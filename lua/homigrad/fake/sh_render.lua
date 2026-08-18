@@ -1,54 +1,17 @@
 local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vector, AngleRand, VectorRand, math, hook, util, game
 local IsValid, math_Clamp = IsValid, math.Clamp
 
-local function FindHeadBone(ent)
-	-- Try standard ValveBiped bone first
-	local headBone = ent:LookupBone("ValveBiped.Bip01_Head1")
-	if headBone then return headBone end
-
-	-- Try protogen-specific bone names
-	local protogenBones = {
-		"Head",
-		"head",
-		"Head1",
-		"Bip01_Head",
-		"skull",
-		"SKULL"
-	}
-
-	for _, boneName in ipairs(protogenBones) do
-		headBone = ent:LookupBone(boneName)
-		if headBone then return headBone end
-	end
-
-	-- Fallback: search for any bone containing "head" in the name
-	for i = 0, ent:GetBoneCount() - 1 do
-		local boneName = ent:GetBoneName(i)
-		if string.lower(boneName):find("head") then
-			return i
-		end
-	end
-
-	return nil
-end
-
 --\\ Smooth UnRagdoll
 	local vecSmall = Vector(0.01, 0.01, 0.01)
 	function hg.SmoothUnfake(ent, ply)
-		if ply.gettingup and (ply.gettingup + 1 - CurTime()) > 0 and IsValid(ply) then
-			local headBone = ent.ZCHeadBoneRender
-			if headBone == nil and ent.LookupBone then
-				headBone = FindHeadBone(ent)
-				ent.ZCHeadBoneRender = headBone or false
-			end
-			headBone = headBone == false and nil or headBone
-			local k = math_Clamp(1 - (ply.gettingup + 0.8 - CurTime()) / 0.8, 0, 1)
-			local boneCount = ent:GetBoneCount()
-			for i = 0, boneCount - 1 do
+		if IsValid(ent) and IsValid(ply) and ply.gettingup and (ply.gettingup + 1 - CurTime()) > 0 then
+			for i = 0, ent:GetBoneCount() - 1 do
 				local m1 = ent:GetBoneMatrix(i)
 				local m2 = ply:GetBoneMatrix(i)
 
 				if not m1 or not m2 then continue end
+
+				local k = math_Clamp(1 - (ply.gettingup + 0.8 - CurTime()) / 0.8, 0, 1)
 
 				local q1 = Quaternion()
 				q1:SetMatrix(m1)
@@ -63,7 +26,7 @@ end
 				newmat:SetAngles(q3:Angle())
 				newmat:SetScale(m1:GetScale())
 
-				if i == headBone and lply == GetViewEntity() and lply == ply then
+				if i == ent:LookupBone("ValveBiped.Bip01_Head1") and lply == GetViewEntity() and lply == ply then
 					newmat:SetScale(vecSmall)
 					//ply.headm = newmat
 				end
@@ -75,7 +38,7 @@ end
 	end
 --//
 --\\ DrawPlayerRagdoll
-	local hg_ragdollcombat = ConVarExists("hg_ragdollcombat") and GetConVar("hg_ragdollcombat") or CreateConVar("hg_ragdollcombat", 0, {FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED}, "Toggle ragdoll combat-like ragdoll mode (walking, running in ragdoll, etc.)", 0, 1)
+	local hg_ragdollcombat = ConVarExists("hg_ragdollcombat") and GetConVar("hg_ragdollcombat") or CreateConVar("hg_ragdollcombat", 0, FCVAR_REPLICATED, "Toggle ragdoll combat-like ragdoll mode (walking, running in ragdoll, etc.)", 0, 1)
 	
 	function hg.RagdollCombatInUse(ply)
 		return hg_ragdollcombat:GetBool() and IsValid(ply.FakeRagdoll)
@@ -85,15 +48,12 @@ end
 	local hg_firstperson_death = { GetBool = function() return false end }
 	local hg_thirdperson = ConVarExists("hg_thirdperson") and GetConVar("hg_thirdperson") or CreateConVar("hg_thirdperson", 0, FCVAR_REPLICATED, "Toggle third-person camera view", 0, 1)
 	local hg_gopro = ConVarExists("hg_gopro") and GetConVar("hg_gopro") or CreateClientConVar("hg_gopro", "0", true, false, "Toggle GoPro-like camera view", 0, 1)
-	local hg_no_camera_in_cars = ConVarExists("hg_no_camera_in_cars") and GetConVar("hg_no_camera_in_cars") or CreateConVar("hg_no_camera_in_cars", "0", FCVAR_ARCHIVE + FCVAR_REPLICATED, "disables camera in cars", 0, 1)
 	local hg_deathfadeout = CreateClientConVar("hg_deathfadeout", "1", true, true, "Toggle screen fade and sound mute on death", 0, 1)
 
 	local vector_full = Vector(1, 1, 1)
 	local vector_small = Vector(0.01, 0.01, 0.01)
-	local FULL_POSE_RENDER_DIST_SQR = 1100 * 1100
-	local ARMOR_RENDER_DIST_SQR = 1450 * 1450
-	local DETAIL_RENDER_DIST_SQR = 2000 * 2000
 	local angfuck = Angle()
+	local hg_no_camera_in_cars = CreateConVar("hg_no_camera_in_cars","0",FCVAR_ARCHIVE + FCVAR_REPLICATED, "disables camera in cars", 0, 1)
 
 	local bandageBGNames = {
 		[0] = "belly",
@@ -128,6 +88,10 @@ end
 			if IsValid(ent.bandageGlovesModel) then ent.bandageGlovesModel:Remove() end
 			ent.bandageGlovesModel = ClientsideModel(mdl, RENDERGROUP_BOTH)
 			local model = ent.bandageGlovesModel
+			if not IsValid(model) then
+				ent.bandageGlovesModel = nil
+				return
+			end
 			ent:CallOnRemove("removebandagegloves", function()
 				if IsValid(model) then
 					model:Remove()
@@ -187,21 +151,23 @@ end
 
 		local wep = ply.GetActiveWeapon and ply:GetActiveWeapon()
 
-		local lkp = ent.ZCHeadBoneRender
-		if lkp == nil and ent.LookupBone then
-			lkp = FindHeadBone(ent)
-			ent.ZCHeadBoneRender = lkp or false
-		end
-		lkp = lkp == false and nil or lkp
+		local lkp = ent.LookupBone and ent:LookupBone("ValveBiped.Bip01_Head1")
 		if !ent.GetManipulateBoneScale or !lkp then return end
 
-		if IsValid(ply.OldRagdoll) then
+		local gettingUp = ply:GetNWBool("FakeGettingUp", false) and IsValid(ply.OldRagdoll)
+		local playerBonesSetUp = false
+		if gettingUp then
+			local idleSequence = ply:SelectWeightedSequence(ACT_HL2MP_IDLE)
+			if idleSequence and idleSequence >= 0 then
+				ply:SetSequence(idleSequence)
+				ply:SetCycle(0)
+			end
 			ply:SetupBones()
+			playerBonesSetUp = ent == ply
 		end
-
 		hg.RenderWeapons(ent, ply)
 
-		ent:SetupBones()
+		if not playerBonesSetUp then ent:SetupBones() end
 
 		if IsValid(wep) and (wep.ismelee or wep.isTPIKBase) and wep.DrawWorldModel2 then
 			wep:DrawWorldModel2(true)
@@ -223,7 +189,7 @@ end
 
 		local armors = ply:GetNetVar("Armor") or ent.PredictedArmor
 		local hideArmorRender = ply:GetNetVar("HideArmorRender", false) or ent.PredictedHideArmorRender
-		if armorRender and armors and next(armors) and not hideArmorRender then
+		if armors and next(armors) and not hideArmorRender then
 			RenderArmors(ply, armors, ent)
 		end
 
@@ -231,15 +197,15 @@ end
 
 		hg.RenderBandages(ent, ply)
 
+		hg.RenderBandageGloves(ent, ply)
+
 		hg.RenderTourniquets(ent, ply)
 
-	if fullPoseRender then
 		hg.GoreCalc(ent, ply)
-	end
 
 --local current = ent:GetManipulateBoneScale(lkp)
-		local fountains = GetNetVar("fountains") or {}
-		local wawanted = (GetViewEntity() != ply) and !fountains[ent] and (!(!lply:Alive() and lply:GetNWEntity("spect") == ply and viewmode == 1) and !(hg_firstperson_death:GetBool() and follow == ent)) and vector_full or vector_small
+		local isFountain = ent:GetNW2Bool("hg_fountain", false)
+		local wawanted = (GetViewEntity() != ply) and !isFountain and (!(!lply:Alive() and lply:GetNWEntity("spect") == ply and viewmode == 1) and !(hg_firstperson_death:GetBool() and follow == ent)) and vector_full or vector_small
 		local org = ent.new_organism or ent.organism
 		local hideHead = (ent.headexploded or (org and org.headamputated)) or ((!hg_thirdperson:GetBool() and !hg_gopro:GetBool() and (ent == ply or (!hg_ragdollcombat:GetBool() or hg_firstperson_ragdoll:GetBool()))) or (hg_firstperson_death:GetBool() and follow == ent)) and wawanted == vector_small
 		local headScale = hideHead and vector_small or vector_full
@@ -257,19 +223,18 @@ end
 					mat:SetScale(wawanted)
 				end
 			end
-			-- GetBoneMatrix returns a copy on some client builds.  Commit the
-			-- render-only scale so the head cannot pop back in before DrawModel.
-			if mat then ent:SetBoneMatrix(lkp, mat) end
+			--angfuck[3] = -GetViewPunchAngles2()[2] - GetViewPunchAngles3()[2]
+
+			--local _, ang = LocalToWorld(vector_origin, angfuck, vector_origin, mat:GetAngles())
+			--mat:SetAngles(ang)
+
+			if mat then hg.bone_apply_matrix(ent, lkp, mat) end
 		--end
 
 		--hg.CoolGloves(ent, ply, wep)
 
-		if detailRender then
-			hg.ProjectilesDraw(ent, ply)
-		end
+		hg.ProjectilesDraw(ent, ply)
 
-		-- A headcrab replaces the visible head, so do not cull it under the optional
-		-- detail-render distance used for cosmetic props.
 		if ply:GetNetVar("headcrab") then hg.RenderHeadcrab(ent, ply) end
 	end
 --//

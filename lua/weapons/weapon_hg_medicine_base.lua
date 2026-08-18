@@ -23,7 +23,7 @@ SWEP.WorldModelExchange = false
 
 if CLIENT then
 	SWEP.WepSelectIcon = Material("vgui/wep_jack_hmcd_bandage")
-	SWEP.IconOverride = "vgui/wep_jack_hmcd_bandage.vmt"
+	SWEP.IconOverride = "vgui/wep_jack_hmcd_bandage.png"
 	SWEP.BounceWeaponIcon = false
 end
 
@@ -113,7 +113,6 @@ if CLIENT then
 	SWEP.ofsV = Vector(10,-2,1)
 	SWEP.ofsA = Angle(-90,-40,270)
 	local vector_one = Vector(1,1,1)
-
 	function SWEP:DrawHUD()
 		local owner = self:GetOwner()
 		if !owner:IsPlayer() then return end
@@ -144,36 +143,42 @@ if CLIENT then
 		local p,a = mdl:GetPos(), mdl:GetAngles()
 		local pos,ang = LocalToWorld(self.ofsV,self.ofsA,p,a)
 		if self.showstats and self.modeValues and istable(self.modeValues) then
-			render.PushFilterMag(TEXFILTER.LINEAR)
-			render.PushFilterMin(TEXFILTER.LINEAR)
-			local m = Matrix()
-			m:Translate(Vector(ScrW() / 2 - ScreenScale(60), ScrH() / 2 + ScreenScaleH(125), 0))
-			m:Scale(vector_one * 0.5)
+			//cam.Start3D()
+				//cam.Start3D2D(pos,ang,0.01)
+				render.PushFilterMag( TEXFILTER.LINEAR )
+				render.PushFilterMin( TEXFILTER.LINEAR )
+				local m = Matrix()
+				m:Translate( Vector(  ScrW() / 2-ScreenScale(60), ScrH() / 2 + ScreenScaleH(125), 0 ) )
+				m:Scale( vector_one * 0.5 )
 
-			cam.PushModelMatrix(m, true)
-				for i, val in ipairs(self.modeValues) do
-					if not isnumber(i) or not val or not self.modeValuesdef or not self.modeValuesdef[i][1] then continue end
-					local val = math.Round(val / self.modeValuesdef[i][1] * 100)
-					local x, y = 0, i * ScrH() / 20
-					local reveal = 1
-					colBrown.a = reveal * 185
-					draw.RoundedBox(2, x, y, x + ScreenScale(210) + ScrW() / 10, ScrH() / 25, colBrown)
-					surface.SetFont("ZCity_Small")
-					surface.SetTextPos(x, y)
-					surface.SetTextColor(255, 255, 255, 255 * reveal)
-					local txt = string.NiceName(tostring(self.modeNames[i]))
-					colBrown.a = reveal * 255
-					draw.SimpleTextOutlined(txt, "ZCity_Small", x, y, Color(255, i == self.mode and 0 or 255, i == self.mode and 0 or 255, 255 * reveal), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP, 1.5, colBrown)
+				cam.PushModelMatrix( m, true )
+					for i, val in ipairs(self.modeValues) do
+						if not isnumber(i) or not val or not self.modeValuesdef or not self.modeValuesdef[i][1] then continue end
+						local val = math.Round(val / self.modeValuesdef[i][1] * 100)
+						local x,y = 0, i * ScrH() / 20
+						local reveal = 1//math.Clamp(lply:EyeAngles()[1] / 90 - 0.25, 0, 1) * 4 / 3
+						colBrown.a = reveal * 185
+						draw.RoundedBox(2,x,y,x + ScreenScale(210) + ScrW() / 10,ScrH() / 25 + (#self.modeValues > 0 and 0 or 0),colBrown)
+						surface.SetFont("ZCity_Small")
+						surface.SetTextPos(x,y)
+						surface.SetTextColor(255,255,255,255 * reveal)
+						local txt = string.NiceName(tostring(self.modeNames[i]))
+						local w, h = surface.GetTextSize(txt)
+						--surface.DrawText(tostring(self.modeNames[i]))
+						colBrown.a = reveal * 255
+						draw.SimpleTextOutlined(txt, "ZCity_Small", x, y, Color(255,i == self.mode and 0 or 255,i == self.mode and 0 or 255, 255 * reveal), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP, 1.5, colBrown)
+					
+						surface.SetDrawColor(0,100,0,255 * reveal)
+						surface.DrawRect(x + ScreenScale(210),y,ScrW() / 10 * val / 100,ScrH() / 25)
+						surface.SetDrawColor(0,0,0,255 * reveal)
+						surface.DrawOutlinedRect(x + ScreenScale(210),y,ScrW() / 10,ScrH() / 25, 4)
+					end
+				cam.PopModelMatrix()
 
-					surface.SetDrawColor(0, 100, 0, 255 * reveal)
-					surface.DrawRect(x + ScreenScale(210), y, ScrW() / 10 * val / 100, ScrH() / 25)
-					surface.SetDrawColor(0, 0, 0, 255 * reveal)
-					surface.DrawOutlinedRect(x + ScreenScale(210), y, ScrW() / 10, ScrH() / 25, 4)
-				end
-			cam.PopModelMatrix()
-
-			render.PopFilterMag()
-			render.PopFilterMin()
+				render.PopFilterMag()
+				render.PopFilterMin()
+				//cam.End3D2D()
+			//cam.End3D()
 		end
 	end
 end
@@ -210,7 +215,7 @@ function SWEP:Initialize()
 	util.PrecacheSound(self.DeploySnd)
 	util.PrecacheSound(self.HolsterSnd)
 	util.PrecacheSound(self.FallSnd)
-	util.PrecacheSound("snd_jack_hmcd_needleprick.ogg")
+	util.PrecacheSound("snd_jack_hmcd_needleprick.wav")
 	
 	self:AddCallback("PhysicsCollide",function(ent,data)
 		if data.Speed > 200 then
@@ -291,16 +296,6 @@ end
 -- WoundTBL = {dmgBlood / 2, localPos, localAng, bone, time}
 SWEP.ShouldDeleteOnFullUse = true
 if SERVER then
-	function SWEP:GetBandageVisualInfo(wound)
-		local color = self.HGBandageColor or self.Color
-		return {
-			pos = wound and wound[2] or vector_origin,
-			ang = wound and wound[3] or angle_zero,
-			color = {r = color and color.r or 255, g = color and color.g or 255, b = color and color.b or 255, a = color and color.a or 255},
-			judgeTexture = GetConVar("hg_healanims") and GetConVar("hg_healanims"):GetInt() == 1 or false
-		}
-	end
-
 	function SWEP:CanHeal(ent)
 		local org = ent.organism
 		local owner = self:GetOwner()
@@ -342,9 +337,8 @@ if SERVER then
 					end
 					ent.bandaged_limbs = ent.bandaged_limbs or {}
 					local bone_name = org.wounds[1][4]
-					local wound = org.wounds[1]
 					if not ent.bandaged_limbs[bone_name] then
-						ent.bandaged_limbs[bone_name] = self:GetBandageVisualInfo(wound)
+						ent.bandaged_limbs[bone_name] = true
 						done = true
 					end
 					if org.wounds[1][1] == 0 then table.remove(org.wounds, 1) end
@@ -353,20 +347,20 @@ if SERVER then
 		else
 			local bonewounds = {}
 			
-			for i, tbl in pairs(org.wounds) do
+			for _, tbl in pairs(org.wounds) do
 				if ent:GetBoneName(ent:LookupBone(tbl[4])) == bone then
-					table.insert(bonewounds,i)
+					table.insert(bonewounds, tbl)
 				end
 			end
 			
-			for i = 1, #bonewounds do
+			for _, wound in ipairs(bonewounds) do
 				if self.modeValues[1] ~= 0 and #bonewounds > 0 then
-					if org.wounds[bonewounds[1]] then
-						local biggestWound = org.wounds[bonewounds[1]][1]
+					if wound then
+						local biggestWound = wound[1]
 						local healedWound = math.max(biggestWound - self.modeValues[1], 0)
 						local woundHeal = self.modeValues[1] - (biggestWound - healedWound)
 						org.bleed = math.max(org.bleed - (biggestWound - healedWound), 0)
-						org.wounds[bonewounds[1]][1] = healedWound
+						wound[1] = healedWound
 						self.modeValues[1] = woundHeal
 
 						org.pain = math.max(org.pain - (biggestWound - healedWound) / 4, 0)
@@ -376,26 +370,21 @@ if SERVER then
 						end
 
 						ent.bandaged_limbs = ent.bandaged_limbs or {}
-						local bone_name = ent:GetBoneName(ent:LookupBone(org.wounds[bonewounds[1]][4]))
-						local wound = org.wounds[bonewounds[1]]
+						local bone_name = ent:GetBoneName(ent:LookupBone(wound[4]))
 						
 						if not ent.bandaged_limbs[bone_name] then
-							ent.bandaged_limbs[bone_name] = self:GetBandageVisualInfo(wound)
+							ent.bandaged_limbs[bone_name] = true
 							done = true
 						end
 
-						if org.wounds[bonewounds[1]][1] == 0 then table.remove(org.wounds, bonewounds[1]) end
+						if wound[1] == 0 then table.RemoveByValue(org.wounds, wound) end
 					end
-					table.remove(bonewounds, 1)
 				end
 			end
 		end
-		org.owner:SetNetVar("wounds",org.wounds)
+		hg.organism.MarkWoundsNetDirty(org, true)
 		timer.Create("bandage_limbs"..ent:EntIndex(),0.1,1,function()
 			ent:SetNetVar("bandaged_limbs",ent.bandaged_limbs)
-			if IsValid(ent.FakeRagdoll) then
-				ent.FakeRagdoll:SetNetVar("bandaged_limbs",ent.bandaged_limbs)
-			end
 			if ent:IsRagdoll() and hg.RagdollOwner(ent) and hg.RagdollOwner(ent):Alive() then
 				hg.RagdollOwner(ent):SetNetVar("bandaged_limbs",ent.bandaged_limbs)
 			end
@@ -448,7 +437,7 @@ if SERVER then
 		end
 
 		if done then
-			owner:EmitSound("snd_jack_hmcd_bandage.ogg", 60, math.random(95, 105))
+			owner:EmitSound("snd_jack_hmcd_bandage.wav", 60, math.random(95, 105))
 
 			if self.poisoned2 then
 				org.poison4 = CurTime()
@@ -463,7 +452,7 @@ if SERVER then
 	function SWEP:Heal(ent, mode, bone)
 		local owner = self:GetOwner()
 		if owner:IsNPC() then
-			self:NPCHeal(owner, 0.15, "snd_jack_hmcd_bandage.ogg")
+			self:NPCHeal(owner, 0.15, "snd_jack_hmcd_bandage.wav")
 		end
 
 		local org = ent.organism
@@ -620,6 +609,15 @@ if SERVER then
 			["ValveBiped.Bip01_R_Foot"] = true
 		},
 	}
+	local amputationArteryGroups = {}
+	for _, group in ipairs({
+		{"ValveBiped.Bip01_L_UpperArmartery", "ValveBiped.Bip01_L_Forearmartery", "ValveBiped.Bip01_L_Handartery"},
+		{"ValveBiped.Bip01_R_UpperArmartery", "ValveBiped.Bip01_R_Forearmartery", "ValveBiped.Bip01_R_Handartery"},
+		{"ValveBiped.Bip01_L_Thighartery", "ValveBiped.Bip01_L_Calfartery"},
+		{"ValveBiped.Bip01_R_Thighartery", "ValveBiped.Bip01_R_Calfartery"},
+	}) do
+		for _, artery in ipairs(group) do amputationArteryGroups[artery] = group end
+	end
 	function SWEP:Tourniquet(ent, bone)
 		local org = ent.organism
 		if not org then return end
@@ -631,20 +629,22 @@ if SERVER then
 			local bonewounds = {}
 			if not bone then
 				for i,wound in pairs(org.arterialwounds) do
-					pw = i
-					for i1,tbl in pairs(org.wounds) do
-						if !tbl or !tbl[4] or !ent:LookupBone(tbl[4]) then continue end
-						local bonename = ent:GetBoneName(ent:LookupBone(tbl[4]))
-						local sec_bonename = ent:GetBoneName(ent:LookupBone(wound[4]))
-						--print(1,bonename,sec_bonename)
-						if bonename == sec_bonename or (tourniqet_bones[sec_bonename] and tourniqet_bones[sec_bonename][bonename]) then
-							--print(2,bonename,sec_bonename)
-							table.insert(bonewounds,i1)
+					if wound[7] != "arteria" then 
+						pw = i 
+						for i1,tbl in pairs(org.wounds) do
+							if !tbl or !tbl[4] or !ent:LookupBone(tbl[4]) then continue end
+							local bonename = ent:GetBoneName(ent:LookupBone(tbl[4]))
+							local sec_bonename = ent:GetBoneName(ent:LookupBone(wound[4]))
+							--print(1,bonename,sec_bonename)
+							if bonename == sec_bonename or (tourniqet_bones[sec_bonename] and tourniqet_bones[sec_bonename][bonename]) then
+								--print(2,bonename,sec_bonename)
+								table.insert(bonewounds,i1)
+							end
 						end
-					end
-					--PrintTable(bonewounds)
-				break end
-
+						--PrintTable(bonewounds)
+					break end
+				end
+				
 			else
 				for i,wound in pairs(org.arterialwounds) do
 					if ent:GetBoneName(ent:LookupBone(wound[4])) == bone then pw = i break end
@@ -655,38 +655,46 @@ if SERVER then
 						table.insert(bonewounds,i)
 					end
 				end
-			end
+			end		
 			pw = pw or math.random(#org.arterialwounds)
 
 			local wound = org.arterialwounds[pw]
 			if not wound then return false end
-
+			
 			ent.tourniquets[#ent.tourniquets + 1] = {wound[2], wound[3], wound[4]}
+			local arteryGroup = amputationArteryGroups[wound[7]]
+			local fullLimbAmputation = arteryGroup and (
+				(arteryGroup[1] == "ValveBiped.Bip01_L_UpperArmartery" and org.larmupamputated) or
+				(arteryGroup[1] == "ValveBiped.Bip01_R_UpperArmartery" and org.rarmupamputated) or
+				(arteryGroup[1] == "ValveBiped.Bip01_L_Thighartery" and org.llegupamputated) or
+				(arteryGroup[1] == "ValveBiped.Bip01_R_Thighartery" and org.rlegupamputated)
+			)
+			if not fullLimbAmputation then arteryGroup = nil end
+			if arteryGroup then
+				local groupedArteries = {}
+				for _, artery in ipairs(arteryGroup) do groupedArteries[artery] = true end
+				for i = #org.arterialwounds, 1, -1 do
+					local artery = org.arterialwounds[i][7]
+					if groupedArteries[artery] then
+						org[artery] = 0
+						table.remove(org.arterialwounds, i)
+					end
+				end
+			else
+				org[wound[7]] = 0
+				table.remove(org.arterialwounds, pw)
+			end
 
 			if wound[7] == "arteria" then org.o2.regen = 0 end
 
-			table.remove(org.arterialwounds,pw)
+			hg.organism.MarkArterialWoundsNetDirty(org)
 
-			if hg.organism.RebuildArteryWoundState then
-				hg.organism.RebuildArteryWoundState(org, true)
-			else
-				org[wound[7]] = 0
-				org.owner:SetNetVar("arterialwounds",org.arterialwounds)
+			table.sort(bonewounds, function(a, b) return a > b end)
+			for _, woundIndex in ipairs(bonewounds) do
+				if org.wounds[woundIndex] then table.remove(org.wounds, woundIndex) end
 			end
 
-			for i = 1, #bonewounds do
-				if org.wounds[bonewounds[i]] then
-					--print(org.wounds[bonewounds[i]], bonewounds[i])
-					org.wounds[bonewounds[i]][1] = 0
-				end
-			end
-			for i = 1, #bonewounds do
-				if org.wounds[bonewounds[i]] then
-					table.remove(org.wounds, bonewounds[i])
-				end
-			end
-
-			org.owner:SetNetVar("wounds",org.wounds)
+			hg.organism.MarkWoundsNetDirty(org, true)
 
 			ent:SetNetVar("Tourniquets",ent.tourniquets)
 			if IsValid(ent.FakeRagdoll) then
@@ -703,7 +711,7 @@ if SERVER then
 
 			SetNetVar("TourniquetGuys",hg.TourniquetGuys)
 
-			self:GetOwner():EmitSound("snd_jack_hmcd_bandage.ogg", 65, math.random(95, 105))
+			self:GetOwner():EmitSound("snd_jack_hmcd_bandage.wav", 65, math.random(95, 105))
 			return true
 		end
 	end
@@ -820,19 +828,20 @@ else
 
 	--hook.Add("PostDrawPlayerRagdoll", "draw_tourniquets", function(ent,ply)
 	function hg.RenderTourniquets(ent, ply)
-		local tourniquets = ent.tourniquets
-		if not tourniquets or not next(tourniquets) then
-			tourniquets = ply.tourniquets
-			if not tourniquets or not next(tourniquets) then return end
-		end
-		local tourniquetsM = ent.tourniquetsM or {}
-		ent.tourniquetsM = tourniquetsM
-		for i, wound in ipairs(tourniquets) do
-			tourniquetsM[i] = IsValid(tourniquetsM[i]) and tourniquetsM[i] or ClientsideModel("models/tourniquet/tourniquet_put.mdl")
-			local model = tourniquetsM[i]
+		if !ply.tourniquets or !next(ply.tourniquets) then return end
+		for i, wound in ipairs(ply.tourniquets) do
+			ply.tourniquetsM = ply.tourniquetsM or {}
+			ply.tourniquetsM[i] = IsValid(ply.tourniquetsM[i]) and ply.tourniquetsM[i] or ClientsideModel("models/tourniquet/tourniquet_put.mdl")
+			local model = ply.tourniquetsM[i]
 			model:SetNoDraw(true)
 
 			if not IsValid(model) then return end
+			
+			local boneName = wound[3]
+			local limb = hg.amputatedlimbs2 and hg.amputatedlimbs2[boneName]
+			if limb and ply.organism and ply.organism[limb.."amputated"] then
+				continue
+			end
 			
 			local matrix = ent:GetBoneMatrix(ent:LookupBone(wound[3]))
 			if not matrix then
@@ -866,19 +875,9 @@ else
 	function remove_bandages(ent)
 		if IsValid(ent.bandagesModel) then
 			ent.bandagesModel:Remove()
-			ent.bandagesModel = nil
 		end
-		if IsValid(ent.bruiseWrapModel) then
-			ent.bruiseWrapModel:Remove()
-			ent.bruiseWrapModel = nil
-		end
-		if not ent.bandagesModels then return end
-		for _, model in pairs(ent.bandagesModels) do
-			if IsValid(model) then
-				model:Remove()
-			end
-		end
-		ent.bandagesModels = nil
+		ent.bandagesModel = nil
+		ent.bandagesSoak = nil
 	end
 
 	hook.Add("OnNetVarSet","bandage_netvar",function(index, key, var)
@@ -888,9 +887,15 @@ else
 			if IsValid(ent) then
 	
 				remove_bandages(ent)
-	
+
 				ent.bandaged_limbs = var
-	
+
+				local oldSoak = ent.bandagesSoak
+				ent.bandagesSoak = {}
+				for bone in pairs(ent.bandaged_limbs) do
+					ent.bandagesSoak[bone] = (oldSoak and oldSoak[bone]) or 0
+				end
+
 				ent:CallOnRemove("remove_bandages",function()
 					remove_bandages(ent)
 				end)
@@ -935,99 +940,80 @@ else
 	}
 
 	--hook.Add("PostDrawPlayerRagdoll", "draw_bandages", function(ent,ply)
-	hg.RenderBandages = hg.RenderBandages or function(ent, ply)
-		local bandaged_limbs = ent:GetNetVar("bandaged_limbs") or ent.bandaged_limbs
-		if not bandaged_limbs or not next(bandaged_limbs) then
-			bandaged_limbs = ply:GetNetVar("bandaged_limbs") or ply.bandaged_limbs
-			if not bandaged_limbs or not next(bandaged_limbs) then return end
+	local function GetBandageSoakRate(org)
+		if not org then return 0.0015 end
+
+		local rate = 0.0015
+		rate = rate + math.Clamp((org.bleed or 0) / 0.6, 0, 1) * 0.03
+		rate = rate + math.Clamp((5000 - (org.blood or 5000)) / 5000, 0, 1) * 0.006
+
+		return rate
+	end
+	local function GetBandageSoakColor(soak)
+		if not soak or soak <= 0 then return Color(255, 255, 255, 255) end
+
+		return Color(255 - math.floor(255 * soak * 0.12), 255 - math.floor(255 * soak * 0.85), 255 - math.floor(255 * soak * 0.9), 255)
+	end
+
+	function hg.RenderBandages(ent, ply)
+		--PrintTable(ent.bandaged_limbs)
+		if not ent.bandaged_limbs then return end
+		if !next(ent.bandaged_limbs) then return end
+
+		if not ent.bandagesSoak then
+			ent.bandagesSoak = {}
+			for bone in pairs(ent.bandaged_limbs) do ent.bandagesSoak[bone] = 0 end
 		end
 
-		local bandagedBones = {}
-		local bandageColor
-		local darkestBandage = math.huge
-		local judgeTexture = false
-
-		for bone, info in pairs(bandaged_limbs) do
-			if hg.amputatedbone and hg.amputatedbone(ent, bone) then continue end
-
-			bandagedBones[#bandagedBones + 1] = bone
-
-			local col = istable(info) and info.color
-			if IsColor(col) or (istable(col) and col.r and col.g and col.b) then
-				local score = (tonumber(col.r) or 255) + (tonumber(col.g) or 255) + (tonumber(col.b) or 255)
-				if score < darkestBandage then
-					darkestBandage = score
-					bandageColor = col
-				end
+		local org = ent and ent.organism or (IsValid(ply) and ply.organism)
+		local soak = 0
+		for bone, v in pairs(ent.bandagesSoak) do
+			if ent.bandaged_limbs[bone] then
+				ent.bandagesSoak[bone] = math.min((ent.bandagesSoak[bone] or 0) + GetBandageSoakRate(org) * FrameTime(), 1)
+				soak = math.max(soak, ent.bandagesSoak[bone])
 			end
-			judgeTexture = judgeTexture or (istable(info) and info.judgeTexture == true)
 		end
 
-		if #bandagedBones > 0 then
-			if not IsValid(ent.bruiseWrapModel) then
-				local sexEnt = IsValid(ply) and ply or ent
-				local isFemale = ThatPlyIsFemale(sexEnt)
-				local mdlPath = isFemale and BadagesModelFemale or BadagesModelMale
-				local model = ClientsideModel(mdlPath)
-				ent.bruiseWrapModel = model
-				model:SetNoDraw(true)
-				model:SetPos(ent:GetPos() + vector_up * 1)
-				model:SetParent(ent)
-				model:AddEffects(EF_BONEMERGE)
-
-				local mapping = isFemale and BodyGroupsFemale or BodyGroupsMale
-				local dontmakehands = false
-				if not hg.Appearance.FuckYouModels[1][ent:GetModel()] and not hg.Appearance.FuckYouModels[2][ent:GetModel()] then
-					dontmakehands = true
+		if not IsValid( ent.bandagesModel ) then
+			ent.bandagesModel = (ThatPlyIsFemale(ent) and ClientsideModel(BadagesModelFemale) or ClientsideModel(BadagesModelMale))
+			local model = ent.bandagesModel
+			ent:CallOnRemove("removebandages",function()
+				if IsValid(model) then
+					model:Remove()
+					model = nil
 				end
-
-				model.wrapBodygroups = {}
-				for bone, bgName in pairs(mapping) do
-					if dontmakehands and (bone == "ValveBiped.Bip01_L_Hand" or bone == "ValveBiped.Bip01_R_Hand") then continue end
-					local bgID = model:FindBodygroupByName(bgName)
-					if bgID and bgID >= 0 then
-						model.wrapBodygroups[bone] = bgID
-					end
-				end
-
-				ent:CallOnRemove("remove_bruise_wrap", function()
-					if IsValid(model) then
-						model:Remove()
-					end
-				end)
+			end)
+		end
+		
+		local model = ent.bandagesModel
+		model:SetNoDraw(true)
+		model:SetPos(ent:GetPos() + vector_up * 1)
+		model:SetParent(ent)
+		model:AddEffects(EF_BONEMERGE)
+		model:SetColor(GetBandageSoakColor(soak))
+		local dontmakehands = false
+		if !hg.Appearance.FuckYouModels[1][ent:GetModel()] and !hg.Appearance.FuckYouModels[2][ent:GetModel()] then dontmakehands = true end
+		
+		if not model.BodygroupsApplied then 
+			for k, v in pairs(ent.bandaged_limbs) do
+				if dontmakehands and (k == "ValveBiped.Bip01_L_Hand" or k == "ValveBiped.Bip01_R_Hand") then continue end -- ez
+				model:SetBodygroup(model:FindBodygroupByName( ThatPlyIsFemale(ent) and BodyGroupsFemale[k] or BodyGroupsMale[k] or ""), 1)
 			end
 
-			local model = ent.bruiseWrapModel
-
-			local hasActiveBodygroup = false
-			if model.wrapBodygroups then
-				for bone, bgID in pairs(model.wrapBodygroups) do
-					model:SetBodygroup(bgID, 0)
-				end
-				for _, bone in ipairs(bandagedBones) do
-					if hg.amputatedbone and hg.amputatedbone(ent, bone) then continue end
-					local bgID = model.wrapBodygroups[bone]
-					if bgID then
-						model:SetBodygroup(bgID, 1)
-						hasActiveBodygroup = true
+			for k, v in pairs(hg.amputatedlimbs2) do
+				local children = hg.get_children(ent, k)
+				table.insert(children, k)
+				
+				for k2, v2 in ipairs(children) do
+					if ent.bandaged_limbs[v2] and ent.organism and ent.organism[hg.amputatedlimbs2[v2].."amputated"] then
+						model:SetBodygroup(model:FindBodygroupByName( ThatPlyIsFemale(ent) and BodyGroupsFemale[v2] or BodyGroupsMale[v2] or ""), 0)
 					end
 				end
 			end
 
-			if hasActiveBodygroup then
-				if bandageColor then
-					render.SetColorModulation((bandageColor.r or 255) / 255, (bandageColor.g or 255) / 255, (bandageColor.b or 255) / 255)
-				end
-				local material = judgeTexture and hg.ResolveJudgeBandageMaterial and hg.ResolveJudgeBandageMaterial() or nil
-				model:SetMaterial(material or "")
-
-				model:DrawModel()
-				render.SetColorModulation(1, 1, 1)
-			end
-		elseif IsValid(ent.bruiseWrapModel) then
-			ent.bruiseWrapModel:Remove()
-			ent.bruiseWrapModel = nil
+			model.BodygroupsApplied = true
 		end
+		model:DrawModel()
 	end
 	--end)
 end
@@ -1057,7 +1043,7 @@ function SWEP:NPCHeal(npc, mul, snd)
 			mul = 0.3
 		end
 		npc:SetHealth(math.Clamp(npc:Health() + (npc:GetMaxHealth() * 1 * mul), 0, npc:GetMaxHealth() * math.Clamp(2 * mul, 2, 100)))
-		npc:EmitSound(snd or "snd_jack_hmcd_bandage.ogg", 75, math.random(95, 105))
+		npc:EmitSound(snd or "snd_jack_hmcd_bandage.wav", 75, math.random(95, 105))
 
 		if SERVER then
 			self:Remove()
@@ -1068,7 +1054,7 @@ end
 function SWEP:OwnerChanged()
 	local owner = self:GetOwner()
 	if IsValid(owner) and owner:IsNPC() then
-		self:NPCHeal(owner, 0.15, "snd_jack_hmcd_bandage.ogg")
+		self:NPCHeal(owner, 0.15, "snd_jack_hmcd_bandage.wav")
 	end
 end
 

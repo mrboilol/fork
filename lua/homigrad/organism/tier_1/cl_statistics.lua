@@ -1,20 +1,26 @@
 hg.organism_ents = hg.organism_ents or {}
 
+-- organism_send net message flags (must match sv_organism.lua)
+local ORG_NET_FORCE = 1
+local ORG_NET_SPECTATOR_SKIP = 2
+local ORG_NET_MORE_INFO = 3
+local ORG_NET_MERGE = 4
+
 net.Receive("organism_send", function()
 	local org = net.ReadTable()
 	local force = net.ReadBool()
-	local spectatov_ne_trogaem = net.ReadBool()
-	local moreinfopls = net.ReadBool()
-	local add = net.ReadBool()
+	local spectatorSkip = net.ReadBool()
+	local moreInfo = net.ReadBool()
+	local merge = net.ReadBool()
 	local ply = org.owner
 	if !IsValid(ply) then return end
 	
 	if ply:IsNPC() then
 		hg.organism_ents[ply] = true
+		if hg.RegisterRelevantEntity then hg.RegisterRelevantEntity(ply) end
 	end
 
-	
-	if add and org.owner.organism and org.owner.new_organism then
+	if merge and org.owner.organism and org.owner.new_organism then
 		hook.Run("HG_OrganismChanged", org.owner.organism, org)
 		
 		table.Merge(org.owner.organism, org, true)
@@ -23,12 +29,10 @@ net.Receive("organism_send", function()
 		return 
 	end
 
-	if ply.is_lookedat and not moreinfopls then return end
-	if spectatov_ne_trogaem and (ply == LocalPlayer():GetNWEntity("spect",nil)) and not LocalPlayer():Alive() then return end
-	
-	ply.new_organism = org
+	if ply.is_lookedat and not moreInfo then return end
+	if spectatorSkip and (ply == LocalPlayer():GetNWEntity("spect",nil)) and not LocalPlayer():Alive() then return end
 
-	--print(org.owner,org.blood)
+	ply.new_organism = org
 	
 	if not ply.organism or force then
 		ply.organism = org
@@ -43,10 +47,6 @@ net.Receive("organism_send", function()
 		rag.organism = ply.organism
 		rag.new_organism = org
 	end
-
-	--[[jit.on()
-	jit.collectgarbage()--]]
-	--print(collectgarbage("collect"))
 end)
 
 hook.Add("Player_Death","removeorg",function(ply)
@@ -66,21 +66,18 @@ local black = Color(0, 0, 0, 200)
 local list = {
 	"owner",
 	"superfighter",
+	"berserkActive2",
 	"temperature",
 	"tempchanging",
 	"heatbuff",
 	"blindness",
 	"fear",
-	{"goodmood", 1, false},
 	"assimilated",
 	"berserk",
 	"noradrenaline",
 	"fearadd",
 	{"blood", 5000}, 
 	{"bleed", 100, true}, 
-	{"venousBleed", 10, true},
-	{"arterialBleed", 25, true},
-	{"internalBleedRate", 10, true},
 	"bloodtype",
 	"hemotransfusionshock",
 	{"internalBleed", 10, true}, 
@@ -100,6 +97,12 @@ local list = {
 	{"rlegamputated", true, true},
 	{"larmamputated", true, true},
 	{"rarmamputated", true, true},
+	{"lhandamputated", true, true},
+	{"rhandamputated", true, true},
+	{"larmupamputated", true, true},
+	{"rarmupamputated", true, true},
+	{"llegupamputated", true, true},
+	{"rlegupamputated", true, true},
 	0,
 	"likely_phrase",
 	{"alive", true}, 
@@ -123,7 +126,6 @@ local list = {
 	{"adrenaline", 5, true},
 	{"adrenalineStorage", 5, false},
 	{"adrenalineAdd", 5, true},
-	{"anger", 1, false},
 	{"panicattackadd", 1, true},
 	{"panicattack", 1, true},
 	0, 
@@ -141,12 +143,8 @@ local list = {
 	{"brainOccipital", 1, true},
 	{"brainHemorrhage", 1, true},
 	{"brainBleedRate", 0.008, true},
-	{"brainSwelling", 1, true},
-	{"seizure", 1, true, "seizure chance"},
-	{"seizureActive", true, true},
-	{"concussion", 6, true},
 	{"consciousness", 1, false},
-	{"skull", 1, true},
+	{"skull", 1, true}, 
 	{"disorientation",1,true},
 	{"jaw", 1, true}, false,
 	{"teethLost", 32, true}, false,
@@ -163,23 +161,13 @@ local list = {
 	{"bloodPressure", 90},
 	{"systolic", 120},
 	{"diastolic", 80},
+	{"cardiacOutput", 1},
 	{"myocardialOxygen", 1},
 	{"heartStrain", 1, true},
 	{"hypertension", 1, true},
 	{"hypotension", 1, true},
-	"ecgState",
 	{"pulse", 70}, 
-	{"heartbeat", 300, true},
-	{"cardiacOutput", 1.5},
-	{"strokeVolume", 1.5},
-	{"hemorrhageCompensation", 1, true},
-	{"compensationPulseMultiplier", 1},
-	{"compensationHeartRateTarget", 300, true},
-	{"mechanicalPulseCapture", 1},
-	{"pulseDeficit", 300, true},
-	{"palpitations", 1, true},
-	{"hypovolemia", 1, true},
-	{"hypovolemicShock", 1, true}, false,
+	{"heartbeat", 70}, false, 
 	{"stomach", 1, true}, 
 	{"liver", 1, true}, 
 	{"intestines", 1, true}, 
@@ -194,13 +182,9 @@ local list = {
 	{{"lungsR.penetrated", "lungsR", 2}, 1,true},
 	{"trachea", 1, true}, 
 	{"pneumothorax", 1, true}, 
-	{"hemothorax", 1, true},
-	{"cardiacTamponade", 1, true},
 	{"needle", 1, true},
 	0, 
-	{"o2", {"o2", "range"}, false, "Tissue O2"},
-	{"bloodO2Cap", 30, false, "Arterial O2"},
-	{"bloodCarryO2Cap", 30, false, "O2 Transport Reserve"},
+	{"o2", {"o2", "range"}}, 
 	"CO",
 	{"lungsfunction", true, false},
 	"COregen",
@@ -208,16 +192,6 @@ local list = {
 	"holdingbreath",
 	{{"o2.regen", "o2", "regen"}, 2}, 
 	{{"o2.curregen", "o2", "curregen"}, 0.4},
-	{"bodyoxygen", 1, false},
-	{"perfusion", 1, false},
-	{"peripheralperfusion", 1, false},
-	{"cerebralPerfusion", 1, false},
-	{"brainoxygen", 1, false},
-	{"hypoxia", 1, true},
-	{"hypoxiaTime", 120, true},
-	{"severeHypoxiaTime", 120, true},
-	{"ischemia", 1, true},
-	{"intracranialPressure", 1, true},
 	0, 
 	{"lleg", 1, true}, 
 	{"rleg", 1, true}, 
@@ -250,8 +224,8 @@ local function getTextTable(org)
 				value = org[v[1][2]][v[1][3]]
 			else
 				if org[v[1]] == nil then continue end
-				text1 = v[4] or v[1]
-				value = org[v[1]]
+				text1 = v[1]
+				value = org[text1]
 				
 				if type(value) == "table" then value = value[1] end
 			end
@@ -279,7 +253,7 @@ local function getTextTable(org)
 		elseif v == 0 then
 
 		else
-			if org[v] == nil then continue end
+			if not org[v] then continue end
 			text1 = tostring(v)
 			text2 = isnumber(org[v]) and string.sub(string.format("%f", org[v]),1,-5) or org[v]
 		end
@@ -331,7 +305,8 @@ hook.Add("HUDPaint", "homigrad-organism-debug", function()
 	
 	--LerpVariables(FrameTime(),organism,new_organism)
 	if !organism then return end
-
+	if not developer:GetBool() then return end
+	if not LocalPlayer():IsAdmin() then return end
 	if !hg_stats:GetBool() then return end
 	local textList = getTextTable(organism)
 	local h = math.Round(ScreenScaleH(5.5))
@@ -374,27 +349,20 @@ hook.Add("HUDPaint", "homigrad-organism-debug", function()
 	local textList = getTextTable(organism_otherply)
 	local w = ScrW()
 	local x = w - 15 - weight
-	draw.RoundedBox(0, x, 15, weight, cutoff * h, black)
-
-	if cutoff < #textList then
-		draw.RoundedBox(0, x - weight - 15, 15, weight, (#textList - cutoff) * h, black)
-	end
-
+	draw.RoundedBox(0, x, 15, weight, #textList * h, black)
 	for i, text in ipairs(textList) do
-		local y = i > cutoff and 15 + (i - 1 - cutoff) * h or 15 + (i - 1) * h
-		local rowX = i > cutoff and x - weight - 15 or x
-
-		if i % 2 == 0 then draw.RoundedBox(0, rowX, y, weight, h, littleblack) end
+		local y = 15 + (i - 1) * h
+		if i % 2 == 0 then draw.RoundedBox(0, x, y, weight, h, littleblack) end
 		if text[3] then
 			trahalgmod.r = text[3]
 			trahalgmod.g = text[4]
 			trahalgmod.b = text[5]
 			trahalgmod.a = 75
-			draw.RoundedBox(0, rowX, y, weight, h, trahalgmod)
+			draw.RoundedBox(0, x, y, weight, h, trahalgmod)
 		end
 
-		draw.SimpleText(text[1], "DefaultFixedDropShadow", rowX + weight, y, white, TEXT_ALIGN_RIGHT)
-		draw.SimpleText(text[2], "DefaultFixedDropShadow", rowX, y, white)
+		draw.SimpleText(text[1], "DefaultFixedDropShadow", w - 15, y, white, TEXT_ALIGN_RIGHT)
+		draw.SimpleText(text[2], "DefaultFixedDropShadow", w - 15 - weight, y, white)
 	end
 end)
 

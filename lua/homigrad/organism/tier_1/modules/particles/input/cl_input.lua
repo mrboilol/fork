@@ -18,8 +18,6 @@ local bloodSpillMats = {}
 for i = 1, 6 do
 	bloodSpillMats[i] = Material("bloodspill/blood" .. i)
 end
-local vomitColorPrimary = Color(229, 220, 148, 140)
-local vomitColorSecondary = Color(238, 235, 210, 130)
 
 --оставь это лучше выглядит
 --[[for i = 4, 6 do
@@ -31,37 +29,21 @@ hg.bloodparticles2 = hg.bloodparticles2 or {}
 local vecZero = Vector(0, 0, 0)
 local lastplaced = SysTime()
 local hg_blood_fps = ConVarExists("hg_blood_fps") and GetConVar("hg_blood_fps") or CreateClientConVar("hg_blood_fps", 24, true, nil, "fps to draw blood", 12, 165)
-
 local function addBloodPart(pos, vel, mat, w, h, artery, kishki, owner)
+	--local fps = 1 / hg_blood_fps:GetInt() * 1
+	--if lastplaced + fps > SysTime() then return end
+	--lastplaced = SysTime()
 	if LocalPlayer():GetNetVar("disappearance", nil) or (IsValid(owner) and owner:GetNetVar("disappearance", nil)) then return end
 
 	pos = pos + vecZero
 	vel = vel + vecZero
-	w = math.max(tonumber(w) or 2, 0.12)
-	h = math.max(tonumber(h) or w, 0.12)
 
 	local pos2 = Vector()
 	pos2:Set(pos)
 
-	local size = math.max(w, h)
-	local speed = vel:Length()
-	local tiny = size <= 0.55
-	-- Thin falling beads and high-velocity microdroplets mostly read as discrete
-	-- droplets, not long blood-core beams. Larger/pressurized drops retain a
-	-- progressively greater chance of drawing a trail when trail rendering is on.
-	local part = {pos, pos2, vel, mat or mat_huy, w, h, CurTime(), artery = artery, kishki = kishki, owner = owner, start_velocity = IsValid(owner) and owner:GetVelocity() or vector_origin, active = true}
-	part.decalWeight = size
-	part.tiny = tiny
-	-- The current hg_old_blood convar is authoritative. Store only stable random
-	-- input/launch kinematics so changing the convar immediately changes how even
-	-- already-airborne droplets render and land.
-	part.trailRoll = math.Rand(0, 1)
-	part.initialSpeed = speed
-	part.initialVerticalSpeed = vel.z
-	part.maxLife = tiny and math.Rand(6, 12) or 30
-	hg.bloodparticles1[#hg.bloodparticles1 + 1] = part
-
-	return part
+	if #hg.bloodparticles1 > 200 then table.remove(hg.bloodparticles1, 1) end
+	
+	hg.bloodparticles1[#hg.bloodparticles1 + 1] = {pos, pos2, vel, mat or mat_huy, w or 2, h or 2, CurTime(), artery = artery, kishki = kishki, owner = owner, start_velocity = IsValid(owner) and owner:GetVelocity() or vector_origin}
 end
 
 local function addBloodPart2(pos, vel, mat, w, h, time, water, owner)
@@ -75,6 +57,7 @@ local function addBloodPart2(pos, vel, mat, w, h, time, water, owner)
 	local pos2 = Vector()
 	pos2:Set(pos)
 	
+	if #hg.bloodparticles2 > 200 then table.remove(hg.bloodparticles2, 1) end
 	--if water and math.random(2) == 1 then return end
 	--if water and math.random(3) > 1 then return end
 
@@ -85,96 +68,53 @@ hg.addBloodPart = addBloodPart
 hg.addBloodPart2 = addBloodPart2
 
 local Rand = math.Rand
-local render_SetMaterial = render.SetMaterial
-local render_DrawSprite = render.DrawSprite
-local table_remove = table.remove
 local spillColor = Color(70, 0, 0, 255)
 hg.gibbloodspillparticles = hg.gibbloodspillparticles or {}
 
 local function addGibBloodSpill(ent, stump)
-	if LocalPlayer():GetNetVar("disappearance", nil) or (IsValid(ent) and ent:GetNetVar("disappearance", nil)) then return end
-
+	if not IsValid(ent) then return end
+	if LocalPlayer():GetNetVar("disappearance", nil) or ent:GetNetVar("disappearance", nil) then return end
+	if #hg.gibbloodspillparticles > 120 then table.remove(hg.gibbloodspillparticles, 1) end
 	local vel = VectorRand(-18, 18) + ent:GetVelocity() * 0.04
 	vel[3] = vel[3] + (stump and Rand(10, 22) or Rand(-2, 10))
 	hg.gibbloodspillparticles[#hg.gibbloodspillparticles + 1] = {ent:GetPos() + VectorRand(-3, 3), vel, bloodSpillMats[math.random(#bloodSpillMats)], CurTime(), Rand(0.35, 0.55), stump and Rand(1, 2) or Rand(0.25, 0.6), stump and Rand(9, 16) or Rand(3, 6), stump}
 end
 
 hook.Add("PostDrawTranslucentRenderables", "hg_gib_bloodspill", function()
-	local time = CurTime()
-	local ft = FrameTime()
+	local time, ft = CurTime(), FrameTime()
 	for i = #hg.gibbloodspillparticles, 1, -1 do
 		local part = hg.gibbloodspillparticles[i]
 		local frac = (time - part[4]) / part[5]
-		if frac >= 1 then table_remove(hg.gibbloodspillparticles, i) continue end
-
+		if frac >= 1 then table.remove(hg.gibbloodspillparticles, i) continue end
 		part[1]:Add(part[2] * ft)
 		part[2]:Mul(0.96)
 		part[2][3] = part[2][3] - (part[8] and 10 or 30) * ft
-
 		local grow = 1 - (1 - frac) * (1 - frac)
 		local size = Lerp(grow, part[6], part[7])
 		spillColor.a = 255 * (1 - frac)
-		render_SetMaterial(part[3])
-		render_DrawSprite(part[1], size, size, spillColor)
+		render.SetMaterial(part[3])
+		render.DrawSprite(part[1], size, size, spillColor)
 	end
 end)
 
 local hg_bloodimpacts = ConVarExists("hg_bloodimpacts") and GetConVar("hg_bloodimpacts") or CreateConVar("hg_bloodimpacts", 0, FCVAR_ARCHIVE + FCVAR_REPLICATED, "Enable custom blood impact effects spray cool kill death", 0, 1)
-local bloodImpactCloudSize = 19
-local bloodImpactParticleSize = 0.85
-local pendingBulletImpacts = {}
-local pendingBulletImpactCount = 0
-local maxPendingBulletImpacts = 96
-local impactsPerFrame = 3
+local bloodImpactCloudSize = 16
+local bloodImpactParticleSize = 0.75
 
-local function impact(pos,vel,mul,owner,severe,isExit)
-	local max = math.Clamp(math.ceil(mul or 1), 1, 8)
-	local iters = math.ceil(math.random(1, max) * 3.25)
-	local outward = -vel:GetNormalized()
-	local velnorm = outward * 5
-	local speed = vel:Length()
-	local mistCount = isExit and math.random(5, 8) or math.random(2, 3)
-	local mistSpread = isExit and 72 or 11
-	local mistSpeedMin = isExit and 0.78 or 0.9
-	local mistSpeedMax = isExit and 1.08 or 1.12
-	local spawnSpread = isExit and 3.5 or 0.8
-
-	-- Entry blood leaves as a tight jet back toward the shot. Exit blood carries
-	-- fragments and disrupted tissue forward in a wider, denser burst.
-	for i = 1, mistCount do
-		local mistVelocity = outward * speed * Rand(mistSpeedMin, mistSpeedMax) + VectorRand(-mistSpread, mistSpread)
-		addBloodPart2(pos + velnorm + VectorRand(-spawnSpread, spawnSpread), mistVelocity, nil, Rand(9, 14), Rand(9, 14), Rand(0.6, 0.9), true, owner)
-	end
+local function impact(pos,vel,mul)
+	local max = math.min(mul,8)
+	local iters = math.ceil(math.random(1, max) * 2.5)
+	local velnorm = -vel:GetNormalized() * 5
 	
 	if hg_bloodimpacts:GetBool() then
-		local cloudSpread = isExit and 65 or 16
-		addBloodPart2(pos + velnorm, outward * speed + VectorRand(-cloudSpread, cloudSpread), nil, bloodImpactCloudSize, bloodImpactCloudSize, 0.3)
-		addBloodPart2(pos + velnorm, outward * speed * 0.55 + VectorRand(-cloudSpread, cloudSpread), nil, bloodImpactCloudSize, bloodImpactCloudSize, 0.3)
-		addBloodPart2(pos + velnorm, outward * speed * 0.38 + VectorRand(-cloudSpread, cloudSpread), nil, bloodImpactCloudSize, bloodImpactCloudSize, 0.3)
-	end
-
-	if isExit then
-		iters = math.ceil(iters * 1.65) + math.random(3, 6)
+		addBloodPart2(pos + velnorm, -vel + Vector(Rand(-10, 10), Rand(-10, 10), Rand(-10, 10)) * 5, nil, bloodImpactCloudSize, bloodImpactCloudSize, 0.3)
+		addBloodPart2(pos + velnorm, -vel / 2 + Vector(Rand(-10, 10), Rand(-10, 10), Rand(-10, 10)) * 5, nil, bloodImpactCloudSize, bloodImpactCloudSize, 0.3)
+		addBloodPart2(pos + velnorm, -vel / 3 + Vector(Rand(-10, 10), Rand(-10, 10), Rand(-10, 10)) * 5, nil, bloodImpactCloudSize, bloodImpactCloudSize, 0.3)
 	end
 
 	for i = 1, iters do
 		local size = bloodImpactParticleSize
-		-- Bullet impacts are wound blood, not an arterial wound effect.
-		local travel = Lerp(i / iters, isExit and 0.5 or 0.72, 1)
-		local velocitySpread = isExit and 105 or 13
-		local velocity = outward * speed * travel * Rand(isExit and 1.7 or 1.72, isExit and 2.15 or 2.18)
-		velocity:Add(VectorRand(-velocitySpread, velocitySpread))
-		velocity[3] = velocity[3] + Rand(isExit and -18 or -3, isExit and 75 or 22)
-		addBloodPart(pos + VectorRand(isExit and -2.5 or -0.5, isExit and 2.5 or 0.5), velocity, mat_huy, size, size, false, false, owner)
-	end
-
-	if severe then
-		-- Reuse the small physical pellets used by the forceful amputation burst,
-		-- without marking the shot itself as arterial.
-		for i = 1, math.random(7, 10) do
-			local velocity = -vel:GetNormalized() * Rand(160, 250) + VectorRand(-85, 85) + Vector(0, 0, Rand(35, 95))
-			addBloodPart(pos + VectorRand(-1.5, 1.5), velocity, mat_huy, Rand(0.7, 1.1), Rand(0.7, 1.1), false, false, owner)
-		end
+		addBloodPart(pos, -vel * i / iters + Vector(Rand(-20, 20), Rand(-20, 20), 0), mat_huy, size, size, false, false)
 	end
 end
 
@@ -183,96 +123,25 @@ net.Receive("hg_bloodimpact", function()
 	local vel = net.ReadVector() * 500
 	local mul = net.ReadFloat()
 	local amt = net.ReadInt(8)
-	local severe = net.ReadBool()
-	local isExit = net.ReadBool()
 	amt = math.Clamp(amt,0,32)
 	//debugoverlay.Line(pos, vel, 5, color_white)
-		
-	local owner = nil
-	for _, v in ipairs(ents.FindInSphere(pos, 40)) do
-		if v:IsPlayer() or v:IsNPC() or v:IsNextBot() or v:IsRagdoll() then 
-			owner = v 
-			break 
-		end
-	end
-	-- A burst can represent many hits received during one server tick.  Rendering
-	-- them all at once makes both the particles and their collision sounds hitch.
-	amt = math.min(amt, math.max(maxPendingBulletImpacts - pendingBulletImpactCount, 0))
-	if amt <= 0 then return end
-	pendingBulletImpactCount = pendingBulletImpactCount + amt
-	pendingBulletImpacts[#pendingBulletImpacts + 1] = {
-		pos = pos,
-		vel = vel,
-		mul = mul,
-		owner = owner,
-		amount = amt,
-		severe = severe,
-		isExit = isExit,
-	}
-end)
-
-hook.Add("Think", "hg.bloodimpact.render_queue", function()
-	local budget = impactsPerFrame
-	while budget > 0 and pendingBulletImpacts[1] do
-		local queued = pendingBulletImpacts[1]
-		impact(queued.pos, queued.vel, queued.mul, queued.owner, queued.severe, queued.isExit)
-		queued.amount = queued.amount - 1
-		pendingBulletImpactCount = pendingBulletImpactCount - 1
-		budget = budget - 1
-
-		if queued.amount <= 0 then
-			table.remove(pendingBulletImpacts, 1)
-		end
-	end
-end)
-	net.Receive("hg_brainmist", function()
-	local ent = net.ReadEntity()
-	local pos = net.ReadVector()
-	local ang = net.ReadAngle()
-	local headshot = net.ReadBool()
-	local club = net.ReadBool()
-	local redmist = net.ReadBool()
-	local renderEnt = IsValid(ent) and (hg.GetCurrentCharacter and hg.GetCurrentCharacter(ent) or ent) or nil
-	if IsValid(renderEnt) and renderEnt:LookupBone("ValveBiped.Bip01_Head1") then
-		local bone = renderEnt:LookupBone("ValveBiped.Bip01_Head1")
-		local headpos, headang = renderEnt:GetBonePosition(bone)
-		if headpos and (renderEnt:IsRagdoll() or headpos:DistToSqr(pos) <= 40000) then
-			pos = headpos
-			ang = headang
-		end
-	end
-	if headshot then
-		ParticleEffect("headshot", pos, ang)
-		-- Keep the stock headshot effect, but give its physical blood spray enough
-		-- force to visibly travel away from the impact instead of dying at the head.
-		for i = 1, math.random(8, 11) do
-			local velocity = ang:Forward() * -Rand(165, 235) + VectorRand(-55, 55) + Vector(0, 0, Rand(25, 70))
-			hg.addBloodPart(pos + VectorRand(-1.5, 1.5), velocity, mat_huy, Rand(0.7, 1.1), Rand(0.7, 1.1), false, false, renderEnt or ent)
-		end
-	end
-	if redmist then
-		-- An open skull retains the normal impact spray above and adds this dense
-		-- local mist, rather than replacing the stronger effect with a smaller one.
-		for i = 1, math.random(1, 2) do
-			local owner = renderEnt or ent
-			local velocity = VectorRand(-18, 18) + ang:Forward() * -8
-			hg.addBloodPart2(pos + VectorRand(-1.5, 1.5), velocity, nil, Rand(6, 10), Rand(6, 10), Rand(0.25, 0.4), true, owner)
-			hg.addBloodPart(pos + VectorRand(-1, 1), velocity * Rand(1.2, 1.8), mat_huy, Rand(0.65, 1), Rand(0.65, 1), true, false, owner)
-		end
-	end
-	if club then
-		local spitColor = Color(210, 230, 235, 110)
-		hg.addBloodPart2(pos + VectorRand(-1, 1), ang:Forward() * -90 + VectorRand(-10, 10), nil, Rand(8, 12), Rand(8, 12), 0.25, false, renderEnt or ent, spitColor)
-		hg.addBloodPart2(pos + VectorRand(-1, 1), ang:Forward() * -70 + VectorRand(-8, 8), nil, Rand(5, 10), Rand(5, 10), 0.2, false, renderEnt or ent, spitColor)
+	local batch = 4
+	local index = 0
+	while amt > 0 do
+		local n = math.min(amt, batch)
+		amt = amt - n
+		timer.Simple(index * 0.04, function()
+			for i = 1, n do impact(pos,vel,mul) end
+		end)
+		index = index + 1
 	end
 end)
 
 net.Receive("hg_fullbody_bloodmist", function()
 	local pos = net.ReadVector()
 	local force = net.ReadVector()
-	local amt = net.ReadUInt(8)
+	local amt = math.Clamp(net.ReadUInt(8), 0, 120)
 	local forceDir = force:LengthSqr() > 1 and force:GetNormalized() or vector_origin
-	amt = math.Clamp(amt, 0, 120)
 
 	for i = 1, amt do
 		local dir = VectorRand()
@@ -285,7 +154,7 @@ end)
 
 local function explode(pos, size, force)
 	size = size or 1
-	local xx, yy = 12, 12
+	local xx, yy = 8, 8
 	local w, h = 360 / xx, 360 / yy
 	for x = 1, xx * size do
 		for y = 1, yy * size do
@@ -305,199 +174,183 @@ local limbs = {
 	["rleg"] = "ValveBiped.Bip01_R_Calf",
 	["larm"] = "ValveBiped.Bip01_L_Forearm",
 	["rarm"] = "ValveBiped.Bip01_R_Forearm",
-	["head"] = "ValveBiped.Bip01_Head1",
+	["lhand"] = "ValveBiped.Bip01_L_Hand",
+	["rhand"] = "ValveBiped.Bip01_R_Hand",
+	["llegup"] = "ValveBiped.Bip01_L_Thigh",
+	["rlegup"] = "ValveBiped.Bip01_R_Thigh",
+	["larmup"] = "ValveBiped.Bip01_L_UpperArm",
+	["rarmup"] = "ValveBiped.Bip01_R_UpperArm",
 }
 
-local injuryBones = {
-	skull = "ValveBiped.Bip01_Head1",
-	spine1 = "ValveBiped.Bip01_Spine",
-	spine2 = "ValveBiped.Bip01_Spine1",
-	spine3 = "ValveBiped.Bip01_Spine2",
-	chest = "ValveBiped.Bip01_Spine2",
-	pelvis = "ValveBiped.Bip01_Pelvis",
-	lleg = limbs.lleg,
-	rleg = limbs.rleg,
-	larm = limbs.larm,
-	rarm = limbs.rarm,
-}
-
-local severeOrgans = {
-	heart = "ValveBiped.Bip01_Spine2",
-	stomach = "ValveBiped.Bip01_Spine1",
-	liver = "ValveBiped.Bip01_Spine1",
-	intestines = "ValveBiped.Bip01_Pelvis",
-	lungsL = "ValveBiped.Bip01_Spine2",
-	lungsR = "ValveBiped.Bip01_Spine2",
-	trachea = "ValveBiped.Bip01_Neck1",
-	brain = "ValveBiped.Bip01_Head1",
-}
-
-local function getInjuryPos(ent, boneName)
-	if not IsValid(ent) then return end
-	local bone = boneName and ent:LookupBone(boneName)
-	local mat = bone and ent:GetBoneMatrix(bone)
-	return mat and mat:GetTranslation() or ent:WorldSpaceCenter()
-end
-
-local function emitInjuryMist(ent, pos, forceful)
-	if not pos then return end
-	local mistSpeed = forceful and 80 or 18
-	local mistCount = forceful and math.random(4, 6) or math.random(1, 2)
-	for i = 1, mistCount do
-		local velocity = VectorRand(-mistSpeed, mistSpeed) + Vector(0, 0, math.Rand(forceful and 20 or 4, forceful and 55 or 14))
-		hg.addBloodPart2(pos + VectorRand(-1.5, 1.5), velocity, nil, math.Rand(6, 10), math.Rand(6, 10), forceful and math.Rand(0.65, 0.95) or math.Rand(0.25, 0.4), true, ent)
-		hg.addBloodPart(pos + VectorRand(-1, 1), velocity * math.Rand(forceful and 1.1 or 0.8, forceful and 1.6 or 1.25), mat_huy, math.Rand(0.65, 1), math.Rand(0.65, 1), forceful, false, ent)
-	end
-end
-
-local function getOrganDamage(value)
-	if istable(value) then return tonumber(value[1]) or 0 end
-	return tonumber(value) or 0
-end
-
-hook.Add("HG_OrganismChanged", "injury_damage_mist", function(oldorg, org)
+hook.Add("HG_OrganismChanged", "explodelegs", function(oldorg, org)
 	local ply = org.owner
 	local ent = hg.GetCurrentCharacter(ply)
-	if not IsValid(ent) then return end
-
-	local mistPos
-	local amputation
+	
 	for ind, nam in pairs(limbs) do
 		if !oldorg[ind.."amputated"] and org[ind.."amputated"] then
-			mistPos = getInjuryPos(ent, nam)
-			amputation = true
-			break
-		end
-	end
+			local bone = ent:LookupBone(nam)
 
-	if not mistPos then
-		for key, boneName in pairs(injuryBones) do
-			if key != "skull" and (oldorg[key] or 0) < 1 and (org[key] or 0) >= 1 then
-				mistPos = getInjuryPos(ent, boneName)
-				break
+			timer.Simple(0, function()
+				if IsValid(ent.bandagesModel) and ent.bandagesModel.BodygroupsApplied then
+					ent.bandagesModel.BodygroupsApplied = false
+				end
+			end)
+
+			if bone then
+				local mat = ent:GetBoneMatrix(bone)
+
+				if mat then
+					explode(mat:GetTranslation() + mat:GetAngles():Forward() * 8, 0.5, Vector())
+				end
 			end
 		end
 	end
-
-	if not mistPos then
-		for key, boneName in pairs(severeOrgans) do
-			if getOrganDamage(oldorg[key]) < 0.75 and getOrganDamage(org[key]) >= 0.75 then
-				mistPos = getInjuryPos(ent, boneName)
-				break
-			end
-		end
-	end
-
-	emitInjuryMist(ent, mistPos, amputation)
 end)
 
 hg.explode = explode
+
+hg.gibTrails = hg.gibTrails or {}
+local function addGibTrail(ent)
+	if not IsValid(ent) or hg.gibTrails[ent] then return end
+	hg.gibTrails[ent] = {lastSpawn = 0}
+end
 
 net.Receive("hg_gib_bloodspill", function()
 	local entIndex = net.ReadUInt(16)
 	net.ReadFloat()
 	local stump = net.ReadBool()
+	local trail = net.ReadBool()
 	local ent = Entity(entIndex)
 	if not IsValid(ent) then return end
-	for i = 1, stump and 16 or 5 do
-		addGibBloodSpill(ent, stump)
+	for i = 1, stump and 16 or 5 do addGibBloodSpill(ent, stump) end
+	if trail then addGibTrail(ent) end
+end)
+
+net.Receive("hg_fullbody_gibspill", function()
+	local groupID = net.ReadUInt(32)
+	local count = net.ReadUInt(8)
+	local pending = {}
+	for _ = 1, count do pending[net.ReadUInt(16)] = true end
+
+	local function applyGroup(attempt)
+		for entIndex in pairs(pending) do
+			local ent = Entity(entIndex)
+			if not IsValid(ent) or ent:GetNW2Int("hg_fullbody_gib_group", -1) != groupID then continue end
+			for i = 1, 5 do addGibBloodSpill(ent, false) end
+			addGibTrail(ent)
+			pending[entIndex] = nil
+		end
+
+		if next(pending) and attempt < 20 then
+			timer.Simple(0.05, function() applyGroup(attempt + 1) end)
+		end
+	end
+
+	applyGroup(1)
+end)
+
+hook.Add("Think", "hg_gib_trail", function()
+	for ent, data in pairs(hg.gibTrails) do
+		if not IsValid(ent) then
+			hg.gibTrails[ent] = nil
+			continue
+		end
+		if LocalPlayer():GetNetVar("disappearance", nil) or ent:GetNetVar("disappearance", nil) then
+			hg.gibTrails[ent] = nil
+			continue
+		end
+
+		local vel = ent:GetVelocity()
+		local now = CurTime()
+		local speedSqr = vel:LengthSqr()
+		if speedSqr < 22 * 22 then
+			data.settleTime = data.settleTime or now
+			if data.settleTime + 1 <= now then hg.gibTrails[ent] = nil end
+			continue
+		end
+		data.settleTime = nil
+
+		if data.lastSpawn > now then continue end
+		data.lastSpawn = now + 0.035
+
+		local speed = math.sqrt(speedSqr)
+		local normVel = vel / speed
+		addBloodPart(ent:GetPos() + VectorRand(-1.5, 1.5), -normVel * Rand(15, 35) + VectorRand(-4, 4), mats[math.random(countmats)], Rand(1.5, 3), Rand(1.5, 3), false, false)
 	end
 end)
 
 net.Receive("addfountain",function()
 	local ent = net.ReadEntity()
+	local entIndex = net.ReadUInt(16)
 	local force = net.ReadVector()
-	
+
+	local function spawnEffect(attempt)
+		ent = IsValid(ent) and ent or Entity(entIndex)
+		if not IsValid(ent) or not ent:GetNW2Bool("hg_fountain", false) then
+			if attempt < 20 then timer.Simple(0.05, function() spawnEffect(attempt + 1) end) end
+			return
+		end
 	--local bone = net.ReadInt(8)
 	--local lpos = net.ReadVector()
 	--local lang = net.ReadAngle()
 
-	if not IsValid(ent) then return end
-
-	local bone = ent:LookupBone("ValveBiped.Bip01_Neck1")
-	if bone then
-		local mat = ent:GetBoneMatrix(bone)
-		if mat then
-			explode(mat:GetTranslation() + mat:GetAngles():Forward() * 8, 0.5, force)
+		local bone = ent:LookupBone("ValveBiped.Bip01_Neck1")
+		if bone then
+			local mat = ent:GetBoneMatrix(bone)
+			if mat then
+				explode(mat:GetTranslation() + mat:GetAngles():Forward() * 8, 0.5, force)
+			end
 		end
 	end
+
+	spawnEffect(0)
 end)
 
-local bloodEmitterSerial = 0
-local function nextBloodEmitterTimer(prefix, ent)
-	bloodEmitterSerial = bloodEmitterSerial + 1
-	return prefix .. (IsValid(ent) and ent:EntIndex() or 0) .. "_" .. bloodEmitterSerial
-end
-
-local function getBloodEmitterOwner(source)
-	if not IsValid(source) then return nil end
-	if source:IsPlayer() then return source end
-	local owner = hg.RagdollOwner(source)
-	return IsValid(owner) and owner or source
-end
-
-local function getBloodEmitterBody(owner, source)
-	if IsValid(owner) and owner:IsPlayer() then
-		local fake = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner:GetNWEntity("FakeRagdoll", NULL)
-		if IsValid(fake) then return fake end
-
-		if owner:GetNWBool("FakeGettingUp", false) then
-			local old = IsValid(owner.FakeRagdollOld) and owner.FakeRagdollOld or owner:GetNWEntity("FakeRagdollOld", NULL)
-			return IsValid(old) and old or nil
-		end
-
-		if not owner:Alive() then
-			local death = IsValid(owner.RagdollDeath) and owner.RagdollDeath or owner:GetNWEntity("RagdollDeath", NULL)
-			return IsValid(death) and death or nil
-		end
-
-		return owner
-	end
-
-	return IsValid(source) and source or (IsValid(owner) and owner or nil)
-end
-
-local function getBloodEmitterBoneMatrix(owner, source, boneName)
-	local body = getBloodEmitterBody(owner, source)
-	if not IsValid(body) or not isstring(boneName) or boneName == "" then return nil, nil end
-	local bone = body:LookupBone(boneName)
-	if not bone then return body, nil end
-	return body, body:GetBoneMatrix(bone)
-end
-
+local bloodSquirtSerial = 0
 net.Receive("bloodsquirt", function()
-	local source = net.ReadEntity()
-	if not IsValid(source) then return end
-
+	local ent = net.ReadEntity()
+	local entIndex = net.ReadUInt(16)
 	local boneName = net.ReadString()
-	local sourceMatrix = net.ReadMatrix()
+	local mat = net.ReadMatrix()
 	local pos = net.ReadVector()
 	local dir = net.ReadVector()
-	if not sourceMatrix then return end
 	local len = dir:Length()
-	local owner = getBloodEmitterOwner(source)
-	if not IsValid(owner) then return end
 
-	local localPos, localDir = WorldToLocal(pos, dir:Angle(), sourceMatrix:GetTranslation(), sourceMatrix:GetAngles())
-	local name = nextBloodEmitterTimer("squirtblood_", owner)
-	local i = 250
-	local maxI = i
-	local vechuy = Vector(0, 0, 0)
-	timer.Create(name, 0.01 * game.GetTimeScale(), i + 10, function()
-		if not IsValid(owner) then timer.Remove(name) return end
-		local body, mat = getBloodEmitterBoneMatrix(owner, source, boneName)
-		if not IsValid(body) then return end -- body handoff in progress: skip, never emit from the frozen player proxy
-		if not mat then timer.Remove(name) return end
+	local function spawnEffect(attempt)
+		ent = IsValid(ent) and ent or Entity(entIndex)
+		if not IsValid(ent) then
+			if attempt < 20 then timer.Simple(0.05, function() spawnEffect(attempt + 1) end) end
+			return
+		end
+		local bone = ent:LookupBone(boneName)
+		if not bone or not mat then return end
+		ent = hg.RagdollOwner(ent) or ent
 
-		local amt = math.max(i / maxI, 0)
-		local worldPos, worldDir = LocalToWorld(localPos, localDir, mat:GetTranslation(), mat:GetAngles())
-		worldDir = worldDir:Forward() * len
-		vechuy = vechuy + VectorRand(-amt * 5, amt * 5)
-		addBloodPart(worldPos, worldDir * amt * 90 + vechuy * amt, mat_huy, 3, 3, true, false, owner)
-		i = i - 1
-		if i <= 0 then timer.Remove(name) end
-	end)
-	timer.Adjust(name, 0)
+	//local mat = ent:GetBoneMatrix(bone)
+		local localPos, localDir = WorldToLocal(pos, dir:Angle(), mat:GetTranslation(), mat:GetAngles())
+
+		bloodSquirtSerial = bloodSquirtSerial + 1
+		local name = "squirtblood"..ent:EntIndex().."_"..bloodSquirtSerial
+		local i = 125
+		local maxI = i
+		local vechuy = Vector(0,0,0)
+		local dsqr = 2000 * 2000
+		timer.Create(name, 0.02, i + 10, function()
+			if not IsValid(ent) then timer.Remove(name) return end
+			local drawEnt = IsValid(ent.FakeRagdoll) and ent.FakeRagdoll or ent
+			local amt = i / maxI
+			local drawMat = drawEnt:GetBoneMatrix(bone)
+			if not drawMat then timer.Remove(name) return end
+			local drawPos, drawDir = LocalToWorld(localPos, localDir, drawMat:GetTranslation(), drawMat:GetAngles())
+			drawDir = drawDir:Forward() * len
+			if (drawPos - LocalPlayer():EyePos()):LengthSqr() > dsqr then i = i - 1 return end
+			vechuy = vechuy + VectorRand(-amt * 5,amt * 5)
+			addBloodPart(drawPos, drawDir * amt * 90 + vechuy * amt, mat_huy, math.Rand(3,3), math.Rand(3,3), true, false)
+			i = i - 1
+		end)
+	end
+
+	spawnEffect(0)
 end)
 
 --net.Receive("blood particle explode", function() explode(net.ReadVector()) end)
@@ -508,73 +361,58 @@ end)
 	addBloodPart(pos, Vector(25, 0, 0), mat_huy, math.random(10, 15), math.random(10, 15))
 end)]]
 
-
-net.Receive("hg_seal_blood_drop", function()
-    local source = net.ReadEntity()
-    local pos = net.ReadVector()
-    local velocity = net.ReadVector()
-    local intensity = math.Clamp(net.ReadFloat(), 0, 1)
-    if not hg.addBloodPart then return end
-
-    local count = math.Clamp(1 + math.floor(intensity * 3 + 0.25), 1, 4)
-    local owner = IsValid(source) and source or nil
-    for i = 1, count do
-        local spread = Lerp(intensity, 3, 12)
-        local size = Lerp(intensity, 1.5, 2.7)
-        hg.addBloodPart(
-            pos + VectorRand(-0.7, 0.7),
-            velocity + VectorRand(-spread, spread),
-            nil,
-            size,
-            size,
-            false,
-            false,
-            owner
-        )
-    end
-
-    if intensity > 0.45 and hg.addBloodPart2 and math.Rand(0, 1) < intensity * 0.45 then
-        hg.addBloodPart2(pos, velocity * 0.35 + VectorRand(-6, 6), nil, 8, 8, 0.35, false, owner)
-    end
-end)
-
 net.Receive("bloodsquirt2", function()
-	local source = net.ReadEntity()
-	if not IsValid(source) then return end
+	local ent = net.ReadEntity()
+	
+	if not IsValid(ent) then return end
 
-	local boneName = net.ReadString()
-	local sourceMatrix = net.ReadMatrix()
+	local bone = net.ReadString()
+	local bone = ent:LookupBone(bone)
+	local mat = net.ReadMatrix()
 	local pos = net.ReadVector()
 	local dir = net.ReadVector()
-	if not sourceMatrix then return end
 	local len = dir:Length()
-	local owner = getBloodEmitterOwner(source)
-	if not IsValid(owner) then return end
 
-	local localPos, localDir = WorldToLocal(pos, dir:Angle(), sourceMatrix:GetTranslation(), sourceMatrix:GetAngles())
-	if owner == lply then localPos:Add(-Vector(2, -2, 0)) end
+	local ent = hg.RagdollOwner(ent) or ent
+	local ply = ent
 
-	local name = nextBloodEmitterTimer("squirtblood2_", owner)
+	//local mat = ent:GetBoneMatrix(bone)
+	local localPos, localDir = WorldToLocal(pos, dir:Angle(), mat:GetTranslation(), mat:GetAngles())
+
+	if ply == lply then
+		localPos:Add(-Vector(2,-2,0))
+	end
+
+	local name = "squirtblood2"..ent:EntIndex()//..dir[1]
 	local i = 50
 	local maxI = i
-	timer.Create(name, 0.01 * game.GetTimeScale(), i + 10, function()
-		if not IsValid(owner) then timer.Remove(name) return end
-		local body, mat = getBloodEmitterBoneMatrix(owner, source, boneName)
-		if not IsValid(body) then return end
+	local vechuy = Vector(0,0,0)
+	local dsqr = 2000 * 2000
+	timer.Create(name, 0.01, i + 10, function()
+		if not IsValid(ent) then timer.Remove(name) return end
+		local ent = IsValid(ent.FakeRagdoll) and ent.FakeRagdoll or ent
+		local amt = math.max(i / maxI, 0.2)
+		if math.random(5) == 1 then return end
+		local mat = ent:GetBoneMatrix(bone)
 		if not mat then timer.Remove(name) return end
 
-		local amt = math.max(i / maxI, 0.2)
-		if math.random(5) ~= 1 then
-			if owner == lply and (i == 50 or i == 25) then ViewPunch(Angle(15, 0, 0)) end
-			local worldPos, worldDir = LocalToWorld(localPos, localDir, mat:GetTranslation(), mat:GetAngles())
-			if owner == lply then worldDir = lply:EyeAngles() end
-			worldDir = worldDir:Forward() * len
-			addBloodPart(worldPos + VectorRand(-0.2, 0.2), worldDir * amt * 90 + VectorRand(-amt * 25, amt * 25), mat_huy, 3, 3, false, false, owner)
+		if ply == lply and (i == 50 or i == 25) then
+			ViewPunch(Angle(15,0,0))
 		end
+
+		--ent:SetFlexWeight(ent:GetFlexIDByName("jaw_drop"), 1)
+
+		local pos, dir = LocalToWorld(localPos, localDir, mat:GetTranslation(), mat:GetAngles())
+		
+		if lply == ply then
+			dir = lply:EyeAngles()
+		end
+
+		dir = dir:Forward() * len
+		if (pos - LocalPlayer():EyePos()):LengthSqr() > dsqr then i = i - 1 return end
+		addBloodPart(pos + VectorRand(-0.2, 0.2), dir * amt * 90 + VectorRand(-amt * 25,amt * 25), mat_huy, math.Rand(3,3), math.Rand(3,3), false, false)
 		i = i - 1
-		if i <= 0 then timer.Remove(name) end
 	end)
-	timer.Adjust(name, 0)
 end)
 
 net.Receive("vomitConcussionMouth", function()
@@ -627,7 +465,6 @@ net.Receive("vomitConcussionMouth", function()
 		end
 		i = i - 1
 	end)
-	timer.Adjust(name, 0)
 end)
 
 local shitMat

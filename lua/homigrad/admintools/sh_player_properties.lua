@@ -195,7 +195,7 @@ properties.Add( "freeze", {
         ent = hg.RagdollOwner( ent ) or ent
         
 		ent:Freeze(not ent:IsFrozen())
-		print(tostring(ply:Nick() or ply) .. (ent:IsFrozen() and " has frozen " or " has unfrozen ").. tostring(ent:Nick() or ent))
+		print(tostring(ply:Nick() or ply) .. (not ent:IsFrozen() and " has frozen " or " has unfrozen ").. tostring(ent:Nick() or ent))
 	end 
 } )
 
@@ -286,28 +286,6 @@ properties.Add( "vomit", {
 	end 
 } )
 
-properties.Add( "vomit_normal", {
-	MenuLabel = "Make normal vomit",
-	Order = 9.1,
-	MenuIcon = "pluv/pluv51.png",
-
-	Filter = check,
-	Action = function( self, ent )
-		self:MsgStart()
-			net.WriteEntity( ent )
-		self:MsgEnd()
-	end,
-	Receive = function( self, length, ply )
-		local ent = net.ReadEntity()
-
-		if not self:Filter(ent, ply) then return end
-        ent = hg.RagdollOwner(ent) or ent
-
-		hg.organism.VomitNormal(ent)
-		print(tostring(ply:Nick() or ply) .." forced ".. tostring(ent:Nick() or ent) .." to vomit normally.")
-	end 
-} )
-
 properties.Add( "lobotomize", {
 	MenuLabel = "Lobotomize", -- Name to display on the context menu
 	Order = 10, -- The order to display this property relative to other properties
@@ -378,226 +356,175 @@ properties.Add("removeply", {
 	end 
 })
 
-local adminRoleSyncNet = "hg_admin_player_role_sync"
-
-local adminProfessionFallback = {
-	athlete = "Athlete",
-	builder = "Builder",
-	cook = "Cook",
-	engineer = "Engineer",
-	huntsman = "Huntsman",
-	lucky_guy = "Lucky Guy",
-	medic = "Medic",
-	thug = "Thug",
-}
-
-local adminTraitorClassFallback = {
-	traitor_assasin = "Assassin",
-	traitor_chemist = "Chemist",
-	traitor_custom = "Traitor",
-	traitor_default = "Legacy",
-	traitor_infiltrator = "Infiltrator",
-	traitor_martial_artist = "Martial Artist",
-	traitor_shadow = "Shadow",
-	traitor_zombie = "Zombie",
-}
-
-local function getHomicideMode()
-	return zb and zb.modes and zb.modes.hmcd
-end
-
-local function getAdminRoleOptions(roleType)
-	local options = {}
-	local fallback = roleType == "profession" and adminProfessionFallback or adminTraitorClassFallback
-
-	for id, name in pairs(fallback) do
-		options[id] = name
-	end
-
-	local mode = getHomicideMode()
-	local modeRoles = mode and (roleType == "profession" and mode.Professions or mode.SubRoles)
-
-	for id, roleInfo in pairs(modeRoles or {}) do
-		options[id] = roleInfo.Name or id
-	end
-
-	return options
-end
-
-local function resolvePlayerPropertyTarget(ent)
-	return hg.RagdollOwner(ent) or hg.GetCurrentCharacter(ent) or ent
-end
-
-local function syncAdminPlayerRoles(actor, target)
-	if not SERVER then return end
-
-	net.Start(adminRoleSyncNet)
-		net.WriteEntity(target)
-		net.WriteString(target.Profession or "")
-		net.WriteString(target.SubRole or "")
-		net.WriteBool(target.isTraitor and true or false)
-		net.WriteBool(target.MainTraitor and true or false)
-		net.WriteBool(target.isGunner and true or false)
-
-	if actor == target then
-		net.Send(actor)
-	else
-		net.Send({actor, target})
-	end
-end
-
-if SERVER then
-	util.AddNetworkString(adminRoleSyncNet)
-else
-	net.Receive(adminRoleSyncNet, function()
-		local target = net.ReadEntity()
-		local profession = net.ReadString()
-		local subRole = net.ReadString()
-		local isTraitor = net.ReadBool()
-		local mainTraitor = net.ReadBool()
-		local isGunner = net.ReadBool()
-
-		if not IsValid(target) then return end
-
-		target.Profession = profession ~= "" and profession or nil
-		target.SubRole = subRole ~= "" and subRole or nil
-		target.isTraitor = isTraitor
-		target.MainTraitor = mainTraitor
-		target.isGunner = isGunner
-	end)
-end
-
-local function addAdminRoleOption(property, menu, ent, roleType, id, label, checked)
-	local opt = menu:AddOption(label)
-	opt:SetRadio(true)
-	opt:SetChecked(checked)
-	opt:SetIsCheckable(true)
-	opt.OnChecked = function()
-		property:SetRole(ent, roleType, id)
-	end
-end
-
-local function addAdminRoleMenu(property, rootMenu, ent, label, roleType, currentRole)
-	local category = rootMenu:AddOption(label)
-	local menu = category:AddSubMenu()
-
-	addAdminRoleOption(property, menu, ent, roleType, "", "None", not currentRole or currentRole == "")
-
-	local sortedRoles = {}
-	for id, name in pairs(getAdminRoleOptions(roleType)) do
-		sortedRoles[#sortedRoles + 1] = {id = id, name = name}
-	end
-
-	table.sort(sortedRoles, function(a, b)
-		return string.lower(a.name) < string.lower(b.name)
-	end)
-
-	for _, role in ipairs(sortedRoles) do
-		addAdminRoleOption(property, menu, ent, roleType, role.id, role.name .. " (" .. role.id .. ")", currentRole == role.id)
-	end
-end
-
 properties.Add( "setplayerclass", {
 	MenuLabel = "Set player class", -- Name to display on the context menu
 	Order = 15, -- The order to display this property relative to other properties
 	MenuIcon = "vgui/entities/npc_nukude_proto_h", -- The icon to display next to the property
 
 	Filter = check,
-	Action = function() end, -- Choices are handled by the three submenus below.
-	SetRole = function( self, ent, roleType, name )
+	Action = function( self, ent ) -- The action to perform upon using the property ( Clientside )
 		self:MsgStart()
-			net.WriteEntity(ent)
-			net.WriteString(roleType)
-			net.WriteString(name)
+			net.WriteEntity( ent )
+		self:MsgEnd()
+	end,
+	PlayerClass = function( self, ent, name )
+		self:MsgStart()
+			net.WriteEntity( ent )
+			net.WriteString( name )
 		self:MsgEnd()
 	end,
 	Receive = function( self, length, ply )
 		local ent = net.ReadEntity()
-		if not self:Filter(ent, ply) then return end
+		if not self:Filter(ent, ply) then return end -- this line was not here before
+		local class = net.ReadString( )
 
-		local roleType = net.ReadString()
-		local roleId = net.ReadString()
-
-		ent = resolvePlayerPropertyTarget(ent)
-		if not IsValid(ent) or not ent:IsPlayer() then return end
-
-		if roleType == "playerclass" then
-			if roleId ~= "" and not player.classList[roleId] then return end
-
-			ent:SetPlayerClass(roleId ~= "" and roleId or nil)
-		elseif roleType == "profession" then
-			if roleId ~= "" and not getAdminRoleOptions("profession")[roleId] then return end
-
-			local mode = getHomicideMode()
-			if mode and mode.ClearProfessionLoadout then
-				mode.ClearProfessionLoadout(ent)
-			end
-
-			ent.Profession = roleId ~= "" and roleId or nil
-			ent.HMCDPreferredProfession = ent.Profession
-
-			if mode and mode.ApplyProfessionLoadout then
-				mode.ApplyProfessionLoadout(ent)
-			end
-
-			syncAdminPlayerRoles(ply, ent)
-		elseif roleType == "traitor" then
-			if roleId ~= "" and not getAdminRoleOptions("traitor")[roleId] then return end
-
-			ent.SubRole = roleId ~= "" and roleId or nil
-			if ent.organism then
-				ent.organism.recoilmul = hg.GetSubRolePerk and hg.GetSubRolePerk(ent, "RecoilMul", 1) or 1
-			end
-			ent.isTraitor = ent.SubRole ~= nil
-			ent.MainTraitor = ent.isTraitor
-			if ent.isTraitor then
-				ent.isGunner = false
-			end
-
-			local mode = getHomicideMode()
-			local roleInfo = mode and mode.SubRoles and mode.SubRoles[ent.SubRole or ""]
-			if roleInfo and roleInfo.SpawnFunction and ent:Alive() then
-				roleInfo.SpawnFunction(ent)
-			end
-
-			syncAdminPlayerRoles(ply, ent)
+		ent = hg.RagdollOwner(ent) or hg.GetCurrentCharacter(ent) or ent
+		if IsValid(ent) and ent:IsPlayer() and player.classList[class] then
+			ent:SetPlayerClass(class)
 		end
 	end,
 	MenuOpen = function( self, option, ent, tr )
 		local submenu = option:AddSubMenu()
-		local target = resolvePlayerPropertyTarget(ent)
-		if not IsValid(target) or not target:IsPlayer() then return end
 
-		local playerClassCategory = submenu:AddOption("Player classes")
-		local playerClassMenu = playerClassCategory:AddSubMenu()
-		addAdminRoleOption(self, playerClassMenu, ent, "playerclass", "", "None", not target:GetPlayerClass())
-
-		local sortedClasses = {}
-		for name in pairs(player.classList) do
-			sortedClasses[#sortedClasses + 1] = name
+		for name, tbl in pairs(player.classList) do
+			local opt = submenu:AddOption(name)
+			opt:SetRadio(true)
+			opt:SetChecked(ent.PlayerClassName == name)
+			opt:SetIsCheckable(true)
+			opt.OnChecked = function(s, checked)
+				self:PlayerClass(ent, name)
+			end	
 		end
-		table.sort(sortedClasses, function(a, b) return string.lower(a) < string.lower(b) end)
-
-		for _, name in ipairs(sortedClasses) do
-			addAdminRoleOption(self, playerClassMenu, ent, "playerclass", name, name, target.PlayerClassName == name)
-		end
-
-		addAdminRoleMenu(self, submenu, ent, "Subroles", "profession", target.Profession)
-		addAdminRoleMenu(self, submenu, ent, "Traitor classes", "traitor", target.SubRole)
 	end
 } )
+
+local function hiddenBodyDamageCheck(self, ent, ply)
+	if CLIENT then return false end
+	return check(self, ent, ply)
+end
+
+local function withBodyDamageRagdoll(ent, callback)
+	local owner = ent:IsPlayer() and ent or hg.RagdollOwner(ent)
+	if not IsValid(owner) or not owner:IsPlayer() or not owner:Alive() then return end
+
+	local function apply(attempt)
+		if not IsValid(owner) or not owner:Alive() or not owner.organism then return end
+
+		local character = owner.FakeRagdoll
+		if IsValid(character) then
+			callback(owner, character, owner.organism)
+			return
+		end
+
+		local moveType = owner:GetMoveType()
+		local godFakeBypass = owner._godFakeBypass
+		if moveType == MOVETYPE_NONE then owner:SetMoveType(MOVETYPE_WALK) end
+		owner._godFakeBypass = true
+		hg.Fake(owner, nil, true, true)
+		owner._godFakeBypass = godFakeBypass
+		if IsValid(owner) and moveType == MOVETYPE_NONE then owner:SetMoveType(moveType) end
+
+		if attempt < 10 then timer.Simple(0.05, function() apply(attempt + 1) end) end
+	end
+
+	apply(0)
+end
+
+local function addLimbSubmenu(parent, ent, breakProperty, amputateProperty, includeBreaks, includeAmputations)
+	local handsOption = parent:AddOption("Hands")
+	local hands = handsOption:AddSubMenu()
+	if includeBreaks then
+		hands:AddOption("Break Left Forearm", function() breakProperty:BreakLimb(ent, 1) end)
+		hands:AddOption("Break Right Forearm", function() breakProperty:BreakLimb(ent, 2) end)
+		hands:AddOption("Break Left Upper Arm", function() breakProperty:BreakLimb(ent, 8) end)
+		hands:AddOption("Break Right Upper Arm", function() breakProperty:BreakLimb(ent, 9) end)
+	end
+	if includeBreaks and includeAmputations then hands:AddSpacer() end
+	if includeAmputations then
+		hands:AddOption("Amputate Left Hand", function() amputateProperty:AmputateLimb(ent, 5) end)
+		hands:AddOption("Amputate Right Hand", function() amputateProperty:AmputateLimb(ent, 6) end)
+		hands:AddOption("Amputate Left Forearm", function() amputateProperty:AmputateLimb(ent, 1) end)
+		hands:AddOption("Amputate Right Forearm", function() amputateProperty:AmputateLimb(ent, 2) end)
+		hands:AddOption("Amputate Left Upper Arm", function() amputateProperty:AmputateLimb(ent, 7) end)
+		hands:AddOption("Amputate Right Upper Arm", function() amputateProperty:AmputateLimb(ent, 8) end)
+	end
+
+	local legsOption = parent:AddOption("Legs")
+	local legs = legsOption:AddSubMenu()
+	if includeBreaks then
+		legs:AddOption("Break Left Lower Leg", function() breakProperty:BreakLimb(ent, 3) end)
+		legs:AddOption("Break Right Lower Leg", function() breakProperty:BreakLimb(ent, 4) end)
+		legs:AddOption("Break Left Upper Leg", function() breakProperty:BreakLimb(ent, 10) end)
+		legs:AddOption("Break Right Upper Leg", function() breakProperty:BreakLimb(ent, 11) end)
+	end
+	if includeBreaks and includeAmputations then legs:AddSpacer() end
+	if includeAmputations then
+		legs:AddOption("Amputate Left Lower Leg", function() amputateProperty:AmputateLimb(ent, 3) end)
+		legs:AddOption("Amputate Right Lower Leg", function() amputateProperty:AmputateLimb(ent, 4) end)
+		legs:AddOption("Amputate Left Upper Leg", function() amputateProperty:AmputateLimb(ent, 9) end)
+		legs:AddOption("Amputate Right Upper Leg", function() amputateProperty:AmputateLimb(ent, 10) end)
+	end
+end
+
+properties.Add("break_bones", {
+	MenuLabel = "Break Bones",
+	Order = 13,
+	MenuIcon = "pluv/pluv51.png",
+	Filter = check,
+	Action = function() end,
+	MenuOpen = function(self, option, ent)
+		local submenu = option:AddSubMenu()
+		local breakProperty = properties.List.break_limb
+		local amputateProperty = properties.List.amputate_limb
+		local neck = submenu:AddOption("Break Neck", function() breakProperty:BreakLimb(ent, 0) end)
+		neck:SetIcon("icon16/user_delete.png")
+		local spine = submenu:AddOption("Spine")
+		local spineMenu = spine:AddSubMenu()
+		spineMenu:AddOption("Spine 1", function() breakProperty:BreakLimb(ent, 5) end)
+		spineMenu:AddOption("Spine 2", function() breakProperty:BreakLimb(ent, 6) end)
+		spineMenu:AddOption("Spine 3", function() breakProperty:BreakLimb(ent, 7) end)
+		addLimbSubmenu(submenu, ent, breakProperty, amputateProperty, true, false)
+	end,
+	Receive = function(self, length, ply)
+		local ent = net.ReadEntity()
+		if not self:Filter(ent, ply) then return end
+	end
+})
+
+properties.Add("dismemberment", {
+	MenuLabel = "Dismemberment",
+	Order = 14,
+	MenuIcon = "effects/arc9_eft/evil.png",
+	Filter = check,
+	Action = function() end,
+	MenuOpen = function(self, option, ent)
+		local submenu = option:AddSubMenu()
+		local breakProperty = properties.List.break_limb
+		local amputateProperty = properties.List.amputate_limb
+		local head = submenu:AddOption("Head", function() amputateProperty:AmputateLimb(ent, 0) end)
+		head:SetIcon("icon16/user_delete.png")
+		local gib = submenu:AddOption("Gib", function()
+			self:MsgStart()
+				net.WriteEntity(ent)
+			self:MsgEnd()
+		end)
+		gib:SetIcon("icon16/bomb.png")
+		submenu:AddSpacer()
+		addLimbSubmenu(submenu, ent, breakProperty, amputateProperty, false, true)
+	end,
+	Receive = function(self, length, ply)
+		local ent = net.ReadEntity()
+		if not self:Filter(ent, ply) or not hg.FullBodyExplode then return end
+		hg.FullBodyExplode(ent, vector_origin)
+	end
+})
 
 properties.Add( "break_limb", {
 	MenuLabel = "Break Limb",
 	Order = 13,
 	MenuIcon = "pluv/pluv51.png",
 
-	Filter = function(self, ent, ply)
-		if not check(self, ent, ply) then return false end
-
-		ent = hg.RagdollOwner(ent) or hg.GetCurrentCharacter(ent) or ent
-		return ent.organism ~= nil
-	end,
+	Filter = hiddenBodyDamageCheck,
 	MenuOpen = function( self, option, ent, tr )
 		ent = hg.RagdollOwner(ent) or hg.GetCurrentCharacter(ent) or ent
 
@@ -605,7 +532,7 @@ properties.Add( "break_limb", {
 
 		local neck = submenu:AddOption("Neck")
 		neck:SetRadio(true)
-		neck:SetChecked(ent.organism.larm > 0)
+		neck:SetChecked(ent.organism.spine3 >= 1)
 		neck:SetIsCheckable(true)
 		neck.OnChecked = function(s, checked) self:BreakLimb(ent, 0) end
 
@@ -650,6 +577,30 @@ properties.Add( "break_limb", {
 		spine3:SetChecked(ent.organism.rleg > 0)
 		spine3:SetIsCheckable(true)
 		spine3.OnChecked = function(s, checked) self:BreakLimb(ent, 7) end
+
+		local larmup = submenu:AddOption("Left Upper Arm")
+		larmup:SetRadio(true)
+		larmup:SetChecked(ent.organism.larm > 0)
+		larmup:SetIsCheckable(true)
+		larmup.OnChecked = function(s, checked) self:BreakLimb(ent, 8) end
+
+		local rarmup = submenu:AddOption("Right Upper Arm")
+		rarmup:SetRadio(true)
+		rarmup:SetChecked(ent.organism.rarm > 0)
+		rarmup:SetIsCheckable(true)
+		rarmup.OnChecked = function(s, checked) self:BreakLimb(ent, 9) end
+
+		local llegup = submenu:AddOption("Left Upper Leg")
+		llegup:SetRadio(true)
+		llegup:SetChecked(ent.organism.lleg > 0)
+		llegup:SetIsCheckable(true)
+		llegup.OnChecked = function(s, checked) self:BreakLimb(ent, 10) end
+
+		local rlegup = submenu:AddOption("Right Upper Leg")
+		rlegup:SetRadio(true)
+		rlegup:SetChecked(ent.organism.rleg > 0)
+		rlegup:SetIsCheckable(true)
+		rlegup.OnChecked = function(s, checked) self:BreakLimb(ent, 11) end
 	end,
 
 	BreakLimb = function( self, ent, id )
@@ -662,29 +613,60 @@ properties.Add( "break_limb", {
 	Receive = function( self, length, ply )
 		local ent = net.ReadEntity()
 		local limb = net.ReadUInt( 8 )
-        
-		if not self:Filter(ent, ply) then return end
-       	ent = hg.RagdollOwner(ent) or hg.GetCurrentCharacter(ent) or ent
-		if not ent.organism then return end
-        
-        local dmgInfo = DamageInfo()
-		if limb == 0 then
-            hg.BreakNeck(ent)
-        elseif limb == 1 then
-            hg.organism.input_list.larmup(ent.organism, 0, 1, dmgInfo)
-		elseif limb == 2 then
-			hg.organism.input_list.rarmup(ent.organism, 0, 1, dmgInfo)
-		elseif limb == 3 then
-			hg.organism.input_list.llegup(ent.organism, 0, 1, dmgInfo)
-		elseif limb == 4 then
-			hg.organism.input_list.rlegup(ent.organism, 0, 1, dmgInfo)
-		elseif limb == 5 then
-			hg.organism.input_list.spine1(ent.organism, 0, 1, dmgInfo)
-		elseif limb == 6 then
-			hg.organism.input_list.spine2(ent.organism, 0, 1, dmgInfo)
-		elseif limb == 7 then
-			hg.organism.input_list.spine3(ent.organism, 0, 1, dmgInfo)
-		end
+		if limb > 11 or not self:Filter(ent, ply) then return end
+		withBodyDamageRagdoll(ent, function(owner, character, organism)
+			if limb == 0 then
+				hg.BreakNeck(owner, ply, character)
+				return
+			end
+
+			local handlers = {
+				[1] = "larmdown",
+				[2] = "rarmdown",
+				[3] = "llegdown",
+				[4] = "rlegdown",
+				[5] = "spine1",
+				[6] = "spine2",
+				[7] = "spine3",
+				[8] = "larmup",
+				[9] = "rarmup",
+				[10] = "llegup",
+				[11] = "rlegup",
+			}
+			local handler = hg.organism.input_list[handlers[limb]]
+			if not handler then return end
+
+			local dmgInfo = DamageInfo()
+			dmgInfo:SetDamageType(DMG_BULLET)
+			dmgInfo:SetAttacker(game.GetWorld())
+			dmgInfo:SetInflictor(character)
+			local limbKeys = {
+				[1] = "larm",
+				[2] = "rarm",
+				[3] = "lleg",
+				[4] = "rleg",
+				[8] = "larm",
+				[9] = "rarm",
+				[10] = "lleg",
+				[11] = "rleg",
+			}
+			local limbKey = limbKeys[limb]
+			if limbKey then
+				organism[limbKey] = math.min(organism[limbKey] or 0, 0.99)
+				organism[limbKey .. "dislocation"] = false
+			end
+
+			local oldRecipient = organism.forcedBoneBreakRecipient
+			local oldSoundEnt = organism.forcedBoneBreakSoundEnt
+			organism.forcedBoneBreakRecipient = ply
+			organism.forcedBoneBreakSoundEnt = character
+			local ok, err = xpcall(function()
+				handler(organism, 0, 3, dmgInfo)
+			end, debug.traceback)
+			organism.forcedBoneBreakRecipient = oldRecipient
+			organism.forcedBoneBreakSoundEnt = oldSoundEnt
+			if not ok then ErrorNoHalt(err .. "\n") end
+		end)
 	end
 } )
 
@@ -693,47 +675,75 @@ properties.Add( "amputate_limb", {
 	Order = 14,
 	MenuIcon = "effects/arc9_eft/evil.png",
 
-	Filter = function(self, ent, ply)
-		if not check(self, ent, ply) then return false end
-
-		ent = hg.RagdollOwner(ent) or hg.GetCurrentCharacter(ent) or ent
-		return IsValid(ent) and ent.organism ~= nil
-	end,
+	Filter = hiddenBodyDamageCheck,
 	MenuOpen = function( self, option, ent, tr )
 		ent = hg.RagdollOwner(ent) or hg.GetCurrentCharacter(ent) or ent
-		if not IsValid(ent) or not ent.organism then return end
 
 		local submenu = option:AddSubMenu()
 
-		local head = submenu:AddOption("Head")
-		head:SetRadio(true)
-		head:SetChecked(ent.organism.larm > 0)
-		head:SetIsCheckable(true)
-		head.OnChecked = function(s, checked) self:AmputateLimb(ent, 0) end
+		submenu:AddOption("Head", function()
+			self:AmputateLimb(ent, 0)
+		end)
 
 		local larm = submenu:AddOption("Left Arm")
 		larm:SetRadio(true)
 		larm:SetChecked(ent.organism.larm > 0)
 		larm:SetIsCheckable(true)
-		larm.OnChecked = function(s, checked) self:AmputateLimb(ent, 1) end
+		larm.OnChecked = function(s, checked) if checked then self:AmputateLimb(ent, 1) end end
 
 		local rarm = submenu:AddOption("Right Arm")
 		rarm:SetRadio(true)
 		rarm:SetChecked(ent.organism.rarm > 0)
 		rarm:SetIsCheckable(true)
-		rarm.OnChecked = function(s, checked) self:AmputateLimb(ent, 2) end
+		rarm.OnChecked = function(s, checked) if checked then self:AmputateLimb(ent, 2) end end
 
 		local lleg = submenu:AddOption("Left Leg")
 		lleg:SetRadio(true)
 		lleg:SetChecked(ent.organism.lleg > 0)
 		lleg:SetIsCheckable(true)
-		lleg.OnChecked = function(s, checked) self:AmputateLimb(ent, 3) end
+		lleg.OnChecked = function(s, checked) if checked then self:AmputateLimb(ent, 3) end end
 
 		local rleg = submenu:AddOption("Right Leg")
 		rleg:SetRadio(true)
 		rleg:SetChecked(ent.organism.rleg > 0)
 		rleg:SetIsCheckable(true)
-		rleg.OnChecked = function(s, checked) self:AmputateLimb(ent, 4) end
+		rleg.OnChecked = function(s, checked) if checked then self:AmputateLimb(ent, 4) end end
+
+		local lhand = submenu:AddOption("Left Hand")
+		lhand:SetRadio(true)
+		lhand:SetChecked(ent.organism.lhandamputated)
+		lhand:SetIsCheckable(true)
+		lhand.OnChecked = function(s, checked) if checked then self:AmputateLimb(ent, 5) end end
+
+		local rhand = submenu:AddOption("Right Hand")
+		rhand:SetRadio(true)
+		rhand:SetChecked(ent.organism.rhandamputated)
+		rhand:SetIsCheckable(true)
+		rhand.OnChecked = function(s, checked) if checked then self:AmputateLimb(ent, 6) end end
+
+		local larmup = submenu:AddOption("Left Upper Arm")
+		larmup:SetRadio(true)
+		larmup:SetChecked(ent.organism.larmupamputated)
+		larmup:SetIsCheckable(true)
+		larmup.OnChecked = function(s, checked) if checked then self:AmputateLimb(ent, 7) end end
+
+		local rarmup = submenu:AddOption("Right Upper Arm")
+		rarmup:SetRadio(true)
+		rarmup:SetChecked(ent.organism.rarmupamputated)
+		rarmup:SetIsCheckable(true)
+		rarmup.OnChecked = function(s, checked) if checked then self:AmputateLimb(ent, 8) end end
+
+		local llegup = submenu:AddOption("Left Upper Leg")
+		llegup:SetRadio(true)
+		llegup:SetChecked(ent.organism.llegupamputated)
+		llegup:SetIsCheckable(true)
+		llegup.OnChecked = function(s, checked) if checked then self:AmputateLimb(ent, 9) end end
+
+		local rlegup = submenu:AddOption("Right Upper Leg")
+		rlegup:SetRadio(true)
+		rlegup:SetChecked(ent.organism.rlegupamputated)
+		rlegup:SetIsCheckable(true)
+		rlegup.OnChecked = function(s, checked) if checked then self:AmputateLimb(ent, 10) end end
 	end,
 
 	AmputateLimb = function( self, ent, id )
@@ -748,23 +758,39 @@ properties.Add( "amputate_limb", {
 		local limb = net.ReadUInt( 8 )
         
 		if not self:Filter(ent, ply) then return end
-        ent = hg.RagdollOwner(ent) or hg.GetCurrentCharacter(ent) or ent
-        if not IsValid(ent) or not ent.organism then return end
-        
-        local dmgInfo = DamageInfo()
 		if limb == 0 then
-			if SERVER and not ent.noHead then
-				hg.ExplodeHead(ent)
+			local target = ent
+			if ent:IsPlayer() then
+				local fake = IsValid(ent.FakeRagdoll) and ent.FakeRagdoll or ent:GetNWEntity("FakeRagdoll")
+				local death = ent:GetNWEntity("RagdollDeath")
+				target = IsValid(fake) and fake or (IsValid(death) and death or ent)
 			end
-        elseif limb == 1 then
-            hg.organism.AmputateLimb(ent.organism, "larm")
-		elseif limb == 2 then
-			hg.organism.AmputateLimb(ent.organism, "rarm")
-		elseif limb == 3 then
-			hg.organism.AmputateLimb(ent.organism, "lleg")
-		elseif limb == 4 then
-			hg.organism.AmputateLimb(ent.organism, "rleg")
+			if not target.noHead then hg.ExplodeHead(target) end
+			return
 		end
+		withBodyDamageRagdoll(ent, function(owner, character, organism)
+			if limb == 1 then
+				hg.organism.AmputateLimb(organism, "larm")
+			elseif limb == 2 then
+				hg.organism.AmputateLimb(organism, "rarm")
+			elseif limb == 3 then
+				hg.organism.AmputateLimb(organism, "lleg")
+			elseif limb == 4 then
+				hg.organism.AmputateLimb(organism, "rleg")
+			elseif limb == 5 then
+				hg.organism.AmputateLimb(organism, "lhand")
+			elseif limb == 6 then
+				hg.organism.AmputateLimb(organism, "rhand")
+			elseif limb == 7 then
+				hg.organism.AmputateLimb(organism, "larmup")
+			elseif limb == 8 then
+				hg.organism.AmputateLimb(organism, "rarmup")
+			elseif limb == 9 then
+				hg.organism.AmputateLimb(organism, "llegup")
+			elseif limb == 10 then
+				hg.organism.AmputateLimb(organism, "rlegup")
+			end
+		end)
 	end
 } )
 
@@ -866,7 +892,7 @@ local function Respawn(ply,body)
             hg.Fake( ply, body )
             hg.LightStunPlayer( ply )
 
-            timer.Simple(0.1, function()
+            timer.Simple(0.1,function()
                 if body.CurAppearance then
                     local color = body:GetNWVector("PlayerColor", vector_origin)
                     body.CurAppearance.AColor = Color( color[1] * 255,color[2] * 255,color[3] * 255 )
@@ -878,11 +904,6 @@ local function Respawn(ply,body)
                     local Appearance = ply.CurAppearance or hg.Appearance.GetRandomAppearance()
                     Appearance.AColthes = ""
                     ply:SetNetVar("Accessories", "")
-					local bgs = {}
-					for k, v in ipairs(body:GetBodyGroups()) do
-						table.insert(bgs, body:GetBodygroup( k - 1 ))
-					end
-					ply:SetBodyGroups(table.concat(bgs))
                     ply:SetModel(body:GetModel())
                     ply:SetSubMaterial()
                     ply:SetPlayerColor(ply:GetNWVector("PlayerColor", vector_origin))

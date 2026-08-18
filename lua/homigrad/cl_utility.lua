@@ -1,5 +1,16 @@
 local plymeta = FindMetaTable("Player")
 hg.ConVars = hg.ConVars or {}
+--\\ Success sound variant (rem_success.wav / rem_success1.wav)
+	local hg_success_sound_alt = GetConVar("hg_success_sound_alt") or CreateClientConVar("hg_success_sound_alt", "0", true, false, "Use the alternate round-success sound (rem_success1.wav)", 0, 1)
+	hg.ConVars.success_sound_alt = hg_success_sound_alt
+
+	function hg.GetSuccessSound()
+		if hg_success_sound_alt and hg_success_sound_alt:GetBool() then
+			return "ui/rem_success1.wav"
+		end
+		return "ui/rem_success.wav"
+	end
+--//
 --\\ AimVector fix
 	hg.GetAimVector = hg.GetAimVector or plymeta.GetAimVector
 
@@ -118,20 +129,6 @@ hg.ConVars = hg.ConVars or {}
 --\\ Remove cl models on cleanup
 	hg.oldClientsideModel = hg.oldClientsideModel or ClientsideModel
 	hg.ClientsideModels = hg.ClientsideModels or {}
-	local EntityMeta = FindMetaTable("Entity")
-
-	if hg.ZCClientsideModelGuardsInstalled then
-		if hg.oldEntitySetModel then
-			EntityMeta.SetModel = hg.oldEntitySetModel
-		end
-		if hg.oldEntitySetSequence then
-			EntityMeta.SetSequence = hg.oldEntitySetSequence
-		end
-		if hg.oldEntitySetCycle then
-			EntityMeta.SetCycle = hg.oldEntitySetCycle
-		end
-		hg.ZCClientsideModelGuardsInstalled = nil
-	end
 
 	function ClientsideModel(...)
 		local model = hg.oldClientsideModel(...)
@@ -249,23 +246,6 @@ players : 1 humans, 0 bots (20 max)
 		suppressionVec = Vector(0, 0, 0)
 		suppressionDist = 0
 		suppressionDistAdd = 0
-		local SUPPRESSION_PUNCH_MULTIPLIER = 3.5
-		local SUPPRESSION_SOUND_VOLUME = 4
-		local SUPPRESSION_SOUND_LEVEL = 200
-		local SUPERSONIC_AUDIBLE_RADIUS = 1400
-		local SUBSONIC_AUDIBLE_RADIUS = 900
-		local DISTANT_CRACK_VOLUME = 3.5
-		local DISTANT_CRACK_SOUND_LEVEL = 190
-		local function ApplySuppressionPunch(angle)
-			if hg_suppression_viewpunch and not hg_suppression_viewpunch:GetBool() then return end
-			angle = angle * SUPPRESSION_PUNCH_MULTIPLIER
-			if type(QuickViewPunch) == "function" then
-				QuickViewPunch(angle)
-			elseif type(ViewPunch) == "function" then
-				ViewPunch(angle)
-			end
-		end
-
 		net.Receive("add_supression", function()
 			if not IsValid(lply) or not lply:IsPlayer() then return end
 			if !lply:Alive() or !lply.organism or lply.organism.otrub then return end
@@ -273,7 +253,7 @@ players : 1 humans, 0 bots (20 max)
 			local pos = net.ReadVector()
 			local eyePos = LocalPlayer():EyePos()
 			local dist = pos:Distance(eyePos)
-			if dist > 1000 then return end
+			if dist > 500 then return end
 			local isVisible = not util.TraceLine({
 				start = pos,
 				endpos = eyePos,
@@ -283,12 +263,14 @@ players : 1 humans, 0 bots (20 max)
 			if not isVisible then dist = dist * 2 end
 
 			Suppress(dist * 25)
-			ApplySuppressionPunch(AngleRand(-1, 1) * math.Clamp(1000 / math.max(dist, 100), 1, 5))
+			ViewPunch(AngleRand(-1,1) * dist / 100)
+			ViewPunch2(AngleRand(-1,1) * dist / 100)
 		end)
 
 		local anguse = Angle(0,0,0)
 		s_suppression = s_suppression or 0
 		hook.Add("PostEntityFireBullets","bulletsuppression2",function(ent,bullet)
+			if bullet.NearMissShotID then return end
 			if not lply:Alive() then return end
 			if not IsValid(lply) or not lply:IsPlayer() then return end
 			if !lply:Alive() or !lply.organism or lply.organism.otrub then return end
@@ -299,11 +281,12 @@ players : 1 humans, 0 bots (20 max)
 			local subsonic = !(CustomAmmoType and CustomAmmoType.BulletSettings and CustomAmmoType.BulletSettings.Speed and CustomAmmoType.BulletSettings.Speed > 340)
 			
 			local tr = bullet.Trace
+			local mr = math.random(17)
 			local view = render.GetViewSetup(true)
 			if tr.StartPos:Distance( tr.HitPos ) > 5000 and !subsonic then
 				local time = view.origin:Distance(tr.StartPos+tr.HitPos/2) / 17836
 				timer.Simple(time,function()
-					EmitSound("cracks/distant/dist_crack_" .. string.format("%02d", math.random(1, 17)) .. ".ogg", tr.StartPos+tr.HitPos*0.35, 0, CHAN_AUTO, DISTANT_CRACK_VOLUME, DISTANT_CRACK_SOUND_LEVEL)
+					EmitSound("cracks/distant/dist_crack_" .. ( mr < 9 and "0" or "") .. mr .. ".ogg", tr.StartPos+tr.HitPos*0.35, 0, CHAN_AUTO, 1,SNDLVL_140dB)
 				end)
 			end
 
@@ -311,13 +294,12 @@ players : 1 humans, 0 bots (20 max)
 			if tr.Entity == hg.GetCurrentCharacter(lply) then
 
 				Suppress( 10 )
-				ApplySuppressionPunch(Angle(math.Rand(-5, 2), math.Rand(-3, 3), 0))
 				return
 			end
 
 			if not IsValid(self) or self:GetOwner() == lply:GetViewEntity() then return end
 			local eyePos = view.origin
-			local _, pos = util.DistanceToLine(tr.StartPos, tr.HitPos, eyePos)
+			local dis, pos = util.DistanceToLine(tr.StartPos, tr.HitPos, eyePos)
 			local isVisible = not util.TraceLine({
 				start = pos,
 				endpos = eyePos,
@@ -328,15 +310,25 @@ players : 1 humans, 0 bots (20 max)
 			if not isVisible then return end
 
 			local dist = pos:Distance(eyePos)
-			local SND = subsonic and "bul_flyby/subsonic_" .. math.random(1, 27) .. ".wav"
-				or bullet.Damage >= 50 and "cracks/heavy/heav_crack_0" .. math.random(1, 9) .. ".ogg"
-				or bullet.Damage >= 30 and "cracks/medium/med_crack_0" .. math.random(1, 9) .. ".ogg"
-				or "cracks/light/light_crack_0" .. math.random(1, 9) .. ".ogg"
+			local shooterdist = tr.StartPos:Distance(eyePos)
+			local mr = math.random(9)
 
-			local audibleRadius = subsonic and SUBSONIC_AUDIBLE_RADIUS or SUPERSONIC_AUDIBLE_RADIUS
-			if dist < audibleRadius then
-				local playPos = pos - tr.Normal * 25
-				EmitSound(SND, playPos, 0, CHAN_ITEM, SUPPRESSION_SOUND_VOLUME, SUPPRESSION_SOUND_LEVEL)
+			if not IsLookingAt(self:GetOwner(),eyePos) then return end
+			local SND = subsonic and "weapons/bullets/fx/subsonic_0" .. mr .. ".wav"
+				or bullet.Damage >= 50 and "cracks/" .. "heavy/heav" .. "_crack_0" .. mr .. ".ogg"
+				or bullet.Damage >= 30 and "cracks/" .. "medium/med" .. "_crack_0" .. mr .. ".ogg"
+				or "cracks/" .. "light/light" .. "_crack_0" .. mr .. ".ogg"
+
+			if dist < 180 then
+				timer.Simple(0.02,function()
+					EmitSound("weapons/bullets/fx/subsonic_0" .. mr .. ".wav", pos - tr.Normal * 25, 0, CHAN_ITEM, 1, 155)
+				end)
+				if !subsonic then
+					EmitSound(SND, pos - tr.Normal * 25, 0, CHAN_ITEM, 1, 155)
+					EmitSound(SND, pos - tr.Normal * 25, 0, CHAN_WEAPON, 1, 155)
+					EmitSound(SND, pos - tr.Normal * 25, 0, CHAN_REPLACE, 1, 155)
+					EmitSound(SND, pos - tr.Normal * 25, 0, CHAN_BODY, 1, 155)
+				end
 			else return end
 			-- if dist > 120 then return end
 			-- if !subsonic then
@@ -350,13 +342,14 @@ players : 1 humans, 0 bots (20 max)
 			local ang_yaw = localpos:Dot(lply:EyeAngles():Right())
 			local ang_pitch = localpos:Dot(lply:EyeAngles():Up())
 
-			anguse[2] = -ang_yaw / (dist * 8)
-			anguse[1] = -ang_pitch / (dist * 8)
+			anguse[2] = -ang_yaw / (dist * 30)
+			anguse[1] = -ang_pitch / (dist * 30)
 
 			local badass = lply.organism and lply.organism.recoilmul or 1
 			local bulletdmg = math.max(bullet.Damage / 15,1)
 			if hg_suppression_viewpunch and hg_suppression_viewpunch:GetBool() then
-				ApplySuppressionPunch(anguse * badass * bulletdmg * 12)
+				ViewPunch(anguse * badass * bulletdmg)
+				ViewPunch2((anguse * badass * bulletdmg)/-2)
 			end
 			Suppress((dist * 45) * badass * bulletdmg)
 		end)
@@ -367,6 +360,26 @@ players : 1 humans, 0 bots (20 max)
 		function Suppress(force)
 			SIB_suppress.Force = math.Clamp(SIB_suppress.Force + force / 1, 0, 10)
 		end
+
+		net.Receive("hg_bullet_nearmiss", function()
+			if not IsValid(lply) or not lply:Alive() or not lply.organism or lply.organism.otrub then return end
+			local pos = net.ReadVector()
+			local strength = net.ReadFloat()
+			local eyePos = lply:EyePos()
+			local direction = (eyePos - pos):GetNormalized()
+			local side = direction:Dot(lply:EyeAngles():Right())
+			local vertical = direction:Dot(lply:EyeAngles():Up())
+			local soundIndex = math.random(1, 9)
+			local soundName = strength > 0.6 and "cracks/heavy/heav_crack_0" or strength > 0.3 and "cracks/medium/med_crack_0" or "cracks/light/light_crack_0"
+
+			EmitSound(soundName .. soundIndex .. ".ogg", pos, 0, CHAN_WEAPON, 1, 140)
+			Suppress(0.8 + strength * 3.2)
+			if hg_suppression_viewpunch and hg_suppression_viewpunch:GetBool() then
+				local punch = Angle(vertical * -0.35, side * -0.45, 0) * strength
+				ViewPunch(punch)
+				ViewPunch2(punch / -2)
+			end
+		end)
 
 		local pain_mat = Material("sprites/mat_jack_hmcd_narrow")
 
@@ -396,9 +409,11 @@ players : 1 humans, 0 bots (20 max)
 
 			if force > 0 then
 				render.UpdateScreenEffectTexture()
-				vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
-				vignetteMat:SetFloat("$c0_z", force / 3)
-				vignetteMat:SetFloat("$c1_y", force / 12)
+
+				vignetteMat:SetFloat("$c2_x", CurTime() + 10000) //Time
+				vignetteMat:SetFloat("$c0_z", force / 3 ) //ColorIntensity
+				vignetteMat:SetFloat("$c1_y", force / 12 ) //Vignette
+
 				render.SetMaterial(vignetteMat)
 				render.DrawScreenQuad()
 			end
@@ -413,7 +428,7 @@ players : 1 humans, 0 bots (20 max)
 		end)
 
 		hook.Add("Think","SIB_Suppresss_Think",function()
-			SIB_suppress.Force = Lerp(0.50 * FrameTime(), SIB_suppress.Force,0)
+			SIB_suppress.Force = Lerp(0.25 * FrameTime(), SIB_suppress.Force,0)
 		end)
 
 		hook.Add("PlayerDeath","huyDeathRemoveSuppression",function()
@@ -585,37 +600,77 @@ players : 1 humans, 0 bots (20 max)
 --//
 
 --\\ Can see or not
-	local nextVisibilityCheck = 0
+	--local checkcd = 0
 	local ents_FindByClass = ents.FindByClass
 	local player_GetAll = player.GetAll
 	local render_GetViewSetup = render.GetViewSetup
 	LocalPlayerSeen = true
 	hg.seenents = {}
 	hg.seenents2 = {}
+	hg.organism_ents = hg.organism_ents or {}
 	local hg_fov = GetConVar("hg_fov")
 	local math_cos = math.cos
 	local math_rad = math.rad
 	local util_DistanceToLine = util.DistanceToLine
-	local table_Add = table.Add
+	local table_Empty = table.Empty
+	local modelBounds = {}
+	local nextVisibilityCheck = 0
+	local nextRelevantReconcile = 0
+	local relevantEntities = {}
+
+	local function registerRelevantEntity(ent)
+		if not IsValid(ent) then return end
+		relevantEntities[ent] = true
+		if ent.shouldTransmit == nil then ent.shouldTransmit = true end
+	end
+
+	local function unregisterRelevantEntity(ent)
+		relevantEntities[ent] = nil
+	end
+
+	function hg.RegisterRelevantEntity(ent)
+		registerRelevantEntity(ent)
+	end
+
+	local function reconcileRelevantEntities()
+		for _, ent in ipairs(ents_FindByClass("prop_ragdoll")) do
+			registerRelevantEntity(ent)
+		end
+
+		for _, ply in ipairs(player_GetAll()) do
+			registerRelevantEntity(ply)
+		end
+
+		for ent in pairs(hg.organism_ents) do
+			if IsValid(ent) then
+				registerRelevantEntity(ent)
+			else
+				hg.organism_ents[ent] = nil
+				unregisterRelevantEntity(ent)
+			end
+		end
+	end
+
+	hook.Add("NetworkEntityCreated", "HG_RegisterRelevantEntity", function(ent)
+		if not IsValid(ent) then return end
+		if ent:IsPlayer() or ent:GetClass() == "prop_ragdoll" then
+			registerRelevantEntity(ent)
+		end
+	end)
+
+	hook.Add("EntityRemoved", "HG_UnregisterRelevantEntity", unregisterRelevantEntity)
 
 	hook.Add("Think", "CanBeSeenOrNot", function()
 		local curTime = CurTime()
 		if nextVisibilityCheck > curTime then return end
 		nextVisibilityCheck = curTime + 0.1
-		local entities = ents_FindByClass("prop_ragdoll")
-		table_Add(entities, player_GetAll())
-
-		local orgents = {}
-		if hg.organism_ents then
-			for ent in pairs(hg.organism_ents) do
-				if !IsValid(ent) then hg.organism_ents[ent] = nil continue end
-
-				table.insert(entities, ent)
-			end
+		if nextRelevantReconcile <= curTime then
+			nextRelevantReconcile = curTime + 8
+			reconcileRelevantEntities()
 		end
 
-		hg.seenents = {}
-		hg.seenents2 = {}
+		table_Empty(hg.seenents)
+		table_Empty(hg.seenents2)
 
 		if g_VR and g_VR.active then return end
 
@@ -623,10 +678,15 @@ players : 1 humans, 0 bots (20 max)
 		local origin = view.origin
 		local angles = view.angles
 		local forward = angles:Forward()
-		local fovCos = math_cos(math_rad((view.fov or hg_fov:GetFloat()) * 0.5))
+		local viewEnd = origin + forward * 9999
+		local fovCos = math_cos(math_rad(hg_fov:GetInt()))
 
-		for i = 1, #entities do
-			v = entities[i]
+		for v in pairs(relevantEntities) do
+			if not IsValid(v) then
+				unregisterRelevantEntity(v)
+				hg.organism_ents[v] = nil
+				continue
+			end
 			if v.shouldTransmit then
 				hg.seenents2[#hg.seenents2 + 1] = v
 			end
@@ -639,10 +699,15 @@ players : 1 humans, 0 bots (20 max)
 				continue
 			end
 
-			local min,max = v:GetModelBounds()
-			local len = (max - min):Length()
+			local model = v:GetModel() or ""
+			local len = modelBounds[model]
+			if not len then
+				local min, max = v:GetModelBounds()
+				len = (max - min):Length()
+				modelBounds[model] = len
+			end
 			local vPos = v:GetPos()
-			local _, point, _ = util_DistanceToLine(origin, origin + angles:Forward() * 9999, vPos)
+			local _, point = util_DistanceToLine(origin, viewEnd, vPos)
 			local vSize = (point - vPos):GetNormalized() * len
 			local diff = (vPos + vSize - origin):GetNormalized()
 
@@ -714,6 +779,7 @@ players : 1 humans, 0 bots (20 max)
 			})
 
 			local volume = (talker:WaterLevel() == 3) and 0.25 or (trace.Hit and 0.5 or 1)
+			if hg.IsVoiceMuffled and hg.IsVoiceMuffled(talker) then volume = volume * 0.65 end
 
 			volume = volume * math.max(talker.GetNW2Float and talker:GetNW2Float("fw_voicemuffle", 1) or 1, 0)
 
@@ -748,60 +814,15 @@ players : 1 humans, 0 bots (20 max)
 				[6] = ent:GetFlexIDByName( "lower_lip" )
 			}
 
-			local org = ent.organism
-			local jawDislocated = org and (org.jawdislocation or org.jaw == 1)
-			local weight
-			
-			if jawDislocated then
-				-- Jaw dislocation: jaw offset to one side, not hanging open
-				if not ent.jawDislocationSide then
-					ent.jawDislocationSide = math.random(2) == 1 and "left" or "right"
-				end
+			local weight = (ply:IsSpeaking() and math.Clamp( ply:VoiceVolume() * 5, 0, 2 )) or 0
 
-				local sideWeight = math.Clamp(0.7 + math.Rand(-0.08, 0.08), 0, 1)
-				local dropWeight = math.Clamp(0.12 + math.Rand(-0.05, 0.05), 0, 1)
-				local speakingExtra = ply:IsSpeaking() and math.Clamp(ply:VoiceVolume() * 1.5, 0, 0.3) or 0
-				weight = dropWeight
+			if (ply:GetNWFloat("PainScreamUntil", 0) or 0) > CurTime() then
+				weight = math.max(weight, 1.8)
+			end
 
-				local jawDrop    = flexes[1]
-				local leftPart   = flexes[2]
-				local rightPart  = flexes[3]
-				local leftDrop   = flexes[4]
-				local rightDrop  = flexes[5]
-				local lowerLip   = flexes[6]
-
-				if jawDrop  and jawDrop  ~= -1 then ent:SetFlexWeight(jawDrop,  dropWeight + speakingExtra) end
-				if lowerLip and lowerLip ~= -1 then ent:SetFlexWeight(lowerLip, dropWeight * 0.5) end
-
-				if ent.jawDislocationSide == "left" then
-					if leftPart  and leftPart  ~= -1 then ent:SetFlexWeight(leftPart,  sideWeight) end
-					if rightPart and rightPart ~= -1 then ent:SetFlexWeight(rightPart, 0) end
-					if leftDrop  and leftDrop  ~= -1 then ent:SetFlexWeight(leftDrop,  dropWeight * 0.6) end
-					if rightDrop and rightDrop ~= -1 then ent:SetFlexWeight(rightDrop, 0) end
-				else
-					if leftPart  and leftPart  ~= -1 then ent:SetFlexWeight(leftPart,  0) end
-					if rightPart and rightPart ~= -1 then ent:SetFlexWeight(rightPart, sideWeight) end
-					if leftDrop  and leftDrop  ~= -1 then ent:SetFlexWeight(leftDrop,  0) end
-					if rightDrop and rightDrop ~= -1 then ent:SetFlexWeight(rightDrop, dropWeight * 0.6) end
-				end
-
-				-- Subtle head tilt toward the dislocated side when speaking
-				local headBone = ent:LookupBone("ValveBiped.Bip01_Head1")
-				if headBone and ply:IsSpeaking() then
-					local rollDir = ent.jawDislocationSide == "left" and 1 or -1
-					local twitchAng = Angle(math.Rand(-1, 1), 0, rollDir * math.Rand(1, 3))
-					hg.bone.Set(ent, headBone, vector_origin, twitchAng, "jawdislocation", 0.1, FrameTime())
-				end
-			else
-				ent.jawDislocationSide = nil
-				weight = (ply:IsSpeaking() and math.Clamp( ply:VoiceVolume() * 5, 0, 2 )) or 0
-
-				for k = 1, #flexes do
-					local v = flexes[ k ]
-					if v and v ~= -1 then
-						ent:SetFlexWeight( v, weight )
-					end
-				end
+			for k = 1, #flexes do
+				v = flexes[ k ]
+				ent:SetFlexWeight( v, weight )
 			end
 
 			local org = ent.organism
@@ -827,23 +848,24 @@ players : 1 humans, 0 bots (20 max)
 				ent.Blinking = 1
 			end
 			
-			local blinkId = ent:GetFlexIDByName("blink")
-			if blinkId and blinkId ~= -1 then
-				ent:SetFlexWeight(blinkId, ent.Blinking or 0)
+			if ent:GetFlexIDByName("blink") then
+				ent:SetFlexWeight(ent:GetFlexIDByName("blink"), ent.Blinking or 0)
 			end
 
-			local wrinklerId = ent:GetFlexIDByName("wrinkler")
-			if wrinklerId and wrinklerId ~= -1 then
-				ent:SetFlexWeight(wrinklerId, ent.Blinking or 0)
+			if ent:GetFlexIDByName("wrinkler") then
+				ent:SetFlexWeight(ent:GetFlexIDByName("wrinkler"), ent.Blinking or 0)
 			end
 
-			local halfClosedId = ent:GetFlexIDByName("half_closed")
-			if halfClosedId and halfClosedId ~= -1 then
-				ent:SetFlexWeight(halfClosedId, ent.Blinking or 0)
+			if ent:GetFlexIDByName("half_closed") then
+				ent:SetFlexWeight(ent:GetFlexIDByName("half_closed"), ent.Blinking or 0)
 			end
 		end
 
-		hook.Add("Player Think", "MouthThink", function(ply) if IsValid(ply.FakeRagdoll) then mouthmove(ply) end end)
+		hook.Add("Player Think", "MouthThink", function(ply)
+			if IsValid(ply.FakeRagdoll) or (ply:GetNWFloat("PainScreamUntil", 0) or 0) > CurTime() then
+				mouthmove(ply)
+			end
+		end)
 
 		hg.mouthmove = mouthmove
 --//
@@ -864,7 +886,7 @@ players : 1 humans, 0 bots (20 max)
 			fallSndStation:Stop()
 			fallSndStation = nil
 		end
-		sound.PlayFile( "sound/zcity/other/fallstatic.ogg", "noplay noblock", function(station, _, _)
+		sound.PlayFile( "sound/zcity/other/fallstatic.wav", "noplay noblock", function(station, _, _)
 			if IsValid(station) then
 				station:EnableLooping( true )
 				station:SetVolume( 0 )
@@ -876,7 +898,7 @@ players : 1 humans, 0 bots (20 max)
 			windSndStation:Stop()
 			windSndStation = nil
 		end
-		sound.PlayFile( "sound/zcity/other/runwind.ogg", "noplay noblock", function(station, _, _)
+		sound.PlayFile( "sound/zcity/other/runwind.wav", "noplay noblock", function(station, _, _)
 			if IsValid(station) then
 				station:EnableLooping( true )
 				station:SetVolume( 0 )
@@ -977,15 +999,6 @@ players : 1 humans, 0 bots (20 max)
 
 --\\ CL Utils setting adjustments
 	if CLIENT then
-		local function ensureBloodDecalBudget()
-			for name, minimum in pairs({r_decals = 16384, mp_decals = 16384}) do
-				local cvar = GetConVar(name)
-				if cvar and cvar:GetInt() < minimum then RunConsoleCommand(name, tostring(minimum)) end
-			end
-		end
-		timer.Simple(0, ensureBloodDecalBudget)
-		hook.Add("InitPostEntity", "hg_blood_decal_budget", ensureBloodDecalBudget)
-
 		hook.Add("Think","RemoveMe_001",function()
 			hook.Remove("PostPlayerDraw","BA2_GasmaskDraw")
 			hook.Remove("Think","RemoveMe_001")
@@ -996,24 +1009,41 @@ players : 1 humans, 0 bots (20 max)
 --\\ Tinnitus function
 	if CLIENT then
 		local lply = LocalPlayer()
-		local function AddTinnitus(time, needSound, brainDamage)
+		local function AddTinnitus(time, needSound)
 			lply = LocalPlayer()
 			lply.tinnitus = CurTime() + time * 4
-			lply.tinnitusBrainDamage = brainDamage or false
 			lply:SetDSP(32)
 		end
 
 		local plymeta = FindMetaTable("Player")
-		function plymeta:AddTinnitus(time,needSound,brainDamage)
+		function plymeta:AddTinnitus(time,needSound)
 			needSound = needSound or false
-			AddTinnitus(time,needSound,brainDamage)
+			AddTinnitus(time,needSound)
 		end
 
 		net.Receive("send_tinnitus",function()
 			local time = net.ReadFloat()
 			local bool = net.ReadBool()
-			local brainDamage = net.ReadBool()
-			AddTinnitus(time,bool,brainDamage)
+			AddTinnitus(time,bool)
+		end)
+
+		net.Receive("send_custom_tinnitus",function()
+			local soundFile = net.ReadString()
+			LocalPlayer():EmitSound(soundFile, 75, 100, 1, CHAN_AUTO)
+		end)
+
+		net.Receive("stop_custom_tinnitus",function()
+			local ply = LocalPlayer()
+			if IsValid(ply) then
+				ply:StopSound("tinnitus.wav")
+				ply:StopSound("tinnituslong.wav")
+				ply:StopSound("headhit.mp3")
+			end
+		end)
+
+		net.Receive("hg_play_client_sound_file",function()
+			local snd = net.ReadString()
+			LocalPlayer():EmitSound(snd, 75, 100, 1, CHAN_AUTO)
 		end)
 	end
 --//
@@ -1049,45 +1079,14 @@ players : 1 humans, 0 bots (20 max)
 
 	local blackout_mat = Material("sprites/mat_jack_hmcd_narrow")
 
-	local function clampToScreen(x, y)
-		local w, h = ScrW(), ScrH()
-		local cx, cy = w / 2, h / 2
-		x = math.Clamp(x, 0, w)
-		y = math.Clamp(y, 0, h)
-		local dx, dy = x - cx, y - cy
-		if dx == 0 and dy == 0 then return cx, cy end
-		local ang = math.atan2(dy, dx)
-		local cos = math.cos(ang)
-		local sin = math.sin(ang)
-		local maxDist
-		if math.abs(cos) < 0.001 then
-			maxDist = cy / math.abs(sin)
-		elseif math.abs(sin) < 0.001 then
-			maxDist = cx / math.abs(cos)
-		else
-			maxDist = math.min(cx / math.abs(cos), cy / math.abs(sin))
-		end
-		local dist = math.min(math.sqrt(dx * dx + dy * dy), maxDist)
-		return cx + math.cos(ang) * dist, cy + math.sin(ang) * dist
-	end
-
-	function hg.AddFlash(eyepos, dot, pos, time, size, is_headtrauma)
+	function hg.AddFlash(eyepos, dot, pos, time, size)
 		time = time or 20
 		size = size or 1000--pixels
-		if is_headtrauma then
-			size = size * 2.0
-		end
 		size = size / math.max(pos:Distance(eyepos) / 64,0.01) * (dot^2)
 		local taint = math.max(200 - size,0) / 200 * time * 0.9
 		local scr = pos:ToScreen()
 
-		if is_headtrauma then
-			if not scr.visible or scr.x < 0 or scr.x > ScrW() or scr.y < 0 or scr.y > ScrH() then
-				scr.x, scr.y = clampToScreen(scr.x, scr.y)
-			end
-		end
-
-		table.insert(hg.flashes,{x = scr.x, y = scr.y, time = CurTime() + time - taint, lentime = time, size = size, is_headtrauma = is_headtrauma})
+		table.insert(hg.flashes,{x = scr.x, y = scr.y, time = CurTime() + time - taint, lentime = time, size = size})
 	end
 
 	local flash
@@ -1105,13 +1104,13 @@ players : 1 humans, 0 bots (20 max)
 		end
 	end)
 
-	hook.Add("PreCleanupMap", "noflashesforyounigge", function()
+	hook.Add("PreCleanupMap", "noflashesforyouMreowe", function()
 		hg.flashes = {}
 		amtflashed = 0
 		amtflashed2 = 0
 	end)
 
-	hook.Add("Post Pre Post Processing","flasheseffect",function()
+	hook.Add("Post Post Pre Post Processing","flasheseffect",function()
 		if !lply:Alive() then
 			if !next(hg.flashes) then
 				hg.flashes = {}
@@ -1126,8 +1125,6 @@ players : 1 humans, 0 bots (20 max)
 			flash = hg.flashes[i]
 
 			if (flash.time or 0) < CurTime() then table.remove(hg.flashes[i]) continue end
-
-			if flash.is_headtrauma then continue end
 
 			local animpos = (flash.time - CurTime()) / flash.lentime
 			local size = flash.size
@@ -1149,7 +1146,6 @@ players : 1 humans, 0 bots (20 max)
 
 		for i = 1, #hg.flashes do
 			flash = hg.flashes[i]
-			if flash.is_headtrauma then continue end
 			
 			local animpos = flash.animpos
 			local size = flash.size

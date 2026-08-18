@@ -76,13 +76,6 @@ if (CLIENT) then
 else
 	util.AddNetworkString("ZB_request_fullupdate")
 
-	local function ShouldSkipNetVarResend(currentValue, newValue, receiver)
-		if receiver ~= nil then return false end
-		if istable(currentValue) or istable(newValue) then return false end
-
-		return currentValue == newValue
-	end
-
 	net.Receive("ZB_request_fullupdate",function(len,ply)
 		ply.cooldown_sendnet = ply.cooldown_sendnet or 0
 		if ply.cooldown_sendnet < CurTime() then
@@ -129,20 +122,24 @@ else
     	end--]]
     end
 
+	local function isScalarNetValue(value)
+		local valueType = type(value)
+		return valueType == "number" or valueType == "string" or valueType == "boolean"
+	end
+
     function GetNetVar(key, default)
     	local value = zb.net.globals[key]
 
     	return value != nil and value or default
     end
 
-    function SetNetVar(key, value, receiver)
-    	if (CheckBadType(key, value)) then return end
-
-		if ShouldSkipNetVarResend(zb.net.globals[key], value, receiver) then return end
+    function SetNetVar(key, value, receiver, unreliable)
+		if (CheckBadType(key, value)) then return end
+		if receiver == nil and not unreliable and isScalarNetValue(value) and zb.net.globals[key] == value then return end
 		
     	zb.net.globals[key] = value
 
-    	net.Start("zbGlobalVarSet")
+    	net.Start("zbGlobalVarSet", unreliable)
     	net.WriteString(key)
     	net.WriteType(value)
 
@@ -194,11 +191,11 @@ else
     end
 
     function playerMeta:SetLocalVar(key, value)
-    	if (CheckBadType(key, value)) then return end
+		if (CheckBadType(key, value)) then return end
 
-    	zb.net.locals[self] = zb.net.locals[self] or {}
-		if ShouldSkipNetVarResend(zb.net.locals[self][key], value, nil) then return end
-    	zb.net.locals[self][key] = value
+		zb.net.locals[self] = zb.net.locals[self] or {}
+		if isScalarNetValue(value) and zb.net.locals[self][key] == value then return end
+		zb.net.locals[self][key] = value
 
     	net.Start("zbLocalVarSet")
     		net.WriteString(key)
@@ -215,12 +212,14 @@ else
     end
 
     function entityMeta:SetNetVar(key, value, receiver)
-    	if (CheckBadType(key, value)) then return end
+		if (CheckBadType(key, value)) then return end
 
 		zb.net.list[self] = zb.net.list[self] or {}
+		if receiver == nil and isScalarNetValue(value) and zb.net.list[self][key] == value then return end
 
-		if ShouldSkipNetVarResend(zb.net.list[self][key], value, receiver) then return end
-    	zb.net.list[self][key] = value
+    	if (zb.net.list[self][key] != value) then
+    		zb.net.list[self][key] = value 
+    	end
 		
 		self:SendNetVar(key, receiver)
 	end

@@ -22,10 +22,16 @@ local color = Color(90,0,0,122)
 
 bloodparticles_hook[3] = function(anim_pos)
     local time = CurTime()
+	local eyePos = EyePos()
+	local eyeForward = EyeAngles():Forward()
+	local drawDistance = hg_blood_draw_distance:GetInt()
+	local drawDistanceSqr = drawDistance * drawDistance
 
     for i = 1, #hg.bloodparticles2 do
         local part = hg.bloodparticles2[i]
         if not part then continue end
+		if (part[2] - eyePos):LengthSqr() > drawDistanceSqr then continue end
+		if (part[2] - eyePos):Dot(eyeForward) < 0 then continue end
         local animpos = math.max((part[7] - time) / part[8], 0)
         color.a = part.water and (200 * animpos) or (122 * animpos)
         local sizeing = part.water and math.max((1 - animpos), 0.1) or 1
@@ -54,23 +60,27 @@ bloodparticles_hook[4] = function(mul)
 
     for i = #hg.bloodparticles2, 1, -1 do
         local part = hg.bloodparticles2[i]
-        if not part then table_remove(hg.bloodparticles2, i) continue end
+        if not part then hg.bloodparticles2[i] = hg.bloodparticles2[#hg.bloodparticles2]; table_remove(hg.bloodparticles2) continue end
+		if part[7] <= time then
+			hg.bloodparticles2[i] = hg.bloodparticles2[#hg.bloodparticles2]; table_remove(hg.bloodparticles2)
+			continue
+		end
 
         local pos = part[1]
         local posSet = part[2]
         
         tr.start = posSet
         tr.endpos = tr.start + part[3] * mul
-        result = util_TraceLine(tr)
+		local result = util_TraceLine(tr)
         
         local hitPos = result.HitPos
 
         local up = hitPos[3] - pos[3]
 
-		if radiusSqr < hitPos:LengthSqr() then table_remove(hg.bloodparticles2, i) continue end
+		if radiusSqr < hitPos:LengthSqr() then hg.bloodparticles2[i] = hg.bloodparticles2[#hg.bloodparticles2]; table_remove(hg.bloodparticles2) continue end
 
-        if result.Hit or part[7] - time <= 0 then
-            table_remove(hg.bloodparticles2, i)
+		if result.Hit then
+            hg.bloodparticles2[i] = hg.bloodparticles2[#hg.bloodparticles2]; table_remove(hg.bloodparticles2)
             
             --util.Decal("Water.Blood", pos + result.HitNormal, pos - result.HitNormal, ents.FindInSphere(pos, 1))
 
@@ -89,7 +99,12 @@ bloodparticles_hook[4] = function(mul)
 
         part[3] = LerpVector(0.5 * mul,part[3],vecZero)
 
-        if bit.band(util.PointContents(pos + vector_up * 7), CONTENTS_WATER) != CONTENTS_WATER then
+		if time >= (part.nextwater or 0) then
+			part.nextwater = time + 0.08
+			part.outsideWater = bit.band(util.PointContents(pos + vector_up * 7), CONTENTS_WATER) != CONTENTS_WATER
+		end
+
+		if part.outsideWater then
             part[3][3] = -5
             --pos:Add(-vector_up * up)
             --posSet:Add(-vector_up * up)

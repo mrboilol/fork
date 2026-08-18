@@ -637,23 +637,41 @@ hg.fakeBoneFlop = hg.fakeBoneFlop or {}
 local fakeBoneFlop = hg.fakeBoneFlop
 local fakeBoneMatrixCache = fakeBoneFlop.matrix_cache or {}
 fakeBoneFlop.matrix_cache = fakeBoneMatrixCache
+local serverOnlyEFlag = EFL_SERVER_ONLY or 512
+
+local networkOriginLimit = 16000
+local function isSafeNetworkPos(pos)
+	if not isvector(pos) then return false end
+	return pos.x == pos.x and pos.y == pos.y and pos.z == pos.z
+		and math.abs(pos.x) < networkOriginLimit
+		and math.abs(pos.y) < networkOriginLimit
+		and math.abs(pos.z) < networkOriginLimit
+end
 
 local fakeBoneParents = {
+	["ValveBiped.Bip01_Head1"] = "ValveBiped.Bip01_Spine3",
+	["ValveBiped.Bip01_Spine3"] = "ValveBiped.Bip01_Spine2",
 	["ValveBiped.Bip01_R_UpperArm"] = "ValveBiped.Bip01_Spine2",
 	["ValveBiped.Bip01_L_UpperArm"] = "ValveBiped.Bip01_Spine2",
 	["ValveBiped.Bip01_R_Forearm"] = "ValveBiped.Bip01_R_UpperArm",
 	["ValveBiped.Bip01_L_Forearm"] = "ValveBiped.Bip01_L_UpperArm",
-	["ValveBiped.Bip01_R_Hand"] = "ValveBiped.Bip01_R_Forearm",
-	["ValveBiped.Bip01_L_Hand"] = "ValveBiped.Bip01_L_Forearm",
 	["ValveBiped.Bip01_R_Thigh"] = "ValveBiped.Bip01_Pelvis",
 	["ValveBiped.Bip01_L_Thigh"] = "ValveBiped.Bip01_Pelvis",
 	["ValveBiped.Bip01_R_Calf"] = "ValveBiped.Bip01_R_Thigh",
 	["ValveBiped.Bip01_L_Calf"] = "ValveBiped.Bip01_L_Thigh",
-	["ValveBiped.Bip01_R_Foot"] = "ValveBiped.Bip01_R_Calf",
-	["ValveBiped.Bip01_L_Foot"] = "ValveBiped.Bip01_L_Calf",
 }
 
 local fakeBoneLimits = {
+	["ValveBiped.Bip01_Head1"] = {
+		[0] = {[0] = "55", [1] = "-55"},
+		[1] = {[0] = "35", [1] = "-90"},
+		[2] = {[0] = "50", [1] = "-50"},
+	},
+	["ValveBiped.Bip01_Spine3"] = {
+		[0] = {[0] = "45", [1] = "-45"},
+		[1] = {[0] = "45", [1] = "-45"},
+		[2] = {[0] = "45", [1] = "-45"},
+	},
 	["ValveBiped.Bip01_R_UpperArm"] = {
 		[0] = {[0] = "100", [1] = "-100"},
 		[1] = {[0] = "50", [1] = "-50"},
@@ -673,12 +691,6 @@ local fakeBoneLimits = {
 		[0] = {[0] = "90", [1] = "-135"},
 		[1] = {[0] = "45", [1] = "-45"},
 		[2] = {[0] = "90", [1] = "-90"},
-	},
-	["ValveBiped.Bip01_R_Hand"] = {
-		[0] = {[0] = "90", [1] = "-90"}, [1] = {[0] = "90", [1] = "-90"}, [2] = {[0] = "90", [1] = "-90"},
-	},
-	["ValveBiped.Bip01_L_Hand"] = {
-		[0] = {[0] = "90", [1] = "-90"}, [1] = {[0] = "90", [1] = "-90"}, [2] = {[0] = "90", [1] = "-90"},
 	},
 	["ValveBiped.Bip01_R_Thigh"] = {
 		[0] = {[0] = "100", [1] = "-60"},
@@ -700,12 +712,6 @@ local fakeBoneLimits = {
 		[1] = {[0] = "45", [1] = "-20"},
 		[2] = {[0] = "5", [1] = "-45"},
 	},
-	["ValveBiped.Bip01_R_Foot"] = {
-		[0] = {[0] = "45", [1] = "-45"}, [1] = {[0] = "45", [1] = "-45"}, [2] = {[0] = "45", [1] = "-45"},
-	},
-	["ValveBiped.Bip01_L_Foot"] = {
-		[0] = {[0] = "45", [1] = "-45"}, [1] = {[0] = "45", [1] = "-45"}, [2] = {[0] = "45", [1] = "-45"},
-	},
 }
 
 local fakeBoneCrookedOffsets = {
@@ -725,8 +731,6 @@ local fakeBoneCrookedOffsets = {
 		pos = Vector(0, 2, -1),
 		ang = Angle(-65, 10, -85),
 	},
-	["ValveBiped.Bip01_R_Hand"] = {pos = Vector(0, -1.2, -0.5), ang = Angle(-25, -20, 45)},
-	["ValveBiped.Bip01_L_Hand"] = {pos = Vector(0, 1.2, -0.5), ang = Angle(-25, 20, -45)},
 	["ValveBiped.Bip01_R_Thigh"] = {
 		pos = Vector(0, -3, 1),
 		ang = Angle(25, -20, 20),
@@ -743,94 +747,73 @@ local fakeBoneCrookedOffsets = {
 		pos = Vector(0, 2, -1),
 		ang = Angle(-55, 10, -30),
 	},
-	["ValveBiped.Bip01_R_Foot"] = {pos = Vector(1, -0.5, -1), ang = Angle(30, -10, 20)},
-	["ValveBiped.Bip01_L_Foot"] = {pos = Vector(1, 0.5, -1), ang = Angle(30, 10, -20)},
+	["ValveBiped.Bip01_Spine3"] = {
+		pos = Vector(0, 0, -2),
+		ang = Angle(-30, 0, 0),
+	},
+	["ValveBiped.Bip01_Head1"] = {
+		pos = Vector(0, 0, -4),
+		ang = Angle(-45, 0, 0),
+	},
 }
 
 local fakeLimbBoneGroups = {
 	larm = {
 		"ValveBiped.Bip01_L_UpperArm",
 		"ValveBiped.Bip01_L_Forearm",
-		"ValveBiped.Bip01_L_Hand",
 	},
 	rarm = {
 		"ValveBiped.Bip01_R_UpperArm",
 		"ValveBiped.Bip01_R_Forearm",
-		"ValveBiped.Bip01_R_Hand",
 	},
 	lleg = {
 		"ValveBiped.Bip01_L_Thigh",
 		"ValveBiped.Bip01_L_Calf",
-		"ValveBiped.Bip01_L_Foot",
 	},
 	rleg = {
 		"ValveBiped.Bip01_R_Thigh",
 		"ValveBiped.Bip01_R_Calf",
-		"ValveBiped.Bip01_R_Foot",
 	},
 }
 
 local fakeLimbBoneSegments = {
 	larm = {
-		[1] = "ValveBiped.Bip01_L_UpperArm",
-		[2] = "ValveBiped.Bip01_L_Forearm",
-		[3] = "ValveBiped.Bip01_L_Hand",
 		up = "ValveBiped.Bip01_L_UpperArm",
 		down = "ValveBiped.Bip01_L_Forearm",
 	},
 	rarm = {
-		[1] = "ValveBiped.Bip01_R_UpperArm",
-		[2] = "ValveBiped.Bip01_R_Forearm",
-		[3] = "ValveBiped.Bip01_R_Hand",
 		up = "ValveBiped.Bip01_R_UpperArm",
 		down = "ValveBiped.Bip01_R_Forearm",
 	},
 	lleg = {
-		[1] = "ValveBiped.Bip01_L_Thigh",
-		[2] = "ValveBiped.Bip01_L_Calf",
-		[3] = "ValveBiped.Bip01_L_Foot",
 		up = "ValveBiped.Bip01_L_Thigh",
 		down = "ValveBiped.Bip01_L_Calf",
 	},
 	rleg = {
-		[1] = "ValveBiped.Bip01_R_Thigh",
-		[2] = "ValveBiped.Bip01_R_Calf",
-		[3] = "ValveBiped.Bip01_R_Foot",
 		up = "ValveBiped.Bip01_R_Thigh",
 		down = "ValveBiped.Bip01_R_Calf",
 	},
 }
 
 function fakeBoneFlop.ResolveBone(limb, segment)
-	local segments = fakeLimbBoneSegments[limb]
-	if not segments then return end
-	if segment == nil then segment = 2 elseif isnumber(segment) then segment = math.Clamp(math.Round(segment), 1, 3) end
-	return segments[segment] or segments[2]
+	return fakeLimbBoneSegments[limb] and fakeLimbBoneSegments[limb][segment]
 end
 
 function fakeBoneFlop.GetLimbBones(limb)
 	return fakeLimbBoneGroups[limb]
 end
 
-local function normalizeFloppyState(state)
-	if istable(state) then return table.Copy(state) end
-	if isstring(state) then return {state = state} end
-	return {state = "broken"}
-end
-
-function fakeBoneFlop.FlagBone(org, bone, active, state)
+function fakeBoneFlop.FlagBone(org, bone, active)
 	if not org or not bone then return false end
 
 	if active then
 		org.fake_floppy_bones = org.fake_floppy_bones or {}
-		local wanted = normalizeFloppyState(state)
-		local current = org.fake_floppy_bones[bone]
-		if istable(current) and current.state == wanted.state and current.limb == wanted.limb and current.segment == wanted.segment then return false, bone end
-		org.fake_floppy_bones[bone] = wanted
-		return true, bone
+		if org.fake_floppy_bones[bone] then return false end
+		org.fake_floppy_bones[bone] = true
+		return true
 	end
 
-	if not org.fake_floppy_bones then return false, bone end
+	if not org.fake_floppy_bones then return false end
 	if not org.fake_floppy_bones[bone] then return false end
 	org.fake_floppy_bones[bone] = nil
 
@@ -838,34 +821,21 @@ function fakeBoneFlop.FlagBone(org, bone, active, state)
 		org.fake_floppy_bones = nil
 	end
 
-	return true, bone
+	return true
 end
 
-function fakeBoneFlop.SetLimbSegmentState(org, limb, segment, active, state)
+function fakeBoneFlop.SetLimbSegmentState(org, limb, segment, active)
 	local bone = fakeBoneFlop.ResolveBone(limb, segment)
-	local meta = normalizeFloppyState(state)
-	meta.limb = meta.limb or limb
-	meta.segment = meta.segment or (isnumber(segment) and math.Clamp(math.Round(segment), 1, 3) or segment or 2)
-	local changed = fakeBoneFlop.FlagBone(org, bone, active, meta)
-	return changed, bone
-end
+	local changed = fakeBoneFlop.FlagBone(org, bone, active)
+	if not changed or not IsValid(org.owner) then return changed end
+	if not active then
+		fakeBoneFlop.ScheduleRebuild(org.owner)
+		return true
+	end
 
-function fakeBoneFlop.GetRagdollBoneState(rag, bone)
-	if not IsValid(rag) or not bone then return end
-	local state = rag.hg_floppy_bones and rag.hg_floppy_bones[bone]
-	if state then return normalizeFloppyState(state) end
-	local owner = hg.RagdollOwner and hg.RagdollOwner(rag) or rag:GetNWEntity("ply")
-	state = IsValid(owner) and owner.organism and owner.organism.fake_floppy_bones and owner.organism.fake_floppy_bones[bone]
-	return state and normalizeFloppyState(state) or nil
-end
-
-function fakeBoneFlop.GetPhysControlMultiplier(rag, physNumber, alreadyReal)
-	if not IsValid(rag) then return false, 1 end
-	local real = alreadyReal and physNumber or (hg.realPhysNum and hg.realPhysNum(rag, physNumber) or physNumber)
-	local bone = rag:TranslatePhysBoneToBone(real)
-	local state = bone and bone >= 0 and fakeBoneFlop.GetRagdollBoneState(rag, rag:GetBoneName(bone)) or nil
-	if not state then return false, 1 end
-	return true, state.state == "dislocated" and 0.18 or 0
+	local rag = hg.GetCurrentCharacter(org.owner)
+	if IsValid(rag) and rag:IsRagdoll() then fakeBoneFlop.ScheduleApply(rag, bone, org) end
+	return changed
 end
 
 function fakeBoneFlop.ClearStoredLimb(org, limb)
@@ -899,8 +869,6 @@ function fakeBoneFlop.BendBone(rag, bone, forceMul)
 	if not IsValid(rag) then return end
 	if not (rag.hg_floppy_bones and rag.hg_floppy_bones[bone]) then return end
 	forceMul = forceMul or 1
-	local state = fakeBoneFlop.GetRagdollBoneState(rag, bone)
-	if state and state.state == "dislocated" then forceMul = forceMul * 1.25 end
 
 	local parentBone = fakeBoneParents[bone]
 	local offset = fakeBoneCrookedOffsets[bone]
@@ -913,6 +881,7 @@ function fakeBoneFlop.BendBone(rag, bone, forceMul)
 	local physIDChild = rag:TranslateBoneToPhysBone(boneIDChild)
 	local physIDParent = rag:TranslateBoneToPhysBone(boneIDParent)
 	if physIDChild < 0 or physIDParent < 0 then return end
+	if rag.gibRemove and (rag.gibRemove[physIDChild] or rag.gibRemove[physIDParent]) then return end
 
 	local phys = rag:GetPhysicsObjectNum(physIDChild)
 	local physParent = rag:GetPhysicsObjectNum(physIDParent)
@@ -957,19 +926,20 @@ local function fakeBoneBuildMatrixCache(rag)
 		local boneID = rag:TranslatePhysBoneToBone(i)
 		local mesh = meshes[boneID]
 		if mesh and mesh.matrix then
-			fakeBoneMatrixCache[model][boneID] = mesh.matrix:GetInverse()
+			local inv = mesh.matrix:GetInverse()
+			local t = inv:GetTranslation()
+			if isSafeNetworkPos(t) then
+				fakeBoneMatrixCache[model][boneID] = inv
+			end
 		end
 	end
 
 	return fakeBoneMatrixCache[model]
 end
 
-function fakeBoneFlop.ApplyBone(rag, bone, state)
+function fakeBoneFlop.ApplyBone(rag, bone)
 	if not IsValid(rag) then return end
-	if rag.hg_floppy_bones and rag.hg_floppy_bones[bone] then
-		if state then rag.hg_floppy_bones[bone] = normalizeFloppyState(state) end
-		return
-	end
+	if rag.hg_floppy_bones and rag.hg_floppy_bones[bone] then return end
 
 	local parentBone = fakeBoneParents[bone]
 	local limits = fakeBoneLimits[bone]
@@ -982,10 +952,46 @@ function fakeBoneFlop.ApplyBone(rag, bone, state)
 	local physIDChild = rag:TranslateBoneToPhysBone(boneIDChild)
 	local physIDParent = rag:TranslateBoneToPhysBone(boneIDParent)
 	if physIDChild < 0 or physIDParent < 0 then return end
+	if rag.gibRemove and (rag.gibRemove[physIDChild] or rag.gibRemove[physIDParent]) then return end
 
 	local phys = rag:GetPhysicsObjectNum(physIDChild)
 	local physParent = rag:GetPhysicsObjectNum(physIDParent)
-	if not IsValid(phys) or not IsValid(physParent) then return end
+	if not IsValid(phys) or not IsValid(physParent) or phys == physParent then return end
+
+	if bone == "ValveBiped.Bip01_Head1" then
+		local anchor = WorldToLocal(
+			phys:GetPos() + phys:GetAngles():Forward() * -2 + phys:GetAngles():Up() * -1.5,
+			angle_zero,
+			physParent:GetPos(),
+			physParent:GetAngles()
+		)
+
+		rag:RemoveInternalConstraint(physIDChild)
+		phys:SetPos(physParent:GetPos() + physParent:GetAngles():Forward() * 12.9 + physParent:GetAngles():Right() * -1)
+
+		local cons = ents.Create("phys_ragdollconstraint")
+		if not IsValid(cons) then return end
+		cons:AddEFlags(serverOnlyEFlag)
+		cons:SetPos(physParent:LocalToWorld(anchor))
+		cons:SetKeyValue("xmin", "-55")
+		cons:SetKeyValue("xmax", "55")
+		cons:SetKeyValue("ymin", "-90")
+		cons:SetKeyValue("ymax", "35")
+		cons:SetKeyValue("zmin", "-50")
+		cons:SetKeyValue("zmax", "50")
+		cons:SetKeyValue("spawnflags", "0")
+		cons:SetPhysConstraintObjects(physParent, phys)
+		cons:Spawn()
+		cons:Activate()
+		phys:AddAngleVelocity(Vector(0, 45, 20))
+
+		rag.hg_floppy_constraints = rag.hg_floppy_constraints or {}
+		rag.hg_floppy_bones = rag.hg_floppy_bones or {}
+		rag.hg_floppy_constraints[bone] = cons
+		rag.hg_floppy_bones[bone] = true
+		rag:SetSaveValue("m_ragdoll.allowStretch", false)
+		return
+	end
 
 	local matrixCache = fakeBoneBuildMatrixCache(rag)
 	if not matrixCache then return end
@@ -993,6 +999,10 @@ function fakeBoneFlop.ApplyBone(rag, bone, state)
 	local matrix = matrixCache[boneIDChild]
 	local matrixParent = matrixCache[boneIDParent]
 	if not matrix or not matrixParent then return end
+
+	local childTrans = matrix:GetTranslation()
+	local parentTrans = matrixParent:GetTranslation()
+	if not isSafeNetworkPos(childTrans) or not isSafeNetworkPos(parentTrans) then return end
 
 	rag.hg_floppy_constraints = rag.hg_floppy_constraints or {}
 	rag.hg_floppy_bones = rag.hg_floppy_bones or {}
@@ -1021,6 +1031,8 @@ function fakeBoneFlop.ApplyBone(rag, bone, state)
 	physParent:SetAngles(rag:LocalToWorldAngles(matrixParent:GetAngles()))
 
 	local cons = ents.Create("phys_ragdollconstraint")
+	if not IsValid(cons) then return end
+	cons:AddEFlags(serverOnlyEFlag)
 	cons:SetPos(childPos)
 	cons:SetKeyValue("xmin", limits[0][1])
 	cons:SetKeyValue("xmax", limits[0][0])
@@ -1028,12 +1040,13 @@ function fakeBoneFlop.ApplyBone(rag, bone, state)
 	cons:SetKeyValue("ymax", limits[1][0])
 	cons:SetKeyValue("zmin", limits[2][1])
 	cons:SetKeyValue("zmax", limits[2][0])
+	cons:SetKeyValue("spawnflags", "0")
 	cons:SetPhysConstraintObjects(phys, physParent)
 	cons:Spawn()
 	cons:Activate()
 
 	rag.hg_floppy_constraints[bone] = cons
-	rag.hg_floppy_bones[bone] = normalizeFloppyState(state or fakeBoneFlop.GetRagdollBoneState(rag, bone))
+	rag.hg_floppy_bones[bone] = true
 
 	phys:SetPos(posOri)
 	phys:SetAngles(angOri)
@@ -1052,22 +1065,37 @@ function fakeBoneFlop.ApplyBone(rag, bone, state)
 	rag:SetSaveValue("m_ragdoll.allowStretch", false)
 end
 
+function fakeBoneFlop.ScheduleApply(rag, bone, org)
+	if not IsValid(rag) or not bone then return end
+	rag.hg_floppy_pending = rag.hg_floppy_pending or {}
+	if rag.hg_floppy_pending[bone] then return end
+	rag.hg_floppy_pending[bone] = true
+
+	timer.Simple(0, function()
+		if not IsValid(rag) then return end
+		rag.hg_floppy_pending[bone] = nil
+		local activeOrg = rag.organism or org
+		if activeOrg and not (activeOrg.fake_floppy_bones and activeOrg.fake_floppy_bones[bone]) then return end
+		fakeBoneFlop.ApplyBone(rag, bone)
+	end)
+end
+
 function fakeBoneFlop.ApplyStored(rag, org)
 	if not IsValid(rag) or not org or not org.fake_floppy_bones then return end
 
-	for bone, state in pairs(org.fake_floppy_bones) do
-		fakeBoneFlop.ApplyBone(rag, bone, state)
+	for bone in pairs(org.fake_floppy_bones) do
+		fakeBoneFlop.ScheduleApply(rag, bone, org)
 	end
 
-	timer.Simple(0, function()
+	timer.Simple(0.01, function()
 		if IsValid(rag) then
-			fakeBoneFlop.BendStored(rag, org, 0.35)
+			fakeBoneFlop.BendStored(rag, rag.organism or org, 0.35)
 		end
 	end)
 
 	timer.Simple(0.12, function()
 		if IsValid(rag) then
-			fakeBoneFlop.BendStored(rag, org, 0.2)
+			fakeBoneFlop.BendStored(rag, rag.organism or org, 0.2)
 		end
 	end)
 end
@@ -1141,7 +1169,26 @@ hook.Add("Org Think", "hg-fakeboneflop-sync", function(owner, org)
 	end
 end)
 
+local amputatedRootBones = {
+	larm = "ValveBiped.Bip01_L_Forearm",
+	rarm = "ValveBiped.Bip01_R_Forearm",
+	lhand = "ValveBiped.Bip01_L_Hand",
+	rhand = "ValveBiped.Bip01_R_Hand",
+	larmup = "ValveBiped.Bip01_L_UpperArm",
+	rarmup = "ValveBiped.Bip01_R_UpperArm",
+	lleg = "ValveBiped.Bip01_L_Calf",
+	rleg = "ValveBiped.Bip01_R_Calf",
+	llegup = "ValveBiped.Bip01_L_Thigh",
+	rlegup = "ValveBiped.Bip01_R_Thigh"
+}
+
 hook.Add("OnAmputateLimb", "hg-fakeboneflop-amputation", function(org, ent, limb)
+	if IsValid(ent) and ent:IsRagdoll() then
+		local bone = ent:LookupBone(amputatedRootBones[limb] or "")
+		local physBone = bone and ent:TranslateBoneToPhysBone(bone)
+		if bone and physBone and physBone >= 0 then Gib_RemoveBone(ent, bone, physBone, true) end
+	end
+
 	if fakeBoneFlop.ClearStoredLimb(org, limb) and IsValid(org.owner) and org.owner:IsPlayer() then
 		fakeBoneFlop.ScheduleRebuild(org.owner)
 	end
@@ -1709,10 +1756,16 @@ hook.Add("PlayerLeaveVehicle","allowweapons",function(ply,veh)
 			ragdoll:SetParent()
 
 			if fast then
-				ragdoll:GetPhysicsObject():ApplyForceCenter(ragdoll:GetVelocity():GetNormalized() * 10000)
-				ragdoll:GetPhysicsObject():ApplyForceCenter(vector_up * 10000)
+				local phys = ragdoll:GetPhysicsObject()
+				if IsValid(phys) then
+					local vel = ragdoll:GetVelocity()
+					if vel:LengthSqr() < 1e6 then
+						phys:ApplyForceCenter(vel:GetNormalized() * 5000)
+					end
+					phys:ApplyForceCenter(vector_up * 5000)
+				end
 
-				veh:EmitSound("zbattle/glass_shatter.mp3")
+				veh:EmitSound("zbattle/glass_shatter.ogg")
 			end
 		else
 			ply:SetCollisionGroup(COLLISION_GROUP_PLAYER)
@@ -1899,7 +1952,7 @@ hook.Add("Ragdoll Collide", "FallSounds", function(rag, data)
 
 	rag:EmitSound("player/falling_foley/fall_foley"..mRandom(13)..".wav", 60, mRandom(95, 115), 1, CHAN_AUTO)
 	if mRandom(3) == 2 then
-		rag:EmitSound("physics/flesh/flesh_impact_hard"..mRandom(6)..".ogg", 55, mRandom(85, 105), 1, CHAN_AUTO)
+		rag:EmitSound("physics/flesh/flesh_impact_hard"..mRandom(6)..".wav", 55, mRandom(85, 105), 1, CHAN_AUTO)
 	end
 
 	--[[local ply = rag:GetNWEntity("ply")

@@ -14,20 +14,8 @@ function hg.organism.Add(ent)
 end
 
 function hg.organism.Clear(org)
-	if not org then return end
-
-	hook_Run("Org Clear", org)
-	if not IsValid(org.owner) then return end
-	
-	local owner = org.owner
-	if owner:IsPlayer() then
-		local lastDeathTime = owner.lastDeathTime or 0
-		if CurTime() - lastDeathTime < 2 then
-			return
-		end
-	end
-	
-	owner.fullsend = true
+	hook_Run("Org Clear", org)//.owner.organism_internal)
+	if IsValid(org.owner) then org.owner.fullsend = true end
 	hg.send_organism(org)
 end
 
@@ -38,23 +26,9 @@ function hg.organism.Remove(ent)
 end
 
 hook.Add("PlayerInitialSpawn", "homigrad-organism", function(ply) hg.organism.Add(ply) end)
-hook.Add("Player Spawn", "homigrad-organism", function(ply)
-	local org = ply.organism or hg.organism.Add(ply)
-	hg.organism.Clear(org)
-end)
+hook.Add("Player Spawn", "homigrad-organism", function(ply) hg.organism.Clear(ply.organism) end)
 hook.Add("PlayerDisconnected", "homigrad-organism", function(ply) hg.organism.Remove(ply) end)
 hook.Add("PostPlayerDeath", "homigrad-organism", function(ply)
-	ply.lastDeathTime = CurTime()
-	
-	local entIdx = ply:EntIndex()
-	if timer.GetTable then
-		for k, v in pairs(timer.GetTable()) do
-			if string.find(k, entIdx) then
-				timer.Remove(k)
-			end
-		end
-	end
-	
 	local ragdoll = ply:GetNWEntity("RagdollDeath")
 	
 	if not IsValid(ragdoll) then ragdoll = ply.FakeRagdoll end
@@ -62,6 +36,11 @@ hook.Add("PostPlayerDeath", "homigrad-organism", function(ply)
 	if IsValid(ragdoll) then
 		local newOrg = hg.organism.Add(ragdoll)
 		table.Merge(newOrg, ply.organism)
+		newOrg.woundNetGeneration = (newOrg.woundNetGeneration or 0) + 1
+		newOrg.woundNetFlushPending = nil
+		newOrg.woundsNetDirty = nil
+		newOrg.arterialWoundsNetDirty = nil
+		newOrg.mirrorWoundsToDeathRagdoll = nil
 
 		hook.Run("RagdollDeath", ply, ragdoll)
 
@@ -71,7 +50,9 @@ hook.Add("PostPlayerDeath", "homigrad-organism", function(ply)
 		newOrg.owner = ragdoll
 		ragdoll:CallOnRemove("organism", hg.organism.Remove, ragdoll)
 		newOrg.owner.fullsend = true
-		hg.send_bareinfo(newOrg)
+		hg.organism.FlushWoundsNet(newOrg, true, true)
+		hg.organism.FlushArterialWoundsNet(newOrg, true)
+		hg.send_bareinfo(newOrg, true, true)
 	end
 
 	hg.organism.Clear(ply.organism)
@@ -84,42 +65,37 @@ local delay = 0
 local time, mulTime, start
 local CurTime = CurTime
 local SysTime = SysTime
-timer.Create("homigrad-organism", tickrate, 0, function()
+hook.Add("Think", "homigrad-organism", function()
 	time = CurTime()
 	local tickrate2 = tickrate// / math.max(game.GetTimeScale(), 0.01)
 	//print(delay ,time + tickrate)
-	if delay + tickrate2 > time then
-		if HGPerf and perfStart then HGPerf:End("org.think.gate", perfStart) end
-		return
-	end
+	if delay + tickrate2 > time then return end
 
 	delay = time
 
 	if not start then
 		start = SysTime()
-		if HGPerf and perfStart then HGPerf:End("org.think.init", perfStart) end
 		return
 	end
 	
-	local sysTime = SysTime()
-	mulTime = (sysTime - start) * game.GetTimeScale()
+	mulTime = (SysTime() - start) * game.GetTimeScale()
 
-	start = sysTime
-	for owner, org in pairs(hg.organism.list) do -- теперь ясно почему от трупов лагает...
-		if not IsValid(owner) or org.owner ~= owner then hg.organism.list[owner] = nil continue end
+	start = SysTime()
+	for owner, org in pairs(hg.organism.list) do
+		if not IsValid(owner) or not org or org.owner ~= owner then
+			hg.organism.list[owner] = nil
+			continue
+		end
 		if org.godmode then continue end
 		hook_Run("Org Think", owner, org, mulTime)
 	end
-	if HGPerf and perfStart then HGPerf:End("org.think.main", perfStart) end
 end)
 
-	local lastcall = SysTime()
+local lastcall = SysTime()
 hook.Add("Org Think Call", "homigrad-organism", function(owner, org)
-	local sysTime = SysTime()
-	if (sysTime - lastcall) < tickrate then return end
-	lastcall = sysTime
+	if (SysTime() - lastcall) < tickrate then return end
+	lastcall = SysTime()
 	hook_Run("Org Think", owner, org, 0.00001)
-
 end)
 
 

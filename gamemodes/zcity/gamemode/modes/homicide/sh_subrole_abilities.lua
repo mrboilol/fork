@@ -41,22 +41,6 @@ MODE.DisarmReach = 90
 MODE.NoDisarmWeapons = {
 	["weapon_hands_sh"] = true,
 }
-MODE.ShadowCamouflageChargeTime = 5
-MODE.ShadowCamouflageWallDistance = 34
-MODE.ShadowCamouflageMoveSpeed = 10
-MODE.ShadowCamouflageGraceTime = 0.35
-MODE.ShadowCamouflageAlpha = 96
-MODE.ShadowCamouflageTint = Color(110, 120, 132, 96)
-MODE.ShadowCamouflageBlend = 0.34
-MODE.ShadowCamouflageColorModulation = {
-	0.42,
-	0.45,
-	0.5
-}
-
-function MODE.IsShadowRole(subrole)
-	return subrole == "traitor_shadow" or subrole == "traitor_shadow_soe"
-end
 
 --\\
 function MODE.GetPlayerTraceToOtherVictim(ply, victim, dist)
@@ -101,41 +85,6 @@ function MODE.GetPlayerTraceToOtherVictim(ply, victim, dist)
 end
 --//
 
---\\Chemical resistance
-function MODE.DegradeChemicalsOfPlayer(ply)
-	ply.PassiveAbility_ChemicalAccumulation = ply.PassiveAbility_ChemicalAccumulation or {}
-	
-	for chemical_name, amt in pairs(ply.PassiveAbility_ChemicalAccumulation) do
-		ply.PassiveAbility_ChemicalAccumulation[chemical_name] = math.max(amt - FrameTime() * (chemical_degrade_speeds[chemical_name] or 1), 0)
-	end
-end
-
-function MODE.CleanChemicalsOfPlayer(ply)
-	ply.PassiveAbility_ChemicalAccumulation = {}
-end
-
-function MODE.GetChemicalOfPlayer(ply, chemical_name)
-	ply.PassiveAbility_ChemicalAccumulation = ply.PassiveAbility_ChemicalAccumulation or {}
-	ply.PassiveAbility_ChemicalAccumulation[chemical_name] = (ply.PassiveAbility_ChemicalAccumulation[chemical_name] or 0)
-	
-	return ply.PassiveAbility_ChemicalAccumulation[chemical_name]
-end
-
-function MODE.SetChemicalToPlayer(ply, chemical_name, amt)
-	amt = amt or 1
-	ply.PassiveAbility_ChemicalAccumulation = ply.PassiveAbility_ChemicalAccumulation or {}
-	ply.PassiveAbility_ChemicalAccumulation[chemical_name] = amt
-end
-
-function MODE.AddChemicalToPlayer(ply, chemical_name, amt)
-	amt = amt or 1
-	ply.PassiveAbility_ChemicalAccumulation = ply.PassiveAbility_ChemicalAccumulation or {}
-	ply.PassiveAbility_ChemicalAccumulation[chemical_name] = (ply.PassiveAbility_ChemicalAccumulation[chemical_name] or 0) + amt
-	
-	return ply.PassiveAbility_ChemicalAccumulation[chemical_name]
-end
---//
-
 --\\Neck Break
 function MODE.CanPlayerBreakOtherNeck(ply, aim_ent)
 	if(aim_ent:IsRagdoll())then
@@ -176,66 +125,8 @@ end
 
 function MODE.BreakOtherNeck(ply, other_ply, aim_ent)
 	if(other_ply:Alive())then
-		other_ply:Kill()
 		other_ply:ViewPunch(Angle(0, 0, -10))
-		
-		aim_ent.organism.spine3 = 1
-		
-		aim_ent:EmitSound("neck_snap_01.ogg", 60, 100, 1, CHAN_AUTO)
-
-		timer.Simple(0.1, function()
-			local ent = other_ply:GetNWEntity("RagdollDeath")
-
-			if IsValid(ent) then
-				local headBoneName = "ValveBiped.Bip01_Head1"
-				local spineBoneName = "ValveBiped.Bip01_Neck1"
-				
-				local headBoneId = ent:LookupBone(headBoneName)
-				local spineBoneId = ent:LookupBone(spineBoneName)
-				
-				if not headBoneId or not spineBoneId then return end
-				
-				local headPhysBone = ent:TranslateBoneToPhysBone(headBoneId)
-				local spinePhysBone = ent:TranslateBoneToPhysBone(spineBoneId)
-				
-				if headPhysBone == -1 or spinePhysBone == -1 then return end
-				
-				ent:RemoveInternalConstraint(headPhysBone)
-
-				local pspine = ent:GetPhysicsObjectNum(spinePhysBone)
-				local phead = ent:GetPhysicsObjectNum(headPhysBone)
-				
-				if not IsValid(pspine) or not IsValid(phead) then return end
-				
-				-- Remove any existing neck constraint to prevent stacking
-				if ent.FloppyConstraints and ent.FloppyConstraints.neck then
-					local existing = ent.FloppyConstraints.neck
-					if IsValid(existing) then
-						existing:Remove()
-					end
-				end
-
-				-- Use physics object positions for constraint placement
-				local spine_pos = pspine:GetPos()
-				local spine_ang = pspine:GetAngles()
-				local head_pos = phead:GetPos()
-				local head_ang = phead:GetAngles()
-				
-				local lpos = WorldToLocal(head_pos + head_ang:Forward() * -2 + head_ang:Up() * -1.5, angle_zero, spine_pos, spine_ang)
-                
-				phead:SetPos(spine_pos + spine_ang:Forward() * 12.9 + spine_ang:Right() * -1)
-				phead:Wake()
-				pspine:Wake()
-
-				local cons = constraint.AdvBallsocket(ent, ent, spinePhysBone, headPhysBone, lpos, nil, 0, 0, -55, -90, -50, 55, 35, 50, 0, 0, 0, 0, 0)
-				
-				-- Track the constraint to prevent duplicates
-				if cons then
-					ent.FloppyConstraints = ent.FloppyConstraints or {}
-					ent.FloppyConstraints.neck = cons
-				end
-			end
-		end)
+		hg.BreakNeck(aim_ent, ply, aim_ent)
 	end
 end
 
@@ -570,48 +461,15 @@ function MODE.DisarmOther(ply, other_ply, aim_ent)
 		end
 
 		hg.LightStunPlayer(other_ply)
-
-		local function start_neck_grab(tries_left)
-			if not IsValid(ply) or not IsValid(other_ply) then return end
-			tries_left = tries_left or 12
-			hg.SetCarryEnt2(ply, nil)
-
+		timer.Simple(0,function()
 			local rag = hg.GetCurrentCharacter(other_ply)
-			if not IsValid(rag) or rag == other_ply then
-				if SERVER and other_ply:Alive() then
-					hg.Fake(other_ply)
-				end
-				rag = other_ply.FakeRagdoll or other_ply:GetNWEntity("RagdollDeath", other_ply.FakeRagdoll)
-			end
-
 			if IsValid(rag) and rag ~= other_ply then
 				local bon = rag:LookupBone("ValveBiped.Bip01_Head1")
 				local physnum = rag:TranslateBoneToPhysBone(bon)
 				local phys = rag:GetPhysicsObjectNum(physnum)
-				if IsValid(phys) then
-					local dist = 25
-					hg.SetCarryEnt2(ply, rag, bon, phys:GetMass(), Vector(-2,0,0), ply:GetAimVector() * dist + ply:EyeAngles():Up() * 5 + ply:EyeAngles():Right() * -5 + ply:GetShootPos(), ply:EyeAngles() + Angle(-90, 90, 0))
-					return
-				end
-			end
-
-			if tries_left > 0 then
-				timer.Simple(0.05, function()
-					start_neck_grab(tries_left - 1)
-				end)
-			end
-		end
-
-		local should_dislocate = ply.SubRole == "traitor_martial_artist" and other_ply.organism and not other_ply.organism.rarmamputated and math.random(1, 100) <= 50
-
-		if(should_dislocate)then
-			other_ply.organism.rarmdislocation = true
-			other_ply:EmitSound("newbonebreak/break" .. math.random(10) .. ".wav", 75, math.random(120, 135), 1, CHAN_AUTO, 0, 30)
-		end
-
-		timer.Simple(0, function()
-			if IsValid(ply) and IsValid(other_ply) then
-				start_neck_grab(14)
+				local dist = 25--phys:GetPos():Distance(ply:EyePos())
+				
+				hg.SetCarryEnt2(ply, rag, bon, phys:GetMass(), Vector(-2,0,0), ply:GetAimVector() * dist + ply:EyeAngles():Up() * 5 + ply:EyeAngles():Right() * -5 + ply:GetShootPos(), ply:EyeAngles() + Angle(-90, 90, 0))
 			end
 		end)
 	end
@@ -670,9 +528,6 @@ function MODE.ContinueDisarmingOther(ply)
 			if(ability_data.Progress >= 100)then
 				if(SERVER)then
 					MODE.DisarmOther(ply, victim, aim_ent)
-				end
-				if(ply.SubRole == "traitor_martial_artist")then
-					ply.Ability_DisarmNeedRelease = true
 				end
 				
 				

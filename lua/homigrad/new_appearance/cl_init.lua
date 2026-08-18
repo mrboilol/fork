@@ -112,8 +112,7 @@ function RenderAccessories(ply, accessories, setup)
 
 	islply = ((ply:IsRagdoll() and hg.RagdollOwner(ply)) or ply) == (LocalPlayer():Alive() and LocalPlayer() or LocalPlayer():GetNWEntity("spect",LocalPlayer())) and GetViewEntity() == (LocalPlayer():Alive() and LocalPlayer() or LocalPlayer():GetNWEntity("spect",LocalPlayer()))
 	
-	local fountains = GetNetVar("fountains") or {}
-	if ent == follow and hg_firstperson_death:GetBool() and !fountains[ent] then islply = true end
+	if ent == follow and hg_firstperson_death:GetBool() and !ent:GetNW2Bool("hg_fountain", false) then islply = true end
 
 	if IsShadowCamouflageActiveOnEnt(ent, ply) then
 		ClearAccessoryModels(ent)
