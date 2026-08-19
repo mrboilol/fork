@@ -83,22 +83,63 @@ local function emitRandomBoneBreakSound(ent, volume, level)
 end
 
 local armDropChances = {
-	shot = {larm = 0.003, rarm = 0.008},
-	dislocation = {larm = 0.07, rarm = 0.14},
-	fracture = {larm = 0.10, rarm = 0.20},
+	shot = {larm = 0.005, rarm = 0.025},
+	dislocation = {larm = 0.10, rarm = 0.45},
+	fracture = {larm = 0.18, rarm = 0.68},
 }
 
-local function tryDropHeldItemFromArmInjury(org, key, reason)
+local function weaponUsesBothHands(wep, owner)
+	if not IsValid(wep) then return false end
+	if wep.TwoHanded == true then return true end
+	if wep.OneHandedOnly == true or wep.TwoHanded == false then return false end
+
+	if wep.GetHandSupportState then
+		local ok, state = pcall(wep.GetHandSupportState, wep, owner)
+		if ok and istable(state) then
+			-- Do not require leftSupport here: the injury being processed may have
+			-- just made that arm unusable. We care whether this weapon/posture was a
+			-- two-hand grip, not whether the damaged hand remains usable afterward.
+			return state.wantsTwoHands == true and state.postureOneHanded ~= true
+		end
+	end
+
+	return false
+end
+
+local function tryDropHeldItemFromArmInjury(org, key, reason, severity, boneName, forceDrop)
 	if not SERVER or not org.isPly or (key ~= "larm" and key ~= "rarm") then return end
 	local owner = org.owner
 	if not IsValid(owner) or not owner:Alive() then return end
 	owner.hg_arm_drop_roll = owner.hg_arm_drop_roll or {}
-	if (owner.hg_arm_drop_roll[key] or 0) > CurTime() then return end
+	if not forceDrop and (owner.hg_arm_drop_roll[key] or 0) > CurTime() then return end
 	owner.hg_arm_drop_roll[key] = CurTime() + 0.12
-	local chance = armDropChances[reason] and armDropChances[reason][key] or 0
-	if chance <= 0 or math.random() >= chance then return end
+
 	local wep = owner:GetActiveWeapon()
 	if not IsValid(wep) then owner:DropObject() return end
+
+	-- The right hand is the primary firing/grip hand. The left hand only gets a
+	-- release roll when it is genuinely supporting a two-handed weapon.
+	if key == "larm" and not weaponUsesBothHands(wep, owner) then return end
+
+	local chance = armDropChances[reason] and armDropChances[reason][key] or 0
+	local severityK = math.Clamp(tonumber(severity) or 0, 0, 1.5)
+	local isHand = boneName == (key == "rarm" and "ValveBiped.Bip01_R_Hand" or "ValveBiped.Bip01_L_Hand")
+	local isForearm = boneName == (key == "rarm" and "ValveBiped.Bip01_R_Forearm" or "ValveBiped.Bip01_L_Forearm")
+
+	if reason == "shot" then
+		-- A direct hand hit has the strongest effect on grip. The support hand is
+		-- intentionally much harder to knock free than the primary right hand.
+		local handMul = key == "rarm" and 0.30 or 0.09
+		local forearmMul = key == "rarm" and 0.12 or 0.035
+		local otherMul = key == "rarm" and 0.06 or 0.015
+		chance = chance + severityK * (isHand and handMul or (isForearm and forearmMul or otherMul))
+		if isHand then chance = chance + (key == "rarm" and 0.10 or 0.03) end
+		chance = chance + math.Clamp(org[key] or 0, 0, 1) * (key == "rarm" and 0.18 or 0.05)
+	end
+	if forceDrop then chance = 1 end
+	chance = math.Clamp(chance, 0, 1)
+	if chance <= 0 or math.random() >= chance then return end
+	if wep:GetClass() == "weapon_hands_sh" then owner:DropObject() return end
 	if wep.GetCarrying and wep.SetCarrying and IsValid(wep:GetCarrying()) then
 		if key == "larm" and wep.UsingLeftHand == false then return end
 		if key == "rarm" and wep.UsingRightHand == false then return end
@@ -106,15 +147,27 @@ local function tryDropHeldItemFromArmInjury(org, key, reason)
 		owner:DropObject()
 		return
 	end
-	if wep.NoDrop then return end
+	if wep.NoDrop and not forceDrop then return end
 	if key == "larm" then
 		local rightMissing = org.rarmamputated == true
 		local oneHandedItem = wep.OneHandedOnly == true or wep.TwoHanded == false
 		if oneHandedItem and not rightMissing then return end
 	end
+
 	hook.Run("PlayerDropWeapon", owner)
 	owner:DropObject()
+	-- Amputation is a hard loss of grip. If a gamemode hook did not actually
+	-- release the active weapon, force the engine drop as a final fallback.
+	if forceDrop and IsValid(wep) and wep:GetOwner() == owner and not wep.bigNoDrop then
+		owner:DropWeapon(wep)
+	end
 end
+
+hook.Add("OnAmputateLimb", "HG_AmputationDropsHeldWeapon", function(org, ent, limb)
+	if limb == "rarm" then
+		tryDropHeldItemFromArmInjury(org, "rarm", "fracture", 1.5, "ValveBiped.Bip01_R_Hand", true)
+	end
+end)
 
 local function playBoneFractureSound(ent)
 	emitRandomBoneBreakSound(ent)
@@ -410,7 +463,7 @@ local function arms(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 
 	if org[key] == 1 then
 		addBrokenBoneHitTrauma(org, key, dmg, 0.5)
-		if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) then tryDropHeldItemFromArmInjury(org, key, "shot") end
+		if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) then tryDropHeldItemFromArmInjury(org, key, "shot", dmg, boneindex) end
 		return 0
 	end
 
@@ -420,11 +473,11 @@ local function arms(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 	markDamagedBone(org, key == "larm" and (segment == "up" and "ValveBiped.Bip01_L_UpperArm" or "ValveBiped.Bip01_L_Forearm") or (segment == "up" and "ValveBiped.Bip01_R_UpperArm" or "ValveBiped.Bip01_R_Forearm"), dmg)
 
 	if dmg < 0.6 then
-		if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) then tryDropHeldItemFromArmInjury(org, key, "shot") end
+		if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) then tryDropHeldItemFromArmInjury(org, key, "shot", dmg, boneindex) end
 		return 0
 	end
 	if dmg < 1 and !dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH + DMG_FALL) then
-		if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) then tryDropHeldItemFromArmInjury(org, key, "shot") end
+		if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) then tryDropHeldItemFromArmInjury(org, key, "shot", dmg, boneindex) end
 		return 0
 	end
 
@@ -447,7 +500,7 @@ local function arms(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 		--timer.Simple(0, function() hg.LightStunPlayer(org.owner,1) end)
 		playBoneFractureSound(org.owner)
 		if org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner, 1.35) end
-		tryDropHeldItemFromArmInjury(org, key, "fracture")
+		tryDropHeldItemFromArmInjury(org, key, "fracture", dmg, boneindex)
 	else
 		org[key .. "dislocation"] = true
 		markBrokenBone(org, key == "larm" and (segment == "up" and "ValveBiped.Bip01_L_UpperArm" or "ValveBiped.Bip01_L_Forearm") or (segment == "up" and "ValveBiped.Bip01_R_UpperArm" or "ValveBiped.Bip01_R_Forearm"))
@@ -462,7 +515,7 @@ local function arms(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 		--timer.Simple(0, function() hg.LightStunPlayer(org.owner,1) end)
 		playBoneFractureSound(org.owner)
 		if org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner, 1) end
-		tryDropHeldItemFromArmInjury(org, key, "dislocation")
+		tryDropHeldItemFromArmInjury(org, key, "dislocation", dmg, boneindex)
 	end
 
 	hg.AddHarmToAttacker(dmgInfo, (org[key] - oldDmg) * 1.5, "Arms bone damage harm")
@@ -624,6 +677,12 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	org._skullImpactThisHit = true
 	local oldDmg = org.skull
 	local oldConcussion = org.concussion or 0
+	-- Use the pre-impact skull state so this hit cannot amplify itself merely by
+	-- causing the fracture. The vulnerability applies to subsequent trauma.
+	local cranialVulnerability, cranialTraumaMul = 0, 1
+	if hg.organism.GetCranialTraumaFactors then
+		cranialVulnerability, cranialTraumaMul = hg.organism.GetCranialTraumaFactors(oldDmg)
+	end
 	if isFistInflictor(dmgInfo) then dmg = dmg * fist_skull_damage_mul end
 	local result, vecrand = damageBone(org, 0.25, dmg, dmgInfo, "skull", boneindex, dir, hit, ricochet)
 	local inflictor = dmgInfo:GetInflictor()
@@ -685,10 +744,16 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	-- A hard club, bat, or punch can injure the brain without opening the skull.
 	-- Scale this from impact energy so light taps remain concussion-only.
 	if severeBluntHeadImpact then
-		bluntBrainDamage = bluntBrainDamage + math.min(math.max(dmg - 0.35, 0) * 0.04, 0.2)
+		-- Once the skull is fractured, the same external impulse transfers more
+		-- energy to intracranial contents. Strong hits remain energy-scaled rather
+		-- than becoming a fixed "three-hit kill" counter.
+		bluntBrainDamage = bluntBrainDamage + math.min(math.max(dmg - 0.35, 0) * 0.065, 0.28)
 	end
 	if brainExposure > 0 and brainImpact then
-		bluntBrainDamage = bluntBrainDamage + dmg * 0.05 * Lerp(brainExposure, 0.35, 1)
+		bluntBrainDamage = bluntBrainDamage + dmg * 0.08 * Lerp(brainExposure, 0.35, 1)
+	end
+	if bluntBrainDamage > 0 and cranialVulnerability > 0 then
+		bluntBrainDamage = bluntBrainDamage * cranialTraumaMul
 	end
 
 	if math.random(1, 4) == 1 then
@@ -709,7 +774,11 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	local brainTraumaApplied = false
 	if bluntBrainDamage > 0 then
 		if isBluntBrainImpact(dmgInfo) and hg.organism.ApplyBluntBrainTrauma then
-			brainGain = hg.organism.ApplyBluntBrainTrauma(org, bluntBrainDamage, dmgInfo, 0.85)
+			-- With an intact skull, most blunt injury remains regional. As cranial
+			-- structure fails, the same impact behaves increasingly like diffuse
+			-- brain trauma, so repeated hard hits to a 1.0 skull become rapidly fatal.
+			local regionalChance = Lerp(cranialVulnerability, 0.85, 0.15)
+			brainGain = hg.organism.ApplyBluntBrainTrauma(org, bluntBrainDamage, dmgInfo, regionalChance)
 			brainTraumaApplied = true
 		else
 			local brainBefore = org.brain or 0

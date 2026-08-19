@@ -253,6 +253,82 @@ local function getHeldWoundClotMul(org, wound)
 	return hold_wound_clot_mul
 end
 
+-- Systemic hemostatic treatment accelerates clot formation; it never restores
+-- blood that has already been lost. internalBleedHeal is also treated as an
+-- active clotting-assistance pool so surgery/medical actions and TXA converge on
+-- the same mechanism instead of owning unrelated healing rules.
+local function getHemostaticTreatmentDrive(org)
+	local txa = math.Clamp((tonumber(org.tranexamic_acid) or 0) / 10, 0, 1)
+	local internalAid = math.Clamp((tonumber(org.internalBleedHeal) or 0) / 6, 0, 1)
+	return 1 - (1 - txa) * (1 - internalAid), txa, internalAid
+end
+
+local function initializeWoundHemostasis(wound, now)
+	if not wound then return end
+	if wound.openedAt == nil then
+		local recorded = tonumber(wound[5]) or now
+		wound.openedAt = math.min(recorded, now)
+	end
+	if wound.initialSeverity == nil then
+		wound.initialSeverity = math.max(tonumber(wound[1]) or 0, 0.01)
+	end
+end
+
+-- Returns the amount by which the open wound score should change this tick.
+-- Negative means clotting; positive means an uncontrolled severe wound is
+-- mechanically opening further. The growth branch is capped from the original
+-- wound size so it cannot become a runaway positive-feedback bleed.
+local function getWoundHemostasisDelta(org, wound, dt, now, arterial, catastrophic, compressionMul)
+	initializeWoundHemostasis(wound, now)
+
+	local cfg = hg.organism.config or {}
+	local severity = math.max(tonumber(wound[1]) or 0, 0)
+	local initial = math.max(tonumber(wound.initialSeverity) or severity, 0.01)
+	local age = math.max(now - (tonumber(wound.openedAt) or now), 0)
+	local treatment = getHemostaticTreatmentDrive(org)
+	local temperature = tonumber(org.temperature) or 36.7
+	local temperatureCoag = math.Clamp((temperature - 27) / 9.7, 0.25, 1)
+	local coag = math.Clamp(tonumber(org.coagulation_multiplier) or 1, 0.15, 2.5) * temperatureCoag
+	local nutrition = math.Clamp(0.75 + (tonumber(org.satiety) or 50) / 200, 0.75, 1.25)
+
+	local severeStart = tonumber(cfg.WOUND_UNSTABLE_START_SCORE) or 12
+	local severeFull = math.max(tonumber(cfg.WOUND_UNSTABLE_FULL_SCORE) or 30, severeStart + 0.01)
+	local severityK = math.Clamp((initial - severeStart) / (severeFull - severeStart), 0, 1)
+	local delay = Lerp(math.Clamp(initial / severeFull, 0, 1), tonumber(cfg.WOUND_CLOT_DELAY_MIN_S) or 6, tonumber(cfg.WOUND_CLOT_DELAY_MAX_S) or 18)
+	if arterial then delay = delay * (tonumber(cfg.ARTERIAL_CLOT_DELAY_MULTIPLIER) or 1.6) end
+	delay = math.max(delay * (1 - treatment * (tonumber(cfg.HEMOSTATIC_TREATMENT_DELAY_REDUCTION) or 0.82)), 1.5)
+
+	local rampSeconds = math.max(tonumber(cfg.WOUND_CLOT_RAMP_S) or 12, 0.1)
+	local maturity = math.Clamp((age - delay) / rampSeconds, 0, 1)
+	-- Strong treatment can begin stabilizing a fresh wound before natural clot
+	-- maturation would normally be established.
+	maturity = math.max(maturity, treatment * 0.88)
+
+	local clotRate = (tonumber(cfg.WOUND_CLOT_RATE_SCORE_S) or 0.11) * coag * nutrition * maturity
+	clotRate = clotRate * math.max(tonumber(compressionMul) or 1, 0.1)
+	clotRate = clotRate * (1 + treatment * (tonumber(cfg.HEMOSTATIC_TREATMENT_CLOT_GAIN) or 7))
+	if wound.bandaged then clotRate = clotRate * 1.8 end
+	if arterial then clotRate = clotRate * (tonumber(cfg.ARTERIAL_CLOT_RATE_MULTIPLIER) or 0.32) end
+	if catastrophic then clotRate = clotRate * (tonumber(cfg.CATASTROPHIC_ARTERIAL_CLOT_MULTIPLIER) or 0.08) end
+
+	local clot = clotRate * dt
+	local growth = 0
+	if severityK > 0 and not wound.bandaged then
+		local maxGrowthFraction = (tonumber(cfg.WOUND_UNSTABLE_MAX_GROWTH_FRACTION) or 0.22) * severityK
+		local maxSeverity = initial * (1 + maxGrowthFraction)
+		if severity < maxSeverity then
+			local pressure = math.Clamp((tonumber(org.bloodPressure) or 92) / 92, 0.25, 1.4)
+			local growthTime = math.max(tonumber(cfg.WOUND_UNSTABLE_GROWTH_TIME_S) or 90, 1)
+			local openFraction = 1 - maturity
+			local treatmentSuppression = 1 - treatment * 0.95
+			growth = initial * maxGrowthFraction / growthTime * severityK * pressure * openFraction * treatmentSuppression * dt
+			growth = math.min(growth, maxSeverity - severity)
+		end
+	end
+
+	return growth - clot, maturity, treatment
+end
+
 module[2] = function(owner, org, mulTime)
 	local adrenaline = math.Clamp(org.adrenaline or 0, 0, 2)
 	local isPlayer = owner:IsPlayer()
@@ -261,6 +337,8 @@ module[2] = function(owner, org, mulTime)
 	org.coagulation_multiplier = tonumber(org.coagulation_multiplier) or 1.2
 	org.blood_regeneration_multiplier = tonumber(org.blood_regeneration_multiplier) or 1.2
 	org.bleedingmul = tonumber(org.bleedingmul) or 0.8
+	local hemostaticTreatment, txaHemostasis, internalHemostasis = getHemostaticTreatmentDrive(org)
+	org.hemostaticTreatment = hemostaticTreatment
 
 	-- Internal bleeding increases external wound bleeding rate
 	if org.internalBleed > 0 then
@@ -445,10 +523,10 @@ module[2] = function(owner, org, mulTime)
 			local tourniquetBleedMul = hg.GetTourniquetBleedMultiplier and hg.GetTourniquetBleedMultiplier(owner, wound[4]) or 1
 			local heldClotMul = getHeldWoundClotMul(org, wound)
 			local rand1 = math.Rand(4, 10)
-			local rand2 = math.Rand(0.5, 1)
 			local bleed = rand1 * wound[1] * mulTime * math.max(pulse, 20) / 70 * wound_bleed_rate_mul * (1 - math.min(adrenaline / 6, 0.5)) * bleedMul * 0.02 * tourniquetBleedMul
 			bleed = bleed * getHeldWoundBleedMul(org, wound)
-			local coagulate = 2 * mulTime * rand2 * (adrenaline * 0.1 + 1) * (org.satiety / 100 + 1) * 0.05 * coagMul * heldClotMul
+			local compressionClotMul = heldClotMul * Lerp(math.Clamp(1 - tourniquetBleedMul, 0, 1), 1, 2.4)
+			local hemostasisDelta = getWoundHemostasisDelta(org, wound, mulTime, time, false, false, compressionClotMul)
 			local woundBleedRate = bleed / rand1 * 3
 			bleedoutspeed = bleedoutspeed + woundBleedRate
 			local visualWoundBleedRate = bleed / math.max(mulTime, 0.001)
@@ -462,10 +540,11 @@ module[2] = function(owner, org, mulTime)
 				hg.organism.BloodDroplet2(owner, org, wound, entVel + VectorRand(-50, 50), false)
 			end
 			if isAlive or not isPlayer then
-				wound[1] = max(wound[1] - coagulate, 0)
+				wound[1] = math.Clamp((wound[1] or 0) + hemostasisDelta, 0, math.max((wound.initialSeverity or wound[1] or 0) * 1.35, wound[1] or 0))
 			end
 
-			if wound[1] == 0 then
+			if wound[1] <= 0.001 then
+				wound[1] = 0
 				table.insert(woundsToRemove, i)
 			end
 		end
@@ -499,6 +578,7 @@ module[2] = function(owner, org, mulTime)
 		local isAmputation = wound[9] == true
 		local isHeadGib = wound[10] == "headgib"
 		local woundSeverityMul = isAmputation and amputation_arterial_bleed_mul or (isHeadGib and headgib_arterial_bleed_mul or 1)
+		initializeWoundHemostasis(wound, time)
 		local circulationOutput = math.max(tonumber(org.cardiacOutput) or 0, 0)
 		local pressureFactor = math.Clamp((tonumber(org.bloodPressure) or 0) / 92, 0, 1.5)
 		local pulseFactor = math.Clamp((tonumber(org.pulse) or 0) / 70, 0, 1.5)
@@ -538,10 +618,20 @@ module[2] = function(owner, org, mulTime)
 				end
 			end
 
-			if wound[1] == 0 then
-				table.insert(arterialToRemove, i)
-				org[wound[7]] = 0
-			end
+		end
+
+		if isAlive or not isPlayer then
+			local heldClotMul = getHeldWoundClotMul(org, wound)
+			local compressionClotMul = heldClotMul * Lerp(math.Clamp(1 - tourniquetBleedMul, 0, 1), 1, 3.0)
+			local catastrophic = isAmputation or isHeadGib
+			local hemostasisDelta = getWoundHemostasisDelta(org, wound, mulTime, time, true, catastrophic, compressionClotMul)
+			wound[1] = math.Clamp((wound[1] or 0) + hemostasisDelta, 0, math.max((wound.initialSeverity or wound[1] or 0) * 1.35, wound[1] or 0))
+		end
+
+		if (wound[1] or 0) <= 0.001 then
+			wound[1] = 0
+			table.insert(arterialToRemove, i)
+			org[wound[7]] = 0
 		end
 		arterialWoundBleedRates[i] = woundBleedRate
 		wound.visualBleedRate = woundBleedRate
@@ -588,18 +678,24 @@ module[2] = function(owner, org, mulTime)
 	local canHealInternalBleed = org.liver <= 0 or (org.tranexamic_acid or 0) > 0
 	local internalBleedHeal = org.internalBleedHeal or 0
 
-	-- Natural clotting remains slow. internalBleedHeal is pending treatment,
-	-- though, so consume it in lockstep with the injury it actually repairs. This
-	-- makes medicine act within seconds and prevents its healing budget from
-	-- fading away before it reaches the wound.
-	local naturalHeal = mulTime / (canHealInternalBleed and 150 or 300)
+	-- Internal hemostasis also has an opening phase. Large internal injuries take
+	-- longer to stabilize naturally, while TXA/internalBleedHeal can establish a
+	-- clot much earlier. The treatment budget still repairs only active bleeding.
+	local bleedBeforeHeal = math.max(org.internalBleed or 0, 0)
+	local internalSeverityK = math.Clamp(bleedBeforeHeal / 6, 0, 1)
+	local internalClotDelay = Lerp(internalSeverityK, 10, 32)
+	internalClotDelay = math.max(internalClotDelay * (1 - hemostaticTreatment * 0.86), 1.5)
+	local internalClotMaturity = math.Clamp(((org.internalBleedDuration or 0) - internalClotDelay) / 16, 0, 1)
+	internalClotMaturity = math.max(internalClotMaturity, hemostaticTreatment * 0.92)
+	local naturalHeal = mulTime / (canHealInternalBleed and 150 or 300) * internalClotMaturity
+	naturalHeal = naturalHeal * (1 + txaHemostasis * 8 + internalHemostasis * 4)
 	local treatmentHeal = 0
 	if internalBleedHeal > 0 then
 		local treatmentRate = math.Clamp(0.35 + internalBleedHeal * 0.15, 0.35, 1.1)
+		treatmentRate = treatmentRate * (0.8 + internalClotMaturity * 0.7)
 		treatmentHeal = math.min(internalBleedHeal, mulTime * treatmentRate)
 	end
 
-	local bleedBeforeHeal = math.max(org.internalBleed or 0, 0)
 	local naturalApplied = math.min(bleedBeforeHeal, naturalHeal)
 	local treatmentApplied = math.min(math.max(bleedBeforeHeal - naturalApplied, 0), treatmentHeal)
 	org.internalBleed = math.max(bleedBeforeHeal - naturalApplied - treatmentApplied, 0)

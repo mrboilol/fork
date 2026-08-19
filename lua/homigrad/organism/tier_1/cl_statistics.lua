@@ -174,6 +174,8 @@ local list = {
 	{"hemorrhageCompensation", 1, true},
 	{"compensationPulseMultiplier", 1},
 	{"compensationHeartRateTarget", 300, true},
+	{"mechanicalPulseCapture", 1},
+	{"pulseDeficit", 300, true},
 	{"palpitations", 1, true},
 	{"hypovolemia", 1, true},
 	{"hypovolemicShock", 1, true}, false,

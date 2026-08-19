@@ -370,13 +370,21 @@ local function applyHeadTraumaDizziness(org, dmgInfo, impactDamage, brainDamage)
 	if not penetrating and not traumatic then return 0 end
 
 	-- A skull strike can briefly throw off balance, while damage to brain tissue
-	-- makes the same reaction both substantially more likely and more severe.
+	-- makes the same reaction both substantially more likely and more severe. A
+	-- previously fractured skull raises susceptibility without replacing impact
+	-- energy as the actual cause of the neurological response.
 	local resistance = hg.organism.GetZerlkersResistance and hg.organism.GetZerlkersResistance(org) or 0
 	local traumaResponse = 1 - resistance * 0.65
-	local chance = math.Clamp((0.08 + impactDamage * 0.45 + brainDamage * 6) * traumaResponse, 0.08, 0.95)
+	local cranialTraumaMul = 1
+	if hg.organism.GetCranialTraumaFactors then
+		local _, derivedTraumaMul = hg.organism.GetCranialTraumaFactors(org)
+		cranialTraumaMul = derivedTraumaMul
+	end
+	local cranialResponse = 1 + (cranialTraumaMul - 1) * 0.35
+	local chance = math.Clamp((0.08 + impactDamage * 0.45 + brainDamage * 6) * traumaResponse * cranialResponse, 0.08, 0.98)
 	if math.Rand(0, 1) > chance then return 0 end
 
-	local dizziness = math.Clamp((math.Rand(0.3, 0.75) + impactDamage * 0.8 + brainDamage * 12) * traumaResponse, 0, 5)
+	local dizziness = math.Clamp((math.Rand(0.3, 0.75) + impactDamage * 0.8 + brainDamage * 12) * traumaResponse * cranialResponse, 0, 6)
 	org.disorientation = math.min((org.disorientation or 0) + dizziness, 10)
 	return dizziness
 end
@@ -399,12 +407,23 @@ local function applyBrainTraumaEffects(org, delta, dmgInfo, profile)
 	local penetrating = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
 	local impact = dmgInfo:IsDamageType(DMG_CLUB + DMG_BLAST + DMG_CRUSH + DMG_FALL)
 	local hemorrhageScale = profile.hemorrhage or 0.8
-	local hemorrhageChance = penetrating and math.Clamp(0.4 + delta * 2, 0, 0.98)
-		or impact and math.Clamp(0.12 + delta * hemorrhageScale * 1.5, 0, 0.8)
-		or math.Clamp(0.04 + delta * hemorrhageScale, 0, 0.5)
+	local cranialHemorrhageMul = 1
+	if hg.organism.GetCranialTraumaFactors then
+		local _, _, derivedHemorrhageMul = hg.organism.GetCranialTraumaFactors(org)
+		cranialHemorrhageMul = derivedHemorrhageMul
+	end
+	local hemorrhageProbabilityMul = math.sqrt(cranialHemorrhageMul)
+	local hemorrhageChance = penetrating and math.Clamp((0.4 + delta * 2) * hemorrhageProbabilityMul, 0, 0.995)
+		or impact and math.Clamp((0.12 + delta * hemorrhageScale * 1.5) * hemorrhageProbabilityMul, 0, 0.96)
+		or math.Clamp((0.04 + delta * hemorrhageScale) * hemorrhageProbabilityMul, 0, 0.75)
 
 	if math.Rand(0, 1) <= hemorrhageChance then
-		addBrainHemorrhage(org, delta * hemorrhageScale * 1.25, delta * (penetrating and 0.0035 or 0.0015))
+		-- Vulnerability strongly raises bleed probability, but the amount rises more
+		-- gently so one hard hit does not automatically max intracranial hemorrhage.
+		local hemorrhageAmountMul = 1 + (cranialHemorrhageMul - 1) * 0.15
+		local hemorrhageAmount = delta * hemorrhageScale * 1.25 * hemorrhageAmountMul
+		local hemorrhageRate = delta * (penetrating and 0.0035 or 0.0015) * hemorrhageProbabilityMul
+		addBrainHemorrhage(org, hemorrhageAmount, hemorrhageRate)
 	end
 end
 
@@ -533,12 +552,26 @@ end)
 hook.Add("HomigradDamage", "BrainHemorrhageTrauma", function(ply, dmgInfo, hitgroup)
 	local org = ply.organism
 	if not org or hitgroup ~= HITGROUP_HEAD or not org.skull then return end
-	if org.skull < 0.7 then return end
 
-	local chance = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) and 0.45 or dmgInfo:IsDamageType(DMG_CLUB + DMG_BLAST + DMG_CRUSH) and 0.22 or 0
-	chance = chance + math.max(org.skull - 0.7, 0) * 0.55
+	local cranialVulnerability, hemorrhageMul = 0, 1
+	if hg.organism.GetCranialTraumaFactors then
+		local derivedVulnerability, _, derivedHemorrhageMul = hg.organism.GetCranialTraumaFactors(org)
+		cranialVulnerability = derivedVulnerability
+		hemorrhageMul = derivedHemorrhageMul
+	end
+	if cranialVulnerability <= 0 then return end
+
+	-- This path represents an intracranial vessel injury from the head impact even
+	-- when no discrete brain hitbox took damage. It scales smoothly from a damaged
+	-- skull instead of waiting for an unrelated 0.7 threshold.
+	local baseChance = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) and 0.45
+		or dmgInfo:IsDamageType(DMG_CLUB + DMG_BLAST + DMG_CRUSH) and 0.22 or 0
+	if baseChance <= 0 then return end
+	local exposure = 0.35 + cranialVulnerability * 0.65
+	local chance = math.Clamp(baseChance * exposure * math.sqrt(hemorrhageMul), 0, 0.98)
 	if math.Rand(0, 1) <= chance then
-		addBrainHemorrhage(org, math.Rand(0.03, 0.09), math.Rand(0.0005, 0.0018))
+		local amountMul = 0.75 + hemorrhageMul * 0.25
+		addBrainHemorrhage(org, math.Rand(0.03, 0.09) * amountMul, math.Rand(0.0005, 0.0018) * math.sqrt(hemorrhageMul))
 	end
 end)
 

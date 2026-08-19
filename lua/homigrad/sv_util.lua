@@ -1,7 +1,96 @@
 local getBloodColor = FindMetaTable( "Entity" ).GetBloodColor
 local isBulletDamage = FindMetaTable( "CTakeDamageInfo" ).IsBulletDamage
+local string_find = string.find
 
 hg.ConVars = hg.ConVars or {}
+
+-- Held gun worldmodels are intentionally non-solid so they do not interfere with
+-- movement/physics. Bullets still need to be able to strike the weapon in front
+-- of the right hand, however. Intersect the shot segment with the server-side
+-- visual worldmodel AABB and redirect the hit into the wielder's right hand.
+-- The weapon absorbs part of the energy; the organism damage hook consumes the
+-- transient scale marker below exactly once.
+local function segmentAABB(startPos, endPos, mins, maxs)
+    local dir = endPos - startPos
+    local tmin, tmax = 0, 1
+    for _, axis in ipairs({"x", "y", "z"}) do
+        local start = startPos[axis]
+        local delta = dir[axis]
+        local minv, maxv = mins[axis], maxs[axis]
+        if math.abs(delta) < 0.0001 then
+            if start < minv or start > maxv then return nil end
+        else
+            local inv = 1 / delta
+            local t1 = (minv - start) * inv
+            local t2 = (maxv - start) * inv
+            if t1 > t2 then t1, t2 = t2, t1 end
+            tmin = math.max(tmin, t1)
+            tmax = math.min(tmax, t2)
+            if tmin > tmax then return nil end
+        end
+    end
+    return tmin
+end
+
+function hg.TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, originalTrace)
+    if not isvector(startPos) or not isvector(endPos) then return originalTrace end
+    local ray = endPos - startPos
+    local rayLength = ray:Length()
+    if rayLength <= 0.001 then return originalTrace end
+
+    local bestT, bestBody, bestPhysBone
+    for _, ply in ipairs(player.GetAll()) do
+        if ply == shooter or not IsValid(ply) or not ply:Alive() then continue end
+        local wep = ply:GetActiveWeapon()
+        if not IsValid(wep) then continue end
+        local worldModel = wep.worldModel
+        if not IsValid(worldModel) then continue end
+
+        local mins, maxs = worldModel:WorldSpaceAABB()
+        if not mins or not maxs then continue end
+        -- A tiny expansion catches the visible metal/polymer surface without
+        -- turning the weapon into a large invisible shield.
+        local expand = Vector(0.75, 0.75, 0.75)
+        local t = segmentAABB(startPos, endPos, mins - expand, maxs + expand)
+        if not t or t < 0 or t > 1 or (bestT and t >= bestT) then continue end
+
+        local body = IsValid(ply.FakeRagdoll) and ply.FakeRagdoll or ply
+        if not IsValid(body) then continue end
+        local handBone = body:LookupBone("ValveBiped.Bip01_R_Hand")
+        if handBone == nil then continue end
+        local physBone = body:TranslateBoneToPhysBone(handBone)
+        if not isnumber(physBone) or physBone < 0 then continue end
+
+        bestT, bestBody, bestPhysBone = t, body, physBone
+    end
+
+    if not bestT or not IsValid(bestBody) then return originalTrace end
+
+    local tr = table.Copy(originalTrace or {})
+    local hitPos = startPos + ray * bestT
+    local dir = ray / rayLength
+    tr.Hit = true
+    tr.HitWorld = false
+    tr.HitSky = false
+    tr.StartSolid = false
+    tr.AllSolid = false
+    tr.Entity = bestBody
+    tr.HitPos = hitPos
+    tr.StartPos = startPos
+    tr.Fraction = bestT
+    tr.PhysicsBone = bestPhysBone
+    tr.HitGroup = HITGROUP_RIGHTARM
+    tr.MatType = MAT_FLESH
+    tr.HitNormal = -dir
+    tr.Normal = dir
+
+    bestBody.hgHeldWeaponBulletIntercept = {
+        expires = CurTime() + 0.1,
+        damageScale = 0.55,
+        hitPos = hitPos,
+    }
+    return tr
+end
 
 local blastWallAttenuation = {
 	[MAT_GLASS] = 1.15,

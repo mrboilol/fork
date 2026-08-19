@@ -148,7 +148,7 @@ bloodparticles_hook[1] = function(anim_pos, mul)
 		local light3 = render.ComputeDynamicLighting(pos, vector_up * 1)
 
 		local light = (light1 + light2 + light3) * 3
-		if part.landed or part.kishki or hg_blood_sprites:GetBool() then
+		if part.landed or part.kishki or hg_blood_sprites:GetBool() or part.drawTrail == false then
 			render_SetMaterial(part[4] or mat_huy)
 			if part.kishki then
 				render_SetMaterial(part[4])
@@ -169,7 +169,8 @@ bloodparticles_hook[1] = function(anim_pos, mul)
 				--render_DrawBeam(pos - (part[2] - part[1]) * part.lerpedshit / mul / 24 * 0.5,pos + (part[2] - part[1]) * part.lerpedshit / mul / 24 * 0.5, part.lerpedshit, 0, 1, part[9] or lightcolor )
 				
 				--render_DrawBeam(pos - (len < 2 and (part[2] - part[1]):GetNormalized() * 2 or (part[2] - part[1])) * 0.5 / mul / 24,pos + (part[2] - part[1]) * 0.5 / mul / 24, 1, 0, 1, part[9] or lightcolor )
-				render_DrawBeam(pos - (part[2] - part[1]) * 1 / mul / 24 * 0.5,pos + (part[2] - part[1]) * 1 / mul / 24 * 0.5, 1, 0, 1, part[9] or lightcolor )
+				local trailWidth = math.Clamp(math.max(part[5] or 1, part[6] or 1), 0.25, 2.5)
+				render_DrawBeam(pos - (part[2] - part[1]) * 1 / mul / 24 * 0.5,pos + (part[2] - part[1]) * 1 / mul / 24 * 0.5, trailWidth, 0, 1, part[9] or lightcolor )
 
 				--lightcolor.r = lightcolor.r * 0.25
 				--debugoverlay.Line(part[2], part[1], 1, lightcolor, false)	
@@ -197,9 +198,14 @@ hg.bloodcount = hg.bloodcount or 0
 local bloodDripSoundChance = 2 / 3
 local bloodDripSoundVolume = 0.2
 local bloodDecalCellSize = 4
+local bloodSmearMinSpeed = 48
+local bloodSmearMinTangentSpeed = 24
+local bloodSmearMaxChance = 0.62
 
-local function playBloodDripImpact(pos, tr, artery)
-	if math.Rand(0, 1) > bloodDripSoundChance then return end
+local function playBloodDripImpact(pos, tr, artery, decalWeight)
+	local weight = math.max(tonumber(decalWeight) or 1, 0.1)
+	local soundChance = bloodDripSoundChance * math.Clamp(weight / 0.8, 0.08, 1)
+	if math.Rand(0, 1) > soundChance then return end
 
 	if artery then
 		if tr.MatType == MAT_METAL then
@@ -213,7 +219,39 @@ local function playBloodDripImpact(pos, tr, artery)
 	sound.Play("gore/blood" .. math_random(1, 6) .. ".mp3", pos, math.random(85, 95), math.random(80, 120), bloodDripSoundVolume)
 end
 
-local function decalBlood(pos, normal, tr, artery, owner, decalWeight)
+local function maybeSmearBlood(pos, normal, tr, artery, owner, decalWeight, impactVelocity)
+	if not isvector(impactVelocity) then return end
+	local speed = impactVelocity:Length()
+	if speed < bloodSmearMinSpeed then return end
+
+	local normalSpeed = impactVelocity:Dot(normal)
+	local tangent = impactVelocity - normal * normalSpeed
+	local tangentSpeed = tangent:Length()
+	if tangentSpeed < bloodSmearMinTangentSpeed then return end
+
+	local oblique = math.Clamp(tangentSpeed / math.max(speed, 1), 0, 1)
+	local weight = math.Clamp(tonumber(decalWeight) or 1, 0.15, 4)
+	local chance = math.Clamp((speed - bloodSmearMinSpeed) / 260 * 0.28 + oblique * 0.34 + math.min(weight / 3, 1) * 0.10, 0, bloodSmearMaxChance)
+	-- Tiny mist beads can smear, but much less often than a substantial angled drop.
+	if weight <= 0.5 then chance = chance * 0.35 end
+	if math.Rand(0, 1) > chance then return end
+
+	-- Streak back toward the incoming source direction. A drop arriving from the
+	-- right therefore has a chance to leave its short smear/tail toward the right.
+	local dir = -tangent / tangentSpeed
+	local side = normal:Cross(dir)
+	local length = math.Clamp(tangentSpeed * 0.035 + weight * 1.4, 2.2, 12)
+	local steps = math.Clamp(math.floor(length / 2.4 + 0.5), 2, 5)
+	local decal = artery and "Arterial.Blood1" or "Normal.Blood1"
+
+	for i = 1, steps do
+		local frac = i / steps
+		local smearPos = pos + dir * (length * frac) + side * math.Rand(-0.45, 0.45) * (1 - frac)
+		util.Decal(decal, smearPos + normal, smearPos - normal, owner)
+	end
+end
+
+local function decalBlood(pos, normal, tr, artery, owner, decalWeight, impactVelocity)
 	-- Pool nearby splashes so a single burst does not immediately evict older
 	-- engine decals from the client's finite decal buffer. Small drops begin
 	-- with the smallest decal; more blood in the same spot advances it through
@@ -249,23 +287,25 @@ local function decalBlood(pos, normal, tr, artery, owner, decalWeight)
 			if grew or placeArterialDecal then
 				util.Decal("Arterial.Blood2"..decalSize, pos + normal, pos - normal, owner)
 			end
-			playBloodDripImpact(pos, tr, true)
+			playBloodDripImpact(pos, tr, true, decalWeight)
 		else
 			util.Decal("Arterial.Blood1", pos + normal, pos - normal, owner)
-			playBloodDripImpact(pos, tr, true)
+			playBloodDripImpact(pos, tr, true, decalWeight)
 		end
 	else
 		if !hg_old_blood:GetBool() then
-			playBloodDripImpact(pos, tr, false)
+			playBloodDripImpact(pos, tr, false, decalWeight)
 
 			if grew then
 				util.Decal("Normal.Blood2"..decalSize, pos + normal, pos - normal, owner)
 			end
 		else
 			util.Decal("Normal.Blood1", pos + normal, pos - normal, owner)
-			playBloodDripImpact(pos, tr, false)
+			playBloodDripImpact(pos, tr, false, decalWeight)
 		end
 	end
+
+	maybeSmearBlood(pos, normal, tr, artery, owner, decalWeight, impactVelocity)
 end
 --дурак, просто смотри сколько ентити стоит в одном месте
 local tr2 = { collisiongroup = COLLISION_GROUP_WORLD, output = {} }
@@ -319,7 +359,7 @@ bloodparticles_hook[2] = function(mul)
 			continue
 		end
 		
-		if time - part[7] >= 30 then
+		if time - part[7] >= (part.maxLife or 30) then
 			part.active = false
 			table_remove(hg.bloodparticles1, i)
 
@@ -330,7 +370,7 @@ bloodparticles_hook[2] = function(mul)
 			part.active = false
 			table_remove(hg.bloodparticles1, i)
 			local dir = result.HitNormal
-			decalBlood(result.HitPos, dir, result, part.artery, part.owner, part.decalWeight)
+			decalBlood(result.HitPos, dir, result, part.artery, part.owner, part.decalWeight, part[3])
 			
 			
 			--sound.Play("zbattle/blood_drop.mp3", hitPos, math.random(10, 60), math.random(120, 120))
@@ -351,6 +391,16 @@ bloodparticles_hook[2] = function(mul)
 			result.Hit = result.Hit and shouldhit
 
 			if result.Hit then
+				-- Microdroplets are intentionally cheap: one collision trace, one tiny
+				-- impact/decal, then they are gone. They do not enter the expensive
+				-- surface-slide solver used by larger drops.
+				if part.tiny then
+					decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner, part.decalWeight, part[3])
+					part.active = false
+					table_remove(hg.bloodparticles1, i)
+					continue
+				end
+
 				--local down = vecDown * mul * (math.max(0, grav))
 				local down = result.HitNormal
 				local nextpos = (result.Normal + down):GetNormalized() * 5
@@ -358,7 +408,7 @@ bloodparticles_hook[2] = function(mul)
 				if !insolid and (part.nextput or 0) < CurTime() then
 					part.nextput = CurTime() + 1
 
-					decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner, part.decalWeight)
+					decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner, part.decalWeight, part[3])
 				end
 
 				local insolid = result.StartSolid and IsValid(result.Entity)
@@ -384,7 +434,7 @@ bloodparticles_hook[2] = function(mul)
 				part.lerpedmove = LerpVector(1, part.lerpedmove or part[3] * mul, nextpos * mul * 2)
 				
 				if part.lerpedmove:LengthSqr() < 0.1 * mul then
-					decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner, part.decalWeight)
+					decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner, part.decalWeight, part[3])
 					
 					part.active = false
 					table_remove(hg.bloodparticles1, i)

@@ -721,6 +721,7 @@ if SERVER then
 					local woundHeal = self.modeValues[1] - (biggestWound - healedWound)-- * ((owner.Profession == "doctor") and 0.33 or 1)
 					org.bleed = math.max(org.bleed - (biggestWound - healedWound), 0)
 					org.wounds[1][1] = healedWound
+					org.wounds[1].bandaged = true
 					self.modeValues[1] = woundHeal > 0.1 and woundHeal or 0
 					
 					if (biggestWound - healedWound) > 0.1 then
@@ -756,6 +757,7 @@ if SERVER then
 						local woundHeal = self.modeValues[1] - (biggestWound - healedWound)
 						org.bleed = math.max(org.bleed - (biggestWound - healedWound), 0)
 						org.wounds[bonewounds[1]][1] = healedWound
+						org.wounds[bonewounds[1]].bandaged = true
 						self.modeValues[1] = woundHeal
 
 						org.pain = math.max(org.pain - (biggestWound - healedWound) / 4, 0)

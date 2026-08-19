@@ -32,19 +32,33 @@ local vecZero = Vector(0, 0, 0)
 local lastplaced = SysTime()
 local hg_blood_fps = ConVarExists("hg_blood_fps") and GetConVar("hg_blood_fps") or CreateClientConVar("hg_blood_fps", 24, true, nil, "fps to draw blood", 12, 165)
 local function addBloodPart(pos, vel, mat, w, h, artery, kishki, owner)
-	--local fps = 1 / hg_blood_fps:GetInt() * 1
-	--if lastplaced + fps > SysTime() then return end
-	--lastplaced = SysTime()
 	if LocalPlayer():GetNetVar("disappearance", nil) or (IsValid(owner) and owner:GetNetVar("disappearance", nil)) then return end
 
 	pos = pos + vecZero
 	vel = vel + vecZero
+	w = math.max(tonumber(w) or 2, 0.12)
+	h = math.max(tonumber(h) or w, 0.12)
 
 	local pos2 = Vector()
 	pos2:Set(pos)
 
-	local part = {pos, pos2, vel, mat or mat_huy, w or 2, h or 2, CurTime(), artery = artery, kishki = kishki, owner = owner, start_velocity = IsValid(owner) and owner:GetVelocity() or vector_origin, active = true}
-	part.decalWeight = math.max(w or 2, h or 2)
+	local size = math.max(w, h)
+	local speed = vel:Length()
+	local tiny = size <= 0.55
+	-- Thin falling beads and high-velocity microdroplets mostly read as discrete
+	-- droplets, not long blood-core beams. Larger/pressurized drops retain a
+	-- progressively greater chance of drawing a trail when trail rendering is on.
+	local sizeFactor = math.Clamp((size - 0.18) / 1.35, 0, 1)
+	local trailChance = 0.08 + sizeFactor * 0.62
+	if speed >= 170 then trailChance = trailChance * 0.48 end
+	if vel.z <= -35 then trailChance = trailChance * 0.58 end
+	if artery and size >= 0.9 then trailChance = math.min(trailChance + 0.20, 0.88) end
+
+	local part = {pos, pos2, vel, mat or mat_huy, w, h, CurTime(), artery = artery, kishki = kishki, owner = owner, start_velocity = IsValid(owner) and owner:GetVelocity() or vector_origin, active = true}
+	part.decalWeight = size
+	part.tiny = tiny
+	part.drawTrail = math.Rand(0, 1) < trailChance
+	part.maxLife = tiny and math.Rand(6, 12) or 30
 	hg.bloodparticles1[#hg.bloodparticles1 + 1] = part
 
 	return part

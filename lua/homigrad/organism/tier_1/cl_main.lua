@@ -905,6 +905,10 @@ local normalBleedRateFull = 6
 local normalParticleSizeThin = 0.48
 local normalParticleSizeAverage = 0.7
 local normalParticleSizeThick = 0.9
+local highBleedNormalThreshold = 0.68
+local highBleedArterialThreshold = 0.58
+local microDropSizeMin = 0.16
+local microDropSizeMax = 0.43
 local hg_blood_fps = ConVarExists("hg_blood_fps") and GetConVar("hg_blood_fps") or CreateClientConVar("hg_blood_fps", 24, true, nil, "fps to draw blood", 12, 165)
 local bloodDown = Vector(0, 0, -1)
 
@@ -969,12 +973,8 @@ local function getWoundPressure(org)
 end
 
 local function emitNormalWoundParticles(ent, pos, outward, intensity, circulation, org)
-	local count = intensity >= 0.82 and 3 or intensity >= 0.48 and 2 or 1
 	local pressure, beat = getWoundPressure(org)
 	local pulseForce = math.Clamp((org.pulse or 0) / 70, 0, 1.5)
-	-- Even a mild venous wound should leave the surface before gravity wins.
-	-- Pressure and bleed intensity still decide the range, but the launch floor
-	-- prevents ordinary blood from appearing to fall straight through the wound.
 	local force = (10 + intensity * intensity * 44) * circulation * pressure * (0.72 + beat * 0.58) * pulseForce
 	local spread = 0.8 + intensity * 5.5
 	local decalWeight = Lerp(intensity, 0.45, 3)
@@ -985,21 +985,52 @@ local function emitNormalWoundParticles(ent, pos, outward, intensity, circulatio
 		particleSize = normalParticleSizeThick
 	end
 
+	local mode = "normal"
+	if intensity >= highBleedNormalThreshold then
+		local roll = math.Rand(0, 1)
+		if roll < 0.32 then
+			mode = "stream"
+		elseif roll < 0.74 then
+			mode = "micro"
+		end
+	end
+
+	local count = intensity >= 0.82 and 3 or intensity >= 0.48 and 2 or 1
+	if mode == "stream" then count = 1 end
+	if mode == "micro" then count = math.random(4, 8) end
+
 	for _ = 1, count do
 		local direction = outward
 		if not direction or direction:LengthSqr() <= 0 then
 			direction = (VectorRand(-1, 1) + Vector(0, 0, -0.7)):GetNormalized()
 		end
-
 		direction = direction:GetNormalized()
-		local velocity = direction * force * math.Rand(0.9, 1.2)
-			+ VectorRand(-spread, spread)
-			+ bloodDown * Lerp(intensity, 0.15, 1.4)
-		local particle = hg.addBloodPart(pos + VectorRand(-0.45, 0.45), velocity, nil, particleSize, particleSize, false, nil, ent)
+
+		local thisSize = particleSize
+		local thisForce = force
+		local thisSpread = spread
+		local thisDecalWeight = decalWeight
+		if mode == "stream" then
+			thisSize = math.Rand(1.0, 1.55) * Lerp(intensity, 0.85, 1.15)
+			thisForce = force * math.Rand(1.05, 1.28)
+			thisSpread = math.max(spread * 0.28, 0.35)
+			thisDecalWeight = decalWeight * 1.25
+		elseif mode == "micro" then
+			thisSize = math.Rand(microDropSizeMin + 0.02, microDropSizeMax)
+			thisForce = force * math.Rand(0.72, 1.18)
+			thisSpread = spread * math.Rand(1.35, 2.1)
+			thisDecalWeight = math.Rand(0.18, 0.42)
+		end
+
+		local velocity = direction * thisForce * math.Rand(0.9, 1.2)
+			+ VectorRand(-thisSpread, thisSpread)
+			+ bloodDown * Lerp(intensity, 0.15, mode == "micro" and 0.8 or 1.4)
+		local particle = hg.addBloodPart(pos + VectorRand(-0.45, 0.45), velocity, nil, thisSize, thisSize, false, nil, ent)
 		if particle then
-			particle.decalWeight = decalWeight
+			particle.decalWeight = thisDecalWeight
 			particle.gravityRampStart = CurTime() + 0.035
 			particle.gravityRampEnd = CurTime() + Lerp(intensity, 0.11, 0.16)
+			if mode == "stream" then particle.drawTrail = true end
 		end
 	end
 end
@@ -1099,7 +1130,8 @@ function hg.queueArterialWoundSound(ent, wound)
 end
 
 emitArterialSpray = function(ent, pos, dir, ang, org, woundIndex, size, intensity, isAmputation, isHeadGib)
-	-- Pressure-driven jet; amputation keeps its separate legacy tuning.
+	-- Pressure-driven jet; amputation keeps its separate legacy tuning. High-flow
+	-- wounds vary between a coherent thick jet and atomized microdroplets.
 	local time = CurTime()
 	local pulse = math.max(org.pulse or 0, 0)
 	local pulseMul = pulse / 70
@@ -1107,7 +1139,7 @@ emitArterialSpray = function(ent, pos, dir, ang, org, woundIndex, size, intensit
 	local arterialPressureMul = circulation * (isAmputation and 1.7 or (isHeadGib and 4.4 or 3.1))
 	if arterialPressureMul <= 0 then
 		hg.addBloodPart(pos, bloodDown * 2 + VectorRand(-0.5, 0.5), nil, size, size, true, nil, ent)
-		return
+		return 1
 	end
 	local bleedRangeMul = 1 + (isAmputation and 1 or (isHeadGib and 5.5 or 4)) * intensity
 	local forwardVelocityMul = (isAmputation and 1.55 or (isHeadGib and 3.8 or 2.9)) * bleedRangeMul
@@ -1119,12 +1151,50 @@ emitArterialSpray = function(ent, pos, dir, ang, org, woundIndex, size, intensit
 		+ vector_up * upwardVelocity
 		+ VectorRand(-1, 1) * pulseMul) * arterialPressureMul
 
-	local count = isHeadGib and (intensity >= 0.65 and 3 or 2) or (intensity >= 0.78 and 3 or intensity >= 0.42 and 2 or 1)
-	for _ = 1, count do
-		local particle = hg.addBloodPart(pos + VectorRand(-0.35, 0.35), velocity + VectorRand(-2, 2), nil, size, size, true, nil, ent)
-		if particle then particle.decalWeight = Lerp(intensity, 0.7, 4.5) end
+	local mode = "normal"
+	if intensity >= highBleedArterialThreshold and not isAmputation then
+		local roll = math.Rand(0, 1)
+		if roll < 0.27 then
+			mode = "stream"
+		elseif roll < 0.58 then
+			mode = "micro"
+		end
 	end
+
+	local count = isHeadGib and (intensity >= 0.65 and 3 or 2) or (intensity >= 0.78 and 3 or intensity >= 0.42 and 2 or 1)
+	local intervalScale = 1
+	if mode == "stream" then
+		count = 1
+		intervalScale = 0.9
+	elseif mode == "micro" then
+		count = isHeadGib and math.random(6, 10) or math.random(4, 7)
+		intervalScale = 2.0
+	end
+
+	for _ = 1, count do
+		local thisSize = size
+		local thisVelocity = velocity + VectorRand(-2, 2)
+		local thisWeight = Lerp(intensity, 0.7, 4.5)
+		if mode == "stream" then
+			thisSize = size * math.Rand(1.35, 1.75)
+			thisVelocity = velocity * math.Rand(1.03, 1.15) + VectorRand(-0.8, 0.8)
+			thisWeight = thisWeight * 1.35
+		elseif mode == "micro" then
+			thisSize = math.Rand(microDropSizeMin, microDropSizeMax - 0.03)
+			thisVelocity = velocity * math.Rand(0.82, 1.14) + VectorRand(-10, 10)
+			thisWeight = math.Rand(0.16, 0.38)
+		end
+
+		local particle = hg.addBloodPart(pos + VectorRand(-0.35, 0.35), thisVelocity, nil, thisSize, thisSize, true, nil, ent)
+		if particle then
+			particle.decalWeight = thisWeight
+			if mode == "stream" then particle.drawTrail = true end
+		end
+	end
+
+	return intervalScale
 end
+
 local hg_altberserk = GetConVar("hg_altberserk")
 local hg_altnoradrenaline = GetConVar("hg_altnoradrenaline")
 
@@ -1434,10 +1504,12 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 						if water then
 							hg.addBloodPart2(pos, VectorRand(-5, 5), nil, nil, nil, nil, true, nil, ent)
 						else
-							emitArterialSpray(ent, pos, dir, boneAng, org, i, size, intensity, wound[9] == true, wound[10] == "headgib")
+							local intervalScale = emitArterialSpray(ent, pos, dir, boneAng, org, i, size, intensity, wound[9] == true, wound[10] == "headgib") or 1
+							wound._visualIntervalScale = intervalScale
 						end
 
-						wound[5] = time + (water and 2 or (0.5 / hg_blood_fps:GetInt()))
+						local intervalScale = wound._visualIntervalScale or 1
+						wound[5] = time + (water and 2 or (0.75 / hg_blood_fps:GetInt()) * intervalScale)
 					else
 						local pos = ent:GetPos()
 						local water = bit.band(util.PointContents(pos), CONTENTS_WATER) == CONTENTS_WATER
@@ -1447,7 +1519,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 							hg.addBloodPart(pos, VectorRand(-15, 15), nil, size, size, true, nil, ent)
 						end
 
-						wound[5] = time + (water and 2 or 0)
+						wound[5] = time + (water and 2 or math.max(0.08, 1 / hg_blood_fps:GetInt()))
 					end
 				end
 			end

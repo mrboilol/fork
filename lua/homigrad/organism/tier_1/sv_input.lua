@@ -157,6 +157,7 @@ local function Trace_Bullet(box, hit, ricochet, impact, org, organs, dmg, dmgInf
 	
 
     if func and !hook_info.restricted then
+        if requiredLimbHitgroup then org._bulletLimbBoneHitThisHit = requiredLimbHitgroup end
         local old_consciousness = org.consciousness
         local directBrainBefore = isBrain and (org[name] or 0) or nil
         -- Keep the per-shot ballistic state with every layer in the organ trace.
@@ -1216,6 +1217,15 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 
 	if not org then return end
 
+	if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) and ent.hgHeldWeaponBulletIntercept then
+		local intercept = ent.hgHeldWeaponBulletIntercept
+		ent.hgHeldWeaponBulletIntercept = nil
+		if (intercept.expires or 0) >= CurTime() then
+			dmgInfo:ScaleDamage(math.Clamp(tonumber(intercept.damageScale) or 0.55, 0.2, 1))
+			org._heldWeaponImpactThisHit = true
+		end
+	end
+
 	if dmgInfo:GetAttacker():GetClass() == "npc_zombie" then
 		--if not org then return end 
 		dmgInfo:SetDamageType( org and org.immobilization > 50 and DMG_BLAST or DMG_SLASH )
@@ -1435,6 +1445,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	org._armorPainMul = nil
 	org._directBrainDamageThisHit = nil
 	org._bulletHitVitalThisHit = nil
+	org._bulletLimbBoneHitThisHit = nil
 	org._fistHeadTraceSkullIntact = isFistInflictor(dmgInfo) and (org.skull or 0) < 1 or nil
 	org._skullImpactThisHit = nil
 	-- Limb bone and artery damage must stay on the physics limb the bullet
@@ -1477,6 +1488,40 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		hg.organism.BlastTrace(dmgInfo:GetDamagePosition(), (ent:GetPos() - dmgInfo:GetDamagePosition()):Length() / 200, dmg * 2, boxs, organs, Trace_Blast, ent.organism, organs, dmg / 300, dmgInfo)
 		hg.organism.AddWoundManual(ent,dmg,vector_origin,angle_zero,math.random(0,ent:GetBoneCount()),CurTime())
 	end
+
+	-- The physics trace is authoritative for limb entry. Custom organ boxes are
+	-- intentionally narrow and can miss a forearm/hand even when Source already
+	-- reported that exact physics bone. Supply one direct limb-bone hit only when
+	-- no matching organ box handled it, preventing the right forearm/hand from
+	-- behaving like a bullet ghost zone.
+	if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) and org._bulletLimbBoneHitThisHit ~= entryHitgroup then
+		local directLimbInput
+		if entryBoneName == "ValveBiped.Bip01_R_Hand" or entryBoneName == "ValveBiped.Bip01_R_Forearm" then
+			directLimbInput = input_list.rarmdown
+		elseif entryBoneName == "ValveBiped.Bip01_R_UpperArm" then
+			directLimbInput = input_list.rarmup
+		elseif entryBoneName == "ValveBiped.Bip01_L_Hand" or entryBoneName == "ValveBiped.Bip01_L_Forearm" then
+			directLimbInput = input_list.larmdown
+		elseif entryBoneName == "ValveBiped.Bip01_L_UpperArm" then
+			directLimbInput = input_list.larmup
+		end
+		if directLimbInput then
+			directLimbInput(org, 0.5, math.max(dmgInfo:GetDamage() / 25, 0), dmgInfo, entryBoneName, dir, true, false)
+			org._bulletLimbBoneHitThisHit = entryHitgroup
+		end
+	end
+
+	local heldWeaponImpactThisHit = org._heldWeaponImpactThisHit == true
+	if heldWeaponImpactThisHit then
+		-- A held weapon is a real obstruction. It can transmit a reduced impact to
+		-- the gripping hand, but do not immediately re-fire the same projectile as
+		-- a clean through-and-through body exit behind the weapon.
+		outputHole = {}
+		outputDir = {}
+		distance = nil
+		if impact then impact.armorStopped = true end
+	end
+
 	local directBrainDamageThisHit = org._directBrainDamageThisHit == true
 	local bulletHitVitalThisHit = org._bulletHitVitalThisHit == true
 	-- `fatalBrainShotCandidate` used to be referenced below without ever being
@@ -1489,6 +1534,8 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	org._bulletImpactHitgroup = nil
 	org._directBrainDamageThisHit = nil
 	org._bulletHitVitalThisHit = nil
+	org._bulletLimbBoneHitThisHit = nil
+	org._heldWeaponImpactThisHit = nil
 	org._fistHeadTraceSkullIntact = nil
 	org._spineArteryTraceDmgInfo = nil
 

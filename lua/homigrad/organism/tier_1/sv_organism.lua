@@ -31,8 +31,35 @@ hg.organism.config = hg.organism.config or {
 	BRADYCARDIA_ARREST_EXPOSURE = 8,
 	BRADYCARDIA_ARREST_OUTPUT = 0.22,
 	BRADYCARDIA_ARREST_PERFUSION = 0.28,
+	-- Palpable pulse is mechanical/peripheral, not a duplicate of ECG heart rate.
+	PALPABLE_ARRHYTHMIA_PENALTY = 0.60,
+	PALPABLE_PALPITATION_PENALTY = 0.50,
+	PALPABLE_VASOCONSTRICTION_PENALTY = 0.35,
 	HEADGIB_ARTERIAL_WOUND_SIZE = 34,
-	BLOOD_REGEN_RATE_ML_S = 0.5
+	BLOOD_REGEN_RATE_ML_S = 0.5,
+	-- Hemostasis is time-dependent: a fresh wound stays open before a clot can
+	-- mature. Larger wounds take longer and may enlarge slightly if uncontrolled.
+	WOUND_CLOT_DELAY_MIN_S = 6,
+	WOUND_CLOT_DELAY_MAX_S = 18,
+	WOUND_CLOT_RAMP_S = 12,
+	WOUND_CLOT_RATE_SCORE_S = 0.11,
+	WOUND_UNSTABLE_START_SCORE = 12,
+	WOUND_UNSTABLE_FULL_SCORE = 30,
+	WOUND_UNSTABLE_MAX_GROWTH_FRACTION = 0.22,
+	WOUND_UNSTABLE_GROWTH_TIME_S = 90,
+	ARTERIAL_CLOT_DELAY_MULTIPLIER = 1.6,
+	ARTERIAL_CLOT_RATE_MULTIPLIER = 0.32,
+	CATASTROPHIC_ARTERIAL_CLOT_MULTIPLIER = 0.08,
+	HEMOSTATIC_TREATMENT_CLOT_GAIN = 7,
+	HEMOSTATIC_TREATMENT_DELAY_REDUCTION = 0.82,
+	-- Existing skull injury increases the consequence of the next head impact.
+	-- 0.6 is a meaningful fracture; 1.0 is a fully failed cranial shell.
+	SKULL_VULNERABILITY_START = 0.5,
+	SKULL_VULNERABILITY_FULL = 1.0,
+	SKULL_BRAIN_TRAUMA_ROOT_GAIN = 1.4,
+	SKULL_BRAIN_TRAUMA_QUADRATIC_GAIN = 1.2,
+	SKULL_HEMORRHAGE_ROOT_GAIN = 1.8,
+	SKULL_HEMORRHAGE_QUADRATIC_GAIN = 1.6
 }
 hg.organism.normalBloodVolume = hg.organism.config.NORMAL_BLOOD_VOLUME_ML or 5000
 
@@ -76,6 +103,27 @@ function hg.organism.GetHemorrhageCompensationDrive(blood)
 	local loss = math.Clamp((normalVolume - volume) / math.max(normalVolume - terminalVolume, 1), 0, 1)
 	local power = math.max(tonumber(cfg.HEMORRHAGE_COMPENSATION_POWER) or 1.25, 0.1)
 	return loss ^ power
+end
+
+-- Cranial vulnerability is derived from the skull's existing structural damage.
+-- It deliberately uses a smooth curve: an intact skull contributes no bonus, a
+-- displaced fracture around 0.6 meaningfully increases cerebral injury risk, and
+-- a fully failed skull makes subsequent substantial head impacts extremely dangerous.
+-- Returns normalized vulnerability, brain-trauma multiplier, hemorrhage multiplier.
+function hg.organism.GetCranialTraumaFactors(orgOrSkull)
+	local cfg = hg.organism.config or {}
+	local skull = type(orgOrSkull) == "table" and (orgOrSkull.skull or 0) or (tonumber(orgOrSkull) or 0)
+	local startDamage = math.Clamp(tonumber(cfg.SKULL_VULNERABILITY_START) or 0.5, 0, 0.99)
+	local fullDamage = math.Clamp(tonumber(cfg.SKULL_VULNERABILITY_FULL) or 1, startDamage + 0.01, 1)
+	local x = math.Clamp((skull - startDamage) / (fullDamage - startDamage), 0, 1)
+	local root = math.sqrt(x)
+	local traumaMul = 1
+		+ root * (tonumber(cfg.SKULL_BRAIN_TRAUMA_ROOT_GAIN) or 1.4)
+		+ x * x * (tonumber(cfg.SKULL_BRAIN_TRAUMA_QUADRATIC_GAIN) or 1.2)
+	local hemorrhageMul = 1
+		+ root * (tonumber(cfg.SKULL_HEMORRHAGE_ROOT_GAIN) or 1.8)
+		+ x * x * (tonumber(cfg.SKULL_HEMORRHAGE_QUADRATIC_GAIN) or 1.6)
+	return x, traumaMul, hemorrhageMul
 end
 
 function hg.organism.ZeroVitals(org)
@@ -1013,7 +1061,7 @@ local statisticSyncKeys = {
 	"seizure", "seizureActive", "concussion", "consciousness", "skull", "disorientation", "jaw", "spine1", "spine2", "spine3", "chest", "pelvis",
 	"heart", "heartstop", "fibrillation", "arrhythmia", "bloodPressure", "systolic", "diastolic", "myocardialOxygen", "heartStrain",
 	"hypertension", "hypotension", "ecgState", "pulse", "heartbeat", "cardiacOutput", "strokeVolume", "hemorrhageCompensation",
-	"compensationPulseMultiplier", "compensationHeartRateTarget", "palpitations", "hypovolemia", "hypovolemicShock",
+	"compensationPulseMultiplier", "compensationHeartRateTarget", "mechanicalPulseCapture", "pulseDeficit", "palpitations", "hypovolemia", "hypovolemicShock",
 	"stomach", "liver", "intestines", "thiamine", "vomitInThroat",
 	"lungsL", "lungsR", "eyeL", "eyeR", "trachea", "pneumothorax", "hemothorax", "cardiacTamponade", "needle",
 	"o2", "bloodO2Cap", "bloodCarryO2Cap", "CO", "lungsfunction", "COregen", "LodgedEntities", "holdingbreath",
@@ -1096,6 +1144,8 @@ local function send_organism(org, ply)
 	sendtable.hemorrhageCompensation = org.hemorrhageCompensation
 	sendtable.compensationPulseMultiplier = org.compensationPulseMultiplier
 	sendtable.compensationHeartRateTarget = org.compensationHeartRateTarget
+	sendtable.mechanicalPulseCapture = org.mechanicalPulseCapture
+	sendtable.pulseDeficit = org.pulseDeficit
 	sendtable.hypovolemia = org.hypovolemia
 	sendtable.hypovolemicShock = org.hypovolemicShock
 	sendtable.bloodO2Cap = org.bloodO2Cap
@@ -1247,6 +1297,8 @@ local function send_bareinfo(org)
 	sendtable.hemorrhageCompensation = org.hemorrhageCompensation
 	sendtable.compensationPulseMultiplier = org.compensationPulseMultiplier
 	sendtable.compensationHeartRateTarget = org.compensationHeartRateTarget
+	sendtable.mechanicalPulseCapture = org.mechanicalPulseCapture
+	sendtable.pulseDeficit = org.pulseDeficit
 	sendtable.hypovolemia = org.hypovolemia
 	sendtable.hypovolemicShock = org.hypovolemicShock
 	sendtable.bloodO2Cap = org.bloodO2Cap

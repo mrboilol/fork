@@ -40,6 +40,37 @@ local function getRateOutput(heartbeat)
 	return math.Clamp(normalizedRate * fillingCompensation * fastFillingLoss, 0, 1.35)
 end
 
+local function getPalpablePulseTarget(org, heartbeat, circulation, hemorrhageCompensation, effectivePalpitations)
+	local cfg = hg.organism.config or {}
+	local rate = math.Clamp(tonumber(heartbeat) or 0, 0, terminalHeartRate)
+	if rate <= 0 or circulation <= 0 then return 0, 0 end
+
+	-- Cardiac output above already contains blood volume, preload, temperature,
+	-- contractility and the fast-rate filling penalty. Derive how much blood each
+	-- electrical beat is effectively ejecting instead of multiplying those causes
+	-- into the pulse a second time.
+	local rateFactor = math.max(rate / 70, 0.1)
+	local effectiveStrokeVolume = math.Clamp(circulation / rateFactor, 0, 1)
+
+	-- Arrhythmias/palpitations produce a pulse deficit: some electrical complexes
+	-- do not create enough mechanical ejection to be palpable. This is specifically
+	-- a beat-capture term, separate from their smaller central-output penalty.
+	local arrhythmia = math.Clamp(tonumber(org.arrhythmia) or 0, 0, 1)
+	local rhythmCapture = math.Clamp(1
+		- arrhythmia * (tonumber(cfg.PALPABLE_ARRHYTHMIA_PENALTY) or 0.60)
+		- math.Clamp(effectivePalpitations or 0, 0, 1) * (tonumber(cfg.PALPABLE_PALPITATION_PENALTY) or 0.50), 0.08, 1)
+	if org.fibrillation then rhythmCapture = rhythmCapture * 0.08 end
+
+	-- Sympathetic compensation centralizes blood through vasoconstriction. It may
+	-- maintain central MAP while making a radial/peripheral pulse much weaker.
+	local peripheralVasoconstriction = math.Clamp(1
+		- math.Clamp(hemorrhageCompensation or 0, 0, 1) * (tonumber(cfg.PALPABLE_VASOCONSTRICTION_PENALTY) or 0.35), 0.5, 1)
+	local peripheralFlow = math.Clamp(circulation / 0.9, 0, 1) ^ 0.35
+
+	local capture = math.Clamp(effectiveStrokeVolume * rhythmCapture * peripheralVasoconstriction * peripheralFlow, 0, 1)
+	return rate * capture, capture
+end
+
 -- Extreme speed and sustained lateral acceleration can briefly reduce venous
 -- return.  Keep this separate from blood loss: it is a reversible pressure
 -- problem, not a wound or a permanent reduction in blood volume.
@@ -353,6 +384,8 @@ local function maintainSimplifiedCirculation(org)
 	org.strokeVolume = 1
 	org.compensationPulseMultiplier = 1
 	org.compensationHeartRateTarget = 70
+	org.mechanicalPulseCapture = 1
+	org.pulseDeficit = 0
 	org.cardiacArrestStart = nil
 	org.cardiacArrestO2Start = nil
 	org.terminalRhythm = nil
@@ -433,6 +466,8 @@ module[1] = function(org)
 	org.ecgState = "normal_sinus"
 	org.compensationPulseMultiplier = 1
 	org.compensationHeartRateTarget = 75
+	org.mechanicalPulseCapture = 1
+	org.pulseDeficit = 0
 	org.palpitations = 0
 	org.palpitationTreatmentUntil = 0
 	org.cardiacArrestStart = nil
@@ -569,7 +604,19 @@ module[2] = function(owner, org, timeValue)
 		residualCirculation = Clamp(max(initialPulseFlow, initialPressureFlow, initialOutput) * arrestMechanicalFactor, 0, 1.5)
 	end
 	local circulation = org.alive and (org.heartstop and max(arrestCirculation, residualCirculation) or circulationBase * rhythmMul) or 0
-	org.pulse = Approach(org.pulse, circulation * 92, heart == 0 and timeValue * 10 or timeValue * 5)
+	local palpablePulseTarget, mechanicalPulseCapture
+	if org.heartstop then
+		-- During arrest, residual/support circulation owns the fading mechanical pulse.
+		palpablePulseTarget = circulation * 92
+		mechanicalPulseCapture = (org.heartbeat or 0) > 0 and math.Clamp(palpablePulseTarget / math.max(org.heartbeat, 1), 0, 1) or 0
+	else
+		palpablePulseTarget, mechanicalPulseCapture = getPalpablePulseTarget(
+			org, org.heartbeat or 0, circulation, hemorrhageCompensation, effectivePalpitations
+		)
+	end
+	org.mechanicalPulseCapture = mechanicalPulseCapture
+	org.pulseDeficit = math.max((org.heartbeat or 0) - palpablePulseTarget, 0)
+	org.pulse = Approach(org.pulse, palpablePulseTarget, heart == 0 and timeValue * 10 or timeValue * 8)
 	-- Keep a real mean arterial pressure alongside the legacy palpable-pulse
 	-- value. Judge's pressure readout is useful to medicine/UI code, while the
 	-- current circulation model remains the single owner of the actual target.
