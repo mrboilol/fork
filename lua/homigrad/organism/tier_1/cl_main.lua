@@ -944,8 +944,7 @@ local function getArterialVisualIntensity(org, wounds, wound, woundIndex)
 end
 
 local function getCirculationStrength(org, pulseOverride)
-	local residualPostMortemFlow = not org.alive and (tonumber(org.postMortemDecayEnd) or 0) > CurTime()
-	local pulse = (org.heartstop and not residualPostMortemFlow) and 0 or math.max(pulseOverride or org.pulse or 70, 0)
+	local pulse = math.max(pulseOverride or org.pulse or 70, 0)
 	local circulation = math.Clamp(1 - (org.hypotension or 0) + (org.hypertension or 0) * 0.2, 0, 1.55)
 	if pulse <= 0 or circulation <= 0 then return 0 end
 	local pulseStrength = math.Clamp(pulse / 70, 0, 1.55)
@@ -957,8 +956,6 @@ local function getCirculationStrength(org, pulseOverride)
 end
 
 local function getWoundPressure(org)
-	if org.heartstop then return 0, 0 end
-
 	local pulse = math.max(tonumber(org.pulse) or 0, 0)
 	local peripheralPressure = math.Clamp(1 - (tonumber(org.hypotension) or 0), 0, 1)
 	local cardiacOutput = math.Clamp(tonumber(org.cardiacOutput) or peripheralPressure, 0, 1.5)

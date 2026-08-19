@@ -442,7 +442,17 @@ module[2] = function(owner, org, timeValue)
 
 	
 
-	org.disorientation = math.Approach(org.disorientation, 0, timeValue / 5)
+	local disorientationNow = math.max(tonumber(org.disorientation) or 0, 0)
+	if disorientationNow > 0.05 then
+		org.disorientationExposure = math.min((org.disorientationExposure or 0) + timeValue, 30)
+	else
+		org.disorientationExposure = math.Approach(org.disorientationExposure or 0, 0, timeValue * 2)
+	end
+	-- The nervous system settles faster after the acute period instead of leaving a
+	-- weak residual wobble for an excessively long time. Ongoing causes can still
+	-- re-raise the value in their own modules.
+	local recoveryMul = 1 + math.Clamp(((org.disorientationExposure or 0) - 4) / 12, 0, 1) * 3
+	org.disorientation = math.Approach(disorientationNow, 0, timeValue / 5 * recoveryMul)
 
 
 

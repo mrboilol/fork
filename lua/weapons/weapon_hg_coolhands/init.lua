@@ -1079,7 +1079,8 @@ function SWEP:ShoveFront(sprintShove)
                 local ragdollPushVel = pushVel * (victimSprinting and 1.5 or 1) + victimVel
 
 			local baseRagdollChance = 1 / (sprintShove and math.max(math.floor(shoveRagdollChance * 0.5), 1) or shoveRagdollChance)
-			local strengthRagdoll = math.Rand(0, 1) <= math.Clamp(baseRagdollChance * strengthMul, 0, 1)
+			local strengthMul = math.max(tonumber(owner.strengthMul) or tonumber(owner.MeleeDamageMul) or 1, 0)
+			local strengthRagdoll = math.Rand(0, 1) <= math.Clamp(baseRagdollChance * math.sqrt(strengthMul), 0, 1)
 			if (victimBlocking or victimSprinting or strengthRagdoll) and hg.TriggerSprintCollisionRagdoll then
                         ragdolled = true
                         hg.TriggerSprintCollisionRagdoll(target, trace, ragdollPushVel, ragdollPushVel:Length() * 0.45)

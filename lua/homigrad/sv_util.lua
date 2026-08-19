@@ -1541,27 +1541,8 @@ function plymeta:GetUseEntity()
 	return ent
 end
 
---\\ Get shards/table legs on break
-	local string_find = string.find
-	hook.Add("PropBreak", "FurnitureLegs", function(ply, ent)
-		if IsValid(ent) and string_find(ent:GetModel(), "furniture", 1, "%a") and math.random(3) == 2 then
-			if string_find(ent:GetModel(), "table", 1, "%a") or string_find(ent:GetModel(), "drawer", 1, "%a") or string_find(ent:GetModel(), "desk", 1, "%a") then
-				local leg = ents.Create("weapon_table_leg")
-				leg:SetPos(ent:GetPos())
-				leg:SetAngles(AngleRand(-180, 180))
-				leg:Spawn()
-				leg.IsSpawned = true
-				leg.init = true
-			elseif string_find(ent:GetModel(), "chair", 1, "%a") or string_find(ent:GetModel(), "vanity", 1, "%a") then
-				local leg = ents.Create("weapon_chair_leg")
-				leg:SetPos(ent:GetPos())
-				leg:SetAngles(AngleRand(-180, 180))
-				leg:Spawn()
-				leg.IsSpawned = true
-				leg.init = true
-			end
-		end
-	end)
+-- Source/propdata owns prop break debris so each model uses its authored break pieces.
+	-- Glass-shard gameplay below is separate from visual prop gibs.
 
 	hook.Add("PostEntityTakeDamage", "GlassShards", function(ent, dmginfo)
 		if not IsValid(ent) then return end

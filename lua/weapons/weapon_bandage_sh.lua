@@ -16,6 +16,8 @@ SWEP.Secondary.DefaultClip = -1
 SWEP.Secondary.Automatic = true
 SWEP.Secondary.Ammo = "none"
 SWEP.HoldType = "slam"
+SWEP.handPosOffset = SWEP.handPosOffset or Vector(0, 0, 0)
+SWEP.handAngOffset = SWEP.handAngOffset or Angle(0, 0, 0)
 SWEP.ViewModel = ""
 SWEP.WorldModel = "models/bandages.mdl"
 SWEP.BandageOriginalWorldModel = SWEP.WorldModel
@@ -82,6 +84,13 @@ function SWEP:UseJudgeBandageTPIK()
 end
 
 function SWEP:ApplyBandageVisualMode()
+	-- Medkits, tourniquets and other descendants inherit this function but own
+	-- proprietary models. Never restore those classes to the base bandage model.
+	if self.BandageTPIK ~= true then
+		self.HGBandageJudgeVisualMode = false
+		return
+	end
+
 	local judgeMode = self:UseJudgeBandageTPIK()
 	if self.HGBandageJudgeVisualMode == judgeMode then return end
 
@@ -654,6 +663,20 @@ if SERVER then
 		end
 	end
 
+	function SWEP:GetBandageVisualInfo(wound)
+		local color = self.HGBandageColor or self.Color
+		local r = color and tonumber(color.r) or 255
+		local g = color and tonumber(color.g) or 255
+		local b = color and tonumber(color.b) or 255
+		local a = color and tonumber(color.a) or 255
+		return {
+			pos = wound and wound[2] or vector_origin,
+			ang = wound and wound[3] or angle_zero,
+			color = {r = r, g = g, b = b, a = a},
+			judgeTexture = hg_healanims:GetInt() == 1
+		}
+	end
+
 	function SWEP:TreatSeal(ent)
 		local owner = self:GetOwner()
 		local seal = ResolveSealTreatmentTarget(ent, ent ~= owner)
@@ -710,10 +733,9 @@ if SERVER then
 					end
 					ent.bandaged_limbs = ent.bandaged_limbs or {}
 					local bone_name = org.wounds[1][4]
-					if not ent.bandaged_limbs[bone_name] then
-						ent.bandaged_limbs[bone_name] = true
-						done = true
-					end
+					local wasBandaged = ent.bandaged_limbs[bone_name] ~= nil
+					ent.bandaged_limbs[bone_name] = self:GetBandageVisualInfo(org.wounds[1])
+					if not wasBandaged then done = true end
 					if org.wounds[1][1] == 0 then table.remove(org.wounds, 1) end
 				end
 			end
@@ -745,10 +767,9 @@ if SERVER then
 						ent.bandaged_limbs = ent.bandaged_limbs or {}
 						local bone_name = ent:GetBoneName(ent:LookupBone(org.wounds[bonewounds[1]][4]))
 						
-						if not ent.bandaged_limbs[bone_name] then
-							ent.bandaged_limbs[bone_name] = true
-							done = true
-						end
+						local wasBandaged = ent.bandaged_limbs[bone_name] ~= nil
+						ent.bandaged_limbs[bone_name] = self:GetBandageVisualInfo(org.wounds[bonewounds[1]])
+						if not wasBandaged then done = true end
 
 						if org.wounds[bonewounds[1]][1] == 0 then table.remove(org.wounds, bonewounds[1]) end
 					end
@@ -773,7 +794,7 @@ if SERVER then
 			org.bandagedskull = true
 			org.pain = math.max(org.pain - 7, 0)
 			ent.bandaged_limbs = ent.bandaged_limbs or {}
-			ent.bandaged_limbs["ValveBiped.Bip01_Head1"] = true
+			ent.bandaged_limbs["ValveBiped.Bip01_Head1"] = self:GetBandageVisualInfo()
 			done = true
 		end
 
@@ -1312,6 +1333,51 @@ else
 		["ValveBiped.Bip01_R_Calf"] = "LegDownRught-f",
 	}
 
+	local function ResolveJudgeBandageMaterial()
+		if hg._judgeBandageMaterialResolved then return hg._judgeBandageMaterial end
+		hg._judgeBandageMaterialResolved = true
+		local probe = ClientsideModel("models/weapons/nmrih/items/bandage/w_bandages.mdl", RENDERGROUP_OTHER)
+		if IsValid(probe) then
+			local materials = probe:GetMaterials()
+			hg._judgeBandageMaterial = materials and materials[1] or nil
+			probe:Remove()
+		end
+		return hg._judgeBandageMaterial
+	end
+	hg.ResolveJudgeBandageMaterial = hg.ResolveJudgeBandageMaterial or ResolveJudgeBandageMaterial
+
+	local function GetAppliedBandageStyle(limbs)
+		local selected = {r = 255, g = 255, b = 255, a = 255}
+		local darkest = math.huge
+		local judgeTexture = false
+		for _, info in pairs(limbs or {}) do
+			if istable(info) then
+				local col = info.color
+				if istable(col) and tonumber(col.r) and tonumber(col.g) and tonumber(col.b) then
+					local score = tonumber(col.r) + tonumber(col.g) + tonumber(col.b)
+					if score < darkest then
+						darkest = score
+						selected = {r = tonumber(col.r), g = tonumber(col.g), b = tonumber(col.b), a = tonumber(col.a) or 255}
+					end
+				end
+				judgeTexture = judgeTexture or info.judgeTexture == true
+			end
+		end
+		return selected, judgeTexture
+	end
+
+	local function ApplyBandageStyle(model, limbs)
+		if not IsValid(model) then return end
+		local color, judgeTexture = GetAppliedBandageStyle(limbs)
+		local material = judgeTexture and hg.ResolveJudgeBandageMaterial and hg.ResolveJudgeBandageMaterial() or nil
+		model:SetMaterial(material or "")
+		render.SetColorModulation(color.r / 255, color.g / 255, color.b / 255)
+	end
+
+	local function ResetBandageStyle()
+		render.SetColorModulation(1, 1, 1)
+	end
+
 	--hook.Add("PostDrawPlayerRagdoll", "draw_bandages", function(ent,ply)
 	local function GetBandageSoakRate(org)
 		if not org then return 0.0015 end
@@ -1371,7 +1437,9 @@ else
 
 			model.BodygroupsApplied = true
 		end
+		ApplyBandageStyle(model, ent.bandaged_limbs)
 		model:DrawModel()
+		ResetBandageStyle()
 
 		if ent.bandaged_limbs["ValveBiped.Bip01_Head1"] and not (ply == LocalPlayer() and GetViewEntity() == LocalPlayer()) then
 			local female = ThatPlyIsFemale(ent)
@@ -1402,7 +1470,9 @@ else
 				end
 			end
 
+			ApplyBandageStyle(headmodel, {head = ent.bandaged_limbs["ValveBiped.Bip01_Head1"]})
 			headmodel:DrawModel()
+			ResetBandageStyle()
 		end
 	end
 	--end)
@@ -1561,7 +1631,12 @@ function SWEP:CanBandageTPIK(target)
 end
 
 function SWEP:StartBandageTPIK(target, button)
-	if not SERVER or self.bandageTPIKUsing or self.bandageTPIKAwaitRelease or self._reverseToIdle then return end
+	if not SERVER then return end
+	local owner = self:GetOwner()
+	if self.bandageTPIKAwaitRelease and IsValid(owner) and not owner:KeyDown(IN_ATTACK) and not owner:KeyDown(IN_ATTACK2) then
+		self.bandageTPIKAwaitRelease = nil
+	end
+	if self.bandageTPIKUsing or self.bandageTPIKAwaitRelease or self._reverseToIdle then return end
 	if not self:CanBandageTPIK(target) then return end
 	local armSpeed = hg.MedicalMinigame and hg.MedicalMinigame.GetArmSpeedMultiplier
 		and hg.MedicalMinigame.GetArmSpeedMultiplier(self:GetOwner()) or 1
@@ -1603,7 +1678,11 @@ function SWEP:CancelBandageTPIK(reverse)
 	self.bandageTPIKUseTime = nil
 	self.bandageTPIKEndTime = nil
 	self.bandageTPIKSounds = nil
+	local owner = self:GetOwner()
+	self.bandageTPIKAwaitRelease = IsValid(owner) and (owner:KeyDown(IN_ATTACK) or owner:KeyDown(IN_ATTACK2)) or nil
 	if SERVER then
+		self:SetNextPrimaryFire(CurTime() + 0.1)
+		self:SetNextSecondaryFire(CurTime() + 0.1)
 		local timerName = "bandage_finish_" .. self:EntIndex()
 		timer.Remove(timerName)
 		local deployTimerName = "bandage_deploy_" .. self:EntIndex()

@@ -27,6 +27,10 @@ SWEP.modeNames = {
 	[1] = "adrenaline"
 }
 
+function SWEP:SetupDataTablesAdd()
+	self:NetworkVar("Bool", 0, "HealingOther")
+end
+
 function SWEP:InitializeAdd()
 	self:SetHold(self.HoldType)
 

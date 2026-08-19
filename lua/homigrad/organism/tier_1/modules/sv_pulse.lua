@@ -18,9 +18,10 @@ end
 local function getBloodCompensationRate(blood)
 	local cfg = hg.organism.config or {}
 	local reserve = getBloodPerfusion(blood)
-	local response = math.Clamp((1 - reserve) / 0.75, 0, 1)
+	local response = hg.organism.GetHemorrhageCompensationDrive and hg.organism.GetHemorrhageCompensationDrive(blood)
+		or math.Clamp(1 - reserve, 0, 1)
 	local maxRate = cfg.HEMORRHAGE_MAX_COMPENSATED_HR or 220
-	local rate = 70 + (maxRate - 70) * response ^ 0.85
+	local rate = 70 + (maxRate - 70) * response
 	local bradyReserve = math.Clamp(cfg.HEMORRHAGE_BRADYCARDIA_RESERVE or 0.35, 0.05, 0.9)
 	local preloadFailure = math.Clamp((bradyReserve - reserve) / bradyReserve, 0, 1)
 	return Lerp(preloadFailure ^ 1.2, rate, cfg.HEMORRHAGE_BRADYCARDIC_HR or 45)
@@ -28,9 +29,15 @@ end
 
 local function getRateOutput(heartbeat)
 	local rate = math.Clamp(tonumber(heartbeat) or 0, 0, terminalHeartRate)
-	local rateSupport = math.Clamp((rate / 70) ^ 0.55, 0.18, 1.35)
-	local filling = 1 - math.Clamp((rate - 150) / 150, 0, 0.72)
-	return math.Clamp(rateSupport * filling, 0.08, 1.35)
+	-- Cardiac output is fundamentally rate x stroke volume. Bradycardia can gain
+	-- some stroke volume from extra filling time, but that compensation is capped;
+	-- a 20-30 BPM escape rhythm cannot provide normal minute output merely because
+	-- circulating volume is still adequate.
+	local normalizedRate = rate / 70
+	local slowRateDepth = math.Clamp((70 - rate) / 55, 0, 1)
+	local fillingCompensation = Lerp(slowRateDepth, 1, 1.25)
+	local fastFillingLoss = 1 - math.Clamp((rate - 150) / 150, 0, 0.72)
+	return math.Clamp(normalizedRate * fillingCompensation * fastFillingLoss, 0, 1.35)
 end
 
 -- Extreme speed and sustained lateral acceleration can briefly reduce venous
@@ -319,6 +326,9 @@ end
 function hg.organism.StartFibrillation(org)
 	if not org or org.heartstop then return end
 	if hg.organism.OrganSystemsEnabled and not hg.organism.OrganSystemsEnabled() then return false end
+	-- Do not restart the VF clock every Think while the same fibrillation episode
+	-- is already active; progression to arrest depends on elapsed VF duration.
+	if org.fibrillation then return true end
 	org.fibrillation = true
 	-- Fibrillation replaces an organized palpitation rhythm; keeping both
 	-- active makes circulation, ECG, and status displays disagree.
@@ -332,6 +342,7 @@ local function maintainSimplifiedCirculation(org)
 	-- hg_huyorgans 0 keeps one intentionally small cardiovascular model. Organ
 	-- hits may still bleed and hurt, but the protected heart continues pumping.
 	org.heartstop = false
+	if hg.organism.ClearCardiacArrestMechanicalDecay then hg.organism.ClearCardiacArrestMechanicalDecay(org) end
 	org.heartbeat = 70
 	org.pulse = 70
 	org.ecgState = "normal_sinus"
@@ -382,6 +393,7 @@ function hg.organism.TryRestartHeartWithResuscitation(org)
 	if math.random(100) > chance then return false end
 
 	org.heartstop = false
+	if hg.organism.ClearCardiacArrestMechanicalDecay then hg.organism.ClearCardiacArrestMechanicalDecay(org) end
 	org.fibrillation = false
 	org.arrhythmia = math.max((org.arrhythmia or 0) - 0.45, 0)
 	org.heart = math.max((org.heart or 0) - 0.08, 0)
@@ -486,7 +498,14 @@ module[2] = function(owner, org, timeValue)
 
 	if organSystemsEnabled then applyTemperatureTrauma(org) end
 
-	local pulse = org.heartstop and 0 or 70-- + 120 * ((stamina.max or 180) - stamina[1]) / (stamina.max or 180) * (org.lungsfunction and 1 or 0)
+	local arrestMechanicalFactor, arrestMechanicalInitial = 1, nil
+	if hg.organism and hg.organism.GetCardiacArrestMechanicalFactor then
+		arrestMechanicalFactor, arrestMechanicalInitial = hg.organism.GetCardiacArrestMechanicalFactor(org)
+	end
+
+	local pulse = org.heartstop
+		and math.max(((arrestMechanicalInitial and arrestMechanicalInitial.pulse) or org.pulse or 70) * arrestMechanicalFactor, 0)
+		or 70-- + 120 * ((stamina.max or 180) - stamina[1]) / (stamina.max or 180) * (org.lungsfunction and 1 or 0)
 	--pulse = pulse + math.min(org.adrenaline, 2) * 40 + (!org.otrub and math.max(org.fear * 50, 0) or 0)
 	pulse = org.alive and pulse or 0
 	pulse = math.Clamp(pulse, 0, 200)
@@ -509,10 +528,12 @@ module[2] = function(owner, org, timeValue)
 	local compensationPulseMultiplier = math.Clamp(1 - hypovolemicShock * 0.18 - effectivePalpitations * 0.3, 0.35, 1)
 	org.compensationPulseMultiplier = compensationPulseMultiplier
 	local bloodPerfusionK = preloadReserve
-	local k = heart * o2 * math.Clamp(bloodPerfusionK, 0, 1) * brain * (org.heartstop and 0 or 1)
-	pulse = pulse * k
-	pulse = pulse * compensationPulseMultiplier
-	pulse = pulse * (math.Clamp(math.Remap(org.temperature, 28, 36.7, 0.5, 1), 0.5, 1))
+	local k = heart * o2 * math.Clamp(bloodPerfusionK, 0, 1) * brain
+	if not org.heartstop then
+		pulse = pulse * k
+		pulse = pulse * compensationPulseMultiplier
+		pulse = pulse * (math.Clamp(math.Remap(org.temperature, 28, 36.7, 0.5, 1), 0.5, 1))
+	end
 
 	-- Loss of circulation is progressive while the organism is still alive. This
 	-- leaves a short treatment window instead of turning a heart stop into an
@@ -540,7 +561,14 @@ module[2] = function(owner, org, timeValue)
 	local cprSupport = (org.cprSupportUntil or 0) > CurTime()
 	local cprSupportPulse = math.Clamp(tonumber(org.cprSupportPulse) or 40, 0, 70)
 	local arrestCirculation = (dihSupport and (70 / 92) or (defibGrace and 0.49 or (cprSupport and cprSupportPulse / 92 or 0))) * bloodVolume
-	local circulation = org.alive and (org.heartstop and arrestCirculation or circulationBase * rhythmMul) or 0
+	local residualCirculation = 0
+	if org.heartstop then
+		local initialPulseFlow = ((arrestMechanicalInitial and arrestMechanicalInitial.pulse) or org.pulse or 0) / 92
+		local initialPressureFlow = ((arrestMechanicalInitial and arrestMechanicalInitial.bloodPressure) or org.bloodPressure or 0) / 92
+		local initialOutput = (arrestMechanicalInitial and arrestMechanicalInitial.cardiacOutput) or org.cardiacOutput or 0
+		residualCirculation = Clamp(max(initialPulseFlow, initialPressureFlow, initialOutput) * arrestMechanicalFactor, 0, 1.5)
+	end
+	local circulation = org.alive and (org.heartstop and max(arrestCirculation, residualCirculation) or circulationBase * rhythmMul) or 0
 	org.pulse = Approach(org.pulse, circulation * 92, heart == 0 and timeValue * 10 or timeValue * 5)
 	-- Keep a real mean arterial pressure alongside the legacy palpable-pulse
 	-- value. Judge's pressure readout is useful to medicine/UI code, while the
@@ -554,7 +582,13 @@ module[2] = function(owner, org, timeValue)
 	local pulsePressure = Clamp(40 * Clamp(org.bloodPressure / 92, 0, 1.5) + ((org.heartbeat or 70) - 70) * 0.1, 0, 80)
 	org.systolic = math.Round(Clamp(org.bloodPressure + pulsePressure * 2 / 3, 0, 240))
 	org.diastolic = math.Round(Clamp(org.bloodPressure - pulsePressure / 3, 0, 160))
-	org.cardiacOutput = org.heartstop and ((dihSupport and 1 or (defibGrace and 0.35 or (cprSupport and cprSupportPulse / 110 or 0))) * bloodVolume) or Clamp(circulation, 0, 1.5)
+	local supportCardiacOutput = (dihSupport and 1 or (defibGrace and 0.35 or (cprSupport and cprSupportPulse / 110 or 0))) * bloodVolume
+	if org.heartstop then
+		local residualCardiacOutput = ((arrestMechanicalInitial and arrestMechanicalInitial.cardiacOutput) or org.cardiacOutput or 0) * arrestMechanicalFactor
+		org.cardiacOutput = Clamp(max(supportCardiacOutput, residualCardiacOutput), 0, 1.5)
+	else
+		org.cardiacOutput = Clamp(circulation, 0, 1.5)
+	end
 	-- Oxygenation, preload reserve, and circulation are linked but should not be
 	-- multiplied repeatedly. The weakest link caps myocardial delivery once.
 	-- The weakest link should cap delivery once without compounding blood loss.
@@ -716,6 +750,12 @@ module[2] = function(owner, org, timeValue)
 	-- so volume is not counted again after cardiac output has already fallen.
 	local cfg = hg.organism.config or {}
 	local circulatoryReserve = math.min(getBloodPerfusion(bloodNow), math.Clamp(circulation, 0, 1))
+	local hemorrhageO2Transport = hg.organism.GetHemorrhageOxygenTransportFraction and hg.organism.GetHemorrhageOxygenTransportFraction(bloodNow) or circulatoryReserve
+	local electricalFlowFailure = math.Clamp((0.48 - circulatoryReserve) / 0.48, 0, 1)
+	local electricalO2Failure = math.Clamp((0.42 - hemorrhageO2Transport) / 0.42, 0, 1)
+	local myocardialFailure = math.Clamp((0.45 - (org.myocardialOxygen or 1)) / 0.45, 0, 1)
+	local hemorrhageElectricalInstability = math.max(electricalFlowFailure, electricalO2Failure, myocardialFailure)
+	org.hemorrhageElectricalInstability = hemorrhageElectricalInstability
 	local criticalReserve = cfg.CRITICAL_CIRCULATION_RESERVE or 0.68
 	local criticalRange = math.max(cfg.CRITICAL_CIRCULATION_RANGE or 0.50, 0.01)
 	local criticalHemorrhageDepth = math.Clamp((criticalReserve - circulatoryReserve) / criticalRange, 0, 1)
@@ -764,8 +804,11 @@ module[2] = function(owner, org, timeValue)
 		org.nextColdRhythmRoll = CurTime() + 6
 		local deepCold = math.Clamp((30 - (org.temperature or 36.7)) / 2, 0, 1)
 		if roll < deepCold * 0.08 then
+			-- Deep cold may destabilize into VF, but temperature itself does not
+			-- directly flip the heartstop flag. VF and/or the resulting failure of
+			-- cardiac output are what progress the organism into arrest.
+			hg.organism.StartFibrillation(org)
 			org.terminalRhythm = "ventricular_fibrillation"
-			org.heartstop = true
 		elseif roll < 0.03 + hypothermiaInstability * 0.16 then
 			org.unstableRhythm = "atrial_fibrillation"
 		elseif roll < 0.15 + hypothermiaInstability * 0.24 then
@@ -837,8 +880,9 @@ module[2] = function(owner, org, timeValue)
 	org.heartbeat = math.Approach(org.heartbeat, heartbeat, heartbeat > org.heartbeat and timeValue * 5 or timeValue * 3)
 	
 	local ischemia = Clamp(1 - (org.myocardialOxygen or 1), 0, 1)
-	local stress = Clamp((org.heart or 0) * 0.9 + ischemia * 0.8 + (org.hypertension or 0) * 0.35 + (org.hypotension or 0) * 0.3 + hemorrhageRhythmStress * 0.25 + hypothermiaInstability * 0.35 + Clamp(org.shock, 0, 80) / 180 + max(org.pain - 60, 0) / 220 + max(org.heartbeat - 165, 0) / 190, 0, 2)
-	org.arrhythmia = Approach(org.arrhythmia or 0, Clamp(stress * 0.42, 0, 1), stress > (org.arrhythmia or 0) and timeValue / 25 or timeValue / 90)
+	local stress = Clamp((org.heart or 0) * 0.9 + ischemia * 0.8 + (org.hypertension or 0) * 0.35 + (org.hypotension or 0) * 0.3 + hemorrhageRhythmStress * 0.35 + hemorrhageElectricalInstability * 0.95 + hypothermiaInstability * 0.35 + Clamp(org.shock, 0, 80) / 180 + max(org.pain - 60, 0) / 220 + max(org.heartbeat - 165, 0) / 190, 0, 2.5)
+	local arrhythmiaTarget = Clamp(math.max(stress * 0.42, hemorrhageElectricalInstability * 0.88), 0, 1)
+	org.arrhythmia = Approach(org.arrhythmia or 0, arrhythmiaTarget, arrhythmiaTarget > (org.arrhythmia or 0) and timeValue / Lerp(hemorrhageElectricalInstability, 25, 6) or timeValue / 90)
 	if org.isPly and not org.otrub then
 		if org.fibrillation or org.unstableRhythm or org.arrhythmia > 0.35 then
 			owner:Notify("My heart rhythm feels irregular...", 45, "arrhythmia", 0, nil, Color(255, 170, 170))
@@ -850,8 +894,13 @@ module[2] = function(owner, org, timeValue)
 		end
 	end
 	if stress > 0.65 and CurTime() >= (org.nextArrhythmiaRoll or 0) then
-		org.nextArrhythmiaRoll = CurTime() + Clamp(Remap(stress, 0.65, 1.6, 14, 3), 3, 14)
-		if math.Rand(0, 1) < Clamp((stress - 0.65) * 0.12, 0.01, 0.18) then hg.organism.StartFibrillation(org) end
+		local rollInterval = Clamp(Remap(stress + hemorrhageElectricalInstability, 0.65, 2.3, 14, 1.5), 1.5, 14)
+		org.nextArrhythmiaRoll = CurTime() + rollInterval
+		local vfChance = Clamp((stress - 0.65) * 0.12 + hemorrhageElectricalInstability ^ 2 * 0.32, 0.01, 0.55)
+		if math.Rand(0, 1) < vfChance then
+			hg.organism.StartFibrillation(org)
+			if hemorrhageElectricalInstability > 0.72 then org.terminalRhythm = "ventricular_fibrillation" end
+		end
 	end
 
 	if org.heartbeat >= terminalHeartRate then
@@ -862,7 +911,13 @@ module[2] = function(owner, org, timeValue)
 		local pressureReserve = 1 - Clamp(org.hypotension or 0, 0, 1)
 		org.consciousness = math.min(org.consciousness, 0.33 + pressureReserve ^ 1.35 * 0.67)
 		org.o2[1] = max(org.o2[1] - timeValue * 1.8, 0)
-		if (org.fibrillationStart or CurTime()) + 24 < CurTime() or (org.cardiacOutput or 0) < 0.08 then org.heartstop = true end
+		local vfElapsed = CurTime() - (org.fibrillationStart or CurTime())
+		local minVF = math.max(tonumber(cfg.HEMORRHAGE_VF_MIN_SECONDS) or 6, 1)
+		local noUsefulOutput = (org.cardiacOutput or 0) < 0.08
+		if vfElapsed >= 24 or (noUsefulOutput and vfElapsed >= minVF) then
+			org.heartstop = true
+			org.terminalRhythm = "ventricular_fibrillation"
+		end
 	end
 	if org.hypertension > 0.35 then org.heartStrain = Clamp((org.heartStrain or 0) + timeValue * org.hypertension / 360, 0, 1) end
 	if ischemia > 0.35 then org.heartStrain = Clamp((org.heartStrain or 0) + timeValue * ischemia / 260, 0, 1) end
@@ -953,37 +1008,59 @@ module[2] = function(owner, org, timeValue)
 	-- epinephrine injection can affect an arrest before its normal decay tick.
 	local adren = math.max(org.adrenaline or 0, org.adrenalineAdd or 0)
 
+	-- Bradycardia is dangerous because too few effective beats reduce minute
+	-- cardiac output, not because cold owns a separate lethal temperature check.
+	-- This can therefore kill a severely hypothermic patient who still has 3 L+
+	-- of blood, while a well-perfused slow rhythm remains survivable.
+	local bradyLowRate = math.max(tonumber(cfg.BRADYCARDIA_LOW_OUTPUT_HR_BPM) or 45, 1)
+	local bradyLowReserve = math.Clamp(tonumber(cfg.BRADYCARDIA_LOW_OUTPUT_RESERVE) or 0.34, 0.05, 0.8)
+	local bradyRateDepth = math.Clamp((bradyLowRate - (org.heartbeat or 0)) / math.max(bradyLowRate - 15, 1), 0, 1)
+	local bradyOutputDepth = math.Clamp((bradyLowReserve - (org.cardiacOutput or 0)) / bradyLowReserve, 0, 1)
+	local bradyPerfusionDepth = math.Clamp((bradyLowReserve - (org.perfusion or 0)) / bradyLowReserve, 0, 1)
+	local bradyLowOutputSeverity = math.min(bradyRateDepth, math.max(bradyOutputDepth, bradyPerfusionDepth))
+	org.bradycardicLowOutputSeverity = bradyLowOutputSeverity
+	if not org.heartstop and bradyLowOutputSeverity > 0 then
+		local gain = timeValue * (0.35 + bradyLowOutputSeverity ^ 2 * 1.65)
+		org.bradycardicLowOutputTime = math.min((org.bradycardicLowOutputTime or 0) + gain, 20)
+	else
+		org.bradycardicLowOutputTime = math.Approach(org.bradycardicLowOutputTime or 0, 0, timeValue * 1.5)
+	end
+
 	local volumeExplainsLowOutput = criticalHemorrhageDepth > 0 and (org.criticalHemorrhageTime or 0) < 18 and (org.heart or 0) < 0.8 and org.brain < 0.6
-	if terminalCirculatoryFailure and not restartCirculationActive then
-		org.heartstop = true
-		org.terminalRhythm = "asystole"
-		-- Zero effective flow is a true discrete arrest state. Backdate the PEA
-		-- transition so the ECG does not invent several seconds of organized
-		-- electrical activity after circulation has already fallen essentially to 0.
-		org.cardiacArrestStart = math.min(org.cardiacArrestStart or CurTime(), CurTime() - peaDuration)
+	if terminalCirculatoryFailure and not restartCirculationActive and not org.heartstop then
+		-- Terminal hemorrhage usually loses electrical stability before becoming a
+		-- true flatline.  VF has almost no useful output, then progresses to asystole
+		-- if circulation cannot be restored.
+		hg.organism.StartFibrillation(org)
+		org.terminalRhythm = "ventricular_fibrillation"
 	end
 	if organSystemsEnabled then
 		if not restartCirculationActive and (org.criticalHemorrhageTime or 0) >= 18 then
 			org.heartstop = true
 		end
 		local failedCirculation = (org.pulse < 10 or org.hypotension > 0.92) and not volumeExplainsLowOutput and not restartCirculationActive
-		if failedCirculation or org.brain >= 0.85 or org.heart >= 0.9 then org.heartstop = true end
-		if org.temperature < 28 or org.temperature > 42 then org.heartstop = true end
+		local failedBradyOutput = (org.bradycardicLowOutputTime or 0) >= (tonumber(cfg.BRADYCARDIA_ARREST_EXPOSURE) or 8)
+			and (org.cardiacOutput or 0) < (tonumber(cfg.BRADYCARDIA_ARREST_OUTPUT) or 0.22)
+			and (org.perfusion or 0) < (tonumber(cfg.BRADYCARDIA_ARREST_PERFUSION) or 0.28)
+			and not restartCirculationActive
+		if failedCirculation or failedBradyOutput or org.brain >= 0.85 or org.heart >= 0.9 then org.heartstop = true end
+		if org.temperature > 42 then org.heartstop = true end
 	end
 	-- A successful AED/epinephrine restart deliberately has a short window to
 	-- rebuild circulation.  Do not immediately overwrite it here just because
 	-- the previous arrest left the pulse at zero or caused temporary hypoxia.
 	if ((org.pulse < 10 and not volumeExplainsLowOutput) or org.brain >= 0.6) and not restartCirculationActive then org.heartstop = true end
-	if org.temperature < 28 or org.temperature > 42 then org.heartstop = true end
+	if org.temperature > 42 then org.heartstop = true end
 	if org.heartstop and not org.fibrillation and org.terminalRhythm ~= "ventricular_fibrillation" and org.terminalRhythm ~= "asystole"
 		and (org.heartbeat or 0) >= 140 and (org.arrhythmia or 0) >= 0.72
 		and (ischemia >= 0.35 or (org.heartStrain or 0) >= 0.3 or (org.heartbeat or 0) >= 200) then
 		org.terminalRhythm = "terminal_tachycardia"
 	end
 	if org.heartstop then
-		org.heartbeat = 0
-		org.fibrillation = false
-		org.arrhythmia = 0
+		-- Rhythm failure is discrete, but the electrical/mechanical numbers decay.
+		-- Do not force heartbeat, pulse and pressure to zero on the arrest tick.
+		if org.terminalRhythm ~= "ventricular_fibrillation" then org.fibrillation = false end
+		org.arrhythmia = math.Approach(org.arrhythmia or 0, 0, timeValue * 0.35)
 	end
 
 	if org.temperature < 34 or org.temperature > 38 or org.blood < 4000 or org.pain > 20 then
@@ -1024,7 +1101,7 @@ module[2] = function(owner, org, timeValue)
 			org.heartbeat = math.Approach(org.heartbeat or terminalHeartRate, peaTarget, timeValue * 120)
 			org.ecgState = "pea"
 		else
-			org.heartbeat = math.Approach(org.heartbeat or 0, 0, timeValue * 40)
+			org.heartbeat = math.Approach(org.heartbeat or 0, 0, timeValue * 18)
 			org.ecgState = org.heartbeat < 1 and "asystole" or "pea"
 		end
 		if arrestElapsed >= peaDuration then

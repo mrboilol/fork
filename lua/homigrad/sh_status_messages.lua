@@ -611,14 +611,34 @@ local function get_status_message(ply)
 	end
 	
 	if most_wanted_phraselist then
-		local phraseIndex = math.random(#most_wanted_phraselist)
-		local previousPhrase = org.last_status_phrase
-		if #most_wanted_phraselist > 1 and most_wanted_phraselist[phraseIndex] == previousPhrase then
-			phraseIndex = phraseIndex % #most_wanted_phraselist + 1
+		org.recent_status_phrases = org.recent_status_phrases or {}
+		local candidates = {}
+		for i, phrase in ipairs(most_wanted_phraselist) do
+			if not org.recent_status_phrases[phrase] then candidates[#candidates + 1] = i end
 		end
-
+		if #candidates == 0 then
+			org.recent_status_phrases = {}
+			for i = 1, #most_wanted_phraselist do candidates[#candidates + 1] = i end
+		end
+		local phraseIndex = candidates[math.random(#candidates)]
 		str = most_wanted_phraselist[phraseIndex]
+		org.recent_status_phrases[str] = CurTime()
 		org.last_status_phrase = str
+
+		-- Keep only a short rolling memory so a pool eventually becomes reusable.
+		local recentCount = 0
+		for phrase, stamp in pairs(org.recent_status_phrases) do
+			if CurTime() - stamp > 45 then
+				org.recent_status_phrases[phrase] = nil
+			else
+				recentCount = recentCount + 1
+			end
+		end
+		if recentCount >= math.max(#most_wanted_phraselist - 1, 3) then
+			for phrase, stamp in pairs(org.recent_status_phrases) do
+				if phrase ~= str and CurTime() - stamp > 8 then org.recent_status_phrases[phrase] = nil end
+			end
+		end
 
 		return str
 	else

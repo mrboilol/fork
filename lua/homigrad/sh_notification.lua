@@ -206,7 +206,11 @@ if CLIENT then
 		if not hg_newthoughts:GetBool() then return end
 		if lply:IsBerserk() then return end
 
-		table.insert(hg.thoughts, {msg, CurTime(), clr or Color(255, 255, 255, 255)})
+		local now = CurTime()
+		for _, thought in ipairs(hg.thoughts) do
+			if thought[1] == msg and now - (thought[2] or 0) < 18 then return end
+		end
+		table.insert(hg.thoughts, {msg, now, clr or Color(255, 255, 255, 255)})
 
 		while #hg.thoughts > 3 do
 			local tbl = hg.thoughts[1]

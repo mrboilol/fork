@@ -26,6 +26,10 @@ SWEP.modeNames = {
 	[1] = "naloxone"
 }
 
+function SWEP:SetupDataTablesAdd()
+	self:NetworkVar("Bool", 0, "HealingOther")
+end
+
 SWEP.DeploySnd = ""
 SWEP.HolsterSnd = ""
 

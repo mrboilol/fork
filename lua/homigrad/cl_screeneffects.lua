@@ -318,6 +318,8 @@ local painThresholdIntensityLerp = 1
 local PanicAttackLerp = 0
 local PanicStationVolume = 0
 local O2Lerp = 0
+local dyingAudioFade = 0
+local ischemicVignetteLerp = 0
 local assimilatedLerp = 0
 local tempLerp = 36.6
 local brainFrontalLerp = 0
@@ -341,6 +343,8 @@ local brainFrontalColor = {
 PainLerp = 0
 PanicAttackLerp = 0
 O2Lerp = 0
+dyingAudioFade = 0
+ischemicVignetteLerp = 0
 AnalgesiaLerp = 0
 assimilatedLerp = 0
 tempLerp = 36.6
@@ -1769,9 +1773,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				end)
 			end
 			
-			if IsValid(NoiseStation2) then
-				NoiseStation2:SetVolume(math.Clamp((o2 - 50) / 100 + (brain > 0.3 and (brain - 0.3) * 5 or 0), 0, consciousnessTypeBeatVolume))
-			end
+			-- Volume is assigned after the shared fade target is calculated below.
 
 			if IsValid(NoiseStation2Dying) then
 				NoiseStation2Dying:SetVolume(0)
@@ -1789,19 +1791,19 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				end)
 			end
 
-			local consciousVol = math.Clamp((o2 - 50) / 100 + (brain > 0.3 and (brain - 0.3) * 5 or 0), 0, 3)
-			hg.consciousBeatIntensity = consciousVol
-
-			-- Dying ambience when bleeding out (low blood + active bleeding)
+			local dyingAudioTarget = math.Clamp((o2 - 50) / 100 + (brain > 0.3 and (brain - 0.3) * 5 or 0), 0, 3)
 			local blood = org.blood or 5000
 			local bleed = org.bleed or 0
-			local bleedingOut = blood < 4000 and bleed > 0
-
-			if bleedingOut then
+			if blood < 4000 and bleed > 0 then
 				local bleedSeverity = math.Clamp((3500 - blood) / 3500, 0, 1)
-				consciousVol = math.max(consciousVol, bleedSeverity * 2)
-				hg.consciousBeatIntensity = math.max(hg.consciousBeatIntensity, bleedSeverity * 2)
+				dyingAudioTarget = math.max(dyingAudioTarget, bleedSeverity * 2)
 			end
+
+			-- Low-O2/bleedout ambience ramps into the requested volume instead of
+			-- appearing at full level on the first qualifying frame.
+			dyingAudioFade = LerpFT(0.018, dyingAudioFade, dyingAudioTarget)
+			local consciousVol = dyingAudioFade
+			hg.consciousBeatIntensity = consciousVol
 
 			if IsValid(NoiseStation2Dying) then
 				NoiseStation2Dying:SetVolume(0)
@@ -2126,7 +2128,8 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				NoiseStation2Dying:SetVolume(0)
 			end
 		else
-			hg.consciousBeatIntensity = 0
+			dyingAudioFade = LerpFT(0.05, dyingAudioFade, 0)
+			hg.consciousBeatIntensity = dyingAudioFade
 			if IsValid(NoiseStation2) then
 				NoiseStation2:SetVolume(0)
 			end
@@ -2233,6 +2236,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			if IsValid(OtrubModeStation) then OtrubModeStation:SetVolume(0) end
 		end
 	else
+		dyingAudioFade = LerpFT(0.05, dyingAudioFade, 0)
 		if IsValid(NoiseStation) then
 			NoiseStation:Stop()
 			NoiseStation = nil
@@ -2338,7 +2342,9 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end
 
 		local blood = org.blood or 5000
-		local lowBloodVisual = math.Clamp((4000 - blood) / 2000, 0, 1)
+		-- A very small desaturation begins with the first measurable loss, then the
+		-- curve steepens as the circulation approaches the decompensation region.
+		local lowBloodVisual = math.Clamp((5000 - blood) / 3000, 0, 1) ^ 1.25
 		if lowBloodVisual > 0 then
 			-- Blood loss starts with a restrained desaturation and blur, while the
 			-- existing consciousness/shock effects still own severe collapse.
@@ -2347,6 +2353,29 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end
 		if blood < 3500 then
 			grayscaleTarget = grayscaleTarget + math.Clamp((3500 - blood) / 3500, 0, 1) * 0.25 * zerlkersVisualMul
+		end
+
+		local ischemiaVisual = math.Clamp(tonumber(org.ischemia) or 0, 0, 1)
+		local internalBleedVisual = math.Clamp((tonumber(org.internalBleed) or 0) / 5, 0, 1)
+		local hemothoraxVisual = math.Clamp(tonumber(org.hemothorax) or 0, 0, 1)
+		local pneumothoraxVisual = math.Clamp(tonumber(org.pneumothorax) or 0, 0, 1)
+		local perfusionVisual = math.Clamp(1 - (tonumber(org.perfusion) or 1), 0, 1)
+		local circulatoryVisual = math.max(
+			ischemiaVisual,
+			internalBleedVisual * 0.65,
+			hemothoraxVisual * 0.75,
+			pneumothoraxVisual * 0.65,
+			perfusionVisual * 0.8
+		)
+		grayscaleTarget = grayscaleTarget + circulatoryVisual * 0.24 * zerlkersVisualMul
+		ischemicVignetteLerp = LerpFT(0.035, ischemicVignetteLerp, math.Clamp(lowBloodVisual * 0.45 + circulatoryVisual * 0.65, 0, 0.8) * zerlkersVisualMul)
+		if ischemicVignetteLerp > 0.005 then
+			render.UpdateScreenEffectTexture()
+			vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
+			vignetteMat:SetFloat("$c0_z", ischemicVignetteLerp * 0.35)
+			vignetteMat:SetFloat("$c1_y", ischemicVignetteLerp * 0.75)
+			render.SetMaterial(vignetteMat)
+			render.DrawScreenQuad()
 		end
 
 		local o2 = (org.o2 and isnumber(org.o2[1])) and org.o2[1] or 100
@@ -2377,6 +2406,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end
 		else
 			grayscaleLerp = LerpFT(0.04, grayscaleLerp, 0)
+			ischemicVignetteLerp = LerpFT(0.04, ischemicVignetteLerp, 0)
 		end
 	end
 

@@ -977,8 +977,9 @@ concommand.Add("hg_heartstop", function(ply, cmd, args)
     if not IsValid(ent) or not ent.organism then return end
 
     ent.organism.heartstop = true
-    ent.organism.pulse = 0
-    ent.organism.heartbeat = 0
+    if hg.organism and hg.organism.BeginCardiacArrestMechanicalDecay then
+        hg.organism.BeginCardiacArrestMechanicalDecay(ent.organism)
+    end
 end)
 
 concommand.Add("hg_heartstart", function(ply, cmd, args)
@@ -988,4 +989,7 @@ concommand.Add("hg_heartstart", function(ply, cmd, args)
     if not IsValid(ent) or not ent.organism then return end
 
     ent.organism.heartstop = false
+    if hg.organism and hg.organism.ClearCardiacArrestMechanicalDecay then
+        hg.organism.ClearCardiacArrestMechanicalDecay(ent.organism)
+    end
 end)

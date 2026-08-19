@@ -7,21 +7,6 @@ local WOOD_PHYSICS_MATERIALS = {
 	wood_solid = true
 }
 
-local WOOD_BREAK_MODEL_CANDIDATES = {
-	"models/gibs/wood_gib01a.mdl",
-	"models/gibs/wood_gib01b.mdl",
-	"models/gibs/wood_gib01c.mdl",
-	"models/gibs/wood_gib01d.mdl",
-	"models/gibs/wood_gib01e.mdl"
-}
-
-local VALID_WOOD_BREAK_MODELS = {}
-for _, model in ipairs(WOOD_BREAK_MODEL_CANDIDATES) do
-	if util.IsValidModel(model) and util.IsValidProp(model) then
-		VALID_WOOD_BREAK_MODELS[#VALID_WOOD_BREAK_MODELS + 1] = model
-	end
-end
-
 local function HasWoodMaterial(ent)
 	if not IsValid(ent) then return false end
 	if ent:GetMaterialType() == MAT_WOOD then return true end
@@ -218,40 +203,5 @@ hook.Add("EntityTakeDamage", "hg-FireBluntSmothering", function(ent, dmgInfo)
 	hg.SmotherEntityFire(ent, amount, dmgInfo:GetDamagePosition())
 end)
 
-hook.Add("PropBreak", "hg-WoodPropBreakModels", function(attacker, prop)
-	if not IsValid(prop) or prop.hgFallbackBreakGib then return end
-	-- Some watermelons report wood physics; never add artificial wood gibs.
-	if string.find(string.lower(prop:GetModel() or ""), "watermelon", 1, true) then return end
-	local class = prop:GetClass()
-	if class ~= "prop_physics" and class ~= "prop_physics_multiplayer" then return end
-	if not HasWoodMaterial(prop) or #VALID_WOOD_BREAK_MODELS == 0 then return end
+-- Source/propdata owns break gibs so each prop uses its model-defined debris.
 
-	local center = prop:WorldSpaceCenter()
-	local velocity = prop:GetVelocity()
-	local radius = math.max(prop:GetModelRadius(), 10)
-	local count = math.Clamp(math.floor(radius / 24), 2, 5)
-
-	for i = 1, count do
-		local gib = ents.Create("prop_physics")
-		if not IsValid(gib) then continue end
-
-		gib.hgFallbackBreakGib = true
-		gib:SetModel(VALID_WOOD_BREAK_MODELS[math.random(#VALID_WOOD_BREAK_MODELS)])
-		gib:SetPos(center + VectorRand(-math.min(radius * 0.25, 12), math.min(radius * 0.25, 12)))
-		gib:SetAngles(AngleRand())
-		gib:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
-		gib:Spawn()
-
-		if IsValid(attacker) and attacker:IsPlayer() then
-			gib:SetCreator(attacker)
-		end
-
-		local phys = gib:GetPhysicsObject()
-		if IsValid(phys) then
-			phys:SetVelocity(velocity + VectorRand(-90, 90) + vector_up * math.Rand(20, 85))
-			phys:AddAngleVelocity(VectorRand(-180, 180))
-		end
-
-		SafeRemoveEntityDelayed(gib, math.Rand(25, 40))
-	end
-end)

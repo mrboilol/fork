@@ -354,7 +354,17 @@ local moodleTexts = {
 }
 local function getMoodle3Material(name)
 	if moodle3Icons[name] == nil then
-		local mat = Material("vgui/hud/moodles 3/" .. name .. ".png", "smooth")
+		local mat
+		-- Zerlked lives in the dedicated Moodle 3 asset folder used by the
+		-- content pack. Keep the legacy path as a fallback for older installs.
+		if name == "zerlked" then
+			mat = Material("vgui/moodles3/zerlked.png", "smooth")
+			if not mat or mat:IsError() then
+				mat = Material("vgui/hud/moodles 3/zerlked.png", "smooth")
+			end
+		else
+			mat = Material("vgui/hud/moodles 3/" .. name .. ".png", "smooth")
+		end
 		moodle3Icons[name] = mat and not mat:IsError() and mat or false
 	end
 	return moodle3Icons[name] or nil

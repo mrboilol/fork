@@ -7,29 +7,34 @@ local MEDKIT_TYPES = {
         PrintName = "Basic Medkit",
         Instructions = "A compact first-aid kit with a basic bandage roll and one tourniquet. Best for stopping a small wound before it becomes serious. RMB to apply on others, R to change use mode.",
         contents = {bandage = 40, tourniquet = 1},
+        bandageColor = Color(235, 235, 235),
     },
     standard = {
         PrintName = "Standard Medkit",
         Instructions = "A general-purpose first-aid kit with bandages, a tourniquet and paracetamol for everyday injuries. RMB to apply on others, R to change use mode.",
         contents = {bandage = 60, tourniquet = 1, painkiller = 1},
+        bandageColor = Color(205, 205, 205),
         painkillerType = "paracetamol",
     },
     emergency = {
         PrintName = "Emergency Medkit",
         Instructions = "An emergency trauma kit with extra bandages, two tourniquets, tramadol and naloxone for severe bleeding or overdose response. RMB to apply on others, R to change use mode.",
         contents = {bandage = 150, tourniquet = 2, painkiller = 0.4, naloxone = 1},
+        bandageColor = Color(165, 165, 165),
         painkillerType = "tramadol",
     },
     advanced = {
         PrintName = "Advanced Medkit",
         Instructions = "An advanced trauma kit with large dressings, two tourniquets, tramadol, tranexamic acid and a decompression needle for severe trauma. RMB to apply on others, R to change use mode.",
         contents = {bandage = 225, tourniquet = 2, painkiller = 0.4, tranexamic = 10, needle = 1},
+        bandageColor = Color(125, 125, 125),
         painkillerType = "tramadol",
     },
     surgical = {
         PrintName = "Surgical Medkit",
         Instructions = "A fully stocked surgical kit with QuikClot-grade dressings, two tourniquets, tapentadol, tranexamic acid, naloxone, mannitol and a decompression needle. RMB to apply on others, R to change use mode.",
         contents = {bandage = 375, tourniquet = 2, painkiller = 0.6, tranexamic = 10, naloxone = 1, mannitol = 1, needle = 1},
+        bandageColor = Color(75, 75, 75),
         painkillerType = "tapentadol",
     },
 }
@@ -37,6 +42,7 @@ local NORMAL_MEDKIT = {
     PrintName = "Medkit",
     Instructions = "A standard medical bag with a quality bandage, painkiller, tranexamic acid, a tourniquet and a decompression needle. RMB to apply on others, R to change use mode.",
     qualityBandageAmount = 150,
+    bandageColor = Color(165, 165, 165),
 }
 
 local MEDKIT_PICKUP_CLASSES = {
@@ -70,6 +76,7 @@ local function setupMedkit(wep)
     wep.modeValues = {}
     wep.modeValuesdef = {}
     wep.HGMedkitModeTypes = {}
+    wep.HGBandageColor = definition.bandageColor
     for _, typeName in ipairs(modeOrder) do
         local amount = definition.contents[typeName]
         if amount and amount > 0 then
@@ -176,6 +183,7 @@ local function patchNormalMedkit()
     normal.InitializeAdd = function(self)
         initializeAdd(self)
         self.modeValues[1] = NORMAL_MEDKIT.qualityBandageAmount
+        self.HGBandageColor = NORMAL_MEDKIT.bandageColor
     end
 
     -- Ground pickups remain the generic medkit entity until a player takes
@@ -373,6 +381,7 @@ local function registerBandageGrades()
         if istable(registered) then
             registered.PrintName = grade.name
             registered.Instructions = grade.instructions
+            registered.Color = grade.color
             registered.PickupFunc = false -- do not inherit weapon_bandage_sh's generic reroll callback
         end
     end

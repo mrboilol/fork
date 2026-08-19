@@ -28,6 +28,10 @@ SWEP.modeNames = {
 	[1] = "fury-13"
 }
 
+function SWEP:SetupDataTablesAdd()
+	self:NetworkVar("Bool", 0, "HealingOther")
+end
+
 function SWEP:InitializeAdd()
 	self:SetHold(self.HoldType)
 

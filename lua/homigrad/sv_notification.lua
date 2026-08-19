@@ -522,6 +522,22 @@ local function ResetNotification(ply, key)
     ply.msgs[key] = nil
 end
 
+local thoughtGroupPatterns = {
+    {"blood", "circulation"}, {"bleed", "circulation"}, {"arter", "circulation"}, {"perfusion", "circulation"},
+    {"oxygen", "respiration"}, {"hypox", "respiration"}, {"breath", "respiration"}, {"lung", "respiration"}, {"pneumo", "respiration"}, {"hemo", "respiration"},
+    {"heart", "cardiac"}, {"pulse", "cardiac"}, {"arrhythm", "cardiac"}, {"tachy", "cardiac"}, {"brady", "cardiac"},
+    {"bone", "skeletal"}, {"limb", "skeletal"}, {"fract", "skeletal"}, {"disloc", "skeletal"},
+    {"pain", "pain"}, {"hurt", "pain"}, {"concussion", "neuro"}, {"brain", "neuro"}, {"dizz", "neuro"},
+}
+
+local function GetThoughtGroup(msgKey, msg)
+    local haystack = string.lower(tostring(msgKey or "") .. " " .. tostring(msg or ""))
+    for _, rule in ipairs(thoughtGroupPatterns) do
+        if string.find(haystack, rule[1], 1, true) then return rule[2] end
+    end
+    return "misc"
+end
+
 CreateThought = function(ply, msg, delay, msgKey, showTime, clr, func)
     if not IsValid(ply) or not ply:IsPlayer() then error("player is not valid!") return false end
     if not msg or not isstring(msg) then error("no message or message is invalid!") return false end
@@ -531,6 +547,18 @@ CreateThought = function(ply, msg, delay, msgKey, showTime, clr, func)
 
     msgKey = msgKey or msg
     ply.thoughtmsgs = ply.thoughtmsgs or {}
+    ply.thoughtGroupCooldowns = ply.thoughtGroupCooldowns or {}
+    ply.recentThoughtText = ply.recentThoughtText or {}
+    local now = CurTime()
+    local group = GetThoughtGroup(msgKey, msg)
+
+    -- Different hooks often describe the same physiological event with different
+    -- keys. Group them so one injury does not dump several near-identical thoughts
+    -- onto the screen in the same second.
+    if (ply.nextThoughtGlobal or 0) > now then return false end
+    if (ply.thoughtGroupCooldowns[group] or 0) > now then return false end
+    if (ply.recentThoughtText[msg] or 0) > now then return false end
+
     if msgKey and ply.thoughtmsgs[msgKey] then
         if isnumber(ply.thoughtmsgs[msgKey]) then
             if ply.thoughtmsgs[msgKey] > CurTime() then
@@ -543,7 +571,10 @@ CreateThought = function(ply, msg, delay, msgKey, showTime, clr, func)
 
     delay = delay or 0
 
-    if msgKey then ply.thoughtmsgs[msgKey] = delay and (not isnumber(delay) or CurTime() + delay) or nil end
+    if msgKey then ply.thoughtmsgs[msgKey] = delay and (not isnumber(delay) or now + delay) or nil end
+    ply.nextThoughtGlobal = now + 0.85
+    ply.thoughtGroupCooldowns[group] = now + (group == "misc" and 1.5 or 3.25)
+    ply.recentThoughtText[msg] = now + 18
 
     showTime = showTime or 0
     local clr = clr or color_white
@@ -570,18 +601,27 @@ hook.Add("Player Spawn","removeNotifications",function(ply)
     ply.msgs = {}
     ply.thoughtmsgs = {}
     ply.lastConditionThought = {}
+    ply.thoughtGroupCooldowns = {}
+    ply.recentThoughtText = {}
+    ply.nextThoughtGlobal = 0
 end)
 
 hook.Add("HG_OnOtrub","removeNotifications",function(ply)
     ply.msgs = {}
     ply.thoughtmsgs = {}
     ply.lastConditionThought = {}
+    ply.thoughtGroupCooldowns = {}
+    ply.recentThoughtText = {}
+    ply.nextThoughtGlobal = 0
 end)
 
 hook.Add("Player_Death","removeNotifications",function(ply)
     ply.msgs = {}
     ply.thoughtmsgs = {}
     ply.lastConditionThought = {}
+    ply.thoughtGroupCooldowns = {}
+    ply.recentThoughtText = {}
+    ply.nextThoughtGlobal = 0
 end)
 
 local PLAYER = FindMetaTable("Player")

@@ -5,6 +5,9 @@ hg.berserkStartTime2 = hg.berserkStartTime2 or 0
 hg.berserkStation = hg.berserkStation or nil
 hg.berserkMusicPlayed = hg.berserkMusicPlayed or false
 hg.berserkMusicLoading = hg.berserkMusicLoading or false
+hg.berserkMusicPath = hg.berserkMusicPath or nil
+hg.berserkRequestedPath = hg.berserkRequestedPath or nil
+hg.berserkMusicRequest = hg.berserkMusicRequest or 0
 hg.berserkFadeOut = hg.berserkFadeOut or false
 hg.berserkFadeOutStartTime = hg.berserkFadeOutStartTime or 0
 hg.berserkLastActivationTime = hg.berserkLastActivationTime or 0
@@ -62,19 +65,33 @@ local function getBerserkBPM()
 end
 
 local function startBerserkMusic(musicPath)
+	musicPath = tostring(musicPath or "")
+	if musicPath == "" then return end
+
 	if IsValid(hg.berserkStation) then
-		hg.berserkStation:EnableLooping(true)
-		hg.berserkStation:SetVolume(1)
-		hg.berserkFadeOut = false
-		hg.berserkMusicPlayed = true
-		return
+		if hg.berserkMusicPath == musicPath then
+			hg.berserkStation:EnableLooping(true)
+			hg.berserkStation:SetVolume(1)
+			hg.berserkFadeOut = false
+			hg.berserkMusicPlayed = true
+			return
+		end
+		hg.berserkStation:Stop()
+		hg.berserkStation = nil
 	end
 
-	if hg.berserkMusicLoading then return end
+	if hg.berserkMusicLoading and hg.berserkRequestedPath == musicPath then return end
 
+	hg.berserkMusicRequest = (hg.berserkMusicRequest or 0) + 1
+	local request = hg.berserkMusicRequest
+	hg.berserkRequestedPath = musicPath
 	hg.berserkMusicLoading = true
 	hg.berserkMusicPlayed = true
 	sound.PlayFile(musicPath, "noblock", function(channel)
+		if request ~= hg.berserkMusicRequest then
+			if IsValid(channel) then channel:Stop() end
+			return
+		end
 		hg.berserkMusicLoading = false
 
 		if not IsValid(channel) then
@@ -82,13 +99,14 @@ local function startBerserkMusic(musicPath)
 			return
 		end
 
-		if not hg.underberserk and not hg.underberserk2 then
+		if (not hg.underberserk and not hg.underberserk2) or getBerserkMusicPath() ~= musicPath then
 			channel:Stop()
 			hg.berserkMusicPlayed = false
 			return
 		end
 
 		hg.berserkStation = channel
+		hg.berserkMusicPath = musicPath
 		channel:EnableLooping(true)
 		channel:SetVolume(1)
 		hg.berserkFadeOut = false
@@ -103,7 +121,11 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 		hg.underberserk2 = false
 
 		if IsValid(hg.berserkStation) then hg.berserkStation:Stop() end
+		hg.berserkMusicRequest = (hg.berserkMusicRequest or 0) + 1
 		hg.berserkStation = nil
+		hg.berserkMusicPath = nil
+		hg.berserkRequestedPath = nil
+		hg.berserkMusicLoading = false
 		hg.berserkFadeOut = false
 		hg.berserkMusicPlayed = false
 
@@ -179,12 +201,24 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 		hg.berserkActivationSoundPlayed = false
 		hg.berserkLastActivationTime = 0
 		if IsValid(hg.berserkStation) then hg.berserkStation:Stop() end
+		hg.berserkMusicRequest = (hg.berserkMusicRequest or 0) + 1
 		hg.berserkStation = nil
+		hg.berserkMusicPath = nil
+		hg.berserkRequestedPath = nil
+		hg.berserkMusicLoading = false
 		hg.berserkFadeOut = false
 		hg.berserkMusicPlayed = false
 
 		hg.notificationFont = "HuyFont"
 		hg.berserkIntensity = 0
+	end
+
+	if (hg.underberserk or hg.underberserk2) then
+		local expectedMusicPath = getBerserkMusicPath()
+		if (IsValid(hg.berserkStation) and hg.berserkMusicPath ~= expectedMusicPath)
+			or (not IsValid(hg.berserkStation) and not hg.berserkMusicLoading and hg.berserkMusicPlayed) then
+			startBerserkMusic(expectedMusicPath)
+		end
 	end
 
 	if hg.underberserk then

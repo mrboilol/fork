@@ -291,6 +291,16 @@ end
 -- WoundTBL = {dmgBlood / 2, localPos, localAng, bone, time}
 SWEP.ShouldDeleteOnFullUse = true
 if SERVER then
+	function SWEP:GetBandageVisualInfo(wound)
+		local color = self.HGBandageColor or self.Color
+		return {
+			pos = wound and wound[2] or vector_origin,
+			ang = wound and wound[3] or angle_zero,
+			color = {r = color and color.r or 255, g = color and color.g or 255, b = color and color.b or 255, a = color and color.a or 255},
+			judgeTexture = GetConVar("hg_healanims") and GetConVar("hg_healanims"):GetInt() == 1 or false
+		}
+	end
+
 	function SWEP:CanHeal(ent)
 		local org = ent.organism
 		local owner = self:GetOwner()
@@ -334,7 +344,7 @@ if SERVER then
 					local bone_name = org.wounds[1][4]
 					local wound = org.wounds[1]
 					if not ent.bandaged_limbs[bone_name] then
-						ent.bandaged_limbs[bone_name] = { pos = wound[2] or vector_origin, ang = wound[3] or angle_zero }
+						ent.bandaged_limbs[bone_name] = self:GetBandageVisualInfo(wound)
 						done = true
 					end
 					if org.wounds[1][1] == 0 then table.remove(org.wounds, 1) end
@@ -370,7 +380,7 @@ if SERVER then
 						local wound = org.wounds[bonewounds[1]]
 						
 						if not ent.bandaged_limbs[bone_name] then
-							ent.bandaged_limbs[bone_name] = { pos = wound[2] or vector_origin, ang = wound[3] or angle_zero }
+							ent.bandaged_limbs[bone_name] = self:GetBandageVisualInfo(wound)
 							done = true
 						end
 
@@ -925,7 +935,7 @@ else
 	}
 
 	--hook.Add("PostDrawPlayerRagdoll", "draw_bandages", function(ent,ply)
-	function hg.RenderBandages(ent, ply)
+	hg.RenderBandages = hg.RenderBandages or function(ent, ply)
 		local bandaged_limbs = ent:GetNetVar("bandaged_limbs") or ent.bandaged_limbs
 		if not bandaged_limbs or not next(bandaged_limbs) then
 			bandaged_limbs = ply:GetNetVar("bandaged_limbs") or ply.bandaged_limbs
@@ -934,6 +944,8 @@ else
 
 		local bandagedBones = {}
 		local bandageColor
+		local darkestBandage = math.huge
+		local judgeTexture = false
 
 		for bone, info in pairs(bandaged_limbs) do
 			if hg.amputatedbone and hg.amputatedbone(ent, bone) then continue end
@@ -942,10 +954,13 @@ else
 
 			local col = istable(info) and info.color
 			if IsColor(col) or (istable(col) and col.r and col.g and col.b) then
-				if not bandageColor then
+				local score = (tonumber(col.r) or 255) + (tonumber(col.g) or 255) + (tonumber(col.b) or 255)
+				if score < darkestBandage then
+					darkestBandage = score
 					bandageColor = col
 				end
 			end
+			judgeTexture = judgeTexture or (istable(info) and info.judgeTexture == true)
 		end
 
 		if #bandagedBones > 0 then
@@ -1003,6 +1018,8 @@ else
 				if bandageColor then
 					render.SetColorModulation((bandageColor.r or 255) / 255, (bandageColor.g or 255) / 255, (bandageColor.b or 255) / 255)
 				end
+				local material = judgeTexture and hg.ResolveJudgeBandageMaterial and hg.ResolveJudgeBandageMaterial() or nil
+				model:SetMaterial(material or "")
 
 				model:DrawModel()
 				render.SetColorModulation(1, 1, 1)

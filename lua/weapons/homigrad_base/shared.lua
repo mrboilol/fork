@@ -1310,8 +1310,12 @@ if CLIENT then
 			local sizeX = (clipsize == 1 and scrH / 15 or scrW / 40) * scale
 			local sizeY = (clipsize == 1 and scrH / 80 or scrH / 10) * scale
 			local clip = math.max(self:Clip1(), 0)
-			local ammo = owner:GetAmmoCount(self:GetPrimaryAmmoType())
-			local magCount = self.AnimInsert and ammo or math.ceil(ammo / clipsize)
+			local ammo = math.max(tonumber(owner:GetAmmoCount(self:GetPrimaryAmmoType())) or 0, 0)
+			local looseRoundReserve = self.AnimInsert or self.ShotgunTubeReload or (self.IsManuallyCycledWeapon and self:IsManuallyCycledWeapon())
+			local magCount = looseRoundReserve and math.floor(ammo) or math.ceil(ammo / clipsize)
+			magCount = math.max(math.floor(tonumber(magCount) or 0), 0)
+			local visibleReserve = looseRoundReserve and math.min(magCount, 8) or math.min(magCount, 3)
+			visibleReserve = math.max(math.floor(tonumber(visibleReserve) or 0), 0)
 
 			self.hudinspect = self.hudinspect or 0
 			if self.hudinspect > CurTime() or self:KeyDown(IN_RELOAD) or dynamicmags:GetBool() then
@@ -1335,9 +1339,11 @@ if CLIENT then
 			local magY = posY + (clipsize == 1 and scrH / 70 or scrH / 20)
 			local smallX = sizeX / 2
 			local smallY = sizeY / 2
-			local reserveAmmo = ammo
+			local reserveAmmo = tonumber(ammo) or 0
+			local reserveBlocks = math.max(math.floor(tonumber(visibleReserve) or 0), 0)
 
-			for i = 1, visibleReserve do
+			local i = 1
+			while i <= reserveBlocks do
 				local x = magX + (smallX + 15) * i
 				if looseRoundReserve then
 					-- One empty mini-block equals one loose shell/round. The loaded tube/internal
@@ -1354,11 +1360,12 @@ if CLIENT then
 					surface.DrawRect(x, magY - reserveLeft + smallY, smallX, reserveLeft)
 					surface.DrawOutlinedRect(x - 5, magY - 5, smallX + 10, smallY + 10, 1)
 				end
+				i = i + 1
 			end
 
-			if magCount > visibleReserve then
-				local extraMags = "+" .. (magCount - visibleReserve)
-				local extraX = magX + (smallX + 15) * (visibleReserve + 1)
+			if magCount > reserveBlocks then
+				local extraMags = "+" .. (magCount - reserveBlocks)
+				local extraX = magX + (smallX + 15) * (reserveBlocks + 1)
 				draw.SimpleText(extraMags, "AmmoFont", extraX + 1, magY + smallX / 2 + 1, Color(0, 0, 0, 255 * lerpAmmoCheck), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 				draw.SimpleText(extraMags, "AmmoFont", extraX, magY + smallX / 2, Color(255, 255, 255, 255 * lerpAmmoCheck), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 			end

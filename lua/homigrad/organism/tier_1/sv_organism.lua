@@ -9,9 +9,13 @@ hg.organism.config = hg.organism.config or {
 	BLOOD_PRELOAD_FULL_ML = 3500,
 	BLOOD_PRELOAD_CURVE_POWER = 2.5,
 	BLOOD_OXYGEN_TRANSPORT_ZERO_ML = 2000,
-	BLOOD_OXYGEN_TRANSPORT_FULL_ML = 3000,
-	BLOOD_OXYGEN_TRANSPORT_CURVE_POWER = 1.08,
+	BLOOD_OXYGEN_TRANSPORT_FULL_ML = 5000,
+	-- Calibrated so the 0-30 tissue-O2 transport ceiling is ~8 at 2250 mL,
+	-- while even mild hemorrhage produces a small continuous delivery penalty.
+	BLOOD_OXYGEN_TRANSPORT_CURVE_POWER = 3.565,
 	HEMORRHAGE_MAX_COMPENSATED_HR = 220,
+	HEMORRHAGE_COMPENSATION_POWER = 1.25,
+	HEMORRHAGE_VF_MIN_SECONDS = 6,
 	HEMORRHAGE_BRADYCARDIC_HR = 45,
 	HEMORRHAGE_BRADYCARDIA_RESERVE = 0.35,
 	CRITICAL_CIRCULATION_RESERVE = 0.62,
@@ -21,6 +25,12 @@ hg.organism.config = hg.organism.config or {
 	ARTERIAL_AMPUTATION_BLEED_MULTIPLIER = 0.65,
 	ARTERIAL_HEADGIB_BLEED_MULTIPLIER = 1.65,
 	POSTMORTEM_DECAY_SECONDS = 5,
+	CARDIAC_ARREST_MECHANICAL_DECAY_SECONDS = 5,
+	BRADYCARDIA_LOW_OUTPUT_HR_BPM = 45,
+	BRADYCARDIA_LOW_OUTPUT_RESERVE = 0.34,
+	BRADYCARDIA_ARREST_EXPOSURE = 8,
+	BRADYCARDIA_ARREST_OUTPUT = 0.22,
+	BRADYCARDIA_ARREST_PERFUSION = 0.28,
 	HEADGIB_ARTERIAL_WOUND_SIZE = 34,
 	BLOOD_REGEN_RATE_ML_S = 0.5
 }
@@ -49,10 +59,23 @@ function hg.organism.GetHemorrhageOxygenTransportFraction(blood)
 	local normalVolume = hg.organism.normalBloodVolume or 5000
 	local volume = math.Clamp(tonumber(blood) or normalVolume, 0, normalVolume)
 	local zeroVolume = math.Clamp(cfg.BLOOD_OXYGEN_TRANSPORT_ZERO_ML or 2000, 0, normalVolume - 1)
-	local fullVolume = math.Clamp(cfg.BLOOD_OXYGEN_TRANSPORT_FULL_ML or 3000, zeroVolume + 1, normalVolume)
+	local fullVolume = math.Clamp(cfg.BLOOD_OXYGEN_TRANSPORT_FULL_ML or normalVolume, zeroVolume + 1, normalVolume)
 	local x = math.Clamp((volume - zeroVolume) / (fullVolume - zeroVolume), 0, 1)
-	local shape = math.max(tonumber(cfg.BLOOD_OXYGEN_TRANSPORT_CURVE_POWER) or 1.08, 0.1)
+	local shape = math.max(tonumber(cfg.BLOOD_OXYGEN_TRANSPORT_CURVE_POWER) or 3.565, 0.1)
 	return math.Clamp(1 - (1 - x) ^ shape, 0, 1)
+end
+
+-- Sympathetic compensation is driven by fractional loss of usable circulating
+-- volume, not by a list of blood checkpoints.  It begins immediately but ramps
+-- nonlinearly; severe preload failure can still overpower it in sv_pulse.
+function hg.organism.GetHemorrhageCompensationDrive(blood)
+	local cfg = hg.organism.config or {}
+	local normalVolume = hg.organism.normalBloodVolume or 5000
+	local terminalVolume = math.Clamp(cfg.BLOOD_PRELOAD_ZERO_ML or 2000, 0, normalVolume - 1)
+	local volume = math.Clamp(tonumber(blood) or normalVolume, 0, normalVolume)
+	local loss = math.Clamp((normalVolume - volume) / math.max(normalVolume - terminalVolume, 1), 0, 1)
+	local power = math.max(tonumber(cfg.HEMORRHAGE_COMPENSATION_POWER) or 1.25, 0.1)
+	return loss ^ power
 end
 
 function hg.organism.ZeroVitals(org)
@@ -128,6 +151,52 @@ function hg.organism.IsPostMortemDecaying(org)
 	return org and not org.alive and (tonumber(org.postMortemDecayEnd) or 0) > CurTime()
 end
 
+local arrestMechanicalKeys = {
+	pulse = true,
+	bloodPressure = true,
+	systolic = true,
+	diastolic = true,
+	cardiacOutput = true,
+	strokeVolume = true
+}
+
+function hg.organism.ClearCardiacArrestMechanicalDecay(org)
+	if not org then return end
+	org.cardiacArrestMechanicalStart = nil
+	org.cardiacArrestMechanicalEnd = nil
+	org.cardiacArrestMechanicalInitial = nil
+end
+
+function hg.organism.BeginCardiacArrestMechanicalDecay(org)
+	if not org or not org.alive or not org.heartstop or org.cardiacArrestMechanicalStart then return end
+
+	local now = CurTime()
+	local duration = math.max(tonumber(hg.organism.config.CARDIAC_ARREST_MECHANICAL_DECAY_SECONDS) or 5, 0.1)
+	org.cardiacArrestMechanicalStart = now
+	org.cardiacArrestMechanicalEnd = now + duration
+	org.cardiacArrestMechanicalInitial = {}
+	for key in pairs(arrestMechanicalKeys) do
+		org.cardiacArrestMechanicalInitial[key] = math.max(tonumber(org[key]) or 0, 0)
+	end
+end
+
+function hg.organism.GetCardiacArrestMechanicalFactor(org)
+	if not org or not org.alive or not org.heartstop then
+		hg.organism.ClearCardiacArrestMechanicalDecay(org)
+		return 1, nil
+	end
+
+	hg.organism.BeginCardiacArrestMechanicalDecay(org)
+	local startTime = tonumber(org.cardiacArrestMechanicalStart) or CurTime()
+	local endTime = tonumber(org.cardiacArrestMechanicalEnd) or startTime
+	local duration = math.max(endTime - startTime, 0.1)
+	local progress = math.Clamp((CurTime() - startTime) / duration, 0, 1)
+	-- Residual mechanical circulation falls quickly enough to feel like arrest, but
+	-- not so quickly that every pressure/output value teleports to zero in one tick.
+	local factor = (1 - progress) ^ 1.55
+	return factor, org.cardiacArrestMechanicalInitial or {}
+end
+
 function hg.organism.UpdatePostMortemVitals(org)
 	if not org or org.alive then return false end
 	if not org.postMortemDecayStart then hg.organism.BeginPostMortemDecay(org) end
@@ -150,11 +219,11 @@ function hg.organism.UpdatePostMortemVitals(org)
 	}
 	for key, curve in pairs(postMortemVitalKeys) do
 		local starting = tonumber(initial[key]) or math.max(tonumber(org[key]) or 0, 0)
-		org[key] = math.min(math.max(tonumber(org[key]) or 0, 0), starting * factors[curve])
+		org[key] = math.max(starting * factors[curve], 0)
 	end
 	if istable(org.o2) then
 		local startingO2 = tonumber(initial.o2) or math.max(tonumber(org.o2[1]) or 0, 0)
-		org.o2[1] = math.min(math.max(tonumber(org.o2[1]) or 0, 0), startingO2 * factors.oxygen)
+		org.o2[1] = math.max(startingO2 * factors.oxygen, 0)
 		org.o2.curregen = 0
 	end
 
@@ -667,6 +736,7 @@ function hg.organism.ZerlkersCanPreventFake(org)
 	local mechanicalIncapacity = (org.spine2 or 0) >= hg.organism.fake_spine2
 		or (org.spine3 or 0) >= hg.organism.fake_spine3
 		or ((org.lleg or 0) >= 1 and (org.rleg or 0) >= 1)
+		or org.seizureActive == true
 	local severePhysiology = oxygen < 5
 		or (org.brain or 0) >= 0.35 or org.choking or org.neckslit
 
@@ -742,7 +812,7 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	-- Systemic perfusion therefore follows the circulation limit once, rather than
 	-- subtracting the same hemorrhage again from the downstream result.
 	local pressureDelivery = math.Clamp(circulationLimit, 0, 1)
-	local centralFlowSupply = org.heartstop and 0 or math.min(pressureDelivery, bloodFraction)
+	local centralFlowSupply = math.min(pressureDelivery, bloodFraction)
 	-- Perfusion is blood flow. Oxygen content affects the tissue supplied by that
 	-- flow, but must not feed back into the flow value that sv_lungs uses as its
 	-- O2 cap; that loop was the remaining sudden O2 crash at moderate blood loss.
@@ -2337,6 +2407,14 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 			org.needfake = true
 		end
 	end
+	-- Resolve Zerlkers resistance before publishing org.fake. Previously the
+	-- transient damage/stun needfake flag was copied to org.fake first, so other
+	-- hooks could observe a knockdown for a tick even though Zerlkers cleared the
+	-- source flag immediately afterward.
+	if org.needfake and hg.organism.ZerlkersCanPreventFake(org) then
+		org.needfake = false
+		org.consciousness = math.max(org.consciousness or 0, 0.55)
+	end
 	if org.NoKnockdown then
 		org.otrub = false
 		org.needotrub = false
@@ -2345,10 +2423,6 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	else
 		org.otrub = org.needotrub
 		org.fake = org.needfake
-	end
-	if org.needfake and hg.organism.ZerlkersCanPreventFake(org) then
-		org.needfake = false
-		org.consciousness = math.max(org.consciousness or 0, 0.55)
 	end
 
 	if org.neckslitSoundName and (org.otrub or org.needotrub) then

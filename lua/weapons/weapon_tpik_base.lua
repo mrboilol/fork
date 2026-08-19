@@ -84,6 +84,14 @@ function hg.GetTPIKCharacter(owner)
 	return IsValid(ragdoll) and ragdoll or owner
 end
 
+local function GetSafeTPIKModelPath(wep, preferReal)
+	if not IsValid(wep) then return end
+	local primary = preferReal and wep.WorldModelReal or wep.WorldModel
+	local fallback = preferReal and wep.WorldModel or wep.WorldModelReal
+	if isstring(primary) and primary ~= "" then return primary end
+	if isstring(fallback) and fallback ~= "" then return fallback end
+end
+
 if CLIENT then
 
     local vecPochtiZero = Vector(0.0001, 0.0001, 0.0001)
@@ -95,7 +103,9 @@ if CLIENT then
     end
 
 	function SWEP:GetWM()
-		if not IsValid(self.worldModel) then self.worldModel = ClientsideModel(self.WorldModel) end
+		local modelPath = GetSafeTPIKModelPath(self, false)
+		if not modelPath then return end
+		if not IsValid(self.worldModel) then self.worldModel = ClientsideModel(modelPath) end
 		if not IsValid(self.worldModel) then return end
         self.worldModel:SetNoDraw(true)
 		return self.worldModel
@@ -111,7 +121,9 @@ if CLIENT then
 		local owner = self:GetOwner()
 
         if not IsValid(self.worldModel) then
-            self.worldModel = ClientsideModel(self.WorldModel)
+			local modelPath = GetSafeTPIKModelPath(self, false)
+			if not modelPath then return end
+            self.worldModel = ClientsideModel(modelPath)
 			if not IsValid(self.worldModel) then return end
             local model = self.worldModel
             self.worldModel:SetSkin(self.WMSkin or 0)
@@ -166,7 +178,8 @@ if CLIENT then
 			local ang = owner:EyeAngles()
             if not tr then return end
 
-            if WorldModel:GetModel() ~= self.WorldModelReal then WorldModel:SetModel(self.WorldModelReal); WorldModel:SetSkin(self.WMSkinV or self.WMSkin or 0) end
+            local realModel = GetSafeTPIKModelPath(self, true)
+            if realModel and WorldModel:GetModel() ~= realModel then WorldModel:SetModel(realModel); WorldModel:SetSkin(self.WMSkinV or self.WMSkin or 0) end
 
 			local holdPos = self.HoldPos
 			if self.GetTPIKHoldPos then holdPos = self:GetTPIKHoldPos(holdPos) or holdPos end
@@ -185,7 +198,8 @@ if CLIENT then
 			WorldModel:SetRenderOrigin(pos)
 			WorldModel:SetRenderAngles(ang)
         else
-            if WorldModel:GetModel() ~= self.WorldModel then WorldModel:SetModel(self.WorldModel); WorldModel:SetSkin(self.WMSkin or 0) end
+            local worldModel = GetSafeTPIKModelPath(self, false)
+            if worldModel and WorldModel:GetModel() ~= worldModel then WorldModel:SetModel(worldModel); WorldModel:SetSkin(self.WMSkin or 0) end
 			
             WorldModel:SetRenderOrigin(self:GetPos())
 			WorldModel:SetRenderAngles(self:GetAngles())
@@ -702,7 +716,11 @@ function SWEP:PlayAnim(anim,time,cycling,callbackFuncName,reverse,sendtoclient,s
 		self.animBlendStart = CurTime()
 		self.animBlendEnd = self.animBlendStart + self.AnimBlendTime
 	end
-    if mdl:GetModel() ~= self.WorldModelReal then mdl:SetModel(self.WorldModelReal) end
+    local targetModel = GetSafeTPIKModelPath(self, true)
+    if not targetModel then return end
+    if mdl:GetModel() ~= targetModel then
+        mdl:SetModel(targetModel)
+    end
     local tAnim = self.AnimList[anim] or {}
     self.seq = tAnim and tAnim[1] or anim
     self.anim = anim
@@ -836,7 +854,9 @@ function SWEP:CreateFake(ragdoll)
 	ent.notprop = true
 
 	ent:SetPos(rh:GetPos())
-	ent:SetModel(self.WorldModel)
+	local worldModel = GetSafeTPIKModelPath(self, false)
+	if not worldModel then ent:Remove() return end
+	ent:SetModel(worldModel)
 	ent:Spawn()
 	ent:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
 	ent:SetMoveType(MOVETYPE_NONE)
@@ -881,7 +901,9 @@ function SWEP:SpawnGarbage(mdl_custom, skin_custom, snd_custom, clr_custom, bgs_
 
 	local ent = ents.Create("prop_physics")
 	if not IsValid(ent) then return end
-	ent:SetModel(Model((mdl_custom and mdl_custom ~= "" and mdl_custom ~= nil and isstring(mdl_custom)) and mdl_custom or self.WorldModel))
+	local garbageModel = (isstring(mdl_custom) and mdl_custom ~= "" and mdl_custom) or GetSafeTPIKModelPath(self, false)
+	if not garbageModel then ent:Remove() return end
+	ent:SetModel(Model(garbageModel))
 
 	if skin_custom and skin_custom ~= nil and isnumber(skin_custom) then
 		ent:SetSkin(skin_custom or 0)

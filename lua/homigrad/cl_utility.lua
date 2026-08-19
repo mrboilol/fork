@@ -977,7 +977,14 @@ players : 1 humans, 0 bots (20 max)
 
 --\\ CL Utils setting adjustments
 	if CLIENT then
-		--RunConsoleCommand("mp_decals", "4096")  -- "4194304" - if you set this value you will get crashed :3
+		local function ensureBloodDecalBudget()
+			for name, minimum in pairs({r_decals = 16384, mp_decals = 16384}) do
+				local cvar = GetConVar(name)
+				if cvar and cvar:GetInt() < minimum then RunConsoleCommand(name, tostring(minimum)) end
+			end
+		end
+		timer.Simple(0, ensureBloodDecalBudget)
+		hook.Add("InitPostEntity", "hg_blood_decal_budget", ensureBloodDecalBudget)
 
 		hook.Add("Think","RemoveMe_001",function()
 			hook.Remove("PostPlayerDraw","BA2_GasmaskDraw")

@@ -395,9 +395,14 @@ module[2] = function(owner, org, mulTime)
 		or math.Clamp(blood / (hg.organism.normalBloodVolume or 5000), 0, 1)
 	local reserveLoss = 1 - preloadReserve
 	local criticalReserve = math.Clamp((hg.organism.config and hg.organism.config.CRITICAL_CIRCULATION_RESERVE) or 0.62, 0.1, 0.95)
-	local symptomaticLoss = math.Clamp((reserveLoss - 0.06) / 0.94, 0, 1)
+	local normalBlood = math.max((hg.organism.config and hg.organism.config.NORMAL_BLOOD_VOLUME_ML) or 5000, 1)
+	local rawLossFraction = math.Clamp(1 - blood / normalBlood, 0, 1)
+	-- Subtle weakness begins with the first real loss. Catastrophic shock is still
+	-- derived below from preload reserve, so this does not create an early death band.
+	local symptomaticLoss = rawLossFraction ^ 1.10
 	local decompensation = math.Clamp((criticalReserve - preloadReserve) / criticalReserve, 0, 1) ^ 1.35
-	local compensationDemand = math.Clamp(reserveLoss / math.max(1 - criticalReserve, 0.05), 0, 1)
+	local compensationDemand = hg.organism.GetHemorrhageCompensationDrive and hg.organism.GetHemorrhageCompensationDrive(blood)
+		or math.Clamp(reserveLoss / math.max(1 - criticalReserve, 0.05), 0, 1)
 
 	org.hypovolemia = symptomaticLoss
 	org.hemorrhageCompensation = compensationDemand * (1 - decompensation)
@@ -497,8 +502,10 @@ module[2] = function(owner, org, mulTime)
 		local circulationOutput = math.max(tonumber(org.cardiacOutput) or 0, 0)
 		local pressureFactor = math.Clamp((tonumber(org.bloodPressure) or 0) / 92, 0, 1.5)
 		local pulseFactor = math.Clamp((tonumber(org.pulse) or 0) / 70, 0, 1.5)
-		local residualPostMortemFlow = hg.organism.IsPostMortemDecaying and hg.organism.IsPostMortemDecaying(org)
-		local arterialDrive = (org.heartstop and not residualPostMortemFlow) and 0 or math.Clamp(math.sqrt(math.max(circulationOutput * pressureFactor * pulseFactor, 0)), 0, 1.5)
+		-- Pressure-driven bleeding follows actual residual flow. Cardiac arrest is a
+		-- rhythm state, not a reason to erase the last few seconds of mechanical
+		-- pressure before cardiac output/pulse have mathematically decayed.
+		local arterialDrive = math.Clamp(math.sqrt(math.max(circulationOutput * pressureFactor * pulseFactor, 0)), 0, 1.5)
 		local passiveDrive = math.Clamp(0.08 + arterialDrive * 0.92, 0.08, 1.5)
 		if wound[7] == "arteria" and (wound[1] or 0) > 0 then hasCarotidWound = true end
 		if wound[7] == "arteria" and org.manualHoldWound and org.manualHoldWoundArterial and org.manualHoldWoundTarget == wound then

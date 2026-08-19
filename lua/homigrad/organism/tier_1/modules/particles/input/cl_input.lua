@@ -43,12 +43,6 @@ local function addBloodPart(pos, vel, mat, w, h, artery, kishki, owner)
 	local pos2 = Vector()
 	pos2:Set(pos)
 
-	local maxDrops = math.Clamp((hg_blood_fps:GetInt() or 24) * 14, 220, 900)
-	if #hg.bloodparticles1 > maxDrops then
-		hg.bloodparticles1[1].active = false
-		table.remove(hg.bloodparticles1, 1)
-	end
-	
 	local part = {pos, pos2, vel, mat or mat_huy, w or 2, h or 2, CurTime(), artery = artery, kishki = kishki, owner = owner, start_velocity = IsValid(owner) and owner:GetVelocity() or vector_origin, active = true}
 	part.decalWeight = math.max(w or 2, h or 2)
 	hg.bloodparticles1[#hg.bloodparticles1 + 1] = part
@@ -67,8 +61,6 @@ local function addBloodPart2(pos, vel, mat, w, h, time, water, owner)
 	local pos2 = Vector()
 	pos2:Set(pos)
 	
-	local maxClouds = math.Clamp((hg_blood_fps:GetInt() or 24) * 120, 2500, 7000)
-	if #hg.bloodparticles2 > maxClouds then table.remove(hg.bloodparticles2, 1) end
 	--if water and math.random(2) == 1 then return end
 	--if water and math.random(3) > 1 then return end
 
@@ -87,7 +79,6 @@ hg.gibbloodspillparticles = hg.gibbloodspillparticles or {}
 
 local function addGibBloodSpill(ent, stump)
 	if LocalPlayer():GetNetVar("disappearance", nil) or (IsValid(ent) and ent:GetNetVar("disappearance", nil)) then return end
-	if #hg.gibbloodspillparticles > 120 then table_remove(hg.gibbloodspillparticles, 1) end
 
 	local vel = VectorRand(-18, 18) + ent:GetVelocity() * 0.04
 	vel[3] = vel[3] + (stump and Rand(10, 22) or Rand(-2, 10))
@@ -418,39 +409,79 @@ net.Receive("addfountain",function()
 	end
 end)
 
-net.Receive("bloodsquirt", function()
-	local ent = net.ReadEntity()
-	
-	if not IsValid(ent) then return end
+local bloodEmitterSerial = 0
+local function nextBloodEmitterTimer(prefix, ent)
+	bloodEmitterSerial = bloodEmitterSerial + 1
+	return prefix .. (IsValid(ent) and ent:EntIndex() or 0) .. "_" .. bloodEmitterSerial
+end
 
-	local bone = net.ReadString()
-	local bone = ent:LookupBone(bone)
-	local mat = net.ReadMatrix()
+local function getBloodEmitterOwner(source)
+	if not IsValid(source) then return nil end
+	if source:IsPlayer() then return source end
+	local owner = hg.RagdollOwner(source)
+	return IsValid(owner) and owner or source
+end
+
+local function getBloodEmitterBody(owner, source)
+	if IsValid(owner) and owner:IsPlayer() then
+		local fake = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner:GetNWEntity("FakeRagdoll", NULL)
+		if IsValid(fake) then return fake end
+
+		if owner:GetNWBool("FakeGettingUp", false) then
+			local old = IsValid(owner.FakeRagdollOld) and owner.FakeRagdollOld or owner:GetNWEntity("FakeRagdollOld", NULL)
+			return IsValid(old) and old or nil
+		end
+
+		if not owner:Alive() then
+			local death = IsValid(owner.RagdollDeath) and owner.RagdollDeath or owner:GetNWEntity("RagdollDeath", NULL)
+			return IsValid(death) and death or nil
+		end
+
+		return owner
+	end
+
+	return IsValid(source) and source or (IsValid(owner) and owner or nil)
+end
+
+local function getBloodEmitterBoneMatrix(owner, source, boneName)
+	local body = getBloodEmitterBody(owner, source)
+	if not IsValid(body) or not isstring(boneName) or boneName == "" then return nil, nil end
+	local bone = body:LookupBone(boneName)
+	if not bone then return body, nil end
+	return body, body:GetBoneMatrix(bone)
+end
+
+net.Receive("bloodsquirt", function()
+	local source = net.ReadEntity()
+	if not IsValid(source) then return end
+
+	local boneName = net.ReadString()
+	local sourceMatrix = net.ReadMatrix()
 	local pos = net.ReadVector()
 	local dir = net.ReadVector()
+	if not sourceMatrix then return end
 	local len = dir:Length()
+	local owner = getBloodEmitterOwner(source)
+	if not IsValid(owner) then return end
 
-	local ent = hg.RagdollOwner(ent) or ent
-
-	//local mat = ent:GetBoneMatrix(bone)
-	local localPos, localDir = WorldToLocal(pos, dir:Angle(), mat:GetTranslation(), mat:GetAngles())
-
-	local name = "squirtblood"..ent:EntIndex()..dir[1]
+	local localPos, localDir = WorldToLocal(pos, dir:Angle(), sourceMatrix:GetTranslation(), sourceMatrix:GetAngles())
+	local name = nextBloodEmitterTimer("squirtblood_", owner)
 	local i = 250
 	local maxI = i
-	local vechuy = Vector(0,0,0)
+	local vechuy = Vector(0, 0, 0)
 	timer.Create(name, 0.01 * game.GetTimeScale(), i + 10, function()
-		if not IsValid(ent) then timer.Remove(name) return end
-		local ent = IsValid(ent.FakeRagdoll) and ent.FakeRagdoll or ent
-		local amt = i / maxI
-		local mat = ent:GetBoneMatrix(bone)
+		if not IsValid(owner) then timer.Remove(name) return end
+		local body, mat = getBloodEmitterBoneMatrix(owner, source, boneName)
+		if not IsValid(body) then return end -- body handoff in progress: skip, never emit from the frozen player proxy
 		if not mat then timer.Remove(name) return end
-		local pos, dir = LocalToWorld(localPos, localDir, mat:GetTranslation(), mat:GetAngles())
-		dir = dir:Forward() * len
-		
-		vechuy = vechuy + VectorRand(-amt * 5,amt * 5)
-		addBloodPart(pos, dir * amt * 90 + vechuy * amt, mat_huy, math.Rand(3,3), math.Rand(3,3), true, false)
+
+		local amt = math.max(i / maxI, 0)
+		local worldPos, worldDir = LocalToWorld(localPos, localDir, mat:GetTranslation(), mat:GetAngles())
+		worldDir = worldDir:Forward() * len
+		vechuy = vechuy + VectorRand(-amt * 5, amt * 5)
+		addBloodPart(worldPos, worldDir * amt * 90 + vechuy * amt, mat_huy, 3, 3, true, false, owner)
 		i = i - 1
+		if i <= 0 then timer.Remove(name) end
 	end)
 	timer.Adjust(name, 0)
 end)
@@ -494,54 +525,40 @@ net.Receive("hg_seal_blood_drop", function()
 end)
 
 net.Receive("bloodsquirt2", function()
-	local ent = net.ReadEntity()
-	
-	if not IsValid(ent) then return end
+	local source = net.ReadEntity()
+	if not IsValid(source) then return end
 
-	local bone = net.ReadString()
-	local bone = ent:LookupBone(bone)
-	local mat = net.ReadMatrix()
+	local boneName = net.ReadString()
+	local sourceMatrix = net.ReadMatrix()
 	local pos = net.ReadVector()
 	local dir = net.ReadVector()
+	if not sourceMatrix then return end
 	local len = dir:Length()
+	local owner = getBloodEmitterOwner(source)
+	if not IsValid(owner) then return end
 
-	local ent = hg.RagdollOwner(ent) or ent
-	local ply = ent
+	local localPos, localDir = WorldToLocal(pos, dir:Angle(), sourceMatrix:GetTranslation(), sourceMatrix:GetAngles())
+	if owner == lply then localPos:Add(-Vector(2, -2, 0)) end
 
-	//local mat = ent:GetBoneMatrix(bone)
-	local localPos, localDir = WorldToLocal(pos, dir:Angle(), mat:GetTranslation(), mat:GetAngles())
-
-	if ply == lply then
-		localPos:Add(-Vector(2,-2,0))
-	end
-
-	local name = "squirtblood2"..ent:EntIndex()//..dir[1]
+	local name = nextBloodEmitterTimer("squirtblood2_", owner)
 	local i = 50
 	local maxI = i
-	local vechuy = Vector(0,0,0)
 	timer.Create(name, 0.01 * game.GetTimeScale(), i + 10, function()
-		if not IsValid(ent) then timer.Remove(name) return end
-		local ent = IsValid(ent.FakeRagdoll) and ent.FakeRagdoll or ent
-		local amt = math.max(i / maxI, 0.2)
-		if math.random(5) == 1 then return end
-		local mat = ent:GetBoneMatrix(bone)
+		if not IsValid(owner) then timer.Remove(name) return end
+		local body, mat = getBloodEmitterBoneMatrix(owner, source, boneName)
+		if not IsValid(body) then return end
 		if not mat then timer.Remove(name) return end
 
-		if ply == lply and (i == 50 or i == 25) then
-			ViewPunch(Angle(15,0,0))
+		local amt = math.max(i / maxI, 0.2)
+		if math.random(5) ~= 1 then
+			if owner == lply and (i == 50 or i == 25) then ViewPunch(Angle(15, 0, 0)) end
+			local worldPos, worldDir = LocalToWorld(localPos, localDir, mat:GetTranslation(), mat:GetAngles())
+			if owner == lply then worldDir = lply:EyeAngles() end
+			worldDir = worldDir:Forward() * len
+			addBloodPart(worldPos + VectorRand(-0.2, 0.2), worldDir * amt * 90 + VectorRand(-amt * 25, amt * 25), mat_huy, 3, 3, false, false, owner)
 		end
-
-		--ent:SetFlexWeight(ent:GetFlexIDByName("jaw_drop"), 1)
-
-		local pos, dir = LocalToWorld(localPos, localDir, mat:GetTranslation(), mat:GetAngles())
-		
-		if lply == ply then
-			dir = lply:EyeAngles()
-		end
-
-		dir = dir:Forward() * len
-		addBloodPart(pos + VectorRand(-0.2, 0.2), dir * amt * 90 + VectorRand(-amt * 25,amt * 25), mat_huy, math.Rand(3,3), math.Rand(3,3), false, false)
 		i = i - 1
+		if i <= 0 then timer.Remove(name) end
 	end)
 	timer.Adjust(name, 0)
 end)

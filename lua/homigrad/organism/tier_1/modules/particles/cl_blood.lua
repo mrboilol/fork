@@ -180,6 +180,17 @@ bloodparticles_hook[1] = function(anim_pos, mul)
 end
 
 local hg_old_blood = ConVarExists("hg_old_blood") and GetConVar("hg_old_blood") or CreateClientConVar("hg_old_blood", 0, true, false, "new decals, or old", 0, 1)
+local hg_max_blood_decals = ConVarExists("hg_max_blood_decals") and GetConVar("hg_max_blood_decals") or CreateClientConVar("hg_max_blood_decals", 1, true, false, "Raise the Source decal budget for persistent blood", 0, 1)
+
+local function ensureBloodDecalBudget()
+	if not hg_max_blood_decals:GetBool() then return end
+	for _, name in ipairs({"r_decals", "mp_decals"}) do
+		local cv = GetConVar(name)
+		if cv and cv:GetInt() < 8192 then RunConsoleCommand(name, "8192") end
+	end
+end
+hook.Add("InitPostEntity", "hg_blood_decal_budget", ensureBloodDecalBudget)
+timer.Simple(0, ensureBloodDecalBudget)
 
 hg.bloodpositions = hg.bloodpositions or {}
 hg.bloodcount = hg.bloodcount or 0

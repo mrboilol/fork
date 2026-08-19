@@ -125,6 +125,10 @@ function SWEP:CanSecondaryAttack()
     return false
 end
 
+function SWEP:IsEquipLocked()
+    return self.anim == "deploy" and (self.animtime or 0) > CurTime()
+end
+
 function SWEP:PrimaryAttack()
     local owner = self:GetOwner()
     if IsValid(owner) and hg.KeyDown(owner, IN_USE) then return end
@@ -137,7 +141,8 @@ function SWEP:CanStartLoopAttack(requireAttackReady, checkCooldown)
 
     local owner = self:GetOwner()
     if not IsValid(owner) then return false end
-    if self:IsEquipLocked() then return false end
+    local equipLocked = isfunction(self.IsEquipLocked) and self:IsEquipLocked() or (self.anim == "deploy" and (self.animtime or 0) > CurTime())
+    if equipLocked then return false end
     if self:GetBlocking() then return false end
     if not self:InUse() then return false end
     if requireAttackReady then
@@ -238,7 +243,8 @@ end
 function SWEP:StartTapSecondaryAttack()
     local owner = self:GetOwner()
     if not IsValid(owner) then return end
-    if self:IsEquipLocked() then return end
+    local equipLocked = isfunction(self.IsEquipLocked) and self:IsEquipLocked() or (self.anim == "deploy" and (self.animtime or 0) > CurTime())
+    if equipLocked then return end
     if self:GetBlocking() then return end
     if not self:InUse() then return end
     if (self:GetLastAttack() + self:GetAttackWait()) > CurTime() then return end

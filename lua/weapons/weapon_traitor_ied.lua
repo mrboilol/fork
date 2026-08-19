@@ -1,5 +1,5 @@
 if SERVER then AddCSLuaFile() end
-SWEP.Base = "weapon_base"
+SWEP.Base = "weapon_tpik_base"
 SWEP.PrintName = "Improvised Explosive Device"
 SWEP.Instructions = "Press E to plant immediately. Hold LMB for a silent plant, hold RMB on an object to plant inside it, or hold both for a silent inside plant. Dial the assigned number from a phone to detonate."
 SWEP.Category = "Weapons - Explosive"
@@ -16,6 +16,8 @@ SWEP.Secondary.DefaultClip = -1
 SWEP.Secondary.Automatic = false
 SWEP.Secondary.Ammo = "none"
 SWEP.HoldType = "normal"
+SWEP.WorldModel = "models/props_junk/cardboard_jox004a.mdl"
+SWEP.WorldModelReal = "models/saraphines/insurgency explosives/ied/insurgency_ied_phone.mdl"
 if CLIENT then
 	SWEP.WepSelectIcon = Material("vgui/wep_jack_hmcd_ied")
 	SWEP.IconOverride = "vgui/wep_jack_hmcd_ied"
@@ -112,9 +114,15 @@ if CLIENT then
 		det_detonate = true
 	}
 
+	function SWEP:GetIEDWorldModel()
+		local getter = self.GetWM
+		if isfunction(getter) then return getter(self) end
+		return self.worldModel
+	end
+
 	function SWEP:SetHandPos()
 		local ply = self:GetOwner()
-		local model = self:GetWM()
+		local model = self:GetIEDWorldModel()
 		if not IsValid(ply) or not IsValid(model) then return end
 		if not ply.shouldTransmit or ply.NotSeen then return end
 
@@ -122,7 +130,7 @@ if CLIENT then
 		if not IsValid(ent) then return end
 
 		self.rhandik = self.setrh
-		self.lhandik = self.setlh and not phoneAnimations[self.anim] and (ply:GetTable().ChatGestureWeight < 0.1)
+		self.lhandik = self.setlh and not phoneAnimations[self.anim] and ((ply:GetTable().ChatGestureWeight or 0) < 0.1)
 
 		local canUseRight = self.rhandik and hg.CanUseRightHand(ply)
 		local canUseLeft = self.lhandik and hg.CanUseLeftHand(ply)
@@ -984,7 +992,6 @@ function SWEP:Initialize()
 	self:SetHold(self.HoldType)
 	self.Planted = false
 	self.HaveTheBomb = false
-	self.WorldModel = "models/props_junk/cardboard_jox004a.mdl"
 end
 
 if SERVER then
