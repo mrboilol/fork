@@ -800,7 +800,7 @@ local math_abs, math_Approach, math_AngleDifference, math_Clamp, math_cos, math_
 			inertia_len = math_min(inertia_len, run_speed * 1.1)
 		end
 
-		if org.lleg == 1 or org.rleg == 1 or org.llegdislocation or org.rlegdislocation then
+		if (org.lleg == 1 or org.rleg == 1 or org.llegdislocation or org.rlegdislocation) and ply:OnGround() then
 			inertia_len = math.min(inertia_len, (ply:GetSlowWalkSpeed() or 100) * 0.78)
 		end
 		
