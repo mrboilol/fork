@@ -21,6 +21,8 @@ local brokenBoneTbl = {
 }
 
 local zeroAng = Angle(0, 0, 0)
+local boneLayer = "brokenlimbs"
+local spineLayer = "brokenlimbs_limp"
 
 local function applyBoneVisuals(ply, org)
 	ply.hg_BrokenLimbBones = ply.hg_BrokenLimbBones or {}
@@ -30,7 +32,7 @@ local function applyBoneVisuals(ply, org)
 		if org[key] == 1 and not org[key .. "amputated"] then
 			local bid = ply:LookupBone(boneName)
 			if bid then
-				ply:ManipulateBoneAngles(bid, data.ang)
+				hg.bone.Set(ply, bid, vector_origin, data.ang, boneLayer)
 				applied[bid] = true
 				ply.hg_BrokenLimbBones[bid] = true
 			end
@@ -38,48 +40,60 @@ local function applyBoneVisuals(ply, org)
 	end
 	for bid in pairs(ply.hg_BrokenLimbBones) do
 		if not applied[bid] then
-			ply:ManipulateBoneAngles(bid, zeroAng)
+			hg.bone.Set(ply, bid, vector_origin, zeroAng, boneLayer)
 			ply.hg_BrokenLimbBones[bid] = nil
 		end
 	end
 end
 
+local function clearBoneVisuals(ply)
+	if ply.hg_LimpSpine then
+		hg.bone.Set(ply, ply.hg_LimpSpine, vector_origin, zeroAng, spineLayer)
+		ply.hg_LimpSpine = nil
+	end
+
+	if ply.hg_BrokenLimbBones then
+		for bid in pairs(ply.hg_BrokenLimbBones) do
+			hg.bone.Set(ply, bid, vector_origin, zeroAng, boneLayer)
+		end
+		ply.hg_BrokenLimbBones = nil
+	end
+end
+
 hook.Add("CalcMainActivity", "hgBrokenLimbVisuals", function(ply, vel)
-	if not IsValid(ply) or not ply:Alive() then return end
+	if not IsValid(ply) then return end
+	if not ply:Alive() then
+		clearBoneVisuals(ply)
+		return
+	end
 	local org = ply.organism
-	if not org then return end
+	if not org then
+		clearBoneVisuals(ply)
+		return
+	end
 
 	local brokenLeg = org.lleg == 1 or org.rleg == 1 or org.llegdislocation or org.rlegdislocation
 	local brokenArm = org.larm == 1 or org.rarm == 1
-	if not brokenLeg and not brokenArm then
-		if ply.hg_LimpSpine then
-			ply:ManipulateBoneAngles(ply.hg_LimpSpine, zeroAng)
-			ply.hg_LimpSpine = nil
-		end
-		if ply.hg_BrokenLimbBones then
-			for bid in pairs(ply.hg_BrokenLimbBones) do
-				ply:ManipulateBoneAngles(bid, zeroAng)
-			end
-			ply.hg_BrokenLimbBones = nil
-		end
+	local style = hg_limp_style:GetInt()
+	if style == 0 or (not brokenLeg and not brokenArm) then
+		clearBoneVisuals(ply)
 		return
 	end
 
 	applyBoneVisuals(ply, org)
 
-	local style = hg_limp_style:GetInt()
 	local limping = brokenLeg and not ply:Crouching() and not ply:InVehicle() and ply:IsOnGround() and vel and vel:Length() > 60
 	if limping then
 		local spineBid = ply:LookupBone("ValveBiped.Bip01_Spine")
 		if spineBid then
-			ply:ManipulateBoneAngles(spineBid, Angle(0, 10, 0))
+			hg.bone.Set(ply, spineBid, vector_origin, Angle(0, 10, 0), spineLayer)
 			ply.hg_LimpSpine = spineBid
 		end
 		if style == 1 or style == 2 then
 			return limpActivities[style], 0
 		end
 	elseif ply.hg_LimpSpine then
-		ply:ManipulateBoneAngles(ply.hg_LimpSpine, zeroAng)
+		hg.bone.Set(ply, ply.hg_LimpSpine, vector_origin, zeroAng, spineLayer)
 		ply.hg_LimpSpine = nil
 	end
 end)
