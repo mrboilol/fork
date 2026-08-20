@@ -38,7 +38,7 @@ module[1] = function(org)
 
 	org.stamina = {
 
-		range = 60 * 3,
+		range = 60 * 4,
 
 		regen = 1,
 
@@ -54,7 +54,7 @@ module[1] = function(org)
 
 		recoveryPenaltyFadeUntil = 0,
 
-		max = 60 * 3,
+		max = 60 * 4,
 
 	}
 

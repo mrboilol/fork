@@ -76,7 +76,7 @@ local SLAMPlacementRadius = 80
 end]]
 
 if CLIENT then
-	function SWEP:DrawWorldModel2()
+	function SWEP:DrawWorldModel2(prepareOnly)
 		render.SetColorModulation(0.45,0.52,1)
 		local owner = self:GetOwner()
 
