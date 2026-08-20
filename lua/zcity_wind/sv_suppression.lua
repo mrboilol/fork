@@ -82,9 +82,19 @@ function ZW.SendServerSuppressionForBullet(bullet, startPos, endPos)
         -- kick and panic. Keep those two ranges independent so an audible
         -- round at distance does not behave like it shaved the player's head.
         local soundOnly = dist > SUPPRESSION_RADIUS
-        if playerState and soundOnly then continue end
 
-        local playSound = not playerState
+        -- A bullet can first become audible at long range and then enter the tight
+        -- suppression radius a moment later. Keep one distant crack and one close
+        -- fly-by event per listener instead of letting the distant event suppress
+        -- the much more important near-head crack/whizz.
+        local playSound
+        if soundOnly then
+            playSound = not (playerState and playerState.audioDistant)
+        else
+            playSound = not (playerState and playerState.audioNear)
+        end
+        if soundOnly and not playSound then continue end
+
         local proximity = math.Clamp(1 - dist / SUPPRESSION_RADIUS, 0, 1)
         local force = soundOnly and 0 or math.Clamp(0.8 + proximity * proximity * 11 + math.min(damage / 25, 2.5), 0.8, 14)
 
@@ -98,8 +108,12 @@ function ZW.SendServerSuppressionForBullet(bullet, startPos, endPos)
             net.WriteBool(playSound)
         net.Send(ply)
         playerState = playerState or {}
-        playerState.audio = true
-        playerState.suppression = playerState.suppression or not soundOnly
+        if soundOnly then
+            playerState.audioDistant = true
+        else
+            playerState.audioNear = true
+            playerState.suppression = true
+        end
         sentPlayers[ply] = playerState
 
         -- Apply Z-City adrenaline and fear from nearby flying bullets
@@ -140,6 +154,28 @@ function ZW.SendServerSuppressionForBullet(bullet, startPos, endPos)
         end
     end
 end
+
+-- Native FireBullets weapons do not enter the physical-bullet Think hooks.
+-- Feed their actual shot segment through the same closest-pass calculation so
+-- suppression audio is not exclusive to the custom projectile implementation.
+hook.Add("PostEntityFireBullets", "ZCity_Wind_HitscanNearMissAudio", function(shooter, data)
+    if not config.Suppression or not istable(data) then return end
+    if not isvector(data.Src) or not isvector(data.Dir) then return end
+
+    local direction = Vector(data.Dir)
+    if direction:LengthSqr() <= 0 then return end
+    direction:Normalize()
+
+    local distance = math.Clamp(tonumber(data.Distance) or 8192, 128, 32768)
+    local synthetic = {
+        Shooter = shooter,
+        Attacker = IsValid(data.Attacker) and data.Attacker or shooter,
+        Damage = tonumber(data.Damage) or 10,
+        Speed = tonumber(data.Speed) or 343
+    }
+
+    ZW.SendServerSuppressionForBullet(synthetic, data.Src, data.Src + direction * distance)
+end)
 
 -- A hit is suppression too. Physical bullets may die during their impact tick,
 -- so send this from damage dispatch rather than relying on a later path hook.

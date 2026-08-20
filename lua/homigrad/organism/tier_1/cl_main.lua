@@ -910,6 +910,7 @@ local highBleedArterialThreshold = 0.58
 local microDropSizeMin = 0.16
 local microDropSizeMax = 0.43
 local hg_blood_fps = ConVarExists("hg_blood_fps") and GetConVar("hg_blood_fps") or CreateClientConVar("hg_blood_fps", 24, true, nil, "fps to draw blood", 12, 165)
+local hg_old_blood = ConVarExists("hg_old_blood") and GetConVar("hg_old_blood") or CreateClientConVar("hg_old_blood", 0, true, false, "Use the legacy blood visual style", 0, 1)
 local bloodDown = Vector(0, 0, -1)
 
 local function getWoundVisualIntensity(totalBleedRate, wound, woundCount, fullRate, woundIndex, woundRates)
@@ -944,7 +945,9 @@ local function getArterialVisualIntensity(org, wounds, wound, woundIndex)
 		rate = math.max(org.arterialBleed or 0, 0) * share
 	end
 
-	return math.Clamp((rate - 0.04) / 1.2, 0, 1)
+	-- arterialWoundBleedRates is now true mL/s. A small limb artery should
+	-- not render at the same intensity as a carotid/head-vessel wound.
+	return math.Clamp((rate - 3) / 45, 0, 1)
 end
 
 local function getCirculationStrength(org, pulseOverride)
@@ -988,10 +991,12 @@ local function emitNormalWoundParticles(ent, pos, outward, intensity, circulatio
 	local mode = "normal"
 	if intensity >= highBleedNormalThreshold then
 		local roll = math.Rand(0, 1)
-		if roll < 0.32 then
-			mode = "stream"
-		elseif roll < 0.74 then
-			mode = "micro"
+		if hg_old_blood:GetBool() then
+			-- Oldblood favors the recognizable long/chunky stream style.
+			if roll < 0.50 then mode = "stream" elseif roll < 0.62 then mode = "micro" end
+		else
+			-- Newblood favors atomized, discrete droplets more often.
+			if roll < 0.32 then mode = "stream" elseif roll < 0.74 then mode = "micro" end
 		end
 	end
 
@@ -1154,10 +1159,10 @@ emitArterialSpray = function(ent, pos, dir, ang, org, woundIndex, size, intensit
 	local mode = "normal"
 	if intensity >= highBleedArterialThreshold and not isAmputation then
 		local roll = math.Rand(0, 1)
-		if roll < 0.27 then
-			mode = "stream"
-		elseif roll < 0.58 then
-			mode = "micro"
+		if hg_old_blood:GetBool() then
+			if roll < 0.46 then mode = "stream" elseif roll < 0.56 then mode = "micro" end
+		else
+			if roll < 0.27 then mode = "stream" elseif roll < 0.58 then mode = "micro" end
 		end
 	end
 

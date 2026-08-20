@@ -16,12 +16,12 @@ local colorServerText = Color(255, 50, 50)
 local colorDeviation = Color(0, 191, 255, 255)
 local colorTextShadow = Color(0, 0, 0, 255)
 local textOffset = Vector(0, 0, 15)
-local SUPPRESSION_SOUND_VOLUME = 4
-local SUPPRESSION_SOUND_LEVEL = 200
+local SUPPRESSION_SOUND_VOLUME = 1
+local SUPPRESSION_SOUND_LEVEL = 110
 local SUPERSONIC_AUDIBLE_RADIUS = 1400
 local SUBSONIC_AUDIBLE_RADIUS = 900
-local DISTANT_CRACK_VOLUME = 3.5
-local DISTANT_CRACK_SOUND_LEVEL = 190
+local DISTANT_CRACK_VOLUME = 0.8
+local DISTANT_CRACK_SOUND_LEVEL = 96
 
 -- The remote Z-City crack pack is mounted on the server.  Keep the modern
 -- snap sounds as a fallback for installations that do not have that pack.
@@ -33,13 +33,27 @@ end
 -- Suppression is determined on the server, while the physical-bullet client
 -- hook is not guaranteed to run for every remote bullet.  Play the fly-by
 -- sound from the same authoritative event that applies the suppression.
-local function PlaySuppressionCrack(pos, subsonic, damage)
+local function PlaySuppressionCrack(pos, subsonic, damage, soundOnly)
     local crack = subsonic and "bul_flyby/subsonic_" .. math.random(1, 27) .. ".wav"
         or damage >= 50 and "cracks/heavy/heav_crack_0" .. math.random(1, 9) .. ".ogg"
         or damage >= 30 and "cracks/medium/med_crack_0" .. math.random(1, 9) .. ".ogg"
         or "cracks/light/light_crack_0" .. math.random(1, 9) .. ".ogg"
     crack = ResolveCrackSound(crack, "bul_snap/supersonic_snap_" .. math.random(1, 18) .. ".wav")
-    EmitSound(crack, pos, 0, CHAN_ITEM, SUPPRESSION_SOUND_VOLUME, SUPPRESSION_SOUND_LEVEL)
+
+    local level = soundOnly and DISTANT_CRACK_SOUND_LEVEL or SUPPRESSION_SOUND_LEVEL
+    local volume = soundOnly and DISTANT_CRACK_VOLUME or SUPPRESSION_SOUND_VOLUME
+
+    -- sound.Play is more reliable for positional one-shots than the raw global
+    -- EmitSound form here. A close supersonic pass gets both the shock crack and
+    -- a lower-pitched aerodynamic fly-by; subsonic rounds only get the fly-by.
+    sound.Play(crack, pos, level, math.random(97, 103), volume)
+
+    if not soundOnly and not subsonic then
+        local whizz = "bul_flyby/subsonic_" .. math.random(1, 27) .. ".wav"
+        if file.Exists("sound/" .. whizz, "GAME") then
+            sound.Play(whizz, pos, math.max(level - 8, 75), math.random(103, 116), math.min(volume * 0.82, 1))
+        end
+    end
 end
 
 net.Receive("ZCity_Wind_SuppressionForce", function()
@@ -66,7 +80,7 @@ net.Receive("ZCity_Wind_SuppressionForce", function()
     -- Hits have their own impact feedback; this event represents a clear
     -- near-miss, so it must also provide the audible crack.
     if not wasHit and playSound then
-        PlaySuppressionCrack(pos, subsonic, damage)
+        PlaySuppressionCrack(pos, subsonic, damage, soundOnly)
     end
 
 	if not soundOnly and (not hg_suppression_viewpunch or hg_suppression_viewpunch:GetBool()) then

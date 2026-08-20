@@ -637,11 +637,12 @@ local function DrawEKG(state, centerX, centerY, width, height, org, color, ringA
         return h
     end
 
-    local function getVentricularFibrillationH(phase, beatIndex)
-        -- Chaotic electrical activity with no pulse-producing QRS complexes.
+    local function getVentricularFibrillationH(phase)
+        -- Keep VF visually unmistakable but smooth: a continuous fibrillatory
+        -- sine wave rather than stacked pseudo-random harmonics that look like
+        -- impossible vertical scribbles. Fine VF naturally loses amplitude.
         local amplitude = Lerp(fibrillationFine, 0.54, 0.20)
-        return math.sin((phase * 9 + beatIndex * 0.63) * math.pi * 2) * amplitude
-            + math.sin((phase * 17 + beatIndex * 0.19) * math.pi * 2) * amplitude * 0.42
+        return math.sin((phase % 1) * math.pi * 2) * amplitude
     end
 
     local function getPVCH(phase)
@@ -701,7 +702,7 @@ local function DrawEKG(state, centerX, centerY, width, height, org, color, ringA
         local compensatoryPause = pvcStrength >= 0.18 and beatIndex % pvcPeriod == 0
 
         if rhythm == "ventricular_fibrillation" then
-            h = getVentricularFibrillationH(phase, beatIndex)
+            h = getVentricularFibrillationH(phase)
         elseif rhythm == "atrial_fibrillation" then
             h = getAtrialFibrillationH(phase, beatIndex)
         elseif rhythm == "ventricular_escape" or rhythm == "terminal_tachycardia" then

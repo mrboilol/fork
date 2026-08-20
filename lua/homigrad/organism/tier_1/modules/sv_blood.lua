@@ -163,7 +163,8 @@ local hold_wound_clot_twohand_mul = 1.6
 -- Coagulation, wound pressure, tourniquets, and adrenaline continue to modify
 -- these rates normally rather than being bypassed by an instant-loss shortcut.
 local wound_bleed_rate_mul = 2.25
-local arterial_bleed_rate_mul = 1.35
+local arterial_bleed_ml_s_per_severity = (hg.organism.config and hg.organism.config.ARTERIAL_BLEED_ML_S_PER_SEVERITY) or 3.0
+local arterial_min_flow_fraction = (hg.organism.config and hg.organism.config.ARTERIAL_MIN_FLOW_FRACTION) or 0.08
 -- An amputated limb must remain an urgent arterial bleed.  This is lower than
 -- the old runaway jet, but high enough to be clearly visible and dangerous
 -- until the stump is controlled.
@@ -566,7 +567,7 @@ module[2] = function(owner, org, mulTime)
 
 	local bleedoutspeed2 = 0
 	local arterialWoundBleedRates = {}
-	local next_arterypump = 1 / math.max(pulse, 10)
+	local next_arterypump = 60 / math.max(pulse, 10)
 	local ent = isPlayer and IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
 	local ownerVel = owner:GetVelocity()
 
@@ -586,38 +587,37 @@ module[2] = function(owner, org, mulTime)
 		-- rhythm state, not a reason to erase the last few seconds of mechanical
 		-- pressure before cardiac output/pulse have mathematically decayed.
 		local arterialDrive = math.Clamp(math.sqrt(math.max(circulationOutput * pressureFactor * pulseFactor, 0)), 0, 1.5)
-		local passiveDrive = math.Clamp(0.08 + arterialDrive * 0.92, 0.08, 1.5)
+		local flowDrive = math.Clamp(arterial_min_flow_fraction + arterialDrive * (1 - arterial_min_flow_fraction), arterial_min_flow_fraction, 1.35)
 		if wound[7] == "arteria" and (wound[1] or 0) > 0 then hasCarotidWound = true end
 		if wound[7] == "arteria" and org.manualHoldWound and org.manualHoldWoundArterial and org.manualHoldWoundTarget == wound then
 			heldCarotidWound = true
 		end
-		local passiveArterialBleed = wound[1] * mulTime * 0.14 * arterial_bleed_rate_mul * woundSeverityMul * passiveDrive * tourniquetBleedMul
-		bleedoutspeed2 = bleedoutspeed2 + passiveArterialBleed
-		local arterialBleed = wound[1] * mulTime * 0.2 * arterial_bleed_rate_mul * woundSeverityMul * arterialDrive * tourniquetBleedMul
-		arterialBleed = arterialBleed * getHeldWoundBleedMul(org, wound)
-		bleedoutspeed2 = bleedoutspeed2 + arterialBleed
-		local woundBleedRate = (passiveArterialBleed + arterialBleed) / math.max(mulTime, 0.001)
+		-- Wound severity is converted into an actual mL/s loss rate. Circulatory
+		-- pressure scales that rate continuously; compression/tourniquets act on the
+		-- same rate. Blood subtraction is therefore independent of Think frequency.
+		local heldBleedMul = getHeldWoundBleedMul(org, wound)
+		local woundBleedRate = math.max(wound[1] or 0, 0)
+			* arterial_bleed_ml_s_per_severity
+			* woundSeverityMul
+			* flowDrive
+			* tourniquetBleedMul
+			* heldBleedMul
+		bleedoutspeed2 = bleedoutspeed2 + woundBleedRate
+		org.blood = max(org.blood - woundBleedRate * mulTime, 1)
 
-		if wound[5] + next_arterypump * 2 < time then
+		-- Visual spurts occur at the effective palpable-pulse cadence, but they do
+		-- not subtract a second packet of blood. That prevents the old tick-rate-
+		-- dependent double loss while preserving pressure-synchronized spraying.
+		if wound[5] + next_arterypump < time then
 			local pos, ang = ent:GetBonePosition(ent:LookupBone(wound[4]))
 			wound[5] = time
-			local pulseBleed = wound[1] * mulTime * 3.2 * arterial_bleed_rate_mul * woundSeverityMul * arterialDrive * tourniquetBleedMul
-			org.blood = max(org.blood - pulseBleed, 1)
-			woundBleedRate = woundBleedRate + pulseBleed / math.max(mulTime, 0.001)
-			if tourniquetBleedMul > 0 and (isAlive or not isPlayer) then
-				local pumpBleed = wound[1] * mulTime * 4.5 * arterial_bleed_rate_mul * woundSeverityMul * arterialDrive * tourniquetBleedMul
-				pumpBleed = pumpBleed * getHeldWoundBleedMul(org, wound)
-				org.blood = max(org.blood - pumpBleed, 1)
-				woundBleedRate = woundBleedRate + pumpBleed / math.max(mulTime, 0.001)
-				if arterialDrive > 0.01 then
-					local dir = wound[6]
-					local len = dir:Length()
-					local _, dir = LocalToWorld(vecZero, dir:Angle(), vecZero, ang)
-					dir = -dir:Forward() * len
-					hg.organism.BloodDroplet2(owner, org, wound, ownerVel + VectorRand(-10, 10) + dir, true)
-				end
+			if tourniquetBleedMul > 0 and (isAlive or not isPlayer) and arterialDrive > 0.01 then
+				local dir = wound[6]
+				local len = dir:Length()
+				local _, dir = LocalToWorld(vecZero, dir:Angle(), vecZero, ang)
+				dir = -dir:Forward() * len
+				hg.organism.BloodDroplet2(owner, org, wound, ownerVel + VectorRand(-10, 10) + dir, true)
 			end
-
 		end
 
 		if isAlive or not isPlayer then
@@ -655,7 +655,6 @@ module[2] = function(owner, org, mulTime)
 		-- Airway damage is owned by the trachea/ventilation model. Do not drain O2
 		-- again here just because the same throat injury also opened an artery.
 	end
-	bleedoutspeed2 = bleedoutspeed2 / next_arterypump
 
 	if hasAntiIschemia then
 		org.ischemia = math.max((org.ischemia or 0) - mulTime * 0.05, 0)

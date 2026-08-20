@@ -31,6 +31,7 @@ hg.bloodparticles2 = hg.bloodparticles2 or {}
 local vecZero = Vector(0, 0, 0)
 local lastplaced = SysTime()
 local hg_blood_fps = ConVarExists("hg_blood_fps") and GetConVar("hg_blood_fps") or CreateClientConVar("hg_blood_fps", 24, true, nil, "fps to draw blood", 12, 165)
+
 local function addBloodPart(pos, vel, mat, w, h, artery, kishki, owner)
 	if LocalPlayer():GetNetVar("disappearance", nil) or (IsValid(owner) and owner:GetNetVar("disappearance", nil)) then return end
 
@@ -48,16 +49,15 @@ local function addBloodPart(pos, vel, mat, w, h, artery, kishki, owner)
 	-- Thin falling beads and high-velocity microdroplets mostly read as discrete
 	-- droplets, not long blood-core beams. Larger/pressurized drops retain a
 	-- progressively greater chance of drawing a trail when trail rendering is on.
-	local sizeFactor = math.Clamp((size - 0.18) / 1.35, 0, 1)
-	local trailChance = 0.08 + sizeFactor * 0.62
-	if speed >= 170 then trailChance = trailChance * 0.48 end
-	if vel.z <= -35 then trailChance = trailChance * 0.58 end
-	if artery and size >= 0.9 then trailChance = math.min(trailChance + 0.20, 0.88) end
-
 	local part = {pos, pos2, vel, mat or mat_huy, w, h, CurTime(), artery = artery, kishki = kishki, owner = owner, start_velocity = IsValid(owner) and owner:GetVelocity() or vector_origin, active = true}
 	part.decalWeight = size
 	part.tiny = tiny
-	part.drawTrail = math.Rand(0, 1) < trailChance
+	-- The current hg_old_blood convar is authoritative. Store only stable random
+	-- input/launch kinematics so changing the convar immediately changes how even
+	-- already-airborne droplets render and land.
+	part.trailRoll = math.Rand(0, 1)
+	part.initialSpeed = speed
+	part.initialVerticalSpeed = vel.z
 	part.maxLife = tiny and math.Rand(6, 12) or 30
 	hg.bloodparticles1[#hg.bloodparticles1 + 1] = part
 

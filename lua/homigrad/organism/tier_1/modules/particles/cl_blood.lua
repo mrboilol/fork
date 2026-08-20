@@ -21,6 +21,7 @@ local render_GetLightColor = render.GetLightColor
 
 local hg_blood_draw_distance = ConVarExists("hg_blood_draw_distance") and GetConVar("hg_blood_draw_distance") or CreateClientConVar("hg_blood_draw_distance", 1024, true, nil, "distance to draw blood", 0, 4096)
 local hg_blood_sprites = ConVarExists("hg_blood_sprites") and GetConVar("hg_blood_sprites") or CreateClientConVar("hg_blood_sprites", 1, true, nil, "blood is sprites or trails", 0, 1)
+local hg_old_blood = ConVarExists("hg_old_blood") and GetConVar("hg_old_blood") or CreateClientConVar("hg_old_blood", 0, true, false, "Use the legacy blood visual style", 0, 1)
 local nosebleedDripNext = {}
 
 hook.Add("PostCleanupMap","removeblooddroplets",function()
@@ -126,6 +127,32 @@ local function setBloodParticleColor(part, light)
 	end
 end
 
+local function shouldDrawBloodTrail(part)
+	if part.drawTrail == true then return true end
+	if part.drawTrail == false then return false end
+
+	local size = math.max(tonumber(part[5]) or 1, tonumber(part[6]) or 1)
+	local sizeFactor = math.Clamp((size - 0.18) / 1.35, 0, 1)
+	local speed = tonumber(part.initialSpeed) or (isvector(part[3]) and part[3]:Length() or 0)
+	local verticalSpeed = tonumber(part.initialVerticalSpeed) or 0
+	local oldStyle = hg_old_blood:GetBool()
+	local chance
+
+	if oldStyle then
+		chance = 0.28 + sizeFactor * 0.58
+		if speed >= 220 then chance = chance * 0.78 end
+		if verticalSpeed <= -55 then chance = chance * 0.82 end
+		if part.artery and size >= 0.9 then chance = math.min(chance + 0.22, 0.94) end
+	else
+		chance = 0.08 + sizeFactor * 0.62
+		if speed >= 170 then chance = chance * 0.48 end
+		if verticalSpeed <= -35 then chance = chance * 0.58 end
+		if part.artery and size >= 0.9 then chance = math.min(chance + 0.20, 0.88) end
+	end
+
+	return (part.trailRoll or 0.5) < chance
+end
+
 bloodparticles_hook[1] = function(anim_pos, mul)
 	 
 	local int = hg_blood_draw_distance:GetInt()
@@ -148,7 +175,7 @@ bloodparticles_hook[1] = function(anim_pos, mul)
 		local light3 = render.ComputeDynamicLighting(pos, vector_up * 1)
 
 		local light = (light1 + light2 + light3) * 3
-		if part.landed or part.kishki or hg_blood_sprites:GetBool() or part.drawTrail == false then
+		if part.landed or part.kishki or hg_blood_sprites:GetBool() or not shouldDrawBloodTrail(part) then
 			render_SetMaterial(part[4] or mat_huy)
 			if part.kishki then
 				render_SetMaterial(part[4])
@@ -180,7 +207,6 @@ bloodparticles_hook[1] = function(anim_pos, mul)
 	--render.OverrideBlend( false )
 end
 
-local hg_old_blood = ConVarExists("hg_old_blood") and GetConVar("hg_old_blood") or CreateClientConVar("hg_old_blood", 0, true, false, "new decals, or old", 0, 1)
 local hg_max_blood_decals = ConVarExists("hg_max_blood_decals") and GetConVar("hg_max_blood_decals") or CreateClientConVar("hg_max_blood_decals", 1, true, false, "Raise the Source decal budget for persistent blood", 0, 1)
 
 local function ensureBloodDecalBudget()
@@ -219,7 +245,7 @@ local function playBloodDripImpact(pos, tr, artery, decalWeight)
 	sound.Play("gore/blood" .. math_random(1, 6) .. ".mp3", pos, math.random(85, 95), math.random(80, 120), bloodDripSoundVolume)
 end
 
-local function maybeSmearBlood(pos, normal, tr, artery, owner, decalWeight, impactVelocity)
+local function maybeSmearBlood(pos, normal, tr, artery, owner, decalWeight, impactVelocity, oldStyle)
 	if not isvector(impactVelocity) then return end
 	local speed = impactVelocity:Length()
 	if speed < bloodSmearMinSpeed then return end
@@ -232,40 +258,55 @@ local function maybeSmearBlood(pos, normal, tr, artery, owner, decalWeight, impa
 	local oblique = math.Clamp(tangentSpeed / math.max(speed, 1), 0, 1)
 	local weight = math.Clamp(tonumber(decalWeight) or 1, 0.15, 4)
 	local chance = math.Clamp((speed - bloodSmearMinSpeed) / 260 * 0.28 + oblique * 0.34 + math.min(weight / 3, 1) * 0.10, 0, bloodSmearMaxChance)
-	-- Tiny mist beads can smear, but much less often than a substantial angled drop.
 	if weight <= 0.5 then chance = chance * 0.35 end
+	if oldStyle then chance = chance * 0.55 end
 	if math.Rand(0, 1) > chance then return end
 
-	-- Streak back toward the incoming source direction. A drop arriving from the
-	-- right therefore has a chance to leave its short smear/tail toward the right.
 	local dir = -tangent / tangentSpeed
 	local side = normal:Cross(dir)
-	local length = math.Clamp(tangentSpeed * 0.035 + weight * 1.4, 2.2, 12)
-	local steps = math.Clamp(math.floor(length / 2.4 + 0.5), 2, 5)
-	local decal = artery and "Arterial.Blood1" or "Normal.Blood1"
+	local length = math.Clamp(tangentSpeed * 0.035 + weight * 1.4, 2.2, oldStyle and 8 or 12)
+	local steps = math.Clamp(math.floor(length / (oldStyle and 3.4 or 2.4) + 0.5), 2, oldStyle and 3 or 5)
 
 	for i = 1, steps do
 		local frac = i / steps
 		local smearPos = pos + dir * (length * frac) + side * math.Rand(-0.45, 0.45) * (1 - frac)
+		local decal
+		if oldStyle then
+			decal = artery and "Arterial.Blood1" or "Normal.Blood1"
+		else
+			-- Newblood uses the scalable droplet set for smear tails too. The tail
+			-- narrows as it travels away from the primary impact.
+			local smearSize = math.Clamp(math.ceil((weight * (1 - frac * 0.65)) / 0.55), 1, 5)
+			decal = (artery and "Arterial.Blood2" or "Normal.Blood2") .. smearSize
+		end
 		util.Decal(decal, smearPos + normal, smearPos - normal, owner)
 	end
 end
-
 local function decalBlood(pos, normal, tr, artery, owner, decalWeight, impactVelocity)
-	-- Pool nearby splashes so a single burst does not immediately evict older
-	-- engine decals from the client's finite decal buffer. Small drops begin
-	-- with the smallest decal; more blood in the same spot advances it through
-	-- the larger decal materials instead of making every drop look identical.
-	local vec = math.Round(pos[1] / bloodDecalCellSize)..":"..math.Round(pos[2] / bloodDecalCellSize)..":"..math.Round(pos[3] / bloodDecalCellSize)
+	local oldStyle = hg_old_blood:GetBool()
+	local weight = math.Clamp(tonumber(decalWeight) or 1, 0.15, 6)
 
+	-- Legacy mode intentionally remains simple: every landed drop is an
+	-- independent classic z_blood/arterial splat. Tiny beads are thinned so a
+	-- 0.2-size microdrop does not stamp a full-size legacy decal every time.
+	if oldStyle then
+		local placeChance = weight <= 0.5 and math.Clamp(weight / 0.5, 0.18, 1) or 1
+		if math.Rand(0, 1) <= placeChance then
+			util.Decal(artery and "Arterial.Blood1" or "Normal.Blood1", pos + normal, pos - normal, owner)
+		end
+		playBloodDripImpact(pos, tr, artery, weight)
+		maybeSmearBlood(pos, normal, tr, artery, owner, weight, impactVelocity, true)
+		return
+	end
+
+	-- Newblood accumulates nearby droplet volume into the scalable Blood2 set.
+	-- This lets tiny beads remain tiny while repeated bleeding grows a stain.
+	local vec = math.Round(pos[1] / bloodDecalCellSize)..":"..math.Round(pos[2] / bloodDecalCellSize)..":"..math.Round(pos[3] / bloodDecalCellSize)
 	hg.bloodcount = hg.bloodcount + 1
-	
 	if hg.bloodcount > 10000 then
 		hg.bloodpositions = {}
 		hg.bloodcount = 0
 	end
-
-	-- я не знаю насколько большой можно делать такие таблицы... надеюсь, что это не так страшно выйдет
 
 	local cell = hg.bloodpositions[vec]
 	if !istable(cell) then
@@ -274,7 +315,7 @@ local function decalBlood(pos, normal, tr, artery, owner, decalWeight, impactVel
 	end
 
 	cell.hits = cell.hits + 1
-	cell.volume = math.min(cell.volume + math.Clamp(tonumber(decalWeight) or 1, 0.35, 6), 12)
+	cell.volume = math.min(cell.volume + weight, 12)
 	local decalSize = math.Clamp(math.ceil(cell.volume / 2.2), 1, 5)
 	local grew = decalSize > cell.decalSize
 	if grew then cell.decalSize = decalSize end
@@ -283,31 +324,18 @@ local function decalBlood(pos, normal, tr, artery, owner, decalWeight, impactVel
 	if grew or placeArterialDecal then cell.lastArterialDecal = now end
 
 	if artery then
-		if !hg_old_blood:GetBool() then
-			if grew or placeArterialDecal then
-				util.Decal("Arterial.Blood2"..decalSize, pos + normal, pos - normal, owner)
-			end
-			playBloodDripImpact(pos, tr, true, decalWeight)
-		else
-			util.Decal("Arterial.Blood1", pos + normal, pos - normal, owner)
-			playBloodDripImpact(pos, tr, true, decalWeight)
+		if grew or placeArterialDecal then
+			util.Decal("Arterial.Blood2"..decalSize, pos + normal, pos - normal, owner)
 		end
 	else
-		if !hg_old_blood:GetBool() then
-			playBloodDripImpact(pos, tr, false, decalWeight)
-
-			if grew then
-				util.Decal("Normal.Blood2"..decalSize, pos + normal, pos - normal, owner)
-			end
-		else
-			util.Decal("Normal.Blood1", pos + normal, pos - normal, owner)
-			playBloodDripImpact(pos, tr, false, decalWeight)
+		if grew then
+			util.Decal("Normal.Blood2"..decalSize, pos + normal, pos - normal, owner)
 		end
 	end
 
-	maybeSmearBlood(pos, normal, tr, artery, owner, decalWeight, impactVelocity)
-end
---дурак, просто смотри сколько ентити стоит в одном месте
+	playBloodDripImpact(pos, tr, artery, weight)
+	maybeSmearBlood(pos, normal, tr, artery, owner, weight, impactVelocity, false)
+end--дурак, просто смотри сколько ентити стоит в одном месте
 local tr2 = { collisiongroup = COLLISION_GROUP_WORLD, output = {} }
 
 function util.IsInWorld( pos )

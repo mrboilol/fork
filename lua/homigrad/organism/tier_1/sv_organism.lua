@@ -24,6 +24,11 @@ hg.organism.config = hg.organism.config or {
 	TERMINAL_CARDIAC_OUTPUT = 0.04,
 	ARTERIAL_AMPUTATION_BLEED_MULTIPLIER = 0.65,
 	ARTERIAL_HEADGIB_BLEED_MULTIPLIER = 1.65,
+	-- Arterial loss is modeled directly in mL/s from wound severity and current
+	-- flow. This keeps it frame-rate independent and lethal over tens of seconds
+	-- instead of emptying the circulation in only a few simulation ticks.
+	ARTERIAL_BLEED_ML_S_PER_SEVERITY = 3.0,
+	ARTERIAL_MIN_FLOW_FRACTION = 0.08,
 	POSTMORTEM_DECAY_SECONDS = 5,
 	CARDIAC_ARREST_MECHANICAL_DECAY_SECONDS = 5,
 	BRADYCARDIA_LOW_OUTPUT_HR_BPM = 45,
