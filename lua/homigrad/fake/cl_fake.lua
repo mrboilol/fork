@@ -103,6 +103,8 @@ local rollang = 0
 local ctime
 local vecUpX, vecUpY, vecUpZ = Vector(1, 0, 0), Vector(0, 1, 0), Vector(0, 0, 1)
 hook.Add("HG.InputMouseApply", "fakeCameraAngles2", function(tbl)
+	if not IsValid(lply) then return end
+
 	if IsValid(follow) and ctime != CurTime() then
 		ctime = CurTime()
 
@@ -115,16 +117,17 @@ hook.Add("HG.InputMouseApply", "fakeCameraAngles2", function(tbl)
 	local angle = tbl.angle
 
 	local wep = lply:GetActiveWeapon()
+	local organism = lply.organism or {}
 
 	local consmul = 1 - hg.CalculateConsciousnessMul()
 
-	if (wep.weight or wep.visualweight) and ((wep.weight and wep.weight > 0 or wep.visualweight and wep.visualweight > 0) or lply.organism.larmamputated or lply.organism.larmupamputated or consmul > 0.3) then
-		ViewPunch3(Angle(-y / 50 / 16, x / 50 / 16, 0) * math.min(((wep.visualweight ~= nil and wep.visualweight > 0) and wep.visualweight) or wep.weight, 10) / 3 / (1 - consmul * 0.5) * ((lply.organism.larmamputated or lply.organism.larmupamputated) and 4 or 1) * ((lply.organism.rarmamputated or lply.organism.rarmupamputated) and 2 or 1))
+	if (wep.weight or wep.visualweight) and ((wep.weight and wep.weight > 0 or wep.visualweight and wep.visualweight > 0) or organism.larmamputated or organism.larmupamputated or consmul > 0.3) then
+		ViewPunch3(Angle(-y / 50 / 16, x / 50 / 16, 0) * math.min(((wep.visualweight ~= nil and wep.visualweight > 0) and wep.visualweight) or wep.weight, 10) / 3 / (1 - consmul * 0.5) * ((organism.larmamputated or organism.larmupamputated) and 4 or 1) * ((organism.rarmamputated or organism.rarmupamputated) and 2 or 1))
 	end
 
 	ViewPunch4(Angle(y / 50 / 16, -x / 50 / 16, -x / 50 / 1) * 0.1)
 
-	if !IsValid(lply) or !lply:Alive() then return end
+	if !lply:Alive() then return end
 
 	if lply.lean and math.abs(lply.lean) < 0.01 then
 		oldlean = 0

@@ -9,6 +9,28 @@ local module = hg.organism.module.pulse
 local terminalHeartRate = 300
 local peaDuration = 6
 
+function hg.organism.GetBloodDeliveryFraction(blood, scale)
+	local cfg = hg.organism.config or {}
+	local normalBlood = math.max(tonumber(cfg.NORMAL_BLOOD_VOLUME_ML) or hg.organism.normalBloodVolume or 5000, 1)
+	local volumeFraction = math.Clamp((tonumber(blood) or normalBlood) / normalBlood, 0, 1)
+	local curve = math.max(tonumber(cfg.HEMORRHAGE_PERFUSION_EXPONENT) or 0.7, 0.05)
+	return math.Clamp(volumeFraction ^ curve * (tonumber(scale) or 1), 0, 1)
+end
+
+function hg.organism.GetHemorrhageCompensationDrive(blood)
+	local reserve = hg.organism.GetBloodDeliveryFraction(blood, 1)
+	local cfg = hg.organism.config or {}
+	local bradyReserve = math.Clamp(tonumber(cfg.HEMORRHAGE_BRADYCARDIA_RESERVE) or 0.35, 0.05, 0.9)
+	return math.Clamp((1 - reserve) / math.max(1 - bradyReserve, 0.05), 0, 1)
+end
+
+function hg.organism.GetHemorrhageOxygenTransportFraction(blood)
+	local cfg = hg.organism.config or {}
+	local normalBlood = math.max(tonumber(cfg.NORMAL_BLOOD_VOLUME_ML) or hg.organism.normalBloodVolume or 5000, 1)
+	local volumeFraction = math.Clamp((tonumber(blood) or normalBlood) / normalBlood, 0, 1)
+	return hg.organism.GetBloodDeliveryFraction(blood, 1) * (0.55 + volumeFraction * 0.45)
+end
+
 local function getBloodPerfusion(blood)
 	-- Preserve enough central circulation at moderate loss while allowing an
 	-- almost empty circulation to become correspondingly ineffective.
@@ -1200,4 +1222,3 @@ function hg.organism.Pulse(owner, org, timeValue)
 		net.Send(owner)
 	end
 end
-

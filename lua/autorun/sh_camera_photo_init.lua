@@ -1,6 +1,11 @@
 -- lua/autorun/sh_camera_photo_init.lua
 -- Self-contained photo camera system (no dependency on investigation_system addon)
 
+local serverFile = "camera/sv_camera_photo.lua"
+local clientFile = "camera/cl_camera_capture.lua"
+
+if not file.Exists(serverFile, "LUA") or not file.Exists(clientFile, "LUA") then return end
+
 HgCamera = HgCamera or {}
 
 HgCamera.Settings = {
@@ -42,9 +47,9 @@ if SERVER then
         util.AddNetworkString(str)
     end
 
-    AddCSLuaFile("camera/cl_camera_capture.lua")
+    AddCSLuaFile(clientFile)
 
-    include("camera/sv_camera_photo.lua")
+    include(serverFile)
 else
-    include("camera/cl_camera_capture.lua")
+    include(clientFile)
 end

@@ -18,6 +18,8 @@ local render_SetMaterial = render.SetMaterial
 local render_DrawSprite = render.DrawSprite
 local surface_SetDrawColor = surface.SetDrawColor
 
+local hg_blood_draw_distance = ConVarExists("hg_blood_draw_distance") and GetConVar("hg_blood_draw_distance") or CreateClientConVar("hg_blood_draw_distance", 1024, true, nil, "distance to draw blood", 0, 4096)
+
 local color = Color(90,0,0,122)
 
 bloodparticles_hook[3] = function(anim_pos)
