@@ -354,6 +354,7 @@ local function send_organism(org, ply, recipientForce, reliable)
 	sendtable.noradrenaline = org.noradrenaline
 	sendtable.panicattackadd = org.panicattackadd
 	sendtable.panicattack = org.panicattack
+	sendtable.panicattackActive = org.panicattackActive
 	sendtable.seizure = org.seizure
 	sendtable.seizureActive = org.seizureActive
 	sendtable.seizureStart = org.seizureStart
@@ -526,6 +527,7 @@ local function send_bareinfo(org, force, reliable)
 	sendtable.noradrenalineActive = org.noradrenalineActive
 	sendtable.panicattackadd = org.panicattackadd
 	sendtable.panicattack = org.panicattack
+	sendtable.panicattackActive = org.panicattackActive
 	sendtable.seizure = org.seizure
 	sendtable.seizureActive = org.seizureActive
 	sendtable.seizureStart = org.seizureStart

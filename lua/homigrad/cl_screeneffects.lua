@@ -392,8 +392,7 @@ local panicattackShakeIntervalMin = 0.45
 local panicattackShakeIntervalMax = 1.4
 local panicattackShakeMul = 0.85
 local function getPanicAttackFx(org)
-	local panicConVar = GetConVar("hg_panic")
-	if not panicConVar or not panicConVar:GetBool() or org.otrub then return 0 end
+	if org.otrub then return 0 end
 
 	local panic = math.Clamp(tonumber(org.panicattack) or 0, 0, 1)
 	return math.Clamp(math.Remap(panic, panicattackFadeStart, panicattackThreshold, 0, panicattackVolumeMul), 0, 1)
@@ -1655,14 +1654,19 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	local tinnitusTime = lply.tinnitus and math.max(lply.tinnitus - CurTime(), 0) or 0
 	local disorientation = org.disorientation or 0
 	local concussion = org.concussion or 0
-	local disorientationSpike = math.max(disorientation - (lastDisorientationFx or 0), 0)
+	local hypertension = math.Clamp(org.hypertension or 0, 0, 1)
+	local hypertensionK = math.Clamp(hypertension * 1.27, 0, 1)
+	local adrenalineMitigation = math.Clamp((org.adrenaline or 0) / 3, 0, 1) * 0.25
+	local hypertensionDisorientation = hypertension > 0 and (0.25 + hypertensionK * (1 - adrenalineMitigation) * 1.5) or 0
+	local neuroDisorientation = math.max(disorientation - hypertensionDisorientation, 0)
+	local disorientationSpike = math.max(neuroDisorientation - (lastDisorientationFx or 0), 0)
 	local concussionSpike = math.max(concussion - (lastConcussionFx or 0), 0)
-	lastDisorientationFx = disorientation
+	lastDisorientationFx = neuroDisorientation
 	lastConcussionFx = concussion
 
 	if lply:Alive() and not org.otrub and CurTime() >= nextNeuroTinnitus and (disorientationSpike >= 1.5 or concussionSpike >= 1.0) then
 		local spike = math.max(disorientationSpike / 2, concussionSpike)
-		local chance = math.Clamp(0.18 + spike * 0.18 + math.Clamp(disorientation / 10, 0, 1) * 0.12 + math.Clamp(concussion / 6, 0, 1) * 0.18, 0, 0.75)
+		local chance = math.Clamp(0.18 + spike * 0.18 + math.Clamp(neuroDisorientation / 10, 0, 1) * 0.12 + math.Clamp(concussion / 6, 0, 1) * 0.18, 0, 0.75)
 		if math.Rand(0, 1) < chance then
 			lply:AddTinnitus(math.Rand(0.7, 1.8) + spike * 0.7, false, concussion >= 3 or brain > 0.05)
 			nextNeuroTinnitus = CurTime() + math.Rand(4, 9)

@@ -23,19 +23,8 @@ local thoughtMessages = {
     pneumothorax3 = "You are struggling to breathe.",
     brain = "Your brain is damaged.",
     blood2 = "You are close to fainting.",
-    internalbleed = {
-        "Something inside me is bleeding.",
-        "I can feel blood pooling inside me.",
-        "That hit did something bad inside.",
-        "I'm bleeding internally. I need treatment.",
-        "Something ruptured inside me."
-    },
-    nosebleed = {
-        "My nose is bleeding.",
-        "I can taste blood from my nose.",
-        "Blood is running out of my nose.",
-        "My nose won't stop bleeding."
-    },
+    internalbleed = "You are bleeding internally.",
+    nosebleed = "Your nose is bleeding.",
     hungry = "You are hungry.",
     heart = "You feel a sharp pain from your chest.",
     heartstop = "Your heart stopped.",
@@ -306,6 +295,38 @@ local function GetConditionThought(ply, msgKey)
     return options[index]
 end
 
+local function GetStatusThought(ply)
+    local org = ply.organism or {}
+    if org.heartstop then return "Cardiac arrest detected." end
+    if (org.o2 and org.o2[1] or 30) <= 15 then return "Oxygen levels are critically low." end
+    if (org.bleed or 0) > 0.5 or (org.blood or 5000) < 3750 then return "You are losing blood." end
+    if (org.pain or 0) > 75 then return "Severe pain is impairing movement." end
+    if org.fibrillation or org.unstableRhythm or (org.arrhythmia or 0) > 0.35 then return "Your heart rhythm is irregular." end
+    if (org.heartbeat or 70) >= 150 then return "Your heart rate is dangerously high." end
+    if (org.hypotension or 0) > 0.5 then return "Poor circulation is weakening your limbs." end
+    if (org.temperature or 36.6) < 35 then return "Cold exposure is reducing coordination." end
+    if (org.temperature or 36.6) > 38 then return "Heat stress is reducing coordination." end
+    if (org.panicattack or 0) > 0.55 then return "You are losing focus." end
+    if (org.brain or 0) > 0.1 then return "Neurological trauma is impairing your focus." end
+    return "Your condition is changing."
+end
+
+local function GetNewThoughtMessage(ply, msg, msgKey)
+    if msgKey == "phrase" or msgKey == "wake" then return GetStatusThought(ply) end
+    local thought = thoughtMessages[msgKey] and GetConditionThought(ply, msgKey)
+    if thought then return thought end
+
+    local key = string.lower(tostring(msgKey or ""))
+    if string.find(key, "panic", 1, true) then return "You are losing focus." end
+    if string.find(key, "skull", 1, true) or string.find(key, "jaw", 1, true) then return "You feel severe pain around your head." end
+    if string.find(key, "concussion", 1, true) or string.find(key, "brain", 1, true) then return "Neurological trauma is impairing your focus." end
+    if string.find(key, "bone", 1, true) or string.find(key, "broke", 1, true) or string.find(key, "disloc", 1, true) or string.find(key, "ribs", 1, true) or string.find(key, "pelvis", 1, true) then return "You feel a painful bone injury." end
+    if string.find(key, "blood", 1, true) or string.find(key, "bleed", 1, true) then return "You are losing blood." end
+    if string.find(key, "oxygen", 1, true) or string.find(key, "breath", 1, true) then return "You are struggling to breathe." end
+    if string.find(key, "pain", 1, true) then return "Pain is impairing movement." end
+    return GetStatusThought(ply)
+end
+
 local function SCPCBHitThought(ply, target, dmgType, dmg, hitPos, dmginfo)
     if not dmg or dmg <= 0 then return end
 
@@ -385,7 +406,7 @@ local function CreateNotification(ply, msg, delay, msgKey, showTime, func, clr)
     -- without a special wording entry are sent over HGNotificate and then
     -- deliberately discarded by the client.
     if ply:GetInfoNum("hg_newthoughts", 0) > 0 and CreateThought then
-        local thought = thoughtMessages[msgKey] and GetConditionThought(ply, msgKey) or msg
+        local thought = GetNewThoughtMessage(ply, msg, msgKey)
         if not thought then return false end
 
         local conditionCooldown = conditionThoughtCooldowns[msgKey]
@@ -546,6 +567,10 @@ CreateThought = function(ply, msg, delay, msgKey, showTime, clr, func)
     if ply:GetInfoNum("hg_newthoughts", 0) <= 0 then return false end
 
     msgKey = msgKey or msg
+    local lowerMessage = string.lower(msg)
+    if string.find(lowerMessage, "^i[%s'%-]") or string.find(lowerMessage, "^my%s") then
+        msg = GetNewThoughtMessage(ply, msg, msgKey)
+    end
     ply.thoughtmsgs = ply.thoughtmsgs or {}
     ply.thoughtGroupCooldowns = ply.thoughtGroupCooldowns or {}
     ply.recentThoughtText = ply.recentThoughtText or {}

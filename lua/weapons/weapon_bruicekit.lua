@@ -67,14 +67,20 @@ if SERVER then
 		return v >= 0.05
 	end
 
-	function SWEP:GetHealData(org)
+	function SWEP:GetHealData(org, bone)
 		local totalRotations = 1 -- Base 1 rotation
 		local totalCost = 0
 		local bonesToHeal = {}
 		local availableResource = self.modeValues[1] or 0
 
+		local priority = table.Copy(conditionPriority)
+		if bone == "skull" or (isstring(bone) and string.find(bone, "Head", 1, true)) then
+			table.RemoveByValue(priority, "skull")
+			table.insert(priority, 1, "skull")
+		end
+
 		-- Prioritize based on conditionPriority order
-		for _, key in ipairs(conditionPriority) do
+		for _, key in ipairs(priority) do
 			if CanHealKey(org, key) then
 				local isBroken = table.HasValue(brokenLimbsList, key)
 				local isComplex = table.HasValue(complexBonesList, key)
@@ -143,7 +149,7 @@ if SERVER then
 			if self:GetHolding() < 100 then return end
 		end
 
-		local totalRotations, totalCost, bones = self:GetHealData(org)
+		local totalRotations, totalCost, bones = self:GetHealData(org, bone)
 		if #bones == 0 then return false end
 
 		-- Heal the bones and spend bruise kit
@@ -168,6 +174,9 @@ if SERVER then
 			end
 
 			org[key] = newVal
+			if key == "skull" and newVal < v then
+				org.bandagedskull = true
+			end
 			amountHealed = amountHealed + (v - newVal)
 		end
 

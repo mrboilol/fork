@@ -122,8 +122,8 @@ local limbName = {
 }
 
 local function sendThought(org, msg, key, delay, clr)
-	if org.isPly and IsValid(org.owner) and org.owner.Thought then
-		org.owner:Thought(msg, delay or 1, key, 0, clr)
+	if org.isPly and IsValid(org.owner) and org.owner.Notify then
+		org.owner:Notify(msg, delay or 1, key, 0, nil, clr)
 	end
 end
 
@@ -349,40 +349,11 @@ local function shouldTriggerTinnitus(dmgInfo, damage, hasHelmet)
 	return math.random(100) <= chance
 end
 
-local function manageTinnitusSound(org, targetPlayer)
-	if not IsValid(targetPlayer) or not targetPlayer:IsPlayer() then return end
-	if org.skull >= 0.6 then
-		if not org.tinnitusLongPlaying then
-			org.tinnitusLongPlaying = true
-			targetPlayer:PlayCustomTinnitus("tinnituslong.wav")
-			local timerName = "TinnitusCheck_" .. targetPlayer:SteamID64()
-			timer.Create(timerName, 8.0, 0, function()
-				if not IsValid(targetPlayer) or not targetPlayer:Alive() or org.skull < 0.6 then
-					timer.Remove(timerName)
-					org.tinnitusLongPlaying = false
-					targetPlayer:StopCustomTinnitus()
-					return
-				end
-				targetPlayer:PlayCustomTinnitus("tinnituslong.wav")
-			end)
-		end
-	else
-		if org.tinnitusLongPlaying then
-			org.tinnitusLongPlaying = false
-			local timerName = "TinnitusCheck_" .. targetPlayer:SteamID64()
-			timer.Remove(timerName)
-			targetPlayer:StopCustomTinnitus()
-		end
-	end
+local function applySkullTinnitus(targetPlayer, skullDamage, impactDamage)
+	if not IsValid(targetPlayer) or not targetPlayer:IsPlayer() or not targetPlayer.AddTinnitus then return end
+	local duration = math.Clamp(skullDamage * 18 + impactDamage * 1.5, 1.5, 12)
+	targetPlayer:AddTinnitus(duration, true)
 end
-
-hook.Add("Org Think", "TinnitusDisorientation", function(owner, org, timeValue)
-	if not org or not org.tinnitusLongPlaying then return end
-	if not owner:IsPlayer() or not owner:Alive() or org.skull < 0.6 then return end
-	local hasHelmet = owner.armors and owner.armors["head"] != nil
-	local rate = (hasHelmet and 0.02 or 0.06) * timeValue * 10
-	org.disorientation = math.min(org.disorientation + rate, 1.5)
-end)
 
 local input_list = hg.organism.input_list
 local toothModel = Model("models/phobias/general/tooth/tooth.mdl")
@@ -563,6 +534,7 @@ hook.Add("CanListenOthers", "CantHaveShitInDetroit", function(output, input, isC
 		if output:GetInfoNum("hg_newthoughts", 0) <= 0 then output:Notify("My jaw is really hurting when I speak.", 60, "painfromjawspeak", 0, nil, Color(255, 210, 210)) end
 	end
 end)
+
 
 input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet, impact)
 	local oldDmg = org.skull
@@ -751,7 +723,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 			if IsValid(targetPlayer) and targetPlayer:IsPlayer() then
 				targetPlayer:PlayCustomTinnitus("headhit.mp3")
 				if not hasHelmet or (org.skull - oldDmg) > 0.15 then
-					manageTinnitusSound(org, targetPlayer)
+					applySkullTinnitus(targetPlayer, org.skull - oldDmg, dmg)
 				end
 			end
 		end
@@ -765,15 +737,6 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 			if IsValid(targetPlayer) and targetPlayer:IsPlayer() then
 				targetPlayer:PlayCustomTinnitus("tinnitus.wav")
 			end
-		end
-	elseif org.isPly then
-		local targetPlayer = org.owner
-		if IsValid(org.owner.FakeRagdoll) then
-			local ragdoll = org.owner.FakeRagdoll
-			if IsValid(ragdoll.ply) then targetPlayer = ragdoll.ply end
-		end
-		if IsValid(targetPlayer) and targetPlayer:IsPlayer() then
-			manageTinnitusSound(org, targetPlayer)
 		end
 	end
 
@@ -948,27 +911,6 @@ hook.Add("Org Think", "homigrad_bone_stabilization", function(owner, org, timeVa
 			org.immobilization = math.Approach(org.immobilization, 0, timeValue * 10)
 
 			org._zsh_stab_prev[key] = true
-		end
-	end
-end)
-
-hook.Add("PlayerDisconnected", "CleanupTinnitusSounds", function(ply)
-	if IsValid(ply) then
-		local timerName = "TinnitusCheck_" .. ply:SteamID64()
-		timer.Remove(timerName)
-		if ply.organism then
-			ply.organism.tinnitusLongPlaying = false
-		end
-	end
-end)
-
-hook.Add("PlayerDeath", "CleanupTinnitusOnDeath", function(ply)
-	if IsValid(ply) then
-		local timerName = "TinnitusCheck_" .. ply:SteamID64()
-		timer.Remove(timerName)
-		ply:StopCustomTinnitus()
-		if ply.organism then
-			ply.organism.tinnitusLongPlaying = false
 		end
 	end
 end)

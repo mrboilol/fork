@@ -575,7 +575,7 @@ if SERVER then
 		if not org then return end
 		
 		-- Если растрелять труп а потом его взорвать гранатой, после перевязать - крашнет сервер why?
-		if self.modeValues[1] <= 0 or not (#org.wounds > 0 or org.lleg == 1 or org.rleg == 1 or org.skull >= 0.6 or org.chest == 1 or org.rarm == 1 or org.larm == 1) then return end
+		if self.modeValues[1] <= 0 or not (#org.wounds > 0 or org.lleg == 1 or org.rleg == 1 or org.skull > 0.05 or org.chest == 1 or org.rarm == 1 or org.larm == 1) then return end
 		table.sort(org.wounds, function(a, b) return a[1] > b[1] end)
 		
 		local done = false
@@ -658,8 +658,9 @@ if SERVER then
 		local who = (self:GetOwner() == org.owner) and "You" or ((owner.Profession == "doctor") and "A doctor" or "Someone")
 		local mul = ((owner.Profession == "doctor") and 0.2 or 1)
 		local amt = 25 * mul
-		if org.skull >= 0.6 and self.modeValues[1] >= amt then
-			org.skull = 0.59
+		local treatingSkull = not bone or bone == "skull" or (isstring(bone) and string.find(bone, "Head", 1, true))
+		if treatingSkull and org.skull > 0.05 and self.modeValues[1] >= amt then
+			org.skull = math.max(org.skull - 0.25, 0)
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.bandagedskull = true
 			org.pain = math.max(org.pain - 7, 0)
@@ -1445,7 +1446,7 @@ function SWEP:GetBandageTPIKUseTime(target)
 
 	local owner = self:GetOwner()
 	local treatmentCost = 25 * (IsValid(owner) and owner.Profession == "doctor" and 0.2 or 1)
-	if (org.skull or 0) >= 0.6 then required = required + treatmentCost end
+	if (org.skull or 0) > 0.05 then required = required + treatmentCost end
 	if org.chest == 1 then required = required + treatmentCost end
 	if org.lleg == 1 and not org.llegamputated then required = required + treatmentCost end
 	if org.rleg == 1 and not org.rlegamputated then required = required + treatmentCost end
@@ -1468,7 +1469,7 @@ function SWEP:CanBandageTPIK(target)
 	local owner = self:GetOwner()
 	local treatmentCost = 25 * (IsValid(owner) and owner.Profession == "doctor" and 0.2 or 1)
 	if available < treatmentCost then return false end
-	if (org.skull or 0) >= 0.6 or org.chest == 1 then return true end
+	if (org.skull or 0) > 0.05 or org.chest == 1 then return true end
 	if org.lleg == 1 and not org.llegamputated then return true end
 	if org.rleg == 1 and not org.rlegamputated then return true end
 	if org.larm == 1 and not org.larmamputated then return true end

@@ -740,9 +740,8 @@ local function buildEffects(ply, org)
 		add(effects, "internal_bleed", "internalbleed", level, "bad", 39, math.Round(internalBleed, 2))
 	end
 
-	local panicConVar = GetConVar("hg_panic")
 	local panic = math.Clamp(orgNumber(org, "panicattack", 0), 0, 1)
-	if panicConVar and panicConVar:GetBool() and (org.panicattackActive == true or panic > 0.1) then
+	if org.panicattackActive == true or panic >= 0.45 then
 		add(effects, "panic", "panicmaxxing", org.panicattackActive and 4 or highRank(panic, {0.1, 0.35, 0.6, 0.85}), "bad", 40, math.floor(panic * 100) .. "%")
 	end
 	local fear = math.Clamp(orgNumber(org, "fear", 0), 0, 1)

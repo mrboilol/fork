@@ -1289,7 +1289,7 @@ kaz
 		org.brain = min(org.brain + timeValue * hemorrhage / (hemorrhage < 0.3 and 900 or 300), 1)
 		org.disorientation = math.max(org.disorientation, hemorrhage * 0.9)
 		org.consciousness = math.min(org.consciousness, 1 - hemorrhage * 0.45)
-		org.painadd = math.max(org.painadd, hemorrhage * 25)
+		org.painadd = math.min((org.painadd or 0) + timeValue * hemorrhage * 4, 150)
 	end
 
 	if hg.organism.AddSeizure and temporal > 0.2 then
@@ -1391,4 +1391,3 @@ kaz
 	end
 
 end
-

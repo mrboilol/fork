@@ -9,16 +9,16 @@ local function get_target_organism()
 end
 
 local hungerThoughts = {
-	"I'm getting hungry...",
-	"I need to eat something.",
-	"My stomach is growling.",
-	"When was the last time I ate?",
-	"I should find some food.",
-	"I'm so hungry.",
-	"I need food now.",
-	"I'm starving...",
-	"I can't go on like this.",
-	"I'm wasting away...",
+	"You are becoming hungry.",
+	"You need food.",
+	"Hunger is causing stomach discomfort.",
+	"You have not eaten recently.",
+	"You should find food.",
+	"You are very hungry.",
+	"You need food soon.",
+	"You are starving.",
+	"Hunger is severely weakening you.",
+	"Starvation is worsening.",
 }
 
 local hungerThoughtIndex = 0

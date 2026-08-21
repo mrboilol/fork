@@ -1150,7 +1150,11 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 
 	end
 	
-	local bone = tr.Entity == ent and tr.PhysicsBone
+	local meleeContact = IsValid(inf) and inf.MeleeDamageContact
+	if meleeContact and (meleeContact.entity ~= ent or (meleeContact.expires or 0) < CurTime()) then
+		meleeContact = nil
+	end
+	local bone = meleeContact and meleeContact.entity == ent and meleeContact.physicsBone or tr.Entity == ent and tr.PhysicsBone
 	if not bone then
 		local dir = -(dmgPos - (ent:GetPos() + ent:OBBCenter())):GetNormalized()
 		local tr = util.QuickTrace(dmgPos, dir * 100)
@@ -1188,8 +1192,18 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	local dirCool = dmgInfo:GetDamageForce():GetNormalized()
 	local tr = util.QuickTrace(dmgPos, dirCool * 100)
 	local len = math.abs(dmgInfo:GetDamageForce():Length())
+	if meleeContact then
+		tr.HitGroup = meleeContact.hitGroup or tr.HitGroup
+		tr.HGHeadContact = meleeContact.head == true
+	end
 
 	local hitgroup, bonename = getDamageHitgroup(ent, bone, dmgPos)
+	if tr.HitGroup and tr.HitGroup ~= HITGROUP_GENERIC then
+		hitgroup = tr.HitGroup
+	end
+	if tr.HGHeadContact then
+		hitgroup = HITGROUP_HEAD
+	end
 	--print(dmg_before, 1)
 	--if ent:IsRagdoll() then
 		if RagdollForceBoneMul[hitgroup] then len = len * RagdollForceBoneMul[hitgroup] end

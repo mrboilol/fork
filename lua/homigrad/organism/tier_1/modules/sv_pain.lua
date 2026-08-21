@@ -291,8 +291,8 @@ module[2] = function(owner, org, timeValue)
 	end
 	org.nearpainlimit = not org.otrub and org.pain >= org.pain_turn * pain_fake_threshold
 
-	if org.isPly and org.pain >= 85 and IsValid(owner) and owner.Thought then
-		owner:Thought("You are experiencing excruciating pain.", 8, "thought_excruciatingpain", 0, Color(255, 160, 160))
+	if org.isPly and org.pain >= 85 and IsValid(owner) and owner.Notify then
+		owner:Notify("You are experiencing excruciating pain.", 8, "thought_excruciatingpain", 0, nil, Color(255, 160, 160))
 	end
 
 	-- Remove only pain that actually entered avgpain. The old queuedPain
