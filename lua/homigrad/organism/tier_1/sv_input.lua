@@ -867,6 +867,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	local ply = (ent:IsPlayer() and ent) or hg.RagdollOwner(ent)
 
 	org.isPly = IsValid(ply)
+	local combatThoughtState = hg.CaptureCombatInjuryState and hg.CaptureCombatInjuryState(org)
 	
 	if org.godmode then return true end
 
@@ -1337,6 +1338,10 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	
 	if ply or org.fakePlayer then
 		hook_Run("HomigradDamage", org.fakePlayer and ent or ply, dmgInfo, bonetohitgroup[bonename], ent, attacker.harm, hitBoxs, inputHole)
+	end
+
+	if hg.ReportCombatInjuryState then
+		hg.ReportCombatInjuryState(attacker, ply, org, combatThoughtState)
 	end
 	
 	attacker.harm = 0

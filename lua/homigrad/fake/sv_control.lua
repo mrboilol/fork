@@ -580,6 +580,18 @@ local function fakeLegKickHit(ply, ragdoll, state)
 	end
 end
 
+function hg.TriggerFakeLegKickExtension(ply, ragdoll, impactSpeed)
+	if not IsValid(ply) or not IsValid(ragdoll) then return false end
+	local state = ragdoll.fakeLegKick
+	if not state or state.hit then return false end
+
+	state.extended = true
+	state.extendTime = CurTime()
+	state.hitTime = math.min(state.hitTime, CurTime())
+	state.impactSpeed = math.max(impactSpeed or 0, state.launchSpeed or 0)
+	return true
+end
+
 function hg.FakeLegAttack(ply)
 	local ragdoll = ply.FakeRagdoll
 	local org = ply.organism
@@ -613,6 +625,7 @@ function hg.FakeLegAttack(ply)
 		hitTime = CurTime() + duration * 0.55,
 		dmg = dmg,
 		dir = ang:Forward(),
+		launchSpeed = ragdoll:GetVelocity():Length(),
 		hit = false
 	}
 end
@@ -1053,7 +1066,14 @@ hook.Add("Think", "Fake", function()
 
 				local duration = fakeKick.finish - fakeKick.start
 				local phase = math.Clamp((time - fakeKick.start) / duration, 0, 1)
-				local kickExtend = phase >= FAKE_LEG_KICK_EXTEND_TIME
+				if not fakeKick.extended and phase < FAKE_LEG_KICK_EXTEND_TIME then
+					local contact = getFakeLegKickTrace(ply, ragdoll, fakeKick.dir)
+					if contact and contact.Hit and IsValid(contact.Entity) then
+						hg.TriggerFakeLegKickExtension(ply, ragdoll, ragdoll:GetVelocity():Length())
+					end
+				end
+
+				local kickExtend = fakeKick.extended or phase >= FAKE_LEG_KICK_EXTEND_TIME
 				local angle = -(-angles2)
 				angle:RotateAroundAxis(angle:Forward(), FAKE_LEG_KICK_CHARGE_FORWARD_OFFSET)
 

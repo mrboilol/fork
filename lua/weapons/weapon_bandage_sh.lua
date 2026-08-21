@@ -18,6 +18,7 @@ SWEP.Secondary.Ammo = "none"
 SWEP.HoldType = "slam"
 SWEP.ViewModel = ""
 SWEP.WorldModel = "models/bandages.mdl"
+SWEP.BandageOriginalWorldModel = SWEP.WorldModel
 if CLIENT then
 	SWEP.WepSelectIcon = Material("vgui/wep_jack_hmcd_bandage")
 	SWEP.IconOverride = "vgui/wep_jack_hmcd_bandage.png"
@@ -66,12 +67,57 @@ end
 SWEP.offsetVec = Vector(4, -3.5, 0)
 SWEP.offsetAng = Angle(90, 90, 0)
 
-local hg_healanims = CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Toggle heal/food animations", 0, 1)
+local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Healing method: 0 = original models + progressive minigames, 1 = Judge animations", 0, 1)
+
+local judgeBandageClasses = {
+	weapon_bandage_sh = true,
+	weapon_bigbandage_sh = true,
+	weapon_packedbandage_sh = true,
+	weapon_combatbandage_sh = true,
+	weapon_quikclotbandage_sh = true
+}
+
+function SWEP:UseJudgeBandageTPIK()
+	return self.BandageTPIK == true and judgeBandageClasses[self:GetClass()] == true and hg_healanims:GetInt() == 1
+end
+
+function SWEP:ApplyBandageVisualMode()
+	local judgeMode = self:UseJudgeBandageTPIK()
+	if self.HGBandageJudgeVisualMode == judgeMode then return end
+
+	if judgeMode then
+		self:EnableBandageTPIK()
+	else
+		self:CancelBandageTPIK(false)
+		self.supportTPIK = nil
+		self.isTPIKBase = nil
+		self.WorldModel = self.BandageOriginalWorldModel
+		self.WorldModelReal = nil
+		self.WorldModelExchange = nil
+		self.AnimList = nil
+		self.HoldPos = nil
+		self.HoldAng = nil
+		self.sprint_pos = nil
+		self.sprint_ang = nil
+		self.setlh = nil
+		self.setrh = nil
+		self.modelscale = nil
+		self.modelscale2 = nil
+		self.CallbackTimeAdjust = nil
+		self.animtime = nil
+		self.animspeed = nil
+		self.cycling = nil
+		self.reverseanim = nil
+	end
+
+	self.HGBandageJudgeVisualMode = judgeMode
+end
 
 modelshuy = modelshuy or {}
 
 function SWEP:DrawWorldModel()
-	if self.BandageTPIK then
+	self:ApplyBandageVisualMode()
+	if self:UseJudgeBandageTPIK() then
 		local base = weapons.GetStored("weapon_tpik_base")
 		if base and base.DrawWorldModel then return base.DrawWorldModel(self) end
 	end
@@ -82,7 +128,8 @@ function SWEP:DrawWorldModel()
 end
 
 function SWEP:DrawWorldModel2(nodraw)
-	if self.BandageTPIK then
+	self:ApplyBandageVisualMode()
+	if self:UseJudgeBandageTPIK() then
 		local base = weapons.GetStored("weapon_tpik_base")
 		if base and base.DrawWorldModel2 then return base.DrawWorldModel2(self) end
 	end
@@ -140,8 +187,10 @@ function SWEP:DrawWorldModel2(nodraw)
 end
 
 function SWEP:OnRemove()
-	if self.BandageTPIK then
+	if self.bandageTPIKUsing then
 		self:CancelBandageTPIK(false)
+	end
+	if self:UseJudgeBandageTPIK() then
 		local base = weapons.GetStored("weapon_tpik_base")
 		if base and base.OnRemove then return base.OnRemove(self) end
 	end
@@ -182,7 +231,11 @@ end
 SWEP.usetime = 2
 local math = math
 function SWEP:Think()
-	if self.BandageTPIK then return self:BandageTPIKThink() end
+	self:ApplyBandageVisualMode()
+	if self.bandageTPIKUsing and not self:UseJudgeBandageTPIK() then
+		self:CancelBandageTPIK(false)
+	end
+	if self:UseJudgeBandageTPIK() then return self:BandageTPIKThink() end
 
 	self:SetHold(self.HoldType)
 
@@ -190,7 +243,7 @@ function SWEP:Think()
 		self.ModelScale = math.Clamp(self.modeValues[1] / (self.modeValuesdef[1][1] * 0.8), 0.5, 1)
 	end
 
-	if not self:GetOwner():KeyDown(IN_ATTACK) and hg_healanims:GetBool() then
+	if not self:GetOwner():KeyDown(IN_ATTACK) and not hg_healanims:GetBool() then
 		self:SetHolding(math.max(self:GetHolding() - 12, 0))
 	end
 
@@ -233,7 +286,8 @@ function SWEP:Think()
 end
 SWEP.net_cooldown2 = 0
 function SWEP:PrimaryAttack()
-	if self.BandageTPIK then return self:StartBandageTPIK(self:GetOwner(), IN_ATTACK) end
+	self:ApplyBandageVisualMode()
+	if self:UseJudgeBandageTPIK() then return self:StartBandageTPIK(self:GetOwner(), IN_ATTACK) end
 
 	if SERVER then--and not self.modeValuesdef[self.mode][2] then
 
@@ -389,7 +443,8 @@ function SWEP:SetInfo(info)
 end
 
 function SWEP:SecondaryAttack()
-	if self.BandageTPIK then
+	self:ApplyBandageVisualMode()
+	if self:UseJudgeBandageTPIK() then
 		if IsValid(self:GetNWEntity("fakeGun")) then return end
 		local ent = hg.eyeTrace(self:GetOwner()).Entity
 		if not IsValid(ent) then return end
@@ -649,7 +704,7 @@ if SERVER then
 		end
 
 		if done then
-			if not self.BandageTPIK then
+			if not self:UseJudgeBandageTPIK() then
 			owner:EmitSound("snd_jack_hmcd_bandage.wav", 60, math.random(95, 105))
 			end
 
@@ -672,7 +727,7 @@ if SERVER then
 		if not org then return end
 	
 		local owner = self:GetOwner()
-		if ent == hg.GetCurrentCharacter(owner) and hg_healanims:GetBool() then
+		if ent == hg.GetCurrentCharacter(owner) and not hg_healanims:GetBool() then
 			self:SetHolding(math.min(self:GetHolding() + 10, 100))
 
 			if self:GetHolding() < 100 then return end
@@ -1286,8 +1341,10 @@ function SWEP:IsLocal()
 end
 
 function SWEP:Holster(wep)
-	if self.BandageTPIK then
+	if self.bandageTPIKUsing then
 		self:CancelBandageTPIK(false)
+	end
+	if self:UseJudgeBandageTPIK() then
 		return true
 	end
 
@@ -1327,7 +1384,8 @@ function SWEP:OwnerChanged()
 end
 
 function SWEP:Deploy()
-	if self.BandageTPIK then
+	self:ApplyBandageVisualMode()
+	if self:UseJudgeBandageTPIK() then
 		self:CancelBandageTPIK(false)
 		self._idleScheduled = nil
 		local base = weapons.GetStored("weapon_tpik_base")
@@ -1373,6 +1431,7 @@ function SWEP:EnableBandageTPIK()
 	self.animspeed = 1
 	self.cycling = false
 	self.reverseanim = false
+	self.HGBandageJudgeVisualMode = nil
 end
 
 function SWEP:GetBandageTPIKUseTime(target)

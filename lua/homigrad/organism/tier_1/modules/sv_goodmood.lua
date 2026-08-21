@@ -1,6 +1,11 @@
 hg.organism.module.goodmood = {}
 local module = hg.organism.module.goodmood
 
+local function GetGoodMood(org)
+    org.goodmood = math.Clamp(tonumber(org.goodmood) or 1, 0, 1)
+    return org.goodmood
+end
+
 module[1] = function(org)
     org.goodmood = 1.0
     org._goodmoodLostTime = 0
@@ -9,6 +14,7 @@ end
 
 module[2] = function(owner, org, timeValue)
     local goodmood_add = 0
+    GetGoodMood(org)
 
     -- Natural mood decay towards 0
     org.goodmood = math.Approach(org.goodmood, 0, timeValue / 600)
@@ -89,13 +95,14 @@ hook.Add("HomigradDamage", "GoodMood_OnDamage", function(ply, dmgInfo, hitgroup,
 
     local damage = dmgInfo:GetDamage()
     if damage > 5 then
-        org.goodmood = math.Clamp(org.goodmood - (damage * 0.002), 0, 1)
+        org.goodmood = math.Clamp(GetGoodMood(org) - (damage * 0.002), 0, 1)
     end
 end)
 
 -- Increase goodmood when overcoming fear.
 hook.Add("Org Think", "GoodMood_OvercomeFear", function(owner, org, timeValue)
     if not IsValid(owner) or not owner:IsPlayer() or not owner:Alive() then return end
+    GetGoodMood(org)
 
     -- Check if in penalty window (30 seconds after losing goodmood)
     local timeSinceLoss = CurTime() - (org._goodmoodLostTime or 0)
@@ -120,6 +127,7 @@ hook.Add("PostHeal", "GoodMood_OnHeal", function(wep, target, mode)
     if not IsValid(target) then return end
     local org = target.organism
     if not org then return end
+    GetGoodMood(org)
 
     local owner = wep:GetOwner()
     if IsValid(owner) and owner == target then
@@ -133,6 +141,7 @@ hook.Add("PostHeal", "GoodMood_OnHeal", function(wep, target, mode)
         -- Healing others gives mood boost to healer
         local healerOrg = owner.organism
         if healerOrg then
+            GetGoodMood(healerOrg)
             local timeSinceLoss = CurTime() - (healerOrg._goodmoodLostTime or 0)
             local inPenaltyWindow = timeSinceLoss < 30
             local boost = inPenaltyWindow and 0.0025 or 0.01

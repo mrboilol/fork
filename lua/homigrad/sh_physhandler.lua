@@ -40,6 +40,54 @@ function math.BadNumber(v)
 	return not v or v==inf or v==ninf or not (v>=0 or v<=0) or tostring(v) == "nan"
 end
 
+hg = hg or {}
+hg._queuedCollisionRuleRefresh = hg._queuedCollisionRuleRefresh or {}
+hg._queuedCollisionGroupChanges = hg._queuedCollisionGroupChanges or {}
+hg._queuedCustomCollisionChecks = hg._queuedCustomCollisionChecks or {}
+
+function hg.QueueCollisionRulesChanged(ent)
+	if IsValid(ent) then hg._queuedCollisionRuleRefresh[ent] = true end
+end
+
+function hg.QueueSetCollisionGroup(ent, collisionGroup)
+	if IsValid(ent) then hg._queuedCollisionGroupChanges[ent] = collisionGroup end
+end
+
+function hg.QueueSetCustomCollisionCheck(ent, enabled)
+	if IsValid(ent) then hg._queuedCustomCollisionChecks[ent] = enabled and true or false end
+end
+
+function hg.SafeSetCustomCollisionCheck(ent, enabled)
+	if IsValid(ent) then hg.QueueSetCustomCollisionCheck(ent, enabled) end
+end
+
+function hg.SafeSetCollisionGroup(ent, collisionGroup)
+	if IsValid(ent) then hg.QueueSetCollisionGroup(ent, collisionGroup) end
+end
+
+function hg.SafeCollisionRulesChanged(ent)
+	if IsValid(ent) then hg.QueueCollisionRulesChanged(ent) end
+end
+
+if SERVER then
+	hook.Add("Tick", "hg_queue_collision_rules_changed", function()
+		for ent, enabled in pairs(hg._queuedCustomCollisionChecks) do
+			hg._queuedCustomCollisionChecks[ent] = nil
+			if IsValid(ent) and ent:GetCustomCollisionCheck() ~= enabled then ent:SetCustomCollisionCheck(enabled) end
+		end
+
+		for ent, collisionGroup in pairs(hg._queuedCollisionGroupChanges) do
+			hg._queuedCollisionGroupChanges[ent] = nil
+			if IsValid(ent) and ent:GetCollisionGroup() ~= collisionGroup then ent:SetCollisionGroup(collisionGroup) end
+		end
+
+		for ent in pairs(hg._queuedCollisionRuleRefresh) do
+			hg._queuedCollisionRuleRefresh[ent] = nil
+			if IsValid(ent) then ent:CollisionRulesChanged() end
+		end
+	end)
+end
+
 local max_reasonable_pos 		= 16000
 local min_reasonable_pos 		= -16000
 

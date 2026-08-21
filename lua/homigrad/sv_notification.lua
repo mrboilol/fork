@@ -642,6 +642,131 @@ function PLAYER:ResetNotification(key)
     ResetNotification(self,key)
 end
 
+local combatThoughtOrgans = {
+	{"heart", "heart"}, {"liver", "liver"}, {"stomach", "stomach"}, {"intestines", "intestines"},
+	{"lungsL", "left lung", 1}, {"lungsR", "right lung", 1}, {"trachea", "windpipe"},
+	{"brain", "brain"}, {"eyeL", "left eye"}, {"eyeR", "right eye"},
+}
+
+local combatThoughtBones = {
+	{"skull", "skull"}, {"jaw", "jaw"}, {"chest", "ribs"}, {"pelvis", "pelvis"},
+	{"spine1", "lower spine"}, {"spine2", "upper spine"}, {"spine3", "neck"},
+	{"larm", "left forearm"}, {"rarm", "right forearm"}, {"larmup", "left upper arm"}, {"rarmup", "right upper arm"},
+	{"lleg", "left lower leg"}, {"rleg", "right lower leg"}, {"llegup", "left thigh"}, {"rlegup", "right thigh"},
+}
+
+local combatThoughtArteries = {
+	{"arteria", "neck artery"}, {"rarmartery", "right arm artery"}, {"larmartery", "left arm artery"},
+	{"rlegartery", "right leg artery"}, {"llegartery", "left leg artery"}, {"spineartery", "spinal artery"},
+}
+
+local function combatThoughtValue(org, info)
+	local value = org[info[1]]
+	if info[3] then value = istable(value) and value[info[3]] or 0 end
+	return tonumber(value) or 0
+end
+
+local function combatThoughtStoppedBreathing(org)
+	if org.heartstop or org.choking then return true end
+	if (org.trachea or 0) >= 0.95 then return true end
+	return org.o2 and (org.o2.curregen or 0) <= 0 and not org.holdingbreath
+end
+
+function hg.CaptureCombatInjuryState(org)
+	if not org then return end
+	local state = {organs = {}, bones = {}, arteries = {}, otrub = org.otrub or org.needotrub, notBreathing = combatThoughtStoppedBreathing(org)}
+	for _, info in ipairs(combatThoughtOrgans) do state.organs[info[1]] = combatThoughtValue(org, info) end
+	for _, info in ipairs(combatThoughtBones) do
+		state.bones[info[1]] = combatThoughtValue(org, info)
+		state.bones[info[1] .. "dislocation"] = org[info[1] .. "dislocation"] and true or false
+	end
+	for _, info in ipairs(combatThoughtArteries) do state.arteries[info[1]] = combatThoughtValue(org, info) end
+	return state
+end
+function hg.ReportCombatInjuryState(attacker, victim, org, before)
+	if not IsValid(attacker) or not attacker:IsPlayer() or attacker == victim or not org or not before then return end
+	if attacker:GetInfoNum("hg_newthoughts", 0) <= 0 then return end
+
+	local message, key
+	if not before.otrub and (org.otrub or org.needotrub) then
+		message, key = "They collapse and stop responding.", "combat_knockout"
+	elseif not before.notBreathing and combatThoughtStoppedBreathing(org) then
+		message, key = "They stop breathing.", "combat_breathing"
+	end
+
+	if not message then
+		for _, info in ipairs(combatThoughtArteries) do
+			if before.arteries[info[1]] < 1 and combatThoughtValue(org, info) >= 1 then
+				message, key = "You opened their " .. info[2] .. ".", "combat_artery_" .. info[1]
+				break
+			end
+		end
+	end
+
+	if not message then
+		for _, info in ipairs(combatThoughtOrgans) do
+			local old, new = before.organs[info[1]], combatThoughtValue(org, info)
+			if old < 0.95 and new >= 0.95 then
+				message, key = "Their " .. info[2] .. " is destroyed.", "combat_organ_destroyed_" .. info[1]
+				break
+			elseif new > old + 0.025 then
+				message, key = "You damaged their " .. info[2] .. ".", "combat_organ_damaged_" .. info[1]
+				break
+			end
+		end
+	end
+
+	if not message then
+		for _, info in ipairs(combatThoughtBones) do
+			local old, new = before.bones[info[1]], combatThoughtValue(org, info)
+			if not before.bones[info[1] .. "dislocation"] and org[info[1] .. "dislocation"] then
+				message, key = "You dislocated their " .. info[2] .. ".", "combat_dislocation_" .. info[1]
+				break
+			elseif old < 0.95 and new >= 0.95 then
+				message, key = "You destroyed their " .. info[2] .. ".", "combat_bone_destroyed_" .. info[1]
+				break
+			elseif new > old + 0.025 then
+				message, key = "You damaged their " .. info[2] .. ".", "combat_bone_damaged_" .. info[1]
+				break
+			end
+		end
+	end
+
+	if message then CreateThought(attacker, message, 2, key, 0, Color(255, 220, 190)) end
+	if not before.otrub and not (org.otrub or org.needotrub) and not org.combatThoughtKnockoutPending then
+		org.combatThoughtKnockoutPending = true
+		timer.Simple(3.5, function()
+			org.combatThoughtKnockoutPending = nil
+			if IsValid(attacker) and org.otrub and IsValid(org.owner) then
+				CreateThought(attacker, "They collapse and stop responding.", 2, "combat_delayed_knockout_" .. org.owner:EntIndex(), 0, Color(255, 220, 190))
+			end
+		end)
+	end
+end
+
+hook.Add("KeyPress", "HGThoughtCheckResponsiveness", function(ply, key)
+	if key ~= IN_USE or not IsValid(ply) or not ply:Alive() or ply:GetInfoNum("hg_newthoughts", 0) <= 0 then return end
+	local trace = ply:GetEyeTrace()
+	local target = trace and trace.Entity
+	local org = IsValid(target) and target.organism
+	if not org or target == ply or ply:GetPos():DistToSqr(target:GetPos()) > 14400 then return end
+
+	local message
+	if combatThoughtStoppedBreathing(org) then
+		message = "They are motionless. You cannot see them breathing."
+	elseif org.otrub or org.needotrub then
+		message = "They are unresponsive."
+	elseif org.seizure or org.panicattack then
+		message = "They are visibly convulsing and unresponsive to you."
+	elseif (org.disorientation or 0) > 35 or (org.shock or 0) > 35 then
+		message = "They look dazed and barely responsive."
+	elseif (org.arterialBleed or 0) > 0.2 or ((org.arterialwounds and #org.arterialwounds) or 0) > 0 then
+		message = "They are bleeding heavily."
+	end
+
+	if message then CreateThought(ply, message, 3, "responsiveness_" .. target:EntIndex(), 0, Color(255, 225, 190)) end
+end)
+
 hook.Add("EntityTakeDamage", "SCPCB_HGThoughtDamage", function(target, dmginfo)
     if not dmginfo or dmginfo:GetDamage() <= 0 then return end
 

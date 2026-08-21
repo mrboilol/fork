@@ -387,7 +387,7 @@ hook.Add("RagdollDeath", "BrainfuckStart", function(ply, rag)
 		local forceFencingPosturing = false
 		local headshot = hadBrainDamage or hadHeadDamage or recentHeadshot
 		local brainFactor = getBrainFactor(org)
-		local chance = math_clamp(CHANCE + brainFactor * 0.6, 0, 1)
+		local chance = math_clamp(CHANCE + brainFactor * 0.6 + (recentClubHit and recentHeadshot and 0.15 or 0), 0, 1)
 		if not headshot and not forceFencingPosturing and (rag.noHead or org.noHead or ply.noHead) then return end
 		if (headshot and (recentHeadshot or hadHeadDamage or math_random() < chance)) or forceFencingPosturing then
 			local stype = forceFencingPosturing and "posturing" or getRandomSpasm()

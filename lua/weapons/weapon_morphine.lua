@@ -205,15 +205,18 @@ function SWEP:PostSetHandPos()
 	local ent = hg.GetCurrentCharacter(ply)
 	if not IsValid(ent) then return end
 
+	local handPosOffset = isvector(self.handPosOffset) and self.handPosOffset or vector_origin
+	local handAngOffset = isangle(self.handAngOffset) and self.handAngOffset or angle_zero
+
 	local rhBone = ent:LookupBone("ValveBiped.Bip01_R_Hand")
 	if rhBone then
 		local mat = ent:GetBoneMatrix(rhBone)
 		if mat then
-			local pos = mat:GetTranslation() + self.handPosOffset
+			local pos = mat:GetTranslation() + handPosOffset
 			local ang = mat:GetAngles()
-			ang.p = ang.p + self.handAngOffset.p
-			ang.y = ang.y + self.handAngOffset.y
-			ang.r = ang.r + self.handAngOffset.r
+			ang.p = ang.p + handAngOffset.p
+			ang.y = ang.y + handAngOffset.y
+			ang.r = ang.r + handAngOffset.r
 			mat:SetTranslation(pos)
 			mat:SetAngles(ang)
 			ent:SetBoneMatrix(rhBone, mat)
@@ -227,14 +230,14 @@ function SWEP:PostSetHandPos()
 		local mat = ent:GetBoneMatrix(lhBone)
 		if mat then
 			local pos = mat:GetTranslation()
-			local offset = self.handPosOffset
+			local offset = handPosOffset
 			pos.x = pos.x - offset.x
 			pos.y = pos.y - offset.y
 			pos.z = pos.z + offset.z
 			local ang = mat:GetAngles()
-			ang.p = ang.p - self.handAngOffset.p
-			ang.y = ang.y - self.handAngOffset.y
-			ang.r = ang.r + self.handAngOffset.r
+			ang.p = ang.p - handAngOffset.p
+			ang.y = ang.y - handAngOffset.y
+			ang.r = ang.r + handAngOffset.r
 			mat:SetTranslation(pos)
 			mat:SetAngles(ang)
 			ent:SetBoneMatrix(lhBone, mat)

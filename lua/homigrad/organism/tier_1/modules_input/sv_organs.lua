@@ -119,7 +119,10 @@ local function damageBrainLobe(org, bone, dmg, dmgInfo, key)
 	local profile = brainLobeProfiles[key]
 	if not profile then return 0 end
 	if dmgInfo:IsDamageType(DMG_BLAST) then dmg = dmg / 50 end
-	if dmgInfo:IsDamageType(DMG_CLUB) then dmg = dmg / 3 end
+	if dmgInfo:IsDamageType(DMG_CLUB) then
+		local intactSkull = math.Clamp(1 - (org.skull or 0) / 0.7, 0, 1)
+		dmg = dmg / 3 * Lerp(intactSkull, 1, 0.75)
+	end
 
 	local oldBrainLobeDamage = getBrainLobeDamage(org)
 	local oldDmg = org[key] or 0
