@@ -91,6 +91,46 @@ local internalBleedThoughts = {
 	"I'm bleeding internally. I need treatment.",
 	"Something ruptured inside me.",
 }
+local bloodLossThoughts = {
+	light = {
+		"I'm bleeding... I need to stop it...",
+		"Damn, that's gonna leave a mark...",
+		"I need to patch this up...",
+		"Blood's flowing... shit...",
+		"Gotta find something to wrap this with..."
+	},
+	moderate = {
+		"I'm losing too much blood...",
+		"I can feel myself getting weaker...",
+		"The blood won't stop... I need help...",
+		"I'm getting dizzy from the blood loss...",
+		"Need to stop the bleeding... now..."
+	},
+	severe = {
+		"I can't... I'm losing so much blood...",
+		"My vision is going dark...",
+		"I feel so cold... so weak...",
+		"Please... someone help me...",
+		"I can't feel my fingers..."
+	},
+	critical = {
+		"I'm dying... I know it...",
+		"Everything's fading away...",
+		"I can't... hold on...",
+		"Tell them... I tried...",
+		"So... cold..."
+	}
+}
+
+local function notifyBloodLoss(owner, org, symptomaticLoss)
+	if not org.isPly or org.otrub or symptomaticLoss <= 0.05 or not IsValid(owner) then return end
+
+	local blood = org.blood or 5000
+	local severity = blood < 1750 and "critical" or blood < 2750 and "severe" or blood < 3500 and "moderate" or "light"
+	local thoughts = bloodLossThoughts[severity]
+	local delay = severity == "critical" and 10 or severity == "severe" and 14 or severity == "moderate" and 20 or 30
+	owner:Notify(thoughts[math.random(#thoughts)], delay, "bloodloss_" .. severity, 0, nil, Color(200, 170, 170))
+end
 
 local vecZero = Vector(0, 0, 0)
 local limbArteryWeakness = {
@@ -368,8 +408,6 @@ module[2] = function(owner, org, mulTime)
 		end
 	end
 
-	if org.isPly and not org.otrub and (hg.organism.GetResilientBlood and hg.organism.GetResilientBlood(org) or org.blood) < 2900 then org.owner:Notify(math.random(2) == 1 and "I cant feel anything..." or (math.random(2) == 1 and "I think I'm gonna faint right now...") or "I dont feel so good...",true,"blood2",0,nil,Color(200, 170, 170)) end
-
 	if org.internalBleed < 0.5 and org.bleed <= 0 and org.pulse > 5 then
 		-- Slow game-scaled recovery. Do not refill hundreds of mL per minute simply
 		-- because bleeding has stopped.
@@ -501,9 +539,7 @@ module[2] = function(owner, org, mulTime)
 	-- Falling brain oxygen can still carry consciousness through that floor later.
 	local pressureConsciousness = 1 - decompensation ^ 1.1 * 0.67
 	org.consciousness = math.min(org.consciousness, pressureConsciousness * tempMul)
-	if symptomaticLoss > 0.05 and org.isPly and not org.otrub then
-		org.owner:Notify("I'm getting weak and lightheaded...", true, "blood_pressure_low", 0, nil, Color(200, 170, 170))
-	end
+	notifyBloodLoss(owner, org, symptomaticLoss)
 
 	local beatsPerSecond = max(min(60 / math.max(org.pulse,2) / (org.bleed / 15), 7), 0.3)
 	time = CurTime()

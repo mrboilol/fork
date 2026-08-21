@@ -202,6 +202,31 @@ end
 
 local heatDamageTargets = {"brain", "heart", "liver", "stomach", "intestines"}
 local coldDamageTargets = {"heart", "liver", "stomach", "intestines"}
+local hypothermiaThoughts = {
+	{"I'm getting cold...", "Chilly out here...", "Need to warm up...", "My fingers are numb...", "Shivering..."},
+	{"I can't stop shaking...", "So cold... can't feel my hands...", "Need warmth... now...", "My body won't stop trembling...", "I'm freezing..."},
+	{"I can't... feel anything...", "So... tired... just want to sleep...", "The cold is... numbing everything...", "I'm so sleepy...", "Can't... move..."},
+	{"Everything's... going dark...", "So... cold...", "I can't... feel my body...", "Sleep... just... sleep..."}
+}
+local hyperthermiaThoughts = {
+	{"It's too hot...", "I'm sweating so much...", "Need water... need shade...", "I'm overheating...", "Can't take this heat..."},
+	{"I'm burning up...", "Everything's spinning from the heat...", "Can't... think straight... too hot...", "I need to cool down...", "My head is pounding from the heat..."},
+	{"I can't... breathe in this heat...", "Everything's... blurring...", "Need... water...", "I'm going to collapse..."},
+	{"Can't... take it...", "Everything's... fading...", "Too... hot..."}
+}
+local tachycardiaThoughts = {
+	"My heart is racing...",
+	"I can feel my heartbeat in my ears...",
+	"Why is my heart pounding so hard...",
+	"I can hear my own heartbeat...",
+	"My chest is pounding..."
+}
+local cardiacArrestThoughts = {
+	"My heart... it's stopping...",
+	"I can't... feel my pulse...",
+	"Something's wrong with my heart...",
+	"I'm fading... I can feel it..."
+}
 
 local function applyTemperatureTrauma(org)
 	local temperature = org.temperature or 36.7
@@ -233,15 +258,22 @@ local function notifyTemperatureStress(owner, org)
 	if not org.isPly or org.otrub or not IsValid(owner) or not owner:Alive() then return end
 
 	local temperature = org.temperature or 36.7
-	if temperature < 33 then
-		owner:Notify("I'm very cold...", 30, "temperature_very_cold", 0, nil, Color(150, 210, 255))
-	elseif temperature < 35 then
-		owner:Notify("I'm getting cold...", 30, "temperature_cold", 0, nil, Color(150, 210, 255))
-	elseif temperature >= 40 then
-		owner:Notify("I'm very hot...", 30, "temperature_very_hot", 0, nil, Color(255, 145, 110))
+	local thoughts
+	local key
+	local color
+	if temperature < 35 then
+		local stage = temperature < 29 and 4 or temperature < 31 and 3 or temperature < 33 and 2 or 1
+		thoughts = hypothermiaThoughts[stage]
+		key = "temperature_cold"
+		color = Color(150, 210, 255)
 	elseif temperature >= 38.5 then
-		owner:Notify("I'm getting hot...", 30, "temperature_hot", 0, nil, Color(255, 145, 110))
+		local stage = temperature >= 41.5 and 4 or temperature >= 40.5 and 3 or temperature >= 39.5 and 2 or 1
+		thoughts = hyperthermiaThoughts[stage]
+		key = "temperature_hot"
+		color = Color(255, 145, 110)
 	end
+
+	if thoughts then owner:Notify(thoughts[math.random(#thoughts)], 30, key, 0, nil, color) end
 end
 
 local function stabilizeECGState(org, candidate, heartbeat)
@@ -537,7 +569,6 @@ module[2] = function(owner, org, timeValue)
 	local o2 = halfValue2(o2[1], o2.range, o2.k)
 
 	if org.isPly and not org.otrub and (heart == 0) then org.owner:Notify("My torso hurts a lot...",true,"heart",6) end
-	if org.isPly and not org.otrub and org.heartstop then org.owner:Notify("",true,"heartstop",6) end
 
 	local stamina = org.stamina
 	
@@ -953,13 +984,12 @@ module[2] = function(owner, org, timeValue)
 	local stress = Clamp((org.heart or 0) * 0.9 + ischemia * 0.8 + (org.hypertension or 0) * 0.35 + (org.hypotension or 0) * 0.3 + hemorrhageRhythmStress * 0.35 + hemorrhageElectricalInstability * 0.95 + hypothermiaInstability * 0.35 + Clamp(org.shock, 0, 80) / 180 + max(org.pain - 60, 0) / 220 + max(org.heartbeat - 165, 0) / 190, 0, 2.5)
 	local arrhythmiaTarget = Clamp(math.max(stress * 0.42, hemorrhageElectricalInstability * 0.88), 0, 1)
 	org.arrhythmia = Approach(org.arrhythmia or 0, arrhythmiaTarget, arrhythmiaTarget > (org.arrhythmia or 0) and timeValue / Lerp(hemorrhageElectricalInstability, 25, 6) or timeValue / 90)
-	if org.isPly and not org.otrub then
+	if org.isPly and not org.otrub and not org.heartstop then
 		if org.fibrillation or org.unstableRhythm or org.arrhythmia > 0.35 then
 			owner:Notify("My heart rhythm feels irregular...", 45, "arrhythmia", 0, nil, Color(255, 170, 170))
-		end
-		if org.heartbeat >= 150 and not org.heartstop then
-			owner:Notify("My heart is racing...", 45, "tachycardia", 0, nil, Color(255, 170, 170))
-		elseif org.heartbeat > 0 and org.heartbeat <= 45 and not org.heartstop then
+		elseif org.heartbeat >= 150 then
+			owner:Notify(tachycardiaThoughts[math.random(#tachycardiaThoughts)], 45, "tachycardia", 0, nil, Color(255, 170, 170))
+		elseif org.heartbeat > 0 and org.heartbeat <= 45 then
 			owner:Notify("My heartbeat is becoming dangerously slow...", 45, "bradycardia", 0, nil, Color(150, 210, 255))
 		end
 	end
@@ -1190,7 +1220,7 @@ module[2] = function(owner, org, timeValue)
 	if org.heartstop then
 		org.heartstoptime = org.heartstoptime or CurTime()
 		if org.isPly then
-	        org.owner:Notify("I'm feeling dizzy...", true, "heartstop", 10)
+	        org.owner:Notify(cardiacArrestThoughts[math.random(#cardiacArrestThoughts)], true, "heartstop", 10)
 		end
 	else
 		if org.isPly then
