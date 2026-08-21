@@ -522,6 +522,7 @@ function hg.organism.should_gain_fear(org)
 end
 
 module[2] = function(owner, org, timeValue)
+	org.ischemia = tonumber(org.ischemia) or 0
 	local organSystemsEnabled = hg.organism.OrganSystemsEnabled and hg.organism.OrganSystemsEnabled() or true
 	notifyTemperatureStress(owner, org)
 
