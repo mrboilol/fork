@@ -399,8 +399,8 @@ local function getPanicAttackFx(org)
 end
 local painBeatOverlayVolumeMul = 1.25
 local painThresholdMax = 120
-local painAgonyThreshold = 60 / painThresholdMax
-local painExcruciatingThreshold = 85 / painThresholdMax
+local painAgonyThreshold = 60
+local painExcruciatingThreshold = 85
 local painAgonyVolumeMul = 1.15
 local painExcruciatingVolumeMul = 0.85
 local painLayerFadeLerp = 0.06
@@ -415,6 +415,10 @@ local hiddenPainFlickerAttackEnd = 0
 local hiddenPainFlickerEnd = 0
 local hiddenPainFlickerPeak = 0
 local hiddenPainNextFlicker = 0
+local function getPainLayerBlend(pain, threshold)
+	if pain < threshold then return 0 end
+	return math.Clamp(math.Remap(pain, threshold, painThresholdMax, 0.2, 1), 0, 1)
+end
 local hiddenPainColor = {
 	["$pp_colour_brightness"] = 0,
 	["$pp_colour_contrast"] = 1,
@@ -429,13 +433,14 @@ local hiddenPainColor = {
 local PainStationLoading = false
 local PanicStationLoading = false
 local PainStationOverlayLoading = false
+local RemAgonyStationLoading = false
+local RemExcruciatingPainStationLoading = false
 local AssimilationStationLoading = false
 local BrainTraumaStationLoading = false
 local TinnitusLoading = false
 local NoiseStationLoading = false
 local NoiseStation2Loading = false
 local NoiseStation2DyingLoading = false
-local painAudioGeneration = 0
 
 local function isRapidPainShakeActive(org)
 	return not org.otrub and (org.pain or 0) > painRapidShakeThreshold
@@ -447,25 +452,6 @@ local function getPainPulse(org)
 	return math.ease.InOutSine(math.abs(math.cos(CurTime() * 2))) * PainLerp * (org.otrub and 0.5 or painPulseIntensity)
 end
 
-local painLayers = {
-	agony = {
-		path = "rem_agony.mp3",
-		threshold = painAgonyThreshold,
-		volumeMul = painAgonyVolumeMul,
-		pitchMax = painPitchMax,
-		fadeLerp = painLayerFadeLerp,
-		currentVolume = 0,
-		targetVolume = 0
-	},
-	excruciating = {
-		path = "rem_excruciatingpain.mp3",
-		threshold = painExcruciatingThreshold,
-		volumeMul = painExcruciatingVolumeMul,
-		fadeLerp = painLayerFadeLerp,
-		currentVolume = 0,
-		targetVolume = 0
-	}
-}
 local seizureSoundPath = "sound/rem_seizure.mp3"
 local seizureIntroDuration = 3
 local seizureFlashDelayMin = 0.12
@@ -611,47 +597,6 @@ local function updateSeizureEffects(org)
 		end
 	else
 		stopSeizureEffects()
-	end
-end
-
-local function stopPainLayer(layer)
-	layer.targetVolume = 0
-	layer.currentVolume = 0
-	if layer.station then
-		layer.station:Stop()
-		layer.station = nil
-	end
-end
-
-local function stopPainLayers()
-	painAudioGeneration = painAudioGeneration + 1
-	for _, layer in pairs(painLayers) do
-		stopPainLayer(layer)
-	end
-end
-
-local function ensurePainLayer(layer)
-	if layer.station then return end
-	layer.station = CreateSound(lply, layer.path)
-	if !layer.station then return end
-	layer.station:PlayEx(0, 100)
-end
-
-local function updatePainLayer(layer, normalizedPain, baseVolume)
-	local shouldPlay = normalizedPain >= layer.threshold and baseVolume > 0.001
-	layer.targetVolume = shouldPlay and math.Clamp(math.Remap(normalizedPain, layer.threshold, 1, 0, layer.volumeMul), 0, layer.volumeMul) * math.min(baseVolume, 1) or 0
-	layer.currentVolume = LerpFT(layer.fadeLerp, layer.currentVolume or 0, layer.targetVolume)
-	if shouldPlay then
-		ensurePainLayer(layer)
-	end
-	if !layer.station then return end
-	layer.station:ChangeVolume(layer.currentVolume, 0)
-	if layer.pitchMax then
-		layer.station:ChangePitch(math.Clamp(math.Remap(normalizedPain, layer.threshold, 1, 100, layer.pitchMax), 100, layer.pitchMax), 0)
-	end
-	if !shouldPlay and layer.currentVolume <= 0.01 then
-		layer.station:Stop()
-		layer.station = nil
 	end
 end
 
@@ -859,9 +804,8 @@ drawFinalVitalsVignettes = function()
 
 	local org = lply.new_organism or lply.organism
 	if not org or not org.brain or not org.o2 or not isnumber(org.o2[1]) or not org.analgesia then return end
-	local normalizedPain = math.Clamp((org.pain or 0) / painThresholdMax, 0, 1)
 	local excruciatingBlend = getServerSoundMode("hg_painsound", 6) == 6
-		and math.Clamp(math.Remap(normalizedPain, painExcruciatingThreshold, 1, 0, 1), 0, 1)
+		and getPainLayerBlend(org.pain or 0, painExcruciatingThreshold)
 		or 0
 	painThresholdIntensityLerp = LerpFT(painLayerFadeLerp, painThresholdIntensityLerp or 1, 1 + excruciatingBlend * painEffectIntensity)
 
@@ -1051,15 +995,10 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	
 	local painMode = getServerSoundMode("hg_painsound", 6)
 
-	if canRetrySound("PainStation", PainStation) then
+	if not PainStationLoading and canRetrySound("PainStation", PainStation) then
+		PainStationLoading = true
 		sound.PlayFile("sound/zbattle/pain_beat.mp3", "noblock noplay", function(station)
 			PainStationLoading = false
-			if generation != painAudioGeneration then
-				if IsValid(station) then
-					station:Stop()
-				end
-				return
-			end
 			if IsValid(station) then
 				station:SetVolume(0)
 				station:Play()
@@ -1070,9 +1009,15 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end)
 	end
 
-	if painMode == 6 and canRetrySound("PainStationOverlay", PainStationOverlay) then
-		sound.PlayFile("sound/rem_pain.mp3", "noblock noplay", function(station)
+	if painMode == 6 and not PainStationOverlayLoading and canRetrySound("PainStationOverlay", PainStationOverlay) then
+		PainStationOverlayLoading = true
+		sound.PlayFile(painBeatOverlayPath, "noblock noplay", function(station)
+			PainStationOverlayLoading = false
 			if IsValid(station) then
+				if getServerSoundMode("hg_painsound", 6) != 6 then
+					station:Stop()
+					return
+				end
 				station:SetVolume(0)
 				station:Play()
 				station:SetTime(IsValid(PainStation) and PainStation:GetTime() or 0)
@@ -1118,9 +1063,15 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end)
 	end
 
-	if painMode == 6 and canRetrySound("RemAgonyStation", RemAgonyStation) then
+	if painMode == 6 and not RemAgonyStationLoading and canRetrySound("RemAgonyStation", RemAgonyStation) then
+		RemAgonyStationLoading = true
 		sound.PlayFile("sound/rem_agony.mp3", "noblock noplay", function(station)
+			RemAgonyStationLoading = false
 			if IsValid(station) then
+				if getServerSoundMode("hg_painsound", 6) != 6 then
+					station:Stop()
+					return
+				end
 				station:SetVolume(0)
 				station:Play()
 				station:SetTime(math.min(math.Rand(0, station:GetLength()), 139))
@@ -1130,9 +1081,15 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end)
 	end
 
-	if painMode == 6 and canRetrySound("RemExcruciatingPainStation", RemExcruciatingPainStation) then
+	if painMode == 6 and not RemExcruciatingPainStationLoading and canRetrySound("RemExcruciatingPainStation", RemExcruciatingPainStation) then
+		RemExcruciatingPainStationLoading = true
 		sound.PlayFile("sound/rem_excruciatingpain.mp3", "noblock noplay", function(station)
+			RemExcruciatingPainStationLoading = false
 			if IsValid(station) then
+				if getServerSoundMode("hg_painsound", 6) != 6 then
+					station:Stop()
+					return
+				end
 				station:SetVolume(0)
 				station:Play()
 				station:SetTime(math.min(math.Rand(0, station:GetLength()), 139))
@@ -1451,8 +1408,8 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		render.DrawScreenQuad()
 	end
 
-	local pain = org.pain or 0
-	pain = math.max(pain - 15, 0)
+	local rawPain = math.max(org.pain or 0, 0)
+	local pain = math.max(rawPain - 15, 0)
 	local shock = (org.shock or 0) * 1 + (1 - org.consciousness) * 40
 	shockLerp = LerpFT(0.01, shockLerp or 0, shock)
 	consciousnessLerp = LerpFT(org.consciousness < (consciousnessLerp or 1) and 1 or 0.01, consciousnessLerp or 1, org.consciousness)
@@ -1581,8 +1538,8 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			elseif painMode == 6 then
 				targetPainVolume = painVolume
 				targetRemPainVolume = painVolume * painBeatOverlayVolumeMul
-				targetRemAgonyVolume = math.Clamp(math.Remap(normalizedPain, painAgonyThreshold, 1, 0, 1), 0, 1) * painVolume * painAgonyVolumeMul
-				targetRemExcruciatingVolume = math.Clamp(math.Remap(normalizedPain, painExcruciatingThreshold, 1, 0, 1), 0, 1) * painVolume * painExcruciatingVolumeMul
+				targetRemAgonyVolume = getPainLayerBlend(rawPain, painAgonyThreshold) * painVolume * painAgonyVolumeMul
+				targetRemExcruciatingVolume = getPainLayerBlend(rawPain, painExcruciatingThreshold) * painVolume * painExcruciatingVolumeMul
 			end
 
 			if IsValid(PainStation) then
@@ -1600,7 +1557,10 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				RemAgonyStation:SetVolume(targetRemAgonyVolume)
 				RemAgonyStation:SetPlaybackRate(painPitch / 100)
 			end
-			if IsValid(RemExcruciatingPainStation) then RemExcruciatingPainStation:SetVolume(targetRemExcruciatingVolume) end
+			if IsValid(RemExcruciatingPainStation) then
+				RemExcruciatingPainStation:SetVolume(targetRemExcruciatingVolume)
+				RemExcruciatingPainStation:SetPlaybackRate(painPitch / 100)
+			end
 			if IsValid(SillypainStation) then SillypainStation:SetVolume(targetSillypainVolume) end
 		//else
 		//	if IsValid(PainStation) then
