@@ -720,10 +720,6 @@ module[2] = function(owner, org, timeValue)
 
 
 
-		local circulationConditionK = math.Clamp(1 - (org.hypotension or 0) * 0.9 - (org.hypertension or 0) * 0.25, 0.2, 1)
-
-
-
 		local pulseMultiplier = math.Clamp((org.heartbeat or 75) / 75, 0.8, 1.5)
 		local pulsePerfusionK = math.Clamp(((org.pulse or 70) - 15) / 55, 0.12, 1)
 		local circulationK = math.Clamp(org.cardiacOutput or (pulseMultiplier * pulsePerfusionK), 0.05, 1.5)
@@ -732,7 +728,7 @@ module[2] = function(owner, org, timeValue)
 		local coldO2RegenK = Lerp(coldO2Stress, 1, 0.55)
 		local opioidBreathingK = math.Clamp(1 - drugRespiratoryDepression * 1.15, 0.05, 1)
 		local roleO2RegenMul = hg.GetSubRolePerk and hg.GetSubRolePerk(owner, "O2RegenMul", 1) or 1
-		local regenerate = regen * timeValue * 4 * circulationK * (mask_blevota and 0 or 1) * ((org.temperature > 38) and math.Clamp(math.Remap(org.temperature, 38, 41, 1, 0.1), 0.1, 1) or 1) * coldO2RegenK * altitudeO2K * circulationConditionK * coBreathePenalty * opioidBreathingK * roleO2RegenMul
+		local regenerate = regen * timeValue * 4 * circulationK * (mask_blevota and 0 or 1) * ((org.temperature > 38) and math.Clamp(math.Remap(org.temperature, 38, 41, 1, 0.1), 0.1, 1) or 1) * coldO2RegenK * altitudeO2K * coBreathePenalty * opioidBreathingK * roleO2RegenMul
 		-- Berserk repairs the airway and makes it immune to both the ongoing
 		-- breathing deterioration below and its associated oxygen penalties.
 		local berserkAirwayProtected = owner:IsBerserk()
@@ -930,10 +926,13 @@ module[2] = function(owner, org, timeValue)
 	-- in cardiac output used to instantly delete O2 here, which made players
 	-- pass out far too often. Intake is still capped above; an existing reserve
 	-- now drains at a rate proportional to the actual delivery failure.
-	local pulseValue = math.max(tonumber(org.pulse) or 70, 0)
-	local pulseO2K = pulseValue >= 60 and 1 or math.Clamp((pulseValue - 15) / 45, 0.05, 1)
-	local pulseO2Cap = o2.range * pulseO2K
-	local deliveryO2Cap = min(bloodO2Cap, bloodCarryO2Cap, pulseO2Cap, perfusionO2Cap, exertionO2Cap)
+	local deliveryReserve = hg.organism.GetLimitingReserve(
+		bloodO2Cap / o2.range,
+		bloodCarryO2Cap / o2.range,
+		perfusionO2Cap / o2.range,
+		exertionO2Cap / o2.range
+	)
+	local deliveryO2Cap = o2.range * deliveryReserve
 	if o2[1] > deliveryO2Cap then
 		local deliveryFailure = math.Clamp(1 - deliveryO2Cap / math.max(o2.range, 1), 0, 1)
 		local hemorrhageFailure = math.Clamp(1 - hemorrhageTransportK, 0, 1)

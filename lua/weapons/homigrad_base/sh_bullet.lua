@@ -924,6 +924,9 @@ function SWEP:FireBullet()
 		end
 	end
 
+	if SERVER and isply and hg.organism and hg.organism.MarkPanicGunfight then
+		hg.organism.MarkPanicGunfight(owner.organism)
+	end
 	self:PostFireBullet(bullet)
 end
 

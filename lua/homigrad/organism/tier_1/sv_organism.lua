@@ -1,6 +1,7 @@
 hg.organism.module = hg.organism.module or {}
 local module = hg.organism.module
 hg.organism.lastindex = hg.organism.lastindex or 1000000
+local hg_panic = CreateConVar("hg_panic", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enables panic attack gain", 0, 1)
 local panicattack_threshold = 0.45
 local panicattack_add_decay_time = 90
 local panicattack_rise_time = 2.5
@@ -16,6 +17,8 @@ local panicattack_damage_scale = 0.011
 local panicattack_damage_cooldown = 2.5
 local panicattack_witness_radius = 700
 local panicattack_death_radius = 900
+local panicattack_gunfight_hold_time = 8
+local panicattack_sustained_fear_time = 10
 local seizure_duration = 90
 local seizure_brain_damage_start = 80
 local seizure_brain_damage_final = 0.99
@@ -33,20 +36,39 @@ local seizure_brain_roll_delay = 20
 local seizure_brain_roll_chance = 15
 local seizure_brain_roll_gain_min = 0.04
 local seizure_brain_roll_gain_max = 0.11
+local organismModuleInitOrder = {
+	"pulse",
+	"blood",
+	"pain",
+	"stamina",
+	"lungs",
+	"liver",
+	"metabolism",
+	"random_events",
+	"concussion",
+	"goodmood",
+	"medical_system",
+	"teeth"
+}
+
+local function runOrganismModule(name, stage, owner, org, timeValue)
+	local current = module[name]
+	local callback = current and current[stage]
+	if not isfunction(callback) then return end
+	if stage == 1 then
+		callback(org)
+	else
+		callback(owner, org, timeValue)
+	end
+end
+
 hook.Add("Org Clear", "Main", function(org)
 	org.alive = true
 	org.otrub = false
 	org.entindex = IsValid(org.owner) and org.owner:EntIndex() or hg.organism.lastindex + 1
-	module.pulse[1](org)
-	module.blood[1](org)
-	module.pain[1](org)
-	module.stamina[1](org)
-	module.lungs[1](org)
-	module.liver[1](org)
-	module.metabolism[1](org)
-	module.random_events[1](org)
-	module.concussion[1](org)
-	module.trauma_combo[1](org)
+	for _, name in ipairs(organismModuleInitOrder) do
+		runOrganismModule(name, 1, nil, org)
+	end
 	org.brain = 0
 	org.brainFrontal = 0
 	org.brainParietal = 0
@@ -132,6 +154,8 @@ hook.Add("Org Clear", "Main", function(org)
 	org.panicattack = 0
 	org.panicattackActive = false
 	org.nextPanicHeartRoll = 0
+	org.panicGunfightUntil = 0
+	org.panicSustainedFearSince = 0
 	org.seizure = 0
 	org.seizureActive = false
 	org.seizureStart = 0
@@ -579,9 +603,51 @@ end
 function META2:IsStimulated()
 	return false
 end
-function hg.organism.AddPanicAttack(org, amount, silent)
+function hg.organism.MarkPanicGunfight(org, duration)
+	if not org then return end
+	org.panicGunfightUntil = math.max(org.panicGunfightUntil or 0, CurTime() + (duration or panicattack_gunfight_hold_time))
+end
+
+local function panic_has_usable_firearm(org)
+	local owner = org.owner
+	if not IsValid(owner) or not owner:IsPlayer() or not owner:Alive() or org.otrub or org.canmove == false then return false end
+	local wep = owner:GetActiveWeapon()
+	if not IsValid(wep) or not wep:IsWeapon() then return false end
+
+	local primary = wep.Primary or {}
+	local ammoName = primary.Ammo
+	local clip = wep.Clip1 and wep:Clip1() or -1
+	local maxClip = wep.GetMaxClip1 and wep:GetMaxClip1() or -1
+	local hasFirearmAmmo = isstring(ammoName) and ammoName != "" and string.lower(ammoName) != "none"
+	if not wep.ishgweapon and maxClip <= 0 then return false end
+	if clip <= 0 and not hasFirearmAmmo then return false end
+
+	if wep.GetHandSupportState then
+		local support = wep:GetHandSupportState(owner)
+		if support and (support.supportHands or 0) <= 0 then return false end
+	end
+	if clip > 0 then return true end
+
+	local ammoType = wep.GetPrimaryAmmoType and wep:GetPrimaryAmmoType() or -1
+	if hasFirearmAmmo and owner:GetAmmoCount(ammoName) > 0 then return true end
+	return ammoType >= 0 and owner:GetAmmoCount(ammoType) > 0
+end
+
+local function panic_has_sustained_fear(org)
+	local since = org.panicSustainedFearSince or 0
+	return since > 0 and since <= CurTime() - panicattack_sustained_fear_time
+end
+
+local function panic_has_gunfight_protection(org)
+	return (org.panicGunfightUntil or 0) > CurTime() and panic_has_usable_firearm(org) and not panic_has_sustained_fear(org)
+end
+
+function hg.organism.AddPanicAttack(org, amount, silent, combatEvent, ignoreGunfightProtection)
 	if not org then return 0 end
 	if not isnumber(amount) or amount <= 0 then return org.panicattackadd or 0 end
+	if combatEvent then hg.organism.MarkPanicGunfight(org) end
+	if not hg_panic:GetBool() then return org.panicattackadd or 0 end
+	if not ignoreGunfightProtection and panic_has_gunfight_protection(org) then return org.panicattackadd or 0 end
 	if silent and IsValid(org.owner) and org.owner:IsPlayer() and (org.owner.lastKillTime or 0) > CurTime() - 4 then
 		return org.panicattackadd or 0
 	end
@@ -653,7 +719,7 @@ local function resolve_panic_attacker(victim, attacker)
 		end
 	end
 end
-local function panic_witness_event(victim, attacker, amount, radius)
+local function panic_witness_event(victim, attacker, amount, radius, combatEvent)
 	if not IsValid(victim) then return end
 	if not isnumber(amount) or amount <= 0 then return end
 	local victimEnt = hg.GetCurrentCharacter(victim) or victim
@@ -672,7 +738,7 @@ local function panic_witness_event(victim, attacker, amount, radius)
 			mask = MASK_SHOT
 		})
 		if tr.Hit then continue end
-		hg.organism.AddPanicAttack(watcher.organism, amount, true)
+		hg.organism.AddPanicAttack(watcher.organism, amount, true, combatEvent)
 	end
 end
 hook.Add("EntityTakeDamage", "PanicTrackLastAttacker", function(target, dmgInfo)
@@ -682,7 +748,15 @@ hook.Add("EntityTakeDamage", "PanicTrackLastAttacker", function(target, dmgInfo)
 	if IsValid(att) then
 		owner.lastPanicAttacker = att
 		owner.lastPanicAttackTime = CurTime()
+		if att != owner and dmgInfo:GetDamage() > 0 and dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_BLAST) then
+			hg.organism.MarkPanicGunfight(owner.organism)
+			hg.organism.MarkPanicGunfight(att.organism)
+		end
 	end
+end)
+hook.Add("EntityFireBullets", "PanicTrackGunfightFire", function(ent)
+	local owner = ent:IsPlayer() and ent or (ent.GetOwner and ent:GetOwner()) or nil
+	if IsValid(owner) and owner:IsPlayer() then hg.organism.MarkPanicGunfight(owner.organism) end
 end)
 local numerical = {
 	"One.",
@@ -727,14 +801,15 @@ hook.Add("HomigradDamage", "PanicAttackDamage", function(ply, dmgInfo)
 	if not IsValid(ply) or not ply:IsPlayer() or not ply:Alive() then return end
 	if not ply.organism then return end
 	if (ply.nextPanicAttackTime or 0) > CurTime() then return end
+	local combatEvent = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_BLAST)
 	local amount = math.Clamp(dmgInfo:GetDamage() * panicattack_damage_scale + (dmgInfo:IsDamageType(DMG_BLAST) and 0.08 or 0), 0.03, 0.55)
 	local attacker = resolve_panic_attacker(ply, dmgInfo:GetAttacker())
 	if not IsValid(attacker) and IsValid(ply.lastPanicAttacker) and (ply.lastPanicAttackTime or 0) > CurTime() - 30 then
 		attacker = ply.lastPanicAttacker
 	end
-	hg.organism.AddPanicAttack(ply.organism, amount)
+	hg.organism.AddPanicAttack(ply.organism, amount, false, combatEvent)
 	if dmgInfo:GetDamage() <= 0 and not dmgInfo:IsDamageType(DMG_BLAST) then return end
-	panic_witness_event(ply, attacker, math.Clamp(amount * 0.75, 0.04, 0.2), panicattack_witness_radius)
+	panic_witness_event(ply, attacker, math.Clamp(amount * 0.75, 0.04, 0.2), panicattack_witness_radius, combatEvent)
 	ply.nextPanicAttackTime = CurTime() + panicattack_damage_cooldown
 end)
 local function stopNeckSlitSound(owner, org)
@@ -775,10 +850,13 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	org.incapacitated = false
 	org.critical = false
 	if isPly then
-		module.stamina[2](owner, org, timeValue)
+		runOrganismModule("goodmood", 2, owner, org, timeValue)
+		runOrganismModule("medical_system", 2, owner, org, timeValue)
+		runOrganismModule("teeth", 2, owner, org, timeValue)
+		runOrganismModule("stamina", 2, owner, org, timeValue)
 	end
 	if isPly or org.fakePlayer then
-		module.lungs[2](owner, org, timeValue)
+		runOrganismModule("lungs", 2, owner, org, timeValue)
 	end
 	local eyeL = org.eyeL or 0
 	local eyeR = org.eyeR or 0
@@ -792,9 +870,9 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.blindness = 0
 	end
 	if isPly then
-		module.liver[2](owner, org, timeValue)
+		runOrganismModule("liver", 2, owner, org, timeValue)
 	end
-	module.blood[2](owner, org, timeValue)
+	runOrganismModule("blood", 2, owner, org, timeValue)
 	local neckslit = false
 	if org.arterialwounds then
 		for i, wound in pairs(org.arterialwounds) do
@@ -832,14 +910,13 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		end
 	end
 
-	module.pain[2](owner, org, timeValue)
+	runOrganismModule("pain", 2, owner, org, timeValue)
 	if isPly then
-		module.metabolism[2](owner, org, timeValue)
-		module.random_events[2](owner, org, timeValue)
+		runOrganismModule("metabolism", 2, owner, org, timeValue)
+		runOrganismModule("random_events", 2, owner, org, timeValue)
 	end
-	module.pulse[2](owner, org, timeValue)
-	module.concussion[2](owner, org, timeValue)
-	module.trauma_combo[2](owner, org, timeValue)
+	runOrganismModule("pulse", 2, owner, org, timeValue)
+	runOrganismModule("concussion", 2, owner, org, timeValue)
 	if org.owner.PlayerClassName == "furry" then
 		org.assimilated = 0
 	end
@@ -860,6 +937,13 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	end
 	org.berserk = math.Approach(org.berserk, 0, timeValue / 60)
 	org.noradrenaline = math.Approach(org.noradrenaline, 0, timeValue / 45)
+	local fear = org.fear or 0
+	local fearAdd = org.fearadd or 0
+	if fear >= 0.65 or fearAdd >= 0.85 then
+		if (org.panicSustainedFearSince or 0) <= 0 then org.panicSustainedFearSince = CurTime() end
+	elseif fear < 0.4 and fearAdd < 0.35 then
+		org.panicSustainedFearSince = 0
+	end
 	local oldPanicAttack = org.panicattack or 0
 	org.panicattackadd = math.Approach(org.panicattackadd or 0, 0, timeValue / panicattack_add_decay_time)
 	org.panicattack = math.Approach(oldPanicAttack, org.panicattackadd or 0, timeValue / ((org.panicattackadd or 0) > oldPanicAttack and panicattack_rise_time or panicattack_decay_time))

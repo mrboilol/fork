@@ -20,7 +20,6 @@ local input_list = hg.organism.input_list
 local function addInternalBleed(org, amount, organ)
 	if amount <= 0 then return end
 	org.internalBleed = org.internalBleed + amount
-	if hg.organism.AddBleedSource then hg.organism.AddBleedSource(org, "internal", amount, organ) end
 end
 
 input_list.heart = function(org, bone, dmg, dmgInfo)
@@ -268,7 +267,7 @@ local function hitArtery(artery, org, dmg, dmgInfo, boneindex, dir, hit)
 	org.painadd = math.min(org.painadd + dmg * 1 + 45, 150)
 	org.shock = math.min(org.shock + 15, 95)
 	org.fearadd = math.min(org.fearadd + 1.5, 3)
-	org.panicattackadd = math.max(org.panicattackadd or 0, 0.9)
+	hg.organism.AddPanicAttack(org, math.max(0.9 - (org.panicattackadd or 0), 0), false, false, true)
 	if org[artery] == 1 then return 0 end
 	if org[string.Replace(artery, "artery", "").."amputated"] then return end
 
@@ -314,7 +313,6 @@ local function hitArtery(artery, org, dmg, dmgInfo, boneindex, dir, hit)
 	local localPos, localAng, dir2 = getlocalshit(owner, bonea, dmgInfo, dir, hit)
 	local wound = {arterySize[artery], localPos, localAng, boneindex, CurTime(), dir2 * 100, artery}
 	table.insert(org.arterialwounds, wound)
-	if hg.organism.AddBleedSource then hg.organism.AddBleedSource(org, "arterial", arterySize[artery], artery, boneindex, wound) end
 	hg.organism.MarkArterialWoundsNetDirty(org)
 	--if IsValid(owner:GetNWEntity("RagdollDeath")) then owner:GetNWEntity("RagdollDeath"):SetNetVar("wounds",org.arterialwounds) end
 	return 0

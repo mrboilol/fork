@@ -1433,23 +1433,11 @@ function SWEP:IsHeadHit(ent, trace)
     return self:IsHeadTrace(trace and trace.Entity, trace) or self:IsHeadTrace(victim, trace)
 end
 
--- DamageInfo does not retain a trace hitgroup.  The organism damage handler
--- consequently has to recreate the contact from DamagePosition/Force, which
--- is especially unreliable for a swinging hull that catches the head at its
--- edge.  Preserve this server-side contact just for TakeDamageInfo so the
--- physiology path receives the same body part the melee trace actually hit.
 function SWEP:SetMeleeDamageContact(ent, trace)
     if not SERVER then return end
-    if not IsValid(ent) or not trace then return end
-
-    self.MeleeDamageContact = {
-        entity = ent,
-        physicsBone = trace.PhysicsBone,
-        hitBoxBone = trace.HitBoxBone,
-        hitGroup = trace.HitGroup,
-        head = self:IsHeadHit(ent, trace),
-        expires = CurTime() + 0.1,
-    }
+    if hg.SetMeleeDamageContact then
+        hg.SetMeleeDamageContact(self, ent, trace, self:IsHeadHit(ent, trace))
+    end
 end
 
 function SWEP:IsHeadTrace(ent, trace)

@@ -493,8 +493,8 @@ local function HealStitching(org, config)
     local arteriesChanged = HealWoundTable(org.arterialwounds, config.BleedHeal)
     if arteriesChanged and hg and hg.organism and hg.organism.RebuildArteryWoundState then
         hg.organism.RebuildArteryWoundState(org, true)
-    elseif woundsChanged and IsValid(org.owner) and hg and hg.organism and hg.organism.SyncWounds then
-        hg.organism.SyncWounds(org)
+    elseif woundsChanged and IsValid(org.owner) and hg and hg.organism and hg.organism.SyncWoundsNet then
+        hg.organism.SyncWoundsNet(org)
     end
 end
 

@@ -483,7 +483,7 @@ local function ApplyBlastDamage(data, enta, tracePos, len)
 			-- контузия/баротравма возможна даже за стеной (наушники гасят только звук)
 			hg.ExplosionDisorientation(enta, data.DisorientPower * frac / wallDiv, data.DisorientTime * frac / wallDiv)
 			if not enta.organism.otrub then
-				hg.organism.AddPanicAttack(enta.organism, math.Clamp(frac * 0.22 / wallDiv + data.Damage * damageFrac / 900, 0.04, 0.28), true)
+				hg.organism.AddPanicAttack(enta.organism, math.Clamp(frac * 0.22 / wallDiv + data.Damage * damageFrac / 900, 0.04, 0.28), true, true)
 			end
 			hg.RunZManipAnim(owner, "shieldexplosion")
 		end

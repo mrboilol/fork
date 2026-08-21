@@ -142,7 +142,7 @@ local WAKE_CONSCIOUSNESS_THRESHOLD = 0.3
 local OTRUB_CONSCIOUSNESS_RECOVERY_SPEED = 20
 local OTRUB_SHOCK_DECAY_PER_SECOND = 4
 local OTRUB_PAIN_DRAIN_PER_SECOND = 8 * 4.5
-local INCAPACITATION_DEATH_TIME = 20
+local INCAPACITATION_DEATH_TIME = 25
 local wakeEstimateAnchor = 0
 local wakeEstimateSmoothed
 
@@ -903,6 +903,12 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     local replicatedOrg = ply.new_organism or org
     local incapacitated = replicatedOrg.incapacitated or org.incapacitated or false
     local deathStateEnd = tonumber(replicatedOrg.deathStateEnd or org.deathStateEnd)
+    local incapacitationProgress = 0
+    if isUnconscious and incapacitated and deathStateEnd and deathStateEnd > CurTime() then
+        local remaining = math.max(deathStateEnd - CurTime(), 0)
+        incapacitationProgress = math.Clamp((INCAPACITATION_DEATH_TIME - remaining) / INCAPACITATION_DEATH_TIME, 0, 1)
+    end
+    local incapacitationWhite = math.ease.InOutSine(incapacitationProgress)
     local isCritical = (org.critical == true)
         or (ecgState == "asystole" and brain >= 0.02)
         or IsCirculationCritical(org)
@@ -1039,6 +1045,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         local scrW, scrH = ScrW(), ScrH()
         local boxScale = math.Clamp(scrH / 1080, 0.75, 1.2)
         local centerX, centerY = scrW * 0.5, scrH * 0.5
+        local ecgCenterY = centerY - math.min(scrH * 0.1, ScreenScaleH(92)) * incapacitationWhite
         local showLegacyECG = abnormalECG
             or (not isUnconscious and not lowConsciousness and (sinusECGTail > 0 or admiring))
 
@@ -1070,10 +1077,16 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
 
         if showLegacyECG and not (hg_unconsciousclassic and hg_unconsciousclassic:GetBool()) then
             local severity = GetAwakeECGSeverity(ecgState)
-            local ecgColor = abnormalECG
-                and Color(Lerp(severity, 220, 255), Lerp(severity, 220, 50), Lerp(severity, 220, 40), 255 * otrubECGAlpha)
-                or Color(230, 230, 230, 255 * otrubECGAlpha)
-            DrawEKG(centerEKGState, centerX, centerY, 540, 140, org, ecgColor, otrubECGAlpha)
+            local ecgR = abnormalECG and Lerp(severity, 220, 255) or 230
+            local ecgG = abnormalECG and Lerp(severity, 220, 50) or 230
+            local ecgB = abnormalECG and Lerp(severity, 220, 40) or 230
+            local ecgColor = Color(
+                Lerp(incapacitationWhite, ecgR, abnormalECG and 70 or 24),
+                Lerp(incapacitationWhite, ecgG, abnormalECG and 12 or 24),
+                Lerp(incapacitationWhite, ecgB, abnormalECG and 10 or 24),
+                255 * otrubECGAlpha
+            )
+            DrawEKG(centerEKGState, centerX, ecgCenterY, 540, 140, org, ecgColor, otrubECGAlpha)
         end
     end
 
@@ -1083,12 +1096,14 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         local fade = math.Clamp((INCAPACITATION_DEATH_TIME - remaining) / 1.25, 0, 1)
         local urgency = math.Clamp((5 - remaining) / 5, 0, 1)
         local pulseAlpha = 0.82 + math.abs(math.sin(CurTime() * 6)) * 0.18 * urgency
+        local promptBase = Lerp(incapacitationWhite, 235, 24)
         local promptColor = Color(
-            235,
-            Lerp(urgency, 235, 55),
-            Lerp(urgency, 235, 45),
+            Lerp(urgency, promptBase, Lerp(incapacitationWhite, 235, 90)),
+            Lerp(urgency, promptBase, Lerp(incapacitationWhite, 55, 12)),
+            Lerp(urgency, promptBase, Lerp(incapacitationWhite, 45, 10)),
             245 * fade * pulseAlpha
         )
+        local promptOutline = Lerp(incapacitationWhite, 0, 255)
 
         if not incapPromptX then
             local radius = math.min(280, ScrH() * 0.32)
@@ -1105,7 +1120,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
             TEXT_ALIGN_CENTER,
             TEXT_ALIGN_TOP,
             2,
-            Color(0, 0, 0, 220 * fade)
+            Color(promptOutline, promptOutline, promptOutline, 220 * fade)
         )
     end
 

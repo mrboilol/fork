@@ -2586,7 +2586,9 @@ function SWEP:AttackFront(special_attack, rand)
 		Dam:SetDamageForce(AimVec * Mul ^ 2)
 		Dam:SetDamageType((clawClasses[owner.PlayerClassName] or (Ent:GetClass() == "func_breakable_surf")) and DMG_SLASH or DMG_CLUB)
 		Dam:SetDamagePosition(HitPos)
+		if hg.SetMeleeDamageContact then hg.SetMeleeDamageContact(self, Ent, trace) end
 		Ent:TakeDamageInfo(Dam)
+		if hg.ClearMeleeDamageContact then hg.ClearMeleeDamageContact(self) end
 
 		if glass and Ent:Health() <= 0 then
 			hg.organism.AddWoundManual(owner, math.Rand(50,75) * 0.5, vector_origin, AngleRand(), owner:LookupBone("ValveBiped.Bip01_"..(rand and "R" or "L").."_Hand"), CurTime())

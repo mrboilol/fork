@@ -663,7 +663,7 @@ module[2] = function(owner, org, timeValue)
 	-- multiplied repeatedly. The weakest link caps myocardial delivery once.
 	-- The weakest link should cap delivery once without compounding blood loss.
 	local circulationDelivery = Clamp(circulation * (92 / 70), 0, 1.2)
-	local myocardialTarget = Clamp(math.min(oxygenation, bloodVolume, circulationDelivery), 0, 1)
+	local myocardialTarget = hg.organism.GetLimitingReserve(oxygenation, bloodVolume, circulationDelivery)
 	if org.heartstop and defibGrace then myocardialTarget = math.max(myocardialTarget, 0.25) end
 	org.myocardialOxygen = Approach(org.myocardialOxygen or 1, myocardialTarget, timeValue / 8)
 	local hypotensionTarget = Clamp(Remap(circulation, 0.98, 0.22, 0, 1), 0, 1)

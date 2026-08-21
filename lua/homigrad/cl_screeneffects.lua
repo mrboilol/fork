@@ -960,40 +960,44 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	if not organism then stopthings() return end
 	if not organism.brain then stopthings() return end
 	local org = organism
+	local deathStateEnd = tonumber(org.deathStateEnd)
+	local incapacitated = org.otrub and org.incapacitated and deathStateEnd and deathStateEnd > CurTime()
+	local incapacitationProgress = incapacitated and math.Clamp((25 - (deathStateEnd - CurTime())) / 25, 0, 1) or 0
+	local sensoryActive = not org.otrub or incapacitated
+	local sensoryMix = incapacitated and Lerp(incapacitationProgress, 1, 0.35) or 1
 
     -- Concussion and low blood blur
     local blurAmount = 0
-    if not org.otrub and org.concussion and org.concussion > 2 then
-        blurAmount = math.min((org.concussion - 2) / 8, 1) * 4
+    if sensoryActive and org.concussion and org.concussion > 2 then
+        blurAmount = math.min((org.concussion - 2) / 8, 1) * 4 * sensoryMix
     end
 
-    if not org.otrub and org.blood and org.blood < 4000 then
-        blurAmount = math.max(blurAmount, math.min((4000 - org.blood) / 3500, 1) * 5)
+    if sensoryActive and org.blood and org.blood < 4000 then
+        blurAmount = math.max(blurAmount, math.min((4000 - org.blood) / 3500, 1) * 5 * sensoryMix)
     end
 
     local adrenaline = org.adrenaline or 0
     local adrenalineIntensity = math.Clamp((adrenaline - 1) / 1.5, 0, 1)
-    if adrenalineIntensity > 0 and not org.otrub then
+    if adrenalineIntensity > 0 and sensoryActive then
 		-- A sustained surge should feel increasingly disorienting instead of
 		-- jumping straight to its final visual strength.
 		adrenalineVisualLerp = math.Approach(adrenalineVisualLerp, 1, FrameTime() * (0.08 + adrenalineIntensity * 0.22))
-		local adrenalineShock = adrenalineIntensity * (0.35 + adrenalineVisualLerp * 2.65)
+		local adrenalineShock = adrenalineIntensity * (0.35 + adrenalineVisualLerp * 2.65) * sensoryMix
 		blurAmount = math.max(blurAmount, adrenalineShock * 1.5)
 
-        if not (lply:IsBerserk() or lply:IsStimulated()) then
+		if not (lply:IsBerserk() or lply:IsStimulated()) then
             render.UpdateScreenEffectTexture()
             heatMat:SetFloat("$c0_x", -CurTime() * 0.18)
             heatMat:SetFloat("$c0_y", adrenalineShock * 0.01)
             heatMat:SetFloat("$c2_x", (math.sin(CurTime() * 0.75) - 1.5) * (adrenalineShock * 0.1))
             render.SetMaterial(heatMat)
             render.DrawScreenQuad()
-
-            render.UpdateScreenEffectTexture()
-            chromaticMat:SetFloat("$c0_x", adrenalineShock * 0.04 * 1.5)
-            chromaticMat:SetInt("$c0_y", 1)
-            render.SetMaterial(chromaticMat)
-            render.DrawScreenQuad()
 		end
+		render.UpdateScreenEffectTexture()
+		chromaticMat:SetFloat("$c0_x", adrenalineShock * (0.18 + math.abs(math.sin(CurTime() * 5)) * 0.08))
+		chromaticMat:SetInt("$c0_y", 1)
+		render.SetMaterial(chromaticMat)
+		render.DrawScreenQuad()
 		render.UpdateScreenEffectTexture()
 		vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
 		vignetteMat:SetFloat("$c0_z", adrenalineShock * 0.6)
@@ -1640,7 +1644,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end
 
 		if IsValid(BrainTraumaStation) then
-			BrainTraumaStation:SetVolume(math.Clamp(!org.otrub and brainTrauma * 2 or 0, 0, 1))
+			BrainTraumaStation:SetVolume(math.Clamp(sensoryActive and brainTrauma * 2 * sensoryMix or 0, 0, 1))
 		end
 	else
 		if IsValid(BrainTraumaStation) then
@@ -1718,7 +1722,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	
 	-- Keep the original lobotomy effect self-contained: intermittent material
 	-- overlays only. Head-trauma flashes are handled by their own net event.
-	if brain > 0.1 and not org.otrub then
+	if brain > 0.1 and sensoryActive then
 		if show_some_images_time > 0 then
 			show_some_images_time = show_some_images_time - 1
 
@@ -1747,10 +1751,11 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		lobotomy_index = 0
 	end
 	
-	if O2Lerp > 1 then
+	local terminalDyingVolume = 0
+	if O2Lerp > 1 or incapacitated then
 		o2 = O2Lerp
 		
-		if o2 > 50 and !org.otrub then
+		if (o2 > 50 and not org.otrub) or incapacitated then
 			local dyingMode = getServerSoundMode("hg_dyingsound", 2)
 
 			if canRetrySound("NoiseStation2", NoiseStation2) then
@@ -1765,10 +1770,16 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				end)
 			end
 
-			if (dyingMode == 8 or dyingMode == 9) and (!IsValid(NoiseStation2Dying) or NoiseStation2Dying:GetState() != GMOD_CHANNEL_PLAYING) then
+			if (dyingMode == 8 or dyingMode == 9) and not NoiseStation2DyingLoading and canRetrySound("NoiseStation2Dying", NoiseStation2Dying) then
+				NoiseStation2DyingLoading = true
 				sound.PlayFile("sound/rem_dying2.mp3", "noblock noplay", function(station)
 					NoiseStation2DyingLoading = false
 					if IsValid(station) then
+						local currentMode = getServerSoundMode("hg_dyingsound", 2)
+						if currentMode != 8 and currentMode != 9 then
+							station:Stop()
+							return
+						end
 						station:SetVolume(0)
 						station:Play()
 						NoiseStation2Dying = station
@@ -1802,11 +1813,15 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				local bleedSeverity = math.Clamp((3500 - blood) / 3500, 0, 1)
 				dyingAudioTarget = math.max(dyingAudioTarget, bleedSeverity * 2)
 			end
+			if incapacitated then
+				dyingAudioTarget = math.max(dyingAudioTarget, Lerp(incapacitationProgress, 0.65, 0.9))
+			end
 
 			-- Low-O2/bleedout ambience ramps into the requested volume instead of
 			-- appearing at full level on the first qualifying frame.
 			dyingAudioFade = LerpFT(0.018, dyingAudioFade, dyingAudioTarget)
-			local consciousVol = dyingAudioFade
+			local consciousVol = dyingAudioFade * (incapacitated and Lerp(incapacitationProgress, 0.72, 0.28) or 1)
+			terminalDyingVolume = incapacitated and consciousVol or 0
 			hg.consciousBeatIntensity = consciousVol
 
 			if IsValid(NoiseStation2Dying) then
@@ -1879,15 +1894,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 							local avgPeak = peakSum / #fft
 
 							-- Apply screen shake based on peak intensity
-							if avgPeak > 0.3 then
-								local shakeIntensity = math.Clamp((avgPeak - 0.3) * 2, 0, 1)
-								local shakeAngle = Angle(
-									math.Rand(-1, 1) * shakeIntensity * 2,
-									math.Rand(-1, 1) * shakeIntensity * 2,
-									math.Rand(-0.5, 0.5) * shakeIntensity
-								)
-								ViewPunch(shakeAngle)
-							end
 							if avgPeak > 0.3 then
 								local shakeIntensity = math.Clamp((avgPeak - 0.3) * 2, 0, 1)
 								local shakeAngle = Angle(
@@ -2170,12 +2176,15 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			end
 		end
 		
-		if o2 > 20 and org.otrub then
+		if (o2 > 20 or incapacitated) and org.otrub then
 			local otrubMode = getServerSoundMode("hg_otrubsound", 4)
 			-- OTRU audio is selected solely by hg_otrubsound.  Remorseism
 			-- incapacitation is a gameplay state, not an audio override: otherwise it
 			-- replaced every configured OTRU track with rem_dying1.
 			local otrubVol = math.Clamp((o2 - 30) / 100 + (brain > 0.3 and (brain - 0.3) * 5 or 0), 0, 1)
+			if incapacitated then
+				otrubVol = math.max(otrubVol, 0.3) * Lerp(incapacitationProgress, 0.45, 0.12)
+			end
 
 			if canRetrySound("NoiseStation", NoiseStation) then
 				sound.PlayFile("sound/zbattle/unconscious_type_beat.mp3", "noblock noplay", function(station)
@@ -2196,7 +2205,8 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			elseif otrubMode == 6 or otrubMode == 7 then
 				if IsValid(NoiseStation) then NoiseStation:SetVolume(0) end
 				if IsValid(OtrubModeStation) then OtrubModeStation:SetVolume(0) end
-				if IsValid(sharedOtrubStation) then sharedOtrubStation:SetVolume(otrubVol) end
+				local sameDyingTrack = incapacitated and ((otrubMode == 6 and selectedDyingMode == 6) or (otrubMode == 7 and selectedDyingMode == 10))
+				if IsValid(sharedOtrubStation) then sharedOtrubStation:SetVolume(math.max(otrubVol, sameDyingTrack and terminalDyingVolume or 0)) end
 			else
 				if IsValid(NoiseStation) then NoiseStation:SetVolume(0) end
 
@@ -2228,11 +2238,13 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			-- Do not let a dying-mode station bleed into the selected OTRU sound.
 			-- Modes 6 and 7 deliberately reuse their dying channel so playback
 			-- continues from the exact point where consciousness was lost.
-			if otrubMode != 6 and IsValid(ItssooverStation) then ItssooverStation:SetVolume(0) end
-			if IsValid(RemDying1Station) then RemDying1Station:SetVolume(0) end
-			if IsValid(AltRemDyingStation) then AltRemDyingStation:SetVolume(0) end
-			if otrubMode != 7 and IsValid(ItsHopelessStation) then ItsHopelessStation:SetVolume(0) end
-			if IsValid(NoiseStation2Dying) then NoiseStation2Dying:SetVolume(0) end
+			if not incapacitated then
+				if otrubMode != 6 and IsValid(ItssooverStation) then ItssooverStation:SetVolume(0) end
+				if IsValid(RemDying1Station) then RemDying1Station:SetVolume(0) end
+				if IsValid(AltRemDyingStation) then AltRemDyingStation:SetVolume(0) end
+				if otrubMode != 7 and IsValid(ItsHopelessStation) then ItsHopelessStation:SetVolume(0) end
+				if IsValid(NoiseStation2Dying) then NoiseStation2Dying:SetVolume(0) end
+			end
 		else
 			if IsValid(NoiseStation) then
 				NoiseStation:SetVolume(0)

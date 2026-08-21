@@ -1257,7 +1257,9 @@ function SWEP:AttackFront(special_attack, rand)
                 Dam:SetDamageType((owner.PlayerClassName == "furry" or (Ent:GetClass() == "func_breakable_surf")) and DMG_SLASH or DMG_CLUB)
                 Dam:SetDamagePosition(HitPos)
 				local isClub = special_attack and Dam:GetDamageType() == DMG_CLUB
+				if hg.SetMeleeDamageContact then hg.SetMeleeDamageContact(self, Ent, trace) end
 				Ent:TakeDamageInfo(Dam)
+				if hg.ClearMeleeDamageContact then hg.ClearMeleeDamageContact(self) end
 				SendCoolHandsHitStop(self, trace.HitNormal, special_attack)
 
 				if isClub then

@@ -141,7 +141,7 @@ function hg.organism.RebuildArteryWoundState(org, syncNow)
 
 	local owner = org.owner
 	if IsValid(owner) then
-		hg.organism.SyncWounds(org)
+		hg.organism.SyncWoundsNet(org)
 
 		if syncNow and hg.send_organism then
 			hg.send_organism(org, owner)
@@ -478,7 +478,7 @@ module[2] = function(owner, org, mulTime)
 	local rawLossFraction = math.Clamp(1 - blood / normalBlood, 0, 1)
 	-- Subtle weakness begins with the first real loss. Catastrophic shock is still
 	-- derived below from preload reserve, so this does not create an early death band.
-	local symptomaticLoss = rawLossFraction ^ 1.10
+	local symptomaticLoss = hg.organism.GetSmoothSeverity(rawLossFraction, 0.04, 0.55, 1.10)
 	local decompensation = math.Clamp((criticalReserve - preloadReserve) / criticalReserve, 0, 1) ^ 1.35
 	local compensationDemand = hg.organism.GetHemorrhageCompensationDrive and hg.organism.GetHemorrhageCompensationDrive(blood)
 		or math.Clamp(reserveLoss / math.max(1 - criticalReserve, 0.05), 0, 1)
@@ -501,7 +501,7 @@ module[2] = function(owner, org, mulTime)
 	-- Falling brain oxygen can still carry consciousness through that floor later.
 	local pressureConsciousness = 1 - decompensation ^ 1.1 * 0.67
 	org.consciousness = math.min(org.consciousness, pressureConsciousness * tempMul)
-	if symptomaticLoss > 0 and org.isPly and not org.otrub then
+	if symptomaticLoss > 0.05 and org.isPly and not org.otrub then
 		org.owner:Notify("I'm getting weak and lightheaded...", true, "blood_pressure_low", 0, nil, Color(200, 170, 170))
 	end
 
@@ -554,7 +554,7 @@ module[2] = function(owner, org, mulTime)
 			table.remove(org.wounds, woundsToRemove[idx])
 		end
 		if #woundsToRemove > 0 then
-			hg.organism.SyncWounds(org)
+			hg.organism.SyncWoundsNet(org)
 		end
 	end
 
@@ -759,6 +759,7 @@ end
 
 util.AddNetworkString("bloodsquirt2")
 util.AddNetworkString("vomitsquirt2")
+util.AddNetworkString("vomitConcussionMouth")
 util.AddNetworkString("hg_organism_defecate")
 
 local function GetVomitDecal()
@@ -840,6 +841,41 @@ function hg.organism.Vomit(owner, snd)
 			net.Broadcast()
 		end
 	end
+end
+
+function hg.organism.VomitConcussion(owner)
+	if not hg.IsValidPlayer(owner) then return end
+
+	local org = owner.organism
+	local ent = hg.GetCurrentCharacter(owner)
+	if not IsValid(ent) then return end
+
+	local bon = "ValveBiped.Bip01_Head1"
+	local bone = ent:LookupBone(bon)
+	local mat = isnumber(bone) and bone >= 0 and ent:GetBoneMatrix(bone)
+	if not mat then return end
+
+	local onSpine = mat:GetAngles():Right()[3] > 0.25
+	if onSpine then
+		org.vomitInThroat = true
+		return
+	end
+
+	owner:SetNetVar("vomiting", CurTime() + 1.5)
+	ent:EmitSound("vomit/vomit5.ogg")
+
+	if owner.armors and owner.armors.face and hg.armor.face[owner.armors.face].voice_change then
+		owner:SetNetVar("zableval_masku", true)
+		return
+	end
+
+	net.Start("vomitConcussionMouth")
+		net.WriteEntity(ent)
+		net.WriteString(bon)
+		net.WriteMatrix(mat)
+		net.WriteVector(mat:GetTranslation() + mat:GetAngles():Right() * 6 + mat:GetAngles():Forward())
+		net.WriteVector(mat:GetAngles():Right() * 2 * math.Clamp((org.pulse or 0) / 70, 0.4, 1))
+	net.SendPVS(mat:GetTranslation())
 end
 
 function hg.organism.VomitNormal(owner, snd)
@@ -940,4 +976,3 @@ end
 function hg.organism.BloodDroplet2(owner, org, wound, dir, artery)
 	hook.Run("HG_BloodParticleStartedDropping", owner, org, wound, dir, artery)
 end
-

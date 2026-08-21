@@ -7,6 +7,10 @@ if SERVER then
 	for _, name in ipairs(moodle3Files) do
 		resource.AddFile("materials/vgui/hud/moodles 3/" .. name)
 	end
+	local standaloneMoodle3Files = file.Find("materials/vgui/moodles 3/*.png", "GAME")
+	for _, name in ipairs(standaloneMoodle3Files) do
+		resource.AddFile("materials/vgui/moodles 3/" .. name)
+	end
 
 	local moodleType = CreateConVar("hg_moodletype", "2", {FCVAR_ARCHIVE, FCVAR_REPLICATED, FCVAR_NOTIFY}, "Moodle 3 moodles", 2, 2)
 	if moodleType:GetInt() ~= 2 then moodleType:SetInt(2) end
@@ -362,6 +366,11 @@ local function getMoodle3Material(name)
 			if not mat or mat:IsError() then
 				mat = Material("vgui/hud/moodles 3/zerlked.png", "smooth")
 			end
+		elseif name == "panic" then
+			mat = Material("vgui/moodles 3/panic.png", "smooth")
+			if not mat or mat:IsError() then
+				mat = Material("vgui/hud/moodles 3/panic.png", "smooth")
+			end
 		else
 			mat = Material("vgui/hud/moodles 3/" .. name .. ".png", "smooth")
 		end
@@ -386,7 +395,7 @@ local function getMoodle3IconName(effect)
 		respiratory_arrest = "respiratory-arrest", skull = "intercranial-hypertension",
 		dislocated_jaw = "dejawed", organ_damage = effect.icon, spine_break = "fractured",
 		shock = "trauma", seizure = "seizure", internal_bleed = "internal-bleeding",
-		panic = "trauma", fear = "trauma", tinnitus = "tinnitus", deaf = "deafness", encumbered = "encumbered",
+		panic = "panic", fear = "trauma", tinnitus = "tinnitus", deaf = "deafness", encumbered = "encumbered",
 		nausea = "sick", amputated = "amputation", concussion = "stress", sepsis = "sepsis",
 		adrenaline = "adrenaline", zerlked = "zerlked",
 		rage = "anger5",

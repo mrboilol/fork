@@ -317,6 +317,43 @@ local hitgrouptolimb = {
 
 hg.bonetohitgroup = bonetohitgroup
 
+function hg.SetMeleeDamageContact(inflictor, ent, trace, forceHead)
+	if not IsValid(inflictor) or not IsValid(ent) or not trace then return end
+
+	local traceEnt = IsValid(trace.Entity) and trace.Entity or ent
+	local boneName
+	if forceHead or trace.HitGroup == HITGROUP_HEAD then
+		boneName = "ValveBiped.Bip01_Head1"
+	elseif trace.HitBoxBone ~= nil and traceEnt.GetBoneName then
+		boneName = traceEnt:GetBoneName(trace.HitBoxBone)
+	elseif trace.PhysicsBone ~= nil and traceEnt.TranslatePhysBoneToBone and traceEnt.GetBoneName then
+		local bone = traceEnt:TranslatePhysBoneToBone(trace.PhysicsBone)
+		if bone and bone >= 0 then boneName = traceEnt:GetBoneName(bone) end
+	end
+
+	local head = forceHead or boneName == "ValveBiped.Bip01_Head1"
+	local hitGroup = head and HITGROUP_HEAD or trace.HitGroup
+	if (not hitGroup or hitGroup == HITGROUP_GENERIC) and boneName then
+		hitGroup = bonetohitgroup[boneName] or hitGroup
+	end
+
+	inflictor.MeleeDamageContact = {
+		entity = ent,
+		physicsBone = trace.PhysicsBone,
+		boneName = boneName,
+		hitGroup = hitGroup,
+		head = head,
+		hitPos = trace.HitPos,
+		normal = trace.Normal,
+		hitNormal = trace.HitNormal,
+		expires = CurTime() + 0.1,
+	}
+end
+
+function hg.ClearMeleeDamageContact(inflictor)
+	if IsValid(inflictor) then inflictor.MeleeDamageContact = nil end
+end
+
 hg.amputeetable = {
 	["ValveBiped.Bip01_L_UpperArm"] = "larmup",
 	["ValveBiped.Bip01_L_Forearm"] = "larm",
@@ -550,7 +587,6 @@ function hg.organism.AddWound(ent, tr, bone, dmgInfo, dmgPos, dmgBlood, inputHol
 			if #org.wounds < 30 then
 				local wound = {dmgBlood / 2, localPos, localAng, ent:GetBoneName(bone), CurTime()}
 				table.insert(org.wounds, wound)
-				if hg.organism.AddBleedSource then hg.organism.AddBleedSource(org, "external", dmgBlood / 2, nil, wound[4], wound) end
 			else
 				if org.wounds[1] then org.wounds[1][1] = org.wounds[1][1] + dmgBlood / 2 end
 			end
@@ -571,7 +607,6 @@ function hg.organism.AddWoundManual(ent,dmgBlood,localPos,localAng,bone,time)
 	if #org.wounds < 30 then
 		local wound = {dmgBlood / 2, localPos, localAng, bone, time}
 		table.insert(org.wounds, wound)
-		if hg.organism.AddBleedSource then hg.organism.AddBleedSource(org, "external", dmgBlood / 2, nil, bone, wound) end
 	else
 		if org.wounds[1] then org.wounds[1][1] = org.wounds[1][1] + dmgBlood / 2 end
 	end
@@ -881,6 +916,15 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	inf = IsValid(inf.weapon) and inf.weapon or inf
 	if IsValid(inf) then dmgInfo:SetInflictor(inf) end
 
+	local meleeContact = IsValid(inf) and inf.MeleeDamageContact
+	if meleeContact then
+		local contactOwner = IsValid(meleeContact.entity) and (hg.RagdollOwner(meleeContact.entity) or meleeContact.entity)
+		local damageOwner = hg.RagdollOwner(ent) or ent
+		if (meleeContact.entity ~= ent and contactOwner ~= damageOwner) or (meleeContact.expires or 0) < CurTime() then
+			meleeContact = nil
+		end
+	end
+
 	-- Damage scaling handled in FireLuaBullets via ammo damage
 	local dmg = dmgInfo:GetDamage()
 
@@ -951,7 +995,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		end)
 	end
 
-	dir:Set(dmgInfo:GetDamageForce())
+	dir:Set(meleeContact and isvector(meleeContact.normal) and meleeContact.normal or dmgInfo:GetDamageForce())
 	dir:Normalize()
 	dir:Mul(pen)
 	--print(bullet.Penetration, pen, bullet ~= nil)
@@ -991,15 +1035,28 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		end
 	end
 	
-	local dmgPos = dmgInfo:GetDamagePosition()
-	local tr = util.QuickTrace(dmgPos, dir:GetNormalized() * 100)
-	if tr.Hit and tr.Entity == ent then
-		dmgPos = tr.HitPos
+	local dmgPos = meleeContact and meleeContact.hitPos or dmgInfo:GetDamagePosition()
+	local tr
+	if meleeContact then
+		tr = {
+			Entity = ent,
+			Hit = true,
+			HitPos = dmgPos,
+			Normal = dir:GetNormalized(),
+			HitNormal = meleeContact.hitNormal or -dir:GetNormalized(),
+			PhysicsBone = meleeContact.physicsBone,
+			HitGroup = meleeContact.hitGroup,
+		}
 	else
-		tr = util.QuickTrace(dmgPos, -(dmgPos - (ent:GetPos() + ent:OBBCenter())))
+		tr = util.QuickTrace(dmgPos, dir:GetNormalized() * 100)
 		if tr.Hit and tr.Entity == ent then
-			dir = tr.Normal * pen
 			dmgPos = tr.HitPos
+		else
+			tr = util.QuickTrace(dmgPos, -(dmgPos - (ent:GetPos() + ent:OBBCenter())))
+			if tr.Hit and tr.Entity == ent then
+				dir = tr.Normal * pen
+				dmgPos = tr.HitPos
+			end
 		end
 	end
 
@@ -1150,11 +1207,14 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 
 	end
 	
-	local meleeContact = IsValid(inf) and inf.MeleeDamageContact
-	if meleeContact and (meleeContact.entity ~= ent or (meleeContact.expires or 0) < CurTime()) then
-		meleeContact = nil
+	local bone
+	if meleeContact and meleeContact.boneName then
+		local contactBone = ent:LookupBone(meleeContact.boneName)
+		local contactPhysBone = contactBone and ent:TranslateBoneToPhysBone(contactBone) or nil
+		if contactPhysBone and contactPhysBone >= 0 then bone = contactPhysBone end
 	end
-	local bone = meleeContact and meleeContact.entity == ent and meleeContact.physicsBone or tr.Entity == ent and tr.PhysicsBone
+	if bone == nil and meleeContact then bone = meleeContact.physicsBone end
+	if bone == nil and tr.Entity == ent then bone = tr.PhysicsBone end
 	if not bone then
 		local dir = -(dmgPos - (ent:GetPos() + ent:OBBCenter())):GetNormalized()
 		local tr = util.QuickTrace(dmgPos, dir * 100)
@@ -1188,9 +1248,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	-- 	net.Send(rf)
 	-- end
 	
-	local dmgPos = dmgInfo:GetDamagePosition()
-	local dirCool = dmgInfo:GetDamageForce():GetNormalized()
-	local tr = util.QuickTrace(dmgPos, dirCool * 100)
+	local dirCool = meleeContact and isvector(meleeContact.normal) and meleeContact.normal:GetNormalized() or dmgInfo:GetDamageForce():GetNormalized()
 	local len = math.abs(dmgInfo:GetDamageForce():Length())
 	if meleeContact then
 		tr.HitGroup = meleeContact.hitGroup or tr.HitGroup
@@ -1351,7 +1409,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	end
 	
 	if ply or org.fakePlayer then
-		hook_Run("HomigradDamage", org.fakePlayer and ent or ply, dmgInfo, bonetohitgroup[bonename], ent, attacker.harm, hitBoxs, inputHole)
+		hook_Run("HomigradDamage", org.fakePlayer and ent or ply, dmgInfo, hitgroup, ent, attacker.harm, hitBoxs, inputHole)
 	end
 
 	if hg.ReportCombatInjuryState then

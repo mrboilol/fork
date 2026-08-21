@@ -77,14 +77,6 @@ local tabblood = {
 	["$pp_colour_mulb"] = 0,
 }
 
-surface.CreateFont("RemDeathStateFont", {
-	font = "Lora",
-	size = ScreenScale(22),
-	weight = 1100,
-	outline = true
-})
-
-local remDeathStateColor = Color(255, 255, 255, 0)
 local remDeathStateStation
 local remDeathStateLoading
 local remDeathStateSounds = {"rem_deathstatefull.mp3", "incap1.mp3", "incap2.mp3"}
@@ -103,6 +95,25 @@ local seizureStopping
 
 local MUSIC_VOLUME = 0.75
 local BRAINROT_VOLUME = 0.45
+local INCAPACITATION_DEATH_TIME = 25
+
+local function GetLocalDeathState()
+	local ply = LocalPlayer()
+	if not IsValid(ply) or not ply:Alive() then return end
+
+	local org = ply.new_organism or ply.organism
+	local deathStateEnd = org and tonumber(org.deathStateEnd)
+	if not org or not org.otrub or not org.incapacitated or not deathStateEnd or deathStateEnd <= CurTime() then return end
+
+	local remaining = math.max(deathStateEnd - CurTime(), 0)
+	local progress = math.Clamp((INCAPACITATION_DEATH_TIME - remaining) / INCAPACITATION_DEATH_TIME, 0, 1)
+	return org, deathStateEnd, progress
+end
+
+local function StopRemDeathStateSound()
+	if IsValid(remDeathStateStation) then remDeathStateStation:Stop() end
+	remDeathStateStation = nil
+end
 
 local function PlayStationRandom(station, volume)
 	station:SetVolume(volume or 1)
@@ -131,24 +142,35 @@ local function PlayRemHeartStopSound(uncon)
 end
 
 local function PlayRemDeathStateSound()
-	if IsValid(remDeathStateStation) then
-		remDeathStateStation:Play()
-		return
-	end
+	if IsValid(remDeathStateStation) then return end
 	if remDeathStateLoading then return end
 
 	remDeathStateLoading = true
 	sound.PlayFile("sound/" .. remDeathStateSounds[math.random(#remDeathStateSounds)], "noplay", function(station)
 		remDeathStateLoading = nil
 		if not IsValid(station) then return end
-		if not LocalPlayer():Alive() then station:Stop() return end
+		local _, _, progress = GetLocalDeathState()
+		if not progress then station:Stop() return end
 		remDeathStateStation = station
 		station:EnableLooping(true)
-		PlayStationRandom(station, MUSIC_VOLUME)
+		PlayStationRandom(station, Lerp(progress, 0.28, MUSIC_VOLUME))
 	end)
 end
 
 net.Receive("rem_deathstate_sound", PlayRemDeathStateSound)
+
+hook.Add("Think", "RemDeathStateSound", function()
+	local _, _, progress = GetLocalDeathState()
+	if not progress then
+		StopRemDeathStateSound()
+		return
+	end
+
+	PlayRemDeathStateSound()
+	if IsValid(remDeathStateStation) then
+		remDeathStateStation:SetVolume(Lerp(progress, 0.28, MUSIC_VOLUME))
+	end
+end)
 
 local function GetBrainLobeDamage(org)
 	return (org.brainFrontal or 0) + (org.brainParietal or 0) + (org.brainTemporal or 0) + (org.brainOccipital or 0)
@@ -283,13 +305,6 @@ hook.Add("Think", "RemCardiacSounds", function()
 	TryPlayBrainRotSound(org)
 	UpdateBrainRotSound(org)
 	if org and org.seizureActive then StartSeizureSound(org) else StopSeizureSound() end
-end)
-
-hook.Add("Think", "RemDeathStateSoundStop", function()
-	local ply = LocalPlayer()
-	if not IsValid(ply) or ply:Alive() or not IsValid(remDeathStateStation) then return end
-	remDeathStateStation:Stop()
-	remDeathStateStation = nil
 end)
 
 local k1, k2, k3
@@ -652,7 +667,7 @@ end
 
 local function DrawIncapacitatedDeathFade(deathStateEnd)
 	local remaining = math.max(deathStateEnd - CurTime(), 0)
-	local fade = math.Clamp((25 - remaining) / 25, 0, 1)
+	local fade = math.Clamp((INCAPACITATION_DEATH_TIME - remaining) / INCAPACITATION_DEATH_TIME, 0, 1)
 	local finalFade = math.Clamp((6 - remaining) / 6, 0, 1)
 	local shine = finalFade * (0.65 + math.abs(math.sin(CurTime() * 9)) * 0.35)
 	local sw, sh = ScrW(), ScrH()
@@ -670,17 +685,6 @@ local function DrawIncapacitatedDeathFade(deathStateEnd)
 		surface.SetDrawColor(255, 255, 255, math.Clamp(finalFade * 180 + shine * 75, 0, 255))
 		DrawScreenFillShape(sw / 2, sh / 2, radius * (0.88 + shine * 0.12), 320, 0.2 * (1 - finalFade * 0.45), 13.5)
 	end
-end
-
-local function DrawIncapacitatedDeathText(seconds, deathStateEnd)
-	local remaining = math.max(deathStateEnd - CurTime(), 0)
-	local fade = math.Clamp((25 - remaining) / 25, 0, 1)
-	local radius = math.ease.InOutSine(fade) * math.sqrt(ScrW() * ScrW() + ScrH() * ScrH()) / 2
-	local textDark = math.Clamp((radius - 12) / 80, 0, 1)
-	local textValue = math.floor(255 * (1 - textDark))
-	local textColor = Color(textValue, textValue, textValue, remDeathStateColor.a)
-
-	draw.SimpleText("You are incapacitated, You will die in " .. seconds, "RemDeathStateFont", ScrW() / 2, ScrH() / 2, textColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 end
 
 hook.Add("Post Post Pre Post Processing", "organism-effects", function()
@@ -738,15 +742,6 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 	tinnitusSoundFactor = Lerp(FrameTime()*2.5,tinnitusSoundFactor or 0, math.min(math.max( lply.tinnitus and (lply.tinnitus - CurTime()) or 0, 0)*7.5,120))
 	local tinnitusSoundFactor2 = tinnitusSoundFactor + (hook.Run("ModifyTinnitusFactor", tinnitusSoundFactor) or 0)
 
-	if lply:Alive() and (otrub or new_organism.otrub) and incapacitated and deathStateEnd then
-		local seconds = math.max(math.ceil(deathStateEnd - CurTime()), 0)
-		remDeathStateColor.a = math.Clamp((25 - (deathStateEnd - CurTime())) / 2, 0, 1) * 255
-		PlayRemDeathStateSound()
-	elseif IsValid(remDeathStateStation) then
-		remDeathStateStation:Stop()
-		remDeathStateStation = nil
-	end
-
 	--print(lply.tinnitus)
 	local adrenK = math.min(math.max(1 + adrenaline, 1), 1.2)
 
@@ -770,7 +765,7 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 			plyCommand(lply,"soundfade "..tinnitusSoundFactor2.." 25")
 		elseif lply:Alive() then
 			lply:SetDSP(17)
-			plyCommand(lply,"soundfade 100 25")
+			plyCommand(lply, incapacitated and "soundfade 25 1" or "soundfade 100 25")
 		end
 	else
 		plyCommand(lply,"soundfade "..tinnitusSoundFactor2.." 25")
@@ -1003,10 +998,6 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 			//surface.DrawRect(-1,-1,ScrW()+1,ent.Blinking * ScrH())
 			//surface.DrawRect(-1,ScrH() + 1,ScrW()+1,-ent.Blinking * ScrH())
 		end
-	end
-	if lply:Alive() and (otrub or new_organism.otrub) and incapacitated and deathStateEnd then
-		local seconds = math.max(math.ceil(deathStateEnd - CurTime()), 0)
-		DrawIncapacitatedDeathText(seconds, deathStateEnd)
 	end
 end)
 

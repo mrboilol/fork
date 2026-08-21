@@ -622,67 +622,6 @@ function module.GetStage(org)
     else return 4 end
 end
 
-local min, max, Clamp, Approach = math.min, math.max, math.Clamp, math.Approach
-hg.organism.module.trauma_combo = {}
-local module = hg.organism.module.trauma_combo
-module[1] = function(org)
-	org.combo_hemohypoxia = 0
-	org.combo_painhypovolemia = 0
-	org.nextComboPhrase = 0
-end
-local combo_hemohypoxia_phrases = {
-	"I can't breathe... and I'm freezing...",
-	"I'm fading out...",
-	"Everything is going dark..."
-}
-local combo_painhypovolemia_phrases = {
-	"Too much pain... I can't move...",
-	"I feel weak and dizzy...",
-	"I might collapse..."
-}
-module[2] = function(owner, org, timeValue)
-	if not org.alive then
-		org.combo_hemohypoxia = 0
-		org.combo_painhypovolemia = 0
-		return
-	end
-	local o2 = org.o2 and org.o2[1] or 30
-	local blood = org.blood or 5000
-	local hemoPart = Clamp((2600 - blood) / 1100, 0, 1)
-	local hypoPart = Clamp((14 - o2) / 10, 0, 1)
-	local comboHemohypoxiaTarget = hemoPart * hypoPart
-	org.combo_hemohypoxia = Approach(org.combo_hemohypoxia or 0, comboHemohypoxiaTarget, timeValue / 6)
-	local painPart = Clamp((org.pain - 60) / 35, 0, 1)
-	local hypoVolPart = Clamp((3300 - blood) / 1000, 0, 1)
-	local comboPainHypovolemiaTarget = painPart * hypoVolPart
-	org.combo_painhypovolemia = Approach(org.combo_painhypovolemia or 0, comboPainHypovolemiaTarget, timeValue / 6)
-	local hemohypoxia = org.combo_hemohypoxia or 0
-	if hemohypoxia > 0 then
-		org.shock = min((org.shock or 0) + timeValue * 8 * hemohypoxia, 85)
-		org.disorientation = min((org.disorientation or 0) + timeValue * 1.3 * hemohypoxia, 10)
-		org.fearadd = min((org.fearadd or 0) + timeValue * 0.4 * hemohypoxia, 3)
-		org.consciousness = Approach(org.consciousness or 1, max(0.05, 0.35 - hemohypoxia * 0.25), timeValue / 10 * hemohypoxia)
-	end
-	local painhypo = org.combo_painhypovolemia or 0
-	if painhypo > 0 then
-		org.immobilization = min((org.immobilization or 0) + timeValue * 12 * painhypo, 90)
-		org.shock = min((org.shock or 0) + timeValue * 6 * painhypo, 90)
-		org.fearadd = min((org.fearadd or 0) + timeValue * 0.25 * painhypo, 3)
-		if org.stamina then
-			org.stamina.subadd = (org.stamina.subadd or 0) + painhypo * 0.35
-		end
-	end
-	if org.isPly and not org.otrub and (org.nextComboPhrase or 0) < CurTime() then
-		if hemohypoxia > 0.5 then
-			org.nextComboPhrase = CurTime() + math.random(14, 22)
-			owner:Notify(combo_hemohypoxia_phrases[math.random(#combo_hemohypoxia_phrases)], 6, "combo_hemohypoxia", 0)
-		elseif painhypo > 0.55 then
-			org.nextComboPhrase = CurTime() + math.random(14, 22)
-			owner:Notify(combo_painhypovolemia_phrases[math.random(#combo_painhypovolemia_phrases)], 6, "combo_painhypovolemia", 0)
-		end
-	end
-end
-
 if SERVER then
     concommand.Add("hg_concussion_test", function(ply, cmd, args)
         if not IsValid(ply) or not ply:IsAdmin() then return end

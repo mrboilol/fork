@@ -638,7 +638,7 @@ function hg.ProcessBulletNearMiss(data)
 			local strength = math.Clamp((1 - dist / 120) * (data.Damage or 25) / 45, 0.08, 1)
 			ply:AddNaturalAdrenaline(0.035 * strength)
 			org.fearadd = org.fearadd + 0.12 * strength
-			hg.organism.AddPanicAttack(org, 0.0004 + strength * 0.0025, true)
+			hg.organism.AddPanicAttack(org, 0.0004 + strength * 0.0025, true, true)
 			net.Start("hg_bullet_nearmiss")
 				net.WriteVector(pos)
 				net.WriteFloat(strength)
@@ -746,7 +746,7 @@ function hg.ExplosionEffect(pos, dis, dmg)
 		if tr.Hit and dist > radius * 0.35 then continue end
 
 		local amount = math.Clamp((1 - dist / radius) * 0.55 + (dmg or 0) / 1200, 0.08, 0.55)
-		hg.organism.AddPanicAttack(ply.organism, amount, true)
+		hg.organism.AddPanicAttack(ply.organism, amount, true, true)
 	end
 end
 
