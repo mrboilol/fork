@@ -156,7 +156,7 @@ if SERVER then
 		if (not org.poison1notificate) and ((org.poison1 + 20) < curtime) then
 			org.poison1notificate = true
 			org.owner:Notify("I can't... properly breathe...", true, "poison1", 3)
-			org.owner:EmitSound( ( ThatPlyIsFemale(org.owner) and "vo/npc/female01/moan0"..math.random(5)..".ogg" ) or "vo/npc/male01/moan0"..math.random(5)..".ogg")
+			org.owner:EmitSound( ( ThatPlyIsFemale(org.owner) and "vo/npc/female01/moan0"..math.random(5)..".wav" ) or "vo/npc/male01/moan0"..math.random(5)..".wav")
 		end
 
 		if (org.poison1 + (owner.SubRole == "traitor_chemist" and 50 or 30)) < curtime then

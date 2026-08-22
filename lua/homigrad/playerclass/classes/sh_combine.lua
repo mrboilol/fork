@@ -723,7 +723,7 @@ if SERVER then
             --;; Если есть ragdoll и т.п.
             ply.CombineLerpedFootStep = LerpFT(0.5,ply.CombineLerpedFootStep or 60, (not ply:IsSprinting() and (ply:KeyDown(IN_DUCK) or ply:KeyDown(IN_WALK))) and 20 or 60)
             if IsValid(ply.FakeRagdoll) and ply:GetNetVar("lastFake") == 0 then return end
-            chr:EmitSound("npc/combine_soldier/gear" .. math.random(1,6) .. ".ogg",
+            chr:EmitSound("npc/combine_soldier/gear" .. math.random(1,6) .. ".wav",
                 ply.CombineLerpedFootStep, math.random(92, 108), 0.7
             )
         end
@@ -741,7 +741,7 @@ if SERVER then
         --[[if ply.PlayerClassName == "Combine" then
             ply.painCD = ply.painCD or 0
             if hitgroups_sounds[hitgroup] and ply.painCD < CurTime() and ply.organism and not ply.organism.otrub and ply:Alive() then
-                local snd = "npc/combine_soldier/pain" .. math.random(1,3) .. ".ogg"
+                local snd = "npc/combine_soldier/pain" .. math.random(1,3) .. ".wav"
                 ent:EmitSound(snd,80,ply.VoicePitch)
                 ply.painCD = CurTime() + SoundDuration(snd)
                 ply.lastPhr = snd

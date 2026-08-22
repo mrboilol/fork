@@ -185,7 +185,7 @@ if(SERVER)then
 		if((poison_start_time + (20 / poison_potency)) < CurTime() and (!poison.NextNotification1 or poison.NextNotification1 <= CurTime()))then
 			poison.NextNotification1 = CurTime() + math.max(5 / poison_potency, 1)
 			
-			if not org.otrub then org.owner:EmitSound((ThatPlyIsFemale(org.owner) and "vo/npc/female01/moan0"..math.random(5)..".ogg" ) or "vo/npc/male01/moan0"..math.random(5)..".ogg") end
+			if not org.otrub then org.owner:EmitSound((ThatPlyIsFemale(org.owner) and "vo/npc/female01/moan0"..math.random(5)..".wav" ) or "vo/npc/male01/moan0"..math.random(5)..".wav") end
 		end
 		
 		if((poison_start_time + (22 / poison_potency)) < CurTime())then

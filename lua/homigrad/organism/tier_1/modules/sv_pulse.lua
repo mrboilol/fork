@@ -13,7 +13,7 @@ function hg.organism.GetBloodDeliveryFraction(blood, scale)
 	local cfg = hg.organism.config or {}
 	local normalBlood = math.max(tonumber(cfg.NORMAL_BLOOD_VOLUME_ML) or hg.organism.normalBloodVolume or 5000, 1)
 	local volumeFraction = math.Clamp((tonumber(blood) or normalBlood) / normalBlood, 0, 1)
-	local curve = math.max(tonumber(cfg.HEMORRHAGE_PERFUSION_EXPONENT) or 0.7, 0.05)
+	local curve = math.max(tonumber(cfg.HEMORRHAGE_PERFUSION_EXPONENT) or 0.85, 0.05)
 	return math.Clamp(volumeFraction ^ curve * (tonumber(scale) or 1), 0, 1)
 end
 
@@ -31,6 +31,38 @@ function hg.organism.GetHemorrhageOxygenTransportFraction(blood)
 	return hg.organism.GetBloodDeliveryFraction(blood, 1) * (0.55 + volumeFraction * 0.45)
 end
 
+function hg.organism.RestoreSupportedOxygen(org, amount, targets)
+	if not org or not org.o2 or org.oxygenIntakeAvailable == false then return false end
+
+	amount = math.Clamp(tonumber(amount) or 0, 0, 1)
+	if amount <= 0 then return false end
+	targets = targets or {}
+	local bloodReserve = hg.organism.GetBloodDeliveryFraction(org.blood, 1)
+	local support = amount * bloodReserve
+	if support <= 0 then return false end
+
+	local oxygenTarget = math.Clamp(tonumber(targets.oxygenTarget) or targets.oxygen or org.o2[1], 0, org.o2.range or 30)
+	if targets.oxygen then
+		org.o2[1] = math.min(oxygenTarget, math.max(org.o2[1] or 0, tonumber(targets.oxygen) or 0))
+	end
+
+	for _, key in ipairs({"bodyoxygen", "brainoxygen", "perfusion", "peripheralperfusion", "cerebralPerfusion", "myocardialOxygen"}) do
+		local target = tonumber(targets[key .. "Target"]) or tonumber(targets[key])
+		if target then
+			org[key] = math.Approach(tonumber(org[key]) or 0, math.Clamp(target, 0, 1), support)
+		end
+	end
+
+	for _, key in ipairs({"hypoxiaTime", "severeHypoxiaTime", "systemicIschemiaTime"}) do
+		local reduction = tonumber(targets[key])
+		if reduction then
+			org[key] = math.max((tonumber(org[key]) or 0) - reduction * support, 0)
+		end
+	end
+
+	return true
+end
+
 local function getBloodPerfusion(blood)
 	-- Preserve enough central circulation at moderate loss while allowing an
 	-- almost empty circulation to become correspondingly ineffective.
@@ -42,7 +74,7 @@ local function getBloodCompensationRate(blood)
 	local reserve = getBloodPerfusion(blood)
 	local response = hg.organism.GetHemorrhageCompensationDrive and hg.organism.GetHemorrhageCompensationDrive(blood)
 		or math.Clamp(1 - reserve, 0, 1)
-	local maxRate = cfg.HEMORRHAGE_MAX_COMPENSATED_HR or 220
+	local maxRate = cfg.HEMORRHAGE_MAX_COMPENSATED_HR or 235
 	local rate = 70 + (maxRate - 70) * response
 	local bradyReserve = math.Clamp(cfg.HEMORRHAGE_BRADYCARDIA_RESERVE or 0.35, 0.05, 0.9)
 	local preloadFailure = math.Clamp((bradyReserve - reserve) / bradyReserve, 0, 1)

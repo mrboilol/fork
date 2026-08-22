@@ -228,7 +228,7 @@ function CLASS.PlayerDeath(self)
         end
     end
 
-    EmitSound( "npc/metropolice/die" .. math.random(1,4) .. ".ogg", self:GetPos() )
+    EmitSound( "npc/metropolice/die" .. math.random(1,4) .. ".wav", self:GetPos() )
 
     hook.Remove( "OnEntityCreated", "relation_shipdo"..self:EntIndex())
 end
@@ -252,7 +252,7 @@ if SERVER then
             --;; Если есть ragdoll и т.п.
             ply.CombineLerpedFootStep = LerpFT(0.5,ply.CombineLerpedFootStep or 60, (not ply:IsSprinting() and (ply:KeyDown(IN_DUCK) or ply:KeyDown(IN_WALK))) and 20 or 60)
             if IsValid(ply.FakeRagdoll) and ply:GetNetVar("lastFake") == 0 then return end
-            chr:EmitSound("npc/metropolice/gear" .. math.random(1,6) .. ".ogg",
+            chr:EmitSound("npc/metropolice/gear" .. math.random(1,6) .. ".wav",
                 ply.CombineLerpedFootStep, math.random(92, 108), 0.7
             )
         end

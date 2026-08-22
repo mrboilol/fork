@@ -1220,6 +1220,12 @@ local function GetValidBone(ent, bone)
 	return id
 end
 
+local function GetWoundBoneMatrix(ent, bone)
+	local id = GetValidBone(ent, bone)
+	if not id then return end
+	return ent:GetBoneMatrix(id), id
+end
+
 hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, ent, time)
 	--local ent = IsValid(ply.FakeRagdoll) and ply.FakeRagdoll or ply
 	--print(ply,ent,ply.organism.owner,ply.new_organism.owner)
@@ -1403,18 +1409,18 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 
 	if seen and org and org.blood and org.blood > 10 and wounds and #wounds > 0 and entDistSqr <= bloodDistSqr then
 		if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then
+			ent:SetupBones()
 			for i, wound in pairs(wounds) do
 				local size = math.random(0, 1) * math.max(math.min(wound[1], 1), 0.5)
 
 				if wound[5] + beatsPerSecond < time then
-					local boneID = GetValidBone(ent, wound[4])
+					local mat, boneID = GetWoundBoneMatrix(ent, wound[4])
 					if boneID then
 						local bone = wound[4]
 						local should = !(hg.amputatedlimbs2[bone] and org[hg.amputatedlimbs2[bone].."amputated"])
 
 						if !should then continue end
 
-						local mat = ent:GetBoneMatrix(boneID)
 						if not mat then continue end
 						local bonePos, boneAng = mat:GetTranslation(), mat:GetAngles()
 						if not wound[2] or not wound[3] or not bonePos or not boneAng then continue end
@@ -1437,9 +1443,10 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 	end
 	
 	if seen and org and org.blood and org.blood > 10 and arterialwounds and #arterialwounds > 0 and entDistSqr <= bloodDistSqr then
+		ent:SetupBones()
 		for i, wound in pairs(arterialwounds) do
 			local addtime = 1 / math.Clamp(org.pulse or 70, 1,15) * 0.25
-			local boneID = GetValidBone(ent, wound[4])
+			local mat, boneID = GetWoundBoneMatrix(ent, wound[4])
 			if wound[5] + addtime < time and boneID then
 				if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then
 					local size = math.random(1, 2) * math.max(math.min(wound[1], 1), 0.5) * arterySizeMul
@@ -1450,7 +1457,6 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 
 						if !should then continue end
 						
-						local mat = ent:GetBoneMatrix(boneID)
 						if not mat then continue end
 						local bonePos, boneAng = mat:GetTranslation(), mat:GetAngles()
 						if not wound[2] or not wound[3] or not bonePos or not boneAng then continue end

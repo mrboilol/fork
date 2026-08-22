@@ -307,6 +307,31 @@ net.Receive("addfountain",function()
 end)
 
 local bloodSquirtSerial = 0
+local function getBloodEffectBody(ent)
+	if not IsValid(ent) then return end
+	if ent:IsRagdoll() then return ent, hg.RagdollOwner(ent) or ent end
+
+	local owner = hg.RagdollOwner(ent)
+	if IsValid(owner) then ent = owner end
+
+	local rag = IsValid(ent.FakeRagdoll) and ent.FakeRagdoll
+		or (ent.GetNWEntity and ent:GetNWEntity("FakeRagdoll"))
+	if IsValid(rag) then return rag, ent end
+
+	rag = IsValid(ent.RagdollDeath) and ent.RagdollDeath
+		or (ent.GetNWEntity and ent:GetNWEntity("RagdollDeath"))
+	if IsValid(rag) then return rag, ent end
+
+	return ent, ent
+end
+
+local function getBloodEffectBoneMatrix(ent, boneName)
+	if not IsValid(ent) then return end
+	ent:SetupBones()
+	local bone = ent:LookupBone(boneName or "")
+	return bone and bone >= 0 and ent:GetBoneMatrix(bone)
+end
+
 net.Receive("bloodsquirt", function()
 	local ent = net.ReadEntity()
 	local entIndex = net.ReadUInt(16)
@@ -322,30 +347,28 @@ net.Receive("bloodsquirt", function()
 			if attempt < 20 then timer.Simple(0.05, function() spawnEffect(attempt + 1) end) end
 			return
 		end
-		local bone = ent:LookupBone(boneName)
-		if not bone or not mat then return end
-		ent = hg.RagdollOwner(ent) or ent
+		if not mat then return end
 
-	//local mat = ent:GetBoneMatrix(bone)
 		local localPos, localDir = WorldToLocal(pos, dir:Angle(), mat:GetTranslation(), mat:GetAngles())
+		local source = ent
 
 		bloodSquirtSerial = bloodSquirtSerial + 1
-		local name = "squirtblood"..ent:EntIndex().."_"..bloodSquirtSerial
-		local i = 125
+		local name = "squirtblood"..source:EntIndex().."_"..bloodSquirtSerial
+		local i = 150
 		local maxI = i
 		local vechuy = Vector(0,0,0)
 		local dsqr = 2000 * 2000
 		timer.Create(name, 0.02, i + 10, function()
-			if not IsValid(ent) then timer.Remove(name) return end
-			local drawEnt = IsValid(ent.FakeRagdoll) and ent.FakeRagdoll or ent
+			local drawEnt = getBloodEffectBody(source)
+			if not IsValid(drawEnt) then timer.Remove(name) return end
 			local amt = i / maxI
-			local drawMat = drawEnt:GetBoneMatrix(bone)
+			local drawMat = getBloodEffectBoneMatrix(drawEnt, boneName)
 			if not drawMat then timer.Remove(name) return end
 			local drawPos, drawDir = LocalToWorld(localPos, localDir, drawMat:GetTranslation(), drawMat:GetAngles())
 			drawDir = drawDir:Forward() * len
 			if (drawPos - LocalPlayer():EyePos()):LengthSqr() > dsqr then i = i - 1 return end
 			vechuy = vechuy + VectorRand(-amt * 5,amt * 5)
-			addBloodPart(drawPos, drawDir * amt * 90 + vechuy * amt, mat_huy, math.Rand(3,3), math.Rand(3,3), true, false)
+			addBloodPart(drawPos, drawDir * amt * 130 + vechuy * amt, mat_huy, math.Rand(3,3), math.Rand(3,3), true, false)
 			i = i - 1
 		end)
 	end
@@ -366,34 +389,33 @@ net.Receive("bloodsquirt2", function()
 	
 	if not IsValid(ent) then return end
 
-	local bone = net.ReadString()
-	local bone = ent:LookupBone(bone)
+	local boneName = net.ReadString()
 	local mat = net.ReadMatrix()
 	local pos = net.ReadVector()
 	local dir = net.ReadVector()
 	local len = dir:Length()
 
-	local ent = hg.RagdollOwner(ent) or ent
-	local ply = ent
+	if not mat then return end
+	local source = ent
+	local _, ply = getBloodEffectBody(source)
 
-	//local mat = ent:GetBoneMatrix(bone)
 	local localPos, localDir = WorldToLocal(pos, dir:Angle(), mat:GetTranslation(), mat:GetAngles())
 
 	if ply == lply then
 		localPos:Add(-Vector(2,-2,0))
 	end
 
-	local name = "squirtblood2"..ent:EntIndex()//..dir[1]
+	local name = "squirtblood2"..source:EntIndex()//..dir[1]
 	local i = 50
 	local maxI = i
 	local vechuy = Vector(0,0,0)
 	local dsqr = 2000 * 2000
 	timer.Create(name, 0.01, i + 10, function()
+		local ent = getBloodEffectBody(source)
 		if not IsValid(ent) then timer.Remove(name) return end
-		local ent = IsValid(ent.FakeRagdoll) and ent.FakeRagdoll or ent
 		local amt = math.max(i / maxI, 0.2)
 		if math.random(5) == 1 then return end
-		local mat = ent:GetBoneMatrix(bone)
+		local mat = getBloodEffectBoneMatrix(ent, boneName)
 		if not mat then timer.Remove(name) return end
 
 		if ply == lply and (i == 50 or i == 25) then
@@ -419,29 +441,29 @@ net.Receive("vomitConcussionMouth", function()
 	local ent = net.ReadEntity()
 	if not IsValid(ent) then return end
 
-	local bone = net.ReadString()
-	local boneIdx = ent:LookupBone(bone)
+	local boneName = net.ReadString()
 	local mat = net.ReadMatrix()
 	local pos = net.ReadVector()
 	local dir = net.ReadVector()
 	local len = dir:Length()
 
-	local ent = hg.RagdollOwner(ent) or ent
-	local ply = ent
+	if not mat then return end
+	local source = ent
+	local _, ply = getBloodEffectBody(source)
 
 	local localPos, localDir = WorldToLocal(pos, dir:Angle(), mat:GetTranslation(), mat:GetAngles())
 
 	if ply == lply then localPos:Add(-Vector(2,-2,0)) end
 
-	local name = "vomitConcussionMouth"..ent:EntIndex()
+	local name = "vomitConcussionMouth"..source:EntIndex()
 	local i = 24
 	local maxI = i
 	timer.Create(name, 0.025, i + 5, function()
+		local ent = getBloodEffectBody(source)
 		if not IsValid(ent) then timer.Remove(name) return end
-		local ent = IsValid(ent.FakeRagdoll) and ent.FakeRagdoll or ent
 		local amt = math.max(i / maxI, 0.2)
 		if math.random(3) == 1 then return end
-		local mat = ent:GetBoneMatrix(boneIdx)
+		local mat = getBloodEffectBoneMatrix(ent, boneName)
 		if not mat then timer.Remove(name) return end
 
 		if ply == lply and (i == 24 or i == 12) then

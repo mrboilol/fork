@@ -203,7 +203,7 @@ local hold_wound_clot_twohand_mul = 1.6
 -- Coagulation, wound pressure, tourniquets, and adrenaline continue to modify
 -- these rates normally rather than being bypassed by an instant-loss shortcut.
 local wound_bleed_rate_mul = 2.25
-local arterial_bleed_ml_s_per_severity = (hg.organism.config and hg.organism.config.ARTERIAL_BLEED_ML_S_PER_SEVERITY) or 7.5
+local arterial_bleed_ml_s_per_severity = (hg.organism.config and hg.organism.config.ARTERIAL_BLEED_ML_S_PER_SEVERITY) or 5.5
 local arterial_min_flow_fraction = (hg.organism.config and hg.organism.config.ARTERIAL_MIN_FLOW_FRACTION) or 0.08
 -- An amputated limb must remain an urgent arterial bleed.  This is lower than
 -- the old runaway jet, but high enough to be clearly visible and dangerous
@@ -409,10 +409,9 @@ module[2] = function(owner, org, mulTime)
 	end
 
 	if org.internalBleed < 0.5 and org.bleed <= 0 and org.pulse > 5 then
-		-- Slow game-scaled recovery. Do not refill hundreds of mL per minute simply
-		-- because bleeding has stopped.
-		local regenRate = (hg.organism.config and hg.organism.config.BLOOD_REGEN_RATE_ML_S) or 0.5
-		org.blood = min(org.blood + mulTime * regenRate, hg.organism.normalBloodVolume or 5000)
+		local regenRate = (hg.organism.config and hg.organism.config.BLOOD_REGEN_RATE_ML_S) or 4
+		local regenerationMul = math.Clamp(tonumber(org.blood_regeneration_multiplier) or 1, 0.1, 2)
+		org.blood = min(org.blood + mulTime * regenRate * regenerationMul, hg.organism.normalBloodVolume or 5000)
 	end
 
 	local totalAdrenaline = (org.adrenaline or 0) + (org.noradrenaline or 0)

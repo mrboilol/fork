@@ -461,9 +461,13 @@ module[2] = function(owner, org, timeValue)
 	local hemorrhageTransportK = hg.organism.GetHemorrhageOxygenTransportFraction
 		and hg.organism.GetHemorrhageOxygenTransportFraction(rawBlood)
 		or math.Clamp(rawBlood / math.max(hg.organism.normalBloodVolume or 5000, 1), 0, 1)
-	local bloodCarryO2Cap = o2.range * hemorrhageTransportK
+	local hemorrhageAdrenaline = math.Clamp(((org.adrenaline or 0) + (org.noradrenaline or 0) - 0.5) / 3, 0, 1)
+	local hemorrhageAdrenalineSupport = (1 - hemorrhageTransportK) * hemorrhageAdrenaline * 0.18
+	local effectiveHemorrhageTransportK = math.Clamp(hemorrhageTransportK + hemorrhageAdrenalineSupport, 0, 1)
+	local bloodCarryO2Cap = o2.range * effectiveHemorrhageTransportK
 	org.bloodCarryO2Cap = bloodCarryO2Cap
-	org.hemorrhageOxygenTransport = hemorrhageTransportK
+	org.hemorrhageOxygenTransport = effectiveHemorrhageTransportK
+	org.hemorrhageAdrenalineO2Support = hemorrhageAdrenalineSupport
 	local bloodO2Cap = org.bloodO2Cap or o2.range
 
 	local bodyTemperature = org.temperature or 36.7
@@ -944,7 +948,7 @@ module[2] = function(owner, org, timeValue)
 	local deliveryO2Cap = o2.range * deliveryReserve
 	if o2[1] > deliveryO2Cap then
 		local deliveryFailure = math.Clamp(1 - deliveryO2Cap / math.max(o2.range, 1), 0, 1)
-		local hemorrhageFailure = math.Clamp(1 - hemorrhageTransportK, 0, 1)
+		local hemorrhageFailure = math.Clamp(1 - effectiveHemorrhageTransportK, 0, 1)
 		local decayRate = 0.16 + deliveryFailure * 0.45 + hemorrhageFailure ^ 3 * 0.50
 		local deliveryResponse = 1 - math.exp(-timeValue * decayRate)
 		o2[1] = o2[1] + (deliveryO2Cap - o2[1]) * deliveryResponse

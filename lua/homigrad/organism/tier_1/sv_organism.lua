@@ -1,7 +1,7 @@
 hg.organism.module = hg.organism.module or {}
 local module = hg.organism.module
 hg.organism.lastindex = hg.organism.lastindex or 1000000
-local hg_panic = CreateConVar("hg_panic", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enables panic attack gain", 0, 1)
+local hg_panic = CreateConVar("hg_panic", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enables panic attacks; normal adrenaline and fear responses remain active", 0, 1)
 local panicattack_threshold = 0.45
 local panicattack_add_decay_time = 90
 local panicattack_rise_time = 2.5
@@ -199,7 +199,7 @@ hook.Add("Org Clear", "Main", function(org)
 end)
 hook.Add("Should Fake Up", "organism", function(ply)
 	local org = ply.organism
-	if org.seizureActive or org.otrub or org.fake or org.nearpainlimit or org.shock > 40 or org.spine1 >= hg.organism.fake_spine1 or org.spine2 >= hg.organism.fake_spine2 or org.spine3 >= hg.organism.fake_spine3 or (org.lleg == 1 and org.rleg == 1) and org.berserk <= 0.3 or (org.blood < 2900) or org.consciousness <= 0.4 then
+	if org.seizureActive or org.otrub or org.fake or org.nearpainlimit or org.shock > 40 or org.spine1 >= hg.organism.fake_spine1 or org.spine2 >= hg.organism.fake_spine2 or org.spine3 >= hg.organism.fake_spine3 or (org.lleg == 1 and org.rleg == 1) and org.berserk <= 0.3 or (org.blood <= 2250) or org.consciousness <= 0.4 then
 		return false
 	end
 end)
@@ -655,11 +655,25 @@ local function panic_has_gunfight_protection(org)
 	return (org.panicGunfightUntil or 0) > CurTime() and panic_has_usable_firearm(org) and not panic_has_sustained_fear(org)
 end
 
-function hg.organism.AddPanicAttack(org, amount, silent, combatEvent, ignoreGunfightProtection)
+local function apply_panic_disabled_stress(org, amount)
+	if org.otrub then return end
+
+	local owner = org.owner
+	if IsValid(owner) and owner:IsPlayer() and owner:Alive() and owner.AddNaturalAdrenaline then
+		owner:AddNaturalAdrenaline(math.Clamp(amount * 0.75, 0.015, 0.35))
+	end
+
+	org.fearadd = math.min((org.fearadd or 0) + math.Clamp(amount * 2.5, 0.04, 0.6), 3)
+end
+
+function hg.organism.AddPanicAttack(org, amount, silent, combatEvent, ignoreGunfightProtection, universalStressApplied)
 	if not org then return 0 end
 	if not isnumber(amount) or amount <= 0 then return org.panicattackadd or 0 end
 	if combatEvent then hg.organism.MarkPanicGunfight(org) end
-	if not hg_panic:GetBool() then return org.panicattackadd or 0 end
+	if not hg_panic:GetBool() then
+		if not universalStressApplied then apply_panic_disabled_stress(org, amount) end
+		return org.panicattackadd or 0
+	end
 	if not ignoreGunfightProtection and panic_has_gunfight_protection(org) then return org.panicattackadd or 0 end
 	if silent and IsValid(org.owner) and org.owner:IsPlayer() and (org.owner.lastKillTime or 0) > CurTime() - 4 then
 		return org.panicattackadd or 0
@@ -820,7 +834,7 @@ hook.Add("HomigradDamage", "PanicAttackDamage", function(ply, dmgInfo)
 	if not IsValid(attacker) and IsValid(ply.lastPanicAttacker) and (ply.lastPanicAttackTime or 0) > CurTime() - 30 then
 		attacker = ply.lastPanicAttacker
 	end
-	hg.organism.AddPanicAttack(ply.organism, amount, false, combatEvent)
+	hg.organism.AddPanicAttack(ply.organism, amount, false, combatEvent, nil, true)
 	if dmgInfo:GetDamage() <= 0 and not dmgInfo:IsDamageType(DMG_BLAST) then return end
 	panic_witness_event(ply, attacker, math.Clamp(amount * 0.75, 0.04, 0.2), panicattack_witness_radius, combatEvent)
 	ply.nextPanicAttackTime = CurTime() + panicattack_damage_cooldown
@@ -1077,7 +1091,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.canmove = (org.spine2 < hg.organism.fake_spine2 and org.spine3 < hg.organism.fake_spine3) and not org.otrub
 		org.canmovehead = (org.spine3 < hg.organism.fake_spine3) and not org.otrub
 		if not (org.canmove and org.canmovehead and (org.stun - CurTime()) < 0) then org.needfake = true end
-		if (org.blood < 2700) then org.needfake = true end
+		if (org.blood <= 2250) then org.needfake = true end
 		if org.neckslit and not org.otrub then org.needfake = true end
 	end
 	local just_went_uncon = not org.otrub and org.needotrub

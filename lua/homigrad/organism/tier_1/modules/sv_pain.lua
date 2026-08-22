@@ -70,6 +70,8 @@ module[1] = function(org)
 	org.painlessen = 0
 
 	org.tranquilizer = 0
+	org.zerlkers = 0
+	org.zerlkersOverdose = 0
 
 	org.shock_turn = 0
 
@@ -86,8 +88,14 @@ module[2] = function(owner, org, timeValue)
 	local adrenalineMul = min(max(1 + org.adrenaline, 1), 1.2)
 
 	local adrenaline = org.adrenaline
+	local zerlkersDose = math.Clamp(tonumber(org.zerlkers) or 0, 0, 4)
+	if zerlkersDose > 0 then
+		zerlkersDose = math.max(zerlkersDose - timeValue / 120, 0)
+	end
+	org.zerlkers = zerlkersDose
+	org.zerlkersOverdose = math.Clamp(zerlkersDose - 1, 0, 1)
 	local resilience = hg.organism.GetResilience and hg.organism.GetResilience(org) or 0
-	local zerlkers = math.Clamp(org.zerlkers or 0, 0, 1)
+	local zerlkers = math.Clamp(zerlkersDose, 0, 1)
 	local zerlkersResistance = hg.organism.GetZerlkersResistance and hg.organism.GetZerlkersResistance(org) or zerlkers
 	local anger = Clamp(org.anger or 0, 0, 1)
 

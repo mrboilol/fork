@@ -90,6 +90,58 @@ local function queueTimer(ent, name, delay, func)
 	end
 end
 
+local function getHeadshotBloodRagdoll(ent, ply)
+	if IsValid(ent) and (ent:IsRagdoll() or ent:IsNPC()) then return ent end
+	if not IsValid(ply) then return end
+
+	if IsValid(ply.FakeRagdoll) then return ply.FakeRagdoll end
+
+	local deathRagdoll = ply:GetNWEntity("RagdollDeath")
+	if IsValid(deathRagdoll) then return deathRagdoll end
+end
+
+local function sendHeadshotBloodSquirt(ent, ply, damagePos, direction, outputHole)
+	local attempts = 0
+	local function send()
+		attempts = attempts + 1
+		local rag = getHeadshotBloodRagdoll(ent, ply)
+		if not IsValid(rag) then
+			if attempts < 20 then timer.Simple(0.05, send) end
+			return
+		end
+
+		if rag.bloodsquirted or rag.headexploded then return end
+
+		local headBoneName = "ValveBiped.Bip01_Head1"
+		local bone = rag:LookupBone(headBoneName)
+		local mat = bone and rag:GetBoneMatrix(bone)
+		if not mat then
+			if attempts < 20 then timer.Simple(0.05, send) end
+			return
+		end
+
+		rag.bloodsquirted = true
+
+		local function sendJet(pos, dir)
+			net.Start("bloodsquirt")
+			net.WriteEntity(rag)
+			net.WriteUInt(rag:EntIndex(), 16)
+			net.WriteString(headBoneName)
+			net.WriteMatrix(mat)
+			net.WriteVector(pos)
+			net.WriteVector(dir)
+			net.SendPVS(pos)
+		end
+
+		sendJet(damagePos + direction * 2, -direction * 2)
+		if outputHole and #outputHole > 0 then
+			sendJet(outputHole[1] - direction * 2, direction * 2)
+		end
+	end
+
+	send()
+end
+
 local function ApplyFatalOrganismDamage(org, dmgInfo)
 	local owner = org and org.owner
 	if not IsValid(owner) or org.fatalDamageQueued then return end
@@ -1413,7 +1465,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	end
 
 	if hg.ReportCombatInjuryState then
-		hg.ReportCombatInjuryState(attacker, ply, org, combatThoughtState)
+		hg.ReportCombatInjuryState(attacker, ply, org, combatThoughtState, meleeContact and inf, meleeContact, dmg, dmgtype)
 	end
 	
 	attacker.harm = 0
@@ -1492,8 +1544,6 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	end
 	org.dmgstack[hitgroup][1] = headGoreStack or gibStack
 	if hitgroup == HITGROUP_HEAD and ent.headexploded and Gib_UpdateHeadGoreStage then Gib_UpdateHeadGoreStage(ent, headGoreStack or gibStack) end
-	local translatedBone = ent:TranslatePhysBoneToBone(bone or 0)
-	local mat = translatedBone and translatedBone >= 0 and ent:GetBoneMatrix(translatedBone) or nil
 	local hitgroup_max = 100
 	if org.isPly then
 		hitgroup_max = hitgroup == HITGROUP_HEAD and (isBuckshot and player_buckshot_head_gib_threshold or player_head_gib_threshold) or hitgrouptolimb[hitgroup] and player_limb_gib_threshold or hitgroup == HITGROUP_STOMACH and player_stomach_gib_threshold or hitgroup_max
@@ -1504,6 +1554,13 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	local blast = dmgInfo:IsDamageType(DMG_BLAST)
 	local slash = dmgInfo:IsDamageType(DMG_SLASH)
 	if not noDismemberment and instant and hitgroup == HITGROUP_HEAD and !ent.headexploded then hg.ExplodeHead(ent, headGoreStack or gibStack, slash, dirCool * len) end
+	if hitgroup == HITGROUP_HEAD and damageStack > 0 and dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) and !ent.headexploded then
+		local squirtDirection = dirCool
+		if squirtDirection:LengthSqr() == 0 then
+			squirtDirection = (dmgPos - ent:WorldSpaceCenter()):GetNormalized()
+		end
+		sendHeadshotBloodSquirt(ent, ply, dmgPos, squirtDirection, outputHole)
+	end
 	if not noDismemberment and instant and (hitgrouptolimb[hitgroup] or hg.amputeetable[bonename]) then
 		if blast then
 			for _, limb in ipairs({"lleg", "rleg", "larm", "rarm", "lhand", "rhand", "llegup", "rlegup", "larmup", "rarmup"}) do
@@ -1566,32 +1623,6 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 				hitgroupStack[2] = nil
 			end
 			
-			if IsValid(rag) then
-				if mat and !rag.bloodsquirted and !rag.headexploded and (hitgroup == HITGROUP_HEAD) and (bit.band(dmgtype, DMG_BULLET + DMG_BUCKSHOT) > 0) and math.random(4) == 1 and org.pulse > 30 then
-					rag.bloodsquirted = true
-
-					net.Start("bloodsquirt")
-					net.WriteEntity(rag)
-					net.WriteUInt(rag:EntIndex(), 16)
-					net.WriteString(bonename)
-					net.WriteMatrix(mat)
-					net.WriteVector(dmgPos + dirCool * 2)
-					net.WriteVector(-dirCool * 2)
-					net.SendPVS(dmgPos)
-
-					if outputHole and #outputHole > 0 then
-						net.Start("bloodsquirt")
-						net.WriteEntity(rag)
-						net.WriteUInt(rag:EntIndex(), 16)
-						net.WriteString(bonename)
-						net.WriteMatrix(mat)
-						net.WriteVector(outputHole[1] - dirCool * 2)
-						net.WriteVector(dirCool * 2)
-						net.SendPVS(outputHole[1])
-					end
-				end
-			end
-
 			hitgroupStack[1] = nil
 			hitgroupStack[2] = nil
 

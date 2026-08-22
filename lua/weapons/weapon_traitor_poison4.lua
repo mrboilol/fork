@@ -239,7 +239,7 @@ if SERVER then
 			if (not org.poison4notificate) and ((org.poison4 + 20) < CurTime()) then
 				org.poison4notificate = true
 				org.owner:Notify("I'm doing.. Something.. Wrong...", true, "poison4", 3)
-				org.owner:EmitSound( ( ThatPlyIsFemale(org.owner) and "vo/npc/female01/moan0"..math.random(5)..".ogg" ) or "vo/npc/male01/moan0"..math.random(5)..".ogg")
+				org.owner:EmitSound( ( ThatPlyIsFemale(org.owner) and "vo/npc/female01/moan0"..math.random(5)..".wav" ) or "vo/npc/male01/moan0"..math.random(5)..".wav")
 				org.o2.regen = 0
 				--hg.organism.AmputateLimb(org, "larm") -- жестокие видеоигры
 				--hg.organism.AmputateLimb(org, "rarm")
@@ -272,7 +272,7 @@ if SERVER then
 		if (not org.poison4notificate) and ((org.poison4 + 20) < CurTime()) then
 			org.poison4notificate = true
 			org.owner:Notify("Breathing is... oddly harder...", true, "poison4", 3)
-			org.owner:EmitSound( ( ThatPlyIsFemale(org.owner) and "vo/npc/female01/moan0"..math.random(5)..".ogg" ) or "vo/npc/male01/moan0"..math.random(5)..".ogg")
+			org.owner:EmitSound( ( ThatPlyIsFemale(org.owner) and "vo/npc/female01/moan0"..math.random(5)..".wav" ) or "vo/npc/male01/moan0"..math.random(5)..".wav")
 		end
 
 		if (org.poison4 + 30) < CurTime() then

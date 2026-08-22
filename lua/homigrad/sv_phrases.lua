@@ -1,9 +1,9 @@
 local painPhrases = {
 	[1] = {
-		{"vo/npc/male01/moan", ".ogg", 1, 5},
+		{"vo/npc/male01/moan", ".wav", 1, 5},
 	},
 	[2] = {
-		{"vo/npc/female01/moan", ".ogg", 1, 5},
+		{"vo/npc/female01/moan", ".wav", 1, 5},
 	}
 }
 

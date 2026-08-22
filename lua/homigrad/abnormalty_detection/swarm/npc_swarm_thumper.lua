@@ -171,7 +171,7 @@ function ENT:Psych( )--Heavy on performance. Rethink
 		angle = (lastenem:GetPos()-self:GetPos()):Angle()
 		--angle[1] = 0
 		--angle[3] = 0
-		self:EmitSound("npc/stalker/go_alert2"..((math.random(0,3)==0 and "a") or "")..".ogg",75)
+			self:EmitSound("npc/stalker/go_alert2"..((math.random(0,3)==0 and "a") or "")..".wav",75)
 	end
 	
 	local found = self:TraceCircle(self:GetPos()+vector_up*self.SearchHeight,90,SWARM_CV_Thumper_PsychRange:GetInt(),{self},angle,45)

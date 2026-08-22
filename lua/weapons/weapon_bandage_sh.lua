@@ -82,6 +82,8 @@ function SWEP:UseJudgeBandageTPIK()
 end
 
 function SWEP:ApplyBandageVisualMode()
+	if not judgeBandageClasses[self:GetClass()] then return end
+
 	local judgeMode = self:UseJudgeBandageTPIK()
 	if self.HGBandageJudgeVisualMode == judgeMode then return end
 
@@ -202,6 +204,21 @@ function SWEP:SetHold(value)
 	self:SetWeaponHoldType(value)
 	self:SetHoldType(value)
 	self.holdtype = value
+end
+
+function SWEP:RefreshPerfusionTreatment(ent)
+	local org = IsValid(ent) and ent.organism or nil
+	if not org then return false end
+
+	local patient = org.owner
+	if IsValid(patient) then
+		patient.fullsend = true
+		if hg.send_organism then
+			hg.send_organism(org, patient)
+		end
+	end
+
+	return true
 end
 
 function SWEP:SetupDataTables()
@@ -1669,8 +1686,10 @@ function SWEP:ReverseAnimToIdle(...)
 	if base and base.ReverseAnimToIdle then return base.ReverseAnimToIdle(self, ...) end
 end
 
-
-SWEP:EnableBandageTPIK()
+function SWEP:ThinkReverseAnimToIdle(...)
+	local base = weapons.GetStored("weapon_tpik_base")
+	if base and base.ThinkReverseAnimToIdle then return base.ThinkReverseAnimToIdle(self, ...) end
+end
 
 function SWEP:CanBePickedUpByNPCs()
 	return true

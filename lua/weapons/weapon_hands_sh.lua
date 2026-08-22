@@ -2367,7 +2367,7 @@ function SWEP:PrimaryAttack(forcespecial)
 
 	local snd, pitch = "weapons/slam/throw.wav", math.random(110, 120)
 	if owner.PlayerClassName == "headcrabzombie" then
-		snd, pitch = "npc/zombie/claw_miss"..math.random(2)..".ogg", math.random(95, 110)
+		snd, pitch = "npc/zombie/claw_miss"..math.random(2)..".wav", math.random(95, 110)
 	end
 	if owner.PlayerClassName == "furry" then
 		local Ent = WhomILookinAt(owner, .3, 45)
@@ -2482,7 +2482,7 @@ function SWEP:AttackFront(special_attack, rand)
 			if Ent:IsPlayer() and IsValid(Ent:GetActiveWeapon()) and Ent:GetActiveWeapon().GetBlocking and Ent:GetActiveWeapon():GetBlocking() and not RagdollOwner(Ent) then
 				local snd = "Flesh.ImpactSoft"
 				if isZomb then
-					snd = "npc/zombie/claw_strike"..math.random(3)..".ogg"
+					snd = "npc/zombie/claw_strike"..math.random(3)..".wav"
 				elseif owner.PlayerClassName == "furry" then
 					snd = "pwb/weapons/knife/hit"..math.random(4)..".ogg"
 				end
@@ -2493,7 +2493,7 @@ function SWEP:AttackFront(special_attack, rand)
 			else
 				local snd = "Flesh.ImpactHard"
 				if isZomb then
-					snd = "npc/zombie/claw_strike"..math.random(3)..".ogg"
+					snd = "npc/zombie/claw_strike"..math.random(3)..".wav"
 				elseif owner.PlayerClassName == "furry" then
 					snd = "pwb/weapons/knife/hit"..math.random(4)..".ogg"
 				end
@@ -2516,7 +2516,7 @@ function SWEP:AttackFront(special_attack, rand)
 		else
 			local snd = "Flesh.ImpactSoft"
 			if isZomb then
-				snd = "npc/zombie/claw_strike"..math.random(3)..".ogg"
+				snd = "npc/zombie/claw_strike"..math.random(3)..".wav"
 			elseif owner.PlayerClassName == "furry" then
 				snd = "pwb/weapons/knife/hitwall.wav"
 			end
