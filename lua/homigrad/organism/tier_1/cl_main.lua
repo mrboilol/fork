@@ -1020,6 +1020,10 @@ hook.Add("OnNetVarSet","wounds_netvar",function(index, key, var)
 			if IsValid(rag) then
 				rag.wounds = var
 			end
+			local deathRag = IsValid(ent:GetNWEntity("RagdollDeath")) and ent:GetNWEntity("RagdollDeath")
+			if IsValid(deathRag) and deathRag != rag then
+				deathRag.wounds = var
+			end
 		end
 	end
 end)
@@ -1051,6 +1055,10 @@ hook.Add("OnNetVarSet","wounds_netvar2",function(index, key, var)
 			
 			if IsValid(rag) then
 				rag.arterialwounds = var
+			end
+			local deathRag = IsValid(ent:GetNWEntity("RagdollDeath")) and ent:GetNWEntity("RagdollDeath")
+			if IsValid(deathRag) and deathRag != rag then
+				deathRag.arterialwounds = var
 			end
 		end
 	end
@@ -1219,8 +1227,8 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 	local new_organism = ply.new_organism
 	
 	local seen = ent.shouldTransmit-- and not ent.NotSeen
-	local wounds = ply.wounds
-	local arterialwounds = ply.arterialwounds
+	local wounds = ent.wounds or ply.wounds
+	local arterialwounds = ent.arterialwounds or ply.arterialwounds
 
 	local org = ent.organism
 

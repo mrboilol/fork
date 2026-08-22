@@ -203,7 +203,7 @@ local hold_wound_clot_twohand_mul = 1.6
 -- Coagulation, wound pressure, tourniquets, and adrenaline continue to modify
 -- these rates normally rather than being bypassed by an instant-loss shortcut.
 local wound_bleed_rate_mul = 2.25
-local arterial_bleed_ml_s_per_severity = (hg.organism.config and hg.organism.config.ARTERIAL_BLEED_ML_S_PER_SEVERITY) or 3.0
+local arterial_bleed_ml_s_per_severity = (hg.organism.config and hg.organism.config.ARTERIAL_BLEED_ML_S_PER_SEVERITY) or 7.5
 local arterial_min_flow_fraction = (hg.organism.config and hg.organism.config.ARTERIAL_MIN_FLOW_FRACTION) or 0.08
 -- An amputated limb must remain an urgent arterial bleed.  This is lower than
 -- the old runaway jet, but high enough to be clearly visible and dangerous
@@ -604,7 +604,22 @@ module[2] = function(owner, org, mulTime)
 	local bleedoutspeed2 = 0
 	local arterialWoundBleedRates = {}
 	local next_arterypump = 60 / math.max(pulse, 10)
-	local ent = isPlayer and IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
+	local ent = owner
+	if isPlayer then
+		local rag = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or nil
+		if not IsValid(rag) then
+			local netRag = owner:GetNWEntity("FakeRagdoll")
+			rag = IsValid(netRag) and netRag or nil
+		end
+		if not IsValid(rag) then
+			rag = IsValid(owner.RagdollDeath) and owner.RagdollDeath or nil
+		end
+		if not IsValid(rag) then
+			local deathRag = owner:GetNWEntity("RagdollDeath")
+			rag = IsValid(deathRag) and deathRag or nil
+		end
+		if IsValid(rag) then ent = rag end
+	end
 	local ownerVel = owner:GetVelocity()
 
 	local arterialToRemove = {}

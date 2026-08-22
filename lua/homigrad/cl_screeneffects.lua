@@ -409,6 +409,31 @@ local painEffectIntensity = 0.8
 local unconsciousPainEffectIntensity = 1.55
 local painPulseIntensity = 0.25
 local painRapidShakeThreshold = 95
+hg.screeneffects_config = {
+	consciousnessTypeBeatVolume = consciousnessTypeBeatVolume,
+	dying2Volume = dying2Volume,
+	alternateDyingForegroundVolume = alternateDyingForegroundVolume,
+	sonimCookedForegroundVolume = sonimCookedForegroundVolume,
+	alternateDyingBackgroundVolume = alternateDyingBackgroundVolume,
+	alternateDyingBackgroundMul = alternateDyingBackgroundMul,
+	painBeatOverlayPath = painBeatOverlayPath,
+	panicattackOverlayPath = panicattackOverlayPath,
+	panicattackVisualExponent = panicattackVisualExponent,
+	panicattackPulseFloor = panicattackPulseFloor,
+	panicattackPulseIntensity = panicattackPulseIntensity,
+	panicattackShakeIntervalMin = panicattackShakeIntervalMin,
+	panicattackShakeIntervalMax = panicattackShakeIntervalMax,
+	panicattackShakeMul = panicattackShakeMul,
+	painBeatOverlayVolumeMul = painBeatOverlayVolumeMul,
+	painThresholdMax = painThresholdMax,
+	painAgonyThreshold = painAgonyThreshold,
+	painExcruciatingThreshold = painExcruciatingThreshold,
+	painAgonyVolumeMul = painAgonyVolumeMul,
+	painExcruciatingVolumeMul = painExcruciatingVolumeMul,
+	painPitchMax = painPitchMax,
+	itsHopelessLoopStart = ITS_HOPELESS_LOOP_START,
+	itsHopelessLoopEndTrim = ITS_HOPELESS_LOOP_END_TRIM,
+}
 local hiddenPainFlickerSeverity = 0
 local hiddenPainFlickerStart = 0
 local hiddenPainFlickerAttackEnd = 0
@@ -1011,7 +1036,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 
 	if painMode == 6 and not PainStationOverlayLoading and canRetrySound("PainStationOverlay", PainStationOverlay) then
 		PainStationOverlayLoading = true
-		sound.PlayFile(painBeatOverlayPath, "noblock noplay", function(station)
+		sound.PlayFile(hg.screeneffects_config.painBeatOverlayPath, "noblock noplay", function(station)
 			PainStationOverlayLoading = false
 			if IsValid(station) then
 				if getServerSoundMode("hg_painsound", 6) != 6 then
@@ -1155,7 +1180,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			if IsValid(station) then
 				station:SetVolume(0)
 				station:Play()
-				station:SetTime(ITS_HOPELESS_LOOP_START)
+				station:SetTime(hg.screeneffects_config.itsHopelessLoopStart)
 				ItsHopelessStation = station
 				station:EnableLooping(true)
 			end
@@ -1164,10 +1189,10 @@ hook.Add("Post Post Processing", "ItHurts", function()
 
 	if IsValid(ItsHopelessStation) then
 		local trackLength = ItsHopelessStation:GetLength()
-		local loopEnd = trackLength - ITS_HOPELESS_LOOP_END_TRIM
+		local loopEnd = trackLength - hg.screeneffects_config.itsHopelessLoopEndTrim
 		local playbackTime = ItsHopelessStation:GetTime()
-		if loopEnd > ITS_HOPELESS_LOOP_START and (playbackTime < ITS_HOPELESS_LOOP_START or playbackTime >= loopEnd) then
-			ItsHopelessStation:SetTime(ITS_HOPELESS_LOOP_START)
+		if loopEnd > hg.screeneffects_config.itsHopelessLoopStart and (playbackTime < hg.screeneffects_config.itsHopelessLoopStart or playbackTime >= loopEnd) then
+			ItsHopelessStation:SetTime(hg.screeneffects_config.itsHopelessLoopStart)
 		end
 	end
 
@@ -1259,10 +1284,10 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	updateSeizureEffects(org)
 
 	local panicBaseTarget = getPanicAttackFx(org)
-	PanicAttackLerp = LerpFT(0.03, PanicAttackLerp, panicBaseTarget ^ panicattackVisualExponent)
+	PanicAttackLerp = LerpFT(0.03, PanicAttackLerp, panicBaseTarget ^ hg.screeneffects_config.panicattackVisualExponent)
 	if PanicAttackLerp > 0.001 and not org.otrub then
 		local panicBase = PanicAttackLerp
-		local panicPulse = panicBase * (panicattackPulseFloor + math.ease.InOutSine(math.abs(math.cos(CurTime() * 2))) * panicattackPulseIntensity)
+		local panicPulse = panicBase * (hg.screeneffects_config.panicattackPulseFloor + math.ease.InOutSine(math.abs(math.cos(CurTime() * 2))) * hg.screeneffects_config.panicattackPulseIntensity)
 
 		render.UpdateScreenEffectTexture()
 		heatMat:SetFloat("$c0_x", -CurTime() * 0.1)
@@ -1287,14 +1312,14 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		render.DrawScreenQuad()
 
 		if CurTime() >= nextPanicAttackShake then
-			local shakeMul = (0.25 + panicBase * 0.9) * panicattackShakeMul
+			local shakeMul = (0.25 + panicBase * 0.9) * hg.screeneffects_config.panicattackShakeMul
 			ViewPunch(Angle(math.Rand(-0.8, 0.6), math.Rand(-1, 1), math.Rand(-0.2, 0.2)) * shakeMul)
 			ViewPunch2(Angle(math.Rand(-0.25, 0.35), math.Rand(-0.55, 0.55), math.Rand(-0.4, 0.4)) * shakeMul)
-			nextPanicAttackShake = CurTime() + math.Rand(panicattackShakeIntervalMin, panicattackShakeIntervalMax)
+			nextPanicAttackShake = CurTime() + math.Rand(hg.screeneffects_config.panicattackShakeIntervalMin, hg.screeneffects_config.panicattackShakeIntervalMax)
 		end
 
 		if canRetrySound("PanicStation", PanicStation) then
-			sound.PlayFile(panicattackOverlayPath, "noblock noplay", function(station)
+			sound.PlayFile(hg.screeneffects_config.panicattackOverlayPath, "noblock noplay", function(station)
 				if IsValid(station) then
 					station:SetVolume(0)
 					station:EnableLooping(true)
@@ -1510,9 +1535,9 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end
 		
 		//if pain > 10 then
-			painVolume = math.Clamp(math.Remap(pain, 0, painThresholdMax, 0, 2), 0, 2)
-			normalizedPain = math.Clamp(pain / painThresholdMax, 0, 1)
-			painPitch = math.Clamp(math.Remap(normalizedPain, 0, 1, 100, painPitchMax), 100, painPitchMax)
+			painVolume = math.Clamp(math.Remap(pain, 0, hg.screeneffects_config.painThresholdMax, 0, 2), 0, 2)
+			normalizedPain = math.Clamp(pain / hg.screeneffects_config.painThresholdMax, 0, 1)
+			painPitch = math.Clamp(math.Remap(normalizedPain, 0, 1, 100, hg.screeneffects_config.painPitchMax), 100, hg.screeneffects_config.painPitchMax)
 			local targetPainVolume = 0
 			local targetRealityVolume = 0
 			local targetAgonyVolume = 0
@@ -1537,9 +1562,9 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				targetSillypainVolume = painVolume
 			elseif painMode == 6 then
 				targetPainVolume = painVolume
-				targetRemPainVolume = painVolume * painBeatOverlayVolumeMul
-				targetRemAgonyVolume = getPainLayerBlend(rawPain, painAgonyThreshold) * painVolume * painAgonyVolumeMul
-				targetRemExcruciatingVolume = getPainLayerBlend(rawPain, painExcruciatingThreshold) * painVolume * painExcruciatingVolumeMul
+				targetRemPainVolume = painVolume * hg.screeneffects_config.painBeatOverlayVolumeMul
+				targetRemAgonyVolume = getPainLayerBlend(rawPain, hg.screeneffects_config.painAgonyThreshold) * painVolume * hg.screeneffects_config.painAgonyVolumeMul
+				targetRemExcruciatingVolume = getPainLayerBlend(rawPain, hg.screeneffects_config.painExcruciatingThreshold) * painVolume * hg.screeneffects_config.painExcruciatingVolumeMul
 			end
 
 			if IsValid(PainStation) then
@@ -1990,7 +2015,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 					ItssooverStation:SetVolume(0)
 				end
 				if IsValid(SonimCookedStation) then
-					SonimCookedStation:SetVolume(math.Clamp(consciousVol * 1.5, 0, sonimCookedForegroundVolume))
+					SonimCookedStation:SetVolume(math.Clamp(consciousVol * 1.5, 0, hg.screeneffects_config.sonimCookedForegroundVolume))
 				end
 			elseif dyingMode == 8 then
 				-- REM low-O2 stack from the reference: rem_dying1 + rem_dying2.
@@ -2016,10 +2041,10 @@ hook.Add("Post Post Processing", "ItHurts", function()
 					SonimCookedStation:SetVolume(0)
 				end
 				if IsValid(RemDying1Station) then
-					RemDying1Station:SetVolume(math.Clamp(consciousVol, 0, consciousnessTypeBeatVolume))
+					RemDying1Station:SetVolume(math.Clamp(consciousVol, 0, hg.screeneffects_config.consciousnessTypeBeatVolume))
 				end
 				if IsValid(NoiseStation2Dying) then
-					NoiseStation2Dying:SetVolume(math.Clamp(consciousVol, 0, dying2Volume))
+					NoiseStation2Dying:SetVolume(math.Clamp(consciousVol, 0, hg.screeneffects_config.dying2Volume))
 				end
 			elseif dyingMode == 9 then
 				-- Alternate REM stack: keep rem_dying2, but replace rem_dying1
@@ -2046,11 +2071,11 @@ hook.Add("Post Post Processing", "ItHurts", function()
 					SonimCookedStation:SetVolume(0)
 				end
 				if IsValid(AltRemDyingStation) then
-					AltRemDyingStation:SetVolume(math.Clamp(consciousVol * alternateDyingBackgroundMul, 0, alternateDyingBackgroundVolume))
+					AltRemDyingStation:SetVolume(math.Clamp(consciousVol * hg.screeneffects_config.alternateDyingBackgroundMul, 0, hg.screeneffects_config.alternateDyingBackgroundVolume))
 					if AltRemDyingStation:GetTime() >= 120 then AltRemDyingStation:SetTime(0) end
 				end
 				if IsValid(NoiseStation2Dying) then
-					NoiseStation2Dying:SetVolume(math.Clamp(consciousVol, 0, alternateDyingForegroundVolume))
+					NoiseStation2Dying:SetVolume(math.Clamp(consciousVol, 0, hg.screeneffects_config.alternateDyingForegroundVolume))
 				end
 			elseif dyingMode == 10 then
 				-- Only itshopeless.mp3, no screen shake.

@@ -23,6 +23,24 @@ hg.organism.module.stamina = {}
 
 local module = hg.organism.module.stamina
 
+function hg.organism.ConsumeStamina(org, amount)
+	if not org or not org.stamina then return 0 end
+	amount = math.max(tonumber(amount) or 0, 0)
+	if amount <= 0 or hg_infstamina:GetBool() then return 0 end
+
+	local owner = org.owner
+	amount = amount * (IsValid(owner) and owner.StaminaExhaustMul or 1)
+	amount = amount / (1 + math.max(org.berserk or 0, 0))
+	local stamina = org.stamina
+	local spent = math.min(stamina[1] or 0, amount)
+	stamina[1] = math.max((stamina[1] or 0) - amount, 0)
+	if spent > 0 then
+		stamina.recoveryPenaltyUntil = CurTime() + recent_stamina_loss_hold_time
+		stamina.recoveryPenaltyFadeUntil = stamina.recoveryPenaltyUntil + recent_stamina_loss_fade_time
+	end
+	return spent
+end
+
 module[1] = function(org)
 
 	org.adrenaline = 0
@@ -176,12 +194,6 @@ module[2] = function(owner, org, timeValue)
 	stamina.sub = stamina.sub * (owner.StaminaExhaustMul or 1)
 
 	stamina.sub = stamina.sub / (1 + org.berserk)
-
-		if org.o2[1] < 10 then
-
-		stamina.sub = 0
-
-	end
 
 	local goodmood = math.Clamp(org.goodmood or 0, 0, 1)
 

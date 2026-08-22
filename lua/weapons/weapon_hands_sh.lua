@@ -1977,7 +1977,7 @@ function SWEP:BlockingLogic(ent, mul, attacktype, trace)
 				return 1
 			end
 
-			ent.organism.stamina.subadd = ent.organism.stamina.subadd + mul * math.Clamp(selfdmg / dmg, 0.1, 1) * selfdmg * (1 - math.Clamp((self:GetStartedBlocking() - CurTime() + 0.1), 0, 0.1) / 0.1)
+			if hg.organism and hg.organism.ConsumeStamina then hg.organism.ConsumeStamina(ent.organism, mul * math.Clamp(selfdmg / dmg, 0.1, 1) * selfdmg * (1 - math.Clamp((self:GetStartedBlocking() - CurTime() + 0.1), 0, 0.1) / 0.1)) end
 
             if defenderBlockTier >= attackerBlockTier then
                 if wep.BlockImpactSound then
@@ -2000,12 +2000,10 @@ function SWEP:BlockingLogic(ent, mul, attacktype, trace)
                 if perfectblock then
                     -- ent:EmitSound("tasty/empty.ogg")
                 else
-                    if ent.organism then
-                        ent.organism.stamina.subadd = ent.organism.stamina.subadd + 15
-                    end
+					if ent.organism and hg.organism and hg.organism.ConsumeStamina then hg.organism.ConsumeStamina(ent.organism, 15) end
                 end
 
-                ent.organism.stamina.subadd = ent.organism.stamina.subadd + mul * math.Clamp(selfdmg / dmg, 0.1, 1) * selfdmg * (perfectblock and 0 or 1)
+				if hg.organism and hg.organism.ConsumeStamina then hg.organism.ConsumeStamina(ent.organism, mul * math.Clamp(selfdmg / dmg, 0.1, 1) * selfdmg * (perfectblock and 0 or 1)) end
 
                 if wep.SetLastBlocked then
                     -- wep:SetLastBlocked(CurTime()) -- Removing this to ensure block doesn't stop
@@ -2266,9 +2264,7 @@ function SWEP:ShoveFront()
 		sound.Play(impactSnd, HitPos or Ent:WorldSpaceCenter(), 65, math.random(92, 108))
 	end
 
-	if owner.organism and owner.organism.stamina then
-		owner.organism.stamina.subadd = owner.organism.stamina.subadd + SHOVE_STAMINA_COST
-	end
+	if owner.organism and owner.organism.stamina and hg.organism and hg.organism.ConsumeStamina then hg.organism.ConsumeStamina(owner.organism, SHOVE_STAMINA_COST) end
 
 	owner:LagCompensation(false)
 end
@@ -2360,9 +2356,7 @@ function SWEP:PrimaryAttack(forcespecial)
 	self:SetNextPrimaryFire(CurTime() + self.SwingCooldown / armSpeedMul * math.Clamp((180 - owner.organism.stamina[1]) / 90,1,2) + (math.max(special_attack and 0.5 or 0, clawClasses[owner.PlayerClassName] or 0)))
 	self:SetNextSecondaryFire(CurTime() + self.SwingCooldown + (math.max(special_attack and 0.5 or 0, clawClasses[owner.PlayerClassName] or 0)))
 	self:SetLastShootTime(CurTime())
-	if SERVER and owner.organism and owner.organism.stamina then
-		owner.organism.stamina.subadd = (owner.organism.stamina.subadd or 0) + self.FistStaminaCost
-	end
+	if SERVER and owner.organism and owner.organism.stamina and hg.organism and hg.organism.ConsumeStamina then hg.organism.ConsumeStamina(owner.organism, self.FistStaminaCost) end
 	if rand then
 		self.swingBackRightEnd = CurTime() + self.SwingBackDuration
 		self.swingBackLeftEnd = CurTime()

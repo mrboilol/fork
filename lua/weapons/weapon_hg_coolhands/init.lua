@@ -207,9 +207,7 @@ function SWEP:SecondaryAttack()
                 self:PlayAnim("Shove",1)
                 self:GetOwner():ViewPunch(Angle(2, 0, 0))
                 sound.Play("player/shove_0"..math_random(5)..".wav", self:GetPos(), 65, math_random(105, 115))
-                if self:GetOwner().organism then
-                        self:GetOwner().organism.stamina.subadd = self:GetOwner().organism.stamina.subadd + shoveStaminaCost * attackStaminaCostMul
-                end
+				if self:GetOwner().organism and hg.organism and hg.organism.ConsumeStamina then hg.organism.ConsumeStamina(self:GetOwner().organism, shoveStaminaCost * attackStaminaCostMul) end
                 self:ShoveFront(sprintShove)
                 return
         end
@@ -721,7 +719,7 @@ function SWEP:BlockingLogic(ent, mul, attacktype, trace)
 		local selfdmg = self.DamagePrimary * 0.2
 
 		if wep.GetBlocking and wep:GetBlocking() and wep.SetStartedBlocking and dist < 10 then
-			ent.organism.stamina.subadd = ent.organism.stamina.subadd + mul * math_Clamp(selfdmg / dmg, 0.1, 1) * selfdmg * (1 - math_Clamp((self:GetStartedBlocking() - CurTime() + 0.1), 0, 0.1) / 0.1)
+			if hg.organism and hg.organism.ConsumeStamina then hg.organism.ConsumeStamina(ent.organism, mul * math_Clamp(selfdmg / dmg, 0.1, 1) * selfdmg * (1 - math_Clamp((self:GetStartedBlocking() - CurTime() + 0.1), 0, 0.1) / 0.1)) end
 
 			wep:SetLastBlocked(CurTime())
 
@@ -1291,7 +1289,7 @@ function SWEP:AttackFront(special_attack, rand)
         if SERVER then
                 local anger = math_Clamp((owner.organism and owner.organism.anger) or 0, 0, 1)
                 local staminaCost = special_attack and owner:KeyDown(IN_SPEED) and sprintSpecialPunchStaminaCost or punchStaminaCost
-                owner.organism.stamina.subadd = owner.organism.stamina.subadd + staminaCost * attackStaminaCostMul * (1 + anger * 0.6)
+				if hg.organism and hg.organism.ConsumeStamina then hg.organism.ConsumeStamina(owner.organism, staminaCost * attackStaminaCostMul * (1 + anger * 0.6)) end
         end
 
         owner:LagCompensation(false)

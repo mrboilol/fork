@@ -203,10 +203,10 @@ end
 local heatDamageTargets = {"brain", "heart", "liver", "stomach", "intestines"}
 local coldDamageTargets = {"heart", "liver", "stomach", "intestines"}
 local hypothermiaThoughts = {
-	{"I'm getting cold...", "Chilly out here...", "Need to warm up...", "My fingers are numb...", "Shivering..."},
-	{"I can't stop shaking...", "So cold... can't feel my hands...", "Need warmth... now...", "My body won't stop trembling...", "I'm freezing..."},
-	{"I can't... feel anything...", "So... tired... just want to sleep...", "The cold is... numbing everything...", "I'm so sleepy...", "Can't... move..."},
-	{"Everything's... going dark...", "So... cold...", "I can't... feel my body...", "Sleep... just... sleep..."}
+	{"You are cold.", "You are shivering from cold.", "Cold is making your hands numb."},
+	{"You are weak due to cold.", "You have hypothermia.", "Cold is causing severe shivering."},
+	{"You are severely weak from hypothermia.", "Hypothermia is making you numb and drowsy.", "You are struggling to move due to cold."},
+	{"You are freezing to death.", "Severe hypothermia is causing you to lose consciousness.", "You are close to dying from cold."}
 }
 local hyperthermiaThoughts = {
 	{"It's too hot...", "I'm sweating so much...", "Need water... need shade...", "I'm overheating...", "Can't take this heat..."},

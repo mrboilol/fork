@@ -191,17 +191,33 @@ end)
 
 local angZero = Angle(0, 0, 0)
 local vecZero = Vector(0, 0, 0)
-local function getlocalshit(ent, bone, dmgInfo, dir, hit)
-	if IsValid(ent) and bone then
-		local ent = IsValid(ent.FakeRagdoll) and ent.FakeRagdoll or ent
-		local bonePos, boneAng = ent:GetBonePosition(bone)
-		local dmgPos = not isbool(hit) and hit or bonePos
-		
-		local localPos, localAng = WorldToLocal(dmgPos, angZero, bonePos, boneAng)
-		local _, dir2 = WorldToLocal(vecZero, dir:Angle(), vecZero, boneAng)
-		dir2 = dir2:Forward()
-		return localPos, localAng, dir2
-	end
+local function getWoundBody(owner, hitEnt)
+	if IsValid(hitEnt) then return hitEnt end
+	if not IsValid(owner) then return end
+
+	local rag = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll
+		or owner.GetNWEntity and owner:GetNWEntity("FakeRagdoll")
+	if IsValid(rag) then return rag end
+
+	rag = IsValid(owner.RagdollDeath) and owner.RagdollDeath
+		or owner.GetNWEntity and owner:GetNWEntity("RagdollDeath")
+	return IsValid(rag) and rag or owner
+end
+
+local function getlocalshit(owner, hitEnt, bone, dir, hit)
+	local ent = getWoundBody(owner, hitEnt)
+	if not IsValid(ent) then return end
+
+	local boneID = isnumber(bone) and bone or ent:LookupBone(bone or "")
+	if not boneID or boneID < 0 then return end
+
+	local mat = ent:GetBoneMatrix(boneID)
+	if not mat then return end
+	local bonePos, boneAng = mat:GetTranslation(), mat:GetAngles()
+	local dmgPos = isvector(hit) and hit or bonePos
+	local localPos, localAng = WorldToLocal(dmgPos, angZero, bonePos, boneAng)
+	local _, dir2 = WorldToLocal(vecZero, dir:Angle(), vecZero, boneAng)
+	return localPos, localAng, dir2:Forward(), ent:GetBoneName(boneID)
 end
 
 local arterySize = {
@@ -244,7 +260,7 @@ local function getStaminaMul(dmgInfo)
 	return 1
 end
 
-local function hitArtery(artery, org, dmg, dmgInfo, boneindex, dir, hit)
+local function hitArtery(artery, org, dmg, dmgInfo, boneindex, dir, hit, impact)
 	if isCrush(dmgInfo) then return 1 end
 	if dmgInfo:IsDamageType(DMG_BLAST) then return 1 end
 	if dmgInfo:IsDamageType(DMG_SLASH) and dmg < 2 then
@@ -309,16 +325,19 @@ local function hitArtery(artery, org, dmg, dmgInfo, boneindex, dir, hit)
 		end)
 	end
 
-	local bonea = owner:LookupBone(boneindex)
-	local localPos, localAng, dir2 = getlocalshit(owner, bonea, dmgInfo, dir, hit)
-	local wound = {arterySize[artery], localPos, localAng, boneindex, CurTime(), dir2 * 100, artery}
+	local hitEnt = impact and impact.entity
+	local localPos, localAng, dir2, woundBone = getlocalshit(owner, hitEnt, boneindex, dir, hit)
+	if not localPos then
+		localPos, localAng, dir2 = vecZero, angZero, Vector(-1, 0, 0)
+	end
+	local wound = {arterySize[artery], localPos, localAng, woundBone or boneindex, CurTime(), dir2 * 100, artery}
 	table.insert(org.arterialwounds, wound)
 	hg.organism.MarkArterialWoundsNetDirty(org)
 	--if IsValid(owner:GetNWEntity("RagdollDeath")) then owner:GetNWEntity("RagdollDeath"):SetNetVar("wounds",org.arterialwounds) end
 	return 0
 end
 
-hook.Add("PreTraceOrganBulletDamage", "hg_melee_artery_chance", function(org, bone, dmg, dmgInfo, box, dir, hit, ricochet, organ)
+hook.Add("PreTraceOrganBulletDamage", "hg_melee_artery_chance", function(org, bone, dmg, dmgInfo, box, dir, hit, ricochet, organ, hookInfo, impact)
 	if not dmgInfo:IsDamageType(DMG_SLASH) then return end
 
 	local artery = organ and slashToArtery[organ[1]]
@@ -328,18 +347,18 @@ hook.Add("PreTraceOrganBulletDamage", "hg_melee_artery_chance", function(org, bo
 	local arteryChance = math.Clamp(getArteryChanceMul(dmgInfo) - 1, 0, 1)
 	if math.Rand(0, 1) > arteryChance then return end
 
-	hitArtery(artery, org, dmg, dmgInfo, box[6], dir, hit)
+	hitArtery(artery, org, dmg, dmgInfo, box[6], dir, hit, impact)
 end)
 
-input_list.arteria = function(org, bone, dmg, dmgInfo, boneindex, dir, hit)
-	return hitArtery("arteria", org, dmg, dmgInfo, "ValveBiped.Bip01_Neck1", dir, hit)
+input_list.arteria = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet, impact)
+	return hitArtery("arteria", org, dmg, dmgInfo, "ValveBiped.Bip01_Neck1", dir, hit, impact)
 end
 
-input_list.rarmartery = function(org, bone, dmg, dmgInfo, boneindex, dir, hit) return hitArtery("rarmartery", org, dmg, dmgInfo, boneindex, dir, hit) end
-input_list.larmartery = function(org, bone, dmg, dmgInfo, boneindex, dir, hit) return hitArtery("larmartery", org, dmg, dmgInfo, boneindex, dir, hit) end
-input_list.rlegartery = function(org, bone, dmg, dmgInfo, boneindex, dir, hit) return hitArtery("rlegartery", org, dmg, dmgInfo, boneindex, dir, hit) end
-input_list.llegartery = function(org, bone, dmg, dmgInfo, boneindex, dir, hit) return hitArtery("llegartery", org, dmg, dmgInfo, boneindex, dir, hit) end
-input_list.spineartery = function(org, bone, dmg, dmgInfo, boneindex, dir, hit) return hitArtery("spineartery", org, dmg, dmgInfo, boneindex, dir, hit) end
+input_list.rarmartery = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet, impact) return hitArtery("rarmartery", org, dmg, dmgInfo, boneindex, dir, hit, impact) end
+input_list.larmartery = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet, impact) return hitArtery("larmartery", org, dmg, dmgInfo, boneindex, dir, hit, impact) end
+input_list.rlegartery = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet, impact) return hitArtery("rlegartery", org, dmg, dmgInfo, boneindex, dir, hit, impact) end
+input_list.llegartery = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet, impact) return hitArtery("llegartery", org, dmg, dmgInfo, boneindex, dir, hit, impact) end
+input_list.spineartery = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet, impact) return hitArtery("spineartery", org, dmg, dmgInfo, boneindex, dir, hit, impact) end
 input_list.eyeL = function(org, bone, dmg, dmgInfo)
 	local oldDmg = org.eyeL or 0
 	dmg = dmg * 0.75

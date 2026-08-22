@@ -1440,6 +1440,13 @@ function SWEP:SetMeleeDamageContact(ent, trace)
     end
 end
 
+function SWEP:ConsumeMeleeStamina(owner, amount)
+	if not SERVER or not IsValid(owner) or not owner.organism then return end
+	if hg.organism and hg.organism.ConsumeStamina then
+		hg.organism.ConsumeStamina(owner.organism, amount)
+	end
+end
+
 function SWEP:IsHeadTrace(ent, trace)
     if not trace then return false end
     if trace.HitGroup == HITGROUP_HEAD then return true end
@@ -1592,9 +1599,7 @@ function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
             
             self:PlaySwingSound(owner, attacktype)
             
-            if owner.organism then
-                owner.organism.stamina.subadd = owner.organism.stamina.subadd + self:GetAttackConfigValue(self.StaminaPrimary, self.StaminaSecondary, self.ChargeStamina, attacktype) * (self.StaminaCostMul or 0.4) * math.Clamp(vellen / 200, 1, 1.25)
-            end
+			self:ConsumeMeleeStamina(owner, self:GetAttackConfigValue(self.StaminaPrimary, self.StaminaSecondary, self.ChargeStamina, attacktype) * (self.StaminaCostMul or 0.4) * math.Clamp(vellen / 200, 1, 1.25))
 
             if charge then
                 if self.CustomChargeAttack and self:CustomChargeAttack() then
@@ -2371,11 +2376,11 @@ function SWEP:Feint()
 
     self.Feinting = true
 
-    if owner.organism then
-        local attacktype = self:GetAttackType()
-        local vellen = IsValid(owner) and owner:GetVelocity():Length() or 0
-        local staminaCost = self:GetAttackConfigValue(self.StaminaPrimary, self.StaminaSecondary, self.ChargeStamina, attacktype) or 0
-        owner.organism.stamina.subadd = owner.organism.stamina.subadd + staminaCost * (self.StaminaCostMul or 0.4) * 0.5 * math.Clamp(vellen / 200, 1, 1.25)
+	if owner.organism then
+		local attacktype = self:GetAttackType()
+		local vellen = IsValid(owner) and owner:GetVelocity():Length() or 0
+		local staminaCost = self:GetAttackConfigValue(self.StaminaPrimary, self.StaminaSecondary, self.ChargeStamina, attacktype) or 0
+		self:ConsumeMeleeStamina(owner, staminaCost * (self.StaminaCostMul or 0.4) * 0.5 * math.Clamp(vellen / 200, 1, 1.25))
     end
 
     self:SetInAttack(false)
@@ -2636,9 +2641,7 @@ function SWEP:BlockingLogic(ent, mul, attacktype, trace)
             if perfectblock then
                 trace.HGPreventHeadRagdoll = true
 
-                if owner.organism and owner.organism.stamina then
-                    owner.organism.stamina.subadd = owner.organism.stamina.subadd + swingStamina * (wep.BlockParryStaminaMul or self.BlockParryStaminaMul or 0.5)
-                end
+				self:ConsumeMeleeStamina(owner, swingStamina * (wep.BlockParryStaminaMul or self.BlockParryStaminaMul or 0.5))
 
 				if not owner:IsNPC() then
             	    self:PunchPlayer(owner, attacktype, -owner:GetAimVector(), selfdmg * 0.15)
@@ -2666,14 +2669,10 @@ function SWEP:BlockingLogic(ent, mul, attacktype, trace)
                 return 0, "parry"
             end
 
-            if ent.organism and ent.organism.stamina then
-                ent.organism.stamina.subadd = ent.organism.stamina.subadd + blockStaminaCost
-            end
+			if hg.organism and hg.organism.ConsumeStamina then hg.organism.ConsumeStamina(ent.organism, blockStaminaCost) end
 
             if tierDiff >= (self.BlockBreakTierDiff or 2) then
-                if ent.organism and ent.organism.stamina then
-                    ent.organism.stamina.subadd = ent.organism.stamina.subadd + selfdmg * (wep.BlockBreakStaminaMul or self.BlockBreakStaminaMul or 0.75)
-                end
+				if hg.organism and hg.organism.ConsumeStamina then hg.organism.ConsumeStamina(ent.organism, selfdmg * (wep.BlockBreakStaminaMul or self.BlockBreakStaminaMul or 0.75)) end
 
                 if wep.SetBlocking then
                     wep:SetBlocking(false)

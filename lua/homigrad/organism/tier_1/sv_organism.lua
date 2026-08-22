@@ -79,6 +79,7 @@ hook.Add("Org Clear", "Main", function(org)
 	org.eyeL = 0
 	org.eyeR = 0
 	org.consciousness = 1
+	org.spawnOxygenGraceUntil = CurTime() + 0.75
 	org.disorientation = 0
 	org.jaw = 0
 	org.teethLost = 0
@@ -238,23 +239,34 @@ function hg.organism.SyncArterialWoundsNet(org)
 	return hg.organism.FlushArterialWoundsNet(org)
 end
 
-local function mirrorWoundsToDeathRagdoll(org)
+local function mirrorWoundsToRagdolls(org, key, wounds)
 	local owner = org and org.owner
 	if not IsValid(owner) or not owner:IsPlayer() then return end
-	local rag = IsValid(owner.RagdollDeath) and owner.RagdollDeath or owner:GetNWEntity("RagdollDeath")
-	if IsValid(rag) then rag:SetNetVar("wounds", org.wounds or {}) end
+	local rags = {
+		owner.FakeRagdoll,
+		owner:GetNWEntity("FakeRagdoll"),
+		owner.RagdollDeath,
+		owner:GetNWEntity("RagdollDeath"),
+	}
+	local mirrored = {}
+	for _, rag in pairs(rags) do
+		if IsValid(rag) and not mirrored[rag] then
+			rag:SetNetVar(key, wounds or {})
+			mirrored[rag] = true
+		end
+	end
 end
 
 function hg.organism.FlushWoundsNet(org, force, mirrorDeathRagdoll)
 	if not org or not IsValid(org.owner) then return end
 	local signature = wounds_signature(org.wounds)
 	if not force and org.lastWoundsSig == signature then
-		if mirrorDeathRagdoll then mirrorWoundsToDeathRagdoll(org) end
+		if mirrorDeathRagdoll then mirrorWoundsToRagdolls(org, "wounds", org.wounds) end
 		return false
 	end
 	org.lastWoundsSig = signature
 	org.owner:SetNetVar("wounds", org.wounds or {})
-	if mirrorDeathRagdoll then mirrorWoundsToDeathRagdoll(org) end
+	mirrorWoundsToRagdolls(org, "wounds", org.wounds)
 	return true
 end
 
@@ -265,6 +277,7 @@ function hg.organism.FlushArterialWoundsNet(org, force)
 	if not force and org.lastArterialWoundsSig == signature then return false end
 	org.lastArterialWoundsSig = signature
 	org.owner:SetNetVar("arterialwounds", org.arterialwounds or {})
+	mirrorWoundsToRagdolls(org, "arterialwounds", org.arterialwounds)
 	return true
 end
 

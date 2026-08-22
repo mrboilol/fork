@@ -405,6 +405,15 @@ module[2] = function(owner, org, timeValue)
 		return
 	end
 
+	if (org.spawnOxygenGraceUntil or 0) > CurTime() then
+		o2[1] = o2.range
+		o2.curregen = o2.regen
+		org.exertionO2Debt = 0
+		org.oxygenIntakeAvailable = true
+		org.lungsfunction = true
+		return
+	end
+
 	local staminaValue = org.stamina and org.stamina[1] or lowStaminaO2Start
 	local activelyExerting = org.stamina and (org.stamina.sub or 0) > 0.05 or false
 	if owner:IsPlayer() and not owner:InVehicle() then
