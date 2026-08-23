@@ -1,4 +1,5 @@
 local min, max, halfValue2 = math.min, math.max, util.halfValue2
+local Clamp, Approach, Remap = math.Clamp, math.Approach, math.Remap
 --local Organism = hg.organism
 hg.organism.module.pulse = {}
 local module = hg.organism.module.pulse
@@ -447,7 +448,6 @@ end
 
 
 
-local Clamp, Approach, Remap = math.Clamp, math.Approach, math.Remap
 local CurTime = CurTime
 local function getBloodVolume(org)
 	return getBloodPerfusion(org.blood)

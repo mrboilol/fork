@@ -47,6 +47,7 @@ local function ZB_IsBackToBackBlocked(mode, previous)
 end
 
 local function ZB_IsForcedModeAllowed(mode)
+        mode = ZB_NormalizeModeKey(mode)
         if !isstring(mode) or !ZB_FORCED_MODE_POOL[mode] then return false end
 
 	local parentMode = zb:GetMode(mode)
@@ -54,11 +55,12 @@ local function ZB_IsForcedModeAllowed(mode)
 	return tbl and (!tbl.CanLaunch or tbl:CanLaunch())
 end
 
-local function ZB_GetForcedTempMode()
+local function ZB_GetForcedTempMode(previous)
         local total = 0
+        previous = ZB_NormalizeModeKey(previous)
 
         for mode, chance in pairs(ZB_FORCED_TEMP_MODE_WEIGHTS) do
-                if ZB_IsForcedModeAllowed(mode) then
+                if ZB_IsForcedModeAllowed(mode) and !ZB_IsBackToBackBlocked(mode, previous) then
                         total = total + chance
                 end
         end
@@ -69,7 +71,7 @@ local function ZB_GetForcedTempMode()
         local count = 0
 
         for mode, chance in pairs(ZB_FORCED_TEMP_MODE_WEIGHTS) do
-                if ZB_IsForcedModeAllowed(mode) then
+                if ZB_IsForcedModeAllowed(mode) and !ZB_IsBackToBackBlocked(mode, previous) then
                         count = count + chance
 
                         if random <= count then
@@ -82,8 +84,11 @@ local function ZB_GetForcedTempMode()
 end
 
 local function ZB_ResolveNextRound(round)
+	round = ZB_NormalizeModeKey(round)
+
 	if ZB_FORCE_LIMITED_MODE_POOL then
-                return ZB_IsForcedModeAllowed(round) and round or ZB_GetForcedTempMode()
+		local previous = ZB_NormalizeModeKey(zb.CROUND)
+                return (ZB_IsForcedModeAllowed(round) and !ZB_IsBackToBackBlocked(round, previous)) and round or ZB_GetForcedTempMode(previous)
 	end
 
 	return round
@@ -108,6 +113,8 @@ end)
 local forcemodeconvar = CreateConVar("zb_forcemode", "random", nil, "Set force mode (set to 'random' to disable)")
 forcemodeconvar:SetString("random")
 function zb:GetMode(round)
+	round = ZB_NormalizeModeKey(round)
+
 	if zb.modes[round] then return round end
 
 	-- Сначала ищем в базовых режимах (без base)
@@ -230,7 +237,6 @@ function zb:CheckWinner(tbl)
 end
 
 zb.ROUND_TIME = zb.ROUND_TIME or 300
-local ROUND_END_STARTUP_GRACE = 3
 
 function zb:ShouldRoundEnd()
 	local time = zb.ROUND_TIME
@@ -251,17 +257,13 @@ function zb:ShouldRoundEnd()
 end
 
 function zb:EndRoundThink()
-	if zb.ROUND_STATE == 1
-		and CurTime() >= (zb.ROUND_END_CHECK_AFTER or 0)
-		and zb:ShouldRoundEnd() then
-		zb:EndRound()
-	end
+	if zb.ROUND_STATE == 1 and zb:ShouldRoundEnd() then zb:EndRound() end
 	if zb.ROUND_STATE == 3 then
 		if !zb.END_TIME then
 			zb.END_TIME = (CurTime() + (CurrentRound().end_time or 5))
 			if zb.nextround == "coop" and GetGlobalVar("coop_first_round_timer", 0) == 0 then
 
-				zb.END_TIME = (CurTime() + (GetConVar("zb_dev"):GetBool() and 5 or 60))
+				zb.END_TIME = (CurTime() + (GetConVar("zb_dev") and 5 or 60))
 				SetGlobalVar("coop_first_round_timer", zb.END_TIME)
 			end
 		end
@@ -283,6 +285,7 @@ function zb:EndRoundThink()
                         zb.SKIP_END_PRESENTATION = false
 
 			hook.Run("ZB_PreRoundStart")
+			hook.Run("TTTPrepareRound") -- stormfox2 random_round_weather
 
 			zb.CROUND = zb.nextround or "hmcd"
 			if CurrentRound().shouldfreeze then zb:Freeze() end
@@ -450,7 +453,7 @@ function zb.GetModesPlaytime()
 	local newtbl = {}
 	local count = 0
 
-	for i,name in ipairs(tbl) do
+	for i, name in ipairs(tbl) do
 		local amt = zb.ModesPlaytime[name] or 0
 		newtbl[name] = amt
 		count = count + amt
@@ -483,24 +486,21 @@ function zb.AddCurrentModePlayed()
 	zb.AddModePlaytime(name, 1)
 end
 
-zb.ModesChances = zb.ModesChances or {}
-
-function zb.GetChance(name, modes, amtplayed)
+function zb.GetChance(name, addtbl)
 	local mode = zb:GetMode(name)
-	if mode == "hmcd" then
-		return 1
-	end
-	return 0
+	local tbl = zb.modes[mode]
+
+	local newtbl = tbl.Types and tbl.Types[name] or tbl
+
+	return newtbl.ChanceFunction and newtbl:ChanceFunction(addtbl or {}) or zb.ModesChances[name] or newtbl.Chance or 0.1
 end
 
 function zb.GetModesChances()
 	local tbl = zb.GetAvailableModes()
 	local newtbl = {}
 
-	local modes, amtplayed = zb.GetModesPlaytime()
-
 	for i, name in pairs(tbl) do
-		newtbl[name] = zb.GetChance(name, modes, amtplayed)
+		newtbl[name] = zb.GetChance(name)
 	end
 
 	return newtbl
@@ -509,16 +509,18 @@ end
 function zb.WeightedChanceMode(modes_chances)
 	local weight = 0
 
+	local newchancestbl = {}
 	for name, chance in pairs(modes_chances) do
-		local played = modes_chances[name]
-		weight = weight + chance * 100
+		local newchance = zb.GetChance(name, {rounds = zb.RoundList}) or chance
+		newchancestbl[name] = newchance
+		weight = weight + newchance * 100
 	end
 
 	local random = math.random(weight)
 
 	local count = 0
 	for name, chance in RandomPairs(modes_chances) do
-		count = count + chance * 100
+		count = count + (newchancestbl[name] or chance) * 100
 
 		if count >= random then
 			return name
@@ -585,12 +587,15 @@ function zb.RerollChances()
 	local chances = zb.GetModesChances()
 
 	for i = 1, 20 do
-		zb.RoundList[i] = zb.WeightedChanceMode(chances)
+		local round = zb.WeightedChanceMode(chances)
+		local previous = zb.RoundList[i - 1] or zb.CROUND
+		if ZB_IsBackToBackBlocked(round, previous) then round = ZB_GetForcedTempMode(previous) end
+
+		zb.RoundList[i] = round
 	end
 
 	zb.nextround = ZB_ResolveNextRound(table.remove(zb.RoundList, 1))
 end
-
 
 function zb.GetModesInfo()
 	local modesInfo = {}
@@ -646,6 +651,10 @@ end
 
 function zb.SetRoundList(newList)
 	local newLista = table.Copy(newList)
+	for i, modeKey in ipairs(newLista) do
+		newLista[i] = ZB_NormalizeModeKey(modeKey)
+	end
+
 	if #newLista > 0 then
 		zb.nextround = ZB_ResolveNextRound(table.remove(newLista, 1))
 		zb.RoundList = newLista
@@ -675,14 +684,7 @@ function zb.SendRoundListToClient(ply)
 	net.Start("ZB_SendRoundList")
 		net.WriteTable(zb.RoundList)
 		net.WriteString(zb.nextround or "")
-		net.WriteString(forcemodeconvar:GetString() or "random")
 	net.Send(ply)
-end
-
-function zb.SyncForceModeToAdmins()
-	for _, admin in ipairs(zb.GetAllAdmins()) do
-		zb.SendRoundListToClient(admin)
-	end
 end
 
 
@@ -729,15 +731,11 @@ function zb:RoundStart()
 	zb.START_TIME = nil
 
 	local mode, round = CurrentRound()
-	
 
 	VFIRE_DISABLED = false
 
-	local roundStart = CurTime()
-	zb.ROUND_START = roundStart
-	zb.ROUND_BEGIN = roundStart
-	zb.ROUND_END_CHECK_AFTER = roundStart + ROUND_END_STARTUP_GRACE
-	hg.UpdateRoundTime(zb.ROUND_TIME, zb.ROUND_START, zb.ROUND_BEGIN)
+	zb.ROUND_BEGIN = CurTime()
+	hg.UpdateRoundTime()
 
 	net.Start("RoundInfo")
 		net.WriteString(mode.name or "hmcd")
@@ -804,21 +802,20 @@ net.Receive("AdminSetGameMode", function(len, ply)
 	if not ply:IsAdmin() then return end
 
 	local command = net.ReadString()
-	local modeKey = net.ReadString()
+	local modeKey = ZB_NormalizeModeKey(net.ReadString())
 	local addToQueue = net.ReadBool() or false
 
 	if command == "setmode" then
                 NextRound(modeKey, true)
 		ply:ChatPrint("Game mode set to: " .. modeKey)
 
-		if addToQueue then
+		if addToQueue and #zb.QueuedModes < 12 then
 			table.insert(zb.QueuedModes, modeKey)
 			zb.NotifyQueueModified(ply, "added " .. modeKey .. " to")
 
 			zb.SyncQueueToAdmins()
 		end
 	elseif command == "setforcemode" then
-		forcemodeconvar:SetString(modeKey)
 		forcemode = modeKey
                 NextRound(forcemode, true)
 		ply:ChatPrint("Force mode set to: " .. modeKey)
@@ -931,8 +928,7 @@ COMMANDS.setforcemode = {
 		if args[1] ~= "random" then
                         NextRound(args[1], true)
 		end
-	end,
-	0
+	end, 0
 }
 
 COMMANDS.endround = {
@@ -992,14 +988,13 @@ if SERVER then
 			end
 			ply:ChatPrint("Game mode set to: " .. modeKey)
 
-			if addToQueue then
+			if addToQueue and #zb.QueuedModes < 12 then
 				table.insert(zb.QueuedModes, modeKey)
 				zb.NotifyQueueModified(ply, "added " .. modeKey .. " to")
 
 				zb.SyncQueueToAdmins()
 			end
 		elseif command == "setforcemode" then
-			forcemodeconvar:SetString(modeKey)
 			forcemode = modeKey
                         NextRound(forcemode, true)
 			if zb.ROUND_STATE == 0 then
@@ -1010,9 +1005,7 @@ if SERVER then
 			end
 			ply:ChatPrint("Force mode set to: " .. modeKey)
 
-			zb.SyncForceModeToAdmins()
-
-			if addToQueue then
+			if addToQueue and #zb.QueuedModes < 12 then
 				table.insert(zb.QueuedModes, modeKey)
 				zb.NotifyQueueModified(ply, "added " .. modeKey .. " to")
 

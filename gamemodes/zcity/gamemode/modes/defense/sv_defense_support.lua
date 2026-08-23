@@ -187,7 +187,7 @@ local function CreateFallingAirdrop(items, requester)
  
         if distToTarget < 10 then
             timer.Remove(fallTimer)
-            crate:EmitSound("physics/metal/metal_box_impact_hard" .. math.random(1, 3) .. ".ogg", 100)
+            crate:EmitSound("physics/metal/metal_box_impact_hard" .. math.random(1, 3) .. ".wav", 100)
             
             if IsValid(light) then light:Remove() end
             if IsValid(smoke) then smoke:Remove() end
@@ -326,7 +326,7 @@ local function SpawnSupportTeam(requester)
             end
         end
         
-        requester:EmitSound("ambient/levels/streetwar/city_battle" .. math.random(1, 7) .. ".ogg")
+        requester:EmitSound("ambient/levels/streetwar/city_battle" .. math.random(1, 7) .. ".wav")
         
         return true
     end
@@ -424,8 +424,8 @@ local function RespawnDeadPlayers(requester)
                     wep.bloodtype = "o-" 
                 end 
             end)
-            ply:Give("weapon_painkillers")
-            ply:Give("weapon_betablock")
+            ply:Give("weapon_painkillers_tpik")
+            ply:Give("weapon_betablock_tpik")
             ply:Give("weapon_adrenaline")
             ply:Give("weapon_morphine")
         elseif role == "Engineer" then

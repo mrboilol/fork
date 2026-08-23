@@ -461,7 +461,6 @@ local function CreateLootPollingMenu()
             weaponSubMenu:AddOption("Pistol (USP)", function() classEntry:SetValue("weapon_hk_usp") end)
             weaponSubMenu:AddOption("Revolver", function() classEntry:SetValue("weapon_revolver357") end)
             weaponSubMenu:AddOption("Desert Eagle", function() classEntry:SetValue("weapon_deagle") end)
-            weaponSubMenu:AddOption("Shotgun", function() classEntry:SetValue("weapon_remington870") end)
             weaponSubMenu:AddOption("MP5", function() classEntry:SetValue("weapon_mp5") end)
             weaponSubMenu:AddOption("AKM", function() classEntry:SetValue("weapon_akm") end)
             weaponSubMenu:AddOption("Sniper Rifle", function() classEntry:SetValue("weapon_m98b") end)
@@ -495,7 +494,7 @@ local function CreateLootPollingMenu()
             menu:SetSkin("Default")
             menu:AddOption("Medkit", function() classEntry:SetValue("weapon_medkit_sh") end)
             menu:AddOption("Bandages", function() classEntry:SetValue("weapon_bandage_sh") end)
-            menu:AddOption("Painkillers", function() classEntry:SetValue("weapon_painkillers") end)
+            menu:AddOption("Painkillers", function() classEntry:SetValue("weapon_painkillers_tpik") end)
             menu:Open()
         end
     )
@@ -518,13 +517,11 @@ net.Receive("event_loot_sync", function()
     if IsValid(LootPollingMenu) then
         LootPollingMenu:RefreshItems()
     end
-end) 
+end)
 
-concommand.Add("zb_event_loot_menu", function(ply)
-	if not ply:IsAdmin() then
-		return
-	end
 
+
+concommand.Add("zb_event_loot_menu", function()
     RunConsoleCommand("zb_event_lootpoll")
 end)
 

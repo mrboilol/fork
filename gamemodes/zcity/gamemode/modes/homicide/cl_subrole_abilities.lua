@@ -101,7 +101,7 @@ net.Receive("HMCD_UpdateChemicalResistance", function(len, ply)
 	while chemical_name != "" do
 		local amt = net.ReadUInt(MODE.NetSize_ChemicalResistanceBits)
 		
-		MODE.SetChemicalToPlayer(LocalPlayer(), chemical_name, amt)
+		SetChemicalToPlayer(LocalPlayer(), chemical_name, amt)
 		
 		chemical_name = net.ReadString()
 	end

@@ -16,40 +16,33 @@ end
 local HeroWeaponData = {
 	["weapon_px4beretta"] = {extraClips = 0},
 	["weapon_glock17"] = {extraClips = 0},
-	["weapon_hk_usp"] = {extraClips = 0},
-	["weapon_remington870"] = {extraClips = 0, sling = true},
-	["weapon_remington870_long"] = {extraClips = 0, sling = true},
-	["weapon_remington870_sawed_off"] = {extraClips = 0},
+	["weapon_usp"] = {extraClips = 0},
+	["weapon_chiappa_rhino"] = {extraClips = 0},
+	["weapon_m590a1"] = {extraClips = 0, sling = true},
+	["weapon_mr43"] = {extraClips = 0, sling = true},
+	["weapon_mr43_short"] = {extraClips = 0},
 	["weapon_kar98"] = {extraClips = 0, sling = true},
-	["weapon_vpo209"] = {extraClips = 0},
-	["weapon_vpo136"] = {extraClips = 0},
-	["weapon_mosin"] = {extraClips = 0, sling = true},
+	["weapon_mp18"] = {extraClips = 0},
+	["weapon_vpo136"] = {extraClips = 0, sling = true},
 }
 
 local HeroUpgradeData = {
-	["hero_px4_silencer"] = {parent = "weapon_px4beretta", type = "attachment", attachment = "supressor4"},
 	["hero_px4_ammo"] = {parent = "weapon_px4beretta", type = "ammo", extraClips = 1},
-	["hero_glock_silencer"] = {parent = "weapon_glock17", type = "attachment", attachment = "supressor4"},
+	["hero_glock_silencer"] = {parent = "weapon_glock17", type = "attachment", attachment = "supressor2"},
 	["hero_glock_rmr"] = {parent = "weapon_glock17", type = "attachment", attachment = "holo16"},
 	["hero_glock_laser"] = {parent = "weapon_glock17", type = "attachment", attachment = "laser3"},
 	["hero_glock_ammo"] = {parent = "weapon_glock17", type = "ammo", extraClips = 1},
-	["hero_usp_silencer"] = {parent = "weapon_hk_usp", type = "attachment", attachment = "supressor4"},
-	["hero_usp_ammo"] = {parent = "weapon_hk_usp", type = "ammo", extraClips = 1},
-	["hero_remington_sight"] = {parent = "weapon_remington870", type = "attachment", attachment = "holo16"},
-	["hero_remington_ammo"] = {parent = "weapon_remington870", type = "ammo", extraClips = 1},
-	["hero_remington_long_sight"] = {parent = "weapon_remington870_long", type = "attachment", attachment = "holo16"},
-	["hero_remington_long_ammo"] = {parent = "weapon_remington870_long", type = "ammo", extraClips = 1},
-	["hero_remington_sawedoff_sight"] = {parent = "weapon_remington870_sawed_off", type = "attachment", attachment = "holo16"},
-	["hero_remington_sawedoff_ammo"] = {parent = "weapon_remington870_sawed_off", type = "ammo", extraClips = 1},
+	["hero_usp_ammo"] = {parent = "weapon_usp", type = "ammo", extraClips = 1},
+	["hero_usp_rmr"] = {parent = "weapon_usp", type = "attachment", attachment = "holo16"},
+	["hero_usp_supressor"] = {parent = "weapon_usp", type = "attachment", attachment = "supressor1"},
+	["hero_m590a1_ammo"] = {parent = "weapon_m590a1", type = "ammo", extraClips = 1},
+	["hero_mr43_long_ammo"] = {parent = "weapon_mr43", type = "ammo", extraClips = 1},
+	["hero_mr43_ammo"] = {parent = "weapon_mr43_short", type = "ammo", extraClips = 1},
+	["hero_mp18_ammo"] = {parent = "weapon_mp18", type = "ammo", extraClips = 8},
+	["hero_chiappa_ammo"] = {parent = "weapon_chiappa_rhino", type = "ammo", extraClips = 1},
 	["hero_kar98_scope"] = {parent = "weapon_kar98", type = "attachment", attachment = "optic12"},
 	["hero_kar98_ammo"] = {parent = "weapon_kar98", type = "ammo", extraClips = 1},
-	["hero_vpo209_silencer"] = {parent = "weapon_vpo209", type = "attachment", attachment = "supressor1"},
-	["hero_vpo209_optic"] = {parent = "weapon_vpo209", type = "attachment", attachment = "holo16"},
-	["hero_vpo209_ammo"] = {parent = "weapon_vpo209", type = "ammo", extraClips = 1},
-	["hero_vpo136_silencer"] = {parent = "weapon_vpo136", type = "attachment", attachment = "supressor1"},
-	["hero_vpo136_optic"] = {parent = "weapon_vpo136", type = "attachment", attachment = "holo16"},
-	["hero_vpo136_ammo"] = {parent = "weapon_vpo136", type = "ammo", extraClips = 1},
-	["hero_mosin_silencer"] = {parent = "weapon_mosin", type = "attachment", attachment = "supressor1"},
+	["hero_mosin_silencer"] = {parent = "weapon_mosin", type = "attachment", attachment = "supressor9"},
 	["hero_mosin_scope"] = {parent = "weapon_mosin", type = "attachment", attachment = "optic12"},
 	["hero_mosin_ammo"] = {parent = "weapon_mosin", type = "ammo", extraClips = 1},
 }
@@ -91,15 +84,24 @@ local TraitorSkillsetSubRoles = {
 	["brawler"] = "traitor_brawler",
 }
 
-local function ApplyTraitorLoadout(ply, forcedSkillset, preserveSubRole)
+local function ApplyCodeAttachments(weapon, attachments)
+	if not IsValid(weapon) or not istable(weapon.attachments) or not hg or not hg.SetAttachment then return end
+
+	for _, attachmentId in ipairs(attachments) do
+		hg.SetAttachment(weapon.attachments, attachmentId, weapon:GetClass())
+	end
+
+	if weapon.UpdateAttachmentModifiers then weapon:UpdateAttachmentModifiers() end
+	if weapon.SyncAtts then weapon:SyncAtts() end
+end
+
+local function ApplyTraitorLoadout(ply)
 	local loadout = ParseLoadoutString(ply:GetInfo("hmcd_traitor_loadout"))
 	if not loadout.skillset and not istable(loadout.weapons) then loadout = LegacyTraitorLoadout end
 
-	local skillset = forcedSkillset or loadout.skillset or "none"
+	local skillset = loadout.skillset or "none"
 	local weaponsList = loadout.weapons or {}
-	if not preserveSubRole then
-		ply.SubRole = TraitorSkillsetSubRoles[skillset] or ply.SubRole
-	end
+	ply.SubRole = TraitorSkillsetSubRoles[skillset] or ply.SubRole
 
 	ply.organism.stamina.max = 220
 	ply.organism.recoilmul = 1
@@ -139,14 +141,14 @@ local function ApplyTraitorLoadout(ply, forcedSkillset, preserveSubRole)
 			timer.Simple(0.5, function()
 				if IsValid(ply) and ply:HasWeapon("weapon_p22") then
 					local w = ply:GetWeapon("weapon_p22")
-					if hg and hg.AddAttachmentForce then hg.AddAttachmentForce(ply, w, "supressor4") end
+					ApplyCodeAttachments(w, {"supressor1"})
 				end
 			end)
 		elseif wep == "weapon_pl15_silencer" then
 			timer.Simple(0.5, function()
 				if IsValid(ply) and ply:HasWeapon("weapon_pl15") then
 					local w = ply:GetWeapon("weapon_pl15")
-					if hg and hg.AddAttachmentForce then hg.AddAttachmentForce(ply, w, "supressor4") end
+					ApplyCodeAttachments(w, {"supressor2"})
 				end
 			end)
 		elseif wep == "weapon_p22_ammo" then
@@ -262,11 +264,7 @@ local function ApplyHeroLoadout(ply)
 			if not IsValid(activeWeapon) then
 				return
 			end
-			for _, attachmentId in ipairs(attachments) do
-				if hg and hg.AddAttachmentForce then
-					hg.AddAttachmentForce(ply, activeWeapon, attachmentId)
-				end
-			end
+			ApplyCodeAttachments(activeWeapon, attachments)
 		end)
 	end
 end
@@ -275,61 +273,13 @@ MODE.ApplyTraitorLoadout = ApplyTraitorLoadout
 MODE.ApplyHeroLoadout = ApplyHeroLoadout
 
 MODE.SubRoles = {
-	["traitor_default"] = {
-		Name = "Legacy",
-		Description = "You are a traitor with the standard loadout.",
-		Objective = "Use your loadout to murder everyone here.",
-		SpawnFunction = function(ply)
-			ApplyTraitorLoadout(ply, "none")
-		end,
-	},
 	["traitor_custom"] = {
-		Name = "Traitor",
-		Description = [[You are the custom traitor.
+		Name = "Executioner",
+		Description = [[You are the custom executioner.
 Your abilities and loadout are based on your selected preset or loadout.]],
-		Objective = "Use your loadout to murder everyone here.",
+		Objective = "Use your loadout to eliminate everyone before the Judge stops you.",
 		SpawnFunction = function(ply)
 			ApplyTraitorLoadout(ply)
-		end,
-	},
-	["traitor_infiltrator"] = {
-		Name = "Infiltrator",
-		Description = "Break necks and disguise yourself as victims.",
-		Objective = "Infiltrate and murder everyone here.",
-		SpawnFunction = function(ply)
-			ApplyTraitorLoadout(ply, "infiltrator")
-		end,
-	},
-	["traitor_assasin"] = {
-		Name = "Assassin",
-		Description = "Handle weapons more steadily and disarm your victims.",
-		Objective = "Assassinate everyone here.",
-		SpawnFunction = function(ply)
-			ApplyTraitorLoadout(ply, "assassin")
-		end,
-	},
-	["traitor_chemist"] = {
-		Name = "Chemist",
-		Description = "Resist chemical exposure and use toxins more effectively.",
-		Objective = "Poison everyone here.",
-		SpawnFunction = function(ply)
-			ApplyTraitorLoadout(ply, "chemist")
-		end,
-	},
-	["traitor_martial_artist"] = {
-		Name = "Martial Artist",
-		Description = "Disarm victims and break necks in close quarters.",
-		Objective = "Eliminate everyone in close quarters.",
-		SpawnFunction = function(ply)
-			ApplyTraitorLoadout(ply, "none", true)
-		end,
-	},
-	["traitor_shadow"] = {
-		Name = "Shadow",
-		Description = "Blend into nearby walls while standing still.",
-		Objective = "Hide in the shadows and murder everyone here.",
-		SpawnFunction = function(ply)
-			ApplyTraitorLoadout(ply, "none", true)
 		end,
 	},
 	["traitor_zombie"] = {
@@ -389,112 +339,10 @@ MODE.ProfessionsRoundTypes = {
 }
 
 MODE.Professions = {
-	["medic"] = {
-		Name = "Medic",
-		Objective = "You are the Medic. Keep the innocents alive and treat injuries before the murderer can finish the job.",
-		Loadout = {
-			"weapon_bigbandage_sh",
-			"weapon_defibrilator_homigrad",
-			"weapon_medkit_sh",
-			"weapon_painkillers",
-			"weapon_needle",
-			"weapon_bloodbag",
-			"weapon_tourniquet",
-		},
-		SpawnFunction = function(ply)
-			for _, weapon_class in ipairs(MODE.Professions.medic.Loadout) do
-				local wep = ply:Give(weapon_class)
-
-				if(weapon_class == "weapon_bloodbag" and IsValid(wep))then
-					timer.Simple(0, function()
-						if(IsValid(wep))then
-							wep.modeValues = wep.modeValues or {}
-							wep.modeValues[1] = 1
-							wep.bloodtype = "o-"
-						end
-					end)
-				end
-			end
-		end,
-	},
-	["lucky_guy"] = {
-		Name = "Lucky Guy",
-		Objective = "You are the Lucky Guy. Fortune is on your side, giving you extra health and stamina to outlast the murderer.",
-		Loadout = {
-			"weapon_screwdriver",
-		},
-		HealthMultiplier = 1.3,
-		StaminaMultiplier = 1.2,
-		SpawnFunction = function(ply)
-			for _, weapon_class in ipairs(MODE.Professions.lucky_guy.Loadout) do
-				ply:Give(weapon_class)
-			end
-		end,
-	},
-	["athlete"] = {
-		Name = "Athlete",
-		Objective = "You are the Athlete. Use your larger build, stamina and strength to outrun danger and win close fights.",
-		ModelScale = 1.15,
-		StaminaMultiplier = 2,
-		StaminaExhaustMultiplier = 0.7,
-		MeleeDamageMultiplier = 1.5,
-		LegStrengthMultiplier = 1.5,
-		JumpPowerMultiplier = 1.15,
-		SpawnFunction = function(ply)
+	["doctor"] = {
+		Name = "Doctor",
+		SpawnFunction = function(ply)	--; TODO MAKE IT WORK
 			--; It's a bad practice to give professions any weapons or tools
-		end,
-	},
-	["thug"] = {
-		Name = "Thug",
-		Objective = "You are the Thug. Use your bat and fentanyl to dominate close fights and stay alive.",
-		Loadout = {
-			"weapon_bat",
-			"weapon_fentanyl",
-		},
-		MaxPlayers = 2,
-		SpawnFunction = function(ply)
-			local delayed_bat_timer = "HMCD_ThugDelayedBat_" .. ply:EntIndex()
-
-			timer.Remove(delayed_bat_timer)
-
-			for _, weapon_class in ipairs(MODE.Professions.thug.Loadout) do
-				if(weapon_class == "weapon_bat")then
-					continue
-				end
-
-				ply:Give(weapon_class)
-			end
-
-			timer.Create(delayed_bat_timer, 3, 1, function()
-				if(!IsValid(ply) or !ply:Alive() or ply.Profession != "thug" or ply:HasWeapon("weapon_bat"))then
-					return
-				end
-
-				local active_weapon = ply:GetActiveWeapon()
-				local active_class = IsValid(active_weapon) and active_weapon:GetClass() or nil
-
-				if(!active_class or active_class == "weapon_bat")then
-					active_class = ply:HasWeapon("weapon_fentanyl") and "weapon_fentanyl" or nil
-				end
-
-				local wep = ply:Give("weapon_bat")
-
-				if(!IsValid(wep))then
-					return
-				end
-
-				wep.bigNoDrop = true
-				wep.NoHolster = false
-				wep.weaponInvCategory = 0
-
-				if(active_class and ply:HasWeapon(active_class))then
-					timer.Simple(0, function()
-						if(IsValid(ply) and ply:Alive() and ply:HasWeapon(active_class))then
-							ply:SelectWeapon(active_class)
-						end
-					end)
-				end
-			end)
 		end,
 	},
 	["huntsman"] = {
@@ -563,19 +411,37 @@ MODE.RoleChooseRoundTypes = {
 MODE.Roles = {}
 MODE.Roles.standard = {
 	traitor = {
-		objective = "You've been preparing for this for a long time. Kill everyone.",
-		name = "Murderer",
+		objective = "You've been preparing for this for a long time. Eliminate everyone before the Judge stops you.",
+		name = "Executioner",
 		color = Color(190,0,0)
 	},
 
 	gunner = {
-		objective = "You're the hero. Use your loadout to stop the murderer.",
-		name = "Hero",
+		objective = "You're the Judge. Use your loadout to stop the Executioner.",
+		name = "Judge",
 		color = Color(158,0,190)
 	},
 
 	innocent = {
-		name = "Bystander",
+		name = "Victim",
+		color = Color(0,120,190)
+	},
+}
+
+MODE.Roles.suicidelunatic = {
+	traitor = {
+		objective = "You are the Suicide Lunatic. You have a bomb strapped to your chest. Walk into a crowd and detonate.",
+		name = "Lunatic",
+		color = Color(190,0,0)
+	},
+
+	gunner = {
+		name = "Innocent",
+		color = Color(0,120,190)
+	},
+
+	innocent = {
+		name = "Innocent",
 		color = Color(0,120,190)
 	},
 }

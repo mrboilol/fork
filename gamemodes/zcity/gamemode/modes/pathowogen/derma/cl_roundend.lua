@@ -13,7 +13,7 @@ surface.CreateFont("ZB_UWUEnd1", {
 })
 
 surface.CreateFont("ZB_UWUEnd2", {
-    font = "VCR OSD Mono",
+    font = "Courier Prime",
     size = ScreenScale(10),
     extended = true,
     weight = 400,
@@ -29,7 +29,7 @@ surface.CreateFont("ZB_UWUEnd3", {
 })
 
 surface.CreateFont("ZB_UWUEnd4", {
-    font = "VCR OSD Mono",
+    font = "Courier Prime",
     size = ScreenScale(50),
     extended = true,
     weight = 400,
@@ -84,7 +84,7 @@ function PANEL:Init()
 		end
 	})
 
-	surface.PlaySound("zbattle/dialogue/radio_talk.mp3")
+	surface.PlaySound("zbattle/dialogue/radio_talk.ogg")
 
 	timer.Simple(10, function()
 		if IsValid(self) then

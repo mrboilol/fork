@@ -153,6 +153,7 @@ hook.Add("HomigradDamage", "GuiltReg", function(ply, dmgInfo, hitgroup, ent, har
 
     if not IsValid(Attacker) or not Attacker:IsPlayer() then return end
     if not IsValid(Victim) or not (Victim:IsPlayer() or (Victim.organism.fakePlayer and Victim.organism.alive)) then return end
+	if Victim:IsNPC() or Victim:IsNextBot() then return end
 
     local id = Victim:IsPlayer() and Victim:SteamID() or Victim:EntIndex()
     local id2 = Attacker:IsPlayer() and Attacker:SteamID() or Attacker:EntIndex()
@@ -404,7 +405,7 @@ hook.Add("Org Think", "Its_Karma_Bro",function(owner, org, timeValue)
 
     if (ply.Karma or 100) < 35 then
         if math.random(2000) == 1 then
-            hg.organism.VomitNormal(owner)
+            hg.organism.Vomit(owner)
         end
     end
 end)
@@ -456,7 +457,9 @@ concommand.Add("hg_setkarma",function(ply,cmd,args)
     
     local lenargs = #args
     local newply = player.GetListByName(lenargs > 1 and args[1] or ply:Name())[1]
-    if not IsValid(newply) then return end
+	if not IsValid(newply) then return end
+	local karma = tonumber(lenargs > 1 and args[2] or args[1])
+	if not karma then return end
 
 	newply.Karma = math.Clamp(karma, 0, zb.MaxKarma or 100)
 	newply:SetNetVar("Karma",newply.Karma)
@@ -470,6 +473,7 @@ net.Receive("open_guilt_menu",function(len, ply)
     if ply:Alive() then return end
     local tbl = zb.HarmDoneKarma[ply] or {}
     net.Start("open_guilt_menu")
+    net.WriteFloat(ply.Karma or 100)
     net.WriteTable(tbl)
     net.Send(ply)
     //current round guilt
@@ -488,6 +492,7 @@ net.Receive("forgive_player", function(len, ply)
     zb.HarmDone[ply][ent] = 0
     zb.HarmDoneKarma[ply][ent] = 0
     net.Start("open_guilt_menu")
+    net.WriteFloat(ply.Karma or 100)
     net.WriteTable(zb.HarmDoneKarma[ply])
     net.Send(ply)
 end)

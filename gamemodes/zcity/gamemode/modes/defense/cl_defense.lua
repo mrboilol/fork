@@ -7,7 +7,7 @@ local highlightNPCs = {}
 
 
 net.Receive("npc_defense_start",function()
-    surface.PlaySound("csgo_round.ogg")
+    surface.PlaySound("csgo_round.wav")
 end)
 
 local teams = {

@@ -1,3 +1,4 @@
+--
 local PANEL = {}
 
 local gradient_r = surface.GetTextureID("vgui/gradient-r")
@@ -15,19 +16,19 @@ end
 
 local function CreateRTVButtonFonts()
     surface.CreateFont("ZCity_RTV_Button", {
-        font = "VCR OSD Mono",
+        font = "Verily Serif Mono",
         size = RTVUnit(14),
         weight = 200
     })
 
     surface.CreateFont("ZCity_RTV_ButtonTiny", {
-        font = "VCR OSD Mono",
+        font = "Verily Serif Mono",
         size = RTVUnit(7),
         weight = 200
     })
 
     surface.CreateFont("ZCity_RTV_Voted", {
-        font = "VCR OSD Mono",
+        font = "Verily Serif Mono",
         size = RTVUnit(18),
         weight = 800
     })
@@ -129,9 +130,6 @@ function PANEL:OnCursorEntered()
         bIgnoreConfig = true
     })
     self.hovered = true
-    if isfunction(self.OnPreviewHover) then
-        self:OnPreviewHover()
-    end
 end
 
 function PANEL:OnCursorExited()

@@ -1,104 +1,52 @@
 if CLIENT then
     local isMenuOpen = nil
     zb.availableModes = zb.availableModes or {}
-
+    local availableModes = zb.availableModes
+    
     zb.RoundList = zb.RoundList or {}
     zb.nextround = zb.nextround or nil
-    zb.forcemode = zb.forcemode or "random"
-    local queueManagerInstance = nil
-
-    --;; The worst part of the job is taking the shit you wrote and making it readable
-    local COL_BG        = Color(28, 28, 28, 240)
-    local COL_BORDER    = Color(75, 75, 75, 255)
-    local COL_CAT       = Color(60, 60, 60, 255)
-    local COL_CATBAR    = Color(42, 42, 42, 255)
-    local COL_ROW       = Color(43, 43, 43, 235)
-    local COL_ROW_HOV   = Color(56, 56, 56, 240)
-    local COL_ROWBAR    = Color(47, 47, 47, 235)
-    local COL_ACCENT    = Color(160, 45, 45, 255)
-    local COL_ACCENT_H  = Color(190, 60, 60, 255)
-    local COL_GREEN     = Color(80, 125, 65, 255)
-    local COL_GREEN_H   = Color(100, 150, 85, 255)
-    local COL_ORANGE    = Color(220, 150, 45, 255)
-    local COL_TEXT      = Color(235, 235, 235, 235)
-    local COL_TEXT_DIM  = Color(140, 140, 140, 220)
-    local COL_TOGGLE_BG = Color(28, 28, 28, 255)
-
-    local menufont = "Bahnschrift"
-
-    surface.CreateFont("ZB_QM_Title",    {font = menufont, size = 26, weight = 500, antialias = true})
-    surface.CreateFont("ZB_QM_Category", {font = menufont, size = 21, weight = 400, antialias = true})
-    surface.CreateFont("ZB_QM_Item",     {font = menufont, size = 19, weight = 400, antialias = true})
-    surface.CreateFont("ZB_QM_Small",    {font = menufont, size = 14, weight = 300, antialias = true})
-    surface.CreateFont("ZB_QM_Btn",      {font = menufont, size = 16, weight = 500, antialias = true})
-
-    local SND_CLICK   = "shitty/tap_depress.ogg"
-    local SND_RELEASE = "shitty/tap_release.ogg"
-    local SND_HOVER   = "shitty/tap-resonant.ogg"
-
-
+    local queuePanelInstance = nil 
+    local selectedModes = {}
 
     net.Receive("ZB_SendModesInfo", function()
         zb.availableModes = net.ReadTable()
-        if IsValid(queueManagerInstance) then queueManagerInstance:RebuildModes() end
     end)
-
+    
     net.Receive("ZB_SendRoundList", function()
         zb.RoundList = net.ReadTable()
         zb.nextround = net.ReadString()
-        zb.forcemode = net.ReadString()
         table.insert(zb.RoundList, 1, zb.nextround)
         zb.nextround = nil
-        if IsValid(queueManagerInstance) then queueManagerInstance:QueueUpdate() end
+        if IsValid(queuePanelInstance) then
+            queuePanelInstance:QueueUpdate()
+        end
     end)
-
+    
     net.Receive("ZB_NotifyRoundListChange", function()
         local playerName = net.ReadString()
-        chat.AddText(Color(180, 180, 255), playerName, COL_TEXT, " has modified the game mode queue")
+        
+        chat.AddText(Color(180, 180, 255), playerName, Color(255, 255, 255), " has modified the game mode queue")
+        
         net.Start("ZB_RequestRoundList")
         net.SendToServer()
     end)
 
-    local function GetModeName(key)
-        for _, mode in ipairs(zb.availableModes) do
-            if mode.key == key then return mode.name end
-        end
-        return key
-    end
-    local function ForceActive()
-        return zb.forcemode and zb.forcemode ~= "random" and zb.forcemode ~= ""
-    end
-
-    local function DrawFrameBG(self, w, h)
-            if hg and hg.DrawBlur then hg.DrawBlur(self, 4) end
-            surface.SetDrawColor(COL_BG)
-            surface.DrawRect(0, 0, w, h)
-            surface.SetDrawColor(120, 120, 130, 12)
-            local sp = 64
-            local ox = (CurTime() * 18) % sp
-            for x = 0, math.ceil(w / sp) do
-                surface.DrawRect(x * sp - ox, 0, 1, h)
+    local function StyleElement(element, bgColor)
+        bgColor = bgColor or Color(40, 40, 40, 200)
+        
+        element.Paint = function(self, w, h)
+            draw.RoundedBox(6, 0, 0, w, h, bgColor)
+            
+            if self:IsHovered() and self.Selectable then
+                draw.RoundedBox(6, 1, 1, w-2, h-2, Color(60, 60, 60, 100))
+                surface.SetDrawColor(255, 165, 0, 150)
+                surface.DrawOutlinedRect(1, 1, w-2, h-2, 1)
             end
-            local oy = (CurTime() * 18) % sp
-            for y = 0, math.ceil(h / sp) do
-                surface.DrawRect(0, y * sp - oy + sp, w, 1)
+            
+            if self.Selected then
+                surface.SetDrawColor(0, 255, 0, 150)
+                surface.DrawOutlinedRect(0, 0, w, h, 2)
             end
-            surface.SetDrawColor(COL_BORDER)
-            surface.DrawOutlinedRect(0, 0, w, h, 1)
-    end
-
-    local function ZcityBUTT(btn, base, hover, txtColor)
-        base     = base     or COL_ROW
-        hover    = hover    or COL_ROW_HOV
-        txtColor = txtColor or COL_TEXT
-        btn:SetFont("ZB_QM_Btn")
-        btn:SetTextColor(txtColor)
-        btn.OnCursorEntered = function() surface.PlaySound(SND_HOVER) end
-        btn.Paint = function(self, w, h)
-            local c = self:IsHovered() and hover or base
-            draw.RoundedBox(0, 0, 0, w, h, c)
-            surface.SetDrawColor(0, 0, 0, 55)
-            surface.DrawRect(0, h - 3, w, 3)
         end
     end
     
@@ -293,52 +241,35 @@ if CLIENT then
 
     local function OpenModeSelection(command)
         local frame = vgui.Create("ZFrame")
-        frame:SetSize(math.Clamp(ScrW() * 0.62, 900, 1280), math.Clamp(ScrH() * 0.72, 560, 780))
+        frame:SetSize(700, 500)
         frame:Center()
-        frame:SetTitle("")
-        frame:SetDraggable(true)
-        frame:ShowCloseButton(false)
-        frame:SetBorder(false)
+        frame:SetTitle("Game Mode Manager")
         frame:MakePopup()
-        frame.Paint = DrawFrameBG
-        queueManagerInstance = frame
-        local content = MakeContent(frame)
-        local header = vgui.Create("DPanel", content)
-        header:Dock(TOP)
-        header:SetTall(42)
-        header:DockMargin(0, 0, 0, 10)
-        header.Paint = function(self, w, h)
-            surface.SetDrawColor(COL_CAT)
-            surface.DrawRect(0, 0, w, h)
-            surface.SetDrawColor(COL_CATBAR)
-            surface.DrawRect(0, h - 5, w, 5)
-            draw.SimpleText("Game Mode Queue", "ZB_QM_Title", w / 2, h / 2 - 2, COL_TEXT, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-        end
-        AddCloseButton(header, frame)
-        local body = vgui.Create("DPanel", content)
-        body:Dock(FILL)
-        body.Paint = nil
-        local leftPanel = vgui.Create("DPanel", body)
+        
+        selectedModes = {}
+        
+        local queuePanel = CreateQueuePanel(frame)
+        
+        local leftPanel = vgui.Create("DPanel", frame)
+        leftPanel:SetSize(frame:GetWide() / 2 - 10, frame:GetTall())
         leftPanel:Dock(LEFT)
-        leftPanel:SetWide(frame:GetWide() * 0.55)
-        leftPanel:DockMargin(0, 0, 6, 0)
-        leftPanel.Paint = nil
-        CreateCategoryBar(leftPanel, "Available Game Modes")
+        leftPanel:DockMargin(5, 5, 5, 5)
+        StyleElement(leftPanel, Color(30, 30, 30, 200))
+        
+        local titleLabel = vgui.Create("DLabel", leftPanel)
+        titleLabel:SetText("Available Game Modes")
+        titleLabel:SetFont("DermaLarge")
+        titleLabel:SetTextColor(Color(255, 200, 0))
+        titleLabel:Dock(TOP)
+        titleLabel:DockMargin(0, 5, 0, 5)
+        titleLabel:SetContentAlignment(5) 
+        
         local searchBar = vgui.Create("DTextEntry", leftPanel)
+        searchBar:SetPlaceholderText("Search game modes...")
         searchBar:Dock(TOP)
-        searchBar:DockMargin(0, 0, 0, 8)
-        searchBar:SetTall(32)
-        searchBar:SetFont("ZB_QM_Item")
-        searchBar.Paint = function(self, w, h)
-            surface.SetDrawColor(COL_TOGGLE_BG)
-            surface.DrawRect(0, 0, w, h)
-            surface.SetDrawColor(70, 70, 70, 255)
-            surface.DrawOutlinedRect(0, 0, w, h, 1)
-            self:DrawTextEntryText(COL_TEXT, Color(120, 120, 120), COL_TEXT)
-            if self:GetText() == "" then
-                draw.SimpleText("Search game modes...", "ZB_QM_Item", 8, h / 2, COL_TEXT_DIM, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-            end
-        end
+        searchBar:DockMargin(5, 5, 5, 5)
+        searchBar:SetTall(25)
+        
         local dscroll = vgui.Create("DScrollPanel", leftPanel)
         dscroll:Dock(FILL)
         dscroll:DockMargin(5, 5, 5, 5)
@@ -750,10 +681,7 @@ if CLIENT then
         local frame = isMenuOpen
         frame:SetSize(300, 252)
         frame:Center()
-        frame:SetTitle("")
-        frame:SetDraggable(true)
-        frame:ShowCloseButton(false)
-        frame:SetBorder(false)
+        frame:SetTitle("Admin Panel")
         frame:MakePopup()
 
         local setModeBtn = vgui.Create("DButton", frame)
@@ -798,23 +726,25 @@ if CLIENT then
             end
         end
 
-        local manageBtn = BigButton("Manage Game Mode Queue", COL_ROW, COL_ROW_HOV)
-        manageBtn.DoClick = function()
-            surface.PlaySound(SND_CLICK)
-            OpenQueueManager()
+        local endRoundBtn = vgui.Create("DButton", frame)
+        endRoundBtn:SetText("End Round")
+        endRoundBtn:Dock(TOP)
+        endRoundBtn:DockMargin(5, 2, 5, 2)
+        endRoundBtn:SetSize(300, 40)
+        StyleElement(endRoundBtn)
+        endRoundBtn.DoClick = function()
+			net.Start("AdminEndRound")
+			net.SendToServer()
+			frame:Close()
         end
 
-        local endBtn = BigButton("End Round", COL_ACCENT, COL_ACCENT_H)
-        endBtn.DoClick = function()
-            surface.PlaySound(SND_CLICK)
-            net.Start("AdminEndRound")
-            net.SendToServer()
-            frame:Close()
-        end
         frame.OnClose = function()
             isMenuOpen = false
         end
+        frame:InvalidateLayout(true)
+        frame:SizeToChildren(false, true)
     end
+    
 
     hook.Add("InitPostEntity", "RequestModeData", function()
         if LocalPlayer():IsAdmin() then

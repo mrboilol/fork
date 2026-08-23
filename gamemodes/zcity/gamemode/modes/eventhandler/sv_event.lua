@@ -166,10 +166,9 @@ MODE.LootTable = {
         {8,"weapon_deagle"},
         {8,"weapon_doublebarrel_short"},
         {8,"weapon_doublebarrel"},
-        {8,"weapon_remington870"},
-        {8,"weapon_glock18c"},
-        {7,"weapon_mp5"},
-        {6,"weapon_xm1014"},
+		{8,"weapon_m590a1"},
+		{7,"weapon_saiga12"},
+		{6,"weapon_aa12"},
         {6,"ent_armor_vest3"},
         {5,"ent_armor_helmet1"},
         {5,"weapon_mp7"},
@@ -345,7 +344,7 @@ concommand.Add("zb_event_loot_reset", function(ply, _, _, _)
     
     local recipients = {}
     for _, p in player.Iterator() do
-        if p:IsAdmin() or MODE.EventersList[ply:SteamID()] then
+		if p:IsAdmin() or MODE.EventersList[p:SteamID()] then
             table.insert(recipients, p)
         end
     end

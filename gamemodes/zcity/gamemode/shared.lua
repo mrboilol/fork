@@ -1,5 +1,5 @@
 GM.Name = "ZCity"
-GM.Author = "uzelezz, sadsalat, mr.point, zac90, deka, mannytko"
+GM.Author = "uzelezz, sadsalat, Mr. Point, Zac90, Deka, Mannytko"
 GM.Email = "N/A"
 GM.Website = "N/A"
 
@@ -8,8 +8,6 @@ team.SetUp(1, "Players2", Color(0, 0, 255))
 team.SetUp(2, "Players3", Color(0, 255, 0))
 
 DeriveGamemode("sandbox")
-
-local spawn = {"PlayerGiveSWEP", "PlayerSpawnEffect", "PlayerSpawnNPC", "PlayerSpawnObject", "PlayerSpawnProp", "PlayerSpawnRagdoll", "PlayerSpawnSENT", "PlayerSpawnSWEP", "PlayerSpawnVehicle"}
 
 local blur = Material("pp/blurscreen")
 local hg_potatopc -- НАДО ЭТО ГОВНО ПЕРЕПИСАТЬ НОРМАЛЬНО, И ВСЕ МЕНЮШКИ ОДИНАКОВЫЕ ТОЖЕ!!!
@@ -43,6 +41,8 @@ local function BlockSpawn(ply, ent)
 
 	return false
 end
+
+local spawn = {"PlayerGiveSWEP", "PlayerSpawnEffect", "PlayerSpawnNPC", "PlayerSpawnObject", "PlayerSpawnProp", "PlayerSpawnRagdoll", "PlayerSpawnSENT", "PlayerSpawnSWEP", "PlayerSpawnVehicle"}
 
 for _, v in ipairs(spawn) do
 	hook.Add(v, "BlockSpawn", BlockSpawn)
@@ -125,6 +125,18 @@ function zb:CheckPlaying()
 		tbl[#tbl + 1] = ply
 	end
 	return tbl
+end
+-- А это разве не в корне?
+function GM:HandlePlayerLanding( ply, velocity, WasOnGround )
+	if SERVER then return end
+	if ply == LocalPlayer() and ply == GetViewEntity() then return end
+
+	if ( ply:GetMoveType() == MOVETYPE_NOCLIP ) then return end
+
+	if ( ply:IsOnGround() && !WasOnGround ) then
+		ply:AnimRestartGesture( GESTURE_SLOT_JUMP, ACT_LAND, true )
+	end
+
 end
 
 function GM:GrabEarAnimation(ply)

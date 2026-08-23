@@ -125,7 +125,7 @@ function MODE:RenderScreenspaceEffects()
 	local time = 60
 
 	if intensity > time and !IsValid(hg.ghostStation) then
-		sound.PlayFile("sound/zbattle/dragonfly_wings.mp3", "noplay", function(channel) //the track is 59 seconds btw
+		sound.PlayFile("sound/zbattle/dragonfly_wings.ogg", "noplay", function(channel) //the track is 59 seconds btw
 			channel:SetVolume(0)
 			channel:Play()
 			hg.ghostStation = channel
@@ -167,12 +167,12 @@ local ScarySounds = {
 	--"npc/advisor/advisorscreenvx06.wav",
 	--"npc/advisor/advisorscreenvx07.wav",
 	--"npc/advisor/advisorscreenvx08.wav",
-	--"cry1.ogg",
-	--"cry2.ogg",
-	"mumbling.ogg",
-	"blow.ogg",
-	--"strangeround.ogg",
-	"knock.ogg",
+	--"cry1.wav",
+	--"cry2.wav",
+	"mumbling.wav",
+	"blow.mp3",
+	--"strangeround.wav",
+	"knock.mp3",
 	"ambient/atmosphere/hole_hit1.wav",
 	"ambient/atmosphere/hole_hit2.wav",
 	"ambient/atmosphere/hole_hit3.wav",
@@ -187,10 +187,10 @@ local ScarySounds = {
 }
 
 local notifs = {
-	"I feel suddenly so alone...",
-	"You feel a chill running down your spine.",
-	"I am alone, but... I feel someone's presence...",
-	"Where is everyone?",
+	"Uh-oh...",
+	"Oh no",
+	"This isn't good",
+	"Where's everyone?",
 }
 
 function MODE:Player_Death(ply)
@@ -209,12 +209,12 @@ function MODE:Player_Death(ply)
 				hg.CreateNotification(table.Random(notifs))
 
 				self:CreateTimer("fear2", 115, 1, function()
-					hg.CreateNotification("Turn around.")
+					hg.CreateNotification("bye")
 				end)
 			end)
 
 			self:CreateTimer("fearfearingfearful3", 1, 1, function()
-				sound.PlayFile("sound/crawlspace.ogg", "", function(channel)
+				sound.PlayFile("sound/crawlspace.mp3", "", function(channel)
 					hg.lastOneStation = channel
 				end)
 			end)
@@ -228,8 +228,8 @@ function MODE:RoundStart()
 		if !IsValid(lply) then return end
 		local snd = table.Random(ScarySounds)
 
-		if snd == "knock.ogg" then
-			surface.PlaySound("knock.ogg")
+		if snd == "knock.mp3" then
+			surface.PlaySound("knock.mp3")
 			timer.Adjust("FearSounds", math.Rand(20, 60))
 
 			return

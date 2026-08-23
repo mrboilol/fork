@@ -43,7 +43,7 @@ function EVENT:StartScare( ply )
     local EndIndex = self.Ent:EntIndex()
     timer.Simple(1,function()
         if IsValid(ply) and ply:Alive() then return end
-        ply:SendLua("Entity("..EndIndex.."):EmitSound(\"cry1.ogg\")") --
+        ply:SendLua("Entity("..EndIndex.."):EmitSound(\"cry1.wav\")") -- 
     end)
     self.Started = CurTime()
 end
@@ -78,10 +78,10 @@ function EVENT:Run( ply )
     if !self.ScareSoundSend then
         self.ScareSoundSend = true
         self.Ent:ResetSequence(13)
-        ply:SendLua("surface.PlaySound(\"lurker_scream.ogg\")")
+        ply:SendLua("surface.PlaySound(\"lurker_scream.wav\")")
     end
     if vec:Distance(ply:GetPos()) < 50 then
-        hg.BreakNeck(ply)
+        ply:KillSilent()
         timer.Simple(0.6,function()
             ply:SendLua("RunConsoleCommand(\"stopsound\")")
         end)--

@@ -46,6 +46,7 @@ end)
 local OpenMenu
 
 net.Receive("open_guilt_menu", function()
+    local karma = net.ReadFloat()
     local tbl = net.ReadTable()
 
     OpenMenu(tbl, karma)

@@ -58,7 +58,7 @@ function PANEL:Init()
 	self:SetKeyboardInputEnabled(true)
 	self:SetMouseInputEnabled(false)
 
-	sound.PlayFile("sound/zbattle/briefing_fur.mp3", "", function() end)
+	sound.PlayFile("sound/zbattle/briefing_fur.ogg", "", function() end)
 end
 
 function PANEL:Paint(w, h)

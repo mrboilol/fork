@@ -55,7 +55,7 @@ function MODE:Think()
 
 		if lply:GetPos():DistToSqr(point) < 3000000 then
 			if !IsValid(self.ExtractionMusic) then
-				sound.PlayFile("sound/zbattle/extracted.mp3", "", function(station)
+				sound.PlayFile("sound/zbattle/extracted.ogg", "", function(station)
 					if IsValid(station) then
 						self.ExtractionMusic = station
 					end

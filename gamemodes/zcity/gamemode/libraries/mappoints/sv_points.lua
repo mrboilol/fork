@@ -244,11 +244,11 @@ function zb.tdm_checkpoints()
     if #zb.GetMapPoints( "HMCD_TDM_T" ) == 0 then
         zb.SaveMapPoints( "HMCD_TDM_T", points )
     end
+    if #zb.GetMapPoints( "HMCD_ARENA_T" ) == 0 then
+        zb.SaveMapPoints( "HMCD_ARENA_T", points )
+    end
     if #zb.GetMapPoints( "RIOT_TDM_RIOTERS" ) == 0 then
         zb.SaveMapPoints( "RIOT_TDM_RIOTERS", points )
-    end
-    if #zb.GetMapPoints( "HMCD_SWO_AZOV" ) == 0 then
-        zb.SaveMapPoints( "HMCD_SWO_AZOV", points )
     end
     if #zb.GetMapPoints( "HMCD_CRI_T" ) == 0 then
         zb.SaveMapPoints( "HMCD_CRI_T", points )
@@ -267,14 +267,14 @@ function zb.tdm_checkpoints()
     if #zb.GetMapPoints( "HMCD_TDM_CT" ) == 0 then
         zb.SaveMapPoints( "HMCD_TDM_CT", points )
     end
+    if #zb.GetMapPoints( "HMCD_ARENA_CT" ) == 0 then
+        zb.SaveMapPoints( "HMCD_ARENA_CT", points )
+    end
     if #zb.GetMapPoints( "HMCD_CRI_CT" ) == 0 then
         zb.SaveMapPoints( "HMCD_CRI_CT", points )
     end
     if #zb.GetMapPoints( "RIOT_TDM_LAW" ) == 0 then
         zb.SaveMapPoints( "RIOT_TDM_LAW", points )
-    end
-    if #zb.GetMapPoints( "HMCD_SWO_WAGNER" ) == 0 then
-        zb.SaveMapPoints( "HMCD_SWO_WAGNER", points )
     end
 
     --||

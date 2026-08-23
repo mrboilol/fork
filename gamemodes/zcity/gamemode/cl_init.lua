@@ -268,18 +268,8 @@ hook.Add("RenderScreenspaceEffects", "huyhuyUwU", function()
 end)
 
 zb.ROUND_STATE = 0
-local function RefreshAllPlayerXP()
-	for _, ply in player.Iterator() do
-		if not IsValid(ply) then continue end
-		net.Start("zb_xp_get")
-			net.WriteEntity(ply)
-		net.SendToServer()
-	end
-end
-
 net.Receive("RoundInfo", function()
 	local rnd = net.ReadString()
-	local oldRoundState = zb.ROUND_STATE
 	
 	hook.Run("RoundInfoCalled", rnd)
 
@@ -292,10 +282,6 @@ net.Receive("RoundInfo", function()
 	zb.CROUND = rnd
 
 	zb.ROUND_STATE = net.ReadInt(4)
-
-	if oldRoundState ~= 3 and zb.ROUND_STATE == 3 then
-		surface.PlaySound("levelend.mp3")
-	end
 	
 	if zb.ROUND_STATE == 0 then
 		zb.fade = 0.75
@@ -311,10 +297,6 @@ net.Receive("RoundInfo", function()
 				if CurrentRound().RoundStart then
 					CurrentRound():RoundStart()
 				end
-				RefreshAllPlayerXP()
-				timer.Simple(1, function()
-					RefreshAllPlayerXP()
-				end)
 			end
 		end
 	end
@@ -333,8 +315,8 @@ hook.Add("Player Disconnected","retrymenu",function(data)
 end)
 
 --local hg_coolvetica = ConVarExists("hg_coolvetica") and GetConVar("hg_coolvetica") or CreateClientConVar("hg_coolvetica", "0", true, false, "changes every text to coolvetica because its good", 0, 1)
-local hg_font_default = "VCR OSD Mono"
-local hg_font_legacy_default = "VCR OSD Mono"
+local hg_font_default = "Lora"
+local hg_font_legacy_default = "Courier Prime"
 local hg_font = ConVarExists("hg_font") and GetConVar("hg_font") or CreateClientConVar("hg_font", hg_font_default, true, false, "Change UI text font")
 local hg_font_value = hg_font:GetString()
 
@@ -343,7 +325,7 @@ if hg_font_value == "" or hg_font_value == hg_font_legacy_default then
 	hg_font_value = hg_font_default
 end
 
-local font = function() -- hg_coolvetica:GetBool() and "Coolvetica" or "VCR OSD Mono"
+local font = function() -- hg_coolvetica:GetBool() and "Coolvetica" or "Courier Prime"
     local usefont = hg_font_default
 
     if hg_font:GetString() != "" then
@@ -480,14 +462,12 @@ local function OpenPlayerSoundSettings(selfa, ply)
 	if not hg.playerInfo[ply:SteamID()] or not istable(hg.playerInfo[ply:SteamID()]) then addToPlayerInfo(ply, false, 1) end
 
 	local mute = Menu:AddOption( "Mute", function(self)
-		if not IsValid(ply) then return end
-		if hg.muteall or (hg.mutespect and not ply:Alive()) then return end
+		if hg.muteall || hg.mutespect then return end
 		
-		local muted = not ply:IsMuted()
-		ply:SetMuted(muted)
-		self:SetChecked(muted)
-		SetSoundButtonIcon(selfa, ply)
-		addToPlayerInfo(ply, muted, hg.playerInfo[ply:SteamID()] and hg.playerInfo[ply:SteamID()][2] or 1)
+		self:SetChecked(not ply:IsMuted())
+		ply:SetMuted( not ply:IsMuted() )
+		selfa:SetImage(not ply:IsMuted() && "icon16/sound.png" || "icon16/sound_mute.png")
+		addToPlayerInfo(ply, ply:IsMuted(), hg.playerInfo[ply:SteamID()][2])
 	end ) -- get your stupid one line ass outta here
 
 	mute:SetIsCheckable( true )
@@ -566,22 +546,22 @@ local function CreateScoreboardFonts()
 	local scale = math.min(ScrW(), ScrH()) / 1000
 
 	surface.CreateFont("ZCity_SB_Header", {
-		font = "VCR OSD Mono",
+		font = "Verily Serif Mono",
 		size = math.max(18, math.floor(30 * scale)),
 		weight = 300,
 	})
 	surface.CreateFont("ZCity_SB_Title", {
-		font = "VCR OSD Mono",
+		font = "Verily Serif Mono",
 		size = math.max(15, math.floor(22 * scale)),
 		weight = 300,
 	})
 	surface.CreateFont("ZCity_SB_Row", {
-		font = "VCR OSD Mono",
+		font = "Verily Serif Mono",
 		size = math.max(13, math.floor(18 * scale)),
 		weight = 300,
 	})
 	surface.CreateFont("ZCity_SB_Tiny", {
-		font = "VCR OSD Mono",
+		font = "Verily Serif Mono",
 		size = math.max(11, math.floor(14 * scale)),
 		weight = 300,
 	})
@@ -659,6 +639,7 @@ function GM:ScoreboardShow()
 	scoreBoardMenu:SetAlpha(0)
 	scoreBoardMenu.OpenAlpha = 0
 	scoreBoardMenu.Think = function(pnl)
+		if pnl.Closing then return end
 		pnl.OpenAlpha = math.Approach(pnl.OpenAlpha, 255, FrameTime() * 700)
 		pnl:SetAlpha(pnl.OpenAlpha)
 		pnl:SetPos(0, 0)
@@ -748,7 +729,6 @@ function GM:ScoreboardShow()
 	body:Dock(FILL)
 	body:DockMargin(SB_Unit(10), SB_Unit(8), SB_Unit(10), SB_Unit(8))
 	body.Paint = function() end
-	local nextRowRefresh = 0
 	body.Think = function()
 		if switchingPage then
 			pageAlpha = math.Approach(pageAlpha, 0, FrameTime() * 850)
@@ -762,18 +742,16 @@ function GM:ScoreboardShow()
 		end
 
 		if IsValid(body.List) then body.List:SetAlpha(pageAlpha) end
-
-		if not switchingPage and RefreshRows and CurTime() >= nextRowRefresh then
-			nextRowRefresh = CurTime() + 0.45
-			RefreshRows()
-		end
 	end
 
 	local function RequestPlayerXP(ply)
-		if not IsValid(ply) or ply.exp ~= nil then return end
+		if not IsValid(ply) or ply.exp ~= nil then return false end
+		if (ply.zcitySBXPRequested or 0) > CurTime() then return false end
+		ply.zcitySBXPRequested = CurTime() + 2
 		net.Start("zb_xp_get")
 			net.WriteEntity(ply)
 		net.SendToServer()
+		return true
 	end
 
 	local function MakeColumn()
@@ -884,6 +862,20 @@ function GM:ScoreboardShow()
 			menu:AddOption("Copy SteamID", function()
 				SetClipboardText(ply:SteamID())
 			end)
+			if lp:IsSuperAdmin() then
+				menu:AddOption("Set as assistant", function()
+					net.Start("HMCD_SetNextTraitorRole")
+						net.WriteEntity(ply)
+						net.WriteString("assistant")
+					net.SendToServer()
+				end)
+				menu:AddOption("Set as traitor", function()
+					net.Start("HMCD_SetNextTraitorRole")
+						net.WriteEntity(ply)
+						net.WriteString("traitor")
+					net.SendToServer()
+				end)
+			end
 			menu:Open()
 		end
 	end
@@ -892,8 +884,10 @@ function GM:ScoreboardShow()
 	body.List = playersCol
 
 	RefreshRows = function()
+		if not IsValid(playersCol) or not IsValid(playersCol.Scroll) then return end
 		playersCol.Scroll:Clear()
-		local count = 0
+		local players = {}
+		local requestedXP = false
 
 		for _, ply in player.Iterator() do
 			if not IsValid(ply) then continue end
@@ -901,12 +895,28 @@ function GM:ScoreboardShow()
 			if disappearance and ply ~= lp then continue end
 			if showingSpectators ~= (ply:Team() == TEAM_SPECTATOR) then continue end
 
-			RequestPlayerXP(ply)
-			AddPlayerRow(playersCol.Scroll, ply, showingSpectators)
-			count = count + 1
+			requestedXP = RequestPlayerXP(ply) or requestedXP
+			players[#players + 1] = ply
 		end
 
-		playersCol.TitleText = (showingSpectators and "SPECTATORS" or "PLAYERS") .. "  —  " .. count
+		table.sort(players, function(a, b)
+			local axp = a.exp or 0
+			local bxp = b.exp or 0
+			if axp == bxp then return a:Name():lower() < b:Name():lower() end
+			return axp > bxp
+		end)
+
+		for _, ply in ipairs(players) do
+			AddPlayerRow(playersCol.Scroll, ply, showingSpectators)
+		end
+
+		if requestedXP then
+			timer.Simple(0.35, function()
+				if IsValid(scoreBoardMenu) then RefreshRows() end
+			end)
+		end
+
+		playersCol.TitleText = (showingSpectators and "SPECTATORS" or "PLAYERS") .. "  —  " .. #players
 	end
 	RefreshRows()
 
@@ -916,20 +926,24 @@ function GM:ScoreboardShow()
 		playersCol:SetSize(cw, h)
 	end
 
-
 	return true
 end
 
 function GM:ScoreboardHide()
 	if IsValid(scoreBoardMenu) then
-		scoreBoardMenu:Close()
+		local menu = scoreBoardMenu
+		menu.Closing = true
+		menu:AlphaTo(0, 0.2, 0, function()
+			if IsValid(menu) then menu:Remove() end
+		end)
 		scoreBoardMenu = nil
 	end
 end
-local AdminShowVoiceChat = CreateClientConVar("zb_admin_show_voicechat","0",false,false,"Shows voicechat panles",0,1)
-hook.Add("PlayerStartVoice", "asd", function(ply)
+local AdminShowVoiceChat = CreateClientConVar("zb_admin_show_voicechat","0",false,false,"Show voicechat panels for admins",0,1)
+hook.Add("PlayerStartVoice", "showVoicePanels", function(ply)
 	if !IsValid(ply) then return end
-	if LocalPlayer():IsAdmin() and AdminShowVoiceChat:GetBool() then return end
+	local lp = LocalPlayer()
+	if (lp:IsAdmin() or (lp.CheckGroup and (lp:CheckGroup("admin") or lp:CheckGroup("superadmin")))) and AdminShowVoiceChat:GetBool() then return end
 
 	local other_alive = (ply:Alive() and LocalPlayer() != ply) or (ply.organism and (ply.organism.otrub or (ply.organism.brain and ply.organism.brain > 0.05)))
 

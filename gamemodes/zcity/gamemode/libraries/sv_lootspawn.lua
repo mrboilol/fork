@@ -206,7 +206,7 @@ function hg.GenerateLoot(ply,ent,func)
 	local traitor_opened = IsValid(ply) and ply.isTraitor
 	local low_karma_player = IsValid(ply) and (ply.Karma < 70)
 	local very_low_karma_player = IsValid(ply) and (ply.Karma < 30)
-	local high_karma_player = IsValid(ply) and (ply.Karma > 80)
+	local high_karma_player = IsValid(ply) and (ply.Karma >= zb.MaxKarma)
 	local on_ground = not IsValid(ply)
 
 	local time = CurTime() - (zb.ROUND_START or CurTime())
@@ -215,13 +215,13 @@ function hg.GenerateLoot(ply,ent,func)
 	local mul = hook.Run("ZB_LootMultiplier", ply)
 
 	if !mul then
-		mul = traitor_opened and 1.5 or (very_low_karma_player and 0.25 or (low_karma_player and 0.5 or (high_karma_player and 1.5 or 1)))
+		mul = traitor_opened and 1.5 or (very_low_karma_player and 0.25 or (low_karma_player and 0.5 or (high_karma_player and 1.25 or 1)))
 	end
 
 	if curRound.LootOnTime then
 		local div = curRound.LootDivTime or 300
 		mul = math.Rand(1, math.Clamp(mul * (time / div), 0.25, 1.75))
-		if developer:GetBool() and IsValid(ply) then
+		if developer:GetBool() and IsValid(ply) and ply:IsAdmin() then
 			timer.Simple(0,function()
 				ply:ChatPrint("sv_lootspawn: MUL = "..mul.." TIME/"..div.." = "..(time/div).." TIME = "..time)
 			end)
@@ -262,6 +262,8 @@ function hg.GenerateLoot(ply,ent,func)
 
 	local _, entName = hg.WeightedRandomSelect(tab)
 	entName = hg.CanonicalWeaponClass(entName)
+
+	if entName and hg.LootBlacklist[entName] then return end
 
 	if hg.PluvTown.Active and (entName == "weapon_bigconsumable" or entName == "weapon_smallconsumable") then
 		entName = "weapon_pluviska"
@@ -757,5 +759,3 @@ for i = 1,100 do
 		huy.AmmoCount = AmmoCount
 	end
 end--]]
-
-

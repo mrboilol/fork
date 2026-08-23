@@ -23,10 +23,10 @@ end
 
 --прошу обратить внимание что файлы внутри папок загружаются первыми
 local function LoadFromDir(directory)
-    local files, folders = file.Find(directory .. "/*", "LUA")
-    
+	local files, folders = file.Find(directory .. "/*", "LUA")
+
 	for _, v in ipairs(folders) do
-        LoadFromDir(directory .. "/" .. v)
+		LoadFromDir(directory .. "/" .. v)
 	end
 
 	for _, v in ipairs(files) do
@@ -36,125 +36,122 @@ end
 
 LoadFromDir("zcity/gamemode/libraries")
 
---моды лоадер (плывисочная машина), если чё непонятно спрашивайте у меня (мистера поинта). мод много модов.
 zb.modesHooks = {}
 zb.modes = zb.modes or {}
+
+local function addModeHook( MODE, hookName, func )
+	zb.modesHooks[MODE.name] = zb.modesHooks[MODE.name] or {}
+	zb.modesHooks[MODE.name][hookName] = func
+
+	hook.Add( hookName, "zb_modehook_" .. hookName, function( ... )
+		local Current = zb.CROUND_MAIN or zb.CROUND or "tdm"
+
+		local modeHooks = zb.modesHooks[Current]
+		if modeHooks and modeHooks[hookName] then
+			local ModeTable = zb.modes[Current]
+			local a, b, c, d, e, f = modeHooks[hookName]( ModeTable, ... )
+
+			if a ~= nil then
+				return a, b, c, d, e, f
+			end
+		end
+	end )
+end
+
+local function InitMode()
+	if table.IsEmpty(MODE) then return end
+
+	local name = MODE.name
+	local saved = zb.modes[name] and zb.modes[name].saved or {} -- saved table is used for saving data between hotloads
+
+	if MODE.base then
+		table.Inherit(MODE, zb.modes[MODE.base])
+
+		for i, tbl in pairs(MODE) do
+			if istable(MODE[i]) and istable(zb.modes[MODE.base][i]) then
+				tbl2 = {}
+
+				table.CopyFromTo(MODE[i], tbl2)
+
+				MODE[i] = tbl2
+			end
+		end
+
+		if MODE.AfterBaseInheritance then
+			MODE:AfterBaseInheritance()
+		end
+	end
+
+	zb.modes[name] = MODE
+	zb.modes[name].saved = saved
+
+	if SERVER then
+		if MODE.SetupChances then
+			MODE:SetupChances()
+		else
+			zb.ModesChances[name] = zb.ModesChances[name] or MODE.Chance
+		end
+	end
+
+	for k, v2 in pairs(MODE) do
+		if isfunction(v2) then
+			addModeHook(MODE, k, v2)
+		end
+	end
+end
 
 local chancesfile = "zbattle/modeschances.json"
 
 if SERVER then
-	zb.ModesChances = util.JSONToTable(file.Read(chancesfile, "DATA") or "") or {}
-
 	hook.Add("ShutDown", "savechances", function()
 		file.Write(chancesfile, util.TableToJSON(zb.ModesChances or {}, true))
 	end)
 
-	concommand.Add("zb_getmodeschances", function(ply)
-		if not ply:IsAdmin() then return end
+	concommand.Add("zb_getmodeschances", function(ply, cmd, args)
 		ply:zChatPrint(util.TableToJSON(zb.ModesChances, true))
 	end)
 
-	concommand.Add("zb_setmodechance", function(ply, _, args)
-		if not ply:IsAdmin() then return end
-
+	concommand.Add("zb_setmodechance", function(ply, cmd, args)
 		local mode = args[1]
 		local chance = tonumber(args[2])
-		if not zb.ModesChances[mode] or not chance then return end
+
+		if !zb.ModesChances[mode] or !chance then return end
 
 		zb.ModesChances[mode] = chance
 	end)
 
-	concommand.Add("zb_savemodeschances", function(ply)
-		if not ply:IsAdmin() then return end
+	concommand.Add("zb_savemodeschances", function(ply, cmd, args)
 		file.Write(chancesfile, util.TableToJSON(zb.ModesChances or {}, true))
 	end)
-end
-
-local function addModeHook(MODE, hookName, func)
-    zb.modesHooks[MODE.name] = zb.modesHooks[MODE.name] or {}
-    zb.modesHooks[MODE.name][hookName] = func
-
-    hook.Add(hookName, "zb_modehook_" .. hookName, function(...)
-        local Current = zb.CROUND_MAIN or zb.CROUND or "tdm"
-
-        local modeHooks = zb.modesHooks[Current]
-        if modeHooks and modeHooks[hookName] then
-            local ModeTable = zb.modes[Current]
-            local a, b, c, d, e, f = modeHooks[hookName](ModeTable, ...)
-
-            if a ~= nil then
-                return a, b, c, d, e, f
-            end
-        end
-    end)
-end
-
-local function InitMode(mode)
-	if table.IsEmpty(mode) or mode.Abstract == true then return end
-	if not isstring(mode.name) or mode.name == "" then
-		ErrorNoHalt("[ZCity] Refusing to register a mode without a name.\n")
-		return
-	end
-
-	local saved = zb.modes[mode.name] and zb.modes[mode.name].saved or {}
-
-	if mode.base then
-		local base = zb.modes[mode.base]
-		if not base then
-			ErrorNoHalt("[ZCity] Mode '" .. mode.name .. "' is missing base mode '" .. mode.base .. "'.\n")
-			return
-		end
-
-		table.Inherit(mode, base)
-
-		for key, value in pairs(mode) do
-			if istable(value) and istable(base[key]) then
-				mode[key] = table.Copy(value)
-			end
-		end
-
-		if mode.AfterBaseInheritance then
-			mode:AfterBaseInheritance()
-		end
-	end
-
-	zb.modes[mode.name] = mode
-	mode.saved = saved
-
-	if SERVER then
-		if mode.SetupChances then
-			mode:SetupChances()
-		else
-			zb.ModesChances[mode.name] = zb.ModesChances[mode.name] or mode.Chance
-		end
-	end
-
-	for hookName, callback in pairs(mode) do
-		if isfunction(callback) then
-			addModeHook(mode, hookName, callback)
-		end
-	end
 end
 
 local function LoadModes()
 	local directory = "zcity/gamemode/modes"
 	local files, folders = file.Find(directory .. "/*", "LUA")
 
+	if SERVER then
+		zb.ModesChances = util.JSONToTable(file.Read(chancesfile,  "DATA") or "") or {}
+	end
+
 	for _, v in ipairs(files) do
 		MODE = {}
 		IncluderFunc(directory .. "/" .. v)
-		InitMode(MODE)
+		InitMode()
 		MODE = nil
 	end
 
 	for _, v in ipairs(folders) do
 		MODE = {}
 		LoadFromDir(directory .. "/" .. v)
-		InitMode(MODE)
+		InitMode()
 		MODE = nil
+	end
+
+	if SERVER and !file.Exists(chancesfile,  "DATA") then
+		file.Write(chancesfile, util.TableToJSON(zb.ModesChances, true))
 	end
 end
 
 LoadModes()
 
-print("ZB modes loaded!")
+print("Z-City modes loaded!")

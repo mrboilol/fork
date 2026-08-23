@@ -35,9 +35,8 @@ COMMANDS.respawn = {
 		if not ply:IsAdmin() then return end
 		local plya = #args > 0 and args[1] or ply:Name()
 		for i, ply2 in pairs(player.GetListByName(plya)) do
-			if ply2:Alive() then continue end
 			ply2:Spawn()
-            ApplyAppearance( ply2,nil,nil,nil,SWARM_CV_Thumper_ForgetTime )
+            ApplyAppearance( ply2 )
 			local hands = ply2:Give("weapon_hands_sh")
 			ply2:SelectWeapon(hands)
 
@@ -96,6 +95,8 @@ local function GetAchievementValues(data)
 
     return output
 end
+
+local adminStatsAchievementMetadata = {}
 
 local function GetActiveAdminStatsRows()
     local rows = {}
@@ -175,6 +176,8 @@ local function SendAdminStats(ply)
             local ply2 = active[steamID64]
             local exp = IsValid(ply2) and zb.Experience and zb.Experience.PlayerInstances and zb.Experience.PlayerInstances[steamID64] or nil
             local achievements = IsValid(ply2) and hg and hg.achievements and hg.achievements.GetPlayerAchievements and hg.achievements.GetPlayerAchievements(ply2) or nil
+            local storedAchievements = achievements or util.JSONToTable(data.achievements or "") or {}
+            adminStatsAchievementMetadata[steamID64] = storedAchievements
 
             seen[steamID64] = true
             rows[#rows + 1] = {
@@ -186,7 +189,7 @@ local function SendAdminStats(ply)
                 deaths = exp and tonumber(exp.deaths) or tonumber(data.deaths) or 0,
                 kills = exp and tonumber(exp.kills) or tonumber(data.kills) or 0,
                 suicides = exp and tonumber(exp.suicides) or tonumber(data.suicides) or 0,
-                headshots = IsValid(ply2) and (tonumber(ply2:GetPData("Headshots", 0)) or 0) or 0,
+                headshots = IsValid(ply2) and (tonumber(ply2:GetPData("Headshots", 0)) or 0) or tonumber(storedAchievements.gollavo and storedAchievements.gollavo.value) or 0,
                 karma = tonumber(data.karma) or (IsValid(ply2) and ply2.guilt_GetValue and ply2:guilt_GetValue() or 100),
                 achievements = GetAchievementValues(achievements and util.TableToJSON(achievements) or data.achievements)
             }
@@ -281,19 +284,31 @@ net.Receive("ZB_AdminStatsSave", function(len, ply)
 
     if hg and hg.achievements then
         local achievements = {}
-        local oldAchievements = hg.achievements.achievements_data and hg.achievements.achievements_data.player_achievements and hg.achievements.achievements_data.player_achievements[steamID64] or {}
+        local oldAchievements = hg.achievements.achievements_data and hg.achievements.achievements_data.player_achievements and hg.achievements.achievements_data.player_achievements[steamID64] or adminStatsAchievementMetadata[steamID64] or {}
 
         for key, value in pairs(oldAchievements) do
-            achievements[key] = {value = AdminStatsNumber(istable(value) and value.value or value, 0)}
+            achievements[key] = {
+                value = AdminStatsNumber(istable(value) and value.value or value, 0),
+                obtained_at = istable(value) and value.obtained_at or nil
+            }
         end
 
         if istable(data.achievements) then
             for key, value in pairs(data.achievements) do
-                achievements[key] = {value = AdminStatsNumber(value, 0)}
+                local old = oldAchievements[key]
+                local newValue = AdminStatsNumber(value, 0)
+                local info = hg.achievements.GetAchievementInfo and hg.achievements.GetAchievementInfo(key)
+                local obtainedAt = istable(old) and old.obtained_at or nil
+                if not obtainedAt and info and newValue >= info.needed_value then obtainedAt = os.time() end
+                achievements[key] = {value = newValue, obtained_at = obtainedAt}
             end
         end
 
-        achievements.gollavo = {value = headshots}
+        local oldGollavo = oldAchievements.gollavo
+        local gollavoInfo = hg.achievements.GetAchievementInfo and hg.achievements.GetAchievementInfo("gollavo")
+        local gollavoObtainedAt = istable(oldGollavo) and oldGollavo.obtained_at or nil
+        if not gollavoObtainedAt and gollavoInfo and headshots >= gollavoInfo.needed_value then gollavoObtainedAt = os.time() end
+        achievements.gollavo = {value = headshots, obtained_at = gollavoObtainedAt}
 
         achievements = hg.achievements.FilterPlayerAchievements and hg.achievements.FilterPlayerAchievements(achievements) or achievements
 
@@ -342,19 +357,31 @@ net.Receive("ZB_AdminStatsSave", function(len, ply)
 
     if hg and hg.achievements then
         local achievements = {}
-        local oldAchievements = hg.achievements.achievements_data and hg.achievements.achievements_data.player_achievements and hg.achievements.achievements_data.player_achievements[steamID64] or {}
+        local oldAchievements = hg.achievements.achievements_data and hg.achievements.achievements_data.player_achievements and hg.achievements.achievements_data.player_achievements[steamID64] or adminStatsAchievementMetadata[steamID64] or {}
 
         for key, value in pairs(oldAchievements) do
-            achievements[key] = {value = AdminStatsNumber(istable(value) and value.value or value, 0)}
+            achievements[key] = {
+                value = AdminStatsNumber(istable(value) and value.value or value, 0),
+                obtained_at = istable(value) and value.obtained_at or nil
+            }
         end
 
         if istable(data.achievements) then
             for key, value in pairs(data.achievements) do
-                achievements[key] = {value = AdminStatsNumber(value, 0)}
+                local old = oldAchievements[key]
+                local newValue = AdminStatsNumber(value, 0)
+                local info = hg.achievements.GetAchievementInfo and hg.achievements.GetAchievementInfo(key)
+                local obtainedAt = istable(old) and old.obtained_at or nil
+                if not obtainedAt and info and newValue >= info.needed_value then obtainedAt = os.time() end
+                achievements[key] = {value = newValue, obtained_at = obtainedAt}
             end
         end
 
-        achievements.gollavo = {value = headshots}
+        local oldGollavo = oldAchievements.gollavo
+        local gollavoInfo = hg.achievements.GetAchievementInfo and hg.achievements.GetAchievementInfo("gollavo")
+        local gollavoObtainedAt = istable(oldGollavo) and oldGollavo.obtained_at or nil
+        if not gollavoObtainedAt and gollavoInfo and headshots >= gollavoInfo.needed_value then gollavoObtainedAt = os.time() end
+        achievements.gollavo = {value = headshots, obtained_at = gollavoObtainedAt}
 
         achievements = hg.achievements.FilterPlayerAchievements and hg.achievements.FilterPlayerAchievements(achievements) or achievements
 

@@ -3,7 +3,7 @@ MODE.name = "hl2dm"
 local MODE = MODE
 
 net.Receive("hl2dm_start",function()
-    surface.PlaySound("hl2mode1.ogg")
+    surface.PlaySound("hl2mode1.wav")
 	zb.RemoveFade()
 	hg.DynaMusic:Start( "hl_coop" )
 end)

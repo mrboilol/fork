@@ -184,13 +184,10 @@ function PLAYER:GetRandomSpawn()
 	self:SetPos(spawnPos)
 end
 
-function GM:PlayerSelectSpawn(ply, transition)
-end
-
 local function PlayerSelectSpawn(ply, transition)
 	if CurrentRound().randomSpawns then
 		local randSpawn = zb:GetRandomSpawn()
-		ply:SetPos(randSpawn)
+		if randSpawn then ply:SetPos(randSpawn) end
 
 		return
 	end
@@ -199,10 +196,15 @@ local function PlayerSelectSpawn(ply, transition)
 
 	if not spawnPos then
 		local randSpawn = zb:GetRandomSpawn()
-		ply:SetPos(randSpawn)
+		if randSpawn then ply:SetPos(randSpawn) end
 	else
 		ply:SetPos(spawnPos)
 	end
+end
+
+function GM:PlayerSelectSpawn(ply, transition)
+	if OverrideSpawn or ply.gottarespawn then return end
+	PlayerSelectSpawn(ply, transition)
 end
 
 function PLAYER:SetupTeam(team_)
@@ -233,9 +235,14 @@ function GM:PlayerSpawn(ply)
     end
 
     if CurrentRound() and not CurrentRound().OverrideSpawn then
+        local mode = CurrentRound()
+        local team_ = ply:Team()
+        if not (mode.OverrideBalance and (team_ == 0 or team_ == 1)) then
+            team_ = zb:BalancedChoice(0, 1)
+        end
         ply:SetTeam(1001)
         ApplyAppearance(ply,nil,nil,nil,true)
-        ply:SetTeam(zb:BalancedChoice(0, 1))
+        ply:SetTeam(team_)
     end
 
 end

@@ -2,10 +2,10 @@ local PANEL = {}
 local sw, sh = ScrW(), ScrH()    
 local color_white = Color(255,255,255)
 
-net.Receive("CS_Intermission", function()
+net.Receive("zb_cs_round_intermission", function()
 	plyteam = net.ReadBool()
 	rounds = net.ReadInt(6)
-	vgui.Create("CS_Intermission")
+	vgui.Create("zb_cs_round_intermission")
 end)
 
 function PANEL:Init()
@@ -95,5 +95,5 @@ function PANEL:Close()
 	})
 end
 
-vgui.Register("CS_Intermission", PANEL, "EditablePanel")
+vgui.Register("zb_cs_round_intermission", PANEL, "EditablePanel")
 

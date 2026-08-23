@@ -70,7 +70,7 @@ net.Receive("supfight_start",function()
 	
     StartTime = CurTime()
 	ZonePos = net.ReadVector()
-    --surface.PlaySound("snd_jack_hmcd_deathmatch.ogg")
+    --surface.PlaySound("snd_jack_hmcd_deathmatch.mp3")
 end)
 
 local fighter = {

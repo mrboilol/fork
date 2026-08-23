@@ -4,14 +4,14 @@ local MODE = MODE
 MODE.GuiltDisabled = true
 MODE.PoliceTime = 9999
 
-function MODE.AfterBaseInheritance()
-	MODE.Types.standard2 = MODE.Types.standard
-	MODE.Types.soe2 = MODE.Types.soe
+function MODE:AfterBaseInheritance()
+	self.Types.standard2 = self.Types.standard
+	self.Types.soe2 = self.Types.soe
 
-	MODE.Types.wildwest = nil
-	MODE.Types.gunfreezone = nil
-	MODE.Types.standard = nil
-	MODE.Types.soe = nil
+	self.Types.wildwest = nil
+	self.Types.gunfreezone = nil
+	self.Types.standard = nil
+	self.Types.soe = nil
 end
 
 function MODE:CanLaunch()
@@ -50,7 +50,7 @@ function MODE:RandomStuff()
 	end
 
 	if math.random(1, 25) == 1 and !IsValid(crysound) then
-		local snd = math.random(2) == 1 and "cry2.ogg" or "cry1.ogg"
+		local snd = math.random(2) == 1 and "cry2.wav" or "cry1.wav"
 		if crysound then return end
 		local tbl = ents.FindByClass("func_door_rotating")
 		table.Add(ents.FindByClass("prop_door_rotating"))
@@ -113,7 +113,7 @@ function MODE:Intermission()
 	self.Type = CROUND
 	local player_count = 0
 
-	for k, ply in ipairs(player.GetAll()) do
+	for k, ply in player.Iterator() do
 		if ply:Team() == TEAM_SPECTATOR then continue end
 		ply:KillSilent()
 
@@ -195,7 +195,7 @@ function MODE:Intermission()
 	self.PoliceSpawned = false
 	self.PoliceAllowed = false
 
-	for k, ply in ipairs(player.GetAll()) do
+	for k, ply in player.Iterator() do
 		if(MODE.ShouldStartRoleRound())then
 			net.Start("HMCD_RoundStart")	--; TODO Structure description
 				net.WriteBool(ply.isTraitor)	--; Is Traitor
@@ -237,7 +237,7 @@ end
 
 function MODE:EndRound()
 	timer.Remove("HMCDSpawnSWAT")
-timer.Remove("SpawnAdditionalPolice")
+	timer.Remove("SpawnAdditionalPolice")
 	timer.Remove("SpawnAdditionalNationalGuard")
 
 	for k, _ in pairs(self.saved.Timers or {}) do
@@ -253,7 +253,7 @@ timer.Remove("SpawnAdditionalPolice")
 	local players_alive = 0
 	local endround, winner = zb:CheckWinner(self:CheckAlivePlayers())
 
-	for i, ply in ipairs(player.GetAll()) do
+	for i, ply in player.Iterator() do
 		if ply.isTraitor and ply:Team() ~= TEAM_SPECTATOR then
 			traitors[#traitors + 1] = ply
 		end
@@ -509,8 +509,7 @@ function MODE:RoundThink()
 	--print(ply, CurTime(), MODE.saved.KillTime, true)
 
 	if #players == 1 then
-		
-		self:StartEvent("scary_black_guy", ply)
+		ply:KillSilent()
 
 		return
 	end
@@ -528,6 +527,8 @@ function MODE:RoundThink()
 
 		if flag then -- we can kill him :3	
 			if math.random(2) == 1 then
+				ply:KillSilent()
+			elseif math.random(2) == 1 then
 				self:PropKill(ply)
 			elseif math.random(2) == 1 then
 				hg.BreakNeck(ply)
@@ -538,6 +539,11 @@ function MODE:RoundThink()
 			end
 		else
 			if math.random(2) == 1 then
+				for k, v in player.Iterator() do
+					v:ScreenFade(SCREENFADE.IN, Color(0, 0, 0), 0.7, 0.4)
+				end
+				ply:KillSilent()
+			elseif math.random(2) == 1 then
 				local bot = ents.Create("bot_fear")
 				bot.Victim = ply
 				bot:Spawn()

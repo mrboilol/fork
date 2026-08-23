@@ -21,26 +21,26 @@ DEFENSE_WAVE_DEFINITIONS = {}
 
 DEFENSE_MUSIC = {
     WAVE = {
-        [1] = "music_themes/defense/wave01.ogg",
-        [2] = "music_themes/defense/wave02.ogg",
-        [3] = "music_themes/defense/wave03.ogg",
-        [4] = "music_themes/defense/wave04.ogg",
+        [1] = "music_themes/defense/wave01.wav",
+        [2] = "music_themes/defense/wave02.wav",
+        [3] = "music_themes/defense/wave03.wav",
+        [4] = "music_themes/defense/wave04.wav",
         [5] = "music_themes/exhaustion.mp3",
-        [6] = "music_themes/defense/wave02.ogg",
-        [7] = "music_themes/defense/wave01.ogg",
-        [8] = "music_themes/defense/wave02.ogg",
-        [9] = "music_themes/defense/wave03.ogg",
-        [10] = "music_themes/defense/wave04.ogg",
+        [6] = "music_themes/defense/wave02.wav",
+        [7] = "music_themes/defense/wave01.wav",
+        [8] = "music_themes/defense/wave02.wav",
+        [9] = "music_themes/defense/wave03.wav",
+        [10] = "music_themes/defense/wave04.wav",
         [11] = "music_themes/exhaustion.mp3",
-        [12] = "music_themes/defense/wave02.ogg",
+        [12] = "music_themes/defense/wave02.wav",
     },
     WAITING = {
-        [0] = "music_themes/dm/mpdkick.ogg",
-        [1] = "music_themes/defense/waiting_theme01.ogg",
-        [2] = "music_themes/defense/waiting_theme02.ogg",
+        [0] = "music_themes/dm/mpdkick.wav",
+        [1] = "music_themes/defense/waiting_theme01.wav",
+        [2] = "music_themes/defense/waiting_theme02.wav",
         [3] = "music_themes/unnamed.mp3",
         [4] = "music_themes/roll.mp3",
-        [5] = "music_themes/defense/waiting_theme02.ogg"
+        [5] = "music_themes/defense/waiting_theme02.wav"
     }
 }
 
@@ -60,8 +60,6 @@ DEFENSE_WEAPONS = {
         "weapon_sr25",
         "weapon_svd",
 		"weapon_m590a1",
-        "weapon_remington870",
-        "weapon_xm1014",
     }
 }
 
@@ -81,54 +79,62 @@ DEFENSE_ARMOR = {
 
 
 DEFENSE_LOOTTABLE = {
-	{30, {
+	{32, {
 		{4,"weapon_leadpipe"},
 		{3,"weapon_hg_crowbar"},
 		{2,"weapon_tomahawk"},
 		{2,"weapon_hatchet"},
 		{1,"weapon_hg_axe"},
+		{1,"weapon_pocketknife"},
 	}},
-	{50, {
+	{48, {
 		{9,"*ammo*"},
 		{9,"*sight*"},
 		{9,"*barrel*"},
-		{9,"weapon_hk_usp"},
-		{8,"weapon_revolver357"},
-		{8,"weapon_deagle"},
-		{8,"weapon_doublebarrel_short"},
-		{8,"weapon_doublebarrel"},
-		{8,"weapon_remington870"},
-		{8,"weapon_glock18c"},
-		{7,"weapon_mp5"},
-		{6,"weapon_xm1014"},
+		{8,"weapon_hk_usp"},
+		{7,"weapon_revolver357"},
+		{7,"weapon_deagle"},
+		{7,"weapon_doublebarrel_short"},
+		{7,"weapon_doublebarrel"},
+		{6,"weapon_glock18c"},
+		{5,"weapon_mp5"},
+		{4,"weapon_mp7"},
+		{4,"weapon_sks"},
+		{3,"weapon_akm"},
+		{3,"weapon_sr25"},
+		{3,"weapon_hg_crossbow"},
+		{3,"weapon_m98b"},
+		{2,"weapon_ptrd"},
+		{2,"weapon_hg_rpg"},
 
 		{6,"ent_armor_vest3"},
 		{5,"ent_armor_helmet1"},
-
-		{5,"weapon_mp7"},
-		{5,"weapon_sks"},
-
 		{5,"ent_armor_vest4"},
+		{4,"ent_armor_vest5"},
+		{3,"ent_armor_helmet7"},
 
 		{5,"weapon_hg_molotov_tpik"},
 		{5,"weapon_hg_pipebomb_tpik"},
-		{5,"weapon_claymore"},
-		{5,"weapon_hg_f1_tpik"},
-		{5,"weapon_traitor_ied"},
-		{5,"weapon_hg_slam"},
-		{5,"weapon_hg_legacy_grenade_shg"},
-		{5,"weapon_hg_grenade_tpik"},
-
-		{5,"weapon_ptrd"},
-		{5,"weapon_akm"},
-		{5,"weapon_pkm"},
-		{5,"weapon_hk21"},
-		{5,"weapon_hg_crossbow"},
-		{5,"weapon_m98b"},
-		{5,"weapon_hg_rpg"},
-		{5,"weapon_sr25"},
+		{4,"weapon_claymore"},
+		{4,"weapon_hg_f1_tpik"},
+		{3,"weapon_traitor_ied"},
+		{3,"weapon_hg_slam"},
+		{3,"weapon_hg_legacy_grenade_shg"},
+		{3,"weapon_hg_grenade_tpik"},
 	}},
 }
+
+hg.AppendLootPool(DEFENSE_LOOTTABLE[1][2], hg.LootPools.MeleeCommon, 1)
+hg.AppendLootPool(DEFENSE_LOOTTABLE[1][2], hg.LootPools.MeleeRare, 0.7)
+hg.AppendLootPool(DEFENSE_LOOTTABLE[2][2], hg.LootPools.Sidearms, 0.6)
+hg.AppendLootPool(DEFENSE_LOOTTABLE[2][2], hg.LootPools.SMGs, 0.4)
+hg.AppendLootPool(DEFENSE_LOOTTABLE[2][2], hg.LootPools.Shotguns, 0.4)
+hg.AppendLootPool(DEFENSE_LOOTTABLE[2][2], hg.LootPools.AssaultRifles, 0.3)
+hg.AppendLootPool(DEFENSE_LOOTTABLE[2][2], hg.LootPools.Marksman, 0.25)
+hg.AppendLootPool(DEFENSE_LOOTTABLE[2][2], hg.LootPools.LMG, 0.2)
+hg.AppendLootPool(DEFENSE_LOOTTABLE[2][2], hg.LootPools.ArmorMedium, 0.5)
+hg.AppendLootPool(DEFENSE_LOOTTABLE[2][2], hg.LootPools.ArmorHeavy, 0.4)
+hg.AppendLootPool(DEFENSE_LOOTTABLE[2][2], hg.LootPools.Explosives, 0.5)
 
 
 MODE.LootTable = DEFENSE_LOOTTABLE

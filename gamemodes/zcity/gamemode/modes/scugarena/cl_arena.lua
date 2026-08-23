@@ -52,7 +52,7 @@ net.Receive("scugarena_start", function()
 	zb.RemoveFade()
 	
     StartTime = CurTime()
-	--surface.PlaySound("snd_jack_hmcd_deathmatch.ogg")
+	--surface.PlaySound("snd_jack_hmcd_deathmatch.mp3")
 end)
 
 local slugcat = {

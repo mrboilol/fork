@@ -59,7 +59,7 @@ function MODE:RenderScreenspaceEffects()
 end
 
 surface.CreateFont("timer_Font2", {
-	font = "VCR OSD Mono",
+	font = "Courier Prime", 
 	size = ScreenScale(12), 
 	extended = true, 
 	weight = 650,

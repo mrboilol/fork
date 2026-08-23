@@ -1,9 +1,6 @@
 local MODE = MODE
 MODE.name = "hmcd"
 
-local huy_material = Material("huy.png")
-local hg_scaryeye = CreateClientConVar("hg_scaryeye", "1", true, false)
-
 --\\Local Functions
 local function screen_scale_2(num)
 	return ScreenScale(num) / (ScrW() / ScrH())
@@ -49,6 +46,8 @@ end)
 
 local fade = 0
 local HMCD_ScreenDuration = 10
+local hmcd_show_associates
+local hmcd_clear_associates
 net.Receive("HMCD_RoundStart",function()
 	local lply = LocalPlayer()
 	if not IsValid(lply) then return end
@@ -68,15 +67,9 @@ net.Receive("HMCD_RoundStart",function()
 	MODE.TraitorWord = net.ReadString()
 	MODE.TraitorWordSecond = net.ReadString()
 	MODE.TraitorExpectedAmt = net.ReadUInt(MODE.TraitorExpectedAmtBits)
-	local traitor_list_count = net.ReadUInt(8)
 	StartTime = CurTime()
 	MODE.TraitorsLocal = {}
 	MODE.TraitorAssociates = {}
-
-	for key = 1, traitor_list_count do
-		local traitor_info = {net.ReadColor(false), net.ReadString()}
-		MODE.TraitorsLocal[#MODE.TraitorsLocal + 1] = traitor_info
-	end
 
 	if(lply.isTraitor and screen_time_is_default)then
 		if(MODE.TraitorExpectedAmt == 1)then
@@ -85,10 +78,10 @@ net.Receive("HMCD_RoundStart",function()
 			if(MODE.TraitorExpectedAmt == 2)then
 				chat.AddText("You have 1 accomplice")
 			else
-				chat.AddText("There are(is) " .. MODE.TraitorExpectedAmt - 1 .. " traitor(s) besides you")
+				chat.AddText("There are " .. (MODE.TraitorExpectedAmt - 1) .. " other executioners besides you.")
 			end
 
-			chat.AddText("Traitor secret words are: \"" .. MODE.TraitorWord .. "\" and \"" .. MODE.TraitorWordSecond .. "\".")
+			chat.AddText("Executioner secret words are: \"" .. MODE.TraitorWord .. "\" and \"" .. MODE.TraitorWordSecond .. "\".")
 		end
 
 		local associate_count = net.ReadUInt(4)
@@ -107,7 +100,11 @@ net.Receive("HMCD_RoundStart",function()
 			MODE.TraitorsLocal[#MODE.TraitorsLocal + 1] = {traitor_info.color, traitor_info.name, IsValid(traitor_info.ply) and traitor_info.ply:SteamID() or ""}
 		end
 
-		if(lply.isTraitor and MODE.TraitorExpectedAmt > 1)then
+		if(lply.MainTraitor)then
+			if(MODE.TraitorExpectedAmt > 1)then
+				chat.AddText("Executioner names (only the main Executioner can see them):")
+			end
+
 			for _, traitor_info in ipairs(MODE.TraitorsLocal) do
 				chat.AddText(traitor_info[1], "\t" .. traitor_info[2])
 			end
@@ -134,22 +131,17 @@ net.Receive("HMCD_RoundStart",function()
 	MODE.CursorLerpY = 0
 
 	fade = 0
-end)
-
-net.Receive("HMCD(SetProfession)", function()
-	local lply = LocalPlayer()
-	if not IsValid(lply) then return end
-
-	lply.Profession = net.ReadString()
+	hmcd_clear_associates()
 end)
 
 MODE.TypeNames = {
 	["standard"] = "Homicide",
+	["suicidelunatic"] = "Suicide Lunatic",
 }
 
 --local hg_coolvetica = ConVarExists("hg_coolvetica") and GetConVar("hg_coolvetica") or CreateClientConVar("hg_coolvetica", "0", true, false, "changes every text to coolvetica because its good", 0, 1)
-local hg_font_default = "VCR OSD Mono"
-local hg_font_legacy_default = "VCR OSD Mono"
+local hg_font_default = "Lora"
+local hg_font_legacy_default = "Courier Prime"
 local hg_font = ConVarExists("hg_font") and GetConVar("hg_font") or CreateClientConVar("hg_font", hg_font_default, true, false, "Change UI text font")
 local hg_font_value = hg_font:GetString()
 
@@ -158,7 +150,7 @@ if hg_font_value == "" or hg_font_value == hg_font_legacy_default then
 	hg_font_value = hg_font_default
 end
 
-local font = function() -- hg_coolvetica:GetBool() and "Coolvetica" or "VCR OSD Mono"
+local font = function() -- hg_coolvetica:GetBool() and "Coolvetica" or "Courier Prime"
     local usefont = hg_font_default
 
     if hg_font:GetString() != "" then
@@ -170,59 +162,42 @@ end
 
 surface.CreateFont("ZB_HomicideSmall", {
 	font = font(),
-	size = ScreenScale(11),
+	size = ScreenScale(15),
 	weight = 400,
 	antialias = true
 })
 
 surface.CreateFont("ZB_HomicideMedium", {
 	font = font(),
-	size = ScreenScale(11),
+	size = ScreenScale(15),
 	weight = 400,
 	antialias = true
 })
 
 surface.CreateFont("ZB_HomicideMediumLarge", {
 	font = font(),
-	size = ScreenScale(18),
+	size = ScreenScale(25),
 	weight = 400,
 	antialias = true
 })
 
 surface.CreateFont("ZB_HomicideLarge", {
 	font = font(),
-	size = ScreenScale(22),
+	size = ScreenScale(30),
 	weight = 400,
 	antialias = true
 })
 
 surface.CreateFont("ZB_HomicideHeader", {
 	font = font(),
-	size = ScreenScale(32),
+	size = ScreenScale(45),
 	weight = 400,
 	antialias = true
 })
 
 surface.CreateFont("ZB_HomicideHumongous", {
 	font = font(),
-	size = 180,
-	weight = 400,
-	antialias = true
-})
-
--- Keep the end-of-round reveal and player statistics visually tied to the
--- homicide intro.  These preserve the previous panel sizes while using the
--- same configurable homicide typeface as the title card.
-surface.CreateFont("ZB_HomicideEndText", {
-	font = font(),
-	size = ScreenScale(8),
-	weight = 400,
-	antialias = true
-})
-
-surface.CreateFont("ZB_HomicideEndStats", {
-	font = font(),
-	size = 26,
+	size = 255,
 	weight = 400,
 	antialias = true
 })
@@ -230,15 +205,15 @@ surface.CreateFont("ZB_HomicideEndStats", {
 MODE.TypeObjectives = {}
 MODE.TypeObjectives.standard = {
 	traitor = {
-		objective = "You're geared up with items, poisons, explosives and weapons hidden in your pockets. Murder everyone here.",
-		name = "a Murderer",
+		objective = "You're geared up with items, poisons, explosives and weapons hidden in your pockets. Eliminate everyone before the Judge stops you.",
+		name = "an Executioner",
 		color1 = Color(190,0,0),
 		color2 = Color(190,0,0)
 	},
 
 	gunner = {
-		objective = "You are a hero. You've tasked yourself to help police find the criminal faster.",
-		name = "a Hero",
+		objective = "You are the Judge. Use your loadout to identify and stop the Executioner.",
+		name = "the Judge",
 		color1 = Color(158,0,190),
 		color2 = Color(158,0,190)
 	},
@@ -281,14 +256,8 @@ function MODE:RenderScreenspaceEffects()
 
 		local fade = math.min(time_diff / 2.5, 1)
 
-		if hg_scaryeye:GetInt() == 0 then
-			surface.SetDrawColor(255, 255, 255, 255 * fade)
-			surface.SetMaterial(huy_material)
-			surface.DrawTexturedRect(0, 0, ScrW(), ScrH())
-		else
-			surface.SetDrawColor(0, 0, 0, 255 * fade)
-			surface.DrawRect(-1, -1, ScrW() + 1, ScrH() + 1 )
-		end
+		surface.SetDrawColor(0, 0, 0, 255 * fade)
+		surface.DrawRect(-1, -1, ScrW() + 1, ScrH() + 1 )
 	end
 end
 
@@ -312,6 +281,187 @@ local function hmcd_draw_text(text, fontname, x, y, r, g, b, a, ang, xalign, yal
 	cam.PushModelMatrix(m)
 		draw.SimpleText(text, fontname, x, y, Color(r, g, b, a), xalign, yalign)
 	cam.PopModelMatrix()
+end
+
+local HMCD_AssociatePanels = {}
+local HMCD_AssociatePoses = {
+	"pose_standing_01",
+	"pose_standing_02",
+	"pose_standing_03",
+	"idle_all_01",
+	"idle_all_angry"
+}
+
+hmcd_clear_associates = function()
+	for _, pnl in ipairs(HMCD_AssociatePanels) do
+		if IsValid(pnl) then pnl:Remove() end
+	end
+
+	HMCD_AssociatePanels = {}
+end
+
+local function hmcd_appearance_model_data(appearance)
+	if not istable(appearance) or not hg or not hg.Appearance or not hg.Appearance.PlayerModels then return end
+	return hg.Appearance.PlayerModels[1][appearance.AModel] or hg.Appearance.PlayerModels[2][appearance.AModel]
+end
+
+local function hmcd_material_slot(mats, mat)
+	if not mat then return end
+	local want = string.lower(mat)
+	for i = 1, #mats do
+		if string.lower(mats[i] or "") == want then return i - 1 end
+	end
+end
+
+local function hmcd_appearance_color(clr)
+	if not clr then return Vector(1, 1, 1), Color(245, 245, 245) end
+	local r = clr.r or clr.x or clr[1] or 255
+	local g = clr.g or clr.y or clr[2] or 255
+	local b = clr.b or clr.z or clr[3] or 255
+	if r <= 1 and g <= 1 and b <= 1 then return Vector(r, g, b), Color(r * 255, g * 255, b * 255) end
+	return Vector(r / 255, g / 255, b / 255), Color(r, g, b)
+end
+
+local function hmcd_apply_associate_appearance(ent, data)
+	local appearance = data.appearance
+	if istable(appearance) and appearance.AColor then
+		local vec = hmcd_appearance_color(appearance.AColor)
+		ent.GetPlayerColor = function()
+			return vec
+		end
+	end
+
+	local model_data = hmcd_appearance_model_data(appearance)
+	if not model_data then
+		if IsValid(data.ply) then
+			ent:SetSkin(data.ply:GetSkin())
+			for _, bg in ipairs(ent:GetBodyGroups()) do
+				ent:SetBodygroup(bg.id, data.ply:GetBodygroup(bg.id))
+			end
+		end
+		return
+	end
+
+	ent:SetSubMaterial()
+	local mats = ent:GetMaterials()
+	local clothes = istable(appearance.AClothes) and appearance.AClothes or {}
+	local sex = model_data.sex and 2 or 1
+
+	for key, mat in SortedPairs(model_data.submatSlots or {}) do
+		local slot = hmcd_material_slot(mats, mat)
+		local set = hg.Appearance.Clothes and hg.Appearance.Clothes[sex]
+		local cloth = set and (set[clothes[key] or "normal"] or set.normal)
+		if slot and cloth then ent:SetSubMaterial(slot, cloth) end
+	end
+
+	if hg.Appearance.FacemapsSlots then
+		local facemap_slot = hg.Appearance.FacemapsModels and hg.Appearance.FacemapsModels[model_data.mdl]
+		if facemap_slot then
+			for i = 1, #mats do
+				local set = hg.Appearance.FacemapsSlots[mats[i]]
+				local facemap = set and set[appearance.AFacemap]
+				if facemap then ent:SetSubMaterial(i - 1, facemap) end
+			end
+		end
+	end
+
+	local bodygroups = istable(appearance.ABodygroups) and appearance.ABodygroups or {}
+	for _, bg in ipairs(ent:GetBodyGroups()) do
+		local selected = bodygroups[bg.name]
+		local bgdata = selected and hg.Appearance.Bodygroups and hg.Appearance.Bodygroups[bg.name]
+		local bgset = bgdata and bgdata[sex] and bgdata[sex][selected]
+		if not bgset then continue end
+		for i = 0, #bg.submodels do
+			if bgset[1] == bg.submodels[i] then
+				ent:SetBodygroup(bg.id, i)
+				break
+			end
+		end
+	end
+end
+
+hmcd_show_associates = function()
+	hmcd_clear_associates()
+	if not lply.isTraitor then return end
+
+	local associates = MODE.TraitorAssociates or {}
+	if #associates <= 0 then return end
+
+	local sw, sh = ScrW(), ScrH()
+	local w, h = math.floor(sw * 0.2), math.floor(sh * 0.55)
+	local y = math.floor(sh * 0.26)
+	local slots = {
+		{x = math.floor(sw * 0.055), off = -w - ScreenScale(30)},
+		{x = math.floor(sw - sw * 0.055 - w), off = sw + ScreenScale(30)},
+	}
+
+	for i = 1, math.min(#associates, 2) do
+		local data = associates[i]
+		local slot = slots[i]
+		local model_data = hmcd_appearance_model_data(data.appearance)
+		local model = model_data and model_data.mdl or data.model
+		if not model or model == "" or not util.IsValidModel(model) then continue end
+
+		local panel = vgui.Create("DPanel")
+		panel:SetSize(w, h)
+		panel:SetPos(slot.off, y)
+		panel:SetAlpha(255)
+		panel:SetPaintBackground(false)
+		panel:SetMouseInputEnabled(false)
+		panel:SetKeyboardInputEnabled(false)
+		panel.HMCDOffX = slot.off
+		panel.HMCDY = y
+		panel.Paint = function(self, pw, ph)
+			local a = self:GetAlpha()
+			local _, name_col = hmcd_appearance_color(istable(data.appearance) and data.appearance.AColor)
+			draw.SimpleTextOutlined("Assistant", "ZB_HomicideMedium", pw / 2, 0, Color(190, 0, 0, a), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP, 1, Color(0, 0, 0, a))
+			draw.SimpleTextOutlined(data.name, "ZB_HomicideMedium", pw / 2, ScreenScale(14), Color(name_col.r, name_col.g, name_col.b, a), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP, 1, Color(0, 0, 0, a))
+		end
+		panel.Think = function(self)
+			if self.HMCDLeaving then return end
+			local fade_end_time = MODE.DynamicFadeScreenEndTime or 0
+			if fade_end_time - CurTime() <= 2.5 then
+				self.HMCDLeaving = true
+				self:MoveTo(self.HMCDOffX, self.HMCDY, 0.75, 0, 0.15)
+				self:AlphaTo(0, 0.35, 0)
+			end
+		end
+
+		local mp = vgui.Create("DModelPanel", panel)
+		mp:SetPos(0, ScreenScale(28))
+		mp:SetSize(w, h - ScreenScale(28))
+		mp:SetModel(model)
+		mp:SetFOV(32)
+		mp:SetCamPos(Vector(68, 0, 36))
+		mp:SetLookAng((Vector(0, 0, 37) - Vector(68, 0, 36)):Angle())
+		mp:SetMouseInputEnabled(false)
+		mp:SetAmbientLight(Color(90, 90, 100))
+		mp:SetDirectionalLight(BOX_FRONT, Color(210, 210, 215))
+		function mp:LayoutEntity(ent)
+			if not self.HMCDApplied then
+				hmcd_apply_associate_appearance(ent, data)
+				self.HMCDApplied = true
+			end
+
+			ent:SetAngles(Angle(0, i == 1 and -10 or 10, 0))
+			if not self.HMCDSeq then
+				for add = 0, #HMCD_AssociatePoses - 1 do
+					local seq = ent:LookupSequence(HMCD_AssociatePoses[((i + add - 1) % #HMCD_AssociatePoses) + 1])
+					if seq and seq >= 0 then
+						self.HMCDSeq = seq
+						break
+					end
+				end
+
+				self.HMCDSeq = self.HMCDSeq or 0
+				ent:ResetSequence(self.HMCDSeq)
+			end
+			ent:FrameAdvance(RealFrameTime())
+		end
+
+		panel:MoveTo(slot.x, y, 0.75, 0.45 + i * 0.15, 0.15)
+		HMCD_AssociatePanels[#HMCD_AssociatePanels + 1] = panel
+	end
 end
 
 function MODE:HUDPaint()
@@ -389,7 +539,7 @@ if lply:Team() == TEAM_SPECTATOR then return end
 		MODE.TraitorsLocal = MODE.TraitorsLocal or {}
 
 		if(#MODE.TraitorsLocal > 0)then
-			add("Traitors list:", "ZB_HomicideMedium", ColorRole, sw * 0.5, cur_y, "right", stack_delay, 1.05)
+			add("Executioners list:", "ZB_HomicideMedium", ColorRole, sw * 0.5, cur_y, "right", stack_delay, 1.05)
 			stack_delay = stack_delay + 0.15
 
 			for _, traitor_info in ipairs(MODE.TraitorsLocal) do
@@ -398,7 +548,7 @@ if lply:Team() == TEAM_SPECTATOR then return end
 				stack_delay = stack_delay + 0.15
 			end
 		elseif(!lply.MainTraitor)then
-			add("Traitor secret words:", "ZB_HomicideMedium", ColorRole, sw * 0.5, cur_y, "right", stack_delay, 1.05)
+			add("Executioner secret words:", "ZB_HomicideMedium", ColorRole, sw * 0.5, cur_y, "right", stack_delay, 1.05)
 			stack_delay = stack_delay + 0.15
 
 			cur_y = cur_y + ScreenScale(15)
@@ -432,7 +582,7 @@ if lply:Team() == TEAM_SPECTATOR then return end
 	end
 
 	if(!lply.MainTraitor and lply.isTraitor)then
-		Objective = "You are equipped with nothing. Help other traitors win."
+		Objective = "You are equipped with nothing. Help the other Executioners win."
 	end
 
 	--; WARNING Traitor's objective is not lined up with SubRole's
@@ -479,13 +629,15 @@ if lply:Team() == TEAM_SPECTATOR then return end
 		surface.SetDrawColor(255, 255, 255, math.random(175, 255) * pluv_a / 2)
 		surface.DrawTexturedRect(sw * 0.25 + cox, sh * 0.44 - ScreenScale(15) + coy, sw / 2, ScreenScale(30))
 
-		draw.SimpleText("SOMEWHERE IN PLUVTOWN", "ZB_ScrappersSmall", sw / 2 + cox, sh * 0.44 - ScreenScale(2) + coy, Color(0, 0, 0, 255 * pluv_a), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		draw.SimpleText("SOMEWHERE IN PLUVTOWN", "ZB_ScrappersLarge", sw / 2 + cox, sh * 0.44 - ScreenScale(2) + coy, Color(0, 0, 0, 255 * pluv_a), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 	end
 end
 
 local CreateEndMenu
 
 net.Receive("hmcd_roundend", function()
+	hmcd_clear_associates()
+
 	local traitors, gunners = {}, {}
 
 	for key = 1, net.ReadUInt(MODE.TraitorExpectedAmtBits) do
@@ -521,7 +673,7 @@ net.Receive("hmcd_announce_traitor_lose", function()
 	local traitor_alive = net.ReadBool()
 
 	if(IsValid(traitor))then
-		chat.AddText(color_white, "Traitor ", traitor:GetPlayerColor():ToColor(), traitor:GetPlayerName() .. ", " .. traitor:Nick(), color_white, " was " .. (traitor_alive and "arrested." or "killed."))
+		chat.AddText(color_white, (traitor_alive and "" or "Executioner "), traitor:GetPlayerColor():ToColor(), traitor:GetPlayerName() .. ", " .. traitor:Nick(), color_white, " was " .. (traitor_alive and "an Executioner." or "killed."))
 	end
 end)
 
@@ -609,7 +761,7 @@ CreateEndMenu = function(traitor)
 	closebutton.Paint = function(self,w,h)
 		surface.SetDrawColor(122, 122, 122, 255)
 		surface.DrawOutlinedRect(0, 0, w, h, 2.5)
-		surface.SetFont("ZB_HomicideEndText")
+		surface.SetFont("ZB_InterfaceMedium")
 		surface.SetTextColor(col.r, col.g, col.b, col.a)
 		local lengthX, lengthY = surface.GetTextSize("Close")
 		surface.SetTextPos(lengthX - lengthX / 1.1, 4)
@@ -617,11 +769,11 @@ CreateEndMenu = function(traitor)
 	end
 
 	hmcdEndMenu.PaintOver = function(self,w,h)
-		surface.SetFont("ZB_HomicideEndStats")
+		surface.SetFont( "ZB_InterfaceMediumLarge" )
 		surface.SetTextColor(col.r,col.g,col.b,col.a)
-		local lengthX, lengthY = surface.GetTextSize(traitorName .. " was a traitor ("..traitorNick..")")
+		local lengthX, lengthY = surface.GetTextSize(traitorName .. " was an Executioner ("..traitorNick..")")
 		surface.SetTextPos(w / 2 - lengthX / 2, 20)
-		surface.DrawText(traitorName .. " was a traitor ("..traitorNick..")")
+		surface.DrawText(traitorName .. " was an Executioner ("..traitorNick..")")
 	end
 
 	-- PLAYERS
@@ -647,7 +799,7 @@ CreateEndMenu = function(traitor)
 			surface.DrawRect(0, h / 2, w, h / 2)
 
 			local col = info.col
-			surface.SetFont("ZB_HomicideEndStats")
+			surface.SetFont("ZB_InterfaceMediumLarge")
 			local lengthX, lengthY = surface.GetTextSize(name)
 
 			surface.SetTextColor(0, 0, 0, 255)
@@ -660,13 +812,13 @@ CreateEndMenu = function(traitor)
 
 
 			local col = colSpect2
-			surface.SetFont("ZB_HomicideEndStats")
+			surface.SetFont("ZB_InterfaceMediumLarge")
 			surface.SetTextColor(col.r,col.g,col.b,col.a)
 			local lengthX, lengthY = surface.GetTextSize(info.name)
 			surface.SetTextPos(15, h / 2 - lengthY / 2)
 			surface.DrawText(info.name .. ((!info.alive and " - died") or (info.incapacitated and " - incapacitated") or ""))
 
-			surface.SetFont("ZB_HomicideEndStats")
+			surface.SetFont("ZB_InterfaceMediumLarge")
 			surface.SetTextColor(col.r, col.g, col.b, col.a)
 			local lengthX, lengthY = surface.GetTextSize(info.frags)
 			surface.SetTextPos(w - lengthX -15,h/2 - lengthY/2)
@@ -699,7 +851,7 @@ net.Receive("HMCD(StartPlayersRoleSelection)", function()
 end)
 
 function hg.SelectPlayerRole(role, mode)
-	role = role or "Traitor"
+	role = role or "Executioner"
 	mode = mode or "standard"
 
 	if(IsValid(VGUI_HMCD_RolePanelList))then

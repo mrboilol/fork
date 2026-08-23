@@ -1,9 +1,10 @@
+--
 local PANEL = {}
 
-local gradientD = surface.GetTextureID("vgui/gradient-d")
-local gradientL = surface.GetTextureID("vgui/gradient-l")
-local gradientR = surface.GetTextureID("vgui/gradient-r")
-local background = Color(10, 10, 19, 235)
+local gradient_d = surface.GetTextureID("vgui/gradient-d")
+local gradient_l = surface.GetTextureID("vgui/gradient-l")
+local gradient_r = surface.GetTextureID("vgui/gradient-r")
+local bg = Color(10, 10, 19, 235)
 local border = Color(155, 155, 155, 210)
 local soft = Color(255, 255, 255, 25)
 
@@ -13,14 +14,14 @@ end
 
 local function CreateRTVFonts()
     surface.CreateFont("ZCity_RTV_Title", {
-        font = "VCR OSD Mono",
+        font = "Verily Serif Mono",
         size = RTVUnit(32),
         weight = 800,
         antialias = true
     })
 
     surface.CreateFont("ZCity_RTV_Tiny", {
-        font = "VCR OSD Mono",
+        font = "Verily Serif Mono",
         size = RTVUnit(8),
         weight = 200
     })
@@ -34,33 +35,36 @@ function PANEL:Init()
     self:SetDraggable(false)
     self:ShowCloseButton(false)
     self:SetBorder(false)
-    self:SetColorBG(background)
+    self:SetColorBG(bg)
     self:SetColorBR(border)
     self:SetBlurStrengh(5)
 end
 
 function PANEL:Paint( w, h )
-    draw.RoundedBox(0, 0, 0, w, h, background)
+    draw.RoundedBox(0, 0, 0, w, h, bg)
     hg.DrawBlur(self, 5)
 
     surface.SetDrawColor(18, 18, 18, 65)
-    surface.SetTexture(gradientR)
+    surface.SetTexture(gradient_r)
     surface.DrawTexturedRect(0, 0, w, h)
 
-    surface.SetDrawColor(background)
-    surface.SetTexture(gradientL)
+    surface.SetDrawColor(bg)
+    surface.SetTexture(gradient_l)
     surface.DrawTexturedRect(0, 0, w, h)
 
     surface.SetDrawColor(100, 100, 100, 35)
-    surface.SetTexture(gradientD)
+    surface.SetTexture(gradient_d)
     surface.DrawTexturedRect(0, 0, w, h)
 
     surface.SetDrawColor(border)
-    surface.DrawOutlinedRect(0, 0, w, h, 2)
+    surface.DrawOutlinedRect(0, 0, w, h, 1.5)
 
     local title = "ROCK THE VOTE"
+
     draw.SimpleTextOutlined(title, "ZCity_RTV_Title", RTVUnit(28), RTVUnit(24), color_white, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP, 1, color_black)
+
     draw.SimpleText("ESC / EXIT", "ZCity_RTV_Tiny", w - RTVUnit(30), h - RTVUnit(22), soft, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
+
 end
 
-vgui.Register("ZB_RTVMenu", PANEL, "ZFrame")
+vgui.Register( "ZB_RTVMenu", PANEL, "ZFrame")

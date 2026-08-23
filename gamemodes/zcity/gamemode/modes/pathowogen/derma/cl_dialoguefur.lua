@@ -7,7 +7,7 @@ local text = "There's an unknown pathowogen virus ravaging your current area. Yo
 local COMMANDER = Material("zbattle/FURMANDER.png", "smooth")
 
 surface.CreateFont("ZB_PathowogenDialogue", {
-	font = "VCR OSD Mono",
+	font = "Courier Prime",
 	size = ScreenScale(6),
 	extended = true,
 	weight = 400,
@@ -16,7 +16,7 @@ surface.CreateFont("ZB_PathowogenDialogue", {
 })
 
 surface.CreateFont("ZB_PathowogenDialogueTitle", {
-	font = "VCR OSD Mono",
+	font = "Courier Prime",
 	size = ScreenScale(10),
 	extended = true,
 	weight = 400,
@@ -38,7 +38,7 @@ function PANEL:Init()
 	self.textpos = 0
 	self.currenttext = ""
 
-	surface.PlaySound("zbattle/dialogue/radio_talk.mp3")
+	surface.PlaySound("zbattle/dialogue/radio_talk.ogg")
 
 	-- timer.Simple(1.2, function()
 	--     self:CreateAnimation(#text / 20, {
@@ -52,7 +52,7 @@ function PANEL:Init()
 	--             local newtext = string.sub(text, 0, self.textpos)
 
 	--             if self.currenttext != newtext then
-	--                 sound.PlayFile("sound/zbattle/dialogue/commander_talk2.mp3", "", function() end)
+	--                 sound.PlayFile("sound/zbattle/dialogue/commander_talk2.ogg", "", function() end)
 	--                 self.currenttext = newtext
 	--                 self.text:SetText(newtext)
 	--             end
@@ -145,7 +145,7 @@ function PANEL:Think()
 		local newtext = string.sub(self.textread, 0, self.textpos)
 
 		if self.currenttext != newtext then
-			sound.PlayFile("sound/zbattle/dialogue/commander_talk2.mp3", "", function() end)
+			sound.PlayFile("sound/zbattle/dialogue/commander_talk2.ogg", "", function() end)
 			self.currenttext = newtext
 			self.text:SetText(newtext)
 		end

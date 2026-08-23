@@ -3,12 +3,6 @@ TOOL.Name = "Point Editor"
 
 TOOL.ClientConVar["point"] = ""
 
-zb = zb or {}
-zb.Points = zb.Points or {}
-zb.Points.HMCD_OVERSTIM_SHOOTER = zb.Points.HMCD_OVERSTIM_SHOOTER or {}
-zb.Points.HMCD_OVERSTIM_SHOOTER.Color = Color(200, 40, 40)
-zb.Points.HMCD_OVERSTIM_SHOOTER.Name = "HMCD_OVERSTIM_SHOOTER"
-
 function TOOL:LeftClick(trace, attach)
 	local ply = self:GetOwner()
 	if not ply:IsAdmin() then
@@ -135,7 +129,7 @@ function TOOL:Deploy()
 	if SERVER then
 		local ply = self:GetOwner()
 
-		ply:EmitSound("zbattle/pointinator.ogg")
+		ply:EmitSound("zbattle/pointinator.mp3")
 
 		zb.SendPointsToPly(ply)
 	end
