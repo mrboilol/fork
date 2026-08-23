@@ -777,6 +777,8 @@ function SWEP:FireBullet()
 			if organism then
 				accuracyMul = accuracyMul * (1 + ((organism.larm or 0) + (organism.rarm or 0)) * 0.65)
 			end
+			local combat = hg.GetCombatCondition and hg.GetCombatCondition(owner) or nil
+			if combat then accuracyMul = accuracyMul * combat.aim end
 			local readiness = self.weaponReadiness or 1
 			local stability = self.weaponStability or 0
 			accuracyMul = accuracyMul * Lerp(readiness, 2.2, 1)

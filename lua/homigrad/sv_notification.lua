@@ -755,12 +755,23 @@ local meleeHitgroupNames = {
 	[HITGROUP_LEFTLEG] = "left leg", [HITGROUP_RIGHTLEG] = "right leg", [8] = "pelvis",
 }
 
+local meleeImpactResults = {
+	[HITGROUP_HEAD] = "bruising their skull",
+	[HITGROUP_CHEST] = "bruising their ribs",
+	[HITGROUP_STOMACH] = "bruising their abdomen",
+	[HITGROUP_LEFTARM] = "bruising their left arm",
+	[HITGROUP_RIGHTARM] = "bruising their right arm",
+	[HITGROUP_LEFTLEG] = "bruising their left leg",
+	[HITGROUP_RIGHTLEG] = "bruising their right leg",
+	[8] = "bruising their pelvis",
+}
+
 local function getMeleeStrikePrefix(weapon, damage, hitgroup, damageType)
 	local owner = weapon:GetOwner()
 	local stamina = IsValid(owner) and owner.organism and owner.organism.stamina and tonumber(owner.organism.stamina[1]) or 100
 	local weaponDamage = math.max(tonumber(weapon.DamagePrimary) or 0, tonumber(weapon.DamageSecondary) or 0, 1)
 	local weaponWeight = tonumber(weapon.weight) or tonumber(weapon.Weight) or 0
-	local force = math.Clamp(stamina / 100 * 0.4 + math.Clamp(weaponDamage / 35, 0, 1) * 0.4 + math.Clamp(weaponWeight / 3, 0, 1) * 0.1 + math.Clamp((damage or 0) / 45, 0, 1) * 0.1, 0, 1)
+	local force = math.Clamp(stamina / 100 * 0.25 + math.Clamp(weaponDamage / 55, 0, 1) * 0.25 + math.Clamp(weaponWeight / 4, 0, 1) * 0.15 + math.Clamp((damage or 0) / 35, 0, 1) * 0.35, 0, 1)
 	local target = meleeHitgroupNames[hitgroup] or "body"
 	local name = weapon.PrintName or weapon:GetClass() or "weapon"
 	local heldWeapon = (weapon:GetClass() == "weapon_hands_sh" or weapon:GetClass() == "weapon_hg_coolhands") and "your fist" or "the " .. string.lower(name)
@@ -777,7 +788,7 @@ local function getMeleeStrikePrefix(weapon, damage, hitgroup, damageType)
 	return "You clip their " .. target .. " with " .. heldWeapon, force
 end
 
-local function getMeleeInjuryOutcome(org, before, force)
+local function getMeleeInjuryOutcome(org, before, force, hitgroup)
 	if not before.otrub and (org.otrub or org.needotrub) then return "rendering them unresponsive" end
 	if not before.notBreathing and combatThoughtStoppedBreathing(org) then return "leaving them unable to breathe" end
 
@@ -788,17 +799,17 @@ local function getMeleeInjuryOutcome(org, before, force)
 	for _, info in ipairs(combatThoughtOrgans) do
 		local old, new = before.organs[info[1]], combatThoughtValue(org, info)
 		if old < 0.95 and new >= 0.95 then return "destroying their " .. info[2] end
-		if new > old + 0.025 then return "causing damage to their " .. info[2] end
+		if new > old + 0.005 then return "damaging their " .. info[2] end
 	end
 
 	for _, info in ipairs(combatThoughtBones) do
 		local old, new = before.bones[info[1]], combatThoughtValue(org, info)
 		if not before.bones[info[1] .. "dislocation"] and org[info[1] .. "dislocation"] then return "dislocating their " .. info[2] end
-		if old < 0.95 and new >= 0.95 then return "shattering their " .. info[2] end
-		if new > old + 0.025 then return "damaging their " .. info[2] end
+		if old < 0.95 and new >= 0.95 then return "breaking their " .. info[2] end
+		if new > old + 0.005 then return "injuring their " .. info[2] end
 	end
 
-	return force >= 0.72 and "causing severe pain" or "leaving them in pain"
+	return meleeImpactResults[hitgroup] or (force >= 0.72 and "leaving a heavy bruise" or "leaving a bruise")
 end
 
 function hg.ReportCombatInjuryState(attacker, victim, org, before, meleeWeapon, meleeContact, damage, damageType)
@@ -806,7 +817,7 @@ function hg.ReportCombatInjuryState(attacker, victim, org, before, meleeWeapon, 
 	if attacker:GetInfoNum("hg_newthoughts", 0) <= 0 then return end
 	if IsValid(meleeWeapon) and meleeContact then
 		local strike, force = getMeleeStrikePrefix(meleeWeapon, damage, meleeContact.hitGroup, damageType)
-		CreateThought(attacker, strike .. ", " .. getMeleeInjuryOutcome(org, before, force) .. ".", 2, "combat_melee_" .. meleeWeapon:EntIndex() .. "_" .. (IsValid(victim) and victim:EntIndex() or 0), 0, Color(255, 220, 190))
+		CreateThought(attacker, strike .. ", " .. getMeleeInjuryOutcome(org, before, force, meleeContact.hitGroup) .. ".", 2, "combat_melee_" .. meleeWeapon:EntIndex() .. "_" .. (IsValid(victim) and victim:EntIndex() or 0), 0, Color(255, 220, 190))
 		return
 	end
 

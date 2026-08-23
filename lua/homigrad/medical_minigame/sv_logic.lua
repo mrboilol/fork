@@ -327,6 +327,8 @@ function hg.MedicalMinigame.StartBandageMinigame(ply, ent)
         }
         hg.MedicalMinigame.BandageSessions[ply] = existingSession
     end
+    existingSession.weapon = wep
+    existingSession.mode = IsValid(wep) and wep.mode or nil
 
     net.Start("hg_medical_minigame_start")
     net.WriteString("bandage")
@@ -725,14 +727,16 @@ net.Receive("hg_medical_minigame_finish", function(len, ply)
         local target = bandageSession.target
         if not CanUseMedicalMinigameTarget(ply, target) then return end
 
-        local wep = ply:GetActiveWeapon()
-        if not IsValid(wep) then return end
+        local wep = bandageSession.weapon
+        if not IsValid(wep) or wep:GetOwner() ~= ply or wep.mode ~= bandageSession.mode then
+            hg.MedicalMinigame.BandageSessions[ply] = nil
+            return
+        end
 
-        -- Apply healing when required completions reached
         if wep.SetHolding then
             wep:SetHolding(100)
         end
-        local done = wep:Heal(target, wep.mode)
+        local done = wep:Heal(target, bandageSession.mode)
         if done and wep.PostHeal then
             wep:PostHeal(target, wep.mode)
         end

@@ -21,7 +21,7 @@ end
 function hg.organism.GetHemorrhageCompensationDrive(blood)
 	local reserve = hg.organism.GetBloodDeliveryFraction(blood, 1)
 	local cfg = hg.organism.config or {}
-	local bradyReserve = math.Clamp(tonumber(cfg.HEMORRHAGE_BRADYCARDIA_RESERVE) or 0.35, 0.05, 0.9)
+	local bradyReserve = math.Clamp(tonumber(cfg.HEMORRHAGE_BRADYCARDIA_RESERVE) or 0.14, 0.05, 0.9)
 	return math.Clamp((1 - reserve) / math.max(1 - bradyReserve, 0.05), 0, 1)
 end
 
@@ -75,11 +75,11 @@ local function getBloodCompensationRate(blood)
 	local reserve = getBloodPerfusion(blood)
 	local response = hg.organism.GetHemorrhageCompensationDrive and hg.organism.GetHemorrhageCompensationDrive(blood)
 		or math.Clamp(1 - reserve, 0, 1)
-	local maxRate = cfg.HEMORRHAGE_MAX_COMPENSATED_HR or 235
+	local maxRate = cfg.HEMORRHAGE_MAX_COMPENSATED_HR or 300
 	local rate = 70 + (maxRate - 70) * response
-	local bradyReserve = math.Clamp(cfg.HEMORRHAGE_BRADYCARDIA_RESERVE or 0.35, 0.05, 0.9)
+	local bradyReserve = math.Clamp(cfg.HEMORRHAGE_BRADYCARDIA_RESERVE or 0.14, 0.05, 0.9)
 	local preloadFailure = math.Clamp((bradyReserve - reserve) / bradyReserve, 0, 1)
-	return Lerp(preloadFailure ^ 1.2, rate, cfg.HEMORRHAGE_BRADYCARDIC_HR or 45)
+	return Lerp(preloadFailure ^ 1.2, rate, cfg.HEMORRHAGE_BRADYCARDIC_HR or 15)
 end
 
 local function getRateOutput(heartbeat)
@@ -115,6 +115,9 @@ local function getPalpablePulseTarget(org, heartbeat, circulation, hemorrhageCom
 		- arrhythmia * (tonumber(cfg.PALPABLE_ARRHYTHMIA_PENALTY) or 0.60)
 		- math.Clamp(effectivePalpitations or 0, 0, 1) * (tonumber(cfg.PALPABLE_PALPITATION_PENALTY) or 0.50), 0.08, 1)
 	if org.fibrillation then rhythmCapture = rhythmCapture * 0.08 end
+	if rate <= 55 and arrhythmia < 0.15 and (effectivePalpitations or 0) < 0.15 and circulation >= 0.45 then
+		return rate, 1
+	end
 
 	-- Sympathetic compensation centralizes blood through vasoconstriction. It may
 	-- maintain central MAP while making a radial/peripheral pulse much weaker.
@@ -747,7 +750,8 @@ module[2] = function(owner, org, timeValue)
 	-- Keep a real mean arterial pressure alongside the legacy palpable-pulse
 	-- value. Judge's pressure readout is useful to medicine/UI code, while the
 	-- current circulation model remains the single owner of the actual target.
-	local pressureTarget = Clamp(circulation * 92, 0, 180)
+	local pulsePressureSupport = Clamp((palpablePulseTarget - 10) / 50, 0, 1)
+	local pressureTarget = Clamp(circulation * 92 * Lerp(pulsePressureSupport, 0.3, 1), 0, 180)
 	local pressureNow = tonumber(org.bloodPressure) or pressureTarget
 	local pressureFallRate = org.heartstop and not (dihSupport or defibGrace or cprSupport) and 22 or 12
 	org.bloodPressure = Approach(pressureNow, pressureTarget, timeValue * (pressureTarget > pressureNow and 12 or pressureFallRate))
@@ -934,8 +938,8 @@ module[2] = function(owner, org, timeValue)
 	local cfg = hg.organism.config or {}
 	local circulatoryReserve = math.min(getBloodPerfusion(bloodNow), math.Clamp(circulation, 0, 1))
 	local hemorrhageO2Transport = hg.organism.GetHemorrhageOxygenTransportFraction and hg.organism.GetHemorrhageOxygenTransportFraction(bloodNow) or circulatoryReserve
-	local electricalFlowFailure = math.Clamp((0.48 - circulatoryReserve) / 0.48, 0, 1)
-	local electricalO2Failure = math.Clamp((0.42 - hemorrhageO2Transport) / 0.42, 0, 1)
+	local electricalFlowFailure = math.Clamp((0.62 - circulatoryReserve) / 0.62, 0, 1)
+	local electricalO2Failure = math.Clamp((0.58 - hemorrhageO2Transport) / 0.58, 0, 1)
 	local myocardialFailure = math.Clamp((0.45 - (org.myocardialOxygen or 1)) / 0.45, 0, 1)
 	local hemorrhageElectricalInstability = math.max(electricalFlowFailure, electricalO2Failure, myocardialFailure)
 	org.hemorrhageElectricalInstability = hemorrhageElectricalInstability
@@ -1075,10 +1079,10 @@ module[2] = function(owner, org, timeValue)
 			owner:Notify("My heartbeat is becoming dangerously slow...", 45, "bradycardia", 0, nil, Color(150, 210, 255))
 		end
 	end
-	if stress > 0.65 and CurTime() >= (org.nextArrhythmiaRoll or 0) then
-		local rollInterval = Clamp(Remap(stress + hemorrhageElectricalInstability, 0.65, 2.3, 14, 1.5), 1.5, 14)
+	if stress > 0.55 and CurTime() >= (org.nextArrhythmiaRoll or 0) then
+		local rollInterval = Clamp(Remap(stress + hemorrhageElectricalInstability, 0.55, 2.3, 10, 1.25), 1.25, 10)
 		org.nextArrhythmiaRoll = CurTime() + rollInterval
-		local vfChance = Clamp((stress - 0.65) * 0.12 + hemorrhageElectricalInstability ^ 2 * 0.32, 0.01, 0.55)
+		local vfChance = Clamp((stress - 0.55) * 0.15 + hemorrhageElectricalInstability ^ 2 * 0.42, 0.01, 0.65)
 		if math.Rand(0, 1) < vfChance then
 			hg.organism.StartFibrillation(org)
 			if hemorrhageElectricalInstability > 0.72 then org.terminalRhythm = "ventricular_fibrillation" end

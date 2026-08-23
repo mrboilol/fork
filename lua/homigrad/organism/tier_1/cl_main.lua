@@ -260,7 +260,7 @@ local function StartRemFibrillationSound()
 	end
 	if remFibrillationLoading then return end
 	remFibrillationLoading = true
-	sound.PlayFile("sound/rem_fibrillation.mp3", "noplay", function(station)
+	sound.PlayFile("sound/criticalbeats.mp3", "noplay", function(station)
 		remFibrillationLoading = nil
 		if not IsValid(station) then return end
 		local ply = LocalPlayer()
@@ -295,10 +295,14 @@ end
 
 hook.Add("Think", "RemCardiacSounds", function()
 	local ply = LocalPlayer()
-	if not IsValid(ply) then return end
+	if not IsValid(ply) then
+		hg.criticalBeatsActive = false
+		return
+	end
 	local org = ply:Alive() and (ply.new_organism or ply.organism)
 	local heartstop = org and org.heartstop or false
 	local fibrillation = org and org.fibrillation or false
+	hg.criticalBeatsActive = fibrillation
 	if heartstop and not remHeartStopped then PlayRemHeartStopSound(org.otrub) end
 	remHeartStopped = heartstop
 	if fibrillation then StartRemFibrillationSound() else StopRemFibrillationSound() end
@@ -1725,9 +1729,9 @@ net.Receive("headtrauma_concussion_update", function()
 	local concussionLevel = net.ReadFloat()
 	if not lply or not lply:Alive() then return end
 
-	local flashAlpha = math.Clamp(severity * 22, 0, 130)
+	local flashAlpha = math.Clamp(severity * 32, 18, 180)
 	if flashAlpha > 1 then
-		lply:ScreenFade(SCREENFADE.IN, Color(220, 180, 180, flashAlpha), 0.35, 0.45)
+		lply:ScreenFade(SCREENFADE.IN, Color(235, 210, 210, flashAlpha), 0.2, 0.28)
 	end
 
 	if severity > 0.4 then

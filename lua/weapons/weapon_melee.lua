@@ -1229,9 +1229,11 @@ end
 function SWEP:MultiplyDMG(owner, ent, vellen, mul)
     mul = mul * 1 / math.Clamp((180 - owner.organism.stamina[1]) / 90,1,1.3)
     mul = mul * math.Clamp(vellen / 250, 0.9, 1.25)
-    mul = mul * (ent ~= owner and 0.75 or 1)
+	mul = mul * (ent ~= owner and 0.75 or 1)
 	mul = mul * (owner.MeleeDamageMul or 1)
 	mul = mul * Lerp(self:GetMeleeArmEffectiveness(owner), 0.3, 1)
+	local combat = hg.GetCombatCondition and hg.GetCombatCondition(owner) or nil
+	if combat then mul = mul * combat.power end
 	local panic = owner.organism and owner.organism.panicattack or 0
 	if owner.organism and owner.organism.panicattackActive and panic >= 0.45 then
 		mul = mul * math.Remap(math.Clamp(panic, 0.45, 1), 0.45, 1, 0.9, 0.72)
@@ -1257,7 +1259,9 @@ function SWEP:GetMeleeArmEffectiveness(owner)
 end
 
 function SWEP:GetMeleeArmSpeedMul(owner)
-	return Lerp(self:GetMeleeArmEffectiveness(owner), 0.35, 1)
+	local armSpeed = Lerp(self:GetMeleeArmEffectiveness(owner), 0.35, 1)
+	local combat = hg.GetCombatCondition and hg.GetCombatCondition(owner) or nil
+	return armSpeed * (combat and combat.tempo or 1)
 end
 
 function SWEP:AddMeleeArmUsePain(owner, scale)
@@ -1279,7 +1283,9 @@ function SWEP:GetSwingDamageMul()
 
     local t = math.Clamp((speed - minSpeed) / math.max(maxSpeed - minSpeed, 0.001), 0, 1)
 
-    return Lerp(t, 1, maxMul)
+	local owner = self:GetOwner()
+	local combat = hg.GetCombatCondition and hg.GetCombatCondition(owner) or nil
+	return Lerp(t, 1, maxMul) * (combat and combat.tempo or 1)
 end
 
 function SWEP:ResetCombo()
@@ -1446,6 +1452,9 @@ function SWEP:ConsumeMeleeStamina(owner, amount)
 	if not SERVER or not IsValid(owner) or not owner.organism then return end
 	if hg.organism and hg.organism.ConsumeStamina then
 		hg.organism.ConsumeStamina(owner.organism, amount)
+	end
+	if hg.organism and hg.organism.RecordMeleeExertion then
+		hg.organism.RecordMeleeExertion(owner.organism, amount)
 	end
 end
 

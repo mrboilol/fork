@@ -2,6 +2,9 @@ hg.organism.module = hg.organism.module or {}
 local module = hg.organism.module
 hg.organism.lastindex = hg.organism.lastindex or 1000000
 local hg_panic = CreateConVar("hg_panic", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enables panic-attack consequences; panic still drives fear, adrenaline, and thoughts", 0, 1)
+local hg_painsound = ConVarExists("hg_painsound") and GetConVar("hg_painsound") or CreateConVar("hg_painsound", "6", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Pain audio: 0 = pain beat + reality, 1 = pain beat, 2 = agony, 3 = altpain, 4 = reality, 5 = sillypain, 6 = REM pain stack", 0, 6)
+local hg_dyingsound = ConVarExists("hg_dyingsound") and GetConVar("hg_dyingsound") or CreateConVar("hg_dyingsound", "2", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Dying audio: 0 = conscious beat + ending, 1 = conscious beat, 2 = dying, 3 = alto2, 4 = ending, 5 = sillydying, 6 = fuck, 7 = sonimcooked, 8 = REM dying 1 + 2, 9 = REM dying 2 + quiet itssofuckingover background, 10 = itshopeless", 0, 10)
+local hg_otrubsound = ConVarExists("hg_otrubsound") and GetConVar("hg_otrubsound") or CreateConVar("hg_otrubsound", "4", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Unconscious (otrub) audio: 0 = unconscious beat, 1 = altotrub, 2 = sleepy, 3 = itssoover, 4 = nga im cooked, 5 = REM dying, 6 = fuck, 7 = itshopeless", 0, 7)
 local panicattack_threshold = 0.45
 local panicattack_add_decay_time = 18
 local panicattack_rise_time = 1.4
@@ -412,6 +415,17 @@ local function send_organism(org, ply, recipientForce, reliable)
 	sendtable.concussion = org.concussion
 	sendtable.nausea = org.nausea
 	sendtable.concussion_tinnitus = org.concussion_tinnitus
+	for _, key in ipairs({
+		"painkiller", "goodmood", "hungry", "satiety", "palpitations", "unstableRhythm", "ecgState",
+		"strokeVolume", "hypoxiaTime", "intracranialPressure", "peripheralperfusion", "perfusionMoveMul",
+		"legstrength", "armstrength", "losing_oxy", "respiratoryArrest", "pneumothorax", "hemothorax",
+		"skull", "chest", "heart", "trachea", "liver", "stomach", "intestines", "lungsL", "lungsR",
+		"spine1", "spine2", "spine3", "internalBleed", "internalBleedComplication", "wantToVomit",
+		"weight", "maxweight", "ischemia", "hemotransfusionshock", "zerlkers", "zerlkersOverdose", "anger",
+		"brainSwelling", "cardiacTamponade"
+	}) do
+		sendtable[key] = org[key]
+	end
 	net.Start("organism_send", not reliable and hg_unreliable_nets:GetBool())
 	net.WriteTable(not hg_developer:GetBool() and sendtable or org)
 	net.WriteBool(recipientForce or org.owner.fullsend or false)  -- ORG_NET_FORCE
@@ -531,6 +545,10 @@ local function send_bareinfo(org, force, reliable)
 	sendtable.systolic = org.systolic
 	sendtable.diastolic = org.diastolic
 	sendtable.cardiacOutput = org.cardiacOutput
+	sendtable.strokeVolume = org.strokeVolume
+	sendtable.ecgState = org.ecgState
+	sendtable.palpitations = org.palpitations
+	sendtable.unstableRhythm = org.unstableRhythm
 	sendtable.myocardialOxygen = org.myocardialOxygen
 	sendtable.perfusion = org.perfusion
 	sendtable.cerebralPerfusion = org.cerebralPerfusion

@@ -57,6 +57,8 @@ local function GetCombatStrengthMul(ply)
 	if ply:IsBerserk() and org then
 		mul = mul * (1 + (org.berserk or 0) * 5)
 	end
+	local combat = hg.GetCombatCondition and hg.GetCombatCondition(ply) or nil
+	if combat then mul = mul * combat.power end
 
 	return math.max(mul, 0)
 end
@@ -2353,8 +2355,12 @@ function SWEP:PrimaryAttack(forcespecial)
 
 	self:UpdateNextIdle()
 
-	self:SetNextPrimaryFire(CurTime() + self.SwingCooldown / armSpeedMul * math.Clamp((180 - owner.organism.stamina[1]) / 90,1,2) + (math.max(special_attack and 0.5 or 0, clawClasses[owner.PlayerClassName] or 0)))
-	self:SetNextSecondaryFire(CurTime() + self.SwingCooldown + (math.max(special_attack and 0.5 or 0, clawClasses[owner.PlayerClassName] or 0)))
+	local strikingArm = rand and "rarm" or "larm"
+	local armSpeedMul = Lerp(hg.GetArmEffectiveness and hg.GetArmEffectiveness(owner, strikingArm) or 1, 0.35, 1)
+	local combat = hg.GetCombatCondition and hg.GetCombatCondition(owner) or nil
+	armSpeedMul = armSpeedMul * (combat and combat.tempo or 1)
+	self:SetNextPrimaryFire(CurTime() + self.SwingCooldown / math.max(armSpeedMul, 0.1) * math.Clamp((180 - owner.organism.stamina[1]) / 90,1,2) + (math.max(special_attack and 0.5 or 0, clawClasses[owner.PlayerClassName] or 0)))
+	self:SetNextSecondaryFire(CurTime() + self.SwingCooldown / math.max(armSpeedMul, 0.1) + (math.max(special_attack and 0.5 or 0, clawClasses[owner.PlayerClassName] or 0)))
 	self:SetLastShootTime(CurTime())
 	if SERVER and owner.organism and owner.organism.stamina and hg.organism and hg.organism.ConsumeStamina then hg.organism.ConsumeStamina(owner.organism, self.FistStaminaCost) end
 	if rand then
@@ -2532,7 +2538,9 @@ function SWEP:AttackFront(special_attack, rand)
 		end
 
 		local armEffectiveness = hg.GetArmEffectiveness and hg.GetArmEffectiveness(owner, rand and "rarm" or "larm") or 1
-		local DamageAmt = (math.random(3, 5) * (special_attack and 3 or 1)) * (self.DamageMul or 1) * self.SwingDamageMul * Lerp(armEffectiveness, 0.2, 1)
+		local combat = hg.GetCombatCondition and hg.GetCombatCondition(owner) or nil
+		local combatPower = combat and combat.power or 1
+		local DamageAmt = (math.random(3, 5) * (special_attack and 3 or 1)) * (self.DamageMul or 1) * self.SwingDamageMul * Lerp(armEffectiveness, 0.2, 1) * combatPower
 		local ent = Ent
 		local vec = AimVec
 

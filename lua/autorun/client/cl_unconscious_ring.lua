@@ -434,6 +434,7 @@ end
 local function RequestFibrillationSound(volume)
     if hg_unconsciousclassic and hg_unconsciousclassic:GetBool() then return end
     if hg and hg.healthAlarmActive then return end
+    if hg and hg.criticalBeatsActive then return end
     fibrillationRequested = true
     fibrillationVolume = math.max(fibrillationVolume, math.Clamp(volume or 1, 0, 1))
 end
@@ -976,11 +977,13 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     heartPhase = heartPhase + FrameTime() * (heartbeat / 60)
 
     local lowConsciousness = (org.consciousness or 1) < 0.4 and not isUnconscious
+    local pulse = math.max(tonumber(org.pulse) or heartbeat, 0)
     local abnormalPulse = (heartbeat < 40 and heartbeat >= 1) or heartbeat > 100
+    local severeMechanicalPulse = (pulse > 0 and pulse < 45) or pulse > 125
     local abnormalECG = ecgState ~= "normal_sinus"
     local sinusECGTail = UpdateECGStateAlert(ecgState)
     local showAwakeECG = not isUnconscious and not lowConsciousness
-        and (abnormalECG or sinusECGTail > 0 or admiring)
+        and (abnormalECG or severeMechanicalPulse or sinusECGTail > 0 or admiring)
     
 	local unconsciousElapsed = isUnconscious and (CurTime() - (unconsciousStartTime or CurTime())) or 0
 	if isUnconscious and unconsciousElapsed >= UNCONSCIOUS_RING_DELAY then
@@ -1006,7 +1009,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     -- a recovered sinus trace gets a short tail and then fades away.
     if showAwakeECG then
         local severity = abnormalECG and GetAwakeECGSeverity(ecgState) or 0
-        local awakeECGTargetAlpha = abnormalECG and Lerp(severity, 0.28, 0.92) or (0.22 * sinusECGTail)
+        local awakeECGTargetAlpha = abnormalECG and Lerp(severity, 0.28, 0.92) or (severeMechanicalPulse and 0.45 or (0.22 * sinusECGTail))
 
         if admiring then awakeECGTargetAlpha = math.max(awakeECGTargetAlpha, 0.24) end
         if ply:KeyDown(IN_ATTACK2) then awakeECGTargetAlpha = awakeECGTargetAlpha * 0.65 end
@@ -1174,7 +1177,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     end
 
 
-    local abnormalPulse = (heartbeat < 40 and heartbeat >= 1) or heartbeat > 100
+    local abnormalPulse = (heartbeat < 40 and heartbeat >= 1) or heartbeat > 100 or severeMechanicalPulse
     if IsVentricularFibrillation(org) and (admiring or isUnconscious or abnormalPulse or isCheckingPulse) then
         RequestFibrillationSound(GetHeartbeatVolumeAdmiring(org, admiring))
     end

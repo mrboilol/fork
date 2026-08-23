@@ -559,15 +559,6 @@ local function buildEffects(ply, org)
 	if stamina then
 		local staminaMax = number(stamina.max, number(stamina.range, 180))
 		local staminaFraction = math.Clamp(number(stamina[1], staminaMax) / math.max(staminaMax, 1), 0, 1)
-		-- Moodle 3 uses one slot for fitness and exertion. Low current stamina
-		-- replaces the fitness state instead of displaying a duplicate icon.
-		local showFitness = staminaFraction >= 0.75
-		if showFitness and staminaMax >= 200 then
-			add(effects, "stamina", "stamina", math.Clamp(math.floor((staminaMax - 200) / 100 * 3 + 1.001), 1, 4), "good", 12, math.floor(staminaMax))
-		elseif showFitness and staminaMax < 160 then
-			local level = staminaMax < 90 and 4 or staminaMax < 120 and 3 or staminaMax <= 140 and 2 or 1
-			add(effects, "stamina", "stamina", level, "bad", 12, math.floor(staminaMax))
-		end
 		if staminaFraction < 0.75 then
 			local level = lowRank(staminaFraction, {0.75, 0.5, 0.25, 0.1})
 			-- Moodle 3 reserves tired/very-tired for consciousness. Exertion shows
@@ -581,9 +572,10 @@ local function buildEffects(ply, org)
 	if org.berserkActive2 == true then add(effects, "rage", "rage", 4, "bad", -90) end
 	local hungry = math.Clamp(orgNumber(org, "hungry", 0), 0, 100)
 	local satiety = math.Clamp(orgNumber(org, "satiety", 0), 0, 100)
-	if hungry > 10 then
+	local hungerSystem = GetConVar("hg_hungersystem")
+	if hungerSystem and hungerSystem:GetBool() and hungry > 10 then
 		add(effects, "hunger", "hunger", highRank(hungry, {10, 30, 55, 75}), "bad", 17, math.floor(hungry) .. "%")
-	elseif satiety >= 80 then
+	elseif hungerSystem and hungerSystem:GetBool() and satiety >= 80 then
 		add(effects, "full", "full", satiety >= 95 and 2 or 1, "good", 17, math.floor(satiety) .. "%")
 	end
 
@@ -1013,15 +1005,19 @@ local function drawMoodles()
 	local spacing = math.max(HUD and HUD.status_effects_spacing or 59, baseSize + 4)
 	local gap = spacing - baseSize
 	local edgeMargin = math.max(12, ScrH() * 0.015)
+	local rowMargin = edgeMargin
 	local rawPositions = {}
 	local nextX = edgeMargin
 	local rightEdge = ScrW() - edgeMargin
 	for index, effect in ipairs(effects) do
 		local effectSize = baseSize
-		if nextX + effectSize > rightEdge and #rawPositions > 0 then break end
+		if nextX + effectSize > rightEdge and #rawPositions > 0 then
+			nextX = edgeMargin
+			rowMargin = rowMargin + effectSize + gap
+		end
 		rawPositions[#rawPositions + 1] = {
 			x = nextX,
-			y = ScrH() - edgeMargin - effectSize,
+			y = ScrH() - rowMargin - effectSize,
 			size = effectSize,
 			effect = effect,
 		}

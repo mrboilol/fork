@@ -38,6 +38,7 @@ local FATIGUE_DRAIN = 0.15
 local COGNITIVE_THRESHOLD = 1.5
 local PHOTOPHOBIA_THRESHOLD = 2.0
 local PHONOPHOBIA_THRESHOLD = 1.8
+local CONCUSSION_FLASH_INTERVAL = 0.7
 
 local function getConcussionDecay(concussion)
     concussion = math.max(tonumber(concussion) or 0, 0)
@@ -384,7 +385,7 @@ module[2] = function(ply, org, timeValue)
 
         if org.concussion_effects.duration > 0 then
             org.concussion_effects.duration = math.max(org.concussion_effects.duration - timeValue, 0)
-            if org.concussion_effects.severity > 0.3 and IsValid(ply) and ply:IsPlayer() and (org.concussion_effects.last_impact or 0) < now - 1.5 then
+            if org.concussion_effects.severity > 0.3 and IsValid(ply) and ply:IsPlayer() and (org.concussion_effects.last_impact or 0) < now - CONCUSSION_FLASH_INTERVAL then
                 net.Start("headtrauma_concussion_update")
                     net.WriteFloat(org.concussion_effects.severity)
                     net.WriteFloat(org.concussion)

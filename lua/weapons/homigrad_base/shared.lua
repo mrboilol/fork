@@ -234,6 +234,8 @@ function SWEP:GetArmHealthHandlingMul()
 
 	loss = loss + math.Clamp(org.aiming_fatigue or 0, 0, 10) * 0.045
 	loss = loss + math.Clamp(org.permanent_aim_impairment or 0, 0, 2) * 0.4
+	local combat = hg.GetCombatCondition and hg.GetCombatCondition(owner) or nil
+	if combat then loss = loss + (combat.aim - 1) * 0.7 end
 
 	return math.Clamp(1 + loss, 0.8, 4.5), loss
 end
@@ -278,7 +280,9 @@ function SWEP:GetAimAlignmentTime(ply)
 	local org = ply.organism or {}
 	local brainPenalty = math.Clamp(org.brain or 0, 0, 1) * 2.5
 	local fatigueMul = 1 + math.Clamp(org.aiming_fatigue or 0, 0, 10) * 0.1
-	return math.Clamp(base * handling * supportMul * fatigueMul + brainPenalty, 0.2, 8)
+	local combat = hg.GetCombatCondition and hg.GetCombatCondition(ply) or nil
+	local combatMul = combat and combat.aim or 1
+	return math.Clamp(base * handling * supportMul * fatigueMul * combatMul + brainPenalty, 0.2, 8)
 end
 
 function SWEP:IsManuallyCycledWeapon()
@@ -2446,6 +2450,8 @@ function SWEP:GetAdditionalValues()
 		local support = self:GetHandSupportState(ply)
 		local supportMul = self:GetRecoilSupportMul()
 		local handlingMul = self:GetArmHealthHandlingMul()
+		local combat = hg.GetCombatCondition and hg.GetCombatCondition(ply) or nil
+		local combatInstability = combat and (1 - combat.stability) or 0
 		local armInjury = math.Clamp(handlingMul - 1, 0, 3.5)
 		local stanceMul = self:GetPostureStabilityMul(self:IsZoom())
 		local restMul = self:IsResting() and 0.35 or 1
@@ -2471,6 +2477,18 @@ function SWEP:GetAdditionalValues()
 			self.AdditionalPos2[1] = self.AdditionalPos2[1] + wobY * amp * 0.6
 			self.AdditionalPos2[2] = self.AdditionalPos2[2] + wobX * amp * (cantedHold and -0.42 or 0.08) * sideAmp
 			self.AdditionalPos2[3] = self.AdditionalPos2[3] + wobZ * amp * 0.58
+		end
+
+		if combatInstability > 0.001 then
+			local t = CurTime()
+			local aimWobble = combatInstability * (self:IsResting() and 0.28 or 1)
+			local longGun = not self:IsPistolHoldType() and not self.PistolKinda
+			local swayPitch = math.sin(t * 2.1) * 0.62 + math.sin(t * 4.7) * 0.38
+			local swayYaw = math.cos(t * 1.7) * 0.67 + math.sin(t * 3.9) * 0.33
+			self.AdditionalAng2[1] = self.AdditionalAng2[1] + swayPitch * aimWobble * (longGun and 2.4 or 1.7)
+			self.AdditionalAng2[2] = self.AdditionalAng2[2] + swayYaw * aimWobble * (longGun and 1.35 or 1.7)
+			self.AdditionalPos2[2] = self.AdditionalPos2[2] + swayYaw * aimWobble * 0.16
+			self.AdditionalPos2[3] = self.AdditionalPos2[3] + swayPitch * aimWobble * 0.2
 		end
 
 		-- Keep a strong, readable rearward/upward impulse after the instant shot

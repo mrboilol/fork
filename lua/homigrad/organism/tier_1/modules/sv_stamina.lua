@@ -41,6 +41,16 @@ function hg.organism.ConsumeStamina(org, amount)
 	return spent
 end
 
+function hg.organism.RecordMeleeExertion(org, amount)
+	if not org or not org.stamina or hg_infstamina:GetBool() then return end
+	local stamina = org.stamina
+	local now = CurTime()
+	local elapsed = math.max(now - (stamina.meleeExertionTime or now), 0)
+	stamina.meleeExertion = math.max((stamina.meleeExertion or 0) - elapsed * 0.45, 0)
+	stamina.meleeExertion = math.min(stamina.meleeExertion + math.max(tonumber(amount) or 0, 0) / 18, 8)
+	stamina.meleeExertionTime = now
+end
+
 module[1] = function(org)
 
 	org.adrenaline = 0
@@ -71,6 +81,10 @@ module[1] = function(org)
 		recoveryPenaltyUntil = 0,
 
 		recoveryPenaltyFadeUntil = 0,
+
+		meleeExertion = 0,
+
+		meleeExertionTime = 0,
 
 		max = 60 * 4,
 
@@ -186,6 +200,10 @@ module[2] = function(owner, org, timeValue)
 
 
 	stamina.sub = stamina.sub + stamina.subadd
+	local meleeElapsed = math.max(now - (stamina.meleeExertionTime or now), 0)
+	stamina.meleeExertion = math.max((stamina.meleeExertion or 0) - meleeElapsed * 0.45, 0)
+	stamina.meleeExertionTime = now
+	stamina.sub = stamina.sub + math.max(stamina.meleeExertion - 1.25, 0) * 0.4
 
 	stamina.sub = stamina.sub + (org.stamina_damage or 0)
 

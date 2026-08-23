@@ -67,7 +67,14 @@ end
 SWEP.offsetVec = Vector(4, -3.5, 0)
 SWEP.offsetAng = Angle(90, 90, 0)
 
-local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Healing method: 0 = original models + progressive minigames, 1 = Judge animations", 0, 1)
+if SERVER and not ConVarExists("hg_healanims") then
+	CreateConVar("hg_healanims", "0", FCVAR_ARCHIVE + FCVAR_REPLICATED, "Healing method: 0 = original models + progressive minigames, 1 = Judge animations", 0, 1)
+end
+
+local function JudgeHealAnimationsEnabled()
+	local convar = GetConVar("hg_healanims")
+	return convar and convar:GetBool() or false
+end
 
 local judgeBandageClasses = {
 	weapon_bandage_sh = true,
@@ -81,7 +88,7 @@ local judgeBandageClasses = {
 }
 
 function SWEP:UseJudgeBandageTPIK()
-	return self.BandageTPIK == true and judgeBandageClasses[self:GetClass()] == true and hg_healanims:GetInt() == 1
+	return self.BandageTPIK == true and judgeBandageClasses[self:GetClass()] == true and JudgeHealAnimationsEnabled()
 end
 
 function SWEP:ApplyBandageVisualMode()
@@ -263,7 +270,7 @@ function SWEP:Think()
 		self.ModelScale = math.Clamp(self.modeValues[1] / (self.modeValuesdef[1][1] * 0.8), 0.5, 1)
 	end
 
-	if not self:GetOwner():KeyDown(IN_ATTACK) and not hg_healanims:GetBool() then
+	if not self:GetOwner():KeyDown(IN_ATTACK) and not JudgeHealAnimationsEnabled() then
 		self:SetHolding(math.max(self:GetHolding() - 12, 0))
 	end
 
@@ -615,6 +622,9 @@ if SERVER then
 					if (biggestWound - healedWound) > 0.1 then
 						bandaged = true
 					end
+					if biggestWound > healedWound then
+						done = true
+					end
 
 					local owner = self:GetOwner()
 					if owner.Karma then
@@ -652,6 +662,9 @@ if SERVER then
 
 						if (biggestWound - healedWound) > 0.1 then
 							bandaged = true
+						end
+						if biggestWound > healedWound then
+							done = true
 						end
 
 						ent.bandaged_limbs = ent.bandaged_limbs or {}
@@ -748,7 +761,7 @@ if SERVER then
 		if not org then return end
 	
 		local owner = self:GetOwner()
-		if ent == hg.GetCurrentCharacter(owner) and not hg_healanims:GetBool() then
+		if ent == hg.GetCurrentCharacter(owner) and not JudgeHealAnimationsEnabled() then
 			self:SetHolding(math.min(self:GetHolding() + 10, 100))
 
 			if self:GetHolding() < 100 then return end

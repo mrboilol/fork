@@ -94,16 +94,18 @@ function SWEP:PrimarySpread()
 		local supportMul = self.GetRecoilSupportMul and self:GetRecoilSupportMul() or 1
 		local handlingMul = self.GetArmHealthHandlingMul and self:GetArmHealthHandlingMul() or 1
 		local stanceMul = self.GetPostureStabilityMul and self:GetPostureStabilityMul(self:IsZoom()) or 1
+		local combat = hg.GetCombatCondition and hg.GetCombatCondition(owner) or nil
+		local combatAimMul = combat and combat.aim or 1
 		local cantedHold = owner.posture == 7 or owner.posture == 9
 		local force = math.Clamp(caliberMul * weightMul * supportMul * handlingMul * stanceMul * (0.75 + math.min(sprayI / 10, 0.75)) * 1.18, 0.18, 5.5)
 		local panic = organism.panicattackActive and math.Clamp(organism.panicattack or 0, 0.45, 1) or 0
 		local panicRecoilMul = panic > 0 and math.Remap(panic, 0.45, 1, 1.12, 1.42) or 1
-		force = force * panicRecoilMul
+		force = force * panicRecoilMul * combatAimMul
 		-- Arm trauma can make the physical muzzle movement extreme, but cap the
 		-- camera-side multiplier so recoil cannot pin the player's view vertically.
 		mul = mul * math.Clamp(supportMul * handlingMul, 0.65, 3.75)
 		mul = mul * self.RecoilMul
-		mul = mul * panicRecoilMul
+		mul = mul * panicRecoilMul * combatAimMul
 		local screenRecoilMul = self.ScreenRecoilMul or 1
 		mul = mul * (owner:Crouching() and 0.75 or 1)
 		--mul = mul * (hg.IsOnGround(hg.GetCurrentCharacter(owner)) and 1 or 5)

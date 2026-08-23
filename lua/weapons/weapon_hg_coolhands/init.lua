@@ -957,8 +957,10 @@ function SWEP:PrimaryAttack(forcespecial)
 
 	self:UpdateNextIdle()
 
-	self:SetNextPrimaryFire(CurTime() + .6 * math_Clamp((180 - owner.organism.stamina[1]) / 90,1,2) / (owner.organism.meleespeed or 1) + (special_attack and 0.5 or isfur and 0.4 or 0))
-	self:SetNextSecondaryFire(CurTime() + .6 / (owner.organism.meleespeed or 1) + (special_attack and 0.5 or isfur and 0.4 or 0))
+	local combat = hg.GetCombatCondition and hg.GetCombatCondition(owner) or nil
+	local combatTempo = combat and combat.tempo or 1
+	self:SetNextPrimaryFire(CurTime() + .6 * math_Clamp((180 - owner.organism.stamina[1]) / 90,1,2) / math.max((owner.organism.meleespeed or 1) * combatTempo, 0.1) + (special_attack and 0.5 or isfur and 0.4 or 0))
+	self:SetNextSecondaryFire(CurTime() + .6 / math.max((owner.organism.meleespeed or 1) * combatTempo, 0.1) + (special_attack and 0.5 or isfur and 0.4 or 0))
 	self:SetLastShootTime(CurTime())
 
 	if isfur then
@@ -1201,7 +1203,9 @@ function SWEP:AttackFront(special_attack, rand)
                 local runningChargeMul = special_attack and (1 + math_Clamp((owner:GetVelocity():Length() - 100) / 200, 0, 1) * (runningSpecialDamageMul - 1)) or 1
                 local incomingSpeed = math.max(Ent:GetVelocity():Dot(-AimVec), 0)
                 local incomingDamageMul = 1 + math_Clamp((incomingSpeed - 150) / 450, 0, 1) * (incomingVelocityDamageMul - 1)
-                local DamageAmt = ((math_random(special_attack and 8 or 6, special_attack and 10 or 8) * (special_attack and specialDamageMul * runningChargeMul or 1) * incomingDamageMul) * ((isfur and (owner:IsBerserk() and 10 or 0.85)) or 1)) * (self.DamageMul or 1)
+		local combat = hg.GetCombatCondition and hg.GetCombatCondition(owner) or nil
+		local combatPower = combat and combat.power or 1
+		local DamageAmt = ((math_random(special_attack and 8 or 6, special_attack and 10 or 8) * (special_attack and specialDamageMul * runningChargeMul or 1) * incomingDamageMul) * ((isfur and (owner:IsBerserk() and 10 or 0.85)) or 1)) * (self.DamageMul or 1) * combatPower
                 local ent = Ent
                 local vec = AimVec
                 local hitForceVec = AimVec

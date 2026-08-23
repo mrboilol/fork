@@ -1749,7 +1749,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	if O2Lerp > 1 or incapacitated then
 		o2 = O2Lerp
 		
-		if (o2 > 50 and not org.otrub) or incapacitated then
+		if o2 > 50 and not org.otrub then
 			local dyingMode = getServerSoundMode("hg_dyingsound", 2)
 
 			if canRetrySound("NoiseStation2", NoiseStation2) then

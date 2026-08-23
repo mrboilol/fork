@@ -2,7 +2,7 @@ if CLIENT then return end
 
 -- Public semantics: 0 uses the original models with progressive minigames;
 -- 1 uses Judge-style animation-only medical items where those variants exist.
-local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Healing method: 0 = original models + progressive minigames, 1 = Judge animations", 0, 1)
+local hg_healanims = GetConVar("hg_healanims") or CreateConVar("hg_healanims", "0", FCVAR_ARCHIVE + FCVAR_REPLICATED, "Healing method: 0 = original models + progressive minigames, 1 = Judge animations", 0, 1)
 local HEAL_ANIMATION_RETURN_TIME = 0.35
 
 local MEDICAL_WEAPON_CLASSES = {
@@ -304,14 +304,14 @@ local function PatchWeapon(class)
     if stored.__hg_med_minigame_patched then return true end
 
     stored.__hg_med_minigame_patched = true
-    stored.__hg_med_minigame_primary = stored.PrimaryAttack
-    stored.__hg_med_minigame_secondary = stored.SecondaryAttack
-    stored.__hg_med_minigame_think = stored.Think
+    local originalPrimary = stored.PrimaryAttack
+    local originalSecondary = stored.SecondaryAttack
+    local originalThink = stored.Think
 
     function stored:Think()
         local result
-        if self.__hg_med_minigame_think then
-            result = self:__hg_med_minigame_think()
+        if originalThink then
+            result = originalThink(self)
         end
 
         -- The original weapon Think methods lower Holding whenever the mouse
@@ -340,8 +340,8 @@ local function PatchWeapon(class)
             end
         end
 
-        if self.__hg_med_minigame_primary then
-            return self:__hg_med_minigame_primary()
+        if originalPrimary then
+            return originalPrimary(self)
         end
     end
 
@@ -362,8 +362,8 @@ local function PatchWeapon(class)
             end
         end
 
-        if self.__hg_med_minigame_secondary then
-            return self:__hg_med_minigame_secondary()
+        if originalSecondary then
+            return originalSecondary(self)
         end
     end
 
