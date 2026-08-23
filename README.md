@@ -2,7 +2,7 @@ based on remorseism by kazoo
 content https://steamcommunity.com/sharedfiles/filedetails/?id=3493194513&savesuccess=1
 DO NOT USE THIS FOR YOUR OWN "PUBLIC" SERVER WITHOUT MY PERMISSION, please
 
-`hg_healanims` selects the complete healing method: `0` uses the original medical models with progressive medical minigames, while `1` enables Judge's timed treatment, NMRiH bandage models, textures, and sequences. Medical actions prefer the stronger usable arm, switch to the left arm when the right is missing or less effective, slow down for fractures/dislocations/amputations, and require at least one usable arm.
+`hg_healanims` selects the complete healing method: `0` uses the original medical models with progressive medical minigames, while `1` enables Judge's timed treatment, NMRiH bandage models, textures, and sequences. Medical actions prefer the stronger usable arm, switch to the left arm when the right is missing or less effective, slow down for fractures/dislocations/amputations, and require at least one usable arm. A fully broken arm or leg now has near-zero effectiveness across the shared interaction, weapon, and movement paths; bandages can repair skull, rib, and limb trauma, while bruise kits additionally repair pelvis and spinal trauma with stronger treatment and analgesia.
 
 ## Cherry-pick recovery note
 

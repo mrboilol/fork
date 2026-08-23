@@ -35,7 +35,7 @@ function SWEP:InitializeAdd()
 end
 
 SWEP.modeValuesdef = {
-	[1] = {1.0, false},
+	[1] = {1.5, false},
 }
 
 SWEP.ShouldDeleteOnFullUse = true

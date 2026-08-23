@@ -1417,6 +1417,9 @@ hg.renderOverride = function(self, ent, flags)
 
 		local damage = math.Clamp(tonumber(org[limb]) or 0, 0, 1)
 		local effectiveness = damage < 0.25 and 1 or Lerp((damage - 0.25) / 0.75, 0.82, 0.12)
+		if damage >= 1 then
+			effectiveness = math.min(effectiveness, 0.08)
+		end
 		if org[limb .. "dislocation"] or org[limb .. "dislocated"] then
 			effectiveness = math.min(effectiveness, 0.18)
 		end
@@ -1455,6 +1458,9 @@ hg.renderOverride = function(self, ent, flags)
 
 		local damage = math.Clamp(tonumber(org[limb]) or 0, 0, 1)
 		local effectiveness = damage < 0.2 and 1 or Lerp((damage - 0.2) / 0.8, 0.85, 0.2)
+		if damage >= 1 then
+			effectiveness = math.min(effectiveness, 0.1)
+		end
 		if org[limb .. "dislocation"] or org[limb .. "dislocated"] then
 			effectiveness = math.min(effectiveness, 0.15)
 		end

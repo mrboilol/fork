@@ -1467,11 +1467,11 @@ function SWEP:GetBandageTPIKUseTime(target)
 	local owner = self:GetOwner()
 	local treatmentCost = 25 * (IsValid(owner) and owner.Profession == "doctor" and 0.2 or 1)
 	if (org.skull or 0) > 0.05 then required = required + treatmentCost end
-	if org.chest == 1 then required = required + treatmentCost end
-	if org.lleg == 1 and not org.llegamputated then required = required + treatmentCost end
-	if org.rleg == 1 and not org.rlegamputated then required = required + treatmentCost end
-	if org.larm == 1 and not org.larmamputated then required = required + treatmentCost end
-	if org.rarm == 1 and not org.rarmamputated then required = required + treatmentCost end
+	if (org.chest or 0) >= 0.05 then required = required + treatmentCost end
+	if (org.lleg or 0) >= 0.05 and not org.llegamputated then required = required + treatmentCost end
+	if (org.rleg or 0) >= 0.05 and not org.rlegamputated then required = required + treatmentCost end
+	if (org.larm or 0) >= 0.05 and not org.larmamputated then required = required + treatmentCost end
+	if (org.rarm or 0) >= 0.05 and not org.rarmamputated then required = required + treatmentCost end
 
 	local used = math.min(required, self.modeValues and self.modeValues[1] or 0)
 	return math.Clamp(1.2 + used / 40 * 2.2, 1.2, 6)
@@ -1489,11 +1489,11 @@ function SWEP:CanBandageTPIK(target)
 	local owner = self:GetOwner()
 	local treatmentCost = 25 * (IsValid(owner) and owner.Profession == "doctor" and 0.2 or 1)
 	if available < treatmentCost then return false end
-	if (org.skull or 0) > 0.05 or org.chest == 1 then return true end
-	if org.lleg == 1 and not org.llegamputated then return true end
-	if org.rleg == 1 and not org.rlegamputated then return true end
-	if org.larm == 1 and not org.larmamputated then return true end
-	if org.rarm == 1 and not org.rarmamputated then return true end
+	if (org.skull or 0) >= 0.05 or (org.chest or 0) >= 0.05 then return true end
+	if (org.lleg or 0) >= 0.05 and not org.llegamputated then return true end
+	if (org.rleg or 0) >= 0.05 and not org.rlegamputated then return true end
+	if (org.larm or 0) >= 0.05 and not org.larmamputated then return true end
+	if (org.rarm or 0) >= 0.05 and not org.rarmamputated then return true end
 
 	return false
 end
