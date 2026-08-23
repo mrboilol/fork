@@ -283,27 +283,46 @@ function ENT:RecordAngerDamage(attacker, amount)
 end
 
 function ENT:GetAngerTarget()
-    local best, bestDamage = nil, -1
-    for id, record in pairs(self.DamageByPlayer or {}) do
-        if not IsValid(record.player) or not record.player:Alive() or CurTime() - record.time > 120 then
-            self.DamageByPlayer[id] = nil
-        elseif record.damage > bestDamage then
-            best, bestDamage = record.player, record.damage
-        end
-    end
-
-    if IsValid(best) and self:GetPos():DistToSqr(best:GetPos()) <= ((HG_SEAL_CONFIG or {}).ANGER_TARGET_RANGE or 500) ^ 2 then return best end
-
+    local cfg = HG_SEAL_CONFIG or {}
+    local targetRange = cfg.ANGER_TARGET_RANGE or 325
+    local targetRangeSqr = targetRange ^ 2
+    local dangerRange = cfg.ANGER_DANGER_TARGET_RANGE or cfg.ANGER_TARGET_RANGE or 325
+    local dangerRangeSqr = dangerRange ^ 2
     local nearest, nearestDist = nil, math.huge
     for _, player in ipairs(player.GetAll()) do
         if player:Alive() then
             local dist = self:GetPos():DistToSqr(player:GetPos())
-            if dist < nearestDist and dist <= ((HG_SEAL_CONFIG or {}).ANGER_TARGET_RANGE or 500) ^ 2 then
+            if dist < nearestDist and dist <= targetRangeSqr then
                 nearest, nearestDist = player, dist
             end
         end
     end
+
+    local mostDangerous, mostDangerousDamage, mostDangerousDist = nil, 0, math.huge
+    for id, record in pairs(self.DamageByPlayer or {}) do
+        if not IsValid(record.player) or not record.player:Alive() or CurTime() - record.time > 120 then
+            self.DamageByPlayer[id] = nil
+        else
+            local dist = self:GetPos():DistToSqr(record.player:GetPos())
+            if dist <= dangerRangeSqr and (record.damage > mostDangerousDamage or (record.damage == mostDangerousDamage and dist < mostDangerousDist)) then
+                mostDangerous, mostDangerousDamage, mostDangerousDist = record.player, record.damage, dist
+            end
+        end
+    end
+
+    if IsValid(mostDangerous) and (not IsValid(nearest) or mostDangerousDist <= nearestDist * 1.5) then
+        return mostDangerous
+    end
     return nearest
+end
+
+function ENT:BeginAngryAttack(target, now)
+    if self.AttackTarget ~= target or now >= (self.NextRageSoundTime or 0) then
+        self.AttackTarget = target
+        self.AttackWindupUntil = now + ((HG_SEAL_CONFIG or {}).ANGRY_ATTACK_WINDUP or 0.65)
+        self.NextRageSoundTime = now + 2
+        self:EmitSound("sealplush/angry.wav", 78, math.random(94, 106), 1, CHAN_VOICE)
+    end
 end
 
 function ENT:TryAngryBite(target)
@@ -350,21 +369,39 @@ function ENT:UpdateAnger(now, dt)
     local hungerAnger = math.max((self.Hunger or 0) - (cfg.ANGER_HUNGER_START or 65), 0) * (cfg.ANGER_HUNGER_RATE or 1.2) * dt
     self.Anger = math.Clamp((self.Anger or 0) + hungerAnger - (cfg.ANGER_DECAY_RATE or 1.8) * dt, 0, 100)
     self.Happiness = math.max((self.Happiness or 0) - dt * 0.45, 0)
-    if self.Anger < (cfg.ANGER_BITE_THRESHOLD or 30) or self.State == "held" or self.IsSleeping then return end
+    if self.Anger < (cfg.ANGER_BITE_THRESHOLD or 30) or self.State == "held" or self.IsSleeping then
+        self.AttackTarget = nil
+        self.AttackWindupUntil = nil
+        return
+    end
 
     local target = self:GetAngerTarget()
-    if not IsValid(target) then return end
+    if not IsValid(target) then
+        self.AttackTarget = nil
+        self.AttackWindupUntil = nil
+        return
+    end
+    if self.AttackTarget ~= target or now < (self.AttackWindupUntil or 0) then
+        self:BeginAngryAttack(target, now)
+        return
+    end
+
     local distance = self:GetPos():Distance(target:GetPos())
     if distance <= (cfg.BITE_RANGE or 82) then
         self:TryAngryBite(target)
         return
     end
 
+    if distance > (cfg.ANGRY_LEAP_RANGE or 240) or now < (self.NextAngryLeap or 0) then return end
     local phys = self:GetPhysicsObject()
     if IsValid(phys) then
         local direction = (target:GetPos() - self:GetPos()):GetNormalized()
+        direction.z = 0
+        if direction:LengthSqr() <= 0 then return end
+        direction:Normalize()
         self:ApplySteerTorque(direction:Angle().yaw)
-        phys:ApplyForceCenter(direction * (900 + self.Anger * 10) + Vector(0, 0, 1800))
+        phys:ApplyForceCenter(direction * (cfg.ANGRY_LEAP_FORCE or 575) + Vector(0, 0, cfg.ANGRY_LEAP_UPWARD_FORCE or 800))
+        self.NextAngryLeap = now + math.Rand(cfg.ANGRY_LEAP_INTERVAL_MIN or 0.75, cfg.ANGRY_LEAP_INTERVAL_MAX or 1.15)
     end
 end
 
