@@ -11,6 +11,9 @@ local MEDICAL_WEAPON_CLASSES = {
     "weapon_packedbandage_sh",
     "weapon_combatbandage_sh",
     "weapon_quikclotbandage_sh",
+    "weapon_bigpackedbandage_sh",
+    "weapon_bigcombatbandage_sh",
+    "weapon_bigquikclotbandage_sh",
     "weapon_bruicekit",
     "weapon_tourniquet",
     "weapon_morphine",
@@ -119,7 +122,7 @@ local function GetMinigameType(wep)
     if medkitModeType == "tourniquet" then return "tourniquet" end
     if medkitModeType then return "syringe" end
 
-    if class == "weapon_bandage_sh" or class == "weapon_bigbandage_sh" or class == "weapon_packedbandage_sh" or class == "weapon_combatbandage_sh" or class == "weapon_quikclotbandage_sh" or class == "weapon_bruicekit" then
+    if class == "weapon_bandage_sh" or class == "weapon_bigbandage_sh" or class == "weapon_packedbandage_sh" or class == "weapon_combatbandage_sh" or class == "weapon_quikclotbandage_sh" or class == "weapon_bigpackedbandage_sh" or class == "weapon_bigcombatbandage_sh" or class == "weapon_bigquikclotbandage_sh" or class == "weapon_bruicekit" then
         return "bandage"
     end
 

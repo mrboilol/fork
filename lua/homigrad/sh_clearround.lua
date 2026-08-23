@@ -9,7 +9,7 @@ local CLEAR_TEXTS = {
 	"CLEAR",
 	"gg no re",
 	"yall suck butt",
-	"back to the lobby",
+	"what happened",
 	"yay",
 }
 

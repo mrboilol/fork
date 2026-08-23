@@ -3,22 +3,22 @@ local module = hg.organism.module
 hg.organism.lastindex = hg.organism.lastindex or 1000000
 local hg_panic = CreateConVar("hg_panic", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enables panic-attack consequences; panic still drives fear, adrenaline, and thoughts", 0, 1)
 local panicattack_threshold = 0.45
-local panicattack_add_decay_time = 90
-local panicattack_rise_time = 2.5
-local panicattack_decay_time = 200
+local panicattack_add_decay_time = 18
+local panicattack_rise_time = 1.4
+local panicattack_decay_time = 24
 local panicattack_gain_chance = 1
 local panicattack_gain_mul = 1
 local panicattack_disorientation = 0.45
-local panicattack_adrenaline_add_target = 4
-local panicattack_adrenaline_add_rise_time = 14
-local panicattack_heart_roll_delay = 15
-local panicattack_heart_roll_chance = 1
+local panicattack_adrenaline_add_target = 3.5
+local panicattack_adrenaline_add_rise_time = 2.5
+local panicattack_adrenaline_duration = 12
 local panicattack_damage_scale = 0.011
 local panicattack_damage_cooldown = 2.5
 local panicattack_witness_radius = 700
 local panicattack_death_radius = 900
 local panicattack_gunfight_hold_time = 8
 local panicattack_sustained_fear_time = 10
+local panicattack_grenade_radius = 750
 local seizure_duration = 90
 local seizure_brain_damage_start = 80
 local seizure_brain_damage_final = 0.99
@@ -154,7 +154,7 @@ hook.Add("Org Clear", "Main", function(org)
 	org.panicattackadd = 0
 	org.panicattack = 0
 	org.panicattackActive = false
-	org.nextPanicHeartRoll = 0
+	org.panicAdrenalineUntil = 0
 	org.panicGunfightUntil = 0
 	org.panicSustainedFearSince = 0
 	org.seizure = 0
@@ -168,6 +168,7 @@ hook.Add("Org Clear", "Main", function(org)
 	org.lastSeizureTemperature = org.temperature
 	org.deathStateEnd = nil
 	org.deathStateKilled = nil
+	org.fatalDamageQueued = nil
 	org.lastWoundsSig = nil
 	org.lastArterialWoundsSig = nil
 	org.lastObserverSig = nil
@@ -685,6 +686,58 @@ function hg.organism.AddPanicAttack(org, amount, silent, combatEvent, ignoreGunf
 	org.panicattackadd = math.Clamp((org.panicattackadd or 0) + amount * panicattack_gain_mul, 0, 1)
 	return org.panicattackadd
 end
+
+function hg.organism.PanicGrenadeThreat(grenade)
+	if not IsValid(grenade) or grenade.Exploded or not grenade.timer then return end
+	local pos = grenade:WorldSpaceCenter()
+	local owner = IsValid(grenade.owner) and grenade.owner or nil
+	grenade.panicThreatTargets = grenade.panicThreatTargets or {}
+
+	for _, ply in player.Iterator() do
+		if ply == owner or not ply:Alive() or not ply.organism or ply.organism.otrub then continue end
+		local distance = ply:EyePos():Distance(pos)
+		if distance > panicattack_grenade_radius then continue end
+		if grenade.panicThreatTargets[ply] and grenade.panicThreatTargets[ply] > CurTime() then continue end
+		local direction = pos - ply:EyePos()
+		if ply:GetAimVector():Dot(direction:GetNormalized()) < 0.3 then continue end
+		local character = hg.GetCurrentCharacter(ply)
+		local trace = util.TraceLine({
+			start = ply:EyePos(),
+			endpos = pos,
+			filter = {ply, character, grenade, owner},
+			mask = MASK_SHOT
+		})
+		if trace.Hit then continue end
+		local amount = math.Clamp(math.Remap(distance, 70, panicattack_grenade_radius, 0.22, 0.05), 0.05, 0.22)
+		hg.organism.AddPanicAttack(ply.organism, amount, true, false, true)
+		grenade.panicThreatTargets[ply] = CurTime() + 1.25
+	end
+end
+
+function hg.organism.PanicFlyingObjectThreat(object, thrower, velocity)
+	if not IsValid(object) or not isvector(velocity) or velocity:Length() < 350 then return end
+	local pos = object:WorldSpaceCenter()
+	local direction = velocity:GetNormalized()
+	object.panicFlybyTargets = object.panicFlybyTargets or {}
+
+	for _, ply in player.Iterator() do
+		if ply == thrower or not ply:Alive() or not ply.organism or ply.organism.otrub then continue end
+		if object.panicFlybyTargets[ply] and object.panicFlybyTargets[ply] > CurTime() then continue end
+		local distance, closest = util.DistanceToLine(pos - direction * 120, pos + direction * 180, ply:EyePos())
+		if distance > 90 or closest:DistToSqr(ply:EyePos()) > 600 ^ 2 then continue end
+		local character = hg.GetCurrentCharacter(ply)
+		local trace = util.TraceLine({
+			start = closest,
+			endpos = ply:EyePos(),
+			filter = {object, thrower, ply, character},
+			mask = MASK_SHOT
+		})
+		if trace.Hit then continue end
+		local amount = math.Clamp(math.Remap(distance, 15, 90, 0.14, 0.045), 0.045, 0.14)
+		hg.organism.AddPanicAttack(ply.organism, amount, true, true, true)
+		object.panicFlybyTargets[ply] = CurTime() + 1.25
+	end
+end
 function hg.organism.AddSeizure(org, amount)
 	if not org then return 0 end
 	if not isnumber(amount) or amount <= 0 then return org.seizure or 0 end
@@ -999,25 +1052,23 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	if hg_panic:GetBool() and oldPanicAttack < panicattack_threshold and org.panicattack >= panicattack_threshold and isPly and owner:Alive() then
 		owner:Notify("I can't calm down.", 2, "panicattack_start", 2, nil, Color(255, 140, 140))
 	end
+	if oldPanicAttack < panicattack_threshold and org.panicattack >= panicattack_threshold then
+		org.panicAdrenalineUntil = CurTime() + panicattack_adrenaline_duration
+	end
 	local panicDying = org.otrub or org.incapacitated or org.deathStateKilled or (isPly and not owner:Alive())
 	if org.panicattack >= panicattack_threshold then
 		org.panicattackActive = hg_panic:GetBool() and not panicDying
-		local adrenalineTarget = math.Remap(org.panicattack, panicattack_threshold, 1, panicattack_adrenaline_add_target * 0.5, panicattack_adrenaline_add_target)
-		if not hg_panic:GetBool() then adrenalineTarget = adrenalineTarget * 0.55 end
-		org.adrenalineAdd = math.Approach(org.adrenalineAdd or 0, adrenalineTarget, timeValue / panicattack_adrenaline_add_rise_time)
+		if CurTime() < (org.panicAdrenalineUntil or 0) then
+			local adrenalineTarget = math.Remap(org.panicattack, panicattack_threshold, 1, panicattack_adrenaline_add_target * 0.5, panicattack_adrenaline_add_target)
+			if not hg_panic:GetBool() then adrenalineTarget = adrenalineTarget * 0.55 end
+			org.adrenalineAdd = math.Approach(org.adrenalineAdd or 0, adrenalineTarget, timeValue / panicattack_adrenaline_add_rise_time)
+		end
 		if org.panicattackActive then
 			org.disorientation = math.max(org.disorientation, 0.6 + panicattack_disorientation * org.panicattack)
 		end
-		if org.panicattackActive and isPly and CurTime() >= (org.nextPanicHeartRoll or 0) then
-			org.nextPanicHeartRoll = CurTime() + panicattack_heart_roll_delay
-			if math.random(100) <= panicattack_heart_roll_chance then
-				org.heartstop = true
-				owner:Notify("My heart just stopped.", 2, "panicattack_heartstop", 2, nil, Color(255, 120, 120))
-			end
-		end
 	else
 		org.panicattackActive = false
-		org.nextPanicHeartRoll = CurTime() + panicattack_heart_roll_delay
+		org.panicAdrenalineUntil = 0
 	end
 	local brainDelta = (org.brain or 0) - oldSeizureBrain
 	local lobeDelta = lobeDamage - oldSeizureLobeDamage

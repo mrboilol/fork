@@ -30,7 +30,7 @@ function SWEP:InitializeAdd()
 	self.ModelScale = 1
 
 	self.modeValues = {
-		[1] = 1.0,
+		[1] = 1.5,
 	}
 end
 
@@ -57,6 +57,7 @@ if SERVER then
 
 	local brokenLimbsList = { "lleg", "rleg", "larm", "rarm", "chest" }
 	local complexBonesList = { "spine3", "spine2", "spine1", "pelvis", "chest", "skull" }
+	local boneHealing = 0.35
 
 	local function CanHealKey(org, key)
 		local v = tonumber(org[key] or 0) or 0
@@ -84,13 +85,13 @@ if SERVER then
 			if CanHealKey(org, key) then
 				local isBroken = table.HasValue(brokenLimbsList, key)
 				local isComplex = table.HasValue(complexBonesList, key)
-				local cost = 0.25 -- 0.25 regen per bone
+				local cost = 0.25
 				local rotations = isBroken and 2 or 1 -- 2 rotations for broken bones, 1 for others
 				
 				if totalCost + cost <= availableResource + 0.001 then
 					totalCost = totalCost + cost
 					totalRotations = totalRotations + rotations
-					table.insert(bonesToHeal, {key = key, cost = cost, heal = 0.25})
+					table.insert(bonesToHeal, {key = key, cost = cost, heal = boneHealing})
 				end
 			end
 		end
@@ -217,7 +218,7 @@ if SERVER then
 		end
 
 		-- gain slight analgesia per total use (0.2-0.4 depending how much one healed)
-		local analgesiaAdd = math.Clamp(amountHealed * 0.4, 0.2, 0.4)
+		local analgesiaAdd = math.Clamp(amountHealed * 0.65, 0.35, 0.8)
 		org.analgesiaAdd = math.min((org.analgesiaAdd or 0) + analgesiaAdd, 4)
 
 		owner:EmitSound("snd_jack_hmcd_bandage.ogg", 60, math.random(95, 105))

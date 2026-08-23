@@ -47,7 +47,7 @@ function SWEP:CanReload()
 
 	if !ply.GetAmmoCount then return true end
 	
-	if self.ReloadNext or not self:CanUse() or self:IsJamClearing() or self:GetJammed() or ply:GetAmmoCount(self:GetPrimaryAmmoType()) == 0 or self:Clip1() >= self:GetMaxClip1() + (self.drawBullet and not self.OpenBolt and 1 or 0) then --shit
+	if self.ReloadNext or not self:CanUse() or self:IsJamClearing() or self:GetJammed() or ply:GetAmmoCount(self:GetPrimaryAmmoType()) == 0 or self:Clip1() >= self:GetReloadCapacity() then --shit
 		return
 	end
 
@@ -59,7 +59,7 @@ if SERVER then
 end
 
 function SWEP:GetReloadCapacity()
-	local chambered = self.drawBullet == true and not self.OpenBolt
+	local chambered = not self.OpenBolt
 	return math.max(self:GetMaxClip1() + (chambered and 1 or 0), 0)
 end
 

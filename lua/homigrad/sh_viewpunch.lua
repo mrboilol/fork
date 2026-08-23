@@ -310,6 +310,7 @@ local IsValid = IsValid
 		util.AddNetworkString("ViewPunch")
 
 		function PLAYER:ViewPunch(ang)
+			if not isangle(ang) then return end
 			net.Start("ViewPunch")
 			net.WriteAngle(ang)
 			net.Send(self)

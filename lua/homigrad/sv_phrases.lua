@@ -1,25 +1,3 @@
-local painPhrases = {
-	[1] = {
-		{"vo/npc/male01/moan", ".wav", 1, 5},
-	},
-	[2] = {
-		{"vo/npc/female01/moan", ".wav", 1, 5},
-	}
-}
-
-local bigPainPhrases = {
-	[1] = {
-		{"vo/npc/male01/pain", ".wav", 7, 9},
-		{"painSounds/bigPain", ".mp3", 1, 7, true},
-	},
-	[2] = {
-		{"vo/npc/female01/pain", ".wav", 9, 9},
-		{"vo/npc/female01/pain", ".wav", 6, 6},
-		{"vo/npc/female01/ow", ".wav", 2, 2},
-		{"painSounds/bigFemalePain", ".mp3", 1, 4, true},
-	}
-}
-
 local terrorist_phrases = {
 	normal = {
 		"mercenary/moving1.mp3",
@@ -313,30 +291,19 @@ net.Receive("hg_phrase", function(len, ply)
 		num = mRandom(1, 2)
 	end
 
-	local phrases2 = phrases
-
 	local inpain = ply.organism.pain > 60
+	local phrase
 	if inpain then
-		phrases2 = bigPainPhrases
+		phrase = hg.UniversalScreamSounds[mRandom(#hg.UniversalScreamSounds)]
+	else
+		local phr = phrases[math.Round(mClamp(gender, 1, 2))]
+		phr = phr[math.Round(mClamp(i, 1, #phr))]
+		if !phr then return end
 
-		if ply.organism.pain > 100 then
-			phrases2 = painPhrases
-		end
+		local random = math.Round(mClamp(num, phr[3], phr[4]))
+		local huy = random < 10 and not phr[5] and "0" or ""
+		phrase = phr[1] .. huy .. random .. phr[2]
 	end
-	
-	local phr = phrases2[math.Round(mClamp(gender, 1, 2))]
-	phr = phr[math.Round(mClamp(i, 1, #phr))]
-	
-	if !phr then return end
-
-	local random = math.Round(mClamp(num, phr[3], phr[4]))
-
-	if inpain then
-		random = mRandom(phr[3], phr[4])
-	end
-
-	local huy = random < 10 and not phr[5] and "0" or ""
-	local phrase = phr[1] .. huy .. random .. phr[2]
 	local ent = hg.GetCurrentCharacter(ply)
 	local muffed = false
 	local pitch = nil
@@ -407,46 +374,34 @@ hook.Add("HG_OnOtrub", "StopPhrOnOtrub", function( ply )
 	ply.phrCld = 0
 end)
 
-local femaleCount = 10
-local maleCount = 14
 local clr = Color(204,48,0)
-local painScreamFolders = {
-	[false] = {
-		"male1",
-		"male2"
-	},
-	[true] = {
-		"female1",
-		"female2"
-	}
+hg.UniversalScreamSounds = {
+	"screams/universal1/burnfive.mp3",
+	"screams/universal1/burnfour.mp3",
+	"screams/universal1/burnone.mp3",
+	"screams/universal1/burnsix.mp3",
+	"screams/universal1/burnthree.mp3",
+	"screams/universal1/burntwo.mp3",
+	"screams/universal1/death_scream_male1.mp3",
+	"screams/universal1/death_scream_male2.mp3",
+	"screams/universal1/death_scream_male3.mp3",
+	"screams/universal1/death_scream_male4.mp3",
+	"screams/universal1/death_scream_male5.mp3",
+	"screams/universal1/falling_down_male4.mp3",
+	"screams/universal1/malescream_1.mp3",
+	"screams/universal1/malescream_2.mp3",
+	"screams/universal1/malescream_3.mp3",
+	"screams/universal1/malescream_4.mp3",
+	"screams/universal1/malescream_5.mp3",
+	"screams/universal1/malescream_6.mp3",
+	"screams/universal1/pain_scream_male1.mp3",
+	"screams/universal1/pain_scream_male2.mp3",
+	"screams/universal1/pain_scream_male3.mp3",
+	"screams/universal1/screamone.mp3",
+	"screams/universal1/screamthree.mp3",
+	"screams/universal1/screamtwo.mp3",
+	"screams/universal1/wilhelm_scream.mp3",
 }
-local painScreamSounds = {
-	[false] = {
-		"painSounds/bigPain1.mp3",
-		"painSounds/bigPain2.mp3",
-		"painSounds/bigPain3.mp3",
-		"painSounds/bigPain4.mp3",
-		"painSounds/bigPain5.mp3",
-		"painSounds/bigPain6.mp3",
-		"painSounds/bigPain7.mp3",
-	},
-	[true] = {
-		"painSounds/bigFemalePain1.mp3",
-		"painSounds/bigFemalePain2.mp3",
-		"painSounds/bigFemalePain3.mp3",
-		"painSounds/bigFemalePain4.mp3",
-	},
-}
-local painScreamUniversalChance = 1
-local burnScreamSounds = {
-	"screams/universal1/burnOne.mp3",
-	"screams/universal1/burnTwo.mp3",
-	"screams/universal1/burnThree.mp3",
-	"screams/universal1/burnFour.mp3",
-	"screams/universal1/burnFive.mp3",
-	"screams/universal1/burnSix.mp3",
-}
-local burnScreamUniversalChance = 0.5
 local painScreamRestartFade = 0.8
 local painScreamEndFade = 0.05
 local painScreamChance = 0.52
@@ -455,31 +410,6 @@ local silentCombatClasses = {
 	terrorist = true,
 	swat = true,
 }
-
-function hg.AssignPainScreamFolder(ply)
-	if !IsValid(ply) or !ply:IsPlayer() then return end
-
-	local female = ThatPlyIsFemale(ply)
-
-	if ply.painScreamFolder and ply.painScreamFolderFemale == female then
-		return ply.painScreamFolder
-	end
-
-	local folders = painScreamFolders[female] or painScreamFolders[false]
-	ply.painScreamFolderFemale = female
-	ply.painScreamFolder = folders[mRandom(#folders)]
-
-	return ply.painScreamFolder
-end
-
-hook.Add("PlayerSpawn", "HG_AssignPainScreamFolder", function(ply)
-	timer.Simple(0, function()
-		if !IsValid(ply) then return end
-
-		hg.StopPainScream(ply, 0)
-		hg.AssignPainScreamFolder(ply)
-	end)
-end)
 
 local function canPainScream(ply)
 	if !IsValid(ply) or !ply:IsPlayer() or !ply:Alive() then return false end
@@ -564,21 +494,13 @@ local function playPainScream(ply)
 	if !canPainScream(ply) then return false end
 	if mRandom(1, 100) > (mClamp(painScreamChance, 0, 1) * 100) then return true end
 
-	local folder = hg.AssignPainScreamFolder(ply)
 	local ent = hg.GetCurrentCharacter(ply)
 
-	if !folder or !IsValid(ent) then return false end
+	if !IsValid(ent) then return false end
 
 	hg.StopPainScream(ply, painScreamRestartFade)
 
-	local phrase
-	if mRandom(1, 100) <= mClamp(painScreamUniversalChance, 0, 1) * 100 then
-		local sounds = painScreamSounds[ThatPlyIsFemale(ply)] or painScreamSounds[false]
-		phrase = sounds[mRandom(#sounds)]
-	else
-		local prefix = string.match(folder, "^(female)") or string.match(folder, "^(male)") or folder
-		phrase = "screams/" .. folder .. "/rem_" .. prefix .. "partial" .. mRandom(1, 4) .. ".mp3"
-	end
+	local phrase = hg.UniversalScreamSounds[mRandom(#hg.UniversalScreamSounds)]
 	local rf = RecipientFilter()
 	rf:AddPAS(ent:GetPos())
 
@@ -668,12 +590,7 @@ hook.Add("PreHomigradDamage","BurnScream", function( ent, dmgInfo )
 
 		if dmgInfo:IsDamageType(DMG_BURN) and IsValid(ply) and ply:IsPlayer() 
 	and ply.organism and !ply.organism.otrub and ply:Alive() then
-		local phrase
-		if mRandom(1, 100) <= mClamp(burnScreamUniversalChance, 0, 1) * 100 then
-			phrase = burnScreamSounds[mRandom(#burnScreamSounds)]
-		else
-			phrase = "zcitysnd/"..(ThatPlyIsFemale(ply) and "fe" or "").."male/burn/death_burn"..mRandom(1,ThatPlyIsFemale(ply) and femaleCount or maleCount)..".ogg"
-		end
+		local phrase = hg.UniversalScreamSounds[mRandom(#hg.UniversalScreamSounds)]
 
 		-- overrides
 		override_ply, override_phrase = hook.Run("HG_ReplaceBurnPhrase", ply, phrase)

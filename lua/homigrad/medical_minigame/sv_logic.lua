@@ -290,9 +290,6 @@ function hg.MedicalMinigame.StartBandageMinigame(ply, ent)
             if class == "weapon_bruicekit" then
                 local totalRotations, _, _ = wep:GetHealData(org)
                 requiredCompletions = totalRotations
-            elseif class == "weapon_bandage_sh" or class == "weapon_bigbandage_sh" then
-                local totalRotations, _, _, _ = wep:GetHealData(org)
-                requiredCompletions = totalRotations
             else
                 local mode = wep.mode or 1
                 local amount = wep.modeValues and wep.modeValues[mode] or 0
@@ -411,7 +408,7 @@ local function GetMedicalMinigameType(wep)
     if medkitModeType == "tourniquet" then return "tourniquet" end
     if medkitModeType then return "syringe" end
 
-    if class == "weapon_bruicekit" or class == "weapon_bandage_sh" or class == "weapon_bigbandage_sh" or class == "weapon_packedbandage_sh" or class == "weapon_combatbandage_sh" or class == "weapon_quikclotbandage_sh" or (class == "weapon_medkit_sh" and wep.mode == 1) then
+    if class == "weapon_bruicekit" or class == "weapon_bandage_sh" or class == "weapon_bigbandage_sh" or class == "weapon_packedbandage_sh" or class == "weapon_combatbandage_sh" or class == "weapon_quikclotbandage_sh" or class == "weapon_bigpackedbandage_sh" or class == "weapon_bigcombatbandage_sh" or class == "weapon_bigquikclotbandage_sh" or (class == "weapon_medkit_sh" and wep.mode == 1) then
         return "bandage"
     end
 

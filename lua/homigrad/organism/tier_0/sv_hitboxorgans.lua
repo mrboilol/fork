@@ -172,7 +172,7 @@ function hg.organism.BlastTrace(pos, size, dmg, boxs, organs, funcInput, ...)
 		--size = size * 999
 		local amt = dmg / dist * (1 - (organ and organ[2] or 0)) / size
 		
-		local dirSub = funcInput(box, amt, organ, ...)
+		local dirSub = tonumber(funcInput(box, amt, organ, ...)) or 0
 		
 		size = size * (dirSub * 0.01 + 1)
 	end

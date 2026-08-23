@@ -530,11 +530,14 @@ local function GetIEDDialDelay(self, ent)
 	return Lerp(math.Clamp(distance / self.MaxDialDistance, 0, 1), self.CallStartDelay, self.MaxDialTime)
 end
 
-local function PlayIEDExplosionSound(self, ent)
+local function PlayIEDExplosionSound(ent, fallbackPos, sounds, soundLevel, pitchMin, pitchMax)
+	if not istable(sounds) or #sounds == 0 then return end
+
+	local soundName = sounds[math.random(#sounds)]
 	if IsValid(ent) and not ent:IsWorld() then
-		ent:EmitSound(table.Random(self.ExplosionSounds), self.ExplosionSoundLevel, math.random(self.ExplosionSoundPitchMin, self.ExplosionSoundPitchMax), 1, CHAN_AUTO)
+		ent:EmitSound(soundName, soundLevel, math.random(pitchMin, pitchMax), 1, CHAN_AUTO)
 	else
-		sound.Play(table.Random(self.ExplosionSounds), self.LastBombPos or self:GetPos(), self.ExplosionSoundLevel, math.random(self.ExplosionSoundPitchMin, self.ExplosionSoundPitchMax), 1)
+		sound.Play(soundName, fallbackPos, soundLevel, math.random(pitchMin, pitchMax), 1)
 	end
 end
 
@@ -628,6 +631,14 @@ ExplodeTheItem = function(self,ent)
 	end
 	local BlastDamage = self.BlastDamage
 	local BlastDis = self.BlastDis
+	local DisorientationRange = self.DisorientationRange or SWEP.DisorientationRange
+	local ExplosionSounds = istable(self.ExplosionSounds) and self.ExplosionSounds or SWEP.ExplosionSounds
+	local ExplosionSoundLevel = self.ExplosionSoundLevel or SWEP.ExplosionSoundLevel
+	local ExplosionSoundPitchMin = self.ExplosionSoundPitchMin or SWEP.ExplosionSoundPitchMin
+	local ExplosionSoundPitchMax = self.ExplosionSoundPitchMax or SWEP.ExplosionSoundPitchMax
+	local Sound = istable(self.Sound) and self.Sound or SWEP.Sound
+	local SoundFar = istable(self.SoundFar) and self.SoundFar or SWEP.SoundFar
+	local SoundWater = self.SoundWater or SWEP.SoundWater
 	local owner = IsValid(self.IEDPlanter) and self.IEDPlanter or self:GetOwner()
 	local attacker = IsValid(owner) and owner or self
 	local BlastForce = self.BlastForce * (planted and self.PlantedBlastForceMul or 1)
@@ -665,14 +676,14 @@ ExplodeTheItem = function(self,ent)
 
 	timer.Simple(0.4,function()
 		timer.Simple(0.1,function()
-			PlayIEDExplosionSound(self, ent)
+			PlayIEDExplosionSound(ent, EntPos, ExplosionSounds, ExplosionSoundLevel, ExplosionSoundPitchMin, ExplosionSoundPitchMax)
 			net.Start("projectileFarSound")
-				net.WriteString(self.Sound[math.random(#self.Sound)])
-				net.WriteString(self.SoundFar[math.random(#self.SoundFar)])
+				net.WriteString(Sound[math.random(#Sound)])
+				net.WriteString(SoundFar[math.random(#SoundFar)])
 				net.WriteVector(EntPos)
 				net.WriteEntity(entValid and ent or Entity(0))
 				net.WriteBool(entWaterLevel > 0)
-				net.WriteString(self.SoundWater)
+				net.WriteString(SoundWater)
 			hg.SendNetToPlayersWithin(EntPos, 25000)
 
 			if entWaterLevel > 0 then
@@ -705,7 +716,7 @@ ExplodeTheItem = function(self,ent)
 			end
 			
 			local dis = BlastDis / 0.01905
-			local disorientation_dis = self.DisorientationRange / 0.01905
+			local disorientation_dis = DisorientationRange / 0.01905
 			for _, enta in ipairs(ents.FindInSphere(EntPos, disorientation_dis)) do
 				local tracePos = enta:IsPlayer() and (enta:GetPos() + enta:OBBCenter()) or enta:GetPos()
 				local tr = hg.ExplosionTrace(EntPos, tracePos, {ent})

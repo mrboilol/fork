@@ -765,8 +765,8 @@ surface.CreateFont("Rem_Sum_Stat", { font = "ITC Avant Garde Gothic", size = Scr
 surface.CreateFont("Rem_Sum_Countdown", { font = "ITC Avant Garde Gothic", size = ScreenScale(23), weight = 800, antialias = true, extended = true })
 
 local AWARD_INFO = {
-	mvp          = { title = "MVP OF THE ROUND", color = Color(232, 190, 70),  desc = function(v) return "Best player around" end },
-    dm_winner    = { title = "MVP OF THE ROUND", color = Color(232, 190, 70),  desc = function(v) return "Deathmatch round winner" end },
+	mvp          = { title = "GOY OF THE ROUND", color = Color(232, 190, 70),  desc = function(v) return "Best player around" end },
+    dm_winner    = { title = "GOY OF THE ROUND", color = Color(232, 190, 70),  desc = function(v) return "Deathmatch round winner" end },
     dm_kills     = { title = "MOST KILLS",       color = Color(210, 80, 80),   desc = function(v) return v .. " kill" .. (v == 1 and "" or "s") end },
     dm_headshots = { title = "MOST HEADSHOTS",   color = Color(215, 95, 70),   desc = function(v) return v .. " headshot" .. (v == 1 and "" or "s") end },
 	executioner  = { title = "THE EXECUTIONER",  color = Color(150, 20, 20),   desc = function(v) return "Killed the main traitor" end },

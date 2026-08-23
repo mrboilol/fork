@@ -74,7 +74,10 @@ local judgeBandageClasses = {
 	weapon_bigbandage_sh = true,
 	weapon_packedbandage_sh = true,
 	weapon_combatbandage_sh = true,
-	weapon_quikclotbandage_sh = true
+	weapon_quikclotbandage_sh = true,
+	weapon_bigpackedbandage_sh = true,
+	weapon_bigcombatbandage_sh = true,
+	weapon_bigquikclotbandage_sh = true
 }
 
 function SWEP:UseJudgeBandageTPIK()
@@ -592,7 +595,7 @@ if SERVER then
 		if not org then return end
 		
 		-- Если растрелять труп а потом его взорвать гранатой, после перевязать - крашнет сервер why?
-		if self.modeValues[1] <= 0 or not (#org.wounds > 0 or org.lleg == 1 or org.rleg == 1 or org.skull > 0.05 or org.chest == 1 or org.rarm == 1 or org.larm == 1) then return end
+		if self.modeValues[1] <= 0 or not (#org.wounds > 0 or (org.lleg or 0) >= 0.05 or (org.rleg or 0) >= 0.05 or (org.skull or 0) >= 0.05 or (org.chest or 0) >= 0.05 or (org.rarm or 0) >= 0.05 or (org.larm or 0) >= 0.05) then return end
 		table.sort(org.wounds, function(a, b) return a[1] > b[1] end)
 		
 		local done = false
@@ -686,36 +689,36 @@ if SERVER then
 			done = true
 		end
 
-		if org.chest == 1 and self.modeValues[1] >= amt then
-			org.chest = org.chest - 0.05
+		if (org.chest or 0) >= 0.05 and self.modeValues[1] >= amt then
+			org.chest = math.max(org.chest - 0.08, 0)
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.avgpain = math.max(org.avgpain - 7, 0)
 			done = true
 		end
 
-		if org.lleg == 1 and self.modeValues[1] >= amt and !org.llegamputated then
-			org.lleg = org.lleg - 0.05
+		if (org.lleg or 0) >= 0.05 and self.modeValues[1] >= amt and !org.llegamputated then
+			org.lleg = math.max(org.lleg - 0.08, 0)
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.avgpain = math.max(org.avgpain - 7, 0)
 			done = true
 		end
 
-		if org.rleg == 1 and self.modeValues[1] >= amt and !org.rlegamputated then
-			org.rleg = org.rleg - 0.05
+		if (org.rleg or 0) >= 0.05 and self.modeValues[1] >= amt and !org.rlegamputated then
+			org.rleg = math.max(org.rleg - 0.08, 0)
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.avgpain = math.max(org.avgpain - 7, 0)
 			done = true
 		end
 
-		if org.rarm == 1 and self.modeValues[1] >= amt and !org.rarmamputated then
-			org.rarm = org.rarm - 0.05
+		if (org.rarm or 0) >= 0.05 and self.modeValues[1] >= amt and !org.rarmamputated then
+			org.rarm = math.max(org.rarm - 0.08, 0)
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.avgpain = math.max(org.avgpain - 7, 0)
 			done = true
 		end
 
-		if org.larm == 1 and self.modeValues[1] >= amt and !org.larmamputated then
-			org.larm = org.larm - 0.05
+		if (org.larm or 0) >= 0.05 and self.modeValues[1] >= amt and !org.larmamputated then
+			org.larm = math.max(org.larm - 0.08, 0)
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.avgpain = math.max(org.avgpain - 7, 0)
 			done = true

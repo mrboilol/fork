@@ -94,6 +94,7 @@ end
 local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Healing method: 0 = original models + progressive minigames, 1 = Judge animations", 0, 1)
 
 local lang1, lang2 = Angle(0, -10, 0), Angle(0, 10, 0)
+local ang_eat = Angle(1, 0, 0)
 function SWEP:Animation()
 	if (self:GetOwner().zmanipstart ~= nil and not self:GetOwner().organism.larmamputated) then return end
 	local hold = self:GetHolding()

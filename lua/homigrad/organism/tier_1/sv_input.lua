@@ -249,7 +249,7 @@ local function Trace_Blast(box, amt, organ, org, organs, dmg, dmgInfo)
 
 	local amount = amt * dmg
 	
-	if func then return func(org, 1, amount, dmgInfo, box[6], vector_origin, true, false) end
+	return func and (func(org, 1, amount, dmgInfo, box[6], vector_origin, true, false) or 0) or 0
 end
 
 local dir = Vector(0, 0, 0)
@@ -1554,7 +1554,8 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	local blast = dmgInfo:IsDamageType(DMG_BLAST)
 	local slash = dmgInfo:IsDamageType(DMG_SLASH)
 	if not noDismemberment and instant and hitgroup == HITGROUP_HEAD and !ent.headexploded then hg.ExplodeHead(ent, headGoreStack or gibStack, slash, dirCool * len) end
-	if hitgroup == HITGROUP_HEAD and damageStack > 0 and dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) and !ent.headexploded then
+	local fatalHeadshot = (org.brain or 0) >= 0.7 or not org.alive or (IsValid(ply) and not ply:Alive())
+	if hitgroup == HITGROUP_HEAD and fatalHeadshot and damageStack > 0 and dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) and !ent.headexploded then
 		local squirtDirection = dirCool
 		if squirtDirection:LengthSqr() == 0 then
 			squirtDirection = (dmgPos - ent:WorldSpaceCenter()):GetNormalized()

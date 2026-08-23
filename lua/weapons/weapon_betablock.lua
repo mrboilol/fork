@@ -109,7 +109,6 @@ if SERVER then
 		org.panicattackadd = 0
 		org.panicattack = 0
 		org.panicattackActive = false
-		org.nextPanicHeartRoll = CurTime() + 15
 		org.adrenalineAdd = math.Approach(org.adrenalineAdd, -8, self.modeValues[1] * 2)
 		org.adrenaline = math.Approach(org.adrenaline, 0, self.modeValues[1] * 0.5)
         

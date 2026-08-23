@@ -7,7 +7,6 @@ local hev_color = Color(255,125,0)
 local CreateThought
 local thoughtMessages = {
     panicattack_start = "You are experiencing a panic attack.",
-    panicattack_heartstop = "Your heart stopped.",
     wake = "You regained consciousness.",
     dislocations_unlucky = "The joint is back in place.",
     painfromjawspeak = "Your jaw hurts when you speak.",
@@ -31,6 +30,27 @@ local thoughtMessages = {
     painfrommoving = "Your leg hurts when you move.",
     painfromjaw = "Your jaw hurts.",
     painfromribs = "Your broken ribs make it painful to breathe.",
+}
+
+local legacyThoughtMessages = {
+    temperature_cold = {
+        "I'm getting cold.",
+        "I can't stop shivering.",
+        "My hands are going numb from the cold.",
+        "I feel so weak... I need to get warm.",
+        "I'm freezing... I don't think I can stay awake."
+    },
+    temperature_hot = {
+        "I'm getting too hot.",
+        "I can't stop sweating.",
+        "The heat is making my head spin.",
+        "I need to cool down before I pass out."
+    },
+    thought_excruciatingpain = {
+        "The pain is unbearable.",
+        "I can't think through this pain.",
+        "Everything hurts too much to move."
+    },
 }
 
 local scpcbHitgroupToCat = {
@@ -295,6 +315,21 @@ local function GetConditionThought(ply, msgKey)
     return options[index]
 end
 
+local function GetLegacyThoughtMessage(ply, msg, msgKey)
+    local options = legacyThoughtMessages[msgKey]
+    if not options then return msg end
+
+    ply.lastLegacyThought = ply.lastLegacyThought or {}
+    local index = math.random(#options)
+    local lastIndex = ply.lastLegacyThought[msgKey]
+    if #options > 1 and index == lastIndex then
+        index = index % #options + 1
+    end
+
+    ply.lastLegacyThought[msgKey] = index
+    return options[index]
+end
+
 local function GetStatusThought(ply)
     local org = ply.organism or {}
     if org.heartstop then return "Cardiac arrest detected." end
@@ -418,6 +453,8 @@ local function CreateNotification(ply, msg, delay, msgKey, showTime, func, clr)
     end
 
     if msg == "" then return end
+
+    msg = GetLegacyThoughtMessage(ply, msg, msgKey)
 
     ply.msgs = ply.msgs or {}
     if msgKey and ply.msgs[msgKey] then
@@ -626,6 +663,7 @@ hook.Add("Player Spawn","removeNotifications",function(ply)
     ply.msgs = {}
     ply.thoughtmsgs = {}
     ply.lastConditionThought = {}
+    ply.lastLegacyThought = {}
     ply.thoughtGroupCooldowns = {}
     ply.recentThoughtText = {}
     ply.nextThoughtGlobal = 0
@@ -635,6 +673,7 @@ hook.Add("HG_OnOtrub","removeNotifications",function(ply)
     ply.msgs = {}
     ply.thoughtmsgs = {}
     ply.lastConditionThought = {}
+    ply.lastLegacyThought = {}
     ply.thoughtGroupCooldowns = {}
     ply.recentThoughtText = {}
     ply.nextThoughtGlobal = 0
@@ -644,6 +683,7 @@ hook.Add("Player_Death","removeNotifications",function(ply)
     ply.msgs = {}
     ply.thoughtmsgs = {}
     ply.lastConditionThought = {}
+    ply.lastLegacyThought = {}
     ply.thoughtGroupCooldowns = {}
     ply.recentThoughtText = {}
     ply.nextThoughtGlobal = 0

@@ -24,32 +24,7 @@ local DEATH_MESSAGES = {
 }
 
 local DEATH_SOUNDS = {
-    "rem_brutaldeath.mp3",
-    "screams/universal1/burnfive.mp3",
-    "screams/universal1/burnfour.mp3",
-    "screams/universal1/burnone.mp3",
-    "screams/universal1/burnsix.mp3",
-    "screams/universal1/burnthree.mp3",
-    "screams/universal1/burntwo.mp3",
-    "screams/universal1/death_scream_male1.mp3",
-    "screams/universal1/death_scream_male2.mp3",
-    "screams/universal1/death_scream_male3.mp3",
-    "screams/universal1/death_scream_male4.mp3",
-    "screams/universal1/death_scream_male5.mp3",
-    "screams/universal1/falling_down_male4.mp3",
-    "screams/universal1/malescream_1.mp3",
-    "screams/universal1/malescream_2.mp3",
-    "screams/universal1/malescream_3.mp3",
-    "screams/universal1/malescream_4.mp3",
-    "screams/universal1/malescream_5.mp3",
-    "screams/universal1/malescream_6.mp3",
-    "screams/universal1/pain_scream_male1.mp3",
-    "screams/universal1/pain_scream_male2.mp3",
-    "screams/universal1/pain_scream_male3.mp3",
-    "screams/universal1/screamone.mp3",
-    "screams/universal1/screamthree.mp3",
-    "screams/universal1/screamtwo.mp3",
-    "screams/universal1/wilhelm_scream.mp3",
+    [0] = "rem_brutaldeath.mp3",
 }
 
 local DEATH_COLORS = {
@@ -483,16 +458,17 @@ local function CinematicDeathTracker()
         StopDeathSounds()
         CDeath.keepSoundAlive = true
         local soundGeneration = CDeath.deathSoundGeneration
-        local deathSound = DEATH_SOUNDS[math.random(#DEATH_SOUNDS)]
-        sound.PlayFile("sound/" .. deathSound, "noplay", function(station)
-            if not IsValid(station) then return end
-            if soundGeneration ~= CDeath.deathSoundGeneration or not CDeath.isDead then
-                station:Stop()
-                return
-            end
-            CDeath.deathSoundChannels[#CDeath.deathSoundChannels + 1] = station
-            station:Play()
-        end)
+        for _, deathSound in pairs(DEATH_SOUNDS) do
+            sound.PlayFile("sound/" .. deathSound, "noplay", function(station)
+                if not IsValid(station) then return end
+                if soundGeneration ~= CDeath.deathSoundGeneration or not CDeath.isDead then
+                    station:Stop()
+                    return
+                end
+                CDeath.deathSoundChannels[#CDeath.deathSoundChannels + 1] = station
+                station:Play()
+            end)
+        end
 
     elseif ply:Alive() and CDeath.isDead then
         CDeath.isDead         = false

@@ -121,8 +121,12 @@ local limbName = {
 	larm = "left arm",
 }
 
+local function hasNewThoughts(org)
+	return org.isPly and IsValid(org.owner) and org.owner:GetInfoNum("hg_newthoughts", 0) > 0
+end
+
 local function sendThought(org, msg, key, delay, clr)
-	if org.isPly and IsValid(org.owner) and org.owner.Notify then
+	if hasNewThoughts(org) and org.owner.Notify then
 		org.owner:Notify(msg, delay or 1, key, 0, nil, clr)
 	end
 end
@@ -144,15 +148,15 @@ local function doDislocate(org, key, dmg, segment)
 	org.owner:AddNaturalAdrenaline(0.5)
 	org.fearadd = org.fearadd + 0.5
 
-	sendThought(org, "Your " .. limbName[key] .. " is dislocated.", "thought_dislocated" .. key, 1, Color(255, 220, 220))
+	if hasNewThoughts(org) then
+		sendThought(org, "Your " .. limbName[key] .. " is dislocated.", "thought_dislocated" .. key, 1, Color(255, 220, 220))
+	else
+		org.owner:Notify((key == "rarm" or key == "larm") and dislocated_arm[math.random(#dislocated_arm)] or dislocated_leg[math.random(#dislocated_leg)], true, "dislocated" .. key, 2)
+	end
 
 	timer.Simple(0, function() hg.LightStunPlayer(org.owner,2) end)
 	playBoneFractureSound(org.owner)
 	if org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner, 1) end
-end
-
-local function hasNewThoughts(org)
-	return org.isPly and IsValid(org.owner) and org.owner:GetInfoNum("hg_newthoughts", 0) > 0
 end
 
 local function legs(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, ricochet)
@@ -202,7 +206,11 @@ local function legs(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 		org.owner:AddNaturalAdrenaline(1)
 		org.fearadd = org.fearadd + 0.5
 
-		sendThought(org, "Your " .. limbName[key] .. " is broken.", "thought_broke" .. key, 1, Color(255, 210, 210))
+		if hasNewThoughts(org) then
+			sendThought(org, "Your " .. limbName[key] .. " is broken.", "thought_broke" .. key, 1, Color(255, 210, 210))
+		else
+			org.owner:Notify(broke_leg[math.random(#broke_leg)], true, "broke" .. key, 2)
+		end
 
 		timer.Simple(0, function() hg.LightStunPlayer(org.owner,2) end)
 		playBoneFractureSound(org.owner)
@@ -263,7 +271,11 @@ local function arms(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 		org.owner:AddNaturalAdrenaline(1)
 		org.fearadd = org.fearadd + 0.5
 
-		sendThought(org, "Your " .. limbName[key] .. " is broken.", "thought_broke" .. key, 1, Color(255, 210, 210))
+		if hasNewThoughts(org) then
+			sendThought(org, "Your " .. limbName[key] .. " is broken.", "thought_broke" .. key, 1, Color(255, 210, 210))
+		else
+			org.owner:Notify(broke_arm[math.random(#broke_arm)], true, "broke" .. key, 2)
+		end
 
 		playBoneFractureSound(org.owner)
 		if org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner, 1.35) end
@@ -759,10 +771,10 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 end
 
 local ribs = {
-	"MY CHEST... SNAPPED",
-	"SOMETHING SNAPPED IN MY TORSO",
-	"THERE'S SOMETHING SHARP IN MY CHEST...",
-	"I FEEL SOMETHING SHARP IN MY TORSO",
+	"I think something snapped in my chest.",
+	"Something feels wrong in my chest.",
+	"I think there is something sharp in my chest.",
+	"My chest hurts. Something may be broken.",
 }
 
 input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet)	
@@ -781,8 +793,11 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		org.brokenribs = math.Round(org.chest * 3)
 		
 		if org.brokenribs > 0 then
-			//org.owner:Notify(ribs[math.random(#ribs)], 5, "ribs", 4)
-			sendThought(org, "You broke " .. org.brokenribs .. " ribs.", "thought_ribs", 3, Color(255, 210, 210))
+			if hasNewThoughts(org) then
+				sendThought(org, "You broke " .. org.brokenribs .. " ribs.", "thought_ribs", 3, Color(255, 210, 210))
+			else
+				org.owner:Notify(ribs[math.random(#ribs)], 5, "ribs", 4)
+			end
 
 			playBoneFractureSound(org.owner)
 			if hg.QueuePainScream then hg.QueuePainScream(org.owner, 0.8) end

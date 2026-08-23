@@ -504,6 +504,7 @@ end
 
 util.AddNetworkString("ZB_KeyDown2")
 hook.Add("KeyPress", "huy-hg", function(ply, key)
+	if not IsValid(ply) or not ply.organism then return end
 	net.Start("ZB_KeyDown2")
 		net.WriteInt(key, 26)
 		net.WriteBool( ply.organism.canmove )
@@ -512,6 +513,7 @@ hook.Add("KeyPress", "huy-hg", function(ply, key)
 end)
 
 hook.Add("KeyRelease", "huy-hg2", function(ply, key)
+	if not IsValid(ply) then return end
 	net.Start("ZB_KeyDown2")
 		net.WriteInt(key, 26)
 		net.WriteBool(false)
@@ -638,7 +640,8 @@ function hg.ProcessBulletNearMiss(data)
 			local strength = math.Clamp((1 - dist / 120) * (data.Damage or 25) / 45, 0.08, 1)
 			ply:AddNaturalAdrenaline(0.035 * strength)
 			org.fearadd = org.fearadd + 0.12 * strength
-			hg.organism.AddPanicAttack(org, 0.0004 + strength * 0.0025, true, true, nil, true)
+			local panicAmount = math.Clamp(0.045 + strength * 0.16, 0.05, 0.21)
+			hg.organism.AddPanicAttack(org, panicAmount, true, true, strength >= 0.65, true)
 			net.Start("hg_bullet_nearmiss")
 				net.WriteVector(pos)
 				net.WriteFloat(strength)

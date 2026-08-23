@@ -83,25 +83,12 @@ hook.Add("HomigradDamage","FurCrackHit",function(ply, dmgInfo, hitgroup, ent)
 	end
 end)
 
-local fur_pain = {
-	"zbattle/furry/exp5.wav",
-	"zbattle/furry/exp6.wav",
-	"zbattle/furry/exp7.wav",
-	"zbattle/furry/exp8.wav",
-	"zbattle/furry/exp9.wav",
-	"zbattle/furry/exp10.wav",
-	"zbattle/furry/exp11.wav",
-	"zbattle/furry/exp12.wav",
-	"zbattle/furry/exp13.wav",
-	"zbattle/furry/exp14.wav",
-	"zbattle/furry/exp15.wav",
-	"zbattle/furry/exp16.wav",
-	"zbattle/furry/exp17.wav",
-	"zbattle/furry/death1.wav",
-	"zbattle/furry/death3.wav",
-	"zbattle/furry/death4.wav",
-	"zbattle/furry/death5.wav",
-}
+local function GetUniversalScream()
+	local sounds = hg.UniversalScreamSounds
+	if !sounds or #sounds == 0 then return end
+
+	return sounds[math.random(#sounds)]
+end
 
 local uwuspeak_phrases = {
 	"zbattle/furry/cat_mrrp1.mp3",
@@ -118,7 +105,7 @@ local uwuspeak_phrases = {
 hook.Add("HG_ReplacePhrase", "UwUPhrases", function(ply, phrase, muffed, pitch)
 	if IsValid(ply) and ply.PlayerClassName == "furry" then
 		local inpain = ply.organism.pain > 60
-		local phr = (inpain and fur_pain[math.random(#fur_pain)] or uwuspeak_phrases[math.random(#uwuspeak_phrases)])
+		local phr = (inpain and GetUniversalScream() or uwuspeak_phrases[math.random(#uwuspeak_phrases)])
 
 		return ply, phr, muffed, pitch
 	end
@@ -126,7 +113,7 @@ end)
 
 hook.Add("HG_ReplaceBurnPhrase", "UwUBurnPhrases", function(ply, phrase)
 	if ply.PlayerClassName == "furry" then
-		return ply, fur_pain[math.random(#fur_pain)]
+		return ply, GetUniversalScream()
 	end
 end)
 
@@ -134,7 +121,7 @@ hook.Add("Org Think", "ItHurtsfrfr",function(owner, org, timeValue)
 	if owner.PlayerClassName != "furry" then return end
 
 	if (owner.lastPainSoundCD or 0) < CurTime() and !org.otrub and org.pain >= 30 and math.random(1, 50) == 1 then
-		local phrase = table.Random(fur_pain)
+		local phrase = GetUniversalScream()
 
 		local muffed = owner.armors["face"] == "mask2"
 

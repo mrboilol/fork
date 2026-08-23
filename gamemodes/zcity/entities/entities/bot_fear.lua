@@ -136,14 +136,17 @@ if SERVER then
 
         local path = found and paths[found] or table.Random(paths)
         
-        -- simplify path
-        self.Path = {}
-        local skip = 0
-        for i = 1, #path do
-            if !hg.isVisible(self.Path[#self.Path], path[i + 1], {self.Victim}, MASK_SOLID_BRUSHONLY) then
-                self.Path[#self.Path + 1] = path[i]
-            end
-        end
+		self.Path = {path[1] or self:GetPos()}
+		for i = 2, #path - 1 do
+			if !hg.isVisible(self.Path[#self.Path], path[i + 1], {self.Victim}, MASK_SOLID_BRUSHONLY) then
+				self.Path[#self.Path + 1] = path[i]
+			end
+		end
+
+		local destination = path[#path]
+		if destination and destination ~= self.Path[#self.Path] then
+			self.Path[#self.Path + 1] = destination
+		end
 
         self.OpenDoorIds = {}
         
@@ -178,7 +181,10 @@ if SERVER then
             end
         end
 
-        self.TotalLen = self.TotalLen + (self.Path[1] - self.Path[math.Clamp(2, 1, #self.Path)]):Length()
+		self.TotalLen = 0
+		for i = 1, #self.Path - 1 do
+			self.TotalLen = self.TotalLen + self.Path[i]:Distance(self.Path[i + 1])
+		end
         self.HidingSpot = self.Path[#self.Path]
         self.IsHidingSpotCovered = found
     end

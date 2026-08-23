@@ -104,6 +104,10 @@ function ENT:Think()
 	if CLIENT then return end
 	local curTime = CurTime()
 	self:NextThink(curTime)
+	if self.timer and hg.organism and hg.organism.PanicGrenadeThreat and (self.nextPanicThreat or 0) <= curTime then
+		hg.organism.PanicGrenadeThreat(self)
+		self.nextPanicThreat = curTime + 0.25
+	end
 
 	if self.AddThink then
 		self:AddThink()

@@ -8,6 +8,17 @@ local repairClasses = {
 	["prop_dynamic_override"] = true,
 }
 
+local panicFreeze = {
+	nextCheck = 0,
+	badSince = nil,
+	frozenUntil = 0,
+	stableSince = nil,
+}
+
+local severeSimulationMs = 25
+local criticalSimulationMs = 50
+local recoverySimulationMs = 12
+
 local ignoredModelHints = {
 	"grass",
 	"bush",
@@ -134,7 +145,68 @@ local function clearFurnitureRepair(ent)
 
 	ent.hg_collision_blocker = nil
 	ent.hg_collision_proxy = nil
+	ent.hg_collision_panic_frozen = nil
 	restoreOriginalMapProp(ent)
+end
+
+local function setManagedPropMotion(ent, enabled)
+	if not IsValid(ent) then return false end
+	if ent.hg_collision_repaired ~= "vphysics" and ent.hg_collision_repaired ~= "vphysics_furniture" then return false end
+
+	local phys = ent:GetPhysicsObject()
+	if not IsValid(phys) then return false end
+
+	phys:EnableMotion(enabled)
+	if enabled then
+		phys:Wake()
+		ent.hg_collision_panic_frozen = nil
+	else
+		phys:Sleep()
+		ent.hg_collision_panic_frozen = true
+	end
+
+	return true
+end
+
+local function setPanicFreeze(enabled)
+	for _, ent in ipairs(ents.GetAll()) do
+		if ent.hg_collision_repaired then
+			setManagedPropMotion(ent, not enabled)
+		end
+	end
+end
+
+local function updatePanicFreeze()
+	local now = CurTime()
+	if panicFreeze.nextCheck > now then return end
+	panicFreeze.nextCheck = now + 1
+
+	local simulationMs = physenv.GetLastSimulationTime() * 1000
+	if simulationMs >= severeSimulationMs then
+		panicFreeze.badSince = panicFreeze.badSince or now
+		panicFreeze.stableSince = nil
+
+		if now - panicFreeze.badSince >= 2 then
+			local hold = simulationMs >= criticalSimulationMs and 12 or 4
+			panicFreeze.frozenUntil = math.max(panicFreeze.frozenUntil, now + hold)
+			setPanicFreeze(true)
+		end
+		return
+	end
+
+	panicFreeze.badSince = nil
+	if panicFreeze.frozenUntil == 0 then return end
+
+	if simulationMs <= recoverySimulationMs then
+		panicFreeze.stableSince = panicFreeze.stableSince or now
+		if now >= panicFreeze.frozenUntil and now - panicFreeze.stableSince >= 3 then
+			panicFreeze.frozenUntil = 0
+			panicFreeze.stableSince = nil
+			setPanicFreeze(false)
+		end
+	else
+		panicFreeze.stableSince = nil
+	end
 end
 
 local function shouldRepairMapProp(ent)
@@ -180,17 +252,17 @@ local function tryEnableFurniturePhysics(ent)
 	if not IsValid(ent) then return false end
 
 	restoreOriginalMapProp(ent)
-	ent:SetMoveType(MOVETYPE_NONE)
+	ent:SetMoveType(MOVETYPE_VPHYSICS)
 	ent:SetCollisionGroup(COLLISION_GROUP_NONE)
 	ent:EnableCustomCollisions(true)
 
-	if ent.PhysicsInitStatic then
-		ent:PhysicsInitStatic(SOLID_VPHYSICS)
+	if ent.PhysicsInit then
+		ent:PhysicsInit(SOLID_VPHYSICS)
 		local phys = ent:GetPhysicsObject()
 		if IsValid(phys) then
 			ent:SetSolid(SOLID_VPHYSICS)
-			phys:EnableMotion(false)
-			phys:Sleep()
+			phys:EnableMotion(true)
+			phys:Wake()
 			return true
 		end
 	end
@@ -270,7 +342,7 @@ local function tryRepairMapPropCollision(ent)
 		end
 	end
 
-	ent:SetMoveType(MOVETYPE_NONE)
+	ent:SetMoveType(MOVETYPE_VPHYSICS)
 	ent:SetCollisionGroup(COLLISION_GROUP_NONE)
 	ent:EnableCustomCollisions(true)
 
@@ -279,8 +351,8 @@ local function tryRepairMapPropCollision(ent)
 		local phys = ent:GetPhysicsObject()
 		if IsValid(phys) then
 			ent:SetSolid(SOLID_VPHYSICS)
-			phys:EnableMotion(false)
-			phys:Sleep()
+			phys:EnableMotion(true)
+			phys:Wake()
 			ent.hg_collision_repaired = "vphysics"
 			return true
 		end
@@ -319,12 +391,17 @@ hook.Add("InitPostEntity", "zcity_repair_map_prop_collision", function()
 	timer.Simple(0, repairBrokenMapPropCollisions)
 end)
 
+hook.Add("Think", "zcity_map_prop_panic_freeze", updatePanicFreeze)
+
 hook.Add("PostCleanupMap", "zcity_cleanup_map_prop_collision", function()
 	for _, ent in ipairs(ents.GetAll()) do
 		if ent.hg_collision_repaired then
 			clearFurnitureRepair(ent)
 		end
 	end
+	panicFreeze.badSince = nil
+	panicFreeze.frozenUntil = 0
+	panicFreeze.stableSince = nil
 end)
 
 hook.Add("OnEntityCreated", "zcity_repair_map_prop_collision", function(ent)

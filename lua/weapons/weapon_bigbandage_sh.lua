@@ -14,6 +14,7 @@ SWEP.offsetVec = Vector(3, -4.5, 0)
 SWEP.offsetAng = Angle(90, 90, 0)
 SWEP.Category = "ZCity Medicine"
 SWEP.BandageTPIK = true
+SWEP.BandageAmount = 150
 
 if CLIENT then
 	SWEP.WepSelectIcon = Material("vgui/wep_jack_hmcd_bandage")
@@ -33,7 +34,7 @@ function SWEP:Initialize()
 
 	self.ModelScale = 1.1
 	self.modeValues = {
-		[1] = 150,
+		[1] = self.BandageAmount,
 	}
 end
 
@@ -72,10 +73,10 @@ function SWEP:Deploy()
 		local owner = self:GetOwner()
 		if IsValid(owner) and owner.Profession == "doctor" then
 			self.modeValuesdef = {
-				[1] = {150, true},
+				[1] = {self.BandageAmount, true},
 			}
 			self.modeValues = {
-				[1] = 150,
+				[1] = self.BandageAmount,
 			}
 		end
 		self.isFirstDeploy = false

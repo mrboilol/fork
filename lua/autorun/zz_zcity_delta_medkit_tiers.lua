@@ -303,12 +303,21 @@ local BANDAGE_GRADES = {
     weapon_quikclotbandage_sh = {name = "QuikClot Bandage", amount = 375, color = Color(75, 75, 75), instructions = "A hemostatic QuikClot dressing for heavy bleeding when ordinary gauze is not enough. RMB to use on someone else."},
 }
 
+local LARGE_BANDAGE_GRADES = {
+    weapon_bigpackedbandage_sh = {name = "Packed Bandage +", amount = 225, color = Color(205, 205, 205), instructions = "An oversized sealed field dressing with enough sterile gauze for several serious wounds. RMB to use on someone else."},
+    weapon_bigcombatbandage_sh = {name = "Combat Bandage +", amount = 450, color = Color(125, 125, 125), instructions = "An oversized military trauma dressing for controlling multiple serious wounds in the field. RMB to use on someone else."},
+    weapon_bigquikclotbandage_sh = {name = "QuikClot Bandage +", amount = 750, color = Color(75, 75, 75), instructions = "An oversized hemostatic QuikClot dressing for catastrophic bleeding and extended field care. RMB to use on someone else."},
+}
+
 local BANDAGE_PICKUP_CLASSES = {
     "weapon_bandage_sh",
     "weapon_bigbandage_sh",
     "weapon_packedbandage_sh",
     "weapon_combatbandage_sh",
     "weapon_quikclotbandage_sh",
+    "weapon_bigpackedbandage_sh",
+    "weapon_bigcombatbandage_sh",
+    "weapon_bigquikclotbandage_sh",
 }
 
 local BANDAGE_PICKUP_CLASS_SET = {}
@@ -383,6 +392,34 @@ local function registerBandageGrades()
             registered.Instructions = grade.instructions
             registered.Color = grade.color
             registered.PickupFunc = false -- do not inherit weapon_bandage_sh's generic reroll callback
+        end
+    end
+
+    if not istable(quality) then return end
+    for class, grade in pairs(LARGE_BANDAGE_GRADES) do
+        if not weapons.GetStored(class) then
+            local swep = table.Copy(quality)
+            swep.Base = "weapon_bigbandage_sh"
+            swep.PrintName = grade.name
+            swep.Instructions = grade.instructions
+            swep.PickupFunc = false
+            swep.Spawnable = true
+            swep.AdminOnly = false
+            swep.Category = "ZCity Medicine"
+            swep.Color = grade.color
+            swep.BandageAmount = grade.amount
+            swep.modeValuesdef = {[1] = {grade.amount, true}}
+            weapons.Register(swep, class)
+        end
+
+        local registered = weapons.GetStored(class)
+        if istable(registered) then
+            registered.PrintName = grade.name
+            registered.Instructions = grade.instructions
+            registered.Color = grade.color
+            registered.BandageAmount = grade.amount
+            registered.modeValuesdef = {[1] = {grade.amount, true}}
+            registered.PickupFunc = false
         end
     end
 end

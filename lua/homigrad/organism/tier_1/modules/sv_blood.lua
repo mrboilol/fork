@@ -122,14 +122,33 @@ local bloodLossThoughts = {
 	}
 }
 
+local bloodLossNotificationKeys = {
+	"bloodloss_light",
+	"bloodloss_moderate",
+	"bloodloss_severe",
+	"bloodloss_critical",
+}
+
+local function clearBloodLossThoughts(owner, keep)
+	if not IsValid(owner) or not owner.ResetNotification then return end
+	for _, key in ipairs(bloodLossNotificationKeys) do
+		if key ~= keep then owner:ResetNotification(key) end
+	end
+end
+
 local function notifyBloodLoss(owner, org, symptomaticLoss)
-	if not org.isPly or org.otrub or symptomaticLoss <= 0.05 or not IsValid(owner) then return end
+	if not org.isPly or org.otrub or symptomaticLoss <= 0.05 or not IsValid(owner) or (org.bleed or 0) <= 0.05 then
+		clearBloodLossThoughts(owner)
+		return
+	end
 
 	local blood = org.blood or 5000
 	local severity = blood < 1750 and "critical" or blood < 2750 and "severe" or blood < 3500 and "moderate" or "light"
 	local thoughts = bloodLossThoughts[severity]
 	local delay = severity == "critical" and 10 or severity == "severe" and 14 or severity == "moderate" and 20 or 30
-	owner:Notify(thoughts[math.random(#thoughts)], delay, "bloodloss_" .. severity, 0, nil, Color(200, 170, 170))
+	local key = "bloodloss_" .. severity
+	clearBloodLossThoughts(owner, key)
+	owner:Notify(thoughts[math.random(#thoughts)], delay, key, 0, nil, Color(200, 170, 170))
 end
 
 local vecZero = Vector(0, 0, 0)
@@ -538,8 +557,6 @@ module[2] = function(owner, org, mulTime)
 	-- Falling brain oxygen can still carry consciousness through that floor later.
 	local pressureConsciousness = 1 - decompensation ^ 1.1 * 0.67
 	org.consciousness = math.min(org.consciousness, pressureConsciousness * tempMul)
-	notifyBloodLoss(owner, org, symptomaticLoss)
-
 	local beatsPerSecond = max(min(60 / math.max(org.pulse,2) / (org.bleed / 15), 7), 0.3)
 	time = CurTime()
 
@@ -804,6 +821,7 @@ module[2] = function(owner, org, mulTime)
 	org.woundBleedRates = woundBleedRates
 	org.arterialWoundBleedRates = arterialWoundBleedRates
 	org.internalBleedRate = bleed
+	notifyBloodLoss(owner, org, symptomaticLoss)
 	updateHoldWound(org)
 end
 

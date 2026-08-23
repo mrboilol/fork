@@ -239,6 +239,11 @@ function ENT:Think()
 		self:Remove()
 		return
 	end
+	local phys = self:GetPhysicsObject()
+	if hg.organism and hg.organism.PanicFlyingObjectThreat and (self.nextPanicFlybyThreat or 0) <= CurTime() then
+		hg.organism.PanicFlyingObjectThreat(self, self:GetOwner(), phys:GetVelocity())
+		self.nextPanicFlybyThreat = CurTime() + 0.1
+	end
 	if self.Stuck then
 		self.Stress = (self.Stress or 0) - FrameTime() * 20
 		if self.Stress < 0 then self.Stress = 0 end
