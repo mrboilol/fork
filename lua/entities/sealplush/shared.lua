@@ -6,3 +6,4 @@ ENT.Category = "Seal"
 ENT.Spawnable = true
 ENT.AdminSpawnable = true
 ENT.ClassName = "sealplush"
+ENT.IsZPickup = true

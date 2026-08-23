@@ -9,6 +9,13 @@ local screamSounds = {
     "sealplush/krik4.wav",
 }
 
+local squeakSounds = {
+    "sealplush/squeak1.wav",
+    "sealplush/squeak2.wav",
+    "sealplush/squeak3.wav",
+    "sealplush/squeak4.wav",
+}
+
 util.AddNetworkString("SealPickedUpSound")
 util.AddNetworkString("SealHeldState")
 util.AddNetworkString("SealAIToggle")
@@ -61,6 +68,12 @@ function ENT:Initialize()
     self.FlipAttempts        = 0
     self.WantsSleep          = false
     self.AIDisabled          = false
+    self.Anger               = 0
+    self.Happiness           = 0
+    self.DamageByPlayer      = {}
+    self.NextBiteTime        = 0
+    self.NextCollisionSqueak = 0
+    self.ArteryChance        = (HG_SEAL_CONFIG or {}).BITE_ARTERY_CHANCE or 2
 
     local cfg = HG_SEAL_CONFIG or {}
     self.SealAlive = true
@@ -73,6 +86,7 @@ function ENT:Initialize()
     self:SetNW2Bool("SealAlive", true)
     self:SetNW2Float("SealBlood", self.SealBlood)
     self:SetNW2Float("SealBleedRate", 0)
+    self:SetNW2Float("SealAnger", 0)
 
     self:SetSkin(0)
     self:EmitSound("sealplush/ohmygah.wav", 75, 100)
@@ -95,6 +109,7 @@ function ENT:SyncPhysiology()
     self:SetNW2Bool("SealAlive", self.SealAlive == true)
     self:SetNW2Float("SealBlood", math.max(self.SealBlood or 0, 0))
     self:SetNW2Float("SealBleedRate", math.max(self.SealBleedRate or 0, 0))
+    self:SetNW2Float("SealAnger", math.Clamp(self.Anger or 0, 0, 100))
 end
 
 function ENT:KillSeal(reason)
@@ -244,6 +259,115 @@ function ENT:UpdateDrives()
     end
 end
 
+local function DamagePlayer(attacker)
+    if not IsValid(attacker) then return nil end
+    if attacker:IsPlayer() then return attacker end
+    if hg and hg.RagdollOwner then
+        local owner = hg.RagdollOwner(attacker)
+        if IsValid(owner) and owner:IsPlayer() then return owner end
+    end
+    local owner = attacker.GetOwner and attacker:GetOwner() or nil
+    return IsValid(owner) and owner:IsPlayer() and owner or nil
+end
+
+function ENT:RecordAngerDamage(attacker, amount)
+    local player = DamagePlayer(attacker)
+    if not IsValid(player) then return end
+
+    local id = player:SteamID64() or tostring(player:EntIndex())
+    self.DamageByPlayer[id] = self.DamageByPlayer[id] or {player = player, damage = 0, time = CurTime()}
+    local record = self.DamageByPlayer[id]
+    record.player = player
+    record.damage = record.damage + amount
+    record.time = CurTime()
+end
+
+function ENT:GetAngerTarget()
+    local best, bestDamage = nil, -1
+    for id, record in pairs(self.DamageByPlayer or {}) do
+        if not IsValid(record.player) or not record.player:Alive() or CurTime() - record.time > 120 then
+            self.DamageByPlayer[id] = nil
+        elseif record.damage > bestDamage then
+            best, bestDamage = record.player, record.damage
+        end
+    end
+
+    if IsValid(best) and self:GetPos():DistToSqr(best:GetPos()) <= ((HG_SEAL_CONFIG or {}).ANGER_TARGET_RANGE or 500) ^ 2 then return best end
+
+    local nearest, nearestDist = nil, math.huge
+    for _, player in ipairs(player.GetAll()) do
+        if player:Alive() then
+            local dist = self:GetPos():DistToSqr(player:GetPos())
+            if dist < nearestDist and dist <= ((HG_SEAL_CONFIG or {}).ANGER_TARGET_RANGE or 500) ^ 2 then
+                nearest, nearestDist = player, dist
+            end
+        end
+    end
+    return nearest
+end
+
+function ENT:TryAngryBite(target)
+    if not IsValid(target) or CurTime() < (self.NextBiteTime or 0) then return end
+    local source = self:WorldSpaceCenter()
+    local targetPos = target:WorldSpaceCenter()
+    if math.Rand(0, 1) < 0.45 then
+        local neck = target:LookupBone("ValveBiped.Bip01_Neck1")
+        if neck and neck >= 0 then
+            local neckPos = target:GetBonePosition(neck)
+            if isvector(neckPos) then targetPos = neckPos end
+        end
+    end
+    if source:DistToSqr(targetPos) > ((HG_SEAL_CONFIG or {}).BITE_RANGE or 82) ^ 2 then return end
+
+    local trace = util.TraceHull({
+        start = source,
+        endpos = targetPos,
+        mins = Vector(-5, -5, -5),
+        maxs = Vector(5, 5, 5),
+        filter = self,
+        mask = MASK_SHOT_HULL,
+    })
+    local hit = trace.Entity
+    local hitOwner = DamagePlayer(hit)
+    if IsValid(hitOwner) and hitOwner ~= target then return end
+
+    local bitePos = trace.Hit and trace.HitPos or targetPos
+    local direction = (targetPos - source):GetNormalized()
+    local dmg = DamageInfo()
+    dmg:SetAttacker(self)
+    dmg:SetInflictor(self)
+    dmg:SetDamage((HG_SEAL_CONFIG or {}).BITE_DAMAGE or 14)
+    dmg:SetDamageType(DMG_SLASH)
+    dmg:SetDamagePosition(bitePos)
+    dmg:SetDamageForce(direction * 1800)
+    target:TakeDamageInfo(dmg)
+    self:EmitSound("sealplush/bite.wav", 75, math.random(94, 106), 1, CHAN_WEAPON)
+    self.NextBiteTime = CurTime() + math.Rand((HG_SEAL_CONFIG or {}).BITE_COOLDOWN_MIN or 1.2, (HG_SEAL_CONFIG or {}).BITE_COOLDOWN_MAX or 2.4)
+end
+
+function ENT:UpdateAnger(now, dt)
+    local cfg = HG_SEAL_CONFIG or {}
+    local hungerAnger = math.max((self.Hunger or 0) - (cfg.ANGER_HUNGER_START or 65), 0) * (cfg.ANGER_HUNGER_RATE or 1.2) * dt
+    self.Anger = math.Clamp((self.Anger or 0) + hungerAnger - (cfg.ANGER_DECAY_RATE or 1.8) * dt, 0, 100)
+    self.Happiness = math.max((self.Happiness or 0) - dt * 0.45, 0)
+    if self.Anger < (cfg.ANGER_BITE_THRESHOLD or 30) or self.State == "held" or self.IsSleeping then return end
+
+    local target = self:GetAngerTarget()
+    if not IsValid(target) then return end
+    local distance = self:GetPos():Distance(target:GetPos())
+    if distance <= (cfg.BITE_RANGE or 82) then
+        self:TryAngryBite(target)
+        return
+    end
+
+    local phys = self:GetPhysicsObject()
+    if IsValid(phys) then
+        local direction = (target:GetPos() - self:GetPos()):GetNormalized()
+        self:ApplySteerTorque(direction:Angle().yaw)
+        phys:ApplyForceCenter(direction * (900 + self.Anger * 10) + Vector(0, 0, 1800))
+    end
+end
+
 function ENT:UpdateMood()
     local now = CurTime()
     local dt  = now - self.LastMoodUpdate
@@ -255,7 +379,7 @@ function ENT:UpdateMood()
         - (self.Boredom   / 100) * 0.2
         - (self.Social    / 100) * 0.2
 
-    local targetMood = satisfaction * 2 - 1
+    local targetMood = satisfaction * 2 - 1 - (self.Anger or 0) / 100 * 0.5 + (self.Happiness or 0) / 100 * 0.3
     self.Mood = self.Mood + (targetMood - self.Mood) * 0.05 * dt * 10
     self.Mood = math.Clamp(self.Mood, -1, 1)
 end
@@ -375,7 +499,9 @@ function ENT:Think()
         self:UpdateDrives()
         self:UpdateMood()
     end
-    if state == "idle" and not self.IsSwimming and now > self.NextBehaviorCheck then
+    self:UpdateAnger(now, math.Clamp(now - (self.LastAngerUpdate or now), 0, 0.25))
+    self.LastAngerUpdate = now
+    if state == "idle" and not self.IsSwimming and (self.Anger or 0) < ((HG_SEAL_CONFIG or {}).ANGER_BITE_THRESHOLD or 30) and now > self.NextBehaviorCheck then
         self.NextBehaviorCheck = now + 3
         self:ChooseBehavior()
     end
@@ -630,8 +756,15 @@ function ENT:StartRandomSounds()
     timer.Create(id, math.random(15, 30), 0, function()
         if not IsValid(self) then timer.Remove(id) return end
         if self.State ~= "scared" and not self.IsSleeping then
-            local vol = self.Mood > 0 and 110 or 90
-            self:EmitSound("sealplush/soundseal1.wav", vol, 100)
+            local cfg = HG_SEAL_CONFIG or {}
+            local recentlyFed = self.LastFedTime and CurTime() - self.LastFedTime <= (cfg.RECENT_FED_DURATION or 45)
+            local happy = recentlyFed and (self.Happiness or 0) >= 25 and (self.Anger or 0) < (cfg.ANGER_BITE_THRESHOLD or 30)
+            if happy and math.Rand(0, 1) < (cfg.HAPPY_SOUND_CHANCE or 0.35) then
+                self:EmitSound("sealplush/sataandagi.wav", 80, math.random(94, 106))
+            else
+                local vol = self.Mood > 0 and 110 or 90
+                self:EmitSound("sealplush/soundseal1.wav", vol, 100)
+            end
         end
     end)
 end
@@ -716,6 +849,9 @@ function ENT:OnTakeDamage(dmg)
     self:SetHealth(math.max(self:Health() - amount, 0))
 
     local cfg = HG_SEAL_CONFIG or {}
+    self.Anger = math.Clamp((self.Anger or 0) + amount * (cfg.ANGER_DAMAGE_MULTIPLIER or 1.6), 0, 100)
+    self.Happiness = math.max((self.Happiness or 0) - amount * 1.5, 0)
+    self:RecordAngerDamage(dmg:GetAttacker(), amount)
     local hurtSound = screamSounds[math.random(#screamSounds)]
     self:EmitSound(hurtSound, cfg.HURT_SOUND_LEVEL or 82, math.random(96, 108), 1, CHAN_VOICE)
 
@@ -755,6 +891,10 @@ function ENT:OnTakeDamage(dmg)
 end
 
 function ENT:PhysicsCollide(data, physobj)
+    if self.SealAlive and data.Speed >= 25 and CurTime() >= (self.NextCollisionSqueak or 0) then
+        self:EmitSound(squeakSounds[math.random(#squeakSounds)], 60, math.random(92, 108))
+        self.NextCollisionSqueak = CurTime() + math.Rand(0.18, 0.35)
+    end
     if self.SealAlive and not self.SealThrowDamageSpent and CurTime() <= (self.SealThrowDamageUntil or 0) then
         local hit = data.HitEntity
         local ragOwner = IsValid(hit) and hit:IsRagdoll() and hg.RagdollOwner and hg.RagdollOwner(hit) or nil
@@ -806,9 +946,6 @@ function ENT:StartChasingFish(fish)
     self.PlayTarget = fish
     timer.Remove("SealHop_" .. self:EntIndex())
 
-    local pitch = math.floor(90 + (self.Hunger / 100) * 20)
-    self:EmitSound("sealplush/yamapika.wav", 75, pitch)
-
     local id = "SealChaseFish_" .. self:EntIndex()
     timer.Create(id, 0.5, 0, function()
         if not IsValid(self) then timer.Remove(id) return end
@@ -835,6 +972,10 @@ function ENT:StartChasingFish(fish)
             self:SetState("idle")
             self.Hunger  = 0
             self.Mood    = math.min(self.Mood + 0.3, 1)
+            self.Happiness = math.min((self.Happiness or 0) + 55, 100)
+            self.Anger = math.max((self.Anger or 0) - 45, 0)
+            self.LastFedTime = CurTime()
+            if math.random() < 0.6 then self:EmitSound("sealplush/yamapika.wav", 75, math.random(92, 108)) end
             self.Boredom = math.max(self.Boredom - 20, 0)
             self.IsEating = true
             self:SetSkin(5)

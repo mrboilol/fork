@@ -1,7 +1,7 @@
 SWEP.Base = "weapon_tpik_base"
-SWEP.PrintName = "Seal"
+SWEP.PrintName = "not a gubby"
 SWEP.Author = "HacPaL_B_kOlяCkY"
-SWEP.Instructions = "now with TPIK"
+SWEP.Instructions = "is that a gubby..."
 SWEP.Spawnable = true
 SWEP.UseHands = true
 SWEP.ViewModel = "models/weapons/c_seal.mdl"

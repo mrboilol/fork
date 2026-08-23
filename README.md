@@ -70,4 +70,6 @@ Shipped asset references were normalized to their on-disk types in August 2026: 
 
 Physical-bullet flyby audio is server-authoritative when Z-City Wind suppression is active. Supersonic cracks are eligible out to 1400 Source units and subsonic whizzes to 900, while camera kick, panic, and other suppression effects retain their tight 180-unit radius. Track audio and close suppression separately per listener so a bullet first heard at distance can still apply the close-pass response later without playing a duplicate crack.
 
+Seal plushes accumulate anger from hunger and damage, remember the player that hurt them most, and chase/bite nearby targets using the normal slash and organ-hitbox pipeline. Their bite is configured in `sh_seal_config.lua`; collision sounds use the shipped squeak set, while fed/happy vocalizations use `yamapika.wav` and `sataandagi.wav`.
+
 Achievement unlock packets and achievement-menu responses must keep their rarity payloads synchronized between `sv_achievement.lua` and `cl_achievement.lua`. The server owns rarity refreshes and completion timestamps; unlock cards are displayed from the upper middle of the HUD and stack downward.
