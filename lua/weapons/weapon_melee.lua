@@ -241,8 +241,6 @@ SWEP.StaminaCostMul = 0.4
 SWEP.ViewPunch1 = Angle(2,0,0)
 SWEP.ViewPunch2 = Angle(0,1,0)
 
-SWEP.AttackSize = 5
-
 SWEP.canchargeattack = false
 SWEP.ChargeAnimTimeBegin = 0.2
 SWEP.ChargeAnimTimeIdle = 0.35
@@ -1650,9 +1648,6 @@ function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
     --if self:IsEntSoft(eyetr.Entity) then return eyetr end
     
     local trace
-    local bestWorldTrace
-    local bestOtherTrace
-    local floorCombat = ent ~= owner or IsValid(owner.FakeRagdoll) or IsValid(owner.OldRagdoll)
 
     local amt = 6
 
@@ -1687,36 +1682,7 @@ function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
             return clashTrace
         end
 
-        local lineTrace = util.TraceLine(tr)
-        trace = lineTrace
-
-        if not self:IsEntSoft(lineTrace.Entity) then
-            local size = self.AttackSize or 5
-            local hullTr = {
-                start = tr.start + vector_up * size,
-                endpos = tr.endpos + vector_up * size,
-                filter = tr.filter,
-                mask = tr.mask,
-                collisiongroup = tr.collisiongroup,
-                mins = Vector(-size, -size, -size),
-                maxs = Vector(size, size, size)
-            }
-            local hullTrace = util.TraceHull(hullTr)
-
-            if not hullTrace.StartSolid and not hullTrace.AllSolid then
-                if self:IsEntSoft(hullTrace.Entity) or not lineTrace.Hit and hullTrace.Hit then
-                    trace = hullTrace
-                end
-            end
-
-            if shouldDrawHull then
-                DrawMeleeAttackHull(hullTr, hullTrace)
-            end
-        end
-
-        if floorCombat and trace.HitWorld and trace.HitNormal.z > 0.7 and trace.HitPos:DistToSqr(tr.start) < 64 then
-            trace = nil
-        end
+        trace = util.TraceLine(tr)
 
         if shouldDrawHull then
             DrawMeleeAttackHull(tr, trace)
@@ -1729,17 +1695,7 @@ function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
         //    owner:SetVelocity(vec)
         //end
 
-		if trace and self:IsEntSoft(trace.Entity) then
-			break
-		elseif trace and trace.HitWorld then
-			if not bestWorldTrace or trace.Fraction < bestWorldTrace.Fraction then
-				bestWorldTrace = trace
-			end
-		elseif trace and trace.Hit then
-			if not bestOtherTrace or trace.Fraction < bestOtherTrace.Fraction then
-				bestOtherTrace = trace
-			end
-		end
+		if self:IsEntSoft(trace.Entity) then break end
     end
 
     if conePts and #conePts > 0 then
@@ -1753,8 +1709,7 @@ function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
         debugoverlay.Sphere(eyetr.StartPos, 1, 0.05, col, true)
     end
 
-    if trace and self:IsEntSoft(trace.Entity) then return trace end
-    return bestOtherTrace or bestWorldTrace or trace
+    return trace
 end
 
 local bluntDecals, bluntDecalsRand = {}, 1

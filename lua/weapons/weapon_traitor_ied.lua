@@ -496,6 +496,16 @@ local function RegisterIEDBomb(self, ent, tr, insideObject)
 	end
 end
 
+function SWEP:RegisterExternalIEDBomb(ent)
+	if not SERVER or not IsValid(ent) or self:GetPlanted() or self.KABOOM then return false end
+
+	RegisterIEDBomb(self, ent)
+	self.PlantedOnSelf = true
+	self.LastBombPos = ent:LocalToWorld(ent:OBBCenter())
+	self.LastBombModel = ent:GetModel()
+	return self:GetPlanted()
+end
+
 local function SpawnIEDBomb(pos)
 	local bomb = ents.Create("prop_physics")
 	if not IsValid(bomb) then return end
@@ -565,11 +575,7 @@ local function StartIEDDetonation(self, ent)
 
 		if self.KABOOM then return end
 
-		if self.PlantedOnSelf then
-			ExplodeTheItem(self, self:GetOwner())
-		else
-			ExplodeTheItem(self, self.HaveTheBomb)
-		end
+		ExplodeTheItem(self, self.HaveTheBomb)
 
 		self.HaveTheBomb = nil
 	end)
@@ -579,11 +585,7 @@ if SERVER then
 	function SWEP:PhoneDetonate()
 		if not self:GetPlanted() or self:GetDestroyed() or self.KABOOM or self:GetDialing() or self:GetDetonating() then return false end
 
-		if self.PlantedOnSelf then
-			StartIEDDetonation(self, self:GetOwner())
-		else
-			StartIEDDetonation(self, self.HaveTheBomb)
-		end
+		StartIEDDetonation(self, self.HaveTheBomb)
 		return true
 	end
 end

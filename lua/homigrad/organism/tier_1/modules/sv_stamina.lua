@@ -212,7 +212,7 @@ module[2] = function(owner, org, timeValue)
 	local muffed = owner.armors and owner.armors["face"] == "mask2"
 
 	stamina.sub = stamina.sub + stamina.sub * stamina.weight * (muffed and 2 or 1)
-	if (org.panicattack or 0) >= 0.45 then
+	if (org.panicattack or 0) >= 0.45 and org.panicattackActive and not org.otrub and not org.incapacitated then
 		stamina.sub = stamina.sub * panicattack_stamina_drain_mul
 	end
 	org.hungry = org.hungry or 0

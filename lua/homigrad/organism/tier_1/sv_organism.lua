@@ -1,7 +1,7 @@
 hg.organism.module = hg.organism.module or {}
 local module = hg.organism.module
 hg.organism.lastindex = hg.organism.lastindex or 1000000
-local hg_panic = CreateConVar("hg_panic", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enables panic attacks; normal adrenaline and fear responses remain active", 0, 1)
+local hg_panic = CreateConVar("hg_panic", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enables panic-attack consequences; panic still drives fear, adrenaline, and thoughts", 0, 1)
 local panicattack_threshold = 0.45
 local panicattack_add_decay_time = 90
 local panicattack_rise_time = 2.5
@@ -665,12 +665,6 @@ end
 
 local function apply_panic_disabled_stress(org, amount)
 	if org.otrub then return end
-
-	local owner = org.owner
-	if IsValid(owner) and owner:IsPlayer() and owner:Alive() and owner.AddNaturalAdrenaline then
-		owner:AddNaturalAdrenaline(math.Clamp(amount * 0.75, 0.015, 0.35))
-	end
-
 	org.fearadd = math.min((org.fearadd or 0) + math.Clamp(amount * 2.5, 0.04, 0.6), 3)
 end
 
@@ -680,7 +674,8 @@ function hg.organism.AddPanicAttack(org, amount, silent, combatEvent, ignoreGunf
 	if combatEvent then hg.organism.MarkPanicGunfight(org) end
 	if not hg_panic:GetBool() then
 		if not universalStressApplied then apply_panic_disabled_stress(org, amount) end
-		return org.panicattackadd or 0
+		org.panicattackadd = math.Clamp((org.panicattackadd or 0) + amount * panicattack_gain_mul, 0, 1)
+		return org.panicattackadd
 	end
 	if not ignoreGunfightProtection and panic_has_gunfight_protection(org) then return org.panicattackadd or 0 end
 	if silent and IsValid(org.owner) and org.owner:IsPlayer() and (org.owner.lastKillTime or 0) > CurTime() - 4 then
@@ -1001,14 +996,19 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	elseif org.noradrenaline <= 0 then
 		org.noradrenalineActive = false
 	end
-	if oldPanicAttack < panicattack_threshold and org.panicattack >= panicattack_threshold and isPly and owner:Alive() then
+	if hg_panic:GetBool() and oldPanicAttack < panicattack_threshold and org.panicattack >= panicattack_threshold and isPly and owner:Alive() then
 		owner:Notify("I can't calm down.", 2, "panicattack_start", 2, nil, Color(255, 140, 140))
 	end
+	local panicDying = org.otrub or org.incapacitated or org.deathStateKilled or (isPly and not owner:Alive())
 	if org.panicattack >= panicattack_threshold then
-		org.panicattackActive = true
-		org.disorientation = math.max(org.disorientation, 0.6 + panicattack_disorientation * org.panicattack)
-		org.adrenalineAdd = math.Approach(org.adrenalineAdd or 0, math.Remap(org.panicattack, panicattack_threshold, 1, panicattack_adrenaline_add_target * 0.5, panicattack_adrenaline_add_target), timeValue / panicattack_adrenaline_add_rise_time)
-		if isPly and CurTime() >= (org.nextPanicHeartRoll or 0) then
+		org.panicattackActive = hg_panic:GetBool() and not panicDying
+		local adrenalineTarget = math.Remap(org.panicattack, panicattack_threshold, 1, panicattack_adrenaline_add_target * 0.5, panicattack_adrenaline_add_target)
+		if not hg_panic:GetBool() then adrenalineTarget = adrenalineTarget * 0.55 end
+		org.adrenalineAdd = math.Approach(org.adrenalineAdd or 0, adrenalineTarget, timeValue / panicattack_adrenaline_add_rise_time)
+		if org.panicattackActive then
+			org.disorientation = math.max(org.disorientation, 0.6 + panicattack_disorientation * org.panicattack)
+		end
+		if org.panicattackActive and isPly and CurTime() >= (org.nextPanicHeartRoll or 0) then
 			org.nextPanicHeartRoll = CurTime() + panicattack_heart_roll_delay
 			if math.random(100) <= panicattack_heart_roll_chance then
 				org.heartstop = true
@@ -1125,7 +1125,12 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		stopNeckSlitSound(owner, org)
 	end
 
-	if isPly and org.otrub and org.incapacitated then
+	local incapacitationEnabled = not hg.organism.IncapacitationEnabled or hg.organism.IncapacitationEnabled()
+	local terminalIncapacitation = incapacitationEnabled
+		and (org.otrub or org.needotrub)
+		and ((org.brainoxygen or 1) < 0.16 or (org.brain or 0) > 0.4 or (org.trachea or 0) >= 0.5
+			or org.heartstop or (org.spine3 or 0) >= hg.organism.fake_spine3 or (org.spine2 or 0) >= hg.organism.fake_spine2)
+	if isPly and owner:Alive() and terminalIncapacitation then
 		org.deathStateEnd = org.deathStateEnd or CurTime() + 25
 		if (org.defibDeathGrace or 0) > CurTime() then org.deathStateEnd = org.defibDeathGrace end
 

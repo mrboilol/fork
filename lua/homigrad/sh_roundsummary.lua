@@ -761,7 +761,7 @@ surface.CreateFont("Rem_Sum_DescBig", { font = "ITC Avant Garde Gothic", size = 
 surface.CreateFont("Rem_Sum_Desc", { font = "ITC Avant Garde Gothic", size = ScreenScale(16), weight = 500, antialias = true, extended = true })
 surface.CreateFont("Rem_Sum_XPBig", { font = "ITC Avant Garde Gothic", size = ScreenScale(17), weight = 600, antialias = true, extended = true })
 surface.CreateFont("Rem_Sum_XP", { font = "ITC Avant Garde Gothic", size = ScreenScale(14), weight = 600, antialias = true, extended = true })
-surface.CreateFont("Rem_Sum_Stat", { font = "ITC Avant Garde Gothic", size = ScreenScale(21), weight = 800, antialias = true, extended = true })
+surface.CreateFont("Rem_Sum_Stat", { font = "ITC Avant Garde Gothic", size = ScreenScale(16), weight = 800, antialias = true, extended = true })
 surface.CreateFont("Rem_Sum_Countdown", { font = "ITC Avant Garde Gothic", size = ScreenScale(23), weight = 800, antialias = true, extended = true })
 
 local AWARD_INFO = {

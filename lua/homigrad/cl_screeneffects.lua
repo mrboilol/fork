@@ -392,10 +392,12 @@ local panicattackShakeIntervalMin = 0.45
 local panicattackShakeIntervalMax = 1.4
 local panicattackShakeMul = 0.85
 local function getPanicAttackFx(org)
-	if org.otrub then return 0 end
-
+	local panicConVar = GetConVar("hg_panic")
+	if panicConVar and not panicConVar:GetBool() then return 0 end
 	local panic = math.Clamp(tonumber(org.panicattack) or 0, 0, 1)
-	return math.Clamp(math.Remap(panic, panicattackFadeStart, panicattackThreshold, 0, panicattackVolumeMul), 0, 1)
+	local intensity = math.Clamp(math.Remap(panic, panicattackFadeStart, panicattackThreshold, 0, panicattackVolumeMul), 0, 1)
+	if org.otrub or org.incapacitated then return intensity * 0.22 end
+	return intensity
 end
 local painBeatOverlayVolumeMul = 1.25
 local painThresholdMax = 120
@@ -1285,9 +1287,10 @@ hook.Add("Post Post Processing", "ItHurts", function()
 
 	local panicBaseTarget = getPanicAttackFx(org)
 	PanicAttackLerp = LerpFT(0.03, PanicAttackLerp, panicBaseTarget ^ hg.screeneffects_config.panicattackVisualExponent)
-	if PanicAttackLerp > 0.001 and not org.otrub then
+	local panicDying = org.otrub or org.incapacitated
+	if PanicAttackLerp > 0.001 then
 		local panicBase = PanicAttackLerp
-		local panicPulse = panicBase * (hg.screeneffects_config.panicattackPulseFloor + math.ease.InOutSine(math.abs(math.cos(CurTime() * 2))) * hg.screeneffects_config.panicattackPulseIntensity)
+		local panicPulse = panicDying and 0 or panicBase * (hg.screeneffects_config.panicattackPulseFloor + math.ease.InOutSine(math.abs(math.cos(CurTime() * 2))) * hg.screeneffects_config.panicattackPulseIntensity)
 
 		render.UpdateScreenEffectTexture()
 		heatMat:SetFloat("$c0_x", -CurTime() * 0.1)
@@ -1296,29 +1299,31 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		render.SetMaterial(heatMat)
 		render.DrawScreenQuad()
 
-		render.UpdateScreenEffectTexture()
-		render.UpdateFullScreenDepthTexture()
-		grainMat:SetFloat("$c0_x", CurTime())
-		grainMat:SetFloat("$c0_y", -1)
-		grainMat:SetFloat("$c0_z", 1 + panicBase * 1.4)
-		grainMat:SetFloat("$c1_x", panicBase * 3.2 + panicPulse * 5.8)
-		grainMat:SetFloat("$c1_y", panicBase * 0.08 + panicPulse * 0.22)
-		grainMat:SetFloat("$c1_z", panicBase * 0.08 + panicPulse * 0.24)
-		grainMat:SetFloat("$c2_x", panicBase * 0.04 + panicPulse * 0.12)
-		grainMat:SetFloat("$c2_y", 0.075 * panicBase)
-		grainMat:SetFloat("$c2_z", 0)
-		grainMat:SetFloat("$c3_x", 0)
-		render.SetMaterial(grainMat)
-		render.DrawScreenQuad()
+		if not panicDying then
+			render.UpdateScreenEffectTexture()
+			render.UpdateFullScreenDepthTexture()
+			grainMat:SetFloat("$c0_x", CurTime())
+			grainMat:SetFloat("$c0_y", -1)
+			grainMat:SetFloat("$c0_z", 1 + panicBase * 1.4)
+			grainMat:SetFloat("$c1_x", panicBase * 3.2 + panicPulse * 5.8)
+			grainMat:SetFloat("$c1_y", panicBase * 0.08 + panicPulse * 0.22)
+			grainMat:SetFloat("$c1_z", panicBase * 0.08 + panicPulse * 0.24)
+			grainMat:SetFloat("$c2_x", panicBase * 0.04 + panicPulse * 0.12)
+			grainMat:SetFloat("$c2_y", 0.075 * panicBase)
+			grainMat:SetFloat("$c2_z", 0)
+			grainMat:SetFloat("$c3_x", 0)
+			render.SetMaterial(grainMat)
+			render.DrawScreenQuad()
+		end
 
-		if CurTime() >= nextPanicAttackShake then
+		if not panicDying and CurTime() >= nextPanicAttackShake then
 			local shakeMul = (0.25 + panicBase * 0.9) * hg.screeneffects_config.panicattackShakeMul
 			ViewPunch(Angle(math.Rand(-0.8, 0.6), math.Rand(-1, 1), math.Rand(-0.2, 0.2)) * shakeMul)
 			ViewPunch2(Angle(math.Rand(-0.25, 0.35), math.Rand(-0.55, 0.55), math.Rand(-0.4, 0.4)) * shakeMul)
 			nextPanicAttackShake = CurTime() + math.Rand(hg.screeneffects_config.panicattackShakeIntervalMin, hg.screeneffects_config.panicattackShakeIntervalMax)
 		end
 
-		if canRetrySound("PanicStation", PanicStation) then
+		if not panicDying and canRetrySound("PanicStation", PanicStation) then
 			sound.PlayFile(hg.screeneffects_config.panicattackOverlayPath, "noblock noplay", function(station)
 				if IsValid(station) then
 					station:SetVolume(0)
@@ -1329,8 +1334,12 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			end)
 		end
 		if IsValid(PanicStation) then
-			PanicStationVolume = math.Approach(PanicStationVolume, math.Clamp(PanicAttackLerp, 0, 1), FrameTime() * 1.5)
+			PanicStationVolume = math.Approach(PanicStationVolume, panicDying and 0 or math.Clamp(PanicAttackLerp, 0, 1), FrameTime() * 1.8)
 			PanicStation:SetVolume(PanicStationVolume)
+			if PanicStationVolume <= 0.001 then
+				PanicStation:Stop()
+				PanicStation = nil
+			end
 		end
 	else
 		nextPanicAttackShake = 0

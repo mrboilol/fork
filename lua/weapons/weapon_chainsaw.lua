@@ -100,8 +100,8 @@ SWEP.ChainsawTurnOffTime = 1
 SWEP.ChainsawToggleCooldown = 0.5
 SWEP.ChainsawAttemptSoundFirstDelay = 0.5
 SWEP.ChainsawAttemptSoundSecondDelay = 1
-SWEP.ChainsawStartAttemptSoundDelay = 0.5
-SWEP.ChainsawStartSoundDelay = 1
+SWEP.ChainsawStartAttemptSoundDelay = 0.1
+SWEP.ChainsawStartSoundDelay = 0.25
 SWEP.ChainsawAttackLoopPitch = 100
 SWEP.ChainsawAttackLoopHitPitch = 85
 SWEP.ChainsawAttackLoopPitchDownTime = 1
@@ -479,9 +479,7 @@ end
 function SWEP:GetNeededStartAttempts()
     local fuel = self:GetChainsawFuel()
 
-    if fuel >= 90 then return 1 end
-    if fuel >= 60 then return math.random(2, 5) end
-    if fuel >= 10 then return math.random(4, 7) end
+    if fuel >= 10 then return 1 end
 end
 
 function SWEP:TurnChainsawOn()
@@ -503,7 +501,7 @@ function SWEP:TurnChainsawOn()
 
     self:PlayChainsawStartSounds()
 
-    timer.Simple(turnOnTime - self.ChainsawSoundLeadTime, function()
+    timer.Simple(math.max(0, turnOnTime - self.ChainsawSoundLeadTime), function()
         if not IsValid(self) or self.ChainsawStateToken ~= stateToken or not self.ChainsawOn or self.ChainsawAttacking then return end
         self:PlayChainsawLoop("idle")
     end)

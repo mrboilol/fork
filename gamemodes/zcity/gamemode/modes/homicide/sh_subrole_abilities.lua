@@ -359,6 +359,7 @@ function MODE.ContinueChokingOther(ply)
 						rHand:SetPos(headPhys:GetPos() + ply:GetRight() * 3 + Vector(0, 0, -6) + Vector(-sway, sway, 0))
 						lHand:SetVelocity(vector_origin)
 						rHand:SetVelocity(vector_origin)
+					end
 				end
 
 				if(not rag._hmcd_choke_sound or rag._hmcd_choke_sound < CurTime())then

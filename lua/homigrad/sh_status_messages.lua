@@ -176,6 +176,22 @@ local panicattack_phrases = {
     "I don't want to die.",
 }
 
+local panic_uneasy_phrases = {
+	"Something feels wrong.",
+	"Stay alert.",
+	"I don't like this.",
+	"Keep it together.",
+	"I need to be careful.",
+}
+
+local panic_anxious_phrases = {
+	"I need to get somewhere safe.",
+	"My nerves are getting to me.",
+	"Breathe. Focus.",
+	"I can't relax here.",
+	"I need a moment.",
+}
+
 local is_aimed_at_phrases = {
     "Oh God. This is it.",
     "Don't. move.",
@@ -466,6 +482,8 @@ function hg.likely_to_phrase(ply)
 		or (broken_dislocated) and 5
 		or (pain > 65) and 5
 		or (panicattack > 0.55 and 1.2)
+		or (panicattack > 0.3 and 0.55)
+		or (panicattack > 0.1 and 0.2)
 		or (temperature < 35 and (temperature < 31 and 1.25 or 0.65))
 		or (temperature > 38 and (temperature >= 40 and 1.25 or 0.65))
 		or (blood < 3000 and 0.3)
@@ -590,10 +608,14 @@ local function get_status_message(ply)
 		end
 	elseif after_unconscious_notify then
 		most_wanted_phraselist = after_unconscious
-	elseif not most_wanted_phraselist and adrenaline > 1.5 then
-		most_wanted_phraselist = adrenaline_phrases
 	elseif panicattack > 0.55 then
 		most_wanted_phraselist = panicattack_phrases
+	elseif panicattack > 0.3 then
+		most_wanted_phraselist = panic_anxious_phrases
+	elseif panicattack > 0.1 then
+		most_wanted_phraselist = panic_uneasy_phrases
+	elseif not most_wanted_phraselist and adrenaline > 1.5 then
+		most_wanted_phraselist = adrenaline_phrases
 	elseif hg.nothing_happening(ply) then
 		most_wanted_phraselist = random_phrase
 
