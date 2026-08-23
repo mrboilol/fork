@@ -86,6 +86,7 @@ hook.Add("Think", "homigrad-organism", function()
 			hg.organism.list[owner] = nil
 			continue
 		end
+		if org.alive == false or (owner:IsPlayer() and not owner:Alive()) then continue end
 		if org.godmode then continue end
 		hook_Run("Org Think", owner, org, mulTime)
 	end
@@ -94,6 +95,7 @@ end)
 local lastcall = SysTime()
 hook.Add("Org Think Call", "homigrad-organism", function(owner, org)
 	if (SysTime() - lastcall) < tickrate then return end
+	if not IsValid(owner) or not org or org.alive == false or (owner:IsPlayer() and not owner:Alive()) then return end
 	lastcall = SysTime()
 	hook_Run("Org Think", owner, org, 0.00001)
 end)

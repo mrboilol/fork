@@ -287,6 +287,9 @@ module[2] = function(owner, org, timeValue)
 	-- painadd above instead of directly deleting pain already incurred.
 	local angerPainMul = 1 - anger * anger_pain_reduction_max
 	org.pain = org.avgpain * math.max(1 - (org.analgesia + org.painkiller * 0.3), 0) * angerPainMul
+	if zerlkersDose > 0 or adrenaline >= 3 then
+		org.pain = math.min(org.pain, 69.99)
+	end
 	-- Pain can now produce a vasovagal blackout before the slower shock drain has
 	-- finished lowering consciousness. The smooth severity curve keeps moderate
 	-- pain occasional and makes sustained extreme pain progressively less stable.

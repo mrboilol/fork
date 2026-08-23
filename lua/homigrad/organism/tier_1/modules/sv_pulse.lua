@@ -125,6 +125,38 @@ local function getPalpablePulseTarget(org, heartbeat, circulation, hemorrhageCom
 	return rate * capture, capture
 end
 
+function hg.organism.UpdatePerfusion(owner, org, timeValue)
+	if not org or not org.o2 then return end
+
+	local o2Range = math.max(tonumber(org.o2.range) or 30, 1)
+	local oxygenReserve = Clamp((tonumber(org.o2[1]) or 0) / o2Range, 0, 1)
+	local bloodReserve = hg.organism.GetHemorrhageOxygenTransportFraction(org.blood or 0)
+	local circulation = Clamp(tonumber(org.cardiacOutput) or 0, 0, 1)
+	local pressureReserve = Clamp((tonumber(org.bloodPressure) or 0) / 65, 0, 1)
+	local cerebralPerfusion = math.min(circulation * 1.15, pressureReserve)
+	local neckPenalty = Clamp(tonumber(org.neckBrainOxygenPenalty) or 0, 0, 0.8)
+	local brainTarget = math.max(math.min(oxygenReserve, bloodReserve, cerebralPerfusion) - neckPenalty, 0)
+	local bodyTarget = math.min(oxygenReserve, bloodReserve, circulation)
+
+	org.perfusion = Approach(tonumber(org.perfusion) or 1, circulation, timeValue * 0.9)
+	org.cerebralPerfusion = Approach(tonumber(org.cerebralPerfusion) or 1, cerebralPerfusion, timeValue * 1.15)
+	org.peripheralperfusion = Approach(tonumber(org.peripheralperfusion) or 1, math.min(circulation, bloodReserve), timeValue * 0.8)
+	org.bodyoxygen = Approach(tonumber(org.bodyoxygen) or 1, bodyTarget, timeValue * (bodyTarget < (org.bodyoxygen or 1) and 1.0 or 0.35))
+	org.brainoxygenTarget = brainTarget
+	org.brainoxygen = Approach(tonumber(org.brainoxygen) or 1, brainTarget, timeValue * (brainTarget < (org.brainoxygen or 1) and 1.35 or 0.25))
+
+	local severeHypoxia = Clamp((0.28 - org.brainoxygen) / 0.28, 0, 1)
+	org.hypoxiaTime = severeHypoxia > 0 and (org.hypoxiaTime or 0) + timeValue or math.max((org.hypoxiaTime or 0) - timeValue * 2, 0)
+	org.severeHypoxiaTime = org.brainoxygen < 0.16 and (org.severeHypoxiaTime or 0) + timeValue or math.max((org.severeHypoxiaTime or 0) - timeValue, 0)
+	if org.brainoxygen < 0.28 then
+		org.consciousness = math.min(org.consciousness or 1, 0.15 + org.brainoxygen / 0.28 * 0.55)
+	end
+	if org.brainoxygen < 0.16 then org.needotrub = true end
+	if org.brainoxygen < 0.08 then
+		org.brain = math.min((org.brain or 0) + timeValue * (0.08 - org.brainoxygen) * 0.12, 1)
+	end
+end
+
 -- Extreme speed and sustained lateral acceleration can briefly reduce venous
 -- return.  Keep this separate from blood loss: it is a reversible pressure
 -- problem, not a wound or a permanent reduction in blood volume.
@@ -486,6 +518,7 @@ local function maintainSimplifiedCirculation(org)
 	org.hypertension = 0
 	org.hemorrhagicCollapseExposure = 0
 	org.criticalHemorrhageTime = 0
+	hg.organism.UpdatePerfusion(org.owner, org, org.timeValue or 0)
 end
 
 function hg.organism.TryRestartHeartWithResuscitation(org)
@@ -562,6 +595,14 @@ module[1] = function(org)
 	org.fibrillation = false
 	org.fibrillationStart = 0
 	org.myocardialOxygen = 1
+	org.perfusion = 1
+	org.peripheralperfusion = 1
+	org.cerebralPerfusion = 1
+	org.bodyoxygen = 1
+	org.brainoxygen = 1
+	org.brainoxygenTarget = 1
+	org.hypoxiaTime = 0
+	org.severeHypoxiaTime = 0
 	org.heartStrain = 0
 	org.hypertension = 0
 	org.hypotension = 0
@@ -710,6 +751,14 @@ module[2] = function(owner, org, timeValue)
 	local pressureNow = tonumber(org.bloodPressure) or pressureTarget
 	local pressureFallRate = org.heartstop and not (dihSupport or defibGrace or cprSupport) and 22 or 12
 	org.bloodPressure = Approach(pressureNow, pressureTarget, timeValue * (pressureTarget > pressureNow and 12 or pressureFallRate))
+	local pressurePulseReserve = Clamp(org.bloodPressure / 90, 0, 1)
+	local sympatheticSupport = Clamp(math.max((org.adrenaline or 0) - 1.5, 0) / 1.5 + (org.hypertension or 0) * 0.6, 0, 1)
+	local pressurePulseCap = math.min(70 * pressurePulseReserve + 130 * sympatheticSupport, org.heartbeat or 0)
+	if not org.heartstop then
+		palpablePulseTarget = math.min(palpablePulseTarget, pressurePulseCap)
+		org.pulse = Approach(org.pulse, palpablePulseTarget, timeValue * 8)
+		org.pulseDeficit = math.max((org.heartbeat or 0) - palpablePulseTarget, 0)
+	end
 	-- Treat bloodPressure as mean arterial pressure and derive a pulse pressure
 	-- which collapses with circulation. At healthy values this settles near 120/80.
 	local pulsePressure = Clamp(40 * Clamp(org.bloodPressure / 92, 0, 1.5) + ((org.heartbeat or 70) - 70) * 0.1, 0, 80)
@@ -733,6 +782,7 @@ module[2] = function(owner, org, timeValue)
 	local hypotensionRate = highSpeedPressureShock > 0.25 and timeValue / 2.5 or timeValue / 8
 	org.hypotension = Approach(org.hypotension or 0, hypotensionTarget, hypotensionRate)
 	org.hypertension = Approach(org.hypertension or 0, Clamp(Remap(circulation, 1.25, 1.68, 0, 1), 0, 1), timeValue / 20)
+	hg.organism.UpdatePerfusion(owner, org, timeValue)
 	-- Normalized stroke volume separates a fast electrical rate from how much
 	-- blood each effective beat is actually moving.
 	local rateFactor = math.max((org.heartbeat or 0) / 70, 0.1)

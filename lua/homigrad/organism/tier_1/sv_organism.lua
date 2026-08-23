@@ -353,6 +353,9 @@ local function send_organism(org, ply, recipientForce, reliable)
 	sendtable.diastolic = org.diastolic
 	sendtable.cardiacOutput = org.cardiacOutput
 	sendtable.myocardialOxygen = org.myocardialOxygen
+	sendtable.perfusion = org.perfusion
+	sendtable.cerebralPerfusion = org.cerebralPerfusion
+	sendtable.brainoxygen = org.brainoxygen
 	sendtable.heartStrain = org.heartStrain
 	sendtable.hypertension = org.hypertension
 	sendtable.hypotension = org.hypotension
@@ -462,6 +465,8 @@ local function observer_signature(org)
 		observerValue(org.arrhythmia, 0.01), observerValue(org.bloodPressure, 1),
 		observerValue(org.systolic, 1), observerValue(org.diastolic, 1),
 		observerValue(org.cardiacOutput, 0.01), observerValue(org.myocardialOxygen, 0.01),
+		observerValue(org.perfusion, 0.01), observerValue(org.cerebralPerfusion, 0.01),
+		observerValue(org.brainoxygen, 0.01),
 		observerValue(org.heartStrain, 0.01), observerValue(org.hypertension),
 		observerValue(org.hypotension), observerValue(org.analgesia, 0.01),
 		observerValue(o2[1], 0.1), observerValue(o2[2], 0.1),
@@ -526,6 +531,9 @@ local function send_bareinfo(org, force, reliable)
 	sendtable.diastolic = org.diastolic
 	sendtable.cardiacOutput = org.cardiacOutput
 	sendtable.myocardialOxygen = org.myocardialOxygen
+	sendtable.perfusion = org.perfusion
+	sendtable.cerebralPerfusion = org.cerebralPerfusion
+	sendtable.brainoxygen = org.brainoxygen
 	sendtable.heartStrain = org.heartStrain
 	sendtable.hypertension = org.hypertension
 	sendtable.hypotension = org.hypotension
