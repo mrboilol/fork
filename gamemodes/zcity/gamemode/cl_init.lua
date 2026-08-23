@@ -546,22 +546,22 @@ local function CreateScoreboardFonts()
 	local scale = math.min(ScrW(), ScrH()) / 1000
 
 	surface.CreateFont("ZCity_SB_Header", {
-		font = "Verily Serif Mono",
+		font = "Platelet",
 		size = math.max(18, math.floor(30 * scale)),
 		weight = 300,
 	})
 	surface.CreateFont("ZCity_SB_Title", {
-		font = "Verily Serif Mono",
+		font = "Platelet",
 		size = math.max(15, math.floor(22 * scale)),
 		weight = 300,
 	})
 	surface.CreateFont("ZCity_SB_Row", {
-		font = "Verily Serif Mono",
+		font = "Platelet",
 		size = math.max(13, math.floor(18 * scale)),
 		weight = 300,
 	})
 	surface.CreateFont("ZCity_SB_Tiny", {
-		font = "Verily Serif Mono",
+		font = "Platelet",
 		size = math.max(11, math.floor(14 * scale)),
 		weight = 300,
 	})
