@@ -32,6 +32,35 @@ function hg.organism.GetHemorrhageOxygenTransportFraction(blood)
 	return hg.organism.GetBloodDeliveryFraction(blood, 1) * (0.55 + volumeFraction * 0.45)
 end
 
+function hg.organism.UpdateVitalHealthToll(owner, org, timeValue)
+	if not IsValid(owner) or not owner:IsPlayer() or not owner:Alive() then return end
+
+	local normalBlood = math.max(tonumber((hg.organism.config or {}).NORMAL_BLOOD_VOLUME_ML) or hg.organism.normalBloodVolume or 5000, 1)
+	local bloodLoss = math.Clamp(1 - (tonumber(org.blood) or normalBlood) / normalBlood, 0, 1)
+	local bloodLossK = hg.organism.GetSmoothSeverity(bloodLoss, 0.12, 0.72, 1.35)
+	local hypotensionK = hg.organism.GetSmoothSeverity(org.hypotension or 0, 0.18, 0.80, 1.20)
+	local pulse = math.max(tonumber(org.pulse) or 0, 0)
+	local bradycardiaK = hg.organism.GetSmoothSeverity(55 - pulse, 0, 45, 1.10)
+	local tachycardiaK = hg.organism.GetSmoothSeverity(pulse, 130, 220, 1.20)
+	local activeBleedK = hg.organism.GetSmoothSeverity(org.bleed or 0, 0.15, 4, 1.10)
+
+	local circulationK = math.max(bloodLossK, hypotensionK, bradycardiaK)
+	local tachycardiaStress = tachycardiaK * math.max(bloodLossK, hypotensionK)
+	local vitalStress = math.Clamp(math.max(circulationK, tachycardiaStress) + activeBleedK * circulationK * 0.25, 0, 1)
+	org.vitalHealthStress = vitalStress
+
+	local maxHealth = math.max(owner:GetMaxHealth(), 1)
+	org.vitalHealthCeiling = math.max(maxHealth * (1 - vitalStress * 0.8), maxHealth * 0.2)
+	if vitalStress <= 0 then return end
+
+	org.vitalHealthDamageCarry = (org.vitalHealthDamageCarry or 0) + (0.12 + vitalStress ^ 1.55 * 3.9) * timeValue
+	local healthLoss = math.floor(org.vitalHealthDamageCarry)
+	if healthLoss > 0 then
+		org.vitalHealthDamageCarry = org.vitalHealthDamageCarry - healthLoss
+		owner:SetHealth(math.max(owner:Health() - healthLoss, 1))
+	end
+end
+
 function hg.organism.RestoreSupportedOxygen(org, amount, targets)
 	if not org or not org.o2 or org.oxygenIntakeAvailable == false then return false end
 
@@ -417,6 +446,8 @@ function hg.organism.GetECGState(heartbeat, heartstop, org)
 		candidate = "atrial_fibrillation"
 	elseif org.unstableRhythm == "ventricular_ectopy" then
 		candidate = "ventricular_ectopy"
+	elseif arrhythmia >= 0.45 and heartbeat > 50 and heartbeat <= 220 and output > 0.12 and perfusion > 0.12 then
+		candidate = "atrial_fibrillation"
 	elseif cold >= 0.18 and heartbeat > 40 and cold >= math.max(cerebral * 0.9, hypoxia, cardiac * 0.9) then
 		candidate = "hypothermia_bradycardia"
 	elseif heartbeat <= 40 and (hypoxia >= 0.65 or cardiac >= 0.65 or cold >= 0.75 or hemorrhagicDecompensation >= 0.75) then
@@ -616,6 +647,9 @@ module[1] = function(org)
 	org.lastCardiacPain = 0
 	org.hemorrhagicCollapseExposure = 0
 	org.criticalHemorrhageTime = 0
+	org.vitalHealthStress = 0
+	org.vitalHealthCeiling = nil
+	org.vitalHealthDamageCarry = 0
 
 	org.tempchanging = 0
 	org.heatbuff = 30 -- seconds of heat supply

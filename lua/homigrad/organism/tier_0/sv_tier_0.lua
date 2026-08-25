@@ -13,10 +13,10 @@ function hg.organism.Add(ent)
 	return org
 end
 
-function hg.organism.Clear(org)
+function hg.organism.Clear(org, suppressNetwork)
 	hook_Run("Org Clear", org)//.owner.organism_internal)
 	if IsValid(org.owner) then org.owner.fullsend = true end
-	hg.send_organism(org)
+	if not suppressNetwork then hg.send_organism(org) end
 end
 
 function hg.organism.Remove(ent)
@@ -55,7 +55,7 @@ hook.Add("PostPlayerDeath", "homigrad-organism", function(ply)
 		hg.send_bareinfo(newOrg, true, true)
 	end
 
-	hg.organism.Clear(ply.organism)
+	hg.organism.Clear(ply.organism, true)
 
 	hook.Run("PostPostPlayerDeath", ply, ragdoll)
 end)

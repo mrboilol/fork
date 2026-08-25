@@ -550,11 +550,19 @@ local function DrawEKG(state, centerX, centerY, width, height, org, color, ringA
     )
     local tamponade = math.Clamp(tonumber(org.cardiacTamponade) or 0, 0, 1)
     local temperature = tonumber(org.temperature) or 36.7
-    local fibrillationFine = math.Clamp((tonumber(org.severeHypoxiaTime) or 0) / 35, 0, 1)
     local time = CurTime()
     if state.lastUpdate == 0 then state.lastUpdate = time end
     local dt = time - state.lastUpdate
     state.lastUpdate = time
+    if state.rhythm ~= ecgState then
+        state.rhythm = ecgState
+        state.rhythmStartedAt = time
+    end
+
+    local fibrillationFine = math.Clamp(math.max(
+        (tonumber(org.severeHypoxiaTime) or 0) / 35,
+        ecgState == "ventricular_fibrillation" and (time - (state.rhythmStartedAt or time)) / 90 or 0
+    ), 0, 1)
 
     -- Increment heart phase based on heartbeat (BPM to beats per second)
     state.phase = state.phase + dt * (heartbeat / 60)
@@ -627,23 +635,70 @@ local function DrawEKG(state, centerX, centerY, width, height, org, color, ringA
         return h
     end
 
-    local function getAtrialFibrillationH(phase, beatIndex)
-        -- No organized P waves; coarse fibrillatory baseline with irregular,
-        -- variably shaped ventricular complexes.
-        local h = math.sin((phase * 13 + beatIndex * 0.37) * math.pi * 2) * 0.055
-        local qrsStart = beatIndex % 3 == 0 and 0.31 or 0.22
-        if phase > qrsStart and phase < qrsStart + 0.12 then
-            h = h + getSinusH((phase - qrsStart + 0.2) * 2.5)
+    local function rhythmNoise(index, lane)
+        local value = math.sin(index * 12.9898 + lane * 78.233) * 43758.5453
+        return value - math.floor(value)
+    end
+
+    local function getAtrialBeat(rawPhase)
+        local block = math.floor(rawPhase / 16)
+        local offset = rawPhase - block * 16
+        local weights, total = {}, 0
+        for i = 0, 15 do
+            local weight = 0.58 + rhythmNoise(block * 16 + i, 1) * 0.9
+            weights[i] = weight
+            total = total + weight
         end
+
+        local elapsed = 0
+        local scale = 16 / total
+        for i = 0, 15 do
+            local duration = weights[i] * scale
+            if offset < elapsed + duration then
+                return block * 16 + i, (offset - elapsed) / duration, duration
+            end
+            elapsed = elapsed + duration
+        end
+
+        return block * 16 + 15, 1, weights[15] * scale
+    end
+
+    local function getAtrialFibrillationH(rawPhase)
+        local beatIndex, phase, duration = getAtrialBeat(rawPhase)
+        local h = math.sin(rawPhase * math.pi * 2 * 5.4 + math.sin(rawPhase * math.pi * 2 * 0.37) * 0.8) * 0.052
+        h = h + math.sin(rawPhase * math.pi * 2 * 7.1 + beatIndex * 0.31) * 0.022
+
+        local qrsStart = 0.16
+        local qrsWidth = math.Clamp(0.095 / duration, 0.06, 0.17)
+        if phase >= qrsStart and phase < qrsStart + qrsWidth then
+            local qrsPhase = (phase - qrsStart) / qrsWidth
+            local amplitude = 0.84 + rhythmNoise(beatIndex, 2) * 0.24
+            if qrsPhase < 0.16 then
+                h = h - math.sin(qrsPhase / 0.16 * math.pi) * 0.13 * amplitude
+            elseif qrsPhase < 0.52 then
+                h = h + math.sin((qrsPhase - 0.16) / 0.36 * math.pi) * amplitude
+            else
+                h = h - math.sin((qrsPhase - 0.52) / 0.48 * math.pi) * 0.22 * amplitude
+            end
+        end
+
+        local tStart = qrsStart + qrsWidth + 0.075 / duration
+        local tWidth = math.Clamp(0.19 / duration, 0.12, 0.34)
+        if phase >= tStart and phase < tStart + tWidth then
+            h = h + math.sin((phase - tStart) / tWidth * math.pi) * 0.2
+        end
+
         return h
     end
 
-    local function getVentricularFibrillationH(phase)
-        -- Keep VF visually unmistakable but smooth: a continuous fibrillatory
-        -- sine wave rather than stacked pseudo-random harmonics that look like
-        -- impossible vertical scribbles. Fine VF naturally loses amplitude.
+    local function getVentricularFibrillationH(rawPhase)
+        local irregularity = math.sin(rawPhase * math.pi * 2 * 0.16) * 0.72
+        local h = math.sin(rawPhase * math.pi * 2 * 1.14 + irregularity)
+        h = h + math.sin(rawPhase * math.pi * 2 * 2.47 + math.sin(rawPhase * math.pi * 2 * 0.29)) * 0.34
+        h = h + math.sin(rawPhase * math.pi * 2 * 3.81 + 1.1) * 0.16
+        local envelope = math.Clamp(0.7 + math.sin(rawPhase * math.pi * 2 * 0.22) * 0.16 + math.sin(rawPhase * math.pi * 2 * 0.51 + 0.8) * 0.1, 0.36, 1)
         local amplitude = Lerp(fibrillationFine, 0.54, 0.20)
-        return math.sin((phase % 1) * math.pi * 2) * amplitude
+        return math.Clamp(h * envelope * amplitude, -0.75, 0.75)
     end
 
     local function getPVCH(phase)
@@ -703,9 +758,9 @@ local function DrawEKG(state, centerX, centerY, width, height, org, color, ringA
         local compensatoryPause = pvcStrength >= 0.18 and beatIndex % pvcPeriod == 0
 
         if rhythm == "ventricular_fibrillation" then
-            h = getVentricularFibrillationH(phase)
+            h = getVentricularFibrillationH(rawPhase)
         elseif rhythm == "atrial_fibrillation" then
-            h = getAtrialFibrillationH(phase, beatIndex)
+            h = getAtrialFibrillationH(rawPhase)
         elseif rhythm == "ventricular_escape" or rhythm == "terminal_tachycardia" then
             h = getWideComplexH(phase)
         elseif rhythm == "ventricular_ectopy" and beatIndex % 3 == 2 then
@@ -739,15 +794,15 @@ local function DrawEKG(state, centerX, centerY, width, height, org, color, ringA
             end
         end
 
-        if pvcBeat and rhythm ~= "ventricular_fibrillation" and rhythm ~= "terminal_tachycardia" then
+        if pvcBeat and rhythm ~= "ventricular_fibrillation" and rhythm ~= "atrial_fibrillation" and rhythm ~= "terminal_tachycardia" then
             h = getPVCH(phase)
-        elseif compensatoryPause and rhythm ~= "ventricular_fibrillation" and rhythm ~= "terminal_tachycardia" then
+        elseif compensatoryPause and rhythm ~= "ventricular_fibrillation" and rhythm ~= "atrial_fibrillation" and rhythm ~= "terminal_tachycardia" then
             h = 0
         end
 
         local palpitationK = math.Clamp(tonumber(palpitations) or 0, 0, 1)
 		palpitationK = palpitationK * math.Clamp((heartbeat - 120) / 100, 0, 1)
-        if rhythm ~= "asystole" and rhythm ~= "pea" and rhythm ~= "ventricular_fibrillation" and palpitationK > 0 then
+        if rhythm ~= "asystole" and rhythm ~= "pea" and rhythm ~= "ventricular_fibrillation" and rhythm ~= "atrial_fibrillation" and palpitationK > 0 then
             h = Lerp(palpitationK, h, getPalpitationH(phase))
         end
 
@@ -755,7 +810,7 @@ local function DrawEKG(state, centerX, centerY, width, height, org, color, ringA
             h = getSinusH(phase) * 0.72
         end
 
-        if rhythm ~= "ventricular_fibrillation" and rhythm ~= "asystole" then
+        if rhythm ~= "ventricular_fibrillation" and rhythm ~= "atrial_fibrillation" and rhythm ~= "asystole" then
             if phase > 0.33 and phase < 0.44 then
                 h = h - ischemia * 0.12
             elseif phase > 0.45 and phase < 0.65 then

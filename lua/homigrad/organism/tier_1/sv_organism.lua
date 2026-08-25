@@ -1256,7 +1256,8 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	end
 	if owner:IsPlayer() and (org.healthRegen or 0) < CurTime() then
 		org.healthRegen = CurTime() + 30
-		owner:SetHealth(math.min(owner:GetMaxHealth(), owner:Health() + math.max(1.5 - org.hurt, 0)))
+		local healthCeiling = math.min(owner:GetMaxHealth(), org.vitalHealthCeiling or owner:GetMaxHealth())
+		owner:SetHealth(math.min(healthCeiling, owner:Health() + math.max(1.5 - org.hurt, 0)))
 	end
 	org.health = owner:Health()
 	local rag = owner:IsPlayer() and owner.FakeRagdoll or owner

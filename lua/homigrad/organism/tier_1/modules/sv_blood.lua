@@ -821,6 +821,9 @@ module[2] = function(owner, org, mulTime)
 	org.woundBleedRates = woundBleedRates
 	org.arterialWoundBleedRates = arterialWoundBleedRates
 	org.internalBleedRate = bleed
+	if hg.organism.UpdateVitalHealthToll then
+		hg.organism.UpdateVitalHealthToll(owner, org, mulTime)
+	end
 	notifyBloodLoss(owner, org, symptomaticLoss)
 	updateHoldWound(org)
 end
