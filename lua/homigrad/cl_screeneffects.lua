@@ -85,6 +85,7 @@ local activeOtrubMode
 local ConsciousnessSleepyStation
 local AltRemDyingStation
 local ItsHopelessStation
+local VitalityStation
 local ITS_HOPELESS_LOOP_START = 5
 local ITS_HOPELESS_LOOP_END_TRIM = 12
 local hg_dyingpulse = CreateClientConVar("hg_dyingpulse", "1", true, false, "Detect peaks for screen shake when dying", 0, 1)
@@ -762,6 +763,10 @@ local function stopthings()
 		ItsHopelessStation:Stop()
 		ItsHopelessStation = nil
 	end
+	if IsValid(VitalityStation) then
+		VitalityStation:Stop()
+		VitalityStation = nil
+	end
 
 	if IsValid(SillydyingStation) then
 		SillydyingStation:Stop()
@@ -1196,6 +1201,22 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		if loopEnd > hg.screeneffects_config.itsHopelessLoopStart and (playbackTime < hg.screeneffects_config.itsHopelessLoopStart or playbackTime >= loopEnd) then
 			ItsHopelessStation:SetTime(hg.screeneffects_config.itsHopelessLoopStart)
 		end
+	end
+
+	if selectedDyingMode == 11 and canRetrySound("VitalityStation", VitalityStation) then
+		sound.PlayFile("sound/vitality...mp3", "noblock noplay", function(station)
+			if IsValid(station) then
+				if getServerSoundMode("hg_dyingsound", 2) != 11 then
+					station:Stop()
+					return
+				end
+				station:SetVolume(0)
+				station:Play()
+				station:SetTime(math.min(math.Rand(0, station:GetLength()), 139))
+				VitalityStation = station
+				station:EnableLooping(true)
+			end
+		end)
 	end
 
 	if canRetrySound("SillydyingStation", SillydyingStation) then
@@ -1830,6 +1851,9 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			if IsValid(ItsHopelessStation) then
 				ItsHopelessStation:SetVolume(0)
 			end
+			if IsValid(VitalityStation) then
+				VitalityStation:SetVolume(0)
+			end
 
 			if dyingMode == 0 then
 				-- Default: both conscioustypebeat and itsallcomingtoanend play
@@ -2115,6 +2139,37 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				if IsValid(ItsHopelessStation) then
 					ItsHopelessStation:SetVolume(consciousVol)
 				end
+			elseif dyingMode == 11 then
+				if IsValid(NoiseStation2) then
+					NoiseStation2:SetVolume(0)
+				end
+				if IsValid(EndStation) then
+					EndStation:SetVolume(0)
+				end
+				if IsValid(DyingStation) then
+					DyingStation:SetVolume(0)
+				end
+				if IsValid(Alto2Station) then
+					Alto2Station:SetVolume(0)
+				end
+				if IsValid(AltpainStation) then
+					AltpainStation:SetVolume(0)
+				end
+				if IsValid(SillydyingStation) then
+					SillydyingStation:SetVolume(0)
+				end
+				if IsValid(ItssooverStation) then
+					ItssooverStation:SetVolume(0)
+				end
+				if IsValid(SonimCookedStation) then
+					SonimCookedStation:SetVolume(0)
+				end
+				if IsValid(ItsHopelessStation) then
+					ItsHopelessStation:SetVolume(0)
+				end
+				if IsValid(VitalityStation) then
+					VitalityStation:SetVolume(consciousVol)
+				end
 			end
 			if dyingMode != 7 and IsValid(SonimCookedStation) then
 				SonimCookedStation:SetVolume(0)
@@ -2127,6 +2182,9 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			end
 			if dyingMode != 10 and IsValid(ItsHopelessStation) then
 				ItsHopelessStation:SetVolume(0)
+			end
+			if dyingMode != 11 and IsValid(VitalityStation) then
+				VitalityStation:SetVolume(0)
 			end
 			if dyingMode != 8 and dyingMode != 9 and IsValid(NoiseStation2Dying) then
 				NoiseStation2Dying:SetVolume(0)
@@ -2167,6 +2225,9 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			end
 			if IsValid(ItsHopelessStation) then
 				ItsHopelessStation:SetVolume(0)
+			end
+			if IsValid(VitalityStation) then
+				VitalityStation:SetVolume(0)
 			end
 		end
 		

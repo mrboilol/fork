@@ -376,6 +376,7 @@ end)
 
 local clr = Color(204,48,0)
 hg.UniversalScreamSounds = {
+	"screams/universal1/gg.mp3",
 	"screams/universal1/burnfive.mp3",
 	"screams/universal1/burnfour.mp3",
 	"screams/universal1/burnone.mp3",
