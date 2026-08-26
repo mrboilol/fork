@@ -87,7 +87,8 @@ local AltRemDyingStation
 local ItsHopelessStation
 local VitalityStation
 local ITS_HOPELESS_LOOP_START = 5
-local ITS_HOPELESS_LOOP_END_TRIM = 12
+local ITS_HOPELESS_LOOP_FADE_DURATION = 12
+local itsHopelessHasLooped = false
 local hg_dyingpulse = CreateClientConVar("hg_dyingpulse", "1", true, false, "Detect peaks for screen shake when dying", 0, 1)
 local hg_laivlik = CreateClientConVar("hg_laivlik", "1", true, false, "Show black square on skull destruction: 0=off, 1=on", 0, 1)
 local hg_damage_corner_distortion = CreateClientConVar("hg_damage_corner_distortion", "1", true, false, "Distort screen corners from pain and head trauma", 0, 1)
@@ -373,8 +374,10 @@ lobotomy_mats = {
 	[8] = Material("overlays/tallflash3.png")
 }
 
-local consciousnessTypeBeatVolume = 0.18
-local dying2Volume = 0.4
+local consciousnessTypeBeatVolume = 0.35
+local dying2Volume = 0.75
+local remDying1Fade = 0
+local remDying2Fade = 0
 local alternateDyingForegroundVolume = 0.6
 -- sonimcooked is the solo foreground track for hg_dyingsound 7. Its source
 -- file is quieter than the other dying tracks, so give it a higher ceiling.
@@ -435,7 +438,7 @@ hg.screeneffects_config = {
 	painExcruciatingVolumeMul = painExcruciatingVolumeMul,
 	painPitchMax = painPitchMax,
 	itsHopelessLoopStart = ITS_HOPELESS_LOOP_START,
-	itsHopelessLoopEndTrim = ITS_HOPELESS_LOOP_END_TRIM,
+	itsHopelessLoopFadeDuration = ITS_HOPELESS_LOOP_FADE_DURATION,
 }
 local hiddenPainFlickerSeverity = 0
 local hiddenPainFlickerStart = 0
@@ -763,6 +766,7 @@ local function stopthings()
 		ItsHopelessStation:Stop()
 		ItsHopelessStation = nil
 	end
+	itsHopelessHasLooped = false
 	if IsValid(VitalityStation) then
 		VitalityStation:Stop()
 		VitalityStation = nil
@@ -883,6 +887,29 @@ function canRetrySound(key, station)
 	if CurTime() < nextTry then return false end
 	soundRetry[key] = CurTime() + 2.5
 	return true
+end
+
+local function setItsHopelessVolume(volume)
+	if not IsValid(ItsHopelessStation) then return end
+
+	local trackLength = ItsHopelessStation:GetLength()
+	if trackLength <= ITS_HOPELESS_LOOP_START + ITS_HOPELESS_LOOP_FADE_DURATION then
+		ItsHopelessStation:SetVolume(volume)
+		return
+	end
+
+	local playbackTime = ItsHopelessStation:GetTime()
+	if playbackTime >= trackLength or (itsHopelessHasLooped and playbackTime < ITS_HOPELESS_LOOP_START) then
+		ItsHopelessStation:SetTime(ITS_HOPELESS_LOOP_START)
+		playbackTime = ITS_HOPELESS_LOOP_START
+		itsHopelessHasLooped = true
+	end
+
+	local fade = math.Clamp((trackLength - playbackTime) / ITS_HOPELESS_LOOP_FADE_DURATION, 0, 1)
+	if itsHopelessHasLooped then
+		fade = math.min(fade, math.Clamp((playbackTime - ITS_HOPELESS_LOOP_START) / ITS_HOPELESS_LOOP_FADE_DURATION, 0, 1))
+	end
+	ItsHopelessStation:SetVolume(volume * fade)
 end
 hook.Add("Post Post Processing", "ItHurts", function()
 	if not IsValid(lply) then return end
@@ -1161,7 +1188,8 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			if IsValid(station) then
 				station:SetVolume(0)
 				station:Play()
-				station:SetTime(math.min(math.Rand(0, station:GetLength()), 139))
+				station:SetTime(math.min(brain / 0.5 * station:GetLength(), 87))
+				remDying1Fade = 0
 				RemDying1Station = station
 				station:EnableLooping(true)
 			end
@@ -1187,24 +1215,15 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			if IsValid(station) then
 				station:SetVolume(0)
 				station:Play()
-				station:SetTime(hg.screeneffects_config.itsHopelessLoopStart)
+				itsHopelessHasLooped = false
 				ItsHopelessStation = station
 				station:EnableLooping(true)
 			end
 		end)
 	end
 
-	if IsValid(ItsHopelessStation) then
-		local trackLength = ItsHopelessStation:GetLength()
-		local loopEnd = trackLength - hg.screeneffects_config.itsHopelessLoopEndTrim
-		local playbackTime = ItsHopelessStation:GetTime()
-		if loopEnd > hg.screeneffects_config.itsHopelessLoopStart and (playbackTime < hg.screeneffects_config.itsHopelessLoopStart or playbackTime >= loopEnd) then
-			ItsHopelessStation:SetTime(hg.screeneffects_config.itsHopelessLoopStart)
-		end
-	end
-
 	if selectedDyingMode == 11 and canRetrySound("VitalityStation", VitalityStation) then
-		sound.PlayFile("sound/vitality...mp3", "noblock noplay", function(station)
+		sound.PlayFile("sound/vitality.mp3", "noblock noplay", function(station)
 			if IsValid(station) then
 				if getServerSoundMode("hg_dyingsound", 2) != 11 then
 					station:Stop()
@@ -1797,6 +1816,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 						end
 						station:SetVolume(0)
 						station:Play()
+						remDying2Fade = 0
 						NoiseStation2Dying = station
 						station:EnableLooping(true)
 					end
@@ -1849,7 +1869,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				AltRemDyingStation:SetVolume(0)
 			end
 			if IsValid(ItsHopelessStation) then
-				ItsHopelessStation:SetVolume(0)
+				setItsHopelessVolume(0)
 			end
 			if IsValid(VitalityStation) then
 				VitalityStation:SetVolume(0)
@@ -2074,10 +2094,12 @@ hook.Add("Post Post Processing", "ItHurts", function()
 					SonimCookedStation:SetVolume(0)
 				end
 				if IsValid(RemDying1Station) then
-					RemDying1Station:SetVolume(math.Clamp(consciousVol, 0, hg.screeneffects_config.consciousnessTypeBeatVolume))
+					remDying1Fade = LerpFT(0.018, remDying1Fade, 1)
+					RemDying1Station:SetVolume(math.Clamp(consciousVol * remDying1Fade, 0, hg.screeneffects_config.consciousnessTypeBeatVolume))
 				end
 				if IsValid(NoiseStation2Dying) then
-					NoiseStation2Dying:SetVolume(math.Clamp(consciousVol, 0, hg.screeneffects_config.dying2Volume))
+					remDying2Fade = LerpFT(0.018, remDying2Fade, 1)
+					NoiseStation2Dying:SetVolume(math.Clamp(consciousVol * remDying2Fade, 0, hg.screeneffects_config.dying2Volume))
 				end
 			elseif dyingMode == 9 then
 				-- Alternate REM stack: keep rem_dying2, but replace rem_dying1
@@ -2108,7 +2130,8 @@ hook.Add("Post Post Processing", "ItHurts", function()
 					if AltRemDyingStation:GetTime() >= 120 then AltRemDyingStation:SetTime(0) end
 				end
 				if IsValid(NoiseStation2Dying) then
-					NoiseStation2Dying:SetVolume(math.Clamp(consciousVol, 0, hg.screeneffects_config.alternateDyingForegroundVolume))
+					remDying2Fade = LerpFT(0.018, remDying2Fade, 1)
+					NoiseStation2Dying:SetVolume(math.Clamp(consciousVol * remDying2Fade, 0, hg.screeneffects_config.alternateDyingForegroundVolume))
 				end
 			elseif dyingMode == 10 then
 				-- Only itshopeless.mp3, no screen shake.
@@ -2137,7 +2160,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 					SonimCookedStation:SetVolume(0)
 				end
 				if IsValid(ItsHopelessStation) then
-					ItsHopelessStation:SetVolume(consciousVol)
+					setItsHopelessVolume(consciousVol)
 				end
 			elseif dyingMode == 11 then
 				if IsValid(NoiseStation2) then
@@ -2165,7 +2188,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 					SonimCookedStation:SetVolume(0)
 				end
 				if IsValid(ItsHopelessStation) then
-					ItsHopelessStation:SetVolume(0)
+					setItsHopelessVolume(0)
 				end
 				if IsValid(VitalityStation) then
 					VitalityStation:SetVolume(consciousVol)
@@ -2181,7 +2204,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				AltRemDyingStation:SetVolume(0)
 			end
 			if dyingMode != 10 and IsValid(ItsHopelessStation) then
-				ItsHopelessStation:SetVolume(0)
+				setItsHopelessVolume(0)
 			end
 			if dyingMode != 11 and IsValid(VitalityStation) then
 				VitalityStation:SetVolume(0)
@@ -2224,7 +2247,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				AltRemDyingStation:SetVolume(0)
 			end
 			if IsValid(ItsHopelessStation) then
-				ItsHopelessStation:SetVolume(0)
+				setItsHopelessVolume(0)
 			end
 			if IsValid(VitalityStation) then
 				VitalityStation:SetVolume(0)
@@ -2261,7 +2284,14 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				if IsValid(NoiseStation) then NoiseStation:SetVolume(0) end
 				if IsValid(OtrubModeStation) then OtrubModeStation:SetVolume(0) end
 				local sameDyingTrack = incapacitated and ((otrubMode == 6 and selectedDyingMode == 6) or (otrubMode == 7 and selectedDyingMode == 10))
-				if IsValid(sharedOtrubStation) then sharedOtrubStation:SetVolume(math.max(otrubVol, sameDyingTrack and terminalDyingVolume or 0)) end
+				if IsValid(sharedOtrubStation) then
+					local sharedVolume = math.max(otrubVol, sameDyingTrack and terminalDyingVolume or 0)
+					if otrubMode == 7 then
+						setItsHopelessVolume(sharedVolume)
+					else
+						sharedOtrubStation:SetVolume(sharedVolume)
+					end
+				end
 			else
 				if IsValid(NoiseStation) then NoiseStation:SetVolume(0) end
 
@@ -2297,7 +2327,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				if otrubMode != 6 and IsValid(ItssooverStation) then ItssooverStation:SetVolume(0) end
 				if IsValid(RemDying1Station) then RemDying1Station:SetVolume(0) end
 				if IsValid(AltRemDyingStation) then AltRemDyingStation:SetVolume(0) end
-				if otrubMode != 7 and IsValid(ItsHopelessStation) then ItsHopelessStation:SetVolume(0) end
+				if otrubMode != 7 and IsValid(ItsHopelessStation) then setItsHopelessVolume(0) end
 				if IsValid(NoiseStation2Dying) then NoiseStation2Dying:SetVolume(0) end
 			end
 		else

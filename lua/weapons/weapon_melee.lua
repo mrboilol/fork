@@ -236,7 +236,7 @@ SWEP.PenetrationSizeSecondary = 2.5
 
 SWEP.StaminaPrimary = 10
 SWEP.StaminaSecondary = 8.5
-SWEP.StaminaCostMul = 0.4
+SWEP.StaminaCostMul = 0.5
 
 SWEP.ViewPunch1 = Angle(2,0,0)
 SWEP.ViewPunch2 = Angle(0,1,0)
@@ -1122,7 +1122,6 @@ function SWEP:StartChargeAttack()
 
     local mul = 1 / math.Clamp((180 - owner.organism.stamina[1]) / 90, 1, 2)
 	mul = mul * self:GetMeleeArmSpeedMul(owner)
-	self:AddMeleeArmUsePain(owner, 3)
 
     self.HitEnts = nil
     self.FirstAttackTick = false
@@ -1157,7 +1156,6 @@ function SWEP:ReleaseChargeAttack()
 
     local mul = self.ChargeStaminaMul or (1 / math.Clamp((180 - owner.organism.stamina[1]) / 90, 1, 2))
 	mul = math.min(mul, self:GetMeleeArmSpeedMul(owner))
-	self:AddMeleeArmUsePain(owner, 7)
 
     self.ChargeReleasedAt = CurTime()
     self.ReleasedChargeDamageMul = self:GetChargeDamageScale()
@@ -1231,13 +1229,6 @@ function SWEP:MultiplyDMG(owner, ent, vellen, mul)
     mul = mul * math.Clamp(vellen / 250, 0.9, 1.25)
 	mul = mul * (ent ~= owner and 0.75 or 1)
 	mul = mul * (owner.MeleeDamageMul or 1)
-	mul = mul * Lerp(self:GetMeleeArmEffectiveness(owner), 0.3, 1)
-	local combat = hg.GetCombatCondition and hg.GetCombatCondition(owner) or nil
-	if combat then mul = mul * combat.power end
-	local panic = owner.organism and owner.organism.panicattack or 0
-	if owner.organism and owner.organism.panicattackActive and panic >= 0.45 then
-		mul = mul * math.Remap(math.Clamp(panic, 0.45, 1), 0.45, 1, 0.9, 0.72)
-	end
 
     if owner.organism.superfighter then
         mul = mul * 5
@@ -1262,15 +1253,6 @@ function SWEP:GetMeleeArmSpeedMul(owner)
 	local armSpeed = Lerp(self:GetMeleeArmEffectiveness(owner), 0.35, 1)
 	local combat = hg.GetCombatCondition and hg.GetCombatCondition(owner) or nil
 	return armSpeed * (combat and combat.tempo or 1)
-end
-
-function SWEP:AddMeleeArmUsePain(owner, scale)
-	if not SERVER or not IsValid(owner) or not owner.organism then return end
-	local effectiveness = self:GetMeleeArmEffectiveness(owner)
-	if effectiveness >= 0.95 then return end
-	local pain = (1 - effectiveness) * (scale or 5)
-	owner.organism.painadd = (owner.organism.painadd or 0) + pain
-	owner.organism.avgpain = math.min((owner.organism.avgpain or 0) + pain * 0.25, 150)
 end
 
 function SWEP:GetSwingDamageMul()
@@ -1450,12 +1432,8 @@ end
 
 function SWEP:ConsumeMeleeStamina(owner, amount)
 	if not SERVER or not IsValid(owner) or not owner.organism then return end
-	if hg.organism and hg.organism.ConsumeStamina then
-		hg.organism.ConsumeStamina(owner.organism, amount)
-	end
-	if hg.organism and hg.organism.RecordMeleeExertion then
-		hg.organism.RecordMeleeExertion(owner.organism, amount)
-	end
+	local stamina = owner.organism.stamina
+	if stamina then stamina.subadd = (stamina.subadd or 0) + math.max(tonumber(amount) or 0, 0) end
 end
 
 function SWEP:IsHeadTrace(ent, trace)
@@ -1610,7 +1588,7 @@ function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
             
             self:PlaySwingSound(owner, attacktype)
             
-			self:ConsumeMeleeStamina(owner, self:GetAttackConfigValue(self.StaminaPrimary, self.StaminaSecondary, self.ChargeStamina, attacktype) * (self.StaminaCostMul or 0.4) * math.Clamp(vellen / 200, 1, 1.25))
+			self:ConsumeMeleeStamina(owner, self:GetAttackConfigValue(self.StaminaPrimary, self.StaminaSecondary, self.ChargeStamina, attacktype) * (self.StaminaCostMul or 0.5) * math.Clamp(vellen / 200, 1, 1.25))
 
             if charge then
                 if self.CustomChargeAttack and self:CustomChargeAttack() then
@@ -2348,7 +2326,7 @@ function SWEP:Feint()
 		local attacktype = self:GetAttackType()
 		local vellen = IsValid(owner) and owner:GetVelocity():Length() or 0
 		local staminaCost = self:GetAttackConfigValue(self.StaminaPrimary, self.StaminaSecondary, self.ChargeStamina, attacktype) or 0
-		self:ConsumeMeleeStamina(owner, staminaCost * (self.StaminaCostMul or 0.4) * 0.5 * math.Clamp(vellen / 200, 1, 1.25))
+		self:ConsumeMeleeStamina(owner, staminaCost * (self.StaminaCostMul or 0.5) * 0.5 * math.Clamp(vellen / 200, 1, 1.25))
     end
 
     self:SetInAttack(false)
@@ -2959,8 +2937,7 @@ function SWEP:CustomThink()
         end
         
         if self:GetBlocking() and !oldblocking then
-            self:SetStartedBlocking(CurTime())
-			self:AddMeleeArmUsePain(owner, 4)
+			self:SetStartedBlocking(CurTime())
         end
     //end
 
@@ -3645,7 +3622,6 @@ function SWEP:PrimaryAttack()
     local stamina = organism and organism.stamina and organism.stamina[1] or 0
     local mul = 1 / math.Clamp((180 - stamina) / 90, 1, 2)
 	mul = mul * self:GetMeleeArmSpeedMul(owner)
-	self:AddMeleeArmUsePain(owner, 5)
 
     
     self.HitEnts = nil
@@ -3770,7 +3746,6 @@ function SWEP:SecondaryAttack(override)
 
     local mul = 1 / math.Clamp((180 - ply.organism.stamina[1]) / 90, 1, 2)
 	mul = mul * self:GetMeleeArmSpeedMul(ply)
-	self:AddMeleeArmUsePain(ply, 5)
     
     self.HitEnts = nil
     self.FirstAttackTick = false

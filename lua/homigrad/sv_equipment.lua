@@ -903,7 +903,9 @@ local function protec(org, bone, dmg, dmgInfo, placement, armor, scale, scalepro
 			trdata:SetOrigin(hitPos + reflect * 160)
 			util.Effect("Tracer", trdata)
 
-			EmitSound("physics/metal/metal_solid_impact_bullet" .. math.random(4) .. ".ogg", hitPos, 0, CHAN_AUTO, 1, 80, nil, 100)
+			if not HG_BulletImpactSounds or not HG_BulletImpactSounds.PlayRicochet(hitPos) then
+				EmitSound("physics/metal/metal_solid_impact_bullet" .. math.random(4) .. ".ogg", hitPos, 0, CHAN_AUTO, 1, 80, nil, 100)
+			end
 		end
 	end
 

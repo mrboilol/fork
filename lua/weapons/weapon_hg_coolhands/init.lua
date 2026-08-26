@@ -54,12 +54,8 @@ local shoveRange = 50
 local shoveForce = 165
 local shoveRagdollChance = 6
 local shoveStumbleChance = 1
-local shoveStaminaCost = 9
-local punchStaminaCost = 6
-local sprintSpecialPunchStaminaCost = 12
-local attackStaminaCostMul = 0.8
-local specialDamageMul = 2.5
-local runningSpecialDamageMul = 3
+local specialDamageMul = 2
+local runningSpecialDamageMul = 2.5
 local incomingVelocityDamageMul = 2
 
 local function GetCombatStrengthMul(ply)
@@ -207,7 +203,6 @@ function SWEP:SecondaryAttack()
                 self:PlayAnim("Shove",1)
                 self:GetOwner():ViewPunch(Angle(2, 0, 0))
                 sound.Play("player/shove_0"..math_random(5)..".wav", self:GetPos(), 65, math_random(105, 115))
-				if self:GetOwner().organism and hg.organism and hg.organism.ConsumeStamina then hg.organism.ConsumeStamina(self:GetOwner().organism, shoveStaminaCost * attackStaminaCostMul) end
                 self:ShoveFront(sprintShove)
                 return
         end
@@ -1145,7 +1140,7 @@ function SWEP:AttackFront(special_attack, rand)
 
                 local inv = owner:GetNetVar("Inventory",{})
                 local havekastet = inv["Weapons"] and inv["Weapons"]["hg_brassknuckles"]
-                local SelfForce, Mul = 150, 1 * (havekastet and 2.1 or 1)
+                local SelfForce, Mul = 150, 1 * (havekastet and 1.7 or 1)
                 if self:IsEntSoft(Ent) then
                         SelfForce = 25
                     if Ent:IsPlayer() and IsValid(Ent:GetActiveWeapon()) and Ent:GetActiveWeapon().GetBlocking and Ent:GetActiveWeapon():GetBlocking() and not hg.RagdollOwner(Ent) then
@@ -1203,9 +1198,7 @@ function SWEP:AttackFront(special_attack, rand)
                 local runningChargeMul = special_attack and (1 + math_Clamp((owner:GetVelocity():Length() - 100) / 200, 0, 1) * (runningSpecialDamageMul - 1)) or 1
                 local incomingSpeed = math.max(Ent:GetVelocity():Dot(-AimVec), 0)
                 local incomingDamageMul = 1 + math_Clamp((incomingSpeed - 150) / 450, 0, 1) * (incomingVelocityDamageMul - 1)
-		local combat = hg.GetCombatCondition and hg.GetCombatCondition(owner) or nil
-		local combatPower = combat and combat.power or 1
-		local DamageAmt = ((math_random(special_attack and 8 or 6, special_attack and 10 or 8) * (special_attack and specialDamageMul * runningChargeMul or 1) * incomingDamageMul) * ((isfur and (owner:IsBerserk() and 10 or 0.85)) or 1)) * (self.DamageMul or 1) * combatPower
+		local DamageAmt = ((math_random(special_attack and 8 or 6, special_attack and 10 or 8) * (special_attack and specialDamageMul * runningChargeMul or 1) * incomingDamageMul) * ((isfur and (owner:IsBerserk() and 10 or 0.85)) or 1)) * (self.DamageMul or 1)
                 local ent = Ent
                 local vec = AimVec
                 local hitForceVec = AimVec
@@ -1226,7 +1219,7 @@ function SWEP:AttackFront(special_attack, rand)
                         end)
                 end
 
-                Mul = Mul * (owner.MeleeDamageMul or 1) * (hg.GetSubRolePerk and hg.GetSubRolePerk(owner, "MeleeDamageMul", 1) or 1)
+                Mul = Mul * (owner.MeleeDamageMul or 1)
 
                 if Ent:IsPlayer() and IsValid(Ent:GetActiveWeapon()) and Ent:GetActiveWeapon().GetBlocking then
                         Mul = Mul * (self:GetBlocking() and 0.5 or 1)
@@ -1245,9 +1238,6 @@ function SWEP:AttackFront(special_attack, rand)
                                 Ent.organism.immobilization = 1
                         end
                 end
-
-                local anger = math_Clamp((owner.organism and owner.organism.anger) or 0, 0, 1)
-                Mul = Mul * (1 + anger * 0.18)
 
                 Mul = Mul * self:BlockingLogic(Ent, Mul, 0, trace)
 
@@ -1291,9 +1281,7 @@ function SWEP:AttackFront(special_attack, rand)
         end
 
         if SERVER then
-                local anger = math_Clamp((owner.organism and owner.organism.anger) or 0, 0, 1)
-                local staminaCost = special_attack and owner:KeyDown(IN_SPEED) and sprintSpecialPunchStaminaCost or punchStaminaCost
-				if hg.organism and hg.organism.ConsumeStamina then hg.organism.ConsumeStamina(owner.organism, staminaCost * attackStaminaCostMul * (1 + anger * 0.6)) end
+		owner.organism.stamina.subadd = owner.organism.stamina.subadd + (special_attack and owner:KeyDown(IN_SPEED) and 13 or 3)
         end
 
         owner:LagCompensation(false)

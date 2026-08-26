@@ -34,6 +34,12 @@ end
 
 function hg.organism.UpdateVitalHealthToll(owner, org, timeValue)
 	if not IsValid(owner) or not owner:IsPlayer() or not owner:Alive() then return end
+	if hg.organism.OrganSystemsEnabled and not hg.organism.OrganSystemsEnabled() then
+		org.vitalHealthStress = 0
+		org.vitalHealthCeiling = nil
+		org.vitalHealthDamageCarry = 0
+		return
+	end
 
 	local normalBlood = math.max(tonumber((hg.organism.config or {}).NORMAL_BLOOD_VOLUME_ML) or hg.organism.normalBloodVolume or 5000, 1)
 	local bloodLoss = math.Clamp(1 - (tonumber(org.blood) or normalBlood) / normalBlood, 0, 1)
@@ -1178,12 +1184,6 @@ module[2] = function(owner, org, timeValue)
 	if org.hypotension > 0.2 then
 		local disorientK = math.Clamp((org.hypotension - 0.2) / 0.5, 0, 1)
 		org.disorientation = math.max(org.disorientation, 0.5 + disorientK * 1.0)
-	end
-
-	if org.hypotension > 0.14 then
-		local staminaK = math.Clamp((org.hypotension - 0.14) / 0.41, 0, 1)
-		local staminaLoss = staminaK * staminaK * (org.stamina.max * 2 / 3) / 60
-		org.stamina[1] = math.max(org.stamina[1] - timeValue * staminaLoss, 0)
 	end
 
 	if org.hypotension > 0.64 then

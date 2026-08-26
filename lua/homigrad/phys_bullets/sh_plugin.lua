@@ -909,7 +909,7 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 			if(is_ricochet)then
 				if(not HG_BulletImpactSounds or not HG_BulletImpactSounds.PlayRicochet(trace.HitPos))then
 					local rnd = math.random(12)
-					if(rnd == 8)then rnd = 9 end
+					if(rnd >= 8)then rnd = rnd + 1 end
 					sound.Play("arc9_eft_shared/ricochet/ricochet" .. rnd .. ".wav", trace.HitPos, 75, math.random(90, 110))
 				end
 

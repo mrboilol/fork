@@ -1,6 +1,12 @@
 hg.organism.module = hg.organism.module or {}
 local module = hg.organism.module
 hg.organism.lastindex = hg.organism.lastindex or 1000000
+local hg_huyorgans = ConVarExists("hg_huyorgans") and GetConVar("hg_huyorgans") or CreateConVar("hg_huyorgans", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enables the full cardiopulmonary organ-failure model; 0 keeps simplified stable vitals", 0, 1)
+
+function hg.organism.OrganSystemsEnabled()
+	return hg_huyorgans:GetBool()
+end
+
 local hg_panic = CreateConVar("hg_panic", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enables panic-attack consequences; panic still drives fear, adrenaline, and thoughts", 0, 1)
 local hg_painsound = ConVarExists("hg_painsound") and GetConVar("hg_painsound") or CreateConVar("hg_painsound", "6", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Pain audio: 0 = pain beat + reality, 1 = pain beat, 2 = agony, 3 = altpain, 4 = reality, 5 = sillypain, 6 = REM pain stack", 0, 6)
 local hg_dyingsound = ConVarExists("hg_dyingsound") and GetConVar("hg_dyingsound") or CreateConVar("hg_dyingsound", "2", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Dying audio: 0 = conscious beat + ending, 1 = conscious beat, 2 = dying, 3 = alto2, 4 = ending, 5 = sillydying, 6 = fuck, 7 = sonimcooked, 8 = REM dying 1 + 2, 9 = REM dying 2 + quiet itssofuckingover background, 10 = itshopeless, 11 = vitality", 0, 11)
@@ -1256,7 +1262,10 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	end
 	if owner:IsPlayer() and (org.healthRegen or 0) < CurTime() then
 		org.healthRegen = CurTime() + 30
-		local healthCeiling = math.min(owner:GetMaxHealth(), org.vitalHealthCeiling or owner:GetMaxHealth())
+		local healthCeiling = owner:GetMaxHealth()
+		if hg.organism.OrganSystemsEnabled() then
+			healthCeiling = math.min(healthCeiling, org.vitalHealthCeiling or healthCeiling)
+		end
 		owner:SetHealth(math.min(healthCeiling, owner:Health() + math.max(1.5 - org.hurt, 0)))
 	end
 	org.health = owner:Health()

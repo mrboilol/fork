@@ -1,4 +1,6 @@
 --local Organism = hg.organism
+if SERVER then util.AddNetworkString("headtrauma_flash") end
+
 local player_crush_amputation_threshold = 7
 
 util.AddNetworkString("hg_play_client_sound_file")
@@ -367,6 +369,48 @@ local function applySkullTinnitus(targetPlayer, skullDamage, impactDamage)
 	targetPlayer:AddTinnitus(duration, true)
 end
 
+local function sendHeadTraumaFlash(org, dmg, dmgInfo, boneDelta, concussionGain, brainGain)
+	if not org.isPly or not IsValid(org.owner) or not org.owner:IsPlayer() then return end
+
+	local target = org.owner
+	if (target.HeadDisorientFlashCooldown or 0) > CurTime() then return end
+
+	dmg = math.max(dmg or 0, 0)
+	boneDelta = math.max(boneDelta or 0, 0)
+	concussionGain = math.max(concussionGain or 0, 0)
+	brainGain = math.max(brainGain or 0, 0)
+	if boneDelta <= 0.01 and concussionGain <= 0.05 and brainGain <= 0 and dmg < 0.05 then return end
+
+	local hasBrainDamage = brainGain > 0
+	local hasConcussion = concussionGain > 0.05
+	local isCritical = hasBrainDamage or concussionGain >= 1.5
+	local timeScale = math.Clamp(0.35 + boneDelta * 0.8 + concussionGain * 0.2 + brainGain, 0.35, 1.35)
+	local flashSize = math.Clamp(950 + dmg * 260 + boneDelta * 1500 + concussionGain * 180 + brainGain * 900, 950, 3200)
+
+	local eyePos = target:EyePos()
+	local eyeAng = target:EyeAngles()
+	local worldPos = eyePos + eyeAng:Forward() * 16
+	local incomingPos = dmgInfo:GetDamagePosition()
+	if incomingPos ~= vector_origin then
+		local incomingDir = (incomingPos - eyePos):GetNormalized()
+		worldPos = eyePos + eyeAng:Right() * (eyeAng:Right():Dot(incomingDir) * 160) + eyeAng:Up() * (eyeAng:Up():Dot(incomingDir) * 100) + eyeAng:Forward() * 16
+	end
+
+	net.Start("headtrauma_flash")
+		net.WriteVector(worldPos)
+		net.WriteFloat(timeScale)
+		net.WriteInt(math.floor(flashSize), 20)
+		net.WriteBool(isCritical)
+		net.WriteBool(false)
+		net.WriteBool(hasBrainDamage)
+		net.WriteBool(hasConcussion)
+		net.WriteBool(hasConcussion and (concussionGain >= 0.35 or hasBrainDamage))
+		net.WriteBool(hasBrainDamage or concussionGain >= 1.5)
+	net.Send(target)
+
+	target.HeadDisorientFlashCooldown = CurTime() + 0.15
+end
+
 local input_list = hg.organism.input_list
 local toothModel = Model("models/phobias/general/tooth/tooth.mdl")
 local toothFallbackModel = Model("models/grub_nugget_small.mdl")
@@ -536,6 +580,10 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 		end
 	end
 
+	if hg.organism.ApplyOrganTrauma then
+		hg.organism.ApplyOrganTrauma(org, dmgInfo, incomingDmg, org.jaw - oldDmg, oldDmg, "brain")
+	end
+
 	return result, vecrand
 end
 
@@ -550,6 +598,8 @@ end)
 
 input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet, impact)
 	local oldDmg = org.skull
+	local oldConcussion = org.concussion or 0
+	local oldBrain = org.brain or 0
 	
 	local result, vecrand = damageBone(org, 0.25, dmg, dmgInfo, "skull", boneindex, dir, hit, ricochet)
 	local inflictor = dmgInfo:GetInflictor()
@@ -659,22 +709,8 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 
 		if math.random() < baseChance then
 			hg.organism.module.concussion.AddConcussion(org, intensity, math.Clamp(intensity * 6, 6, 50))
-
-			if org.isPly then
-				local targetPlayer = org.owner
-				if IsValid(org.owner.FakeRagdoll) then
-					local ragdoll = org.owner.FakeRagdoll
-					if IsValid(ragdoll.ply) then targetPlayer = ragdoll.ply end
-				end
-				if IsValid(targetPlayer) and targetPlayer:IsPlayer() then
-					targetPlayer:PlayCustomTinnitus("headhit.mp3")
-
-					net.Start("headtrauma_concussion_update")
-						net.WriteFloat(math.Clamp(intensity * 1.5, 1, 6))
-						net.WriteFloat(org.concussion or 0)
-					net.Send(targetPlayer)
-				end
-			end
+		else
+			hg.organism.module.concussion.AddConcussion(org, intensity * 0.35, math.Clamp(intensity * 3, 4, 18))
 		end
 	else
 		-- Light blow: no real concussion. Helmet just rings, bare head a tiny daze.
@@ -694,31 +730,15 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		end
 	end
 
-	if not isStab and dmg > 0.05 and not org.NoKnockdown then
+	if not isStab and dmg > 0.05 then
 		local headDmg = hasHelmet and dmg * 0.3 or dmg
 		org.disorientation = math.min(org.disorientation + math.min(headDmg * 0.15, 1.5), 1.5)
-		if headDmg > 0.5 and org.consciousness and org.consciousness < 0.85 then
-			local fallChance = math.Clamp((headDmg - 0.5) * 0.04, 0.08, 0.55)
-			if math.Rand(0, 1) < fallChance then
-				org.needfake = true
-			end
+		if hg.organism.ApplyOrganTrauma then
+			hg.organism.ApplyOrganTrauma(org, dmgInfo, headDmg, org.skull - oldDmg, oldDmg, "brain")
 		end
 	end
 
-	if org.isPly and dmg > 0.3 then
-		local targetPlayer = org.owner
-		if IsValid(org.owner.FakeRagdoll) then
-			local ragdoll = org.owner.FakeRagdoll
-			if IsValid(ragdoll.ply) then targetPlayer = ragdoll.ply end
-		end
-		if IsValid(targetPlayer) and targetPlayer:IsPlayer() then
-			local impactSeverity = math.Clamp(dmg * 1.5, 0.5, 6)
-			net.Start("headtrauma_concussion_update")
-				net.WriteFloat(impactSeverity)
-				net.WriteFloat(org.concussion or 0)
-			net.Send(targetPlayer)
-		end
-	end
+	sendHeadTraumaFlash(org, dmg, dmgInfo, org.skull - oldDmg, (org.concussion or 0) - oldConcussion, (org.brain or 0) - oldBrain)
 
 	if (org.skull - oldDmg) > 0.02 then
 		local disorientationAdd = math.min(dmg * 1.5, 2.0)

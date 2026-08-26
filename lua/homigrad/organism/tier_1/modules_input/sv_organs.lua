@@ -22,6 +22,77 @@ local function addInternalBleed(org, amount, organ)
 	org.internalBleed = org.internalBleed + amount
 end
 
+local organTraumaMul = {
+	heart = 1.35,
+	liver = 1.15,
+	lungsL = 1.1,
+	lungsR = 1.1,
+	trachea = 1.2,
+	brain = 1.45,
+	stomach = 0.85,
+	intestines = 0.8,
+}
+
+local function traumaDirection(org, dmgInfo)
+	local force = dmgInfo:GetDamageForce()
+	if isvector(force) and force:LengthSqr() > 1 then return force:GetNormalized() end
+
+	local owner = org.owner
+	local attacker = dmgInfo:GetAttacker()
+	if IsValid(owner) and IsValid(attacker) then
+		local direction = owner:WorldSpaceCenter() - attacker:WorldSpaceCenter()
+		if direction:LengthSqr() > 1 then return direction:GetNormalized() end
+	end
+
+	return vector_up
+end
+
+local function applyOrganTrauma(org, dmgInfo, force, delta, previousDamage, organ)
+	if not org.stamina or not org.stamina[1] then return end
+
+	local mul = organTraumaMul[organ] or 1
+	local freshDamage = math.max(delta or 0, 0)
+	local priorDamage = math.Clamp(previousDamage or 0, 0, 1)
+	local rawForce = math.max(force or 0, 0)
+	local repeatThreshold = 0.9 + priorDamage * 1.35
+	local repeatHit = freshDamage <= 0.001 and rawForce >= repeatThreshold
+	if freshDamage <= 0.001 and not repeatHit then return end
+
+	local staminaMax = math.max(org.stamina.max or 180, 1)
+	local staminaLoss = (freshDamage * 34 + rawForce * 4) * mul
+	if repeatHit then staminaLoss = staminaLoss * 0.3 end
+	org.stamina[1] = math.max(org.stamina[1] - math.min(staminaLoss, staminaMax * 0.45), 0)
+
+	local severity = freshDamage * 1.8 + math.max(rawForce - repeatThreshold * 0.45, 0) * 0.32
+	if repeatHit then severity = severity * 0.45 end
+	if severity <= 0.35 or org.NoKnockdown then return end
+
+	local resistance = 1 + priorDamage * 1.6
+	local chance = math.Clamp((severity - 0.35) * 0.22 / resistance, 0, freshDamage > 0.35 and 0.58 or 0.3)
+	if math.Rand(0, 1) > chance then return end
+
+	local owner = org.owner
+	if not IsValid(owner) or not owner:Alive() or org.otrub or org.needotrub then return end
+	if (org.traumaReactionAt or 0) > CurTime() then return end
+	org.traumaReactionAt = CurTime() + 0.35
+
+	local direction = traumaDirection(org, dmgInfo)
+	owner:SetVelocity(direction * math.Clamp(75 + severity * 90, 75, 300) + vector_up * math.Clamp(20 + severity * 35, 20, 140))
+	org.painadd = math.min((org.painadd or 0) + severity * 9, 150)
+
+	if repeatHit and math.Rand(0, 1) < math.Clamp((rawForce - repeatThreshold) * 0.08, 0, 0.25) then
+		addInternalBleed(org, math.min(rawForce * 0.12, 0.8), organ)
+	end
+
+	if severity >= 1.7 and math.Rand(0, 1) < math.Clamp((severity - 1.5) * 0.16 / resistance, 0, 0.35) then
+		org.needotrub = true
+	else
+		org.needfake = true
+	end
+end
+
+hg.organism.ApplyOrganTrauma = applyOrganTrauma
+
 input_list.heart = function(org, bone, dmg, dmgInfo)
 	local oldDmg = org.heart
 
@@ -30,9 +101,12 @@ input_list.heart = function(org, bone, dmg, dmgInfo)
 
 	hg.AddHarmToAttacker(dmgInfo, delta * 10, "Heart damage harm")
 	
-	org.shock = org.shock + dmg * 20
-	org.painadd = org.painadd + dmg * 18
+	if delta > 0 then
+		org.shock = org.shock + dmg * 20
+		org.painadd = org.painadd + dmg * 18
+	end
 	addInternalBleed(org, delta * 10, "heart")
+	applyOrganTrauma(org, dmgInfo, dmg, delta, oldDmg, "heart")
 	org.heartStrain = math.Clamp((org.heartStrain or 0) + delta * 1.4, 0, 1)
 	if hg.organism.AddCardiacStress then hg.organism.AddCardiacStress(org, delta * (dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) and 2.4 or 1.2)) end
 	if delta > 0.08 and dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_SLASH) and math.Rand(0, 1) < math.Clamp(delta * 1.8, 0, 0.75) then
@@ -48,11 +122,12 @@ input_list.liver = function(org, bone, dmg, dmgInfo)
 	
 	hg.AddHarmToAttacker(dmgInfo, (org.liver - oldDmg) * 3, "Liver damage harm")
 	
-	org.shock = org.shock + dmg * 20
-	org.painadd = org.painadd + dmg * 35
-	
 	org.liver = math.min(org.liver + dmg, 1)
 	local harmed = (org.liver - oldDmg)
+	if harmed > 0 then
+		org.shock = org.shock + dmg * 20
+		org.painadd = org.painadd + dmg * 35
+	end
 	if org.analgesia < 0.4 and harmed >= 0.2 then
 		timer.Simple(0, function()
 			if harmed > 0 then -- wtf? whatever
@@ -64,6 +139,7 @@ input_list.liver = function(org, bone, dmg, dmgInfo)
 	end
 
 	addInternalBleed(org, harmed * 4, "liver")
+	applyOrganTrauma(org, dmgInfo, dmg, harmed, oldDmg, "liver")
 	
 	dmgInfo:ScaleDamage(0.8)
 
@@ -77,9 +153,13 @@ input_list.stomach = function(org, bone, dmg, dmgInfo)
 
 	hg.AddHarmToAttacker(dmgInfo, (org.stomach - oldDmg) * 2, "Stomach damage harm")
 
-	org.painadd = org.painadd + dmg * 3
-	org.shock = org.shock + dmg * 1.5
-	addInternalBleed(org, (org.stomach - oldDmg) * 2, "stomach")
+	local delta = org.stomach - oldDmg
+	if delta > 0 then
+		org.painadd = org.painadd + dmg * 3
+		org.shock = org.shock + dmg * 1.5
+	end
+	addInternalBleed(org, delta * 2, "stomach")
+	applyOrganTrauma(org, dmgInfo, dmg, delta, oldDmg, "stomach")
 	return result
 end
 
@@ -90,9 +170,13 @@ input_list.intestines = function(org, bone, dmg, dmgInfo)
 
 	hg.AddHarmToAttacker(dmgInfo, (org.intestines - oldDmg) * 2, "Intestines damage harm")
 
-	org.painadd = org.painadd + dmg * 2
-	org.shock = org.shock + dmg
-	addInternalBleed(org, (org.intestines - oldDmg) * 2, "intestines")
+	local delta = org.intestines - oldDmg
+	if delta > 0 then
+		org.painadd = org.painadd + dmg * 2
+		org.shock = org.shock + dmg
+	end
+	addInternalBleed(org, delta * 2, "intestines")
+	applyOrganTrauma(org, dmgInfo, dmg, delta, oldDmg, "intestines")
 	return result
 end
 
@@ -131,8 +215,11 @@ local function damageBrainLobe(org, bone, dmg, dmgInfo, key)
 	org.brain = math.min((org.brain or 0) + (getBrainLobeDamage(org) - oldBrainLobeDamage) * 1.5, 1)
 	org.consciousness = math.Approach(org.consciousness, 0, delta * profile.consciousness)
 	org.disorientation = org.disorientation + delta * profile.disorientation
-	org.shock = org.shock + dmg * profile.shock
-	org.painadd = org.painadd + dmg * profile.pain
+	if delta > 0 then
+		org.shock = org.shock + dmg * profile.shock
+		org.painadd = org.painadd + dmg * profile.pain
+	end
+	applyOrganTrauma(org, dmgInfo, dmg, delta, oldDmg, "brain")
 
 	hg.AddHarmToAttacker(dmgInfo, delta * 15, key .. " damage harm")
 
@@ -395,6 +482,7 @@ input_list.lungsL = function(org, bone, dmg, dmgInfo)
 	if (dmgInfo:IsDamageType(DMG_BULLET+DMG_SLASH+DMG_BUCKSHOT)) or (math.random(3) == 1) then org.lungsL[2] = math.min(org.lungsL[2] + dmg * 1, 1) end
 
 	addInternalBleed(org, (org.lungsL[1] - oldval) * 2, "lungsL")
+	applyOrganTrauma(org, dmgInfo, dmg, org.lungsL[1] - oldval, oldval, "lungsL")
 	
 	dmgInfo:ScaleDamage(0.8)
 
@@ -410,6 +498,7 @@ input_list.lungsR = function(org, bone, dmg, dmgInfo)
 	if (dmgInfo:IsDamageType(DMG_BULLET+DMG_SLASH+DMG_BUCKSHOT)) or (math.random(3) == 1) then org.lungsR[2] = math.min(org.lungsR[2] + dmg * 1, 1) end
 
 	addInternalBleed(org, (org.lungsR[1] - oldval) * 2, "lungsR")
+	applyOrganTrauma(org, dmgInfo, dmg, org.lungsR[1] - oldval, oldval, "lungsR")
 
 	dmgInfo:ScaleDamage(0.8)
 
@@ -424,6 +513,7 @@ input_list.trachea = function(org, bone, dmg, dmgInfo)
 	local result = damageOrgan(org, dmg * 2, dmgInfo, "trachea")
 
 	hg.AddHarmToAttacker(dmgInfo, (org.trachea - oldDmg) * 8, "Trachea damage harm")
+	applyOrganTrauma(org, dmgInfo, dmg, org.trachea - oldDmg, oldDmg, "trachea")
 
 	//org.internalBleed = org.internalBleed + dmg * 2
 

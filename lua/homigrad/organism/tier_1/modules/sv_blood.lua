@@ -522,9 +522,9 @@ module[2] = function(owner, org, mulTime)
 		hg.applyNosebleed(owner, org.internalBleed * 8)
 	end
 
-	-- Hemorrhagic symptoms use the same preload reserve as cardiac output. This
-	-- keeps compensation, shock, pressure and oxygen delivery on one curve.
-	local tempMul = math.Clamp(((org.temperature < 30 and org.temperature - 30 or 0) * 0.25 + 1), 0.25, 1)
+	-- Blood volume supplies circulation inputs only. Consequences such as
+	-- weakness, disorientation, shock, and loss of consciousness are applied by
+	-- the resulting pressure, pulse, and oxygen failures in their owning modules.
 	local blood = math.max(tonumber(org.blood) or 5000, 0)
 	local preloadReserve = hg.organism.GetBloodDeliveryFraction and hg.organism.GetBloodDeliveryFraction(blood, 1)
 		or math.Clamp(blood / (hg.organism.normalBloodVolume or 5000), 0, 1)
@@ -542,21 +542,6 @@ module[2] = function(owner, org, mulTime)
 	org.hypovolemia = symptomaticLoss
 	org.hemorrhageCompensation = compensationDemand * (1 - decompensation)
 	org.hypovolemicShock = decompensation
-	org.lowBloodTemperatureTarget = 36.7 - reserveLoss ^ 1.4 * 3.2
-	org.disorientation = math.max(org.disorientation or 0, symptomaticLoss ^ 1.25 * 6)
-
-	-- Hypovolemic stress stays below the generic shock-LOC threshold. Pressure
-	-- lowers awareness directly; cerebral oxygen decides whether that becomes OTRUB.
-	local shockTarget = decompensation * 20
-	org.shock = math.Approach(org.shock or 0, math.max(org.shock or 0, shockTarget), mulTime * (0.35 + decompensation * 2.65))
-	if org.stamina and org.stamina[1] then
-		local staminaLoss = decompensation ^ 1.2 * (org.stamina.max or 180) / 38
-		org.stamina[1] = math.max(org.stamina[1] - mulTime * staminaLoss, 0)
-	end
-	-- A pressure-only consciousness floor stays just above the OTRUB threshold.
-	-- Falling brain oxygen can still carry consciousness through that floor later.
-	local pressureConsciousness = 1 - decompensation ^ 1.1 * 0.67
-	org.consciousness = math.min(org.consciousness, pressureConsciousness * tempMul)
 	local beatsPerSecond = max(min(60 / math.max(org.pulse,2) / (org.bleed / 15), 7), 0.3)
 	time = CurTime()
 
@@ -877,12 +862,16 @@ local function VomitDecalSpray(owner, ent, mat)
 	end)
 end
 
+local function applyVomitBloodLoss(org)
+	org.blood = math.max((org.blood or hg.organism.normalBloodVolume or 5000) - 120, 1)
+end
+
 function hg.organism.Vomit(owner, snd)
 	if !hg.IsValidPlayer(owner) then return end
 	
 	local org = owner.organism
-	-- Vomiting loses GI fluid, not 200 mL of circulating blood per episode.
 	local ent = hg.GetCurrentCharacter(owner)
+	applyVomitBloodLoss(org)
 
 	local bon = "ValveBiped.Bip01_Head1"
 	local bone = ent:LookupBone(bon)
@@ -919,6 +908,7 @@ function hg.organism.VomitConcussion(owner)
 
 	local org = owner.organism
 	local ent = hg.GetCurrentCharacter(owner)
+	applyVomitBloodLoss(org)
 	if not IsValid(ent) then return end
 
 	local bon = "ValveBiped.Bip01_Head1"
@@ -969,8 +959,7 @@ function hg.organism.VomitNormal(owner, snd)
 	owner:SetNetVar("vomiting", CurTime() + 1.5)
 	org.disorientation = math.min((org.disorientation or 0) + 1.5, 6)
 	org.consciousness = math.max((org.consciousness or 1) - 0.08, 0)
-	org.hungry = math.min(math.max((org.hungry or 0) + 7, 0), 100)
-	org.satiety = math.max((org.satiety or 0) - 20, 0)
+	applyVomitBloodLoss(org)
 
 	ent:EmitSound(snd or "vomit/vomit5.ogg")
 

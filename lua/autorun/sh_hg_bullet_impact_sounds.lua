@@ -94,6 +94,13 @@ local ricochetSounds = {
 	"panoptisscon/ric5 - Copy.mp3",
 }
 
+local arc9RicochetSounds = {}
+for index = 1, 13 do
+	if index ~= 8 then
+		arc9RicochetSounds[#arc9RicochetSounds + 1] = "arc9_eft_shared/ricochet/ricochet" .. index .. ".wav"
+	end
+end
+
 local materialSounds = {
 	[MAT_FLESH] = {sounds = fleshSounds, always = true},
 	[MAT_ALIENFLESH] = {sounds = fleshSounds, always = true},
@@ -166,9 +173,16 @@ function impactSounds.PlayMaterialImpact(trace)
 end
 
 function impactSounds.PlayRicochet(pos)
-	if not SERVER or not pos or math_random(2) ~= 1 then return false end
+	if not SERVER or not pos then return false end
 
-	local choices = math_random(4) == 1 and genericSounds or ricochetSounds
+	local choices
+	if math_random(2) == 1 then
+		choices = arc9RicochetSounds
+	elseif math_random(4) == 1 then
+		choices = genericSounds
+	else
+		choices = ricochetSounds
+	end
 	sound.Play(choices[math_random(#choices)], pos, 100, math_random(97, 103), 1.2)
 
 	return true

@@ -28,8 +28,9 @@ SWEP.AttackSlowDown = .5
 SWEP.SwingCooldown = 0.75
 SWEP.SwingGateTime = 0.28
 SWEP.AttackTime = 0.10
-SWEP.SwingDamageMul = 1.25
-SWEP.FistStaminaCost = 0.8
+local LIGHT_PUNCH_STAMINA_COST = 7
+local HEAVY_PUNCH_STAMINA_COST = 12
+local MELEE_IMPACT_DAMAGE_MULT = 1.22
 SWEP.SwingBackDuration = 1
 SWEP.JabAnimTime = 1
 SWEP.Primary.ClipSize = -1
@@ -2266,7 +2267,7 @@ function SWEP:ShoveFront()
 		sound.Play(impactSnd, HitPos or Ent:WorldSpaceCenter(), 65, math.random(92, 108))
 	end
 
-	if owner.organism and owner.organism.stamina and hg.organism and hg.organism.ConsumeStamina then hg.organism.ConsumeStamina(owner.organism, SHOVE_STAMINA_COST) end
+	if owner.organism and owner.organism.stamina then owner.organism.stamina.subadd = owner.organism.stamina.subadd + SHOVE_STAMINA_COST end
 
 	owner:LagCompensation(false)
 end
@@ -2362,7 +2363,7 @@ function SWEP:PrimaryAttack(forcespecial)
 	self:SetNextPrimaryFire(CurTime() + self.SwingCooldown / math.max(armSpeedMul, 0.1) * math.Clamp((180 - owner.organism.stamina[1]) / 90,1,2) + (math.max(special_attack and 0.5 or 0, clawClasses[owner.PlayerClassName] or 0)))
 	self:SetNextSecondaryFire(CurTime() + self.SwingCooldown / math.max(armSpeedMul, 0.1) + (math.max(special_attack and 0.5 or 0, clawClasses[owner.PlayerClassName] or 0)))
 	self:SetLastShootTime(CurTime())
-	if SERVER and owner.organism and owner.organism.stamina and hg.organism and hg.organism.ConsumeStamina then hg.organism.ConsumeStamina(owner.organism, self.FistStaminaCost) end
+	if SERVER and owner.organism and owner.organism.stamina then owner.organism.stamina.subadd = owner.organism.stamina.subadd + (special_attack and HEAVY_PUNCH_STAMINA_COST or LIGHT_PUNCH_STAMINA_COST) end
 	if rand then
 		self.swingBackRightEnd = CurTime() + self.SwingBackDuration
 		self.swingBackLeftEnd = CurTime()
@@ -2537,10 +2538,7 @@ function SWEP:AttackFront(special_attack, rand)
 			self.DamageMul = special_attack and 1.6 or 3
 		end
 
-		local armEffectiveness = hg.GetArmEffectiveness and hg.GetArmEffectiveness(owner, rand and "rarm" or "larm") or 1
-		local combat = hg.GetCombatCondition and hg.GetCombatCondition(owner) or nil
-		local combatPower = combat and combat.power or 1
-		local DamageAmt = (math.random(3, 5) * (special_attack and 3 or 1)) * (self.DamageMul or 1) * self.SwingDamageMul * Lerp(armEffectiveness, 0.2, 1) * combatPower
+		local DamageAmt = (math.random(3, 5) * (special_attack and 3 or 1)) * (self.DamageMul or 1) * MELEE_IMPACT_DAMAGE_MULT
 		local ent = Ent
 		local vec = AimVec
 
@@ -2555,6 +2553,8 @@ function SWEP:AttackFront(special_attack, rand)
 				if IsValid(ent) then ent:RemoveCallOnRemove("gibbreak") end
 			end)
 		end
+
+		Mul = Mul * (owner.MeleeDamageMul or 1)
 
 		if Ent:IsPlayer() and IsValid(Ent:GetActiveWeapon()) and Ent:GetActiveWeapon().GetBlocking then
 			Mul = Mul * (self:GetBlocking() and 0.5 or 1)
@@ -2608,40 +2608,6 @@ function SWEP:AttackFront(special_attack, rand)
 			end
 			Phys:ApplyForceOffset(AimVec * 5000 * Mul * (isZomb and 3 or 1), HitPos)
 			owner:SetVelocity(AimVec * SelfForce * .8 * (owner.organism.superfighter and 2 or 1) * (isZomb and 2 or 1) * (1 + owner.organism.berserk / 10))
-		end
-	end
-
-	if SERVER then
-		-- Apply pain when punching with broken or dislocated arm
-		local org = owner.organism
-		if org then
-			local rarm_broken = org.rarm >= 1
-			local larm_broken = org.larm >= 1
-			local rarm_dislocated = org.rarmdislocation or org.rarmdislocated
-			local larm_dislocated = org.larmdislocation or org.larmdislocated
-
-			local using_right_arm = rand
-			local pain_amount = 0
-
-			if using_right_arm then
-				if rarm_broken then
-					pain_amount = pain_amount + 8
-				elseif rarm_dislocated then
-					pain_amount = pain_amount + 4
-				end
-			else
-				if larm_broken then
-					pain_amount = pain_amount + 8
-				elseif larm_dislocated then
-					pain_amount = pain_amount + 4
-				end
-			end
-
-			if pain_amount > 0 then
-				org.painadd = (org.painadd or 0) + pain_amount
-				org.avgpain = math.min((org.avgpain or 0) + pain_amount * 0.5, 150)
-				org.lasthit = CurTime()
-			end
 		end
 	end
 

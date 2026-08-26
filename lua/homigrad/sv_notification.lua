@@ -6,30 +6,30 @@ util.AddNetworkString("HGThought")
 local hev_color = Color(255,125,0)
 local CreateThought
 local thoughtMessages = {
-    panicattack_start = "You are experiencing a panic attack.",
+    panicattack_start = "Panic is making it hard to focus.",
     wake = "You regained consciousness.",
     dislocations_unlucky = "The joint is back in place.",
-    painfromjawspeak = "Your jaw hurts when you speak.",
-    arteria = "Your carotid artery is gushing out blood.",
-    take_gasmask = "The gas mask is suffocating you.",
-    take_gasmask2 = "The gas mask is suffocating you.",
+    painfromjawspeak = "Your jaw injury hurts when you speak.",
+    arteria = "Your neck artery is bleeding heavily.",
+    take_gasmask = "Your gas mask is restricting your breathing.",
+    take_gasmask2 = "Your gas mask is restricting your breathing.",
     oxygen_lowintake = "You are not getting enough air.",
-    lowoxy = "You are low on oxygen.",
-    lowoxy2 = "You are low on oxygen.",
-    drugged = "You are drugged.", 
-    pneumothorax1 = "Something is filling your lungs.",
-    pneumothorax2 = "It is getting harder to breathe.",
+    lowoxy = "Your oxygen level is low.",
+    lowoxy2 = "Your oxygen level is critically low.",
+    drugged = "A drug is affecting your body.",
+    pneumothorax1 = "Air or blood is building up around a lung.",
+    pneumothorax2 = "A chest injury is making breathing harder.",
     pneumothorax3 = "You are struggling to breathe.",
-    brain = "Your brain is damaged.",
-    blood2 = "You are close to fainting.",
+    brain = "Brain trauma is affecting you.",
+    blood2 = "Blood loss is making you faint.",
     internalbleed = "You are bleeding internally.",
     nosebleed = "Your nose is bleeding.",
-    hungry = "You are hungry.",
-    heart = "You feel a sharp pain from your chest.",
-    heartstop = "Your heart stopped.",
-    painfrommoving = "Your leg hurts when you move.",
-    painfromjaw = "Your jaw hurts.",
-    painfromribs = "Your broken ribs make it painful to breathe.",
+    hungry = "You need food.",
+    heart = "Chest trauma is causing severe pain.",
+    heartstop = "Your heart has stopped.",
+    painfrommoving = "Your leg injury hurts when you move.",
+    painfromjaw = "Your jaw injury is painful.",
+    painfromribs = "Your rib injury is making breathing painful.",
 }
 
 local legacyThoughtMessages = {
@@ -333,33 +333,49 @@ end
 local function GetStatusThought(ply)
     local org = ply.organism or {}
     if org.heartstop then return "Cardiac arrest detected." end
-    if (org.o2 and org.o2[1] or 30) <= 15 then return "Oxygen levels are critically low." end
+    if (org.o2 and org.o2[1] or 30) <= 8 then return "You are running out of oxygen." end
+    if (org.o2 and org.o2[1] or 30) <= 15 then return "Your oxygen level is critically low." end
+    if (org.arterialBleed or 0) > 0.2 then return "An artery is bleeding heavily." end
+    if (org.bleed or 0) > 1 or (org.blood or 5000) < 2500 then return "Severe blood loss is making you collapse." end
     if (org.bleed or 0) > 0.5 or (org.blood or 5000) < 3750 then return "You are losing blood." end
+    if (org.internalBleed or 0) > 1.5 then return "Internal bleeding is getting worse." end
+    if (org.pneumothorax or 0) > 0.2 or (org.hemothorax or 0) > 0.2 then return "A chest injury is restricting your breathing." end
     if (org.pain or 0) > 75 then return "Severe pain is impairing movement." end
     if org.fibrillation or org.unstableRhythm or (org.arrhythmia or 0) > 0.35 then return "Your heart rhythm is irregular." end
     if (org.heartbeat or 70) >= 150 then return "Your heart rate is dangerously high." end
+    if (org.heartbeat or 70) > 0 and (org.heartbeat or 70) <= 45 then return "Your heart rate is dangerously low." end
     if (org.hypotension or 0) > 0.5 then return "Poor circulation is weakening your limbs." end
-    if (org.temperature or 36.6) < 35 then return "Cold exposure is reducing coordination." end
-    if (org.temperature or 36.6) > 38 then return "Heat stress is reducing coordination." end
-    if (org.panicattack or 0) > 0.55 then return "You are losing focus." end
+    if (org.temperature or 36.6) < 31 then return "Severe hypothermia is making you drowsy and uncoordinated." end
+    if (org.temperature or 36.6) < 35 then return "Cold is making you shiver and lose coordination." end
+    if (org.temperature or 36.6) >= 40 then return "Severe heat stress is making you dizzy and weak." end
+    if (org.temperature or 36.6) > 38 then return "Heat stress is reducing your coordination." end
+    if (org.hungry or 0) >= 85 then return "Starvation is weakening your body." end
+    if (org.hungry or 0) >= 30 then return "You need food." end
+    if (org.thirst or 0) >= 85 then return "Severe dehydration is weakening your body." end
+    if (org.thirst or 0) >= 30 then return "You need water." end
+    if (org.panicattack or 0) > 0.55 then return "Panic is making it hard to focus." end
     if (org.brain or 0) > 0.1 then return "Neurological trauma is impairing your focus." end
-    return "Your condition is changing."
 end
 
 local function GetNewThoughtMessage(ply, msg, msgKey)
-    if msgKey == "phrase" or msgKey == "wake" then return GetStatusThought(ply) end
+    if msgKey == "phrase" then return GetStatusThought(ply) end
     local thought = thoughtMessages[msgKey] and GetConditionThought(ply, msgKey)
     if thought then return thought end
 
     local key = string.lower(tostring(msgKey or ""))
     if string.find(key, "panic", 1, true) then return "You are losing focus." end
+    if string.find(key, "neck", 1, true) or string.find(key, "arter", 1, true) then return "A neck artery is bleeding heavily." end
     if string.find(key, "skull", 1, true) or string.find(key, "jaw", 1, true) then return "You feel severe pain around your head." end
     if string.find(key, "concussion", 1, true) or string.find(key, "brain", 1, true) then return "Neurological trauma is impairing your focus." end
     if string.find(key, "bone", 1, true) or string.find(key, "broke", 1, true) or string.find(key, "disloc", 1, true) or string.find(key, "ribs", 1, true) or string.find(key, "pelvis", 1, true) then return "You feel a painful bone injury." end
     if string.find(key, "blood", 1, true) or string.find(key, "bleed", 1, true) then return "You are losing blood." end
     if string.find(key, "oxygen", 1, true) or string.find(key, "breath", 1, true) then return "You are struggling to breathe." end
     if string.find(key, "pain", 1, true) then return "Pain is impairing movement." end
-    return GetStatusThought(ply)
+    if string.find(key, "hunger", 1, true) then return "You need food." end
+    if string.find(key, "thirst", 1, true) or string.find(key, "dehyd", 1, true) then return "You need water." end
+    if string.find(key, "temperature", 1, true) or string.find(key, "heat", 1, true) or string.find(key, "cold", 1, true) then return GetStatusThought(ply) end
+    if string.find(string.lower(msg), "^i[%s'%-]") or string.find(string.lower(msg), "^my%s") then return GetStatusThought(ply) end
+    return msg
 end
 
 local function SCPCBHitThought(ply, target, dmgType, dmg, hitPos, dmginfo)
@@ -586,6 +602,9 @@ local thoughtGroupPatterns = {
     {"heart", "cardiac"}, {"pulse", "cardiac"}, {"arrhythm", "cardiac"}, {"tachy", "cardiac"}, {"brady", "cardiac"},
     {"bone", "skeletal"}, {"limb", "skeletal"}, {"fract", "skeletal"}, {"disloc", "skeletal"},
     {"pain", "pain"}, {"hurt", "pain"}, {"concussion", "neuro"}, {"brain", "neuro"}, {"dizz", "neuro"},
+    {"panic", "panic"}, {"fear", "panic"},
+    {"temperature", "temperature"}, {"hypotherm", "temperature"}, {"heat", "temperature"}, {"cold", "temperature"},
+    {"hunger", "metabolic"}, {"starv", "metabolic"}, {"thirst", "metabolic"}, {"dehyd", "metabolic"},
 }
 
 local function GetThoughtGroup(msgKey, msg)
@@ -606,7 +625,9 @@ CreateThought = function(ply, msg, delay, msgKey, showTime, clr, func)
     msgKey = msgKey or msg
     local lowerMessage = string.lower(msg)
     if string.find(lowerMessage, "^i[%s'%-]") or string.find(lowerMessage, "^my%s") then
-        msg = GetNewThoughtMessage(ply, msg, msgKey)
+        local condition = GetNewThoughtMessage(ply, msg, msgKey)
+        if not condition then return false end
+        msg = condition
     end
     ply.thoughtmsgs = ply.thoughtmsgs or {}
     ply.thoughtGroupCooldowns = ply.thoughtGroupCooldowns or {}

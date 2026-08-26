@@ -237,10 +237,11 @@ module[2] = function(owner, org, timeValue)
 
 	local perfusionMoveMul = math.Clamp(org.perfusionMoveMul or 1, 0.25, 1)
 	local perfusionRegenMul = math.Clamp(org.perfusion or 1, 0.18, 1)
+	local hypotensionStaminaMul = 1 - math.Clamp(org.hypotension or 0, 0, 1) * 0.45
 	local heatWeakness = math.Clamp(math.Remap(org.temperature or 36.7, 38, 41, 0, 0.65), 0, 0.65)
 	local heatStaminaMul = 1 - heatWeakness * 0.55
 	org.heatWeakness = heatWeakness
-	stamina.max = ((org.superfighter and 2 or 1) * ((stamina.range * (1 - (org.pneumothorax) / 2) + org.adrenaline * 20 ) * math.max(1 - org.hemotransfusionshock,0.2)) * math.max(1 - (org.hungry/100),0.65) * math.Clamp(0.55 + perfusionMoveMul * 0.45, 0.55, 1) + goodmood * 20) * heatStaminaMul
+	stamina.max = ((org.superfighter and 2 or 1) * ((stamina.range * (1 - (org.pneumothorax) / 2) + org.adrenaline * 20 ) * math.max(1 - org.hemotransfusionshock,0.2)) * math.max(1 - (org.hungry/100),0.65) * math.Clamp(0.55 + perfusionMoveMul * 0.45, 0.55, 1) * hypotensionStaminaMul + goodmood * 20) * heatStaminaMul
 	stamina[1] = math.min(stamina[1], stamina.max)
 	local staminaFraction = math.Clamp(stamina[1] / math.max(stamina.max, 1), 0, 1)
 	local lowStamina = 1 - staminaFraction
