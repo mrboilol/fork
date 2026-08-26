@@ -189,8 +189,17 @@ local function GetDefibOrganism(ply, target)
 end
 
 local function ShouldShock(org)
-	if not org or not org.alive or org.heartstop or org.deathStateKilled then return false end
-	return org.fibrillation or (org.arrhythmia or 0) > 0.65 or (org.heartbeat or 0) > 200
+	if not org or not org.alive or org.deathStateKilled then return false end
+	local rhythm = org.ecgState or org.terminalRhythm or org.unstableRhythm
+	local output = tonumber(org.cardiacOutput) or 1
+	local pulse = tonumber(org.pulse) or 0
+	local heartbeat = tonumber(org.heartbeat) or 0
+
+	if org.heartstop or rhythm == "asystole" or rhythm == "pea" then return true end
+	if org.fibrillation or rhythm == "ventricular_fibrillation" or rhythm == "terminal_tachycardia" then return true end
+	if rhythm == "av_block_complete" or rhythm == "ventricular_escape" or rhythm == "junctional_escape" then return output < 0.55 or pulse < 35 end
+	if rhythm == "atrial_fibrillation" or rhythm == "ventricular_ectopy" or rhythm == "av_block_partial" then return output < 0.65 or pulse < 45 or heartbeat > 150 end
+	return (org.arrhythmia or 0) > 0.4 or heartbeat > 200 or (heartbeat < 35 and output < 0.5)
 end
 
 local function ShouldFalseShock(org)
@@ -208,6 +217,7 @@ end
 
 local function ShockChest(target, forceMul)
 	if not IsValid(target) then return end
+	local applied = false
 
 	if target:IsPlayer() then
 		-- An AED produces a brief muscle contraction, not a launch.  Large
@@ -377,6 +387,9 @@ local function ApplyAEDShock(org, accidental)
 	org.myocardialOxygen = math.max(org.myocardialOxygen or 0, 0.35)
 	org.defibSupportUntil = CurTime() + 4
 	org.defibDeathGrace = CurTime() + 45
+	if hg.organism and hg.organism.ApplyAEDResuscitation then
+		hg.organism.ApplyAEDResuscitation(org)
+	end
 	if hg.organism and hg.organism.RestoreSupportedOxygen then
 		hg.organism.RestoreSupportedOxygen(org, 0.12, {
 			oxygen = 8, oxygenTarget = 16, bodyoxygen = 0.35, bodyoxygenTarget = 0.6,
@@ -731,7 +744,12 @@ function SWEP:AttachDefib(owner, target, ply)
 		PositionDefib(defib, activeTarget, currentBone, defibPos, defibAng, defibFemPos)
 
 		local org = GetDefibOrganism(ply, activeTarget)
-		if org and org.heartstop then
+		local flatline = org and (
+			org.ecgState == "asystole"
+			or org.terminalRhythm == "asystole"
+			or (org.heartstop and (org.heartbeat or 0) < 1)
+		)
+		if flatline then
 			if fibrillationLoop and not fibrillationStop then fibrillationStop = CurTime() + 0.4 end
 			if not asystolePlayed then
 				PlayAEDSound(defib, AEDSounds.asystole, 75, 100)

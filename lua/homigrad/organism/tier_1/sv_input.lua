@@ -100,7 +100,7 @@ local function getHeadshotBloodRagdoll(ent, ply)
 	if IsValid(deathRagdoll) then return deathRagdoll end
 end
 
-local function sendHeadshotBloodSquirt(ent, ply, damagePos, direction, outputHole)
+local function sendHeadshotBloodSquirt(ent, ply, damagePos, direction, outputHole, smallCaliber)
 	local attempts = 0
 	local function send()
 		attempts = attempts + 1
@@ -133,9 +133,17 @@ local function sendHeadshotBloodSquirt(ent, ply, damagePos, direction, outputHol
 			net.SendPVS(pos)
 		end
 
-		sendJet(damagePos + direction * 2, -direction * 2)
-		if outputHole and #outputHole > 0 then
-			sendJet(outputHole[1] - direction * 2, direction * 2)
+		if smallCaliber then
+			if outputHole and #outputHole > 0 then
+				sendJet(outputHole[1] - direction * 2, direction * 4)
+			else
+				sendJet(damagePos + direction * 2, -direction * 4)
+			end
+		else
+			sendJet(damagePos + direction * 2, -direction * 2)
+			if outputHole and #outputHole > 0 then
+				sendJet(outputHole[1] - direction * 2, direction * 2)
+			end
 		end
 	end
 
@@ -1555,12 +1563,13 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	local slash = dmgInfo:IsDamageType(DMG_SLASH)
 	if not noDismemberment and instant and hitgroup == HITGROUP_HEAD and !ent.headexploded then hg.ExplodeHead(ent, headGoreStack or gibStack, slash, dirCool * len) end
 	local fatalHeadshot = (org.brain or 0) >= 0.7 or not org.alive or (IsValid(ply) and not ply:Alive())
-	if hitgroup == HITGROUP_HEAD and fatalHeadshot and damageStack > 0 and dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) and !ent.headexploded then
+	if hitgroup == HITGROUP_HEAD and fatalHeadshot and damageStack > 0 and dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_SNIPER) and !ent.headexploded and !ent.headExplodePending then
 		local squirtDirection = dirCool
 		if squirtDirection:LengthSqr() == 0 then
 			squirtDirection = (dmgPos - ent:WorldSpaceCenter()):GetNormalized()
 		end
-		sendHeadshotBloodSquirt(ent, ply, dmgPos, squirtDirection, outputHole)
+		local caliber = tonumber(bullet and bullet.Diameter) or tonumber(IsValid(inf) and inf.PenetrationSize) or 0
+		sendHeadshotBloodSquirt(ent, ply, dmgPos, squirtDirection, outputHole, caliber > 0 and caliber <= 5.7)
 	end
 	if not noDismemberment and instant and (hitgrouptolimb[hitgroup] or hg.amputeetable[bonename]) then
 		if blast then

@@ -105,7 +105,7 @@ male["ValveBiped.Bip01_Neck1"] = {
 		nil,
 		Vector(3.5, -2, 2.3),
 		Angle(0, 0, 0),
-		Vector(2.5, 0.25, 0.25),
+		Vector(3, 0.5, 0.5),
 		Color(200, 0, 0)
 	},
 	{
@@ -113,7 +113,7 @@ male["ValveBiped.Bip01_Neck1"] = {
 		nil,
 		Vector(3.5, -2, -2.3),
 		Angle(0, 0, 0),
-		Vector(2.5, 0.25, 0.25),
+		Vector(3, 0.5, 0.5),
 		Color(200, 0, 0)
 	},
 }
@@ -409,7 +409,7 @@ female["ValveBiped.Bip01_Neck1"] = {
 		nil,
 		Vector(1.5, -2, 2.3),
 		Angle(0, 0, 0),
-		Vector(2.5, 0.25, 0.25),
+		Vector(3, 0.5, 0.5),
 		Color(200, 0, 0)
 	},
 	{
@@ -417,7 +417,7 @@ female["ValveBiped.Bip01_Neck1"] = {
 		nil,
 		Vector(1.5, -2, -2.3),
 		Angle(0, 0, 0),
-		Vector(2.5, 0.25, 0.25),
+		Vector(3, 0.5, 0.5),
 		Color(200, 0, 0)
 	},
 }

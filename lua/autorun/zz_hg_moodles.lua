@@ -394,7 +394,7 @@ local function getMoodle3IconName(effect)
 		weakness = "encumbered", bradypnea = "dyspnea", thorax = "hemothorax",
 		respiratory_arrest = "respiratory-arrest", skull = "intercranial-hypertension",
 		dislocated_jaw = "dejawed", organ_damage = effect.icon, spine_break = "fractured",
-		shock = "trauma", seizure = "seizure", internal_bleed = "internal-bleeding",
+		shock = "shock", seizure = "seizure", internal_bleed = "internal-bleeding",
 		panic = "panic", fear = "trauma", tinnitus = "tinnitus", deaf = "deafness", encumbered = "encumbered",
 		nausea = "sick", amputated = "amputation", concussion = "stress", sepsis = "sepsis",
 		adrenaline = "adrenaline", zerlked = "zerlked",

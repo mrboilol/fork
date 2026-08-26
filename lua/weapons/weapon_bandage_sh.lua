@@ -312,6 +312,15 @@ function SWEP:Think()
 	end--]]
 end
 SWEP.net_cooldown2 = 0
+
+local function ResolveBandageTarget(ent)
+	if not IsValid(ent) then return end
+	if ent:IsRagdoll() and hg and hg.RagdollOwner then
+		ent = hg.RagdollOwner(ent) or ent
+	end
+	return ent
+end
+
 function SWEP:PrimaryAttack()
 	self:ApplyBandageVisualMode()
 	if self:UseJudgeBandageTPIK() then return self:StartBandageTPIK(self:GetOwner(), IN_ATTACK) end
@@ -473,7 +482,7 @@ function SWEP:SecondaryAttack()
 	self:ApplyBandageVisualMode()
 	if self:UseJudgeBandageTPIK() then
 		if IsValid(self:GetNWEntity("fakeGun")) then return end
-		local ent = hg.eyeTrace(self:GetOwner()).Entity
+		local ent = ResolveBandageTarget(hg.eyeTrace(self:GetOwner()).Entity)
 		if not IsValid(ent) then return end
 		if hg.GetCurrentCharacter(ent) == hg.GetCurrentCharacter(self:GetOwner()) then return end
 		return self:StartBandageTPIK(ent, IN_ATTACK2)
@@ -482,7 +491,7 @@ function SWEP:SecondaryAttack()
 	--self:SetHolding(math.min(self:GetHolding() + 9, 100))
 	if SERVER then
 		if IsValid(self:GetNWEntity("fakeGun")) then return end
-		local ent = hg.eyeTrace(self:GetOwner()).Entity
+		local ent = ResolveBandageTarget(hg.eyeTrace(self:GetOwner()).Entity)
 		self.healbuddy = ent
 		if !IsValid(self.healbuddy) then return end
 		if hg.GetCurrentCharacter(self.healbuddy) == hg.GetCurrentCharacter(self:GetOwner()) then return end
@@ -595,18 +604,73 @@ end
 
 -- WoundTBL = {dmgBlood / 2, localPos, localAng, bone, time}
 SWEP.ShouldDeleteOnFullUse = true
+
+local function GetBandageableArteryWound(org, ent, bone)
+	if not org or not org.arterialwounds then return end
+
+	local selectedIndex, selectedWound
+	for index, wound in ipairs(org.arterialwounds) do
+		if (wound[1] or 0) > 0 then
+			local matchesBone = not bone or wound[4] == bone
+			local woundBone = ent:LookupBone(wound[4] or "")
+			if not matchesBone and woundBone and woundBone >= 0 and ent:GetBoneName(woundBone) == bone then
+				matchesBone = true
+			end
+
+			if matchesBone and (not selectedWound or wound[1] > selectedWound[1]) then
+				selectedIndex, selectedWound = index, wound
+			end
+		end
+	end
+
+	return selectedIndex, selectedWound
+end
+
 if SERVER then
 	function SWEP:Bandage(ent, bone)
 		local org = ent.organism
 		local owner = self:GetOwner()
 		if not org then return end
+		local arteryIndex, arteryWound = GetBandageableArteryWound(org, ent, bone)
 		
 		-- Если растрелять труп а потом его взорвать гранатой, после перевязать - крашнет сервер why?
-		if self.modeValues[1] <= 0 or not (#org.wounds > 0 or (org.lleg or 0) >= 0.05 or (org.rleg or 0) >= 0.05 or (org.skull or 0) >= 0.05 or (org.chest or 0) >= 0.05 or (org.rarm or 0) >= 0.05 or (org.larm or 0) >= 0.05) then return end
+		if self.modeValues[1] <= 0 or not (arteryWound or #org.wounds > 0 or (org.lleg or 0) >= 0.05 or (org.rleg or 0) >= 0.05 or (org.skull or 0) >= 0.05 or (org.chest or 0) >= 0.05 or (org.rarm or 0) >= 0.05 or (org.larm or 0) >= 0.05) then return end
 		table.sort(org.wounds, function(a, b) return a[1] > b[1] end)
 		
 		local done = false
 		local bandaged = false
+
+		if arteryWound and self.modeValues[1] >= arteryWound[1] then
+			local arterySeverity = arteryWound[1]
+			local arteryName = arteryWound[7]
+			self.modeValues[1] = self.modeValues[1] - arterySeverity
+			table.remove(org.arterialwounds, arteryIndex)
+			if math.Rand(0, 1) < math.Clamp(0.08 + arterySeverity / 80, 0.08, 0.3) then
+				org.internalBleed = (org.internalBleed or 0) + math.Rand(0.25, 0.7) * arterySeverity / 14
+			end
+			if arteryName == "arteria" then
+				org.neckslit = false
+				org.neckslitDeadline = nil
+				org.neckslitWarned = nil
+				org.throatCutPressureShock = 0
+				org.neckBrainOxygenPenalty = 0
+				if org.neckslitSoundName then
+					if IsValid(org.neckslitSoundEnt) then org.neckslitSoundEnt:StopSound(org.neckslitSoundName) end
+					if IsValid(org.owner) then org.owner:StopSound(org.neckslitSoundName) end
+					org.neckslitSoundName = nil
+					org.neckslitSoundEnt = nil
+				end
+			end
+			if hg.organism.RebuildArteryWoundState then
+				hg.organism.RebuildArteryWoundState(org, true)
+			else
+				hg.organism.MarkArterialWoundsNetDirty(org)
+			end
+			ent.bandaged_limbs = ent.bandaged_limbs or {}
+			ent.bandaged_limbs[arteryName == "arteria" and "ValveBiped.Bip01_Head1" or arteryWound[4]] = true
+			bandaged = true
+			done = true
+		end
 		
 		if not bone then
 			--print(#org.wounds)
@@ -753,6 +817,9 @@ if SERVER then
 	end
 
 	function SWEP:Heal(ent, mode, bone)
+		ent = ResolveBandageTarget(ent)
+		if not IsValid(ent) then return end
+
 		if ent:IsNPC() then
 			self:NPCHeal(ent, 0.15, "snd_jack_hmcd_bandage.wav")
 		end
@@ -1476,6 +1543,8 @@ function SWEP:GetBandageTPIKUseTime(target)
 	for _, wound in ipairs(org.wounds or {}) do
 		required = required + math.max(wound[1] or 0, 0)
 	end
+	local _, arteryWound = GetBandageableArteryWound(org, target)
+	if arteryWound then required = required + arteryWound[1] end
 
 	local owner = self:GetOwner()
 	local treatmentCost = 25 * (IsValid(owner) and owner.Profession == "doctor" and 0.2 or 1)
@@ -1498,6 +1567,9 @@ function SWEP:CanBandageTPIK(target)
 	for _, wound in ipairs(org.wounds or {}) do
 		if (wound[1] or 0) > 0.1 then return true end
 	end
+
+	local _, arteryWound = GetBandageableArteryWound(org, target)
+	if arteryWound and available >= arteryWound[1] then return true end
 
 	local owner = self:GetOwner()
 	local treatmentCost = 25 * (IsValid(owner) and owner.Profession == "doctor" and 0.2 or 1)

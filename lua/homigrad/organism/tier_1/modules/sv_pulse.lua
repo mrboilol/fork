@@ -561,32 +561,12 @@ local function maintainSimplifiedCirculation(org)
 	hg.organism.UpdatePerfusion(org.owner, org, org.timeValue or 0)
 end
 
-function hg.organism.TryRestartHeartWithResuscitation(org)
-	if not org or not org.alive or not org.heartstop or org.deathStateKilled then return false end
-	if (org.brain or 0) >= 0.85 or (org.heart or 0) >= 1 then return false end
-
-	local now = CurTime()
-	local hasAED = (org.aedResuscitationUntil or 0) > now
-	local hasEpinephrine = (org.epinephrineResuscitationUntil or 0) > now
-	local hasCPR = (org.cprResuscitationUntil or 0) > now
-	if not ((hasAED and (hasEpinephrine or hasCPR)) or (hasEpinephrine and hasCPR)) then return false end
-
-	-- An intervention window receives one attempt. More compressions must not
-	-- turn a single AED/epinephrine dose into repeated restart rolls.
-	if (org.resuscitationAttemptUntil or 0) > now then return false end
-	org.resuscitationAttemptUntil = now + 15
-
-	local chance = hasAED and hasEpinephrine and 82 or 74
-	chance = chance * Clamp(1 - (org.heart or 0) * 0.35, 0.5, 1)
-	if org.o2 and (org.o2[1] or 0) < 3 then chance = chance * 0.75 end
-	-- Electrical/mechanical restart cannot replace missing circulating volume.
-	local resusBloodK = getBloodPerfusion(org.blood or 5000)
-	chance = chance * resusBloodK
-	if math.random(100) > chance then return false end
-
+local function restoreHeartAfterResuscitation(org, now, resusBloodK)
 	org.heartstop = false
 	if hg.organism.ClearCardiacArrestMechanicalDecay then hg.organism.ClearCardiacArrestMechanicalDecay(org) end
 	org.fibrillation = false
+	org.terminalRhythm = nil
+	org.unstableRhythm = nil
 	org.arrhythmia = math.max((org.arrhythmia or 0) - 0.45, 0)
 	org.heart = math.max((org.heart or 0) - 0.08, 0)
 	org.heartStrain = math.max((org.heartStrain or 0) - 0.2, 0)
@@ -610,6 +590,38 @@ function hg.organism.TryRestartHeartWithResuscitation(org)
 	end
 
 	return true
+end
+
+function hg.organism.ApplyAEDResuscitation(org)
+	if not org or not org.alive or org.deathStateKilled then return false end
+	if (org.brain or 0) >= 0.85 or (org.heart or 0) >= 1 then return false end
+
+	local resusBloodK = getBloodPerfusion(org.blood or 5000)
+	if resusBloodK <= 0.03 then return false end
+	return restoreHeartAfterResuscitation(org, CurTime(), resusBloodK)
+end
+
+function hg.organism.TryRestartHeartWithResuscitation(org)
+	if not org or not org.alive or not org.heartstop or org.deathStateKilled then return false end
+	if (org.brain or 0) >= 0.85 or (org.heart or 0) >= 1 then return false end
+
+	local now = CurTime()
+	local hasAED = (org.aedResuscitationUntil or 0) > now
+	local hasEpinephrine = (org.epinephrineResuscitationUntil or 0) > now
+	local hasCPR = (org.cprResuscitationUntil or 0) > now
+	if not ((hasAED and (hasEpinephrine or hasCPR)) or (hasEpinephrine and hasCPR)) then return false end
+
+	if (org.resuscitationAttemptUntil or 0) > now then return false end
+	org.resuscitationAttemptUntil = now + 15
+
+	local chance = hasAED and hasEpinephrine and 82 or 74
+	chance = chance * Clamp(1 - (org.heart or 0) * 0.35, 0.5, 1)
+	if org.o2 and (org.o2[1] or 0) < 3 then chance = chance * 0.75 end
+	local resusBloodK = getBloodPerfusion(org.blood or 5000)
+	chance = chance * resusBloodK
+	if math.random(100) > chance then return false end
+
+	return restoreHeartAfterResuscitation(org, now, resusBloodK)
 end
 
 module[1] = function(org)

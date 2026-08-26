@@ -1011,11 +1011,16 @@ hook.Add("OnNetVarSet","wounds_netvar",function(index, key, var)
 		--local ent = hg.RagdollOwner(ent) or ent
 		
 		if IsValid(ent) then
+			var = istable(var) and var or {}
 			if ent.wounds then
 				for i = 1, #ent.wounds do
 					if !var or !var[i] then continue end
 					var[i][5] = ent.wounds[i][5]
+					var[i].visualReadyAt = ent.wounds[i].visualReadyAt
 				end
+			end
+			for _, wound in ipairs(var) do
+				wound.visualReadyAt = wound.visualReadyAt or (CurTime() + 0.2)
 			end
 
 			ent.wounds = var
@@ -1044,7 +1049,11 @@ hook.Add("OnNetVarSet","wounds_netvar2",function(index, key, var)
 				for i = 1, #ent.arterialwounds do
 					if not var[i] then continue end
 					var[i][5] = ent.arterialwounds[i][5]
+					var[i].visualReadyAt = ent.arterialwounds[i].visualReadyAt
 				end
+			end
+			for _, wound in ipairs(var) do
+				wound.visualReadyAt = wound.visualReadyAt or (CurTime() + 0.2)
 			end
 
 			if hadBaseline then
@@ -1086,6 +1095,7 @@ hook.Add("Fake", "huyhuyhuy235", function(ply,ragdoll)
 
 	ragdoll.wounds = ply.wounds
 	ragdoll.arterialwounds = ply.arterialwounds
+	ragdoll.hgBloodVisualReadyAt = CurTime() + 0.2
 end)
 
 function hg.applyFountain(pos, ang, mul, mul2, forward, ent)
@@ -1411,13 +1421,13 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 	local bloodDistSqr = 1.5 * bloodDrawDistance
 	bloodDistSqr = bloodDistSqr * bloodDistSqr
 
-	if seen and org and org.blood and org.blood > 10 and wounds and #wounds > 0 and entDistSqr <= bloodDistSqr then
+	if seen and (ent.hgBloodVisualReadyAt or 0) <= CurTime() and org and org.blood and org.blood > 10 and wounds and #wounds > 0 and entDistSqr <= bloodDistSqr then
 		if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then
 			ent:SetupBones()
 			for i, wound in pairs(wounds) do
 				local size = math.random(0, 1) * math.max(math.min(wound[1], 1), 0.5)
 
-				if wound[5] + beatsPerSecond < time then
+				if (wound.visualReadyAt or 0) <= CurTime() and wound[5] + beatsPerSecond < time then
 					local mat, boneID = GetWoundBoneMatrix(ent, wound[4])
 					if boneID then
 						local bone = wound[4]
@@ -1446,12 +1456,12 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 		end
 	end
 	
-	if seen and org and org.blood and org.blood > 10 and arterialwounds and #arterialwounds > 0 and entDistSqr <= bloodDistSqr then
+	if seen and (ent.hgBloodVisualReadyAt or 0) <= CurTime() and org and org.blood and org.blood > 10 and arterialwounds and #arterialwounds > 0 and entDistSqr <= bloodDistSqr then
 		ent:SetupBones()
 		for i, wound in pairs(arterialwounds) do
 			local addtime = 1 / math.Clamp(org.pulse or 70, 1,15) * 0.25
 			local mat, boneID = GetWoundBoneMatrix(ent, wound[4])
-			if wound[5] + addtime < time and boneID then
+			if (wound.visualReadyAt or 0) <= CurTime() and wound[5] + addtime < time and boneID then
 				if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then
 					local size = math.random(1, 2) * math.max(math.min(wound[1], 1), 0.5) * arterySizeMul
 					if boneID then

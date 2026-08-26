@@ -18,7 +18,9 @@ hg.applyCushingToPlayer = nil
 
 local CHANCE = 0.8
 local posturingDur = {5, 10}
-local DECORTICATE_START, DECEREBRATE_START = 0.12, 0.45
+local POSTURE_ROLL_INTERVAL = {3, 6}
+local POSTURE_RECOVERY_DURATION = {2.5, 5}
+local DECORTICATE_START, DECEREBRATE_START = 0.08, 0.34
 local POSTURE_FADE_DURATION, POSTURE_FADE_BLEND = 3, 0.45
 local FENCING_DURATION, FENCING_RECENT_DAMAGE = 3.8, 1.5
 
@@ -328,6 +330,23 @@ end
 
 hg.getRandomSpasm = getRandomSpasm
 
+local function startPosturing(org, dur)
+	if not org then return end
+	dur = dur or math_rand(posturingDur[1], posturingDur[2])
+	local severity = math_max(getBrainFactor(org), DECORTICATE_START)
+	local postureType = severity >= DECEREBRATE_START and "decerebrate" or "decorticate"
+	local time = CurTime()
+	org.postureSpasmType = "posturing"
+	org.postureSpasmStart = time
+	org.postureSpasmEnd = time + dur
+	org.postureSpasmDur = dur
+	org.postureSpasmPostureType = postureType
+	org.postureSpasmSeverity = severity
+	org.postureSpasmScale = getPosturingIntensity(org)
+	org.decorticateVariant = math_random(1, #decorticateOffsets)
+	return postureType, dur
+end
+
 local function applySpasm(rag, stype, useFencing)
 	if not IsValid(rag) then return end
 	local org = rag.organism
@@ -339,17 +358,9 @@ local function applySpasm(rag, stype, useFencing)
 		return
 	end
 
-	local severity = math_max(getBrainFactor(org), DECORTICATE_START)
-	local postureType = severity >= DECEREBRATE_START and "decerebrate" or "decorticate"
-	local time = CurTime()
+	local postureType
+	postureType, dur = startPosturing(org, dur)
 	org.postureSpasmType = stype or "posturing"
-	org.postureSpasmStart = time
-	org.postureSpasmEnd = time + dur
-	org.postureSpasmDur = dur
-	org.postureSpasmPostureType = postureType
-	org.postureSpasmSeverity = severity
-	org.postureSpasmScale = getPosturingIntensity(org)
-	org.decorticateVariant = math_random(1, #decorticateOffsets)
 	printSpasmDebug(rag, postureType, dur)
 end
 
@@ -366,6 +377,7 @@ hook.Add("Org Clear", "BrainfuckClear", function(org)
 	org.fencingStart, org.fencingEnd, org.fencingBrainDamage = nil, nil, nil
 	org.fencingDur = nil
 	org.postureSpasmType, org.postureSpasmEnd, org.postureSpasmStart, org.postureSpasmDur, org.postureSpasmPostureType, org.postureSpasmSeverity, org.postureSpasmScale = nil, nil, nil, nil, nil, nil, nil
+	org.nextPostureRoll, org.postureOtrubUntil = nil, nil
 	org.postureDeathStart, org.postureDeadDone, org.postureDeadDoneSeverity = nil, nil, nil
 	org.postureDeathSeverity, org.postureDeathType = nil, nil
 	org.postureDebugLastType, org.postureDebugNext = nil, nil
@@ -421,6 +433,26 @@ hook.Add("Org Think", "BrainfuckThink", function(owner)
 	local time = CurTime()
 	if org.postureThinkStamp == time then return end
 	org.postureThinkStamp = time
+	if IsValid(org.owner) and org.owner:IsPlayer() and org.owner:Alive() and not org.otrub and not org.seizureActive and not org.postureSpasmEnd then
+		local brainFactor = getBrainFactor(org)
+		org.nextPostureRoll = org.nextPostureRoll or (time + math_rand(POSTURE_ROLL_INTERVAL[1], POSTURE_ROLL_INTERVAL[2]))
+		if brainFactor >= DECORTICATE_START and time >= org.nextPostureRoll then
+			org.nextPostureRoll = time + math_rand(POSTURE_ROLL_INTERVAL[1], POSTURE_ROLL_INTERVAL[2])
+			if math_random() < math_clamp(0.24 + brainFactor * 0.72, 0, 0.9) then
+				local postureType, duration = startPosturing(org)
+				org.postureOtrubUntil = time + duration + math_rand(POSTURE_RECOVERY_DURATION[1], POSTURE_RECOVERY_DURATION[2])
+				org.needotrub = true
+				org.needfake = true
+				printPostureDebug(owner, rag, org, postureType, org.postureSpasmSeverity, org.postureSpasmScale)
+			end
+		end
+	end
+	if (org.postureOtrubUntil or 0) > time then
+		org.needotrub = true
+		org.needfake = true
+	elseif org.postureOtrubUntil then
+		org.postureOtrubUntil = nil
+	end
 	local postureType, postureSeverity, postureScale = getPostureState(org)
 	local ply = IsValid(org.owner) and org.owner or owner
 	deathRag = IsValid(ply) and ply:IsPlayer() and ply:GetNWEntity("RagdollDeath") or deathRag
