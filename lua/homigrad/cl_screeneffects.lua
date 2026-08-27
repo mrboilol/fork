@@ -374,16 +374,16 @@ lobotomy_mats = {
 	[8] = Material("overlays/tallflash3.png")
 }
 
-local consciousnessTypeBeatVolume = 0.35
-local dying2Volume = 0.75
+local consciousnessTypeBeatVolume = 1
+local dying2Volume = 1
 local remDying1Fade = 0
 local remDying2Fade = 0
-local alternateDyingForegroundVolume = 0.6
+local alternateDyingForegroundVolume = 1
 -- sonimcooked is the solo foreground track for hg_dyingsound 7. Its source
 -- file is quieter than the other dying tracks, so give it a higher ceiling.
 local sonimCookedForegroundVolume = 1
-local alternateDyingBackgroundVolume = 0.34
-local alternateDyingBackgroundMul = 0.42
+local alternateDyingBackgroundVolume = 0.75
+local alternateDyingBackgroundMul = 0.8
 local painBeatOverlayPath = "sound/rem_pain.mp3"
 local panicattackOverlayPath = "sound/rem_panicattack.mp3"
 local panicattackFadeStart = 0
@@ -1855,7 +1855,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			-- Low-O2/bleedout ambience ramps into the requested volume instead of
 			-- appearing at full level on the first qualifying frame.
 			dyingAudioFade = LerpFT(0.018, dyingAudioFade, dyingAudioTarget)
-			local consciousVol = dyingAudioFade * (incapacitated and Lerp(incapacitationProgress, 0.72, 0.28) or 1)
+			local consciousVol = math.Clamp(dyingAudioFade * 1.75 * (incapacitated and Lerp(incapacitationProgress, 0.72, 0.28) or 1), 0, 1)
 			terminalDyingVolume = incapacitated and consciousVol or 0
 			hg.consciousBeatIntensity = consciousVol
 

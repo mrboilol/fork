@@ -14,7 +14,7 @@ function hg.organism.GetBloodDeliveryFraction(blood, scale)
 	local cfg = hg.organism.config or {}
 	local normalBlood = math.max(tonumber(cfg.NORMAL_BLOOD_VOLUME_ML) or hg.organism.normalBloodVolume or 5000, 1)
 	local volumeFraction = math.Clamp((tonumber(blood) or normalBlood) / normalBlood, 0, 1)
-	local curve = math.max(tonumber(cfg.HEMORRHAGE_PERFUSION_EXPONENT) or 0.85, 0.05)
+	local curve = math.max(tonumber(cfg.HEMORRHAGE_PERFUSION_EXPONENT) or 1.25, 0.05)
 	return math.Clamp(volumeFraction ^ curve * (tonumber(scale) or 1), 0, 1)
 end
 

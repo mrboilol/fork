@@ -452,20 +452,16 @@ local function CreateNotification(ply, msg, delay, msgKey, showTime, func, clr)
     if ply.PlayerClassName and ply.PlayerClassName == "Gordon" and clr != hev_color then return end
     msgKey = msgKey or msg
 
-    -- Stacked thoughts replace the legacy notification renderer. Route every
-    -- message through that channel while it is enabled; otherwise messages
-    -- without a special wording entry are sent over HGNotificate and then
-    -- deliberately discarded by the client.
     if ply:GetInfoNum("hg_newthoughts", 0) > 0 and CreateThought then
         local thought = GetNewThoughtMessage(ply, msg, msgKey)
-        if not thought then return false end
+        if thought then
+            local conditionCooldown = conditionThoughtCooldowns[msgKey]
+            if conditionCooldown and (delay == nil or isnumber(delay)) then
+                delay = math.max(tonumber(delay) or 0, conditionCooldown)
+            end
 
-        local conditionCooldown = conditionThoughtCooldowns[msgKey]
-        if conditionCooldown and (delay == nil or isnumber(delay)) then
-            delay = math.max(tonumber(delay) or 0, conditionCooldown)
+            return CreateThought(ply, thought, delay, "thought_" .. msgKey, showTime, clr, func)
         end
-
-        return CreateThought(ply, thought, delay, "thought_" .. msgKey, showTime, clr, func)
     end
 
     if msg == "" then return end

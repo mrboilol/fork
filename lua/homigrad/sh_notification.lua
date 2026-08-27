@@ -239,7 +239,6 @@ if CLIENT then
 		local clr = net.ReadColor()
 
 		if msg == "" then return end
-		if hg_newthoughts:GetBool() then return end
 
 		CreateNotification(msg, showtime, clr)
 	end)
