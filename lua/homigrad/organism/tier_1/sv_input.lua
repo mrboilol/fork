@@ -16,9 +16,9 @@ local head_consciousness_mul = 28
 local head_otrub_consciousness_cap = 0.04
 local instant_pain_shock_scale = 0.75
 local player_limb_gib_threshold = 190
-local player_head_gib_threshold = 200
-local player_buckshot_head_gib_threshold = 170
-local player_stomach_gib_threshold = 340
+local player_head_gib_threshold = 50
+local player_buckshot_head_gib_threshold = 42
+local player_stomach_gib_threshold = 260
 local player_blast_limb_gib_threshold = 130
 local player_fall_head_gib_threshold = 1.2
 local full_body_blast_gib_threshold = 5000
@@ -520,17 +520,21 @@ function hg.organism.AmputateLimb(org, limb, noShake)
 	local ang = Angle()
 	local boneup = boneIdx and boneIdx > 0 and org.owner:GetBoneName(boneIdx - 1) or bone
 	
-	local wnds = {}
+	if not org.superfighter then
+		local wnds = {}
 
-	for i, tbl in pairs(org.arterialwounds) do
-		if tbl[7] != limb.."artery" then
-			table.insert(wnds, tbl)
+		for i, tbl in pairs(org.arterialwounds) do
+			if tbl[7] != limb.."artery" then
+				table.insert(wnds, tbl)
+			end
 		end
+		table.insert(wnds, {10, vec, ang, boneup, CurTime(), Vector(-100, 0, 0), bone.."artery"})
+
+		org.arterialwounds = wnds
+		hg.organism.MarkArterialWoundsNetDirty(org)
+	elseif not noShake and hg.organism.CanTouchHealth(org) and org.owner:IsPlayer() then
+		org.owner:SetHealth(math.max(org.owner:Health() - 25, 1))
 	end
-	table.insert(wnds, {10, vec, ang, boneup, CurTime(), Vector(-100, 0, 0), bone.."artery"})
-	
-	org.arterialwounds = wnds
-	hg.organism.MarkArterialWoundsNetDirty(org)
 
 	org[amputatedKey] = true
 
@@ -545,8 +549,10 @@ function hg.organism.AmputateLimb(org, limb, noShake)
 		if hg.LightStunPlayer then hg.LightStunPlayer(org.owner, 3) end
 	end
 
-	for i = 1, 5 do
-		hg.organism.AddWoundManual(org.owner, 50, vec + VectorRand(-2, 2), ang, boneup, CurTime() + math.Rand(0, 2))
+	if not org.superfighter then
+		for i = 1, 5 do
+			hg.organism.AddWoundManual(org.owner, 50, vec + VectorRand(-2, 2), ang, boneup, CurTime() + math.Rand(0, 2))
+		end
 	end
 
     if hg.organism.input_list[limb.."up"] then
@@ -1439,10 +1445,10 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	else
 		local sfd = org.fakePlayer and ent or ply
 		if not IsValid(sfd) then return true end
-		if sfd:Health() < 0 then
+		if sfd:Health() <= 0 then
 			sfd:Kill() 
-			return true -- кодинг это просто :fumo_bounce:
-		else
+			return true
+		elseif sfd ~= ent then
 			sfd:SetHealth(sfd:Health()-dmg_before * .15)
 		end
 	end
@@ -1523,6 +1529,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	--print(damageStack, 3)
 	if dmgInfo:IsDamageType(DMG_SLASH + DMG_CLUB + DMG_GENERIC) then damageStack = damageStack * melee_gib_damage_mul end
 	if hitgroup == HITGROUP_HEAD and IsValid(inf) and inf.HeadGibDamageMul then damageStack = damageStack * inf.HeadGibDamageMul end
+	if hitgroup == HITGROUP_HEAD and isRifleBullet then damageStack = damageStack * 1.5 end
 	if hitgroup == HITGROUP_HEAD and dmgInfo:IsDamageType(DMG_SLASH) then damageStack = damageStack * 25 end
 	local inflictorClass = IsValid(dmgInfo:GetInflictor()) and dmgInfo:GetInflictor():GetClass() or ""
 	local grenadeBlastMul = string.find(inflictorClass, "ent_hg_grenade") and 1.8 or 1
@@ -1562,6 +1569,9 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	local blast = dmgInfo:IsDamageType(DMG_BLAST)
 	local slash = dmgInfo:IsDamageType(DMG_SLASH)
 	if not noDismemberment and instant and hitgroup == HITGROUP_HEAD and !ent.headexploded then hg.ExplodeHead(ent, headGoreStack or gibStack, slash, dirCool * len) end
+	if not noDismemberment and instant and hitgroup == HITGROUP_STOMACH and not org.stomachgibbed and hg.AttachStomachGore then
+		hg.AttachStomachGore(ent, dirCool * len)
+	end
 	local fatalHeadshot = (org.brain or 0) >= 0.7 or not org.alive or (IsValid(ply) and not ply:Alive())
 	if hitgroup == HITGROUP_HEAD and fatalHeadshot and damageStack > 0 and dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_SNIPER) and !ent.headexploded and !ent.headExplodePending then
 		local squirtDirection = dirCool
@@ -1659,7 +1669,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		hg.organism.AmputateLimb(org, "rarm")
 	end--]]
 
-	dmgInfo:ScaleDamage(dmgInfo:IsDamageType(DMG_BURN) and 0.015 or 0.15)
+	dmgInfo:ScaleDamage(hg.organism.CanTouchHealth(org) and (dmgInfo:IsDamageType(DMG_BURN) and 0.015 or 0.15) or 0)
 	
 	takeRagdollDamage(ent, dmgInfo)
 

@@ -14,7 +14,7 @@ function hg.organism.GetBloodDeliveryFraction(blood, scale)
 	local cfg = hg.organism.config or {}
 	local normalBlood = math.max(tonumber(cfg.NORMAL_BLOOD_VOLUME_ML) or hg.organism.normalBloodVolume or 5000, 1)
 	local volumeFraction = math.Clamp((tonumber(blood) or normalBlood) / normalBlood, 0, 1)
-	local curve = math.max(tonumber(cfg.HEMORRHAGE_PERFUSION_EXPONENT) or 1.25, 0.05)
+	local curve = math.max(tonumber(cfg.HEMORRHAGE_PERFUSION_EXPONENT) or 1.7, 0.05)
 	return math.Clamp(volumeFraction ^ curve * (tonumber(scale) or 1), 0, 1)
 end
 
@@ -34,7 +34,7 @@ end
 
 function hg.organism.UpdateVitalHealthToll(owner, org, timeValue)
 	if not IsValid(owner) or not owner:IsPlayer() or not owner:Alive() then return end
-	if hg.organism.OrganSystemsEnabled and not hg.organism.OrganSystemsEnabled() then
+	if not hg.organism.OrganSystemsEnabled() or not hg.organism.CanTouchHealth or not hg.organism.CanTouchHealth(org) then
 		org.vitalHealthStress = 0
 		org.vitalHealthCeiling = nil
 		org.vitalHealthDamageCarry = 0
@@ -721,7 +721,7 @@ module[2] = function(owner, org, timeValue)
 	end
 
 	local pulse = org.heartstop
-		and math.max(((arrestMechanicalInitial and arrestMechanicalInitial.pulse) or org.pulse or 70) * arrestMechanicalFactor, 0)
+		and math.max((arrestMechanicalInitial and arrestMechanicalInitial.pulse or 0) * arrestMechanicalFactor, 0)
 		or 70-- + 120 * ((stamina.max or 180) - stamina[1]) / (stamina.max or 180) * (org.lungsfunction and 1 or 0)
 	--pulse = pulse + math.min(org.adrenaline, 2) * 40 + (!org.otrub and math.max(org.fear * 50, 0) or 0)
 	pulse = org.alive and pulse or 0
@@ -779,10 +779,10 @@ module[2] = function(owner, org, timeValue)
 	local cprSupportPulse = math.Clamp(tonumber(org.cprSupportPulse) or 40, 0, 70)
 	local arrestCirculation = (dihSupport and (70 / 92) or (defibGrace and 0.49 or (cprSupport and cprSupportPulse / 92 or 0))) * bloodVolume
 	local residualCirculation = 0
-	if org.heartstop then
-		local initialPulseFlow = ((arrestMechanicalInitial and arrestMechanicalInitial.pulse) or org.pulse or 0) / 92
-		local initialPressureFlow = ((arrestMechanicalInitial and arrestMechanicalInitial.bloodPressure) or org.bloodPressure or 0) / 92
-		local initialOutput = (arrestMechanicalInitial and arrestMechanicalInitial.cardiacOutput) or org.cardiacOutput or 0
+	if org.heartstop and arrestMechanicalInitial then
+		local initialPulseFlow = (arrestMechanicalInitial.pulse or 0) / 92
+		local initialPressureFlow = (arrestMechanicalInitial.bloodPressure or 0) / 92
+		local initialOutput = arrestMechanicalInitial.cardiacOutput or 0
 		residualCirculation = Clamp(max(initialPulseFlow, initialPressureFlow, initialOutput) * arrestMechanicalFactor, 0, 1.5)
 	end
 	local circulation = org.alive and (org.heartstop and max(arrestCirculation, residualCirculation) or circulationBase * rhythmMul) or 0
@@ -802,8 +802,10 @@ module[2] = function(owner, org, timeValue)
 	-- Keep a real mean arterial pressure alongside the legacy palpable-pulse
 	-- value. Judge's pressure readout is useful to medicine/UI code, while the
 	-- current circulation model remains the single owner of the actual target.
+	local mechanicalPulseReserve = Clamp(palpablePulseTarget / 70, 0, 1)
+	local pressureCirculation = circulation * (0.35 + mechanicalPulseReserve * 0.65)
 	local pulsePressureSupport = Clamp((palpablePulseTarget - 10) / 50, 0, 1)
-	local pressureTarget = Clamp(circulation * 92 * Lerp(pulsePressureSupport, 0.3, 1), 0, 180)
+	local pressureTarget = Clamp(pressureCirculation * 92 * Lerp(pulsePressureSupport, 0.3, 1), 0, 180)
 	local pressureNow = tonumber(org.bloodPressure) or pressureTarget
 	local pressureFallRate = org.heartstop and not (dihSupport or defibGrace or cprSupport) and 22 or 12
 	org.bloodPressure = Approach(pressureNow, pressureTarget, timeValue * (pressureTarget > pressureNow and 12 or pressureFallRate))
@@ -822,7 +824,7 @@ module[2] = function(owner, org, timeValue)
 	org.diastolic = math.Round(Clamp(org.bloodPressure - pulsePressure / 3, 0, 160))
 	local supportCardiacOutput = (dihSupport and 1 or (defibGrace and 0.35 or (cprSupport and cprSupportPulse / 110 or 0))) * bloodVolume
 	if org.heartstop then
-		local residualCardiacOutput = ((arrestMechanicalInitial and arrestMechanicalInitial.cardiacOutput) or org.cardiacOutput or 0) * arrestMechanicalFactor
+		local residualCardiacOutput = (arrestMechanicalInitial and arrestMechanicalInitial.cardiacOutput or 0) * arrestMechanicalFactor
 		org.cardiacOutput = Clamp(max(supportCardiacOutput, residualCardiacOutput), 0, 1.5)
 	else
 		org.cardiacOutput = Clamp(circulation, 0, 1.5)
@@ -834,7 +836,7 @@ module[2] = function(owner, org, timeValue)
 	local myocardialTarget = hg.organism.GetLimitingReserve(oxygenation, bloodVolume, circulationDelivery)
 	if org.heartstop and defibGrace then myocardialTarget = math.max(myocardialTarget, 0.25) end
 	org.myocardialOxygen = Approach(org.myocardialOxygen or 1, myocardialTarget, timeValue / 8)
-	local hypotensionTarget = Clamp(Remap(circulation, 0.98, 0.22, 0, 1), 0, 1)
+	local hypotensionTarget = Clamp(Remap(pressureCirculation, 0.98, 0.22, 0, 1), 0, 1)
 	local hypotensionRate = highSpeedPressureShock > 0.25 and timeValue / 2.5 or timeValue / 8
 	org.hypotension = Approach(org.hypotension or 0, hypotensionTarget, hypotensionRate)
 	org.hypertension = Approach(org.hypertension or 0, Clamp(Remap(circulation, 1.25, 1.68, 0, 1), 0, 1), timeValue / 20)
@@ -1193,9 +1195,9 @@ module[2] = function(owner, org, timeValue)
 		org.ischemia = math.max(org.ischemia - decayRate, 0)
 	end
 
-	if org.hypotension > 0.2 then
-		local disorientK = math.Clamp((org.hypotension - 0.2) / 0.5, 0, 1)
-		org.disorientation = math.max(org.disorientation, 0.5 + disorientK * 1.0)
+	if org.hypotension > 0.55 then
+		local disorientK = math.Clamp((org.hypotension - 0.55) / 0.35, 0, 1)
+		org.disorientation = math.max(org.disorientation, 0.25 + disorientK * 1.25)
 	end
 
 	if org.hypotension > 0.64 then

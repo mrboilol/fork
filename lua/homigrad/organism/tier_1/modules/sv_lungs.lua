@@ -1231,7 +1231,9 @@ kaz
 	local staminaMax = org.stamina and math.max(org.stamina.max or 180, 1) or 180
 	local tissueFraction = tissueO2 / math.max(o2.range, 1)
 	local tissueHypoxia = math.Clamp((0.84 - tissueFraction) / 0.84, 0, 1)
-	local functionalLoss = tissueHypoxia ^ (1.45 + resilience * 0.35)
+	local healthFraction = IsValid(owner) and math.Clamp(owner:Health() / math.max(owner:GetMaxHealth(), 1), 0, 1) or 1
+	local lowHealthHypoxia = math.Clamp((0.55 - healthFraction) / 0.55, 0, 1)
+	local functionalLoss = math.max(tissueHypoxia, lowHealthHypoxia) ^ (1.45 + resilience * 0.35)
 	if functionalLoss > 0 then
 		org.disorientation = math.max(org.disorientation or 0, functionalLoss * 1.4)
 		org.immobilization = math.max(org.immobilization or 0, functionalLoss ^ 1.35 * 6)

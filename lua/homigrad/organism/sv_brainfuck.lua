@@ -378,6 +378,7 @@ hook.Add("Org Clear", "BrainfuckClear", function(org)
 	org.fencingDur = nil
 	org.postureSpasmType, org.postureSpasmEnd, org.postureSpasmStart, org.postureSpasmDur, org.postureSpasmPostureType, org.postureSpasmSeverity, org.postureSpasmScale = nil, nil, nil, nil, nil, nil, nil
 	org.nextPostureRoll, org.postureOtrubUntil = nil, nil
+	org.postureHeadHitPending, org.postureHeadHitUntil = nil, nil
 	org.postureDeathStart, org.postureDeadDone, org.postureDeadDoneSeverity = nil, nil, nil
 	org.postureDeathSeverity, org.postureDeathType = nil, nil
 	org.postureDebugLastType, org.postureDebugNext = nil, nil
@@ -417,6 +418,8 @@ hook.Add("HomigradDamage", "BrainfuckFencing", function(ply, dmgInfo, hitgroup)
 	if hitgroup ~= HITGROUP_HEAD then return end
 	org.lastHeadshot = CurTime()
 	org.fencingBrainDamage = CurTime()
+	org.postureHeadHitPending = true
+	org.postureHeadHitUntil = CurTime() + 12
 end)
 
 hook.Add("CanControlFake", "BrainfuckFencing", function(ply, rag)
@@ -433,18 +436,19 @@ hook.Add("Org Think", "BrainfuckThink", function(owner)
 	local time = CurTime()
 	if org.postureThinkStamp == time then return end
 	org.postureThinkStamp = time
-	if IsValid(org.owner) and org.owner:IsPlayer() and org.owner:Alive() and not org.otrub and not org.seizureActive and not org.postureSpasmEnd then
+	if IsValid(org.owner) and org.owner:IsPlayer() and org.owner:Alive() and org.otrub and not org.seizureActive and not org.postureSpasmEnd then
 		local brainFactor = getBrainFactor(org)
-		org.nextPostureRoll = org.nextPostureRoll or (time + math_rand(POSTURE_ROLL_INTERVAL[1], POSTURE_ROLL_INTERVAL[2]))
-		if brainFactor >= DECORTICATE_START and time >= org.nextPostureRoll then
-			org.nextPostureRoll = time + math_rand(POSTURE_ROLL_INTERVAL[1], POSTURE_ROLL_INTERVAL[2])
-			if math_random() < math_clamp(0.24 + brainFactor * 0.72, 0, 0.9) then
-				local postureType, duration = startPosturing(org)
-				org.postureOtrubUntil = time + duration + math_rand(POSTURE_RECOVERY_DURATION[1], POSTURE_RECOVERY_DURATION[2])
-				org.needotrub = true
-				org.needfake = true
-				printPostureDebug(owner, rag, org, postureType, org.postureSpasmSeverity, org.postureSpasmScale)
-			end
+		if org.postureHeadHitPending and (org.postureHeadHitUntil or 0) > time and brainFactor >= DECORTICATE_START then
+			org.postureHeadHitPending = nil
+			org.postureHeadHitUntil = nil
+			local postureType, duration = startPosturing(org)
+			org.postureOtrubUntil = time + duration + math_rand(POSTURE_RECOVERY_DURATION[1], POSTURE_RECOVERY_DURATION[2])
+			org.needotrub = true
+			org.needfake = true
+			printPostureDebug(owner, rag, org, postureType, org.postureSpasmSeverity, org.postureSpasmScale)
+		elseif (org.postureHeadHitUntil or 0) <= time then
+			org.postureHeadHitPending = nil
+			org.postureHeadHitUntil = nil
 		end
 	end
 	if (org.postureOtrubUntil or 0) > time then

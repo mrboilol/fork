@@ -7,6 +7,10 @@ function hg.organism.OrganSystemsEnabled()
 	return hg_huyorgans:GetBool()
 end
 
+function hg.organism.CanTouchHealth(org)
+	return not hg.organism.OrganSystemsEnabled() or (org and org.superfighter)
+end
+
 local hg_panic = CreateConVar("hg_panic", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enables panic-attack consequences; panic still drives fear, adrenaline, and thoughts", 0, 1)
 local hg_painsound = ConVarExists("hg_painsound") and GetConVar("hg_painsound") or CreateConVar("hg_painsound", "6", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Pain audio: 0 = pain beat + reality, 1 = pain beat, 2 = agony, 3 = altpain, 4 = reality, 5 = sillypain, 6 = REM pain stack", 0, 6)
 local hg_dyingsound = ConVarExists("hg_dyingsound") and GetConVar("hg_dyingsound") or CreateConVar("hg_dyingsound", "2", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Dying audio: 0 = conscious beat + ending, 1 = conscious beat, 2 = dying, 3 = alto2, 4 = ending, 5 = sillydying, 6 = fuck, 7 = sonimcooked, 8 = REM dying 1 + 2, 9 = REM dying 2 + quiet itssofuckingover background, 10 = itshopeless, 11 = vitality", 0, 11)
@@ -806,6 +810,9 @@ local function start_seizure(owner, org)
 	org.seizureStart = time
 	org.seizureEnd = time + seizure_duration
 	org.nextSeizureSpasm = time
+	org.needotrub = true
+	org.needfake = true
+	org.consciousness = math.min(org.consciousness or 1, 0.04)
 	owner.fullsend = true
 	send_organism(org, owner)
 end
@@ -1024,6 +1031,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	end
 	runOrganismModule("pulse", 2, owner, org, timeValue)
 	runOrganismModule("concussion", 2, owner, org, timeValue)
+	org.immobilization = math.Clamp(tonumber(org.immobilization) or 0, 0, 100)
 	if org.owner.PlayerClassName == "furry" then
 		org.assimilated = 0
 	end
@@ -1099,8 +1107,6 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	local traumaDelta = math.max(brainDelta, lobeDelta)
 	if traumaDelta > 0 then
 		hg.organism.AddSeizure(org, math.Clamp(traumaDelta * seizure_brain_trauma_gain_mul, 0, 1))
-	elseif brainDelta < 0 and oldSeizureBrain > 0 then
-		hg.organism.AddSeizure(org, math.Clamp(-brainDelta * seizure_brain_heal_gain_mul, 0, 1))
 	end
 	-- Отключено: перепад температуры (холод/жара) больше не вызывает судороги.
 	-- Раньше на зимних картах это давало случайные припадки из-за переохлаждения.
@@ -1131,6 +1137,8 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		local seizureStart = org.seizureStart or time
 		local seizureEnd = org.seizureEnd or time
 		org.needfake = true
+		org.needotrub = true
+		org.consciousness = math.min(org.consciousness or 1, 0.04)
 		owner.fakecd = math.max(owner.fakecd or 0, seizureEnd)
 		if time >= seizureEnd then
 			org.brain = math.max(org.brain or 0, seizure_brain_damage_final)
@@ -1264,7 +1272,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		dmgInfo:SetAttacker(owner)
 		owner:TakeDamageInfo(dmgInfo)
 	end
-	if owner:IsPlayer() and (org.healthRegen or 0) < CurTime() then
+	if owner:IsPlayer() and hg.organism.CanTouchHealth(org) and (org.healthRegen or 0) < CurTime() then
 		org.healthRegen = CurTime() + 30
 		local healthCeiling = owner:GetMaxHealth()
 		if hg.organism.OrganSystemsEnabled() then

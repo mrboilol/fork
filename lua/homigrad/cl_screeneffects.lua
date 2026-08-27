@@ -2191,7 +2191,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 					setItsHopelessVolume(0)
 				end
 				if IsValid(VitalityStation) then
-					VitalityStation:SetVolume(consciousVol)
+					VitalityStation:SetVolume(math.Clamp(consciousVol * 2.5, 0, 1))
 				end
 			end
 			if dyingMode != 7 and IsValid(SonimCookedStation) then

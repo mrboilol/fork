@@ -132,9 +132,11 @@ module[2] = function(owner, org, timeValue)
     -- Food supports healing/regeneration but does not instantly manufacture
     -- circulating blood. Blood-volume recovery is owned by sv_blood.
     org.regeneratehp = (!((org.regeneratehp or 0) >= 1) and min( (org.regeneratehp or 0) + timeValue * (org.satiety/100), 1)) or 0
-    local healthCeiling = owner:GetMaxHealth()
-    if not hg.organism.OrganSystemsEnabled or hg.organism.OrganSystemsEnabled() then
-        healthCeiling = math.min(healthCeiling, org.vitalHealthCeiling or healthCeiling)
+    if hg.organism.CanTouchHealth and hg.organism.CanTouchHealth(org) then
+        local healthCeiling = owner:GetMaxHealth()
+        if hg.organism.OrganSystemsEnabled() then
+            healthCeiling = math.min(healthCeiling, org.vitalHealthCeiling or healthCeiling)
+        end
+        owner:SetHealth(min(owner:Health() + org.regeneratehp, healthCeiling))
     end
-    owner:SetHealth(min(owner:Health() + org.regeneratehp, healthCeiling))
 end
