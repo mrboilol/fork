@@ -969,14 +969,15 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	local sensoryActive = not org.otrub or incapacitated
 	local sensoryMix = incapacitated and Lerp(incapacitationProgress, 1, 0.35) or 1
 
-    -- Concussion and low blood blur
+    -- Concussion and severe blood-loss blur
     local blurAmount = 0
     if sensoryActive and org.concussion and org.concussion > 2 then
         blurAmount = math.min((org.concussion - 2) / 8, 1) * 4 * sensoryMix
     end
 
-    if sensoryActive and org.blood and org.blood < 4000 then
-        blurAmount = math.max(blurAmount, math.min((4000 - org.blood) / 3500, 1) * 5 * sensoryMix)
+    if sensoryActive and org.blood and org.blood < 3750 then
+        local lowBloodBlur = math.Clamp((3750 - org.blood) / 2000, 0, 1) ^ 1.35
+        blurAmount = math.max(blurAmount, lowBloodBlur * 3 * sensoryMix)
     end
 
     local adrenaline = org.adrenaline or 0
@@ -2443,15 +2444,10 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end
 
 		local blood = org.blood or 5000
-		-- A very small desaturation begins with the first measurable loss, then the
-		-- curve steepens as the circulation approaches the decompensation region.
-		local lowBloodVisual = math.Clamp((5000 - blood) / 3000, 0, 1) ^ 1.25
-		if lowBloodVisual > 0 then
-			-- Blood loss starts with a restrained desaturation and blur, while the
-			-- existing consciousness/shock effects still own severe collapse.
-			grayscaleTarget = grayscaleTarget + lowBloodVisual * 0.18 * zerlkersVisualMul
-			DrawMotionBlur((0.04 + lowBloodVisual * 0.04) * zerlkersVisualMul, (0.18 + lowBloodVisual * 0.22) * zerlkersVisualMul, 0.02)
-		end
+        local lowBloodVisual = math.Clamp((4500 - blood) / 2500, 0, 1) ^ 1.35
+        if lowBloodVisual > 0 then
+            grayscaleTarget = grayscaleTarget + lowBloodVisual * 0.18 * zerlkersVisualMul
+        end
 		if blood < 3500 then
 			grayscaleTarget = grayscaleTarget + math.Clamp((3500 - blood) / 3500, 0, 1) * 0.25 * zerlkersVisualMul
 		end

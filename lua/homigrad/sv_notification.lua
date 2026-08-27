@@ -834,7 +834,7 @@ function hg.ReportCombatInjuryState(attacker, victim, org, before, meleeWeapon, 
 	if attacker:GetInfoNum("hg_newthoughts", 0) <= 0 then return end
 	if IsValid(meleeWeapon) and meleeContact then
 		local strike, force = getMeleeStrikePrefix(meleeWeapon, damage, meleeContact.hitGroup, damageType)
-		CreateThought(attacker, strike .. ", " .. getMeleeInjuryOutcome(org, before, force, meleeContact.hitGroup) .. ".", 2, "combat_melee_" .. meleeWeapon:EntIndex() .. "_" .. (IsValid(victim) and victim:EntIndex() or 0), 0, Color(255, 220, 190))
+		-- CreateThought(attacker, strike .. ", " .. getMeleeInjuryOutcome(org, before, force, meleeContact.hitGroup) .. ".", 2, "combat_melee_" .. meleeWeapon:EntIndex() .. "_" .. (IsValid(victim) and victim:EntIndex() or 0), 0, Color(255, 220, 190))
 		return
 	end
 

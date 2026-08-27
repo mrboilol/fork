@@ -5,9 +5,6 @@ hook.Add("radialOptions", "zcity_delta_dislocation_minigame", function()
     if not IsValid(ply) or not ply:Alive() or not ply.organism or ply.organism.otrub then return end
     if not hg or not hg.radialOptions then return end
 
-    local org = ply.new_organism or ply.organism
-    if not org.canmove or not org.canmovehead then return end
-    if (org.pain or 0) > 60 then return end
     if (ply.tried_fixing_limb or 0) > CurTime() then return end
 
     local function AddOption(label, group, useTarget)
@@ -25,15 +22,17 @@ hook.Add("radialOptions", "zcity_delta_dislocation_minigame", function()
     end
 
     local function HasDislocation(ent, group)
-        if not IsValid(ent) or not ent.organism then return false end
-        local eorg = ent.organism
+        if not IsValid(ent) then return false end
+        local eorg = ent.new_organism or ent.organism
+        if not eorg then return false end
         if group == 1 then return eorg.llegdislocation or eorg.rlegdislocation end
         if group == 2 then return eorg.larmdislocation or eorg.rarmdislocation end
         if group == 3 then return eorg.jawdislocation end
         return false
     end
 
-    local target = hg.eyeTrace(ply).Entity
+    local trace = hg.eyeTrace(ply)
+    local target = trace and trace.Entity
     if IsValid(target) and target:IsRagdoll() and hg.RagdollOwner then
         target = hg.RagdollOwner(target) or target
     end

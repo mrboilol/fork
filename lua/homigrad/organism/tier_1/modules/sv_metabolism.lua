@@ -114,14 +114,12 @@ module[2] = function(owner, org, timeValue)
     org.dehydrationCirculationPenalty = (hg_thirstsystem:GetBool() and org.hydration <= 0)
         and math.Clamp((org.thirst - 60) / 40, 0, 1) or 0
 
-    if (org.intestines > 0.5 or org.stomach > 0.5) and not org.otrub and owner:IsPlayer() and org.satiety > 1 then
-        if not org.randomPainSound or org.randomPainSound < CurTime() then
-            org.randomPainSound = CurTime() + math.random(20,45)
-            local painVol = math.Clamp(math.Remap(org.pain or 0, 0, 120, 0.5, 1.0), 0.5, 1.0)
-            owner:EmitSound("zcitysnd/"..(ThatPlyIsFemale(owner) and "female" or "male").."/pain_"..math.random(1,8)..".ogg", 75, 100, painVol)
-            org.painadd = org.painadd + 20
-            //owner:TakeDamage(5,owner,owner)
-        end
+	if (org.intestines > 0.5 or org.stomach > 0.5) and not org.otrub and owner:IsPlayer() and org.satiety > 1 then
+		if not org.randomPainSound or org.randomPainSound < CurTime() then
+			org.randomPainSound = CurTime() + math.random(20,45)
+			org.painadd = org.painadd + 20
+			//owner:TakeDamage(5,owner,owner)
+		end
     end
 
     if org.satiety == 0 then return end

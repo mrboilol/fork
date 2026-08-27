@@ -9,6 +9,36 @@ local module = hg.organism.module.pulse
 -- loss also contributes a smooth collapse hazard rather than a hard cutoff.
 local terminalHeartRate = 300
 local peaDuration = 6
+local cardiacArrestMechanicalDecayTime = 14
+
+function hg.organism.BeginCardiacArrestMechanicalDecay(org)
+	if not org or org.cardiacArrestMechanicalInitial then return end
+
+	org.cardiacArrestMechanicalStart = CurTime()
+	org.cardiacArrestMechanicalInitial = {
+		pulse = math.max(tonumber(org.pulse) or 0, 0),
+		bloodPressure = math.max(tonumber(org.bloodPressure) or 0, 0),
+		cardiacOutput = math.max(tonumber(org.cardiacOutput) or 0, 0)
+	}
+end
+
+function hg.organism.ClearCardiacArrestMechanicalDecay(org)
+	if not org then return end
+	org.cardiacArrestMechanicalStart = nil
+	org.cardiacArrestMechanicalInitial = nil
+end
+
+function hg.organism.GetCardiacArrestMechanicalFactor(org)
+	if not org then return 0, nil end
+	if not org.cardiacArrestMechanicalInitial then
+		hg.organism.BeginCardiacArrestMechanicalDecay(org)
+	end
+
+	local initial = org.cardiacArrestMechanicalInitial
+	if not initial then return 0, nil end
+	local elapsed = math.max(CurTime() - (org.cardiacArrestMechanicalStart or CurTime()), 0)
+	return math.Clamp(1 - elapsed / cardiacArrestMechanicalDecayTime, 0, 1), initial
+end
 
 function hg.organism.GetBloodDeliveryFraction(blood, scale)
 	local cfg = hg.organism.config or {}
@@ -714,6 +744,9 @@ module[2] = function(owner, org, timeValue)
 	end
 
 	if organSystemsEnabled then applyTemperatureTrauma(org) end
+	if not org.heartstop and org.cardiacArrestMechanicalInitial then
+		hg.organism.ClearCardiacArrestMechanicalDecay(org)
+	end
 
 	local arrestMechanicalFactor, arrestMechanicalInitial = 1, nil
 	if hg.organism and hg.organism.GetCardiacArrestMechanicalFactor then

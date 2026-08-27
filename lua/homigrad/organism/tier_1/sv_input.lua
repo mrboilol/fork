@@ -478,24 +478,15 @@ local function getHeadImpactPos(ent, fallback)
 end
 
 local sounds = {
-	Sound("player/zombie_head_explode_01.wav"),
-	Sound("player/zombie_head_explode_02.wav"),
-	Sound("player/zombie_head_explode_03.wav"),
-	Sound("player/zombie_head_explode_04.wav"),
-	Sound("player/zombie_head_explode_05.wav"),
-	Sound("player/zombie_head_explode_06.wav")
-}
-
-local goreSounds = {
-	Sound("gore/kf2_tear1.wav"),
-	Sound("gore/kf2_tear2.wav"),
-	Sound("gore/kf2_tear3.wav"),
-	Sound("gore/kf2_tear4.wav"),
-	Sound("gore/kf2_tear5.wav"),
-	Sound("gore/kf2_tear6.wav"),
-	Sound("gore/kf2_tear7.wav"),
-	Sound("gore/kf2_tear8.wav"),
-	Sound("gore/kf2_totalgib.wav"),
+	Sound("gore/blast.mp3"),
+	Sound("gore/blast2.mp3"),
+	Sound("gore/blast3.mp3"),
+	Sound("gore/blast4.mp3"),
+	Sound("gore/chop2.mp3"),
+	Sound("gore/chop3.mp3"),
+	Sound("gore/chop4.mp3"),
+	Sound("gore/chop5.mp3"),
+	Sound("gore/chop6.mp3"),
 }
 
 local ents_Create = ents.Create
@@ -560,8 +551,7 @@ function hg.organism.AmputateLimb(org, limb, noShake)
         hg.organism.input_list[limb.."up"](org, 0, 5, dmgInfo)
     end
 
-    org.owner:EmitSound(sounds[math.random(#sounds)], 70, math.random(95, 105), 2)
-	org.owner:EmitSound(goreSounds[math.random(#goreSounds)], 75, math.random(90, 110), 1.5)
+	org.owner:EmitSound(sounds[math.random(#sounds)], 95, math.random(95, 105), 2)
 	
 	local ent = hg.GetCurrentCharacter(org.owner)
 	local gibBone = ent:LookupBone(bone)
@@ -842,6 +832,7 @@ function hg.ExplodeHead(ent, damage, slash, force)
 		local mat = headBone and ent:GetBoneMatrix(headBone)
 		
 		Gib_Input(ent, headBone, force, damage)
+		ent:EmitSound(sounds[math.random(#sounds)], 100, math.random(90, 110), 2)
 
 		if IsValid(ent) then
 			util.ScreenShake(ent:GetPos(), 16, 8, 1.2, 450, false, nil, 1, true, true, true)

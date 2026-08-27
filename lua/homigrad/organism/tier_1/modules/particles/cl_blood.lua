@@ -111,7 +111,7 @@ local bloodDripSoundChance = 2 / 3
 local function playBloodDripImpact(pos, tr)
 	if math.Rand(0, 1) > bloodDripSoundChance then return end
 
-	sound.Play("newblooddrip/sndBloodDrip" .. math_random(1, 3) .. ".wav", pos, math.random(10, 60), tr.MatType == MAT_METAL and math.random(100, 120) or math.random(80, 120))
+	sound.Play("gore/blood" .. math_random(1, 6) .. ".mp3", pos, math.random(10, 60), tr.MatType == MAT_METAL and math.random(100, 120) or math.random(80, 120))
 	if tr.MatType == MAT_METAL then
 		sound.Play("zbattle/blood_drop_metal.mp3", pos, math.random(10, 40), tr.MatType == MAT_METAL and math.random(100, 120) or math.random(80, 120))
 	end

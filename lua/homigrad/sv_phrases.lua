@@ -403,6 +403,20 @@ hg.UniversalScreamSounds = {
 	"screams/universal1/screamtwo.mp3",
 	"screams/universal1/wilhelm_scream.mp3",
 }
+hg.GenderedPainScreamSounds = {
+	female = {
+		"screams/female1/rem_femalepartial1.mp3", "screams/female1/rem_femalepartial2.mp3",
+		"screams/female1/rem_femalepartial3.mp3", "screams/female1/rem_femalepartial4.mp3",
+		"screams/female2/rem_femalepartial1.mp3", "screams/female2/rem_femalepartial2.mp3",
+		"screams/female2/rem_femalepartial3.mp3", "screams/female2/rem_femalepartial4.mp3",
+	},
+	male = {
+		"screams/male1/rem_malepartial1.mp3", "screams/male1/rem_malepartial2.mp3",
+		"screams/male1/rem_malepartial3.mp3", "screams/male1/rem_malepartial4.mp3",
+		"screams/male2/rem_malepartial1.mp3", "screams/male2/rem_malepartial2.mp3",
+		"screams/male2/rem_malepartial3.mp3", "screams/male2/rem_malepartial4.mp3",
+	},
+}
 local painScreamRestartFade = 0.8
 local painScreamEndFade = 0.05
 local painScreamChance = 0.52
@@ -491,9 +505,9 @@ function hg.QueuePainScream(ply, amount)
 	org.painScreamUntil = CurTime() + 8
 end
 
-local function playPainScream(ply)
+local function playPainScream(ply, phrases, guaranteed)
 	if !canPainScream(ply) then return false end
-	if mRandom(1, 100) > (mClamp(painScreamChance, 0, 1) * 100) then return true end
+	if not guaranteed and mRandom(1, 100) > (mClamp(painScreamChance, 0, 1) * 100) then return true end
 
 	local ent = hg.GetCurrentCharacter(ply)
 
@@ -501,7 +515,8 @@ local function playPainScream(ply)
 
 	hg.StopPainScream(ply, painScreamRestartFade)
 
-	local phrase = hg.UniversalScreamSounds[mRandom(#hg.UniversalScreamSounds)]
+	phrases = phrases or hg.UniversalScreamSounds
+	local phrase = phrases[mRandom(#phrases)]
 	local rf = RecipientFilter()
 	rf:AddPAS(ent:GetPos())
 
@@ -570,19 +585,25 @@ hook.Add("Org Think", "HG_PainScreamThink", function(owner, org)
 
 	if (org.painScreamUntil or 0) < time then
 		org.painScreamQueue = 0
-		return
 	end
 
-	if (org.painScreamQueue or 0) < 1 then return end
-	if owner.painScreamPatch then return end
-	if (org.painScreamNext or 0) > time then return end
+	if not owner.painScreamPatch and (org.painScreamQueue or 0) >= 1 and (org.painScreamNext or 0) <= time then
+		org.painScreamQueue = math.max((org.painScreamQueue or 0) - 1, 0)
 
-	org.painScreamQueue = math.max((org.painScreamQueue or 0) - 1, 0)
+		if playPainScream(owner) then
+			org.painScreamNext = time + math.Rand(3, 4)
+			org.genderedPainScreamNext = math.max(org.genderedPainScreamNext or 0, time + 8)
+		else
+			org.painScreamNext = time + 1
+		end
+	end
 
-	if playPainScream(owner) then
-		org.painScreamNext = time + math.Rand(3, 4)
+	if (org.pain or 0) < 75 or owner.painScreamPatch or (org.genderedPainScreamNext or 0) > time then return end
+	local phrases = hg.GenderedPainScreamSounds[ThatPlyIsFemale(owner) and "female" or "male"]
+	if playPainScream(owner, phrases, true) then
+		org.genderedPainScreamNext = time + math.Rand(10, 14)
 	else
-		org.painScreamNext = time + 1
+		org.genderedPainScreamNext = time + 2
 	end
 end)
 

@@ -65,6 +65,9 @@ local function applyOrganTrauma(org, dmgInfo, force, delta, previousDamage, orga
 
 	local severity = freshDamage * 1.8 + math.max(rawForce - repeatThreshold * 0.45, 0) * 0.32
 	if repeatHit then severity = severity * 0.45 end
+	if severity >= 0.9 and org.isPly and hg.QueuePainScream then
+		hg.QueuePainScream(org.owner, math.Clamp(severity, 0.8, 1.6))
+	end
 	if severity <= 0.35 or org.NoKnockdown then return end
 
 	local resistance = 1 + priorDamage * 1.6

@@ -16,7 +16,7 @@ hg.applyDecorticateToPlayer = nil
 hg.applyLazarusToPlayer = nil
 hg.applyCushingToPlayer = nil
 
-local CHANCE = 0.8
+local CHANCE = 0.92
 local posturingDur = {5, 10}
 local POSTURE_ROLL_INTERVAL = {3, 6}
 local POSTURE_RECOVERY_DURATION = {2.5, 5}
@@ -347,6 +347,13 @@ local function startPosturing(org, dur)
 	return postureType, dur
 end
 
+local function hasCatastrophicBrainDestruction(org)
+	if not org then return false end
+
+	return (org.brain or 0) >= 0.75
+		or getBrainLobeSeverity(org) >= 0.55
+end
+
 local function applySpasm(rag, stype, useFencing)
 	if not IsValid(rag) then return end
 	local org = rag.organism
@@ -400,9 +407,10 @@ hook.Add("RagdollDeath", "BrainfuckStart", function(ply, rag)
 		local forceFencingPosturing = false
 		local headshot = hadBrainDamage or hadHeadDamage or recentHeadshot
 		local brainFactor = getBrainFactor(org)
-		local chance = math_clamp(CHANCE + brainFactor * 0.6 + (recentClubHit and recentHeadshot and 0.15 or 0), 0, 1)
+		local catastrophicBrainDestruction = hasCatastrophicBrainDestruction(org)
+		local chance = math_clamp(CHANCE + brainFactor * 0.8 + (recentClubHit and recentHeadshot and 0.15 or 0), 0, 1)
 		if not headshot and not forceFencingPosturing and (rag.noHead or org.noHead or ply.noHead) then return end
-		if (headshot and (recentHeadshot or hadHeadDamage or math_random() < chance)) or forceFencingPosturing then
+		if (headshot and (catastrophicBrainDestruction or recentHeadshot or hadHeadDamage or math_random() < chance)) or forceFencingPosturing then
 			local stype = forceFencingPosturing and "posturing" or getRandomSpasm()
 			applySpasm(rag, stype, forceFencingPosturing)
 		end
