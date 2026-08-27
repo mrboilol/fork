@@ -969,15 +969,16 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	local sensoryActive = not org.otrub or incapacitated
 	local sensoryMix = incapacitated and Lerp(incapacitationProgress, 1, 0.35) or 1
 
-    -- Concussion and severe blood-loss blur
+    -- Concussion and circulatory-symptom blur
     local blurAmount = 0
     if sensoryActive and org.concussion and org.concussion > 2 then
         blurAmount = math.min((org.concussion - 2) / 8, 1) * 4 * sensoryMix
     end
 
-    if sensoryActive and org.blood and org.blood < 3750 then
-        local lowBloodBlur = math.Clamp((3750 - org.blood) / 2000, 0, 1) ^ 1.35
-        blurAmount = math.max(blurAmount, lowBloodBlur * 3 * sensoryMix)
+    local hypotension = math.Clamp(tonumber(org.hypotension) or 0, 0, 1)
+    if sensoryActive and hypotension > 0.25 then
+        local hypotensionBlur = math.Clamp((hypotension - 0.25) / 0.75, 0, 1) ^ 1.35
+        blurAmount = math.max(blurAmount, hypotensionBlur * 3 * sensoryMix)
     end
 
     local adrenaline = org.adrenaline or 0
