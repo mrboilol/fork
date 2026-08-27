@@ -269,6 +269,13 @@ players : 1 humans, 0 bots (20 max)
 
 		local anguse = Angle(0,0,0)
 		s_suppression = s_suppression or 0
+		local function GetBulletFlybySound(subsonic)
+			if subsonic then
+				return string.format("fx/subsonic_%02d.wav", math.random(1, 27))
+			end
+
+			return string.format("fx/supersonic_snap_%02d.wav", math.random(1, 12))
+		end
 		hook.Add("PostEntityFireBullets","bulletsuppression2",function(ent,bullet)
 			if bullet.NearMissShotID then return end
 			if not lply:Alive() then return end
@@ -281,12 +288,11 @@ players : 1 humans, 0 bots (20 max)
 			local subsonic = !(CustomAmmoType and CustomAmmoType.BulletSettings and CustomAmmoType.BulletSettings.Speed and CustomAmmoType.BulletSettings.Speed > 340)
 			
 			local tr = bullet.Trace
-			local mr = math.random(17)
 			local view = render.GetViewSetup(true)
 			if tr.StartPos:Distance( tr.HitPos ) > 5000 and !subsonic then
 				local time = view.origin:Distance(tr.StartPos+tr.HitPos/2) / 17836
 				timer.Simple(time,function()
-					EmitSound("cracks/distant/dist_crack_" .. ( mr < 9 and "0" or "") .. mr .. ".ogg", tr.StartPos+tr.HitPos*0.35, 0, CHAN_AUTO, 1,SNDLVL_140dB)
+					EmitSound(GetBulletFlybySound(false), tr.StartPos+tr.HitPos*0.35, 0, CHAN_AUTO, 1,SNDLVL_140dB)
 				end)
 			end
 
@@ -311,23 +317,19 @@ players : 1 humans, 0 bots (20 max)
 
 			local dist = pos:Distance(eyePos)
 			local shooterdist = tr.StartPos:Distance(eyePos)
-			local mr = math.random(9)
-
 			if not IsLookingAt(self:GetOwner(),eyePos) then return end
-			local SND = subsonic and "weapons/bullets/fx/subsonic_0" .. mr .. ".wav"
-				or bullet.Damage >= 50 and "cracks/" .. "heavy/heav" .. "_crack_0" .. mr .. ".ogg"
-				or bullet.Damage >= 30 and "cracks/" .. "medium/med" .. "_crack_0" .. mr .. ".ogg"
-				or "cracks/" .. "light/light" .. "_crack_0" .. mr .. ".ogg"
+			local flybySound = GetBulletFlybySound(true)
+			local crackSound = GetBulletFlybySound(false)
 
 			if dist < 180 then
 				timer.Simple(0.02,function()
-					EmitSound("weapons/bullets/fx/subsonic_0" .. mr .. ".wav", pos - tr.Normal * 25, 0, CHAN_ITEM, 1, 155)
+					EmitSound(flybySound, pos - tr.Normal * 25, 0, CHAN_ITEM, 1, 155)
 				end)
 				if !subsonic then
-					EmitSound(SND, pos - tr.Normal * 25, 0, CHAN_ITEM, 1, 155)
-					EmitSound(SND, pos - tr.Normal * 25, 0, CHAN_WEAPON, 1, 155)
-					EmitSound(SND, pos - tr.Normal * 25, 0, CHAN_REPLACE, 1, 155)
-					EmitSound(SND, pos - tr.Normal * 25, 0, CHAN_BODY, 1, 155)
+					EmitSound(crackSound, pos - tr.Normal * 25, 0, CHAN_ITEM, 1, 155)
+					EmitSound(crackSound, pos - tr.Normal * 25, 0, CHAN_WEAPON, 1, 155)
+					EmitSound(crackSound, pos - tr.Normal * 25, 0, CHAN_REPLACE, 1, 155)
+					EmitSound(crackSound, pos - tr.Normal * 25, 0, CHAN_BODY, 1, 155)
 				end
 			else return end
 			-- if dist > 120 then return end
@@ -369,10 +371,7 @@ players : 1 humans, 0 bots (20 max)
 			local direction = (eyePos - pos):GetNormalized()
 			local side = direction:Dot(lply:EyeAngles():Right())
 			local vertical = direction:Dot(lply:EyeAngles():Up())
-			local soundIndex = math.random(1, 9)
-			local soundName = strength > 0.6 and "cracks/heavy/heav_crack_0" or strength > 0.3 and "cracks/medium/med_crack_0" or "cracks/light/light_crack_0"
-
-			EmitSound(soundName .. soundIndex .. ".ogg", pos, 0, CHAN_WEAPON, 1, 140)
+			EmitSound(GetBulletFlybySound(false), pos, 0, CHAN_WEAPON, 1, 140)
 			Suppress(0.8 + strength * 3.2)
 			if hg_suppression_viewpunch and hg_suppression_viewpunch:GetBool() then
 				local punch = Angle(vertical * -0.35, side * -0.45, 0) * strength

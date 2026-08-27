@@ -23,22 +23,19 @@ local SUBSONIC_AUDIBLE_RADIUS = 900
 local DISTANT_CRACK_VOLUME = 0.8
 local DISTANT_CRACK_SOUND_LEVEL = 96
 
--- The remote Z-City crack pack is mounted on the server.  Keep the modern
--- snap sounds as a fallback for installations that do not have that pack.
-local function ResolveCrackSound(crack, fallback)
-    if file.Exists("sound/" .. crack, "GAME") then return crack end
-    return fallback
+local function GetBulletFlybySound(subsonic)
+    if subsonic then
+        return string.format("fx/subsonic_%02d.wav", math.random(1, 27))
+    end
+
+    return string.format("fx/supersonic_snap_%02d.wav", math.random(1, 12))
 end
 
 -- Suppression is determined on the server, while the physical-bullet client
 -- hook is not guaranteed to run for every remote bullet.  Play the fly-by
 -- sound from the same authoritative event that applies the suppression.
-local function PlaySuppressionCrack(pos, subsonic, damage, soundOnly)
-    local crack = subsonic and "bul_flyby/subsonic_" .. math.random(1, 27) .. ".wav"
-        or damage >= 50 and "cracks/heavy/heav_crack_0" .. math.random(1, 9) .. ".ogg"
-        or damage >= 30 and "cracks/medium/med_crack_0" .. math.random(1, 9) .. ".ogg"
-        or "cracks/light/light_crack_0" .. math.random(1, 9) .. ".ogg"
-    crack = ResolveCrackSound(crack, "bul_snap/supersonic_snap_" .. math.random(1, 18) .. ".wav")
+local function PlaySuppressionCrack(pos, subsonic, soundOnly)
+    local crack = GetBulletFlybySound(subsonic)
 
     local level = soundOnly and DISTANT_CRACK_SOUND_LEVEL or SUPPRESSION_SOUND_LEVEL
     local volume = soundOnly and DISTANT_CRACK_VOLUME or SUPPRESSION_SOUND_VOLUME
@@ -49,10 +46,7 @@ local function PlaySuppressionCrack(pos, subsonic, damage, soundOnly)
     sound.Play(crack, pos, level, math.random(97, 103), volume)
 
     if not soundOnly and not subsonic then
-        local whizz = "bul_flyby/subsonic_" .. math.random(1, 27) .. ".wav"
-        if file.Exists("sound/" .. whizz, "GAME") then
-            sound.Play(whizz, pos, math.max(level - 8, 75), math.random(103, 116), math.min(volume * 0.82, 1))
-        end
+        sound.Play(GetBulletFlybySound(true), pos, math.max(level - 8, 75), math.random(103, 116), math.min(volume * 0.82, 1))
     end
 end
 
@@ -80,7 +74,7 @@ net.Receive("ZCity_Wind_SuppressionForce", function()
     -- Hits have their own impact feedback; this event represents a clear
     -- near-miss, so it must also provide the audible crack.
     if not wasHit and playSound then
-        PlaySuppressionCrack(pos, subsonic, damage, soundOnly)
+        PlaySuppressionCrack(pos, subsonic, soundOnly)
     end
 
 	if not soundOnly and (not hg_suppression_viewpunch or hg_suppression_viewpunch:GetBool()) then
@@ -287,8 +281,7 @@ local function ApplyClientOverride()
                         local time = view.origin:Distance(midPos) / 17836
                         local soundPos = startPos + (hitPos - startPos) * 0.35
                         timer.Simple(time, function()
-							local crack = "cracks/distant/dist_crack_" .. string.format("%02d", math.random(1, 17)) .. ".ogg"
-							EmitSound(ResolveCrackSound(crack, "bul_snap/supersonic_snap_" .. math.random(1, 18) .. ".wav"), soundPos, 0, CHAN_AUTO, DISTANT_CRACK_VOLUME, DISTANT_CRACK_SOUND_LEVEL)
+							EmitSound(GetBulletFlybySound(false), soundPos, 0, CHAN_AUTO, DISTANT_CRACK_VOLUME, DISTANT_CRACK_SOUND_LEVEL)
                         end)
                     end
                 end
@@ -379,15 +372,8 @@ local function ApplyClientOverride()
                 local playPos = velocity and closestPos - velocity:GetNormalized() * 25 or closestPos
 				bullet._ZCityCrackPlayed = true
 
-				local damage = tonumber(bullet.Damage) or 0
-				local crack = subsonic and "bul_flyby/subsonic_" .. math.random(1, 27) .. ".wav"
-					or damage >= 50 and "cracks/heavy/heav_crack_0" .. math.random(1, 9) .. ".ogg"
-					or damage >= 30 and "cracks/medium/med_crack_0" .. math.random(1, 9) .. ".ogg"
-					or "cracks/light/light_crack_0" .. math.random(1, 9) .. ".ogg"
-				crack = ResolveCrackSound(crack, "bul_snap/supersonic_snap_" .. math.random(1, 18) .. ".wav")
+				local crack = GetBulletFlybySound(subsonic)
 
-				-- Keep the remote Z-City damage-tiered crack selection, with a
-				-- louder near-miss mix so it is not buried by weapon reports.
 				if HG_BulletImpactSounds and HG_BulletImpactSounds.PlayNearMiss(playPos, subsonic, SUPPRESSION_SOUND_LEVEL, SUPPRESSION_SOUND_VOLUME, crack) then return end
 				EmitSound(crack, playPos, 0, CHAN_ITEM, SUPPRESSION_SOUND_VOLUME, SUPPRESSION_SOUND_LEVEL)
             end)

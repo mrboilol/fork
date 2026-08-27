@@ -11,6 +11,12 @@ local function addNumberedSounds(sounds, folder, count, prefix)
 	end
 end
 
+local function addPaddedSounds(sounds, prefix, count)
+	for index = 1, count do
+		sounds[#sounds + 1] = string.format(prefix, index)
+	end
+end
+
 local fleshSounds = {
 	"bullet/ric_flesh1.mp3",
 	"bullet/ric_flesh2.mp3",
@@ -79,8 +85,8 @@ addNumberedSounds(tileSounds, "bfx/tile/", 8)
 
 local supersonicNearMissSounds = {}
 local subsonicNearMissSounds = {}
-addNumberedSounds(supersonicNearMissSounds, "bul_snap/supersonic_snap_", 18)
-addNumberedSounds(subsonicNearMissSounds, "bul_flyby/subsonic_", 27)
+addPaddedSounds(supersonicNearMissSounds, "fx/supersonic_snap_%02d.wav", 12)
+addPaddedSounds(subsonicNearMissSounds, "fx/subsonic_%02d.wav", 27)
 
 local ricochetSounds = {
 	"bullet/ricochet1.mp3",

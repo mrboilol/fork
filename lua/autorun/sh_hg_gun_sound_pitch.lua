@@ -21,6 +21,7 @@ local function isGunOrBulletSound(soundName)
 		or string_find(soundName, "gunshot", 1, true) ~= nil
 		or string_find(soundName, "gunfire", 1, true) ~= nil
 		or string_find(soundName, "bullet", 1, true) ~= nil
+		or string_find(soundName, "fx/", 1, true) ~= nil
 		or string_find(soundName, "ricochet", 1, true) ~= nil
 		or string_find(soundName, "cracks/", 1, true) ~= nil
 		or string_find(soundName, "universal/", 1, true) ~= nil
