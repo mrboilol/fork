@@ -327,10 +327,10 @@ local function getPalpitationThreat(org, blood, o2Value)
 end
 
 local function getHemorrhagicCollapseChance(collapseDepth)
-	-- Random rhythm collapse is an adjunct to sustained failure of derived
-	-- circulation, not a separate raw-blood threshold.
+	-- Collapse begins near 3000 mL, becomes meaningful around 2500 mL, and is
+	-- dangerous at 2000 mL once circulation has remained inadequate.
 	local riskDepth = math.Clamp(tonumber(collapseDepth) or 0, 0, 1)
-	return math.Clamp(riskDepth ^ 3 * 0.035, 0, 0.035)
+	return math.Clamp(riskDepth ^ 2 * 0.16, 0, 0.16)
 end
 
 local heatDamageTargets = {"brain", "heart", "liver", "stomach", "intestines"}
@@ -348,11 +348,11 @@ local hyperthermiaThoughts = {
 	{"Can't... take it...", "Everything's... fading...", "Too... hot..."}
 }
 local tachycardiaThoughts = {
-	"My heart is racing...",
-	"I can feel my heartbeat in my ears...",
-	"Why is my heart pounding so hard...",
-	"I can hear my own heartbeat...",
-	"My chest is pounding..."
+	"Your heart rate is dangerously elevated.",
+	"Tachycardia is straining your circulation.",
+	"Your pulse is racing.",
+	"Severe palpitations are affecting your circulation.",
+	"Your heart is beating too fast."
 }
 local cardiacArrestThoughts = {
 	"My heart... it's stopping...",
@@ -1030,7 +1030,7 @@ module[2] = function(owner, org, timeValue)
 	local myocardialFailure = math.Clamp((0.45 - (org.myocardialOxygen or 1)) / 0.45, 0, 1)
 	local hemorrhageElectricalInstability = math.max(electricalFlowFailure, electricalO2Failure, myocardialFailure)
 	org.hemorrhageElectricalInstability = hemorrhageElectricalInstability
-	local criticalReserve = cfg.CRITICAL_CIRCULATION_RESERVE or 0.68
+	local criticalReserve = cfg.CRITICAL_CIRCULATION_RESERVE or 0.42
 	local criticalRange = math.max(cfg.CRITICAL_CIRCULATION_RANGE or 0.50, 0.01)
 	local criticalHemorrhageDepth = math.Clamp((criticalReserve - circulatoryReserve) / criticalRange, 0, 1)
 	local terminalReserve = math.Clamp(cfg.TERMINAL_CIRCULATION_RESERVE or 0.035, 0, 0.25)

@@ -222,7 +222,7 @@ local hold_wound_clot_twohand_mul = 1.6
 -- Coagulation, wound pressure, tourniquets, and adrenaline continue to modify
 -- these rates normally rather than being bypassed by an instant-loss shortcut.
 local wound_bleed_rate_mul = 3.375
-local arterial_bleed_ml_s_per_severity = (hg.organism.config and hg.organism.config.ARTERIAL_BLEED_ML_S_PER_SEVERITY) or 8.25
+local arterial_bleed_ml_s_per_severity = (hg.organism.config and hg.organism.config.ARTERIAL_BLEED_ML_S_PER_SEVERITY) or 2.25
 local arterial_min_flow_fraction = (hg.organism.config and hg.organism.config.ARTERIAL_MIN_FLOW_FRACTION) or 0.08
 -- An amputated limb must remain an urgent arterial bleed.  This is lower than
 -- the old runaway jet, but high enough to be clearly visible and dangerous
@@ -527,11 +527,11 @@ module[2] = function(owner, org, mulTime)
 		org.internalBleedHemothoraxRisk = false
 	end
 
-	-- Severe internal bleeding can still compromise the pericardium. Pleural
-	-- accumulation is owned by sv_lungs so it has one progression path.
-	local thoracicSeverity = math.Clamp(internalBleedSeverity / 5, 0, 1)
-	local thoracicComplication = thoracicSeverity * (org.internalBleedComplication or 0)
-	local tamponadeTarget = thoracicComplication * math.Clamp((internalBleedSeverity - 2.5) / 7.5, 0, 1) * 0.65
+	-- Pericardial bleeding needs both a wounded heart and a catastrophic active
+	-- internal bleed. Pleural accumulation remains owned by sv_lungs.
+	local heartDamage = math.Clamp(tonumber(org.heart) or 0, 0, 1)
+	local severeCardiacBleed = math.Clamp((internalBleedSeverity - 7.5) / 2.5, 0, 1)
+	local tamponadeTarget = heartDamage * severeCardiacBleed * 0.65
 	org.cardiacTamponade = math.max(org.cardiacTamponade or 0, math.Approach(org.cardiacTamponade or 0, tamponadeTarget, mulTime / 24))
 
 	-- Nosebleed from severe internal bleeding
@@ -546,7 +546,7 @@ module[2] = function(owner, org, mulTime)
 	local preloadReserve = hg.organism.GetBloodDeliveryFraction and hg.organism.GetBloodDeliveryFraction(blood, 1)
 		or math.Clamp(blood / (hg.organism.normalBloodVolume or 5000), 0, 1)
 	local reserveLoss = 1 - preloadReserve
-	local criticalReserve = math.Clamp((hg.organism.config and hg.organism.config.CRITICAL_CIRCULATION_RESERVE) or 0.62, 0.1, 0.95)
+	local criticalReserve = math.Clamp((hg.organism.config and hg.organism.config.CRITICAL_CIRCULATION_RESERVE) or 0.42, 0.1, 0.95)
 	local normalBlood = math.max((hg.organism.config and hg.organism.config.NORMAL_BLOOD_VOLUME_ML) or 5000, 1)
 	local rawLossFraction = math.Clamp(1 - blood / normalBlood, 0, 1)
 	-- Subtle weakness begins with the first real loss. Catastrophic shock is still

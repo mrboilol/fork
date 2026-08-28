@@ -329,6 +329,7 @@ function hg.MedicalMinigame.StartBandageMinigame(ply, ent)
     end
     existingSession.weapon = wep
     existingSession.mode = IsValid(wep) and wep.mode or nil
+    existingSession.bone = IsValid(wep) and wep.GetBandageTargetBone and wep:GetBandageTargetBone(target, hg.eyeTrace(ply)) or nil
 
     net.Start("hg_medical_minigame_start")
     net.WriteString("bandage")
@@ -736,7 +737,7 @@ net.Receive("hg_medical_minigame_finish", function(len, ply)
         if wep.SetHolding then
             wep:SetHolding(100)
         end
-        local done = wep:Heal(target, bandageSession.mode)
+        local done = wep:Heal(target, bandageSession.mode, bandageSession.bone)
         if done and wep.PostHeal then
             wep:PostHeal(target, wep.mode)
         end
@@ -922,6 +923,11 @@ local function StartWeaponMinigameFromCommand(ply, requestedType, useTarget)
 
     if minigameType == "tourniquet" then
         hg.MedicalMinigame.StartTourniquetMinigame(ply, target)
+        return
+    end
+
+    if minigameType == "bandage" then
+        hg.MedicalMinigame.StartBandageMinigame(ply, target)
         return
     end
 

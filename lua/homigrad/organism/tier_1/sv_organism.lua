@@ -699,6 +699,13 @@ end
 
 function hg.organism.AddPanicAttack(org, amount, silent, combatEvent, ignoreGunfightProtection, universalStressApplied)
 	if not org then return 0 end
+	if (org.fury13 or 0) > 0 then
+		org.panicattackadd = 0
+		org.panicattack = 0
+		org.panicattackActive = false
+		org.panicAdrenalineUntil = 0
+		return 0
+	end
 	if not isnumber(amount) or amount <= 0 then return org.panicattackadd or 0 end
 	if combatEvent then hg.organism.MarkPanicGunfight(org) end
 	if not hg_panic:GetBool() then
@@ -1051,6 +1058,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.owner:SetPlayerClass("furry")
 	end
 	org.berserk = math.Approach(org.berserk, 0, timeValue / 60)
+	org.fury13 = math.Approach(org.fury13 or 0, 0, timeValue / 60)
 	org.noradrenaline = math.Approach(org.noradrenaline, 0, timeValue / 45)
 	local fear = org.fear or 0
 	local fearAdd = org.fearadd or 0
@@ -1060,8 +1068,15 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.panicSustainedFearSince = 0
 	end
 	local oldPanicAttack = org.panicattack or 0
-	org.panicattackadd = math.Approach(org.panicattackadd or 0, 0, timeValue / panicattack_add_decay_time)
-	org.panicattack = math.Approach(oldPanicAttack, org.panicattackadd or 0, timeValue / ((org.panicattackadd or 0) > oldPanicAttack and panicattack_rise_time or panicattack_decay_time))
+	if org.fury13 > 0 then
+		org.panicattackadd = 0
+		org.panicattack = 0
+		org.panicattackActive = false
+		org.panicAdrenalineUntil = 0
+	else
+		org.panicattackadd = math.Approach(org.panicattackadd or 0, 0, timeValue / panicattack_add_decay_time)
+		org.panicattack = math.Approach(oldPanicAttack, org.panicattackadd or 0, timeValue / ((org.panicattackadd or 0) > oldPanicAttack and panicattack_rise_time or panicattack_decay_time))
+	end
 	local oldSeizureBrain = org.lastSeizureBrain or (org.brain or 0)
 	local lobeDamage = getSeizureLobeDamage(org)
 	local oldSeizureLobeDamage = org.lastSeizureLobeDamage or lobeDamage

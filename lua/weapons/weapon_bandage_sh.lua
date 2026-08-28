@@ -313,12 +313,71 @@ function SWEP:Think()
 end
 SWEP.net_cooldown2 = 0
 
+local GetBandageableArteryWound
+
 local function ResolveBandageTarget(ent)
 	if not IsValid(ent) then return end
 	if ent:IsRagdoll() and hg and hg.RagdollOwner then
 		ent = hg.RagdollOwner(ent) or ent
 	end
 	return ent
+end
+
+local function GetTraceBone(trace, target)
+
+	if not trace or not IsValid(trace.Entity) then return end
+	local traced = trace.Entity
+	local bone = trace.PhysicsBone
+	if bone == nil or bone < 0 then return end
+
+	local boneIndex = traced.TranslatePhysBoneToBone and traced:TranslatePhysBoneToBone(bone) or bone
+	if not boneIndex or boneIndex < 0 then return end
+
+	local boneName = traced:GetBoneName(boneIndex)
+	if not boneName or boneName == "__INVALIDBONE__" then return end
+
+	if traced ~= target and target:LookupBone(boneName) then
+		return boneName
+	end
+
+	return boneName
+end
+
+function SWEP:GetBandageTargetBone(target, trace)
+	target = ResolveBandageTarget(target)
+	if not IsValid(target) then return end
+
+	local bone = GetTraceBone(trace, target)
+	if bone then return bone end
+
+	local org = target.organism
+	if not org then return end
+	local _, artery = GetBandageableArteryWound(org, target)
+	if artery and artery[4] then return artery[4] end
+
+	local largestWound
+	for _, wound in ipairs(org.wounds or {}) do
+		if (wound[1] or 0) > (largestWound and largestWound[1] or 0) then
+			largestWound = wound
+		end
+	end
+	if largestWound and largestWound[4] then return largestWound[4] end
+
+	if (org.skull or 0) >= 0.05 then return "ValveBiped.Bip01_Head1" end
+	if (org.lleg or 0) >= 0.05 then return "ValveBiped.Bip01_L_Calf" end
+	if (org.rleg or 0) >= 0.05 then return "ValveBiped.Bip01_R_Calf" end
+	if (org.larm or 0) >= 0.05 then return "ValveBiped.Bip01_L_Forearm" end
+	if (org.rarm or 0) >= 0.05 then return "ValveBiped.Bip01_R_Forearm" end
+	if (org.chest or 0) >= 0.05 then return "ValveBiped.Bip01_Spine2" end
+end
+
+local function IsBandageBone(bone, hitgroup)
+	if not bone then return false end
+	if hg and hg.bonetohitgroup and hg.bonetohitgroup[bone] == hitgroup then return true end
+	if hitgroup == HITGROUP_CHEST then
+		return string.find(bone, "Spine", 1, true) ~= nil or string.find(bone, "Pelvis", 1, true) ~= nil
+	end
+	return false
 end
 
 function SWEP:PrimaryAttack()
@@ -605,7 +664,7 @@ end
 -- WoundTBL = {dmgBlood / 2, localPos, localAng, bone, time}
 SWEP.ShouldDeleteOnFullUse = true
 
-local function GetBandageableArteryWound(org, ent, bone)
+GetBandageableArteryWound = function(org, ent, bone)
 	if not org or not org.arterialwounds then return end
 
 	local selectedIndex, selectedWound
@@ -766,35 +825,37 @@ if SERVER then
 			done = true
 		end
 
-		if (org.chest or 0) >= 0.05 and self.modeValues[1] >= amt then
+		if IsBandageBone(bone, HITGROUP_CHEST) and (org.chest or 0) >= 0.05 and self.modeValues[1] >= amt then
 			org.chest = math.max(org.chest - 0.08, 0)
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.avgpain = math.max(org.avgpain - 7, 0)
+			ent.bandaged_limbs = ent.bandaged_limbs or {}
+			ent.bandaged_limbs[bone] = true
 			done = true
 		end
 
-		if (org.lleg or 0) >= 0.05 and self.modeValues[1] >= amt and !org.llegamputated then
+		if IsBandageBone(bone, HITGROUP_LEFTLEG) and (org.lleg or 0) >= 0.05 and self.modeValues[1] >= amt and !org.llegamputated then
 			org.lleg = math.max(org.lleg - 0.08, 0)
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.avgpain = math.max(org.avgpain - 7, 0)
 			done = true
 		end
 
-		if (org.rleg or 0) >= 0.05 and self.modeValues[1] >= amt and !org.rlegamputated then
+		if IsBandageBone(bone, HITGROUP_RIGHTLEG) and (org.rleg or 0) >= 0.05 and self.modeValues[1] >= amt and !org.rlegamputated then
 			org.rleg = math.max(org.rleg - 0.08, 0)
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.avgpain = math.max(org.avgpain - 7, 0)
 			done = true
 		end
 
-		if (org.rarm or 0) >= 0.05 and self.modeValues[1] >= amt and !org.rarmamputated then
+		if IsBandageBone(bone, HITGROUP_RIGHTARM) and (org.rarm or 0) >= 0.05 and self.modeValues[1] >= amt and !org.rarmamputated then
 			org.rarm = math.max(org.rarm - 0.08, 0)
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.avgpain = math.max(org.avgpain - 7, 0)
 			done = true
 		end
 
-		if (org.larm or 0) >= 0.05 and self.modeValues[1] >= amt and !org.larmamputated then
+		if IsBandageBone(bone, HITGROUP_LEFTARM) and (org.larm or 0) >= 0.05 and self.modeValues[1] >= amt and !org.larmamputated then
 			org.larm = math.max(org.larm - 0.08, 0)
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.avgpain = math.max(org.avgpain - 7, 0)
@@ -1590,6 +1651,7 @@ function SWEP:StartBandageTPIK(target, button)
 	self.bandageTPIKUsing = true
 	self.bandageTPIKAwaitRelease = true
 	self.bandageTPIKTarget = target
+	self.bandageTPIKBone = self:GetBandageTargetBone(target, hg.eyeTrace(self:GetOwner()))
 	self.bandageTPIKButton = button
 	self.bandageTPIKStart = CurTime()
 	self._idleScheduled = nil
@@ -1618,6 +1680,7 @@ function SWEP:CancelBandageTPIK(reverse)
 	local wasUsing = self.bandageTPIKUsing
 	self.bandageTPIKUsing = nil
 	self.bandageTPIKTarget = nil
+	self.bandageTPIKBone = nil
 	self.bandageTPIKButton = nil
 	self.bandageTPIKStart = nil
 	self.bandageTPIKUseTime = nil
@@ -1641,6 +1704,7 @@ function SWEP:FinishBandageTPIK()
 	timer.Remove(timerName)
 
 	local target = self.bandageTPIKTarget
+	local bone = self.bandageTPIKBone
 	self:CancelBandageTPIK(false)
 	if not IsValid(target) then
 		self:PlayAnim("idle")
@@ -1650,7 +1714,7 @@ function SWEP:FinishBandageTPIK()
 	if hg.GetCurrentCharacter(target) == hg.GetCurrentCharacter(self:GetOwner()) then
 		self:SetHolding(100)
 	end
-	local done = self:Heal(target, self.mode)
+	local done = self:Heal(target, self.mode, bone)
 	if done and self.PostHeal then self:PostHeal(target, self.mode) end
 	if IsValid(self) then
 		self:SetNetVar("modeValues", self.modeValues)

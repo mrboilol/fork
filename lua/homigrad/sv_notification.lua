@@ -724,30 +724,6 @@ function PLAYER:ResetNotification(key)
     ResetNotification(self,key)
 end
 
-local combatThoughtOrgans = {
-	{"heart", "heart"}, {"liver", "liver"}, {"stomach", "stomach"}, {"intestines", "intestines"},
-	{"lungsL", "left lung", 1}, {"lungsR", "right lung", 1}, {"trachea", "windpipe"},
-	{"brain", "brain"}, {"eyeL", "left eye"}, {"eyeR", "right eye"},
-}
-
-local combatThoughtBones = {
-	{"skull", "skull"}, {"jaw", "jaw"}, {"chest", "ribs"}, {"pelvis", "pelvis"},
-	{"spine1", "lower spine"}, {"spine2", "upper spine"}, {"spine3", "neck"},
-	{"larm", "left forearm"}, {"rarm", "right forearm"}, {"larmup", "left upper arm"}, {"rarmup", "right upper arm"},
-	{"lleg", "left lower leg"}, {"rleg", "right lower leg"}, {"llegup", "left thigh"}, {"rlegup", "right thigh"},
-}
-
-local combatThoughtArteries = {
-	{"arteria", "neck artery"}, {"rarmartery", "right arm artery"}, {"larmartery", "left arm artery"},
-	{"rlegartery", "right leg artery"}, {"llegartery", "left leg artery"}, {"spineartery", "spinal artery"},
-}
-
-local function combatThoughtValue(org, info)
-	local value = org[info[1]]
-	if info[3] then value = istable(value) and value[info[3]] or 0 end
-	return tonumber(value) or 0
-end
-
 local function combatThoughtStoppedBreathing(org)
 	if org.heartstop or org.choking then return true end
 	if (org.trachea or 0) >= 0.95 then return true end
@@ -756,131 +732,17 @@ end
 
 function hg.CaptureCombatInjuryState(org)
 	if not org then return end
-	local state = {organs = {}, bones = {}, arteries = {}, otrub = org.otrub or org.needotrub, notBreathing = combatThoughtStoppedBreathing(org)}
-	for _, info in ipairs(combatThoughtOrgans) do state.organs[info[1]] = combatThoughtValue(org, info) end
-	for _, info in ipairs(combatThoughtBones) do
-		state.bones[info[1]] = combatThoughtValue(org, info)
-		state.bones[info[1] .. "dislocation"] = org[info[1] .. "dislocation"] and true or false
-	end
-	for _, info in ipairs(combatThoughtArteries) do state.arteries[info[1]] = combatThoughtValue(org, info) end
-	return state
-end
-
-local meleeHitgroupNames = {
-	[HITGROUP_HEAD] = "head", [HITGROUP_CHEST] = "chest", [HITGROUP_STOMACH] = "abdomen",
-	[HITGROUP_LEFTARM] = "left arm", [HITGROUP_RIGHTARM] = "right arm",
-	[HITGROUP_LEFTLEG] = "left leg", [HITGROUP_RIGHTLEG] = "right leg", [8] = "pelvis",
-}
-
-local meleeImpactResults = {
-	[HITGROUP_HEAD] = "bruising their skull",
-	[HITGROUP_CHEST] = "bruising their ribs",
-	[HITGROUP_STOMACH] = "bruising their abdomen",
-	[HITGROUP_LEFTARM] = "bruising their left arm",
-	[HITGROUP_RIGHTARM] = "bruising their right arm",
-	[HITGROUP_LEFTLEG] = "bruising their left leg",
-	[HITGROUP_RIGHTLEG] = "bruising their right leg",
-	[8] = "bruising their pelvis",
-}
-
-local function getMeleeStrikePrefix(weapon, damage, hitgroup, damageType)
-	local owner = weapon:GetOwner()
-	local stamina = IsValid(owner) and owner.organism and owner.organism.stamina and tonumber(owner.organism.stamina[1]) or 100
-	local weaponDamage = math.max(tonumber(weapon.DamagePrimary) or 0, tonumber(weapon.DamageSecondary) or 0, 1)
-	local weaponWeight = tonumber(weapon.weight) or tonumber(weapon.Weight) or 0
-	local force = math.Clamp(stamina / 100 * 0.25 + math.Clamp(weaponDamage / 55, 0, 1) * 0.25 + math.Clamp(weaponWeight / 4, 0, 1) * 0.15 + math.Clamp((damage or 0) / 35, 0, 1) * 0.35, 0, 1)
-	local target = meleeHitgroupNames[hitgroup] or "body"
-	local name = weapon.PrintName or weapon:GetClass() or "weapon"
-	local heldWeapon = (weapon:GetClass() == "weapon_hands_sh" or weapon:GetClass() == "weapon_hg_coolhands") and "your fist" or "the " .. string.lower(name)
-	local sharp = damageType and bit.band(damageType, DMG_SLASH) == DMG_SLASH
-
-	if sharp then
-		if force >= 0.72 then return "You drive " .. heldWeapon .. " into their " .. target, force end
-		if force >= 0.42 then return "You slash " .. heldWeapon .. " across their " .. target, force end
-		return "You cut their " .. target .. " with " .. heldWeapon, force
-	end
-
-	if force >= 0.72 then return "You slam " .. heldWeapon .. " into their " .. target, force end
-	if force >= 0.42 then return "You swing " .. heldWeapon .. " into their " .. target, force end
-	return "You clip their " .. target .. " with " .. heldWeapon, force
-end
-
-local function getMeleeInjuryOutcome(org, before, force, hitgroup)
-	if not before.otrub and (org.otrub or org.needotrub) then return "rendering them unresponsive" end
-	if not before.notBreathing and combatThoughtStoppedBreathing(org) then return "leaving them unable to breathe" end
-
-	for _, info in ipairs(combatThoughtArteries) do
-		if before.arteries[info[1]] < 1 and combatThoughtValue(org, info) >= 1 then return "opening their " .. info[2] end
-	end
-
-	for _, info in ipairs(combatThoughtOrgans) do
-		local old, new = before.organs[info[1]], combatThoughtValue(org, info)
-		if old < 0.95 and new >= 0.95 then return "destroying their " .. info[2] end
-		if new > old + 0.005 then return "damaging their " .. info[2] end
-	end
-
-	for _, info in ipairs(combatThoughtBones) do
-		local old, new = before.bones[info[1]], combatThoughtValue(org, info)
-		if not before.bones[info[1] .. "dislocation"] and org[info[1] .. "dislocation"] then return "dislocating their " .. info[2] end
-		if old < 0.95 and new >= 0.95 then return "breaking their " .. info[2] end
-		if new > old + 0.005 then return "injuring their " .. info[2] end
-	end
-
-	return meleeImpactResults[hitgroup] or (force >= 0.72 and "leaving a heavy bruise" or "leaving a bruise")
+	return {otrub = org.otrub or org.needotrub, notBreathing = combatThoughtStoppedBreathing(org)}
 end
 
 function hg.ReportCombatInjuryState(attacker, victim, org, before, meleeWeapon, meleeContact, damage, damageType)
 	if not IsValid(attacker) or not attacker:IsPlayer() or attacker == victim or not org or not before then return end
 	if attacker:GetInfoNum("hg_newthoughts", 0) <= 0 then return end
-	if IsValid(meleeWeapon) and meleeContact then
-		local strike, force = getMeleeStrikePrefix(meleeWeapon, damage, meleeContact.hitGroup, damageType)
-		-- CreateThought(attacker, strike .. ", " .. getMeleeInjuryOutcome(org, before, force, meleeContact.hitGroup) .. ".", 2, "combat_melee_" .. meleeWeapon:EntIndex() .. "_" .. (IsValid(victim) and victim:EntIndex() or 0), 0, Color(255, 220, 190))
-		return
-	end
-
 	local message, key
 	if not before.otrub and (org.otrub or org.needotrub) then
 		message, key = "They collapse and stop responding.", "combat_knockout"
 	elseif not before.notBreathing and combatThoughtStoppedBreathing(org) then
 		message, key = "They stop breathing.", "combat_breathing"
-	end
-
-	if not message then
-		for _, info in ipairs(combatThoughtArteries) do
-			if before.arteries[info[1]] < 1 and combatThoughtValue(org, info) >= 1 then
-				message, key = "You opened their " .. info[2] .. ".", "combat_artery_" .. info[1]
-				break
-			end
-		end
-	end
-
-	if not message then
-		for _, info in ipairs(combatThoughtOrgans) do
-			local old, new = before.organs[info[1]], combatThoughtValue(org, info)
-			if old < 0.95 and new >= 0.95 then
-				message, key = "Their " .. info[2] .. " is destroyed.", "combat_organ_destroyed_" .. info[1]
-				break
-			elseif new > old + 0.025 then
-				message, key = "You damaged their " .. info[2] .. ".", "combat_organ_damaged_" .. info[1]
-				break
-			end
-		end
-	end
-
-	if not message then
-		for _, info in ipairs(combatThoughtBones) do
-			local old, new = before.bones[info[1]], combatThoughtValue(org, info)
-			if not before.bones[info[1] .. "dislocation"] and org[info[1] .. "dislocation"] then
-				message, key = "You dislocated their " .. info[2] .. ".", "combat_dislocation_" .. info[1]
-				break
-			elseif old < 0.95 and new >= 0.95 then
-				message, key = "You destroyed their " .. info[2] .. ".", "combat_bone_destroyed_" .. info[1]
-				break
-			elseif new > old + 0.025 then
-				message, key = "You damaged their " .. info[2] .. ".", "combat_bone_damaged_" .. info[1]
-				break
-			end
-		end
 	end
 
 	if message then CreateThought(attacker, message, 2, key, 0, Color(255, 220, 190)) end

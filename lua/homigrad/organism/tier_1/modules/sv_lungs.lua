@@ -589,41 +589,30 @@ module[2] = function(owner, org, timeValue)
 		org.pneumothorax = max(org.pneumothorax - timeValue / 10, 0)
 	end
 
-	-- Hemothorax requires a badly damaged thoracic organ together with a severe
-	-- active internal bleed. Unrelated bleeding only qualifies through its rare
-	-- catastrophic complication roll. Routine chest and abdominal injuries do
-	-- not slowly fill the pleural space.
+	-- A damaged thoracic organ can bleed into the pleural space from any active
+	-- internal bleed. The amount and fill speed stay proportional to severity,
+	-- so small bleeds begin slowly while catastrophic ones build rapidly.
 	local internalBleedVal = org.internalBleed or 0
-	local internalBleedPeak = math.max(org.internalBleedPeak or internalBleedVal, internalBleedVal)
-	local bleedComplication = math.Clamp(org.internalBleedComplication or 0, 0, 1)
 	local thoracicOrganDamage = math.Clamp(math.max(
 		org.heart or 0,
 		org.trachea or 0,
 		org.lungsL[1] or 0,
 		org.lungsR[1] or 0
 	), 0, 1)
-	local severeThoracicDamage = math.Clamp((thoracicOrganDamage - 0.55) / 0.45, 0, 1)
-	local severeInternalBleed = math.Clamp((internalBleedPeak - 1.5) / 4.5, 0, 1)
-	local severeThoracicBleed = severeThoracicDamage > 0 and severeInternalBleed > 0 and internalBleedVal > 1.25
-	local catastrophicBleed = org.internalBleedHemothoraxRisk == true and internalBleedPeak >= 4 and bleedComplication >= 0.35
+	local bleedSeverity = math.Clamp(internalBleedVal / 10, 0, 1)
+	local thoracicBleed = thoracicOrganDamage > 0 and bleedSeverity > 0
 	if needleActive then
 		org.hemothoraxTrauma = max(org.hemothoraxTrauma - timeValue / 120, 0)
 		org.hemothoraxL = max(org.hemothoraxL - timeValue / 120, 0)
 		org.hemothoraxR = max(org.hemothoraxR - timeValue / 120, 0)
-	elseif severeThoracicBleed or catastrophicBleed then
+	elseif thoracicBleed then
 		if org.internalBleedLungSide != "L" and org.internalBleedLungSide != "R" then
 			org.internalBleedLungSide = math.random(2) == 1 and "L" or "R"
 		end
 
-		local severityK = math.Clamp((internalBleedPeak - 1.5) / 4.5, 0, 1)
-		-- Pleural filling is deliberately measured in minutes. Severe injuries
-		-- progress faster, but no longer jump from a routine bleed to respiratory
-		-- failure in under a minute.
-		local fillTime = Lerp(severityK, 420, 180)
-		local bilateral = internalBleedPeak >= 6 and (severeThoracicDamage >= 0.75 or bleedComplication >= 0.75)
-		local injuryTarget = severeThoracicDamage * severeInternalBleed
-		local complicationTarget = catastrophicBleed and bleedComplication * math.Clamp((internalBleedPeak - 4) / 6, 0, 1) or 0
-		local hemothoraxTarget = math.Clamp(math.max(injuryTarget, complicationTarget), 0, 1)
+		local fillTime = Lerp(bleedSeverity, 720, 150)
+		local bilateral = bleedSeverity >= 0.6 and thoracicOrganDamage >= 0.75
+		local hemothoraxTarget = thoracicOrganDamage * bleedSeverity
 		local targetL = (bilateral or org.internalBleedLungSide == "L") and hemothoraxTarget or 0
 		local targetR = (bilateral or org.internalBleedLungSide == "R") and hemothoraxTarget or 0
 

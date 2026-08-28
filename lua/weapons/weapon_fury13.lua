@@ -277,6 +277,11 @@ if SERVER then
 
 		if !ent.PlayerClassName or ent.PlayerClassName != "furry" then
 			org.berserk = org.berserk + 2
+			org.fury13 = (org.fury13 or 0) + 2
+			org.panicattackadd = 0
+			org.panicattack = 0
+			org.panicattackActive = false
+			org.panicAdrenalineUntil = 0
 		else
 			org.o2["curregen"] = 0
 			org.o2["regen"] = 0

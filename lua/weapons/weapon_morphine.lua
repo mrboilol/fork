@@ -338,7 +338,7 @@ if SERVER then
 			org.analgesiaAdd = math.min((org.analgesiaAdd or 0) + lacedAmount, 25)
 			self.HG_FentanylLacedAmount = nil
 		end
-		local injected = math.min(FrameTime() * 0.5, self.modeValues[1])
+		local injected = math.min(hg_healanims:GetBool() and self.modeValues[1] or FrameTime() * 0.5, self.modeValues[1])
 		org.analgesiaAdd = math.min(org.analgesiaAdd + injected, 4)
 		self.modeValues[1] = math.max(self.modeValues[1] - injected, 0)
 
