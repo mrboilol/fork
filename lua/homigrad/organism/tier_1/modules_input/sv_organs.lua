@@ -4,6 +4,7 @@ local function isCrush(dmgInfo)
 end
 
 local function damageOrgan(org, dmg, dmgInfo, key)
+	dmg = dmg / math.max(org.organStrengthMul or 1, 1)
 	local prot = math.max(0.3 - org[key],0)
 	local oldval = org[key]
 	org[key] = math.Round(math.min(org[key] + dmg * (isCrush(dmgInfo) and 1 or 3), 1), 3)
@@ -353,6 +354,9 @@ end
 local function hitArtery(artery, org, dmg, dmgInfo, boneindex, dir, hit, impact)
 	if isCrush(dmgInfo) then return 1 end
 	if dmgInfo:IsDamageType(DMG_BLAST) then return 1 end
+	local arteryResistance = math.max(org.arteryResistanceMul or 1, 1)
+	if arteryResistance > 1 and math.Rand(0, 1) > 1 / arteryResistance then return 1 end
+	dmg = dmg / arteryResistance
 	if dmgInfo:IsDamageType(DMG_SLASH) and dmg < 2 then
 		local staminaMul = getStaminaMul(dmgInfo)
 		local arteryChanceMul = getArteryChanceMul(dmgInfo)
@@ -481,8 +485,8 @@ input_list.lungsL = function(org, bone, dmg, dmgInfo)
 
 	hg.AddHarmToAttacker(dmgInfo, (dmg * 0.25), "Lung left damage harm")
 
-	org.lungsL[1] = math.min(org.lungsL[1] + dmg / 4, 1)
-	if (dmgInfo:IsDamageType(DMG_BULLET+DMG_SLASH+DMG_BUCKSHOT)) or (math.random(3) == 1) then org.lungsL[2] = math.min(org.lungsL[2] + dmg * 1, 1) end
+	org.lungsL[1] = math.min(org.lungsL[1] + dmg / 4 / math.max(org.organStrengthMul or 1, 1), 1)
+	if (dmgInfo:IsDamageType(DMG_BULLET+DMG_SLASH+DMG_BUCKSHOT)) or (math.random(3) == 1) then org.lungsL[2] = math.min(org.lungsL[2] + dmg / math.max(org.organStrengthMul or 1, 1), 1) end
 
 	addInternalBleed(org, (org.lungsL[1] - oldval) * 2, "lungsL")
 	applyOrganTrauma(org, dmgInfo, dmg, org.lungsL[1] - oldval, oldval, "lungsL")
@@ -497,8 +501,8 @@ input_list.lungsR = function(org, bone, dmg, dmgInfo)
 
 	hg.AddHarmToAttacker(dmgInfo, (dmg * 0.25), "Lung right damage harm")
 
-	org.lungsR[1] = math.min(org.lungsR[1] + dmg / 4, 1)
-	if (dmgInfo:IsDamageType(DMG_BULLET+DMG_SLASH+DMG_BUCKSHOT)) or (math.random(3) == 1) then org.lungsR[2] = math.min(org.lungsR[2] + dmg * 1, 1) end
+	org.lungsR[1] = math.min(org.lungsR[1] + dmg / 4 / math.max(org.organStrengthMul or 1, 1), 1)
+	if (dmgInfo:IsDamageType(DMG_BULLET+DMG_SLASH+DMG_BUCKSHOT)) or (math.random(3) == 1) then org.lungsR[2] = math.min(org.lungsR[2] + dmg / math.max(org.organStrengthMul or 1, 1), 1) end
 
 	addInternalBleed(org, (org.lungsR[1] - oldval) * 2, "lungsR")
 	applyOrganTrauma(org, dmgInfo, dmg, org.lungsR[1] - oldval, oldval, "lungsR")

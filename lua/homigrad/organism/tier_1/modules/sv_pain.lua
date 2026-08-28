@@ -156,7 +156,7 @@ module[2] = function(owner, org, timeValue)
 	-- A Zerlkers dose is deliberately stronger than a natural adrenaline rush:
 	-- it delays new pain, rapidly settles existing pain, and raises the point at
 	-- which pain can force a ragdoll. It does not alter injury or vital damage.
-	local painToleranceMul = 1 + resilience * 0.2 + zerlkers * 1.3
+	local painToleranceMul = (1 + resilience * 0.2 + zerlkers * 1.3) * math.max(org.painToleranceMul or 1, 1)
 	org.pain_turn = (org.otrub and adrenalineMul * otrub_pain_tolerance or adrenalineMul * pain_tolerance) * painToleranceMul
 
 	local owner = org.owner
@@ -219,7 +219,7 @@ module[2] = function(owner, org, timeValue)
 		org.shock = math.Approach(org.shock, painShockTarget, timeValue * painShockGain * (1 - shockResistance))
 	end
 
-	local shockThreshold = shock_consciousness_threshold * analgesiaMul * painkillerMul * (1 + resilience * 0.6 + zerlkersResistance * 1.4)
+	local shockThreshold = shock_consciousness_threshold * analgesiaMul * painkillerMul * (1 + resilience * 0.6 + zerlkersResistance * 1.4) * math.max(org.traumaResistanceMul or 1, 1)
 	local shockActive = org.shock > shockThreshold
 	if shockActive then
 		local shockTarget = Clamp(math.Remap(org.shock, shockThreshold, shock_consciousness_max, shock_consciousness_soft_target, shock_consciousness_hard_target), shock_consciousness_hard_target, shock_consciousness_soft_target)
@@ -286,7 +286,7 @@ module[2] = function(owner, org, timeValue)
 	-- Anger grants a small pain resistance. Stimulants defer incoming pain via
 	-- painadd above instead of directly deleting pain already incurred.
 	local angerPainMul = 1 - anger * anger_pain_reduction_max
-	org.pain = org.avgpain * math.max(1 - (org.analgesia + org.painkiller * 0.3), 0) * angerPainMul
+	org.pain = org.avgpain * math.max(1 - (org.analgesia + org.painkiller * 0.3), 0) * angerPainMul / math.max(org.painResistanceMul or 1, 1)
 	if zerlkersDose > 0 or adrenaline >= 3 then
 		org.pain = math.min(org.pain, 69.99)
 	end
@@ -294,7 +294,7 @@ module[2] = function(owner, org, timeValue)
 	-- finished lowering consciousness. The smooth severity curve keeps moderate
 	-- pain occasional and makes sustained extreme pain progressively less stable.
 	local syncopeSeverity = Clamp((org.pain - pain_syncope_start) / (pain_syncope_full - pain_syncope_start), 0, 1)
-	local syncopeResistance = Clamp(resilience * 0.35 + zerlkersResistance * 0.8, 0, 0.9)
+	local syncopeResistance = Clamp(resilience * 0.35 + zerlkersResistance * 0.8 + (math.max(org.traumaResistanceMul or 1, 1) - 1) * 0.2, 0, 0.9)
 	local syncopeRate = syncopeSeverity ^ 1.7 * pain_syncope_max_rate * (1 - syncopeResistance)
 	if not org.otrub and syncopeRate > 0 and math.random() < Clamp(syncopeRate * timeValue, 0, 1) then
 		org.consciousness = math.min(org.consciousness or 1, 0.2)

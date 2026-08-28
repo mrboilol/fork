@@ -1667,8 +1667,9 @@ function MODE:EndRound()
 	end)
 end
 
--- hook.Add("Player_Death", "HMCD_PlayerDeath", function(_, ply)
-hook.Add("Player_Death", "HMCD_PlayerDeath", function(ply, _)
+hook.Add("PlayerDeath", "HMCD_PlayerDeath", function(ply, inflictor, attacker)
+	if zb.ROUND_STATE ~= 1 or CurrentRound() ~= MODE then return end
+
 	local most_harm,biggest_attacker = 0,nil
 	local last_attacker = nil
 
@@ -1684,6 +1685,11 @@ hook.Add("Player_Death", "HMCD_PlayerDeath", function(ply, _)
 				biggest_attacker = attacker:Name()
 				last_attacker = attacker
 			end
+		end
+
+		if not IsValid(last_attacker) and IsValid(attacker) and attacker:IsPlayer() then
+			biggest_attacker = attacker:Name()
+			last_attacker = attacker
 		end
 		
 

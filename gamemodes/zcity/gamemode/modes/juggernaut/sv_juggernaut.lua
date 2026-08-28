@@ -168,6 +168,12 @@ local function ClearJuggBuffs(ply)
 	org.silentBerserk = nil
 	org.armorMul = nil
 	org.painToleranceMul = nil
+	org.boneStrengthMul = nil
+	org.organStrengthMul = nil
+	org.arteryResistanceMul = nil
+	org.conditionResistanceMul = nil
+	org.traumaResistanceMul = nil
+	org.painResistanceMul = nil
 	org.NoKnockdown = nil
 	org.berserk = 0
 	local s = org.stamina
@@ -187,6 +193,13 @@ local function ApplyJuggernautBuffs(ply)
 	org.recoilmul = 0.6
 	org.legstrength = 1.1
 	org.meleespeed = 1.15
+	org.boneStrengthMul = 4
+	org.organStrengthMul = 3
+	org.arteryResistanceMul = 3
+	org.conditionResistanceMul = 0.3
+	org.traumaResistanceMul = 3
+	org.painResistanceMul = 3
+	org.painToleranceMul = 4
 
 	if IsFury(ply) then
 		org.berserk = MODE.BerserkStrength
@@ -197,7 +210,6 @@ local function ApplyJuggernautBuffs(ply)
 
 	if MODE.variant == 2 then
 		org.armorMul = 6
-		org.painToleranceMul = 4
 		org.blood = 7500
 		org.NoKnockdown = true
 	elseif MODE.variant == 3 then
@@ -205,10 +217,8 @@ local function ApplyJuggernautBuffs(ply)
 		org.painToleranceMul = 5
 		org.blood = 6000
 		org.NoKnockdown = true
-		org.boneStrengthMul = 4
 	else
 		org.armorMul = nil
-		org.painToleranceMul = nil
 		org.NoKnockdown = true
 	end
 

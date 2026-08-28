@@ -192,6 +192,16 @@ hook.Add("Think", "HG_UpdatePickupSelection", function()
 	sendPickupSelection(ply:KeyDown(IN_WALK) and selectedPickup or nil)
 end)
 
+hook.Add("PreDrawHalos", "HG_HighlightPickupCandidates", function()
+	local ply = LocalPlayer()
+	if not IsValid(ply) or not ply:Alive() or not ply:KeyDown(IN_WALK) then return end
+
+	local pickups = scanNearbyPickups(ply)
+	if #pickups > 0 then
+		halo.Add(pickups, Color(255, 210, 80), 2, 2, 1, true, false)
+	end
+end)
+
 function hg.EnsurePickupHudHint(ent)
 	if not IsValid(ent) or ent.HudHintMarkup then return end
 

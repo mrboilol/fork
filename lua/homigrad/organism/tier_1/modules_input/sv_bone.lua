@@ -23,7 +23,7 @@ local function damageBone(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ric
 	
 	local breakBoneMul = dmgInfo:GetInflictor().BreakBoneMul or 1
 	if dmgInfo:IsDamageType(DMG_CLUB) then breakBoneMul = breakBoneMul * 0.8 end
-	dmg = dmg * breakBoneMul
+	dmg = dmg * breakBoneMul / math.max(org.boneStrengthMul or 1, 1)
 	
 	if crush then
 		crush = halfValue2(1 - org[key], 1, 0.5)

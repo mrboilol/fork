@@ -966,11 +966,12 @@ local function protec(org, bone, dmg, dmgInfo, placement, armor, scale, scalepro
 		local normal = impact.normal
 		local incidence = isvector(normal) and math.abs(shotDir:Dot(normal)) or 1
 		local angleMul = math.Clamp(1 / math.max(incidence, 0.4), 1, 2.5)
-		local resistance = ballisticProt * regionWear * (org.owner.armors_broken_mul[armor] or 1) * angleMul
+		local resistance = ballisticProt * 2.25 * regionWear * (org.owner.armors_broken_mul[armor] or 1) * angleMul
 		local stopped = impact.penetrationBefore <= resistance
 		local penetrationCost = math.min(resistance, impact.penetrationBefore)
-		local absorbedFraction = math.Clamp(penetrationCost / math.max(impact.initialPenetration, 1), 0, 1)
-		local energyCost = math.min(impact.energyBefore, impact.initialEnergy * absorbedFraction)
+		local overmatch = math.max(impact.penetrationBefore - resistance, 0) / math.max(impact.penetrationBefore, 1)
+		local penetrationDamageScale = math.Clamp(overmatch * 0.6, 0.04, 0.3)
+		local energyCost = stopped and impact.energyBefore or impact.energyBefore * (1 - penetrationDamageScale)
 		local bluntTransfer = armorData.bluntTransfer or (placement == "head" and 0.22 or 0.18)
 		local bluntDamage = energyCost * bluntTransfer
 
@@ -988,8 +989,11 @@ local function protec(org, bone, dmg, dmgInfo, placement, armor, scale, scalepro
 					org.owner:ViewPunch(Angle(math.Rand(-1.5, -0.7), math.Rand(-0.8, 0.8), math.Rand(-0.5, 0.5)))
 				end
 			else
-				org.lastArmorMitigation = 0.85
+				org.lastArmorMitigation = penetrationDamageScale
 			end
+		end
+		if placement == "head" and not stopped then
+			org.lastHeadArmorMitigation = penetrationDamageScale
 		end
 
 		return {

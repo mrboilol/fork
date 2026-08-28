@@ -1399,7 +1399,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		local painkillerMul = (org.painkiller * 0.5 + 1)
 	
 		org.shock_turn = 10 * (!org.otrub and 1 or 0.1)
-		local collapseThreshold = org.shock_turn * 1.5 * analgesiaMul * painkillerMul
+		local collapseThreshold = org.shock_turn * 1.5 * analgesiaMul * painkillerMul * math.max(org.traumaResistanceMul or 1, 1)
 
 		if org.shock > collapseThreshold then
 			timer.Simple(0, function() hg.Fake(org.owner) end)
@@ -1868,7 +1868,8 @@ function hg.organism.DamageTypeAffliction(dmg, dmgInfo, ply, org)
 		hg.organism.RadDamage(org, dmg, dmgInfo)
 	end
 
-	return dmgBlood * 2, dmgHurt, instaPain / 20, immobilization
+	local traumaResistance = math.max(org.traumaResistanceMul or 1, 1)
+	return dmgBlood * 2, dmgHurt, instaPain / 20 / traumaResistance, immobilization / traumaResistance
 end
 
 local util_TraceLine = util.TraceLine

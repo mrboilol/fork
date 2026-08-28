@@ -162,12 +162,23 @@ local list = {
 	{"systolic", 120},
 	{"diastolic", 80},
 	{"cardiacOutput", 1},
+	{"strokeVolume", 1},
 	{"myocardialOxygen", 1},
+	{"perfusion", 1},
+	{"cerebralPerfusion", 1},
+	{"peripheralperfusion", 1},
+	{"brainoxygen", 1},
 	{"heartStrain", 1, true},
 	{"hypertension", 1, true},
 	{"hypotension", 1, true},
 	{"pulse", 70}, 
-	{"heartbeat", 70}, false, 
+	{"heartbeat", 70},
+	"ecgState",
+	{"cardiacTamponade", true, true},
+	{"ischemia", 1, true},
+	{"brainSwelling", 1, true},
+	{"intracranialPressure", 1, true},
+	0,
 	{"stomach", 1, true}, 
 	{"liver", 1, true}, 
 	{"intestines", 1, true}, 
@@ -186,6 +197,7 @@ local list = {
 	0, 
 	{"o2", {"o2", "range"}}, 
 	"CO",
+	{"hypoxiaTime", 1, true},
 	{"lungsfunction", true, false},
 	"COregen",
 	"LodgedEntities",
@@ -213,6 +225,7 @@ local Round = math.Round -- Тут были плохие слова от дек�
 local red, green = Color(255, 0, 0), Color(0, 255, 0)
 local function getTextTable(org)
 	local textList = {}
+	local shown = {}
 	for i, v in pairs(list) do
 		local text1, text2 = "", ""
 		local value
@@ -258,8 +271,35 @@ local function getTextTable(org)
 			text2 = isnumber(org[v]) and string.sub(string.format("%f", org[v]),1,-5) or org[v]
 		end
 		
-		textList[#textList + 1] = {text1, text2, r, g, b}
+		if text1 != "" then
+			shown[text1] = true
+			textList[#textList + 1] = {text1, text2, r, g, b}
+		end
 	end
+
+	local extra = {}
+	local function addValues(prefix, value, depth)
+		if depth > 2 then return end
+		local valueType = type(value)
+		if valueType == "number" or valueType == "string" or valueType == "boolean" then
+			if !shown[prefix] then
+				extra[#extra + 1] = {prefix, valueType == "number" and string.sub(string.format("%f", value), 1, -5) or tostring(value)}
+			end
+			return
+		end
+		if valueType != "table" then return end
+		for key, child in pairs(value) do
+			if type(key) == "string" or type(key) == "number" then
+				addValues(prefix .. "." .. tostring(key), child, depth + 1)
+			end
+		end
+	end
+
+	for key, value in pairs(org) do
+		if key != "owner" and type(key) == "string" then addValues(key, value, 0) end
+	end
+	table.sort(extra, function(a, b) return a[1] < b[1] end)
+	table.Add(textList, extra)
 
 	return textList
 end
@@ -297,6 +337,31 @@ local trahalgmod = Color(0, 0, 0, 75)
 local weight = 200
 local developer = GetConVar("developer")
 local hg_stats = GetConVar("hg_stats") or CreateClientConVar("hg_stats", 1, true, false, "show stats", 0, 1)
+local function drawStatsTable(textList, startX, startY, direction, h)
+	local rows = math.max(1, math.floor((ScrH() - startY - 15) / h))
+	local columns = math.ceil(#textList / rows)
+	for column = 0, columns - 1 do
+		local x = startX + direction * column * (weight + 15)
+		local count = math.min(rows, #textList - column * rows)
+		draw.RoundedBox(0, x, startY, weight, count * h, black)
+		for row = 1, count do
+			local text = textList[column * rows + row]
+			local y = startY + (row - 1) * h
+			if row % 2 == 0 then draw.RoundedBox(0, x, y, weight, h, littleblack) end
+			if text[3] then
+				trahalgmod.r, trahalgmod.g, trahalgmod.b, trahalgmod.a = text[3], text[4], text[5], 75
+				draw.RoundedBox(0, x, y, weight, h, trahalgmod)
+			end
+			if direction > 0 then
+				draw.SimpleText(text[1], "DefaultFixedDropShadow", x, y, white)
+				draw.SimpleText(text[2], "DefaultFixedDropShadow", x + weight, y, white, TEXT_ALIGN_RIGHT)
+			else
+				draw.SimpleText(text[1], "DefaultFixedDropShadow", x + weight, y, white, TEXT_ALIGN_RIGHT)
+				draw.SimpleText(text[2], "DefaultFixedDropShadow", x, y, white)
+			end
+		end
+	end
+end
 hook.Add("HUDPaint", "homigrad-organism-debug", function()
 	
 	local spect = IsValid(lply:GetNWEntity("spect")) and lply:GetNWEntity("spect")
@@ -310,30 +375,7 @@ hook.Add("HUDPaint", "homigrad-organism-debug", function()
 	if !hg_stats:GetBool() then return end
 	local textList = getTextTable(organism)
 	local h = math.Round(ScreenScaleH(5.5))
-	local cutoff = math.floor((ScrH() - 150 - 50) / h)
-
-	draw.RoundedBox(0, 15, 150, weight, cutoff * h, black)
-	
-	if cutoff < #textList then
-		draw.RoundedBox(0, 15 + weight + 15, 150, weight, (#textList - cutoff) * h, black)
-	end
-
-	for i, text in ipairs(textList) do
-		local y = i > cutoff and 150 + (i - 1 - cutoff) * h or 150 + (i - 1) * h
-		local x = i > cutoff and 15 + weight + 15 or 15
-		
-		if i % 2 == 0 then draw.RoundedBox(0, x, y, weight, h, littleblack) end
-		if text[3] then
-			trahalgmod.r = text[3]
-			trahalgmod.g = text[4]
-			trahalgmod.b = text[5]
-			trahalgmod.a = 75
-			draw.RoundedBox(0, x, y, weight, h, trahalgmod)
-		end
-
-		draw.SimpleText(text[1], "DefaultFixedDropShadow", x, y, white)
-		draw.SimpleText(text[2], "DefaultFixedDropShadow", x + weight, y, white, TEXT_ALIGN_RIGHT)
-	end
+	drawStatsTable(textList, 15, 150, 1, h)
 
 	local tr = hg.eyeTrace(LocalPlayer(), 10000)
 	if not hg.eyeTrace or not IsValid(LocalPlayer()) or !tr then return end
@@ -348,22 +390,7 @@ hook.Add("HUDPaint", "homigrad-organism-debug", function()
 	trent = organism_otherply.owner
 	local textList = getTextTable(organism_otherply)
 	local w = ScrW()
-	local x = w - 15 - weight
-	draw.RoundedBox(0, x, 15, weight, #textList * h, black)
-	for i, text in ipairs(textList) do
-		local y = 15 + (i - 1) * h
-		if i % 2 == 0 then draw.RoundedBox(0, x, y, weight, h, littleblack) end
-		if text[3] then
-			trahalgmod.r = text[3]
-			trahalgmod.g = text[4]
-			trahalgmod.b = text[5]
-			trahalgmod.a = 75
-			draw.RoundedBox(0, x, y, weight, h, trahalgmod)
-		end
-
-		draw.SimpleText(text[1], "DefaultFixedDropShadow", w - 15, y, white, TEXT_ALIGN_RIGHT)
-		draw.SimpleText(text[2], "DefaultFixedDropShadow", w - 15 - weight, y, white)
-	end
+	drawStatsTable(textList, w - 15 - weight, 15, -1, h)
 end)
 
 timeHuy = timeHuy or 0

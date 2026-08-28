@@ -826,7 +826,7 @@ if SERVER then
 		end
 
 		if IsBandageBone(bone, HITGROUP_CHEST) and (org.chest or 0) >= 0.05 and self.modeValues[1] >= amt then
-			org.chest = math.max(org.chest - 0.08, 0)
+			org.chest = math.max(org.chest - 0.25, 0)
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.avgpain = math.max(org.avgpain - 7, 0)
 			ent.bandaged_limbs = ent.bandaged_limbs or {}
@@ -835,28 +835,28 @@ if SERVER then
 		end
 
 		if IsBandageBone(bone, HITGROUP_LEFTLEG) and (org.lleg or 0) >= 0.05 and self.modeValues[1] >= amt and !org.llegamputated then
-			org.lleg = math.max(org.lleg - 0.08, 0)
+			org.lleg = math.max(org.lleg - 0.25, 0)
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.avgpain = math.max(org.avgpain - 7, 0)
 			done = true
 		end
 
 		if IsBandageBone(bone, HITGROUP_RIGHTLEG) and (org.rleg or 0) >= 0.05 and self.modeValues[1] >= amt and !org.rlegamputated then
-			org.rleg = math.max(org.rleg - 0.08, 0)
+			org.rleg = math.max(org.rleg - 0.25, 0)
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.avgpain = math.max(org.avgpain - 7, 0)
 			done = true
 		end
 
 		if IsBandageBone(bone, HITGROUP_RIGHTARM) and (org.rarm or 0) >= 0.05 and self.modeValues[1] >= amt and !org.rarmamputated then
-			org.rarm = math.max(org.rarm - 0.08, 0)
+			org.rarm = math.max(org.rarm - 0.25, 0)
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.avgpain = math.max(org.avgpain - 7, 0)
 			done = true
 		end
 
 		if IsBandageBone(bone, HITGROUP_LEFTARM) and (org.larm or 0) >= 0.05 and self.modeValues[1] >= amt and !org.larmamputated then
-			org.larm = math.max(org.larm - 0.08, 0)
+			org.larm = math.max(org.larm - 0.25, 0)
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.avgpain = math.max(org.avgpain - 7, 0)
 			done = true

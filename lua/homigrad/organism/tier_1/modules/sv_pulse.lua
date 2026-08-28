@@ -671,6 +671,10 @@ module[1] = function(org)
 	org.pulseDeficit = 0
 	org.palpitations = 0
 	org.palpitationTreatmentUntil = 0
+	org.lastHeartbeatForPalpitations = 70
+	org.lastPulseForPalpitations = 70
+	org.internalBleedRhythmRisk = 0
+	org.traumaRhythmRisk = 0
 	org.cardiacArrestStart = nil
 	org.cardiacArrestO2Start = nil
 	org.arrhythmia = 0
@@ -717,6 +721,8 @@ module[2] = function(owner, org, timeValue)
 	notifyTemperatureStress(owner, org)
 
 	local o2Value = org.o2 and org.o2[1] or 30
+	local previousHeartbeat = tonumber(org.lastHeartbeatForPalpitations) or tonumber(org.heartbeat) or 70
+	local previousPulse = tonumber(org.lastPulseForPalpitations) or tonumber(org.pulse) or 70
 	if not org.heartstop and not org.fibrillation and (org.arrhythmia or 0) < 0.25 and (org.myocardialOxygen or 1) > 0.55 then
 		org.heartStrain = Approach(org.heartStrain or 0, 0, timeValue / 45)
 	end
@@ -1007,10 +1013,16 @@ module[2] = function(owner, org, timeValue)
 	local tachycardiaK = math.Clamp((org.heartbeat - 120) / 120, 0, 1)
 	local palpitationGain = (tachycardiaK > 0 and 0.002 or 0) + tachycardiaK * 0.021 + hemorrhageRhythmStress * 0.006
 	local correctingPalpitations = (org.palpitationTreatmentUntil or 0) > CurTime()
+	local heartbeatSettling = (org.heartbeat or 0) <= previousHeartbeat + 0.5
+	local pulseSettling = (org.pulse or 0) <= previousPulse + 0.5
+	local rhythmSettling = heartbeatSettling and pulseSettling
 	if org.fibrillation then
 		org.palpitations = 0
 	elseif correctingPalpitations then
 		org.palpitations = math.max(palpitations - timeValue / 4, 0)
+	elseif rhythmSettling then
+		local slowing = math.Clamp((previousHeartbeat - (org.heartbeat or 0) + previousPulse - (org.pulse or 0)) / 80, 0, 1)
+		org.palpitations = math.max(palpitations - timeValue * (0.0075 + slowing * 0.025), 0)
 	elseif palpitationGain > 0 and not org.heartstop then
 		org.palpitations = math.Clamp(palpitations + timeValue * palpitationGain, 0, 1)
 	else
@@ -1154,8 +1166,14 @@ module[2] = function(owner, org, timeValue)
 	org.heartbeat = math.Approach(org.heartbeat, heartbeat, heartbeat > org.heartbeat and timeValue * 5 or timeValue * 3)
 	
 	local ischemia = Clamp(1 - (org.myocardialOxygen or 1), 0, 1)
-	local stress = Clamp((org.heart or 0) * 0.9 + ischemia * 0.8 + (org.hypertension or 0) * 0.35 + (org.hypotension or 0) * 0.3 + hemorrhageRhythmStress * 0.35 + hemorrhageElectricalInstability * 0.95 + hypothermiaInstability * 0.35 + Clamp(org.shock, 0, 80) / 180 + max(org.pain - 60, 0) / 220 + max(org.heartbeat - 165, 0) / 190, 0, 2.5)
-	local arrhythmiaTarget = Clamp(math.max(stress * 0.42, hemorrhageElectricalInstability * 0.88), 0, 1)
+	local internalBleedRhythmRisk = Clamp(((org.internalBleed or 0) - 1.5) / 6.5, 0, 1)
+	local chestRhythmRisk = Clamp(((org.chest or 0) - 0.45) / 0.55, 0, 1)
+	local cardiacTraumaRhythmRisk = math.max(Clamp(((org.heart or 0) - 0.3) / 0.7, 0, 1), chestRhythmRisk * 0.65)
+	local traumaRhythmRisk = math.max(internalBleedRhythmRisk * (0.45 + cardiacTraumaRhythmRisk * 0.55), cardiacTraumaRhythmRisk * 0.6)
+	org.internalBleedRhythmRisk = internalBleedRhythmRisk
+	org.traumaRhythmRisk = traumaRhythmRisk
+	local stress = Clamp((org.heart or 0) * 0.9 + ischemia * 0.8 + (org.hypertension or 0) * 0.35 + (org.hypotension or 0) * 0.3 + hemorrhageRhythmStress * 0.35 + hemorrhageElectricalInstability * 0.95 + hypothermiaInstability * 0.35 + traumaRhythmRisk * 0.8 + Clamp(org.shock, 0, 80) / 180 + max(org.pain - 60, 0) / 220 + max(org.heartbeat - 165, 0) / 190, 0, 2.5)
+	local arrhythmiaTarget = Clamp(math.max(stress * 0.42, hemorrhageElectricalInstability * 0.88, traumaRhythmRisk * 0.72) * math.Clamp(org.conditionResistanceMul or 1, 0.05, 1), 0, 1)
 	org.arrhythmia = Approach(org.arrhythmia or 0, arrhythmiaTarget, arrhythmiaTarget > (org.arrhythmia or 0) and timeValue / Lerp(hemorrhageElectricalInstability, 25, 6) or timeValue / 90)
 	if org.isPly and not org.otrub and not org.heartstop then
 		if org.fibrillation or org.unstableRhythm or org.arrhythmia > 0.35 then
@@ -1169,7 +1187,7 @@ module[2] = function(owner, org, timeValue)
 	if stress > 0.55 and CurTime() >= (org.nextArrhythmiaRoll or 0) then
 		local rollInterval = Clamp(Remap(stress + hemorrhageElectricalInstability, 0.55, 2.3, 10, 1.25), 1.25, 10)
 		org.nextArrhythmiaRoll = CurTime() + rollInterval
-		local vfChance = Clamp((stress - 0.55) * 0.15 + hemorrhageElectricalInstability ^ 2 * 0.42, 0.01, 0.65)
+		local vfChance = Clamp((stress - 0.55) * 0.15 + hemorrhageElectricalInstability ^ 2 * 0.42 + traumaRhythmRisk ^ 2 * 0.16, 0.01, 0.65)
 		if math.Rand(0, 1) < vfChance then
 			hg.organism.StartFibrillation(org)
 			if hemorrhageElectricalInstability > 0.72 then org.terminalRhythm = "ventricular_fibrillation" end
@@ -1179,6 +1197,8 @@ module[2] = function(owner, org, timeValue)
 	if org.heartbeat >= terminalHeartRate then
 		hg.organism.StartFibrillation(org)
 	end
+	org.lastHeartbeatForPalpitations = org.heartbeat or 0
+	org.lastPulseForPalpitations = org.pulse or 0
 
 	if org.fibrillation then
 		local pressureReserve = 1 - Clamp(org.hypotension or 0, 0, 1)

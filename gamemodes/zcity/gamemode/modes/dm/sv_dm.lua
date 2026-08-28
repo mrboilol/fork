@@ -178,6 +178,13 @@ local function startZoneBurst(ply)
 end
 
 local function MakeDissolver(ent, position, dissolveType)
+    if not IsValid(ent) then return end
+
+    if ent:CreatedByMap() then
+        ent:Remove()
+        return
+    end
+
     local Dissolver = ents.Create("env_entity_dissolver")
     timer.Simple(5, function()
         if IsValid(Dissolver) then Dissolver:Remove() end
@@ -190,7 +197,6 @@ local function MakeDissolver(ent, position, dissolveType)
     Dissolver:SetPhysicsAttacker(ent)
     Dissolver:Spawn()
     ent:SetName(Dissolver.Target)
-	ent:Fire("Open")
     Dissolver:Fire("Dissolve", Dissolver.Target, 0)
     Dissolver:Fire("Kill", "", 0.1)
     return Dissolver

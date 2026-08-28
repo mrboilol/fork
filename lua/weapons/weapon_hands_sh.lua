@@ -98,6 +98,14 @@ local clawClasses = {
 	["headcrabzombie"] = 1.5
 }
 
+local zombieHandsClasses = {
+	["headcrabzombie"] = true
+}
+
+local function IsZombieHandsClass(className)
+	return zombieHandsClasses[className] == true
+end
+
 local function qerp(delta, a, b)
 	local qdelta = -(delta ^ 2) + (delta * 2)
 	qdelta = math.Clamp(qdelta, 0, 1)

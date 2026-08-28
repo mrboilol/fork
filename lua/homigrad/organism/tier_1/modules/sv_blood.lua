@@ -532,7 +532,7 @@ module[2] = function(owner, org, mulTime)
 	local heartDamage = math.Clamp(tonumber(org.heart) or 0, 0, 1)
 	local severeCardiacBleed = math.Clamp((internalBleedSeverity - 7.5) / 2.5, 0, 1)
 	local tamponadeTarget = heartDamage * severeCardiacBleed * 0.65
-	org.cardiacTamponade = math.max(org.cardiacTamponade or 0, math.Approach(org.cardiacTamponade or 0, tamponadeTarget, mulTime / 24))
+	org.cardiacTamponade = math.max(org.cardiacTamponade or 0, math.Approach(org.cardiacTamponade or 0, tamponadeTarget, mulTime / 24 * math.Clamp(org.conditionResistanceMul or 1, 0.05, 1)))
 
 	-- Nosebleed from severe internal bleeding
 	if org.internalBleed > 0.75 and hg.applyNosebleed and math.random() < org.internalBleed * 0.02 * mulTime then

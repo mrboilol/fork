@@ -584,7 +584,7 @@ module[2] = function(owner, org, timeValue)
 	-- an uninjured lung become punctured. The actual puncture remains until the
 	-- lung is repaired, so the condition can return after the temporary vent ends.
 	if hasPneumothorax and not needleActive then
-		org.pneumothorax = min(org.pneumothorax + timeValue / 90 * (org.lungsL[2] + org.lungsR[2]), (org.lungsL[2] + org.lungsR[2]) / 2)
+		org.pneumothorax = min(org.pneumothorax + timeValue / 90 * (org.lungsL[2] + org.lungsR[2]) * math.Clamp(org.conditionResistanceMul or 1, 0.05, 1), (org.lungsL[2] + org.lungsR[2]) / 2)
 	else
 		org.pneumothorax = max(org.pneumothorax - timeValue / 10, 0)
 	end
@@ -616,8 +616,9 @@ module[2] = function(owner, org, timeValue)
 		local targetL = (bilateral or org.internalBleedLungSide == "L") and hemothoraxTarget or 0
 		local targetR = (bilateral or org.internalBleedLungSide == "R") and hemothoraxTarget or 0
 
-		org.hemothoraxL = math.Approach(org.hemothoraxL, targetL, timeValue / fillTime)
-		org.hemothoraxR = math.Approach(org.hemothoraxR, targetR, timeValue / fillTime)
+		local conditionMul = math.Clamp(org.conditionResistanceMul or 1, 0.05, 1)
+		org.hemothoraxL = math.Approach(org.hemothoraxL, targetL, timeValue / fillTime * conditionMul)
+		org.hemothoraxR = math.Approach(org.hemothoraxR, targetR, timeValue / fillTime * conditionMul)
 	elseif internalBleedVal <= 0.1 then
 		-- Blood in the pleural space does not vanish on its own. It needs a
 		-- prolonged recovery period unless the player uses a needle.
@@ -856,7 +857,7 @@ module[2] = function(owner, org, timeValue)
 
 			else
 
-				org.pneumothorax = min(org.pneumothorax + drainRate * 0.5, 1)
+				org.pneumothorax = min(org.pneumothorax + drainRate * 0.5 * math.Clamp(org.conditionResistanceMul or 1, 0.05, 1), 1)
 
 			end
 

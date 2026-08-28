@@ -113,7 +113,11 @@ hook.Add("Think", "homigrad-organism", function()
 			hg.organism.list[owner] = nil
 			continue
 		end
-		if org.alive == false or (owner:IsPlayer() and not owner:Alive()) then continue end
+		if org.alive == false then
+			if owner:IsRagdoll() then hook_Run("Org PostMortem Think", owner, org, mulTime) end
+			continue
+		end
+		if owner:IsPlayer() and not owner:Alive() then continue end
 		if org.godmode then continue end
 		hook_Run("Org Think", owner, org, mulTime)
 	end

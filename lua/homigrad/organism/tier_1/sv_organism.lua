@@ -182,6 +182,8 @@ hook.Add("Org Clear", "Main", function(org)
 	org.deathStateEnd = nil
 	org.deathStateKilled = nil
 	org.fatalDamageQueued = nil
+	org.postMortemElapsed = nil
+	org.postMortemSendTime = nil
 	org.lastWoundsSig = nil
 	org.lastArterialWoundsSig = nil
 	org.lastObserverSig = nil
@@ -515,6 +517,13 @@ local function observer_signature(org)
 		observerValue(org.brainParietal, 0.01), observerValue(org.brainTemporal, 0.01),
 		observerValue(org.brainOccipital, 0.01), observerValue(org.brainHemorrhage, 0.01),
 		observerValue(org.brainBleedRate, 0.01), lodged_signature(lodged),
+		observerValue(org.strokeVolume, 0.01), observerValue(org.ecgState),
+		observerValue(org.cardiacTamponade), observerValue(org.ischemia, 0.01),
+		observerValue(org.brainSwelling, 0.01), observerValue(org.intracranialPressure, 0.01),
+		observerValue(org.hypoxiaTime, 0.1), observerValue(org.respiratoryArrest),
+		observerValue(org.pneumothorax, 0.01), observerValue(org.hemothorax, 0.01),
+		observerValue(org.internalBleed, 0.01), observerValue(org.pain, 0.01),
+		observerValue(org.shock, 0.01), observerValue(org.consciousness, 0.01),
 		observerValue(org.deathStateEnd, 0.1), observerValue(org.critical),
 		observerValue(org.incapacitated)
 	}, ":")
@@ -615,6 +624,19 @@ local function send_bareinfo(org, force, reliable)
 	sendtable.critical = org.critical
 	sendtable.incapacitated = org.incapacitated
 	sendtable.deathStateEnd = org.deathStateEnd or 0
+	for _, key in ipairs({
+		"stamina", "immobilization", "adrenaline", "adrenalineAdd", "pain", "shock", "hurt",
+		"pelvis", "chest", "skull", "heart", "stomach", "liver", "intestines", "trachea",
+		"lungsL", "lungsR", "spine1", "spine2", "spine3", "internalBleed", "internalBleedHeal",
+		"arteria", "rarmartery", "larmartery", "rlegartery", "llegartery", "spineartery",
+		"cardiacTamponade", "ischemia", "brainSwelling", "intracranialPressure", "hypoxiaTime",
+		"peripheralperfusion", "perfusionMoveMul", "legstrength", "armstrength", "losing_oxy",
+		"respiratoryArrest", "pneumothorax", "hemothorax", "strokeVolume", "ecgState",
+		"palpitations", "unstableRhythm", "concussion", "nausea", "consciousness", "temperature",
+		"fear", "satiety", "hemotransfusionshock", "weight", "maxweight", "health", "canmove"
+	}) do
+		sendtable[key] = org[key]
+	end
 
 	local rf = RecipientFilter()
 	rf:AddPVS(org.owner:GetPos())
@@ -633,6 +655,49 @@ local function send_bareinfo(org, force, reliable)
 end
 hg.send_organism = send_organism
 hg.send_bareinfo = send_bareinfo
+
+function hg.organism.BeginPostMortemDecay(org, timeValue)
+	if not org then return end
+
+	org.alive = false
+	org.otrub = true
+	org.incapacitated = true
+	org.heartstop = true
+	org.heartbeat = 0
+	org.pulse = 0
+	org.bloodPressure = 0
+	org.systolic = 0
+	org.diastolic = 0
+	org.cardiacOutput = 0
+	org.strokeVolume = 0
+	org.mechanicalPulseCapture = 0
+	org.pulseDeficit = 0
+	org.ecgState = "asystole"
+	org.perfusion = 0
+	org.peripheralperfusion = 0
+	org.cerebralPerfusion = 0
+	org.myocardialOxygen = 0
+	org.bodyoxygen = 0
+	org.brainoxygen = 0
+	org.brainoxygenTarget = 0
+	org.oxygenIntakeAvailable = false
+	org.lungsfunction = false
+	if org.o2 then
+		org.o2[1] = 0
+		org.o2.curregen = 0
+	end
+	org.postMortemElapsed = (org.postMortemElapsed or 0) + math.max(timeValue or 0, 0)
+end
+
+hook.Add("Org PostMortem Think", "Main", function(owner, org, timeValue)
+	hg.organism.BeginPostMortemDecay(org, timeValue)
+
+	local now = CurTime()
+	if (org.postMortemSendTime or 0) > now then return end
+	org.postMortemSendTime = now + 1
+	send_bareinfo(org, true, true)
+end)
+
 local META = FindMetaTable("Player")
 function META:IsBerserk()
 	if !IsValid(self) then return false end
