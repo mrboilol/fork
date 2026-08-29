@@ -326,13 +326,8 @@ local arterySize = {
 }
 
 local function chooseArterialBleedStyle(artery)
-	local roll = math.Rand(0, 1)
-	if artery == "arteria" or artery == "aorta" then
-		if roll < 0.24 then return 3 end
-		if roll < 0.62 then return 2 end
-		return 1
-	end
-	return roll < 0.46 and 2 or 1
+	if (artery == "arteria" or artery == "aorta") and math.Rand(0, 1) < 0.18 then return 3 end
+	return 1
 end
 
 local arteryMessages ={

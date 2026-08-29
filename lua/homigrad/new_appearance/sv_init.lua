@@ -76,6 +76,20 @@ local function CheckAttachments(ply,tbl)
     return tbl
 end
 
+function APmodule.SyncAppearanceColor(ply, appearance)
+    if !IsValid(ply) then return end
+
+    appearance = appearance or ply.CurAppearance
+    local clr = appearance and appearance.AColor
+    if !clr then return end
+
+    local color = Vector(clr.r / 255, clr.g / 255, clr.b / 255)
+    if ply.SetPlayerColor then
+        ply:SetPlayerColor(color)
+    end
+    ply:SetNWVector("PlayerColor", color)
+end
+
 local function ForceApplyAppearance(ply, tbl, noModelChange)
     local tMdl = APmodule.PlayerModels[1][tbl.AModel] or APmodule.PlayerModels[2][tbl.AModel] or tbl.AModel
     local mdl = istable(tMdl) and tMdl.mdl or tMdl
@@ -83,11 +97,7 @@ local function ForceApplyAppearance(ply, tbl, noModelChange)
         ply:SetModel(mdl)
     end
 
-    local clr = tbl.AColor
-    if ply.SetPlayerColor then
-        ply:SetPlayerColor(Vector(clr.r / 255,clr.g / 255,clr.b / 255))
-    end
-    ply:SetNWVector( "PlayerColor", Vector(clr.r / 255,clr.g / 255,clr.b / 255) )
+    APmodule.SyncAppearanceColor(ply, tbl)
 
     ply:SetSubMaterial()
 

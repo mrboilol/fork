@@ -322,12 +322,16 @@ local O2Lerp = 0
 local dyingAudioFade = 0
 local ischemicVignetteLerp = 0
 local lowOxygenVignetteLerp = 0
+local shockVignetteLerp = 0
 local collapseVisualLerp = 0
 local collapseBlinkLerp = 0
 local nextCollapseBlink = 0
 local collapseBlinkStart = 0
 local collapseBlinkAttackEnd = 0
 local collapseBlinkEnd = 0
+local collapseBlinkFlicker = 1
+local nextCollapseBlinkFlicker = 0
+local collapseBlinkWholeScreen = false
 local collapseColor = {
 	["$pp_colour_addr"] = 0,
 	["$pp_colour_addg"] = 0,
@@ -365,6 +369,7 @@ O2Lerp = 0
 dyingAudioFade = 0
 ischemicVignetteLerp = 0
 lowOxygenVignetteLerp = 0
+shockVignetteLerp = 0
 collapseVisualLerp = 0
 collapseBlinkLerp = 0
 AnalgesiaLerp = 0
@@ -657,12 +662,16 @@ local function stopthings()
 	PanicStationVolume = 0
 	O2Lerp = 0
 	lowOxygenVignetteLerp = 0
+	shockVignetteLerp = 0
 	collapseVisualLerp = 0
 	collapseBlinkLerp = 0
 	nextCollapseBlink = 0
 	collapseBlinkStart = 0
 	collapseBlinkAttackEnd = 0
 	collapseBlinkEnd = 0
+	collapseBlinkFlicker = 1
+	nextCollapseBlinkFlicker = 0
+	collapseBlinkWholeScreen = false
 	AnalgesiaLerp = 0
 	shockLerp = 0
 	assimilatedLerp = 0
@@ -860,43 +869,54 @@ local tempolerp = 0
 local grayscaleLerp = 0
 local soundRetry = {}
 
-local function updateCollapseBlink(severity, brainSeverity)
+local function updateCollapseBlink(severity, consciousnessSeverity, brainSeverity)
 	local now = CurTime()
-	local blinkChance = math.max(
-		math.Clamp((severity - 0.08) / 0.55, 0, 1),
-		math.Clamp(brainSeverity or 0, 0, 1) * 0.9
+	local blinkSeverity = math.max(
+		math.Clamp((severity - 0.16) / 0.74, 0, 1),
+		math.Clamp(consciousnessSeverity or 0, 0, 1),
+		math.Clamp(brainSeverity or 0, 0, 1) * 0.65
 	)
 
-	if blinkChance <= 0 then
+	if blinkSeverity <= 0.01 then
 		collapseBlinkLerp = math.Approach(collapseBlinkLerp, 0, FrameTime() * 5)
-		nextCollapseBlink = now + math.Rand(0.6, 1.4)
-		return collapseBlinkLerp
+		nextCollapseBlink = now + math.Rand(2.5, 5.5)
+		collapseBlinkWholeScreen = false
+		return collapseBlinkLerp, false
 	end
 
 	if now >= nextCollapseBlink and now >= collapseBlinkEnd then
-		local duration = math.Rand(Lerp(blinkChance, 0.11, 0.28), Lerp(blinkChance, 0.25, 0.68))
+		local duration = math.Rand(Lerp(blinkSeverity, 0.09, 0.18), Lerp(blinkSeverity, 0.24, 0.58))
 		collapseBlinkStart = now
-		collapseBlinkAttackEnd = now + math.min(duration * math.Rand(0.14, 0.34), 0.14)
+		collapseBlinkAttackEnd = now + math.min(duration * math.Rand(0.12, 0.3), 0.11)
 		collapseBlinkEnd = now + duration
+		collapseBlinkFlicker = math.Rand(0.55, 1)
+		nextCollapseBlinkFlicker = now + math.Rand(0.025, 0.09)
+		collapseBlinkWholeScreen = math.Rand(0, 1) < 0.04 + blinkSeverity * 0.12
 		nextCollapseBlink = collapseBlinkEnd + math.Rand(
-			Lerp(blinkChance, 1.5, 0.12),
-			Lerp(blinkChance, 3.1, 0.52)
+			Lerp(blinkSeverity, 4.5, 1.15),
+			Lerp(blinkSeverity, 9, 3.4)
 		)
 	end
 
 	local target = 0
 	if now < collapseBlinkEnd then
+		if now >= nextCollapseBlinkFlicker then
+			collapseBlinkFlicker = math.Rand(0, 1) < 0.24 and math.Rand(0.12, 0.45) or math.Rand(0.62, 1)
+			nextCollapseBlinkFlicker = now + math.Rand(0.025, 0.12)
+		end
 		if now < collapseBlinkAttackEnd then
 			target = math.TimeFraction(collapseBlinkStart, collapseBlinkAttackEnd, now)
 		else
 			target = 1 - math.TimeFraction(collapseBlinkAttackEnd, collapseBlinkEnd, now)
 			target = math.max(target, 0) ^ 1.45
 		end
-		target = target * blinkChance * (0.8 + blinkChance * 0.45)
+		target = target * blinkSeverity * (0.72 + blinkSeverity * 0.28) * collapseBlinkFlicker
+	else
+		collapseBlinkWholeScreen = false
 	end
 
-	collapseBlinkLerp = math.Approach(collapseBlinkLerp, target, FrameTime() * (target > collapseBlinkLerp and 18 or 9))
-	return collapseBlinkLerp
+	collapseBlinkLerp = math.Approach(collapseBlinkLerp, target, FrameTime() * (target > collapseBlinkLerp and 16 or 8))
+	return collapseBlinkLerp, collapseBlinkWholeScreen
 end
 
 drawFinalVitalsVignettes = function()
@@ -940,10 +960,15 @@ drawFinalVitalsVignettes = function()
 
 	local oxygen = math.Clamp(tonumber(org.o2[1]) or 30, 0, 30)
 	local brainOxygen = math.Clamp(tonumber(org.brainoxygen) or 1, 0, 1)
-	local oxygenSeverity = math.max(
-		math.Clamp((28 - oxygen) / 22, 0, 1),
+	local oxygenSeverityBase = math.max(
+		math.Clamp((26 - oxygen) / 20, 0, 1),
 		math.Clamp((0.62 - brainOxygen) / 0.52, 0, 1)
 	)
+	local severeOxygenTail = math.max(
+		math.Clamp((10 - oxygen) / 10, 0, 1),
+		math.Clamp((0.24 - brainOxygen) / 0.24, 0, 1)
+	)
+	local oxygenSeverity = math.Clamp(oxygenSeverityBase * 0.9 + severeOxygenTail * 0.1, 0, 1)
 	local blood = math.Clamp(tonumber(org.blood) or 5000, 0, 5000)
 	local activeBleed = math.Clamp((tonumber(org.bleed) or 0) / 10, 0, 1)
 	local internalBleed = math.Clamp((tonumber(org.internalBleed) or 0) / 5, 0, 1)
@@ -953,11 +978,11 @@ drawFinalVitalsVignettes = function()
 		internalBleed * 0.34
 	)
 	local shock = tonumber(org.shock) or 0
-	local shockSeverity = math.Clamp((shock - 18) / 57, 0, 1)
-	local shockDarknessSeverity = math.Clamp((shock - 8) / 34, 0, 1)
+	local shockSeverity = math.Clamp((shock - 10) / 60, 0, 1)
+	local shockDarknessSeverity = math.Clamp((shock - 24) / 51, 0, 1)
 	local consciousness = math.Clamp(tonumber(org.consciousness) or 1, 0, 1)
-	local consciousnessSeverity = math.Clamp((0.82 - consciousness) / 0.52, 0, 1)
-	local lowConsciousnessDarkness = math.Clamp((0.94 - consciousness) / 0.46, 0, 1)
+	local consciousnessSeverity = math.Clamp((0.78 - consciousness) / 0.58, 0, 1)
+	local lowConsciousnessDarkness = math.Clamp((0.5 - consciousness) / 0.5, 0, 1)
 	local brainDamageSeverity = math.max(
 		math.Clamp(((tonumber(org.brain) or 0) - 0.025) / 0.5, 0, 1),
 		math.Clamp((tonumber(org.brainFrontal) or 0) * 0.75, 0, 1),
@@ -968,26 +993,40 @@ drawFinalVitalsVignettes = function()
 	)
 	local severeHypoxia = math.Clamp((oxygenSeverity - 0.52) / 0.48, 0, 1)
 	local collapseSeverity = math.Clamp(math.max(
-		severeHypoxia * 0.62,
-		shockSeverity * 0.9,
-		shockDarknessSeverity * 0.88,
+		severeHypoxia * 0.58,
+		shockSeverity * 0.62,
+		shockDarknessSeverity * 0.72,
 		consciousnessSeverity * 1.15,
-		lowConsciousnessDarkness * 0.96,
+		lowConsciousnessDarkness,
 		brainDamageSeverity * 0.92,
 		bloodLossSeverity * 0.76,
-		severeHypoxia * 0.42 + shockSeverity * 0.42,
+		severeHypoxia * 0.36 + shockSeverity * 0.32,
 		bloodLossSeverity * 0.5 + consciousnessSeverity * 0.55
 	), 0, 1)
 
 	lowOxygenVignetteLerp = LerpFT(0.035, lowOxygenVignetteLerp, oxygenSeverity)
+	shockVignetteLerp = LerpFT(0.04, shockVignetteLerp, shockSeverity)
 	collapseVisualLerp = LerpFT(0.03, collapseVisualLerp, collapseSeverity)
-	local blink = updateCollapseBlink(collapseVisualLerp, math.max(brainDamageSeverity, math.Clamp((0.68 - consciousness) / 0.5, 0, 1)))
+	local blink, wholeScreenBlink = updateCollapseBlink(
+		math.max(collapseVisualLerp * 0.72, severeHypoxia * 0.48),
+		math.Clamp((0.62 - consciousness) / 0.52, 0, 1),
+		brainDamageSeverity
+	)
 
 	if lowOxygenVignetteLerp > 0.005 then
 		render.UpdateScreenEffectTexture()
 		vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
-		vignetteMat:SetFloat("$c0_z", lowOxygenVignetteLerp * 0.48)
-		vignetteMat:SetFloat("$c1_y", 0.34 + lowOxygenVignetteLerp * 1.05)
+		vignetteMat:SetFloat("$c0_z", lowOxygenVignetteLerp * 0.66)
+		vignetteMat:SetFloat("$c1_y", 0.42 + lowOxygenVignetteLerp * 0.88)
+		render.SetMaterial(vignetteMat)
+		render.DrawScreenQuad()
+	end
+
+	if shockVignetteLerp > 0.005 then
+		render.UpdateScreenEffectTexture()
+		vignetteMat:SetFloat("$c2_x", CurTime() + 9750)
+		vignetteMat:SetFloat("$c0_z", shockVignetteLerp * 0.46)
+		vignetteMat:SetFloat("$c1_y", 0.32 + shockVignetteLerp * 1.18)
 		render.SetMaterial(vignetteMat)
 		render.DrawScreenQuad()
 	end
@@ -995,8 +1034,8 @@ drawFinalVitalsVignettes = function()
 	if collapseVisualLerp > 0.01 then
 		render.UpdateScreenEffectTexture()
 		vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
-		vignetteMat:SetFloat("$c0_z", collapseVisualLerp * 0.44 + blink * 0.28)
-		vignetteMat:SetFloat("$c1_y", 0.7 + collapseVisualLerp * 2.75 + blink * 1.05)
+		vignetteMat:SetFloat("$c0_z", collapseVisualLerp * 0.34 + blink * 0.34)
+		vignetteMat:SetFloat("$c1_y", 0.62 + collapseVisualLerp * 2.15 + blink * 1.25)
 		render.SetMaterial(vignetteMat)
 		render.DrawScreenQuad()
 
@@ -1018,16 +1057,16 @@ drawFinalVitalsVignettes = function()
 	end
 
 	local grainSeverity = math.max(
-		math.Clamp((0.72 - consciousness) / 0.48, 0, 1),
-		brainDamageSeverity * 0.72,
-		collapseVisualLerp * 0.55
+		math.Clamp((0.76 - consciousness) / 0.58, 0, 1),
+		brainDamageSeverity * 0.82,
+		collapseVisualLerp * 0.68
 	)
 	if grainSeverity > 0.04 then
 		render.UpdateScreenEffectTexture()
-		noiseMat:SetFloat("$c0_y", 0.72 - grainSeverity * 0.18)
+		noiseMat:SetFloat("$c0_y", 0.7 - grainSeverity * 0.24)
 		noiseMat:SetFloat("$c0_z", 1)
-		noiseMat:SetFloat("$c1_x", 0.035 + grainSeverity * 0.16)
-		noiseMat:SetFloat("$c1_y", 0.16 + grainSeverity * 0.68)
+		noiseMat:SetFloat("$c1_x", 0.05 + grainSeverity * 0.26)
+		noiseMat:SetFloat("$c1_y", 0.2 + grainSeverity * 0.95)
 		noiseMat:SetFloat("$c2_x", CurTime() + 10000)
 		render.SetMaterial(noiseMat)
 		render.DrawScreenQuad()
@@ -1035,10 +1074,10 @@ drawFinalVitalsVignettes = function()
 		render.UpdateScreenEffectTexture()
 		grainMat:SetFloat("$c0_x", CurTime())
 		grainMat:SetFloat("$c0_y", 0.5)
-		grainMat:SetFloat("$c0_z", grainSeverity * 0.22)
-		grainMat:SetFloat("$c1_x", grainSeverity * 0.14)
-		grainMat:SetFloat("$c1_y", grainSeverity * 0.48)
-		grainMat:SetFloat("$c1_z", grainSeverity * 0.16)
+		grainMat:SetFloat("$c0_z", grainSeverity * 0.38)
+		grainMat:SetFloat("$c1_x", grainSeverity * 0.28)
+		grainMat:SetFloat("$c1_y", grainSeverity * 1.25)
+		grainMat:SetFloat("$c1_z", grainSeverity * 0.26)
 		grainMat:SetFloat("$c2_x", 0)
 		grainMat:SetFloat("$c2_y", 0)
 		grainMat:SetFloat("$c2_z", 0)
@@ -1075,14 +1114,20 @@ drawFinalVitalsVignettes = function()
 		collapseColor["$pp_colour_addr"] = 0
 		collapseColor["$pp_colour_addg"] = 0
 		collapseColor["$pp_colour_addb"] = 0
-		collapseColor["$pp_colour_brightness"] = -collapseVisualLerp * 0.17 - blink * 0.13
-		collapseColor["$pp_colour_contrast"] = 1 - collapseVisualLerp * 0.2 - blink * 0.12
+		collapseColor["$pp_colour_brightness"] = -collapseVisualLerp * 0.09 - lowConsciousnessDarkness * 0.24 - shockDarknessSeverity * 0.07 - blink * 0.06
+		collapseColor["$pp_colour_contrast"] = 1 - collapseVisualLerp * 0.14 - lowConsciousnessDarkness * 0.16 - blink * 0.06
 		collapseColor["$pp_colour_colour"] = 1 - grayscale
 		DrawColorModify(collapseColor)
 	end
 
-	if blink > 0.005 then
-		surface.SetDrawColor(8, 10, 12, math.Clamp(blink * 155, 0, 155))
+	if wholeScreenBlink and blink > 0.005 then
+		surface.SetDrawColor(8, 10, 12, math.Clamp(blink * 82, 0, 82))
+		surface.DrawRect(0, 0, ScrW(), ScrH())
+		surface.SetDrawColor(255, 255, 255, 255)
+	end
+
+	if org.otrub then
+		surface.SetDrawColor(0, 0, 0, 252)
 		surface.DrawRect(0, 0, ScrW(), ScrH())
 		surface.SetDrawColor(255, 255, 255, 255)
 	end

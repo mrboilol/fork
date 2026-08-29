@@ -3243,8 +3243,8 @@ function SWEP:CustomThink()
                 end
 
                 if self:ShouldHeadRagdoll(ent, trace) then
+                    local victim = self:GetHitVictim(ent)
                     timer.Simple(0, function()
-                        local victim = self:GetHitVictim(ent)
                         if IsValid(victim) and victim:IsPlayer() and victim:Alive() and not IsValid(victim.FakeRagdoll) then
                             hg.Fake(victim)
                         end
@@ -3416,8 +3416,8 @@ function SWEP:CustomThink()
                 end
 
                 if self:ShouldHeadRagdoll(ent, trace) then
+                    local victim = self:GetHitVictim(ent)
                     timer.Simple(0, function()
-                        local victim = self:GetHitVictim(ent)
                         if IsValid(victim) and victim:IsPlayer() and victim:Alive() and not IsValid(victim.FakeRagdoll) then
                             hg.Fake(victim)
                         end
@@ -3605,8 +3605,8 @@ function SWEP:CustomThink()
                 end
 
                 if self:ShouldHeadRagdoll(ent, trace) then
+                    local victim = self:GetHitVictim(ent)
                     timer.Simple(0, function()
-                        local victim = self:GetHitVictim(ent)
                         if IsValid(victim) and victim:IsPlayer() and victim:Alive() and not IsValid(victim.FakeRagdoll) then
                             hg.Fake(victim)
                         end
@@ -4513,12 +4513,12 @@ function SWEP:NPCThink()
 							phys:ApplyForceOffset(hitForce, trace.HitPos)
 						end
 
-						if self:ShouldHeadRagdoll(trEnt, trace) then
-							timer.Simple(0, function()
-								local victim = self:GetHitVictim(trEnt)
-								if IsValid(victim) and victim:IsPlayer() and victim:Alive() and not IsValid(victim.FakeRagdoll) then
-									hg.Fake(victim)
-								end
+					if self:ShouldHeadRagdoll(trEnt, trace) then
+						local victim = self:GetHitVictim(trEnt)
+						timer.Simple(0, function()
+							if IsValid(victim) and victim:IsPlayer() and victim:Alive() and not IsValid(victim.FakeRagdoll) then
+								hg.Fake(victim)
+							end
 							end)
 						end
 					end

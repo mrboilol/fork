@@ -1150,105 +1150,99 @@ local function getBleedDirection(ang)
 	return dir:GetNormalized()
 end
 
-local function addTinyBloodPart(pos, vel, size, artery, ent)
-	local hidden = size <= 0.22 and math.random(3) == 1
-	hg.addBloodPart(pos, vel, nil, size, size, artery, nil, ent, true, hidden)
+local function getWoundVisualRate(org, wound, index, arterial)
+	local rates = arterial and org.arterialWoundBleedRates or org.woundBleedRates
+	local liveRate = rates and tonumber(rates[index])
+	if liveRate then return math.max(liveRate, 0) end
+	local severity = math.max(tonumber(wound[1]) or 0, 0)
+	local totalRate = arterial and tonumber(org.arterialBleed) or tonumber(org.venousBleed)
+	return math.max(totalRate or severity * (arterial and 2.25 or 0.24), 0)
 end
 
-local function emitOrdinaryBleeding(ent, org, wound, pos, ang)
-	local severity = math.max(tonumber(wound[1]) or 0, 0)
-	local severityK = math.Clamp(severity / 18, 0, 1)
-	local style = tonumber(wound[6]) or (severity <= 3 and 2 or 1)
-	if severity <= 3 then style = 2 end
-	if style == 3 and severity < 8 then style = 2 end
+local function emitOrdinaryBleeding(ent, org, wound, pos, ang, visualRate)
+	local rateK = math.Clamp((visualRate or 0) / 12, 0, 1)
+	local style = tonumber(wound[6]) == 2 and 2 or 1
 
 	local _, pressureDrive = getBleedPressureDrive(org)
 	local outward = getBleedDirection(ang)
-	if pressureDrive <= 0 then
-		local count = style == 1 and 1 or math.max(1, math.floor(2 + severityK * 4))
+	if pressureDrive <= 0.05 then
+		local count = math.Clamp(math.floor(1 + rateK * 3), 1, 4)
 		for _ = 1, count do
-			local vel = bleedDown * math.Rand(4, 18) + VectorRand(-8, 8)
-			local size = style == 2 and math.Rand(0.1, 0.26) or math.Rand(0.8, 1.8 + severityK)
-			if style == 2 then
-				addTinyBloodPart(pos + VectorRand(-0.25, 0.25), vel, size, false, ent)
-			else
-				hg.addBloodPart(pos + VectorRand(-0.35, 0.35), vel, nil, size, size, false, nil, ent)
-			end
+			local spread = 2 + rateK * 9
+			local vel = bleedDown * math.Rand(12, 28 + rateK * 22) + VectorRand(-spread, spread)
+			local size = math.Rand(0.65, 1.15 + rateK * 1.15)
+			hg.addBloodPart(pos + VectorRand(-0.3, 0.3), vel, nil, size, size, false, nil, ent)
 		end
 		return
 	end
 
 	if style == 1 then
-		local speed = (50 + severityK * 135) * pressureDrive
-		local vel = outward * speed + VectorRand(-8, 8) * (0.4 + severityK)
-		local size = 1.1 + severityK * 3.1
-		hg.addBloodPart(pos, vel, nil, size, size, false, nil, ent)
-	elseif style == 2 then
-		local count = math.Clamp(math.floor(1 + severityK * 8), 1, 9)
+		local count = math.Clamp(math.floor(1 + rateK * 4), 1, 5)
 		for _ = 1, count do
-			local speed = math.Rand(20, 65 + severityK * 70) * pressureDrive
-			local scatter = VectorRand() * math.Rand(12, 35 + severityK * 45)
-			local vel = outward * speed + scatter
-			local size = math.Rand(0.09, 0.2 + severityK * 0.12)
-			addTinyBloodPart(pos + VectorRand(-0.35, 0.35), vel, size, false, ent)
+			local spread = 3 + rateK * 16
+			local vel = bleedDown * math.Rand(18, 42 + rateK * 38) + VectorRand(-spread, spread)
+			local size = math.Rand(0.7, 1.2 + rateK * 1.5)
+			hg.addBloodPart(pos + VectorRand(-0.4, 0.4), vel, nil, size, size, false, nil, ent)
 		end
 	else
-		local count = math.Clamp(math.floor(5 + severityK * 8), 5, 13)
+		local phase = CurTime() * (4.5 + rateK * 2.5) + ent:EntIndex() * 0.37
+		local lateral = ang:Right() * math.sin(phase) * (4 + rateK * 8) + ang:Up() * math.cos(phase * 0.73) * (2 + rateK * 5)
+		local speed = (65 + rateK * 105) * pressureDrive
+		local count = math.Clamp(math.floor(1 + rateK * 2), 1, 3)
 		for _ = 1, count do
-			local vel = outward * math.Rand(25, 105) * pressureDrive + VectorRand() * math.Rand(25, 95) * pressureDrive + vector_up * math.Rand(-15, 40)
-			local size = math.Rand(0.55, 1.5 + severityK * 1.4)
-			hg.addBloodPart(pos + VectorRand(-0.8, 0.8), vel, nil, size, size, false, nil, ent)
+			local vel = outward * speed + lateral + VectorRand(-4, 4)
+			local size = math.Rand(0.85, 1.35 + rateK * 1.1)
+			hg.addBloodPart(pos + VectorRand(-0.25, 0.25), vel, nil, size, size, false, nil, ent)
 		end
 	end
 end
 
-local function emitArterialBleeding(ent, org, wound, pos, dir, water)
+local function emitArterialBleeding(ent, org, wound, pos, dir, water, visualRate)
 	local style = tonumber(wound[8]) or 1
 	local artery = wound[7]
-	if style == 3 and artery ~= "arteria" and artery ~= "aorta" then style = 2 end
+	if style == 3 and artery ~= "arteria" and artery ~= "aorta" then style = 1 end
 	local _, pressureDrive = getBleedPressureDrive(org)
 	local pulseDrive = math.Clamp((tonumber(org.pulse) or 70) / 70, 0.15, 1.8)
 	local outward = dir:LengthSqr() > 0.001 and dir:GetNormalized() or bleedDown
+	local rateK = math.Clamp((visualRate or 0) / 36, 0, 1)
 
 	if water then
-		local count = style == 3 and 10 or style == 2 and 6 or arteryBurstCount
+		local count = style == 3 and math.Clamp(math.floor(6 + rateK * 8), 6, 14) or math.Clamp(math.floor(2 + rateK * 4), 2, 6)
 		for _ = 1, count do
 			hg.addBloodPart2(pos + VectorRand(-1, 1), VectorRand(-5, 5), nil, nil, nil, nil, true, ent)
 		end
 		return style
 	end
 
-	if pressureDrive <= 0 then
-		local count = style == 1 and 1 or style == 2 and 5 or 9
+	if pressureDrive <= 0.05 then
+		local count = style == 3 and math.Clamp(math.floor(4 + rateK * 5), 4, 9) or math.Clamp(math.floor(1 + rateK * 3), 1, 4)
 		for _ = 1, count do
-			local size = style == 2 and math.Rand(0.1, 0.28) or math.Rand(0.8, style == 3 and 2.6 or 1.8)
+			local size = math.Rand(0.8, style == 3 and 2.6 or 1.8)
 			local partPos = pos + VectorRand(-0.6, 0.6)
 			local vel = bleedDown * math.Rand(8, 25) + VectorRand(-10, 10)
-			if style == 2 then
-				addTinyBloodPart(partPos, vel, size, true, ent)
-			else
-				hg.addBloodPart(partPos, vel, nil, size, size, true, nil, ent)
-			end
+			hg.addBloodPart(partPos, vel, nil, size, size, true, nil, ent)
 		end
 		return style
 	end
 
 	if style == 1 then
-		local speed = math.Rand(350, 475) * pressureDrive * (0.72 + pulseDrive * 0.28)
-		local vel = outward * speed + VectorRand(-10, 10) * pulseDrive
-		local size = math.Rand(1.2, 2.2) * arterySizeMul
-		hg.addBloodPart(pos, vel, nil, size, size, true, nil, ent)
-	elseif style == 2 then
-		local count = math.random(7, 12)
+		local side = outward:Cross(vector_up)
+		if side:LengthSqr() < 0.01 then side = outward:Cross(Vector(0, 1, 0)) end
+		side:Normalize()
+		local up = side:Cross(outward):GetNormalized()
+		local phase = CurTime() * (5.5 + pulseDrive * 2.5) + ent:EntIndex() * 0.41
+		local oscillation = side * math.sin(phase) * (10 + rateK * 18) + up * math.cos(phase * 0.77) * (5 + rateK * 11)
+		local speed = (265 + rateK * 155) * pressureDrive * (0.78 + pulseDrive * 0.22)
+		local count = math.Clamp(math.floor(2 + rateK * 2), 2, 4)
 		for _ = 1, count do
-			local vel = outward * math.Rand(45, 135) * pressureDrive + VectorRand() * math.Rand(45, 120) * pressureDrive * pulseDrive
-			local size = math.Rand(0.08, 0.24) * arterySizeMul
-			addTinyBloodPart(pos + VectorRand(-0.45, 0.45), vel, size, true, ent)
+			local vel = outward * speed + oscillation + VectorRand(-5, 5)
+			local size = math.Rand(1.05, 1.75 + rateK * 0.8) * arterySizeMul
+			hg.addBloodPart(pos + VectorRand(-0.2, 0.2), vel, nil, size, size, true, nil, ent)
 		end
 	else
-		local count = math.random(12, 18)
+		local count = math.Clamp(math.floor(7 + rateK * 8), 7, 15)
 		for _ = 1, count do
-			local vel = outward * math.Rand(60, 210) * pressureDrive + VectorRand() * math.Rand(55, 165) * pressureDrive * pulseDrive + vector_up * math.Rand(-25, 65)
+			local vel = outward * math.Rand(70, 190) * pressureDrive + VectorRand() * math.Rand(45, 145) * pressureDrive * pulseDrive + vector_up * math.Rand(-20, 55)
 			local size = math.Rand(0.7, 2.7) * arterySizeMul
 			hg.addBloodPart(pos + VectorRand(-1, 1), vel, nil, size, size, true, nil, ent)
 		end

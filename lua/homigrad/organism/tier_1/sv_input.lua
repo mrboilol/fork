@@ -619,11 +619,9 @@ end
 --hg.organism.AmputateLimb(Entity(2).organism, "rarm")
 
 local function chooseWoundBleedStyle(severity)
-	if severity <= 3 then return 2 end
-	local roll = math.Rand(0, 1)
-	if severity >= 14 and roll < 0.3 then return 3 end
-	if roll < 0.68 then return 2 end
-	return 1
+	if severity < 6 then return 1 end
+	local venousChance = math.Clamp(0.16 + (severity - 6) / 30, 0.16, 0.52)
+	return math.Rand(0, 1) < venousChance and 2 or 1
 end
 
 function hg.organism.AddWound(ent, tr, bone, dmgInfo, dmgPos, dmgBlood, inputHole, outputHole)
