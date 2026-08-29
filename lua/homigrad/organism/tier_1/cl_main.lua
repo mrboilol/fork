@@ -1111,7 +1111,6 @@ function hg.applyFountain(pos, ang, mul, mul2, forward, ent)
 	end
 end
 
-local hg_old_blood = ConVarExists("hg_old_blood") and GetConVar("hg_old_blood") or CreateClientConVar("hg_old_blood", 0, true, false, "new decals, or old", 0, 1)
 local vecTorso = Vector(1, 1, 1)
 local checkpulsebones = {
 	["ValveBiped.Bip01_Head1"] = true,
@@ -1133,7 +1132,6 @@ local arterySoundDelayMin = 1
 local arterySoundDelayMax = 1.25
 local arterySoundPitchMin = 95
 local arterySoundPitchMax = 110
-local arteryBurstCount = 2
 local arterySizeMul = 1.35
 local bleedDown = Vector(0, 0, -1)
 
@@ -1461,7 +1459,6 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 	local org = ent.organism or {}
 	local owner = ent
 	
-	local beatsPerSecond = math.max(min(30 / math.max(org.pulse or 70,2), 4), 0.1) * (!hg_old_blood:GetBool() and 0.3 or 1)
 	
 	if org.pulse and org.heartbeat > 30 and (org.lastpulse or 0) + (1 / math.Clamp(org.heartbeat, 1, 600)) * 60 < CurTime() then
 		org.lastpulse = CurTime()
@@ -1546,7 +1543,8 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 		if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then
 			ent:SetupBones()
 			for i, wound in pairs(wounds) do
-				if (wound.visualReadyAt or 0) <= CurTime() and wound[5] + beatsPerSecond < time then
+				local visualRate = getWoundVisualRate(org, wound, i, false)
+				if visualRate > 0.01 and (wound.visualReadyAt or 0) <= CurTime() and (wound.nextVisualBleed or 0) <= time then
 					local mat, boneID = GetWoundBoneMatrix(ent, wound[4])
 					if boneID then
 						local bone = wound[4]
@@ -1561,14 +1559,14 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 
 						local water = bit.band(util.PointContents(pos), CONTENTS_WATER) == CONTENTS_WATER
 						if water then
-							if wound[5] + 1 < time then
-								hg.addBloodPart2(pos, VectorRand(-5, 5), nil, nil, nil, nil, true, ent)
-							end
+							hg.addBloodPart2(pos, VectorRand(-5, 5), nil, nil, nil, nil, true, ent)
 						else
-							emitOrdinaryBleeding(ent, org, wound, pos, ang)
+							emitOrdinaryBleeding(ent, org, wound, pos, ang, visualRate)
 						end
 
-						wound[5] = time + (water and 2 or (math.Rand(0, 1) * (!hg_old_blood:GetBool() and 0.5 or 1) / wound[1] * 15))
+						local rateK = math.Clamp(visualRate / 12, 0, 1)
+						local interval = water and 1.5 or Lerp(rateK, 0.9, 0.16)
+						wound.nextVisualBleed = time + interval * math.Rand(0.78, 1.28)
 					end
 				end
 			end
@@ -1578,9 +1576,9 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 	if seen and (ent.hgBloodVisualReadyAt or 0) <= CurTime() and org and org.blood and org.blood > 10 and arterialwounds and #arterialwounds > 0 and entDistSqr <= bloodDistSqr then
 		ent:SetupBones()
 		for i, wound in pairs(arterialwounds) do
-			local addtime = 1 / math.Clamp(org.pulse or 70, 1,15) * 0.25
+			local visualRate = getWoundVisualRate(org, wound, i, true)
 			local mat, boneID = GetWoundBoneMatrix(ent, wound[4])
-			if (wound.visualReadyAt or 0) <= CurTime() and wound[5] + addtime < time and boneID then
+			if visualRate > 0.01 and (wound.visualReadyAt or 0) <= CurTime() and (wound.nextVisualBleed or 0) <= time and boneID then
 				if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then
 					if boneID then
 						local bone = wound[4]
@@ -1601,9 +1599,9 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 						dir = -dir:Forward() * len
 
 						local water = bit.band(util.PointContents(pos), CONTENTS_WATER) == CONTENTS_WATER
-						local style = emitArterialBleeding(ent, org, wound, pos, dir, water)
-						local styleDelay = style == 1 and 0.5 or style == 2 and 1 or 1.5
-						wound[5] = time + (water and 2 or (styleDelay / math.min(hg_blood_fps:GetInt(), 36)))
+						local style = emitArterialBleeding(ent, org, wound, pos, dir, water, visualRate)
+						local beatInterval = 60 / math.max(tonumber(org.pulse) or 70, 20)
+						wound.nextVisualBleed = time + (water and 1.5 or beatInterval * (style == 3 and 1.35 or 1))
 					end
 				end
 			end

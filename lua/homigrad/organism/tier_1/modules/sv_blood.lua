@@ -23,8 +23,6 @@ module[1] = function(org)
 	org.bleed = 0
 	org.venousBleed = 0
 	org.arterialBleed = 0
-	-- Live per-wound rates let clients draw the blood actually being lost after
-	-- clotting, adrenaline, pressure, and tourniquet effects are applied.
 	org.woundBleedRates = {}
 	org.arterialWoundBleedRates = {}
 	org.internalBleedRate = 0
@@ -217,12 +215,8 @@ local hold_wound_bleed_slow_twohand_mul = 0.55
 local hold_wound_arterial_slow_mul = 0.2
 local hold_wound_clot_mul = 1.35
 local hold_wound_clot_twohand_mul = 1.6
--- Wounds must threaten the larger survivable blood-loss reserve quickly enough
--- that several cuts or an untreated gunshot still demand immediate treatment.
--- Coagulation, wound pressure, tourniquets, and adrenaline continue to modify
--- these rates normally rather than being bypassed by an instant-loss shortcut.
-local wound_bleed_rate_mul = 3.375
-local arterial_bleed_ml_s_per_severity = (hg.organism.config and hg.organism.config.ARTERIAL_BLEED_ML_S_PER_SEVERITY) or 2.25
+local wound_bleed_rate_mul = 2
+local arterial_bleed_ml_s_per_severity = (hg.organism.config and hg.organism.config.ARTERIAL_BLEED_ML_S_PER_SEVERITY) or 0.75
 local arterial_min_flow_fraction = (hg.organism.config and hg.organism.config.ARTERIAL_MIN_FLOW_FRACTION) or 0.08
 -- An amputated limb must remain an urgent arterial bleed.  This is lower than
 -- the old runaway jet, but high enough to be clearly visible and dangerous

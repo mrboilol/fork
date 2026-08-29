@@ -105,7 +105,7 @@ module[2] = function(owner, org, timeValue)
 
 	local goodmood = math.Clamp(org.goodmood or 0, 0, 1)
 
-	local goodmoodResistance = 1 - goodmood * 0.25
+	local goodmoodResistance = 1 - goodmood * 0.35
 
 
 

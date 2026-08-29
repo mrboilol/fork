@@ -100,6 +100,27 @@ local function getHeadshotBloodRagdoll(ent, ply)
 	if IsValid(deathRagdoll) then return deathRagdoll end
 end
 
+local function getShotTravelDirection(dmgInfo, inputHole, outputHole, damagePos, ent)
+	local entry = inputHole and inputHole[1]
+	local exit = outputHole and outputHole[1]
+	if entry and exit then
+		local direction = exit - entry
+		if direction:LengthSqr() > 0 then return direction:GetNormalized() end
+	end
+
+	local attacker = dmgInfo:GetAttacker()
+	if IsValid(attacker) and attacker != ent then
+		local origin = attacker.ShootPos and attacker:ShootPos() or attacker:WorldSpaceCenter()
+		local direction = damagePos - origin
+		if direction:LengthSqr() > 0 then return direction:GetNormalized() end
+	end
+
+	local direction = dmgInfo:GetDamageForce()
+	if direction:LengthSqr() > 0 then return direction:GetNormalized() end
+	direction = damagePos - ent:WorldSpaceCenter()
+	return direction:LengthSqr() > 0 and direction:GetNormalized() or ent:GetForward()
+end
+
 local function sendHeadshotBloodSquirt(ent, ply, damagePos, direction, outputHole, smallCaliber)
 	local attempts = 0
 	local function send()
@@ -1567,10 +1588,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	end
 	local fatalHeadshot = (org.brain or 0) >= 0.7 or not org.alive or (IsValid(ply) and not ply:Alive())
 	if hitgroup == HITGROUP_HEAD and fatalHeadshot and damageStack > 0 and dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_SNIPER) and !ent.headexploded and !ent.headExplodePending then
-		local squirtDirection = dirCool
-		if squirtDirection:LengthSqr() == 0 then
-			squirtDirection = (dmgPos - ent:WorldSpaceCenter()):GetNormalized()
-		end
+		local squirtDirection = getShotTravelDirection(dmgInfo, inputHole, outputHole, dmgPos, ent)
 		local caliber = tonumber(bullet and bullet.Diameter) or tonumber(IsValid(inf) and inf.PenetrationSize) or 0
 		sendHeadshotBloodSquirt(ent, ply, dmgPos, squirtDirection, outputHole, caliber > 0 and caliber <= 5.7)
 	end

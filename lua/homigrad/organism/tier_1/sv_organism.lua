@@ -27,9 +27,11 @@ local panicattack_decay_time = 24
 local panicattack_gain_chance = 1
 local panicattack_gain_mul = 1
 local panicattack_disorientation = 0.45
-local panicattack_adrenaline_add_target = 3.5
+local panicattack_adrenaline_add_target = 0.65
+local panicattack_combat_adrenaline_add_target = 3
 local panicattack_adrenaline_add_rise_time = 2.5
-local panicattack_adrenaline_duration = 12
+local panicattack_adrenaline_duration = 5
+local panicattack_combat_adrenaline_duration = 10
 local panicattack_damage_scale = 0.011
 local panicattack_damage_cooldown = 2.5
 local panicattack_witness_radius = 700
@@ -39,6 +41,8 @@ local panicattack_sustained_fear_time = 10
 local panicattack_grenade_radius = 750
 local seizure_duration = 90
 local seizure_brain_damage_start = 80
+local seizure_otrub_brain_damage_start = 20
+local seizure_otrub_brain_damage_duration = 42
 local seizure_brain_damage_final = 0.99
 local seizure_pose_force = 850
 local seizure_pose_damp = 42
@@ -361,6 +365,10 @@ local function send_organism(org, ply, recipientForce, reliable)
 	sendtable.blood = org.blood
 	sendtable.bloodtype = org.bloodtype
 	sendtable.bleed = org.bleed
+	sendtable.venousBleed = org.venousBleed
+	sendtable.arterialBleed = org.arterialBleed
+	sendtable.woundBleedRates = org.woundBleedRates
+	sendtable.arterialWoundBleedRates = org.arterialWoundBleedRates
 	sendtable.hurt = org.hurt
 	sendtable.pain = org.pain
 	sendtable.shock = org.shock
@@ -561,6 +569,10 @@ local function send_bareinfo(org, force, reliable)
 	sendtable.bloodtype = org.bloodtype
 	sendtable.blood = org.blood
 	sendtable.bleed = org.bleed
+	sendtable.venousBleed = org.venousBleed
+	sendtable.arterialBleed = org.arterialBleed
+	sendtable.woundBleedRates = org.woundBleedRates
+	sendtable.arterialWoundBleedRates = org.arterialWoundBleedRates
 	sendtable.pulse = org.pulse
 	sendtable.heartbeat = org.heartbeat
 	sendtable.heartstop = org.heartstop
@@ -779,6 +791,13 @@ function hg.organism.AddPanicAttack(org, amount, silent, combatEvent, ignoreGunf
 	end
 	if not isnumber(amount) or amount <= 0 then return org.panicattackadd or 0 end
 	if combatEvent then hg.organism.MarkPanicGunfight(org) end
+	local goodmood = math.Clamp(tonumber(org.goodmood) or 0, 0, 1)
+	if goodmood > 0 then
+		local absorbed = math.min(amount, goodmood / 1.25)
+		org.goodmood = math.max(goodmood - absorbed * 1.25, 0)
+		amount = amount - absorbed
+		if amount <= 0 then return org.panicattackadd or 0 end
+	end
 	if not hg_panic:GetBool() then
 		if not universalStressApplied then apply_panic_disabled_stress(org, amount) end
 		org.panicattackadd = math.Clamp((org.panicattackadd or 0) + amount * panicattack_gain_mul, 0, 1)
@@ -993,13 +1012,14 @@ hook.Add("HomigradDamage", "PanicAttackDamage", function(ply, dmgInfo)
 	if not IsValid(ply) or not ply:IsPlayer() or not ply:Alive() then return end
 	if not ply.organism then return end
 	if (ply.nextPanicAttackTime or 0) > CurTime() then return end
-	local combatEvent = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_BLAST)
-	local amount = math.Clamp(dmgInfo:GetDamage() * panicattack_damage_scale + (dmgInfo:IsDamageType(DMG_BLAST) and 0.08 or 0), 0.03, 0.55)
 	local attacker = resolve_panic_attacker(ply, dmgInfo:GetAttacker())
 	if not IsValid(attacker) and IsValid(ply.lastPanicAttacker) and (ply.lastPanicAttackTime or 0) > CurTime() - 30 then
 		attacker = ply.lastPanicAttacker
 	end
-	hg.organism.AddPanicAttack(ply.organism, amount, false, combatEvent, nil, true)
+	local combatEvent = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_BLAST)
+		or (IsValid(attacker) and attacker != ply and dmgInfo:IsDamageType(DMG_SLASH + DMG_CLUB))
+	local amount = math.Clamp(dmgInfo:GetDamage() * panicattack_damage_scale + (dmgInfo:IsDamageType(DMG_BLAST) and 0.08 or 0), 0.03, 0.55)
+	hg.organism.AddPanicAttack(ply.organism, amount, false, combatEvent, combatEvent, true)
 	if dmgInfo:GetDamage() <= 0 and not dmgInfo:IsDamageType(DMG_BLAST) then return end
 	panic_witness_event(ply, attacker, math.Clamp(amount * 0.75, 0.04, 0.2), panicattack_witness_radius, combatEvent)
 	ply.nextPanicAttackTime = CurTime() + panicattack_damage_cooldown
@@ -1171,13 +1191,16 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		owner:Notify("I can't calm down.", 2, "panicattack_start", 2, nil, Color(255, 140, 140))
 	end
 	if oldPanicAttack < panicattack_threshold and org.panicattack >= panicattack_threshold then
-		org.panicAdrenalineUntil = CurTime() + panicattack_adrenaline_duration
+		local combatPanic = (org.panicGunfightUntil or 0) > CurTime()
+		org.panicAdrenalineUntil = CurTime() + (combatPanic and panicattack_combat_adrenaline_duration or panicattack_adrenaline_duration)
 	end
 	local panicDying = org.otrub or org.incapacitated or org.deathStateKilled or (isPly and not owner:Alive())
 	if org.panicattack >= panicattack_threshold then
 		org.panicattackActive = hg_panic:GetBool() and not panicDying
 		if CurTime() < (org.panicAdrenalineUntil or 0) then
-			local adrenalineTarget = math.Remap(org.panicattack, panicattack_threshold, 1, panicattack_adrenaline_add_target * 0.5, panicattack_adrenaline_add_target)
+			local combatPanic = (org.panicGunfightUntil or 0) > CurTime()
+			local targetMaximum = combatPanic and panicattack_combat_adrenaline_add_target or panicattack_adrenaline_add_target
+			local adrenalineTarget = math.Remap(org.panicattack, panicattack_threshold, 1, targetMaximum * 0.5, targetMaximum)
 			if not hg_panic:GetBool() then adrenalineTarget = adrenalineTarget * 0.55 end
 			org.adrenalineAdd = math.Approach(org.adrenalineAdd or 0, adrenalineTarget, timeValue / panicattack_adrenaline_add_rise_time)
 		end
@@ -1230,8 +1253,10 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 			org.brain = math.max(org.brain or 0, seizure_brain_damage_final)
 			stop_seizure(owner, org)
 		else
-			if time >= seizureStart + seizure_brain_damage_start then
-				local frac = math.Clamp((time - (seizureStart + seizure_brain_damage_start)) / math.max(seizure_duration - seizure_brain_damage_start, 0.001), 0, 1)
+			local damageStart = org.otrub and seizure_otrub_brain_damage_start or seizure_brain_damage_start
+			local damageDuration = org.otrub and seizure_otrub_brain_damage_duration or (seizure_duration - seizure_brain_damage_start)
+			if time >= seizureStart + damageStart then
+				local frac = math.Clamp((time - (seizureStart + damageStart)) / math.max(damageDuration, 0.001), 0, 1)
 				org.brain = math.max(org.brain or 0, seizure_brain_damage_final * frac)
 			end
 			local rag = owner.FakeRagdoll
@@ -1382,10 +1407,13 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		local mul = hg.likely_to_phrase(owner)
 		if not org.likely_phrase then org.likely_phrase = 0 end
 		org.likely_phrase = math.max(org.likely_phrase + math.Rand(0, mul) / 100, 0)
-		if org.likely_phrase >= 1 and !hg.GetCurrentCharacter(owner):IsOnFire() then
+		if org.likely_phrase >= 1 and CurTime() >= (org.nextStatusThought or 0) and !hg.GetCurrentCharacter(owner):IsOnFire() then
 			org.likely_phrase = 0
 			local str = hg.get_status_message(owner)
-			owner:Notify(str, 1, "phrase", 1, nil, Color(255, math.Clamp(1 / hg.likely_to_phrase(owner) * 255, 0, 255), math.Clamp(1 / hg.likely_to_phrase(owner) * 255, 0, 255), 255))
+			if str and str != "" then
+				org.nextStatusThought = CurTime() + 8
+				owner:Notify(str, 8, "phrase", 1, nil, Color(255, math.Clamp(1 / hg.likely_to_phrase(owner) * 255, 0, 255), math.Clamp(1 / hg.likely_to_phrase(owner) * 255, 0, 255), 255))
+			end
 		end
 	end
 	if !org.alive then org.otrub = true end

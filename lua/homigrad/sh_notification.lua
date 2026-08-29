@@ -314,6 +314,14 @@ if CLIENT then
 	local vector_one = Vector( 1, 1, 0)
 
 	local bluewhite = Color(187, 187, 255)
+	local function GetThoughtInstability(org)
+		local o2 = istable(org.o2) and (tonumber(org.o2[1]) or 30) or 30
+		local oxygen = math.Clamp((18 - o2) / 18, 0, 1)
+		local blood = math.Clamp((3200 - (tonumber(org.blood) or 5000)) / 2200, 0, 1)
+		local consciousness = math.Clamp((0.65 - (tonumber(org.consciousness) or 1)) / 0.65, 0, 1)
+		local brainOxygen = math.Clamp((0.55 - (tonumber(org.brainoxygen) or 1)) / 0.55, 0, 1)
+		return math.max(oxygen, blood * 0.8, consciousness, brainOxygen)
+	end
 
 	local function NotificationsDraw()
 		time_spent = CurTime()
@@ -328,7 +336,7 @@ if CLIENT then
 		if tbl and istable(tbl) and not table.IsEmpty(tbl) then
 			local msg, time, timeshow, clr = tbl[1], tbl[2], tbl[3], tbl[4]
 
-			local mul = ((org.brain > 0.1 or org.pulse < 50) and 3 or 1)// * (org.fear > 0 and math.max(1 - org.fear, 0.6) or 1)
+			local mul = (org.brain > 0.1 and 3 or 1)// * (org.fear > 0 and math.max(1 - org.fear, 0.6) or 1)
 			local time_one_symbol = 0.06 * mul//(lply.organism and lply.organism.fear >= 0.5 and 0.5 or 1)
 			local time_to_read = (utf8.len(msg) * time_one_symbol)
 			local wait = math.Clamp(time_to_read / 3 * math.Clamp(1 - #hg.notifications / 1, 0.25, 1), 1, 4) + timeshow
@@ -413,12 +421,14 @@ if CLIENT then
 
 					render.PopFilterMag()
 				elseif lply.PlayerClassName == "furry" then
-					local x, y = ScrW() / 2 - txtw / 2 + math.Rand(0, org.pain > 10 and org.pain / 10 or 0) + math.Rand(0, (255 - clr.g) / 255 * 2), ScrH() - ScrH() / 6 + math.Rand(0, org.pain > 10 and org.pain / 10 or 0) + math.Rand(0, (255 - clr.g) / 255 * 2)
+					local shake = (org.pain > 10 and org.pain / 12 or 0) + GetThoughtInstability(org) * 10
+					local x, y = ScrW() / 2 - txtw / 2 + math.Rand(-shake, shake), ScrH() - ScrH() / 6 + math.Rand(-shake, shake)
 
 					draw.SimpleText(last_message or txt, "ZB_ProotOSMedium", x + 2, y + 2, ColorAlpha(color_black, col.a), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 					draw.SimpleText(last_message or txt, "ZB_ProotOSMedium", x, y, ColorAlpha(bluewhite, col.a), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 				else
-					local x, y = ScrW() / 2 - txtw / 2 + math.Rand(0, org.pain > 10 and org.pain / 10 or 0) + math.Rand(0, (255 - clr.g) / 255 * 2), ScrH() - ScrH() / 6 + math.Rand(0, org.pain > 10 and org.pain / 10 or 0) + math.Rand(0, (255 - clr.g) / 255 * 2)
+					local shake = (org.pain > 10 and org.pain / 12 or 0) + GetThoughtInstability(org) * 10
+					local x, y = ScrW() / 2 - txtw / 2 + math.Rand(-shake, shake), ScrH() - ScrH() / 6 + math.Rand(-shake, shake)
 
 					draw.SimpleTextOutlined(last_message or txt, font, x, y, col, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER, 1.5, colBrown)
 				end
@@ -448,6 +458,8 @@ if CLIENT then
 		local time = CurTime()
 		local duration = 4.5
 		local fade = 0.6
+		local org = LocalPlayer().organism
+		local shake = org and GetThoughtInstability(org) * 10 or 0
 
 		for i = #hg.thoughts, 1, -1 do
 			local tbl = hg.thoughts[i]
@@ -463,7 +475,7 @@ if CLIENT then
 				local y = ScrH() - ScrH() / 4 - (i - 1) * ScreenScale(14)
 
 				thoughtBrown.a = alpha
-				draw.SimpleTextOutlined(tbl[1], "ThoughtFont", ScrW() / 2, y, Color(clr.r, clr.g, clr.b, alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, thoughtBrown)
+				draw.SimpleTextOutlined(tbl[1], "ThoughtFont", ScrW() / 2 + math.Rand(-shake, shake), y + math.Rand(-shake, shake), Color(clr.r, clr.g, clr.b, alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, thoughtBrown)
 			end
 		end
 	end

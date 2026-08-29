@@ -27,6 +27,30 @@ end
 
 hook.Add("PlayerInitialSpawn", "homigrad-organism", function(ply) hg.organism.Add(ply) end)
 hook.Add("Player Spawn", "homigrad-organism", function(ply) hg.organism.Clear(ply.organism) end)
+hook.Add("PlayerSpawn", "homigrad-organism-oxygen-safety", function(ply)
+	timer.Simple(0, function()
+		if not IsValid(ply) or not ply:Alive() then return end
+		local org = ply.organism
+		if not org then
+			org = hg.organism.Add(ply)
+			hg.organism.Clear(org, true)
+		end
+		if not istable(org.o2) or not isnumber(org.o2.range) then
+			hg.organism.Clear(org, true)
+		end
+		if not org.o2 or (tonumber(org.o2[1]) or 0) > 0 then return end
+		org.o2[1] = math.max(tonumber(org.o2.range) or 30, 1)
+		org.o2.curregen = tonumber(org.o2.regen) or 4
+		org.lungsfunction = true
+		org.oxygenIntakeAvailable = true
+		org.bodyoxygen = 1
+		org.brainoxygen = 1
+		org.brainoxygenTarget = 1
+		org.spawnOxygenGraceUntil = CurTime() + 1.5
+		ply.fullsend = true
+		if hg.send_organism then hg.send_organism(org, ply, true, true) end
+	end)
+end)
 hook.Add("PlayerDisconnected", "homigrad-organism", function(ply) hg.organism.Remove(ply) end)
 
 local function stopVitalSigns(org)

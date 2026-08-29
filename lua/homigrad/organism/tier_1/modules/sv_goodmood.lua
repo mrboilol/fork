@@ -17,7 +17,7 @@ module[2] = function(owner, org, timeValue)
     GetGoodMood(org)
 
     -- Natural mood decay towards 0
-    org.goodmood = math.Approach(org.goodmood, 0, timeValue / 600)
+    org.goodmood = math.Approach(org.goodmood, 0, timeValue / 420)
 
     -- Track fear duration for cumulative penalty
     local fear = org.fear or 0
@@ -81,7 +81,7 @@ module[2] = function(owner, org, timeValue)
     -- Fear penalty scales with both current fear level and accumulated fear duration
     if org.fear > 0.2 then
         local fearDurationMultiplier = 1 + math.min((org._fearDuration or 0) / 60, 2) -- Up to 3x multiplier after 60 seconds of fear
-        goodmood_add = goodmood_add - timeValue * 0.02 * org.fear * fearDurationMultiplier
+        goodmood_add = goodmood_add - timeValue * 0.04 * org.fear * fearDurationMultiplier
     end
 
     org.goodmood = math.Clamp(org.goodmood + goodmood_add, 0, 1)
@@ -95,7 +95,7 @@ hook.Add("HomigradDamage", "GoodMood_OnDamage", function(ply, dmgInfo, hitgroup,
 
     local damage = dmgInfo:GetDamage()
     if damage > 5 then
-        org.goodmood = math.Clamp(GetGoodMood(org) - (damage * 0.002), 0, 1)
+        org.goodmood = math.Clamp(GetGoodMood(org) - (damage * 0.003), 0, 1)
     end
 end)
 
@@ -198,7 +198,7 @@ hook.Add("ScalePlayerDamage", "GoodMood_Resilience", function(ply, hitgroup, dmg
 
     local goodmood = math.Clamp(org.goodmood or 0, 0, 1)
     if goodmood > 0.3 then
-        local resilience = (goodmood - 0.3) * 0.15 -- Up to 10.5% damage reduction at max goodmood
+        local resilience = (goodmood - 0.3) * 0.22
         dmgInfo:ScaleDamage(1 - resilience)
     end
 end)
