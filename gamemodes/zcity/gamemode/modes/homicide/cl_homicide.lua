@@ -9,7 +9,7 @@ end
 
 MODE.TypeSounds = {
 	["standard"] = "rem_newroundcommence.mp3",
-	["suicidelunatic"] = "allah.mp3",
+	["suicidelunatic"] = "zbattle/jihadmode.mp3",
 }
 
 local function PlayRoundBeginSound(roundType, sequence)

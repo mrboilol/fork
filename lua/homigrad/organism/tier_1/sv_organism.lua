@@ -2,9 +2,14 @@ hg.organism.module = hg.organism.module or {}
 local module = hg.organism.module
 hg.organism.lastindex = hg.organism.lastindex or 1000000
 local hg_huyorgans = ConVarExists("hg_huyorgans") and GetConVar("hg_huyorgans") or CreateConVar("hg_huyorgans", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enables the full cardiopulmonary organ-failure model; 0 keeps simplified stable vitals", 0, 1)
+local hg_incapacitation = ConVarExists("hg_incapacitation") and GetConVar("hg_incapacitation") or CreateConVar("hg_incapacitation", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enables incapacitation and its terminal death timer", 0, 1)
 
 function hg.organism.OrganSystemsEnabled()
 	return hg_huyorgans:GetBool()
+end
+
+function hg.organism.IncapacitationEnabled()
+	return hg_incapacitation:GetBool()
 end
 
 function hg.organism.CanTouchHealth(org)
@@ -378,6 +383,7 @@ local function send_organism(org, ply, recipientForce, reliable)
 	sendtable.timeValue = org.timeValue
 	sendtable.holdingbreath = org.holdingbreath
 	sendtable.arteria = org.arteria
+	sendtable.aorta = org.aorta
 	sendtable.recoilmul = org.recoilmul
 	sendtable.meleespeed = org.meleespeed
 	sendtable.temperature = org.temperature
@@ -628,7 +634,7 @@ local function send_bareinfo(org, force, reliable)
 		"stamina", "immobilization", "adrenaline", "adrenalineAdd", "pain", "shock", "hurt",
 		"pelvis", "chest", "skull", "heart", "stomach", "liver", "intestines", "trachea",
 		"lungsL", "lungsR", "spine1", "spine2", "spine3", "internalBleed", "internalBleedHeal",
-		"arteria", "rarmartery", "larmartery", "rlegartery", "llegartery", "spineartery",
+		"arteria", "rarmartery", "larmartery", "rlegartery", "llegartery", "aorta",
 		"cardiacTamponade", "ischemia", "brainSwelling", "intracranialPressure", "hypoxiaTime",
 		"peripheralperfusion", "perfusionMoveMul", "legstrength", "armstrength", "losing_oxy",
 		"respiratoryArrest", "pneumothorax", "hemothorax", "strokeVolume", "ecgState",

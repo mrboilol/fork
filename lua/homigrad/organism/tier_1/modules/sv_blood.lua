@@ -35,7 +35,7 @@ module[1] = function(org)
 	org.larmartery = 0
 	org.rlegartery = 0
 	org.llegartery = 0
-	org.spineartery = 0
+	org.aorta = 0
 	org.bleedStart = 0
 	org.wounds = {}
 	org.arterialwounds = {}
@@ -162,7 +162,7 @@ local limbArteryWeakness = {
 local o2DebuffArteries = {
 	-- Legacy state flags only; oxygen delivery is derived elsewhere.
 	arteria = true,
-	spineartery = true,
+	aorta = true,
 }
 
 local arteryStatusKeys = {
@@ -171,7 +171,7 @@ local arteryStatusKeys = {
 	"larmartery",
 	"rlegartery",
 	"llegartery",
-	"spineartery",
+	"aorta",
 }
 
 function hg.organism.RebuildArteryWoundState(org, syncNow)
@@ -346,6 +346,7 @@ local function getWoundHemostasisDelta(org, wound, dt, now, arterial, catastroph
 	local initial = math.max(tonumber(wound.initialSeverity) or severity, 0.01)
 	local age = math.max(now - (tonumber(wound.openedAt) or now), 0)
 	local treatment = getHemostaticTreatmentDrive(org)
+	local treatedArterialWound = not arterial or wound.bandaged or treatment > 0
 	local temperature = tonumber(org.temperature) or 36.7
 	local temperatureCoag = math.Clamp((temperature - 27) / 9.7, 0.25, 1)
 	local coag = math.Clamp(tonumber(org.coagulation_multiplier) or 1, 0.15, 2.5) * temperatureCoag
@@ -360,6 +361,9 @@ local function getWoundHemostasisDelta(org, wound, dt, now, arterial, catastroph
 
 	local rampSeconds = math.max(tonumber(cfg.WOUND_CLOT_RAMP_S) or 12, 0.1)
 	local maturity = math.Clamp((age - delay) / rampSeconds, 0, 1)
+	if arterial and not treatedArterialWound then
+		maturity = 0
+	end
 	-- Strong treatment can begin stabilizing a fresh wound before natural clot
 	-- maturation would normally be established.
 	maturity = math.max(maturity, treatment * 0.88)

@@ -86,10 +86,23 @@ if SERVER then
 end
 
 local nearbyPickups = {}
+local nearbyInteractables = {}
 local nextPickupScan = 0
 local selectedPickup
 local lastSentPickup
 local nextPickupSelectionSend = 0
+local altGlowAlpha = 0
+
+function hg.CanPromptSearch(ply, ent)
+	if not IsValid(ply) or not ply:IsPlayer() or not ply:Alive() then return false end
+	if ply.organism and ply.organism.otrub then return false end
+	if ply:GetNetVar("disappearance", nil) then return false end
+	if not IsValid(ent) or ent:IsWorld() or ent:IsPlayer() or ent:IsRagdoll() then return false end
+	if ent:GetNoDraw() or IsValid(ent:GetParent()) then return false end
+	if ply:EyePos():DistToSqr(ent:NearestPoint(ply:EyePos())) > PICKUP_RANGE * PICKUP_RANGE then return false end
+
+	return ent.IsSearchableContainer == true or ent:GetNWBool("hgSearchableContainer", false)
+end
 
 local function pickupName(ent)
 	local name
@@ -128,9 +141,13 @@ local function scanNearbyPickups(ply)
 	nextPickupScan = CurTime() + 0.08
 
 	nearbyPickups = {}
+	nearbyInteractables = {}
 	for _, ent in ipairs(ents.FindInSphere(ply:EyePos(), PICKUP_SCAN_RANGE)) do
 		if hg.CanPromptPickup(ply, ent) and pickupVisible(ply, ent) then
 			nearbyPickups[#nearbyPickups + 1] = ent
+		end
+		if hg.CanPromptSearch(ply, ent) and pickupVisible(ply, ent) then
+			nearbyInteractables[#nearbyInteractables + 1] = ent
 		end
 	end
 
@@ -140,6 +157,18 @@ local function scanNearbyPickups(ply)
 
 	for index = 33, #nearbyPickups do
 		nearbyPickups[index] = nil
+	end
+
+	for _, ent in ipairs(nearbyPickups) do
+		nearbyInteractables[#nearbyInteractables + 1] = ent
+	end
+
+	table.sort(nearbyInteractables, function(a, b)
+		return ply:EyePos():DistToSqr(a:NearestPoint(ply:EyePos())) < ply:EyePos():DistToSqr(b:NearestPoint(ply:EyePos()))
+	end)
+
+	for index = 33, #nearbyInteractables do
+		nearbyInteractables[index] = nil
 	end
 
 	return nearbyPickups
@@ -190,15 +219,16 @@ hook.Add("Think", "HG_UpdatePickupSelection", function()
 
 	selectedPickup = choosePickup(ply, scanNearbyPickups(ply))
 	sendPickupSelection(ply:KeyDown(IN_WALK) and selectedPickup or nil)
+	altGlowAlpha = math.Approach(altGlowAlpha, ply:KeyDown(IN_WALK) and 1 or 0, FrameTime() * 4)
 end)
 
 hook.Add("PreDrawHalos", "HG_HighlightPickupCandidates", function()
 	local ply = LocalPlayer()
-	if not IsValid(ply) or not ply:Alive() or not ply:KeyDown(IN_WALK) then return end
+	if not IsValid(ply) or not ply:Alive() or altGlowAlpha <= 0 then return end
 
-	local pickups = scanNearbyPickups(ply)
-	if #pickups > 0 then
-		halo.Add(pickups, Color(255, 210, 80), 2, 2, 1, true, false)
+	scanNearbyPickups(ply)
+	if #nearbyInteractables > 0 then
+		halo.Add(nearbyInteractables, Color(255, 210, 80, math.Round(255 * altGlowAlpha)), 2, 2, 1, true, false)
 	end
 end)
 
@@ -206,9 +236,10 @@ function hg.EnsurePickupHudHint(ent)
 	if not IsValid(ent) or ent.HudHintMarkup then return end
 
 	local use = string.upper(input.LookupBinding("+use") or "E")
+	local action = hg.CanPromptSearch(LocalPlayer(), ent) and "search" or "pickup"
 	ent.HudHintMarkup = markup.Parse(
 		"<font=ZCity_Tiny>" .. pickupName(ent) .. "</font>\n" ..
-		"<font=ZCity_SuperTiny><colour=125,125,125>" .. use .. " to pickup</colour></font>",
+		"<font=ZCity_SuperTiny><colour=125,125,125>" .. use .. " to " .. action .. "</colour></font>",
 		450
 	)
 	ent.hgGeneratedPickupHudHint = ent.HudHintMarkup
@@ -220,11 +251,11 @@ function hg.GetPickupPromptEntities(ply, traceEnt)
 	if not IsValid(ply) or not ply:Alive() then return noPickupPrompts end
 
 	if ply:KeyDown(IN_WALK) then
-		local pickups = scanNearbyPickups(ply)
-		for _, ent in ipairs(pickups) do
+		scanNearbyPickups(ply)
+		for _, ent in ipairs(nearbyInteractables) do
 			hg.EnsurePickupHudHint(ent)
 		end
-		return pickups, selectedPickup
+		return nearbyInteractables, selectedPickup
 	end
 
 	if IsValid(selectedPickup) and hg.CanPromptPickup(ply, selectedPickup) and pickupVisible(ply, selectedPickup) then

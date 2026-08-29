@@ -87,7 +87,7 @@ local list = {
 	{"larmartery", 1, true}, 
 	{"rlegartery", 1, true}, 
 	{"llegartery", 1, true}, 
-	{"spineartery", 1, true}, 
+	{"aorta", 1, true},
 	{"llegdislocation", true, true},
 	{"rlegdislocation", true, true},
 	{"larmdislocation", true, true},

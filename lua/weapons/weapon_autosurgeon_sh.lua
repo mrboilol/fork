@@ -127,7 +127,7 @@ local ASScanSounds = {
 -- distinct passes. The live planner below orders them by current danger while
 -- mechanical circulation can operate concurrently during cardiac arrest.
 local StitchFields = {
-    "arteria", "rarmartery", "larmartery", "rlegartery", "llegartery", "spineartery",
+    "arteria", "rarmartery", "larmartery", "rlegartery", "llegartery", "aorta",
     "rvein", "lvein", "spinevein", "pulmvein", "rarmvein", "larmvein", "rlegvein", "llegvein"
 }
 

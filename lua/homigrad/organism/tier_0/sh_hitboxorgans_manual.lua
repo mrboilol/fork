@@ -4,7 +4,8 @@ male["ValveBiped.Bip01_Spine1"] = {}
 
 male["ValveBiped.Bip01_Spine"] = {
 	{"liver", nil, Vector(4, 3, -2.5), Angle(0, 0, 0), Vector(2, 2, 3.5), Color(125, 50, 0)},
-	{"stomach", nil, Vector(3, 2, 2), Angle(0, 0, 0), Vector(2.5, 2, 3), Color(255, 125, 0)}
+	{"stomach", nil, Vector(3, 2, 2), Angle(0, 0, 0), Vector(2.5, 2, 3), Color(255, 125, 0)},
+	{"aorta", 0, Vector(2, 0, 0), Angle(0, 0, 0), Vector(5, 0.5, 0.5), Color(255, 0, 0)}
 }
 male["ValveBiped.Bip01_Head1"] = {
 	{
@@ -116,12 +117,13 @@ male["ValveBiped.Bip01_Neck1"] = {
 		Vector(3, 0.5, 0.5),
 		Color(200, 0, 0)
 	},
+	{"aorta", 0, Vector(2.5, -0.75, 0), Angle(0, 0, 0), Vector(3.5, 0.45, 0.45), Color(255, 0, 0)},
 }
 
 local bone = 0.5
 male["ValveBiped.Bip01_Spine2"] = {
 	{"spine2", spine, Vector(4, -1, 0), Angle(0, 0, 0), Vector(8, 0.5, 0.5), Color(0, 125, 0)},
-	{"spineartery", 0, Vector(2, -1, 1), Angle(0, 0, 0), Vector(6, 0.4, 0.4), Color(255, 0, 0)},
+	{"aorta", 0, Vector(2, 1.25, 0.5), Angle(0, 0, 0), Vector(7, 0.55, 0.55), Color(255, 0, 0)},
 	{
 		"chest", --right
 		bone,
@@ -179,7 +181,7 @@ male["ValveBiped.Bip01_Spine2"] = {
 local bone = 0.5
 male["ValveBiped.Bip01_Pelvis"] = {
 	{"spine1", spine, Vector(0, 2, -5), Angle(0, 0, 0), Vector(0.5, 5, 0.5), Color(0, 125, 0)},
-	{"spineartery", 0, Vector(1, 2, -5), Angle(0, 0, 0), Vector(0.4, 5, 0.4), Color(255, 0, 0)},
+	{"aorta", 0, Vector(0, 2, -4.5), Angle(0, 0, 0), Vector(0.55, 3.5, 0.55), Color(255, 0, 0)},
 	{
 		"pelvis", --back
 		bone,
@@ -420,6 +422,7 @@ female["ValveBiped.Bip01_Neck1"] = {
 		Vector(3, 0.5, 0.5),
 		Color(200, 0, 0)
 	},
+	{"aorta", 0, Vector(1.5, -0.75, 0), Angle(0, 0, 0), Vector(3.5, 0.45, 0.45), Color(255, 0, 0)},
 }
 
 table.insert(female["ValveBiped.Bip01_Head1"],1,{"helmet2", 1, Vector(3.5, -0.9, 0), Angle(0, 0, 0), Vector(5, 6, 5.5), Color(255, 255, 0), true, hg.armor.head["helmet2"].protection})
@@ -445,7 +448,7 @@ hg.organism.translationTbl = {
 	["vest1"] = "Armored vest",
 	["vest1"] = "Armored vest",
 	["spine2"] = "Upper spine",
-	["spineartery"] = "Spine artery",
+	["aorta"] = "Aorta",
 	["chest"] = "Ribs",
 	["lungsR"] = "Left lung",
 	["lungsL"] = "Right lung",

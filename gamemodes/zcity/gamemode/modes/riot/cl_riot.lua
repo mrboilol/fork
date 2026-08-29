@@ -39,7 +39,7 @@ net.Receive("riot_start", function()
         RiotIntroMusic:Stop()
         RiotIntroMusic = nil
     end
-    RiotIntroMusic = CreateSound(LocalPlayer(), "rem_track2.mp3")
+    RiotIntroMusic = CreateSound(LocalPlayer(), "zbattle/riot.wav")
     RiotIntroMusic:PlayEx(1.5, 100)
     RiotIntroMusicStart = RiotIntroStartTime
     MODE.RoundTextTilts = {}
@@ -308,7 +308,7 @@ net.Receive("riot_start_vote", function()
         RiotIntroMusic:Stop()
         RiotIntroMusic = nil
     end
-    RiotIntroMusic = CreateSound(LocalPlayer(), "rem_track1.mp3")
+    RiotIntroMusic = CreateSound(LocalPlayer(), "zbattle/riot.wav")
     RiotIntroMusic:PlayEx(1.5, 100)
     RiotIntroMusicStart = 0
     OpenVoteMenu()

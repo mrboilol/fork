@@ -18,6 +18,7 @@ local function damageOrgan(org, dmg, dmgInfo, key)
 end
 
 local input_list = hg.organism.input_list
+local hitArtery
 local function addInternalBleed(org, amount, organ)
 	if amount <= 0 then return end
 	org.internalBleed = org.internalBleed + amount
@@ -97,7 +98,7 @@ end
 
 hg.organism.ApplyOrganTrauma = applyOrganTrauma
 
-input_list.heart = function(org, bone, dmg, dmgInfo)
+input_list.heart = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet, impact)
 	local oldDmg = org.heart
 
 	local result = damageOrgan(org, dmg * 0.3, dmgInfo, "heart")
@@ -115,6 +116,10 @@ input_list.heart = function(org, bone, dmg, dmgInfo)
 	if hg.organism.AddCardiacStress then hg.organism.AddCardiacStress(org, delta * (dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) and 2.4 or 1.2)) end
 	if delta > 0.08 and dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_SLASH) and math.Rand(0, 1) < math.Clamp(delta * 1.8, 0, 0.75) then
 		hg.organism.StartFibrillation(org)
+	end
+	if delta > 0 and (org.aorta or 0) < 1 and math.Rand(0, 1) < math.Clamp(0.18 + delta * 0.7, 0.18, 0.72) then
+		local arteryDir = isvector(dir) and dir:LengthSqr() > 0.001 and dir or traumaDirection(org, dmgInfo)
+		hitArtery("aorta", org, math.max(dmg, 0.2), dmgInfo, boneindex or "ValveBiped.Bip01_Spine2", arteryDir, hit, impact, true)
 	end
 
 	return result
@@ -317,8 +322,18 @@ local arterySize = {
 	["larmartery"] = 6,
 	["rlegartery"] = 9,
 	["llegartery"] = 9,
-	["spineartery"] = 10,
+	["aorta"] = 18,
 }
+
+local function chooseArterialBleedStyle(artery)
+	local roll = math.Rand(0, 1)
+	if artery == "arteria" or artery == "aorta" then
+		if roll < 0.24 then return 3 end
+		if roll < 0.62 then return 2 end
+		return 1
+	end
+	return roll < 0.46 and 2 or 1
+end
 
 local arteryMessages ={
 	"I can feel blood rushing from my neck...",
@@ -351,9 +366,11 @@ local function getStaminaMul(dmgInfo)
 	return 1
 end
 
-local function hitArtery(artery, org, dmg, dmgInfo, boneindex, dir, hit, impact)
-	if isCrush(dmgInfo) then return 1 end
-	if dmgInfo:IsDamageType(DMG_BLAST) then return 1 end
+hitArtery = function(artery, org, dmg, dmgInfo, boneindex, dir, hit, impact, forceRupture)
+	if not forceRupture and (isCrush(dmgInfo) or dmgInfo:IsDamageType(DMG_BLAST)) then
+		local ruptureChance = math.Clamp((dmg - 0.35) * 0.45, 0, 0.75)
+		if ruptureChance <= 0 or math.Rand(0, 1) > ruptureChance then return 1 end
+	end
 	local arteryResistance = math.max(org.arteryResistanceMul or 1, 1)
 	if arteryResistance > 1 and math.Rand(0, 1) > 1 / arteryResistance then return 1 end
 	dmg = dmg / arteryResistance
@@ -378,10 +395,13 @@ local function hitArtery(artery, org, dmg, dmgInfo, boneindex, dir, hit, impact)
 	org.shock = math.min(org.shock + 15, 95)
 	org.fearadd = math.min(org.fearadd + 1.5, 3)
 	hg.organism.AddPanicAttack(org, math.max(0.9 - (org.panicattackadd or 0), 0), false, false, true)
-	if org[artery] == 1 then return 0 end
+	local arteryDamage = tonumber(org[artery]) or 0
+	if arteryDamage >= 1 then return 0 end
 	if org[string.Replace(artery, "artery", "").."amputated"] then return end
 
-	if artery ~= "arteria" then
+	if artery == "aorta" then
+		hg.AddHarmToAttacker(dmgInfo, 18, "Aorta punctured harm")
+	elseif artery ~= "arteria" then
 		hg.AddHarmToAttacker(dmgInfo, 4, "Random artery punctured harm")//((1 - org[artery]) - math.max((1 - org[artery]) - dmg,0)) / 4
 	else
 		if org.isPly and not org.otrub then
@@ -393,7 +413,7 @@ local function hitArtery(artery, org, dmg, dmgInfo, boneindex, dir, hit, impact)
 		org.needfake = true
 	end
 
-	org[artery] = math.min(org[artery] + 1, 1)
+	org[artery] = math.min(arteryDamage + 1, 1)
 
 	local owner = org.owner
 
@@ -424,7 +444,7 @@ local function hitArtery(artery, org, dmg, dmgInfo, boneindex, dir, hit, impact)
 	if not localPos then
 		localPos, localAng, dir2 = vecZero, angZero, Vector(-1, 0, 0)
 	end
-	local wound = {arterySize[artery], localPos, localAng, woundBone or boneindex, CurTime(), dir2 * 100, artery}
+	local wound = {arterySize[artery], localPos, localAng, woundBone or boneindex, CurTime(), dir2 * 100, artery, chooseArterialBleedStyle(artery)}
 	table.insert(org.arterialwounds, wound)
 	hg.organism.MarkArterialWoundsNetDirty(org)
 	--if IsValid(owner:GetNWEntity("RagdollDeath")) then owner:GetNWEntity("RagdollDeath"):SetNetVar("wounds",org.arterialwounds) end
@@ -452,7 +472,7 @@ input_list.rarmartery = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, r
 input_list.larmartery = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet, impact) return hitArtery("larmartery", org, dmg, dmgInfo, boneindex, dir, hit, impact) end
 input_list.rlegartery = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet, impact) return hitArtery("rlegartery", org, dmg, dmgInfo, boneindex, dir, hit, impact) end
 input_list.llegartery = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet, impact) return hitArtery("llegartery", org, dmg, dmgInfo, boneindex, dir, hit, impact) end
-input_list.spineartery = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet, impact) return hitArtery("spineartery", org, dmg, dmgInfo, boneindex, dir, hit, impact) end
+input_list.aorta = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet, impact) return hitArtery("aorta", org, dmg, dmgInfo, boneindex, dir, hit, impact) end
 input_list.eyeL = function(org, bone, dmg, dmgInfo)
 	local oldDmg = org.eyeL or 0
 	dmg = dmg * 0.75

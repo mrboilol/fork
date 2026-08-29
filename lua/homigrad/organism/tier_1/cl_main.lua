@@ -1129,6 +1129,112 @@ local arterySoundPitchMin = 95
 local arterySoundPitchMax = 110
 local arteryBurstCount = 2
 local arterySizeMul = 1.35
+local bleedDown = Vector(0, 0, -1)
+
+local function getBleedPressureDrive(org)
+	local pressure = math.max(tonumber(org.bloodPressure) or 92, 0)
+	if pressure <= 48 then return pressure, 0 end
+	local hypotension = math.Clamp(tonumber(org.hypotension) or 0, 0, 1)
+	return pressure, math.Clamp((pressure - 48) / 44, 0, 1.7) * (1 - hypotension * 0.2)
+end
+
+local function getBleedDirection(ang)
+	local dir = ang and ang:Forward() or vector_origin
+	if dir:LengthSqr() <= 0.001 then return bleedDown end
+	return dir:GetNormalized()
+end
+
+local function emitOrdinaryBleeding(ent, org, wound, pos, ang)
+	local severity = math.max(tonumber(wound[1]) or 0, 0)
+	local severityK = math.Clamp(severity / 18, 0, 1)
+	local style = tonumber(wound[6]) or (severity <= 3 and 2 or 1)
+	if severity <= 3 then style = 2 end
+	if style == 3 and severity < 8 then style = 2 end
+
+	local _, pressureDrive = getBleedPressureDrive(org)
+	local outward = getBleedDirection(ang)
+	if pressureDrive <= 0 then
+		local count = style == 1 and 1 or math.max(1, math.floor(2 + severityK * 4))
+		for _ = 1, count do
+			local vel = bleedDown * math.Rand(4, 18) + VectorRand(-8, 8)
+			local size = style == 2 and math.Rand(0.25, 0.75) or math.Rand(0.8, 1.8 + severityK)
+			hg.addBloodPart(pos + VectorRand(-0.35, 0.35), vel, nil, size, size, false, nil, ent)
+		end
+		return
+	end
+
+	if style == 1 then
+		local speed = (55 + severityK * 170) * pressureDrive
+		local vel = outward * speed + VectorRand(-8, 8) * (0.4 + severityK)
+		local size = 1.1 + severityK * 3.1
+		hg.addBloodPart(pos, vel, nil, size, size, false, nil, ent)
+	elseif style == 2 then
+		local count = math.Clamp(math.floor(1 + severityK * 8), 1, 9)
+		for _ = 1, count do
+			local speed = math.Rand(35, 105 + severityK * 145) * pressureDrive
+			local scatter = VectorRand() * math.Rand(25, 80 + severityK * 110)
+			local vel = outward * speed + scatter
+			local size = math.Rand(0.22, 0.5 + severityK * 0.55)
+			hg.addBloodPart(pos + VectorRand(-0.5, 0.5), vel, nil, size, size, false, nil, ent)
+		end
+	else
+		local count = math.Clamp(math.floor(5 + severityK * 8), 5, 13)
+		for _ = 1, count do
+			local vel = outward * math.Rand(40, 210) * pressureDrive + VectorRand() * math.Rand(45, 190) * pressureDrive + vector_up * math.Rand(-25, 80)
+			local size = math.Rand(0.8, 2.2 + severityK * 2.4)
+			hg.addBloodPart(pos + VectorRand(-1.2, 1.2), vel, nil, size, size, false, nil, ent)
+		end
+	end
+end
+
+local function emitArterialBleeding(ent, org, wound, pos, dir, water)
+	local style = tonumber(wound[8]) or 1
+	local artery = wound[7]
+	if style == 3 and artery ~= "arteria" and artery ~= "aorta" then style = 2 end
+	local _, pressureDrive = getBleedPressureDrive(org)
+	local pulseDrive = math.Clamp((tonumber(org.pulse) or 70) / 70, 0.15, 1.8)
+	local outward = dir:LengthSqr() > 0.001 and dir:GetNormalized() or bleedDown
+
+	if water then
+		local count = style == 3 and 10 or style == 2 and 6 or arteryBurstCount
+		for _ = 1, count do
+			hg.addBloodPart2(pos + VectorRand(-1, 1), VectorRand(-5, 5), nil, nil, nil, nil, true, ent)
+		end
+		return style
+	end
+
+	if pressureDrive <= 0 then
+		local count = style == 1 and 1 or style == 2 and 5 or 9
+		for _ = 1, count do
+			local size = style == 2 and math.Rand(0.3, 0.8) or math.Rand(1, style == 3 and 3.8 or 2.2)
+			hg.addBloodPart(pos + VectorRand(-0.8, 0.8), bleedDown * math.Rand(8, 25) + VectorRand(-14, 14), nil, size, size, true, nil, ent)
+		end
+		return style
+	end
+
+	if style == 1 then
+		local speed = math.Rand(430, 590) * pressureDrive * (0.72 + pulseDrive * 0.28)
+		local vel = outward * speed + VectorRand(-10, 10) * pulseDrive
+		local size = math.Rand(1.2, 2.2) * arterySizeMul
+		hg.addBloodPart(pos, vel, nil, size, size, true, nil, ent)
+	elseif style == 2 then
+		local count = math.random(7, 12)
+		for _ = 1, count do
+			local vel = outward * math.Rand(80, 260) * pressureDrive + VectorRand() * math.Rand(85, 235) * pressureDrive * pulseDrive
+			local size = math.Rand(0.22, 0.75) * arterySizeMul
+			hg.addBloodPart(pos + VectorRand(-0.75, 0.75), vel, nil, size, size, true, nil, ent)
+		end
+	else
+		local count = math.random(12, 18)
+		for _ = 1, count do
+			local vel = outward * math.Rand(120, 440) * pressureDrive + VectorRand() * math.Rand(120, 330) * pressureDrive * pulseDrive + vector_up * math.Rand(-45, 130)
+			local size = math.Rand(1.1, 4.6) * arterySizeMul
+			hg.addBloodPart(pos + VectorRand(-1.5, 1.5), vel, nil, size, size, true, nil, ent)
+		end
+	end
+
+	return style
+end
 
 local pitchAddClasses = {
 	["furry"] = 20,
@@ -1425,8 +1531,6 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 		if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then
 			ent:SetupBones()
 			for i, wound in pairs(wounds) do
-				local size = math.random(0, 1) * math.max(math.min(wound[1], 1), 0.5)
-
 				if (wound.visualReadyAt or 0) <= CurTime() and wound[5] + beatsPerSecond < time then
 					local mat, boneID = GetWoundBoneMatrix(ent, wound[4])
 					if boneID then
@@ -1446,7 +1550,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 								hg.addBloodPart2(pos, VectorRand(-5, 5), nil, nil, nil, nil, true, ent)
 							end
 						else
-							hg.addBloodPart(pos, VectorRand(-15, 15), nil, size, size, false, nil, ent)
+							emitOrdinaryBleeding(ent, org, wound, pos, ang)
 						end
 
 						wound[5] = time + (water and 2 or (math.Rand(0, 1) * (!hg_old_blood:GetBool() and 0.5 or 1) / wound[1] * 15))
@@ -1463,7 +1567,6 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 			local mat, boneID = GetWoundBoneMatrix(ent, wound[4])
 			if (wound.visualReadyAt or 0) <= CurTime() and wound[5] + addtime < time and boneID then
 				if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then
-					local size = math.random(1, 2) * math.max(math.min(wound[1], 1), 0.5) * arterySizeMul
 					if boneID then
 						local bone = wound[4]
 
@@ -1483,19 +1586,9 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 						dir = -dir:Forward() * len
 
 						local water = bit.band(util.PointContents(pos), CONTENTS_WATER) == CONTENTS_WATER
-						if water then
-							for _ = 1, arteryBurstCount do
-								hg.addBloodPart2(pos, VectorRand(-5, 5), nil, nil, nil, nil, true, ent)
-							end
-						else
-							local vel = VectorRand(-1, 1) * (org.pulse or 70) / 70 + dir * 5 * (math.abs(math.sin(CurTime() * 2) + math.cos(CurTime() * (5 + i * 2)) + math.sin(CurTime() * (1 + i))) * 0.6 + math.sin(CurTime() * 2) + 4) * 0.1 + dir:Angle():Right() * 25 * math.sin(CurTime() * 2) * math.cos(CurTime() * 4) + boneAng:Up() * 25 * math.sin(CurTime() * 3) * math.cos(CurTime() * 1) + VectorRand(-1, 1) * (org.pulse or 70) / 70
-							hg.addBloodPart(pos, vel, nil, size, size, true, nil, ent)
-							for _ = 2, arteryBurstCount do
-								hg.addBloodPart(pos, vel * math.Rand(0.65, 1.05) + VectorRand(-3, 3) * (org.pulse or 70) / 70, nil, size * math.Rand(0.85, 1.15), size * math.Rand(0.85, 1.15), true, nil, ent)
-							end
-						end
-
-						wound[5] = time + (water and 2 or (0.5 * 1 / hg_blood_fps:GetInt()))
+						local style = emitArterialBleeding(ent, org, wound, pos, dir, water)
+						local styleDelay = style == 1 and 0.5 or style == 2 and 1 or 1.5
+						wound[5] = time + (water and 2 or (styleDelay / math.min(hg_blood_fps:GetInt(), 36)))
 					end
 				end
 			end

@@ -352,6 +352,29 @@ local function IsSandboxContainer(ent)
 	return hg.SandboxContainerModels[string.lower(ent:GetModel() or "")] ~= nil
 end
 
+local function MarkSandboxContainer(ent)
+	if not IsValid(ent) then return end
+	ent:SetNWBool("hgSearchableContainer", IsSandboxContainer(ent))
+end
+
+local function RefreshSandboxContainerMarkers()
+	for _, ent in ipairs(ents.FindByClass("prop_physics")) do
+		MarkSandboxContainer(ent)
+	end
+end
+
+hook.Add("InitPostEntity", "HG_MarkSandboxSearchContainers", RefreshSandboxContainerMarkers)
+hook.Add("OnEntityCreated", "HG_MarkCreatedSandboxSearchContainer", function(ent)
+	if ent:GetClass() ~= "prop_physics" then return end
+	timer.Simple(0, function()
+		MarkSandboxContainer(ent)
+	end)
+end)
+
+cvars.AddChangeCallback("hg_sandbox_containers", function()
+	RefreshSandboxContainerMarkers()
+end, "HG_RefreshSandboxSearchContainerMarkers")
+
 local function SendSandboxContainerLoot(ply, ent)
 	if not IsValid(ply) or not IsValid(ent) then return end
 	ply.hgSandboxOpenedContainer = ent
@@ -443,6 +466,7 @@ local function ResetSandboxContainers()
 			ent.armors = nil
 			ent:SetNetVar("Inventory", nil)
 			ent:SetNetVar("Armor", nil)
+			MarkSandboxContainer(ent)
 		end
 	end
 end

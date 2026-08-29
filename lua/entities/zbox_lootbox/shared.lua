@@ -19,6 +19,7 @@ ENT.LootTable = {
     {class = "weapon_medkit_sh"},
 }
 ENT.CanGenerate = true
+ENT.IsSearchableContainer = true
 
 function ENT:Initialize()
 	self:PhysicsInit(SOLID_VPHYSICS)

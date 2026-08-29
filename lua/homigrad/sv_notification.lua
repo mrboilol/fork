@@ -724,62 +724,6 @@ function PLAYER:ResetNotification(key)
     ResetNotification(self,key)
 end
 
-local function combatThoughtStoppedBreathing(org)
-	if org.heartstop or org.choking then return true end
-	if (org.trachea or 0) >= 0.95 then return true end
-	return org.o2 and (org.o2.curregen or 0) <= 0 and not org.holdingbreath
-end
-
-function hg.CaptureCombatInjuryState(org)
-	if not org then return end
-	return {otrub = org.otrub or org.needotrub, notBreathing = combatThoughtStoppedBreathing(org)}
-end
-
-function hg.ReportCombatInjuryState(attacker, victim, org, before, meleeWeapon, meleeContact, damage, damageType)
-	if not IsValid(attacker) or not attacker:IsPlayer() or attacker == victim or not org or not before then return end
-	if attacker:GetInfoNum("hg_newthoughts", 0) <= 0 then return end
-	local message, key
-	if not before.otrub and (org.otrub or org.needotrub) then
-		message, key = "They collapse and stop responding.", "combat_knockout"
-	elseif not before.notBreathing and combatThoughtStoppedBreathing(org) then
-		message, key = "They stop breathing.", "combat_breathing"
-	end
-
-	if message then CreateThought(attacker, message, 2, key, 0, Color(255, 220, 190)) end
-	if not before.otrub and not (org.otrub or org.needotrub) and not org.combatThoughtKnockoutPending then
-		org.combatThoughtKnockoutPending = true
-		timer.Simple(3.5, function()
-			org.combatThoughtKnockoutPending = nil
-			if IsValid(attacker) and org.otrub and IsValid(org.owner) then
-				CreateThought(attacker, "They collapse and stop responding.", 2, "combat_delayed_knockout_" .. org.owner:EntIndex(), 0, Color(255, 220, 190))
-			end
-		end)
-	end
-end
-
-hook.Add("KeyPress", "HGThoughtCheckResponsiveness", function(ply, key)
-	if key ~= IN_USE or not IsValid(ply) or not ply:Alive() or ply:GetInfoNum("hg_newthoughts", 0) <= 0 then return end
-	local trace = ply:GetEyeTrace()
-	local target = trace and trace.Entity
-	local org = IsValid(target) and target.organism
-	if not org or target == ply or ply:GetPos():DistToSqr(target:GetPos()) > 14400 then return end
-
-	local message
-	if combatThoughtStoppedBreathing(org) then
-		message = "They are motionless. You cannot see them breathing."
-	elseif org.otrub or org.needotrub then
-		message = "They are unresponsive."
-	elseif org.seizure or org.panicattack then
-		message = "They are visibly convulsing and unresponsive to you."
-	elseif (org.disorientation or 0) > 35 or (org.shock or 0) > 35 then
-		message = "They look dazed and barely responsive."
-	elseif (org.arterialBleed or 0) > 0.2 or ((org.arterialwounds and #org.arterialwounds) or 0) > 0 then
-		message = "They are bleeding heavily."
-	end
-
-	if message then CreateThought(ply, message, 3, "responsiveness_" .. target:EntIndex(), 0, Color(255, 225, 190)) end
-end)
-
 hook.Add("EntityTakeDamage", "SCPCB_HGThoughtDamage", function(target, dmginfo)
     if not dmginfo or dmginfo:GetDamage() <= 0 then return end
 

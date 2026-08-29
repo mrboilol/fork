@@ -116,7 +116,7 @@ hook.Add("Think", "Abnormalties_Heal", function()
 				owner.organism.pneumothorax = 0
 				owner.organism.llegartery = 0
 				owner.organism.rlegartery = 0
-				owner.organism.spineartery = 0
+				owner.organism.aorta = 0
 				owner.organism.brain = 0
 				owner.organism.heartstop = false
 				owner.organism.jaw = 0

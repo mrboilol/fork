@@ -58,7 +58,7 @@ local realPhysNum
 
 local wound_hold_arterial_priority_mul = 14
 local wound_hold_arteria_offset = Vector(2, -2.85, 0)
-local wound_hold_spineartery_offset = Vector(1.5, 0, 4)
+local wound_hold_aorta_offset = Vector(1.5, 0, 4)
 local wound_hold_larmartery_offset = Vector(0.5, 0, 1.5)
 local wound_hold_rarmartery_offset = Vector(0.5, 0, 1.5)
 local wound_hold_llegartery_offset = Vector(1, 0, 2.5)
@@ -114,8 +114,8 @@ local function getHoldWoundPos(ragdoll, wound)
 
 	if artery == "arteria" then
 		return pos + boneAng:Forward() * wound_hold_arteria_offset[1] + boneAng:Right() * wound_hold_arteria_offset[2] + boneAng:Up() * wound_hold_arteria_offset[3]
-	elseif artery == "spineartery" then
-		return pos + boneAng:Forward() * wound_hold_spineartery_offset[1] + boneAng:Right() * wound_hold_spineartery_offset[2] + boneAng:Up() * wound_hold_spineartery_offset[3]
+	elseif artery == "aorta" then
+		return pos + boneAng:Forward() * wound_hold_aorta_offset[1] + boneAng:Right() * wound_hold_aorta_offset[2] + boneAng:Up() * wound_hold_aorta_offset[3]
 	elseif artery == "larmartery" then
 		return pos + boneAng:Forward() * wound_hold_larmartery_offset[1] + boneAng:Right() * wound_hold_larmartery_offset[2] + boneAng:Up() * wound_hold_larmartery_offset[3]
 	elseif artery == "rarmartery" then
@@ -1512,9 +1512,6 @@ hook.Add("Think", "Fake", function()
 					hook.Run("HomigradDamage", org.owner, dmgInfo, HITGROUP_RIGHTARM, hg.GetCurrentCharacter(org.owner), ragdoll.dtime * ((zb.MaximumHarm or 10) / 50) )
 				end
 
-				if org.otrub then
-					ply:Notify("They seem unresponsive.", 60, "choked"..(org.owner:EntIndex()))
-				end
 			end
 			--print("huy")
 		end

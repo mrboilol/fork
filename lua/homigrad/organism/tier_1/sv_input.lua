@@ -519,7 +519,7 @@ function hg.organism.AmputateLimb(org, limb, noShake)
 				table.insert(wnds, tbl)
 			end
 		end
-		table.insert(wnds, {10, vec, ang, boneup, CurTime(), Vector(-100, 0, 0), bone.."artery"})
+		table.insert(wnds, {10, vec, ang, boneup, CurTime(), Vector(-100, 0, 0), bone.."artery", math.Rand(0, 1) < 0.46 and 2 or 1})
 
 		org.arterialwounds = wnds
 		hg.organism.MarkArterialWoundsNetDirty(org)
@@ -618,6 +618,14 @@ end
 
 --hg.organism.AmputateLimb(Entity(2).organism, "rarm")
 
+local function chooseWoundBleedStyle(severity)
+	if severity <= 3 then return 2 end
+	local roll = math.Rand(0, 1)
+	if severity >= 14 and roll < 0.3 then return 3 end
+	if roll < 0.68 then return 2 end
+	return 1
+end
+
 function hg.organism.AddWound(ent, tr, bone, dmgInfo, dmgPos, dmgBlood, inputHole, outputHole)
 	local org = ent.organism
 	if org.superfighter then return end
@@ -641,7 +649,8 @@ function hg.organism.AddWound(ent, tr, bone, dmgInfo, dmgPos, dmgBlood, inputHol
 
 			local localPos, localAng = WorldToLocal(dmgPos + ((i == 1 and 1 or -1) * tr.HitNormal), (i == 1 and -1 or 1) * tr.Normal:Angle(), bonePos, boneAng)
 			if #org.wounds < 30 then
-				local wound = {dmgBlood / 2, localPos, localAng, ent:GetBoneName(bone), CurTime()}
+				local severity = dmgBlood / 2
+				local wound = {severity, localPos, localAng, ent:GetBoneName(bone), CurTime(), chooseWoundBleedStyle(severity)}
 				table.insert(org.wounds, wound)
 			else
 				if org.wounds[1] then org.wounds[1][1] = org.wounds[1][1] + dmgBlood / 2 end
@@ -661,7 +670,8 @@ function hg.organism.AddWoundManual(ent,dmgBlood,localPos,localAng,bone,time)
 	if isnumber(bone) then bone = ent:GetBoneName(bone) end
 
 	if #org.wounds < 30 then
-		local wound = {dmgBlood / 2, localPos, localAng, bone, time}
+		local severity = dmgBlood / 2
+		local wound = {severity, localPos, localAng, bone, time, chooseWoundBleedStyle(severity)}
 		table.insert(org.wounds, wound)
 	else
 		if org.wounds[1] then org.wounds[1][1] = org.wounds[1][1] + dmgBlood / 2 end
@@ -959,8 +969,6 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	local ply = (ent:IsPlayer() and ent) or hg.RagdollOwner(ent)
 
 	org.isPly = IsValid(ply)
-	local combatThoughtState = hg.CaptureCombatInjuryState and hg.CaptureCombatInjuryState(org)
-	
 	if org.godmode then return true end
 
 	if ent == ply and IsValid(ply.FakeRagdoll) and dmgInfo:IsDamageType(DMG_BURN) then
@@ -1469,10 +1477,6 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		hook_Run("HomigradDamage", org.fakePlayer and ent or ply, dmgInfo, hitgroup, ent, attacker.harm, hitBoxs, inputHole)
 	end
 
-	if hg.ReportCombatInjuryState then
-		hg.ReportCombatInjuryState(attacker, ply, org, combatThoughtState, meleeContact and inf, meleeContact, dmg, dmgtype)
-	end
-	
 	attacker.harm = 0
 
 	if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_BLAST + DMG_SLASH + DMG_CLUB + DMG_GENERIC) then

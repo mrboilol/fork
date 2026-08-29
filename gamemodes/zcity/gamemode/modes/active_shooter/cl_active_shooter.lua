@@ -62,7 +62,7 @@ end
 local function PlayRoundStartSound()
 	StopRoundStartSound()
 
-	sound.PlayFile("sound/shooterround.mp3", "noplay noblock", function(audio)
+	sound.PlayFile("sound/zbattle/ger1.ogg", "noplay noblock", function(audio)
 		if IsValid(audio) then
 			audio:EnableLooping(true)
 			audio:Play()
@@ -88,7 +88,7 @@ net.Receive("active_shooter_start", function()
 
 	if playRoundSounds then
 		local musicVolume = GetConVar("snd_musicvolume"):GetFloat()
-		musicSnd = CreateSound(LocalPlayer(), "theyouthinmyblood.mp3")
+		musicSnd = CreateSound(LocalPlayer(), "zbattle/ger1.ogg")
 		if musicSnd then
 			musicSnd:PlayEx(0.6 * musicVolume, 100)
 		end
