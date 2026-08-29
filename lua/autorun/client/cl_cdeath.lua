@@ -24,7 +24,7 @@ local DEATH_MESSAGES = {
 }
 
 local DEATH_SOUNDS = {
-    [0] = "rem_brutaldeath.mp3",
+    [0] = "ooww.ogg",
 }
 
 local DEATH_COLORS = {

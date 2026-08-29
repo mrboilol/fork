@@ -987,7 +987,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	
 	local ply = (ent:IsPlayer() and ent) or hg.RagdollOwner(ent)
 
-	org.isPly = IsValid(ply)
+	org.isPly = IsValid(ply) and ply:IsPlayer()
 	if org.godmode then return true end
 
 	if ent == ply and IsValid(ply.FakeRagdoll) and dmgInfo:IsDamageType(DMG_BURN) then
