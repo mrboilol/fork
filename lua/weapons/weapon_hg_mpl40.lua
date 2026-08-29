@@ -1,4 +1,4 @@
-if SERVER then AddCSLuaFile() end
+﻿if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_melee"
 SWEP.PrintName = "MPL-40"
 SWEP.Instructions = "Part of a lead pipe, you could beat someone up with it, good stuff for a riot.\n\nLMB to attack.\nRMB to block."
@@ -71,7 +71,7 @@ SWEP.hitsoundbrutalize = {
 }
 
 SWEP.swingsoundextra = {
-    {"weapons/darsu_eft/melee/taran_swing_02.mp3", 90, {95, 105}},
+    {"weapons/darsu_eft/melee/taran_swing_02.ogg", 90, {95, 105}},
 }
 
 SWEP.BlockTier = 2

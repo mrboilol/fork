@@ -1,4 +1,4 @@
-if SERVER then AddCSLuaFile() end
+﻿if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_melee"
 SWEP.PrintName = "Fiber Wire"
 SWEP.Instructions = "This is a single cylindrical, flexible strand of metal connected to two ergonomic grips made of carbon fibre and metal. Use it to strange people.\n\nLMB to swing.\nWhen strangling, press LMB to stop strangling."
@@ -78,7 +78,7 @@ function SWEP:PlayAnim(anim, time, cycling, callback, reverse, sendtoclient)
                 if not IsValid(owner) or not IsValid(lply) then return end
                 if owner ~= lply then return end
                 if self.IsLocal and not self:IsLocal() then return end
-                owner:EmitSound("homigrad/suffocation_rope_break.ogg", 75, 125)
+                owner:EmitSound("homigrad/suffocation_rope_break.wav", 75, 125)
             end)
         end
     end
@@ -325,7 +325,7 @@ local function StartStrangle(self, victim)
                 self:PlayAnim("strangle_loop", 100, true, nil, false, true)
             end)
 
-            owner:EmitSound("hitman/weapon/fiberwire_start_0" .. math.random(1,3) .. ".ogg", 75, 100)
+            owner:EmitSound("hitman/weapon/fiberwire_start_0" .. math.random(1,3) .. ".wav", 75, 100)
             self._fw_next_breath = CurTime() + 1.5
             self._fw_lock_until = CurTime() + 0.5
         end)
@@ -368,12 +368,12 @@ local function StartStrangle(self, victim)
     self.breathStage = 0        -- 0 = вдохи, 1 = агональное дыхание
     self.inhaleCount = 0
     
-    self.suffocationSound = CreateSound(owner, "homigrad/suffocation_rope.ogg")
+    self.suffocationSound = CreateSound(owner, "homigrad/suffocation_rope.wav")
     if self.suffocationSound then
         self.suffocationSound:SetSoundLevel(60)
         self.suffocationSound:PlayEx(0.2, math.random(115, 120))
         -- Sometimes CreateSound needs to be explicitly told to loop via DSP or restarting, but CSoundPatch:Play() looping works if the sound has cue points. If not, we have to loop it manually.
-        timer.Create("FW_LoopSound_" .. self:EntIndex(), SoundDuration("homigrad/suffocation_rope.ogg") or 1.5, 0, function()
+        timer.Create("FW_LoopSound_" .. self:EntIndex(), SoundDuration("homigrad/suffocation_rope.wav") or 1.5, 0, function()
             if IsValid(self) and self:GetStrangling() and self.suffocationSound then
                 self.suffocationSound:Stop()
                 self.suffocationSound:PlayEx(0.2, math.random(115, 120))
@@ -913,10 +913,10 @@ function SWEP:CustomThink()
                     if self.breathStage == 0 then
                         if isFemale then
                             local r = math.random(1, 5)
-                            soundToPlay = "breathing/inhale/female/inhale_0" .. r .. ".ogg"
+                            soundToPlay = "breathing/inhale/female/inhale_0" .. r .. ".wav"
                         else
                             local r = math.random(1, 4)
-                            soundToPlay = "breathing/inhale/male/inhale_0" .. r .. ".ogg"
+                            soundToPlay = "breathing/inhale/male/inhale_0" .. r .. ".wav"
                         end
                         self.inhaleCount = (self.inhaleCount or 0) + 1
                         if self.inhaleCount >= 5 then
@@ -924,7 +924,7 @@ function SWEP:CustomThink()
                         end
                     else
                         local r = math.random(1, 13)
-                        soundToPlay = "breathing/agonalbreathing_" .. r .. ".ogg"
+                        soundToPlay = "breathing/agonalbreathing_" .. r .. ".wav"
                     end
 
                     if soundToPlay then

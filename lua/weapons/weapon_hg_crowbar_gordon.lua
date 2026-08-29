@@ -1,4 +1,4 @@
-if SERVER then AddCSLuaFile() end
+﻿if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_melee"
 SWEP.PrintName = "Crowbar"
 SWEP.Instructions = "'I think you dropped this back in Black Mesa!'"
@@ -63,7 +63,7 @@ SWEP.TwoHanded = false
 SWEP.AttackHit = "Canister.ImpactHard"
 SWEP.Attack2Hit = "Canister.ImpactHard"
 SWEP.AttackHitFlesh = "Flesh.ImpactHard"
-SWEP.Attack2HitFlesh = "snd_jack_hmcd_axehit.ogg"
+SWEP.Attack2HitFlesh = "snd_jack_hmcd_axehit.wav"
 SWEP.DeploySnd = "physics/metal/metal_grenade_impact_soft2.wav"
 
 SWEP.AttackPos = Vector(0, 0, 0)

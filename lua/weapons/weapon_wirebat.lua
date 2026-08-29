@@ -92,9 +92,9 @@ SWEP.hitsoundextra = {
 }
 
 SWEP.hitsoundplus = {
-    {"baseballbat/hit1.mp3", 55, {105, 125}},
-    {"baseballbat/hit2.mp3", 55, {105, 125}},
-    {"baseballbat/hit3.mp3", 55, {105, 125}},
+    {"baseballbat/hit1.ogg", 55, {105, 125}},
+    {"baseballbat/hit2.ogg", 55, {105, 125}},
+    {"baseballbat/hit3.ogg", 55, {105, 125}},
 }
 
 SWEP.hitsoundbrutalize = {
@@ -105,7 +105,7 @@ SWEP.hitsoundbrutalize = {
 }
 
 SWEP.swingsoundextra = {
-    {"baseballbat/swing.mp3", 60, {95, 105}},
+    {"baseballbat/swing.ogg", 60, {95, 105}},
 }
 
 SWEP.Attack2Time = 0.45

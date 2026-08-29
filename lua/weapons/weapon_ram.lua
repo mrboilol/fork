@@ -101,7 +101,7 @@
 
         if ent:IsConstrained() and math.random(5) > 3 then
             constraint.RemoveAll( ent )
-            ent:EmitSound("physics/wood/wood_furniture_break"..math.random(1,2)..".ogg")
+            ent:EmitSound("physics/wood/wood_furniture_break"..math.random(1,2)..".wav")
         end
     end
 

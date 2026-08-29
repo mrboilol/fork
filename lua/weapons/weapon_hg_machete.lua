@@ -1,4 +1,4 @@
-if SERVER then AddCSLuaFile() end
+﻿if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_melee"
 SWEP.PrintName = "Machete"
 SWEP.Instructions = "A machete is a broad blade used either as an agricultural implement similar to an axe, or in combat like a long-bladed knife.\n\nLMB to attack.\nRMB to block."
@@ -8,7 +8,7 @@ SWEP.AdminOnly = false
 
 SWEP.WorldModel = "models/weapons/tfa_nmrih/w_me_machete.mdl"
 SWEP.WorldModelReal = "models/weapons/tfa_nmrih/v_me_machete.mdl"
-SWEP.WorldModelExchange = "models/weapons/melee/w_ws_pamachete.mdl"
+--SWEP.WorldModelExchange = "models/weapons/tfa_nmrih/w_me_machete.mdl"
 SWEP.ViewModel = ""
 
 SWEP.SuicidePos = Vector(20, 1, -27)
@@ -20,6 +20,8 @@ SWEP.SuicideSound = "weapons/knife/knife_hit1.wav"
 SWEP.CanSuicide = true
 SWEP.SuicideNoLH = true
 SWEP.SuicidePunchAng = Angle(5, -15, 0)
+
+SWEP.bloodID = 3
 
 SWEP.NoHolster = true
 
@@ -69,7 +71,7 @@ SWEP.StaminaSecondary = 10
 
 SWEP.AttackLen1 = 50
 SWEP.AttackLen2 = 35
-SWEP.weight = 1.4
+SWEP.weight = 1.2
 
 SWEP.canchargeattack = true
 SWEP.ChargeAnimTimeBegin = 1.45
@@ -135,27 +137,11 @@ SWEP.setlh = false
 SWEP.setrh = true
 SWEP.TwoHanded = false
 
-SWEP.AttackHit = "snd_jack_hmcd_knifehit.ogg"
-SWEP.Attack2Hit = "snd_jack_hmcd_knifehit.ogg"
+SWEP.AttackHit = "snd_jack_hmcd_knifehit.wav"
+SWEP.Attack2Hit = "snd_jack_hmcd_knifehit.wav"
 SWEP.AttackHitFlesh = "weapons/knife/knife_hit1.wav"
 SWEP.Attack2HitFlesh = "physics/flesh/flesh_impact_hard1.wav"
 SWEP.DeploySnd = "physics/metal/metal_grenade_impact_soft2.wav"
-SWEP.SwingSound = "machete/macheteswing1.mp3"
-SWEP.HitFleshExtra = {
-    "machete/machetehit1.mp3",
-    "machete/machetehit2.mp3",
-    "machete/machetehit3.mp3",
-    "machete/machetehit4.mp3",
-    "machete/machetehit5.mp3",
-    "machete/machetehit6.mp3",
-}
-SWEP.HitFleshExtraPitch = 75
-SWEP.ArteryChance = 1
-SWEP.SwingSoundPitch = 85
-
-SWEP.BlockTier = 3
-SWEP.MeleeMaterial = "metal"
-SWEP.BlockImpactSound = "physics/metal/metal_solid_impact_bullet1.wav"
 
 SWEP.AttackPos = Vector(0,0,0)
 SWEP.BlockTier = 3
@@ -180,21 +166,21 @@ function SWEP:CanSecondaryAttack()
             self.HoldType = "slam"
         end
     end)
-    return false
+    return true
 end
 
 function SWEP:CanPrimaryAttack()
     self.DamageType = DMG_SLASH
     self.AttackHit = "Canister.ImpactHard"
-    self.Attack2Hit = "snd_jack_hmcd_axehit.ogg"
-    self.AttackHitFlesh = "snd_jack_hmcd_axehit.ogg"
+    self.Attack2Hit = "snd_jack_hmcd_axehit.wav"
+    self.AttackHitFlesh = "snd_jack_hmcd_axehit.wav"
     return true
 end
 
-SWEP.AttackTimeLength = 0.15
+SWEP.AttackTimeLength = 0.1
 SWEP.Attack2TimeLength = 0.05
 
-SWEP.AttackRads = 65
+SWEP.AttackRads = 85
 SWEP.AttackRads2 = 35
 
 SWEP.SwingAng = -15

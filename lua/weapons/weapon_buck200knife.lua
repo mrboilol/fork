@@ -70,10 +70,6 @@ SWEP.ImmobilizationMul = 0.45
 SWEP.StaminaMul = 0.5
 SWEP.HadBackBonus = true
 
-SWEP.BlockTier = 2
-SWEP.MeleeMaterial = "metal"
-SWEP.BlockImpactSound = "physics/metal/metal_solid_impact_bullet1.wav"
-
 SWEP.attack_ang = Angle(0,0,0)
 function SWEP:Initialize()
     self.attackanim = 0
@@ -90,8 +86,8 @@ function SWEP:Initialize()
 end
 
 SWEP.swingsoundextra = {
-    {"knife/knife_bayonet_swing1.mp3", 60, {80, 90}},
-    {"knife/knife_bayonet_swing2.mp3", 60, {80, 90}},
+    {"knife/knife_bayonet_swing1.ogg", 60, {80, 90}},
+    {"knife/knife_bayonet_swing2.ogg", 60, {80, 90}},
 }
 
 SWEP.hitsoundextra = {

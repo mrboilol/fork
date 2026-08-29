@@ -1,4 +1,4 @@
-if SERVER then AddCSLuaFile() end
+﻿if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_melee"
 SWEP.PrintName = "Brick"
 SWEP.Instructions = "A heavy construction brick, that can be used as a deadly weapon.\n\nLMB to attack.\nRMB to block.\nRMB + LMB to throw."
@@ -42,7 +42,7 @@ SWEP.PenetrationSizePrimary = 2
 SWEP.PenetrationSizeSecondary = 2
 
 SWEP.StaminaPrimary = 15
-SWEP.StaminaSecondary = 10
+SWEP.StaminaSecondary = 30
 
 SWEP.AttackTime = 0.25
 SWEP.AnimTime1 = 0.7
@@ -72,7 +72,7 @@ function SWEP:PrimaryAttackAdd(ent, trace)
                     Poof:SetNormal(-trace.HitNormal)
                     util.Effect("eff_jack_hmcd_poof", Poof, true, true)
                 end)
-                owner:EmitSound("physics/concrete/concrete_break" .. math.random(2, 3) .. ".ogg",45,140)
+                owner:EmitSound("physics/concrete/concrete_break" .. math.random(2, 3) .. ".wav",45,140)
                 self:Remove()
             end
 		end
@@ -105,9 +105,7 @@ function SWEP:CustomAttack2()
     local phys = ent:GetPhysicsObject()
 
     if IsValid(phys) then
-        local throwVel = ply:GetAimVector() * ent.MaxSpeed
-        local playerVel = ply:GetVelocity()
-        phys:SetVelocity(throwVel + playerVel * 0.5)
+        phys:SetVelocity(ply:GetAimVector() * ent.MaxSpeed)
         phys:AddAngleVelocity(VectorRand() * 300)
     end
 

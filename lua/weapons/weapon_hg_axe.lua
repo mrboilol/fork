@@ -103,7 +103,7 @@ SWEP.PenetrationSizeSecondary = 1.5
 SWEP.StaminaPrimary = 37
 SWEP.StaminaSecondary = 15
 
-SWEP.AttackLen1 = 55
+SWEP.AttackLen1 = 65
 SWEP.AttackLen2 = 40
 
 if CLIENT then
@@ -119,10 +119,10 @@ SWEP.TwoHanded = true
 
 SWEP.AttackHit = "Canister.ImpactHard"
 SWEP.Attack2Hit = "Canister.ImpactHard"
-SWEP.AttackHitFlesh = "snd_jack_hmcd_axehit.ogg"
+SWEP.AttackHitFlesh = "snd_jack_hmcd_axehit.wav"
 SWEP.Attack2HitFlesh = "Flesh.ImpactHard"
 SWEP.ChargeAttackHit = "Canister.ImpactHard"
-SWEP.ChargeAttackHitFlesh = "snd_jack_hmcd_axehit.ogg"
+SWEP.ChargeAttackHitFlesh = "snd_jack_hmcd_axehit.wav"
 SWEP.DeploySnd = "physics/wood/wood_plank_impact_soft2.wav"
 
 SWEP.hitsoundbrutalize = {
@@ -159,7 +159,7 @@ SWEP.hitsoundplus = {
 }
 
 SWEP.swingsoundextra = {
-    {"baseballbat/swing.mp3", 60, {85, 95}},
+    {"baseballbat/swing.ogg", 60, {85, 95}},
 }
 
 SWEP.AttackPos = Vector(0,0,0)
@@ -183,32 +183,6 @@ SWEP.AttackRads2 = 0
 SWEP.SwingAng = -5
 SWEP.SwingAng2 = 0
 
-SWEP.Attack_Charge_Begin = "Attack_Charge_Begin"
-SWEP.Attack_Charge_Idle = "Attack_Charge_Idle"
-SWEP.Attack_Charge_End = "Attack_Charge_End"
-SWEP.CanHeavyAttack = false -- Set to true to enable
-
-SWEP.HeavyAttackDamageMul = 2.1 -- Max damage multiplier at full charge
-SWEP.HeavyAttackWaitTime = 3 -- Time before you can attack again
-SWEP.HeavyAttackAnimTimeBegin = 1.0 -- Duration of the wind-up/start animation
-SWEP.HeavyAttackAnimTimeIdle = 1 -- Duration of the idle loop
-SWEP.HeavyAttackAnimTimeEnd = 1.85 -- Duration of the attack animation
-SWEP.HeavyAttackDelay = 0.5 -- Time delay before the hit actually connects (during attack anim)
-SWEP.HeavyAttackTimeLength = 0.4 -- Duration of the active hit window
-SWEP.HeavyAttackViewPunch = Angle(5, 0, 0) -- View punch angle on hit
-SWEP.HeavyAttackMaxChargeTime = 3 -- Time in seconds to reach max damage/shake
-SWEP.HeavyAttackSwingAng = 90 -- Custom swing angle for heavy attack
-SWEP.HeavyAttackRads = 95 -- Custom radius/arc for heavy attack
-
-SWEP.HeavyAttackWeaponAng = Angle(-57, -90, 76) -- Configure this angle for heavy attack phase
-SWEP.DefaultWeaponAng = Angle(0, -90, 76) -- Default angle (should match SWEP.weaponAng)
-SWEP.HeavyAttackWeaponAngTransitionSpeed = 10 -- Speed of the smooth transition
-
-
-SWEP.BlockTier = 4
-SWEP.MeleeMaterial = "wood"
-SWEP.BlockImpactSound = "physics/wood/wood_plank_impact_hard1.wav"
-
 function SWEP:CanPrimaryAttack()
     self.DamageType = DMG_SLASH
     self.AttackHit = "Canister.ImpactHard"
@@ -228,7 +202,7 @@ function SWEP:CanChargeAttack()
     self.AttackHit = "Canister.ImpactHard"
     self.Attack2Hit = "Canister.ImpactHard"
     self.ChargeAttackHit = "Canister.ImpactHard"
-    self.ChargeAttackHitFlesh = "snd_jack_hmcd_axehit.ogg"
+    self.ChargeAttackHitFlesh = "snd_jack_hmcd_axehit.wav"
     return true
 end
 

@@ -414,8 +414,9 @@ local bradycardia_phrases = {
 
 local low_perfusion_phrases = {
 	"My limbs feel weak and cold...",
-	"I can barely move...",
-	"Everything feels heavy and sluggish...",
+	"I can barely make myself move...",
+	"My body feels heavy and sluggish...",
+	"My hands and feet are going numb...",
 }
 
 local hg_showthoughts = ConVarExists("hg_showthoughts") and GetConVar("hg_showthoughts") or CreateClientConVar("hg_showthoughts", "1", true, true, "Show the thoughts of your character", 0, 1)

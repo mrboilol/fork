@@ -304,6 +304,7 @@ end )
 
 
 painMat = Material("effects/shaders/zb_grain")
+noiseMat = Material("effects/shaders/zb_grainwhite")
 vignetteMat = Material("effects/shaders/zb_vignette")
 assimilationMat = Material("effects/shaders/zb_assimilation")
 coldMat = Material("effects/shaders/zb_colda")
@@ -392,15 +393,15 @@ lobotomy_mats = {
 	[8] = Material("overlays/tallflash3.png")
 }
 
-local consciousnessTypeBeatVolume = 1
-local dying2Volume = 1
+local consciousnessTypeBeatVolume = 1.2
+local dying2Volume = 1.2
 local remDying1Fade = 0
 local remDying2Fade = 0
-local alternateDyingForegroundVolume = 1
+local alternateDyingForegroundVolume = 1.2
 -- sonimcooked is the solo foreground track for hg_dyingsound 7. Its source
 -- file is quieter than the other dying tracks, so give it a higher ceiling.
-local sonimCookedForegroundVolume = 1
-local alternateDyingBackgroundVolume = 0.75
+local sonimCookedForegroundVolume = 1.2
+local alternateDyingBackgroundVolume = 1
 local alternateDyingBackgroundMul = 0.8
 local painBeatOverlayPath = "sound/rem_pain.mp3"
 local panicattackOverlayPath = "sound/rem_panicattack.mp3"
@@ -859,9 +860,12 @@ local tempolerp = 0
 local grayscaleLerp = 0
 local soundRetry = {}
 
-local function updateCollapseBlink(severity)
+local function updateCollapseBlink(severity, brainSeverity)
 	local now = CurTime()
-	local blinkChance = math.Clamp((severity - 0.2) / 0.8, 0, 1)
+	local blinkChance = math.max(
+		math.Clamp((severity - 0.08) / 0.55, 0, 1),
+		math.Clamp(brainSeverity or 0, 0, 1) * 0.9
+	)
 
 	if blinkChance <= 0 then
 		collapseBlinkLerp = math.Approach(collapseBlinkLerp, 0, FrameTime() * 5)
@@ -870,13 +874,13 @@ local function updateCollapseBlink(severity)
 	end
 
 	if now >= nextCollapseBlink and now >= collapseBlinkEnd then
-		local duration = math.Rand(Lerp(blinkChance, 0.13, 0.24), Lerp(blinkChance, 0.24, 0.48))
+		local duration = math.Rand(Lerp(blinkChance, 0.11, 0.28), Lerp(blinkChance, 0.25, 0.68))
 		collapseBlinkStart = now
-		collapseBlinkAttackEnd = now + math.min(duration * math.Rand(0.18, 0.32), 0.1)
+		collapseBlinkAttackEnd = now + math.min(duration * math.Rand(0.14, 0.34), 0.14)
 		collapseBlinkEnd = now + duration
 		nextCollapseBlink = collapseBlinkEnd + math.Rand(
-			Lerp(blinkChance, 2.6, 0.35),
-			Lerp(blinkChance, 5.2, 1.1)
+			Lerp(blinkChance, 1.5, 0.12),
+			Lerp(blinkChance, 3.1, 0.52)
 		)
 	end
 
@@ -888,10 +892,10 @@ local function updateCollapseBlink(severity)
 			target = 1 - math.TimeFraction(collapseBlinkAttackEnd, collapseBlinkEnd, now)
 			target = math.max(target, 0) ^ 1.45
 		end
-		target = target * blinkChance
+		target = target * blinkChance * (0.8 + blinkChance * 0.45)
 	end
 
-	collapseBlinkLerp = math.Approach(collapseBlinkLerp, target, FrameTime() * (target > collapseBlinkLerp and 12 or 7))
+	collapseBlinkLerp = math.Approach(collapseBlinkLerp, target, FrameTime() * (target > collapseBlinkLerp and 18 or 9))
 	return collapseBlinkLerp
 end
 
@@ -906,15 +910,15 @@ drawFinalVitalsVignettes = function()
 		or 0
 	painThresholdIntensityLerp = LerpFT(painLayerFadeLerp, painThresholdIntensityLerp or 1, 1 + excruciatingBlend * painEffectIntensity)
 
-	if (PainLerp > 0.001 or shockLerp > 5) or org.otrub then
+	if (PainLerp > 0.001 or (org.pain or 0) > 5 or shockLerp > 5) or org.otrub then
 		local strobe = getPainPulse(org)
-		local pain = (PainLerp + strobe) * painThresholdIntensityLerp
+		local pain = math.max((PainLerp + strobe) * painThresholdIntensityLerp, math.max((org.pain or 0) - 5, 0))
 		local shock = shockLerp
-		local painBorder = math.Clamp(pain / 55 + math.max(shock - 5, 0) / 110, 0, 0.72)
-		local painCoverage = math.Clamp(pain / 45 + math.max(shock - 5, 0) / 75, 0, 2.25)
+		local painBorder = math.Clamp(pain / 42 + math.max(shock - 4, 0) / 72, 0, 1.25)
+		local painCoverage = math.Clamp(pain / 30 + math.max(shock - 4, 0) / 48, 0, 3.8)
 		if org.otrub then
-			painBorder = math.min(painBorder, 0.34)
-			painCoverage = math.max(math.min(painCoverage, 2.1), 1.15)
+			painBorder = math.min(painBorder, 0.48)
+			painCoverage = math.max(math.min(painCoverage, 3), 1.5)
 		end
 
 		render.UpdateScreenEffectTexture()
@@ -948,13 +952,28 @@ drawFinalVitalsVignettes = function()
 		activeBleed * 0.42,
 		internalBleed * 0.34
 	)
-	local shockSeverity = math.Clamp(((tonumber(org.shock) or 0) - 18) / 57, 0, 1)
-	local consciousnessSeverity = math.Clamp((0.82 - (tonumber(org.consciousness) or 1)) / 0.52, 0, 1)
+	local shock = tonumber(org.shock) or 0
+	local shockSeverity = math.Clamp((shock - 18) / 57, 0, 1)
+	local shockDarknessSeverity = math.Clamp((shock - 8) / 34, 0, 1)
+	local consciousness = math.Clamp(tonumber(org.consciousness) or 1, 0, 1)
+	local consciousnessSeverity = math.Clamp((0.82 - consciousness) / 0.52, 0, 1)
+	local lowConsciousnessDarkness = math.Clamp((0.94 - consciousness) / 0.46, 0, 1)
+	local brainDamageSeverity = math.max(
+		math.Clamp(((tonumber(org.brain) or 0) - 0.025) / 0.5, 0, 1),
+		math.Clamp((tonumber(org.brainFrontal) or 0) * 0.75, 0, 1),
+		math.Clamp((tonumber(org.brainParietal) or 0) * 0.65, 0, 1),
+		math.Clamp((tonumber(org.brainTemporal) or 0) * 0.65, 0, 1),
+		math.Clamp((tonumber(org.brainOccipital) or 0) * 0.7, 0, 1),
+		math.Clamp((tonumber(org.brainHemorrhage) or 0) * 0.8, 0, 1)
+	)
 	local severeHypoxia = math.Clamp((oxygenSeverity - 0.52) / 0.48, 0, 1)
 	local collapseSeverity = math.Clamp(math.max(
 		severeHypoxia * 0.62,
-		shockSeverity * 0.72,
-		consciousnessSeverity,
+		shockSeverity * 0.9,
+		shockDarknessSeverity * 0.88,
+		consciousnessSeverity * 1.15,
+		lowConsciousnessDarkness * 0.96,
+		brainDamageSeverity * 0.92,
 		bloodLossSeverity * 0.76,
 		severeHypoxia * 0.42 + shockSeverity * 0.42,
 		bloodLossSeverity * 0.5 + consciousnessSeverity * 0.55
@@ -962,13 +981,13 @@ drawFinalVitalsVignettes = function()
 
 	lowOxygenVignetteLerp = LerpFT(0.035, lowOxygenVignetteLerp, oxygenSeverity)
 	collapseVisualLerp = LerpFT(0.03, collapseVisualLerp, collapseSeverity)
-	local blink = updateCollapseBlink(collapseVisualLerp)
+	local blink = updateCollapseBlink(collapseVisualLerp, math.max(brainDamageSeverity, math.Clamp((0.68 - consciousness) / 0.5, 0, 1)))
 
 	if lowOxygenVignetteLerp > 0.005 then
 		render.UpdateScreenEffectTexture()
 		vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
-		vignetteMat:SetFloat("$c0_z", lowOxygenVignetteLerp * 0.3)
-		vignetteMat:SetFloat("$c1_y", 0.18 + lowOxygenVignetteLerp * 0.5)
+		vignetteMat:SetFloat("$c0_z", lowOxygenVignetteLerp * 0.48)
+		vignetteMat:SetFloat("$c1_y", 0.34 + lowOxygenVignetteLerp * 1.05)
 		render.SetMaterial(vignetteMat)
 		render.DrawScreenQuad()
 	end
@@ -976,8 +995,8 @@ drawFinalVitalsVignettes = function()
 	if collapseVisualLerp > 0.01 then
 		render.UpdateScreenEffectTexture()
 		vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
-		vignetteMat:SetFloat("$c0_z", collapseVisualLerp * 0.28 + blink * 0.1)
-		vignetteMat:SetFloat("$c1_y", 0.35 + collapseVisualLerp * 1.85 + blink * 0.35)
+		vignetteMat:SetFloat("$c0_z", collapseVisualLerp * 0.44 + blink * 0.28)
+		vignetteMat:SetFloat("$c1_y", 0.7 + collapseVisualLerp * 2.75 + blink * 1.05)
 		render.SetMaterial(vignetteMat)
 		render.DrawScreenQuad()
 
@@ -990,12 +1009,58 @@ drawFinalVitalsVignettes = function()
 			render.DrawScreenQuad()
 
 			render.UpdateScreenEffectTexture()
-			chromaticMat:SetFloat("$c0_x", collapseVisualLerp * 0.045 + blink * 0.028)
+			chromaticMat:SetFloat("$c0_x", collapseVisualLerp * 0.11 + blink * 0.07)
 			chromaticMat:SetInt("$c0_y", 1)
 			render.SetMaterial(chromaticMat)
 			render.DrawScreenQuad()
-			DrawMotionBlur(0.012 + collapseVisualLerp * 0.025, collapseVisualLerp * 0.18 + blink * 0.11, 0.012)
+			DrawMotionBlur(0.01 + collapseVisualLerp * 0.018, collapseVisualLerp * 0.13 + blink * 0.1, 0.012)
 		end
+	end
+
+	local grainSeverity = math.max(
+		math.Clamp((0.72 - consciousness) / 0.48, 0, 1),
+		brainDamageSeverity * 0.72,
+		collapseVisualLerp * 0.55
+	)
+	if grainSeverity > 0.04 then
+		render.UpdateScreenEffectTexture()
+		noiseMat:SetFloat("$c0_y", 0.72 - grainSeverity * 0.18)
+		noiseMat:SetFloat("$c0_z", 1)
+		noiseMat:SetFloat("$c1_x", 0.035 + grainSeverity * 0.16)
+		noiseMat:SetFloat("$c1_y", 0.16 + grainSeverity * 0.68)
+		noiseMat:SetFloat("$c2_x", CurTime() + 10000)
+		render.SetMaterial(noiseMat)
+		render.DrawScreenQuad()
+
+		render.UpdateScreenEffectTexture()
+		grainMat:SetFloat("$c0_x", CurTime())
+		grainMat:SetFloat("$c0_y", 0.5)
+		grainMat:SetFloat("$c0_z", grainSeverity * 0.22)
+		grainMat:SetFloat("$c1_x", grainSeverity * 0.14)
+		grainMat:SetFloat("$c1_y", grainSeverity * 0.48)
+		grainMat:SetFloat("$c1_z", grainSeverity * 0.16)
+		grainMat:SetFloat("$c2_x", 0)
+		grainMat:SetFloat("$c2_y", 0)
+		grainMat:SetFloat("$c2_z", 0)
+		grainMat:SetFloat("$c3_x", 0)
+		render.SetMaterial(grainMat)
+		render.DrawScreenQuad()
+	end
+
+	if org.otrub then
+		render.UpdateScreenEffectTexture()
+		chromaticMat:SetFloat("$c0_x", 0.12 + collapseVisualLerp * 0.09 + blink * 0.07)
+		chromaticMat:SetInt("$c0_y", 1)
+		render.SetMaterial(chromaticMat)
+		render.DrawScreenQuad()
+
+		render.UpdateScreenEffectTexture()
+		vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
+		vignetteMat:SetFloat("$c0_z", 0.72 + collapseVisualLerp * 0.42 + blink * 0.25)
+		vignetteMat:SetFloat("$c1_y", 3.8 + collapseVisualLerp * 3.4 + blink * 1.1)
+		render.SetMaterial(vignetteMat)
+		render.DrawScreenQuad()
+		DrawMotionBlur(0.025 + collapseVisualLerp * 0.02, 0.22 + collapseVisualLerp * 0.18, 0.01)
 	end
 
 	local grayscale = math.Clamp(
@@ -1010,14 +1075,14 @@ drawFinalVitalsVignettes = function()
 		collapseColor["$pp_colour_addr"] = 0
 		collapseColor["$pp_colour_addg"] = 0
 		collapseColor["$pp_colour_addb"] = 0
-		collapseColor["$pp_colour_brightness"] = -collapseVisualLerp * 0.045 - blink * 0.035
-		collapseColor["$pp_colour_contrast"] = 1 - collapseVisualLerp * 0.08 - blink * 0.045
+		collapseColor["$pp_colour_brightness"] = -collapseVisualLerp * 0.17 - blink * 0.13
+		collapseColor["$pp_colour_contrast"] = 1 - collapseVisualLerp * 0.2 - blink * 0.12
 		collapseColor["$pp_colour_colour"] = 1 - grayscale
 		DrawColorModify(collapseColor)
 	end
 
 	if blink > 0.005 then
-		surface.SetDrawColor(18, 20, 22, math.Clamp(blink * 58, 0, 58))
+		surface.SetDrawColor(8, 10, 12, math.Clamp(blink * 155, 0, 155))
 		surface.DrawRect(0, 0, ScrW(), ScrH())
 		surface.SetDrawColor(255, 255, 255, 255)
 	end
@@ -1766,7 +1831,14 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		//end
 	end
 
-	local brainTrauma = math.max(brain, (org.brainHemorrhage or 0) * 0.85)
+	local brainTrauma = math.max(
+		brain,
+		(org.brainFrontal or 0) * 0.75,
+		(org.brainParietal or 0) * 0.65,
+		(org.brainTemporal or 0) * 0.65,
+		(org.brainOccipital or 0) * 0.7,
+		(org.brainHemorrhage or 0) * 0.85
+	)
 	if brainTrauma > 0.01 then
 		local chooser = 1
 		for i, choose in ipairs(stations) do
@@ -1873,13 +1945,14 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	
 	-- Keep the original lobotomy effect self-contained: intermittent material
 	-- overlays only. Head-trauma flashes are handled by their own net event.
-	if brain > 0.1 and sensoryActive then
+	if brainTrauma > 0.02 and sensoryActive then
 		if show_some_images_time > 0 then
 			show_some_images_time = show_some_images_time - 1
 
-			local flashRoll = math.max(math.floor(10 * (1 - brain)), 1)
+			DrawMotionBlur(0.035 + brainTrauma * 0.065, 0.22 + brainTrauma * 0.5, 0.018)
+			local flashRoll = math.max(math.floor(18 * (1 - brainTrauma)), 1)
 			if show_image_time <= 0 and math.random(flashRoll) < 2 then
-				show_image_time = 75 * math.Rand(0.1, 1) * (math.random(2) == 1 and 0.1 or 1)
+				show_image_time = 95 * math.Rand(0.12, 1) * (math.random(2) == 1 and 0.1 or 1)
 				lobotomy_index = math.random(#lobotomy_mats)
 			end
 
@@ -1894,7 +1967,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				end
 			end
 		else
-			show_some_images_time = math.random(1200) < brain * 15 and 250 or 0
+			show_some_images_time = math.random(900) < brainTrauma * 35 and 280 or 0
 		end
 	else
 		show_image_time = 0
@@ -1906,7 +1979,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	if O2Lerp > 1 or incapacitated then
 		o2 = O2Lerp
 		
-		if o2 > 50 and not org.otrub then
+		if o2 > 1 and not org.otrub then
 			local dyingMode = getServerSoundMode("hg_dyingsound", 2)
 
 			if canRetrySound("NoiseStation2", NoiseStation2) then
@@ -1958,12 +2031,12 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				end)
 			end
 
-			local dyingAudioTarget = math.Clamp((o2 - 50) / 100 + (brain > 0.3 and (brain - 0.3) * 5 or 0), 0, 3)
+			local dyingAudioTarget = math.Clamp((o2 - 25) / 75 + (brain > 0.2 and (brain - 0.2) * 2.5 or 0), 0, 1.2)
 			local blood = org.blood or 5000
 			local bleed = org.bleed or 0
 			if blood < 4000 and bleed > 0 then
 				local bleedSeverity = math.Clamp((3500 - blood) / 3500, 0, 1)
-				dyingAudioTarget = math.max(dyingAudioTarget, bleedSeverity * 2)
+				dyingAudioTarget = math.max(dyingAudioTarget, bleedSeverity * 1.15)
 			end
 			if incapacitated then
 				dyingAudioTarget = math.max(dyingAudioTarget, Lerp(incapacitationProgress, 0.65, 0.9))
@@ -1971,8 +2044,8 @@ hook.Add("Post Post Processing", "ItHurts", function()
 
 			-- Low-O2/bleedout ambience ramps into the requested volume instead of
 			-- appearing at full level on the first qualifying frame.
-			dyingAudioFade = LerpFT(0.018, dyingAudioFade, dyingAudioTarget)
-			local consciousVol = math.Clamp(dyingAudioFade * 1.75 * (incapacitated and Lerp(incapacitationProgress, 0.72, 0.28) or 1), 0, 1)
+			dyingAudioFade = LerpFT(0.035, dyingAudioFade, dyingAudioTarget)
+			local consciousVol = math.Clamp(dyingAudioFade * (incapacitated and Lerp(incapacitationProgress, 0.9, 0.55) or 1), 0, 1.2)
 			terminalDyingVolume = incapacitated and consciousVol or 0
 			hg.consciousBeatIntensity = consciousVol
 
@@ -2308,7 +2381,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 					setItsHopelessVolume(0)
 				end
 				if IsValid(VitalityStation) then
-					VitalityStation:SetVolume(math.Clamp(consciousVol * 2.5, 0, 1))
+					VitalityStation:SetVolume(math.Clamp(consciousVol * 2.5, 0, 1.2))
 				end
 			end
 			if dyingMode != 7 and IsValid(SonimCookedStation) then

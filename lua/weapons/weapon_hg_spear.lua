@@ -1,4 +1,4 @@
-if SERVER then AddCSLuaFile() end
+﻿if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_melee"
 SWEP.PrintName = "Spear"
 SWEP.Instructions = "A spear is an effective weapon to attack at a distance.\n\nLMB to attack.\nRMB to block.\nRMB + LMB to throw."
@@ -78,8 +78,8 @@ SWEP.TwoHanded = true
 
 SWEP.AttackHit = "Concrete.ImpactHard"
 SWEP.Attack2Hit = "Concrete.ImpactHard"
-SWEP.AttackHitFlesh = "snd_jack_hmcd_axehit.ogg"
-SWEP.Attack2HitFlesh = "snd_jack_hmcd_axehit.ogg"
+SWEP.AttackHitFlesh = "snd_jack_hmcd_axehit.wav"
+SWEP.Attack2HitFlesh = "snd_jack_hmcd_axehit.wav"
 SWEP.DeploySnd = "physics/wood/wood_plank_impact_soft2.wav"
 
 SWEP.AttackPos = Vector(0,0,0)
@@ -171,7 +171,7 @@ if SERVER then
             end)
             timer.Simple(0.4,function()
                 if not IsValid(ply) then return end
-                ply:EmitSound("snd_jack_hmcd_ducttape.ogg")
+                ply:EmitSound("snd_jack_hmcd_ducttape.wav")
                 ply:ViewPunch(Angle(5,6,3))
             end)
         end

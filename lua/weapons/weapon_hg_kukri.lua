@@ -139,10 +139,10 @@ SWEP.setlh = false
 SWEP.setrh = true
 SWEP.TwoHanded = false
 
-SWEP.AttackHit = "snd_jack_hmcd_knifehit.ogg"
-SWEP.Attack2Hit = "snd_jack_hmcd_knifehit.ogg"
-SWEP.AttackHitFlesh = "weapons/darsu_eft/melee/body3.mp3"
-SWEP.Attack2HitFlesh = "weapons/darsu_eft/melee/body4.mp3"
+SWEP.AttackHit = "snd_jack_hmcd_knifehit.wav"
+SWEP.Attack2Hit = "snd_jack_hmcd_knifehit.wav"
+SWEP.AttackHitFlesh = "weapons/darsu_eft/melee/body3.ogg"
+SWEP.Attack2HitFlesh = "weapons/darsu_eft/melee/body4.ogg"
 SWEP.DeploySnd = "physics/metal/metal_grenade_impact_soft2.wav"
 
 SWEP.AttackPos = Vector(0,0,0)
@@ -174,8 +174,8 @@ end
 function SWEP:CanPrimaryAttack()
     self.DamageType = DMG_SLASH
     self.AttackHit = "Canister.ImpactHard"
-    self.Attack2Hit = "snd_jack_hmcd_axehit.ogg"
-    self.AttackHitFlesh = "snd_jack_hmcd_axehit.ogg"
+    self.Attack2Hit = "snd_jack_hmcd_axehit.wav"
+    self.AttackHitFlesh = "snd_jack_hmcd_axehit.wav"
     return true
 end
 

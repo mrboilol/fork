@@ -637,6 +637,7 @@ local function ApplyAutopulse(org, config)
 
     if hg and hg.organism and hg.organism.RestoreSupportedOxygen then
         hg.organism.RestoreSupportedOxygen(org, config.AutopulseOxygenRecovery, {
+            artificialSupport = true,
             oxygen = config.AutopulseOxygenFloor,
             oxygenTarget = 30,
             bodyoxygen = 0.60, bodyoxygenTarget = 0.90,

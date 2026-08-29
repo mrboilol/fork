@@ -19,7 +19,6 @@ SWEP.SuicideCutAng = Angle(10, 0, 0)
 SWEP.SuicideTime = 0.5
 SWEP.CanSuicide = true
 SWEP.SuicidePunchAng = Angle(-5, -15, 0)
-SWEP.CantClash = true
 
 SWEP.WorldModel = "models/weapons/hammer/w.mdl"
 SWEP.WorldModelReal = "models/weapons/cs2/c_melee_knife_m7_bayo.mdl"
@@ -47,8 +46,8 @@ SWEP.DamageSecondary = 15
 SWEP.ArteryChance = 1.5
 
 SWEP.swingsoundextra = {
-    {"knife/knife_bayonet_swing1.mp3", 60, {80, 90}},
-    {"knife/knife_bayonet_swing2.mp3", 60, {80, 90}},
+    {"knife/knife_bayonet_swing1.ogg", 60, {80, 90}},
+    {"knife/knife_bayonet_swing2.ogg", 60, {80, 90}},
 }
 
 SWEP.hitsoundextra = {
@@ -99,11 +98,11 @@ if CLIENT then
 end
 
 SWEP.AttackSwing = "weapons/slam/throw.wav"
-SWEP.AttackHit = "snd_jack_hmcd_knifehit.ogg"
-SWEP.Attack2Hit = "snd_jack_hmcd_knifehit.ogg"
-SWEP.AttackHitFlesh = "snd_jack_hmcd_knifestab.ogg"
-SWEP.Attack2HitFlesh = "snd_jack_hmcd_slash.ogg"
-SWEP.DeploySnd = "snd_jack_hmcd_knifedraw.ogg"
+SWEP.AttackHit = "snd_jack_hmcd_knifehit.wav"
+SWEP.Attack2Hit = "snd_jack_hmcd_knifehit.wav"
+SWEP.AttackHitFlesh = "snd_jack_hmcd_knifestab.wav"
+SWEP.Attack2HitFlesh = "snd_jack_hmcd_slash.wav"
+SWEP.DeploySnd = "snd_jack_hmcd_knifedraw.wav"
 
 
 SWEP.SwingAng = -55

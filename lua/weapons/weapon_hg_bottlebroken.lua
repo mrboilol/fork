@@ -5,7 +5,7 @@ SWEP.Instructions = "Broken beer bottle, looks like someone was too drunk.\n\nLM
 SWEP.Category = "Weapons - Melee"
 SWEP.Spawnable = true
 SWEP.AdminOnly = false
-SWEP.HoldType = "melee"
+SWEP.HoldType = "knife"
 
 SWEP.WorldModel = "models/props_junk/glassbottle01a_chunk01a.mdl"
 SWEP.WorldModelReal = "models/weapons/salat/reanim/c_s&wch0014.mdl"
@@ -17,10 +17,11 @@ SWEP.SuicideCutVec = Vector(-1, 5, 4)
 SWEP.SuicideCutAng = Angle(10, 0, 0)
 SWEP.SuicideTime = 0.5
 SWEP.CanSuicide = true
-SWEP.SuicideSound = "snd_jack_hmcd_knifestab.ogg"
+SWEP.SuicideSound = "snd_jack_hmcd_knifestab.wav"
 SWEP.SuicideNoLH = true
 
 SWEP.BreakBoneMul = 0.1
+SWEP.weight = 0.5
 
 SWEP.AnimTime1 = 1.0
 SWEP.AttackTime = 0.2
@@ -49,7 +50,7 @@ SWEP.BleedMultiplier = 1.5
 SWEP.AttackLen1 = 40
 
 SWEP.AttackHit = "GlassBottle.ImpactHard"
-SWEP.AttackHitFlesh = "snd_jack_hmcd_knifestab.ogg"
+SWEP.AttackHitFlesh = "snd_jack_hmcd_knifestab.wav"
 
 SWEP.DeploySnd = "GlassBottle.ImpactSoft"
 
@@ -90,7 +91,7 @@ function SWEP:PrimaryAttackAdd(ent, trace)
     if SERVER and ent and math.random(1, self:IsEntSoft(ent) and 30 or 10) == 1 then
         self:PrecacheGibs()
         self:GibBreakServer(trace.HitNormal * -100)
-        self:GetOwner():EmitSound("physics/glass/glass_pottery_break" .. math.random(1, 4) .. ".ogg")
+        self:GetOwner():EmitSound("physics/glass/glass_pottery_break" .. math.random(1, 4) .. ".wav")
         self:Remove()
     end
 end

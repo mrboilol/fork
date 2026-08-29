@@ -62,7 +62,7 @@ SWEP.HoldType = "revolver"
 --models/weapons/gleb/c_knife_t.mdl
 if CLIENT then
 	SWEP.WepSelectIcon = Material("vgui/wep_jack_hmcd_knife")
-	SWEP.IconOverride = "vgui/wep_jack_hmcd_knife.vmt"
+	SWEP.IconOverride = "vgui/wep_jack_hmcd_knife.png"
 	SWEP.BounceWeaponIcon = false
 end
 
@@ -86,8 +86,8 @@ function SWEP:Initialize()
 end
 
 SWEP.swingsoundextra = {
-    {"knife/knife_bayonet_swing1.mp3", 60, {80, 90}},
-    {"knife/knife_bayonet_swing2.mp3", 60, {80, 90}},
+    {"knife/knife_bayonet_swing1.ogg", 60, {80, 90}},
+    {"knife/knife_bayonet_swing2.ogg", 60, {80, 90}},
 }
 
 SWEP.hitsoundextra = {

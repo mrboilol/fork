@@ -97,12 +97,30 @@ function hg.organism.UpdateVitalHealthToll(owner, org, timeValue)
 	end
 end
 
+local function canReceiveResuscitationBreathing(org)
+	if not org or not org.alive or org.deathStateKilled or not org.o2 then return false end
+	local owner = org.owner
+	if IsValid(owner) and owner.noHead then return false end
+	local leftLung = istable(org.lungsL) and (tonumber(org.lungsL[1]) or 0) or 0
+	local rightLung = istable(org.lungsR) and (tonumber(org.lungsR[1]) or 0) or 0
+	if leftLung >= 1 and rightLung >= 1 then return false end
+	if (tonumber(org.trachea) or 0) >= 1 or (tonumber(org.hemothorax) or 0) >= 0.9 then return false end
+	if (tonumber(org.brain) or 0) >= 0.85 then return false end
+	local cervicalLimit = hg.organism.fake_spine3 or 0.75
+	if (tonumber(org.spine3) or 0) >= cervicalLimit then return false end
+	if IsValid(owner) and owner:WaterLevel() >= 3
+		and not (hg.organism.HasUnderwaterOxygen and hg.organism.HasUnderwaterOxygen(org)) then return false end
+	return true
+end
+
 function hg.organism.RestoreSupportedOxygen(org, amount, targets)
-	if not org or not org.o2 or org.oxygenIntakeAvailable == false then return false end
+	if not org or not org.o2 then return false end
 
 	amount = math.Clamp(tonumber(amount) or 0, 0, 1)
 	if amount <= 0 then return false end
 	targets = targets or {}
+	if org.oxygenIntakeAvailable == false
+		and not (targets.artificialSupport == true and canReceiveResuscitationBreathing(org)) then return false end
 	local bloodReserve = hg.organism.GetBloodDeliveryFraction(org.blood, 1)
 	local support = amount * bloodReserve
 	if support <= 0 then return false end
@@ -126,6 +144,21 @@ function hg.organism.RestoreSupportedOxygen(org, amount, targets)
 		end
 	end
 
+	return true
+end
+
+function hg.organism.TryRestoreBreathingWithResuscitation(org, strength)
+	if not canReceiveResuscitationBreathing(org) or org.heartstop or org.respiratoryArrest then return false end
+	strength = math.Clamp(tonumber(strength) or 0.5, 0.1, 1)
+	org.lungsfunction = true
+	org.oxygenIntakeAvailable = true
+	org.bradyapnea = math.Approach(tonumber(org.bradyapnea) or 0, 0, 0.35 * strength)
+	org.respiratoryRate = math.max(tonumber(org.respiratoryRate) or 0, math.Round(8 + 6 * strength))
+	if hg.organism.OxygenateBlood then
+		org.o2.curregen = math.max(tonumber(org.o2.curregen) or 0, hg.organism.OxygenateBlood(org))
+	end
+	local oxygenFloor = math.min(tonumber(org.o2.range) or 30, 4 + 6 * strength)
+	org.o2[1] = math.max(tonumber(org.o2[1]) or 0, oxygenFloor)
 	return true
 end
 
@@ -609,9 +642,13 @@ local function restoreHeartAfterResuscitation(org, now, resusBloodK)
 	org.strokeVolume = Clamp((org.cardiacOutput or 0) / rateFactor, 0, 1.5)
 	org.myocardialOxygen = max(org.myocardialOxygen or 0, 0.5 * resusBloodK)
 	org.hypotension = math.min(org.hypotension or 1, 1 - 0.45 * resusBloodK)
-	org.cardiacRestartUntil = now + 3
+	org.cardiacRestartUntil = now + 6
+	if hg.organism.TryRestoreBreathingWithResuscitation then
+		hg.organism.TryRestoreBreathingWithResuscitation(org, 1)
+	end
 	if hg.organism.RestoreSupportedOxygen then
 		hg.organism.RestoreSupportedOxygen(org, 0.2, {
+			artificialSupport = true,
 			oxygen = 10, oxygenTarget = 18, bodyoxygen = 0.45, bodyoxygenTarget = 0.7,
 			brainoxygen = 0.4, brainoxygenTarget = 0.65, perfusion = 0.4,
 			perfusionTarget = 0.65, myocardialOxygen = 0.5, myocardialOxygenTarget = 0.75,
@@ -631,7 +668,7 @@ function hg.organism.ApplyAEDResuscitation(org)
 	return restoreHeartAfterResuscitation(org, CurTime(), resusBloodK)
 end
 
-function hg.organism.TryRestartHeartWithResuscitation(org)
+function hg.organism.TryRestartHeartWithResuscitation(org, cprDuration)
 	if not org or not org.alive or not org.heartstop or org.deathStateKilled then return false end
 	if (org.brain or 0) >= 0.85 or (org.heart or 0) >= 1 then return false end
 
@@ -639,16 +676,22 @@ function hg.organism.TryRestartHeartWithResuscitation(org)
 	local hasAED = (org.aedResuscitationUntil or 0) > now
 	local hasEpinephrine = (org.epinephrineResuscitationUntil or 0) > now
 	local hasCPR = (org.cprResuscitationUntil or 0) > now
-	if not ((hasAED and (hasEpinephrine or hasCPR)) or (hasEpinephrine and hasCPR)) then return false end
+	local sustainedCPR = hasCPR and (tonumber(cprDuration) or 0) >= 8
+	if not ((hasAED and (hasEpinephrine or hasCPR)) or (hasEpinephrine and hasCPR) or sustainedCPR) then return false end
 
 	if (org.resuscitationAttemptUntil or 0) > now then return false end
-	org.resuscitationAttemptUntil = now + 15
+	org.resuscitationAttemptUntil = now + 6
 
-	local chance = hasAED and hasEpinephrine and 82 or 74
-	chance = chance * Clamp(1 - (org.heart or 0) * 0.35, 0.5, 1)
-	if org.o2 and (org.o2[1] or 0) < 3 then chance = chance * 0.75 end
+	local chance = hasAED and hasCPR and hasEpinephrine and 100
+		or hasAED and hasCPR and 96
+		or hasAED and hasEpinephrine and 92
+		or hasCPR and hasEpinephrine and 84
+		or 48
+	chance = chance * Clamp(1 - (org.heart or 0) * 0.2, 0.72, 1)
+	if org.o2 and (org.o2[1] or 0) < 3 then chance = chance * 0.9 end
 	local resusBloodK = getBloodPerfusion(org.blood or 5000)
-	chance = chance * resusBloodK
+	if resusBloodK <= 0.03 then return false end
+	chance = chance * (0.6 + resusBloodK * 0.4)
 	if math.random(100) > chance then return false end
 
 	return restoreHeartAfterResuscitation(org, now, resusBloodK)

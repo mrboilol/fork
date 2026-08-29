@@ -251,10 +251,25 @@ module[2] = function(owner, org, timeValue)
 
 	-- Brain trauma and intracranial bleeding share the normal unconsciousness
 	-- pipeline, so a hemorrhage cannot be hidden by the regular recovery step.
-	local brainSeverity = math.Clamp(((org.brain or 0) - 0.325) / 0.675, 0, 1)
+	local structuralBrainDamage = math.max(
+		org.brain or 0,
+		(org.brainFrontal or 0) * 0.75,
+		(org.brainParietal or 0) * 0.65,
+		(org.brainTemporal or 0) * 0.65,
+		(org.brainOccipital or 0) * 0.7,
+		(org.brainHemorrhage or 0) * 0.8
+	)
+	local brainSeverity = math.Clamp((structuralBrainDamage - 0.1) / 0.9, 0, 1)
+	local severeBrainSeverity = math.Clamp((structuralBrainDamage - 0.325) / 0.675, 0, 1)
 	local hemorrhageSeverity = math.Clamp(((org.brainHemorrhage or 0) - 0.05) / 0.95, 0, 1)
 	if brainSeverity > 0 or hemorrhageSeverity > 0 then
-		local consciousnessDrain = brainSeverity > 0 and (0.17 + brainSeverity * 0.06) or 0
+		if brainSeverity > 0 then
+			org.consciousness = math.min(org.consciousness or 1, 0.94 - brainSeverity * 0.6)
+		end
+		local consciousnessDrain = brainSeverity > 0 and (0.025 + brainSeverity * 0.04) or 0
+		if severeBrainSeverity > 0 then
+			consciousnessDrain = consciousnessDrain + 0.17 + severeBrainSeverity * 0.06
+		end
 		consciousnessDrain = consciousnessDrain + hemorrhageSeverity * (0.02 + hemorrhageSeverity * 0.12)
 		org.consciousness = math.max((org.consciousness or 1) - consciousnessDrain * timeValue, 0)
 	end

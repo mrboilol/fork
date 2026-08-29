@@ -82,9 +82,9 @@ SWEP.hitsoundextra = {
 }
 
 SWEP.swingsoundextra = {
-    {"weapons/darsu_eft/melee/taran_swing_01.mp3", 90, {95, 105}},
-    {"weapons/darsu_eft/melee/taran_swing_02.mp3", 90, {95, 105}},
-    {"weapons/darsu_eft/melee/taran_swing_03.mp3", 90, {95, 105}},
+    {"weapons/darsu_eft/melee/taran_swing_01.ogg", 90, {95, 105}},
+    {"weapons/darsu_eft/melee/taran_swing_02.ogg", 90, {95, 105}},
+    {"weapons/darsu_eft/melee/taran_swing_03.ogg", 90, {95, 105}},
 }
 
 SWEP.BlockTier = 2
@@ -106,7 +106,7 @@ SWEP.TwoHanded = false
 
 SWEP.AttackHit = "Canister.ImpactHard"
 SWEP.Attack2Hit = "Canister.ImpactHard"
-SWEP.AttackHitFlesh = "snd_jack_hmcd_axehit.ogg"
+SWEP.AttackHitFlesh = "snd_jack_hmcd_axehit.wav"
 SWEP.Attack2HitFlesh = "Flesh.ImpactHard"
 SWEP.DeploySnd = "physics/metal/metal_solid_impact_soft1.wav"
 

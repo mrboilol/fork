@@ -1,4 +1,4 @@
-if SERVER then AddCSLuaFile() end
+﻿if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_melee"
 SWEP.PrintName = "Pro Spear"
 SWEP.Instructions = "Spear of some slug creature...\n\nLMB to attack.\nRMB to block.\nRMB + LMB to throw."
@@ -78,8 +78,8 @@ SWEP.TwoHanded = true
 
 SWEP.AttackHit = "Concrete.ImpactHard"
 SWEP.Attack2Hit = "Concrete.ImpactHard"
-SWEP.AttackHitFlesh = "snd_jack_hmcd_axehit.ogg"
-SWEP.Attack2HitFlesh = "snd_jack_hmcd_axehit.ogg"
+SWEP.AttackHitFlesh = "snd_jack_hmcd_axehit.wav"
+SWEP.Attack2HitFlesh = "snd_jack_hmcd_axehit.wav"
 SWEP.DeploySnd = "physics/metal/metal_grenade_impact_soft2.wav"
 
 SWEP.AttackPos = Vector(0,0,0)
@@ -102,7 +102,7 @@ if SERVER then
         ent.returndamage = 35
         ent.returnblood = 100
         ent.PenetrationSize = 25
-        ent.Penetration = 45
+        ent.penetration = 10
         ent.AeroDrag = true
         ent.StickInWorld = true
         ent.StickDepth = -6
@@ -114,9 +114,7 @@ if SERVER then
         local phys = ent:GetPhysicsObject()
 
         if IsValid(phys) then
-            local throwVel = ply:GetAimVector() * ent.MaxSpeed
-            local playerVel = ply:GetVelocity()
-            phys:SetVelocity(throwVel + playerVel * 0.5)
+            phys:SetVelocity(ply:GetAimVector() * ent.MaxSpeed)
             phys:AddAngleVelocity(Vector(0,0,0))
         end
 

@@ -1,4 +1,4 @@
-if SERVER then AddCSLuaFile() end
+﻿if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_melee"
 SWEP.PrintName = "Microphone"
 SWEP.Instructions = "Speak up, to the audience!"
@@ -69,7 +69,7 @@ function SWEP:PrimaryAttackAdd(ent, trace)
                     Poof:SetNormal(-trace.HitNormal)
                     util.Effect("eff_jack_hmcd_poof", Poof, true, true)
                 end)
-                owner:EmitSound("physics/concrete/concrete_break" .. math.random(2, 3) .. ".ogg",45,140)
+                owner:EmitSound("physics/concrete/concrete_break" .. math.random(2, 3) .. ".wav",45,140)
                 self:Remove()
             end
 		end

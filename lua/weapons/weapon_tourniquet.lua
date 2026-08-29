@@ -94,6 +94,10 @@ end
 function SWEP:GetTargetBone(ent)
 	local owner = self:GetOwner()
 	local tr = hg.eyeTrace(owner)
+	if self.GetBandageTargetBone then
+		return self:GetBandageTargetBone(ent, tr)
+	end
+
 	if not tr or not IsValid(tr.Entity) then return nil end
 	local physbone = tr.PhysicsBone
 	if not physbone or physbone < 0 then return nil end
@@ -102,7 +106,7 @@ function SWEP:GetTargetBone(ent)
 	return ent:GetBoneName(boneid)
 end
 
-function SWEP:Heal(ent, mode)
+function SWEP:Heal(ent, mode, bone)
 	if ent:IsNPC() then
 		self:NPCHeal(ent, 0.25, "snd_jack_hmcd_bandage.ogg")
 	end
@@ -116,6 +120,6 @@ function SWEP:Heal(ent, mode)
 
 	local org = ent.organism
 	if not org then return end
-	local bone = self:GetTargetBone(ent)
+	bone = bone or self:GetTargetBone(ent)
 	if self:Tourniquet(ent, bone) then self.modeValues[1] = 0 self:GetOwner():SelectWeapon("weapon_hands_sh") self:Remove() end
 end

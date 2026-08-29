@@ -392,14 +392,13 @@ local function ApplyAEDShock(org, accidental)
 	end
 	if hg.organism and hg.organism.RestoreSupportedOxygen then
 		hg.organism.RestoreSupportedOxygen(org, 0.12, {
+			artificialSupport = true,
 			oxygen = 8, oxygenTarget = 16, bodyoxygen = 0.35, bodyoxygenTarget = 0.6,
 			brainoxygen = 0.3, brainoxygenTarget = 0.55, perfusion = 0.3,
 			perfusionTarget = 0.55, myocardialOxygen = 0.4, myocardialOxygenTarget = 0.65,
 			hypoxiaTime = 7, severeHypoxiaTime = 2, systemicIschemiaTime = 8
 		})
 	end
-	-- An AED only creates the resuscitation window; it cannot restart an
-	-- arrested heart unless epinephrine or CPR is also active.
 	MarkAEDResuscitation(org)
 end
 
@@ -489,8 +488,6 @@ local function StartNoShockWarnings(defib, ply, getTarget, uses)
 		DropDefib(defib, getTarget(), uses)
 		return
 	end
-	-- Even when no shock is advised, the AED can be paired with epinephrine or
-	-- CPR during this assessment window; it never restarts a heart by itself.
 	MarkAEDResuscitation(org)
 	if org and org.heartstop then PlayAEDSound(defib, AEDSounds.asystole, 75, 100, 2) end
 	PlayAEDSound(defib, AEDSounds.noshock)

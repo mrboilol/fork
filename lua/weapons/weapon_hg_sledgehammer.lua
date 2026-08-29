@@ -15,7 +15,7 @@ SWEP.ViewModel = ""
 
 SWEP.HoldType = "revolver"
 
-SWEP.weight = 3.5 
+SWEP.weight = 3.5
 
 SWEP.HoldPos = Vector(-14,-2,1)
 SWEP.HoldAng = Angle(0,0,0)
@@ -37,7 +37,6 @@ SWEP.basebone = 94
 
 SWEP.weaponPos = Vector(0,0,0)
 SWEP.weaponAng = Angle(0,-90,0)
-SWEP.modelscale = 0.89
 
 SWEP.DamagePrimary = 67
 SWEP.DamageSecondary = 34
@@ -134,29 +133,6 @@ SWEP.AttackPos = Vector(0,0,0)
 SWEP.BlockTier = 5
 SWEP.BlockMaterial = "metal"
 SWEP.BlockSound = {"physics/metal/metal_solid_impact_hard1.wav", 68, {95, 102}}
-
-SWEP.Attack_Charge_Begin = "Attack_Charge_Begin"
-SWEP.Attack_Charge_Idle = "Attack_Charge_Idle"
-SWEP.Attack_Charge_End = "Attack_Charge_End"
-
-SWEP.HeavyAttackDamageMul = 2.1 -- Max damage multiplier at full charge
-SWEP.HeavyAttackWaitTime = 3 -- Time before you can attack again
-SWEP.HeavyAttackAnimTimeBegin = 1.0 -- Duration of the wind-up/start animation
-SWEP.HeavyAttackAnimTimeIdle = 1 -- Duration of the idle loop
-SWEP.HeavyAttackAnimTimeEnd = 1.85 -- Duration of the attack animation
-SWEP.HeavyAttackDelay = 0.45 -- Time delay before the hit actually connects (during attack anim)
-SWEP.HeavyAttackTimeLength = 0.4 -- Duration of the active hit window
-SWEP.HeavyAttackViewPunch = Angle(5, 0, 0) -- View punch angle on hit
-SWEP.HeavyAttackMaxChargeTime = 3 -- Time in seconds to reach max damage/shake
-SWEP.HeavyAttackSwingAng = -90 -- Custom swing angle for heavy attack
-SWEP.HeavyAttackRads = 95 -- Custom radius/arc for heavy attack
-
-
-SWEP.CanHeavyAttack = true -- Set to true to enable
-
-SWEP.BlockTier = 5
-SWEP.MeleeMaterial = "wood"
-SWEP.BlockImpactSound = "physics/wood/wood_plank_impact_hard1.wav"
 
 function SWEP:CanSecondaryAttack()
     self.DamageType = DMG_CLUB

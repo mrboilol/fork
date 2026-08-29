@@ -1,7 +1,7 @@
 if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_melee"
 SWEP.PrintName = "Nunchucks"
-SWEP.Instructions = "A pair of traditional nunchucks—two short sticks connected by a chain—designed for fast, fluid strikes and defensive control. Lightweight and agile, they reward timing and precision over brute force.\n\nLMB to attack.\nRMB to block.\nE + LMB to special attack."
+SWEP.Instructions = "A pair of traditional nunchucks—two short sticks connected by a chain—designed for fast, fluid strikes and defensive control. Lightweight and agile, they reward timing and precision over brute force.\n\nLMB to attack.\nRMB to block.\nR + LMB for rapid strikes."
 SWEP.Category = "Weapons - Melee"
 SWEP.Spawnable = true
 SWEP.AdminOnly = false
@@ -125,13 +125,9 @@ function SWEP:CanSecondaryAttack()
     return false
 end
 
-function SWEP:IsEquipLocked()
-    return self.anim == "deploy" and (self.animtime or 0) > CurTime()
-end
-
 function SWEP:PrimaryAttack()
     local owner = self:GetOwner()
-    if IsValid(owner) and hg.KeyDown(owner, IN_USE) then return end
+    if IsValid(owner) and hg.KeyDown(owner, IN_RELOAD) then return end
     return self.BaseClass.PrimaryAttack(self)
 end
 
@@ -141,8 +137,6 @@ function SWEP:CanStartLoopAttack(requireAttackReady, checkCooldown)
 
     local owner = self:GetOwner()
     if not IsValid(owner) then return false end
-    local equipLocked = isfunction(self.IsEquipLocked) and self:IsEquipLocked() or (self.anim == "deploy" and (self.animtime or 0) > CurTime())
-    if equipLocked then return false end
     if self:GetBlocking() then return false end
     if not self:InUse() then return false end
     if requireAttackReady then
@@ -229,6 +223,7 @@ function SWEP:StartLoopAttack()
     self.FirstAttackTick = false
     self.AttackHitPlayed = false
     self.HitWorld = false
+    self:SetNWBool("LoopActive", true)
     self:SetAttackType(1)
     self:SetLastAttack(CurTime() + (self.LoopAttackTime or self.AttackTime) / mul)
     self:SetAttackTime(self:GetLastAttack() + (self.LoopAttackTimeLength or self.AttackTimeLength) / mul)
@@ -243,8 +238,6 @@ end
 function SWEP:StartTapSecondaryAttack()
     local owner = self:GetOwner()
     if not IsValid(owner) then return end
-    local equipLocked = isfunction(self.IsEquipLocked) and self:IsEquipLocked() or (self.anim == "deploy" and (self.animtime or 0) > CurTime())
-    if equipLocked then return end
     if self:GetBlocking() then return end
     if not self:InUse() then return end
     if (self:GetLastAttack() + self:GetAttackWait()) > CurTime() then return end
@@ -305,6 +298,36 @@ function SWEP:ThinkAdd()
                 self.LastBlockingState = blocking
             end
         end
+
+        if self:IsLocal() then
+            local inAttack = self:GetInAttack()
+            if inAttack and not self._clWasInAttack and self:GetAttackType() == 1 then
+                local loopActive = self:GetNWBool("LoopActive", false)
+                if loopActive then
+                    local mul = 1
+                    local owner = self:GetOwner()
+                    if IsValid(owner) and owner.organism and owner.organism.stamina and owner.organism.stamina[1] then
+                        mul = 1 / math.Clamp((180 - owner.organism.stamina[1]) / 90, 1, 2)
+                    end
+                    self:PlayAnim(self.LoopAttackAnim or "attack_loop", (self.LoopAnimTime or self.AnimTime1) / mul, false, nil, false, true)
+                else
+                    timer.Simple(0.05, function()
+                        if not IsValid(self) then return end
+                        local stillInAttack = self:GetInAttack()
+                        local loopNow = self:GetNWBool("LoopActive", false)
+                        if stillInAttack and loopNow and self:GetAttackType() == 1 then
+                            local mul = 1
+                            local owner = self:GetOwner()
+                            if IsValid(owner) and owner.organism and owner.organism.stamina and owner.organism.stamina[1] then
+                                mul = 1 / math.Clamp((180 - owner.organism.stamina[1]) / 90, 1, 2)
+                            end
+                            self:PlayAnim(self.LoopAttackAnim or "attack_loop", (self.LoopAnimTime or self.AnimTime1) / mul, false, nil, false, true)
+                        end
+                    end)
+                end
+            end
+            self._clWasInAttack = inAttack
+        end
     end
 
     if CLIENT then return end
@@ -322,7 +345,7 @@ function SWEP:ThinkAdd()
         staminaReady = owner.organism.stamina[1] >= staminaMin
     end
 
-    local inputDown = hg.KeyDown(owner, IN_USE) and hg.KeyDown(owner, IN_ATTACK) and not hg.KeyDown(owner, IN_ATTACK2)
+    local inputDown = hg.KeyDown(owner, IN_RELOAD) and hg.KeyDown(owner, IN_ATTACK) and not hg.KeyDown(owner, IN_ATTACK2)
 
     local wantLoop = inputDown and staminaReady
     local canStartLoopState = self:CanStartLoopAttack(false, true)
@@ -337,6 +360,7 @@ function SWEP:ThinkAdd()
             self.LoopAttackPendingUntil = nil
             if canStartLoopState then
                 self.LoopInputState = true
+                self:SetNWBool("LoopActive", true)
                 self:PlayAnim(self.LoopAttackAnim or "attack_loop", self.LoopAnimTime or self.AnimTime1, true, nil, false, true)
             end
         end
@@ -348,6 +372,7 @@ function SWEP:ThinkAdd()
         self.LoopInputState = false
         self.LoopAttackPendingUntil = nil
         self.LoopAttackCooldownEnd = CurTime() + (self.LoopAttackStopCooldown or 1)
+        self:SetNWBool("LoopActive", false)
         self:PlayAnim(self.LoopAttackAnim or "attack_loop", self.LoopAnimTime or self.AnimTime1, false, nil, false, true)
     end
 
@@ -360,6 +385,10 @@ function SWEP:CustomBlockAnim()
     return self:GetBlocking()
 end
 
+function SWEP:Feint()
+    return
+end
+
 SWEP.AttackTimeLength = 0.155
 SWEP.Attack2TimeLength = 0.1
 
@@ -368,3 +397,63 @@ SWEP.AttackRads2 = 0
 
 SWEP.SwingAng = -60
 SWEP.SwingAng2 = 0
+
+if CLIENT then
+    function SWEP:PlaySwingSound(owner, attacktype)
+        if attacktype == 2 then return end
+
+        local pitch = self.SwingSoundPitch or 100
+        local volume = 0.6
+
+        if self.LoopInputState then
+            pitch = pitch + math.random(-8, 8)
+            volume = 0.45
+        end
+
+        sound.Play("weapons/melee/whoosh.wav", owner:GetShootPos(), 75, pitch, volume)
+
+        if self.LoopInputState then
+            sound.Play("physics/metal/metal_chain_impact_soft1.wav", owner:GetShootPos(), 70, math.random(120, 140), 0.3)
+        end
+    end
+end
+
+function SWEP:PrimaryAttackAdd(ent, trace)
+    if CLIENT then
+        local hitPos = trace.HitPos
+        local hitNormal = trace.HitNormal or Vector(0, 0, 1)
+
+        if ent:IsPlayer() or (ent:IsNPC() and ent:Health() > 0) then
+            local fx = EffectData()
+            fx:SetOrigin(hitPos)
+            fx:SetNormal(hitNormal)
+            fx:SetMagnitude(1)
+            fx:SetScale(0.4)
+            util.Effect("BloodImpact", fx)
+        end
+
+        if self.LoopInputState then
+            self:GetOwner():ViewPunch(Angle(math.Rand(-1.5, 1.5), math.Rand(-2, 2), math.Rand(-0.5, 0.5)))
+        else
+            self:GetOwner():ViewPunch(Angle(math.Rand(-0.8, 0.8), math.Rand(-1, 1), math.Rand(-0.3, 0.3)))
+        end
+    end
+
+    if SERVER then
+        local hitPos = trace.HitPos
+
+        if ent:IsPlayer() or (ent:IsNPC() and ent:Health() > 0) then
+            if self.LoopInputState then
+                sound.Play("physics/body/body_medium_impact_hard" .. math.random(1, 5) .. ".wav", hitPos, 75, math.random(105, 120))
+            else
+                sound.Play("physics/body/body_medium_impact_hard" .. math.random(1, 5) .. ".wav", hitPos, 70, math.random(95, 108))
+            end
+        else
+            if self.LoopInputState then
+                sound.Play("physics/wood/wood_solid_impact_hard" .. math.random(1, 5) .. ".wav", hitPos, 75, math.random(110, 125))
+            else
+                sound.Play("physics/wood/wood_solid_impact_hard" .. math.random(1, 5) .. ".wav", hitPos, 70, math.random(100, 112))
+            end
+        end
+    end
+end

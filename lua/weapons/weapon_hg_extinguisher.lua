@@ -1,4 +1,4 @@
-if SERVER then AddCSLuaFile() end
+﻿if SERVER then AddCSLuaFile() end
 if SERVER then
     util.AddNetworkString("hg_extinguisher_explode_fx")
 end
@@ -134,7 +134,6 @@ SWEP.AttackRads2 = 0
 
 SWEP.SwingAng = -30
 SWEP.SwingAng2 = 0
-SWEP.NextChangeMode = 0
 
 SWEP.BulletBlockExplodeChance = 0.2
 SWEP.DroppedExplodeChance = 0.5
@@ -597,7 +596,7 @@ function SWEP:CanSecondaryAttack()
             end
         end
 
-        self.sound = self:StartLoopingSound("fire_extinguisher/fire_extinguisger_startloop.ogg")
+        self.sound = self:StartLoopingSound("fire_extinguisher/fire_extinguisger_startloop.wav")
         
         timer.Create("extinguisher"..self:EntIndex(), 0.1, 1, function()
             if IsValid(self) then

@@ -6,30 +6,50 @@ util.AddNetworkString("HGThought")
 local hev_color = Color(255,125,0)
 local CreateThought
 local thoughtMessages = {
-    panicattack_start = "Panic is making it hard to focus.",
-    wake = "You regained consciousness.",
-    dislocations_unlucky = "The joint is back in place.",
-    painfromjawspeak = "Your jaw injury hurts when you speak.",
-    arteria = "Your neck artery is bleeding heavily.",
-    take_gasmask = "Your gas mask is restricting your breathing.",
-    take_gasmask2 = "Your gas mask is restricting your breathing.",
-    oxygen_lowintake = "You are not getting enough air.",
-    lowoxy = "Your oxygen level is low.",
-    lowoxy2 = "Your oxygen level is critically low.",
-    drugged = "A drug is affecting your body.",
-    pneumothorax1 = "Air or blood is building up around a lung.",
-    pneumothorax2 = "A chest injury is making breathing harder.",
-    pneumothorax3 = "You are struggling to breathe.",
-    brain = "Brain trauma is affecting you.",
-    blood2 = "Blood loss is making you faint.",
-    internalbleed = "You are bleeding internally.",
-    nosebleed = "Your nose is bleeding.",
-    hungry = "You need food.",
-    heart = "Chest trauma is causing severe pain.",
-    heartstop = "Your heart has stopped.",
-    painfrommoving = "Your leg injury hurts when you move.",
-    painfromjaw = "Your jaw injury is painful.",
-    painfromribs = "Your rib injury is making breathing painful.",
+    panicattack_start = {"Panic is disrupting your focus.", "Your stress response is escalating."},
+    wake = {"Consciousness restored.", "You have regained consciousness."},
+    dislocations_unlucky = {"Joint alignment restored.", "The dislocated joint has been set."},
+    painfromjawspeak = {"Jaw trauma causes pain while speaking.", "Speaking is aggravating your jaw injury."},
+    arteria = {"A neck artery is bleeding heavily.", "Severe arterial bleeding detected in the neck."},
+    take_gasmask = {"Your gas mask is restricting airflow.", "The gas mask is making breathing more difficult."},
+    take_gasmask2 = {"Your gas mask is severely restricting airflow.", "Remove the gas mask to improve breathing."},
+    oxygen_lowintake = {"Air intake is insufficient.", "You are not receiving enough air."},
+    lowoxy = {"Blood oxygen is low.", "Oxygen deprivation is affecting you."},
+    lowoxy2 = {"Blood oxygen is critically low.", "Critical oxygen deprivation detected."},
+    drugged = {"A drug is affecting your coordination.", "A chemical effect is impairing your body."},
+    pneumothorax1 = {"Air or blood is accumulating around a lung.", "A chest injury is affecting lung expansion."},
+    pneumothorax2 = {"A chest injury is restricting breathing.", "Breathing is becoming more difficult due to chest trauma."},
+    pneumothorax3 = {"Respiratory distress is worsening.", "You are struggling to breathe."},
+    brain = {"Neurological trauma is affecting your focus.", "Brain trauma is impairing coordination."},
+    blood2 = {"Blood loss is causing faintness.", "Circulatory loss is making you collapse."},
+    internalbleed = {"Internal bleeding detected.", "Internal bleeding is worsening."},
+    nosebleed = {"Nasal bleeding detected.", "Your nose is bleeding."},
+    hungry = {"You need food.", "Hunger is reducing your stamina."},
+    heart = {"Chest trauma is causing severe pain.", "Cardiac-area trauma is impairing movement."},
+    heartstop = {"Cardiac arrest detected.", "Your heart has stopped."},
+    painfrommoving = {"Movement is aggravating your leg injury.", "Your leg injury is causing pain during movement."},
+    painfromjaw = {"Jaw trauma is causing severe pain.", "Your jaw injury is painful."},
+    painfromribs = {"Rib trauma is making breathing painful.", "Breathing is aggravating your rib injury."},
+    rehab_otrub = {"Post-unconsciousness disorientation is still present.", "Recovery is incomplete; movement and focus are impaired."},
+    arrhythmia = {"Your heart rhythm is irregular.", "An unstable cardiac rhythm is affecting circulation."},
+    tachycardia = {"Your heart rate is dangerously high.", "Tachycardia is straining your circulation."},
+    bradycardia = {"Your heart rate is dangerously low.", "Bradycardia is reducing circulation."},
+    low_perfusion = {"Poor circulation is weakening your limbs.", "Tissue perfusion is critically reduced."},
+    barely_breathing = {"Respiratory function is severely impaired.", "You are barely able to breathe."},
+    low_stamina = {"Exertion is exhausting your body.", "Stamina is critically depleted."},
+    trachea1 = {"Tracheal trauma is restricting airflow.", "Your airway has been damaged."},
+    trachea2 = {"Severe tracheal damage is blocking airflow.", "Airway obstruction is worsening."},
+    trachea_critical = {"Critical airway trauma detected.", "Your trachea can no longer provide enough airflow."},
+    concussion_thought = {"Concussion symptoms are impairing cognition.", "Neurological symptoms are worsening."},
+    concussion_choke = {"Vomiting is obstructing your airway.", "You are choking and unable to breathe properly."},
+    concussion_dryheave = {"Severe nausea is causing dry heaving.", "Your concussion is causing intense nausea."},
+    concussion_lucid = {"Symptoms have briefly eased; the concussion remains active.", "A temporary lucid interval has begun."},
+    med_err_needle = {"Needle placement caused a complication.", "Medical treatment has worsened a chest injury."},
+    med_err_tourniquet = {"The tourniquet was applied incorrectly.", "Improper tourniquet placement is causing additional trauma."},
+    med_err_transfusion = {"An adverse transfusion reaction is occurring.", "Transfusion complications are affecting your circulation."},
+    med_err_dose = {"Medication dosage is causing dizziness.", "A treatment complication is impairing coordination."},
+    med_err_bandage = {"The bandage may have introduced contamination.", "Wound treatment has caused a complication."},
+    med_error_actor = {"Medical complication detected.", "Treatment did not proceed safely."},
 }
 
 local legacyThoughtMessages = {
@@ -370,12 +390,18 @@ local function GetNewThoughtMessage(ply, msg, msgKey)
     if string.find(key, "bone", 1, true) or string.find(key, "broke", 1, true) or string.find(key, "disloc", 1, true) or string.find(key, "ribs", 1, true) or string.find(key, "pelvis", 1, true) then return "You feel a painful bone injury." end
     if string.find(key, "blood", 1, true) or string.find(key, "bleed", 1, true) then return "You are losing blood." end
     if string.find(key, "oxygen", 1, true) or string.find(key, "breath", 1, true) then return "You are struggling to breathe." end
+    if string.find(key, "trachea", 1, true) or string.find(key, "stamina", 1, true) then return "Respiratory function is impaired." end
+    if string.find(key, "rhythm", 1, true) or string.find(key, "arrhythm", 1, true) then return "Your heart rhythm is irregular." end
+    if string.find(key, "tachy", 1, true) then return "Your heart rate is dangerously high." end
+    if string.find(key, "brady", 1, true) then return "Your heart rate is dangerously low." end
+    if string.find(key, "perfusion", 1, true) or string.find(key, "hypotension", 1, true) then return "Poor circulation is weakening your limbs." end
+    if string.find(key, "rehab", 1, true) or string.find(key, "otrub", 1, true) then return "Post-unconsciousness recovery is incomplete." end
+    if string.find(key, "med_err", 1, true) or string.find(key, "medical", 1, true) then return "Medical treatment caused a complication." end
     if string.find(key, "pain", 1, true) then return "Pain is impairing movement." end
     if string.find(key, "hunger", 1, true) then return "You need food." end
     if string.find(key, "thirst", 1, true) or string.find(key, "dehyd", 1, true) then return "You need water." end
     if string.find(key, "temperature", 1, true) or string.find(key, "heat", 1, true) or string.find(key, "cold", 1, true) then return GetStatusThought(ply) end
     if string.find(string.lower(msg), "^i[%s'%-]") or string.find(string.lower(msg), "^my%s") then return GetStatusThought(ply) end
-    return msg
 end
 
 local function SCPCBHitThought(ply, target, dmgType, dmg, hitPos, dmginfo)
@@ -454,14 +480,14 @@ local function CreateNotification(ply, msg, delay, msgKey, showTime, func, clr)
 
     if ply:GetInfoNum("hg_newthoughts", 0) > 0 and CreateThought then
         local thought = GetNewThoughtMessage(ply, msg, msgKey)
-        if thought then
-            local conditionCooldown = conditionThoughtCooldowns[msgKey]
-            if conditionCooldown and (delay == nil or isnumber(delay)) then
-                delay = math.max(tonumber(delay) or 0, conditionCooldown)
-            end
+        if not thought or thought == "" then return false end
 
-            return CreateThought(ply, thought, delay, "thought_" .. msgKey, showTime, clr, func)
+        local conditionCooldown = conditionThoughtCooldowns[msgKey]
+        if conditionCooldown and (delay == nil or isnumber(delay)) then
+            delay = math.max(tonumber(delay) or 0, conditionCooldown)
         end
+
+        return CreateThought(ply, thought, delay, "thought_" .. msgKey, showTime, clr, func)
     end
 
     if msg == "" then return end

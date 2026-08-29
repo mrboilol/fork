@@ -1,4 +1,4 @@
-if SERVER then AddCSLuaFile() end
+﻿if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_melee"
 SWEP.PrintName = "Scythe"
 SWEP.Instructions = "An axe is an implement that has been used for millennia to shape, split, and cut wood. Can break down doors.\n\nLMB to attack.\nR + LMB to charge.\nRMB to block.\n\nA fully charged hit can sever a limb or explode the head, but drains almost all of your stamina."
@@ -120,10 +120,10 @@ SWEP.TwoHanded = true
 
 SWEP.AttackHit = "Canister.ImpactHard"
 SWEP.Attack2Hit = "Canister.ImpactHard"
-SWEP.AttackHitFlesh = "snd_jack_hmcd_axehit.ogg"
+SWEP.AttackHitFlesh = "snd_jack_hmcd_axehit.wav"
 SWEP.Attack2HitFlesh = "Flesh.ImpactHard"
 SWEP.ChargeAttackHit = "Canister.ImpactHard"
-SWEP.ChargeAttackHitFlesh = "snd_jack_hmcd_axehit.ogg"
+SWEP.ChargeAttackHitFlesh = "snd_jack_hmcd_axehit.wav"
 SWEP.DeploySnd = "physics/wood/wood_plank_impact_soft2.wav"
 
 SWEP.hitsoundbrutalize = {
@@ -160,11 +160,11 @@ SWEP.hitsoundplus = {
 }
 
 SWEP.swingsoundextra = {
-    {"weapons/darsu_eft/melee/scythe_whoosh_01.mp3", 90, {95, 100}},
-    {"weapons/darsu_eft/melee/scythe_whoosh_02.mp3", 90, {95, 100}},
-    {"weapons/darsu_eft/melee/scythe_whoosh_03.mp3", 90, {95, 100}},
-    {"weapons/darsu_eft/melee/scythe_whoosh_04.mp3", 90, {95, 100}},
-    {"weapons/darsu_eft/melee/scythe_whoosh_05.mp3", 90, {95, 100}},
+    {"weapons/darsu_eft/melee/scythe_whoosh_01.ogg", 90, {95, 100}},
+    {"weapons/darsu_eft/melee/scythe_whoosh_02.ogg", 90, {95, 100}},
+    {"weapons/darsu_eft/melee/scythe_whoosh_03.ogg", 90, {95, 100}},
+    {"weapons/darsu_eft/melee/scythe_whoosh_04.ogg", 90, {95, 100}},
+    {"weapons/darsu_eft/melee/scythe_whoosh_05.ogg", 90, {95, 100}},
 }
 
 SWEP.AttackPos = Vector(0,0,0)
@@ -205,7 +205,7 @@ function SWEP:CanChargeAttack()
     self.AttackHit = "Canister.ImpactHard"
     self.Attack2Hit = "Canister.ImpactHard"
     self.ChargeAttackHit = "Canister.ImpactHard"
-    self.ChargeAttackHitFlesh = "snd_jack_hmcd_axehit.ogg"
+    self.ChargeAttackHitFlesh = "snd_jack_hmcd_axehit.wav"
     return true
 end
 

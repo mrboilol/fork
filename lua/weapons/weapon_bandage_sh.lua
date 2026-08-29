@@ -343,12 +343,41 @@ local function GetTraceBone(trace, target)
 	return boneName
 end
 
+local function BoneNamesMatch(ent, first, second)
+	if not first or not second then return false end
+	if first == second then return true end
+
+	local firstIndex = ent:LookupBone(first)
+	return firstIndex and ent:GetBoneName(firstIndex) == second or false
+end
+
+local function BoneHasBandageableInjury(ent, bone)
+	local org = ent.organism
+	if not org or not bone then return false end
+
+	local _, artery = GetBandageableArteryWound(org, ent, bone)
+	if artery then return true end
+
+	for _, wound in ipairs(org.wounds or {}) do
+		if BoneNamesMatch(ent, wound[4], bone) then return true end
+	end
+
+	if string.find(bone, "Head", 1, true) then return (org.skull or 0) >= 0.05 end
+	if string.find(bone, "Spine", 1, true) or string.find(bone, "Pelvis", 1, true) then return (org.chest or 0) >= 0.05 end
+	if string.find(bone, "L_", 1, true) and string.find(bone, "Arm", 1, true) then return (org.larm or 0) >= 0.05 end
+	if string.find(bone, "R_", 1, true) and string.find(bone, "Arm", 1, true) then return (org.rarm or 0) >= 0.05 end
+	if string.find(bone, "L_", 1, true) and (string.find(bone, "Leg", 1, true) or string.find(bone, "Thigh", 1, true) or string.find(bone, "Calf", 1, true)) then return (org.lleg or 0) >= 0.05 end
+	if string.find(bone, "R_", 1, true) and (string.find(bone, "Leg", 1, true) or string.find(bone, "Thigh", 1, true) or string.find(bone, "Calf", 1, true)) then return (org.rleg or 0) >= 0.05 end
+
+	return false
+end
+
 function SWEP:GetBandageTargetBone(target, trace)
 	target = ResolveBandageTarget(target)
 	if not IsValid(target) then return end
 
 	local bone = GetTraceBone(trace, target)
-	if bone then return bone end
+	if bone and BoneHasBandageableInjury(target, bone) then return bone end
 
 	local org = target.organism
 	if not org then return end
@@ -766,7 +795,7 @@ if SERVER then
 			local bonewounds = {}
 			
 			for _, tbl in pairs(org.wounds) do
-				if ent:GetBoneName(ent:LookupBone(tbl[4])) == bone then
+				if BoneNamesMatch(ent, tbl[4], bone) then
 					table.insert(bonewounds, tbl)
 				end
 			end
@@ -791,7 +820,7 @@ if SERVER then
 						end
 
 						ent.bandaged_limbs = ent.bandaged_limbs or {}
-						local bone_name = ent:GetBoneName(ent:LookupBone(wound[4]))
+						local bone_name = wound[4] or bone
 						
 						if not ent.bandaged_limbs[bone_name] then
 							ent.bandaged_limbs[bone_name] = true
@@ -838,6 +867,8 @@ if SERVER then
 			org.lleg = math.max(org.lleg - 0.25, 0)
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.avgpain = math.max(org.avgpain - 7, 0)
+			ent.bandaged_limbs = ent.bandaged_limbs or {}
+			ent.bandaged_limbs[bone] = true
 			done = true
 		end
 
@@ -845,6 +876,8 @@ if SERVER then
 			org.rleg = math.max(org.rleg - 0.25, 0)
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.avgpain = math.max(org.avgpain - 7, 0)
+			ent.bandaged_limbs = ent.bandaged_limbs or {}
+			ent.bandaged_limbs[bone] = true
 			done = true
 		end
 
@@ -852,6 +885,8 @@ if SERVER then
 			org.rarm = math.max(org.rarm - 0.25, 0)
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.avgpain = math.max(org.avgpain - 7, 0)
+			ent.bandaged_limbs = ent.bandaged_limbs or {}
+			ent.bandaged_limbs[bone] = true
 			done = true
 		end
 
@@ -859,6 +894,8 @@ if SERVER then
 			org.larm = math.max(org.larm - 0.25, 0)
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.avgpain = math.max(org.avgpain - 7, 0)
+			ent.bandaged_limbs = ent.bandaged_limbs or {}
+			ent.bandaged_limbs[bone] = true
 			done = true
 		end
 
@@ -1084,11 +1121,11 @@ if SERVER then
 				
 			else
 				for i,wound in pairs(org.arterialwounds) do
-					if ent:GetBoneName(ent:LookupBone(wound[4])) == bone then pw = i break end
+					if BoneNamesMatch(ent, wound[4], bone) then pw = i break end
 				end
 				for i,tbl in pairs(org.wounds) do
-					local bonename = ent:GetBoneName(ent:LookupBone(tbl[4]))
-					if bonename == bone or (tourniqet_bones[bone] and tourniqet_bones[bone][bonename]) then
+					local bonename = tbl[4]
+					if BoneNamesMatch(ent, bonename, bone) or (tourniqet_bones[bone] and tourniqet_bones[bone][bonename]) then
 						table.insert(bonewounds,i)
 					end
 				end

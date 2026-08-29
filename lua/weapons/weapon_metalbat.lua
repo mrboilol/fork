@@ -1,4 +1,4 @@
-if SERVER then AddCSLuaFile() end
+﻿if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_melee"
 SWEP.PrintName = "Aluminium Bat"
 SWEP.Instructions = "An Aluminium bat. The design features of the bat allow it to deliver powerful and heavy blows.\n\nLMB to attack.\nRMB to block."
@@ -10,7 +10,6 @@ SWEP.HoldType = "slam"
 SWEP.WorldModel = "models/weapons/baseball_bat/w.mdl"
 SWEP.WorldModelReal = "models/weapons/tfa_nmrih/v_me_bat_metal.mdl"
 SWEP.DontChangeDropped = false
-SWEP.DisableDefaultShadow = true
 SWEP.ViewModel = ""
 SWEP.modelscale = 1.45
 

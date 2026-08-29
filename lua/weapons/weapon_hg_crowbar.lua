@@ -90,8 +90,8 @@ SWEP.swingsoundextra = {
 }
 
 SWEP.hitsoundplus = {
-    {"shovelcrowbarshared/shovelhit1.mp3", 70, {100, 105}},
-    {"shovelcrowbarshared/shovelhit2.mp3", 70, {100, 105}},
+    {"shovelcrowbarshared/shovelhit1.ogg", 70, {100, 105}},
+    {"shovelcrowbarshared/shovelhit2.ogg", 70, {100, 105}},
 }
 
 SWEP.hitsoundextra = {
@@ -141,16 +141,8 @@ SWEP.TwoHanded = true
 SWEP.AttackHit = "Canister.ImpactHard"
 SWEP.Attack2Hit = "Canister.ImpactHard"
 SWEP.AttackHitFlesh = "Flesh.ImpactHard"
-SWEP.Attack2HitFlesh = "snd_jack_hmcd_axehit.ogg"
+SWEP.Attack2HitFlesh = "snd_jack_hmcd_axehit.wav"
 SWEP.DeploySnd = "physics/metal/metal_grenade_impact_soft2.wav"
-SWEP.HitFleshExtra = {
-    "shovelcrowbarshared/shovelhit1.mp3",
-    "shovelcrowbarshared/shovelhit2.mp3",
-}
-SWEP.HitFleshExtraPitch = 85
-SWEP.SwingSound = "baseballbat/swing.mp3"
-SWEP.SwingSoundPitch = {115, 125}
-
 
 SWEP.AttackPos = Vector(0, 0, 0)
 SWEP.BlockTier = 3
@@ -183,26 +175,6 @@ SWEP.SwingAng = -15
 SWEP.SwingAng2 = 0
 SWEP.BlockDirectionalCharge = "overhead" --left, right, overhead, center, neutral
 
-
-SWEP.HeavyAttackDamageType = DMG_SLASH
-SWEP.HeavyAttackDamageMul = 2.0 -- Max damage multiplier at full charge
-SWEP.HeavyAttackWaitTime = 1.0 -- Time before you can attack again
-SWEP.HeavyAttackAnimTimeBegin = 1.0 -- Duration of the wind-up/start animation
-SWEP.HeavyAttackAnimTimeIdle = 1 -- Duration of the idle loop
-SWEP.HeavyAttackAnimTimeEnd = 1.85 -- Duration of the attack animation
-SWEP.HeavyAttackDelay = 0.5 -- Time delay before the hit actually connects (during attack anim)
-SWEP.HeavyAttackTimeLength = 0.4 -- Duration of the active hit window
-SWEP.HeavyAttackViewPunch = Angle(5, 0, 0) -- View punch angle on hit
-SWEP.HeavyAttackMaxChargeTime = 2.0 -- Time in seconds to reach max damage/shake
-SWEP.HeavyAttackSwingAng = -90 -- Custom swing angle for heavy attack
-SWEP.HeavyAttackRads = 70 -- Custom radius/arc for heavy attack
-
-
-SWEP.CanHeavyAttack = true -- Set to true to enable
-
-SWEP.BlockTier = 3
-SWEP.MeleeMaterial = "metal"
-SWEP.BlockImpactSound = "physics/metal/metal_solid_impact_bullet1.wav"
 
 
 function SWEP:PrimaryAttack()

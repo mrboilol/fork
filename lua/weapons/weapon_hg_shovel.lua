@@ -1,4 +1,4 @@
-if SERVER then AddCSLuaFile() end
+﻿if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_melee"
 SWEP.PrintName = "Shovel"
 SWEP.Instructions = "A shovel may be big and slow but it can pack a punch.\n\nLMB to attack.\nRMB to block."
@@ -27,9 +27,9 @@ SWEP.AnimTime1 = 1.65
 SWEP.WaitTime1 = 1.55
 SWEP.ViewPunch1 = Angle(1,2,0)
 
-SWEP.Attack2Time = 0.46
-SWEP.AnimTime2 = 1.4
-SWEP.WaitTime2 = 1
+SWEP.Attack2Time = 0.3
+SWEP.AnimTime2 = 1
+SWEP.WaitTime2 = 0.8
 SWEP.ViewPunch2 = Angle(0,0,-2)
 
 SWEP.attack_ang = Angle(0,0,0)
@@ -74,8 +74,8 @@ SWEP.swingsoundextra = {
 }
 
 SWEP.hitsoundplus = {
-    {"shovelcrowbarshared/shovelhit1.mp3", 70, {80, 95}},
-    {"shovelcrowbarshared/shovelhit2.mp3", 70, {80, 95}},
+    {"shovelcrowbarshared/shovelhit1.ogg", 70, {80, 95}},
+    {"shovelcrowbarshared/shovelhit2.ogg", 70, {80, 95}},
 }
 
 SWEP.hitsoundextra = {
@@ -120,38 +120,13 @@ SWEP.setlh = true
 SWEP.setrh = true
 SWEP.TwoHanded = true
 
+SWEP.AnimAlwaysBack = true
+
 SWEP.AttackHit = "SolidMetal.ImpactHard"
 SWEP.Attack2Hit = "SolidMetal.ImpactHard"
 SWEP.AttackHitFlesh = "Flesh.ImpactHard"
 SWEP.Attack2HitFlesh = "Flesh.ImpactHard"
 SWEP.DeploySnd = "SolidMetal.ImpactSoft"
-SWEP.HitFleshExtra = {
-    "shovelcrowbarshared/shovelhit1.mp3",
-    "shovelcrowbarshared/shovelhit2.mp3",
-}
-SWEP.HitFleshExtraPitch = 60
-SWEP.SwingSound = "baseballbat/swing.mp3"
-SWEP.SwingSoundPitch = {85, 90}
-
-SWEP.HeavyAttackDamageType = DMG_SLASH
-SWEP.HeavyAttackDamageMul = 2.0 -- Max damage multiplier at full charge
-SWEP.HeavyAttackWaitTime = 1.0 -- Time before you can attack again
-SWEP.HeavyAttackAnimTimeBegin = 1.0 -- Duration of the wind-up/start animation
-SWEP.HeavyAttackAnimTimeIdle = 1 -- Duration of the idle loop
-SWEP.HeavyAttackAnimTimeEnd = 1.85 -- Duration of the attack animation
-SWEP.HeavyAttackDelay = 0.5 -- Time delay before the hit actually connects (during attack anim)
-SWEP.HeavyAttackTimeLength = 0.4 -- Duration of the active hit window
-SWEP.HeavyAttackViewPunch = Angle(5, 0, 0) -- View punch angle on hit
-SWEP.HeavyAttackMaxChargeTime = 2.0 -- Time in seconds to reach max damage/shake
-SWEP.HeavyAttackSwingAng = -90 -- Custom swing angle for heavy attack
-SWEP.HeavyAttackRads = 75 -- Custom radius/arc for heavy attack
-
-
-SWEP.CanHeavyAttack = true -- Set to true to enable
-
-SWEP.BlockTier = 3
-SWEP.MeleeMaterial = "metal"
-SWEP.BlockImpactSound = "physics/metal/metal_solid_impact_bullet1.wav"
 
 SWEP.AttackPos = Vector(0,0,0)
 SWEP.BlockTier = 3
@@ -172,7 +147,7 @@ end
 SWEP.AttackTimeLength = 0.5
 SWEP.Attack2TimeLength = 0.01
 
-SWEP.AttackRads = 70
+SWEP.AttackRads = 120
 SWEP.AttackRads2 = 0
 
 SWEP.SwingAng = -5

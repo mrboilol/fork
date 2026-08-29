@@ -1,7 +1,7 @@
 if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_melee"
 SWEP.PrintName = "Bat"
-SWEP.Instructions = "A bat. The design features of the bat allow it to deliver powerful and heavy blows.\n\nLMB to attack.\nRMB to block.\nE+LMB to charge up a heavy attack."
+SWEP.Instructions = "A bat. The design features of the bat allow it to deliver powerful and heavy blows.\n\nLMB to attack.\nRMB to block."
 SWEP.Category = "Weapons - Melee"
 SWEP.Spawnable = true
 SWEP.AdminOnly = false
@@ -16,8 +16,8 @@ SWEP.modelscale = 1.45
 
 SWEP.basebone = 94
 
-
-SWEP.weight = 3
+SWEP.Weight = 0
+SWEP.weight = 1.5
 
 if CLIENT then
 	SWEP.WepSelectIcon = Material("vgui/wep_jack_hmcd_baseballbat")
@@ -37,8 +37,8 @@ SWEP.MaxPenLen = 2
 SWEP.PenetrationSizePrimary = 3
 SWEP.PenetrationSizeSecondary = 1.5
 
-SWEP.StaminaPrimary = 30
-SWEP.StaminaSecondary = 21
+SWEP.StaminaPrimary = 20
+SWEP.StaminaSecondary = 10
 
 SWEP.HoldPos = Vector(-8,0,0)
 SWEP.HoldAng = Angle(0,0,-10)
@@ -104,7 +104,7 @@ SWEP.swingsoundextra = {
 SWEP.Attack2Time = 0.3
 SWEP.AnimTime2 = 1
 SWEP.WaitTime2 = 0.8
-SWEP.AttackLen2 = 30
+SWEP.AttackLen2 = 40
 SWEP.ViewPunch2 = Angle(0,0,-2)
 
 SWEP.attack_ang = Angle(0,0,0)
@@ -131,13 +131,6 @@ SWEP.Attack2Hit = "physics/wood/wood_plank_impact_hard1.wav"
 SWEP.AttackHitFlesh = "Flesh.ImpactHard"
 SWEP.Attack2HitFlesh = "Flesh.ImpactHard"
 SWEP.DeploySnd = "physics/wood/wood_plank_impact_soft2.wav"
-SWEP.SwingSound = "baseballbat/swing.mp3"
-SWEP.HitFleshExtra = {
-    "baseballbat/hit1.mp3",
-    "baseballbat/hit2.mp3",
-    "baseballbat/hit3.mp3"
-}
-SWEP.HitFleshExtraPitch = 112
 
 SWEP.AttackPos = Vector(0,0,0)
 SWEP.BlockTier = 3
@@ -149,33 +142,10 @@ SWEP.NoHolster = true
 SWEP.BreakBoneMul = 0.55
 SWEP.PainMultiplier = 0.65
 
-SWEP.BlockTier = 3
-SWEP.MeleeMaterial = "wood"
-SWEP.BlockImpactSound = "physics/wood/wood_plank_impact_hard1.wav"
-
-SWEP.Attack_Charge_Begin = "Attack_Charge_Begin"
-SWEP.Attack_Charge_Idle = "Attack_Charge_Idle"
-SWEP.Attack_Charge_End = "Attack_Charge_End"
-
-SWEP.HeavyAttackDamageMul = 2.1 -- Max damage multiplier at full charge
-SWEP.HeavyAttackWaitTime = 1.5 -- Time before you can attack again
-SWEP.HeavyAttackAnimTimeBegin = 1.0 -- Duration of the wind-up/start animation
-SWEP.HeavyAttackAnimTimeIdle = 1 -- Duration of the idle loop
-SWEP.HeavyAttackAnimTimeEnd = 1.85 -- Duration of the attack animation
-SWEP.HeavyAttackDelay = 0.5 -- Time delay before the hit actually connects (during attack anim)
-SWEP.HeavyAttackTimeLength = 0.5 -- Duration of the active hit window
-SWEP.HeavyAttackViewPunch = Angle(5, 0, 0) -- View punch angle on hit
-SWEP.HeavyAttackMaxChargeTime = 2.0 -- Time in seconds to reach max damage/shake
-SWEP.HeavyAttackSwingAng = -90 -- Custom swing angle for heavy attack
-SWEP.HeavyAttackRads = 95 -- Custom radius/arc for heavy attack
-SWEP.HeavyAttackStamina = 24
-
-SWEP.CanHeavyAttack = true -- Set to true to enable
-
-SWEP.AttackTimeLength = 0.15
+SWEP.AttackTimeLength = 0.2
 SWEP.Attack2TimeLength = 0.001
 
-SWEP.AttackRads = 85
+SWEP.AttackRads = 120
 SWEP.AttackRads2 = 0
 
 SWEP.SwingAng = -5

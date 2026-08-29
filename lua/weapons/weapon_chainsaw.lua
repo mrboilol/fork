@@ -49,7 +49,7 @@ SWEP.AnimTime2 = 0.7
 SWEP.WaitTime2 = 0.8
 SWEP.ViewPunch2 = Angle(1,2,-2)
 
-SWEP.ViewPunchDiv = -50
+SWEP.ViewPunchDiv = 1
 
 SWEP.attack_ang = Angle(0,0,0)
 SWEP.sprint_ang = Angle(15,0,0)
@@ -100,8 +100,8 @@ SWEP.ChainsawTurnOffTime = 1
 SWEP.ChainsawToggleCooldown = 0.5
 SWEP.ChainsawAttemptSoundFirstDelay = 0.5
 SWEP.ChainsawAttemptSoundSecondDelay = 1
-SWEP.ChainsawStartAttemptSoundDelay = 0.1
-SWEP.ChainsawStartSoundDelay = 0.25
+SWEP.ChainsawStartAttemptSoundDelay = 0.5
+SWEP.ChainsawStartSoundDelay = 1
 SWEP.ChainsawAttackLoopPitch = 100
 SWEP.ChainsawAttackLoopHitPitch = 85
 SWEP.ChainsawAttackLoopPitchDownTime = 1
@@ -175,14 +175,14 @@ SWEP.ChainsawFleshHitSounds = {
 }
 
 SWEP.ChainsawPlayerHitSounds = {
-    {"pocketknife/melee_character_knife_plr_02.mp3", 55, {105, 115}},
-    {"pocketknife/melee_character_knife_plr_01.mp3", 55, {105, 115}},
-    {"pocketknife/melee_character_knife_plr_03.mp3", 55, {105, 115}},
-    {"pocketknife/melee_character_knife_plr_04.mp3", 55, {105, 115}},
-    {"pocketknife/melee_character_knife_plr_05.mp3", 55, {105, 115}},
+    {"pocketknife/melee_character_knife_plr_02.ogg", 55, {105, 115}},
+    {"pocketknife/melee_character_knife_plr_01.ogg", 55, {105, 115}},
+    {"pocketknife/melee_character_knife_plr_03.ogg", 55, {105, 115}},
+    {"pocketknife/melee_character_knife_plr_04.ogg", 55, {105, 115}},
+    {"pocketknife/melee_character_knife_plr_05.ogg", 55, {105, 115}},
 }
 
-SWEP.ChainsawHardHitSound = "snd_jack_hmcd_knifehit.ogg"
+SWEP.ChainsawHardHitSound = "snd_jack_hmcd_knifehit.wav"
 
 SWEP.swingsoundextra = {
     {"bat/baseball_swing_1st_layer_01.wav", 60, {85, 95}},
@@ -253,8 +253,8 @@ SWEP.setlh = true
 SWEP.setrh = true
 SWEP.TwoHanded = false
 
-SWEP.AttackHit = "snd_jack_hmcd_knifehit.ogg"
-SWEP.Attack2Hit = "snd_jack_hmcd_knifehit.ogg"
+SWEP.AttackHit = "snd_jack_hmcd_knifehit.wav"
+SWEP.Attack2Hit = "snd_jack_hmcd_knifehit.wav"
 SWEP.AttackHitFlesh = "weapons/knife/knife_hit1.wav"
 SWEP.Attack2HitFlesh = "physics/flesh/flesh_impact_hard1.wav"
 SWEP.DeploySnd = "physics/metal/metal_grenade_impact_soft2.wav"
@@ -281,8 +281,8 @@ end
 function SWEP:CanPrimaryAttack()
     self.DamageType = DMG_SLASH
     self.AttackHit = "Canister.ImpactHard"
-    self.Attack2Hit = "snd_jack_hmcd_axehit.ogg"
-    self.AttackHitFlesh = "snd_jack_hmcd_axehit.ogg"
+    self.Attack2Hit = "snd_jack_hmcd_axehit.wav"
+    self.AttackHitFlesh = "snd_jack_hmcd_axehit.wav"
     return true
 end
 
@@ -479,7 +479,9 @@ end
 function SWEP:GetNeededStartAttempts()
     local fuel = self:GetChainsawFuel()
 
-    if fuel >= 10 then return 1 end
+    if fuel >= 90 then return 1 end
+    if fuel >= 60 then return math.random(2, 5) end
+    if fuel >= 10 then return math.random(4, 7) end
 end
 
 function SWEP:TurnChainsawOn()
@@ -501,7 +503,7 @@ function SWEP:TurnChainsawOn()
 
     self:PlayChainsawStartSounds()
 
-    timer.Simple(math.max(0, turnOnTime - self.ChainsawSoundLeadTime), function()
+    timer.Simple(turnOnTime - self.ChainsawSoundLeadTime, function()
         if not IsValid(self) or self.ChainsawStateToken ~= stateToken or not self.ChainsawOn or self.ChainsawAttacking then return end
         self:PlayChainsawLoop("idle")
     end)

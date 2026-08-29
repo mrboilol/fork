@@ -355,6 +355,20 @@ function hg.MedicalMinigame.StartTourniquetMinigame(ply, ent)
         hg.MedicalMinigame.TourniquetSessions[ply] = existingSession
     end
 
+    local wep = ply:GetActiveWeapon()
+    existingSession.weapon = wep
+    existingSession.mode = IsValid(wep) and wep.mode or nil
+    if IsValid(wep) then
+        local trace = hg.eyeTrace(ply)
+        if wep.GetBandageTargetBone then
+            existingSession.bone = wep:GetBandageTargetBone(target, trace)
+        elseif wep.GetTargetBone then
+            existingSession.bone = wep:GetTargetBone(target)
+        else
+            existingSession.bone = nil
+        end
+    end
+
     net.Start("hg_medical_minigame_start")
     net.WriteString("tourniquet")
     net.WriteEntity(target)
@@ -445,7 +459,7 @@ local function GetMinigameModeValueIndex(wep, minigameType)
     end
 
     if minigameType == "syringe" then
-        if wep:GetClass() == "weapon_medkit_sh" then
+        if wep:GetClass() == "weapon_medkit_sh" or wep.HGMedkitTier then
             return wep.mode or 3
         end
 
@@ -494,6 +508,8 @@ local function ApplySyringeProgress(wep, ply, target, progressDelta)
     if consumedAmount <= 0 then return end
 
     wep.modeValues[modeValueIndex] = math.max(currentAmount - consumedAmount, 0)
+    if wep.SetDose then wep:SetDose(wep.modeValues[modeValueIndex]) end
+    if wep.SetRemainingAmount then wep:SetRemainingAmount(wep.modeValues[modeValueIndex]) end
 
     local class = wep:GetClass()
     local entOwner = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
@@ -795,15 +811,20 @@ net.Receive("hg_medical_minigame_finish", function(len, ply)
             if not IsValid(target) or not target.organism then return end
             if not CanUseMedicalMinigameTarget(ply, target) then return end
 
+            local sessionWeapon = tourniquetSession and tourniquetSession.weapon or wep
+            local sessionMode = tourniquetSession and tourniquetSession.mode or wep.mode
+            local sessionBone = tourniquetSession and tourniquetSession.bone or nil
+            if not IsValid(sessionWeapon) or sessionWeapon ~= wep or sessionWeapon:GetOwner() ~= ply or sessionWeapon.mode ~= sessionMode then return end
+
             local modeValueIndex = GetMinigameModeValueIndex(wep, minigameType)
-            local done = IsValid(wep) and wep.Tourniquet and wep:Tourniquet(target, nil)
+            local done = wep.Tourniquet and wep:Tourniquet(target, sessionBone)
 
             if IsValid(wep) and done and wep.PostHeal then
                 wep:PostHeal(target, wep.mode)
             end
 
             if IsValid(wep) then
-                if wep.modeValues then
+                if done and wep.modeValues then
                     wep.modeValues[modeValueIndex] = 0
                     wep:SetNetVar("modeValues", table.Copy(wep.modeValues))
                 end

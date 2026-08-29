@@ -60,6 +60,7 @@ bloodparticles_hook[1] = function(anim_pos, mul)
 	for i = 1, #hg.bloodparticles1 do
 		local part = hg.bloodparticles1[i]
 		if not part then continue end
+		if part.hidden then continue end
 		if (part[2] - lplypos):Dot(lplyang) < 0 then continue end
 		if (part[2] - lplypos):LengthSqr() > dstsqr then continue end
 		--if !hg.isVisible(part[1],LocalPlayer():GetShootPos(),LocalPlayer(),MASK_VISIBLE) then continue end
@@ -92,7 +93,8 @@ bloodparticles_hook[1] = function(anim_pos, mul)
 				--render_DrawBeam(pos - (part[2] - part[1]) * part.lerpedshit / mul / 24 * 0.5,pos + (part[2] - part[1]) * part.lerpedshit / mul / 24 * 0.5, part.lerpedshit, 0, 1, part[9] or lightcolor )
 				
 				--render_DrawBeam(pos - (len < 2 and (part[2] - part[1]):GetNormalized() * 2 or (part[2] - part[1])) * 0.5 / mul / 24,pos + (part[2] - part[1]) * 0.5 / mul / 24, 1, 0, 1, part[9] or lightcolor )
-				render_DrawBeam(pos - (part[2] - part[1]) * 1 / mul / 24 * 0.5,pos + (part[2] - part[1]) * 1 / mul / 24 * 0.5, 1, 0, 1, part[9] or lightcolor )
+				local width = math.Clamp((part[5] or 1) * 0.42, part.tiny and 0.04 or 0.18, 1.35)
+				render_DrawBeam(pos - (part[2] - part[1]) * 1 / mul / 24 * 0.5,pos + (part[2] - part[1]) * 1 / mul / 24 * 0.5, width, 0, 1, part[9] or lightcolor )
 
 				--lightcolor.r = lightcolor.r * 0.25
 				--debugoverlay.Line(part[2], part[1], 1, lightcolor, false)	
@@ -117,9 +119,24 @@ local function playBloodDripImpact(pos, tr)
 	end
 end
 
-local function decalBlood(pos, normal, tr, artery, owner)
+local tinyNormalDecalIds = {1, 2, 3, 4, 6, 7, 8, 9, 10, 11}
+local tinyNormalDecals = {}
+for i = 1, #tinyNormalDecalIds do
+	tinyNormalDecals[i] = Material("effects/droplets/drop" .. tinyNormalDecalIds[i] .. "_1")
+end
+local tinyArterialDecal = Material("effects/droplets/drop12_1")
+
+local function decalBlood(pos, normal, tr, artery, owner, tiny)
 	if not pos or not normal then return end
 	if normal:LengthSqr() < 0.0001 then normal = vector_up end
+	if tiny then
+		local decal = artery and tinyArterialDecal or tinyNormalDecals[math.random(#tinyNormalDecals)]
+		local target = IsValid(tr.Entity) and tr.Entity or game.GetWorld()
+		local scale = math.Rand(0.12, 0.24)
+		util.DecalEx(decal, target, pos, normal, color_white, scale, scale)
+		if math.random(7) == 1 then playBloodDripImpact(pos, tr) end
+		return
+	end
 
 	local vec = tostring(math.Round(pos[1]))..tostring(math.Round(pos[2]))..tostring(math.Round(pos[3]))
 
@@ -223,7 +240,7 @@ bloodparticles_hook[2] = function(mul)
         local checkWater = time >= (part.nextwater or 0)
         if checkWater then part.nextwater = time + 0.08 end
         if checkWater and bit.band(util.PointContents(hitPos), CONTENTS_WATER) == CONTENTS_WATER then
-			hg.addBloodPart2(hitPos, part[3] / 20 + VectorRand(-1, 1), nil, nil, nil, nil, true, part.owner)
+			if not part.hidden then hg.addBloodPart2(hitPos, part[3] / 20 + VectorRand(-1, 1), nil, nil, nil, nil, true, part.owner) end
 
 			hg.bloodparticles1[i] = hg.bloodparticles1[#hg.bloodparticles1]; table_remove(hg.bloodparticles1)
 			continue
@@ -231,7 +248,7 @@ bloodparticles_hook[2] = function(mul)
 		if result.Hit and result.Entity:IsWorld() then
 			hg.bloodparticles1[i] = hg.bloodparticles1[#hg.bloodparticles1]; table_remove(hg.bloodparticles1)
 			local dir = result.HitNormal
-			decalBlood(result.HitPos, dir, result, part.artery, part.owner)
+			decalBlood(result.HitPos, dir, result, part.artery, part.owner, part.tiny)
 			
 			
 			--sound.Play("zbattle/blood_drop.mp3", hitPos, math.random(10, 60), math.random(120, 120))
@@ -250,6 +267,12 @@ bloodparticles_hook[2] = function(mul)
 			end
 			
 			result.Hit = result.Hit and shouldhit
+			if result.Hit and part.tiny then
+				decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner, true)
+				hg.bloodparticles1[i] = hg.bloodparticles1[#hg.bloodparticles1]
+				table_remove(hg.bloodparticles1)
+				continue
+			end
 
 			if result.Hit then
 				local insolid = result.StartSolid and IsValid(result.Entity)
@@ -260,7 +283,7 @@ bloodparticles_hook[2] = function(mul)
 				if !insolid and (part.nextput or 0) < time then
 					part.nextput = time + 1
 
-					decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner)
+					decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner, part.tiny)
 				end
 
 				if insolid then
@@ -284,7 +307,7 @@ bloodparticles_hook[2] = function(mul)
 				part.lerpedmove = LerpVector(1, part.lerpedmove or part[3] * mul, nextpos * mul * 2)
 				
 				if part.lerpedmove:LengthSqr() < 0.1 * mul then
-					decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner)
+					decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner, part.tiny)
 					
 					hg.bloodparticles1[i] = hg.bloodparticles1[#hg.bloodparticles1]; table_remove(hg.bloodparticles1)
 					

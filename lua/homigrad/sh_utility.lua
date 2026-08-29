@@ -923,7 +923,7 @@ hg.renderOverride = function(self, ent, flags)
 	function hg.CanSuicide(ply)
 		if not IsValid(ply) or not ply.GetActiveWeapon then return false end
 		local wep = ply:GetActiveWeapon()
-		return ishgweapon(wep) and wep.CanSuicide and not wep.reload
+		return (ishgweapon(wep) or wep.ismelee2) and wep.CanSuicide and not wep.reload
 	end
 --//
 --\\ Calculate Weight 

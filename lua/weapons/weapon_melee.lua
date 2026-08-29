@@ -1423,6 +1423,116 @@ function SWEP:IsHeadHit(ent, trace)
     return self:IsHeadTrace(trace and trace.Entity, trace) or self:IsHeadTrace(victim, trace)
 end
 
+function SWEP:GetMeleeLodgeChance(attacktype)
+    if self:IsSecondaryAttackType(attacktype) then return 0 end
+
+    local class = self:GetClass():lower()
+    local chance = self:GetAttackConfigValue(self.MeleeLodgeChancePrimary, self.MeleeLodgeChanceSecondary, self.MeleeLodgeChanceCharge, attacktype)
+    local lowStaminaBonus = self:GetAttackConfigValue(self.MeleeLodgeLowStaminaBonusPrimary, self.MeleeLodgeLowStaminaBonusSecondary, self.MeleeLodgeLowStaminaBonusCharge, attacktype)
+
+    if chance == nil then
+        if class:find("machete") then
+            chance, lowStaminaBonus = 0.11, 0.18
+        elseif class:find("axe") or class:find("hatchet") then
+            chance, lowStaminaBonus = 0.13, 0.20
+        elseif class:find("knife") or class:find("bayonet") or class:find("spear") then
+            chance, lowStaminaBonus = 0.02, 0.045
+        else
+            return 0
+        end
+    end
+
+    local owner = self:GetOwner()
+    local stamina = IsValid(owner) and owner.organism and owner.organism.stamina
+    if not stamina then return math.Clamp(chance, 0, 1) end
+
+    local current = math.max((stamina[1] or 0) - (stamina.subadd or 0), 0)
+    local maxStamina = math.max(stamina.max or 100, 1)
+    local exhaustion = 1 - math.Clamp(current / maxStamina, 0, 1)
+    return math.Clamp(chance + (lowStaminaBonus or 0) * exhaustion, 0, 1)
+end
+
+function SWEP:GetMeleeLodgeBone(ent, trace)
+    if not IsValid(ent) then return end
+
+    if trace.PhysicsBone ~= nil and ent.TranslatePhysBoneToBone then
+        local bone = ent:TranslatePhysBoneToBone(trace.PhysicsBone)
+        if bone and bone >= 0 then return bone, trace.PhysicsBone end
+    end
+
+    if trace.HitBoxBone ~= nil and trace.HitBoxBone >= 0 and ent.TranslateBoneToPhysBone then
+        local physBone = ent:TranslateBoneToPhysBone(trace.HitBoxBone)
+        if physBone and physBone >= 0 then return trace.HitBoxBone, physBone end
+    end
+
+    if not ent.GetBoneCount or not ent.GetBoneMatrix or not ent.TranslateBoneToPhysBone then return end
+
+    local closestBone, closestPhysBone, closestDistance
+    for bone = 0, ent:GetBoneCount() - 1 do
+        local matrix = ent:GetBoneMatrix(bone)
+        local physBone = ent:TranslateBoneToPhysBone(bone)
+        if matrix and physBone and physBone >= 0 then
+            local distance = matrix:GetTranslation():DistToSqr(trace.HitPos)
+            if not closestDistance or distance < closestDistance then
+                closestBone, closestPhysBone, closestDistance = bone, physBone, distance
+            end
+        end
+    end
+
+    return closestBone, closestPhysBone
+end
+
+function SWEP:TryLodgeMeleeWeapon(ent, trace, attacktype)
+    if not SERVER or self.MeleeWeaponLodged then return false end
+    if self:GetClashDamageType(attacktype) ~= DMG_SLASH then return false end
+
+    local owner = self:GetOwner()
+    local victim = self:GetHitVictim(ent)
+    if not IsValid(owner) or not IsValid(victim) or not victim:IsPlayer() or not victim.organism then return false end
+    if math.Rand(0, 1) > self:GetMeleeLodgeChance(attacktype) then return false end
+
+    local bone, physBone = self:GetMeleeLodgeBone(ent, trace)
+    if not bone or physBone == nil then return false end
+
+    local matrix = ent:GetBoneMatrix(bone)
+    local model = self.WorldModelExchange or self.WorldModel
+    if not matrix or not isstring(model) or model == "" then return false end
+
+    local org = victim.organism
+    org.LodgedEntities = org.LodgedEntities or {}
+    if #org.LodgedEntities >= (self.MaxMeleeLodgedEntities or 8) then return false end
+
+    local direction = trace.HitPos - owner:GetShootPos()
+    if direction:LengthSqr() <= 0.001 then direction = owner:GetAimVector() end
+    direction:Normalize()
+
+    local lodgePos = trace.HitPos + direction * (self.MeleeLodgeDepth or 3)
+    local lodgeAng = direction:Angle()
+    local offsetPos, offsetAng = WorldToLocal(lodgePos, lodgeAng, matrix:GetTranslation(), matrix:GetAngles())
+    org.LodgedEntities[#org.LodgedEntities + 1] = {
+        PhysBoneID = physBone,
+        BoneName = ent:GetBoneName(bone),
+        OffsetPos = offsetPos,
+        OffsetAng = offsetAng,
+        model = model,
+        modelscale = self.modelscale or 1,
+        takeent = self:GetClass(),
+    }
+
+    net.Start("organism_send")
+    net.WriteTable({LodgedEntities = org.LodgedEntities, owner = org.owner})
+    net.WriteBool(true)
+    net.WriteBool(false)
+    net.WriteBool(false)
+    net.WriteBool(true)
+    net.Broadcast()
+
+    self.MeleeWeaponLodged = true
+    owner:StripWeapon(self:GetClass())
+    if IsValid(owner) and owner:HasWeapon("weapon_hands_sh") then owner:SelectWeapon("weapon_hands_sh") end
+    return true
+end
+
 function SWEP:SetMeleeDamageContact(ent, trace)
     if not SERVER then return end
     if hg.SetMeleeDamageContact then
@@ -3143,6 +3253,7 @@ function SWEP:CustomThink()
 
                 if hgIsDoor and hgIsDoor(ent) then ent.SDD_LastMeleeHit = CurTime() end
                 self:PrimaryAttackAdd(ent, trace)
+                if blockState == "none" and self:TryLodgeMeleeWeapon(ent, trace, 1) then return end
             end
 
             if blockState == "none" and soft then
@@ -3504,6 +3615,7 @@ function SWEP:CustomThink()
 
                 if hgIsDoor and hgIsDoor(ent) then ent.SDD_LastMeleeHit = CurTime() end
                 self:ChargeAttackAdd(ent, trace)
+                if blockState == "none" and self:TryLodgeMeleeWeapon(ent, trace, 3) then return end
             end
 
             if blockState == "none" and soft then

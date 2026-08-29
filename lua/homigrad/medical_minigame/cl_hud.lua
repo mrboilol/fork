@@ -711,7 +711,7 @@ end
 
 function PANEL:OnMouseReleased(code)
     if code == MOUSE_LEFT then
-        local shouldFinishSyringe = self.GameType == "syringe" and self.Progress > 0
+        local shouldFinishSyringe = self.GameType == "syringe" and self.Progress >= 0.999
         if self.GameType == "dislocation" and self.DislocationAiming then
             local mx, my = self:CursorPos()
             local startX = self.DislocationAimStartX or mx

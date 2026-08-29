@@ -1744,6 +1744,7 @@ function SWEP:ApplyForce()
 							-- lungs or critically low blood volume still require treatment first.
 							if hg.organism.RestoreSupportedOxygen then
 								hg.organism.RestoreSupportedOxygen(org, 0.018 * skillMult, {
+									artificialSupport = true,
 									oxygen = math.min(24, org.o2.range or 30), bodyoxygen = 0.52,
 									brainoxygen = 0.48, perfusion = 0.42, peripheralperfusion = 0.38,
 									cerebralPerfusion = 0.42, myocardialOxygen = 0.45,
@@ -1756,7 +1757,8 @@ function SWEP:ApplyForce()
 							org.cprSupportUntil = CurTime() + 0.75
 							org.cprSupportPulse = skillMult > 1 and 50 or 40
 							org.cprResuscitationUntil = CurTime() + 2
-							if hg.organism and hg.organism.TryRestartHeartWithResuscitation then hg.organism.TryRestartHeartWithResuscitation(org) end
+							if hg.organism and hg.organism.TryRestartHeartWithResuscitation then hg.organism.TryRestartHeartWithResuscitation(org, self.CPRDuration) end
+							if hg.organism and hg.organism.TryRestoreBreathingWithResuscitation then hg.organism.TryRestoreBreathingWithResuscitation(org, 0.5 * skillMult) end
 							
 							-- Chest compressions temporarily improve hypotension.
 							org.hypotension = math.Approach(org.hypotension or 1, 0, 0.05 * skillMult)
@@ -1775,9 +1777,6 @@ function SWEP:ApplyForce()
 								dmginfo:SetInflictor(self)
 								hg.organism.input_list.chest(org, 1, 5, dmginfo)
 							end
-							
-							-- CPR is life support only: it preserves oxygenation and a small
-							-- compression pulse, but cannot restart an arrested heart.
 							
 							-- Reduce ischemia during CPR
 							org.ischemia = math.max((org.ischemia or 0) - 0.5 * skillMult, 0)

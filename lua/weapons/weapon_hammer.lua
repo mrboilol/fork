@@ -70,7 +70,7 @@ SWEP.hitsoundbrutalize = {
 }
 
 SWEP.hitsoundplus = {
-    {"snd_jack_hmcd_hammerhit.ogg", 55, {105, 115}},
+    {"snd_jack_hmcd_hammerhit.wav", 55, {105, 115}},
 }
 
 SWEP.swingsoundextra = {
@@ -103,7 +103,6 @@ SWEP.BlockTier = 1.5
 SWEP.BlockMaterial = "metal"
 SWEP.BlockSound = {"physics/metal/metal_solid_impact_hard1.wav", 68, {95, 102}}
 SWEP.UnNailables = {MAT_METAL, MAT_SAND, MAT_SLOSH, MAT_GLASS}
-SWEP.CantClash = true
 game.AddDecal("hmcd_jackanail", "decals/mat_jack_hmcd_nailhead")
 function hgCheckBindObjects(ent1)
 	if not ent1.Nails then return end
@@ -374,7 +373,7 @@ function SWEP:SecondaryAttack(override)
 	if self:GetNetVar("AttackMode", 1) == 2 then
 		if self:CutDuct() then return end
 		if ((Tr.Entity.Nails and Tr.Entity.Nails[Tr.PhysicsBone]) or Tr.Entity.LockedDoorNail) and not self.pulling then
-			Owner:EmitSound("nail_pull.ogg", 65, 100, 1, CHAN_AUTO)
+			Owner:EmitSound("nail_pull.mp3", 65, 100, 1, CHAN_AUTO)
 			self.pulling = true
 			timer.Simple(2, function()
 				self.pulling = false
@@ -427,7 +426,7 @@ function SWEP:SecondaryAttack(override)
 							Tr.Entity.LockedDoorNail = true
 							Tr.Entity.CadedByBuilder = (Owner.Profession and Owner.Profession == "builder") and true or false
 							Owner:SetAmmo(Owner:GetAmmoCount(self.Ammo) - (Owner.Profession and Owner.Profession == "builder" and 2 or 3), self.Ammo)
-							sound.Play("snd_jack_hmcd_hammerhit.ogg", Tr.HitPos, 65, math.random(90, 110))
+							sound.Play("snd_jack_hmcd_hammerhit.wav", Tr.HitPos, 65, math.random(90, 110))
 							self:SprayDecals()
 							Owner:PrintMessage(HUD_PRINTCENTER, "Door Sealed")
 							Owner:ViewPunch(vpang)
@@ -467,7 +466,7 @@ function SWEP:SecondaryAttack(override)
 						local Strength, Weld = BindObjects(Tr.Entity, Tr.HitPos, NewEnt, NewTr.HitPos, 3.5, Tr.PhysicsBone or 0, NewTr.PhysicsBone or 0)
 						--print(Tr.Entity,Weld)
 						if Weld or Weld == nil then Owner:SetAmmo(Owner:GetAmmoCount(self.Ammo) - 1, self.Ammo) end
-						sound.Play("snd_jack_hmcd_hammerhit.ogg", Tr.HitPos, 65, math.random(90, 110))
+						sound.Play("snd_jack_hmcd_hammerhit.wav", Tr.HitPos, 65, math.random(90, 110))
 						util.Decal("hmcd_jackanail", Tr.HitPos + Tr.HitNormal, Tr.HitPos - Tr.HitNormal)
 						Owner:ChatPrint("Bond strength: " .. tostring(Strength))
 						Owner:ViewPunch(vpang)

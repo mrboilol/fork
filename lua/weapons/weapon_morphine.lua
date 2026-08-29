@@ -189,6 +189,8 @@ function SWEP:OwnerChanged()
 end
 
 function SWEP:SetHandPos(noset)
+	if not hg_healanims:GetBool() then return end
+
 	if self:GetHealingOther() then
 		self.setlh = false
 	else
@@ -199,6 +201,8 @@ function SWEP:SetHandPos(noset)
 end
 
 function SWEP:PostSetHandPos()
+	if not hg_healanims:GetBool() then return end
+
 	local ply = self:GetOwner()
 	if not IsValid(ply) then return end
 

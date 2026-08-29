@@ -83,7 +83,11 @@ local function StopHealAnimation(owner)
     if not IsValid(wep) then return end
     wep.HGMedicalMinigameActive = nil
     wep.HGMedicalMinigameProgress = nil
-    wep.HGMedicalMinigameAnimationReturnHolding = wep:GetHolding() or 0
+    local returnHolding = wep.HGMedicalMinigameAnimationTarget or 0
+    if wep.GetHolding then
+        returnHolding = wep:GetHolding() or returnHolding
+    end
+    wep.HGMedicalMinigameAnimationReturnHolding = math.Clamp(returnHolding, 0, 100)
     wep.HGMedicalMinigameAnimationReturnStarted = CurTime()
     SetHealAnimationTarget(wep, 0)
     owner.HGMedicalMinigameReturningWeapon = wep

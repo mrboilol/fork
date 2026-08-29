@@ -2,16 +2,16 @@ local min, max, Clamp, Approach = math.min, math.max, math.Clamp, math.Approach
 hg.organism.module.medical_system = {}
 local module = hg.organism.module.medical_system
 local rehab_phrases = {
-	"My vision still feels unstable...",
-	"I need a moment... still recovering.",
-	"I'm awake, but not fully back yet.",
-	"My body feels weak after blackout.",
+	"My vision is still unsteady...",
+	"I need a moment to recover.",
+	"I'm awake, but I don't feel fully present yet.",
+	"My body feels weak after blacking out.",
 	"I can't focus properly yet...",
-	"Everything still feels heavy and slow.",
-	"I should move carefully right now.",
-	"I still feel dizzy after waking up.",
-	"Not steady yet... need a few seconds.",
-	"I'm conscious, but not recovered.",
+	"My limbs still feel heavy and unresponsive.",
+	"I need to move carefully right now.",
+	"I'm still dizzy after waking up.",
+	"I'm not steady yet. Give me a few seconds.",
+	"I'm conscious, but I haven't recovered.",
 }
 local function get_role(ply)
 	if not IsValid(ply) then return "none" end
