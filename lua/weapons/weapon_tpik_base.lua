@@ -33,6 +33,56 @@ function SWEP:CanSecondaryAttack()
 	return true
 end
 
+function SWEP:GetTPIKMedicalTarget()
+	local owner = self:GetOwner()
+	if not IsValid(owner) then return end
+
+	local trace = (hg and hg.eyeTrace and hg.eyeTrace(owner, 100)) or owner:GetEyeTrace()
+	local target = trace and trace.Entity
+	if IsValid(target) and target:IsRagdoll() and hg and hg.RagdollOwner then
+		target = hg.RagdollOwner(target) or target
+	end
+	if not IsValid(target) or not target:IsPlayer() or not target:Alive() or not target.organism then return end
+	if target == owner then return end
+
+	local character = (hg and hg.GetCurrentCharacter and hg.GetCurrentCharacter(target)) or target
+	if not IsValid(character) or owner:GetPos():DistToSqr(character:GetPos()) > 10000 then return end
+	return target
+end
+
+function SWEP:StartTPIKMedicalUse(target)
+	if not SERVER or self.healing then return false end
+	local owner = self:GetOwner()
+	if not IsValid(owner) then return false end
+
+	target = target or owner
+	if not IsValid(target) or not target.organism then return false end
+
+	self.healing = true
+	self.TPIKMedicalTarget = target
+	local useTime = self.UseSpeed or 3
+	self:SetNextPrimaryFire(CurTime() + useTime)
+	self:SetNextSecondaryFire(CurTime() + useTime)
+	self:PlayAnim("use", useTime, false, nil, false)
+	return true
+end
+
+function SWEP:FinishTPIKMedicalUse()
+	if not SERVER then return end
+	local owner = self:GetOwner()
+	local target = self.TPIKMedicalTarget
+	self.TPIKMedicalTarget = nil
+	self.healing = false
+	if not IsValid(owner) or not IsValid(target) or not target.organism then return end
+
+	if target ~= owner then
+		local character = (hg and hg.GetCurrentCharacter and hg.GetCurrentCharacter(target)) or target
+		if not IsValid(character) or owner:GetPos():DistToSqr(character:GetPos()) > 10000 then return end
+	end
+
+	return self:Heal(target)
+end
+
 SWEP.supportTPIK = true
 
 SWEP.weaponPos = Vector(0,0,0)

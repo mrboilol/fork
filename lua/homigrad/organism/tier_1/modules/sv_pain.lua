@@ -450,6 +450,12 @@ module[2] = function(owner, org, timeValue)
 
 	end
 
+	if org.chest < 1 and org.bandagedchest then
+
+		org.chest = max(org.chest - timeValue / 420, 0)
+
+	end
+
 
 
 	if org.pain > 100 then

@@ -25,6 +25,20 @@ SWEP.modeNames = {
 	[1] = "analgesic"
 }
 
+SWEP.JudgeMedicalTPIK = true
+SWEP.BandageTPIK = false
+SWEP.supportTPIK = true
+SWEP.isTPIKBase = true
+SWEP.WorldModelReal = SWEP.WorldModel
+SWEP.HideMeshBones = {}
+SWEP.UseSpeed = 3
+SWEP.CallbackTimeAdjust = 0.5
+SWEP.AnimList = {
+	["deploy"] = { "deploy", 0.5, false },
+	["use"] = { "use", 3, true },
+	["idle"] = { "idle", 5, true }
+}
+
 SWEP.DeploySnd = ""
 SWEP.HolsterSnd = ""
 
@@ -59,7 +73,9 @@ SWEP.showstats = true
 local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Healing method: 0 = original models + progressive minigames, 1 = Judge animations", 0, 1)
 
 function SWEP:Think()
-	if not self:GetOwner():KeyDown(IN_ATTACK) and not hg_healanims:GetBool() then
+	local owner = self:GetOwner()
+	if not IsValid(owner) then return end
+	if not owner:KeyDown(IN_ATTACK) and not hg_healanims:GetBool() then
 		self:SetHolding(math.max(self:GetHolding() - 4, 0))
 	end
 	
@@ -70,6 +86,8 @@ function SWEP:Think()
 	else
 		self.ModelScale = self.ModelScale or 1
 	end
+
+	if hg_healanims:GetBool() then self:ThinkAdd() end
 end
 
 function SWEP:Animation()
@@ -87,9 +105,38 @@ sound.Add( {
 	sound = "snd_jack_sss.ogg",
 } )
 
+function SWEP:Deploy()
+	if not hg_healanims:GetBool() then return true end
+	local base = weapons.GetStored("weapon_tpik_base")
+	if base and base.Deploy then return base.Deploy(self) end
+	return true
+end
+
+function SWEP:Holster()
+	self:SetHealingOther(false)
+	self.setlh = true
+	self.healing = false
+	self.callback = nil
+	hook.Remove("Think", "AnimCallback" .. self:EntIndex())
+	self._injectStartTime = nil
+	self._slowed = false
+	self._animStarted = false
+	return true
+end
+
 function SWEP:OwnerChanged()
 	local owner = self:GetOwner()
+	if IsValid(owner) and owner:IsNPC() then
+		self:SpawnGarbage()
+		self:NPCHeal(owner, 0.3, "snd_jack_hmcd_needleprick.ogg")
+	end
+end
+
+function SWEP:ThinkAdd()
+	local owner = self:GetOwner()
 	if not IsValid(owner) then return end
+	local curTime = CurTime()
+	local anim = self.anim
 
 	if not self.healing and anim == "deploy" and self.animtime and self.animtime <= curTime then
 		if SERVER then
@@ -162,7 +209,7 @@ function SWEP:OwnerChanged()
 				end
 
 				if SERVER then
-					local entOwner = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
+					local entOwner = IsValid(ent.FakeRagdoll) and ent.FakeRagdoll or ent
 					entOwner:EmitSound("pshiksnd")
 				end
 
@@ -317,6 +364,37 @@ if CLIENT then
 end
 
 if SERVER then
+	function SWEP:PrimaryAttack()
+		if not hg_healanims:GetBool() then return self.BaseClass.PrimaryAttack(self) end
+		local owner = self:GetOwner()
+		if not IsValid(owner) or not self.modeValues or (self.modeValues[1] or 0) <= 0 or self.healing then return end
+
+		self.healbuddy = owner
+		self:SetHealingOther(false)
+		self.setlh = true
+		self.healing = true
+	end
+
+	function SWEP:SecondaryAttack()
+		if not hg_healanims:GetBool() then return self.BaseClass.SecondaryAttack(self) end
+		local owner = self:GetOwner()
+		if not IsValid(owner) or not self.modeValues or (self.modeValues[1] or 0) <= 0 or self.healing then return end
+
+		local trace = hg.eyeTrace(owner, 100)
+		local ent = trace and trace.Entity
+		if IsValid(ent) and ent:IsRagdoll() and hg.RagdollOwner then
+			ent = hg.RagdollOwner(ent) or ent
+		end
+		if not IsValid(ent) or not ent.organism or hg.GetCurrentCharacter(ent) == hg.GetCurrentCharacter(owner) then return end
+
+		local character = hg.GetCurrentCharacter(ent)
+		if not IsValid(character) or owner:GetPos():DistToSqr(character:GetPos()) > 10000 then return end
+		self.healbuddy = ent
+		self:SetHealingOther(true)
+		self.setlh = false
+		self.healing = true
+	end
+
 	function SWEP:Heal(ent, mode)
 		if ent:IsNPC() then
 			self:SpawnGarbage()

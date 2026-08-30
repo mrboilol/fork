@@ -30,10 +30,13 @@ if SERVER then
 end
 
 if CLIENT then
+    local tinnitusExposure = 0
+    local lastTinnitusThink = CurTime()
+
     local function AddTinnitus(time, needSound, brainDamage)
         local lply = LocalPlayer()
         if not IsValid(lply) then return end
-        lply.tinnitus = CurTime() + time * 4
+        lply.tinnitus = math.max(lply.tinnitus or 0, CurTime() + time * 4)
         lply.tinnitusBrainDamage = brainDamage or false
         lply:SetDSP(32)
         if needSound then
@@ -63,6 +66,22 @@ if CLIENT then
         if IsValid(ply) then
             ply:StopSound("tinnitus.wav")
             ply:StopSound("tinnituslong.wav")
+        end
+    end)
+
+    hook.Add("Think", "HG_TinnitusAdaptiveRecovery", function()
+        local now = CurTime()
+        local dt = math.Clamp(now - lastTinnitusThink, 0, 0.1)
+        lastTinnitusThink = now
+        local lply = LocalPlayer()
+        if not IsValid(lply) then return end
+
+        if (lply.tinnitus or 0) > now then
+            tinnitusExposure = tinnitusExposure + dt
+            local recoveryBonus = math.Clamp((tinnitusExposure - 8) / 24, 0, 1) * 2
+            lply.tinnitus = math.max((lply.tinnitus or now) - dt * recoveryBonus, now)
+        else
+            tinnitusExposure = math.max(tinnitusExposure - dt * 4, 0)
         end
     end)
 end

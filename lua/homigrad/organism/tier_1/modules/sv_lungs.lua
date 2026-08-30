@@ -464,7 +464,7 @@ module[2] = function(owner, org, timeValue)
 	local hemorrhageAdrenaline = math.Clamp(((org.adrenaline or 0) + (org.noradrenaline or 0) - 0.5) / 3, 0, 1)
 	local hemorrhageAdrenalineSupport = (1 - hemorrhageTransportK) * hemorrhageAdrenaline * 0.18
 	local effectiveHemorrhageTransportK = math.Clamp(hemorrhageTransportK + hemorrhageAdrenalineSupport, 0, 1)
-	local bloodCarryO2Cap = o2.range
+	local bloodCarryO2Cap = o2.range * effectiveHemorrhageTransportK
 	org.bloodCarryO2Cap = bloodCarryO2Cap
 	org.hemorrhageOxygenTransport = effectiveHemorrhageTransportK
 	org.hemorrhageAdrenalineO2Support = hemorrhageAdrenalineSupport
@@ -751,7 +751,7 @@ module[2] = function(owner, org, timeValue)
 		-- rate above.  A small floor keeps a critically injured but not yet fully
 		-- failed lung from snapping to zero in one tick.
 		local lungO2Cap = o2.range * math.max(1 - org.pneumothorax * org.pneumothorax, 0.1) * math.max(1 - (org.hemothorax or 0) * (org.hemothorax or 0), 0.1) * math.max(1 - (org.lungsL[1] + org.lungsR[1]) / 2, 0.1)
-		o2[1] = min(o2[1] + regenerate * math.Clamp(org.o2[1] / 30, 0.25, 1) * (org.holdingbreath and 0 or 1) * (sprayed and 0 or 1) * min((10 / max(org.CO,1)),1), min(lungO2Cap, bloodO2Cap, coldO2Cap, altitudeO2Cap, exertionO2Cap))
+		o2[1] = min(o2[1] + regenerate * math.Clamp(org.o2[1] / 30, 0.25, 1) * (org.holdingbreath and 0 or 1) * (sprayed and 0 or 1) * min((10 / max(org.CO,1)),1), min(lungO2Cap, bloodO2Cap, bloodCarryO2Cap, coldO2Cap, altitudeO2Cap, exertionO2Cap))
 
 
 
@@ -935,6 +935,7 @@ module[2] = function(owner, org, timeValue)
 	-- now drains at a rate proportional to the actual delivery failure.
 	local deliveryReserve = hg.organism.GetLimitingReserve(
 		bloodO2Cap / o2.range,
+		bloodCarryO2Cap / o2.range,
 		perfusionO2Cap / o2.range,
 		exertionO2Cap / o2.range
 	)
@@ -1331,7 +1332,7 @@ kaz
 		org.disorientation = math.max(org.disorientation, occipital * 0.4)
 	end
 
-	if org.skull < 1 and org.skull >= 0.5 and org.bandagedskull then
+	if org.skull < 1 and org.skull > 0 and org.bandagedskull then
 
 		org.skull = math.Approach(org.skull, 0, timeValue / 600)
 

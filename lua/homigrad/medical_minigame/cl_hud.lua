@@ -1925,11 +1925,12 @@ cvars.AddChangeCallback("hg_healanims", function(_, _, value)
 end, "hg_medical_minigame_close_on_healanims_change")
 
 net.Receive("hg_medical_minigame_start", function()
+    local nextType = net.ReadString()
     local healanims = GetConVar("hg_healanims")
-    if healanims and healanims:GetBool() then return end
+    if healanims and healanims:GetBool() and nextType ~= "amputation" and nextType ~= "dislocation" then return end
     if IsValid(hg.MedicalMinigame.Panel) then return end
     if IsLocalPlayerUnconscious() then return end
-    hg.MedicalMinigame.NextType = net.ReadString()
+    hg.MedicalMinigame.NextType = nextType
     hg.MedicalMinigame.NextTarget = nil
     hg.MedicalMinigame.NextLimb = nil
     hg.MedicalMinigame.NextDislocationSide = nil

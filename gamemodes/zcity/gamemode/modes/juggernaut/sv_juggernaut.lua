@@ -200,6 +200,7 @@ local function ApplyJuggernautBuffs(ply)
 	org.traumaResistanceMul = 3
 	org.painResistanceMul = 3
 	org.painToleranceMul = 4
+	org.NoKnockdown = nil
 
 	if IsFury(ply) then
 		org.berserk = MODE.BerserkStrength
@@ -211,15 +212,12 @@ local function ApplyJuggernautBuffs(ply)
 	if MODE.variant == 2 then
 		org.armorMul = 6
 		org.blood = 7500
-		org.NoKnockdown = true
 	elseif MODE.variant == 3 then
 		org.armorMul = 5
 		org.painToleranceMul = 5
 		org.blood = 6000
-		org.NoKnockdown = true
 	else
 		org.armorMul = nil
-		org.NoKnockdown = true
 	end
 
 	ApplyHealthBuff(ply)

@@ -80,7 +80,7 @@ SWEP.AnimList = {
 	["deploy"] = { "draw", 0.5, false },
 	["use"] = { "pills", 3, false, false, function(self)
 		if CLIENT then return end
-		self:Heal(self:GetOwner())
+		self:FinishTPIKMedicalUse()
 	end },
 	["idle"] = { "idle", 5, true }
 }
@@ -153,6 +153,7 @@ end
 
 function SWEP:Holster()
 	self._deploySndPlayed = false
+	self.TPIKMedicalTarget = nil
 
 	if self.healing then
 		self.healing = false
@@ -312,12 +313,17 @@ end
 
 if SERVER then
 	function SWEP:PrimaryAttack()
-		if self.healing then return end
 		local owner = self:GetOwner()
 		if not IsValid(owner) then return end
+		if not self.modeValues or (self.modeValues[1] or 0) <= 0 then return end
+		return self:StartTPIKMedicalUse(owner)
+	end
 
-		self.healing = true
-		self:PlayAnim("use", self.UseSpeed, false, nil, false)
+	function SWEP:SecondaryAttack()
+		if not self.modeValues or (self.modeValues[1] or 0) <= 0 then return end
+		local target = self:GetTPIKMedicalTarget()
+		if not IsValid(target) then return end
+		return self:StartTPIKMedicalUse(target)
 	end
 
 	function SWEP:DropGarbage()
@@ -363,7 +369,7 @@ if SERVER then
 		local owner = self:GetOwner()
 		if not IsValid(owner) then return end
 
-		local entOwner = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
+		local entOwner = IsValid(ent.FakeRagdoll) and ent.FakeRagdoll or ent
 		entOwner:EmitSound("weapons/tfa_nmrih/items/pills_enter_mouth_01.wav", 60, math.random(95, 105))
 		timer.Simple(0.7, function()
 			if not IsValid(entOwner) then return end

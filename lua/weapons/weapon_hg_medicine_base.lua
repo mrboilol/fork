@@ -301,7 +301,8 @@ if SERVER then
 		local owner = self:GetOwner()
 		if not org then return end
 
-		return self.modeValues[1] > 0 and (#org.wounds > 0 or (org.lleg or 0) >= 0.05 or (org.rleg or 0) >= 0.05 or (org.skull or 0) >= 0.05 or (org.chest or 0) >= 0.05 or (org.rarm or 0) >= 0.05 or (org.larm or 0) >= 0.05)
+		local dislocation = hg.organism.GetBandageDislocation and hg.organism.GetBandageDislocation(org)
+		return self.modeValues[1] > 0 and (dislocation or #org.wounds > 0 or (org.lleg or 0) >= 0.05 or (org.rleg or 0) >= 0.05 or (org.skull or 0) >= 0.05 or (org.chest or 0) >= 0.05 or (org.rarm or 0) >= 0.05 or (org.larm or 0) >= 0.05)
 	end
 
 	function SWEP:Bandage(ent, bone)
@@ -310,7 +311,8 @@ if SERVER then
 		if not org then return end
 		
 		-- Если растрелять труп а потом его взорвать гранатой, после перевязать - крашнет сервер why?
-		if self.modeValues[1] <= 0 or not (#org.wounds > 0 or (org.lleg or 0) >= 0.05 or (org.rleg or 0) >= 0.05 or (org.skull or 0) >= 0.05 or (org.chest or 0) >= 0.05 or (org.rarm or 0) >= 0.05 or (org.larm or 0) >= 0.05) then return end
+		local bandageDislocation = hg.organism.GetBandageDislocation and hg.organism.GetBandageDislocation(org, bone)
+		if self.modeValues[1] <= 0 or not (bandageDislocation or #org.wounds > 0 or (org.lleg or 0) >= 0.05 or (org.rleg or 0) >= 0.05 or (org.skull or 0) >= 0.05 or (org.chest or 0) >= 0.05 or (org.rarm or 0) >= 0.05 or (org.larm or 0) >= 0.05) then return end
 		table.sort(org.wounds, function(a, b) return a[1] > b[1] end)
 		
 		local done = false
@@ -393,45 +395,48 @@ if SERVER then
 		local who = (self:GetOwner() == org.owner) and "You" or ((owner.Profession == "doctor") and "A doctor" or "Someone")
 		local mul = ((owner.Profession == "doctor") and 0.2 or 1)
 		local amt = 25 * mul
+		if bandageDislocation and self.modeValues[1] >= amt and hg.organism.CompleteDislocationFix(org, bandageDislocation, owner) then
+			self.modeValues[1] = self.modeValues[1] - amt
+			done = true
+		end
 		local treatingSkull = not bone or bone == "skull" or (isstring(bone) and string.find(bone, "Head", 1, true))
 		if treatingSkull and org.skull > 0.05 and self.modeValues[1] >= amt then
-			org.skull = math.max(org.skull - 0.25, 0)
+			hg.organism.ApplyBandageBoneTreatment(org, "skull", 0.25)
 			self.modeValues[1] = self.modeValues[1] - amt
-			org.bandagedskull = true
 			org.pain = math.max(org.pain - 7, 0)
 			done = true
 		end
 
 		if (org.chest or 0) >= 0.05 and self.modeValues[1] >= amt then
-			org.chest = math.max(org.chest - 0.25, 0)
+			hg.organism.ApplyBandageBoneTreatment(org, "chest", 0.25)
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.avgpain = math.max(org.avgpain - 7, 0)
 			done = true
 		end
 
 		if (org.lleg or 0) >= 0.05 and self.modeValues[1] >= amt and !org.llegamputated then
-			org.lleg = math.max(org.lleg - 0.25, 0)
+			hg.organism.ApplyBandageBoneTreatment(org, "lleg", 0.25)
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.avgpain = math.max(org.avgpain - 7, 0)
 			done = true
 		end
 
 		if (org.rleg or 0) >= 0.05 and self.modeValues[1] >= amt and !org.rlegamputated then
-			org.rleg = math.max(org.rleg - 0.25, 0)
+			hg.organism.ApplyBandageBoneTreatment(org, "rleg", 0.25)
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.avgpain = math.max(org.avgpain - 7, 0)
 			done = true
 		end
 
 		if (org.rarm or 0) >= 0.05 and self.modeValues[1] >= amt and !org.rarmamputated then
-			org.rarm = math.max(org.rarm - 0.25, 0)
+			hg.organism.ApplyBandageBoneTreatment(org, "rarm", 0.25)
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.avgpain = math.max(org.avgpain - 7, 0)
 			done = true
 		end
 
 		if (org.larm or 0) >= 0.05 and self.modeValues[1] >= amt and !org.larmamputated then
-			org.larm = math.max(org.larm - 0.25, 0)
+			hg.organism.ApplyBandageBoneTreatment(org, "larm", 0.25)
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.avgpain = math.max(org.avgpain - 7, 0)
 			done = true

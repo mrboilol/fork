@@ -993,8 +993,9 @@ concommand.Add("hg_med_dislocation", function(ply, cmd, args)
         return
     end
 
-    local useTarget = tostring(args and args[2] or "") == "target"
-    local ent = useTarget and ResolveEyeTarget(ply) or ply
+    local targetArg = tostring(args and args[2] or "")
+    local targetIndex = tonumber(targetArg)
+    local ent = targetIndex and Entity(targetIndex) or (targetArg == "target" and ResolveEyeTarget(ply) or ply)
     hg.MedicalMinigame.StartDislocationMinigame(ply, ent, group)
 end)
 

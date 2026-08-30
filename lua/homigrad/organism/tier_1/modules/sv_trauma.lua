@@ -212,6 +212,7 @@ module[1] = function(org)
     org.lastConcussionPhrase = nil
     org.nextDryHeave = 0
     org.concussion_tinnitus = 0
+    org.concussion_tinnitus_time = 0
     org.concussion_headache = 0
     org.concussion_fatigue = 0
     org.concussion_post = 0
@@ -221,6 +222,16 @@ module[1] = function(org)
         duration = 0,
         last_impact = 0
     }
+end
+
+local function recoverTinnitus(org, timeValue)
+    if (org.concussion_tinnitus or 0) > 0.01 then
+        org.concussion_tinnitus_time = (org.concussion_tinnitus_time or 0) + timeValue
+    else
+        org.concussion_tinnitus_time = math.Approach(org.concussion_tinnitus_time or 0, 0, timeValue * 4)
+    end
+    local recovery = 1 + math.Clamp(((org.concussion_tinnitus_time or 0) - 8) / 24, 0, 1) * 2.5
+    org.concussion_tinnitus = math.Approach(org.concussion_tinnitus or 0, 0, timeValue * 0.55 * recovery)
 end
 
 module[2] = function(ply, org, timeValue)
@@ -235,6 +246,7 @@ module[2] = function(ply, org, timeValue)
     if not org.nausea_onset_time then org.nausea_onset_time = 0 end
     if not org.nausea_wave_timer then org.nausea_wave_timer = 0 end
     if not org.concussion_tinnitus then org.concussion_tinnitus = 0 end
+    if not org.concussion_tinnitus_time then org.concussion_tinnitus_time = 0 end
     if not org.concussion_headache then org.concussion_headache = 0 end
     if not org.concussion_fatigue then org.concussion_fatigue = 0 end
     if not org.concussion_post then org.concussion_post = 0 end
@@ -247,8 +259,9 @@ module[2] = function(ply, org, timeValue)
     local hasPost = org.concussion_post > 0
     local hasHeadache = org.concussion_headache > 0.1
     local hasFatigue = org.concussion_fatigue > 0.1
+    local hasTinnitus = org.concussion_tinnitus > 0.01
 
-    if not hasConcussion and not hasNausea and not hasPost and not hasHeadache and not hasFatigue then
+    if not hasConcussion and not hasNausea and not hasPost and not hasHeadache and not hasFatigue and not hasTinnitus then
         -- A completed concussion must not leave peak/impact history behind.
         -- Those values describe the current episode, not permanent brain or
         -- skull damage, and retaining them makes later injuries artificially
@@ -257,6 +270,7 @@ module[2] = function(ply, org, timeValue)
         org.concussion_impacts = 0
         org.concussion_lucid_end = 0
         org.concussion_loc_timer = 0
+        recoverTinnitus(org, timeValue)
         return
     end
 
@@ -266,6 +280,7 @@ module[2] = function(ply, org, timeValue)
         if org.concussion > 0 then
             org.concussion = math.max(org.concussion - timeValue * getConcussionDecay(org.concussion), 0)
         end
+        recoverTinnitus(org, timeValue)
         return
     end
 
@@ -403,7 +418,7 @@ module[2] = function(ply, org, timeValue)
         end
     end
 
-    org.concussion_tinnitus = math.Approach(org.concussion_tinnitus or 0, 0, timeValue * 0.55)
+    recoverTinnitus(org, timeValue)
     org.concussion_headache = math.Approach(org.concussion_headache or 0, 0, timeValue * 0.2)
     org.concussion_fatigue = math.Approach(org.concussion_fatigue or 0, 0, timeValue * 0.12)
 

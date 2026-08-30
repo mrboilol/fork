@@ -84,11 +84,16 @@ local judgeBandageClasses = {
 	weapon_quikclotbandage_sh = true,
 	weapon_bigpackedbandage_sh = true,
 	weapon_bigcombatbandage_sh = true,
-	weapon_bigquikclotbandage_sh = true
+	weapon_bigquikclotbandage_sh = true,
+	weapon_bruicekit = true
 }
 
 function SWEP:UseJudgeBandageTPIK()
 	return self.BandageTPIK == true and judgeBandageClasses[self:GetClass()] == true and JudgeHealAnimationsEnabled()
+end
+
+function SWEP:UseJudgeMedicalTPIK()
+	return JudgeHealAnimationsEnabled() and (self.JudgeMedicalTPIK == true or self:UseJudgeBandageTPIK())
 end
 
 function SWEP:ApplyBandageVisualMode()
@@ -129,7 +134,7 @@ modelshuy = modelshuy or {}
 
 function SWEP:DrawWorldModel()
 	self:ApplyBandageVisualMode()
-	if self:UseJudgeBandageTPIK() then
+	if self:UseJudgeMedicalTPIK() then
 		local base = weapons.GetStored("weapon_tpik_base")
 		if base and base.DrawWorldModel then return base.DrawWorldModel(self) end
 	end
@@ -141,9 +146,19 @@ end
 
 function SWEP:DrawWorldModel2(nodraw)
 	self:ApplyBandageVisualMode()
-	if self:UseJudgeBandageTPIK() then
+	if self:UseJudgeMedicalTPIK() then
 		local base = weapons.GetStored("weapon_tpik_base")
-		if base and base.DrawWorldModel2 then return base.DrawWorldModel2(self) end
+		if base and base.DrawWorldModel2 then
+			local tint = self.BandageTPIKColor
+			if CLIENT and tint and not nodraw then
+				render.SetColorModulation(tint.r / 255, tint.g / 255, tint.b / 255)
+			end
+			local result = base.DrawWorldModel2(self, nodraw)
+			if CLIENT and tint and not nodraw then
+				render.SetColorModulation(1, 1, 1)
+			end
+			return result
+		end
 	end
 
 	if self.Color then
@@ -202,7 +217,7 @@ function SWEP:OnRemove()
 	if self.bandageTPIKUsing then
 		self:CancelBandageTPIK(false)
 	end
-	if self:UseJudgeBandageTPIK() then
+	if self:UseJudgeMedicalTPIK() then
 		local base = weapons.GetStored("weapon_tpik_base")
 		if base and base.OnRemove then return base.OnRemove(self) end
 	end
@@ -361,6 +376,7 @@ local function BoneHasBandageableInjury(ent, bone)
 	for _, wound in ipairs(org.wounds or {}) do
 		if BoneNamesMatch(ent, wound[4], bone) then return true end
 	end
+	if hg.organism.GetBandageDislocation and hg.organism.GetBandageDislocation(org, bone) then return true end
 
 	if string.find(bone, "Head", 1, true) then return (org.skull or 0) >= 0.05 end
 	if string.find(bone, "Spine", 1, true) or string.find(bone, "Pelvis", 1, true) then return (org.chest or 0) >= 0.05 end
@@ -392,6 +408,11 @@ function SWEP:GetBandageTargetBone(target, trace)
 	end
 	if largestWound and largestWound[4] then return largestWound[4] end
 
+	if org.jawdislocation then return "ValveBiped.Bip01_Head1" end
+	if org.llegdislocation then return "ValveBiped.Bip01_L_Calf" end
+	if org.rlegdislocation then return "ValveBiped.Bip01_R_Calf" end
+	if org.larmdislocation then return "ValveBiped.Bip01_L_Forearm" end
+	if org.rarmdislocation then return "ValveBiped.Bip01_R_Forearm" end
 	if (org.skull or 0) >= 0.05 then return "ValveBiped.Bip01_Head1" end
 	if (org.lleg or 0) >= 0.05 then return "ValveBiped.Bip01_L_Calf" end
 	if (org.rleg or 0) >= 0.05 then return "ValveBiped.Bip01_R_Calf" end
@@ -408,6 +429,14 @@ local function IsBandageBone(bone, hitgroup)
 	end
 	return false
 end
+
+local dislocationBandageBones = {
+	lleg = "ValveBiped.Bip01_L_Calf",
+	rleg = "ValveBiped.Bip01_R_Calf",
+	larm = "ValveBiped.Bip01_L_Forearm",
+	rarm = "ValveBiped.Bip01_R_Forearm",
+	jaw = "ValveBiped.Bip01_Head1",
+}
 
 function SWEP:PrimaryAttack()
 	self:ApplyBandageVisualMode()
@@ -722,7 +751,8 @@ if SERVER then
 		local arteryIndex, arteryWound = GetBandageableArteryWound(org, ent, bone)
 		
 		-- Если растрелять труп а потом его взорвать гранатой, после перевязать - крашнет сервер why?
-		if self.modeValues[1] <= 0 or not (arteryWound or #org.wounds > 0 or (org.lleg or 0) >= 0.05 or (org.rleg or 0) >= 0.05 or (org.skull or 0) >= 0.05 or (org.chest or 0) >= 0.05 or (org.rarm or 0) >= 0.05 or (org.larm or 0) >= 0.05) then return end
+		local bandageDislocation = hg.organism.GetBandageDislocation and hg.organism.GetBandageDislocation(org, bone)
+		if self.modeValues[1] <= 0 or not (bandageDislocation or arteryWound or #org.wounds > 0 or (org.lleg or 0) >= 0.05 or (org.rleg or 0) >= 0.05 or (org.skull or 0) >= 0.05 or (org.chest or 0) >= 0.05 or (org.rarm or 0) >= 0.05 or (org.larm or 0) >= 0.05) then return end
 		table.sort(org.wounds, function(a, b) return a[1] > b[1] end)
 		
 		local done = false
@@ -843,11 +873,16 @@ if SERVER then
 		local who = (self:GetOwner() == org.owner) and "You" or ((owner.Profession == "doctor") and "A doctor" or "Someone")
 		local mul = ((owner.Profession == "doctor") and 0.2 or 1)
 		local amt = 25 * mul
+		if bandageDislocation and self.modeValues[1] >= amt and hg.organism.CompleteDislocationFix(org, bandageDislocation, owner) then
+			self.modeValues[1] = self.modeValues[1] - amt
+			ent.bandaged_limbs = ent.bandaged_limbs or {}
+			ent.bandaged_limbs[dislocationBandageBones[bandageDislocation]] = true
+			done = true
+		end
 		local treatingSkull = not bone or bone == "skull" or (isstring(bone) and string.find(bone, "Head", 1, true))
 		if treatingSkull and org.skull > 0.05 and self.modeValues[1] >= amt then
-			org.skull = math.max(org.skull - 0.25, 0)
+			hg.organism.ApplyBandageBoneTreatment(org, "skull", 0.25)
 			self.modeValues[1] = self.modeValues[1] - amt
-			org.bandagedskull = true
 			org.pain = math.max(org.pain - 7, 0)
 			ent.bandaged_limbs = ent.bandaged_limbs or {}
 			ent.bandaged_limbs["ValveBiped.Bip01_Head1"] = true
@@ -855,7 +890,7 @@ if SERVER then
 		end
 
 		if IsBandageBone(bone, HITGROUP_CHEST) and (org.chest or 0) >= 0.05 and self.modeValues[1] >= amt then
-			org.chest = math.max(org.chest - 0.25, 0)
+			hg.organism.ApplyBandageBoneTreatment(org, "chest", 0.25)
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.avgpain = math.max(org.avgpain - 7, 0)
 			ent.bandaged_limbs = ent.bandaged_limbs or {}
@@ -864,7 +899,7 @@ if SERVER then
 		end
 
 		if IsBandageBone(bone, HITGROUP_LEFTLEG) and (org.lleg or 0) >= 0.05 and self.modeValues[1] >= amt and !org.llegamputated then
-			org.lleg = math.max(org.lleg - 0.25, 0)
+			hg.organism.ApplyBandageBoneTreatment(org, "lleg", 0.25)
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.avgpain = math.max(org.avgpain - 7, 0)
 			ent.bandaged_limbs = ent.bandaged_limbs or {}
@@ -873,7 +908,7 @@ if SERVER then
 		end
 
 		if IsBandageBone(bone, HITGROUP_RIGHTLEG) and (org.rleg or 0) >= 0.05 and self.modeValues[1] >= amt and !org.rlegamputated then
-			org.rleg = math.max(org.rleg - 0.25, 0)
+			hg.organism.ApplyBandageBoneTreatment(org, "rleg", 0.25)
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.avgpain = math.max(org.avgpain - 7, 0)
 			ent.bandaged_limbs = ent.bandaged_limbs or {}
@@ -882,7 +917,7 @@ if SERVER then
 		end
 
 		if IsBandageBone(bone, HITGROUP_RIGHTARM) and (org.rarm or 0) >= 0.05 and self.modeValues[1] >= amt and !org.rarmamputated then
-			org.rarm = math.max(org.rarm - 0.25, 0)
+			hg.organism.ApplyBandageBoneTreatment(org, "rarm", 0.25)
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.avgpain = math.max(org.avgpain - 7, 0)
 			ent.bandaged_limbs = ent.bandaged_limbs or {}
@@ -891,7 +926,7 @@ if SERVER then
 		end
 
 		if IsBandageBone(bone, HITGROUP_LEFTARM) and (org.larm or 0) >= 0.05 and self.modeValues[1] >= amt and !org.larmamputated then
-			org.larm = math.max(org.larm - 0.25, 0)
+			hg.organism.ApplyBandageBoneTreatment(org, "larm", 0.25)
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.avgpain = math.max(org.avgpain - 7, 0)
 			ent.bandaged_limbs = ent.bandaged_limbs or {}
@@ -1652,6 +1687,7 @@ function SWEP:GetBandageTPIKUseTime(target)
 	if (org.rleg or 0) >= 0.05 and not org.rlegamputated then required = required + treatmentCost end
 	if (org.larm or 0) >= 0.05 and not org.larmamputated then required = required + treatmentCost end
 	if (org.rarm or 0) >= 0.05 and not org.rarmamputated then required = required + treatmentCost end
+	if hg.organism.GetBandageDislocation and hg.organism.GetBandageDislocation(org) then required = required + treatmentCost end
 
 	local used = math.min(required, self.modeValues and self.modeValues[1] or 0)
 	return math.Clamp(1.2 + used / 40 * 2.2, 1.2, 6)
@@ -1677,6 +1713,7 @@ function SWEP:CanBandageTPIK(target)
 	if (org.rleg or 0) >= 0.05 and not org.rlegamputated then return true end
 	if (org.larm or 0) >= 0.05 and not org.larmamputated then return true end
 	if (org.rarm or 0) >= 0.05 and not org.rarmamputated then return true end
+	if hg.organism.GetBandageDislocation and hg.organism.GetBandageDislocation(org) then return true end
 
 	return false
 end
@@ -1811,13 +1848,13 @@ function SWEP:BandageTPIKThink()
 end
 
 function SWEP:Camera(eyePos, eyeAng, view, vellen)
-	if not self.BandageTPIK then return end
+	if not self:UseJudgeMedicalTPIK() then return end
 	local base = weapons.GetStored("weapon_tpik_base")
 	if base and base.Camera then return base.Camera(self, eyePos, eyeAng, view, vellen) end
 end
 
 function SWEP:SetHandPos(noset)
-	if not self.BandageTPIK then return end
+	if not self:UseJudgeMedicalTPIK() then return end
 	local base = weapons.GetStored("weapon_tpik_base")
 	if base and base.SetHandPos then return base.SetHandPos(self, noset) end
 end
@@ -1828,7 +1865,8 @@ function SWEP:GetWM()
 end
 
 function SWEP:GetHideMeshBones()
-	if not self.BandageTPIK then return self.HideMeshBones end
+	if not self:UseJudgeMedicalTPIK() then return self.HideMeshBones end
+	if self.JudgeMedicalTPIK then return self.HideMeshBones end
 	if self.anim == "idle" then return self.BandageTPIKHiddenBonesIdle end
 	if self.anim == "use" then
 		local cycle = self:GetCurrentAnimCycle()

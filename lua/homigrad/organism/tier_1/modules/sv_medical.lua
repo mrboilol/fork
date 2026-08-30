@@ -31,6 +31,70 @@ end
 local function is_alive_org(org)
 	return org and org.alive and IsValid(org.owner)
 end
+local dislocation_order = {"lleg", "rleg", "larm", "rarm", "jaw"}
+local dislocation_bones = {
+	lleg = {"lleg", "L_Thigh", "L_Calf", "L_Foot"},
+	rleg = {"rleg", "R_Thigh", "R_Calf", "R_Foot"},
+	larm = {"larm", "L_UpperArm", "L_Forearm", "L_Hand"},
+	rarm = {"rarm", "R_UpperArm", "R_Forearm", "R_Hand"},
+	jaw = {"jaw", "skull", "Head"},
+}
+
+function hg.organism.GetBandageDislocation(org, bone)
+	if not org then return end
+	if not bone then
+		for _, limb in ipairs(dislocation_order) do
+			if org[limb .. "dislocation"] then return limb end
+		end
+		return
+	end
+
+	local boneName = tostring(bone)
+	for _, limb in ipairs(dislocation_order) do
+		if org[limb .. "dislocation"] then
+			for _, match in ipairs(dislocation_bones[limb]) do
+				if boneName == match or string.find(boneName, match, 1, true) then return limb end
+			end
+		end
+	end
+end
+
+function hg.organism.CompleteDislocationFix(org, limb)
+	if not org or not limb or not org[limb .. "dislocation"] then return false end
+	org[limb .. "dislocation"] = false
+	if (org[limb] or 0) < 1 and hg.fakeBoneFlop and hg.fakeBoneFlop.ClearStoredLimb(org, limb) then
+		hg.fakeBoneFlop.ScheduleRebuild(org.owner)
+	end
+	org.painadd = (org.painadd or 0) + 5
+	org.fearadd = (org.fearadd or 0) + 0.1
+	if IsValid(org.owner) then
+		org.owner:EmitSound("physics/flesh/flesh_impact_hard6.wav", 65)
+	end
+	return true
+end
+
+function hg.organism.ApplyBandageBoneTreatment(org, key, amount)
+	if not org or not key then return 0 end
+	local current = math.Clamp(tonumber(org[key]) or 0, 0, 1)
+	if current < 0.05 then return 0 end
+
+	local target
+	if key == "skull" then
+		target = current >= 0.6 and 0.59 or math.max(current - (amount or 0.25), 0)
+		org.bandagedskull = true
+	elseif key == "chest" then
+		target = current >= 1 and 0.99 or math.max(current - (amount or 0.25), 0)
+		org.bandagedchest = true
+	else
+		target = current >= 1 and 0.99 or math.max(current - (amount or 0.25), 0)
+	end
+
+	org[key] = target
+	if key ~= "skull" and key ~= "chest" and target < 1 and hg.fakeBoneFlop and hg.fakeBoneFlop.ClearStoredLimb(org, key) then
+		hg.fakeBoneFlop.ScheduleRebuild(org.owner)
+	end
+	return current - target
+end
 local limb_from_bone = {
 	["ValveBiped.Bip01_L_UpperArm"] = "larmup",
 	["ValveBiped.Bip01_L_Forearm"] = "larm",
@@ -155,6 +219,8 @@ module[1] = function(org)
 	org.medical_errors = 0
 	org.medical_infection = 0
 	org.next_med_error_check = 0
+	org.bandagedchest = false
+	org.bandagedskull = false
 end
 module[2] = function(owner, org, timeValue)
 	if not org.alive then return end

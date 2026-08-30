@@ -25,6 +25,13 @@ SWEP.modeNames = {
 	[1] = "analgesic"
 }
 
+SWEP.JudgeMedicalTPIK = true
+SWEP.BandageTPIK = false
+SWEP.supportTPIK = true
+SWEP.isTPIKBase = true
+SWEP.WorldModelReal = SWEP.WorldModel
+SWEP.HideMeshBones = {}
+
 SWEP.UseSpeed = 3
 SWEP.CallbackTimeAdjust = 0.5
 SWEP.AnalgesiaPerDose = 6
@@ -88,6 +95,7 @@ function SWEP:InitializeAdd()
 end
 
 function SWEP:Deploy()
+	if not hg_healanims:GetBool() then return true end
 	if self.DeploySounds and #self.DeploySounds > 0 then
 		self.DeploySnd = self.DeploySounds[math.random(#self.DeploySounds)]
 	end
@@ -132,7 +140,7 @@ function SWEP:Think()
 		self.ModelScale = self.ModelScale or 1
 	end
 
-	self:ThinkAdd()
+	if hg_healanims:GetBool() then self:ThinkAdd() end
 end
 
 function SWEP:Reload()
@@ -254,7 +262,7 @@ function SWEP:ThinkAdd()
 				self:SetRemainingAmount(self.modeValues[1])
 		
 				if self.modeValues[1] != 0 then
-					local entOwner = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
+					local entOwner = IsValid(ent.FakeRagdoll) and ent.FakeRagdoll or ent
 					entOwner:EmitSound("pshiksnd")
 				else
 					-- No deletion - syringe stays even when empty
@@ -269,6 +277,7 @@ function SWEP:ThinkAdd()
 end
 
 function SWEP:SetHandPos(noset)
+	if not hg_healanims:GetBool() then return end
 	if self:GetHealingOther() then
 		self.setlh = false
 	else
@@ -280,6 +289,7 @@ function SWEP:SetHandPos(noset)
 end
 
 function SWEP:PostSetHandPos()
+	if not hg_healanims:GetBool() then return end
 	local ply = self:GetOwner()
 	if not IsValid(ply) then return end
 
@@ -395,6 +405,7 @@ end
 
 if SERVER then
 	function SWEP:PrimaryAttack()
+		if not hg_healanims:GetBool() then return self.BaseClass.PrimaryAttack(self) end
 		local owner = self:GetOwner()
 		if not IsValid(owner) then return end
 		if self.modeValues[1] <= 0 then return end
@@ -406,20 +417,21 @@ if SERVER then
 	end
 
 	function SWEP:SecondaryAttack()
+		if not hg_healanims:GetBool() then return self.BaseClass.SecondaryAttack(self) end
 		local owner = self:GetOwner()
 		if not IsValid(owner) then return end
 		if self.modeValues[1] <= 0 then return end
 		if self.healing then return end
 
-		local tr = hg.eyeTrace(owner)
-		if not tr then return end
+		local trace = hg.eyeTrace(owner, 100)
+		local ent = trace and trace.Entity
+		if IsValid(ent) and ent:IsRagdoll() and hg.RagdollOwner then
+			ent = hg.RagdollOwner(ent) or ent
+		end
+		if not IsValid(ent) or not ent.organism or hg.GetCurrentCharacter(ent) == hg.GetCurrentCharacter(owner) then return end
 
-		local ent = tr.Entity
-		if not IsValid(ent) then return end
-
-		local chr = hg.GetCurrentCharacter(ent)
-		if chr == hg.GetCurrentCharacter(owner) then return end
-		if not (ent:IsPlayer() or ent:IsNPC() or hg.RagdollOwner(ent)) then return end
+		local character = hg.GetCurrentCharacter(ent)
+		if not IsValid(character) or owner:GetPos():DistToSqr(character:GetPos()) > 10000 then return end
 
 		self.healbuddy = ent
 		self:SetHealingOther(true)

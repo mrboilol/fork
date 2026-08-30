@@ -2,6 +2,7 @@ if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_bandage_sh"
 SWEP.PrintName = "Bruice kit"
 SWEP.Color = Color(0, 255, 150)
+SWEP.BandageTPIKColor = SWEP.Color
 SWEP.Instructions = "A medical kit designed to restore limb condition. RMB to use on someone else."
 SWEP.Category = "ZCity Medicine"
 SWEP.Spawnable = true
@@ -80,6 +81,19 @@ if SERVER then
 			table.insert(priority, 1, "skull")
 		end
 
+		local dislocation = hg.organism.GetBandageDislocation and hg.organism.GetBandageDislocation(org, bone)
+		if dislocation and availableResource >= 0.25 then
+			totalCost = totalCost + 0.25
+			totalRotations = totalRotations + 2
+			table.insert(bonesToHeal, {
+				key = dislocation .. "dislocation",
+				limb = dislocation,
+				dislocation = true,
+				cost = 0.25,
+				heal = 0.25,
+			})
+		end
+
 		-- Prioritize based on conditionPriority order
 		for _, key in ipairs(priority) do
 			if CanHealKey(org, key) then
@@ -92,33 +106,6 @@ if SERVER then
 					totalCost = totalCost + cost
 					totalRotations = totalRotations + rotations
 					table.insert(bonesToHeal, {key = key, cost = cost, heal = boneHealing})
-				end
-			end
-		end
-
-		-- Bones stay ahead of dislocations, but any quarter-charge left after those
-		-- higher-priority treatments can reset one joint in the same use.
-		if availableResource - totalCost >= 0.25 - 0.001 then
-			local dislocations = {
-				{key = "llegdislocation", limb = "lleg"},
-				{key = "rlegdislocation", limb = "rleg"},
-				{key = "larmdislocation", limb = "larm"},
-				{key = "rarmdislocation", limb = "rarm"},
-				{key = "jawdislocation", limb = "jaw"},
-			}
-
-			for _, dislocation in ipairs(dislocations) do
-				if org[dislocation.key] then
-					totalCost = 0.25
-					totalRotations = totalRotations + 2
-					table.insert(bonesToHeal, {
-						key = dislocation.key,
-						limb = dislocation.limb,
-						dislocation = true,
-						cost = 0.25,
-						heal = 0.25,
-					})
-					break
 				end
 			end
 		end

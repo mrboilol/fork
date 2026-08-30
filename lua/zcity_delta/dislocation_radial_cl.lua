@@ -7,14 +7,14 @@ hook.Add("radialOptions", "zcity_delta_dislocation_minigame", function()
 
     if (ply.tried_fixing_limb or 0) > CurTime() then return end
 
-    local function AddOption(label, group, useTarget)
+    local function AddOption(label, group, target)
         hg.radialOptions[#hg.radialOptions + 1] = {
             function()
                 ply.tried_fixing_limb = CurTime() + 0.5
-                if useTarget then
-                    RunConsoleCommand("hg_med_dislocation", group, "target")
+                if IsValid(target) then
+                    RunConsoleCommand("hg_med_dislocation", tostring(group), tostring(target:EntIndex()))
                 else
-                    RunConsoleCommand("hg_med_dislocation", group)
+                    RunConsoleCommand("hg_med_dislocation", tostring(group))
                 end
             end,
             label
@@ -38,20 +38,20 @@ hook.Add("radialOptions", "zcity_delta_dislocation_minigame", function()
     end
 
     if HasDislocation(ply, 1) then
-        AddOption("Fix dislocation (leg)", 1, false)
+        AddOption("Fix dislocation (leg)", 1)
     elseif IsValid(target) and target:IsPlayer() and HasDislocation(target, 1) then
-        AddOption("Fix " .. target:GetPlayerName() .. "'s dislocation (leg)", 1, true)
+        AddOption("Fix " .. target:GetPlayerName() .. "'s dislocation (leg)", 1, target)
     end
 
     if HasDislocation(ply, 2) then
-        AddOption("Fix dislocation (arm)", 2, false)
+        AddOption("Fix dislocation (arm)", 2)
     elseif IsValid(target) and target:IsPlayer() and HasDislocation(target, 2) then
-        AddOption("Fix " .. target:GetPlayerName() .. "'s dislocation (arm)", 2, true)
+        AddOption("Fix " .. target:GetPlayerName() .. "'s dislocation (arm)", 2, target)
     end
 
     if HasDislocation(ply, 3) then
-        AddOption("Fix dislocation (jaw)", 3, false)
+        AddOption("Fix dislocation (jaw)", 3)
     elseif IsValid(target) and target:IsPlayer() and HasDislocation(target, 3) then
-        AddOption("Fix " .. target:GetPlayerName() .. "'s dislocation (jaw)", 3, true)
+        AddOption("Fix " .. target:GetPlayerName() .. "'s dislocation (jaw)", 3, target)
     end
 end)
