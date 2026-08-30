@@ -159,10 +159,10 @@ local moodleTexts = {
 		[4] = {title = "Cardiac Arrest", description = "Your heart has stopped producing effective circulation."},
 	}},
 	low_blood = {levels = {
-		[1] = {title = "Lightheaded", description = "Low pressure or pulse is making you slightly dizzy."},
-		[2] = {title = "Low Circulation", description = "Reduced circulation is causing weakness and disorientation."},
-		[3] = {title = "Severe Hypotension", description = "Your organs are receiving dangerously little blood."},
-		[4] = {title = "Circulatory Collapse", description = "Blood flow is critically inadequate and death is imminent."},
+		[1] = {title = "Low Pulse", description = "Your pulse is slower than normal."},
+		[2] = {title = "Bradycardia", description = "A slow pulse is causing weakness and lightheadedness."},
+		[3] = {title = "Severe Bradycardia", description = "Your pulse is dangerously slow and circulation is weakening."},
+		[4] = {title = "Critical Bradycardia", description = "Your pulse is critically slow and may no longer sustain circulation."},
 	}},
 	high_blood = {levels = {
 		[1] = {title = "Elevated Circulation", description = "Your pressure or pulse is slightly above normal."},
@@ -630,10 +630,10 @@ local function buildEffects(ply, org)
 	end
 	if org.heartstop == true then add(effects, "asystole", "asystole", 4, "bad", -100) end
 
-	local hypotension = math.Clamp(orgNumber(org, "hypotension", 0), 0, 1)
-	if not org.heartstop and hypotension > 0 then
-		local level = math.Clamp(math.ceil(hypotension * 4), 1, 4)
-		add(effects, "low_blood", level >= 3 and "superlowblood" or "lowblood", level, "bad", 27)
+	local pulse = math.max(orgNumber(org, "pulse", 70), 0)
+	if not org.heartstop and pulse > 0 and pulse < 60 then
+		local level = pulse < 30 and 4 or pulse < 40 and 3 or pulse < 50 and 2 or 1
+		add(effects, "low_blood", level >= 3 and "superlowblood" or "lowblood", level, "bad", 27, math.floor(pulse) .. " bpm")
 	end
 	local hypertension = math.Clamp(orgNumber(org, "hypertension", 0), 0, 1)
 	if not org.heartstop and hypertension > 0 then

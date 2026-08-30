@@ -325,6 +325,9 @@ local lowOxygenVignetteLerp = 0
 local shockVignetteLerp = 0
 local consciousnessVignetteLerp = 0
 local otrubVisualLerp = 0
+local OTRUB_CONSCIOUSNESS_THRESHOLD = 0.3
+local SHOCK_CONSCIOUSNESS_THRESHOLD = 25
+local SHOCK_CONSCIOUSNESS_MAX = 85
 local collapseVisualLerp = 0
 local collapseBlinkLerp = 0
 local nextCollapseBlink = 0
@@ -987,8 +990,8 @@ drawFinalVitalsVignettes = function()
 	local shockDarknessSeverity = math.Clamp((shock - 24) / 51, 0, 1)
 	local consciousness = math.Clamp(tonumber(org.consciousness) or 1, 0, 1)
 	local visualConsciousness = math.Clamp(consciousnessLerp or consciousness, 0, 1)
-	local consciousnessSeverity = math.Clamp((0.82 - visualConsciousness) / 0.67, 0, 1)
-	local lowConsciousnessDarkness = math.Clamp((0.68 - visualConsciousness) / 0.58, 0, 1)
+	local consciousnessSeverity = math.Clamp((0.82 - visualConsciousness) / (0.82 - OTRUB_CONSCIOUSNESS_THRESHOLD), 0, 1) ^ 2.2
+	local lowConsciousnessDarkness = math.Clamp((0.68 - visualConsciousness) / (0.68 - OTRUB_CONSCIOUSNESS_THRESHOLD), 0, 1) ^ 2.5
 	local brainDamageSeverity = math.max(
 		math.Clamp(((tonumber(org.brain) or 0) - 0.025) / 0.5, 0, 1),
 		math.Clamp((tonumber(org.brainFrontal) or 0) * 0.75, 0, 1),
@@ -1010,10 +1013,14 @@ drawFinalVitalsVignettes = function()
 		bloodLossSeverity * 0.5 + consciousnessSeverity * 0.55
 	), 0, 1)
 
-	local dyingVisual = (org.incapacitated or org.alive == false) and 0.65 or (org.critical and 0.45 or 0)
-	local oxygenVignetteTarget = math.max(oxygenSeverity, dyingVisual, org.otrub and 0.55 or 0)
-	local shockVignetteTarget = math.Clamp(math.max(shock - 5, 0) / 2.4, 0, 8)
-	local consciousnessVignetteTarget = math.max(consciousnessSeverity, org.otrub and 0.82 or 0)
+	local medication = math.max((tonumber(org.analgesia) or 0) + (tonumber(org.painkiller) or 0) * 0.3, 0)
+	local shockDrainThreshold = SHOCK_CONSCIOUSNESS_THRESHOLD * (medication * 4 + 1)
+	local shockOtrubLevel = shockDrainThreshold + (SHOCK_CONSCIOUSNESS_MAX - shockDrainThreshold) * 0.4
+	local shockVignetteProgress = math.Clamp((shock - shockDrainThreshold) / math.max(shockOtrubLevel - shockDrainThreshold, 1), 0, 1)
+	local shockConsciousnessProgress = math.Clamp((0.5 - consciousness) / (0.5 - OTRUB_CONSCIOUSNESS_THRESHOLD), 0, 1) ^ 2
+	local oxygenVignetteTarget = oxygenSeverity
+	local shockVignetteTarget = shockVignetteProgress ^ 1.8 * Lerp(shockConsciousnessProgress, 1.6, 5)
+	local consciousnessVignetteTarget = consciousnessSeverity
 	lowOxygenVignetteLerp = LerpFT(0.025, lowOxygenVignetteLerp, oxygenVignetteTarget)
 	shockVignetteLerp = LerpFT(0.025, shockVignetteLerp, shockVignetteTarget)
 	consciousnessVignetteLerp = LerpFT(0.028, consciousnessVignetteLerp, consciousnessVignetteTarget)
@@ -1068,18 +1075,19 @@ drawFinalVitalsVignettes = function()
 		end
 	end
 
+	local lowConsciousnessGrain = math.Clamp((0.9 - visualConsciousness) / (0.9 - OTRUB_CONSCIOUSNESS_THRESHOLD), 0, 1) ^ 0.8
 	local grainSeverity = math.max(
-		math.Clamp((0.82 - visualConsciousness) / 0.67, 0, 1),
+		lowConsciousnessGrain,
 		brainDamageSeverity * 0.82,
 		collapseVisualLerp * 0.68,
 		otrubVisualLerp * 0.78
 	)
 	if grainSeverity > 0.04 then
 		render.UpdateScreenEffectTexture()
-		noiseMat:SetFloat("$c0_y", 0.7 - grainSeverity * 0.24)
+		noiseMat:SetFloat("$c0_y", 0.72 - grainSeverity * 0.3)
 		noiseMat:SetFloat("$c0_z", 1)
-		noiseMat:SetFloat("$c1_x", 0.06 + grainSeverity * 0.34)
-		noiseMat:SetFloat("$c1_y", 0.24 + grainSeverity * 1.15)
+		noiseMat:SetFloat("$c1_x", 0.08 + grainSeverity * 0.52)
+		noiseMat:SetFloat("$c1_y", 0.2 + grainSeverity * 0.95)
 		noiseMat:SetFloat("$c2_x", CurTime() + 10000)
 		render.SetMaterial(noiseMat)
 		render.DrawScreenQuad()
@@ -1087,10 +1095,10 @@ drawFinalVitalsVignettes = function()
 		render.UpdateScreenEffectTexture()
 		grainMat:SetFloat("$c0_x", CurTime())
 		grainMat:SetFloat("$c0_y", 0.5)
-		grainMat:SetFloat("$c0_z", grainSeverity * 0.46)
-		grainMat:SetFloat("$c1_x", grainSeverity * 0.36)
-		grainMat:SetFloat("$c1_y", grainSeverity * 1.55)
-		grainMat:SetFloat("$c1_z", grainSeverity * 0.3)
+		grainMat:SetFloat("$c0_z", grainSeverity * 0.66)
+		grainMat:SetFloat("$c1_x", grainSeverity * 0.52)
+		grainMat:SetFloat("$c1_y", grainSeverity * 1.5)
+		grainMat:SetFloat("$c1_z", grainSeverity * 0.42)
 		grainMat:SetFloat("$c2_x", 0)
 		grainMat:SetFloat("$c2_y", 0)
 		grainMat:SetFloat("$c2_z", 0)
@@ -1120,11 +1128,21 @@ drawFinalVitalsVignettes = function()
 			math.max(math.sin(CurTime() * 5.7), 0) ^ 12,
 			math.max(math.sin(CurTime() * 2.13 + 1.7), 0) ^ 20
 		)
+		local oxygenGrain = math.Clamp(lowOxygenVignetteLerp, 0, 1) ^ 0.72
 		render.UpdateScreenEffectTexture()
 		vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
-		vignetteMat:SetFloat("$c0_z", lowOxygenVignetteLerp * 0.38 + oxygenFlicker * 0.08)
-		vignetteMat:SetFloat("$c1_y", lowOxygenVignetteLerp * 1.05 + oxygenFlicker * 0.22)
+		vignetteMat:SetFloat("$c0_z", math.min(oxygenGrain * 0.36 + oxygenFlicker * 0.04, 0.4))
+		vignetteMat:SetFloat("$c1_y", math.min(oxygenGrain * 0.54 + oxygenFlicker * 0.08, 0.62))
 		render.SetMaterial(vignetteMat)
+		render.DrawScreenQuad()
+
+		render.UpdateScreenEffectTexture()
+		noiseMat:SetFloat("$c0_y", 0.82 - oxygenGrain * 0.34)
+		noiseMat:SetFloat("$c0_z", 1)
+		noiseMat:SetFloat("$c1_x", 0.12 + oxygenGrain * 0.72)
+		noiseMat:SetFloat("$c1_y", math.min(0.12 + oxygenGrain * 0.7, 0.82))
+		noiseMat:SetFloat("$c2_x", CurTime() + 10000)
+		render.SetMaterial(noiseMat)
 		render.DrawScreenQuad()
 
 		if lowOxygenVignetteLerp > 0.2 then
@@ -1161,8 +1179,10 @@ drawFinalVitalsVignettes = function()
 		surface.SetDrawColor(255, 255, 255, 255)
 	end
 
-	if otrubVisualLerp > 0.005 then
-		surface.SetDrawColor(8, 9, 10, math.Clamp(otrubVisualLerp * 92 + blink * 18, 0, 110))
+	local consciousnessBlackout = math.Clamp((0.36 - consciousness) / (0.36 - OTRUB_CONSCIOUSNESS_THRESHOLD), 0, 1) ^ 1.8
+	local blackoutAlpha = org.otrub and 255 or consciousnessBlackout * 220
+	if blackoutAlpha > 0.5 then
+		surface.SetDrawColor(0, 0, 0, math.Clamp(blackoutAlpha, 0, 255))
 		surface.DrawRect(0, 0, ScrW(), ScrH())
 		surface.SetDrawColor(255, 255, 255, 255)
 	end
@@ -1791,26 +1811,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			AssimilationStation:Stop()
 			AssimilationStation = nil
 		end
-	end
-
-	if not org.otrub and (org.consciousness or 0) < 1 then
-		local consciousness = 1 - consciousnessLerp
-		render.UpdateScreenEffectTexture()
-		render.UpdateFullScreenDepthTexture()
-
-		grainMat:SetFloat("$c0_x", CurTime()) -- time
-		grainMat:SetFloat("$c0_y", 0.5) -- gate
-		grainMat:SetFloat("$c0_z", consciousness * 0.4) -- Pixelize
-		grainMat:SetFloat("$c1_x", consciousness * 0.3) -- lerp
-		grainMat:SetFloat("$c1_y", consciousness * 2) -- vignette intensity
-		grainMat:SetFloat("$c1_z", consciousness * 0.3) -- BlurIntensity
-		grainMat:SetFloat("$c2_x", 0) -- r
-		grainMat:SetFloat("$c2_y", 0) -- g
-		grainMat:SetFloat("$c2_z", 0) -- b
-		grainMat:SetFloat("$c3_x", 0) -- ImageIntensity
-
-		render.SetMaterial(grainMat)
-		render.DrawScreenQuad()
 	end
 
 	-- The sleepy OTRUB track fades in while consciousness falls, then hands off to

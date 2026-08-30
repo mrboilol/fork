@@ -96,7 +96,7 @@ end
 local function StartHealAnimation(owner, wep)
     if not IsValid(owner) or not IsValid(wep) then return end
 
-    if owner.HGMedicalMinigameWeapon ~= wep then
+    if owner.HGMedicalMinigameWeapon ~= nil and owner.HGMedicalMinigameWeapon ~= wep then
         StopHealAnimation(owner)
     end
 
@@ -212,6 +212,10 @@ local function StartMinigame(wep, owner, minigameType, target)
     if not IsValid(wep) or not IsValid(owner) then return false end
     if not minigameType then return false end
     if not CanUseMedicalArms(owner) then return false end
+
+    if owner.HGMedicalMinigameWeapon ~= nil and owner.HGMedicalMinigameWeapon ~= wep then
+        StopHealAnimation(owner)
+    end
 
     local modeValueIndex = GetModeValueIndex(wep, minigameType)
     local startValue = wep.modeValues and wep.modeValues[modeValueIndex] or nil
