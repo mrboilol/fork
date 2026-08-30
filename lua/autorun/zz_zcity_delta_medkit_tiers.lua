@@ -114,8 +114,7 @@ local function applyMedkitMode(wep, ent, mode)
     elseif typeName == "naloxone" then
         org.naloxoneadd = math.min((org.naloxoneadd or 0) + amount, 1)
     elseif typeName == "tranexamic" then
-        org.internalBleedHeal = (org.internalBleedHeal or 0) + amount
-        org.tranexamic_acid = math.min((org.tranexamic_acid or 0) + amount, 10)
+        hg.organism.AdministerTranexamic(org, amount)
     elseif typeName == "mannitol" then
         org.mannitol = math.Approach(org.mannitol or 0, 4, amount * 2)
         org.headtrauma = 0

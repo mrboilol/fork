@@ -2546,20 +2546,7 @@ function SWEP:AttackFront(special_attack, rand)
 		end
 
 		local DamageAmt = (math.random(3, 5) * (special_attack and 3 or 1)) * (self.DamageMul or 1) * MELEE_IMPACT_DAMAGE_MULT
-		local ent = Ent
-		local vec = AimVec
-
 		Ent:PrecacheGibs()
-
-		if string.find(ent:GetClass(),"prop_") and not ent:IsRagdoll() then
-			ent:CallOnRemove("gibbreak",function()
-				ent:GibBreakClient( vec * 100 )
-			end)
-
-			timer.Simple(1,function()
-				if IsValid(ent) then ent:RemoveCallOnRemove("gibbreak") end
-			end)
-		end
 
 		Mul = Mul * (owner.MeleeDamageMul or 1)
 

@@ -1417,8 +1417,9 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 			org.likely_phrase = 0
 			local str = hg.get_status_message(owner)
 			if str and str != "" then
-				org.nextStatusThought = CurTime() + 8
-				owner:Notify(str, 8, "phrase", 1, nil, Color(255, math.Clamp(1 / hg.likely_to_phrase(owner) * 255, 0, 255), math.Clamp(1 / hg.likely_to_phrase(owner) * 255, 0, 255), 255))
+				local statusCooldown = math.Rand(11, 15)
+				org.nextStatusThought = CurTime() + statusCooldown
+				owner:Notify(str, statusCooldown, "phrase", 1, nil, Color(255, math.Clamp(1 / hg.likely_to_phrase(owner) * 255, 0, 255), math.Clamp(1 / hg.likely_to_phrase(owner) * 255, 0, 255), 255))
 			end
 		end
 	end

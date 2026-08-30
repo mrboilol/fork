@@ -1201,8 +1201,6 @@ function SWEP:AttackFront(special_attack, rand)
                 local incomingSpeed = math.max(Ent:GetVelocity():Dot(-AimVec), 0)
                 local incomingDamageMul = 1 + math_Clamp((incomingSpeed - 150) / 450, 0, 1) * (incomingVelocityDamageMul - 1)
 		local DamageAmt = ((math_random(special_attack and 8 or 6, special_attack and 10 or 8) * (special_attack and specialDamageMul * runningChargeMul or 1) * incomingDamageMul) * ((isfur and (owner:IsBerserk() and 10 or 0.85)) or 1)) * (self.DamageMul or 1)
-                local ent = Ent
-                local vec = AimVec
                 local hitForceVec = AimVec
 
                 if special_attack and not isfur then
@@ -1210,16 +1208,6 @@ function SWEP:AttackFront(special_attack, rand)
                 end
 
                 Ent:PrecacheGibs()
-
-                if string.find(ent:GetClass(),"prop_") and not ent:IsRagdoll() then
-                        ent:CallOnRemove("gibbreak",function()
-                                ent:GibBreakClient( vec * 100 )
-                        end)
-
-                        timer.Simple(1,function()
-                                if IsValid(ent) then ent:RemoveCallOnRemove("gibbreak") end
-                        end)
-                end
 
                 Mul = Mul * (owner.MeleeDamageMul or 1)
 

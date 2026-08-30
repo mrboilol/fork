@@ -62,11 +62,53 @@ function hg.GetLodgedLimbPenalty(ent, limb)
 	return math.max(perObject ^ count, string.find(limb, "leg", 1, true) and 0.72 or 0.62)
 end
 
-if not SERVER then return end
+function hg.BestLodgedToTake(ent)
+	if not IsValid(ent) or not ent.organism or not istable(ent.organism.LodgedEntities) then return end
+
+	local best
+	for i, entry in pairs(ent.organism.LodgedEntities) do
+		if isnumber(i) and istable(entry) and (not best or i > best) then
+			best = i
+		end
+	end
+	return best
+end
+
+hg.BestArrowToTake = hg.BestLodgedToTake
+
+if CLIENT then
+	hook.Add("radialOptions", "takeLodged", function()
+		local ply = LocalPlayer()
+		if not IsValid(ply) or not ply:Alive() or not ply.organism or not ply.organism.canmove then return end
+
+		local i = hg.BestLodgedToTake(ply)
+		local entry = i and ply.organism.LodgedEntities[i]
+		if not entry then return end
+
+		local class = entry.takeent
+		local weapon = isstring(class) and weapons.GetStored(class) or nil
+		local name = entry.CrossbowBolt and "crossbow bolt"
+			or weapon and weapon.PrintName
+			or "embedded item"
+		hg.radialOptions[#hg.radialOptions + 1] = {
+			function()
+				RunConsoleCommand("hg_take_lodged")
+			end,
+			"Take " .. name .. " from yourself"
+		}
+	end)
+
+	return
+end
 
 local chestOrgansUpper = {"lungsL", "lungsR", "heart"}
 local chestOrgansLower = {"liver", "stomach", "intestines"}
 local brainLobes = {"brainFrontal", "brainParietal", "brainTemporal", "brainOccipital"}
+
+local lodgedExtractionBleed = {
+	limb = {min = 95, max = 145},
+	vital = {min = 125, max = 175},
+}
 
 local function lodgedTransform(owner, entry)
 	local body = lodgedBody(owner)
@@ -161,9 +203,10 @@ function hg.ApplyLodgedExtraction(owner, extractor, entry)
 	local body = lodgedBody(owner)
 	local region = hg.GetLodgedRegion(entry, body)
 	local vitalRegion = region == "head" or region == "neck" or region == "chest"
-	local extractionBleed = vitalRegion and math.Rand(52, 72) or math.Rand(42, 60)
+	local bleedRange = lodgedExtractionBleed[vitalRegion and "vital" or "limb"]
+	local extractionBleed = math.Rand(bleedRange.min, bleedRange.max)
 	local worldPos, worldAng
-	body, worldPos, worldAng = addLodgedWound(owner, org, entry, extractionBleed, math.Rand(45, 90))
+	body, worldPos, worldAng = addLodgedWound(owner, org, entry, extractionBleed, math.Rand(60, 120))
 	showExtractionBlood(owner, entry)
 	org.painadd = math.min((org.painadd or 0) + math.Rand(14, 22), 150)
 
@@ -177,6 +220,57 @@ function hg.ApplyLodgedExtraction(owner, extractor, entry)
 		addInternalBleed(org, math.Rand(0.04, 0.14))
 	end
 end
+
+function hg.TakeLodged(ent, ply)
+	if not IsValid(ent) or not ent.organism or not istable(ent.organism.LodgedEntities) then return false end
+	if not IsValid(ply) or not ply:IsPlayer() or not ply.organism or not ply.organism.canmove then return false end
+
+	local i = hg.BestLodgedToTake(ent)
+	if not i then return false end
+
+	local entry = table.remove(ent.organism.LodgedEntities, i)
+	if not entry then return false end
+
+	hg.ApplyLodgedExtraction(ent, ply, entry)
+
+	if isstring(entry.takeent) and entry.takeent ~= "" then
+		if ply:HasWeapon(entry.takeent) then
+			local weapon = ents.Create(entry.takeent)
+			if IsValid(weapon) then
+				weapon:SetPos(ply:EyePos())
+				weapon.IsSpawned = true
+				weapon:Spawn()
+			end
+		else
+			ply:Give(entry.takeent)
+		end
+	else
+		local ammoType = entry.CrossbowBolt and "Armature" or "Arrow"
+		ply:GiveAmmo(1, ammoType, true)
+		if ammoType == "Arrow" then
+			ply:EmitSound("weapons/bow_deerhunter/arrow_load_0" .. math.random(3) .. ".wav", 55)
+		else
+			ply:EmitSound("weapons/crossbow/reload1.wav", 55)
+		end
+	end
+
+	net.Start("organism_send")
+	net.WriteTable({LodgedEntities = ent.organism.LodgedEntities, owner = ent.organism.owner})
+	net.WriteBool(true)
+	net.WriteBool(false)
+	net.WriteBool(false)
+	net.WriteBool(true)
+	net.Broadcast()
+
+	ent:EmitSound("arrow_tear.ogg")
+	return true
+end
+
+concommand.Add("hg_take_lodged", function(ply)
+	if IsValid(ply) and ply.organism and ply.organism.canmove then
+		hg.TakeLodged(ply, ply)
+	end
+end)
 
 hook.Add("Org Think", "LodgedObjectComplications", function(owner, org)
 	if not IsValid(owner) or not istable(org.LodgedEntities) or #org.LodgedEntities == 0 then return end

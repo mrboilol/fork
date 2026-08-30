@@ -15,28 +15,6 @@ ENT.Force = 0.2
 
 -- pluv
 
-function hg.BestArrowToTake(ent)
-	local org = ent.organism
-	
-	if !IsValid(ent) or !org or !org.LodgedEntities or #org.LodgedEntities == 0 then return end
-	
-	local i = #org.LodgedEntities
-	
-	if org.LodgedEntities[i].CrossbowBolt then
-		while i > 0 do
-			i = i - 1
-
-			if i == 0 or !org.LodgedEntities[i].CrossbowBolt then
-				break
-			end
-		end
-
-		if i == 0 then return end
-	end
-	
-	return i
-end
-
 if SERVER then
 	function ENT:Initialize()
 		self:SetModel(self.Model)
@@ -221,59 +199,12 @@ if SERVER then
 	end
 
 	function hg.TakeArrow(ent, ply)
-		local org = ent.organism
-		
-		if !IsValid(ent) or !org or !org.LodgedEntities or #org.LodgedEntities == 0 then return end
-		
-		local i = hg.BestArrowToTake(ent)
-		
-		if !i or i == 0 then return end
-
-		local tbl = table.remove(org.LodgedEntities, i)
-
-		if hg.ApplyLodgedExtraction then
-			hg.ApplyLodgedExtraction(org.owner, ply, tbl)
-		else
-			local bone = ent:TranslatePhysBoneToBone(tbl.PhysBoneID or 0)
-			local mat = ent:GetBoneMatrix(bone)
-			if mat then
-				hg.organism.AddWoundManual(org.owner, 24, tbl.OffsetPos or vector_origin, tbl.OffsetAng or angle_zero, tbl.BoneName or ent:GetBoneName(bone), CurTime() + math.Rand(18, 36))
-			end
-		end
-
-		if tbl.takeent then
-			if ply:HasWeapon(tbl.takeent) then
-				local wep = ents.Create(tbl.takeent)
-				wep:SetPos(ply:EyePos())
-				wep.IsSpawned = true
-				wep:Spawn()
-			else
-				ply:Give(tbl.takeent)
-			end
-		else
-			ply:GiveAmmo(1, "Arrow", true)
-			ply:EmitSound("weapons/bow_deerhunter/arrow_load_0"..math.random(3)..".wav", 55)	
-		end
-
-		net.Start("organism_send")
-
-		local netTbl = {}
-		netTbl.LodgedEntities = org.LodgedEntities
-		netTbl.owner = org.owner
-	
-		net.WriteTable(netTbl)
-		net.WriteBool(true)
-		net.WriteBool(false)
-		net.WriteBool(false)
-		net.WriteBool(true)
-		net.Broadcast()
-
-		ent:EmitSound("arrow_tear.ogg")
+		return hg.TakeLodged(ent, ply)
 	end
 
 	concommand.Add("hg_takearrow", function(ply, cmd, args)
 		if ply.organism and ply.organism.LodgedEntities and ply.organism.canmove then
-			hg.TakeArrow(ply, ply)
+			hg.TakeLodged(ply, ply)
 		end
 	end)
 
@@ -294,32 +225,12 @@ if SERVER then
 				end
 			end
 
-			hg.TakeArrow(ent, ply)
+			hg.TakeLodged(ent, ply)
 		end
 	end)
-elseif CLIENT then
-	hook.Add("radialOptions", "takearrow", function()
-		local ply = LocalPlayer()
-		
-		if ply.organism and ply.organism.canmove and ply.organism.LodgedEntities and #ply.organism.LodgedEntities > 0 then
-			local i = hg.BestArrowToTake(ply)
+	end
 
-			if !i or i == 0 then return end
-
-			if i and ply.organism.LodgedEntities[i] then
-				local class = ply.organism.LodgedEntities[i].takeent
-				local ent = weapons.GetStored(class)
-				local tbl = {
-					function()
-						RunConsoleCommand("hg_takearrow")
-					end,
-					"Take "..(ent and ent.PrintName or "arrow").." from yourself"
-				}
-				hg.radialOptions[#hg.radialOptions + 1] = tbl
-			end
-		end
-	end)
-
+	if CLIENT then
 	hg.lodgedmodels = hg.lodgedmodels or {}
 
 	function hg.ProjectilesDraw(ent, ply)

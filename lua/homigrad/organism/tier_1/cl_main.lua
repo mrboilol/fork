@@ -393,9 +393,25 @@ end
 
 local disorientationLerp = 0
 local disorientationVignetteMat = Material("effects/shaders/zb_vignette")
+local shockVignetteMat = Material("effects/shaders/zb_vignette")
+local criticalChromaticMat = Material("effects/shaders/merc_chromaticaberration")
 local concLerp = 0
 local nauseaLerp = 0
 local tinnitusConcLerp = 0
+local criticalFlickerNext = 0
+local criticalFlickerValue = 0
+
+local function GetCriticalVisualFlicker(intensity)
+	if intensity <= 0 then return 0 end
+
+	local time = CurTime()
+	if time >= criticalFlickerNext then
+		criticalFlickerNext = time + Lerp(math.Clamp(intensity, 0, 1), 0.09, 0.018)
+		criticalFlickerValue = math.Rand(0.2, 1)
+	end
+
+	return criticalFlickerValue
+end
 
 hook.Add("Player Spawn", "screenshot_game", function(ply)
 	if OverrideSpawn then return end
@@ -636,6 +652,7 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 	local o2 = org.o2 and org.o2[1] or 30
 	local brain = org.brain or 0
 	local otrub = lply:Alive() and org.otrub or false
+	local consciousness = math.Clamp(org.consciousness or 1, 0, 1)
 	local analgesia = organism.analgesia or 0
 	local analgesiaVisual = org.seizureActive and math.max(analgesia * 3, 3) or analgesia
 	local health = health
@@ -697,8 +714,14 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 		return false
 	end
 	
+	local lowO2Visual = math.Clamp((15 - o2) / 15, 0, 1)
+	local lowConsciousnessVisual = math.Clamp((0.5 - consciousness) / 0.2, 0, 1)
+	local shockVisual = math.Clamp(((org.shock or 0) - 18) / 62, 0, 1)
+	local shockVignette = math.max(lowO2Visual ^ 1.2, lowConsciousnessVisual ^ 1.35, shockVisual * 0.8)
+	local criticalFlicker = GetCriticalVisualFlicker(shockVignette)
+	local consciousnessBlackout = lowConsciousnessVisual ^ 2.6 * 0.58
 	k1 = Lerp(FrameTime() * 15, k1 or 0, math.min(math.min(adrenaline / 1, 2),1.5))
-	k2 = (30 - (o2 or 30)) / 30 + (1 - (consciousnessLerp or 1)) * 1-- + brain * 2
+	k2 = (30 - (o2 or 30)) / 30 + consciousnessBlackout
 	k3 = ((5000 / math.max(blood, 1000)) - 1) * 1.5
 
 	local stamina = org.stamina and org.stamina[1] or 180
@@ -726,6 +749,23 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 		disorientationVignetteMat:SetFloat("$c1_y", disVig * 1.0)
 		render.SetMaterial(disorientationVignetteMat)
 		render.DrawScreenQuad()
+	end
+
+	if shockVignette > 0.01 and lply:Alive() then
+		local flickerStrength = 0.62 + criticalFlicker * 0.58
+		local vignetteStrength = math.Clamp(shockVignette * flickerStrength, 0, 1)
+		render.UpdateScreenEffectTexture()
+		shockVignetteMat:SetFloat("$c2_x", CurTime() * (18 + vignetteStrength * 34))
+		shockVignetteMat:SetFloat("$c0_z", 0.2 + vignetteStrength * 0.8)
+		shockVignetteMat:SetFloat("$c1_y", 0.7 + vignetteStrength * 1.8)
+		render.SetMaterial(shockVignetteMat)
+		render.DrawScreenQuad()
+
+		criticalChromaticMat:SetFloat("$c0_x", (2.4 + vignetteStrength * 6.6) * (0.8 + criticalFlicker * 0.5))
+		criticalChromaticMat:SetInt("$c0_y", 1)
+		render.SetMaterial(criticalChromaticMat)
+		render.DrawScreenQuad()
+		DrawMaterialOverlay("sprites/mat_jack_hmcd_scope_aberration", 0.012 + vignetteStrength * 0.055)
 	end
 
 	if (disorientationLerp > 1) and lply:Alive() or brain > 0 then
@@ -801,9 +841,9 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 
 	*/
 
-	tabblood["$pp_colour_colour"] = Lerp(FrameTime() * 30, tabblood["$pp_colour_colour"], math.max(0, (blood / 5000) * (potato and (blood / 5000) or 1) - (!org.otrub and potato and k2 or 0) - k4 * 0.5 + (math.max(analgesiaVisual - 1, 0) * math.sin(CurTime()) * 5)))
+	tabblood["$pp_colour_colour"] = Lerp(FrameTime() * 30, tabblood["$pp_colour_colour"], math.max(0, (blood / 5000) * (potato and (blood / 5000) or 1) - (!org.otrub and potato and k2 or 0) - k4 * 0.5 - (potato and consciousnessBlackout * 0.05 or consciousnessBlackout * 0.32) + (math.max(analgesiaVisual - 1, 0) * math.sin(CurTime()) * 5)))
 	//tabblood["$pp_colour_contrast"] = Lerp(FrameTime() * 30, tabblood["$pp_colour_contrast"], health < 80 and math.max(1.5 * ( 1 - math.min(health / 50, 1) ), 1 ) or 1)
-	tabblood["$pp_colour_brightness"] = Lerp(FrameTime() * 30, tabblood["$pp_colour_brightness"], (potato and ((blood / 5000 - 1) / 2 - (!org.otrub and k2 / 10 or 0) - k4 / 12) or 0) )
+	tabblood["$pp_colour_brightness"] = Lerp(FrameTime() * 30, tabblood["$pp_colour_brightness"], (potato and ((blood / 5000 - 1) / 2 - (!org.otrub and k2 / 10 or 0) - k4 / 12) or 0) - consciousnessBlackout * 0.09 )
 	tabblood["$pp_colour_addb"] = 0
 	//tabblood["$pp_colour_addg"] = k2 / 15
 	//tabblood["$pp_colour_addr"] = k2 / 15
@@ -813,6 +853,12 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 	//DrawColorModify(tab)
 	
 	DrawColorModify(tabblood)
+
+	local blackoutAlpha = otrub and 250 or math.floor(consciousnessBlackout * 255)
+	if blackoutAlpha > 0 then
+		surface.SetDrawColor(0, 0, 0, blackoutAlpha)
+		surface.DrawRect(0, 0, ScrW(), ScrH())
+	end
 
 	if concussion > 0 and lply:Alive() then
 		concLerp = LerpFT(0.03, concLerp, concussion)

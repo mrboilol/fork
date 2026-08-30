@@ -182,7 +182,13 @@ function hg.organism.ApplyMedicalAction(actor, target, action, ctx)
 		org.hemotransfusionshock = max((org.hemotransfusionshock or 0) - (0.03 * skill), 0)
 	end
 	if action == "internal_bleed_treat" and ctx and ctx.success then
-		org.internalBleedHeal = min((org.internalBleedHeal or 0) + 0.3 * skill, 20)
+		local wep = IsValid(actor) and actor:GetActiveWeapon() or nil
+		local medkitType = IsValid(wep) and wep.HGMedkitModeTypes and wep.HGMedkitModeTypes[wep.mode]
+		if IsValid(wep) and (wep:GetClass() == "weapon_tranexamic_acid" or medkitType == "tranexamic") then
+			hg.organism.AdministerTranexamic(org, 0.3 * skill)
+		else
+			org.internalBleedHeal = min((org.internalBleedHeal or 0) + 0.3 * skill, 20)
+		end
 	end
 	if (org.next_med_error_check or 0) > CurTime() then return end
 	org.next_med_error_check = CurTime() + 0.6

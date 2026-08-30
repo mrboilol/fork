@@ -360,8 +360,8 @@ local function getPalpitationThreat(org, blood, o2Value)
 end
 
 local function getHemorrhagicCollapseChance(collapseDepth)
-	-- Collapse begins near 3000 mL, becomes meaningful around 2500 mL, and is
-	-- dangerous at 2000 mL once circulation has remained inadequate.
+	-- Collapse begins near 2500 mL and becomes dangerous around 2000 mL once
+	-- circulation has remained inadequate.
 	local riskDepth = math.Clamp(tonumber(collapseDepth) or 0, 0, 1)
 	return math.Clamp(riskDepth ^ 2 * 0.16, 0, 0.16)
 end
@@ -517,6 +517,8 @@ function hg.organism.GetECGState(heartbeat, heartstop, org)
 		candidate = "ventricular_ectopy"
 	elseif arrhythmia >= 0.45 and heartbeat > 50 and heartbeat <= 220 and output > 0.12 and perfusion > 0.12 then
 		candidate = "atrial_fibrillation"
+	elseif arrhythmia >= 0.1 and heartbeat > 35 and heartbeat <= 220 and output > 0.12 and perfusion > 0.12 then
+		candidate = "ventricular_ectopy"
 	elseif cold >= 0.18 and heartbeat > 40 and cold >= math.max(cerebral * 0.9, hypoxia, cardiac * 0.9) then
 		candidate = "hypothermia_bradycardia"
 	elseif heartbeat <= 40 and (hypoxia >= 0.65 or cardiac >= 0.65 or cold >= 0.75 or hemorrhagicDecompensation >= 0.75) then
@@ -852,8 +854,10 @@ module[2] = function(owner, org, timeValue)
 	-- cardiac output without treating tamponade as an immediate flatline.
 	local tamponade = Clamp(org.cardiacTamponade or 0, 0, 1)
 	local tamponadePreload = Clamp(1 - tamponade * 0.82, 0.18, 1)
+	local internalBleedComplication = Clamp(org.internalBleedComplication or 0, 0, 1)
+	local internalBleedPressureMul = Clamp(1 - internalBleedComplication * 0.35, 0.65, 1)
 	local rateOutput = getRateOutput(org.heartstop and 0 or (org.heartbeat or 70))
-	local circulationBase = bloodVolume * heart * compensationPulseMultiplier * rateOutput * vascularTone * accelerationPressureMul * dehydrationPressureMul * tamponadePreload * Clamp(Remap(org.temperature, 28, 36.7, 0.55, 1), 0.45, 1.1)
+	local circulationBase = bloodVolume * heart * compensationPulseMultiplier * rateOutput * vascularTone * accelerationPressureMul * dehydrationPressureMul * tamponadePreload * internalBleedPressureMul * Clamp(Remap(org.temperature, 28, 36.7, 0.55, 1), 0.45, 1.1)
 	local rhythmMul = org.fibrillation and 0.18 or Clamp(1 - (org.arrhythmia or 0) * 0.22, 0.5, 1)
 	local dihSupport = (org.dihSupportUntil or 0) > CurTime()
 	local defibGrace = (org.defibDeathGrace or 0) > CurTime() or (org.defibSupportUntil or 0) > CurTime()
@@ -1085,8 +1089,8 @@ module[2] = function(owner, org, timeValue)
 	local myocardialFailure = math.Clamp((0.45 - (org.myocardialOxygen or 1)) / 0.45, 0, 1)
 	local hemorrhageElectricalInstability = math.max(electricalFlowFailure, electricalO2Failure, myocardialFailure)
 	org.hemorrhageElectricalInstability = hemorrhageElectricalInstability
-	local criticalReserve = cfg.CRITICAL_CIRCULATION_RESERVE or 0.42
-	local criticalRange = math.max(cfg.CRITICAL_CIRCULATION_RANGE or 0.50, 0.01)
+	local criticalReserve = cfg.CRITICAL_CIRCULATION_RESERVE or 0.31
+	local criticalRange = math.max(cfg.CRITICAL_CIRCULATION_RANGE or 0.10, 0.01)
 	local criticalHemorrhageDepth = math.Clamp((criticalReserve - circulatoryReserve) / criticalRange, 0, 1)
 	local terminalReserve = math.Clamp(cfg.TERMINAL_CIRCULATION_RESERVE or 0.035, 0, 0.25)
 	local terminalOutput = math.Clamp(cfg.TERMINAL_CARDIAC_OUTPUT or 0.04, 0, 0.25)
@@ -1209,7 +1213,8 @@ module[2] = function(owner, org, timeValue)
 	org.heartbeat = math.Approach(org.heartbeat, heartbeat, heartbeat > org.heartbeat and timeValue * 5 or timeValue * 3)
 	
 	local ischemia = Clamp(1 - (org.myocardialOxygen or 1), 0, 1)
-	local internalBleedRhythmRisk = Clamp(((org.internalBleed or 0) - 1.5) / 6.5, 0, 1)
+	local internalBleedPeak = math.max(tonumber(org.internalBleedPeak) or 0, tonumber(org.internalBleed) or 0, 0)
+	local internalBleedRhythmRisk = Clamp(internalBleedComplication * math.Clamp(internalBleedPeak / 6, 0, 1), 0, 1)
 	local chestRhythmRisk = Clamp(((org.chest or 0) - 0.45) / 0.55, 0, 1)
 	local cardiacTraumaRhythmRisk = math.max(Clamp(((org.heart or 0) - 0.3) / 0.7, 0, 1), chestRhythmRisk * 0.65)
 	local traumaRhythmRisk = math.max(internalBleedRhythmRisk * (0.45 + cardiacTraumaRhythmRisk * 0.55), cardiacTraumaRhythmRisk * 0.6)

@@ -352,12 +352,13 @@ end
 
 local function GetStatusThought(ply)
     local org = ply.organism or {}
+    local bleeding = hg.IsActivelyBleeding and hg.IsActivelyBleeding(org) or (org.bleed or 0) > 0.05
     if org.heartstop then return "Your heart stopped." end
     if (org.o2 and org.o2[1] or 30) <= 8 then return "You are running out of oxygen." end
     if (org.o2 and org.o2[1] or 30) <= 15 then return "Your oxygen level is critically low." end
     if (org.arterialBleed or 0) > 0.2 then return "An artery is bleeding heavily." end
-    if (org.bleed or 0) > 1 or (org.blood or 5000) < 2500 then return "Severe blood loss is making you collapse." end
-    if (org.bleed or 0) > 0.5 or (org.blood or 5000) < 3750 then return "You are losing blood." end
+    if bleeding and ((org.bleed or 0) > 1 or (org.blood or 5000) < 2500) then return "Severe blood loss is making you collapse." end
+    if bleeding and ((org.bleed or 0) > 0.5 or (org.blood or 5000) < 3750) then return "You are losing blood." end
     if (org.internalBleed or 0) > 1.5 then return "Internal bleeding is getting worse." end
     if (org.pneumothorax or 0) > 0.2 or (org.hemothorax or 0) > 0.2 then return "A chest injury is restricting your breathing." end
     if (org.pain or 0) > 75 then return "Severe pain is impairing movement." end
@@ -614,8 +615,11 @@ local function CreateNotificationBerserk(ply, msg, delay, msgKey, showTime, func
 end
 
 local function ResetNotification(ply, key)
-    if not ply.msgs or not ply.msgs[key] then return end
-    ply.msgs[key] = nil
+	if ply.msgs then ply.msgs[key] = nil end
+	if ply.thoughtmsgs then
+		ply.thoughtmsgs[key] = nil
+		ply.thoughtmsgs["thought_" .. key] = nil
+	end
 end
 
 local thoughtGroupPatterns = {

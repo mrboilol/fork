@@ -425,6 +425,10 @@ local low_perfusion_phrases = {
 
 local hg_showthoughts = ConVarExists("hg_showthoughts") and GetConVar("hg_showthoughts") or CreateClientConVar("hg_showthoughts", "1", true, true, "Show the thoughts of your character", 0, 1)
 
+function hg.IsActivelyBleeding(org)
+	return istable(org) and (tonumber(org.bleed) or 0) > 0.05
+end
+
 function string.Random(length)
 	local length = tonumber(length)
 
@@ -471,7 +475,7 @@ function hg.likely_to_phrase(ply)
 	local hypotension = org.hypotension or 0
 	local temperature = org.temperature
 	local o2 = org.o2 and org.o2[1] or 30
-	local bleedingOut = (org.bleed or 0) > 0.5
+	local bleedingOut = hg.IsActivelyBleeding(org)
 	local boneThoughtAge = org.just_damaged_bone and (CurTime() - org.just_damaged_bone)
 	local broken_dislocated = boneThoughtAge and boneThoughtAge >= 0 and boneThoughtAge <= 8
 	local adrenaline = org.adrenaline or 0
@@ -483,7 +487,7 @@ function hg.likely_to_phrase(ply)
 	return (org.heartstop) and 6
 		or (o2 <= 15) and 4.5
 		or (bleedingOut and blood < 4000) and 4
-		or (blood < 2500) and 3
+		or (bleedingOut and blood < 2500) and 3
 		or (broken_dislocated) and 5
 		or (pain > 65) and 5
 		or (panicattack > 0.55 and 1.2)
@@ -531,7 +535,7 @@ local function get_status_message(ply)
 	local boneThoughtAge = org.just_damaged_bone and (CurTime() - org.just_damaged_bone)
 	local broken_dislocated = boneThoughtAge and boneThoughtAge >= 0 and boneThoughtAge <= 8
 	local o2 = org.o2 and org.o2[1] or 30
-	local bleedingOut = (org.bleed or 0) > 0.5
+	local bleedingOut = hg.IsActivelyBleeding(org)
 	local fear = org.fear or 0
 	local adrenaline = org.adrenaline or 0
 	local arrhythmia = org.arrhythmia or 0
@@ -568,7 +572,7 @@ local function get_status_message(ply)
 		most_wanted_phraselist = near_death_poetic
 	elseif bleedingOut and blood < 4000 then
 		most_wanted_phraselist = near_death_poetic
-	elseif blood < 3750 then
+	elseif bleedingOut and blood < 3750 then
 		-- sv_blood owns the immediate faintness and hemorrhage alerts. Blood loss
 		-- still gets priority for recurring status thoughts, but shares the same
 		-- dying pool as the other terminal conditions.
@@ -595,7 +599,7 @@ local function get_status_message(ply)
 		end
 	elseif temperature > 38 then
 		most_wanted_phraselist = temperature >= 40 and heatstroke_phraselist or hot_phraselist
-	elseif ((blood < 3250 and heartbeat >= 30 and heartbeat <= 250) or (broken_dislocated) or (broken_notify) or (dislocated_notify)) then
+	elseif ((bleedingOut and blood < 3250 and heartbeat >= 30 and heartbeat <= 250) or (broken_dislocated) or (broken_notify) or (dislocated_notify)) then
 		if pain > 75 and (broken_dislocated) then
 			most_wanted_phraselist = math.random(2) == 1 and audible_pain or (broken_notify and broken_limb or dislocated_limb)
 		elseif pain > 75 then
@@ -605,9 +609,9 @@ local function get_status_message(ply)
 		end
 
 		if not most_wanted_phraselist then
-			if (broken_notify or dislocated_notify) and blood < 3100 then
+			if (broken_notify or dislocated_notify) and bleedingOut and blood < 3100 then
 				most_wanted_phraselist = blood < 2900 and (near_death_poetic) or (math.random(2) == 1 and (broken_notify and broken_limb or dislocated_limb) or near_death_poetic)
-			elseif(blood < 3100)then
+			elseif bleedingOut and blood < 3100 then
 				most_wanted_phraselist = positive_thinking and near_death_positive or near_death_poetic
 			end
 		end

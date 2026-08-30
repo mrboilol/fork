@@ -752,10 +752,10 @@ local function DrawEKG(state, centerX, centerY, width, height, org, color, ringA
         local phase = rawPhase % 1
         local beatIndex = math.floor(rawPhase)
         local h
-        local pvcStrength = math.max(arrhythmia * 0.7, palpitations * 0.8, ischemia * 0.55, hypoxia * 0.45)
+        local pvcStrength = math.max(arrhythmia * 0.9, palpitations * 0.8, ischemia * 0.55, hypoxia * 0.45)
         local pvcPeriod = math.max(3, math.floor(Lerp(math.Clamp(pvcStrength, 0, 1), 14, 4)))
-        local pvcBeat = pvcStrength >= 0.18 and beatIndex % pvcPeriod == pvcPeriod - 1
-        local compensatoryPause = pvcStrength >= 0.18 and beatIndex % pvcPeriod == 0
+        local pvcBeat = pvcStrength >= 0.1 and beatIndex % pvcPeriod == pvcPeriod - 1
+        local compensatoryPause = pvcStrength >= 0.1 and beatIndex % pvcPeriod == 0
 
         if rhythm == "ventricular_fibrillation" then
             h = getVentricularFibrillationH(rawPhase)

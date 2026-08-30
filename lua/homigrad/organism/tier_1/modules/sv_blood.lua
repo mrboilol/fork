@@ -5,6 +5,19 @@ local max, min, Round = math.max, math.min, math.Round
 hg.organism.module.blood = {}
 local module = hg.organism.module.blood
 local hg_infections = ConVarExists("hg_infections") and GetConVar("hg_infections") or CreateConVar("hg_infections",1,FCVAR_ARCHIVE + FCVAR_NOTIFY,"Enable infections system",0,1)
+local tranexamicOnsetDelay = 8
+
+function hg.organism.AdministerTranexamic(org, dose)
+	dose = tonumber(dose) or 0
+	if not org or dose <= 0 then return false end
+
+	org.tranexamic_acid_pending = math.min((tonumber(org.tranexamic_acid_pending) or 0) + dose, 10)
+	org.tranexamic_acid_onset = math.max(
+		tonumber(org.tranexamic_acid_onset) or 0,
+		CurTime() + tranexamicOnsetDelay
+	)
+	return true
+end
 
 hg.organism.bloodtypes = {
 	["o-"] = {["o-"] = true,["o+"] = true,["a-"] = true,["a+"] = true,["b-"] = true,["b+"] = true,["ab-"] = true,["ab+"] = true},
@@ -28,6 +41,9 @@ module[1] = function(org)
 	org.internalBleedRate = 0
 	org.internalBleed = 0
 	org.internalBleedHeal = 0
+	org.tranexamic_acid = 0
+	org.tranexamic_acid_pending = 0
+	org.tranexamic_acid_onset = 0
 	org.arteria = 0
 	org.rarmartery = 0
 	org.larmartery = 0
@@ -135,7 +151,7 @@ local function clearBloodLossThoughts(owner, keep)
 end
 
 local function notifyBloodLoss(owner, org, symptomaticLoss)
-	if not org.isPly or org.otrub or symptomaticLoss <= 0.05 or not IsValid(owner) or (org.bleed or 0) <= 0.05 then
+	if not org.isPly or org.otrub or symptomaticLoss <= 0.05 or not IsValid(owner) or not hg.IsActivelyBleeding(org) then
 		clearBloodLossThoughts(owner)
 		return
 	end
@@ -407,6 +423,14 @@ end
 module[2] = function(owner, org, mulTime)
 	local adrenaline = math.Clamp(org.adrenaline or 0, 0, 2)
 	local isPlayer = owner:IsPlayer()
+	local now = CurTime()
+	if (tonumber(org.tranexamic_acid_pending) or 0) > 0 and now >= (tonumber(org.tranexamic_acid_onset) or 0) then
+		local pendingDose = tonumber(org.tranexamic_acid_pending) or 0
+		org.tranexamic_acid = math.min((tonumber(org.tranexamic_acid) or 0) + pendingDose, 10)
+		org.internalBleedHeal = math.min((tonumber(org.internalBleedHeal) or 0) + pendingDose, 20)
+		org.tranexamic_acid_pending = 0
+		org.tranexamic_acid_onset = 0
+	end
 	-- sv_liver owns the continuous base modifiers. These fallbacks only protect
 	-- hot reloads or unusual construction order before its first tick.
 	org.coagulation_multiplier = tonumber(org.coagulation_multiplier) or 1.2
@@ -526,12 +550,10 @@ module[2] = function(owner, org, mulTime)
 		org.internalBleedHemothoraxRisk = false
 	end
 
-	-- Pericardial bleeding needs both a wounded heart and a catastrophic active
-	-- internal bleed. Pleural accumulation remains owned by sv_lungs.
 	local heartDamage = math.Clamp(tonumber(org.heart) or 0, 0, 1)
-	local severeCardiacBleed = math.Clamp((internalBleedSeverity - 7.5) / 2.5, 0, 1)
+	local severeCardiacBleed = math.Clamp(org.internalBleedComplication or 0, 0, 1) * math.Clamp(((org.internalBleedPeak or internalBleedSeverity) - 7.5) / 2.5, 0, 1)
 	local tamponadeTarget = heartDamage * severeCardiacBleed * 0.65
-	org.cardiacTamponade = math.max(org.cardiacTamponade or 0, math.Approach(org.cardiacTamponade or 0, tamponadeTarget, mulTime / 24 * math.Clamp(org.conditionResistanceMul or 1, 0.05, 1)))
+	org.cardiacTamponade = math.Approach(org.cardiacTamponade or 0, tamponadeTarget, mulTime / 24 * math.Clamp(org.conditionResistanceMul or 1, 0.05, 1))
 
 	-- Nosebleed from severe internal bleeding
 	if org.internalBleed > 0.75 and hg.applyNosebleed and math.random() < org.internalBleed * 0.02 * mulTime then
@@ -545,7 +567,7 @@ module[2] = function(owner, org, mulTime)
 	local preloadReserve = hg.organism.GetBloodDeliveryFraction and hg.organism.GetBloodDeliveryFraction(blood, 1)
 		or math.Clamp(blood / (hg.organism.normalBloodVolume or 5000), 0, 1)
 	local reserveLoss = 1 - preloadReserve
-	local criticalReserve = math.Clamp((hg.organism.config and hg.organism.config.CRITICAL_CIRCULATION_RESERVE) or 0.42, 0.1, 0.95)
+	local criticalReserve = math.Clamp((hg.organism.config and hg.organism.config.CRITICAL_CIRCULATION_RESERVE) or 0.31, 0.1, 0.95)
 	local normalBlood = math.max((hg.organism.config and hg.organism.config.NORMAL_BLOOD_VOLUME_ML) or 5000, 1)
 	local rawLossFraction = math.Clamp(1 - blood / normalBlood, 0, 1)
 	-- Subtle weakness begins with the first real loss. Catastrophic shock is still

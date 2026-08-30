@@ -635,37 +635,37 @@ module[2] = function(owner, org, timeValue)
 		org.pneumothorax = max(org.pneumothorax - timeValue / 10, 0)
 	end
 
-	-- A damaged thoracic organ can bleed into the pleural space from any active
-	-- internal bleed. The amount and fill speed stay proportional to severity,
-	-- so small bleeds begin slowly while catastrophic ones build rapidly.
-	local internalBleedVal = org.internalBleed or 0
+	local internalBleedPeak = math.max(tonumber(org.internalBleedPeak) or 0, tonumber(org.internalBleed) or 0, 0)
+	local internalBleedComplication = math.Clamp(tonumber(org.internalBleedComplication) or 0, 0, 1)
 	local thoracicOrganDamage = math.Clamp(math.max(
 		org.heart or 0,
 		org.trachea or 0,
 		org.lungsL[1] or 0,
 		org.lungsR[1] or 0
 	), 0, 1)
-	local bleedSeverity = math.Clamp(internalBleedVal / 10, 0, 1)
-	local thoracicBleed = thoracicOrganDamage > 0 and bleedSeverity > 0
+	local bleedSeverity = math.Clamp(internalBleedPeak / 10, 0, 1)
+	local delayedBleed = internalBleedComplication * bleedSeverity
+	local incidentalHemothorax = org.internalBleedHemothoraxRisk and delayedBleed * 0.35 or 0
+	local hemothoraxDrive = math.max(thoracicOrganDamage * delayedBleed, incidentalHemothorax)
 	if needleActive then
 		org.hemothoraxTrauma = max(org.hemothoraxTrauma - timeValue / 120, 0)
 		org.hemothoraxL = max(org.hemothoraxL - timeValue / 120, 0)
 		org.hemothoraxR = max(org.hemothoraxR - timeValue / 120, 0)
-	elseif thoracicBleed then
+	elseif hemothoraxDrive > 0.005 then
 		if org.internalBleedLungSide != "L" and org.internalBleedLungSide != "R" then
 			org.internalBleedLungSide = math.random(2) == 1 and "L" or "R"
 		end
 
-		local fillTime = Lerp(bleedSeverity, 720, 150)
-		local bilateral = bleedSeverity >= 0.6 and thoracicOrganDamage >= 0.75
-		local hemothoraxTarget = thoracicOrganDamage * bleedSeverity
+		local fillTime = Lerp(delayedBleed, 900, 180)
+		local bilateral = delayedBleed >= 0.6 and thoracicOrganDamage >= 0.75
+		local hemothoraxTarget = hemothoraxDrive
 		local targetL = (bilateral or org.internalBleedLungSide == "L") and hemothoraxTarget or 0
 		local targetR = (bilateral or org.internalBleedLungSide == "R") and hemothoraxTarget or 0
 
 		local conditionMul = math.Clamp(org.conditionResistanceMul or 1, 0.05, 1)
 		org.hemothoraxL = math.Approach(org.hemothoraxL, targetL, timeValue / fillTime * conditionMul)
 		org.hemothoraxR = math.Approach(org.hemothoraxR, targetR, timeValue / fillTime * conditionMul)
-	elseif internalBleedVal <= 0.1 then
+	else
 		-- Blood in the pleural space does not vanish on its own. It needs a
 		-- prolonged recovery period unless the player uses a needle.
 		org.hemothoraxTrauma = max(org.hemothoraxTrauma - timeValue / 480, 0)

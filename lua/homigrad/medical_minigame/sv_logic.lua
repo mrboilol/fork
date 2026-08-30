@@ -547,13 +547,10 @@ local function ApplySyringeProgress(wep, ply, target, progressDelta)
         local internalBleed = math.max((org.internalBleed or 0) - (org.internalBleedHeal or 0), 0)
         local healAmount = math.min(internalBleed, consumedAmount / efficiency)
 
-        org.internalBleedHeal = (org.internalBleedHeal or 0) + healAmount
+        hg.organism.AdministerTranexamic(org, healAmount)
         entOwner:EmitSound("snds_jack_gmod/ez_medical/" .. math.random(16, 18) .. ".ogg", 60, math.random(95, 105))
     elseif class == "weapon_tranexamic_acid" then
-        -- Match direct use: consuming the full 10-unit dose supplies exactly
-        -- 10 points of internal-bleed healing for every profession.
-        org.internalBleedHeal = (org.internalBleedHeal or 0) + consumedAmount
-        org.tranexamic_acid = math.min((org.tranexamic_acid or 0) + consumedAmount, 10)
+        hg.organism.AdministerTranexamic(org, consumedAmount)
         entOwner:EmitSound("snds_jack_gmod/ez_medical/" .. math.random(16, 18) .. ".ogg", 60, math.random(95, 105))
     end
 

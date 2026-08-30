@@ -94,10 +94,7 @@ if SERVER then
 
 		local dose = self.modeValues[1]
 		if dose > 0 then
-			-- One full 10-unit syringe always supplies exactly 10 points of
-			-- rapid internal-bleed healing, regardless of profession.
-			org.internalBleedHeal = (org.internalBleedHeal or 0) + dose
-			org.tranexamic_acid = math.min(org.tranexamic_acid + dose, 10)
+			hg.organism.AdministerTranexamic(org, dose)
 			self.modeValues[1] = 0
 			owner:EmitSound("snds_jack_gmod/ez_medical/" .. math.random(16, 18) .. ".ogg", 60, math.random(95, 105))
 		end

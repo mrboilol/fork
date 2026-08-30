@@ -372,22 +372,51 @@ local stomachFallbackBones = {
 }
 
 local function getDamageHitgroup(ent, bone, dmgPos)
-	local translatedBone = ent:TranslatePhysBoneToBone(bone or 0)
+	local translatedBone = bone and bone >= 0 and ent:TranslatePhysBoneToBone(bone) or -1
 	local bonename = translatedBone and translatedBone >= 0 and ent:GetBoneName(translatedBone) or nil
 	local hitgroup = bonetohitgroup[bonename] or HITGROUP_GENERIC
 	if not ent:IsRagdoll() or hitgroup ~= HITGROUP_GENERIC then return hitgroup, bonename end
 
+	local headBone = ent:LookupBone("ValveBiped.Bip01_Head1")
+	local headPhysBone = headBone and ent:TranslateBoneToPhysBone(headBone)
+	local headPhys = headPhysBone and headPhysBone >= 0 and ent:GetPhysicsObjectNum(headPhysBone)
+	if IsValid(headPhys) and isvector(dmgPos) and dmgPos:DistToSqr(headPhys:GetPos()) < 1024 then
+		return HITGROUP_HEAD, "ValveBiped.Bip01_Head1"
+	end
+	if headBone and isvector(dmgPos) then
+		local matrix = ent:GetBoneMatrix(headBone)
+		if matrix and dmgPos:DistToSqr(matrix:GetTranslation()) < 784 then
+			return HITGROUP_HEAD, "ValveBiped.Bip01_Head1"
+		end
+	end
+
 	for _, physNum in ipairs({0, 1}) do
 		local realPhysNum = hg.realPhysNum and hg.realPhysNum(ent, physNum) or physNum
 		local phys = ent:GetPhysicsObjectNum(realPhysNum)
-		if IsValid(phys) and dmgPos:DistToSqr(phys:GetPos()) < 1225 then return HITGROUP_STOMACH, "ValveBiped.Bip01_Pelvis" end
+		if IsValid(phys) and isvector(dmgPos) and dmgPos:DistToSqr(phys:GetPos()) < 1225 then return HITGROUP_STOMACH, "ValveBiped.Bip01_Pelvis" end
 	end
 	for _, name in ipairs(stomachFallbackBones) do
 		local fallbackBone = ent:LookupBone(name)
 		local matrix = fallbackBone and ent:GetBoneMatrix(fallbackBone)
-		if matrix and dmgPos:DistToSqr(matrix:GetTranslation()) < 625 then return HITGROUP_STOMACH, name end
+		if matrix and isvector(dmgPos) and dmgPos:DistToSqr(matrix:GetTranslation()) < 625 then return HITGROUP_STOMACH, name end
 	end
 	return hitgroup, bonename
+end
+
+local function getHeadImpactAxis(ent)
+	local headBone = ent:LookupBone("ValveBiped.Bip01_Head1")
+	local neckBone = ent:LookupBone("ValveBiped.Bip01_Neck1") or ent:LookupBone("ValveBiped.Bip01_Spine4")
+	if not headBone or not neckBone then return end
+
+	local headPhysBone = ent:TranslateBoneToPhysBone(headBone)
+	local headPhys = headPhysBone and headPhysBone >= 0 and ent:GetPhysicsObjectNum(headPhysBone)
+	local headPos = IsValid(headPhys) and headPhys:GetPos() or ent:GetBonePosition(headBone)
+	local neckPos = ent:GetBonePosition(neckBone)
+	if not isvector(headPos) or not isvector(neckPos) then return end
+
+	local axis = headPos - neckPos
+	if axis:LengthSqr() <= 1 then return end
+	return axis:GetNormalized()
 end
 
 local function getGibbedHeadForcePhys(ent, physBone)
@@ -2084,10 +2113,11 @@ local function velocityDamage(ent, data)
 	dmg = math.min(dmg, 5)
 
 	local bone
-	for i = 0, ent:GetPhysicsObjectCount() do
+	for i = 0, ent:GetPhysicsObjectCount() - 1 do
 		local phys = ent:GetPhysicsObjectNum(i)
 		if phys == data.PhysObject then
 			bone = i
+			break
 		end
 	end
 	if bone and ent.gibRemove and ent.gibRemove[bone] then return end
@@ -2125,7 +2155,7 @@ local function velocityDamage(ent, data)
 
 	local traceResult = GetTraceDamage(ent, data.HitPos, -relativeVelocity)
 	
-	if not bone then
+	if not bone or bone < 0 then
 		bone = traceResult.PhysicsBone
 	end
 
@@ -2134,10 +2164,10 @@ local function velocityDamage(ent, data)
 	end
 
 
-	local hitgroup
-	local bonename = ent:GetBoneName(ent:TranslatePhysBoneToBone(bone or 0))
-	
-	if bonetohitgroup[bonename] ~= nil then hitgroup = bonetohitgroup[bonename] end
+	local hitgroup, bonename = getDamageHitgroup(ent, bone, data.HitPos)
+	if traceResult.HitGroup == HITGROUP_HEAD or (hitgroup == HITGROUP_GENERIC and traceResult.HitGroup and traceResult.HitGroup ~= HITGROUP_GENERIC) then
+		hitgroup = traceResult.HitGroup
+	end
 	if RagdollDamageBoneMul[hitgroup] then dmgInfo:ScaleDamage(RagdollDamageBoneMul[hitgroup]) end
 
 	local org = ent.organism
@@ -2212,20 +2242,29 @@ local function velocityDamage(ent, data)
 			local head_otrub_chance = math.Clamp((dmg - head_otrub_min_damage) * head_otrub_chance_mul, 0, head_otrub_max_chance)
 			local headDamageMul = hadhelmet and 0.2 or 1
 			local oldSkull = org.skull
+			local oldSpine3 = org.spine3 or 0
 			local isMeleeHit = dmgInfo:IsDamageType(DMG_CLUB) or dmgInfo:IsDamageType(DMG_SLASH)
 			local skullDmgMul = isMeleeHit and 0.08 or 4.5
 			local cervicalImpact = math.Clamp((normalSpeed - 420) / 700, 0, 1)
-			local hitCervicalSpine = math.Rand(0, 1) < (0.28 + cervicalImpact * 0.42)
+			local headAxis = getHeadImpactAxis(ent)
+			local collisionNormal = isvector(data.HitNormal) and data.HitNormal:GetNormalized()
+			local impactDirection = relativeVelocity:GetNormalized()
+			local axialCollision = headAxis and collisionNormal and math.abs(headAxis:Dot(collisionNormal)) or 0
+			local axialVelocity = headAxis and math.abs(headAxis:Dot(impactDirection)) or 0
+			local cervicalLoad = math.max(axialCollision, axialVelocity)
+			local spine3PhysicsHit = cervicalLoad >= 0.45
 
-			if hitCervicalSpine then
-				hg.organism.input_list.spine3(org, bone, dmg * (3.2 + cervicalImpact * 2.2) * (hadhelmet and 0.65 or 1), dmgInfo)
+			hg.organism.input_list.skull(org, bone, dmg * skullDmgMul * headDamageMul * ragdoll_fall_skull_damage_mul, dmgInfo)
+			hg.organism.input_list.jaw(org, bone, dmg * headDamageMul * ragdoll_fall_jaw_damage_mul, dmgInfo)
+			if spine3PhysicsHit then
+				hg.organism.input_list.spine3(org, bone, dmg * (2.4 + cervicalLoad * 2 + cervicalImpact * 1.2) * (hadhelmet and 0.65 or 1), dmgInfo)
 				if hg.organism.module.concussion and hg.organism.module.concussion.AddConcussion then
 					local concussion = math.Clamp(dmg * (hadhelmet and 0.75 or 1.8), 0.35, 3.5)
 					hg.organism.module.concussion.AddConcussion(org, concussion, math.Clamp(concussion * 8, 6, 36))
 				end
-			else
-				hg.organism.input_list.skull(org, bone, dmg * skullDmgMul * headDamageMul * ragdoll_fall_skull_damage_mul, dmgInfo)
-				hg.organism.input_list.jaw(org, bone, dmg * headDamageMul * ragdoll_fall_jaw_damage_mul, dmgInfo)
+			end
+			if oldSpine3 < 0.8 and org.spine3 >= 0.8 and hg.BreakNeck then
+				hg.BreakNeck(ent)
 			end
 			
 			org.consciousness = math.Approach(org.consciousness, 0, dmg * head_consciousness_mul * headDamageMul)
