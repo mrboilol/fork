@@ -85,7 +85,6 @@ function SWEP:Shoot(override)
 	if primary.Next > CurTime() then return false end
 	if (primary.NextFire or 0) > CurTime() then return false end
 	primary.Next = CurTime() + primary.Wait
-	self:SetLastShootTime(CurTime())
 	primary.Automatic = weapons.Get(self:GetClass()).Primary.Automatic
 	
     local owner = self:GetOwner()

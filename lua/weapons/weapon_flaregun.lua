@@ -413,8 +413,6 @@ function SWEP:Shoot(override)
     if not override and IsValid(self:GetOwner()) and not self:GetOwner():IsNPC() and (primary.NextFire or 0) > CurTime() then return false end
 
     primary.Next = CurTime() + primary.Wait
-    self:SetLastShootTime(CurTime())
-
     local _, pos, ang = self:GetTrace(true)
     self:DoFlareShot(pos, ang)
 

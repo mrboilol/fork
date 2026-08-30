@@ -129,7 +129,7 @@ function SWEP:Blur(x,y,w,z)
 	if not shouldblur:GetBool() then return nil end
 	local primary = self.Primary
 	
-	local fraction = self:GetAnimPos_Shoot2(self.lastShoot or 0, 0.01 * (math.max((self.weight or 1) - 1,0.1) * 5 + 1))
+	local fraction = self:GetAnimPos_Shoot2(self.lastShoot or 0, 0.01 * (math.max(self:GetWeaponWeight() - 1,0.1) * 5 + 1))
 
 	w = w + fraction * - blurintens:GetFloat()
 	local blurtbl = {x,y,w,z}
@@ -195,7 +195,7 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	local justzoomed = zooming and !oldzoom
 	lastzoom = (justzoomed or (cocking or self.shot2 == 1)) and CurTime() or lastzoom
 
-	local tta = self.GetAimAlignmentTime and self:GetAimAlignmentTime(ply) or math.Clamp(self.weight / 4, 0.25, 1) * 0.5
+	local tta = self.GetAimAlignmentTime and self:GetAimAlignmentTime(ply) or math.Clamp(self:GetWeaponWeight() / 4, 0.25, 1) * 0.5
 	if isvector(vellen) then
 		vellen = vellen:Length()
 	end
@@ -223,7 +223,7 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 		view.angles:RotateAroundAxis(view.angles:Right(), self.GunCamAng and self.GunCamAng[1] or 90)
 		view.angles:RotateAroundAxis(view.angles:Up(), self.GunCamAng and self.GunCamAng[2] or -80)
 		view.angles:RotateAroundAxis(view.angles:Forward(), self.GunCamAng and self.GunCamAng[3] or 0 )
-		local fraction = self:GetAnimPos_Shoot2(self.lastShoot or 0, 0.01 * (math.max((self.weight or 1) - 1,0.1) * 5 + 1))
+		local fraction = self:GetAnimPos_Shoot2(self.lastShoot or 0, 0.01 * (math.max(self:GetWeaponWeight() - 1,0.1) * 5 + 1))
 		--print(CurTime() - self.lastShoot )
 		view.origin = view.origin + VectorRand(-fraction,fraction) * fraction/12
 		view.angles = view.angles + AngleRand(-fraction,fraction) * fraction
@@ -303,7 +303,7 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	local mulhuy = (self:IsPistolHoldType() or self.PistolKinda) and 2 or (((ply.posture == 1 and not self:IsZoom()) or ply.posture == 7 or ply.posture == 8) and 2 or 0.75)
 	local shit = 0.2 * mulhuy / game.GetTimeScale()
 	local animpos3 = self:GetAnimShoot2(shit, true) / shit
-	local shit2 = (1 / self.weight) * (self.NumBullet or 3) / 3
+	local shit2 = (1 / self:GetWeaponWeight()) * (self.NumBullet or 3) / 3
 
 	angZoom:Add(self.prankang or angle_zero)
 	posZoom:Add(VectorRand(-0.05, 0.05) * animpos3 * shit2)

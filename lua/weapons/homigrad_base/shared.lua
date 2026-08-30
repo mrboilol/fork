@@ -31,6 +31,11 @@ SWEP.Secondary.DefaultClip = -1
 SWEP.Secondary.Automatic = false
 SWEP.Secondary.Ammo = "none"
 SWEP.Weight = 5
+function SWEP:GetWeaponWeight()
+	local weight = tonumber(self.weight)
+	if weight == nil then weight = tonumber(self.Weight) end
+	return math.max(weight or 1, 0.1)
+end
 SWEP.AutoSwitchTo = false
 SWEP.AutoSwitchFrom = false
 SWEP.DrawAmmo = true
@@ -165,6 +170,14 @@ function SWEP:GetHandSupportState(ply)
 	}
 end
 
+function SWEP:GetWeaponExperienceMul(ply)
+	ply = ply or self:GetOwner()
+	if not IsValid(ply) then return 1 end
+
+	local skill = math.Clamp(tonumber(ply:GetNWFloat("hg_experience_skill", 0)) or 0, 0, 4.6)
+	return math.Remap(skill, 0, 4.6, 1, 0.78)
+end
+
 function SWEP:GetAmmoBallistics()
 	local ammo = self.Primary and self.Primary.Ammo
 	local ammoInfo = ammo and hg.ammotypeshuy and hg.ammotypeshuy[ammo]
@@ -179,7 +192,7 @@ function SWEP:GetRecoilImpulseFactors()
 	local mass = ammo.Mass or 8
 	local speed = ammo.Speed or 700
 	local numBullet = ammo.NumBullet or self.NumBullet or 1
-	local weaponWeight = math.max(self.weight or self.Weight or 5, 0.5)
+	local weaponWeight = math.max(self:GetWeaponWeight(), 0.5)
 	local payloadCount = math.max(numBullet, 1)
 	local recoilForce = force * (1 + math.max(payloadCount - 1, 0) * 0.55)
 	local forceFactor = math.Clamp(recoilForce / 40, 0.25, 3.75)
@@ -272,7 +285,7 @@ function SWEP:GetAimAlignmentTime(ply)
 
 	local support = self:GetHandSupportState(ply)
 	local handling = self:GetArmHealthHandlingMul()
-	local base = math.Clamp((self.weight or self.Weight or 5) / 4, 0.25, 1) * 0.9
+	local base = math.Clamp(self:GetWeaponWeight() / 4, 0.25, 1) * 0.9
 	local supportMul = support.supportHands >= 2 and 1 or 1.6
 	if support.onlyLeft then supportMul = supportMul * 1.35 end
 	if support.leftBusy or support.rightBusy then supportMul = supportMul * 1.2 end
@@ -282,7 +295,7 @@ function SWEP:GetAimAlignmentTime(ply)
 	local fatigueMul = 1 + math.Clamp(org.aiming_fatigue or 0, 0, 10) * 0.1
 	local combat = hg.GetCombatCondition and hg.GetCombatCondition(ply) or nil
 	local combatMul = combat and combat.aim or 1
-	return math.Clamp(base * handling * supportMul * fatigueMul * combatMul + brainPenalty, 0.2, 8)
+	return math.Clamp(base * handling * supportMul * fatigueMul * combatMul * self:GetWeaponExperienceMul(ply) + brainPenalty, 0.2, 8)
 end
 
 function SWEP:IsManuallyCycledWeapon()
@@ -1733,7 +1746,7 @@ function SWEP:CoreStep()
 	end
 
 	local stam = (owner.organism ~= nil and owner.organism.stamina and owner.organism.stamina[1]) or 180
-	if owner:GetNWFloat("InLegKick",0) <= CurTime() and (!(IsValid(owner.FakeRagdoll) or IsValid(owner.FakeRagdollOld)) or false--[[self:Clip1() <= 0]]) and self:KeyDown(IN_ATTACK) and self:KeyDown(IN_USE) and ((self:GetButtstockAttack() + 1 * ((math.max(0, (self.weight - 3)) * 0.2) + 1) * (math.Clamp((180 - stam) / 90, 1, 2))) < CurTime()) and owner:GetVelocity():LengthSqr() < 250 * 250 and (SERVER or IsFirstTimePredicted()) then
+	if owner:GetNWFloat("InLegKick",0) <= CurTime() and (!(IsValid(owner.FakeRagdoll) or IsValid(owner.FakeRagdollOld)) or false--[[self:Clip1() <= 0]]) and self:KeyDown(IN_ATTACK) and self:KeyDown(IN_USE) and ((self:GetButtstockAttack() + 1 * ((math.max(0, (self:GetWeaponWeight() - 3)) * 0.2) + 1) * (math.Clamp((180 - stam) / 90, 1, 2))) < CurTime()) and owner:GetVelocity():LengthSqr() < 250 * 250 and (SERVER or IsFirstTimePredicted()) then
 		self:SetButtstockAttack(CurTime())
 		self:GetOwner():EmitSound("weapons/tfa/melee"..math.random(1,6)..".ogg")
 		if SERVER then
@@ -1777,7 +1790,7 @@ function SWEP:CoreStep()
 						end
 					end
 
-					owner.organism.stamina.subadd = owner.organism.stamina.subadd + 3 * self.weight
+					owner.organism.stamina.subadd = owner.organism.stamina.subadd + 3 * self:GetWeaponWeight()
 				end
 
 				owner:LagCompensation(false)
@@ -2256,7 +2269,7 @@ function SWEP:GetAdditionalValues()
 	end
 	
 	if true then
-		local timea = 0.3 * ((math.max(0, (self.weight - 3)) * 0.2) + 1)// * (math.Clamp((180 - owner.organism.stamina[1]) / 90, 1, 1.5))
+		local timea = 0.3 * ((math.max(0, (self:GetWeaponWeight() - 3)) * 0.2) + 1)// * (math.Clamp((180 - owner.organism.stamina[1]) / 90, 1, 1.5))
 		local progress = (1 - math.Clamp(self:GetButtstockAttack() - CurTime() + timea * 2, 0, timea * 2) / timea)
 		
 		if progress > 0 then
@@ -2407,12 +2420,13 @@ function SWEP:GetAdditionalValues()
 	end
 
 	local skillissue = ply.organism and ply.organism.recoilmul or 1
+	local experienceMul = self:GetWeaponExperienceMul(ply)
 
 
-	local speed_add = math.Clamp(1 / skillissue,0.5,1.5)
+	local speed_add = math.Clamp(1 / skillissue,0.5,1.5) / experienceMul
 	
 	if not suiciding and !self.norecoil then
-		local weaponRecoilMul = self.WeaponRecoilMul or 1
+		local weaponRecoilMul = (self.WeaponRecoilMul or 1) * experienceMul
 		local cantedHold = ply.posture == 7 or ply.posture == 9
 		local mulhuy = (self:IsPistolHoldType() or self.PistolKinda) and 2 or (((ply.posture == 1 and not self:IsZoom()) or ply.posture == 7 or ply.posture == 8) and 2 or 0.75)
 		local animpos = self:GetAnimShoot2(0.09 * mulhuy / host_timescale(), true)
@@ -2423,7 +2437,7 @@ function SWEP:GetAdditionalValues()
 		animpos = animpos * math.min((self.Primary.Force2 or self.Primary.Force) / 40,3) * ((self.NumBullet or 1) * 3 or 1) * (self.animposmul or 1) // * 4
 
 		self.AdditionalPos2 = self.AdditionalPos2 - (self.AdditionalAng + self.AdditionalAng2):Forward() * animpos * 9
-		local shit2 = (1 / self.weight) * (self.NumBullet or 3) / 3 * 0.5 * weaponRecoilMul
+		local shit2 = (1 / self:GetWeaponWeight()) * (self.NumBullet or 3) / 3 * 0.5 * weaponRecoilMul
 		self.AdditionalPos2[2] = self.AdditionalPos2[2] + math.sin(animpos3) * 1 * shit2
 		self.AdditionalPos2[1] = self.AdditionalPos2[1] + math.sin(animpos3) * -1 * shit2
 		self.AdditionalAng2[2] = self.AdditionalAng2[2] + math.sin(animpos3) * -2 * shit2
@@ -2445,7 +2459,7 @@ function SWEP:GetAdditionalValues()
 		-- this deterministic tail so the live muzzle ray follows the visible climb.
 		local sinceShot = CurTime() - (self:LastShootTime() or 0)
 		local firing = sinceShot >= 0 and sinceShot < 0.24
-		local weaponMass = math.max((self.weight or 1) + (self.addweight or 0), 0.5)
+		local weaponMass = math.max(self:GetWeaponWeight() + (self.addweight or 0), 0.5)
 		local caliberMul, weightMul = self:GetRecoilImpulseFactors()
 		local support = self:GetHandSupportState(ply)
 		local supportMul = self:GetRecoilSupportMul()
@@ -2456,7 +2470,7 @@ function SWEP:GetAdditionalValues()
 		local stanceMul = self:GetPostureStabilityMul(self:IsZoom())
 		local restMul = self:IsResting() and 0.35 or 1
 		local burstMul = 0.85 + math.Clamp((self.SprayI or 0) / 7, 0, 1) * 0.65
-		local physicalImpulse = math.Clamp(caliberMul * weightMul * supportMul * handlingMul * 1.2, 0.3, 5.5)
+		local physicalImpulse = math.Clamp(caliberMul * weightMul * supportMul * handlingMul * experienceMul * 1.2, 0.3, 5.5)
 		local recoveryRate = math.Clamp(0.095 / (1 + armInjury * 0.85 + weaponMass * 0.1 + (support.oneHanded and 0.5 or 0)), 0.018, 0.08)
 		local wobbleTarget = firing and physicalImpulse * burstMul * stanceMul * restMul or 0
 		self.recoilWobbleAmp = Lerp(hg.lerpFrameTime2(firing and 0.42 or recoveryRate, dtime), self.recoilWobbleAmp or 0, wobbleTarget)
@@ -2481,7 +2495,7 @@ function SWEP:GetAdditionalValues()
 
 		if combatInstability > 0.001 then
 			local t = CurTime()
-			local aimWobble = combatInstability * (self:IsResting() and 0.28 or 1)
+			local aimWobble = combatInstability * experienceMul * (self:IsResting() and 0.28 or 1)
 			local longGun = not self:IsPistolHoldType() and not self.PistolKinda
 			local swayPitch = math.sin(t * 2.1) * 0.62 + math.sin(t * 4.7) * 0.38
 			local swayYaw = math.cos(t * 1.7) * 0.67 + math.sin(t * 3.9) * 0.33

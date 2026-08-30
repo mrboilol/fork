@@ -2174,7 +2174,12 @@ local function velocityDamage(ent, data)
 	if ent.NoDismembermentPhysics then org.NoDismembermentPhysics = true end
 	noDismemberment = noDismemberment or org.NoDismembermentPhysics
 	if org.godmode then return end
-	if not noDismemberment and (not ent.hgMeleeImpulseUntil or ent.hgMeleeImpulseUntil <= CurTime()) and hg.FullBodyExplode and not org.fullbodyexploded and (speed >= full_body_physics_speed_threshold or rawPhysicsDamage >= full_body_physics_damage_threshold) then
+	local throwImpulse = (ent.hgThrowImpulseUntil or 0) > CurTime()
+	local ragdollOwner = hg.RagdollOwner(ent)
+	if not throwImpulse and IsValid(ragdollOwner) then
+		throwImpulse = (ragdollOwner.hgThrowImpulseUntil or 0) > CurTime()
+	end
+	if not noDismemberment and not throwImpulse and (not ent.hgMeleeImpulseUntil or ent.hgMeleeImpulseUntil <= CurTime()) and hg.FullBodyExplode and not org.fullbodyexploded and (speed >= full_body_physics_speed_threshold or rawPhysicsDamage >= full_body_physics_damage_threshold) then
 		if hg.FullBodyExplode(ent, data.OurOldVelocity - data.TheirOldVelocity, dmgInfo) then return end
 	end
 

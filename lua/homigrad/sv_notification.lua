@@ -52,27 +52,6 @@ local thoughtMessages = {
     med_error_actor = {"You botched the treatment.", "Something went wrong during treatment."},
 }
 
-local legacyThoughtMessages = {
-    temperature_cold = {
-        "I'm getting cold.",
-        "I can't stop shivering.",
-        "My hands are going numb from the cold.",
-        "I feel so weak... I need to get warm.",
-        "I'm freezing... I don't think I can stay awake."
-    },
-    temperature_hot = {
-        "I'm getting too hot.",
-        "I can't stop sweating.",
-        "The heat is making my head spin.",
-        "I need to cool down before I pass out."
-    },
-    thought_excruciatingpain = {
-        "The pain is unbearable.",
-        "I can't think through this pain.",
-        "Everything hurts too much to move."
-    },
-}
-
 local scpcbHitgroupToCat = {
     [HITGROUP_HEAD] = "head",
     [HITGROUP_CHEST] = "chest",
@@ -335,76 +314,6 @@ local function GetConditionThought(ply, msgKey)
     return options[index]
 end
 
-local function GetLegacyThoughtMessage(ply, msg, msgKey)
-    local options = legacyThoughtMessages[msgKey]
-    if not options then return msg end
-
-    ply.lastLegacyThought = ply.lastLegacyThought or {}
-    local index = math.random(#options)
-    local lastIndex = ply.lastLegacyThought[msgKey]
-    if #options > 1 and index == lastIndex then
-        index = index % #options + 1
-    end
-
-    ply.lastLegacyThought[msgKey] = index
-    return options[index]
-end
-
-local function GetStatusThought(ply)
-    local org = ply.organism or {}
-    local bleeding = hg.IsActivelyBleeding and hg.IsActivelyBleeding(org) or (org.bleed or 0) > 0.05
-    if org.heartstop then return "Your heart stopped." end
-    if (org.o2 and org.o2[1] or 30) <= 8 then return "You are running out of oxygen." end
-    if (org.o2 and org.o2[1] or 30) <= 15 then return "Your oxygen level is critically low." end
-    if (org.arterialBleed or 0) > 0.2 then return "An artery is bleeding heavily." end
-    if bleeding and ((org.bleed or 0) > 1 or (org.blood or 5000) < 2500) then return "Severe blood loss is making you collapse." end
-    if bleeding and ((org.bleed or 0) > 0.5 or (org.blood or 5000) < 3750) then return "You are losing blood." end
-    if (org.internalBleed or 0) > 1.5 then return "Internal bleeding is getting worse." end
-    if (org.pneumothorax or 0) > 0.2 or (org.hemothorax or 0) > 0.2 then return "A chest injury is restricting your breathing." end
-    if (org.pain or 0) > 75 then return "Severe pain is impairing movement." end
-    if org.fibrillation or org.unstableRhythm or (org.arrhythmia or 0) > 0.35 then return "Your heart rhythm is irregular." end
-    if (org.heartbeat or 70) >= 150 then return "Your heart rate is dangerously high." end
-    if (org.heartbeat or 70) > 0 and (org.heartbeat or 70) <= 45 then return "Your heart rate is dangerously low." end
-    if (org.hypotension or 0) > 0.5 then return "Poor circulation is weakening your limbs." end
-    if (org.temperature or 36.6) < 31 then return "Severe hypothermia is making you drowsy and uncoordinated." end
-    if (org.temperature or 36.6) < 35 then return "Cold is making you shiver and lose coordination." end
-    if (org.temperature or 36.6) >= 40 then return "Severe heat stress is making you dizzy and weak." end
-    if (org.temperature or 36.6) > 38 then return "Heat stress is reducing your coordination." end
-    if (org.hungry or 0) >= 85 then return "Starvation is weakening your body." end
-    if (org.hungry or 0) >= 30 then return "You need food." end
-    if (org.thirst or 0) >= 85 then return "Severe dehydration is weakening your body." end
-    if (org.thirst or 0) >= 30 then return "You need water." end
-    if (org.panicattack or 0) > 0.55 then return "Panic is making it hard to focus." end
-    if (org.brain or 0) > 0.1 then return "Your brain is damaged." end
-end
-
-local function GetNewThoughtMessage(ply, msg, msgKey)
-    if msgKey == "phrase" then return GetStatusThought(ply) end
-    local thought = thoughtMessages[msgKey] and GetConditionThought(ply, msgKey)
-    if thought then return thought end
-
-    local key = string.lower(tostring(msgKey or ""))
-    if string.find(key, "panic", 1, true) then return "You are losing focus." end
-    if string.find(key, "neck", 1, true) or string.find(key, "arter", 1, true) then return "A neck artery is bleeding heavily." end
-    if string.find(key, "skull", 1, true) or string.find(key, "jaw", 1, true) then return "You feel severe pain around your head." end
-    if string.find(key, "concussion", 1, true) or string.find(key, "brain", 1, true) then return "Your brain is damaged." end
-    if string.find(key, "bone", 1, true) or string.find(key, "broke", 1, true) or string.find(key, "disloc", 1, true) or string.find(key, "ribs", 1, true) or string.find(key, "pelvis", 1, true) then return "You feel a painful bone injury." end
-    if string.find(key, "blood", 1, true) or string.find(key, "bleed", 1, true) then return "You are losing blood." end
-    if string.find(key, "oxygen", 1, true) or string.find(key, "breath", 1, true) then return "You are struggling to breathe." end
-    if string.find(key, "trachea", 1, true) or string.find(key, "stamina", 1, true) then return "Your trachea is damaged." end
-    if string.find(key, "rhythm", 1, true) or string.find(key, "arrhythm", 1, true) then return "You have a heart arrythmia." end
-    if string.find(key, "tachy", 1, true) then return "You have tachycardia." end
-    if string.find(key, "brady", 1, true) then return "Your have bradycardia." end
-    if string.find(key, "perfusion", 1, true) or string.find(key, "hypotension", 1, true) then return "Your limbs feel unusually cold." end
-    if string.find(key, "rehab", 1, true) or string.find(key, "otrub", 1, true) then return "You feel weak and disoriented after waking up." end
-    if string.find(key, "med_err", 1, true) or string.find(key, "medical", 1, true) then return "You botched the treatment." end
-    if string.find(key, "pain", 1, true) then return "Pain is impairing movement." end
-    if string.find(key, "hunger", 1, true) then return "You need food." end
-    if string.find(key, "thirst", 1, true) or string.find(key, "dehyd", 1, true) then return "You need water." end
-    if string.find(key, "temperature", 1, true) or string.find(key, "heat", 1, true) or string.find(key, "cold", 1, true) then return GetStatusThought(ply) end
-    if string.find(string.lower(msg), "^i[%s'%-]") or string.find(string.lower(msg), "^my%s") then return GetStatusThought(ply) end
-end
-
 local function SCPCBHitThought(ply, target, dmgType, dmg, hitPos, dmginfo)
     if not dmg or dmg <= 0 then return end
 
@@ -480,8 +389,7 @@ local function CreateNotification(ply, msg, delay, msgKey, showTime, func, clr)
     msgKey = msgKey or msg
 
     if ply:GetInfoNum("hg_newthoughts", 0) > 0 and CreateThought then
-        local thought = GetNewThoughtMessage(ply, msg, msgKey)
-        if not thought or thought == "" then return false end
+        local thought = GetConditionThought(ply, msgKey) or msg
 
         local conditionCooldown = conditionThoughtCooldowns[msgKey]
         if conditionCooldown and (delay == nil or isnumber(delay)) then
@@ -492,8 +400,6 @@ local function CreateNotification(ply, msg, delay, msgKey, showTime, func, clr)
     end
 
     if msg == "" then return end
-
-    msg = GetLegacyThoughtMessage(ply, msg, msgKey)
 
     ply.msgs = ply.msgs or {}
     if msgKey and ply.msgs[msgKey] then
@@ -655,12 +561,6 @@ CreateThought = function(ply, msg, delay, msgKey, showTime, clr, func)
     if ply:GetInfoNum("hg_newthoughts", 0) <= 0 then return false end
 
     msgKey = msgKey or msg
-    local lowerMessage = string.lower(msg)
-    if string.find(lowerMessage, "^i[%s'%-]") or string.find(lowerMessage, "^my%s") then
-        local condition = GetNewThoughtMessage(ply, msg, msgKey)
-        if not condition then return false end
-        msg = condition
-    end
     ply.thoughtmsgs = ply.thoughtmsgs or {}
     ply.thoughtGroupCooldowns = ply.thoughtGroupCooldowns or {}
     ply.recentThoughtText = ply.recentThoughtText or {}
@@ -717,7 +617,6 @@ hook.Add("Player Spawn","removeNotifications",function(ply)
     ply.msgs = {}
     ply.thoughtmsgs = {}
     ply.lastConditionThought = {}
-    ply.lastLegacyThought = {}
     ply.thoughtGroupCooldowns = {}
     ply.recentThoughtText = {}
     ply.nextThoughtGlobal = 0
@@ -727,7 +626,6 @@ hook.Add("HG_OnOtrub","removeNotifications",function(ply)
     ply.msgs = {}
     ply.thoughtmsgs = {}
     ply.lastConditionThought = {}
-    ply.lastLegacyThought = {}
     ply.thoughtGroupCooldowns = {}
     ply.recentThoughtText = {}
     ply.nextThoughtGlobal = 0
@@ -737,7 +635,6 @@ hook.Add("Player_Death","removeNotifications",function(ply)
     ply.msgs = {}
     ply.thoughtmsgs = {}
     ply.lastConditionThought = {}
-    ply.lastLegacyThought = {}
     ply.thoughtGroupCooldowns = {}
     ply.recentThoughtText = {}
     ply.nextThoughtGlobal = 0

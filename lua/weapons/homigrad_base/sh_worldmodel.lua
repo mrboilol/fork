@@ -22,7 +22,7 @@ end
 function SWEP:GetAnimShoot2(time, force, delay)
 	if self.IsPistolHoldType and not self:IsPistolHoldType() and not force then return 0 end
 	
-	local animpos = self:GetAnimPos_Shoot2(self.lastShoot or 0, time * (math.max((self.weight or 1) + (self.addweight or 0) - 1,0.1) * 2 + 2))
+	local animpos = self:GetAnimPos_Shoot2(self.lastShoot or 0, time * (math.max(self:GetWeaponWeight() + (self.addweight or 0) - 1,0.1) * 2 + 2))
 	
 	--/ (FrameTime() / engine.TickInterval())
 	animpos = 1.5 * animpos ^ 3 - 1 * animpos ^ 2
@@ -56,10 +56,11 @@ SWEP.weaponAngLerp = Angle(0,0,0)
 SWEP.WeaponInertiaScale = 0.3
 
 function SWEP:GetWeaponInertiaFactor()
-	local mass = math.max((self.weight or 1) + (self.addweight or 0), 0.25)
+	local mass = math.max(self:GetWeaponWeight() + (self.addweight or 0), 0.25)
 	local length = self.InertiaLength or (self.LocalMuzzlePos and math.abs(self.LocalMuzzlePos[1])) or 15
 	local ergonomicsInertia = math.Clamp(1 / (self.Ergonomics or 1), 0.65, 2)
-	return math.Clamp(mass * (math.Clamp(length, 8, 45) / 20) ^ 2, 0.3, 8) * (self.WeaponInertiaScale or 1) * ergonomicsInertia
+	local experienceMul = self.GetWeaponExperienceMul and self:GetWeaponExperienceMul() or 1
+	return math.Clamp(mass * (math.Clamp(length, 8, 45) / 20) ^ 2, 0.3, 8) * (self.WeaponInertiaScale or 1) * ergonomicsInertia * experienceMul
 end
 
 function SWEP:GetInertialAimAngle(target, dtime)

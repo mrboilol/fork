@@ -110,7 +110,6 @@ function SWEP:Shoot(override)
 	if primary.Next > CurTime() then return false end
 	if (primary.NextFire or 0) > CurTime() then return false end
 	primary.Next = CurTime() + primary.Wait
-	self:SetLastShootTime(CurTime())
 	primary.Automatic = weapons.Get(self:GetClass()).Primary.Automatic
 
     local gun = self:GetWeaponEntity()
@@ -162,6 +161,7 @@ function SWEP:Shoot(override)
 		--end
 	end
 
+	self:SetLastShootTime(CurTime())
 	self:EmitShoot()
 	--self:PrimarySpread()
 	self:PlayAnim("fire",1,false,nil,false,false,true)

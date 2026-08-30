@@ -528,7 +528,9 @@ function SWEP:GetTrace(bCacheTrace, desiredPos, desiredAng, NoTrace, closeanim)
 		gunpos, gunang = LocalToWorld(mat:GetTranslation(), mat:GetAngles(), gunpos, gunang)
 	end
 	
-	local pos, ang = LocalToWorld(self.LocalMuzzlePos, self.LocalMuzzleAng, gunpos, gunang)
+	local muzzlePos = self.LocalMuzzlePos or vecZero
+	local muzzleAng = self.LocalMuzzleAng or angZero
+	local pos, ang = LocalToWorld(muzzlePos, muzzleAng, gunpos, gunang)
 
 	if CLIENT and !closeanim then
 		local muzz = self:GetMuzzleAtt(gun, true)
@@ -781,6 +783,8 @@ function SWEP:FireBullet()
 			end
 			local combat = hg.GetCombatCondition and hg.GetCombatCondition(owner) or nil
 			if combat then accuracyMul = accuracyMul * combat.aim end
+			local experienceMul = self.GetWeaponExperienceMul and self:GetWeaponExperienceMul(owner) or 1
+			accuracyMul = accuracyMul * experienceMul
 			local readiness = self.weaponReadiness or 1
 			local stability = self.weaponStability or 0
 			accuracyMul = accuracyMul * Lerp(readiness, 2.2, 1)

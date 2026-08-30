@@ -204,7 +204,6 @@ function SWEP:Shoot(override)
 	self.Shooted = self.Shooted + 1
 
 	primary.Next = CurTime() + primary.Wait
-	self:SetLastShootTime(CurTime())
 	self:PrimaryShoot()
 	self:PrimaryShootPost()
 end

@@ -105,66 +105,6 @@ local internalBleedThoughts = {
 	"I feel like something ripped inside.",
 	"I think something moved wrong inside.",
 }
-local bloodLossThoughts = {
-	light = {
-		"It might be a good idea to stop the bleeding.",
-		"Im feeling a little lightheaded...",
-		"Im starting to lose some blood...",
-		"Im feeling more weak than usual.",
-		"I need to stop the bleeding before it gets worse."
-	},
-	moderate = {
-		"I can feel my heart struggling already.",
-		"I can feel myself getting weaker...",
-		"Im really starting to feel dizzy now...",
-		"I feel my limbs getting numb...",
-		"Im feeling really cold right now."
-	},
-	severe = {
-		"Im too dizzy to keep going...",
-		"The border of my vision is getting dark...",
-		"Everything is starting to go gray...",
-		"I cant keep going like this.",
-		"I can't feel my fingers..."
-	},
-	critical = {
-		"I'm so close to death...",
-		"Its so cold and dark...",
-		"Im barely grasping consciousness...",
-		"Im trying, I really am...",
-		"It's so cold... I can't feel anything..."
-	}
-}
-
-local bloodLossNotificationKeys = {
-	"bloodloss_light",
-	"bloodloss_moderate",
-	"bloodloss_severe",
-	"bloodloss_critical",
-}
-
-local function clearBloodLossThoughts(owner, keep)
-	if not IsValid(owner) or not owner.ResetNotification then return end
-	for _, key in ipairs(bloodLossNotificationKeys) do
-		if key ~= keep then owner:ResetNotification(key) end
-	end
-end
-
-local function notifyBloodLoss(owner, org, symptomaticLoss)
-	if not org.isPly or org.otrub or symptomaticLoss <= 0.05 or not IsValid(owner) or not hg.IsActivelyBleeding(org) then
-		clearBloodLossThoughts(owner)
-		return
-	end
-
-	local blood = org.blood or 5000
-	local severity = blood < 3250 and "critical" or blood < 3750 and "severe" or blood < 4500 and "moderate" or "light"
-	local thoughts = bloodLossThoughts[severity]
-	local delay = severity == "critical" and 10 or severity == "severe" and 14 or severity == "moderate" and 20 or 30
-	local key = "bloodloss_" .. severity
-	clearBloodLossThoughts(owner, key)
-	owner:Notify(thoughts[math.random(#thoughts)], delay, key, 0, nil, Color(200, 170, 170))
-end
-
 local vecZero = Vector(0, 0, 0)
 local limbArteryWeakness = {
 	rarmartery = {limb = "rarm", damage = 0.65},
@@ -833,7 +773,6 @@ module[2] = function(owner, org, mulTime)
 	if hg.organism.UpdateVitalHealthToll then
 		hg.organism.UpdateVitalHealthToll(owner, org, mulTime)
 	end
-	notifyBloodLoss(owner, org, symptomaticLoss)
 	updateHoldWound(org)
 end
 

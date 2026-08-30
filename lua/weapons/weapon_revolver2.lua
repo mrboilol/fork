@@ -426,7 +426,6 @@ function SWEP:Shoot(override)
 	self:ShiftDrum(1)
 	
 	primary.Next = CurTime() + primary.Wait
-	self:SetLastShootTime(CurTime())
 	primary.Automatic = weapons.Get(self:GetClass()).Primary.Automatic
 	self:PrimaryShoot()
 	self:PrimaryShootPost()

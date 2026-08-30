@@ -63,6 +63,25 @@ local function GetCombatStrengthMul(ply)
 
 	return math.max(mul, 0)
 end
+
+local function GetThrowStrengthMul(ply)
+	local mul = GetCombatStrengthMul(ply)
+	local org = IsValid(ply) and ply.organism
+	if org and (org.fury13 or 0) > 0 then
+		return math.min(mul, 2)
+	end
+	return mul
+end
+
+local function ProtectThrownRagdoll(ent)
+	if not IsValid(ent) then return end
+
+	local expires = CurTime() + 1.25
+	ent.hgThrowImpulseUntil = expires
+
+	local owner = ent:IsPlayer() and ent or ent:IsRagdoll() and hg.RagdollOwner(ent)
+	if IsValid(owner) then owner.hgThrowImpulseUntil = expires end
+end
 SWEP.animtime = 0
 SWEP.HeadbuttReach = 25
 SWEP.HeadbuttCooldown = 2.35
@@ -1712,7 +1731,8 @@ function SWEP:ApplyForce()
 				if bone != "ValveBiped.Bip01_Spine2" or !trace.Hit then
 					local throwCap = self.TwoHandGrip and 8000 or 5000
 					local throwMassScale = self.TwoHandGrip and 1200 or 800
-					phys:ApplyForceCenter(ply:GetAimVector() * math.min(throwCap, phys:GetMass() * throwMassScale) * GetCombatStrengthMul(ply))
+					phys:ApplyForceCenter(ply:GetAimVector() * math.min(throwCap, phys:GetMass() * throwMassScale) * GetThrowStrengthMul(ply))
+					ProtectThrownRagdoll(self.CarryEnt)
 					self:SetCarrying()
 				end
 
@@ -1807,7 +1827,9 @@ function SWEP:ApplyForce()
 			end
 
 			if ply:KeyDown(IN_ATTACK) and (ply.organism.superfighter or ply:IsBerserk()) then
-				phys:ApplyForceCenter(ply:GetAimVector() * 40000 * self.Penetration * GetCombatStrengthMul(ply))
+				local thrownEnt = self.CarryEnt
+				phys:ApplyForceCenter(ply:GetAimVector() * 40000 * self.Penetration * GetThrowStrengthMul(ply))
+				ProtectThrownRagdoll(thrownEnt)
 				self:SetCarrying()
 			end
 		end
@@ -2569,6 +2591,13 @@ function SWEP:AttackFront(special_attack, rand)
 		end
 
 		Mul = Mul * self:BlockingLogic(Ent, Mul, 0, trace)
+		local physicalMul = Mul
+		if owner.organism and (owner.organism.fury13 or 0) > 0 then
+			local combatMul = GetCombatStrengthMul(owner)
+			if combatMul > 0 then
+				physicalMul = Mul * math.min(1, GetThrowStrengthMul(owner) / combatMul)
+			end
+		end
 		
 		local glass = false
 		if string.find(Ent:GetClass(), "break") and Ent:GetBrushSurfaces()[1] and string.find(Ent:GetBrushSurfaces()[1]:GetMaterial():GetName(), "glass") then
@@ -2579,7 +2608,7 @@ function SWEP:AttackFront(special_attack, rand)
 		Dam:SetAttacker(owner)
 		Dam:SetInflictor(self)
 		Dam:SetDamage(DamageAmt * Mul * 0.75 * (clawClasses[owner.PlayerClassName] and 5 or 1))
-		Dam:SetDamageForce(AimVec * Mul ^ 2)
+		Dam:SetDamageForce(AimVec * physicalMul ^ 2)
 		Dam:SetDamageType((clawClasses[owner.PlayerClassName] or (Ent:GetClass() == "func_breakable_surf")) and DMG_SLASH or DMG_CLUB)
 		Dam:SetDamagePosition(HitPos)
 		if hg.SetMeleeDamageContact then hg.SetMeleeDamageContact(self, Ent, trace) end
@@ -2598,9 +2627,12 @@ function SWEP:AttackFront(special_attack, rand)
 
 		if IsValid(Phys) then
 			if Ent:IsPlayer() then
-				Ent:SetVelocity(AimVec * SelfForce * 1.5 * (owner.organism.superfighter and 2 or 1) * (isZomb and 4 or 1) * (1 + owner.organism.berserk * 5))
+				Ent:SetVelocity(AimVec * SelfForce * 1.5 * (owner.organism.superfighter and 2 or 1) * (isZomb and 4 or 1) * GetThrowStrengthMul(owner))
 			end
-			Phys:ApplyForceOffset(AimVec * 5000 * Mul * (isZomb and 3 or 1), HitPos)
+			Phys:ApplyForceOffset(AimVec * 5000 * physicalMul * (isZomb and 3 or 1), HitPos)
+			if owner.organism and (owner.organism.fury13 or 0) > 0 then
+				ProtectThrownRagdoll(Ent)
+			end
 			owner:SetVelocity(AimVec * SelfForce * .8 * (owner.organism.superfighter and 2 or 1) * (isZomb and 2 or 1) * (1 + owner.organism.berserk / 10))
 		end
 	end
@@ -2840,7 +2872,7 @@ if SERVER then
 
 			if wep.GetCarrying and ply:KeyDown(IN_ATTACK) then
 				phys:ApplyForceCenter(ply:GetAimVector() * math.min(5000, phys:GetMass() * 800))
-				
+				ProtectThrownRagdoll(ent)
 				hg.SetCarryEnt2(ply)
 				heldents[i] = nil
 			end

@@ -159,7 +159,7 @@ function SWEP:AnimHold()
 	self:SetHold(self.holdtype)
 
 	local stam = (ply.organism ~= nil and ply.organism.stamina and ply.organism.stamina[1]) or 180
-	local timea = 0.4 * ((math.max(0, (self.weight - 3)) * 0.2) + 1) * (math.Clamp((180 - stam) / 90, 1, 1.5))
+	local timea = 0.4 * ((math.max(0, (self:GetWeaponWeight() - 3)) * 0.2) + 1) * (math.Clamp((180 - stam) / 90, 1, 1.5))
 	local progress = (1 - math.Clamp(self:GetButtstockAttack() - CurTime() + timea * 2, 0, timea * 2) / timea)
 	
 	if progress > 0 then
@@ -221,7 +221,8 @@ function SWEP:AnimApply_ShootRecoil(time)
 	local owner = self:GetOwner()
 	local animpos = self:GetAnimPos_Shoot(time, 0.3)
 	animpos = math.ease.InOutSine(animpos)
-	animpos = animpos * ((self:IsZoom() and self.SpreadMulZoom or self.SpreadMul) + math_max(self.Primary.Force / 110 - 1, 0)) * (( not owner:IsNPC() and owner:Crouching() ) and self.CrouchMul or 1) * 0.75
+	local experienceMul = self.GetWeaponExperienceMul and self:GetWeaponExperienceMul(owner) or 1
+	animpos = animpos * experienceMul * ((self:IsZoom() and self.SpreadMulZoom or self.SpreadMul) + math_max(self.Primary.Force / 110 - 1, 0)) * (( not owner:IsNPC() and owner:Crouching() ) and self.CrouchMul or 1) * 0.75
 	animpos = animpos * self.AnimShootMul
 	--if animpos > 0 then
 		if CLIENT and (owner ~= LocalPlayer() or LocalPlayer() ~= GetViewEntity()) then

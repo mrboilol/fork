@@ -540,20 +540,18 @@ function MODE:ShouldRoundEnd()
 		return true
 	end
 
-	if MODE.variant == 3 then
-		local gruntsAlive = false
-		for _, ply in player.Iterator() do
-			if ply:Team() == TEAM_SPECTATOR then continue end
-			if self:IsJuggernaut(ply) then continue end
-			if ply:Alive() then
-				gruntsAlive = true
-				break
-			end
+	local gruntsAlive = false
+	for _, ply in player.Iterator() do
+		if ply:Team() == TEAM_SPECTATOR then continue end
+		if self:IsJuggernaut(ply) then continue end
+		if ply:Alive() then
+			gruntsAlive = true
+			break
 		end
-		if not gruntsAlive then
-			self._juggernautSurvived = true
-			return true
-		end
+	end
+	if not gruntsAlive then
+		self._juggernautSurvived = true
+		return true
 	end
 
 	return nil

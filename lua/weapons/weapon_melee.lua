@@ -1991,7 +1991,7 @@ function SWEP:PlayEffects(trace, attacktype)
 
         owner:EmitSound(self:GetAttackHitSound(attacktype), 50)
 
-		if self.weight >= 1.5 and self.DamageType ~= DMG_SLASH and trace.MatType ~= MAT_GLASS and not self:IsSecondaryAttackType(attacktype) then
+		if (tonumber(self.weight) or 0) >= 1.5 and self.DamageType ~= DMG_SLASH and trace.MatType ~= MAT_GLASS and not self:IsSecondaryAttackType(attacktype) then
 			util.Decal("Impact.BluntAdd" .. math.random(bluntDecalsRand), trace.HitPos + trace.HitNormal, trace.HitPos - trace.HitNormal, owner)
 			owner:ScreenShake(trace.HitPos, self.HitScreenShakeAmp or 22, self.HitScreenShakeFreq or 6, self.HitScreenShakeDur or 0.28, self.HitScreenShakeRadius or 110, false)
 		end

@@ -45,7 +45,8 @@ function SWEP:GetPrimaryMul()
 	local owner = self:GetOwner()
 	local mul = ((0.5) + math_max(self.Primary.Force / 110 - 1, 0)) * (owner.Crouching and owner:Crouching() and self.CrouchMul or 1)
 	self:ApplyForce(mul)
-	mul = (mul or 0) * (owner.organism and owner.organism.recoilmul or 1)
+	local experienceMul = self.GetWeaponExperienceMul and self:GetWeaponExperienceMul(owner) or 1
+	mul = (mul or 0) * (owner.organism and owner.organism.recoilmul or 1) * experienceMul
 	return mul
 end
 
@@ -100,10 +101,11 @@ function SWEP:PrimarySpread()
 		local caliberMul, weightMul = self:GetRecoilImpulseFactors()
 		local supportMul = self:GetRecoilSupportMul()
 		local handlingMul = self:GetArmHealthHandlingMul()
+		local experienceMul = self.GetWeaponExperienceMul and self:GetWeaponExperienceMul(owner) or 1
 		local stanceMul = self:GetPostureStabilityMul(self:IsZoom())
 		local cantedHold = owner.posture == 7 or owner.posture == 9
 		local restMul = self:IsResting() and 0.35 or 1
-		local recoilImpulse = math.Clamp(caliberMul * weightMul * supportMul * handlingMul * stanceMul * (0.78 + math.min(sprayI / 11, 0.82)) * restMul * (self.WeaponRecoilMul or 1) * self:GetAttachmentRecoilMul() * 1.3, 0.18, 7)
+		local recoilImpulse = math.Clamp(caliberMul * weightMul * supportMul * handlingMul * experienceMul * stanceMul * (0.78 + math.min(sprayI / 11, 0.82)) * restMul * (self.WeaponRecoilMul or 1) * self:GetAttachmentRecoilMul() * 1.3, 0.18, 7)
 		local lateralImpulse = recoilImpulse * math.Clamp(self.addSprayMul or 1, 0.08, 2.5)
 		self.recoilShotIndex = (self.recoilShotIndex or 0) + 1
 		local seed = self.recoilShotIndex * 43
@@ -140,11 +142,12 @@ function SWEP:PrimarySpread()
 		end
 		local supportMul = self.GetRecoilSupportMul and self:GetRecoilSupportMul() or 1
 		local handlingMul = self.GetArmHealthHandlingMul and self:GetArmHealthHandlingMul() or 1
+		local experienceMul = self.GetWeaponExperienceMul and self:GetWeaponExperienceMul(owner) or 1
 		local stanceMul = self.GetPostureStabilityMul and self:GetPostureStabilityMul(self:IsZoom()) or 1
 		local combat = hg.GetCombatCondition and hg.GetCombatCondition(owner) or nil
 		local combatAimMul = combat and combat.aim or 1
 		local cantedHold = owner.posture == 7 or owner.posture == 9
-		local force = math.Clamp(caliberMul * weightMul * supportMul * handlingMul * stanceMul * (0.75 + math.min(sprayI / 10, 0.75)) * 1.18, 0.18, 5.5)
+		local force = math.Clamp(caliberMul * weightMul * supportMul * handlingMul * experienceMul * stanceMul * (0.75 + math.min(sprayI / 10, 0.75)) * 1.18, 0.18, 5.5)
 		local panic = organism.panicattackActive and math.Clamp(organism.panicattack or 0, 0.45, 1) or 0
 		local panicRecoilMul = panic > 0 and math.Remap(panic, 0.45, 1, 1.12, 1.42) or 1
 		force = force * panicRecoilMul * combatAimMul
@@ -221,7 +224,7 @@ function SWEP:PrimarySpread()
 		sprayAng:RotateAroundAxis(angle_zero:Forward(), eyeang.roll)
 		sprayAng.roll = 0
 
-		owner:SetEyeAngles(eyeang + sprayAng * (organism.recoilmul or 1) * (owner.posture == 1 and not self:IsZoom() and 0.1 or 1) * 0.18 * screenRecoilMul)
+		owner:SetEyeAngles(eyeang + sprayAng * (organism.recoilmul or 1) * experienceMul * (owner.posture == 1 and not self:IsZoom() and 0.1 or 1) * 0.18 * screenRecoilMul)
 		
 		local max_clip1 = self:GetMaxClip1()
 		

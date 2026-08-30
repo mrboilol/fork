@@ -7,6 +7,11 @@ zb.Experience.PlayerInstances = zb.Experience.PlayerInstances or {}
 zb.Experience.Active = zb.Experience.Active or false
 zb.Experience._loaded = true
 
+local function SetNetworkedSkill(ply, skill)
+    if not IsValid(ply) then return end
+    ply:SetNWFloat("hg_experience_skill", math.max(tonumber(skill) or 0, 0))
+end
+
 hook.Add("DatabaseConnected", "ExperienceCreateData", function()
 	local query
 
@@ -38,6 +43,7 @@ hook.Add( "PlayerInitialSpawn","ZB_Exp_OnInitSpawn", function( ply )
         inst.sandbox_kills = inst.sandbox_kills or 0
         inst.sandbox_deaths = inst.sandbox_deaths or 0
         inst.sandbox_suicides = inst.sandbox_suicides or 0
+        SetNetworkedSkill(ply, inst.sandbox_skill)
         return
     end 
 
@@ -67,6 +73,7 @@ hook.Add( "PlayerInitialSpawn","ZB_Exp_OnInitSpawn", function( ply )
                 zb.Experience.PlayerInstances[steamID64].deaths = tonumber(result[1].deaths)
                 zb.Experience.PlayerInstances[steamID64].kills = tonumber(result[1].kills)
                 zb.Experience.PlayerInstances[steamID64].suicides = tonumber(result[1].suicides)
+                SetNetworkedSkill(ply, zb.Experience.PlayerInstances[steamID64].skill)
 
 			else
 				local insertQuery = mysql:Insert("zb_experience")
@@ -91,6 +98,7 @@ hook.Add( "PlayerInitialSpawn","ZB_Exp_OnInitSpawn", function( ply )
                 zb.Experience.PlayerInstances[steamID64].deaths = 0
                 zb.Experience.PlayerInstances[steamID64].kills = 0
                 zb.Experience.PlayerInstances[steamID64].suicides = 0
+                SetNetworkedSkill(ply, 0)
 
 			end
 		end)
@@ -142,6 +150,7 @@ function plyMeta:GiveSkill( ammout )
     if not zb.Experience.PlayerInstances[steamID64] then zb.Experience.PlayerInstances[steamID64] = {} end
 
     zb.Experience.PlayerInstances[steamID64].skill = math.max( (zb.Experience.PlayerInstances[steamID64].skill or 0) + ammout, 0 )
+    SetNetworkedSkill(self, zb.Experience.PlayerInstances[steamID64].skill)
 
 	if zb.Experience.Active then
 		local updateQuery = mysql:Update("zb_experience")
@@ -245,6 +254,7 @@ function plyMeta:GiveSandboxSkill(ammout)
     if not zb.Experience.PlayerInstances[steamID64] then return end
     local inst = zb.Experience.PlayerInstances[steamID64]
     inst.sandbox_skill = math.max((inst.sandbox_skill or 0) + ammout, 0)
+    SetNetworkedSkill(self, inst.sandbox_skill)
 end
 
 function plyMeta:GetSandboxKills()

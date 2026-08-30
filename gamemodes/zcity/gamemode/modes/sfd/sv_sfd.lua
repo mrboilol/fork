@@ -2,6 +2,8 @@ local MODE = MODE
 
 MODE.name = "superfighters"
 MODE.PrintName = "Superfighters 3D"
+MODE.Description = "Loot weapons, fight through the city, and be the last Superfighter standing."
+MODE.start_time = 5
 MODE.LootSpawn = true
 MODE.GuiltDisabled = true
 MODE.randomSpawns = true
@@ -34,11 +36,12 @@ function MODE:Intermission()
 		ply:SetupTeam(0)
 	end
 
-	local rndpoints = zb.GetMapPoints("RandomSpawns")
-	zonepoint = table.Random(rndpoints)
+	local rndpoints = zb.GetMapPoints("RandomSpawns") or {}
+	local point = table.Random(rndpoints)
+	local zonePos = point and point.pos or (player.GetHumans()[1] and player.GetHumans()[1]:GetPos() or vector_origin)
 
 	net.Start("supfight_start")
-		net.WriteVector(zonepoint.pos)
+		net.WriteVector(zonePos)
 	net.Broadcast()
 end
 
@@ -46,6 +49,7 @@ function MODE:CheckAlivePlayers()
 	local AlivePlyTbl = {
 	}
 	for _, ply in player.Iterator() do
+		if ply:Team() == TEAM_SPECTATOR then continue end
 		if not ply:Alive() then continue end
 		if ply.organism and ply.organism.incapacitated then continue end
 		AlivePlyTbl[#AlivePlyTbl + 1] = ply
@@ -54,7 +58,7 @@ function MODE:CheckAlivePlayers()
 end
 
 function MODE:ShouldRoundEnd()
-	return (#zb:CheckAlive(true) <= 1)
+	return #self:CheckAlivePlayers() <= 1
 end
 
 function MODE:RoundStart()
@@ -64,8 +68,9 @@ function MODE:RoundStart()
 		ply.noSound = true
 		local hands = ply:Give("weapon_hands_sh")
 
-		local inv = ply:GetNetVar("Inventory")
-		inv["Weapons"]["hg_sling"] = true
+		local inv = ply:GetNetVar("Inventory") or {}
+		inv.Weapons = inv.Weapons or {}
+		inv.Weapons.hg_sling = true
 		ply:SetNetVar("Inventory",inv)
 
 		ply:Give("weapon_walkie_talkie")
@@ -164,8 +169,9 @@ end
 
 function MODE:EndRound()
 	timer.Simple(2,function()
+		if CurrentRound() ~= self then return end
 		net.Start("supfight_end")
-		local ent = zb:CheckAlive(true)[1]
+		local ent = self:CheckAlivePlayers()[1]
 		net.WriteEntity(IsValid(ent) and ent:Alive() and ent or NULL)
 		net.Broadcast()
 	end)

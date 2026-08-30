@@ -55,11 +55,19 @@ function hg.organism.GetHemorrhageCompensationDrive(blood)
 	return math.Clamp((1 - reserve) / math.max(1 - bradyReserve, 0.05), 0, 1)
 end
 
+local function getHemorrhageDanger(blood)
+	local normalBlood = math.max(tonumber((hg.organism.config or {}).NORMAL_BLOOD_VOLUME_ML) or hg.organism.normalBloodVolume or 5000, 1)
+	local volumeFraction = math.Clamp((tonumber(blood) or normalBlood) / normalBlood, 0, 1)
+	return math.Clamp((0.60 - volumeFraction) / 0.20, 0, 1) ^ 1.2
+end
+
 function hg.organism.GetHemorrhageOxygenTransportFraction(blood)
 	local cfg = hg.organism.config or {}
 	local normalBlood = math.max(tonumber(cfg.NORMAL_BLOOD_VOLUME_ML) or hg.organism.normalBloodVolume or 5000, 1)
 	local volumeFraction = math.Clamp((tonumber(blood) or normalBlood) / normalBlood, 0, 1)
-	return hg.organism.GetBloodDeliveryFraction(blood, 1) * (0.55 + volumeFraction * 0.45)
+	local compensatedTransport = 1 - (1 - volumeFraction) * 0.20
+	local depletedTransport = hg.organism.GetBloodDeliveryFraction(blood, 1)
+	return Lerp(getHemorrhageDanger(blood), compensatedTransport, depletedTransport)
 end
 
 function hg.organism.UpdateVitalHealthToll(owner, org, timeValue)
@@ -343,10 +351,9 @@ end
 
 local function getPalpitationThreat(org, blood, o2Value)
 	-- Hemorrhage-related rhythm danger follows the same preload reserve as cardiac
-	-- output. It stays near zero while compensation is effective, then rises with
-	-- severe loss instead of switching on at a raw blood-volume checkpoint.
-	local preloadReserve = getBloodPerfusion(blood)
-	local lowBlood = math.Clamp((0.55 - preloadReserve) / 0.55, 0, 1)
+	-- output. It stays near zero through compensated loss, then rises through the
+	-- 3000-2000 mL danger band instead of switching on around normal volume.
+	local lowBlood = getHemorrhageDanger(blood)
 	local lowCirculation = math.Clamp(((org.hypotension or 0) - 0.5) / 0.5, 0, 1)
 	local hypoxia = math.Clamp((12 - o2Value) / 12, 0, 1)
 	local shock = math.Clamp(((org.shock or 0) - 20) / 40, 0, 1)
@@ -815,9 +822,11 @@ module[2] = function(owner, org, timeValue)
 	
 	local bloodNow = org.blood or 5000
 	local preloadReserve = getBloodPerfusion(bloodNow)
-	-- Rhythm stress follows the same preload reserve that drives circulation.
-	-- This avoids creating a second raw-blood danger band with different cutoffs.
-	local hemorrhageRhythmStress = math.Clamp((0.55 - preloadReserve) / 0.50, 0, 1)
+	-- Blood loss alone should not destabilize the rhythm while the patient is
+	-- still in the compensated range. Complications can still lower circulation
+	-- and enter the electrical-risk path independently.
+	local hemorrhageDanger = getHemorrhageDanger(bloodNow)
+	local hemorrhageRhythmStress = hemorrhageDanger
 	org.hemorrhageRhythmStress = hemorrhageRhythmStress
 	local hemorrhageCompensation = math.Clamp(org.hemorrhageCompensation or 0, 0, 1)
 	local hypovolemicShock = math.Clamp(org.hypovolemicShock or 0, 0, 1)
@@ -1087,7 +1096,8 @@ module[2] = function(owner, org, timeValue)
 	local electricalFlowFailure = math.Clamp((0.62 - circulatoryReserve) / 0.62, 0, 1)
 	local electricalO2Failure = math.Clamp((0.58 - hemorrhageO2Transport) / 0.58, 0, 1)
 	local myocardialFailure = math.Clamp((0.45 - (org.myocardialOxygen or 1)) / 0.45, 0, 1)
-	local hemorrhageElectricalInstability = math.max(electricalFlowFailure, electricalO2Failure, myocardialFailure)
+	local bloodOnlyElectricalFailure = math.max(electricalO2Failure, myocardialFailure) * hemorrhageDanger
+	local hemorrhageElectricalInstability = math.max(electricalFlowFailure, bloodOnlyElectricalFailure)
 	org.hemorrhageElectricalInstability = hemorrhageElectricalInstability
 	local criticalReserve = cfg.CRITICAL_CIRCULATION_RESERVE or 0.31
 	local criticalRange = math.max(cfg.CRITICAL_CIRCULATION_RANGE or 0.10, 0.01)
