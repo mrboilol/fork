@@ -1,6 +1,8 @@
 local CurTime = CurTime
 local time
 local max, min, Round = math.max, math.min, math.Round
+local internalBleedCatastrophicThreshold = 10
+local internalBleedDefaultComplicationDelay = 120
 --local Organism = hg.organism
 hg.organism.module.blood = {}
 local module = hg.organism.module.blood
@@ -69,7 +71,7 @@ module[1] = function(org)
 	org.internalBleedDuration = 0
 	org.internalBleedPeak = 0
 	org.internalBleedComplication = 0
-	org.internalBleedComplicationDelay = 90
+	org.internalBleedComplicationDelay = internalBleedDefaultComplicationDelay
 	org.internalBleedHemothoraxRoll = nil
 	org.internalBleedHemothoraxRisk = false
 	org.internalBleedThoughtLevel = 0
@@ -457,13 +459,12 @@ module[2] = function(owner, org, mulTime)
 		org.internalBleedDuration = (org.internalBleedDuration or 0) + mulTime
 		org.internalBleedPeak = math.max(org.internalBleedPeak or 0, internalBleedSeverity)
 
-		local severityK = math.Clamp(((org.internalBleedPeak or 0) - 0.2) / 2.8, 0, 1)
-		-- Internal injuries must have time to develop consequences. Moderate
-		-- untreated bleeding can progress into shock, while catastrophic trauma
-		-- deteriorates much faster.
-		local complicationDelay = Lerp(severityK, 45, 5)
-		local progressionTime = Lerp(severityK, 105, 18)
-		local severityLimit = math.Clamp((org.internalBleedPeak or 0) / 2, 0.1, 1)
+		local internalBleedPeak = org.internalBleedPeak or 0
+		local catastrophic = internalBleedPeak >= internalBleedCatastrophicThreshold
+		local severityK = math.Clamp(internalBleedPeak / internalBleedCatastrophicThreshold, 0, 1)
+		local complicationDelay = catastrophic and 0 or Lerp(severityK, internalBleedDefaultComplicationDelay, 60)
+		local progressionTime = catastrophic and 1 or Lerp(severityK, 360, 240)
+		local severityLimit = catastrophic and 1 or math.Clamp(severityK, 0.05, 0.9)
 		local complicationTarget = math.Clamp(((org.internalBleedDuration or 0) - complicationDelay) / progressionTime, 0, 1) * severityLimit
 
 		org.internalBleedComplicationDelay = complicationDelay
@@ -484,8 +485,8 @@ module[2] = function(owner, org, mulTime)
 	else
 		org.internalBleedDuration = 0
 		org.internalBleedPeak = 0
-		org.internalBleedComplicationDelay = 90
-		org.internalBleedComplication = math.Approach(org.internalBleedComplication or 0, 0, mulTime / 90)
+		org.internalBleedComplicationDelay = internalBleedDefaultComplicationDelay
+		org.internalBleedComplication = math.Approach(org.internalBleedComplication or 0, 0, mulTime / internalBleedDefaultComplicationDelay)
 		org.internalBleedHemothoraxRoll = nil
 		org.internalBleedHemothoraxRisk = false
 	end

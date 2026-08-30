@@ -3,7 +3,7 @@ SWEP.Base = "weapon_bandage_sh"
 SWEP.PrintName = "Bruice kit"
 SWEP.Color = Color(0, 255, 150)
 SWEP.BandageTPIKColor = SWEP.Color
-SWEP.Instructions = "A medical kit designed to restore limb condition. RMB to use on someone else."
+SWEP.Instructions = "A medical kit designed to restore limb condition and a small amount of internal bleeding. RMB to use on someone else."
 SWEP.Category = "ZCity Medicine"
 SWEP.Spawnable = true
 SWEP.Primary.Wait = 1
@@ -59,6 +59,8 @@ if SERVER then
 	local brokenLimbsList = { "lleg", "rleg", "larm", "rarm", "chest" }
 	local complexBonesList = { "spine3", "spine2", "spine1", "pelvis", "chest", "skull" }
 	local boneHealing = 0.35
+	local internalBleedHealing = 0.5
+	local internalBleedCost = 0.25
 
 	local function CanHealKey(org, key)
 		local v = tonumber(org[key] or 0) or 0
@@ -110,6 +112,18 @@ if SERVER then
 			end
 		end
 
+		local internalBleed = math.max((tonumber(org.internalBleed) or 0) - (tonumber(org.internalBleedHeal) or 0), 0)
+		if internalBleed > 0.05 and totalCost + internalBleedCost <= availableResource + 0.001 then
+			totalCost = totalCost + internalBleedCost
+			totalRotations = totalRotations + 1
+			table.insert(bonesToHeal, {
+				key = "internalBleed",
+				cost = internalBleedCost,
+				heal = math.min(internalBleed, internalBleedHealing),
+				internalBleed = true,
+			})
+		end
+
 		return totalRotations, totalCost, bonesToHeal
 	end
 
@@ -144,6 +158,15 @@ if SERVER then
 		local amountHealed = 0
 		for _, data in ipairs(bones) do
 			local key = data.key
+			if data.internalBleed then
+				local internalBleed = math.max((tonumber(org.internalBleed) or 0) - (tonumber(org.internalBleedHeal) or 0), 0)
+				local healAmount = math.min(internalBleed, data.heal)
+				if healAmount > 0 then
+					org.internalBleedHeal = math.min((tonumber(org.internalBleedHeal) or 0) + healAmount, 20)
+					amountHealed = amountHealed + healAmount
+				end
+				continue
+			end
 			if data.dislocation then
 				if hg.organism.CompleteDislocationFix then
 					hg.organism.CompleteDislocationFix(org, data.limb, owner)
@@ -162,6 +185,9 @@ if SERVER then
 			end
 
 			org[key] = newVal
+			if hg.fakeBoneFlop and hg.fakeBoneFlop.ReconcileLimb and hg.fakeBoneFlop.ReconcileLimb(org, key) then
+				hg.fakeBoneFlop.ScheduleRebuild(org.owner)
+			end
 			if key == "skull" and newVal < v then
 				org.bandagedskull = true
 			end

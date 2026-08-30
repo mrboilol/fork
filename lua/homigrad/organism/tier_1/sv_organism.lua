@@ -1648,7 +1648,7 @@ local finally_fixed = {
 local function fixlimb(org, key, fixer)
 	if math.random(100) > (97 + (fixer != org.owner and (fixer.organism and fixer.organism.pain or 0) or 0) - (org.analgesia * 50 + org.painkiller * 15) - (fixer != org.owner and 30 or 0) - (fixer.tries or 0) * 10 - (fixer.Profession == "doctor" and 100 or 0) - (org.owner == fixer and (IsValid(org.owner.FakeRagdoll) or (org.owner.Crouching and org.owner:Crouching())) and 10 or 0)) then
 		org[key.."dislocation"] = false
-		if (org[key] or 0) < 1 and hg.fakeBoneFlop and hg.fakeBoneFlop.ClearStoredLimb(org, key) then
+		if hg.fakeBoneFlop and hg.fakeBoneFlop.ReconcileLimb and hg.fakeBoneFlop.ReconcileLimb(org, key) then
 			hg.fakeBoneFlop.ScheduleRebuild(org.owner)
 		end
 		org.painadd = org.painadd + 5 * math.random(1, 3)
@@ -1767,7 +1767,7 @@ net.Receive("hg_dislocation_minigame_success", function(len, ply)
 
 	if key then
 		org[key.."dislocation"] = false
-		if (org[key] or 0) < 1 and hg.fakeBoneFlop and hg.fakeBoneFlop.ClearStoredLimb(org, key) then
+		if hg.fakeBoneFlop and hg.fakeBoneFlop.ReconcileLimb and hg.fakeBoneFlop.ReconcileLimb(org, key) then
 			hg.fakeBoneFlop.ScheduleRebuild(org.owner)
 		end
 

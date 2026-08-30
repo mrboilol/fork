@@ -62,7 +62,7 @@ end
 function hg.organism.CompleteDislocationFix(org, limb)
 	if not org or not limb or not org[limb .. "dislocation"] then return false end
 	org[limb .. "dislocation"] = false
-	if (org[limb] or 0) < 1 and hg.fakeBoneFlop and hg.fakeBoneFlop.ClearStoredLimb(org, limb) then
+	if hg.fakeBoneFlop and hg.fakeBoneFlop.ReconcileLimb and hg.fakeBoneFlop.ReconcileLimb(org, limb) then
 		hg.fakeBoneFlop.ScheduleRebuild(org.owner)
 	end
 	org.painadd = (org.painadd or 0) + 5
@@ -90,7 +90,7 @@ function hg.organism.ApplyBandageBoneTreatment(org, key, amount)
 	end
 
 	org[key] = target
-	if key ~= "skull" and key ~= "chest" and target < 1 and hg.fakeBoneFlop and hg.fakeBoneFlop.ClearStoredLimb(org, key) then
+	if key ~= "skull" and key ~= "chest" and target < 1 and hg.fakeBoneFlop and hg.fakeBoneFlop.ReconcileLimb and hg.fakeBoneFlop.ReconcileLimb(org, key) then
 		hg.fakeBoneFlop.ScheduleRebuild(org.owner)
 	end
 	return current - target

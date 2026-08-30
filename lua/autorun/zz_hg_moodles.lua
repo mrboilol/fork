@@ -735,7 +735,7 @@ local function buildEffects(ply, org)
 	local internalBleed = orgNumber(org, "internalBleed", 0)
 	local complication = orgNumber(org, "internalBleedComplication", 0)
 	if internalBleed > 0.05 then
-		local level = highRank(internalBleed, {0.05, 0.5, 1.5, 2.5})
+		local level = highRank(internalBleed, {0.05, 1.5, 5, 10})
 		if thorax > 0.01 or complication > 0.01 then level = math.max(level, 3) end
 		if hemothorax >= 0.5 or complication >= 0.65 then level = 4 end
 		add(effects, "internal_bleed", "internalbleed", level, "bad", 39, math.Round(internalBleed, 2))

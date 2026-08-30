@@ -908,6 +908,36 @@ function fakeBoneFlop.ClearStoredLimb(org, limb)
 	return changed
 end
 
+function fakeBoneFlop.ClearStoredDislocation(org, limb)
+	local bones = fakeBoneFlop.GetLimbBones(limb)
+	if not bones or not org.fake_dislocated_bones then return false end
+
+	local changed = false
+	for _, bone in ipairs(bones) do
+		if org.fake_dislocated_bones[bone] then
+			org.fake_dislocated_bones[bone] = nil
+			changed = true
+		end
+	end
+	if not next(org.fake_dislocated_bones) then org.fake_dislocated_bones = nil end
+
+	return changed
+end
+
+function fakeBoneFlop.ReconcileLimb(org, limb)
+	if not org or not fakeLimbBoneGroups[limb] then return false end
+
+	local changed = false
+	if not org[limb .. "dislocation"] then
+		changed = fakeBoneFlop.ClearStoredDislocation(org, limb) or changed
+	end
+	if (tonumber(org[limb]) or 0) < 1 and not org[limb .. "dislocation"] then
+		changed = fakeBoneFlop.ClearStoredLimb(org, limb) or changed
+	end
+
+	return changed
+end
+
 function fakeBoneFlop.CleanupRagdoll(rag)
 	if not IsValid(rag) then return end
 
@@ -1215,28 +1245,17 @@ end)
 
 hook.Add("Org Clear", "hg-fakeboneflop-clear", function(org)
 	org.fake_floppy_bones = nil
+	org.fake_dislocated_bones = nil
 end)
 
 hook.Add("Org Think", "hg-fakeboneflop-sync", function(owner, org)
-	if not owner:IsPlayer() or not org or not org.fake_floppy_bones then return end
+	if not owner:IsPlayer() or not org then return end
 
 	local changed = false
-
-	if org.larm < 1 and not org.larmdislocation then
-		changed = fakeBoneFlop.ClearStoredLimb(org, "larm") or changed
-	end
-
-	if org.rarm < 1 and not org.rarmdislocation then
-		changed = fakeBoneFlop.ClearStoredLimb(org, "rarm") or changed
-	end
-
-	if org.lleg < 1 and not org.llegdislocation then
-		changed = fakeBoneFlop.ClearStoredLimb(org, "lleg") or changed
-	end
-
-	if org.rleg < 1 and not org.rlegdislocation then
-		changed = fakeBoneFlop.ClearStoredLimb(org, "rleg") or changed
-	end
+	changed = fakeBoneFlop.ReconcileLimb(org, "larm") or changed
+	changed = fakeBoneFlop.ReconcileLimb(org, "rarm") or changed
+	changed = fakeBoneFlop.ReconcileLimb(org, "lleg") or changed
+	changed = fakeBoneFlop.ReconcileLimb(org, "rleg") or changed
 
 	if changed then
 		fakeBoneFlop.ScheduleRebuild(owner)
