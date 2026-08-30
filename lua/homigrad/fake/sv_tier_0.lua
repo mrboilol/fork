@@ -795,6 +795,38 @@ local fakeLimbBoneSegments = {
 	},
 }
 
+hook.Add("Think", "HG_DislocatePulledJoints", function()
+	local now = CurTime()
+	for _, ply in ipairs(player.GetAll()) do
+		local rag = ply.FakeRagdoll
+		local org = ply.organism
+		if not IsValid(rag) or not org or not org.alive or org.otrub then continue end
+
+		org.nextJointPullCheck = org.nextJointPullCheck or 0
+		if org.nextJointPullCheck > now then continue end
+		org.nextJointPullCheck = now + 0.12
+
+		for limb, segments in pairs(fakeLimbBoneSegments) do
+			if org[limb .. "dislocation"] or (org[limb] or 0) >= 1 then continue end
+			for segment, bone in pairs(segments) do
+				local parentBone = fakeBoneParents[bone]
+				local childID = rag:LookupBone(bone)
+				local parentID = parentBone and rag:LookupBone(parentBone)
+				local childPhysID = childID and rag:TranslateBoneToPhysBone(childID)
+				local parentPhysID = parentID and rag:TranslateBoneToPhysBone(parentID)
+				local childPhys = childPhysID and childPhysID >= 0 and rag:GetPhysicsObjectNum(childPhysID)
+				local parentPhys = parentPhysID and parentPhysID >= 0 and rag:GetPhysicsObjectNum(parentPhysID)
+				if IsValid(childPhys) and IsValid(parentPhys) then
+					local pullSpeed = (childPhys:GetVelocity() - parentPhys:GetVelocity()):Length()
+					if pullSpeed >= 520 and hg.TryDislocateLimb then
+						hg.TryDislocateLimb(org, limb, segment, (pullSpeed - 400) / 420)
+					end
+				end
+			end
+		end
+	end
+end)
+
 function fakeBoneFlop.ResolveBone(limb, segment)
 	return fakeLimbBoneSegments[limb] and fakeLimbBoneSegments[limb][segment]
 end
@@ -838,6 +870,27 @@ function fakeBoneFlop.SetLimbSegmentState(org, limb, segment, active)
 	return changed
 end
 
+function fakeBoneFlop.SetLimbSegmentDislocation(org, limb, segment, active)
+	local bone = fakeBoneFlop.ResolveBone(limb, segment)
+	if not org or not bone then return false end
+	if not active and not org.fake_dislocated_bones then return false end
+	org.fake_dislocated_bones = org.fake_dislocated_bones or {}
+	local changed = org.fake_dislocated_bones[bone] ~= active
+	if not changed then return false end
+	org.fake_dislocated_bones[bone] = active or nil
+	if not next(org.fake_dislocated_bones) then org.fake_dislocated_bones = nil end
+
+	if not IsValid(org.owner) then return true end
+	if not active then
+		fakeBoneFlop.ScheduleRebuild(org.owner)
+		return true
+	end
+
+	local rag = hg.GetCurrentCharacter(org.owner)
+	if IsValid(rag) and rag:IsRagdoll() then fakeBoneFlop.ScheduleApply(rag, bone, org) end
+	return true
+end
+
 function fakeBoneFlop.ClearStoredLimb(org, limb)
 	local bones = fakeBoneFlop.GetLimbBones(limb)
 	if not bones then return false end
@@ -845,7 +898,12 @@ function fakeBoneFlop.ClearStoredLimb(org, limb)
 	local changed = false
 	for _, bone in ipairs(bones) do
 		changed = fakeBoneFlop.FlagBone(org, bone, false) or changed
+		if org.fake_dislocated_bones and org.fake_dislocated_bones[bone] then
+			org.fake_dislocated_bones[bone] = nil
+			changed = true
+		end
 	end
+	if org.fake_dislocated_bones and not next(org.fake_dislocated_bones) then org.fake_dislocated_bones = nil end
 
 	return changed
 end
@@ -863,6 +921,8 @@ function fakeBoneFlop.CleanupRagdoll(rag)
 
 	rag.hg_floppy_constraints = nil
 	rag.hg_floppy_bones = nil
+	rag.hg_dislocated_bones = nil
+	rag:SetSaveValue("m_ragdoll.allowStretch", false)
 end
 
 function fakeBoneFlop.BendBone(rag, bone, forceMul)
@@ -939,7 +999,10 @@ end
 
 function fakeBoneFlop.ApplyBone(rag, bone)
 	if not IsValid(rag) then return end
+	local org = rag.organism
+	local dislocated = org and org.fake_dislocated_bones and org.fake_dislocated_bones[bone]
 	if rag.hg_floppy_bones and rag.hg_floppy_bones[bone] then return end
+	if rag.hg_dislocated_bones and rag.hg_dislocated_bones[bone] then return end
 
 	local parentBone = fakeBoneParents[bone]
 	local limits = fakeBoneLimits[bone]
@@ -989,7 +1052,7 @@ function fakeBoneFlop.ApplyBone(rag, bone)
 		rag.hg_floppy_bones = rag.hg_floppy_bones or {}
 		rag.hg_floppy_constraints[bone] = cons
 		rag.hg_floppy_bones[bone] = true
-		rag:SetSaveValue("m_ragdoll.allowStretch", false)
+		rag:SetSaveValue("m_ragdoll.allowStretch", org.fake_dislocated_bones and next(org.fake_dislocated_bones) ~= nil or false)
 		return
 	end
 
@@ -1024,6 +1087,12 @@ function fakeBoneFlop.ApplyBone(rag, bone)
 
 	local childPos = rag:LocalToWorld(matrix:GetTranslation())
 	local parentPos = rag:LocalToWorld(matrixParent:GetTranslation())
+	if dislocated then
+		local crooked = fakeBoneCrookedOffsets[bone]
+		if crooked then
+			childPos = childPos + physParent:LocalToWorld(crooked.pos * 0.32) - physParent:GetPos()
+		end
+	end
 
 	phys:SetPos(childPos)
 	phys:SetAngles(rag:LocalToWorldAngles(matrix:GetAngles()))
@@ -1034,12 +1103,13 @@ function fakeBoneFlop.ApplyBone(rag, bone)
 	if not IsValid(cons) then return end
 	cons:AddEFlags(serverOnlyEFlag)
 	cons:SetPos(childPos)
-	cons:SetKeyValue("xmin", limits[0][1])
-	cons:SetKeyValue("xmax", limits[0][0])
-	cons:SetKeyValue("ymin", limits[1][1])
-	cons:SetKeyValue("ymax", limits[1][0])
-	cons:SetKeyValue("zmin", limits[2][1])
-	cons:SetKeyValue("zmax", limits[2][0])
+	local loosen = dislocated and 22 or 0
+	cons:SetKeyValue("xmin", tostring(tonumber(limits[0][1]) - loosen))
+	cons:SetKeyValue("xmax", tostring(tonumber(limits[0][0]) + loosen))
+	cons:SetKeyValue("ymin", tostring(tonumber(limits[1][1]) - loosen))
+	cons:SetKeyValue("ymax", tostring(tonumber(limits[1][0]) + loosen))
+	cons:SetKeyValue("zmin", tostring(tonumber(limits[2][1]) - loosen))
+	cons:SetKeyValue("zmax", tostring(tonumber(limits[2][0]) + loosen))
 	cons:SetKeyValue("spawnflags", "0")
 	cons:SetPhysConstraintObjects(phys, physParent)
 	cons:Spawn()
@@ -1047,6 +1117,10 @@ function fakeBoneFlop.ApplyBone(rag, bone)
 
 	rag.hg_floppy_constraints[bone] = cons
 	rag.hg_floppy_bones[bone] = true
+	if dislocated then
+		rag.hg_dislocated_bones = rag.hg_dislocated_bones or {}
+		rag.hg_dislocated_bones[bone] = true
+	end
 
 	phys:SetPos(posOri)
 	phys:SetAngles(angOri)
@@ -1062,7 +1136,8 @@ function fakeBoneFlop.ApplyBone(rag, bone)
 	physParent:SetAngleVelocityInstantaneous(avelOriParent)
 	physParent:SetAngleVelocity(avelOriParent)
 
-	rag:SetSaveValue("m_ragdoll.allowStretch", false)
+	local allowStretch = dislocated or (org.fake_dislocated_bones and next(org.fake_dislocated_bones) ~= nil) or false
+	rag:SetSaveValue("m_ragdoll.allowStretch", allowStretch)
 end
 
 function fakeBoneFlop.ScheduleApply(rag, bone, org)
@@ -1075,26 +1150,25 @@ function fakeBoneFlop.ScheduleApply(rag, bone, org)
 		if not IsValid(rag) then return end
 		rag.hg_floppy_pending[bone] = nil
 		local activeOrg = rag.organism or org
-		if activeOrg and not (activeOrg.fake_floppy_bones and activeOrg.fake_floppy_bones[bone]) then return end
+		if activeOrg and not ((activeOrg.fake_floppy_bones and activeOrg.fake_floppy_bones[bone]) or (activeOrg.fake_dislocated_bones and activeOrg.fake_dislocated_bones[bone])) then return end
 		fakeBoneFlop.ApplyBone(rag, bone)
 	end)
 end
 
 function fakeBoneFlop.ApplyStored(rag, org)
-	if not IsValid(rag) or not org or not org.fake_floppy_bones then return end
+	if not IsValid(rag) or not org then return end
 
-	for bone in pairs(org.fake_floppy_bones) do
-		fakeBoneFlop.ScheduleApply(rag, bone, org)
-	end
+	for bone in pairs(org.fake_floppy_bones or {}) do fakeBoneFlop.ScheduleApply(rag, bone, org) end
+	for bone in pairs(org.fake_dislocated_bones or {}) do fakeBoneFlop.ScheduleApply(rag, bone, org) end
 
 	timer.Simple(0.01, function()
-		if IsValid(rag) then
+		if IsValid(rag) and org.fake_floppy_bones then
 			fakeBoneFlop.BendStored(rag, rag.organism or org, 0.35)
 		end
 	end)
 
 	timer.Simple(0.12, function()
-		if IsValid(rag) then
+		if IsValid(rag) and org.fake_floppy_bones then
 			fakeBoneFlop.BendStored(rag, rag.organism or org, 0.2)
 		end
 	end)

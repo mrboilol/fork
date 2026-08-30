@@ -1,15 +1,43 @@
 
 local PLAYER = FindMetaTable("Player")
 util.AddNetworkString("hg_headcrab")
-function PLAYER:AddHeadcrab(headcrab)
+
+local function headcrabReleasePosition(ply)
+	local ent = hg.GetCurrentCharacter and hg.GetCurrentCharacter(ply) or ply
+	if not IsValid(ent) then return ply:GetPos() + Vector(0, 0, 48), ply:EyeAngles() end
+	local bone = ent:LookupBone("ValveBiped.Bip01_Head1")
+	local matrix = bone and ent:GetBoneMatrix(bone)
+	if matrix then return matrix:GetTranslation() + matrix:GetAngles():Up() * 8, matrix:GetAngles() end
+	return ent:EyePos(), ent:EyeAngles()
+end
+
+local function releaseHeadcrab(ply, class, killCrab)
+	if killCrab then return end
+	class = class or "npc_headcrab"
+	local crab = ents.Create(class)
+	if not IsValid(crab) then return end
+	local pos, ang = headcrabReleasePosition(ply)
+	crab:SetPos(pos)
+	crab:SetAngles(ang)
+	crab:Spawn()
+	crab:Activate()
+end
+
+function hg.organism.IsBrainDamageIgnored(org)
+	return org and IsValid(org.owner) and org.owner.PlayerClassName == "headcrabzombie" and (org.brain or 0) < 0.7
+end
+
+function PLAYER:AddHeadcrab(headcrab, headcrabClass)
 	if self.PlayerClassName == "headcrabzombie" then return end
 	if not self.organism then return end
 
-	-- The headcrab's forced 0.3 brain damage must not overwrite trauma the
-	-- victim already had. Keep only the amount the headcrab itself added so a
-	-- later removal cannot erase a gunshot or older brain injury.
-	self.organism.headcrabBrainDamage = math.max(0.3 - (self.organism.brain or 0), 0)
-    --self.organism.headcrabon = headcrab
+    self.organism.headcrabBrainDamage = math.max(0.03 - (self.organism.brain or 0), 0)
+    self.organism.brain = math.max(self.organism.brain or 0, 0.03)
+    self.organism.headcrabClass = headcrabClass or "npc_headcrab"
+    self.organism.headcrabAttached = true
+    self.organism.headcrabPreviousClass = self.PlayerClassName
+    self.organism.headcrabModel = headcrab
+    self.organism.headcrabConverted = false
     self:SetNetVar("headcrab",headcrab)
    
     self.organism.headcrabon = headcrab and CurTime()
@@ -22,9 +50,9 @@ function PLAYER:AddHeadcrab(headcrab)
     net.Broadcast()--]]
 end
 
-function PLAYER:RemoveHeadcrabFromTrauma()
+function PLAYER:RemoveHeadcrabFromTrauma(killCrab)
 	local org = self.organism
-	if not org or not self:GetNetVar("headcrab") then return false end
+	if not org or not (org.headcrabAttached or self:GetNetVar("headcrab")) then return false end
 
 	-- Remove only the damage imposed by the headcrab. Any prior injury and any
 	-- new wound from the shot remain part of the recovery calculation.
@@ -33,6 +61,8 @@ function PLAYER:RemoveHeadcrabFromTrauma()
 	org.headcrabon = nil
 	org.headcrabevent = false
 	org.headcrabPainSoundAt = nil
+	org.headcrabAttached = nil
+	org.headcrabConverted = nil
 	org.noHead = false
 	self.noHead = false
 	self:SetNWString("PlayerName", "")
@@ -42,6 +72,17 @@ function PLAYER:RemoveHeadcrabFromTrauma()
 	if IsValid(rag) then
 		rag:SetNetVar("headcrab", false)
 	end
+
+	local headcrabClass = org.headcrabClass
+	org.headcrabClass = nil
+	org.headcrabModel = nil
+	if self.PlayerClassName == "headcrabzombie" then
+		local restoredClass = org.headcrabPreviousClass or self.PreZombClass or "Rebel"
+		self:SetPlayerClass(restoredClass)
+		if zb and zb.GiveRole then zb.GiveRole(self, restoredClass, Color(255, 155, 0)) end
+	end
+	org.headcrabPreviousClass = nil
+	releaseHeadcrab(self, headcrabClass, killCrab)
 
 	-- A violent removal can partially undo real brain trauma, including trauma
 	-- that existed before the headcrab attached. It is deliberately only a
@@ -60,6 +101,31 @@ function PLAYER:RemoveHeadcrabFromTrauma()
 	return true
 end
 
+function PLAYER:StartHeadcrabRemovalAttempt()
+	local org = self.organism
+	if not org or not org.headcrabAttached or (self.headcrabRemovalAttemptUntil or 0) > CurTime() then return false end
+
+	self.headcrabRemovalAttemptUntil = CurTime() + 3
+	self.suiciding = false
+	self.startsuicide = nil
+	self:SetNWBool("suiciding", false)
+	self:DoAnimationEvent(PLAYERANIMEVENT_ATTACK_PRIMARY)
+	self:SetAnimation(PLAYER_ATTACK1)
+	self:EmitSound("npc/headcrab/attack1.wav", 48, math.random(85, 95), 0.3)
+
+	timer.Simple(2.2, function()
+		if not IsValid(self) or not self:Alive() or not self.organism or not self.organism.headcrabAttached then return end
+		self:DoAnimationEvent(PLAYERANIMEVENT_ATTACK_PRIMARY)
+		if math.Rand(0, 1) <= 0.65 then
+			self:RemoveHeadcrabFromTrauma(math.Rand(0, 1) < 0.5)
+		else
+			self.organism.painadd = (self.organism.painadd or 0) + 3
+		end
+	end)
+
+	return true
+end
+
 hook.Add("RagdollDeath","headcrab",function(ply,rag)
     rag:SetNetVar("headcrab", ply:GetNetVar("headcrab"))
     ply:SetNetVar("headcrab", false)
@@ -72,6 +138,11 @@ hook.Add("Org Clear", "removeheadcrab", function(org)
 	org.headcrabevent = false
 	org.headcrabBrainDamage = nil
 	org.headcrabPainSoundAt = nil
+	org.headcrabAttached = nil
+	org.headcrabConverted = nil
+	org.headcrabClass = nil
+	org.headcrabModel = nil
+	org.headcrabPreviousClass = nil
 	if IsValid(org.owner) then
 		org.owner:SetNetVar("headcrab", false)
 		org.owner.noHead = false
@@ -101,7 +172,7 @@ local clr_red, lerpAng = Color(150, 0, 0), Angle(0, 0, 0)
 hook.Add("Org Think", "Headcrab",function(owner, org, timeValue)
     if not IsValid(owner) then return end
     if not owner:IsPlayer() or not owner:Alive() then return end
-    if not org.headcrabon then return end
+	if not org.headcrabon or not org.headcrabAttached then return end
 
     local curTime = CurTime()
 
@@ -114,19 +185,18 @@ hook.Add("Org Think", "Headcrab",function(owner, org, timeValue)
 	end
 
 	if owner:IsPlayer() then
-			owner.noHead = true
+			owner.noHead = not org.headcrabConverted
 			owner:SetNWString("PlayerName", "Body with headcrab")
-			org.brain = math.max(org.brain or 0, 0.3)
+			org.brain = math.max(org.brain or 0, 0.03)
 
-			if org.alive then
+			if org.alive and not org.headcrabConverted then
 				lerpAng = LerpAngle(FrameTime() * 3, lerpAng, AngleRand(-90, 90))
 				lerpAng.r = 0
 				owner:SetEyeAngles(owner:EyeAngles() + lerpAng)
 			end
 
-			if (org.headcrabon + 60) < curTime and org.alive and not org.headcrabevent then
-				owner:EmitSound("npc/zombie/zombie_alert" .. math.random(3) .. ".wav", 80, math.random(60, 70))
-				owner:EmitSound("neck_snap_01.ogg", 80, 80, 1, CHAN_AUTO)
+			if (org.headcrabon + 60) < curTime and org.alive and not org.headcrabConverted then
+				owner:EmitSound("npc/headcrab/headbite.wav", 50, math.random(92, 102), 0.35)
 				owner:SetPlayerClass("headcrabzombie")
 				org.painadd = org.painadd + 5
 
@@ -135,27 +205,17 @@ hook.Add("Org Think", "Headcrab",function(owner, org, timeValue)
 					zb.GiveRole(owner, "Zombie", clr_red)
 				end
 
-				org.headcrabevent = true
-				org.headcrabon = nil
-				org.headcrabevent = false
+				org.headcrabConverted = true
 				org.noHead = false
 
 				hg.FakeUp(owner, true)
-				owner:SetNetVar("headcrab", false)
+				owner:SetNetVar("headcrab", org.headcrabModel or "models/nova/w_headcrab.mdl")
 			end
 
-        if org.alive and org.headcrabon and (org.headcrabon + 20) < curTime then
-			if (org.headcrabon + 30) > curTime then
-				owner:EmitSound("npc/zombie/zombie_pain"..math.random(6)..".wav", 80, math.random(80, 90))
-				org.painadd = org.painadd + 15
-				hg.StunPlayer(owner, 5)
-				org.headcrabPainSoundAt = CurTime() + 4
-			end
-		end
-
-        if org.alive and org.headcrabon and (org.headcrabon + 60) < curTime then
-			owner:SetNWString("PlayerName", "Body with headcrab")
-			org.alive = false
+		if org.alive and not org.headcrabConverted and (org.headcrabon + 20) < curTime and (org.headcrabPainSoundAt or 0) <= curTime then
+			owner:EmitSound("npc/headcrab/attack1.wav", 48, math.random(95, 105), 0.25)
+			org.painadd = org.painadd + 2
+			org.headcrabPainSoundAt = curTime + 7
 		end
     end
 end)

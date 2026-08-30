@@ -137,6 +137,10 @@ hook.Add("Org Clear", "Main", function(org)
 	org.furryinfected = false
 	org.health = 100
 	org.canmove = true
+	org.paralyzed = false
+	org.cervicalParalysis = false
+	org.cervicalRespiratoryArrest = false
+	org.cervicalArrestAnnounced = false
 	org.recoilmul = 1
 	org.legstrength = 1
 	org.meleespeed = 1
@@ -1211,8 +1215,9 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.panicattackActive = false
 		org.panicAdrenalineUntil = 0
 	end
-	local brainDelta = (org.brain or 0) - oldSeizureBrain
-	local lobeDelta = lobeDamage - oldSeizureLobeDamage
+	local ignoreBrainDamage = hg.organism.IsBrainDamageIgnored and hg.organism.IsBrainDamageIgnored(org)
+	local brainDelta = ignoreBrainDamage and 0 or (org.brain or 0) - oldSeizureBrain
+	local lobeDelta = ignoreBrainDamage and 0 or lobeDamage - oldSeizureLobeDamage
 	local traumaDelta = math.max(brainDelta, lobeDelta)
 	if traumaDelta > 0 then
 		hg.organism.AddSeizure(org, math.Clamp(traumaDelta * seizure_brain_trauma_gain_mul, 0, 1))
@@ -1221,7 +1226,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	-- Раньше на зимних картах это давало случайные припадки из-за переохлаждения.
 	local temperature = org.temperature or 36.7
 	local curTime = CurTime()
-	local seizureBrainDamage = math.max(org.brain or 0, lobeDamage)
+	local seizureBrainDamage = ignoreBrainDamage and 0 or math.max(org.brain or 0, lobeDamage)
 	if seizureBrainDamage > 0.05 then
 		org.nextSeizureRoll = org.nextSeizureRoll or (curTime + seizure_brain_roll_delay)
 		if curTime >= org.nextSeizureRoll then
@@ -1294,7 +1299,8 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.canmove = true
 		org.canmovehead = true
 	else
-		org.canmove = (org.spine2 < hg.organism.fake_spine2 and org.spine3 < hg.organism.fake_spine3) and not org.otrub
+		org.paralyzed = (org.spine3 or 0) >= (hg.organism.fake_spine3 or 0.75)
+		org.canmove = (org.spine2 < hg.organism.fake_spine2 and not org.paralyzed) and not org.otrub
 		org.canmovehead = (org.spine3 < hg.organism.fake_spine3) and not org.otrub
 		if not (org.canmove and org.canmovehead and (org.stun - CurTime()) < 0) then org.needfake = true end
 		if (org.blood <= 2250) then org.needfake = true end
@@ -1326,7 +1332,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	local incapacitationEnabled = not hg.organism.IncapacitationEnabled or hg.organism.IncapacitationEnabled()
 	local terminalIncapacitation = incapacitationEnabled
 		and (org.otrub or org.needotrub)
-		and ((org.brainoxygen or 1) < 0.16 or (org.brain or 0) > 0.4 or (org.trachea or 0) >= 0.5
+		and ((org.brainoxygen or 1) < 0.16 or (not ignoreBrainDamage and (org.brain or 0) > 0.4) or (org.trachea or 0) >= 0.5
 			or org.heartstop or (org.spine3 or 0) >= hg.organism.fake_spine3 or (org.spine2 or 0) >= hg.organism.fake_spine2)
 	if isPly and owner:Alive() and terminalIncapacitation then
 		org.deathStateEnd = org.deathStateEnd or CurTime() + 25
@@ -1363,7 +1369,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	if just_went_uncon then
 		org.owner.fullsend = true
 	end
-	if org.brain > 0.05 then
+	if not ignoreBrainDamage and org.brain > 0.05 then
 		if math.random(600) < org.brain * 20 then
 			org.needfake = true
 		end

@@ -6,7 +6,7 @@ SWEP.Instructions = "A wad of gauze bandage, can help stop light bleeding. Since
 SWEP.Spawnable = true
 SWEP.AdminOnly = false
 SWEP.modeValuesdef = {
-	[1] = {150, true},
+	[1] = {3, true},
 }
 
 SWEP.ModelScale = 1.1
@@ -14,7 +14,7 @@ SWEP.offsetVec = Vector(3, -4.5, 0)
 SWEP.offsetAng = Angle(90, 90, 0)
 SWEP.Category = "ZCity Medicine"
 SWEP.BandageTPIK = true
-SWEP.BandageAmount = 150
+SWEP.BandageAmount = 3
 
 if CLIENT then
 	SWEP.WepSelectIcon = Material("vgui/wep_jack_hmcd_bandage")

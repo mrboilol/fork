@@ -1379,7 +1379,7 @@ module[2] = function(owner, org, timeValue)
 	-- A successful AED/epinephrine restart deliberately has a short window to
 	-- rebuild circulation.  Do not immediately overwrite it here just because
 	-- the previous arrest left the pulse at zero or caused temporary hypoxia.
-	if ((org.pulse < 10 and not volumeExplainsLowOutput) or org.brain >= 0.6) and not restartCirculationActive then org.heartstop = true end
+	if ((org.pulse < 10 and not volumeExplainsLowOutput) or (org.brain >= 0.6 and not (hg.organism.IsBrainDamageIgnored and hg.organism.IsBrainDamageIgnored(org)))) and not restartCirculationActive then org.heartstop = true end
 	if org.temperature > 42 then org.heartstop = true end
 	if org.heartstop and not org.fibrillation and org.terminalRhythm ~= "ventricular_fibrillation" and org.terminalRhythm ~= "asystole"
 		and (org.heartbeat or 0) >= 140 and (org.arrhythmia or 0) >= 0.72

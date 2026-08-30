@@ -479,10 +479,11 @@ module[2] = function(owner, org, mulTime)
 	local internalBleedSeverity = math.max(tonumber(org.internalBleed) or 0, 0)
 	local internalThoughtLevel = internalBleedSeverity >= 3 and 3 or internalBleedSeverity >= 1.5 and 2 or internalBleedSeverity > 0.75 and 1 or 0
 	if internalThoughtLevel > 0 and org.isPly and IsValid(owner) and not org.otrub then
-		if internalThoughtLevel > (org.internalBleedThoughtLevel or 0) and (org.nextInternalBleedThought or 0) <= CurTime() then
-			owner:Notify(internalBleedThoughts[math.random(#internalBleedThoughts)], 30, "internalbleed", 0, nil, Color(220, 170, 170))
+		if internalThoughtLevel > (org.internalBleedThoughtLevel or 0) and (org.nextInternalBleedThought or 0) <= CurTime() and (org.nextCriticalStatusNotify or 0) <= CurTime() then
+			owner:Notify(internalBleedThoughts[math.random(#internalBleedThoughts)], 45, "internalbleed", 0, nil, Color(220, 170, 170))
 			org.internalBleedThoughtLevel = internalThoughtLevel
-			org.nextInternalBleedThought = CurTime() + 30
+			org.nextInternalBleedThought = CurTime() + 45
+			org.nextCriticalStatusNotify = CurTime() + 12
 		end
 	elseif internalBleedSeverity <= 0.05 then
 		org.internalBleedThoughtLevel = 0
@@ -788,13 +789,14 @@ module[2] = function(owner, org, mulTime)
 	-- Blood volume and tissue O2 never start the terminal OTRUB timer directly.
 	-- Cerebral oxygen, brain/airway injury, cardiac arrest, and spinal failure do.
 	local cerebralFailure = (org.brainoxygen or 1) < 0.16
-	org.incapacitated = incapacitationEnabled and org.otrub and (cerebralFailure or (org.brain > 0.4) or (org.trachea >= 0.5) or org.heartstop or (org.spine3 >= hg.organism.fake_spine3) or (org.spine2 >= hg.organism.fake_spine2)) or false
+	local ignoreBrainDamage = hg.organism.IsBrainDamageIgnored and hg.organism.IsBrainDamageIgnored(org)
+	org.incapacitated = incapacitationEnabled and org.otrub and (cerebralFailure or (not ignoreBrainDamage and org.brain > 0.4) or (org.trachea >= 0.5) or org.heartstop or (org.spine3 >= hg.organism.fake_spine3) or (org.spine2 >= hg.organism.fake_spine2)) or false
 
 	local noNeedle = org.needle <= 0
 	local tracheaBlocking = org.trachea > 0.5 and noNeedle
 	local tracheaNoO2Regen = org.trachea > 0.5 and (org.o2.curregen or 0) <= 0
 
-	if (org.brain > 0.4) or (org.heart > 0.6) or tracheaBlocking or tracheaNoO2Regen then
+	if (not ignoreBrainDamage and org.brain > 0.4) or (org.heart > 0.6) or tracheaBlocking or tracheaNoO2Regen then
 		org.critical = true
 	else
 		org.critical = false

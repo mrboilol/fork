@@ -476,6 +476,7 @@ function PANEL:Init()
     local activeWeapon = LocalPlayer():GetActiveWeapon()
     self.ShowMedkitTreatmentTarget = IsValid(activeWeapon) and (activeWeapon:GetClass() == "weapon_medkit_sh" or activeWeapon.HGMedkitTier ~= nil)
     local armSpeed = hg.MedicalMinigame.GetArmSpeedMultiplier(LocalPlayer())
+    if IsHelpingOtherPlayer() then armSpeed = armSpeed * 2.5 end
     self.MedicalArmSpeedMultiplier = math.max(armSpeed, 0.25)
     self.MinigameDifficultyMultiplier = 1 / self.MedicalArmSpeedMultiplier
     self.TargetTurns = (self.GameType == "bandage") and 1 or (hg.MedicalMinigame.RequiredTurns or 6)

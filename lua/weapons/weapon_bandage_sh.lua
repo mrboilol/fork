@@ -560,8 +560,10 @@ end
 function SWEP:Initialize()
 	self:SetHold(self.HoldType)
 
+	local bandageCapacity = self.modeValuesdef and self.modeValuesdef[1]
+	bandageCapacity = istable(bandageCapacity) and bandageCapacity[1] or bandageCapacity
 	self.modeValues = {
-		[1] = 40,
+		[1] = tonumber(bandageCapacity) or 2,
 	}
 
 	if CLIENT then
@@ -583,7 +585,7 @@ function SWEP:Initialize()
 end
 
 SWEP.modeValuesdef = {
-	[1] = {40,true},
+	[1] = {2,true},
 }
 
 function SWEP:GetInfo()
@@ -750,6 +752,40 @@ GetBandageableArteryWound = function(org, ent, bone)
 	return selectedIndex, selectedWound
 end
 
+function SWEP:GetBandageStructuralTreatmentCost()
+	local owner = self:GetOwner()
+	return 3 * (IsValid(owner) and owner.Profession == "doctor" and 0.2 or 1)
+end
+
+function SWEP:GetBandageTreatmentCost(target, bone)
+	local org = IsValid(target) and target.organism
+	if not org then return 0 end
+
+	local _, arteryWound = GetBandageableArteryWound(org, target, bone)
+	if arteryWound then return math.max(arteryWound[1] or 0, 0) end
+
+	local woundCost = 0
+	for _, wound in ipairs(org.wounds or {}) do
+		if not bone or BoneNamesMatch(target, wound[4], bone) then
+			woundCost = math.max(woundCost, wound[1] or 0)
+		end
+	end
+	if woundCost > 0 then return woundCost end
+
+	local structuralCost = self:GetBandageStructuralTreatmentCost()
+	if hg.organism.GetBandageDislocation and hg.organism.GetBandageDislocation(org, bone) then return structuralCost end
+	if not bone or bone == "skull" or (isstring(bone) and string.find(bone, "Head", 1, true)) then
+		if (org.skull or 0) >= 0.05 then return structuralCost end
+	end
+	if IsBandageBone(bone, HITGROUP_CHEST) and (org.chest or 0) >= 0.05 then return structuralCost end
+	if IsBandageBone(bone, HITGROUP_LEFTLEG) and (org.lleg or 0) >= 0.05 and not org.llegamputated then return structuralCost end
+	if IsBandageBone(bone, HITGROUP_RIGHTLEG) and (org.rleg or 0) >= 0.05 and not org.rlegamputated then return structuralCost end
+	if IsBandageBone(bone, HITGROUP_LEFTARM) and (org.larm or 0) >= 0.05 and not org.larmamputated then return structuralCost end
+	if IsBandageBone(bone, HITGROUP_RIGHTARM) and (org.rarm or 0) >= 0.05 and not org.rarmamputated then return structuralCost end
+
+	return 0
+end
+
 if SERVER then
 	function SWEP:Bandage(ent, bone)
 		local org = ent.organism
@@ -878,8 +914,7 @@ if SERVER then
 		end)
 
 		local who = (self:GetOwner() == org.owner) and "You" or ((owner.Profession == "doctor") and "A doctor" or "Someone")
-		local mul = ((owner.Profession == "doctor") and 0.2 or 1)
-		local amt = 25 * mul
+		local amt = self:GetBandageStructuralTreatmentCost()
 		if bandageDislocation and self.modeValues[1] >= amt and hg.organism.CompleteDislocationFix(org, bandageDislocation, owner) then
 			self.modeValues[1] = self.modeValues[1] - amt
 			ent.bandaged_limbs = ent.bandaged_limbs or {}
@@ -1679,24 +1714,7 @@ function SWEP:GetBandageTPIKUseTime(target)
 	local org = IsValid(target) and target.organism
 	if not org then return self.BandageUseTime end
 
-	local required = 0
-	for _, wound in ipairs(org.wounds or {}) do
-		required = required + math.max(wound[1] or 0, 0)
-	end
-	local _, arteryWound = GetBandageableArteryWound(org, target)
-	if arteryWound then required = required + arteryWound[1] end
-
-	local owner = self:GetOwner()
-	local treatmentCost = 25 * (IsValid(owner) and owner.Profession == "doctor" and 0.2 or 1)
-	if (org.skull or 0) > 0.05 then required = required + treatmentCost end
-	if (org.chest or 0) >= 0.05 then required = required + treatmentCost end
-	if (org.lleg or 0) >= 0.05 and not org.llegamputated then required = required + treatmentCost end
-	if (org.rleg or 0) >= 0.05 and not org.rlegamputated then required = required + treatmentCost end
-	if (org.larm or 0) >= 0.05 and not org.larmamputated then required = required + treatmentCost end
-	if (org.rarm or 0) >= 0.05 and not org.rarmamputated then required = required + treatmentCost end
-	if hg.organism.GetBandageDislocation and hg.organism.GetBandageDislocation(org) then required = required + treatmentCost end
-
-	local used = math.min(required, self.modeValues and self.modeValues[1] or 0)
+	local used = math.min(self:GetBandageTreatmentCost(target, self:GetBandageTargetBone(target, hg.eyeTrace(self:GetOwner()))), self.modeValues and self.modeValues[1] or 0)
 	return math.Clamp(1.2 + used / 40 * 2.2, 1.2, 6)
 end
 
@@ -1712,8 +1730,7 @@ function SWEP:CanBandageTPIK(target)
 	local _, arteryWound = GetBandageableArteryWound(org, target)
 	if arteryWound and available >= arteryWound[1] then return true end
 
-	local owner = self:GetOwner()
-	local treatmentCost = 25 * (IsValid(owner) and owner.Profession == "doctor" and 0.2 or 1)
+	local treatmentCost = self:GetBandageStructuralTreatmentCost()
 	if available < treatmentCost then return false end
 	if (org.skull or 0) >= 0.05 or (org.chest or 0) >= 0.05 then return true end
 	if (org.lleg or 0) >= 0.05 and not org.llegamputated then return true end

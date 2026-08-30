@@ -135,9 +135,10 @@ local function sendThought(org, msg, key, delay, clr)
 end
 
 local function doDislocate(org, key, dmg, segment)
+	if org[key.."dislocation"] then return false end
 	org[key.."dislocation"] = true
 	if hg.fakeBoneFlop then
-		hg.fakeBoneFlop.SetLimbSegmentState(org, key, segment, not org[key.."stabilized"])
+		hg.fakeBoneFlop.SetLimbSegmentDislocation(org, key, segment, not org[key.."stabilized"])
 	end
 
 	local stabilized = org[key.."stabilized"]
@@ -160,6 +161,20 @@ local function doDislocate(org, key, dmg, segment)
 	timer.Simple(0, function() hg.LightStunPlayer(org.owner,2) end)
 	playBoneFractureSound(org.owner)
 	if org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner, 1) end
+	return true
+end
+
+function hg.TryDislocateLimb(org, key, segment, severity)
+	if not org or not limbName[key] or org[key .. "amputated"] or org[key .. "upamputated"] then return false end
+	if org[key .. "dislocation"] or (org[key] or 0) >= 1 then return false end
+
+	severity = math.max(tonumber(severity) or 0, 0)
+	if severity < 0.18 then return false end
+	local chance = math.Clamp((severity - 0.15) * 0.72, 0.08, 0.82)
+	if math.Rand(0, 1) > chance then return false end
+
+	org[key] = math.min(math.max(org[key] or 0, severity * 0.38), 0.82)
+	return doDislocate(org, key, severity, segment or "up")
 end
 
 local function legs(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, ricochet)
@@ -309,7 +324,8 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 
 	local name = "spine" .. number
 	local name2 = "fake_spine" .. number
-	if org[name] >= hg.organism[name2] then return 0 end
+	local damageLimit = name == "spine3" and 1 or hg.organism[name2]
+	if org[name] >= damageLimit then return 0 end
 	local oldDmg = org[name]
 
 	local result, vecrand = damageBone(org, 0.1, dmgInfo:IsDamageType(DMG_SLASH) and dmg * 0.6 or dmg * 0.4, dmgInfo, name, boneindex, dir, hit, ricochet)
@@ -320,7 +336,7 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 		hg.AddHarmToAttacker(dmgInfo, (org[name] - oldDmg) * 8, "Broken spine harm")
 	end
 
-	if org[name] >= hg.organism[name2] and org.isPly then
+	if oldDmg < hg.organism[name2] and org[name] >= hg.organism[name2] and org.isPly then
 		playBoneFractureSound(org.owner)
 		if hg.QueuePainScream then hg.QueuePainScream(org.owner, 1.1) end
 		if org.owner:IsPlayer() and !hasNewThoughts(org) then
@@ -328,6 +344,26 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 		end
 		sendThought(org, "Your spine is broken.", "thought_" .. name, 4, Color(255, 210, 210))
 		org.painadd = org.painadd + 25
+	end
+
+	if name == "spine3" then
+		local cervicalLimit = hg.organism.fake_spine3 or 0.75
+		if oldDmg < cervicalLimit and org.spine3 >= cervicalLimit then
+			org.cervicalParalysis = true
+			org.paralyzed = true
+			if org.isPly and IsValid(org.owner) then
+				org.owner:Notify("Your neck is broken. You can't move.", 20, "cervical_paralysis", 0, nil, Color(255, 190, 190))
+			end
+		end
+		if oldDmg < 1 and org.spine3 >= 1 then
+			org.cervicalParalysis = true
+			org.paralyzed = true
+			org.cervicalRespiratoryArrest = true
+			org.respiratoryArrest = true
+			if org.isPly and IsValid(org.owner) then
+				org.owner:Notify("I CANT BREATHE.. I CANT MOVE..", true, "cervical_respiratory_arrest", 0, nil, Color(255, 95, 95))
+			end
+		end
 	end
 	
 	if dmg > 0.2 then
@@ -601,6 +637,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	local oldDmg = org.skull
 	local oldConcussion = org.concussion or 0
 	local oldBrain = org.brain or 0
+	local ignoreBrainDamage = hg.organism.IsBrainDamageIgnored and hg.organism.IsBrainDamageIgnored(org)
 	
 	local result, vecrand = damageBone(org, 0.25, dmg, dmgInfo, "skull", boneindex, dir, hit, ricochet)
 	local inflictor = dmgInfo:GetInflictor()
@@ -648,7 +685,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		org.brain = math.min(org.brain + 0.1, 1)
 	end
 
-	if org.brain >= 0.01 and math.random(3) == 1 and (rnd or (org.skull - oldDmg) > 0.6) then
+	if not ignoreBrainDamage and org.brain >= 0.01 and math.random(3) == 1 and (rnd or (org.skull - oldDmg) > 0.6) then
 		org.shock = 70
 	end
 
@@ -696,7 +733,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	-- bullet/blast would, because the force is transferred over a wider area.
 	-- Bullets/explosions keep the old, harder threshold (effectiveDmg > 7).
 	local concThreshold = isBlunt and 3 or 7
-	if effectiveDmg > concThreshold then
+	if not ignoreBrainDamage and effectiveDmg > concThreshold then
 		local baseChance, intensity
 		if isBlunt then
 			-- blunt: generous chance even at moderate blows, lower ceiling
@@ -713,7 +750,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		else
 			hg.organism.module.concussion.AddConcussion(org, intensity * 0.35, math.Clamp(intensity * 3, 4, 18))
 		end
-	else
+	elseif not ignoreBrainDamage then
 		-- Light blow: no real concussion. Helmet just rings, bare head a tiny daze.
 		if org.isPly then
 			local targetPlayer = org.owner
@@ -731,7 +768,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		end
 	end
 
-	if not isStab and dmg > 0.05 then
+	if not ignoreBrainDamage and not isStab and dmg > 0.05 then
 		local headDmg = hasHelmet and dmg * 0.3 or dmg
 		org.disorientation = math.min(org.disorientation + math.min(headDmg * 0.15, 1.5), 1.5)
 		if hg.organism.ApplyOrganTrauma then
@@ -773,7 +810,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		end
 	end
 
-	if org.isPly and (org.brain - 0) > 0 and dmg > 0.5 then
+	if not ignoreBrainDamage and org.isPly and (org.brain - 0) > 0 and dmg > 0.5 then
 		local targetPlayer = org.owner
 		if IsValid(org.owner.FakeRagdoll) then
 			local ragdoll = org.owner.FakeRagdoll

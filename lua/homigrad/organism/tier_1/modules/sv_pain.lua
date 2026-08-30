@@ -259,6 +259,7 @@ module[2] = function(owner, org, timeValue)
 		(org.brainOccipital or 0) * 0.7,
 		(org.brainHemorrhage or 0) * 0.8
 	)
+	if hg.organism.IsBrainDamageIgnored and hg.organism.IsBrainDamageIgnored(org) then structuralBrainDamage = 0 end
 	local brainSeverity = math.Clamp((structuralBrainDamage - 0.1) / 0.9, 0, 1)
 	local severeBrainSeverity = math.Clamp((structuralBrainDamage - 0.325) / 0.675, 0, 1)
 	local hemorrhageSeverity = math.Clamp(((org.brainHemorrhage or 0) - 0.05) / 0.95, 0, 1)

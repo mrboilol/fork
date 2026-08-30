@@ -303,6 +303,33 @@ local lowoxy = {
 	"I CANT FUCKING BREATHE."
 }
 
+local multiCauseDying = {
+	"Everything is fading... I don't think I can keep going.",
+	"My body is shutting down...",
+	"I can't stay awake much longer...",
+}
+
+local function notifyCriticalHypoxia(org)
+	local owner = org.owner
+	if not IsValid(owner) or not owner:IsPlayer() then return end
+	local now = CurTime()
+	if (org.nextCriticalStatusNotify or 0) > now then return end
+
+	local multipleCauses = (org.internalBleed or 0) > 0.75
+		or (org.bleed or 0) > 0
+		or (org.brain or 0) > 0.08
+		or (org.heart or 0) > 0.2
+		or (org.pneumothorax or 0) > 0.2
+		or (org.hemothorax or 0) > 0.15
+		or org.cervicalRespiratoryArrest
+
+	local message = (multipleCauses and math.Rand(0, 1) < 0.58)
+		and multiCauseDying[math.random(#multiCauseDying)]
+		or lowoxy[math.random(#lowoxy)]
+	owner:Notify(message, 28, "hypoxia_critical", 0, nil, color_red3)
+	org.nextCriticalStatusNotify = now + 24
+end
+
 local not_enough_intake = {
 
 	//"I have to breathe...",
@@ -472,7 +499,7 @@ module[2] = function(owner, org, timeValue)
 	org.drugRespiratoryDepression = drugRespiratoryDepression
 	org.bradyapnea = bradyapnea
 	org.respiratoryRate = math.Round(Lerp(bradyapnea, 14, 4))
-	org.respiratoryArrest = drugRespiratoryDepression >= opioidRespiratoryArrestThreshold
+	org.respiratoryArrest = org.cervicalRespiratoryArrest == true or drugRespiratoryDepression >= opioidRespiratoryArrestThreshold
 
 	-- Arterial saturation comes from lungs; hemorrhage separately limits how much
 	-- oxygen can be transported through the whole circulation. The transport curve
@@ -982,7 +1009,7 @@ module[2] = function(owner, org, timeValue)
 
 	
 
-	if org.isPly and not org.otrub and o2.curregen < losing_oxy and org.analgesia <= 1.5 and !org.heartstop then
+	if org.isPly and not org.otrub and not org.holdingbreath and o2.curregen < losing_oxy and org.analgesia <= 1.5 and !org.heartstop then
 
 		if mask_blevota then
 
@@ -1016,15 +1043,7 @@ module[2] = function(owner, org, timeValue)
 
 
 
-			org.owner:Notify(lowoxy[math.random(#lowoxy)], 30, "lowoxy", 0, nil, color_red3)
-
-	
-
-			if o2[1] < 6 then
-
-				org.owner:Notify("Oxygen... please...", 30, "lowoxy2", 0, nil, color_red)
-
-			end
+			notifyCriticalHypoxia(org)
 
 		end
 
@@ -1034,7 +1053,7 @@ module[2] = function(owner, org, timeValue)
 
 	-- Barely breathing (low curregen but just enough) - 2nd priority, bypassed if choking
 
-	if org.isPly and not org.otrub and not org.choking and o2.curregen >= losing_oxy and o2.curregen < losing_oxy * 1.3 and org.analgesia <= 1.5 and !org.heartstop then
+	if org.isPly and not org.otrub and not org.holdingbreath and not org.choking and o2.curregen >= losing_oxy and o2.curregen < losing_oxy * 1.3 and org.analgesia <= 1.5 and !org.heartstop then
 
 		org.owner:Notify(barely_breathing[math.random(#barely_breathing)], 45, "barely_breathing", 2, barelyBreathingThoughtExpired)
 
@@ -1382,7 +1401,7 @@ kaz
 
 
 
-        if org.brain >= 0.5 then
+	if org.brain >= 0.5 and not (hg.organism.IsBrainDamageIgnored and hg.organism.IsBrainDamageIgnored(org)) then
 		if org.brain >= 0.5 and (mannitolK <= 0 or (org.brainHemorrhage or 0) >= 0.85) then
 			if math.random(60) == 1 then
 				org.heartstop = true

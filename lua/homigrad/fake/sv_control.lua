@@ -1127,7 +1127,7 @@ hook.Add("Think", "Fake", function()
 		end
 		
 		if not wep.RagdollFunc then
-			local force = math.max(1 - org.larm / 1.3, 0)
+			local force = hg.GetArmEffectiveness and hg.GetArmEffectiveness(ply, "larm") or math.max(1 - org.larm / 1.3, 0)
 			if not fallCoverActive and not manualHoldWound and (!IsValid(ragdoll.ConsLH) and (ply:KeyDown(IN_ATTACK) and !ishgweapon(wep)) or (((ishgweapon(wep) and (!wep:IsResting() or ply:KeyDown(IN_FORWARD) or ply:KeyDown(IN_BACK))) or wep.ismelee2) and (ply:KeyDown(IN_USE) or ply:KeyDown(IN_ATTACK2)))) then// || ply:InVehicle() then
 				if org.canmove then
 					//if !ply:InVehicle() then
@@ -1241,7 +1241,7 @@ hook.Add("Think", "Fake", function()
 				end
 			end
 
-			local force = math.max(1 - org.rarm / 1.3, 0)
+			local force = hg.GetArmEffectiveness and hg.GetArmEffectiveness(ply, "rarm") or math.max(1 - org.rarm / 1.3, 0)
 
 			if not fallCoverActive and (!IsValid(ragdoll.ConsRH) and ply:KeyDown(IN_ATTACK2) or ((ishgweapon(wep) or wep.ismelee2) and ply:KeyDown(IN_USE))) then// || ply:InVehicle() then
 				if org.canmove then

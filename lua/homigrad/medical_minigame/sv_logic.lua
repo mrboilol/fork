@@ -19,7 +19,7 @@ end
 
 local function GetMedicalMinigameOtherSpeedMultiplier(ply, target)
     if not IsValid(ply) or not IsValid(target) or target == ply then return 1 end
-    return 0.7
+    return 0.35
 end
 
 local amputationLimbNames = {
@@ -293,25 +293,16 @@ function hg.MedicalMinigame.StartBandageMinigame(ply, ent)
             else
                 local mode = wep.mode or 1
                 local amount = wep.modeValues and wep.modeValues[mode] or 0
-                local baseLoops = (isnumber(amount) and amount > 0) and math.Clamp(math.ceil(amount / 30), 1, 8) or 1
-                local injuryScore = 0
-                if istable(org.wounds) then injuryScore = injuryScore + #org.wounds end
-                if istable(org.arterialwounds) then injuryScore = injuryScore + (#org.arterialwounds * 2) end
-                if isnumber(org.bleed) then injuryScore = injuryScore + math.Clamp(math.floor(org.bleed / 35), 0, 6) end
-                if org.lleg >= 1 and not org.llegamputated then injuryScore = injuryScore + 2 end
-                if org.rleg >= 1 and not org.rlegamputated then injuryScore = injuryScore + 2 end
-                if org.larm >= 1 and not org.larmamputated then injuryScore = injuryScore + 2 end
-                if org.rarm >= 1 and not org.rarmamputated then injuryScore = injuryScore + 2 end
-                requiredCompletions = math.Clamp(baseLoops + math.ceil(injuryScore * 0.1), 1, 8)
+                local bone = wep.GetBandageTargetBone and wep:GetBandageTargetBone(target, hg.eyeTrace(ply)) or nil
+                local treatmentCost = wep.GetBandageTreatmentCost and wep:GetBandageTreatmentCost(target, bone) or amount
+                requiredCompletions = math.Clamp(math.ceil(math.min(treatmentCost, amount)), 1, 15)
             end
         else
             requiredCompletions = 1
         end
     end
 
-    -- Bandages are quick field dressings: require fewer full wraps while keeping
-    -- the amount healed per completed wrap unchanged.
-    requiredCompletions = math.max(math.ceil(requiredCompletions * 0.65 * GetMedicalMinigameOtherSpeedMultiplier(ply, target)), 1)
+    requiredCompletions = math.max(math.ceil(requiredCompletions * GetMedicalMinigameOtherSpeedMultiplier(ply, target)), 1)
 
     -- The weapon wrapper uses this to map each completed wrap to the same
     -- fraction of its animation instead of conflicting with normal medicines.

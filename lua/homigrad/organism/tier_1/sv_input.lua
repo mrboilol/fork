@@ -848,6 +848,9 @@ function hg.ExplodeHead(ent, damage, slash, force)
 	local sourceEnt = ent
 
 	local ply = ent:IsRagdoll() and hg.RagdollOwner(ent) or ent
+	if IsValid(ply) and ply:IsPlayer() and ply.RemoveHeadcrabFromTrauma then
+		ply:RemoveHeadcrabFromTrauma(false)
+	end
 	if IsValid(ply) and ply:IsPlayer() and ply:Alive() then ply:Kill() end
 	if ent:IsNPC() and ent.organism then
 		ent.organism.shock = 100
@@ -1627,6 +1630,12 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		local caliber = tonumber(bullet and bullet.Diameter) or tonumber(IsValid(inf) and inf.PenetrationSize) or 0
 		sendHeadshotBloodSquirt(ent, ply, dmgPos, squirtDirection, outputHole, caliber > 0 and caliber <= 5.7)
 	end
+	if ply and hitgroup == HITGROUP_HEAD and ply.RemoveHeadcrabFromTrauma
+		and ply.organism and ply.organism.headcrabAttached and damageStack > 0 then
+		local chanceCap = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_SNIPER) and 0.55 or 0.28
+		local hitChance = math.Clamp(0.08 + damageStack / 180, 0.08, chanceCap)
+		if math.Rand(0, 1) <= hitChance then ply:RemoveHeadcrabFromTrauma(math.Rand(0, 1) < 0.45) end
+	end
 	if not noDismemberment and instant and (hitgrouptolimb[hitgroup] or hg.amputeetable[bonename]) then
 		if blast then
 			for _, limb in ipairs({"lleg", "rleg", "larm", "rarm", "lhand", "rhand", "llegup", "rlegup", "larmup", "rarmup"}) do
@@ -1759,7 +1768,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 
 			ply.PreZombClass = ply.PlayerClassName
 
-			ply:AddHeadcrab(headcrabsmodels[class])
+			ply:AddHeadcrab(headcrabsmodels[class], class)
 			
 			dmgInfo:GetAttacker():Remove()
 		end
@@ -2034,7 +2043,7 @@ local hg_safe_landing_maxspeed = 900
 local function velocityDamage(ent, data)
 	local relativeVelocity = data.OurOldVelocity - data.TheirOldVelocity
 	local speed = relativeVelocity:Length()
-	if speed < 545 then return end
+	if speed < 280 then return end
 	if IsValid(data.HitEntity) and data.HitEntity.NoDismemberment then
 		-- A thrown item can transfer momentum before this ragdoll hits the world.
 		-- Keep that secondary impact from becoming projectile-caused dismemberment.
@@ -2060,7 +2069,9 @@ local function velocityDamage(ent, data)
 
 	--print(data.HitObject:GetEntity():IsWorld())
 	local normalSpeed = math.abs(relativeVelocity:Dot(data.HitNormal))
-	local dmg = normalSpeed / 5350 * ((IsValid(data.HitObject) && !data.HitObject:GetEntity():IsWorld()) && math.min(data.HitObject:GetMass() / 20, 1) || 1)
+	local impactMassMul = (IsValid(data.HitObject) && !data.HitObject:GetEntity():IsWorld()) && math.min(data.HitObject:GetMass() / 20, 1) || 1
+	local dmg = math.max(normalSpeed - 170, 0) / 900
+	dmg = dmg ^ 1.28 * 0.95 * impactMassMul
 	if !data.HitObject:GetEntity():IsWorld() && !data.HitObject:GetEntity():IsRagdoll() then
 		//dmg = dmg * math.max(data.HitObject:GetMass()*(speed/50000),5)
 	end
@@ -2153,6 +2164,14 @@ local function velocityDamage(ent, data)
 	end
 	dmg = dmg * armorDmgMul
 
+	if (hitgroup == HITGROUP_LEFTARM or hitgroup == HITGROUP_RIGHTARM or hitgroup == HITGROUP_LEFTLEG or hitgroup == HITGROUP_RIGHTLEG)
+		and hg.TryDislocateLimb and normalSpeed >= 360 then
+		local limb = hitgroup == HITGROUP_LEFTARM and "larm" or hitgroup == HITGROUP_RIGHTARM and "rarm" or hitgroup == HITGROUP_LEFTLEG and "lleg" or "rleg"
+		local boneNameLower = string.lower(bonename or "")
+		local segment = (string.find(boneNameLower, "forearm", 1, true) or string.find(boneNameLower, "calf", 1, true)) and "down" or "up"
+		hg.TryDislocateLimb(org, limb, segment, dmg * math.Clamp(normalSpeed / 500, 0.85, 2.2))
+	end
+
 	if (hitgroup == HITGROUP_LEFTARM and IsValid(ent.ConsLH)) or (hitgroup == HITGROUP_RIGHTARM and IsValid(ent.ConsRH))
 		or ((hitgroup == HITGROUP_LEFTARM or hitgroup == HITGROUP_RIGHTARM) and IsValid(ply) and (ply:KeyDown(IN_FORWARD) or ply:KeyDown(IN_BACK))) then
 		dmg = dmg * 0.1
@@ -2194,26 +2213,27 @@ local function velocityDamage(ent, data)
 			local headDamageMul = hadhelmet and 0.2 or 1
 			local oldSkull = org.skull
 			local isMeleeHit = dmgInfo:IsDamageType(DMG_CLUB) or dmgInfo:IsDamageType(DMG_SLASH)
-			local skullDmgMul = isMeleeHit and 0.08 or 6
-			
-			hg.organism.input_list.skull(org, bone, dmg * skullDmgMul * headDamageMul * ragdoll_fall_skull_damage_mul, dmgInfo)
-			hg.organism.input_list.jaw(org, bone, dmg * headDamageMul * ragdoll_fall_jaw_damage_mul, dmgInfo)
+			local skullDmgMul = isMeleeHit and 0.08 or 4.5
+			local cervicalImpact = math.Clamp((normalSpeed - 420) / 700, 0, 1)
+			local hitCervicalSpine = math.Rand(0, 1) < (0.28 + cervicalImpact * 0.42)
+
+			if hitCervicalSpine then
+				hg.organism.input_list.spine3(org, bone, dmg * (3.2 + cervicalImpact * 2.2) * (hadhelmet and 0.65 or 1), dmgInfo)
+				if hg.organism.module.concussion and hg.organism.module.concussion.AddConcussion then
+					local concussion = math.Clamp(dmg * (hadhelmet and 0.75 or 1.8), 0.35, 3.5)
+					hg.organism.module.concussion.AddConcussion(org, concussion, math.Clamp(concussion * 8, 6, 36))
+				end
+			else
+				hg.organism.input_list.skull(org, bone, dmg * skullDmgMul * headDamageMul * ragdoll_fall_skull_damage_mul, dmgInfo)
+				hg.organism.input_list.jaw(org, bone, dmg * headDamageMul * ragdoll_fall_jaw_damage_mul, dmgInfo)
+			end
 			
 			org.consciousness = math.Approach(org.consciousness, 0, dmg * head_consciousness_mul * headDamageMul)
 			
-			local neck_not_broken = org.spine3 < 0.8
-			
-			//if dmg > 0.5 then
-				hg.organism.input_list.spine3(org, bone, dmg * (math.random(4) == 1 and 1 or 0) * 3 * (hadhelmet and 0.5 or 1), dmgInfo)
-			//end
 			if dmg > head_otrub_min_damage and !hadhelmet and math.Rand(0, 1) < head_otrub_chance then
 				org.needotrub = true
 				org.shock = org.shock + 10
 				org.consciousness = math.min(org.consciousness, head_otrub_consciousness_cap)
-			end
-
-			if neck_not_broken and org.spine3 >= 0.8 then
-				hg.BreakNeck(ent)
 			end
 
 			if oldSkull < 1 and org.skull == 1 then
@@ -2290,13 +2310,20 @@ function hg.BreakNeck(ent, recipient, soundEnt)
 	if not org then return end
 
 	org.spine3 = 1
+	org.cervicalParalysis = true
+	org.paralyzed = true
+	org.cervicalRespiratoryArrest = true
+	org.respiratoryArrest = true
 	if hg.fakeBoneFlop then
 		hg.fakeBoneFlop.FlagBone(org, "ValveBiped.Bip01_Spine3", true)
 		hg.fakeBoneFlop.FlagBone(org, "ValveBiped.Bip01_Head1", true)
 	end
 
 	local ply = ent:IsRagdoll() and hg.RagdollOwner(ent) or ent
-	if IsValid(ply) and ply:Alive() then ply:Kill() end
+	if IsValid(ply) and ply:Alive() and not org.cervicalArrestAnnounced then
+		org.cervicalArrestAnnounced = true
+		ply:Notify("I CANT BREATHE.. I CANT MOVE..", true, "cervical_respiratory_arrest", 0, nil, Color(255, 95, 95))
+	end
 
 	soundEnt = IsValid(soundEnt) and soundEnt or ent
 	local filter

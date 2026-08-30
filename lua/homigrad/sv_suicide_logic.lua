@@ -6,6 +6,7 @@ if SERVER then
     concommand.Add("suicide", function(ply)
         if not IsValid(ply) or not ply:Alive() then return end
         if not hg.CanSuicide(ply) then return end
+        if ply.StartHeadcrabRemovalAttempt and ply:StartHeadcrabRemovalAttempt() then return end
 
         local wep = ply:GetActiveWeapon()
         local has_gun = IsValid(wep) and wep.ishgweapon and not wep.ismelee and not wep.ismelee2 and wep:Clip1() > 0

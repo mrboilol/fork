@@ -83,7 +83,15 @@ function SWEP:PrimarySpread()
 				recoilForce = resolvedForce
 			end
 			local injuryPain = math.max(0, 1 - effectiveness) * math.Clamp((recoilForce or self.Primary.Force or 30) / 15, 0.5, 6)
+			local fractured = (org[firingArm] or 0) >= 1
+			local dislocated = org[firingArm .. "dislocation"] or org[firingArm .. "dislocated"]
+			if dislocated then injuryPain = injuryPain * 0.42 end
+			if fractured then injuryPain = injuryPain * 1.25 end
 			if support.oneHanded then injuryPain = injuryPain + math.max((recoilForce or 0) - 25, 0) * 0.035 end
+			if support.wantsTwoHands then
+				local braceArm = firingArm == "larm" and "rarm" or "larm"
+				if (org[braceArm] or 0) >= 1 then injuryPain = injuryPain + 0.9 end
+			end
 			org.painadd = (org.painadd or 0) + injuryPain
 		end
 	end

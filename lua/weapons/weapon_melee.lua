@@ -1621,8 +1621,24 @@ end
 
 function SWEP:ConsumeMeleeStamina(owner, amount)
 	if not SERVER or not IsValid(owner) or not owner.organism then return end
-	local stamina = owner.organism.stamina
+	local org = owner.organism
+	local stamina = org.stamina
 	if stamina then stamina.subadd = (stamina.subadd or 0) + math.max(tonumber(amount) or 0, 0) end
+
+	local arms = self.TwoHanded and {"rarm", "larm"} or {"rarm"}
+	local pain = 0
+	for _, arm in ipairs(arms) do
+		local damage = math.Clamp(tonumber(org[arm]) or 0, 0, 1)
+		local dislocated = org[arm .. "dislocation"] or org[arm .. "dislocated"]
+		if damage >= 1 then
+			pain = pain + 4.5
+		elseif dislocated then
+			pain = pain + 1.35
+		elseif damage >= 0.6 then
+			pain = pain + (damage - 0.55) * 3
+		end
+	end
+	if pain > 0 then org.painadd = (org.painadd or 0) + pain end
 end
 
 function SWEP:IsHeadTrace(ent, trace)
