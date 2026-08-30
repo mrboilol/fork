@@ -795,7 +795,8 @@ if SERVER then
 		
 		-- Если растрелять труп а потом его взорвать гранатой, после перевязать - крашнет сервер why?
 		local bandageDislocation = hg.organism.GetBandageDislocation and hg.organism.GetBandageDislocation(org, bone)
-		if self.modeValues[1] <= 0 or not (bandageDislocation or arteryWound or #org.wounds > 0 or (org.lleg or 0) >= 0.05 or (org.rleg or 0) >= 0.05 or (org.skull or 0) >= 0.05 or (org.chest or 0) >= 0.05 or (org.rarm or 0) >= 0.05 or (org.larm or 0) >= 0.05) then return end
+		local anyBandageDislocation = hg.organism.GetBandageDislocation and hg.organism.GetBandageDislocation(org)
+		if self.modeValues[1] <= 0 or not (bandageDislocation or anyBandageDislocation or arteryWound or #org.wounds > 0 or (org.lleg or 0) >= 0.05 or (org.rleg or 0) >= 0.05 or (org.skull or 0) >= 0.05 or (org.chest or 0) >= 0.05 or (org.rarm or 0) >= 0.05 or (org.larm or 0) >= 0.05) then return end
 		table.sort(org.wounds, function(a, b) return a[1] > b[1] end)
 		
 		local done = false
@@ -913,6 +914,13 @@ if SERVER then
 			end
 		end)
 
+		local structuralBone = bone
+		if not structuralBone then
+			local trace = IsValid(owner) and hg.eyeTrace(owner) or nil
+			structuralBone = self:GetBandageTargetBone(ent, trace)
+		end
+		bandageDislocation = hg.organism.GetBandageDislocation and hg.organism.GetBandageDislocation(org, structuralBone)
+
 		local who = (self:GetOwner() == org.owner) and "You" or ((owner.Profession == "doctor") and "A doctor" or "Someone")
 		local amt = self:GetBandageStructuralTreatmentCost()
 		if bandageDislocation and self.modeValues[1] >= amt and hg.organism.CompleteDislocationFix(org, bandageDislocation, owner) then
@@ -921,7 +929,7 @@ if SERVER then
 			ent.bandaged_limbs[dislocationBandageBones[bandageDislocation]] = true
 			done = true
 		end
-		local treatingSkull = not bone or bone == "skull" or (isstring(bone) and string.find(bone, "Head", 1, true))
+		local treatingSkull = not structuralBone or structuralBone == "skull" or (isstring(structuralBone) and string.find(structuralBone, "Head", 1, true))
 		if treatingSkull and org.skull > 0.05 and self.modeValues[1] >= amt then
 			hg.organism.ApplyBandageBoneTreatment(org, "skull", 0.25)
 			self.modeValues[1] = self.modeValues[1] - amt
@@ -931,48 +939,48 @@ if SERVER then
 			done = true
 		end
 
-		if IsBandageBone(bone, HITGROUP_CHEST) and (org.chest or 0) >= 0.05 and self.modeValues[1] >= amt then
+		if IsBandageBone(structuralBone, HITGROUP_CHEST) and (org.chest or 0) >= 0.05 and self.modeValues[1] >= amt then
 			hg.organism.ApplyBandageBoneTreatment(org, "chest", 0.25)
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.avgpain = math.max(org.avgpain - 7, 0)
 			ent.bandaged_limbs = ent.bandaged_limbs or {}
-			ent.bandaged_limbs[bone] = true
+			ent.bandaged_limbs[structuralBone] = true
 			done = true
 		end
 
-		if IsBandageBone(bone, HITGROUP_LEFTLEG) and (org.lleg or 0) >= 0.05 and self.modeValues[1] >= amt and !org.llegamputated then
+		if IsBandageBone(structuralBone, HITGROUP_LEFTLEG) and (org.lleg or 0) >= 0.05 and self.modeValues[1] >= amt and !org.llegamputated then
 			hg.organism.ApplyBandageBoneTreatment(org, "lleg", 0.25)
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.avgpain = math.max(org.avgpain - 7, 0)
 			ent.bandaged_limbs = ent.bandaged_limbs or {}
-			ent.bandaged_limbs[bone] = true
+			ent.bandaged_limbs[structuralBone] = true
 			done = true
 		end
 
-		if IsBandageBone(bone, HITGROUP_RIGHTLEG) and (org.rleg or 0) >= 0.05 and self.modeValues[1] >= amt and !org.rlegamputated then
+		if IsBandageBone(structuralBone, HITGROUP_RIGHTLEG) and (org.rleg or 0) >= 0.05 and self.modeValues[1] >= amt and !org.rlegamputated then
 			hg.organism.ApplyBandageBoneTreatment(org, "rleg", 0.25)
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.avgpain = math.max(org.avgpain - 7, 0)
 			ent.bandaged_limbs = ent.bandaged_limbs or {}
-			ent.bandaged_limbs[bone] = true
+			ent.bandaged_limbs[structuralBone] = true
 			done = true
 		end
 
-		if IsBandageBone(bone, HITGROUP_RIGHTARM) and (org.rarm or 0) >= 0.05 and self.modeValues[1] >= amt and !org.rarmamputated then
+		if IsBandageBone(structuralBone, HITGROUP_RIGHTARM) and (org.rarm or 0) >= 0.05 and self.modeValues[1] >= amt and !org.rarmamputated then
 			hg.organism.ApplyBandageBoneTreatment(org, "rarm", 0.25)
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.avgpain = math.max(org.avgpain - 7, 0)
 			ent.bandaged_limbs = ent.bandaged_limbs or {}
-			ent.bandaged_limbs[bone] = true
+			ent.bandaged_limbs[structuralBone] = true
 			done = true
 		end
 
-		if IsBandageBone(bone, HITGROUP_LEFTARM) and (org.larm or 0) >= 0.05 and self.modeValues[1] >= amt and !org.larmamputated then
+		if IsBandageBone(structuralBone, HITGROUP_LEFTARM) and (org.larm or 0) >= 0.05 and self.modeValues[1] >= amt and !org.larmamputated then
 			hg.organism.ApplyBandageBoneTreatment(org, "larm", 0.25)
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.avgpain = math.max(org.avgpain - 7, 0)
 			ent.bandaged_limbs = ent.bandaged_limbs or {}
-			ent.bandaged_limbs[bone] = true
+			ent.bandaged_limbs[structuralBone] = true
 			done = true
 		end
 

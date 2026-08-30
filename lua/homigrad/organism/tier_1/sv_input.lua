@@ -2068,6 +2068,20 @@ local hg_safe_landing_legmul = 0.6
 local hg_safe_landing_painmul = 0.7
 local hg_safe_landing_minspeed = 350
 local hg_safe_landing_maxspeed = 900
+local physics_internal_bleed_min_damage = 1.1
+local physics_internal_bleed_cooldown = 0.5
+
+local function addPhysicsInternalBleed(ent, org, hitgroup, dmg)
+	if hitgroup ~= HITGROUP_CHEST and hitgroup ~= HITGROUP_STOMACH then return end
+	if dmg <= physics_internal_bleed_min_damage then return end
+
+	local now = CurTime()
+	if (ent.hgLastInternalBleedImpact or 0) > now then return end
+	ent.hgLastInternalBleedImpact = now + physics_internal_bleed_cooldown
+
+	local amount = math.min((dmg - physics_internal_bleed_min_damage) * 2, 3)
+	org.internalBleed = math.min((org.internalBleed or 0) + amount, 10)
+end
 
 local function velocityDamage(ent, data)
 	local relativeVelocity = data.OurOldVelocity - data.TheirOldVelocity
@@ -2236,9 +2250,7 @@ local function velocityDamage(ent, data)
 			--PrintTable(org.wounds)
 		end
 		--print(dmg)
-		if dmg > 0.2 then
-			org.internalBleed = org.internalBleed + (dmg * 2.5) 
-		end
+		addPhysicsInternalBleed(ent, org, hitgroup, dmg)
 
 		org.owner:AddNaturalAdrenaline( math.min( dmg * 0.5, 4) )
 

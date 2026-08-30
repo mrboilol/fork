@@ -416,7 +416,6 @@ local color_white, color_red, color_red2, color_red3 = Color(255, 255, 255), Col
 module[2] = function(owner, org, timeValue)
 
 	local o2 = org.o2
-	local rawBlood = tonumber(org.blood) or 5000
 	if not org.alive then
 		if hg.organism and hg.organism.BeginPostMortemDecay then
 			hg.organism.BeginPostMortemDecay(org)
@@ -501,19 +500,12 @@ module[2] = function(owner, org, timeValue)
 	org.respiratoryRate = math.Round(Lerp(bradyapnea, 14, 4))
 	org.respiratoryArrest = org.cervicalRespiratoryArrest == true or drugRespiratoryDepression >= opioidRespiratoryArrestThreshold
 
-	-- Arterial saturation comes from lungs; hemorrhage separately limits how much
-	-- oxygen can be transported through the whole circulation. The transport curve
-	-- is shared with preload/cardiac-output math and is intentionally non-linear.
-	local hemorrhageTransportK = hg.organism.GetHemorrhageOxygenTransportFraction
-		and hg.organism.GetHemorrhageOxygenTransportFraction(rawBlood)
-		or math.Clamp(rawBlood / math.max(hg.organism.normalBloodVolume or 5000, 1), 0, 1)
-	local hemorrhageAdrenaline = math.Clamp(((org.adrenaline or 0) + (org.noradrenaline or 0) - 0.5) / 3, 0, 1)
-	local hemorrhageAdrenalineSupport = (1 - hemorrhageTransportK) * hemorrhageAdrenaline * 0.18
-	local effectiveHemorrhageTransportK = math.Clamp(hemorrhageTransportK + hemorrhageAdrenalineSupport, 0, 1)
-	local bloodCarryO2Cap = o2.range * effectiveHemorrhageTransportK
-	org.bloodCarryO2Cap = bloodCarryO2Cap
-	org.hemorrhageOxygenTransport = effectiveHemorrhageTransportK
-	org.hemorrhageAdrenalineO2Support = hemorrhageAdrenalineSupport
+	-- Blood volume affects oxygen delivery through cardiac output, pulse, and
+	-- pressure. It is not itself an arterial saturation cap; the lungs own the
+	-- blood's oxygen saturation and the circulation module owns delivery.
+	org.bloodCarryO2Cap = o2.range
+	org.hemorrhageOxygenTransport = 1
+	org.hemorrhageAdrenalineO2Support = 0
 	local bloodO2Cap = org.bloodO2Cap or o2.range
 
 	local bodyTemperature = org.temperature or 36.7
@@ -797,7 +789,7 @@ module[2] = function(owner, org, timeValue)
 		-- rate above.  A small floor keeps a critically injured but not yet fully
 		-- failed lung from snapping to zero in one tick.
 		local lungO2Cap = o2.range * math.max(1 - org.pneumothorax * org.pneumothorax, 0.1) * math.max(1 - (org.hemothorax or 0) * (org.hemothorax or 0), 0.1) * math.max(1 - (org.lungsL[1] + org.lungsR[1]) / 2, 0.1)
-		o2[1] = min(o2[1] + regenerate * math.Clamp(org.o2[1] / 30, 0.25, 1) * (org.holdingbreath and 0 or 1) * (sprayed and 0 or 1) * min((10 / max(org.CO,1)),1), min(lungO2Cap, bloodO2Cap, bloodCarryO2Cap, coldO2Cap, altitudeO2Cap, exertionO2Cap))
+		o2[1] = min(o2[1] + regenerate * math.Clamp(org.o2[1] / 30, 0.25, 1) * (org.holdingbreath and 0 or 1) * (sprayed and 0 or 1) * min((10 / max(org.CO,1)),1), min(lungO2Cap, bloodO2Cap, coldO2Cap, altitudeO2Cap, exertionO2Cap))
 
 
 
@@ -959,18 +951,13 @@ module[2] = function(owner, org, timeValue)
 
 	end
 
-	-- Blood volume and exertion debt cap tissue oxygen delivery. When circulation
-	-- reaches zero, tissue oxygen reaches zero with it.
-	-- O2[1] is the tissue reserve, so it must follow actual circulation as well
-	-- as lung intake and blood volume.  Without this link a player could have
-	-- 0.4 perfusion while still carrying a full 30-point tissue-O2 reserve.
-	-- Use current pump output directly. org.perfusion is derived after lungs/O2,
-	-- so feeding it back here produced a one-tick self-amplifying O2 loop.
-	local tissuePerfusion = math.Clamp(org.cardiacOutput or 1, 0, 1)
-	local normalBlood = math.max(hg.organism.normalBloodVolume or 5000, 1)
-	if rawBlood < normalBlood then
-		tissuePerfusion = math.min(tissuePerfusion, math.Clamp(((org.pulse or 0) - 10) / 50, 0, 1))
-	end
+	-- Tissue oxygen follows effective pump output and palpable pulse. This is
+	-- the downstream low-blood path: poor filling lowers pulse/perfusion first,
+	-- then the resulting delivery failure drains O2.
+	local tissuePerfusion = math.min(
+		math.Clamp(org.cardiacOutput or 1, 0, 1),
+		math.Clamp((org.pulse or 0) / 70, 0, 1)
+	)
 	-- Tissue oxygen is a delivered value, not an independent reservoir. With no
 	-- perfusion there is no delivery, so its cap must be zero as well.
 	local perfusionO2Cap = o2.range * tissuePerfusion
@@ -981,7 +968,6 @@ module[2] = function(owner, org, timeValue)
 	-- now drains at a rate proportional to the actual delivery failure.
 	local deliveryReserve = hg.organism.GetLimitingReserve(
 		bloodO2Cap / o2.range,
-		bloodCarryO2Cap / o2.range,
 		perfusionO2Cap / o2.range,
 		exertionO2Cap / o2.range
 	)

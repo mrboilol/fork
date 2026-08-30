@@ -228,7 +228,7 @@ hook.Add("Org Clear", "Main", function(org)
 end)
 hook.Add("Should Fake Up", "organism", function(ply)
 	local org = ply.organism
-	if org.seizureActive or org.otrub or org.fake or org.nearpainlimit or org.shock > 40 or org.spine1 >= hg.organism.fake_spine1 or org.spine2 >= hg.organism.fake_spine2 or org.spine3 >= hg.organism.fake_spine3 or (org.lleg == 1 and org.rleg == 1) and org.berserk <= 0.3 or (org.blood <= 2250) or org.consciousness <= 0.4 then
+	if org.seizureActive or org.otrub or org.fake or org.nearpainlimit or org.shock > 40 or org.spine1 >= hg.organism.fake_spine1 or org.spine2 >= hg.organism.fake_spine2 or org.spine3 >= hg.organism.fake_spine3 or (org.lleg == 1 and org.rleg == 1) and org.berserk <= 0.3 or org.consciousness <= 0.4 then
 		return false
 	end
 end)
@@ -1303,7 +1303,6 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.canmove = (org.spine2 < hg.organism.fake_spine2 and not org.paralyzed) and not org.otrub
 		org.canmovehead = (org.spine3 < hg.organism.fake_spine3) and not org.otrub
 		if not (org.canmove and org.canmovehead and (org.stun - CurTime()) < 0) then org.needfake = true end
-		if (org.blood <= 2250) then org.needfake = true end
 		if org.neckslit and not org.otrub then org.needfake = true end
 	end
 	local just_went_uncon = not org.otrub and org.needotrub
