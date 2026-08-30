@@ -147,6 +147,7 @@ SWEP.NoHolster = true
 
 SWEP.BreakBoneMul = 0.8
 SWEP.PainMultiplier = 0.76
+SWEP.TraumaShockMultiplier = 1.2
 
 SWEP.AttackTimeLength = 0.255
 SWEP.Attack2TimeLength = 0.001

@@ -6,50 +6,50 @@ util.AddNetworkString("HGThought")
 local hev_color = Color(255,125,0)
 local CreateThought
 local thoughtMessages = {
-    panicattack_start = {"Panic is disrupting your focus.", "Your stress response is escalating."},
-    wake = {"Consciousness restored.", "You have regained consciousness."},
-    dislocations_unlucky = {"Joint alignment restored.", "The dislocated joint has been set."},
-    painfromjawspeak = {"Jaw trauma causes pain while speaking.", "Speaking is aggravating your jaw injury."},
-    arteria = {"A neck artery is bleeding heavily.", "Severe arterial bleeding detected in the neck."},
-    take_gasmask = {"Your gas mask is restricting airflow.", "The gas mask is making breathing more difficult."},
-    take_gasmask2 = {"Your gas mask is severely restricting airflow.", "Remove the gas mask to improve breathing."},
-    oxygen_lowintake = {"Air intake is insufficient.", "You are not receiving enough air."},
-    lowoxy = {"Blood oxygen is low.", "Oxygen deprivation is affecting you."},
-    lowoxy2 = {"Blood oxygen is critically low.", "Critical oxygen deprivation detected."},
-    drugged = {"A drug is affecting your coordination.", "A chemical effect is impairing your body."},
-    pneumothorax1 = {"Air or blood is accumulating around a lung.", "A chest injury is affecting lung expansion."},
-    pneumothorax2 = {"A chest injury is restricting breathing.", "Breathing is becoming more difficult due to chest trauma."},
-    pneumothorax3 = {"Respiratory distress is worsening.", "You are struggling to breathe."},
-    brain = {"Neurological trauma is affecting your focus.", "Brain trauma is impairing coordination."},
-    blood2 = {"Blood loss is causing faintness.", "Circulatory loss is making you collapse."},
-    internalbleed = {"Internal bleeding detected.", "Internal bleeding is worsening."},
-    nosebleed = {"Nasal bleeding detected.", "Your nose is bleeding."},
-    hungry = {"You need food.", "Hunger is reducing your stamina."},
-    heart = {"Chest trauma is causing severe pain.", "Cardiac-area trauma is impairing movement."},
-    heartstop = {"Cardiac arrest detected.", "Your heart has stopped."},
-    painfrommoving = {"Movement is aggravating your leg injury.", "Your leg injury is causing pain during movement."},
-    painfromjaw = {"Jaw trauma is causing severe pain.", "Your jaw injury is painful."},
-    painfromribs = {"Rib trauma is making breathing painful.", "Breathing is aggravating your rib injury."},
-    rehab_otrub = {"Post-unconsciousness disorientation is still present.", "Recovery is incomplete; movement and focus are impaired."},
-    arrhythmia = {"Your heart rhythm is irregular.", "An unstable cardiac rhythm is affecting circulation."},
-    tachycardia = {"Your heart rate is dangerously high.", "Tachycardia is straining your circulation."},
-    bradycardia = {"Your heart rate is dangerously low.", "Bradycardia is reducing circulation."},
-    low_perfusion = {"Poor circulation is weakening your limbs.", "Tissue perfusion is critically reduced."},
-    barely_breathing = {"Respiratory function is severely impaired.", "You are barely able to breathe."},
-    low_stamina = {"Exertion is exhausting your body.", "Stamina is critically depleted."},
-    trachea1 = {"Tracheal trauma is restricting airflow.", "Your airway has been damaged."},
-    trachea2 = {"Severe tracheal damage is blocking airflow.", "Airway obstruction is worsening."},
-    trachea_critical = {"Critical airway trauma detected.", "Your trachea can no longer provide enough airflow."},
-    concussion_thought = {"Concussion symptoms are impairing cognition.", "Neurological symptoms are worsening."},
-    concussion_choke = {"Vomiting is obstructing your airway.", "You are choking and unable to breathe properly."},
-    concussion_dryheave = {"Severe nausea is causing dry heaving.", "Your concussion is causing intense nausea."},
-    concussion_lucid = {"Symptoms have briefly eased; the concussion remains active.", "A temporary lucid interval has begun."},
-    med_err_needle = {"Needle placement caused a complication.", "Medical treatment has worsened a chest injury."},
-    med_err_tourniquet = {"The tourniquet was applied incorrectly.", "Improper tourniquet placement is causing additional trauma."},
-    med_err_transfusion = {"An adverse transfusion reaction is occurring.", "Transfusion complications are affecting your circulation."},
-    med_err_dose = {"Medication dosage is causing dizziness.", "A treatment complication is impairing coordination."},
-    med_err_bandage = {"The bandage may have introduced contamination.", "Wound treatment has caused a complication."},
-    med_error_actor = {"Medical complication detected.", "Treatment did not proceed safely."},
+    panicattack_start = {"Panic is disrupting your focus.", "Panic is starting to settle."},
+    wake = {"You regain consciousness.", "You woke up."},
+    dislocations_unlucky = {"You are struggling to fix a dislocation.", "You fail to fix a dislocation."},
+    painfromjawspeak = {"Your jaw is hurting due to speech.", "Speaking causes your jaw to hurt."},
+    arteria = {"Your neck has ben cut open.", "Your carotid artery is open."},
+    take_gasmask = {"Your gas mask is restricting airflow.", "Your gas mask is making it hard to breathe."},
+    take_gasmask2 = {"The gas mask is preventing you from breathing.", "You can't breathe due to a gas mask."},
+    oxygen_lowintake = {"You cant get enough air.", "You are struggling to breathe."},
+    lowoxy = {"You are suffering of hypoxemia.", "You are showing hypoxia symptoms."},
+    lowoxy2 = {"You are experiencing anoxia symptoms.", "You are dying of oxygen loss."},
+    drugged = {"You have been drugged.", "You are overdosing."},
+    pneumothorax1 = {"Air or blood is accumulating around a lung.", "Something is building up around your lungs."},
+    pneumothorax2 = {"Your lungs are not breathing properly.", "Something causes your lungs to not expand properly."},
+    pneumothorax3 = {"A chest injury is preventing you from breathing.", "Something around your lungs prevents breathing."},
+    brain = {"You have a brain injury.", "You are brain damaged."},
+    blood2 = {"You have lost a significant amount of blood.", "Blood loss is making you feel weak."},
+    internalbleed = {"Something is bleeding inside.", "You are internally bleeding."},
+    nosebleed = {"Something makes your nose bleed.", "Your nose is bleeding."},
+    hungry = {"You need food.", "You are hungry."},
+    heart = {"Your heart is not functioning properly.", "Something is wrong with your heart."},
+    heartstop = {"You are undergoing cardiac arrest.", "Your heart has stopped."},
+    painfrommoving = {"Your leg is hurting when moving.", "Your leg prevents you from moving comfortably."},
+    painfromjaw = {"Speaking causes your jaw to hurt.", "Your jaw is causing pain."},
+    painfromribs = {"You feel pain in your chest.", "Something is poking at your lungs."},
+    rehab_otrub = {"You feel very weak after waking up.", "You feel disoriented after regaining consciousness."},
+    arrhythmia = {"Your heart rhythm is irregular.", "You have a heart arrhythmia."},
+    tachycardia = {"Your heart rate is dangerously high.", "You have symptoms of tachycardia."},
+    bradycardia = {"Your heart rate is dangerously low.", "You are showing symptoms of bradycardia."},
+    low_perfusion = {"Your body feels numb.", "Your limbs feel weak."},
+    barely_breathing = {"You are breathing weakly.", "Your breathing is shallow."},
+    low_stamina = {"You are exerted.", "You feel tired."},
+    trachea1 = {"Your trachea is slightly damaged.", "Something hit your windpipe."},
+    trachea2 = {"Your trachea is damaged.", "Your windpipe is injured."},
+    trachea_critical = {"Your trachea is too damaged to work.", "Your windpipe can't provide air anymore."},
+    concussion_thought = {"You have a concussion.", "You are concussed."},
+    concussion_choke = {"Head trauma is making breathing hard.", "You cant breathe due to head trauma."},
+    concussion_dryheave = {"You feel nauseous due to trauma.", "You feel incredibly nauseous."},
+    concussion_lucid = {"You are experiencing a temporary lucid interval.", "You feel a temporary relief from concussion symptoms."},
+    med_err_needle = {"Something went wrong with the needle.", "You placed the needle wrong."},
+    med_err_tourniquet = {"The tourniquet was applied incorrectly.", "You botched the tourniquet placement."},
+    med_err_transfusion = {"Something happened with the transfusion.", "Something went wrong with the transfusion."},
+    med_err_dose = {"You administered the wrong dosage.", "You introduced the wrong dosage."},
+    med_err_bandage = {"You failed to properly bandage the wound.", "Something went wrong while bandaging."},
+    med_error_actor = {"You botched the treatment.", "Something went wrong during treatment."},
 }
 
 local legacyThoughtMessages = {
@@ -231,7 +231,7 @@ local scpcbThoughts = {
     },
     armor_partial = {
         "A {weapon} hit your chest. The vest absorbed some of the damage.",
-        "A {weapon} struck your chest. Vest compromised.",
+        "A {weapon} struck your chest. Your armor slowed it down.",
         "A {weapon} hit your chest. Plating cracked but stopped the impact.",
         "A {weapon} struck your vest, partially penetrating.",
         "A {weapon} hit your chest. Armor slowed the strike, but it still hit you."
@@ -352,7 +352,7 @@ end
 
 local function GetStatusThought(ply)
     local org = ply.organism or {}
-    if org.heartstop then return "Cardiac arrest detected." end
+    if org.heartstop then return "Your heart stopped." end
     if (org.o2 and org.o2[1] or 30) <= 8 then return "You are running out of oxygen." end
     if (org.o2 and org.o2[1] or 30) <= 15 then return "Your oxygen level is critically low." end
     if (org.arterialBleed or 0) > 0.2 then return "An artery is bleeding heavily." end
@@ -374,7 +374,7 @@ local function GetStatusThought(ply)
     if (org.thirst or 0) >= 85 then return "Severe dehydration is weakening your body." end
     if (org.thirst or 0) >= 30 then return "You need water." end
     if (org.panicattack or 0) > 0.55 then return "Panic is making it hard to focus." end
-    if (org.brain or 0) > 0.1 then return "Neurological trauma is impairing your focus." end
+    if (org.brain or 0) > 0.1 then return "Your brain is damaged." end
 end
 
 local function GetNewThoughtMessage(ply, msg, msgKey)
@@ -386,17 +386,17 @@ local function GetNewThoughtMessage(ply, msg, msgKey)
     if string.find(key, "panic", 1, true) then return "You are losing focus." end
     if string.find(key, "neck", 1, true) or string.find(key, "arter", 1, true) then return "A neck artery is bleeding heavily." end
     if string.find(key, "skull", 1, true) or string.find(key, "jaw", 1, true) then return "You feel severe pain around your head." end
-    if string.find(key, "concussion", 1, true) or string.find(key, "brain", 1, true) then return "Neurological trauma is impairing your focus." end
+    if string.find(key, "concussion", 1, true) or string.find(key, "brain", 1, true) then return "Your brain is damaged." end
     if string.find(key, "bone", 1, true) or string.find(key, "broke", 1, true) or string.find(key, "disloc", 1, true) or string.find(key, "ribs", 1, true) or string.find(key, "pelvis", 1, true) then return "You feel a painful bone injury." end
     if string.find(key, "blood", 1, true) or string.find(key, "bleed", 1, true) then return "You are losing blood." end
     if string.find(key, "oxygen", 1, true) or string.find(key, "breath", 1, true) then return "You are struggling to breathe." end
-    if string.find(key, "trachea", 1, true) or string.find(key, "stamina", 1, true) then return "Respiratory function is impaired." end
-    if string.find(key, "rhythm", 1, true) or string.find(key, "arrhythm", 1, true) then return "Your heart rhythm is irregular." end
-    if string.find(key, "tachy", 1, true) then return "Your heart rate is dangerously high." end
-    if string.find(key, "brady", 1, true) then return "Your heart rate is dangerously low." end
-    if string.find(key, "perfusion", 1, true) or string.find(key, "hypotension", 1, true) then return "Poor circulation is weakening your limbs." end
-    if string.find(key, "rehab", 1, true) or string.find(key, "otrub", 1, true) then return "Post-unconsciousness recovery is incomplete." end
-    if string.find(key, "med_err", 1, true) or string.find(key, "medical", 1, true) then return "Medical treatment caused a complication." end
+    if string.find(key, "trachea", 1, true) or string.find(key, "stamina", 1, true) then return "Your trachea is damaged." end
+    if string.find(key, "rhythm", 1, true) or string.find(key, "arrhythm", 1, true) then return "You have a heart arrythmia." end
+    if string.find(key, "tachy", 1, true) then return "You have tachycardia." end
+    if string.find(key, "brady", 1, true) then return "Your have bradycardia." end
+    if string.find(key, "perfusion", 1, true) or string.find(key, "hypotension", 1, true) then return "Your limbs feel unusually cold." end
+    if string.find(key, "rehab", 1, true) or string.find(key, "otrub", 1, true) then return "You feel weak and disoriented after waking up." end
+    if string.find(key, "med_err", 1, true) or string.find(key, "medical", 1, true) then return "You botched the treatment." end
     if string.find(key, "pain", 1, true) then return "Pain is impairing movement." end
     if string.find(key, "hunger", 1, true) then return "You need food." end
     if string.find(key, "thirst", 1, true) or string.find(key, "dehyd", 1, true) then return "You need water." end

@@ -158,11 +158,15 @@ end
 function hg.ApplyLodgedExtraction(owner, extractor, entry)
 	if not IsValid(owner) or not owner.organism or not istable(entry) then return end
 	local org = owner.organism
-	local body, worldPos, worldAng = addLodgedWound(owner, org, entry, math.Rand(18, 28), math.Rand(18, 36))
-	showExtractionBlood(owner, entry)
-	org.painadd = math.min((org.painadd or 0) + math.Rand(8, 14), 150)
-
+	local body = lodgedBody(owner)
 	local region = hg.GetLodgedRegion(entry, body)
+	local vitalRegion = region == "head" or region == "neck" or region == "chest"
+	local extractionBleed = vitalRegion and math.Rand(52, 72) or math.Rand(42, 60)
+	local worldPos, worldAng
+	body, worldPos, worldAng = addLodgedWound(owner, org, entry, extractionBleed, math.Rand(45, 90))
+	showExtractionBlood(owner, entry)
+	org.painadd = math.min((org.painadd or 0) + math.Rand(14, 22), 150)
+
 	local direction = isangle(worldAng) and worldAng:Forward() or vector_up
 	if region == "neck" and math.Rand(0, 1) < 0.04 then
 		cutCarotid(owner, org, worldPos or owner:WorldSpaceCenter(), direction, extractor)
@@ -212,14 +216,15 @@ hook.Add("Org Think", "LodgedObjectComplications", function(owner, org)
 			end
 		elseif region == "head" then
 			local activityMul = fast and 2 or 1
-			if math.Rand(0, 1) < 0.00016 * activityMul then
+			local skullRiskMul = 1 + math.Clamp(tonumber(org.skull) or 0, 0, 1) * 1.8
+			if math.Rand(0, 1) < 0.0008 * activityMul * skullRiskMul then
 				if hg.organism.AddBrainHemorrhage then
-					hg.organism.AddBrainHemorrhage(org, math.Rand(0.004, 0.012), math.Rand(0.00002, 0.00008))
+					hg.organism.AddBrainHemorrhage(org, math.Rand(0.006, 0.018), math.Rand(0.00004, 0.00012))
 				else
-					org.brainHemorrhage = math.min((tonumber(org.brainHemorrhage) or 0) + math.Rand(0.004, 0.012), 1)
+					org.brainHemorrhage = math.min((tonumber(org.brainHemorrhage) or 0) + math.Rand(0.006, 0.018), 1)
 				end
 			end
-			if math.Rand(0, 1) < 0.00008 * activityMul then damageBrainLobe(org) end
+			if math.Rand(0, 1) < 0.00012 * activityMul then damageBrainLobe(org) end
 		end
 
 		if math.Rand(0, 1) < 0.0004 then addLodgedWound(owner, org, entry, math.Rand(2, 4), math.Rand(6, 12)) end

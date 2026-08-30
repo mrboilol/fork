@@ -15,6 +15,7 @@ local head_otrub_max_chance = 0.35
 local head_consciousness_mul = 28
 local head_otrub_consciousness_cap = 0.04
 local instant_pain_shock_scale = 0.75
+local traumatic_shock_threshold = 24
 local player_limb_gib_threshold = 190
 local player_head_gib_threshold = 50
 local player_buckshot_head_gib_threshold = 42
@@ -53,6 +54,18 @@ local body_part_heal = {
 	[HITGROUP_RIGHTARM] = 1,
 	[HITGROUP_STOMACH] = 1,
 }
+
+local function getDamageAmmoSettings(dmgInfo, bullet)
+	local ammoName
+	local ammoID = dmgInfo:GetAmmoType()
+	if ammoID and ammoID >= 0 then
+		ammoName = game.GetAmmoName(ammoID)
+	end
+
+	ammoName = ammoName or (bullet and bullet.AmmoType)
+	local ammo = ammoName and hg.ammotypeshuy[ammoName]
+	return ammo and ammo.BulletSettings
+end
 
 -- Batched timer system to reduce timer overhead
 hg.organism.timerQueue = hg.organism.timerQueue or {}
@@ -398,7 +411,7 @@ local hitgrouptolimb = {
 
 hg.bonetohitgroup = bonetohitgroup
 
-function hg.SetMeleeDamageContact(inflictor, ent, trace, forceHead)
+function hg.SetMeleeDamageContact(inflictor, ent, trace, forceHead, trauma)
 	if not IsValid(inflictor) or not IsValid(ent) or not trace then return end
 
 	local traceEnt = IsValid(trace.Entity) and trace.Entity or ent
@@ -424,6 +437,7 @@ function hg.SetMeleeDamageContact(inflictor, ent, trace, forceHead)
 		boneName = boneName,
 		hitGroup = hitGroup,
 		head = head,
+		trauma = trauma,
 		hitPos = trace.HitPos,
 		normal = trace.Normal,
 		hitNormal = trace.HitNormal,
@@ -509,6 +523,21 @@ local sounds = {
 	Sound("gore/chop5.mp3"),
 	Sound("gore/chop6.mp3"),
 }
+
+function hg.organism.AddTraumaticShock(org, trauma, multiplier)
+	if not org then return 0 end
+
+	trauma = math.max(tonumber(trauma) or 0, 0)
+	local excess = trauma - traumatic_shock_threshold
+	if excess <= 0 then return 0 end
+
+	local resistance = math.max(tonumber(org.traumaResistanceMul) or 1, 1)
+	local shock = math.Clamp(excess * 0.55 + math.sqrt(excess) * 0.75, 0, 30)
+	shock = shock * math.max(tonumber(multiplier) or 1, 0) / resistance
+	org.shock = math.min((org.shock or 0) + shock, 95)
+
+	return shock
+end
 
 local ents_Create = ents.Create
 local childLimbs = {
@@ -1418,6 +1447,9 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) then
 			org.avgpain = math.min((org.avgpain or 0) + instant_pain * 0.5, 150)
 		end
+		if meleeContact and dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH) then
+			hg.organism.AddTraumaticShock(org, meleeContact.trauma or dmg_before, IsValid(inf) and inf.TraumaShockMultiplier or nil)
+		end
 		org.shock = math.min(org.shock + instaPain * shockMul * 4.5 * instant_pain_shock_scale * math.Clamp(pen / 5,1,2), 70)
 		org.immobilization = math.min(org.immobilization + immobilization * immobilizationMul, 30)
 		org.lasthit = CurTime()
@@ -1434,7 +1466,8 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 			timer.Simple(0, function() hg.Fake(org.owner) end)
 		end
 
-		if bullet and hg.ammotypeshuy[bullet.AmmoType] and hg.ammotypeshuy[bullet.AmmoType].BulletSettings.tranquilizer then
+		local ammoSettings = getDamageAmmoSettings(dmgInfo, bullet)
+		if ammoSettings and ammoSettings.tranquilizer then
 			org.tranquilizer = org.tranquilizer + dmgInfo:GetDamage()
 		end
 

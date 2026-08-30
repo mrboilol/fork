@@ -278,8 +278,8 @@ hook.Add("HomigradDamage", "BrainHemorrhageTrauma", function(ply, dmgInfo, hitgr
 	if not org or hitgroup ~= HITGROUP_HEAD or not org.skull then return end
 	if org.skull < 0.7 then return end
 
-	local chance = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) and 0.2 or dmgInfo:IsDamageType(DMG_CLUB + DMG_BLAST + DMG_CRUSH) and 0.08 or 0
-	chance = chance + math.max(org.skull - 0.7, 0) * 0.35
+	local chance = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) and 0.28 or dmgInfo:IsDamageType(DMG_CLUB + DMG_BLAST + DMG_CRUSH) and 0.14 or 0
+	chance = chance + math.max(org.skull - 0.7, 0) * 0.5
 	if math.Rand(0, 1) <= chance then
 		addBrainHemorrhage(org, math.Rand(0.015, 0.05), math.Rand(0.0002, 0.001))
 	end

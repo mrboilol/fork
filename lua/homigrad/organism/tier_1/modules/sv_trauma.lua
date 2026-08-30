@@ -354,7 +354,7 @@ module[2] = function(ply, org, timeValue)
                 end
                 org.concussion_loc_timer = 0
                 if org.isPly and IsValid(ply) and ply:IsPlayer() then
-                    ply:Notify("Everything goes black...", 15, "concussion_loc", 0)
+                    ply:Notify("Eveything is going dark...", 15, "concussion_loc", 0)
                 end
             end
         else

@@ -296,11 +296,11 @@ end)
 
 
 local lowoxy = {
-	"I'm gonna faint right now... There's not enough oxygen.",
-	"There's not enough oxygen... I can't hold much longer...",
-	"I really need some fresh air...",
-	"I'm gasping for air...",
-	"Need to breathe air... or I'm gonna faint right here..."
+	"I NEED AIR... I CAN'T BREATHE...",
+	"IM SUFFOCATING TO FUCKING DEATH.",
+	"WHY CANT I BREATHE. I NEED AIR...",
+	"IT'S GETTING HARDER TO BREATHE... I NEED AIR...",
+	"I CANT FUCKING BREATHE."
 }
 
 local not_enough_intake = {
@@ -313,12 +313,12 @@ local not_enough_intake = {
 
 	//"Resting sounds like a nice idea.",
 	"I need to breathe...",
-	"I'm struggling to breathe...",
+	"I'm struggling to get air.",
 }
 
 local barely_breathing = {
-	"My breathing is getting shallow...",
-	"I can barely catch my breath...",
+	"Breathing is so hard for some reason...",
+	"I can't get enough air in...",
 	"Every breath feels weak...",
 }
 
@@ -342,15 +342,15 @@ local function barelyBreathingThoughtExpired(ply)
 end
 
 local low_stamina = {
-	"I'm running out of stamina...",
+	"I'm tired of this...",
 	"I need to slow down and catch my breath...",
 	"I can barely keep going...",
 }
 
 local drop_mask = {
-	"I can't breathe in this mask... I need to take it off.",
-	"Drop the mask, it's not worth it...",
-	"It's fucking disgusting... and I surely can't breathe in this...",
+	"Drop the fucking mask.",
+	"I cant breathe in this mask...",
+	"It's fucking disgusting in this mask, I cant breathe...",
 	"Fucking stinks... Gotta take this mask off...",
 }
 
@@ -1307,6 +1307,29 @@ kaz
 	local hemorrhageReliefRate = 0
 	if mannitolK > 0 then hemorrhageReliefRate = hemorrhageReliefRate + (1 / 110) * mannitolK end
 	if (org.tranexamic_acid or 0) > 0 then hemorrhageReliefRate = hemorrhageReliefRate + 1 / 1200 end
+
+	local skullDamage = math.Clamp(tonumber(org.skull) or 0, 0, 1)
+	if skullDamage >= 0.4 then
+		local fractureSeverity = math.Clamp((skullDamage - 0.4) / 0.6, 0, 1)
+		local dressingMul = org.bandagedskull and 0.22 or 1
+		local medicationMul = (1 - mannitolK * 0.4) * ((org.tranexamic_acid or 0) > 0 and 0.65 or 1)
+		local resistanceMul = 1 - zerlkersResistance * 0.75
+		local ruptureRate = (0.00015 + fractureSeverity * fractureSeverity * 0.0032)
+			* dressingMul * medicationMul * resistanceMul
+		local ruptureChance = 1 - math.exp(-ruptureRate * math.max(timeValue, 0))
+		if math.Rand(0, 1) < ruptureChance then
+			local amount = math.Rand(0.006, 0.018) * Lerp(fractureSeverity, 0.45, 1)
+			local rate = math.Rand(0.00004, 0.00018) * Lerp(fractureSeverity, 0.5, 1)
+			if hg.organism.AddBrainHemorrhage then
+				hg.organism.AddBrainHemorrhage(org, amount, rate)
+			else
+				org.brainHemorrhage = math.min((org.brainHemorrhage or 0) + amount, 1)
+				org.brainBleedRate = math.min((org.brainBleedRate or 0) + rate, 0.008)
+			end
+		end
+	end
+	hemorrhage = org.brainHemorrhage or hemorrhage
+	bleedRate = org.brainBleedRate or bleedRate
 
 	org.disorientation = math.max(org.disorientation, frontal * 0.35 + parietal * 0.65 + temporal * 0.25)
 	org.immobilization = math.max(org.immobilization, parietal * 8)

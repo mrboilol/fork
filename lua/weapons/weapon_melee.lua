@@ -1612,10 +1612,10 @@ if SERVER then
     end)
 end
 
-function SWEP:SetMeleeDamageContact(ent, trace)
+function SWEP:SetMeleeDamageContact(ent, trace, trauma)
     if not SERVER then return end
     if hg.SetMeleeDamageContact then
-        hg.SetMeleeDamageContact(self, ent, trace, self:IsHeadHit(ent, trace))
+        hg.SetMeleeDamageContact(self, ent, trace, self:IsHeadHit(ent, trace), trauma)
     end
 end
 
@@ -3273,6 +3273,7 @@ function SWEP:CustomThink()
             end
             
             if self.MultiDmg1 or (self.HitEnts[#self.HitEnts] ~= ent) then
+                local trauma = dmg
                 //if self:BreakGlass(ent) then
                     //goto meleeskip1
                 //end
@@ -3293,7 +3294,7 @@ function SWEP:CustomThink()
                 dmginfo:SetDamagePosition(trace.HitPos)
                 
                 self.slash = self.MultiDmg1
-                self:SetMeleeDamageContact(ent, trace)
+                self:SetMeleeDamageContact(ent, trace, trauma)
                 ent:TakeDamageInfo(dmginfo)
                 self.MeleeDamageContact = nil
                 self.attackedOnce = true
@@ -3447,6 +3448,7 @@ function SWEP:CustomThink()
             end
 
             if self.MultiDmg2 or (self.HitEnts[#self.HitEnts] ~= ent) then
+                local trauma = dmg
                 //if self:BreakGlass(ent) then
                     //goto meleeskip2
                 //end
@@ -3465,7 +3467,7 @@ function SWEP:CustomThink()
                 dmginfo:SetDamagePosition(trace.HitPos)
 
                 self.slash = self.MultiDmg2
-                self:SetMeleeDamageContact(ent, trace)
+                self:SetMeleeDamageContact(ent, trace, trauma)
                 --print(dmg)
                 ent:TakeDamageInfo(dmginfo)
                 self.MeleeDamageContact = nil
@@ -3636,6 +3638,7 @@ function SWEP:CustomThink()
             end
             
             if self.MultiDmgCharge or (self.HitEnts[#self.HitEnts] ~= ent) then
+                local trauma = dmg
                 if self.MultiDmgCharge or not self:IsEntSoft(ent) then
                     dmg = dmg / math.max(((self.ChargeAttackRads or self.AttackRads) or 1) * ((self.ChargeAttackTimeLength or self.AttackTimeLength) or 0.01), 1)
                 else
@@ -3654,7 +3657,7 @@ function SWEP:CustomThink()
                 local oldBreakBoneMul = self.BreakBoneMul
                 self.BreakBoneMul = (self.BreakBoneMul or 1) * (self.ReleasedChargeBoneMul or 1)
                 self.slash = self.MultiDmgCharge
-                self:SetMeleeDamageContact(ent, trace)
+                self:SetMeleeDamageContact(ent, trace, trauma)
                 ent:TakeDamageInfo(dmginfo)
                 self.MeleeDamageContact = nil
                 self.attackedOnce = true
@@ -4568,7 +4571,7 @@ function SWEP:NPCThink()
 					dmginfo:SetDamageForce(trace.Normal * dmg * 1)
 					dmginfo:SetDamageType(self.DamageType)
 					dmginfo:SetDamagePosition(trace.HitPos)
-					self:SetMeleeDamageContact(trEnt, trace)
+					self:SetMeleeDamageContact(trEnt, trace, dmg)
 					trEnt:TakeDamageInfo(dmginfo)
 					self.MeleeDamageContact = nil
 					if blockState == "none" or blockState == "break" then

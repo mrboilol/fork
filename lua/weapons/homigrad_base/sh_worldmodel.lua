@@ -145,10 +145,33 @@ function SWEP:ChangeGunPos(dtime)
 	self.weaponAng[2] = 0
 	self.weaponAng[3] = 0
 
-	if CLIENT then
-		self.ShotMuzzleWobble = LerpAngle(hg.lerpFrameTime2(0.075, dtime), self.ShotMuzzleWobble or angle_zero, angle_zero)
-		self.ShotMuzzleOffset = LerpVector(hg.lerpFrameTime2(0.075, dtime), self.ShotMuzzleOffset or vector_origin, vector_origin)
+	local recoilDtime = math.min(dtime or FrameTime(), 0.05)
+	local angularSpring, angularDamping = 165, 20
+	local positionSpring, positionDamping = 145, 18
+	local wobble = self.ShotMuzzleWobble or Angle(0, 0, 0)
+	local wobbleVelocity = self.ShotMuzzleWobbleVelocity or Angle(0, 0, 0)
+	local offset = self.ShotMuzzleOffset or Vector(0, 0, 0)
+	local offsetVelocity = self.ShotMuzzleOffsetVelocity or Vector(0, 0, 0)
+	local angularDrag = math.exp(-angularDamping * recoilDtime)
+	local positionDrag = math.exp(-positionDamping * recoilDtime)
+
+	for i = 1, 3 do
+		wobbleVelocity[i] = (wobbleVelocity[i] - wobble[i] * angularSpring * recoilDtime) * angularDrag
+		wobble[i] = wobble[i] + wobbleVelocity[i] * recoilDtime
+		offsetVelocity[i] = (offsetVelocity[i] - offset[i] * positionSpring * recoilDtime) * positionDrag
+		offset[i] = offset[i] + offsetVelocity[i] * recoilDtime
 	end
+
+	wobble[1] = math.Clamp(wobble[1], -11, 5)
+	wobble[2] = math.Clamp(wobble[2], -6, 6)
+	wobble[3] = math.Clamp(wobble[3], -6, 6)
+	offset[1] = math.Clamp(offset[1], -6, 1)
+	offset[2] = math.Clamp(offset[2], -3, 3)
+	offset[3] = math.Clamp(offset[3], -3, 4)
+	self.ShotMuzzleWobble = wobble
+	self.ShotMuzzleWobbleVelocity = wobbleVelocity
+	self.ShotMuzzleOffset = offset
+	self.ShotMuzzleOffsetVelocity = offsetVelocity
 	
 	if ply.viewingGun and ply.viewingGun > CurTime() then
 		self.weaponAng:Add(Angle(math.sin(ply.viewingGun - CurTime()) * -5, math.sin(ply.viewingGun - CurTime()) * -5, math.cos(ply.viewingGun+1.5 - CurTime()) * 30))

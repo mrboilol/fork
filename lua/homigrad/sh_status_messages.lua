@@ -8,20 +8,20 @@ local allowedchars = {
 }
 
 local audible_pain = {
-	"AAAAAGH..FUCK.. IT HURTS.",
-	"I CAN'T TAKE THIS ANYMORE!",
+	"PLEASE STOP PLEASE STOP PLEASE STOP",
+	"IT HURTS SO FUCKING BAD.",
     "Make it STOP make it STOP MAKE IT STOP",
     "Why won't IT STOP",
-    "Make me unconscious. PLEASE",
+    "JUST KILL ME ALREADY",
     "Why was I born to feel this why...",
     "I'd do anything for it to stop... ANYTHING.",
     "This isn't living this is being TORTURED",
     "I don't care anymore just STOP the PAIN",
     "Nothing matters EXCEPT MAKING IT STOP...",
-    "Every second is an eternity of FIRE.",
+    "THIS FEELS LIKE THE DEEPEST PIT OF HELl.",
     "DEATH WOULD BE MERCY NOW...",
     "Just one moment without the pain..",
-	"I WISH I HAD SOME PAINKILLERS NOW. FUCK.",
+	"I WOULD KILL FOR PAINKILLERS RIGHT NOW.",
 }
 
 local sharp_pain = {
@@ -144,8 +144,8 @@ local fear_phrases = {
 }
 
 local situation_fear_phrases = {
-	"Im not safe here.",
-	"Im scared...",
+	"I need to get out of here.",
+	"I need to find a way out.",
 	"I'm in danger.",
 	"Things are going wrong.",
 	"I need to get out of here.",
@@ -159,7 +159,7 @@ local panicattack_phrases = {
 	"I CAN'T... I CAN BARELY BREATHE!",
 	"My chest is... convulsing...?",
 	"I'm gonna make it... I am gonna make it..",
-	"What the fuck..?",
+	"I need to calm down... I need to calm down...",
 	"Shit.. What is happening?",
 	"Something is very wrong with me.",
 	"Relax..!",
@@ -209,17 +209,20 @@ local is_aimed_at_phrases = {
 }
 
 local near_death_poetic = {
-	"I CANT STOP DYING. WHY CANT I STOP DYING, I DONT WANT TO GO YET, THIS ISNT HOW ITS SUPPOSED TO END",
-	"I cant go, I cant go yet. This isnt how its supposed to end I dont want to die I dont want to die...",
-	"Its hopeless, ill just die here like a dog without anyone willing to help a dying, helpless man.",
-	"Why is it me, out of all the people today why did it have to be me...",
-	"Everything is so dark and weak and heavy and I cant move and I cant breathe and I cant see and I cant think and I dont want to die...",
-	"Someone help me, please, I dont want to die like this, I dont want to die like this, I dont want to die like this...",
-	"What happens after death? Is this it? will I be accepted into heaven or hell? I never had time to think I dont want to die a sinner..",
-	"This is it isnt it? No one will fucking help me, no one will save me, no one will even notice me, I am going to die here and no one will care.",
-	"This is fucking hopeless, I cant move, I cant see, I cant do ANYTHING, IM GOING TO FUCKING DIE",
-	"I have so much regrets, so much I didnt do, so much I didnt say and experience, this is how I fucking die and its a pathetic way to die.",
-	"Why is it so dark and heavy and cold and I cant move and I cant breathe and I cant see and I cant think and I dont want to die...",
+	"I dont want to die.",
+	"This is hopeless.",
+	"You have to do something...",
+	"This is it isnt it?",
+	"I regret so much.",
+	"I can't die like this.",
+	"Why cant I stop dying I cant die yet I cant die...",
+	"I dont want to die like this.",
+	"I cant believe this is how it ends.",
+	"I dont want to die. I dont want to die. I dont want to die.",
+	"Why is this happening to me?",
+	"I dont want to go yet. I have so much left to do.",
+	"I dont want to know what happens next. I dont want to die.",
+	"Stop. Please. Stop. I dont want to die.",
 }
 
 local near_death_positive = {
@@ -244,20 +247,20 @@ local near_death_positive = {
 }
 
 local broken_limb = {
-	"FUCK. FUCK. ITS DEFINITELY BROKEN!",
+	"FUCK. I THINK I BROKE SOMETHING.",
 	"I CAN FEEL THE BONE PIECES MOVING!",
 	"IT'S FUCKING BROKEN. I THINK..",
-	"It hurts just thinking about it. Definitely broken.",
-	"I don't think it should bend here.",
+	"I don't think I can move this limb anymore.",
+	"Jesus christ, I think I broke something.",
 	"Oh fuck. It is snapped.",
 	"I don't see any open fracture, but I feel like I broke something",
 }
 
 local dislocated_limb = {
-	"My limb is at a really weird angle...",
+	"Ugh.. god.. I can see it out of place...",
 	"I have to get this bone back in.",
-	"No... I have to move it back in place.",
-	"It just hurts so much there. I might need a check up.",
+	"I think I dislocated my limb.",
+	"I can feel the joint out of place.",
 	"My limb is out of place.",
 }
 
@@ -275,17 +278,18 @@ local very_hungry = {
 }
 
 local after_unconscious = {
-    "What happened? It hurts...",
-	"Where am I? Why does it hurt...",
+    "HOLY FUCK- I THOUGHT I WAS GOING TO DIE.",
+	"What the fuck happened? I was out for a while.",
 	"I-I thought I was going to die...",
-	"My head... What happened?",
+	"Jesus christ im not dead.... I thought I was dead.",
 	"Did I almost die a second ago?",
 	"It felt like I died.",
-	"The heavens didn't take me?",
+	"I think I almost died.",
 	"Ohh-fuck... my head is aching...",
 	"Oh it's gonna be hard to get up right now... but I have to...",
-	"I don't recognize this place at all... or do I?",
-	"I don't want to experience this EVER AGAIN!",
+	"Fuck me, im in the same place... just like before.",
+	"God damn it, it wasnt a dream.",
+	"I guess I was dead for a minute... or maybe more.",
 }
 
 local thirsty_a_bit = {
@@ -403,7 +407,7 @@ local arrhythmia_phrases = {
 local tachycardia_phrases = {
 	"My heart is racing...",
 	"My heart is beating far too fast...",
-	"I can feel my pulse pounding...",
+	"I can feel my heart pounding...",
 }
 
 local bradycardia_phrases = {

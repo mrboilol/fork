@@ -2457,7 +2457,7 @@ function SWEP:GetAdditionalValues()
 		local restMul = self:IsResting() and 0.35 or 1
 		local burstMul = 0.85 + math.Clamp((self.SprayI or 0) / 7, 0, 1) * 0.65
 		local physicalImpulse = math.Clamp(caliberMul * weightMul * supportMul * handlingMul * 1.2, 0.3, 5.5)
-		local recoveryRate = math.Clamp(0.026 / (1 + armInjury * 0.85 + weaponMass * 0.1 + (support.oneHanded and 0.5 or 0)), 0.0045, 0.024)
+		local recoveryRate = math.Clamp(0.095 / (1 + armInjury * 0.85 + weaponMass * 0.1 + (support.oneHanded and 0.5 or 0)), 0.018, 0.08)
 		local wobbleTarget = firing and physicalImpulse * burstMul * stanceMul * restMul or 0
 		self.recoilWobbleAmp = Lerp(hg.lerpFrameTime2(firing and 0.42 or recoveryRate, dtime), self.recoilWobbleAmp or 0, wobbleTarget)
 
@@ -2467,9 +2467,9 @@ function SWEP:GetAdditionalValues()
 			local amp = self.recoilWobbleAmp * (1.35 + armInjury * 0.22)
 			local sideAmp = math.Clamp(self.addSprayMul or 1, 0.08, 2.5)
 			local longGun = not self:IsPistolHoldType() and not self.PistolKinda
-			local wobX = math.sin(t * 1.65 * frequencyMul) * 0.65 + math.sin(t * 2.95 * frequencyMul) * 0.35
-			local wobY = math.cos(t * 2.05 * frequencyMul) * 0.65 + math.cos(t * 3.45 * frequencyMul) * 0.35
-			local wobZ = math.sin(t * 2.45 * frequencyMul) * 0.65 + math.cos(t * 3.2 * frequencyMul) * 0.35
+			local wobX = math.sin(t * 7.8 * frequencyMul) * 0.65 + math.sin(t * 12.4 * frequencyMul) * 0.35
+			local wobY = math.cos(t * 8.9 * frequencyMul) * 0.65 + math.cos(t * 14.2 * frequencyMul) * 0.35
+			local wobZ = math.sin(t * 10.1 * frequencyMul) * 0.65 + math.cos(t * 15.6 * frequencyMul) * 0.35
 
 			self.AdditionalAng2[1] = self.AdditionalAng2[1] + wobY * amp * (cantedHold and 0.45 or (longGun and 2.3 or 1.7))
 			self.AdditionalAng2[2] = self.AdditionalAng2[2] + wobX * amp * (cantedHold and -1.65 or (longGun and 0.08 or 0.14)) * sideAmp
@@ -2494,13 +2494,13 @@ function SWEP:GetAdditionalValues()
 		-- Keep a strong, readable rearward/upward impulse after the instant shot
 		-- offset has started easing. This is what makes automatic fire climb and
 		-- makes an injured shooter visibly fight the weapon back onto target.
-		local recoilDecay = self:GetAnimShoot2(0.32 * mulhuy / host_timescale(), true)
+		local recoilDecay = self:GetAnimShoot2(0.18 * mulhuy / host_timescale(), true)
 		if recoilDecay > 0.001 then
 			local climb = 0.55 + math.Clamp((self.SprayI or 0) / 7, 0, 1) * 0.65
 			local seed = math.floor(self.SprayI or 0)
 			local sideRand = util.SharedRandom("hg_recoil_side", -1, 1, seed)
 			local rollRand = util.SharedRandom("hg_recoil_roll", -1, 1, seed + 9173)
-			local kick = recoilDecay * physicalImpulse * stanceMul * restMul * climb * (self.WeaponRecoilMul or 1) * 1.35
+			local kick = recoilDecay * physicalImpulse * stanceMul * restMul * climb * (self.WeaponRecoilMul or 1) * 1.52
 
 			if cantedHold then
 				self.AdditionalAng2[1] = self.AdditionalAng2[1] - kick * 0.75

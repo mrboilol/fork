@@ -83,40 +83,40 @@ local about_to_puke = {
 }
 
 local internalBleedThoughts = {
-	"Something inside me is bleeding.",
-	"That hit did something bad inside.",
-	"I can feel blood pooling inside me.",
-	"I'm bleeding internally. I need treatment.",
-	"Something ruptured inside me.",
+	"Im feeling something weird inside.",
+	"My tummy hurts...",
+	"Something is wrong inside me.",
+	"I feel like something ripped inside.",
+	"I think something moved wrong inside.",
 }
 local bloodLossThoughts = {
 	light = {
-		"I'm bleeding... I need to stop it...",
-		"Damn, that's gonna leave a mark...",
-		"I need to patch this up...",
-		"Blood's flowing... shit...",
-		"Gotta find something to wrap this with..."
+		"It might be a good idea to stop the bleeding.",
+		"Im feeling a little lightheaded...",
+		"Im starting to lose some blood...",
+		"Im feeling more weak than usual.",
+		"I need to stop the bleeding before it gets worse."
 	},
 	moderate = {
-		"I'm losing too much blood...",
+		"I can feel my heart struggling already.",
 		"I can feel myself getting weaker...",
-		"The blood won't stop... I need help...",
-		"I'm getting dizzy from the blood loss...",
-		"Need to stop the bleeding... now..."
+		"Im really starting to feel dizzy now...",
+		"I feel my limbs getting numb...",
+		"Im feeling really cold right now."
 	},
 	severe = {
-		"I can't... I'm losing so much blood...",
-		"My vision is going dark...",
-		"I feel so cold... so weak...",
-		"Please... someone help me...",
+		"Im too dizzy to keep going...",
+		"The border of my vision is getting dark...",
+		"Everything is starting to go gray...",
+		"I cant keep going like this.",
 		"I can't feel my fingers..."
 	},
 	critical = {
-		"I'm dying... I know it...",
-		"Everything's fading away...",
-		"I can't... hold on...",
-		"Tell them... I tried...",
-		"So... cold..."
+		"I'm so close to death...",
+		"Its so cold and dark...",
+		"Im barely grasping consciousness...",
+		"Im trying, I really am...",
+		"It's so cold... I can't feel anything..."
 	}
 }
 
@@ -141,7 +141,7 @@ local function notifyBloodLoss(owner, org, symptomaticLoss)
 	end
 
 	local blood = org.blood or 5000
-	local severity = blood < 1750 and "critical" or blood < 2750 and "severe" or blood < 3500 and "moderate" or "light"
+	local severity = blood < 3250 and "critical" or blood < 3750 and "severe" or blood < 4500 and "moderate" or "light"
 	local thoughts = bloodLossThoughts[severity]
 	local delay = severity == "critical" and 10 or severity == "severe" and 14 or severity == "moderate" and 20 or 30
 	local key = "bloodloss_" .. severity

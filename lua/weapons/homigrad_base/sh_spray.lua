@@ -9,6 +9,9 @@ function SWEP:ResetTransientAimState()
 	self.recoilWobbleAmp = 0
 	self.ShotMuzzleWobble = Angle(0, 0, 0)
 	self.ShotMuzzleOffset = Vector(0, 0, 0)
+	self.ShotMuzzleWobbleVelocity = Angle(0, 0, 0)
+	self.ShotMuzzleOffsetVelocity = Vector(0, 0, 0)
+	self.recoilShotIndex = 0
 	self.inertialAim = nil
 	self.inertialAimVelocity = Angle(0, 0, 0)
 	self.weaponReadiness = nil
@@ -85,6 +88,42 @@ function SWEP:PrimarySpread()
 		end
 	end
 
+	if not self.norecoil then
+		local caliberMul, weightMul = self:GetRecoilImpulseFactors()
+		local supportMul = self:GetRecoilSupportMul()
+		local handlingMul = self:GetArmHealthHandlingMul()
+		local stanceMul = self:GetPostureStabilityMul(self:IsZoom())
+		local cantedHold = owner.posture == 7 or owner.posture == 9
+		local restMul = self:IsResting() and 0.35 or 1
+		local recoilImpulse = math.Clamp(caliberMul * weightMul * supportMul * handlingMul * stanceMul * (0.78 + math.min(sprayI / 11, 0.82)) * restMul * (self.WeaponRecoilMul or 1) * self:GetAttachmentRecoilMul() * 1.3, 0.18, 7)
+		local lateralImpulse = recoilImpulse * math.Clamp(self.addSprayMul or 1, 0.08, 2.5)
+		self.recoilShotIndex = (self.recoilShotIndex or 0) + 1
+		local seed = self.recoilShotIndex * 43
+		local side = util.SharedRandom("hg_recoil_impulse_side", -1, 1, seed)
+		local roll = util.SharedRandom("hg_recoil_impulse_roll", -1, 1, seed + 991)
+		local wobbleVelocity = self.ShotMuzzleWobbleVelocity or Angle(0, 0, 0)
+		local offsetVelocity = self.ShotMuzzleOffsetVelocity or Vector(0, 0, 0)
+
+		if cantedHold then
+			wobbleVelocity[1] = wobbleVelocity[1] - recoilImpulse * 8
+			wobbleVelocity[2] = wobbleVelocity[2] - lateralImpulse * (25 + math.abs(side) * 7)
+			wobbleVelocity[3] = wobbleVelocity[3] - lateralImpulse * (5 + math.abs(roll) * 4)
+			offsetVelocity[1] = offsetVelocity[1] - recoilImpulse * 10
+			offsetVelocity[2] = offsetVelocity[2] - lateralImpulse * 6
+			offsetVelocity[3] = offsetVelocity[3] + recoilImpulse * 4
+		else
+			wobbleVelocity[1] = wobbleVelocity[1] - recoilImpulse * (26 + math.abs(side) * 6)
+			wobbleVelocity[2] = wobbleVelocity[2] + side * lateralImpulse * 8
+			wobbleVelocity[3] = wobbleVelocity[3] + roll * lateralImpulse * 6
+			offsetVelocity[1] = offsetVelocity[1] - recoilImpulse * 11
+			offsetVelocity[2] = offsetVelocity[2] + side * lateralImpulse * 4
+			offsetVelocity[3] = offsetVelocity[3] + recoilImpulse * 7
+		end
+
+		self.ShotMuzzleWobbleVelocity = wobbleVelocity
+		self.ShotMuzzleOffsetVelocity = offsetVelocity
+	end
+
 	if CLIENT and (owner == LocalPlayer() or (not LocalPlayer():Alive() and owner == LocalPlayer():GetNWEntity("spect"))) and !self.norecoil then
 		local organism = owner.organism or {}
 		local caliberMul, weightMul = 1, 1
@@ -157,23 +196,6 @@ function SWEP:PrimarySpread()
 			ViewPunch(angpopa * (hg_coolcamera:GetBool() and 1.8 or 0.7) * screenRecoilMul)
 			spray = spray + angRand * 2 * (self.randmul or 1)
 		end
-
-		-- The old recoil system kicked the muzzle itself, not only the camera.
-		-- Keep this render-side so authoritative shot spread remains predictable;
-		-- sh_worldmodel applies the offset and eases it back after every shot.
-		-- Recoil owns the dominant rise while addSprayMul widens only side travel.
-		local muzzleKickMul = math.Clamp(force * (self.WeaponRecoilMul or 1), 0.12, 7)
-		local muzzleSideMul = math.Clamp(self.addSprayMul or 1, 0.08, 2.5)
-		self.ShotMuzzleWobble = (self.ShotMuzzleWobble or Angle(0, 0, 0)) + Angle(
-			(cantedHold and math.Rand(-0.12, 0.08) or -math.Rand(0.42, 0.82)) * muzzleKickMul,
-			(cantedHold and -math.Rand(0.65, 1.05) or math.Rand(-0.22, 0.22)) * muzzleKickMul * muzzleSideMul,
-			(cantedHold and -math.Rand(0.18, 0.38) or math.Rand(-0.14, 0.14)) * muzzleKickMul * muzzleSideMul
-		)
-		self.ShotMuzzleOffset = (self.ShotMuzzleOffset or Vector(0, 0, 0)) + Vector(
-			-math.Rand(0.18, 0.42) * muzzleKickMul,
-			(cantedHold and -math.Rand(0.28, 0.55) or math.Rand(-0.13, 0.13)) * muzzleKickMul * muzzleSideMul,
-			(cantedHold and math.Rand(-0.08, 0.12) or math.Rand(0.2, 0.48)) * muzzleKickMul
-		)
 
 		local prank3 = math.Rand(-self.Primary.Force2,self.Primary.Force2) / (self.Primary.Force2 != 0 and self.Primary.Force2 or 1) * 2
 		local angleprikol = Angle(0,0,prank3)

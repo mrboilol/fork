@@ -342,7 +342,7 @@ local moodleTexts = {
 		[1] = {title = "Irritated", description = "Slightly angered at something."},
 		[2] = {title = "Angry", description = "Anger due to combat is affecting your resolve and resilience."},
 		[3] = {title = "Furious", description = "Pain and fear are being replaced by overwhelming rage."},
-		[4] = {title = "Enraged", description = "Kill this kid."},
+		[4] = {title = "Enraged", description = "Your anger is consuming your mind and body, making you a danger to yourself and others."},
 	}},
 	rage = {fixed = {
 		title = "UNDETERRABLE RAGE",
