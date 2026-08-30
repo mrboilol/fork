@@ -6,34 +6,34 @@ local MEDKIT_TYPES = {
     basic = {
         PrintName = "Basic Medkit",
         Instructions = "A compact first-aid kit with a basic bandage roll and one tourniquet. Best for stopping a small wound before it becomes serious. RMB to apply on others, R to change use mode.",
-        contents = {bandage = 2, tourniquet = 1},
+        contents = {bandage = 40, tourniquet = 1},
         bandageColor = Color(235, 235, 235),
     },
     standard = {
         PrintName = "Standard Medkit",
         Instructions = "A general-purpose first-aid kit with bandages, a tourniquet and paracetamol for everyday injuries. RMB to apply on others, R to change use mode.",
-        contents = {bandage = 3, tourniquet = 1, painkiller = 1},
+        contents = {bandage = 60, tourniquet = 1, painkiller = 1},
         bandageColor = Color(205, 205, 205),
         painkillerType = "paracetamol",
     },
     emergency = {
         PrintName = "Emergency Medkit",
         Instructions = "An emergency trauma kit with extra bandages, two tourniquets, tramadol and naloxone for severe bleeding or overdose response. RMB to apply on others, R to change use mode.",
-        contents = {bandage = 7, tourniquet = 2, painkiller = 0.4, naloxone = 1},
+        contents = {bandage = 120, tourniquet = 2, painkiller = 0.4, naloxone = 1},
         bandageColor = Color(165, 165, 165),
         painkillerType = "tramadol",
     },
     advanced = {
         PrintName = "Advanced Medkit",
         Instructions = "An advanced trauma kit with large dressings, two tourniquets, tramadol, tranexamic acid and a decompression needle for severe trauma. RMB to apply on others, R to change use mode.",
-        contents = {bandage = 10, tourniquet = 2, painkiller = 0.4, tranexamic = 10, needle = 1},
+        contents = {bandage = 225, tourniquet = 2, painkiller = 0.4, tranexamic = 10, needle = 1},
         bandageColor = Color(125, 125, 125),
         painkillerType = "tramadol",
     },
     surgical = {
         PrintName = "Surgical Medkit",
         Instructions = "A fully stocked surgical kit with QuikClot-grade dressings, two tourniquets, tapentadol, tranexamic acid, naloxone, mannitol and a decompression needle. RMB to apply on others, R to change use mode.",
-        contents = {bandage = 15, tourniquet = 2, painkiller = 0.6, tranexamic = 10, naloxone = 1, mannitol = 1, needle = 1},
+        contents = {bandage = 350, tourniquet = 2, painkiller = 0.6, tranexamic = 10, naloxone = 1, mannitol = 1, needle = 1},
         bandageColor = Color(75, 75, 75),
         painkillerType = "tapentadol",
     },
@@ -41,7 +41,7 @@ local MEDKIT_TYPES = {
 local NORMAL_MEDKIT = {
     PrintName = "Medkit",
     Instructions = "A standard medical bag with a quality bandage, painkiller, tranexamic acid, a tourniquet and a decompression needle. RMB to apply on others, R to change use mode.",
-    qualityBandageAmount = 7,
+    qualityBandageAmount = 150,
     bandageColor = Color(165, 165, 165),
 }
 
@@ -298,15 +298,15 @@ local function patchMedicalMinigame()
 end
 
 local BANDAGE_GRADES = {
-    weapon_packedbandage_sh = {name = "Packed bandage", amount = 4, color = Color(205, 205, 205), instructions = "A sealed field dressing with more clean gauze than a loose bandage. RMB to use on someone else."},
-    weapon_combatbandage_sh = {name = "Combat bandage", amount = 7, color = Color(125, 125, 125), instructions = "A large military dressing for controlling serious bleeding in the field. RMB to use on someone else."},
-    weapon_quikclotbandage_sh = {name = "QuikClot Bandage", amount = 10, color = Color(75, 75, 75), instructions = "A hemostatic QuikClot dressing for heavy bleeding when ordinary gauze is not enough. RMB to use on someone else."},
+    weapon_packedbandage_sh = {name = "Packed bandage", amount = 60, color = Color(205, 205, 205), instructions = "A sealed field dressing with more clean gauze than a loose bandage. RMB to use on someone else."},
+    weapon_combatbandage_sh = {name = "Combat bandage", amount = 120, color = Color(125, 125, 125), instructions = "A large military dressing for controlling serious bleeding in the field. RMB to use on someone else."},
+    weapon_quikclotbandage_sh = {name = "QuikClot Bandage", amount = 180, color = Color(75, 75, 75), instructions = "A hemostatic QuikClot dressing for heavy bleeding when ordinary gauze is not enough. RMB to use on someone else."},
 }
 
 local LARGE_BANDAGE_GRADES = {
-    weapon_bigpackedbandage_sh = {name = "Packed Bandage +", amount = 8, color = Color(205, 205, 205), instructions = "An oversized sealed field dressing with enough sterile gauze for several serious wounds. RMB to use on someone else."},
-    weapon_bigcombatbandage_sh = {name = "Combat Bandage +", amount = 12, color = Color(125, 125, 125), instructions = "An oversized military trauma dressing for controlling multiple serious wounds in the field. RMB to use on someone else."},
-    weapon_bigquikclotbandage_sh = {name = "QuikClot Bandage +", amount = 15, color = Color(75, 75, 75), instructions = "An oversized hemostatic QuikClot dressing for catastrophic bleeding and extended field care. RMB to use on someone else."},
+    weapon_bigpackedbandage_sh = {name = "Packed Bandage +", amount = 150, color = Color(205, 205, 205), instructions = "An oversized sealed field dressing with enough sterile gauze for several serious wounds. RMB to use on someone else."},
+    weapon_bigcombatbandage_sh = {name = "Combat Bandage +", amount = 225, color = Color(125, 125, 125), instructions = "An oversized military trauma dressing for controlling multiple serious wounds in the field. RMB to use on someone else."},
+    weapon_bigquikclotbandage_sh = {name = "QuikClot Bandage +", amount = 350, color = Color(75, 75, 75), instructions = "An oversized hemostatic QuikClot dressing for catastrophic bleeding and extended field care. RMB to use on someone else."},
 }
 
 local BANDAGE_PICKUP_CLASSES = {
@@ -384,7 +384,7 @@ local function registerBandageGrades()
     normal.PrintName = "Bandage"
     normal.Instructions = "A loose roll of gauze for light bleeding. It may not be sterile, but it is better than leaving a wound open. RMB to use on someone else."
     normal.Color = Color(235, 235, 235)
-    normal.modeValuesdef = {[1] = {2, true}}
+    normal.modeValuesdef = {[1] = {40, true}}
     if istable(quality) then
         quality.PrintName = "Quality bandage"
         quality.Instructions = "A larger sterile dressing with quality gauze for wounds that need more than a basic bandage. RMB to use on someone else."

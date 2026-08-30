@@ -563,7 +563,7 @@ function SWEP:Initialize()
 	local bandageCapacity = self.modeValuesdef and self.modeValuesdef[1]
 	bandageCapacity = istable(bandageCapacity) and bandageCapacity[1] or bandageCapacity
 	self.modeValues = {
-		[1] = tonumber(bandageCapacity) or 2,
+		[1] = tonumber(bandageCapacity) or 40,
 	}
 
 	if CLIENT then
@@ -585,7 +585,7 @@ function SWEP:Initialize()
 end
 
 SWEP.modeValuesdef = {
-	[1] = {2,true},
+	[1] = {40,true},
 }
 
 function SWEP:GetInfo()
@@ -754,7 +754,7 @@ end
 
 function SWEP:GetBandageStructuralTreatmentCost()
 	local owner = self:GetOwner()
-	return 3 * (IsValid(owner) and owner.Profession == "doctor" and 0.2 or 1)
+	return 25 * (IsValid(owner) and owner.Profession == "doctor" and 0.2 or 1)
 end
 
 function SWEP:GetBandageTreatmentCost(target, bone)

@@ -295,7 +295,7 @@ function hg.MedicalMinigame.StartBandageMinigame(ply, ent)
                 local amount = wep.modeValues and wep.modeValues[mode] or 0
                 local bone = wep.GetBandageTargetBone and wep:GetBandageTargetBone(target, hg.eyeTrace(ply)) or nil
                 local treatmentCost = wep.GetBandageTreatmentCost and wep:GetBandageTreatmentCost(target, bone) or amount
-                requiredCompletions = math.Clamp(math.ceil(math.min(treatmentCost, amount)), 1, 15)
+                requiredCompletions = math.Clamp(math.ceil(math.min(treatmentCost, amount) / (350 / 15)), 1, 15)
             end
         else
             requiredCompletions = 1
