@@ -14,6 +14,8 @@ local armorBreakShotRanges = {
 }
 
 local armorBrokenProtectionRange = {0.1, 0.2}
+local BROKEN_ARMOR_LIFE_MUL = 0.18
+local BROKEN_ARMOR_WORLD_HITS = {2, 5}
 local armorBreakSound = "rem_armorbreak.mp3"
 local armorBreakSoundLevel = 160
 local armorBreakSoundVolume = 2
@@ -81,8 +83,11 @@ function hg.GetArmorBreakShotCount(equipment)
 end
 
 local function getBrokenArmorProtectionMul()
-	-- A fully broken plate carrier (plates destroyed) stops protecting entirely.
-	return 0
+	return math.Rand(armorBrokenProtectionRange[1], armorBrokenProtectionRange[2])
+end
+
+function hg.GetBrokenArmorProtectionMul()
+	return getBrokenArmorProtectionMul()
 end
 
 local function GetArmorWear(owner, armor, placement)
@@ -136,11 +141,38 @@ local function markArmorBroken(owner, equipment, mul)
 	owner.armors_broken_mul[equipment] = mul or owner.armors_broken_mul[equipment] or getBrokenArmorProtectionMul()
 end
 
+local function ResetBrokenArmorLife(owner, equipment, placement, armorData)
+	if IsDurabilityArmor(placement, armorData) then
+		owner.armors_durability = owner.armors_durability or {}
+		owner.armors_durability[equipment] = math.max((armorData.durability or DEFAULT_HELMET_DURABILITY) * BROKEN_ARMOR_LIFE_MUL, 1)
+	else
+		owner.armors_health = owner.armors_health or {}
+		owner.armors_health[equipment] = math.max((armorData.health or DEFAULT_VEST_HEALTH) * BROKEN_ARMOR_LIFE_MUL, 0.05)
+	end
+	owner.armors_shots = owner.armors_shots or {}
+	owner.armors_shots[equipment] = nil
+end
+
 function hg.SetArmorBrokenEntity(ent)
 	if not IsValid(ent) then return end
+	local wasBroken = ent.broken or ent:GetNWBool("ArmorBroken", false)
 
 	ent.broken = true
 	ent:SetNWBool("ArmorBroken", true)
+	ent.brokenProtectionMul = ent.brokenProtectionMul or getBrokenArmorProtectionMul()
+	if wasBroken then return end
+
+	local equipment = ent.name or string.Replace(ent:GetClass(), "ent_armor_", "")
+	local placement = hg.GetArmorPlacement(equipment)
+	local armorData = placement and hg.armor[placement] and hg.armor[placement][equipment]
+	if armorData then
+		if IsDurabilityArmor(placement, armorData) then
+			ent.armorDurability = math.max((armorData.durability or DEFAULT_HELMET_DURABILITY) * BROKEN_ARMOR_LIFE_MUL, 1)
+		else
+			ent.armorHealth = math.max((armorData.health or DEFAULT_VEST_HEALTH) * BROKEN_ARMOR_LIFE_MUL, 0.05)
+		end
+	end
+	ent.brokenHitsLeft = math.random(BROKEN_ARMOR_WORLD_HITS[1], BROKEN_ARMOR_WORLD_HITS[2])
 end
 
 function hg.PlayArmorBreakSound(ent)
@@ -230,21 +262,75 @@ local function IsArmorBreakProtected(ent)
 	return false
 end
 
+function hg.EmitArmorDestroyEffects(ent, pos)
+	if not IsValid(ent) and not isvector(pos) then return end
+	pos = pos or ent:WorldSpaceCenter()
+
+	local effect = EffectData()
+	effect:SetOrigin(pos)
+	effect:SetMagnitude(3)
+	effect:SetScale(1.5)
+	effect:SetRadius(28)
+	util.Effect("Sparks", effect, true, true)
+	util.Effect("GlassImpact", effect, true, true)
+	if IsValid(ent) then hg.PlayArmorBreakSound(ent) end
+end
+
+function hg.DestroyArmor(ent, equipment, pos)
+	if not IsValid(ent) or not ent.armors then return false end
+	local placement = hg.GetArmorPlacement(equipment)
+	if not placement or ent.armors[placement] ~= equipment then return false end
+
+	if not isvector(pos) or pos:LengthSqr() <= 0 then pos = nil end
+	local effectPos = getArmorDropTransform(ent, equipment, pos)
+	hg.EmitArmorDestroyEffects(ent, effectPos)
+	ent.armors[placement] = nil
+
+	local stateTables = {
+		ent.armors_shots,
+		ent.armors_health,
+		ent.armors_durability,
+		ent.armors_regions,
+		ent.armors_broken,
+		ent.armors_broken_mul,
+		ent.armors_wear_stage,
+		ent.armor_states
+	}
+	for _, states in pairs(stateTables) do
+		if states then states[equipment] = nil end
+	end
+	ent:SetNWFloat("ArmorWear" .. equipment, 0)
+
+	local armorData = hg.armor[placement] and hg.armor[placement][equipment]
+	if armorData and armorData.voice_change and eightbit and eightbit.EnableEffect and ent.UserID then
+		eightbit.EnableEffect(ent:UserID(), ent.PlayerClassName == "furry" and eightbit.EFF_PROOT or 0)
+	end
+
+	local ply = ent:IsPlayer() and ent or (ent:IsRagdoll() and hg.RagdollOwner(ent))
+	syncLinkedArmor(ent)
+	if IsValid(ply) then DropDependentArmorRecursive(ply, placement, equipment) end
+	return true
+end
+
 function hg.BreakArmor(ent, equipment, pos, dmgInfo)
 	if not IsValid(ent) then return false end
 	if IsArmorBreakProtected(ent) then return false end
 	if not ent.armors or not table.HasValue(ent.armors, equipment) then return false end
+	if ent.armors_broken and ent.armors_broken[equipment] then
+		return hg.DestroyArmor(ent, equipment, pos)
+	end
 
 	local placement = hg.GetArmorPlacement(equipment)
 	local brokenMul = ent.armors_broken_mul and ent.armors_broken_mul[equipment] or getBrokenArmorProtectionMul()
 	ent.armors_shots = ent.armors_shots or {}
 	ent.armors_health = ent.armors_health or {}
 	markArmorBroken(ent, equipment, brokenMul)
+	local armorData = placement and hg.armor[placement] and hg.armor[placement][equipment]
+	if armorData then ResetBrokenArmorLife(ent, equipment, placement, armorData) end
 	SyncArmorWear(ent, equipment, placement)
 
 	hg.PlayArmorBreakSound(ent)
 
-	local armorData = placement and hg.armor[placement] and hg.armor[placement][equipment]
 	if not BreakDropsArmor(placement, armorData) then
 		ent.armors_shots[equipment] = nil
 		syncLinkedArmor(ent)
@@ -517,9 +603,9 @@ function hg.AddArmor(ply, equipment, ent)
     ply.armors[placement] = equipment
 	ply.armors_regions = ply.armors_regions or {}
 	if not ent then ply.armors_regions[equipment] = nil end
-    ply:SetNWFloat("ArmorWear" .. equipment, 0)
-    ply.armors_wear_stage = ply.armors_wear_stage or {}
-    ply.armors_wear_stage[equipment] = 0
+	ply.armors_wear_stage = ply.armors_wear_stage or {}
+	ply.armors_wear_stage[equipment] = ply.armors_broken and ply.armors_broken[equipment] and ARMOR_WEAR_STAGES or 0
+	SyncArmorWear(ply, equipment, placement)
 
     ply:SyncArmor()
     return true
@@ -615,48 +701,12 @@ function hg.DropArmor(ply, equipment)
 
     if IsValid(ply) and ply.DropCD and ply.DropCD > CurTime() then return false end
 
-    if hg.armor[placement][equipment] then
-		ply:DoAnimationEvent((placement == "head" or placement == "ears" or placement == "face" or placement == "visor" or placement == "helmet_jaw" or placement == "helmet_ears") and ACT_GMOD_GESTURE_MELEE_SHOVE_1HAND or ACT_GMOD_GESTURE_MELEE_SHOVE_2HAND)
-	    ply:ViewPunch(Angle(1,-2,1))
-        ply.DropCD = CurTime() + 0.35
-        --timer.Simple(0.3,function()
-        if not IsValid(ply) then return end
-        local equipmentEnt = ents.Create("ent_armor_" .. equipment)
-        equipmentEnt:Spawn()
-        equipmentEnt:SetPos(ply:EyePos())
-        equipmentEnt:SetAngles(ply:EyeAngles())
-		equipmentEnt:ReciveData(ply,equipment)
-		equipmentEnt.armorState = ply.armor_states and table.Copy(ply.armor_states[equipment] or {}) or nil
-		equipmentEnt.shotsLeft = ply.armors_shots and ply.armors_shots[equipment] or nil
-        
-        if placement == "face" and ply:GetNetVar("zableval_masku", false) then
-            equipmentEnt.zablevano = true
-            ply:SetNetVar("zableval_masku", false)
-        end
-        
-        local phys = equipmentEnt:GetPhysicsObject()
-        if IsValid(phys) then phys:SetVelocity(ply:EyeAngles():Forward() * 150) end
-        if IsValid(equipmentEnt) then table.RemoveByValue(ply.armors, equipment) end
-		if ply.armors_shots then
-			ply.armors_shots[equipment] = nil
-		end
-		if ply.armors_durability then
-			ply.armors_durability[equipment] = nil
-		end
-		if ply.armor_states then ply.armor_states[equipment] = nil end
-        
-		DropDependentArmorRecursive(ply, placement, equipment)
-        
-        if hg.armor[placement][equipment].voice_change then
-            if eightbit and eightbit.EnableEffect and ply.UserID then
-                eightbit.EnableEffect(ply:UserID(), ply.PlayerClassName == "furry" and eightbit.EFF_PROOT or 0)
-            end
-        end
+	ply:DoAnimationEvent((placement == "head" or placement == "ears" or placement == "face" or placement == "visor" or placement == "helmet_jaw" or placement == "helmet_ears") and ACT_GMOD_GESTURE_MELEE_SHOVE_1HAND or ACT_GMOD_GESTURE_MELEE_SHOVE_2HAND)
+	ply:ViewPunch(Angle(1, -2, 1))
+	ply.DropCD = CurTime() + 0.35
 
-        ply:SyncArmor()
-        --end)
-        return true
-    end
+	local equipmentEnt = hg.DropArmorForce(ply, equipment, ply:EyePos(), ply:EyeAngles(), ply:EyeAngles():Forward() * 150)
+	return IsValid(equipmentEnt)
 end
 
 -- armorstuff
@@ -678,7 +728,7 @@ local function DamageArmor(org, placement, armor, dmgInfo, rawDmg)
 	if not IsValid(owner) then return false end
 	if IsArmorBreakProtected(owner) then return false end
 	if not owner.armors or owner.armors[placement] ~= armor then return false end
-	if owner.armors_broken and owner.armors_broken[armor] then return false end
+	local wasBroken = owner.armors_broken and owner.armors_broken[armor] or false
 
 	local armorData = placement and hg.armor[placement] and hg.armor[placement][armor]
 	if not armorData then return false end
@@ -700,7 +750,7 @@ local function DamageArmor(org, placement, armor, dmgInfo, rawDmg)
 		local breakThreshold = armorData.breakThreshold or DEFAULT_HELMET_BREAK_THRESHOLD
 		if currentDurability <= 0 or rawDmg >= breakThreshold * 1.5 then
 			hg.BreakArmor(owner, armor, dmgInfo and dmgInfo:GetDamagePosition(), dmgInfo)
-			return true
+			return true, wasBroken
 		end
 		return false
 	end
@@ -714,11 +764,10 @@ local function DamageArmor(org, placement, armor, dmgInfo, rawDmg)
 		SyncArmorWear(owner, armor, placement)
 		PlayArmorWearStageSound(owner, armor, placement)
 
-		local wornThreshold = armorData.wornThreshold or DEFAULT_VEST_WORN_THRESHOLD
+	local wornThreshold = wasBroken and 0 or (armorData.wornThreshold or DEFAULT_VEST_WORN_THRESHOLD)
 	if currentHealth <= wornThreshold then
-		owner.armors_health[armor] = DEFAULT_VEST_HEALTH
 		hg.BreakArmor(owner, armor, dmgInfo and dmgInfo:GetDamagePosition(), dmgInfo)
-		return true
+		return true, wasBroken
 	end
 
 	return false
@@ -777,7 +826,8 @@ local function protec(org, bone, dmg, dmgInfo, placement, armor, scale, scalepro
 	end
 
 	local ricochetHit = false
-	if isBullet and impact and impact.ballisticVersion and IsDurabilityArmor(placement, armorData) then
+	local armorWasBroken = org.owner.armors_broken and org.owner.armors_broken[armor]
+	if isBullet and impact and impact.ballisticVersion and IsDurabilityArmor(placement, armorData) and not armorWasBroken then
 		local shotDir = (isvector(dir) and dir:GetNormalized()) or dmgInfo:GetDamageForce():GetNormalized()
 		local normal = impact.normal
 		local incidence = isvector(normal) and math.abs(shotDir:Dot(normal)) or 1
@@ -798,8 +848,11 @@ local function protec(org, bone, dmg, dmgInfo, placement, armor, scale, scalepro
 	org.owner.armors_broken_mul = org.owner.armors_broken_mul or {}
 
 	local maxHealth = (armorData and armorData.health) or DEFAULT_VEST_HEALTH
-	prot = prot * ((org.owner.armors_health[armor] or maxHealth) / maxHealth)
-	prot = prot * (org.owner.armors_broken_mul[armor] or 1)
+	if armorWasBroken then
+		prot = prot * (org.owner.armors_broken_mul[armor] or 1)
+	else
+		prot = prot * ((org.owner.armors_health[armor] or maxHealth) / maxHealth)
+	end
 
 	if punch then
 		if org.alive and org.organism and org.owner:IsPlayer() and dmgInfo:IsDamageType(DMG_BUCKSHOT + DMG_BULLET) then
@@ -842,8 +895,8 @@ local function protec(org, bone, dmg, dmgInfo, placement, armor, scale, scalepro
 	-- Helmets break and drop, vests wear out and protect less
 	if armorData then
 		local rawDmg = dmgInfo:GetDamage()
-		local broken = DamageArmor(org, placement, armor, dmgInfo, ricochetHit and rawDmg * 0.15 or rawDmg)
-				if broken and placement == "head" then
+		local broken, destroyed = DamageArmor(org, placement, armor, dmgInfo, ricochetHit and rawDmg * 0.15 or rawDmg)
+		if broken and placement == "head" and not destroyed then
 			-- The shot that knocks the helmet off fully protects the player:
 			-- the helmet stops the bullet and it does not punch through to the head.
 			dmgInfo:ScaleDamage(0)
@@ -856,17 +909,10 @@ local function protec(org, bone, dmg, dmgInfo, placement, armor, scale, scalepro
 			return 1
 		end
 
-		-- A fully broken plate carrier / mask offers no protection: let the bullet
-		-- pass straight through to the body at full damage (no penetration block,
-		-- no damage scaling, no ricochet). Returning before the ScaleDamage below
-		-- is what actually makes the round reach (and wound) the chest.
-		if not BreakDropsArmor(placement, armorData) and (broken or (org.owner.armors_broken and org.owner.armors_broken[armor])) then
-			-- Shattered plate still throws fragments into the wearer (Tarkov-style).
-			if placement == "torso" then
-				ApplyArmorShrapnel(org, dmgInfo, dmg, bone, boneindex)
-			end
-			return 0
+		if placement == "torso" and org.owner.armors_broken and org.owner.armors_broken[armor] then
+			ApplyArmorShrapnel(org, dmgInfo, dmg, bone, boneindex)
 		end
+		if destroyed then return 0 end
 
 		-- Disorientation on strong impact to head
 		if not broken and isImpact and placement == "head" and org.organism and org.owner:IsPlayer() then
@@ -933,14 +979,15 @@ local function protec(org, bone, dmg, dmgInfo, placement, armor, scale, scalepro
 	local originalDamageForce = dmgInfo:GetDamageForce()
 	dmgInfo:SetDamageForce(originalDamageForce * 0.4)
 
-	if not IsDurabilityArmor(placement, armorData) then
-		local maxHealth = (armorData and armorData.health) or DEFAULT_VEST_HEALTH
-		local health = org.owner.armors_health[armor] or maxHealth
-		local brokenMul = org.owner.armors_broken_mul[armor] or 1
-		local wearMul = math.Clamp((health / maxHealth) * brokenMul, 0, 1)
-		if wearMul < 1 then
-			dmgScale = 1 - (1 - dmgScale) * wearMul
-		end
+	local wearMul = org.owner.armors_broken_mul[armor] or 1
+	local armorIsBroken = org.owner.armors_broken and org.owner.armors_broken[armor]
+	if not armorIsBroken and not IsDurabilityArmor(placement, armorData) then
+		local conditionMaxHealth = (armorData and armorData.health) or DEFAULT_VEST_HEALTH
+		local health = org.owner.armors_health[armor] or conditionMaxHealth
+		wearMul = wearMul * math.Clamp(health / conditionMaxHealth, 0, 1)
+	end
+	if wearMul < 1 then
+		dmgScale = 1 - (1 - dmgScale) * math.Clamp(wearMul, 0, 1)
 	end
 
 	org.lastArmorMitigation = dmgScale
@@ -1004,18 +1051,7 @@ local function protec(org, bone, dmg, dmgInfo, placement, armor, scale, scalepro
 		}
 	end
 
-	-- Penetration consumed by this armor layer. A broken plate carrier no longer
-	-- stops the bullet, so let it pass straight through to the body — otherwise the
-	-- trace ends at the armor box and the chest is never hit (no wound / no bleed / no impact).
-	local penReturn = dmgScale
-	if org.owner.armors_broken and org.owner.armors_broken[armor] then
-		penReturn = 0
-	end
-
-	-- Non-bullet damage (melee/fall) is still reduced by the armor's scale even if "penetrated"
-	if not isBullet then return penReturn end
-
-	return penReturn
+	return dmgScale
 end
 
 ArmorEffect = function(placement, armor, dmgInfo, org, hit, prot)

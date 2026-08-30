@@ -165,7 +165,7 @@ concommand.Add("hg_reloadfloorweapon", function(ply, cmd, args)
 								heldents[ent2:EntIndex()] = nil
 							end
 
-							ent:EmitSound("physics/metal/weapon_impact_hard"..mRandom(3)..".ogg", 65)
+							ent:EmitSound("physics/metal/weapon_impact_hard"..mRandom(3)..".wav", 65)
 							ply:Notify(randomgovno[mRandom(#randomgovno)], 10)
 							ply:EmitSound("physics/body/body_medium_impact_soft"..mRandom(7)..".wav", 55)
 							ply:ViewPunch(AngleRand(-3, 3))

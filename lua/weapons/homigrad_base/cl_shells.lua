@@ -226,7 +226,7 @@ function hg.CreateMag( self, vel, bodygroups, bDontChangePhys )
 
 	ent:AddCallback("PhysicsCollide",function(ent,data)
 		if data.Speed > 100 then
-			ent:EmitSound("physics/metal/weapon_impact_hard"..math.random(1,3)..".ogg", 60, 110)
+			ent:EmitSound("physics/metal/weapon_impact_hard"..math.random(1,3)..".wav", 60, 110)
 		end
 	end)
 

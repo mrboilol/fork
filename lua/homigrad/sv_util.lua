@@ -1062,7 +1062,7 @@ function hgKickDoor(door, attacker, impact, direction, dropkick)
 		end
 	end
 
-	door:EmitSound(metal and "physics/metal/metal_solid_impact_hard3.wav" or "physics/wood/wood_crate_impact_hard" .. math.random(1, 4) .. ".ogg", 70, math.random(92, 106))
+	door:EmitSound(metal and "physics/metal/metal_solid_impact_hard3.wav" or "physics/wood/wood_crate_impact_hard" .. math.random(1, 4) .. ".wav", 70, math.random(92, 106))
 	return "damaged"
 end
 
@@ -1374,7 +1374,7 @@ hook.Add( "Move", "hg_RagdollIntoWalls", function( ply, mv)
 						phys:Wake()
 					end
 				end
-				ply:EmitSound("physics/concrete/boulder_impact_hard"..math.random(1,4)..".ogg",75)
+				ply:EmitSound("physics/concrete/boulder_impact_hard"..math.random(1,4)..".wav",75)
 				util.Decal("Rollermine.Crater",tr.HitPos + tr.HitNormal, tr.HitPos - tr.HitNormal, ply)
 			else
 				hg.Fake(ply)
@@ -1722,7 +1722,7 @@ end
 		net.WriteBool(true)
 		net.Broadcast()
 
-		ply:EmitSound("physics/glass/glass_pottery_break" .. math.random(1, 4) .. ".ogg", 65)
+		ply:EmitSound("physics/glass/glass_pottery_break" .. math.random(1, 4) .. ".wav", 65)
 	end
 
 	local glassCutPhrases = {
@@ -1770,21 +1770,7 @@ end
 				ply.glassTalkCD = CurTime() + math.random(3, 4)
 			end
 
-			ply.glassBleedCD = ply.glassBleedCD or 0
-			if ply.glassBleedCD < CurTime() then
-				ply.glassBleedCD = CurTime() + 1.0
-
-				local body = IsValid(ply.FakeRagdoll) and ply.FakeRagdoll or ply
-				for _, v in ipairs(org.LodgedEntities) do
-					if v.takeent ~= "weapon_hg_glassshard" then continue end
-					if #org.wounds >= 10 then break end
-
-					local animBone = body:TranslatePhysBoneToBone(v.PhysBoneID)
-					hg.organism.AddWoundManual(ply, 5, v.OffsetPos, angle_zero, body:GetBoneName(animBone), CurTime() + 6)
-				end
-
-				org.painadd = (org.painadd or 0) + shards * 0.4
-			end
+			org.painadd = math.min((org.painadd or 0) + shards * 0.4, 150)
 
 			ply.glassTalkCD = ply.glassTalkCD or 0
 			if ply.glassTalkCD < CurTime() then

@@ -574,8 +574,8 @@ function SWEP:ApplyForce()
 
 						phys:ApplyForceCenter(-vector_up * 6000)
 
-						--self.CarryEnt:EmitSound("physics/body/body_medium_impact_soft" .. tostring(math.random(7)) .. ".ogg")
-						--self.CarryEnt:EmitSound("physics/body/body_medium_impact_soft" .. tostring(math.random(7)) .. ".ogg")
+						--self.CarryEnt:EmitSound("physics/body/body_medium_impact_soft" .. tostring(math.random(7)) .. ".wav")
+						--self.CarryEnt:EmitSound("physics/body/body_medium_impact_soft" .. tostring(math.random(7)) .. ".wav")
 					end
 				end
 			else
@@ -1127,7 +1127,7 @@ function SWEP:AttackFront(special_attack, rand)
         local isfur = owner.PlayerClassName == "furry"
         if IsValid(Ent) or (Ent and Ent.IsWorld and Ent:IsWorld()) then
                 if string.find(Ent:GetClass(),"break") and Ent:GetBrushSurfaces()[1] and string.find(Ent:GetBrushSurfaces()[1]:GetMaterial():GetName(),"glass") then
-                        //Ent:EmitSound("physics/glass/glass_sheet_impact_hard"..math_random(3)..".ogg")
+                        //Ent:EmitSound("physics/glass/glass_sheet_impact_hard"..math_random(3)..".wav")
 
                         //if math_random(1,8) == 8 and Ent:Health() < 250 then
                                 hg.organism.AddWoundManual(owner, math.Rand(50,75) * 1, vector_origin, AngleRand(), owner:LookupBone("ValveBiped.Bip01_"..(rand and "R" or "L").."_Hand"), CurTime())

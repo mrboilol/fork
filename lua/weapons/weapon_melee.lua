@@ -188,6 +188,7 @@ SWEP.DamageType = DMG_SLASH
 SWEP.DamagePrimary = 15
 SWEP.DamageSecondary = 8
 SWEP.ArteryChance = 1
+SWEP.MeleeStepLodgeChance = 0.04
 SWEP.ComboEnabled = false
 SWEP.ComboResetTime = 1.1
 SWEP.ComboDamageMul1 = 1
@@ -1482,39 +1483,24 @@ function SWEP:GetMeleeLodgeBone(ent, trace)
     return closestBone, closestPhysBone
 end
 
-function SWEP:TryLodgeMeleeWeapon(ent, trace, attacktype)
-    if not SERVER or self.MeleeWeaponLodged then return false end
-    if self:GetClashDamageType(attacktype) ~= DMG_SLASH then return false end
+function SWEP:AddMeleeLodgedEntity(victim, body, bone, physBone, lodgePos, lodgeAng)
+    if not SERVER or not IsValid(victim) or not victim.organism or not IsValid(body) then return false end
 
-    local owner = self:GetOwner()
-    local victim = self:GetHitVictim(ent)
-    if not IsValid(owner) or not IsValid(victim) or not victim:IsPlayer() or not victim.organism then return false end
-    if math.Rand(0, 1) > self:GetMeleeLodgeChance(attacktype) then return false end
-
-    local bone, physBone = self:GetMeleeLodgeBone(ent, trace)
-    if not bone or physBone == nil then return false end
-
-    local matrix = ent:GetBoneMatrix(bone)
-    local model = self.WorldModelExchange or self.WorldModel
-    if not matrix or not isstring(model) or model == "" then return false end
+    local matrix = body:GetBoneMatrix(bone)
+    local lodgedModel = self.WorldModelExchange or self.WorldModel
+    if not matrix or not isstring(lodgedModel) or lodgedModel == "" then return false end
 
     local org = victim.organism
     org.LodgedEntities = org.LodgedEntities or {}
     if #org.LodgedEntities >= (self.MaxMeleeLodgedEntities or 8) then return false end
 
-    local direction = trace.HitPos - owner:GetShootPos()
-    if direction:LengthSqr() <= 0.001 then direction = owner:GetAimVector() end
-    direction:Normalize()
-
-    local lodgePos = trace.HitPos + direction * (self.MeleeLodgeDepth or 3)
-    local lodgeAng = direction:Angle()
     local offsetPos, offsetAng = WorldToLocal(lodgePos, lodgeAng, matrix:GetTranslation(), matrix:GetAngles())
     org.LodgedEntities[#org.LodgedEntities + 1] = {
         PhysBoneID = physBone,
-        BoneName = ent:GetBoneName(bone),
+        BoneName = body:GetBoneName(bone),
         OffsetPos = offsetPos,
         OffsetAng = offsetAng,
-        model = model,
+        model = lodgedModel,
         modelscale = self.modelscale or 1,
         takeent = self:GetClass(),
     }
@@ -1527,10 +1513,103 @@ function SWEP:TryLodgeMeleeWeapon(ent, trace, attacktype)
     net.WriteBool(true)
     net.Broadcast()
 
+    return true, offsetPos
+end
+
+function SWEP:TryLodgeMeleeWeapon(ent, trace, attacktype)
+    if not SERVER or self.MeleeWeaponLodged then return false end
+    if self:GetClashDamageType(attacktype) ~= DMG_SLASH then return false end
+
+    local owner = self:GetOwner()
+    local victim = self:GetHitVictim(ent)
+    if not IsValid(owner) or not IsValid(victim) or not victim:IsPlayer() or not victim.organism then return false end
+    if math.Rand(0, 1) > self:GetMeleeLodgeChance(attacktype) then return false end
+
+    local bone, physBone = self:GetMeleeLodgeBone(ent, trace)
+    if not bone or physBone == nil then return false end
+
+    local direction = trace.HitPos - owner:GetShootPos()
+    if direction:LengthSqr() <= 0.001 then direction = owner:GetAimVector() end
+    direction:Normalize()
+
+    local lodgePos = trace.HitPos + direction * (self.MeleeLodgeDepth or 3)
+    local lodgeAng = direction:Angle()
+    if not self:AddMeleeLodgedEntity(victim, ent, bone, physBone, lodgePos, lodgeAng) then return false end
+
     self.MeleeWeaponLodged = true
     owner:StripWeapon(self:GetClass())
     if IsValid(owner) and owner:HasWeapon("weapon_hands_sh") then owner:SelectWeapon("weapon_hands_sh") end
     return true
+end
+
+function SWEP:CanLodgeFromFootstep()
+    if self.MeleeStepLodgeChance == false or self.DamageType ~= DMG_SLASH then return false end
+    if not self.IsSpawned or IsValid(self:GetOwner()) or IsValid(self:GetParent()) then return false end
+    if self.IsPlayerHolding and self:IsPlayerHolding() then return false end
+    return true
+end
+
+function SWEP:TryLodgeFromFootstep(ply, stepPos)
+    if not SERVER or not IsValid(ply) or not ply:Alive() or not ply.organism then return false end
+    if not self:CanLodgeFromFootstep() then return false end
+
+    local chance = tonumber(self.MeleeStepLodgeChance) or 0
+    local weight = math.max(tonumber(self.weight) or 1, 1)
+    chance = chance / math.sqrt(weight)
+    if math.Rand(0, 1) > math.Clamp(chance, 0, 1) then return false end
+
+    local body = hg.GetCurrentCharacter(ply)
+    if not IsValid(body) then return false end
+
+    local bone, matrix, closestDistance
+    for _, boneName in ipairs({"ValveBiped.Bip01_L_Foot", "ValveBiped.Bip01_R_Foot"}) do
+        local candidate = body:LookupBone(boneName)
+        local candidateMatrix = candidate and body:GetBoneMatrix(candidate)
+        if candidateMatrix then
+            local distance = candidateMatrix:GetTranslation():DistToSqr(stepPos)
+            if not closestDistance or distance < closestDistance then
+                bone, matrix, closestDistance = candidate, candidateMatrix, distance
+            end
+        end
+    end
+
+    if not bone or not matrix then return false end
+    local physBone = body:TranslateBoneToPhysBone(bone)
+    if not physBone or physBone < 0 then return false end
+
+    local contactPos = self:NearestPoint(stepPos + Vector(0, 0, 2))
+    local lodged, offsetPos = self:AddMeleeLodgedEntity(ply, body, bone, physBone, contactPos, vector_up:Angle())
+    if not lodged then return false end
+
+    local woundDamage = math.Clamp((tonumber(self.DamagePrimary) or 8) * 0.5, 3, 10)
+    hg.organism.AddWoundManual(ply, woundDamage, offsetPos, angle_zero, body:GetBoneName(bone), CurTime() + math.Rand(1, 4))
+    ply.organism.painadd = math.min((ply.organism.painadd or 0) + woundDamage, 150)
+    ply:EmitSound(self.AttackHitFlesh or "snd_jack_hmcd_knifestab.wav", 60, math.random(95, 105))
+    self:Remove()
+    return true
+end
+
+if SERVER then
+    hook.Add("HG_PlayerFootstep_Notify", "SharpMeleeFootLodging", function(ply, pos)
+        if not IsValid(ply) or not isvector(pos) or not ply:Alive() or not ply.organism or ply.organism.otrub then return end
+        if (ply.meleeStepLodgeCooldown or 0) > CurTime() then return end
+
+        local nearest, nearestDistance
+        local searchMins = pos - Vector(10, 10, 6)
+        local searchMaxs = pos + Vector(10, 10, 8)
+        for _, ent in ipairs(ents.FindInBox(searchMins, searchMaxs)) do
+            if not IsValid(ent) or not ent.TryLodgeFromFootstep or not ent:CanLodgeFromFootstep() then continue end
+
+            local distance = ent:NearestPoint(pos):DistToSqr(pos)
+            if distance <= 100 and (not nearestDistance or distance < nearestDistance) then
+                nearest, nearestDistance = ent, distance
+            end
+        end
+
+        if not IsValid(nearest) then return end
+        ply.meleeStepLodgeCooldown = CurTime() + 0.2
+        nearest:TryLodgeFromFootstep(ply, pos)
+    end)
 end
 
 function SWEP:SetMeleeDamageContact(ent, trace)
@@ -1906,7 +1985,7 @@ end
 function SWEP:BreakGlass(ent)
 	if not IsValid(ent) then return end
     if string.find(ent:GetClass(),"break") and ent:GetBrushSurfaces()[1] and string.find(ent:GetBrushSurfaces()[1]:GetMaterial():GetName(),"glass") then
-        //ent:EmitSound("physics/glass/glass_sheet_impact_hard"..math.random(3)..".ogg")
+        //ent:EmitSound("physics/glass/glass_sheet_impact_hard"..math.random(3)..".wav")
         
         if math.random(1, 4) == 4 and ent:Health() < 250 then
             //ent:Fire("Break")

@@ -314,7 +314,7 @@ hook.Add("Think", "stanleytumbler", function()
                                 org.larm = 1 -- Break left arm
                             end
                         else
-                            ply:EmitSound("physics/body/body_medium_break"..math.random(2,4)..".ogg")
+                            ply:EmitSound("physics/body/body_medium_break"..math.random(2,4)..".wav")
                         end
 					end
                 end

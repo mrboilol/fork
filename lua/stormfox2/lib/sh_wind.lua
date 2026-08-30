@@ -458,7 +458,7 @@ if CLIENT then return end
 		if(wind > 30) then
 			if( StormFox2.Setting.GetCache("windmove_props_unweld", true) ) then
 				if constraint.FindConstraint( ent, "Weld" ) and math.random(1, 15) < 2 then
-					ent:EmitSound("physics/wood/wood_box_break" .. math.random(1,2) .. ".ogg")
+					ent:EmitSound("physics/wood/wood_box_break" .. math.random(1,2) .. ".wav")
 					constraint.RemoveConstraints( ent, "Weld" )
 				end
 			end

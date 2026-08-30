@@ -1787,7 +1787,7 @@ function SWEP:ApplyForce()
 
 						phys:ApplyForceCenter(-vector_up * 6000)
 
-						--self.CarryEnt:EmitSound("physics/body/body_medium_impact_soft" .. tostring(math.random(7)) .. ".ogg")
+						--self.CarryEnt:EmitSound("physics/body/body_medium_impact_soft" .. tostring(math.random(7)) .. ".wav")
 					end
 				end
 			else
@@ -2488,7 +2488,7 @@ function SWEP:AttackFront(special_attack, rand)
 				hgBlastThatDoor(Ent,self:GetOwner():GetAimVector() * 50 + self:GetOwner():GetVelocity())
 			else
 				sound.Play(vent[math.random(#vent)], HitPos, 90, math.random(90, 110), 1)
-				sound.Play("physics/wood/wood_crate_impact_hard" .. math.random(4) .. ".ogg", HitPos, 90, math.random(90, 110), 1)
+				sound.Play("physics/wood/wood_crate_impact_hard" .. math.random(4) .. ".wav", HitPos, 90, math.random(90, 110), 1)
 			end
 			Ent.Clawed = (Ent.Clawed or 0) + 1
 		elseif self:IsEntSoft(Ent) then

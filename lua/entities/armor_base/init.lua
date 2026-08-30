@@ -41,8 +41,15 @@ function ENT:OnRemove()
 end
 
 function ENT:OnTakeDamage(dmgInfo)
-	if self.broken or self:GetNWBool("ArmorBroken", false) then return end
 	if not dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) then return end
+	if self.broken or self:GetNWBool("ArmorBroken", false) then
+		self.brokenHitsLeft = (self.brokenHitsLeft or math.random(2, 5)) - 1
+		if self.brokenHitsLeft <= 0 then
+			hg.EmitArmorDestroyEffects(self)
+			self:Remove()
+		end
+		return
+	end
 
 	self.shotsLeft = self.shotsLeft or hg.GetArmorBreakShotCount(self.name)
 	self.shotsLeft = self.shotsLeft - 1
@@ -59,10 +66,6 @@ end
 
 function ENT:TakeByPlayer(activator)
 	if not activator:IsPlayer() then return end
-	if self.broken or self:GetNWBool("ArmorBroken", false) then
-		activator:Notify("This armor is broken.", true, "armor_broken_pickup", 3)
-		return
-	end
 
 	local can = hg.AddArmor(activator,self.name, self)
     if can then
@@ -85,7 +88,7 @@ end
 		ply.armors_durability = ply.armors_durability or {}
 		ply.armors_regions = ply.armors_regions or {}
 		ply.armors_broken[equipment] = self.broken or self:GetNWBool("ArmorBroken", false) or nil
-		ply.armors_broken_mul[equipment] = self.brokenProtectionMul or nil
+		ply.armors_broken_mul[equipment] = ply.armors_broken[equipment] and (self.brokenProtectionMul or hg.GetBrokenArmorProtectionMul()) or nil
 		ply.armors_shots[equipment] = ply.armors_broken[equipment] and nil or self.shotsLeft or hg.GetArmorBreakShotCount(equipment)
 		ply.armors_health[equipment] = self.armorHealth or ply.armors_health[equipment] or 1
 		local placement = hg.GetArmorPlacement(equipment)

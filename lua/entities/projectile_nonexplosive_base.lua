@@ -66,7 +66,8 @@ if SERVER then
 			constraint.Weld(self, rag, 0, rag:IsPlayer() and 0 or phys_bone_id, 0, true, false)
 		end
 
-		local mat = ent:GetBoneMatrix(ent:TranslatePhysBoneToBone(phys_bone_id))
+		local bone = ent:TranslatePhysBoneToBone(phys_bone_id)
+		local mat = ent:GetBoneMatrix(bone)
 		local offset_pos = Vector()
 		local offset_ang = Angle()
 		
@@ -87,6 +88,7 @@ if SERVER then
 			org.LodgedEntities = org.LodgedEntities or {}
 			org.LodgedEntities[#org.LodgedEntities + 1] = {
 				PhysBoneID = self.phys_bone_id,
+				BoneName = bone and ent:GetBoneName(bone) or nil,
 				OffsetPos = offset_pos,
 				OffsetAng = offset_ang,
 				CrossbowBolt = self:GetClass() == "crossbow_projectile",
@@ -147,7 +149,16 @@ if SERVER then
                 effectdata:SetRadius(0.1)
                 util.Effect( "Sparks", effectdata )
             end)
-			self:Hit(data.HitEntity, data.HitPos, 0, data.OurOldVelocity:GetNormalized())
+			local physBoneID = 0
+			if IsValid(data.HitEntity) and IsValid(data.HitObject) then
+				for index = 0, data.HitEntity:GetPhysicsObjectCount() - 1 do
+					if data.HitEntity:GetPhysicsObjectNum(index) == data.HitObject then
+						physBoneID = index
+						break
+					end
+				end
+			end
+			self:Hit(data.HitEntity, data.HitPos, physBoneID, data.OurOldVelocity:GetNormalized())
             self:DamagePly(data.HitEntity, data.HitObject:GetMaterial(), data.HitPos) 
             return 
 		end
@@ -220,12 +231,13 @@ if SERVER then
 
 		local tbl = table.remove(org.LodgedEntities, i)
 
-		local bone = ent:TranslatePhysBoneToBone(tbl.PhysBoneID or 0)
-		local mat = ent:GetBoneMatrix(bone)
-		
-		if mat then
-			for j = 1, 5 do
-				hg.organism.AddWoundManual(org.owner, 50, vector_origin, AngleRand(-180, 180), ent:GetBoneName(bone), CurTime() + math.Rand(0, 2))
+		if hg.ApplyLodgedExtraction then
+			hg.ApplyLodgedExtraction(org.owner, ply, tbl)
+		else
+			local bone = ent:TranslatePhysBoneToBone(tbl.PhysBoneID or 0)
+			local mat = ent:GetBoneMatrix(bone)
+			if mat then
+				hg.organism.AddWoundManual(org.owner, 24, tbl.OffsetPos or vector_origin, tbl.OffsetAng or angle_zero, tbl.BoneName or ent:GetBoneName(bone), CurTime() + math.Rand(18, 36))
 			end
 		end
 

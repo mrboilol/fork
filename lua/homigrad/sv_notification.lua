@@ -619,8 +619,8 @@ local function ResetNotification(ply, key)
 end
 
 local thoughtGroupPatterns = {
+    {"oxygen", "respiration"}, {"hypox", "respiration"}, {"lowoxy", "respiration"}, {"breath", "respiration"}, {"lung", "respiration"}, {"pneumo", "respiration"}, {"hemothorax", "respiration"},
     {"blood", "circulation"}, {"bleed", "circulation"}, {"arter", "circulation"}, {"perfusion", "circulation"},
-    {"oxygen", "respiration"}, {"hypox", "respiration"}, {"breath", "respiration"}, {"lung", "respiration"}, {"pneumo", "respiration"}, {"hemo", "respiration"},
     {"heart", "cardiac"}, {"pulse", "cardiac"}, {"arrhythm", "cardiac"}, {"tachy", "cardiac"}, {"brady", "cardiac"},
     {"bone", "skeletal"}, {"limb", "skeletal"}, {"fract", "skeletal"}, {"disloc", "skeletal"},
     {"pain", "pain"}, {"hurt", "pain"}, {"concussion", "neuro"}, {"brain", "neuro"}, {"dizz", "neuro"},
@@ -630,10 +630,16 @@ local thoughtGroupPatterns = {
 }
 
 local function GetThoughtGroup(msgKey, msg)
-    local haystack = string.lower(tostring(msgKey or "") .. " " .. tostring(msg or ""))
+    local haystack = string.lower(tostring(msgKey or ""))
     for _, rule in ipairs(thoughtGroupPatterns) do
         if string.find(haystack, rule[1], 1, true) then return rule[2] end
     end
+
+    haystack = string.lower(tostring(msg or ""))
+    for _, rule in ipairs(thoughtGroupPatterns) do
+        if string.find(haystack, rule[1], 1, true) then return rule[2] end
+    end
+
     return "misc"
 end
 
@@ -694,6 +700,7 @@ CreateThought = function(ply, msg, delay, msgKey, showTime, clr, func)
         net.Start("HGThought")
         net.WriteString(msg)
         net.WriteColor(clr2)
+        net.WriteString(group)
         net.Send(ply)
     end)
 

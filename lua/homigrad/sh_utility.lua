@@ -1429,6 +1429,9 @@ hg.renderOverride = function(self, ent, flags)
 		if org.armstrength and org.armstrength > 0 and org.armstrength < 1 then
 			effectiveness = effectiveness * org.armstrength
 		end
+		if hg.GetLodgedLimbPenalty then
+			effectiveness = effectiveness * hg.GetLodgedLimbPenalty(ent, limb)
+		end
 
 		return math.Clamp(effectiveness, 0, 1)
 	end
@@ -1522,6 +1525,9 @@ hg.renderOverride = function(self, ent, flags)
 		end
 		if org.legstrength and org.legstrength > 0 and org.legstrength < 1 then
 			effectiveness = effectiveness * org.legstrength
+		end
+		if hg.GetLodgedLimbPenalty then
+			effectiveness = effectiveness * hg.GetLodgedLimbPenalty(ent, limb)
 		end
 
 		return math.Clamp(effectiveness, 0, 1)

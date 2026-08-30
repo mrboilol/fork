@@ -1249,11 +1249,11 @@ if SERVER then
 
 		if ent.ducttaped_hands then
 			RemoveLimbTape(ent, "hands")
-			ent:EmitSound("physics/cardboard/cardboard_box_break" .. math.random(1, 3) .. ".ogg", 65)
+			ent:EmitSound("physics/cardboard/cardboard_box_break" .. math.random(1, 3) .. ".wav", 65)
 			ply:ChatPrint("Cut hand tape.")
 		elseif ent.ducttaped_legs then
 			RemoveLimbTape(ent, "legs")
-			ent:EmitSound("physics/cardboard/cardboard_box_break" .. math.random(1, 3) .. ".ogg", 65)
+			ent:EmitSound("physics/cardboard/cardboard_box_break" .. math.random(1, 3) .. ".wav", 65)
 			ply:ChatPrint("Cut leg tape.")
 		end
 	end)
@@ -1286,11 +1286,11 @@ if SERVER then
 		local ent = tr.Entity
 		if ent.ducttaped_hands then
 			RemoveLimbTape(ent, "hands")
-			ent:EmitSound("physics/cardboard/cardboard_box_break" .. math.random(1, 3) .. ".ogg", 65)
+			ent:EmitSound("physics/cardboard/cardboard_box_break" .. math.random(1, 3) .. ".wav", 65)
 			ply:ChatPrint("Cut hand tape.")
 		elseif ent.ducttaped_legs then
 			RemoveLimbTape(ent, "legs")
-			ent:EmitSound("physics/cardboard/cardboard_box_break" .. math.random(1, 3) .. ".ogg", 65)
+			ent:EmitSound("physics/cardboard/cardboard_box_break" .. math.random(1, 3) .. ".wav", 65)
 			ply:ChatPrint("Cut leg tape.")
 		else
 			ply:ChatPrint("This ragdoll has no tape.")

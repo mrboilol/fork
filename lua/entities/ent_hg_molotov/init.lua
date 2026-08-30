@@ -34,7 +34,7 @@ function ENT:PhysicsCollide(data, physobj)
 				self:Detonate()
 				self:EmitSound("weapons/molotov/molotov_detonate.ogg")
 			else
-				self:EmitSound("physics/glass/glass_bottle_impact_hard" .. math.random(1, 3) .. ".ogg", 75, math.random(90, 110))
+				self:EmitSound("physics/glass/glass_bottle_impact_hard" .. math.random(1, 3) .. ".wav", 75, math.random(90, 110))
 			end
 		end
 	end

@@ -501,6 +501,13 @@ if CLIENT then
 				m:Scale( vector_one * 0.5 )
 
 				cam.PushModelMatrix( m, true )
+					local promptTarget = ResolveBandageTarget(Tr.Entity)
+					if (self:GetClass() == "weapon_medkit_sh" or self.HGMedkitTier) and IsValid(promptTarget) and promptTarget:IsPlayer() and promptTarget ~= owner then
+						local targetName = promptTarget:GetNWString("PlayerName", "")
+						if targetName == "" then targetName = "Unknown" end
+						draw.SimpleTextOutlined('RMB - Treat "' .. targetName .. '"', "ZCity_Small", 0, 0, color_white, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP, 1.5, colBrown)
+					end
+
 					for i, val in ipairs(self.modeValues) do
 						if not isnumber(i) or not val or not self.modeValuesdef or not self.modeValuesdef[i][1] then continue end
 						local val = math.Round(val / self.modeValuesdef[i][1] * 100)

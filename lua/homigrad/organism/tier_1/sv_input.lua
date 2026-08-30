@@ -687,10 +687,11 @@ function hg.organism.AddWoundManual(ent,dmgBlood,localPos,localAng,bone,time)
 	if org.superfighter then return end
 	
 	if isnumber(bone) then bone = ent:GetBoneName(bone) end
+	local wound
 
 	if #org.wounds < 30 then
 		local severity = dmgBlood / 2
-		local wound = {severity, localPos, localAng, bone, time, chooseWoundBleedStyle(severity)}
+		wound = {severity, localPos, localAng, bone, time, chooseWoundBleedStyle(severity)}
 		table.insert(org.wounds, wound)
 	else
 		if org.wounds[1] then org.wounds[1][1] = org.wounds[1][1] + dmgBlood / 2 end
@@ -699,6 +700,7 @@ function hg.organism.AddWoundManual(ent,dmgBlood,localPos,localAng,bone,time)
 	table.sort(org.wounds, function(a, b) return a[1] > b[1] end)
 
 	hg.organism.MarkWoundsNetDirty(org, true)
+	return wound
 end
 
 --[[hook.Add( "PlayerDeath", "GlobalDeathMessage", function( victim, inflictor, attacker )

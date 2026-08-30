@@ -322,6 +322,25 @@ local barely_breathing = {
 	"Every breath feels weak...",
 }
 
+local function oxygenIntakeThoughtExpired(ply)
+	local current = IsValid(ply) and ply.organism
+	if not current or not current.o2 then return true end
+
+	local oxygen = tonumber(current.o2[1]) or 30
+	local intake = tonumber(current.o2.curregen) or 0
+	local demand = tonumber(current.losing_oxy) or 0
+	return current.heartstop or current.otrub or (current.analgesia or 0) > 1.5 or intake >= demand or oxygen <= 12 or oxygen >= 25
+end
+
+local function barelyBreathingThoughtExpired(ply)
+	local current = IsValid(ply) and ply.organism
+	if not current or not current.o2 then return true end
+
+	local intake = tonumber(current.o2.curregen) or 0
+	local demand = tonumber(current.losing_oxy) or 0
+	return current.heartstop or current.otrub or current.choking or (current.analgesia or 0) > 1.5 or intake < demand or intake >= demand * 1.3
+end
+
 local low_stamina = {
 	"I'm running out of stamina...",
 	"I need to slow down and catch my breath...",
@@ -981,7 +1000,7 @@ module[2] = function(owner, org, timeValue)
 
 			if o2[1] < 25 and o2[1] > 12 then
 
-				org.owner:Notify(not_enough_intake[math.random(#not_enough_intake)], 61, "oxygen_lowintake", 3)
+				org.owner:Notify(not_enough_intake[math.random(#not_enough_intake)], 61, "oxygen_lowintake", 3, oxygenIntakeThoughtExpired)
 
 			end
 
@@ -1017,7 +1036,7 @@ module[2] = function(owner, org, timeValue)
 
 	if org.isPly and not org.otrub and not org.choking and o2.curregen >= losing_oxy and o2.curregen < losing_oxy * 1.3 and org.analgesia <= 1.5 and !org.heartstop then
 
-		org.owner:Notify(barely_breathing[math.random(#barely_breathing)], 45, "barely_breathing", 2)
+		org.owner:Notify(barely_breathing[math.random(#barely_breathing)], 45, "barely_breathing", 2, barelyBreathingThoughtExpired)
 
 	end
 

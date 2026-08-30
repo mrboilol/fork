@@ -2,6 +2,14 @@ if SERVER then return end
 
 local PANEL = {}
 
+surface.CreateFont("HGMedicalTreating", {
+    font = "VCR OSD Mono",
+    size = math.max(ScreenScale(10), 20),
+    weight = 500,
+    antialias = true,
+    extended = true
+})
+
 local circleMat = Material("vgui/circle")
 
 local function IsBruiceKitActive()
@@ -464,6 +472,9 @@ function PANEL:Init()
     self.AccumulatedAngle = 0
     self.WrapAngle = 0
     self.GameType = (hg and hg.MedicalMinigame and hg.MedicalMinigame.NextType) or "bandage"
+    self.TreatmentTarget = hg and hg.MedicalMinigame and hg.MedicalMinigame.NextTarget or nil
+    local activeWeapon = LocalPlayer():GetActiveWeapon()
+    self.ShowMedkitTreatmentTarget = IsValid(activeWeapon) and (activeWeapon:GetClass() == "weapon_medkit_sh" or activeWeapon.HGMedkitTier ~= nil)
     local armSpeed = hg.MedicalMinigame.GetArmSpeedMultiplier(LocalPlayer())
     self.MedicalArmSpeedMultiplier = math.max(armSpeed, 0.25)
     self.MinigameDifficultyMultiplier = 1 / self.MedicalArmSpeedMultiplier
@@ -584,6 +595,29 @@ function PANEL:Init()
         self.AmputationFillSpeedCap = 520
     end
 
+end
+
+function PANEL:DrawTreatmentTarget(w, h)
+    if not self.ShowMedkitTreatmentTarget then return end
+
+    local target = self.TreatmentTarget
+    local lp = LocalPlayer()
+    if not IsValid(target) or not target:IsPlayer() or target == lp then return end
+
+    local targetName = target:GetNWString("PlayerName", "")
+    if targetName == "" then targetName = "Unknown" end
+
+    draw.SimpleTextOutlined(
+        "Treating (" .. targetName .. ")",
+        "HGMedicalTreating",
+        w * 0.5,
+        h - math.max(ScreenScaleH(18), 36),
+        Color(255, 255, 255, 245),
+        TEXT_ALIGN_CENTER,
+        TEXT_ALIGN_BOTTOM,
+        2,
+        Color(0, 0, 0, 220)
+    )
 end
 
 function PANEL:StartMusic()
@@ -1811,21 +1845,25 @@ end
 function PANEL:Paint(w, h)
     if self.GameType == "tourniquet" then
         self:PaintTourniquet(w, h)
+        self:DrawTreatmentTarget(w, h)
         return
     end
 
     if self.GameType == "syringe" then
         self:PaintSyringe(w, h)
+        self:DrawTreatmentTarget(w, h)
         return
     end
 
     if self.GameType == "amputation" then
         self:PaintAmputation(w, h)
+        self:DrawTreatmentTarget(w, h)
         return
     end
 
     if self.GameType == "dislocation" then
         self:PaintDislocation(w, h)
+        self:DrawTreatmentTarget(w, h)
         return
     end
 
@@ -1894,6 +1932,7 @@ function PANEL:Paint(w, h)
     draw.DrawText(counterText, "HomigradFontLarge", drawCenterX, drawCenterY - 20, counterColor, TEXT_ALIGN_CENTER)
 
     self:DrawCommonOverlays(self.Progress, false)
+    self:DrawTreatmentTarget(w, h)
 end
 
 vgui.Register("hg_medical_minigame", PANEL, "DFrame")

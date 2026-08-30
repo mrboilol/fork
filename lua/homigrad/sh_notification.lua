@@ -202,7 +202,7 @@ if CLIENT then
 		table.insert(hg.notifications, {msg, (showTimer or defaultShowTimer), clr or Color(255, 255, 255, 255)})
 	end
 
-	local function CreateThought(msg, clr)
+	local function CreateThought(msg, clr, group)
 		if not hg_newthoughts:GetBool() then return end
 		if lply:IsBerserk() then return end
 
@@ -210,7 +210,12 @@ if CLIENT then
 		for _, thought in ipairs(hg.thoughts) do
 			if thought[1] == msg and now - (thought[2] or 0) < 18 then return end
 		end
-		table.insert(hg.thoughts, {msg, now, clr or Color(255, 255, 255, 255)})
+		if group then
+			for i = #hg.thoughts, 1, -1 do
+				if hg.thoughts[i][4] == group then table.remove(hg.thoughts, i) end
+			end
+		end
+		table.insert(hg.thoughts, {msg, now, clr or Color(255, 255, 255, 255), group})
 
 		while #hg.thoughts > 3 do
 			local tbl = hg.thoughts[1]
@@ -255,10 +260,11 @@ if CLIENT then
 	net.Receive("HGThought",function()
 		local msg = net.ReadString()
 		local clr = net.ReadColor()
+		local group = net.ReadString()
 
 		if msg == "" then return end
 
-		CreateThought(msg, clr)
+		CreateThought(msg, clr, group != "" and group or nil)
 	end)
 
 	hg.CreateNotification = CreateNotification

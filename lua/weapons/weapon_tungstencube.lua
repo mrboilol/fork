@@ -66,7 +66,7 @@ function SWEP:PrimaryAttack()
     ent.damage = 25
     ent.MaxSpeed = 1200
     ent.DamageType = DMG_CLUB
-    ent.AttackHit = "physics/metal/metal_solid_impact_soft" .. math.random(1, 3) .. ".ogg"
+    ent.AttackHit = "physics/metal/metal_solid_impact_soft" .. math.random(1, 3) .. ".wav"
     ent.AttackHitFlesh = "Flesh.ImpactHard"
     ent.noStuck = true
     ent.modelscale = self.modelscale or 1.0
