@@ -803,6 +803,7 @@ function SWEP:FireBullet()
 	bullet.AmmoType = primary.Ammo
 	bullet.Speed = ammotype.Speed or 0
 	bullet.StopsInJaw = self.StopsInJaw
+	bullet.StopsInBrain = self.StopsInBrain
 	self.nearMissShotSequence = (self.nearMissShotSequence or 0) + 1
 	bullet.NearMissShotID = tostring(self:EntIndex()) .. ":" .. tostring(self.nearMissShotSequence)
 	bullet.TracerName = self.Tracer or "nil"

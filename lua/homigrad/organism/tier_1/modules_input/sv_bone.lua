@@ -656,6 +656,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	local oldConcussion = org.concussion or 0
 	local oldBrain = org.brain or 0
 	local ignoreBrainDamage = hg.organism.IsBrainDamageIgnored and hg.organism.IsBrainDamageIgnored(org)
+	local brainEnergy = impact and impact.source == "physics" and math.max(impact.residualEnergy or 0, 0) or dmg
 	
 	local result, vecrand = damageBone(org, 0.25, dmg, dmgInfo, "skull", boneindex, dir, hit, ricochet)
 	local inflictor = dmgInfo:GetInflictor()
@@ -685,7 +686,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 
 	org.shock = org.shock + dmg * 3
 
-	local rnd = math.random(10) == 1 or dmgInfo:IsDamageType(DMG_CRUSH)
+	local rnd = (math.random(10) == 1 or dmgInfo:IsDamageType(DMG_CRUSH)) and brainEnergy > 0.05
 	org.consciousness = math.Approach(org.consciousness, 0, rnd and dmg * 2 or 0)
 
 	org.brain = math.min(org.brain + (rnd and dmg * 0.05 or 0), 1)
@@ -699,11 +700,11 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		end
 	end
 
-	if (org.skull - oldDmg) > 0.6 then
+	if (org.skull - oldDmg) > 0.6 and brainEnergy > 0.05 then
 		org.brain = math.min(org.brain + 0.1, 1)
 	end
 
-	if not ignoreBrainDamage and org.brain >= 0.01 and math.random(3) == 1 and (rnd or (org.skull - oldDmg) > 0.6) then
+	if not ignoreBrainDamage and brainEnergy > 0.05 and org.brain >= 0.01 and math.random(3) == 1 and (rnd or (org.skull - oldDmg) > 0.6) then
 		org.shock = 70
 	end
 
@@ -736,11 +737,11 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 
 	local hasHelmet = org.owner.armors and org.owner.armors["head"] != nil
 	if hg.organism.module.concussion and hg.organism.module.concussion.AddHeadTrauma then
-		hg.organism.module.concussion.AddHeadTrauma(org, org.skull - oldDmg, org.brain - oldBrain, dmg, dmgInfo)
+		hg.organism.module.concussion.AddHeadTrauma(org, org.skull - oldDmg, org.brain - oldBrain, brainEnergy, dmgInfo)
 	end
 
-	if not ignoreBrainDamage and not isStab and dmg > 0.05 then
-		local headDmg = hasHelmet and dmg * 0.3 or dmg
+	if not ignoreBrainDamage and not isStab and brainEnergy > 0.05 then
+		local headDmg = math.min(dmg, brainEnergy) * (hasHelmet and 0.3 or 1)
 		org.disorientation = math.min(org.disorientation + math.min(headDmg * 0.15, 1.5), 1.5)
 		if hg.organism.ApplyOrganTrauma then
 			hg.organism.ApplyOrganTrauma(org, dmgInfo, headDmg, org.skull - oldDmg, oldDmg, "brain")

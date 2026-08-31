@@ -1452,3 +1452,4 @@ function hg.organism.Pulse(owner, org, timeValue)
 		net.Send(owner)
 	end
 end
+

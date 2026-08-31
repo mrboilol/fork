@@ -215,6 +215,9 @@ local function Trace_Bullet(box, hit, ricochet, impact, org, organs, dmg, dmgInf
 	if impact.ballisticVersion then
 		local energyFraction = math.Clamp(impact.energyBefore / impact.initialEnergy, 0, 1)
 		local organDamageMul = impact.tissueDamage * (1 + impact.temporaryCavity * 0.35)
+		if impact.nearbyOrgan then
+			organDamageMul = organDamageMul * (impact.nearbyDamageMul or 1)
+		end
 		local fragmentation = impact.fragmentation
 		if istable(fragmentation) and not impact.fragmented and energyFraction >= (fragmentation.energyThreshold or 0.65) and math.Rand(0, 1) <= (fragmentation.chance or 0) then
 			impact.fragmented = true
@@ -236,6 +239,8 @@ local function Trace_Bullet(box, hit, ricochet, impact, org, organs, dmg, dmgInf
 	end
 	local bone = organ[2] or 0
 	local func = input_list[name]
+	local isBrainLobe = string.StartWith(name, "brain")
+	local oldBrainLobe = isBrainLobe and (org[name] or 0) or 0
 	local hook_info = {
 		restricted = false,
 		dmg = dmg,
@@ -248,12 +253,8 @@ local function Trace_Bullet(box, hit, ricochet, impact, org, organs, dmg, dmgInf
 	if func and !hook_info.restricted then
 		local resistance = func(org, bone, dmg, dmgInfo, box[6], dir, hit, ricochet, impact)
 
-		if isRifleBullet and name == "skull" then resistance = 0 end
-		if impact.ballisticVersion and string.StartWith(name, "brain") then
-			org.brain = 1
-			org.alive = false
-			ApplyFatalOrganismDamage(org, dmgInfo)
-		end
+		if isRifleBullet and name == "skull" then resistance = (resistance or 0) * 0.35 end
+		local brainDelta = isBrainLobe and math.max((org[name] or 0) - oldBrainLobe, 0) or 0
 		if name == "jaw" and impact.bullet and impact.bullet.StopsInJaw then
 			return {
 				penetrationCost = impact.penetrationBefore,
@@ -267,14 +268,42 @@ local function Trace_Bullet(box, hit, ricochet, impact, org, organs, dmg, dmgInf
 		local penetrationCost = math.max((resistance or 0) * impact.penetrationBefore, 0)
 		local layerCost = bone > 0 and math.max(bone * 2, 0.35) or 0.2
 		local energyCost = impact.energyBefore * math.Clamp(layerCost / math.max(impact.initialPenetration, 1), 0.01, 0.45)
+		energyCost = math.min(impact.energyBefore, energyCost + impact.energyBefore * (1 - math.Clamp(impact.energyRetention or 0.85, 0.5, 1)))
+		local bullet = impact.bullet or {}
+		local caliberFactor = math.Clamp(math.sqrt(math.max(bullet.Diameter or 7.62, 1) / 7.62), 0.6, 1.35)
+		local penetrationFactor = math.Clamp((bullet.Penetration or impact.initialPenetration) / 8, 0.35, 1.8)
+		local pelletFactor = 1 + math.Clamp((bullet.Pellets or 1) - 1, 0, 12) * 0.025
+		local brainTransfer = caliberFactor * penetrationFactor * pelletFactor
+		if isBrainLobe then
+			if brainDelta > 0 and hg.organism.AddBrainHemorrhage then
+				hg.organism.AddBrainHemorrhage(org, math.Clamp(0.01 + brainDelta * 0.35, 0.01, 0.14), math.Clamp(0.0003 + brainDelta * 0.003, 0.0003, 0.004))
+			end
+			impact.brainHit = brainDelta > 0
+			local maxBrainCost = math.Clamp(0.95 - math.Clamp((brainTransfer - 0.45) * 0.22, 0, 0.35), 0.58, 0.95)
+			energyCost = math.max(energyCost, impact.energyBefore * math.Clamp(0.45 + brainDelta * 0.35, 0.45, maxBrainCost))
+		end
 		if impact.fragmented then
 			energyCost = math.min(impact.energyBefore, energyCost + impact.initialEnergy * impact.fragmentationEnergy)
 			impact.fragmented = nil
 		end
-		return {
+		local result = {
 			penetrationCost = penetrationCost + layerCost,
 			energyCost = energyCost
 		}
+		if isBrainLobe and brainDelta > 0 then
+			local energyAfter = math.max(impact.energyBefore - energyCost, 0)
+			local energyAfterFraction = energyAfter / math.max(impact.initialEnergy, 0.01)
+			local passesBrain = energyAfterFraction > 0.08 and energyAfterFraction * brainTransfer > 0.06
+			if bullet.StopsInBrain or not passesBrain then
+				result.stopped = true
+			end
+			if brainDelta >= 0.75 or (org.brain or 0) >= 0.95 then
+				org.brain = 1
+				org.alive = false
+				ApplyFatalOrganismDamage(org, dmgInfo)
+			end
+		end
+		return result
 	else
 		return 0
 	end
@@ -1282,6 +1311,9 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		temporaryCavity = (bullet ~= nil and bullet.TemporaryCavity) or 0.5,
 		fragmentation = bullet ~= nil and bullet.BulletFragmentation,
 		energyRetention = (bullet ~= nil and bullet.EnergyRetention) or 0.85,
+		expansionRadius = (bullet ~= nil and bullet.ExpansionRadius) or math.Clamp((dmg_before - 45) / 18, 0, 10),
+		expansionChance = (bullet ~= nil and bullet.ExpansionChance) or math.Clamp(0.15 + (dmg_before - 45) / 120, 0, 0.8),
+		nearbyDamageMul = (bullet ~= nil and bullet.NearbyDamageMul) or math.Clamp(1 + (dmg_before - 45) / 180, 1, 1.65),
 		layerIndex = 0
 	}
 
@@ -2136,7 +2168,6 @@ end
 local function resolvePhysicsImpactLane(ent, hitgroup, bonename, data, relativeVelocity, normalSpeed)
 	local velocityDirection = relativeVelocity:GetNormalized()
 	local collisionNormal = isvector(data.HitNormal) and data.HitNormal:GetNormalized()
-	local normalLoad = collisionNormal and math.abs(velocityDirection:Dot(collisionNormal)) or 1
 
 	if hitgroup == HITGROUP_HEAD then
 		local headAxis = getHeadImpactAxis(ent)
@@ -2145,8 +2176,6 @@ local function resolvePhysicsImpactLane(ent, hitgroup, bonename, data, relativeV
 			collisionNormal and math.abs(headAxis:Dot(collisionNormal)) or 0
 		) or 0
 
-		-- A nearly axial, high-speed head-first impact loads the cervical spine.
-		-- Glancing or side-loaded contact stays in the skull lane.
 		if axialLoad >= 0.78 and normalSpeed >= 540 then
 			return {name = "spine3", reserve = 0.9, scale = 3.2, axialLoad = axialLoad}
 		end
@@ -2160,7 +2189,6 @@ local function resolvePhysicsImpactLane(ent, hitgroup, bonename, data, relativeV
 		local shearLoad = axis and (1 - math.abs(axis:Dot(velocityDirection))) or 0
 		local segment = (string.find(string.lower(bonename or ""), "forearm", 1, true) or string.find(string.lower(bonename or ""), "calf", 1, true)) and "down" or "up"
 
-		-- A sideways pull is a joint injury; force along the bone is a fracture.
 		if shearLoad >= 0.62 and normalSpeed >= 360 then
 			return {name = "dislocation", limb = limb, segment = segment, reserve = 0.4, scale = 1.25, shearLoad = shearLoad}
 		end
@@ -2184,16 +2212,12 @@ end
 local function applyPhysicsResidual(ent, org, hitgroup, residual, lane)
 	if residual <= 0 then return end
 
-	-- Structural damage owns the break/dislocation response. These effects only
-	-- represent force that was not consumed by that structural response.
 	org.painadd = math.min((org.painadd or 0) + residual * 5, 150)
 	org.shock = math.min((org.shock or 0) + residual * 3.5, 95)
 
 	if hitgroup == HITGROUP_CHEST or hitgroup == HITGROUP_STOMACH then
 		addPhysicsInternalBleed(ent, org, hitgroup, residual)
 	elseif lane == "skull" and (org.skull or 0) >= 0.7 and hg.organism.AddBrainHemorrhage then
-		-- A broken skull can bleed into the cranial vault, but only from energy
-		-- left after the selected skull lane has been resolved.
 		hg.organism.AddBrainHemorrhage(org, math.Clamp(residual * 0.025, 0.01, 0.12), math.Clamp(residual * 0.0008, 0.0002, 0.004))
 	end
 end
@@ -2328,14 +2352,6 @@ local function velocityDamage(ent, data)
 	end
 	dmg = dmg * armorDmgMul
 
-	if (hitgroup == HITGROUP_LEFTARM or hitgroup == HITGROUP_RIGHTARM or hitgroup == HITGROUP_LEFTLEG or hitgroup == HITGROUP_RIGHTLEG)
-		and hg.TryDislocateLimb and normalSpeed >= 360 then
-		local limb = hitgroup == HITGROUP_LEFTARM and "larm" or hitgroup == HITGROUP_RIGHTARM and "rarm" or hitgroup == HITGROUP_LEFTLEG and "lleg" or "rleg"
-		local boneNameLower = string.lower(bonename or "")
-		local segment = (string.find(boneNameLower, "forearm", 1, true) or string.find(boneNameLower, "calf", 1, true)) and "down" or "up"
-		hg.TryDislocateLimb(org, limb, segment, dmg * math.Clamp(normalSpeed / 500, 0.85, 2.2))
-	end
-
 	if (hitgroup == HITGROUP_LEFTARM and IsValid(ent.ConsLH)) or (hitgroup == HITGROUP_RIGHTARM and IsValid(ent.ConsRH))
 		or ((hitgroup == HITGROUP_LEFTARM or hitgroup == HITGROUP_RIGHTARM) and IsValid(ply) and (ply:KeyDown(IN_FORWARD) or ply:KeyDown(IN_BACK))) then
 		dmg = dmg * 0.1
@@ -2346,27 +2362,40 @@ local function velocityDamage(ent, data)
 
 	if not org.superfighter then
 		local legMul = safeLanding and safeLegMul or 1
+		local lane = resolvePhysicsImpactLane(ent, hitgroup, bonename, data, relativeVelocity, normalSpeed)
+		local structuralBudget = math.min(dmg, lane.reserve * math.Clamp(normalSpeed / 600, 0.8, 2.5))
+		local residual = math.max(dmg - structuralBudget, 0)
+		local physicsImpact = {
+			source = "physics",
+			lane = lane.name,
+			residualEnergy = residual,
+		}
 
-		if hitgroup == HITGROUP_LEFTLEG and (dmg * 3 > 0.25) then hg.organism.input_list.llegup(org, bone, dmg * legMul * math.Rand(1, 2), dmgInfo) end--org.lleg = math.min(org.lleg + dmg, 1) end
-		if hitgroup == HITGROUP_RIGHTLEG and (dmg * 3 > 0.25) then hg.organism.input_list.rlegup(org, bone, dmg * legMul * math.Rand(1, 2), dmgInfo) end
-		if hitgroup == HITGROUP_LEFTARM and (dmg * 2 > 0.2) then hg.organism.input_list.larmup(org, bone, dmg * 1 * math.Rand(1, 2), dmgInfo) end
-		if hitgroup == HITGROUP_RIGHTARM and (dmg * 2 > 0.2) then hg.organism.input_list.rarmup(org, bone, dmg * 1 * math.Rand(1, 2), dmgInfo) end
-		if hitgroup == HITGROUP_CHEST and (dmg * 3 > 0.25) then hg.organism.input_list.chest(org, bone, dmg * 3, dmgInfo) end
-		if hitgroup == HITGROUP_STOMACH and (dmg * 3 > 0.25) then hg.organism.input_list.pelvis(org, bone, dmg * 3, dmgInfo) end
-		local physAng = data.PhysObject:GetAngles()
-		
-		if hitgroup == HITGROUP_STOMACH and math.abs(physAng:Forward():Dot(data.HitNormal)) > 0.35 then hg.organism.input_list.spine1(org, bone, dmg * 3, dmgInfo) end -- | И В ПРАВДУ ПОЧЕМУ У НАС СПИНА ЛОМАЕТСЯ ОТ ПАДЕНИЯ НА ГРУДЬ ИЛИ ЖИВОТ...
-		if hitgroup == HITGROUP_CHEST and math.abs(physAng:Forward():Dot(data.HitNormal)) > 0.35 then hg.organism.input_list.spine2(org, bone, dmg * 3, dmgInfo) end
-
-
-		--print(dmg * 3, dmg * 80)
-		if surfaceType and surfaceType ~= nil and bleedSurfaces[surfaceType] and (dmg * 3 > 0.17) and math.random(2) == 2 then
-			hg.organism.AddWoundManual(ent,dmg*5,vector_origin,angle_zero,bonename or "ValveBiped.Bip01_Spine2",CurTime() + (dmg * 250))
-			--PrintTable(org.wounds)
+		if lane.name == "dislocation" then
+			local severity = structuralBudget * math.Clamp(normalSpeed / 500, 0.85, 2.2)
+			if not hg.TryDislocateLimb or not hg.TryDislocateLimb(org, lane.limb, lane.segment, severity) then
+				lane.name = "limb"
+				lane.scale = 2.5
+			end
 		end
-		--print(dmg)
-		addPhysicsInternalBleed(ent, org, hitgroup, dmg)
 
+		if lane.name == "limb" then
+			local limbDamage = structuralBudget * legMul
+			if hitgroup == HITGROUP_LEFTLEG then hg.organism.input_list.llegup(org, bone, limbDamage * math.Rand(1, 2), dmgInfo) end
+			if hitgroup == HITGROUP_RIGHTLEG then hg.organism.input_list.rlegup(org, bone, limbDamage * math.Rand(1, 2), dmgInfo) end
+			if hitgroup == HITGROUP_LEFTARM then hg.organism.input_list.larmup(org, bone, limbDamage * math.Rand(1, 2), dmgInfo) end
+			if hitgroup == HITGROUP_RIGHTARM then hg.organism.input_list.rarmup(org, bone, limbDamage * math.Rand(1, 2), dmgInfo) end
+		elseif lane.name == "chest" then
+			hg.organism.input_list.chest(org, bone, structuralBudget * lane.scale, dmgInfo)
+		elseif lane.name == "pelvis" then
+			hg.organism.input_list.pelvis(org, bone, structuralBudget * lane.scale, dmgInfo)
+		elseif lane.name == "spine1" or lane.name == "spine2" then
+			hg.organism.input_list[lane.name](org, bone, structuralBudget * lane.scale, dmgInfo)
+		end
+
+		if surfaceType and surfaceType ~= nil and bleedSurfaces[surfaceType] and (residual * 3 > 0.17) and math.random(2) == 2 then
+			hg.organism.AddWoundManual(ent,residual*5,vector_origin,angle_zero,bonename or "ValveBiped.Bip01_Spine2",CurTime() + (residual * 250))
+		end
 		org.owner:AddNaturalAdrenaline( math.min( dmg * 0.5, 4) )
 
 		if hitgroup == HITGROUP_HEAD then
@@ -2375,24 +2404,12 @@ local function velocityDamage(ent, data)
 			local headDamageMul = hadhelmet and 0.2 or 1
 			local oldSkull = org.skull
 			local oldSpine3 = org.spine3 or 0
-			local isMeleeHit = dmgInfo:IsDamageType(DMG_CLUB) or dmgInfo:IsDamageType(DMG_SLASH)
-			local skullDmgMul = isMeleeHit and 0.08 or 4.5
-			local cervicalImpact = math.Clamp((normalSpeed - 420) / 700, 0, 1)
-			local headAxis = getHeadImpactAxis(ent)
-			local collisionNormal = isvector(data.HitNormal) and data.HitNormal:GetNormalized()
-			local impactDirection = relativeVelocity:GetNormalized()
-			local axialCollision = headAxis and collisionNormal and math.abs(headAxis:Dot(collisionNormal)) or 0
-			local axialVelocity = headAxis and math.abs(headAxis:Dot(impactDirection)) or 0
-			local cervicalLoad = math.max(axialCollision, axialVelocity)
-			local spine3PhysicsHit = cervicalLoad >= 0.45
-
-			hg.organism.input_list.skull(org, bone, dmg * skullDmgMul * headDamageMul * ragdoll_fall_skull_damage_mul, dmgInfo)
-			hg.organism.input_list.jaw(org, bone, dmg * headDamageMul * ragdoll_fall_jaw_damage_mul, dmgInfo)
-			if spine3PhysicsHit then
-				hg.organism.input_list.spine3(org, bone, dmg * (2.4 + cervicalLoad * 2 + cervicalImpact * 1.2) * (hadhelmet and 0.65 or 1), dmgInfo)
-				if hg.organism.module.concussion and hg.organism.module.concussion.AddConcussion then
-					local concussion = math.Clamp(dmg * (hadhelmet and 0.75 or 1.8), 0.35, 3.5)
-					hg.organism.module.concussion.AddConcussion(org, concussion, math.Clamp(concussion * 8, 6, 36))
+			if lane.name == "spine3" then
+				hg.organism.input_list.spine3(org, bone, structuralBudget * lane.scale * (hadhelmet and 0.65 or 1), dmgInfo)
+			else
+				hg.organism.input_list.skull(org, bone, structuralBudget * lane.scale * headDamageMul * ragdoll_fall_skull_damage_mul, dmgInfo, nil, nil, nil, nil, physicsImpact)
+				if residual > 0.15 then
+					hg.organism.input_list.jaw(org, bone, math.min(residual, 0.8) * headDamageMul * ragdoll_fall_jaw_damage_mul, dmgInfo)
 				end
 			end
 			if oldSpine3 < 0.8 and org.spine3 >= 0.8 and hg.BreakNeck then
@@ -2417,10 +2434,11 @@ local function velocityDamage(ent, data)
 				net.SendPVS(skullImpactPos)
 			end
 
-			if not noDismemberment and !ent.headexploded and dmg * headDamageMul > player_fall_head_gib_threshold then
-				hg.ExplodeHead(ent, dmg * 30, false, data.OurOldVelocity - data.TheirOldVelocity)
+			if not noDismemberment and !ent.headexploded and lane.name == "skull" and structuralBudget * headDamageMul > player_fall_head_gib_threshold then
+				hg.ExplodeHead(ent, structuralBudget * 30, false, data.OurOldVelocity - data.TheirOldVelocity)
 			end
 		end
+		applyPhysicsResidual(ent, org, hitgroup, residual, lane.name)
 	else
 		local sfd = org.fakePlayer and ent or ply
 		if not IsValid(sfd) then return end
