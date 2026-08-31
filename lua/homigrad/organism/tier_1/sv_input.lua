@@ -419,6 +419,24 @@ local function getHeadImpactAxis(ent)
 	return axis:GetNormalized()
 end
 
+local function getBoneAxis(ent, bonename)
+	if not bonename or not ent.LookupBone then return end
+
+	local bone = ent:LookupBone(bonename)
+	if not bone or bone < 0 then return end
+
+	local bonePos = ent:GetBonePosition(bone)
+	local parent = ent:GetBoneParent(bone)
+	local parentPos = parent and parent >= 0 and ent:GetBonePosition(parent)
+	if isvector(bonePos) and isvector(parentPos) then
+		local axis = bonePos - parentPos
+		if axis:LengthSqr() > 1 then return axis:GetNormalized() end
+	end
+
+	local matrix = ent:GetBoneMatrix(bone)
+	return matrix and matrix:GetAngles():Forward():GetNormalized()
+end
+
 local function getGibbedHeadForcePhys(ent, physBone)
 	if not ent.headexploded then return physBone end
 	local bone = ent:TranslatePhysBoneToBone(physBone or 0)
@@ -2113,6 +2131,71 @@ local function addPhysicsInternalBleed(ent, org, hitgroup, dmg)
 
 	local amount = math.min((dmg - physics_internal_bleed_min_damage) * 2, 3)
 	org.internalBleed = math.min((org.internalBleed or 0) + amount, 10)
+end
+
+local function resolvePhysicsImpactLane(ent, hitgroup, bonename, data, relativeVelocity, normalSpeed)
+	local velocityDirection = relativeVelocity:GetNormalized()
+	local collisionNormal = isvector(data.HitNormal) and data.HitNormal:GetNormalized()
+	local normalLoad = collisionNormal and math.abs(velocityDirection:Dot(collisionNormal)) or 1
+
+	if hitgroup == HITGROUP_HEAD then
+		local headAxis = getHeadImpactAxis(ent)
+		local axialLoad = headAxis and math.max(
+			math.abs(headAxis:Dot(velocityDirection)),
+			collisionNormal and math.abs(headAxis:Dot(collisionNormal)) or 0
+		) or 0
+
+		-- A nearly axial, high-speed head-first impact loads the cervical spine.
+		-- Glancing or side-loaded contact stays in the skull lane.
+		if axialLoad >= 0.78 and normalSpeed >= 540 then
+			return {name = "spine3", reserve = 0.9, scale = 3.2, axialLoad = axialLoad}
+		end
+
+		return {name = "skull", reserve = 0.8, scale = 4.5, axialLoad = axialLoad}
+	end
+
+	local limb = hitgrouptolimb[hitgroup]
+	if limb then
+		local axis = getBoneAxis(ent, bonename)
+		local shearLoad = axis and (1 - math.abs(axis:Dot(velocityDirection))) or 0
+		local segment = (string.find(string.lower(bonename or ""), "forearm", 1, true) or string.find(string.lower(bonename or ""), "calf", 1, true)) and "down" or "up"
+
+		-- A sideways pull is a joint injury; force along the bone is a fracture.
+		if shearLoad >= 0.62 and normalSpeed >= 360 then
+			return {name = "dislocation", limb = limb, segment = segment, reserve = 0.4, scale = 1.25, shearLoad = shearLoad}
+		end
+
+		return {name = "limb", limb = limb, segment = segment, reserve = 0.55, scale = 2.5, shearLoad = shearLoad}
+	end
+
+	if hitgroup == HITGROUP_CHEST or hitgroup == HITGROUP_STOMACH then
+		local physAng = IsValid(data.PhysObject) and data.PhysObject:GetAngles()
+		local axialLoad = physAng and collisionNormal and math.abs(physAng:Forward():Dot(collisionNormal)) or 0
+		if axialLoad >= 0.72 and normalSpeed >= 480 then
+			return {name = hitgroup == HITGROUP_CHEST and "spine2" or "spine1", reserve = 0.7, scale = 2.8, axialLoad = axialLoad}
+		end
+
+		return {name = hitgroup == HITGROUP_CHEST and "chest" or "pelvis", reserve = 0.55, scale = 2.2, axialLoad = axialLoad}
+	end
+
+	return {name = "soft", reserve = 0.25, scale = 1}
+end
+
+local function applyPhysicsResidual(ent, org, hitgroup, residual, lane)
+	if residual <= 0 then return end
+
+	-- Structural damage owns the break/dislocation response. These effects only
+	-- represent force that was not consumed by that structural response.
+	org.painadd = math.min((org.painadd or 0) + residual * 5, 150)
+	org.shock = math.min((org.shock or 0) + residual * 3.5, 95)
+
+	if hitgroup == HITGROUP_CHEST or hitgroup == HITGROUP_STOMACH then
+		addPhysicsInternalBleed(ent, org, hitgroup, residual)
+	elseif lane == "skull" and (org.skull or 0) >= 0.7 and hg.organism.AddBrainHemorrhage then
+		-- A broken skull can bleed into the cranial vault, but only from energy
+		-- left after the selected skull lane has been resolved.
+		hg.organism.AddBrainHemorrhage(org, math.Clamp(residual * 0.025, 0.01, 0.12), math.Clamp(residual * 0.0008, 0.0002, 0.004))
+	end
 end
 
 local function velocityDamage(ent, data)
