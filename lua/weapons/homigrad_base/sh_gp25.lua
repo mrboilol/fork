@@ -331,22 +331,41 @@ else
 	end)
 end
 
-local basePrimaryAttack = SWEP.PrimaryAttack
+local basePrimaryAttack = SWEP.HGGP25BasePrimaryAttack or SWEP.PrimaryAttack
+SWEP.HGGP25BasePrimaryAttack = basePrimaryAttack
 function SWEP:PrimaryAttack(...)
 	if (self.GP25NextAction or 0) > CurTime() then return end
 	if self:IsGP25Active() then
 		if CLIENT then return end
 		return self:GP25PrimaryAttack()
 	end
-	return basePrimaryAttack(self, ...)
+	if isfunction(basePrimaryAttack) and basePrimaryAttack ~= self.PrimaryAttack then
+		return basePrimaryAttack(self, ...)
+	end
+
+	return false
 end
 
-local baseReload = SWEP.Reload
+local baseReload = SWEP.HGGP25BaseReload or SWEP.HGBaseReload or SWEP.Reload
+SWEP.HGGP25BaseReload = baseReload
 function SWEP:Reload(...)
 	if (self.GP25NextAction or 0) > CurTime() then return end
 	if self:IsGP25Active() then
 		if CLIENT then return end
 		return self:GP25Reload()
 	end
-	return baseReload(self, ...)
+	if isfunction(baseReload) and baseReload ~= self.Reload then
+		return baseReload(self, ...)
+	end
+
+	local baseClass = self.BaseClass
+	while istable(baseClass) do
+		local inheritedReload = baseClass.Reload
+		if isfunction(inheritedReload) and inheritedReload ~= self.Reload then
+			return inheritedReload(self, ...)
+		end
+		baseClass = baseClass.BaseClass
+	end
+
+	return false
 end

@@ -515,6 +515,24 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 	local jawDelta = math.max(org.jaw - oldDmg, 0)
 	org.teethLost = math.Clamp(org.teethLost or 0, 0, 32)
 
+	local jawPain = math.Clamp(incomingDmg * 8 + jawDelta * 22, 0, 30)
+	org.painadd = math.min((org.painadd or 0) + jawPain, 150)
+	org.avgpain = math.min((org.avgpain or 0) + jawPain * 0.3, 150)
+	org.shock = math.min((org.shock or 0) + jawPain * 0.35, 95)
+
+	if org.consciousness then
+		local consciousnessDrain = math.Clamp(incomingDmg * 0.015 + jawDelta * 0.18, 0, 0.18)
+		org.consciousness = math.max(org.consciousness - consciousnessDrain, 0)
+	end
+
+	if org.alive and not org.otrub and incomingDmg > 0.25 then
+		local knockoutChance = math.Clamp(incomingDmg * 0.04 + jawDelta * 0.35, 0, 0.28)
+		if math.Rand(0, 1) < knockoutChance then
+			org.needotrub = true
+			org.consciousness = math.min(org.consciousness or 1, 0.18)
+		end
+	end
+
 	if jawDelta > 0 and incomingDmg >= 0.12 and org.teethLost < 32 then
 		local typeMul = 0.35
 		if bit.band(rawDamageType, DMG_CLUB) ~= 0 then
@@ -716,56 +734,9 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 
 	org.disorientation = math.min(org.disorientation + (isCrush(dmgInfo) and dmg * 1 or dmg * 1), 1.5)
 
-	-- Realistic head trauma:
-	--  - A helmet diffuses the blow: most of a weak/glancing hit is soaked up, so it
-	--    mostly just rings (tinnitus) and barely concusses. You need a really solid
-	--    impact to get through it.
-	--  - A bare head is the dangerous case: the same hit reaches the skull directly and
-	--    concusses far more easily and severely.
-	--  - A light tap on the head (weak melee) is not a concussion either way.
 	local hasHelmet = org.owner.armors and org.owner.armors["head"] != nil
-	local effectiveDmg = hasHelmet and dmg * 0.3 or dmg
-	local isBlunt = dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH)
-
-	-- Blunt melee (DMG_CLUB/DMG_CRUSH) is the classic cause of real concussions:
-	-- a club, baton or fist to the head rattles the brain without breaking the
-	-- skull. It concusses at a much lower threshold and higher chance than a
-	-- bullet/blast would, because the force is transferred over a wider area.
-	-- Bullets/explosions keep the old, harder threshold (effectiveDmg > 7).
-	local concThreshold = isBlunt and 3 or 7
-	if not ignoreBrainDamage and effectiveDmg > concThreshold then
-		local baseChance, intensity
-		if isBlunt then
-			-- blunt: generous chance even at moderate blows, lower ceiling
-			baseChance = math.Clamp((effectiveDmg - 3) / 18, 0.2, 0.95)
-			intensity = math.Clamp(effectiveDmg * 0.4, 0.4, hasHelmet and 1.5 or 3.0)
-		else
-			-- chance + severity grow with how hard the (post-helmet) impact is
-			baseChance = math.Clamp((effectiveDmg - 7) / 30, 0.12, 0.97)
-			intensity = math.Clamp(effectiveDmg * 0.32, 0.5, hasHelmet and 1.2 or 4.0)
-		end
-
-		if math.random() < baseChance then
-			hg.organism.module.concussion.AddConcussion(org, intensity, math.Clamp(intensity * 6, 6, 50))
-		else
-			hg.organism.module.concussion.AddConcussion(org, intensity * 0.35, math.Clamp(intensity * 3, 4, 18))
-		end
-	elseif not ignoreBrainDamage then
-		-- Light blow: no real concussion. Helmet just rings, bare head a tiny daze.
-		if org.isPly then
-			local targetPlayer = org.owner
-			if IsValid(org.owner.FakeRagdoll) then
-				local ragdoll = org.owner.FakeRagdoll
-				if IsValid(ragdoll.ply) then targetPlayer = ragdoll.ply end
-			end
-			if IsValid(targetPlayer) and targetPlayer:IsPlayer() then
-				if hasHelmet then
-					targetPlayer:PlayCustomTinnitus("headhit.mp3")
-				else
-					org.disorientation = math.min(org.disorientation + math.Clamp(effectiveDmg * 0.08, 0, 0.25), 1.5)
-				end
-			end
-		end
+	if hg.organism.module.concussion and hg.organism.module.concussion.AddHeadTrauma then
+		hg.organism.module.concussion.AddHeadTrauma(org, org.skull - oldDmg, org.brain - oldBrain, dmg, dmgInfo)
 	end
 
 	if not ignoreBrainDamage and not isStab and dmg > 0.05 then

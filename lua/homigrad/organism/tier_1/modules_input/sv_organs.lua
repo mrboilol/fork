@@ -224,6 +224,9 @@ local function damageBrainLobe(org, bone, dmg, dmgInfo, key)
 	org.brain = math.min((org.brain or 0) + (getBrainLobeDamage(org) - oldBrainLobeDamage) * 1.5, 1)
 	org.consciousness = math.Approach(org.consciousness, 0, delta * profile.consciousness)
 	org.disorientation = org.disorientation + delta * profile.disorientation
+	if hg.organism.module.concussion and hg.organism.module.concussion.AddHeadTrauma then
+		hg.organism.module.concussion.AddHeadTrauma(org, 0, delta, dmg, dmgInfo)
+	end
 	if delta > 0 then
 		org.shock = org.shock + dmg * profile.shock
 		org.painadd = org.painadd + dmg * profile.pain
@@ -314,6 +317,27 @@ local function getlocalshit(owner, hitEnt, bone, dir, hit)
 	local localPos, localAng = WorldToLocal(dmgPos, angZero, bonePos, boneAng)
 	local _, dir2 = WorldToLocal(vecZero, dir:Angle(), vecZero, boneAng)
 	return localPos, localAng, dir2:Forward(), ent:GetBoneName(boneID)
+end
+
+local function emitArterialImpact(owner, wound)
+	if not IsValid(owner) or not wound then return end
+	local body = getWoundBody(owner)
+	if not IsValid(body) then return end
+	local bone = body:LookupBone(wound[4] or "")
+	local matrix = bone and bone >= 0 and body:GetBoneMatrix(bone)
+	local pos, normal = body:WorldSpaceCenter(), vector_up
+	if matrix then
+		pos = LocalToWorld(wound[2] or vector_origin, wound[3] or angle_zero, matrix:GetTranslation(), matrix:GetAngles())
+		normal = matrix:GetAngles():Forward()
+	end
+
+	local effect = EffectData()
+	effect:SetOrigin(pos)
+	effect:SetNormal(normal)
+	effect:SetMagnitude(2)
+	effect:SetScale(1.2)
+	effect:SetRadius(3)
+	util.Effect("BloodImpact", effect, true, true)
 end
 
 local arterySize = {
@@ -440,8 +464,10 @@ hitArtery = function(artery, org, dmg, dmgInfo, boneindex, dir, hit, impact, for
 		localPos, localAng, dir2 = vecZero, angZero, Vector(-1, 0, 0)
 	end
 	local wound = {arterySize[artery], localPos, localAng, woundBone or boneindex, CurTime(), dir2 * 100, artery, chooseArterialBleedStyle(artery)}
+	wound.visualBleedRate = math.max((arterySize[artery] or 6) * 0.75, 1)
 	table.insert(org.arterialwounds, wound)
 	hg.organism.MarkArterialWoundsNetDirty(org)
+	emitArterialImpact(owner, wound)
 	--if IsValid(owner:GetNWEntity("RagdollDeath")) then owner:GetNWEntity("RagdollDeath"):SetNetVar("wounds",org.arterialwounds) end
 	return 0
 end

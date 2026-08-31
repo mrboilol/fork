@@ -1083,7 +1083,9 @@ end
 local function getWoundVisualRate(org, wound, index, arterial)
 	local rates = arterial and org.arterialWoundBleedRates or org.woundBleedRates
 	local liveRate = rates and tonumber(rates[index])
-	if liveRate then return math.max(liveRate, 0) end
+	if liveRate and liveRate > 0.01 then return liveRate end
+	local woundRate = tonumber(wound.visualBleedRate)
+	if woundRate and woundRate > 0.01 then return woundRate end
 	local severity = math.max(tonumber(wound[1]) or 0, 0)
 	local totalRate = arterial and tonumber(org.arterialBleed) or tonumber(org.venousBleed)
 	return math.max(totalRate or severity * (arterial and 2.25 or 0.24), 0)
@@ -1170,10 +1172,13 @@ local function emitArterialBleeding(ent, org, wound, pos, dir, water, visualRate
 			hg.addBloodPart(pos + VectorRand(-0.2, 0.2), vel, nil, size, size, true, nil, ent)
 		end
 	else
-		local count = math.Clamp(math.floor(7 + rateK * 8), 7, 15)
+		local streamPressure = math.Clamp(pressureDrive * 0.35, 0.08, 0.55)
+		local count = math.Clamp(math.floor(15 + rateK * 12), 15, 27)
 		for _ = 1, count do
-			local vel = outward * math.Rand(70, 190) * pressureDrive + VectorRand() * math.Rand(45, 145) * pressureDrive * pulseDrive + vector_up * math.Rand(-20, 55)
-			local size = math.Rand(0.7, 2.7) * arterySizeMul
+			local vel = bleedDown * math.Rand(24, 58 + rateK * 24)
+				+ outward * math.Rand(12, 46) * streamPressure
+				+ VectorRand(-14, 14)
+			local size = math.Rand(0.55, 1.8 + rateK * 0.9) * arterySizeMul
 			hg.addBloodPart(pos + VectorRand(-1, 1), vel, nil, size, size, true, nil, ent)
 		end
 	end
@@ -1294,14 +1299,16 @@ end
 hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, ent, time)
 	--local ent = IsValid(ply.FakeRagdoll) and ply.FakeRagdoll or ply
 	--print(ply,ent,ply.organism.owner,ply.new_organism.owner)
-	local organism = ply.organism
-	local new_organism = ply.new_organism
+	local organism = ply.organism or ply.new_organism or ent.organism or ent.new_organism
+	local new_organism = ply.new_organism or ent.new_organism or organism
 	
 	local seen = ent.shouldTransmit-- and not ent.NotSeen
-	local wounds = ent.wounds or ply.wounds
-	local arterialwounds = ent.arterialwounds or ply.arterialwounds
+	local wounds = ent.wounds
+	if not istable(wounds) or #wounds == 0 then wounds = ply.wounds end
+	local arterialwounds = ent.arterialwounds
+	if not istable(arterialwounds) or #arterialwounds == 0 then arterialwounds = ply.arterialwounds end
 
-	local org = ent.organism
+	local org = ent.organism or ent.new_organism or organism
 
 	if !org then return end
 
@@ -1388,7 +1395,11 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 	
 	hg.LerpVariables(FrameTime() * 10, organism, new_organism)
 	
-	local org = ent.organism or {}
+	local org = ent.new_organism
+	if not org or org.blood == nil then org = ent.organism end
+	if not org or org.blood == nil then org = ply.new_organism end
+	if not org or org.blood == nil then org = ply.organism end
+	org = org or {}
 	local owner = ent
 	
 	

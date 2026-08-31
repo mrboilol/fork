@@ -534,6 +534,8 @@ function SWEP:Reload(time)
 	self.dwr_reverbDisable = true
 end
 
+SWEP.HGBaseReload = SWEP.Reload
+
 function SWEP:ReloadStart()
 	if not IsValid(self:GetOwner()) then return end
 	--self:SetHold(self.ReloadHold or self.HoldType)

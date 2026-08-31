@@ -83,6 +83,8 @@ function SWEP:Reload(time)
 	net.Broadcast()
 end
 
+SWEP.HGBaseReload = SWEP.Reload
+
 function SWEP:OnCantReload()
 
 end

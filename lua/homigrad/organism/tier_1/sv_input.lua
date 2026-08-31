@@ -703,6 +703,32 @@ local function chooseWoundBleedStyle(severity)
 	return math.Rand(0, 1) < venousChance and 2 or 1
 end
 
+local function emitWoundImpact(ent, wound)
+	if not IsValid(ent) or not wound then return end
+	local body = ent
+	if ent:IsPlayer() and hg.GetCurrentCharacter then
+		local current = hg.GetCurrentCharacter(ent)
+		if IsValid(current) then body = current end
+	end
+	if not IsValid(body) then return end
+
+	local bone = body:LookupBone(wound[4] or "")
+	local matrix = bone and bone >= 0 and body:GetBoneMatrix(bone)
+	local pos, normal = body:WorldSpaceCenter(), vector_up
+	if matrix then
+		pos = LocalToWorld(wound[2] or vector_origin, wound[3] or angle_zero, matrix:GetTranslation(), matrix:GetAngles())
+		normal = matrix:GetAngles():Forward()
+	end
+
+	local effect = EffectData()
+	effect:SetOrigin(pos)
+	effect:SetNormal(normal)
+	effect:SetMagnitude(1)
+	effect:SetScale(0.8)
+	effect:SetRadius(2)
+	util.Effect("BloodImpact", effect, true, true)
+end
+
 function hg.organism.AddWound(ent, tr, bone, dmgInfo, dmgPos, dmgBlood, inputHole, outputHole)
 	local org = ent.organism
 	if org.superfighter then return end
@@ -728,13 +754,14 @@ function hg.organism.AddWound(ent, tr, bone, dmgInfo, dmgPos, dmgBlood, inputHol
 			if #org.wounds < 30 then
 				local severity = dmgBlood / 2
 				local wound = {severity, localPos, localAng, ent:GetBoneName(bone), CurTime(), chooseWoundBleedStyle(severity)}
+				wound.visualBleedRate = math.max(severity * 0.24, 0.1)
 				table.insert(org.wounds, wound)
 			else
 				if org.wounds[1] then org.wounds[1][1] = org.wounds[1][1] + dmgBlood / 2 end
 			end
 			
 			table.sort(org.wounds, function(a, b) return a[1] > b[1] end)
-			
+
 			hg.organism.MarkWoundsNetDirty(org, true)
 		end
 	end
@@ -750,14 +777,19 @@ function hg.organism.AddWoundManual(ent,dmgBlood,localPos,localAng,bone,time)
 	if #org.wounds < 30 then
 		local severity = dmgBlood / 2
 		wound = {severity, localPos, localAng, bone, time, chooseWoundBleedStyle(severity)}
+		wound.visualBleedRate = math.max(severity * 0.24, 0.1)
 		table.insert(org.wounds, wound)
 	else
-		if org.wounds[1] then org.wounds[1][1] = org.wounds[1][1] + dmgBlood / 2 end
+		if org.wounds[1] then
+			org.wounds[1][1] = org.wounds[1][1] + dmgBlood / 2
+			wound = org.wounds[1]
+		end
 	end
 	
 	table.sort(org.wounds, function(a, b) return a[1] > b[1] end)
 
 	hg.organism.MarkWoundsNetDirty(org, true)
+	emitWoundImpact(ent, wound)
 	return wound
 end
 
@@ -2246,7 +2278,7 @@ local function velocityDamage(ent, data)
 
 		--print(dmg * 3, dmg * 80)
 		if surfaceType and surfaceType ~= nil and bleedSurfaces[surfaceType] and (dmg * 3 > 0.17) and math.random(2) == 2 then
-			hg.organism.AddWoundManual(ent,dmg*5,vector_origin,angle_zero,bone,CurTime() + (dmg * 250))
+			hg.organism.AddWoundManual(ent,dmg*5,vector_origin,angle_zero,bonename or "ValveBiped.Bip01_Spine2",CurTime() + (dmg * 250))
 			--PrintTable(org.wounds)
 		end
 		--print(dmg)

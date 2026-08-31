@@ -106,8 +106,8 @@ local chestOrgansLower = {"liver", "stomach", "intestines"}
 local brainLobes = {"brainFrontal", "brainParietal", "brainTemporal", "brainOccipital"}
 
 local lodgedExtractionBleed = {
-	limb = {min = 95, max = 145},
-	vital = {min = 125, max = 175},
+	limb = {min = 150, max = 235},
+	vital = {min = 210, max = 330},
 }
 
 local function lodgedTransform(owner, entry)
@@ -148,9 +148,9 @@ local function showExtractionBlood(owner, entry)
 	local effect = EffectData()
 	effect:SetOrigin(pos)
 	effect:SetNormal(ang:Forward())
-	effect:SetMagnitude(2)
-	effect:SetScale(1.4)
-	effect:SetRadius(4)
+	effect:SetMagnitude(4)
+	effect:SetScale(2.2)
+	effect:SetRadius(6)
 	util.Effect("BloodImpact", effect, true, true)
 	util.Decal("Blood", pos + ang:Forward() * 5, pos - ang:Forward() * 7, body)
 end
@@ -211,12 +211,12 @@ function hg.ApplyLodgedExtraction(owner, extractor, entry)
 	org.painadd = math.min((org.painadd or 0) + math.Rand(14, 22), 150)
 
 	local direction = isangle(worldAng) and worldAng:Forward() or vector_up
-	if region == "neck" and math.Rand(0, 1) < 0.04 then
+	if region == "neck" and math.Rand(0, 1) < 0.12 then
 		cutCarotid(owner, org, worldPos or owner:WorldSpaceCenter(), direction, extractor)
 	elseif region == "head" then
 		org.brain = math.min((tonumber(org.brain) or 0) + math.Rand(0.002, 0.006), 1)
 		if math.Rand(0, 1) < 0.08 then damageBrainLobe(org) end
-	elseif region == "chest" and math.Rand(0, 1) < 0.12 then
+	elseif region == "chest" and math.Rand(0, 1) < 0.24 then
 		addInternalBleed(org, math.Rand(0.04, 0.14))
 	end
 end

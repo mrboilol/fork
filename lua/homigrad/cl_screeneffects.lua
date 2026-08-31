@@ -322,12 +322,9 @@ local O2Lerp = 0
 local dyingAudioFade = 0
 local ischemicVignetteLerp = 0
 local lowOxygenVignetteLerp = 0
-local shockVignetteLerp = 0
 local consciousnessVignetteLerp = 0
 local otrubVisualLerp = 0
 local OTRUB_CONSCIOUSNESS_THRESHOLD = 0.3
-local SHOCK_CONSCIOUSNESS_THRESHOLD = 25
-local SHOCK_CONSCIOUSNESS_MAX = 85
 local collapseVisualLerp = 0
 local collapseBlinkLerp = 0
 local nextCollapseBlink = 0
@@ -374,7 +371,6 @@ O2Lerp = 0
 dyingAudioFade = 0
 ischemicVignetteLerp = 0
 lowOxygenVignetteLerp = 0
-shockVignetteLerp = 0
 consciousnessVignetteLerp = 0
 otrubVisualLerp = 0
 collapseVisualLerp = 0
@@ -675,7 +671,6 @@ local function stopthings()
 	PanicStationVolume = 0
 	O2Lerp = 0
 	lowOxygenVignetteLerp = 0
-	shockVignetteLerp = 0
 	consciousnessVignetteLerp = 0
 	otrubVisualLerp = 0
 	collapseVisualLerp = 0
@@ -940,18 +935,22 @@ drawFinalVitalsVignettes = function()
 	if IsValid(lply:GetNWEntity("spect")) then return end
 
 	local org = lply.new_organism or lply.organism
-	if not org or not org.brain or not org.o2 or not isnumber(org.o2[1]) or not org.analgesia then return end
+	if not org or not org.brain then return end
 	local excruciatingBlend = getServerSoundMode("hg_painsound", 6) == 6
 		and getPainLayerBlend(org.pain or 0, painExcruciatingThreshold)
 		or 0
 	painThresholdIntensityLerp = LerpFT(painLayerFadeLerp, painThresholdIntensityLerp or 1, 1 + excruciatingBlend * painEffectIntensity)
 
-	if PainLerp > 0.001 or (org.pain or 0) > 5 then
+	local renderedShock = math.max(tonumber(shockLerp) or tonumber(org.shock) or 0, 0)
+	if PainLerp > 0.001 or (org.pain or 0) > 5 or renderedShock > 5 or org.otrub then
 		local strobe = getPainPulse(org)
 		local pain = math.max((PainLerp + strobe) * painThresholdIntensityLerp, math.max((org.pain or 0) - 5, 0))
 		local painSeverity = math.Clamp(pain / painThresholdMax, 0, 1.35)
 		local painBorder = math.Clamp(painSeverity ^ 0.78 * 2.2, 0, 2.2)
 		local painCoverage = math.Clamp(painSeverity ^ 0.72 * 6, 0, 6)
+		local shockVignette = (pain / 32 + math.max(renderedShock - 5, 0) / 2.4) * painEffectIntensity
+		painBorder = math.max(painBorder, shockVignette)
+		painCoverage = math.max(painCoverage, shockVignette)
 		if otrubVisualLerp > 0.005 then
 			painBorder = Lerp(otrubVisualLerp, painBorder, math.min(painBorder, 0.48))
 			painCoverage = Lerp(otrubVisualLerp, painCoverage, math.max(math.min(painCoverage, 3), 1.5))
@@ -968,14 +967,17 @@ drawFinalVitalsVignettes = function()
 		painMat:SetFloat("$c2_x", CurTime() + 10000)
 		painMat:SetFloat("$c0_y", math.Clamp(0.3 + painSeverity * 0.65, 0.3, 0.95))
 		painMat:SetFloat("$c0_z", math.Clamp(0.85 + painSeverity * 1.4, 0.85, 2.75))
-		local grainCoverage = math.Clamp(painSeverity ^ 0.8 * 1.25, 0, 1.25)
+		local grainCoverage = math.max(
+			math.Clamp(painSeverity ^ 0.8 * 1.25, 0, 1.25),
+			math.Clamp(pain / 70, 0, 0.95)
+		)
 		painMat:SetFloat("$c1_x", grainCoverage)
 		painMat:SetFloat("$c1_y", grainCoverage)
 		render.SetMaterial(painMat)
 		render.DrawScreenQuad()
 	end
 
-	local oxygen = math.Clamp(tonumber(org.o2[1]) or 30, 0, 30)
+	local oxygen = math.Clamp(tonumber(org.o2 and org.o2[1]) or 30, 0, 30)
 	local brainOxygen = math.Clamp(tonumber(org.brainoxygen) or 1, 0, 1)
 	local blood = math.Clamp(tonumber(org.blood) or 5000, 0, 5000)
 	local activeBleed = math.Clamp((tonumber(org.bleed) or 0) / 10, 0, 1)
@@ -1031,20 +1033,9 @@ drawFinalVitalsVignettes = function()
 		bloodLossSeverity * 0.5 + consciousnessSeverity * 0.55
 	), 0, 1)
 
-	local medication = math.max((tonumber(org.analgesia) or 0) + (tonumber(org.painkiller) or 0) * 0.3, 0)
-	local shockDrainThreshold = SHOCK_CONSCIOUSNESS_THRESHOLD * (medication * 4 + 1)
-	local shockOtrubLevel = shockDrainThreshold + (SHOCK_CONSCIOUSNESS_MAX - shockDrainThreshold) * 0.4
-	local shockVignetteProgress = math.Clamp((shock - shockDrainThreshold) / math.max(shockOtrubLevel - shockDrainThreshold, 1), 0, 1)
-	local shockConsciousnessProgress = math.Clamp((0.5 - consciousness) / (0.5 - OTRUB_CONSCIOUSNESS_THRESHOLD), 0, 1) ^ 2
-	local lowConsciousnessShockVignette = math.Clamp((0.64 - visualConsciousness) / (0.64 - OTRUB_CONSCIOUSNESS_THRESHOLD), 0, 1) ^ 1.35
 	local oxygenVignetteTarget = oxygenSeverity
-	local shockVignetteTarget = math.max(
-		shockVignetteProgress ^ 1.8 * Lerp(shockConsciousnessProgress, 1.6, 5),
-		lowConsciousnessShockVignette * 3.8
-	)
 	local consciousnessVignetteTarget = consciousnessSeverity
 	lowOxygenVignetteLerp = LerpFT(0.025, lowOxygenVignetteLerp, oxygenVignetteTarget)
-	shockVignetteLerp = LerpFT(0.025, shockVignetteLerp, shockVignetteTarget)
 	consciousnessVignetteLerp = LerpFT(0.028, consciousnessVignetteLerp, consciousnessVignetteTarget)
 	otrubVisualLerp = LerpFT(org.otrub and 0.018 or 0.012, otrubVisualLerp, org.otrub and 1 or 0)
 	collapseVisualLerp = LerpFT(0.03, collapseVisualLerp, collapseSeverity)
@@ -1053,17 +1044,6 @@ drawFinalVitalsVignettes = function()
 		math.Clamp((0.62 - consciousness) / 0.52, 0, 1),
 		brainDamageSeverity
 	)
-
-	if shockVignetteLerp > 0.005 then
-		local shockCoverage = math.Clamp(shockVignetteLerp, 0, 4.25)
-		local shockBorder = math.Clamp((shockCoverage / 1.8) ^ 0.78 * 0.86, 0, 0.86)
-		render.UpdateScreenEffectTexture()
-		vignetteMat:SetFloat("$c2_x", CurTime() + 9750)
-		vignetteMat:SetFloat("$c0_z", shockBorder)
-		vignetteMat:SetFloat("$c1_y", shockCoverage)
-		render.SetMaterial(vignetteMat)
-		render.DrawScreenQuad()
-	end
 
 	if consciousnessVignetteLerp > 0.005 then
 		local consciousnessBorder = math.Clamp(consciousnessVignetteLerp ^ 0.82, 0, 1)
@@ -1249,7 +1229,7 @@ drawFinalVitalsVignettes = function()
 
 	local consciousnessBlackout = math.Clamp((0.48 - consciousness) / (0.48 - OTRUB_CONSCIOUSNESS_THRESHOLD), 0, 1) ^ 1.55
 	local otrubOxygenReveal = math.Clamp(oxygenSeverity * 0.55 + severeOxygenTail * 0.65, 0, 1)
-	local blackoutAlpha = org.otrub and Lerp(otrubOxygenReveal, 252, 188) or consciousnessBlackout * 242
+	local blackoutAlpha = org.otrub and Lerp(otrubOxygenReveal, 252, 188) or consciousnessBlackout * 255
 	if blackoutAlpha > 0.5 then
 		surface.SetDrawColor(0, 0, 0, math.Clamp(blackoutAlpha, 0, 255))
 		surface.DrawRect(0, 0, ScrW(), ScrH())

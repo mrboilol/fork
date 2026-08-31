@@ -419,7 +419,7 @@ hg.GenderedPainScreamSounds = {
 }
 local painScreamRestartFade = 0.8
 local painScreamEndFade = 0.05
-local painScreamChance = 0.52
+local painScreamChance = 0.75
 local silentCombatClasses = {
 	arena_cleaner = true,
 	terrorist = true,
@@ -570,12 +570,19 @@ hook.Add("HomigradDamage", "HG_PainScreamDamage", function(ply, dmgInfo)
 	if !canPainScream(ply) then return end
 
 	local dmg = dmgInfo:GetDamage()
+	local amount
 
-	if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) and dmg >= 8 then
-		hg.QueuePainScream(ply, mClamp(dmg / 20, 0.75, 1.35))
-	elseif dmgInfo:IsDamageType(DMG_BLAST) and dmg >= 10 then
-		hg.QueuePainScream(ply, mClamp(dmg / 16, 1, 1.75))
+	if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) and dmg >= 6 then
+		amount = mClamp(dmg / 18, 0.75, 1.5)
+	elseif dmgInfo:IsDamageType(DMG_BLAST) and dmg >= 7 then
+		amount = mClamp(dmg / 14, 0.9, 1.8)
+	elseif dmgInfo:IsDamageType(DMG_SLASH) and dmg >= 4 then
+		amount = mClamp(dmg / 12, 0.7, 1.5)
+	elseif dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH + DMG_VEHICLE + DMG_FALL) and dmg >= 7 then
+		amount = mClamp(dmg / 14, 0.7, 1.6)
 	end
+
+	if amount then hg.QueuePainScream(ply, amount) end
 end)
 
 hook.Add("Org Think", "HG_PainScreamThink", function(owner, org)
@@ -591,17 +598,17 @@ hook.Add("Org Think", "HG_PainScreamThink", function(owner, org)
 		org.painScreamQueue = math.max((org.painScreamQueue or 0) - 1, 0)
 
 		if playPainScream(owner) then
-			org.painScreamNext = time + math.Rand(3, 4)
+			org.painScreamNext = time + math.Rand(2.25, 3.25)
 			org.genderedPainScreamNext = math.max(org.genderedPainScreamNext or 0, time + 8)
 		else
 			org.painScreamNext = time + 1
 		end
 	end
 
-	if (org.pain or 0) < 75 or owner.painScreamPatch or (org.genderedPainScreamNext or 0) > time then return end
+	if (org.pain or 0) < 65 or owner.painScreamPatch or (org.genderedPainScreamNext or 0) > time then return end
 	local phrases = hg.GenderedPainScreamSounds[ThatPlyIsFemale(owner) and "female" or "male"]
 	if playPainScream(owner, phrases, true) then
-		org.genderedPainScreamNext = time + math.Rand(10, 14)
+		org.genderedPainScreamNext = time + math.Rand(7, 10)
 	else
 		org.genderedPainScreamNext = time + 2
 	end

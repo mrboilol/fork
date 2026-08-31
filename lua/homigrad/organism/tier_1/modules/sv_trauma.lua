@@ -528,6 +528,24 @@ function module.AddImmediateConcussion(org, intensity)
     return org.concussion - before
 end
 
+function module.AddHeadTrauma(org, skullDamage, brainDamage, impactDamage, dmgInfo)
+    if not org then return 0 end
+    if hg.organism.IsBrainDamageIgnored and hg.organism.IsBrainDamageIgnored(org) then return 0 end
+
+    skullDamage = math.max(tonumber(skullDamage) or 0, 0)
+    brainDamage = math.max(tonumber(brainDamage) or 0, 0)
+    impactDamage = math.max(tonumber(impactDamage) or 0, 0)
+
+    local concussion = skullDamage * 2.4 + brainDamage * 5.5 + math.Clamp(impactDamage * 0.04, 0, 1.5)
+    if skullDamage > 0.015 then concussion = concussion + 0.18 end
+    if brainDamage > 0.005 then concussion = concussion + 0.3 end
+    if concussion <= 0 then return 0 end
+
+    local duration = math.Clamp(concussion * 7, 5, 50)
+    module.AddConcussion(org, math.Clamp(concussion, 0.2, 4.5), duration)
+    return concussion
+end
+
 function module.AddConcussion(org, intensity, duration)
     if not org then return end
     if not org.concussion then org.concussion = 0 end

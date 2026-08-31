@@ -540,6 +540,13 @@ local function get_status_message(ply)
 	local adrenaline = org.adrenaline or 0
 	local arrhythmia = org.arrhythmia or 0
 	local hypotension = org.hypotension or 0
+	local arrhythmiaActive = org.fibrillation or org.unstableRhythm or arrhythmia > 0.35
+	local arrhythmiaStatusStreak = org.arrhythmia_status_streak or 0
+	if not arrhythmiaActive and arrhythmiaStatusStreak > 0 then
+		org.arrhythmia_status_streak = 0
+		arrhythmiaStatusStreak = 0
+	end
+	local suppressArrhythmiaStatus = arrhythmiaActive and arrhythmiaStatusStreak >= 2
 	local positive_thinking = goodmood and goodmood > 0.5
 
 	if fear >= 1.0 and math.random(10) > 3 then
@@ -581,7 +588,7 @@ local function get_status_message(ply)
 		most_wanted_phraselist = sharp_pain
 	elseif pain > 75 then
 		most_wanted_phraselist = audible_pain
-	elseif org.fibrillation or org.unstableRhythm or arrhythmia > 0.35 then
+	elseif not suppressArrhythmiaStatus and arrhythmiaActive then
 		most_wanted_phraselist = arrhythmia_phrases
 	elseif heartbeat >= 150 then
 		most_wanted_phraselist = tachycardia_phrases
@@ -655,6 +662,11 @@ local function get_status_message(ply)
 		str = most_wanted_phraselist[phraseIndex]
 		org.recent_status_phrases[str] = CurTime()
 		org.last_status_phrase = str
+		if most_wanted_phraselist == arrhythmia_phrases then
+			org.arrhythmia_status_streak = arrhythmiaStatusStreak + 1
+		else
+			org.arrhythmia_status_streak = 0
+		end
 
 		-- Keep only a short rolling memory so a pool eventually becomes reusable.
 		local recentCount = 0
