@@ -7,6 +7,7 @@ SWEP.Spawnable = false
 SWEP.AdminOnly = true
 SWEP.ReloadTime = 1
 SWEP.ReloadSound = "weapons/smg1/smg1_reload.wav"
+SWEP.HoldType = "rpg"
 SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/m14/handling/m14_empty.ogg", 75, 100, 105, CHAN_WEAPON, 2}
 SWEP.Primary.Wait = 0.1
 SWEP.Primary.Next = 0

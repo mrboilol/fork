@@ -402,7 +402,7 @@ end
 
 local function applySkullTinnitus(targetPlayer, skullDamage, impactDamage)
 	if not IsValid(targetPlayer) or not targetPlayer:IsPlayer() or not targetPlayer.AddTinnitus then return end
-	local duration = math.Clamp(skullDamage * 18 + impactDamage * 1.5, 1.5, 12)
+	local duration = math.Clamp(skullDamage * 9 + impactDamage * 0.45, 0.75, 5)
 	targetPlayer:AddTinnitus(duration, true)
 end
 
@@ -515,10 +515,10 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 	local jawDelta = math.max(org.jaw - oldDmg, 0)
 	org.teethLost = math.Clamp(org.teethLost or 0, 0, 32)
 
-	local jawPain = math.Clamp(incomingDmg * 8 + jawDelta * 22, 0, 30)
+	local jawPain = math.Clamp(incomingDmg * 10 + jawDelta * 28, 0, 38)
 	org.painadd = math.min((org.painadd or 0) + jawPain, 150)
-	org.avgpain = math.min((org.avgpain or 0) + jawPain * 0.3, 150)
-	org.shock = math.min((org.shock or 0) + jawPain * 0.35, 95)
+	org.avgpain = math.min((org.avgpain or 0) + jawPain * 0.45, 150)
+	org.shock = math.min((org.shock or 0) + jawPain * 0.5, 95)
 
 	if org.consciousness then
 		local consciousnessDrain = math.Clamp(incomingDmg * 0.015 + jawDelta * 0.18, 0, 0.18)
@@ -653,7 +653,6 @@ end)
 
 input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet, impact)
 	local oldDmg = org.skull
-	local oldConcussion = org.concussion or 0
 	local oldBrain = org.brain or 0
 	local ignoreBrainDamage = hg.organism.IsBrainDamageIgnored and hg.organism.IsBrainDamageIgnored(org)
 	local brainEnergy = impact and impact.source == "physics" and math.max(impact.residualEnergy or 0, 0) or dmg
@@ -735,9 +734,22 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 
 	org.disorientation = math.min(org.disorientation + (isCrush(dmgInfo) and dmg * 1 or dmg * 1), 1.5)
 
+	local skullDelta = math.max(org.skull - oldDmg, 0)
+	local brainDelta = math.max(org.brain - oldBrain, 0)
 	local hasHelmet = org.owner.armors and org.owner.armors["head"] != nil
+	local concussionGain = 0
 	if hg.organism.module.concussion and hg.organism.module.concussion.AddHeadTrauma then
-		hg.organism.module.concussion.AddHeadTrauma(org, org.skull - oldDmg, org.brain - oldBrain, brainEnergy, dmgInfo)
+		concussionGain = hg.organism.module.concussion.AddHeadTrauma(org, skullDelta, brainDelta, brainEnergy, dmgInfo)
+	end
+
+	local headTraumaSeverity = skullDelta * 2.8 + brainDelta * 5.5 + math.Clamp(brainEnergy * 0.1, 0, 1)
+	if org.alive and not org.otrub and headTraumaSeverity >= 0.85 then
+		local knockoutChance = math.Clamp((headTraumaSeverity - 0.65) * 0.18 + brainDelta * 0.35, 0, hasHelmet and 0.12 or 0.34)
+		if math.Rand(0, 1) < knockoutChance then
+			org.needotrub = true
+			org.consciousness = math.min(org.consciousness or 1, 0.08)
+			org.shock = math.min((org.shock or 0) + 12 + brainDelta * 20, 95)
+		end
 	end
 
 	if not ignoreBrainDamage and not isStab and brainEnergy > 0.05 then
@@ -748,7 +760,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		end
 	end
 
-	sendHeadTraumaFlash(org, dmg, dmgInfo, org.skull - oldDmg, (org.concussion or 0) - oldConcussion, (org.brain or 0) - oldBrain)
+	sendHeadTraumaFlash(org, dmg, dmgInfo, skullDelta, concussionGain, brainDelta)
 
 	if (org.skull - oldDmg) > 0.02 then
 		local disorientationAdd = math.min(dmg * 1.5, 2.0)

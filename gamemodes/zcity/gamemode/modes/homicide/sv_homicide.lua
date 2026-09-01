@@ -911,6 +911,7 @@ function MODE:Intermission()
 
 	if IsValid(forced_main) and traitors_needed > 0 then
 		forced_main.isTraitor = true
+		forced_main.isGunner = false
 		forced_main.MainTraitor = true
 		main_traitor = forced_main
 		traitors_needed = traitors_needed - 1
@@ -922,6 +923,7 @@ function MODE:Intermission()
 		if ply.isTraitor or ply:Team() == TEAM_SPECTATOR then continue end
 
 		ply.isTraitor = true
+		ply.isGunner = false
 		traitors_needed = traitors_needed - 1
 		traitors[#traitors + 1] = ply
 	end
@@ -943,6 +945,7 @@ function MODE:Intermission()
 
 		if traitors_needed > 0 then
 			ply.isTraitor = true
+			ply.isGunner = false
 			traitors_needed = traitors_needed - 1
 			traitors[#traitors + 1] = ply
 
@@ -960,6 +963,7 @@ function MODE:Intermission()
 
 		if traitors_needed > 0 then
 			ply.isTraitor = true
+			ply.isGunner = false
 			traitors_needed = traitors_needed - 1
 			traitors[#traitors + 1] = ply
 			
@@ -976,6 +980,7 @@ function MODE:Intermission()
 
 			if traitors_needed > 0 then
 				ply.isTraitor = true
+				ply.isGunner = false
 				traitors_needed = traitors_needed - 1
 				traitors[#traitors + 1] = ply
 
@@ -1818,6 +1823,12 @@ end
 function MODE.SpawnPlayers(spawn_with_subroles)
     local gunner_found = false
 
+	for _, ply in player.Iterator() do
+		if ply:Team() ~= TEAM_SPECTATOR and ply.isTraitor then
+			ply.isGunner = false
+		end
+	end
+
     for i, ply in RandomPairs(player.GetAll()) do
         if ply.isTraitor or ply.isGunner or ply:Team() == TEAM_SPECTATOR then continue end
         if math.random(100) > (ply.Karma or 100) then continue end
@@ -1943,7 +1954,18 @@ function MODE.SpawnPlayers(spawn_with_subroles)
 					sub_role = sub_role_id
                 end
 
-                if(current_ply.isGunner)then
+                if(current_ply.isTraitor)then
+                    if(current_ply.MainTraitor)then
+                        local role_info = MODE.SubRoles[sub_role]
+                        if(!role_info or !MODE.RoleChooseRoundTypes[MODE.Type].Traitor[sub_role])then
+                            sub_role = MODE.RoleChooseRoundTypes[MODE.Type].TraitorDefaultRole or "traitor_custom"
+                            role_info = MODE.SubRoles[sub_role]
+                        end
+
+                        current_ply.SubRole = sub_role
+                        role_info.SpawnFunction(current_ply)
+                    end
+                elseif(current_ply.isGunner)then
                     if MODE.ApplyHeroLoadout then
                         MODE.ApplyHeroLoadout(current_ply)
                     else
@@ -1951,29 +1973,10 @@ function MODE.SpawnPlayers(spawn_with_subroles)
                     end
                 end
 
-                if(sub_role)then
-                    if(current_ply.isGunner)then
-
-                    elseif(current_ply.isTraitor)then
-                        local role_info = MODE.SubRoles[sub_role]
-                        if(!role_info or !MODE.RoleChooseRoundTypes[MODE.Type].Traitor[sub_role])then
-                            sub_role = MODE.RoleChooseRoundTypes[MODE.Type].TraitorDefaultRole or "traitor_custom"
-                            role_info = MODE.SubRoles[sub_role]
-                        end
-
-                        if(current_ply.MainTraitor)then
-                            local spawn_func = role_info.SpawnFunction
-                            current_ply.SubRole = sub_role
-                            spawn_func(current_ply)
-                        end
-                    end
-                end
             else
                 if(current_ply.isTraitor and current_ply.MainTraitor)then
                     MODE.Types[MODE.Type].TraitorLoot(current_ply)
-                end
-
-                if(current_ply.isGunner)then
+				elseif(current_ply.isGunner)then
                     MODE.Types[MODE.Type].GunManLoot(current_ply)
                 end
             end

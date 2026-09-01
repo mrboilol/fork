@@ -700,6 +700,11 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 	end
 	
 	local lowO2Visual = math.Clamp((15 - o2) / 15, 0, 1)
+	if lowO2Visual > 0 then
+		local flickerStep = math.floor(CurTime() * (10 + lowO2Visual * 18))
+		local lowO2Flicker = flickerStep % 3 == 0 and 1 or 0.58
+		lowO2Visual = lowO2Visual * lowO2Flicker
+	end
 	local lowConsciousnessVisual = math.Clamp((0.5 - consciousness) / 0.2, 0, 1)
 	local shockVisual = math.Clamp(((org.shock or 0) - 18) / 62, 0, 1)
 	local shockVignette = math.max(lowO2Visual ^ 1.2, lowConsciousnessVisual ^ 1.35, shockVisual * 0.8)
@@ -736,8 +741,8 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 	end
 
 	if shockVignette > 0.01 and lply:Alive() then
-		local shockCoverage = math.Clamp(shockVignette * 4.25, 0, 4.25)
-		local shockBorder = math.Clamp((shockCoverage / 1.8) ^ 0.78 * 0.86, 0, 0.86)
+		local shockCoverage = math.Clamp(shockVignette * 2.6, 0, 2.6)
+		local shockBorder = math.Clamp((shockCoverage / 2.4) ^ 0.9 * 0.62, 0, 0.62)
 		render.UpdateScreenEffectTexture()
 		shockVignetteMat:SetFloat("$c2_x", CurTime() + 10000)
 		shockVignetteMat:SetFloat("$c0_z", shockBorder)

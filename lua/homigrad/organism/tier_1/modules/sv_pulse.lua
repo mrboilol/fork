@@ -377,10 +377,10 @@ local tachycardiaThoughts = {
 	"Your heart is beating too fast."
 }
 local cardiacArrestThoughts = {
-	"My heart... it's stopping...",
-	"I can't... feel my pulse...",
-	"Something's wrong with my heart...",
-	"I'm fading... I can feel it..."
+	"MY CHEST- IT HURTS...",
+	"I'M FADING- EVERYTHING IS GOING DARK",
+	"I'M DYING... I CAN'T FEEL MY PULSE",
+	"gg boi im cooked"
 }
 
 local function applyTemperatureTrauma(org)
@@ -1227,11 +1227,11 @@ module[2] = function(owner, org, timeValue)
 	org.arrhythmia = Approach(org.arrhythmia or 0, arrhythmiaTarget, arrhythmiaTarget > (org.arrhythmia or 0) and timeValue / Lerp(hemorrhageElectricalInstability, 25, 6) or timeValue / 90)
 	if org.isPly and not org.otrub and not org.heartstop then
 		if org.fibrillation or org.unstableRhythm or org.arrhythmia > 0.35 then
-			owner:Notify("My heart rhythm feels irregular...", 45, "arrhythmia", 0, nil, Color(255, 170, 170))
+			owner:Notify("My heart feels like its beating weird...", 45, "arrhythmia", 0, nil, Color(255, 170, 170))
 		elseif org.heartbeat >= 150 then
-			owner:Notify(tachycardiaThoughts[math.random(#tachycardiaThoughts)], 45, "tachycardia", 0, nil, Color(255, 170, 170))
+			owner:Notify("My heart is beating faster than normal.", 45, "tachycardia", 0, nil, Color(255, 170, 170))
 		elseif org.heartbeat > 0 and org.heartbeat <= 45 then
-			owner:Notify("My heartbeat is becoming dangerously slow...", 45, "bradycardia", 0, nil, Color(150, 210, 255))
+			owner:Notify("My heart feels too slow...", 45, "bradycardia", 0, nil, Color(150, 210, 255))
 		end
 	end
 	if stress > 0.55 and CurTime() >= (org.nextArrhythmiaRoll or 0) then

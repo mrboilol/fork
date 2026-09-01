@@ -61,7 +61,7 @@ function SWEP:Reload(time)
 	self:ReloadStartPost()
 	local org = self:GetOwner().organism
 	local experienceMul = self.GetWeaponExperienceMul and self:GetWeaponExperienceMul(self:GetOwner()) or 1
-	self.StaminaReloadMul = ((org and ((2 - (self:GetOwner().organism.stamina[1] / 180)) + ((org.pain / 40) + (org.larm / 3) + (org.rarm / 5)) - (1 - math.Clamp(org.recoilmul or 1,0.45,1.4))) or 1) * experienceMul
+	self.StaminaReloadMul = (org and ((2 - (org.stamina[1] / 180)) + ((org.pain / 40) + (org.larm / 3) + (org.rarm / 5)) - (1 - math.Clamp(org.recoilmul or 1, 0.45, 1.4))) or 1) * experienceMul
 	self.StaminaReloadMul = math.Clamp(self.StaminaReloadMul,0.65,1.5)
 	local magazine = self:GetAttachmentInfo("magwell")
 	local baseCapacity = self.BaseMagazineCapacity or self.Primary.DefaultClip or self.Primary.ClipSize
@@ -113,7 +113,7 @@ local function FailSafe(ply)
 end
 
 local function SafeCheck(ply, ent, dist)
-	if not IsValid(ply) and not ply:Alive() then return false end
+	if not IsValid(ply) or not ply:Alive() then return false end
 	if (ply:GetNetVar("carryent2") ~= ent and not IsValid(ply.FakeRagdoll)) or dist then FailSafe(ply) return false end
 
 	local org = ply.organism
@@ -126,7 +126,7 @@ end
 local mRandom, mRand, mClamp = math.random, math.Rand, math.Clamp
 
 concommand.Add("hg_reloadfloorweapon", function(ply, cmd, args)
-	if not IsValid(ply) and not ply:Alive() then return end
+	if not IsValid(ply) or not ply:Alive() then return end
 	local org = ply.organism
 	if ply:GetNWBool("hg_hold_wound_manual", false) or org.rarmamputated and org.larmamputated then return end
 

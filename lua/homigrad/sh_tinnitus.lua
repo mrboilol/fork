@@ -36,7 +36,7 @@ if CLIENT then
     local function AddTinnitus(time, needSound, brainDamage)
         local lply = LocalPlayer()
         if not IsValid(lply) then return end
-        lply.tinnitus = math.max(lply.tinnitus or 0, CurTime() + time * 4)
+        lply.tinnitus = math.max(lply.tinnitus or 0, CurTime() + time * 2.25)
         lply.tinnitusBrainDamage = brainDamage or false
         lply:SetDSP(32)
         if needSound then
@@ -78,7 +78,7 @@ if CLIENT then
 
         if (lply.tinnitus or 0) > now then
             tinnitusExposure = tinnitusExposure + dt
-            local recoveryBonus = math.Clamp((tinnitusExposure - 8) / 24, 0, 1) * 2
+            local recoveryBonus = 0.5 + math.Clamp((tinnitusExposure - 4) / 12, 0, 1) * 2.5
             lply.tinnitus = math.max((lply.tinnitus or now) - dt * recoveryBonus, now)
         else
             tinnitusExposure = math.max(tinnitusExposure - dt * 4, 0)

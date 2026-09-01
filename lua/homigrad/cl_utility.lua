@@ -1010,7 +1010,7 @@ players : 1 humans, 0 bots (20 max)
 		local lply = LocalPlayer()
 		local function AddTinnitus(time, needSound)
 			lply = LocalPlayer()
-			lply.tinnitus = CurTime() + time * 4
+			lply.tinnitus = CurTime() + time * 2.25
 			lply:SetDSP(32)
 		end
 

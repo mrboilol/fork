@@ -3301,10 +3301,10 @@ net.Receive("headtrauma_flash", function()
 	if trigger_tinnitus then
         if is_critical then
             surface.PlaySound("tinnituslong.wav")
-            if IsValid(lply) then lply:AddTinnitus(5 + time * 0.7, false, hasBrainDamage) end
+            if IsValid(lply) then lply:AddTinnitus(2.25 + time * 0.35, false, hasBrainDamage) end
         else
             surface.PlaySound("tinnitus.wav")
-            if IsValid(lply) then lply:AddTinnitus(2.5 + time * 0.5, false, hasBrainDamage) end
+            if IsValid(lply) then lply:AddTinnitus(1 + time * 0.25, false, hasBrainDamage) end
         end
     end
 

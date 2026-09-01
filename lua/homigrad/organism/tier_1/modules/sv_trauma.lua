@@ -39,7 +39,7 @@ local COGNITIVE_THRESHOLD = 1.5
 local PHOTOPHOBIA_THRESHOLD = 2.0
 local PHONOPHOBIA_THRESHOLD = 1.8
 local CONCUSSION_FLASH_INTERVAL = 0.7
-local HEAD_TRAUMA_CONCUSSION_MULTIPLIER = 1.5
+local HEAD_TRAUMA_CONCUSSION_MULTIPLIER = 1.7
 
 local function getConcussionDecay(concussion)
     concussion = math.max(tonumber(concussion) or 0, 0)
@@ -231,8 +231,8 @@ local function recoverTinnitus(org, timeValue)
     else
         org.concussion_tinnitus_time = math.Approach(org.concussion_tinnitus_time or 0, 0, timeValue * 4)
     end
-    local recovery = 1 + math.Clamp(((org.concussion_tinnitus_time or 0) - 8) / 24, 0, 1) * 2.5
-    org.concussion_tinnitus = math.Approach(org.concussion_tinnitus or 0, 0, timeValue * 0.55 * recovery)
+    local recovery = 1 + math.Clamp(((org.concussion_tinnitus_time or 0) - 4) / 12, 0, 1) * 2.5
+    org.concussion_tinnitus = math.Approach(org.concussion_tinnitus or 0, 0, timeValue * 1.05 * recovery)
 end
 
 module[2] = function(ply, org, timeValue)
@@ -384,7 +384,7 @@ module[2] = function(ply, org, timeValue)
         end
 
         if effectiveConcussion > 0.2 then
-            org.concussion_tinnitus = math.max(org.concussion_tinnitus or 0, effectiveConcussion * 0.35)
+            org.concussion_tinnitus = math.max(org.concussion_tinnitus or 0, effectiveConcussion * 0.18)
         end
 
         if org.isPly and not org.otrub and IsValid(ply) and ply:IsPlayer() then
@@ -415,7 +415,7 @@ module[2] = function(ply, org, timeValue)
         org.concussion_post = math.max(org.concussion_post - timeValue * POST_CONCUSSION_DECAY, 0)
         if org.concussion_post > POST_CONCUSSION_THRESHOLD then
             org.disorientation = math.max(org.disorientation or 0, org.concussion_post * 0.15)
-            org.concussion_tinnitus = math.max(org.concussion_tinnitus or 0, org.concussion_post * 0.1)
+            org.concussion_tinnitus = math.max(org.concussion_tinnitus or 0, org.concussion_post * 0.05)
         end
     end
 
@@ -537,7 +537,7 @@ function module.AddHeadTrauma(org, skullDamage, brainDamage, impactDamage, dmgIn
     brainDamage = math.max(tonumber(brainDamage) or 0, 0)
     impactDamage = math.max(tonumber(impactDamage) or 0, 0)
 
-    local concussion = skullDamage * 2.4 + brainDamage * 5.5 + math.Clamp(impactDamage * 0.04, 0, 1.5)
+    local concussion = skullDamage * 3.8 + brainDamage * 8.0 + math.Clamp(impactDamage * 0.05, 0, 1.8)
     concussion = concussion * HEAD_TRAUMA_CONCUSSION_MULTIPLIER
     if skullDamage > 0.015 then concussion = concussion + 0.18 end
     if brainDamage > 0.005 then concussion = concussion + 0.3 end
@@ -603,7 +603,7 @@ function module.AddConcussion(org, intensity, duration)
 
     org.concussion_effects.severity = math.max(org.concussion_effects.severity or 0, add)
     org.concussion_effects.duration = math.max(org.concussion_effects.duration or 0, duration or math.Clamp(intensity * 6, 5, 80))
-    org.concussion_tinnitus = math.max(org.concussion_tinnitus or 0, add * 0.5)
+    org.concussion_tinnitus = math.max(org.concussion_tinnitus or 0, add * 0.25)
     org.concussion_headache = math.max(org.concussion_headache or 0, add * 0.4)
     org.concussion_fatigue = math.max(org.concussion_fatigue or 0, add * 0.2)
 
