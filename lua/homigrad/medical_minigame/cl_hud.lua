@@ -473,10 +473,14 @@ function PANEL:Init()
     self.WrapAngle = 0
     self.GameType = (hg and hg.MedicalMinigame and hg.MedicalMinigame.NextType) or "bandage"
     self.TreatmentTarget = hg and hg.MedicalMinigame and hg.MedicalMinigame.NextTarget or nil
+    self.TreatmentWeapon = LocalPlayer():GetActiveWeapon()
     local activeWeapon = LocalPlayer():GetActiveWeapon()
     self.ShowMedkitTreatmentTarget = IsValid(activeWeapon) and (activeWeapon:GetClass() == "weapon_medkit_sh" or activeWeapon.HGMedkitTier ~= nil)
     local armSpeed = hg.MedicalMinigame.GetArmSpeedMultiplier(LocalPlayer())
     if IsHelpingOtherPlayer() then armSpeed = armSpeed * 2.5 end
+    if self.GameType == "bandage" and hg.MedicalMinigame.GetBandageEaseMultiplier then
+        armSpeed = armSpeed * hg.MedicalMinigame.GetBandageEaseMultiplier(LocalPlayer())
+    end
     self.MedicalArmSpeedMultiplier = math.max(armSpeed, 0.25)
     self.MinigameDifficultyMultiplier = 1 / self.MedicalArmSpeedMultiplier
     self.TargetTurns = (self.GameType == "bandage") and 1 or (hg.MedicalMinigame.RequiredTurns or 6)
@@ -518,6 +522,13 @@ function PANEL:Init()
     self.TourniquetLastTubeAngle = nil
     self.TourniquetStageSwitchUntil = 0
     self.TourniquetTurnCount = 0 -- Track turns for increasing pain
+
+    if self.GameType == "bandage" then
+        self.Progress = math.Clamp((hg and hg.MedicalMinigame and hg.MedicalMinigame.NextProgress) or 0, 0, 1)
+        self.LastProgressSent = self.Progress
+        self.AccumulatedAngle = self.Progress * 2 * math.pi * self.TargetTurns
+        self.WrapAngle = self.Progress * 2 * math.pi
+    end
 
     self.SyringeGrabbed = false
     self.SyringeGrabOffsetY = 0
@@ -874,6 +885,15 @@ function PANEL:ResetWrapProgress()
     self.TrailPoints = {}
 end
 
+function PANEL:SendBandageState()
+    if self.GameType ~= "bandage" then return end
+
+    net.Start("hg_medical_minigame_bandage_state")
+    net.WriteFloat(math.Clamp(self.Progress or 0, 0, 1))
+    net.WriteUInt(math.Clamp(math.floor(self.BandageCompletions or 0), 0, 255), 8)
+    net.SendToServer()
+end
+
 function PANEL:CommitVisualWrap()
     self.CompletedWraps = self.CompletedWraps + 1
     self.WrapAngle = math.max(self.WrapAngle - (2 * math.pi), 0)
@@ -898,6 +918,7 @@ function PANEL:CompleteWrap()
 
     -- Check if required completions reached
     if self.BandageCompletions >= (self.BandageRequiredCompletions or 3) then
+        self:SendBandageState()
         self:Finish()
         return
     end
@@ -905,6 +926,7 @@ function PANEL:CompleteWrap()
     self:CommitVisualWrap()
 
     self:ResetWrapProgress()
+    self:SendBandageState()
 end
 
 function PANEL:ThinkTourniquet(mx, my)
@@ -1269,6 +1291,12 @@ function PANEL:GetSyringeFluidColor()
 end
 
 function PANEL:Think()
+    local lp = LocalPlayer()
+    if not IsValid(lp) or not IsValid(self.TreatmentWeapon) or lp:GetActiveWeapon() ~= self.TreatmentWeapon then
+        self:Remove()
+        return
+    end
+
     local mx, my = self:CursorPos()
 
     local fear, adrenaline, jitter, stabilizer = GetBandageStressFactors()
@@ -1435,6 +1463,8 @@ function PANEL:Finish()
     if self.Finished then return end
     self.Finished = true
     self:StopMusic()
+
+    self:SendBandageState()
     
     if (self.GameType == "bandage" or self.GameType == "syringe" or self.GameType == "amputation" or self.GameType == "dislocation") and self.Progress > self.LastProgressSent then
         net.Start("hg_medical_minigame_progress")
@@ -1488,6 +1518,15 @@ function PANEL:OnRemove()
         net.WriteFloat(self.Progress - self.LastProgressSent)
         net.WriteFloat(math.abs(self.DislocationAppliedForce or 0))
         net.SendToServer()
+    end
+
+    if not self.Finished and self.GameType == "bandage" then
+        if self.Progress > self.LastProgressSent then
+            net.Start("hg_medical_minigame_progress")
+            net.WriteFloat(self.Progress - self.LastProgressSent)
+            net.SendToServer()
+        end
+        self:SendBandageState()
     end
 
     if not self.Finished and self.GameType then
@@ -1974,6 +2013,7 @@ net.Receive("hg_medical_minigame_start", function()
     hg.MedicalMinigame.NextTarget = nil
     hg.MedicalMinigame.NextLimb = nil
     hg.MedicalMinigame.NextDislocationSide = nil
+    hg.MedicalMinigame.NextProgress = 0
     hg.MedicalMinigame.NextCompletions = nil
     hg.MedicalMinigame.NextRequiredCompletions = nil
 

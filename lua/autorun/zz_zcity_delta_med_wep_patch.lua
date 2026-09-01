@@ -73,9 +73,6 @@ local function StopHealAnimation(owner)
     owner.HGMedicalMinigameWeapon = nil
 
     local medical = hg and hg.MedicalMinigame
-    if medical and medical.BandageSessions then
-        medical.BandageSessions[owner] = nil
-    end
     if medical and medical.TourniquetSessions then
         medical.TourniquetSessions[owner] = nil
     end

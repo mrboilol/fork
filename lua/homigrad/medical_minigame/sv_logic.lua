@@ -200,13 +200,38 @@ local function ClearDislocationSessionsForPlayer(ply)
 end
 
 local function ClearBandageSessionsForPlayer(ply)
+    local ownSession = hg.MedicalMinigame.BandageSessions[ply]
+    if ownSession and IsValid(ownSession.weapon) then
+        ownSession.weapon.HGMedicalMinigameBandageProgress = nil
+        ownSession.weapon.minigameCompletions = 0
+        ownSession.weapon.HGMedicalMinigameBandageTarget = nil
+    end
     hg.MedicalMinigame.BandageSessions[ply] = nil
 
     for healer, session in pairs(hg.MedicalMinigame.BandageSessions) do
         if session and session.target == ply then
+            if IsValid(session.weapon) then
+                session.weapon.HGMedicalMinigameBandageProgress = nil
+                session.weapon.minigameCompletions = 0
+                session.weapon.HGMedicalMinigameBandageTarget = nil
+            end
             hg.MedicalMinigame.BandageSessions[healer] = nil
         end
     end
+end
+
+local function SaveBandageProgress(session, progress, completions)
+    if not session then return end
+
+    session.progress = math.Clamp(tonumber(progress) or 0, 0, 1)
+    session.completions = math.max(math.floor(tonumber(completions) or 0), 0)
+
+    local wep = session.weapon
+    if not IsValid(wep) then return end
+
+    wep.HGMedicalMinigameBandageProgress = session.progress
+    wep.minigameCompletions = session.completions
+    wep.HGMedicalMinigameBandageTarget = session.target
 end
 
 local function ClearTourniquetSessionsForPlayer(ply)
@@ -281,9 +306,15 @@ function hg.MedicalMinigame.StartBandageMinigame(ply, ent)
 
     local wep = ply:GetActiveWeapon()
     local completions = 0
+    local progress = 0
     local requiredCompletions = 3
     if IsValid(wep) then
         completions = wep.minigameCompletions or 0
+        if wep.HGMedicalMinigameBandageTarget == target then
+            progress = wep.HGMedicalMinigameBandageProgress or 0
+        else
+            completions = 0
+        end
         local class = wep:GetClass()
         local org = target.organism
         if org then
@@ -302,7 +333,8 @@ function hg.MedicalMinigame.StartBandageMinigame(ply, ent)
         end
     end
 
-    requiredCompletions = math.max(math.ceil(requiredCompletions * GetMedicalMinigameOtherSpeedMultiplier(ply, target)), 1)
+    local bandageEase = hg.MedicalMinigame.GetBandageEaseMultiplier(ply)
+    requiredCompletions = math.max(math.ceil(requiredCompletions * GetMedicalMinigameOtherSpeedMultiplier(ply, target) / bandageEase), 1)
 
     -- The weapon wrapper uses this to map each completed wrap to the same
     -- fraction of its animation instead of conflicting with normal medicines.
@@ -311,23 +343,26 @@ function hg.MedicalMinigame.StartBandageMinigame(ply, ent)
     end
 
     local existingSession = hg.MedicalMinigame.BandageSessions[ply]
-    if not existingSession or existingSession.target ~= target then
+    if not existingSession or existingSession.target ~= target or existingSession.weapon ~= wep or existingSession.mode ~= (IsValid(wep) and wep.mode or nil) then
         existingSession = {
             target = target,
-            progress = 0
+            progress = progress,
+            completions = completions
         }
         hg.MedicalMinigame.BandageSessions[ply] = existingSession
     end
     existingSession.weapon = wep
     existingSession.mode = IsValid(wep) and wep.mode or nil
+    existingSession.requiredCompletions = requiredCompletions
     existingSession.bone = IsValid(wep) and wep.GetBandageTargetBone and wep:GetBandageTargetBone(target, hg.eyeTrace(ply)) or nil
+    SaveBandageProgress(existingSession, existingSession.progress, existingSession.completions)
 
     net.Start("hg_medical_minigame_start")
-    net.WriteString("bandage")
-    net.WriteEntity(target)
-    net.WriteFloat(math.Clamp(existingSession.progress or 0, 0, 1))
-    net.WriteInt(completions, 8)
-    net.WriteInt(requiredCompletions, 8)
+        net.WriteString("bandage")
+        net.WriteEntity(target)
+        net.WriteFloat(math.Clamp(existingSession.progress or 0, 0, 1))
+        net.WriteInt(existingSession.completions or 0, 8)
+        net.WriteInt(requiredCompletions, 8)
     net.Send(ply)
 
     return true
@@ -374,6 +409,15 @@ net.Receive("hg_medical_minigame_request_amputation", function(len, ply)
     hg.MedicalMinigame.StartAmputationMinigame(ply, ent, limb)
 end)
 
+net.Receive("hg_medical_minigame_bandage_state", function(len, ply)
+    local progress = net.ReadFloat()
+    local completions = net.ReadUInt(8)
+    local session = hg.MedicalMinigame.BandageSessions[ply]
+    if not session or not IsValid(session.weapon) or session.weapon:GetOwner() ~= ply then return end
+
+    SaveBandageProgress(session, progress, completions)
+end)
+
 net.Receive("hg_medical_minigame_cancel", function(len, ply)
     local minigameType = net.ReadString()
     hook.Run("hg_medical_minigame_ended", ply, minigameType, false)
@@ -389,7 +433,6 @@ net.Receive("hg_medical_minigame_cancel", function(len, ply)
     end
 
     if minigameType == "bandage" then
-        ClearBandageSessionsForPlayer(ply)
         return
     end
 
@@ -732,6 +775,8 @@ net.Receive("hg_medical_minigame_finish", function(len, ply)
         local target = bandageSession.target
         if not CanUseMedicalMinigameTarget(ply, target) then return end
 
+        if (bandageSession.completions or 0) < (bandageSession.requiredCompletions or 1) then return end
+
         local wep = bandageSession.weapon
         if not IsValid(wep) or wep:GetOwner() ~= ply or wep.mode ~= bandageSession.mode then
             hg.MedicalMinigame.BandageSessions[ply] = nil
@@ -750,6 +795,11 @@ net.Receive("hg_medical_minigame_finish", function(len, ply)
         end
 
         hg.MedicalMinigame.BandageSessions[ply] = nil
+        if IsValid(wep) then
+            wep.HGMedicalMinigameBandageProgress = nil
+            wep.minigameCompletions = 0
+            wep.HGMedicalMinigameBandageTarget = nil
+        end
         hook.Run("hg_medical_minigame_finished", ply, target, "bandage")
         return
     end

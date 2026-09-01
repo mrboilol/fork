@@ -39,6 +39,7 @@ local COGNITIVE_THRESHOLD = 1.5
 local PHOTOPHOBIA_THRESHOLD = 2.0
 local PHONOPHOBIA_THRESHOLD = 1.8
 local CONCUSSION_FLASH_INTERVAL = 0.7
+local HEAD_TRAUMA_CONCUSSION_MULTIPLIER = 1.5
 
 local function getConcussionDecay(concussion)
     concussion = math.max(tonumber(concussion) or 0, 0)
@@ -537,6 +538,7 @@ function module.AddHeadTrauma(org, skullDamage, brainDamage, impactDamage, dmgIn
     impactDamage = math.max(tonumber(impactDamage) or 0, 0)
 
     local concussion = skullDamage * 2.4 + brainDamage * 5.5 + math.Clamp(impactDamage * 0.04, 0, 1.5)
+    concussion = concussion * HEAD_TRAUMA_CONCUSSION_MULTIPLIER
     if skullDamage > 0.015 then concussion = concussion + 0.18 end
     if brainDamage > 0.005 then concussion = concussion + 0.3 end
     if concussion <= 0 then return 0 end

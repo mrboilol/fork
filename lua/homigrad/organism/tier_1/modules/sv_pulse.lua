@@ -11,6 +11,7 @@ local terminalHeartRate = 300
 local peaDuration = 6
 local cardiacArrestMechanicalDecayTime = 14
 local hypotensionComplicationTime = 45
+local arrhythmiaComplicationTime = 75
 
 function hg.organism.BeginCardiacArrestMechanicalDecay(org)
 	if not org or org.cardiacArrestMechanicalInitial then return end
@@ -75,13 +76,16 @@ function hg.organism.UpdateVitalHealthToll(owner, org, timeValue)
 	local bloodLoss = math.Clamp(1 - (tonumber(org.blood) or normalBlood) / normalBlood, 0, 1)
 	local bloodLossK = hg.organism.GetSmoothSeverity(bloodLoss, 0.12, 0.72, 1.35)
 	local hypotensionK = hg.organism.GetSmoothSeverity(org.hypotension or 0, 0.18, 0.80, 1.20)
+	local arrhythmiaK = math.Clamp(tonumber(org.arrhythmia) or 0, 0, 1)
+	if org.unstableRhythm then arrhythmiaK = math.max(arrhythmiaK, 0.35) end
+	if org.fibrillation then arrhythmiaK = 1 end
 	local pulse = math.max(tonumber(org.pulse) or 0, 0)
 	local bradycardiaK = hg.organism.GetSmoothSeverity(55 - pulse, 0, 45, 1.10)
 	local tachycardiaK = hg.organism.GetSmoothSeverity(pulse, 130, 220, 1.20)
 	local activeBleedK = hg.organism.GetSmoothSeverity(org.bleed or 0, 0.15, 4, 1.10)
 
-	local circulationK = math.max(bloodLossK, hypotensionK, bradycardiaK)
-	local tachycardiaStress = tachycardiaK * math.max(bloodLossK, hypotensionK)
+	local circulationK = math.max(bloodLossK, hypotensionK, bradycardiaK, arrhythmiaK * 0.8)
+	local tachycardiaStress = tachycardiaK * math.max(bloodLossK, hypotensionK, arrhythmiaK * 0.65)
 	local vitalStress = math.Clamp(math.max(circulationK, tachycardiaStress) + activeBleedK * circulationK * 0.25, 0, 1)
 	org.vitalHealthStress = vitalStress
 
@@ -593,6 +597,7 @@ local function maintainSimplifiedCirculation(org)
 	org.fibrillation = false
 	org.fibrillationStart = 0
 	org.arrhythmia = 0
+	org.arrhythmiaComplication = 0
 	org.palpitations = 0
 	org.myocardialOxygen = 1
 	org.heartStrain = 0
@@ -702,6 +707,7 @@ module[1] = function(org)
 	org.cardiacArrestStart = nil
 	org.cardiacArrestO2Start = nil
 	org.arrhythmia = 0
+	org.arrhythmiaComplication = 0
 	org.fibrillation = false
 	org.fibrillationStart = 0
 	org.myocardialOxygen = 1
@@ -838,9 +844,13 @@ module[2] = function(owner, org, timeValue)
 	local tamponadePreload = Clamp(1 - tamponade * 0.82, 0.18, 1)
 	local internalBleedComplication = Clamp(org.internalBleedComplication or 0, 0, 1)
 	local internalBleedPressureMul = Clamp(1 - internalBleedComplication * 0.35, 0.65, 1)
+	local arrhythmia = Clamp(tonumber(org.arrhythmia) or 0, 0, 1)
+	local rhythmInstability = arrhythmia
+	if org.unstableRhythm then rhythmInstability = math.max(rhythmInstability, 0.35) end
+	if org.fibrillation then rhythmInstability = 1 end
 	local rateOutput = getRateOutput(org.heartstop and 0 or (org.heartbeat or 70))
 	local circulationBase = bloodVolume * heart * compensationPulseMultiplier * rateOutput * vascularTone * accelerationPressureMul * dehydrationPressureMul * tamponadePreload * internalBleedPressureMul * Clamp(Remap(org.temperature, 28, 36.7, 0.55, 1), 0.45, 1.1)
-	local rhythmMul = org.fibrillation and 0.18 or Clamp(1 - (org.arrhythmia or 0) * 0.22, 0.5, 1)
+	local rhythmMul = org.fibrillation and 0.18 or Clamp(1 - rhythmInstability * 0.42, 0.32, 1)
 	local dihSupport = (org.dihSupportUntil or 0) > CurTime()
 	local defibGrace = (org.defibDeathGrace or 0) > CurTime() or (org.defibSupportUntil or 0) > CurTime()
 	local cprSupport = (org.cprSupportUntil or 0) > CurTime()
@@ -871,7 +881,7 @@ module[2] = function(owner, org, timeValue)
 	-- value. Judge's pressure readout is useful to medicine/UI code, while the
 	-- current circulation model remains the single owner of the actual target.
 	local mechanicalPulseReserve = Clamp(palpablePulseTarget / 70, 0, 1)
-	local pressureCirculation = circulation * (0.35 + mechanicalPulseReserve * 0.65)
+	local pressureCirculation = circulation * (0.35 + mechanicalPulseReserve * 0.65) * Clamp(1 - rhythmInstability * 0.24, 0.70, 1)
 	local pulsePressureSupport = Clamp((palpablePulseTarget - 10) / 50, 0, 1)
 	local pressureTarget = Clamp(pressureCirculation * 92 * Lerp(pulsePressureSupport, 0.3, 1), 0, 180)
 	local pressureNow = tonumber(org.bloodPressure) or pressureTarget
@@ -904,9 +914,18 @@ module[2] = function(owner, org, timeValue)
 	local myocardialTarget = hg.organism.GetLimitingReserve(oxygenation, circulationDelivery)
 	if org.heartstop and defibGrace then myocardialTarget = math.max(myocardialTarget, 0.25) end
 	org.myocardialOxygen = Approach(org.myocardialOxygen or 1, myocardialTarget, timeValue / 8)
-	local hypotensionTarget = Clamp(Remap(pressureCirculation, 0.98, 0.22, 0, 1), 0, 1)
+	local pressureHypotensionTarget = Clamp(Remap(pressureCirculation, 0.98, 0.22, 0, 1), 0, 1)
+	local rhythmHypotensionTarget = rhythmInstability * (org.fibrillation and 0.85 or 0.48)
+	local hypotensionTarget = math.max(pressureHypotensionTarget, rhythmHypotensionTarget)
 	local hypotensionRate = highSpeedPressureShock > 0.25 and timeValue / 2.5 or timeValue / 8
 	org.hypotension = Approach(org.hypotension or 0, hypotensionTarget, hypotensionRate)
+	local arrhythmiaComplicationTarget = math.Clamp(rhythmInstability * (0.45 + (1 - pressureCirculation) * 0.55), 0, 1)
+	local arrhythmiaComplication = Approach(
+		org.arrhythmiaComplication or 0,
+		arrhythmiaComplicationTarget,
+		arrhythmiaComplicationTarget > (org.arrhythmiaComplication or 0) and timeValue / arrhythmiaComplicationTime or timeValue / 120
+	)
+	org.arrhythmiaComplication = arrhythmiaComplication
 	if org.hypotension > 0.92 and not org.heartstop then
 		org.hypotensionExposure = math.min((org.hypotensionExposure or 0) + timeValue, 120)
 	else
@@ -1140,8 +1159,7 @@ module[2] = function(owner, org, timeValue)
 		end
 	end
 
-	-- Track sustained ventricular tachycardia for the probabilistic arrest
-	-- check below. Low pressure/perfusion is only a late complication.
+	-- Track sustained ventricular tachycardia for the probabilistic arrest check below.
 	if org.heartbeat > 250 and k < 0.65 then
 		org._tachycardiaSince = org._tachycardiaSince or CurTime()
 	else
@@ -1243,6 +1261,11 @@ module[2] = function(owner, org, timeValue)
 			org.terminalRhythm = "ventricular_fibrillation"
 		end
 	end
+	if rhythmInstability > 0 then
+		local complicationBurden = math.max(rhythmInstability * 0.7, arrhythmiaComplication)
+		org.heartStrain = Clamp((org.heartStrain or 0) + timeValue * complicationBurden / 160, 0, 1)
+		org.ischemia = math.min((org.ischemia or 0) + timeValue * complicationBurden * 0.05, 6)
+	end
 	if org.hypertension > 0.35 then org.heartStrain = Clamp((org.heartStrain or 0) + timeValue * org.hypertension / 360, 0, 1) end
 	if ischemia > 0.35 then org.heartStrain = Clamp((org.heartStrain or 0) + timeValue * ischemia / 260, 0, 1) end
 	if ischemia > 0.45 and org.isPly and not org.otrub and (org.lastCardiacPain or 0) < CurTime() then
@@ -1270,6 +1293,7 @@ module[2] = function(owner, org, timeValue)
 		-- Epinephrine/adrenaline above 0.5 accelerates ischemia regression
 		-- Tranexamic acid and thiamine also accelerate ischemia regression
 		local decayRate = (adrenalineStabilizer or hasAntiIschemia) and timeValue / 4 or timeValue / 10
+		decayRate = decayRate * (1 - math.Clamp(arrhythmiaComplication * 0.9, 0, 0.9))
 		org.ischemia = math.max(org.ischemia - decayRate, 0)
 	end
 
@@ -1452,4 +1476,3 @@ function hg.organism.Pulse(owner, org, timeValue)
 		net.Send(owner)
 	end
 end
-

@@ -155,6 +155,7 @@ hook.Add("Org Clear", "Main", function(org)
 	org.fibrillation = false
 	org.fibrillationStart = 0
 	org.arrhythmia = 0
+	org.arrhythmiaComplication = 0
 	org.heartStrain = 0
 	org.bloodPressure = 90
 	org.systolic = 120
@@ -1348,12 +1349,6 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	else
 		org.deathStateEnd = nil
 		org.deathStateKilled = nil
-	end
-
-	if isPly and org.neckslit and org.neckslitDeadline and CurTime() >= org.neckslitDeadline and owner:Alive() and not org.deathStateKilled then
-		org.deathStateKilled = true
-		owner:Kill()
-		return
 	end
 
 	if isPly and org.brain and org.brain >= 1 and owner:Alive() and not org.deathStateKilled then
