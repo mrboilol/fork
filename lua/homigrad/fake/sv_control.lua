@@ -1913,8 +1913,6 @@ hook.Add("Think", "Fake", function()
 			shadowControl(ragdoll, 12, 0.001, AngleRand(-rand,rand), maxangspeed, maxangdamp)
 		end
 
-		ragdoll.hgControlled = inmove
-
 	end
 end)
 
