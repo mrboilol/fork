@@ -1343,7 +1343,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	local org = organism
 	local deathStateEnd = tonumber(org.deathStateEnd)
 	local incapacitated = org.otrub and org.incapacitated and deathStateEnd and deathStateEnd > CurTime()
-	local incapacitationProgress = incapacitated and math.Clamp((25 - (deathStateEnd - CurTime())) / 25, 0, 1) or 0
+	local incapacitationProgress = incapacitated and math.Clamp((20 - (deathStateEnd - CurTime())) / 20, 0, 1) or 0
 	local sensoryActive = not org.otrub or incapacitated
 	local sensoryMix = incapacitated and Lerp(incapacitationProgress, 1, 0.35) or 1
 

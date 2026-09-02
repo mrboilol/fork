@@ -753,7 +753,7 @@ module[2] = function(owner, org, mulTime)
 	-- Cerebral oxygen, brain/airway injury, cardiac arrest, and spinal failure do.
 	local cerebralFailure = (org.brainoxygen or 1) < 0.16
 	local ignoreBrainDamage = hg.organism.IsBrainDamageIgnored and hg.organism.IsBrainDamageIgnored(org)
-	org.incapacitated = incapacitationEnabled and org.otrub and (cerebralFailure or (not ignoreBrainDamage and org.brain > 0.4) or (org.trachea >= 0.5) or org.heartstop or (org.spine3 >= hg.organism.fake_spine3) or (org.spine2 >= hg.organism.fake_spine2)) or false
+	org.incapacitated = incapacitationEnabled and org.otrub and (cerebralFailure or (not ignoreBrainDamage and org.brain > 0.4) or (org.trachea >= 0.5) or org.heartstop or (org.spine3 >= 1) or (org.spine2 >= hg.organism.fake_spine2)) or false
 
 	local noNeedle = org.needle <= 0
 	local tracheaBlocking = org.trachea > 0.5 and noNeedle

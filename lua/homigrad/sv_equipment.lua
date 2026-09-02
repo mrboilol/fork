@@ -773,6 +773,57 @@ local function DamageArmor(org, placement, armor, dmgInfo, rawDmg)
 	return false
 end
 
+local function GetArmorImpactDamageScale(owner, armor, armorData, dmgType, placement)
+	local protection = math.max(tonumber(armorData.protection) or 0, 0)
+	local isSharp = bit.band(dmgType, DMG_SLASH) ~= 0
+	local isClub = bit.band(dmgType, DMG_CLUB) ~= 0 or bit.band(dmgType, DMG_GENERIC) ~= 0
+	local isPhysics = bit.band(dmgType, DMG_CRUSH) ~= 0 or bit.band(dmgType, DMG_FALL) ~= 0
+	local damageScale
+
+	if isSharp then
+		damageScale = armorData.sharpDamageScale or math.Clamp(0.9 - protection / 3.3, 0.015, 0.9)
+	elseif isPhysics then
+		damageScale = armorData.crushFallDamageScale or armorData.impactDamageScale or math.Clamp(0.78 - protection / 24, 0.06, 0.78)
+	elseif isClub then
+		damageScale = armorData.impactDamageScale or math.Clamp(0.78 - protection / 26, 0.1, 0.78)
+	else
+		damageScale = 1
+	end
+
+	local brokenMul = owner.armors_broken_mul and owner.armors_broken_mul[armor] or 1
+	local broken = owner.armors_broken and owner.armors_broken[armor]
+	if broken then
+		damageScale = 1 - (1 - damageScale) * math.Clamp(brokenMul, 0, 1)
+	else
+		local durability = armorData.durability or DEFAULT_HELMET_DURABILITY
+		local health = armorData.health or DEFAULT_VEST_HEALTH
+		local condition
+		if IsDurabilityArmor(placement, armorData) then
+			condition = (owner.armors_durability and owner.armors_durability[armor] or durability) / durability
+		else
+			condition = (owner.armors_health and owner.armors_health[armor] or health) / health
+		end
+		damageScale = 1 - (1 - damageScale) * math.Clamp(condition, 0, 1)
+	end
+
+	return damageScale, protection, isSharp
+end
+
+function hg.GetArmorImpactMitigation(org, placement, dmgInfo, rawDmg)
+	local owner = org and org.owner
+	if not IsValid(owner) or not owner.armors then return 1, false, false end
+
+	local armor = owner.armors[placement]
+	local armorData = armor and hg.armor[placement] and hg.armor[placement][armor]
+	if not armorData then return 1, false, false end
+
+	local damageScale, protection, isSharp = GetArmorImpactDamageScale(owner, armor, armorData, dmgInfo:GetDamageType(), placement)
+	local broken, destroyed = DamageArmor(org, placement, armor, dmgInfo, rawDmg or dmgInfo:GetDamage())
+	if destroyed then return 1, false, false end
+
+	return damageScale, isSharp and protection >= 2.5 and damageScale <= 0.15, true
+end
+
 -- Tarkov-style plate fragmentation: a fully shattered plate carrier still
 -- throws fragments into the wearer's chest on every hit that reaches it.
 local function ApplyArmorShrapnel(org, dmgInfo, dmg, bone, boneindex)
@@ -805,8 +856,8 @@ local function protec(org, bone, dmg, dmgInfo, placement, armor, scale, scalepro
 	
 	local armorData = hg.armor[placement] and hg.armor[placement][armor]
 	local ballisticProt = ballisticProtOverride or (armorData and armorData.protection) or 0
-	local meleeProt = armorData and (armorData.meleeProt or (armorData.protection and armorData.protection * 0.4) or 0) or 0
-	local stabProt = armorData and (armorData.stabProt or (armorData.protection and armorData.protection * 0.3) or 0) or 0
+	local meleeProt = armorData and (armorData.meleeProt or armorData.protection or 0) or 0
+	local stabProt = armorData and (armorData.stabProt or armorData.protection or 0) or 0
 
 	local isBullet = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
 	local isStab = dmgInfo:IsDamageType(DMG_SLASH)
@@ -967,7 +1018,7 @@ local function protec(org, bone, dmg, dmgInfo, placement, armor, scale, scalepro
 	end
 
 	-- Impact-specific damage scaling
-	if isImpact and not isBullet and armorData then
+	if isImpact and not isBullet and not isStab and armorData then
 		if dmgInfo:IsDamageType(DMG_CRUSH + DMG_FALL) then
 			dmgScale = armorData.crushFallDamageScale or armorData.impactDamageScale or dmgScale
 		else
@@ -988,6 +1039,11 @@ local function protec(org, bone, dmg, dmgInfo, placement, armor, scale, scalepro
 	end
 	if wearMul < 1 then
 		dmgScale = 1 - (1 - dmgScale) * math.Clamp(wearMul, 0, 1)
+	end
+	if isStab then
+		local sharpScale, sharpProtection = GetArmorImpactDamageScale(org.owner, armor, armorData, impact and impact.rawDamageType or dmgInfo:GetDamageType(), placement)
+		dmgScale = sharpScale
+		org.lastArmorSharpStopped = not armorIsBroken and sharpProtection >= 2.5 and dmgScale <= 0.15
 	end
 
 	org.lastArmorMitigation = dmgScale

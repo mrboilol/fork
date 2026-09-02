@@ -110,8 +110,7 @@ local function canReceiveResuscitationBreathing(org)
 	if leftLung >= 1 and rightLung >= 1 then return false end
 	if (tonumber(org.trachea) or 0) >= 1 or (tonumber(org.hemothorax) or 0) >= 0.9 then return false end
 	if (tonumber(org.brain) or 0) >= 0.85 then return false end
-	local cervicalLimit = hg.organism.fake_spine3 or 0.75
-	if (tonumber(org.spine3) or 0) >= cervicalLimit then return false end
+	if (tonumber(org.spine3) or 0) >= 1 then return false end
 	if IsValid(owner) and owner:WaterLevel() >= 3
 		and not (hg.organism.HasUnderwaterOxygen and hg.organism.HasUnderwaterOxygen(org)) then return false end
 	return true

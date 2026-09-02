@@ -1520,10 +1520,11 @@ function SWEP:TryLodgeMeleeWeapon(ent, trace, attacktype)
     if not SERVER or self.MeleeWeaponLodged then return false end
     if self:GetClashDamageType(attacktype) ~= DMG_SLASH then return false end
 
-    local owner = self:GetOwner()
-    local victim = self:GetHitVictim(ent)
-    if not IsValid(owner) or not IsValid(victim) or not victim:IsPlayer() or not victim.organism then return false end
-    if math.Rand(0, 1) > self:GetMeleeLodgeChance(attacktype) then return false end
+	local owner = self:GetOwner()
+	local victim = self:GetHitVictim(ent)
+	if not IsValid(owner) or not IsValid(victim) or not victim:IsPlayer() or not victim.organism then return false end
+	if victim.organism.lastArmorSharpStopped then return false end
+	if math.Rand(0, 1) > self:GetMeleeLodgeChance(attacktype) then return false end
 
     local bone, physBone = self:GetMeleeLodgeBone(ent, trace)
     if not bone or physBone == nil then return false end

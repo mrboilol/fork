@@ -19,6 +19,11 @@ end
 
 local input_list = hg.organism.input_list
 local hitArtery
+local function addPain(org, amount, region)
+	if hg.organism.AddPain then return hg.organism.AddPain(org, amount, region) end
+	org.painadd = math.min((org.painadd or 0) + amount, 150)
+	return amount
+end
 local function addInternalBleed(org, amount, organ)
 	if amount <= 0 then return end
 	org.internalBleed = org.internalBleed + amount
@@ -83,7 +88,7 @@ local function applyOrganTrauma(org, dmgInfo, force, delta, previousDamage, orga
 
 	local direction = traumaDirection(org, dmgInfo)
 	owner:SetVelocity(direction * math.Clamp(75 + severity * 90, 75, 300) + vector_up * math.Clamp(20 + severity * 35, 20, 140))
-	org.painadd = math.min((org.painadd or 0) + severity * 9, 150)
+	addPain(org, severity * 9, string.StartWith(organ or "", "brain") and "head" or "body")
 
 	if repeatHit and math.Rand(0, 1) < math.Clamp((rawForce - repeatThreshold) * 0.08, 0, 0.25) then
 		addInternalBleed(org, math.min(rawForce * 0.12, 0.8), organ)
@@ -108,7 +113,7 @@ input_list.heart = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	
 	if delta > 0 then
 		org.shock = org.shock + dmg * 20
-		org.painadd = org.painadd + dmg * 18
+		addPain(org, dmg * 18, "body")
 	end
 	addInternalBleed(org, delta * 10, "heart")
 	applyOrganTrauma(org, dmgInfo, dmg, delta, oldDmg, "heart")
@@ -135,7 +140,7 @@ input_list.liver = function(org, bone, dmg, dmgInfo)
 	local harmed = (org.liver - oldDmg)
 	if harmed > 0 then
 		org.shock = org.shock + dmg * 20
-		org.painadd = org.painadd + dmg * 35
+		addPain(org, dmg * 35, "body")
 	end
 	if org.analgesia < 0.4 and harmed >= 0.2 then
 		timer.Simple(0, function()
@@ -164,7 +169,7 @@ input_list.stomach = function(org, bone, dmg, dmgInfo)
 
 	local delta = org.stomach - oldDmg
 	if delta > 0 then
-		org.painadd = org.painadd + dmg * 3
+		addPain(org, dmg * 3, "body")
 		org.shock = org.shock + dmg * 1.5
 	end
 	addInternalBleed(org, delta * 2, "stomach")
@@ -181,7 +186,7 @@ input_list.intestines = function(org, bone, dmg, dmgInfo)
 
 	local delta = org.intestines - oldDmg
 	if delta > 0 then
-		org.painadd = org.painadd + dmg * 2
+		addPain(org, dmg * 2, "body")
 		org.shock = org.shock + dmg
 	end
 	addInternalBleed(org, delta * 2, "intestines")
@@ -229,7 +234,7 @@ local function damageBrainLobe(org, bone, dmg, dmgInfo, key)
 	end
 	if delta > 0 then
 		org.shock = org.shock + dmg * profile.shock
-		org.painadd = org.painadd + dmg * profile.pain
+		addPain(org, dmg * profile.pain, "head")
 	end
 	applyOrganTrauma(org, dmgInfo, dmg, delta, oldDmg, "brain")
 
@@ -402,7 +407,7 @@ hitArtery = function(artery, org, dmg, dmgInfo, boneindex, dir, hit, impact, for
 			-- Didn't fully cut through, maybe just a scratch
 			local scratchChance = 0.2 + 0.3 * staminaMul
 			if math.Rand(0, 1) < scratchChance then
-				org.painadd = org.painadd + dmg * 0.3
+				addPain(org, dmg * 0.3, artery == "arteria" and "head" or (artery == "llegartery" or artery == "rlegartery") and "lower" or "body")
 				if artery == "arteria" and org.isPly and IsValid(org.owner) then
 					org.owner:Notify("My neck got scratched!", true, "arteria", 0)
 				end
@@ -410,7 +415,7 @@ hitArtery = function(artery, org, dmg, dmgInfo, boneindex, dir, hit, impact, for
 			return
 		end
 	end
-	org.painadd = math.min(org.painadd + dmg * 1 + 45, 150)
+	addPain(org, dmg + 45, artery == "arteria" and "head" or (artery == "llegartery" or artery == "rlegartery") and "lower" or "body")
 	org.shock = math.min(org.shock + 15, 95)
 	org.fearadd = math.min(org.fearadd + 1.5, 3)
 	hg.organism.AddPanicAttack(org, math.max(0.9 - (org.panicattackadd or 0), 0), false, false, true)
@@ -500,7 +505,7 @@ input_list.eyeL = function(org, bone, dmg, dmgInfo)
 	org.eyeL = math.min((org.eyeL or 0) + dmg, 1)
 
 	hg.AddHarmToAttacker(dmgInfo, dmg * 5, "Left eye damage harm")
-	org.painadd = org.painadd + dmg * 20
+	addPain(org, dmg * 20, "head")
 	org.shock = org.shock + dmg * 10
 
 	dmgInfo:ScaleDamage(0.8)
@@ -513,7 +518,7 @@ input_list.eyeR = function(org, bone, dmg, dmgInfo)
 	org.eyeR = math.min((org.eyeR or 0) + dmg, 1)
 
 	hg.AddHarmToAttacker(dmgInfo, dmg * 5, "Right eye damage harm")
-	org.painadd = org.painadd + dmg * 20
+	addPain(org, dmg * 20, "head")
 	org.shock = org.shock + dmg * 10
 
 	dmgInfo:ScaleDamage(0.8)

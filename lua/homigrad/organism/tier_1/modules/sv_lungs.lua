@@ -498,7 +498,22 @@ module[2] = function(owner, org, timeValue)
 	org.drugRespiratoryDepression = drugRespiratoryDepression
 	org.bradyapnea = bradyapnea
 	org.respiratoryRate = math.Round(Lerp(bradyapnea, 14, 4))
-	org.respiratoryArrest = org.cervicalRespiratoryArrest == true or drugRespiratoryDepression >= opioidRespiratoryArrestThreshold
+	local cervicalOxygenLoss = 0
+	if (org.spine3 or 0) >= 1 then
+		org.spine3OxygenLossAt = org.spine3OxygenLossAt or CurTime() + 4
+		cervicalOxygenLoss = math.Clamp((CurTime() - org.spine3OxygenLossAt) / 10, 0, 1)
+		if cervicalOxygenLoss > 0 and not org.spine3OxygenLossWarned then
+			org.spine3OxygenLossWarned = true
+			if org.isPly and IsValid(owner) and owner:Alive() then
+				owner:Notify("I'm starting to lose oxygen... I can't breathe.", 20, "spine3_oxygen_loss", 0, nil, Color(255, 95, 95))
+			end
+		end
+	else
+		org.spine3OxygenLossAt = nil
+		org.spine3OxygenLossWarned = nil
+	end
+	org.cervicalOxygenLoss = cervicalOxygenLoss
+	org.respiratoryArrest = drugRespiratoryDepression >= opioidRespiratoryArrestThreshold
 
 	-- Blood volume affects oxygen delivery through cardiac output, pulse, and
 	-- pressure. It is not itself an arterial saturation cap; the lungs own the
@@ -770,6 +785,7 @@ module[2] = function(owner, org, timeValue)
 		local opioidBreathingK = math.Clamp(1 - drugRespiratoryDepression * 1.15, 0.05, 1)
 		local roleO2RegenMul = hg.GetSubRolePerk and hg.GetSubRolePerk(owner, "O2RegenMul", 1) or 1
 		local regenerate = regen * timeValue * 4 * circulationK * (mask_blevota and 0 or 1) * ((org.temperature > 38) and math.Clamp(math.Remap(org.temperature, 38, 41, 1, 0.1), 0.1, 1) or 1) * coldO2RegenK * altitudeO2K * coBreathePenalty * opioidBreathingK * roleO2RegenMul
+		regenerate = regenerate * Lerp(cervicalOxygenLoss, 1, 0.12)
 		-- Berserk repairs the airway and makes it immune to both the ongoing
 		-- breathing deterioration below and its associated oxygen penalties.
 		local berserkAirwayProtected = owner:IsBerserk()
@@ -1121,24 +1137,6 @@ module[2] = function(owner, org, timeValue)
 	if org.trachea >= 1.0 then
 
 		org.lungsfunction = false
-
-	end
-
-
-
-	-- Spine3 (neck) damage affects breathing capability
-
-	if org.spine3 and org.spine3 > 0.5 then
-
-		local fake3 = hg.organism and hg.organism.fake_spine3 or 0.75
-
-		local spine3BreathingPenalty = (org.spine3 - 0.5) / (fake3 - 0.5)
-
-		if math.random() < spine3BreathingPenalty * 0.1 then
-
-			org.lungsfunction = false
-
-		end
 
 	end
 

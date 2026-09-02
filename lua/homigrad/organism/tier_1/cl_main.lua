@@ -79,7 +79,7 @@ local tabblood = {
 
 local remDeathStateStation
 local remDeathStateLoading
-local remDeathStateSounds = {"rem_deathstatefull.mp3", "incap1.mp3", "incap2.mp3"}
+local remDeathStateSounds = {"drawyourlastdick.ogg"}
 local brainRotStation
 local brainRotLoading
 local nextBrainRotRoll = 0
@@ -95,7 +95,7 @@ local seizureStopping
 
 local MUSIC_VOLUME = 0.75
 local BRAINROT_VOLUME = 0.45
-local INCAPACITATION_DEATH_TIME = 25
+local INCAPACITATION_DEATH_TIME = 20
 
 local function GetLocalDeathState()
 	local ply = LocalPlayer()

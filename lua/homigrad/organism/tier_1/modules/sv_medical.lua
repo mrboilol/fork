@@ -1,18 +1,6 @@
 local min, max, Clamp, Approach = math.min, math.max, math.Clamp, math.Approach
 hg.organism.module.medical_system = {}
 local module = hg.organism.module.medical_system
-local rehab_phrases = {
-	"My vision is still unsteady...",
-	"I need a moment to recover.",
-	"I'm awake, but I don't feel fully present yet.",
-	"My body feels weak after blacking out.",
-	"I can't focus properly yet...",
-	"My limbs still feel heavy and unresponsive.",
-	"I need to move carefully right now.",
-	"I'm still dizzy after waking up.",
-	"I'm not steady yet. Give me a few seconds.",
-	"I'm conscious, but I haven't recovered.",
-}
 local function get_role(ply)
 	if not IsValid(ply) then return "none" end
 	local role = string.lower(tostring(ply.Profession or ""))
@@ -242,10 +230,6 @@ module[2] = function(owner, org, timeValue)
 		org.disorientation = min((org.disorientation or 0) + timeValue * (0.8 + remain), 10)
 		org.immobilization = min((org.immobilization or 0) + timeValue * (3 + 5 * remain), 80)
 		org.stamina.subadd = (org.stamina.subadd or 0) + remain * 0.2
-		if org.isPly and (org.next_rehab_phrase or 0) < now and remain > 0.25 then
-			org.next_rehab_phrase = now + math.random(15, 26)
-			owner:Notify(rehab_phrases[math.random(#rehab_phrases)], 5, "rehab_otrub", 0)
-		end
 	end
 end
 hook.Add("HG_OnWakeOtrub", "organism-rehab-after-otrub", function(owner)

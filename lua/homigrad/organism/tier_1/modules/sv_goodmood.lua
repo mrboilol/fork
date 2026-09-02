@@ -169,7 +169,7 @@ hook.Add("PostHeal", "GoodMood_OnHeal", function(wep, target, mode)
     end
 
     -- Apply neck constraint if spine3 is broken
-    if org.spine3 and org.spine3 > 0.75 and not org.headamputated then
+    if org.spine3 and org.spine3 >= 1 and not org.headamputated then
         timer.Simple(0.1, function()
             if IsValid(ragdoll) and IsValid(target) then
                 hg.BreakNeck(ragdoll, false)

@@ -30,7 +30,6 @@ local thoughtMessages = {
     painfrommoving = {"Your leg is hurting when moving.", "Your leg prevents you from moving comfortably."},
     painfromjaw = {"Speaking causes your jaw to hurt.", "Your jaw is causing pain."},
     painfromribs = {"You feel pain in your chest.", "Something is poking at your lungs."},
-    rehab_otrub = {"You feel very weak after waking up.", "You feel disoriented after regaining consciousness."},
     arrhythmia = {"Your heart rhythm is irregular.", "You have a heart arrhythmia."},
     tachycardia = {"Your heart rate is dangerously high.", "You have symptoms of tachycardia."},
     bradycardia = {"Your heart rate is dangerously low.", "You are showing symptoms of bradycardia."},

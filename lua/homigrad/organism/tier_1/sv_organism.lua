@@ -1333,9 +1333,9 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	local terminalIncapacitation = incapacitationEnabled
 		and (org.otrub or org.needotrub)
 		and ((org.brainoxygen or 1) < 0.16 or (not ignoreBrainDamage and (org.brain or 0) > 0.4) or (org.trachea or 0) >= 0.5
-			or org.heartstop or (org.spine3 or 0) >= hg.organism.fake_spine3 or (org.spine2 or 0) >= hg.organism.fake_spine2)
+			or org.heartstop or (org.spine3 or 0) >= 1 or (org.spine2 or 0) >= hg.organism.fake_spine2)
 	if isPly and owner:Alive() and terminalIncapacitation then
-		org.deathStateEnd = org.deathStateEnd or CurTime() + 25
+		org.deathStateEnd = org.deathStateEnd or CurTime() + 20
 		if (org.defibDeathGrace or 0) > CurTime() then org.deathStateEnd = org.defibDeathGrace end
 
 		if CurTime() >= org.deathStateEnd and not org.deathStateKilled then

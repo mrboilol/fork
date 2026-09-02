@@ -9,10 +9,6 @@ hg.organism.input_list = hg.organism.input_list or {}
 local vecZero, angZero = Vector(), Angle()
 local hook_Run = hook.Run
 local input_list = hg.organism.input_list
-local head_otrub_min_damage = 0.05
-local head_otrub_chance_mul = 1.25
-local head_otrub_max_chance = 0.35
-local head_consciousness_mul = 28
 local head_otrub_consciousness_cap = 0.04
 local instant_pain_shock_scale = 0.75
 local traumatic_shock_threshold = 24
@@ -600,6 +596,12 @@ local sounds = {
 	Sound("gore/chop6.mp3"),
 }
 
+local function painRegionForHitgroup(hitgroup)
+	if hitgroup == HITGROUP_HEAD then return "head" end
+	if hitgroup == HITGROUP_LEFTLEG or hitgroup == HITGROUP_RIGHTLEG then return "lower" end
+	return "body"
+end
+
 function hg.organism.AddTraumaticShock(org, trauma, multiplier)
 	if not org then return 0 end
 
@@ -655,14 +657,15 @@ function hg.organism.AmputateLimb(org, limb, noShake)
 
 	org[amputatedKey] = true
 
-	org.painadd = math.min((org.painadd or 0) + 80, 150)
-	org.avgpain = math.min((org.avgpain or 0) + 40, 150)
+	local region = (limb == "lleg" or limb == "rleg" or limb == "llegup" or limb == "rlegup") and "lower" or "body"
+	if hg.organism.AddPain then hg.organism.AddPain(org, 80, region) else org.painadd = math.min((org.painadd or 0) + 80, 150) end
+	if hg.organism.AddInstantPain then hg.organism.AddInstantPain(org, 40, region) else org.avgpain = math.min((org.avgpain or 0) + 40, 150) end
 	org.shock = math.min((org.shock or 0) + 40, 95)
 	org.immobilization = math.min((org.immobilization or 0) + 45, 100)
 	org.fearadd = math.min((org.fearadd or 0) + 2, 3)
 	if IsValid(org.owner) and org.owner:IsPlayer() and org.owner:Alive() then
 		org.owner:AddNaturalAdrenaline(1)
-		if hg.QueuePainScream then hg.QueuePainScream(org.owner, 2) end
+		if hg.QueuePainScream and (not hg.organism.CanFeelPain or hg.organism.CanFeelPain(org, region)) then hg.QueuePainScream(org.owner, 2) end
 		if hg.LightStunPlayer then hg.LightStunPlayer(org.owner, 3) end
 	end
 
@@ -1319,6 +1322,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 
 	org.lastArmorMitigation = 1
 	org.lastHeadArmorMitigation = 1
+	org.lastArmorSharpStopped = false
 
 	-- Cache organs/hitboxes for this damage event
 	local cachedOrgans = hg.organism.GetHitBoxOrgans(ent:GetModel(), ent)
@@ -1557,9 +1561,10 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		
 		local instant_pain = instantPainMul * painadd
 		local slow_pain = (1 - instantPainMul) * painadd
-		org.painadd = org.painadd + slow_pain
+		local painRegion = painRegionForHitgroup(hitgroup)
+		if hg.organism.AddPain then hg.organism.AddPain(org, slow_pain, painRegion) else org.painadd = org.painadd + slow_pain end
 		if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) then
-			org.avgpain = math.min((org.avgpain or 0) + instant_pain * 0.5, 150)
+			if hg.organism.AddInstantPain then hg.organism.AddInstantPain(org, instant_pain * 0.5, painRegion) else org.avgpain = math.min((org.avgpain or 0) + instant_pain * 0.5, 150) end
 		end
 		if meleeContact and dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH) then
 			hg.organism.AddTraumaticShock(org, meleeContact.trauma or dmg_before, IsValid(inf) and inf.TraumaShockMultiplier or nil)
@@ -2176,8 +2181,8 @@ local function resolvePhysicsImpactLane(ent, hitgroup, bonename, data, relativeV
 			collisionNormal and math.abs(headAxis:Dot(collisionNormal)) or 0
 		) or 0
 
-		if axialLoad >= 0.78 and normalSpeed >= 540 then
-			return {name = "spine3", reserve = 0.9, scale = 3.2, axialLoad = axialLoad}
+		if axialLoad >= 0.58 and normalSpeed >= 390 then
+			return {name = "spine3", reserve = 1.05, scale = 3.8, axialLoad = axialLoad}
 		end
 
 		return {name = "skull", reserve = 0.8, scale = 4.5, axialLoad = axialLoad}
@@ -2212,7 +2217,8 @@ end
 local function applyPhysicsResidual(ent, org, hitgroup, residual, lane)
 	if residual <= 0 then return end
 
-	org.painadd = math.min((org.painadd or 0) + residual * 5, 150)
+	local painRegion = painRegionForHitgroup(hitgroup)
+	if hg.organism.AddPain then hg.organism.AddPain(org, residual * 5, painRegion) else org.painadd = math.min((org.painadd or 0) + residual * 5, 150) end
 	org.shock = math.min((org.shock or 0) + residual * 3.5, 95)
 
 	if hitgroup == HITGROUP_CHEST or hitgroup == HITGROUP_STOMACH then
@@ -2336,21 +2342,19 @@ local function velocityDamage(ent, data)
 		if hg.FullBodyExplode(ent, data.OurOldVelocity - data.TheirOldVelocity, dmgInfo) then return end
 	end
 
-	-- Armor protection vs physical/fall damage
-	local armorDmgMul = 1
-	local eqArmors = org.owner.armors or {}
+	local armorPlacement
+	local armorImpactApplied = false
+	local unarmoredImpactDamage = dmg
 	if hitgroup == HITGROUP_CHEST or hitgroup == HITGROUP_STOMACH then
-		local a = eqArmors["torso"]
-		if a and hg.armor.torso[a] then
-			armorDmgMul = math.Clamp(1 - (hg.armor.torso[a].protection or 0) / 40, 0.25, 1)
-		end
+		armorPlacement = "torso"
 	elseif hitgroup == HITGROUP_HEAD then
-		local a = eqArmors["head"]
-		if a and hg.armor.head[a] then
-			armorDmgMul = math.Clamp(1 - (hg.armor.head[a].protection or 0) / 40, 0.3, 1)
-		end
+		armorPlacement = "head"
 	end
-	dmg = dmg * armorDmgMul
+	if armorPlacement and hg.GetArmorImpactMitigation then
+		local armorDmgMul
+		armorDmgMul, _, armorImpactApplied = hg.GetArmorImpactMitigation(org, armorPlacement, dmgInfo, dmgInfo:GetDamage())
+		dmg = dmg * armorDmgMul
+	end
 
 	if (hitgroup == HITGROUP_LEFTARM and IsValid(ent.ConsLH)) or (hitgroup == HITGROUP_RIGHTARM and IsValid(ent.ConsRH))
 		or ((hitgroup == HITGROUP_LEFTARM or hitgroup == HITGROUP_RIGHTARM) and IsValid(ply) and (ply:KeyDown(IN_FORWARD) or ply:KeyDown(IN_BACK))) then
@@ -2369,6 +2373,7 @@ local function velocityDamage(ent, data)
 			source = "physics",
 			lane = lane.name,
 			residualEnergy = residual,
+			headOutcomeHandled = true,
 		}
 
 		if lane.name == "dislocation" then
@@ -2399,8 +2404,7 @@ local function velocityDamage(ent, data)
 		org.owner:AddNaturalAdrenaline( math.min( dmg * 0.5, 4) )
 
 		if hitgroup == HITGROUP_HEAD then
-			local hadhelmet = org.owner.armors and org.owner.armors["head"] != nil
-			local head_otrub_chance = math.Clamp((dmg - head_otrub_min_damage) * head_otrub_chance_mul, 0, head_otrub_max_chance)
+			local hadhelmet = armorImpactApplied or org.owner.armors and org.owner.armors["head"] != nil
 			local headDamageMul = hadhelmet and 0.2 or 1
 			local oldSkull = org.skull
 			local oldSpine3 = org.spine3 or 0
@@ -2412,16 +2416,24 @@ local function velocityDamage(ent, data)
 					hg.organism.input_list.jaw(org, bone, math.min(residual, 0.8) * headDamageMul * ragdoll_fall_jaw_damage_mul, dmgInfo)
 				end
 			end
-			if oldSpine3 < 0.8 and org.spine3 >= 0.8 and hg.BreakNeck then
+			if oldSpine3 < 1 and org.spine3 >= 1 and hg.BreakNeck then
 				hg.BreakNeck(ent)
 			end
 			
-			org.consciousness = math.Approach(org.consciousness, 0, dmg * head_consciousness_mul * headDamageMul)
-			
-			if dmg > head_otrub_min_damage and !hadhelmet and math.Rand(0, 1) < head_otrub_chance then
+			local headImpactSeverity = math.Clamp(math.max(unarmoredImpactDamage, structuralBudget) * math.Clamp(normalSpeed / 600, 0.7, 2), 0, 3)
+			local knockoutChance = math.Clamp((headImpactSeverity - 0.3) * 0.22, 0, 0.45)
+			if hadhelmet then knockoutChance = knockoutChance * 0.2 end
+			if headImpactSeverity > 0.15 and math.Rand(0, 1) < knockoutChance then
 				org.needotrub = true
 				org.shock = org.shock + 10
 				org.consciousness = math.min(org.consciousness, head_otrub_consciousness_cap)
+			else
+				if headImpactSeverity > 0.15 and hg.organism.module.concussion then
+					local concussionIntensity = math.Clamp(headImpactSeverity * (hadhelmet and 2.2 or 1.45), 0.25, hadhelmet and 3.6 or 4.5)
+					hg.organism.module.concussion.AddConcussion(org, concussionIntensity, math.Clamp(10 + concussionIntensity * 18, 12, 75))
+				end
+				local consciousnessLoss = headImpactSeverity * (hadhelmet and 0.04 or 0.12)
+				org.consciousness = math.max((org.consciousness or 1) - consciousnessLoss, hadhelmet and 0.5 or 0.3)
 			end
 
 			if oldSkull < 1 and org.skull == 1 then
@@ -2481,7 +2493,8 @@ local function velocityDamage(ent, data)
 	local dmghuy = dmg * 20 * (safeLanding and safePainMul or 1) * (org.painresist or 1)
 
 	if not org.superfighter then
-		org.painadd = org.painadd + dmghuy
+		local painRegion = painRegionForHitgroup(hitgroup)
+		if hg.organism.AddPain then hg.organism.AddPain(org, dmghuy, painRegion) else org.painadd = org.painadd + dmghuy end
 		org.shock = org.shock + dmghuy
 	else
 		dmghuy = dmghuy * 0.5
@@ -2501,8 +2514,16 @@ function hg.BreakNeck(ent, recipient, soundEnt)
 	org.spine3 = 1
 	org.cervicalParalysis = true
 	org.paralyzed = true
-	org.cervicalRespiratoryArrest = true
-	org.respiratoryArrest = true
+	org.cervicalRespiratoryArrest = false
+	org.respiratoryArrest = false
+	org.spine3OxygenLossAt = org.spine3OxygenLossAt or CurTime() + 4
+	org.spine3OxygenLossWarned = nil
+	if (org.spine3AcutePainUntil or 0) <= CurTime() then
+		org.spine3AcutePainUntil = CurTime() + 1.5
+		org.spine3AcutePain = 95
+		if hg.organism.AddPain then hg.organism.AddPain(org, 95, "spine3acute") else org.painadd = math.min((org.painadd or 0) + 95, 150) end
+		if hg.QueuePainScream then hg.QueuePainScream(org.owner, 1.6) end
+	end
 	if hg.fakeBoneFlop then
 		hg.fakeBoneFlop.FlagBone(org, "ValveBiped.Bip01_Spine3", true)
 		hg.fakeBoneFlop.FlagBone(org, "ValveBiped.Bip01_Head1", true)
@@ -2511,7 +2532,7 @@ function hg.BreakNeck(ent, recipient, soundEnt)
 	local ply = ent:IsRagdoll() and hg.RagdollOwner(ent) or ent
 	if IsValid(ply) and ply:Alive() and not org.cervicalArrestAnnounced then
 		org.cervicalArrestAnnounced = true
-		ply:Notify("I CANT BREATHE.. I CANT MOVE..", true, "cervical_respiratory_arrest", 0, nil, Color(255, 95, 95))
+		ply:Notify("I CAN'T MOVE...", true, "cervical_respiratory_arrest", 0, nil, Color(255, 95, 95))
 	end
 
 	soundEnt = IsValid(soundEnt) and soundEnt or ent

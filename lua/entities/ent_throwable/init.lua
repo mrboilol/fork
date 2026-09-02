@@ -417,6 +417,14 @@ function ENT:PhysicsCollide(data, phys)
 	dmginfo:SetDamagePosition(data.HitPos)
 	self.DamageSpent = true
 	target:TakeDamageInfo(dmginfo)
+	local armorStoppedSharp = targetOrganism and targetOrganism.lastArmorSharpStopped
+	if armorStoppedSharp and isSharp then
+		self:EmitSound(self.AttackHit or "physics/metal/metal_solid_impact_hard1.wav", 65)
+		if IsValid(phys) then
+			phys:SetVelocity(-hitDirection * math.max(data.Speed * 0.22, 80))
+		end
+		return
+	end
 
 	if targetOrganism then
 		self:EmitSound(self.AttackHitFlesh, 65)

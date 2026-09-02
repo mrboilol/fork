@@ -134,6 +134,16 @@ local function sendThought(org, msg, key, delay, clr)
 	end
 end
 
+local function addPain(org, amount, region)
+	if hg.organism.AddPain then return hg.organism.AddPain(org, amount, region) end
+	org.painadd = math.min((org.painadd or 0) + amount, 150)
+	return amount
+end
+
+local function canFeelPain(org, region)
+	return not hg.organism.CanFeelPain or hg.organism.CanFeelPain(org, region)
+end
+
 local function doDislocate(org, key, dmg, segment)
 	if org[key.."dislocation"] then return false end
 	org[key.."dislocation"] = true
@@ -143,10 +153,10 @@ local function doDislocate(org, key, dmg, segment)
 
 	local stabilized = org[key.."stabilized"]
 	if not stabilized then
-		org.painadd = org.painadd + 35
+		addPain(org, 35, (key == "lleg" or key == "rleg") and "lower" or "body")
 		org.immobilization = org.immobilization + dmg * 10
 	else
-		org.painadd = org.painadd + 10
+		addPain(org, 10, (key == "lleg" or key == "rleg") and "lower" or "body")
 		org.immobilization = org.immobilization + dmg * 3
 	end
 	org.owner:AddNaturalAdrenaline(0.5)
@@ -160,7 +170,7 @@ local function doDislocate(org, key, dmg, segment)
 
 	timer.Simple(0, function() hg.LightStunPlayer(org.owner,2) end)
 	playBoneFractureSound(org.owner)
-	if org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner, 1) end
+	if org.isPly and hg.QueuePainScream and canFeelPain(org, (key == "lleg" or key == "rleg") and "lower" or "body") then hg.QueuePainScream(org.owner, 1) end
 	return true
 end
 
@@ -215,10 +225,10 @@ local function legs(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 		end
 
 		if not stabilized then
-			org.painadd = org.painadd + 55
+			addPain(org, 55, "lower")
 			org.immobilization = org.immobilization + dmg * 25
 		else
-			org.painadd = org.painadd + 10
+			addPain(org, 10, "lower")
 			org.immobilization = org.immobilization + dmg * 5
 		end
 		org.owner:AddNaturalAdrenaline(1)
@@ -232,7 +242,7 @@ local function legs(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 
 		timer.Simple(0, function() hg.LightStunPlayer(org.owner,2) end)
 		playBoneFractureSound(org.owner)
-		if org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner, 1.35) end
+		if org.isPly and hg.QueuePainScream and canFeelPain(org, "lower") then hg.QueuePainScream(org.owner, 1.35) end
 	else
 		doDislocate(org, key, dmg, segment)
 	end
@@ -280,10 +290,10 @@ local function arms(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 		end
 
 		if not stabilized then
-			org.painadd = org.painadd + 55
+			addPain(org, 55, (limb_key == "lleg" or limb_key == "rleg") and "lower" or "body")
 			org.immobilization = org.immobilization + dmg * 25
 		else
-			org.painadd = org.painadd + 10
+			addPain(org, 10, (limb_key == "lleg" or limb_key == "rleg") and "lower" or "body")
 			org.immobilization = org.immobilization + dmg * 5
 		end
 		org.owner:AddNaturalAdrenaline(1)
@@ -296,7 +306,7 @@ local function arms(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 		end
 
 		playBoneFractureSound(org.owner)
-		if org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner, 1.35) end
+		if org.isPly and hg.QueuePainScream and canFeelPain(org, "body") then hg.QueuePainScream(org.owner, 1.35) end
 	else
 		doDislocate(org, key, dmg, segment)
 	end
@@ -336,14 +346,26 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 		hg.AddHarmToAttacker(dmgInfo, (org[name] - oldDmg) * 8, "Broken spine harm")
 	end
 
-	if oldDmg < hg.organism[name2] and org[name] >= hg.organism[name2] and org.isPly then
+	local breakThreshold = name == "spine3" and 1 or hg.organism[name2]
+	if oldDmg < breakThreshold and org[name] >= breakThreshold and org.isPly then
 		playBoneFractureSound(org.owner)
 		if hg.QueuePainScream then hg.QueuePainScream(org.owner, 1.1) end
 		if org.owner:IsPlayer() and !hasNewThoughts(org) then
 			org.owner:Notify(huyasd[name], true, name, 2)
 		end
 		sendThought(org, "Your spine is broken.", "thought_" .. name, 4, Color(255, 210, 210))
-		org.painadd = org.painadd + 25
+		if name == "spine3" then
+			org.spine3AcutePainUntil = CurTime() + 1.5
+			org.spine3AcutePain = 95
+			addPain(org, 95, "spine3acute")
+			if hg.QueuePainScream then hg.QueuePainScream(org.owner, 1.6) end
+		else
+			if name == "spine2" then
+				org.painadd = 0
+				org.avgpain = 0
+			end
+			addPain(org, 25, "body")
+		end
 	end
 
 	if name == "spine3" then
@@ -358,10 +380,8 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 		if oldDmg < 1 and org.spine3 >= 1 then
 			org.cervicalParalysis = true
 			org.paralyzed = true
-			org.cervicalRespiratoryArrest = true
-			org.respiratoryArrest = true
 			if org.isPly and IsValid(org.owner) then
-				org.owner:Notify("I CANT BREATHE.. I CANT MOVE..", true, "cervical_respiratory_arrest", 0, nil, Color(255, 95, 95))
+				org.owner:Notify("I CAN'T MOVE...", true, "cervical_respiratory_arrest", 0, nil, Color(255, 95, 95))
 			end
 		end
 	end
@@ -370,7 +390,7 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 		--org.owner:Notify("Your spinal cord is damaged.",true,"spinalcord",4)
 	end
 
-	org.painadd = org.painadd + dmg * 2
+	addPain(org, dmg * 2, "body")
 	timer.Simple(0, function() hg.LightStunPlayer(org.owner) end)
 	org.shock = org.shock + dmg * 5
 	return result,vecrand
@@ -516,8 +536,8 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 	org.teethLost = math.Clamp(org.teethLost or 0, 0, 32)
 
 	local jawPain = math.Clamp(incomingDmg * 10 + jawDelta * 28, 0, 38)
-	org.painadd = math.min((org.painadd or 0) + jawPain, 150)
-	org.avgpain = math.min((org.avgpain or 0) + jawPain * 0.45, 150)
+	addPain(org, jawPain, "head")
+	if hg.organism.AddInstantPain then hg.organism.AddInstantPain(org, jawPain * 0.45, "head") else org.avgpain = math.min((org.avgpain or 0) + jawPain * 0.45, 150) end
 	org.shock = math.min((org.shock or 0) + jawPain * 0.5, 95)
 
 	if org.consciousness then
@@ -560,7 +580,7 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 			lost = math.min(lost, 32 - org.teethLost)
 			org.teethLost = org.teethLost + lost
 			SpawnTeeth(org, lost, hit, dir)
-			org.painadd = math.min((org.painadd or 0) + 4 + lost * 3, 150)
+			addPain(org, 4 + lost * 3, "head")
 			org.shock = math.min((org.shock or 0) + 1 + lost * 1.5, 95)
 			hg.AddHarmToAttacker(dmgInfo, lost * 0.08, "Teeth loss harm")
 
@@ -588,7 +608,7 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 
 	if org.jaw == 1 then
 		org.shock = org.shock + dmg * 40
-		org.avgpain = org.avgpain + dmg * 30
+		if hg.organism.AddInstantPain then hg.organism.AddInstantPain(org, dmg * 30, "head") else org.avgpain = org.avgpain + dmg * 30 end
 
 		if oldDmg != 1 then
 			playBoneFractureSound(org.owner)
@@ -600,7 +620,7 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 
 	if dislocated then
 		org.shock = org.shock + dmg * 20
-		org.avgpain = org.avgpain + dmg * 20
+		if hg.organism.AddInstantPain then hg.organism.AddInstantPain(org, dmg * 20, "head") else org.avgpain = org.avgpain + dmg * 20 end
 		
 		if !org.jawdislocation then
 			playBoneFractureSound(org.owner)
@@ -645,7 +665,7 @@ end
 hook.Add("CanListenOthers", "CantHaveShitInDetroit", function(output, input, isChat, teamonly, text)
 	if IsValid(output) and (output.organism.jaw == 1 or output.organism.jawdislocation) and output:Alive() and (output:IsSpeaking() or isChat) then
 		-- and !isChat and output:IsSpeaking()
-		output.organism.painadd = output.organism.painadd + 2 * (output:IsSpeaking() and 1 or (isChat and 5 or 0))
+		addPain(output.organism, 2 * (output:IsSpeaking() and 1 or (isChat and 5 or 0)), "head")
 		if output:GetInfoNum("hg_newthoughts", 0) <= 0 then output:Notify("My jaw is really hurting when I speak.", 60, "painfromjawspeak", 0, nil, Color(255, 210, 210)) end
 	end
 end)
@@ -656,6 +676,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	local oldBrain = org.brain or 0
 	local ignoreBrainDamage = hg.organism.IsBrainDamageIgnored and hg.organism.IsBrainDamageIgnored(org)
 	local brainEnergy = impact and impact.source == "physics" and math.max(impact.residualEnergy or 0, 0) or dmg
+	local headOutcomeHandled = impact and impact.headOutcomeHandled
 	
 	local result, vecrand = damageBone(org, 0.25, dmg, dmgInfo, "skull", boneindex, dir, hit, ricochet)
 	local inflictor = dmgInfo:GetInflictor()
@@ -665,6 +686,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	local functionalHelmet = helmet and hg.armor.head and hg.armor.head[helmet]
 		and not (org.owner.armors_broken and org.owner.armors_broken[helmet])
 	local helmetApplied = (org.lastHeadArmorMitigation or 1) < 1
+	local helmetProtectedHit = functionalHelmet and helmetApplied
 
 	if isStab and functionalHelmet and helmetApplied then
 		org.skull = oldDmg
@@ -675,7 +697,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 
 	if org.skull == 1 then
 		org.shock = org.shock + dmg * 40
-		org.avgpain = org.avgpain + dmg * 30
+		if hg.organism.AddInstantPain then hg.organism.AddInstantPain(org, dmg * 30, "head") else org.avgpain = org.avgpain + dmg * 30 end
 
 		if oldDmg != 1 then
 			playSkullFractureSound(org.owner)
@@ -685,7 +707,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 
 	org.shock = org.shock + dmg * 3
 
-	local rnd = (math.random(10) == 1 or dmgInfo:IsDamageType(DMG_CRUSH)) and brainEnergy > 0.05
+	local rnd = not headOutcomeHandled and (math.random(10) == 1 or dmgInfo:IsDamageType(DMG_CRUSH)) and brainEnergy > 0.05
 	org.consciousness = math.Approach(org.consciousness, 0, rnd and dmg * 2 or 0)
 
 	org.brain = math.min(org.brain + (rnd and dmg * 0.05 or 0), 1)
@@ -738,18 +760,18 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	local brainDelta = math.max(org.brain - oldBrain, 0)
 	local hasHelmet = org.owner.armors and org.owner.armors["head"] != nil
 	local concussionGain = 0
-	if hg.organism.module.concussion and hg.organism.module.concussion.AddHeadTrauma then
-		concussionGain = hg.organism.module.concussion.AddHeadTrauma(org, skullDelta, brainDelta, brainEnergy, dmgInfo)
-	end
-
 	local headTraumaSeverity = skullDelta * 2.8 + brainDelta * 5.5 + math.Clamp(brainEnergy * 0.1, 0, 1)
-	if org.alive and not org.otrub and headTraumaSeverity >= 0.85 then
-		local knockoutChance = math.Clamp((headTraumaSeverity - 0.65) * 0.18 + brainDelta * 0.35, 0, hasHelmet and 0.12 or 0.34)
+	if not headOutcomeHandled and org.alive and not org.otrub and headTraumaSeverity >= 0.85 then
+		local knockoutChance = math.Clamp((headTraumaSeverity - 0.65) * 0.18 + brainDelta * 0.35, 0, helmetProtectedHit and 0.06 or 0.34)
 		if math.Rand(0, 1) < knockoutChance then
 			org.needotrub = true
 			org.consciousness = math.min(org.consciousness or 1, 0.08)
 			org.shock = math.min((org.shock or 0) + 12 + brainDelta * 20, 95)
+			headOutcomeHandled = true
 		end
+	end
+	if not headOutcomeHandled and hg.organism.module.concussion and hg.organism.module.concussion.AddHeadTrauma then
+		concussionGain = hg.organism.module.concussion.AddHeadTrauma(org, skullDelta, brainDelta, brainEnergy * (helmetProtectedHit and 1.8 or 1), dmgInfo)
 	end
 
 	if not ignoreBrainDamage and not isStab and brainEnergy > 0.05 then
@@ -828,7 +850,7 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	
 	hg.AddHarmToAttacker(dmgInfo, (org.chest - oldDmg) * 3, "Ribs bone damage harm")
 
-	org.painadd = org.painadd + dmg * 1.5
+	addPain(org, dmg * 1.5, "body")
 	org.shock = org.shock + dmg * 1.5
 
 	if org.isPly and (not org.brokenribs or (org.brokenribs ~= math.Round(org.chest * 3))) then
@@ -853,7 +875,7 @@ end
 
 input_list.pelvis = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet)
 	local oldDmg = org.pelvis
-	org.painadd = org.painadd + dmg * 1
+	addPain(org, dmg * 1, "lower")
 	org.shock = org.shock + dmg * 1
 
 	local result = damageBone(org, 0.15, dmg * 0.5, dmgInfo, "pelvis", boneindex, dir, hit, ricochet)
@@ -903,17 +925,17 @@ local function upper_limb(org, bone, dmg, dmgInfo, amputate_key, limb_key, segme
 		end
 
 		if not stabilized then
-			org.painadd = org.painadd + 55
+			addPain(org, 55, "body")
 			org.immobilization = org.immobilization + d * 25
 		else
-			org.painadd = org.painadd + 10
+			addPain(org, 10, "body")
 			org.immobilization = org.immobilization + d * 5
 		end
 		org.owner:AddNaturalAdrenaline(1)
 		org.fearadd = org.fearadd + 0.5
 
 		playBoneFractureSound(org.owner)
-		if org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner, 1.35) end
+		if org.isPly and hg.QueuePainScream and canFeelPain(org, (limb_key == "lleg" or limb_key == "rleg") and "lower" or "body") then hg.QueuePainScream(org.owner, 1.35) end
 	else
 		doDislocate(org, limb_key, d, segment)
 	end

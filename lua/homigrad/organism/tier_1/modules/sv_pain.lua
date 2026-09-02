@@ -41,6 +41,36 @@ function hg.organism.GetAdrenalinePainPacing(adrenaline)
 	return max(1 / (1 + adrenaline * 2.5), 0.08)
 end
 
+function hg.organism.CanFeelPain(org, region)
+	if not org or org.otrub then return false end
+
+	local spine1Broken = (org.spine1 or 0) >= (hg.organism.fake_spine1 or 1)
+	local spine2Broken = (org.spine2 or 0) >= (hg.organism.fake_spine2 or 1)
+	local spine3Broken = (org.spine3 or 0) >= 1
+
+	if spine3Broken then return region == "spine3acute" and (org.spine3AcutePainUntil or 0) > CurTime() end
+	if spine2Broken then return region == "head" end
+	if spine1Broken and region == "lower" then return false end
+	return true
+end
+
+function hg.organism.AddPain(org, amount, region)
+	amount = math.max(tonumber(amount) or 0, 0)
+	if amount <= 0 or not hg.organism.CanFeelPain(org, region) then return 0 end
+
+	local key = region == "head" and "headpainadd" or "painadd"
+	org[key] = math.min((org[key] or 0) + amount, 150)
+	return amount
+end
+
+function hg.organism.AddInstantPain(org, amount, region)
+	amount = math.max(tonumber(amount) or 0, 0)
+	if amount <= 0 or not hg.organism.CanFeelPain(org, region) then return 0 end
+
+	org.avgpain = math.min((org.avgpain or 0) + amount, 150)
+	return amount
+end
+
 module[1] = function(org)
 
 	org.shock = 0
@@ -50,6 +80,7 @@ module[1] = function(org)
 	org.avgpain = 0
 
 	org.painadd = 0
+	org.headpainadd = 0
 	org.nearpainlimit = false
 	org.hurt = 0
 
@@ -166,12 +197,11 @@ module[2] = function(owner, org, timeValue)
 	if !org.lasthit or org.lasthit + 1.5 < CurTime() then org.shock = max(org.shock - timeValue * 4 * (org.otrub and 1 or 0.5) * (1 + resilience * 0.75 + zerlkersResistance * 2.25), 0) end
 	org.immobilization = math.Clamp(max((tonumber(org.immobilization) or 0) - timeValue * 5 * adrenalineMul, 0), 0, 100)
 
-	local shouldPainAdd = not (org.otrub or org.spine2 >= hg.organism.fake_spine2 or org.spine3 >= hg.organism.fake_spine3)
-	
-	-- Otrub blocks queued pain from reaching avgpain. Keep the queue intact so
-	-- stimulants and unconsciousness defer pain instead of deleting it.
-	local queuedPain = math.min(timeValue * 15, org.painadd)
-	local add = shouldPainAdd and queuedPain or 0
+	local spine2Broken = (org.spine2 or 0) >= (hg.organism.fake_spine2 or 1)
+	local spine3Broken = (org.spine3 or 0) >= 1
+	local queuedPain = math.min(timeValue * 15, org.painadd or 0)
+	local queuedHeadPain = math.min(timeValue * 15, org.headpainadd or 0)
+	local add = org.otrub and 0 or (spine3Broken and 0 or (spine2Broken and queuedHeadPain or queuedPain + queuedHeadPain))
 	local sub = (add <= 0.2) and (timeValue * pain_drain_base * (org.otrub and pain_drain_otrub_mul or 1) + timeValue * ((org.painkiller * 0.3 + org.analgesia) * 4)) or (0)
 
 	-- Adrenaline delays incoming pain. Zerlkers nearly stops it, preserving the
@@ -324,7 +354,23 @@ module[2] = function(owner, org, timeValue)
 
 	-- Remove only pain that actually entered avgpain. The old queuedPain
 	-- subtraction made adrenaline and Zerlkers erase deferred damage.
-	org.painadd = min(max(org.painadd - add * analgesiaMul, 0), 150)
+	local headApplied = spine2Broken and add or math.min(queuedHeadPain, add)
+	local bodyApplied = add - headApplied
+	org.headpainadd = min(max((org.headpainadd or 0) - headApplied * analgesiaMul, 0), 150)
+	org.painadd = min(max((org.painadd or 0) - bodyApplied * analgesiaMul, 0), 150)
+
+	if spine3Broken then
+		org.painadd = 0
+		org.headpainadd = 0
+		org.avgpain = 0
+		if (org.spine3AcutePainUntil or 0) > CurTime() then
+			org.pain = math.max(org.spine3AcutePain or 95, 0)
+		else
+			org.pain = 0
+		end
+	elseif spine2Broken then
+		org.painadd = 0
+	end
 
 	//org.painkiller = Approach(org.painkiller, 0, timeValue / 240 * (org.naloxone * 25 + 1))
 
