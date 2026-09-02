@@ -332,7 +332,7 @@ module[2] = function(owner, org, timeValue)
 	-- Anger grants a small pain resistance. Stimulants defer incoming pain via
 	-- painadd above instead of directly deleting pain already incurred.
 	local angerPainMul = 1 - anger * anger_pain_reduction_max
-	org.pain = org.avgpain * math.max(1 - (org.analgesia + org.painkiller * 0.3), 0) * angerPainMul / math.max(org.painResistanceMul or 1, 1)
+	org.pain = org.avgpain * math.max(1 - (org.analgesia + org.painkiller * 0.3), 0) * angerPainMul / math.max(org.painResistanceMul or 1, 1)  * (org.psychePainMul or 1)
 	if zerlkersDose > 0 or adrenaline >= 3 then
 		org.pain = math.min(org.pain, 69.99)
 	end

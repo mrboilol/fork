@@ -88,9 +88,17 @@ hook.Add("Org Clear", "Main", function(org)
 	org.alive = true
 	org.otrub = false
 	org.entindex = IsValid(org.owner) and org.owner:EntIndex() or hg.organism.lastindex + 1
-	for _, name in ipairs(organismModuleInitOrder) do
-		runOrganismModule(name, 1, nil, org)
-	end
+	module.pulse[1](org)
+	module.blood[1](org)
+	module.pain[1](org)
+	module.stamina[1](org)
+	module.lungs[1](org)
+	module.liver[1](org)
+	module.metabolism[1](org)
+	module.random_events[1](org)
+	module.concussion[1](org)
+	module.trauma_combo[1](org)
+	module.psyche[1](org)
 	org.brain = 0
 	org.brainFrontal = 0
 	org.brainParietal = 0
@@ -429,7 +437,8 @@ local function send_organism(org, ply, recipientForce, reliable)
 	sendtable.noradrenaline = org.noradrenaline
 	sendtable.panicattackadd = org.panicattackadd
 	sendtable.panicattack = org.panicattack
-	sendtable.panicattackActive = org.panicattackActive
+	sendtable.psycheAnger = org.psycheAnger or 0
+	sendtable.psycheApathy = org.psycheApathy or 0
 	sendtable.seizure = org.seizure
 	sendtable.seizureActive = org.seizureActive
 	sendtable.seizureStart = org.seizureStart
@@ -1132,9 +1141,10 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		runOrganismModule("metabolism", 2, owner, org, timeValue)
 		runOrganismModule("random_events", 2, owner, org, timeValue)
 	end
-	runOrganismModule("pulse", 2, owner, org, timeValue)
-	runOrganismModule("concussion", 2, owner, org, timeValue)
-	org.immobilization = math.Clamp(tonumber(org.immobilization) or 0, 0, 100)
+	module.pulse[2](owner, org, timeValue)
+	module.concussion[2](owner, org, timeValue)
+	module.trauma_combo[2](owner, org, timeValue)
+	module.psyche[2](owner, org, timeValue)
 	if org.owner.PlayerClassName == "furry" then
 		org.assimilated = 0
 	end

@@ -800,9 +800,13 @@ local math_abs, math_Approach, math_AngleDifference, math_Clamp, math_cos, math_
 			inertia_len = math_min(inertia_len, run_speed * 1.1)
 		end
 
-		if (org.lleg == 1 or org.rleg == 1 or org.llegdislocation or org.rlegdislocation) and ply:OnGround() then
-			inertia_len = math.min(inertia_len, (ply:GetSlowWalkSpeed() or 100) * 0.78)
-		end
+	if (org.lleg == 1 or org.rleg == 1 or org.llegdislocation or org.rlegdislocation) and ply:OnGround() then
+		inertia_len = math.min(inertia_len, (ply:GetSlowWalkSpeed() or 100) * 0.78)
+	end
+
+	if org.psycheApathy and org.psycheApathy > 0 then
+		inertia_len = inertia_len * (1 - 0.08 * math.min(org.psycheApathy, 1))
+	end
 		
 		mv:SetMaxSpeed(inertia_len)
 		mv:SetMaxClientSpeed(inertia_len)
