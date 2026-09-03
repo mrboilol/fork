@@ -1312,27 +1312,28 @@ kaz
 	if (org.tranexamic_acid or 0) > 0 then hemorrhageReliefRate = hemorrhageReliefRate + 1 / 1200 end
 
 	local skullDamage = math.Clamp(tonumber(org.skull) or 0, 0, 1)
-	if skullDamage >= 0.4 then
-		local fractureSeverity = math.Clamp((skullDamage - 0.4) / 0.6, 0, 1)
-		local dressingMul = org.bandagedskull and 0.22 or 1
-		local medicationMul = (1 - mannitolK * 0.4) * ((org.tranexamic_acid or 0) > 0 and 0.65 or 1)
-		local resistanceMul = 1 - zerlkersResistance * 0.75
-		local ruptureRate = (0.00015 + fractureSeverity * fractureSeverity * 0.0032)
-			* dressingMul * medicationMul * resistanceMul
-		local ruptureChance = 1 - math.exp(-ruptureRate * math.max(timeValue, 0))
-		if math.Rand(0, 1) < ruptureChance then
-			local amount = math.Rand(0.006, 0.018) * Lerp(fractureSeverity, 0.45, 1)
-			local rate = math.Rand(0.00004, 0.00018) * Lerp(fractureSeverity, 0.5, 1)
-			if hg.organism.AddBrainHemorrhage then
-				hg.organism.AddBrainHemorrhage(org, amount, rate)
-			else
-				org.brainHemorrhage = math.min((org.brainHemorrhage or 0) + amount, 1)
-				org.brainBleedRate = math.min((org.brainBleedRate or 0) + rate, 0.008)
-			end
-		end
+	local activeConcussion = math.max(tonumber(org.concussion) or 0, tonumber(org.concussion_onset) or 0)
+	local lobeDamage = math.max(frontal, parietal, temporal, occipital)
+	local skullCrisis = math.Clamp((skullDamage - 0.35) / 0.65, 0, 1)
+	local concussionCrisis = math.Clamp((activeConcussion - 2.5) / 3.5, 0, 1)
+	local brainCrisis = math.Clamp((lobeDamage - 0.35) / 0.65, 0, 1)
+	local cranialCrisis = math.max(skullCrisis, concussionCrisis, brainCrisis)
+	local skullProtection = org.bandagedskull and 0.22 or 1
+	local medicationMul = (1 - mannitolK * 0.8) * ((org.tranexamic_acid or 0) > 0 and 0.65 or 1)
+	local resistanceMul = 1 - zerlkersResistance * 0.75
+	local crisisBleedRate = skullCrisis * (0.00002 + skullCrisis * 0.00022) * skullProtection
+		+ concussionCrisis * 0.00012
+		+ brainCrisis * 0.00008
+	crisisBleedRate = crisisBleedRate * medicationMul * resistanceMul
+
+	if crisisBleedRate > 0 then
+		hemorrhage = min(hemorrhage + timeValue * crisisBleedRate, 1)
+		bleedRate = mannitolK > 0 and math.min(bleedRate, crisisBleedRate) or math.max(bleedRate, crisisBleedRate)
+	else
+		bleedRate = 0
 	end
-	hemorrhage = org.brainHemorrhage or hemorrhage
-	bleedRate = org.brainBleedRate or bleedRate
+	org.brainHemorrhage = hemorrhage
+	org.brainBleedRate = bleedRate
 
 	org.disorientation = math.max(org.disorientation, frontal * 0.35 + parietal * 0.65 + temporal * 0.25)
 	org.immobilization = math.max(org.immobilization, parietal * 8)
@@ -1358,12 +1359,24 @@ kaz
 		local brainDamageRate = 0.35 + cranialDamage * 1.65
 		org.brainHemorrhage = min(hemorrhage + timeValue * bleedRate * hemorrhageRate * traumaProgression, 1)
 		org.brain = min(org.brain + timeValue * bleedRate * brainDamageRate * traumaProgression, 1)
-		org.brainBleedRate = max(bleedRate - timeValue / 600000, 0)
+		org.brainBleedRate = max(bleedRate - timeValue / (cranialCrisis > 0 and 600000 or 1200), 0)
 	end
 
+	if cranialCrisis <= 0 then hemorrhageReliefRate = hemorrhageReliefRate + 1 / 360 end
 	if hemorrhageReliefRate > 0 and (org.brainHemorrhage or 0) > 0 then
 		org.brainHemorrhage = max(org.brainHemorrhage - timeValue * hemorrhageReliefRate, 0)
 	end
+	local swellingTarget = math.Clamp((org.brainHemorrhage or 0) * 0.55 + cranialCrisis * 0.3, 0, 1)
+	if mannitolK > 0 then swellingTarget = swellingTarget * (1 - mannitolK * 0.8) end
+	local swelling = math.Clamp(tonumber(org.brainSwelling) or 0, 0, 1)
+	local swellingRate = mannitolK > 0 and 1 / 35 or (swellingTarget > swelling and 1 / 90 or 1 / 260)
+	org.brainSwelling = math.Approach(swelling, swellingTarget, timeValue * swellingRate)
+
+	local pressureTarget = math.Clamp((org.brainHemorrhage or 0) * 0.75 + org.brainSwelling * 0.65 + cranialCrisis * 0.1, 0, 1)
+	if mannitolK > 0 then pressureTarget = pressureTarget * (1 - mannitolK * 0.85) end
+	local pressure = math.Clamp(tonumber(org.intracranialPressure) or 0, 0, 1)
+	local pressureRate = mannitolK > 0 and 1 / 30 or (pressureTarget > pressure and 1 / 75 or 1 / 220)
+	org.intracranialPressure = math.Approach(pressure, pressureTarget, timeValue * pressureRate)
 	if mannitolK > 0 then
 		local mannitolBrainRecovery = timeValue * (1 / 170) * mannitolK
 		org.brain = max(org.brain - mannitolBrainRecovery, 0)

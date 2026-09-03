@@ -50,7 +50,6 @@ hook.Add("Player Spawn", "removeownblooddroplets", function(ply)
 	end
 end)
 
-local mat_huy = Material("effects/blood_core")
 local lightcolor = Color(0, 0, 0, 255)
 bloodparticles_hook[1] = function(anim_pos, mul)
 	 
@@ -88,7 +87,7 @@ bloodparticles_hook[1] = function(anim_pos, mul)
 			local len = (part[2] - part[1]):LengthSqr()
 			--part.lerpeddiff = LerpVector(FrameTime() * 1, part.lerpeddiff or Vector(), (part[2] - part[1]))
 			--if len > 1 * 1 then
-				render_SetMaterial(mat_huy)
+				render_SetMaterial(part[4])
 				lightcolor.r = math.min((part.artery and 45 or 20) * light[1], 255)
 				--part.lerpedshit = LerpFT(!part.lasthit and 1 or mul * 1, part.lerpedshit or 1, part.lasthit and 7 or 1)
 				--render_DrawBeam(pos - (len < 2 and (part[2] - part[1]):GetNormalized() * part.lerpedshit or (part[2] - part[1])) * 0.5 / mul / 24,pos + (part[2] - part[1]) * 0.5 / mul / 24, part.lerpedshit, 0, 1, part[9] or lightcolor )
@@ -134,6 +133,7 @@ local function fadeGroundBlood(stain, now)
 end
 
 local function addGroundBlood(pos, normal, artery, tiny)
+	if hg_old_blood:GetBool() then return false end
 	if normal.z < 0.55 then return false end
 
 	local now = CurTime()
@@ -233,6 +233,11 @@ for i = 1, #tinyNormalDecalIds do
 	tinyNormalDecals[i] = Material("effects/droplets/drop" .. tinyNormalDecalIds[i] .. "_1")
 end
 local tinyArterialDecal = Material("effects/droplets/drop12_1")
+local oldTinyNormalDecals = {}
+for i = 1, 10 do
+	oldTinyNormalDecals[i] = Material("decals/z_blood" .. i)
+end
+local oldTinyArterialDecal = Material("decals/arterial_blood1")
 
 local function decalBlood(pos, normal, tr, artery, owner, tiny)
 	if not pos or not normal then return end
@@ -242,7 +247,9 @@ local function decalBlood(pos, normal, tr, artery, owner, tiny)
 		return
 	end
 	if tiny then
-		local decal = artery and tinyArterialDecal or tinyNormalDecals[math.random(#tinyNormalDecals)]
+		local oldBlood = hg_old_blood:GetBool()
+		local decal = artery and (oldBlood and oldTinyArterialDecal or tinyArterialDecal)
+			or (oldBlood and oldTinyNormalDecals[math.random(#oldTinyNormalDecals)] or tinyNormalDecals[math.random(#tinyNormalDecals)])
 		local target = IsValid(tr.Entity) and tr.Entity or game.GetWorld()
 		local scale = math.Rand(0.12, 0.24)
 		util.DecalEx(decal, target, pos, normal, color_white, scale, scale)

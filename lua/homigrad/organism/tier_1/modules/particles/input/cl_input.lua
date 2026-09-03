@@ -1,4 +1,6 @@
+local hg_old_blood = ConVarExists("hg_old_blood") and GetConVar("hg_old_blood") or CreateClientConVar("hg_old_blood", 0, true, false, "new decals, or old", 0, 1)
 local mats = {}
+local oldMats = {}
 for i = 1, 6 do
 	mats[i] = CreateMaterial( "blood_particle0"..i, "Sprite", {
 		["$translucent"] = 1,
@@ -6,17 +8,48 @@ for i = 1, 6 do
 		["$vertexcolor"] = 1
 	} )
 	mats[i]:SetTexture("$basetexture",Material("decals/blood" .. i):GetTexture("$basetexture"))
+	oldMats[i] = CreateMaterial( "hg_old_blood_particle0"..i, "Sprite", {
+		["$translucent"] = 1,
+		["$vertexalpha"] = 1,
+		["$vertexcolor"] = 1
+	} )
+	oldMats[i]:SetTexture("$basetexture", Material("decals/z_blood" .. i):GetTexture("$basetexture"))
 end
 
 --local mat_huy = Material("sprites/mat_jack_irregularcircle")
-local texture = Material("decals/z_blood1"):GetTexture("$basetexture")
 local mat_huy = Material("effects/blood_core")
-mat_huy:SetTexture("$basetexture",texture)
+local oldMatHuy = CreateMaterial("hg_old_blood_core", "Sprite", {
+	["$translucent"] = 1,
+	["$vertexalpha"] = 1,
+	["$vertexcolor"] = 1
+})
+oldMatHuy:SetTexture("$basetexture", Material("decals/z_blood1"):GetTexture("$basetexture"))
+
+local function bloodParticleMaterial()
+	return hg_old_blood:GetBool() and oldMatHuy or mat_huy
+end
+
+local function bloodTrailMaterial()
+	local materials = hg_old_blood:GetBool() and oldMats or mats
+	return materials[math.random(#materials)]
+end
+
+cvars.RemoveChangeCallback("hg_old_blood", "hg_refresh_blood_textures")
+cvars.AddChangeCallback("hg_old_blood", function(_, oldValue, newValue)
+	if oldValue == newValue then return end
+	hg.bloodparticles1 = {}
+	hg.bloodparticles2 = {}
+	hg.gibbloodspillparticles = {}
+	hg.groundbloodstains = {}
+	hg.fadinggroundbloodstains = {}
+end, "hg_refresh_blood_textures")
 
 local cloudmat = Material("effects/smoke_b")
 local bloodSpillMats = {}
+local oldBloodSpillMats = {}
 for i = 1, 6 do
 	bloodSpillMats[i] = Material("bloodspill/blood" .. i)
+	oldBloodSpillMats[i] = oldMats[i]
 end
 
 --оставь это лучше выглядит
@@ -43,7 +76,7 @@ local function addBloodPart(pos, vel, mat, w, h, artery, kishki, owner, tiny, hi
 
 	if #hg.bloodparticles1 >= 600 then table.remove(hg.bloodparticles1, 1) end
 	
-	local part = {pos, pos2, vel, mat or mat_huy, w or 2, h or 2, CurTime(), artery = artery, kishki = kishki, owner = owner, start_velocity = IsValid(owner) and owner:GetVelocity() or vector_origin, tiny = tiny, hidden = hidden}
+	local part = {pos, pos2, vel, mat or bloodParticleMaterial(), w or 2, h or 2, CurTime(), artery = artery, kishki = kishki, owner = owner, start_velocity = IsValid(owner) and owner:GetVelocity() or vector_origin, tiny = tiny, hidden = hidden}
 	hg.bloodparticles1[#hg.bloodparticles1 + 1] = part
 	return part
 end
@@ -79,7 +112,8 @@ local function addGibBloodSpill(ent, stump)
 	if #hg.gibbloodspillparticles > 120 then table.remove(hg.gibbloodspillparticles, 1) end
 	local vel = VectorRand(-18, 18) + ent:GetVelocity() * 0.04
 	vel[3] = vel[3] + (stump and Rand(10, 22) or Rand(-2, 10))
-	hg.gibbloodspillparticles[#hg.gibbloodspillparticles + 1] = {ent:GetPos() + VectorRand(-3, 3), vel, bloodSpillMats[math.random(#bloodSpillMats)], CurTime(), Rand(0.35, 0.55), stump and Rand(1, 2) or Rand(0.25, 0.6), stump and Rand(9, 16) or Rand(3, 6), stump}
+	local spillMats = hg_old_blood:GetBool() and oldBloodSpillMats or bloodSpillMats
+	hg.gibbloodspillparticles[#hg.gibbloodspillparticles + 1] = {ent:GetPos() + VectorRand(-3, 3), vel, spillMats[math.random(#spillMats)], CurTime(), Rand(0.35, 0.55), stump and Rand(1, 2) or Rand(0.25, 0.6), stump and Rand(9, 16) or Rand(3, 6), stump}
 end
 
 hook.Add("PostDrawTranslucentRenderables", "hg_gib_bloodspill", function()
@@ -116,7 +150,7 @@ local function impact(pos,vel,mul)
 
 	for i = 1, iters do
 		local size = bloodImpactParticleSize
-		addBloodPart(pos, -vel * i / iters + Vector(Rand(-20, 20), Rand(-20, 20), 0), mat_huy, size, size, false, false)
+		addBloodPart(pos, -vel * i / iters + Vector(Rand(-20, 20), Rand(-20, 20), 0), bloodParticleMaterial(), size, size, false, false)
 	end
 end
 
@@ -166,7 +200,7 @@ local function explode(pos, size, force)
 			dir:Rotate(Angle(h * y * Rand(0.9, 1.1), w * x * Rand(0.9, 1.1), 0))
 			dir[3] = dir[3] + Rand(0.5, 1.5)
 			dir:Mul(250 * size)
-			addBloodPart(pos, force * 0.2 + dir, mat_huy, math.Rand(5,10), math.Rand(5,10), false, true)
+			addBloodPart(pos, force * 0.2 + dir, bloodParticleMaterial(), math.Rand(5,10), math.Rand(5,10), false, true)
 		end
 	end
 end
@@ -277,7 +311,7 @@ hook.Add("Think", "hg_gib_trail", function()
 
 		local speed = math.sqrt(speedSqr)
 		local normVel = vel / speed
-		addBloodPart(ent:GetPos() + VectorRand(-1.5, 1.5), -normVel * Rand(15, 35) + VectorRand(-4, 4), mats[math.random(countmats)], Rand(1.5, 3), Rand(1.5, 3), false, false)
+		addBloodPart(ent:GetPos() + VectorRand(-1.5, 1.5), -normVel * Rand(15, 35) + VectorRand(-4, 4), bloodTrailMaterial(), Rand(1.5, 3), Rand(1.5, 3), false, false)
 	end
 end)
 
@@ -370,7 +404,7 @@ net.Receive("bloodsquirt", function()
 			drawDir = drawDir:Forward() * len
 			if (drawPos - LocalPlayer():EyePos()):LengthSqr() > dsqr then i = i - 1 return end
 			vechuy = vechuy + VectorRand(-amt * 5,amt * 5)
-			addBloodPart(drawPos, drawDir * amt * 130 + vechuy * amt, mat_huy, math.Rand(3,3), math.Rand(3,3), true, false)
+			addBloodPart(drawPos, drawDir * amt * 130 + vechuy * amt, bloodParticleMaterial(), math.Rand(3,3), math.Rand(3,3), true, false)
 			i = i - 1
 		end)
 	end
@@ -434,7 +468,7 @@ net.Receive("bloodsquirt2", function()
 
 		dir = dir:Forward() * len
 		if (pos - LocalPlayer():EyePos()):LengthSqr() > dsqr then i = i - 1 return end
-		addBloodPart(pos + VectorRand(-0.2, 0.2), dir * amt * 90 + VectorRand(-amt * 25,amt * 25), mat_huy, math.Rand(3,3), math.Rand(3,3), false, false)
+		addBloodPart(pos + VectorRand(-0.2, 0.2), dir * amt * 90 + VectorRand(-amt * 25,amt * 25), bloodParticleMaterial(), math.Rand(3,3), math.Rand(3,3), false, false)
 		i = i - 1
 	end)
 end)

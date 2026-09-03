@@ -597,6 +597,7 @@ CreateThought = function(ply, msg, delay, msgKey, showTime, clr, func)
     timer.Simple(showTime, function()
         if !IsValid(ply) then return end
         if !ply.thoughtmsgs[msgKey] then return end
+        if ply:GetInfoNum("hg_newthoughts", 0) <= 0 then return end
         if (ply.organism and ply.organism.otrub) or !ply:Alive() then return end
         if func and isfunction(func) and func(ply) then return end
 

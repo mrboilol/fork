@@ -267,6 +267,7 @@ if CLIENT then
 		local group = net.ReadString()
 
 		if msg == "" then return end
+		if not hg_newthoughts:GetBool() then return end
 
 		CreateThought(msg, clr, group != "" and group or nil)
 	end)

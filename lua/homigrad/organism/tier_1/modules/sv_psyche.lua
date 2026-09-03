@@ -56,20 +56,7 @@ local apathy_phrases = {
 	"The light seems weaker than it was yesterday.",
 	"You are merely existing, not living."
 }
-local fear_phrases = {
-	"I'm scared...",
-	"I'm so scared...",
-	"I want to go home...",
-	"I don't want to die...",
-	"I don't want to die here...",
-	"Calm down. Just calm down...",
-	"It's fine. It's fine...",
-	"It's going to be okay... right?",
-	"I can't stop shaking...",
-	"Just don't panic. Don't panic...",
-	"Please, not me. Not now...",
-	"I just want to survive this..."
-}
+local fear_phrase = "You are in fear."
 local derealization_phrases = {
 	"This doesn't feel real.",
 	"The world looks wrong, like a rough sketch of itself.",
@@ -143,7 +130,7 @@ module[2] = function(owner, org, timeValue)
 			psycheThought(owner, derealization_phrases[math.random(#derealization_phrases)], math.Rand(18, 28), "psyche_derealization", derealization_color)
 		end
 		if fearLevel > 0.5 and panic < 0.55 then
-			psycheThought(owner, fear_phrases[math.random(#fear_phrases)], math.Rand(15, 25), "psyche_fear", fear_color)
+			psycheThought(owner, fear_phrase, math.Rand(15, 25), "psyche_fear", fear_color)
 		end
 		if anger > 0.55 then
 			psycheThought(owner, anger_phrases[math.random(#anger_phrases)], math.Rand(20, 35), "psyche_anger", anger_color)
