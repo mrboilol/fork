@@ -2,7 +2,7 @@ hg = hg or {}
 hg.organism = hg.organism or {}
 hg.organism.fake_spine1 = 1
 hg.organism.fake_spine2 = 1
-hg.organism.fake_spine3 = 0.5
+hg.organism.fake_spine3 = 0.75
 hg.organism.fake_legs = 1
 hg.organism.input_list = hg.organism.input_list or {}
 
@@ -647,7 +647,7 @@ function hg.organism.AmputateLimb(org, limb, noShake)
 				table.insert(wnds, tbl)
 			end
 		end
-		table.insert(wnds, {10, vec, ang, boneup, CurTime(), Vector(-100, 0, 0), bone.."artery", math.Rand(0, 1) < 0.46 and 2 or 1})
+		table.insert(wnds, {10, vec, ang, boneup, CurTime(), Vector(-100, 0, 0), bone.."artery"})
 
 		org.arterialwounds = wnds
 		hg.organism.MarkArterialWoundsNetDirty(org)
@@ -2514,6 +2514,7 @@ function hg.BreakNeck(ent, recipient, soundEnt)
 	org.spine3 = 1
 	org.cervicalParalysis = true
 	org.paralyzed = true
+	org.heartbeat = math.min(tonumber(org.heartbeat) or 70, 45)
 	org.cervicalRespiratoryArrest = false
 	org.respiratoryArrest = false
 	org.spine3OxygenLossAt = org.spine3OxygenLossAt or CurTime() + 4

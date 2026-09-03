@@ -755,7 +755,6 @@ local function DrawEKG(state, centerX, centerY, width, height, org, color, ringA
         local pvcStrength = math.max(arrhythmia * 0.9, palpitations * 0.8, ischemia * 0.55, hypoxia * 0.45)
         local pvcPeriod = math.max(3, math.floor(Lerp(math.Clamp(pvcStrength, 0, 1), 14, 4)))
         local pvcBeat = pvcStrength >= 0.1 and beatIndex % pvcPeriod == pvcPeriod - 1
-        local compensatoryPause = pvcStrength >= 0.1 and beatIndex % pvcPeriod == 0
 
         if rhythm == "ventricular_fibrillation" then
             h = getVentricularFibrillationH(rawPhase)
@@ -765,8 +764,6 @@ local function DrawEKG(state, centerX, centerY, width, height, org, color, ringA
             h = getWideComplexH(phase)
         elseif rhythm == "ventricular_ectopy" and beatIndex % 3 == 2 then
             h = getPVCH(phase)
-        elseif rhythm == "ventricular_ectopy" and beatIndex % 3 == 0 then
-            h = 0
         elseif rhythm == "junctional_escape" then
             h = getJunctionalH(phase)
         elseif rhythm == "hypothermia_bradycardia" then
@@ -796,8 +793,6 @@ local function DrawEKG(state, centerX, centerY, width, height, org, color, ringA
 
         if pvcBeat and rhythm ~= "ventricular_fibrillation" and rhythm ~= "atrial_fibrillation" and rhythm ~= "terminal_tachycardia" then
             h = getPVCH(phase)
-        elseif compensatoryPause and rhythm ~= "ventricular_fibrillation" and rhythm ~= "atrial_fibrillation" and rhythm ~= "terminal_tachycardia" then
-            h = 0
         end
 
         local palpitationK = math.Clamp(tonumber(palpitations) or 0, 0, 1)

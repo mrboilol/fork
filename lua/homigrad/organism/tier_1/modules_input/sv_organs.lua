@@ -354,11 +354,6 @@ local arterySize = {
 	["aorta"] = 18,
 }
 
-local function chooseArterialBleedStyle(artery)
-	if (artery == "arteria" or artery == "aorta") and math.Rand(0, 1) < 0.18 then return 3 end
-	return 1
-end
-
 local arteryMessages ={
 	"I can feel blood rushing from my neck...",
 	"My neck.. it's... pumping out blood.",
@@ -468,7 +463,7 @@ hitArtery = function(artery, org, dmg, dmgInfo, boneindex, dir, hit, impact, for
 	if not localPos then
 		localPos, localAng, dir2 = vecZero, angZero, Vector(-1, 0, 0)
 	end
-	local wound = {arterySize[artery], localPos, localAng, woundBone or boneindex, CurTime(), dir2 * 100, artery, chooseArterialBleedStyle(artery)}
+	local wound = {arterySize[artery], localPos, localAng, woundBone or boneindex, CurTime(), dir2 * 100, artery}
 	wound.visualBleedRate = math.max((arterySize[artery] or 6) * 0.75, 1)
 	table.insert(org.arterialwounds, wound)
 	hg.organism.MarkArterialWoundsNetDirty(org)

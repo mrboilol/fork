@@ -612,12 +612,14 @@ module[2] = function(owner, org, mulTime)
 		-- pressure scales that rate continuously; compression/tourniquets act on the
 		-- same rate. Blood subtraction is therefore independent of Think frequency.
 		local heldBleedMul = getHeldWoundBleedMul(org, wound)
+		local bandageCoverage = math.Clamp(tonumber(wound.bandageCoverage) or 0, 0, 1)
 		local woundBleedRate = math.max(wound[1] or 0, 0)
 			* arterial_bleed_ml_s_per_severity
 			* woundSeverityMul
 			* flowDrive
 			* tourniquetBleedMul
 			* heldBleedMul
+			* (1 - bandageCoverage)
 		bleedoutspeed2 = bleedoutspeed2 + woundBleedRate
 		org.blood = max(org.blood - woundBleedRate * mulTime, 1)
 

@@ -255,7 +255,7 @@ local function wounds_signature(wounds)
 	for i = 1, #wounds do
 		local wound = wounds[i]
 		if wound then
-			sig = sig .. ":" .. tostring(wound[4]) .. ":" .. tostring(math.Round((wound[1] or 0) * 100)) .. ":" .. tostring(wound[7])
+			sig = sig .. ":" .. tostring(wound[4]) .. ":" .. tostring(math.Round((wound[1] or 0) * 100)) .. ":" .. tostring(math.Round((wound.bandageCoverage or 0) * 100)) .. ":" .. tostring(wound[7])
 		end
 	end
 	return sig

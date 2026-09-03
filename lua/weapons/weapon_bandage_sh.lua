@@ -752,6 +752,25 @@ GetBandageableArteryWound = function(org, ent, bone)
 	return selectedIndex, selectedWound
 end
 
+local neckArteryBandageCostMultiplier = 4
+
+local function GetArteryBandageTreatmentCost(wound)
+	if not wound then return 0 end
+
+	local severity = math.max(tonumber(wound.initialSeverity) or tonumber(wound[1]) or 0, 0)
+	if wound[7] == "arteria" then
+		return math.max(severity * neckArteryBandageCostMultiplier, 1)
+	end
+
+	return severity
+end
+
+local function GetRemainingArteryBandageTreatmentCost(wound)
+	local total = GetArteryBandageTreatmentCost(wound)
+	local applied = math.Clamp(tonumber(wound.bandageMaterial) or 0, 0, total)
+	return math.max(total - applied, 0), total, applied
+end
+
 function SWEP:GetBandageStructuralTreatmentCost()
 	local owner = self:GetOwner()
 	return 25 * (IsValid(owner) and owner.Profession == "doctor" and 0.2 or 1)
@@ -762,7 +781,10 @@ function SWEP:GetBandageTreatmentCost(target, bone)
 	if not org then return 0 end
 
 	local _, arteryWound = GetBandageableArteryWound(org, target, bone)
-	if arteryWound then return math.max(arteryWound[1] or 0, 0) end
+	if arteryWound then
+		local remaining = GetRemainingArteryBandageTreatmentCost(arteryWound)
+		return remaining
+	end
 
 	local woundCost = 0
 	for _, wound in ipairs(org.wounds or {}) do
@@ -802,36 +824,50 @@ if SERVER then
 		local done = false
 		local bandaged = false
 
-		if arteryWound and self.modeValues[1] >= arteryWound[1] then
-			local arterySeverity = arteryWound[1]
-			local arteryName = arteryWound[7]
-			self.modeValues[1] = self.modeValues[1] - arterySeverity
-			table.remove(org.arterialwounds, arteryIndex)
-			if math.Rand(0, 1) < math.Clamp(0.08 + arterySeverity / 80, 0.08, 0.3) then
-				org.internalBleed = (org.internalBleed or 0) + math.Rand(0.25, 0.7) * arterySeverity / 14
-			end
-			if arteryName == "arteria" then
-				org.neckslit = false
-				org.neckslitDeadline = nil
-				org.neckslitWarned = nil
-				org.throatCutPressureShock = 0
-				org.neckBrainOxygenPenalty = 0
-				if org.neckslitSoundName then
-					if IsValid(org.neckslitSoundEnt) then org.neckslitSoundEnt:StopSound(org.neckslitSoundName) end
-					if IsValid(org.owner) then org.owner:StopSound(org.neckslitSoundName) end
-					org.neckslitSoundName = nil
-					org.neckslitSoundEnt = nil
+		if arteryWound then
+			local remainingCost, totalCost, appliedMaterial = GetRemainingArteryBandageTreatmentCost(arteryWound)
+			local usedMaterial = math.min(self.modeValues[1], remainingCost)
+			if usedMaterial > 0 then
+				local arterySeverity = arteryWound[1]
+				local arteryName = arteryWound[7]
+				appliedMaterial = appliedMaterial + usedMaterial
+				arteryWound.bandageMaterial = appliedMaterial
+				arteryWound.bandageCoverage = math.Clamp(appliedMaterial / math.max(totalCost, 0.01), 0, 1)
+				arteryWound.bandaged = arteryWound.bandageCoverage > 0
+				self.modeValues[1] = self.modeValues[1] - usedMaterial
+
+				ent.bandaged_limbs = ent.bandaged_limbs or {}
+				ent.bandaged_limbs[arteryName == "arteria" and "ValveBiped.Bip01_Neck1" or arteryWound[4]] = true
+				bandaged = true
+				done = true
+
+				if arteryWound.bandageCoverage >= 0.999 then
+					table.remove(org.arterialwounds, arteryIndex)
+					if math.Rand(0, 1) < math.Clamp(0.08 + arterySeverity / 80, 0.08, 0.3) then
+						org.internalBleed = (org.internalBleed or 0) + math.Rand(0.25, 0.7) * arterySeverity / 14
+					end
+					if arteryName == "arteria" then
+						org.neckslit = false
+						org.neckslitDeadline = nil
+						org.neckslitWarned = nil
+						org.throatCutPressureShock = 0
+						org.neckBrainOxygenPenalty = 0
+						if org.neckslitSoundName then
+							if IsValid(org.neckslitSoundEnt) then org.neckslitSoundEnt:StopSound(org.neckslitSoundName) end
+							if IsValid(org.owner) then org.owner:StopSound(org.neckslitSoundName) end
+							org.neckslitSoundName = nil
+							org.neckslitSoundEnt = nil
+						end
+					end
+					if hg.organism.RebuildArteryWoundState then
+						hg.organism.RebuildArteryWoundState(org, true)
+					else
+						hg.organism.MarkArterialWoundsNetDirty(org)
+					end
+				else
+					hg.organism.MarkArterialWoundsNetDirty(org)
 				end
 			end
-			if hg.organism.RebuildArteryWoundState then
-				hg.organism.RebuildArteryWoundState(org, true)
-			else
-				hg.organism.MarkArterialWoundsNetDirty(org)
-			end
-			ent.bandaged_limbs = ent.bandaged_limbs or {}
-			ent.bandaged_limbs[arteryName == "arteria" and "ValveBiped.Bip01_Head1" or arteryWound[4]] = true
-			bandaged = true
-			done = true
 		end
 		
 		if not bone then
@@ -1478,6 +1514,7 @@ else
 		["ValveBiped.Bip01_Spine"] = "groin",
 		["ValveBiped.Bip01_Spine1"] = "belly",
 		["ValveBiped.Bip01_Spine2"] = "Chest",
+		["ValveBiped.Bip01_Neck1"] = "Neck",
 		["ValveBiped.Bip01_L_UpperArm"] = "HandUpLeft",
 		["ValveBiped.Bip01_L_Forearm"] = "HandDownLeft",
 		["ValveBiped.Bip01_L_Hand"] = "HandLeft",
@@ -1495,6 +1532,7 @@ else
 		["ValveBiped.Bip01_Spine"] = "groin-f",
 		["ValveBiped.Bip01_Spine1"] = "belly-f",
 		["ValveBiped.Bip01_Spine2"] = "Chest-f",
+		["ValveBiped.Bip01_Neck1"] = "Neck-f",
 		["ValveBiped.Bip01_L_UpperArm"] = "HandUpLeft-f",
 		["ValveBiped.Bip01_L_Forearm"] = "HandDownLeft-f",
 		["ValveBiped.Bip01_L_Hand"] = "HandLeft-f",

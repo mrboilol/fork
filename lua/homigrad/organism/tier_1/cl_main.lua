@@ -79,6 +79,8 @@ local tabblood = {
 
 local remDeathStateStation
 local remDeathStateLoading
+local remDeathStateGeneration = 0
+local remDeathStateActive = false
 local remDeathStateSounds = {"drawyourlastdick.ogg"}
 local brainRotStation
 local brainRotLoading
@@ -102,8 +104,11 @@ local function GetLocalDeathState()
 	if not IsValid(ply) or not ply:Alive() then return end
 
 	local org = ply.new_organism or ply.organism
-	local deathStateEnd = org and tonumber(org.deathStateEnd)
-	if not org or not org.otrub or not org.incapacitated or not deathStateEnd or deathStateEnd <= CurTime() then return end
+	if not org or not org.otrub or not org.incapacitated then return end
+
+	local deathStateEnd = tonumber(org.deathStateEnd)
+	if deathStateEnd and deathStateEnd <= CurTime() then return end
+	if not deathStateEnd then return org, nil, 0 end
 
 	local remaining = math.max(deathStateEnd - CurTime(), 0)
 	local progress = math.Clamp((INCAPACITATION_DEATH_TIME - remaining) / INCAPACITATION_DEATH_TIME, 0, 1)
@@ -111,6 +116,8 @@ local function GetLocalDeathState()
 end
 
 local function StopRemDeathStateSound()
+	remDeathStateGeneration = remDeathStateGeneration + 1
+	remDeathStateActive = false
 	if IsValid(remDeathStateStation) then remDeathStateStation:Stop() end
 	remDeathStateStation = nil
 end
@@ -145,15 +152,18 @@ local function PlayRemDeathStateSound()
 	if IsValid(remDeathStateStation) then return end
 	if remDeathStateLoading then return end
 
+	local generation = remDeathStateGeneration
 	remDeathStateLoading = true
 	sound.PlayFile("sound/" .. remDeathStateSounds[math.random(#remDeathStateSounds)], "noplay", function(station)
 		remDeathStateLoading = nil
 		if not IsValid(station) then return end
 		local _, _, progress = GetLocalDeathState()
-		if not progress then station:Stop() return end
+		if generation ~= remDeathStateGeneration or not remDeathStateActive or progress == nil then station:Stop() return end
 		remDeathStateStation = station
 		station:EnableLooping(true)
-		PlayStationRandom(station, Lerp(progress, 0.28, MUSIC_VOLUME))
+		station:SetVolume(Lerp(progress, 0.28, MUSIC_VOLUME))
+		if station.SetTime then station:SetTime(0) end
+		station:Play()
 	end)
 end
 
@@ -161,11 +171,12 @@ net.Receive("rem_deathstate_sound", PlayRemDeathStateSound)
 
 hook.Add("Think", "RemDeathStateSound", function()
 	local _, _, progress = GetLocalDeathState()
-	if not progress then
-		StopRemDeathStateSound()
+	if progress == nil then
+		if remDeathStateActive or remDeathStateLoading or IsValid(remDeathStateStation) then StopRemDeathStateSound() end
 		return
 	end
 
+	remDeathStateActive = true
 	PlayRemDeathStateSound()
 	if IsValid(remDeathStateStation) then
 		remDeathStateStation:SetVolume(Lerp(progress, 0.28, MUSIC_VOLUME))
@@ -1070,6 +1081,7 @@ local arterySoundDelayMax = 1.25
 local arterySoundPitchMin = 95
 local arterySoundPitchMax = 110
 local arterySizeMul = 1.35
+local arterialPourPulseThreshold = 20
 local bleedDown = Vector(0, 0, -1)
 
 local function getBleedPressureDrive(org)
@@ -1135,60 +1147,46 @@ local function emitOrdinaryBleeding(ent, org, wound, pos, ang, visualRate)
 end
 
 local function emitArterialBleeding(ent, org, wound, pos, dir, water, visualRate)
-	local style = tonumber(wound[8]) or 1
-	local artery = wound[7]
-	if style == 3 and artery ~= "arteria" and artery ~= "aorta" then style = 1 end
 	local _, pressureDrive = getBleedPressureDrive(org)
-	local pulseDrive = math.Clamp((tonumber(org.pulse) or 70) / 70, 0.15, 1.8)
+	local pulse = math.max(tonumber(org.pulse) or 70, 0)
+	local pulseDrive = math.Clamp(pulse / 70, 0.15, 1.8)
 	local outward = dir:LengthSqr() > 0.001 and dir:GetNormalized() or bleedDown
 	local rateK = math.Clamp((visualRate or 0) / 36, 0, 1)
 
 	if water then
-		local count = style == 3 and math.Clamp(math.floor(6 + rateK * 8), 6, 14) or math.Clamp(math.floor(2 + rateK * 4), 2, 6)
+		local count = math.Clamp(math.floor(2 + rateK * 4), 2, 6)
 		for _ = 1, count do
 			hg.addBloodPart2(pos + VectorRand(-1, 1), VectorRand(-5, 5), nil, nil, nil, nil, true, ent)
 		end
-		return style
+		return false
 	end
 
-	if pressureDrive <= 0.05 then
-		local count = style == 3 and math.Clamp(math.floor(4 + rateK * 5), 4, 9) or math.Clamp(math.floor(1 + rateK * 3), 1, 4)
+	if pulse <= arterialPourPulseThreshold then
+		local count = math.Clamp(math.floor(1 + rateK * 3), 1, 4)
 		for _ = 1, count do
-			local size = math.Rand(0.8, style == 3 and 2.6 or 1.8)
+			local size = math.Rand(0.8, 1.8)
 			local partPos = pos + VectorRand(-0.6, 0.6)
 			local vel = bleedDown * math.Rand(8, 25) + VectorRand(-10, 10)
 			hg.addBloodPart(partPos, vel, nil, size, size, true, nil, ent)
 		end
-		return style
+		return true
 	end
 
-	if style == 1 then
-		local side = outward:Cross(vector_up)
-		if side:LengthSqr() < 0.01 then side = outward:Cross(Vector(0, 1, 0)) end
-		side:Normalize()
-		local up = side:Cross(outward):GetNormalized()
-		local phase = CurTime() * (5.5 + pulseDrive * 2.5) + ent:EntIndex() * 0.41
-		local oscillation = side * math.sin(phase) * (10 + rateK * 18) + up * math.cos(phase * 0.77) * (5 + rateK * 11)
-		local speed = (265 + rateK * 155) * pressureDrive * (0.78 + pulseDrive * 0.22)
-		local count = math.Clamp(math.floor(2 + rateK * 2), 2, 4)
-		for _ = 1, count do
-			local vel = outward * speed + oscillation + VectorRand(-5, 5)
-			local size = math.Rand(1.05, 1.75 + rateK * 0.8) * arterySizeMul
-			hg.addBloodPart(pos + VectorRand(-0.2, 0.2), vel, nil, size, size, true, nil, ent)
-		end
-	else
-		local streamPressure = math.Clamp(pressureDrive * 0.35, 0.08, 0.55)
-		local count = math.Clamp(math.floor(15 + rateK * 12), 15, 27)
-		for _ = 1, count do
-			local vel = bleedDown * math.Rand(24, 58 + rateK * 24)
-				+ outward * math.Rand(12, 46) * streamPressure
-				+ VectorRand(-14, 14)
-			local size = math.Rand(0.55, 1.8 + rateK * 0.9) * arterySizeMul
-			hg.addBloodPart(pos + VectorRand(-1, 1), vel, nil, size, size, true, nil, ent)
-		end
+	local side = outward:Cross(vector_up)
+	if side:LengthSqr() < 0.01 then side = outward:Cross(Vector(0, 1, 0)) end
+	side:Normalize()
+	local up = side:Cross(outward):GetNormalized()
+	local phase = CurTime() * (5.5 + pulseDrive * 2.5) + ent:EntIndex() * 0.41
+	local oscillation = side * math.sin(phase) * (10 + rateK * 18) + up * math.cos(phase * 0.77) * (5 + rateK * 11)
+	local speed = (265 + rateK * 155) * pressureDrive * (0.78 + pulseDrive * 0.22)
+	local count = 2
+	for _ = 1, count do
+		local vel = outward * speed + oscillation + VectorRand(-5, 5)
+		local size = math.Rand(1.05, 1.75 + rateK * 0.8) * arterySizeMul
+		hg.addBloodPart(pos + VectorRand(-0.2, 0.2), vel, nil, size, size, true, nil, ent)
 	end
 
-	return style
+	return false
 end
 
 local pitchAddClasses = {
@@ -1547,9 +1545,10 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 						dir = -dir:Forward() * len
 
 						local water = bit.band(util.PointContents(pos), CONTENTS_WATER) == CONTENTS_WATER
-						local style = emitArterialBleeding(ent, org, wound, pos, dir, water, visualRate)
+						local pouring = emitArterialBleeding(ent, org, wound, pos, dir, water, visualRate)
 						local beatInterval = 60 / math.max(tonumber(org.pulse) or 70, 20)
-						wound.nextVisualBleed = time + (water and 1.5 or beatInterval * (style == 3 and 1.35 or 1))
+						local jetInterval = 0.5 / math.max(hg_blood_fps:GetInt(), 1)
+						wound.nextVisualBleed = time + (water and 1.5 or (pouring and beatInterval * 1.35 or jetInterval))
 					end
 				end
 			end

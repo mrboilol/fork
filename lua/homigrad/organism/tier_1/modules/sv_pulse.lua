@@ -1004,9 +1004,10 @@ module[2] = function(owner, org, timeValue)
 	local hemorrhagicDecompensation = math.Clamp((0.25 - preloadReserve) / 0.25, 0, 1)
 	local zerlkersSuppression = math.Clamp(org.zerlkersOverdose or 0, 0, 1)
 	local drugBradycardia = math.Clamp(((org.drugRespiratoryDepression or 0) - 0.12) / 0.88, 0, 1)
+	local cervicalSuppression = org.cervicalParalysis and 0.58 or 0
 	-- Low blood volume produces tachycardia until preload becomes extremely poor;
 	-- it is not a bradycardia source before that point.
-	local bradycardiaSeverity = math.max(cerebralSuppression, hypoxiaSuppression, cardiacSuppression * 0.9, coldSuppression, zerlkersSuppression, drugBradycardia * 0.9)
+	local bradycardiaSeverity = math.max(cerebralSuppression, hypoxiaSuppression, cardiacSuppression * 0.9, coldSuppression, zerlkersSuppression, drugBradycardia * 0.9, cervicalSuppression)
 	org.bradycardiaSeverity = bradycardiaSeverity
 	org.drugBradycardia = drugBradycardia
 	org.hemorrhagicDecompensation = hemorrhagicDecompensation
@@ -1210,6 +1211,7 @@ module[2] = function(owner, org, timeValue)
 	heartbeat = heartbeat - (org.myocardialOxygen and (1 - org.myocardialOxygen) or 0) * 35
 	if (org.arrhythmia or 0) > 0.05 and not org.fibrillation then heartbeat = heartbeat + math.Rand(-70, 90) * org.arrhythmia end
 	if org.fibrillation then heartbeat = math.Rand(180, 360) end
+	if bradyTarget and not org.fibrillation then heartbeat = math.min(heartbeat, bradyTarget) end
 
 	org.heartbeat = math.Approach(org.heartbeat, heartbeat, heartbeat > org.heartbeat and timeValue * 5 or timeValue * 3)
 	

@@ -26,6 +26,8 @@ hook.Add("PostCleanupMap","removeblooddroplets",function()
 	hg.bloodparticles1 = {}
 	hg.bloodpositions = {}
 	hg.bloodcount = 0
+	hg.groundbloodstains = {}
+	hg.fadinggroundbloodstains = {}
 end)
 
 hook.Add("Player Spawn", "removeownblooddroplets", function(ply)
@@ -110,6 +112,112 @@ hg.bloodpositions = hg.bloodpositions or {}
 hg.bloodcount = hg.bloodcount or 0
 local bloodDripSoundChance = 2 / 3
 
+local hg_blood_ground_limit = ConVarExists("hg_blood_ground_limit") and GetConVar("hg_blood_ground_limit") or CreateClientConVar("hg_blood_ground_limit", 600, true, false, "Maximum persistent ground blood stains", 1, 2000)
+local hg_blood_ground_lifetime = ConVarExists("hg_blood_ground_lifetime") and GetConVar("hg_blood_ground_lifetime") or CreateClientConVar("hg_blood_ground_lifetime", 900, true, false, "Seconds before ground blood fades", 30, 7200)
+local hg_blood_ground_fade = ConVarExists("hg_blood_ground_fade") and GetConVar("hg_blood_ground_fade") or CreateClientConVar("hg_blood_ground_fade", 20, true, false, "Seconds ground blood takes to fade", 1, 120)
+
+hg.groundbloodstains = hg.groundbloodstains or {}
+hg.fadinggroundbloodstains = hg.fadinggroundbloodstains or {}
+
+local groundBloodMaterials = {}
+for i = 1, 6 do
+	groundBloodMaterials[i] = Material("bloodspill/blood" .. i)
+end
+
+local groundBloodColor = Color(92, 0, 0, 255)
+local render_DrawQuadEasy = render.DrawQuadEasy
+
+local function fadeGroundBlood(stain, now)
+	stain.fadeStart = now
+	stain.fadeEnd = now + math.max(hg_blood_ground_fade:GetFloat(), 0.1)
+	hg.fadinggroundbloodstains[#hg.fadinggroundbloodstains + 1] = stain
+end
+
+local function addGroundBlood(pos, normal, artery, tiny)
+	if normal.z < 0.55 then return false end
+
+	local now = CurTime()
+	local stains = hg.groundbloodstains
+	local limit = math.max(hg_blood_ground_limit:GetInt(), 1)
+	while #stains >= limit do
+		fadeGroundBlood(table.remove(stains, 1), now)
+	end
+
+	local size
+	if tiny then
+		size = math.Rand(0.8, 1.7)
+	elseif artery then
+		size = math.Rand(11, 22)
+	else
+		size = math.Rand(7, 15)
+	end
+
+	stains[#stains + 1] = {
+		pos = pos + normal * 0.2,
+		normal = normal,
+		material = groundBloodMaterials[math_random(#groundBloodMaterials)],
+		size = size,
+		rotation = math_random(0, 359),
+		created = now,
+	}
+
+	return true
+end
+
+hook.Add("Think", "hg_persistent_ground_blood", function()
+	local now = CurTime()
+	local stains = hg.groundbloodstains
+	local lifetime = math.max(hg_blood_ground_lifetime:GetFloat(), 0.1)
+	local limit = math.max(hg_blood_ground_limit:GetInt(), 1)
+
+	for i = #stains, 1, -1 do
+		if now - stains[i].created >= lifetime then
+			fadeGroundBlood(table.remove(stains, i), now)
+		end
+	end
+
+	while #stains > limit do
+		fadeGroundBlood(table.remove(stains, 1), now)
+	end
+
+	local fading = hg.fadinggroundbloodstains
+	for i = #fading, 1, -1 do
+		if fading[i].fadeEnd <= now then
+			table_remove(fading, i)
+		end
+	end
+
+	while #fading > limit do
+		table_remove(fading, 1)
+	end
+end)
+
+hook.Add("PostDrawTranslucentRenderables", "hg_draw_persistent_ground_blood", function()
+	local eyePos = EyePos()
+	local eyeForward = EyeAngles():Forward()
+	local drawDistance = hg_blood_draw_distance:GetInt()
+	local drawDistanceSqr = drawDistance * drawDistance
+
+	local function drawStain(stain, alpha)
+		local offset = stain.pos - eyePos
+		if offset:LengthSqr() > drawDistanceSqr or offset:Dot(eyeForward) < -stain.size then return end
+		groundBloodColor.a = alpha
+		render_SetMaterial(stain.material)
+		render_DrawQuadEasy(stain.pos, stain.normal, stain.size, stain.size, groundBloodColor, stain.rotation)
+	end
+
+	for i = 1, #hg.groundbloodstains do
+		drawStain(hg.groundbloodstains[i], 255)
+	end
+
+	local now = CurTime()
+	for i = 1, #hg.fadinggroundbloodstains do
+		local stain = hg.fadinggroundbloodstains[i]
+		local alpha = math.Clamp((stain.fadeEnd - now) / (stain.fadeEnd - stain.fadeStart), 0, 1) * 255
+		drawStain(stain, alpha)
+	end
+end)
+
 local function playBloodDripImpact(pos, tr)
 	if math.Rand(0, 1) > bloodDripSoundChance then return end
 
@@ -129,6 +237,10 @@ local tinyArterialDecal = Material("effects/droplets/drop12_1")
 local function decalBlood(pos, normal, tr, artery, owner, tiny)
 	if not pos or not normal then return end
 	if normal:LengthSqr() < 0.0001 then normal = vector_up end
+	if tr.HitWorld and addGroundBlood(pos, normal, artery, tiny) then
+		if not tiny or math.random(7) == 1 then playBloodDripImpact(pos, tr) end
+		return
+	end
 	if tiny then
 		local decal = artery and tinyArterialDecal or tinyNormalDecals[math.random(#tinyNormalDecals)]
 		local target = IsValid(tr.Entity) and tr.Entity or game.GetWorld()
