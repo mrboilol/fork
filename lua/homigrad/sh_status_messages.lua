@@ -423,6 +423,12 @@ local low_perfusion_phrases = {
 	"My hands and feet are going numb...",
 }
 
+local hypertension_phrases = {
+	"My blood pressure feels dangerously high...",
+	"My head is pounding from the pressure...",
+	"I feel pressure building in my head...",
+}
+
 local hg_showthoughts = ConVarExists("hg_showthoughts") and GetConVar("hg_showthoughts") or CreateClientConVar("hg_showthoughts", "1", true, true, "Show the thoughts of your character", 0, 1)
 
 function hg.IsActivelyBleeding(org)
@@ -473,6 +479,7 @@ function hg.likely_to_phrase(ply)
 	local panicattack = org.panicattack or 0
 	local arrhythmia = org.arrhythmia or 0
 	local hypotension = org.hypotension or 0
+	local hypertension = org.hypertension or 0
 	local temperature = org.temperature
 	local o2 = org.o2 and org.o2[1] or 30
 	local bleedingOut = hg.IsActivelyBleeding(org)
@@ -486,6 +493,8 @@ function hg.likely_to_phrase(ply)
 	-- before the normal low-blood cadence can reach its next phrase.
 	return (org.heartstop) and 6
 		or (o2 <= 15) and 4.5
+		or (hypotension > 0.5 and 0.55)
+		or (hypertension > 0.5 and 0.55)
 		or (bleedingOut and blood < 4000) and 4
 		or (bleedingOut and blood < 2500) and 3
 		or (broken_dislocated) and 5
@@ -540,6 +549,7 @@ local function get_status_message(ply)
 	local adrenaline = org.adrenaline or 0
 	local arrhythmia = org.arrhythmia or 0
 	local hypotension = org.hypotension or 0
+	local hypertension = org.hypertension or 0
 	local arrhythmiaActive = org.fibrillation or org.unstableRhythm or arrhythmia > 0.35
 	local arrhythmiaStatusStreak = org.arrhythmia_status_streak or 0
 	if not arrhythmiaActive and arrhythmiaStatusStreak > 0 then
@@ -569,33 +579,45 @@ local function get_status_message(ply)
 	local str = ""
 
 	local most_wanted_phraselist
+	local statusThoughtKey
 
 	if org.heartstop then
 		most_wanted_phraselist = near_death_poetic
+		statusThoughtKey = "heartstop"
 	elseif o2 <= 15 then
 		-- sv_lungs owns the immediate breathing symptom alerts. Keep periodic
 		-- low-O2 thoughts in the shared dying-status pool so they do not repeat
 		-- those callouts.
 		most_wanted_phraselist = near_death_poetic
+		statusThoughtKey = "lowoxy"
 	elseif bleedingOut and blood < 4000 then
 		most_wanted_phraselist = near_death_poetic
+		statusThoughtKey = "blood2"
 	elseif bleedingOut and blood < 3750 then
 		-- sv_blood owns the immediate faintness and hemorrhage alerts. Blood loss
 		-- still gets priority for recurring status thoughts, but shares the same
 		-- dying pool as the other terminal conditions.
 		most_wanted_phraselist = near_death_poetic
+		statusThoughtKey = "blood2"
 	elseif pain > 100 then
 		most_wanted_phraselist = sharp_pain
 	elseif pain > 75 then
 		most_wanted_phraselist = audible_pain
 	elseif not suppressArrhythmiaStatus and arrhythmiaActive then
 		most_wanted_phraselist = arrhythmia_phrases
+		statusThoughtKey = "arrhythmia"
 	elseif heartbeat >= 150 then
 		most_wanted_phraselist = tachycardia_phrases
+		statusThoughtKey = "tachycardia"
 	elseif heartbeat > 0 and heartbeat <= 45 then
 		most_wanted_phraselist = bradycardia_phrases
+		statusThoughtKey = "bradycardia"
 	elseif hypotension > 0.5 then
 		most_wanted_phraselist = low_perfusion_phrases
+		statusThoughtKey = "hypotension"
+	elseif hypertension > 0.5 then
+		most_wanted_phraselist = hypertension_phrases
+		statusThoughtKey = "hypertension"
 	elseif temperature < 35 then
 		if temperature < 29 then
 			most_wanted_phraselist = numb_phraselist
@@ -647,6 +669,16 @@ local function get_status_message(ply)
 			most_wanted_phraselist = ((IsAimedAt(ply) > 0.9) and is_aimed_at_phrases or (math.random(10) == 1 and fear_hurt_ironic or fear_phrases))
 		end
 	end
+
+	if most_wanted_phraselist == near_death_poetic or most_wanted_phraselist == near_death_positive then
+		statusThoughtKey = statusThoughtKey or (bleedingOut and "blood2" or "fear")
+	elseif most_wanted_phraselist == panicattack_phrases or most_wanted_phraselist == panic_anxious_phrases or most_wanted_phraselist == panic_uneasy_phrases then
+		statusThoughtKey = "panicattack"
+	elseif most_wanted_phraselist == fear_phrases or most_wanted_phraselist == fear_hurt_ironic or most_wanted_phraselist == situation_fear_phrases then
+		statusThoughtKey = "fear"
+	elseif most_wanted_phraselist == is_aimed_at_phrases then
+		statusThoughtKey = "threatened"
+	end
 	
 	if most_wanted_phraselist then
 		org.recent_status_phrases = org.recent_status_phrases or {}
@@ -683,7 +715,7 @@ local function get_status_message(ply)
 			end
 		end
 
-		return str
+		return str, statusThoughtKey
 	else
 		return ""
 	end
@@ -787,7 +819,7 @@ function hg.get_notify_color(ply)
 end
 
 function hg.get_status_message(ply)
-	local txt = get_status_message(ply)
+	local txt, statusThoughtKey = get_status_message(ply)
 
-	return txt
+	return txt, statusThoughtKey
 end

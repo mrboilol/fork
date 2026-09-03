@@ -1111,7 +1111,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		elseif org.neckslitWarned ~= true and org.neckslitDeadline - CurTime() <= 4 then
 			org.neckslitWarned = true
 			if isPly and owner:Alive() then
-				owner:Notify("I'm fading... someone save me!", true, "neckslit_save", 0)
+				owner:Notify("I CAN'T STOP THE BLEEDING I CAN'T I JUST CANT PLEASE HELP ME", true, "neckslit_save", 0)
 			end
 		end
 	elseif org.neckslitDeadline then
@@ -1411,11 +1411,11 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.likely_phrase = math.max(org.likely_phrase + math.Rand(0, mul) / 100, 0)
 		if org.likely_phrase >= 1 and CurTime() >= (org.nextStatusThought or 0) and !hg.GetCurrentCharacter(owner):IsOnFire() then
 			org.likely_phrase = 0
-			local str = hg.get_status_message(owner)
+			local str, statusThoughtKey = hg.get_status_message(owner)
 			if str and str != "" then
 				local statusCooldown = math.Rand(11, 15)
 				org.nextStatusThought = CurTime() + statusCooldown
-				owner:Notify(str, statusCooldown, "phrase", 1, nil, Color(255, math.Clamp(1 / hg.likely_to_phrase(owner) * 255, 0, 255), math.Clamp(1 / hg.likely_to_phrase(owner) * 255, 0, 255), 255))
+				owner:Notify(str, statusCooldown, statusThoughtKey or "phrase", 1, nil, Color(255, math.Clamp(1 / hg.likely_to_phrase(owner) * 255, 0, 255), math.Clamp(1 / hg.likely_to_phrase(owner) * 255, 0, 255), 255))
 			end
 		end
 	end

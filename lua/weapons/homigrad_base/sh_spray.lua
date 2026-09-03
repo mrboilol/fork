@@ -183,7 +183,11 @@ function SWEP:PrimarySpread()
 			-- Clockwise-canted Gangsta/Somalian holds rotate muzzle rise into leftward travel.
 			angrand2 = Angle(math.Rand(-force * 0.18, force * 0.08), -math.Rand(force * 0.72, force * 1.15), -math.Rand(force * 0.12, force * 0.35))
 		else
-			angrand2 = Angle(-math.Rand(force * 0.65, force), math.Rand(-force * 0.22, force * 0.22), math.Rand(-force * 0.08, force * 0.08))
+			local downwardKick = util.SharedRandom("hg_recoil_downward", 0, 1, (self.recoilShotIndex or 0) * 79) < 0.08
+			local pitch = downwardKick
+				and math.Rand(force * 0.06, force * 0.18)
+				or -math.Rand(force * 0.65, force)
+			angrand2 = Angle(pitch, math.Rand(-force * 0.22, force * 0.22), math.Rand(-force * 0.08, force * 0.08))
 		end
 		self.LastRecoilDirection = Angle(angrand2[1] / math.max(force, 0.001), angrand2[2] / math.max(force, 0.001), angrand2[3] / math.max(force, 0.001))
 		
@@ -191,20 +195,13 @@ function SWEP:PrimarySpread()
 		angrand3[3] = 0
 		if not self.SprayRandOnly then
 			if not cantedHold then
-				angrand2[1] = math.Clamp(-math.abs(angrand2[1]), -10, -force / 1.5)
+				if angrand2[1] < 0 then
+					angrand2[1] = math.Clamp(angrand2[1], -10, -force / 1.5)
+				end
 				angrand2[2] = math.Clamp(angrand2[2], -1, 1)
 				angrand2[3] = -angrand2[2]
 			end
-			local mulhuy = GetGlobalBool("FullRealismMode",false) and 10 or 1
 			mul = mul * self:GetAttachmentRecoilMul()
-			
-			local huyang = angrand2 * mul / 2 * mulhuy
-			huyang[3] = 0
-			ViewPunch2(huyang * (owner.posture == 1 and not self:IsZoom() and 3 or 1) * 0.17 * screenRecoilMul)
-			
-			local angpopa = angrand2 * mul
-			angpopa[3] = 0
-			ViewPunch(angpopa * (hg_coolcamera:GetBool() and 1.8 or 0.7) * screenRecoilMul)
 			spray = spray + angRand * 2 * (self.randmul or 1)
 		end
 
@@ -212,10 +209,6 @@ function SWEP:PrimarySpread()
 		local angleprikol = Angle(0,0,prank3)
 
 		//ViewPunch2(angleprikol)
-
-		local cameraKick = math.Clamp(force * self.Primary.Force2 / 100, 0.06, 1.5) * screenRecoilMul
-		ViewPunch2(angrand2 * cameraKick * 0.24)
-		ViewPunch(angrand2 * cameraKick * 0.1)
 
 		local eyeang = owner:EyeAngles()
 		local sprayAng = (spray * (self:IsResting() and 0.1 or 1) * 8 + angrand3 * self.addSprayMul) * (eyeang.z == 180 and -1 or 1)

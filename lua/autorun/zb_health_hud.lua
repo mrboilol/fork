@@ -928,10 +928,10 @@ local tooltipTexts = {
             [1] = {title = "Tachycardia", text = "Probably just a workout."}
         },
 		bradycardia = {
-			[4] = {title = "Critical Bradycardia", text = "Your heart is barely contracting. Circulatory arrest is imminent."},
-			[3] = {title = "Severe Bradycardia", text = "Your heart rate is dangerously slow. You may lose consciousness."},
-			[2] = {title = "Bradycardia", text = "Your heart is beating too slowly. You feel weak and dizzy."},
-			[1] = {title = "Slow Heart Rate", text = "Your heartbeat is unusually slow."}
+			[4] = {title = "Terminally Hypotensive", text = "Your heart is struggling to pump blood, and your body is shutting down."},
+			[3] = {title = "Critical Hypotensive", text = "Your blood pressure is struggling to reach your body extremities."},
+			[2] = {title = "Advanced Hypotension", text = "Your blood pressure is lower because of an abnormality."},
+			[1] = {title = "Hypotension", text = "Your blood pressure is lower than normal."}
 		},
         hypoventilation = {
             [4] = {title = "Severe Hypoventilation", text = "I CANT CATCH A SINGLE GOOD BREATH OF AIR"},

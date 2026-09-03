@@ -151,7 +151,7 @@ function SWEP:Shoot(override)
 	primary.Next = CurTime() + primary.Wait
 	primary.Automatic = weapons.Get(self:GetClass()).Primary.Automatic
 	
-	local tr,pos,ang = self:GetFireTrace()
+	local tr,pos,ang = self:GetTrace(true)
 	local owner = self:GetOwner()
 	
 	if SERVER then

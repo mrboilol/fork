@@ -91,11 +91,11 @@ if SERVER then
         local id = ply:SteamID()
         local savedCD = nextThoughtTime[id]
         nextThoughtTime[id] = 0
-        local str = hg.get_status_message(ply)
+		local str, statusThoughtKey = hg.get_status_message(ply)
         if not str or str == "" then
             nextThoughtTime[id] = savedCD
             return
         end
-        ply:Notify(str, 1, "phrase", 1, nil, Color(255, 255, 255))
+		ply:Notify(str, 1, statusThoughtKey or "phrase", 1, nil, Color(255, 255, 255))
     end)
 end

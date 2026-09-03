@@ -995,7 +995,7 @@ module[2] = function(owner, org, timeValue)
 	-- flatline path.
 	local brainHemorrhage = math.Clamp(org.brainHemorrhage or 0, 0, 1)
 	local cerebralSuppression = math.Clamp(math.max((org.brain or 0) * 0.8, brainHemorrhage) * 0.9, 0, 1)
-	local hypoxiaSuppression = math.Clamp((12 - o2Value) / 12, 0, 1)
+	local hypoxiaSuppression = math.Clamp((16 - o2Value) / 16, 0, 1)
 	local cardiacSuppression = math.Clamp(org.heart or 0, 0, 1)
 	-- Compensation remains effective through mild cold. Below 34 C the sinus
 	-- node and conduction system progressively lose responsiveness. Extremely low
@@ -1013,7 +1013,7 @@ module[2] = function(owner, org, timeValue)
 	org.hemorrhagicDecompensation = hemorrhagicDecompensation
 
 	local bradyTarget
-	if bradycardiaSeverity >= 0.16 then
+	if bradycardiaSeverity >= 0.10 then
 		if bradycardiaSeverity >= 0.78 then
 			bradyTarget = 28 -- ventricular escape: 20-40 BPM
 		elseif bradycardiaSeverity >= 0.52 then
@@ -1021,7 +1021,7 @@ module[2] = function(owner, org, timeValue)
 		elseif bradycardiaSeverity >= 0.32 then
 			bradyTarget = Lerp(math.Remap(bradycardiaSeverity, 0.32, 0.52, 0, 1), 58, 45)
 		else
-			bradyTarget = Lerp(math.Remap(bradycardiaSeverity, 0.16, 0.32, 0, 1), 66, 58)
+			bradyTarget = Lerp(math.Remap(bradycardiaSeverity, 0.10, 0.32, 0, 1), 68, 58)
 		end
 		heartbeat = math.min(heartbeat, bradyTarget)
 	end
