@@ -4,7 +4,7 @@ local red_select = Color(192,0,0)
 local menu_music_default_path = "sound/predatorsunknown.ogg"
 local menu_music_appearance_path = "sound/rainworldlarp.ogg"
 local menu_music_flags = "noblock noplay"
-local menu_music_volume = 0.25
+local menu_music_volume = 1
 local menu_music_fade_speed = 1.8
 local menu_music_station
 local menu_music_station_path
@@ -48,23 +48,6 @@ local function StopMainMenuMusic()
     menu_music_target_path = menu_music_default_path
 end
 
-local function PauseMainMenuMusic()
-    if menu_music_station then
-        menu_music_station:SetVolume(0)
-        if menu_music_station:GetState() ~= GMOD_CHANNEL_PAUSED then
-            menu_music_station:Pause()
-        end
-    end
-    menu_music_station_lerp = 0
-
-    if menu_music_pending_station then
-        menu_music_pending_station:Stop()
-        menu_music_pending_station = nil
-    end
-    menu_music_pending_path = nil
-    menu_music_pending_lerp = 0
-end
-
 local function QueueMainMenuMusic(owner, path)
     path = path or menu_music_default_path
     menu_music_target_path = path
@@ -95,9 +78,7 @@ end
 
 local function UpdateMainMenuMusic(owner)
     if not IsValid(owner) or MainMenu ~= owner then
-        if not IsValid(MainMenu) then
-            PauseMainMenuMusic()
-        end
+        StopMainMenuMusic()
         return
     end
 
@@ -133,9 +114,6 @@ local function UpdateMainMenuMusic(owner)
             menu_music_pending_lerp = 0
         end
     elseif menu_music_station then
-        if menu_music_station:GetState() ~= GMOD_CHANNEL_PLAYING then
-            menu_music_station:Play()
-        end
         menu_music_station_lerp = math.min(1, menu_music_station_lerp + fadeStep)
         menu_music_station:SetVolume(menu_music_volume * menu_music_station_lerp)
     elseif menu_music_target_path then
@@ -1307,7 +1285,7 @@ end
 
 function PANEL:Close()
     if self.DisconnectCutscene then return end
-    PauseMainMenuMusic()
+    StopMainMenuMusic()
     if IsValid(self.previewModel) and IsValid(self.previewModel.Entity) then
         CleanupPreviewAccessories(self.previewModel.Entity)
     end
@@ -1326,9 +1304,7 @@ function PANEL:Close()
 end
 
 function PANEL:OnRemove()
-    if MainMenu == self then
-        PauseMainMenuMusic()
-    end
+    StopMainMenuMusic()
 end
 
 function PANEL:SetMenuMusic(path)
