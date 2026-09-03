@@ -12,6 +12,8 @@ local chat_dist_whisper = 100
 local function ChatLogic(output, input, isChat, teamonly, text)
 	if not IsValid(output) then return true, true end
 	if not IsValid(input) then return false end
+	local outputOrg = output.organism
+	local inputOrg = input.organism
 	local result, is3D = hook.Run("CanListenOthers",output,input,isChat,teamonly,text)
 	
 	if result ~= nil then return result,is3D end
@@ -29,7 +31,7 @@ local function ChatLogic(output, input, isChat, teamonly, text)
 		end
 	end
 
-	if output:Alive() and input:Alive() and not output.organism.otrub and not input.organism.otrub and output.organism.o2[1] >= 15 and not output.organism.holdingbreath and not output.organism.neckslit and input:TestPVS( output ) then
+	if output:Alive() and input:Alive() and outputOrg and inputOrg and not outputOrg.otrub and not inputOrg.otrub and outputOrg.o2 and (tonumber(outputOrg.o2[1]) or 0) >= 15 and not outputOrg.holdingbreath and not outputOrg.neckslit and input:TestPVS( output ) then
 		if input:GetPos():Distance(output:GetPos()) < chat_dist and not teamonly then
 			return true, true
 		else
@@ -190,7 +192,8 @@ hook.Add("HG_PlayerSay", "furrifyPhraseOwO", function(ply, txt)
 end)
 
 hook.Add("HG_PlayerCanHearPlayersVoice","BrainDamage", function(listener, speaker)
-	if speaker.organism.brain > 0.05 or speaker.organism.seizureActive or speaker.organism.neckslit then return false, false end
+	local org = IsValid(speaker) and speaker.organism
+	if org and ((tonumber(org.brain) or 0) > 0.05 or org.seizureActive or org.neckslit) then return false, false end
 end)
 
 local braindeadphrase_male = {

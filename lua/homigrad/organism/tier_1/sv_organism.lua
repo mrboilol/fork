@@ -70,7 +70,8 @@ local organismModuleInitOrder = {
 	"concussion",
 	"goodmood",
 	"medical_system",
-	"teeth"
+	"teeth",
+	"psyche"
 }
 
 local function runOrganismModule(name, stage, owner, org, timeValue)
@@ -91,17 +92,6 @@ hook.Add("Org Clear", "Main", function(org)
 	for _, name in ipairs(organismModuleInitOrder) do
 		runOrganismModule(name, 1, nil, org)
 	end
-	module.pulse[1](org)
-	module.blood[1](org)
-	module.pain[1](org)
-	module.stamina[1](org)
-	module.lungs[1](org)
-	module.liver[1](org)
-	module.metabolism[1](org)
-	module.random_events[1](org)
-	module.concussion[1](org)
-	module.trauma_combo[1](org)
-	module.psyche[1](org)
 	org.brain = 0
 	org.brainFrontal = 0
 	org.brainParietal = 0
@@ -1144,10 +1134,9 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		runOrganismModule("metabolism", 2, owner, org, timeValue)
 		runOrganismModule("random_events", 2, owner, org, timeValue)
 	end
-	module.pulse[2](owner, org, timeValue)
-	module.concussion[2](owner, org, timeValue)
-	module.trauma_combo[2](owner, org, timeValue)
-	module.psyche[2](owner, org, timeValue)
+	runOrganismModule("pulse", 2, owner, org, timeValue)
+	runOrganismModule("concussion", 2, owner, org, timeValue)
+	runOrganismModule("psyche", 2, owner, org, timeValue)
 	if org.owner.PlayerClassName == "furry" then
 		org.assimilated = 0
 	end
@@ -1168,7 +1157,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	end
 	org.berserk = math.Approach(org.berserk, 0, timeValue / 60)
 	org.fury13 = math.Approach(org.fury13 or 0, 0, timeValue / 60)
-	org.noradrenaline = math.Approach(org.noradrenaline, 0, timeValue / 45)
+	org.noradrenaline = math.Approach(tonumber(org.noradrenaline) or 0, 0, timeValue / 45)
 	local fear = org.fear or 0
 	local fearAdd = org.fearadd or 0
 	if fear >= 0.65 or fearAdd >= 0.85 then
@@ -1520,8 +1509,9 @@ hook.Add("Org Think", "regenerationberserk", function(owner, org, timeValue)
 end)
 hook.Add("Org Think", "regenerationnoradrenaline", function(owner, org, timeValue)
 	if not owner:IsPlayer() or not owner:Alive() then return end
-	if org.noradrenaline <= 0 then return end
-	local regen = timeValue / 60 * org.noradrenaline
+	local noradrenaline = tonumber(org.noradrenaline) or 0
+	if noradrenaline <= 0 then return end
+	local regen = timeValue / 60 * noradrenaline
 	org.lungsR[1] = math.max(org.lungsR[1] - regen, 0)
 	org.lungsL[1] = math.max(org.lungsL[1] - regen, 0)
 	org.lungsR[2] = math.max((org.lungsR[2] or 0) - regen, 0)
@@ -1537,7 +1527,7 @@ hook.Add("Org Think", "regenerationnoradrenaline", function(owner, org, timeValu
 	org.disorientation = math.Approach(org.disorientation, 0, regen * 10)
 	org.adrenaline = math.Approach(org.adrenaline, 5, regen * 100)
 	org.analgesia = math.Approach(org.analgesia, 1, regen * 10)
-	if org.noradrenaline > 2 then
+	if noradrenaline > 2 then
 		local oldBrain = org.brain or 0
 		org.brain = math.Approach(oldBrain, 0.3, timeValue / 60)
 		hg.organism.AddSeizure(org, math.Clamp((oldBrain - org.brain) * seizure_brain_heal_gain_mul, 0, 1))

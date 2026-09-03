@@ -2606,8 +2606,16 @@ if SERVER then
 		local org = ply.organism
 		if not org then return end
 
-		local power = org.pain and ((org.pain > 50 or org.blood < 2900 or org.o2[1] < 5) and 0.3) or ((org.pain > 20 or org.blood < 4200 or org.o2[1] < 10) and 0.5) or 1
-		power = power * org.consciousness
+		local pain = tonumber(org.pain) or 0
+		local blood = tonumber(org.blood) or 5000
+		local oxygen = org.o2 and tonumber(org.o2[1]) or 30
+		local power = 1
+		if pain > 50 or blood < 2900 or oxygen < 5 then
+			power = 0.3
+		elseif pain > 20 or blood < 4200 or oxygen < 10 then
+			power = 0.5
+		end
+		power = power * (tonumber(org.consciousness) or 1)
 
 		if ply:GetNWFloat("power", -1) ~= power then
 			ply:SetNWFloat("power", power)
