@@ -1,3 +1,5 @@
+if true then return end
+
 if SERVER then AddCSLuaFile() end
 
 SWEP.Base = "weapon_fentanyl"
