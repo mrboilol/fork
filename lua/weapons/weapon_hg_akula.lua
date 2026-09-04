@@ -171,7 +171,6 @@ SWEP.HitStopSoftResumeMul = 0
 
 function SWEP:CanSecondaryAttack()
     if not self.allowsec then return false end
-    self.Attack2HitFlesh = "knife/NEWRapierSlash"..math.random(1, 6)..".wav"
     return true
 end
 
@@ -187,11 +186,7 @@ SWEP.SwingAng2 = 0
 SWEP.MultiDmg1 = false
 SWEP.MultiDmg2 = true
 
-SWEP.hitsoundextra = {
-    {"knife/KnifeStabIn-1.wav", 55, {105, 115}},
-    {"knife/KnifeStabIn-2.wav", 55, {105, 115}},
-    {"knife/KnifeStabIn-3.wav", 55, {105, 115}},
-}
+SWEP.hitsoundextra = nil
 
 SWEP.swingsoundextra = {
     {"knife/knife_bayonet_swing1.ogg", 30, {80, 90}},
@@ -200,6 +195,6 @@ SWEP.swingsoundextra = {
 
 SWEP.AttackHit = "weapons/knife/knife_hitwall1.wav"
 SWEP.Attack2Hit = "snd_jack_hmcd_knifehit.wav"
-SWEP.AttackHitFlesh = "knife/knifestabin-3.wav"
-SWEP.Attack2HitFlesh = "snd_jack_hmcd_knifehit.wav"
+SWEP.AttackHitFlesh = "snd_jack_hmcd_knifestab.wav"
+SWEP.Attack2HitFlesh = "snd_jack_hmcd_slash.wav"
 SWEP.DeploySnd = "weapons/darsu_eft/knife_bayonet_equip.ogg"

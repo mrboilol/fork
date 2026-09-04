@@ -286,6 +286,11 @@ function PHONE:OpenPhone(ply, phone)
 end
 
 function PHONE.OpenIEDPhone(ply, phone)
+	if not hg_iedphones:GetBool() then
+		Notify(ply, "IED phones are disabled on this server.")
+		return false
+	end
+
 	return PHONE:OpenPhone(ply, phone)
 end
 

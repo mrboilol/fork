@@ -2590,8 +2590,8 @@ function SWEP:AttackFront(special_attack, rand)
 			end
 		end
 
-		if owner.organism and (owner.organism.psycheAnger or 0) > 0.2 then
-			Mul = Mul * (1 + 0.1 * math.Clamp((owner.organism.psycheAnger - 0.2) / 0.8, 0, 1))
+		if owner.organism then
+			Mul = Mul * (1 + math.Clamp(owner.organism.anger or 0, 0, 1) * 0.18)
 		end
 
 		Mul = Mul * self:BlockingLogic(Ent, Mul, 0, trace)

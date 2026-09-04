@@ -982,8 +982,9 @@ drawFinalVitalsVignettes = function()
 		render.DrawScreenQuad()
 	end
 
-	local oxygen = math.Clamp(tonumber(org.o2 and org.o2[1]) or 30, 0, 30)
-	local brainOxygen = math.Clamp(tonumber(org.brainoxygen) or 1, 0, 1)
+	local oxygenMaximum = math.max(tonumber(org.o2 and org.o2.range) or 30, 1)
+	local oxygen = math.Clamp(tonumber(org.o2 and org.o2[1]) or oxygenMaximum, 0, oxygenMaximum)
+	local oxygenFraction = oxygen / oxygenMaximum
 	local blood = math.Clamp(tonumber(org.blood) or 5000, 0, 5000)
 	local activeBleed = math.Clamp((tonumber(org.bleed) or 0) / 10, 0, 1)
 	local internalBleed = math.Clamp((tonumber(org.internalBleed) or 0) / 5, 0, 1)
@@ -993,16 +994,8 @@ drawFinalVitalsVignettes = function()
 		activeBleed * 0.42,
 		internalBleed * 0.34
 	)
-	local oxygenSeverityBase = math.max(
-		math.Clamp((29.7 - oxygen) / 25.7, 0, 1) ^ 0.78,
-		math.Clamp((0.96 - brainOxygen) / 0.86, 0, 1) ^ 0.82,
-		bloodLossSeverity * 0.58
-	)
-	local severeOxygenTail = math.max(
-		math.Clamp((10 - oxygen) / 10, 0, 1),
-		math.Clamp((0.24 - brainOxygen) / 0.24, 0, 1)
-	)
-	local oxygenSeverity = math.Clamp(math.max(oxygenSeverityBase, oxygenSeverityBase * 0.86 + severeOxygenTail * 0.24), 0, 1)
+	local oxygenSeverity = math.Clamp((0.99 - oxygenFraction) / (0.99 - 0.1333333333), 0, 1) ^ 0.78
+	local severeOxygenTail = math.Clamp((0.3333333333 - oxygenFraction) / 0.3333333333, 0, 1)
 	local shock = tonumber(org.shock) or 0
 	local shockSeverity = math.Clamp((shock - 10) / 60, 0, 1)
 	local shockDarknessSeverity = math.Clamp((shock - 24) / 51, 0, 1)

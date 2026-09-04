@@ -58,13 +58,7 @@ SWEP.swingsoundextra = {
     {"pocketknife/melee_attack_knife_plr_06.ogg", 40, {80, 90}},
 }
 
-SWEP.hitsoundextra = {
-    {"pocketknife/melee_character_knife_plr_02.ogg", 55, {105, 115}},
-    {"pocketknife/melee_character_knife_plr_01.ogg", 55, {105, 115}},
-    {"pocketknife/melee_character_knife_plr_03.ogg", 55, {105, 115}},
-    {"pocketknife/melee_character_knife_plr_04.ogg", 55, {105, 115}},
-    {"pocketknife/melee_character_knife_plr_05.ogg", 55, {105, 115}},
-}
+SWEP.hitsoundextra = nil
 
 
 
@@ -87,7 +81,8 @@ SWEP.AttackHit = "weapons/knife/knife_hitwall1.wav"
 SWEP.Attack2Hit = "snd_jack_hmcd_knifehit.wav"
 SWEP.DeploySnd = "weapons/knife/knife_deploy1.wav"
 
-SWEP.Attack2HitFlesh = "knife/NEWRapierSlash1.wav"
+SWEP.AttackHitFlesh = "snd_jack_hmcd_knifestab.wav"
+SWEP.Attack2HitFlesh = "snd_jack_hmcd_slash.wav"
 
 SWEP.AttackPos = Vector(0,0,0)
 SWEP.DamageType = DMG_SLASH
@@ -245,7 +240,6 @@ end
 
 function SWEP:CanSecondaryAttack()
     if not self.allowsec then return false end
-    self.Attack2HitFlesh = "knife/NEWRapierSlash"..math.random(1, 6)..".wav"
     return true
 end
 

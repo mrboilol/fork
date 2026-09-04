@@ -1,7 +1,7 @@
 if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_tpik_base"
 SWEP.PrintName = "Improvised Explosive Device"
-SWEP.Instructions = "Press E to plant immediately. Hold LMB for a silent plant, hold RMB on an object to plant inside it, or hold both for a silent inside plant. Dial the assigned number from a phone to detonate."
+SWEP.Instructions = "Press E to plant immediately. Hold LMB for a silent plant, hold RMB on an object to plant inside it, or hold both for a silent inside plant. With IED phones disabled, press LMB after planting to detonate."
 SWEP.Category = "Weapons - Explosive"
 SWEP.Spawnable = true
 SWEP.AdminOnly = false
@@ -198,6 +198,14 @@ function SWEP:ThinkAdd()
 		end
 	end
 
+	if SERVER and self:GetPlanted() then
+		local phonesEnabled = GetConVar("hg_iedphones") and GetConVar("hg_iedphones"):GetBool() or false
+		if self:GetPhoneMode() ~= phonesEnabled then
+			self:SetPhoneMode(phonesEnabled)
+			if HG_PHONE_SERVER then HG_PHONE_SERVER:UpdateIEDPhone(self, phonesEnabled) end
+		end
+	end
+
 	if SERVER and IsValid(self.HaveTheBomb) then
 		self.LastBombPos = self.HaveTheBomb:LocalToWorld(self.HaveTheBomb:OBBCenter())
 		self.LastBombModel = self.HaveTheBomb:GetModel()
@@ -331,9 +339,9 @@ if CLIENT then
 			draw.SimpleText("Planting IED: " .. math.Round(math.max(self:GetPlantAt() - CurTime(), 0), 1) .. "s", "HomigradFontMedium", toScreen.x, toScreen.y + 25, color_white, TEXT_ALIGN_CENTER)
 		elseif self:GetPlanted() then
 			local xrand,yrand = math.random(-1,1),math.random(-1,1)
-			local number = HG_PHONE.GetNumber(self)
-			draw.SimpleText("Dial " .. number .. " from a phone.", "HomigradFontMedium", toScreen.x + 2 + xrand, toScreen.y + 26 + yrand, color_black, TEXT_ALIGN_CENTER)
-			draw.SimpleText("Dial " .. number .. " from a phone.", "HomigradFontMedium", toScreen.x + xrand, toScreen.y + 25 + yrand, color_red, TEXT_ALIGN_CENTER)
+			local instruction = self:GetPhoneMode() and "Dial " .. HG_PHONE.GetNumber(self) .. " from a phone." or "LMB to detonate."
+			draw.SimpleText(instruction, "HomigradFontMedium", toScreen.x + 2 + xrand, toScreen.y + 26 + yrand, color_black, TEXT_ALIGN_CENTER)
+			draw.SimpleText(instruction, "HomigradFontMedium", toScreen.x + xrand, toScreen.y + 25 + yrand, color_red, TEXT_ALIGN_CENTER)
 		end
 	end
 end
@@ -444,10 +452,12 @@ local function RegisterIEDBomb(self, ent, tr, insideObject)
 	self:SetDestroyed(false)
 	self:SetDetonating(false)
 	local owner = self:GetOwner()
-	local hasPhone = IsValid(owner) and owner:HasWeapon("weapon_phone")
-	self:SetPhoneMode(hasPhone)
+	local phonesEnabled = GetConVar("hg_iedphones") and GetConVar("hg_iedphones"):GetBool() or false
+	local hasPhone = phonesEnabled and IsValid(owner) and owner:HasWeapon("weapon_phone")
+	self:SetPhoneMode(phonesEnabled)
 	self:SetPlanted(true)
-	if HG_PHONE_SERVER then
+	self.IEDPlanter = owner
+	if phonesEnabled and HG_PHONE_SERVER then
 		-- Set privacy before registration; this number must never enter Contacts.
 		self:SetNW2Bool("HGPhonePublic", false)
 		self:SetNW2Bool("HGPhonePublicInitialized", true)
@@ -463,7 +473,6 @@ local function RegisterIEDBomb(self, ent, tr, insideObject)
 				local phone = owner:Give("weapon_phone")
 				if IsValid(phone) then owner:SelectWeapon("weapon_phone") end
 			end
-			self.IEDPlanter = owner
 			owner:DropWeapon(self)
 			self:SetNoDraw(true)
 			self:SetSolid(SOLID_NONE)
@@ -1132,9 +1141,20 @@ if SERVER then
 	end)
 
 	function SWEP:PrimaryAttack()
-		if not self:GetPlanted() or not self:GetPhoneMode() or not HG_PHONE_SERVER or not HG_PHONE_SERVER.OpenIEDPhone then return end
-		self:SetNextPrimaryFire(CurTime() + 0.4)
-		HG_PHONE_SERVER.OpenIEDPhone(self:GetOwner(), self)
+		if not self:GetPlanted() then return end
+
+		if self:GetPhoneMode() then
+			if not HG_PHONE_SERVER or not HG_PHONE_SERVER.OpenIEDPhone then return end
+			self:SetNextPrimaryFire(CurTime() + 0.4)
+			HG_PHONE_SERVER.OpenIEDPhone(self:GetOwner(), self)
+			return
+		end
+
+		if (self.nextattackhuy or 0) > CurTime() then return end
+		if self:PhoneDetonate() then
+			self.nextattackhuy = CurTime() + 1
+			self:SetNextPrimaryFire(CurTime() + 1)
+		end
 	end
 	function SWEP:SecondaryAttack() end
 

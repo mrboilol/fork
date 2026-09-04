@@ -174,12 +174,11 @@ local hold_wound_arterial_slow_mul = 0.2
 local hold_wound_clot_mul = 1.35
 local hold_wound_clot_twohand_mul = 1.6
 local wound_bleed_rate_mul = 2
-local arterial_bleed_ml_s_per_severity = (hg.organism.config and hg.organism.config.ARTERIAL_BLEED_ML_S_PER_SEVERITY) or 0.75
-local arterial_min_flow_fraction = (hg.organism.config and hg.organism.config.ARTERIAL_MIN_FLOW_FRACTION) or 0.08
+local arterial_bleed_ml_s_per_severity = (hg.organism.config and hg.organism.config.ARTERIAL_BLEED_ML_S_PER_SEVERITY) or 4.5
 -- An amputated limb must remain an urgent arterial bleed.  This is lower than
 -- the old runaway jet, but high enough to be clearly visible and dangerous
 -- until the stump is controlled.
-local amputation_arterial_bleed_mul = (hg.organism.config and hg.organism.config.ARTERIAL_AMPUTATION_BLEED_MULTIPLIER) or 0.65
+local amputation_arterial_bleed_mul = (hg.organism.config and hg.organism.config.ARTERIAL_AMPUTATION_BLEED_MULTIPLIER) or 1
 local headgib_arterial_bleed_mul = (hg.organism.config and hg.organism.config.ARTERIAL_HEADGIB_BLEED_MULTIPLIER) or 1.65
 
 local function hasWound(wounds, target)
@@ -377,7 +376,7 @@ module[2] = function(owner, org, mulTime)
 	-- hot reloads or unusual construction order before its first tick.
 	org.coagulation_multiplier = tonumber(org.coagulation_multiplier) or 1.2
 	org.blood_regeneration_multiplier = tonumber(org.blood_regeneration_multiplier) or 1.2
-	org.bleedingmul = tonumber(org.bleedingmul) or 0.8
+	org.bleedingmul = tonumber(org.bleedingmul) or 1
 	local hemostaticTreatment, txaHemostasis, internalHemostasis = getHemostaticTreatmentDrive(org)
 	org.hemostaticTreatment = hemostaticTreatment
 
@@ -599,18 +598,12 @@ module[2] = function(owner, org, mulTime)
 		local circulationOutput = math.max(tonumber(org.cardiacOutput) or 0, 0)
 		local pressureFactor = math.Clamp((tonumber(org.bloodPressure) or 0) / 92, 0, 1.5)
 		local pulseFactor = math.Clamp((tonumber(org.pulse) or 0) / 70, 0, 1.5)
-		-- Pressure-driven bleeding follows actual residual flow. Cardiac arrest is a
-		-- rhythm state, not a reason to erase the last few seconds of mechanical
-		-- pressure before cardiac output/pulse have mathematically decayed.
 		local arterialDrive = math.Clamp(math.sqrt(math.max(circulationOutput * pressureFactor * pulseFactor, 0)), 0, 1.5)
-		local flowDrive = math.Clamp(arterial_min_flow_fraction + arterialDrive * (1 - arterial_min_flow_fraction), arterial_min_flow_fraction, 1.35)
+		local flowDrive = math.max(pulse, 20) / 80
 		if wound[7] == "arteria" and (wound[1] or 0) > 0 then hasCarotidWound = true end
 		if wound[7] == "arteria" and org.manualHoldWound and org.manualHoldWoundArterial and org.manualHoldWoundTarget == wound then
 			heldCarotidWound = true
 		end
-		-- Wound severity is converted into an actual mL/s loss rate. Circulatory
-		-- pressure scales that rate continuously; compression/tourniquets act on the
-		-- same rate. Blood subtraction is therefore independent of Think frequency.
 		local heldBleedMul = getHeldWoundBleedMul(org, wound)
 		local bandageCoverage = math.Clamp(tonumber(wound.bandageCoverage) or 0, 0, 1)
 		local woundBleedRate = math.max(wound[1] or 0, 0)

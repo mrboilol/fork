@@ -640,7 +640,6 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 	if not org.brain then return end
 	
 	local adrenaline = org.adrenaline or 0
-	local pulse = org.pulse or 70
 	local pain = org.pain or 0
 	local hurt = org.hurt or 0
 	local blood = org.blood or 5000
@@ -668,8 +667,6 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 	local tinnitusSoundFactor2 = tinnitusSoundFactor + (hook.Run("ModifyTinnitusFactor", tinnitusSoundFactor) or 0)
 
 	--print(lply.tinnitus)
-	local adrenK = math.min(math.max(1 + adrenaline, 1), 1.2)
-
 	if org.otrub then
 		//DrawMotionBlur(0.1, 1., 0.1)
 		//lply:ScreenFade( SCREENFADE.IN, clr_black2, 2, 0.5 )
@@ -728,15 +725,11 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 	local k4 = math.Clamp((EXHAUSTED_THRESHOLD - stamina) / EXHAUSTED_THRESHOLD, 0, 1)
 
 	DrawSharpen(k1 * 2, k1 * 1)
-	local lowpulse = math.max((70 - pulse) / 70, 0) + math.max(3000 * ((math.cos(CurTime()/2) + 1) / 2 * 0.1 + 1) - (blood * adrenK - 300),0) / 400
-
 	if (lply.PlayerClassName == "headcrabzombie" or lply:GetNetVar("headcrab")) and lply:Alive() then
 		disorientation = disorientation + 100
 	end
 
 	disorientation = disorientation + amtflashed * 5
-
-	local amount = 1 - math.Clamp(lowpulse + disorientation / 4 + k2 * 2,0,1)
 
 	disorientationLerp = LerpFT(disorientation > disorientationLerp and 1 or 0.15, disorientationLerp, math.max(lply.suiciding and 1.5 or 0, disorientation))
 

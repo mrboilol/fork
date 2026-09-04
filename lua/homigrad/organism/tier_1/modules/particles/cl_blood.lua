@@ -50,6 +50,7 @@ hook.Add("Player Spawn", "removeownblooddroplets", function(ply)
 	end
 end)
 
+local mat_huy = Material("effects/blood_core")
 local lightcolor = Color(0, 0, 0, 255)
 bloodparticles_hook[1] = function(anim_pos, mul)
 	 
@@ -87,7 +88,7 @@ bloodparticles_hook[1] = function(anim_pos, mul)
 			local len = (part[2] - part[1]):LengthSqr()
 			--part.lerpeddiff = LerpVector(FrameTime() * 1, part.lerpeddiff or Vector(), (part[2] - part[1]))
 			--if len > 1 * 1 then
-				render_SetMaterial(part[4])
+				render_SetMaterial(mat_huy)
 				lightcolor.r = math.min((part.artery and 45 or 20) * light[1], 255)
 				--part.lerpedshit = LerpFT(!part.lasthit and 1 or mul * 1, part.lerpedshit or 1, part.lasthit and 7 or 1)
 				--render_DrawBeam(pos - (len < 2 and (part[2] - part[1]):GetNormalized() * part.lerpedshit or (part[2] - part[1])) * 0.5 / mul / 24,pos + (part[2] - part[1]) * 0.5 / mul / 24, part.lerpedshit, 0, 1, part[9] or lightcolor )
@@ -106,6 +107,14 @@ bloodparticles_hook[1] = function(anim_pos, mul)
 end
 
 local hg_old_blood = ConVarExists("hg_old_blood") and GetConVar("hg_old_blood") or CreateClientConVar("hg_old_blood", 0, true, false, "new decals, or old", 0, 1)
+
+cvars.RemoveChangeCallback("hg_old_blood", "hg_refresh_old_blood_decals")
+cvars.AddChangeCallback("hg_old_blood", function(_, oldValue, newValue)
+	if oldValue == newValue then return end
+	hg.bloodpositions = {}
+	hg.groundbloodstains = {}
+	hg.fadinggroundbloodstains = {}
+end, "hg_refresh_old_blood_decals")
 
 hg.bloodpositions = hg.bloodpositions or {}
 hg.bloodcount = hg.bloodcount or 0

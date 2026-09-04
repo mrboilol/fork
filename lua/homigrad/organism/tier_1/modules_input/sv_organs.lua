@@ -464,7 +464,7 @@ hitArtery = function(artery, org, dmg, dmgInfo, boneindex, dir, hit, impact, for
 		localPos, localAng, dir2 = vecZero, angZero, Vector(-1, 0, 0)
 	end
 	local wound = {arterySize[artery], localPos, localAng, woundBone or boneindex, CurTime(), dir2 * 100, artery}
-	wound.visualBleedRate = math.max((arterySize[artery] or 6) * 0.75, 1)
+	wound.visualBleedRate = math.max((arterySize[artery] or 6) * 4.5, 1)
 	table.insert(org.arterialwounds, wound)
 	hg.organism.MarkArterialWoundsNetDirty(org)
 	emitArterialImpact(owner, wound)

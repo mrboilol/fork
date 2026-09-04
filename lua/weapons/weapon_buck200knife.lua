@@ -90,11 +90,7 @@ SWEP.swingsoundextra = {
     {"knife/knife_bayonet_swing2.ogg", 60, {80, 90}},
 }
 
-SWEP.hitsoundextra = {
-    {"knife/KnifeStabIn-1.wav", 55, {105, 115}},
-    {"knife/KnifeStabIn-2.wav", 55, {105, 115}},
-    {"knife/KnifeStabIn-3.wav", 55, {105, 115}},
-}
+SWEP.hitsoundextra = nil
 
 SWEP.AttackTime = 0.2
 SWEP.AnimTime1 = 1
@@ -107,7 +103,8 @@ SWEP.Attack2Time = 0.15
 SWEP.WaitTime2 = 0.56
 SWEP.noreverse = true
 
-SWEP.Attack2HitFlesh = "knife/NEWRapierSlash1.wav"
+SWEP.AttackHitFlesh = "snd_jack_hmcd_knifestab.wav"
+SWEP.Attack2HitFlesh = "snd_jack_hmcd_slash.wav"
 
 SWEP.AnimList = {
     ["idle"] = "idle",
@@ -150,7 +147,6 @@ end
 
 function SWEP:CanSecondaryAttack()
     if not self.allowsec then return false end
-    self.Attack2HitFlesh = "knife/NEWRapierSlash"..math.random(1, 6)..".wav"
     return true
 end
 
