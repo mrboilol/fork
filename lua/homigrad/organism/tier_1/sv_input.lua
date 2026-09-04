@@ -785,15 +785,20 @@ function hg.organism.AddWound(ent, tr, bone, dmgInfo, dmgPos, dmgBlood, inputHol
 	
 	local physBone = bone != -1 and bone or math.random(0, ent:GetPhysicsObjectCount() - 1)
 	local bone = ent:TranslatePhysBoneToBone(physBone)
-	dmgPos = ent:GetBonePosition(bone)
 	
 	if bone and dmgBlood > 0 then
 		for i = 1, 2 do
 			local bonePos, boneAng = ent:GetBonePosition(bone)
+			if ent:IsRagdoll() then
+				local phys = ent:GetPhysicsObjectNum(physBone)
+				if IsValid(phys) then
+					bonePos, boneAng = phys:GetPos(), phys:GetAngles()
+				end
+			end
 			
 			if not bonePos then return end
 
-			dmgPos = (i == 1 and inputHole[1] or outputHole[1]) or dmgPos
+			dmgPos = (i == 1 and inputHole[1] or outputHole[1]) or bonePos
 			
 			if i == 2 and not outputHole[1] then continue end
 			if i == 1 and not outputHole[1] then dmgBlood = dmgBlood * 2 end

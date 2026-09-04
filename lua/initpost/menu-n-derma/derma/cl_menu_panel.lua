@@ -73,6 +73,7 @@ local function QueueMainMenuMusic(owner, path)
         station:EnableLooping(true)
         station:SetVolume(0)
         station:Play()
+        station:SetTime(12)
     end)
 end
 

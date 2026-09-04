@@ -2162,7 +2162,7 @@ hook.Add("Org Think", "BodyTemperature", function(owner, org, timeValue) -- пе
 		if org.FreezeSndCD < CurTime() then
 			org.FreezeSndCD = CurTime() + math.random(10, 35)
 
-			ent:EmitSound("zcitysnd/"..(ThatPlyIsFemale(ent) and "fe" or "").."male/freezing_"..math.random(1,8)..".ogg",65)
+			ent:EmitSound("zcitysnd/"..(ThatPlyIsFemale(ent) and "fe" or "").."male/freezing_"..math.random(1,8)..".mp3",65)
 		end
 	end
 	

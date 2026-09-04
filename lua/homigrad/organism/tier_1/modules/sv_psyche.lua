@@ -77,16 +77,6 @@ local apathy_phrases = {
 		"I just want this to be over."
 	}
 }
-local fear_phrases = {
-	legacy = {"You are in fear."},
-	new = {
-		"I'm scared.",
-		"I don't want to die here.",
-		"I need to get out of here.",
-		"Please, not like this.",
-		"I just want to survive."
-	}
-}
 local derealization_phrases = {
 	legacy = {
 	"This doesn't feel real.",
@@ -111,7 +101,6 @@ local derealization_phrases = {
 }
 local anger_color = Color(255, 110, 110)
 local apathy_color = Color(170, 170, 170)
-local fear_color = Color(190, 190, 255)
 local derealization_color = Color(180, 160, 255)
 
 local function psycheThought(owner, phrases, delay, key, clr)
@@ -164,9 +153,6 @@ module[2] = function(owner, org, timeValue)
 		local panic = org.panicattack or 0
 		if panic >= 0.55 then
 			psycheThought(owner, derealization_phrases, math.Rand(18, 28), "psyche_derealization", derealization_color)
-		end
-		if fearLevel > 0.5 and panic < 0.55 then
-			psycheThought(owner, fear_phrases, math.Rand(15, 25), "psyche_fear", fear_color)
 		end
 		if anger > 0.55 then
 			psycheThought(owner, anger_phrases, math.Rand(20, 35), "psyche_anger", anger_color)

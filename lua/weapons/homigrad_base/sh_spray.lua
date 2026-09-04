@@ -122,11 +122,11 @@ function SWEP:PrimarySpread()
 			offsetVelocity[2] = offsetVelocity[2] - lateralImpulse * 6
 			offsetVelocity[3] = offsetVelocity[3] + recoilImpulse * 4
 		else
-			wobbleVelocity[1] = wobbleVelocity[1] - recoilImpulse * (26 + math.abs(side) * 6)
-			wobbleVelocity[2] = wobbleVelocity[2] + side * lateralImpulse * 8
-			wobbleVelocity[3] = wobbleVelocity[3] + roll * lateralImpulse * 6
+			wobbleVelocity[1] = wobbleVelocity[1] - recoilImpulse * (32 + math.abs(side) * 4)
+			wobbleVelocity[2] = wobbleVelocity[2] + side * lateralImpulse * 5
+			wobbleVelocity[3] = wobbleVelocity[3] + roll * lateralImpulse * 3.5
 			offsetVelocity[1] = offsetVelocity[1] - recoilImpulse * 11
-			offsetVelocity[2] = offsetVelocity[2] + side * lateralImpulse * 4
+			offsetVelocity[2] = offsetVelocity[2] + side * lateralImpulse * 2.5
 			offsetVelocity[3] = offsetVelocity[3] + recoilImpulse * 7
 		end
 
@@ -183,11 +183,11 @@ function SWEP:PrimarySpread()
 			-- Clockwise-canted Gangsta/Somalian holds rotate muzzle rise into leftward travel.
 			angrand2 = Angle(math.Rand(-force * 0.18, force * 0.08), -math.Rand(force * 0.72, force * 1.15), -math.Rand(force * 0.12, force * 0.35))
 		else
-			local downwardKick = util.SharedRandom("hg_recoil_downward", 0, 1, (self.recoilShotIndex or 0) * 79) < 0.08
+			local downwardKick = util.SharedRandom("hg_recoil_downward", 0, 1, (self.recoilShotIndex or 0) * 79) < 0.025
 			local pitch = downwardKick
 				and math.Rand(force * 0.06, force * 0.18)
-				or -math.Rand(force * 0.65, force)
-			angrand2 = Angle(pitch, math.Rand(-force * 0.22, force * 0.22), math.Rand(-force * 0.08, force * 0.08))
+				or -math.Rand(force * 0.78, force * 1.12)
+			angrand2 = Angle(pitch, math.Rand(-force * 0.12, force * 0.12), math.Rand(-force * 0.05, force * 0.05))
 		end
 		self.LastRecoilDirection = Angle(angrand2[1] / math.max(force, 0.001), angrand2[2] / math.max(force, 0.001), angrand2[3] / math.max(force, 0.001))
 		

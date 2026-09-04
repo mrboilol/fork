@@ -128,11 +128,8 @@ local function UpdateECGStateAlert(ecgState)
 end
 
 -- Better sound system from oldring
-local SOUND_HEART = "health/critbeat.mp3"
-local SOUND_HEALTH_ALARM = "health/healthbeat.mp3"
+local SOUND_HEART = "heartbeat/heartbeat_single.ogg"
 local SOUND_FLATLINE = "health/gg.mp3"
-local SOUND_FIBRILLATION = "criticalbeats.mp3"
-local CRITBEAT_VOLUME_SCALE = 0.6
 
 local lastPhaseMod = 0
 local wasUnconsciousState = false
@@ -216,12 +213,6 @@ local heartStationsLoading = false
 local heartStationNext = 1
 local flatlineStation = nil
 local flatlineLoading = false
-local fibrillationStation = nil
-local fibrillationLoading = false
-local fibrillationPlaying = false
-local fibrillationRequested = false
-local fibrillationVolume = 0
-
 local nearDeathClasses = {
     ["furry"] = true,
     ["Gordon"] = true,
@@ -230,15 +221,6 @@ local nearDeathClasses = {
 
 local hg_unconsciousring = CreateClientConVar("hg_unconsciousring", "1", true, false, "Enable unconscious ring", 0, 1)
 local hg_unconsciousclassic = CreateClientConVar("hg_unconsciousclassic", "0", true, false, "Use classic dots instead of EKG line", 0, 1)
-
-local function GetHeartbeatVolume(org)
-    if not org then return 0.2 end
-    local hurt = math.Clamp((5000 - (org.blood or 5000)) / 5000, 0, 1) * 0.4
-         + math.Clamp((org.pain or 0) / 100, 0, 1) * 0.4
-         + math.Clamp(org.brain or 0, 0, 1) * 0.2
-         + math.Clamp(org.brainHemorrhage or 0, 0, 1) * 0.2
-    return math.Clamp(0.2 + hurt, 0.2, 1.0)
-end
 
 local function GetMechanicalPulseStrength(org)
     if not org then return 0 end
@@ -273,20 +255,16 @@ local function IsCirculationCritical(org)
         or (tonumber(org.cardiacTamponade) or 0) > 0.55
 end
 
-local function GetHeartbeatVolumeAdmiring(org, admiring)
+local function GetHeartbeatVolume(org)
     if not org then return 0.2 end
-    if admiring then
-        -- When admiring self, make heartbeats loud and clear with abnormal heart rate
-        local heartRate = tonumber(org.heartbeat) or 0
-        local abnormalPulse = (heartRate < 40 and heartRate >= 1) or heartRate > 100
-        if abnormalPulse then
-            return 1.0 -- Maximum volume when admiring with abnormal heart rate
-        end
-    end
-    -- Normal volume calculation
     local hurt = math.Clamp((5000 - (org.blood or 5000)) / 5000, 0, 1) * 0.4
          + math.Clamp((org.pain or 0) / 100, 0, 1) * 0.4
          + math.Clamp(org.brain or 0, 0, 1) * 0.2
+         + math.Clamp(org.brainHemorrhage or 0, 0, 1) * 0.2
+
+    if not org.critical and not IsCirculationCritical(org) and not IsVentricularFibrillation(org) then
+        hurt = math.min(hurt, 0.2)
+    end
 
     return math.Clamp(0.2 + hurt, 0.2, 1.0)
 end
@@ -322,14 +300,6 @@ local function ResetRingAudio()
     flatlineStation = nil
     flatlineLoading = false
 
-    if IsValid(fibrillationStation) then
-        fibrillationStation:Stop()
-    end
-    fibrillationStation = nil
-    fibrillationLoading = false
-    fibrillationPlaying = false
-    fibrillationRequested = false
-    fibrillationVolume = 0
 end
 
 hook.Add("Player Spawn", "ResetUnconsciousRingFlatline", function(ply)
@@ -431,52 +401,6 @@ local function EmitRingSound(soundPath, volume)
     end
 end
 
-local function RequestFibrillationSound(volume)
-    if hg_unconsciousclassic and hg_unconsciousclassic:GetBool() then return end
-    if hg and hg.healthAlarmActive then return end
-    if hg and hg.criticalBeatsActive then return end
-    fibrillationRequested = true
-    fibrillationVolume = math.max(fibrillationVolume, math.Clamp(volume or 1, 0, 1))
-end
-
-local function UpdateFibrillationSound()
-    if fibrillationRequested then
-        if fibrillationPlaying then return end
-
-        fibrillationPlaying = true
-        if IsValid(fibrillationStation) then
-            PlayStation(fibrillationStation, fibrillationVolume)
-            return
-        end
-
-        if fibrillationLoading then return end
-        fibrillationLoading = true
-        local gen = soundGen
-        sound.PlayFile("sound/" .. SOUND_FIBRILLATION, "noblock noplay", function(station)
-            fibrillationLoading = false
-            if gen ~= soundGen or not fibrillationPlaying then
-                if IsValid(station) then station:Stop() end
-                return
-            end
-            if IsValid(station) then
-                fibrillationStation = station
-                station:EnableLooping(true)
-                PlayStation(fibrillationStation, fibrillationVolume)
-            end
-        end)
-    elseif fibrillationPlaying then
-        fibrillationPlaying = false
-        if IsValid(fibrillationStation) and fibrillationStation:GetState() == GMOD_CHANNEL_PLAYING then
-            if fibrillationStation.FadeOut then
-                fibrillationStation:FadeOut(0.5)
-            else
-                fibrillationStation:SetVolume(0)
-                fibrillationStation:Stop()
-            end
-        end
-    end
-end
-
 -- Update ring audio with phase-based triggering from oldring
 local function UpdateRingAudio(heartRate, ringAlpha, org, admiring)
     if heartRate < 1 or ringAlpha <= 0 then return end
@@ -486,33 +410,10 @@ local function UpdateRingAudio(heartRate, ringAlpha, org, admiring)
     lastPhaseMod = curr
 
     local mechanicalStrength = GetMechanicalPulseStrength(org)
-    local beatVolume = GetHeartbeatVolumeAdmiring(org, admiring) * ringAlpha * mechanicalStrength
-    local fibrillating = IsVentricularFibrillation(org)
-    if fibrillating then
-        RequestFibrillationSound(GetHeartbeatVolumeAdmiring(org, admiring) * ringAlpha)
-    end
+    local beatVolume = GetHeartbeatVolume(org) * ringAlpha * mechanicalStrength
     if PhaseCrossed(prev, curr, 0.239) then
-        -- Use heartthump for abnormal heart rates or high stress, normal heartbeat otherwise
-        local abnormalPulse = (heartRate < 40 and heartRate >= 1) or heartRate > 100
-        local highStress = false
-        if org then
-            local hurt = math.Clamp((5000 - (org.blood or 5000)) / 5000, 0, 1) * 0.4
-                 + math.Clamp((org.pain or 0) / 100, 0, 1) * 0.4
-                 + math.Clamp(org.brain or 0, 0, 1) * 0.2
-            highStress = hurt > 0.3
-        end
-
-        -- When admiring with abnormal pulse, use full volume
-        if admiring and abnormalPulse then
-            beatVolume = mechanicalStrength
-        end
-
-        if fibrillating and hg and hg.healthAlarmActive then
-            EmitRingSound(SOUND_HEALTH_ALARM, GetHeartbeatVolumeAdmiring(org, admiring) * ringAlpha)
-        elseif mechanicalStrength > 0.02 and not fibrillating and (abnormalPulse or highStress) then
-            EmitRingSound(hg and hg.healthAlarmActive and SOUND_HEALTH_ALARM or SOUND_HEART, beatVolume * CRITBEAT_VOLUME_SCALE)
-        elseif mechanicalStrength > 0.02 and not fibrillating then
-            EmitRingSound(hg and hg.healthAlarmActive and SOUND_HEALTH_ALARM or "sound/heartbeat/heartbeat_single.ogg", beatVolume)
+        if mechanicalStrength > 0.02 then
+            EmitRingSound(SOUND_HEART, beatVolume)
         end
     end
 end
@@ -968,9 +869,6 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         or (brainHemorrhage >= 0.4)
         or (tonumber(org.brainSwelling) or 0) >= 0.45
     local admiring = ply:GetNWBool("mcd_admiring", false) and not ply.mcd_admire_local_cancel
-    fibrillationRequested = false
-    fibrillationVolume = 0
-
     -- Allow a new flatline only after the heart has actually recovered.
     if ecgState ~= "asystole" and wasHeartbeatZero then
         flatlinePlayedThisLife = false
@@ -987,23 +885,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     local className = ply.PlayerClassName
     local isNearDeathClass = nearDeathClasses[className] == true
     
-    local isInBadHealth = isCritical
-        or org.heartstop
-        or (org.trachea and org.trachea >= 0.6)
-        or (org.skull and org.skull >= 1)
-        or (org.heart and org.heart > 0.6)
-        or (org.blood and org.blood < 3000)
-        or (org.o2 and org.o2[1] and org.o2[1] < 10)
-        or (org.hypotension and org.hypotension > 0.55)
-        or IsCirculationCritical(org)
-        or IsVentricularFibrillation(org)
-        or (org.hemothorax and org.hemothorax > 0.55)
-        or (org.cardiacTamponade and org.cardiacTamponade > 0.4)
-        or brainHemorrhage >= 0.25
-        or (org.brainSwelling and org.brainSwelling >= 0.35)
-        or (heartbeat < 30 or heartbeat > 170)
-    
-    local healthAlarmActive = ply:Alive() and not isUnconscious and isNearDeathClass and isInBadHealth
+    local healthAlarmActive = ply:Alive() and not isUnconscious and isNearDeathClass and isCritical
     if hg then hg.healthAlarmActive = healthAlarmActive end
 
     if not healthAlarmActive then
@@ -1028,11 +910,10 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
 
     local lowConsciousness = (org.consciousness or 1) < 0.4 and not isUnconscious
     local pulse = math.max(tonumber(org.pulse) or heartbeat, 0)
-    local abnormalPulse = (heartbeat < 40 and heartbeat >= 1) or heartbeat > 100
     local severeMechanicalPulse = (pulse > 0 and pulse < 45) or pulse > 125
     local abnormalECG = ecgState ~= "normal_sinus"
     local sinusECGTail = UpdateECGStateAlert(ecgState)
-    local showAwakeECG = not isUnconscious and not lowConsciousness
+    local showAwakeECG = isCritical and not isUnconscious and not lowConsciousness
         and (abnormalECG or severeMechanicalPulse or sinusECGTail > 0 or admiring)
     
 	local unconsciousElapsed = isUnconscious and (CurTime() - (unconsciousStartTime or CurTime())) or 0
@@ -1088,7 +969,6 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     -- Determine if we should show otrub ECG (for unconscious or awake with abnormal heartbeat/admiring/recent sudden drop)
 
     if ringAlpha <= 0 and awakeECGAlpha <= 0.01 and not showPulseCheckECG then
-        UpdateFibrillationSound()
         return
     end
     local otrubECGAlpha = (isUnconscious or lowConsciousness) and ringAlpha or awakeECGAlpha
@@ -1215,10 +1095,6 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
                 or (target_brain > 0.4)
                 or (target_hemorrhage >= 0.4)
                 or (tonumber(target_org.brainSwelling) or 0) >= 0.45
-            if IsVentricularFibrillation(target_org) then
-                RequestFibrillationSound(GetHeartbeatVolume(target_org))
-            end
-
             local targetECGColor = target_isCritical and Color(200, 0, 0, 255) or Color(255, 255, 255, 255)
             DrawEKG(pulseCheckEKGState, boxX + boxW / 2, boxY + boxH * 0.52, boxW - 20, boxH - 28, target_org, targetECGColor, ecgAlphaPulseCheck)
         end
@@ -1227,16 +1103,12 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     end
 
 
-    local abnormalPulse = (heartbeat < 40 and heartbeat >= 1) or heartbeat > 100 or severeMechanicalPulse
-    if IsVentricularFibrillation(org) and (admiring or isUnconscious or abnormalPulse or isCheckingPulse) then
-        RequestFibrillationSound(GetHeartbeatVolumeAdmiring(org, admiring))
-    end
-    if heartbeat >= 1 then
+    if heartbeat >= 1 and (admiring or isUnconscious or isCheckingPulse or isCritical) then
         if IsValid(flatlineStation) and flatlineStation:GetState() == GMOD_CHANNEL_PLAYING then
             flatlineStation:Stop()
         end
 
-        if admiring or isUnconscious or abnormalPulse or isCheckingPulse then
+        if admiring or isUnconscious or isCheckingPulse or isCritical then
             -- Skip oldring sound system when unconscious ring is active with EKG mode
             if not (isUnconscious and ringAlpha > 0.01 and not (hg_unconsciousclassic and hg_unconsciousclassic:GetBool())) then
                 local currentHeartBeat = math.floor(heartPhase)
@@ -1244,36 +1116,15 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
                     lastHeartBeat = currentHeartBeat
 
                     local mechanicalStrength = GetMechanicalPulseStrength(org)
-                    local vol = GetHeartbeatVolumeAdmiring(org, admiring) * mechanicalStrength
-                    local hasHealthHUD = (className == "Gordon" or className == "Combine" or className == "furry")
-                    local highStress = vol > 0.5
-                    local fibrillating = IsVentricularFibrillation(org)
-                    if (abnormalPulse and hasHealthHUD) or highStress or admiring then
-                        if fibrillating then
-                            if hg and hg.healthAlarmActive then
-                                EmitRingSound(SOUND_HEALTH_ALARM, vol)
-                            else
-                                RequestFibrillationSound(vol)
-                            end
-                        elseif mechanicalStrength > 0.02 then
-                            EmitRingSound(hg and hg.healthAlarmActive and SOUND_HEALTH_ALARM or SOUND_HEART, vol * CRITBEAT_VOLUME_SCALE)
-                        end
-                    elseif mechanicalStrength > 0.02 then
-                        EmitRingSound(hg and hg.healthAlarmActive and SOUND_HEALTH_ALARM or "sound/heartbeat/heartbeat_single.ogg", vol)
+                    local vol = GetHeartbeatVolume(org) * mechanicalStrength
+                    if mechanicalStrength > 0.02 then
+                        EmitRingSound(SOUND_HEART, vol)
                     end
                 end
             end
         end
     end
 
-    -- Critical-beats is only for fibrillation. As soon as the local heart is
-    -- asystolic, clear any request so the existing fade-out branch runs.
-    if ecgState == "asystole" then
-        fibrillationRequested = false
-        fibrillationVolume = 0
-    end
-    UpdateFibrillationSound()
-    
     if healthAlarmActive then
         local flashCycle = math.floor(CurTime() / 0.65)
         local isVisible = flashCycle % 2 == 0

@@ -1292,6 +1292,22 @@ local function GetWoundBoneMatrix(ent, bone)
 	return ent:GetBoneMatrix(id), id
 end
 
+local function GetWoundTransform(ent, wound, mat, boneID)
+	local bonePos, boneAng = mat:GetTranslation(), mat:GetAngles()
+	if not wound[2] or not wound[3] or not bonePos or not boneAng then return end
+
+	local pos, ang = LocalToWorld(wound[2], wound[3], bonePos, boneAng)
+	if not ent:IsRagdoll() then return pos, ang end
+
+	local physBone = ent:TranslateBoneToPhysBone(boneID)
+	local phys = physBone and physBone >= 0 and ent:GetPhysicsObjectNum(physBone)
+	if IsValid(phys) and pos:DistToSqr(phys:GetPos()) > 96 * 96 then
+		return phys:GetPos(), phys:GetAngles()
+	end
+
+	return pos, ang
+end
+
 hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, ent, time)
 	--local ent = IsValid(ply.FakeRagdoll) and ply.FakeRagdoll or ply
 	--print(ply,ent,ply.organism.owner,ply.new_organism.owner)
@@ -1416,11 +1432,10 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 				vol = math.Clamp(vol, 0, 0.7) * hg_heartbeat_volume:GetFloat()
 			end
 
-			--ply:EmitSound("heartbeat/heartbeat_single.wav", 55, 60, vol)
 			if ent:GetVelocity():LengthSqr() < 10 then
-				sound.Play("heartbeat/heartbeat_single.wav", ply:EyePos(), 55, 60, vol * 1.5)
+				sound.Play("heartbeat/heartbeat_single.ogg", ply:EyePos(), 55, 60, vol * 1.5)
 			else
-				EmitSound("heartbeat/heartbeat_single.wav", ply:EyePos(), ply:EntIndex(), CHAN_AUTO, vol, 55, nil, 60)
+				EmitSound("heartbeat/heartbeat_single.ogg", ply:EyePos(), ply:EntIndex(), CHAN_AUTO, vol, 55, nil, 60)
 			end
 		end
 	end
@@ -1492,9 +1507,8 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 						if !should then continue end
 
 						if not mat then continue end
-						local bonePos, boneAng = mat:GetTranslation(), mat:GetAngles()
-						if not wound[2] or not wound[3] or not bonePos or not boneAng then continue end
-						local pos, ang = LocalToWorld(wound[2], wound[3], bonePos, boneAng)
+						local pos, ang = GetWoundTransform(ent, wound, mat, boneID)
+						if not pos then continue end
 
 						local water = bit.band(util.PointContents(pos), CONTENTS_WATER) == CONTENTS_WATER
 						if water then
@@ -1527,13 +1541,12 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 						if !should then continue end
 						
 						if not mat then continue end
-						local bonePos, boneAng = mat:GetTranslation(), mat:GetAngles()
-						if not wound[2] or not wound[3] or not bonePos or not boneAng then continue end
-						local pos = LocalToWorld(wound[2], wound[3], bonePos, boneAng)
+						local pos, ang = GetWoundTransform(ent, wound, mat, boneID)
+						if not pos then continue end
 
 						local dir = wound[6]
 						local len = dir:Length() * (org.pulse or 70) / 70
-						local _, dir = LocalToWorld(vector_origin, dir:Angle(), vector_origin, boneAng)
+						local _, dir = LocalToWorld(vector_origin, dir:Angle(), vector_origin, ang)
 						
 						dir = -dir:Forward() * len
 

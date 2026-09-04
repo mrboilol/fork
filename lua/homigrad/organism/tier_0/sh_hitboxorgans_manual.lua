@@ -325,7 +325,7 @@ female["ValveBiped.Bip01_Head1"] = {
 	{
 		"eyeL", --left eye
 		0.3,
-		Vector(3.5, -3.3, 1.2),
+		Vector(3.5, -3.55, 1.2),
 		Angle(0, 0, 0),
 		Vector(0.85, 0.9, 0.9),
 		Color(255, 255, 255)
@@ -333,7 +333,7 @@ female["ValveBiped.Bip01_Head1"] = {
 	{
 		"eyeR", --right eye
 		0.3,
-		Vector(3.5, -3.3, -1.2),
+		Vector(3.5, -3.55, -1.2),
 		Angle(0, 0, 0),
 		Vector(0.85, 0.9, 0.9),
 		Color(255, 255, 255)
