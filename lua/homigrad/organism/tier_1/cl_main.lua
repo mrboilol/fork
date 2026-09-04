@@ -87,9 +87,7 @@ local brainRotLoading
 local nextBrainRotRoll = 0
 local brainRotEnd = 0
 local remHeartStopped = false
-local remFibrillationStation
-local remFibrillationLoading
-local remFibrillationStopping
+local nextRemFibrillationBeat = 0
 local remHeartStopLoading
 local seizureStation
 local seizureLoading
@@ -262,46 +260,17 @@ local function StopSeizureSound()
 	end
 end
 
-local function StartRemFibrillationSound()
-	if IsValid(remFibrillationStation) then
-		remFibrillationStopping = nil
-		remFibrillationStation:Play()
-		if remFibrillationStation.ChangeVolume then remFibrillationStation:ChangeVolume(1, 1) else remFibrillationStation:SetVolume(1) end
+local function UpdateRemFibrillationSound(ply, org)
+	if not org or not org.fibrillation then
+		nextRemFibrillationBeat = 0
 		return
 	end
-	if remFibrillationLoading then return end
-	remFibrillationLoading = true
-	sound.PlayFile("sound/criticalbeats.mp3", "noplay", function(station)
-		remFibrillationLoading = nil
-		if not IsValid(station) then return end
-		local ply = LocalPlayer()
-		local org = IsValid(ply) and (ply.new_organism or ply.organism)
-		if not IsValid(ply) or not ply:Alive() or not org or not org.fibrillation then station:Stop() return end
-		remFibrillationStation = station
-		station:EnableLooping(true)
-		station:SetVolume(0)
-		station:Play()
-		if station.ChangeVolume then station:ChangeVolume(1, 1) else station:SetVolume(1) end
-	end)
-end
 
-local function StopRemFibrillationSound()
-	if not IsValid(remFibrillationStation) or remFibrillationStopping then return end
-	remFibrillationStopping = true
-	if remFibrillationStation.ChangeVolume then
-		remFibrillationStation:ChangeVolume(0, 1)
-	else
-		remFibrillationStation:Stop()
-		remFibrillationStation = nil
-		remFibrillationStopping = nil
-		return
-	end
-	timer.Simple(1.05, function()
-		if not remFibrillationStopping or not IsValid(remFibrillationStation) then return end
-		remFibrillationStation:Stop()
-		remFibrillationStation = nil
-		remFibrillationStopping = nil
-	end)
+	local time = CurTime()
+	if time < nextRemFibrillationBeat then return end
+	local heartbeat = math.Clamp(tonumber(org.heartbeat) or 180, 60, 240)
+	nextRemFibrillationBeat = time + 60 / heartbeat
+	sound.Play("heartbeat/heartbeat_single.ogg", ply:EyePos(), 65, 100, 0.55)
 end
 
 hook.Add("Think", "RemCardiacSounds", function()
@@ -316,7 +285,7 @@ hook.Add("Think", "RemCardiacSounds", function()
 	hg.criticalBeatsActive = fibrillation
 	if heartstop and not remHeartStopped then PlayRemHeartStopSound(org.otrub) end
 	remHeartStopped = heartstop
-	if fibrillation then StartRemFibrillationSound() else StopRemFibrillationSound() end
+	UpdateRemFibrillationSound(ply, org)
 	TryPlayBrainRotSound(org)
 	UpdateBrainRotSound(org)
 	if org and org.seizureActive then StartSeizureSound(org) else StopSeizureSound() end

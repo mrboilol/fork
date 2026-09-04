@@ -1,7 +1,7 @@
 if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_tpik_base"
 SWEP.PrintName = "Improvised Explosive Device"
-SWEP.Instructions = "Press E to plant immediately. Hold LMB for a silent plant, hold RMB on an object to plant inside it, or hold both for a silent inside plant. With IED phones disabled, press LMB after planting to detonate."
+SWEP.Instructions = "Press E to plant immediately. Hold R to implant it into yourself. Hold LMB for a silent plant, hold RMB on an object to plant inside it, or hold both for a silent inside plant. With IED phones disabled, press LMB after planting to detonate."
 SWEP.Category = "Weapons - Explosive"
 SWEP.Spawnable = true
 SWEP.AdminOnly = false
@@ -177,6 +177,25 @@ end
 function SWEP:ThinkAdd()
 	if SERVER and not self:GetPlanted() then
 		local owner = self:GetOwner()
+		if IsValid(owner) and owner:Alive() and owner:KeyDown(IN_RELOAD) then
+			if not self.SelfPlantStartedAt then
+				self.SelfPlantStartedAt = CurTime()
+				self:SetPlanting(true)
+				self:SetPlantAt(self.SelfPlantStartedAt + self.SelfPlantTime)
+				self:SetHold("slam")
+			elseif CurTime() >= self.SelfPlantStartedAt + self.SelfPlantTime then
+				self:PlantOnSelf()
+			end
+			return
+		elseif self.SelfPlantStartedAt then
+			local wasTap = CurTime() < self.SelfPlantStartedAt + self.SelfPlantTime
+			self:CancelPlant()
+			if wasTap and IsValid(owner) then
+				self.IEDPublicOnPlant = not self.IEDPublicOnPlant
+				owner:ChatPrint("IED number will be " .. (self.IEDPublicOnPlant and "public." or "private."))
+			end
+		end
+
 		local left = IsValid(owner) and owner:KeyDown(IN_ATTACK)
 		local right = IsValid(owner) and owner:KeyDown(IN_ATTACK2)
 		if not IsValid(owner) or not owner:Alive() or (not left and not right) then
@@ -248,6 +267,7 @@ SWEP.NormalPlantSound = "snd_jack_hmcd_bombrig.ogg"
 SWEP.SilentPlantTime = 3.5
 SWEP.InsidePlantTime = 5
 SWEP.CombinedPlantTime = 7
+SWEP.SelfPlantTime = 1.5
 SWEP.DisorientationRange = 15
 SWEP.FireEntForceBonus = 350
 SWEP.BlastForce = 600000
@@ -379,6 +399,8 @@ MarkIEDDestroyed = function(self)
 	self:SetPlanted(false)
 	self.Planted = false
 	self.PlantedOnSelf = false
+	self.IEDSelfImplanted = nil
+	self.SelfPlantStartedAt = nil
 	self.HaveTheBomb = nil
 	self.IEDPlacementLocalPos = nil
 	self.IEDPlacementLocalNormal = nil
@@ -615,7 +637,8 @@ ExplodeTheItem = function(self,ent)
 	local planted = entValid and self.IEDPlacementLocalPos ~= nil
 	local plantedWorld = planted and ent:IsWorld()
 	local plantedDoor = planted and hgIsDoor and hgIsDoor(ent)
-	local hasShrapnel = mat == MAT_METAL or (planted and self.IEDHasShrapnel)
+	local selfImplanted = self.IEDSelfImplanted
+	local hasShrapnel = selfImplanted or mat == MAT_METAL or (planted and self.IEDHasShrapnel)
 	local plantedNormal
 
 	if planted then
@@ -625,6 +648,7 @@ ExplodeTheItem = function(self,ent)
 		self.IEDPlacementLocalNormal = nil
 		self.IEDHasShrapnel = nil
 	end
+	self.IEDSelfImplanted = nil
 
 	self.KABOOM = true
 	self:SetDialing(false)
@@ -718,7 +742,7 @@ ExplodeTheItem = function(self,ent)
 				hg.BlastDamageWithShockwave(inflictor, attacker, EntPos, BlastDis / 0.01905, BlastDamage * 0.3, {
 					Force = 50000,
 					ExplosionType = "IED",
-					Filter = IsValid(ent) and {ent} or {}
+					Filter = IsValid(ent) and not selfImplanted and {ent} or {}
 				})
 			else
 				util.BlastDamage(inflictor, attacker, EntPos, BlastDis / 0.01905, BlastDamage * 0.3)
@@ -747,9 +771,14 @@ ExplodeTheItem = function(self,ent)
 			hgBlastDoors(IsValid(ent) and ent or attacker, EntPos, BlastDamage / 400, BlastDis/8, false)
 			util.ScreenShake( EntPos, 50, 300, 3.5, 4000 )
 
-			if FireEnts[entModel] then
-				local Tr = util.QuickTrace(EntPos, -vector_up*500, {EntPos})
-				local fire = CreateVFire(game.GetWorld(), Tr.HitPos, Tr.HitNormal, 300, IsValid(owner) and owner or self)
+			if selfImplanted or FireEnts[entModel] then
+				local fireTarget = selfImplanted and ent or game.GetWorld()
+				local firePos, fireNormal = EntPos, vector_up
+				if not selfImplanted then
+					local Tr = util.QuickTrace(EntPos, -vector_up * 500, {EntPos})
+					firePos, fireNormal = Tr.HitPos, Tr.HitNormal
+				end
+				local fire = CreateVFire(fireTarget, firePos, fireNormal, 300, IsValid(owner) and owner or self)
 				if IsValid(fire) then
 					fire:ChangeLife(300)
 				end
@@ -757,9 +786,9 @@ ExplodeTheItem = function(self,ent)
 
 			local shrapnelActive = false
 
-			if IsValid(ent) and IsValid(ent:GetPhysicsObject()) then
+			if IsValid(ent) and (selfImplanted or IsValid(ent:GetPhysicsObject())) then
 				shrapnelActive = true
-				local fragmentCount = math.Clamp(1200 + math.Round(ent:GetPhysicsObject():GetMass() * 20), 1200, 3000)
+				local fragmentCount = selfImplanted and 3000 or math.Clamp(1200 + math.Round(ent:GetPhysicsObject():GetMass() * 20), 1200, 3000)
 				if ent.iedFreePlant then
 					fragmentCount = math.max(math.Round(fragmentCount * 0.75), 900)
 				end
@@ -830,7 +859,7 @@ ExplodeTheItem = function(self,ent)
 					end
 
 					if ent.ShrapnelDone then
-						ent:Remove()
+						if not selfImplanted then ent:Remove() end
 						timer.Remove("IEDCheck_" .. index)
 					end
 				end)
@@ -840,7 +869,7 @@ ExplodeTheItem = function(self,ent)
 				self:Remove()
 			end
 
-			if not shrapnelActive and IsValid(ent) then
+			if not shrapnelActive and IsValid(ent) and not selfImplanted then
 				ent:Remove()
 			end
 		end)
@@ -1036,6 +1065,7 @@ if SERVER then
 	function SWEP:CancelPlant()
 		self.PlantMode = nil
 		self.PlantStartedAt = nil
+		self.SelfPlantStartedAt = nil
 		self:SetPlanting(false)
 		self:SetPlantAt(0)
 		self:SetHold("normal")
@@ -1074,9 +1104,29 @@ if SERVER then
 		return self:PlaceNormally()
 	end
 
-	-- E is an immediate plant.  This used to call a deleted method, leaving the
-	-- weapon in hand and throwing an error every time the advertised control was
-	-- used.  Keep it independent from the timed planting animation.
+	function SWEP:PlantOnSelf()
+		local owner = self:GetOwner()
+		if not IsValid(owner) or not owner:Alive() or self:GetPlanted() or self.IEDPlantPending then
+			return self:CancelPlant()
+		end
+
+		self.SelfPlantStartedAt = nil
+		self:SetPlanting(false)
+		self:SetPlantAt(0)
+		self:SetHold("normal")
+		self.PlantedOnSelf = true
+		self.IEDSelfImplanted = true
+		RegisterIEDBomb(self, owner)
+		self.LastBombPos = owner:LocalToWorld(owner:OBBCenter())
+		self.LastBombModel = owner:GetModel()
+		self.Planted = true
+		self:SetPlanted(true)
+		owner:EmitSound(self.NormalPlantSound, 60, 100, 1, CHAN_AUTO)
+		owner:EmitSound("snd_jack_hmcd_jihad" .. math.random(1, 3) .. ".ogg", 75, 100, 1, CHAN_AUTO)
+		self.nextattackhuy = CurTime() + 2
+		self:SetNextPrimaryFire(CurTime() + 2)
+	end
+
 	function SWEP:PlaceNormally()
 		local owner = self:GetOwner()
 		if not IsValid(owner) or self:GetPlanted() or self.Planted or self.IEDPlantPending then return false end
@@ -1163,8 +1213,6 @@ if SERVER then
 		if (self.NextPhoneOpen or 0) > CurTime() then return end
 		self.NextPhoneOpen = CurTime() + 0.5
 		if not self:GetPlanted() then
-			self.IEDPublicOnPlant = not self.IEDPublicOnPlant
-			self:GetOwner():ChatPrint("IED number will be " .. (self.IEDPublicOnPlant and "public." or "private."))
 			return
 		end
 
@@ -1172,31 +1220,5 @@ if SERVER then
 			HG_PHONE_SERVER.OpenIEDPhone(self:GetOwner(), self)
 		end
 
-		-- Historical self-plant behavior remains intentionally disabled.
-		--if not self.Planted and not self.PlantedOnSelf then
-		--	local Owner = self:GetOwner()
---
-		--	self.PlantedOnSelf = true
---
---
-		--	self.WorldModel = "models/saraphines/insurgency explosives/ied/insurgency_ied_phone.mdl"
---
-		--	net.Start("ied_have_the_bomb")
-		--	net.WriteEntity(self)
-		--	net.Broadcast()
---
-		--	Owner:EmitSound("snd_jack_hmcd_bombrig.ogg",50,100,1,CHAN_AUTO)
---
-		--	self.Planted = true
---
---
-		--	timer.Simple(5, function()
-		--		if IsValid(self) and IsValid(Owner) and self.PlantedOnSelf then
-		--			ExplodeTheItem(self, Owner)
-		--		end
-		--	end)
---
-		--	self:SetNextPrimaryFire(CurTime() + 2)
-		--end
 	end
 end

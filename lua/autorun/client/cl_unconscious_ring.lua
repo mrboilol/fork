@@ -402,7 +402,7 @@ local function EmitRingSound(soundPath, volume)
 end
 
 -- Update ring audio with phase-based triggering from oldring
-local function UpdateRingAudio(heartRate, ringAlpha, org, admiring)
+local function UpdateRingAudio(heartRate, ringAlpha, org)
     if heartRate < 1 or ringAlpha <= 0 then return end
 
     local prev = lastPhaseMod
@@ -1005,7 +1005,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
                     ringColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
             end
 
-            UpdateRingAudio(heartbeat, ringAlpha, org, admiring)
+            UpdateRingAudio(heartbeat, ringAlpha, org)
         end
 
         if showLegacyECG and not (hg_unconsciousclassic and hg_unconsciousclassic:GetBool()) then
