@@ -15,10 +15,13 @@ util.AddNetworkString("ZB_AttachRemove")
 util.AddNetworkString("ZB_AttachDrop")
 util.AddNetworkString("ZB_AttachSightSlide")
 net.Receive("ZB_AttachAdd", function(len, ply)
+	if not IsValid(ply) then return end
+	if (ply._attCD or 0) > CurTime() then return end
+	ply._attCD = CurTime() + 0.25
 	local att = net.ReadString()
+	if #att > 64 or not string.match(att, "^[%w_]+$") then return end
 	local wep = ply:GetActiveWeapon()
 	hg.AddAttachment(ply,wep,att)
-	//ply:SetNetVar("Inventory",ply.inventory)
 end)
 
 function hg.AddAttachment(ply,wep,att)
@@ -169,11 +172,14 @@ function hg.AddAttachmentForce(ply,wep,att)
 end
 
 net.Receive("ZB_AttachRemove", function(len, ply)
+	if not IsValid(ply) then return end
+	if (ply._attRemCD or 0) > CurTime() then return end
+	ply._attRemCD = CurTime() + 0.25
 	local att = net.ReadString()
+	if #att > 64 or not string.match(att, "^[%w_]+$") then return end
 	local wep = ply:GetActiveWeapon()
 	if not IsValid(wep) or not wep.attachments then return end
 	if wep:GetNWFloat("addAttachment", 0) + 1 > CurTime() then return end
-	if not IsValid(ply) then return end
 	if ply.organism.larmamputated or ply.organism.rarmamputated then return end
 	--[[if table.HasValue(ply.inventory.Attachments, att) then
 		ply:ChatPrint("You already have that attachment.")
@@ -223,7 +229,11 @@ net.Receive("ZB_AttachRemove", function(len, ply)
 end)
 
 net.Receive("ZB_AttachDrop", function(len, ply)
+	if not IsValid(ply) then return end
+	if (ply._attDropCD or 0) > CurTime() then return end
+	ply._attDropCD = CurTime() + 0.25
 	local att = net.ReadString()
+	if #att > 64 or not string.match(att, "^[%w_]+$") then return end
 	local placement = nil
 	for plc, tbl in pairs(hg.attachments) do
 		placement = tbl[att] and tbl[att][1] or placement
