@@ -1,3 +1,4 @@
+﻿--made by lazzy https://steamcommunity.com/id/TimeToFuckinDie
 SWEP.Base = "homigrad_base"
 SWEP.Spawnable = true
 SWEP.AdminOnly = false
@@ -15,7 +16,19 @@ SWEP.ViewModel = ""
 SWEP.WorldModel = "models/weapons/w_snip_g3sg1.mdl"
 SWEP.WorldModelFake = "models/tasty/asval.mdl"
 
-SWEP.FakePos = Vector(-10.5, 3.92, 8.35)
+SWEP.ModularParts = {
+	magazine = {
+		model = "models/weapons/mods/mag_val2_30.mdl",
+		bonemerge = false,
+		bone = "mod_magazine",
+		pos = Vector(0, -1.7, 0),
+		ang = Angle(0, -90, 0)
+	},
+}
+SWEP.HeldMagOffsetPos = Vector(0, 0, 0)
+SWEP.HeldMagOffsetAng = Angle(0, -90, 0)
+
+SWEP.FakePos = Vector(-13, 2.52, 7.5)
 SWEP.FakeAng = Angle(0, 0, 0)
 SWEP.AttachmentPos = Vector(1,0,0.5)
 SWEP.AttachmentAng = Angle(0,0,0)
@@ -37,9 +50,38 @@ SWEP.FakeEmptyReloadSounds = {
 	[0.92] = "weapons/ak47/ak47_boltback.ogg",
 	[0.97] = "weapons/ak47/ak47_boltrelease.ogg"
 }
-SWEP.MagModel = "models/weapons/arc9/darsu_eft/mods/mag_ak_custom_sawed_off_762x39_10.mdl"
-local vector_full = Vector(1,1,1)
-local vecPochtiZero = Vector(0.01,0.01,0.01)
+
+SWEP.AnimList = {
+	["fire"] = "fire",
+	["idle"] = "idle",
+	["reload"] = "reload0",
+	["reload_empty"] = "reload_empty0_0",
+	["inspect"] = "look_new",
+}
+
+function SWEP:AllowedInspect()
+	if not self:CanUse() then return end
+	if self.isReloading then return end
+	if self:Clip1() < self.Primary.ClipSize then return end
+	if self.drawBullet == false then return end
+	return true
+end
+
+function SWEP:ModelCreated(model)
+	if not CLIENT then return end
+	if not IsValid(model) then return end
+	if not self.FakeBodyGroups then return end
+
+	model:SetBodyGroups(self.FakeBodyGroups)
+
+	for i = 0, #model:GetMaterials() - 1 do
+		model:SetSubMaterial(i, "")
+	end
+end
+
+SWEP.ReloadHold = nil
+SWEP.FakeVPShouldUseHand = false
+
 if CLIENT then
 	SWEP.FakeReloadEvents = {
 		[0.15] = function( self, timeMul )
@@ -54,31 +96,6 @@ if CLIENT then
 	}
 end
 
-SWEP.lmagpos = Vector(0,0,0)
-SWEP.lmagang = Angle(0,0,0)
-SWEP.lmagpos2 = Vector(0,2,-6)
-SWEP.lmagang2 = Angle(0,0,-90)
-
-SWEP.FakeViewBobBone = "ValveBiped.Bip01_R_Hand"
-SWEP.FakeViewBobBaseBone = "ValveBiped.Bip01_L_UpperArm"
-SWEP.ViewPunchDiv = 70
-SWEP.FakeMagDropBone = 48
-
-SWEP.AnimList = {
-	["idle"] = "idle",
-	["reload"] = "reload",
-	["reload_empty"] = "reload_empty",
-}
-
-
-function SWEP:ModelCreated(model)
-	self:GetWM():ManipulateBoneScale(48, vecPochtiZero)
-	self:GetWM():ManipulateBoneScale(49, vecPochtiZero)
-end
-
-SWEP.WepSelectIcon2 = Material("pwb2/vgui/weapons/asval.vmt")
-SWEP.IconOverride = "pwb2/vgui/weapons/asval.vmt"
-SWEP.ScrappersSlot = "Primary"
 SWEP.weaponInvCategory = 1
 SWEP.dwr_customIsSuppressed = true
 SWEP.Primary.ClipSize = 20
@@ -186,67 +203,8 @@ function SWEP:DrawPost()
 	end
 end
 
--- RELOAD ANIM AKM
-SWEP.ReloadAnimLH = {
-	Vector(0,0,0),
-	Vector(-0.5,1.5,-5),
-	Vector(-0.5,1.5,-5),
-	Vector(-0.5,1.5,-5),
-	Vector(-6,7,-9),
-	Vector(-15,7,-15),
-	Vector(-15,6,-15),
-	Vector(-13,5,-5),
-	Vector(-0.5,1.5,-5),
-	Vector(-0.5,1.5,-5),
-	Vector(-0.5,1.5,-5),
-	"fastreload",
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-}
-
-SWEP.ReloadAnimRH = {
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,1),
-	Vector(8,1,2),
-	Vector(6,4.5,-4),
-	Vector(6,4.5,-4),
-	Vector(6,4.5,-4),
-	Vector(1,4.5,-3),
-	Vector(1,4.5,-2),
-	Vector(0,4,-2),
-	Vector(0,5,0),
-	"reloadend",
-	Vector(-2,2,1),
-	Vector(0,0,0),
-}
+SWEP.FireAnimTime = 0.15
+SWEP.FireAnimCandidates = {"fire", "fire1"}
 
 SWEP.ReloadAnimLHAng = {
 	Angle(0,0,0),
@@ -304,55 +262,9 @@ SWEP.ReloadAnimWepAng = {
 }
 
 
-SWEP.ReloadSlideAnim = {
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	4,
-	4,
-	0,
-	0,
-	0,
-	0
-}
-
--- Inspect Assault
-
-SWEP.InspectAnimWepAng = {
-	Angle(0,0,0),
-	Angle(4,4,15),
-	Angle(10,15,25),
-	Angle(10,15,25),
-	Angle(10,15,25),
-	Angle(-6,-15,-15),
-	Angle(1,15,-45),
-	Angle(15,25,-55),
-	Angle(15,25,-55),
-	Angle(15,25,-55),
-	Angle(0,0,0),
-	Angle(0,0,0)
-}
+	self.AnimList.fire = selectedSequence
+	self:PlayAnim("fire", self.FireAnimTime, false, function()
+		if not IsValid(self) then return end
+		self:PlayAnim("idle", 1, not self.NoIdleLoop)
+	end)
+end

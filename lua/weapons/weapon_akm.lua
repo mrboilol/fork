@@ -1,3 +1,4 @@
+﻿--made by lazzy https://steamcommunity.com/id/TimeToFuckinDie
 SWEP.Base = "homigrad_base"
 SWEP.Spawnable = true
 SWEP.AdminOnly = false
@@ -15,10 +16,60 @@ SWEP.ViewModel = ""
 SWEP.WorldModel = "models/weapons/w_rif_ak47.mdl"
 SWEP.WorldModelFake = "models/weapons/arccw/c_ur_ak.mdl"
 
-SWEP.FakePos = Vector(-12, 2.52, 5.5)
-SWEP.FakeAng = Angle(-1, 0.25, 5.5)
-SWEP.AttachmentPos = Vector(3,3,-26.8)
-SWEP.AttachmentAng = Angle(0,-1.5,0)
+SWEP.ModularParts = {
+	receiver = {
+		model = "models/weapons/mods/ak_dc_akm_std.mdl",
+		bonemerge = false,
+		bone = "weapon",
+		pos = Vector(0, -19, 1.5),
+		ang = Angle(0, 0, 0)
+	},
+	magazine = {
+		model = "models/weapons/mods/mag_ak_izhmash_6l10_762x39_30.mdl",
+		bonemerge = false,
+		bone = "mod_magazine",
+		pos = Vector(0, 0, -0.15),
+		ang = Angle(0, 0, 0)
+	},
+	handguard = {
+		model = "models/weapons/mods/ak_hg_akm_std_wood.mdl",
+		bonemerge = false,
+		bone = "weapon",
+		pos = Vector(0, -19.41, 0.5),
+		ang = Angle(0, 0, 0)
+	},
+	pistolgrip = {
+		model = "models/weapons/mods/ak_pgrip_akm_wood.mdl",
+		bonemerge = false,
+		bone = "weapon",
+		pos = Vector(0, -12.3, -1.3),
+		ang = Angle(0, 0, 0)
+	},
+	stock = {
+		model = "models/weapons/mods/ak_stock_akm_std_wood.mdl",
+		bonemerge = false,
+		bone = "weapon",
+		pos = Vector(0.65, -9.6, -0.8),
+		ang = Angle(0, 0, 0)
+	},
+	stock_mount = {
+		model = "models/weapons/mods/ak_stock_zenit_pt1_lock.mdl",
+		bonemerge = false,
+		bone = "weapon",
+		pos = Vector(0.65, -9.6, -0.8),
+		ang = Angle(0, 0, 0)
+	},
+}
+SWEP.HeldMagOffsetPos = Vector(0, 0, 0)
+SWEP.HeldMagOffsetAng = Angle(0, 0, 0)
+
+SWEP.ARC9DefaultLHIKPart = "handguard"
+SWEP.ARC9DefaultLHIKSourceModel = "models/weapons/mods/ak_hg_akm_std_wood.mdl"
+
+SWEP.FakePos = Vector(-14, 2.52, 7.5)
+SWEP.FakeAng = Angle(0, 0, 0)
+SWEP.AttachmentPos = Vector(-1, 0, 0)
+SWEP.AttachmentAng = Angle(0, 0, 0)
 SWEP.FakeAttachment = "1"
 SWEP.FakeBodyGroups = "01010080102"
 
@@ -210,6 +261,10 @@ SWEP.lengthSub = 20
 SWEP.handsAng = Angle(3, -1, 0)
 SWEP.AimHands = Vector(-4, 0.5, -4)
 
+SWEP.RHPos = Vector(3, -7, 3.5)
+SWEP.RHAng = Angle(0, -8, 90)
+SWEP.LHPos = Vector(11, 1.6, -3)
+SWEP.LHAng = Angle(-110, -180, 5)
 
 SWEP.weight = 4
 
@@ -243,20 +298,31 @@ local vec_zero = Vector(0,0,0)
 local l_finger02 = Angle(-10,0,0)
 function SWEP:AnimHoldPost()
 
-end
--- Inspect Assault
+SWEP.FireAnimTime = 0.15
+SWEP.FireAnimCandidates = {"fire", "fire1"}
 
-SWEP.InspectAnimWepAng = {
-	Angle(0,0,0),
-	Angle(4,4,15),
-	Angle(10,15,25),
-	Angle(10,15,25),
-	Angle(10,15,25),
-	Angle(-6,-15,-15),
-	Angle(1,15,-45),
-	Angle(15,25,-55),
-	Angle(15,25,-55),
-	Angle(15,25,-55),
-	Angle(0,0,0),
-	Angle(0,0,0)
-}
+function SWEP:PrimaryShootPost()
+	if not CLIENT then return end
+	if self.reload then return end
+	if not self:ShouldUseFakeModel() then return end
+
+	local worldModel = self:GetWM()
+	if not IsValid(worldModel) then return end
+
+	local selectedSequence
+	for _, sequenceName in ipairs(self.FireAnimCandidates) do
+		local sequenceID = worldModel:LookupSequence(sequenceName)
+		if sequenceID ~= nil and sequenceID >= 0 then
+			selectedSequence = sequenceName
+			break
+		end
+	end
+
+	if not selectedSequence then return end
+
+	self.AnimList.fire = selectedSequence
+	self:PlayAnim("fire", self.FireAnimTime, false, function()
+		if not IsValid(self) then return end
+		self:PlayAnim("idle", 1, not self.NoIdleLoop)
+	end)
+end
