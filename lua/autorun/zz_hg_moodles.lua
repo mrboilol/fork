@@ -140,6 +140,12 @@ local moodleTexts = {
 		[3] = {title = "Severe Arrhythmia", description = "Your heart rhythm is dangerously unstable."},
 		[4] = {title = "Critical Arrhythmia", description = "Your heart is struggling to maintain an effective rhythm."},
 	}},
+	palpitations = {levels = {
+		[1] = {title = "Tachycardia", description = "Your heart is beating faster than normal."},
+		[2] = {title = "Tachycardia", description = "Your elevated heart rate is becoming uncomfortable."},
+		[3] = {title = "Severe Tachycardia", description = "Your heart is racing and straining your circulation."},
+		[4] = {title = "Critical Tachycardia", description = "Your dangerously fast heart rate is threatening circulation."},
+	}},
 	fibrillation = {levels = {
 		[1] = {title = "Palpitations", description = "You can feel an abnormal fluttering heartbeat."},
 		[2] = {title = "Palpitations", description = "Your heartbeat is forceful and irregular."},
@@ -387,9 +393,9 @@ local function getMoodle3IconName(effect)
 	local names = {
 		fracture = "fractured", dislocated = "dislocated", analgesia = "drugged",
 		stamina = "exertion", exertion = "exertion", bleeding = level == 1 and "bleeding" or "bleeding" .. level,
-		carbon_monoxide = "hypoxemia", arrhythmia = "arrhythmia", fibrillation = "fibrillation",
+		carbon_monoxide = "hypoxemia", arrhythmia = "arrhythmia", palpitations = "palpitations", fibrillation = "fibrillation",
 		hypoxemia = "hypoxemia", brain_hypoxia = "brain-hypoxia", brain_dying = "brain-dying", asystole = "heart-failure",
-		low_blood = "hypotension", high_blood = "hypertension", no_eye = "last-stand", blinded = "confused",
+		low_blood = "arrhythmia", high_blood = "hypertension", no_eye = "last-stand", blinded = "confused",
 		brain_bleed = "terror", intracranial_pressure = "terror",
 		weakness = "encumbered", bradypnea = "dyspnea", thorax = "hemothorax",
 		respiratory_arrest = "respiratory-arrest", skull = "intercranial-hypertension",
@@ -607,15 +613,15 @@ local function buildEffects(ply, org)
 	local arrhythmia = math.Clamp(orgNumber(org, "arrhythmia", 0), 0, 1)
 	local unstableRhythm = org.unstableRhythm
 	local irregular = arrhythmia > 0.1 or unstableRhythm ~= nil
-	local fibrillating = org.fibrillation == true
-		or palpitations > 0.05
-		or unstableRhythm == "atrial_fibrillation"
-		or (irregular and heartRate >= 190)
+	local fibrillating = org.fibrillation == true or unstableRhythm == "atrial_fibrillation"
 	if not org.heartstop and fibrillating then
 		local level = org.fibrillation and 4 or highRank(math.max(palpitations, arrhythmia, math.Clamp((heartRate - 160) / 140, 0, 1)), {0.1, 0.3, 0.6, 0.85})
 		add(effects, "fibrillation", "fibrillation", level, "bad", org.fibrillation and -95 or 24, math.floor(heartRate) .. " bpm")
 	elseif not org.heartstop and irregular then
 		add(effects, "arrhythmia", "arrhythmia", highRank(arrhythmia, {0.1, 0.3, 0.6, 0.85}), "bad", 24.5, math.floor(heartRate) .. " bpm")
+	elseif not org.heartstop and (heartRate > 120 or palpitations > 0.05) then
+		local level = highRank(math.max(palpitations, math.Clamp((heartRate - 120) / 140, 0, 1)), {0.1, 0.3, 0.6, 0.85})
+		add(effects, "palpitations", "palpitations", level, "bad", 24.5, math.floor(heartRate) .. " bpm")
 	end
 
 	local oxygen, oxygenMax = o2Value(org), o2Maximum(org)

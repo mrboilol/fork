@@ -51,6 +51,11 @@ local function SyncAccessories(ply, accessories)
 		ply.OldRagdoll:SetNetVar("Accessories", CopyAccessories(accessories))
 	end
 
+	local deathRagdoll = ply:GetNWEntity("RagdollDeath", NULL)
+	if IsValid(deathRagdoll) and deathRagdoll != character and deathRagdoll != ply.OldRagdoll then
+		deathRagdoll:SetNetVar("Accessories", CopyAccessories(accessories))
+	end
+
 	if ply.CurAppearance then
 		ply.CurAppearance.AAttachments = CopyAccessories(accessories)
 	end
@@ -145,6 +150,36 @@ local function FindAccessoryImpact(ent, accessories, hitPos, direction)
 	return nearest
 end
 
+local function FindHeadAccessoryImpact(ent, accessories, hitPos)
+	if !isvector(hitPos) then return end
+
+	local headBone = ent:LookupBone("ValveBiped.Bip01_Head1")
+	local headMatrix = headBone and ent:GetBoneMatrix(headBone)
+	if !headMatrix or hitPos:DistToSqr(headMatrix:GetTranslation()) > 34 ^ 2 then return end
+
+	local nearest
+	for index, accessoryID in pairs(accessories) do
+		local accessory = hg.Accessories[accessoryID]
+		if !IsDroppableAccessory(accessory) or (accessory.placement != "head" and accessory.placement != "ears") then continue end
+
+		local pos = GetAccessoryTransform(ent, accessory)
+		if pos then
+			local distance = pos:DistToSqr(hitPos)
+			if !nearest or distance < nearest.distance then
+				nearest = {
+					id = accessoryID,
+					index = index,
+					data = accessory,
+					position = pos,
+					distance = distance,
+				}
+			end
+		end
+	end
+
+	return nearest
+end
+
 local function SpawnAccessoryDrop(accessoryID, accessory, owner, position, force)
 	local model = accessory[ThatPlyIsFemale(owner) and "femmodel"] or accessory.model
 	if !model then return end
@@ -173,7 +208,7 @@ local function SpawnAccessoryDrop(accessoryID, accessory, owner, position, force
 		phys:SetMass(2)
 		phys:Wake()
 		if isvector(force) and force:LengthSqr() > 0 then
-			phys:AddVelocity(force:GetNormalized() * math.Clamp(force:Length() * 0.08, 90, 340))
+			phys:AddVelocity(force:GetNormalized() * math.Clamp(force:Length() * 0.4, 130, 650))
 		end
 	end
 
@@ -184,28 +219,76 @@ local function SpawnAccessoryDrop(accessoryID, accessory, owner, position, force
 	return dropped
 end
 
+function APmodule.DropAccessoriesByPlacement(ent, placements, force)
+	if !IsValid(ent) or !istable(placements) then return false end
+
+	local wearer = GetAccessoryWearer(ent)
+	if !IsValid(wearer) then return false end
+
+	local accessories = ent:GetNetVar("Accessories", {})
+	if !istable(accessories) or table.IsEmpty(accessories) then
+		accessories = wearer:GetNetVar("Accessories", {})
+	end
+	if !istable(accessories) then return false end
+
+	accessories = CopyAccessories(accessories)
+	local drops = {}
+	for index, accessoryID in pairs(accessories) do
+		local accessory = hg.Accessories[accessoryID]
+		if IsDroppableAccessory(accessory) and placements[accessory.placement] then
+			drops[#drops + 1] = {index = index, id = accessoryID, data = accessory}
+		end
+	end
+	if #drops == 0 then return false end
+
+	table.sort(drops, function(a, b)
+		if isnumber(a.index) and isnumber(b.index) then return a.index > b.index end
+		return isnumber(a.index)
+	end)
+
+	local launchForce = isvector(force) and force or ent:GetVelocity() + VectorRand() * 180 + vector_up * 120
+	for _, drop in ipairs(drops) do
+		local position = GetAccessoryTransform(ent, drop.data) or ent:WorldSpaceCenter()
+		SpawnAccessoryDrop(drop.id, drop.data, wearer, position, launchForce + VectorRand() * 90)
+		if isnumber(drop.index) then
+			table.remove(accessories, drop.index)
+		else
+			accessories[drop.index] = nil
+		end
+	end
+
+	SyncAccessories(wearer, accessories)
+	return true
+end
+
 function APmodule.TryAbsorbAccessoryImpact(ent, dmgInfo, hitPos, direction)
 	if !IsValid(ent) or !dmgInfo or !dmgInfo:IsDamageType(accessoryImpactTypes) then return end
 
 	local damage = dmgInfo:GetDamage()
-	if damage < 16 then return end
+	if damage < 10 then return end
 
 	local wearer = GetAccessoryWearer(ent)
 	if !IsValid(wearer) then return end
 
-	local accessories = ent:GetNetVar("Accessories", wearer:GetNetVar("Accessories", {}))
+	local accessories = ent:GetNetVar("Accessories", {})
+	if !istable(accessories) or table.IsEmpty(accessories) then
+		accessories = wearer:GetNetVar("Accessories", {})
+	end
 	if !istable(accessories) then return end
 
 	local impact = FindAccessoryImpact(ent, accessories, hitPos, direction)
+	if !impact and damage >= 24 then
+		impact = FindHeadAccessoryImpact(ent, accessories, hitPos)
+	end
 	if !impact then return end
 
-	local severity = math.Clamp((damage - 16) / 84, 0, 1)
-	local absorbed = 0.12 + severity * 0.18
-	local dropChance = 0.08 + severity * 0.42
-	if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) then dropChance = dropChance + 0.1 end
+	local severity = math.Clamp((damage - 10) / 55, 0, 1)
+	local absorbed = 0.06 + severity * 0.08
+	local dropChance = 0.18 + severity * 0.56
+	if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) then dropChance = dropChance + 0.2 end
 
 	if math.Rand(0, 1) <= dropChance then
-		absorbed = absorbed + 0.16
+		absorbed = 0.23 + severity * 0.13
 		if isnumber(impact.index) then
 			table.remove(accessories, impact.index)
 		else
@@ -215,7 +298,7 @@ function APmodule.TryAbsorbAccessoryImpact(ent, dmgInfo, hitPos, direction)
 		SpawnAccessoryDrop(impact.id, impact.data, wearer, impact.position, direction)
 	end
 
-	dmgInfo:ScaleDamage(math.Clamp(1 - absorbed, 0.45, 1))
+	dmgInfo:ScaleDamage(math.Clamp(1 - absorbed, 0.6, 1))
 	return true
 end
 

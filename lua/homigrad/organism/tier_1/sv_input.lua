@@ -1003,6 +1003,9 @@ function hg.ExplodeHead(ent, damage, slash, force)
 			return
 		end
 		ent.headExplodePending = true
+		if hg.Appearance and hg.Appearance.DropAccessoriesByPlacement then
+			hg.Appearance.DropAccessoriesByPlacement(ent, {face = true, face2 = true, mask = true}, force)
+		end
 		--[[if not isbool(ent) then
 			hook.Run("OnHeadExplode", ply, ent)
 		end]]

@@ -242,7 +242,20 @@ for i = 1, 10 do
 end
 local oldTinyArterialDecal = Material("decals/arterial_blood1")
 local newBloodDecal = "Normal.Blood24"
-local newTinyBloodDecal = Material(util.DecalMaterial(newBloodDecal))
+local newTinyBloodDecal
+
+local function getNewTinyBloodDecal()
+	if newTinyBloodDecal then return newTinyBloodDecal end
+
+	local materialName = util.DecalMaterial(newBloodDecal)
+	if not isstring(materialName) or materialName == "" then return oldTinyNormalDecals[1] end
+
+	local material = Material(materialName)
+	if material:IsError() then return oldTinyNormalDecals[1] end
+
+	newTinyBloodDecal = material
+	return newTinyBloodDecal
+end
 
 local function decalBlood(pos, normal, tr, artery, owner, tiny)
 	if not pos or not normal then return end
@@ -253,7 +266,7 @@ local function decalBlood(pos, normal, tr, artery, owner, tiny)
 	end
 	if tiny then
 		local oldBlood = hg_old_blood:GetBool()
-		local decal = oldBlood and (artery and oldTinyArterialDecal or oldTinyNormalDecals[math.random(#oldTinyNormalDecals)]) or newTinyBloodDecal
+		local decal = oldBlood and (artery and oldTinyArterialDecal or oldTinyNormalDecals[math.random(#oldTinyNormalDecals)]) or getNewTinyBloodDecal()
 		local target = IsValid(tr.Entity) and tr.Entity or game.GetWorld()
 		local scale = math.Rand(0.12, 0.24)
 		util.DecalEx(decal, target, pos, normal, color_white, scale, scale)

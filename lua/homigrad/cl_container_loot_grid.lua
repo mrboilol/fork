@@ -5,6 +5,8 @@ hg = hg or {}
 local cooldown = 0
 local closeDuration = 0.18
 local openDuration = 0.34
+local searchDuration = 0.7
+local revealInterval = 0.32
 
 local function GetItemName(class)
 	local weapon = weapons.Get(class)
@@ -28,27 +30,27 @@ local function ResolveMaterial(icon)
 	return icon, false
 end
 
+local function ResolveFirstMaterial(...)
+	for index = 1, select("#", ...) do
+		local icon, isTexture = ResolveMaterial(select(index, ...))
+		if icon then return icon, isTexture end
+	end
+end
+
 local function GetItemIcon(class)
 	local weapon = weapons.Get(class)
 	if weapon then
-		local candidates = {weapon.WepSelectIcon2, weapon.WepSelectIcon, weapon.IconOverride}
-		for _, candidate in ipairs(candidates) do
-			local icon, isTexture = ResolveMaterial(candidate)
-			if icon then return icon, isTexture end
-		end
+		local icon, isTexture = ResolveFirstMaterial(weapon.IconOverride, "entities/" .. class .. ".png", "vgui/entities/" .. class, weapon.WepSelectIcon2, weapon.WepSelectIcon)
+		if icon then return icon, isTexture end
 	end
 
 	local entity = scripted_ents.Get(class)
 	if entity then
-		local icon, isTexture = ResolveMaterial(entity.IconOverride)
+		local icon, isTexture = ResolveFirstMaterial(entity.IconOverride, "entities/" .. class .. ".png", "vgui/entities/" .. class)
 		if icon then return icon, isTexture end
 	end
 
-	local icon = Material("entities/" .. class .. ".png", "smooth")
-	if not icon:IsError() then return icon, false end
-
-	icon = Material("vgui/entities/" .. class, "smooth")
-	if not icon:IsError() then return icon, false end
+	return ResolveFirstMaterial("entities/" .. class .. ".png", "vgui/entities/" .. class)
 end
 
 local function SortedItemIDs(items)
@@ -88,32 +90,38 @@ local function RectsOverlap(left, top, width, height, otherLeft, otherTop, other
 		and top + height + gap > otherTop
 end
 
-local function ArrangeLootButtons(menu, anchorX, anchorY)
+local function ArrangeLootButtons(menu, anchorX, anchorY, now)
 	local placed = {}
 	local padding = 8
 	local goldenAngle = math.pi * (3 - math.sqrt(5))
 	local scale = math.Clamp(ScrH() / 1080, 0.75, 1.15)
+	local revealed = {}
 
-	for sequence, button in ipairs(menu.Buttons) do
-		if not IsValid(button) then continue end
+	for _, button in ipairs(menu.Buttons) do
+		if IsValid(button) and now >= button.RevealAt and not button.Taking then
+			revealed[#revealed + 1] = button
+		end
+	end
+
+	for index = #revealed, 1, -1 do
+		local button = revealed[index]
 
 		local width = button.BaseW
 		local height = button.BaseH
 		local halfWidth = width * 0.5
 		local halfHeight = height * 0.5
-		if button.Taking then
-			local left, top = button:GetPos()
-			placed[#placed + 1] = {left = left, top = top, width = width, height = height}
-			continue
-		end
 
 		local bestX, bestY
-		local startAngle = -math.pi * 0.5 + (sequence - 1) * goldenAngle
+		local age = #revealed - index
+		if age == 0 then
+			bestX, bestY = anchorX, anchorY
+		end
+		local startAngle = math.pi + (age - 1) * goldenAngle
 
-		for attempt = 0, 95 do
+		for attempt = 0, bestX and -1 or 95 do
 			local ring = math.floor(attempt / 12)
 			local angle = startAngle + (attempt % 12) * goldenAngle
-			local radius = (92 + ring * 78) * scale
+			local radius = (88 + ring * 78) * scale
 			local x = anchorX + math.cos(angle) * radius
 			local y = anchorY + math.sin(angle) * radius
 			local left = x - halfWidth
@@ -144,8 +152,8 @@ local function ArrangeLootButtons(menu, anchorX, anchorY)
 			bestY = math.Clamp(anchorY, minY, maxY)
 		end
 
-		button.OffsetX = bestX - anchorX
-		button.OffsetY = bestY - anchorY
+		button.TargetOffsetX = bestX - anchorX
+		button.TargetOffsetY = bestY - anchorY
 		placed[#placed + 1] = {
 			left = bestX - halfWidth,
 			top = bestY - halfHeight,
@@ -171,6 +179,7 @@ function hg.OpenContainerLootGrid(options)
 	menu.ent = ent
 	menu.entindex = ent:EntIndex()
 	menu.Created = CurTime()
+	menu.SearchEnds = menu.Created + (options.searchDuration or searchDuration)
 	menu.Buttons = {}
 	menu.RWasDown = input.IsKeyDown(KEY_R)
 	menu:SetPos(0, 0)
@@ -181,7 +190,12 @@ function hg.OpenContainerLootGrid(options)
 	menu:MakePopup()
 	menu:SetKeyboardInputEnabled(false)
 
-	menu.Paint = nil
+	menu.Paint = function(self)
+		local remaining = self.SearchEnds - CurTime()
+		if remaining <= 0 or self.Closing then return end
+		local dots = string.rep(".", math.floor(CurTime() * 3) % 3 + 1)
+		draw.SimpleText("Searching" .. dots, "ZCity_SuperTiny", self.AnchorX or ScrW() * 0.5, (self.AnchorY or ScrH() * 0.5) - 48, Color(235, 235, 235), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+	end
 
 	local released = false
 	local function Release()
@@ -254,7 +268,7 @@ function hg.OpenContainerLootGrid(options)
 
 		local anchorX = self.AnchorX or ScrW() * 0.5
 		local anchorY = self.AnchorY or ScrH() * 0.5
-		ArrangeLootButtons(self, anchorX, anchorY)
+		ArrangeLootButtons(self, anchorX, anchorY, now)
 		local originX = self.OriginX or anchorX
 		local originY = self.OriginY or anchorY
 		for _, button in ipairs(self.Buttons) do
@@ -268,7 +282,15 @@ function hg.OpenContainerLootGrid(options)
 				continue
 			end
 
-			local openProgress = math.Clamp((now - self.Created - button.OpenDelay) / openDuration, 0, 1)
+			local openProgress = math.Clamp((now - button.RevealAt) / openDuration, 0, 1)
+			if openProgress <= 0 then
+				button:SetAlpha(0)
+				button:SetMouseInputEnabled(false)
+				continue
+			end
+			local moveFraction = math.min(FrameTime() * 12, 1)
+			button.OffsetX = Lerp(moveFraction, button.OffsetX, button.TargetOffsetX)
+			button.OffsetY = Lerp(moveFraction, button.OffsetY, button.TargetOffsetY)
 			local motion = EaseOutBack(openProgress)
 			local scale = math.max(0.01, 0.42 + motion * 0.58)
 			local targetX = anchorX + button.OffsetX
@@ -303,7 +325,9 @@ function hg.OpenContainerLootGrid(options)
 		button.BaseH = buttonH
 		button.OffsetX = 0
 		button.OffsetY = 0
-		button.OpenDelay = (sequence - 1) * 0.045
+		button.TargetOffsetX = 0
+		button.TargetOffsetY = 0
+		button.RevealAt = menu.SearchEnds + (sequence - 1) * (options.revealInterval or revealInterval)
 		button.ItemID = itemID
 		button.Item = item
 		button.Slot = string.format("%02d", sequence)
@@ -348,8 +372,7 @@ function hg.OpenContainerLootGrid(options)
 				end
 				DrawIcon(self.Icon, self.IconIsTexture, (w - drawW) * 0.5, (iconHeight - drawH) * 0.5, drawW, drawH, 255)
 			else
-				draw.RoundedBox(math.floor(6 * scale), w * 0.2, iconHeight * 0.12, w * 0.6, iconHeight * 0.7, Color(12, 12, 12, 185))
-				draw.SimpleText("ITEM", "ZCity_SuperTiny", w * 0.5, iconHeight * 0.47, Color(235, 235, 235), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+				draw.SimpleText("?", "HomigradFontBig", w * 0.5, iconHeight * 0.5, Color(235, 235, 235), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 			end
 
 			draw.SimpleText(self.Slot, "ZCity_SuperTiny", w * 0.5 + 1, h - 1, Color(0, 0, 0, 220), TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM)
