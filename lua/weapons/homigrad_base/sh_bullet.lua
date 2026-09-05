@@ -780,11 +780,8 @@ function SWEP:FireBullet()
 	bullet.Damage = bullet.Damage * 0.95 * (self.Supressor and (self.SupressorDamageMultiplier or 0.9) or 1) * (self.DamageMultiplier or 1)
 
 	if numbullet > 1 then
-		-- Shotgun pellets still need a cone; posture and movement control its size.
-		local baseSpread = (ammotype.Spread or self.Primary.Spread or 0) * 3
-		if self.ShotgunTubeReload and self.ShotgunManualCycle then
-			baseSpread = baseSpread * (self.ShotgunSpreadMul or 1 / 3)
-		end
+		local isShotgun = self.IsShotgun or self.Category == "Weapons - Shotguns"
+		local baseSpread = isShotgun and Vector(0.04, 0.04, 0) or (ammotype.Spread or self.Primary.Spread or 0) * 3
 
 		local accuracyMul = 1
 		if isply then

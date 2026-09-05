@@ -236,17 +236,13 @@ local function playBloodDripImpact(pos, tr)
 	end
 end
 
-local tinyNormalDecalIds = {1, 2, 3, 4, 6, 7, 8, 9, 10, 11}
-local tinyNormalDecals = {}
-for i = 1, #tinyNormalDecalIds do
-	tinyNormalDecals[i] = Material("effects/droplets/drop" .. tinyNormalDecalIds[i] .. "_1")
-end
-local tinyArterialDecal = Material("effects/droplets/drop12_1")
 local oldTinyNormalDecals = {}
 for i = 1, 10 do
 	oldTinyNormalDecals[i] = Material("decals/z_blood" .. i)
 end
 local oldTinyArterialDecal = Material("decals/arterial_blood1")
+local newBloodDecal = "Normal.Blood24"
+local newTinyBloodDecal = Material(util.DecalMaterial(newBloodDecal))
 
 local function decalBlood(pos, normal, tr, artery, owner, tiny)
 	if not pos or not normal then return end
@@ -257,8 +253,7 @@ local function decalBlood(pos, normal, tr, artery, owner, tiny)
 	end
 	if tiny then
 		local oldBlood = hg_old_blood:GetBool()
-		local decal = artery and (oldBlood and oldTinyArterialDecal or tinyArterialDecal)
-			or (oldBlood and oldTinyNormalDecals[math.random(#oldTinyNormalDecals)] or tinyNormalDecals[math.random(#tinyNormalDecals)])
+		local decal = oldBlood and (artery and oldTinyArterialDecal or oldTinyNormalDecals[math.random(#oldTinyNormalDecals)]) or newTinyBloodDecal
 		local target = IsValid(tr.Entity) and tr.Entity or game.GetWorld()
 		local scale = math.Rand(0.12, 0.24)
 		util.DecalEx(decal, target, pos, normal, color_white, scale, scale)
@@ -279,37 +274,16 @@ local function decalBlood(pos, normal, tr, artery, owner, tiny)
 
 	if artery then
 		if !hg_old_blood:GetBool() then
-			local howmuch = 1
-			
-			//timer.Simple(0.1, function()
-				hg.bloodpositions[vec] = (hg.bloodpositions[vec] or 0) + 1
-				if hg.bloodpositions[vec] < 6 then
-					util.Decal("Arterial.Blood2"..math.Clamp(hg.bloodpositions[vec], 1, 5), pos + normal, pos - normal, owner)
-				end
-				playBloodDripImpact(pos, tr)
-			//end)
+			util.Decal(newBloodDecal, pos + normal, pos - normal, owner)
+			playBloodDripImpact(pos, tr)
 		else
 			util.Decal("Arterial.Blood1", pos + normal, pos - normal, owner)
 			playBloodDripImpact(pos, tr)
 		end
 	else
 		if !hg_old_blood:GetBool() then
-			local howmuch = 1
-			
-			//timer.Simple(0.1, function()
-				hg.bloodpositions[vec] = (hg.bloodpositions[vec] or 0) + 1
-				
-				playBloodDripImpact(pos, tr)
-
-				if hg.bloodpositions[vec] < 6 then
-					util.Decal("Normal.Blood2"..math.Clamp((hg.bloodpositions[vec] or 0) + math.random(0, 2), 1, 5), pos + normal, pos - normal, owner)
-				end
-
-				if hg.bloodpositions[vec] == 50 then
-					util.Decal("Blood", pos + normal, pos - normal, owner)
-				end
-
-			//end)
+			util.Decal(newBloodDecal, pos + normal, pos - normal, owner)
+			playBloodDripImpact(pos, tr)
 		else
 			util.Decal("Normal.Blood1", pos + normal, pos - normal, owner)
 			playBloodDripImpact(pos, tr)

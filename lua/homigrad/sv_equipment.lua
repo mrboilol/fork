@@ -443,6 +443,15 @@ end
 net.Receive("hg_drop_equipment", function(len, ply)
     local equipment = net.ReadString()
 
+    if string.StartWith(equipment, "accessory:") then
+        if not ply.organism or not ply.organism.canmove then return end
+        local accessoryID = string.sub(equipment, #"accessory:" + 1)
+        if hg.Appearance and hg.Appearance.DropAccessory then
+            hg.Appearance.DropAccessory(ply, accessoryID)
+        end
+        return
+    end
+
     if equipment == "hg_flashlight" then
         ply:ConCommand("hg_dropflashlight")
     end

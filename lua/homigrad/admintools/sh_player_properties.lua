@@ -168,6 +168,158 @@ properties.Add( "reset_org", {
 	end 
 } )
 
+local organismEditorFields = {
+	"adrenaline", "adrenalineAdd", "alive", "analgesia", "analgesiaAdd", "anger", "arrhythmia", "arrhythmiaComplication",
+	"assimilated", "avgpain", "berserk", "bleed", "bleedingmul", "blood", "bloodPressure", "bodyoxygen",
+	"brain", "brainBleedRate", "brainFrontal", "brainHemorrhage", "brainOccipital", "brainoxygen", "brainoxygenTarget", "brainParietal", "brainSwelling", "brainTemporal",
+	"bruises", "bulletwounds", "burns", "canmove", "canmovehead", "cardiacOutput", "cerebralPerfusion", "chest", "consciousness",
+	"diastolic", "disorientation", "energy", "eyeL", "eyeR", "explosionwounds", "fear", "fearadd", "fibrillation", "goodmood",
+	"handcuffed", "health", "heart", "heartbeat", "heartstop", "heartStrain", "hemothorax", "hydration", "hypertension", "hypotension",
+	"immobilization", "incapacitated", "internalBleed", "intestines", "intracranialPressure", "jaw", "jawdislocation", "legstrength", "liver",
+	"larm", "larmamputated", "larmdislocation", "larmupamputated", "lhandamputated", "lleg", "llegamputated", "llegdislocation", "llegupamputated",
+	"lungsfunction", "maxweight", "meleespeed", "myocardialOxygen", "nausea", "needfake", "needotrub", "neckslit", "noHead", "noradrenaline",
+	"o2.current", "o2.range", "o2.regen", "o2.curregen", "otrub", "pain", "painadd", "painkiller", "panicattack", "panicattackActive",
+	"paralyzed", "pelvis", "perfusion", "peripheralperfusion", "pneumothorax", "pulse", "pulseDeficit", "rarm", "rarmamputated", "rarmdislocation",
+	"rarmupamputated", "regeneratehp", "respiratoryArrest", "respiratoryRate", "rhandamputated", "rleg", "rlegamputated", "rlegdislocation", "rlegupamputated",
+	"satiety", "seizure", "seizureActive", "shock", "skull", "slashwounds", "spine1", "spine2", "spine3", "stamina.current",
+	"stamina.max", "stamina.range", "stamina.regen", "stamina.sub", "stamina.subadd", "stomach", "strokeVolume", "stun", "superfighter", "survivalchance",
+	"systolic", "teethLost", "temperature", "thiamine", "thirst", "trachea", "tranexamic_acid", "tranquilizer", "vitalHealthCeiling", "weight"
+}
+
+local organismEditorFieldSet = {}
+for _, field in ipairs(organismEditorFields) do organismEditorFieldSet[field] = true end
+
+local organismEditorUnitFields = {
+	adrenaline = true, analgesia = true, anger = true, arrhythmia = true, assimilated = true, brain = true, brainFrontal = true,
+	brainHemorrhage = true, brainOccipital = true, brainParietal = true, brainSwelling = true, chest = true, consciousness = true,
+	disorientation = true, eyeL = true, eyeR = true, fear = true, heart = true, hemothorax = true, immobilization = true,
+	intestines = true, jaw = true, larm = true, lleg = true, liver = true, myocardialOxygen = true, painkiller = true,
+	pelvis = true, perfusion = true, peripheralperfusion = true, pneumothorax = true, rarm = true, rleg = true, shock = true,
+	skull = true, spine1 = true, spine2 = true, spine3 = true, stomach = true, survivalchance = true, trachea = true
+}
+
+local function getOrganismEditorValue(org, field)
+	if field == "stamina.current" then return org.stamina and org.stamina[1], org.stamina, 1 end
+	if field == "o2.current" then return org.o2 and org.o2[1], org.o2, 1 end
+	local group, key = string.match(field, "^([%a%d_]+)%.([%a%d_]+)$")
+	if group and key and (group == "stamina" or group == "o2") then return org[group] and org[group][key], org[group], key end
+	return org[field], org, field
+end
+
+local function getOrganismEditorBounds(org, field)
+	if organismEditorUnitFields[field] then return 0, 1 end
+	if field == "blood" then return 0, hg.organism.normalBloodVolume or 5000 end
+	if field == "health" then return 0, IsValid(org.owner) and org.owner:GetMaxHealth() or 100 end
+	if field == "temperature" then return 0, 50 end
+	if field == "heartbeat" or field == "pulse" or field == "systolic" or field == "diastolic" then return 0, 300 end
+	if field == "o2.current" then return 0, (org.o2 and org.o2.range) or 30 end
+	if field == "stamina.current" then return 0, (org.stamina and (org.stamina.max or org.stamina.range)) or 180 end
+	if field == "stamina.max" or field == "stamina.range" then return 0, 1000 end
+	return 0, 1000000
+end
+
+properties.Add("change_organism_value", {
+	MenuLabel = "Change organism value",
+	Order = 5.5,
+	MenuIcon = "icon16/heart_edit.png",
+	Filter = check,
+	Action = function(self, ent)
+		if not CLIENT then return end
+		local frame = vgui.Create("DFrame")
+		frame:SetSize(620, 500)
+		frame:Center()
+		frame:SetTitle("Change organism value: " .. ent:GetPlayerName())
+		frame:MakePopup()
+
+		local search = vgui.Create("DTextEntry", frame)
+		search:Dock(TOP)
+		search:SetTall(26)
+		search:SetPlaceholderText("Search the organism-value list")
+
+		local list = vgui.Create("DListView", frame)
+		list:Dock(FILL)
+		list:AddColumn("Organism value")
+		local selected = organismEditorFields[1]
+		local value = vgui.Create("DTextEntry", frame)
+		value:Dock(BOTTOM)
+		value:SetTall(28)
+		value:SetText("0")
+
+		local controls = vgui.Create("DPanel", frame)
+		controls:Dock(BOTTOM)
+		controls:SetTall(58)
+		controls.Paint = nil
+		local function send(mode, numberValue, boolValue)
+			local field = string.Trim(search:GetValue())
+			if organismEditorFieldSet[field] then selected = field else field = selected end
+			if field == "" then return end
+			self:MsgStart()
+				net.WriteEntity(ent)
+				net.WriteString(field)
+				net.WriteBool(mode == "bool")
+				if mode == "bool" then net.WriteBool(boolValue) else net.WriteFloat(numberValue) end
+			self:MsgEnd()
+		end
+		local function addButton(label, x, width, callback)
+			local button = vgui.Create("DButton", controls)
+			button:SetPos(x, 4)
+			button:SetSize(width, 24)
+			button:SetText(label)
+			button.DoClick = callback
+		end
+		for index, preset in ipairs({0, 0.25, 0.5, 0.75, 1}) do
+			addButton(tostring(preset), (index - 1) * 58, 54, function() value:SetText(tostring(preset)) end)
+		end
+		addButton("Minimum", 292, 76, function() value:SetText("0") end)
+		addButton("Maximum", 372, 76, function() value:SetText("1000000") end)
+		addButton("True", 452, 54, function() send("bool", nil, true) end)
+		addButton("False", 510, 54, function() send("bool", nil, false) end)
+		addButton("Set", 568, 44, function()
+			local amount = tonumber(value:GetValue())
+			if amount then send("number", amount) end
+		end)
+
+		local function populate(filter)
+			list:Clear()
+			filter = string.lower(filter or "")
+			for _, field in ipairs(organismEditorFields) do
+				if filter == "" or string.find(string.lower(field), filter, 1, true) then list:AddLine(field) end
+			end
+		end
+		search.OnValueChange = function(_, text) populate(text) end
+		list.OnRowSelected = function(_, _, line)
+			selected = line:GetColumnText(1)
+			search:SetText(selected)
+		end
+		search.OnEnter = function(input)
+			if organismEditorFieldSet[input:GetValue()] then selected = input:GetValue() end
+		end
+		populate()
+	end,
+	Receive = function(self, length, ply)
+		local ent = net.ReadEntity()
+		local field = net.ReadString()
+		local isBoolean = net.ReadBool()
+		local boolValue, numberValue
+		if isBoolean then boolValue = net.ReadBool() else numberValue = net.ReadFloat() end
+		if not self:Filter(ent, ply) or not organismEditorFieldSet[field] then return end
+		ent = hg.RagdollOwner(ent) or ent
+		if not IsValid(ent) or not ent.organism then return end
+		local current, container, key = getOrganismEditorValue(ent.organism, field)
+		if not container then return end
+		if isBoolean then
+			if not isbool(current) then return end
+			container[key] = boolValue
+		else
+			if not isnumber(current) or not isnumber(numberValue) then return end
+			local minimum, maximum = getOrganismEditorBounds(ent.organism, field)
+			container[key] = math.Clamp(numberValue, minimum, maximum)
+		end
+		ent.fullsend = true
+		if hg.send_organism then hg.send_organism(ent.organism, ent, true, true) end
+	end
+})
+
 properties.Add( "freeze", {
 	MenuLabel = "Freeze", -- Name to display on the context menu
 	Order = 6, -- The order to display this property relative to other properties

@@ -166,8 +166,7 @@ LP.SMGs = {
 	{0.6, "weapon_vector45"},
 	{0.6, "weapon_mp18"},
 	{0.5, "weapon_asval_mod4"},
-	{0.4, "weapon_draco"},
-	{0.4, "weapon_dracovska"},
+	{0.8, "weapon_dracovska"},
 }
 
 LP.Shotguns = {

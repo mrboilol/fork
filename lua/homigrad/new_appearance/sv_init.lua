@@ -80,8 +80,8 @@ local function GetAccessoryTransform(ent, accessory)
 	return pos, ang, pose[3] or 1
 end
 
-local function IsHeadAccessory(accessory)
-	return accessory and (accessory.placement == "head" or accessory.placement == "face" or accessory.placement == "face2" or accessory.bone == "ValveBiped.Bip01_Head1")
+local function IsDroppableAccessory(accessory)
+	return accessory and accessory.model and accessory.placement and accessory.placement != "none"
 end
 
 local accessoryModelBounds = {}
@@ -119,7 +119,7 @@ local function FindAccessoryImpact(ent, accessories, hitPos, direction)
 
 	for index, accessoryID in pairs(accessories) do
 		local accessory = hg.Accessories[accessoryID]
-		if !IsHeadAccessory(accessory) or !accessory.model then continue end
+		if !IsDroppableAccessory(accessory) then continue end
 
 		local pos, ang, scale = GetAccessoryTransform(ent, accessory)
 		if !pos then continue end
@@ -158,6 +158,11 @@ local function SpawnAccessoryDrop(accessoryID, accessory, owner, position, force
 	dropped:Spawn()
 	dropped:SetModelScale((accessory[ThatPlyIsFemale(owner) and "fempos"] or accessory.malepos or {})[3] or 1, 0)
 	dropped:SetSkin(isfunction(accessory.skin) and accessory.skin(owner) or accessory.skin or 0)
+	if accessory.bSetColor and owner.GetPlayerColor then
+		local color = owner:GetPlayerColor():ToColor()
+		dropped:SetColor(color)
+		dropped.HGAccessoryColor = color
+	end
 	dropped:SetCollisionGroup(COLLISION_GROUP_WEAPON)
 	dropped:SetUseType(SIMPLE_USE)
 	dropped.HGAccessoryID = accessoryID
@@ -219,7 +224,7 @@ function APmodule.EquipFallenAccessory(ply, dropped)
 
 	local accessoryID = dropped.HGAccessoryID
 	local accessory = hg.Accessories[accessoryID]
-	if !IsHeadAccessory(accessory) then return false end
+	if !IsDroppableAccessory(accessory) then return false end
 
 	local accessories = CopyAccessories(ply:GetNetVar("Accessories", {}))
 	local replacement
@@ -232,6 +237,11 @@ function APmodule.EquipFallenAccessory(ply, dropped)
 	end
 
 	if replacement then
+		local replacedID = accessories[replacement]
+		local replacedAccessory = hg.Accessories[replacedID]
+		if IsDroppableAccessory(replacedAccessory) then
+			SpawnAccessoryDrop(replacedID, replacedAccessory, ply, dropped:GetPos(), dropped:GetVelocity())
+		end
 		accessories[replacement] = accessoryID
 	else
 		accessories[#accessories + 1] = accessoryID
@@ -240,6 +250,22 @@ function APmodule.EquipFallenAccessory(ply, dropped)
 	SyncAccessories(ply, accessories)
 	ply:EmitSound("snd_jack_hmcd_disguise.ogg", 70, math.random(95, 105), 0.7, CHAN_ITEM)
 	dropped:Remove()
+	return true
+end
+
+function APmodule.DropAccessory(ply, accessoryID)
+	if !IsValid(ply) or !ply:IsPlayer() or !isstring(accessoryID) then return false end
+
+	local accessories = CopyAccessories(ply:GetNetVar("Accessories", {}))
+	local index = table.KeyFromValue(accessories, accessoryID)
+	local accessory = hg.Accessories[accessoryID]
+	if !index or !IsDroppableAccessory(accessory) then return false end
+
+	local dropped = SpawnAccessoryDrop(accessoryID, accessory, ply, ply:EyePos() + ply:EyeAngles():Forward() * 18, ply:EyeAngles():Forward() * 150)
+	if !IsValid(dropped) then return false end
+
+	table.remove(accessories, index)
+	SyncAccessories(ply, accessories)
 	return true
 end
 

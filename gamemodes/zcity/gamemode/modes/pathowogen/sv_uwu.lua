@@ -755,7 +755,7 @@ MODE.LootTable = {
 
 		{3,"weapon_kar98"},
 		{3,"weapon_ar_pistol"},
-		{3,"weapon_draco"},
+		{3,"weapon_dracovska"},
 		{3,"weapon_mp5"},
 		--{3,"weapon_xm1014"},
 

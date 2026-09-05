@@ -90,7 +90,7 @@ local loadouts = {
 	{primary = "weapon_mp9", attachments = "", armor = {"vest3","helmet1"}, ammo = 3},
 	{primary = "weapon_mp5", attachments = {{"supressor4"}}, armor = {"vest3","helmet1"}, ammo = 3},
 	{primary = "weapon_m590a1", attachments = "", armor = {"vest4","helmet1","mask1"}, ammo = 3},
-	{primary = "weapon_draco", attachments = "", armor = {"vest1","helmet1"}, ammo = 3},
+	{primary = "weapon_dracovska", attachments = "", armor = {"vest1","helmet1"}, ammo = 3},
 	{primary = "weapon_uzi", attachments = "", armor = {"vest3","helmet1"}, ammo = 3},
 	{primary = "weapon_ump45", attachments = {{"optic8"},{"holo3"},{"holo4"}}, armor = {"vest3","helmet1"}, ammo = 3},
 	{primary = "weapon_saiga12", attachments = "", armor = {"vest3","helmet1","mask1"}, ammo = 4},

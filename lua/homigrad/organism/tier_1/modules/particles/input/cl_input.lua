@@ -14,10 +14,19 @@ local mat_huy = Material("effects/blood_core")
 mat_huy:SetTexture("$basetexture",texture)
 
 local cloudmat = Material("effects/smoke_b")
+local hg_old_blood = ConVarExists("hg_old_blood") and GetConVar("hg_old_blood") or CreateClientConVar("hg_old_blood", 0, true, false, "new decals, or old", 0, 1)
 local bloodSpillMats = {}
 for i = 1, 6 do
 	bloodSpillMats[i] = Material("bloodspill/blood" .. i)
 end
+
+net.Receive("hg_gib_blood_decal", function()
+	local ent = net.ReadEntity()
+	local pos = net.ReadVector()
+	local normal = net.ReadVector()
+	if not pos or not normal or normal:LengthSqr() < 0.0001 then return end
+	util.Decal(hg_old_blood:GetBool() and "Normal.Blood1" or "Normal.Blood24", pos - normal, pos + normal, IsValid(ent) and ent or nil)
+end)
 
 --оставь это лучше выглядит
 --[[for i = 4, 6 do

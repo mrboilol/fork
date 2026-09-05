@@ -1243,8 +1243,8 @@ drawFinalVitalsVignettes = function()
 	end
 
 	local consciousnessBlackout = math.Clamp((0.48 - consciousness) / (0.48 - OTRUB_CONSCIOUSNESS_THRESHOLD), 0, 1) ^ 1.55
-	local otrubOxygenReveal = math.Clamp(oxygenSeverity * 0.55 + severeOxygenTail * 0.65, 0, 1)
-	local blackoutAlpha = org.otrub and Lerp(otrubOxygenReveal, 252, 188) or consciousnessBlackout * 255
+	local otrubOxygenReveal = math.Clamp(oxygenSeverity * 0.7 + severeOxygenTail * 0.8, 0, 1)
+	local blackoutAlpha = org.otrub and Lerp(otrubOxygenReveal, 252, 72) or consciousnessBlackout * 255
 	if blackoutAlpha > 0.5 then
 		surface.SetDrawColor(0, 0, 0, math.Clamp(blackoutAlpha, 0, 255))
 		surface.DrawRect(0, 0, ScrW(), ScrH())

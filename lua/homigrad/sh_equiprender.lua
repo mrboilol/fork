@@ -653,6 +653,16 @@ if CLIENT then
 		if inventory["Weapons"]["hg_brassknuckles"] then
 			tbl["hg_brassknuckles"] = inventory["Weapons"]["hg_brassknuckles"]
 		end
+
+		local accessories = LocalPlayer():GetNetVar("Accessories", {})
+		if istable(accessories) then
+			for _, accessoryID in pairs(accessories) do
+				local accessory = hg.Accessories and hg.Accessories[accessoryID]
+				if accessory and accessory.model and accessory.placement and accessory.placement != "none" then
+					tbl["accessory:" .. accessoryID] = accessoryID
+				end
+			end
+		end
 	
 		if not organism.otrub and table.Count(tbl) > 0 then
 			hg.radialOptions = hg.radialOptions or {}
@@ -721,11 +731,21 @@ if CLIENT then
 			tblcpy["hg_brassknuckles"] = inventory["Weapons"]["hg_brassknuckles"]
 		end
 
+		local accessories = lply:GetNetVar("Accessories", {})
+		if istable(accessories) then
+			for _, accessoryID in pairs(accessories) do
+				local accessory = hg.Accessories and hg.Accessories[accessoryID]
+				if accessory and accessory.model and accessory.placement and accessory.placement != "none" then
+					tblcpy["accessory:" .. accessoryID] = accessoryID
+				end
+			end
+		end
+
 		return tblcpy
 	end
 
 	hook.Add("OnNetVarSet", "equipmentPanelRefresh", function(index, key, var)
-		if IsValid(hg.armorMenuPanel) and (key == "Armor" or key == "Inventory") then
+		if IsValid(hg.armorMenuPanel) and (key == "Armor" or key == "Inventory" or key == "Accessories") then
 			if hg.armorMenuPanel.RefreshTbl and Entity(index) == lply then
 				hg.armorMenuPanel:RefreshTbl()
 			end
@@ -871,12 +891,16 @@ if CLIENT then
 				if !hg.armorNames[v] and isnumber(k) then continue end
 				//if hg.armor[v][k].nodrop then continue end
 				local but = vgui.Create("DButton")
-				local prefix = string.find(k, "_")
-				if prefix then
-					k = string.sub(k, prefix + 1)
+				local accessory = isstring(k) and string.StartWith(k, "accessory:") and hg.Accessories and hg.Accessories[v]
+				local displayKey = k
+				if !accessory then
+					local prefix = string.find(displayKey, "_")
+					if prefix then
+						displayKey = string.sub(displayKey, prefix + 1)
+					end
 				end
 
-				but:SetText( hg.armorNames[v] or string.NiceName(k) )
+				but:SetText(accessory and (accessory.name or string.NiceName(v)) or hg.armorNames[v] or string.NiceName(displayKey))
 				but:SetFont("ZCity_Tiny")
 				but:Dock( TOP )
 				but:DockMargin( 6, 6, 6, 0 )

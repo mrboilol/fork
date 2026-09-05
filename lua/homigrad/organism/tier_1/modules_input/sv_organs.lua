@@ -386,7 +386,8 @@ local function getStaminaMul(dmgInfo)
 end
 
 hitArtery = function(artery, org, dmg, dmgInfo, boneindex, dir, hit, impact, forceRupture)
-	if not forceRupture and (isCrush(dmgInfo) or dmgInfo:IsDamageType(DMG_BLAST)) then
+	if isCrush(dmgInfo) then return 1 end
+	if not forceRupture and dmgInfo:IsDamageType(DMG_BLAST) then
 		local ruptureChance = math.Clamp((dmg - 0.35) * 0.45, 0, 0.75)
 		if ruptureChance <= 0 or math.Rand(0, 1) > ruptureChance then return 1 end
 	end

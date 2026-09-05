@@ -164,7 +164,7 @@ local lootPools = {
 		"weapon_mini14",
 		"weapon_kar98",
 		"weapon_ar_pistol",
-		"weapon_draco",
+		"weapon_dracovska",
 		"weapon_mp5",
 		"weapon_m16a2",
 		"weapon_mp7",

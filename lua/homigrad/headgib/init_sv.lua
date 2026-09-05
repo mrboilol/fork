@@ -106,7 +106,11 @@ local function PhysCallback(ent, data)
 
 	if not ent.hgGoreImpactDecal and isvector(data.HitPos) and isvector(data.HitNormal) then
 		ent.hgGoreImpactDecal = true
-		util.Decal("Normal.Blood24", data.HitPos - data.HitNormal, data.HitPos + data.HitNormal, ent)
+		net.Start("hg_gib_blood_decal")
+		net.WriteEntity(ent)
+		net.WriteVector(data.HitPos)
+		net.WriteVector(data.HitNormal)
+		net.SendPVS(data.HitPos)
 	end
 
 	if ent.hgGoreImpactSounds >= 2 and ent.hgGoreCallbackID then
@@ -226,6 +230,7 @@ local headpos_male, headpos_female, headang = Vector(0,0,5), Vector(-2,0,4), Ang
 
 util.AddNetworkString("addfountain")
 util.AddNetworkString("hg_gib_bloodspill")
+util.AddNetworkString("hg_gib_blood_decal")
 util.AddNetworkString("hg_fullbody_gibspill")
 util.AddNetworkString("hg_fullbody_bloodmist")
 

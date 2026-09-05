@@ -167,7 +167,7 @@ MODE.LootTable = {
 		{3,"weapon_hg_pipebomb_tpik"},
 
 		{2.5,"weapon_mp5"},
-		{2,"weapon_draco"},
+		{2,"weapon_dracovska"},
 		{2,"weapon_kar98"},
 		{1.5,"weapon_m1a1"},
 		{1.5,"weapon_sks"},

@@ -8,6 +8,10 @@ hg.noradrenalineFadeOutStartTime = hg.noradrenalineFadeOutStartTime or 0
 
 local altnoradrenaline = CreateClientConVar("hg_altnoradrenaline", "0", true, false, "Enable alternative noradrenaline mode (11s delay, 88 BPM heartbeat)", 0, 1)
 
+local function isNoradrenalineChannel(channel)
+	return channel and isfunction(channel.SetVolume) and isfunction(channel.Stop)
+end
+
 local tab = {
 	[ "$pp_colour_addr" ] = 0,
 	[ "$pp_colour_addg" ] = 0,
@@ -59,11 +63,12 @@ hook.Add("RenderScreenspaceEffects", "noradrenalineEffect", function()
 		surface.PlaySound("shitty/music/mi_deathcam.ogg")
 
 		if altnoradrenaline:GetBool() then
-			if IsValid(hg.noradrenalineStation) then
+			if isNoradrenalineChannel(hg.noradrenalineStation) then
 				hg.noradrenalineStation:SetVolume(1)
 				hg.noradrenalineFadeOut = false
 			else
 				sound.PlayFile("sound/NIGGARUN.mp3", "noblock", function(channel)
+					if not isNoradrenalineChannel(channel) or not isfunction(channel.EnableLooping) then return end
 					hg.noradrenalineStation = channel
 					channel:EnableLooping(true)
 					channel:SetVolume(1)
@@ -88,7 +93,7 @@ hook.Add("RenderScreenspaceEffects", "noradrenalineEffect", function()
 
 	elseif noradrenaline < 0.0001 then
 		if hg.undernoradrenaline then
-			if altnoradrenaline:GetBool() and IsValid(hg.noradrenalineStation) and not hg.noradrenalineFadeOut then
+			if altnoradrenaline:GetBool() and isNoradrenalineChannel(hg.noradrenalineStation) and not hg.noradrenalineFadeOut then
 				hg.noradrenalineFadeOut = true
 				hg.noradrenalineFadeOutStartTime = SysTime()
 			elseif not altnoradrenaline:GetBool() and not hg.noradrenalineFadeOut then
@@ -113,11 +118,16 @@ hook.Add("RenderScreenspaceEffects", "noradrenalineEffect", function()
 	-- Handle fade out for noradrenaline music (slower fade: 30 seconds)
 	if hg.noradrenalineFadeOut then
 		local fadeProgress = (SysTime() - hg.noradrenalineFadeOutStartTime) / 30
-		if altnoradrenaline:GetBool() and IsValid(hg.noradrenalineStation) then
-			local volume = math.max(0, 1 - fadeProgress)
-			hg.noradrenalineStation:SetVolume(volume)
-			if fadeProgress >= 1 then
-				hg.noradrenalineStation:Stop()
+		if altnoradrenaline:GetBool() then
+			if isNoradrenalineChannel(hg.noradrenalineStation) then
+				local volume = math.max(0, 1 - fadeProgress)
+				hg.noradrenalineStation:SetVolume(volume)
+				if fadeProgress >= 1 then
+					hg.noradrenalineStation:Stop()
+					hg.noradrenalineStation = nil
+					hg.noradrenalineFadeOut = false
+				end
+			else
 				hg.noradrenalineStation = nil
 				hg.noradrenalineFadeOut = false
 			end
