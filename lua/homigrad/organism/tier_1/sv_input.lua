@@ -2438,15 +2438,15 @@ local function velocityDamage(ent, data)
 			local headImpactSeverity = math.Clamp(math.max(unarmoredImpactDamage, structuralBudget) * math.Clamp(normalSpeed / 600, 0.7, 2), 0, 3)
 			local knockoutChance = math.Clamp((headImpactSeverity - 0.3) * 0.22, 0, 0.45)
 			if hadhelmet then knockoutChance = knockoutChance * 0.2 end
+			if headImpactSeverity > 0.15 and hg.organism.module.concussion then
+				local concussionIntensity = math.Clamp(headImpactSeverity * (hadhelmet and 2.2 or 1.45), 0.25, hadhelmet and 3.6 or 4.5)
+				hg.organism.module.concussion.AddConcussion(org, concussionIntensity, math.Clamp(10 + concussionIntensity * 18, 12, 75))
+			end
 			if headImpactSeverity > 0.15 and math.Rand(0, 1) < knockoutChance then
 				org.needotrub = true
 				org.shock = org.shock + 10
 				org.consciousness = math.min(org.consciousness, head_otrub_consciousness_cap)
 			else
-				if headImpactSeverity > 0.15 and hg.organism.module.concussion then
-					local concussionIntensity = math.Clamp(headImpactSeverity * (hadhelmet and 2.2 or 1.45), 0.25, hadhelmet and 3.6 or 4.5)
-					hg.organism.module.concussion.AddConcussion(org, concussionIntensity, math.Clamp(10 + concussionIntensity * 18, 12, 75))
-				end
 				local consciousnessLoss = headImpactSeverity * (hadhelmet and 0.04 or 0.12)
 				org.consciousness = math.max((org.consciousness or 1) - consciousnessLoss, hadhelmet and 0.5 or 0.3)
 			end

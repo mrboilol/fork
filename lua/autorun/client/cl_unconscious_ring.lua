@@ -143,6 +143,59 @@ local INCAPACITATION_DEATH_TIME = 20
 local wakeEstimateAnchor = 0
 local wakeEstimateSmoothed
 
+local function GetIncapacitationDeathCauses(org)
+    local causes = {}
+    local brainOxygen = tonumber(org.brainoxygen) or 1
+    local bloodOxygen = org.o2 and tonumber(org.o2[1]) or 30
+    local leftLungDamage = org.lungsL and tonumber(org.lungsL[1]) or 0
+    local rightLungDamage = org.lungsR and tonumber(org.lungsR[1]) or 0
+    local spine2Threshold = hg.organism and hg.organism.fake_spine2 or 1
+
+    if (tonumber(org.brain) or 0) > 0.4 then
+        causes[#causes + 1] = "Your brain is critically damaged."
+    end
+    if brainOxygen < 0.16 then
+        causes[#causes + 1] = "Your brain is starved of oxygen."
+    end
+    if bloodOxygen <= 8 then
+        causes[#causes + 1] = "Your blood oxygen is critically low."
+    end
+    if (tonumber(org.trachea) or 0) >= 0.5 then
+        causes[#causes + 1] = "Your trachea is too damaged to keep your airway open."
+    end
+    if leftLungDamage >= 1 then
+        causes[#causes + 1] = "Your left lung is destroyed."
+    end
+    if rightLungDamage >= 1 then
+        causes[#causes + 1] = "Your right lung is destroyed."
+    end
+    if org.respiratoryArrest then
+        causes[#causes + 1] = "Your breathing has stopped."
+    end
+    if (tonumber(org.heart) or 0) > 0.6 then
+        causes[#causes + 1] = "Your heart is too damaged to pump blood effectively."
+    end
+    if org.heartstop then
+        causes[#causes + 1] = "Your heart has stopped."
+    end
+    if (tonumber(org.spine3) or 0) >= 1 then
+        causes[#causes + 1] = "Your spinal cord is severed."
+    end
+    if (tonumber(org.spine2) or 0) >= spine2Threshold then
+        causes[#causes + 1] = "Your spine is critically damaged."
+    end
+    if #causes == 0 then
+        causes[1] = "Your injuries have caused irreversible organ failure."
+    end
+
+    return causes
+end
+
+local function GetSuicideBinding()
+    local binding = input.LookupBinding and input.LookupBinding("suicide") or nil
+    return binding and binding ~= "" and string.upper(binding) or "K"
+end
+
 local function EstimateWakeSeconds(org)
     local brainOxygen = math.Clamp(org.brainoxygen or 1, 0, 1)
     local cannotWake = org.incapacitated
@@ -856,7 +909,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     local incapacitated = replicatedOrg.incapacitated or org.incapacitated or false
     local deathStateEnd = tonumber(replicatedOrg.deathStateEnd or org.deathStateEnd)
     local incapacitationProgress = 0
-    if isUnconscious and incapacitated and deathStateEnd and deathStateEnd > CurTime() then
+    if isUnconscious and incapacitated and deathStateEnd then
         local remaining = math.max(deathStateEnd - CurTime(), 0)
         incapacitationProgress = math.Clamp((INCAPACITATION_DEATH_TIME - remaining) / INCAPACITATION_DEATH_TIME, 0, 1)
     end
@@ -1023,20 +1076,14 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         end
     end
 
-    if isUnconscious and incapacitated and deathStateEnd and deathStateEnd > CurTime() then
+    if isUnconscious and incapacitated and deathStateEnd then
         local remaining = math.max(deathStateEnd - CurTime(), 0)
         local seconds = math.max(math.ceil(remaining), 0)
         local fade = math.Clamp((INCAPACITATION_DEATH_TIME - remaining) / 1.25, 0, 1)
         local urgency = math.Clamp((5 - remaining) / 5, 0, 1)
         local pulseAlpha = 0.82 + math.abs(math.sin(CurTime() * 6)) * 0.18 * urgency
-        local promptBase = Lerp(incapacitationWhite, 235, 24)
-        local promptColor = Color(
-            Lerp(urgency, promptBase, Lerp(incapacitationWhite, 235, 90)),
-            Lerp(urgency, promptBase, Lerp(incapacitationWhite, 55, 12)),
-            Lerp(urgency, promptBase, Lerp(incapacitationWhite, 45, 10)),
-            245 * fade * pulseAlpha
-        )
-        local promptOutline = Lerp(incapacitationWhite, 0, 255)
+        local promptColor = Color(235, 55, 45, 245 * fade * pulseAlpha)
+        local promptOutline = 0
 
         if not incapPromptX then
             local radius = math.min(280, ScrH() * 0.32)
@@ -1045,7 +1092,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         end
 
         draw.SimpleTextOutlined(
-            "You are incapacitated - death in " .. seconds .. "s",
+            seconds > 0 and "You are incapacitated - death in " .. seconds .. "s" or "You are dying",
             "OtrubCriticalMessage",
             incapPromptX,
             incapPromptY,
@@ -1054,6 +1101,36 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
             TEXT_ALIGN_TOP,
             2,
             Color(promptOutline, promptOutline, promptOutline, 220 * fade)
+        )
+
+        local messageY = incapPromptY + ScreenScaleH(20)
+        if seconds == 0 then
+            for _, cause in ipairs(GetIncapacitationDeathCauses(replicatedOrg)) do
+                draw.SimpleTextOutlined(
+                    cause,
+                    "HomigradFontTypewriterSmall",
+                    incapPromptX,
+                    messageY,
+                    promptColor,
+                    TEXT_ALIGN_CENTER,
+                    TEXT_ALIGN_TOP,
+                    1,
+                    Color(0, 0, 0, 220 * fade)
+                )
+                messageY = messageY + ScreenScaleH(14)
+            end
+        end
+
+        draw.SimpleTextOutlined(
+            "Press " .. GetSuicideBinding() .. " to give up.",
+            "HomigradFontTypewriterSmall",
+            incapPromptX,
+            seconds == 0 and messageY + ScreenScaleH(4) or messageY,
+            promptColor,
+            TEXT_ALIGN_CENTER,
+            TEXT_ALIGN_TOP,
+            1,
+            Color(0, 0, 0, 220 * fade)
         )
     end
 

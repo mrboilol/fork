@@ -591,6 +591,9 @@ function module.AddConcussion(org, intensity, duration)
         if org.isPly and IsValid(org.owner) and org.owner:IsPlayer() then
             org.owner:Notify("I feel... okay? Maybe it wasn't that bad...", 6, "concussion_lucid", 0)
         end
+        if hg.organism.AddHeadTraumaSeizureRisk then
+            hg.organism.AddHeadTraumaSeizureRisk(org, add, intensity)
+        end
         return
     end
 
@@ -606,6 +609,10 @@ function module.AddConcussion(org, intensity, duration)
     org.concussion_tinnitus = math.max(org.concussion_tinnitus or 0, add * 0.25)
     org.concussion_headache = math.max(org.concussion_headache or 0, add * 0.4)
     org.concussion_fatigue = math.max(org.concussion_fatigue or 0, add * 0.2)
+
+    if hg.organism.AddHeadTraumaSeizureRisk then
+        hg.organism.AddHeadTraumaSeizureRisk(org, add, intensity)
+    end
 
     local stage = module.GetStage(org)
     local nauseaSpike = add * 0.25

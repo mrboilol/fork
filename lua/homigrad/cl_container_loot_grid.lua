@@ -79,6 +79,82 @@ local function DrawIcon(icon, isTexture, x, y, w, h, alpha)
 	surface.DrawTexturedRect(x, y, w, h)
 end
 
+local function RectsOverlap(left, top, width, height, otherLeft, otherTop, otherWidth, otherHeight, gap)
+
+	gap = gap or 0
+	return left < otherLeft + otherWidth + gap
+		and left + width + gap > otherLeft
+		and top < otherTop + otherHeight + gap
+		and top + height + gap > otherTop
+end
+
+local function ArrangeLootButtons(menu, anchorX, anchorY)
+	local placed = {}
+	local padding = 8
+	local goldenAngle = math.pi * (3 - math.sqrt(5))
+	local scale = math.Clamp(ScrH() / 1080, 0.75, 1.15)
+
+	for sequence, button in ipairs(menu.Buttons) do
+		if not IsValid(button) then continue end
+
+		local width = button.BaseW
+		local height = button.BaseH
+		local halfWidth = width * 0.5
+		local halfHeight = height * 0.5
+		if button.Taking then
+			local left, top = button:GetPos()
+			placed[#placed + 1] = {left = left, top = top, width = width, height = height}
+			continue
+		end
+
+		local bestX, bestY
+		local startAngle = -math.pi * 0.5 + (sequence - 1) * goldenAngle
+
+		for attempt = 0, 95 do
+			local ring = math.floor(attempt / 12)
+			local angle = startAngle + (attempt % 12) * goldenAngle
+			local radius = (92 + ring * 78) * scale
+			local x = anchorX + math.cos(angle) * radius
+			local y = anchorY + math.sin(angle) * radius
+			local left = x - halfWidth
+			local top = y - halfHeight
+
+			if left < padding or top < padding or left + width > ScrW() - padding or top + height > ScrH() - padding then continue end
+
+			local overlaps = false
+			for _, other in ipairs(placed) do
+				if RectsOverlap(left, top, width, height, other.left, other.top, other.width, other.height, 10 * scale) then
+					overlaps = true
+					break
+				end
+			end
+
+			if not overlaps then
+				bestX, bestY = x, y
+				break
+			end
+		end
+
+		if not bestX then
+			local minX = padding + halfWidth
+			local maxX = math.max(minX, ScrW() - padding - halfWidth)
+			local minY = padding + halfHeight
+			local maxY = math.max(minY, ScrH() - padding - halfHeight)
+			bestX = math.Clamp(anchorX, minX, maxX)
+			bestY = math.Clamp(anchorY, minY, maxY)
+		end
+
+		button.OffsetX = bestX - anchorX
+		button.OffsetY = bestY - anchorY
+		placed[#placed + 1] = {
+			left = bestX - halfWidth,
+			top = bestY - halfHeight,
+			width = width,
+			height = height,
+		}
+	end
+end
+
 function hg.OpenContainerLootGrid(options)
 	options = options or {}
 	local ent = options.ent
@@ -178,6 +254,7 @@ function hg.OpenContainerLootGrid(options)
 
 		local anchorX = self.AnchorX or ScrW() * 0.5
 		local anchorY = self.AnchorY or ScrH() * 0.5
+		ArrangeLootButtons(self, anchorX, anchorY)
 		local originX = self.OriginX or anchorX
 		local originY = self.OriginY or anchorY
 		for _, button in ipairs(self.Buttons) do
@@ -214,26 +291,18 @@ function hg.OpenContainerLootGrid(options)
 	local scale = math.Clamp(ScrH() / 1080, 0.75, 1.15)
 	local buttonW = math.floor(76 * scale)
 	local buttonH = math.floor(88 * scale)
-	local spacingX = math.floor(82 * scale)
-	local spacingY = math.floor(82 * scale)
-	local perRow = math.max(1, math.min(6, #ids))
-
 	for sequence, itemID in ipairs(ids) do
 		local item = items[itemID]
 		local class = item and item.class
 		if not class then continue end
 
-		local row = math.floor((sequence - 1) / perRow)
-		local firstInRow = row * perRow + 1
-		local rowCount = math.min(perRow, #ids - firstInRow + 1)
-		local column = sequence - firstInRow + 1
 		local button = vgui.Create("DButton", menu)
 		button:SetText("")
 		button:SetSize(buttonW, buttonH)
 		button.BaseW = buttonW
 		button.BaseH = buttonH
-		button.OffsetX = (column - (rowCount + 1) * 0.5) * spacingX
-		button.OffsetY = -buttonH * 0.58 - row * spacingY
+		button.OffsetX = 0
+		button.OffsetY = 0
 		button.OpenDelay = (sequence - 1) * 0.045
 		button.ItemID = itemID
 		button.Item = item
@@ -280,7 +349,7 @@ function hg.OpenContainerLootGrid(options)
 				DrawIcon(self.Icon, self.IconIsTexture, (w - drawW) * 0.5, (iconHeight - drawH) * 0.5, drawW, drawH, 255)
 			else
 				draw.RoundedBox(math.floor(6 * scale), w * 0.2, iconHeight * 0.12, w * 0.6, iconHeight * 0.7, Color(12, 12, 12, 185))
-				draw.SimpleText("?", "ZCity_Tiny", w * 0.5, iconHeight * 0.47, Color(235, 235, 235), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+				draw.SimpleText("ITEM", "ZCity_SuperTiny", w * 0.5, iconHeight * 0.47, Color(235, 235, 235), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 			end
 
 			draw.SimpleText(self.Slot, "ZCity_SuperTiny", w * 0.5 + 1, h - 1, Color(0, 0, 0, 220), TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM)

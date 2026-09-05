@@ -770,7 +770,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 			headOutcomeHandled = true
 		end
 	end
-	if not headOutcomeHandled and hg.organism.module.concussion and hg.organism.module.concussion.AddHeadTrauma then
+	if not (impact and impact.headOutcomeHandled) and hg.organism.module.concussion and hg.organism.module.concussion.AddHeadTrauma then
 		concussionGain = hg.organism.module.concussion.AddHeadTrauma(org, skullDelta, brainDelta, brainEnergy * (helmetProtectedHit and 1.8 or 1), dmgInfo)
 	end
 

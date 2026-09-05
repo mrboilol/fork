@@ -291,9 +291,56 @@ local function RandomAmmoAmount(class)
 	return math.random(hg.ammoents and hg.ammoents[ammoName] and hg.ammoents[ammoName].Count or 30)
 end
 
-local function SpawnLootClass(ent, class, ammoAmount, ply)
+local function RestoreContainerItemData(spawned, data)
+	if not data then return end
+
+	if data.skin then spawned:SetSkin(data.skin) end
+	if data.material then spawned:SetMaterial(data.material) end
+	if data.color then spawned:SetColor(Color(data.color.r, data.color.g, data.color.b, data.color.a)) end
+	for bodygroup, value in pairs(data.bodygroups or {}) do
+		spawned:SetBodygroup(bodygroup, value)
+	end
+
+	for key, value in pairs(data.values or {}) do
+		spawned[key] = value
+	end
+
+	if data.clip1 and spawned.SetClip1 then spawned:SetClip1(data.clip1) end
+	if data.clip2 and spawned.SetClip2 then spawned:SetClip2(data.clip2) end
+	hook.Run("HG_RestoreContainerItem", spawned, data.extra)
+end
+
+local function CaptureContainerItemData(source)
+	local color = source:GetColor()
+	local data = {
+		skin = source:GetSkin(),
+		material = source:GetMaterial(),
+		color = {r = color.r, g = color.g, b = color.b, a = color.a},
+		bodygroups = {},
+		values = {},
+	}
+
+	for bodygroup = 0, source:GetNumBodyGroups() - 1 do
+		data.bodygroups[bodygroup] = source:GetBodygroup(bodygroup)
+	end
+
+	for _, key in ipairs({"poisoned", "poisoned2", "AmmoCount", "Amount", "amount", "count"}) do
+		if source[key] ~= nil then data.values[key] = source[key] end
+	end
+
+	if source:IsWeapon() then
+		data.clip1 = source:Clip1()
+		data.clip2 = source:Clip2()
+	end
+
+	data.extra = hook.Run("HG_CaptureContainerItem", source)
+	return data
+end
+
+local function SpawnLootClass(ent, class, ammoAmount, ply, data)
 	local spawned = ents.Create(class)
 	if not IsValid(spawned) then return end
+	if data and data.model then spawned:SetModel(data.model) end
 
 	if IsValid(ply) then
 		local trace = util.TraceEntityHull({
@@ -310,6 +357,7 @@ local function SpawnLootClass(ent, class, ammoAmount, ply)
 	spawned:Spawn()
 	spawned.IsSpawned = true
 	spawned.init = true
+	RestoreContainerItemData(spawned, data)
 
 	if string.StartWith(class, "ent_ammo_") then
 		spawned.AmmoCount = ammoAmount or RandomAmmoAmount(class)
@@ -352,6 +400,31 @@ local function IsSandboxContainer(ent)
 	return hg.SandboxContainerModels[string.lower(ent:GetModel() or "")] ~= nil
 end
 
+local function StoreCarriedItem(ply, container)
+	if not IsSandboxContainer(container) or not ply:KeyDown(IN_SPEED) then return false end
+
+	local weapon = ply:GetActiveWeapon()
+	if not IsValid(weapon) or not weapon.GetCarrying or not weapon.SetCarrying then return false end
+
+	local carried = weapon:GetCarrying()
+	if not IsValid(carried) or carried == container or carried:IsPlayer() or carried:IsRagdoll() then return false end
+	if not IsValid(carried:GetPhysicsObject()) then return false end
+
+	local item = {
+		class = carried:GetClass(),
+		data = CaptureContainerItemData(carried),
+	}
+	if string.StartWith(item.class, "prop_") then item.data.model = carried:GetModel() end
+	if string.StartWith(item.class, "ent_ammo_") then item.ammoAmount = carried.AmmoCount or RandomAmmoAmount(item.class) end
+
+	container.sandboxLoot = container.sandboxLoot or {}
+	container.sandboxLoot[#container.sandboxLoot + 1] = item
+	weapon:SetCarrying()
+	carried:Remove()
+	container:EmitSound("items/ammocrate_close.wav", 65, 105)
+	return true
+end
+
 local function MarkSandboxContainer(ent)
 	if not IsValid(ent) then return end
 	ent:SetNWBool("hgSearchableContainer", IsSandboxContainer(ent))
@@ -385,9 +458,13 @@ local function SendSandboxContainerLoot(ply, ent)
 	elseif IsValid(wep) and wep.UsingRightHand and not wep.UsingLeftHand then
 		handMode = 2
 	end
+	local clientLoot = {}
+	for itemID, item in pairs(ent.sandboxLoot or {}) do
+		clientLoot[itemID] = {class = item.class}
+	end
 	net.Start("hg_sandbox_container_open")
 		net.WriteEntity(ent)
-		net.WriteTable(ent.sandboxLoot or {})
+		net.WriteTable(clientLoot)
 		net.WriteUInt(handMode, 2)
 	net.Send(ply)
 end
@@ -396,10 +473,11 @@ hook.Add("ZB_CanLootInventory", "SandboxContainerGrid", function(ply, ent)
 	if not IsSandboxContainer(ent) then return end
 	if not ply.keypressed then
 		GenerateSandboxContainerLoot(ply, ent)
+		local storedItem = StoreCarriedItem(ply, ent)
 
 		local wep = ply:GetActiveWeapon()
 		local handsWeapon = IsValid(wep) and (wep:GetClass() == "weapon_hands_sh" or wep:GetClass() == "weapon_hg_coolhands")
-		if handsWeapon and wep.GetCarrying and wep.SetCarrying and not IsValid(wep:GetCarrying()) then
+		if not storedItem and handsWeapon and wep.GetCarrying and wep.SetCarrying and not IsValid(wep:GetCarrying()) then
 			local phys = ent:GetPhysicsObject()
 			if IsValid(phys) then
 				wep:SetCarrying(ent, 0, ent:WorldSpaceCenter(), ply:EyePos():Distance(ent:WorldSpaceCenter()))
@@ -421,7 +499,7 @@ net.Receive("hg_sandbox_container_take", function(_, ply)
 	if not item or not item.class then return end
 
 	ent.sandboxLoot[itemID] = nil
-	SpawnLootClass(ent, item.class, item.ammoAmount, ply)
+	SpawnLootClass(ent, item.class, item.ammoAmount, ply, item.data)
 end)
 
 net.Receive("hg_sandbox_container_close", function(_, ply)
@@ -448,7 +526,7 @@ hook.Add("PropBreak", "SandboxContainers", function(ply, ent)
 	end
 
 	for _, item in pairs(ent.sandboxLoot or {}) do
-		SpawnLootClass(ent, item.class, item.ammoAmount)
+		SpawnLootClass(ent, item.class, item.ammoAmount, nil, item.data)
 	end
 
 	ent.sandboxLoot = {}

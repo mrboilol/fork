@@ -50,14 +50,18 @@ local seizure_leg_buckle = 46
 local seizure_shake_freq = 5.8
 local seizure_shake_amp = 1.35
 local seizure_brain_trauma_gain_mul = 2
-local seizure_brain_heal_gain_mul = 1.1
 local seizure_temperature_gain_mul = 0.013
 local seizure_temperature_low_start = 35
 local seizure_temperature_high_start = 39
 local seizure_brain_roll_delay = 20
-local seizure_brain_roll_chance = 15
-local seizure_brain_roll_gain_min = 0.04
-local seizure_brain_roll_gain_max = 0.11
+local seizure_brain_roll_chance_min = 0.015
+local seizure_brain_roll_chance_max = 0.12
+local seizure_head_trauma_window = 9
+local seizure_head_trauma_min_concussion = 1.25
+local seizure_karma_roll_delay = 30
+local seizure_karma_start = 70
+local seizure_karma_roll_chance_min = 0.015
+local seizure_karma_roll_chance_max = 0.1
 local organismModuleInitOrder = {
 	"pulse",
 	"blood",
@@ -191,6 +195,10 @@ hook.Add("Org Clear", "Main", function(org)
 	org.seizureEnd = 0
 	org.nextSeizureSpasm = 0
 	org.nextSeizureRoll = 0
+	org.nextKarmaSeizureRoll = 0
+	org.seizureSuppressedUntil = 0
+	org.seizureHeadTraumaStart = 0
+	org.seizureHeadTraumaHits = 0
 	org.lastSeizureBrain = 0
 	org.lastSeizureLobeDamage = 0
 	org.lastSeizureTemperature = org.temperature
@@ -873,8 +881,42 @@ end
 function hg.organism.AddSeizure(org, amount)
 	if not org then return 0 end
 	if not isnumber(amount) or amount <= 0 then return org.seizure or 0 end
+	if (org.seizureSuppressedUntil or 0) > CurTime() then return org.seizure or 0 end
 	org.seizure = math.Clamp((org.seizure or 0) + amount, 0, 1)
 	return org.seizure
+end
+
+function hg.organism.AddHeadTraumaSeizureRisk(org, concussionGain, impactDamage)
+	if not org or org.seizureActive or (org.seizureSuppressedUntil or 0) > CurTime() then return false end
+
+	concussionGain = math.max(tonumber(concussionGain) or 0, 0)
+	if concussionGain < seizure_head_trauma_min_concussion then return false end
+
+	local time = CurTime()
+	if time - (org.seizureHeadTraumaStart or 0) > seizure_head_trauma_window then
+		org.seizureHeadTraumaStart = time
+		org.seizureHeadTraumaHits = 0
+	end
+
+	org.seizureHeadTraumaHits = (org.seizureHeadTraumaHits or 0) + 1
+	local concussionSeverity = math.Clamp((org.concussion or 0) + (org.concussion_onset or 0), 0, 6)
+	local impactSeverity = math.Clamp(tonumber(impactDamage) or 0, 0, 8)
+	local chance = math.Clamp(
+		(concussionSeverity - 1.75) * 0.07
+		+ (concussionGain - seizure_head_trauma_min_concussion) * 0.05
+		+ (impactSeverity - 1.5) * 0.025
+		+ ((org.seizureHeadTraumaHits or 1) - 1) * 0.06
+		+ math.Clamp((org.brain or 0) * 0.08, 0, 0.08),
+		0,
+		0.5
+	)
+
+	if chance > 0 and math.Rand(0, 1) < chance then
+		hg.organism.AddSeizure(org, 1)
+		return true
+	end
+
+	return false
 end
 
 function hg.organism.StartFibrillation(org)
@@ -906,8 +948,17 @@ local function stop_seizure(owner, org)
 		send_organism(org, owner)
 	end
 end
+
+function hg.organism.SuppressSeizure(org, duration)
+	if not org then return end
+
+	duration = math.max(tonumber(duration) or 0, 0)
+	org.seizureSuppressedUntil = math.max(org.seizureSuppressedUntil or 0, CurTime() + duration)
+	stop_seizure(org.owner, org)
+end
+
 local function start_seizure(owner, org)
-	if org.seizureActive or not IsValid(owner) or not owner:IsPlayer() or not owner:Alive() then return end
+	if org.seizureActive or (org.seizureSuppressedUntil or 0) > CurTime() or not IsValid(owner) or not owner:IsPlayer() or not owner:Alive() then return end
 	local time = CurTime()
 	org.seizure = 1
 	org.seizureActive = true
@@ -1234,12 +1285,26 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.nextSeizureRoll = org.nextSeizureRoll or (curTime + seizure_brain_roll_delay)
 		if curTime >= org.nextSeizureRoll then
 			org.nextSeizureRoll = curTime + seizure_brain_roll_delay
-			if math.random(seizure_brain_roll_chance) == 1 then
-				hg.organism.AddSeizure(org, math.Rand(seizure_brain_roll_gain_min, seizure_brain_roll_gain_max) * math.Clamp(math.Remap(seizureBrainDamage, 0.05, 1, 0.75, 1.5), 0.75, 1.5))
+			local randomSeizureChance = math.Clamp(math.Remap(seizureBrainDamage, 0.05, 1, seizure_brain_roll_chance_min, seizure_brain_roll_chance_max), seizure_brain_roll_chance_min, seizure_brain_roll_chance_max)
+			if math.Rand(0, 1) < randomSeizureChance then
+				hg.organism.AddSeizure(org, 1)
 			end
 		end
 	else
 		org.nextSeizureRoll = curTime + seizure_brain_roll_delay
+	end
+	local karma = isPly and tonumber(owner.Karma) or nil
+	if karma and karma < seizure_karma_start then
+		org.nextKarmaSeizureRoll = org.nextKarmaSeizureRoll or (curTime + seizure_karma_roll_delay)
+		if curTime >= org.nextKarmaSeizureRoll then
+			org.nextKarmaSeizureRoll = curTime + seizure_karma_roll_delay
+			local karmaSeizureChance = math.Clamp(math.Remap(karma, seizure_karma_start, 0, seizure_karma_roll_chance_min, seizure_karma_roll_chance_max), seizure_karma_roll_chance_min, seizure_karma_roll_chance_max)
+			if math.Rand(0, 1) < karmaSeizureChance then
+				hg.organism.AddSeizure(org, 1)
+			end
+		end
+	else
+		org.nextKarmaSeizureRoll = curTime + seizure_karma_roll_delay
 	end
 	org.lastSeizureBrain = org.brain or 0
 	org.lastSeizureLobeDamage = lobeDamage
@@ -1491,7 +1556,6 @@ hook.Add("Org Think", "regenerationberserk", function(owner, org, timeValue)
 	org.eyeR = math.max((org.eyeR or 0) - regen, 0)
 	local oldBrain = org.brain or 0
 	org.brain = math.max(oldBrain - regen, 0)
-	hg.organism.AddSeizure(org, math.Clamp((oldBrain - org.brain) * seizure_brain_heal_gain_mul, 0, 1))
 	org.lastSeizureBrain = org.brain
 	org.hungry = 0
 	org.pain = math.Approach(org.pain, 0, timeValue * 10)
@@ -1530,7 +1594,6 @@ hook.Add("Org Think", "regenerationnoradrenaline", function(owner, org, timeValu
 	if noradrenaline > 2 then
 		local oldBrain = org.brain or 0
 		org.brain = math.Approach(oldBrain, 0.3, timeValue / 60)
-		hg.organism.AddSeizure(org, math.Clamp((oldBrain - org.brain) * seizure_brain_heal_gain_mul, 0, 1))
 		org.lastSeizureBrain = org.brain
 	end
 	org.pulse = math.Approach(org.pulse, 70, regen * 10)

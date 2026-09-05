@@ -44,10 +44,11 @@ local EUPHORIA_SLOWMO_TIME = 0.32
 local EUPHORIA_SLOWMO_SCALE = 0.45
 local EUPHORIA_SLOWMO_RAMP = 0.35
 local EUPHORIA_SLOWMO_COOLDOWN = 0.8
-local EUPHORIA_CURL_TIME = 2.5
-local EUPHORIA_CURL_WINDOW = 1.2
+local EUPHORIA_CURL_TIME = 1.1
+local EUPHORIA_CURL_WINDOW = 0.9
 local EUPHORIA_CURL_TRIGGER = 2
-local EUPHORIA_CURL_EASE = 0.5
+local EUPHORIA_CURL_MIN_DAMAGE = 8
+local EUPHORIA_CURL_EASE = 0.3
 
 local function isFloppyBone(ragdoll, physNum)
 	local floppy = ragdoll.hg_floppy_bones
@@ -290,17 +291,19 @@ hook.Add("EntityTakeDamage", "HG_EuphoriaHit", function(ent, dmgInfo)
 	local dmg = dmgInfo:GetDamage()
 
 	local now = SysTime()
-	if ragdoll.hgBeat and now > ragdoll.hgBeat.untilT then
-		ragdoll.hgBeat = nil
-	end
-	if not ragdoll.hgBeat then
-		ragdoll.hgBeat = { count = 0, untilT = now + EUPHORIA_CURL_WINDOW }
-	end
-	ragdoll.hgBeat.count = ragdoll.hgBeat.count + 1
-	if ragdoll.hgBeat.count >= EUPHORIA_CURL_TRIGGER and not ragdoll.hgCurl and not ragdoll.hgGetUp and hg_euphoria_detail:GetBool() then
-		ragdoll.hgBeat = nil
-		ragdoll.hgWoundGrab = nil
-		ragdoll.hgCurl = { untilT = now + EUPHORIA_CURL_TIME, dur = EUPHORIA_CURL_TIME }
+	if dmg >= EUPHORIA_CURL_MIN_DAMAGE then
+		if ragdoll.hgBeat and now > ragdoll.hgBeat.untilT then
+			ragdoll.hgBeat = nil
+		end
+		if not ragdoll.hgBeat then
+			ragdoll.hgBeat = { count = 0, untilT = now + EUPHORIA_CURL_WINDOW }
+		end
+		ragdoll.hgBeat.count = ragdoll.hgBeat.count + 1
+		if ragdoll.hgBeat.count >= EUPHORIA_CURL_TRIGGER and not ragdoll.hgCurl and not ragdoll.hgGetUp and hg_euphoria_detail:GetBool() then
+			ragdoll.hgBeat = nil
+			ragdoll.hgWoundGrab = nil
+			ragdoll.hgCurl = { untilT = now + EUPHORIA_CURL_TIME, dur = EUPHORIA_CURL_TIME }
+		end
 	end
 
 	if dmg < 8 then return end
@@ -625,10 +628,10 @@ hook.Add("Think", "HG_EuphoriaCurl", function()
 		local fwd = pelvisAng:Forward()
 		local right = pelvisAng:Right()
 
-		curlTarget(ragdoll, 12, pelvisPos + up * 20 + fwd * 8, speed, damp)
-		curlTarget(ragdoll, 13, pelvisPos + up * 16 + fwd * 6, speed, damp)
-		curlTarget(ragdoll, 9, pelvisPos + up * 20 + fwd * 8, speed, damp)
-		curlTarget(ragdoll, 14, pelvisPos + up * 16 + fwd * 6, speed, damp)
+		curlTarget(ragdoll, 12, pelvisPos + up * 8 + fwd * 18 - right * 8, speed, damp)
+		curlTarget(ragdoll, 13, pelvisPos + up * 3 + fwd * 28 - right * 10, speed, damp)
+		curlTarget(ragdoll, 9, pelvisPos + up * 8 + fwd * 18 + right * 8, speed, damp)
+		curlTarget(ragdoll, 14, pelvisPos + up * 3 + fwd * 28 + right * 10, speed, damp)
 		curlTarget(ragdoll, 5, chestPos + up * 10 - right * 10, speed, damp)
 		curlTarget(ragdoll, 4, chestPos + up * 12 - right * 15, speed, damp)
 		curlTarget(ragdoll, 7, chestPos + up * 10 + right * 10, speed, damp)
