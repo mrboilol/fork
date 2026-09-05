@@ -9,7 +9,7 @@ local pickupHistory = {}
 local typeState = {}
 
 local font = "HomigradFont"
-local color_bg = Color(0, 0, 0, 200)
+local color_bg = Color(99, 99, 99, 200)
 local color_outline_def = Color(255, 255, 255, 125)
 local color_text_def = Color(255, 255, 255, 255)
 
@@ -73,7 +73,6 @@ hook.Add("HUDWeaponPickedUp", "UniversalPickup_Weapon", function(wep)
     AddPickupNotification(name)
     return true
 end)
-
 net.Receive("HG_PickupHistory_Dropped", function()
     local ply = LocalPlayer()
     if not IsValid(ply) or not ply:Alive() then return end
