@@ -12,16 +12,20 @@ hook.Add("PostDrawTranslucentRenderables", "bloodpartciels", function()
 	local fps = 1 / hg_blood_fps:GetInt()-- / game.GetTimeScale()
 	if not bloodparticles_hook then return end
 	local animpos = math_min((delay - time) / fps, 1)
-	if not bloodparticles_hook[1] then return end
-	
-	bloodparticles_hook[1](animpos, fps)
-	bloodparticles_hook[3](animpos, fps)
+	local drawBlood = bloodparticles_hook[1]
+	local drawWaterBlood = bloodparticles_hook[3]
+
+	if isfunction(drawBlood) then drawBlood(animpos, fps) end
+	if isfunction(drawWaterBlood) then drawWaterBlood(animpos, fps) end
 
 	if delay < time then
 		delay = time + fps
 
-		bloodparticles_hook[2](fps)
-		bloodparticles_hook[4](fps)
+		local updateBlood = bloodparticles_hook[2]
+		local updateWaterBlood = bloodparticles_hook[4]
+
+		if isfunction(updateBlood) then updateBlood(fps) end
+		if isfunction(updateWaterBlood) then updateWaterBlood(fps) end
 	end
 end)
 
