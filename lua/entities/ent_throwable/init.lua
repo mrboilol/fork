@@ -415,6 +415,13 @@ function ENT:PhysicsCollide(data, phys)
 	dmginfo:SetDamageForce(data.OurOldVelocity)
 	dmginfo:SetDamageType(damageType)
 	dmginfo:SetDamagePosition(data.HitPos)
+	if hg.Appearance and hg.Appearance.TryAbsorbAccessoryImpact then
+		local impactBody = IsValid(hitEnt) and hitEnt or target
+		local impactRadius = hg.Appearance.GetEntityImpactRadius and hg.Appearance.GetEntityImpactRadius(self) or 0
+		if hg.Appearance.TryAbsorbAccessoryImpact(impactBody, dmginfo, data.HitPos, hitDirection, nil, impactRadius) and hg.EquipmentImpact then
+			hg.EquipmentImpact.ProcessedDamage[dmginfo] = {}
+		end
+	end
 	self.DamageSpent = true
 	target:TakeDamageInfo(dmginfo)
 	local armorStoppedSharp = targetOrganism and targetOrganism.lastArmorSharpStopped

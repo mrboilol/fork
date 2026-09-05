@@ -104,7 +104,7 @@ local function IsDroppableAccessory(accessory)
 	return accessory and accessory.model and accessory.placement and accessory.placement != "none"
 end
 
-function APmodule.TraceAccessoryShot(ent, startPos, endPos, seen, hits)
+function APmodule.TraceAccessoryShot(ent, startPos, endPos, seen, hits, padding)
 	local accessories = ent:GetNetVar("Accessories", {})
 	if !istable(accessories) or table.IsEmpty(accessories) then
 		local wearer = GetAccessoryWearer(ent)
@@ -117,18 +117,32 @@ function APmodule.TraceAccessoryShot(ent, startPos, endPos, seen, hits)
 		if !IsDroppableAccessory(accessory) or seen[key] then continue end
 		local pos, ang, scale = GetAccessoryTransform(ent, accessory)
 		if !pos then continue end
-		local hit = hg.TraceEquipmentModel(accessory[ThatPlyIsFemale(ent) and "femmodel"] or accessory.model, pos, ang, scale, startPos, endPos)
+		local hit = hg.TraceEquipmentModel(accessory[ThatPlyIsFemale(ent) and "femmodel"] or accessory.model, pos, ang, scale, startPos, endPos, padding)
 		if !hit then continue end
 		hit.id, hit.index, hit.data, hit.body, hit.key = accessoryID, index, accessory, ent, key
 		hits[#hits + 1] = hit
 	end
 end
 
-local function FindAccessoryImpact(ent, hitPos, direction)
+function APmodule.GetEntityImpactRadius(ent)
+	if !IsValid(ent) or ent:IsWorld() then return 0 end
+	local mins, maxs = ent:OBBMins(), ent:OBBMaxs()
+	if !isvector(mins) or !isvector(maxs) then return 0 end
+	local extents = {
+		math.max(math.abs(mins.x), math.abs(maxs.x)),
+		math.max(math.abs(mins.y), math.abs(maxs.y)),
+		math.max(math.abs(mins.z), math.abs(maxs.z)),
+	}
+	table.sort(extents)
+	return math.Clamp(extents[2] * math.max(ent:GetModelScale(), 0.01), 0, 5)
+end
+
+local function FindAccessoryImpact(ent, hitPos, direction, impactRadius)
 	if !isvector(hitPos) or !isvector(direction) or direction:LengthSqr() < 0.001 then return end
 	local hits = {}
 	local dir = direction:GetNormalized()
-	APmodule.TraceAccessoryShot(ent, hitPos - dir * 16, hitPos + dir * 0.5, {}, hits)
+	local radius = math.max(tonumber(impactRadius) or 0, 0)
+	APmodule.TraceAccessoryShot(ent, hitPos - dir * (24 + radius), hitPos + dir * 1, {}, hits, radius)
 	table.sort(hits, function(a, b) return a.fraction < b.fraction end)
 	return hits[1]
 end
@@ -163,6 +177,9 @@ local function SpawnAccessoryDrop(accessoryID, accessory, owner, position, force
 		if isvector(force) and force:LengthSqr() > 0 then
 			phys:AddVelocity(force:GetNormalized() * math.Clamp(force:Length() * 0.4, 130, 650))
 		end
+	end
+	if hg.NotifyPickupHistoryDrop then
+		hg.NotifyPickupHistoryDrop(owner, accessory.name or accessoryID)
 	end
 
 	timer.Simple(180, function()
@@ -214,7 +231,7 @@ function APmodule.DropAccessoriesByPlacement(ent, placements, force)
 	return true
 end
 
-function APmodule.TryAbsorbAccessoryImpact(ent, dmgInfo, hitPos, direction, directImpact)
+function APmodule.TryAbsorbAccessoryImpact(ent, dmgInfo, hitPos, direction, directImpact, impactRadius)
 	if !IsValid(ent) or !dmgInfo or !dmgInfo:IsDamageType(accessoryImpactTypes) then return end
 	if hg.EquipmentImpact and hg.EquipmentImpact.ProcessedDamage[dmgInfo] then return end
 
@@ -231,7 +248,13 @@ function APmodule.TryAbsorbAccessoryImpact(ent, dmgInfo, hitPos, direction, dire
 	end
 	if !istable(accessories) then return end
 
-	local impact = directImpact or FindAccessoryImpact(ent, hitPos, direction)
+	if impactRadius == nil and !dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) then
+		local inflictor = dmgInfo:GetInflictor()
+		if IsValid(inflictor) and !inflictor:IsPlayer() and !inflictor:IsWeapon() and !inflictor:IsWorld() then
+			impactRadius = APmodule.GetEntityImpactRadius(inflictor)
+		end
+	end
+	local impact = directImpact or FindAccessoryImpact(ent, hitPos, direction, impactRadius)
 	if !impact then return end
 	accessories = CopyAccessories(accessories)
 	local index = table.KeyFromValue(accessories, impact.id)

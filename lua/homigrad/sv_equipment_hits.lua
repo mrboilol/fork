@@ -27,6 +27,7 @@ impact.Config = {
     dropCooldown = 0.35,
     maxImpulseSpeed = 320,
     inheritedSpeed = 160,
+    weaponHitPadding = 0.65,
     weaponSolidFraction = 0.25,
     weaponMaxThickness = 8,
     defaultHardness = 0.9,
@@ -60,7 +61,7 @@ local function GetGeometry(model)
         end
         if #planes > 0 then geometry.convexes[#geometry.convexes + 1] = planes end
     end
-    if #geometry.convexes == 0 then
+    if #geometry.convexes == 0 and isfunction(probe.SetupBones) and isfunction(probe.GetHitBoxCount) and isfunction(probe.GetHitBoxBone) and isfunction(probe.GetHitBoxBounds) and isfunction(probe.GetBoneMatrix) then
         probe:SetupBones()
         for i = 0, (probe:GetHitBoxCount(0) or 0) - 1 do
             local bone = probe:GetHitBoxBone(i, 0)
@@ -95,7 +96,7 @@ local function ClipConvex(startPos, ray, planes)
     return entry, leave, normal
 end
 
-function hg.TraceEquipmentModel(model, pos, ang, scale, startPos, endPos)
+function hg.TraceEquipmentModel(model, pos, ang, scale, startPos, endPos, padding)
     if not isstring(model) or model == "" then return end
     local geometry = GetGeometry(model)
     if not geometry or not geometry.mins or not geometry.maxs then return end
@@ -103,20 +104,29 @@ function hg.TraceEquipmentModel(model, pos, ang, scale, startPos, endPos)
     local startLocal = WorldToLocal(startPos, angle_zero, pos, ang) / scale
     local endLocal = WorldToLocal(endPos, angle_zero, pos, ang) / scale
     local ray = endLocal - startLocal
+    padding = math.max(tonumber(padding) or 0, 0) / scale
     if ray:LengthSqr() < 0.000001 then return end
-    if not util.IntersectRayWithOBB(startLocal, ray, vector_origin, angle_zero, geometry.mins, geometry.maxs) then return end
+    local paddingVector = Vector(padding, padding, padding)
+    if not util.IntersectRayWithOBB(startLocal, ray, vector_origin, angle_zero, geometry.mins - paddingVector, geometry.maxs + paddingVector) then return end
     local best, exit, normal
     for _, planes in ipairs(geometry.convexes) do
-        local entry, leave, hitNormal = ClipConvex(startLocal, ray, planes)
+        local expandedPlanes = planes
+        if padding > 0 then
+            expandedPlanes = {}
+            for _, plane in ipairs(planes) do
+                expandedPlanes[#expandedPlanes + 1] = {normal = plane.normal, distance = plane.distance + padding}
+            end
+        end
+        local entry, leave, hitNormal = ClipConvex(startLocal, ray, expandedPlanes)
         if entry and (not best or entry < best) then best, exit, normal = entry, leave, hitNormal end
     end
     if #geometry.convexes == 0 then
         local boxes = #geometry.boxes > 0 and geometry.boxes or {{pos = vector_origin, ang = angle_zero, mins = geometry.mins, maxs = geometry.maxs}}
         for _, box in ipairs(boxes) do
-            local hit, hitNormal, entry = util.IntersectRayWithOBB(startLocal, ray, box.pos, box.ang, box.mins, box.maxs)
+            local hit, hitNormal, entry = util.IntersectRayWithOBB(startLocal, ray, box.pos, box.ang, box.mins - paddingVector, box.maxs + paddingVector)
             if hit and (not best or entry < best) then
                 local beyond = hit + ray:GetNormalized() * ((box.maxs - box.mins):Length() + 1)
-                local back = util.IntersectRayWithOBB(beyond, hit - beyond, box.pos, box.ang, box.mins, box.maxs)
+                local back = util.IntersectRayWithOBB(beyond, hit - beyond, box.pos, box.ang, box.mins - paddingVector, box.maxs + paddingVector)
                 best, exit, normal = entry, entry + (back and back:Distance(hit) or 0.1) / ray:Length(), hitNormal
             end
         end
@@ -163,6 +173,11 @@ end
 
 function hg.GetHeldWeaponImpactModel(ply, wep)
     if not IsValid(wep) then return end
+    local frame = FrameNumber()
+    if wep.WorldModel_Transform and wep.HGEquipmentTransformFrame ~= frame then
+        wep.HGEquipmentTransformFrame = frame
+        wep:WorldModel_Transform()
+    end
     local model = wep.worldModel
     if IsValid(model) then return model:GetModel(), model:GetPos(), model:GetAngles(), model:GetModelScale() end
     if wep.NoDrop then return end
@@ -183,7 +198,9 @@ function hg.DropWeaponFromImpact(ply, wep, direction, strength)
     local _, pos, ang = hg.GetHeldWeaponImpactModel(ply, wep)
     pos, ang = pos or wep:GetPos(), ang or wep:GetAngles()
     local body = hg.GetCurrentCharacter(ply)
+    wep.HGImpactDropNotificationPending = true
     hook.Run("PlayerDropWeapon", ply, wep)
+    if IsValid(wep) then wep.HGImpactDropNotificationPending = nil end
     if not IsValid(wep) or IsValid(wep:GetOwner()) then return false end
     ply.hgNextImpactDrop = CurTime() + cfg.dropCooldown
     wep:SetPos(pos)
@@ -196,6 +213,10 @@ function hg.DropWeaponFromImpact(ply, wep, direction, strength)
         local speed = math.Clamp(strength or 0, 0, 1) * cfg.maxImpulseSpeed
         phys:Wake()
         phys:SetVelocity(inherited + dir * speed)
+    end
+    if hg.NotifyPickupHistoryDrop then
+        local name = wep.GetPrintName and wep:GetPrintName() or wep.PrintName or wep:GetClass()
+        hg.NotifyPickupHistoryDrop(ply, name)
     end
     return true
 end
@@ -240,7 +261,15 @@ function hg.TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, origin
     shot = shot or {}
     shot.EquipmentHits = shot.EquipmentHits or {}
     local seen, hits, checkedBodies = shot.EquipmentHits, {}, {}
-    local direction = (endPos - startPos):GetNormalized()
+    local segment = endPos - startPos
+    local segmentLength = segment:Length()
+    local direction = segment / segmentLength
+    local obstructionFraction = 1
+    if originalTrace and originalTrace.Hit and isvector(originalTrace.HitPos) then
+        obstructionFraction = math.Clamp(startPos:Distance(originalTrace.HitPos) / segmentLength, 0, 1)
+    end
+    local cfg = impact.Config
+    local projectileRadius = math.max(tonumber(shot.EquipmentRadius) or 0, 0)
     for _, ply in ipairs(player.GetAll()) do
         if ply == shooter or not ply:Alive() then continue end
         local body = hg.GetCurrentCharacter(ply)
@@ -249,15 +278,18 @@ function hg.TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, origin
         local wep = ply:GetActiveWeapon()
         if IsValid(wep) and not seen[wep] then
             local model, pos, ang, modelScale = hg.GetHeldWeaponImpactModel(ply, wep)
-            local hit = model and hg.TraceEquipmentModel(model, pos, ang, modelScale, startPos, endPos)
-            if hit then hit.weapon, hit.ply, hit.key = wep, ply, wep; hits[#hits + 1] = hit end
+            local hit = model and hg.TraceEquipmentModel(model, pos, ang, modelScale, startPos, endPos, cfg.weaponHitPadding + projectileRadius)
+            if hit and hit.fraction <= obstructionFraction + 0.0001 then hit.weapon, hit.ply, hit.key = wep, ply, wep; hits[#hits + 1] = hit end
         end
         if hg.Appearance and hg.Appearance.TraceAccessoryShot then
-            hg.Appearance.TraceAccessoryShot(body, startPos, endPos, seen, hits)
+            hg.Appearance.TraceAccessoryShot(body, startPos, endPos, seen, hits, projectileRadius)
         end
     end
+    for index = #hits, 1, -1 do
+        if hits[index].fraction > obstructionFraction + 0.0001 then table.remove(hits, index) end
+    end
     table.sort(hits, function(a, b) return a.fraction < b.fraction end)
-    local scale, cfg = 1, impact.Config
+    local scale = 1
     for _, hit in ipairs(hits) do
         seen[hit.key] = true
         if hit.weapon then
@@ -289,7 +321,8 @@ function hg.TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, origin
                 tr.Hit, tr.HitWorld, tr.HitSky = true, false, false
                 tr.Entity, tr.HitPos, tr.HitNormal, tr.Normal = game.GetWorld(), hit.position, hit.normal, direction
                 tr.StartSolid, tr.AllSolid, tr.MatType = false, false, material
-                tr.Fraction = originalTrace.Fraction * hit.fraction
+                local endsAtOriginalHit = originalTrace.Hit and isvector(originalTrace.HitPos) and endPos:DistToSqr(originalTrace.HitPos) < 0.0001
+                tr.Fraction = endsAtOriginalHit and originalTrace.Fraction * hit.fraction or hit.fraction
                 tr.HGEquipmentBlocked, tr.HGEquipmentScale = true, 0
                 return tr
             end

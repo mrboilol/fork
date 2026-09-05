@@ -10,7 +10,7 @@ local typeState = {}
 
 local font = "HomigradFont"
 local color_bg = Color(0, 0, 0, 200)
-local color_outline_def = Color(145, 0, 0, 255)
+local color_outline_def = Color(255, 255, 255, 125)
 local color_text_def = Color(255, 255, 255, 255)
 
 local displayTime = 5
@@ -72,6 +72,14 @@ hook.Add("HUDWeaponPickedUp", "UniversalPickup_Weapon", function(wep)
     local name = language.GetPhrase(wep:GetPrintName() or class)
     AddPickupNotification(name)
     return true
+end)
+
+net.Receive("HG_PickupHistory_Dropped", function()
+    local ply = LocalPlayer()
+    if not IsValid(ply) or not ply:Alive() then return end
+
+    local name = language.GetPhrase(net.ReadString())
+    AddPickupNotification(name, true)
 end)
 
 -- === HUD ОТРИСОВКА ===

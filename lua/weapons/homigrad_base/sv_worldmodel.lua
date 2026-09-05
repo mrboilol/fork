@@ -5,7 +5,7 @@ function SWEP:CreateWorldModel()
 	if not IsValid(model) then return end
 
 	model:SetNoDraw(not hg.show_weapons)
-	model:SetModel(self.WorldModel)
+	model:SetModel(self.WorldModelFake or self.WorldModel)
 	model:SetMaterial("models/wireframe")
 	model:Spawn()
 	timer.Simple(0,function()

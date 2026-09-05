@@ -451,7 +451,8 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 
 			if(SERVER and hg.TraceHeldWeaponShot and not self.PenetratingMaterial)then
 				local speedmul = math.max(len_before / self.StartLen, 0)
-				trace = hg.TraceHeldWeaponShot(hull_trace.start, trace.Hit and trace.HitPos or hull_trace.endpos, self.Shooter, self.Damage * math.sqrt(speedmul), self.Force * speedmul, trace, self) or trace
+				self.EquipmentRadius = self.Size * 0.5
+				trace = hg.TraceHeldWeaponShot(hull_trace.start, hull_trace.endpos, self.Shooter, self.Damage * math.sqrt(speedmul), self.Force * speedmul, trace, self) or trace
 				if trace.HGEquipmentBlocked then
 					self.Pos = trace.HitPos
 					if self.OnStopped then self:OnStopped(trace.HitPos, "equipment", trace) end

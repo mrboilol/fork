@@ -513,6 +513,7 @@ function hg.SetMeleeDamageContact(inflictor, ent, trace, forceHead, trauma)
 		hitPos = trace.HitPos,
 		normal = trace.Normal,
 		hitNormal = trace.HitNormal,
+		impactRadius = math.Clamp(tonumber(inflictor.AccessoryImpactRadius or inflictor.PenetrationSize) or 1, 0, 3),
 		expires = CurTime() + 0.1,
 	}
 end
@@ -1276,7 +1277,8 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	
 	local dmgPos = meleeContact and meleeContact.hitPos or dmgInfo:GetDamagePosition()
 	local accessoryDamage = dmgInfo:GetDamage()
-	if hg.Appearance and hg.Appearance.TryAbsorbAccessoryImpact and hg.Appearance.TryAbsorbAccessoryImpact(ent, dmgInfo, dmgPos, dir) then
+	local impactRadius = meleeContact and meleeContact.impactRadius or nil
+	if hg.Appearance and hg.Appearance.TryAbsorbAccessoryImpact and hg.Appearance.TryAbsorbAccessoryImpact(ent, dmgInfo, dmgPos, dir, nil, impactRadius) then
 		local damageRatio = dmgInfo:GetDamage() / math.max(accessoryDamage, 0.01)
 		dmg = dmgInfo:GetDamage()
 		pen = pen * damageRatio
@@ -2346,7 +2348,9 @@ local function velocityDamage(ent, data)
 	end
 	if RagdollDamageBoneMul[hitgroup] then dmgInfo:ScaleDamage(RagdollDamageBoneMul[hitgroup]) end
 	local accessoryDamage = dmgInfo:GetDamage()
-	if hg.Appearance and hg.Appearance.TryAbsorbAccessoryImpact and hg.Appearance.TryAbsorbAccessoryImpact(ent, dmgInfo, data.HitPos, relativeVelocity) then
+	local collisionEnt = IsValid(data.HitObject) and data.HitObject:GetEntity() or nil
+	local impactRadius = hg.Appearance and hg.Appearance.GetEntityImpactRadius and hg.Appearance.GetEntityImpactRadius(collisionEnt) or 0
+	if hg.Appearance and hg.Appearance.TryAbsorbAccessoryImpact and hg.Appearance.TryAbsorbAccessoryImpact(ent, dmgInfo, data.HitPos, relativeVelocity, nil, impactRadius) then
 		dmg = dmg * (dmgInfo:GetDamage() / math.max(accessoryDamage, 0.01))
 	end
 
