@@ -1270,6 +1270,12 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	end
 	
 	local dmgPos = meleeContact and meleeContact.hitPos or dmgInfo:GetDamagePosition()
+	local accessoryDamage = dmgInfo:GetDamage()
+	if hg.Appearance and hg.Appearance.TryAbsorbAccessoryImpact and hg.Appearance.TryAbsorbAccessoryImpact(ent, dmgInfo, dmgPos, dir) then
+		local damageRatio = dmgInfo:GetDamage() / math.max(accessoryDamage, 0.01)
+		dmg = dmgInfo:GetDamage()
+		pen = pen * damageRatio
+	end
 	local tr
 	if meleeContact then
 		tr = {
@@ -2333,6 +2339,10 @@ local function velocityDamage(ent, data)
 		hitgroup = traceResult.HitGroup
 	end
 	if RagdollDamageBoneMul[hitgroup] then dmgInfo:ScaleDamage(RagdollDamageBoneMul[hitgroup]) end
+	local accessoryDamage = dmgInfo:GetDamage()
+	if hg.Appearance and hg.Appearance.TryAbsorbAccessoryImpact and hg.Appearance.TryAbsorbAccessoryImpact(ent, dmgInfo, data.HitPos, relativeVelocity) then
+		dmg = dmg * (dmgInfo:GetDamage() / math.max(accessoryDamage, 0.01))
+	end
 
 	local org = ent.organism
 	if ent.NoDismembermentPhysics then org.NoDismembermentPhysics = true end

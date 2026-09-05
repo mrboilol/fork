@@ -1,6 +1,7 @@
 if CLIENT then
 	hook.Add("PlayerButtonDown", "hg_inspect_key", function(ply, button)
 		if button ~= KEY_R then return end
+		if IsValid(hg.attachmentsMenuPanel) then return end
 		local wep = ply:GetActiveWeapon()
 		if not IsValid(wep) then return end
 		if wep.IsGP25Active and wep:IsGP25Active() then return end

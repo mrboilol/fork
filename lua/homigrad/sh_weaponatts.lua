@@ -3099,6 +3099,25 @@ local attCategoryNames = {
 }
 hg.attachmentslaunguage = attNames
 hg.attachmentsIcons = attachmentsIcons
+if CLIENT then
+	local filteredAttachmentIcons = {}
+
+	function hg.ShouldFilterAttachmentIcon(iconPath)
+		if filteredAttachmentIcons[iconPath] ~= nil then return filteredAttachmentIcons[iconPath] end
+		local material = Material(iconPath, "smooth mips")
+		local keyValues = material and material:GetKeyValues() or {}
+		local tintKey = keyValues["$color2"] and "$color2" or keyValues["$color"] and "$color"
+		local tint = tintKey and material:GetVector(tintKey)
+		local red = tint and tint.x or 1
+		local green = tint and tint.y or 1
+		local blue = tint and tint.z or 1
+		if red > 1 or green > 1 or blue > 1 then
+			red, green, blue = red / 255, green / 255, blue / 255
+		end
+		filteredAttachmentIcons[iconPath] = green > 0.35 and green > red * 1.35 and green > blue * 1.35
+		return filteredAttachmentIcons[iconPath]
+	end
+end
 local function initAttachments()
 	for possibleAtt, attachments in pairs(hg.attachments) do
 		for attachment, attData in pairs(attachments) do

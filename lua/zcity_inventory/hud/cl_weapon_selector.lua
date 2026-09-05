@@ -223,6 +223,10 @@ local zcity_slot_icon_tint = Color(255, 255, 255, 255)
 local zcity_slot_gradient = Material("vgui/gradient-d")
 local ZCityWeaponIconCache = {}
 
+WS.DialAlpha = WS.DialAlpha or 0
+WS.DialPop = WS.DialPop or 0
+WS.DialAngle = WS.DialAngle or nil
+
 local function ZCityWrapWeaponDescription(text, maxWidth)
     surface.SetFont("ZCity_SuperTiny")
 
@@ -594,6 +598,114 @@ local function ZCityGetSWEPSelectIcon(wep)
     end
 
     return nil
+end
+
+local function ZCityDrawDialIcon(icon, centerX, centerY, width, alpha)
+    if not icon then return end
+
+    local height = icon.boxed and width or width * 0.55
+    local x = math.floor(centerX - width * 0.5)
+    local y = math.floor(centerY - height * 0.5)
+
+    surface.SetDrawColor(0, 0, 0, 185 * alpha)
+    if icon.kind == "material" then
+        surface.SetMaterial(icon.value)
+    else
+        surface.SetTexture(icon.value)
+    end
+    surface.DrawTexturedRect(x + 2, y + 2, width, height)
+
+    surface.SetDrawColor(245, 245, 245, 255 * alpha)
+    if icon.kind == "material" then
+        surface.SetMaterial(icon.value)
+    else
+        surface.SetTexture(icon.value)
+    end
+    surface.DrawTexturedRect(x, y, width, height)
+
+    return x, y, width, height
+end
+
+function WS.DrawDialSelector(ply)
+    local enabled = ZCityGetInventorySystem() == 2 and IsValid(ply) and ply:Alive()
+    local open = enabled and WS.Show > CurTime()
+    local animationSpeed = math.Clamp(FrameTime() * 14, 0, 1)
+    WS.DialAlpha = Lerp(animationSpeed, WS.DialAlpha or 0, open and 1 or 0)
+    WS.DialPop = Lerp(animationSpeed, WS.DialPop or 0, open and 1 or 0)
+
+    if not enabled or WS.DialAlpha < 0.01 then return end
+
+    local weapons = WS.GetWeaponTable(ply)
+    if not weapons then return end
+
+    local occupied = {}
+    local selectedIndex
+    for slot = 0, 5 do
+        local slotWeapons = weapons[slot]
+        if slotWeapons and IsValid(slotWeapons[0]) then
+            occupied[#occupied + 1] = {
+                slot = slot,
+                weapons = slotWeapons
+            }
+            if slot == WS.SelectedSlot then selectedIndex = #occupied end
+        end
+    end
+
+    if #occupied == 0 then return end
+    if not selectedIndex then
+        selectedIndex = 1
+        WS.SelectedSlot = occupied[1].slot
+        WS.SelectedSlotPos = 0
+    end
+
+    local step = 360 / #occupied
+    local focusAngle = 135
+    local targetAngle = focusAngle - (selectedIndex - 1) * step
+    if WS.DialAngle == nil then
+        WS.DialAngle = targetAngle
+    else
+        WS.DialAngle = WS.DialAngle + math.AngleDifference(targetAngle, WS.DialAngle) * math.Clamp(FrameTime() * 11, 0, 1)
+    end
+
+    local uiScale = math.Clamp(ScrH() / 1080, 0.75, 1.1)
+    local popScale = Lerp(WS.DialPop, 0.82, 1)
+    local centerX = ScrW() - 112 * uiScale
+    local centerY = ScrH() - 112 * uiScale
+    local radius = 59 * uiScale * popScale
+    local alpha = WS.DialAlpha
+
+    local function drawSlot(data, focused)
+        local slotPosition
+        for index, candidate in ipairs(occupied) do
+            if candidate == data then
+                slotPosition = index
+                break
+            end
+        end
+
+        local angle = math.rad(WS.DialAngle + (slotPosition - 1) * step)
+        local x = centerX + math.cos(angle) * radius
+        local y = centerY + math.sin(angle) * radius
+        local slotAlpha = alpha * (focused and 1 or 0.48)
+        local iconWidth = (focused and 68 or 48) * uiScale * popScale
+        local selectedPosition = math.Clamp(WS.SelectedSlotPos or 0, 0, #data.weapons)
+        local wep = focused and (data.weapons[selectedPosition] or data.weapons[0]) or data.weapons[0]
+        local iconX, iconY, iconW, iconH = ZCityDrawDialIcon(ZCityGetSWEPSelectIcon(wep), x, y, iconWidth, slotAlpha)
+
+        draw.SimpleTextOutlined(tostring(data.slot + 1), "ZCity_SuperTiny", x - iconWidth * 0.52, y - iconWidth * 0.45, Color(245, 245, 245, 255 * slotAlpha), TEXT_ALIGN_RIGHT, TEXT_ALIGN_BOTTOM, 1, Color(0, 0, 0, 220 * slotAlpha))
+
+        local additional = #data.weapons
+        if additional > 0 then
+            local badgeX = iconX and (iconX + iconW) or (x + iconWidth * 0.5)
+            local badgeY = iconY and (iconY + iconH) or (y + iconWidth * 0.3)
+            draw.SimpleTextOutlined("+" .. additional, "ZCity_SuperTiny", badgeX, badgeY, Color(245, 245, 245, 255 * slotAlpha), TEXT_ALIGN_RIGHT, TEXT_ALIGN_BOTTOM, 1, Color(0, 0, 0, 235 * slotAlpha))
+        end
+    end
+
+    for _, data in ipairs(occupied) do
+        if data.slot ~= WS.SelectedSlot then drawSlot(data, false) end
+    end
+    drawSlot(occupied[selectedIndex], true)
 end
 
 local function ZCityDrawOutlinedBox(x, y, w, h, outlineWidth)
@@ -1028,15 +1140,21 @@ end
 
 function WS.ChangeSelectionWep( ply, key, pressed, code )
     local inventorySystem = ZCityGetInventorySystem()
-    if inventorySystem == 1 then
+    if inventorySystem == 1 or inventorySystem == 2 then
         ZCityResetSlotHold(false)
-        if SimpleSelector.Change then
-            return SimpleSelector.Change(ply, key, pressed, code)
+        if pressed == false then
+            if inventorySystem == 2 and (tAcceptKeys[key] or key == "invnext" or key == "invprev" or key == "lastinv") then
+                return true
+            end
+            return
         end
-        return
-    elseif inventorySystem ~= 0 then
-        ZCityResetSlotHold(false)
-        if tAcceptKeys[key] or key == "invnext" or key == "invprev" or key == "lastinv" then return true end
+        if SimpleSelector.Change then
+            local result = SimpleSelector.Change(ply, key, pressed, code)
+            if inventorySystem == 2 and (tAcceptKeys[key] or key == "invnext" or key == "invprev" or key == "lastinv") then
+                return true
+            end
+            return result
+        end
         return
     end
 
@@ -1132,7 +1250,7 @@ end
 
 function WS.SetActuallyWeapon( ply, cmd )
     local inventorySystem = ZCityGetInventorySystem()
-    if inventorySystem == 1 then
+    if inventorySystem == 1 or inventorySystem == 2 then
         ZCityResetSlotHold(false)
         if SimpleSelector.Select then return SimpleSelector.Select(ply, cmd) end
         return
@@ -1191,6 +1309,7 @@ hook.Add( "PlayerBindPress", "WeaponSelector_PlayerBindPress", WS.ChangeSelectio
 hook.Add( "HUDPaint", "WeaponSelector_Draw", function()
     WS.WeaponSelectorDraw( LocalPlayer() )
     WS.DrawBodySlotSelector( LocalPlayer() )
+    WS.DrawDialSelector( LocalPlayer() )
 end)
 
 hook.Add( "StartCommand", "WeaponSelector_StartCommand", WS.SetActuallyWeapon )

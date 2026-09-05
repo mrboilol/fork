@@ -197,6 +197,12 @@ local function getRateOutput(heartbeat)
 	return math.Clamp(normalizedRate * fillingCompensation * fastFillingLoss, 0, 1.35)
 end
 
+function hg.organism.GetPulseOxygenPerfusion(pulse)
+	local normalizedPulse = Clamp((tonumber(pulse) or 0) / 70, 0, 1)
+	local curve = 0.8
+	return (1 - math.exp(-curve * normalizedPulse)) / (1 - math.exp(-curve))
+end
+
 local function getPalpablePulseTarget(org, heartbeat, circulation, hemorrhageCompensation, effectivePalpitations)
 	local cfg = hg.organism.config or {}
 	local rate = math.Clamp(tonumber(heartbeat) or 0, 0, terminalHeartRate)
@@ -237,7 +243,7 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	local o2Range = math.max(tonumber(org.o2.range) or 30, 1)
 	local oxygenReserve = Clamp((tonumber(org.o2[1]) or 0) / o2Range, 0, 1)
 	local circulation = Clamp(tonumber(org.cardiacOutput) or 0, 0, 1)
-	local pulseReserve = Clamp((tonumber(org.pulse) or 0) / 70, 0, 1)
+	local pulseReserve = hg.organism.GetPulseOxygenPerfusion(org.pulse)
 	-- A slow or weak palpable pulse means tissue is not receiving enough
 	-- effective beats, even when stored oxygen and nominal cardiac output have
 	-- not caught up yet. Blood volume reaches O2 through this circulation path.

@@ -11,7 +11,7 @@ local inventorySystem = GetConVar("hg_invsystem") or CreateConVar(
 	"hg_invsystem",
 	1,
 	{FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_SERVER_CAN_EXECUTE},
-	"Inventory system: 0 = body/backpack, 1 = simple selector, 2 = radial",
+	"Inventory system: 0 = body/backpack, 1 = simple selector, 2 = compact dial",
 	0,
 	2
 )
@@ -19,7 +19,7 @@ local inventorySystem = GetConVar("hg_invsystem") or CreateConVar(
 local function SyncInventorySystem()
 	local mode = math.Clamp(inventorySystem:GetInt(), 0, 2)
 	SetGlobalInt("InventorySystem", mode)
-	SetGlobalBool("RadialInventory", mode == 2)
+	SetGlobalBool("RadialInventory", false)
 end
 
 cvars.AddChangeCallback("hg_invsystem", SyncInventorySystem, "HomigradInventorySystem")

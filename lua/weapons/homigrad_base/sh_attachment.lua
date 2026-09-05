@@ -1648,7 +1648,7 @@ if CLIENT then
 			frame:ShowCloseButton(false)
 			frame:MakePopup()
 			frame:SetKeyboardInputEnabled(true)
-			frame.escapeWasDown = input.IsKeyDown(KEY_ESCAPE)
+			frame.rWasDown = input.IsKeyDown(KEY_R)
 			frame.Paint = function(self, w, h)
 				hg.DrawBlur(self, 2)
 				surface.SetDrawColor(attMenuFill)
@@ -1659,7 +1659,7 @@ if CLIENT then
 				surface.SetDrawColor(attMenuOutline)
 				surface.DrawOutlinedRect(0, 0, w, h, 1)
 				drawAttachmentText("INVENTORY ATTACHMENTS", "HG_Attachment_Title", w * 0.5, attachmentPx(20), menuText, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-				drawAttachmentText("LMB: DROP FROM INVENTORY", "HG_Attachment_Small", w * 0.5, h - attachmentPx(16), menuMuted, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+				drawAttachmentText("LMB: DROP FROM INVENTORY     R: CLOSE", "HG_Attachment_Small", w * 0.5, h - attachmentPx(16), menuMuted, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 			end
 
 			local scroll = vgui.Create("DScrollPanel", frame)
@@ -1713,13 +1713,13 @@ if CLIENT then
 			buildList()
 
 			function frame:Think()
-				local escapeDown = input.IsKeyDown(KEY_ESCAPE)
-				if escapeDown and not self.escapeWasDown then self:Close() return end
-				self.escapeWasDown = escapeDown
+				local rDown = input.IsKeyDown(KEY_R)
+				if rDown and not self.rWasDown then self:Close() return end
+				self.rWasDown = rDown
 			end
 
 			function frame:OnKeyCodePressed(key)
-				if key == KEY_ESCAPE then self:Close() end
+				if key == KEY_R then self:Close() end
 			end
 
 			function frame:OnRemove()
@@ -1744,7 +1744,7 @@ if CLIENT then
 		frame.pendingUntil = 0
 		frame.availableSlots = {}
 		frame.openedAt = RealTime()
-		frame.escapeWasDown = input.IsKeyDown(KEY_ESCAPE)
+		frame.rWasDown = input.IsKeyDown(KEY_R)
 		for _, placement in ipairs(slotOrder) do
 			if wep.availableAttachments[placement] or placement == "underbarrel" and wep.availableAttachments.gp25 then
 				frame.availableSlots[#frame.availableSlots + 1] = placement
@@ -1768,7 +1768,7 @@ if CLIENT then
 			surface.SetDrawColor(0, 0, 0, 105)
 			surface.DrawRect(0, 0, w, h)
 
-			drawAttachmentText("LMB  EQUIP / REMOVE     RMB  DROP FROM INVENTORY", "HG_Attachment_Small", w * 0.5, h * 0.95, menuMuted, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			drawAttachmentText("LMB  EQUIP / REMOVE     RMB  DROP FROM INVENTORY     R  CLOSE", "HG_Attachment_Small", w * 0.5, h * 0.95, menuMuted, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 
 			local view = hg.LastMainRenderView or render.GetViewSetup(true)
 			local minX, minY = 4, 4
@@ -1815,22 +1815,6 @@ if CLIENT then
 				section:SetPos(immediate and targetX or Lerp(openProgress, startX, targetX), targetY)
 			end
 		end
-
-		local closeButton = vgui.Create("DButton", frame)
-		closeButton:SetText("")
-		closeButton:SetSize(attachmentPx(42), attachmentPx(42))
-		closeButton:SetPos(ScrW() - attachmentPx(66), attachmentPx(24))
-		closeButton.Paint = function(self, w, h)
-			local accent = getMenuAccent()
-			self.hover = Lerp(FrameTime() * 12, self.hover or 0, self:IsHovered() and 1 or 0)
-			surface.SetDrawColor(getMenuPanel(132 + self.hover * 80))
-			surface.DrawRect(0, 0, w, h)
-			surface.SetDrawColor(accent.r, accent.g, accent.b, 70 + self.hover * 80)
-			surface.DrawOutlinedRect(0, 0, w, h, 1)
-			if self.hover > 0.05 then drawSelectorCorners(0, 0, w, h, accent, self.hover * 180) end
-			drawAttachmentText("X", "HG_Attachment_Label", w * 0.5, h * 0.5, menuText, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-		end
-		closeButton.DoClick = function() frame:Close() end
 
 		function frame:RunAttachmentAction(action, id)
 			if CurTime() < self.pendingUntil then return end
@@ -2043,12 +2027,20 @@ if CLIENT then
 				card.Paint = function(button, w, h)
 					local accent = getMenuAccent()
 					button.hover = Lerp(FrameTime() * 14, button.hover or 0, button:IsHovered() and 1 or 0)
-					surface.SetDrawColor(getMenuPanel(isInstalled and 235 or 205 + button.hover * 30))
+					if isInstalled then
+						surface.SetDrawColor(112, 112, 112, 235)
+					else
+						surface.SetDrawColor(getMenuPanel(205 + button.hover * 30))
+					end
 					surface.DrawRect(0, 0, w, h)
-					surface.SetDrawColor(accent.r, accent.g, accent.b, isInstalled and 190 or 65 + button.hover * 65)
+					if isInstalled then
+						surface.SetDrawColor(190, 190, 190, 220)
+					else
+						surface.SetDrawColor(accent.r, accent.g, accent.b, 65 + button.hover * 65)
+					end
 					surface.DrawOutlinedRect(0, 0, w, h, isInstalled and 2 or 1)
 					if isInstalled or button.hover > 0.05 then
-						drawSelectorCorners(0, 0, w, h, accent, isInstalled and 185 or button.hover * 150)
+						drawSelectorCorners(0, 0, w, h, isInstalled and Color(210, 210, 210) or accent, isInstalled and 185 or button.hover * 150)
 					end
 					if isInstalled then
 						drawAttachmentText("ACTIVE", "HG_Attachment_Micro", attachmentPx(5), attachmentPx(5), menuMuted, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
@@ -2071,7 +2063,7 @@ if CLIENT then
 				end
 
 				local iconPath = hg.attachmentsIcons[id]
-				if isstring(iconPath) and iconPath ~= "" then
+				if isstring(iconPath) and iconPath ~= "" and (not hg.ShouldFilterAttachmentIcon or not hg.ShouldFilterAttachmentIcon(iconPath)) then
 					local icon = vgui.Create("DImage", card)
 					icon:SetImage(iconPath)
 					icon:SetKeepAspect(true)
@@ -2214,12 +2206,12 @@ if CLIENT then
 				return
 			end
 
-			local escapeDown = input.IsKeyDown(KEY_ESCAPE)
-			if escapeDown and not self.escapeWasDown then
+			local rDown = input.IsKeyDown(KEY_R)
+			if rDown and not self.rWasDown then
 				self:Close()
 				return
 			end
-			self.escapeWasDown = escapeDown
+			self.rWasDown = rDown
 
 			if self.inspectSequence and self.weapon.seq == self.inspectSequence and CurTime() >= self.inspectStarted + self.inspectDuration * inspectFreezeFraction then
 				self.weapon.animtime = CurTime() + self.inspectDuration * (1 - inspectFreezeFraction)
@@ -2237,7 +2229,7 @@ if CLIENT then
 		end
 
 		function frame:OnKeyCodePressed(key)
-			if key == KEY_ESCAPE then self:Close() end
+			if key == KEY_R then self:Close() end
 		end
 
 		function frame:OnRemove()

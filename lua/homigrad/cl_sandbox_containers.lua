@@ -5,7 +5,7 @@ hg = hg or {}
 net.Receive("hg_sandbox_container_open", function()
 	local ent = net.ReadEntity()
 	local loot = net.ReadTable()
-	net.ReadUInt(2) -- Legacy hand-placement mode; the shared grid is centered.
+	net.ReadUInt(2)
 	if not IsValid(ent) then return end
 
 	hg.OpenedContainer = ent

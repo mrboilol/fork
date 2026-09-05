@@ -5,7 +5,7 @@ end
 
 function ENT:OnRemove()
 	if IsValid(hg and hg.ContainerLootMenu) and hg.ContainerLootMenu.ent == self then
-		hg.ContainerLootMenu:Remove()
+		hg.ContainerLootMenu:Close()
 	end
 end
 

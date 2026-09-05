@@ -108,6 +108,9 @@ if CLIENT then
 
 		if tab == "Attachments" and hg.attachmentsIcons[thing] then
 			local AttIcon = hg.attachmentsIcons[thing]
+			if hg.ShouldFilterAttachmentIcon and hg.ShouldFilterAttachmentIcon(AttIcon) then
+				return nil, false, false, true
+			end
 			local HaveIcon = true
 			return AttIcon, HaveIcon, false, true
 		end

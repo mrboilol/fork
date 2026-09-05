@@ -972,7 +972,7 @@ module[2] = function(owner, org, timeValue)
 	-- then the resulting delivery failure drains O2.
 	local tissuePerfusion = math.min(
 		math.Clamp(org.cardiacOutput or 1, 0, 1),
-		math.Clamp((org.pulse or 0) / 70, 0, 1)
+		hg.organism.GetPulseOxygenPerfusion(org.pulse)
 	)
 	-- Tissue oxygen is a delivered value, not an independent reservoir. With no
 	-- perfusion there is no delivery, so its cap must be zero as well.

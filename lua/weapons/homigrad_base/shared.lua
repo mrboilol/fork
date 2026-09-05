@@ -2472,9 +2472,9 @@ function SWEP:GetAdditionalValues()
 		local restMul = self:IsResting() and 0.35 or 1
 		local burstMul = 0.85 + math.Clamp((self.SprayI or 0) / 7, 0, 1) * 0.65
 		local physicalImpulse = math.Clamp(caliberMul * weightMul * supportMul * handlingMul * experienceMul * 1.2, 0.3, 5.5)
-		local recoveryRate = math.Clamp(0.095 / (1 + armInjury * 0.85 + weaponMass * 0.1 + (support.oneHanded and 0.5 or 0)), 0.018, 0.08)
-		local wobbleTarget = firing and physicalImpulse * burstMul * stanceMul * restMul or 0
-		self.recoilWobbleAmp = Lerp(hg.lerpFrameTime2(firing and 0.42 or recoveryRate, dtime), self.recoilWobbleAmp or 0, wobbleTarget)
+		local recoveryRate = math.Clamp(0.32 / (1 + armInjury * 0.35 + weaponMass * 0.04 + (support.oneHanded and 0.2 or 0)), 0.14, 0.28)
+		local wobbleTarget = firing and math.min(physicalImpulse * burstMul * stanceMul * restMul, 2.2) or 0
+		self.recoilWobbleAmp = Lerp(hg.lerpFrameTime2(firing and 0.32 or recoveryRate, dtime), self.recoilWobbleAmp or 0, wobbleTarget)
 
 		if (self.recoilWobbleAmp or 0) > 0.0001 then
 			local t = CurTime()
@@ -3176,7 +3176,7 @@ end
 hook.Add( "EntityEmitSound", "WeaponDropSound", function( t )
 	--print(string.find(t.SoundName,"physics/metal/weapon_impact_*"))
 	if string.find(t.SoundName,"physics/metal/weapon_impact_*") then
-		t.SoundName = "weapon_impact_soft"..math_random(1,3)..".ogg"
+		t.SoundName = "weapon_impact_soft"..math_random(1,3)..".wav"
 		t.Pitch = t.Pitch - 10
 		return true
 	end 

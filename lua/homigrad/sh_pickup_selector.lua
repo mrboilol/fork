@@ -227,8 +227,13 @@ hook.Add("PreDrawHalos", "HG_HighlightPickupCandidates", function()
 	if not IsValid(ply) or not ply:Alive() or altGlowAlpha <= 0 then return end
 
 	scanNearbyPickups(ply)
-	if #nearbyInteractables > 0 then
-		halo.Add(nearbyInteractables, Color(255, 210, 80, math.Round(255 * altGlowAlpha)), 2, 2, 1, true, false)
+	local eyePos = ply:EyePos()
+	for _, ent in ipairs(nearbyInteractables) do
+		local distance = eyePos:Distance(ent:NearestPoint(eyePos))
+		local proximity = math.Clamp(1 - distance / PICKUP_RANGE, 0, 1)
+		local intensity = 0.3 + proximity * 0.7
+
+		halo.Add({ent}, Color(255 * intensity, 210 * intensity, 80 * intensity, math.Round(255 * altGlowAlpha)), 2, 2, 1, true, false)
 	end
 end)
 
