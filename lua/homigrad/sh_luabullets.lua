@@ -375,6 +375,7 @@ end
 local function Damage(bDoDebugHit, bStartedInWater, bEndNotWater, iFlags, iDamage, iPlayerDamage, iNPCDamage, iAmmoDamage, pAttacker, pInflictor,
 	iAmmoDamageType, tr, Weapon, vShotDir, flAmmoForce, flForce, flPhysPush, iAmmoType, vSrc, fCallback, bFirstTimePredicted, bDrop, sImpactEffect, sRagdollImpactEffect, tInfo)
 	
+	if tr.HGEquipmentBlocked then return end
 	local vHitPos = tr.HitPos
 	local pEntity = tr.Entity
 	
@@ -425,6 +426,10 @@ local function Damage(bDoDebugHit, bStartedInWater, bEndNotWater, iFlags, iDamag
 			info:SetDamageForce(vShotDir * flAmmoForce * flForce * flPhysPush)
 			info:SetAmmoType(iAmmoType)
 			info:SetReportedPosition(vSrc)
+			local equipmentScale = tr.HGEquipmentScale or 1
+			info:ScaleDamage(equipmentScale)
+			info:SetDamageForce(info:GetDamageForce() * (tr.HGEquipmentForceScale or equipmentScale))
+			if SERVER and tr.HGEquipmentProcessed and hg.EquipmentImpact then hg.EquipmentImpact.ProcessedDamage[info] = {penetration = tr.HGEquipmentPenetration} end
 			
 			if (fCallback) then
 				fCallback(info:GetAttacker(), tr, info, tInfo, Weapon)
@@ -731,10 +736,6 @@ function ENTITY:FireLuaBullets(tInfo)
 					filter = Filter
 				})
 
-			if SERVER and hg.TraceHeldWeaponShot then
-				tr = hg.TraceHeldWeaponShot(vNewSrc, tr.Hit and tr.HitPos or vEnd, pAttacker, iDamage, flForce, tr) or tr
-			end
-			
 			local tries = 50
 			while (tries > 0 and IsValid(tr.Entity) and tr.Entity.organism) do
 				local ent = tr.Entity
@@ -775,6 +776,10 @@ function ENTITY:FireLuaBullets(tInfo)
 				--print(tr.Entity, tr.HitGroup, hitgroup, tr.PhysicsBone, tr.StartSolid)
 			end
 
+			if SERVER and hg.TraceHeldWeaponShot then
+				local equipmentDamage = iDamage ~= 0 and iDamage or (bIsPlayer and iAmmoPlayerDamage or iAmmoNPCDamage)
+				tr = hg.TraceHeldWeaponShot(vNewSrc, tr.Hit and tr.HitPos or vEnd, pAttacker, equipmentDamage, flForce, tr, {Penetration = tInfo.Penetration}) or tr
+			end
 			local data = {}
 			data.Trace = tr
 			data.AmmoType = tInfo.AmmoType
@@ -1099,6 +1104,7 @@ function PLAYER:FireCSSBullets(tInfo)
 		
 		-- Loop values
 		local flCurrentDamage = iDamage	// damage of the bullet at it's current trajectory
+		local equipmentShot = {Penetration = flPenetrationPower}
 		local flCurrentPlayerDamage = iPlayerDamage
 		local flCurrentNPCDamage = iNPCDamage
 		local flCurrentDistance = 0	// distance that the bullet has traveled so far
@@ -1135,6 +1141,19 @@ function PLAYER:FireCSSBullets(tInfo)
 					filter = Filter
 				})
 			
+			if SERVER and hg.TraceHeldWeaponShot then
+				equipmentShot.Penetration = flPenetrationPower
+				tr = hg.TraceHeldWeaponShot(vNewSrc, tr.Hit and tr.HitPos or vEnd, pAttacker, flCurrentDamage, flForce, tr, equipmentShot) or tr
+				local equipmentScale = tr.HGEquipmentScale or 1
+				equipmentShot.ForceScale = (equipmentShot.ForceScale or 1) * equipmentScale
+				tr.HGEquipmentForceScale = equipmentShot.ForceScale
+				if equipmentShot.EquipmentPenetration then flPenetrationPower = math.min(flPenetrationPower, equipmentShot.EquipmentPenetration) end
+				flCurrentDamage = flCurrentDamage * equipmentScale
+				flCurrentPlayerDamage = flCurrentPlayerDamage * equipmentScale
+				flCurrentNPCDamage = flCurrentNPCDamage * equipmentScale
+				tr.HGEquipmentScale = 1
+				if tr.HGEquipmentBlocked then vFinalHit = tr.HitPos; break end
+			end
 			// Check for player hitboxes extending outside their collision bounds
 			--util.ClipTraceToPlayers(tr, vNewSrc, vEnd + vShotDir * flHitboxTolerance, Filter, iMask)
 			

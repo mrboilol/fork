@@ -25,6 +25,17 @@ local function SyncInventoryAccessoryEffects(ply, accessories)
 end
 
 local accessoryImpactTypes = DMG_BULLET + DMG_BUCKSHOT + DMG_CLUB + DMG_SLASH + DMG_CRUSH + DMG_FALL
+APmodule.ImpactConfig = {
+	minDamage = 10,
+	fullDamage = 55,
+	dropChance = 0.18,
+	severityChance = 0.56,
+	bulletChance = 0.2,
+	absorption = 0.06,
+	severityAbsorption = 0.08,
+	dropAbsorption = 0.23,
+	dropSeverityAbsorption = 0.13,
+}
 
 local function CopyAccessories(accessories)
 	return istable(accessories) and table.Copy(accessories) or {}
@@ -73,6 +84,10 @@ local function GetAccessoryTransform(ent, accessory)
 
 	local bone = ent:LookupBone(accessory.bone or "ValveBiped.Bip01_Head1")
 	if !bone then return end
+	if ent:GetManipulateBoneScale(bone):LengthSqr() < 0.1 then return end
+	local limb = hg.amputatedlimbs2 and hg.amputatedlimbs2[accessory.bone]
+	if limb and ent.organism and ent.organism[limb .. "amputated"] then return end
+	if ent.armors and ent.armors[accessory.placement] then return end
 
 	local matrix = ent:GetBoneMatrix(bone)
 	if !matrix then return end
@@ -89,95 +104,33 @@ local function IsDroppableAccessory(accessory)
 	return accessory and accessory.model and accessory.placement and accessory.placement != "none"
 end
 
-local accessoryModelBounds = {}
-
-local function GetAccessoryModelBounds(model)
-	if !isstring(model) then return end
-
-	local cached = accessoryModelBounds[model]
-	if cached then return cached.mins, cached.maxs end
-
-	local mins, maxs
-	if isfunction(util.GetModelBounds) then
-		mins, maxs = util.GetModelBounds(model)
+function APmodule.TraceAccessoryShot(ent, startPos, endPos, seen, hits)
+	local accessories = ent:GetNetVar("Accessories", {})
+	if !istable(accessories) or table.IsEmpty(accessories) then
+		local wearer = GetAccessoryWearer(ent)
+		accessories = IsValid(wearer) and wearer:GetNetVar("Accessories", {}) or {}
 	end
-
-	if !mins or !maxs then
-		local probe = ents.Create("base_anim")
-		if IsValid(probe) then
-			probe:SetModel(model)
-			mins, maxs = probe:GetModelBounds()
-			probe:Remove()
-		end
-	end
-
-	accessoryModelBounds[model] = {mins = mins, maxs = maxs}
-	return mins, maxs
-end
-
-local function FindAccessoryImpact(ent, accessories, hitPos, direction)
-	if !isvector(hitPos) or !isvector(direction) or direction:LengthSqr() <= 0.001 then return end
-
-	local rayDirection = direction:GetNormalized() * 128
-	local rayStart = hitPos - rayDirection * 0.5
-	local nearest
-
+	if !istable(accessories) then return end
 	for index, accessoryID in pairs(accessories) do
 		local accessory = hg.Accessories[accessoryID]
-		if !IsDroppableAccessory(accessory) then continue end
-
+		local key = tostring(ent:EntIndex()) .. ":" .. tostring(accessoryID)
+		if !IsDroppableAccessory(accessory) or seen[key] then continue end
 		local pos, ang, scale = GetAccessoryTransform(ent, accessory)
 		if !pos then continue end
-
-		local mins, maxs = GetAccessoryModelBounds(accessory[ThatPlyIsFemale(ent) and "femmodel"] or accessory.model)
-		if !mins or !maxs then continue end
-
-		local impactPos = util.IntersectRayWithOBB(rayStart, rayDirection, pos, ang, mins * scale, maxs * scale)
-		if !impactPos then continue end
-
-		local distance = impactPos:DistToSqr(rayStart)
-		if !nearest or distance < nearest.distance then
-			nearest = {
-				id = accessoryID,
-				index = index,
-				data = accessory,
-				position = impactPos,
-				distance = distance,
-			}
-		end
+		local hit = hg.TraceEquipmentModel(accessory[ThatPlyIsFemale(ent) and "femmodel"] or accessory.model, pos, ang, scale, startPos, endPos)
+		if !hit then continue end
+		hit.id, hit.index, hit.data, hit.body, hit.key = accessoryID, index, accessory, ent, key
+		hits[#hits + 1] = hit
 	end
-
-	return nearest
 end
 
-local function FindHeadAccessoryImpact(ent, accessories, hitPos)
-	if !isvector(hitPos) then return end
-
-	local headBone = ent:LookupBone("ValveBiped.Bip01_Head1")
-	local headMatrix = headBone and ent:GetBoneMatrix(headBone)
-	if !headMatrix or hitPos:DistToSqr(headMatrix:GetTranslation()) > 34 ^ 2 then return end
-
-	local nearest
-	for index, accessoryID in pairs(accessories) do
-		local accessory = hg.Accessories[accessoryID]
-		if !IsDroppableAccessory(accessory) or (accessory.placement != "head" and accessory.placement != "ears") then continue end
-
-		local pos = GetAccessoryTransform(ent, accessory)
-		if pos then
-			local distance = pos:DistToSqr(hitPos)
-			if !nearest or distance < nearest.distance then
-				nearest = {
-					id = accessoryID,
-					index = index,
-					data = accessory,
-					position = pos,
-					distance = distance,
-				}
-			end
-		end
-	end
-
-	return nearest
+local function FindAccessoryImpact(ent, hitPos, direction)
+	if !isvector(hitPos) or !isvector(direction) or direction:LengthSqr() < 0.001 then return end
+	local hits = {}
+	local dir = direction:GetNormalized()
+	APmodule.TraceAccessoryShot(ent, hitPos - dir * 16, hitPos + dir * 0.5, {}, hits)
+	table.sort(hits, function(a, b) return a.fraction < b.fraction end)
+	return hits[1]
 end
 
 local function SpawnAccessoryDrop(accessoryID, accessory, owner, position, force)
@@ -261,11 +214,13 @@ function APmodule.DropAccessoriesByPlacement(ent, placements, force)
 	return true
 end
 
-function APmodule.TryAbsorbAccessoryImpact(ent, dmgInfo, hitPos, direction)
+function APmodule.TryAbsorbAccessoryImpact(ent, dmgInfo, hitPos, direction, directImpact)
 	if !IsValid(ent) or !dmgInfo or !dmgInfo:IsDamageType(accessoryImpactTypes) then return end
+	if hg.EquipmentImpact and hg.EquipmentImpact.ProcessedDamage[dmgInfo] then return end
 
+	local cfg = APmodule.ImpactConfig
 	local damage = dmgInfo:GetDamage()
-	if damage < 10 then return end
+	if damage < cfg.minDamage then return end
 
 	local wearer = GetAccessoryWearer(ent)
 	if !IsValid(wearer) then return end
@@ -276,23 +231,23 @@ function APmodule.TryAbsorbAccessoryImpact(ent, dmgInfo, hitPos, direction)
 	end
 	if !istable(accessories) then return end
 
-	local impact = FindAccessoryImpact(ent, accessories, hitPos, direction)
-	if !impact and damage >= 24 then
-		impact = FindHeadAccessoryImpact(ent, accessories, hitPos)
-	end
+	local impact = directImpact or FindAccessoryImpact(ent, hitPos, direction)
 	if !impact then return end
+	accessories = CopyAccessories(accessories)
+	local index = table.KeyFromValue(accessories, impact.id)
+	if !index then return end
 
-	local severity = math.Clamp((damage - 10) / 55, 0, 1)
-	local absorbed = 0.06 + severity * 0.08
-	local dropChance = 0.18 + severity * 0.56
-	if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) then dropChance = dropChance + 0.2 end
+	local severity = math.Clamp((damage - cfg.minDamage) / cfg.fullDamage, 0, 1)
+	local absorbed = cfg.absorption + severity * cfg.severityAbsorption
+	local dropChance = cfg.dropChance + severity * cfg.severityChance
+	if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) then dropChance = dropChance + cfg.bulletChance end
 
 	if math.Rand(0, 1) <= dropChance then
-		absorbed = 0.23 + severity * 0.13
-		if isnumber(impact.index) then
-			table.remove(accessories, impact.index)
+		absorbed = cfg.dropAbsorption + severity * cfg.dropSeverityAbsorption
+		if isnumber(index) then
+			table.remove(accessories, index)
 		else
-			accessories[impact.index] = nil
+			accessories[index] = nil
 		end
 		SyncAccessories(wearer, accessories)
 		SpawnAccessoryDrop(impact.id, impact.data, wearer, impact.position, direction)

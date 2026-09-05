@@ -449,8 +449,22 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 				trace = util.TraceHull(hull_trace)
 			end
 
-			if(SERVER and hg.TraceHeldWeaponShot)then
-				trace = hg.TraceHeldWeaponShot(hull_trace.start, trace.Hit and trace.HitPos or hull_trace.endpos, self.Shooter, self.Damage, self.Force, trace) or trace
+			if(SERVER and hg.TraceHeldWeaponShot and not self.PenetratingMaterial)then
+				local speedmul = math.max(len_before / self.StartLen, 0)
+				trace = hg.TraceHeldWeaponShot(hull_trace.start, trace.Hit and trace.HitPos or hull_trace.endpos, self.Shooter, self.Damage * math.sqrt(speedmul), self.Force * speedmul, trace, self) or trace
+				if trace.HGEquipmentBlocked then
+					self.Pos = trace.HitPos
+					if self.OnStopped then self:OnStopped(trace.HitPos, "equipment", trace) end
+					self:Die()
+					return
+				end
+				local equipmentScale = trace.HGEquipmentScale or 1
+				if equipmentScale < 1 then
+					self.Damage = self.Damage * equipmentScale ^ 0.75
+					len_before = len_before * math.sqrt(equipmentScale)
+					len = len * math.sqrt(equipmentScale)
+					self.Vel = dir * len_before
+				end
 			end
 			
 			trace_hit = trace.Hit
@@ -583,6 +597,7 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 							dmg:SetInflictor(Entity(0))
 						end
 
+						if trace.HGEquipmentProcessed and hg.EquipmentImpact then hg.EquipmentImpact.ProcessedDamage[dmg] = {penetration = trace.HGEquipmentPenetration} end
 						trace.Entity:DispatchTraceAttack(dmg, trace, dir)
 
 						if(trace.Entity.organism)then

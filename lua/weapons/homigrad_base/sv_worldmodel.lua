@@ -19,6 +19,7 @@ function SWEP:CreateWorldModel()
 	self:DeleteOnRemove(model)
 	self.worldModel = model
 	self:SetLagCompensated(true)
+	model:SetLagCompensated(true)
 	model.weapon = self
 	return model
 end

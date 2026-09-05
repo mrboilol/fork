@@ -1184,6 +1184,8 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		
 		PenetrationGlobal = nil
 	end
+	local equipmentImpact = hg.EquipmentImpact and hg.EquipmentImpact.ProcessedDamage[dmgInfo]
+	if equipmentImpact and equipmentImpact.penetration then pen = math.min(pen, equipmentImpact.penetration) end
 
 	if MaxPenLenGlobal then
 		maxpen = MaxPenLenGlobal
@@ -1854,6 +1856,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		hg.organism.AmputateLimb(org, "rarm")
 	end--]]
 
+	if hg.TryArmTraumaDrop then hg.TryArmTraumaDrop(ply, dmgInfo, hitgroup, ent, dmg_before) end
 	dmgInfo:ScaleDamage(hg.organism.CanTouchHealth(org) and (dmgInfo:IsDamageType(DMG_BURN) and 0.015 or 0.15) or 0)
 	
 	takeRagdollDamage(ent, dmgInfo)
@@ -2480,6 +2483,7 @@ local function velocityDamage(ent, data)
 		end
 	end
 
+	if hg.TryArmTraumaDrop then hg.TryArmTraumaDrop(ply, dmgInfo, hitgroup, ent) end
 	hook_Run("HomigradDamage", ent, dmgInfo, hitgroup, ent, att.harm, {}, {})
 	
 	if org.isPly and ply then
