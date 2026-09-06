@@ -5,6 +5,11 @@ if SERVER then
 
     concommand.Add("suicide", function(ply)
         if not IsValid(ply) or not ply:Alive() then return end
+        if ply.organism and ply.organism.incapacitated then
+            ply.organism.deathStateKilled = true
+            ply:Kill()
+            return
+        end
         if not hg.CanSuicide(ply) then return end
         if ply.StartHeadcrabRemovalAttempt and ply:StartHeadcrabRemovalAttempt() then return end
 

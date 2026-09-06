@@ -1885,6 +1885,17 @@ function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
 
         trace = util.TraceLine(tr)
 
+        if SERVER and not self:IsEntSoft(trace.Entity) and hg.TraceHeldWeaponShot then
+            if self.HGEquipmentHitEnts ~= self.HitEnts then
+                self.HGEquipmentHitEnts = self.HitEnts
+                self.HGEquipmentSwing = {Contact = true, EquipmentHits = {}}
+            end
+            self.HGEquipmentSwing.DamageType = self:GetClashDamageType(attacktype)
+            local damage = self:GetAttackDamageBase(attacktype)
+            trace = hg.TraceHeldWeaponShot(tr.start, tr.endpos, owner, damage, damage, trace, self.HGEquipmentSwing) or trace
+            if trace.HGEquipmentContact then return trace end
+        end
+
         if shouldDrawHull then
             DrawMeleeAttackHull(tr, trace)
         end

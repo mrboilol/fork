@@ -22,6 +22,15 @@ function ishgweapon(wep)
 	return wep.ishgweapon
 end
 
+function hg.CanSuicide(ply)
+	if not IsValid(ply) or not ply.GetActiveWeapon then return false end
+
+	local wep = ply:GetActiveWeapon()
+	if not IsValid(wep) then return false end
+
+	return (ishgweapon(wep) or wep.ismelee2) and wep.CanSuicide and not wep.reload
+end
+
 function hg.isVisible(pos1, pos2, filter, mask)
 	return not util.TraceLine({
 		start = pos1,

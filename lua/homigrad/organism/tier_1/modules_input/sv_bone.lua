@@ -841,6 +841,28 @@ local ribs = {
 	"My chest hurts. Something may be broken.",
 }
 
+local pelvis_broken = {
+	"MY PELVIS HURTS SO MUCH.",
+	"MY PELVIS IS BROKEN. I CAN'T MOVE RIGHT.",
+	"MY HIPS ARE ON FIRE. SOMETHING IS VERY WRONG.",
+}
+
+local function damageLungFromRibs(org, brokenRibs)
+	if not org.lungsL or not org.lungsR then return end
+
+	local chance = math.Clamp(0.04 + brokenRibs * 0.035, 0, 0.46)
+	if math.Rand(0, 1) > chance then return end
+
+	local lung = math.random(2) == 1 and org.lungsL or org.lungsR
+	if math.random(3) == 1 then
+		lung[1] = math.min((lung[1] or 0) + math.Rand(0.05, 0.12) * (1 + brokenRibs / 12), 1)
+	else
+		lung[2] = 1
+	end
+
+	org.internalBleed = math.min((org.internalBleed or 0) + math.Rand(0.15, 0.35) * (1 + brokenRibs / 12), 10)
+end
+
 input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet)	
 	local oldDmg = org.chest
 
@@ -853,12 +875,15 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	addPain(org, dmg * 1.5, "body")
 	org.shock = org.shock + dmg * 1.5
 
-	if org.isPly and (not org.brokenribs or (org.brokenribs ~= math.Round(org.chest * 3))) then
-		org.brokenribs = math.Round(org.chest * 3)
+	if org.isPly and (not org.brokenribs or (org.brokenribs ~= math.Round(org.chest * 12))) then
+		org.brokenribs = math.Round(org.chest * 12)
 		
 		if org.brokenribs > 0 then
+			damageLungFromRibs(org, org.brokenribs)
+
 			if hasNewThoughts(org) then
-				sendThought(org, "You broke " .. org.brokenribs .. " ribs.", "thought_ribs", 3, Color(255, 210, 210))
+				local ribWord = org.brokenribs == 1 and " rib." or " ribs."
+				sendThought(org, "You broke " .. org.brokenribs .. ribWord, "thought_ribs", 3, Color(255, 210, 210))
 			else
 				org.owner:Notify(ribs[math.random(#ribs)], 5, "ribs", 4)
 			end
@@ -882,9 +907,14 @@ input_list.pelvis = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoc
 	
 	hg.AddHarmToAttacker(dmgInfo, (org.pelvis - oldDmg) / 2, "Pelvis bone damage harm")
 
-	if org.isPly and org.pelvis == 1 then
-		//org.owner:Notify("My pelvis is agonizingly hurting.", true, "pelvis", 4)
-		sendThought(org, "Your pelvis is broken.", "thought_pelvis", 4, Color(255, 210, 210))
+	if org.isPly and oldDmg < 1 and org.pelvis == 1 then
+		org.internalBleed = math.min((org.internalBleed or 0) + 4.5, 10)
+
+		if hasNewThoughts(org) then
+			sendThought(org, "You broke your pelvis.", "thought_pelvis", 4, Color(255, 210, 210))
+		else
+			org.owner:Notify(pelvis_broken[math.random(#pelvis_broken)], 5, "pelvis", 4)
+		end
 	end
 
 	return result

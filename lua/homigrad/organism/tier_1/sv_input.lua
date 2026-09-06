@@ -784,18 +784,14 @@ function hg.organism.AddWound(ent, tr, bone, dmgInfo, dmgPos, dmgBlood, inputHol
 	local org = ent.organism
 	if org.superfighter then return end
 	
-	local physBone = bone != -1 and bone or math.random(0, ent:GetPhysicsObjectCount() - 1)
+	local physBone = isnumber(bone) and bone >= 0 and bone or 0
 	local bone = ent:TranslatePhysBoneToBone(physBone)
+	ent:SetupBones()
 	
 	if bone and dmgBlood > 0 then
 		for i = 1, 2 do
-			local bonePos, boneAng = ent:GetBonePosition(bone)
-			if ent:IsRagdoll() then
-				local phys = ent:GetPhysicsObjectNum(physBone)
-				if IsValid(phys) then
-					bonePos, boneAng = phys:GetPos(), phys:GetAngles()
-				end
-			end
+			local matrix = bone >= 0 and ent:GetBoneMatrix(bone)
+			local bonePos = matrix and matrix:GetTranslation()
 			
 			if not bonePos then return end
 
@@ -806,10 +802,11 @@ function hg.organism.AddWound(ent, tr, bone, dmgInfo, dmgPos, dmgBlood, inputHol
 
 			if dmgInfo:IsDamageType(DMG_BLAST) or dmgInfo:GetAttacker():IsNPC() or (ent:IsPlayer() and ent:InVehicle()) then dmgPos = bonePos end
 
-			local localPos, localAng = WorldToLocal(dmgPos + ((i == 1 and 1 or -1) * tr.HitNormal), (i == 1 and -1 or 1) * tr.Normal:Angle(), bonePos, boneAng)
+			local localPos, localAng, woundBone = hg.organism.GetWoundAnchor(ent, dmgPos + ((i == 1 and 1 or -1) * tr.HitNormal), ((i == 1 and -1 or 1) * tr.Normal):Angle(), bone)
+			if not localPos then continue end
 			if #org.wounds < 30 then
 				local severity = dmgBlood / 2
-				local wound = {severity, localPos, localAng, ent:GetBoneName(bone), CurTime(), chooseWoundBleedStyle(severity)}
+				local wound = {severity, localPos, localAng, woundBone, CurTime(), chooseWoundBleedStyle(severity)}
 				wound.visualBleedRate = math.max(severity * 0.24, 0.1)
 				table.insert(org.wounds, wound)
 			else
@@ -1278,7 +1275,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	local dmgPos = meleeContact and meleeContact.hitPos or dmgInfo:GetDamagePosition()
 	local accessoryDamage = dmgInfo:GetDamage()
 	local impactRadius = meleeContact and meleeContact.impactRadius or nil
-	if hg.Appearance and hg.Appearance.TryAbsorbAccessoryImpact and hg.Appearance.TryAbsorbAccessoryImpact(ent, dmgInfo, dmgPos, dir, nil, impactRadius) then
+	if hg.TryAbsorbEquipmentImpact and hg.TryAbsorbEquipmentImpact(ent, dmgInfo, dmgPos, dir, impactRadius) then
 		local damageRatio = dmgInfo:GetDamage() / math.max(accessoryDamage, 0.01)
 		dmg = dmgInfo:GetDamage()
 		pen = pen * damageRatio
@@ -1396,6 +1393,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		local bullet = inf.bullet
 		ent.bloodamt = ent.bloodamt or 0
 		ent.bloodamt = ent.bloodamt + 1
+		local exitPos, exitAng, exitBone = hg.organism.GetWoundAnchor(ent, outputHole[#outputHole], (-outputDir):Angle())
 		
 		timer.Simple(0, function()
 			if !IsValid(ent) then return end
@@ -1452,6 +1450,12 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 				net.WriteVector(-outputDir:GetNormalized() * 0.3)
 				net.WriteFloat(dmg)
 				net.WriteInt(math.Clamp(math.ceil(dmg / 60), 2, 24), 8)
+				if exitPos then
+					net.WriteEntity(ent)
+					net.WriteVector(exitPos)
+					net.WriteAngle(exitAng)
+					net.WriteString(exitBone)
+				end
 				net.SendPVS(outputHole[#outputHole])
 			end
 
@@ -1546,6 +1550,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 
 		ent.bloodamt2 = ent.bloodamt2 or 0
 		ent.bloodamt2 = ent.bloodamt2 + 1
+		local entryPos, entryAng, entryBone = hg.organism.GetWoundAnchor(ent, inputHole[1], dir:Angle(), ent:TranslatePhysBoneToBone(bone or 0))
 
 		queueTimer(ent, "blood_input", 0.02, function()
 			if not IsValid(ent) then return end
@@ -1554,6 +1559,12 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 			net.WriteVector(dir / 2)
 			net.WriteFloat(dmg)
 			net.WriteInt(ent.bloodamt2, 8)
+			if entryPos then
+				net.WriteEntity(ent)
+				net.WriteVector(entryPos)
+				net.WriteAngle(entryAng)
+				net.WriteString(entryBone)
+			end
 			net.SendPVS(inputHole[1])
 			ent.bloodamt2 = 0
 		end)
@@ -2357,7 +2368,7 @@ local function velocityDamage(ent, data)
 	local accessoryDamage = dmgInfo:GetDamage()
 	local collisionEnt = IsValid(data.HitObject) and data.HitObject:GetEntity() or nil
 	local impactRadius = hg.Appearance and hg.Appearance.GetEntityImpactRadius and hg.Appearance.GetEntityImpactRadius(collisionEnt) or 0
-	if hg.Appearance and hg.Appearance.TryAbsorbAccessoryImpact and hg.Appearance.TryAbsorbAccessoryImpact(ent, dmgInfo, data.HitPos, relativeVelocity, nil, impactRadius) then
+	if hg.TryAbsorbEquipmentImpact and hg.TryAbsorbEquipmentImpact(ent, dmgInfo, data.HitPos, relativeVelocity, impactRadius) then
 		dmg = dmg * (dmgInfo:GetDamage() / math.max(accessoryDamage, 0.01))
 	end
 

@@ -1,7 +1,8 @@
 if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_tpik_base"
 SWEP.PrintName = "Gravity Gun"
-SWEP.Instructions = "The Zero Point Energy Field Manipulator. \nCommonly known as the Gravity Gun, is a Tractor beam-type weapon designed for handling hazardous materials.\n\nLMB To Punt RMB To Pull"
+SWEP.Description = "A reinforced Zero Point Energy Field Manipulator. Pull and hold props or people with RMB; living targets collapse into a controllable ragdoll when grabbed. LMB punts the held target."
+SWEP.Instructions = "The Zero Point Energy Field Manipulator.\n\nRMB to pull and hold props or people. Living targets ragdoll when grabbed.\nLMB to punt the held target."
 SWEP.Category = "Weapons - Other"
 SWEP.Spawnable = true
 SWEP.AdminOnly = game.IsDedicated()
@@ -68,10 +69,10 @@ SWEP.AnimList = {
 }
 
 SWEP.PuntForce = 1000000
-SWEP.PuntMultiply = 850
-SWEP.PullForce = 8000
-SWEP.HL2PullForce = 4000
-SWEP.HL2PullForceRagdoll = 3500
+SWEP.PuntMultiply = 1200
+SWEP.PullForce = 12000
+SWEP.HL2PullForce = 8000
+SWEP.HL2PullForceRagdoll = 7000
 SWEP.MaxMass = 16500
 SWEP.HL2MaxMass = 5500
 SWEP.MaxPuntRange = 1650
@@ -208,6 +209,7 @@ local function i(self)
     self.HPCollideG = COLLISION_GROUP_NONE
     self.HPHealth = -1
     self.HPBone = nil
+    self.HeldTargetPos = nil
     self.OnDropOwner = nil
 end
 
@@ -782,16 +784,19 @@ function SWEP:ThinkAdd()
                     w:SetVelocity(Vector(0, 0, 0))
                 end
             elseif IsValid(self:GetTP()) then
+                local holdPos = self.HeldTargetPos
                 if u:IsRagdoll() then
-                    self:GetTP():SetPos(z)
+                    self:GetTP():SetPos(holdPos or z)
                 else
-                    self:GetTP():SetPos(y)
+                    self:GetTP():SetPos(holdPos or y)
                 end
 
                 self:GetTP():PointAtEntity(self:GetOwner())
             else
-                self:CreateTP()
+                self:CreateTP(self.HeldTargetPos)
             end
+
+            self.HeldTargetPos = nil
 
             local D = u:GetAngles()
             u:SetAngles(Angle(0, D.y, D.r))
@@ -1322,7 +1327,7 @@ function SWEP:SecondaryAttack()
     local x = self:GetMaxPickupRange()
     local y = (w:GetPos() - self:GetOwner():GetPos()):LengthSqr() / x
     local z = false
-    local function A(B)
+    local function A(B, heldBone, heldTargetPos)
         if z == true then return end
         z = true
         self:PlayAnim("attack")
@@ -1337,12 +1342,21 @@ function SWEP:SecondaryAttack()
         self:SetNextSecondaryFire(CurTime() + 0.2)
         if styleCvar then self:SetNextPrimaryFire(CurTime() + 0.1) end
         self.Secondary.Automatic = false
-        if B:IsRagdoll() then if u.Entity == B then self.HPBone = u.PhysicsBone end end
+        if B:IsRagdoll() then self.HPBone = heldBone or (u.Entity == B and u.PhysicsBone) or 0 end
+        if isvector(heldTargetPos) then self.HeldTargetPos = heldTargetPos end
     end
 
     if SERVER and not self:NotAllowedClass(w) and not self:AllowedClass(w) and y < x then
         if w:IsPlayer() and w:HasGodMode() == true then return end
-        if w:IsNPC() or w:IsNextBot() or w:IsPlayer() then
+        if w:IsPlayer() then
+            local heldTargetPos = w:WorldSpaceCenter()
+            hg.Fake(w)
+            local ragdoll = w.FakeRagdoll
+            if IsValid(ragdoll) then A(ragdoll, 0, heldTargetPos) end
+            return
+        end
+
+        if w:IsNPC() or w:IsNextBot() then
             q(self, w, u.HitPos, false)
             if w:Health() >= 1 then return end
             local B = r(self, w, false)
@@ -1467,6 +1481,7 @@ end
 function SWEP:DropGeneral()
     self.PropLockTime = nil
     self.HPBone = nil
+    self.HeldTargetPos = nil
     f(self, false)
     if SERVER then self:RemoveGlow() end
     local u = self:GetHP()
@@ -1713,7 +1728,7 @@ function SWEP:TPrem()
     self:SetTP(nil)
 end
 
-function SWEP:CreateTP()
+function SWEP:CreateTP(holdPos)
     local u = self:GetHP()
     if not IsValid(u) then return end
     local v = nil
@@ -1727,7 +1742,9 @@ function SWEP:CreateTP()
     local w = nil
     if u:IsRagdoll() and self.HPBone ~= nil and util.IsValidPhysicsObject(u, self.HPBone) then w = u:GetPhysicsObjectNum(self.HPBone) end
     if not IsValid(w) then if IsValid(u:GetPhysicsObject()) then w = u:GetPhysicsObject() end end
-    if IsValid(w) and u:IsRagdoll() then
+    if isvector(holdPos) then
+        v:SetPos(holdPos)
+    elseif IsValid(w) and u:IsRagdoll() then
         v:SetPos(w:GetPos())
     elseif not u:WorldSpaceCenter():IsZero() then
         v:SetPos(u:WorldSpaceCenter())

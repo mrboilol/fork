@@ -30,6 +30,7 @@ impact.Config = {
     weaponHitPadding = 0.65,
     weaponSolidFraction = 0.25,
     weaponMaxThickness = 8,
+    contactAbsorption = 0.55,
     defaultHardness = 0.9,
 }
 
@@ -173,22 +174,19 @@ end
 
 function hg.GetHeldWeaponImpactModel(ply, wep)
     if not IsValid(wep) then return end
-    local frame = FrameNumber()
-    if wep.WorldModel_Transform and wep.HGEquipmentTransformFrame ~= frame then
-        wep.HGEquipmentTransformFrame = frame
-        wep:WorldModel_Transform()
-    end
+    if wep.WorldModel_Transform then wep:WorldModel_Transform() end
     local model = wep.worldModel
     if IsValid(model) then return model:GetModel(), model:GetPos(), model:GetAngles(), model:GetModelScale() end
     if wep.NoDrop then return end
     local body = hg.GetCurrentCharacter(ply)
     if not IsValid(body) then return end
+    body:SetupBones()
     local grip = hg.GetWeaponImpactGrip(ply, wep)
     local bone = body:LookupBone(grip.firingArm == "larm" and "ValveBiped.Bip01_L_Hand" or "ValveBiped.Bip01_R_Hand")
     local matrix = bone and body:GetBoneMatrix(bone)
     if not matrix then return end
     local pos, ang = LocalToWorld(wep.weaponPos or wep.WorldPos or vector_origin, wep.weaponAng or wep.WorldAng or angle_zero, matrix:GetTranslation(), matrix:GetAngles())
-    return wep.WorldModelExchange or wep.WorldModel or wep:GetModel(), pos, ang, wep.modelscale2 or wep:GetModelScale()
+    return wep.WorldModelExchange or wep.WorldModel or wep:GetModel(), pos, ang, (wep.WorldModelExchange and wep.modelscale or wep.modelscale2) or wep:GetModelScale()
 end
 
 function hg.DropWeaponFromImpact(ply, wep, direction, strength)
@@ -256,6 +254,36 @@ local function WeaponImpact(ply, wep, hit, damage, force, direction)
     if math.Rand(0, 1) < math.min(chance, cfg.maxDropChance) then hg.DropWeaponFromImpact(ply, wep, direction, power) end
 end
 
+function hg.TryAbsorbEquipmentImpact(ent, dmgInfo, hitPos, direction, impactRadius)
+    if impact.ProcessedDamage[dmgInfo] then return end
+    if not IsValid(ent) or not isvector(hitPos) or not isvector(direction) or direction:LengthSqr() < 0.001 then return end
+    if not dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_CLUB + DMG_SLASH + DMG_CRUSH + DMG_FALL + DMG_VEHICLE) then return end
+    local damage = dmgInfo:GetDamage()
+    local ply = ent:IsPlayer() and ent or hg.RagdollOwner(ent)
+    local wep = IsValid(ply) and ply:GetActiveWeapon()
+    if IsValid(wep) then
+        local dir = direction:GetNormalized()
+        local radius = math.max(tonumber(impactRadius) or 0, 0)
+        local startPos = hitPos - dir * (48 + radius)
+        local obstruction = util.TraceLine({start = hitPos, endpos = startPos, filter = {ent, ply, wep, wep.worldModel}})
+        if obstruction.Hit then startPos = obstruction.HitPos end
+        local model, pos, ang, scale = hg.GetHeldWeaponImpactModel(ply, wep)
+        local hit = model and hg.TraceEquipmentModel(model, pos, ang, scale, startPos, hitPos + dir, impact.Config.weaponHitPadding + radius)
+        if hit then
+            WeaponImpact(ply, wep, hit, damage, dmgInfo:GetDamageForce():Length(), dir)
+            local directness = math.Clamp(-hit.normal:Dot(dir), 0, 1)
+            local absorbed = impact.Config.contactAbsorption * directness * math.Clamp(hit.thickness / 2, 0, 1)
+            dmgInfo:ScaleDamage(1 - absorbed)
+            dmgInfo:SetDamageForce(dmgInfo:GetDamageForce() * (1 - absorbed))
+        end
+    end
+    if hg.Appearance and hg.Appearance.TryAbsorbAccessoryImpact then
+        hg.Appearance.TryAbsorbAccessoryImpact(ent, dmgInfo, hitPos, direction, nil, impactRadius)
+    end
+    impact.ProcessedDamage[dmgInfo] = {}
+    return dmgInfo:GetDamage() < damage
+end
+
 function hg.TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, originalTrace, shot)
     if not isvector(startPos) or not isvector(endPos) or startPos:DistToSqr(endPos) < 0.000001 then return originalTrace end
     shot = shot or {}
@@ -274,6 +302,7 @@ function hg.TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, origin
         if ply == shooter or not ply:Alive() then continue end
         local body = hg.GetCurrentCharacter(ply)
         if not IsValid(body) then continue end
+        body:SetupBones()
         checkedBodies[body] = true
         local wep = ply:GetActiveWeapon()
         if IsValid(wep) and not seen[wep] then
@@ -292,6 +321,23 @@ function hg.TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, origin
     local scale = 1
     for _, hit in ipairs(hits) do
         seen[hit.key] = true
+        if shot.Contact then
+            if hit.weapon then
+                WeaponImpact(hit.ply, hit.weapon, hit, damage, force, direction)
+            else
+                local info = DamageInfo()
+                info:SetDamage(damage)
+                info:SetDamageType(shot.DamageType or DMG_CLUB)
+                hg.Appearance.TryAbsorbAccessoryImpact(hit.body, info, hit.position, direction * (force or damage), hit)
+            end
+            local tr = table.Copy(originalTrace)
+            tr.Hit, tr.HitWorld, tr.HitSky = true, false, false
+            tr.Entity, tr.HitPos, tr.HitNormal, tr.Normal = game.GetWorld(), hit.position, hit.normal, direction
+            tr.StartSolid, tr.AllSolid = false, false
+            tr.MatType, tr.Fraction = hit.weapon and MAT_METAL or MAT_PLASTIC, hit.fraction
+            tr.HGEquipmentContact = true
+            return tr
+        end
         if hit.weapon then
             WeaponImpact(hit.ply, hit.weapon, hit, damage * scale, (force or 0) * scale, direction)
             local materialName = hit.weapon.GetClashMaterial and hit.weapon:GetClashMaterial() or hit.weapon.BlockMaterial

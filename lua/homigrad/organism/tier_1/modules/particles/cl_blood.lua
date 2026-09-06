@@ -96,7 +96,12 @@ bloodparticles_hook[1] = function(anim_pos, mul)
 				
 				--render_DrawBeam(pos - (len < 2 and (part[2] - part[1]):GetNormalized() * 2 or (part[2] - part[1])) * 0.5 / mul / 24,pos + (part[2] - part[1]) * 0.5 / mul / 24, 1, 0, 1, part[9] or lightcolor )
 				local width = math.Clamp((part[5] or 1) * 0.42, part.tiny and 0.04 or 0.18, 1.35)
-				render_DrawBeam(pos - (part[2] - part[1]) * 1 / mul / 24 * 0.5,pos + (part[2] - part[1]) * 1 / mul / 24 * 0.5, width, 0, 1, part[9] or lightcolor )
+				local beamMotion = (part[2] - part[1]) / mul / 24
+				local maxBeamLength = part.maxBeamLength
+				if maxBeamLength and beamMotion:LengthSqr() > maxBeamLength * maxBeamLength then
+					beamMotion = beamMotion:GetNormalized() * maxBeamLength
+				end
+				render_DrawBeam(pos - beamMotion * 0.5, pos + beamMotion * 0.5, width, 0, 1, part[9] or lightcolor )
 
 				--lightcolor.r = lightcolor.r * 0.25
 				--debugoverlay.Line(part[2], part[1], 1, lightcolor, false)	
@@ -333,7 +338,7 @@ bloodparticles_hook[2] = function(mul)
 	for i = #hg.bloodparticles1, 1, -1 do
 		local part = hg.bloodparticles1[i]
 		if not part then hg.bloodparticles1[i] = hg.bloodparticles1[#hg.bloodparticles1]; table_remove(hg.bloodparticles1) continue end
-		if time - part[7] >= 30 then
+		if time - part[7] >= (part.lifetime or 30) then
 			hg.bloodparticles1[i] = hg.bloodparticles1[#hg.bloodparticles1]; table_remove(hg.bloodparticles1)
 			continue
 		end

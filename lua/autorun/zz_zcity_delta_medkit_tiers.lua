@@ -41,8 +41,10 @@ local MEDKIT_TYPES = {
 local NORMAL_MEDKIT = {
     PrintName = "Medkit",
     Instructions = "A standard medical bag with a quality bandage, painkiller, tranexamic acid, a tourniquet and a decompression needle. RMB to apply on others, R to change use mode.",
-    qualityBandageAmount = 150,
+    contents = {bandage = 150, painkiller = 1, tourniquet = 1, tranexamic = 10, needle = 1},
     bandageColor = Color(165, 165, 165),
+    bandageName = "quality bandage",
+    painkillerType = "paracetamol",
 }
 
 local MEDKIT_PICKUP_CLASSES = {
@@ -64,12 +66,8 @@ local modeNames = {
 }
 local modeOrder = {"bandage", "painkiller", "tourniquet", "naloxone", "tranexamic", "mannitol", "needle"}
 
-local function isTieredMedkit(wep)
-    return IsValid(wep) and wep.HGMedkitTier ~= nil
-end
-
 local function setupMedkit(wep)
-    local definition = MEDKIT_TYPES[wep.HGMedkitTier]
+    local definition = MEDKIT_TYPES[wep.HGMedkitTier] or NORMAL_MEDKIT
     if not definition then return end
 
     wep.modeNames = {}
@@ -81,7 +79,7 @@ local function setupMedkit(wep)
         local amount = definition.contents[typeName]
         if amount and amount > 0 then
             local index = #wep.modeValues + 1
-            wep.modeNames[index] = modeNames[typeName]
+            wep.modeNames[index] = typeName == "bandage" and (definition.bandageName or modeNames[typeName]) or modeNames[typeName]
             wep.modeValues[index] = amount
             wep.modeValuesdef[index] = {amount, typeName == "bandage" or typeName == "tourniquet" or typeName == "tranexamic"}
             wep.HGMedkitModeTypes[index] = typeName
@@ -89,6 +87,45 @@ local function setupMedkit(wep)
     end
     wep.modes = #wep.modeValues
     wep.mode = math.Clamp(wep.mode or 1, 1, math.max(wep.modes, 1))
+end
+
+local function resolveMedicalTarget(ent)
+    if not IsValid(ent) then return end
+    if ent:IsRagdoll() and hg and hg.RagdollOwner then
+        ent = hg.RagdollOwner(ent) or ent
+    end
+    return IsValid(ent) and ent or nil
+end
+
+local function getMedkitDefinition(wep)
+    return MEDKIT_TYPES[wep.HGMedkitTier] or NORMAL_MEDKIT
+end
+
+local function medkitHasSupplies(wep)
+    for _, amount in ipairs(wep.modeValues or {}) do
+        if amount > 0 then return true end
+    end
+    return false
+end
+
+local function syncMedkit(wep)
+    if (wep.net_cooldown2 or 0) < CurTime() then
+        wep:SetNetVar("modeValues", wep.modeValues)
+    end
+end
+
+local function finishMedkitUse(wep)
+    syncMedkit(wep)
+    if medkitHasSupplies(wep) then return end
+
+    local owner = wep:GetOwner()
+    if IsValid(owner) then owner:SelectWeapon("weapon_hands_sh") end
+    wep:Remove()
+end
+
+local function getMedicalTargetBone(wep, ent)
+    if not wep.GetBandageTargetBone then return end
+    return wep:GetBandageTargetBone(ent, hg.eyeTrace(wep:GetOwner()))
 end
 
 local function applyMedkitMode(wep, ent, mode)
@@ -101,7 +138,7 @@ local function applyMedkitMode(wep, ent, mode)
 
     local owner = wep:GetOwner()
     local entOwner = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
-    local definition = MEDKIT_TYPES[wep.HGMedkitTier]
+    local definition = getMedkitDefinition(wep)
     if typeName == "painkiller" then
         if definition.painkillerType == "paracetamol" then
             org.painkiller = math.min((org.painkiller or 0) + amount, 5)
@@ -132,6 +169,89 @@ local function applyMedkitMode(wep, ent, mode)
     return true
 end
 
+local function useMedkit(wep, ent, mode, bone)
+    ent = resolveMedicalTarget(ent)
+    if not IsValid(ent) or not ent.organism then return end
+
+    local modeIndex = mode or wep.mode
+    local typeName = wep.HGMedkitModeTypes and wep.HGMedkitModeTypes[modeIndex]
+    if not typeName or not wep.modeValues or (wep.modeValues[modeIndex] or 0) <= 0 then return end
+
+    local owner = wep:GetOwner()
+    local done
+    if typeName == "bandage" then
+        local bandage = weapons.GetStored("weapon_bandage_sh")
+        if bandage and bandage.Heal then
+            done = bandage.Heal(wep, ent, modeIndex, bone or getMedicalTargetBone(wep, ent))
+        end
+    elseif typeName == "tourniquet" then
+        local selfTreatment = hg.GetCurrentCharacter(ent) == hg.GetCurrentCharacter(owner)
+        if selfTreatment and not hg_healanims:GetBool() then
+            wep:SetHolding(math.min(wep:GetHolding() + 10, 100))
+            if wep:GetHolding() < 100 then return end
+        end
+
+        done = wep:Tourniquet(ent, bone or getMedicalTargetBone(wep, ent))
+        if done then wep.modeValues[modeIndex] = math.max(wep.modeValues[modeIndex] - 1, 0) end
+    else
+        done = applyMedkitMode(wep, ent, modeIndex)
+    end
+
+    if done then finishMedkitUse(wep) end
+    return done
+end
+
+local function canUseMedkitMode(wep, ent)
+    ent = resolveMedicalTarget(ent)
+    if not IsValid(ent) or not ent.organism then return false end
+
+    local modeIndex = wep.mode or 1
+    local typeName = wep.HGMedkitModeTypes and wep.HGMedkitModeTypes[modeIndex]
+    if not typeName or not wep.modeValues or (wep.modeValues[modeIndex] or 0) <= 0 then return false end
+
+    if typeName == "bandage" then
+        local org = ent.organism
+        return #org.wounds > 0 or (hg.organism.GetBandageDislocation and hg.organism.GetBandageDislocation(org)) or (org.lleg or 0) >= 0.05 or (org.rleg or 0) >= 0.05 or (org.skull or 0) >= 0.05 or (org.chest or 0) >= 0.05 or (org.rarm or 0) >= 0.05 or (org.larm or 0) >= 0.05
+    end
+
+    return true
+end
+
+local function applyMedkitControls(swep)
+    swep.ShouldDeleteOnFullUse = false
+    swep.CanHeal = function(self, ent)
+        return canUseMedkitMode(self, ent)
+    end
+    swep.Heal = function(self, ent, mode, bone)
+        return useMedkit(self, ent, mode, bone)
+    end
+    swep.PrimaryAttack = function(self)
+        if not SERVER then return end
+        local owner = self:GetOwner()
+        if not IsValid(owner) or not owner:Alive() then return end
+        self:SetNextPrimaryFire(CurTime() + 0.15)
+        self:Heal(owner, self.mode)
+    end
+    swep.SecondaryAttack = function(self)
+        if not SERVER or IsValid(self:GetNWEntity("fakeGun")) then return end
+        local owner = self:GetOwner()
+        if not IsValid(owner) or not owner:Alive() then return end
+
+        local target = resolveMedicalTarget(hg.eyeTrace(owner).Entity)
+        if not IsValid(target) or hg.GetCurrentCharacter(target) == hg.GetCurrentCharacter(owner) then return end
+        self:SetNextSecondaryFire(CurTime() + 0.15)
+        self:Heal(target, self.mode, getMedicalTargetBone(self, target))
+    end
+    swep.Reload = function(self)
+        if not SERVER or not self:GetOwner():KeyPressed(IN_RELOAD) or self.modes <= 1 then return end
+        self.mode = self.mode % self.modes + 1
+        net.Start("select_mode")
+        net.WriteEntity(self)
+        net.WriteInt(self.mode, 4)
+        net.Broadcast()
+    end
+end
+
 local function registerTieredMedkits()
     local base = weapons.GetStored("weapon_medkit_sh")
     if not istable(base) then return false end
@@ -150,17 +270,7 @@ local function registerTieredMedkits()
             self:SetHold(self.HoldType)
             setupMedkit(self)
         end
-        swep.Heal = function(self, ent, mode, bone)
-            local typeName = self.HGMedkitModeTypes and self.HGMedkitModeTypes[mode or self.mode]
-            if typeName == "bandage" then
-                return self:Bandage(ent, bone)
-            elseif typeName == "tourniquet" then
-                local done = self:Tourniquet(ent, bone)
-                if done then self.modeValues[mode or self.mode] = 0 end
-                return done
-            end
-            return applyMedkitMode(self, ent, mode)
-        end
+        applyMedkitControls(swep)
         weapons.Register(swep, class)
     end
     return true
@@ -168,22 +278,16 @@ end
 
 local function patchNormalMedkit()
     local normal = weapons.GetStored("weapon_medkit_sh")
-    if not istable(normal) or normal.__hg_normal_medkit_patched then return end
+    if not istable(normal) then return end
 
-    normal.__hg_normal_medkit_patched = true
     normal.PrintName = NORMAL_MEDKIT.PrintName
     normal.Instructions = NORMAL_MEDKIT.Instructions
-    normal.modeNames = table.Copy(normal.modeNames or {})
-    normal.modeNames[1] = "quality bandage"
-    normal.modeValuesdef = table.Copy(normal.modeValuesdef or {})
-    normal.modeValuesdef[1] = {NORMAL_MEDKIT.qualityBandageAmount, true}
-
-    local initializeAdd = normal.InitializeAdd
+    normal.HGOriginalInitializeAdd = normal.HGOriginalInitializeAdd or normal.InitializeAdd
     normal.InitializeAdd = function(self)
-        initializeAdd(self)
-        self.modeValues[1] = NORMAL_MEDKIT.qualityBandageAmount
-        self.HGBandageColor = NORMAL_MEDKIT.bandageColor
+        if normal.HGOriginalInitializeAdd then normal.HGOriginalInitializeAdd(self) end
+        setupMedkit(self)
     end
+    applyMedkitControls(normal)
 
     -- Ground pickups remain the generic medkit entity until a player takes
     -- them. Resolve the result here so map loot, crates and dropped generic

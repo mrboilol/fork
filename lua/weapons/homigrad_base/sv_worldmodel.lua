@@ -6,6 +6,7 @@ function SWEP:CreateWorldModel()
 
 	model:SetNoDraw(not hg.show_weapons)
 	model:SetModel(self.WorldModelFake or self.WorldModel)
+	model:SetModelScale(self.WorldModelFake and self.FakeScale or 1, 0)
 	model:SetMaterial("models/wireframe")
 	model:Spawn()
 	timer.Simple(0,function()
@@ -41,6 +42,8 @@ function SWEP:WorldModel_Transform(bNoApply, bNoAdditional)
 	
 	if IsValid(owner) and (IsValid(owner:GetActiveWeapon()) and self == owner:GetActiveWeapon()) then
 		local ent = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
+		ent = owner:GetNWBool("FakeGettingUp", false) and IsValid(owner.OldRagdoll) and owner.OldRagdoll or ent
+		ent:SetupBones()
 		
 		local dtime = SysTime() - (self.last_transform or SysTime())
 		self.last_transform = SysTime()
@@ -68,8 +71,6 @@ function SWEP:WorldModel_Transform(bNoApply, bNoAdditional)
 		desiredAng[3] = desiredAng[3] + (owner:EyeAngles()[3])
 		desiredAng:RotateAroundAxis(desiredAng:Forward(), ent:IsNPC() and 0 or 180)
 		local desiredPos = matrixR:GetTranslation()
-		local aimdir = aimvec:Forward()
-		desiredPos = owner:EyePos() + aimdir * math_max(0, (desiredPos - owner:EyePos()):Dot(aimdir))
 		
 		--local oldPos = -(-desiredPos)
 		--local oldAng = -(-desiredAng)
@@ -88,13 +89,13 @@ function SWEP:WorldModel_Transform(bNoApply, bNoAdditional)
 		--desiredPos = LerpVector(self.fuckhands, oldPos, self.lastTpikPos or desiredPos)
 		--desiredAng = LerpAngle(self.fuckhands, oldAng, self.lastTpikAng or desiredAng)
 
-		local newPos,newAng = LocalToWorld(self.WorldPos, self.WorldAng, desiredPos, desiredAng)
+		local newPos,newAng = LocalToWorld(self.WorldPos, self.WorldAng + (self.WorldAng2 or angle_zero), desiredPos, desiredAng)
 		newAng:RotateAroundAxis(newAng:Forward(), 180)
-		self.desiredPos, self.desiredAng = newPos, newAng
 
 		if self:ShouldUseFakeModel() then
-			//newPos, newAng = LocalToWorld(self.FakePos, self.FakeAng, newPos, newAng)
+			newPos, newAng = LocalToWorld(self.FakePos, self.FakeAng, newPos, newAng)
 		end
+		self.desiredPos, self.desiredAng = newPos, newAng
 
 		if bNoApply then
 			return newPos, newAng, desiredPos, desiredAng

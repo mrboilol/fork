@@ -1104,28 +1104,26 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         )
 
         local messageY = incapPromptY + ScreenScaleH(20)
-        if seconds == 0 then
-            for _, cause in ipairs(GetIncapacitationDeathCauses(replicatedOrg)) do
-                draw.SimpleTextOutlined(
-                    cause,
-                    "HomigradFontTypewriterSmall",
-                    incapPromptX,
-                    messageY,
-                    promptColor,
-                    TEXT_ALIGN_CENTER,
-                    TEXT_ALIGN_TOP,
-                    1,
-                    Color(0, 0, 0, 220 * fade)
-                )
-                messageY = messageY + ScreenScaleH(14)
-            end
+        for _, cause in ipairs(GetIncapacitationDeathCauses(replicatedOrg)) do
+            draw.SimpleTextOutlined(
+                cause,
+                "HomigradFontTypewriterSmall",
+                incapPromptX,
+                messageY,
+                promptColor,
+                TEXT_ALIGN_CENTER,
+                TEXT_ALIGN_TOP,
+                1,
+                Color(0, 0, 0, 220 * fade)
+            )
+            messageY = messageY + ScreenScaleH(14)
         end
 
         draw.SimpleTextOutlined(
             "Press " .. GetSuicideBinding() .. " to give up.",
             "HomigradFontTypewriterSmall",
             incapPromptX,
-            seconds == 0 and messageY + ScreenScaleH(4) or messageY,
+            messageY + ScreenScaleH(4),
             promptColor,
             TEXT_ALIGN_CENTER,
             TEXT_ALIGN_TOP,

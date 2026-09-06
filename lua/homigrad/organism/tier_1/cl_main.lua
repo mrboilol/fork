@@ -1015,8 +1015,10 @@ function hg.applyFountain(pos, ang, mul, mul2, forward, ent)
 		hg.addBloodPart2(pos + VectorRand(-1,1), ang:Forward() * forward * 0.25 + VectorRand(-10,10) * mul2, nil, nil, nil, nil, true, ent)
 		//hg.addBloodPart2(pos + VectorRand(-1,1), ang:Forward() * forward * 0.25 + VectorRand(-10,10) * mul2, nil, nil, nil, nil, true, nil, ent)
 	else
-		hg.addBloodPart(pos, ang:Forward() * forward * 2 * math.abs(math.sin(CurTime() * 3) + math.cos(CurTime() * 5) + math.sin(CurTime() * 2) + 4) * 0.1 + ang:Right() * 15 * (math.sin(CurTime()) * 1) + ang:Right() * math.sin(CurTime() * 2) * 15 + VectorRand(-3, 3),nil,nil,nil,true,nil,ent)
-		hg.addBloodPart(pos + VectorRand(-1,1), ang:Forward() * 55 + VectorRand(-25,25) * mul2,nil,nil,nil,nil, nil, ent)
+		local fountainSpeed = math.Clamp(forward * 0.28, 105, 230)
+		local pulseWave = 0.72 + math.abs(math.sin(CurTime() * 3) + math.cos(CurTime() * 5)) * 0.14
+		hg.addBloodPart(pos, ang:Forward() * fountainSpeed * pulseWave + ang:Right() * (math.sin(CurTime()) + math.sin(CurTime() * 2)) * 10 + VectorRand(-3, 3), nil, nil, nil, true, nil, ent, nil, nil, 0.75, 5)
+		hg.addBloodPart(pos + VectorRand(-1,1), ang:Forward() * 48 + VectorRand(-18,18) * mul2, nil, nil, nil, nil, nil, ent, nil, nil, 0.9, 5)
 		//hg.addBloodPart(pos + VectorRand(-1,1), ang:Forward() * 55 + VectorRand(-25,25) * mul2,nil,nil,nil,nil, nil, ent)
 	end
 end
@@ -1140,12 +1142,12 @@ local function emitArterialBleeding(ent, org, wound, pos, dir, water, visualRate
 	local up = side:Cross(outward):GetNormalized()
 	local phase = CurTime() * (5.5 + pulseDrive * 2.5) + ent:EntIndex() * 0.41
 	local oscillation = side * math.sin(phase) * (10 + rateK * 18) + up * math.cos(phase * 0.77) * (5 + rateK * 11)
-	local speed = (265 + rateK * 155) * pressureDrive * (0.78 + pulseDrive * 0.22)
-	local count = 2
+	local speed = (145 + rateK * 90) * pressureDrive * (0.72 + pulseDrive * 0.28)
+	local count = 1
 	for _ = 1, count do
 		local vel = outward * speed + oscillation + VectorRand(-5, 5)
 		local size = math.Rand(1.05, 1.75 + rateK * 0.8) * arterySizeMul
-		hg.addBloodPart(pos + VectorRand(-0.2, 0.2), vel, nil, size, size, true, nil, ent)
+		hg.addBloodPart(pos + VectorRand(-0.2, 0.2), vel, nil, size, size, true, nil, ent, nil, nil, 0.8, 5)
 	end
 
 	return false
@@ -1166,7 +1168,7 @@ local function getArterySoundEnt(ent)
 	if IsValid(rag) then return rag end
 
 	rag = ent.GetNWEntity and ent:GetNWEntity("RagdollDeath")
-	if IsValid(rag) then return rag end
+	if IsValid(rag) and (not ent:IsPlayer() or not ent:Alive()) then return rag end
 
 	return ent
 end
@@ -1174,19 +1176,9 @@ end
 local function getArterialWoundPos(ent, wound)
 	local target = getArterySoundEnt(ent)
 	if not IsValid(target) then return end
-
-	local bone = target:LookupBone(wound[4] or "")
-	if bone then
-		local mat = target:GetBoneMatrix(bone)
-		if mat and wound[2] and wound[3] then
-			local bonePos, boneAng = mat:GetTranslation(), mat:GetAngles()
-			if bonePos and boneAng then
-				return LocalToWorld(wound[2], wound[3], bonePos, boneAng), target
-			end
-		end
-	end
-
-	return target:GetPos(), target
+	target:SetupBones()
+	local pos = hg.organism.GetWoundTransform(target, wound)
+	return pos, target
 end
 
 local function randomArteryPitch()
@@ -1262,22 +1254,15 @@ local function GetWoundBoneMatrix(ent, bone)
 end
 
 local function GetWoundTransform(ent, wound, mat, boneID)
-	local bonePos, boneAng = mat:GetTranslation(), mat:GetAngles()
-	if not wound[2] or not wound[3] or not bonePos or not boneAng then return end
-
-	local pos, ang = LocalToWorld(wound[2], wound[3], bonePos, boneAng)
-	if not ent:IsRagdoll() then return pos, ang end
-
-	local physBone = ent:TranslateBoneToPhysBone(boneID)
-	local phys = physBone and physBone >= 0 and ent:GetPhysicsObjectNum(physBone)
-	if IsValid(phys) and pos:DistToSqr(phys:GetPos()) > 96 * 96 then
-		return phys:GetPos(), phys:GetAngles()
-	end
-
-	return pos, ang
+	return hg.organism.GetWoundTransform(ent, wound)
 end
 
 hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, ent, time)
+	if ent:IsPlayer() then
+		local body = getArterySoundEnt(ent)
+		if IsValid(body) and body ~= ent then return end
+		if not ent:Alive() then return end
+	end
 	--local ent = IsValid(ply.FakeRagdoll) and ply.FakeRagdoll or ply
 	--print(ply,ent,ply.organism.owner,ply.new_organism.owner)
 	local organism = ply.organism or ply.new_organism or ent.organism or ent.new_organism
@@ -1522,7 +1507,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 						local water = bit.band(util.PointContents(pos), CONTENTS_WATER) == CONTENTS_WATER
 						local pouring = emitArterialBleeding(ent, org, wound, pos, dir, water, visualRate)
 						local beatInterval = 60 / math.max(tonumber(org.pulse) or 70, 20)
-						local jetInterval = 0.5 / math.max(hg_blood_fps:GetInt(), 1)
+						local jetInterval = math.max(1 / math.max(hg_blood_fps:GetInt(), 1), 0.075)
 						wound.nextVisualBleed = time + (water and 1.5 or (pouring and beatInterval * 1.35 or jetInterval))
 					end
 				end

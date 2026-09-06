@@ -366,6 +366,7 @@ local function send_organism(org, ply, recipientForce, reliable)
 	sendtable.rleg = org.rleg
 	sendtable.rarm = org.rarm
 	sendtable.larm = org.larm
+	sendtable.chest = org.chest
 	sendtable.pelvis = org.pelvis
 	sendtable.disorientation = org.disorientation
 	sendtable.brain = org.brain

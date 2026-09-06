@@ -545,7 +545,13 @@ local function buildEffects(ply, org)
 	local effects = {}
 
 	local fractures = countFractures(org)
-	if fractures > 0 then add(effects, "fracture", "fracture", fractures, "bad", 50, fractures) end
+	if fractures > 0 then
+		local level = math.ceil(fractures / 2)
+		if orgNumber(org, "pelvis", 0) >= 0.95 or orgNumber(org, "chest", 0) >= 0.95 then level = 4 end
+		add(effects, "fracture", "fracture", level, "bad", 50, fractures)
+	elseif orgNumber(org, "pelvis", 0) >= 0.95 or orgNumber(org, "chest", 0) >= 0.95 then
+		add(effects, "fracture", "fracture", 4, "bad", 50, 1)
+	end
 	local dislocations = countDislocations(org)
 	if dislocations > 0 then add(effects, "dislocated", "dislocated", dislocations, "bad", 51, dislocations) end
 

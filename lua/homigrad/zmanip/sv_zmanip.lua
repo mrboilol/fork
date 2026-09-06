@@ -22,7 +22,7 @@ hook.Add("PlayerUse", "ZManipUseAnim", function(ply, ent)
 	if IsValid(ent) and !ent:IsRagdoll() and ent.Use and (!ply.ZManipInteractCD or ply.ZManipInteractCD < CurTime()) and !hgIsDoor(ent) then
 		if string.find(ent:GetClass(), "prop") or string.find(ent:GetClass(), "breakable") or string.find(ent:GetClass(), "ladder") then return end
 		
-		local chosenArm, isRight, isBroken = hg.GetPrioritizedArm(ply)
+		local _, _, isBroken = hg.GetPrioritizedArm(ply)
 		ply.ZManipInteractCD = CurTime() + 0.95
 		ply.ZManipOldUse = ply:KeyDown(IN_USE)
 		local anim = (ent:IsWeapon() or ent.IsZPickup) and "interact" or "use"
@@ -38,7 +38,7 @@ hook.Add("PlayerUse", "ZManipUseAnim", function(ply, ent)
 
 		--if ent:IsWeapon() then hg.RunZManipAnim(ply, anim) return end
 		timer.Simple(0,function()
-			--print(anim)w
+			if not IsValid(ply) or not IsValid(ent) then return end
 			hg.RunZManipAnim(ply, anim, nil, nil, {ent})
 		end)
 	end

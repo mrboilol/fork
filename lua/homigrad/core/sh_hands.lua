@@ -67,6 +67,14 @@ function hg.CanUseRightHand(ply)
 	return true
 end
 
+function hg.GetPrioritizedArm(ply)
+	if not IsValid(ply) or not ply.organism then return "left", false, false end
+
+	local org = ply.organism
+	local isBroken = ((org.larm and org.larm >= 1) or org.larmdislocation) == true
+	return "left", false, isBroken
+end
+
 function hg.earanim(ply)
 	local plyTable = ply:GetTable()
 

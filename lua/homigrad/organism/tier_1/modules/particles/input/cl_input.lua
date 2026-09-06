@@ -38,7 +38,7 @@ hg.bloodparticles2 = hg.bloodparticles2 or {}
 local vecZero = Vector(0, 0, 0)
 local lastplaced = SysTime()
 local hg_blood_fps = ConVarExists("hg_blood_fps") and GetConVar("hg_blood_fps") or CreateClientConVar("hg_blood_fps", 24, true, nil, "fps to draw blood", 12, 165)
-local function addBloodPart(pos, vel, mat, w, h, artery, kishki, owner, tiny, hidden)
+local function addBloodPart(pos, vel, mat, w, h, artery, kishki, owner, tiny, hidden, lifetime, maxBeamLength)
 	--local fps = 1 / hg_blood_fps:GetInt() * 1
 	--if lastplaced + fps > SysTime() then return end
 	--lastplaced = SysTime()
@@ -52,7 +52,7 @@ local function addBloodPart(pos, vel, mat, w, h, artery, kishki, owner, tiny, hi
 
 	if #hg.bloodparticles1 >= 600 then table.remove(hg.bloodparticles1, 1) end
 	
-	local part = {pos, pos2, vel, mat or mat_huy, w or 2, h or 2, CurTime(), artery = artery, kishki = kishki, owner = owner, start_velocity = IsValid(owner) and owner:GetVelocity() or vector_origin, tiny = tiny, hidden = hidden}
+	local part = {pos, pos2, vel, mat or mat_huy, w or 2, h or 2, CurTime(), artery = artery, kishki = kishki, owner = owner, start_velocity = IsValid(owner) and owner:GetVelocity() or vector_origin, tiny = tiny, hidden = hidden, lifetime = lifetime, maxBeamLength = maxBeamLength}
 	hg.bloodparticles1[#hg.bloodparticles1 + 1] = part
 	return part
 end
@@ -134,6 +134,11 @@ net.Receive("hg_bloodimpact", function()
 	local vel = net.ReadVector() * 500
 	local mul = net.ReadFloat()
 	local amt = net.ReadInt(8)
+	local source, anchor
+	if net.BytesLeft() > 1 then
+		source = net.ReadEntity()
+		anchor = {0, net.ReadVector(), net.ReadAngle(), net.ReadString()}
+	end
 	amt = math.Clamp(amt,0,32)
 	//debugoverlay.Line(pos, vel, 5, color_white)
 	local batch = 4
@@ -142,7 +147,22 @@ net.Receive("hg_bloodimpact", function()
 		local n = math.min(amt, batch)
 		amt = amt - n
 		timer.Simple(index * 0.04, function()
-			for i = 1, n do impact(pos,vel,mul) end
+			local origin, velocity = pos, vel
+			if anchor then
+				if not IsValid(source) then return end
+				local body = source
+				if source:IsPlayer() then
+					local rag = source:GetNWEntity("FakeRagdoll")
+					local death = source:GetNWEntity("RagdollDeath")
+					body = IsValid(rag) and rag or (not source:Alive() and IsValid(death) and death or source)
+					if body == source and not source:Alive() then return end
+				end
+				body:SetupBones()
+				local point, angle = hg.organism.GetWoundTransform(body, anchor)
+				if not point then return end
+				origin, velocity = point, angle:Forward() * vel:Length()
+			end
+			for i = 1, n do impact(origin, velocity, mul) end
 		end)
 		index = index + 1
 	end
