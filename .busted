@@ -1,0 +1,7 @@
+return {
+    default = {
+        ROOT = {"tests"},
+        pattern = "_spec",
+        lpath = "tests/?.lua;lua/?.lua;gamemodes/zcity/gamemode/libraries/?.lua",
+    },
+}
