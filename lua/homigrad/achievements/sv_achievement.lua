@@ -296,7 +296,7 @@ end)
 
 //if !hg.init_ach then
     -- braindeath
-    hg.achievements.CreateAchievementType("brain",1,0,"Die from hypoxia.","I will definitely survive...", nil, false)
+    hg.achievements.CreateAchievementType("brain",1,0,"Die from hypoxia.","TYPE KILL IN CONSOLE YOU FUCKING NIG", nil, false)
     -- death from drugs
     hg.achievements.CreateAchievementType("drugs",1,0,"Die from opioids overdose.","Overstimulated", nil, false)
     -- TERMINATOR
