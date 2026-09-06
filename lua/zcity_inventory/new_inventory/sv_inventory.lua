@@ -17,7 +17,7 @@ local inventorySystem = GetConVar("hg_invsystem") or CreateConVar(
 	"hg_invsystem",
 	1,
 	{FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_SERVER_CAN_EXECUTE},
-	"Inventory system: 0 = body/backpack, 1 = simple selector, 2 = compact dial",
+	"Inventory system: 0 = body/backpack, 1 = Judge-style selector, 2 = compact dial",
 	0,
 	2
 )

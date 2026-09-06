@@ -34,9 +34,11 @@ local function ZCitySelectInventoryWeapon(wep)
 end
 
 function WS.GetPrintName( self )
-	local class = self:GetClass()
-	local phrase = language.GetPhrase(class)
-	return phrase ~= class and phrase or self:GetPrintName()
+    local class = self:GetClass()
+    local phrase = language.GetPhrase(class)
+    if phrase ~= class and phrase ~= "" then return phrase end
+    local printName = self:GetPrintName()
+    return isstring(printName) and printName ~= "" and printName or class
 end
 
 local function ZCityGetWeaponDescription(wep)
@@ -155,6 +157,543 @@ function WS.WeaponSelectorDraw( ply )
         return SimpleSelector.Draw(ply)
     end
 end
+
+local JudgeSelector = {
+    Show = 0,
+    Transparent = 0,
+    LastSelectedSlot = 0,
+    LastSelectedSlotPos = 0,
+    SelectedSlot = 0,
+    SelectedSlotPos = 0,
+    BoxAnim = {},
+    SlotBadgeAnim = {},
+    CornerFlashWeapon = nil,
+    InfoAlpha = 0,
+    InfoWeapon = nil,
+}
+
+local judgeAccent = Color(190, 190, 190)
+local judgePanel = Color(9, 9, 9)
+local judgeInactiveIcon = Color(175, 175, 175)
+local judgeName = Color(235, 235, 235)
+local judgeShadow = Color(0, 0, 0, 215)
+local judgeIconCache = setmetatable({}, {__mode = "k"})
+local judgeTextureCache = {}
+local judgeAcceptKeys = {
+    slot1 = 1,
+    slot2 = 2,
+    slot3 = 3,
+    slot4 = 4,
+    slot5 = 5,
+    slot6 = 6,
+}
+
+local function ZCityJudgeFontFace()
+    local font = GetConVar("hg_font")
+    return font and font:GetString() ~= "" and font:GetString() or "x14y24pxHeadUpDaisy"
+end
+
+surface.CreateFont("ZCityJudgeWeaponName", {
+    font = ZCityJudgeFontFace(),
+    size = ScreenScale(7),
+    weight = 600,
+    antialias = true,
+})
+
+surface.CreateFont("ZCityJudgeWeaponNameSmall", {
+    font = ZCityJudgeFontFace(),
+    size = ScreenScale(5.5),
+    weight = 600,
+    antialias = true,
+})
+
+surface.CreateFont("ZCityJudgeSlotBadge", {
+    font = ZCityJudgeFontFace(),
+    size = math.floor(ScreenScale(6) + 0.5),
+    weight = 700,
+    antialias = true,
+})
+
+surface.CreateFont("ZCityJudgeInfoLabel", {
+    font = ZCityJudgeFontFace(),
+    size = ScreenScale(5.5),
+    weight = 700,
+    antialias = true,
+})
+
+surface.CreateFont("ZCityJudgeInfoText", {
+    font = ZCityJudgeFontFace(),
+    size = ScreenScale(5.5),
+    weight = 500,
+    antialias = true,
+})
+
+local ZCityJudgeCorners
+
+local function ZCityJudgeWrapText(text, font, maxWide)
+    surface.SetFont(font)
+    local lines = {}
+    for _, paragraph in ipairs(string.Explode("\n", text)) do
+        local current = ""
+        for _, word in ipairs(string.Explode(" ", paragraph)) do
+            local candidate = current == "" and word or current .. " " .. word
+            if current ~= "" and surface.GetTextSize(candidate) > maxWide then
+                lines[#lines + 1] = current
+                current = word
+            else
+                current = candidate
+            end
+        end
+        if current ~= "" then lines[#lines + 1] = current end
+    end
+    return lines
+end
+
+local function ZCityJudgeDrawInfoPanel(wep, x, y, wide, alpha)
+    if not IsValid(wep) then return end
+    local author = isstring(wep.Author) and wep.Author or ""
+    local instructions = isstring(wep.Instructions) and wep.Instructions or ""
+    if author == "" and instructions == "" then return end
+
+    JudgeSelector.InfoAlpha = LerpFT(0.2, JudgeSelector.InfoAlpha or 0, 1)
+    if JudgeSelector.InfoWeapon ~= wep then
+        JudgeSelector.InfoWeapon = wep
+        JudgeSelector.InfoAlpha = 0
+    end
+    local fade = JudgeSelector.InfoAlpha * JudgeSelector.InfoAlpha * (3 - 2 * JudgeSelector.InfoAlpha)
+    if fade < 0.001 then return end
+
+    local paddingX = math.max(8, math.floor(ScreenScale(5) + 0.5))
+    local paddingY = math.max(6, math.floor(ScreenScale(4) + 0.5))
+    local innerWide = wide - paddingX * 2
+    surface.SetFont("ZCityJudgeInfoText")
+    local _, fontTall = surface.GetTextSize("Wg")
+    local lineTall = fontTall + math.max(2, math.floor(ScreenScale(1) + 0.5))
+    local gap = math.floor(ScreenScale(3) + 0.5)
+    local authorLines = author ~= "" and ZCityJudgeWrapText(author, "ZCityJudgeInfoText", innerWide) or {}
+    local infoLines = instructions ~= "" and ZCityJudgeWrapText(instructions, "ZCityJudgeInfoText", innerWide) or {}
+    local contentTall = 0
+    if #authorLines > 0 then contentTall = contentTall + lineTall + #authorLines * lineTall end
+    if #infoLines > 0 then contentTall = contentTall + (#authorLines > 0 and gap or 0) + lineTall + #infoLines * lineTall end
+    if contentTall <= 0 then return end
+
+    local tall = contentTall + paddingY * 2
+    surface.SetDrawColor(judgePanel.r, judgePanel.g, judgePanel.b, alpha * fade * 220)
+    surface.DrawRect(x, y, wide, tall)
+    ZCityJudgeCorners(x, y, wide, tall, alpha * fade, 0)
+
+    local textX, textY = x + paddingX, y + paddingY
+    local labelColor = Color(judgeAccent.r, judgeAccent.g, judgeAccent.b, alpha * fade * 200)
+    local textColor = Color(200, 200, 200, alpha * fade * 255)
+    if #authorLines > 0 then
+        draw.DrawText("Manufacturer", "ZCityJudgeInfoLabel", textX, textY, labelColor, TEXT_ALIGN_LEFT)
+        textY = textY + lineTall
+        for _, line in ipairs(authorLines) do
+            draw.DrawText(line, "ZCityJudgeInfoText", textX, textY, textColor, TEXT_ALIGN_LEFT)
+            textY = textY + lineTall
+        end
+    end
+    if #infoLines > 0 then
+        if #authorLines > 0 then textY = textY + gap end
+        draw.DrawText("Information", "ZCityJudgeInfoLabel", textX, textY, labelColor, TEXT_ALIGN_LEFT)
+        textY = textY + lineTall
+        for _, line in ipairs(infoLines) do
+            draw.DrawText(line, "ZCityJudgeInfoText", textX, textY, textColor, TEXT_ALIGN_LEFT)
+            textY = textY + lineTall
+        end
+    end
+end
+
+local function ZCityJudgeWeaponTable(ply)
+    if not IsValid(ply) or not ply:Alive() then return end
+
+    local weapons = ply:GetWeapons()
+    local cache = JudgeSelector.WeaponTableCache
+    local validCount = 0
+    local cacheValid = cache and cache.ply == ply
+    for _, wep in ipairs(weapons) do
+        if not IsValid(wep) then continue end
+        validCount = validCount + 1
+        if cacheValid then
+            local cached = cache.meta[wep]
+            if not cached
+                or cached.slot ~= (tonumber(wep.Slot) or 0)
+                or cached.position ~= (tonumber(wep.SlotPos) or 0)
+                or cached.class ~= wep:GetClass() then
+                cacheValid = false
+            end
+        end
+    end
+    if cacheValid and cache.count == validCount then return cache.slots end
+
+    local validWeapons = {}
+    for _, wep in ipairs(weapons) do
+        if IsValid(wep) then validWeapons[#validWeapons + 1] = wep end
+    end
+    table.sort(validWeapons, function(a, b)
+        local slotA, slotB = tonumber(a.Slot) or 0, tonumber(b.Slot) or 0
+        if slotA ~= slotB then return slotA < slotB end
+        local posA, posB = tonumber(a.SlotPos) or 0, tonumber(b.SlotPos) or 0
+        if posA ~= posB then return posA < posB end
+        local classA, classB = a:GetClass(), b:GetClass()
+        return classA == classB and a:EntIndex() < b:EntIndex() or classA < classB
+    end)
+
+    local slots = {}
+    for slot = 0, 5 do slots[slot] = {count = 0} end
+    local meta = {}
+    for _, wep in ipairs(validWeapons) do
+        local slot = math.Clamp(tonumber(wep.Slot) or 0, 0, 5)
+        local slotTable = slots[slot]
+        slotTable[slotTable.count] = wep
+        slotTable.count = slotTable.count + 1
+        meta[wep] = {
+            slot = tonumber(wep.Slot) or 0,
+            position = tonumber(wep.SlotPos) or 0,
+            class = wep:GetClass(),
+        }
+    end
+
+    JudgeSelector.WeaponTableCache = {ply = ply, count = validCount, meta = meta, slots = slots}
+    return slots
+end
+
+local function ZCityJudgeFindWeapon(slots, target)
+    if not IsValid(target) then return end
+    for slot = 0, 5 do
+        local slotTable = slots[slot]
+        for position = 0, slotTable.count - 1 do
+            if slotTable[position] == target then return slot, position end
+        end
+    end
+end
+
+local function ZCityJudgeSelectedWeapon(slots)
+    slots = slots or ZCityJudgeWeaponTable(LocalPlayer())
+    local slotTable = slots and slots[JudgeSelector.SelectedSlot]
+    local wep = slotTable and slotTable[JudgeSelector.SelectedSlotPos]
+    return IsValid(wep) and wep or nil
+end
+
+local function ZCityJudgeSelectFallback(slots, ply)
+    local slot, position = ZCityJudgeFindWeapon(slots, ply:GetActiveWeapon())
+    if slot then
+        JudgeSelector.SelectedSlot, JudgeSelector.SelectedSlotPos = slot, position
+        return slots[slot][position]
+    end
+
+    for slotID = 0, 5 do
+        if slots[slotID].count > 0 then
+            JudgeSelector.SelectedSlot, JudgeSelector.SelectedSlotPos = slotID, 0
+            return slots[slotID][0]
+        end
+    end
+end
+
+local function ZCityJudgeIconInfo(icon)
+    if not icon then return end
+    local cache = isnumber(icon) and judgeTextureCache or judgeIconCache
+    local cached = cache[icon]
+    if cached then return icon, cached[1], cached[2] end
+
+    local wide, tall
+    if isnumber(icon) then
+        wide, tall = surface.GetTextureSize(icon)
+    elseif isfunction(icon.Width) and isfunction(icon.Height) and (not isfunction(icon.IsError) or not icon:IsError()) then
+        wide, tall = icon:Width(), icon:Height()
+    end
+    if not isnumber(wide) or not isnumber(tall) or wide <= 0 or tall <= 0 then return end
+
+    cache[icon] = {wide, tall}
+    return icon, wide, tall
+end
+
+local function ZCityJudgeDrawIcon(wep, x, y, wide, tall, alpha, muted)
+    local icon, iconWide, iconTall = ZCityJudgeIconInfo(wep.WepSelectIcon2)
+    if not icon then icon, iconWide, iconTall = ZCityJudgeIconInfo(wep.WepSelectIcon) end
+    if not icon then return false end
+
+    local pad = math.max(2, math.floor(ScreenScale(1.5) + 0.5))
+    wide, tall = wide - pad * 2, tall - pad * 2
+    if wide <= 0 or tall <= 0 then return false end
+    local scale = math.min(wide / iconWide, tall / iconTall) * (muted and 0.95 or math.Clamp(tonumber(wep.WSIconScale) or 1.05, 0.75, 1.15))
+    local drawWide, drawTall = iconWide * scale, iconTall * scale
+    local drawX, drawY = x + (wide - drawWide) * 0.5 + pad, y + (tall - drawTall) * 0.5 + pad
+
+    render.PushFilterMag(TEXFILTER.ANISOTROPIC)
+    render.PushFilterMin(TEXFILTER.ANISOTROPIC)
+    local tint = muted and judgeInactiveIcon or color_white
+    surface.SetDrawColor(tint.r, tint.g, tint.b, alpha)
+    if isnumber(icon) then surface.SetTexture(icon) else surface.SetMaterial(icon) end
+    surface.DrawTexturedRect(drawX, drawY, drawWide, drawTall)
+    render.PopFilterMin()
+    render.PopFilterMag()
+    return true
+end
+
+local function ZCityJudgeFitName(name, maxWide)
+    local font = "ZCityJudgeWeaponName"
+    surface.SetFont(font)
+    if surface.GetTextSize(name) <= maxWide then return name, font end
+
+    font = "ZCityJudgeWeaponNameSmall"
+    surface.SetFont(font)
+    if surface.GetTextSize(name) <= maxWide then return name, font end
+
+    local suffix = "..."
+    while #name > 0 and surface.GetTextSize(name .. suffix) > maxWide do
+        name = string.sub(name, 1, #name - 1)
+    end
+    return name .. suffix, font
+end
+
+local function ZCityJudgeUTF8Length(text)
+    local length = 0
+    for index = 1, #text do
+        local byte = string.byte(text, index)
+        if byte < 128 or byte >= 192 then length = length + 1 end
+    end
+    return length
+end
+
+local function ZCityJudgeUTF8Prefix(text, characterCount)
+    if characterCount <= 0 then return "" end
+    local length = 0
+    for index = 1, #text do
+        local byte = string.byte(text, index)
+        if byte < 128 or byte >= 192 then
+            length = length + 1
+            if length > characterCount then return string.sub(text, 1, index - 1) end
+        end
+    end
+    return text
+end
+
+local function ZCityJudgeScramble(text)
+    text = tostring(text or "")
+    local ply = LocalPlayer()
+    if not ply.organism or not ply.organism.brain or ply.organism.brain <= 0.05 then return text end
+
+    local characters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|;:,.<>?"
+    local scrambled = {}
+    for index = 1, #text do
+        if string.sub(text, index, index) == " " then
+            scrambled[index] = " "
+        else
+            local character = math.random(#characters)
+            scrambled[index] = string.sub(characters, character, character)
+        end
+    end
+    return table.concat(scrambled)
+end
+
+ZCityJudgeCorners = function(x, y, wide, tall, alpha, flash)
+    local line = math.max(1, math.floor(ScreenScale(0.5) + 0.5))
+    local inset = math.max(2, math.floor(ScreenScale(1) + 0.5))
+    local length = math.min(math.max(line * 3, math.floor(ScreenScale(5) + 0.5)) + math.floor(ScreenScale(1.75) * flash), math.floor(math.min(wide, tall) / 2) - inset)
+    if length <= line then return end
+
+    local left, top = math.floor(x + inset), math.floor(y + inset)
+    local right, bottom = math.floor(x + wide - inset - line), math.floor(y + tall - inset - line)
+    local white = 190 + 65 * flash
+    surface.SetDrawColor(white, white, white, alpha * (160 + 38 * flash))
+    surface.DrawRect(left, top, length, line)
+    surface.DrawRect(left, top, line, length)
+    surface.DrawRect(right - length + line, bottom, length, line)
+    surface.DrawRect(right, bottom - length + line, line, length)
+end
+
+function JudgeSelector.Draw(ply)
+    if not IsValid(ply) or not ply:Alive() then return end
+    local now = CurTime()
+    if JudgeSelector.Show < now then
+        JudgeSelector.SelectedSlot = JudgeSelector.LastSelectedSlot
+        JudgeSelector.SelectedSlotPos = -1
+        JudgeSelector.Transparent = 0
+        JudgeSelector.InfoAlpha = 0
+        JudgeSelector.InfoWeapon = nil
+        return
+    end
+
+    local slots = ZCityJudgeWeaponTable(ply)
+    local selected = ZCityJudgeSelectedWeapon(slots) or ZCityJudgeSelectFallback(slots, ply)
+    if not IsValid(selected) then return end
+    JudgeSelector.Transparent = LerpFT(0.2, JudgeSelector.Transparent, math.min(JudgeSelector.Show - now, 1))
+
+    local screenWide, screenTall = ScrW(), ScrH()
+    local slotCount = 0
+    for slot = 0, 5 do if slots[slot].count > 0 then slotCount = slotCount + 1 end end
+    local cardWide = screenWide * 0.085
+    local columnGap = math.max(2, math.floor(ScreenScale(2) + 0.5))
+    local rowGap = math.max(1, math.floor(ScreenScale(1) + 0.5))
+    local groupWide = slotCount * cardWide + math.max(0, slotCount - 1) * columnGap
+    local x = (screenWide - groupWide) * 0.5
+    local firstY = screenTall * 0.05
+    local compactTall, selectedTall = screenTall * 0.025, screenTall * 0.12
+
+    for slot = 0, 5 do
+        local slotTable = slots[slot]
+        if slotTable.count < 1 then continue end
+        local rowY = firstY
+        local badgeTarget = slot == JudgeSelector.SelectedSlot and 1 or 0
+        JudgeSelector.SlotBadgeAnim[slot] = LerpFT(0.18, JudgeSelector.SlotBadgeAnim[slot] or 0, badgeTarget)
+        local badgeAlpha = JudgeSelector.Transparent * JudgeSelector.SlotBadgeAnim[slot] * 255
+        if badgeAlpha > 0.5 then
+            local badgeSize = math.floor(ScreenScale(7) + 0.5)
+            local badgeX, badgeY = math.floor(x + (cardWide - badgeSize) * 0.5), math.floor(firstY - badgeSize - ScreenScale(1.5))
+            surface.SetDrawColor(judgePanel.r, judgePanel.g, judgePanel.b, badgeAlpha * 0.8)
+            surface.DrawRect(badgeX, badgeY, badgeSize, badgeSize)
+            surface.SetDrawColor(judgeAccent.r, judgeAccent.g, judgeAccent.b, badgeAlpha * 0.32)
+            surface.DrawOutlinedRect(badgeX, badgeY, badgeSize, badgeSize, 1)
+            draw.SimpleText(slot + 1, "ZCityJudgeSlotBadge", badgeX + badgeSize * 0.5, badgeY + badgeSize * 0.5 - 2, Color(220, 220, 220, badgeAlpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+        end
+
+        for position = 0, slotTable.count - 1 do
+            local wep = slotTable[position]
+            local isSelected = wep == selected
+            local targetTall = isSelected and selectedTall or compactTall
+            local animation = JudgeSelector.BoxAnim[wep] or {tall = compactTall}
+            JudgeSelector.BoxAnim[wep] = animation
+            animation.tall = LerpFT(0.18, animation.tall, targetTall)
+            local drawTall = animation.tall
+            surface.SetDrawColor(judgePanel.r, judgePanel.g, judgePanel.b, JudgeSelector.Transparent * (isSelected and 220 or 135))
+            surface.DrawRect(x, rowY, cardWide, drawTall)
+
+            if isSelected then
+                local cornerLength, inset, cornerSafe = math.max(3, math.floor(ScreenScale(5) + 0.5)), math.max(2, math.floor(ScreenScale(1) + 0.5)), 0
+                cornerSafe = inset + cornerLength + math.max(1, math.floor(ScreenScale(0.5) + 0.5))
+                local titleTall = math.max(ScreenScale(8), compactTall)
+                local titleY = rowY + drawTall - titleTall
+                local fittedName, font = ZCityJudgeFitName(ZCityJudgeScramble(WS.GetPrintName(wep)), math.max(0, cardWide - cornerSafe * 2))
+                surface.SetFont(font)
+                local nameWide, nameTall = surface.GetTextSize(fittedName)
+                surface.SetDrawColor(judgeAccent.r, judgeAccent.g, judgeAccent.b, JudgeSelector.Transparent * 45)
+                surface.DrawRect(x + ScreenScale(3), titleY, cardWide - ScreenScale(6), 1)
+                if JudgeSelector.NameAnimWeapon ~= wep then
+                    JudgeSelector.NameAnimWeapon = wep
+                    JudgeSelector.NameAnimStarted = nil
+                end
+                local nameRoom = titleY - rowY - cornerSafe
+                local nameReveal = math.Clamp(nameRoom / math.max(1, ScreenScale(3)), 0, 1)
+                if nameReveal >= 0.65 then JudgeSelector.NameAnimStarted = JudgeSelector.NameAnimStarted or now end
+                local characters = ZCityJudgeUTF8Length(fittedName)
+                local duration = math.Clamp(characters * 0.02, 0.14, 0.27)
+                local visibleCharacters = JudgeSelector.NameAnimStarted and math.min(characters, math.floor((now - JudgeSelector.NameAnimStarted) / duration * characters)) or 0
+                local visibleName = ZCityJudgeUTF8Prefix(fittedName, visibleCharacters)
+                render.SetScissorRect(math.ceil(x + cornerSafe), math.ceil(titleY), math.floor(x + cardWide - cornerSafe), math.floor(rowY + drawTall - ScreenScale(1)), true)
+                draw.DrawText(visibleName, font, x + (cardWide - nameWide) * 0.5 + 1, titleY + (titleTall - nameTall) * 0.5 - ScreenScale(1) + 1, Color(judgeShadow.r, judgeShadow.g, judgeShadow.b, JudgeSelector.Transparent * nameReveal * 210), TEXT_ALIGN_LEFT)
+                draw.DrawText(visibleName, font, x + (cardWide - nameWide) * 0.5, titleY + (titleTall - nameTall) * 0.5 - ScreenScale(1), Color(judgeName.r, judgeName.g, judgeName.b, JudgeSelector.Transparent * nameReveal * 255), TEXT_ALIGN_LEFT)
+                render.SetScissorRect(0, 0, 0, 0, false)
+
+                local iconLeft, iconTop = math.ceil(x + cornerSafe), math.ceil(rowY + cornerSafe)
+                local iconRight, iconBottom = math.floor(x + cardWide - cornerSafe), math.floor(titleY - ScreenScale(1.25))
+                if iconRight > iconLeft and iconBottom > iconTop then
+                    render.SetScissorRect(iconLeft, iconTop, iconRight, iconBottom, true)
+                    local drawn = ZCityJudgeDrawIcon(wep, iconLeft, iconTop, iconRight - iconLeft, iconBottom - iconTop, JudgeSelector.Transparent * 255, false)
+                    if not drawn and wep.DrawWeaponSelection then wep:DrawWeaponSelection(iconLeft, iconTop, iconRight - iconLeft, iconBottom - iconTop, JudgeSelector.Transparent * 230) end
+                    render.SetScissorRect(0, 0, 0, 0, false)
+                end
+
+                if JudgeSelector.CornerFlashWeapon ~= wep then
+                    JudgeSelector.CornerFlashWeapon = wep
+                    JudgeSelector.CornerFlashStarted = now
+                end
+                local age = now - (JudgeSelector.CornerFlashStarted or now)
+                local flash = age < 0.1 and math.Clamp(age / 0.1, 0, 1) or age < 0.3 and math.Clamp(1 - (age - 0.1) / 0.2, 0, 1) or 0
+                ZCityJudgeCorners(x, rowY, cardWide, drawTall, JudgeSelector.Transparent, flash)
+            else
+                ZCityJudgeDrawIcon(wep, x, rowY, cardWide, drawTall, JudgeSelector.Transparent * 95, true)
+            end
+            rowY = rowY + drawTall + rowGap
+        end
+        x = x + cardWide + columnGap
+    end
+
+    local infoWide = math.min(screenWide * 0.22, 320)
+    ZCityJudgeDrawInfoPanel(selected, screenWide - infoWide - math.floor(ScreenScale(8) + 0.5), math.floor(screenTall * 0.055 + 0.5), infoWide, JudgeSelector.Transparent)
+end
+
+local function ZCityJudgeStep(slots, direction, useSelected)
+    local ordered, index = {}, nil
+    local selected = useSelected and ZCityJudgeSelectedWeapon(slots) or LocalPlayer():GetActiveWeapon()
+    for slot = 0, 5 do
+        for position = 0, slots[slot].count - 1 do
+            local entry = {slot = slot, position = position, wep = slots[slot][position]}
+            ordered[#ordered + 1] = entry
+            if entry.wep == selected then index = #ordered end
+        end
+    end
+    if #ordered < 1 then return false end
+    index = index or (direction > 0 and 0 or 1)
+    local entry = ordered[((index - 1 + direction) % #ordered) + 1]
+    JudgeSelector.SelectedSlot, JudgeSelector.SelectedSlotPos = entry.slot, entry.position
+    return true
+end
+
+local judgeLastBind
+local judgeLastBindCode
+local judgeLastBindTime = 0
+
+function JudgeSelector.Change(ply, key, pressed, code)
+    if pressed == false or not IsValid(ply) or not ply:Alive() or (ply.organism and ply.organism.otrub) then return end
+    local active = ply:GetActiveWeapon()
+    if IsAiming(ply) or (IsValid(active) and active:GetClass() == "weapon_physgun" and ply:KeyDown(IN_ATTACK)) then return end
+
+    key = string.lower(string.match(tostring(key or ""), "^([^%s;]+)") or "")
+    local slot = judgeAcceptKeys[key]
+    if not slot and key ~= "invnext" and key ~= "invprev" and key ~= "lastinv" then return end
+    if key == "lastinv" and not IsValid(JudgeSelector.LastInv) then return end
+    local bindTime = SysTime()
+    if slot and key == judgeLastBind and code == judgeLastBindCode and bindTime - judgeLastBindTime < 0.075 then return true end
+
+    local slots = ZCityJudgeWeaponTable(ply)
+    if slot and slots[slot - 1].count < 1 then return true end
+    judgeLastBind = key
+    judgeLastBindCode = code
+    judgeLastBindTime = bindTime
+    local wasOpen = JudgeSelector.Show > CurTime()
+    JudgeSelector.Show = CurTime() + 4
+    surface.PlaySound("arc9_eft_shared/weapon_generic_rifle_spin" .. math.random(10) .. ".ogg")
+    if slot then
+        slot = slot - 1
+        JudgeSelector.SelectedSlotPos = wasOpen and JudgeSelector.SelectedSlot == slot and (JudgeSelector.SelectedSlotPos + 1) % slots[slot].count or 0
+        JudgeSelector.SelectedSlot = slot
+    elseif key == "invnext" then
+        ZCityJudgeStep(slots, 1, wasOpen)
+    elseif key == "invprev" then
+        ZCityJudgeStep(slots, -1, wasOpen)
+    else
+        JudgeSelector.Show = 0
+        local previous = ply:GetActiveWeapon()
+        ZCitySelectInventoryWeapon(JudgeSelector.LastInv)
+        JudgeSelector.LastInv = previous
+    end
+    return true
+end
+
+function JudgeSelector.Select(ply, cmd)
+    if not IsValid(ply) or not ply:Alive() or JudgeSelector.Show <= CurTime() then return end
+    if not cmd:KeyDown(IN_ATTACK) and not cmd:KeyDown(IN_ATTACK2) then return end
+    cmd:RemoveKey(IN_ATTACK)
+    cmd:RemoveKey(IN_ATTACK2)
+    if JudgeSelector.Selected and JudgeSelector.Selected > CurTime() then return end
+
+    local target = ZCityJudgeSelectedWeapon()
+    local active = ply:GetActiveWeapon()
+    if IsValid(target) then
+        if target ~= active then JudgeSelector.LastInv = IsValid(active) and active or nil end
+        ZCitySelectInventoryWeapon(target)
+    end
+    JudgeSelector.LastSelectedSlot = JudgeSelector.SelectedSlot
+    JudgeSelector.LastSelectedSlotPos = JudgeSelector.SelectedSlotPos
+    JudgeSelector.Selected = CurTime() + 0.2
+    JudgeSelector.Show = CurTime() + 0.2
+    surface.PlaySound("arc9_eft_shared/weapon_generic_spin" .. math.random(1, 10) .. ".ogg")
+end
+
+SimpleSelector.Draw = JudgeSelector.Draw
+SimpleSelector.Change = JudgeSelector.Change
+SimpleSelector.Select = JudgeSelector.Select
 
 WS.BodyAlpha = WS.BodyAlpha or 0
 WS.HoldStart = WS.HoldStart or 0
