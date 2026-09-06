@@ -562,11 +562,6 @@ if CLIENT then
 	end
 end
 
-function SWEP:PrimaryShootPost()
-	if not CLIENT then return end
-	if self.reload then return end
-	if not self:ShouldUseFakeModel() then return end
-
 SWEP.ReloadSlideAnim = {
 	0,
 	0,
@@ -639,3 +634,29 @@ SWEP.InspectAnimWepAng = {
 	Angle(0,0,0),
 	Angle(0,0,0)
 }
+
+function SWEP:PrimaryShootPost()
+	if not CLIENT then return end
+	if self.reload then return end
+	if not self:ShouldUseFakeModel() then return end
+
+	local worldModel = self:GetWM()
+	if not IsValid(worldModel) then return end
+
+	local selectedSequence
+	for _, sequenceName in ipairs(self.FireAnimCandidates) do
+		local sequenceID = worldModel:LookupSequence(sequenceName)
+		if sequenceID ~= nil and sequenceID >= 0 then
+			selectedSequence = sequenceName
+			break
+		end
+	end
+
+	if not selectedSequence then return end
+
+	self.AnimList.fire = selectedSequence
+	self:PlayAnim("fire", self.FireAnimTime, false, function()
+		if not IsValid(self) then return end
+		self:PlayAnim("idle", 1, not self.NoIdleLoop)
+	end)
+end

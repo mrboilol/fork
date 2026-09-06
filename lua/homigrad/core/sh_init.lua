@@ -34,7 +34,7 @@ end
 
 DEFAULT_JUMP_POWER = 200
 
-function hg.CalculateWeight(ply, maxweight)
+function hg.GetCarryWeight(ply)
 	local weight = 0
 
 	local weps = ply:GetWeapons()
@@ -56,8 +56,12 @@ function hg.CalculateWeight(ply, maxweight)
 		end
 	end
 
-	local weightmul = (1 / (weight / maxweight + 1))
-	return weightmul
+	return weight
+end
+
+function hg.CalculateWeight(ply, maxweight)
+	local weight = hg.GetCarryWeight(ply)
+	return 1 / (weight / maxweight + 1)
 end
 
 hg.IdealMassPlayer = {

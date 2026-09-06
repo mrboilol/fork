@@ -297,6 +297,7 @@ local lfang0 = Angle(0,-7,0)
 local vec_zero = Vector(0,0,0)
 local l_finger02 = Angle(-10,0,0)
 function SWEP:AnimHoldPost()
+end
 
 SWEP.FireAnimTime = 0.15
 SWEP.FireAnimCandidates = {"fire", "fire1"}
