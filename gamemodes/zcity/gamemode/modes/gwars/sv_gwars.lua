@@ -25,7 +25,7 @@ local GWARS_TEAMS = {
 		accessoryChance = 0.4,
 		haircuts = {"haircut", "long haircut", "The witcher haircut", "Half haircut", "haircut gorshok", "modcut", "mohawk (dlya daynov)"},
 		haircutChance = 0.5,
-		hats = {"baseball cap", "fedora", "stetson", "straw hat", "sun hat", "bling cap", "top hat", "ZCity cap", "Usec cap", "pompon", "bomber"},
+		hats = {"baseball cap", "fedora", "stetson", "straw hat", "sun hat", "bling cap", "top hat", "ZCity cap", "Usec cap", "petushok...", "bomber"},
 	},
 }
 

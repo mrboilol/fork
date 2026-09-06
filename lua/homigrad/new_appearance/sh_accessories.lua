@@ -1776,7 +1776,7 @@ hg.Accessories = {
         placement = "head",
     },
 
-    ["pompon"] = {
+    ["petushok..."] = {
         model = "models/eft_props/gear/headwear/head_pompon.mdl",
         bone = "ValveBiped.Bip01_Head1",
         malepos = {Vector(2.7,-0.6,0.1),Angle(180,105,90),1},
