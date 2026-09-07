@@ -105,7 +105,6 @@ local function IsDroppableAccessory(accessory)
 end
 
 function APmodule.TraceAccessoryShot(ent, startPos, endPos, seen, hits, padding)
-	if isfunction(ent.SetupBones) then ent:SetupBones() end
 	local accessories = ent:GetNetVar("Accessories", {})
 	if !istable(accessories) or table.IsEmpty(accessories) then
 		local wearer = GetAccessoryWearer(ent)

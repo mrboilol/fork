@@ -27,7 +27,7 @@ local DEATH_MESSAGES = {
     { title = "ez", desc = "noob" },
     { title = "FUCK", desc = "FUCK THIS SHITTY GAME NOT FAIR GRR NIG" },
     { title = "back to the lobby", desc = "wait i didnt see what happened" },
-    { title = "even john is better than you", desc = "you fucking noob" },
+    { title = "john is better than you", desc = "you fucking noob" },
 }
 
 local DEATH_SOUNDS = {

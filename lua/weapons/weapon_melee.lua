@@ -3048,6 +3048,19 @@ local function QueueMeleeHitStop(self, speedMul, pause, reverse, stopanim)
     end)
 end
 
+local function TraceMeleeAttack(self, owner, ent, vellen, attacktype, inattackLength)
+    if CLIENT then return self:Attack(owner, ent, vellen, attacktype, inattackLength) end
+
+    owner:LagCompensation(true)
+    local ok, trace = xpcall(function()
+        return self:Attack(owner, ent, vellen, attacktype, inattackLength)
+    end, debug.traceback)
+    owner:LagCompensation(false)
+
+    if not ok then error(trace, 0) end
+    return trace
+end
+
 function SWEP:CustomThink()
     local owner = self:GetOwner()
     local actwep = owner.GetActiveWeapon and owner:GetActiveWeapon()
@@ -3224,11 +3237,7 @@ function SWEP:CustomThink()
         local mul = self:MultiplyDMG(owner, ent, vellen, 1)
         
         if self:GetAttackType() == 1 and inattack1 == 0 then
-            owner:LagCompensation(true)
-            
-            local trace = self:Attack(owner, ent, vellen, false, inattackL1)
-
-            owner:LagCompensation(false)
+            local trace = TraceMeleeAttack(self, owner, ent, vellen, false, inattackL1)
 
             local ownerVel = owner:GetVelocity()
             ownerVel.z = 0
@@ -3403,11 +3412,7 @@ function SWEP:CustomThink()
                 self.ComboAppliedThisAttack = nil
             end
         elseif self:GetAttackType() == 2 and inattack2 == 0 then
-            owner:LagCompensation(true)
-            
-            local trace = self:Attack(owner, ent, vellen, true, inattackL2)
-
-            owner:LagCompensation(false)
+            local trace = TraceMeleeAttack(self, owner, ent, vellen, true, inattackL2)
 
             if !trace then return end
             if self:ShouldAbortForClash() then return end
@@ -3576,11 +3581,7 @@ function SWEP:CustomThink()
                 self.ComboAppliedThisAttack = nil
             end
         elseif self:GetAttackType() == 3 and inattack3 == 0 then
-            owner:LagCompensation(true)
-            
-            local trace = self:Attack(owner, ent, vellen, 3, inattackL3)
-
-            owner:LagCompensation(false)
+            local trace = TraceMeleeAttack(self, owner, ent, vellen, 3, inattackL3)
 
             local ownerVel = owner:GetVelocity()
             ownerVel.z = 0
