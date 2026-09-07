@@ -192,7 +192,7 @@ local function ShouldHideAccessoryInFirstPerson(accessData, islply)
 end
 
 function DrawAccesories(ply, ent, accessories,accessData, islply, force, setup)
-	if not accessories then return end
+	if not accessories or accessories == "none" then return end
 	if not accessData then return end
 
 	ply.modelAccess = ply.modelAccess or {}
