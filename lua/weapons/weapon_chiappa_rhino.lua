@@ -324,18 +324,6 @@ if SERVER then
 	end
 end
 
-local phrases = {
-	"Didn't fire...",
-	"Lucky me...",
-	"I thought that was it...",
-	"Still not dead...",
-	"I knew it wasn't there! I really did!..",
-	"FUCK- Thought it would fire...",
-	"HELL YEAH!",
-	"Luck is on my side!",
-}
-
-local clr_notify = Color(122, 0, 0)
 function SWEP:Shoot(override)
 	if not self:CanPrimaryAttack() then return false end
 	if self:KeyDown(IN_USE) and !IsValid(self:GetOwner().FakeRagdoll) then return false end
@@ -354,13 +342,6 @@ function SWEP:Shoot(override)
 		primary.Automatic = false
 		self:ShiftDrum(1)
 		self.shooanim = 1
-
-		local ply = self:GetOwner()
-		if SERVER and IsValid(ply) and ply:IsPlayer() and ply.organism and self.Rolled and self:Clip1() > 0 and ply.suiciding and ply:GetNWFloat("willsuicide") < CurTime() then
-			ply.organism.adrenalineAdd = ply.organism.adrenalineAdd + self:Clip1()
-			ply.organism.fearadd = ply.organism.fearadd + 0.5
-			ply:Notify(phrases[math.random(#phrases)], 1, "suicide", nil, nil, clr_notify)
-		end
 
 		return false
 	end

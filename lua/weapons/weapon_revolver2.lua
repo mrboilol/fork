@@ -376,18 +376,6 @@ function SWEP:SetDrum(drum)
 	self.DrumLastPredicted = CurTime() + 1
 end
 
-local phrases = {
-	"Didn't fire...",
-	"Lucky me...",
-	"I thought that was it...",
-	"Still not dead...",
-	"I knew it wasn't there! I really did!..",
-	"FUCK- Thought it would fire...",
-	"HELL YEAH!",
-	"Luck is on my side!",
-}
-
-local clr_notify = Color(122, 0, 0)
 function SWEP:Shoot(override)
 	--self:GetWeaponEntity():ResetSequenceInfo()
 	--self:GetWeaponEntity():SetSequence(1)
@@ -410,13 +398,8 @@ function SWEP:Shoot(override)
 		self.shooanim = 1
 
 		local ply = self:GetOwner()
-		if SERVER and IsValid(ply) and ply:IsPlayer() then
+		if SERVER and IsValid(ply) and ply:IsPlayer() and not ply.suiciding then
 			hook.Run("HG_RussianRouletteSurvived", ply)
-		end
-		if SERVER and IsValid(ply) and ply:IsPlayer() and ply.organism and self.Rolled and self:Clip1() > 0 and ply.suiciding and ply:GetNWFloat("willsuicide") < CurTime() then
-			ply.organism.adrenalineAdd = ply.organism.adrenalineAdd + self:Clip1()
-			ply.organism.fearadd = ply.organism.fearadd + 0.5
-			ply:Notify(phrases[math.random(#phrases)], 1, "suicide", nil, nil, clr_notify)
 		end
 
 		return false

@@ -3095,6 +3095,8 @@ function SWEP:CustomThink()
             else
                 local dmgInfo = DamageInfo()
                 dmgInfo:SetDamageType(DMG_SLASH)
+                dmgInfo:SetAttacker(owner)
+                dmgInfo:SetInflictor(self)
 
                 local org = owner.organism
                 local ent = hg.GetCurrentCharacter(owner)
