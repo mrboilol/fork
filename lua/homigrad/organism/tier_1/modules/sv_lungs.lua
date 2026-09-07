@@ -495,7 +495,12 @@ module[2] = function(owner, org, timeValue)
 	local opioidRespiratoryDepression = math.Clamp((analgesiaLoad + painkillerLoad) * (1 - naloxoneProtection), 0, 1)
 	local zerlkersRespiratoryDepression = math.Clamp(org.zerlkersOverdose or 0, 0, 1)
 	local drugRespiratoryDepression = math.max(opioidRespiratoryDepression, zerlkersRespiratoryDepression)
-	local bradyapnea = math.Clamp((drugRespiratoryDepression - 0.08) / 0.92, 0, 1)
+	local leftLungDamage = math.Clamp(tonumber(org.lungsL[1]) or 0, 0, 1)
+	local rightLungDamage = math.Clamp(tonumber(org.lungsR[1]) or 0, 0, 1)
+	local lungDamage = (leftLungDamage + rightLungDamage) / 2
+	local lungBradyapnea = math.Clamp(lungDamage ^ 1.35, 0, 1)
+	local drugBradyapnea = math.Clamp((drugRespiratoryDepression - 0.08) / 0.92, 0, 1)
+	local bradyapnea = math.max(drugBradyapnea, lungBradyapnea)
 	org.opioidRespiratoryDepression = opioidRespiratoryDepression
 	org.drugRespiratoryDepression = drugRespiratoryDepression
 	org.bradyapnea = bradyapnea
@@ -688,7 +693,7 @@ module[2] = function(owner, org, timeValue)
 	-- Relative arterial oxygenation (0..30 game scale). The nonlinear reserve
 	-- means moderate gas-exchange impairment does not immediately equal severe
 	-- arterial desaturation.
-	local lungGasExchange = math.Clamp(((1 - (org.lungsL[1] or 0)) + (1 - (org.lungsR[1] or 0))) / 2, 0, 1)
+	local lungGasExchange = 1 - lungDamage
 	local airwayGasExchange = math.Clamp(1 - (org.trachea or 0) * 0.8, 0, 1)
 	local thoracicGasExchange = math.Clamp(1 - (org.pneumothorax or 0) * 0.70 - (org.hemothorax or 0) * 0.65, 0, 1)
 	local respiratoryDrive = math.Clamp(1 - drugRespiratoryDepression * 0.95, 0, 1)
@@ -806,7 +811,7 @@ module[2] = function(owner, org, timeValue)
 		-- The reserve cap must follow remaining lung tissue as well as the intake
 		-- rate above.  A small floor keeps a critically injured but not yet fully
 		-- failed lung from snapping to zero in one tick.
-		local lungO2Cap = o2.range * math.max(1 - org.pneumothorax * org.pneumothorax, 0.1) * math.max(1 - (org.hemothorax or 0) * (org.hemothorax or 0), 0.1) * math.max(1 - (org.lungsL[1] + org.lungsR[1]) / 2, 0.1)
+		local lungO2Cap = o2.range * math.max(1 - org.pneumothorax * org.pneumothorax, 0.1) * math.max(1 - (org.hemothorax or 0) * (org.hemothorax or 0), 0.1) * math.max(1 - lungDamage, 0.1)
 		o2[1] = min(o2[1] + regenerate * math.Clamp(org.o2[1] / 30, 0.25, 1) * (org.holdingbreath and 0 or 1) * (sprayed and 0 or 1) * min((10 / max(org.CO,1)),1), min(lungO2Cap, bloodO2Cap, coldO2Cap, altitudeO2Cap, exertionO2Cap))
 
 

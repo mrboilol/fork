@@ -49,6 +49,9 @@ local checkUse = {
 }
 
 hook.Add("FindUseEntity", "findhguse", function(ply, heldent)
+	local pickupEnt = hg.GetPickupUseEntity and hg.GetPickupUseEntity(ply)
+	if IsValid(pickupEnt) then return pickupEnt end
+
 	if IsValid(heldent) and heldent:GetClass() == "button" then return heldent end
 
 	if not ply:KeyDown(IN_USE) then return false end

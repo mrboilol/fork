@@ -497,48 +497,105 @@ function playerMeta:GetLookTrace()
     return util.TraceLine(tr)
 end
 
-hook.Add("Player Think", "loot-fellows",function(ply)
-    if not ply:Alive() then return end
+local function IsSearchableContainer(ent)
+    if not IsValid(ent) or ent:IsWorld() then return false end
+    if ent.IsSearchableContainer == true or ent:GetNWBool("hgSearchableContainer", false) then return true end
+
+    local model = string.lower(ent:GetModel() or "")
+    if hg.loot_boxes and hg.loot_boxes[model] then return true end
+    if hg.SandboxContainerModels and hg.SandboxContainerModels[model] then return true end
+    return false
+end
+
+local function IsKnownLootEntity(ent)
+    if not IsValid(ent) or ent:IsWorld() then return false end
+    return ent:GetNetVar("Inventory") ~= nil or IsSearchableContainer(ent)
+end
+
+local function ResolveLootEntityFromTrace(ply, trace)
+    if not trace then return end
+
+    local traced = trace.Entity
+    local owner = hg.RagdollOwner(traced)
+    local ent = IsValid(owner) and owner or traced
+    if IsKnownLootEntity(ent) or (IsValid(ent) and ent:IsPlayer()) then return ent end
+
+    local hitPos = trace.HitPos
+    if not isvector(hitPos) then return ent end
+
+    local best
+    local bestDistance
+    for _, candidate in ipairs(ents.FindInSphere(hitPos, 48)) do
+        if IsKnownLootEntity(candidate) then
+            local nearest = candidate.NearestPoint and candidate:NearestPoint(hitPos) or candidate:GetPos()
+            local distance = nearest:DistToSqr(hitPos)
+            if not bestDistance or distance < bestDistance then
+                best = candidate
+                bestDistance = distance
+            end
+        end
+    end
+
+    return best or ent
+end
+
+local function HandleLootInput(ply)
+    if not IsValid(ply) then return end
+    if not ply:Alive() then
+        ply.keypressed = false
+        return
+    end
     ply.keypressed = ply.keypressed or false
 
     local fakeRagdoll = IsValid(ply.FakeRagdoll)
-    local use = fakeRagdoll and (ply:KeyDown(IN_WALK) and ply:KeyDown(IN_SPEED) and not ply:KeyDown(IN_ATTACK) and not ply:KeyDown(IN_ATTACK2)) or (not fakeRagdoll and (ply:KeyDown(IN_ATTACK2) and ply:KeyDown(IN_USE)))
+    local use = fakeRagdoll and (ply:KeyDown(IN_WALK) and ply:KeyDown(IN_SPEED) and not ply:KeyDown(IN_ATTACK) and not ply:KeyDown(IN_ATTACK2)) or (not fakeRagdoll and ply:KeyDown(IN_ATTACK2) and ply:KeyDown(IN_USE))
     if not use then
         ply.keypressed = false
         return
     end
 
+    local trace = hg.eyeTrace(ply, 100)
+    if not trace then return end
+
+    local ent = ResolveLootEntityFromTrace(ply, trace)
     if not fakeRagdoll then
         local wep = ply:GetActiveWeapon()
-        if IsValid(wep) and wep.GetFists and wep:GetFists() then
+        if IsValid(wep) and wep.GetFists and wep:GetFists() and not IsKnownLootEntity(ent) then
             ply.keypressed = false
             return
         end
     end
 
-    local trace = hg.eyeTrace(ply, 60)
-    
-    if not trace then return end
-    local ent = trace.Entity
-    ent = IsValid(hg.RagdollOwner(ent)) and hg.RagdollOwner(ent) or ent
-		if IsValid(ent) and ent:IsPlayer() and ent ~= ply and ent:Alive() and ent.organism and not ent.organism.otrub then
-			if not ply.keypressed then ply:ChatPrint("You cant loot them, they are awake.") end
-			ply.keypressed = true
-			return
-		end
-		local _ply, _ent, canloot = hook.Run("ZB_CanLootInventory", ply, ent, canloot)
-		if canloot ~= nil and canloot == false then
-			ply.keypressed = true
-			return
-		end
-    
-        hook.Run("ZB_InventoryChecked", ply, ent)
-        
-        if not IsValid(ent) or not ent:GetNetVar("Inventory") then return end
-        
-        if not ply.keypressed then ply:OpenInventory(ent) end
-        
+    if IsValid(ent) and ent:IsPlayer() and ent ~= ply and ent:Alive() and ent.organism and not ent.organism.otrub then
+        if not ply.keypressed then ply:ChatPrint("You cant loot them, they are awake.") end
         ply.keypressed = true
+        return
+    end
+
+    local hookPly, hookEnt, canloot = hook.Run("ZB_CanLootInventory", ply, ent)
+    if canloot ~= nil and canloot == false then
+        if not ply.keypressed and IsValid(ent) and hookPly == ply and hookEnt == ent and IsSearchableContainer(ent) and hg.TryZManipInteract then
+            hg.TryZManipInteract(ply, ent, "interact")
+        end
+        ply.keypressed = true
+        return
+    end
+
+    hook.Run("ZB_InventoryChecked", ply, ent)
+    if not IsValid(ent) or not ent:GetNetVar("Inventory") then return end
+
+    if not ply.keypressed then
+        ply:OpenInventory(ent)
+        if hg.TryZManipInteract then hg.TryZManipInteract(ply, ent, "interact") end
+    end
+
+    ply.keypressed = true
+end
+
+hook.Add("Think", "loot-fellows", function()
+    for _, ply in ipairs(player.GetAll()) do
+        HandleLootInput(ply)
+    end
 end)
 
 --// Prop inventory example

@@ -10,8 +10,9 @@ function hg.RunZManipAnim(ply, anim, revers, timeOveride, additionalTbl)
 	net.SendPVS(ply:GetPos())
 end
 
-hook.Add("PlayerUse", "ZManipUseAnim", function(ply, ent)
-	--print(ent,ent.Use)
+function hg.TryZManipInteract(ply, ent, anim, applyPain)
+	if not IsValid(ply) or not ply:Alive() or not IsValid(ent) then return false end
+
 	local org = ply.organism
 	if org and org.larmamputated then
 		if IsValid(ply:GetNetVar("carryent")) or IsValid(ply:GetNetVar("carryent2")) then
@@ -19,28 +20,41 @@ hook.Add("PlayerUse", "ZManipUseAnim", function(ply, ent)
 		end
 	end
 
-	if IsValid(ent) and !ent:IsRagdoll() and ent.Use and (!ply.ZManipInteractCD or ply.ZManipInteractCD < CurTime()) and !hgIsDoor(ent) then
-		if string.find(ent:GetClass(), "prop") or string.find(ent:GetClass(), "breakable") or string.find(ent:GetClass(), "ladder") then return end
-		
-		local _, _, isBroken = hg.GetPrioritizedArm(ply)
-		ply.ZManipInteractCD = CurTime() + 0.95
-		ply.ZManipOldUse = ply:KeyDown(IN_USE)
-		local anim = (ent:IsWeapon() or ent.IsZPickup) and "interact" or "use"
+	if (ply.ZManipInteractCD or 0) >= CurTime() then return false end
 
-		-- Add pain if using broken arm to interact/pickup (only for the arm being used)
-		if org and isBroken then
-			local armVal = org.larm or 0
-			local disloc = org.larmdislocation
-			-- This may be charged alongside PlayerUse's generic arm-use check.
-			local painAmount = armVal * 3 + (disloc and 2 or 0)
-			org.painadd = (org.painadd or 0) + painAmount
-		end
+	local _, _, isBroken = hg.GetPrioritizedArm(ply)
+	ply.ZManipInteractCD = CurTime() + 0.95
+	ply.ZManipOldUse = ply:KeyDown(IN_USE)
 
-		--if ent:IsWeapon() then hg.RunZManipAnim(ply, anim) return end
-		timer.Simple(0,function()
-			if not IsValid(ply) or not IsValid(ent) then return end
-			hg.RunZManipAnim(ply, anim, nil, nil, {ent})
-		end)
+	if applyPain ~= false and org and isBroken then
+		local armVal = org.larm or 0
+		local disloc = org.larmdislocation
+		local painAmount = armVal * 3 + (disloc and 2 or 0)
+		org.painadd = (org.painadd or 0) + painAmount
+	end
+
+	timer.Simple(0, function()
+		if not IsValid(ply) or not IsValid(ent) then return end
+		hg.RunZManipAnim(ply, anim or "interact", nil, nil, {ent})
+	end)
+
+	return true
+end
+
+hook.Add("PlayerUse", "ZManipUseAnim", function(ply, ent)
+	if not IsValid(ent) or ent:IsRagdoll() or hgIsDoor(ent) then return end
+	if not ent.Use or ent.dontPickup then return end
+
+	local class = ent:GetClass()
+	local pickup = hg.CanPromptPickup and hg.CanPromptPickup(ply, ent)
+	if (string.find(class, "prop") or string.find(class, "breakable") or string.find(class, "ladder")) and not pickup then return end
+
+	hg.TryZManipInteract(ply, ent, pickup and "interact" or (ent:IsWeapon() or ent.IsZPickup) and "interact" or "use")
+end)
+
+hook.Add("OnPlayerPhysicsPickup", "ZManipPickupAnim", function(ply, ent)
+	if IsValid(ent) then
+		hg.TryZManipInteract(ply, ent, "interact")
 	end
 end)
 

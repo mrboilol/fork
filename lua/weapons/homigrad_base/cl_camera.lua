@@ -199,7 +199,7 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	if isvector(vellen) then
 		vellen = vellen:Length()
 	end
-	local slowlyZooming = math.Clamp((lastzoom - CurTime() + tta) / tta, inpain and 1 - (0.9 * painmul) or (0.10 * (math.Clamp(vellen / 200 * (ply:Crouching() and 0.5 or 1), 0, 1) * 15 + 1)), 1)
+	local slowlyZooming = math.Clamp((lastzoom - CurTime() + tta) / tta, inpain and 1 - (0.9 * painmul) or (0.10 * (math.Clamp(vellen / 200 * (self:IsOwnerCrouching(ply) and 0.5 or 1), 0, 1) * 15 + 1)), 1)
 	
 	if lastPosSelected + 0.1 * (inpain and 0.1 or 1) < CurTime() then
 		lastPosSelected = CurTime()

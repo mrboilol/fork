@@ -43,7 +43,7 @@ SWEP.WeaponRecoilMul = 1.45
 function SWEP:GetPrimaryMul()
 	local owner = self:GetOwner()
 	local caliberMul, weightMul = self:GetRecoilImpulseFactors()
-	local mul = math.Clamp(caliberMul * weightMul * 0.48, 0.16, 2.4) * (owner.Crouching and owner:Crouching() and self.CrouchMul or 1)
+	local mul = math.Clamp(caliberMul * weightMul * 0.48, 0.16, 2.4) * (self:IsOwnerCrouching(owner) and self.CrouchMul or 1)
 	self:ApplyForce(mul)
 	local experienceMul = self.GetWeaponExperienceMul and self:GetWeaponExperienceMul(owner) or 1
 	mul = (mul or 0) * (owner.organism and owner.organism.recoilmul or 1) * experienceMul
@@ -157,7 +157,7 @@ function SWEP:PrimarySpread()
 		mul = mul * self.RecoilMul
 		mul = mul * panicRecoilMul * combatAimMul
 		local screenRecoilMul = self.ScreenRecoilMul or 1
-		mul = mul * (owner:Crouching() and 0.75 or 1)
+		mul = mul * (self:IsOwnerCrouching(owner) and 0.75 or 1)
 		--mul = mul * (hg.IsOnGround(hg.GetCurrentCharacter(owner)) and 1 or 5)
 		mul = mul * (self:IsResting() and 0.1 or 1)
 

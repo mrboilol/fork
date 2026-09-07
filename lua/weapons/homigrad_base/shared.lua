@@ -281,10 +281,15 @@ function SWEP:GetPostureStabilityMul(aiming)
 	local owner = self:GetOwner()
 	if not IsValid(owner) then return 1 end
 	if self:IsResting() then return 0.32 end
-	if owner:Crouching() then return aiming and 0.72 or 0.82 end
+	if self:IsOwnerCrouching(owner) then return aiming and 0.72 or 0.82 end
 	if owner.posture == 3 or owner.posture == 4 then return aiming and 0.78 or 0.88 end
 	if owner.posture == 7 or owner.posture == 8 or owner.posture == 9 then return 1.2 end
 	return aiming and 0.9 or 1
+end
+
+function SWEP:IsOwnerCrouching(owner)
+	owner = owner or self:GetOwner()
+	return IsValid(owner) and isfunction(owner.Crouching) and owner:Crouching() or false
 end
 
 function SWEP:GetAimAlignmentTime(ply)

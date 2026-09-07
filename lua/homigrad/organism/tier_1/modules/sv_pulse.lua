@@ -63,6 +63,60 @@ local function getHemorrhageDanger(blood)
 	return math.Clamp((0.60 - volumeFraction) / 0.20, 0, 1) ^ 1.2
 end
 
+local function updateStrokeRisk(org, timeValue)
+	local bloodPressureRisk = math.max(
+		Remap(tonumber(org.bloodPressure) or 90, 110, 155, 0, 1),
+		Remap(tonumber(org.systolic) or 120, 160, 220, 0, 1),
+		math.Clamp(tonumber(org.hypertension) or 0, 0, 1)
+	)
+	local brainDamage = math.Clamp(math.max(
+		tonumber(org.brain) or 0,
+		tonumber(org.brainFrontal) or 0,
+		tonumber(org.brainParietal) or 0,
+		tonumber(org.brainTemporal) or 0,
+		tonumber(org.brainOccipital) or 0
+	), 0, 1)
+	local brainDamageRisk = Remap(brainDamage, 0.18, 0.65, 0, 1)
+	local cranialPressureRisk = math.max(
+		Remap(tonumber(org.intracranialPressure) or 0, 0.2, 0.75, 0, 1),
+		Remap(tonumber(org.brainSwelling) or 0, 0.35, 0.85, 0, 1)
+	)
+	local internalBleed = math.max(tonumber(org.internalBleedPeak) or 0, tonumber(org.internalBleed) or 0, 0)
+	local internalBleedRisk = Remap(internalBleed, 4, 12, 0, 1)
+	local internalBleedComplication = math.Clamp(tonumber(org.internalBleedComplication) or 0, 0, 1)
+	local cerebralPerfusionRisk = math.max(
+		Remap(1 - math.Clamp(tonumber(org.cerebralPerfusion) or 1, 0, 1), 0.35, 0.8, 0, 1),
+		Remap(1 - math.Clamp(tonumber(org.brainoxygen) or 1, 0, 1), 0.4, 0.85, 0, 1)
+	)
+	local internalStrokeRisk = math.Clamp(internalBleedRisk * 0.75 + internalBleedComplication * 0.25 + cerebralPerfusionRisk * 0.25, 0, 1)
+	local strokeRisk = math.Clamp(math.max(
+		bloodPressureRisk,
+		brainDamageRisk * 0.85,
+		cranialPressureRisk * 0.9,
+		internalStrokeRisk
+	), 0, 1)
+
+	org.strokeRisk = strokeRisk
+	local exposure = tonumber(org.strokeExposure) or 0
+	if strokeRisk > 0.35 then
+		exposure = math.min(exposure + timeValue * (strokeRisk - 0.35) / 18, 1)
+	else
+		exposure = math.max(exposure - timeValue / 45, 0)
+	end
+	org.strokeExposure = exposure
+	if exposure < 1 or (org.nextStrokeTime or 0) > CurTime() then return end
+
+	local severity = math.Clamp((strokeRisk - 0.35) / 0.65, 0, 1)
+	if hg.organism.AddBrainHemorrhage then
+		hg.organism.AddBrainHemorrhage(org, 0.025 + severity * 0.095, 0.00035 + severity * 0.00165)
+	else
+		org.brainHemorrhage = math.min((org.brainHemorrhage or 0) + 0.025 + severity * 0.095, 1)
+		org.brainBleedRate = math.min((org.brainBleedRate or 0) + 0.00035 + severity * 0.00165, 0.008)
+	end
+	org.strokeExposure = 0
+	org.nextStrokeTime = CurTime() + 8 + (1 - severity) * 16
+end
+
 function hg.organism.UpdateVitalHealthToll(owner, org, timeValue)
 	if not IsValid(owner) or not owner:IsPlayer() or not owner:Alive() then return end
 	if not hg.organism.OrganSystemsEnabled() or not hg.organism.CanTouchHealth or not hg.organism.CanTouchHealth(org) then
@@ -728,6 +782,9 @@ module[1] = function(org)
 	org.severeHypoxiaTime = 0
 	org.heartStrain = 0
 	org.hypertension = 0
+	org.strokeRisk = 0
+	org.strokeExposure = 0
+	org.nextStrokeTime = 0
 	org.sympatheticCompensation = 0
 	org.hypotension = 0
 	org.hypotensionExposure = 0
@@ -973,6 +1030,7 @@ module[2] = function(owner, org, timeValue)
 	org.prolongedHypotension = (org.hypotensionExposure or 0) >= hypotensionComplicationTime
 	org.hypertension = Approach(org.hypertension or 0, Clamp(Remap(circulation, 1.25, 1.68, 0, 1), 0, 1), timeValue / 20)
 	hg.organism.UpdatePerfusion(owner, org, timeValue)
+	updateStrokeRisk(org, timeValue)
 	-- Normalized stroke volume separates a fast electrical rate from how much
 	-- blood each effective beat is actually moving.
 	local rateFactor = math.max((org.heartbeat or 0) / 70, 0.1)

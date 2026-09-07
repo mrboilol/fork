@@ -640,6 +640,9 @@ function SWEP:SetCarrying(ent, bone, pos, dist)
 		self.CarryEnt = ent
 		self.CarryBone = bone
 		self.CarryDist = dist
+		if SERVER and IsValid(ent) and not ent:IsWorld() and hg.TryZManipInteract then
+			hg.TryZManipInteract(owner, ent, "interact", false)
+		end
 
 		local phys = self.CarryEnt:GetPhysicsObjectNum(self.CarryBone)
 

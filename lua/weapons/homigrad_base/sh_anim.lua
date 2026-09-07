@@ -224,7 +224,7 @@ function SWEP:AnimApply_ShootRecoil(time)
 	local animpos = self:GetAnimPos_Shoot(time, 0.3)
 	animpos = math.ease.InOutSine(animpos)
 	local experienceMul = self.GetWeaponExperienceMul and self:GetWeaponExperienceMul(owner) or 1
-	animpos = animpos * experienceMul * ((self:IsZoom() and self.SpreadMulZoom or self.SpreadMul) + math_max(self.Primary.Force / 110 - 1, 0)) * (( not owner:IsNPC() and owner:Crouching() ) and self.CrouchMul or 1) * 0.75
+	animpos = animpos * experienceMul * ((self:IsZoom() and self.SpreadMulZoom or self.SpreadMul) + math_max(self.Primary.Force / 110 - 1, 0)) * ((not owner:IsNPC() and self:IsOwnerCrouching(owner)) and self.CrouchMul or 1) * 0.75
 	animpos = animpos * self.AnimShootMul
 	--if animpos > 0 then
 		if CLIENT and (owner ~= LocalPlayer() or LocalPlayer() ~= GetViewEntity()) then
@@ -330,7 +330,7 @@ local function isMoving(ply)
 end
 
 local function isCrouching(ply)
-	return (hg.KeyDown(ply,IN_DUCK) or ply:Crouching()) and ply:OnGround()
+	return (hg.KeyDown(ply,IN_DUCK) or (isfunction(ply.Crouching) and ply:Crouching())) and ply:OnGround()
 end
 
 local ang1 = Angle(0, -10, -20)

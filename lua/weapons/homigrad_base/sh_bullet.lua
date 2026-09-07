@@ -788,7 +788,7 @@ function SWEP:FireBullet()
 			if isnumber(baseSpread) then baseSpread = math.max(baseSpread, 0.00075) end
 			local speed = owner:GetVelocity():Length2D()
 			accuracyMul = accuracyMul * (1 + math.Clamp(speed / 220, 0, 1) * 0.9)
-			accuracyMul = accuracyMul * (owner:Crouching() and 0.75 or 1)
+			accuracyMul = accuracyMul * (self:IsOwnerCrouching(owner) and 0.75 or 1)
 			accuracyMul = accuracyMul * (self:IsZoom() and 0.72 or 1)
 			accuracyMul = accuracyMul * (owner:OnGround() and 1 or 2.25)
 			accuracyMul = accuracyMul * (self:IsResting() and 0.45 or 1)
