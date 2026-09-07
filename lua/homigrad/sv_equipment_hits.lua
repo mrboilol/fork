@@ -312,6 +312,20 @@ local function WeaponImpact(ply, wep, hit, damage, force, direction)
     if math.Rand(0, 1) < math.min(chance, cfg.maxDropChance) then hg.DropWeaponFromImpact(ply, wep, direction, power) end
 end
 
+local function GetWeaponImpactAbsorption(wep, hit, direction, dmgInfo)
+    local directness = math.Clamp(-hit.normal:Dot(direction), 0, 1)
+    local absorbed = impact.Config.contactAbsorption * directness * math.Clamp(hit.thickness / 2, 0, 1)
+    local blocking = wep.GetBlocking and wep:GetBlocking() or false
+    local parry = false
+    if blocking and wep.GetStartedBlocking and wep.GetBlockParryWindow then
+        parry = CurTime() - wep:GetStartedBlocking() <= wep:GetBlockParryWindow()
+    end
+    local highFall = dmgInfo and dmgInfo:IsDamageType(DMG_FALL) and dmgInfo:GetDamageForce():Length() >= impact.Config.parryFallBreakSpeed
+    if blocking then absorbed = math.max(absorbed, impact.Config.blockAbsorption) end
+    if parry and not highFall then return 1, true end
+    return math.Clamp(absorbed, 0, 1), false
+end
+
 function hg.TryAbsorbEquipmentImpact(ent, dmgInfo, hitPos, direction, impactRadius)
     if impact.ProcessedDamage[dmgInfo] then return end
     if not IsValid(ent) or not isvector(hitPos) or not isvector(direction) or direction:LengthSqr() < 0.001 then return end
@@ -330,17 +344,8 @@ function hg.TryAbsorbEquipmentImpact(ent, dmgInfo, hitPos, direction, impactRadi
         local hit = model and hg.TraceEquipmentModel(model, pos, ang, scale, startPos, hitPos + dir, impact.Config.weaponHitPadding + radius)
         if hit then
             WeaponImpact(ply, wep, hit, damage, dmgInfo:GetDamageForce():Length(), dir)
-            local directness = math.Clamp(-hit.normal:Dot(dir), 0, 1)
-            local absorbed = impact.Config.contactAbsorption * directness * math.Clamp(hit.thickness / 2, 0, 1)
-            local blocking = wep.GetBlocking and wep:GetBlocking() or false
-            local parry = false
-            if blocking and wep.GetStartedBlocking and wep.GetBlockParryWindow then
-                parry = CurTime() - wep:GetStartedBlocking() <= wep:GetBlockParryWindow()
-            end
-            local highFall = dmgInfo:IsDamageType(DMG_FALL) and dmgInfo:GetDamageForce():Length() >= impact.Config.parryFallBreakSpeed
-            if blocking then absorbed = math.max(absorbed, impact.Config.blockAbsorption) end
-            if parry and not highFall then
-                absorbed = 1
+            local absorbed, weaponParry = GetWeaponImpactAbsorption(wep, hit, dir, dmgInfo)
+            if weaponParry then
                 parried = true
                 if wep.PlayBlockImpactEffect then
                     wep:PlayBlockImpactEffect({HitPos = hit.position, HitNormal = hit.normal}, wep, "parry")
@@ -377,6 +382,7 @@ function hg.TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, origin
         if not IsValid(body) then continue end
         SetupEntityBones(body)
         checkedBodies[body] = true
+        checkedBodies[ply] = true
         local wep = ply:GetActiveWeapon()
         if IsValid(wep) and not seen[wep] then
             local model, pos, ang, modelScale = hg.GetHeldWeaponImpactModel(ply, wep)
@@ -421,6 +427,7 @@ function hg.TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, origin
             return tr
         end
         if hit.weapon then
+            local absorbed, parry = GetWeaponImpactAbsorption(hit.weapon, hit, direction)
             WeaponImpact(hit.ply, hit.weapon, hit, damage * scale, (force or 0) * scale, direction)
             local materialName = hit.weapon.GetClashMaterial and hit.weapon:GetClashMaterial() or hit.weapon.BlockMaterial
             local material = ({wood = MAT_WOOD, plastic = MAT_PLASTIC, glass = MAT_GLASS})[materialName] or MAT_METAL
@@ -434,6 +441,7 @@ function hg.TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, origin
                 local after = hg.PhysBullet.CalcVelocityLostInMaterial(material, thickness * thickness, speed)
                 remaining = math.min(remaining, (after / math.max(speed, 1)) ^ 2)
             end
+            remaining = remaining * (1 - absorbed)
             shot.Penetration = penetration * remaining
             shot.EquipmentPenetration = shot.Penetration
             scale = scale * remaining
@@ -444,6 +452,20 @@ function hg.TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, origin
             effect:SetScale(1)
             if material == MAT_METAL then util.Effect("Sparks", effect, true, true) end
             if HG_BulletImpactSounds then HG_BulletImpactSounds.PlayMaterialImpact({HitPos = hit.position, MatType = material}) end
+            if parry then
+                local tr = table.Copy(originalTrace or {})
+                tr.Hit, tr.HitWorld, tr.HitSky = true, false, false
+                tr.Entity, tr.HitPos, tr.HitNormal, tr.Normal = game.GetWorld(), hit.position, hit.normal, direction
+                tr.StartSolid, tr.AllSolid, tr.MatType = false, false, material
+                tr.Fraction = hit.fraction
+                tr.HGEquipmentBlocked, tr.HGEquipmentScale = true, 0
+                tr.HGEquipmentProcessed, tr.HGEquipmentIntercept = true, true
+                tr.HGEquipmentWeapon = hit.weapon
+                if hit.weapon.PlayBlockImpactEffect then
+                    hit.weapon:PlayBlockImpactEffect({HitPos = hit.position, HitNormal = hit.normal}, hit.weapon, "parry")
+                end
+                return tr
+            end
             if scale <= 0.001 then
                 local tr = table.Copy(originalTrace)
                 tr.Hit, tr.HitWorld, tr.HitSky = true, false, false
@@ -457,7 +479,7 @@ function hg.TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, origin
         else
             local info = DamageInfo()
             info:SetDamage(damage * scale)
-            info:SetDamageType(DMG_BULLET)
+            info:SetDamageType(shot.DamageType or DMG_BULLET)
             hg.Appearance.TryAbsorbAccessoryImpact(hit.body, info, hit.position, direction * (force or damage), hit)
             scale = scale * info:GetDamage() / math.max(damage * scale, 0.001)
         end

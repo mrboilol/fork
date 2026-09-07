@@ -169,6 +169,9 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 		if(new_bullet.DirOriginal)then
 			new_bullet.DirOriginal = Vector(new_bullet.DirOriginal)
 		end
+
+		new_bullet.EquipmentHits = {}
+		new_bullet.AttackedEnts = {}
 		
 		new_bullet.Key = nil
 		
