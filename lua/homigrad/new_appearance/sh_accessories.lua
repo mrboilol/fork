@@ -2503,7 +2503,7 @@ hg.Accessories = {
         name = "Blue Fedora"
     },
     -- beanies
-    ["striped beanie"] = {
+    ["lame petushok"] = {
         model = "models/modified/hat03.mdl",
         bone = "ValveBiped.Bip01_Head1",
         malepos = {Vector(4,0,0),Angle(180,105,90),1},

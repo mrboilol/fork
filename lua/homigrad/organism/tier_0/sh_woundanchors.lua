@@ -15,7 +15,7 @@ end
 
 function hg.organism.GetWoundAnchor(ent, pos, ang, fallbackBone)
     if not IsValid(ent) or not isvector(pos) then return end
-    ent:SetupBones()
+    if isfunction(ent.SetupBones) then ent:SetupBones() end
     local bestBone, bestPos, bestAng, bestDistance
     for index = 0, (ent:GetHitBoxCount(0) or 0) - 1 do
         local bone = ent:GetHitBoxBone(index, 0)

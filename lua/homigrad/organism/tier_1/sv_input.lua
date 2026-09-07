@@ -786,7 +786,7 @@ function hg.organism.AddWound(ent, tr, bone, dmgInfo, dmgPos, dmgBlood, inputHol
 	
 	local physBone = isnumber(bone) and bone >= 0 and bone or 0
 	local bone = ent:TranslatePhysBoneToBone(physBone)
-	ent:SetupBones()
+	if isfunction(ent.SetupBones) then ent:SetupBones() end
 	
 	if bone and dmgBlood > 0 then
 		for i = 1, 2 do

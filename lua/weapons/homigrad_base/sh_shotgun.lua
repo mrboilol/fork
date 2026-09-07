@@ -102,7 +102,7 @@ function SWEP:ShotgunCanInsert()
 	local owner = self:GetOwner()
 	return IsValid(owner)
 		and self:Clip1() < self.Primary.ClipSize
-		and owner:GetAmmoCount(self:GetPrimaryAmmoType()) > 0
+		and (owner:IsNPC() or owner:GetAmmoCount(self:GetPrimaryAmmoType()) > 0)
 end
 
 function SWEP:ShotgunGetInsertAnimation()

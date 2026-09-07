@@ -45,9 +45,14 @@ function SWEP:CanReload()
 		return false
 	end
 
+	if self.ReloadNext or not self:CanUse() or self:IsJamClearing() or self:GetJammed() or self:Clip1() >= self:GetReloadCapacity() then --shit
+		return
+	end
+
+	if ply:IsNPC() then return true end
 	if !ply.GetAmmoCount then return true end
-	
-	if self.ReloadNext or not self:CanUse() or self:IsJamClearing() or self:GetJammed() or ply:GetAmmoCount(self:GetPrimaryAmmoType()) == 0 or self:Clip1() >= self:GetReloadCapacity() then --shit
+
+	if ply:GetAmmoCount(self:GetPrimaryAmmoType()) == 0 then
 		return
 	end
 
@@ -123,6 +128,29 @@ function SWEP:ReloadEnd()
 	--end
 	self.ReloadNext = CurTime() + self.ReloadCooldown --я хуй знает чо это
 	self:Draw()
+end
+
+function SWEP:Step_NPCWeaponState(time)
+	if not SERVER then return end
+
+	local owner = self:GetOwner()
+	if not IsValid(owner) or not owner:IsNPC() or owner:GetActiveWeapon() ~= self then return end
+	if (self.NPCWeaponActionAt or 0) > time then return end
+
+	if self.GetJammed and self:GetJammed() then
+		self.NPCWeaponActionAt = time + (self.JamTriggerCooldown or 0.18)
+		if self.StartJamClear then self:StartJamClear() end
+		return
+	end
+
+	if self.reload or self:IsJamClearing() or self:Clip1() > 0 then return end
+
+	self.NPCWeaponActionAt = time + 0.5
+	if self.ShotgunTubeReload then
+		if not self:IsShotgunBusy() then self:ShotgunReload() end
+	elseif self:CanReload() then
+		self:Reload()
+	end
 end
 
 SWEP.FakeReloadEvents = {
