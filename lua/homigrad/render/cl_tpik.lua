@@ -1224,7 +1224,8 @@ function hg.DoTPIK(ply, ent)
             local hand = ply_l_hand_matrix:GetTranslation()
             local add = (hand - segments[1].Pos):GetNormalized() * 5 + eyeang:Right() * -5 + eyeang:Forward() * ((ply.lerp_hand or 0) - 0.5) * 10
 
-            if ply.organism and ply.organism.larm and ply.organism.larm > 0.99 and ishgweapon(self) and !self.reload and ishgweapon(self) then
+            local leftArmDisabled = ply.organism and ((ply.organism.larm or 0) > 0.99 or ply.organism.larmdislocation or ply.organism.larmdislocated)
+            if leftArmDisabled and ishgweapon(self) and !self.reload then
                 segments[3] = segments[3] or {Pos = hand, Len = limblength}
                 segments[3].Pos = LerpVector(!(ishgweapon(self) and self:IsPistolHoldType()) and 0.05 or 0.01, segments[3].Pos + (-vector_up * 0.6 + eyeang:Forward() * 0.4 + ((ishgweapon(self) and !self:IsPistolHoldType()) and eyeang:Right() * 0.7 or vector_origin) + ent:GetVelocity() / 400) * 0.5, hand)
             else
@@ -1285,7 +1286,8 @@ function hg.DoTPIK(ply, ent)
 
         ply_l_forearm_matrix:SetAngles(ang)
 
-        if ply.organism and ply.organism.larm and ply.organism.larm > 0.99 and ishgweapon(self) and !self.reload and ishgweapon(self) then
+        local leftArmDisabled = ply.organism and ((ply.organism.larm or 0) > 0.99 or ply.organism.larmdislocation or ply.organism.larmdislocated)
+        if leftArmDisabled and ishgweapon(self) and !self.reload then
             local ang = ang//qt:Angle()
             ang:RotateAroundAxis(ang:Forward(), 95)
             ply_l_hand_matrix:SetAngles(LerpAngle(0.5, ply_l_hand_matrix:GetAngles(), ang))

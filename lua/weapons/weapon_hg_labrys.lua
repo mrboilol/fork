@@ -243,7 +243,7 @@ local function GetChargeHitBoneName(ent, trace)
     end
 end
 
-function SWEP:ChargeAttackAdd(ent, trace)
+function SWEP:ChargeAttackAdd(ent, trace, dmgInfo)
     self:PrimaryAttackAdd(ent)
 
     if CLIENT then return end
@@ -261,18 +261,12 @@ function SWEP:ChargeAttackAdd(ent, trace)
     end
 
     local bonename = GetChargeHitBoneName(ent, trace)
-    local limb
-
-    if bonename and hg.amputeetable and hg.amputeetable[bonename] then
-        limb = hg.amputeetable[bonename]
-    elseif trace and chargeHitGroupToLimb[trace.HitGroup or -1] then
-        limb = chargeHitGroupToLimb[trace.HitGroup]
-    elseif bonename and hg.bonetohitgroup then
-        limb = chargeHitGroupToLimb[hg.bonetohitgroup[bonename] or -1]
-    end
+    local hitgroup = trace and trace.HitGroup or bonename and hg.bonetohitgroup and hg.bonetohitgroup[bonename]
+    local limb = hg.organism.ResolveAmputationLimb and hg.organism.ResolveAmputationLimb(org, bonename, hitgroup)
+        or chargeHitGroupToLimb[hitgroup or -1]
 
     if limb and not org[limb .. "amputated"] and math.Rand(0, 1) <= (self.ChargeDismemberChance or 0.45) then
-        hg.organism.AmputateLimb(org, limb)
+        hg.organism.AmputateLimb(org, limb, nil, dmgInfo)
     end
 end
 

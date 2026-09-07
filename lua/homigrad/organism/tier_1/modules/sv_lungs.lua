@@ -83,6 +83,7 @@ module[1] = function(org)
 	org.bradyapnea = 0
 	org.respiratoryRate = 14
 	org.respiratoryArrest = false
+	org.circulatoryO2Reserve = 1
 
 
 
@@ -439,6 +440,7 @@ module[2] = function(owner, org, timeValue)
 		org.bradyapnea = 0
 		org.respiratoryRate = 14
 		org.respiratoryArrest = false
+		org.circulatoryO2Reserve = 1
 		org._zeroO2Time = 0
 		if org.brain >= 0.7 and org.alive then
 			if hg.organism.KillFatalBrainDamage then
@@ -967,36 +969,36 @@ module[2] = function(owner, org, timeValue)
 
 	end
 
-	-- Tissue oxygen follows effective pump output and palpable pulse. This is
-	-- the downstream low-blood path: poor filling lowers pulse/perfusion first,
-	-- then the resulting delivery failure drains O2.
-	local tissuePerfusion = math.min(
+	local bloodDelivery = hg.organism.GetBloodDeliveryFraction(org.blood, 1)
+	local pressureDelivery = math.Clamp(((tonumber(org.bloodPressure) or 90) - 25) / 65, 0, 1)
+	local rawTissuePerfusion = math.min(
 		math.Clamp(org.cardiacOutput or 1, 0, 1),
-		hg.organism.GetPulseOxygenPerfusion(org.pulse)
+		hg.organism.GetPulseOxygenPerfusion(org.pulse),
+		pressureDelivery,
+		bloodDelivery
 	)
-	-- Tissue oxygen is a delivered value, not an independent reservoir. With no
-	-- perfusion there is no delivery, so its cap must be zero as well.
+	local tissuePerfusionTarget = rawTissuePerfusion ^ 0.72
+	local currentTissuePerfusion = math.Clamp(tonumber(org.circulatoryO2Reserve) or 1, 0, 1)
+	local transitionTime = tissuePerfusionTarget < currentTissuePerfusion
+		and Lerp(1 - tissuePerfusionTarget, 14, 8)
+		or 5
+	local tissuePerfusion = currentTissuePerfusion
+		+ (tissuePerfusionTarget - currentTissuePerfusion) * (1 - math.exp(-timeValue / transitionTime))
+	org.circulatoryO2Reserve = math.Clamp(tissuePerfusion, 0, 1)
 	local perfusionO2Cap = o2.range * tissuePerfusion
 	org.perfusionO2Cap = perfusionO2Cap
-	-- Do not snap the current reserve to a new cap. A minor, short-lived change
-	-- in cardiac output used to instantly delete O2 here, which made players
-	-- pass out far too often. Intake is still capped above; an existing reserve
-	-- now drains at a rate proportional to the actual delivery failure.
 	local deliveryReserve = hg.organism.GetLimitingReserve(
 		bloodO2Cap / o2.range,
 		perfusionO2Cap / o2.range,
 		exertionO2Cap / o2.range
 	)
 	local deliveryO2Cap = o2.range * deliveryReserve
-	if o2[1] > deliveryO2Cap then
+	if not org.heartstop and o2[1] > deliveryO2Cap then
 		local deliveryFailure = math.Clamp(1 - deliveryO2Cap / math.max(o2.range, 1), 0, 1)
 		local decayRate = 0.16 + deliveryFailure * 0.45
 		local deliveryResponse = 1 - math.exp(-timeValue * decayRate)
 		o2[1] = o2[1] + (deliveryO2Cap - o2[1]) * deliveryResponse
 	end
-
-	-- Hemorrhage is already represented by carrying capacity and current cardiac
-	-- output. Do not add another raw-blood/bleed/pulse drain on top of delivery.
 
 	o2[1] = math.Clamp(o2[1], 0, o2.range)
 	if org.heartstop then

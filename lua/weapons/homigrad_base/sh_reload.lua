@@ -37,7 +37,7 @@ function SWEP:CanReload()
 		end
 	end
 
-	if (IsValid(ply.FakeRagdoll) and ply:GetNWBool("hg_hold_wound_manual", false)) or (ply.organism and (ply.organism.larmamputated or ply.organism.rarmamputated)) then
+	if (IsValid(ply.FakeRagdoll) and ply:GetNWBool("hg_hold_wound_manual", false)) or (not self.IgnoreOneArmPenalties and ply.organism and (ply.organism.larmamputated or ply.organism.rarmamputated)) then
 		if not self.Notified and self:Clip1() < self:GetMaxClip1() then
 			ply:Notify("I can't reload it in my hand...", 10)
 			self.Notified = true

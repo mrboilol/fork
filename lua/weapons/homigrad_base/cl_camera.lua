@@ -254,10 +254,15 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 
 	local support = self.GetHandSupportState and self:GetHandSupportState(ply) or {}
 	local handling = self.GetArmHealthHandlingMul and self:GetArmHealthHandlingMul() or 1
-	local shakeMul = (((larm > 0.25 and (larm - 0.25) * 0.45) or 0)
-		+ ((rarm > 0.1 and (rarm - 0.1) * 0.7) or 0)
+	local larmShake = (larm > 0.25 and (larm - 0.25) * 0.45) or 0
+	local rarmShake = (rarm > 0.1 and (rarm - 0.1) * 0.7) or 0
+	if self.IgnoreOneArmPenalties then
+		if support.firingArm == "larm" then rarmShake = 0 else larmShake = 0 end
+	end
+	local shakeMul = (larmShake
+		+ rarmShake
 		+ ((handling - 1) * 0.2)
-		+ (support.oneHanded and 0.08 or 0)) / 4
+		+ (support.oneHanded and not self.IgnoreOneArmPenalties and 0.08 or 0)) / 4
 
 	local addview = AngleRand(-shakeMul - 0.01, shakeMul + 0.01) * (organism.holdingbreath and 0.1 or 1)
 	addview[3] = 0
@@ -303,7 +308,8 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	local mulhuy = (self:IsPistolHoldType() or self.PistolKinda) and 2 or (((ply.posture == 1 and not self:IsZoom()) or ply.posture == 7 or ply.posture == 8) and 2 or 0.75)
 	local shit = 0.2 * mulhuy / game.GetTimeScale()
 	local animpos3 = self:GetAnimShoot2(shit, true) / shit
-	local shit2 = (1 / self:GetWeaponWeight()) * (self.NumBullet or 3) / 3
+	local caliberMul, weightMul = self:GetRecoilImpulseFactors()
+	local shit2 = math.Clamp(caliberMul * weightMul, 0.2, 4) * ((self:IsPistolHoldType() or self.PistolKinda) and 0.9 or 0.35)
 
 	angZoom:Add(self.prankang or angle_zero)
 	posZoom:Add(VectorRand(-0.05, 0.05) * animpos3 * shit2)

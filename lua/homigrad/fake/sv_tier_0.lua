@@ -80,6 +80,17 @@ end
 
 hg.cacheModel = cacheModel
 
+local ragdollAmputationRoots = {
+	["ValveBiped.Bip01_L_UpperArm"] = {limb = "larmup"},
+	["ValveBiped.Bip01_R_UpperArm"] = {limb = "rarmup"},
+	["ValveBiped.Bip01_L_Thigh"] = {limb = "llegup"},
+	["ValveBiped.Bip01_R_Thigh"] = {limb = "rlegup"},
+	["ValveBiped.Bip01_L_Forearm"] = {limb = "larm", parent = "larmup"},
+	["ValveBiped.Bip01_R_Forearm"] = {limb = "rarm", parent = "rarmup"},
+	["ValveBiped.Bip01_L_Calf"] = {limb = "lleg", parent = "llegup"},
+	["ValveBiped.Bip01_R_Calf"] = {limb = "rleg", parent = "rlegup"},
+}
+
 local IdealMassPlayer = hg.IdealMassPlayer
 
 local fixbones = {
@@ -224,7 +235,11 @@ local function Ragdoll_CreateInternal(ply)
 		local bonename = ragdoll:GetBoneName(bone)
 		local hitgroup = hg.bonetohitgroup[bonename]--( ent:IsPlayer() and tr.HitGroup or hg.bonetohitgroup[bonename])
 		
-		if hg.amputeetable[bonename] and ply.organism and ply.organism[hg.amputeetable[bonename].."amputated"] then
+		local amputationRoot = ragdollAmputationRoots[bonename]
+		local removeAmputatedRoot = amputationRoot and ply.organism
+			and ply.organism[amputationRoot.limb.."amputated"]
+			and (not amputationRoot.parent or not ply.organism[amputationRoot.parent.."amputated"])
+		if removeAmputatedRoot then
 			--phys:SetContents(CONTENTS_EMPTY)
 			Gib_RemoveBone(ragdoll, bone, physNum, true)
 			--phys:SetCollisionGroup(COLLISION_GROUP_WORLD)

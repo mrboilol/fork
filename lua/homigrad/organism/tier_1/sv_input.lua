@@ -523,16 +523,12 @@ function hg.ClearMeleeDamageContact(inflictor)
 end
 
 hg.amputeetable = {
-	["ValveBiped.Bip01_L_UpperArm"] = "larmup",
 	["ValveBiped.Bip01_L_Forearm"] = "larm",
-	["ValveBiped.Bip01_L_Hand"] = "lhand",
-	["ValveBiped.Bip01_R_UpperArm"] = "rarmup",
+	["ValveBiped.Bip01_L_Hand"] = "larm",
 	["ValveBiped.Bip01_R_Forearm"] = "rarm",
-	["ValveBiped.Bip01_R_Hand"] = "rhand",
-	["ValveBiped.Bip01_L_Thigh"] = "llegup",
+	["ValveBiped.Bip01_R_Hand"] = "rarm",
 	["ValveBiped.Bip01_L_Calf"] = "lleg",
 	["ValveBiped.Bip01_L_Foot"] = "lleg",
-	["ValveBiped.Bip01_R_Thigh"] = "rlegup",
 	["ValveBiped.Bip01_R_Calf"] = "rleg",
 	["ValveBiped.Bip01_R_Foot"] = "rleg"
 }
@@ -628,23 +624,77 @@ local childLimbs = {
 	["rlegup"] = {"rleg"},
 }
 
-function hg.organism.AmputateLimb(org, limb, noShake)
+local requestedLimbBase = {
+	lhand = "larm",
+	rhand = "rarm",
+	larmup = "larm",
+	rarmup = "rarm",
+	llegup = "lleg",
+	rlegup = "rleg",
+}
+
+local upperBoneLimbs = {
+	["ValveBiped.Bip01_L_UpperArm"] = "larmup",
+	["ValveBiped.Bip01_R_UpperArm"] = "rarmup",
+	["ValveBiped.Bip01_L_Thigh"] = "llegup",
+	["ValveBiped.Bip01_R_Thigh"] = "rlegup",
+}
+
+local amputationDamageEvents = setmetatable({}, {__mode = "k"})
+
+function hg.organism.ResolveAmputationLimb(org, bonename, hitgroup)
+	if not org then return end
+	local upperLimb = upperBoneLimbs[bonename]
+	local baseLimb = upperLimb and requestedLimbBase[upperLimb]
+	if upperLimb and org[baseLimb.."amputated"] and not org[upperLimb.."amputated"] then
+		return upperLimb
+	end
+
+	local resolvedHitgroup = hitgroup
+	if not hitgrouptolimb[resolvedHitgroup] then resolvedHitgroup = bonetohitgroup[bonename] end
+	return hg.amputeetable[bonename] or hitgrouptolimb[resolvedHitgroup]
+end
+
+function hg.organism.AmputateLimb(org, limb, noShake, dmgInfo)
+	local baseLimb = requestedLimbBase[limb]
+	if limb == "lhand" or limb == "rhand" or (baseLimb and not org[baseLimb.."amputated"]) then
+		limb = baseLimb
+	end
+	if not limb then return false end
+
+	local damageLimb = requestedLimbBase[limb] or limb
+	local damageCuts = dmgInfo and amputationDamageEvents[dmgInfo]
+	if damageCuts and damageCuts[damageLimb] then return false end
+
 	local amputatedKey = limb.."amputated"
-	if org[amputatedKey] == nil or org[amputatedKey] then return end
+	if org[amputatedKey] == nil or org[amputatedKey] then return false end
 
 	local bone = limbs[limb]
-	if !IsValid(org.owner) then return end
+	if !bone or !IsValid(org.owner) then return false end
 	local boneIdx = org.owner:LookupBone(bone)
 	local len = boneIdx and boneIdx > 0 and org.owner:BoneLength(boneIdx) or 10
 	local vec = Vector(len, 0, 0)
 	local ang = Angle()
 	local boneup = boneIdx and boneIdx > 0 and org.owner:GetBoneName(boneIdx - 1) or bone
+
+	local obsoleteArteries = {}
+	local obsoleteWoundBones = {}
+	for _, childLimb in ipairs(childLimbs[limb] or {}) do
+		if org[childLimb.."amputated"] then
+			local childBone = limbs[childLimb]
+			obsoleteArteries[childBone.."artery"] = true
+			local childBoneIdx = org.owner:LookupBone(childBone)
+			if childBoneIdx and childBoneIdx > 0 then
+				obsoleteWoundBones[org.owner:GetBoneName(childBoneIdx - 1)] = true
+			end
+		end
+	end
 	
 	if not org.superfighter then
 		local wnds = {}
 
 		for i, tbl in pairs(org.arterialwounds) do
-			if tbl[7] != limb.."artery" then
+			if tbl[7] != bone.."artery" and not obsoleteArteries[tbl[7]] then
 				table.insert(wnds, tbl)
 			end
 		end
@@ -652,11 +702,25 @@ function hg.organism.AmputateLimb(org, limb, noShake)
 
 		org.arterialwounds = wnds
 		hg.organism.MarkArterialWoundsNetDirty(org)
+
+		if next(obsoleteWoundBones) then
+			local wounds = {}
+			for _, wound in pairs(org.wounds) do
+				if not obsoleteWoundBones[wound[4]] then table.insert(wounds, wound) end
+			end
+			org.wounds = wounds
+			hg.organism.MarkWoundsNetDirty(org, true)
+		end
 	elseif not noShake and hg.organism.CanTouchHealth(org) and org.owner:IsPlayer() then
 		org.owner:SetHealth(math.max(org.owner:Health() - 25, 1))
 	end
 
 	org[amputatedKey] = true
+	if dmgInfo then
+		damageCuts = damageCuts or {}
+		damageCuts[damageLimb] = true
+		amputationDamageEvents[dmgInfo] = damageCuts
+	end
 
 	local region = (limb == "lleg" or limb == "rleg" or limb == "llegup" or limb == "rlegup") and "lower" or "body"
 	if hg.organism.AddPain then hg.organism.AddPain(org, 80, region) else org.painadd = math.min((org.painadd or 0) + 80, 150) end
@@ -698,38 +762,6 @@ function hg.organism.AmputateLimb(org, limb, noShake)
 
 	hook.Run("OnAmputateLimb", org, ent, limb)
 
-	if childLimbs[limb] then
-		for _, childLimb in ipairs(childLimbs[limb]) do
-			if org[childLimb.."amputated"] then
-				local childBone = limbs[childLimb]
-				local childBoneName = org.owner:GetBoneName(org.owner:LookupBone(childBone) - 1)
-				
-				local newWnds = {}
-				for i, tbl in pairs(org.arterialwounds) do
-					if tbl[7] != childBone.."artery" and tbl[4] != childBoneName then
-						table.insert(newWnds, tbl)
-					end
-				end
-				org.arterialwounds = newWnds
-				hg.organism.MarkArterialWoundsNetDirty(org)
-				
-				local newWounds = {}
-				for i, wound in pairs(org.wounds) do
-					if wound[4] != childBoneName then
-						table.insert(newWounds, wound)
-					end
-				end
-				org.wounds = newWounds
-				hg.organism.MarkWoundsNetDirty(org, true)
-			end
-		end
-	end
-
-	if limb == "larmup" and not org.larmamputated then hg.organism.AmputateLimb(org, "larm", true) end
-	if limb == "rarmup" and not org.rarmamputated then hg.organism.AmputateLimb(org, "rarm", true) end
-	if limb == "llegup" and not org.llegamputated then hg.organism.AmputateLimb(org, "lleg", true) end
-	if limb == "rlegup" and not org.rlegamputated then hg.organism.AmputateLimb(org, "rleg", true) end
-
 	if org.owner:IsNPC() then
 		org.shock = 100
 	end
@@ -744,6 +776,7 @@ function hg.organism.AmputateLimb(org, limb, noShake)
 	net.WriteBool(false)
 	net.WriteBool(true) // вот эта шняга отвечает за то чтобы оно просто мерджнуло и всё
 	net.SendPVS(IsValid(org.owner) and org.owner:GetPos() or ent:GetPos())
+	return true
 end
 
 --hg.organism.AmputateLimb(Entity(2).organism, "rarm")
@@ -1787,14 +1820,19 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		local hitChance = math.Clamp(0.08 + damageStack / 180, 0.08, chanceCap)
 		if math.Rand(0, 1) <= hitChance then ply:RemoveHeadcrabFromTrauma(math.Rand(0, 1) < 0.45) end
 	end
-	if not noDismemberment and instant and (hitgrouptolimb[hitgroup] or hg.amputeetable[bonename]) then
+	if not noDismemberment and instant and (hitgrouptolimb[hitgroup] or hg.amputeetable[bonename] or upperBoneLimbs[bonename]) then
 		if blast then
-			for _, limb in ipairs({"lleg", "rleg", "larm", "rarm", "lhand", "rhand", "llegup", "rlegup", "larmup", "rarmup"}) do
-				if !org[limb.."amputated"] and math.random(5) < 200 / lend then hg.organism.AmputateLimb(org, limb) end
+			for _, limb in ipairs({"lleg", "rleg", "larm", "rarm"}) do
+				if !org[limb.."amputated"] and math.random(5) < 200 / lend then hg.organism.AmputateLimb(org, limb, nil, dmgInfo) end
+			end
+			local upperLimb = upperBoneLimbs[bonename]
+			local baseLimb = upperLimb and requestedLimbBase[upperLimb]
+			if upperLimb and org[baseLimb.."amputated"] and !org[upperLimb.."amputated"] then
+				hg.organism.AmputateLimb(org, upperLimb, nil, dmgInfo)
 			end
 		else
-			local limbToAmputate = hg.amputeetable[bonename] or hitgrouptolimb[hitgroup]
-			if limbToAmputate and !org[limbToAmputate.."amputated"] then hg.organism.AmputateLimb(org, limbToAmputate) end
+			local limbToAmputate = hg.organism.ResolveAmputationLimb(org, bonename, hitgroup)
+			if limbToAmputate and !org[limbToAmputate.."amputated"] then hg.organism.AmputateLimb(org, limbToAmputate, nil, dmgInfo) end
 		end
 	end
 

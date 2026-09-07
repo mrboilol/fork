@@ -40,10 +40,10 @@ SWEP.RecoilMul = 0.8
 SWEP.ScreenRecoilMul = 0.7
 SWEP.WeaponRecoilMul = 1.45
 
-local cos, sin, math_max, math_min = math.cos, math.sin, math.max, math.min
 function SWEP:GetPrimaryMul()
 	local owner = self:GetOwner()
-	local mul = ((0.5) + math_max(self.Primary.Force / 110 - 1, 0)) * (owner.Crouching and owner:Crouching() and self.CrouchMul or 1)
+	local caliberMul, weightMul = self:GetRecoilImpulseFactors()
+	local mul = math.Clamp(caliberMul * weightMul * 0.48, 0.16, 2.4) * (owner.Crouching and owner:Crouching() and self.CrouchMul or 1)
 	self:ApplyForce(mul)
 	local experienceMul = self.GetWeaponExperienceMul and self:GetWeaponExperienceMul(owner) or 1
 	mul = (mul or 0) * (owner.organism and owner.organism.recoilmul or 1) * experienceMul
@@ -88,8 +88,8 @@ function SWEP:PrimarySpread()
 			local dislocated = org[firingArm .. "dislocation"] or org[firingArm .. "dislocated"]
 			if dislocated then injuryPain = injuryPain * 0.42 end
 			if fractured then injuryPain = injuryPain * 1.25 end
-			if support.oneHanded then injuryPain = injuryPain + math.max((recoilForce or 0) - 25, 0) * 0.035 end
-			if support.wantsTwoHands then
+			if support.oneHanded and not self.IgnoreOneArmPenalties then injuryPain = injuryPain + math.max((recoilForce or 0) - 25, 0) * 0.035 end
+			if support.wantsTwoHands and not self.IgnoreOneArmPenalties then
 				local braceArm = firingArm == "larm" and "rarm" or "larm"
 				if (org[braceArm] or 0) >= 1 then injuryPain = injuryPain + 0.9 end
 			end
@@ -229,7 +229,7 @@ function SWEP:PrimarySpread()
 		
 		--self.weaponSway = self.weaponSway + sprayvel
 
-		self.sprayAngles[3] = self.sprayAngles[3] + math.max(self.Primary.Damage / 100,1) * self.addSprayMul * (self.cameraShakeMul or 1) * ((((self.NumBullet or 1) - 1) / 2) + 1) * (((self.podkid or 1) - 1) / 3 + 1) / 40
+		self.sprayAngles[3] = self.sprayAngles[3] + math.Clamp(caliberMul * weightMul, 0.25, 4) * self.addSprayMul * (self.cameraShakeMul or 1) * ((((self.NumBullet or 1) - 1) / 2) + 1) * (((self.podkid or 1) - 1) / 3 + 1) / 40
 
 		if self.Primary.Automatic and sprayI > 1 then
 			ViewPunch2(Angle(0, 0, angrand2[2] * 0.6 * math.min(sprayI / math.max(max_clip1, 1), 1) * (self.cameraShakeMul or 1) * screenRecoilMul))

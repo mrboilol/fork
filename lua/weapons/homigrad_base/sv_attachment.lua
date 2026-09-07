@@ -27,7 +27,7 @@ function hg.AddAttachment(ply,wep,att)
 	if not IsValid(wep) or not wep.attachments or att == "" then return end
 	if not IsValid(ply) then return end
 	local sandbox = engine.ActiveGamemode() == "sandbox"
-	if ply.organism.larmamputated or ply.organism.rarmamputated then return end -- зубами
+	if not wep.IgnoreOneArmPenalties and (ply.organism.larmamputated or ply.organism.rarmamputated) then return end -- зубами
 
 	if att and istable(att) then
 		for i,atta in pairs(att) do
@@ -174,7 +174,7 @@ net.Receive("ZB_AttachRemove", function(len, ply)
 	if not IsValid(wep) or not wep.attachments then return end
 	if wep:GetNWFloat("addAttachment", 0) + 1 > CurTime() then return end
 	if not IsValid(ply) then return end
-	if ply.organism.larmamputated or ply.organism.rarmamputated then return end
+	if not wep.IgnoreOneArmPenalties and (ply.organism.larmamputated or ply.organism.rarmamputated) then return end
 	--[[if table.HasValue(ply.inventory.Attachments, att) then
 		ply:ChatPrint("You already have that attachment.")
 		return

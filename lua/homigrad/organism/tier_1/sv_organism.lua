@@ -40,10 +40,6 @@ local panicattack_gunfight_hold_time = 8
 local panicattack_sustained_fear_time = 10
 local panicattack_grenade_radius = 750
 local seizure_duration = 90
-local seizure_brain_damage_start = 80
-local seizure_otrub_brain_damage_start = 20
-local seizure_otrub_brain_damage_duration = 42
-local seizure_brain_damage_final = 0.99
 local seizure_pose_force = 850
 local seizure_pose_damp = 42
 local seizure_leg_buckle = 46
@@ -1318,22 +1314,14 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	end
 	if org.seizureActive then
 		local time = CurTime()
-		local seizureStart = org.seizureStart or time
 		local seizureEnd = org.seizureEnd or time
 		org.needfake = true
 		org.needotrub = true
 		org.consciousness = math.min(org.consciousness or 1, 0.04)
 		owner.fakecd = math.max(owner.fakecd or 0, seizureEnd)
 		if time >= seizureEnd then
-			org.brain = math.max(org.brain or 0, seizure_brain_damage_final)
 			stop_seizure(owner, org)
 		else
-			local damageStart = org.otrub and seizure_otrub_brain_damage_start or seizure_brain_damage_start
-			local damageDuration = org.otrub and seizure_otrub_brain_damage_duration or (seizure_duration - seizure_brain_damage_start)
-			if time >= seizureStart + damageStart then
-				local frac = math.Clamp((time - (seizureStart + damageStart)) / math.max(damageDuration, 0.001), 0, 1)
-				org.brain = math.max(org.brain or 0, seizure_brain_damage_final * frac)
-			end
 			local rag = owner.FakeRagdoll
 			if IsValid(rag) then
 				apply_seizure_pose(rag, org, time)

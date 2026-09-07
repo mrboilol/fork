@@ -25,6 +25,13 @@ SWEP.FakeVPShouldUseHand = true
 SWEP.FakeViewBobBone = "ValveBiped.Bip01_R_Hand"
 SWEP.FakeViewBobBaseBone = "ValveBiped.Bip01_R_Forearm"
 SWEP.ViewPunchDiv = 1
+SWEP.IgnoreOneArmPenalties = true
+SWEP.RecoilBallisticsOverride = {
+	Force = 20,
+	Speed = 330,
+	Diameter = 5.72,
+	Mass = 2.6
+}
 
 SWEP.ModularParts = {
 	magazine = {

@@ -1076,14 +1076,14 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         end
     end
 
-    if isUnconscious and incapacitated and deathStateEnd then
-        local remaining = math.max(deathStateEnd - CurTime(), 0)
-        local seconds = math.max(math.ceil(remaining), 0)
-        local fade = math.Clamp((INCAPACITATION_DEATH_TIME - remaining) / 1.25, 0, 1)
-        local urgency = math.Clamp((5 - remaining) / 5, 0, 1)
+    if isUnconscious then
+        local terminal = incapacitated and deathStateEnd
+        local remaining = terminal and math.max(deathStateEnd - CurTime(), 0) or 0
+        local seconds = terminal and math.max(math.ceil(remaining), 0) or 0
+        local fade = terminal and math.Clamp((INCAPACITATION_DEATH_TIME - remaining) / 1.25, 0, 1) or ringAlpha
+        local urgency = terminal and math.Clamp((5 - remaining) / 5, 0, 1) or 0
         local pulseAlpha = 0.82 + math.abs(math.sin(CurTime() * 6)) * 0.18 * urgency
-        local promptColor = Color(235, 55, 45, 245 * fade * pulseAlpha)
-        local promptOutline = 0
+        local promptColor = terminal and Color(235, 55, 45, 245 * fade * pulseAlpha) or Color(225, 225, 225, 235 * fade)
 
         if not incapPromptX then
             local radius = math.min(280, ScrH() * 0.32)
@@ -1091,32 +1091,35 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
             incapPromptY = math.min(ScrH() * 0.5 + radius + ScreenScaleH(18), ScrH() - ScreenScaleH(30))
         end
 
-        draw.SimpleTextOutlined(
-            seconds > 0 and "You are incapacitated - death in " .. seconds .. "s" or "You are dying",
-            "OtrubCriticalMessage",
-            incapPromptX,
-            incapPromptY,
-            promptColor,
-            TEXT_ALIGN_CENTER,
-            TEXT_ALIGN_TOP,
-            2,
-            Color(promptOutline, promptOutline, promptOutline, 220 * fade)
-        )
-
-        local messageY = incapPromptY + ScreenScaleH(20)
-        for _, cause in ipairs(GetIncapacitationDeathCauses(replicatedOrg)) do
+        local messageY = incapPromptY
+        if terminal then
             draw.SimpleTextOutlined(
-                cause,
-                "HomigradFontTypewriterSmall",
+                seconds > 0 and "You are incapacitated - death in " .. seconds .. "s" or "You are dying",
+                "OtrubCriticalMessage",
                 incapPromptX,
                 messageY,
                 promptColor,
                 TEXT_ALIGN_CENTER,
                 TEXT_ALIGN_TOP,
-                1,
+                2,
                 Color(0, 0, 0, 220 * fade)
             )
-            messageY = messageY + ScreenScaleH(14)
+            messageY = messageY + ScreenScaleH(20)
+
+            for _, cause in ipairs(GetIncapacitationDeathCauses(replicatedOrg)) do
+                draw.SimpleTextOutlined(
+                    cause,
+                    "HomigradFontTypewriterSmall",
+                    incapPromptX,
+                    messageY,
+                    promptColor,
+                    TEXT_ALIGN_CENTER,
+                    TEXT_ALIGN_TOP,
+                    1,
+                    Color(0, 0, 0, 220 * fade)
+                )
+                messageY = messageY + ScreenScaleH(14)
+            end
         end
 
         draw.SimpleTextOutlined(

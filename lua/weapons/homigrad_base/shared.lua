@@ -37,6 +37,10 @@ function SWEP:GetWeaponWeight()
 	if weight == nil then weight = tonumber(self.Weight) end
 	return math.max(weight or 1, 0.1)
 end
+
+function SWEP:GetHandlingWeight()
+	return math.max(self:GetWeaponWeight() + (tonumber(self.addweight) or 0), 0.25)
+end
 SWEP.AutoSwitchTo = false
 SWEP.AutoSwitchFrom = false
 SWEP.DrawAmmo = true
@@ -187,24 +191,25 @@ end
 
 function SWEP:GetRecoilImpulseFactors()
 	local primary = self.Primary or {}
-	local ammo = self:GetAmmoBallistics()
+	local ammo = self.RecoilBallisticsOverride or self:GetAmmoBallistics()
 	local force = ammo.Force or primary.Force2 or primary.Force or 30
 	local diameter = ammo.Diameter or 7.62
 	local mass = ammo.Mass or 8
 	local speed = ammo.Speed or 700
 	local numBullet = ammo.NumBullet or self.NumBullet or 1
-	local weaponWeight = math.max(self:GetWeaponWeight(), 0.5)
+	local weaponWeight = math.max(self:GetHandlingWeight(), 0.5)
 	local payloadCount = math.max(numBullet, 1)
 	local recoilForce = force * (1 + math.max(payloadCount - 1, 0) * 0.55)
-	local forceFactor = math.Clamp(recoilForce / 40, 0.25, 3.75)
-	local momentumFactor = math.Clamp((mass * payloadCount * speed) / (8 * 700), 0.3, 3.2)
-	local diameterFactor = math.Clamp((diameter * payloadCount) / 7.62, 0.55, 2.1)
+	local forceFactor = math.Clamp(recoilForce / 40, 0.18, 4.5)
+	local momentumFactor = math.Clamp((mass * payloadCount * speed) / (8 * 700), 0.2, 4)
+	local diameterFactor = math.Clamp((diameter * payloadCount) / 7.62, 0.4, 2.6)
 	local payloadFactor = payloadCount > 1 and math.Clamp(1 + math.log(payloadCount) / math.log(2) * 0.06, 1, 1.25) or 1
-	local caliber = math.Clamp((forceFactor * 0.45 + momentumFactor * 0.4 + diameterFactor * 0.15) * payloadFactor, 0.3, 3.6)
+	local caliber = (forceFactor * 0.45 + momentumFactor * 0.4 + diameterFactor * 0.15) * payloadFactor
 
 	if not self:IsPistolHoldType() and speed >= 750 and force >= 25 and diameter >= 5 then
-		caliber = math.max(caliber, (mass >= 7 or diameter >= 7) and 1.3 or 1.08)
+		caliber = math.max(caliber, (mass >= 7 or diameter >= 7) and 1.3 or 0.92)
 	end
+	caliber = math.Clamp(caliber ^ 1.18 * (self.RecoilImpulseMul or 1), 0.2, 4.5)
 
 	return caliber, math.Clamp(3 / weaponWeight, 0.55, 1.75), recoilForce, numBullet, ammo
 end
@@ -231,20 +236,21 @@ function SWEP:GetArmHealthHandlingMul()
 	local firingBroken, firingDislocated, firingAmputated = getSevereArmTrauma(org, firingArm)
 	local braceBroken, braceDislocated, braceAmputated = getSevereArmTrauma(org, braceArm)
 	local loss = (1 - firing) * 1.55
-	if support.wantsTwoHands then loss = loss + (1 - brace) * 0.85 end
-	if support.oneHanded then loss = loss + 0.5 end
+	local ignoreOneArm = self.IgnoreOneArmPenalties == true
+	if support.wantsTwoHands and not ignoreOneArm then loss = loss + (1 - brace) * 0.85 end
+	if support.oneHanded and not ignoreOneArm then loss = loss + 0.5 end
 	-- A fracture/dislocation is more than gradual weakness: recoil is being
 	-- caught by an unstable joint or a broken lever. Keep this explicit so the
 	-- severe state remains much worse than an arm that is merely wounded.
 	if firingBroken then loss = loss + 0.5 end
 	if firingDislocated then loss = loss + 0.6 end
 	if firingAmputated then loss = loss + 0.7 end
-	if support.wantsTwoHands and braceBroken then loss = loss + 0.3 end
-	if support.wantsTwoHands and braceDislocated then loss = loss + 0.4 end
-	if support.wantsTwoHands and braceAmputated then loss = loss + 0.5 end
-	if support.onlyLeft then loss = loss + 0.25 end
-	if support.leftBusy then loss = loss + 0.3 end
-	if support.rightBusy then loss = loss + 0.5 end
+	if support.wantsTwoHands and braceBroken and not ignoreOneArm then loss = loss + 0.3 end
+	if support.wantsTwoHands and braceDislocated and not ignoreOneArm then loss = loss + 0.4 end
+	if support.wantsTwoHands and braceAmputated and not ignoreOneArm then loss = loss + 0.5 end
+	if support.onlyLeft and not ignoreOneArm then loss = loss + 0.25 end
+	if support.leftBusy and not ignoreOneArm then loss = loss + 0.3 end
+	if support.rightBusy and not ignoreOneArm then loss = loss + 0.5 end
 
 	loss = loss + math.Clamp(org.aiming_fatigue or 0, 0, 10) * 0.045
 	loss = loss + math.Clamp(org.permanent_aim_impairment or 0, 0, 2) * 0.4
@@ -259,6 +265,7 @@ function SWEP:GetRecoilSupportMul()
 	if not IsValid(owner) then return 1 end
 
 	local support = self:GetHandSupportState(owner)
+	if self.IgnoreOneArmPenalties and support.supportHands > 0 then return 0.82, support.supportHands end
 	local mul = support.supportHands >= 2 and 0.82 or 1.25
 	if support.oneHanded then mul = mul * 1.25 end
 	if support.leftBusy then mul = mul * 1.2 end
@@ -286,10 +293,13 @@ function SWEP:GetAimAlignmentTime(ply)
 
 	local support = self:GetHandSupportState(ply)
 	local handling = self:GetArmHealthHandlingMul()
-	local base = math.Clamp(self:GetWeaponWeight() / 4, 0.25, 1) * 0.9
+	local handlingWeight = self:GetHandlingWeight()
+	local longGun = not self:IsPistolHoldType() and not self.PistolKinda
+	local base = math.Clamp(0.16 + handlingWeight ^ 0.72 * 0.18 + (longGun and 0.2 or 0), 0.24, 3)
 	local supportMul = support.supportHands >= 2 and 1 or 1.6
-	if support.onlyLeft then supportMul = supportMul * 1.35 end
-	if support.leftBusy or support.rightBusy then supportMul = supportMul * 1.2 end
+	if self.IgnoreOneArmPenalties and support.supportHands > 0 then supportMul = 1 end
+	if support.onlyLeft and not self.IgnoreOneArmPenalties then supportMul = supportMul * 1.35 end
+	if (support.leftBusy or support.rightBusy) and not self.IgnoreOneArmPenalties then supportMul = supportMul * 1.2 end
 
 	local org = ply.organism or {}
 	local brainPenalty = math.Clamp(org.brain or 0, 0, 1) * 2.5
@@ -2176,7 +2186,7 @@ function SWEP:GetAdditionalValues()
 		end
 	end
 
-	if ply.organism and (ply.organism.rarmamputated and self:IsPistolHoldType()) then
+	if ply.organism and (ply.organism.rarmamputated and self:IsPistolHoldType()) and not self.IgnoreOneArmPenalties then
 		if ply.posture and ply.posture >= 7 then
 			ply.posture = 2
 		end
@@ -2429,6 +2439,8 @@ function SWEP:GetAdditionalValues()
 	
 	if not suiciding and !self.norecoil then
 		local weaponRecoilMul = (self.WeaponRecoilMul or 1) * experienceMul
+		local caliberMul, weightMul = self:GetRecoilImpulseFactors()
+		local ballisticRecoil = math.Clamp(caliberMul * weightMul, 0.2, 4)
 		local cantedHold = ply.posture == 7 or ply.posture == 9
 		local mulhuy = (self:IsPistolHoldType() or self.PistolKinda) and 2 or (((ply.posture == 1 and not self:IsZoom()) or ply.posture == 7 or ply.posture == 8) and 2 or 0.75)
 		local animpos = self:GetAnimShoot2(0.09 * mulhuy / host_timescale(), true)
@@ -2436,10 +2448,10 @@ function SWEP:GetAdditionalValues()
 		local animpos3 = self:GetAnimShoot2(shit, true) / shit
 		
 		animpos = animpos * 0.15 * mulhuy * (self:IsPistolHoldType() and 1 or 1) * weaponRecoilMul
-		animpos = animpos * math.min((self.Primary.Force2 or self.Primary.Force) / 40,3) * ((self.NumBullet or 1) * 3 or 1) * (self.animposmul or 1) // * 4
+		animpos = animpos * ballisticRecoil * 1.7 * (self.animposmul or 1) // * 4
 
 		self.AdditionalPos2 = self.AdditionalPos2 - (self.AdditionalAng + self.AdditionalAng2):Forward() * animpos * 9
-		local shit2 = (1 / self:GetWeaponWeight()) * (self.NumBullet or 3) / 3 * 0.5 * weaponRecoilMul
+		local shit2 = ballisticRecoil * ((self:IsPistolHoldType() or self.PistolKinda) and 0.45 or 0.16) * weaponRecoilMul
 		self.AdditionalPos2[2] = self.AdditionalPos2[2] + math.sin(animpos3) * 1 * shit2
 		self.AdditionalPos2[1] = self.AdditionalPos2[1] + math.sin(animpos3) * -1 * shit2
 		self.AdditionalAng2[2] = self.AdditionalAng2[2] + math.sin(animpos3) * -2 * shit2
@@ -2450,7 +2462,7 @@ function SWEP:GetAdditionalValues()
 		
 		if self.podkid or self:IsPistolHoldType() then
 			local animpos2 = self:GetAnimShoot2(0.05 * mulhuy / host_timescale(), true)
-			animpos2 = animpos2 * weaponRecoilMul
+			animpos2 = animpos2 * weaponRecoilMul * ballisticRecoil
 			self.AdditionalAng2[2] = self.AdditionalAng2[2] + animpos2 * (cantedHold and -24 or 20) * (self.podkid or 1)
 			self.AdditionalAng2[3] = self.AdditionalAng2[3] + animpos2 * (cantedHold and -5 or 10) * (self.podkid or 1)
 			self.AdditionalAng2[1] = self.AdditionalAng2[1] + animpos2 * (cantedHold and -1 or -5) * (self.podkid or 1)
@@ -2461,8 +2473,7 @@ function SWEP:GetAdditionalValues()
 		-- this deterministic tail so the live muzzle ray follows the visible climb.
 		local sinceShot = CurTime() - (self:LastShootTime() or 0)
 		local firing = sinceShot >= 0 and sinceShot < 0.24
-		local weaponMass = math.max(self:GetWeaponWeight() + (self.addweight or 0), 0.5)
-		local caliberMul, weightMul = self:GetRecoilImpulseFactors()
+		local weaponMass = math.max(self:GetHandlingWeight(), 0.5)
 		local support = self:GetHandSupportState(ply)
 		local supportMul = self:GetRecoilSupportMul()
 		local handlingMul = self:GetArmHealthHandlingMul()
@@ -2473,7 +2484,7 @@ function SWEP:GetAdditionalValues()
 		local restMul = self:IsResting() and 0.35 or 1
 		local burstMul = 0.85 + math.Clamp((self.SprayI or 0) / 7, 0, 1) * 0.65
 		local physicalImpulse = math.Clamp(caliberMul * weightMul * supportMul * handlingMul * experienceMul * 1.2, 0.3, 5.5)
-		local recoveryRate = math.Clamp(0.32 / (1 + armInjury * 0.35 + weaponMass * 0.04 + (support.oneHanded and 0.2 or 0)), 0.14, 0.28)
+		local recoveryRate = math.Clamp(0.32 / (1 + armInjury * 0.35 + weaponMass * 0.04 + (support.oneHanded and not self.IgnoreOneArmPenalties and 0.2 or 0)), 0.14, 0.28)
 		local wobbleTarget = firing and math.min(physicalImpulse * burstMul * stanceMul * restMul, 2.2) or 0
 		self.recoilWobbleAmp = Lerp(hg.lerpFrameTime2(firing and 0.32 or recoveryRate, dtime), self.recoilWobbleAmp or 0, wobbleTarget)
 

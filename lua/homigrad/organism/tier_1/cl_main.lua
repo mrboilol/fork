@@ -810,12 +810,6 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 	
 	DrawColorModify(tabblood)
 
-	local blackoutAlpha = otrub and 250 or math.floor(consciousnessBlackout * 255)
-	if blackoutAlpha > 0 then
-		surface.SetDrawColor(0, 0, 0, blackoutAlpha)
-		surface.DrawRect(0, 0, ScrW(), ScrH())
-	end
-
 	if concussion > 0 and lply:Alive() then
 		concLerp = LerpFT(0.03, concLerp, concussion)
 		if concLerp > 1.0 then

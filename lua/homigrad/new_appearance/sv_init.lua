@@ -308,6 +308,14 @@ function APmodule.EquipFallenAccessory(ply, dropped)
 		accessories[#accessories + 1] = accessoryID
 	end
 
+	local hands = ply:GetActiveWeapon()
+	if IsValid(hands) and hands.GetCarrying and hands.SetCarrying and hands:GetCarrying() == dropped then
+		hands:SetCarrying()
+	end
+	if ply:GetNetVar("carryent2") == dropped and hg.SetCarryEnt2 then
+		hg.SetCarryEnt2(ply)
+	end
+
 	SyncAccessories(ply, accessories)
 	ply:EmitSound("snd_jack_hmcd_disguise.ogg", 70, math.random(95, 105), 0.7, CHAN_ITEM)
 	dropped:Remove()

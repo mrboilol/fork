@@ -956,11 +956,6 @@ drawFinalVitalsVignettes = function()
 		local shockVignette = (pain / 32 + math.max(renderedShock - 5, 0) / 2.4) * painEffectIntensity
 		painBorder = math.max(painBorder, shockVignette)
 		painCoverage = math.max(painCoverage, shockVignette)
-		if otrubVisualLerp > 0.005 then
-			painBorder = Lerp(otrubVisualLerp, painBorder, math.min(painBorder, 0.48))
-			painCoverage = Lerp(otrubVisualLerp, painCoverage, math.max(math.min(painCoverage, 3), 1.5))
-		end
-
 		render.UpdateScreenEffectTexture()
 		vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
 		vignetteMat:SetFloat("$c0_z", painBorder)
@@ -1035,10 +1030,16 @@ drawFinalVitalsVignettes = function()
 	local shockVignetteProgress = math.Clamp((shock - shockDrainThreshold) / math.max(shockOtrubLevel - shockDrainThreshold, 1), 0, 1)
 	local shockConsciousnessProgress = math.Clamp((0.5 - consciousness) / (0.5 - OTRUB_CONSCIOUSNESS_THRESHOLD), 0, 1) ^ 2
 	local lowConsciousnessShockVignette = math.Clamp((0.64 - visualConsciousness) / (0.64 - OTRUB_CONSCIOUSNESS_THRESHOLD), 0, 1) ^ 1.35
-	local oxygenVignetteTarget = oxygenSeverity
+	local criticalOxygen = oxygenMaximum * 0.5
+	local awakeCriticalOxygen = 0
+	if not org.otrub and oxygen <= criticalOxygen then
+		awakeCriticalOxygen = 0.22 + math.Clamp((criticalOxygen - oxygen) / math.max(criticalOxygen, 1), 0, 1) * 0.78
+	end
+	local oxygenVignetteTarget = org.otrub and 0 or math.max(oxygenSeverity, awakeCriticalOxygen)
 	local shockVignetteTarget = math.max(
 		shockVignetteProgress ^ 1.8 * Lerp(shockConsciousnessProgress, 1.6, 5),
-		lowConsciousnessShockVignette * 3.8
+		lowConsciousnessShockVignette * 3.8,
+		awakeCriticalOxygen * 3.2
 	)
 	local consciousnessVignetteTarget = consciousnessSeverity
 	lowOxygenVignetteLerp = LerpFT(0.025, lowOxygenVignetteLerp, oxygenVignetteTarget)
@@ -1132,24 +1133,6 @@ drawFinalVitalsVignettes = function()
 		render.DrawScreenQuad()
 	end
 
-	if otrubVisualLerp > 0.005 then
-		render.UpdateScreenEffectTexture()
-		chromaticMat:SetFloat("$c0_x", otrubVisualLerp * (0.055 + collapseVisualLerp * 0.07 + blink * 0.055))
-		chromaticMat:SetInt("$c0_y", 1)
-		render.SetMaterial(chromaticMat)
-		render.DrawScreenQuad()
-
-		render.UpdateScreenEffectTexture()
-		vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
-		vignetteMat:SetFloat("$c0_z", otrubVisualLerp * (0.42 + collapseVisualLerp * 0.24 + blink * 0.16))
-		vignetteMat:SetFloat("$c1_y", otrubVisualLerp * (2.25 + collapseVisualLerp * 1.75 + blink * 0.75))
-		render.SetMaterial(vignetteMat)
-		render.DrawScreenQuad()
-		if motionBlurCause > 0.06 then
-			DrawMotionBlur(0.006 + motionBlurCause * 0.018, otrubVisualLerp * (0.04 + collapseVisualLerp * 0.1) * motionBlurCause, 0.014)
-		end
-	end
-
 	local oxygenFlicker = 0
 	if lowOxygenVignetteLerp > 0.005 then
 		local oxygenTime = CurTime()
@@ -1218,6 +1201,7 @@ drawFinalVitalsVignettes = function()
 	local grayscale = math.Clamp(
 		bloodLossSeverity * 0.62
 		+ oxygenSeverity * 0.2
+		+ awakeCriticalOxygen * 0.38
 		+ shockSeverity * 0.2
 		+ consciousnessSeverity * 0.34
 		+ otrubVisualLerp * 0.18,
@@ -1243,8 +1227,7 @@ drawFinalVitalsVignettes = function()
 	end
 
 	local consciousnessBlackout = math.Clamp((0.48 - consciousness) / (0.48 - OTRUB_CONSCIOUSNESS_THRESHOLD), 0, 1) ^ 1.55
-	local otrubOxygenReveal = math.Clamp(oxygenSeverity * 0.7 + severeOxygenTail * 0.8, 0, 1)
-	local blackoutAlpha = org.otrub and Lerp(otrubOxygenReveal, 252, 72) or consciousnessBlackout * 255
+	local blackoutAlpha = org.otrub and 0 or consciousnessBlackout * 255
 	if blackoutAlpha > 0.5 then
 		surface.SetDrawColor(0, 0, 0, math.Clamp(blackoutAlpha, 0, 255))
 		surface.DrawRect(0, 0, ScrW(), ScrH())
@@ -1908,6 +1891,11 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		local strobe = getPainPulse(org)
 		pain = PainLerp + strobe
 		shock = shockLerp
+
+		if org.otrub then
+			DrawMotionBlur(0.1, 1, 0.01)
+			lply:ScreenFade(SCREENFADE.IN, Color(0, 0, 0), 2, 0.5)
+		end
 
 		//if pain > 10 then
 			painVolume = math.Clamp(math.Remap(pain, 0, hg.screeneffects_config.painThresholdMax, 0, 2), 0, 2)
@@ -3039,24 +3027,24 @@ hook.Add("Post Pain Processing", "PainEffects", function()
 
 	local org = lply:Alive() and lply.organism or (IsValid(spect) and spect.organism)
 	if not org or not org.brain then return end
-	if PainLerp <= 0.001 then return end
+	if not ((PainLerp > 0.001 or shockLerp > 5) or org.otrub) then return end
 
 	local strobe = math.ease.InOutSine(math.abs(math.cos(CurTime() * 2))) * PainLerp * painPulseIntensity
 	local pain = PainLerp + strobe
+	local shock = shockLerp
 	local zerlkersVisualMul = 1 - math.Clamp(org.zerlkers or 0, 0, 1) * 0.85
 	local thresholdReached = PainLerp >= painThresholdMax
 	painThresholdIntensityLerp = LerpFT(0.03, painThresholdIntensityLerp, thresholdReached and 5 or 1)
 	local intensityMul = painThresholdIntensityLerp
 	local coverage = (thresholdReached and 1 or math.Clamp(pain / 70, 0, 0.95)) * zerlkersVisualMul
 	local effectIntensity = pain / 32 * painEffectIntensity * intensityMul * zerlkersVisualMul
-	local vignetteIntensity = Lerp(otrubVisualLerp, effectIntensity, 5 * unconsciousPainEffectIntensity)
-	local grainIntensity = Lerp(otrubVisualLerp, painEffectIntensity * intensityMul * zerlkersVisualMul, unconsciousPainEffectIntensity)
+		+ math.max(shock - 5, 0) / 2.4 * painEffectIntensity
 
 	render.UpdateScreenEffectTexture()
 
 	vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
-	vignetteMat:SetFloat("$c0_z", vignetteIntensity)
-	vignetteMat:SetFloat("$c1_y", Lerp(otrubVisualLerp, effectIntensity, 10 * unconsciousPainEffectIntensity))
+	vignetteMat:SetFloat("$c0_z", org.otrub and 5 * unconsciousPainEffectIntensity or effectIntensity)
+	vignetteMat:SetFloat("$c1_y", org.otrub and 10 * unconsciousPainEffectIntensity or effectIntensity)
 
 	render.SetMaterial(vignetteMat)
 	render.DrawScreenQuad()
@@ -3065,7 +3053,7 @@ hook.Add("Post Pain Processing", "PainEffects", function()
 
 	painMat:SetFloat("$c2_x", CurTime() + 10000)
 	painMat:SetFloat("$c0_y", 0.8)
-	painMat:SetFloat("$c0_z", grainIntensity)
+	painMat:SetFloat("$c0_z", org.otrub and unconsciousPainEffectIntensity or painEffectIntensity * intensityMul * zerlkersVisualMul)
 	painMat:SetFloat("$c1_x", coverage)
 	painMat:SetFloat("$c1_y", coverage)
 

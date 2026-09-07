@@ -3731,7 +3731,7 @@ function SWEP:CustomThink()
                 end
 
                 if hgIsDoor and hgIsDoor(ent) then ent.SDD_LastMeleeHit = CurTime() end
-                self:ChargeAttackAdd(ent, trace)
+                self:ChargeAttackAdd(ent, trace, dmginfo)
                 if blockState == "none" and self:TryLodgeMeleeWeapon(ent, trace, 3) then return end
             end
 
@@ -3782,7 +3782,7 @@ end
 function SWEP:SecondaryAttackAdd(ent)
 end
 
-function SWEP:ChargeAttackAdd(ent, trace)
+function SWEP:ChargeAttackAdd(ent, trace, dmgInfo)
     self:PrimaryAttackAdd(ent, trace)
 end
 

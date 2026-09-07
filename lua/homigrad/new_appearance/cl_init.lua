@@ -99,9 +99,40 @@ local function ClearAccessoryModels(ent)
 	end
 end
 
+local function PruneAccessoryModels(ent, accessories)
+	if not IsValid(ent) or not ent.modelAccess then return end
+
+	local equipped = {}
+	if istable(accessories) then
+		for _, accessoryID in pairs(accessories) do equipped[accessoryID] = true end
+	elseif isstring(accessories) and accessories != "none" then
+		equipped[accessories] = true
+	end
+
+	for accessoryID, model in pairs(ent.modelAccess) do
+		if not equipped[accessoryID] then
+			if IsValid(model) then model:Remove() end
+			ent.modelAccess[accessoryID] = nil
+		end
+	end
+end
+
+hook.Add("OnNetVarSet", "ZCityAccessoryModelCleanup", function(index, key, accessories)
+	if key != "Accessories" then return end
+	local ent = Entity(index)
+	if not IsValid(ent) then return end
+
+	PruneAccessoryModels(ent, accessories)
+	if ent:IsRagdoll() then
+		local owner = ent:GetNWEntity("ply")
+		if IsValid(owner) then PruneAccessoryModels(owner, accessories) end
+	end
+end)
+
 function RenderAccessories(ply, accessories, setup)
 
 	if not IsValid(ply) or not accessories then return end
+	PruneAccessoryModels(ply, accessories)
 
 	if accessories == "none" then return end
 
@@ -115,17 +146,17 @@ function RenderAccessories(ply, accessories, setup)
 	if ent == follow and hg_firstperson_death:GetBool() and !ent:GetNW2Bool("hg_fountain", false) then islply = true end
 
 	if IsShadowCamouflageActiveOnEnt(ent, ply) then
-		ClearAccessoryModels(ent)
+		ClearAccessoryModels(ply)
 		return
 	end
 
 	if islply and IsValid(wep) and whitelist[wep:GetClass()] then
-		ClearAccessoryModels(ent)
+		ClearAccessoryModels(ply)
 		return
 	end
 
 	if ent.shouldTransmit == false or ent.NotSeen then
-		ClearAccessoryModels(ent)
+		ClearAccessoryModels(ply)
 		return
 	end
 
@@ -179,6 +210,8 @@ function DrawAccesories(ply, ent, accessories,accessData, islply, force, setup)
 	end
 
 	local fem = ThatPlyIsFemale(ent)
+	local bone = ent:LookupBone(accessData["bone"])
+	if not bone then return end
 	if not IsValid(ply.modelAccess[accessories]) then
 		if not accessData["model"] then return end
 		ply.modelAccess[accessories] = ClientsideModel(fem and accessData["femmodel"] or accessData["model"], RENDERGROUP_BOTH)
@@ -220,7 +253,7 @@ function DrawAccesories(ply, ent, accessories,accessData, islply, force, setup)
 		if accessData["randomBodygroups"] and best and bodygroups then
 			model:SetBodygroup(best.id, tonumber(bodygroups) or 0)
 		end
-		model:SetParent(ent, ent:LookupBone(accessData["bone"]))
+		model:SetParent(ent, bone)
 		if accessData.bonemerge then
 			model:AddEffects(EF_BONEMERGE)
 		end
@@ -251,6 +284,7 @@ function DrawAccesories(ply, ent, accessories,accessData, islply, force, setup)
 	end
 
 	local model = ply.modelAccess[accessories]
+	if not IsValid(model) then ply.modelAccess[accessories] = nil return end
 	--print(ent:GetModel(),ent)
 	local mdl = string.Split(string.sub(ent:GetModel(),1,-5),"/")[#string.Split(string.sub(ent:GetModel(),1,-5),"/")]
 	if mdl and model:GetFlexIDByName(mdl) then
@@ -260,8 +294,6 @@ function DrawAccesories(ply, ent, accessories,accessData, islply, force, setup)
 	--	model:SetFlexWeight(model:GetFlexIDByName(ThatPlyIsFemale(ply) and "F" or "M"),1)
 	--end
 	model:SetSkin( isfunction(accessData["skin"]) and accessData["skin"](ent) or accessData["skin"] )
-
-	if not IsValid(model) then ply.modelAccess[accessories] = nil return end
 
 	if ply.armors and accessData["placement"] and ply.armors[accessData["placement"]] then
 
@@ -276,8 +308,6 @@ function DrawAccesories(ply, ent, accessories,accessData, islply, force, setup)
 	if ply.organism and hg.amputatedlimbs2[accessData["bone"]] and ply.organism[hg.amputatedlimbs2[accessData["bone"]].."amputated"] then return end
 
 	if setup != false then
-		local bone = ent:LookupBone(accessData["bone"])
-		if not bone then return end
 		if ent:GetManipulateBoneScale(bone):LengthSqr() < 0.1 then return end
 		local matrix = ent:GetBoneMatrix(bone)
 		if not matrix then return end
