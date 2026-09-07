@@ -778,7 +778,13 @@ function ENTITY:FireLuaBullets(tInfo)
 
 			if SERVER and hg.TraceHeldWeaponShot then
 				local equipmentDamage = iDamage ~= 0 and iDamage or (bIsPlayer and iAmmoPlayerDamage or iAmmoNPCDamage)
-				tr = hg.TraceHeldWeaponShot(vNewSrc, tr.Hit and tr.HitPos or vEnd, pAttacker, equipmentDamage, flForce, tr, {Penetration = tInfo.Penetration}) or tr
+				tr = hg.TraceHeldWeaponShot(vNewSrc, tr.Hit and tr.HitPos or vEnd, pAttacker, equipmentDamage, flForce, tr, {
+					Penetration = tInfo.Penetration,
+					Diameter = tInfo.Diameter,
+					DamageType = iAmmoDamageType,
+					Vel = vShotDir * (tInfo.Speed or 0),
+					AmmoType = tInfo.AmmoType,
+				}) or tr
 			end
 			local data = {}
 			data.Trace = tr
@@ -1104,7 +1110,12 @@ function PLAYER:FireCSSBullets(tInfo)
 		
 		-- Loop values
 		local flCurrentDamage = iDamage	// damage of the bullet at it's current trajectory
-		local equipmentShot = {Penetration = flPenetrationPower}
+		local equipmentShot = {
+			Penetration = flPenetrationPower,
+			Diameter = tInfo.Diameter,
+			DamageType = iAmmoDamageType,
+			AmmoType = tInfo.AmmoType,
+		}
 		local flCurrentPlayerDamage = iPlayerDamage
 		local flCurrentNPCDamage = iNPCDamage
 		local flCurrentDistance = 0	// distance that the bullet has traveled so far
@@ -1119,6 +1130,7 @@ function PLAYER:FireCSSBullets(tInfo)
 		else
 			vShotDir = vDir
 		end
+		equipmentShot.Vel = vShotDir * (tInfo.Speed or 0)
 		
 		local vEnd = vNewSrc + vShotDir * flDistance
 		

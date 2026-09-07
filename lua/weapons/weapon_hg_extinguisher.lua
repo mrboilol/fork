@@ -448,6 +448,17 @@ local function TryExtinguisherBulletBlock(target, dmginfo)
     return true
 end
 
+function SWEP:OnHeldWeaponImpact(hit, damage, force, direction, shot)
+    if self.ExtinguisherExploded or not istable(shot) or shot.Contact then return end
+    local damageType = shot.DamageType or 0
+    if bit.band(damageType, DMG_BULLET + DMG_BUCKSHOT) == 0 then return end
+
+    local chance = math.Clamp((self.BulletBlockExplodeChance or 0.5) * 0.75 + math.Clamp((damage or 0) / 100, 0, 1) * 0.25, 0, 1)
+    if math.Rand(0, 1) <= chance then
+        ExplodeExtinguisher(self, IsValid(self:GetOwner()) and self:GetOwner() or nil, hit and hit.position)
+    end
+end
+
 if SERVER then
     hg.TryExtinguisherBulletBlock = TryExtinguisherBulletBlock
 

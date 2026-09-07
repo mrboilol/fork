@@ -31,6 +31,8 @@ impact.Config = {
     weaponSolidFraction = 0.25,
     weaponMaxThickness = 8,
     contactAbsorption = 0.55,
+    blockAbsorption = 0.82,
+    parryFallBreakSpeed = 950,
     defaultHardness = 0.9,
 }
 
@@ -156,6 +158,43 @@ local function ArmState(org, arm)
     return missing, math.Clamp(math.max(damage, (dislocated or missing) and 1 or 0), 0, 1)
 end
 
+function hg.GetFallBraceState(ply, body)
+    if not IsValid(ply) then return end
+    if IsValid(body) and body.HGFallCoverActive then
+        local coverWep = ply.GetActiveWeapon and ply:GetActiveWeapon()
+        return true, IsValid(coverWep) and coverWep.GetBlocking and coverWep:GetBlocking() or false
+    end
+
+    local wep = ply.GetActiveWeapon and ply:GetActiveWeapon()
+    local blocking = IsValid(wep) and wep.GetBlocking and wep:GetBlocking() or false
+    local handsOut = ply.KeyDown and ply:KeyDown(IN_USE)
+    if not handsOut and ply.KeyDown and ply:KeyDown(IN_ATTACK2) then
+        handsOut = not IsValid(wep) or wep:GetClass() == "weapon_hands_sh" or wep.ismelee2 == true
+    end
+
+    return blocking or handsOut, blocking
+end
+
+function hg.ApplyFallBraceDamage(ply, body, dmgInfo, damage)
+    if not IsValid(ply) or not isnumber(damage) or damage <= 0 then return 0 end
+    local target = IsValid(body) and body or ply
+    local org = target.organism or ply.organism
+    local input = hg.organism and hg.organism.input_list
+    if not org or not input then return 0 end
+
+    local arms = {}
+    if not org.rarmamputated and not org.rarmupamputated then arms[#arms + 1] = "rarmup" end
+    if not org.larmamputated and not org.larmupamputated then arms[#arms + 1] = "larmup" end
+    if #arms == 0 then return 0 end
+
+    local perArm = damage / #arms
+    for _, arm in ipairs(arms) do
+        if input[arm] then input[arm](org, 0, perArm, dmgInfo) end
+    end
+
+    return damage
+end
+
 function hg.GetWeaponImpactGrip(ply, wep)
     local org = ply.organism or {}
     local rightMissing, rightInjury = ArmState(org, "rarm")
@@ -182,7 +221,15 @@ function hg.GetHeldWeaponImpactModel(ply, wep)
     if not IsValid(wep) then return end
     if wep.WorldModel_Transform then wep:WorldModel_Transform() end
     local model = wep.worldModel
-    if IsValid(model) then return model:GetModel(), model:GetPos(), model:GetAngles(), model:GetModelScale() end
+    if IsValid(model) then
+        local modelName = model:GetModel()
+        local modelScale = model:GetModelScale()
+        if isstring(wep.WorldModelExchange) and wep.WorldModelExchange ~= "" then
+            modelName = wep.WorldModelExchange
+            modelScale = wep.modelscale or modelScale
+        end
+        return modelName, model:GetPos(), model:GetAngles(), modelScale
+    end
     if wep.NoDrop then return end
     local body = hg.GetCurrentCharacter(ply)
     if not IsValid(body) then return end
@@ -257,6 +304,11 @@ local function WeaponImpact(ply, wep, hit, damage, force, direction)
     if grip.sole then chance = chance + power * grip.injury * cfg.weaponSoleInjuryChance end
     if grip.sole and grip.injury >= cfg.weaponSoleSevereInjury and power >= cfg.weaponSoleSignificantPower then chance = math.max(chance, cfg.soleArmChance) end
     if grip.noHands then chance = cfg.maxDropChance end
+
+    if isfunction(wep.OnHeldWeaponImpact) then
+        wep:OnHeldWeaponImpact(hit, damage, force, direction, hit.shot)
+    end
+
     if math.Rand(0, 1) < math.min(chance, cfg.maxDropChance) then hg.DropWeaponFromImpact(ply, wep, direction, power) end
 end
 
@@ -267,6 +319,7 @@ function hg.TryAbsorbEquipmentImpact(ent, dmgInfo, hitPos, direction, impactRadi
     local damage = dmgInfo:GetDamage()
     local ply = ent:IsPlayer() and ent or hg.RagdollOwner(ent)
     local wep = IsValid(ply) and ply:GetActiveWeapon()
+    local parried = false
     if IsValid(wep) then
         local dir = direction:GetNormalized()
         local radius = math.max(tonumber(impactRadius) or 0, 0)
@@ -279,6 +332,20 @@ function hg.TryAbsorbEquipmentImpact(ent, dmgInfo, hitPos, direction, impactRadi
             WeaponImpact(ply, wep, hit, damage, dmgInfo:GetDamageForce():Length(), dir)
             local directness = math.Clamp(-hit.normal:Dot(dir), 0, 1)
             local absorbed = impact.Config.contactAbsorption * directness * math.Clamp(hit.thickness / 2, 0, 1)
+            local blocking = wep.GetBlocking and wep:GetBlocking() or false
+            local parry = false
+            if blocking and wep.GetStartedBlocking and wep.GetBlockParryWindow then
+                parry = CurTime() - wep:GetStartedBlocking() <= wep:GetBlockParryWindow()
+            end
+            local highFall = dmgInfo:IsDamageType(DMG_FALL) and dmgInfo:GetDamageForce():Length() >= impact.Config.parryFallBreakSpeed
+            if blocking then absorbed = math.max(absorbed, impact.Config.blockAbsorption) end
+            if parry and not highFall then
+                absorbed = 1
+                parried = true
+                if wep.PlayBlockImpactEffect then
+                    wep:PlayBlockImpactEffect({HitPos = hit.position, HitNormal = hit.normal}, wep, "parry")
+                end
+            end
             dmgInfo:ScaleDamage(1 - absorbed)
             dmgInfo:SetDamageForce(dmgInfo:GetDamageForce() * (1 - absorbed))
         end
@@ -286,7 +353,7 @@ function hg.TryAbsorbEquipmentImpact(ent, dmgInfo, hitPos, direction, impactRadi
     if hg.Appearance and hg.Appearance.TryAbsorbAccessoryImpact then
         hg.Appearance.TryAbsorbAccessoryImpact(ent, dmgInfo, hitPos, direction, nil, impactRadius)
     end
-    impact.ProcessedDamage[dmgInfo] = {}
+    impact.ProcessedDamage[dmgInfo] = parried and {parried = true} or {}
     return dmgInfo:GetDamage() < damage
 end
 
@@ -314,7 +381,7 @@ function hg.TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, origin
         if IsValid(wep) and not seen[wep] then
             local model, pos, ang, modelScale = hg.GetHeldWeaponImpactModel(ply, wep)
             local hit = model and hg.TraceEquipmentModel(model, pos, ang, modelScale, startPos, endPos, cfg.weaponHitPadding + projectileRadius)
-            if hit and hit.fraction <= obstructionFraction + 0.0001 then hit.weapon, hit.ply, hit.key = wep, ply, wep; hits[#hits + 1] = hit end
+            if hit and hit.fraction <= obstructionFraction + 0.0001 then hit.weapon, hit.ply, hit.key = wep, ply, wep; hit.shot = shot; hits[#hits + 1] = hit end
         end
         if hg.Appearance and hg.Appearance.TraceAccessoryShot then
             hg.Appearance.TraceAccessoryShot(body, startPos, endPos, seen, hits, projectileRadius)
@@ -336,12 +403,21 @@ function hg.TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, origin
                 info:SetDamageType(shot.DamageType or DMG_CLUB)
                 hg.Appearance.TryAbsorbAccessoryImpact(hit.body, info, hit.position, direction * (force or damage), hit)
             end
-            local tr = table.Copy(originalTrace)
+            local tr = table.Copy(originalTrace or {})
             tr.Hit, tr.HitWorld, tr.HitSky = true, false, false
-            tr.Entity, tr.HitPos, tr.HitNormal, tr.Normal = game.GetWorld(), hit.position, hit.normal, direction
+            tr.Entity, tr.HitPos, tr.HitNormal, tr.Normal = hit.weapon and hit.ply or game.GetWorld(), hit.position, hit.normal, direction
             tr.StartSolid, tr.AllSolid = false, false
             tr.MatType, tr.Fraction = hit.weapon and MAT_METAL or MAT_PLASTIC, hit.fraction
             tr.HGEquipmentContact = true
+            if hit.weapon then
+                local grip = hg.GetWeaponImpactGrip(hit.ply, hit.weapon)
+                local directness = math.Clamp(-hit.normal:Dot(direction), 0, 1)
+                local absorbed = impact.Config.contactAbsorption * directness * math.Clamp(hit.thickness / 2, 0, 1)
+                tr.HGEquipmentScale = 1 - absorbed
+                tr.HGEquipmentWeapon = hit.weapon
+                tr.HGEquipmentIntercept = true
+                tr.HitGroup = grip and grip.firingArm == "larm" and HITGROUP_LEFTARM or HITGROUP_RIGHTARM
+            end
             return tr
         end
         if hit.weapon then

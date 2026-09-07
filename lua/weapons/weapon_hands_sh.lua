@@ -2004,10 +2004,12 @@ function SWEP:BlockingLogic(ent, mul, attacktype, trace)
 
         //print(dist, distLine)
 
-        local dmg = wep.DamagePrimary
+        local dmg = math.max(wep.DamagePrimary or self.DamagePrimary or 1, 1)
         local selfdmg = self.DamagePrimary * 0.2
+        local attackerBlockTier = self.GetBlockTier and self:GetBlockTier() or math.max(self.BlockTier or 1, 1)
+        local defenderBlockTier = wep.GetBlockTier and wep:GetBlockTier() or math.max(wep.BlockTier or 1, 1)
 
-		if wep.GetBlocking and wep:GetBlocking() and wep.SetStartedBlocking and dist < 10 then
+		if wep.GetBlocking and wep:GetBlocking() and wep.SetStartedBlocking and (trace.HGEquipmentIntercept or dist < 10) then
 			if wep.CanBlockWeapon and not wep:CanBlockWeapon(self) then
 				return 1
 			end

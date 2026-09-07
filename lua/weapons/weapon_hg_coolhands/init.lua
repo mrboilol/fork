@@ -715,10 +715,10 @@ function SWEP:BlockingLogic(ent, mul, attacktype, trace)
 
 		//print(dist, distLine)
 
-		local dmg = wep.DamagePrimary
+		local dmg = math.max(wep.DamagePrimary or self.DamagePrimary or 1, 1)
 		local selfdmg = self.DamagePrimary * 0.2
 
-		if wep.GetBlocking and wep:GetBlocking() and wep.SetStartedBlocking and dist < 10 then
+		if wep.GetBlocking and wep:GetBlocking() and wep.SetStartedBlocking and (trace.HGEquipmentIntercept or dist < 10) then
 			if hg.organism and hg.organism.ConsumeStamina then hg.organism.ConsumeStamina(ent.organism, mul * math_Clamp(selfdmg / dmg, 0.1, 1) * selfdmg * (1 - math_Clamp((self:GetStartedBlocking() - CurTime() + 0.1), 0, 0.1) / 0.1)) end
 
 			wep:SetLastBlocked(CurTime())

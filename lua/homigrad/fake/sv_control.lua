@@ -949,6 +949,8 @@ hook.Add("Think", "Fake", function()
 				end
 			end
 		end
+		ply.HGFallCoverActive = fallCoverActive
+		ragdoll.HGFallCoverActive = fallCoverActive
 		local holdWound, holdWoundArterial = getHoldWound(org, ragdoll)
 		local wantsManualHold = (holdWound and org.canmove and hg.KeyDown(ply, IN_USE) and hg.KeyDown(ply, IN_JUMP)) or (org.neckslit and not org.otrub and holdWoundArterial and org.canmove)
 		local canHoldLeft = IsValid(lupper) and IsValid(lforearm) and IsValid(lhand) and not org.larmamputated and not org.larmupamputated

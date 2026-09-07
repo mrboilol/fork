@@ -79,6 +79,14 @@ hook.Add("OnPlayerHitGround","fallStun",function(ply,inwater,onfloater,speed)
 				dmgInfo:SetInflictor(game.GetWorld())
 				dmgInfo:SetAttacker(game.GetWorld())
 				local fallDmg = math.Clamp((speed - 650) / 800, 0.1, 3)
+				local braceActive, braceBlocking = hg.GetFallBraceState and hg.GetFallBraceState(ply, ply)
+				if braceActive then
+					local braceMul = math.Clamp(0.55 + math.Clamp((speed - 650) / 700, 0, 1) * 0.35, 0, 0.92)
+					if braceBlocking then braceMul = math.min(braceMul + 0.08, 0.97) end
+					local braceDamage = fallDmg * braceMul
+					local applied = hg.ApplyFallBraceDamage and hg.ApplyFallBraceDamage(ply, ply, dmgInfo, braceDamage * (braceBlocking and 1.35 or 1.15)) or 0
+					if applied > 0 then fallDmg = fallDmg - braceDamage end
+				end
 				hg.organism.input_list.llegup(org, 0, fallDmg, dmgInfo)
 				hg.organism.input_list.rlegup(org, 0, fallDmg, dmgInfo)
 				if speed > 1100 then

@@ -1885,7 +1885,7 @@ function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
 
         trace = util.TraceLine(tr)
 
-        if SERVER and not self:IsEntSoft(trace.Entity) and hg.TraceHeldWeaponShot then
+        if SERVER and hg.TraceHeldWeaponShot then
             if self.HGEquipmentHitEnts ~= self.HitEnts then
                 self.HGEquipmentHitEnts = self.HitEnts
                 self.HGEquipmentSwing = {Contact = true, EquipmentHits = {}}
@@ -2750,6 +2750,8 @@ function SWEP:CanDirectionalBlock(blockWep, defender, attacker, attacktype, hier
 end
 
 function SWEP:IsBlockTraceCovered(defender, trace, eyePos, aimvec, blockWep)
+    if trace and trace.HGEquipmentIntercept then return true end
+
     local blockDist = (blockWep.BlockTraceDist or self.BlockTraceDist or 10) + (blockWep.BlockTraceCoverageBonus or self.BlockTraceCoverageBonus or 0)
     local dist = util.DistanceToLine(eyePos + aimvec * 100, eyePos, trace.HitPos)
     if dist < blockDist then
@@ -3293,6 +3295,7 @@ function SWEP:CustomThink()
 
             mul = mul * self:GetBehindAttackDamageMul(ent, 1)
             blockMul, blockState = self:BlockingLogic(ent, mul, false, trace)
+            blockMul = blockMul * math.Clamp(trace.HGEquipmentScale or 1, 0, 1)
             mul = mul * blockMul
 
             dmg = dmg * mul
@@ -3464,6 +3467,7 @@ function SWEP:CustomThink()
 
             mul = mul * self:GetBehindAttackDamageMul(ent, 2)
             blockMul, blockState = self:BlockingLogic(ent, mul, true, trace)
+            blockMul = blockMul * math.Clamp(trace.HGEquipmentScale or 1, 0, 1)
             mul = mul * blockMul
 
             dmg = dmg * mul
@@ -3650,6 +3654,7 @@ function SWEP:CustomThink()
 
             mul = mul * self:GetBehindAttackDamageMul(ent, 3)
             blockMul, blockState = self:BlockingLogic(ent, mul, 3, trace)
+            blockMul = blockMul * math.Clamp(trace.HGEquipmentScale or 1, 0, 1)
             mul = mul * blockMul
 
             dmg = dmg * mul

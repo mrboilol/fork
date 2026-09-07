@@ -134,7 +134,7 @@ function hg.organism.UpdateVitalHealthToll(owner, org, timeValue)
 	if org.unstableRhythm then arrhythmiaK = math.max(arrhythmiaK, 0.35) end
 	if org.fibrillation then arrhythmiaK = 1 end
 	local pulse = math.max(tonumber(org.pulse) or 0, 0)
-	local bradycardiaK = hg.organism.GetSmoothSeverity(55 - pulse, 0, 45, 1.10)
+	local bradycardiaK = hg.organism.GetSmoothSeverity(70 - pulse, 0, 45, 1.10)
 	local tachycardiaK = hg.organism.GetSmoothSeverity(pulse, 130, 220, 1.20)
 	local activeBleedK = hg.organism.GetSmoothSeverity(org.bleed or 0, 0.15, 4, 1.10)
 

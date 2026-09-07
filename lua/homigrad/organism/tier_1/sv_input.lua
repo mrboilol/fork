@@ -1308,6 +1308,8 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	local accessoryDamage = dmgInfo:GetDamage()
 	local impactRadius = meleeContact and meleeContact.impactRadius or nil
 	if hg.TryAbsorbEquipmentImpact and hg.TryAbsorbEquipmentImpact(ent, dmgInfo, dmgPos, dir, impactRadius) then
+		local absorbedImpact = hg.EquipmentImpact and hg.EquipmentImpact.ProcessedDamage[dmgInfo]
+		if absorbedImpact and absorbedImpact.parried then return true end
 		local damageRatio = dmgInfo:GetDamage() / math.max(accessoryDamage, 0.01)
 		dmg = dmgInfo:GetDamage()
 		pen = pen * damageRatio
@@ -2357,6 +2359,7 @@ local function velocityDamage(ent, data)
 
 	local dmgInfo = DamageInfo()
 	dmgInfo:SetDamage(dmg * 20)
+	dmgInfo:SetDamageForce(relativeVelocity)
 	local surfaceType = util.GetSurfacePropName(data["TheirSurfaceProps"])
 	--[[if surfaceType and surfaceType ~= nil and bleedSurfaces[surfaceType] then
 		--print(surfaceType)
@@ -2408,6 +2411,22 @@ local function velocityDamage(ent, data)
 	if hg.TryAbsorbEquipmentImpact and hg.TryAbsorbEquipmentImpact(ent, dmgInfo, data.HitPos, relativeVelocity, impactRadius) then
 		dmg = dmg * (dmgInfo:GetDamage() / math.max(accessoryDamage, 0.01))
 	end
+	local equipmentImpact = hg.EquipmentImpact and hg.EquipmentImpact.ProcessedDamage[dmgInfo]
+	if equipmentImpact and equipmentImpact.parried then return end
+
+	local braceActive, braceBlocking = hg.GetFallBraceState and hg.GetFallBraceState(ply, ent)
+	local groundImpact = relativeVelocity.z < -120 or (isvector(data.HitNormal) and data.HitNormal.z > 0.45)
+	if braceActive and groundImpact and normalSpeed >= 320 then
+		local braceMul = math.Clamp(0.55 + math.Clamp((normalSpeed - 320) / 650, 0, 1) * 0.35, 0, 0.92)
+		if braceBlocking then braceMul = math.min(braceMul + 0.08, 0.97) end
+		local braceDamage = dmg * braceMul
+		local applied = hg.ApplyFallBraceDamage and hg.ApplyFallBraceDamage(ply, ent, dmgInfo, braceDamage * (braceBlocking and 1.35 or 1.15)) or 0
+		if applied > 0 then
+			dmg = math.max(dmg - braceDamage, 0)
+			dmgInfo:SetDamage(dmg * 20)
+		end
+	end
+	rawPhysicsDamage = dmg * 20
 
 	local org = ent.organism
 	if ent.NoDismembermentPhysics then org.NoDismembermentPhysics = true end

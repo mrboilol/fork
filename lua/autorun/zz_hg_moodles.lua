@@ -141,10 +141,10 @@ local moodleTexts = {
 		[4] = {title = "Critical Arrhythmia", description = "Your heart is struggling to maintain an effective rhythm."},
 	}},
 	palpitations = {levels = {
-		[1] = {title = "Tachycardia", description = "Your heart is beating faster than normal."},
-		[2] = {title = "Tachycardia", description = "Your elevated heart rate is becoming uncomfortable."},
-		[3] = {title = "Severe Tachycardia", description = "Your heart is racing and straining your circulation."},
-		[4] = {title = "Critical Tachycardia", description = "Your dangerously fast heart rate is threatening circulation."},
+		[1] = {title = "Abnormal Heart Rate", description = "Your heart rate is outside its normal range."},
+		[2] = {title = "Severe Heart Rate Disturbance", description = "Your heart rate is becoming dangerously slow or fast."},
+		[3] = {title = "Critical Heart Rate", description = "Your abnormal heart rate is straining circulation."},
+		[4] = {title = "Life-Threatening Heart Rate", description = "Your heart rate may no longer sustain effective circulation."},
 	}},
 	fibrillation = {levels = {
 		[1] = {title = "Palpitations", description = "You can feel an abnormal fluttering heartbeat."},
@@ -165,10 +165,10 @@ local moodleTexts = {
 		[4] = {title = "Cardiac Arrest", description = "Your heart has stopped producing effective circulation."},
 	}},
 	low_blood = {levels = {
-		[1] = {title = "Low Pulse", description = "Your pulse is slower than normal."},
-		[2] = {title = "Bradycardia", description = "A slow pulse is causing weakness and lightheadedness."},
-		[3] = {title = "Severe Bradycardia", description = "Your pulse is dangerously slow and circulation is weakening."},
-		[4] = {title = "Critical Bradycardia", description = "Your pulse is critically slow and may no longer sustain circulation."},
+		[1] = {title = "Low Blood Pressure", description = "Your pulse or blood pressure is slightly below normal."},
+		[2] = {title = "Hypotension", description = "Reduced circulation is causing weakness and lightheadedness."},
+		[3] = {title = "Severe Hypotension", description = "Your circulation is dangerously weak."},
+		[4] = {title = "Critical Hypotension", description = "Your circulation may no longer sustain your vital organs."},
 	}},
 	high_blood = {levels = {
 		[1] = {title = "Elevated Circulation", description = "Your pressure or pulse is slightly above normal."},
@@ -393,12 +393,12 @@ local function getMoodle3IconName(effect)
 	local names = {
 		fracture = "fractured", dislocated = "dislocated", analgesia = "drugged",
 		stamina = "exertion", exertion = "exertion", bleeding = level == 1 and "bleeding" or "bleeding" .. level,
-		carbon_monoxide = "hypoxemia", arrhythmia = "arrhythmia", palpitations = "palpitations", fibrillation = "fibrillation",
-		hypoxemia = "hypoxemia", brain_hypoxia = "brain-hypoxia", brain_dying = "brain-dying", asystole = "heart-failure",
-		low_blood = "arrhythmia", high_blood = "hypertension", no_eye = "last-stand", blinded = "confused",
-		brain_bleed = "terror", intracranial_pressure = "terror",
+		carbon_monoxide = "hypoxemia", arrhythmia = "arrhythmia", palpitations = "fibrilation", fibrillation = "fibrilation",
+		hypoxemia = "hypoxemia", brain_hypoxia = "brain-hypoxia", brain_dying = "stress", asystole = "heart-failure",
+		low_blood = "hypotension", high_blood = "hypertension", no_eye = "last-stand", blinded = "confused",
+		brain_bleed = "brain-hemorrhage", intracranial_pressure = "terror",
 		weakness = "encumbered", bradypnea = "dyspnea", thorax = "hemothorax",
-		respiratory_arrest = "respiratory-arrest", skull = "intercranial-hypertension",
+		respiratory_arrest = "respiratory-arrest", skull = "terror",
 		dislocated_jaw = "dejawed", organ_damage = effect.icon, spine_break = "fractured",
 		shock = "shock", seizure = "seizure", internal_bleed = "internal-bleeding",
 		panic = "panic", fear = "trauma", tinnitus = "tinnitus", deaf = "deafness", encumbered = "encumbered",
@@ -417,7 +417,7 @@ local function getMoodle3IconName(effect)
 	if effect.name == "happy" then name = level == 1 and "happy" or "happy" .. level end
 	if effect.name == "anger" then name = "anger" .. level end
 	if effect.name == "blinded" then name = "confused" end
-	if effect.name == "brain_damage" then name = level == 1 and "brain-damage" or "brain-damage" .. level end
+	if effect.name == "brain_damage" then name = "stress" end
 	if effect.name == "temperature" then
 		name = effect.icon == "veryhot" and "hyperthermia" or effect.icon == "heated" and "hot" or level >= 3 and "hypothermia" or "cold"
 	end
@@ -541,6 +541,18 @@ local function getTourniquetedLimbs(ply)
 	return result
 end
 
+local irregularECGSeverity = {
+	ventricular_ectopy = 0.35,
+	atrial_fibrillation = 0.65,
+	hypothermia_bradycardia = 0.45,
+	av_block_partial = 0.45,
+	av_block_complete = 0.75,
+	ventricular_escape = 0.75,
+	junctional_escape = 0.55,
+	sinus_pause = 0.55,
+	cerebral_irregular = 0.55,
+}
+
 local function buildEffects(ply, org)
 	local effects = {}
 
@@ -618,15 +630,22 @@ local function buildEffects(ply, org)
 	local palpitations = math.Clamp(orgNumber(org, "palpitations", 0), 0, 1)
 	local arrhythmia = math.Clamp(orgNumber(org, "arrhythmia", 0), 0, 1)
 	local unstableRhythm = org.unstableRhythm
-	local irregular = arrhythmia > 0.1 or unstableRhythm ~= nil
-	local fibrillating = org.fibrillation == true or unstableRhythm == "atrial_fibrillation"
+	local ecgState = org.ecgState
+	local irregularSeverity = irregularECGSeverity[ecgState] or 0
+	local irregular = irregularSeverity > 0 or (not ecgState and unstableRhythm ~= nil)
+	local fibrillating = org.fibrillation == true or ecgState == "atrial_fibrillation" or ecgState == "ventricular_fibrillation"
+		or (not ecgState and unstableRhythm == "atrial_fibrillation")
 	if not org.heartstop and fibrillating then
-		local level = org.fibrillation and 4 or highRank(math.max(palpitations, arrhythmia, math.Clamp((heartRate - 160) / 140, 0, 1)), {0.1, 0.3, 0.6, 0.85})
+		local level = org.fibrillation and 4 or highRank(math.max(palpitations, arrhythmia, irregularSeverity, 0.1), {0.1, 0.3, 0.6, 0.85})
 		add(effects, "fibrillation", "fibrillation", level, "bad", org.fibrillation and -95 or 24, math.floor(heartRate) .. " bpm")
 	elseif not org.heartstop and irregular then
-		add(effects, "arrhythmia", "arrhythmia", highRank(arrhythmia, {0.1, 0.3, 0.6, 0.85}), "bad", 24.5, math.floor(heartRate) .. " bpm")
-	elseif not org.heartstop and (heartRate > 120 or palpitations > 0.05) then
-		local level = highRank(math.max(palpitations, math.Clamp((heartRate - 120) / 140, 0, 1)), {0.1, 0.3, 0.6, 0.85})
+		local level = highRank(math.max(arrhythmia, irregularSeverity, 0.1), {0.1, 0.3, 0.6, 0.85})
+		add(effects, "arrhythmia", "arrhythmia", level, "bad", 24.5, math.floor(heartRate) .. " bpm")
+	elseif not org.heartstop and (heartRate >= 150 or (heartRate > 0 and heartRate <= 45)) then
+		local rateSeverity = heartRate >= 150
+			and math.Clamp((heartRate - 150) / 150, 0, 1)
+			or math.Clamp((45 - heartRate) / 30, 0, 1)
+		local level = highRank(math.max(palpitations, rateSeverity, 0.1), {0.1, 0.3, 0.6, 0.85})
 		add(effects, "palpitations", "palpitations", level, "bad", 24.5, math.floor(heartRate) .. " bpm")
 	end
 
@@ -643,9 +662,13 @@ local function buildEffects(ply, org)
 	if org.heartstop == true then add(effects, "asystole", "asystole", 4, "bad", -100) end
 
 	local pulse = math.max(orgNumber(org, "pulse", 70), 0)
-	if not org.heartstop and pulse > 0 and pulse < 60 then
-		local level = pulse < 30 and 4 or pulse < 40 and 3 or pulse < 50 and 2 or 1
-		add(effects, "low_blood", level >= 3 and "superlowblood" or "lowblood", level, "bad", 27, math.floor(pulse) .. " bpm")
+	local hypotension = math.Clamp(orgNumber(org, "hypotension", 0), 0, 1)
+	local lowPulseSeverity = math.Clamp((70 - pulse) / 40, 0, 1)
+	local lowCirculationSeverity = math.max(lowPulseSeverity, hypotension)
+	if not org.heartstop and ((pulse > 0 and pulse < 70) or hypotension > 0.01) then
+		local level = highRank(math.max(lowCirculationSeverity, 0.1), {0.1, 0.3, 0.6, 0.85})
+		local pressure = math.floor(math.max(orgNumber(org, "bloodPressure", 0), 0))
+		add(effects, "low_blood", level >= 3 and "superlowblood" or "lowblood", level, "bad", 27, math.floor(pulse) .. " bpm / " .. pressure .. " MAP")
 	end
 	local hypertension = math.Clamp(orgNumber(org, "hypertension", 0), 0, 1)
 	if not org.heartstop and hypertension > 0 then
