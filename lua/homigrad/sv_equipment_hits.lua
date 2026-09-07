@@ -37,6 +37,12 @@ impact.Config = {
 impact.ProcessedDamage = setmetatable({}, {__mode = "k"})
 local geometryCache = {}
 
+local function SetupEntityBones(entity)
+    if IsValid(entity) and isfunction(entity.SetupBones) then
+        entity:SetupBones()
+    end
+end
+
 local function GetGeometry(model)
     if geometryCache[model] ~= nil then return geometryCache[model] or nil end
     local probe = ents.Create("base_anim")
@@ -180,7 +186,7 @@ function hg.GetHeldWeaponImpactModel(ply, wep)
     if wep.NoDrop then return end
     local body = hg.GetCurrentCharacter(ply)
     if not IsValid(body) then return end
-    body:SetupBones()
+    SetupEntityBones(body)
     local grip = hg.GetWeaponImpactGrip(ply, wep)
     local bone = body:LookupBone(grip.firingArm == "larm" and "ValveBiped.Bip01_L_Hand" or "ValveBiped.Bip01_R_Hand")
     local matrix = bone and body:GetBoneMatrix(bone)
@@ -302,7 +308,7 @@ function hg.TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, origin
         if ply == shooter or not ply:Alive() then continue end
         local body = hg.GetCurrentCharacter(ply)
         if not IsValid(body) then continue end
-        body:SetupBones()
+        SetupEntityBones(body)
         checkedBodies[body] = true
         local wep = ply:GetActiveWeapon()
         if IsValid(wep) and not seen[wep] then

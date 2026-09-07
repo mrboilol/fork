@@ -1,5 +1,7 @@
 if not SERVER then return end
 
+resource.AddFile("sound/niceone.ogg")
+
 -- convars
 CreateConVar(
     "deatheffect_spectator", "1",

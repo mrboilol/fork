@@ -5,43 +5,84 @@ local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") 
 local MEDKIT_TYPES = {
     basic = {
         PrintName = "Basic Medkit",
-        Instructions = "A compact first-aid kit with a basic bandage roll and one tourniquet. Best for stopping a small wound before it becomes serious. RMB to apply on others, R to change use mode.",
+        Instructions = "A compact first-aid kit with a basic bandage roll and one tourniquet. Left click to unpack it; RMB applies the selected treatment.",
         contents = {bandage = 40, tourniquet = 1},
+        contentItems = {
+            {class = "weapon_bandage_sh", amount = 40},
+            {class = "weapon_tourniquet", amount = 1},
+        },
         bandageColor = Color(235, 235, 235),
     },
     standard = {
         PrintName = "Standard Medkit",
-        Instructions = "A general-purpose first-aid kit with bandages, a tourniquet and paracetamol for everyday injuries. RMB to apply on others, R to change use mode.",
+        Instructions = "A general-purpose first-aid kit with bandages, a tourniquet and paracetamol. Left click to unpack it; RMB applies the selected treatment.",
         contents = {bandage = 60, tourniquet = 1, painkiller = 1},
+        contentItems = {
+            {class = "weapon_packedbandage_sh", amount = 60},
+            {class = "weapon_tourniquet", amount = 1},
+            {class = "weapon_painkillers", amount = 1, painkillerType = "paracetamol"},
+        },
         bandageColor = Color(205, 205, 205),
         painkillerType = "paracetamol",
     },
     emergency = {
         PrintName = "Emergency Medkit",
-        Instructions = "An emergency trauma kit with extra bandages, two tourniquets, tramadol and naloxone for severe bleeding or overdose response. RMB to apply on others, R to change use mode.",
+        Instructions = "An emergency trauma kit with extra bandages, two tourniquets, tramadol and naloxone. Left click to unpack it; RMB applies the selected treatment.",
         contents = {bandage = 120, tourniquet = 2, painkiller = 0.4, naloxone = 1},
+        contentItems = {
+            {class = "weapon_combatbandage_sh", amount = 120},
+            {class = "weapon_tourniquet", amount = 1},
+            {class = "weapon_tourniquet", amount = 1},
+            {class = "weapon_tramadol", amount = 0.4},
+            {class = "weapon_naloxone", amount = 1},
+        },
         bandageColor = Color(165, 165, 165),
         painkillerType = "tramadol",
     },
     advanced = {
         PrintName = "Advanced Medkit",
-        Instructions = "An advanced trauma kit with large dressings, two tourniquets, tramadol, tranexamic acid and a decompression needle for severe trauma. RMB to apply on others, R to change use mode.",
+        Instructions = "An advanced trauma kit with large dressings, two tourniquets, tramadol, tranexamic acid and a decompression needle. Left click to unpack it; RMB applies the selected treatment.",
         contents = {bandage = 225, tourniquet = 2, painkiller = 0.4, tranexamic = 10, needle = 1},
+        contentItems = {
+            {class = "weapon_bigcombatbandage_sh", amount = 225},
+            {class = "weapon_tourniquet", amount = 1},
+            {class = "weapon_tourniquet", amount = 1},
+            {class = "weapon_tramadol", amount = 0.4},
+            {class = "weapon_tranexamic_acid", amount = 10},
+            {class = "weapon_needle", amount = 1},
+        },
         bandageColor = Color(125, 125, 125),
         painkillerType = "tramadol",
     },
     surgical = {
         PrintName = "Surgical Medkit",
-        Instructions = "A fully stocked surgical kit with QuikClot-grade dressings, two tourniquets, tapentadol, tranexamic acid, naloxone, mannitol and a decompression needle. RMB to apply on others, R to change use mode.",
+        Instructions = "A fully stocked surgical kit with QuikClot dressings, two tourniquets, tapentadol, tranexamic acid, naloxone, mannitol and a decompression needle. Left click to unpack it; RMB applies the selected treatment.",
         contents = {bandage = 350, tourniquet = 2, painkiller = 0.6, tranexamic = 10, naloxone = 1, mannitol = 1, needle = 1},
+        contentItems = {
+            {class = "weapon_bigquikclotbandage_sh", amount = 350},
+            {class = "weapon_tourniquet", amount = 1},
+            {class = "weapon_tourniquet", amount = 1},
+            {class = "weapon_tapentadol", amount = 0.6},
+            {class = "weapon_tranexamic_acid", amount = 10},
+            {class = "weapon_naloxone", amount = 1},
+            {class = "weapon_mannitol", amount = 1},
+            {class = "weapon_needle", amount = 1},
+        },
         bandageColor = Color(75, 75, 75),
         painkillerType = "tapentadol",
     },
 }
 local NORMAL_MEDKIT = {
     PrintName = "Medkit",
-    Instructions = "A standard medical bag with a quality bandage, painkiller, tranexamic acid, a tourniquet and a decompression needle. RMB to apply on others, R to change use mode.",
+    Instructions = "A standard medical bag with a quality bandage, painkiller, tranexamic acid, a tourniquet and a decompression needle. Left click to unpack it; RMB applies the selected treatment.",
     contents = {bandage = 150, painkiller = 1, tourniquet = 1, tranexamic = 10, needle = 1},
+    contentItems = {
+        {class = "weapon_bigpackedbandage_sh", amount = 150},
+        {class = "weapon_painkillers", amount = 1, painkillerType = "paracetamol"},
+        {class = "weapon_tourniquet", amount = 1},
+        {class = "weapon_tranexamic_acid", amount = 10},
+        {class = "weapon_needle", amount = 1},
+    },
     bandageColor = Color(165, 165, 165),
     bandageName = "quality bandage",
     painkillerType = "paracetamol",
@@ -99,6 +140,41 @@ end
 
 local function getMedkitDefinition(wep)
     return MEDKIT_TYPES[wep.HGMedkitTier] or NORMAL_MEDKIT
+end
+
+local function setContentAmount(wep, amount)
+    if not IsValid(wep) or not amount then return end
+
+    wep.HGMedkitContentAmount = amount
+    wep.modeValues = {[1] = amount}
+
+    local modeDefinition = wep.modeValuesdef and wep.modeValuesdef[1]
+    if istable(modeDefinition) then
+        wep.modeValuesdef = table.Copy(wep.modeValuesdef)
+        wep.modeValuesdef[1][1] = amount
+    else
+        wep.modeValuesdef = table.Copy(wep.modeValuesdef or {})
+        wep.modeValuesdef[1] = amount
+    end
+
+    if wep.SetRemainingAmount then
+        wep:SetRemainingAmount(amount)
+    end
+
+    if wep.SetNetVar then
+        wep:SetNetVar("modeValues", table.Copy(wep.modeValues))
+    end
+end
+
+local function configureContentWeapon(wep, content)
+    if not IsValid(wep) then return end
+
+    wep.HGMedkitContent = true
+    setContentAmount(wep, content.amount)
+
+    if content.painkillerType and wep.SetNWString then
+        wep:SetNWString("hg_painkiller_type", content.painkillerType)
+    end
 end
 
 local function medkitHasSupplies(wep)
@@ -217,8 +293,88 @@ local function canUseMedkitMode(wep, ent)
     return true
 end
 
+local function dropMedkitContent(wep, content)
+    local owner = wep:GetOwner()
+    if not IsValid(owner) then return false end
+
+    local item = ents.Create(content.class)
+    if not IsValid(item) then return false end
+
+    item:SetPos(owner:EyePos() + owner:GetAimVector() * 40)
+    item:SetAngles(AngleRand(-180, 180))
+    item:Spawn()
+    item:Activate()
+    item.IsSpawned = true
+
+    configureContentWeapon(item, content)
+
+    local phys = item:GetPhysicsObject()
+    if IsValid(phys) then
+        phys:SetVelocity(owner:GetAimVector() * 100 + VectorRand(-30, 30))
+    end
+
+    return true
+end
+
+local function giveMedkitContent(wep, content)
+    local owner = wep:GetOwner()
+    if not IsValid(owner) or not content.class or not weapons.GetStored(content.class) then return false end
+
+    if owner:HasWeapon(content.class) then
+        return dropMedkitContent(wep, content)
+    end
+
+    local item = owner:Give(content.class)
+    if not IsValid(item) then
+        item = owner:GetWeapon(content.class)
+    end
+
+    if IsValid(item) then
+        configureContentWeapon(item, content)
+        return true
+    end
+
+    return dropMedkitContent(wep, content)
+end
+
+local function openMedkit(wep)
+    if wep.opened or wep.opening then return false end
+
+    local owner = wep:GetOwner()
+    if not IsValid(owner) or not owner:IsPlayer() or not owner:Alive() then
+        wep:Remove()
+        return false
+    end
+
+    local definition = getMedkitDefinition(wep)
+    local contentItems = definition and definition.contentItems
+    if not istable(contentItems) or #contentItems == 0 then return false end
+
+    for _, content in ipairs(contentItems) do
+        if not content.class or not weapons.GetStored(content.class) then return false end
+    end
+
+    wep.opening = true
+    for _, content in ipairs(contentItems) do
+        if not giveMedkitContent(wep, content) then
+            wep.opening = nil
+            return false
+        end
+    end
+
+    wep.opened = true
+    wep.opening = nil
+
+    local entOwner = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
+    entOwner:EmitSound("items/suit_power_up.wav", 40, math.random(95, 105))
+    owner:SelectWeapon("weapon_hands_sh")
+    wep:Remove()
+    return true
+end
+
 local function applyMedkitControls(swep)
     swep.ShouldDeleteOnFullUse = false
+    swep.HGMedkitOpensOnPrimary = true
     swep.CanHeal = function(self, ent)
         return canUseMedkitMode(self, ent)
     end
@@ -227,10 +383,8 @@ local function applyMedkitControls(swep)
     end
     swep.PrimaryAttack = function(self)
         if not SERVER then return end
-        local owner = self:GetOwner()
-        if not IsValid(owner) or not owner:Alive() then return end
         self:SetNextPrimaryFire(CurTime() + 0.15)
-        self:Heal(owner, self.mode)
+        openMedkit(self)
     end
     swep.SecondaryAttack = function(self)
         if not SERVER or IsValid(self:GetNWEntity("fakeGun")) then return end
@@ -464,6 +618,7 @@ local function patchBandagePickupRandomizer()
     normal.PickupFunc = function(self, ply)
         if not IsValid(ply) or not ply:IsPlayer() then return end
         if not BANDAGE_PICKUP_CLASS_SET[self:GetClass()] then return end
+        if self.HGMedkitContent then return end
 
         if ply.hgGivingTieredBandage then return true end -- Give() already owns this nested pickup
         local class = pickBandageClass(ply)

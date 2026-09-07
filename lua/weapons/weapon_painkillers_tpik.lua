@@ -378,8 +378,14 @@ if SERVER then
 		end)
 
 		local mode = self.modeValues and self.modeValues[1] or self.modeValuesdef[1]
-
-	org.analgesiaAdd = math.min((org.analgesiaAdd or 0) + mode * 0.3, 4)
+		local medicineID = self:GetNWString("hg_painkiller_type", "")
+		if medicineID == "paracetamol" then
+			org.painkiller = math.min((org.painkiller or 0) + mode, 5)
+		elseif medicineID == "tramadol" or medicineID == "tapentadol" then
+			org.analgesiaAdd = math.min((org.analgesiaAdd or 0) + mode, 4)
+		else
+			org.analgesiaAdd = math.min((org.analgesiaAdd or 0) + mode * 0.3, 4)
+		end
 
 		self.healing = false
 

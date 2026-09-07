@@ -42,8 +42,7 @@ function SWEP:WorldModel_Transform(bNoApply, bNoAdditional)
 	
 	if IsValid(owner) and (IsValid(owner:GetActiveWeapon()) and self == owner:GetActiveWeapon()) then
 		local ent = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
-		ent = owner:GetNWBool("FakeGettingUp", false) and IsValid(owner.OldRagdoll) and owner.OldRagdoll or ent
-		ent:SetupBones()
+		ent = owner:GetNWBool("FakeGettingUp", false) and IsValid(owner.OldRagdoll) and owner.OldRagdoll:IsRagdoll() and owner.OldRagdoll or ent
 		
 		local dtime = SysTime() - (self.last_transform or SysTime())
 		self.last_transform = SysTime()

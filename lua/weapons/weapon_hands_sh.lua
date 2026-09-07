@@ -2922,6 +2922,8 @@ function SWEP:DoBFSAnimation(anim, time, slowmo, force_local)
 		net.WriteEntity(self)
 		net.WriteString(anim)
 		net.WriteFloat(time)
+		net.WriteBool(slowmo == true)
+		net.WriteBool(force_local == true)
                 net.SendPVS(pos)
 	end
 end

@@ -261,12 +261,20 @@ local function ReplaceMedicalWeapon(ent)
 
     local owner = ent:GetOwner()
     local modeValues = istable(ent.modeValues) and table.Copy(ent.modeValues) or nil
+    local isMedkitContent = ent.HGMedkitContent == true
+    local contentAmount = ent.HGMedkitContentAmount
+    local painkillerType = ent:GetNWString("hg_painkiller_type", "")
     local wasActive = IsValid(owner) and owner:IsPlayer() and owner:GetActiveWeapon() == ent
     if IsValid(owner) and owner:IsPlayer() then
         local replacement = owner:GetWeapon(targetClass)
         if not IsValid(replacement) then replacement = owner:Give(targetClass) end
         if IsValid(replacement) then
             if modeValues then replacement.modeValues = modeValues end
+            if isMedkitContent then
+                replacement.HGMedkitContent = true
+                replacement.HGMedkitContentAmount = contentAmount
+            end
+            if painkillerType ~= "" then replacement:SetNWString("hg_painkiller_type", painkillerType) end
             if wasActive then owner:SelectWeapon(targetClass) end
             ent:Remove()
         end
@@ -280,6 +288,11 @@ local function ReplaceMedicalWeapon(ent)
     replacement:Spawn()
     replacement:Activate()
     if modeValues then replacement.modeValues = modeValues end
+    if isMedkitContent then
+        replacement.HGMedkitContent = true
+        replacement.HGMedkitContentAmount = contentAmount
+    end
+    if painkillerType ~= "" then replacement:SetNWString("hg_painkiller_type", painkillerType) end
     local phys = ent:GetPhysicsObject()
     local newPhys = replacement:GetPhysicsObject()
     if IsValid(phys) and IsValid(newPhys) then
@@ -334,11 +347,12 @@ local function PatchWeapon(class)
     function stored:PrimaryAttack()
         local owner = self:GetOwner()
         local minigameType = GetMinigameType(self)
-        if IsValid(owner) and minigameType and not CanUseMedicalArms(owner) then
+        local opensMedkit = self.HGMedkitOpensOnPrimary == true
+        if not opensMedkit and IsValid(owner) and minigameType and not CanUseMedicalArms(owner) then
             self:SetNextPrimaryFire(CurTime() + 0.5)
             return
         end
-        if IsValid(owner) and minigameType and GetMedicalAnimationType() == 1 then
+        if not opensMedkit and IsValid(owner) and minigameType and GetMedicalAnimationType() == 1 then
             if StartMinigame(self, owner, minigameType, owner) then
                 self:SetNextPrimaryFire(CurTime() + (minigameType == "bandage" and 0.25 or 1))
                 return

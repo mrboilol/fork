@@ -224,6 +224,55 @@ local function StopDeathSounds()
     CDeath.keepSoundAlive = false
 end
 
+local function PlayDeathSound(deathSound, generation)
+    local soundPath = "sound/" .. deathSound
+
+    sound.PlayFile(soundPath, "noplay", function(station)
+        if not IsValid(station) then
+            if generation == CDeath.deathSoundGeneration and CDeath.isDead then
+                surface.PlaySound(deathSound)
+                CDeath.keepSoundAlive = false
+            end
+            return
+        end
+
+        if generation ~= CDeath.deathSoundGeneration or not CDeath.isDead then
+            station:Stop()
+            return
+        end
+
+        CDeath.deathSoundChannels[#CDeath.deathSoundChannels + 1] = station
+        station:SetVolume(0.8)
+        station:Play()
+
+        timer.Simple(6, function()
+            if not IsValid(station) then return end
+            if generation ~= CDeath.deathSoundGeneration or not CDeath.isDead then return end
+
+            local fadeDuration = 2
+            local startTime = CurTime()
+            local timerName = "CDeathFade_" .. tostring(station)
+
+            timer.Create(timerName, 0.05, 0, function()
+                if not IsValid(station) then
+                    timer.Remove(timerName)
+                    return
+                end
+
+                local frac = (CurTime() - startTime) / fadeDuration
+                if frac >= 1 then
+                    station:SetVolume(0)
+                    station:Stop()
+                    timer.Remove(timerName)
+                    return
+                end
+
+                station:SetVolume(0.8 * (1 - frac))
+            end)
+        end)
+    end)
+end
+
 local function RestoreRagdoll()
     if IsValid(CDeath.ragdollEnt) then
         CDeath.ragdollEnt:SetNoDraw(false)
@@ -467,48 +516,7 @@ CDeath.keepSoundAlive = true
 local soundGeneration = CDeath.deathSoundGeneration
 
 for _, deathSound in pairs(DEATH_SOUNDS) do
-    sound.PlayFile("sound/" .. deathSound, "noplay", function(station)
-        if not IsValid(station) then return end
-
-        if soundGeneration ~= CDeath.deathSoundGeneration or not CDeath.isDead then
-            station:Stop()
-            return
-        end
-
-        CDeath.deathSoundChannels[#CDeath.deathSoundChannels + 1] = station
-
-        station:SetVolume(0.8) -- slightly quieter
-        station:Play()
-
-        -- Start fading after 6 seconds
-        timer.Simple(6, function()
-            if not IsValid(station) then return end
-            if soundGeneration ~= CDeath.deathSoundGeneration or not CDeath.isDead then return end
-
-            local fadeDuration = 2
-            local startTime = CurTime()
-
-            local timerName = "CDeathFade_" .. tostring(station)
-
-            timer.Create(timerName, 0.05, 0, function()
-                if not IsValid(station) then
-                    timer.Remove(timerName)
-                    return
-                end
-
-                local frac = (CurTime() - startTime) / fadeDuration
-
-                if frac >= 1 then
-                    station:SetVolume(0)
-                    station:Stop()
-                    timer.Remove(timerName)
-                    return
-                end
-
-                station:SetVolume(0.8 * (1 - frac))
-            end)
-        end)
-    end)
+    PlayDeathSound(deathSound, soundGeneration)
 end
 
     elseif ply:Alive() and CDeath.isDead then

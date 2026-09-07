@@ -23,7 +23,7 @@ if (CLIENT) then
 
     function surface.CreateFont(name, info)
         made[name] = nil
-        cache[name] = info
+        cache[name] = istable(info) and table.Copy(info) or nil
 
         old(name, info)
     end
@@ -33,6 +33,8 @@ if (CLIENT) then
     end
 
     function draw.GlowingText(text, font, x, y, col, colglow, colglow2, align, align2)
+        if not isstring(font) or font == "" then return end
+
         align = align or TEXT_ALIGN_LEFT
         align2 = align2 or align or TEXT_ALIGN_CENTER
 
@@ -41,11 +43,23 @@ if (CLIENT) then
 
         if !made[font] then
             local fontdata = ZB_GetFontTable(font)
+            if not istable(fontdata) then
+                fontdata = {
+                    font = "VCR OSD Mono",
+                    size = 16,
+                    weight = 400,
+                    antialias = true,
+                    extended = true,
+                }
+            end
 
-            fontdata.blursize = 4
-            surface.CreateFont(bfont1, fontdata)
-            fontdata.blursize = 20
-            surface.CreateFont(bfont2, fontdata)
+            local glowfont1 = table.Copy(fontdata)
+            glowfont1.blursize = 4
+            surface.CreateFont(bfont1, glowfont1)
+
+            local glowfont2 = table.Copy(fontdata)
+            glowfont2.blursize = 20
+            surface.CreateFont(bfont2, glowfont2)
             made[font] = true
         end
 

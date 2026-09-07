@@ -42,6 +42,7 @@ SWEP.modeValuesdef = {
 	[1] = {1,false},
 }
 SWEP.ShouldDeleteOnFullUse = true
+SWEP.HGMedkitOpensOnPrimary = true
 
 local math = math
 local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Healing method: 0 = original models + progressive minigames, 1 = Judge animations", 0, 1)
@@ -155,14 +156,15 @@ if SERVER then
 		self:Remove()
 	end
 
-	function SWEP:PrimaryAttack()
-		self:OpenMedkit()
-	end
+end
 
-	function SWEP:SecondaryAttack()
-		self:OpenMedkit()
-	end
+function SWEP:PrimaryAttack()
+	if SERVER then self:OpenMedkit() end
+end
 
-	function SWEP:Reload()
-	end
+function SWEP:SecondaryAttack()
+	if SERVER then self:OpenMedkit() end
+end
+
+function SWEP:Reload()
 end
