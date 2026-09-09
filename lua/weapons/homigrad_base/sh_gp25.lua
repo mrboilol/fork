@@ -23,8 +23,7 @@ local GP25_WEAPONS = {
 	["weapon_akm"] = true,
 	["weapon_akmz"] = true,
 	["weapon_akz"] = true,
-	["weapon_vpo136"] = true,
-	["weapon_vpo209"] = true,
+	["weapon_vpo101"] = true,
 	["weapon_sag_ak545"] = true,
 }
 

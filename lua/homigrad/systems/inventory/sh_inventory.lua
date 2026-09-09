@@ -48,6 +48,11 @@ if CLIENT then
 		button.HoldDuration = math.max(duration, 0)
 		button.HoldStart = CurTime()
 		button.HoldReady = true
+		if button.FloatingLoot then
+			button.RevealAt = button.HoldStart + button.HoldDuration
+			local menu = button:GetParent()
+			if IsValid(menu) then menu.SearchEnds = math.max(menu.SearchEnds or 0, button.RevealAt) end
+		end
 	end)
 
 	local function BeginTakeRequest(button, tblIndex, thing, item, owner)
@@ -222,6 +227,57 @@ if CLIENT then
 		surface.DrawText(text)
 		render.SetScissorRect(0, 0, 0, 0, false)
 	end
+
+	local function OpenFloatingContainer(ent, inv, ply)
+		if not hg.OpenContainerLootGrid then return false end
+
+		local items = {}
+		for tab, things in pairs(inv) do
+			if not istable(things) or not functions2[tab] then continue end
+			for i, thing in pairs(things) do
+				local thingTable = istable(thing) and thing or {thing}
+				if not functions2[tab](ply, ent, i, unpack(thingTable)) then continue end
+
+				local class = tostring(i)
+				if tab == "Armor" then
+					class = "ent_armor_" .. tostring(thing)
+				elseif tab == "Attachments" then
+					class = "ent_att_" .. tostring(thing)
+				end
+
+				local icon = getIconThing(i, thing, tab)
+				items[#items + 1] = {
+					class = class,
+					name = nameThings(i, thing),
+					icon = icon,
+					tab = tab,
+					thing = i,
+					value = thing,
+					valueTable = thingTable,
+				}
+			end
+		end
+
+		plyMenu = hg.OpenContainerLootGrid({
+			ent = ent,
+			items = items,
+			onPrepare = function(button, _, item)
+				button.FloatingLoot = true
+				button.RevealAt = math.huge
+				BeginTakeRequest(button, item.tab, item.thing, item.valueTable, ent)
+			end,
+			onTake = function(_, _, item, button)
+				if not button.HoldReady or not button.HoldDuration or CurTime() - button.HoldStart < button.HoldDuration then return false end
+				if not functions[item.tab](ply, ent, item.thing, unpack(item.valueTable)) then return false end
+
+				if istable(item.value) then item.value.render = {} end
+				TakeItem(item.tab, item.thing, item.value, ent)
+				return true
+			end,
+		})
+		return true
+	end
+
 	OpenInv = function(ent)
 		if IsValid(plyMenu) then
 			plyMenu:Remove()
@@ -252,6 +308,8 @@ if CLIENT then
 			end
 		end
 		local name = isBodyInventory and (nameStr .. "'s inventory") or nameStr
+		if not isBodyInventory and OpenFloatingContainer(ent, inv, ply) then return end
+
 		local sizeX = math.floor(math.min(math.max(ScrW() * 0.62, 420), ScrW() - 20, 980))
 		local sizeY = math.floor(math.min(math.max(ScrH() * 0.74, 360), ScrH() - 20, 760))
 		plyMenu = vgui.Create("ZFrame")

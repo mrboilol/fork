@@ -1,7 +1,7 @@
 ﻿if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_melee"
 SWEP.PrintName = "Pan"
-SWEP.Instructions = "A cast iron cooking pan that can pack a deadly punch. Can't protect from bullets.\n\nLMB to attack.\nRMB to block."
+SWEP.Instructions = "A cast iron cooking pan that can pack a deadly punch. It can stop weaker bullets when held in their path.\n\nLMB to attack.\nRMB to block."
 SWEP.Category = "Weapons - Melee"
 SWEP.Spawnable = true
 SWEP.AdminOnly = false
@@ -12,6 +12,11 @@ SWEP.WorldModelExchange = "models/props_c17/metalPot002a.mdl"
 SWEP.ViewModel = ""
 
 SWEP.NoHolster = true
+SWEP.EquipmentMaterial = "metal"
+SWEP.EquipmentBallisticResistance = 12
+SWEP.EquipmentDurability = 190
+SWEP.EquipmentContactAbsorption = 0.62
+SWEP.EquipmentBlockAbsorption = 0.9
 
 SWEP.BreakBoneMul = 0.35
 

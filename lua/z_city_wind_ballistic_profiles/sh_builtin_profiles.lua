@@ -124,7 +124,7 @@ ZCityWindBallistics.BUILTIN_WEAPON_PROFILES = {
     ["weapon_uspeft"] = {BarrelLengthMM = 112, VelocityMult = 0.979, WindDriftMul = 1.02, DragMul = 1.005, SpreadMul = 1.12},
     ["weapon_uzi"] = {BarrelLengthMM = 260, VelocityMult = 1.015, WindDriftMul = 0.986, DragMul = 0.996, SpreadMul = 1.1},
     ["weapon_vector"] = {BarrelLengthMM = 140, VelocityMult = 1.013, WindDriftMul = 0.987, DragMul = 0.997, SpreadMul = 1.1},
-    ["weapon_vpo209"] = {BarrelLengthMM = 415, VelocityMult = 1, WindDriftMul = 1, DragMul = 1, SpreadMul = 1.0},
+    ["weapon_vpo101"] = {BarrelLengthMM = 415, VelocityMult = 1, WindDriftMul = 1, DragMul = 1, SpreadMul = 1.0},
     ["weapon_vsk94"] = {BarrelLengthMM = 230, VelocityMult = 0.96, WindDriftMul = 1.10, DragMul = 1.14, SpreadMul = 0.78},
     ["weapon_vss_eft"] = {BarrelLengthMM = 200, VelocityMult = 0.95, WindDriftMul = 1.10, DragMul = 1.15, SpreadMul = 0.75},
     ["weapon_winchester"] = {BarrelLengthMM = 508, VelocityMult = 1.05, WindDriftMul = 0.90, DragMul = 0.90, SpreadMul = 0.55},

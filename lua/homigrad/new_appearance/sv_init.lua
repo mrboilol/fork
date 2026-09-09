@@ -26,7 +26,7 @@ end
 
 local accessoryImpactTypes = DMG_BULLET + DMG_BUCKSHOT + DMG_CLUB + DMG_SLASH + DMG_CRUSH + DMG_FALL
 APmodule.ImpactConfig = {
-	minDamage = 10,
+	minDamage = 1,
 	fullDamage = 55,
 	dropChance = 0.18,
 	severityChance = 0.56,
@@ -35,6 +35,14 @@ APmodule.ImpactConfig = {
 	severityAbsorption = 0.08,
 	dropAbsorption = 0.23,
 	dropSeverityAbsorption = 0.13,
+}
+
+local accessoryMaterialProfiles = {
+	metal = {durability = 95, absorption = 0.34, wear = 0.45},
+	wood = {durability = 48, absorption = 0.1, wear = 0.72},
+	plastic = {durability = 36, absorption = 0.06, wear = 0.9},
+	glass = {durability = 12, absorption = 0.02, wear = 1.5},
+	fabric = {durability = 25, absorption = 0.025, wear = 0.8},
 }
 
 local function CopyAccessories(accessories)
@@ -104,6 +112,32 @@ local function IsDroppableAccessory(accessory)
 	return accessory and accessory.model and accessory.placement and accessory.placement != "none"
 end
 
+local function GetAccessoryMaterialProfile(accessory)
+	local value = string.lower(table.concat({tostring(accessory.impactMaterial or ""), tostring(accessory.material or ""), tostring(accessory.model or ""), tostring(accessory.name or "")}, " "))
+	if string.find(value, "metal", 1, true) or string.find(value, "steel", 1, true) or string.find(value, "iron", 1, true) or string.find(value, "helmet", 1, true) then return accessoryMaterialProfiles.metal end
+	if string.find(value, "wood", 1, true) then return accessoryMaterialProfiles.wood end
+	if string.find(value, "glass", 1, true) or string.find(value, "goggle", 1, true) then return accessoryMaterialProfiles.glass end
+	if string.find(value, "plastic", 1, true) or string.find(value, "rubber", 1, true) then return accessoryMaterialProfiles.plastic end
+	return accessoryMaterialProfiles.fabric
+end
+
+local function GetAccessoryCondition(wearer, accessoryID, accessory)
+	wearer.HGAccessoryDurability = wearer.HGAccessoryDurability or {}
+	local profile = GetAccessoryMaterialProfile(accessory)
+	local maximum = math.max(tonumber(accessory.impactDurability) or profile.durability, 1)
+	local durability = wearer.HGAccessoryDurability[accessoryID]
+	if durability == nil then durability = maximum end
+	return durability, maximum, profile
+end
+
+local function DamageAccessoryCondition(wearer, accessoryID, accessory, damage)
+	local durability, maximum, profile = GetAccessoryCondition(wearer, accessoryID, accessory)
+	durability = math.max(durability - math.max(damage, 0) * profile.wear, 0)
+	wearer.HGAccessoryDurability[accessoryID] = durability
+	wearer:SetNWFloat("HGAccessoryCondition_" .. util.CRC(accessoryID), durability / maximum)
+	return durability <= 0, durability, maximum, profile
+end
+
 function APmodule.TraceAccessoryShot(ent, startPos, endPos, seen, hits, padding)
 	local accessories = ent:GetNetVar("Accessories", {})
 	if !istable(accessories) or table.IsEmpty(accessories) then
@@ -147,7 +181,7 @@ local function FindAccessoryImpact(ent, hitPos, direction, impactRadius)
 	return hits[1]
 end
 
-local function SpawnAccessoryDrop(accessoryID, accessory, owner, position, force)
+local function SpawnAccessoryDrop(accessoryID, accessory, owner, position, force, durability, maximum)
 	local model = accessory[ThatPlyIsFemale(owner) and "femmodel"] or accessory.model
 	if !model then return end
 
@@ -169,6 +203,11 @@ local function SpawnAccessoryDrop(accessoryID, accessory, owner, position, force
 	dropped:SetUseType(SIMPLE_USE)
 	dropped.HGAccessoryID = accessoryID
 	dropped.HGAccessoryOwner = owner
+	dropped.HGAccessoryDurability = durability
+	dropped.HGAccessoryMaxDurability = maximum
+	if isnumber(durability) and isnumber(maximum) and maximum > 0 then
+		dropped:SetNWFloat("HGEquipmentCondition", math.Clamp(durability / maximum, 0, 1))
+	end
 
 	local phys = dropped:GetPhysicsObject()
 	if IsValid(phys) then
@@ -219,7 +258,8 @@ function APmodule.DropAccessoriesByPlacement(ent, placements, force)
 	local launchForce = isvector(force) and force or ent:GetVelocity() + VectorRand() * 180 + vector_up * 120
 	for _, drop in ipairs(drops) do
 		local position = GetAccessoryTransform(ent, drop.data) or ent:WorldSpaceCenter()
-		SpawnAccessoryDrop(drop.id, drop.data, wearer, position, launchForce + VectorRand() * 90)
+		local durability, maximum = GetAccessoryCondition(wearer, drop.id, drop.data)
+		SpawnAccessoryDrop(drop.id, drop.data, wearer, position, launchForce + VectorRand() * 90, durability, maximum)
 		if isnumber(drop.index) then
 			table.remove(accessories, drop.index)
 		else
@@ -261,11 +301,15 @@ function APmodule.TryAbsorbAccessoryImpact(ent, dmgInfo, hitPos, direction, dire
 	if !index then return end
 
 	local severity = math.Clamp((damage - cfg.minDamage) / cfg.fullDamage, 0, 1)
-	local absorbed = cfg.absorption + severity * cfg.severityAbsorption
+	local broken, durability, maximum, materialProfile = DamageAccessoryCondition(wearer, impact.id, impact.data, damage)
+	local condition = math.Clamp(durability / maximum, 0, 1)
+	local thickness = math.Clamp((impact.thickness or 0.2) / 2, 0.1, 1)
+	local materialAbsorption = materialProfile.absorption * thickness * Lerp(condition, 0.25, 1)
+	local absorbed = math.max(cfg.absorption + severity * cfg.severityAbsorption, materialAbsorption)
 	local dropChance = cfg.dropChance + severity * cfg.severityChance
 	if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) then dropChance = dropChance + cfg.bulletChance end
 
-	if math.Rand(0, 1) <= dropChance then
+	if broken or math.Rand(0, 1) <= dropChance then
 		absorbed = cfg.dropAbsorption + severity * cfg.dropSeverityAbsorption
 		if isnumber(index) then
 			table.remove(accessories, index)
@@ -273,7 +317,7 @@ function APmodule.TryAbsorbAccessoryImpact(ent, dmgInfo, hitPos, direction, dire
 			accessories[index] = nil
 		end
 		SyncAccessories(wearer, accessories)
-		SpawnAccessoryDrop(impact.id, impact.data, wearer, impact.position, direction)
+		SpawnAccessoryDrop(impact.id, impact.data, wearer, impact.position, direction, durability, maximum)
 	end
 
 	dmgInfo:ScaleDamage(math.Clamp(1 - absorbed, 0.6, 1))
@@ -301,11 +345,18 @@ function APmodule.EquipFallenAccessory(ply, dropped)
 		local replacedID = accessories[replacement]
 		local replacedAccessory = hg.Accessories[replacedID]
 		if IsDroppableAccessory(replacedAccessory) then
-			SpawnAccessoryDrop(replacedID, replacedAccessory, ply, dropped:GetPos(), dropped:GetVelocity())
+			local durability, maximum = GetAccessoryCondition(ply, replacedID, replacedAccessory)
+			SpawnAccessoryDrop(replacedID, replacedAccessory, ply, dropped:GetPos(), dropped:GetVelocity(), durability, maximum)
 		end
 		accessories[replacement] = accessoryID
 	else
 		accessories[#accessories + 1] = accessoryID
+	end
+	if isnumber(dropped.HGAccessoryDurability) then
+		ply.HGAccessoryDurability = ply.HGAccessoryDurability or {}
+		ply.HGAccessoryDurability[accessoryID] = dropped.HGAccessoryDurability
+		local maximum = math.max(tonumber(dropped.HGAccessoryMaxDurability) or 1, 1)
+		ply:SetNWFloat("HGAccessoryCondition_" .. util.CRC(accessoryID), math.Clamp(dropped.HGAccessoryDurability / maximum, 0, 1))
 	end
 
 	local hands = ply:GetActiveWeapon()
@@ -330,7 +381,8 @@ function APmodule.DropAccessory(ply, accessoryID)
 	local accessory = hg.Accessories[accessoryID]
 	if !index or !IsDroppableAccessory(accessory) then return false end
 
-	local dropped = SpawnAccessoryDrop(accessoryID, accessory, ply, ply:EyePos() + ply:EyeAngles():Forward() * 18, ply:EyeAngles():Forward() * 150)
+	local durability, maximum = GetAccessoryCondition(ply, accessoryID, accessory)
+	local dropped = SpawnAccessoryDrop(accessoryID, accessory, ply, ply:EyePos() + ply:EyeAngles():Forward() * 18, ply:EyeAngles():Forward() * 150, durability, maximum)
 	if !IsValid(dropped) then return false end
 
 	table.remove(accessories, index)

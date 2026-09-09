@@ -109,7 +109,7 @@ local primary = {
     "weapon_mp5",
     "weapon_mp7",
     "weapon_sks",
-    "weapon_vpo136",
+    "weapon_vpo101",
     "weapon_winchester",
     "weapon_mts255",
     "weapon_mr43_short",

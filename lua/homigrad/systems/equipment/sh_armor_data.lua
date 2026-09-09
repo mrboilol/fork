@@ -972,6 +972,33 @@ local vectors = {
 	[5] = Vector(-4.5,0,-2)
 }
 hg.armor.head = {
+	["pot"] = {
+		"head",
+		"models/props_interiors/pot02a.mdl",
+		Vector(7, -3.8, -3.8),
+		Angle(-45, -65, 90),
+		protection = 3.2,
+		meleeProt = 5,
+		stabProt = 2.5,
+		bone = "ValveBiped.Bip01_Head1",
+		model = "models/props_interiors/pot02a.mdl",
+		femPos = Vector(-1.2, 0, 0.5),
+		norender = true,
+		viewmaterial = Material("sprites/mat_jack_hmcd_helmover"),
+		effect = "Impact",
+		surfaceprop = 67,
+		mass = 2,
+		ScrappersSlot = "Armor",
+		restricted = {"head", "ears"},
+		breakable = true,
+		durability = 72,
+		breakThreshold = 150,
+		absorbMultiplier = 0.2,
+		durabilityDamageMul = 4,
+		ricochetChance = 0.48,
+		impactProtectionMul = 1.4,
+		impactDamageScale = 0.2,
+	},
 	["helmet2"] = {
 		"head",
 		"models/dean/gtaiv/helmet.mdl",
@@ -2094,6 +2121,7 @@ hg.armor.back = {
 	}
 }
 local armorNames = {
+	["pot"] = "Cooking Pot Helmet",
 	["aqualung"] = "Scuba Suit",
 	["ego_equalizer"] = "[HE] Equalizer",
 	["gordon_helmet"] = "HEV Suit Helmet",

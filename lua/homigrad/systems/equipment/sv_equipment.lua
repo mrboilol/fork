@@ -943,6 +943,9 @@ local function protec(org, bone, dmg, dmgInfo, placement, armor, scale, scalepro
 	end
 	
 	ArmorEffect(placement, armor, dmgInfo, org, hit, prot)
+	if isBullet and armor == "pot" and prot > 0 and IsValid(org.owner) and org.owner:IsPlayer() then
+		hook.Run("HGEquipmentBulletBlocked", org.owner, "pot", armor, hit)
+	end
 	if IsDurabilityArmor(placement, armorData) then
 		hg.HandleArmorShot(org, placement, armor, dmgInfo, hit, ricochetHit)
 	end

@@ -2,7 +2,7 @@ local clrInv = Color(20, 0, 0, 200)
 local clrInvSelected = Color(90, 0, 0, 200)
 
 hook.Add("PlayerButtonDown", "NI_PlayerButtonDown", function(ply, key)
-	if ply ~= LocalPlayer() or key ~= KEY_1 or not GetGlobalBool("RadialInventory", false) then return end
+	if ply ~= LocalPlayer() or key ~= KEY_1 or GetGlobalInt("InventorySystem", 0) ~= 3 then return end
 	if not ply:Alive() or not ply.organism or ply.organism.otrub or not hg.CreateRadialMenu then return end
 
 	local options = {}
@@ -26,7 +26,7 @@ hook.Add("PlayerButtonDown", "NI_PlayerButtonDown", function(ply, key)
 end)
 
 hook.Add("PlayerButtonUp", "NI_PlayerButtonUp", function(ply, key)
-	if ply == LocalPlayer() and key == KEY_1 and GetGlobalBool("RadialInventory", false) and hg.PressRadialMenu then
+	if ply == LocalPlayer() and key == KEY_1 and GetGlobalInt("InventorySystem", 0) == 3 and hg.PressRadialMenu then
 		hg.PressRadialMenu(1)
 	end
 end)

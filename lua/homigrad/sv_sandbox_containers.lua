@@ -171,7 +171,7 @@ local lootPools = {
 		"weapon_sks",
 		"weapon_ar15",
 		"weapon_ac556",
-		"weapon_vpo136",
+		"weapon_vpo101",
 		"weapon_sr25",
 	},
 	food = {

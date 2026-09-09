@@ -328,12 +328,19 @@ end)
     hg.achievements.CreateAchievementType("git_gud", 1, 0, "Kill yourself with your own grenade.", "Git Gud", nil, false)
     hg.achievements.CreateAchievementType("london", 28, 0, "Take 28 knife wounds in one life. OI! Where are you going mate?", "London", nil, true)
     hg.achievements.CreateAchievementType("john_wicks_heir", 439, 0, "Deliver 439 fatal pistol headshots. The Baba Yaga returns.", "John Wick's Heir", nil, true)
+    hg.achievements.CreateAchievementType("pan_shot", 1, 0, "Stop a bullet with a frying pan or cooking pot helmet.", "Pan Shot", nil, false)
     -- Splinter Cell: unlocks weapon_sam_fisher_glock
     hg.achievements.CreateAchievementType("samfisher", 10, 0, "Kill 10 enemies with a silenced weapon.", "Splinter Cell", "entities/sam.png", true)
     hg.achievements.CreateAchievementType("brawler", 1, 0, "Win a Brawl round.", "Brawler", nil, false)
 
     //hg.init_ach = true
 //end
+
+hook.Add("HGEquipmentBulletBlocked", "hg_pan_shot_achievement", function(ply, equipment)
+    if not IsValid(ply) or not ply:IsPlayer() then return end
+    if equipment ~= "pan" and equipment ~= "pot" then return end
+    hg.achievements.SetPlayerAchievement(ply, "pan_shot", 1)
+end)
 
 local roundply = 0
 local roundInnocents = 0

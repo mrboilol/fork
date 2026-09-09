@@ -92,7 +92,7 @@ local primary_weapons = {
     "weapon_ump45",
     "weapon_skorpion1",
     "weapon_m590a1",
-    "weapon_vpo136",
+    "weapon_vpo101",
     "weapon_sok94",
     "weapon_ar15"
 }

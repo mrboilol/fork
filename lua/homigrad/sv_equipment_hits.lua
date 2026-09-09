@@ -34,10 +34,100 @@ impact.Config = {
     blockAbsorption = 0.82,
     parryFallBreakSpeed = 950,
     defaultHardness = 0.9,
+    heldDurabilityMultiplier = 1.75,
 }
 
 impact.ProcessedDamage = setmetatable({}, {__mode = "k"})
 local geometryCache = {}
+local materialProfiles = {
+    metal = {mat = MAT_METAL, hardness = 0.9, ballisticResistance = 9, contactAbsorption = 0.5, blockAbsorption = 0.82, durability = 150, bulletWear = 0.42, meleeWear = 0.22},
+    wood = {mat = MAT_WOOD, hardness = 0.5, ballisticResistance = 1.25, contactAbsorption = 0.12, blockAbsorption = 0.48, durability = 65, bulletWear = 0.7, meleeWear = 0.5},
+    plastic = {mat = MAT_PLASTIC, hardness = 0.35, ballisticResistance = 0.7, contactAbsorption = 0.08, blockAbsorption = 0.35, durability = 45, bulletWear = 0.85, meleeWear = 0.65},
+    glass = {mat = MAT_GLASS, hardness = 0.2, ballisticResistance = 0.25, contactAbsorption = 0.03, blockAbsorption = 0.18, durability = 18, bulletWear = 1.4, meleeWear = 1.3},
+    ceramic = {mat = MAT_CONCRETE, hardness = 0.75, ballisticResistance = 4.5, contactAbsorption = 0.28, blockAbsorption = 0.55, durability = 42, bulletWear = 1.05, meleeWear = 0.8},
+    fabric = {mat = MAT_FLESH, hardness = 0.15, ballisticResistance = 0.12, contactAbsorption = 0.02, blockAbsorption = 0.12, durability = 28, bulletWear = 0.95, meleeWear = 0.75},
+}
+
+local function NormalizeMaterialName(name)
+    name = string.lower(tostring(name or ""))
+    if string.find(name, "metal", 1, true) or string.find(name, "iron", 1, true) or string.find(name, "steel", 1, true) then return "metal" end
+    if string.find(name, "wood", 1, true) or string.find(name, "chair", 1, true) or string.find(name, "furniture", 1, true) then return "wood" end
+    if string.find(name, "glass", 1, true) then return "glass" end
+    if string.find(name, "concrete", 1, true) or string.find(name, "stone", 1, true) or string.find(name, "brick", 1, true) or string.find(name, "ceramic", 1, true) or string.find(name, "mug", 1, true) then return "ceramic" end
+    if string.find(name, "cloth", 1, true) or string.find(name, "fabric", 1, true) or string.find(name, "leather", 1, true) then return "fabric" end
+    if string.find(name, "plastic", 1, true) or string.find(name, "rubber", 1, true) then return "plastic" end
+end
+
+function hg.GetEquipmentMaterialProfile(ent, materialName)
+    local normalized = NormalizeMaterialName(materialName)
+    if not normalized and IsValid(ent) then
+        normalized = NormalizeMaterialName(ent.EquipmentMaterial or ent.BlockMaterial)
+        if not normalized and isfunction(ent.GetClashMaterial) then normalized = NormalizeMaterialName(ent:GetClashMaterial()) end
+        if not normalized then
+            local phys = ent:GetPhysicsObject()
+            if IsValid(phys) and isfunction(phys.GetMaterial) then normalized = NormalizeMaterialName(phys:GetMaterial()) end
+        end
+        if not normalized then normalized = NormalizeMaterialName(ent:GetMaterial()) or NormalizeMaterialName((ent:GetModel() or "") .. " " .. tostring(ent.PrintName or "")) end
+        if not normalized and ent:IsWeapon() then normalized = "metal" end
+    end
+    normalized = normalized or "plastic"
+    return materialProfiles[normalized], normalized
+end
+
+function hg.GetEquipmentCondition(ent, held)
+    if not IsValid(ent) then return 0, 1 end
+    local profile = hg.GetEquipmentMaterialProfile(ent)
+    local maxDurability = math.max(tonumber(ent.EquipmentDurability) or profile.durability, 1)
+    if held then maxDurability = maxDurability * impact.Config.heldDurabilityMultiplier end
+    local durability = ent.HGEquipmentDurability
+    if durability == nil then durability = maxDurability end
+    return math.Clamp(durability / maxDurability, 0, 1), maxDurability
+end
+
+function hg.DamageEquipmentCondition(ent, damage, damageType, held)
+    if not IsValid(ent) or not isnumber(damage) or damage <= 0 then return false end
+    local profile = hg.GetEquipmentMaterialProfile(ent)
+    local condition, maxDurability = hg.GetEquipmentCondition(ent, held)
+    local isBullet = bit.band(damageType or 0, DMG_BULLET + DMG_BUCKSHOT) ~= 0
+    local wear = damage * (isBullet and profile.bulletWear or profile.meleeWear)
+    local durability = ent.HGEquipmentDurability
+    if durability == nil then durability = maxDurability * condition end
+    durability = math.max(durability - wear, 0)
+    ent.HGEquipmentDurability = durability
+    ent:SetNWFloat("HGEquipmentCondition", math.Clamp(durability / maxDurability, 0, 1))
+    if durability > 0 then return false end
+    local newlyBroken = not ent:GetNWBool("HGEquipmentBroken", false)
+    ent:SetNWBool("HGEquipmentBroken", true)
+    return newlyBroken
+end
+
+function hg.GetHeldEquipmentEntities(ply)
+    local held, seen = {}, {}
+    local function Add(ent)
+        if not IsValid(ent) or ent:IsWorld() or ent:IsPlayer() or ent:IsRagdoll() or seen[ent] then return end
+        seen[ent] = true
+        held[#held + 1] = ent
+    end
+    local wep = IsValid(ply) and ply:GetActiveWeapon()
+    if IsValid(wep) and isfunction(wep.GetCarrying) then Add(wep:GetCarrying()) end
+    if IsValid(ply) and isfunction(ply.GetNetVar) then
+        Add(ply:GetNetVar("carryent"))
+        Add(ply:GetNetVar("carryent2"))
+    end
+    if IsValid(ply) and isfunction(ply.GetEntityInUse) then
+        local ent = ply:GetEntityInUse()
+        if IsValid(ent) and ent:IsPlayerHolding() then Add(ent) end
+    end
+    return held
+end
+
+local function DropHeldEquipment(ply, ent)
+    if not IsValid(ply) or not IsValid(ent) then return end
+    local wep = ply:GetActiveWeapon()
+    if IsValid(wep) and isfunction(wep.GetCarrying) and isfunction(wep.SetCarrying) and wep:GetCarrying() == ent then wep:SetCarrying() end
+    if ply:GetNetVar("carryent2") == ent and hg.SetCarryEnt2 then hg.SetCarryEnt2(ply) end
+    if ent:IsPlayerHolding() and isfunction(ply.DropObject) then ply:DropObject(ent) end
+end
 
 local function SetupEntityBones(entity)
     if IsValid(entity) and isfunction(entity.SetupBones) then
@@ -309,21 +399,59 @@ local function WeaponImpact(ply, wep, hit, damage, force, direction)
         wep:OnHeldWeaponImpact(hit, damage, force, direction, hit.shot)
     end
 
+    local damageType = hit.damageType or (hit.shot and hit.shot.DamageType) or DMG_CLUB
+    local broken = hg.DamageEquipmentCondition(wep, damage, damageType, true)
+    if broken then
+        hg.DropWeaponFromImpact(ply, wep, direction, 1)
+        return
+    end
+
     if math.Rand(0, 1) < math.min(chance, cfg.maxDropChance) then hg.DropWeaponFromImpact(ply, wep, direction, power) end
 end
 
 local function GetWeaponImpactAbsorption(wep, hit, direction, dmgInfo)
     local directness = math.Clamp(-hit.normal:Dot(direction), 0, 1)
-    local absorbed = impact.Config.contactAbsorption * directness * math.Clamp(hit.thickness / 2, 0, 1)
+    local profile = hg.GetEquipmentMaterialProfile(wep)
+    local contactAbsorption = tonumber(wep.EquipmentContactAbsorption) or profile.contactAbsorption or impact.Config.contactAbsorption
+    local absorbed = contactAbsorption * directness * math.Clamp(hit.thickness / 2, 0, 1)
     local blocking = wep.GetBlocking and wep:GetBlocking() or false
     local parry = false
     if blocking and wep.GetStartedBlocking and wep.GetBlockParryWindow then
         parry = CurTime() - wep:GetStartedBlocking() <= wep:GetBlockParryWindow()
     end
     local highFall = dmgInfo and dmgInfo:IsDamageType(DMG_FALL) and dmgInfo:GetDamageForce():Length() >= impact.Config.parryFallBreakSpeed
-    if blocking then absorbed = math.max(absorbed, impact.Config.blockAbsorption) end
+    if blocking then absorbed = math.max(absorbed, tonumber(wep.EquipmentBlockAbsorption) or profile.blockAbsorption or impact.Config.blockAbsorption) end
     if parry and not highFall then return 1, true end
     return math.Clamp(absorbed, 0, 1), false
+end
+
+local function GetHeldEntityImpactAbsorption(ent, hit, direction)
+    local profile = hg.GetEquipmentMaterialProfile(ent)
+    local directness = math.Clamp(-hit.normal:Dot(direction), 0, 1)
+    local thickness = math.Clamp(hit.thickness / 3, 0.15, 1)
+    return math.Clamp((tonumber(ent.EquipmentContactAbsorption) or profile.contactAbsorption) * directness * thickness, 0, 0.9)
+end
+
+local function GetEquipmentBallisticRemaining(ent, hit, shot, damage, scale, absorbed)
+    local profile = hg.GetEquipmentMaterialProfile(ent)
+    local condition = hg.GetEquipmentCondition(ent, true)
+    if ent:GetNWBool("HGEquipmentBroken", false) then condition = math.min(condition, 0.15) end
+    local penetration = math.max(tonumber(shot.Penetration) or damage * scale / 8, 0.1)
+    local resistance = (tonumber(ent.EquipmentBallisticResistance) or profile.ballisticResistance) * Lerp(condition, 0.2, 1)
+    local solidFraction = tonumber(ent.EquipmentSolidFraction) or impact.Config.weaponSolidFraction
+    local maxThickness = tonumber(ent.EquipmentMaxThickness) or impact.Config.weaponMaxThickness
+    local thickness = math.min(hit.thickness * solidFraction, maxThickness)
+    local geometricDistance = math.min(penetration * 3 / math.max(profile.hardness, 0.05) * 0.4, 100)
+    local remaining = math.Clamp(1 - thickness / math.max(geometricDistance, 0.01), 0, 1)
+    remaining = math.min(remaining, math.Clamp((penetration - resistance) / penetration, 0, 1))
+    if shot.Vel and hg.PhysBullet and hg.PhysBullet.CalcVelocityLostInMaterial then
+        local speed = shot.Vel:Length()
+        local after = hg.PhysBullet.CalcVelocityLostInMaterial(profile.mat, thickness * thickness, speed)
+        remaining = math.min(remaining, (after / math.max(speed, 1)) ^ 2)
+    end
+    remaining = remaining * (1 - absorbed)
+    if remaining < 0.02 then remaining = 0 end
+    return remaining, penetration, profile
 end
 
 function hg.TryAbsorbEquipmentImpact(ent, dmgInfo, hitPos, direction, impactRadius)
@@ -334,22 +462,50 @@ function hg.TryAbsorbEquipmentImpact(ent, dmgInfo, hitPos, direction, impactRadi
     local ply = ent:IsPlayer() and ent or hg.RagdollOwner(ent)
     local wep = IsValid(ply) and ply:GetActiveWeapon()
     local parried = false
-    if IsValid(wep) then
+    if IsValid(ply) then
         local dir = direction:GetNormalized()
         local radius = math.max(tonumber(impactRadius) or 0, 0)
         local startPos = hitPos - dir * (48 + radius)
-        local obstruction = util.TraceLine({start = hitPos, endpos = startPos, filter = {ent, ply, wep, wep.worldModel}})
+        local traceFilter = {ent, ply}
+        if IsValid(wep) then
+            traceFilter[#traceFilter + 1] = wep
+            if IsValid(wep.worldModel) then traceFilter[#traceFilter + 1] = wep.worldModel end
+        end
+        local obstruction = util.TraceLine({start = hitPos, endpos = startPos, filter = traceFilter})
         if obstruction.Hit then startPos = obstruction.HitPos end
-        local model, pos, ang, scale = hg.GetHeldWeaponImpactModel(ply, wep)
-        local hit = model and hg.TraceEquipmentModel(model, pos, ang, scale, startPos, hitPos + dir, impact.Config.weaponHitPadding + radius)
+        local equipmentHits = {}
+        if IsValid(wep) then
+            local model, pos, ang, scale = hg.GetHeldWeaponImpactModel(ply, wep)
+            local weaponHit = model and hg.TraceEquipmentModel(model, pos, ang, scale, startPos, hitPos + dir, impact.Config.weaponHitPadding + radius)
+            if weaponHit then weaponHit.weapon, weaponHit.ply = wep, ply; equipmentHits[#equipmentHits + 1] = weaponHit end
+        end
+        for _, heldEnt in ipairs(hg.GetHeldEquipmentEntities(ply)) do
+            local model = heldEnt:GetModel()
+            local heldHit = model and hg.TraceEquipmentModel(model, heldEnt:GetPos(), heldEnt:GetAngles(), heldEnt:GetModelScale(), startPos, hitPos + dir, radius)
+            if heldHit then heldHit.heldEntity, heldHit.ply = heldEnt, ply; equipmentHits[#equipmentHits + 1] = heldHit end
+        end
+        table.sort(equipmentHits, function(a, b) return a.fraction < b.fraction end)
+        local hit = equipmentHits[1]
         if hit then
-            WeaponImpact(ply, wep, hit, damage, dmgInfo:GetDamageForce():Length(), dir)
-            local absorbed, weaponParry = GetWeaponImpactAbsorption(wep, hit, dir, dmgInfo)
-            if weaponParry then
-                parried = true
-                if wep.PlayBlockImpactEffect then
-                    wep:PlayBlockImpactEffect({HitPos = hit.position, HitNormal = hit.normal}, wep, "parry")
+            hit.damageType = dmgInfo:GetDamageType()
+            local absorbed
+            if hit.weapon then
+                if hit.weapon.HGEquipmentContactTick ~= engine.TickCount() then
+                    WeaponImpact(ply, hit.weapon, hit, damage, dmgInfo:GetDamageForce():Length(), dir)
                 end
+                hit.weapon.HGEquipmentContactTick = nil
+                local weaponParry
+                absorbed, weaponParry = GetWeaponImpactAbsorption(hit.weapon, hit, dir, dmgInfo)
+                if weaponParry then
+                    parried = true
+                    if hit.weapon.PlayBlockImpactEffect then
+                        hit.weapon:PlayBlockImpactEffect({HitPos = hit.position, HitNormal = hit.normal}, hit.weapon, "parry")
+                    end
+                end
+            else
+                absorbed = GetHeldEntityImpactAbsorption(hit.heldEntity, hit, dir)
+                local broken = hg.DamageEquipmentCondition(hit.heldEntity, damage, dmgInfo:GetDamageType(), true)
+                if broken then DropHeldEquipment(ply, hit.heldEntity) end
             end
             dmgInfo:ScaleDamage(1 - absorbed)
             dmgInfo:SetDamageForce(dmgInfo:GetDamageForce() * (1 - absorbed))
@@ -364,6 +520,7 @@ end
 
 function hg.TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, originalTrace, shot)
     if not isvector(startPos) or not isvector(endPos) or startPos:DistToSqr(endPos) < 0.000001 then return originalTrace end
+    originalTrace = originalTrace or {}
     shot = shot or {}
     shot.EquipmentHits = shot.EquipmentHits or {}
     local seen, hits, checkedBodies = shot.EquipmentHits, {}, {}
@@ -389,6 +546,15 @@ function hg.TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, origin
             local hit = model and hg.TraceEquipmentModel(model, pos, ang, modelScale, startPos, endPos, cfg.weaponHitPadding + projectileRadius)
             if hit and hit.fraction <= obstructionFraction + 0.0001 then hit.weapon, hit.ply, hit.key = wep, ply, wep; hit.shot = shot; hits[#hits + 1] = hit end
         end
+        for _, heldEnt in ipairs(hg.GetHeldEquipmentEntities(ply)) do
+            if seen[heldEnt] then continue end
+            local model = heldEnt:GetModel()
+            local hit = model and hg.TraceEquipmentModel(model, heldEnt:GetPos(), heldEnt:GetAngles(), heldEnt:GetModelScale(), startPos, endPos, projectileRadius)
+            if hit and hit.fraction <= obstructionFraction + 0.0001 then
+                hit.heldEntity, hit.ply, hit.key, hit.shot = heldEnt, ply, heldEnt, shot
+                hits[#hits + 1] = hit
+            end
+        end
         if hg.Appearance and hg.Appearance.TraceAccessoryShot then
             hg.Appearance.TraceAccessoryShot(body, startPos, endPos, seen, hits, projectileRadius)
         end
@@ -403,6 +569,11 @@ function hg.TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, origin
         if shot.Contact then
             if hit.weapon then
                 WeaponImpact(hit.ply, hit.weapon, hit, damage, force, direction)
+                hit.weapon.HGEquipmentContactTick = engine.TickCount()
+            elseif hit.heldEntity then
+                local broken = hg.DamageEquipmentCondition(hit.heldEntity, damage, shot.DamageType or DMG_CLUB, true)
+                if broken then DropHeldEquipment(hit.ply, hit.heldEntity) end
+                hit.heldEntity.HGHeldEquipmentResistanceUntil = CurTime() + 0.1
             else
                 local info = DamageInfo()
                 info:SetDamage(damage)
@@ -411,9 +582,12 @@ function hg.TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, origin
             end
             local tr = table.Copy(originalTrace or {})
             tr.Hit, tr.HitWorld, tr.HitSky = true, false, false
-            tr.Entity, tr.HitPos, tr.HitNormal, tr.Normal = hit.weapon and hit.ply or game.GetWorld(), hit.position, hit.normal, direction
+            tr.Entity = hit.weapon and hit.ply or hit.heldEntity or game.GetWorld()
+            tr.HitPos, tr.HitNormal, tr.Normal = hit.position, hit.normal, direction
             tr.StartSolid, tr.AllSolid = false, false
-            tr.MatType, tr.Fraction = hit.weapon and MAT_METAL or MAT_PLASTIC, hit.fraction
+            local equipment = hit.weapon or hit.heldEntity
+            local profile = equipment and hg.GetEquipmentMaterialProfile(equipment)
+            tr.MatType, tr.Fraction = profile and profile.mat or MAT_PLASTIC, hit.fraction
             tr.HGEquipmentContact = true
             if hit.weapon then
                 local grip = hg.GetWeaponImpactGrip(hit.ply, hit.weapon)
@@ -423,25 +597,26 @@ function hg.TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, origin
                 tr.HGEquipmentWeapon = hit.weapon
                 tr.HGEquipmentIntercept = true
                 tr.HitGroup = grip and grip.firingArm == "larm" and HITGROUP_LEFTARM or HITGROUP_RIGHTARM
+            elseif hit.heldEntity then
+                tr.HGEquipmentHeldEntity = hit.heldEntity
+                tr.HGEquipmentIntercept = true
             end
             return tr
         end
-        if hit.weapon then
-            local absorbed, parry = GetWeaponImpactAbsorption(hit.weapon, hit, direction)
-            WeaponImpact(hit.ply, hit.weapon, hit, damage * scale, (force or 0) * scale, direction)
-            local materialName = hit.weapon.GetClashMaterial and hit.weapon:GetClashMaterial() or hit.weapon.BlockMaterial
-            local material = ({wood = MAT_WOOD, plastic = MAT_PLASTIC, glass = MAT_GLASS})[materialName] or MAT_METAL
-            local hardness = hg.PhysBullet and hg.PhysBullet.SurfaceHardness and hg.PhysBullet.SurfaceHardness[material] or cfg.defaultHardness
-            local thickness = math.min(hit.thickness * cfg.weaponSolidFraction, cfg.weaponMaxThickness)
-            local penetration = math.max(tonumber(shot.Penetration) or damage * scale / 8, 0.1)
-            local maxDistance = math.min(penetration * 3 / hardness * 0.4, 100)
-            local remaining = math.Clamp(1 - thickness / maxDistance, 0, 1)
-            if shot.Vel and hg.PhysBullet and hg.PhysBullet.CalcVelocityLostInMaterial then
-                local speed = shot.Vel:Length()
-                local after = hg.PhysBullet.CalcVelocityLostInMaterial(material, thickness * thickness, speed)
-                remaining = math.min(remaining, (after / math.max(speed, 1)) ^ 2)
+        if hit.weapon or hit.heldEntity then
+            local equipment = hit.weapon or hit.heldEntity
+            local absorbed, parry
+            if hit.weapon then
+                absorbed, parry = GetWeaponImpactAbsorption(hit.weapon, hit, direction)
+                WeaponImpact(hit.ply, hit.weapon, hit, damage * scale, (force or 0) * scale, direction)
+            else
+                absorbed = GetHeldEntityImpactAbsorption(hit.heldEntity, hit, direction)
+                local broken = hg.DamageEquipmentCondition(hit.heldEntity, damage * scale, shot.DamageType or DMG_BULLET, true)
+                if broken then DropHeldEquipment(hit.ply, hit.heldEntity) end
+                hit.heldEntity.HGHeldEquipmentResistanceUntil = CurTime() + 0.1
             end
-            remaining = remaining * (1 - absorbed)
+            local remaining, penetration, profile = GetEquipmentBallisticRemaining(equipment, hit, shot, damage, scale, absorbed)
+            local material = profile.mat
             shot.Penetration = penetration * remaining
             shot.EquipmentPenetration = shot.Penetration
             scale = scale * remaining
@@ -452,6 +627,9 @@ function hg.TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, origin
             effect:SetScale(1)
             if material == MAT_METAL then util.Effect("Sparks", effect, true, true) end
             if HG_BulletImpactSounds then HG_BulletImpactSounds.PlayMaterialImpact({HitPos = hit.position, MatType = material}) end
+            if hit.weapon and hit.weapon:GetClass() == "weapon_pan" and remaining <= 0.001 then
+                hook.Run("HGEquipmentBulletBlocked", hit.ply, "pan", hit.weapon, hit.position)
+            end
             if parry then
                 local tr = table.Copy(originalTrace or {})
                 tr.Hit, tr.HitWorld, tr.HitSky = true, false, false
@@ -467,13 +645,16 @@ function hg.TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, origin
                 return tr
             end
             if scale <= 0.001 then
-                local tr = table.Copy(originalTrace)
+                local tr = table.Copy(originalTrace or {})
                 tr.Hit, tr.HitWorld, tr.HitSky = true, false, false
                 tr.Entity, tr.HitPos, tr.HitNormal, tr.Normal = game.GetWorld(), hit.position, hit.normal, direction
                 tr.StartSolid, tr.AllSolid, tr.MatType = false, false, material
-                local endsAtOriginalHit = originalTrace.Hit and isvector(originalTrace.HitPos) and endPos:DistToSqr(originalTrace.HitPos) < 0.0001
+                local endsAtOriginalHit = originalTrace and originalTrace.Hit and isvector(originalTrace.HitPos) and endPos:DistToSqr(originalTrace.HitPos) < 0.0001
                 tr.Fraction = endsAtOriginalHit and originalTrace.Fraction * hit.fraction or hit.fraction
                 tr.HGEquipmentBlocked, tr.HGEquipmentScale = true, 0
+                tr.HGEquipmentProcessed, tr.HGEquipmentIntercept = true, true
+                tr.HGEquipmentWeapon = hit.weapon
+                tr.HGEquipmentHeldEntity = hit.heldEntity
                 return tr
             end
         else
@@ -489,3 +670,8 @@ function hg.TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, origin
     originalTrace.HGEquipmentProcessed = checkedBodies[originalTrace.Entity] == true
     return originalTrace
 end
+
+hook.Add("EntityTakeDamage", "HG_HeldEquipmentResistance", function(ent, dmgInfo)
+    if not IsValid(ent) or (ent.HGHeldEquipmentResistanceUntil or 0) < CurTime() then return end
+    dmgInfo:ScaleDamage(1 / impact.Config.heldDurabilityMultiplier)
+end)

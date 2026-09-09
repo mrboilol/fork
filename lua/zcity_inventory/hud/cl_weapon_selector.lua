@@ -18,10 +18,10 @@ local SimpleSelector = {
 local function ZCityGetInventorySystem()
 	local convar = GetConVar("hg_invsystem")
 	if convar then
-		return math.Clamp(convar:GetInt(), 0, 2)
+		return math.Clamp(convar:GetInt(), 0, 3)
 	end
 
-    return math.Clamp(GetGlobalInt("InventorySystem", 0), 0, 2)
+    return math.Clamp(GetGlobalInt("InventorySystem", 0), 0, 3)
 end
 
 local function ZCitySelectInventoryWeapon(wep)
@@ -1674,11 +1674,17 @@ local function canUseSelector(ply)
         return true
     end
 
-    return IsAiming(ply) or (IsValid(wep) and wep:GetClass() == "weapon_physgun" and ply:KeyDown(IN_ATTACK)) or (lply.organism and lply.organism.pain and lply.organism.pain > 100) or ZCityGetInventorySystem() == 2
+    return IsAiming(ply) or (IsValid(wep) and wep:GetClass() == "weapon_physgun" and ply:KeyDown(IN_ATTACK)) or (lply.organism and lply.organism.pain and lply.organism.pain > 100) or ZCityGetInventorySystem() >= 2
 end
 
 function WS.ChangeSelectionWep( ply, key, pressed, code )
     local inventorySystem = ZCityGetInventorySystem()
+    if inventorySystem == 3 then
+        ZCityResetSlotHold(false)
+        if tAcceptKeys[key] or key == "invnext" or key == "invprev" or key == "lastinv" then return true end
+        return
+    end
+
     if inventorySystem == 1 or inventorySystem == 2 then
         ZCityResetSlotHold(false)
         if pressed == false then

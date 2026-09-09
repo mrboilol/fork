@@ -45,7 +45,7 @@ local DEATH_COLORS = {
     Color(0, 115, 255),
     Color(95, 65, 255),
     Color(175, 45, 255),
-    Color(255, 35, 160),
+    Color(255, 35, 160), --pight tussy
 }
 
 -- server convar values yesss

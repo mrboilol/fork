@@ -8,7 +8,8 @@ local openDuration = 0.34
 local searchDuration = 0.7
 local revealInterval = 0.32
 
-local function GetItemName(class)
+local function GetItemName(class, override)
+	if override then return language.GetPhrase(override) end
 	local weapon = weapons.Get(class)
 	local entity = scripted_ents.Get(class)
 	return language.GetPhrase((weapon and weapon.PrintName) or (entity and entity.PrintName) or tostring(class))
@@ -37,16 +38,19 @@ local function ResolveFirstMaterial(...)
 	end
 end
 
-local function GetItemIcon(class)
+local function GetItemIcon(class, override)
+	local icon, isTexture = ResolveMaterial(override)
+	if icon then return icon, isTexture end
+
 	local weapon = weapons.Get(class)
 	if weapon then
-		local icon, isTexture = ResolveFirstMaterial(weapon.IconOverride, "entities/" .. class .. ".png", "vgui/entities/" .. class, weapon.WepSelectIcon2, weapon.WepSelectIcon)
+		icon, isTexture = ResolveFirstMaterial(weapon.IconOverride, "entities/" .. class .. ".png", "vgui/entities/" .. class, weapon.WepSelectIcon2, weapon.WepSelectIcon)
 		if icon then return icon, isTexture end
 	end
 
 	local entity = scripted_ents.Get(class)
 	if entity then
-		local icon, isTexture = ResolveFirstMaterial(entity.IconOverride, "entities/" .. class .. ".png", "vgui/entities/" .. class)
+		icon, isTexture = ResolveFirstMaterial(entity.IconOverride, "entities/" .. class .. ".png", "vgui/entities/" .. class)
 		if icon then return icon, isTexture end
 	end
 
@@ -331,10 +335,11 @@ function hg.OpenContainerLootGrid(options)
 		button.ItemID = itemID
 		button.Item = item
 		button.Slot = string.format("%02d", sequence)
-		button.Icon, button.IconIsTexture = GetItemIcon(class)
-		button:SetTooltip(GetItemName(class))
+		button.Icon, button.IconIsTexture = GetItemIcon(class, item.icon)
+		button:SetTooltip(GetItemName(class, item.name))
 		button:SetAlpha(0)
 		menu.Buttons[#menu.Buttons + 1] = button
+		if options.onPrepare then options.onPrepare(button, itemID, item) end
 
 		button.OnCursorEntered = function()
 			surface.PlaySound("arc9_eft_shared/generic_mag_pouch_out" .. math.random(7) .. ".mp3")
@@ -343,7 +348,7 @@ function hg.OpenContainerLootGrid(options)
 		button.DoClick = function(self)
 			if self.Taking or menu.Closing or cooldown > CurTime() then return end
 			cooldown = CurTime() + 0.3
-			if options.onTake then options.onTake(ent, self.ItemID, self.Item) end
+			if options.onTake and options.onTake(ent, self.ItemID, self.Item, self) == false then return end
 			surface.PlaySound("arc9_eft_shared/generic_mag_pouch_in" .. math.random(7) .. ".mp3")
 			self.Taking = CurTime()
 			self.TakeX, self.TakeY = self:GetPos()
