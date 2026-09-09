@@ -6,6 +6,17 @@ for i = 10,16 do
     table.insert(smoke_mats, "particle/smokesprites_00" .. i)
 end
 
+local g_emit
+local g_emitpos
+local function getEmitter(pos)
+    if not IsValid(g_emit) or not g_emitpos or g_emitpos:DistToSqr(pos) > 65536 then
+        if IsValid(g_emit) then g_emit:Finish() end
+        g_emit = ParticleEmitter(pos)
+        g_emitpos = pos
+    end
+    return g_emit
+end
+
 local g_lastlight = 0
 
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -14,7 +25,7 @@ function EFFECT:Init(data)
     local normal = data:GetNormal()
     local intensity = data:GetMagnitude()
 
-    local emitter = ParticleEmitter(pos)
+    local emitter = getEmitter(pos)
 
     for i = 1,4*intensity do
         local smoke = emitter:Add(smoke_mats[math.random(#smoke_mats)], pos)
@@ -78,7 +89,6 @@ function EFFECT:Init(data)
         end
     end
 
-    emitter:Finish()
 end
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 function EFFECT:Think() end

@@ -255,6 +255,12 @@ module[2] = function(ply, org, timeValue)
         org.concussion_effects = {severity = 0, duration = 0, last_impact = 0}
     end
 
+    local now = CurTime()
+
+    org.concussion_tinnitus = math.Approach(org.concussion_tinnitus or 0, 0, timeValue * 0.12)
+    org.concussion_headache = math.Approach(org.concussion_headache or 0, 0, timeValue * 0.04)
+    org.concussion_fatigue = math.Approach(org.concussion_fatigue or 0, 0, timeValue * 0.02)
+
     local hasConcussion = org.concussion > 0 or org.concussion_onset > 0
     local hasNausea = org.nausea > 0 or org.nausea_target > 0 or org.nausea_pending > 0
     local hasPost = org.concussion_post > 0
@@ -274,8 +280,6 @@ module[2] = function(ply, org, timeValue)
         recoverTinnitus(org, timeValue)
         return
     end
-
-    local now = CurTime()
 
     if org.concussion_lucid_end > now then
         if org.concussion > 0 then
@@ -419,6 +423,7 @@ module[2] = function(ply, org, timeValue)
         end
     end
 
+<<<<<<< HEAD
     recoverTinnitus(org, timeValue)
     org.concussion_headache = math.Approach(org.concussion_headache or 0, 0, timeValue * 0.2)
     org.concussion_fatigue = math.Approach(org.concussion_fatigue or 0, 0, timeValue * 0.12)
@@ -431,6 +436,8 @@ module[2] = function(ply, org, timeValue)
         org.nausea_pending = math.Approach(org.nausea_pending or 0, 0, timeValue * 0.25)
     end
 
+=======
+>>>>>>> a00e02d0 (i hate this)
     org.nausea_wave_timer = (org.nausea_wave_timer or 0) + timeValue * NAUSEA_WAVE_FREQ
     local waveOffset = math.sin(org.nausea_wave_timer * math.pi * 2) * NAUSEA_WAVE_AMP
     local nauseaTargetWithWave = math.max(0, (org.nausea_target or 0) + waveOffset * (org.nausea_target or 0) * 0.5)

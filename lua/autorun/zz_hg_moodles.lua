@@ -394,7 +394,7 @@ local function getMoodle3IconName(effect)
 		fracture = "fractured", dislocated = "dislocated", analgesia = "drugged",
 		stamina = "exertion", exertion = "exertion", bleeding = level == 1 and "bleeding" or "bleeding" .. level,
 		carbon_monoxide = "hypoxemia", arrhythmia = "arrhythmia", palpitations = "fibrilation", fibrillation = "fibrilation",
-		hypoxemia = "hypoxemia", brain_hypoxia = "brain-hypoxia", brain_dying = "stress", asystole = "heart-failure",
+		hypoxemia = "hypoxemia", brain_hypoxia = "brain-hypoxia", brain_dying = "brain-dying", asystole = "heart-failure",
 		low_blood = "hypotension", high_blood = "hypertension", no_eye = "last-stand", blinded = "confused",
 		brain_bleed = "brain-hemorrhage", intracranial_pressure = "terror",
 		weakness = "encumbered", bradypnea = "dyspnea", thorax = "hemothorax",
@@ -417,7 +417,7 @@ local function getMoodle3IconName(effect)
 	if effect.name == "happy" then name = level == 1 and "happy" or "happy" .. level end
 	if effect.name == "anger" then name = "anger" .. level end
 	if effect.name == "blinded" then name = "confused" end
-	if effect.name == "brain_damage" then name = "stress" end
+	if effect.name == "brain_damage" then name = level == 1 and "brain-damage" or "brain-damage" .. level end
 	if effect.name == "temperature" then
 		name = effect.icon == "veryhot" and "hyperthermia" or effect.icon == "heated" and "hot" or level >= 3 and "hypothermia" or "cold"
 	end
@@ -690,7 +690,10 @@ local function buildEffects(ply, org)
 	end
 
 	local hemorrhage = orgNumber(org, "brainHemorrhage", 0)
-	if hemorrhage > 0 then add(effects, "brain_bleed", "brainbleed", highRank(hemorrhage, {0.0001, 0.25, 0.5, 0.75}), "bad", 31, math.floor(hemorrhage * 100) .. "%") end
+	local skull = orgNumber(org, "skull", 0)
+	local hemorrhageLevel = highRank(hemorrhage, {0.0001, 0.25, 0.5, 0.75})
+	if skull >= 0.6 then hemorrhageLevel = math.max(hemorrhageLevel, skull >= 1 and 4 or 3) end
+	if hemorrhageLevel > 0 then add(effects, "brain_bleed", "brainbleed", hemorrhageLevel, "bad", 31, math.floor(math.max(hemorrhage, skull >= 0.6 and skull or 0) * 100) .. "%") end
 	local intracranialPressure = orgNumber(org, "intracranialPressure", 0)
 	if intracranialPressure >= 0.15 then add(effects, "intracranial_pressure", "intrapressure", highRank(intracranialPressure, {0.15, 0.35, 0.6, 0.85}), "bad", 32, math.floor(intracranialPressure * 100) .. "%") end
 
@@ -718,8 +721,6 @@ local function buildEffects(ply, org)
 	if thorax > 0.01 then add(effects, "thorax", "superthorax", highRank(thorax, {0.01, 0.1, 0.3, 0.7}), "bad", 35, math.floor(thorax * 100) .. "%") end
 	if org.lungsfunction == false or org.respiratoryArrest == true then add(effects, "respiratory_arrest", "nolungs", 4, "bad", -90) end
 
-	local skull = orgNumber(org, "skull", 0)
-	if skull >= 0.6 then add(effects, "skull", skull >= 1 and "skull2" or "skull1", skull >= 1 and 4 or 3, "bad", 53, math.floor(skull * 100) .. "%") end
 	local jawBroken = orgNumber(org, "jaw", 0) >= 1
 	local jawDislocated = org.jawdislocation == true or org.jawdislocated == true
 	if jawBroken or jawDislocated then
