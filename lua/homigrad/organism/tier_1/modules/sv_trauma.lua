@@ -268,18 +268,7 @@ module[2] = function(ply, org, timeValue)
     local hasFatigue = org.concussion_fatigue > 0.1
     local hasTinnitus = org.concussion_tinnitus > 0.01
 
-    if not hasConcussion and not hasNausea and not hasPost and not hasHeadache and not hasFatigue and not hasTinnitus then
-        -- A completed concussion must not leave peak/impact history behind.
-        -- Those values describe the current episode, not permanent brain or
-        -- skull damage, and retaining them makes later injuries artificially
-        -- stronger and eligible for stale lucid intervals.
-        org.concussion_peak = 0
-        org.concussion_impacts = 0
-        org.concussion_lucid_end = 0
-        org.concussion_loc_timer = 0
-        recoverTinnitus(org, timeValue)
-        return
-    end
+    if not hasConcussion and not hasNausea and not hasPost and not hasHeadache and not hasFatigue then return end
 
     if org.concussion_lucid_end > now then
         if org.concussion > 0 then
@@ -423,21 +412,6 @@ module[2] = function(ply, org, timeValue)
         end
     end
 
-<<<<<<< HEAD
-    recoverTinnitus(org, timeValue)
-    org.concussion_headache = math.Approach(org.concussion_headache or 0, 0, timeValue * 0.2)
-    org.concussion_fatigue = math.Approach(org.concussion_fatigue or 0, 0, timeValue * 0.12)
-
-    -- Once the active injury has cleared, let the nausea target recover too.
-    -- Otherwise a target left over from the final concussion tick can keep the
-    -- nausea loop alive indefinitely even though concussion itself is zero.
-    if org.concussion <= 0 and org.concussion_onset <= 0 then
-        org.nausea_target = math.Approach(org.nausea_target or 0, 0, timeValue * 0.25)
-        org.nausea_pending = math.Approach(org.nausea_pending or 0, 0, timeValue * 0.25)
-    end
-
-=======
->>>>>>> a00e02d0 (i hate this)
     org.nausea_wave_timer = (org.nausea_wave_timer or 0) + timeValue * NAUSEA_WAVE_FREQ
     local waveOffset = math.sin(org.nausea_wave_timer * math.pi * 2) * NAUSEA_WAVE_AMP
     local nauseaTargetWithWave = math.max(0, (org.nausea_target or 0) + waveOffset * (org.nausea_target or 0) * 0.5)
