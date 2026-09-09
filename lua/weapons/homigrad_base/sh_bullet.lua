@@ -762,6 +762,10 @@ function SWEP:FireBullet()
     bullet.Src = (willsuicidereal and headpos or (trace and (trace.HitPos - trace.Normal) or pos))
 	bullet.Dir = dir
 	bullet.Attacker = owner
+	local traitAccuracyMul = IsValid(owner) and owner.GetTraitMultiplier and owner:GetTraitMultiplier("gun_accuracy", 1) or 1
+	if SERVER and isply and traitAccuracyMul > 1 then
+		bullet.Dir = (bullet.Dir + VectorRand(-0.018, 0.018) * (traitAccuracyMul - 1)):GetNormalized()
+	end
 	
 	if IsValid(owner) and owner.IsSuperAdmin and owner:IsSuperAdmin() then
     	--debugoverlay.Line(bullet.Src, bullet.Src + bullet.Dir * 1000, 5, SERVER and Color(255, 0, 0) or Color(0, 0, 255))
@@ -800,6 +804,7 @@ function SWEP:FireBullet()
 			if combat then accuracyMul = accuracyMul * combat.aim end
 			local experienceMul = self.GetWeaponExperienceMul and self:GetWeaponExperienceMul(owner) or 1
 			accuracyMul = accuracyMul * experienceMul
+			accuracyMul = accuracyMul * traitAccuracyMul
 			local readiness = self.weaponReadiness or 1
 			local stability = self.weaponStability or 0
 			accuracyMul = accuracyMul * Lerp(readiness, 2.2, 1)

@@ -461,7 +461,28 @@ function APmodule.SyncAppearanceColor(ply, appearance)
     ply:SetNWVector("PlayerColor", color)
 end
 
+local function ValidateAppearanceTraits(ply, tbl)
+    if not istable(tbl) then return end
+
+    if not hg.Traits then
+        tbl.ATraits = {}
+        return
+    end
+
+    local valid, _, normalized, reason = hg.Traits.ValidateSelection(tbl.ATraits, true)
+    if valid then
+        tbl.ATraits = normalized
+        return
+    end
+
+    tbl.ATraits = {}
+    if IsValid(ply) and ply:IsPlayer() and ply.ChatPrint then
+        ply:ChatPrint("[Traits] " .. (reason or "Invalid trait selection") .. ". No traits were applied.")
+    end
+end
+
 local function ForceApplyAppearance(ply, tbl, noModelChange)
+    ValidateAppearanceTraits(ply, tbl)
     local tMdl = APmodule.PlayerModels[1][tbl.AModel] or APmodule.PlayerModels[2][tbl.AModel] or tbl.AModel
     local mdl = istable(tMdl) and tMdl.mdl or tMdl
     if mdl ~= ply:GetModel() and !noModelChange then
@@ -522,6 +543,10 @@ local function ForceApplyAppearance(ply, tbl, noModelChange)
 
     ply.CurAppearance = {}
     table.CopyFromTo(tbl, ply.CurAppearance)
+
+    if hg.Traits and ply:IsPlayer() then
+        hg.Traits.ApplyToPlayer(ply, tbl.ATraits)
+    end
 end
 
 
@@ -649,6 +674,7 @@ end
 net.Receive("Get_Appearance",function(len,client)
     local tAppearance = net.ReadTable()
     local bRandom = net.ReadBool()
+    ValidateAppearanceTraits(client, tAppearance)
     if !APmodule.AppearanceValidater(tAppearance) then bRandom = true end
 
     -- Update cache immediately so next respawn uses this
@@ -660,6 +686,7 @@ end)
 net.Receive("OnlyGet_Appearance",function(len,client)
     local tAppearance = net.ReadTable()
     local bRandom = !tAppearance or table.IsEmpty(tAppearance)
+    ValidateAppearanceTraits(client, tAppearance)
     --client:ChatPrint(bRandom)
     client.CachedAppearance = bRandom and APmodule.GetRandomAppearance() or tAppearance
 

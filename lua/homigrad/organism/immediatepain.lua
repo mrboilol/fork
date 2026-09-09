@@ -5,8 +5,7 @@ if SERVER then
     local adrenalinePainaddPassiveMin = 15
 
     local function applyPain(org)
-        local angerPainMul = 1 - math.Clamp(org.anger or 0, 0, 1) * 0.16
-        local pain = (org.avgpain or 0) * math.max(1 - (org.adrenaline or 0) / 4, 0.75) * math.max(1 - (org.analgesia or 0), 0) * angerPainMul
+        local pain = (org.avgpain or 0) * math.max(1 - (org.adrenaline or 0) / 4, 0.75) * math.max(1 - (org.analgesia or 0), 0)
         if (org.zerlkers or 0) > 0 or (org.adrenaline or 0) >= 3 then
             pain = math.min(pain, 69.99)
         end

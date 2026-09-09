@@ -189,16 +189,3 @@ hook.Add("PostHeal", "GoodMood_OnHeal", function(wep, target, mode)
         end
     end
 end)
-
--- Good mood provides resilience (damage reduction)
-hook.Add("ScalePlayerDamage", "GoodMood_Resilience", function(ply, hitgroup, dmgInfo)
-    if not IsValid(ply) then return end
-    local org = ply.organism
-    if not org then return end
-
-    local goodmood = math.Clamp(org.goodmood or 0, 0, 1)
-    if goodmood > 0.3 then
-        local resilience = (goodmood - 0.3) * 0.22
-        dmgInfo:ScaleDamage(1 - resilience)
-    end
-end)

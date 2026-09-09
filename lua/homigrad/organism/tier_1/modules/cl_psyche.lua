@@ -1,3 +1,5 @@
+if true then return end
+
 local Clamp = math.Clamp
 
 local FEAR_SOUND = "stare.ogg"

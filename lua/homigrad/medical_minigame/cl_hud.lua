@@ -149,11 +149,10 @@ local function GetBandageStressFactors()
     local lp = LocalPlayer()
     if not IsValid(lp) or not lp.organism then return 0, 0, 0, 0 end
     local org = lp.organism
-    local fear = math.Clamp(org.fear or 0, 0, 2)
     local adrenaline = math.Clamp(org.adrenaline or 0, 0, 2)
     local jitter = math.max(0, adrenaline - 1.25)
     local stabilizer = math.min(adrenaline, 1.25) * 0.05
-    return fear, adrenaline, jitter, stabilizer
+    return 0, adrenaline, jitter, stabilizer
 end
 
 for i = 1, 3 do

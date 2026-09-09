@@ -671,6 +671,7 @@ local math_abs, math_Approach, math_AngleDifference, math_Clamp, math_cos, math_
 		local validCarryEnt2 = IsValid(carryent2)
 		k = k * ((validCarryEnt or validCarryEnt2) and math_Clamp(50 / math_max(ply:GetNetVar("carrymass", 0) + ply:GetNetVar("carrymass2", 0), 1), 0.5, 1) or 1)
 		k = k * math_Clamp(20 / ((org.pain or 0) + 1), 0.01, 1)
+		k = k * (ply.GetTraitMultiplier and ply:GetTraitMultiplier("movement_speed", 1) or 1)
 		//k = k * (ishgweapon(wep) and not wep:IsPistolHoldType() and not wep:ReadyStance() and 0.75 or 1)
 
 		local slwdwn = ply:GetNetVar("slowDown", 0)
@@ -804,11 +805,7 @@ local math_abs, math_Approach, math_AngleDifference, math_Clamp, math_cos, math_
 		inertia_len = math.min(inertia_len, (ply:GetSlowWalkSpeed() or 100) * 0.78)
 	end
 
-	if org.psycheApathy and org.psycheApathy > 0 then
-		inertia_len = inertia_len * (1 - 0.08 * math.min(org.psycheApathy, 1))
-	end
-		
-		mv:SetMaxSpeed(inertia_len)
+	mv:SetMaxSpeed(inertia_len)
 		mv:SetMaxClientSpeed(inertia_len)
 		ply:SetMaxSpeed(math_max(100, inertia_len))
 		ply:SetJumpPower(DEFAULT_JUMP_POWER * math_min(k, 1.1) * (not tauntStopMoving and 1 or 0) * (ply.organism.superfighter and 1.5 or 1) * (ply.JumpPowerMul or 1))

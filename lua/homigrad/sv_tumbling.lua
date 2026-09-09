@@ -136,8 +136,7 @@ hook.Add("Think", "stanleytumbler", function()
         local speed = velocity:Length2D()
         local org = ply.organism or {}
         local consciousness = org.consciousness or 1
-        local fear = org.fear or 0
-        local disorientation = org.disorientation or 0
+		local disorientation = org.disorientation or 0
         local stamina = org.stamina and org.stamina[1] or 100
         local effectiveThreshold = TUMBLE_SPEED_THRESHOLD
         effectiveThreshold = effectiveThreshold * math.Clamp(consciousness, 0.5, 1.0)
@@ -252,9 +251,6 @@ hook.Add("Think", "stanleytumbler", function()
             ply.eyeAnglesOld = ply:EyeAngles()
         end
 
-        if fear > 0.1 then
-            tripChance = tripChance + fear * 0.25
-        end
         if disorientation > 0.1 then
             tripChance = tripChance + disorientation * 0.05
         end

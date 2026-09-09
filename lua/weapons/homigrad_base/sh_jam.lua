@@ -159,9 +159,8 @@ function SWEP:GetJamClearTime()
 	if not IsValid(owner) or not owner.organism then return self.JamClearBaseTime end
 
 	local org = owner.organism
-	local fear = math.Clamp(org.fear or 0, 0, 2)
 	local adrenaline = math.Clamp(org.adrenaline or 0, 0, 2)
-	local stress = fear + adrenaline
+	local stress = adrenaline
 
 	local base = self.JamClearBaseTime or 2.5
 	local maxTime = self.JamClearMaxTime or 5.0

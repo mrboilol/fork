@@ -803,6 +803,7 @@ function hg.organism.AddPanicAttack(org, amount, silent, combatEvent, ignoreGunf
 		return 0
 	end
 	if not isnumber(amount) or amount <= 0 then return org.panicattackadd or 0 end
+	if IsValid(org.owner) and org.owner.GetTraitMultiplier then amount = amount * org.owner:GetTraitMultiplier("panic_gain", 1) end
 	if combatEvent then hg.organism.MarkPanicGunfight(org) end
 	local goodmood = math.Clamp(tonumber(org.goodmood) or 0, 0, 1)
 	if goodmood > 0 then
@@ -1246,27 +1247,8 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	if hg_panic:GetBool() and oldPanicAttack < panicattack_threshold and org.panicattack >= panicattack_threshold and isPly and owner:Alive() then
 		owner:Notify("I can't calm down.", 2, "panicattack_start", 2, nil, Color(255, 140, 140))
 	end
-	if oldPanicAttack < panicattack_threshold and org.panicattack >= panicattack_threshold then
-		local combatPanic = (org.panicGunfightUntil or 0) > CurTime()
-		org.panicAdrenalineUntil = CurTime() + (combatPanic and panicattack_combat_adrenaline_duration or panicattack_adrenaline_duration)
-	end
-	local panicDying = org.otrub or org.incapacitated or org.deathStateKilled or (isPly and not owner:Alive())
-	if org.panicattack >= panicattack_threshold then
-		org.panicattackActive = hg_panic:GetBool() and not panicDying
-		if CurTime() < (org.panicAdrenalineUntil or 0) then
-			local combatPanic = (org.panicGunfightUntil or 0) > CurTime()
-			local targetMaximum = combatPanic and panicattack_combat_adrenaline_add_target or panicattack_adrenaline_add_target
-			local adrenalineTarget = math.Remap(org.panicattack, panicattack_threshold, 1, targetMaximum * 0.5, targetMaximum)
-			if not hg_panic:GetBool() then adrenalineTarget = adrenalineTarget * 0.55 end
-			org.adrenalineAdd = math.Approach(org.adrenalineAdd or 0, adrenalineTarget, timeValue / panicattack_adrenaline_add_rise_time)
-		end
-		if org.panicattackActive then
-			org.disorientation = math.max(org.disorientation, 0.6 + panicattack_disorientation * org.panicattack)
-		end
-	else
-		org.panicattackActive = false
-		org.panicAdrenalineUntil = 0
-	end
+	org.panicattackActive = false
+	org.panicAdrenalineUntil = 0
 	local ignoreBrainDamage = hg.organism.IsBrainDamageIgnored and hg.organism.IsBrainDamageIgnored(org)
 	local brainDelta = ignoreBrainDamage and 0 or (org.brain or 0) - oldSeizureBrain
 	local lobeDelta = ignoreBrainDamage and 0 or lobeDamage - oldSeizureLobeDamage

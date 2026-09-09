@@ -53,7 +53,7 @@ SWEP.DamageMul = 1
 local function GetCombatStrengthMul(ply)
 	if not IsValid(ply) then return 1 end
 
-	local mul = (ply.MeleeDamageMul or 1) * (hg.GetSubRolePerk and hg.GetSubRolePerk(ply, "MeleeDamageMul", 1) or 1)
+	local mul = (ply.MeleeDamageMul or 1) * (hg.GetSubRolePerk and hg.GetSubRolePerk(ply, "MeleeDamageMul", 1) or 1) * (ply.GetTraitMultiplier and ply:GetTraitMultiplier("melee_damage", 1) or 1)
 	local org = ply.organism
 	if ply:IsBerserk() and org then
 		mul = mul * (1 + (org.berserk or 0) * 5)

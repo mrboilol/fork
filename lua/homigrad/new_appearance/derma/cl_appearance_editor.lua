@@ -315,6 +315,7 @@ local function NormalizeAttachmentSlots(appearance)
     for slotID = 1, 6 do
         appearance.AAttachments[slotID] = appearance.AAttachments[slotID] or "none"
     end
+    appearance.ATraits = hg.Traits and hg.Traits.NormalizeSelection(appearance.ATraits) or {}
     return appearance
 end
 
@@ -734,6 +735,56 @@ function PANEL:PostInit()
         return row
     end
 
+    local function AddTraitRow(parent, trait)
+        local row = vgui.Create("DButton", parent)
+        row:Dock(TOP)
+        row:SetTall(MenuUnit(68))
+        row:DockMargin(MenuUnit(12), MenuUnit(3), MenuUnit(12), 0)
+        row:SetText("")
+        row:SetCursor("hand")
+        row:SetTooltip(trait.Description)
+
+        function row:DoClick()
+            local selection = hg.Traits.NormalizeSelection(main.AppearanceTable.ATraits)
+            if hg.Traits.SelectionHas(selection, trait.ID) then
+                table.RemoveByValue(selection, trait.ID)
+            else
+                if #selection >= hg.Traits.MaxSelected then
+                    surface.PlaySound("buttons/button10.wav")
+                    notification.AddLegacy("Too many traits selected", NOTIFY_ERROR, 4)
+                    return
+                end
+                selection[#selection + 1] = trait.ID
+            end
+
+            main.AppearanceTable.ATraits = hg.Traits.NormalizeSelection(selection)
+            surface.PlaySound("buttons/button14.wav")
+        end
+
+        function row:Paint(w, h)
+            local selected = hg.Traits.SelectionHas(main.AppearanceTable.ATraits, trait.ID)
+            local background = selected and Color(40, 40, 54, 235) or Color(18, 18, 26, 180)
+            if self:IsHovered() then background = Color(34, 34, 46, 235) end
+
+            surface.SetDrawColor(background)
+            surface.DrawRect(0, 0, w, h)
+            surface.SetDrawColor(appearance_color_white.r, appearance_color_white.g, appearance_color_white.b, selected and 180 or 75)
+            surface.DrawOutlinedRect(0, 0, w, h, 1)
+            if selected then
+                surface.SetDrawColor(appearance_color_white.r, appearance_color_white.g, appearance_color_white.b, 210)
+                surface.DrawRect(0, 0, MenuUnit(3), h)
+            end
+
+            local pointText = trait.Points > 0 and ("+" .. trait.Points) or tostring(trait.Points)
+            local pointColor = trait.Points > 0 and Color(115, 220, 135) or (trait.Points < 0 and Color(235, 120, 120) or appearance_color_text_dim)
+            draw.SimpleText(trait.Name, "ZCity_Menu_Settings_Small", MenuUnit(10), MenuUnit(11), selected and appearance_color_white or appearance_color_text, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+            draw.SimpleText(pointText .. " PTS", "ZCity_Menu_Settings_Tiny", w - MenuUnit(10), MenuUnit(13), pointColor, TEXT_ALIGN_RIGHT, TEXT_ALIGN_TOP)
+            draw.SimpleText(string.Left(trait.Description, 52), "ZCity_Menu_Settings_Tiny", MenuUnit(10), MenuUnit(39), appearance_color_text_dim, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+        end
+
+        return row
+    end
+
     local function AddSelectorModelRow(parent, strTitle, modelData, fnIsActive, fnClick, strSubtitle)
         local row = vgui.Create("DButton", parent)
         row:Dock(TOP)
@@ -1051,6 +1102,15 @@ function PANEL:PostInit()
     end
 
     local function ApplyAppearance()
+        local traitsValid, _, normalizedTraits, traitReason = hg.Traits.ValidateSelection(main.AppearanceTable.ATraits, true)
+        if not traitsValid then
+            surface.PlaySound("buttons/button10.wav")
+            notification.AddLegacy("Traits not applied: " .. (traitReason or "invalid selection"), NOTIFY_ERROR, 5)
+            chat.AddText(Color(235, 120, 120), "[Traits] ", color_white, (traitReason or "Invalid trait selection") .. ". Nothing was applied.")
+            return false
+        end
+
+        main.AppearanceTable.ATraits = normalizedTraits
         hg.Appearance.CreateAppearanceFile(hg.Appearance.SelectedAppearance:GetString(), main.AppearanceTable)
         net.Start("OnlyGet_Appearance")
             net.WriteTable(main.AppearanceTable)
@@ -1058,6 +1118,7 @@ function PANEL:PostInit()
         main.SharedPreviewOriginal = table.Copy(main.AppearanceTable)
         savedAppearanceSnapshot = BuildComparableAppearanceTable(main.AppearanceTable)
         surface.PlaySound(SOUND_APPEARANCE_SUCCESS)
+        return true
     end
 
     local function HasUnsavedChanges()
@@ -1130,7 +1191,7 @@ function PANEL:PostInit()
             draw.SimpleText("Save", "ZCity_Menu_Settings_Small", w * 0.5, h * 0.5, appearance_color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
         end
         saveBtn.DoClick = function()
-            ApplyAppearance()
+            if not ApplyAppearance() then return end
             CloseUnsavedPrompt(function()
                 main:ReturnToMenu()
             end)
@@ -1735,6 +1796,50 @@ function PANEL:PostInit()
         end)
     end
 
+    local function OpenTraitsMenu()
+        OpenSelectorPanel("Traits", "Traits", "Balance must be 0 or higher", function(scroll)
+            local balancePanel = vgui.Create("DPanel", scroll)
+            balancePanel:Dock(TOP)
+            balancePanel:SetTall(MenuUnit(62))
+            balancePanel:DockMargin(MenuUnit(12), MenuUnit(8), MenuUnit(12), MenuUnit(5))
+            balancePanel.Paint = function(this, w, h)
+                local balance = hg.Traits.GetPointBalance(main.AppearanceTable.ATraits)
+                local valid = balance >= 0
+                surface.SetDrawColor(20, 20, 30, 210)
+                surface.DrawRect(0, 0, w, h)
+                surface.SetDrawColor(valid and Color(90, 190, 110) or Color(215, 85, 85))
+                surface.DrawOutlinedRect(0, 0, w, h, 1)
+                draw.SimpleText("AVAILABLE POINTS", "ZCity_Menu_Settings_Tiny", MenuUnit(10), MenuUnit(9), appearance_color_text_dim, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+                draw.SimpleText(tostring(balance), "ZCity_Menu_Settings_Medium", w - MenuUnit(10), MenuUnit(7), valid and Color(115, 220, 135) or Color(235, 120, 120), TEXT_ALIGN_RIGHT, TEXT_ALIGN_TOP)
+                draw.SimpleText(valid and "Selection can be applied." or "Traits will not apply until this is 0 or higher.", "ZCity_Menu_Settings_Tiny", MenuUnit(10), MenuUnit(36), valid and appearance_color_text or Color(235, 120, 120), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+            end
+
+            local categories = {
+                {"positive", "Positive"},
+                {"neutral", "Neutral"},
+                {"negative", "Negative"}
+            }
+
+            for _, category in ipairs(categories) do
+                CreateAppearanceSectionLabel(scroll, category[2])
+                local entries = hg.Traits.GetByCategory(category[1])
+                if #entries == 0 then
+                    local empty = vgui.Create("DLabel", scroll)
+                    empty:Dock(TOP)
+                    empty:SetTall(MenuUnit(28))
+                    empty:DockMargin(MenuUnit(12), 0, MenuUnit(12), MenuUnit(3))
+                    empty:SetFont("ZCity_Menu_Settings_Tiny")
+                    empty:SetTextColor(appearance_color_text_dim)
+                    empty:SetText("No " .. category[1] .. " traits are registered yet.")
+                else
+                    for _, trait in ipairs(entries) do
+                        AddTraitRow(scroll, trait)
+                    end
+                end
+            end
+        end)
+    end
+
     local function OpenFacemapMenu()
         local modelData = main:GetCurrentModelData()
         if not modelData then return end
@@ -1965,7 +2070,8 @@ function PANEL:PostInit()
     CreateAppearanceSectionLabel(sidebar, "Identity")
     CreateAppearanceButtonGrid(sidebar, {
         {"Model", function() OpenModelMenu() end, function() return main.ActiveSection=="Model" end},
-        {"Facemap", function() OpenFacemapMenu() end, function() return main.ActiveSection=="Facemap" end}
+        {"Facemap", function() OpenFacemapMenu() end, function() return main.ActiveSection=="Facemap" end},
+        {"Traits", function() OpenTraitsMenu() end, function() return main.ActiveSection=="Traits" end}
     })
     CreateAppearanceSectionLabel(sidebar, "Accessories")
     CreateAppearanceButtonGrid(sidebar, {
@@ -2065,7 +2171,11 @@ function PANEL:PostInit()
     lowerActions.Paint = function() end
 
     local rotateBtn = CreateAppearanceTextButton(lowerActions, "Rotate", function() ToggleRotate() end, function() return main.ActiveSection == "Rotate" end)
-    local applyBtn = CreateAppearanceTextButton(lowerActions, "Apply", function() main.ActiveSection = "Apply" CloseSelectorPanel() ApplyAppearance() end, function() return main.ActiveSection == "Apply" end)
+    local applyBtn = CreateAppearanceTextButton(lowerActions, "Apply", function()
+        if not ApplyAppearance() then return end
+        main.ActiveSection = "Apply"
+        CloseSelectorPanel()
+    end, function() return main.ActiveSection == "Apply" end)
     local savePresetBtn = CreateAppearanceTextButton(lowerActions, "Save Preset", function() main.ActiveSection = "Save Preset" CloseSelectorPanel() SaveCurrentPreset() end, function() return main.ActiveSection == "Save Preset" end)
     local loadPresetBtn = CreateAppearanceTextButton(lowerActions, "Load Preset", function() main.ActiveSection = "Load Preset" CloseSelectorPanel() LoadCurrentPreset() end, function() return main.ActiveSection == "Load Preset" end)
     local deletePresetBtn = CreateAppearanceTextButton(lowerActions, "Delete Preset", function() main.ActiveSection = "Delete Preset" CloseSelectorPanel() DeleteCurrentPreset() end, function() return main.ActiveSection == "Delete Preset" end)

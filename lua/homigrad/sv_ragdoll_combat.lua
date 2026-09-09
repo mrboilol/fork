@@ -79,7 +79,7 @@ local function RagdollBodyDamage()
 
                             if tr.Entity:IsPlayer() and tr.Entity ~= owner then
                                 local dmginfo = DamageInfo()
-                                dmginfo:SetDamage(damage)
+								dmginfo:SetDamage(damage * (owner.GetTraitMultiplier and owner:GetTraitMultiplier("melee_damage", 1) or 1))
                                 dmginfo:SetAttacker(owner)
                                 dmginfo:SetInflictor(ragdoll)
                                 dmginfo:SetDamageType(DMG_CLUB)

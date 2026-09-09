@@ -922,7 +922,7 @@ module[2] = function(owner, org, timeValue)
 		timeValue / (sympatheticTarget > (org.sympatheticCompensation or 0) and 6 or 12)
 	)
 	org.sympatheticCompensation = sympatheticCompensation
-	local vascularTone = Clamp(1 + hemorrhageCompensation * 0.24 + min(activeCatecholamine, 3) * 0.12 + sympatheticCompensation * 0.26 + max(org.fear, 0) * 0.08 + Clamp(org.shock, 0, 45) / 360, 0.65, 1.55)
+	local vascularTone = Clamp(1 + hemorrhageCompensation * 0.24 + min(activeCatecholamine, 3) * 0.12 + sympatheticCompensation * 0.26 + Clamp(org.shock, 0, 45) / 360, 0.65, 1.55)
 	local accelerationPressureMul = 1 - highSpeedPressureShock * 0.8
 	local dehydrationPressureMul = 1 - math.Clamp(org.dehydrationCirculationPenalty or 0, 0, 1) * 0.22
 	-- Pericardial blood restricts filling before it directly damages the heart.
@@ -1086,7 +1086,6 @@ module[2] = function(owner, org, timeValue)
 	heartbeat = heartbeat - 40 * math.min(org.analgesia / 2.5, 1)
 	heartbeat = heartbeat + 100 * math.Clamp(math.Remap(org.temperature, 40, 42, 0, 1), 0, 1)
 	heartbeat = heartbeat - 160 * (1 - math.Clamp(math.Remap(org.temperature, 28, 36.7, 0, 1), 0, 1))
-	if org.panicattackActive then heartbeat = heartbeat + 20 end -- adrenaline handles most of the boost
 
 	-- Neurologic injury, oxygen starvation, myocardial damage, and cold each
 	-- suppress the sinus node differently. This creates bradycardia first, then
@@ -1286,7 +1285,6 @@ module[2] = function(owner, org, timeValue)
 			chance = 0.025
 		end
 
-		if org.panicattackActive then chance = chance * 0.5 end
 		if chance > 0 and math.random() < chance then
 			org.heartstop = true
 		end

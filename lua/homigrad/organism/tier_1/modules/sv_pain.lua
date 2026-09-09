@@ -27,7 +27,6 @@ local otrub_pain_tolerance = 90
 local pain_fake_threshold = 0.9
 local pain_drain_base = 8
 local pain_drain_otrub_mul = 4.5
-local anger_pain_reduction_max = 0.16
 local pain_syncope_start = 55
 local pain_syncope_full = 120
 local pain_syncope_max_rate = 0.055
@@ -56,6 +55,8 @@ end
 
 function hg.organism.AddPain(org, amount, region)
 	amount = math.max(tonumber(amount) or 0, 0)
+	local owner = org and org.owner
+	if IsValid(owner) and owner.GetTraitMultiplier then amount = amount * owner:GetTraitMultiplier("pain_received", 1) end
 	if amount <= 0 or not hg.organism.CanFeelPain(org, region) then return 0 end
 
 	local key = region == "head" and "headpainadd" or "painadd"
@@ -65,6 +66,8 @@ end
 
 function hg.organism.AddInstantPain(org, amount, region)
 	amount = math.max(tonumber(amount) or 0, 0)
+	local owner = org and org.owner
+	if IsValid(owner) and owner.GetTraitMultiplier then amount = amount * owner:GetTraitMultiplier("pain_received", 1) end
 	if amount <= 0 or not hg.organism.CanFeelPain(org, region) then return 0 end
 
 	org.avgpain = math.min((org.avgpain or 0) + amount, 150)
@@ -126,19 +129,16 @@ module[2] = function(owner, org, timeValue)
 	org.zerlkers = zerlkersDose
 	org.zerlkersOverdose = math.Clamp(zerlkersDose - 1, 0, 1)
 	local resilience = hg.organism.GetResilience and hg.organism.GetResilience(org) or 0
+	if IsValid(owner) and owner.GetTraitMultiplier then
+		org.painToleranceMul = owner:GetTraitMultiplier("pain_tolerance", 1)
+		org.traumaResistanceMul = owner:GetTraitMultiplier("trauma_resistance", 1)
+	end
 	local zerlkers = math.Clamp(zerlkersDose, 0, 1)
 	local zerlkersResistance = hg.organism.GetZerlkersResistance and hg.organism.GetZerlkersResistance(org) or zerlkers
-	local anger = Clamp(org.anger or 0, 0, 1)
 
 	local analgesiaMul = ((org.analgesia + org.painkiller * 0.3) * 4 + 1)
 
 	local painkillerMul = 1
-
-	local goodmood = math.Clamp(org.goodmood or 0, 0, 1)
-
-	local goodmoodResistance = 1 - goodmood * 0.35
-
-
 
 	-- Check for left hand mitigation: working left hand + damaged right hand
 
@@ -329,10 +329,7 @@ module[2] = function(owner, org, timeValue)
 
 
 
-	-- Anger grants a small pain resistance. Stimulants defer incoming pain via
-	-- painadd above instead of directly deleting pain already incurred.
-	local angerPainMul = 1 - anger * anger_pain_reduction_max
-	org.pain = org.avgpain * math.max(1 - (org.analgesia + org.painkiller * 0.3), 0) * angerPainMul / math.max(org.painResistanceMul or 1, 1)  * (org.psychePainMul or 1)
+	org.pain = org.avgpain * math.max(1 - (org.analgesia + org.painkiller * 0.3), 0) / math.max(org.painResistanceMul or 1, 1)
 	if zerlkersDose > 0 or adrenaline >= 3 then
 		org.pain = math.min(org.pain, 69.99)
 	end
@@ -449,14 +446,6 @@ module[2] = function(owner, org, timeValue)
 
 
 
-	-- When in fear, adrenaline decays faster
-
-	if org.fear and org.fear > 0 then
-
-		adrenalineDecayRate = adrenalineDecayRate * (1 + org.fear * 0.5)
-
-	end
-
 	if org.adrenalineAdd > 0 or CurTime() < (org._adrenalineHoldUntil or 0) then
 		adrenalineDecayRate = 0
 	end
@@ -534,15 +523,5 @@ module[2] = function(owner, org, timeValue)
 	org.disorientation = math.Approach(disorientationNow, 0, timeValue / 5 * recoveryMul)
 
 
-
-	-- Reduce goodmood when pain is high
-
-	if org.pain > 50 then
-
-		local painFactor = math.Clamp((org.pain - 50) / 50, 0, 1)
-
-		org.goodmood = math.Clamp((org.goodmood or 1) - painFactor * timeValue * 0.02, 0, 1)
-
-	end
 
 end

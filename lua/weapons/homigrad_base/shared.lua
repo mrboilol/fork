@@ -256,6 +256,7 @@ function SWEP:GetArmHealthHandlingMul()
 	loss = loss + math.Clamp(org.permanent_aim_impairment or 0, 0, 2) * 0.4
 	local combat = hg.GetCombatCondition and hg.GetCombatCondition(owner) or nil
 	if combat then loss = loss + (combat.aim - 1) * 0.7 end
+	loss = loss * (owner.GetTraitMultiplier and owner:GetTraitMultiplier("weapon_handling", 1) or 1)
 
 	return math.Clamp(1 + loss, 0.8, 4.5), loss
 end

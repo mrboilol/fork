@@ -16,6 +16,8 @@ end
 local halfValue2 = util.halfValue2
 local function damageBone(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet, nodmgchange)
 	local crush = isCrush(dmgInfo)
+	local owner = org.owner
+	if IsValid(owner) and owner.GetTraitMultiplier then dmg = dmg * owner:GetTraitMultiplier("bone_damage", 1) end
 	
 	if dmgInfo:IsDamageType(DMG_SLASH) and dmg > 1.5 then
 		//crush = false

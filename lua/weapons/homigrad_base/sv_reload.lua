@@ -48,6 +48,7 @@ function SWEP:GetReloadArmPenalty()
 			pain = pain + (penalty.MissingRightArmPain or 55)
 		end
 	end
+	if ply.GetTraitMultiplier then speedMul = speedMul * ply:GetTraitMultiplier("reload_speed", 1) end
 
 	return pain, speedMul
 end
@@ -64,6 +65,7 @@ function SWEP:Reload(time)
 	local experienceMul = self.GetWeaponExperienceMul and self:GetWeaponExperienceMul(self:GetOwner()) or 1
 	local armReloadPenalty = org and not self.IgnoreOneArmPenalties and ((org.larm or 0) / 3 + (org.rarm or 0) / 5) or 0
 	self.StaminaReloadMul = (org and ((2 - (org.stamina[1] / 180)) + ((org.pain / 40) + armReloadPenalty) - (1 - math.Clamp(org.recoilmul or 1, 0.45, 1.4))) or 1) * experienceMul
+	self.StaminaReloadMul = self.StaminaReloadMul * (self:GetOwner().GetTraitMultiplier and self:GetOwner():GetTraitMultiplier("reload_speed", 1) or 1)
 	self.StaminaReloadMul = math.Clamp(self.StaminaReloadMul,0.65,1.5)
 	local magazine = self:GetAttachmentInfo("magwell")
 	local baseCapacity = self.BaseMagazineCapacity or self.Primary.DefaultClip or self.Primary.ClipSize

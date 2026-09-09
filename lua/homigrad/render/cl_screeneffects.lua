@@ -430,12 +430,7 @@ local panicattackShakeIntervalMin = 0.45
 local panicattackShakeIntervalMax = 1.4
 local panicattackShakeMul = 0.85
 local function getPanicAttackFx(org)
-	local panicConVar = GetConVar("hg_panic")
-	if panicConVar and not panicConVar:GetBool() then return 0 end
-	local panic = math.Clamp(tonumber(org.panicattack) or 0, 0, 1)
-	local intensity = math.Clamp(math.Remap(panic, panicattackFadeStart, panicattackThreshold, 0, panicattackVolumeMul), 0, 1)
-	if org.otrub or org.incapacitated then return intensity * 0.22 end
-	return intensity
+	return 0
 end
 local painBeatOverlayVolumeMul = 1.25
 local painThresholdMax = 120
@@ -3163,7 +3158,7 @@ hook.Add("PreDrawOpaqueRenderables", "renderblindnessflash", function()
 	local Ang = view.angles
 	Ang[2] = Ang[2] + (eyesmode == 2 and 90 or eyesmode == 1 and -90 or 0)
 	Ang[1] = eyesmode == 0 and Ang[1] or 0
-	lply.blindflash:SetFarZ(40)
+	lply.blindflash:SetFarZ(lply:HasTrait("blind") and 90 or 40)
 	lply.blindflash:SetFOV(160)
 	lply.blindflash:SetBrightness(1)
 	lply.blindflash:SetPos(view.origin)

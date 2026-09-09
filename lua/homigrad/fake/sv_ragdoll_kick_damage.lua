@@ -195,7 +195,9 @@ end
 
 -- Apply kick damage to target
 local function ApplyKickDamage(attacker, target, damage, hitPos, force, boneName, knockback)
-    if damage <= 0 then return end
+	damage = damage * (IsValid(attacker) and attacker.GetTraitMultiplier and attacker:GetTraitMultiplier("melee_damage", 1) or 1)
+	force = force * (IsValid(attacker) and attacker.GetTraitMultiplier and attacker:GetTraitMultiplier("kick_force", 1) or 1)
+	if damage <= 0 then return end
     
     -- Create damage info similar to weapon_melee
     local dmginfo = DamageInfo()

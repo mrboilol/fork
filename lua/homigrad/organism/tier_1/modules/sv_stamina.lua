@@ -7,14 +7,12 @@ local hg_infstamina = CreateConVar("hg_infstamina", "0", {FCVAR_REPLICATED, FCVA
 local min, max, Round = math.min, math.max, Round
 
 local hg_organism_stamina_sprint_mul = CreateConVar("hg_organism_stamina_sprint_mul","1",{FCVAR_ARCHIVE,FCVAR_NOTIFY,FCVAR_NEVER_AS_STRING},"Multiply stamina drain when sprinting",0,10)
-local panicattack_stamina_drain_mul = 1.35
 local low_stamina_drain_max_mul = 1.2
 local low_stamina_recovery_min_mul = 0.85
 local recent_stamina_loss_recovery_min_mul = 0.65
 local recent_stamina_loss_hold_time = 1
 local recent_stamina_loss_fade_time = 4
 local stamina_recovery_per_second = 8
-local goodmood_stamina_recovery_max_bonus = 0.25
 local anger_combat_hold_time = 6
 local anger_decay_per_second = 0.075
 --local Organism = hg.organism
@@ -30,6 +28,7 @@ function hg.organism.ConsumeStamina(org, amount)
 
 	local owner = org.owner
 	amount = amount * (IsValid(owner) and owner.StaminaExhaustMul or 1)
+	amount = amount * (IsValid(owner) and owner.GetTraitMultiplier and owner:GetTraitMultiplier("stamina_cost", 1) or 1)
 	amount = amount / (1 + math.max(org.berserk or 0, 0))
 	local stamina = org.stamina
 	local spent = math.min(stamina[1] or 0, amount)
@@ -175,6 +174,10 @@ module[2] = function(owner, org, timeValue)
 			stamina.sub = (owner:WaterLevel() >= 2 and 2 or 1) * (velLen ^ 0.5) * 1.51 
 		end
 
+		if owner.GetTraitMultiplier and (owner.hg_isJogging or owner.hg_isSprinting) then
+			stamina.sub = stamina.sub * owner:GetTraitMultiplier("sprint_stamina_cost", 1)
+		end
+
 	end
 
 
@@ -210,12 +213,9 @@ module[2] = function(owner, org, timeValue)
 	org.stamina_damage = 0
 
 	stamina.sub = stamina.sub * (owner.StaminaExhaustMul or 1)
+	stamina.sub = stamina.sub * (owner.GetTraitMultiplier and owner:GetTraitMultiplier("stamina_cost", 1) or 1)
 
 	stamina.sub = stamina.sub / (1 + org.berserk)
-
-	local goodmood = math.Clamp(org.goodmood or 0, 0, 1)
-
-
 
 	stamina.subadd = 0
 
@@ -230,9 +230,6 @@ module[2] = function(owner, org, timeValue)
 	local muffed = owner.armors and owner.armors["face"] == "mask2"
 
 	stamina.sub = stamina.sub + stamina.sub * stamina.weight * (muffed and 2 or 1)
-	if (org.panicattack or 0) >= 0.45 and org.panicattackActive and not org.otrub and not org.incapacitated then
-		stamina.sub = stamina.sub * panicattack_stamina_drain_mul
-	end
 	org.hungry = org.hungry or 0
 
 	local perfusionMoveMul = math.Clamp(org.perfusionMoveMul or 1, 0.25, 1)
@@ -241,7 +238,7 @@ module[2] = function(owner, org, timeValue)
 	local heatWeakness = math.Clamp(math.Remap(org.temperature or 36.7, 38, 41, 0, 0.65), 0, 0.65)
 	local heatStaminaMul = 1 - heatWeakness * 0.55
 	org.heatWeakness = heatWeakness
-	stamina.max = ((org.superfighter and 2 or 1) * ((stamina.range * (1 - (org.pneumothorax) / 2) + org.adrenaline * 20 ) * math.max(1 - org.hemotransfusionshock,0.2)) * math.max(1 - (org.hungry/100),0.65) * math.Clamp(0.55 + perfusionMoveMul * 0.45, 0.55, 1) * hypotensionStaminaMul + goodmood * 30) * heatStaminaMul
+	stamina.max = ((org.superfighter and 2 or 1) * ((stamina.range * (1 - (org.pneumothorax) / 2) + org.adrenaline * 20 ) * math.max(1 - org.hemotransfusionshock,0.2)) * math.max(1 - (org.hungry/100),0.65) * math.Clamp(0.55 + perfusionMoveMul * 0.45, 0.55, 1) * hypotensionStaminaMul) * heatStaminaMul
 	stamina[1] = math.min(stamina[1], stamina.max)
 	local staminaFraction = math.Clamp(stamina[1] / math.max(stamina.max, 1), 0, 1)
 	local lowStamina = 1 - staminaFraction
@@ -287,7 +284,6 @@ module[2] = function(owner, org, timeValue)
 			postureRecoveryMul = 1.25
 		end
 	end
-	local goodmoodRecoveryMul = 1 + goodmood * goodmood_stamina_recovery_max_bonus
 	local physiologyRecoveryMul = hg.organism.GetLimitingReserve(
 		(org.o2[1] or 0) / math.max(org.o2.range or 30, 1),
 		perfusionRegenMul,
@@ -297,7 +293,7 @@ module[2] = function(owner, org, timeValue)
 		org.lungsfunction and 1 or 0
 	)
 
-	stamina[1] = min(stamina[1] + stamina.regen * (stamina.regenMul or 1) * staminaRecoveryMul * recentLossRecoveryMul * timeValue * stamina_recovery_per_second * goodmoodRecoveryMul * (org.noradrenaline / 2 + 1) * (org.adrenaline / 16 + 1) * (org.satiety/700 + 1) * pulseMultiplier * postureRecoveryMul * physiologyRecoveryMul * (1 - heatWeakness * 0.65), stamina.max)
+	stamina[1] = min(stamina[1] + stamina.regen * (stamina.regenMul or 1) * staminaRecoveryMul * recentLossRecoveryMul * timeValue * stamina_recovery_per_second * (org.noradrenaline / 2 + 1) * (org.adrenaline / 16 + 1) * (org.satiety/700 + 1) * pulseMultiplier * postureRecoveryMul * physiologyRecoveryMul * (1 - heatWeakness * 0.65), stamina.max)
 	stamina.regenMul = math.Approach(stamina.regenMul or 1, 1, timeValue * (org.BlockRegenRecoverRate or 0.25))
 
 
@@ -343,6 +339,10 @@ function hg.organism.AddNaturalAdrenaline(org, fAmount)
 	if org.otrub and not org.heartstop then return end
 
 	if fAmount < 0 then return end
+	local owner = org.owner
+	if IsValid(owner) and owner.GetTraitMultiplier then
+		fAmount = fAmount * owner:GetTraitMultiplier(fAmount <= 0.5 and "trivial_adrenaline" or "combat_adrenaline", 1)
+	end
 
 	fAmount = fAmount * 0.45
 	if org.heartstop then fAmount = fAmount * 0.75 end
@@ -367,9 +367,6 @@ function hg.organism.AddNaturalAdrenaline(org, fAmount)
 
 end
 
--- Anger is a short combat-only surge using the normal adrenaline reserve.
--- Callers may provide a separate adrenaline amount so firing, landing a hit,
--- and taking serious trauma can produce different physiological responses.
 function hg.organism.RileAnger(org, amount, adrenalineAmount)
 	if not org or not org.alive or org.otrub then return end
 	amount = math.max(amount or 0, 0)
@@ -381,9 +378,6 @@ function hg.organism.RileAnger(org, amount, adrenalineAmount)
 			org.psycheAnger = org.anger
 			org.psycheAngerLastHit = CurTime()
 		end
-	end
-	if adrenalineAmount > 0 then
-		hg.organism.AddNaturalAdrenaline(org, adrenalineAmount)
 	end
 end
 

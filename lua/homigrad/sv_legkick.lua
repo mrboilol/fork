@@ -1,8 +1,9 @@
 local PLAYER = FindMetaTable("Player")
 
 local function getKickDamageMul(ply)
-    local mul = ply.MeleeDamageMul or 1
-    mul = mul * (hg.GetSubRolePerk and hg.GetSubRolePerk(ply, "MeleeDamageMul", 1) or 1)
+	local mul = ply.MeleeDamageMul or 1
+	mul = mul * (hg.GetSubRolePerk and hg.GetSubRolePerk(ply, "MeleeDamageMul", 1) or 1)
+	mul = mul * (ply.GetTraitMultiplier and ply:GetTraitMultiplier("melee_damage", 1) or 1)
 
     local org = ply.organism
     if ply:IsBerserk() and org then
@@ -231,12 +232,13 @@ function PLAYER:LegAttack()
 					MaxPenLenGlobal = 1
                     
                     local horizSpeed = Vector(velocity.x, velocity.y, 0):Length()
-                    local forceMult = math.max(500, 700 - horizSpeed / 6) * (isMidAir and 0.9 or 1) * kickNerf
+					local traitKickForce = self.GetTraitMultiplier and self:GetTraitMultiplier("kick_force", 1) or 1
+                    local forceMult = math.max(500, 700 - horizSpeed / 6) * (isMidAir and 0.9 or 1) * kickNerf * traitKickForce
                     hg.AddForceRag(ent, tr.PhysicsBone or 0, normal * dmg * forceMult, 0.25)
                     ent:TakeDamageInfo(dmginfo)
                     
                     if IsValid(phys) then
-                        local forceOffsetMult = math.max(110, 150 - horizSpeed / 70) * (isMidAir and 0.9 or 1) * kickNerf
+						local forceOffsetMult = math.max(110, 150 - horizSpeed / 70) * (isMidAir and 0.9 or 1) * kickNerf * traitKickForce
                         phys:ApplyForceOffset(normal * dmg * forceOffsetMult, tr.HitPos)
                     end
 

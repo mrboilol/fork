@@ -34,8 +34,9 @@ local CURBSTOMP_HEAD_STOMPS_TO_POP = 7
 local CURBSTOMP_HEAD_RESET = 8
 
 local function getKickDamageMul(ply)
-    local mul = ply.MeleeDamageMul or 1
-    mul = mul * (hg.GetSubRolePerk and hg.GetSubRolePerk(ply, "MeleeDamageMul", 1) or 1)
+	local mul = ply.MeleeDamageMul or 1
+	mul = mul * (hg.GetSubRolePerk and hg.GetSubRolePerk(ply, "MeleeDamageMul", 1) or 1)
+	mul = mul * (ply.GetTraitMultiplier and ply:GetTraitMultiplier("melee_damage", 1) or 1)
 
     local org = ply.organism
     if ply:IsBerserk() and org then
@@ -389,6 +390,10 @@ function PLAYER:LegAttack()
                         ragForceMul = DROP_KICK_RAG_FORCE_MUL
                         playerPush = DROP_KICK_PLAYER_PUSH
                     end
+					local traitKickForce = self.GetTraitMultiplier and self:GetTraitMultiplier("kick_force", 1) or 1
+					ragForceMul = ragForceMul * traitKickForce
+					propForceMul = propForceMul * traitKickForce
+					playerPush = playerPush * traitKickForce
                     local force = normal * hitDmg * ragForceMul
 
                     dmginfo:SetDamageForce(force)

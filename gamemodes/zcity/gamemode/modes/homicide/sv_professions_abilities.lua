@@ -38,7 +38,7 @@ hook.Add("HG_PlayerFootstep_Notify", "HMCD_Professions_Abilities", function(ply,
 			local recepients = {}
 			
 			for _, recepient_ply in player.Iterator() do
-				if(recepient_ply.Profession == "huntsman" and recepient_ply != ply)then
+				if((recepient_ply.Profession == "huntsman" or recepient_ply:HasTrait("hunter")) and recepient_ply != ply)then
 					recepients[#recepients+1] = recepient_ply
 				end
 			end

@@ -1230,6 +1230,7 @@ function SWEP:MultiplyDMG(owner, ent, vellen, mul)
     mul = mul * math.Clamp(vellen / 250, 0.9, 1.25)
 	mul = mul * (ent ~= owner and 0.75 or 1)
 	mul = mul * (owner.MeleeDamageMul or 1)
+	mul = mul * (owner.GetTraitMultiplier and owner:GetTraitMultiplier("melee_damage", 1) or 1)
 
     if owner.organism.superfighter then
         mul = mul * 5

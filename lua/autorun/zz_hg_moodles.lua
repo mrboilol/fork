@@ -165,16 +165,22 @@ local moodleTexts = {
 		[4] = {title = "Cardiac Arrest", description = "Your heart has stopped producing effective circulation."},
 	}},
 	low_blood = {levels = {
-		[1] = {title = "Low Blood Pressure", description = "Your pulse or blood pressure is slightly below normal."},
-		[2] = {title = "Hypotension", description = "Reduced circulation is causing weakness and lightheadedness."},
-		[3] = {title = "Severe Hypotension", description = "Your circulation is dangerously weak."},
-		[4] = {title = "Critical Hypotension", description = "Your circulation may no longer sustain your vital organs."},
+		[1] = {title = "Low Circulation", description = "Your pulse or blood pressure is slightly below normal."},
+		[2] = {title = "Slow Pulse or Hypotension", description = "A slow pulse or reduced blood pressure is causing weakness and lightheadedness."},
+		[3] = {title = "Severe Low Circulation", description = "Your pulse or blood pressure is dangerously low."},
+		[4] = {title = "Critical Low Circulation", description = "Your circulation may no longer sustain your vital organs."},
 	}},
 	high_blood = {levels = {
-		[1] = {title = "Elevated Circulation", description = "Your pressure or pulse is slightly above normal."},
-		[2] = {title = "High Blood Pressure", description = "Your cardiovascular system is under noticeable strain."},
-		[3] = {title = "Severe Hypertension", description = "Dangerous pressure is stressing your heart and blood vessels."},
-		[4] = {title = "Hypertensive Crisis", description = "Extreme pressure threatens immediate organ and vessel damage."},
+		[1] = {title = "Elevated Circulation", description = "Your pulse or blood pressure is slightly above normal."},
+		[2] = {title = "Fast Pulse or Hypertension", description = "A fast pulse or high blood pressure is straining your cardiovascular system."},
+		[3] = {title = "Severe High Circulation", description = "Your pulse or blood pressure is dangerously high."},
+		[4] = {title = "Critical High Circulation", description = "Extreme pulse or pressure threatens immediate organ and vessel damage."},
+	}},
+	hypovolemia = {levels = {
+		[1] = {title = "Mild Blood Loss", description = "Your circulating blood volume is below normal."},
+		[2] = {title = "Hypovolemia", description = "Blood loss is reducing the volume available to your circulation."},
+		[3] = {title = "Severe Hypovolemia", description = "Your blood volume is critically low and requires urgent replacement."},
+		[4] = {title = "Critical Hypovolemia", description = "Massive blood loss is no longer compatible with stable circulation."},
 	}},
 	no_eye = {levels = {
 		[1] = {title = "Dazzled", description = "Bright light has temporarily impaired your vision."},
@@ -365,6 +371,12 @@ local moodleTexts = {
 local function getMoodle3Material(name)
 	if moodle3Icons[name] == nil then
 		local mat
+		local function firstValidMaterial(paths)
+			for _, path in ipairs(paths) do
+				local candidate = Material(path, "smooth")
+				if candidate and not candidate:IsError() then return candidate end
+			end
+		end
 		-- Zerlked lives in the dedicated Moodle 3 asset folder used by the
 		-- content pack. Keep the legacy path as a fallback for older installs.
 		if name == "zerlked" then
@@ -378,7 +390,16 @@ local function getMoodle3Material(name)
 				mat = Material("vgui/hud/moodles 3/panic.png", "smooth")
 			end
 		else
-			mat = Material("vgui/hud/moodles 3/" .. name .. ".png", "smooth")
+			local alternateName = name
+			if string.StartWith(name, "blood-loss") then
+				alternateName = "blod-loss" .. string.sub(name, #"blood-loss" + 1)
+			end
+			mat = firstValidMaterial({
+				"vgui/moodles 3/" .. name .. ".png",
+				"vgui/moodles 3/" .. alternateName .. ".png",
+				"vgui/hud/moodles 3/" .. name .. ".png",
+				"vgui/hud/moodles 3/" .. alternateName .. ".png",
+			})
 		end
 		moodle3Icons[name] = mat and not mat:IsError() and mat or false
 	end
@@ -395,7 +416,7 @@ local function getMoodle3IconName(effect)
 		stamina = "exertion", exertion = "exertion", bleeding = level == 1 and "bleeding" or "bleeding" .. level,
 		carbon_monoxide = "hypoxemia", arrhythmia = "arrhythmia", palpitations = "fibrilation", fibrillation = "fibrilation",
 		hypoxemia = "hypoxemia", brain_hypoxia = "brain-hypoxia", brain_dying = "brain-dying", asystole = "heart-failure",
-		low_blood = "hypotension", high_blood = "hypertension", no_eye = "last-stand", blinded = "confused",
+		low_blood = "hypotension", high_blood = "hypertension", hypovolemia = level == 1 and "blood-loss" or "blood-loss" .. level, no_eye = "last-stand", blinded = "confused",
 		brain_bleed = "brain-hemorrhage", intracranial_pressure = "terror",
 		weakness = "encumbered", bradypnea = "dyspnea", thorax = "hemothorax",
 		respiratory_arrest = "respiratory-arrest", skull = "terror",
@@ -591,8 +612,6 @@ local function buildEffects(ply, org)
 		end
 	end
 
-	local goodmood = math.Clamp(orgNumber(org, "goodmood", 0), 0, 1)
-	if goodmood > 0 then add(effects, "happy", "happy", math.ceil(goodmood * 4), "good", 15, math.floor(goodmood * 100) .. "%") end
 	if org.berserkActive2 == true then add(effects, "rage", "rage", 4, "bad", -90) end
 	local hungry = math.Clamp(orgNumber(org, "hungry", 0), 0, 100)
 	local satiety = math.Clamp(orgNumber(org, "satiety", 0), 0, 100)
@@ -671,9 +690,20 @@ local function buildEffects(ply, org)
 		add(effects, "low_blood", level >= 3 and "superlowblood" or "lowblood", level, "bad", 27, math.floor(pulse) .. " bpm / " .. pressure .. " MAP")
 	end
 	local hypertension = math.Clamp(orgNumber(org, "hypertension", 0), 0, 1)
-	if not org.heartstop and hypertension > 0 then
-		local level = math.Clamp(math.ceil(hypertension * 4), 1, 4)
-		add(effects, "high_blood", "highblood", level, "bad", 28)
+	local highPulseSeverity = math.Clamp((pulse - 100) / 80, 0, 1)
+	local highCirculationSeverity = math.max(highPulseSeverity, hypertension)
+	if not org.heartstop and (pulse > 100 or hypertension > 0.01) then
+		local level = highRank(math.max(highCirculationSeverity, 0.1), {0.1, 0.3, 0.6, 0.85})
+		local pressure = math.floor(math.max(orgNumber(org, "bloodPressure", 0), 0))
+		add(effects, "high_blood", "highblood", level, "bad", 28, math.floor(pulse) .. " bpm / " .. pressure .. " MAP")
+	end
+
+	local normalBloodVolume = math.max(tonumber(hg and hg.organism and hg.organism.config and hg.organism.config.NORMAL_BLOOD_VOLUME_ML) or tonumber(hg and hg.organism and hg.organism.normalBloodVolume) or 5000, 1)
+	local bloodVolume = math.Clamp(orgNumber(org, "blood", normalBloodVolume), 0, normalBloodVolume)
+	local bloodLossSeverity = 1 - bloodVolume / normalBloodVolume
+	if bloodLossSeverity >= 0.1 then
+		local level = highRank(bloodLossSeverity, {0.1, 0.25, 0.4, 0.55})
+		add(effects, "hypovolemia", "blood-loss", level, "bad", 26, math.floor(bloodVolume) .. " ml")
 	end
 
 	local flash = number(amtflashed, 0)
@@ -777,15 +807,6 @@ local function buildEffects(ply, org)
 		add(effects, "internal_bleed", "internalbleed", level, "bad", 39, math.Round(internalBleed, 2))
 	end
 
-	local panic = math.Clamp(orgNumber(org, "panicattack", 0), 0, 1)
-	if org.panicattackActive == true then
-		add(effects, "panic", "panicmaxxing", org.panicattackActive and 4 or highRank(panic, {0.1, 0.35, 0.6, 0.85}), "bad", 40, math.floor(panic * 100) .. "%")
-	end
-	local fear = math.Clamp(orgNumber(org, "fear", 0), 0, 1)
-	if fear > 0.1 then
-		add(effects, "fear", "trauma", highRank(fear, {0.1, 0.35, 0.6, 0.85}), "bad", 39.5, math.floor(fear * 100) .. "%")
-	end
-
 	local tinnitusTime = math.max(number(ply.tinnitus, 0) - CurTime(), 0)
 	local temporalDamage = orgNumber(org, "brainTemporal", 0)
 	if tinnitusTime > 0 or temporalDamage > 0.1 then
@@ -839,8 +860,6 @@ local function buildEffects(ply, org)
 		local mood = (zerlkers >= 2 or zerlkersOverdose > 0) and "bad" or "good"
 		add(effects, "zerlked", "zerlked", math.Clamp(math.ceil(zerlkers * 4), 1, 4), mood, 10.5, math.ceil(zerlkers * 120) .. "s")
 	end
-	local anger = math.Clamp(orgNumber(org, "anger", 0), 0, 1)
-	if anger > 0.01 then add(effects, "anger", "anger", math.ceil(anger * 4), "good", 14, math.floor(anger * 100) .. "%") end
 	local armorCount = countEntries(ply:GetNetVar("Armor", {}) or {})
 	if armorCount > 0 then add(effects, "armored", "armored", armorCount >= 2 and 4 or 2, "good", 16, armorCount) end
 

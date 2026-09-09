@@ -71,8 +71,5 @@ function hg.MedicalMinigame.GetArmSpeedMultiplier(ply)
 end
 
 function hg.MedicalMinigame.GetBandageEaseMultiplier(ply)
-    local org = IsValid(ply) and ply.organism
-    local goodmood = org and math.Clamp(tonumber(org.goodmood) or 0, 0, 1) or 0
-
-    return 1 + goodmood * 0.35
+    return 1
 end

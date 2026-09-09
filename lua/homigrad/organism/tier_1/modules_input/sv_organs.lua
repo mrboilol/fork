@@ -4,6 +4,8 @@ local function isCrush(dmgInfo)
 end
 
 local function damageOrgan(org, dmg, dmgInfo, key)
+	local owner = org.owner
+	if IsValid(owner) and owner.GetTraitMultiplier then dmg = dmg * owner:GetTraitMultiplier("organ_damage", 1) end
 	dmg = dmg / math.max(org.organStrengthMul or 1, 1)
 	local prot = math.max(0.3 - org[key],0)
 	local oldval = org[key]
@@ -26,6 +28,8 @@ local function addPain(org, amount, region)
 end
 local function addInternalBleed(org, amount, organ)
 	if amount <= 0 then return end
+	local owner = org.owner
+	if IsValid(owner) and owner.GetTraitMultiplier then amount = amount * owner:GetTraitMultiplier("internal_bleed", 1) end
 	org.internalBleed = org.internalBleed + amount
 end
 
@@ -386,6 +390,8 @@ local function getStaminaMul(dmgInfo)
 end
 
 hitArtery = function(artery, org, dmg, dmgInfo, boneindex, dir, hit, impact, forceRupture)
+	local owner = org.owner
+	if IsValid(owner) and owner.GetTraitMultiplier then dmg = dmg * owner:GetTraitMultiplier("artery_damage", 1) end
 	if isCrush(dmgInfo) then return 1 end
 	if not forceRupture and dmgInfo:IsDamageType(DMG_BLAST) then
 		local ruptureChance = math.Clamp((dmg - 0.35) * 0.45, 0, 0.75)

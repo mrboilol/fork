@@ -34,7 +34,10 @@ hg.organism.bloodtypes = {
 }
 
 module[1] = function(org)
-	org.blood = hg.organism.normalBloodVolume or 5000
+	local owner = org.owner
+	local bloodCapacity = (hg.organism.normalBloodVolume or 5000) + (IsValid(owner) and owner.GetTraitBonus and owner:GetTraitBonus("blood_capacity", 0) or 0)
+	org.maxblood = math.max(bloodCapacity, 1)
+	org.blood = org.maxblood
 	org.bleed = 0
 	org.venousBleed = 0
 	org.arterialBleed = 0
@@ -362,6 +365,9 @@ local function getBleedingBody(owner)
 end
 
 module[2] = function(owner, org, mulTime)
+	local bloodCapacity = (hg.organism.normalBloodVolume or 5000) + (owner:IsPlayer() and owner.GetTraitBonus and owner:GetTraitBonus("blood_capacity", 0) or 0)
+	org.maxblood = math.max(bloodCapacity, 1)
+	org.blood = math.min(org.blood or org.maxblood, org.maxblood)
 	local adrenaline = math.Clamp(org.adrenaline or 0, 0, 2)
 	local isPlayer = owner:IsPlayer()
 	local now = CurTime()
@@ -377,6 +383,11 @@ module[2] = function(owner, org, mulTime)
 	org.coagulation_multiplier = tonumber(org.coagulation_multiplier) or 1.2
 	org.blood_regeneration_multiplier = tonumber(org.blood_regeneration_multiplier) or 1.2
 	org.bleedingmul = tonumber(org.bleedingmul) or 1
+	if owner:IsPlayer() and owner.GetTraitMultiplier then
+		org.coagulation_multiplier = org.coagulation_multiplier * owner:GetTraitMultiplier("clotting", 1)
+		org.blood_regeneration_multiplier = org.blood_regeneration_multiplier * owner:GetTraitMultiplier("blood_regeneration", 1)
+		org.bleedingmul = org.bleedingmul * owner:GetTraitMultiplier("bleeding", 1)
+	end
 	local hemostaticTreatment, txaHemostasis, internalHemostasis = getHemostaticTreatmentDrive(org)
 	org.hemostaticTreatment = hemostaticTreatment
 
@@ -410,7 +421,7 @@ module[2] = function(owner, org, mulTime)
 	if org.internalBleed < 0.5 and org.bleed <= 0 and org.pulse > 5 then
 		local regenRate = (hg.organism.config and hg.organism.config.BLOOD_REGEN_RATE_ML_S) or 4
 		local regenerationMul = math.Clamp(tonumber(org.blood_regeneration_multiplier) or 1, 0.1, 2)
-		org.blood = min(org.blood + mulTime * regenRate * regenerationMul, hg.organism.normalBloodVolume or 5000)
+		org.blood = min(org.blood + mulTime * regenRate * regenerationMul, org.maxblood)
 	end
 
 	local totalAdrenaline = (org.adrenaline or 0) + (org.noradrenaline or 0)
@@ -508,7 +519,7 @@ module[2] = function(owner, org, mulTime)
 		or math.Clamp(blood / (hg.organism.normalBloodVolume or 5000), 0, 1)
 	local reserveLoss = 1 - preloadReserve
 	local criticalReserve = math.Clamp((hg.organism.config and hg.organism.config.CRITICAL_CIRCULATION_RESERVE) or 0.31, 0.1, 0.95)
-	local normalBlood = math.max((hg.organism.config and hg.organism.config.NORMAL_BLOOD_VOLUME_ML) or 5000, 1)
+	local normalBlood = math.max(org.maxblood or (hg.organism.config and hg.organism.config.NORMAL_BLOOD_VOLUME_ML) or 5000, 1)
 	local rawLossFraction = math.Clamp(1 - blood / normalBlood, 0, 1)
 	-- Subtle weakness begins with the first real loss. Catastrophic shock is still
 	-- derived below from preload reserve, so this does not create an early death band.
@@ -699,6 +710,7 @@ module[2] = function(owner, org, mulTime)
 	internalClotMaturity = math.max(internalClotMaturity, hemostaticTreatment * 0.92)
 	local naturalHeal = mulTime / (canHealInternalBleed and 150 or 300) * internalClotMaturity
 	naturalHeal = naturalHeal * (1 + txaHemostasis * 8 + internalHemostasis * 4)
+	if owner:IsPlayer() and owner.GetTraitMultiplier then naturalHeal = naturalHeal * owner:GetTraitMultiplier("internal_bleed_recovery", 1) end
 	local treatmentHeal = 0
 	if internalBleedHeal > 0 then
 		local treatmentRate = math.Clamp(0.35 + internalBleedHeal * 0.15, 0.35, 1.1)

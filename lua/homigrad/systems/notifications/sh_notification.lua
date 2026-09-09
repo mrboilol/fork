@@ -343,8 +343,8 @@ if CLIENT then
 		if tbl and istable(tbl) and not table.IsEmpty(tbl) then
 			local msg, time, timeshow, clr = tbl[1], tbl[2], tbl[3], tbl[4]
 
-			local mul = (org.brain > 0.1 and 3 or 1)// * (org.fear > 0 and math.max(1 - org.fear, 0.6) or 1)
-			local time_one_symbol = 0.06 * mul//(lply.organism and lply.organism.fear >= 0.5 and 0.5 or 1)
+			local mul = org.brain > 0.1 and 3 or 1
+			local time_one_symbol = 0.06 * mul
 			local time_to_read = (utf8.len(msg) * time_one_symbol)
 			local wait = math.Clamp(time_to_read / 3 * math.Clamp(1 - #hg.notifications / 1, 0.25, 1), 1, 4) + timeshow
 
