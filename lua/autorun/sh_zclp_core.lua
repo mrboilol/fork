@@ -4,7 +4,7 @@ ZCLP.Version = "1.0.0"
 ZCLP.UniqueId = "zcity_loadout_presets_subaddon"
 ZCLP.MaxPresets = 40
 ZCLP.MaxNameLength = 48
-ZCLP.MenuIcon = "zcity_loadout_presets/icon.png"
+ZCLP.MenuIcon = "vgui/blasphemy/rifle.vtf"
 
 ZCLP.Langs = {
     en = {
