@@ -264,6 +264,13 @@ SWEP.SilentPlantSound = "panoptisscon/phone_query.mp3"
 SWEP.SilentPlantSoundLevel = 30
 SWEP.CombinedPlantSoundLevel = 45
 SWEP.NormalPlantSound = "snd_jack_hmcd_bombrig.ogg"
+SWEP.SelfDetonationSounds = {
+	"snd_jack_hmcd_jihad1.ogg",
+	"snd_jack_hmcd_jihad2.ogg",
+	"snd_jack_hmcd_jihad3.ogg"
+}
+SWEP.SelfDetonationSoundLevel = 75
+SWEP.SelfDetonationSoundFallbackDuration = 2
 SWEP.SilentPlantTime = 3.5
 SWEP.InsidePlantTime = 5
 SWEP.CombinedPlantTime = 7
@@ -576,6 +583,12 @@ local function StartIEDDetonation(self, ent)
 	if self:GetDialing() then return end
 
 	local delay = GetIEDDialDelay(self, ent)
+	if self.IEDSelfImplanted and IsValid(ent) then
+		local sounds = self.SelfDetonationSounds or SWEP.SelfDetonationSounds
+		local soundName = sounds[math.random(#sounds)]
+		ent:EmitSound(soundName, self.SelfDetonationSoundLevel or SWEP.SelfDetonationSoundLevel, 100, 1, CHAN_AUTO)
+		delay = math.max(delay, SoundDuration(soundName), self.SelfDetonationSoundFallbackDuration or SWEP.SelfDetonationSoundFallbackDuration)
+	end
 
 	self:SetDialing(true)
 	self:SetDestroyed(false)
@@ -1122,7 +1135,6 @@ if SERVER then
 		self.Planted = true
 		self:SetPlanted(true)
 		owner:EmitSound(self.NormalPlantSound, 60, 100, 1, CHAN_AUTO)
-		owner:EmitSound("snd_jack_hmcd_jihad" .. math.random(1, 3) .. ".ogg", 75, 100, 1, CHAN_AUTO)
 		self.nextattackhuy = CurTime() + 2
 		self:SetNextPrimaryFire(CurTime() + 2)
 	end

@@ -464,8 +464,14 @@ function SWEP:Initialize()
 	self:InitializePost()
 end
 
+SWEP.ImpactMisfireChance = 15
+SWEP.ImpactMisfireMinSpeed = 200
+
 function SWEP:TryDropMisfire(chance, speed, force)
-	if !self.CantFireFromCollision and (force or !self.lastshotfromhit or (self.lastshotfromhit + 0.5 < CurTime())) and (force or speed > 250) and (force or math.random(chance or 45) == 1) then
+	local impactChance = math.max(math.floor(chance or self.ImpactMisfireChance or 15), 1)
+	local minimumSpeed = self.ImpactMisfireMinSpeed or 200
+
+	if !self.CantFireFromCollision and (force or !self.lastshotfromhit or (self.lastshotfromhit + 0.5 < CurTime())) and (force or speed > minimumSpeed) and (force or math.random(impactChance) == 1) then
 		if self.Clip1 and self:Clip1() <= 0 then return end
 		if self.Shoot then self:Shoot(true) else self:PrimaryAttack() end
 		if SERVER and self.Shoot then
@@ -480,7 +486,7 @@ function SWEP:TryDropMisfire(chance, speed, force)
 end
 
 function SWEP:PhysicsCollide(ent, data)
-	self:TryDropMisfire(45, data.Speed)
+	self:TryDropMisfire(nil, data.Speed)
 end
 
 SWEP.WepSelectIcon2 = Material("null")
