@@ -1,0 +1,181 @@
+require("tests.gmod_mock")
+
+-- Load the UTF-8 module
+dofile("lua/homigrad/libraries/core/sh_utf8.lua")
+
+-- Helper: build multi-byte UTF-8 strings using string.char (Lua 5.1 compatible)
+local function utf8_e_acute() return string.char(0xC3, 0xA9) end       -- é (2 bytes)
+local function utf8_n_tilde() return string.char(0xC3, 0xB1) end       -- ñ (2 bytes)
+local function utf8_zhong() return string.char(0xE4, 0xB8, 0xAD) end   -- 中 (3 bytes)
+local function utf8_wen() return string.char(0xE6, 0x96, 0x87) end     -- 文 (3 bytes)
+local function utf8_zi() return string.char(0xE5, 0xAD, 0x97) end      -- 字 (3 bytes)
+local function utf8_emoji() return string.char(0xF0, 0x9F, 0x98, 0x80) end -- 😀 (4 bytes)
+
+describe("UTF-8 string library", function()
+
+    describe("string.utf8bytes", function()
+        it("returns 1 for ASCII characters", function()
+            assert.are.equal(1, string.utf8bytes("A", 1))
+            assert.are.equal(1, string.utf8bytes("z", 1))
+            assert.are.equal(1, string.utf8bytes("0", 1))
+            assert.are.equal(1, string.utf8bytes(" ", 1))
+        end)
+
+        it("returns 2 for 2-byte characters", function()
+            assert.are.equal(2, string.utf8bytes(utf8_e_acute(), 1))
+            assert.are.equal(2, string.utf8bytes(utf8_n_tilde(), 1))
+        end)
+
+        it("returns 3 for 3-byte characters", function()
+            assert.are.equal(3, string.utf8bytes(utf8_zhong(), 1))
+        end)
+
+        it("returns 4 for 4-byte characters", function()
+            assert.are.equal(4, string.utf8bytes(utf8_emoji(), 1))
+        end)
+
+        it("defaults i to 1", function()
+            assert.are.equal(1, string.utf8bytes("A"))
+        end)
+
+        it("errors on invalid first byte", function()
+            assert.has_error(function()
+                string.utf8bytes(string.char(0xFF), 1)
+            end)
+        end)
+
+        it("errors on truncated 2-byte sequence", function()
+            assert.has_error(function()
+                string.utf8bytes(string.char(0xC3), 1)
+            end)
+        end)
+
+        it("errors on truncated 3-byte sequence", function()
+            assert.has_error(function()
+                string.utf8bytes(string.char(0xE4, 0xB8), 1)
+            end)
+        end)
+
+        it("errors on non-string input", function()
+            assert.has_error(function()
+                string.utf8bytes(123)
+            end)
+        end)
+
+        it("errors on non-number index", function()
+            assert.has_error(function()
+                string.utf8bytes("hello", "abc")
+            end)
+        end)
+    end)
+
+    describe("string.utf8len", function()
+        it("returns 0 for empty string", function()
+            assert.are.equal(0, string.utf8len(""))
+        end)
+
+        it("returns correct length for ASCII", function()
+            assert.are.equal(5, string.utf8len("hello"))
+            assert.are.equal(1, string.utf8len("A"))
+        end)
+
+        it("counts multi-byte characters as single characters", function()
+            -- "café" = c, a, f, é (4 chars, 5 bytes)
+            local s = "caf" .. utf8_e_acute()
+            assert.are.equal(4, string.utf8len(s))
+        end)
+
+        it("counts CJK characters correctly", function()
+            -- 3 CJK chars (9 bytes)
+            local s = utf8_zhong() .. utf8_wen() .. utf8_zi()
+            assert.are.equal(3, string.utf8len(s))
+        end)
+
+        it("counts mixed ASCII and multibyte", function()
+            local s = "H" .. utf8_e_acute()
+            assert.are.equal(2, string.utf8len(s))
+        end)
+
+        it("errors on non-string input", function()
+            assert.has_error(function()
+                string.utf8len(42)
+            end)
+        end)
+    end)
+
+    describe("string.utf8sub", function()
+        it("extracts ASCII substring", function()
+            assert.are.equal("ell", string.utf8sub("hello", 2, 4))
+        end)
+
+        it("extracts from start", function()
+            assert.are.equal("hel", string.utf8sub("hello", 1, 3))
+        end)
+
+        it("extracts to end with negative j", function()
+            assert.are.equal("llo", string.utf8sub("hello", 3, -1))
+        end)
+
+        it("handles negative indices", function()
+            assert.are.equal("lo", string.utf8sub("hello", -2, -1))
+        end)
+
+        it("returns empty for reversed range", function()
+            assert.are.equal("", string.utf8sub("hello", 4, 2))
+        end)
+
+        it("works with multibyte characters", function()
+            -- "café" = c(1), a(2), f(3), é(4)
+            local s = "caf" .. utf8_e_acute()
+            assert.are.equal("af", string.utf8sub(s, 2, 3))
+        end)
+
+        it("extracts multibyte character", function()
+            local s = "caf" .. utf8_e_acute()
+            assert.are.equal(utf8_e_acute(), string.utf8sub(s, 4, 4))
+        end)
+
+        it("errors on non-string input", function()
+            assert.has_error(function()
+                string.utf8sub(42, 1, 2)
+            end)
+        end)
+
+        it("errors on non-number i", function()
+            assert.has_error(function()
+                string.utf8sub("hello", "a", 2)
+            end)
+        end)
+    end)
+
+    describe("string.utf8reverse", function()
+        it("reverses ASCII string", function()
+            assert.are.equal("olleh", string.utf8reverse("hello"))
+        end)
+
+        it("reverses empty string", function()
+            assert.are.equal("", string.utf8reverse(""))
+        end)
+
+        it("reverses single character", function()
+            assert.are.equal("A", string.utf8reverse("A"))
+        end)
+
+        it("reverses multibyte characters correctly", function()
+            local s = "a" .. utf8_e_acute()
+            local rev = string.utf8reverse(s)
+            assert.are.equal(utf8_e_acute() .. "a", rev)
+        end)
+
+        it("double reverse returns original", function()
+            local s = "caf" .. utf8_e_acute()
+            assert.are.equal(s, string.utf8reverse(string.utf8reverse(s)))
+        end)
+
+        it("errors on non-string input", function()
+            assert.has_error(function()
+                string.utf8reverse(42)
+            end)
+        end)
+    end)
+end)
