@@ -314,6 +314,10 @@ chromaticMat = Material("effects/shaders/merc_chromaticaberration")
 blindMat = Material("effects/shaders/zb_blind")
 zombMat = grainMat -- Material("effects/shaders/zb_zomb")
 
+local function HasBlindTrait()
+	return IsValid(lply) and lply:HasTrait("blind")
+end
+
 local PainLerp = 0
 local painThresholdIntensityLerp = 1
 local PanicAttackLerp = 0
@@ -1090,7 +1094,7 @@ drawFinalVitalsVignettes = function()
 			chromaticMat:SetInt("$c0_y", 1)
 			render.SetMaterial(chromaticMat)
 			render.DrawScreenQuad()
-			if motionBlurCause > 0.06 then
+			if not HasBlindTrait() and motionBlurCause > 0.06 then
 				DrawMotionBlur(0.004 + motionBlurCause * 0.02, (collapseVisualLerp * 0.08 + blink * 0.05) * motionBlurCause, 0.014)
 			end
 		end
@@ -1188,7 +1192,7 @@ drawFinalVitalsVignettes = function()
 		render.SetMaterial(chromaticMat)
 		render.DrawScreenQuad()
 
-		if oxygenWarp > 0.08 and motionBlurCause > 0.06 then
+		if not HasBlindTrait() and oxygenWarp > 0.08 and motionBlurCause > 0.06 then
 			DrawMotionBlur(0.004 + motionBlurCause * 0.016, (0.018 + oxygenWarp * 0.1 + oxygenFlicker * 0.045) * motionBlurCause, 0.018)
 		end
 	end
@@ -1362,7 +1366,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		adrenalineVisualLerp = math.Approach(adrenalineVisualLerp, 0, FrameTime() * 0.45)
     end
 
-    if blurAmount > 0 then
+    if not HasBlindTrait() and blurAmount > 0 then
         DrawToyTown(blurAmount, ScrH() / 2)
     end
 
@@ -1373,7 +1377,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		render.UpdateScreenEffectTexture()
 		render.UpdateFullScreenDepthTexture()
 
-		blindMat:SetFloat("$c0_x", 5)
+		blindMat:SetFloat("$c0_x", HasBlindTrait() and 14 or 5)
 		blindMat:SetFloat("$c0_y", CurTime())
 		blindMat:SetFloat("$c0_z", eyesmode)
 
@@ -1888,7 +1892,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		shock = shockLerp
 
 		if org.otrub then
-			DrawMotionBlur(0.1, 1, 0.01)
+			if not HasBlindTrait() then DrawMotionBlur(0.1, 1, 0.01) end
 			lply:ScreenFade(SCREENFADE.IN, Color(0, 0, 0), 2, 0.5)
 		end
 
@@ -2030,7 +2034,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	end
 
 	disorientationFxLerp = LerpFT(disorientation > (disorientationFxLerp or 0) and 0.35 or 0.025, disorientationFxLerp or 0, math.max(disorientation, concussion * 0.65))
-	if lply:Alive() and not org.otrub and disorientationFxLerp > 1.2 then
+	if lply:Alive() and not HasBlindTrait() and not org.otrub and disorientationFxLerp > 1.2 then
 		local blurPower = math.Clamp((disorientationFxLerp - 1.2) / 7.5, 0, 1)
 		DrawMotionBlur(0.08 + blurPower * 0.12, 0.45 + blurPower * 1.25, 0.01)
 		if blurPower > 0.35 then
@@ -2076,7 +2080,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		if show_some_images_time > 0 then
 			show_some_images_time = show_some_images_time - 1
 
-			DrawMotionBlur(0.035 + brainTrauma * 0.065, 0.22 + brainTrauma * 0.5, 0.018)
+			if not HasBlindTrait() then DrawMotionBlur(0.035 + brainTrauma * 0.065, 0.22 + brainTrauma * 0.5, 0.018) end
 			local flashRoll = math.max(math.floor(18 * (1 - brainTrauma)), 1)
 			if show_image_time <= 0 and math.random(flashRoll) < 2 then
 				show_image_time = 95 * math.Rand(0.12, 1) * (math.random(2) == 1 and 0.1 or 1)
@@ -2720,14 +2724,14 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		render.DrawScreenQuad()
 
 		-- Motion blur disorientation
-		if suicideLerp > 0.15 then
+		if not HasBlindTrait() and suicideLerp > 0.15 then
 			local blurAlpha = 0.1 + suicideLerp * 0.15
 			local blurDraw = suicideLerp * 1.5
 			DrawMotionBlur(blurAlpha, blurDraw, 0.001)
 		end
 
 		-- ToyTown blur at high intensity
-		if suicideLerp > 0.4 then
+		if not HasBlindTrait() and suicideLerp > 0.4 then
 			DrawToyTown((suicideLerp - 0.4) * 2.5, ScrH() / 2)
 		end
 
@@ -2942,7 +2946,7 @@ hook.Add("Post Pre Post Processing", "BrainLobeEffects", function()
 		render.DrawScreenQuad()
 	end
 
-	if parietal > 0.01 then
+	if not HasBlindTrait() and parietal > 0.01 then
 		DrawMotionBlur(0.025 + parietal * 0.08, 0.35 + parietal * 0.55, 0.015 + parietal * 0.09)
 		DrawSharpen(parietal * 0.8, parietal * 1.4)
 	end
@@ -3131,6 +3135,72 @@ local function removeflash()
 	end
 end
 
+local blindEchoPings = {}
+local blindEchoMaterial = Material("sprites/light_ignorez")
+
+hook.Add("EntityEmitSound", "HGTraitsBlindEcholocation", function(data)
+	if not HasBlindTrait() then return end
+
+	local source = data.Entity
+	if source == lply or (data.Volume or 1) <= 0.08 then return end
+
+	local pos = data.Pos
+	if not isvector(pos) then
+		if not IsValid(source) then return end
+		pos = source:WorldSpaceCenter()
+	end
+
+	local distanceSqr = pos:DistToSqr(lply:EyePos())
+	if distanceSqr > 2500 ^ 2 then return end
+
+	local power = math.Clamp(((data.SoundLevel or 75) / 100) * (data.Volume or 1), 0.25, 1)
+	local duration = Lerp(power, 0.45, 1.2)
+	local now = CurTime()
+
+	for i = #blindEchoPings, 1, -1 do
+		local ping = blindEchoPings[i]
+		if ping.pos:DistToSqr(pos) <= 96 ^ 2 then
+			ping.power = math.max(ping.power, power)
+			ping.expires = now + duration
+			ping.duration = duration
+			return
+		end
+	end
+
+	blindEchoPings[#blindEchoPings + 1] = {pos = pos, power = power, expires = now + duration, duration = duration}
+	if #blindEchoPings > 16 then table.remove(blindEchoPings, 1) end
+end)
+
+hook.Add("HUDPaint", "HGTraitsBlindEcholocation", function()
+	if not HasBlindTrait() then
+		table.Empty(blindEchoPings)
+		return
+	end
+
+	local now = CurTime()
+	local margin = math.min(ScrW(), ScrH()) * 0.05
+	for i = #blindEchoPings, 1, -1 do
+		local ping = blindEchoPings[i]
+		local remaining = ping.expires - now
+		if remaining <= 0 then
+			table.remove(blindEchoPings, i)
+		else
+			local progress = 1 - remaining / ping.duration
+			local screen = ping.pos:ToScreen()
+			local x = math.Clamp(screen.x, margin, ScrW() - margin)
+			local y = math.Clamp(screen.y, margin, ScrH() - margin)
+			local size = 18 + progress * 80 * ping.power
+			local alpha = math.floor(255 * remaining / ping.duration)
+
+			surface.SetMaterial(blindEchoMaterial)
+			surface.SetDrawColor(130, 220, 255, alpha)
+			surface.DrawTexturedRect(x - size / 2, y - size / 2, size, size)
+			surface.SetDrawColor(210, 245, 255, alpha)
+			surface.DrawOutlinedRect(x - size / 2, y - size / 2, size, size, 2)
+		end
+	end
+end)
+
 hook.Add("PreDrawOpaqueRenderables", "renderblindnessflash", function()
 	local spect = IsValid(lply:GetNWEntity("spect")) and lply:GetNWEntity("spect")
 	
@@ -3158,9 +3228,9 @@ hook.Add("PreDrawOpaqueRenderables", "renderblindnessflash", function()
 	local Ang = view.angles
 	Ang[2] = Ang[2] + (eyesmode == 2 and 90 or eyesmode == 1 and -90 or 0)
 	Ang[1] = eyesmode == 0 and Ang[1] or 0
-	lply.blindflash:SetFarZ(lply:HasTrait("blind") and 90 or 40)
-	lply.blindflash:SetFOV(160)
-	lply.blindflash:SetBrightness(1)
+	lply.blindflash:SetFarZ(HasBlindTrait() and 180 or 40)
+	lply.blindflash:SetFOV(HasBlindTrait() and 175 or 160)
+	lply.blindflash:SetBrightness(HasBlindTrait() and 1.4 or 1)
 	lply.blindflash:SetPos(view.origin)
 	lply.blindflash:SetAngles(Ang)
 	lply.blindflash:Update()

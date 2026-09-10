@@ -476,7 +476,7 @@ hook.Add("Post Post Pre Post Processing", "ShowScreens", function()
 			surface.SetMaterial(screens[curscreen])
 			surface.DrawTexturedRect(0, 0, ScrW(), ScrH())
 			
-			DrawToyTown(4, ScrH())
+			if not lply:HasTrait("blind") then DrawToyTown(4, ScrH()) end
 		else
 			if switch then
 				curscreen = curscreen == #screens and 1 or curscreen + 1
@@ -726,7 +726,7 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 
 	if (disorientationLerp > 1) and lply:Alive() or brain > 0 then
 		local add2 = disorientationLerp - 1
-		if not brain_motionblur and lply.PlayerClassName ~= "headcrabzombie" then DrawMotionBlur(0.15 - math.Clamp(add2 / 1, 0, 0.1), add2 * 2, 0.001) end
+		if not lply:HasTrait("blind") and not brain_motionblur and lply.PlayerClassName ~= "headcrabzombie" then DrawMotionBlur(0.15 - math.Clamp(add2 / 1, 0, 0.1), add2 * 2, 0.001) end
 		if disorientationLerp > 2 then
 			local add = (disorientationLerp - 2) * 2
 			local time = CurTime() * 3
@@ -757,7 +757,7 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 			//surface.SetMaterial(pain_mat)
 			//surface.DrawTexturedRect(-1, -1, ScrW()+1, ScrH()+1)
 			local blur = math.max((newpain / 30 + brain * 10),0) / 30
-			if blur > 0 then
+			if not lply:HasTrait("blind") and blur > 0 then
 				DrawMaterialOverlay( "sprites/mat_jack_hmcd_scope_aberration", blur )
 			end
 		end
@@ -765,7 +765,7 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 	hg_potatopc = hg_potatopc or hg.ConVars.potatopc
 	local potato = hg_potatopc:GetBool()
 	if (k1 > 0) or (k2 > 0) or (k3 > 0) or (k4 > 0) or brain > 0 then
-		if !potato then
+		if not lply:HasTrait("blind") and !potato then
 			DrawToyTown(2, (k3 * 3 + k2 * 1 + k4 * 1.5 + brain * 10) * ScrH() / 2)
 		else
 
@@ -775,7 +775,7 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 	--DrawMaterialOverlay( "homigrad/vgui/bloodblur.png", 0)
 	local view = render.GetViewSetup()
 	--RenderSuperDoF(view.origin,view.angles,0)
-	if analgesiaVisual > 1 then
+	if not lply:HasTrait("blind") and analgesiaVisual > 1 then
 		DrawMaterialOverlay( "particle/warp4_warp_noz", -(analgesiaVisual - 0.5) * math.sin(CurTime()) * 5 / 150 )
 	end
 
@@ -822,7 +822,7 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 			)
 			ViewPunch(wobbleAng)
 		end
-		if concLerp > 2.0 then
+		if not lply:HasTrait("blind") and concLerp > 2.0 then
 			local blurAmt = math.Clamp((concLerp - 2.0) / 3, 0, 0.15)
 			DrawToyTown(2, blurAmt * ScrH())
 		end

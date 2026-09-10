@@ -273,6 +273,7 @@ hook.Add("Think", "stanleytumbler", function()
         end
         local traumaChanceMul = hg.organism.GetTraumaRagdollChanceMul and hg.organism.GetTraumaRagdollChanceMul(org) or 1
         tripChance = tripChance * traumaChanceMul
+        tripChance = tripChance * (ply.GetTraitMultiplier and ply:GetTraitMultiplier("terrain_trip_chance", 1) or 1)
 
         tripChance = math.Clamp(tripChance, 0, MAX_TRIP_CHANCE)
 

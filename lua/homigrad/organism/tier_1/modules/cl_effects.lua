@@ -241,10 +241,10 @@ hook.Add("RenderScreenspaceEffects", "overdoseEffect", function()
 		math.sin(t * 1.1 + 1) * i * 0.5
 	))
 
-	if i > 0.05 then
+	if not ply:HasTrait("blind") and i > 0.05 then
 		DrawToyTown(2, i * 0.4 * ScrH())
 	end
-	if strength > 0.4 then
+	if not ply:HasTrait("blind") and strength > 0.4 then
 		DrawMotionBlur(0.08 * i, 0.25 * i, 0.02)
 	end
 

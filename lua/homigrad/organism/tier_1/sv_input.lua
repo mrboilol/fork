@@ -779,6 +779,32 @@ function hg.organism.AmputateLimb(org, limb, noShake, dmgInfo)
 	return true
 end
 
+function hg.organism.SetMissingLimb(org, limb)
+	local baseLimb = requestedLimbBase[limb]
+	if limb == "lhand" or limb == "rhand" or (baseLimb and not org[baseLimb .. "amputated"]) then
+		limb = baseLimb
+	end
+	if not limb then return false end
+
+	local amputatedKey = limb .. "amputated"
+	if org[amputatedKey] == nil or org[amputatedKey] then return false end
+	if not IsValid(org.owner) then return false end
+
+	org[amputatedKey] = true
+
+	net.Start("organism_send")
+	local tbl = {}
+	tbl[amputatedKey] = true
+	tbl.owner = org.owner
+	net.WriteTable(tbl)
+	net.WriteBool(true)
+	net.WriteBool(false)
+	net.WriteBool(false)
+	net.WriteBool(true)
+	net.SendPVS(org.owner:GetPos())
+	return true
+end
+
 --hg.organism.AmputateLimb(Entity(2).organism, "rarm")
 
 local function chooseWoundBleedStyle(severity)

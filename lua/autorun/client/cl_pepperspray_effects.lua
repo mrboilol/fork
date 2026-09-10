@@ -51,6 +51,7 @@ end)
 hook.Add("RenderScreenspaceEffects", "PepperSprayVisualsBlur", function()
     local ply = LocalPlayer()
     if not IsValid(ply) or not ply:Alive() then return end
+    if ply:HasTrait("blind") then return end
 
     local strength = math.max(GetPepperSprayStrength(ply), blackOverlayAlpha / 255)
 

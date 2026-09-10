@@ -707,6 +707,10 @@ hook.Add("Think", "Fake", function()
 		ragdoll.hgProcMove = hg.KeyDown(ply, IN_FORWARD) or hg.KeyDown(ply, IN_BACK) or hg.KeyDown(ply, IN_MOVELEFT) or hg.KeyDown(ply, IN_MOVERIGHT)
 		
 		local ragdollcombat = hg.RagdollCombatInUse(ply)
+		local holdingWoundInput = org.manualHoldWound == true
+		if not holdingWoundInput and org.canmove and hg.KeyDown(ply, IN_USE) and hg.KeyDown(ply, IN_JUMP) then
+			holdingWoundInput = getHoldWound(org, ragdoll) ~= nil
+		end
 		if !ragdollcombat and ragdoll == ply.FakeRagdoll then
 			hg.SetFreemove(ply, false)
 		end
@@ -786,7 +790,7 @@ hook.Add("Think", "Fake", function()
 
 						physobj:Wake()
 						
-						if hg.RagdollCombatInUse(ply) and ply:KeyDown(IN_JUMP) then
+						if ragdollcombat and ply:KeyDown(IN_JUMP) and not holdingWoundInput then
 							if !ply.jumpedfake then
 								ply.jumpedfake = true
 
@@ -1170,7 +1174,7 @@ hook.Add("Think", "Fake", function()
 
 					local force = angles2:Forward()
 					force:Normalize()
-					force = force * 2000 * math.max((hand:GetPos() - torso:GetPos()):GetNormalized():Dot(angles2:Forward()) + 0.1, 0) * ragdoll.dtime / 0.015 * ragdoll.power
+					force = force * 2000 * math.max((hand:GetPos() - torso:GetPos()):GetNormalized():Dot(angles2:Forward()) + 0.1, 0) * ragdoll.dtime / 0.015 * ragdoll.power * (ply.GetTraitMultiplier and ply:GetTraitMultiplier("climb_force", 1) or 1)
 					
 					force = force * 1 / math.max(torso:GetVelocity():Dot(angles2:Forward()) / 25, 1)
 
@@ -1182,7 +1186,7 @@ hook.Add("Think", "Fake", function()
 					end
 
 					if hg_fake_stamina:GetBool() then
-						org.stamina.subadd = org.stamina.subadd + 0.05 * (ragdoll.staminaRightModifyer or 0.5) * (on_ground and 0.25 or 1)
+						org.stamina.subadd = org.stamina.subadd + 0.05 * (ragdoll.staminaRightModifyer or 0.5) * (on_ground and 0.25 or 1) * (ply.GetTraitMultiplier and ply:GetTraitMultiplier("climb_stamina_cost", 1) or 1)
 					end
 				end
 
@@ -1192,7 +1196,7 @@ hook.Add("Think", "Fake", function()
 
 					local force = angles2:Forward()
 					force:Normalize()
-					force = force * 2000 * math.max((hand:GetPos() - torso:GetPos()):GetNormalized():Dot(angles2:Forward()) + 0.1, 0) * ragdoll.dtime / 0.015 * ragdoll.power
+					force = force * 2000 * math.max((hand:GetPos() - torso:GetPos()):GetNormalized():Dot(angles2:Forward()) + 0.1, 0) * ragdoll.dtime / 0.015 * ragdoll.power * (ply.GetTraitMultiplier and ply:GetTraitMultiplier("climb_force", 1) or 1)
 					
 					force = force * 1 / math.max(torso:GetVelocity():Dot(angles2:Forward()) / 25, 1)
 
@@ -1204,7 +1208,7 @@ hook.Add("Think", "Fake", function()
 					end
 
 					if hg_fake_stamina:GetBool() then
-						org.stamina.subadd = org.stamina.subadd + 0.05 * (ragdoll.staminaLeftModifyer or 0.5) * (on_ground and 0.25 or 1)
+						org.stamina.subadd = org.stamina.subadd + 0.05 * (ragdoll.staminaLeftModifyer or 0.5) * (on_ground and 0.25 or 1) * (ply.GetTraitMultiplier and ply:GetTraitMultiplier("climb_stamina_cost", 1) or 1)
 					end
 				end
 			end
@@ -1319,7 +1323,7 @@ hook.Add("Think", "Fake", function()
 			if ply:KeyDown(IN_SPEED) and org.canmove and !org.larmamputated and !org.larmupamputated and (!ply.HandsStun or ply.HandsStun < CurTime()) then
 				if IsValid(ragdoll.ConsLH) then
 					if hg_fake_stamina:GetBool() then
-						org.stamina.subadd = org.stamina.subadd + 0.06 * (ragdoll.staminaLeftModifyer or 0.5) * ( IsValid(ragdoll.ConsRH) and 0.35 or 1.25) * (on_ground and 0.25 or 1)
+						org.stamina.subadd = org.stamina.subadd + 0.06 * (ragdoll.staminaLeftModifyer or 0.5) * ( IsValid(ragdoll.ConsRH) and 0.35 or 1.25) * (on_ground and 0.25 or 1) * (ply.GetTraitMultiplier and ply:GetTraitMultiplier("climb_stamina_cost", 1) or 1)
 					end
 					
 					local ent2 = ragdoll.ConsLH.Ent2
@@ -1408,7 +1412,7 @@ hook.Add("Think", "Fake", function()
 			if ply:KeyDown(IN_WALK) and org.canmove and !(ishgweapon(wep) or wep.ismelee2) and !org.rarmamputated and !org.rarmupamputated and (!ply.HandsStun or ply.HandsStun < CurTime()) then
 				if IsValid(ragdoll.ConsRH) then
 					if hg_fake_stamina:GetBool() then
-						org.stamina.subadd = org.stamina.subadd + 0.06 * (ragdoll.staminaRightModifyer or 1) * ( IsValid(ragdoll.ConsLH) and 0.35 or 1.25) * (on_ground and 0.25 or 1)
+						org.stamina.subadd = org.stamina.subadd + 0.06 * (ragdoll.staminaRightModifyer or 1) * ( IsValid(ragdoll.ConsLH) and 0.35 or 1.25) * (on_ground and 0.25 or 1) * (ply.GetTraitMultiplier and ply:GetTraitMultiplier("climb_stamina_cost", 1) or 1)
 					end
 					
 					local ent2 = ragdoll.ConsRH.Ent2

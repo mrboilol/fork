@@ -239,6 +239,33 @@ function Traits.GetPlayerBonus(ply, key, default)
 	return value
 end
 
+function Traits.GetSpawnAmputationLimbPool(ply)
+	local available = {larm = true, rarm = true, lleg = true, rleg = true}
+	local constrained = false
+
+	for _, id in ipairs(Traits.GetPlayerSelection(ply)) do
+		local pool = Traits.Registry[id].AmputationLimbPool
+		if istable(pool) then
+			local allowed = {}
+			for _, limb in ipairs(pool) do
+				if available[limb] then allowed[limb] = true end
+			end
+			available = allowed
+			constrained = true
+		end
+	end
+
+	if constrained and next(available) == nil then
+		available = {larm = true, rarm = true, lleg = true, rleg = true}
+	end
+
+	local result = {}
+	for _, limb in ipairs({"larm", "rarm", "lleg", "rleg"}) do
+		if available[limb] then result[#result + 1] = limb end
+	end
+	return result
+end
+
 function plymeta:HasTrait(id)
 	if SERVER and self.HGTraits then return self.HGTraits[NormalizeTraitID(id) or ""] == true end
 	return Traits.SelectionHas(Traits.GetPlayerSelection(self), id)

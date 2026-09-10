@@ -612,6 +612,11 @@ local function buildEffects(ply, org)
 		end
 	end
 
+	local goodmood = math.Clamp(orgNumber(org, "goodmood", 0), 0, 1)
+	if goodmood > 0 then
+		add(effects, "happy", "happy", math.ceil(goodmood * 4), "good", 15, math.floor(goodmood * 100) .. "%")
+	end
+
 	if org.berserkActive2 == true then add(effects, "rage", "rage", 4, "bad", -90) end
 	local hungry = math.Clamp(orgNumber(org, "hungry", 0), 0, 100)
 	local satiety = math.Clamp(orgNumber(org, "satiety", 0), 0, 100)
@@ -852,6 +857,10 @@ local function buildEffects(ply, org)
 
 	local adrenaline = orgNumber(org, "adrenaline", 0)
 	if adrenaline > 0.3 then add(effects, "adrenaline", "adrenaline", highRank(adrenaline, {0.3, 0.8, 1.5, 2.1}), "good", 11, math.Round(adrenaline, 1)) end
+	local anger = math.Clamp(orgNumber(org, "anger", 0), 0, 1)
+	if anger > 0.01 then
+		add(effects, "anger", "anger", math.ceil(anger * 4), "good", 14, math.floor(anger * 100) .. "%")
+	end
 	local zerlkers = orgNumber(org, "zerlkers", 0)
 	if zerlkers > 0 then
 		-- A second concurrent dose is the Zerlkers overdose threshold. Keep the

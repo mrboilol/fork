@@ -122,7 +122,7 @@ hook.Add("RenderScreenspaceEffects", "hg_psyche_color", function()
 
 	if panicFrac > 0 then
 		local potato = hg.ConVars and hg.ConVars.potatopc and hg.ConVars.potatopc:GetBool() or false
-		if not potato then
+		if not lply:HasTrait("blind") and not potato then
 			DrawToyTown(2, panicFrac * ScrH())
 		end
 	end

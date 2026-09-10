@@ -422,7 +422,7 @@ players : 1 humans, 0 bots (20 max)
 				DrawColorModify(colormodify)
 			end
 
-			if !hg_potatopc:GetBool() and fraction > 0.1 then DrawToyTown(2,math.min(math.ease.InBack(fraction),0.85) * ScrH() * force / 10) end
+			if not LocalPlayer():HasTrait("blind") and !hg_potatopc:GetBool() and fraction > 0.1 then DrawToyTown(2,math.min(math.ease.InBack(fraction),0.85) * ScrH() * force / 10) end
 
 		end)
 

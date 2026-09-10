@@ -211,7 +211,8 @@ local math_abs, math_Approach, math_AngleDifference, math_Clamp, math_cos, math_
                 local hitEnt = tr.Entity
                 local impactSpeed = math.abs(vel:Dot(-tr.HitNormal))
                 local traumaChanceMul = hg.organism.GetTraumaRagdollChanceMul and hg.organism.GetTraumaRagdollChanceMul(ply.organism) or 1
-                local shouldTrip = math.Rand(0, 1) <= (1 / sprint_collision_trip_chance) * traumaChanceMul
+                local collisionTripMul = ply.GetTraitMultiplier and ply:GetTraitMultiplier("collision_trip_chance", 1) or 1
+                local shouldTrip = math.Rand(0, 1) <= (1 / sprint_collision_trip_chance) * traumaChanceMul * collisionTripMul
 
                 if IsValid(hitEnt) and hitEnt:IsPlayer() and hitEnt:Alive() then
                         impactSpeed = (vel - hitEnt:GetVelocity()):Length()
@@ -742,7 +743,8 @@ local math_abs, math_Approach, math_AngleDifference, math_Clamp, math_cos, math_
 			local cosine = eyeAngles:Forward():Dot(ply.eyeAnglesOld:Forward())
 			ply.eyeAnglesOld = eyeAngles
 
-			if (velLen > 200 and (math.random(150) == 1 or cosine <= 0.99)) then
+			local slipChance = ply.GetTraitMultiplier and ply:GetTraitMultiplier("slip_chance", 1) or 1
+			if (velLen > 200 and math.Rand(0, 1) < slipChance and (math.random(150) == 1 or cosine <= 0.99)) then
 				local trData = ply.hg_inertia_slip_trace or { filter = ply }
 				ply.hg_inertia_slip_trace = trData
 				trData.start = ply:GetPos()

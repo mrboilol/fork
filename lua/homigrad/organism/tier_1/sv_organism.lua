@@ -1169,11 +1169,15 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.neckslitWarned = nil
 	end
 
-	if isPly and (org.lleg == 1 or org.rleg == 1) and not org.NoKnockdown then
+	local brokenLeg = org.lleg == 1 or org.rleg == 1
+	local clumsy = isPly and owner:HasTrait("clumsy")
+	if isPly and (brokenLeg or clumsy) and not org.NoKnockdown then
 		if (org.legBreakFallNext or 0) < CurTime() then
 			org.legBreakFallNext = CurTime() + 0.5
 			local spd = owner:GetVelocity():Length()
-			if not IsValid(owner.FakeRagdoll) and spd > 200 and math.random(100) < math.Clamp((spd - 200) / 4, 2, 30) then
+			local tripSpeed = clumsy and 130 or 200
+			local tripChance = clumsy and math.Clamp((spd - tripSpeed) / 2.5, 12, 65) or math.Clamp((spd - tripSpeed) / 4, 2, 30)
+			if not IsValid(owner.FakeRagdoll) and spd > tripSpeed and math.random(100) < tripChance then
 				org.needfake = true
 			end
 		end

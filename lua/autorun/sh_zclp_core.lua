@@ -8,8 +8,8 @@ ZCLP.MenuIcon = "zcity_loadout_presets/icon.png"
 
 ZCLP.Langs = {
     en = {
-        title = "huytown presets",
-        incompat = "if you see me tell sancho to update version local variable",
+        title = "huy",
+        incompat = "something exploded in the code idk",
         open_menu = "Open loadout presets",
         request_failed = "nigger try again",
         create = "Create Preset",
@@ -35,8 +35,8 @@ ZCLP.Langs = {
         preview_armor = "Armor:",
         preview_clothes = "Clothes:",
         preview_meta = "saved with version:",
-        tab_name = "Z-City Presets",
-        menu_name = "Loadout Presets"
+        tab_name = "huy",
+        menu_name = "huy"
     }
 }
 
