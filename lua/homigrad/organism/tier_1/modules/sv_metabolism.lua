@@ -114,7 +114,7 @@ module[2] = function(owner, org, timeValue)
     org.dehydrationCirculationPenalty = (hg_thirstsystem:GetBool() and org.hydration <= 0)
         and math.Clamp((org.thirst - 60) / 40, 0, 1) or 0
 
-	if (org.intestines > 0.5 or org.stomach > 0.5) and not org.otrub and owner:IsPlayer() and org.satiety > 1 then
+	if (org.intestines > 0.5 or org.stomach > 0.5) and not org.otrub and (org.cotard or 0) <= 0 and owner:IsPlayer() and org.satiety > 1 then
 		if not org.randomPainSound or org.randomPainSound < CurTime() then
 			org.randomPainSound = CurTime() + math.random(20,45)
 			org.painadd = org.painadd + 20
