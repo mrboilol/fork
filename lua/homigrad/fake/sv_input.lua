@@ -8,7 +8,7 @@ concommand.Add("fake", function(ply)
 	ply._godFakeBypass = true
 	if not IsValid(ply.FakeRagdoll) then
 		if hook.Run("CanPlayerFake", ply) == false then ply._godFakeBypass = nil return end
-		hg.Fake(ply)
+		hg.Fake(ply, nil, nil, nil, "voluntary")
 	else
 		hg.FakeUp(ply)
 	end

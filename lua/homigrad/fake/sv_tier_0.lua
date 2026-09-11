@@ -1302,7 +1302,7 @@ hook.Add("OnAmputateLimb", "hg-fakeboneflop-amputation", function(org, ent, limb
 	end
 end)
 
-function hg.Fake(ply, huyragdoll, no_freemove, force)
+function hg.Fake(ply, huyragdoll, no_freemove, force, reason)
 	if not IsValid(ply) or not ply:IsPlayer() or not ply:Alive() then return end
 	ply.switchingseat = nil
 	if ply:GetMoveType() == 0 then return end
@@ -1324,6 +1324,7 @@ function hg.Fake(ply, huyragdoll, no_freemove, force)
 		end
 	end
 	if !IsValid(ragdoll) then return end
+	ragdoll.HGFakeReason = reason or "forced"
 	ragdoll:CallOnRemove("Fake", RemoveRag, ply)
 	ply.fakecd = CurTime() + 1// + ply.organism.shock / 10
 	NET_Fake(ragdoll, ply)

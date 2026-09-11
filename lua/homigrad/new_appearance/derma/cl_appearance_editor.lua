@@ -679,6 +679,7 @@ function PANEL:PostInit()
     local currentSelectorSection
     local CloseSelectorPanel
     local savedAppearanceSnapshot
+    local savedTraitSnapshot
     local unsavedOverlay
 
     local function PlayCloth()
@@ -1117,12 +1118,17 @@ function PANEL:PostInit()
         net.SendToServer()
         main.SharedPreviewOriginal = table.Copy(main.AppearanceTable)
         savedAppearanceSnapshot = BuildComparableAppearanceTable(main.AppearanceTable)
+        savedTraitSnapshot = hg.Traits.NormalizeSelection(main.AppearanceTable.ATraits)
         surface.PlaySound(SOUND_APPEARANCE_SUCCESS)
         return true
     end
 
+    local function HasUnsavedTraitChanges()
+        return not AppearanceValueEqual(savedTraitSnapshot or {}, hg.Traits.NormalizeSelection(main.AppearanceTable.ATraits))
+    end
+
     local function HasUnsavedChanges()
-        return not AppearanceValueEqual(savedAppearanceSnapshot or {}, BuildComparableAppearanceTable(main.AppearanceTable))
+        return HasUnsavedTraitChanges() or not AppearanceValueEqual(savedAppearanceSnapshot or {}, BuildComparableAppearanceTable(main.AppearanceTable))
     end
 
     local function CloseUnsavedPrompt(fnOnClosed)
@@ -2066,6 +2072,7 @@ function PANEL:PostInit()
     end
 
     savedAppearanceSnapshot = BuildComparableAppearanceTable(main.AppearanceTable)
+    savedTraitSnapshot = hg.Traits.NormalizeSelection(main.AppearanceTable.ATraits)
 
     CreateAppearanceSectionLabel(sidebar, "Identity")
     CreateAppearanceButtonGrid(sidebar, {
@@ -2111,7 +2118,6 @@ function PANEL:PostInit()
     returnBtn.LineLerp = 0
     returnBtn.HoverScale = 0.008
     function returnBtn:DoClick()
-        TryExitAppearance()
         TryExitAppearance()
     end
     function returnBtn:Think()
@@ -2186,7 +2192,6 @@ function PANEL:PostInit()
     deletePresetBtn.HoverScale = 0.008
 
     function self:Close()
-        TryExitAppearance()
         TryExitAppearance()
     end
     self:CallbackAppearance()

@@ -101,10 +101,15 @@ hook.Add("Org Think", "HGTraitsPhysiology", function(owner, org, timeValue)
 	end
 end)
 
-hook.Add("Fake", "HGTraitsVibramRecovery", function(ply)
+hook.Add("Fake", "HGTraitsVibramRecovery", function(ply, ragdoll)
 	if not IsValid(ply) or not ply:HasTrait("vibrams") then return end
+	if not IsValid(ragdoll) or ragdoll.HGFakeReason == "voluntary" then return end
+
+	local recoveryID = (ply.HGVibramRecoveryID or 0) + 1
+	ply.HGVibramRecoveryID = recoveryID
 	timer.Simple(0.12, function()
-		if not IsValid(ply) or not ply:Alive() or not IsValid(ply.FakeRagdoll) then return end
+		if not IsValid(ply) or ply.HGVibramRecoveryID != recoveryID or not ply:HasTrait("vibrams") then return end
+		if not ply:Alive() or ply.FakeRagdoll != ragdoll then return end
 		ply.fakecd = 0
 		hg.FakeUp(ply, false, true)
 	end)

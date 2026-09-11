@@ -441,11 +441,11 @@ if SERVER then
 		if hg._origFakeGodWrapped then return end
 		hg._origFakeGodWrapped = true
 		local origFake = hg.Fake
-		function hg.Fake(ply, huyragdoll, no_freemove, force)
+		function hg.Fake(ply, huyragdoll, no_freemove, force, reason)
 			if IsValid(ply) and ply:IsPlayer() and ply.organism and ply.organism.godmode and not ply._godFakeBypass then
 				return
 			end
-			return origFake(ply, huyragdoll, no_freemove, force)
+			return origFake(ply, huyragdoll, no_freemove, force, reason)
 		end
 	end
 

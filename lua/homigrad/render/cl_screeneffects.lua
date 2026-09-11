@@ -3136,6 +3136,9 @@ local function removeflash()
 end
 
 local blindEchoPings = {}
+local blindTraitEchoSoundRange = 18000
+local blindTraitEchoRadiusMin = 1200
+local blindTraitEchoRadiusMax = 3200
 
 hook.Add("EntityEmitSound", "HGTraitsBlindEcholocation", function(data)
 	if not HasBlindTrait() then return end
@@ -3150,7 +3153,7 @@ hook.Add("EntityEmitSound", "HGTraitsBlindEcholocation", function(data)
 	end
 
 	local distanceSqr = pos:DistToSqr(lply:EyePos())
-	if distanceSqr > 8000 ^ 2 then return end
+	if distanceSqr > blindTraitEchoSoundRange ^ 2 then return end
 
 	local power = math.Clamp(((data.SoundLevel or 75) / 100) * (data.Volume or 1), 0.25, 1)
 	local duration = Lerp(power, 0.7, 1.8)
@@ -3184,7 +3187,7 @@ hook.Add("PreDrawHalos", "HGTraitsBlindEcholocation", function()
 		if remaining <= 0 then
 			table.remove(blindEchoPings, i)
 		else
-			local radius = Lerp(ping.power, 220, 700)
+			local radius = Lerp(ping.power, blindTraitEchoRadiusMin, blindTraitEchoRadiusMax)
 			for _, ent in ipairs(ents.FindInSphere(ping.pos, radius)) do
 				if IsValid(ent) and ent != lply and (ent:IsPlayer() or ent:IsNPC() or ent:IsWeapon() or ent:IsRagdoll() or ent:GetMoveType() == MOVETYPE_VPHYSICS) then outlined[ent] = math.max(outlined[ent] or 0, remaining / ping.duration) end
 			end
@@ -3192,7 +3195,7 @@ hook.Add("PreDrawHalos", "HGTraitsBlindEcholocation", function()
 		end
 	end
 	for ent, intensity in pairs(outlined) do
-		halo.Add({ent}, Color(115, 220, 255, math.floor(210 * intensity)), 2 + intensity * 4, 2 + intensity * 4, 1, true, true)
+		halo.Add({ent}, Color(255, 255, 255, math.floor(255 * intensity)), 0.75 + intensity * 1.25, 0.75 + intensity * 1.25, 1, true, true)
 	end
 end)
 
@@ -3223,7 +3226,7 @@ hook.Add("PreDrawOpaqueRenderables", "renderblindnessflash", function()
 	local Ang = view.angles
 	Ang[2] = Ang[2] + (eyesmode == 2 and 90 or eyesmode == 1 and -90 or 0)
 	Ang[1] = eyesmode == 0 and Ang[1] or 0
-	lply.blindflash:SetFarZ(HasBlindTrait() and 180 or 40)
+	lply.blindflash:SetFarZ(HasBlindTrait() and 1400 or 40)
 	lply.blindflash:SetFOV(HasBlindTrait() and 175 or 160)
 	lply.blindflash:SetBrightness(HasBlindTrait() and 1.4 or 1)
 	lply.blindflash:SetPos(view.origin)

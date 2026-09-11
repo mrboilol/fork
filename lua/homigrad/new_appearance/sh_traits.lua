@@ -206,14 +206,14 @@ function Traits.ApplyToPlayer(ply, selection)
 	for _, id in ipairs(oldSelection) do oldSet[id] = true end
 	for _, id in ipairs(normalized) do newSet[id] = true end
 
-	for _, id in ipairs(oldSelection) do
-		if not newSet[id] then RunTraitCallback(Traits.Registry[id], "OnRemove", ply) end
-	end
-
 	ply.HGTraitSelection = table.Copy(normalized)
 	ply.HGTraits = newSet
 	ply:SetNWString("hg_traits", table.concat(normalized, ","))
 	ply:SetNWInt("hg_trait_points", balance)
+
+	for _, id in ipairs(oldSelection) do
+		if not newSet[id] then RunTraitCallback(Traits.Registry[id], "OnRemove", ply) end
+	end
 
 	for _, id in ipairs(normalized) do
 		local trait = Traits.Registry[id]
