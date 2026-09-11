@@ -25,25 +25,40 @@ local moodle3Icons, appearances, lastLevels = {}, {}, {}
 local moodlePositions = {}
 local hover = {index = nil, scale = 1}
 
-surface.CreateFont("HG_MoodleRageText", {
+local function uiScale()
+	return hg and hg.UIScale and hg.UIScale() or math.Clamp(math.min(ScrW() / 1920, ScrH() / 1080), 0.65, 1.5)
+end
+
+local function ui(value)
+	return value * uiScale()
+end
+
+local createUIFont = hg and hg.RegisterUIFont or function(name, definition)
+	definition = table.Copy(definition)
+	definition.size = math.max(1, math.floor((definition.referenceSize or definition.size) * uiScale() + 0.5))
+	definition.referenceSize = nil
+	surface.CreateFont(name, definition)
+end
+
+createUIFont("HG_MoodleRageText", {
 	font = "VCR OSD Mono",
-	size = ScreenScale(8),
+	referenceSize = 18,
 	weight = 500,
 	antialias = true,
 	extended = true,
 })
 
-surface.CreateFont("HG_MoodleTitle", {
+createUIFont("HG_MoodleTitle", {
 	font = "VCR OSD Mono",
-	size = ScreenScale(9),
+	referenceSize = 20,
 	weight = 700,
 	antialias = true,
 	extended = true,
 })
 
-surface.CreateFont("HG_MoodleText", {
+createUIFont("HG_MoodleText", {
 	font = "VCR OSD Mono",
-	size = ScreenScale(7),
+	referenceSize = 16,
 	weight = 500,
 	antialias = true,
 	extended = true,
@@ -881,8 +896,9 @@ end
 
 local function drawGlowingRageText(text, font, x, y)
 	local glowPulse = 0.75 + math.abs(math.sin(CurTime() * 4)) * 0.25
-	for radius = 4, 1, -1 do
-		local glow = Color(255, 0, 0, (5 - radius) * 14 * glowPulse)
+	local maxRadius = math.max(1, math.floor(ui(4)))
+	for radius = maxRadius, 1, -1 do
+		local glow = Color(255, 0, 0, (maxRadius - radius + 1) * 14 * glowPulse)
 		draw.SimpleText(text, font, x - radius, y, glow, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
 		draw.SimpleText(text, font, x + radius, y, glow, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
 		draw.SimpleText(text, font, x, y - radius, glow, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
@@ -908,7 +924,7 @@ local function drawTooltip(effect, pos, mx, my, berserkActive)
 
 	local titleFont = "HG_MoodleTitle"
 	local descriptionFont = rageActive and "HG_MoodleRageText" or "HG_MoodleText"
-	local descriptionLineSpacing = rageActive and 1 or 0
+	local descriptionLineSpacing = rageActive and ui(1) or 0
 	surface.SetFont(titleFont)
 	local titleWidth, titleHeight = surface.GetTextSize(title)
 	surface.SetFont(descriptionFont)
@@ -927,16 +943,16 @@ local function drawTooltip(effect, pos, mx, my, berserkActive)
 		detailsWidth, detailsHeight = surface.GetTextSize(details)
 	end
 
-	local padding, lineSpacing = 10, 4
+	local padding, lineSpacing = ui(10), ui(4)
 	local totalWidth = math.max(titleWidth, descriptionWidth, detailsWidth) + padding * 2
 	local totalHeight = titleHeight + lineSpacing + descriptionHeight + (details and lineSpacing + detailsHeight or 0) + padding * 2
 	local baseX = pos.x + pos.size * 0.5 - totalWidth * 0.5
-	local baseY = pos.y - totalHeight - 12
-	local centerX, centerY = pos.x + pos.size * 0.5, pos.y - totalHeight * 0.5 - 12
-	local parallaxX = math.Clamp((mx - centerX) * 0.1, -15, 15)
-	local parallaxY = math.Clamp((my - centerY) * 0.1, -15, 15)
-	local tooltipX = math.Clamp(baseX + parallaxX, 10, ScrW() - totalWidth - 10)
-	local tooltipY = math.Clamp(baseY + parallaxY, 10, ScrH() - totalHeight - 10)
+	local baseY = pos.y - totalHeight - ui(12)
+	local centerX, centerY = pos.x + pos.size * 0.5, pos.y - totalHeight * 0.5 - ui(12)
+	local parallaxX = math.Clamp((mx - centerX) * 0.1, -ui(15), ui(15))
+	local parallaxY = math.Clamp((my - centerY) * 0.1, -ui(15), ui(15))
+	local tooltipX = math.Clamp(baseX + parallaxX, ui(10), ScrW() - totalWidth - ui(10))
+	local tooltipY = math.Clamp(baseY + parallaxY, ui(10), ScrH() - totalHeight - ui(10))
 
 	surface.SetDrawColor(25, 25, 35, 240)
 	surface.DrawRect(tooltipX, tooltipY, totalWidth, totalHeight)
@@ -971,12 +987,13 @@ local function drawMoodle3Severity(x, y, size, effect, age)
 	if gradient and severity > 0 then
 		surface.SetMaterial(gradient)
 		surface.SetDrawColor(255, 45, 35, math.floor((25 + 155 * severity) * fadeIn * pulse))
-		surface.DrawTexturedRect(x + 1, y + 1, size - 2, size - 2)
+		local inset = ui(1)
+		surface.DrawTexturedRect(x + inset, y + inset, size - inset * 2, size - inset * 2)
 	end
 
 	local border = Color(255, math.floor(255 - 205 * severity), math.floor(255 - 215 * severity), 255)
 	surface.SetDrawColor(border.r, border.g, border.b, border.a)
-	surface.DrawOutlinedRect(x, y, size, size, 2)
+	surface.DrawOutlinedRect(x, y, size, size, math.max(1, math.floor(ui(2))))
 	if severe then
 		local alert = getMoodle3Material("moodlealert")
 		if alert then
@@ -1018,15 +1035,17 @@ local function drawMoodles()
 	end
 	if not ply:Alive() then
 		clearMoodleDrawState()
-		local size = HUD and HUD.status_effects_size or 62
-		local x, y = math.max(12, ScrH() * 0.015), ScrH() - math.max(12, ScrH() * 0.015) - size
+		local size = (HUD and HUD.status_effects_size or 62) * uiScale()
+		local edgeMargin = ui(16)
+		local x, y = edgeMargin, ScrH() - edgeMargin - size
 		local deceased = {name = "deceased", level = 4, mood = "bad"}
 		drawMoodle3Severity(x, y, size, deceased, 1)
 		local icon = getMoodle3Material("deceased")
 		if icon then
 			surface.SetMaterial(icon)
 			surface.SetDrawColor(255, 255, 255, 255)
-			surface.DrawTexturedRect(x + 2, y + 2, size - 4, size - 4)
+			local inset = ui(2)
+			surface.DrawTexturedRect(x + inset, y + inset, size - inset * 2, size - inset * 2)
 		end
 		return
 	end
@@ -1065,10 +1084,10 @@ local function drawMoodles()
 		if not active[name] then appearances[name], lastLevels[name] = nil, nil end
 	end
 
-	local baseSize = HUD and HUD.status_effects_size or 62
-	local spacing = math.max(HUD and HUD.status_effects_spacing or 59, baseSize + 4)
+	local baseSize = (HUD and HUD.status_effects_size or 62) * uiScale()
+	local spacing = math.max((HUD and HUD.status_effects_spacing or 59) * uiScale(), baseSize + ui(4))
 	local gap = spacing - baseSize
-	local edgeMargin = math.max(12, ScrH() * 0.015)
+	local edgeMargin = ui(16)
 	local rowMargin = edgeMargin
 	local rawPositions = {}
 	local nextX = edgeMargin
@@ -1106,14 +1125,14 @@ local function drawMoodles()
 	local mouseOffsetX, mouseOffsetY = 0, 0
 	if hoveredIndex then
 		local hovered = rawPositions[hoveredIndex]
-		mouseOffsetX = math.Clamp((mx - hovered.x - hovered.size * 0.5) * 0.15, -30, 30)
-		mouseOffsetY = math.Clamp((my - hovered.y - hovered.size * 0.5) * 0.15, -30, 30)
+		mouseOffsetX = math.Clamp((mx - hovered.x - hovered.size * 0.5) * 0.15, -ui(30), ui(30))
+		mouseOffsetY = math.Clamp((my - hovered.y - hovered.size * 0.5) * 0.15, -ui(30), ui(30))
 	end
 
 	local pain = orgNumber(org, "pain", 0)
 	local painShakeX, painShakeY = 0, 0
 	if pain > 20 then
-		local intensity = math.min((pain - 20) / 80, 1) * 5
+		local intensity = math.min((pain - 20) / 80, 1) * ui(5)
 		painShakeX = math.sin(now * 120) * intensity * 0.8 + math.sin(now * 70) * intensity * 0.4
 		painShakeY = math.cos(now * 2) * intensity * 0.8 + math.cos(now * 2.4) * intensity * 0.4
 	end
@@ -1150,22 +1169,20 @@ local function drawMoodles()
 		local appearanceShake = 0
 		if age < 1.5 then
 			local easeOut = (1 - age / 1.5) ^ 3
-			appearanceShake = math.sin(age * 18) * easeOut * 30
+			appearanceShake = math.sin(age * 18) * easeOut * ui(30)
 		end
 
 		local beatShakeX, beatShakeY = 0, 0
 		if distortThis then
-			beatShakeX = math.sin(now * 75 + index * 2.3) * berserkKick * 6
-			beatShakeY = -berserkKick * 5 + math.cos(now * 63 + index * 1.7) * berserkKick * 3
+			beatShakeX = math.sin(now * 75 + index * 2.3) * berserkKick * ui(6)
+			beatShakeY = -berserkKick * ui(5) + math.cos(now * 63 + index * 1.7) * berserkKick * ui(3)
 		end
 
 		local finalX = pos.x + repelX + appearanceShake + painShakeX + beatShakeX
 		local finalY = pos.y + repelY + painShakeY + beatShakeY
-		finalX = math.Clamp(finalX, 10, ScrW() - size - 10)
-		finalY = math.Clamp(finalY, 10, ScrH() - size - 10)
 		local drawSize = size * scale * (1 + berserkKick * 0.1)
-		local drawX = finalX - (drawSize - size) * 0.5
-		local drawY = finalY - (drawSize - size) * 0.5
+		local drawX = math.Clamp(finalX - (drawSize - size) * 0.5, ui(10), ScrW() - drawSize - ui(10))
+		local drawY = math.Clamp(finalY - (drawSize - size) * 0.5, ui(10), ScrH() - drawSize - ui(10))
 		drawMoodle3Severity(drawX, drawY, drawSize, effect, age)
 		-- Berserk is Moodle 3's anger level 5: retain each moodle's frame and
 		-- severity, but replace every active symbol except its own rage moodle
@@ -1173,12 +1190,13 @@ local function drawMoodles()
 		local icon = effect.name == "zerlked" and getMoodle3Material("zerlked") or (berserkActive and effect.name ~= "rage" and getMoodle3Material("moodlebreak") or getMoodle3Icon(effect))
 		if icon then
 			surface.SetMaterial(icon)
-			local iconSize = drawSize - 4
+			local inset = ui(2)
+			local iconSize = drawSize - inset * 2
 			surface.SetDrawColor(255, 255, 255, 255)
-			surface.DrawTexturedRect(drawX + 2 + offsetX, drawY + 2 + offsetY, iconSize, iconSize)
+			surface.DrawTexturedRect(drawX + inset + offsetX, drawY + inset + offsetY, iconSize, iconSize)
 		end
 
-		moodlePositions[index] = {x = finalX, y = finalY, size = size, effect = effect}
+		moodlePositions[index] = {x = drawX, y = drawY, size = drawSize, effect = effect}
 	end
 
 	if hoveredIndex then drawTooltip(effects[hoveredIndex], moodlePositions[hoveredIndex], mx, my, berserkActive) end

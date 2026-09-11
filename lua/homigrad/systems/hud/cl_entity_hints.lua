@@ -23,18 +23,21 @@ function hg.BasicHudHint(ent, trace)
 
 	if not hint then return end
 
-	local x, y = trace.HitPos:ToScreen().x, trace.HitPos:ToScreen().y
-	y = y + 145 + -45
+	local screen = trace.HitPos:ToScreen()
+	local scale = hg.UIScale and hg.UIScale() or math.Clamp(math.min(ScrW() / 1920, ScrH() / 1080), 0.65, 1.5)
+	local padding = 5 * scale
+	local x = math.Clamp(screen.x, hint:GetWidth() * 0.5 + padding, ScrW() - hint:GetWidth() * 0.5 - padding)
+	local y = math.Clamp(screen.y + 100 * scale, padding, ScrH() - hint:GetHeight() - padding)
 
-	draw.RoundedBox(2, x - hint:GetWidth() / 2 - 2.5, y - 2.5, hint:GetWidth() + 5, hint:GetHeight() + 5, HintBackgroundColor)
+	draw.RoundedBox(math.max(1, math.floor(2 * scale)), x - hint:GetWidth() / 2 - padding * 0.5, y - padding * 0.5, hint:GetWidth() + padding, hint:GetHeight() + padding, HintBackgroundColor)
 	
 	hint:Draw(x, y, TEXT_ALIGN_CENTER, nil, 175 * (HintBackgroundColor.a / 200), TEXT_ALIGN_CENTER)
 
 	if ent.AdditionalInfoFunc then
 		local str = ent.AdditionalInfoFunc()
 
-		local w, h = surface.GetTextSize(str)
 		surface.SetFont("ZCity_Tiny")
+		local w, h = surface.GetTextSize(str)
 		surface.SetTextColor(color_white)
 		surface.SetTextPos(x - w * 0.5, y + hint:GetHeight() + h)
 		surface.DrawText(str)

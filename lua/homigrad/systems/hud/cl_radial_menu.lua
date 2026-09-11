@@ -85,82 +85,89 @@ local font = function() -- hg_coolvetica:GetBool() and "Coolvetica" or "Courier 
     return hg_font_default
 end
 
+local registerFont = hg.RegisterUIFont or function(name, definition)
+	definition = table.Copy(definition)
+	definition.size = math.max(1, math.floor((definition.referenceSize or definition.size) * math.Clamp(math.min(ScrW() / 1920, ScrH() / 1080), 0.65, 1.5) + 0.5))
+	definition.referenceSize = nil
+	surface.CreateFont(name, definition)
+end
+
 --atlaschat.coolvetica
-surface.CreateFont("HomigradFont", {
+registerFont("HomigradFont", {
 	font = font(),
-	size = ScreenScale(10),
+	referenceSize = 23,
 	weight = 1100,
 	outline = false
 })
 
-surface.CreateFont("ScoreboardPlayer", {
+registerFont("ScoreboardPlayer", {
 	font = font(),
-	size = ScreenScale(7),
+	referenceSize = 16,
 	weight = 1100,
 	outline = false
 })
 
-surface.CreateFont("HomigradFontBig", {
+registerFont("HomigradFontBig", {
 	font = font(),
-	size = ScreenScale(12),
+	referenceSize = 27,
 	weight = 1100,
 	outline = false,
 	shadow = true
 })
 
-surface.CreateFont("HomigradFontMedium", {
+registerFont("HomigradFontMedium", {
 	font = font(),
-	size = ScreenScale(8),
+	referenceSize = 18,
 	weight = 1100,
 	outline = false,
 })
 
-surface.CreateFont("HomigradFontRadialOld", {
+registerFont("HomigradFontRadialOld", {
 	font = font(),
-	size = ScreenScale(11),
+	referenceSize = 25,
 	weight = 1100,
 	outline = false,
 })
 
-surface.CreateFont("HomigradFontRadialCenter", {
+registerFont("HomigradFontRadialCenter", {
 	font = font(),
-	size = ScreenScale(14),
+	referenceSize = 32,
 	weight = 1100,
 	outline = false,
 })
 
-surface.CreateFont("HomigradFontLarge", {
+registerFont("HomigradFontLarge", {
 	font = font(),
-	size = ScreenScale(15),
+	referenceSize = 34,
 	weight = 1100,
 	outline = false
 })
 
-surface.CreateFont("HomigradFontGigantoNormous", {
+registerFont("HomigradFontGigantoNormous", {
 	font = font(),
-	size = ScreenScale(25),
+	referenceSize = 56,
 	weight = 1100,
 	outline = false,
 	shadow = false
 })
 
-surface.CreateFont("HomigradFontSmall", {
+registerFont("HomigradFontSmall", {
 	font = font(),
-	size = 17,
+	referenceSize = 17,
 	weight = 1100,
 	outline = false
 })
 
-surface.CreateFont("HomigradFontVSmall", {
+registerFont("HomigradFontVSmall", {
 	font = font(),
-	size = 12,
+	referenceSize = 12,
 	weight = 400,
 	outline = false
 })
 
-surface.CreateFont("ZCity_Veteran", {
+registerFont("ZCity_Veteran", {
 	font = "x14y24pxHeadUpDaisy",
-	size = ScreenScale(10),
+	referenceSize = 23,
 	weight = 500,
 	outline = false
 })
@@ -465,13 +472,14 @@ end
 local function DrawOldRadialLabel(centerX, centerY, angleRad, radius, text, icon, scaleMul)
 	local baseX = centerX + math.sin(angleRad) * radius * oldRadialTextRadiusMul
 	local baseY = centerY + math.cos(angleRad) * radius * oldRadialTextRadiusMul
-	local iconSize = ScrH() * oldRadialIconSizeMul * scaleMul
+	local uiScale = hg.UIScale and hg.UIScale() or 1
+	local iconSize = 54 * uiScale * scaleMul
 	local textY = baseY
 
 	if icon then
 		surface.SetMaterial(icon)
 		surface.SetDrawColor(oldRadialTextColor)
-		surface.DrawTexturedRect(baseX - iconSize * 0.5, baseY - iconSize - ScrH() * oldRadialLabelGap * scaleMul, iconSize, iconSize)
+		surface.DrawTexturedRect(baseX - iconSize * 0.5, baseY - iconSize - 1080 * oldRadialLabelGap * uiScale * scaleMul, iconSize, iconSize)
 		textY = textY + iconSize * 0.1
 	end
 
@@ -479,7 +487,7 @@ local function DrawOldRadialLabel(centerX, centerY, angleRad, radius, text, icon
 end
 
 local function GetModernRadialHudScale()
-	return 1 + math.max(ScreenScale(10) / 22.5 - 1, 0) * radialModernHudScaleStrength
+	return hg.UIScale and hg.UIScale() or math.Clamp(math.min(ScrW() / 1920, ScrH() / 1080), 0.65, 1.5)
 end
 
 local function DrawModernRadialCenterText(text, x, y, maxWidth, color)
@@ -677,7 +685,7 @@ local function CreateRadialMenu(options_arg, bAutoClose)
 
 			for num, option in ipairs(options) do
 				local oldNum = num - 1
-				local r = scrH * (options_arg ~= nil and 0.4 or 0.45) * viewLerp
+				local r = (options_arg ~= nil and 432 or 486) * (hg.UIScale and hg.UIScale() or 1) * viewLerp
 				isMouseOnRadial = distance <= r and distance > 4
 				isMouseIntersecting = isMouseOnRadial and deg > oldNum * partDeg and deg < (oldNum + 1) * partDeg
 				if isMouseIntersecting then current_option = oldNum + 1 end
@@ -757,7 +765,7 @@ local function CreateRadialMenu(options_arg, bAutoClose)
 					if isMouseIntersecting then
 						local itemX = centerX + math.sin(a) * r * 0.75
 						local itemY = centerY + math.cos(a) * r * 0.75
-						DrawRadialItemDescription(option, itemX, itemY, math.sin(a), scrH * oldRadialIconSizeMul, viewLerp, scrW, scrH)
+						DrawRadialItemDescription(option, itemX, itemY, math.sin(a), 54 * (hg.UIScale and hg.UIScale() or 1), viewLerp, scrW, scrH)
 					end
 				end
 			end
@@ -780,10 +788,10 @@ local function CreateRadialMenu(options_arg, bAutoClose)
 		end
 
 		local modernHudScale = GetModernRadialHudScale()
-		local outerRadius = scrH * radialModernRadiusMul * modernHudScale * viewLerp
+		local outerRadius = 1080 * radialModernRadiusMul * modernHudScale * viewLerp
 		local innerRadius = outerRadius * radialModernInnerRadiusMul
 		local slotOrbit = (outerRadius + innerRadius) * 0.5
-		local iconSizeBase = scrH * radialModernIconSizeMul * modernHudScale * viewLerp
+		local iconSizeBase = 1080 * radialModernIconSizeMul * modernHudScale * viewLerp
 		local hoverBand = iconSizeBase * 0.85
 
 		isMouseOnRadial = optionCount > 0 and distance >= (slotOrbit - hoverBand) and distance <= (slotOrbit + hoverBand)
@@ -809,8 +817,9 @@ local function CreateRadialMenu(options_arg, bAutoClose)
 		surface.DrawRect(0, 0, w, h)
 
 		DrawFilledCircle(centerX, centerY, outerRadius, radialDrawSegments, Color(radialRingColor.r, radialRingColor.g, radialRingColor.b, radialRingColor.a * viewLerp))
-		DrawCircleRing(centerX, centerY, outerRadius, outerRadius + ScrH() * 0.0016 * viewLerp, radialDrawSegments, Color(radialOutlineColor.r, radialOutlineColor.g, radialOutlineColor.b, radialOutlineColor.a * viewLerp))
-		DrawCircleRing(centerX, centerY, innerRadius - ScrH() * 0.0016 * viewLerp, innerRadius, radialDrawSegments, Color(radialOutlineColor.r, radialOutlineColor.g, radialOutlineColor.b, radialOutlineColor.a * viewLerp))
+		local outlineWidth = 1.75 * modernHudScale * viewLerp
+		DrawCircleRing(centerX, centerY, outerRadius, outerRadius + outlineWidth, radialDrawSegments, Color(radialOutlineColor.r, radialOutlineColor.g, radialOutlineColor.b, radialOutlineColor.a * viewLerp))
+		DrawCircleRing(centerX, centerY, innerRadius - outlineWidth, innerRadius, radialDrawSegments, Color(radialOutlineColor.r, radialOutlineColor.g, radialOutlineColor.b, radialOutlineColor.a * viewLerp))
 
 		local hoveredText = nil
 
@@ -1049,10 +1058,10 @@ hook.Add("radialOptions", "7", function()
 end)
 
 local font_size = 50
-surface.CreateFont("HG_font", {
+registerFont("HG_font", {
 	font = "Arial",
 	extended = false,
-	size = font_size,
+	referenceSize = font_size,
 	weight = 500,
 	outline = true
 })

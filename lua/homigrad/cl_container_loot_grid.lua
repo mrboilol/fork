@@ -8,6 +8,10 @@ local openDuration = 0.34
 local searchDuration = 0.7
 local revealInterval = 0.32
 
+local function LootUIScale()
+	return hg.UIScale and hg.UIScale() or math.Clamp(math.min(ScrW() / 1920, ScrH() / 1080), 0.65, 1.5)
+end
+
 local function GetItemName(class, override)
 	if override then return language.GetPhrase(override) end
 	local weapon = weapons.Get(class)
@@ -96,9 +100,9 @@ end
 
 local function ArrangeLootButtons(menu, anchorX, anchorY, now)
 	local placed = {}
-	local padding = 8
+	local padding = 8 * LootUIScale()
 	local goldenAngle = math.pi * (3 - math.sqrt(5))
-	local scale = math.Clamp(ScrH() / 1080, 0.75, 1.15)
+	local scale = LootUIScale()
 	local revealed = {}
 
 	for _, button in ipairs(menu.Buttons) do
@@ -198,7 +202,7 @@ function hg.OpenContainerLootGrid(options)
 		local remaining = self.SearchEnds - CurTime()
 		if remaining <= 0 or self.Closing then return end
 		local dots = string.rep(".", math.floor(CurTime() * 3) % 3 + 1)
-		draw.SimpleText("Searching" .. dots, "ZCity_SuperTiny", self.AnchorX or ScrW() * 0.5, (self.AnchorY or ScrH() * 0.5) - 48, Color(235, 235, 235), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		draw.SimpleText("Searching" .. dots, "ZCity_SuperTiny", self.AnchorX or ScrW() * 0.5, (self.AnchorY or ScrH() * 0.5) - 48 * LootUIScale(), Color(235, 235, 235), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 	end
 
 	local released = false
@@ -281,7 +285,7 @@ function hg.OpenContainerLootGrid(options)
 			if button.Taking then
 				local takeProgress = math.Clamp((now - button.Taking) / 0.14, 0, 1)
 				button:SetAlpha(math.floor(255 * (1 - takeProgress)))
-				button:SetPos(button.TakeX, button.TakeY - takeProgress * 10)
+				button:SetPos(button.TakeX, button.TakeY - takeProgress * 10 * LootUIScale())
 				if takeProgress >= 1 then button:Remove() end
 				continue
 			end
@@ -314,7 +318,7 @@ function hg.OpenContainerLootGrid(options)
 		end
 	end
 
-	local scale = math.Clamp(ScrH() / 1080, 0.75, 1.15)
+	local scale = LootUIScale()
 	local buttonW = math.floor(76 * scale)
 	local buttonH = math.floor(88 * scale)
 	for sequence, itemID in ipairs(ids) do

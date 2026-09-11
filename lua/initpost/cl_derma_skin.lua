@@ -30,15 +30,22 @@ local font = function() -- hg_coolvetica:GetBool() and "Coolvetica" or "VCR OSD 
     return hg_font_default
 end
 
-surface.CreateFont("ZCity_VerySuperTiny", {
+local registerFont = hg.RegisterUIFont or function(name, definition)
+	definition = table.Copy(definition)
+	definition.size = math.max(1, math.floor((definition.referenceSize or definition.size) * math.Clamp(math.min(ScrW() / 1920, ScrH() / 1080), 0.65, 1.5) + 0.5))
+	definition.referenceSize = nil
+	surface.CreateFont(name, definition)
+end
+
+registerFont("ZCity_VerySuperTiny", {
 	font = font(),
-	size = ScreenScale(5),
+	referenceSize = 11,
 	weight = 200
 })
 
-surface.CreateFont("ZCity_SuperTiny", {
+registerFont("ZCity_SuperTiny", {
 	font = font(),
-	size = ScreenScale(6),
+	referenceSize = 14,
 	weight = 200
 })
 
@@ -48,9 +55,9 @@ surface.CreateFont("ZCity_Fixed_SuperTiny", {
 	weight = 200
 })
 
-surface.CreateFont("ZCity_Tiny", {
+registerFont("ZCity_Tiny", {
 	font = font(),
-	size = ScreenScale(8),
+	referenceSize = 18,
 	weight = 200
 })
 
@@ -60,15 +67,15 @@ surface.CreateFont("ZCity_Fixed_Tiny", {
 	weight = 200
 })
 
-surface.CreateFont("ZCity_Small", {
+registerFont("ZCity_Small", {
 	font = font(),
-	size = ScreenScale(20),
+	referenceSize = 45,
 	weight = 200
 })
 
-surface.CreateFont("ZCity_Medium", {
+registerFont("ZCity_Medium", {
 	font = font(),
-	size = ScreenScale(25),
+	referenceSize = 56,
 	weight = 200
 })
 
@@ -78,9 +85,9 @@ surface.CreateFont("ZCity_Fixed_Medium", {
 	weight = 200
 })
 
-surface.CreateFont("ZCity_Big", {
+registerFont("ZCity_Big", {
 	font = font(),
-	size = ScreenScale(35),
+	referenceSize = 79,
 	weight = 200
 })
 

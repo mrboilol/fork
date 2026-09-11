@@ -16,6 +16,11 @@ local SimpleSelector = {
 }
 
 local function ZCityGetInventorySystem()
+	-- The server-owned global is authoritative. A replicated ConVar can briefly
+	-- retain its old value while joining, which previously hid the mode-2 dial.
+	local globalMode = GetGlobalInt("InventorySystem", -1)
+	if globalMode >= 0 then return math.Clamp(globalMode, 0, 3) end
+
 	local convar = GetConVar("hg_invsystem")
 	if convar then
 		return math.Clamp(convar:GetInt(), 0, 3)
@@ -193,37 +198,44 @@ local function ZCityJudgeFontFace()
     return font and font:GetString() ~= "" and font:GetString() or "x14y24pxHeadUpDaisy"
 end
 
-surface.CreateFont("ZCityJudgeWeaponName", {
+local registerUIFont = hg.RegisterUIFont or function(name, definition)
+	definition = table.Copy(definition)
+	definition.size = math.max(1, math.floor((definition.referenceSize or definition.size) * math.Clamp(math.min(ScrW() / 1920, ScrH() / 1080), 0.65, 1.5) + 0.5))
+	definition.referenceSize = nil
+	surface.CreateFont(name, definition)
+end
+
+registerUIFont("ZCityJudgeWeaponName", {
     font = ZCityJudgeFontFace(),
-    size = ScreenScale(7),
+    referenceSize = 16,
     weight = 600,
     antialias = true,
 })
 
-surface.CreateFont("ZCityJudgeWeaponNameSmall", {
+registerUIFont("ZCityJudgeWeaponNameSmall", {
     font = ZCityJudgeFontFace(),
-    size = ScreenScale(5.5),
+    referenceSize = 12,
     weight = 600,
     antialias = true,
 })
 
-surface.CreateFont("ZCityJudgeSlotBadge", {
+registerUIFont("ZCityJudgeSlotBadge", {
     font = ZCityJudgeFontFace(),
-    size = math.floor(ScreenScale(6) + 0.5),
+    referenceSize = 14,
     weight = 700,
     antialias = true,
 })
 
-surface.CreateFont("ZCityJudgeInfoLabel", {
+registerUIFont("ZCityJudgeInfoLabel", {
     font = ZCityJudgeFontFace(),
-    size = ScreenScale(5.5),
+    referenceSize = 12,
     weight = 700,
     antialias = true,
 })
 
-surface.CreateFont("ZCityJudgeInfoText", {
+registerUIFont("ZCityJudgeInfoText", {
     font = ZCityJudgeFontFace(),
-    size = ScreenScale(5.5),
+    referenceSize = 12,
     weight = 500,
     antialias = true,
 })
@@ -1152,7 +1164,8 @@ local function ZCityDrawDialIcon(icon, centerX, centerY, width, alpha)
     else
         surface.SetTexture(icon.value)
     end
-    surface.DrawTexturedRect(x + 2, y + 2, width, height)
+    local shadowOffset = (hg and hg.SX and hg.SX(2)) or 2
+    surface.DrawTexturedRect(x + shadowOffset, y + shadowOffset, width, height)
 
     surface.SetDrawColor(245, 245, 245, 255 * alpha)
     if icon.kind == "material" then
@@ -1206,10 +1219,11 @@ function WS.DrawDialSelector(ply)
         WS.DialAngle = WS.DialAngle + math.AngleDifference(targetAngle, WS.DialAngle) * math.Clamp(FrameTime() * 11, 0, 1)
     end
 
-    local uiScale = math.Clamp(ScrH() / 1080, 0.75, 1.1)
+    local uiScale = hg and hg.UIScale and hg.UIScale() or math.Clamp(math.min(ScrW() / 1920, ScrH() / 1080), 0.65, 1.5)
     local popScale = Lerp(WS.DialPop, 0.82, 1)
-    local centerX = ScrW() - 112 * uiScale
-    local centerY = ScrH() - 112 * uiScale
+    local margin = 112 * uiScale
+    local centerX = ScrW() - margin
+    local centerY = ScrH() - margin
     local radius = 59 * uiScale * popScale
     local alpha = WS.DialAlpha
 
@@ -1230,6 +1244,10 @@ function WS.DrawDialSelector(ply)
         local selectedPosition = math.Clamp(WS.SelectedSlotPos or 0, 0, #data.weapons)
         local wep = focused and (data.weapons[selectedPosition] or data.weapons[0]) or data.weapons[0]
         local iconX, iconY, iconW, iconH = ZCityDrawDialIcon(ZCityGetSWEPSelectIcon(wep), x, y, iconWidth, slotAlpha)
+		if not iconX and IsValid(wep) then
+			local fallback = string.upper(string.Left(WS.GetPrintName(wep), 3))
+			draw.SimpleTextOutlined(fallback, "ZCity_SuperTiny", x, y, Color(245, 245, 245, 255 * slotAlpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0, 235 * slotAlpha))
+		end
 
         draw.SimpleTextOutlined(tostring(data.slot + 1), "ZCity_SuperTiny", x - iconWidth * 0.52, y - iconWidth * 0.45, Color(245, 245, 245, 255 * slotAlpha), TEXT_ALIGN_RIGHT, TEXT_ALIGN_BOTTOM, 1, Color(0, 0, 0, 220 * slotAlpha))
 
@@ -1294,7 +1312,8 @@ end
 local function ZCityGetBodyScreenPosition(pos, size)
     local screenWidth, screenHeight = ScrW(), ScrH()
     local centerX, centerY = screenWidth * 0.5, screenHeight * 0.5
-    local margin = size * 0.5 + 28
+    local uiScale = hg.UIScale and hg.UIScale() or 1
+    local margin = size * 0.5 + 28 * uiScale
     local screen = pos:ToScreen()
     local onScreen = screen.visible
         and screen.x >= margin and screen.x <= screenWidth - margin
@@ -1334,10 +1353,11 @@ local function ZCityGetBodyScreenPosition(pos, size)
 end
 
 local function ZCityDrawOffscreenPointer(centerX, centerY, size, directionX, directionY, alpha)
+    local uiScale = hg.UIScale and hg.UIScale() or 1
     local perpendicularX, perpendicularY = -directionY, directionX
-    local tipDistance = size * 0.5 + 18
-    local baseDistance = size * 0.5 + 5
-    local halfWidth = 7
+    local tipDistance = size * 0.5 + 18 * uiScale
+    local baseDistance = size * 0.5 + 5 * uiScale
+    local halfWidth = 7 * uiScale
     local tipX = centerX + directionX * tipDistance
     local tipY = centerY + directionY * tipDistance
     local baseX = centerX + directionX * baseDistance
@@ -1374,8 +1394,9 @@ local function ZCityDrawBodySquare(place, entry, ent, alpha, presentation)
     local aMul = math.Clamp((alpha or 0) * (presentation.opacity or 1), 0, 1)
     local brightness = math.Clamp(presentation.brightness or 1, 0, 1)
     local scale = math.Clamp(presentation.scale or 1, 0.45, 1)
-    local size = (WS.BodySquareSize or 116) * scale
-    local iconSize = (WS.BodyIconSize or 88) * scale
+    local uiScale = hg.UIScale and hg.UIScale() or 1
+    local size = (WS.BodySquareSize or 116) * scale * uiScale
+    local iconSize = (WS.BodyIconSize or 88) * scale * uiScale
     local screenX, screenY, isOffscreen, directionX, directionY = ZCityGetBodyScreenPosition(pos, size)
     local offsetX = presentation.offsetX or 0
     local offsetY = presentation.offsetY or 0
@@ -1383,7 +1404,7 @@ local function ZCityDrawBodySquare(place, entry, ent, alpha, presentation)
         offsetX = offsetX - directionX * math.abs(offsetX)
         offsetY = offsetY - directionY * math.abs(offsetY)
     end
-    local cardMargin = size * 0.5 + 5
+    local cardMargin = size * 0.5 + 5 * uiScale
     screenX = math.Clamp(screenX + offsetX, cardMargin, ScrW() - cardMargin)
     screenY = math.Clamp(screenY + offsetY, cardMargin, ScrH() - cardMargin)
     local x = math.floor(screenX - size / 2)
@@ -1404,18 +1425,18 @@ local function ZCityDrawBodySquare(place, entry, ent, alpha, presentation)
     end
 
     surface.SetDrawColor(ZCityAlpha(zcity_slot_outline, aMul * brightness))
-    ZCityDrawOutlinedBox(x, y, size, size, 3)
+    ZCityDrawOutlinedBox(x, y, size, size, math.max(1, math.floor(3 * uiScale + 0.5)))
 
     if presentation.progress ~= false then
         surface.SetDrawColor(ZCityAlpha(zcity_slot_progress, aMul))
-        ZCityDrawProgressStroke(x, y, size, size, 4, progress)
+        ZCityDrawProgressStroke(x, y, size, size, math.max(1, math.floor(4 * uiScale + 0.5)), progress)
     end
 
     if icon then
         local drawW = iconSize
         local drawH = icon.boxed and iconSize or math.floor(iconSize * 0.56)
         local drawX = math.floor(screenX - drawW / 2)
-        local drawY = math.floor(screenY - drawH / 2 - 8)
+        local drawY = math.floor(screenY - drawH / 2 - 8 * uiScale)
 
         surface.SetDrawColor(
             zcity_slot_icon_tint.r * brightness,
@@ -1432,13 +1453,13 @@ local function ZCityDrawBodySquare(place, entry, ent, alpha, presentation)
         end
     end
 
-    local labelY = y + size - 25
+    local labelY = y + size - 25 * uiScale
     surface.SetDrawColor(0, 0, 0, 175 * aMul)
-    surface.DrawRect(x + 3, labelY, size - 6, 22)
-    draw.SimpleTextOutlined(entry.name or "", "ZCity_SuperTiny", screenX, labelY + 11, ZCityAlpha(zcity_slot_text, aMul * brightness), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0, 220 * aMul))
+    surface.DrawRect(x + 3 * uiScale, labelY, size - 6 * uiScale, 22 * uiScale)
+    draw.SimpleTextOutlined(entry.name or "", "ZCity_SuperTiny", screenX, labelY + 11 * uiScale, ZCityAlpha(zcity_slot_text, aMul * brightness), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, math.max(1, uiScale), Color(0, 0, 0, 220 * aMul))
 
     if entry.slotNumber then
-        draw.SimpleTextOutlined(tostring(entry.slotNumber), "ZCity_SuperTiny", x + 8, y + 8, ZCityAlpha(zcity_slot_text, aMul * brightness), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP, 1, Color(0, 0, 0, 220 * aMul))
+        draw.SimpleTextOutlined(tostring(entry.slotNumber), "ZCity_SuperTiny", x + 8 * uiScale, y + 8 * uiScale, ZCityAlpha(zcity_slot_text, aMul * brightness), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP, math.max(1, uiScale), Color(0, 0, 0, 220 * aMul))
     end
 
     if isOffscreen and presentation.pointer ~= false then
@@ -1490,7 +1511,7 @@ function WS.DrawBodySlotSelector(ply)
 
     -- Keep each selectable card distinct; the old overlap made it unclear
     -- which item the scroll wheel had focused.
-    local rowStep = WS.BodySquareSize * 1.08
+    local rowStep = WS.BodySquareSize * 1.08 * (hg.UIScale and hg.UIScale() or 1)
     for index, item in ipairs(visible) do
         local durationK = maxDuration > minDuration and math.Clamp((item.duration - minDuration) / (maxDuration - minDuration), 0, 1) or 0
         local isSelected = item.wep == selected
@@ -1685,23 +1706,55 @@ function WS.ChangeSelectionWep( ply, key, pressed, code )
         return
     end
 
-    if inventorySystem == 1 or inventorySystem == 2 then
+    if inventorySystem == 1 then
         ZCityResetSlotHold(false)
-        if pressed == false then
-            if inventorySystem == 2 and (tAcceptKeys[key] or key == "invnext" or key == "invprev" or key == "lastinv") then
-                return true
-            end
-            return
-        end
+        if pressed == false then return end
         if SimpleSelector.Change then
             local result = SimpleSelector.Change(ply, key, pressed, code)
-            if inventorySystem == 2 and (tAcceptKeys[key] or key == "invnext" or key == "invprev" or key == "lastinv") then
-                return true
-            end
             return result
         end
         return
     end
+
+	if inventorySystem == 2 then
+		ZCityResetSlotHold(false)
+		local accepted = tAcceptKeys[key] or key == "invnext" or key == "invprev" or key == "lastinv"
+		if not accepted then return end
+		if pressed == false then return true end
+		if not IsValid(ply) or not ply:Alive() or (ply.organism and ply.organism.otrub) then return true end
+
+		local weapons = WS.GetWeaponTable(ply)
+		if not weapons then return true end
+		local wasOpen = WS.Show > CurTime()
+		WS.Show = CurTime() + 4
+
+		local slotNumber = tAcceptKeys[key]
+		if slotNumber then
+			local slot = slotNumber - 1
+			local slotWeapons = weapons[slot]
+			if slotWeapons and IsValid(slotWeapons[0]) then
+				if wasOpen and WS.SelectedSlot == slot then
+					WS.SelectedSlotPos = ((WS.SelectedSlotPos or 0) + 1) % (#slotWeapons + 1)
+				else
+					WS.SelectedSlot, WS.SelectedSlotPos = slot, 0
+				end
+			end
+		elseif key == "invprev" then
+			WS.SelectedSlotPos = (WS.SelectedSlotPos or 0) - 1
+			if weapons[WS.SelectedSlot] and WS.SelectedSlotPos < 0 then GetUpper(weapons) end
+		elseif key == "invnext" then
+			WS.SelectedSlotPos = (WS.SelectedSlotPos or 0) + 1
+			if weapons[WS.SelectedSlot] and WS.SelectedSlotPos > #weapons[WS.SelectedSlot] then GetDown(weapons) end
+		elseif key == "lastinv" and IsValid(WS.LastInv) then
+			local oldWeapon = ply:GetActiveWeapon()
+			ZCitySelectInventoryWeapon(WS.LastInv)
+			WS.LastInv = oldWeapon
+			WS.Show = 0
+		end
+
+		surface.PlaySound("arc9_eft_shared/weapon_generic_rifle_spin" .. math.random(10) .. ".mp3")
+		return true
+	end
 
     local iPos = tAcceptKeys[key]
     if pressed == false then
@@ -1795,11 +1848,33 @@ end
 
 function WS.SetActuallyWeapon( ply, cmd )
     local inventorySystem = ZCityGetInventorySystem()
-    if inventorySystem == 1 or inventorySystem == 2 then
+    if inventorySystem == 1 then
         ZCityResetSlotHold(false)
         if SimpleSelector.Select then return SimpleSelector.Select(ply, cmd) end
         return
     end
+
+	if inventorySystem == 2 then
+		ZCityResetSlotHold(false)
+		if not IsValid(ply) or not ply:Alive() or WS.Show <= CurTime() then return end
+		if not (cmd:KeyDown(IN_ATTACK) or cmd:KeyDown(IN_ATTACK2)) then return end
+
+		cmd:RemoveKey(IN_ATTACK)
+		cmd:RemoveKey(IN_ATTACK2)
+		if WS.Selected and WS.Selected > CurTime() then return end
+
+		local selected = WS.GetSelectedWeapon()
+		if IsValid(selected) then
+			WS.LastInv = WS.LastInv ~= ply:GetActiveWeapon() and WS.LastInv or ply:GetActiveWeapon()
+			ZCitySelectInventoryWeapon(selected)
+		end
+		WS.LastSelectedSlot = WS.SelectedSlot
+		WS.LastSelectedSlotPos = WS.SelectedSlotPos
+		WS.Selected = CurTime() + 0.2
+		WS.Show = CurTime() + 0.28
+		surface.PlaySound("arc9_eft_shared/weapon_generic_spin" .. math.random(1, 10) .. ".mp3")
+		return
+	end
 
     if inventorySystem ~= 0 or not IsValid( ply ) or not ply:Alive() then
         ZCityResetSlotHold(false)
