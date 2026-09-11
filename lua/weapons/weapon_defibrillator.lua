@@ -497,6 +497,7 @@ local function StartNoShockWarnings(defib, ply, getTarget, uses)
 		local org = GetDefibOrganism(ply, getTarget())
 		if ShouldShock(org) then BeginAEDShock(defib, ply, getTarget, uses) return end
 		PlayAEDSound(defib, AEDSounds.checkpulse)
+		if org and org.otrub and hg and hg.organism and hg.organism.Rouse then hg.organism.Rouse(org, 25, "defib") end
 	end)
 
 	timer.Simple(9, function()
@@ -504,12 +505,14 @@ local function StartNoShockWarnings(defib, ply, getTarget, uses)
 		local org = GetDefibOrganism(ply, getTarget())
 		if ShouldShock(org) then BeginAEDShock(defib, ply, getTarget, uses) return end
 		PlayAEDSound(defib, AEDSounds.checkbreathing)
+		if org and org.otrub and hg and hg.organism and hg.organism.Rouse then hg.organism.Rouse(org, 30, "defib") end
 	end)
 
 	timer.Simple(13.5, function()
 		if not IsAEDState(defib, "no_shock") or not defib.AEDNoShockWarnings then return end
 		local org = GetDefibOrganism(ply, getTarget())
 		if ShouldShock(org) then BeginAEDShock(defib, ply, getTarget, uses) return end
+		if org and org.otrub and hg and hg.organism and hg.organism.Rouse then hg.organism.Rouse(org, 40, "defib") end
 		DropDefib(defib, getTarget(), uses)
 	end)
 end

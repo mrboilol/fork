@@ -210,6 +210,13 @@ if SERVER then
 		end
 		self:RefreshPerfusionTreatment(ent, 0.2)
 
+		if org.otrub and hg and hg.organism and hg.organism.Rouse then
+			hg.organism.Rouse(org, 20, "adrenaline")
+			if IsValid(owner) and ent ~= owner and owner:IsPlayer() then
+				owner:Notify("You inject adrenaline into the unconscious victim.", 5, "adrenaline_rouse", 0)
+			end
+		end
+
 		if self.poisoned2 then
 			org.poison4 = CurTime()
 

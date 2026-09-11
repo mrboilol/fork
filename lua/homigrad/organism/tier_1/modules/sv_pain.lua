@@ -14,6 +14,7 @@ local shock_consciousness_drain_end = 4
 local consciousness_recovery_speed = 12
 local low_consciousness_recovery_speed = 16
 local otrub_consciousness_recovery_speed = 20
+local otrub_rouse_consciousness_recovery_speed = 3.5
 local shock_consciousness_threshold = 25
 local shock_consciousness_max = 85
 local pain_shock_threshold = 80
@@ -116,6 +117,8 @@ module[1] = function(org)
 	org.stun = 0
 
 	org.lightstun = 0
+	org.otrub_rouseUntil = 0
+	org.otrub_rouseSource = nil
 
 end
 
@@ -271,7 +274,10 @@ module[2] = function(owner, org, timeValue)
 		-- low-volume path to OTRUB.
 		local target = 1
 		local recovery_speed = consciousness_recovery_speed
-		if org.otrub or org.consciousness < consciousness_otrub_threshold then
+		if (org.otrub_rouseUntil or 0) > CurTime() then
+			target = 1
+			recovery_speed = otrub_rouse_consciousness_recovery_speed
+		elseif org.otrub or org.consciousness < consciousness_otrub_threshold then
 			recovery_speed = otrub_consciousness_recovery_speed
 		elseif org.consciousness < consciousness_fake_threshold then
 			recovery_speed = low_consciousness_recovery_speed
@@ -527,3 +533,18 @@ module[2] = function(owner, org, timeValue)
 
 
 end
+
+function hg.organism.Rouse(org, seconds, source)
+	if not org or not org.alive then return end
+	org.otrub_rouseUntil = math.max(org.otrub_rouseUntil or 0, CurTime() + (seconds or 20))
+	if source then org.otrub_rouseSource = source end
+	local owner = org.owner
+	if IsValid(owner) and owner:IsPlayer() then
+		net.Start("hg_otrub_rouse")
+			net.WriteString(source or "")
+		net.Send(owner)
+		hook.Run("HG_OnOtrubRouse", owner, org, source)
+	end
+end
+
+util.AddNetworkString("hg_otrub_rouse")
