@@ -654,9 +654,11 @@ local math_abs, math_Approach, math_AngleDifference, math_Clamp, math_cos, math_
 		k = k * math_Clamp((org.temperature and (1 - (org.temperature - 38) * 0.25) or 1), 0.5, 1)
 		k = k * math_Clamp((org.temperature and ((org.temperature - 35) * 0.25 + 1) or 1), 0.5, 1)
 		k = k * math_Clamp(math_Round((org.stamina and org.stamina[1] or 180), 0) / 120, hg_movement_stamina_debuff:GetFloat(), 1)
-		k = k * math_Clamp(5 / ((org.immobilization or 0) + 1), 0.25, 1)
-		k = k * math_Clamp((org.blood or 0) / 5000, 0, 1)
-		k = k * math_Clamp(10 / ((org.shock or 0) + 1), 0.25, 1)
+		local debuffResistance = ply.GetTraitMultiplier and ply:GetTraitMultiplier("movement_debuff_resistance", 1) or 1
+		local function softenDebuff(value) return 1 - (1 - value) * debuffResistance end
+		k = k * softenDebuff(math_Clamp(5 / ((org.immobilization or 0) + 1), 0.25, 1))
+		k = k * softenDebuff(math_Clamp((org.blood or 0) / 5000, 0, 1))
+		k = k * softenDebuff(math_Clamp(10 / ((org.shock or 0) + 1), 0.25, 1))
 		k = k * (math_min(math_Round((org.adrenaline or 0), 1) / 24, 0.3) + 1)
 		local leftLeg = hg.GetLegEffectiveness and hg.GetLegEffectiveness(ply, "lleg") or (org.llegdislocation and 0.15 or math_max(1 - (org.lleg or 0) * 0.8, 0.2))
 		local rightLeg = hg.GetLegEffectiveness and hg.GetLegEffectiveness(ply, "rleg") or (org.rlegdislocation and 0.15 or math_max(1 - (org.rleg or 0) * 0.8, 0.2))
@@ -671,7 +673,8 @@ local math_abs, math_Approach, math_AngleDifference, math_Clamp, math_cos, math_
 		local validCarryEnt = IsValid(carryent)
 		local validCarryEnt2 = IsValid(carryent2)
 		k = k * ((validCarryEnt or validCarryEnt2) and math_Clamp(50 / math_max(ply:GetNetVar("carrymass", 0) + ply:GetNetVar("carrymass2", 0), 1), 0.5, 1) or 1)
-		k = k * math_Clamp(20 / ((org.pain or 0) + 1), 0.01, 1)
+		k = k * softenDebuff(math_Clamp(20 / ((org.pain or 0) + 1), 0.01, 1))
+		if org.nyctophobiaDark then k = k * 0.72 end
 		k = k * (ply.GetTraitMultiplier and ply:GetTraitMultiplier("movement_speed", 1) or 1)
 		//k = k * (ishgweapon(wep) and not wep:IsPistolHoldType() and not wep:ReadyStance() and 0.75 or 1)
 

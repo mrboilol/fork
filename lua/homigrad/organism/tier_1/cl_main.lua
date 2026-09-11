@@ -676,14 +676,15 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 		return false
 	end
 	
-	local lowO2Visual = math.Clamp((15 - o2) / 15, 0, 1)
+	local traitScreenEffects = lply:GetTraitMultiplier("screen_effects", 1)
+	local lowO2Visual = math.Clamp((15 - o2) / 15, 0, 1) * traitScreenEffects
 	if lowO2Visual > 0 then
 		local flickerStep = math.floor(CurTime() * (10 + lowO2Visual * 18))
 		local lowO2Flicker = flickerStep % 3 == 0 and 1 or 0.58
 		lowO2Visual = lowO2Visual * lowO2Flicker
 	end
-	local lowConsciousnessVisual = math.Clamp((0.5 - consciousness) / 0.2, 0, 1)
-	local shockVisual = math.Clamp(((org.shock or 0) - 18) / 62, 0, 1)
+	local lowConsciousnessVisual = math.Clamp((0.5 - consciousness) / 0.2, 0, 1) * traitScreenEffects
+	local shockVisual = math.Clamp(((org.shock or 0) - 18) / 62, 0, 1) * traitScreenEffects
 	local shockVignette = math.max(lowO2Visual ^ 1.2, lowConsciousnessVisual ^ 1.35, shockVisual * 0.8)
 	local consciousnessBlackout = lowConsciousnessVisual ^ 2.6 * 0.58
 	k1 = Lerp(FrameTime() * 15, k1 or 0, math.min(math.min(adrenaline / 1, 2),1.5))

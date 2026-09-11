@@ -480,6 +480,11 @@ hitArtery = function(artery, org, dmg, dmgInfo, boneindex, dir, hit, impact, for
 end
 
 hook.Add("PreTraceOrganBulletDamage", "hg_melee_artery_chance", function(org, bone, dmg, dmgInfo, box, dir, hit, ricochet, organ, hookInfo, impact)
+	local owner = org.owner
+	local name = organ and organ[1] or ""
+	if IsValid(owner) and owner.HasTrait and owner:HasTrait("kirk") and (dmgInfo:IsDamageType(DMG_SLASH) or dmgInfo:IsDamageType(DMG_BULLET)) and (string.find(name, "brain") or name == "skull" or name == "jaw" or name == "eyeL" or name == "eyeR") then
+		hitArtery("arteria", org, math.max(dmg, 2), dmgInfo, "ValveBiped.Bip01_Neck1", dir, hit, impact, true)
+	end
 	if not dmgInfo:IsDamageType(DMG_SLASH) then return end
 
 	local artery = organ and slashToArtery[organ[1]]

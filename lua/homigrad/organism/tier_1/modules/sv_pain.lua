@@ -60,7 +60,8 @@ function hg.organism.AddPain(org, amount, region)
 	if amount <= 0 or not hg.organism.CanFeelPain(org, region) then return 0 end
 
 	local key = region == "head" and "headpainadd" or "painadd"
-	org[key] = math.min((org[key] or 0) + amount, 150)
+	local painCap = IsValid(owner) and owner:HasTrait("gurajchaka_child") and 50 or 150
+	org[key] = math.min((org[key] or 0) + amount, painCap)
 	return amount
 end
 
@@ -70,7 +71,8 @@ function hg.organism.AddInstantPain(org, amount, region)
 	if IsValid(owner) and owner.GetTraitMultiplier then amount = amount * owner:GetTraitMultiplier("pain_received", 1) end
 	if amount <= 0 or not hg.organism.CanFeelPain(org, region) then return 0 end
 
-	org.avgpain = math.min((org.avgpain or 0) + amount, 150)
+	local painCap = IsValid(owner) and owner:HasTrait("gurajchaka_child") and 50 or 150
+	org.avgpain = math.min((org.avgpain or 0) + amount, painCap)
 	return amount
 end
 

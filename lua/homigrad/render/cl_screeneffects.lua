@@ -3136,7 +3136,6 @@ local function removeflash()
 end
 
 local blindEchoPings = {}
-local blindEchoMaterial = Material("sprites/light_ignorez")
 
 hook.Add("EntityEmitSound", "HGTraitsBlindEcholocation", function(data)
 	if not HasBlindTrait() then return end
@@ -3151,10 +3150,10 @@ hook.Add("EntityEmitSound", "HGTraitsBlindEcholocation", function(data)
 	end
 
 	local distanceSqr = pos:DistToSqr(lply:EyePos())
-	if distanceSqr > 2500 ^ 2 then return end
+	if distanceSqr > 8000 ^ 2 then return end
 
 	local power = math.Clamp(((data.SoundLevel or 75) / 100) * (data.Volume or 1), 0.25, 1)
-	local duration = Lerp(power, 0.45, 1.2)
+	local duration = Lerp(power, 0.7, 1.8)
 	local now = CurTime()
 
 	for i = #blindEchoPings, 1, -1 do
@@ -3167,37 +3166,33 @@ hook.Add("EntityEmitSound", "HGTraitsBlindEcholocation", function(data)
 		end
 	end
 
-	blindEchoPings[#blindEchoPings + 1] = {pos = pos, power = power, expires = now + duration, duration = duration}
+	blindEchoPings[#blindEchoPings + 1] = {pos = pos, power = power, expires = now + duration, duration = duration, source = source}
 	if #blindEchoPings > 16 then table.remove(blindEchoPings, 1) end
 end)
 
-hook.Add("HUDPaint", "HGTraitsBlindEcholocation", function()
+hook.Add("PreDrawHalos", "HGTraitsBlindEcholocation", function()
 	if not HasBlindTrait() then
 		table.Empty(blindEchoPings)
 		return
 	end
 
 	local now = CurTime()
-	local margin = math.min(ScrW(), ScrH()) * 0.05
+	local outlined = {}
 	for i = #blindEchoPings, 1, -1 do
 		local ping = blindEchoPings[i]
 		local remaining = ping.expires - now
 		if remaining <= 0 then
 			table.remove(blindEchoPings, i)
 		else
-			local progress = 1 - remaining / ping.duration
-			local screen = ping.pos:ToScreen()
-			local x = math.Clamp(screen.x, margin, ScrW() - margin)
-			local y = math.Clamp(screen.y, margin, ScrH() - margin)
-			local size = 18 + progress * 80 * ping.power
-			local alpha = math.floor(255 * remaining / ping.duration)
-
-			surface.SetMaterial(blindEchoMaterial)
-			surface.SetDrawColor(130, 220, 255, alpha)
-			surface.DrawTexturedRect(x - size / 2, y - size / 2, size, size)
-			surface.SetDrawColor(210, 245, 255, alpha)
-			surface.DrawOutlinedRect(x - size / 2, y - size / 2, size, size, 2)
+			local radius = Lerp(ping.power, 220, 700)
+			for _, ent in ipairs(ents.FindInSphere(ping.pos, radius)) do
+				if IsValid(ent) and ent != lply and (ent:IsPlayer() or ent:IsNPC() or ent:IsWeapon() or ent:IsRagdoll() or ent:GetMoveType() == MOVETYPE_VPHYSICS) then outlined[ent] = math.max(outlined[ent] or 0, remaining / ping.duration) end
+			end
+			if IsValid(ping.source) then outlined[ping.source] = math.max(outlined[ping.source] or 0, remaining / ping.duration) end
 		end
+	end
+	for ent, intensity in pairs(outlined) do
+		halo.Add({ent}, Color(115, 220, 255, math.floor(210 * intensity)), 2 + intensity * 4, 2 + intensity * 4, 1, true, true)
 	end
 end)
 

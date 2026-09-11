@@ -10,6 +10,15 @@ local function GiveRandomSupplies(ply, org)
 	end
 end
 
+util.AddNetworkString("hg_traits_nyctophobia_dark")
+
+net.Receive("hg_traits_nyctophobia_dark", function(_, ply)
+	if not IsValid(ply) or not ply:HasTrait("nyctophobia") then return end
+	if (ply.HGNyctophobiaUpdate or 0) > CurTime() then return end
+	ply.HGNyctophobiaUpdate = CurTime() + 0.35
+	ply.HGNyctophobiaDark = net.ReadBool()
+end)
+
 local function ApplySpawnTraits(ply)
 	if not IsValid(ply) or not ply:Alive() or not ply.organism then return end
 	local org = ply.organism
@@ -58,7 +67,30 @@ hook.Add("Org Think", "HGTraitsPhysiology", function(owner, org, timeValue)
 	if not IsValid(owner) or not owner:IsPlayer() then return end
 	if owner:HasTrait("hemolytic_anemia") or owner:HasTrait("john") then org.blood = math.max((org.blood or 0) - timeValue * 0.35, 0) end
 	if owner:HasTrait("naturally_hypertensive") then org.hypertension = math.max(org.hypertension or 0, 0.7) end
-	org.conditionResistanceMul = owner:HasTrait("biologically_efficient") and 0.7 or 1
+	org.conditionResistanceMul = owner:GetTraitMultiplier("condition_resistance", owner:HasTrait("biologically_efficient") and 0.7 or 1)
+	org.nyctophobiaDark = owner:HasTrait("nyctophobia") and owner.HGNyctophobiaDark or nil
+	if org.nyctophobiaDark then
+		local exposure = math.max(owner.HGNyctophobiaExposure or 0, 0) + timeValue
+		owner.HGNyctophobiaExposure = exposure
+		org.fearadd = math.min((org.fearadd or 0) + timeValue * math.min(0.25 + exposure * 0.015, 1.2), 3)
+		org.shock = math.min((org.shock or 0) + timeValue * math.min(0.1 + exposure * 0.01, 0.8), 95)
+	else
+		owner.HGNyctophobiaExposure = math.max((owner.HGNyctophobiaExposure or 0) - timeValue * 2, 0)
+	end
+	if owner:HasTrait("gurajchaka_child") then
+		org.fearadd = 0
+		org.panicattackadd = 0
+		org.panicattack = 0
+		org.panicattackActive = false
+		org.panicAdrenalineUntil = 0
+		org.adrenaline = 0
+		org.pain = math.min(org.pain or 0, 50)
+		org.avgpain = math.min(org.avgpain or 0, 50)
+		org.painadd = math.min(org.painadd or 0, 50)
+		org.headpainadd = math.min(org.headpainadd or 0, 50)
+		org.shock = math.min((org.shock or 0) * 0.7, 50)
+		org.goodmood = 1
+	end
 	if owner:HasTrait("biologically_efficient") then
 		if (org.heartstop or org.fibrillation or (org.arrhythmia or 0) > 0.65) and math.Rand(0, 1) < timeValue * 0.012 then
 			org.heartstop = false
@@ -67,6 +99,15 @@ hook.Add("Org Think", "HGTraitsPhysiology", function(owner, org, timeValue)
 			org.heartStrain = math.max((org.heartStrain or 0) - 0.2, 0)
 		end
 	end
+end)
+
+hook.Add("Fake", "HGTraitsVibramRecovery", function(ply)
+	if not IsValid(ply) or not ply:HasTrait("vibrams") then return end
+	timer.Simple(0.12, function()
+		if not IsValid(ply) or not ply:Alive() or not IsValid(ply.FakeRagdoll) then return end
+		ply.fakecd = 0
+		hg.FakeUp(ply, false, true)
+	end)
 end)
 
 local function TryClumsyWeaponDrop(ply, chance)
@@ -118,6 +159,19 @@ hook.Add("PlayerSay", "HGTraitsJohn", function(speaker, text)
 			dmg:SetAttacker(speaker)
 			dmg:SetInflictor(speaker)
 			ply:TakeDamageInfo(dmg)
+			timer.Simple(0, function()
+				local rag = IsValid(ply:GetNWEntity("RagdollDeath")) and ply:GetNWEntity("RagdollDeath") or ply.FakeRagdoll
+				if IsValid(rag) and Gib_Input then Gib_Input(rag, rag:LookupBone("ValveBiped.Bip01_Head1"), VectorRand(-900, 900), 1000) end
+			end)
 		end
 	end
+end)
+
+hook.Add("HG_PlayerSay", "HGTraitsAphasia", function(ply, textTable)
+	if not IsValid(ply) or not ply:HasTrait("aphasia") or not isstring(textTable[1]) then return end
+	local words = string.Explode(" ", textTable[1])
+	for index, word in ipairs(words) do
+		if #word > 2 and math.Rand(0, 1) < 0.55 then words[index] = string.sub(word, 1, math.max(1, math.ceil(#word * math.Rand(0.25, 0.7)))) end
+	end
+	textTable[1] = table.concat(words, " ")
 end)

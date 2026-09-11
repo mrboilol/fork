@@ -648,6 +648,7 @@ end)
 local PLAYER = FindMetaTable("Player")
 
 function PLAYER:Notify(...)
+    if self.HasTrait and self:HasTrait("gurajchaka_child") then return end
     return CreateNotification(self, ...)
 end
 
@@ -656,6 +657,7 @@ function PLAYER:NotifyBerserk(...)
 end
 
 function PLAYER:Thought(...)
+    if self.HasTrait and self:HasTrait("gurajchaka_child") then return end
     return CreateThought(self, ...)
 end
 

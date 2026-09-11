@@ -1427,6 +1427,11 @@ module[2] = function(owner, org, timeValue)
 		org.shock = math.Approach(org.shock, math.max(org.shock, 10 + effectiveHighK * 20), timeValue * (0.4 + effectiveHighK * 1.4))
 	end
 
+	local fearless = IsValid(owner) and owner.HasTrait and owner:HasTrait("gurajchaka_child")
+	if fearless then
+		org.fear = 0
+		org.fearadd = 0
+	else
 	org.fear = math.Approach(org.fear, (org.otrub and 0 or (org.fearadd > 0 and 1 or -1)), org.otrub and timeValue * 0.5 or (org.fearadd > 0 and (org.fear < 0 and timeValue * 5 * org.fearadd or timeValue / 5 * org.fearadd) or (org.fear <= 0 and timeValue / 240 or timeValue / 50)))
 	-- less time to start fearing, more time to become calm again
 	-- if no fear, in 3 minutes become slightly talkative, so would say random phrases to calm themselves in a current situation
@@ -1434,6 +1439,7 @@ module[2] = function(owner, org, timeValue)
 	org.fearadd = math.Approach(org.fearadd, 0, gainfear and timeValue or timeValue / 4.9) -- 15 seconds to stop fearing something and start to calm down
 	local fearGainRate = gainfear and timeValue / 5 or 0
 	org.fearadd = math.Approach(org.fearadd, 1, fearGainRate)
+	end
 	
 	-- Medication fills adrenalineAdd first; include that active dose so an
 	-- epinephrine injection can affect an arrest before its normal decay tick.
@@ -1569,6 +1575,12 @@ end
 util.AddNetworkString("pulse")
 function hg.organism.Pulse(owner, org, timeValue)
 	local stamina = org.stamina
+	if IsValid(owner) and owner.HasTrait and owner:HasTrait("gurajchaka_child") and not org.heartstop then
+		org.pulse = 70
+		org.heartbeat = 70
+		org.bloodPressure = 82
+		org.hypotension = math.min(org.hypotension or 0, 0.1)
+	end
 	if org.o2[1] > 1 and org.alive and org.heart < 1 and org.brain < 0.6 then
 		--org.brain = max(org.brain - timeValue / 30, 0) --regen
 	end--brain damage is usually permanent

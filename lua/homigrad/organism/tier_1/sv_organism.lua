@@ -795,6 +795,7 @@ end
 
 function hg.organism.AddPanicAttack(org, amount, silent, combatEvent, ignoreGunfightProtection, universalStressApplied)
 	if not org then return 0 end
+	if IsValid(org.owner) and org.owner.HasTrait and org.owner:HasTrait("gurajchaka_child") then return 0 end
 	if (org.fury13 or 0) > 0 then
 		org.panicattackadd = 0
 		org.panicattack = 0

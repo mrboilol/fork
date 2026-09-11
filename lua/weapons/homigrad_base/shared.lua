@@ -275,6 +275,7 @@ function SWEP:GetRecoilSupportMul()
 
 	local org = owner.organism or {}
 	if org.armstrength and org.armstrength > 0 and org.armstrength < 1 then mul = mul / org.armstrength end
+	mul = mul / (owner.GetTraitMultiplier and owner:GetTraitMultiplier("weapon_weight", 1) or 1)
 	return math.Clamp(mul, 0.65, 2.8), support.supportHands
 end
 

@@ -9,6 +9,7 @@ local plymeta = FindMetaTable("Player")
 Traits.Registry = Traits.Registry or {}
 Traits.StartingPoints = Traits.StartingPoints or 0
 Traits.MaxSelected = Traits.MaxSelected or 32
+local hg_johnmode = CreateConVar("hg_johnmode", "0", {FCVAR_REPLICATED, FCVAR_ARCHIVE, FCVAR_NOTIFY}, "Bypass trait conflicts and point costs", 0, 1)
 Traits.Categories = Traits.Categories or {
 	positive = true,
 	neutral = true,
@@ -111,6 +112,10 @@ function Traits.GetPointBalance(selection)
 	return balance
 end
 
+function Traits.IsJohnMode()
+	return hg_johnmode:GetBool()
+end
+
 function Traits.ValidateSelectionFormat(selection)
 	if selection == nil then return true end
 	if not istable(selection) then return false, "Trait selection is damaged" end
@@ -145,7 +150,22 @@ function Traits.ValidateSelection(selection, requireBalance)
 	end
 
 	local balance = Traits.GetPointBalance(normalized)
-	if requireBalance != false and balance < 0 then
+	if not Traits.IsJohnMode() then
+		for _, id in ipairs(normalized) do
+			local conflicts = Traits.Registry[id].Conflicts
+			if istable(conflicts) then
+				for _, conflict in ipairs(conflicts) do
+					for _, otherID in ipairs(normalized) do
+						local other = Traits.Registry[otherID]
+						if otherID != id and (otherID == conflict or other.Category == conflict) then
+							return false, balance, normalized, Traits.Registry[id].Name .. " cannot be combined with " .. other.Name
+						end
+					end
+				end
+			end
+		end
+	end
+	if requireBalance != false and balance < 0 and not Traits.IsJohnMode() then
 		return false, balance, normalized, "You need 0 or more trait points"
 	end
 
@@ -223,10 +243,13 @@ end
 
 function Traits.GetPlayerMultiplier(ply, key, default)
 	local value = tonumber(default) or 1
+	local hasVibrams = false
 	for _, id in ipairs(Traits.GetPlayerSelection(ply)) do
+		if id == "vibrams" then hasVibrams = true end
 		local modifier = Traits.Registry[id].Modifiers[key]
 		if isnumber(modifier) then value = value * modifier end
 	end
+	if key == "movement_speed" and hasVibrams and value < 1 then value = 1 - (1 - value) * 0.35 end
 	return value
 end
 
