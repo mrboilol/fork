@@ -786,12 +786,16 @@ function SWEP:FireBullet()
 	if numbullet > 1 then
 		local isShotgun = self.IsShotgun or self.Category == "Weapons - Shotguns"
 		local baseSpread = isShotgun and Vector(0.04, 0.04, 0) or (ammotype.Spread or self.Primary.Spread or 0) * 3
+		if self.ShotgunTubeReload and self.ShotgunManualCycle then
+			baseSpread = baseSpread * (self.ShotgunSpreadMul or 1 / 3)
+		end
 
 		local accuracyMul = 1
 		if isply then
 			if isnumber(baseSpread) then baseSpread = math.max(baseSpread, 0.00075) end
 			local speed = owner:GetVelocity():Length2D()
-			accuracyMul = accuracyMul * (1 + math.Clamp(speed / 220, 0, 1) * 0.9)
+			local speedMul = self:CanSprintFire() and 0.28 * self:GetSprintFireShake() or 0.9
+			accuracyMul = accuracyMul * (1 + math.Clamp(speed / 220, 0, 1) * speedMul)
 			accuracyMul = accuracyMul * (self:IsOwnerCrouching(owner) and 0.75 or 1)
 			accuracyMul = accuracyMul * (self:IsZoom() and 0.72 or 1)
 			accuracyMul = accuracyMul * (owner:OnGround() and 1 or 2.25)
