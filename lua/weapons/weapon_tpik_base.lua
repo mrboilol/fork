@@ -325,6 +325,7 @@ if CLIENT then
                     WorldModel:SetBoneMatrix(boneIndex,matrix)
                 end
             end
+
             WorldModel:DrawModel()
         end
 
