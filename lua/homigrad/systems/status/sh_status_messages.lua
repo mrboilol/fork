@@ -483,6 +483,8 @@ function hg.likely_to_phrase(ply)
 	local temperature = org.temperature
 	local o2 = org.o2 and org.o2[1] or 30
 	local bleedingOut = hg.IsActivelyBleeding(org)
+	local bleedoutStartBlood = hg.organism.BLEEDOUT_START_BLOOD or 2500
+	local bleedoutDeathBlood = hg.organism.BLEEDOUT_DEATH_BLOOD or 2000
 	local boneThoughtAge = org.just_damaged_bone and (CurTime() - org.just_damaged_bone)
 	local broken_dislocated = boneThoughtAge and boneThoughtAge >= 0 and boneThoughtAge <= 8
 	local adrenaline = org.adrenaline or 0
@@ -495,8 +497,8 @@ function hg.likely_to_phrase(ply)
 		or (o2 <= 15) and 4.5
 		or (hypotension > 0.5 and 0.55)
 		or (hypertension > 0.5 and 0.55)
-		or (bleedingOut and blood < 4000) and 4
-		or (bleedingOut and blood < 2500) and 3
+		or (bleedingOut and blood <= bleedoutStartBlood and blood > bleedoutDeathBlood) and 4
+		or (bleedingOut and blood <= bleedoutDeathBlood) and 3
 		or (broken_dislocated) and 5
 		or (pain > 65) and 5
 		or (panicattack > 0.55 and 1.2)
@@ -504,7 +506,7 @@ function hg.likely_to_phrase(ply)
 		or (panicattack > 0.1 and 0.2)
 		or (temperature < 35 and (temperature < 31 and 1.25 or 0.65))
 		or (temperature > 38 and (temperature >= 40 and 1.25 or 0.65))
-		or (blood < 3000 and 0.3)
+		or (blood <= bleedoutStartBlood and 0.3)
 		or (fearBoost > 0 and fearBoost)
 		or (brain > 0.1 and brain * 5)
 		or (fear < -0.5 and 0.05)
@@ -545,6 +547,8 @@ local function get_status_message(ply)
 	local broken_dislocated = boneThoughtAge and boneThoughtAge >= 0 and boneThoughtAge <= 8
 	local o2 = org.o2 and org.o2[1] or 30
 	local bleedingOut = hg.IsActivelyBleeding(org)
+	local bleedoutStartBlood = hg.organism.BLEEDOUT_START_BLOOD or 2500
+	local bleedoutDeathBlood = hg.organism.BLEEDOUT_DEATH_BLOOD or 2000
 	local fear = org.fear or 0
 	local adrenaline = org.adrenaline or 0
 	local arrhythmia = org.arrhythmia or 0
@@ -590,13 +594,7 @@ local function get_status_message(ply)
 		-- those callouts.
 		most_wanted_phraselist = near_death_poetic
 		statusThoughtKey = "lowoxy"
-	elseif bleedingOut and blood < 4000 then
-		most_wanted_phraselist = near_death_poetic
-		statusThoughtKey = "blood2"
-	elseif bleedingOut and blood < 3750 then
-		-- sv_blood owns the immediate faintness and hemorrhage alerts. Blood loss
-		-- still gets priority for recurring status thoughts, but shares the same
-		-- dying pool as the other terminal conditions.
+	elseif bleedingOut and blood <= bleedoutStartBlood then
 		most_wanted_phraselist = near_death_poetic
 		statusThoughtKey = "blood2"
 	elseif pain > 100 then
@@ -628,7 +626,7 @@ local function get_status_message(ply)
 		end
 	elseif temperature > 38 then
 		most_wanted_phraselist = temperature >= 40 and heatstroke_phraselist or hot_phraselist
-	elseif ((bleedingOut and blood < 3250 and heartbeat >= 30 and heartbeat <= 250) or (broken_dislocated) or (broken_notify) or (dislocated_notify)) then
+	elseif ((bleedingOut and blood <= bleedoutStartBlood and heartbeat >= 30 and heartbeat <= 250) or (broken_dislocated) or (broken_notify) or (dislocated_notify)) then
 		if pain > 75 and (broken_dislocated) then
 			most_wanted_phraselist = math.random(2) == 1 and audible_pain or (broken_notify and broken_limb or dislocated_limb)
 		elseif pain > 75 then
@@ -638,9 +636,9 @@ local function get_status_message(ply)
 		end
 
 		if not most_wanted_phraselist then
-			if (broken_notify or dislocated_notify) and bleedingOut and blood < 3100 then
-				most_wanted_phraselist = blood < 2900 and (near_death_poetic) or (math.random(2) == 1 and (broken_notify and broken_limb or dislocated_limb) or near_death_poetic)
-			elseif bleedingOut and blood < 3100 then
+			if (broken_notify or dislocated_notify) and bleedingOut and blood <= bleedoutDeathBlood then
+				most_wanted_phraselist = near_death_poetic
+			elseif bleedingOut and blood <= bleedoutStartBlood then
 				most_wanted_phraselist = positive_thinking and near_death_positive or near_death_poetic
 			end
 		end
@@ -769,10 +767,12 @@ function hg.get_notify_color(ply)
 	local lasthit = org.lasthit or 0
 	local recentDamage = lasthit > 0 and (CurTime() - lasthit) < 3
 
-	local dyingBlood = blood < 3750
+	local bleedoutStartBlood = hg.organism.BLEEDOUT_START_BLOOD or 2500
+	local bleedoutDeathBlood = hg.organism.BLEEDOUT_DEATH_BLOOD or 2000
+	local dyingBlood = blood <= bleedoutStartBlood
 	local dyingO2 = o2 <= 15
 	local dyingPulse = pulse < 40 and pulse > 0
-	local dying = dyingO2 or dyingPulse or (blood < 2500) or dyingBlood
+	local dying = dyingO2 or dyingPulse or blood <= bleedoutDeathBlood or dyingBlood
 	local inPain = pain > 30
 	local inShock = shock > 20
 	local inAdrenalineOrFear = (adrenaline > 0.5) or (fear > 0.5)
@@ -785,7 +785,7 @@ function hg.get_notify_color(ply)
 
 	if dying then
 		local tO2 = dyingO2 and math.Clamp(1 - (o2 / 12), 0, 1) or 0
-		local tBlood = dyingBlood and math.Clamp(1 - (blood / 3750), 0, 1) or 0
+		local tBlood = dyingBlood and math.Clamp((bleedoutStartBlood - blood) / math.max(bleedoutStartBlood - bleedoutDeathBlood, 1), 0, 1) or 0
 		local t = math.max(tO2, tBlood)
 		local gray = math.floor(220 - t * 70)
 		return Color(

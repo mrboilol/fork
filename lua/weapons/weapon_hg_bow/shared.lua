@@ -31,6 +31,7 @@ SWEP.WorkWithFake = true
 SWEP.modelscale = 1
 SWEP.modelscale2 = 0.8
 SWEP.WorldModel = "models/z_city/nmrih/weapons/bow/w_bow_deerhunter.mdl"
+SWEP.CameraBone = "camera_bone"
 SWEP.weight = 1.5
 SWEP.AnimList = {
 	["deploy"] = {"draw", 1, false, false, function(self)

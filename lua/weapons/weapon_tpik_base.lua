@@ -426,6 +426,15 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen)
 	eyePos = eyePos - eyeAng:Right() * y * 0.5
 
 	view.origin = (eyePos - (angle_difference_localvec * 150) - (position_difference * 0.5))
+
+	if self.CameraBone and IsValid(owner) and owner:IsPlayer() and self:IsLocal() and hg.KeyDown(owner, IN_ATTACK2) then
+		local model = self:GetWM()
+		local bone = IsValid(model) and model:LookupBone(self.CameraBone)
+		local matrix = bone and model:GetBoneMatrix(bone)
+		if matrix then
+			view.origin = matrix:GetTranslation() + view.origin - eyePos
+		end
+	end
     
     return view
 end

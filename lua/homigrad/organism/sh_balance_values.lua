@@ -1,6 +1,9 @@
 hg = hg or {}
 hg.organism = hg.organism or {}
 
+hg.organism.BLEEDOUT_START_BLOOD = 2500
+hg.organism.BLEEDOUT_DEATH_BLOOD = 2000
+
 function hg.organism.GetLimitingReserve(...)
 	local reserve = 1
 	for index = 1, select("#", ...) do

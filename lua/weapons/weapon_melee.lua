@@ -2383,6 +2383,14 @@ function SWEP:AbortBlockedAttack()
     self:ClearChargeState()
 end
 
+function SWEP:StopAttackOnArmorImpact(trace, attacktype)
+    if not trace or not trace.HGArmorModelContact then return false end
+
+    self:SendMeleeHitStop(attacktype, trace.HitNormal)
+    self:AbortBlockedAttack()
+    return true
+end
+
 function SWEP:ShouldStopAttackOnBlockState(state)
     if state == "block" or state == "parry" then
         return self.StopOnBlockedHit ~= false
@@ -3257,6 +3265,8 @@ function SWEP:CustomThink()
             if self:ShouldAbortForClash() then return end
             if trace.HGClash then return end
 
+            if trace.HGEquipmentContact and self:StopAttackOnArmorImpact(trace, 1) then return end
+
             local ent = trace.Entity
 
             local shouldhit = (IsValid(ent) or ent:IsWorld())
@@ -3313,6 +3323,7 @@ function SWEP:CustomThink()
             if self.SwingDamageDebug and IsValid(owner) then owner:PrintMessage(HUD_PRINTCONSOLE, "[SwingDmg] speed=" .. math.Round(self.SwingSpeed or 0) .. " deg/s  mul=x" .. math.Round(self.SwingDamageMul or 1, 2) .. "  dmg=" .. math.Round(dmg)) end
 
             if self:AlreadyHit(ent, trace) then
+                if self:StopAttackOnArmorImpact(trace, 1) then return end
                 goto meleeskip1
             end
             
@@ -3381,6 +3392,7 @@ function SWEP:CustomThink()
 
                 if hgIsDoor and hgIsDoor(ent) then ent.SDD_LastMeleeHit = CurTime() end
                 self:PrimaryAttackAdd(ent, trace)
+                if self:StopAttackOnArmorImpact(trace, 1) then return end
                 if blockState == "none" and self:TryLodgeMeleeWeapon(ent, trace, 1) then return end
             end
 
@@ -3422,6 +3434,8 @@ function SWEP:CustomThink()
             if !trace then return end
             if self:ShouldAbortForClash() then return end
             if trace.HGClash then return end
+
+            if trace.HGEquipmentContact and self:StopAttackOnArmorImpact(trace, 2) then return end
 
             local ent = trace.Entity
 
@@ -3485,6 +3499,7 @@ function SWEP:CustomThink()
             if self.SwingDamageDebug and IsValid(owner) then owner:PrintMessage(HUD_PRINTCONSOLE, "[SwingDmg] speed=" .. math.Round(self.SwingSpeed or 0) .. " deg/s  mul=x" .. math.Round(self.SwingDamageMul or 1, 2) .. "  dmg=" .. math.Round(dmg)) end
 
             if self:AlreadyHit(ent, trace) then
+                if self:StopAttackOnArmorImpact(trace, 2) then return end
                 goto meleeskip2
             end
 
@@ -3552,6 +3567,7 @@ function SWEP:CustomThink()
 
                 if hgIsDoor and hgIsDoor(ent) then ent.SDD_LastMeleeHit = CurTime() end
                 self:SecondaryAttackAdd(ent, trace)
+                if self:StopAttackOnArmorImpact(trace, 2) then return end
             end
 
             if blockState == "none" and soft then
@@ -3602,6 +3618,8 @@ function SWEP:CustomThink()
             if !trace then return end
             if self:ShouldAbortForClash() then return end
             if trace.HGClash then return end
+
+            if trace.HGEquipmentContact and self:StopAttackOnArmorImpact(trace, 3) then return end
 
             local ent = trace.Entity
 
@@ -3672,6 +3690,7 @@ function SWEP:CustomThink()
             if self.SwingDamageDebug and IsValid(owner) then owner:PrintMessage(HUD_PRINTCONSOLE, "[SwingDmg] speed=" .. math.Round(self.SwingSpeed or 0) .. " deg/s  mul=x" .. math.Round(self.SwingDamageMul or 1, 2) .. "  dmg=" .. math.Round(dmg)) end
 
             if self:AlreadyHit(ent, trace) then
+                if self:StopAttackOnArmorImpact(trace, 3) then return end
                 goto meleeskip3
             end
             
@@ -3739,6 +3758,7 @@ function SWEP:CustomThink()
 
                 if hgIsDoor and hgIsDoor(ent) then ent.SDD_LastMeleeHit = CurTime() end
                 self:ChargeAttackAdd(ent, trace, dmginfo)
+                if self:StopAttackOnArmorImpact(trace, 3) then return end
                 if blockState == "none" and self:TryLodgeMeleeWeapon(ent, trace, 3) then return end
             end
 

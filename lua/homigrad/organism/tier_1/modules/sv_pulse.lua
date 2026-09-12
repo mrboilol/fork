@@ -60,7 +60,9 @@ end
 local function getHemorrhageDanger(blood)
 	local normalBlood = math.max(tonumber((hg.organism.config or {}).NORMAL_BLOOD_VOLUME_ML) or hg.organism.normalBloodVolume or 5000, 1)
 	local volumeFraction = math.Clamp((tonumber(blood) or normalBlood) / normalBlood, 0, 1)
-	return math.Clamp((0.60 - volumeFraction) / 0.20, 0, 1) ^ 1.2
+	local startFraction = math.Clamp((hg.organism.BLEEDOUT_START_BLOOD or 2500) / normalBlood, 0, 1)
+	local deathFraction = math.min((hg.organism.BLEEDOUT_DEATH_BLOOD or 2000) / normalBlood, math.max(startFraction - 0.01, 0))
+	return math.Clamp((startFraction - volumeFraction) / math.max(startFraction - deathFraction, 0.01), 0, 1) ^ 1.2
 end
 
 local function updateStrokeRisk(org, timeValue)

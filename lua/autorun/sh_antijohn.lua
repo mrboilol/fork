@@ -16,17 +16,17 @@ if SERVER then
 	util.AddNetworkString("hg_antijohn_warning")
 
 	local warningWords = {
-		"Dont do that.",
-		"Leave it alone.",
-		"That isn't yours.",
-		"Put it back."
+		"cut that out",
+		"thats for grown ups",
+		"stop",
+		"no"
 	}
 
 	local punishmentWords = {
-		"You were warned.",
-		"Stop.",
+		"stop nigga",
+		"back to the lobby",
 		"This is your last mistake.",
-		"No."
+		"ayo diddy"
 	}
 
 	local function splitList(value, splitWhitespace)
