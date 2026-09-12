@@ -18,8 +18,6 @@ function hg.CanUseLeftHand(ply)
 		holdingwheel = hg.GetCarSteering(Car) > 0
 	end
 
-	local deploying = wep and (wep.deploy and (wep.deploy - CurTime()) > (wep.CooldownDeploy / 2) or wep.holster and (wep.holster - CurTime()) < (wep.CooldownHolster / 2))
-
 	local chatgesture = (ply:GetTable().ChatGestureWeight or 0) > 0.1
 	local tauntleft = ply:GetNWBool("TauntLeftHand", false) and ply:GetNWFloat("StartTaunt", 0) + 0.1 < CurTime()
 	local flashlight = IsValid(ply.flashlight)
@@ -35,12 +33,6 @@ function hg.CanUseLeftHand(ply)
 			if tauntleft then reasons[#reasons + 1] = "taunt" end
 			if flashlight then reasons[#reasons + 1] = "flashlight" end
 		end
-		if deploying then
-			local detail = "deploy"
-			if wep and wep.deploy then detail = detail .. " d=" .. math.Round(wep.deploy - CurTime(), 2) end
-			if wep and wep.holster then detail = detail .. " h=" .. math.Round(wep.holster - CurTime(), 2) end
-			reasons[#reasons + 1] = detail
-		end
 		if fingerpose then reasons[#reasons + 1] = "fingerpose" end
 		if vehiclenowep then reasons[#reasons + 1] = "vehicle" end
 		if #reasons > 0 then
@@ -48,7 +40,7 @@ function hg.CanUseLeftHand(ply)
 		end
 	end
 
-	return (not (((chatgesture or tauntleft or flashlight) and nothandcuffed and notreload) or (deploying) or (fingerpose) or (vehiclenowep))) or ply.zmanipstart
+	return (not (((chatgesture or tauntleft or flashlight) and nothandcuffed and notreload) or (fingerpose) or (vehiclenowep))) or ply.zmanipstart
 end
 
 function hg.CanUseRightHand(ply)

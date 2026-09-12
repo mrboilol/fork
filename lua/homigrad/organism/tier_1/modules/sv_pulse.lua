@@ -8,6 +8,7 @@ local module = hg.organism.module.pulse
 -- Delivery approaches zero with actual circulating volume; sustained severe
 -- loss also contributes a smooth collapse hazard rather than a hard cutoff.
 local terminalHeartRate = 300
+local hemorrhageMaxCompensatedHeartRate = 250
 local peaDuration = 6
 local cardiacArrestMechanicalDecayTime = 14
 local hypotensionComplicationTime = 45
@@ -232,7 +233,7 @@ local function getBloodCompensationRate(blood)
 	local reserve = getBloodPerfusion(blood)
 	local response = hg.organism.GetHemorrhageCompensationDrive and hg.organism.GetHemorrhageCompensationDrive(blood)
 		or math.Clamp(1 - reserve, 0, 1)
-	local maxRate = cfg.HEMORRHAGE_MAX_COMPENSATED_HR or 300
+	local maxRate = cfg.HEMORRHAGE_MAX_COMPENSATED_HR or hemorrhageMaxCompensatedHeartRate
 	-- Hemorrhage drives the electrical rate toward terminal tachycardia. The
 	-- weak palpable pulse and falling pressure are downstream consequences of
 	-- poor filling; they must not turn the blood-loss rhythm into an early
@@ -1013,8 +1014,9 @@ module[2] = function(owner, org, timeValue)
 	if org.heartstop and defibGrace then myocardialTarget = math.max(myocardialTarget, 0.25) end
 	org.myocardialOxygen = Approach(org.myocardialOxygen or 1, myocardialTarget, timeValue / 8)
 	local pressureHypotensionTarget = Clamp(Remap(pressureCirculation, 0.98, 0.22, 0, 1), 0, 1)
+	local pulseHypotensionTarget = Clamp((70 - math.max(tonumber(org.pulse) or 0, 0)) / 40, 0, 1)
 	local rhythmHypotensionTarget = rhythmInstability * (org.fibrillation and 0.85 or 0.48)
-	local hypotensionTarget = math.max(pressureHypotensionTarget, rhythmHypotensionTarget)
+	local hypotensionTarget = math.max(pressureHypotensionTarget, pulseHypotensionTarget, rhythmHypotensionTarget)
 	local hypotensionRate = highSpeedPressureShock > 0.25 and timeValue / 2.5 or timeValue / 8
 	org.hypotension = Approach(org.hypotension or 0, hypotensionTarget, hypotensionRate)
 	local arrhythmiaComplicationTarget = math.Clamp(rhythmInstability * (0.45 + (1 - pressureCirculation) * 0.55), 0, 1)
@@ -1313,6 +1315,7 @@ module[2] = function(owner, org, timeValue)
 	if bradyTarget and not org.fibrillation then heartbeat = math.min(heartbeat, bradyTarget) end
 
 	org.heartbeat = math.Approach(org.heartbeat, heartbeat, heartbeat > org.heartbeat and timeValue * 5 or timeValue * 3)
+	org.heartbeat = math.Clamp(org.heartbeat, 0, terminalHeartRate)
 	
 	local ischemia = Clamp(1 - (org.myocardialOxygen or 1), 0, 1)
 	local internalBleedPeak = math.max(tonumber(org.internalBleedPeak) or 0, tonumber(org.internalBleed) or 0, 0)

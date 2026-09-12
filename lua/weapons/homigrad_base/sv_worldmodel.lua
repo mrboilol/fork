@@ -1,7 +1,7 @@
 --
 util.AddNetworkString("addpredictable")
 function SWEP:CreateWorldModel()
-	local model = ents.Create("prop_physics")--ents.Create("homigrad_gun")
+	local model = ents.Create("base_anim")
 	if not IsValid(model) then return end
 
 	model:SetNoDraw(not hg.show_weapons)
@@ -9,11 +9,8 @@ function SWEP:CreateWorldModel()
 	model:SetModelScale(self.WorldModelFake and self.FakeScale or 1, 0)
 	model:SetMaterial("models/wireframe")
 	model:Spawn()
-	timer.Simple(0,function()
-		if !IsValid(model) then return end
-		model:PhysicsDestroy()
-	end)
 	model:SetMoveType(MOVETYPE_NONE)
+	model:SetSolid(SOLID_NONE)
 	model:SetNWBool("nophys", true)
 	model:SetSolidFlags(FSOLID_NOT_SOLID)
 	model:AddEFlags(EFL_NO_DISSOLVE + EFL_NO_DAMAGE_FORCES + EFL_DONTBLOCKLOS)

@@ -31,6 +31,10 @@ local pain_drain_otrub_mul = 4.5
 local pain_syncope_start = 55
 local pain_syncope_full = 120
 local pain_syncope_max_rate = 0.055
+local otrub_wake_threshold_delay = 5
+local otrub_wake_threshold_ramp_time = 50
+local otrub_wake_shock_max = 50
+local otrub_wake_pain_max = 75
 
 function hg.organism.GetAdrenalinePainPacing(adrenaline)
 	adrenaline = max(adrenaline or 0, 0)
@@ -61,7 +65,7 @@ function hg.organism.AddPain(org, amount, region)
 	if amount <= 0 or not hg.organism.CanFeelPain(org, region) then return 0 end
 
 	local key = region == "head" and "headpainadd" or "painadd"
-	local painCap = IsValid(owner) and owner:HasTrait("gurajchaka_child") and 50 or 150
+	local painCap = IsValid(owner) and owner.HasTrait and owner:HasTrait("gurajchaka_child") and 50 or 150
 	org[key] = math.min((org[key] or 0) + amount, painCap)
 	return amount
 end
@@ -72,7 +76,7 @@ function hg.organism.AddInstantPain(org, amount, region)
 	if IsValid(owner) and owner.GetTraitMultiplier then amount = amount * owner:GetTraitMultiplier("pain_received", 1) end
 	if amount <= 0 or not hg.organism.CanFeelPain(org, region) then return 0 end
 
-	local painCap = IsValid(owner) and owner:HasTrait("gurajchaka_child") and 50 or 150
+	local painCap = IsValid(owner) and owner.HasTrait and owner:HasTrait("gurajchaka_child") and 50 or 150
 	org.avgpain = math.min((org.avgpain or 0) + amount, painCap)
 	return amount
 end
@@ -315,7 +319,14 @@ module[2] = function(owner, org, timeValue)
 
 
 	local consciousnessResistance = 1 - resilience * 0.3
-	if org.consciousness < consciousness_otrub_threshold * consciousnessResistance then
+	local unconsciousTime = max((org.uncon_timer or 0) - otrub_wake_threshold_delay, 0)
+	local wakeThresholdProgress = Clamp(unconsciousTime / otrub_wake_threshold_ramp_time, 0, 1)
+	local wakeShockThreshold = otrub_wake_shock_max * wakeThresholdProgress
+	local wakePainThreshold = otrub_wake_pain_max * wakeThresholdProgress
+	local recoveryBlocked = org.otrub and (org.shock > wakeShockThreshold or org.pain > wakePainThreshold)
+	local persistentConsciousnessCause = org.tranquilizer > 0 or brainSeverity > 0 or hemorrhageSeverity > 0
+	local consciousnessTooLow = org.consciousness < consciousness_otrub_threshold * consciousnessResistance
+	if recoveryBlocked or (consciousnessTooLow and (not org.otrub or persistentConsciousnessCause)) then
 		org.needotrub = true
 
 	end

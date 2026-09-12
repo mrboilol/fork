@@ -2384,7 +2384,7 @@ function SWEP:AbortBlockedAttack()
 end
 
 function SWEP:StopAttackOnArmorImpact(trace, attacktype)
-    if not trace or not trace.HGArmorModelBlocked then return false end
+    if not trace or not (trace.HGArmorModelBlocked or trace.HGEquipmentWeapon or trace.HGEquipmentHeldEntity) then return false end
 
     self:SendMeleeHitStop(attacktype, trace.HitNormal)
     self:AbortBlockedAttack()

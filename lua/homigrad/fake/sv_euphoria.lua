@@ -39,10 +39,11 @@ local EUPHORIA_CURL_TRIGGER = 2
 local EUPHORIA_CURL_MIN_DAMAGE = 8
 local EUPHORIA_CURL_EASE = 0.3
 
-local EUPHORIA_MAX_VELOCITY = 600
-local EUPHORIA_ROOT_MAX_VELOCITY = 450
-local EUPHORIA_MAX_ANGULAR = 1200
-local EUPHORIA_FALL_SKIP_SPEED = 250
+local EUPHORIA_MAX_HORIZONTAL_VELOCITY = 400
+local EUPHORIA_MAX_UPWARD_VELOCITY = 220
+local EUPHORIA_MAX_RELATIVE_VELOCITY = 500
+local EUPHORIA_MAX_ANGULAR = 900
+local EUPHORIA_MAX_TIMESTEP = 0.05
 
 local function clampVec(vec, max)
 	local len = vec:Length()
@@ -51,40 +52,57 @@ local function clampVec(vec, max)
 end
 
 hook.Add("Think", "HG_EuphoriaSafety", function()
-	local maxV = EUPHORIA_MAX_VELOCITY
-	local maxRootV = EUPHORIA_ROOT_MAX_VELOCITY
-	local maxAV = EUPHORIA_MAX_ANGULAR
-
 	for i, ply in player.Iterator() do
 		local ragdoll = ply.FakeRagdoll
 		if not IsValid(ragdoll) then continue end
 		if ragdoll.isSliding or ragdoll.isDropkicking then continue end
 		if ragdoll:IsPlayerHolding() then continue end
 
-		local root = ragdoll:GetPhysicsObject()
-		if IsValid(root) then
-			local v = root:GetVelocity()
-			if v.z >= -EUPHORIA_FALL_SKIP_SPEED and v:LengthSqr() > maxRootV * maxRootV then
-				root:SetVelocity(clampVec(v, maxRootV))
-			end
+		local commonVelocity = Vector(0, 0, 0)
+		local totalMass = 0
+		for j = 0, ragdoll:GetPhysicsObjectCount() - 1 do
+			local phys = ragdoll:GetPhysicsObjectNum(j)
+			if not IsValid(phys) then continue end
+			local mass = math.max(phys:GetMass(), 1)
+			commonVelocity = commonVelocity + phys:GetVelocity() * mass
+			totalMass = totalMass + mass
 		end
+		if totalMass <= 0 then continue end
+
+		commonVelocity = commonVelocity / totalMass
+		local safeCommon = Vector(commonVelocity.x, commonVelocity.y, math.min(commonVelocity.z, EUPHORIA_MAX_UPWARD_VELOCITY))
+		local horizontal = Vector(safeCommon.x, safeCommon.y, 0)
+		if horizontal:LengthSqr() > EUPHORIA_MAX_HORIZONTAL_VELOCITY * EUPHORIA_MAX_HORIZONTAL_VELOCITY then
+			horizontal = clampVec(horizontal, EUPHORIA_MAX_HORIZONTAL_VELOCITY)
+			safeCommon.x = horizontal.x
+			safeCommon.y = horizontal.y
+		end
+		local commonCorrection = safeCommon - commonVelocity
 
 		for j = 0, ragdoll:GetPhysicsObjectCount() - 1 do
 			local phys = ragdoll:GetPhysicsObjectNum(j)
 			if not IsValid(phys) then continue end
 
-			local v = phys:GetVelocity()
-			if v.z >= -EUPHORIA_FALL_SKIP_SPEED and v:LengthSqr() > maxV * maxV then
-				phys:SetVelocity(clampVec(v, maxV))
+			local velocity = phys:GetVelocity() + commonCorrection
+			local relativeVelocity = velocity - safeCommon
+			local velocityChanged = commonCorrection:LengthSqr() > 0.0001
+			if relativeVelocity:LengthSqr() > EUPHORIA_MAX_RELATIVE_VELOCITY * EUPHORIA_MAX_RELATIVE_VELOCITY then
+				velocity = safeCommon + clampVec(relativeVelocity, EUPHORIA_MAX_RELATIVE_VELOCITY)
+				velocityChanged = true
 			end
+			if velocityChanged then phys:SetVelocity(velocity) end
 
 			local av = phys:GetAngleVelocity()
-			if av:LengthSqr() > maxAV * maxAV then
-				phys:SetAngleVelocity(clampVec(av, maxAV))
+			if av:LengthSqr() > EUPHORIA_MAX_ANGULAR * EUPHORIA_MAX_ANGULAR then
+				phys:SetAngleVelocity(clampVec(av, EUPHORIA_MAX_ANGULAR))
 			end
 		end
 	end
 end)
+
+local function reactionDelta(now, previous)
+	return math.Clamp((now - (previous or now)) * game.GetTimeScale(), 0, EUPHORIA_MAX_TIMESTEP)
+end
 
 local function isFloppyBone(ragdoll, physNum)
 	local floppy = ragdoll.hg_floppy_bones
@@ -343,7 +361,7 @@ hook.Add("Think", "HG_EuphoriaSettle", function()
 			continue
 		end
 
-		local dtime = (now - (ragdoll.hgSettleLast or now)) * game.GetTimeScale()
+		local dtime = reactionDelta(now, ragdoll.hgSettleLast)
 		ragdoll.hgSettleLast = now
 		if dtime <= 0 then continue end
 
@@ -393,7 +411,7 @@ hook.Add("Think", "HG_EuphoriaWound", function()
 			continue
 		end
 
-		local dtime = (now - (ragdoll.hgWoundLast or now)) * game.GetTimeScale()
+		local dtime = reactionDelta(now, ragdoll.hgWoundLast)
 		ragdoll.hgWoundLast = now
 		if dtime <= 0 then continue end
 
@@ -480,8 +498,9 @@ hook.Add("Think", "HG_EuphoriaLegRest", function()
 			right = Vector(1, 0, 0)
 		end
 
-		local dtime = (SysTime() - (ragdoll.hgLegRestLast or SysTime())) * game.GetTimeScale()
-		ragdoll.hgLegRestLast = SysTime()
+		local stepNow = SysTime()
+		local dtime = reactionDelta(stepNow, ragdoll.hgLegRestLast)
+		ragdoll.hgLegRestLast = stepNow
 		if dtime <= 0 or dtime > 0.1 then continue end
 
 		legRestShadow(lFoot, target - right * 3, 800, 40, dtime)
@@ -536,7 +555,7 @@ hook.Add("Think", "HG_EuphoriaCurl", function()
 		local stiffness = 700 * ease
 		local damping = 45
 
-		local dtime = (now - (ragdoll.hgCurlLast or now)) * game.GetTimeScale()
+		local dtime = reactionDelta(now, ragdoll.hgCurlLast)
 		ragdoll.hgCurlLast = now
 		if dtime <= 0 or dtime > 0.1 then continue end
 
@@ -578,7 +597,7 @@ hook.Add("Think", "HG_EuphoriaWallGrab", function()
 				continue
 			end
 
-			local dtime = (now - (ragdoll.hgWallGrabLast or now)) * game.GetTimeScale()
+			local dtime = reactionDelta(now, ragdoll.hgWallGrabLast)
 			ragdoll.hgWallGrabLast = now
 			if dtime <= 0 then continue end
 
@@ -653,7 +672,7 @@ hook.Add("Think", "HG_EuphoriaGetUp", function()
 			continue
 		end
 
-		local dtime = (now - (ragdoll.hgGetUpLast or now)) * game.GetTimeScale()
+		local dtime = reactionDelta(now, ragdoll.hgGetUpLast)
 		ragdoll.hgGetUpLast = now
 		if dtime <= 0 then continue end
 
@@ -710,8 +729,9 @@ hook.Add("Think", "HG_EuphoriaTension", function()
 		end
 		if ragdoll.hgWallSmear then continue end
 
-		local dt = (SysTime() - (ragdoll.hgEuphoriaLast or SysTime())) * game.GetTimeScale()
-		ragdoll.hgEuphoriaLast = SysTime()
+		local stepNow = SysTime()
+		local dt = reactionDelta(stepNow, ragdoll.hgEuphoriaLast)
+		ragdoll.hgEuphoriaLast = stepNow
 		tensionBones(ragdoll, ragdoll.hgTensionStrength or 1, dt, ragdoll.hgTensionLinear ~= false)
 	end
 end)
@@ -757,7 +777,7 @@ hook.Add("Think", "HG_EuphoriaWallSmear", function()
 			continue
 		end
 
-		local dtime = (now - (ragdoll.hgWallSmearLast or now)) * game.GetTimeScale()
+		local dtime = reactionDelta(now, ragdoll.hgWallSmearLast)
 		ragdoll.hgWallSmearLast = now
 		if dtime <= 0 then continue end
 
@@ -802,7 +822,7 @@ hook.Add("Think", "HG_EuphoriaAmputee", function()
 			continue
 		end
 
-		local dtime = (now - (ragdoll.hgAmputeeLast or now)) * game.GetTimeScale()
+		local dtime = reactionDelta(now, ragdoll.hgAmputeeLast)
 		ragdoll.hgAmputeeLast = now
 		if dtime <= 0 then continue end
 

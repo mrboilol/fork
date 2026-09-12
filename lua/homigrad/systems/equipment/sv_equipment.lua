@@ -836,7 +836,7 @@ local function GetEquippedArmorCondition(owner, armor, placement, armorData)
 	return math.Clamp((owner.armors_health and owner.armors_health[armor] or maximum) / maximum, 0, 1)
 end
 
-function hg.TryKnockOffHelmet(owner, placement, armor, armorData, dmgInfo, hitPos, ballistic, direction)
+function hg.TryKnockOffHelmet(owner, placement, armor, armorData, dmgInfo, hitPos, ballistic, direction, modelHit)
 	if placement ~= "head" or not IsValid(owner) or not armorData or armorData.nodrop then return false end
 	if IsArmorBreakProtected(owner) or not owner.armors or owner.armors[placement] ~= armor then return false end
 
@@ -852,12 +852,13 @@ function hg.TryKnockOffHelmet(owner, placement, armor, armorData, dmgInfo, hitPo
 	local chance
 	if isBullet then
 		local caliber = math.Clamp((diameter - 4) / 9, 0, 1.35)
-		chance = 0.025 + caliber * 0.18 + severity * 0.16 + math.Clamp(penetration / 35, 0, 1) * 0.1
+		chance = 0.015 + caliber * 0.1 + severity * 0.08 + math.Clamp(penetration / 35, 0, 1) * 0.05
 	else
-		chance = 0.025 + severity * 0.24
+		chance = 0.02 + severity * 0.18
 	end
-	chance = chance + (1 - condition) * 0.16
-	chance = chance / math.Clamp((tonumber(armorData.mass) or 2) / 3, 0.65, 2)
+	chance = chance + (1 - condition) * 0.12
+	chance = chance / math.Clamp((tonumber(armorData.mass) or 2) / 3, 0.8, 2)
+	if modelHit then chance = chance * 1.35 end
 	chance = math.Clamp(tonumber(armorData.knockoffChance) or chance, 0, 0.72)
 	if math.Rand(0, 1) > chance then return false end
 
@@ -1213,7 +1214,7 @@ function hg.ProcessArmorModelHit(hit, damage, forceAmount, direction, shot)
 	dmgInfo:SetDamageForce(forceVector)
 
 	local isBullet = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
-	if hg.TryKnockOffHelmet(owner, placement, armor, armorData, dmgInfo, hit.position, shot, dir) then
+	if hg.TryKnockOffHelmet(owner, placement, armor, armorData, dmgInfo, hit.position, shot, dir, true) then
 		return {scale = 0, penetration = 0, stopped = true, dropped = true, material = MAT_METAL}
 	end
 

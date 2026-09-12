@@ -677,7 +677,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	local oldDmg = org.skull
 	local oldBrain = org.brain or 0
 	local ignoreBrainDamage = hg.organism.IsBrainDamageIgnored and hg.organism.IsBrainDamageIgnored(org)
-	local brainEnergy = impact and impact.source == "physics" and math.max(impact.residualEnergy or 0, 0) or dmg
+	local brainEnergy = impact and impact.source == "physics" and math.max(impact.brainEnergy or impact.residualEnergy or 0, 0) or dmg
 	local headOutcomeHandled = impact and impact.headOutcomeHandled
 	
 	local result, vecrand = damageBone(org, 0.25, dmg, dmgInfo, "skull", boneindex, dir, hit, ricochet)
@@ -713,6 +713,9 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	org.consciousness = math.Approach(org.consciousness, 0, rnd and dmg * 2 or 0)
 
 	org.brain = math.min(org.brain + (rnd and dmg * 0.05 or 0), 1)
+	if not ignoreBrainDamage and impact and impact.source == "physics" and oldDmg >= 1 and brainEnergy > 0.05 then
+		org.brain = math.min(org.brain + math.Clamp(brainEnergy * 0.06, 0.005, 0.12), 1)
+	end
 
 	if math.random(1, 4) == 1 then
 		local eye_dmg = dmg * math.Rand(0.8, 1.5)

@@ -90,8 +90,6 @@ local function applyOrganTrauma(org, dmgInfo, force, delta, previousDamage, orga
 	if (org.traumaReactionAt or 0) > CurTime() then return end
 	org.traumaReactionAt = CurTime() + 0.35
 
-	local direction = traumaDirection(org, dmgInfo)
-	owner:SetVelocity(direction * math.Clamp(75 + severity * 90, 75, 300) + vector_up * math.Clamp(20 + severity * 35, 20, 140))
 	addPain(org, severity * 9, string.StartWith(organ or "", "brain") and "head" or "body")
 
 	if repeatHit and math.Rand(0, 1) < math.Clamp((rawForce - repeatThreshold) * 0.08, 0, 0.25) then

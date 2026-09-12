@@ -2543,10 +2543,14 @@ local function velocityDamage(ent, data)
 			local headDamageMul = hadhelmet and 0.2 or 1
 			local oldSkull = org.skull
 			local oldSpine3 = org.spine3 or 0
+			physicsImpact.brainEnergy = (structuralBudget + residual) * headDamageMul
 			if lane.name == "spine3" then
 				hg.organism.input_list.spine3(org, bone, structuralBudget * lane.scale * (hadhelmet and 0.65 or 1), dmgInfo)
-			else
-				hg.organism.input_list.skull(org, bone, structuralBudget * lane.scale * headDamageMul * ragdoll_fall_skull_damage_mul, dmgInfo, nil, nil, nil, nil, physicsImpact)
+			end
+
+			local skullImpactScale = lane.name == "spine3" and 2.25 or lane.scale
+			hg.organism.input_list.skull(org, bone, structuralBudget * skullImpactScale * headDamageMul * ragdoll_fall_skull_damage_mul, dmgInfo, nil, nil, nil, nil, physicsImpact)
+			if lane.name ~= "spine3" then
 				if residual > 0.15 then
 					hg.organism.input_list.jaw(org, bone, math.min(residual, 0.8) * headDamageMul * ragdoll_fall_jaw_damage_mul, dmgInfo)
 				end
