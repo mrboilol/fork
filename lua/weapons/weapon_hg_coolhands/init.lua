@@ -57,9 +57,6 @@ local shoveStumbleChance = 1
 local specialDamageMul = 1.5
 local runningSpecialDamageMul = 2
 local incomingVelocityDamageMul = 1.5
-local specialDamageMul = 2
-local runningSpecialDamageMul = 2.5
-local incomingVelocityDamageMul = 2
 
 local function GetCombatStrengthMul(ply)
 	if not IsValid(ply) then return 1 end
@@ -771,15 +768,6 @@ function SWEP:Think()
 
         local chargeHeld = owner:KeyDown(IN_USE) and owner:KeyDown(IN_ATTACK)
         local wantsCharge = owner.PlayerClassName ~= "furry" and chargeHeld and self:GetFists() and not owner:KeyDown(IN_SPEED)
-		if self.Charging and self.ChargeComfort and wantsCharge then
-				self.Charging = nil
-				self.ChargeStarted = nil
-				self.ChargeIdlePlayed = nil
-				self.ChargeComfort = nil
-				self:PrimaryAttack(true)
-				return
-		elseif self.Charging and (not chargeHeld or self:GetBlocking() or owner:InVehicle()) then
-        local wantsCharge = owner.PlayerClassName ~= "furry" and owner:KeyDown(IN_USE) and owner:KeyDown(IN_ATTACK) and (self:GetFists() or owner:KeyDown(IN_SPEED))
         if self.Charging and self.ChargeComfort and wantsCharge then
                 self.Charging = nil
                 self.ChargeStarted = nil
@@ -1211,18 +1199,11 @@ function SWEP:AttackFront(special_attack, rand)
                                 if IsValid(ent) then ent:RemoveCallOnRemove("gibbreak") end
                         end)
                 end
-                local runningChargeMul = special_attack and (1 + math_Clamp((owner:GetVelocity():Length() - 100) / 200, 0, 1) * (runningSpecialDamageMul - 1)) or 1
-                local incomingSpeed = math.max(Ent:GetVelocity():Dot(-AimVec), 0)
-                local incomingDamageMul = 1 + math_Clamp((incomingSpeed - 150) / 450, 0, 1) * (incomingVelocityDamageMul - 1)
-		local DamageAmt = ((math_random(special_attack and 8 or 6, special_attack and 10 or 8) * (special_attack and specialDamageMul * runningChargeMul or 1) * incomingDamageMul) * ((isfur and (owner:IsBerserk() and 10 or 0.85)) or 1)) * (self.DamageMul or 1)
                 local hitForceVec = AimVec
 
                 if special_attack and not isfur then
                         hitForceVec = (AimVec + owner:EyeAngles():Right() * 0.45):GetNormalized()
                 end
-
-                Ent:PrecacheGibs()
-
                 Mul = Mul * (owner.MeleeDamageMul or 1)
 
                 if Ent:IsPlayer() and IsValid(Ent:GetActiveWeapon()) and Ent:GetActiveWeapon().GetBlocking then
@@ -1290,7 +1271,6 @@ function SWEP:AttackFront(special_attack, rand)
 
         if SERVER then
 				owner.organism.stamina.subadd = owner.organism.stamina.subadd + (special_attack and owner:KeyDown(IN_SPEED) and 13 or 4)
-		owner.organism.stamina.subadd = owner.organism.stamina.subadd + (special_attack and owner:KeyDown(IN_SPEED) and 13 or 3)
         end
 
         owner:LagCompensation(false)
