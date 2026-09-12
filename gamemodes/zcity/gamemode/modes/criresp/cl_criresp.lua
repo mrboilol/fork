@@ -130,8 +130,105 @@ local function TeamInfo(team_)
 end
 
 function MODE:RenderScreenspaceEffects()
-	zb.RemoveFade()
-	hg.RoundStart.Fade({startTime = zb.ROUND_START, duration = introDuration})
+	if (menuShownAt or 0) + 1 < CurTime() then
+		zb.RemoveFade()
+	end
+
+	if zb.ROUND_BEGIN + 85 < CurTime() then
+		if songfade <= 0.01 and IsValid(song) then
+			song:Stop()
+			song = nil
+			surface.PlaySound(lply:Team() == 0 and "zbattle/criresp/barricadedsuspectstart.mp3" or "snd_jack_hmcd_policesiren.wav")
+		elseif IsValid(song) then
+			songfade = Lerp(0.01, songfade, 0)
+			song:SetVolume(songfade)
+		end
+	end
+end
+
+function MODE:HUDPaint()
+	if endStats then
+		local t = CurTime() - endStats.start
+
+		if t < 14 then
+			if IsValid(MENUPANELHUYHUY) then MENUPANELHUYHUY:Remove() end
+
+			local alpha = 255 * math.Clamp(t / 2, 0, 1)
+
+			surface.SetDrawColor(0, 0, 0, alpha)
+			surface.DrawRect(-1, -1, sw + 2, sh + 2)
+
+			if t > 2 then
+				local textAlpha = math.min(alpha, 255 * math.Clamp((t - 2) / 0.7, 0, 1))
+				if t > 6.5 then
+					textAlpha = textAlpha * math.Clamp(1 - (t - 6.5) / 1.5, 0, 1)
+				end
+
+				local title, titleCol
+				if endStats.winner == 1 then
+					local clean = endStats.arrested + endStats.incap
+					local ratio = endStats.total > 0 and clean / endStats.total or 0
+
+					if ratio >= 0.7 then
+						title, titleCol = "MISSION ACCOMPLISHED", Color(90, 200, 90)
+					elseif ratio >= 0.35 then
+						title, titleCol = "SLOPPY MISSION", Color(230, 190, 60)
+					else
+						title, titleCol = "DISASTROUS MISSION", Color(235, 120, 45)
+					end
+				elseif endStats.winner == 2 then
+					title, titleCol = "MISSION FAILED", criRed
+				else
+					title, titleCol = "OPERATION OVER", criDim
+				end
+
+				draw.SimpleText("CRISIS RESPONSE", "CRI_Med", sw * 0.5, sh * 0.14, ColorAlpha(criRedDark, textAlpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+				draw.SimpleText(title, "CRI_Title", sw * 0.5, sh * 0.32, ColorAlpha(titleCol, textAlpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+
+				draw.SimpleText("SUSPECTS KILLED: " .. endStats.killed .. " / " .. endStats.total, "CRI_Med", sw * 0.5, sh * 0.48, ColorAlpha(criWhite, textAlpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+				draw.SimpleText("INCAPACITATED: " .. endStats.incap, "CRI_Med", sw * 0.5, sh * 0.55, ColorAlpha(criWhite, textAlpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+				draw.SimpleText("ARRESTED: " .. endStats.arrested, "CRI_Med", sw * 0.5, sh * 0.62, ColorAlpha(criWhite, textAlpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			end
+		else
+			endStats = nil
+		end
+
+		return
+	end
+
+	if beginAt then
+		local t = CurTime() - beginAt
+
+		if t < 9.5 then
+			local alpha = 255 * math.Clamp(t / 0.35, 0, 1)
+			if t > 6.5 then
+				alpha = 255 * math.Clamp(1 - (t - 6.5) / 2.5, 0, 1)
+			end
+
+			surface.SetDrawColor(0, 0, 0, alpha)
+			surface.DrawRect(-1, -1, sw + 2, sh + 2)
+
+			if t > 1.5 then
+				local info = teams[lply:Team()] or spectatorInfo
+				local textAlpha = math.min(alpha, 255 * math.Clamp((t - 1.5) / 0.7, 0, 1))
+
+				draw.SimpleText("CRISIS RESPONSE", "CRI_Title", sw * 0.5, sh * 0.12, ColorAlpha(criRed, textAlpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+				draw.SimpleText("YOU ARE " .. info.name, "CRI_Title", sw * 0.5, sh * 0.5, ColorAlpha(info.color, textAlpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+				draw.SimpleText(info.objective, "CRI_Med", sw * 0.5, sh * 0.6, ColorAlpha(criWhite, textAlpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			end
+		else
+			beginAt = nil
+		end
+
+		return
+	end
+
+	if zb.ROUND_BEGIN + 90 > CurTime() and zb.ROUND_BEGIN < CurTime() then
+		local color = Color(255 * -math.sin(CurTime() * 3), 25, 255 * math.sin(CurTime() * 3))
+		local text = "SWAT will arrive in: " .. string.FormattedTime(zb.ROUND_BEGIN + 90 - CurTime(), "%02i:%02i")
+		draw.SimpleText(text, "CRI_Med", sw * 0.02, sh * 0.95, Color(0, 0, 0), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+		draw.SimpleText(text, "CRI_Med", sw * 0.02 - 2, sh * 0.95 - 2, color, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+	end
 end
 
 local endWinner = nil

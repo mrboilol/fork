@@ -143,6 +143,13 @@ local function GetSafeTPIKModelPath(wep, preferReal)
 end
 
 if CLIENT then
+	function SWEP:PreDrawViewModel()
+		return true
+	end
+
+	function SWEP:ViewModelDrawn()
+		return false
+	end
 
     local vecPochtiZero = Vector(0.0001, 0.0001, 0.0001)
 

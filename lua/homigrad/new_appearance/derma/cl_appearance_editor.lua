@@ -1073,28 +1073,11 @@ function PANEL:PostInit()
         end
     end
 
-    local function GetClothesValue(key)
-        return main.AppearanceTable.AClothes and main.AppearanceTable.AClothes[key] or "normal"
-    end
-
-    local function GetAttachmentValue(id)
-        local value = main.AppearanceTable.AAttachments and main.AppearanceTable.AAttachments[id]
-        return value and value != "" and value or "none"
-    end
-
-    local function UpdateAppearance(tbl)
-        main.AppearanceTable = table.Copy(tbl or main.AppearanceTable or {})
-        NormalizeAttachmentSlots(main.AppearanceTable)
-        main.AppearanceTable.AClothes = main.AppearanceTable.AClothes or {}
-        main.AppearanceTable.ABodygroups = main.AppearanceTable.ABodygroups or {}
-        main.AppearanceTable.AColor = main.AppearanceTable.AColor or color_white
-        local modelData = main:GetCurrentModelData()
-        if modelData and modelData.mdl then
-            local facemapKey = hg.Appearance.FacemapsModels and hg.Appearance.FacemapsModels[modelData.mdl]
-            local facemapSet = facemapKey and hg.Appearance.FacemapsSlots[facemapKey]
-            if facemapSet and not facemapSet[main.AppearanceTable.AFacemap] then
-                main.AppearanceTable.AFacemap = "Default"
-            end
+    function viewer:PostDrawModel(Entity)
+        local tbl = main.AppearanceTable
+        Entity.PredictedAccessories = tbl.AAttachments
+        for k,attach in ipairs(tbl.AAttachments) do
+            DrawAccesories(Entity, Entity, attach, hg.Accessories[attach],false,true)
         end
         if IsValid(nameEntry) and nameEntry:GetValue() != (main.AppearanceTable.AName or "") then
             nameEntry:SetText(main.AppearanceTable.AName or "")

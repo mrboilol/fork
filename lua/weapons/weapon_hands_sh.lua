@@ -112,6 +112,16 @@ SWEP.ModelScale2 = 1.5
 
 SWEP.blockinganim = 0
 
+if CLIENT then
+	function SWEP:PreDrawViewModel()
+		return true
+	end
+
+	function SWEP:ViewModelDrawn()
+		return false
+	end
+end
+
 local clawClasses = {
 	["furry"] = 0.5,
 	["headcrabzombie"] = 1.5
@@ -1639,9 +1649,9 @@ function SWEP:ApplyForce()
 						end
 
 						if org.heartstop then
-							--ply:ChatPrint("No pulse.")
+							ply:ChatPrint("No pulse.")
 						else
-							--ply:ChatPrint(org.pulse < 20 and "Barely can feel the pulse." or (org.pulse <= 50 and "Low pulse.") or (org.pulse <= 90 and "Normal pulse.") or "High pulse.")
+							ply:ChatPrint(org.pulse < 20 and "Barely can feel the pulse." or (org.pulse <= 50 and "Low pulse.") or (org.pulse <= 90 and "Normal pulse.") or "High pulse.")
 						end
 
 						if (org.last_heartbeat + 60) > CurTime() then
@@ -1703,7 +1713,7 @@ function SWEP:ApplyForce()
 							--ply:ChatPrint(org.otrub and "No reaction." or "Reaction present.")
 
 							if org.isPly and not org.otrub then
-								org.owner:ChatPrint("You were checked for reaction.")
+								--org.owner:ChatPrint("You were checked for reaction.")
 							end
 						end
 					end

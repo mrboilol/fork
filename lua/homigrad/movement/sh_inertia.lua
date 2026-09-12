@@ -54,196 +54,7 @@ local math_abs, math_Approach, math_AngleDifference, math_Clamp, math_cos, math_
 	local hg_divejump = CreateConVar("hg_divejump", "0", {FCVAR_REPLICATED,FCVAR_ARCHIVE,FCVAR_NOTIFY}, "Toggle dive jumps on crouch jump", 0, 1)
 	local hg_movement_speed_gain_mul = CreateConVar("hg_movement_speed_gain_mul", "1", {FCVAR_REPLICATED,FCVAR_ARCHIVE,FCVAR_NOTIFY}, "Multiply speed gain", 0.01, 5)
 	local hg_movement_speed_lose_mul = CreateConVar("hg_movement_speed_lose_mul", "1", {FCVAR_REPLICATED,FCVAR_ARCHIVE,FCVAR_NOTIFY}, "Multiply speed lose", 0.01, 5)
-	local hg_movement_lagcomp = CreateConVar("hg_movement_lagcomp", "1", {FCVAR_REPLICATED,FCVAR_ARCHIVE,FCVAR_NOTIFY}, "Compensate movement inertia for latency", 0, 1)
-	local function hg_NoJogging(ply)
-		if CLIENT then
-			local convar = GetConVar("hg_nojogging")
-			return convar and convar:GetBool() or false
-		end
-
-		return ply:GetInfoNum("hg_nojogging", 0) ~= 0
-	end
-
-        local function hg_GetMovementLagComp(ply)
-                if not hg_movement_lagcomp:GetBool() or not IsValid(ply) then return 1, 0 end
-
-		local ping_time = math.Clamp(ply:Ping() / 1000, 0, 0.12)
-
-		return math.Clamp(1 - ping_time * 1.25, 0.82, 1), ping_time
-	end
-	local sprint_collision_trace_mins = Vector(-12, -12, -20)
-	local sprint_collision_trace_maxs = Vector(12, 12, 20)
-	local sprint_collision_up = Vector(0, 0, 1)
-	local sprint_collision_force_mul = 0.55
-	local sprint_collision_torso_force_mul = 0.4
-	local sprint_collision_upward_mul = 0.2
-	local sprint_collision_full_speed_mul = 0.98
-	local sprint_collision_trip_chance = 3
-	local sprint_collision_stumble_slowdown = 450
-	local sprint_collision_stumble_time = 0.18
-	local sprint_collision_damage_mul = 0.08
-	local sprint_collision_damage_time = 0.9
-	local sprint_collision_sounds = {
-		"raminto/ram1.wav",
-		"raminto/ram2.wav",
-		"raminto/ram3.wav"
-	}
-
-        local function hg_HoldShiftSprint(ply)
-                return IsValid(ply) and ply:GetInfoNum("hg_hold_shift_sprint", 0) >= 1
-        end
-
-        local function hg_GetSprintCollisionPhysBone(ply, hitPos)
-                local localHit = ply:WorldToLocal(hitPos)
-                local boneName = "ValveBiped.Bip01_Spine2"
-
-                if localHit.z >= 54 then
-                        boneName = "ValveBiped.Bip01_Head1"
-                elseif localHit.z <= 20 then
-                        boneName = localHit.y >= 0 and "ValveBiped.Bip01_L_Thigh" or "ValveBiped.Bip01_R_Thigh"
-                elseif localHit.y >= 12 then
-                        boneName = "ValveBiped.Bip01_L_UpperArm"
-                elseif localHit.y <= -12 then
-                        boneName = "ValveBiped.Bip01_R_UpperArm"
-                end
-
-                local bone = ply:LookupBone(boneName)
-                local physbone = bone and ply:TranslateBoneToPhysBone(bone) or 0
-
-                if not physbone or physbone < 0 then
-                        boneName = "ValveBiped.Bip01_Spine2"
-                        bone = ply:LookupBone(boneName)
-                        physbone = bone and ply:TranslateBoneToPhysBone(bone) or 0
-                end
-
-                return physbone, boneName
-        end
-
-        local function hg_PlaySprintCollisionSound(ply)
-                if not SERVER or not IsValid(ply) then return end
-                ply:EmitSound(sprint_collision_sounds[math.random(#sprint_collision_sounds)], 75, math.random(96, 104), 1)
-        end
-
-        local function hg_TriggerSprintCollisionRagdoll(ply, tr, vel, impactSpeed)
-                if not SERVER or not IsValid(ply) or not ply:Alive() or IsValid(ply.FakeRagdoll) then return end
-
-                ply.hgSprintCollisionCooldown = CurTime() + 0.45
-                hg_PlaySprintCollisionSound(ply)
-
-                local hitEnt = tr.Entity
-                local impactDir
-
-                if IsValid(hitEnt) and hitEnt:IsPlayer() then
-                        impactDir = ply:WorldSpaceCenter() - hitEnt:WorldSpaceCenter()
-                else
-                        impactDir = -tr.HitNormal
-                end
-
-                if impactDir:LengthSqr() <= 0.001 then
-                        impactDir = -vel:GetNormalized()
-                end
-
-                impactDir.z = math.max(impactDir.z, 0.18)
-                impactDir:Normalize()
-
-                local hitPhysbone, hitBoneName = hg_GetSprintCollisionPhysBone(ply, tr.HitPos)
-                local torsoBone = ply:LookupBone("ValveBiped.Bip01_Spine2")
-                torsoBone = torsoBone and ply:TranslateBoneToPhysBone(torsoBone) or 0
-
-                local clampedImpact = math.Clamp(impactSpeed, 0, 260)
-                local hitMass = hg.IdealMassPlayer[hitBoneName] or 4
-                local torsoMass = hg.IdealMassPlayer["ValveBiped.Bip01_Spine2"] or 4
-                local contactForce = impactDir * clampedImpact * hitMass * sprint_collision_force_mul
-                local torsoForce = impactDir * clampedImpact * torsoMass * sprint_collision_torso_force_mul + sprint_collision_up * clampedImpact * torsoMass * sprint_collision_upward_mul
-
-                ply.hgSprintCollisionDamageMul = sprint_collision_damage_mul
-                ply.hgSprintCollisionDamageUntil = CurTime() + sprint_collision_damage_time
-                hg.AddForceRag(ply, hitPhysbone, contactForce, 0.25)
-                hg.AddForceRag(ply, torsoBone, torsoForce, 0.25)
-                hg.LightStunPlayer(ply, 1.35)
-        end
-
-        local function hg_TriggerSprintCollisionStumble(ply)
-                if not SERVER or not IsValid(ply) or not ply:Alive() or IsValid(ply.FakeRagdoll) then return end
-
-                ply.hgSprintCollisionCooldown = CurTime() + 0.35
-                hg_PlaySprintCollisionSound(ply)
-                ply:SetNetVar("slowDown", sprint_collision_stumble_slowdown)
-                ply:ViewPunch(Angle(math.random(2) == 1 and -18 or 18, math.random(-2, 2), math.random(-4, 4)))
-
-                timer.Create("hg_sprint_collision_slowdown_" .. ply:EntIndex(), sprint_collision_stumble_time, 1, function()
-                        if not IsValid(ply) then return end
-                        if ply:GetNetVar("slowDown", 0) <= sprint_collision_stumble_slowdown then
-                                ply:SetNetVar("slowDown", 0)
-                        end
-                end)
-        end
-
-        hg.TriggerSprintCollisionRagdoll = hg_TriggerSprintCollisionRagdoll
-        hg.TriggerSprintCollisionStumble = hg_TriggerSprintCollisionStumble
-
-	local function hg_CheckSprintCollisionRagdoll(ply, vel, velLen)
-		if not SERVER or not IsValid(ply) or not ply:Alive() or IsValid(ply.FakeRagdoll) then return end
-		if ply.hgSprintCollisionCooldown and ply.hgSprintCollisionCooldown > CurTime() then return end
-		if ply.hg_LastLandingTime and ply.hg_LastLandingTime + 0.35 > CurTime() and ply:Ping() >= 45 then return end
-		if ply:InVehicle() or ply:GetMoveType() != MOVETYPE_WALK or ply:WaterLevel() >= 2 then return end
-		if not (ply.hg_isSprinting or (not ply:OnGround() and ply:KeyDown(IN_SPEED) and ply:KeyDown(IN_FORWARD))) then return end
-		local lag_comp_mul, lag_comp_time = hg_GetMovementLagComp(ply)
-		if velLen < 215 / lag_comp_mul then return end
-
-                local fullSpeed = math.max(ply:GetRunSpeed(), ply.move or 0)
-                if velLen < fullSpeed * math.Clamp(sprint_collision_full_speed_mul / lag_comp_mul, 0.78, sprint_collision_full_speed_mul) then return end
-
-                local dir = vel:GetNormalized()
-                if dir:LengthSqr() <= 0.001 then return end
-
-		local tr = util.TraceHull({
-			start = ply:WorldSpaceCenter(),
-			endpos = ply:WorldSpaceCenter() + dir * math.Clamp(velLen * (engine.TickInterval() * 1.5 + lag_comp_time * 0.25), 18, 48),
-			mins = sprint_collision_trace_mins,
-			maxs = sprint_collision_trace_maxs,
-			filter = {ply, ply:GetVehicle()},
-			mask = MASK_PLAYERSOLID
-		})
-
-                if not tr.Hit or tr.HitSky or tr.StartSolid then return end
-
-                local hitEnt = tr.Entity
-                local impactSpeed = math.abs(vel:Dot(-tr.HitNormal))
-                local traumaChanceMul = hg.organism.GetTraumaRagdollChanceMul and hg.organism.GetTraumaRagdollChanceMul(ply.organism) or 1
-                local collisionTripMul = ply.GetTraitMultiplier and ply:GetTraitMultiplier("collision_trip_chance", 1) or 1
-                local shouldTrip = math.Rand(0, 1) <= (1 / sprint_collision_trip_chance) * traumaChanceMul * collisionTripMul
-
-                if IsValid(hitEnt) and hitEnt:IsPlayer() and hitEnt:Alive() then
-                        impactSpeed = (vel - hitEnt:GetVelocity()):Length()
-                        if impactSpeed >= 170 / lag_comp_mul then
-                                if shouldTrip then
-                                        hg_TriggerSprintCollisionRagdoll(ply, tr, vel, impactSpeed)
-                                else
-                                        hg_TriggerSprintCollisionStumble(ply)
-                                end
-                        end
-                        return
-                end
-
-                if IsValid(hitEnt) then
-                        local phys = hitEnt:GetPhysicsObject()
-                        if IsValid(phys) and phys:GetMass() < 8 then return end
-                end
-
-                if impactSpeed <= 0 then
-                        impactSpeed = velLen
-                end
-
-                if impactSpeed >= ((ply:OnGround() and 200 or 160) / lag_comp_mul) then
-                        if shouldTrip then
-                                hg_TriggerSprintCollisionRagdoll(ply, tr, vel, impactSpeed)
-                        else
-                                hg_TriggerSprintCollisionStumble(ply)
-                        end
-                end
-        end
-
+	local hg_movement_weightmul_mul = CreateConVar("hg_movement_weightmul_mul", "1", {FCVAR_REPLICATED,FCVAR_ARCHIVE,FCVAR_NOTIFY}, "Multiply speed lose", 0.01, 5)
 
 	local vomitVPAng, vecZero = Angle(1, 0, 0), Vector()
 	hook.Add("SetupMove", "HG(StartCommand)", function(ply, mv, cmd)
@@ -648,25 +459,18 @@ local math_abs, math_Approach, math_AngleDifference, math_Clamp, math_cos, math_
 			end
 		--//
 
-		local move = (ply.hg_isJogging and (run_speed * 0.55) or run_speed) * 1.1
-		local k = 1 * weightmul
-		k = k * math_Clamp(consmul, 0.7, 1)
-		k = k * math_Clamp((org.temperature and (1 - (org.temperature - 38) * 0.25) or 1), 0.5, 1)
-		k = k * math_Clamp((org.temperature and ((org.temperature - 35) * 0.25 + 1) or 1), 0.5, 1)
-		k = k * math_Clamp(math_Round((org.stamina and org.stamina[1] or 180), 0) / 120, hg_movement_stamina_debuff:GetFloat(), 1)
-		local debuffResistance = ply.GetTraitMultiplier and ply:GetTraitMultiplier("movement_debuff_resistance", 1) or 1
-		local function softenDebuff(value) return 1 - (1 - value) * debuffResistance end
-		k = k * softenDebuff(math_Clamp(5 / ((org.immobilization or 0) + 1), 0.25, 1))
-		k = k * softenDebuff(math_Clamp((org.blood or 0) / 5000, 0, 1))
-		k = k * softenDebuff(math_Clamp(10 / ((org.shock or 0) + 1), 0.25, 1))
-		k = k * (math_min(math_Round((org.adrenaline or 0), 1) / 24, 0.3) + 1)
-		local leftLeg = hg.GetLegEffectiveness and hg.GetLegEffectiveness(ply, "lleg") or (org.llegdislocation and 0.15 or math_max(1 - (org.lleg or 0) * 0.8, 0.2))
-		local rightLeg = hg.GetLegEffectiveness and hg.GetLegEffectiveness(ply, "rleg") or (org.rlegdislocation and 0.15 or math_max(1 - (org.rleg or 0) * 0.8, 0.2))
-		k = k * math_Clamp((leftLeg + rightLeg) * 0.5, 0.15, 1)
-		if hg.HasTourniquetOnLimb then
-			local weakenedLegs = (hg.HasTourniquetOnLimb(ply, "lleg") and 1 or 0) + (hg.HasTourniquetOnLimb(ply, "rleg") and 1 or 0)
-			k = k * (0.6 ^ weakenedLegs)
-		end
+		local move = ply:GetRunSpeed() * 1.1
+		k = 1 * math.min(weightmul / hg_movement_weightmul_mul:GetFloat(), 1)
+		k = k * math.Clamp(consmul, 0.7, 1)
+		k = k * math.Clamp((org.temperature and (1 - (org.temperature - 38) * 0.25) or 1), 0.5, 1)
+		k = k * math.Clamp((org.temperature and ((org.temperature - 35) * 0.25 + 1) or 1), 0.5, 1)
+		k = k * math.Clamp(math.Round((org.stamina and org.stamina[1] or 180), 0) / 120, hg_movement_stamina_debuff:GetFloat(), 1)
+		k = k * math.Clamp(5 / ((org.immobilization or 0) + 1), 0.45, 1)
+		k = k * math.Clamp((org.blood or 0) / 5000, 0, 1)
+		k = k * math.Clamp(10 / ((org.shock or 0) + 1), 0.45, 1)
+		k = k * (math.min(math.Round((org.adrenaline or 0), 1) / 24, 0.3) + 1)
+		k = k * math.Clamp((org.lleg and org.lleg >= 0.5 and math.max(1 - org.lleg, 0.6) or 1) * (org.lleg and org.rleg >= 0.5 and math.max(1 - org.rleg, 0.6) or 1) * ((org.analgesia * 1 + 1)), 0, 1)
+		k = k * (org.llegdislocation and 0.75 or 1) * (org.rlegdislocation and 0.75 or 1)
 		k = k * (org.pelvis == 1 and 0.4 or 1)
 		local carryent = ply:GetNetVar("carryent")
 		local carryent2 = ply:GetNetVar("carryent2")

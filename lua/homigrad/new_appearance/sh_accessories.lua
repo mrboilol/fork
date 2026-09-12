@@ -3028,7 +3028,14 @@ hg.Accessories = {
         bPointShop = true,
         price = 850,
         vpos = Vector(0,0,69),
-        name = "Hood"
+        name = "Hood",
+        modelPreRenderCallback = function(ply,ent,model,accessories) -- я не знаю почему, но почему-то флексы начинают уходить в минус бесконечность, поэтому приходится менять флекс каждый кадр... изивините
+            local accessories1 = accessories or ent.PredictedAccessories
+            model.mfdoom = ((accessories1 and accessories1[2] == "mfdoom mask") and true or false)
+            --print(model.mfdoom)
+            model.flex = model.flex or model:GetFlexIDByName("M")
+            model:SetFlexWeight(model.flex, model.mfdoom and 1 or 0)
+        end,
     },
 
     ["christmas hat"] = {
@@ -3375,131 +3382,61 @@ hg.Accessories = {
         norender = true,
         placement = "head",
     },
-
-    ["security flag cap"] = {
-        model = "models/eft/gear/headwear/cap_security_flagcap.mdl",
-        bone = "ValveBiped.Bip01_Head1",
-        malepos = {Vector(-60,-17.3,0.1),Angle(180,105,90),1},
-        fempos = {Vector(-61,-18.05,0.1),Angle(180,105,90),1},
-        skin = 4,
-        norender = true,
-        placement = "head",
-    },
-
-    ["buffalo half mask"] = {
-        model = "models/eft/gear/facecover/half_mask_buffalo.mdl",
-        bone = "ValveBiped.Bip01_Head1",
-        malepos = {Vector(-61.5,-11.65,0.1),Angle(180,100,90),1},
-        fempos = {Vector(-61.5,-11.65,0.1),Angle(180,100,90),1},
+    --vest
+    ["vest_normal"] = {
+        model = "models/distac/vest_m.mdl",
+        femmodel = "models/distac/vest_f.mdl",
+        bone = "ValveBiped.Bip01_Spine2",
+        malepos = {Vector(0.2,4.8,0),Angle(0,90,90),1},
+        fempos = {Vector(-1.2,3.5,0),Angle(0,90,90),1},
         skin = 0,
-        norender = true,
-        placement = "mask",
+        placement = "torso",
+        norender = false,
+        bonemerge = true,
+        bSetColor = false,
+        bPointShop = false,
+        price = 950,
+        vpos = Vector(0,0,50),
+        name = "Vest Closed"
     },
-
-    ["skull half mask"] = {
-        model = "models/eft/gear/facecover/facecover_skull_half_mask.mdl",
-        bone = "ValveBiped.Bip01_Head1",
-        malepos = {Vector(-58.5,-11.4,0.1),Angle(180,100,90),1},
-        fempos = {Vector(-59,-11.65,0.1),Angle(180,100,90),0.9},
+    ["vest_full_open"] = {
+        model = "models/distac/vest_m.mdl",
+        femmodel = "models/distac/vest_f.mdl",
+        bone = "ValveBiped.Bip01_Spine2",
+        malepos = {Vector(0.2,4.8,0),Angle(0,90,90),1},
+        fempos = {Vector(-1.2,3.5,0),Angle(0,90,90),1},
         skin = 0,
-        norender = true,
-        placement = "mask",
+        placement = "torso",
+        norender = false,
+        bonemerge = true,
+        bSetColor = false,
+        bPointShop = false,
+        price = 950,
+        vpos = Vector(0,0,50),
+        name = "Vest Opened",
+        modelPreRenderCallback = function(ply,ent,model,accessories)
+            model:SetFlexWeight(0, 1)
+        end,
     },
-
-    ["tagilla cap"] = {
-        model = "models/eft/gear/headwear/cap_boss_tagillacap.mdl",
-        bone = "ValveBiped.Bip01_Head1",
-        malepos = {Vector(-60,-17.2,0.1),Angle(180,105,90),1},
-        fempos = {Vector(-61,-18.05,0.1),Angle(180,105,90),1},
+    ["vest_neck_open"] = {
+        model = "models/distac/vest_m.mdl",
+        femmodel = "models/distac/vest_f.mdl",
+        bone = "ValveBiped.Bip01_Spine2",
+        malepos = {Vector(0.2,4.8,0),Angle(0,90,90),1},
+        fempos = {Vector(-1.2,3.5,0),Angle(0,90,90),1},
         skin = 0,
-        norender = true,
-        placement = "head",
+        placement = "torso",
+        norender = false,
+        bonemerge = true,
+        bSetColor = false,
+        bPointShop = false,
+        price = 950,
+        vpos = Vector(0,0,50),
+        name = "Vest Neck Open",
+        modelPreRenderCallback = function(ply,ent,model,accessories)
+            model:SetFlexWeight(1, 1)
+        end,
     },
-
-    ["grinch mask"] = {
-        model = "models/eft/gear/facecover/mask_grinch.mdl",
-        bone = "ValveBiped.Bip01_Head1",
-        malepos = {Vector(-61.5,-11.65,0.1),Angle(180,100,90),1},
-        fempos = {Vector(-62.2,-11.65,0.1),Angle(180,100,90),1},
-        skin = 0,
-        norender = true,
-        placement = "mask",
-    },
-
-    ["jason mask"] = {
-        model = "models/eft/gear/facecover/facecover_halloween_jason.mdl",
-        bone = "ValveBiped.Bip01_Head1",
-        malepos = {Vector(-61.5,-12,0.1),Angle(180,100,90),1},
-        fempos = {Vector(-62.2,-12,0.1),Angle(180,100,90),1},
-        skin = 0,
-        norender = true,
-        placement = "mask",
-    },
-
-    ["kaonasi mask"] = {
-        model = "models/eft/gear/facecover/facecover_halloween_kaonasi.mdl",
-        bone = "ValveBiped.Bip01_Head1",
-        malepos = {Vector(-60,-17.2,0.1),Angle(180,105,90),1},
-        fempos = {Vector(-61,-17.5,0.1),Angle(180,105,90),1},
-        skin = 0,
-        norender = true,
-        placement = "head",
-    },
-
-    ["cowboy hat"] = {
-        model = "models/eft/gear/headwear/head_cowboy.mdl",
-        bone = "ValveBiped.Bip01_Head1",
-        malepos = {Vector(-60,-17.4,0.1),Angle(180,105,90),1},
-        fempos = {Vector(-60.3,-17.4,0.1),Angle(180,105,90),1},
-        skin = 0,
-        norender = true,
-        placement = "head",
-    },
-
-    ["captain hat"] = {
-        model = "models/eft/gear/headwear/hat_captain.mdl",
-        bone = "ValveBiped.Bip01_Head1",
-        malepos = {Vector(-60,-17.2,0.1),Angle(180,105,90),1},
-        fempos = {Vector(-61,-17.8,0.1),Angle(180,105,90),1},
-        skin = 0,
-        norender = true,
-        placement = "head",
-    },
-
-    ["big pipe bandana"] = {
-        model = "models/eft/gear/headwear/head_bandana_boss_big_pipe.mdl",
-        bone = "ValveBiped.Bip01_Head1",
-        malepos = {Vector(-60,-17.2,0.1),Angle(180,105,90),1},
-        fempos = {Vector(-61,-17.6,0.1),Angle(180,105,90),1},
-        skin = 0,
-        norender = true,
-        placement = "head",
-    },
-
-    ["micheal mask"] = {
-        model = "models/eft/gear/facecover/facecover_halloween_micheal.mdl",
-        bone = "ValveBiped.Bip01_Head1",
-        malepos = {Vector(-60.5,-17.4,0.1),Angle(180,105,90),1},
-        fempos = {Vector(-61.2,-18,0.1),Angle(180,105,90),1},
-        skin = 0,
-        norender = true,
-        placement = "head",
-    },
-    ["hotline miami mask"] = {
-        model = "models/splinks/hotline_miami/props/masks.mdl",
-        bone = "ValveBiped.Bip01_Head1",
-        malepos = {Vector(-69.212,-0.5,0.8),Angle(4.975,-89.77,-90.292),1.075},
-        fempos = {Vector(-65.212,-0.6,0.3),Angle(4.975,-89.77,-90.292),2},
-        scaleVec = Vector(1,1,1),
-        scaleVecFem = Vector(1,1,1),
-        skin = 0,
-        placement = "mask",
-        norender = true,
-        randomBodygroups = true,
-        onlySuperAdmin = true,
-        name = "Hotline Miami Mask"
-     }, 
-
 }
 
 hook.Add("Think","RemoveME",function()
