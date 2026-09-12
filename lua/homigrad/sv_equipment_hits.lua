@@ -721,6 +721,7 @@ function hg.TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, origin
                 tr.HGEquipmentProcessed = true
                 tr.HGArmorModelHits = shot.ArmorModelHits
                 tr.HGArmorModelContact = true
+                tr.HGArmorModelBlocked = armorResult and math.Clamp(armorResult.scale or 1, 0, 1) < 1 or false
                 return tr
             end
             local tr = table.Copy(originalTrace or {})
@@ -768,6 +769,7 @@ function hg.TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, origin
                     tr.HGEquipmentProcessed, tr.HGEquipmentIntercept = true, true
                     tr.HGArmorModelHits = shot.ArmorModelHits
                     tr.HGArmorModelContact = true
+                    tr.HGArmorModelBlocked = true
                     return tr
                 end
             end

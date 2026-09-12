@@ -154,6 +154,7 @@ function hg.SetArmorBrokenEntity(ent)
 
 	ent.broken = true
 	ent:SetNWBool("ArmorBroken", true)
+	ent:SetNWFloat("ArmorWear", 1)
 	ent.brokenProtectionMul = ent.brokenProtectionMul or getBrokenArmorProtectionMul()
 	if wasBroken then return end
 
@@ -168,6 +169,19 @@ function hg.SetArmorBrokenEntity(ent)
 		end
 	end
 	ent.brokenHitsLeft = math.random(BROKEN_ARMOR_WORLD_HITS[1], BROKEN_ARMOR_WORLD_HITS[2])
+end
+
+function hg.SetArmorUnusableEntity(ent)
+	if not IsValid(ent) or ent:GetNWBool("ArmorUnusable", false) then return false end
+
+	hg.SetArmorBrokenEntity(ent)
+	ent.unusable = true
+	ent.brokenHitsLeft = nil
+	ent.armorHealth = 0
+	ent.armorDurability = 0
+	ent:SetNWBool("ArmorUnusable", true)
+	ent:SetNWFloat("ArmorWear", 1)
+	return true
 end
 
 function hg.PlayArmorBreakSound(ent)
@@ -317,11 +331,16 @@ function hg.BreakArmor(ent, equipment, pos, dmgInfo)
 	if not IsValid(ent) then return false end
 	if IsArmorBreakProtected(ent) then return false end
 	if not ent.armors or not table.HasValue(ent.armors, equipment) then return false end
+	local placement = hg.GetArmorPlacement(equipment)
 	if ent.armors_broken and ent.armors_broken[equipment] then
-		return hg.DestroyArmor(ent, equipment, pos)
+		local brokenMul = ent.armors_broken_mul and ent.armors_broken_mul[equipment] or getBrokenArmorProtectionMul()
+		local equipmentEnt = hg.DropArmorForce(ent, equipment, pos, nil, getArmorDropVelocity(dmgInfo, ent), brokenMul)
+		if not IsValid(equipmentEnt) then return hg.DestroyArmor(ent, equipment, pos) end
+		hg.SetArmorUnusableEntity(equipmentEnt)
+		hg.EmitArmorDestroyEffects(equipmentEnt)
+		return true
 	end
 
-	local placement = hg.GetArmorPlacement(equipment)
 	local brokenMul = ent.armors_broken_mul and ent.armors_broken_mul[equipment] or getBrokenArmorProtectionMul()
 	ent.armors_shots = ent.armors_shots or {}
 	ent.armors_health = ent.armors_health or {}
@@ -484,6 +503,10 @@ end)
 
 function hg.AddArmor(ply, equipment, ent)
     if not IsValid(ply) then return end
+	if IsValid(ent) and (ent.unusable or ent:GetNWBool("ArmorUnusable", false)) then
+		if ply:IsPlayer() then ply:Notify("This armor is too damaged to wear.", true, "armor_unusable", 3) end
+		return false
+	end
 
 	if not hg.CanEquipArmorPiece(ply, equipment) then
 		if ply:IsPlayer() then

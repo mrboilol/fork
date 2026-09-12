@@ -125,6 +125,12 @@ local moodleTexts = {
 		[3] = {title = "Happy", description = "Strong morale is improving recovery, damage, and resilience."},
 		[4] = {title = "Euphoric", description = "Peak morale is boosting stamina recovery, damage, and resilience."},
 	}},
+	cotard = {levels = {
+		[1] = {title = "Nihilistic Delusion", description = "Your sense of being alive is beginning to feel unreal."},
+		[2] = {title = "Cotard Syndrome", description = "You believe that parts of you are missing, dead, or no longer real."},
+		[3] = {title = "Severe Cotard Syndrome", description = "The conviction that you are dead is overwhelming your perception."},
+		[4] = {title = "Profound Cotard Syndrome", description = "You cannot accept that you or the world around you still exist."},
+	}},
 	bleeding = {levels = {
 		[1] = {title = "Small Bleed", description = "A wound is releasing blood at a small rate."},
 		[2] = {title = "Bleeding", description = "Blood loss is noticeable and should be treated soon."},
@@ -440,6 +446,7 @@ local function getMoodle3IconName(effect)
 		panic = "panic", fear = "trauma", tinnitus = "tinnitus", deaf = "deafness", encumbered = "encumbered",
 		nausea = "sick", amputated = "amputation", concussion = "stress", sepsis = "sepsis",
 		adrenaline = "adrenaline", zerlked = "zerlked",
+		cotard = "suicide",
 		rage = "anger5",
 		hunger = level == 1 and "hunger" or "hunger" .. level, full = level == 1 and "full" or "full2",
 	}
@@ -630,6 +637,10 @@ local function buildEffects(ply, org)
 	local goodmood = math.Clamp(orgNumber(org, "goodmood", 0), 0, 1)
 	if goodmood > 0 then
 		add(effects, "happy", "happy", math.ceil(goodmood * 4), "good", 15, math.floor(goodmood * 100) .. "%")
+	end
+	local cotard = math.Clamp(orgNumber(org, "cotard", 0), 0, 1)
+	if cotard > 0 then
+		add(effects, "cotard", "suicide", highRank(cotard, {0.01, 0.5, 0.75, 0.95}), "bad", -65, math.floor(cotard * 100) .. "%")
 	end
 
 	if org.berserkActive2 == true then add(effects, "rage", "rage", 4, "bad", -90) end

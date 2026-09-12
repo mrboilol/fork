@@ -168,7 +168,8 @@ function APmodule.GetEntityImpactRadius(ent)
 		math.max(math.abs(mins.z), math.abs(maxs.z)),
 	}
 	table.sort(extents)
-	return math.Clamp(extents[2] * math.max(ent:GetModelScale(), 0.01), 0, 5)
+	local modelScale = tonumber(ent:GetModelScale()) or 1
+	return math.Clamp(extents[2] * math.max(modelScale, 0.01), 0, 5)
 end
 
 local function FindAccessoryImpact(ent, hitPos, direction, impactRadius)
@@ -259,6 +260,20 @@ local function SpawnAccessoryDrop(accessoryID, accessory, owner, position, force
 	return dropped
 end
 
+local function QueueAccessoryDrop(accessoryID, accessory, owner, position, force, durability, maximum)
+	if !IsValid(owner) or !istable(accessory) or !isvector(position) then return false end
+	local model = accessory[ThatPlyIsFemale(owner) and "femmodel"] or accessory.model
+	if !model then return false end
+
+	local dropPosition = Vector(position.x, position.y, position.z)
+	local dropForce = isvector(force) and Vector(force.x, force.y, force.z) or vector_origin
+	timer.Simple(0, function()
+		if !IsValid(owner) then return end
+		SpawnAccessoryDrop(accessoryID, accessory, owner, dropPosition, dropForce, durability, maximum)
+	end)
+	return true
+end
+
 function APmodule.DropAccessoriesByPlacement(ent, placements, force)
 	if !IsValid(ent) or !istable(placements) then return false end
 
@@ -344,8 +359,7 @@ function APmodule.TryAbsorbAccessoryImpact(ent, dmgInfo, hitPos, direction, dire
 	if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) then dropChance = dropChance + cfg.bulletChance end
 
 	if broken or math.Rand(0, 1) <= dropChance then
-		local dropped = SpawnAccessoryDrop(impact.id, impact.data, wearer, impact.position, direction, durability, maximum)
-		if IsValid(dropped) then
+		if QueueAccessoryDrop(impact.id, impact.data, wearer, impact.position, direction, durability, maximum) then
 			absorbed = cfg.dropAbsorption + severity * cfg.dropSeverityAbsorption
 			if isnumber(index) then
 				table.remove(accessories, index)

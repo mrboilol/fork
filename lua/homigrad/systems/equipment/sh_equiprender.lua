@@ -197,7 +197,7 @@ if CLIENT then
 					if IsValid(omodel) then
 						omodel:SetNoDraw(true)
 						omodel:SetModelScale(armorScale * 1.01)
-						omodel:SetSubMaterial(0, "armor/brokenarmor")
+						omodel:SetMaterial("models/props_wasteland/metal_tram001a")
 						omodel:SetRenderMode(RENDERMODE_TRANSALPHA)
 						omodel:SetColor(Color(255, 255, 255, 0))
 						if not armorData.nobonemerge then
@@ -413,50 +413,54 @@ if CLIENT then
 		end
 	end)
 
-	local droppedBrokenOverlays = {}
+	local droppedWearOverlays = {}
 
-	local function EnsureDroppedBrokenOverlay(ent)
+	local function EnsureDroppedWearOverlay(ent)
 		if not IsValid(ent) then return end
 		local idx = ent:EntIndex()
-		if droppedBrokenOverlays[idx] then return end
+		if droppedWearOverlays[idx] then return end
 		local mdl = ent:GetModel()
 		if not mdl or mdl == "" or mdl == "models/error.mdl" then return end
 		local omodel = ClientsideModel(mdl)
 		if not IsValid(omodel) then return end
 		omodel:SetNoDraw(true)
 		omodel:SetModelScale(1.01)
-		omodel:SetSubMaterial(0, "armor/brokenarmor")
+		omodel:SetMaterial("models/props_wasteland/metal_tram001a")
 		omodel:SetRenderMode(RENDERMODE_TRANSALPHA)
-		omodel:SetColor(Color(255, 255, 255, 230))
-		droppedBrokenOverlays[idx] = omodel
+		omodel:SetColor(Color(255, 255, 255, 0))
+		droppedWearOverlays[idx] = omodel
 	end
 
-	hook.Add("OnNetVarSet", "BrokenDroppedArmorOverlay", function(index, key, var)
+	hook.Add("OnNetVarSet", "DroppedArmorWearOverlay", function(index, key, var)
 		if key ~= "ArmorBroken" or not var then return end
-		EnsureDroppedBrokenOverlay(Entity(index))
+		EnsureDroppedWearOverlay(Entity(index))
 	end)
 
-	hook.Add("OnEntityCreated", "BrokenDroppedArmorCheck", function(ent)
+	hook.Add("OnEntityCreated", "DroppedArmorWearCheck", function(ent)
 		if not IsValid(ent) then return end
 		local cls = ent:GetClass()
 		if not (cls and (cls:find("ent_armor") or cls == "armor_base")) then return end
 		timer.Simple(0.1, function()
-			if IsValid(ent) and ent:GetNWBool("ArmorBroken", false) then
-				EnsureDroppedBrokenOverlay(ent)
-			end
+			if IsValid(ent) then EnsureDroppedWearOverlay(ent) end
 		end)
 	end)
 
-	hook.Add("PostDrawTranslucentRenderables", "DroppedBrokenOverlayDraw", function()
-		for idx, omodel in pairs(droppedBrokenOverlays) do
+	hook.Add("PostDrawTranslucentRenderables", "DroppedArmorWearOverlayDraw", function()
+		for idx, omodel in pairs(droppedWearOverlays) do
 			local parent = Entity(idx)
 			if not IsValid(parent) or not IsValid(omodel) then
 				if IsValid(omodel) then omodel:Remove() end
-				droppedBrokenOverlays[idx] = nil
+				droppedWearOverlays[idx] = nil
 			else
 				omodel:SetRenderOrigin(parent:GetPos())
 				omodel:SetRenderAngles(parent:GetAngles())
-				omodel:DrawModel()
+				local wear = parent:GetNWFloat("ArmorWear", parent:GetNWBool("ArmorBroken", false) and 1 or 0)
+				if wear > 0.005 and not parent:GetNWBool("ArmorUnusable", false) then
+					local a = math.Clamp(wear, 0, 1)
+					a = a * a * (3 - 2 * a)
+					omodel:SetColor(Color(255, 255, 255, a * 255))
+					omodel:DrawModel()
+				end
 			end
 		end
 	end)

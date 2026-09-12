@@ -41,18 +41,22 @@ function ENT:OnRemove()
 end
 
 function ENT:OnTakeDamage(dmgInfo)
-	if not dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) then return end
+	if not dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_CLUB + DMG_SLASH + DMG_CRUSH) then return end
+	if self.unusable or self:GetNWBool("ArmorUnusable", false) then return end
 	if self.broken or self:GetNWBool("ArmorBroken", false) then
 		self.brokenHitsLeft = (self.brokenHitsLeft or math.random(2, 5)) - 1
 		if self.brokenHitsLeft <= 0 then
 			hg.EmitArmorDestroyEffects(self)
-			self:Remove()
+			hg.SetArmorUnusableEntity(self)
 		end
 		return
 	end
 
 	self.shotsLeft = self.shotsLeft or hg.GetArmorBreakShotCount(self.name)
+	local currentWear = self:GetNWFloat("ArmorWear", 0)
+	self.shotsMax = self.shotsMax or math.max(self.shotsLeft / math.max(1 - currentWear, 0.01), self.shotsLeft)
 	self.shotsLeft = self.shotsLeft - 1
+	self:SetNWFloat("ArmorWear", math.max(currentWear, 1 - self.shotsLeft / self.shotsMax))
 
 	if self.shotsLeft > 0 then return end
 
@@ -66,6 +70,10 @@ end
 
 function ENT:TakeByPlayer(activator)
 	if not activator:IsPlayer() then return end
+	if self.unusable or self:GetNWBool("ArmorUnusable", false) then
+		activator:Notify("This armor is too damaged to wear.", true, "armor_unusable", 3)
+		return
+	end
 
 	local can = hg.AddArmor(activator,self.name, self)
     if can then
@@ -111,6 +119,7 @@ end
 		self.armorHealth = ply.armors_health and ply.armors_health[equipment]
 		self.armorDurability = ply.armors_durability and ply.armors_durability[equipment]
 		self.armorRegions = ply.armors_regions and table.Copy(ply.armors_regions[equipment] or {})
+		self:SetNWFloat("ArmorWear", ply:GetNWFloat("ArmorWear" .. equipment, 0))
 		self.armorState = ply.armor_states and table.Copy(ply.armor_states[equipment] or {}) or nil
 		if ply.armors_broken and ply.armors_broken[equipment] then
 			hg.SetArmorBrokenEntity(self)

@@ -2384,7 +2384,7 @@ function SWEP:AbortBlockedAttack()
 end
 
 function SWEP:StopAttackOnArmorImpact(trace, attacktype)
-    if not trace or not trace.HGArmorModelContact then return false end
+    if not trace or not trace.HGArmorModelBlocked then return false end
 
     self:SendMeleeHitStop(attacktype, trace.HitNormal)
     self:AbortBlockedAttack()
@@ -2426,10 +2426,7 @@ function SWEP:IsBreakableProp(ent)
 
 	local class = ent:GetClass()
 	if class == "func_breakable" or class == "func_breakable_surf" then return true end
-	if class == "prop_physics" or class == "prop_physics_multiplayer" then
-		local model = ent:GetModel()
-		return model ~= nil and hg.loot_boxes and hg.loot_boxes[string.lower(model)] ~= nil
-	end
+	if class == "prop_physics" or class == "prop_physics_multiplayer" or class == "prop_physics_override" or class == "prop_physics_respawnable" or class == "func_physbox" then return true end
 	return false
 end
 

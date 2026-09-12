@@ -3,22 +3,36 @@ ENT.HowToUseInstructions = "<font=ZCity_Tiny>"..string.upper( (input.LookupBindi
 
 function ENT:UpdateArmorHudHint()
 	local damaged = self:GetNWBool("ArmorBroken", false)
-	if self.HudHintMarkup and self.HudHintDamaged == damaged then return end
+	local unusable = self:GetNWBool("ArmorUnusable", false)
+	if self.HudHintMarkup and self.HudHintDamaged == damaged and self.HudHintUnusable == unusable then return end
 
 	self.HudHintDamaged = damaged
+	self.HudHintUnusable = unusable
 	local name = self.ArmorPrintName or self.PrintName
-	if damaged then name = name .. " [Damaged]" end
+	if unusable then
+		name = name .. " [Ruined]"
+	elseif damaged then
+		name = name .. " [Damaged]"
+	end
 	self.PrintName = name
-	self.HudHintMarkup = markup.Parse("<font=ZCity_Tiny>".. name .."</font>\n<font=ZCity_SuperTiny><colour=125,125,125>".. self.HowToUseInstructions .."</colour></font>",450)
+	local instructions = unusable and "<font=ZCity_Tiny>TOO DAMAGED TO WEAR</font>" or self.HowToUseInstructions
+	self.HudHintMarkup = markup.Parse("<font=ZCity_Tiny>".. name .."</font>\n<font=ZCity_SuperTiny><colour=125,125,125>".. instructions .."</colour></font>",450)
 end
 
 function ENT:Draw()
+	local unusable = self:GetNWBool("ArmorUnusable", false)
+	local model = self.PhysModel and self.model or self
+	if unusable and IsValid(model) and not model.HGArmorUnusableMaterial then
+		model.HGArmorUnusableMaterial = true
+		model:SetMaterial("models/props_c17/fence01a")
+		model:SetColor(Color(75, 55, 40))
+	end
+
 	if not self.PhysModel then
 		self:DrawModel()
 		return
 	end
 
-	local model = self.model
 	local pos, ang = LocalToWorld(self.PhysPos, self.PhysAng, self:GetPos(), self:GetAngles())
 	model:SetRenderOrigin(pos)
 	model:SetRenderAngles(ang)

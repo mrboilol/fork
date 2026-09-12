@@ -39,7 +39,9 @@ local panicattack_death_radius = 900
 local panicattack_gunfight_hold_time = 8
 local panicattack_sustained_fear_time = 10
 local panicattack_grenade_radius = 750
-local seizure_duration = 90
+local seizure_min_duration = 10
+local seizure_max_duration = 30
+local seizure_recovery_duration = 20
 local seizure_pose_force = 850
 local seizure_pose_damp = 42
 local seizure_leg_buckle = 46
@@ -196,6 +198,7 @@ hook.Add("Org Clear", "Main", function(org)
 	org.seizureActive = false
 	org.seizureStart = 0
 	org.seizureEnd = 0
+	org.seizureFakeCooldownEnd = 0
 	org.nextSeizureSpasm = 0
 	org.nextSeizureRoll = 0
 	org.nextKarmaSeizureRoll = 0
@@ -947,12 +950,18 @@ local function apply_seizure_pose(rag, org, time)
 end
 local function stop_seizure(owner, org)
 	local wasActive = org.seizureActive
+	local seizureFakeCooldownEnd = tonumber(org.seizureFakeCooldownEnd) or tonumber(org.seizureEnd) or 0
 	org.seizure = 0
 	org.seizureActive = false
 	org.seizureStart = 0
 	org.seizureEnd = 0
+	org.seizureFakeCooldownEnd = 0
 	org.nextSeizureSpasm = 0
+	if wasActive then
+		org.seizureSuppressedUntil = math.max(org.seizureSuppressedUntil or 0, CurTime() + seizure_recovery_duration)
+	end
 	if wasActive and IsValid(owner) and owner:IsPlayer() and owner:Alive() then
+		if (owner.fakecd or 0) <= seizureFakeCooldownEnd then owner.fakecd = CurTime() end
 		owner.fullsend = true
 		send_organism(org, owner)
 	end
@@ -969,10 +978,12 @@ end
 local function start_seizure(owner, org)
 	if org.seizureActive or (org.seizureSuppressedUntil or 0) > CurTime() or not IsValid(owner) or not owner:IsPlayer() or not owner:Alive() then return end
 	local time = CurTime()
+	local severity = math.Clamp(math.max(org.brain or 0, getSeizureLobeDamage(org)), 0, 1)
 	org.seizure = 1
 	org.seizureActive = true
 	org.seizureStart = time
-	org.seizureEnd = time + seizure_duration
+	org.seizureEnd = time + seizure_min_duration + (seizure_max_duration - seizure_min_duration) * severity
+	org.seizureFakeCooldownEnd = org.seizureEnd
 	org.nextSeizureSpasm = time
 	org.needotrub = true
 	org.needfake = true
@@ -1310,7 +1321,22 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	end
 	if org.seizureActive then
 		local time = CurTime()
-		local seizureEnd = org.seizureEnd or time
+		local previousSeizureEnd = tonumber(org.seizureEnd)
+		local seizureStart = tonumber(org.seizureStart)
+		if not seizureStart or seizureStart != seizureStart or seizureStart <= 0 or seizureStart > time then
+			seizureStart = time
+			org.seizureStart = time
+		end
+		local maximumEnd = seizureStart + seizure_max_duration
+		local seizureEnd = tonumber(org.seizureEnd)
+		if not seizureEnd or seizureEnd != seizureEnd or seizureEnd <= seizureStart or seizureEnd > maximumEnd then
+			seizureEnd = maximumEnd
+			org.seizureEnd = seizureEnd
+		end
+		if previousSeizureEnd and (owner.fakecd or 0) == previousSeizureEnd and seizureEnd < previousSeizureEnd then
+			owner.fakecd = seizureEnd
+		end
+		org.seizureFakeCooldownEnd = seizureEnd
 		org.needfake = true
 		org.needotrub = true
 		org.consciousness = math.min(org.consciousness or 1, 0.04)
