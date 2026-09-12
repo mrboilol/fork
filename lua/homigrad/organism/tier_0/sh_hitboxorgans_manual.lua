@@ -1,4 +1,16 @@
 hg.organism = hg.organism or {}
+hg.armor = hg.armor or {}
+
+local unloadedArmor = setmetatable({}, {
+	__index = function()
+		return {protection = 0}
+	end
+})
+
+hg.armor.torso = hg.armor.torso or unloadedArmor
+hg.armor.head = hg.armor.head or unloadedArmor
+hg.armor.face = hg.armor.face or unloadedArmor
+
 local male = {}
 male["ValveBiped.Bip01_Spine1"] = {}
 
@@ -570,6 +582,23 @@ local cmb_mdls = {
 	["models/romka/player/combine_soldier.mdl"] = true
 }
 
+local function RefreshArmorProtection(organs)
+	for _, boneOrgans in pairs(organs) do
+		for _, organ in pairs(boneOrgans) do
+			local name = organ[1]
+			local placement = string.StartWith(name, "vest") and "torso"
+				or string.StartWith(name, "helmet") and "head"
+				or string.StartWith(name, "mask") and "face"
+			local armor = placement and hg.armor and hg.armor[placement] and hg.armor[placement][name]
+			if armor then
+				organ[8] = armor.protection or 0
+			end
+		end
+	end
+end
+
 function hg.organism.GetHitBoxOrgans(model, ent)
-	return (models_female[model] and female) or male
+	local organs = (models_female[model] and female) or male
+	RefreshArmorProtection(organs)
+	return organs
 end

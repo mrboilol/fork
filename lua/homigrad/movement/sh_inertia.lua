@@ -55,6 +55,14 @@ local math_abs, math_Approach, math_AngleDifference, math_Clamp, math_cos, math_
 	local hg_movement_speed_gain_mul = CreateConVar("hg_movement_speed_gain_mul", "1", {FCVAR_REPLICATED,FCVAR_ARCHIVE,FCVAR_NOTIFY}, "Multiply speed gain", 0.01, 5)
 	local hg_movement_speed_lose_mul = CreateConVar("hg_movement_speed_lose_mul", "1", {FCVAR_REPLICATED,FCVAR_ARCHIVE,FCVAR_NOTIFY}, "Multiply speed lose", 0.01, 5)
 	local hg_movement_weightmul_mul = CreateConVar("hg_movement_weightmul_mul", "1", {FCVAR_REPLICATED,FCVAR_ARCHIVE,FCVAR_NOTIFY}, "Multiply speed lose", 0.01, 5)
+	local hg_movement_lagcomp = CreateConVar("hg_movement_lagcomp", "1", {FCVAR_REPLICATED,FCVAR_ARCHIVE,FCVAR_NOTIFY}, "Compensate movement inertia for latency", 0, 1)
+
+	local function hg_GetMovementLagComp(ply)
+		if not hg_movement_lagcomp:GetBool() or not IsValid(ply) then return 1, 0 end
+
+		local ping_time = math_Clamp(ply:Ping() / 1000, 0, 0.12)
+		return math_Clamp(1 - ping_time * 1.25, 0.82, 1), ping_time
+	end
 
 	local vomitVPAng, vecZero = Angle(1, 0, 0), Vector()
 	hook.Add("SetupMove", "HG(StartCommand)", function(ply, mv, cmd)
@@ -130,7 +138,13 @@ local math_abs, math_Approach, math_AngleDifference, math_Clamp, math_cos, math_
 		local crouching = ply:Crouching()
 		local slow_walk_speed = ply:GetSlowWalkSpeed()
 		local runnin_held = in_speed and not crouching and cmd:KeyDown(IN_FORWARD)
-		local no_jogging = hg_NoJogging(ply)
+		local no_jogging
+		if CLIENT and ply == LocalPlayer() then
+			local convar = GetConVar("hg_nojogging")
+			no_jogging = convar and convar:GetBool() or false
+		else
+			no_jogging = ply:GetInfoNum("hg_nojogging", 0) != 0
+		end
 		local command_number = cmd:CommandNumber()
 		local process_input = command_number <= 0 or command_number > (ply.hg_LastMovementCommand or -1)
 
@@ -183,13 +197,6 @@ local math_abs, math_Approach, math_AngleDifference, math_Clamp, math_cos, math_
 		local velLen = vel:Length()
 		local lag_comp_mul, lag_comp_time = hg_GetMovementLagComp(ply)
 		local on_ground = ply:OnGround()
-		if not on_ground then
-			ply.hg_WasAirborne = true
-		elseif ply.hg_WasAirborne then
-			ply.hg_LastLandingTime = curTime
-			ply.hg_WasAirborne = false
-		end
-		hg_CheckSprintCollisionRagdoll(ply, vel, velLen)
 		local brainSway = org.brain and org.brain > 0.1 and math_sin(curTime / 2) or 1
 		local fm = cmd:GetForwardMove() * brainSway
 		local sm = cmd:GetSideMove() * brainSway

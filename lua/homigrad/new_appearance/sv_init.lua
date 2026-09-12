@@ -184,15 +184,41 @@ end
 local function SpawnAccessoryDrop(accessoryID, accessory, owner, position, force, durability, maximum)
 	local model = accessory[ThatPlyIsFemale(owner) and "femmodel"] or accessory.model
 	if !model then return end
+	local scale = (accessory[ThatPlyIsFemale(owner) and "fempos"] or accessory.malepos or {})[3] or 1
 
 	local dropped = ents.Create("prop_physics")
 	if !IsValid(dropped) then return end
 
 	dropped:SetModel(model)
+	dropped:SetModelScale(scale, 0)
 	dropped:SetPos(position)
 	dropped:SetAngles(AngleRand())
 	dropped:Spawn()
-	dropped:SetModelScale((accessory[ThatPlyIsFemale(owner) and "fempos"] or accessory.malepos or {})[3] or 1, 0)
+	dropped:PhysicsInit(SOLID_VPHYSICS)
+	dropped:SetMoveType(MOVETYPE_VPHYSICS)
+	dropped:SetSolid(SOLID_VPHYSICS)
+
+	local phys = dropped:GetPhysicsObject()
+	if !IsValid(phys) then
+		local mins, maxs = dropped:OBBMins(), dropped:OBBMaxs()
+		if isvector(mins) and isvector(maxs) then
+			local center = (mins + maxs) * 0.5
+			local half = (maxs - mins) * 0.5
+			half.x = math.Clamp(half.x, 1, 24)
+			half.y = math.Clamp(half.y, 1, 24)
+			half.z = math.Clamp(half.z, 1, 24)
+			mins, maxs = center - half, center + half
+			dropped:PhysicsInitBox(mins, maxs)
+			dropped:SetCollisionBounds(mins, maxs)
+			phys = dropped:GetPhysicsObject()
+		end
+	end
+
+	if !IsValid(phys) then
+		dropped:Remove()
+		return
+	end
+
 	dropped:SetSkin(isfunction(accessory.skin) and accessory.skin(owner) or accessory.skin or 0)
 	if accessory.bSetColor and owner.GetPlayerColor then
 		local color = owner:GetPlayerColor():ToColor()
@@ -209,14 +235,19 @@ local function SpawnAccessoryDrop(accessoryID, accessory, owner, position, force
 		dropped:SetNWFloat("HGEquipmentCondition", math.Clamp(durability / maximum, 0, 1))
 	end
 
-	local phys = dropped:GetPhysicsObject()
-	if IsValid(phys) then
-		phys:SetMass(2)
-		phys:Wake()
-		if isvector(force) and force:LengthSqr() > 0 then
-			phys:AddVelocity(force:GetNormalized() * math.Clamp(force:Length() * 0.4, 130, 650))
-		end
+	phys:SetMass(2)
+	phys:EnableMotion(true)
+	phys:Wake()
+	local launch = isvector(force) and force or vector_origin
+	if launch:LengthSqr() > 0 then
+		launch = launch:GetNormalized() * math.Clamp(launch:Length() * 0.4, 130, 650)
+	else
+		launch = VectorRand():GetNormalized() * 130
 	end
+	local inheritedVelocity = IsValid(owner) and owner.GetVelocity and owner:GetVelocity() or vector_origin
+	phys:AddVelocity(inheritedVelocity + launch + vector_up * 60 + VectorRand() * 35)
+	phys:AddAngleVelocity(VectorRand() * 240)
+	dropped:Activate()
 	if hg.NotifyPickupHistoryDrop then
 		hg.NotifyPickupHistoryDrop(owner, accessory.name or accessoryID)
 	end
@@ -256,19 +287,22 @@ function APmodule.DropAccessoriesByPlacement(ent, placements, force)
 	end)
 
 	local launchForce = isvector(force) and force or ent:GetVelocity() + VectorRand() * 180 + vector_up * 120
+	local changed = false
 	for _, drop in ipairs(drops) do
 		local position = GetAccessoryTransform(ent, drop.data) or ent:WorldSpaceCenter()
 		local durability, maximum = GetAccessoryCondition(wearer, drop.id, drop.data)
-		SpawnAccessoryDrop(drop.id, drop.data, wearer, position, launchForce + VectorRand() * 90, durability, maximum)
+		local dropped = SpawnAccessoryDrop(drop.id, drop.data, wearer, position, launchForce + VectorRand() * 90, durability, maximum)
+		if !IsValid(dropped) then continue end
 		if isnumber(drop.index) then
 			table.remove(accessories, drop.index)
 		else
 			accessories[drop.index] = nil
 		end
+		changed = true
 	end
 
-	SyncAccessories(wearer, accessories)
-	return true
+	if changed then SyncAccessories(wearer, accessories) end
+	return changed
 end
 
 function APmodule.TryAbsorbAccessoryImpact(ent, dmgInfo, hitPos, direction, directImpact, impactRadius)
@@ -310,14 +344,16 @@ function APmodule.TryAbsorbAccessoryImpact(ent, dmgInfo, hitPos, direction, dire
 	if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) then dropChance = dropChance + cfg.bulletChance end
 
 	if broken or math.Rand(0, 1) <= dropChance then
-		absorbed = cfg.dropAbsorption + severity * cfg.dropSeverityAbsorption
-		if isnumber(index) then
-			table.remove(accessories, index)
-		else
-			accessories[index] = nil
+		local dropped = SpawnAccessoryDrop(impact.id, impact.data, wearer, impact.position, direction, durability, maximum)
+		if IsValid(dropped) then
+			absorbed = cfg.dropAbsorption + severity * cfg.dropSeverityAbsorption
+			if isnumber(index) then
+				table.remove(accessories, index)
+			else
+				accessories[index] = nil
+			end
+			SyncAccessories(wearer, accessories)
 		end
-		SyncAccessories(wearer, accessories)
-		SpawnAccessoryDrop(impact.id, impact.data, wearer, impact.position, direction, durability, maximum)
 	end
 
 	dmgInfo:ScaleDamage(math.Clamp(1 - absorbed, 0.6, 1))

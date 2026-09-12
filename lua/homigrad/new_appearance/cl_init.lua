@@ -313,7 +313,7 @@ function DrawAccesories(ply, ent, accessories,accessData, islply, force, setup, 
 	end
 
 	if model:GetParent() != ent then model:SetParent(ent, bone) end
-	if not ShouldHideAccessoryInFirstPerson(accessData, islply) and !(islply and accessData.norender) and (!setup or accessData.bonemerge) then
+	if !(islply and accessData.norender) and (!setup or accessData.bonemerge) then
 		if accessData["bSetColor"] then
 			local colorDraw = accessData["vecColorOveride"] or ( ply.GetPlayerColor and ply:GetPlayerColor() or ply:GetNWVector("PlayerColor",Vector(1,1,1)) )
 			render.SetColorModulation( colorDraw[1],colorDraw[2],colorDraw[3] )
