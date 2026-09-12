@@ -1104,17 +1104,24 @@ local dynamicmags
 local instructions
 local hg_weird_mags
 if CLIENT then
-	surface.CreateFont("AmmoFont",{
+	local registerFont = hg and hg.RegisterUIFont or function(name, definition)
+		definition = table.Copy(definition)
+		definition.size = math.max(1, math.floor((definition.referenceSize or definition.size) * math.Clamp(math.min(ScrW() / 1920, ScrH() / 1080), 0.65, 1.5) + 0.5))
+		definition.referenceSize = nil
+		surface.CreateFont(name, definition)
+	end
+
+	registerFont("AmmoFont",{
 		font = "Courier Prime",
-		size = ScreenScale(16),
+		referenceSize = 36,
 		extended = true,
 		weight = 500,
 		antialias = true
 	})
 
-	surface.CreateFont("DescFont",{
+	registerFont("DescFont",{
 		font = "Courier Prime",
-		size = ScreenScale(8),
+		referenceSize = 18,
 		extended = true,
 		shadow = true,
 		weight = 500,
@@ -1229,15 +1236,20 @@ if CLIENT then
 	local color_bg = Color(0,0,0,150)
 	local ammoLongCheck = 0
 
-	local function GetAmmoHudPosition(self, scrW, scrH, hudHPos)
-		local posX = scrW * 0.75
-		local posY = scrH * hudHPos
+	local function GetHudScale()
+		return hg and hg.UIScale and hg.UIScale() or math.Clamp(math.min(ScrW() / 1920, ScrH() / 1080), 0.65, 1.5)
+	end
+
+	local function GetAmmoHudPosition(self, scrW, scrH)
+		local uiScale = GetHudScale()
+		local posX = scrW - 480 * uiScale
+		local posY = scrH - 216 * uiScale
 		local att = self.GetMuzzleAtt and self:GetMuzzleAtt(nil, true, true)
 		local screen = att and att.Pos and att.Pos:ToScreen()
 
 		if screen and screen.visible ~= false and screen.x > -scrW * 0.25 and screen.x < scrW * 1.25 and screen.y > -scrH * 0.25 and screen.y < scrH * 1.25 then
-			posX = math.Clamp(screen.x + scrW * 0.035, scrW * 0.56, scrW * 0.9)
-			posY = math.Clamp(screen.y + scrH * 0.045, scrH * 0.42, scrH * 0.88)
+			posX = math.Clamp(screen.x + 67 * uiScale, 845 * uiScale, scrW - 192 * uiScale)
+			posY = math.Clamp(screen.y + 49 * uiScale, 454 * uiScale, scrH - 130 * uiScale)
 		end
 
 		return posX, posY
@@ -1246,6 +1258,7 @@ if CLIENT then
 	SWEP.DrawAmmoMetods = {
 		["Default"] = function(self,texture)
 			local scrW, scrH = ScrW(), ScrH()
+			local uiScale = GetHudScale()
 			local clipsize = self:GetMaxClip1() + (self.OpenBolt and 0 or 1)
 			if clipsize <= 0 then clipsize = 1 end
 			local clip = self:Clip1()
@@ -1255,10 +1268,9 @@ if CLIENT then
 			local looseRoundReserve = self.AnimInsert or self.ShotgunTubeReload or (self.IsManuallyCycledWeapon and self:IsManuallyCycledWeapon())
 			local magCount = looseRoundReserve and ammo or math.ceil(ammo / clipsize)
 			local visibleReserve = looseRoundReserve and math.min(magCount, 8) or math.min(magCount, 3)
-			local HudHPos = 0.8
 			local showDynamic = true
-			local posX, posY = GetAmmoHudPosition(self, scrW, scrH, HudHPos)
-			local posX2 = posX + scrH * 0.11
+			local posX, posY = GetAmmoHudPosition(self, scrW, scrH)
+			local posX2 = posX + 119 * uiScale
 			
 			lastShoot = LerpFT(0.5,lastShoot, shoot > 0 and 1 or 0)
 			lastShootFor = lastShoot
@@ -1280,12 +1292,12 @@ if CLIENT then
 				coloruse.g = 0
 				coloruse.b = 0
 				coloruse.a = 210*math.max(ammoLongCheck-4,0)
-				draw.SimpleText(text,"AmmoFont",posX2 + 2, posY + scrH*0.05 + 2,coloruse,TEXT_ALIGN_LEFT,TEXT_ALIGN_CENTER)
+				draw.SimpleText(text,"AmmoFont",posX2 + 2 * uiScale, posY + 54 * uiScale + 2 * uiScale,coloruse,TEXT_ALIGN_LEFT,TEXT_ALIGN_CENTER)
 				coloruse.r = 255
 				coloruse.g = 255
 				coloruse.b = 255
 				coloruse.a = 210*math.max(ammoLongCheck-4,0)
-				draw.SimpleText(text,"AmmoFont",posX2, posY + scrH*0.05,coloruse,TEXT_ALIGN_LEFT,TEXT_ALIGN_CENTER)
+				draw.SimpleText(text,"AmmoFont",posX2, posY + 54 * uiScale,coloruse,TEXT_ALIGN_LEFT,TEXT_ALIGN_CENTER)
 			end
 
 			lerpAmmoCheck = LerpFT((ammoCheck > CurTime()) and 0.2 or 0.1, lerpAmmoCheck, ammoCheck > CurTime() and 1 or 0)
@@ -1295,11 +1307,11 @@ if CLIENT then
 			--draw.RoundedBox(0,scrW*0.75-(scrH*0.12/2),scrH*0.72,scrH*0.12,scrH*0.18,ColorAlpha(color_black,50))
 			color_bg.a = (250*lastShoot) * lerpAmmoCheck
 			WhiteColor.a = (150*lastShoot) * lerpAmmoCheck
-			local PosLerp = Lerp(math.ease.OutExpo(lerpAmmoCheck),150,0)
+			local PosLerp = Lerp(math.ease.OutExpo(lerpAmmoCheck),150 * uiScale,0)
 			--print(PosLerp)
 			if clip > 0 then
-				DrawBullet(texture,posX - (scrH*0.16)+(scrH*0.08)*(1+lastShoot) + 2 + PosLerp,posY + 2,scrH*0.08, color_bg)
-				DrawBullet(texture,posX - (scrH*0.16)+(scrH*0.08)*(1+lastShoot) + PosLerp,posY,scrH*0.08, WhiteColor)
+				DrawBullet(texture,posX - 173 * uiScale + 86 * uiScale * (1+lastShoot) + 2 * uiScale + PosLerp,posY + 2 * uiScale,86 * uiScale, color_bg)
+				DrawBullet(texture,posX - 173 * uiScale + 86 * uiScale * (1+lastShoot) + PosLerp,posY,86 * uiScale, WhiteColor)
 				--if lastShoot < 0.2 then StopShowBullet = true end
 			end
 			--if StopShowBullet then
@@ -1314,16 +1326,16 @@ if CLIENT then
 			for i = 2, clip do
 				if i > 6 and lastShootFor > 0.5 or i > 7 then continue end
 				i = i - 1
-				local PosAdjust = math.max(PosLerp - i*15,0)
+				local PosAdjust = math.max(PosLerp - i * 15 * uiScale,0)
 				--print(PosAdjust)
 				if i < 2 then
-					DrawBullet(texture,posX + 2 + PosAdjust,posY + scrH*(i*(0.026*lastShoot))+2,scrH*0.08, color_bg)
-					DrawBullet(texture,posX + PosAdjust,posY + scrH*(i*(0.026*lastShoot)),scrH*0.08, WhiteColor)
+					DrawBullet(texture,posX + 2 * uiScale + PosAdjust,posY + 28 * uiScale * i * lastShoot + 2 * uiScale,86 * uiScale, color_bg)
+					DrawBullet(texture,posX + PosAdjust,posY + 28 * uiScale * i * lastShoot,86 * uiScale, WhiteColor)
 				else
 					color_bg.a = (210 - (20 * i)) * lerpAmmoCheck
 					WhiteColor.a = (210 - (20 * i) )* lerpAmmoCheck
-					DrawBullet(texture,posX+2 + PosAdjust,posY + scrH*((-0.026) + i*0.026+(0.026*lastShootFor))+2,scrH*0.08, color_bg)
-					DrawBullet(texture,posX + PosAdjust,posY + scrH*((-0.026) + i*0.026+(0.026*lastShootFor)),scrH*0.08, WhiteColor)
+					DrawBullet(texture,posX + 2 * uiScale + PosAdjust,posY + 28 * uiScale * (-1 + i + lastShootFor) + 2 * uiScale,86 * uiScale, color_bg)
+					DrawBullet(texture,posX + PosAdjust,posY + 28 * uiScale * (-1 + i + lastShootFor),86 * uiScale, WhiteColor)
 				end
 			end
 
@@ -1332,7 +1344,7 @@ if CLIENT then
 				coloruse.g = 0
 				coloruse.b = 0
 				coloruse.a = 210*lerpAmmoCheck
-				draw.SimpleText("+"..magCount,"AmmoFont",posX2 + 2, posY + 2,coloruse,TEXT_ALIGN_LEFT,TEXT_ALIGN_CENTER)
+				draw.SimpleText("+"..magCount,"AmmoFont",posX2 + 2 * uiScale, posY + 2 * uiScale,coloruse,TEXT_ALIGN_LEFT,TEXT_ALIGN_CENTER)
 				coloruse.r = 255
 				coloruse.g = 255
 				coloruse.b = 255
@@ -1343,13 +1355,14 @@ if CLIENT then
 		end,
 		["MagazineBlocks"] = function(self)
 			local scrW, scrH = ScrW(), ScrH()
+			local uiScale = GetHudScale()
 			local clipsize = self:GetMaxClip1() + (self.OpenBolt and 0 or 1)
 			if clipsize <= 0 then clipsize = 1 end
 
 			local owner = self:GetOwner()
-			local posX, posY = GetAmmoHudPosition(self, scrW, scrH, 0.8)
-			local sizeX = (clipsize == 1 and scrH / 15 or scrW / 40) * scale
-			local sizeY = (clipsize == 1 and scrH / 80 or scrH / 10) * scale
+			local posX, posY = GetAmmoHudPosition(self, scrW, scrH)
+			local sizeX = (clipsize == 1 and 72 or 48) * uiScale
+			local sizeY = (clipsize == 1 and 13.5 or 108) * uiScale
 			local clip = math.max(self:Clip1(), 0)
 			local ammo = math.max(tonumber(owner:GetAmmoCount(self:GetPrimaryAmmoType())) or 0, 0)
 			local looseRoundReserve = self.AnimInsert or self.ShotgunTubeReload or (self.IsManuallyCycledWeapon and self:IsManuallyCycledWeapon())
@@ -1370,14 +1383,14 @@ if CLIENT then
 			col:SetUnpacked(LerpColor(clip / clipsize, yellow, color_white))
 			col.a = 255 * lerpAmmoCheck
 			local hudBlockCount = looseRoundReserve and math.min(visibleReserve + 1, 10) or math.min(magCount + 1, clipsize ~= 1 and 5 or 4)
-			DrawBlurRect(posX - sizeX * (clipsize ~= 1 and 0.2 or 0.3), posY - sizeY * (clipsize ~= 1 and 0.1 or 0.7), (sizeX + sizeX * (clipsize ~= 1 and 0.12 or 0.2)) * math.max(hudBlockCount, 1.3), sizeY + (clipsize ~= 1 and 20 or 60), 7, col.a * 5)
+			DrawBlurRect(posX - sizeX * (clipsize ~= 1 and 0.2 or 0.3), posY - sizeY * (clipsize ~= 1 and 0.1 or 0.7), (sizeX + sizeX * (clipsize ~= 1 and 0.12 or 0.2)) * math.max(hudBlockCount, 1.3), sizeY + (clipsize ~= 1 and 20 or 60) * uiScale, 7, col.a * 5)
 
 			surface.SetDrawColor(col)
 			surface.DrawRect(posX, posY - ammoLeft + sizeY, sizeX, ammoLeft)
-			surface.DrawOutlinedRect(posX - 5, posY - 5, sizeX + 10, sizeY + 10, 1)
+			surface.DrawOutlinedRect(posX - 5 * uiScale, posY - 5 * uiScale, sizeX + 10 * uiScale, sizeY + 10 * uiScale, math.max(1, math.floor(uiScale + 0.5)))
 
-			local magX = posX + (clipsize == 1 and scrW / 40 or scrW / 50)
-			local magY = posY + (clipsize == 1 and scrH / 70 or scrH / 20)
+			local magX = posX + (clipsize == 1 and 48 or 38) * uiScale
+			local magY = posY + (clipsize == 1 and 15 or 54) * uiScale
 			local smallX = sizeX / 2
 			local smallY = sizeY / 2
 			local reserveAmmo = tonumber(ammo) or 0
@@ -1385,12 +1398,12 @@ if CLIENT then
 
 			local i = 1
 			while i <= reserveBlocks do
-				local x = magX + (smallX + 15) * i
+				local x = magX + (smallX + 15 * uiScale) * i
 				if looseRoundReserve then
 					-- One empty mini-block equals one loose shell/round. The loaded tube/internal
 					-- magazine remains the large filled block on the left.
 					surface.SetDrawColor(255, 255, 255, 255 * lerpAmmoCheck)
-					surface.DrawOutlinedRect(x - 5, magY - 5, smallX + 10, smallY + 10, 1)
+					surface.DrawOutlinedRect(x - 5 * uiScale, magY - 5 * uiScale, smallX + 10 * uiScale, smallY + 10 * uiScale, math.max(1, math.floor(uiScale + 0.5)))
 				else
 					local magAmmo = math.min(clipsize, reserveAmmo)
 					reserveAmmo = reserveAmmo - magAmmo
@@ -1399,15 +1412,15 @@ if CLIENT then
 					col2.a = 255 * lerpAmmoCheck
 					surface.SetDrawColor(col2)
 					surface.DrawRect(x, magY - reserveLeft + smallY, smallX, reserveLeft)
-					surface.DrawOutlinedRect(x - 5, magY - 5, smallX + 10, smallY + 10, 1)
+					surface.DrawOutlinedRect(x - 5 * uiScale, magY - 5 * uiScale, smallX + 10 * uiScale, smallY + 10 * uiScale, math.max(1, math.floor(uiScale + 0.5)))
 				end
 				i = i + 1
 			end
 
 			if magCount > reserveBlocks then
 				local extraMags = "+" .. (magCount - reserveBlocks)
-				local extraX = magX + (smallX + 15) * (reserveBlocks + 1)
-				draw.SimpleText(extraMags, "AmmoFont", extraX + 1, magY + smallX / 2 + 1, Color(0, 0, 0, 255 * lerpAmmoCheck), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+				local extraX = magX + (smallX + 15 * uiScale) * (reserveBlocks + 1)
+				draw.SimpleText(extraMags, "AmmoFont", extraX + uiScale, magY + smallX / 2 + uiScale, Color(0, 0, 0, 255 * lerpAmmoCheck), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 				draw.SimpleText(extraMags, "AmmoFont", extraX, magY + smallX / 2, Color(255, 255, 255, 255 * lerpAmmoCheck), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 			end
 		end

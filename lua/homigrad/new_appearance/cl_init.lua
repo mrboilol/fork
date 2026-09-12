@@ -179,20 +179,8 @@ function RenderAccessories(ply, accessories, setup)
 end
 
 local huy_addvec = Vector(0.4,0,0.4)
-
-local function ShouldHideAccessoryInFirstPerson(accessData, islply)
-	if not islply or not istable(accessData) then return false end
-
-	local placement = accessData.placement
-	if placement == "head" or placement == "face" then
-		return true
-	end
-
-	return accessData.bone == "ValveBiped.Bip01_Head1"
-end
-
-function DrawAccesories(ply, ent, accessories,accessData, islply, force, setup)
-	if not accessories or accessories == "none" then return end
+function DrawAccesories(ply, ent, accessories,accessData, islply, force, setup, tAccessories)
+	if not accessories then return end
 	if not accessData then return end
 
 	ply.modelAccess = ply.modelAccess or {}

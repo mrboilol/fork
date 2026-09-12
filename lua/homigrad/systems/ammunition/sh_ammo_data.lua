@@ -3313,3 +3313,70 @@ for i,tbl in pairs(hg.ammotypes) do
 	local coef = 8 / (1.2255 * (tbl.BulletSettings.Speed^2) * math.pi * ((tbl.BulletSettings.Diameter / 1000)^2))
 	tbl.BulletSettings.AirResistanceCoef = coef
 end
+
+if SERVER then
+    util.AddNetworkString( "drop_ammo" )
+
+    net.Receive( "drop_ammo", function( len, ply )
+        if !IsValid(ply) then return end
+        if !ply:Alive() then return end
+        if !ply.organism or ply.organism.otrub or !ply.organism.canmove then return end
+
+        if ply.nextDrop and ply.nextDrop > CurTime() then return end
+        ply.nextDrop = CurTime() + 0.5
+
+        local ammotype = math.floor( net.ReadFloat() )
+		if not ammotype or not isnumber(ammotype) or ammotype == -1 then return end
+        local cnt = math.floor( net.ReadFloat() )
+		if not cnt or not isnumber(cnt) then return end
+
+        local ammoname = game.GetAmmoName( ammotype )
+        if not ammoname or ammoname == "" then
+            ply:ChatPrint("Invalid ammo type...")
+            return
+        end
+
+        if cnt < 1 then
+            ply:ChatPrint("You can't drop zero ammo")
+            return
+        end
+
+        local haveammo = ply:GetAmmoCount(ammotype)
+        if not haveammo or haveammo - cnt < 0 then
+            ply:ChatPrint("You don't have enough ammo")
+            return
+        end
+
+        local classname = "ent_ammo_" .. string.lower( string.Replace( ammoname, " ", "" ) )
+		if not classname or classname == nil or classname == "ent_ammo_" or classname == "ent_ammo_ " then return end
+
+        if not scripted_ents.GetStored(classname) then
+            ply:ChatPrint("Invalid entitytype...")
+            return
+        end
+
+        local ammobox = ents.Create( classname )
+        if not IsValid(ammobox) then
+            ply:ChatPrint("Invalid entitytype...")
+            return
+        end
+
+        local droppos = ply:EyePos() + ply:EyeAngles():Forward() * 15
+
+        ammobox:SetPos( droppos )
+        ammobox:Spawn()
+        ammobox.AmmoCount = cnt
+
+        local phys = ammobox:GetPhysicsObject()
+        if IsValid(phys) then
+            local force = game.GetAmmoForce(ammotype) or 1
+            phys:SetMass( math.Clamp( (force * cnt) / 1500, 1, 50000 ) )
+        end
+
+        ply:SetAmmo( haveammo - cnt, ammotype )
+        ply:EmitSound( "snd_jack_hmcd_ammobox.wav", 75, math.random(80, 90), 1, CHAN_ITEM )
+
+        ply.inventory.Ammo = ply:GetAmmo()
+        ply:SetNetVar("Inventory", ply.inventory)
+    end)
+end

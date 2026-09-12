@@ -89,18 +89,25 @@ if CLIENT then
 	local hg_old_notificate = ConVarExists("hg_old_notificate") and GetConVar("hg_old_notificate") or CreateConVar("hg_old_notificate",0,{FCVAR_USERINFO,FCVAR_ARCHIVE},"Toggle old notifications (chatprints)",0,1)
 	local hg_newthoughts = ConVarExists("hg_newthoughts") and GetConVar("hg_newthoughts") or CreateClientConVar("hg_newthoughts", "0", true, true, "Toggle new stacked injury thoughts", 0, 1)
 
-	surface.CreateFont("BerserkFont", {
+	local registerFont = hg.RegisterUIFont or function(name, definition)
+		definition = table.Copy(definition)
+		definition.size = math.max(1, math.floor((definition.referenceSize or definition.size) * math.Clamp(math.min(ScrW() / 1920, ScrH() / 1080), 0.65, 1.5) + 0.5))
+		definition.referenceSize = nil
+		surface.CreateFont(name, definition)
+	end
+
+	registerFont("BerserkFont", {
 		font = "Who asks Satan",
-		size = ScreenScale(25),
+		referenceSize = 56,
 		extended = true,
 		weight = 400,
 		antialias = true,
 	})
 
-	surface.CreateFont("HuyFont", {
+	registerFont("HuyFont", {
 		font = "BudgetLabel",
 		extended = true,
-		size = ScreenScale(8),
+		referenceSize = 18,
 		weight = 0,
 		blursize = 0,
 		scanlines = 0,
@@ -110,10 +117,10 @@ if CLIENT then
 		outline = false,
 	})
 
-	surface.CreateFont("SmallHuyFont", {
+	registerFont("SmallHuyFont", {
 		font = "BudgetLabel",
 		extended = true,
-		size = ScreenScale(7),
+		referenceSize = 16,
 		weight = 0,
 		blursize = 0,
 		scanlines = 0,
@@ -123,10 +130,10 @@ if CLIENT then
 		outline = false,
 	})
 
-	surface.CreateFont("ThoughtFont", {
+	registerFont("ThoughtFont", {
 		font = "BudgetLabel",
 		extended = true,
-		size = ScreenScale(11),
+		referenceSize = 25,
 		weight = 0,
 		blursize = 0,
 		scanlines = 0,
@@ -398,7 +405,8 @@ if CLIENT then
 
 					local rand = org.berserk * 2 * (col.a / 255)
 
-					local x, y = ScrW() / 2 + math.Rand(-rand, rand), ScrH() - ScrH() / 6 + math.Rand(-rand, rand)
+					local uiScale = hg.UIScale and hg.UIScale() or 1
+					local x, y = ScrW() / 2 + math.Rand(-rand, rand) * uiScale, ScrH() - 180 * uiScale + math.Rand(-rand, rand) * uiScale
 
 					local m = Matrix()
 					m:Translate( Vector( x, y, 0 ) )
@@ -429,15 +437,15 @@ if CLIENT then
 					render.PopFilterMag()
 				elseif lply.PlayerClassName == "furry" then
 					local shake = (org.pain > 10 and org.pain / 12 or 0) + GetThoughtInstability(org) * 10
-					local x, y = ScrW() / 2 - txtw / 2 + math.Rand(-shake, shake), ScrH() - ScrH() / 6 + math.Rand(-shake, shake)
-					local x, y = ScrW() / 2 - txtw / 2 + math.Rand(0, org.pain > 10 and org.pain / 10 or 0) + math.Rand(0, (255 - clr.g) / 255 * 2), ScrH() - ScrH() / 6 + math.Rand(0, org.pain > 10 and org.pain / 10 or 0) + math.Rand(0, (255 - clr.g) / 255 * 2)
+					local uiScale = hg.UIScale and hg.UIScale() or 1
+					local x, y = ScrW() / 2 - txtw / 2 + (math.Rand(0, org.pain > 10 and org.pain / 10 or 0) + math.Rand(0, (255 - clr.g) / 255 * 2)) * uiScale, ScrH() - 180 * uiScale + (math.Rand(0, org.pain > 10 and org.pain / 10 or 0) + math.Rand(0, (255 - clr.g) / 255 * 2)) * uiScale
 
 					draw.SimpleText(last_message or txt, "ZB_ProotOSMedium", x + 2, y + 2, ColorAlpha(color_black, col.a), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 					draw.SimpleText(last_message or txt, "ZB_ProotOSMedium", x, y, ColorAlpha(bluewhite, col.a), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 				else
 					local shake = (org.pain > 10 and org.pain / 12 or 0) + GetThoughtInstability(org) * 10
-					local x, y = ScrW() / 2 - txtw / 2 + math.Rand(-shake, shake), ScrH() - ScrH() / 6 + math.Rand(-shake, shake)
-					local x, y = ScrW() / 2 - txtw / 2 + math.Rand(0, org.pain > 10 and org.pain / 10 or 0) + math.Rand(0, (255 - clr.g) / 255 * 2), ScrH() - ScrH() / 6 + math.Rand(0, org.pain > 10 and org.pain / 10 or 0) + math.Rand(0, (255 - clr.g) / 255 * 2)
+					local uiScale = hg.UIScale and hg.UIScale() or 1
+					local x, y = ScrW() / 2 - txtw / 2 + (math.Rand(0, org.pain > 10 and org.pain / 10 or 0) + math.Rand(0, (255 - clr.g) / 255 * 2)) * uiScale, ScrH() - 180 * uiScale + (math.Rand(0, org.pain > 10 and org.pain / 10 or 0) + math.Rand(0, (255 - clr.g) / 255 * 2)) * uiScale
 
 					draw.SimpleTextOutlined(last_message or txt, font, x, y, col, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER, 1.5, colBrown)
 				end
@@ -481,7 +489,8 @@ if CLIENT then
 			else
 				local clr = tbl[3]
 				local alpha = math.min(delta / fade, 1, (duration - delta) / fade) * 255
-				local y = ScrH() - ScrH() / 4 - (i - 1) * ScreenScale(14)
+				local uiScale = hg.UIScale and hg.UIScale() or 1
+				local y = ScrH() - 270 * uiScale - (i - 1) * 32 * uiScale
 
 				thoughtBrown.a = alpha
 				draw.SimpleTextOutlined(tbl[1], "ThoughtFont", ScrW() / 2 + math.Rand(-shake, shake), y + math.Rand(-shake, shake), Color(clr.r, clr.g, clr.b, alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, thoughtBrown)

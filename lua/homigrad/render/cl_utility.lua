@@ -998,6 +998,8 @@ players : 1 humans, 0 bots (20 max)
 
 --\\ CL Utils setting adjustments
 	if CLIENT then
+		--RunConsoleCommand("mp_decals", "4096")  -- "4194304" - if you set this value you will get crashed :3
+
 		hook.Add("Think","RemoveMe_001",function()
 			hook.Remove("PostPlayerDraw","BA2_GasmaskDraw")
 			hook.Remove("Think","RemoveMe_001")
@@ -1155,6 +1157,17 @@ players : 1 humans, 0 bots (20 max)
 			surface.DrawTexturedRect(flash.x - size / 2 + huy, flash.y - size / 2 + huy, size, size)
 			surface.SetMaterial(mat2)
 			surface.DrawTexturedRect(flash.x - size / 2 + huy, flash.y - size / 2 + huy, size, size)
+		end
+	end)
+--//
+
+--\\ Jump Gun viewpunch
+	hg_jump_gun_viewpunch = CreateConVar("hg_jump_gun_viewpunch", "1", {FCVAR_ARCHIVE, FCVAR_REPLICATED, FCVAR_NOTIFY}, "Jump viewpunch var", 0, 1)
+
+	hook.Add("OnPlayerJump", "hg.JumpGunViewpunch", function(ply)
+		if hg.IsLocal(ply) and hg_jump_gun_viewpunch:GetBool() and IsFirstTimePredicted() then
+			ViewPunch(Angle(-1,0,0))
+			ViewPunch2(Angle(math.random(3,5),math.Rand(-2,0.5),0))
 		end
 	end)
 --//

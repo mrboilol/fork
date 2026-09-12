@@ -11,89 +11,96 @@ if CLIENT then
 		return hg_font_default
 	end
 
-	surface.CreateFont("HomigradFont", {
+	local registerFont = hg.RegisterUIFont or function(name, definition)
+		definition = table.Copy(definition)
+		definition.size = math.max(1, math.floor((definition.referenceSize or definition.size) * math.Clamp(math.min(ScrW() / 1920, ScrH() / 1080), 0.65, 1.5) + 0.5))
+		definition.referenceSize = nil
+		surface.CreateFont(name, definition)
+	end
+
+	registerFont("HomigradFont", {
 		font = font(),
-		size = ScreenScale(10),
+		referenceSize = 23,
 		weight = 1100,
 		outline = false
 	})
 
-	surface.CreateFont("ScoreboardPlayer", {
+	registerFont("ScoreboardPlayer", {
 		font = font(),
-		size = ScreenScale(7),
+		referenceSize = 16,
 		weight = 1100,
 		outline = false
 	})
 
-	surface.CreateFont("HomigradFontBig", {
+	registerFont("HomigradFontBig", {
 		font = font(),
-		size = ScreenScale(12),
+		referenceSize = 27,
 		weight = 1100,
 		outline = false,
 		shadow = true
 	})
 
-	surface.CreateFont("HomigradFontMedium", {
+	registerFont("HomigradFontMedium", {
 		font = font(),
-		size = ScreenScale(8),
+		referenceSize = 18,
 		weight = 1100,
 		outline = false,
 	})
 
-	surface.CreateFont("HomigradFontRadialOld", {
+	registerFont("HomigradFontRadialOld", {
 		font = font(),
-		size = ScreenScale(11),
+		referenceSize = 25,
 		weight = 1100,
 		outline = false,
 	})
 
-	surface.CreateFont("HomigradFontRadialCenter", {
+	registerFont("HomigradFontRadialCenter", {
 		font = font(),
-		size = ScreenScale(14),
+		referenceSize = 32,
 		weight = 1100,
 		outline = false,
 	})
 
-	surface.CreateFont("HomigradFontLarge", {
+	registerFont("HomigradFontLarge", {
 		font = font(),
-		size = ScreenScale(15),
+		referenceSize = 34,
 		weight = 1100,
 		outline = false
 	})
 
-	surface.CreateFont("HomigradFontGigantoNormous", {
+	registerFont("HomigradFontGigantoNormous", {
 		font = font(),
-		size = ScreenScale(25),
+		referenceSize = 56,
 		weight = 1100,
 		outline = false,
 		shadow = false
 	})
 
-	surface.CreateFont("HomigradFontSmall", {
+	registerFont("HomigradFontSmall", {
 		font = font(),
-		size = 17,
+		referenceSize = 17,
 		weight = 1100,
 		outline = false
 	})
 
-	surface.CreateFont("HomigradFontVSmall", {
+	registerFont("HomigradFontVSmall", {
 		font = font(),
-		size = 12,
+		referenceSize = 12,
 		weight = 400,
 		outline = false
 	})
 
-	surface.CreateFont("ZCity_Veteran", {
+	registerFont("ZCity_Veteran", {
 		font = "x14y24pxHeadUpDaisy",
-		size = ScreenScale(10),
+		referenceSize = 23,
 		weight = 500,
 		outline = false
 	})
 
-	surface.CreateFont("HG_font", {
+	registerFont("HG_font", {
 		font = "Arial",
 		extended = false,
-		size = 50,
+		referenceSize = 50,
 		weight = 500,
 		outline = true
 	})

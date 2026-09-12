@@ -67,7 +67,7 @@ function ENT:Think()
 							ent.organism.poison3 = CurTime() - (self.ChemistPotency and 10 or 0)
 						end
 						
-						mode_hmcd.NetworkChemicalResistanceOfPlayer(ent)
+						MODE.NetworkChemicalResistanceOfPlayer(ent)
 						
 						ent.PassiveAbility_ChemicalAccumulation_NextNetworkTime = CurTime() + 1
 						
