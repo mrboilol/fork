@@ -36,7 +36,13 @@ function hg.CanPromptPickup(ply, ent)
 	if not IsValid(ply) or not ply:IsPlayer() or not ply:Alive() then return false end
 	if ply.organism and ply.organism.otrub then return false end
 	if ply:GetNetVar("disappearance", nil) then return false end
-	if not IsValid(ent) or ent:IsWorld() or ent:IsPlayer() or ent:IsRagdoll() then return false end
+	if not IsValid(ent) or ent:IsWorld() then return false end
+	if (ent:IsPlayer() or ent:IsRagdoll()) and ent ~= ply then
+		local owner = hg.GetLodgedPickupOwner and hg.GetLodgedPickupOwner(ent)
+		if not IsValid(owner) then return false end
+		return ply:EyePos():DistToSqr(ent:NearestPoint(ply:EyePos())) <= PICKUP_RANGE * PICKUP_RANGE
+	end
+	if ent:IsPlayer() or ent:IsRagdoll() then return false end
 	local isPlayerHolding = isHeldByPlayer(ent)
 	if ent:GetNoDraw() or IsValid(ent:GetParent()) or isPlayerHolding then return false end
 	if ply:EyePos():DistToSqr(ent:NearestPoint(ply:EyePos())) > PICKUP_RANGE * PICKUP_RANGE then return false end
@@ -105,6 +111,16 @@ function hg.CanPromptSearch(ply, ent)
 end
 
 local function pickupName(ent)
+	local lodgedOwner = hg.GetLodgedPickupOwner and hg.GetLodgedPickupOwner(ent)
+	if IsValid(lodgedOwner) and hg.BestLodgedToTake then
+		local index = hg.BestLodgedToTake(lodgedOwner)
+		local entry = index and lodgedOwner.organism.LodgedEntities[index]
+		local stored = entry and isstring(entry.takeent) and weapons.GetStored(entry.takeent)
+		if stored and stored.PrintName then return stored.PrintName end
+		if entry and entry.CrossbowBolt then return "crossbow bolt" end
+		if entry then return "embedded item" end
+	end
+
 	local name
 
 	if ent:IsWeapon() and ent.GetPrintName then

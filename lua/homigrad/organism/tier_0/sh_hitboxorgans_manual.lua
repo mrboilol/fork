@@ -1,16 +1,4 @@
 hg.organism = hg.organism or {}
-hg.armor = hg.armor or {}
-
-local unloadedArmor = setmetatable({}, {
-	__index = function()
-		return {protection = 0}
-	end
-})
-
-hg.armor.torso = hg.armor.torso or unloadedArmor
-hg.armor.head = hg.armor.head or unloadedArmor
-hg.armor.face = hg.armor.face or unloadedArmor
-
 local male = {}
 male["ValveBiped.Bip01_Spine1"] = {}
 
@@ -253,63 +241,17 @@ local models_female = {
 	["models/player/group03/police_fem.mdl"] = true
 }
 
-table.insert(male["ValveBiped.Bip01_Spine2"],1,{"vest1", 1, Vector(3, 7, 0), Angle(0, 0, 0), Vector(7, 2, 6), Color(250, 255, 0), true, hg.armor.torso["vest1"].protection})
-table.insert(male["ValveBiped.Bip01_Spine2"],1,{"vest1", 1, Vector(3, -2.5, 0), Angle(0, 0, 0), Vector(7, 1, 6), Color(250, 255, 0), true, hg.armor.torso["vest1"].protection})
-
-table.insert(male["ValveBiped.Bip01_Spine1"],1,{"vest2", 1, Vector(-4, 2, 0), Angle(0, 0, 0), Vector(5, 7, 7), Color(140, 0, 255), true, hg.armor.torso["vest2"].protection})
-table.insert(male["ValveBiped.Bip01_Spine2"],1,{"vest2", 1, Vector(2, 3, 0), Angle(0, 0, 0), Vector(8, 7, 6), Color(183, 0, 255), true, hg.armor.torso["vest2"].protection})
-
-table.insert(male["ValveBiped.Bip01_Spine2"],1,{"vest3", 1, Vector(3, 8, 0), Angle(0, 0, 0), Vector(7, 2, 6), Color(47, 0, 255), true, hg.armor.torso["vest3"].protection})
-table.insert(male["ValveBiped.Bip01_Spine2"],1,{"vest3", 1, Vector(3, -2.5, 0), Angle(0, 0, 0), Vector(7, 2, 6), Color(0, 17, 255), true, hg.armor.torso["vest3"].protection})
-
-table.insert(male["ValveBiped.Bip01_Spine2"],1,{"vest4", 1, Vector(3, 8, 0), Angle(0, 0, 0), Vector(7, 2, 6), Color(55, 0, 255), true, hg.armor.torso["vest4"].protection})
-table.insert(male["ValveBiped.Bip01_Spine2"],1,{"vest4", 1, Vector(3, -2.5, 0), Angle(0, 0, 0), Vector(7, 2, 6), Color(68, 0, 255), true, hg.armor.torso["vest4"].protection})
-
-
-table.insert(male["ValveBiped.Bip01_Spine1"],1,{"vest5", 1, Vector(-6, 7, 0), Angle(0, 0, 0), Vector(4, 2, 4), Color(140, 0, 255), true, hg.armor.torso["vest5"].protection})
-
-table.insert(male["ValveBiped.Bip01_Spine2"],1,{"vest5", 1, Vector(3, 7, 0), Angle(0, 0, 0), Vector(8, 2, 5), Color(183, 0, 255), true, hg.armor.torso["vest5"].protection})
-table.insert(male["ValveBiped.Bip01_Spine2"],1,{"vest5", 1, Vector(3, -2.5, 0), Angle(0, 0, 0), Vector(8, 2, 5), Color(183, 0, 255), true, hg.armor.torso["vest5"].protection})
-
-table.insert(male["ValveBiped.Bip01_Spine2"],1,{"vest5", 1, Vector(13, 3, 0), Angle(0, 15, 0), Vector(1.5, 4, 4), Color(183, 0, 255), true, hg.armor.torso["vest5"].protection})
-
-
-table.insert(male["ValveBiped.Bip01_L_UpperArm"],1,{"vest5", 1, Vector(3, -1, 2), Angle(0, 0, 0), Vector(5, 2, 1), Color(183, 0, 255), true, hg.armor.torso["vest5"].protection})
-table.insert(male["ValveBiped.Bip01_R_UpperArm"],1,{"vest5", 1, Vector(3, -1, -2), Angle(0, 0, 0), Vector(5, 2, 1), Color(183, 0, 255), true, hg.armor.torso["vest5"].protection})
-
-table.insert(male["ValveBiped.Bip01_Head1"],1,{"helmet1", 1, Vector(6.5, -0.9, 0), Angle(0, 12, 0), Vector(2.7, 7, 4.5), Color(250, 255, 0), true, hg.armor.head["helmet1"].protection})
-table.insert(male["ValveBiped.Bip01_Head1"],1,{"helmet2", 1, Vector(3.5, -0.9, 0), Angle(0, 0, 0), Vector(5, 6, 5.5), Color(255, 255, 0), true, hg.armor.head["helmet2"].protection})
-table.insert(male["ValveBiped.Bip01_Head1"],1,{"helmet3", 1, Vector(3.5, -0.9, 0), Angle(0, 0, 0), Vector(5, 6, 5.5), Color(255, 255, 0), true, hg.armor.head["helmet3"].protection})
-
-table.insert(male["ValveBiped.Bip01_Head1"],1,{"helmet5", 1, Vector(6.5, -1, 0), Angle(0, 20, 0), Vector(2.7, 6, 4.5), Color(250, 255, 0), true, hg.armor.head["helmet5"].protection})
-table.insert(male["ValveBiped.Bip01_Head1"],1,{"helmet5", 1, Vector(1, 2, 0), Angle(0, 0, 0), Vector(1.5, 1.7, 4.5), Color(250, 255, 0), true, hg.armor.head["helmet5"].protection})
-
-table.insert(male["ValveBiped.Bip01_Head1"],1,{"helmet7", 1, Vector(6.5, -0.4, 0), Angle(0, 28, 0), Vector(4.2, 6, 4.5), Color(250, 255, 0), true, hg.armor.head["helmet1"].protection})
-
-table.insert(male["ValveBiped.Bip01_Head1"],1,{"mask1", 1, Vector(3.5, -4, 0), Angle(0, 0, 0), Vector(5, 3, 4.5), Color(255, 0, 221), true, hg.armor.face["mask1"].protection})
-
-table.insert(male["ValveBiped.Bip01_Head1"],1,{"mask3", 1, Vector(3.5, -4, 0), Angle(0, 0, 0), Vector(5, 3, 4.5), Color(255, 0, 221), true, hg.armor.face["mask3"].protection})
--- Vest 6
-table.insert(male["ValveBiped.Bip01_Spine2"],1,{"vest6", 1, Vector(3, 8, 0), Angle(0, 0, 0), Vector(7, 1, 6), Color(55, 0, 255), true, hg.armor.torso["vest6"].protection})
-table.insert(male["ValveBiped.Bip01_Spine2"],1,{"vest6", 1, Vector(3, -2.5, 0), Angle(0, 0, 0), Vector(7, 1, 6), Color(68, 0, 255), true, hg.armor.torso["vest6"].protection})
-table.insert(male["ValveBiped.Bip01_Spine2"],1,{"vest6", 1, Vector(-2, 3, 6), Angle(0, 0, 90), Vector(3, 0.5, 4), Color(255, 242, 0), true, hg.armor.torso["vest6"].protection})
-table.insert(male["ValveBiped.Bip01_Spine2"],1,{"vest6", 1, Vector(-2, 3, -6), Angle(0, 0, 90), Vector(3, 0.5, 4), Color(255, 242, 0), true, hg.armor.torso["vest6"].protection})
--- Vest 7
-table.insert(male["ValveBiped.Bip01_Spine2"],1,{"vest7", 1, Vector(3, 8, 0), Angle(0, 0, 0), Vector(7, 1, 6), Color(55, 0, 255), true, hg.armor.torso["vest7"].protection})
-table.insert(male["ValveBiped.Bip01_Spine2"],1,{"vest7", 1, Vector(3, -2.5, 0), Angle(0, 0, 0), Vector(7, 1, 6), Color(68, 0, 255), true, hg.armor.torso["vest7"].protection})
-table.insert(male["ValveBiped.Bip01_Spine2"],1,{"vest7", 1, Vector(-2, 3, 6), Angle(0, 0, 90), Vector(3, 0.5, 4), Color(255, 242, 0), true, hg.armor.torso["vest7"].protection})
-table.insert(male["ValveBiped.Bip01_Spine2"],1,{"vest7", 1, Vector(-2, 3, -6), Angle(0, 0, 90), Vector(3, 0.5, 4), Color(255, 242, 0), true, hg.armor.torso["vest7"].protection})
--- Vest 8 
-table.insert(male["ValveBiped.Bip01_Spine2"],1,{"vest8", 1, Vector(3, 8, 0), Angle(0, 0, 0), Vector(7, 2, 6), Color(55, 0, 255), true, hg.armor.torso["vest8"].protection})
-table.insert(male["ValveBiped.Bip01_Spine2"],1,{"vest8", 1, Vector(3, -2.5, 0), Angle(0, 0, 0), Vector(7, 2, 6), Color(68, 0, 255), true, hg.armor.torso["vest8"].protection})
-table.insert(male["ValveBiped.Bip01_Spine2"],1,{"vest8", 1, Vector(-2, 3, 6), Angle(0, 0, 90), Vector(3, 2, 4), Color(255, 242, 0), true, hg.armor.torso["vest8"].protection})
-table.insert(male["ValveBiped.Bip01_Spine2"],1,{"vest8", 1, Vector(-2, 3, -6), Angle(0, 0, 90), Vector(3, 2, 4), Color(255, 242, 0), true, hg.armor.torso["vest8"].protection})
-
-table.insert(male["ValveBiped.Bip01_Spine1"],1,{"vest8", 1, Vector(-5, 7, 0), Angle(0, 0, 0), Vector(3, 2, 7), Color(55, 0, 255), true, hg.armor.torso["vest8"].protection})
-table.insert(male["ValveBiped.Bip01_Spine2"],1,{"vest8", 1, Vector(-7, -2.5, 0), Angle(0, 0, 0), Vector(3, 2, 6), Color(68, 0, 255), true, hg.armor.torso["vest8"].protection})
-
-table.insert(male["ValveBiped.Bip01_Head1"],1,{"helmet6", 1, Vector(6.5, -1, 0), Angle(0, 15, 0), Vector(2.7, 6, 4.5), Color(250, 255, 0), true, hg.armor.head["helmet6"].protection})
---table.insert(male["ValveBiped.Bip01_Head1"],1,{"helmet6", 1, Vector(1, 2, 0), Angle(0, 0, 0), Vector(1.5, 1.7, 4.5), Color(250, 255, 0), true, hg.armor.head["helmet6"].protection})
+table.insert(male["ValveBiped.Bip01_Spine2"], 1, {"torso_armor", 1, Vector(3, 3, 0), Angle(0, 0, 0), Vector(8, 7, 6), Color(250, 255, 0), "torso", 0})
+table.insert(male["ValveBiped.Bip01_Spine1"], 1, {"torso_armor", 1, Vector(-4, 2, 0), Angle(0, 0, 0), Vector(5, 7, 7), Color(250, 255, 0), "torso", 0})
+table.insert(male["ValveBiped.Bip01_Head1"], 1, {"head_armor", 1, Vector(5, 1, 0), Angle(0, 0, 0), Vector(3.8, 3.5, 4.5), Color(250, 255, 0), "head", 0})
+table.insert(male["ValveBiped.Bip01_Head1"], 1, {"face_armor", 1, Vector(3.5, -4, 0), Angle(0, 0, 0), Vector(5, 3, 4.5), Color(255, 0, 221), "face", 0})
+table.insert(male["ValveBiped.Bip01_Head1"], 1, {"visor_eyes_armor", 1, Vector(4.8, -4, 0), Angle(0, 0, 0), Vector(2.2, 2.5, 4.5), Color(80, 180, 255), "visor", 0})
+table.insert(male["ValveBiped.Bip01_Head1"], 1, {"visor_mouth_armor", 1, Vector(1.2, -4, 0), Angle(0, 0, 0), Vector(1.4, 2.5, 4.5), Color(80, 180, 255), "visor", 0})
+table.insert(male["ValveBiped.Bip01_Head1"], 1, {"jaw_mouth_armor", 1, Vector(1.2, -4, 0), Angle(0, 0, 0), Vector(1.4, 2.5, 4.5), Color(255, 160, 40), "helmet_jaw", 0})
+table.insert(male["ValveBiped.Bip01_Head1"], 1, {"jaw_ears_armor", 1, Vector(3, 0, 4.5), Angle(0, 0, 0), Vector(2.8, 3.5, 0.9), Color(255, 160, 40), "helmet_jaw", 0})
+table.insert(male["ValveBiped.Bip01_Head1"], 1, {"jaw_ears_armor", 1, Vector(3, 0, -4.5), Angle(0, 0, 0), Vector(2.8, 3.5, 0.9), Color(255, 160, 40), "helmet_jaw", 0})
+table.insert(male["ValveBiped.Bip01_Head1"], 1, {"helmet_ears_armor", 1, Vector(3, 0, 4.5), Angle(0, 0, 0), Vector(2.8, 3.5, 0.9), Color(160, 255, 80), "helmet_ears", 0})
+table.insert(male["ValveBiped.Bip01_Head1"], 1, {"helmet_ears_armor", 1, Vector(3, 0, -4.5), Angle(0, 0, 0), Vector(2.8, 3.5, 0.9), Color(160, 255, 80), "helmet_ears", 0})
 local female = {}
 table.CopyFromTo(male, female)
 
@@ -582,23 +524,6 @@ local cmb_mdls = {
 	["models/romka/player/combine_soldier.mdl"] = true
 }
 
-local function RefreshArmorProtection(organs)
-	for _, boneOrgans in pairs(organs) do
-		for _, organ in pairs(boneOrgans) do
-			local name = organ[1]
-			local placement = string.StartWith(name, "vest") and "torso"
-				or string.StartWith(name, "helmet") and "head"
-				or string.StartWith(name, "mask") and "face"
-			local armor = placement and hg.armor and hg.armor[placement] and hg.armor[placement][name]
-			if armor then
-				organ[8] = armor.protection or 0
-			end
-		end
-	end
-end
-
 function hg.organism.GetHitBoxOrgans(model, ent)
-	local organs = (models_female[model] and female) or male
-	RefreshArmorProtection(organs)
-	return organs
+	return (models_female[model] and female) or male
 end

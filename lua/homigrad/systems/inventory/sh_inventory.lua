@@ -163,8 +163,6 @@ if CLIENT then
 			if true then return true end
 		end,
 		["Armor"] = function(ply, ent, placement, armor)
-			local armors = ply:GetNetVar("Armor",{})
-			if armors[placement] then return false end
 			if true then return true end
 		end,
 		["Attachments"] = function(ply, ent, att, tbl)

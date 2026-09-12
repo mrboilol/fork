@@ -273,12 +273,16 @@ else
 	end
 
 	function SWEP:Think()
-		local ent = hg.eyeTrace(self:GetOwner()).Entity
-		ent = IsValid(ent) and ent.organism and ent or self:GetOwner()
+		local owner = self:GetOwner()
+		if not IsValid(owner) then return end
+
+		local ent = hg.eyeTrace(owner).Entity
+		ent = IsValid(ent) and ent.organism and ent or owner
+		local recipientBloodType = ent.organism and ent.organism.bloodtype or "unknown"
 		local mode = self:GetNetVar("mode",2) - 1
 		if mode == 0 then mode = 2 end
 		local modeStr = self.modeNames2[mode]
-		self.modeNames[1] = self:GetNetVar("modeValues", {})[1] == 0 and modeStr .. " | Recipent: " .. ent.organism.bloodtype or modeStr .. " | in: "..self:GetNetVar("type","o-").." | recipent: "..ent.organism.bloodtype
+		self.modeNames[1] = self:GetNetVar("modeValues", {})[1] == 0 and modeStr .. " | Recipent: " .. recipientBloodType or modeStr .. " | in: "..self:GetNetVar("type","o-").." | recipent: "..recipientBloodType
 	end
 
 	function SWEP:AfterDrawModel(wm,nodraw)

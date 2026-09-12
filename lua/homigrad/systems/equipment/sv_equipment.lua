@@ -39,11 +39,6 @@ local function IsDurabilityArmor(placement, armorData)
 	return placement == "head" or placement == "face"
 end
 
-local function BreakDropsArmor(placement, armorData)
-	if armorData and armorData.breakDrops ~= nil then return armorData.breakDrops end
-	return placement == "head" or placement == "face"
-end
-
 local function DamageArmorRegion(owner, armor, placement, armorData, hitPos, rawDmg, character)
 	owner.armors_regions = owner.armors_regions or {}
 	owner.armors_regions[armor] = owner.armors_regions[armor] or {}
@@ -199,16 +194,22 @@ local function getArmorDropTransform(ent, equipment, pos)
 	return pos or dropPos, dropAng
 end
 
-local function getArmorDropVelocity(dmgInfo)
-	if not dmgInfo then return end
+local function getArmorDropVelocity(dmgInfo, ent)
+	local force = dmgInfo and dmgInfo:GetDamageForce()
+	if force and force:LengthSqr() > 0 then
+		force = force:GetNormalized() * math.Clamp(force:Length() * 0.02, 100, 250)
+		force.z = force.z + 35
+		return force
+	end
 
-	local force = dmgInfo:GetDamageForce()
-	if not force or force:LengthSqr() <= 0 then return end
+	local direction = VectorRand()
+	local attacker = dmgInfo and dmgInfo:GetAttacker()
+	if IsValid(attacker) and IsValid(ent) then
+		direction = ent:WorldSpaceCenter() - attacker:WorldSpaceCenter()
+	end
+	direction.z = math.abs(direction.z) + 0.35
 
-	force = force:GetNormalized() * math.Clamp(force:Length() * 0.02, 100, 250)
-	force.z = force.z + 35
-
-	return force
+	return direction:GetNormalized() * math.random(125, 225)
 end
 
 function hg.ArmorRequirementSatisfied(ent, req)
@@ -331,13 +332,7 @@ function hg.BreakArmor(ent, equipment, pos, dmgInfo)
 
 	hg.PlayArmorBreakSound(ent)
 
-	if not BreakDropsArmor(placement, armorData) then
-		ent.armors_shots[equipment] = nil
-		syncLinkedArmor(ent)
-		return true
-	end
-
-	local equipmentEnt = hg.DropArmorForce(ent, equipment, pos, nil, getArmorDropVelocity(dmgInfo), brokenMul)
+	local equipmentEnt = hg.DropArmorForce(ent, equipment, pos, nil, getArmorDropVelocity(dmgInfo, ent), brokenMul)
 
 	if placement == "head" or placement == "face" then
 		sound.Play("physics/glass/glass_sheet_break1.wav", isvector(pos) and pos or ent:GetPos(), 120, 100)
@@ -360,26 +355,6 @@ function hg.BreakArmor(ent, equipment, pos, dmgInfo)
 
 	hg.SetArmorBrokenEntity(equipmentEnt)
 	hg.PlayArmorBreakSound(equipmentEnt)
-
-	if placement == "visor" then
-		local visorTr = util.TraceLine({
-			start = equipmentEnt:GetPos() + Vector(0, 0, 8),
-			endpos = equipmentEnt:GetPos() - Vector(0, 0, 120),
-			mask = MASK_SOLID,
-			filter = {equipmentEnt, ent}
-		})
-		if visorTr.Hit then
-			equipmentEnt:SetPos(visorTr.HitPos + visorTr.HitNormal * 2)
-		end
-
-		local visorPhys = equipmentEnt:GetPhysicsObject()
-		if IsValid(visorPhys) then
-			visorPhys:EnableMotion(false)
-			visorPhys:EnableCollisions(false)
-		end
-		equipmentEnt:SetNotSolid(true)
-		equipmentEnt:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
-	end
 
 	return true
 end
@@ -826,6 +801,54 @@ local function GetArmorImpactDamageScale(owner, armor, armorData, dmgType, place
 	return damageScale, protection, isSharp
 end
 
+local function GetEquippedArmorCondition(owner, armor, placement, armorData)
+	if owner.armors_broken and owner.armors_broken[armor] then
+		return math.Clamp(owner.armors_broken_mul and owner.armors_broken_mul[armor] or getBrokenArmorProtectionMul(), 0.05, 1)
+	end
+	if IsDurabilityArmor(placement, armorData) then
+		local maximum = armorData.durability or DEFAULT_HELMET_DURABILITY
+		return math.Clamp((owner.armors_durability and owner.armors_durability[armor] or maximum) / maximum, 0, 1)
+	end
+	local maximum = armorData.health or DEFAULT_VEST_HEALTH
+	return math.Clamp((owner.armors_health and owner.armors_health[armor] or maximum) / maximum, 0, 1)
+end
+
+function hg.TryKnockOffHelmet(owner, placement, armor, armorData, dmgInfo, hitPos, ballistic, direction)
+	if placement ~= "head" or not IsValid(owner) or not armorData or armorData.nodrop then return false end
+	if IsArmorBreakProtected(owner) or not owner.armors or owner.armors[placement] ~= armor then return false end
+
+	local rawDamage = math.max(dmgInfo and dmgInfo:GetDamage() or 0, 0)
+	local isBullet = dmgInfo and dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
+	local bullet = ballistic and ballistic.bullet or nil
+	local inflictor = dmgInfo and dmgInfo:GetInflictor()
+	if not bullet and IsValid(inflictor) then bullet = inflictor.bullet end
+	local diameter = math.max(tonumber(ballistic and ballistic.Diameter) or tonumber(bullet and bullet.Diameter) or 0, 0)
+	local penetration = math.max(tonumber(ballistic and ballistic.Penetration) or tonumber(ballistic and ballistic.penetrationBefore) or tonumber(bullet and bullet.Penetration) or 0, 0)
+	local condition = GetEquippedArmorCondition(owner, armor, placement, armorData)
+	local severity = math.Clamp(rawDamage / 85, 0, 1.5)
+	local chance
+	if isBullet then
+		local caliber = math.Clamp((diameter - 4) / 9, 0, 1.35)
+		chance = 0.025 + caliber * 0.18 + severity * 0.16 + math.Clamp(penetration / 35, 0, 1) * 0.1
+	else
+		chance = 0.025 + severity * 0.24
+	end
+	chance = chance + (1 - condition) * 0.16
+	chance = chance / math.Clamp((tonumber(armorData.mass) or 2) / 3, 0.65, 2)
+	chance = math.Clamp(tonumber(armorData.knockoffChance) or chance, 0, 0.72)
+	if math.Rand(0, 1) > chance then return false end
+
+	local launchDir = isvector(direction) and direction:GetNormalized() or dmgInfo and dmgInfo:GetDamageForce():GetNormalized() or VectorRand():GetNormalized()
+	local caliberSpeed = isBullet and math.Clamp(diameter * 18, 0, 260) or 0
+	local speed = math.Clamp(135 + caliberSpeed + rawDamage * 1.7, 135, 650)
+	local inherited = owner.GetVelocity and owner:GetVelocity() or vector_origin
+	local dropped = hg.DropArmorForce(owner, armor, hitPos, nil, inherited + launchDir * speed + vector_up * math.Clamp(45 + caliberSpeed * 0.2, 45, 100))
+	if not IsValid(dropped) then return false end
+
+	sound.Play("physics/metal/metal_solid_impact_hard" .. math.random(1, 5) .. ".wav", hitPos or dropped:GetPos(), 80, math.random(92, 108), 0.9)
+	return true
+end
+
 function hg.GetArmorImpactMitigation(org, placement, dmgInfo, rawDmg)
 	local owner = org and org.owner
 	if not IsValid(owner) or not owner.armors then return 1, false, false end
@@ -833,6 +856,14 @@ function hg.GetArmorImpactMitigation(org, placement, dmgInfo, rawDmg)
 	local armor = owner.armors[placement]
 	local armorData = armor and hg.armor[placement] and hg.armor[placement][armor]
 	if not armorData then return 1, false, false end
+	local processed = hg.EquipmentImpact and hg.EquipmentImpact.ProcessedDamage[dmgInfo]
+	local armorHitKey = "armor:" .. tostring(owner:EntIndex()) .. ":" .. tostring(armor)
+	if processed and processed.armorHits and processed.armorHits[armorHitKey] then return 1, false, false end
+	if hg.TryKnockOffHelmet(owner, placement, armor, armorData, dmgInfo, dmgInfo:GetDamagePosition(), nil, dmgInfo:GetDamageForce()) then
+		dmgInfo:ScaleDamage(0)
+		dmgInfo:SetDamageForce(vector_origin)
+		return 0, false, true
+	end
 
 	local damageScale, protection, isSharp = GetArmorImpactDamageScale(owner, armor, armorData, dmgInfo:GetDamageType(), placement)
 	local broken, destroyed = DamageArmor(org, placement, armor, dmgInfo, rawDmg or dmgInfo:GetDamage())
@@ -879,6 +910,18 @@ local function protec(org, bone, dmg, dmgInfo, placement, armor, scale, scalepro
 	local isBullet = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
 	local isStab = dmgInfo:IsDamageType(DMG_SLASH)
 	local isClub = dmgInfo:IsDamageType(DMG_CLUB + DMG_GENERIC)
+	local armorHitKey = "armor:" .. tostring(org.owner:EntIndex()) .. ":" .. tostring(armor)
+	if impact and impact.modelArmorHits and impact.modelArmorHits[armorHitKey] then return 0 end
+	if hg.TryKnockOffHelmet(org.owner, placement, armor, armorData, dmgInfo, hit, impact, dir) then
+		dmgInfo:ScaleDamage(0)
+		dmgInfo:SetDamageForce(vector_origin)
+		org.lastArmorMitigation = 1
+		org.lastHeadArmorMitigation = 1
+		if isBullet and impact and impact.ballisticVersion then
+			return {penetrationCost = impact.penetrationBefore, energyCost = impact.energyBefore, stopped = true, armorStopped = true}
+		end
+		return 1
+	end
 
 	local baseProt = ballisticProt
 	if isStab then baseProt = stabProt elseif isClub then baseProt = meleeProt end
@@ -1128,6 +1171,69 @@ local function protec(org, bone, dmg, dmgInfo, placement, armor, scale, scalepro
 	end
 
 	return dmgScale
+end
+
+function hg.ProcessArmorModelHit(hit, damage, forceAmount, direction, shot)
+	if not hit or not IsValid(hit.body) then return end
+	local owner = hit.body
+	local armor, placement, armorData = hit.armor, hit.placement, hit.data
+	if not armorData or not owner.armors or owner.armors[placement] ~= armor then return end
+
+	local dir = isvector(direction) and direction:GetNormalized() or vector_origin
+	local dmgInfo = DamageInfo()
+	dmgInfo:SetAttacker(game.GetWorld())
+	dmgInfo:SetInflictor(game.GetWorld())
+	dmgInfo:SetDamage(math.max(tonumber(damage) or 0, 0))
+	dmgInfo:SetDamageType(shot and shot.DamageType or DMG_BULLET)
+	dmgInfo:SetDamagePosition(hit.position)
+	local forceVector = isvector(forceAmount) and forceAmount or dir * math.max(tonumber(forceAmount) or damage or 0, 0)
+	dmgInfo:SetDamageForce(forceVector)
+
+	local isBullet = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
+	if hg.TryKnockOffHelmet(owner, placement, armor, armorData, dmgInfo, hit.position, shot, dir) then
+		return {scale = 0, penetration = 0, stopped = true, dropped = true, material = MAT_METAL}
+	end
+
+	local org = owner.organism or {owner = owner}
+	if not org.owner then org.owner = owner end
+	local broken, destroyed = DamageArmor(org, placement, armor, dmgInfo, dmgInfo:GetDamage() * 1.1)
+	if isBullet and owner.armors and owner.armors[placement] == armor and IsDurabilityArmor(placement, armorData) then
+		hg.HandleArmorShot(org, placement, armor, dmgInfo, hit.position, false)
+	end
+	ArmorEffect(placement, armor, dmgInfo, org, hit.position, math.max(tonumber(armorData.protection) or 0, 0))
+
+	if owner.armors and owner.armors[placement] ~= armor then
+		return {scale = 0, penetration = 0, stopped = true, dropped = placement == "head" or placement == "face", material = MAT_METAL}
+	end
+	if destroyed then return {scale = 1, penetration = shot and shot.Penetration, material = MAT_METAL} end
+
+	if not isBullet then
+		local damageScale = GetArmorImpactDamageScale(owner, armor, armorData, dmgInfo:GetDamageType(), placement)
+		damageScale = math.Clamp(damageScale * 1.2 + 0.05, 0.08, 0.95)
+		return {scale = damageScale, stopped = false, material = MAT_METAL, broken = broken}
+	end
+
+	local penetration = math.max(tonumber(shot and shot.Penetration) or dmgInfo:GetDamage() / 2, 0.01)
+	local protection = math.max(tonumber(armorData.protection) or 0, 0)
+	local condition = GetEquippedArmorCondition(owner, armor, placement, armorData)
+	local incidence = isvector(hit.normal) and math.abs(dir:Dot(hit.normal)) or 1
+	local angleMul = math.Clamp(1 / math.max(incidence, 0.45), 1, 2.2)
+	local resistance = protection * 1.55 * condition * angleMul
+	local remainingPenetration = math.max(penetration - resistance, 0)
+	if remainingPenetration <= 0 then
+		return {scale = 0, penetration = 0, stopped = true, material = MAT_METAL, broken = broken}
+	end
+
+	local overmatch = remainingPenetration / penetration
+	local scale = math.Clamp(overmatch * 0.72, 0.08, 0.5)
+	return {
+		scale = scale,
+		penetration = remainingPenetration,
+		penetrationCost = resistance,
+		stopped = false,
+		material = MAT_METAL,
+		broken = broken
+	}
 end
 
 ArmorEffect = function(placement, armor, dmgInfo, org, hit, prot)

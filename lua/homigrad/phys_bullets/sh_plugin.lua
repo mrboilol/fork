@@ -601,7 +601,7 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 							dmg:SetInflictor(Entity(0))
 						end
 
-						if trace.HGEquipmentProcessed and hg.EquipmentImpact then hg.EquipmentImpact.ProcessedDamage[dmg] = {penetration = trace.HGEquipmentPenetration} end
+						if trace.HGEquipmentProcessed and hg.EquipmentImpact then hg.EquipmentImpact.ProcessedDamage[dmg] = {penetration = trace.HGEquipmentPenetration, armorHits = trace.HGArmorModelHits} end
 						trace.Entity:DispatchTraceAttack(dmg, trace, dir)
 
 						if(trace.Entity.organism)then

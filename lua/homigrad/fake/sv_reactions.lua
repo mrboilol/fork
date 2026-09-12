@@ -508,6 +508,14 @@ function hg.reactions.ProcessProtective(ragdoll, ply, org)
     return false
 end
 
+local function ReactionResult(ragdoll, arms, legs)
+    if (arms or legs) and hg.DampenRagdollCommonSpin then
+        hg.DampenRagdollCommonSpin(ragdoll, 140, 0.3)
+    end
+
+    return {arms = arms, legs = legs}
+end
+
 -- Main entry point
 function hg.ProcessReactions(ragdoll, ply, org)
     if not IsValid(ragdoll) or not IsValid(ply) or not org then return end
@@ -524,43 +532,43 @@ function hg.ProcessReactions(ragdoll, ply, org)
     -- Neurological Posturing (Severe brain damage - decerebrate/decorticate)
     local isNeurological = hg.reactions.ProcessNeurological(ragdoll, ply, org)
     if isNeurological then
-        return {arms = true, legs = true}
+        return ReactionResult(ragdoll, true, true)
     end
     
     -- Headshot / Brain Damage (High priority, involuntary)
     local isHeadshot = hg.reactions.ProcessHeadshot(ragdoll, ply, org)
     if isHeadshot then
-        return {arms = true, legs = true}
+        return ReactionResult(ragdoll, true, true)
     end
     
     -- Burning (High priority)
     local isBurning = hg.reactions.ProcessBurning(ragdoll, ply, org)
     if isBurning then
-        return {arms = true, legs = true}
+        return ReactionResult(ragdoll, true, true)
     end
     
     -- Drowning (High priority)
     local isDrowning = hg.reactions.ProcessDrowning(ragdoll, ply, org)
     if isDrowning then
-        return {arms = true, legs = true}
+        return ReactionResult(ragdoll, true, true)
     end
 
     -- Check for tripping (Highest priority - immediate physical interaction)
     local isTripping = hg.reactions.ProcessTripping(ragdoll, ply, org)
     if isTripping then
-        return {arms = true, legs = true}
+        return ReactionResult(ragdoll, true, true)
     end
     
     -- Check for injured (High pain / dying)
     local isInjured = hg.reactions.ProcessInjured(ragdoll, ply, org)
     if isInjured then
-        return {arms = true, legs = true}
+        return ReactionResult(ragdoll, true, true)
     end
     
     -- Check for cowering (Moderate pain / fear)
     local isCowering = hg.reactions.ProcessCowering(ragdoll, ply, org)
     if isCowering then
-        return {arms = true, legs = true}
+        return ReactionResult(ragdoll, true, true)
     end
     
     -- Check for protective (Falling close to ground)
@@ -569,5 +577,5 @@ function hg.ProcessReactions(ragdoll, ply, org)
     -- Check for stagger (Balance)
     local handledLegs = hg.reactions.ProcessStagger(ragdoll, ply, org)
     
-    return {arms = handledArms, legs = handledLegs}
+    return ReactionResult(ragdoll, handledArms, handledLegs)
 end

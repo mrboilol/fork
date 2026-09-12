@@ -1782,7 +1782,6 @@ local function HelmetAccessory(placement, model, protection, helmets, mass, cove
 		absorbMultiplier = 0.2,
 		durabilityDamageMul = 5,
 		durabilityArmor = true,
-		breakDrops = true,
 		bone = "ValveBiped.Bip01_Head1",
 		model = model,
 		femPos = visorFemPos,

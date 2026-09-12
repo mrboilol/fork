@@ -900,7 +900,11 @@ if CLIENT then
 					end
 				end
 
-				but:SetText(accessory and (accessory.name or string.NiceName(v)) or hg.armorNames[v] or string.NiceName(displayKey))
+				local displayName = accessory and (accessory.name or string.NiceName(v)) or hg.armorNames[v] or string.NiceName(displayKey)
+				if not accessory and lply:GetNWFloat("ArmorWear" .. v, 0) >= 1 then
+					displayName = displayName .. " [Damaged]"
+				end
+				but:SetText(displayName)
 				but:SetFont("ZCity_Tiny")
 				but:Dock( TOP )
 				but:DockMargin( 6, 6, 6, 0 )

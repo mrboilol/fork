@@ -269,6 +269,10 @@ local function processPosture(rag, postureType, scale)
 			phys:ComputeShadowControl(shadowparams)
 		end
 	end
+
+	if hg.DampenRagdollCommonSpin then
+		hg.DampenRagdollCommonSpin(rag, 85, 0.55)
+	end
 end
 
 function hg.applySeizurePostureToRagdoll(rag, org, scale)

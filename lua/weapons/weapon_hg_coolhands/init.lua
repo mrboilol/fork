@@ -151,18 +151,6 @@ local function WhomILookinAt(ply, cone, dist)
 	return
 end
 
-function SWEP:CanShove()
-        local owner = self:GetOwner()
-        if not IsValid(owner) or owner:InVehicle() then return false end
-	local sprintShove = owner:KeyDown(IN_SPEED) and owner:KeyDown(IN_USE)
-	if (not self:GetFists() and not sprintShove) or self:GetBlocking() or self.Charging then return false end
-        if owner:GetNetVar("handcuffed",false) or owner:GetNetVar("ducttaped_hands",false) then return false end
-        if (self.ShoveEnd or 0) > CurTime() then return false end
-        if (self.SpecialAttackUntil or 0) > CurTime() then return false end
-
-        return self:GetNextPrimaryFire() < CurTime() and self:GetNextSecondaryFire() < CurTime()
-end
-
 function SWEP:Deploy()
 	local owner = self:GetOwner()
 	if not IsFirstTimePredicted() then

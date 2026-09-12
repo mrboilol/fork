@@ -1073,18 +1073,6 @@ function PANEL:PostInit()
         end
     end
 
-    function viewer:PostDrawModel(Entity)
-        local tbl = main.AppearanceTable
-        Entity.PredictedAccessories = tbl.AAttachments
-        for k,attach in ipairs(tbl.AAttachments) do
-            DrawAccesories(Entity, Entity, attach, hg.Accessories[attach],false,true)
-        end
-        if IsValid(nameEntry) and nameEntry:GetValue() != (main.AppearanceTable.AName or "") then
-            nameEntry:SetText(main.AppearanceTable.AName or "")
-        end
-        main:SyncSharedPreview()
-    end
-
     local function ApplyAppearance()
         local traitsValid, _, normalizedTraits, traitReason = hg.Traits.ValidateSelection(main.AppearanceTable.ATraits, true)
         if not traitsValid then

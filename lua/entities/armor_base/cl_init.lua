@@ -1,6 +1,17 @@
 include("shared.lua")
 ENT.HowToUseInstructions = "<font=ZCity_Tiny>"..string.upper( (input.LookupBinding("+use") or "BIND YOUR +USE KEY PLEASE. WRITE \"bind e +use\" IN CONSOLE FOR THE LOVE OF GOD") ).." to wear</font>"
 
+function ENT:UpdateArmorHudHint()
+	local damaged = self:GetNWBool("ArmorBroken", false)
+	if self.HudHintMarkup and self.HudHintDamaged == damaged then return end
+
+	self.HudHintDamaged = damaged
+	local name = self.ArmorPrintName or self.PrintName
+	if damaged then name = name .. " [Damaged]" end
+	self.PrintName = name
+	self.HudHintMarkup = markup.Parse("<font=ZCity_Tiny>".. name .."</font>\n<font=ZCity_SuperTiny><colour=125,125,125>".. self.HowToUseInstructions .."</colour></font>",450)
+end
+
 function ENT:Draw()
 	if not self.PhysModel then
 		self:DrawModel()
@@ -15,10 +26,12 @@ function ENT:Draw()
 end
 
 function ENT:Think()
+	self:UpdateArmorHudHint()
 end
 
 function ENT:Initialize()
-	self.HudHintMarkup = markup.Parse("<font=ZCity_Tiny>".. self.PrintName .."</font>\n<font=ZCity_SuperTiny><colour=125,125,125>".. self.HowToUseInstructions .."</colour></font>",450)
+	self.ArmorPrintName = self.PrintName
+	self:UpdateArmorHudHint()
 	self.model = ClientsideModel(self.Model, RENDERGROUP_OPAQUE)
 	if !IsValid(self.model) then return end
 	self.model:SetNoDraw(true)

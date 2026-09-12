@@ -514,6 +514,9 @@ function hg.SetMeleeDamageContact(inflictor, ent, trace, forceHead, trauma)
 		normal = trace.Normal,
 		hitNormal = trace.HitNormal,
 		impactRadius = math.Clamp(tonumber(inflictor.AccessoryImpactRadius or inflictor.PenetrationSize) or 1, 0, 3),
+		equipmentProcessed = trace.HGEquipmentProcessed,
+		equipmentPenetration = trace.HGEquipmentPenetration,
+		armorModelHits = trace.HGArmorModelHits,
 		expires = CurTime() + 0.1,
 	}
 end
@@ -1333,6 +1336,12 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	local dmgPos = meleeContact and meleeContact.hitPos or dmgInfo:GetDamagePosition()
 	local accessoryDamage = dmgInfo:GetDamage()
 	local impactRadius = meleeContact and meleeContact.impactRadius or nil
+	if meleeContact and meleeContact.equipmentProcessed and hg.EquipmentImpact then
+		hg.EquipmentImpact.ProcessedDamage[dmgInfo] = {
+			penetration = meleeContact.equipmentPenetration,
+			armorHits = meleeContact.armorModelHits,
+		}
+	end
 	if hg.TryAbsorbEquipmentImpact and hg.TryAbsorbEquipmentImpact(ent, dmgInfo, dmgPos, dir, impactRadius) then
 		local absorbedImpact = hg.EquipmentImpact and hg.EquipmentImpact.ProcessedDamage[dmgInfo]
 		if absorbedImpact and absorbedImpact.parried then return true end
@@ -1392,6 +1401,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		expansionRadius = (bullet ~= nil and bullet.ExpansionRadius) or math.Clamp((dmg_before - 45) / 18, 0, 10),
 		expansionChance = (bullet ~= nil and bullet.ExpansionChance) or math.Clamp(0.15 + (dmg_before - 45) / 120, 0, 0.8),
 		nearbyDamageMul = (bullet ~= nil and bullet.NearbyDamageMul) or math.Clamp(1 + (dmg_before - 45) / 180, 1, 1.65),
+		modelArmorHits = equipmentImpact and equipmentImpact.armorHits,
 		layerIndex = 0
 	}
 

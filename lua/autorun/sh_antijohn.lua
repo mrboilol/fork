@@ -10,7 +10,7 @@ local punishmentDuration = 2.038
 
 if SERVER then
 	local targetConVar = CreateConVar("hg_antijohnuser", "", FCVAR_REPLICATED, "Toggle current in-server player names, separated by commas")
-	local blacklistConVar = CreateConVar("hg_antijohnweapons", "", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Weapon classes, entity classes, or prop models to forbid, separated by commas; * is supported")
+	local blacklistConVar = CreateConVar("hg_antijohnweapons", "", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Weapon names/classes, entity classes, or prop models to forbid, separated by commas; partial words and * are supported")
 	local restrictedNames = {}
 
 	util.AddNetworkString("hg_antijohn_warning")
@@ -56,8 +56,89 @@ if SERVER then
 		return false
 	end
 
+	local function containsAny(value, entries)
+		value = string.lower(string.Trim(tostring(value or "")))
+		if value == "" then return false end
+		for _, pattern in ipairs(entries) do
+			if pattern ~= "" and not string.find(pattern, "*", 1, true) and string.find(value, pattern, 1, true) then
+				return true
+			end
+		end
+		return false
+	end
+
+	local function editDistance(left, right)
+		local previous = {}
+		for column = 0, #right do
+			previous[column] = column
+		end
+
+		for row = 1, #left do
+			local current = {[0] = row}
+			local leftCharacter = string.sub(left, row, row)
+			for column = 1, #right do
+				local cost = leftCharacter == string.sub(right, column, column) and 0 or 1
+				current[column] = math.min(current[column - 1] + 1, previous[column] + 1, previous[column - 1] + cost)
+			end
+			previous = current
+		end
+
+		return previous[#right]
+	end
+
+	local function nearestPlayerNames(query)
+		local ranked = {}
+		local seen = {}
+		for _, ply in ipairs(player.GetAll()) do
+			local displayName = string.Trim(ply:Nick())
+			local name = string.lower(displayName)
+			if name ~= "" and not seen[name] then
+				seen[name] = true
+				local position = string.find(name, query, 1, true)
+				ranked[#ranked + 1] = {
+					name = displayName,
+					contains = position ~= nil,
+					position = position or math.huge,
+					distance = editDistance(query, name)
+				}
+			end
+		end
+
+		table.sort(ranked, function(left, right)
+			if left.contains ~= right.contains then return left.contains end
+			if left.contains and left.position ~= right.position then return left.position < right.position end
+			if left.distance ~= right.distance then return left.distance < right.distance end
+			return string.lower(left.name) < string.lower(right.name)
+		end)
+
+		local names = {}
+		for index = 1, math.min(#ranked, 5) do
+			names[index] = ranked[index].name
+		end
+		return names
+	end
+
 	local function toggleRestrictedNames(value)
-		for _, name in ipairs(splitList(value)) do
+		for _, query in ipairs(splitList(value)) do
+			local name = query
+			if not restrictedNames[name] then
+				name = nil
+				for _, ply in ipairs(player.GetAll()) do
+					local currentName = string.lower(string.Trim(ply:Nick()))
+					if currentName == query then
+						name = currentName
+						break
+					end
+				end
+			end
+
+			if not name then
+				local nearest = nearestPlayerNames(query)
+				MsgN("[AntiJohn] No exact in-server user found for: " .. query)
+				MsgN(#nearest > 0 and "[AntiJohn] Nearest matches: " .. table.concat(nearest, ", ") or "[AntiJohn] There are no players to suggest.")
+				continue
+			end
+
 			if restrictedNames[name] then
 				restrictedNames[name] = nil
 				for _, ply in ipairs(player.GetAll()) do
@@ -112,10 +193,16 @@ if SERVER then
 		local entries = splitList(blacklistConVar:GetString(), true)
 		if #entries == 0 then return false end
 		if matchesAny(value, entries) then return true end
+
+		local canonical
 		if hg and hg.CanonicalWeaponClass then
-			return matchesAny(hg.CanonicalWeaponClass(tostring(value or "")), entries)
+			canonical = hg.CanonicalWeaponClass(tostring(value or ""))
+			if matchesAny(canonical, entries) then return true end
 		end
-		return false
+
+		local stored = weapons.Get(tostring(value or ""))
+		local printName = stored and stored.PrintName
+		return containsAny(value, entries) or containsAny(canonical, entries) or containsAny(printName, entries)
 	end
 
 	local function sendWarning(ply, stage)

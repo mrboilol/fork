@@ -429,7 +429,7 @@ local function Damage(bDoDebugHit, bStartedInWater, bEndNotWater, iFlags, iDamag
 			local equipmentScale = tr.HGEquipmentScale or 1
 			info:ScaleDamage(equipmentScale)
 			info:SetDamageForce(info:GetDamageForce() * (tr.HGEquipmentForceScale or equipmentScale))
-			if SERVER and tr.HGEquipmentProcessed and hg.EquipmentImpact then hg.EquipmentImpact.ProcessedDamage[info] = {penetration = tr.HGEquipmentPenetration} end
+			if SERVER and tr.HGEquipmentProcessed and hg.EquipmentImpact then hg.EquipmentImpact.ProcessedDamage[info] = {penetration = tr.HGEquipmentPenetration, armorHits = tr.HGArmorModelHits} end
 			
 			if (fCallback) then
 				fCallback(info:GetAttacker(), tr, info, tInfo, Weapon)

@@ -283,6 +283,114 @@ hook.Add("PostPlayerDeath", "homigrad-inventory", function(ply)
     ply:RemoveAllAmmo()
 end)
 
+local lootDropMins = Vector(-8, -8, 0)
+local lootDropMaxs = Vector(8, 8, 16)
+
+local function GetLootDropPosition(ply, source)
+    local forward = ply:EyeAngles():Forward()
+    forward.z = 0
+    if forward:LengthSqr() > 0 then forward:Normalize() end
+
+    local start = ply:GetPos() + forward * 32 + Vector(0, 0, 32)
+    local trace = util.TraceHull({
+        start = start,
+        endpos = start - Vector(0, 0, 96),
+        mins = lootDropMins,
+        maxs = lootDropMaxs,
+        filter = {ply, source},
+        mask = MASK_SOLID
+    })
+
+    return trace.HitPos + trace.HitNormal * 3
+end
+
+local function PutLootEntityOnGround(ply, source, item)
+    if not IsValid(item) then return end
+
+    item:SetParent(NULL)
+    item:SetPos(GetLootDropPosition(ply, source))
+    item:SetAngles(Angle(0, ply:EyeAngles().y, 0))
+    item:SetNoDraw(false)
+    item:DrawShadow(true)
+    item:RemoveSolidFlags(FSOLID_NOT_SOLID)
+    item:SetCollisionGroup(COLLISION_GROUP_WEAPON)
+    item.IsSpawned = true
+    item.init = true
+    item.DontEquipInstantly = nil
+
+    local phys = item:GetPhysicsObject()
+    if IsValid(phys) then
+        phys:SetVelocity(vector_origin)
+        phys:Wake()
+    end
+end
+
+local function DropLootAmmo(ply, source, ammoID, count)
+    local ammoName = game.GetAmmoName(ammoID)
+    if not ammoName or count <= 0 then return false end
+
+    local class = "ent_ammo_" .. string.lower(string.Replace(ammoName, " ", ""))
+    if not scripted_ents.GetStored(class) then return false end
+
+    local ammoBox = ents.Create(class)
+    if not IsValid(ammoBox) then return false end
+
+    ammoBox.AmmoCount = count
+    ammoBox:SetPos(GetLootDropPosition(ply, source))
+    ammoBox:SetAngles(Angle(0, ply:EyeAngles().y, 0))
+    ammoBox:Spawn()
+
+    local phys = ammoBox:GetPhysicsObject()
+    if IsValid(phys) then
+        local force = game.GetAmmoForce(ammoID) or 1
+        phys:SetMass(math.Clamp((force * count) / 1500, 1, 50000))
+        phys:Wake()
+    end
+
+    return true
+end
+
+local function CanStoreLootWeapon(ply, weapon)
+    if ply:HasWeapon(weapon:GetClass()) then return false end
+    if weapon.weaponInvCategory and not ply.weaponInv then return false end
+    if hg.weaponInv and hg.weaponInv.CanInsert and hg.weaponInv.CanInsert(ply, weapon) == false then return false end
+    return true
+end
+
+local function CanStoreLootEntity(ply, item)
+    local class = item:GetClass()
+    local weaponsInventory = ply.inventory and ply.inventory.Weapons or {}
+    if class == "hg_flashlight" or class == "hg_sling" then return not weaponsInventory[class] end
+    if class == "hg_brassknuckles" then
+        local value = weaponsInventory[class]
+        local count = isnumber(value) and value or (value and 1 or 0)
+        return count < 2
+    end
+    return true
+end
+
+local function ArmorFitsWithoutReplacing(ply, placement, armor)
+    local equippedArmors = ply.armors or {}
+    if equippedArmors[placement] then return false end
+    if hg.CanEquipArmorPiece and not hg.CanEquipArmorPiece(ply, armor) then return false end
+
+    local armorData = hg.armor and hg.armor[placement] and hg.armor[placement][armor]
+    if not armorData then return false end
+    if armorData.whitelistClasses and not armorData.whitelistClasses[ply.PlayerClassName] then return false end
+
+    local dependency = armorData.requireEquipped or armorData.requiresArmor or armorData.requiredArmor
+    if dependency and hg.ArmorRequirementSatisfied and not hg.ArmorRequirementSatisfied(ply, dependency) then return false end
+
+    for equippedPlacement, equippedArmor in pairs(equippedArmors) do
+        local equippedData = hg.armor[equippedPlacement] and hg.armor[equippedPlacement][equippedArmor]
+        if equippedData and equippedData.restricted and table.HasValue(equippedData.restricted, placement) then return false end
+        if armorData.restricted and table.HasValue(armorData.restricted, equippedPlacement) then return false end
+        if placement == "ears" and equippedData and equippedData.blocksHeadphones then return false end
+    end
+
+    return hook.Run("CanEquipArmor", ply, armor) ~= false
+end
+
 local functions = {
     ["Weapons"] = function(ply, ent, wep)
 		local originalClass = wep
@@ -300,28 +408,26 @@ local functions = {
         --if not weapon then return end
         
         local weapon
+		local previousWeapon = ply:GetActiveWeapon()
 		local storedWeapon = ent.inventory.Weapons[wep]
         local weaponIsEnt = not isbool(storedWeapon) and IsValid(storedWeapon) and storedWeapon:IsWeapon() and storedWeapon:GetClass() == wep
         --print(weaponIsEnt)
         if not weaponIsEnt then
             weapon = ents.Create(wep)
-            weapon.DontEquipInstantly = (not weapon.NoHolster) and (weapon.weaponInvCategory != 1)
+            if not IsValid(weapon) then return end
             weapon.IsSpawned = true
             weapon.init = true
             --weapon.init = true--<^разве это не одно и то же?
-            weapon:Spawn()
             weapon:SetPos(ent:GetPos())
             weapon:SetAngles(ent:GetAngles())
+            weapon:Spawn()
             
 			local tbl = isentity(storedWeapon) and IsValid(storedWeapon) and storedWeapon.GetInfo and storedWeapon:GetInfo() or storedWeapon
             if weapon.SetInfo and istable(tbl) then weapon:SetInfo(tbl) end
 			if isentity(storedWeapon) and IsValid(storedWeapon) and storedWeapon:IsWeapon() then storedWeapon:Remove() end
         else
             weapon = ent.inventory.Weapons[wep]
-            weapon.DontEquipInstantly = (not weapon.NoHolster) and (weapon.weaponInvCategory != 1)
-
             weapon:SetParent( NULL )
-            weapon:SetPos(hg.eyeTrace(ply, 60).HitPos)
             weapon:SetAngles( ent:GetAngles() )
             weapon:SetNoDraw( false )
             weapon:DrawShadow( true )
@@ -339,7 +445,6 @@ local functions = {
         if ent:IsPlayer() then
             if weaponIsEnt then
                 ent:DropWeapon(weapon)
-                weapon:SetPos(hg.eyeTrace(ply, 60).HitPos)
             else
 				ent:StripWeapon(originalClass)
             end
@@ -347,15 +452,22 @@ local functions = {
 
         ply:DropObject()
 
-        if not weapon:IsWeapon() then weapon:Use(ply) return end
+        PutLootEntityOnGround(ply, ent, weapon)
+
+        if not weapon:IsWeapon() then
+            if not CanStoreLootEntity(ply, weapon) then return end
+            weapon:Use(ply)
+            return
+        end
+
+        if not CanStoreLootWeapon(ply, weapon) then return end
         
         weapon.IsSpawned = false
         weapon.init = false
+        weapon.DontEquipInstantly = true
 
         if hook.Run("PlayerCanPickupWeapon",ply,weapon) == false then 
-            --print("huy")
-            weapon.IsSpawned = true weapon.init = true 
-            weapon:SetPos(ply:EyePos())
+            PutLootEntityOnGround(ply, ent, weapon)
             return
         end
         
@@ -363,24 +475,44 @@ local functions = {
             ply:PickupWeapon(weapon)
         end
 
-        if not weapon.DontEquipInstantly then timer.Simple(0,function() ply:SelectWeapon(weapon:GetClass()) end) end
+        if not IsValid(weapon) or weapon:GetOwner() ~= ply then
+            PutLootEntityOnGround(ply, ent, weapon)
+            return
+        end
+
+        timer.Simple(0, function()
+            if not IsValid(ply) or not IsValid(previousWeapon) or previousWeapon:GetOwner() ~= ply then return end
+            if ply:GetActiveWeapon() ~= previousWeapon then ply:SelectWeapon(previousWeapon:GetClass()) end
+        end)
     end,
     ["Ammo"] = function(ply, ent, ammo, amt)
-        local amt2 = ent.inventory.Ammo[tonumber(ammo)]
+        local ammoID = tonumber(ammo)
+        local amt2 = ammoID and ent.inventory.Ammo[ammoID]
         if not amt2 or amt != amt2 then return end
 
-        ply:GiveAmmo(amt2, game.GetAmmoName(ammo), true)
-        --ent.inventory.Ammo[tonumber(ammo)] = nil
+        local before = ply:GetAmmoCount(ammoID)
+        ply:GiveAmmo(amt2, ammoID, true)
+        local remaining = math.max(amt2 - math.max(ply:GetAmmoCount(ammoID) - before, 0), 0)
+        local dropped = remaining > 0 and DropLootAmmo(ply, ent, ammoID, remaining)
+
         if ent:IsPlayer() then
-            ent:SetAmmo(0, game.GetAmmoName(ammo))
+            ent:SetAmmo(remaining > 0 and not dropped and remaining or 0, ammoID)
         else
-            ent.inventory.Ammo[tonumber(ammo)] = nil
+            ent.inventory.Ammo[ammoID] = remaining > 0 and not dropped and remaining or nil
         end
     end,
     ["Armor"] = function(ply, ent, placement, armor)
-        if hg.armor[placement][armor].nodrop then return end
-        if (not ent.armors[placement]) or (ent.armors[placement] ~= armor) or ply.armors[placement] then return end
-        if !hg.AddArmor(ply, armor) then return end
+        local armorData = hg.armor and hg.armor[placement] and hg.armor[placement][armor]
+        if not armorData or armorData.nodrop then return end
+        if not ent.armors or ent.armors[placement] ~= armor then return end
+        if not ArmorFitsWithoutReplacing(ply, placement, armor) then
+            hg.DropArmorForce(ent, armor, GetLootDropPosition(ply, ent), Angle(0, ply:EyeAngles().y, 0))
+            return
+        end
+        if !hg.AddArmor(ply, armor) then
+            hg.DropArmorForce(ent, armor, GetLootDropPosition(ply, ent), Angle(0, ply:EyeAngles().y, 0))
+            return
+        end
         ent.armors[placement] = nil
 
         if placement == "face" and ent:GetNetVar("zableval_masku", false) and armor != "nightvision1" then

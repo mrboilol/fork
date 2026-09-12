@@ -116,17 +116,6 @@ function hg.animator.Update(ragdoll)
     end
 end
 
--- Apply forces to match ghost
-local shadowparams = {
-    secondstoarrive = 0.05,
-    maxangular = 1000,
-    maxangulardamp = 100,
-    maxspeed = 1000,
-    maxspeeddamp = 100,
-    dampfactor = 0.8,
-    teleportdistance = 0
-}
-
 function hg.animator.Apply(ragdoll)
     if not hg.animator.IsPlaying(ragdoll) then return end
     
@@ -148,23 +137,14 @@ function hg.animator.Apply(ragdoll)
         local ghostBoneID = ghost:LookupBone(boneName)
         if not ghostBoneID then continue end
         
-        -- Get target pos/ang
-        local targetPos, targetAng = ghost:GetBonePosition(ghostBoneID)
+        local _, targetAng = ghost:GetBonePosition(ghostBoneID)
         
-        if targetPos and targetAng then
-            shadowparams.secondstoarrive = 0.05
-            shadowparams.pos = targetPos
-            shadowparams.angle = targetAng
-            shadowparams.maxangular = 5000 * strength -- Increased force
-            shadowparams.maxangulardamp = 500 * strength -- Increased damp
-            shadowparams.maxspeed = 5000 * strength -- Increased force
-            shadowparams.maxspeeddamp = 500 * strength -- Increased damp
-            shadowparams.dampfactor = 0.8
-            
-            phys:Wake()
-            phys:ComputeShadowControl(shadowparams)
-        else
-            -- print("[HG] Animator: Bone match failed for " .. tostring(boneName))
+        if targetAng then
+            hg.ShadowControl(ragdoll, i, 0.08, targetAng, 1400 * strength, 180 * strength, phys:GetPos(), 0, 0)
         end
+    end
+
+    if hg.DampenRagdollCommonSpin then
+        hg.DampenRagdollCommonSpin(ragdoll, 110, 0.45)
     end
 end

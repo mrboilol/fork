@@ -267,6 +267,34 @@ function hg.ShadowControl(ragdoll, physNumber, ss, ang, maxang, maxangdamp, pos,
 	phys:ComputeShadowControl(shadowparams)
 end
 
+function hg.DampenRagdollCommonSpin(ragdoll, maxSpin, damping)
+	if not IsValid(ragdoll) then return end
+
+	local angular, totalMass = vector_origin, 0
+	local count = ragdoll:GetPhysicsObjectCount()
+	for i = 0, count - 1 do
+		local phys = ragdoll:GetPhysicsObjectNum(i)
+		if not IsValid(phys) then continue end
+
+		local mass = math.max(phys:GetMass(), 1)
+		angular = angular + phys:GetAngleVelocity() * mass
+		totalMass = totalMass + mass
+	end
+
+	if totalMass <= 0 then return end
+	angular = angular / totalMass
+	local speed = angular:Length()
+	if speed <= maxSpin then return end
+
+	local correction = angular * ((speed - maxSpin) / speed) * math.Clamp(damping or 1, 0, 1)
+	for i = 0, count - 1 do
+		local phys = ragdoll:GetPhysicsObjectNum(i)
+		if IsValid(phys) then
+			phys:AddAngleVelocity(-correction)
+		end
+	end
+end
+
 local shadowControl = hg.ShadowControl
 
 hook.Add("Fake", "Contorl", function(ply, ragdoll)

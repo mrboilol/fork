@@ -11,6 +11,20 @@ local function lodgedBody(ent)
 	return IsValid(ent.FakeRagdoll) and ent.FakeRagdoll or ent
 end
 
+function hg.GetLodgedPickupOwner(ent)
+	if not IsValid(ent) then return end
+
+	local owner = ent
+	if ent:IsRagdoll() and hg.RagdollOwner then
+		local ragdollOwner = hg.RagdollOwner(ent)
+		if IsValid(ragdollOwner) then owner = ragdollOwner end
+	end
+
+	local org = owner.organism or ent.organism
+	if not org or not istable(org.LodgedEntities) or #org.LodgedEntities == 0 then return end
+	return IsValid(org.owner) and org.owner or owner
+end
+
 local function lodgedBoneName(entry, body)
 	if isstring(entry.BoneName) and entry.BoneName ~= "" then return entry.BoneName end
 	if not IsValid(body) then return "" end
@@ -269,6 +283,21 @@ end
 concommand.Add("hg_take_lodged", function(ply)
 	if IsValid(ply) and ply.organism and ply.organism.canmove then
 		hg.TakeLodged(ply, ply)
+	end
+end)
+
+hook.Add("KeyPress", "TakeLodgedObject", function(ply, key)
+	if key ~= IN_USE or not ply:Alive() then return end
+
+	local ent = ply:GetEyeTrace().Entity
+	local owner = hg.GetLodgedPickupOwner(ent)
+	if not IsValid(owner) or owner == ply then return end
+	if ply:EyePos():DistToSqr(ent:NearestPoint(ply:EyePos())) > 10000 then return end
+	if (ply.hgNextLodgedTake or 0) > CurTime() then return end
+
+	if hg.TakeLodged(owner, ply) then
+		ply.hgNextLodgedTake = CurTime() + 0.75
+		if hg.TryZManipInteract then hg.TryZManipInteract(ply, ent, "interact", false) end
 	end
 end)
 
