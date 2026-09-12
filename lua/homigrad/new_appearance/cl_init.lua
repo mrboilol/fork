@@ -182,6 +182,7 @@ local huy_addvec = Vector(0.4,0,0.4)
 function DrawAccesories(ply, ent, accessories,accessData, islply, force, setup, tAccessories)
 	if not accessories then return end
 	if not accessData then return end
+	if not isstring(accessData["bone"]) or not accessData["model"] then return end
 
 	ply.modelAccess = ply.modelAccess or {}
 

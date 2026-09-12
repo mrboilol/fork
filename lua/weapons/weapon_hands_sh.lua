@@ -2318,7 +2318,7 @@ function SWEP:PrimaryAttack(forcespecial)
 	if not inv then return end
 	local havekastet = inv["Weapons"] and inv["Weapons"]["hg_brassknuckles"]
 
-	if rand or (CLIENT and ((owner:GetTable().ChatGestureWeight >= 0.1) or twohands)) or havekastet then
+	if rand or (CLIENT and (((owner:GetTable().ChatGestureWeight or 0) >= 0.1) or twohands)) or havekastet then
 		side = "fists_right"
 	end
 
