@@ -91,6 +91,10 @@ function SWEP:WorldModel_Transform(bNoApply, bNoAdditional)
 		if self:ShouldUseFakeModel() then
 			newPos, newAng = LocalToWorld(self.FakePos, self.FakeAng, newPos, newAng)
 		end
+
+		if hg.EquipmentImpactPose then newPos, newAng = hg.EquipmentImpactPose(self, newPos, newAng) end
+		if hg.ResolveEquipmentClearance then newPos = hg.ResolveEquipmentClearance(self, owner, model:GetModel(), newPos, newAng, model:GetModelScale()) end
+
 		self.desiredPos, self.desiredAng = newPos, newAng
 
 		if bNoApply then

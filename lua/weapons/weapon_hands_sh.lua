@@ -1502,6 +1502,11 @@ function SWEP:ApplyForce()
 			end
 		end
 
+		if not self.CarryEnt:IsRagdoll() and hg.ResolveEquipmentClearance then
+			local origin = self.CarryEnt:GetPos()
+			local resolved = hg.ResolveEquipmentClearance(self.CarryEnt, ply, self.CarryEnt:GetModel(), origin + target - TargetPos, self.CarryEnt:GetAngles(), self.CarryEnt:GetModelScale())
+			target = resolved - origin + TargetPos
+		end
 		local vec = target - TargetPos
 		local len, mul = vec:Length(), phys:GetMass()
 
@@ -2824,6 +2829,11 @@ if SERVER then
 			end
 
 			local target,_ = LocalToWorld(target,angle_zero,ply:EyePos(),(ent.rememberedang or ply:EyeAngles()) - (not ply:KeyDown(IN_USE) and ent.addang or ent.oldaddang or angle_zero))
+			if not ent:IsRagdoll() and hg.ResolveEquipmentClearance then
+				local origin = ent:GetPos()
+				local resolved = hg.ResolveEquipmentClearance(ent, ply, ent:GetModel(), origin + target - TargetPos, ent:GetAngles(), ent:GetModelScale())
+				target = resolved - origin + TargetPos
+			end
 			local vec = target - TargetPos
 			local len, mul = vec:Length(), phys:GetMass()
 

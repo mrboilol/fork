@@ -15,6 +15,7 @@ function SWEP:ResetTransientAimState()
 	self.inertialAim = nil
 	self.inertialAimVelocity = Angle(0, 0, 0)
 	self.weaponReadiness = nil
+	self.recoilAimPenalty = 0
 	self.cache_trace = nil
 	self:SetLastShootTime(0)
 end
@@ -70,6 +71,19 @@ function SWEP:PrimarySpread()
 	self.dmgStack = self.dmgStack + self.Primary.Damage
 	self.dmgStack2 = math.min(self.dmgStack2 + 0.2, 60)
 	local sprayI = self.SprayI
+	if not self.norecoil then
+		local _, _, _, _, _, disturbance = self:GetRecoilImpulseFactors()
+		local supportMul = self:GetRecoilSupportMul()
+		local handlingMul = self:GetArmHealthHandlingMul()
+		local stanceMul = self:GetPostureStabilityMul(self:IsZoom())
+		local experienceMul = self.GetWeaponExperienceMul and self:GetWeaponExperienceMul(owner) or 1
+		local attachmentMul = self:GetAttachmentRecoilMul()
+		local restMul = self:IsResting() and 0.3 or 1
+		local recoveryImpulse = math.Clamp(disturbance * supportMul * math.sqrt(handlingMul) * stanceMul * experienceMul * attachmentMul * restMul, 0.1, 7)
+		self.recoilAimPenalty = math.Clamp((self.recoilAimPenalty or 0) + recoveryImpulse * 0.22, 0, 6)
+		self.weaponReadiness = math.min(self.weaponReadiness or 1, 1 - math.Clamp(recoveryImpulse * 0.055, 0.02, 0.48))
+		self.weaponStability = 0
+	end
 	
 	if SERVER then
 		if owner:IsNPC() then return end
@@ -250,7 +264,9 @@ function SWEP:ApplyForce(mul)
 			local phys = ent:GetPhysicsObjectNum(ent:TranslateBoneToPhysBone(ent:LookupBone("ValveBiped.Bip01_R_Hand")))
 			local tr, pos, ang = self:GetTrace(nil, nil, nil, true)
 			local dir = ang:Forward()
-			phys:ApplyForceCenter(-dir * self.Primary.Force * 5)
+			local caliberMul, weightMul = self:GetRecoilImpulseFactors()
+			local feltRecoilForce = math.Clamp(caliberMul * weightMul * 35, 8, 90)
+			phys:ApplyForceCenter(-dir * feltRecoilForce * 5)
 		end
 
 		return true

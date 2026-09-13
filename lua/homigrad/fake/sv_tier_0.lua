@@ -206,6 +206,7 @@ local function Ragdoll_CreateInternal(ply)
 		ragdoll.hgRagdollVehicle = veh
 	end
 
+	local pendingReactionForce = vecZero
 	for physNum = 0, ragdoll:GetPhysicsObjectCount() - 1 do
 		local phys = ragdoll:GetPhysicsObjectNum(physNum)
 		local bone = ragdoll:TranslatePhysBoneToBone(physNum)
@@ -220,7 +221,7 @@ local function Ragdoll_CreateInternal(ply)
 		
 		phys:SetMass(IdealMassPlayer[ragdoll:GetBoneName(bone)] or 4)
 		phys:SetVelocity(velocity)
-		phys:ApplyForceCenter(vel)
+		pendingReactionForce = pendingReactionForce + vel
 
 		--phys:SetContents(bit.band(phys:GetContents(), bit.bnot(MASK_SHOT)))
 		
@@ -345,6 +346,11 @@ local function Ragdoll_CreateInternal(ply)
 			phys:EnableMotion(false)
 		end--]]
 		phys:Wake()
+	end
+
+	local reactionPhys = ragdoll:GetPhysicsObjectNum(0)
+	if IsValid(reactionPhys) and hg.ClampRagdollReactionForce then
+		reactionPhys:ApplyForceCenter(hg.ClampRagdollReactionForce(ragdoll, pendingReactionForce))
 	end
 
 	ragdoll:SetNWString("PlayerName", ply:GetNWString("PlayerName") or ply:Name())

@@ -1171,122 +1171,81 @@ hg.TourniquetGuys = hg.TourniquetGuys or {}
 
 if SERVER then
 	util.AddNetworkString("send_tourniquets")
-	local tourniqet_bones = {
-		["ValveBiped.Bip01_L_UpperArm"] = {
-			["ValveBiped.Bip01_L_Forearm"] = true,
-			["ValveBiped.Bip01_L_Hand"] = true
-		},
-		["ValveBiped.Bip01_L_Forearm"] = {
-			["ValveBiped.Bip01_L_Hand"] = true
-		},
-
-		["ValveBiped.Bip01_R_UpperArm"] = {
-			["ValveBiped.Bip01_R_Forearm"] = true,
-			["ValveBiped.Bip01_R_Hand"] = true
-		},
-		["ValveBiped.Bip01_R_Forearm"] = {
-			["ValveBiped.Bip01_R_Hand"] = true
-		},
-
-		["ValveBiped.Bip01_L_Thigh"] = {
-			["ValveBiped.Bip01_L_Calf"] = true,
-			["ValveBiped.Bip01_L_Foot"] = true
-		},
-		["ValveBiped.Bip01_L_Calf"] = {
-			["ValveBiped.Bip01_L_Foot"] = true
-		},
-
-		["ValveBiped.Bip01_R_Thigh"] = {
-			["ValveBiped.Bip01_R_Calf"] = true,
-			["ValveBiped.Bip01_R_Foot"] = true
-		},
-		["ValveBiped.Bip01_R_Calf"] = {
-			["ValveBiped.Bip01_R_Foot"] = true
-		},
+	local tourniquetLimbBones = {
+		larm = {high = "ValveBiped.Bip01_L_UpperArm", bones = {"ValveBiped.Bip01_L_UpperArm", "ValveBiped.Bip01_L_Forearm", "ValveBiped.Bip01_L_Hand"}},
+		rarm = {high = "ValveBiped.Bip01_R_UpperArm", bones = {"ValveBiped.Bip01_R_UpperArm", "ValveBiped.Bip01_R_Forearm", "ValveBiped.Bip01_R_Hand"}},
+		lleg = {high = "ValveBiped.Bip01_L_Thigh", bones = {"ValveBiped.Bip01_L_Thigh", "ValveBiped.Bip01_L_Calf", "ValveBiped.Bip01_L_Foot"}},
+		rleg = {high = "ValveBiped.Bip01_R_Thigh", bones = {"ValveBiped.Bip01_R_Thigh", "ValveBiped.Bip01_R_Calf", "ValveBiped.Bip01_R_Foot"}},
 	}
-	local amputationArteryGroups = {}
-	for _, group in ipairs({
-		{"ValveBiped.Bip01_L_UpperArmartery", "ValveBiped.Bip01_L_Forearmartery", "ValveBiped.Bip01_L_Handartery"},
-		{"ValveBiped.Bip01_R_UpperArmartery", "ValveBiped.Bip01_R_Forearmartery", "ValveBiped.Bip01_R_Handartery"},
-		{"ValveBiped.Bip01_L_Thighartery", "ValveBiped.Bip01_L_Calfartery"},
-		{"ValveBiped.Bip01_R_Thighartery", "ValveBiped.Bip01_R_Calfartery"},
-	}) do
-		for _, artery in ipairs(group) do amputationArteryGroups[artery] = group end
+	local tourniquetBoneToLimb = {}
+	for limb, data in pairs(tourniquetLimbBones) do
+		for _, limbBone in ipairs(data.bones) do tourniquetBoneToLimb[limbBone] = limb end
+	end
+	local function getTourniquetLimb(bone)
+		if not bone then return end
+		local name = tostring(bone):gsub("artery$", "")
+		return tourniquetBoneToLimb[name]
+	end
+	local function getTourniquetCandidates(org)
+		local candidates = {}
+		for index, wound in ipairs(org.arterialwounds or {}) do
+			local limb = getTourniquetLimb(wound[4]) or getTourniquetLimb(wound[7])
+			if limb and (wound[1] or 0) > 0 then
+				local entry = candidates[limb] or {score = 0, arteries = {}, wounds = {}}
+				entry.score = entry.score + (wound[1] or 0) * 100
+				table.insert(entry.arteries, index)
+				candidates[limb] = entry
+			end
+		end
+		for index, wound in ipairs(org.wounds or {}) do
+			local limb = getTourniquetLimb(wound[4])
+			if limb and (wound[1] or 0) > 0 then
+				local entry = candidates[limb] or {score = 0, arteries = {}, wounds = {}}
+				entry.score = entry.score + (wound[1] or 0)
+				table.insert(entry.wounds, index)
+				candidates[limb] = entry
+			end
+		end
+		return candidates
+	end
+	function SWEP:CanTourniquet(ent)
+		local org = IsValid(ent) and ent.organism
+		if not org then return false end
+		for _, entry in pairs(getTourniquetCandidates(org)) do
+			if #entry.arteries > 0 or entry.score >= 10 then return true end
+		end
+		return false
 	end
 	function SWEP:Tourniquet(ent, bone)
 		local org = ent.organism
-		if not org then return end
-		if #org.arterialwounds > 0 then
+		if not org then return false end
+		local candidates = getTourniquetCandidates(org)
+		local selectedLimb, selected
+		for limb, entry in pairs(candidates) do
+			if (#entry.arteries > 0 or entry.score >= 10) and (not selected or entry.score > selected.score) then
+				selectedLimb, selected = limb, entry
+			end
+		end
+		if selectedLimb and selected then
 			local ent = org.isPly and org.owner or ent
 			ent.tourniquets = ent.tourniquets or {}
 
-			local pw
-			local bonewounds = {}
-			if not bone then
-				for i,wound in pairs(org.arterialwounds) do
-					if wound[7] != "arteria" then 
-						pw = i 
-						for i1,tbl in pairs(org.wounds) do
-							if !tbl or !tbl[4] or !ent:LookupBone(tbl[4]) then continue end
-							local bonename = ent:GetBoneName(ent:LookupBone(tbl[4]))
-							local sec_bonename = ent:GetBoneName(ent:LookupBone(wound[4]))
-							--print(1,bonename,sec_bonename)
-							if bonename == sec_bonename or (tourniqet_bones[sec_bonename] and tourniqet_bones[sec_bonename][bonename]) then
-								--print(2,bonename,sec_bonename)
-								table.insert(bonewounds,i1)
-							end
-						end
-						--PrintTable(bonewounds)
-					break end
+			local placementBone = tourniquetLimbBones[selectedLimb].high
+			ent.tourniquets[#ent.tourniquets + 1] = {vector_origin, angle_zero, placementBone}
+			for i = #org.arterialwounds, 1, -1 do
+				local wound = org.arterialwounds[i]
+				if getTourniquetLimb(wound[4]) == selectedLimb or getTourniquetLimb(wound[7]) == selectedLimb then
+					org[wound[7]] = 0
+					table.remove(org.arterialwounds, i)
 				end
-				
-			else
-				for i,wound in pairs(org.arterialwounds) do
-					if BoneNamesMatch(ent, wound[4], bone) then pw = i break end
-				end
-				for i,tbl in pairs(org.wounds) do
-					local bonename = tbl[4]
-					if BoneNamesMatch(ent, bonename, bone) or (tourniqet_bones[bone] and tourniqet_bones[bone][bonename]) then
-						table.insert(bonewounds,i)
-					end
-				end
-			end		
-			pw = pw or math.random(#org.arterialwounds)
-
-			local wound = org.arterialwounds[pw]
-			if not wound then return false end
-			
-			ent.tourniquets[#ent.tourniquets + 1] = {wound[2], wound[3], wound[4]}
-			local arteryGroup = amputationArteryGroups[wound[7]]
-			local fullLimbAmputation = arteryGroup and (
-				(arteryGroup[1] == "ValveBiped.Bip01_L_UpperArmartery" and org.larmupamputated) or
-				(arteryGroup[1] == "ValveBiped.Bip01_R_UpperArmartery" and org.rarmupamputated) or
-				(arteryGroup[1] == "ValveBiped.Bip01_L_Thighartery" and org.llegupamputated) or
-				(arteryGroup[1] == "ValveBiped.Bip01_R_Thighartery" and org.rlegupamputated)
-			)
-			if not fullLimbAmputation then arteryGroup = nil end
-			if arteryGroup then
-				local groupedArteries = {}
-				for _, artery in ipairs(arteryGroup) do groupedArteries[artery] = true end
-				for i = #org.arterialwounds, 1, -1 do
-					local artery = org.arterialwounds[i][7]
-					if groupedArteries[artery] then
-						org[artery] = 0
-						table.remove(org.arterialwounds, i)
-					end
-				end
-			else
-				org[wound[7]] = 0
-				table.remove(org.arterialwounds, pw)
 			end
-
-			if wound[7] == "arteria" then org.o2.regen = 0 end
 
 			hg.organism.MarkArterialWoundsNetDirty(org)
 
-			table.sort(bonewounds, function(a, b) return a > b end)
-			for _, woundIndex in ipairs(bonewounds) do
-				if org.wounds[woundIndex] then table.remove(org.wounds, woundIndex) end
+			for i = #org.wounds, 1, -1 do
+				if getTourniquetLimb(org.wounds[i][4]) == selectedLimb then
+					table.remove(org.wounds, i)
+				end
 			end
 
 			hg.organism.MarkWoundsNetDirty(org, true)
@@ -1774,7 +1733,7 @@ function SWEP:CanBandageTPIK(target)
 	end
 
 	local _, arteryWound = GetBandageableArteryWound(org, target)
-	if arteryWound and available >= arteryWound[1] then return true end
+	if arteryWound and available > 0 then return true end
 
 	local treatmentCost = self:GetBandageStructuralTreatmentCost()
 	if available < treatmentCost then return false end

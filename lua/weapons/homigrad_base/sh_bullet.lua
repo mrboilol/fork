@@ -74,16 +74,57 @@ local function scaleBulletForce(force, pellets)
 	return math.max((force or 0) * (knockbackMul / pellets), knockbackMin / pellets)
 end
 
+local function applyBallisticProfile(bullet, settings, damage, penetration)
+	local diameter = math.max(tonumber(settings.Diameter) or 7.62, 0.1)
+	local speed = math.max(tonumber(settings.Speed) or 0, 0)
+	local mass = math.max(tonumber(settings.Mass) or 0, 0)
+	local damageFactor = math.Clamp(math.sqrt(math.max(damage, 1) / 25), 0.55, 2.5)
+	local caliberFactor = math.Clamp(math.sqrt(diameter / 9), 0.45, 2.25)
+	local kineticEnergy = mass > 0 and speed > 0 and mass / 2000 * speed * speed or damage * 18
+	local energyFactor = math.Clamp((kineticEnergy / 500) ^ 0.22, 0.65, 1.8)
+	local expansionFactor = settings.ExpansionMultiplier or math.Clamp(0.8 + damageFactor * 0.35 + caliberFactor * 0.2 - penetration / 120, 0.85, 2.1)
+
+	bullet.Speed = speed
+	bullet.ImpactSpeed = speed
+	bullet.Mass = mass
+	bullet.KineticEnergy = kineticEnergy
+	bullet.Diameter = diameter
+	bullet.TissueDamage = settings.TissueDamage or math.Clamp(0.45 + damageFactor * 0.3 + caliberFactor * 0.25 + energyFactor * 0.12, 0.65, 2.25)
+	bullet.TemporaryCavity = settings.TemporaryCavity or math.Clamp(0.2 + energyFactor * 0.45 + math.Clamp(speed / 900, 0, 1) * 0.45, 0.35, 1.8)
+	bullet.PermanentCavityRadius = settings.PermanentCavityRadius or diameter / 50.8 * expansionFactor
+	bullet.ExpansionRadius = settings.ExpansionRadius or math.Clamp(bullet.PermanentCavityRadius * (0.5 + bullet.TemporaryCavity) + math.max(damage - 35, 0) / 45, 0, 4.5)
+	bullet.ExpansionChance = settings.ExpansionChance or math.Clamp(0.08 + math.max(damage - 25, 0) / 130 + bullet.TemporaryCavity * 0.08, 0.08, 0.62)
+	bullet.NearbyDamageMul = settings.NearbyDamageMul or math.Clamp(0.2 + damageFactor * 0.13 + bullet.TemporaryCavity * 0.12, 0.25, 0.72)
+	bullet.GrazeDamageMul = settings.GrazeDamageMul or math.Clamp(0.35 + caliberFactor * 0.16 + damageFactor * 0.08, 0.4, 0.82)
+	bullet.WoundMultiplier = settings.WoundMultiplier or math.Clamp(damageFactor * 0.45 + caliberFactor * 0.35 + energyFactor * 0.2, 0.55, 2.25)
+	bullet.PainMultiplier = settings.PainMultiplier or math.Clamp(damageFactor * 0.5 + energyFactor * 0.35 + bullet.TemporaryCavity * 0.15, 0.6, 2.3)
+	bullet.DestructiveMultiplier = settings.DestructiveMultiplier or math.Clamp(damageFactor * 0.55 + caliberFactor * 0.3 + energyFactor * 0.15, 0.55, 2.35)
+	bullet.EnergyRetention = settings.EnergyRetention or math.Clamp(0.68 + penetration / 100 - (expansionFactor - 1) * 0.08, 0.55, 0.95)
+
+	if settings.BulletFragmentation ~= nil then
+		bullet.BulletFragmentation = settings.BulletFragmentation
+	else
+		local chance = math.Clamp(math.max(damage - 38, 0) / 180 + math.max(speed - 500, 0) / 2400, 0, 0.32)
+		bullet.BulletFragmentation = chance > 0 and {
+			chance = chance,
+			energyThreshold = 0.48,
+			energyFraction = math.Clamp(0.1 + damage / 500, 0.1, 0.32),
+			damageMul = math.Clamp(0.25 + damage / 220, 0.25, 0.8)
+		} or false
+	end
+
+	return bullet
+end
+
 local function callbackBullet(self, tr, dmg, force, bullet, penetration)
 	if CLIENT then return end
 	if not bullet then return end
 	bullet.limit_ricochet = bullet.limit_ricochet or 0
 	bullet.penetrated = bullet.penetrated or 0
 	bullet.Penetration = bullet.Penetration or 5
-	bullet.Diameter = bullet.Diameter or 7.62
-	bullet.TissueDamage = bullet.TissueDamage or math.Clamp(bullet.Diameter / 7.62, 0.65, 1.5)
-	bullet.TemporaryCavity = bullet.TemporaryCavity or 0.5
-	bullet.EnergyRetention = bullet.EnergyRetention or 0.85
+	if not bullet.PermanentCavityRadius then
+		applyBallisticProfile(bullet, bullet, bullet.Damage or 25, bullet.Penetration)
+	end
 	if bullet.penetrated > 6 then return end
 	if bullet.limit_ricochet > 6 then return end
 	if tr.Entity.organism then return end
@@ -165,6 +206,18 @@ local function callbackBullet(self, tr, dmg, force, bullet, penetration)
 				TemporaryCavity = bullet.TemporaryCavity,
 				BulletFragmentation = bullet.BulletFragmentation,
 				EnergyRetention = bullet.EnergyRetention,
+				PermanentCavityRadius = bullet.PermanentCavityRadius,
+				ExpansionRadius = bullet.ExpansionRadius,
+				ExpansionChance = bullet.ExpansionChance,
+				NearbyDamageMul = bullet.NearbyDamageMul,
+				GrazeDamageMul = bullet.GrazeDamageMul,
+				WoundMultiplier = bullet.WoundMultiplier,
+				PainMultiplier = bullet.PainMultiplier,
+				DestructiveMultiplier = bullet.DestructiveMultiplier,
+				Speed = bullet.Speed,
+				ImpactSpeed = bullet.ImpactSpeed,
+				Mass = bullet.Mass,
+				KineticEnergy = bullet.KineticEnergy,
 				penetrated = bullet.penetrated + 1,
 				dmgtype = bullet.dmgtype or DMG_BULLET,
 				NpcShoot = bullet.NpcShoot,
@@ -278,6 +331,18 @@ local function callbackBullet(self, tr, dmg, force, bullet, penetration)
 			TemporaryCavity = bullet.TemporaryCavity,
 			BulletFragmentation = bullet.BulletFragmentation,
 			EnergyRetention = bullet.EnergyRetention,
+			PermanentCavityRadius = bullet.PermanentCavityRadius,
+			ExpansionRadius = bullet.ExpansionRadius,
+			ExpansionChance = bullet.ExpansionChance,
+			NearbyDamageMul = bullet.NearbyDamageMul,
+			GrazeDamageMul = bullet.GrazeDamageMul,
+			WoundMultiplier = bullet.WoundMultiplier,
+			PainMultiplier = bullet.PainMultiplier,
+			DestructiveMultiplier = bullet.DestructiveMultiplier,
+			Speed = bullet.Speed,
+			ImpactSpeed = bullet.ImpactSpeed,
+			Mass = bullet.Mass,
+			KineticEnergy = bullet.KineticEnergy,
 			penetrated = bullet.penetrated + 1,
 			dmgtype = bullet.dmgtype or DMG_BULLET,
 			Pellets = bullet.Pellets,
@@ -696,18 +761,21 @@ function SWEP:FireBullet()
 
     local numbullet = ammotype.NumBullet or 1
 
+	local recoilImpulse, recoilWeight, recoilForce = self:GetRecoilImpulseFactors()
+	local feltRecoilForce = math.Clamp(recoilImpulse * recoilWeight * 35, 8, 90)
+
 	if not IsValid(owner) then
 		local phys = self:GetPhysicsObject()
 
 		if IsValid(phys) then
-			phys:ApplyForceOffset(-dir * self.Primary.Force * 5, pos)
+			phys:ApplyForceOffset(-dir * recoilForce * 5, pos)
 		end
 	else
 		local char = hg.GetCurrentCharacter(owner)
 		local phys = char:GetPhysicsObjectNum(0)
 		
 		if IsValid(phys) then
-			phys:ApplyForceCenter(-dir * math.min(self.Primary.Force, 70) * 40 * (self.NumBullet or 1))
+			phys:ApplyForceCenter(-dir * feltRecoilForce * 40)
 		end
 	end
 
@@ -874,21 +942,13 @@ function SWEP:FireBullet()
 	end
 
 	local penetration = (ammotype.Penetration or (-(-self.Penetration))) * (self.PenetrationMultiplier or 1)
-	local diameter = ammotype.Diameter or 1
-	local tissueDamage = ammotype.TissueDamage or math.Clamp(diameter / 7.62, 0.65, 1.5)
-	local temporaryCavity = ammotype.TemporaryCavity or math.Clamp((ammotype.Speed or 350) / 700, 0.35, 1.6)
-	local energyRetention = ammotype.EnergyRetention or math.Clamp(0.72 + penetration / 100, 0.75, 0.95)
 
     for i = 1, numbullet do
 		local shot = numbullet == 1 and bullet or table_Copy(bullet)
 		shot.penetrated = 0
 		shot.MaxPenLen = 100
 		shot.Penetration = penetration
-		shot.Diameter = diameter
-		shot.TissueDamage = tissueDamage
-		shot.TemporaryCavity = temporaryCavity
-		shot.BulletFragmentation = ammotype.BulletFragmentation or false
-		shot.EnergyRetention = energyRetention
+		applyBallisticProfile(shot, ammotype, shot.Damage, penetration)
 
 		if SERVER and owner.suiciding and willsuicidereal then
 			local dmginfo = DamageInfo()
@@ -898,7 +958,14 @@ function SWEP:FireBullet()
 			dmginfo:SetDamageType(DMG_BULLET)
 			dmginfo:SetDamageForce(dir * shot.Force)
 			dmginfo:SetDamagePosition(headpos)
+			dmginfo:SetAmmoType(game.GetAmmoID(primary.Ammo))
+			local previousBullet = self.bullet
+			self.bullet = shot
+			hg.BallisticDamageInfo = hg.BallisticDamageInfo or {}
+			hg.BallisticDamageInfo[dmginfo] = shot
 			ent:TakeDamageInfo(dmginfo)
+			hg.BallisticDamageInfo[dmginfo] = nil
+			if self.bullet == shot then self.bullet = previousBullet end
 		end
 
 		if(hg.PhysBullet and hg.PhysBullet.CreateBullet and self.UsePhysBullets)then

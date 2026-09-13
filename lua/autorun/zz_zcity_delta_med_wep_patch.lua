@@ -205,9 +205,33 @@ local function CanUseMedicalArms(owner)
     return false
 end
 
+local function CanStartTreatment(wep, target, minigameType)
+    if not IsValid(wep) or not IsValid(target) or not target.organism then return false end
+
+    if minigameType == "bandage" then
+        if wep.CanBandageTPIK then
+            return wep:CanBandageTPIK(target)
+        end
+
+        local mode = wep.mode or 1
+        local available = wep.modeValues and wep.modeValues[mode] or 0
+        if available <= 0 then return false end
+        local bone = wep.GetBandageTargetBone and wep:GetBandageTargetBone(target, hg.eyeTrace(wep:GetOwner())) or nil
+        return wep.GetBandageTreatmentCost and wep:GetBandageTreatmentCost(target, bone) > 0 or false
+    end
+
+    if minigameType == "tourniquet" then
+        return wep.CanTourniquet and wep:CanTourniquet(target) or false
+    end
+
+    return true
+end
+
 local function StartMinigame(wep, owner, minigameType, target)
     if not IsValid(wep) or not IsValid(owner) then return false end
     if not minigameType then return false end
+    target = target or owner
+    if not CanStartTreatment(wep, target, minigameType) then return false end
     if not CanUseMedicalArms(owner) then return false end
 
     if owner.HGMedicalMinigameWeapon ~= nil and owner.HGMedicalMinigameWeapon ~= wep then
@@ -217,7 +241,7 @@ local function StartMinigame(wep, owner, minigameType, target)
     local modeValueIndex = GetModeValueIndex(wep, minigameType)
     local startValue = wep.modeValues and wep.modeValues[modeValueIndex] or nil
 
-    wep.healbuddy = target or owner
+    wep.healbuddy = target
     wep.HGMedicalMinigameStartValue = startValue
     wep.HGMedicalMinigameRequiredProgress = 1
 
@@ -355,8 +379,8 @@ local function PatchWeapon(class)
         if not opensMedkit and IsValid(owner) and minigameType and GetMedicalAnimationType() == 1 then
             if StartMinigame(self, owner, minigameType, owner) then
                 self:SetNextPrimaryFire(CurTime() + (minigameType == "bandage" and 0.25 or 1))
-                return
             end
+            return
         end
 
         if originalPrimary then
@@ -376,8 +400,8 @@ local function PatchWeapon(class)
             if IsValid(target) then
                 if StartMinigame(self, owner, minigameType, target) then
                     self:SetNextSecondaryFire(CurTime() + (minigameType == "bandage" and 0.25 or 1))
-                    return
                 end
+                return
             end
         end
 

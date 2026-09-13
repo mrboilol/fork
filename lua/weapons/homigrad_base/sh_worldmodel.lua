@@ -103,12 +103,16 @@ function SWEP:UpdateWeaponReadiness(owner, dtime)
 	local lowered = (sprinting and !self:CanSprintFire()) or deploying
 	local factor = self:GetWeaponInertiaFactor()
 	local raiseRate = math.Clamp((self.Ergonomics or 1) * 4 / math.sqrt(factor), 1.6, 8)
+	local recoveryRate = math.Clamp(((self.Ergonomics or 1) * 1.8 + 0.6) / (1 + math.sqrt(factor) * 0.35), 0.45, 2.4)
+	self.recoilAimPenalty = math.Approach(self.recoilAimPenalty or 0, 0, dt * recoveryRate)
+	local readyTarget = lowered and 0 or 1 - math.Clamp(self.recoilAimPenalty * 0.075, 0, 0.45)
 
-	self.weaponReadiness = math.Approach(self.weaponReadiness or (lowered and 0 or 1), lowered and 0 or 1, dt * raiseRate)
+	self.weaponReadiness = math.Approach(self.weaponReadiness or readyTarget, readyTarget, dt * raiseRate)
 	local velocity = self.inertialAimVelocity or angle_zero
 	local angularSpeed = math.abs(velocity[1]) + math.abs(velocity[2])
-	local stable = not lowered and self.weaponReadiness > 0.98 and owner:GetVelocity():Length2D() < 25 and angularSpeed < 5
-	self.weaponStability = math.Approach(self.weaponStability or 0, stable and 1 or 0, dt * (stable and 2.8 or 6))
+	local stable = not lowered and self.recoilAimPenalty < 0.05 and self.weaponReadiness > 0.98 and owner:GetVelocity():Length2D() < 25 and angularSpeed < 5
+	local stabilityRate = stable and 2.8 / (1 + self.recoilAimPenalty * 0.35) or 6
+	self.weaponStability = math.Approach(self.weaponStability or 0, stable and 1 or 0, dt * stabilityRate)
 
 	if lowered then
 		self.weaponReadyState = "LOW"
@@ -874,6 +878,9 @@ function SWEP:WorldModel_Transform(bNoApply, bNoAdditional, model)
 			newPos, newAng = LocalToWorld(self.FakePos, self.FakeAng, newPos, newAng)
 		end
 		
+		if hg.EquipmentImpactPose then newPos, newAng = hg.EquipmentImpactPose(self, newPos, newAng) end
+		if hg.ResolveEquipmentClearance then newPos = hg.ResolveEquipmentClearance(self, owner, model:GetModel(), newPos, newAng, model:GetModelScale()) end
+
 		if bNoApply then
 			return newPos, newAng, desiredPos, desiredAng
 		end
@@ -901,6 +908,7 @@ function SWEP:WorldModel_Transform(bNoApply, bNoAdditional, model)
 			renderAng = laggedAng
 		end
 
+		if hg.ResolveEquipmentClearance then renderPos = hg.ResolveEquipmentClearance(self, owner, model:GetModel(), renderPos, renderAng, model:GetModelScale()) end
 		self.visualDesiredPos, self.visualDesiredAng = renderPos, renderAng
 		model:SetRenderOrigin(renderPos)
 		model:SetRenderAngles(renderAng)

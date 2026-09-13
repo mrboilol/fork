@@ -16,6 +16,11 @@ Z-City is a GMod addon which modifies character damage and controls. Z-City also
 - https://steamcommunity.com/sharedfiles/filedetails/?id=3657285193 - Steam Workshop link (stable version)
 - https://github.com/uzelezz123/8bit_zcity - 8bit module (compiled version is in lua/bin)
 
+## Ballistic ammunition
+Weapon-base projectiles pass their complete per-shot ballistic profile into organism damage. `BulletSettings` damage, diameter, penetration, speed, and mass drive bleeding, pain, permanent and temporary wound channels, organ grazing, structural damage, and retained energy. Specialized ammunition can override `TissueDamage`, `TemporaryCavity`, `ExpansionMultiplier`, `ExpansionRadius`, `ExpansionChance`, `NearbyDamageMul`, `GrazeDamageMul`, `WoundMultiplier`, `PainMultiplier`, `DestructiveMultiplier`, `EnergyRetention`, and `BulletFragmentation`.
+
+Recoil uses the ammunition's force, mass, velocity, energy, diameter, and projectile count together with the weapon's weight and action. Weapon mass strongly reduces immediate kick, while powerful ammunition still increases post-shot sway, stability recovery, and aim-alignment time.
+
 Optional Discord RPC module for clients:
 1. https://github.com/YuRaNnNzZZ/gmcl_steamrichpresencer/releases/tag/2023.07.20 - Steam Rich Presence
 2. https://github.com/fluffy-servers/gmod-discord-rpc/releases/tag/1.2.1 - Discord Rich Presence

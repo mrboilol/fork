@@ -192,26 +192,40 @@ end
 function SWEP:GetRecoilImpulseFactors()
 	local primary = self.Primary or {}
 	local ammo = self.RecoilBallisticsOverride or self:GetAmmoBallistics()
-	local force = ammo.Force or primary.Force2 or primary.Force or 30
-	local diameter = ammo.Diameter or 7.62
-	local mass = ammo.Mass or 8
-	local speed = ammo.Speed or 700
-	local numBullet = ammo.NumBullet or self.NumBullet or 1
+	local force = math.max(tonumber(ammo.Force) or tonumber(primary.Force2) or tonumber(primary.Force) or 30, 0)
+	local diameter = math.max(tonumber(ammo.Diameter) or 7.62, 0.1)
+	local mass = math.max(tonumber(ammo.Mass) or 8, 0.01)
+	local speed = math.max(tonumber(ammo.Speed) or 700, 1)
+	local numBullet = math.max(tonumber(ammo.NumBullet) or tonumber(self.NumBullet) or 1, 1)
 	local weaponWeight = math.max(self:GetHandlingWeight(), 0.5)
-	local payloadCount = math.max(numBullet, 1)
-	local recoilForce = force * (1 + math.max(payloadCount - 1, 0) * 0.55)
-	local forceFactor = math.Clamp(recoilForce / 40, 0.18, 4.5)
-	local momentumFactor = math.Clamp((mass * payloadCount * speed) / (8 * 700), 0.2, 4)
-	local diameterFactor = math.Clamp((diameter * payloadCount) / 7.62, 0.4, 2.6)
-	local payloadFactor = payloadCount > 1 and math.Clamp(1 + math.log(payloadCount) / math.log(2) * 0.06, 1, 1.25) or 1
-	local caliber = (forceFactor * 0.45 + momentumFactor * 0.4 + diameterFactor * 0.15) * payloadFactor
-
-	if not self:IsPistolHoldType() and speed >= 750 and force >= 25 and diameter >= 5 then
-		caliber = math.max(caliber, (mass >= 7 or diameter >= 7) and 1.3 or 0.92)
+	local recoilForce = force * (1 + math.max(numBullet - 1, 0) * 0.55)
+	local projectileMomentum = mass / 1000 * speed * numBullet
+	local projectileEnergy = mass / 2000 * speed * speed * numBullet
+	local forceFactor = math.Clamp(recoilForce / 40, 0.15, 6)
+	local momentumFactor = math.Clamp(projectileMomentum / 4.2, 0.15, 7)
+	local energyFactor = math.Clamp(math.sqrt(projectileEnergy / 1700), 0.2, 5)
+	local diameterFactor = math.Clamp(diameter / 7.62 * math.sqrt(numBullet), 0.35, 3)
+	local payloadFactor = numBullet > 1 and math.Clamp(1 + math.log(numBullet) / math.log(2) * 0.05, 1, 1.22) or 1
+	local actionMul
+	if self.RecoilActionMul then
+		actionMul = self.RecoilActionMul
+	elseif self:IsPistolHoldType() or self.PistolKinda then
+		actionMul = 1.05
+	elseif (self.IsManuallyCycledWeapon and self:IsManuallyCycledWeapon()) or self.ShotgunManualCycle then
+		actionMul = 1.08
+	elseif primary.Automatic then
+		actionMul = 0.9
+	else
+		actionMul = 0.96
 	end
-	caliber = math.Clamp(caliber ^ 1.18 * (self.RecoilImpulseMul or 1), 0.2, 4.5)
 
-	return caliber, math.Clamp(3 / weaponWeight, 0.55, 1.75), recoilForce, numBullet, ammo
+	local roundImpulse = (momentumFactor * 0.48 + energyFactor * 0.24 + forceFactor * 0.2 + diameterFactor * 0.08) * payloadFactor
+	roundImpulse = math.Clamp(roundImpulse ^ 1.12 * actionMul * (self.RecoilImpulseMul or 1), 0.18, 6)
+	local weightMul = math.Clamp((3 / weaponWeight) ^ 0.8, 0.25, 2)
+	local disturbance = (momentumFactor * 0.5 + energyFactor * 0.32 + forceFactor * 0.13 + diameterFactor * 0.05) * payloadFactor
+	disturbance = math.Clamp(disturbance * math.Clamp(0.82 + math.sqrt(weaponWeight) * 0.08, 0.85, 1.25) * (self.RecoilRecoveryMul or 1), 0.18, 6)
+
+	return roundImpulse, weightMul, recoilForce, numBullet, ammo, disturbance, projectileMomentum, projectileEnergy
 end
 
 local function getSevereArmTrauma(org, arm)
@@ -313,7 +327,8 @@ function SWEP:GetAimAlignmentTime(ply)
 	local fatigueMul = 1 + math.Clamp(org.aiming_fatigue or 0, 0, 10) * 0.1
 	local combat = hg.GetCombatCondition and hg.GetCombatCondition(ply) or nil
 	local combatMul = combat and combat.aim or 1
-	return math.Clamp(base * handling * supportMul * fatigueMul * combatMul * self:GetWeaponExperienceMul(ply) + brainPenalty, 0.2, 8)
+	local recoilPenalty = math.Clamp(self.recoilAimPenalty or 0, 0, 6)
+	return math.Clamp(base * handling * supportMul * fatigueMul * combatMul * self:GetWeaponExperienceMul(ply) + brainPenalty + recoilPenalty * 0.18, 0.2, 8)
 end
 
 function SWEP:IsManuallyCycledWeapon()
@@ -783,6 +798,7 @@ local CantDoIt = {
 }
 --qol lmao
 function SWEP:CanPrimaryAttack()
+	if self:GetNWFloat("HGEquipmentRecovery", 0) > CurTime() then return false end
 	if not self:ShotgunCanPrimaryAttack() then return false end
 	local owner = self:GetOwner()
 	if !IsValid(owner) then return end
@@ -2479,7 +2495,7 @@ function SWEP:GetAdditionalValues()
 	
 	if not suiciding and !self.norecoil then
 		local weaponRecoilMul = (self.WeaponRecoilMul or 1) * experienceMul
-		local caliberMul, weightMul = self:GetRecoilImpulseFactors()
+		local caliberMul, weightMul, _, _, _, ballisticDisturbance = self:GetRecoilImpulseFactors()
 		local ballisticRecoil = math.Clamp(caliberMul * weightMul, 0.2, 4)
 		local cantedHold = ply.posture == 7 or ply.posture == 9
 		local mulhuy = (self:IsPistolHoldType() or self.PistolKinda) and 2 or (((ply.posture == 1 and not self:IsZoom()) or ply.posture == 7 or ply.posture == 8) and 2 or 0.75)
@@ -2524,8 +2540,9 @@ function SWEP:GetAdditionalValues()
 		local restMul = self:IsResting() and 0.35 or 1
 		local burstMul = 0.85 + math.Clamp((self.SprayI or 0) / 7, 0, 1) * 0.65
 		local physicalImpulse = math.Clamp(caliberMul * weightMul * supportMul * handlingMul * experienceMul * 1.2, 0.3, 5.5)
-		local recoveryRate = math.Clamp(0.32 / (1 + armInjury * 0.35 + weaponMass * 0.04 + (support.oneHanded and not self.IgnoreOneArmPenalties and 0.2 or 0)), 0.14, 0.28)
-		local wobbleTarget = firing and math.min(physicalImpulse * burstMul * stanceMul * restMul, 2.2) or 0
+		local recoveryImpulse = math.Clamp(ballisticDisturbance * supportMul * math.sqrt(handlingMul) * experienceMul, 0.2, 6)
+		local recoveryRate = math.Clamp(0.34 / (1 + armInjury * 0.35 + weaponMass * 0.04 + ballisticDisturbance * 0.1 + (support.oneHanded and not self.IgnoreOneArmPenalties and 0.2 or 0)), 0.1, 0.28)
+		local wobbleTarget = firing and math.min((physicalImpulse * 0.7 + recoveryImpulse * 0.3) * burstMul * stanceMul * restMul, 2.8) or 0
 		self.recoilWobbleAmp = Lerp(hg.lerpFrameTime2(firing and 0.32 or recoveryRate, dtime), self.recoilWobbleAmp or 0, wobbleTarget)
 
 		if (self.recoilWobbleAmp or 0) > 0.0001 then

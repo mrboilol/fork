@@ -290,6 +290,10 @@ local function canUseMedkitMode(wep, ent)
         return #org.wounds > 0 or (hg.organism.GetBandageDislocation and hg.organism.GetBandageDislocation(org)) or (org.lleg or 0) >= 0.05 or (org.rleg or 0) >= 0.05 or (org.skull or 0) >= 0.05 or (org.chest or 0) >= 0.05 or (org.rarm or 0) >= 0.05 or (org.larm or 0) >= 0.05
     end
 
+    if typeName == "tourniquet" then
+        return wep.CanTourniquet and wep:CanTourniquet(ent) or false
+    end
+
     return true
 end
 

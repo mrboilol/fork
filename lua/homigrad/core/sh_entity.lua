@@ -100,6 +100,32 @@ end
 hg.MaxLookX, hg.MinLookX = 55, -55
 hg.MaxLookY, hg.MinLookY = 45, -45
 
+local function getRagdollReactionPhys(ragdoll)
+	local pelvis = ragdoll:GetPhysicsObjectNum(0)
+	if IsValid(pelvis) then return pelvis end
+
+	for physbone = 1, ragdoll:GetPhysicsObjectCount() - 1 do
+		local phys = ragdoll:GetPhysicsObjectNum(physbone)
+		if IsValid(phys) then return phys end
+	end
+end
+
+function hg.ClampRagdollReactionForce(ragdoll, force)
+	if not isvector(force) then return vector_origin end
+
+	local forceLength = force:Length()
+	if forceLength <= 0 then return vector_origin end
+
+	local mass = 0
+	for physbone = 0, ragdoll:GetPhysicsObjectCount() - 1 do
+		local phys = ragdoll:GetPhysicsObjectNum(physbone)
+		if IsValid(phys) then mass = mass + phys:GetMass() end
+	end
+
+	local maximum = math.max(mass * 350, 12000)
+	return force * math.min(forceLength, maximum) / forceLength
+end
+
 function hg.AddForceRag(ent, physbone, force, time)
 	if !IsValid(ent) then return end
 
@@ -114,8 +140,7 @@ function hg.AddForceRag(ent, physbone, force, time)
 			ent.AddForceRag = ent.AddForceRag or {}
 			ent.AddForceRag[physbone] = ent.AddForceRag[physbone] or {}
 
-			local restforce = math.max(((ent.AddForceRag[physbone][1] or CurTime()) - CurTime()), 0) / 0.25 * (ent.AddForceRag[physbone][2] or vector_origin)
-			local resttime = (ent.AddForceRag[physbone][1] or CurTime())
+			local restforce = math.max((ent.AddForceRag[physbone][1] or CurTime()) - CurTime(), 0) / 0.25 * (ent.AddForceRag[physbone][2] or vector_origin)
 
 			ent.AddForceRag[physbone][2] = restforce + force
 			ent.AddForceRag[physbone][1] = CurTime() + 0.25
@@ -128,10 +153,10 @@ function hg.AddForceRag(ent, physbone, force, time)
 		return
 	end
 
-	local phys = ragdoll:GetPhysicsObjectNum(physbone)
+	local phys = getRagdollReactionPhys(ragdoll)
 
 	if IsValid(phys) then
-		phys:ApplyForceCenter(force)
+		phys:ApplyForceCenter(hg.ClampRagdollReactionForce(ragdoll, force))
 	end
 end
 

@@ -26,6 +26,7 @@ SWEP.HoldType = "knife"
 SWEP.weight = 0.4
 
 function SWEP:CanPrimaryAttack()
+    if self:GetNWFloat("HGEquipmentRecovery", 0) > CurTime() then return false end
 	local owner = self:GetOwner()
 	if IsValid(owner) and owner:GetNetVar("ducttaped_hands", false) then return false end
 	return true
@@ -39,6 +40,7 @@ function SWEP:IsSprinting()
 end
 
 function SWEP:CanSecondaryAttack()
+    if self:GetNWFloat("HGEquipmentRecovery", 0) > CurTime() then return false end
 	local owner = self:GetOwner()
 	if IsValid(owner) and owner:GetNetVar("ducttaped_hands", false) then return false end
     if self:GetClass() == "weapon_melee" then return false end
@@ -46,7 +48,7 @@ function SWEP:CanSecondaryAttack()
 end
 
 function SWEP:CanChargeAttack()
-    return true
+    return self:GetNWFloat("HGEquipmentRecovery", 0) <= CurTime()
 end
 
 function SWEP:IsSecondaryAttackType(attacktype)
@@ -562,6 +564,7 @@ if CLIENT then
                 pos,ang = LocalToWorld(self.weaponPos,self.weaponAng,huy and mat and mat:GetTranslation() or self.worldModel:GetPos(),huy and mat and mat:GetAngles() or self.worldModel:GetAngles())
             end
 
+            if IsValid(owner) and hg.ResolveEquipmentClearance then pos = hg.ResolveEquipmentClearance(self, owner, self.WorldModelExchange, pos, ang, self.modelscale) end
             self.worldModel2:SetModelScale(self.modelscale)
             self.worldModel2:SetRenderOrigin(pos)
             self.worldModel2:SetRenderAngles(ang)
@@ -849,10 +852,9 @@ function SWEP:ModelAnim(model, pos, ang)
 
 	self.timetick2 = SysTime()
 
-    if self.ModelAnimAdd then
-        return self:ModelAnimAdd(model,pos,ang)
-    end
-
+    if self.ModelAnimAdd then pos, ang = self:ModelAnimAdd(model, pos, ang) end
+    if hg.EquipmentImpactPose then pos, ang = hg.EquipmentImpactPose(self, pos, ang) end
+    if hg.ResolveEquipmentClearance then pos = hg.ResolveEquipmentClearance(self, owner, self.WorldModelExchange or self.WorldModel, pos, ang, self.WorldModelExchange and self.modelscale or self.modelscale2) end
     return pos, ang
 end
 
@@ -2384,8 +2386,12 @@ function SWEP:AbortBlockedAttack()
 end
 
 function SWEP:StopAttackOnArmorImpact(trace, attacktype)
-    if not trace or not (trace.HGArmorModelBlocked or trace.HGEquipmentWeapon or trace.HGEquipmentHeldEntity) then return false end
+    if not trace or not (trace.HGArmorModelBlocked or trace.HGEquipmentWeapon or trace.HGEquipmentHeldEntity or trace.HGEquipmentAccessory) then return false end
 
+    local other = trace.HGEquipmentWeapon
+    if SERVER and IsValid(other) and IsValid(other:GetOwner()) and other.CanClashWeapon and other:CanClashWeapon() and self:CanClashWeapon() and other:GetInAttack() then
+        self:HandleMeleeClash(other, trace.HitPos, trace.HitNormal, attacktype, other:GetAttackType())
+    end
     self:SendMeleeHitStop(attacktype, trace.HitNormal)
     self:AbortBlockedAttack()
     return true

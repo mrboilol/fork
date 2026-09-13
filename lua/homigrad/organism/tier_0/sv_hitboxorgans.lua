@@ -18,17 +18,17 @@ function hg.organism.Trace(pos, dir, size, maxpen, boxs, center, endDis, organs,
 	tracePos:Set(pos)
 
 	local hitBoxs = {}
-	local nearbyAttempts = {}
+	local nearbyRolls = {}
 	local tracePoses = {}
 	local inputHole, outputHole = {}, {}
 	local inBody, hitSomething
 	local box
-	-- Ballistic impacts may expand their effective wound channel.  This is kept
-	-- in the server-side trace so a near miss can only affect real organ boxes,
-	-- never the model hitboxes used to enter the body.
+	local permanentRadius = impact and impact.ballisticVersion and math.max(impact.permanentCavityRadius or 0, 0) or 0
 	local expansionRadius = impact and impact.expansionRadius or 0
 	local expansionChance = impact and impact.expansionChance or 0
 	local nearbyDamageMul = impact and impact.nearbyDamageMul or 1
+	local grazeDamageMul = impact and impact.grazeDamageMul or 0.5
+	local permanentExpansion = permanentRadius > 0 and Vector(permanentRadius, permanentRadius, permanentRadius) or nil
 	local expansion = expansionRadius > 0 and Vector(expansionRadius, expansionRadius, expansionRadius) or nil
 
 	local distance = math_ceil(dir:Length())
@@ -47,7 +47,8 @@ function hg.organism.Trace(pos, dir, size, maxpen, boxs, center, endDis, organs,
 
 		local frac = 1
 		local iHit, normal, hit
-		local impactNearby = false
+		local impactContact = "direct"
+		local impactContactMul = 1
 		local segDir = dir * segLen
 
 		for i = 1, #boxs do
@@ -57,14 +58,24 @@ function hg.organism.Trace(pos, dir, size, maxpen, boxs, center, endDis, organs,
 			if not organs[box[6]] then continue end
 
 			local hit_, normal_, frac_ = util_IntersectRayWithOBB(tracePos, segDir, box[1], box[2], box[3], box[4])
-			local nearby = false
-			if not hit_ and expansion and box[6] and not nearbyAttempts[i] then
+			local contact = "direct"
+			local contactMul = 1
+			if not hit_ and permanentExpansion and box[6] then
+				local expandedHit, expandedNormal, expandedFrac = util_IntersectRayWithOBB(tracePos, segDir, box[1], box[2], box[3] - permanentExpansion, box[4] + permanentExpansion)
+				if expandedHit then
+					hit_, normal_, frac_ = expandedHit, expandedNormal, expandedFrac
+					contact = "graze"
+					contactMul = grazeDamageMul
+				end
+			end
+			if not hit_ and expansion and box[6] then
 				local expandedHit, expandedNormal, expandedFrac = util_IntersectRayWithOBB(tracePos, segDir, box[1], box[2], box[3] - expansion, box[4] + expansion)
 				if expandedHit then
-					nearbyAttempts[i] = true
-					if math.Rand(0, 1) < expansionChance then
+					if nearbyRolls[i] == nil then nearbyRolls[i] = math.Rand(0, 1) end
+					if nearbyRolls[i] < expansionChance then
 						hit_, normal_, frac_ = expandedHit, expandedNormal, expandedFrac
-						nearby = true
+						contact = "cavity"
+						contactMul = nearbyDamageMul
 					end
 				end
 			end
@@ -74,7 +85,8 @@ function hg.organism.Trace(pos, dir, size, maxpen, boxs, center, endDis, organs,
 				frac = frac_
 				normal = normal_
 				hit = tracePos + segDir * frac_
-				impactNearby = nearby
+				impactContact = contact
+				impactContactMul = contactMul
 			end
 		end
 
@@ -92,7 +104,9 @@ function hg.organism.Trace(pos, dir, size, maxpen, boxs, center, endDis, organs,
 				impact.normal = normal
 				impact.penetrationBefore = distance
 				impact.energyBefore = impact.energy
-				impact.nearbyOrgan = impactNearby or false
+				impact.organContact = impactContact
+				impact.contactDamageMul = impactContactMul
+				impact.nearbyOrgan = impactContact ~= "direct"
 				impact.nearbyDamageMul = nearbyDamageMul
 				dirSub = funcInput(box, tracePos, false, impact, ...)
 			else

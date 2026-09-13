@@ -224,12 +224,14 @@ function SWEP:AnimApply_ShootRecoil(time)
 	local animpos = self:GetAnimPos_Shoot(time, 0.3)
 	animpos = math.ease.InOutSine(animpos)
 	local experienceMul = self.GetWeaponExperienceMul and self:GetWeaponExperienceMul(owner) or 1
-	animpos = animpos * experienceMul * ((self:IsZoom() and self.SpreadMulZoom or self.SpreadMul) + math_max(self.Primary.Force / 110 - 1, 0)) * ((not owner:IsNPC() and self:IsOwnerCrouching(owner)) and self.CrouchMul or 1) * 0.75
+	local caliberMul, weightMul = self:GetRecoilImpulseFactors()
+	local recoilAnimation = math_Clamp(math.sqrt(caliberMul * weightMul), 0.45, 2.2)
+	animpos = animpos * experienceMul * ((self:IsZoom() and self.SpreadMulZoom or self.SpreadMul) + math_max(recoilAnimation - 1, 0) * 0.4) * ((not owner:IsNPC() and self:IsOwnerCrouching(owner)) and self.CrouchMul or 1) * 0.75
 	animpos = animpos * self.AnimShootMul
 	--if animpos > 0 then
 		if CLIENT and (owner ~= LocalPlayer() or LocalPlayer() ~= GetViewEntity()) then
-			angShoot[3] = -15 * animpos * self.Primary.Force / 50 * (self.NumBullet and self.NumBullet * 0.5 or 1)
-			angShoot2[2] = -15 * animpos * self.Primary.Force / 50 * (self.NumBullet and self.NumBullet * 0.5 or 1)
+			angShoot[3] = -15 * animpos * recoilAnimation * 0.65
+			angShoot2[2] = -15 * animpos * recoilAnimation * 0.65
 			self:BoneSet("spine", vecZero, angShoot, "shooting")
 			self:BoneSet("head", vecZero, angShoot2, "shooting")
 		end

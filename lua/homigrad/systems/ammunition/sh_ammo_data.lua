@@ -1118,6 +1118,23 @@ hg.ammotypes = {
 			Speed = 340,
 			Diameter = 9,
 			Mass = 6.5,
+			TissueDamage = 1.6,
+			TemporaryCavity = 1.05,
+			ExpansionMultiplier = 1.9,
+			ExpansionRadius = 1.65,
+			ExpansionChance = 0.55,
+			NearbyDamageMul = 0.72,
+			GrazeDamageMul = 0.68,
+			WoundMultiplier = 1.55,
+			PainMultiplier = 1.45,
+			DestructiveMultiplier = 1.5,
+			EnergyRetention = 0.62,
+			BulletFragmentation = {
+				chance = 0.38,
+				energyThreshold = 0.38,
+				energyFraction = 0.22,
+				damageMul = 0.6
+			},
 			Icon = matPistolAmmo
 		}
 	},

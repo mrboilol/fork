@@ -305,6 +305,7 @@ function hg.MedicalMinigame.StartBandageMinigame(ply, ent)
     if not CanUseMedicalMinigameTarget(ply, target) then return false end
 
     local wep = ply:GetActiveWeapon()
+    if IsValid(wep) and wep.CanBandageTPIK and not wep:CanBandageTPIK(target) then return false end
     local completions = 0
     local progress = 0
     local requiredCompletions = 3
@@ -373,6 +374,9 @@ function hg.MedicalMinigame.StartTourniquetMinigame(ply, ent)
     local target = ResolveMinigameTarget(ent) or ply
     if not CanUseMedicalMinigameTarget(ply, target) then return false end
 
+    local wep = ply:GetActiveWeapon()
+    if not IsValid(wep) or not wep.CanTourniquet or not wep:CanTourniquet(target) then return false end
+
     local existingSession = hg.MedicalMinigame.TourniquetSessions[ply]
     if not existingSession or existingSession.target ~= target then
         existingSession = {
@@ -381,7 +385,6 @@ function hg.MedicalMinigame.StartTourniquetMinigame(ply, ent)
         hg.MedicalMinigame.TourniquetSessions[ply] = existingSession
     end
 
-    local wep = ply:GetActiveWeapon()
     existingSession.weapon = wep
     existingSession.mode = IsValid(wep) and wep.mode or nil
     if IsValid(wep) then
@@ -873,7 +876,9 @@ net.Receive("hg_medical_minigame_finish", function(len, ply)
                 end
             end
 
-            hook.Run("hg_medical_minigame_finished", ply, target, "tourniquet")
+            if done then
+                hook.Run("hg_medical_minigame_finished", ply, target, "tourniquet")
+            end
             return
         end
 

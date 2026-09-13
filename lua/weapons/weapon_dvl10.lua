@@ -13,8 +13,8 @@ SWEP.Slot = 2
 SWEP.SlotPos = 10
 SWEP.ViewModel = ""
 SWEP.WorldModel = "models/weapons/w_rif_m4a1.mdl"
-SWEP.WorldModelFake = "models/weapons/c_dvl10.mdl"
-SWEP.WorldModelReal = "models/weapons/c_dvl10.mdl"
+SWEP.WorldModelFake = "models/weapons/zcity_dvl10/c_dvl10.mdl"
+SWEP.WorldModelReal = "models/weapons/zcity_dvl10/c_dvl10.mdl"
 
 SWEP.WepSelectIcon2 = Material("entities/arc9_eft_dvl10.png")
 SWEP.IconOverride = "entities/arc9_eft_dvl10.png"

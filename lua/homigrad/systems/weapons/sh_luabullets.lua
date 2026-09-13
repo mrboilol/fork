@@ -434,7 +434,13 @@ local function Damage(bDoDebugHit, bStartedInWater, bEndNotWater, iFlags, iDamag
 			if (fCallback) then
 				fCallback(info:GetAttacker(), tr, info, tInfo, Weapon)
 			end
+		local previousBullet = IsValid(pInflictor) and pInflictor.bullet or nil
+		if IsValid(pInflictor) then pInflictor.bullet = tInfo end
+		hg.BallisticDamageInfo = hg.BallisticDamageInfo or {}
+		hg.BallisticDamageInfo[info] = tInfo
 		pEntity:DispatchTraceAttack(info, tr, vShotDir)
+		hg.BallisticDamageInfo[info] = nil
+		if IsValid(pInflictor) and pInflictor.bullet == tInfo then pInflictor.bullet = previousBullet end
 		
 		if (bEndNotWater or bit.band(iFlags, FIRE_BULLETS_ALLOW_WATER_SURFACE_IMPACTS) ~= 0) then
 			Impact(Weapon, iAmmoDamageType, bFirstTimePredicted, vSrc, tr, sImpactEffect, sRagdollImpactEffect)
@@ -781,6 +787,7 @@ function ENTITY:FireLuaBullets(tInfo)
 				tr = hg.TraceHeldWeaponShot(vNewSrc, tr.Hit and tr.HitPos or vEnd, pAttacker, equipmentDamage, flForce, tr, {
 					Penetration = tInfo.Penetration,
 					Diameter = tInfo.Diameter,
+					Speed = tInfo.Speed,
 					DamageType = iAmmoDamageType,
 					Vel = vShotDir * (tInfo.Speed or 0),
 					AmmoType = tInfo.AmmoType,
@@ -1113,6 +1120,7 @@ function PLAYER:FireCSSBullets(tInfo)
 		local equipmentShot = {
 			Penetration = flPenetrationPower,
 			Diameter = tInfo.Diameter,
+			Speed = tInfo.Speed,
 			DamageType = iAmmoDamageType,
 			AmmoType = tInfo.AmmoType,
 		}

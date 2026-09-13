@@ -593,16 +593,26 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 						dmg:SetDamagePosition(trace.HitPos)
 						dmg:SetDamageForce(self.AmmoForce * dir * (speedmul * self.Force * self.ForceMul))
 						
+						local ballisticInflictor = IsValid(self.Inflictor) and self.Inflictor or self.Shooter
 						if(IsValid(self.Shooter))then
 							dmg:SetAttacker(self.Shooter)
-							dmg:SetInflictor(self.Shooter)
+							dmg:SetInflictor(IsValid(ballisticInflictor) and ballisticInflictor or self.Shooter)
 						else
 							dmg:SetAttacker(Entity(0))
 							dmg:SetInflictor(Entity(0))
 						end
 
 						if trace.HGEquipmentProcessed and hg.EquipmentImpact then hg.EquipmentImpact.ProcessedDamage[dmg] = {penetration = trace.HGEquipmentPenetration, armorHits = trace.HGArmorModelHits} end
+						self.ImpactSpeed = len_before / 52.5
+						self.ImpactPenetration = math.max(self.Penetration or 0, 0) * speedmul
+						self.KineticEnergy = math.max(self.Mass or 0, 0) / 2000 * self.ImpactSpeed * self.ImpactSpeed
+						local previousBullet = IsValid(ballisticInflictor) and ballisticInflictor.bullet or nil
+						if IsValid(ballisticInflictor) then ballisticInflictor.bullet = self end
+						hg.BallisticDamageInfo = hg.BallisticDamageInfo or {}
+						hg.BallisticDamageInfo[dmg] = self
 						trace.Entity:DispatchTraceAttack(dmg, trace, dir)
+						hg.BallisticDamageInfo[dmg] = nil
+						if IsValid(ballisticInflictor) and ballisticInflictor.bullet == self then ballisticInflictor.bullet = previousBullet end
 
 						if(trace.Entity.organism)then
 							if(HG_BulletImpactSounds)then
