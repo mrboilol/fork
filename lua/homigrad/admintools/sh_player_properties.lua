@@ -896,6 +896,11 @@ properties.Add( "amputate_limb", {
 		rlegup:SetChecked(ent.organism.rlegupamputated)
 		rlegup:SetIsCheckable(true)
 		rlegup.OnChecked = function(s, checked) if checked then self:AmputateLimb(ent, 10) end end
+
+		local torso = submenu:AddOption("Amputate Torso")
+		torso:SetRadio(true)
+		torso:SetIsCheckable(true)
+		torso.OnChecked = function(s, checked) if checked then self:AmputateLimb(ent, 11) end end
 	end,
 
 	AmputateLimb = function( self, ent, id )
@@ -918,6 +923,9 @@ properties.Add( "amputate_limb", {
 				target = IsValid(fake) and fake or (IsValid(death) and death or ent)
 			end
 			if not target.noHead then hg.ExplodeHead(target) end
+			return
+		elseif limb == 11 then
+			hg.AmputateTorso(ent, VectorRand(-250, 250), false)
 			return
 		end
 		withBodyDamageRagdoll(ent, function(owner, character, organism)

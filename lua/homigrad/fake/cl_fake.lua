@@ -102,9 +102,8 @@ local hg_newfakecam = ConVarExists("hg_newfakecam") and GetConVar("hg_newfakecam
 local rollang = 0
 local ctime
 local vecUpX, vecUpY, vecUpZ = Vector(1, 0, 0), Vector(0, 1, 0), Vector(0, 0, 1)
-hook.Add("HG.InputMouseApply", "fakeCameraAngles2", function(tbl)
+	hook.Add("HG.InputMouseApply", "fakeCameraAngles2", function(tbl)
 	if not IsValid(lply) then return end
-
 	if IsValid(follow) and ctime != CurTime() then
 		ctime = CurTime()
 
@@ -116,10 +115,13 @@ hook.Add("HG.InputMouseApply", "fakeCameraAngles2", function(tbl)
 	local y = tbl.y
 	local angle = tbl.angle
 
+	if not IsValid(lply) then return end
 	local wep = lply:GetActiveWeapon()
+	if not IsValid(wep) then wep = {} end
 	local organism = lply.organism or {}
 
-	local consmul = 1 - hg.CalculateConsciousnessMul()
+	local consmul = 0
+	if lply.organism then consmul = 1 - hg.CalculateConsciousnessMul() end
 
 	if (wep.weight or wep.visualweight) and ((wep.weight and wep.weight > 0 or wep.visualweight and wep.visualweight > 0) or organism.larmamputated or organism.larmupamputated or consmul > 0.3) then
 		ViewPunch3(Angle(-y / 50 / 16, x / 50 / 16, 0) * math.min(((wep.visualweight ~= nil and wep.visualweight > 0) and wep.visualweight) or wep.weight, 10) / 3 / (1 - consmul * 0.5) * ((organism.larmamputated or organism.larmupamputated) and 4 or 1) * ((organism.rarmamputated or organism.rarmupamputated) and 2 or 1))

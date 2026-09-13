@@ -58,15 +58,17 @@ function hg.GetCarryWeight(ply)
 
 	weight = math.max(weight - 1, 0)
 
-	local ammo = ply:GetAmmo()
-	for id, count in pairs(ammo) do
-		weight = weight + (game.GetAmmoForce(id) * count) / 1500
-	end
+	if not ply:GetNWBool("RealishNoLoadoutWeight", false) then
+		local ammo = ply:GetAmmo()
+		for id, count in pairs(ammo) do
+			weight = weight + (game.GetAmmoForce(id) * count) / 1500
+		end
 
-	ply.armors = ply:GetNetVar("Armor", {})
-	for plc, arm in pairs(ply.armors) do
-		if hg.armor[plc] and hg.armor[plc][arm] then
-			weight = weight + (hg.armor[plc][arm].mass or 1)
+		ply.armors = ply:GetNetVar("Armor", {})
+		for plc, arm in pairs(ply.armors) do
+			if hg.armor[plc] and hg.armor[plc][arm] then
+				weight = weight + (hg.armor[plc][arm].mass or 1)
+			end
 		end
 	end
 

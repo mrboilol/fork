@@ -12,6 +12,19 @@ if SERVER then
         end
         if not hg.CanSuicide(ply) then return end
         if ply.StartHeadcrabRemovalAttempt and ply:StartHeadcrabRemovalAttempt() then return end
+		if ply:GetNWFloat("rem_urges_end", 0) > CurTime() or ply.remUrgeEnd then return end
+		if not ply.suiciding and ply.organism and (ply.organism.depression or 0) < 0.5 then
+			if ply:GetInfoNum("hg_newthoughts", 0) > 0 and ply.Thought then
+				ply:Thought("You shouldnt do this.", 6, "depression_block_suicide", 0)
+			else
+				ply:Notify("I shouldnt do this", 6, "depression_block_suicide", 0)
+			end
+			return
+		end
+		if not ply.suiciding and hg.StartSuicideUrge then
+			hg.StartSuicideUrge(ply)
+			return
+		end
 
         local wep = ply:GetActiveWeapon()
         local has_gun = IsValid(wep) and wep.ishgweapon and not wep.ismelee and not wep.ismelee2 and wep:Clip1() > 0

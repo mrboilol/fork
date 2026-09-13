@@ -716,6 +716,13 @@ function hg.organism.AmputateLimb(org, limb, noShake, dmgInfo)
 	local amputatedKey = limb.."amputated"
 	if org[amputatedKey] == nil or org[amputatedKey] then return false end
 
+	local owner = org.owner
+	local ply = owner
+	if IsValid(ply) and not ply:IsPlayer() then
+		ply = (hg.RagdollOwner and hg.RagdollOwner(ply)) or (IsValid(ply.ply) and ply.ply) or ply:GetNWEntity("ply")
+	end
+	if org.torsoamputated or (IsValid(ply) and (ply.__hgTorsoPending or ply.__hgTorsoBlastQueued or ply:GetNWBool("hgTorsoSevered", false))) then return end
+
 	local bone = limbs[limb]
 	if !bone or !IsValid(org.owner) then return false end
 	local boneIdx = org.owner:LookupBone(bone)

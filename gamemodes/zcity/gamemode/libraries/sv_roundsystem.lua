@@ -18,11 +18,12 @@ local ZB_FORCED_TEMP_MODE_WEIGHTS = {
 }
 local ZB_FORCED_MODE_POOL = {
         ["hmcd"] = true,
-        ["standard"] = true,
+	["standard"] = true,
 	["suicidelunatic"] = true,
 	["active_shooter"] = true,
 	["dm"] = true,
 	["tdm"] = true,
+	["realish"] = true,
 	["riot"] = true,
 	["juggernaut"] = true,
 	["criresp"] = true,

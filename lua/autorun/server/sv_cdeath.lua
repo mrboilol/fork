@@ -22,7 +22,7 @@ CreateConVar(
     0, 60
 )
 
--- strings
+
 util.AddNetworkString("DeathEffect_Respawn")
 util.AddNetworkString("DeathEffect_UpdateCam")
 util.AddNetworkString("DeathEffect_EnterSpectator")
@@ -49,13 +49,64 @@ local function DeathEffectCanRespawn(ply)
 
     -- Preserve standalone compatibility if this death effect is ever loaded
     -- without ZCity's PLAYER:CanSpawn implementation.
-    return not DeathEffectRoundActive()
+	return not DeathEffectRoundActive()
+end
+
+local function DeathEffect_GetTimerName(ply)
+    if not IsValid(ply) then return nil end
+
+    local id = ply:SteamID64()
+    if id and id ~= "" then
+        return "DeathEffect_AutoUnblock_" .. id
+    end
+    return "DeathEffect_AutoUnblock_EI" .. ply:EntIndex()
+end
+
+local function DeathEffect_ClearBlock(ply, removeTimer)
+    if not IsValid(ply) then return end
+    ply:SetNWBool("DeathEffect_BlockRespawn", false)
+    ply.DeathEffect_DeathTime = nil
+    if removeTimer ~= false then
+        local tname = DeathEffect_GetTimerName(ply)
+        if tname then timer.Remove(tname) end
+    end
 end
 
 -- respawn block
 hook.Add("PlayerDeathThink", "DeathEffect_BlockRespawn", function(ply)
     if ply:GetNWBool("DeathEffect_BlockRespawn", false) then
+
+
+        local dt = ply.DeathEffect_DeathTime
+        if not dt then
+
+            ply.DeathEffect_DeathTime = CurTime() - 11
+            return false
+        end
+        if (CurTime() - dt) > 12 then
+            DeathEffect_ClearBlock(ply, true)
+            return
+        end
         return false
+    else
+
+        if ply.DeathEffect_DeathTime and ply:Alive() then
+            ply.DeathEffect_DeathTime = nil
+        end
+    end
+end)
+
+
+timer.Create("DeathEffect_StuckSweep", 5, 0, function()
+    for _, ply in ipairs(player.GetAll()) do
+        if IsValid(ply) and ply:GetNWBool("DeathEffect_BlockRespawn", false) and not ply:Alive() then
+            local dt = ply.DeathEffect_DeathTime
+            if not dt then
+                ply.DeathEffect_DeathTime = CurTime() - 11
+            elseif (CurTime() - dt) > 12 then
+                DeathEffect_ClearBlock(ply, true)
+            end
+        end
     end
 end)
 
@@ -77,46 +128,67 @@ hook.Add("PlayerDeath", "DeathEffect_OnDeath", function(ply)
         return
     end
 
-    ply:SetNWBool("DeathEffect_BlockRespawn", true)
+    local realish = CurrentRound and CurrentRound().name == "realish"
 
-    net.Start("DeathEffect_Config")
-        net.WriteBool(GetConVar("deatheffect_spectator"):GetBool())
-        net.WriteBool(GetConVar("deatheffect_compat"):GetBool())
-        net.WriteFloat(GetConVar("deatheffect_options_delay"):GetFloat())
-        net.WriteBool(DeathEffectCanRespawn(ply))
+    ply:SetNWBool("DeathEffect_BlockRespawn", true)
+    ply.DeathEffect_DeathTime = CurTime()
+
+
+
+
+    local failsafeDelay = realish and 3 or 12
+    local tname = DeathEffect_GetTimerName(ply)
+    if tname then
+        timer.Create(tname, failsafeDelay, 1, function()
+            if IsValid(ply) and ply:GetNWBool("DeathEffect_BlockRespawn", false) and not ply:Alive() then
+                DeathEffect_ClearBlock(ply, false)
+            end
+        end)
+    end
+
+	net.Start("DeathEffect_Config")
+		net.WriteBool(not realish and GetConVar("deatheffect_spectator"):GetBool())
+		net.WriteBool(GetConVar("deatheffect_compat"):GetBool())
+		net.WriteFloat(realish and 0 or GetConVar("deatheffect_options_delay"):GetFloat())
+		net.WriteBool(DeathEffectCanRespawn(ply))
     net.Send(ply)
 end)
 
 hook.Add("PlayerSpawn", "DeathEffect_OnSpawn", function(ply)
-    ply:SetNWBool("DeathEffect_BlockRespawn", false)
+    DeathEffect_ClearBlock(ply, true)
 end)
 
--- client triggers
+hook.Add("PlayerDisconnected", "DeathEffect_Cleanup", function(ply)
+    local tname = DeathEffect_GetTimerName(ply)
+    if tname then timer.Remove(tname) end
+end)
+
+
 net.Receive("DeathEffect_Respawn", function(len, ply)
-    if not IsValid(ply) or ply:Alive() or not DeathEffectCanRespawn(ply) then return end
+	if not IsValid(ply) or ply:Alive() or not DeathEffectCanRespawn(ply) then return end
 
-    ply:SetNWBool("DeathEffect_BlockRespawn", false)
-    ply:UnSpectate()
-    ply:Spawn()
+	DeathEffect_ClearBlock(ply, true)
+	ply:UnSpectate()
+	ply:Spawn()
 end)
 
--- allow respawning because compat mode is on
+
 net.Receive("DeathEffect_CompatUnblock", function(len, ply)
     if IsValid(ply) then
-        ply:SetNWBool("DeathEffect_BlockRespawn", false)
+        DeathEffect_ClearBlock(ply, true)
     end
 end)
 
 net.Receive("DeathEffect_EnterSpectator", function(len, ply)
     if IsValid(ply) and not ply:Alive() then
-        ply:SetNWBool("DeathEffect_BlockRespawn", false)
+        DeathEffect_ClearBlock(ply, true)
         ply.viewmode = 3
         ply:Spectate(OBS_MODE_ROAMING)
         ply:SetMoveType(MOVETYPE_NOCLIP)
     end
 end)
 
--- spectator cam sync
+
 net.Receive("DeathEffect_UpdateCam", function(len, ply)
     if IsValid(ply) and not ply:Alive() and ply:GetNWBool("DeathEffect_BlockRespawn", false) then
         local camPos = net.ReadVector()

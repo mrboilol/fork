@@ -30,17 +30,25 @@ if SERVER then
         if adrenaline > adrenalinePainaddPassiveMin then
             passiveDrain = math.min(org.painadd - add, timeValue * adrenalinePainaddPassiveRate * adrenaline)
         end
+        local isHero = IsValid(owner) and owner:IsPlayer() and owner.RealishIsHero
+        if isHero then
+            org.avgpain = 0
+            org.painadd = 0
+            org.pain = 0
+            org.shock = 0
+            return
+        end
         org.avgpain = math.min(org.avgpain + add, 150)
         org.painadd = math.max(org.painadd - add - passiveDrain, 0)
-        applyPain(org)
+		applyPain(org)
 
-        if org.avgpain > 0 then
-            local extraSub = timeValue * ( (org.painkiller or 0) * 2 + (org.analgesia or 0) * 4 ) * 2
+		if org.avgpain > 0 then
+			local extraSub = timeValue * ( (org.painkiller or 0) * 2 + (org.analgesia or 0) * 4 ) * 2
             if org.naloxone and org.naloxone > 0 then
                 extraSub = extraSub * math.max(0, 1 - org.naloxone * 0.5)
             end
             org.avgpain = math.max(org.avgpain - extraSub, 0)
-            applyPain(org)
-        end
-    end, HOOK_MONITOR_HIGH)
+			applyPain(org)
+		end
+	end, HOOK_MONITOR_HIGH)
 end

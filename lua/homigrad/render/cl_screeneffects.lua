@@ -314,6 +314,124 @@ chromaticMat = Material("effects/shaders/merc_chromaticaberration")
 blindMat = Material("effects/shaders/zb_blind")
 zombMat = grainMat -- Material("effects/shaders/zb_zomb")
 
+local depressionState = {
+	overlayPath = "casunknown-images/screen/depressionoverlay",
+	lerp = 0,
+	greyscaleLerp = 0,
+	motionLerp = 0,
+	vignetteLerp = 0,
+	audioLerp = 0,
+	greyTab = {
+		["$pp_colour_addr"] = 0,
+		["$pp_colour_addg"] = 0,
+		["$pp_colour_addb"] = 0,
+		["$pp_colour_brightness"] = 0,
+		["$pp_colour_contrast"] = 1,
+		["$pp_colour_colour"] = 1,
+		["$pp_colour_mulr"] = 0,
+		["$pp_colour_mulg"] = 0,
+		["$pp_colour_mulb"] = 0
+	}
+}
+local depressionStation
+local depressionStationLoading = false
+
+local function GetDepressionMaterial()
+	if depressionState.mat == false then return end
+	if not depressionState.mat then
+		depressionState.mat = CreateMaterial("remorseism_depression_composite_runtime", "screenspace_general", {
+			["$pixshader"] = "woundsystem_condition_ps20b",
+			["$basetexture"] = "_rt_FullFrameFB",
+			["$texture1"] = depressionState.overlayPath,
+			["$ignorez"] = 1,
+			["$vertexcolor"] = 1,
+			["$vertextransform"] = 1,
+			["$copyalpha"] = 1,
+			["$alpha_blend_color_overlay"] = 0,
+			["$alpha_blend"] = 1,
+			["$linearwrite"] = 1,
+			["$linearread_basetexture"] = 1,
+			["$linearread_texture1"] = 1
+		})
+	end
+	local mat = depressionState.mat
+	if not mat or mat:IsError() then depressionState.mat = false return end
+	if not depressionState.bound then
+		local source = Material(depressionState.overlayPath, "smooth")
+		local texture = source and not source:IsError() and source.GetTexture and source:GetTexture("$basetexture")
+		if texture then mat:SetTexture("$texture1", texture) end
+		depressionState.bound = true
+	end
+	return mat
+end
+
+local function UpdateDepressionAudio(depression, unconscious)
+	local target = not unconscious and depression >= 0.5 and math.Clamp(math.Remap(depression, 0.5, 1, 0, 1), 0, 1) or 0
+	depressionState.audioLerp = LerpFT(0.04, depressionState.audioLerp, target)
+	if target > 0.001 and not IsValid(depressionStation) and not depressionStationLoading then
+		depressionStationLoading = true
+		sound.PlayFile("sound/rem_despair.mp3", "noblock noplay", function(station)
+			depressionStationLoading = false
+			if not IsValid(station) then return end
+			station:SetVolume(depressionState.audioLerp)
+			station:Play()
+			station:EnableLooping(true)
+			depressionStation = station
+		end)
+	end
+	if IsValid(depressionStation) then
+		depressionStation:SetVolume(depressionState.audioLerp)
+		if target <= 0.001 and depressionState.audioLerp <= 0.01 then
+			depressionStation:Stop()
+			depressionStation = nil
+		end
+	end
+end
+
+local function DrawDepressionEffect(org)
+	local depression = math.Clamp(tonumber(org.depression) or 0, 0, 1)
+	depressionState.lerp = LerpFT(0.01, depressionState.lerp, depression)
+	local intensity = depressionState.lerp
+	if intensity > 0.00005 then
+		local mat = GetDepressionMaterial()
+		if mat then
+			local time = CurTime()
+			local wobbleX = math.sin(time * 0.9) * 0.042 + math.sin(time * 0.935) * 0.028
+			local wobbleY = math.cos(time * 0.72) * 0.042 + math.cos(time * 0.715) * 0.028
+			local pulse = math.sin(time * 1.4) * 0.5 + 0.5
+			depressionState.motionLerp = LerpFT(0.04, depressionState.motionLerp, intensity * (0.25 + pulse * 0.4))
+			depressionState.greyscaleLerp = LerpFT(0.012, depressionState.greyscaleLerp, math.Clamp(intensity * 1.18, 0, 1))
+			depressionState.vignetteLerp = LerpFT(0.01, depressionState.vignetteLerp, intensity * 11.67)
+			local pulseScale = (math.sin(time * math.pi / 0.93) * 0.5 + 0.5) * 1.1 * intensity
+
+			render.UpdateScreenEffectTexture()
+			mat:SetFloat("$c0_x", intensity)
+			mat:SetFloat("$c0_y", 0)
+			mat:SetFloat("$c0_z", time + wobbleX * 85 + depressionState.motionLerp * 14)
+			mat:SetFloat("$c0_w", 0)
+			mat:SetFloat("$c1_x", 1 + wobbleX * 3.2 + depressionState.motionLerp * 0.65 + pulseScale)
+			mat:SetFloat("$c1_y", 1 + wobbleY * 3.2 + depressionState.motionLerp * 0.65 + pulseScale)
+			mat:SetFloat("$c1_z", 0.82661 + depressionState.greyscaleLerp * 0.38)
+			render.SetMaterial(mat)
+			render.DrawScreenQuad()
+
+			render.UpdateScreenEffectTexture()
+			vignetteMat:SetFloat("$c2_x", time + 10000)
+			vignetteMat:SetFloat("$c0_z", depressionState.vignetteLerp)
+			vignetteMat:SetFloat("$c1_y", depressionState.vignetteLerp)
+			render.SetMaterial(vignetteMat)
+			render.DrawScreenQuad()
+
+			local tab = depressionState.greyTab
+			tab["$pp_colour_brightness"] = -depressionState.greyscaleLerp * 0.07
+			tab["$pp_colour_contrast"] = 1 - depressionState.greyscaleLerp * 0.16
+			tab["$pp_colour_colour"] = 1 - depressionState.greyscaleLerp * 0.98
+			DrawColorModify(tab)
+		end
+	end
+	UpdateDepressionAudio(depression, org.otrub)
+end
+
 local function HasBlindTrait()
 	return IsValid(lply) and lply:HasTrait("blind")
 end
@@ -325,7 +443,6 @@ local PanicStationVolume = 0
 local O2Lerp = 0
 local dyingAudioFade = 0
 local ischemicVignetteLerp = 0
-local lowOxygenVignetteLerp = 0
 local shockVignetteLerp = 0
 local consciousnessVignetteLerp = 0
 local otrubVisualLerp = 0
@@ -377,7 +494,6 @@ PanicAttackLerp = 0
 O2Lerp = 0
 dyingAudioFade = 0
 ischemicVignetteLerp = 0
-lowOxygenVignetteLerp = 0
 shockVignetteLerp = 0
 consciousnessVignetteLerp = 0
 otrubVisualLerp = 0
@@ -673,7 +789,6 @@ local function stopthings()
 	PanicAttackLerp = 0
 	PanicStationVolume = 0
 	O2Lerp = 0
-	lowOxygenVignetteLerp = 0
 	shockVignetteLerp = 0
 	consciousnessVignetteLerp = 0
 	otrubVisualLerp = 0
@@ -698,6 +813,16 @@ local function stopthings()
 	brainOccipitalLerp = 0
 	brainHemorrhageLerp = 0
 	CardioLerp = 0
+	depressionState.lerp = 0
+	depressionState.greyscaleLerp = 0
+	depressionState.motionLerp = 0
+	depressionState.vignetteLerp = 0
+	depressionState.audioLerp = 0
+	depressionStationLoading = false
+	if IsValid(depressionStation) then
+		depressionStation:Stop()
+		depressionStation = nil
+	end
 
 	lply.tinnitus = 0
 	nextPanicAttackShake = 0
@@ -976,9 +1101,6 @@ drawFinalVitalsVignettes = function()
 		render.DrawScreenQuad()
 	end
 
-	local oxygenMaximum = math.max(tonumber(org.o2 and org.o2.range) or 30, 1)
-	local oxygen = math.Clamp(tonumber(org.o2 and org.o2[1]) or oxygenMaximum, 0, oxygenMaximum)
-	local oxygenFraction = oxygen / oxygenMaximum
 	local blood = math.Clamp(tonumber(org.blood) or 5000, 0, 5000)
 	local activeBleed = math.Clamp((tonumber(org.bleed) or 0) / 10, 0, 1)
 	local internalBleed = math.Clamp((tonumber(org.internalBleed) or 0) / 5, 0, 1)
@@ -988,8 +1110,6 @@ drawFinalVitalsVignettes = function()
 		activeBleed * 0.42,
 		internalBleed * 0.34
 	)
-	local oxygenSeverity = math.Clamp((0.99 - oxygenFraction) / (0.99 - 0.1333333333), 0, 1) ^ 0.78
-	local severeOxygenTail = math.Clamp((0.3333333333 - oxygenFraction) / 0.3333333333, 0, 1)
 	local shock = tonumber(org.shock) or 0
 	local shockSeverity = math.Clamp((shock - 10) / 60, 0, 1)
 	local shockDarknessSeverity = math.Clamp((shock - 24) / 51, 0, 1)
@@ -1012,14 +1132,12 @@ drawFinalVitalsVignettes = function()
 		math.Clamp((tonumber(org.brainOccipital) or 0) * 0.7, 0, 1),
 		math.Clamp((tonumber(org.brainHemorrhage) or 0) * 0.8, 0, 1)
 	)
-	local severeHypoxia = math.Clamp((oxygenSeverity - 0.52) / 0.48, 0, 1)
 	local collapseSeverity = math.Clamp(math.max(
-		severeHypoxia * 0.58,
 		shockSeverity * 0.62,
 		shockDarknessSeverity * 0.72,
 		brainDamageSeverity * 0.92,
 		bloodLossSeverity * 0.76,
-		severeHypoxia * 0.36 + shockSeverity * 0.32,
+		shockSeverity * 0.32,
 		bloodLossSeverity * 0.5
 	), 0, 1)
 
@@ -1029,25 +1147,18 @@ drawFinalVitalsVignettes = function()
 	local shockVignetteProgress = math.Clamp((shock - shockDrainThreshold) / math.max(shockOtrubLevel - shockDrainThreshold, 1), 0, 1)
 	local shockConsciousnessProgress = math.Clamp((0.5 - consciousness) / (0.5 - OTRUB_CONSCIOUSNESS_THRESHOLD), 0, 1) ^ 2
 	local lowConsciousnessShockVignette = math.Clamp((0.64 - visualConsciousness) / (0.64 - OTRUB_CONSCIOUSNESS_THRESHOLD), 0, 1) ^ 1.35
-	local criticalOxygen = oxygenMaximum * 0.5
-	local awakeCriticalOxygen = 0
-	if not org.otrub and oxygen <= criticalOxygen then
-		awakeCriticalOxygen = 0.22 + math.Clamp((criticalOxygen - oxygen) / math.max(criticalOxygen, 1), 0, 1) * 0.78
-	end
-	local oxygenVignetteTarget = org.otrub and 0 or math.max(oxygenSeverity, awakeCriticalOxygen)
 	local shockVignetteTarget = math.max(
 		shockVignetteProgress ^ 1.8 * Lerp(shockConsciousnessProgress, 1.6, 5),
 		lowConsciousnessShockVignette * 3.8,
-		awakeCriticalOxygen * 3.2
+		0
 	)
 	local consciousnessVignetteTarget = consciousnessSeverity
-	lowOxygenVignetteLerp = LerpFT(0.025, lowOxygenVignetteLerp, oxygenVignetteTarget)
 	shockVignetteLerp = LerpFT(0.025, shockVignetteLerp, shockVignetteTarget)
 	consciousnessVignetteLerp = LerpFT(0.028, consciousnessVignetteLerp, consciousnessVignetteTarget)
 	otrubVisualLerp = LerpFT(org.otrub and 0.018 or 0.012, otrubVisualLerp, org.otrub and 1 or 0)
 	collapseVisualLerp = LerpFT(0.03, collapseVisualLerp, collapseSeverity)
 	local blink, wholeScreenBlink, blinkSeverity = updateCollapseBlink(
-		math.max(collapseVisualLerp * 0.78, severeHypoxia * 0.8),
+		collapseVisualLerp * 0.78,
 		math.Clamp((0.62 - consciousness) / 0.52, 0, 1),
 		brainDamageSeverity
 	)
@@ -1132,75 +1243,8 @@ drawFinalVitalsVignettes = function()
 		render.DrawScreenQuad()
 	end
 
-	local oxygenFlicker = 0
-	if lowOxygenVignetteLerp > 0.005 then
-		local oxygenTime = CurTime()
-		local oxygenGrain = math.Clamp(lowOxygenVignetteLerp, 0, 1) ^ 0.72
-		local oxygenFlutter = 0.5 + math.sin(oxygenTime * 16.7 + math.sin(oxygenTime * 1.31) * 2.6) * 0.5
-		local oxygenDropout = math.max(
-			math.max(math.sin(oxygenTime * 3.17 + math.sin(oxygenTime * 0.73) * 1.9), 0) ^ 14,
-			math.max(math.sin(oxygenTime * 1.83 + 2.4), 0) ^ 22
-		)
-		oxygenFlicker = lowOxygenVignetteLerp * (0.08 + oxygenFlutter * 0.18)
-			+ lowOxygenVignetteLerp ^ 1.15 * oxygenDropout * 0.74
-		local oxygenDistortion = math.Clamp(math.max(
-			oxygenGrain,
-			bloodLossSeverity ^ 0.75 * 0.92,
-			hypotensionSeverity * 0.82
-		), 0, 1)
-		local oxygenWarp = math.Clamp((oxygenDistortion - 0.04) / 0.96, 0, 1)
-		render.UpdateScreenEffectTexture()
-		vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
-		vignetteMat:SetFloat("$c0_z", math.min(0.06 + oxygenGrain * 0.86 + oxygenFlicker * 0.36, 0.98))
-		vignetteMat:SetFloat("$c1_y", math.min(0.14 + oxygenGrain * 2.18 + oxygenFlicker * 1.05, 3.15))
-		render.SetMaterial(vignetteMat)
-		render.DrawScreenQuad()
-
-		render.UpdateScreenEffectTexture()
-		heatMat:SetFloat("$c0_x", -oxygenTime * 0.035)
-		heatMat:SetFloat("$c0_y", 0.00055 + oxygenWarp * 0.0042 + oxygenFlicker * 0.0025)
-		heatMat:SetFloat("$c2_x", (math.sin(oxygenTime * 0.58) - 1.35) * (0.018 + oxygenWarp * 0.082))
-		render.SetMaterial(heatMat)
-		render.DrawScreenQuad()
-
-		render.UpdateScreenEffectTexture()
-		noiseMat:SetFloat("$c0_y", math.max(0.28, 0.9 - oxygenGrain * 0.48 - oxygenFlicker * 0.12))
-		noiseMat:SetFloat("$c0_z", 1)
-		noiseMat:SetFloat("$c1_x", math.min(0.05 + oxygenGrain * 1.85 + oxygenFlicker * 0.62, 2.4))
-		noiseMat:SetFloat("$c1_y", math.min(0.1 + oxygenGrain * 3.05 + oxygenFlicker * 1.5, 4.15))
-		noiseMat:SetFloat("$c2_x", CurTime() + 10000)
-		render.SetMaterial(noiseMat)
-		render.DrawScreenQuad()
-
-		render.UpdateScreenEffectTexture()
-		grainMat:SetFloat("$c0_x", oxygenTime)
-		grainMat:SetFloat("$c0_y", 0.46)
-		grainMat:SetFloat("$c0_z", oxygenGrain * 0.84 + oxygenFlicker * 0.38)
-		grainMat:SetFloat("$c1_x", oxygenGrain * 0.92 + oxygenFlicker * 0.44)
-		grainMat:SetFloat("$c1_y", oxygenGrain * 2.12 + oxygenFlicker * 0.82)
-		grainMat:SetFloat("$c1_z", oxygenGrain * 0.43)
-		grainMat:SetFloat("$c2_x", 0)
-		grainMat:SetFloat("$c2_y", 0)
-		grainMat:SetFloat("$c2_z", 0)
-		grainMat:SetFloat("$c3_x", 0)
-		render.SetMaterial(grainMat)
-		render.DrawScreenQuad()
-
-		render.UpdateScreenEffectTexture()
-		chromaticMat:SetFloat("$c0_x", math.min(oxygenDistortion * (0.05 + oxygenDistortion * 0.25) + oxygenFlicker * 0.22, 0.5))
-		chromaticMat:SetInt("$c0_y", 1)
-		render.SetMaterial(chromaticMat)
-		render.DrawScreenQuad()
-
-		if not HasBlindTrait() and oxygenWarp > 0.08 and motionBlurCause > 0.06 then
-			DrawMotionBlur(0.004 + motionBlurCause * 0.016, (0.018 + oxygenWarp * 0.1 + oxygenFlicker * 0.045) * motionBlurCause, 0.018)
-		end
-	end
-
 	local grayscale = math.Clamp(
 		bloodLossSeverity * 0.62
-		+ oxygenSeverity * 0.2
-		+ awakeCriticalOxygen * 0.38
 		+ shockSeverity * 0.2
 		+ consciousnessSeverity * 0.34
 		+ otrubVisualLerp * 0.18,
@@ -1208,12 +1252,12 @@ drawFinalVitalsVignettes = function()
 		0.82
 	)
 	if grayscale > 0.005 or blink > 0.005 then
-		local oxygenWash = oxygenSeverity ^ 0.78
+		local oxygenWash = 0
 		collapseColor["$pp_colour_addr"] = oxygenWash * 0.009
 		collapseColor["$pp_colour_addg"] = oxygenWash * 0.01
 		collapseColor["$pp_colour_addb"] = oxygenWash * 0.012
-		collapseColor["$pp_colour_brightness"] = oxygenWash * 0.025 - severeOxygenTail * 0.045 - collapseVisualLerp * 0.07 - lowConsciousnessDarkness * 0.28 - shockDarknessSeverity * 0.08 - otrubVisualLerp * 0.08 - blink * 0.05 - oxygenFlicker * 0.045
-		collapseColor["$pp_colour_contrast"] = 1 - oxygenWash * 0.08 - collapseVisualLerp * 0.11 - lowConsciousnessDarkness * 0.18 - otrubVisualLerp * 0.08 - blink * 0.05 - oxygenFlicker * 0.035
+		collapseColor["$pp_colour_brightness"] = -collapseVisualLerp * 0.07 - lowConsciousnessDarkness * 0.28 - shockDarknessSeverity * 0.08 - otrubVisualLerp * 0.08 - blink * 0.05
+		collapseColor["$pp_colour_contrast"] = 1 - collapseVisualLerp * 0.11 - lowConsciousnessDarkness * 0.18 - otrubVisualLerp * 0.08 - blink * 0.05
 		collapseColor["$pp_colour_colour"] = 1 - grayscale
 		DrawColorModify(collapseColor)
 	end
@@ -2105,7 +2149,21 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		show_some_images_time = 0
 		lobotomy_index = 0
 	end
-	
+
+	DrawDepressionEffect(org)
+
+	if O2Lerp > 1 then
+		render.UpdateScreenEffectTexture()
+		local remO2 = O2Lerp
+		noiseMat:SetFloat("$c0_y", 1 - remO2 / 200)
+		noiseMat:SetFloat("$c0_z", 1)
+		noiseMat:SetFloat("$c1_x", math.Clamp(remO2 / 200, 0, 2))
+		noiseMat:SetFloat("$c1_y", remO2 * (!org.otrub and 0.05 or 1))
+		noiseMat:SetFloat("$c2_x", CurTime() + 10000)
+		render.SetMaterial(noiseMat)
+		render.DrawScreenQuad()
+	end
+
 	local terminalDyingVolume = 0
 	if O2Lerp > 1 or incapacitated then
 		o2 = O2Lerp

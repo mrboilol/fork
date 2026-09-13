@@ -505,6 +505,10 @@ local math_abs, math_Approach, math_AngleDifference, math_Clamp, math_cos, math_
 			k = k * 0.25
 		end
 
+		if ply:GetNWBool("selfharming", false) then
+			k = k * 0.3
+		end
+
 		local ent = validCarryEnt and carryent or validCarryEnt2 and carryent2
 
 		if SERVER and inertia_len > 5 and (ply.hg_isSprinting or ply.hg_isJogging) then

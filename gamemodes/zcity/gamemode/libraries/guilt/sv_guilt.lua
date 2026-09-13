@@ -4,6 +4,7 @@ zb = zb or {}
 zb.GuiltTable = zb.GuiltTable or {}
 zb.HarmDone = zb.HarmDone or {}
 zb.HarmDoneKarma = zb.HarmDoneKarma or {}
+zb.HarmReturnedKarma = zb.HarmReturnedKarma or {}
 zb.HarmDoneDetailed = zb.HarmDoneDetailed or {}
 zb.HarmAttacked = zb.HarmAttacked or {}
 zb.GuiltSQL = zb.GuiltSQL or {}
@@ -257,11 +258,23 @@ hook.Add("HomigradDamage", "GuiltReg", function(ply, dmgInfo, hitgroup, ent, har
         add = add * (mul or 1)
     end
     
-    local guiltadd = amt * 60
-    Attacker.Guilt = (Attacker.Guilt or 0) + guiltadd
-    local karmaLoss = add
-    SetKarma(Attacker, (Attacker.Karma or 100) - karmaLoss)
-    AddRoundKarmaLoss(Attacker, karmaLoss)
+	local guiltadd = amt * 60
+	local isShove = dmgInfo.GetDamageCustom and dmgInfo:GetDamageCustom() == 1
+	local maxLoss = zb.IsForce(Attacker) and 50 or 30
+    local karmaDone = zb.HarmDoneKarma[Victim][Attacker]
+    zb.HarmReturnedKarma[Attacker] = zb.HarmReturnedKarma[Attacker] or {}
+    local karmaReturn = 0
+    if not isShove then
+        karmaReturn = math.max(((zb.HarmDoneKarma[Attacker] and zb.HarmDoneKarma[Attacker][Victim] or 0) * 0.5) - (zb.HarmReturnedKarma[Attacker][Victim] or 0), 0)
+        zb.HarmReturnedKarma[Attacker][Victim] = (zb.HarmReturnedKarma[Attacker][Victim] or 0) + karmaReturn
+	end
+	add = math.Clamp(add, 0, math.max(maxLoss - karmaDone, 0))
+	if isShove then add = 0 end
+
+	Attacker.Guilt = (Attacker.Guilt or 0) + guiltadd
+	local karmaLoss = add
+	SetKarma(Attacker, (Attacker.Karma or 100) - karmaLoss + karmaReturn)
+	AddRoundKarmaLoss(Attacker, karmaLoss)
 
     zb.HarmDoneKarma[Victim][Attacker] = zb.HarmDoneKarma[Victim][Attacker] + karmaLoss
 
@@ -269,7 +282,7 @@ hook.Add("HomigradDamage", "GuiltReg", function(ply, dmgInfo, hitgroup, ent, har
         SetKarma(Victim, (Victim.Karma or 100) + karmaLoss)
     end
 
-    if shouldBanGuilt and Attacker.Guilt >= 100 and not Attacker.KarmaTeamDamageBanned then
+	if shouldBanGuilt and Attacker.Guilt >= 100 and not Attacker.KarmaTeamDamageBanned then
 		Attacker.KarmaTeamDamageBanned = true
 		local banTime = zb.KarmaTeamDamageBanTime
 		-- if ULib then
@@ -279,11 +292,11 @@ hook.Add("HomigradDamage", "GuiltReg", function(ply, dmgInfo, hitgroup, ent, har
 		-- end
 
         PrintMessage(HUD_PRINTTALK, "Player "..Attacker:Name().." has been banned for "..banTime.." minutes for RDMing in a team based gamemode.")
-    end
+	end
     
     zb.GuiltTable[Attacker][Victim] = math.Clamp((zb.GuiltTable[Attacker][Victim] or 0) + guiltadd, 0, 200)
 
-    if Attacker.Karma <= 0 then
+    if not isShove and Attacker.Karma <= 0 then
         local steamID = Attacker:SteamID()
         local name = Attacker:Name()
         local karma = Attacker.Karma
@@ -433,8 +446,9 @@ hook.Add("ZB_StartRound","NO_HARM",function()
         //ply:guilt_SetValue( ply.Karma or 100 )
     end
     
-    zb.HarmDone = {}
-    zb.HarmDoneKarma = {}
+	zb.HarmDone = {}
+	zb.HarmDoneKarma = {}
+	zb.HarmReturnedKarma = {}
 end)
 
 util.AddNetworkString("get_karma")
