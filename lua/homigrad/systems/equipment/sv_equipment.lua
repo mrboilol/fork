@@ -327,6 +327,56 @@ function hg.DestroyArmor(ent, equipment, pos)
 	return true
 end
 
+local function ApplyHelmetKnockoffTrauma(owner, dmgInfo, ballistic, rawDamage)
+	if not IsValid(owner) then return end
+
+	local target
+	if owner:IsPlayer() then
+		target = owner
+	elseif hg.RagdollOwner then
+		target = hg.RagdollOwner(owner)
+	end
+	local org = owner.organism
+	if IsValid(target) then org = target.organism or org end
+	if not org or org.godmode or org.alive == false then return end
+
+	local damage = math.max(tonumber(rawDamage) or 0, dmgInfo and dmgInfo:GetDamage() or 0)
+	local force = dmgInfo and dmgInfo:GetDamageForce()
+	local impactSeverity = math.Clamp(damage / 35, 0, 1.25)
+	if isvector(force) then
+		impactSeverity = math.max(impactSeverity, math.Clamp(force:Length() / 3200, 0, 1.1))
+	end
+
+	local isBullet = dmgInfo and dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
+	local bullet = ballistic and ballistic.bullet or ballistic
+	local inflictor = dmgInfo and dmgInfo:GetInflictor()
+	if not bullet and IsValid(inflictor) then bullet = inflictor.bullet end
+	if isBullet then
+		local energy = math.max(
+			tonumber(ballistic and ballistic.energyBefore) or 0,
+			tonumber(ballistic and ballistic.KineticEnergy) or 0,
+			tonumber(bullet and bullet.KineticEnergy) or 0
+		)
+		if energy > 0 then
+			impactSeverity = math.max(impactSeverity, math.Clamp(math.sqrt(energy / 2000) * 0.85, 0, 1.35))
+		end
+	end
+	impactSeverity = math.Clamp(impactSeverity, 0, 1.35)
+
+	if IsValid(target) and target:IsPlayer() and target:Alive() and target.ViewPunch then
+		local punchScale = math.Clamp(0.95 + impactSeverity * 0.18, 0.95, 1.2)
+		target:ViewPunch(Angle(math.Rand(-8.5, -5.5), math.Rand(-5.5, 5.5), math.Rand(-2.5, 2.5)) * punchScale)
+	end
+
+	org.disorientation = math.min((org.disorientation or 0) + math.Clamp(0.18 + impactSeverity * 0.12, 0.18, 0.38), 1.5)
+	if isBullet and hg.organism and hg.organism.module and hg.organism.module.concussion and hg.organism.module.concussion.AddConcussion then
+		local concussion = math.Clamp(0.12 + impactSeverity * 0.65, 0.12, 1.2)
+		hg.organism.module.concussion.AddConcussion(org, concussion, math.Clamp(5 + concussion * 12, 5, 25))
+	end
+
+	if IsValid(org.owner) then org.owner.fullsend = true end
+end
+
 function hg.BreakArmor(ent, equipment, pos, dmgInfo)
 	if not IsValid(ent) then return false end
 	if IsArmorBreakProtected(ent) then return false end
@@ -335,6 +385,7 @@ function hg.BreakArmor(ent, equipment, pos, dmgInfo)
 	if ent.armors_broken and ent.armors_broken[equipment] then
 		local brokenMul = ent.armors_broken_mul and ent.armors_broken_mul[equipment] or getBrokenArmorProtectionMul()
 		local equipmentEnt = hg.DropArmorForce(ent, equipment, pos, nil, getArmorDropVelocity(dmgInfo, ent), brokenMul)
+		if placement == "head" then ApplyHelmetKnockoffTrauma(ent, dmgInfo, nil, dmgInfo and dmgInfo:GetDamage()) end
 		if not IsValid(equipmentEnt) then return hg.DestroyArmor(ent, equipment, pos) end
 		hg.SetArmorUnusableEntity(equipmentEnt)
 		hg.EmitArmorDestroyEffects(equipmentEnt)
@@ -355,9 +406,10 @@ function hg.BreakArmor(ent, equipment, pos, dmgInfo)
 
 	if placement == "head" or placement == "face" then
 		sound.Play("physics/glass/glass_sheet_break1.wav", isvector(pos) and pos or ent:GetPos(), 120, 100)
-		if ent:IsPlayer() and ent:Alive() then
-			ent:ViewPunch(AngleRand(-6, 6))
-			ent:AddTinnitus(0.5, true)
+		local target = ent:IsPlayer() and ent or hg.RagdollOwner and hg.RagdollOwner(ent)
+		if IsValid(target) and target:IsPlayer() and target:Alive() then
+			if placement == "face" then target:ViewPunch(AngleRand(-6, 6)) end
+			target:AddTinnitus(0.5, true)
 		end
 	end
 
@@ -370,6 +422,7 @@ function hg.BreakArmor(ent, equipment, pos, dmgInfo)
 		ent.armors_broken_mul[equipment] = nil
 	end
 
+	if placement == "head" then ApplyHelmetKnockoffTrauma(ent, dmgInfo, nil, dmgInfo and dmgInfo:GetDamage()) end
 	if not IsValid(equipmentEnt) then return true end
 
 	hg.SetArmorBrokenEntity(equipmentEnt)
@@ -869,6 +922,7 @@ function hg.TryKnockOffHelmet(owner, placement, armor, armorData, dmgInfo, hitPo
 	local dropped = hg.DropArmorForce(owner, armor, hitPos, nil, inherited + launchDir * speed + vector_up * math.Clamp(45 + caliberSpeed * 0.2, 45, 100))
 	if not IsValid(dropped) then return false end
 
+	ApplyHelmetKnockoffTrauma(owner, dmgInfo, ballistic, rawDamage)
 	sound.Play("physics/metal/metal_solid_impact_hard" .. math.random(1, 5) .. ".wav", hitPos or dropped:GetPos(), 80, math.random(92, 108), 0.9)
 	return true
 end

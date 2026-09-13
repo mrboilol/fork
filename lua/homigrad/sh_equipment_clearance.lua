@@ -13,11 +13,23 @@ local function GetEquipmentModelBounds(ent, model)
         candidates[#candidates + 1] = ent
     end
 
+    local fallbackCandidate
     for _, candidate in ipairs(candidates) do
         if not isfunction(candidate.GetModelBounds) then continue end
         local candidateModel = candidate.GetModel and candidate:GetModel() or nil
-        if candidateModel and candidateModel ~= "" and candidateModel ~= model then continue end
-        local ok, mins, maxs = pcall(candidate.GetModelBounds, candidate)
+        if candidateModel and candidateModel ~= "" and candidateModel ~= model then
+            fallbackCandidate = fallbackCandidate or candidate
+        else
+            local ok, mins, maxs = pcall(candidate.GetModelBounds, candidate)
+            if ok and isvector(mins) and isvector(maxs) then
+                modelBoundsCache[model] = {mins, maxs}
+                return mins, maxs
+            end
+        end
+    end
+
+    if IsValid(fallbackCandidate) then
+        local ok, mins, maxs = pcall(fallbackCandidate.GetModelBounds, fallbackCandidate)
         if ok and isvector(mins) and isvector(maxs) then
             modelBoundsCache[model] = {mins, maxs}
             return mins, maxs

@@ -151,7 +151,7 @@ function APmodule.TraceAccessoryShot(ent, startPos, endPos, seen, hits, padding)
 		if !IsDroppableAccessory(accessory) or seen[key] then continue end
 		local pos, ang, scale = GetAccessoryTransform(ent, accessory)
 		if !pos then continue end
-		local hit = hg.TraceEquipmentModel(accessory[ThatPlyIsFemale(ent) and "femmodel"] or accessory.model, pos, ang, scale, startPos, endPos, padding)
+		local hit = hg.TraceEquipmentModel(accessory[ThatPlyIsFemale(ent) and "femmodel"] or accessory.model, pos, ang, scale, startPos, endPos, padding, true)
 		if !hit then continue end
 		hit.id, hit.index, hit.data, hit.body, hit.key = accessoryID, index, accessory, ent, key
 		hits[#hits + 1] = hit
