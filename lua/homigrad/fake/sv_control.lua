@@ -1162,7 +1162,8 @@ hook.Add("Think", "Fake", function()
 		
 		if not wep.RagdollFunc then
 			local force = hg.GetArmEffectiveness and hg.GetArmEffectiveness(ply, "larm") or math.max(1 - org.larm / 1.3, 0)
-			if not fallCoverActive and not manualHoldWound and (!IsValid(ragdoll.ConsLH) and (ply:KeyDown(IN_ATTACK) and !ishgweapon(wep)) or (((ishgweapon(wep) and (!wep:IsResting() or ply:KeyDown(IN_FORWARD) or ply:KeyDown(IN_BACK))) or wep.ismelee2) and (ply:KeyDown(IN_USE) or ply:KeyDown(IN_ATTACK2)))) then// || ply:InVehicle() then
+			local meleeHandControl = wep.ismelee2 and (ply:KeyDown(IN_ATTACK) or ply:KeyDown(IN_ATTACK2) or ply:KeyDown(IN_USE))
+			if not fallCoverActive and not manualHoldWound and (!IsValid(ragdoll.ConsLH) and (ply:KeyDown(IN_ATTACK) and !ishgweapon(wep)) or (((ishgweapon(wep) and (!wep:IsResting() or ply:KeyDown(IN_FORWARD) or ply:KeyDown(IN_BACK))) and (ply:KeyDown(IN_USE) or ply:KeyDown(IN_ATTACK2))) or meleeHandControl)) then// || ply:InVehicle() then
 				if org.canmove then
 					//if !ply:InVehicle() then
 						ang2:Set(angles)
@@ -1277,7 +1278,7 @@ hook.Add("Think", "Fake", function()
 
 			local force = hg.GetArmEffectiveness and hg.GetArmEffectiveness(ply, "rarm") or math.max(1 - org.rarm / 1.3, 0)
 
-			if not fallCoverActive and (!IsValid(ragdoll.ConsRH) and ply:KeyDown(IN_ATTACK2) or ((ishgweapon(wep) or wep.ismelee2) and ply:KeyDown(IN_USE))) then// || ply:InVehicle() then
+			if not fallCoverActive and (!IsValid(ragdoll.ConsRH) and ply:KeyDown(IN_ATTACK2) or (ishgweapon(wep) and ply:KeyDown(IN_USE)) or meleeHandControl) then// || ply:InVehicle() then
 				if org.canmove then
 					--if org.shock > 1 and not ply:KeyDown(IN_ATTACK2) then angles = spine:GetAngles() end
 					//if !ply:InVehicle() then

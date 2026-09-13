@@ -737,16 +737,25 @@ if SERVER then
         [HITGROUP_RIGHTLEG] = true,
         [HITGROUP_LEFTLEG]  = true
     }
-    hook.Add("HomigradDamage","Combine_painsounds",function(ply, dmgInfo, hitgroup, ent)
-        --[[if ply.PlayerClassName == "Combine" then
-            ply.painCD = ply.painCD or 0
-            if hitgroups_sounds[hitgroup] and ply.painCD < CurTime() and ply.organism and not ply.organism.otrub and ply:Alive() then
-                local snd = "npc/combine_soldier/pain" .. math.random(1,3) .. ".wav"
-                ent:EmitSound(snd,80,ply.VoicePitch)
-                ply.painCD = CurTime() + SoundDuration(snd)
-                ply.lastPhr = snd
-            end
-        end--]]
+    function hg.PlayCombinePain(ply, hitgroup, ent)
+        if not IsValid(ply) or ply.PlayerClassName ~= "Combine" then return false end
+        if not ply:Alive() or not ply.organism or ply.organism.otrub then return false end
+        if hitgroup and not hitgroups_sounds[hitgroup] then return false end
+        if (ply.painCD or 0) > CurTime() then return false end
+
+        local character = IsValid(ent) and ent or hg.GetCurrentCharacter(ply)
+        if not IsValid(character) then return false end
+
+        local snd = "npc/combine_soldier/pain" .. math.random(1, 3) .. ".wav"
+        character:EmitSound(snd, 80, ply.VoicePitch or 100)
+        ply.painCD = CurTime() + math.max(SoundDuration(snd) or 0, 0.4)
+        ply.lastPhr = snd
+
+        return true
+    end
+
+    hook.Add("HomigradDamage", "Combine_painsounds", function(ply, dmgInfo, hitgroup, ent)
+        hg.PlayCombinePain(ply, hitgroup, ent)
     end)
 
     hook.Add("HGReloading","Combine_reloadalert",function(wep)

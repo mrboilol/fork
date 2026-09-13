@@ -506,7 +506,7 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 				
 					if(penetration_pos)then
 						self.Pos = penetration_pos
-						len_before = PLUGIN.CalcVelocityLostInMaterial(material, self.PenetratingStartPos:DistToSqr(penetration_pos), len_before)
+						len_before = PLUGIN.CalcVelocityLostInMaterial(self.PenetratingMaterial, self.PenetratingStartPos:DistToSqr(penetration_pos), len_before)
 						len = math.min(len, len_before)
 						
 						if(SERVER)then
@@ -637,9 +637,9 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 					effectdata:SetOrigin(trace.HitPos)
 					effectdata:SetEntity(trace.Entity)
 					effectdata:SetStart(trace.StartPos)
-					effectdata:SetSurfaceProp(trace.SurfaceProps)
+					effectdata:SetSurfaceProp(trace.SurfaceProps or 0)
 					effectdata:SetDamageType(DMG_BULLET)
-					effectdata:SetHitBox(trace.HitBox)
+					effectdata:SetHitBox(trace.HitBox or 0)
 
 					local replacedSound = HG_BulletImpactSounds and HG_BulletImpactSounds.PlayMaterialImpact(trace)
 					if(replacedSound)then
@@ -873,10 +873,12 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 			shooter:LagCompensation(true)
 		end
 
-		bullet:Think()
-
 		if(lag_compensate)then
+			local ok, err = xpcall(function() bullet:Think() end, debug.traceback)
 			shooter:LagCompensation(false)
+			if not ok then error(err, 0) end
+		else
+			bullet:Think()
 		end
 	end
 

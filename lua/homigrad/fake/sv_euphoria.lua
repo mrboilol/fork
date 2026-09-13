@@ -39,10 +39,11 @@ local EUPHORIA_CURL_TRIGGER = 2
 local EUPHORIA_CURL_MIN_DAMAGE = 8
 local EUPHORIA_CURL_EASE = 0.3
 
-local EUPHORIA_MAX_HORIZONTAL_VELOCITY = 400
-local EUPHORIA_MAX_UPWARD_VELOCITY = 220
-local EUPHORIA_MAX_RELATIVE_VELOCITY = 500
-local EUPHORIA_MAX_ANGULAR = 900
+local EUPHORIA_MAX_HORIZONTAL_VELOCITY = 300
+local EUPHORIA_MAX_UPWARD_VELOCITY = 160
+local EUPHORIA_MAX_RELATIVE_VELOCITY = 250
+local EUPHORIA_MAX_ANGULAR = 360
+local EUPHORIA_MAX_REACTION_IMPULSE = 65
 local EUPHORIA_MAX_TIMESTEP = 0.05
 
 local function clampVec(vec, max)
@@ -117,7 +118,7 @@ local function springPull(phys, target, stiffness, damping, dtime)
 	local vel = phys:GetVelocity()
 	local toTarget = target - pos
 	local force = toTarget * stiffness - vel * damping
-	phys:AddVelocity(force * dtime)
+	phys:AddVelocity(clampVec(force * dtime, EUPHORIA_MAX_REACTION_IMPULSE))
 end
 
 local function tensionBones(ragdoll, strength, dtime, allowLinear)

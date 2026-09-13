@@ -715,6 +715,46 @@ SWEP.SuicideTime = 0.5
 
 SWEP.CanSuicide = false -- for weapon_melee its configured in Initialize
 
+function SWEP:GetEquipmentImpactModel()
+    if not SERVER or not self:InUse() then return end
+    local model = self.HGEquipmentModel
+    if not IsValid(model) then
+        model = ents.Create("base_anim")
+        if not IsValid(model) then return end
+        model:SetModel(self.WorldModelReal or self.WorldModel)
+        model:Spawn()
+        model:SetNoDraw(true)
+        model:SetSolid(SOLID_NONE)
+        model:SetMoveType(MOVETYPE_NONE)
+        self:DeleteOnRemove(model)
+        self.HGEquipmentModel = model
+    end
+    local modelName = self.GetWorldModelReal and self:GetWorldModelReal() or self.WorldModelReal or self.WorldModel
+    if model:GetModel() ~= modelName then model:SetModel(modelName) end
+    model:SetModelScale(self.modelscale2 or 1, 0)
+    local animation = self.HGEquipmentAnimation
+    if animation then
+        model:SetSequence(animation.sequence)
+        local timing = (CurTime() - animation.start) / animation.duration
+        timing = animation.cycling and timing % 1 or math.Clamp(timing, 0, 1)
+        if animation.reverse then timing = 1 - timing end
+        model:SetCycle(timing)
+    end
+    local pos, ang = self:ModelAnim(model)
+    if not isvector(pos) or not isangle(ang) then return end
+    model:SetPos(pos)
+    model:SetAngles(ang)
+    if model.SetupBones then model:SetupBones() end
+    local exchange = self.WorldModelExchange
+    if exchange and not (self.ShouldDrawWorldModelReal and self:ShouldDrawWorldModelReal()) then
+        local matrix = model:GetBoneMatrix(self.basebone or 1)
+        pos, ang = LocalToWorld(self.weaponPos or vector_origin, self.weaponAng or angle_zero, matrix and matrix:GetTranslation() or pos, matrix and matrix:GetAngles() or ang)
+        if hg.ResolveEquipmentClearance then pos = hg.ResolveEquipmentClearance(self, self:GetOwner(), exchange, pos, ang, self.modelscale) end
+        return exchange, pos, ang, self.modelscale or 1
+    end
+    return modelName, pos, ang, self.modelscale2 or 1, model
+end
+
 function SWEP:ModelAnim(model, pos, ang)
     local owner = self:GetOwner()
 
@@ -2391,6 +2431,8 @@ function SWEP:StopAttackOnArmorImpact(trace, attacktype)
     local other = trace.HGEquipmentWeapon
     if SERVER and IsValid(other) and IsValid(other:GetOwner()) and other.CanClashWeapon and other:CanClashWeapon() and self:CanClashWeapon() and other:GetInAttack() then
         self:HandleMeleeClash(other, trace.HitPos, trace.HitNormal, attacktype, other:GetAttackType())
+    elseif SERVER then
+        self:PlayBlockImpactEffect(trace, other or trace.HGEquipmentHeldEntity, "block")
     end
     self:SendMeleeHitStop(attacktype, trace.HitNormal)
     self:AbortBlockedAttack()
@@ -4487,6 +4529,7 @@ end
 
 function SWEP:PlayAnim(anim, time, cycling, callback, reverse, sendtoclient)
     if SERVER then
+        self.HGEquipmentAnimation = {sequence = self.AnimList[anim] or anim, start = CurTime(), duration = math.max(time or 0, 0.001), cycling = cycling, reverse = reverse}
         sendtoclient = sendtoclient or false
         net.Start("melee_attack")
             local netTbl = {

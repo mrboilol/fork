@@ -428,6 +428,7 @@ local silentCombatClasses = {
 
 local function canPainScream(ply)
 	if !IsValid(ply) or !ply:IsPlayer() or !ply:Alive() then return false end
+	if ply.PlayerClassName == "Combine" or ply.PlayerClassName == "Gordon" then return false end
 	if silentCombatClasses[ply.PlayerClassName] then return false end
 
 	local org = ply.organism
@@ -617,8 +618,18 @@ end)
 
 hook.Add("PreHomigradDamage","BurnScream", function( ent, dmgInfo )
 	local ply = ent:IsRagdoll() and hg.RagdollOwner(ent) or ent
+	if not IsValid(ply) or not ply:IsPlayer() then return end
 
-		if dmgInfo:IsDamageType(DMG_BURN) and IsValid(ply) and ply:IsPlayer() 
+	if ply.PlayerClassName == "Gordon" then return end
+
+	if ply.PlayerClassName == "Combine" then
+		if dmgInfo:IsDamageType(DMG_BURN) and hg.PlayCombinePain then
+			hg.PlayCombinePain(ply, nil, hg.GetCurrentCharacter(ply))
+		end
+		return
+	end
+
+		if dmgInfo:IsDamageType(DMG_BURN)
 	and ply.organism and !ply.organism.otrub and (ply.organism.cotard or 0) <= 0 and ply:Alive() then
 		local phrase = hg.UniversalScreamSounds[mRandom(#hg.UniversalScreamSounds)]
 
