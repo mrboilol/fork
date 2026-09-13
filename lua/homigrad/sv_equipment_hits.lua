@@ -474,7 +474,6 @@ function hg.GetHeldWeaponImpactModel(ply, wep)
         end
         return modelName, transformedPos or model:GetPos(), transformedAng or model:GetAngles(), modelScale
     end
-    if wep.NoDrop and not wep.WorldModelExchange and (not wep.WorldModel or wep.WorldModel == "") then return end
     local body = hg.GetCurrentCharacter(ply)
     if not IsValid(body) then return end
     SetupEntityBones(body)
@@ -722,6 +721,7 @@ function hg.TraceOrganismArms(body, startPos, endPos)
     local owner = hg.RagdollOwner and hg.RagdollOwner(body)
     local org = body.organism or IsValid(owner) and owner.organism or {}
     local set = body.GetHitboxSet and body:GetHitboxSet() or 0
+    local armHitboxBones = {}
     local function IsArmBone(name)
         name = string.lower(tostring(name or ""))
         local side = name:find("_l_", 1, true) and "l" or name:find("_r_", 1, true) and "r"
@@ -766,6 +766,7 @@ function hg.TraceOrganismArms(body, startPos, endPos)
             if not hitSide or IsAmputated(hitSide, isHand, isForearm, isUpper, isClavicle) then continue end
             local mins, maxs = body:GetHitBoxBounds(index, set)
             if mins and maxs then
+                armHitboxBones[bone] = true
                 AddArmTrace(index, bone, mins, maxs, hitSide, false)
             end
         end
@@ -774,7 +775,7 @@ function hg.TraceOrganismArms(body, startPos, endPos)
         for bone = 0, (body:GetBoneCount() or 0) - 1 do
             local name = body:GetBoneName(bone)
             local hitSide, isHand, isForearm, isUpper, isClavicle = IsArmBone(name)
-            if not hitSide or IsAmputated(hitSide, isHand, isForearm, isUpper, isClavicle) then continue end
+            if not hitSide or (armHitboxBones[bone] and not isHand) or IsAmputated(hitSide, isHand, isForearm, isUpper, isClavicle) then continue end
             local extent = isHand and 3 or isClavicle and 4 or 6
             AddArmTrace(nil, bone, Vector(-extent, -3, -3), Vector(extent, 3, 3), hitSide, true)
         end
