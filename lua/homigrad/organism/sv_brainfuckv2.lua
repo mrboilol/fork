@@ -296,18 +296,6 @@ local function getPostureState(org)
 		org.brainfuckv2Severe = nil
 	end
 
-	if selected == nil then
-		org.brainfuckv2Allowed = nil
-	else
-		if org.brainfuckv2Allowed == nil then
-			org.brainfuckv2Allowed = math.Rand(0, 1) < (postureChance or 0.85)
-		end
-		if not org.brainfuckv2Allowed then
-			selected = nil
-			selectedSeverity = nil
-		end
-	end
-
 	return selected, selectedSeverity
 end
 
@@ -338,7 +326,6 @@ local taserPhaseTime = 0.5
 local skipChance = 0.25
 local flopChance = 0.25
 local flopSpeed = 55
-local postureChance = 0.85
 local legChance = 0.3
 local slowTime = 3
 local legBones = {[8] = true, [9] = true, [11] = true, [12] = true, [13] = true, [14] = true}
@@ -638,7 +625,6 @@ hook.Add("Org Clear", "BrainfuckV2", function(org)
 	org.brainfuckv2SlowUntil = nil
 	org.brainfuckv2Severe = nil
 	org.brainfuckv2LastSeverity = nil
-	org.brainfuckv2Allowed = nil
 end)
 
 hook.Add("Should Fake Up", "BrainfuckV2", function(ply)

@@ -24,6 +24,7 @@ local depression_cold_threshold = 35
 local depression_cold_gain = 0.01
 local depression_panic_gain = 0.02
 local depression_amputation_gain = 0.015
+local suicide_depression_gain = 0.025
 
 local selfharm_threshold = 0.4
 local selfharm_roll_time_min = 5
@@ -109,11 +110,11 @@ local depression_minigame_phrases = {
 util.AddNetworkString("rem_selfharm_press")
 util.AddNetworkString("rem_selfharm_end")
 
-local function showDepressionThought(owner, text, id)
+local function showDepressionThought(owner, text, duration, id)
 	if owner:GetInfoNum("hg_newthoughts", 0) > 0 then
-		owner:Thought(text, 6, id, 0)
+		owner:Thought(text, duration, id, 0)
 	else
-		owner:Notify(text, 6, id, 0)
+		owner:Notify(text, duration, id, 0)
 	end
 end
 
@@ -170,7 +171,7 @@ function hg.organism.StartSelfHarm(owner)
 	owner:SetNWFloat("rem_selfharm_wave_end", org.selfharmWaveEnd)
 
 	if org.isPly then
-		owner:Notify(selfharm_phrases[math.random(#selfharm_phrases)], 12, "selfharm", 0)
+		showDepressionThought(owner, selfharm_phrases[math.random(#selfharm_phrases)], 12, "selfharm")
 	end
 end
 
@@ -350,7 +351,7 @@ local function rollSelfHarm(owner, org)
 	owner:SetNWFloat("rem_selfharm_pending", org.selfharmPendingUntil)
 
 	if org.isPly then
-		owner:Notify(table.Random(selfharm_pending_phrases), 12, "selfharmpending", 0)
+		showDepressionThought(owner, table.Random(selfharm_pending_phrases), 12, "selfharmpending")
 	end
 end
 
@@ -420,11 +421,19 @@ module[2] = function(owner, org, timeValue)
 		add = add * max(1 - adrenaline * 0.2, depression_adrenaline_suppress_min)
 	end
 
+	local goodmood = Clamp(tonumber(org.goodmood) or 0, 0, 1)
+	if goodmood > 0 then
+		add = add * Lerp(goodmood, 1, 0.6)
+	end
+
 	org.depression = Clamp((org.depression or 0) + add, 0, depression_max)
 
 	local drainRate = timeValue / depression_drain_time
 	if pain < 30 and fear < 2 and blood > 4000 and not org.otrub then
 		drainRate = drainRate * (depression_drain_time / depression_drain_boost_time)
+	end
+	if goodmood > 0 then
+		drainRate = drainRate * Lerp(goodmood, 1, 1.75)
 	end
 
 	if org.superfighter then
@@ -437,72 +446,79 @@ module[2] = function(owner, org, timeValue)
 
 	org.depression = max((org.depression or 0) - drainRate, 0)
 
+	local suicidal = GetConVar("hg_suicidal")
+	if owner.suiciding and suicidal and suicidal:GetInt() == 2 then
+		org.depression = Clamp((org.depression or 0) + suicide_depression_gain * timeValue, 0, depression_max)
+	end
+
 	if owner:IsPlayer() then
 		local dep = org.depression or 0
-		local stage = org.depressionThoughtStage
+		if owner:GetInfoNum("hg_newthoughts", 0) > 0 then
+			local stage = org.depressionThoughtStage
 
-		if stage and dep < stage then
-			org.depressionThoughtStage = nil
-		end
+			if stage and dep < stage then
+				org.depressionThoughtStage = nil
+			end
 
-		if dep < depression_stage_thresholds[1] then
-			org.depressionThoughtStage = nil
-		elseif (org.depressionNextStageThought or 0) < CurTime() then
-			stage = org.depressionThoughtStage or 0
+			if dep < depression_stage_thresholds[1] then
+				org.depressionThoughtStage = nil
+			elseif (org.depressionNextStageThought or 0) < CurTime() then
+				stage = org.depressionThoughtStage or 0
 
-			for i = #depression_stage_thresholds, 1, -1 do
-				local threshold = depression_stage_thresholds[i]
+				for i = #depression_stage_thresholds, 1, -1 do
+					local threshold = depression_stage_thresholds[i]
 
-				if dep >= threshold then
-					if stage < threshold then
-						org.depressionThoughtStage = threshold
-						org.depressionNextStageThought = CurTime() + depression_stage_cooldown
-						showDepressionThought(owner, depression_stage_thoughts[threshold], "depression_stage_" .. threshold)
+					if dep >= threshold then
+						if stage < threshold then
+							org.depressionThoughtStage = threshold
+							org.depressionNextStageThought = CurTime() + depression_stage_cooldown
+							showDepressionThought(owner, depression_stage_thoughts[threshold], 6, "depression_stage_" .. threshold)
+						end
+
+						break
 					end
-
-					break
 				end
 			end
-		end
 
-		if dep > depression_dark_threshold then
-			if (org.depressionNextDarkThought or 0) < CurTime() then
-				org.depressionNextDarkThought = CurTime() + math.Rand(depression_dark_thought_min, depression_dark_thought_max)
-				showDepressionThought(owner, table.Random(depression_dark_thoughts), "depression_dark")
+			if dep > depression_dark_threshold then
+				if (org.depressionNextDarkThought or 0) < CurTime() then
+					org.depressionNextDarkThought = CurTime() + math.Rand(depression_dark_thought_min, depression_dark_thought_max)
+					showDepressionThought(owner, table.Random(depression_dark_thoughts), 6, "depression_dark")
+				end
+			else
+				org.depressionNextDarkThought = nil
 			end
 		else
-			org.depressionNextDarkThought = nil
-		end
+			local notifyStage = org.depressionNotifyStage
 
-		local notifyStage = org.depressionNotifyStage
+			if notifyStage and dep < notifyStage then
+				org.depressionNotifyStage = nil
+			end
 
-		if notifyStage and dep < notifyStage then
-			org.depressionNotifyStage = nil
-		end
+			if dep < depression_notify_stage_thresholds[1] then
+				org.depressionNotifyStage = nil
+			elseif (org.depressionNextNotifyThought or 0) < CurTime() then
+				notifyStage = org.depressionNotifyStage or 0
 
-		if dep < depression_notify_stage_thresholds[1] then
-			org.depressionNotifyStage = nil
-		elseif (org.depressionNextNotifyThought or 0) < CurTime() then
-			notifyStage = org.depressionNotifyStage or 0
+				for i = #depression_notify_stage_thresholds, 1, -1 do
+					local threshold = depression_notify_stage_thresholds[i]
 
-			for i = #depression_notify_stage_thresholds, 1, -1 do
-				local threshold = depression_notify_stage_thresholds[i]
+					if dep >= threshold then
+						if notifyStage < threshold then
+							org.depressionNotifyStage = threshold
+							org.depressionNextNotifyThought = CurTime() + depression_stage_cooldown
+							owner:Notify(table.Random(depression_notify_stage_phrases[threshold]), 6, "depression_notify_stage_" .. threshold, 0)
+						end
 
-				if dep >= threshold then
-					if notifyStage < threshold then
-						org.depressionNotifyStage = threshold
-						org.depressionNextNotifyThought = CurTime() + depression_stage_cooldown
-						owner:Notify(table.Random(depression_notify_stage_phrases[threshold]), 6, "depression_notify_stage_" .. threshold, 0)
+						break
 					end
-
-					break
 				end
 			end
 		end
 
 		if (owner.selfharming or owner.suiciding or owner.remUrgeEnd) and (org.depressionNextMinigamePhrase or 0) < CurTime() then
 			org.depressionNextMinigamePhrase = CurTime() + math.Rand(depression_minigame_phrase_interval_min, depression_minigame_phrase_interval_max)
-			owner:Notify(table.Random(depression_minigame_phrases), 3, "depression_minigame", 0)
+			showDepressionThought(owner, table.Random(depression_minigame_phrases), 3, "depression_minigame")
 		elseif not owner.selfharming and not owner.suiciding and not owner.remUrgeEnd then
 			org.depressionNextMinigamePhrase = nil
 		end

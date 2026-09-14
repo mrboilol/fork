@@ -1,7 +1,10 @@
 local Clamp, max, min = math.Clamp, math.max, math.min
+local cotard_unconscious_time = 8
 
 local function chooseType(org)
-	local lungs = max(org.pneumothorax or 0, (org.lungsL[1] or 0) * 0.7, (org.lungsR[1] or 0) * 0.7)
+	local lungsL = istable(org.lungsL) and org.lungsL[1] or 0
+	local lungsR = istable(org.lungsR) and org.lungsR[1] or 0
+	local lungs = max(org.pneumothorax or 0, lungsL * 0.7, lungsR * 0.7)
 	local brain = max(org.brain or 0, (org.disorientation or 0) / 8)
 	local blood = 1 - Clamp((org.blood or 5000) / 5000, 0, 1)
 
@@ -56,7 +59,7 @@ hook.Add("Org Think", "CotardThink", function(owner, org, timeValue)
 
 	local unconsciousTime = org.cotardUnconTimer or 0
 	org.cotardUnconTimer = 0
-	if unconsciousTime < 18 then return end
+	if unconsciousTime < cotard_unconscious_time then return end
 	if (org.cotard or 0) > 0 then return end
 
 	org.cotard = Clamp(unconsciousTime / 90, 0.35, 1)

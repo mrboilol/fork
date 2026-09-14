@@ -475,9 +475,18 @@ end
 local function setupStomachGoreParent(gore, ent)
 	if not IsValid(gore) or not IsValid(ent) then return false end
 	gore:SetParent(ent)
+	local attachment
+	for _, att in pairs(ent:GetAttachments() or {}) do
+		attachment = att.name
+	end
+	if attachment then gore:Fire("SetParentAttachment", attachment) end
 	gore:AddEffects(EF_BONEMERGE)
 	gore:SetSolid(SOLID_NONE)
 	return true
+end
+
+local function SpawnIntestineChunks(ent, pos, force)
+	SpawnMeatGore(ent, pos, 6, force or VectorRand(-120, 120), 0.55, false, intestineChunkModels)
 end
 
 local function clearStomachGoreRefs(gore)
@@ -851,7 +860,7 @@ function hg.AttachStomachGore(target, force)
 	ent:EmitSound(sounds[math.random(#sounds)], 70, math.random(95, 105), 1)
 	sendGibBloodSpill(gore, true)
 	SpawnMeatGore(ent, pos, 4, force, 0.7)
-	SpawnMeatGore(ent, pos, 6, force or VectorRand(-120, 120), 0.55, false, intestineChunkModels)
+	SpawnIntestineChunks(ent, pos, force)
 
 	local owner = target:IsPlayer() and target or ent:IsRagdoll() and hg.RagdollOwner(ent) or ent
 	if ent.organism then ent.organism.stomachgibbed = true end

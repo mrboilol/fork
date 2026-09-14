@@ -6,6 +6,13 @@ local function GetGoodMood(org)
     return org.goodmood
 end
 
+local function GetGoodMoodGainMultiplier(org)
+    local depression = math.Clamp(tonumber(org.depression) or 0, 0, 1)
+    if depression <= 0.05 then return 1 end
+
+    return math.Clamp(1 - depression * 1.6, 0.05, 0.9)
+end
+
 module[1] = function(org)
     org.goodmood = 1.0
     org._goodmoodLostTime = 0
@@ -77,6 +84,13 @@ module[2] = function(owner, org, timeValue)
         goodmood_add = goodmood_add + timeValue * 0.005 * math.Clamp(org.painkiller, 0, 5) * multiplier
     end
 
+    goodmood_add = goodmood_add * GetGoodMoodGainMultiplier(org)
+
+    local depression = math.Clamp(tonumber(org.depression) or 0, 0, 1)
+    if depression > 0.05 then
+        goodmood_add = goodmood_add - timeValue * (0.015 + depression * 0.11)
+    end
+
     -- Decrease goodmood when in fear.
     -- Fear penalty scales with both current fear level and accumulated fear duration
     if org.fear > 0.2 then
@@ -116,7 +130,7 @@ hook.Add("Org Think", "GoodMood_OvercomeFear", function(owner, org, timeValue)
     -- Reduced by 75% during penalty window
     if prevFear > 0.8 and currentFear < 0.2 then
         local boost = inPenaltyWindow and 0.0375 or 0.15
-        org.goodmood = math.Clamp(org.goodmood + boost, 0, 1)
+        org.goodmood = math.Clamp(org.goodmood + boost * GetGoodMoodGainMultiplier(org), 0, 1)
     end
 
     org._prevFear = currentFear
@@ -136,7 +150,7 @@ hook.Add("PostHeal", "GoodMood_OnHeal", function(wep, target, mode)
         local timeSinceLoss = CurTime() - (org._goodmoodLostTime or 0)
         local inPenaltyWindow = timeSinceLoss < 30
         local boost = inPenaltyWindow and 0.005 or 0.02
-        org.goodmood = math.Clamp(org.goodmood + boost, 0, 1)
+        org.goodmood = math.Clamp(org.goodmood + boost * GetGoodMoodGainMultiplier(org), 0, 1)
     elseif IsValid(owner) then
         -- Healing others gives mood boost to healer
         local healerOrg = owner.organism
@@ -145,7 +159,7 @@ hook.Add("PostHeal", "GoodMood_OnHeal", function(wep, target, mode)
             local timeSinceLoss = CurTime() - (healerOrg._goodmoodLostTime or 0)
             local inPenaltyWindow = timeSinceLoss < 30
             local boost = inPenaltyWindow and 0.0025 or 0.01
-            healerOrg.goodmood = math.Clamp(healerOrg.goodmood + boost, 0, 1)
+            healerOrg.goodmood = math.Clamp(healerOrg.goodmood + boost * GetGoodMoodGainMultiplier(healerOrg), 0, 1)
         end
     end
 

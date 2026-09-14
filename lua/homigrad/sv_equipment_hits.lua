@@ -4,15 +4,15 @@ local impact = hg.EquipmentImpact
 impact.Config = {
     traumaMinDamage = 5,
     traumaFullDamage = 65,
-    rightChance = 0.012,
-    leftChance = 0.004,
-    traumaSeverityChance = 0.06,
+    rightChance = 0.025,
+    leftChance = 0.01,
+    traumaSeverityChance = 0.11,
     traumaInjuryChance = 0.38,
     leftInjuryMultiplier = 0.65,
     soleArmSignificantDamage = 18,
     soleArmChance = 0.92,
-    weaponBaseChance = 0.005,
-    weaponPowerChance = 0.36,
+    weaponBaseChance = 0.018,
+    weaponPowerChance = 0.52,
     weaponInjuryChance = 0.55,
     weaponSoleInjuryChance = 0.45,
     weaponSoleSignificantPower = 0.3,
@@ -125,7 +125,15 @@ end
 local function DropHeldEquipment(ply, ent)
     if not IsValid(ply) or not IsValid(ent) then return end
     local wep = ply:GetActiveWeapon()
-    if IsValid(wep) and isfunction(wep.GetCarrying) and isfunction(wep.SetCarrying) and wep:GetCarrying() == ent then wep:SetCarrying() end
+    local primaryCarry = ply:GetNetVar("carryent") == ent
+    if IsValid(wep) and isfunction(wep.GetCarrying) and isfunction(wep.SetCarrying) and (wep:GetCarrying() == ent or primaryCarry) then
+        wep:SetCarrying()
+    elseif primaryCarry then
+        ply:SetNetVar("carryent", nil)
+        ply:SetNetVar("carrybone", nil)
+        ply:SetNetVar("carrymass", nil)
+        ply:SetNetVar("carrypos", nil)
+    end
     if ply:GetNetVar("carryent2") == ent and hg.SetCarryEnt2 then hg.SetCarryEnt2(ply) end
     if ent:IsPlayerHolding() and isfunction(ply.DropObject) then ply:DropObject(ent) end
 end
@@ -150,7 +158,8 @@ local function HeldEntityImpact(ply, ent, hit, damage, direction, damageType)
         phys:Wake()
         phys:ApplyForceOffset(direction * math.min(phys:GetMass() * power * 80, 2400), hit.position)
     end
-    if broken or math.Rand(0, 1) < power * power * impact.Config.weaponPowerChance then DropHeldEquipment(ply, ent) end
+    local bulletHit = bit.band(damageType or 0, DMG_BULLET + DMG_BUCKSHOT) ~= 0
+    if bulletHit or broken or math.Rand(0, 1) < power * power * impact.Config.weaponPowerChance then DropHeldEquipment(ply, ent) end
     ent.HGHeldEquipmentResistanceUntil = CurTime() + 0.1
 end
 
@@ -512,11 +521,7 @@ local function TraceHeldWeaponModel(ply, wep, startPos, endPos, padding)
         end
         return best
     end
-    local hit = hg.TraceEquipmentModel(model, pos, ang, scale, startPos, endPos, padding, true)
-    if IsValid(wep.worldModel) then
-        local boundsHit = TraceEquipmentEntityBounds(wep.worldModel, pos, ang, scale, startPos, endPos, padding)
-        if boundsHit and (not hit or boundsHit.fraction < hit.fraction) then hit = boundsHit end
-    end
+    local hit = hg.TraceEquipmentModel(model, pos, ang, scale, startPos, endPos, padding)
     return hit
 end
 
@@ -681,9 +686,7 @@ function hg.TryAbsorbEquipmentImpact(ent, dmgInfo, hitPos, direction, impactRadi
         end
         for _, heldEnt in ipairs(hg.GetHeldEquipmentEntities(ply)) do
             local model = heldEnt:GetModel()
-            local heldHit = model and hg.TraceEquipmentModel(model, heldEnt:GetPos(), heldEnt:GetAngles(), heldEnt:GetModelScale(), startPos, hitPos + dir, radius, true)
-            local boundsHit = TraceEquipmentEntityBounds(heldEnt, heldEnt:GetPos(), heldEnt:GetAngles(), heldEnt:GetModelScale(), startPos, hitPos + dir, radius)
-            if boundsHit and (not heldHit or boundsHit.fraction < heldHit.fraction) then heldHit = boundsHit end
+            local heldHit = model and hg.TraceEquipmentModel(model, heldEnt:GetPos(), heldEnt:GetAngles(), heldEnt:GetModelScale(), startPos, hitPos + dir, radius)
             if heldHit then heldHit.heldEntity, heldHit.ply = heldEnt, ply; equipmentHits[#equipmentHits + 1] = heldHit end
         end
         if hg.TraceArmorShot then
@@ -856,9 +859,7 @@ local function TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, ori
         for _, heldEnt in ipairs(hg.GetHeldEquipmentEntities(ply)) do
             if seen[heldEnt] and not shot.Contact then continue end
             local model = heldEnt:GetModel()
-            local hit = model and hg.TraceEquipmentModel(model, heldEnt:GetPos(), heldEnt:GetAngles(), heldEnt:GetModelScale(), startPos, endPos, projectileRadius, true)
-            local boundsHit = TraceEquipmentEntityBounds(heldEnt, heldEnt:GetPos(), heldEnt:GetAngles(), heldEnt:GetModelScale(), startPos, endPos, projectileRadius)
-            if boundsHit and (not hit or boundsHit.fraction < hit.fraction) then hit = boundsHit end
+            local hit = model and hg.TraceEquipmentModel(model, heldEnt:GetPos(), heldEnt:GetAngles(), heldEnt:GetModelScale(), startPos, endPos, projectileRadius)
             if hit and hit.fraction <= obstructionFraction + 0.0001 then
                 hit.heldEntity, hit.ply, hit.key, hit.shot = heldEnt, ply, heldEnt, shot
                 hits[#hits + 1] = hit

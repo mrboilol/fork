@@ -348,9 +348,8 @@ local function Ragdoll_CreateInternal(ply)
 		phys:Wake()
 	end
 
-	local reactionPhys = ragdoll:GetPhysicsObjectNum(0)
-	if IsValid(reactionPhys) and hg.ClampRagdollReactionForce then
-		reactionPhys:ApplyForceCenter(hg.ClampRagdollReactionForce(ragdoll, pendingReactionForce))
+	if hg.ApplyRagdollReactionForce then
+		hg.ApplyRagdollReactionForce(ragdoll, pendingReactionForce)
 	end
 
 	ragdoll:SetNWString("PlayerName", ply:GetNWString("PlayerName") or ply:Name())

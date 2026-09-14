@@ -489,7 +489,11 @@ if CLIENT then
         if updatePose then
             WorldModel:SetupBones()
         end
-        
+
+        if updatePose and inuse then
+            self:SetHandPos()
+        end
+
         if updatePose and IsValid(owner) and !inuse then
             local bon = ent:LookupBone("ValveBiped.Bip01_R_Hand")
             if not bon then return end

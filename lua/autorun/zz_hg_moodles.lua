@@ -125,6 +125,12 @@ local moodleTexts = {
 		[3] = {title = "Happy", description = "Strong morale is improving recovery, damage, and resilience."},
 		[4] = {title = "Euphoric", description = "Peak morale is boosting stamina recovery, damage, and resilience."},
 	}},
+	depression = {levels = {
+		[1] = {title = "Unhappy", description = "Stress and injury are beginning to weigh on you."},
+		[2] = {title = "Dreary", description = "You are becoming noticeably unhappy."},
+		[3] = {title = "Hopeless", description = "Depressive symptoms are starting to take hold."},
+		[4] = {title = "Miserable", description = "You are depressed and need relief from the conditions worsening it."},
+	}},
 	cotard = {levels = {
 		[1] = {title = "Nihilistic Delusion", description = "Your sense of being alive is beginning to feel unreal."},
 		[2] = {title = "Cotard Syndrome", description = "You believe that parts of you are missing, dead, or no longer real."},
@@ -431,6 +437,7 @@ end
 -- shared with the existing renderer, which keeps every threshold in one place.
 local function getMoodle3IconName(effect)
 	if effect.moodle3Icon then return effect.moodle3Icon end
+	if effect.name == "depression" then return effect.icon end
 	local level = effect.level or 1
 	local names = {
 		fracture = "fractured", dislocated = "dislocated", analgesia = "drugged",
@@ -637,6 +644,20 @@ local function buildEffects(ply, org)
 	local goodmood = math.Clamp(orgNumber(org, "goodmood", 0), 0, 1)
 	if goodmood > 0 then
 		add(effects, "happy", "happy", math.ceil(goodmood * 4), "good", 15, math.floor(goodmood * 100) .. "%")
+	end
+	local depression = math.Clamp(orgNumber(org, "depression", 0), 0, 1)
+	if depression > 0 then
+		local icon, level = "unhappy", 1
+		if depression >= 0.5 then
+			icon, level = "miserable", 4
+		elseif depression >= 0.4 then
+			icon, level = "desolate", 4
+		elseif depression >= 0.35 then
+			icon, level = "hopeless", 3
+		elseif depression >= 0.25 then
+			icon, level = "dreary", 2
+		end
+		add(effects, "depression", icon, level, "bad", -64, math.floor(depression * 100) .. "%")
 	end
 	local cotard = math.Clamp(orgNumber(org, "cotard", 0), 0, 1)
 	if cotard > 0 then
@@ -929,6 +950,10 @@ local function drawTooltip(effect, pos, mx, my, berserkActive)
 	local levelText = rageActive and textData.fixed or textLevels and textLevels[tooltipLevel] or nil
 	local title = levelText and levelText.title or effect.name
 	local description = levelText and levelText.description or "An active condition is affecting you."
+	if effect.name == "depression" and effect.icon == "desolate" then
+		title = "Desolate"
+		description = "Your depression has reached self-harm levels."
+	end
 	local descriptionLines = rageActive and levelText and levelText.descriptionLines or {description}
 	local details = not rageActive and "Severity " .. tooltipLevel .. " of 4" or nil
 	if details and effect.value ~= nil then details = details .. " - " .. tostring(effect.value) end

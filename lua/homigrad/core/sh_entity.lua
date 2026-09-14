@@ -100,16 +100,6 @@ end
 hg.MaxLookX, hg.MinLookX = 55, -55
 hg.MaxLookY, hg.MinLookY = 45, -45
 
-local function getRagdollReactionPhys(ragdoll)
-	local pelvis = ragdoll:GetPhysicsObjectNum(0)
-	if IsValid(pelvis) then return pelvis end
-
-	for physbone = 1, ragdoll:GetPhysicsObjectCount() - 1 do
-		local phys = ragdoll:GetPhysicsObjectNum(physbone)
-		if IsValid(phys) then return phys end
-	end
-end
-
 function hg.ClampRagdollReactionForce(ragdoll, force)
 	if not isvector(force) then return vector_origin end
 
@@ -124,6 +114,31 @@ function hg.ClampRagdollReactionForce(ragdoll, force)
 
 	local maximum = math.max(mass * 350, 12000)
 	return force * math.min(forceLength, maximum) / forceLength
+end
+
+function hg.ApplyRagdollReactionForce(ragdoll, force)
+	if not IsValid(ragdoll) then return end
+
+	force = hg.ClampRagdollReactionForce(ragdoll, force)
+	if force:LengthSqr() <= 0 then return end
+
+	local totalMass = 0
+	for physbone = 0, ragdoll:GetPhysicsObjectCount() - 1 do
+		local phys = ragdoll:GetPhysicsObjectNum(physbone)
+		if IsValid(phys) and phys:IsMotionEnabled() then
+			totalMass = totalMass + math.max(phys:GetMass(), 0)
+		end
+	end
+
+	if totalMass <= 0 then return end
+
+	for physbone = 0, ragdoll:GetPhysicsObjectCount() - 1 do
+		local phys = ragdoll:GetPhysicsObjectNum(physbone)
+		if IsValid(phys) and phys:IsMotionEnabled() then
+			phys:ApplyForceCenter(force * (math.max(phys:GetMass(), 0) / totalMass))
+			phys:Wake()
+		end
+	end
 end
 
 function hg.AddForceRag(ent, physbone, force, time)
@@ -153,11 +168,7 @@ function hg.AddForceRag(ent, physbone, force, time)
 		return
 	end
 
-	local phys = getRagdollReactionPhys(ragdoll)
-
-	if IsValid(phys) then
-		phys:ApplyForceCenter(hg.ClampRagdollReactionForce(ragdoll, force))
-	end
+	hg.ApplyRagdollReactionForce(ragdoll, force)
 end
 
 function hg.IsOnGround(ent)

@@ -64,24 +64,16 @@ function hg.ResolveEquipmentClearance(ent, owner, model, pos, ang, scale)
     if IsValid(ent.worldModel) then filter[#filter + 1] = ent.worldModel end
     if IsValid(ent.worldModel2) then filter[#filter + 1] = ent.worldModel2 end
     local target = LocalToWorld(center, angle_zero, pos, ang)
-    local anchor = owner.GetShootPos and owner:GetShootPos() or owner:EyePos()
-    local traceData = {start = anchor, endpos = target, mins = -extent, maxs = extent, filter = filter, mask = MASK_SOLID}
+    local previous = ent.HGClearanceCenter
+    local start = target
+    if isvector(previous) and previous:DistToSqr(target) < 128 * 128 then start = previous end
+    local traceData = {start = start, endpos = target, mins = -extent, maxs = extent, filter = filter, mask = MASK_SOLID}
     local trace = util.TraceHull(traceData)
     if trace.StartSolid then
-        for _, axis in ipairs({vector_up, -owner:GetAimVector(), owner:EyeAngles():Right(), -owner:EyeAngles():Right()}) do
-            traceData.start = anchor + axis * math.min(extent:Length() + 2, 64)
-            local path = util.TraceLine({start = anchor, endpos = traceData.start, filter = filter, mask = MASK_SOLID})
-            if path.Hit then continue end
-            local candidate = util.TraceHull(traceData)
-            if not candidate.StartSolid then trace = candidate; break end
-        end
-    end
-    if trace.StartSolid then
-        local previous = ent.HGClearancePosition
-        if previous and previous:DistToSqr(pos) < 128 * 128 then
-            traceData.start = previous + target - pos
-            traceData.endpos = traceData.start
-            if not util.TraceHull(traceData).StartSolid then return previous end
+        local previousPos = ent.HGClearancePosition
+        if isvector(previousPos) and isvector(previous) and previousPos:DistToSqr(pos) < 128 * 128 then
+            local previousTrace = util.TraceHull({start = previous, endpos = previous, mins = -extent, maxs = extent, filter = filter, mask = MASK_SOLID})
+            if not previousTrace.StartSolid then return previousPos end
         end
         return pos
     end
@@ -99,6 +91,7 @@ function hg.ResolveEquipmentClearance(ent, owner, model, pos, ang, scale)
     end
     local resolved = resolvedCenter - (target - pos)
     ent.HGClearancePosition = resolved
+    ent.HGClearanceCenter = resolvedCenter
     return resolved
 end
 

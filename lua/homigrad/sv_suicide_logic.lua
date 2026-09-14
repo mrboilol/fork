@@ -2,6 +2,7 @@ if SERVER then
     resource.AddFile("resource/fonts/arnopro.ttf")
     util.AddNetworkString("HG_SuicideCutscene")
     local hg_cutscene = ConVarExists("hg_cutscene") and GetConVar("hg_cutscene") or CreateConVar("hg_cutscene", "0", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enable suicide cutscene", 0, 1)
+    local hg_suicidal = ConVarExists("hg_suicidal") and GetConVar("hg_suicidal") or CreateConVar("hg_suicidal", "0", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Suicide behavior: 0 = normal, 1 = unrestricted, 2 = unrestricted and increases depression", 0, 2)
 
     concommand.Add("suicide", function(ply)
         if not IsValid(ply) or not ply:Alive() then return end
@@ -13,7 +14,9 @@ if SERVER then
         if not hg.CanSuicide(ply) then return end
         if ply.StartHeadcrabRemovalAttempt and ply:StartHeadcrabRemovalAttempt() then return end
 		if ply:GetNWFloat("rem_urges_end", 0) > CurTime() or ply.remUrgeEnd then return end
-		if not ply.suiciding and ply.organism and (ply.organism.depression or 0) < 0.5 then
+        local suicideMode = hg_suicidal:GetInt()
+
+        if suicideMode == 0 and not ply.suiciding and ply.organism and (ply.organism.depression or 0) < 0.5 then
 			if ply:GetInfoNum("hg_newthoughts", 0) > 0 and ply.Thought then
 				ply:Thought("You shouldnt do this.", 6, "depression_block_suicide", 0)
 			else
@@ -21,7 +24,7 @@ if SERVER then
 			end
 			return
 		end
-		if not ply.suiciding and hg.StartSuicideUrge then
+        if suicideMode == 0 and not ply.suiciding and hg.StartSuicideUrge then
 			hg.StartSuicideUrge(ply)
 			return
 		end

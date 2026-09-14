@@ -1917,6 +1917,9 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	local blast = dmgInfo:IsDamageType(DMG_BLAST)
 	local slash = dmgInfo:IsDamageType(DMG_SLASH)
 	if not noDismemberment and instant and hitgroup == HITGROUP_HEAD and !ent.headexploded then hg.ExplodeHead(ent, headGoreStack or gibStack, slash, dirCool * len) end
+	if not noDismemberment and instant and hitgroup == HITGROUP_STOMACH and hg.AmputateTorso then
+		hg.AmputateTorso(ent, dirCool * len, blast)
+	end
 	if not noDismemberment and instant and hitgroup == HITGROUP_STOMACH and not org.stomachgibbed and hg.AttachStomachGore then
 		hg.AttachStomachGore(ent, dirCool * len)
 	end
