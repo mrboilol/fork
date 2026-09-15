@@ -52,9 +52,6 @@ local function updateUrgeLoop(active)
 	urgeLoop:SetVolume(urgeLoopVol)
 end
 
-local flashMat = Material("vgui/flash.png")
-local flashFade = 0
-
 local function stopUrges()
 	if urgeSound then
 		urgeSound:Stop()
@@ -65,12 +62,10 @@ local function stopUrges()
 end
 
 net.Receive("rem_selfharm_end", function()
-	flashFade = 1
 	surface.PlaySound("dicksdoor.mp3")
 end)
 
 net.Receive("rem_urges_end", function()
-	flashFade = 1
 	surface.PlaySound("dicksdoor.mp3")
 end)
 
@@ -162,10 +157,4 @@ hook.Add("HUDPaint", "REM_SuicideUrges", function()
 		flashRed = math.max(flashRed - FrameTime() * 3, 0)
 	end
 
-	if flashFade > 0 then
-		surface.SetDrawColor(255, 255, 255, 255 * flashFade)
-		surface.SetMaterial(flashMat)
-		surface.DrawTexturedRect(0, 0, ScrW(), ScrH())
-		flashFade = math.max(flashFade - FrameTime(), 0)
-	end
 end)
