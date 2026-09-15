@@ -28,6 +28,7 @@ impact.Config = {
     maxImpulseSpeed = 320,
     inheritedSpeed = 160,
     weaponHitPadding = 0.65,
+    armHitPadding = 1.25,
     weaponSolidFraction = 0.25,
     weaponMaxThickness = 8,
     contactAbsorption = 0.55,
@@ -62,7 +63,7 @@ end
 function hg.GetEquipmentMaterialProfile(ent, materialName)
     local normalized = NormalizeMaterialName(materialName)
     if not normalized and IsValid(ent) then
-        normalized = NormalizeMaterialName(ent.EquipmentMaterial or ent.BlockMaterial)
+        normalized = NormalizeMaterialName(ent.EquipmentMaterial or ent.BlockMaterial or ent.MeleeMaterial)
         if not normalized and isfunction(ent.GetClashMaterial) then normalized = NormalizeMaterialName(ent:GetClashMaterial()) end
         if not normalized then
             local phys = ent:GetPhysicsObject()
@@ -521,7 +522,7 @@ local function TraceHeldWeaponModel(ply, wep, startPos, endPos, padding)
         end
         return best
     end
-    local hit = hg.TraceEquipmentModel(model, pos, ang, scale, startPos, endPos, padding)
+    local hit = hg.TraceEquipmentModel(model, pos, ang, scale, startPos, endPos, padding, true)
     return hit
 end
 
@@ -744,8 +745,9 @@ function hg.TryAbsorbEquipmentImpact(ent, dmgInfo, hitPos, direction, impactRadi
     return dmgInfo:GetDamage() < damage
 end
 
-function hg.TraceOrganismArms(body, startPos, endPos)
+function hg.TraceOrganismArms(body, startPos, endPos, padding)
     if not IsValid(body) or not isvector(startPos) or not isvector(endPos) then return end
+    padding = math.max(tonumber(padding) or 0, 0)
     local ray = endPos - startPos
     local best
     local owner = hg.RagdollOwner and hg.RagdollOwner(body)
@@ -779,7 +781,8 @@ function hg.TraceOrganismArms(body, startPos, endPos)
         local bonePos, boneAng = matrix and matrix:GetTranslation(), matrix and matrix:GetAngles()
         if not bonePos and body.GetBonePosition then bonePos, boneAng = body:GetBonePosition(bone) end
         if not isvector(bonePos) or not isangle(boneAng) then return end
-        local position, normal, fraction = util.IntersectRayWithOBB(startPos, ray, bonePos, boneAng, mins, maxs)
+        local expand = Vector(padding, padding, padding)
+        local position, normal, fraction = util.IntersectRayWithOBB(startPos, ray, bonePos, boneAng, mins - expand, maxs + expand)
         if not position or best and fraction >= best.Fraction then return end
         local physicsBone
         if isfunction(body.TranslateBoneToPhysBone) then physicsBone = body:TranslateBoneToPhysBone(bone) end
@@ -827,6 +830,37 @@ function hg.IsSmallEquipmentRound(shot)
     return diameter and diameter <= 9.1 and speed and speed > 0 or false
 end
 
+local impactEffects = {
+    [MAT_METAL] = "metal",
+    [MAT_WOOD] = "wood",
+    [MAT_GLASS] = "glass",
+    [MAT_FLESH] = "flesh",
+    [MAT_PLASTIC] = "concrete",
+    [MAT_CONCRETE] = "concrete",
+}
+
+local function PlayEquipmentBulletImpact(hit, material, direction)
+    local effectName = impactEffects[material]
+    if effectName then
+        local effect = EffectData()
+        effect:SetOrigin(hit.position)
+        effect:SetStart(hit.position + direction * 2)
+        effect:SetNormal(hit.normal)
+        effect:SetMagnitude(1)
+        effect:SetScale(1)
+        util.Effect("zippy_impact_" .. effectName, effect, true, true)
+    end
+
+    if material == MAT_METAL then
+        local sparks = EffectData()
+        sparks:SetOrigin(hit.position)
+        sparks:SetNormal(hit.normal)
+        sparks:SetMagnitude(1)
+        sparks:SetScale(1)
+        util.Effect("Sparks", sparks, true, true)
+    end
+end
+
 local function TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, originalTrace, shot)
     if not isvector(startPos) or not isvector(endPos) or startPos:DistToSqr(endPos) < 0.000001 then return originalTrace end
     originalTrace = originalTrace or {}
@@ -847,7 +881,7 @@ local function TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, ori
         local body = hg.GetCurrentCharacter(ply)
         if not IsValid(body) then continue end
         SetupEntityBones(body)
-        local armTrace = hg.TraceOrganismArms(body, startPos, endPos)
+        local armTrace = hg.TraceOrganismArms(body, startPos, endPos, cfg.armHitPadding + projectileRadius)
         if armTrace then armTraces[#armTraces + 1] = armTrace end
         checkedBodies[body] = true
         checkedBodies[ply] = true
@@ -1009,12 +1043,7 @@ local function TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, ori
             shot.Penetration = penetration * remaining
             shot.EquipmentPenetration = shot.Penetration
             scale = scale * remaining
-            local effect = EffectData()
-            effect:SetOrigin(hit.position)
-            effect:SetNormal(hit.normal)
-            effect:SetMagnitude(1)
-            effect:SetScale(1)
-            if material == MAT_METAL then util.Effect("Sparks", effect, true, true) end
+            PlayEquipmentBulletImpact(hit, material, direction)
             if HG_BulletImpactSounds then HG_BulletImpactSounds.PlayMaterialImpact({HitPos = hit.position, MatType = material}) end
             if hit.weapon and hit.weapon:GetClass() == "weapon_pan" and remaining <= 0.001 then
                 hook.Run("HGEquipmentBulletBlocked", hit.ply, "pan", hit.weapon, hit.position)

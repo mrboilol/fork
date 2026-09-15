@@ -142,6 +142,33 @@ local function addPain(org, amount, region)
 	return amount
 end
 
+local function addBoneFracturePain(org, amount, region)
+	addPain(org, amount, region)
+	if hg.organism.AddInstantPain then
+		hg.organism.AddInstantPain(org, amount * 0.5, region)
+	else
+		org.avgpain = math.min((org.avgpain or 0) + amount * 0.5, 150)
+	end
+end
+
+local function addJawSpeechPain(ply, isChat)
+	local org = ply.organism
+	if not org or (org.jaw ~= 1 and not org.jawdislocation) then return end
+
+	local now = CurTime()
+	if (org.nextJawSpeechPain or 0) > now then return end
+
+	local broken = org.jaw == 1
+	local pain = broken and (isChat and 22 or 16) or (isChat and 11 or 8)
+	org.nextJawSpeechPain = now + (isChat and 0.8 or 0.5)
+	addPain(org, pain, "head")
+	if hg.organism.AddInstantPain then hg.organism.AddInstantPain(org, pain * 0.45, "head") end
+
+	if ply:GetInfoNum("hg_newthoughts", 0) <= 0 then
+		ply:Notify("My jaw is really hurting when I speak.", 60, "painfromjawspeak", 0, nil, Color(255, 210, 210))
+	end
+end
+
 local function canFeelPain(org, region)
 	return not hg.organism.CanFeelPain or hg.organism.CanFeelPain(org, region)
 end
@@ -227,10 +254,10 @@ local function legs(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 		end
 
 		if not stabilized then
-			addPain(org, 55, "lower")
+			addBoneFracturePain(org, 55, "lower")
 			org.immobilization = org.immobilization + dmg * 25
 		else
-			addPain(org, 10, "lower")
+			addBoneFracturePain(org, 10, "lower")
 			org.immobilization = org.immobilization + dmg * 5
 		end
 		org.owner:AddNaturalAdrenaline(1)
@@ -292,10 +319,10 @@ local function arms(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 		end
 
 		if not stabilized then
-			addPain(org, 55, (limb_key == "lleg" or limb_key == "rleg") and "lower" or "body")
+			addBoneFracturePain(org, 55, "body")
 			org.immobilization = org.immobilization + dmg * 25
 		else
-			addPain(org, 10, (limb_key == "lleg" or limb_key == "rleg") and "lower" or "body")
+			addBoneFracturePain(org, 10, "body")
 			org.immobilization = org.immobilization + dmg * 5
 		end
 		org.owner:AddNaturalAdrenaline(1)
@@ -613,6 +640,8 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 		if hg.organism.AddInstantPain then hg.organism.AddInstantPain(org, dmg * 30, "head") else org.avgpain = org.avgpain + dmg * 30 end
 
 		if oldDmg != 1 then
+			addPain(org, 45, "head")
+			if hg.organism.AddInstantPain then hg.organism.AddInstantPain(org, 30, "head") else org.avgpain = math.min((org.avgpain or 0) + 30, 150) end
 			playBoneFractureSound(org.owner)
 			if org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner, 1) end
 		end
@@ -666,9 +695,7 @@ end
 
 hook.Add("CanListenOthers", "CantHaveShitInDetroit", function(output, input, isChat, teamonly, text)
 	if IsValid(output) and output.organism and (output.organism.jaw == 1 or output.organism.jawdislocation) and output:Alive() and (output:IsSpeaking() or isChat) then
-		-- and !isChat and output:IsSpeaking()
-		addPain(output.organism, 2 * (output:IsSpeaking() and 1 or (isChat and 5 or 0)), "head")
-		if output:GetInfoNum("hg_newthoughts", 0) <= 0 then output:Notify("My jaw is really hurting when I speak.", 60, "painfromjawspeak", 0, nil, Color(255, 210, 210)) end
+		addJawSpeechPain(output, isChat)
 	end
 end)
 
@@ -961,14 +988,20 @@ local function upper_limb(org, bone, dmg, dmgInfo, amputate_key, limb_key, segme
 		end
 
 		if not stabilized then
-			addPain(org, 55, "body")
+			addBoneFracturePain(org, 55, (limb_key == "lleg" or limb_key == "rleg") and "lower" or "body")
 			org.immobilization = org.immobilization + d * 25
 		else
-			addPain(org, 10, "body")
+			addBoneFracturePain(org, 10, (limb_key == "lleg" or limb_key == "rleg") and "lower" or "body")
 			org.immobilization = org.immobilization + d * 5
 		end
 		org.owner:AddNaturalAdrenaline(1)
 		org.fearadd = org.fearadd + 0.5
+
+		if hasNewThoughts(org) then
+			sendThought(org, "Your " .. limbName[limb_key] .. " is broken.", "thought_broke" .. limb_key, 1, Color(255, 210, 210))
+		else
+			org.owner:Notify((limb_key == "rarm" or limb_key == "larm") and broke_arm[math.random(#broke_arm)] or broke_leg[math.random(#broke_leg)], true, "broke" .. limb_key, 2)
+		end
 
 		playBoneFractureSound(org.owner)
 		if org.isPly and hg.QueuePainScream and canFeelPain(org, (limb_key == "lleg" or limb_key == "rleg") and "lower" or "body") then hg.QueuePainScream(org.owner, 1.35) end

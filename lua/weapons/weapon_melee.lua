@@ -24,6 +24,9 @@ SWEP.WorldModelExchange = false
 SWEP.ViewModel = ""
 SWEP.HoldType = "knife"
 SWEP.weight = 0.4
+SWEP.MeleeWallRetractStart = 36
+SWEP.MeleeWallRetractDistance = 12
+SWEP.MeleeWallRetractAmount = 18
 
 function SWEP:CanPrimaryAttack()
     if self:GetNWFloat("HGEquipmentRecovery", 0) > CurTime() then return false end
@@ -953,7 +956,11 @@ function SWEP:ModelAnim(model, pos, ang)
        addAngLerp.p = addAngLerp.p - math.min(math.abs(math.max(eyeAng.p,0)),25)
     end
 
-    addPosLerp.x = addPosLerp.x - 20 * math.max(0.5 - tr.Fraction, 0)
+    local wallDistance = tr.HitPos:Distance(tr.StartPos)
+    local retractStart = self.MeleeWallRetractStart or 36
+    local retractRange = math.max(self.MeleeWallRetractDistance or 12, 0.001)
+    local wallRetract = math.Clamp((retractStart - wallDistance) / retractRange, 0, 1)
+    addPosLerp.x = addPosLerp.x - wallRetract * (self.MeleeWallRetractAmount or 18)
 
     if self.CanSuicide and owner.suiciding then
         addPosLerp:Set(self.SuicidePos)
