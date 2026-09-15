@@ -92,17 +92,22 @@ local function updateStrokeRisk(org, timeValue)
 		Remap(1 - math.Clamp(tonumber(org.brainoxygen) or 1, 0, 1), 0.4, 0.85, 0, 1)
 	)
 	local internalStrokeRisk = math.Clamp(internalBleedRisk * 0.75 + internalBleedComplication * 0.25 + cerebralPerfusionRisk * 0.25, 0, 1)
-	local strokeRisk = math.Clamp(math.max(
-		bloodPressureRisk,
+	local nonPressureStrokeRisk = math.max(
 		brainDamageRisk * 0.85,
 		cranialPressureRisk * 0.9,
 		internalStrokeRisk
+	)
+	local strokeRisk = math.Clamp(math.max(
+		bloodPressureRisk,
+		nonPressureStrokeRisk
 	), 0, 1)
 
 	org.strokeRisk = strokeRisk
 	local exposure = tonumber(org.strokeExposure) or 0
 	if strokeRisk > 0.35 then
-		exposure = math.min(exposure + timeValue * (strokeRisk - 0.35) / 18, 1)
+		local pressureDominance = math.Clamp((bloodPressureRisk - nonPressureStrokeRisk) / 0.65, 0, 1)
+		local exposureTime = 18 + 72 * pressureDominance
+		exposure = math.min(exposure + timeValue * (strokeRisk - 0.35) / exposureTime, 1)
 	else
 		exposure = math.max(exposure - timeValue / 45, 0)
 	end
@@ -925,7 +930,11 @@ module[2] = function(owner, org, timeValue)
 		timeValue / (sympatheticTarget > (org.sympatheticCompensation or 0) and 6 or 12)
 	)
 	org.sympatheticCompensation = sympatheticCompensation
-	local vascularTone = Clamp(1 + hemorrhageCompensation * 0.24 + min(activeCatecholamine, 3) * 0.12 + sympatheticCompensation * 0.26 + Clamp(org.shock, 0, 45) / 360, 0.65, 1.55)
+	local anestheticRelief = Clamp(((tonumber(org.analgesia) or 0) - 0.25) / 2.25, 0, 1)
+	local tranquilizerRelief = Clamp((tonumber(org.tranquilizer) or 0) / 12, 0, 1)
+	local sedativePressureRelief = math.max(anestheticRelief * 0.32, tranquilizerRelief * 0.42)
+	org.sedativePressureRelief = sedativePressureRelief
+	local vascularTone = Clamp((1 + hemorrhageCompensation * 0.24 + min(activeCatecholamine, 3) * 0.12 + sympatheticCompensation * 0.26 + Clamp(org.shock, 0, 45) / 360) * (1 - sedativePressureRelief), 0.65, 1.55)
 	local accelerationPressureMul = 1 - highSpeedPressureShock * 0.8
 	local dehydrationPressureMul = 1 - math.Clamp(org.dehydrationCirculationPenalty or 0, 0, 1) * 0.22
 	-- Pericardial blood restricts filling before it directly damages the heart.
@@ -1032,7 +1041,8 @@ module[2] = function(owner, org, timeValue)
 		org.hypotensionExposure = math.Approach(org.hypotensionExposure or 0, 0, timeValue * 1.5)
 	end
 	org.prolongedHypotension = (org.hypotensionExposure or 0) >= hypotensionComplicationTime
-	org.hypertension = Approach(org.hypertension or 0, Clamp(Remap(circulation, 1.25, 1.68, 0, 1), 0, 1), timeValue / 20)
+	local hypertensionTarget = Clamp(Remap(circulation, 1.25, 1.68, 0, 1), 0, 1) * (1 - sedativePressureRelief)
+	org.hypertension = Approach(org.hypertension or 0, hypertensionTarget, timeValue / (sedativePressureRelief > 0 and 8 or 20))
 	hg.organism.UpdatePerfusion(owner, org, timeValue)
 	updateStrokeRisk(org, timeValue)
 	-- Normalized stroke volume separates a fast electrical rate from how much

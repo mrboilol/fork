@@ -1322,14 +1322,14 @@ kaz
 	local activeConcussion = math.max(tonumber(org.concussion) or 0, tonumber(org.concussion_onset) or 0)
 	local lobeDamage = math.max(frontal, parietal, temporal, occipital)
 	local skullCrisis = math.Clamp((skullDamage - 0.35) / 0.65, 0, 1)
-	local concussionCrisis = math.Clamp((activeConcussion - 2.5) / 3.5, 0, 1)
+	local concussionCrisis = math.Clamp((activeConcussion - 3.0) / 3.0, 0, 1)
 	local brainCrisis = math.Clamp((lobeDamage - 0.35) / 0.65, 0, 1)
 	local cranialCrisis = math.max(skullCrisis, concussionCrisis, brainCrisis)
 	local skullProtection = org.bandagedskull and 0.22 or 1
 	local medicationMul = (1 - mannitolK * 0.8) * ((org.tranexamic_acid or 0) > 0 and 0.65 or 1)
 	local resistanceMul = 1 - zerlkersResistance * 0.75
 	local crisisBleedRate = skullCrisis * (0.00002 + skullCrisis * 0.00022) * skullProtection
-		+ concussionCrisis * 0.00012
+		+ concussionCrisis * 0.00004
 		+ brainCrisis * 0.00008
 	crisisBleedRate = crisisBleedRate * medicationMul * resistanceMul
 

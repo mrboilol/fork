@@ -485,6 +485,7 @@ function hg.likely_to_phrase(ply)
 	local bleedingOut = hg.IsActivelyBleeding(org)
 	local bleedoutStartBlood = hg.organism.BLEEDOUT_START_BLOOD or 2500
 	local bleedoutDeathBlood = hg.organism.BLEEDOUT_DEATH_BLOOD or 2000
+	local terminalBloodLoss = blood <= bleedoutDeathBlood
 	local boneThoughtAge = org.just_damaged_bone and (CurTime() - org.just_damaged_bone)
 	local broken_dislocated = boneThoughtAge and boneThoughtAge >= 0 and boneThoughtAge <= 8
 	local adrenaline = org.adrenaline or 0
@@ -495,6 +496,7 @@ function hg.likely_to_phrase(ply)
 	-- before the normal low-blood cadence can reach its next phrase.
 	return (org.heartstop) and 6
 		or (o2 <= 15) and 4.5
+		or terminalBloodLoss and 4.5
 		or (hypotension > 0.5 and 0.55)
 		or (hypertension > 0.5 and 0.55)
 		or (bleedingOut and blood <= bleedoutStartBlood and blood > bleedoutDeathBlood) and 4
@@ -549,6 +551,7 @@ local function get_status_message(ply)
 	local bleedingOut = hg.IsActivelyBleeding(org)
 	local bleedoutStartBlood = hg.organism.BLEEDOUT_START_BLOOD or 2500
 	local bleedoutDeathBlood = hg.organism.BLEEDOUT_DEATH_BLOOD or 2000
+	local terminalBloodLoss = blood <= bleedoutDeathBlood
 	local fear = org.fear or 0
 	local adrenaline = org.adrenaline or 0
 	local arrhythmia = org.arrhythmia or 0
@@ -594,7 +597,7 @@ local function get_status_message(ply)
 		-- those callouts.
 		most_wanted_phraselist = near_death_poetic
 		statusThoughtKey = "lowoxy"
-	elseif bleedingOut and blood <= bleedoutStartBlood then
+	elseif terminalBloodLoss or (bleedingOut and blood <= bleedoutStartBlood) then
 		most_wanted_phraselist = near_death_poetic
 		statusThoughtKey = "blood2"
 	elseif pain > 100 then

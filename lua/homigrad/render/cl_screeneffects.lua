@@ -133,6 +133,8 @@ hook.Add("RenderScreenspaceEffects", "homigrad", function()
 	-- Keep the vital-state borders above every motion-blur pass, including the
 	-- organism effects dispatched by the hook immediately above.
 	if drawFinalVitalsVignettes then drawFinalVitalsVignettes() end
+
+	hook_Run("Post Pain Processing")
 end)
 
 local postprs = hg.postprocess
@@ -321,6 +323,7 @@ local depressionState = {
 	motionLerp = 0,
 	vignetteLerp = 0,
 	audioLerp = 0,
+	trackIndex = 0,
 	greyTab = {
 		["$pp_colour_addr"] = 0,
 		["$pp_colour_addg"] = 0,
@@ -332,6 +335,10 @@ local depressionState = {
 		["$pp_colour_mulg"] = 0,
 		["$pp_colour_mulb"] = 0
 	}
+}
+local depressionTracks = {
+	"sound/rem_track1.mp3",
+	"sound/rem_track2.mp3",
 }
 local depressionStation
 local depressionStationLoading = false
@@ -370,7 +377,9 @@ local function UpdateDepressionAudio(depression, unconscious)
 	depressionState.audioLerp = LerpFT(0.04, depressionState.audioLerp, target)
 	if target > 0.001 and not IsValid(depressionStation) and not depressionStationLoading then
 		depressionStationLoading = true
-		sound.PlayFile("sound/rem_despair.mp3", "noblock noplay", function(station)
+		depressionState.trackIndex = depressionState.trackIndex % #depressionTracks + 1
+		local track = depressionTracks[depressionState.trackIndex]
+		sound.PlayFile(track, "noblock noplay", function(station)
 			depressionStationLoading = false
 			if not IsValid(station) then return end
 			station:SetVolume(depressionState.audioLerp)
@@ -393,15 +402,15 @@ local function DrawDepressionEffect(org)
 	depressionState.lerp = LerpFT(0.01, depressionState.lerp, depression)
 	local intensity = depressionState.lerp
 	if intensity > 0.00005 then
+		local time = CurTime()
+		local pulse = math.sin(time * 1.4) * 0.5 + 0.5
+		depressionState.greyscaleLerp = LerpFT(0.012, depressionState.greyscaleLerp, math.Clamp(intensity * 1.18, 0, 1))
+		depressionState.vignetteLerp = LerpFT(0.01, depressionState.vignetteLerp, intensity * 11.67)
 		local mat = GetDepressionMaterial()
 		if mat then
-			local time = CurTime()
 			local wobbleX = math.sin(time * 0.9) * 0.042 + math.sin(time * 0.935) * 0.028
 			local wobbleY = math.cos(time * 0.72) * 0.042 + math.cos(time * 0.715) * 0.028
-			local pulse = math.sin(time * 1.4) * 0.5 + 0.5
 			depressionState.motionLerp = LerpFT(0.04, depressionState.motionLerp, intensity * (0.25 + pulse * 0.4))
-			depressionState.greyscaleLerp = LerpFT(0.012, depressionState.greyscaleLerp, math.Clamp(intensity * 1.18, 0, 1))
-			depressionState.vignetteLerp = LerpFT(0.01, depressionState.vignetteLerp, intensity * 11.67)
 			local pulseScale = (math.sin(time * math.pi / 0.93) * 0.5 + 0.5) * 1.1 * intensity
 
 			render.UpdateScreenEffectTexture()
@@ -414,20 +423,20 @@ local function DrawDepressionEffect(org)
 			mat:SetFloat("$c1_z", 0.82661 + depressionState.greyscaleLerp * 0.38)
 			render.SetMaterial(mat)
 			render.DrawScreenQuad()
-
-			render.UpdateScreenEffectTexture()
-			vignetteMat:SetFloat("$c2_x", time + 10000)
-			vignetteMat:SetFloat("$c0_z", depressionState.vignetteLerp)
-			vignetteMat:SetFloat("$c1_y", depressionState.vignetteLerp)
-			render.SetMaterial(vignetteMat)
-			render.DrawScreenQuad()
-
-			local tab = depressionState.greyTab
-			tab["$pp_colour_brightness"] = -depressionState.greyscaleLerp * 0.07
-			tab["$pp_colour_contrast"] = 1 - depressionState.greyscaleLerp * 0.16
-			tab["$pp_colour_colour"] = 1 - depressionState.greyscaleLerp * 0.98
-			DrawColorModify(tab)
 		end
+
+		render.UpdateScreenEffectTexture()
+		vignetteMat:SetFloat("$c2_x", time + 10000)
+		vignetteMat:SetFloat("$c0_z", depressionState.vignetteLerp)
+		vignetteMat:SetFloat("$c1_y", depressionState.vignetteLerp)
+		render.SetMaterial(vignetteMat)
+		render.DrawScreenQuad()
+
+		local tab = depressionState.greyTab
+		tab["$pp_colour_brightness"] = -depressionState.greyscaleLerp * 0.07
+		tab["$pp_colour_contrast"] = 1 - depressionState.greyscaleLerp * 0.16
+		tab["$pp_colour_colour"] = 1 - depressionState.greyscaleLerp * 0.98
+		DrawColorModify(tab)
 	end
 	UpdateDepressionAudio(depression, org.otrub)
 end
@@ -1092,8 +1101,8 @@ drawFinalVitalsVignettes = function()
 		painMat:SetFloat("$c0_y", math.Clamp(0.3 + painSeverity * 0.65, 0.3, 0.95))
 		painMat:SetFloat("$c0_z", math.Clamp(0.85 + painSeverity * 1.4, 0.85, 2.75))
 		local grainCoverage = math.max(
-			math.Clamp(painSeverity ^ 0.8 * 1.25, 0, 1.25),
-			math.Clamp(pain / 70, 0, 0.95)
+			math.Clamp(painSeverity ^ 0.8 * 1.65, 0, 1.65),
+			math.Clamp(pain / 55, 0, 1.3)
 		)
 		painMat:SetFloat("$c1_x", grainCoverage)
 		painMat:SetFloat("$c1_y", grainCoverage)
@@ -2150,15 +2159,13 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		lobotomy_index = 0
 	end
 
-	DrawDepressionEffect(org)
-
 	if O2Lerp > 1 then
 		render.UpdateScreenEffectTexture()
 		local remO2 = O2Lerp
 		noiseMat:SetFloat("$c0_y", 1 - remO2 / 200)
 		noiseMat:SetFloat("$c0_z", 1)
-		noiseMat:SetFloat("$c1_x", math.Clamp(remO2 / 200, 0, 2))
-		noiseMat:SetFloat("$c1_y", remO2 * (!org.otrub and 0.05 or 1))
+		noiseMat:SetFloat("$c1_x", math.Clamp(remO2 / 160, 0, 2.5))
+		noiseMat:SetFloat("$c1_y", remO2 * (!org.otrub and 0.075 or 1.25))
 		noiseMat:SetFloat("$c2_x", CurTime() + 10000)
 		render.SetMaterial(noiseMat)
 		render.DrawScreenQuad()
@@ -3093,7 +3100,7 @@ hook.Add("Post Pain Processing", "PainEffects", function()
 	local thresholdReached = PainLerp >= painThresholdMax
 	painThresholdIntensityLerp = LerpFT(0.03, painThresholdIntensityLerp, thresholdReached and 5 or 1)
 	local intensityMul = painThresholdIntensityLerp
-	local coverage = (thresholdReached and 1 or math.Clamp(pain / 70, 0, 0.95)) * zerlkersVisualMul
+	local coverage = (thresholdReached and 1.3 or math.Clamp(pain / 55, 0, 1.3)) * zerlkersVisualMul
 	local effectIntensity = pain / 32 * painEffectIntensity * intensityMul * zerlkersVisualMul
 		+ math.max(shock - 5, 0) / 2.4 * painEffectIntensity
 
@@ -3229,6 +3236,15 @@ hook.Add("EntityEmitSound", "HGTraitsBlindEcholocation", function(data)
 
 	blindEchoPings[#blindEchoPings + 1] = {pos = pos, power = power, expires = now + duration, duration = duration, source = source}
 	if #blindEchoPings > 16 then table.remove(blindEchoPings, 1) end
+end)
+
+hook.Add("Post Pain Processing", "DepressionEffects", function()
+	local spect = IsValid(lply:GetNWEntity("spect")) and lply:GetNWEntity("spect")
+	if !lply:Alive() and (!IsValid(spect) or viewmode != 1) then return end
+
+	local org = lply:Alive() and lply.organism or (IsValid(spect) and spect.organism)
+	if not org then return end
+	DrawDepressionEffect(org)
 end)
 
 hook.Add("PreDrawHalos", "HGTraitsBlindEcholocation", function()

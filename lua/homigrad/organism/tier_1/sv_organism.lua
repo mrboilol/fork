@@ -1197,6 +1197,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.neckslitWarned = nil
 	end
 
+	local compoundLeg = hg.organism.IsLimbCompoundFractured and (hg.organism.IsLimbCompoundFractured(org, "lleg") or hg.organism.IsLimbCompoundFractured(org, "rleg"))
 	local brokenLeg = org.lleg == 1 or org.rleg == 1
 	local clumsy = isPly and owner:HasTrait("clumsy")
 	if isPly and (brokenLeg or clumsy) and not org.NoKnockdown then
@@ -1204,8 +1205,8 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 			org.legBreakFallNext = CurTime() + 0.5
 			local spd = owner:GetVelocity():Length()
 			local tripSpeed = clumsy and 130 or 200
-			local tripChance = clumsy and math.Clamp((spd - tripSpeed) / 2.5, 12, 65) or math.Clamp((spd - tripSpeed) / 4, 2, 30)
-			if not IsValid(owner.FakeRagdoll) and spd > tripSpeed and math.random(100) < tripChance then
+			local tripChance = compoundLeg and math.Clamp((spd - 80) / 1.25, 35, 100) or (clumsy and math.Clamp((spd - tripSpeed) / 2.5, 12, 65) or math.Clamp((spd - tripSpeed) / 4, 2, 30))
+			if not IsValid(owner.FakeRagdoll) and spd > (compoundLeg and 80 or tripSpeed) and math.random(100) < tripChance then
 				org.needfake = true
 			end
 		end
@@ -1899,5 +1900,8 @@ hook.Add("OnEntityWaterLevelChanged", "ClearBlood", function(ent, old, new)
 	if new >= 2 then
 		if ent:IsOnFire() then ent:Extinguish() end
 		ent:RemoveAllDecals()
+		net.Start("hg_clear_blood_decals")
+		net.WriteEntity(ent)
+		net.Broadcast()
 	end
 end)

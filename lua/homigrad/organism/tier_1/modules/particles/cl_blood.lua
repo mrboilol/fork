@@ -125,9 +125,7 @@ hg.bloodpositions = hg.bloodpositions or {}
 hg.bloodcount = hg.bloodcount or 0
 local bloodDripSoundChance = 2 / 3
 
-local hg_blood_ground_limit = ConVarExists("hg_blood_ground_limit") and GetConVar("hg_blood_ground_limit") or CreateClientConVar("hg_blood_ground_limit", 600, true, false, "Maximum persistent ground blood stains", 1, 2000)
-local hg_blood_ground_lifetime = ConVarExists("hg_blood_ground_lifetime") and GetConVar("hg_blood_ground_lifetime") or CreateClientConVar("hg_blood_ground_lifetime", 900, true, false, "Seconds before ground blood fades", 30, 7200)
-local hg_blood_ground_fade = ConVarExists("hg_blood_ground_fade") and GetConVar("hg_blood_ground_fade") or CreateClientConVar("hg_blood_ground_fade", 20, true, false, "Seconds ground blood takes to fade", 1, 120)
+local hg_blood_ground_limit = GetConVar("hg_blood_ground_limit") or CreateClientConVar("hg_blood_ground_limit", 600, true, false, "Maximum persistent ground blood stains", 1, 2000)
 
 hg.groundbloodstains = hg.groundbloodstains or {}
 hg.fadinggroundbloodstains = hg.fadinggroundbloodstains or {}
@@ -140,21 +138,14 @@ end
 local groundBloodColor = Color(92, 0, 0, 255)
 local render_DrawQuadEasy = render.DrawQuadEasy
 
-local function fadeGroundBlood(stain, now)
-	stain.fadeStart = now
-	stain.fadeEnd = now + math.max(hg_blood_ground_fade:GetFloat(), 0.1)
-	hg.fadinggroundbloodstains[#hg.fadinggroundbloodstains + 1] = stain
-end
-
 local function addGroundBlood(pos, normal, artery, tiny)
 	if hg_old_blood:GetBool() then return false end
 	if normal.z < 0.55 then return false end
 
-	local now = CurTime()
 	local stains = hg.groundbloodstains
 	local limit = math.max(hg_blood_ground_limit:GetInt(), 1)
 	while #stains >= limit do
-		fadeGroundBlood(table.remove(stains, 1), now)
+		table.remove(stains, 1)
 	end
 
 	local size
@@ -172,37 +163,17 @@ local function addGroundBlood(pos, normal, artery, tiny)
 		material = groundBloodMaterials[math_random(#groundBloodMaterials)],
 		size = size,
 		rotation = math_random(0, 359),
-		created = now,
 	}
 
 	return true
 end
 
 hook.Add("Think", "hg_persistent_ground_blood", function()
-	local now = CurTime()
 	local stains = hg.groundbloodstains
-	local lifetime = math.max(hg_blood_ground_lifetime:GetFloat(), 0.1)
 	local limit = math.max(hg_blood_ground_limit:GetInt(), 1)
 
-	for i = #stains, 1, -1 do
-		if now - stains[i].created >= lifetime then
-			fadeGroundBlood(table.remove(stains, i), now)
-		end
-	end
-
 	while #stains > limit do
-		fadeGroundBlood(table.remove(stains, 1), now)
-	end
-
-	local fading = hg.fadinggroundbloodstains
-	for i = #fading, 1, -1 do
-		if fading[i].fadeEnd <= now then
-			table_remove(fading, i)
-		end
-	end
-
-	while #fading > limit do
-		table_remove(fading, 1)
+		table.remove(stains, 1)
 	end
 end)
 
@@ -224,12 +195,6 @@ hook.Add("PostDrawTranslucentRenderables", "hg_draw_persistent_ground_blood", fu
 		drawStain(hg.groundbloodstains[i], 255)
 	end
 
-	local now = CurTime()
-	for i = 1, #hg.fadinggroundbloodstains do
-		local stain = hg.fadinggroundbloodstains[i]
-		local alpha = math.Clamp((stain.fadeEnd - now) / (stain.fadeEnd - stain.fadeStart), 0, 1) * 255
-		drawStain(stain, alpha)
-	end
 end)
 
 local function playBloodDripImpact(pos, tr)

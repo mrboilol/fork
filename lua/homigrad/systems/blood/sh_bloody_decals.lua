@@ -2,6 +2,7 @@
 if SERVER then
     util.AddNetworkString("bloody_decal_1")
     util.AddNetworkString("bruise_decal")
+    util.AddNetworkString("hg_clear_blood_decals")
 
     local bruiseDecalCount = 4
 
@@ -26,10 +27,18 @@ end
 
 function ClearDecalToEnt(ent)
 	if ent.decalshuy then
-		ent:SetSubMaterial()
-		
+		for id, material in pairs(ent.decalshuy) do
+			ent:SetSubMaterial(id - 1, material)
+		end
 		ent.decalshuy = nil
 	end
+end
+
+local function getBloodDecalModel(ent)
+	local mdl = ent.worldModel2
+	mdl = IsValid(mdl) and mdl or ent.worldModel
+	mdl = IsValid(mdl) and mdl or ent.NPCworldModel
+	return IsValid(mdl) and mdl or ent
 end
 
 local matRepl = Material("decals/decalsplash")
@@ -143,10 +152,7 @@ net.Receive("bloody_decal_1", function()
 	local self = net.ReadEntity()
 
 	if IsValid(self) then
-		local mdl = self.worldModel2
-		mdl = IsValid(mdl) and mdl or self.worldModel
-		mdl = IsValid(mdl) and mdl or self.NPCworldModel
-		mdl = IsValid(mdl) and mdl or self
+		local mdl = getBloodDecalModel(self)
 		
 		if self.bloodID then
 			AddDecalToEnt(mdl, self.bloodID, self:EntIndex(), hg_old_blood:GetBool() and oldMatBlood or matBlood, false, nil, nil, nil, nil, self.DamageType != DMG_SLASH and 100)
@@ -154,6 +160,14 @@ net.Receive("bloody_decal_1", function()
 			AddDecalToEnt2(mdl, self:EntIndex(), hg_old_blood:GetBool() and oldMatBlood or matBlood, false, nil, nil, nil, nil, self.DamageType != DMG_SLASH and 100)
 		end
 	end
+end)
+
+net.Receive("hg_clear_blood_decals", function()
+	local ent = net.ReadEntity()
+	if not IsValid(ent) then return end
+	ClearDecalToEnt(ent)
+	local mdl = getBloodDecalModel(ent)
+	if mdl ~= ent then ClearDecalToEnt(mdl) end
 end)
 
 local bruiseSizeCvar = CreateClientConVar("hg_bruise_size", "0.04", true, false, "Bruise decal size (world units)", 0.01, 5)

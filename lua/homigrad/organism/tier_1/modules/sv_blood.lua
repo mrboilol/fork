@@ -7,6 +7,7 @@ local internalBleedDefaultComplicationDelay = 120
 hg.organism.module.blood = {}
 local module = hg.organism.module.blood
 local hg_infections = ConVarExists("hg_infections") and GetConVar("hg_infections") or CreateConVar("hg_infections",1,FCVAR_ARCHIVE + FCVAR_NOTIFY,"Enable infections system",0,1)
+local hg_blood_ground_limit = ConVarExists("hg_blood_ground_limit") and GetConVar("hg_blood_ground_limit") or CreateConVar("hg_blood_ground_limit", 600, FCVAR_ARCHIVE + FCVAR_REPLICATED, "Maximum persistent ground blood stains", 1, 2000)
 local tranexamicOnsetDelay = 8
 
 function hg.organism.AdministerTranexamic(org, dose)
@@ -545,7 +546,6 @@ module[2] = function(owner, org, mulTime)
 		local ent = getBleedingBody(owner)
 		local entVel = ent:GetVelocity()
 		
-		local woundsToRemove = {}
 		for i, wound in pairs(org.wounds) do
 			local tourniquetBleedMul = hg.GetTourniquetBleedMultiplier and hg.GetTourniquetBleedMultiplier(owner, wound[4]) or 1
 			local heldClotMul = getHeldWoundClotMul(org, wound)
@@ -572,15 +572,7 @@ module[2] = function(owner, org, mulTime)
 
 			if wound[1] <= 0.001 then
 				wound[1] = 0
-				table.insert(woundsToRemove, i)
 			end
-		end
-
-		for idx = #woundsToRemove, 1, -1 do
-			table.remove(org.wounds, woundsToRemove[idx])
-		end
-		if #woundsToRemove > 0 then
-			hg.organism.SyncWoundsNet(org)
 		end
 	end
 
@@ -597,7 +589,6 @@ module[2] = function(owner, org, mulTime)
 	local ent = getBleedingBody(owner)
 	local ownerVel = ent:GetVelocity()
 
-	local arterialToRemove = {}
 	local hasCarotidWound = false
 	local heldCarotidWound = false
 	for i, wound in pairs(org.arterialwounds) do
@@ -652,19 +643,12 @@ module[2] = function(owner, org, mulTime)
 
 		if (wound[1] or 0) <= 0.001 then
 			wound[1] = 0
-			table.insert(arterialToRemove, i)
 			org[wound[7]] = 0
 		end
 		arterialWoundBleedRates[i] = woundBleedRate
 		wound.visualBleedRate = woundBleedRate
 	end
 
-	for idx = #arterialToRemove, 1, -1 do
-		table.remove(org.arterialwounds, arterialToRemove[idx])
-	end
-	if #arterialToRemove > 0 then
-		hg.organism.RebuildArteryWoundState(org)
-	end
 	if org.throatcut then
 		local severity = math.Clamp(org.throatCutSeverity or 1, 0.35, 1.25)
 		local carotidPressureMul = heldCarotidWound and hold_wound_arterial_slow_mul or 1

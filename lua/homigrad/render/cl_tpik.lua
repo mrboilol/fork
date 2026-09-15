@@ -978,8 +978,11 @@ function hg.DoTPIK(ply, ent)
 	local self = ply:GetActiveWeapon()
 
     local org = ply.organism or ent.organism
-    local leftArmDisabled = org and ((org.larm or 0) >= 1 or org.larmdislocation or org.larmdislocated or org.larmamputated or org.lhandamputated or org.larmupamputated)
-    local lhik2 = not leftArmDisabled and ((IsValid(self) and self.lhandik) or ply:InVehicle()) and hg.CanUseLeftHand(ply)
+    local leftArmBroken = org and ((org.larm or 0) >= 1 or org.larmdislocation or org.larmdislocated)
+    local leftArmAmputated = org and (org.larmamputated or org.lhandamputated or org.larmupamputated)
+    local leftArmDisabled = leftArmBroken or leftArmAmputated
+    local leftArmRelaxing = leftArmBroken and not leftArmAmputated and IsValid(self) and ishgweapon(self) and not self.reload
+    local lhik2 = leftArmRelaxing or (not leftArmDisabled and ((IsValid(self) and self.lhandik) or ply:InVehicle()) and hg.CanUseLeftHand(ply))
     local rhik2 = ((IsValid(self) and self.rhandik) or ply:InVehicle()) and hg.CanUseRightHand(ply)
     
     local shouldrebuild = false
@@ -1009,7 +1012,7 @@ function hg.DoTPIK(ply, ent)
         ent.dirtymatrixrh = nil
     end*/
 
-    ply.lerp_lh = leftArmDisabled and 0 or math.Approach(ply.lerp_lh or 0, lhik2 and 1 or 0, FrameTime() * 2.0 * game.GetTimeScale())//LerpFT(0.1, ply.lerp_lh or 1, lhik2 and 1 or 0)
+    ply.lerp_lh = leftArmAmputated and 0 or math.Approach(ply.lerp_lh or 0, lhik2 and 1 or 0, FrameTime() * 2.0 * game.GetTimeScale())//LerpFT(0.1, ply.lerp_lh or 1, lhik2 and 1 or 0)
     ply.lerp_rh = math.Approach(ply.lerp_rh or 0, rhik2 and 1 or 0, FrameTime() * 2.0 * game.GetTimeScale())//LerpFT(0.1, ply.lerp_rh or 1, rhik2 and 1 or 0)
 
     local lerp_lh = math.ease.InOutSine(ply.lerp_lh)
@@ -1231,7 +1234,12 @@ local angrotate = math.NormalizeAngle(-eyeang.r + ply_r_hand_matrix:GetAngles().
             end
 
             local hand = ply_l_hand_matrix:GetTranslation()
-            segments[3] = {Pos = Lerp(1 - lerp_lh, ply.last_lh and ply.last_lh:GetTranslation() or segments[3].Pos, ply_l_hand_matrix_old and ply_l_hand_matrix_old:GetTranslation() or hand), Len = 12}
+            if leftArmRelaxing then
+                segments[3] = segments[3] or {Pos = hand, Len = limblength}
+                segments[3].Pos = LerpVector(self:IsPistolHoldType() and 0.01 or 0.05, segments[3].Pos + (-vector_up * 0.6 + eyeang:Forward() * 0.4 + (self:IsPistolHoldType() and vector_origin or eyeang:Right() * 0.7) + ent:GetVelocity() / 400) * 0.5, hand)
+            else
+                segments[3] = {Pos = Lerp(1 - lerp_lh, ply.last_lh and ply.last_lh:GetTranslation() or segments[3].Pos, ply_l_hand_matrix_old and ply_l_hand_matrix_old:GetTranslation() or hand), Len = 12}
+            end
 
             if lply:IsSuperAdmin() then
                 for i = 2, #segments do
@@ -1288,6 +1296,11 @@ q = q * Quaternion():SetAngleAxis(-60 - angrr.r + eyeang.r - math.NormalizeAngle
         local ang = q:Angle()
 
         ply_l_forearm_matrix:SetAngles(ang)
+
+        if leftArmRelaxing then
+            ang:RotateAroundAxis(ang:Forward(), 95)
+            ply_l_hand_matrix:SetAngles(LerpAngle(0.5, ply_l_hand_matrix:GetAngles(), ang))
+        end
 
         hg.bone_apply_matrix(ent, ply_l_upperarm_index, ply_l_upperarm_matrix, ply_l_forearm_index)
         hg.bone_apply_matrix(ent, ply_l_forearm_index, ply_l_forearm_matrix, ply_l_hand_index)
