@@ -18,9 +18,9 @@ if SERVER then
 
         if suicideMode == 0 and not ply.suiciding and ply.organism and (ply.organism.depression or 0) < 0.5 then
 			if ply:GetInfoNum("hg_newthoughts", 0) > 0 and ply.Thought then
-				ply:Thought("You shouldnt do this.", 6, "depression_block_suicide", 0)
+				ply:Thought("You shouldn't do this.", 6, "depression_block_suicide", 0)
 			else
-				ply:Notify("I shouldnt do this", 6, "depression_block_suicide", 0)
+				ply:Notify("I can't do it.", 6, "depression_block_suicide", 0)
 			end
 			return
 		end

@@ -547,9 +547,9 @@ concommand.Add("selfharm", function(ply)
 	if (ply.remUrgeCooldown or 0) > CurTime() then return end
 	if ply.organism and (ply.organism.depression or 0) < 0.5 then
 		if ply:GetInfoNum("hg_newthoughts", 0) > 0 then
-			ply:Thought("You shouldnt do this.", 6, "depression_block_selfharm", 0)
+			ply:Thought("You shouldn't do this.", 6, "depression_block_selfharm", 0)
 		else
-			ply:Notify("I shouldnt do this", 6, "depression_block_selfharm", 0)
+			ply:Notify("I can't do it.", 6, "depression_block_selfharm", 0)
 		end
 		return
 	end

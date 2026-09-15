@@ -1189,7 +1189,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		elseif org.neckslitWarned ~= true and org.neckslitDeadline - CurTime() <= 4 then
 			org.neckslitWarned = true
 			if isPly and owner:Alive() then
-				owner:Notify("I CAN'T STOP THE BLEEDING I CAN'T I JUST CANT PLEASE HELP ME", true, "neckslit_save", 0)
+				owner:Notify("I CAN'T STOP THE BLEEDING I CAN'T I JUST CAN'T PLEASE HELP ME", true, "neckslit_save", 0)
 			end
 		end
 	elseif org.neckslitDeadline then
