@@ -66,12 +66,12 @@ end
 
 net.Receive("rem_selfharm_end", function()
 	flashFade = 1
-	surface.PlaySound("rem_enditall.mp3")
+	surface.PlaySound("dicksdoor.mp3")
 end)
 
 net.Receive("rem_urges_end", function()
 	flashFade = 1
-	surface.PlaySound("rem_enditall.mp3")
+	surface.PlaySound("dicksdoor.mp3")
 end)
 
 hook.Add("PlayerButtonDown", "REM_UrgesPress", function(ply, button)
