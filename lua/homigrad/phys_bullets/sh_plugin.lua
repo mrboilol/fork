@@ -26,7 +26,7 @@
 --//
 
 -- ulx luarun SetGlobalBool('PhysBullets_ReplaceDefault', true)
-SetGlobalBool("PhysBullets_ReplaceDefault", false)
+if SERVER then SetGlobalBool("PhysBullets_ReplaceDefault", true) end
 
 PLUGIN.Name = "Physics Bullet"
 PLUGIN.Description = "Creates projectiles"

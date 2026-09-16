@@ -6,24 +6,28 @@ local depression_max = 1
 local depression_drain_time = 300
 local depression_drain_boost_time = 100
 local depression_pain_threshold = 60
-local depression_pain_gain = 0.02
+local depression_pain_gain = 0.006
 local depression_fear_threshold = 3
-local depression_fear_gain = 0.015
+local depression_fear_gain = 0.004
 local depression_blood_threshold = 3500
-local depression_blood_gain = 0.01
+local depression_blood_gain = 0.003
 local depression_otrub_gain = 0.005
 local depression_adrenaline_suppress_start = 0.5
 local depression_adrenaline_suppress_min = 0.1
 local depression_bleedrate_threshold = 5
-local depression_bleedrate_gain = 0.03
-local depression_bleedrate_maxmul = 4
-local depression_o2_threshold = 15
-local depression_o2_gain = 0.02
-local depression_bones_gain = 0.012
+local depression_bleedrate_gain = 0.004
+local depression_bleedrate_maxmul = 2
+local depression_bones_gain = 0.004
 local depression_cold_threshold = 35
-local depression_cold_gain = 0.01
-local depression_panic_gain = 0.02
-local depression_amputation_gain = 0.015
+local depression_cold_gain = 0.003
+local depression_panic_gain = 0.006
+local depression_amputation_gain = 0.005
+local depression_wake_relief = 0.2
+local depression_wake_relief_time = 35
+local depression_untreated_bleed_threshold = 2
+local depression_untreated_bleed_delay = 45
+local depression_untreated_bleed_gain = 0.006
+local depression_treatment_failure_gain = 0.035
 local suicide_depression_gain = 0.025
 
 local selfharm_threshold = 0.4
@@ -224,6 +228,10 @@ module[1] = function(org)
 	org.depressionNotifyStage = nil
 	org.depressionNextNotifyThought = nil
 	org.depressionNextMinigamePhrase = nil
+	org.depressionWakeReliefUntil = nil
+	org.depressionUntreatedBleedSince = nil
+	org.depressionTreatmentUntil = nil
+	org.depressionWasUnconscious = false
 	org.selfharmNextRoll = CurTime() + selfharm_initial_delay
 	org.selfharmUntil = 0
 	org.selfharmPendingUntil = nil
@@ -251,6 +259,26 @@ local function doSelfHarmCut(owner)
 	if not IsValid(wep) or not wep.DoSelfHarmCut then return end
 
 	wep:DoSelfHarmCut()
+end
+
+function hg.organism.RecordDepressionTreatment(org, failed)
+	if not org then return end
+
+	org.depressionTreatmentUntil = CurTime() + depression_untreated_bleed_delay
+	org.depressionUntreatedBleedSince = nil
+	if failed then
+		org.depressionWakeReliefUntil = nil
+		org.depressionadd = Clamp((org.depressionadd or 0) + depression_treatment_failure_gain, 0, depression_max)
+	end
+end
+
+local function applyWakeRelief(org)
+	if (org.bleed or 0) <= 0 and (org.internalBleed or 0) <= 0 then return end
+
+	org.depression = max((org.depression or 0) - depression_wake_relief, 0)
+	org.depressionWakeReliefUntil = CurTime() + depression_wake_relief_time
+	org.depressionUntreatedBleedSince = nil
+	org.depressionTreatmentUntil = CurTime() + depression_wake_relief_time
 end
 
 local function updateSelfHarmCutTick(owner, org)
@@ -362,6 +390,10 @@ module[2] = function(owner, org, timeValue)
 
 	if not org.alive then return end
 	if org.heartstop then return end
+	if org.depressionWasUnconscious and not org.otrub then
+		applyWakeRelief(org)
+	end
+	org.depressionWasUnconscious = org.otrub and true or false
 
 	local add = 0
 
@@ -385,11 +417,6 @@ module[2] = function(owner, org, timeValue)
 		add = add + depression_bleedrate_gain * min(bleedrate / depression_bleedrate_threshold, depression_bleedrate_maxmul) * timeValue
 	end
 
-	local o2 = org.o2 and org.o2[1] or 30
-	if o2 < depression_o2_threshold then
-		add = add + depression_o2_gain * timeValue
-	end
-
 	if (org.immobilization or 0) > 0 or (org.spine1 or 0) > 0.5 or (org.spine2 or 0) > 0.5 or (org.spine3 or 0) > 0.5 or (org.lleg or 0) >= 0.5 or (org.rleg or 0) >= 0.5 then
 		add = add + depression_bones_gain * timeValue
 	end
@@ -410,6 +437,17 @@ module[2] = function(owner, org, timeValue)
 		add = add + depression_otrub_gain * timeValue
 	end
 
+	local now = CurTime()
+	local severeBleeding = bleedrate > depression_untreated_bleed_threshold or (org.internalBleed or 0) > 0.5
+	if severeBleeding and now >= (org.depressionTreatmentUntil or 0) then
+		org.depressionUntreatedBleedSince = org.depressionUntreatedBleedSince or now
+		if now - org.depressionUntreatedBleedSince >= depression_untreated_bleed_delay then
+			add = add + depression_untreated_bleed_gain * timeValue
+		end
+	else
+		org.depressionUntreatedBleedSince = nil
+	end
+
 	if (org.depressionadd or 0) > 0 then
 		local applied = min(org.depressionadd, timeValue / 5)
 		org.depressionadd = max(org.depressionadd - applied, 0)
@@ -424,6 +462,9 @@ module[2] = function(owner, org, timeValue)
 	local goodmood = Clamp(tonumber(org.goodmood) or 0, 0, 1)
 	if goodmood > 0 then
 		add = add * Lerp(goodmood, 1, 0.6)
+	end
+	if now < (org.depressionWakeReliefUntil or 0) then
+		add = 0
 	end
 
 	org.depression = Clamp((org.depression or 0) + add, 0, depression_max)

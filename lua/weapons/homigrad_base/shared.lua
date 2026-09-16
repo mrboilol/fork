@@ -3195,6 +3195,13 @@ function SWEP:PlayAnim(anim, data, cycling, callback, reverse, sendtoclient)
 	end
 
 	if SERVER then
+        self.HGEquipmentAnimation = {
+            sequence = self.AnimList[anim] or anim,
+            start = CurTime() - start,
+            duration = math.max(time, 0.001),
+            cycling = cycling,
+            reverse = reverse,
+        }
         net.Start("hg_animation")
             local netTbl = {
                 anim = anim,

@@ -175,6 +175,9 @@ local function GetGeometry(model)
     local probe = ents.Create("base_anim")
     if not IsValid(probe) then return end
     probe:SetModel(model)
+    probe:SetPos(vector_origin)
+    probe:SetAngles(angle_zero)
+    probe:Spawn()
     local mins, maxs = probe:GetModelBounds()
     local geometry = {mins = mins, maxs = maxs, convexes = {}, boxes = {}}
     local meshes = {}
@@ -485,8 +488,18 @@ function hg.GetHeldWeaponImpactModel(ply, wep)
         if isstring(wep.WorldModelExchange) and wep.WorldModelExchange ~= "" then
             modelName = wep.WorldModelExchange
             modelScale = wep.modelscale or modelScale
+            return modelName, transformedPos or model:GetPos(), transformedAng or model:GetAngles(), modelScale
         end
-        return modelName, transformedPos or model:GetPos(), transformedAng or model:GetAngles(), modelScale
+        local animation = wep.HGEquipmentAnimation
+        model:SetSequence(animation and animation.sequence or wep.AnimList and wep.AnimList.idle or "idle")
+        if animation then
+            local timing = (CurTime() - animation.start) / animation.duration
+            timing = animation.cycling and timing % 1 or math.Clamp(timing, 0, 1)
+            if animation.reverse and not animation.cycling then timing = 1 - timing end
+            model:SetCycle(timing)
+        end
+        SetupEntityBones(model)
+        return modelName, transformedPos or model:GetPos(), transformedAng or model:GetAngles(), modelScale, model
     end
     local body = hg.GetCurrentCharacter(ply)
     if not IsValid(body) then return end
@@ -506,12 +519,15 @@ end
 local function TraceHeldWeaponModel(ply, wep, startPos, endPos, padding)
     local model, pos, ang, scale, pose = hg.GetHeldWeaponImpactModel(ply, wep)
     if not model then return end
+    local best
     if IsValid(pose) and (pose:GetHitBoxCount(0) or 0) > 0 then
-        local best
         local expand = Vector(padding, padding, padding)
         local ray = endPos - startPos
         for index = 0, pose:GetHitBoxCount(0) - 1 do
             local bone = pose:GetHitBoxBone(index, 0)
+            local name = bone and string.lower(pose:GetBoneName(bone) or "") or ""
+            local humanBone = name:find("valvebiped", 1, true) or name:find("human", 1, true) or name:find("bip01", 1, true)
+            if humanBone and (name:find("hand", 1, true) or name:find("arm", 1, true) or name:find("palm", 1, true) or name:find("finger", 1, true) or name:find("clavicle", 1, true)) then continue end
             local matrix = bone and pose:GetBoneMatrix(bone)
             local mins, maxs = pose:GetHitBoxBounds(index, 0)
             if not matrix or not mins or not maxs then continue end
@@ -520,10 +536,10 @@ local function TraceHeldWeaponModel(ply, wep, startPos, endPos, padding)
                 best = {position = position, normal = normal, fraction = fraction, thickness = math.max((maxs - mins):Length() * scale, 0.05)}
             end
         end
-        return best
     end
     local hit = hg.TraceEquipmentModel(model, pos, ang, scale, startPos, endPos, padding, true)
-    return hit
+    if hit and (not best or hit.fraction < best.fraction) then return hit end
+    return best
 end
 
 function hg.DropWeaponFromImpact(ply, wep, direction, strength)
@@ -924,7 +940,7 @@ local function TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, ori
         local overlapsEquipment = false
         if armTrace.HGArmFallback then
             for _, hit in ipairs(hits) do
-                if (hit.weapon or hit.heldEntity) and IsValid(hit.ply) and hg.GetCurrentCharacter(hit.ply) == armTrace.Entity and hit.fraction <= obstructionFraction + 0.0001 then
+                if (hit.weapon or hit.heldEntity) and IsValid(hit.ply) and hg.GetCurrentCharacter(hit.ply) == armTrace.Entity and hit.fraction <= armTrace.Fraction + 0.0001 then
                     overlapsEquipment = true
                     break
                 end

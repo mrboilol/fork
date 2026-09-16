@@ -178,9 +178,17 @@ function hg.organism.ApplyMedicalAction(actor, target, action, ctx)
 			org.internalBleedHeal = min((org.internalBleedHeal or 0) + 0.3 * skill, 20)
 		end
 	end
-	if (org.next_med_error_check or 0) > CurTime() then return end
+	if (org.next_med_error_check or 0) > CurTime() then
+		if hg.organism.RecordDepressionTreatment then
+			hg.organism.RecordDepressionTreatment(org, false)
+		end
+		return
+	end
 	org.next_med_error_check = CurTime() + 0.6
-	apply_med_error(actor, org, action, ctx)
+	local failed = apply_med_error(actor, org, action, ctx)
+	if hg.organism.RecordDepressionTreatment then
+		hg.organism.RecordDepressionTreatment(org, failed)
+	end
 end
 
 hook.Add("hg_medical_minigame_finished", "organism-medical-system-action", function(actor, target, minigameType)
