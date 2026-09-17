@@ -25,7 +25,7 @@ Register("clumsy", {Name = "Clumsy", Description = "You tend to mess up sometime
 Register("deaf", {Name = "Deaf", Description = "You cannot hear sounds or speech.", Category = "negative", Points = 2, SortOrder = 80})
 Register("pushover", {Name = "Pushover", Description = "You let people push you easily.", Category = "negative", Points = 2, SortOrder = 90})
 Register("wimp", {Name = "Wimp", Description = "You are more prone to pain.", Category = "negative", Points = 3, SortOrder = 100, Modifiers = {pain_received = 1.75, trauma_resistance = 0.72}})
-Register("amputee", {Name = "Amputee", Description = "Spawn without one limb.", Category = "negative", Points = 3, SortOrder = 110})
+Register("amputee", {Name = "Amputee", Description = "Spawn without one limb.", Category = "negative", Points = 6, SortOrder = 110})
 Register("frail", {Name = "Frail", Description = "You are easily wounded.", Category = "negative", Points = 3, SortOrder = 120, Modifiers = {bone_damage = 1.4, bleeding = 1.3}})
 Register("weak", {Name = "Weak", Description = "You are weak. (dumbass)", Category = "negative", Points = 2, SortOrder = 130, Modifiers = {melee_damage = 0.7, weapon_handling = 1.25, weapon_weight = 0.72}})
 Register("slow", {Name = "Slow", Description = "You walk, jog, and run more slowly.", Category = "negative", Points = 2, SortOrder = 140, Modifiers = {movement_speed = 0.74}})
