@@ -52,9 +52,11 @@ end)
 
 net.Receive("HG.Plugin[bullet](RemoveBullet)", function(len)
 	local bullet_key = PLUGIN.net_readkey()
+	local position = net.ReadVector()
 	local bullet = PLUGIN.BulletsTable[bullet_key]
 	
 	if(bullet)then
+		bullet.Pos = position
 		bullet:Remove()
 	end
 end)

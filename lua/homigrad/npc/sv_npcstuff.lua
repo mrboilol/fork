@@ -113,6 +113,7 @@ local math_random, math_Rand = math.random, math.Rand
 				newOrg.owner.fullsend = true
 				hg.organism.FlushWoundsNet(newOrg, true, true)
 				hg.organism.FlushArterialWoundsNet(newOrg, true)
+				hg.organism.SyncWoundMarksNet(newOrg)
 				hg.send_bareinfo(newOrg, true, true)
 			
 				ent.organism = nil

@@ -267,32 +267,57 @@ function hg.ShadowControl(ragdoll, physNumber, ss, ang, maxang, maxangdamp, pos,
 	phys:ComputeShadowControl(shadowparams)
 end
 
-function hg.DampenRagdollCommonSpin(ragdoll, maxSpin, damping)
+function hg.StabilizeRagdollReaction(ragdoll, maxSpin, maxRelativeSpin, maxRelativeSpeed, damping)
 	if not IsValid(ragdoll) then return end
 
-	local angular, totalMass = vector_origin, 0
+	local velocity, angular, totalMass = vector_origin, vector_origin, 0
 	local count = ragdoll:GetPhysicsObjectCount()
 	for i = 0, count - 1 do
 		local phys = ragdoll:GetPhysicsObjectNum(i)
-		if not IsValid(phys) then continue end
+		if not IsValid(phys) or not phys:IsMotionEnabled() then continue end
 
 		local mass = math.max(phys:GetMass(), 1)
+		velocity = velocity + phys:GetVelocity() * mass
 		angular = angular + phys:GetAngleVelocity() * mass
 		totalMass = totalMass + mass
 	end
 
 	if totalMass <= 0 then return end
+	velocity = velocity / totalMass
 	angular = angular / totalMass
-	local speed = angular:Length()
-	if speed <= maxSpin then return end
+	damping = math.Clamp(damping or 1, 0, 1)
+	maxSpin = math.max(maxSpin or 90, 0)
+	maxRelativeSpin = math.max(maxRelativeSpin or 180, maxSpin)
+	maxRelativeSpeed = math.max(maxRelativeSpeed or 220, 0)
 
-	local correction = angular * ((speed - maxSpin) / speed) * math.Clamp(damping or 1, 0, 1)
+	local commonSpeed = angular:Length()
+	local commonCorrection = vector_origin
+	if commonSpeed > maxSpin then
+		commonCorrection = angular * ((commonSpeed - maxSpin) / commonSpeed) * damping
+	end
+
 	for i = 0, count - 1 do
 		local phys = ragdoll:GetPhysicsObjectNum(i)
-		if IsValid(phys) then
-			phys:AddAngleVelocity(-correction)
+		if not IsValid(phys) or not phys:IsMotionEnabled() then continue end
+
+		local relativeAngular = phys:GetAngleVelocity() - angular
+		local relativeAngularSpeed = relativeAngular:Length()
+		local angularCorrection = commonCorrection
+		if relativeAngularSpeed > maxRelativeSpin then
+			angularCorrection = angularCorrection + relativeAngular * ((relativeAngularSpeed - maxRelativeSpin) / relativeAngularSpeed) * damping
+		end
+		if angularCorrection:LengthSqr() > 0 then phys:AddAngleVelocity(-angularCorrection) end
+
+		local relativeVelocity = phys:GetVelocity() - velocity
+		local relativeSpeed = relativeVelocity:Length()
+		if relativeSpeed > maxRelativeSpeed then
+			phys:AddVelocity(-relativeVelocity * ((relativeSpeed - maxRelativeSpeed) / relativeSpeed) * damping)
 		end
 	end
+end
+
+function hg.DampenRagdollCommonSpin(ragdoll, maxSpin, damping)
+	hg.StabilizeRagdollReaction(ragdoll, maxSpin, math.huge, math.huge, damping)
 end
 
 local shadowControl = hg.ShadowControl

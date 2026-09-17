@@ -111,8 +111,9 @@ function PLUGIN.NetworkBulletFull(bullet, ply, forced)
 end
 
 function PLUGIN.NetworkBulletRemove(bullet, ply)
-	net.Start("HG.Plugin[bullet](RemoveBullet)", true)
+	net.Start("HG.Plugin[bullet](RemoveBullet)")
 		PLUGIN.net_writekey(bullet.Key)
+		net.WriteVector(bullet.Pos)
 	
 	if(ply)then
 		net.Send(ply)

@@ -95,14 +95,6 @@ local syringeBaseMat = LoadHudMaterial("homigrad/syringe/s2.png", "homigrad/syri
 local syringePlungerFrames = {}
 local syringePlungerFrameDuration = 0.09
 local amputationVisualStateCache = {}
-local dislocationLimbLabels = {
-    larm = "LEFT ARM",
-    rarm = "RIGHT ARM",
-    lleg = "LEFT LEG",
-    rleg = "RIGHT LEG",
-    jaw = "JAW"
-}
-
 local function GetAmputationVisualStateKey(target, limb)
     local targetId = "self"
     if IsValid(target) then
@@ -371,6 +363,12 @@ local function DrawOutlinedBone(x, y, width, height, angleDeg, outlineColor, inn
     DrawFilledCircle(rx, ry + height * 0.22, height * 0.16, innerColor, 20)
 end
 
+local function GetBoneEnd(x, y, width, height, angleDeg, endSign)
+    local endOffset = ((width * 0.5) - (height * 0.3)) * (endSign or 1)
+    local rad = math.rad(angleDeg or 0)
+    return x + endOffset * math.cos(rad), y + endOffset * math.sin(rad)
+end
+
 local function DrawAmputationBlade(x, y, width, height, angleDeg)
     local rad = math.rad(angleDeg or 0)
     local cosA, sinA = math.cos(rad), math.sin(rad)
@@ -507,9 +505,7 @@ function PANEL:Init()
     self.TargetAngleObj = Angle(0, 0, 0)
     
     self.TrailPoints = {}
-    self.CompletedWraps = 0
-    self.StartAngleRad = -math.pi / 2 -- Start at -90 degrees (top)
-    self.StartAngleReached = false
+    self.CompletedWraps = self.BandageCompletions
 
     self.TourniquetStage = 1
     self.TourniquetStrapProgress = 0
@@ -559,19 +555,44 @@ function PANEL:Init()
         self.DislocationSide = (hg and hg.MedicalMinigame and hg.MedicalMinigame.NextDislocationSide) or 1
         self.Progress = math.Clamp((hg and hg.MedicalMinigame and hg.MedicalMinigame.NextProgress) or 0, 0, 1)
         self.LastProgressSent = self.Progress
-        local sign = self.DislocationSide >= 0 and 1 or -1
         self.DislocationFixedBoneWidth = 230
         self.DislocationFixedBoneHeight = 90
         self.DislocationMoveBoneWidth = 220
         self.DislocationMoveBoneHeight = 84
-        self.DislocationMoveAngle = -18 * sign
-        self.DislocationFixedBoneX = self.CenterX - (260 * sign)
-        self.DislocationFixedBoneY = self.CenterY + 140
-        local fixedEndOffset = (self.DislocationFixedBoneWidth * 0.5) - (self.DislocationFixedBoneHeight * 0.3)
-        local fixedEndX = self.DislocationFixedBoneX + fixedEndOffset * sign
-        local fixedEndY = self.DislocationFixedBoneY
-        self.DislocationMoveX = fixedEndX + (265 * sign)
-        self.DislocationMoveY = fixedEndY - 220
+        local limb = self.DislocationLimb
+        if limb == "lleg" or limb == "rleg" then
+            local legSide = limb == "lleg" and -1 or 1
+            self.DislocationFixedBoneAngle = -90
+            self.DislocationFixedContactSign = 1
+            self.DislocationMoveContactSign = -1
+            self.DislocationMoveAngle = -90 + (30 * legSide)
+            self.DislocationFixedBoneX = self.CenterX
+            self.DislocationFixedBoneY = self.CenterY + 260
+            local fixedEndX, fixedEndY = GetBoneEnd(self.DislocationFixedBoneX, self.DislocationFixedBoneY, self.DislocationFixedBoneWidth, self.DislocationFixedBoneHeight, self.DislocationFixedBoneAngle, self.DislocationFixedContactSign)
+            self.DislocationMoveX = fixedEndX + (160 * legSide)
+            self.DislocationMoveY = fixedEndY - 265
+        elseif limb == "jaw" then
+            self.DislocationFixedBoneAngle = 90
+            self.DislocationFixedContactSign = 1
+            self.DislocationMoveContactSign = -1
+            self.DislocationMoveAngle = 78
+            self.DislocationFixedBoneX = self.CenterX
+            self.DislocationFixedBoneY = self.CenterY - 260
+            local fixedEndX, fixedEndY = GetBoneEnd(self.DislocationFixedBoneX, self.DislocationFixedBoneY, self.DislocationFixedBoneWidth, self.DislocationFixedBoneHeight, self.DislocationFixedBoneAngle, self.DislocationFixedContactSign)
+            self.DislocationMoveX = fixedEndX + 120
+            self.DislocationMoveY = fixedEndY + 245
+        else
+            local armSide = limb == "rarm" and -1 or 1
+            self.DislocationFixedBoneAngle = 0
+            self.DislocationFixedContactSign = armSide
+            self.DislocationMoveContactSign = -armSide
+            self.DislocationMoveAngle = -18 * armSide
+            self.DislocationFixedBoneX = self.CenterX - (260 * armSide)
+            self.DislocationFixedBoneY = self.CenterY + 140
+            local fixedEndX, fixedEndY = GetBoneEnd(self.DislocationFixedBoneX, self.DislocationFixedBoneY, self.DislocationFixedBoneWidth, self.DislocationFixedBoneHeight, self.DislocationFixedBoneAngle, self.DislocationFixedContactSign)
+            self.DislocationMoveX = fixedEndX + (265 * armSide)
+            self.DislocationMoveY = fixedEndY - 220
+        end
         self.DislocationMoveStartX = self.DislocationMoveX
         self.DislocationMoveStartY = self.DislocationMoveY
         self.DislocationVelX = 0
@@ -908,13 +929,6 @@ function PANEL:CompleteWrap()
     -- Increment completions for threshold-based healing
     self.BandageCompletions = (self.BandageCompletions or 0) + 1
 
-  
-    surface.PlaySound("autonigger/bandage.wav")
-
-    -- Reduced shake effect on wrap completion, no red flash
-    self.RotationFlashAlpha = 0
-    self.RotationShakeIntensity = 2
-
     -- Check if required completions reached
     if self.BandageCompletions >= (self.BandageRequiredCompletions or 3) then
         self:SendBandageState()
@@ -923,6 +937,11 @@ function PANEL:CompleteWrap()
     end
 
     self:CommitVisualWrap()
+    surface.PlaySound("autonigger/bandage.wav")
+
+    -- Reduced shake effect on wrap completion, no red flash
+    self.RotationFlashAlpha = 0
+    self.RotationShakeIntensity = 2
 
     self:ResetWrapProgress()
     self:SendBandageState()
@@ -1150,10 +1169,6 @@ function PANEL:ThinkAmputation(mx, my)
     self.AmputationLastMouseX = mx
 end
 
-function PANEL:GetDislocationLabel()
-    return dislocationLimbLabels[self.DislocationLimb] or "JOINT"
-end
-
 function PANEL:ThinkDislocation(mx, my)
     local dt = FrameTime()
     local now = SysTime()
@@ -1222,22 +1237,15 @@ function PANEL:ThinkDislocation(mx, my)
     local fixedY = self.DislocationFixedBoneY or self.CenterY
     local fixedW = self.DislocationFixedBoneWidth or 230
     local fixedH = self.DislocationFixedBoneHeight or 90
-    local fixedSign = (self.DislocationSide or 1) >= 0 and 1 or -1
-    local fixedEndOffset = (fixedW * 0.5) - (fixedH * 0.3)
-    local fixedEndX = fixedX + fixedEndOffset * fixedSign
-    local fixedEndY = fixedY
+    local fixedAngle = self.DislocationFixedBoneAngle or 0
+    local fixedEndX, fixedEndY = GetBoneEnd(fixedX, fixedY, fixedW, fixedH, fixedAngle, self.DislocationFixedContactSign or 1)
 
     local moveX = self.DislocationMoveX or self.CenterX
     local moveY = self.DislocationMoveY or self.CenterY
     local moveW = self.DislocationMoveBoneWidth or 220
     local moveH = self.DislocationMoveBoneHeight or 84
-    local moveAng = self.DislocationMoveAngle or (-18 * fixedSign)
-    local moveEndOffset = (moveW * 0.5) - (moveH * 0.3)
-    local moveContactSign = -fixedSign
-    local moveRad = math.rad(moveAng)
-    local moveCos, moveSin = math.cos(moveRad), math.sin(moveRad)
-    local moveEndX = moveX + (moveEndOffset * moveContactSign) * moveCos
-    local moveEndY = moveY + (moveEndOffset * moveContactSign) * moveSin
+    local moveAng = self.DislocationMoveAngle or -18
+    local moveEndX, moveEndY = GetBoneEnd(moveX, moveY, moveW, moveH, moveAng, self.DislocationMoveContactSign or -1)
 
     local diffX = moveEndX - fixedEndX
     local diffY = moveEndY - fixedEndY
@@ -1403,22 +1411,6 @@ function PANEL:Think()
                         currentRad,
                         math.rad(1.5)
                     )
-                end
-
-                -- Check if bandage has moved away from start position
-                local distFromStart = math.abs(NormalizeAngleDiff(currentRad - self.StartAngleRad))
-                if distFromStart > 0.1 then
-                    self.StartAngleReached = true
-                end
-
-                -- Check if bandage has returned to start position after moving away
-                if self.StartAngleReached and distFromStart < 0.15 then
-                    self:CommitVisualWrap()
-                    self.StartAngleReached = false
-                end
-
-                while self.WrapAngle >= (2 * math.pi) do
-                    self:CommitVisualWrap()
                 end
 
                 self.Progress = math.min(self.AccumulatedAngle / (2 * math.pi * self.TargetTurns), 1)
@@ -1829,22 +1821,15 @@ function PANEL:PaintDislocation(w, h)
     local moveW = self.DislocationMoveBoneWidth or 220
     local moveH = self.DislocationMoveBoneHeight or 84
     local moveAng = self.DislocationMoveAngle or -18
-    local fixedSign = (self.DislocationSide or 1) >= 0 and 1 or -1
-    local fixedEndOffset = (fixedW * 0.5) - (fixedH * 0.3)
-    local fixedEndX = fixedX + fixedEndOffset * fixedSign
-    local fixedEndY = fixedY
-    local moveEndOffset = (moveW * 0.5) - (moveH * 0.3)
-    local moveContactSign = -fixedSign
-    local moveRad = math.rad(moveAng)
-    local moveCos, moveSin = math.cos(moveRad), math.sin(moveRad)
-    local moveEndX = moveX + (moveEndOffset * moveContactSign) * moveCos
-    local moveEndY = moveY + (moveEndOffset * moveContactSign) * moveSin
+    local fixedAng = self.DislocationFixedBoneAngle or 0
+    local fixedEndX, fixedEndY = GetBoneEnd(fixedX, fixedY, fixedW, fixedH, fixedAng, self.DislocationFixedContactSign or 1)
+    local moveEndX, moveEndY = GetBoneEnd(moveX, moveY, moveW, moveH, moveAng, self.DislocationMoveContactSign or -1)
     local forceFill = math.Clamp(math.abs(self.DislocationAppliedForce or 0), 0, 1)
     local diffX = moveEndX - fixedEndX
     local diffY = moveEndY - fixedEndY
     local aligned = math.sqrt((diffX * diffX) + (diffY * diffY)) <= (self.DislocationSnapWindow or 30)
 
-    DrawOutlinedBone(fixedX, fixedY, fixedW, fixedH, 0, Color(255, 255, 255, 255), Color(0, 0, 0, 255))
+    DrawOutlinedBone(fixedX, fixedY, fixedW, fixedH, fixedAng, Color(255, 255, 255, 255), Color(0, 0, 0, 255))
     DrawOutlinedBone(moveX, moveY, moveW, moveH, moveAng, Color(255, 255, 255, 255), Color(0, 0, 0, 255))
 
     DrawFilledCircle(fixedEndX, fixedEndY, 12, aligned and Color(205, 255, 205, 190) or Color(255, 255, 255, 120), 22)
@@ -1874,10 +1859,6 @@ function PANEL:PaintDislocation(w, h)
     draw.RoundedBox(6, meterX, meterY, meterWidth, 18, Color(50, 50, 50, 220))
     draw.RoundedBox(6, meterX + 3, meterY + 3, math.max((meterWidth - 6) * forceFill, 0), 12, Color(200, 200, 200, 245))
 
-    draw.SimpleText("Push the dislocated bone back into the other bone.", "Trebuchet24", self.CenterX, self.CenterY - 170, Color(245, 245, 245, 235), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-    draw.SimpleText(self:GetDislocationLabel(), "DermaLarge", self.CenterX, self.CenterY - 128, Color(255, 230, 180, 245), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-    draw.SimpleText("Hold the bone, pull the mouse, and release to shove it that way.", "Trebuchet18", self.CenterX, self.CenterY + 205, Color(220, 220, 220, 205), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-
     self:DrawCommonOverlays(self.Progress, false)
 end
 
@@ -1902,7 +1883,6 @@ function PANEL:Paint(w, h)
 
     if self.GameType == "dislocation" then
         self:PaintDislocation(w, h)
-        self:DrawTreatmentTarget(w, h)
         return
     end
 

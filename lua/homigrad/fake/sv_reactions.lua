@@ -509,8 +509,8 @@ function hg.reactions.ProcessProtective(ragdoll, ply, org)
 end
 
 local function ReactionResult(ragdoll, arms, legs)
-    if (arms or legs) and hg.DampenRagdollCommonSpin then
-        hg.DampenRagdollCommonSpin(ragdoll, 140, 0.3)
+    if (arms or legs) and hg.StabilizeRagdollReaction then
+        hg.StabilizeRagdollReaction(ragdoll, 85, 180, 200, 0.65)
     end
 
     return {arms = arms, legs = legs}

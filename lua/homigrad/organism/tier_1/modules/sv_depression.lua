@@ -114,6 +114,12 @@ local depression_minigame_phrases = {
 util.AddNetworkString("rem_selfharm_press")
 util.AddNetworkString("rem_selfharm_end")
 
+local function isDepressionImmune(org)
+	local owner = org and org.owner
+
+	return IsValid(owner) and owner.HasTrait and owner:HasTrait("apathetic")
+end
+
 local function showDepressionThought(owner, text, duration, id)
 	if owner:GetInfoNum("hg_newthoughts", 0) > 0 then
 		owner:Thought(text, duration, id, 0)
@@ -158,6 +164,7 @@ function hg.organism.StartSelfHarm(owner)
 
 	local org = owner.organism
 	if not org or not org.alive or owner.selfharming then return end
+	if isDepressionImmune(org) then return end
 	if owner.suiciding or owner.remUrgeEnd then return end
 	if (owner.remUrgeCooldown or 0) > CurTime() then return end
 
@@ -263,6 +270,7 @@ end
 
 function hg.organism.RecordDepressionTreatment(org, failed)
 	if not org then return end
+	if isDepressionImmune(org) then return end
 
 	org.depressionTreatmentUntil = CurTime() + depression_untreated_bleed_delay
 	org.depressionUntreatedBleedSince = nil
@@ -384,6 +392,22 @@ local function rollSelfHarm(owner, org)
 end
 
 module[2] = function(owner, org, timeValue)
+	if isDepressionImmune(org) then
+		if owner.selfharming then hg.organism.EndSelfHarm(owner) end
+		org.depression = 0
+		org.depressionadd = 0
+		org.depressionThoughtStage = nil
+		org.depressionNextStageThought = nil
+		org.depressionNextDarkThought = nil
+		org.depressionNotifyStage = nil
+		org.depressionNextNotifyThought = nil
+		org.depressionNextMinigamePhrase = nil
+		org.depressionUntreatedBleedSince = nil
+		org.selfharmPendingUntil = nil
+		if owner:IsPlayer() then owner:SetNWFloat("rem_selfharm_pending", 0) end
+		return
+	end
+
 	if owner.selfharming and (not org.alive or org.heartstop) then
 		hg.organism.EndSelfHarm(owner)
 	end
@@ -575,6 +599,11 @@ end
 
 function hg.organism.AddDepression(org, amount)
 	if not org then return 0 end
+	if isDepressionImmune(org) then
+		org.depression = 0
+		org.depressionadd = 0
+		return 0
+	end
 	if not isnumber(amount) or amount <= 0 then return org.depressionadd or 0 end
 
 	org.depressionadd = Clamp((org.depressionadd or 0) + amount, 0, depression_max)

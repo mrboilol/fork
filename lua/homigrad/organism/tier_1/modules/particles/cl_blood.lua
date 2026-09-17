@@ -240,8 +240,16 @@ local function decalBlood(pos, normal, tr, artery, owner, tiny)
 		local target = IsValid(tr.Entity) and tr.Entity or game.GetWorld()
 		local scale = math.Rand(0.12, 0.24)
 		util.DecalEx(decal, target, pos, normal, color_white, scale, scale)
+		if IsValid(target) and hg.AddPersistentBodyBloodMark and (target:IsPlayer() or target:IsNPC() or target:IsRagdoll() or target.organism) then
+			hg.AddPersistentBodyBloodMark(target, pos, normal, scale * 10)
+		end
 		if math.random(7) == 1 then playBloodDripImpact(pos, tr) end
 		return
+	end
+
+	local target = IsValid(tr.Entity) and tr.Entity or nil
+	if IsValid(target) and hg.AddPersistentBodyBloodMark and (target:IsPlayer() or target:IsNPC() or target:IsRagdoll() or target.organism) then
+		hg.AddPersistentBodyBloodMark(target, pos, normal, artery and 2.8 or 2)
 	end
 
 	local vec = tostring(math.Round(pos[1]))..tostring(math.Round(pos[2]))..tostring(math.Round(pos[3]))

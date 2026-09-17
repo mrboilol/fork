@@ -41,8 +41,9 @@ local EUPHORIA_CURL_EASE = 0.3
 
 local EUPHORIA_MAX_HORIZONTAL_VELOCITY = 300
 local EUPHORIA_MAX_UPWARD_VELOCITY = 160
-local EUPHORIA_MAX_RELATIVE_VELOCITY = 250
-local EUPHORIA_MAX_ANGULAR = 360
+local EUPHORIA_MAX_RELATIVE_VELOCITY = 200
+local EUPHORIA_MAX_COMMON_ANGULAR = 85
+local EUPHORIA_MAX_RELATIVE_ANGULAR = 180
 local EUPHORIA_MAX_REACTION_IMPULSE = 65
 local EUPHORIA_MAX_TIMESTEP = 0.05
 
@@ -60,18 +61,22 @@ hook.Add("Think", "HG_EuphoriaSafety", function()
 		if ragdoll:IsPlayerHolding() then continue end
 
 		local commonVelocity = Vector(0, 0, 0)
+		local commonAngular = Vector(0, 0, 0)
 		local totalMass = 0
 		for j = 0, ragdoll:GetPhysicsObjectCount() - 1 do
 			local phys = ragdoll:GetPhysicsObjectNum(j)
-			if not IsValid(phys) then continue end
+			if not IsValid(phys) or not phys:IsMotionEnabled() then continue end
 			local mass = math.max(phys:GetMass(), 1)
 			commonVelocity = commonVelocity + phys:GetVelocity() * mass
+			commonAngular = commonAngular + phys:GetAngleVelocity() * mass
 			totalMass = totalMass + mass
 		end
 		if totalMass <= 0 then continue end
 
 		commonVelocity = commonVelocity / totalMass
+		commonAngular = commonAngular / totalMass
 		local safeCommon = Vector(commonVelocity.x, commonVelocity.y, math.min(commonVelocity.z, EUPHORIA_MAX_UPWARD_VELOCITY))
+		local safeCommonAngular = clampVec(commonAngular, EUPHORIA_MAX_COMMON_ANGULAR)
 		local horizontal = Vector(safeCommon.x, safeCommon.y, 0)
 		if horizontal:LengthSqr() > EUPHORIA_MAX_HORIZONTAL_VELOCITY * EUPHORIA_MAX_HORIZONTAL_VELOCITY then
 			horizontal = clampVec(horizontal, EUPHORIA_MAX_HORIZONTAL_VELOCITY)
@@ -79,10 +84,11 @@ hook.Add("Think", "HG_EuphoriaSafety", function()
 			safeCommon.y = horizontal.y
 		end
 		local commonCorrection = safeCommon - commonVelocity
+		local commonAngularCorrection = safeCommonAngular - commonAngular
 
 		for j = 0, ragdoll:GetPhysicsObjectCount() - 1 do
 			local phys = ragdoll:GetPhysicsObjectNum(j)
-			if not IsValid(phys) then continue end
+			if not IsValid(phys) or not phys:IsMotionEnabled() then continue end
 
 			local velocity = phys:GetVelocity() + commonCorrection
 			local relativeVelocity = velocity - safeCommon
@@ -93,10 +99,14 @@ hook.Add("Think", "HG_EuphoriaSafety", function()
 			end
 			if velocityChanged then phys:SetVelocity(velocity) end
 
-			local av = phys:GetAngleVelocity()
-			if av:LengthSqr() > EUPHORIA_MAX_ANGULAR * EUPHORIA_MAX_ANGULAR then
-				phys:SetAngleVelocity(clampVec(av, EUPHORIA_MAX_ANGULAR))
+			local angular = phys:GetAngleVelocity() + commonAngularCorrection
+			local relativeAngular = angular - safeCommonAngular
+			local angularChanged = commonAngularCorrection:LengthSqr() > 0.0001
+			if relativeAngular:LengthSqr() > EUPHORIA_MAX_RELATIVE_ANGULAR * EUPHORIA_MAX_RELATIVE_ANGULAR then
+				angular = safeCommonAngular + clampVec(relativeAngular, EUPHORIA_MAX_RELATIVE_ANGULAR)
+				angularChanged = true
 			end
+			if angularChanged then phys:SetAngleVelocity(angular) end
 		end
 	end
 end)

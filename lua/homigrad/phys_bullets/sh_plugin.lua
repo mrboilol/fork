@@ -25,8 +25,17 @@
 	end
 --//
 
--- ulx luarun SetGlobalBool('PhysBullets_ReplaceDefault', true)
-if SERVER then SetGlobalBool("PhysBullets_ReplaceDefault", true) end
+if SERVER then
+	SetGlobalBool("PhysBullets_ReplaceDefault", true)
+	hook.Add("PlayerSpawn", "HG_PhysicalBulletsOnSpawn", function(ply)
+		SetGlobalBool("PhysBullets_ReplaceDefault", true)
+		timer.Simple(0, function()
+			if not IsValid(ply) or not GetGlobalBool("PhysBullets_ReplaceDefault", false) then return end
+			if not isfunction(PLUGIN.CreateBullet) or not isfunction(hg.TraceHeldWeaponShot) then return end
+			ply:ChatPrint("[Z-City] Physical bullets enabled successfully; weapon collision tracing is active.")
+		end)
+	end)
+end
 
 PLUGIN.Name = "Physics Bullet"
 PLUGIN.Description = "Creates projectiles"

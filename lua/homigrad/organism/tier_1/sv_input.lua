@@ -921,6 +921,7 @@ function hg.organism.AddWound(ent, tr, bone, dmgInfo, dmgPos, dmgBlood, inputHol
 				local wound = {severity, localPos, localAng, woundBone, CurTime(), chooseWoundBleedStyle(severity)}
 				wound.visualBleedRate = math.max(severity * 0.24, 0.1)
 				table.insert(org.wounds, wound)
+				hg.organism.RecordWoundMark(org, wound, false)
 			else
 				if org.wounds[1] then org.wounds[1][1] = org.wounds[1][1] + dmgBlood / 2 end
 			end
@@ -944,6 +945,7 @@ function hg.organism.AddWoundManual(ent,dmgBlood,localPos,localAng,bone,time)
 		wound = {severity, localPos, localAng, bone, time, chooseWoundBleedStyle(severity)}
 		wound.visualBleedRate = math.max(severity * 0.24, 0.1)
 		table.insert(org.wounds, wound)
+		hg.organism.RecordWoundMark(org, wound, false)
 	else
 		if org.wounds[1] then
 			org.wounds[1][1] = org.wounds[1][1] + dmgBlood / 2

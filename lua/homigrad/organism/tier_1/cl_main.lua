@@ -1000,16 +1000,32 @@ hook.Add("OnNetVarSet","wounds_netvar2",function(index, key, var)
 	end
 end)
 
+hook.Add("OnNetVarSet", "woundmarks_netvar", function(index, key, var)
+	if key != "woundmarks" then return end
+	local ent = Entity(index)
+	if not IsValid(ent) then return end
+
+	ent.woundmarks = istable(var) and var or {}
+	local rag = ent:GetNWEntity("FakeRagdoll")
+	if IsValid(rag) then rag.woundmarks = ent.woundmarks end
+	local deathRag = ent:GetNWEntity("RagdollDeath")
+	if IsValid(deathRag) and deathRag != rag then deathRag.woundmarks = ent.woundmarks end
+end)
+
 hook.Add("Player Spawn", "removewounds", function(ply)
 	if OverrideSpawn then return end
 
 	ply.wounds = {}
 	ply.arterialwounds = {}
+	ply.woundmarks = {}
+	ply.persistentBloodMarks = {}
 
 	local rag = ply:GetNWEntity("FakeRagdoll")
 	if IsValid(rag) then
 		rag.wounds = {}
 		rag.arterialwounds = {}
+		rag.woundmarks = {}
+		rag.persistentBloodMarks = {}
 	end
 end)
 
@@ -1018,6 +1034,8 @@ hook.Add("Fake", "huyhuyhuy235", function(ply,ragdoll)
 
 	ragdoll.wounds = ply.wounds
 	ragdoll.arterialwounds = ply.arterialwounds
+	ragdoll.woundmarks = ply.woundmarks
+	ragdoll.persistentBloodMarks = ply.persistentBloodMarks
 	ragdoll.hgBloodVisualReadyAt = CurTime() + 0.2
 end)
 
@@ -1251,6 +1269,83 @@ end
 local function GetWoundTransform(ent, wound, mat, boneID)
 	return hg.organism.GetWoundTransform(ent, wound)
 end
+
+function hg.AddPersistentBodyBloodMark(ent, pos, normal, size)
+	if not IsValid(ent) or not isvector(pos) then return end
+	local ang = isvector(normal) and normal:LengthSqr() > 0.001 and normal:Angle() or angle_zero
+	local localPos, localAng, bone = hg.organism.GetWoundAnchor(ent, pos + ang:Forward() * 0.15, ang)
+	if not localPos then return end
+
+	ent.persistentBloodMarks = ent.persistentBloodMarks or {}
+	for _, mark in ipairs(ent.persistentBloodMarks) do
+		if mark[4] == bone and mark[2]:DistToSqr(localPos) < 2.25 then
+			mark[1] = math.min(math.max(mark[1] or 1, size or 1) + 0.15, 5)
+			mark[5] = CurTime()
+			return
+		end
+	end
+
+	ent.persistentBloodMarks[#ent.persistentBloodMarks + 1] = {
+		math.Clamp(tonumber(size) or 1.25, 0.55, 5),
+		localPos,
+		localAng,
+		bone,
+		CurTime(),
+		false,
+	}
+end
+
+local woundMarkMaterials = {}
+for i = 1, 6 do woundMarkMaterials[i] = Material("bloodspill/blood" .. i) end
+local woundMarkColor = Color(125, 0, 0, 255)
+
+local function drawPersistentWoundMarks(ent, marks, materialOffset)
+	if not IsValid(ent) or not istable(marks) or #marks == 0 then return end
+	ent:SetupBones()
+
+	for index, wound in ipairs(marks) do
+		local pos, ang = hg.organism.GetWoundTransform(ent, wound)
+		if not pos or not ang then continue end
+		local normal = ang:Forward()
+		local age = math.max(CurTime() - (tonumber(wound[5]) or CurTime()), 0)
+		local ageFade = math.Clamp((age - 120) / 900, 0, 1)
+		local severity = math.max(tonumber(wound[1]) or 0.01, 0.01)
+		local size = math.Clamp(0.75 + math.sqrt(severity) * 0.42, 0.8, wound[6] and 4.8 or 3.8)
+		woundMarkColor.r = Lerp(ageFade, wound[6] and 145 or 125, 48)
+		woundMarkColor.g = Lerp(ageFade, 0, 7)
+		woundMarkColor.b = Lerp(ageFade, 0, 5)
+		woundMarkColor.a = Lerp(ageFade, 245, 72)
+		render.SetMaterial(woundMarkMaterials[(index + materialOffset - 2) % #woundMarkMaterials + 1])
+		render.DrawQuadEasy(pos + normal * 0.12, normal, size, size, woundMarkColor, (index * 137 + materialOffset * 29) % 360)
+	end
+end
+
+hook.Add("PostDrawTranslucentRenderables", "hg_persistent_organism_blood", function(depth, skybox)
+	if skybox then return end
+	local eyePos = EyePos()
+	local maxDistance = hg_blood_draw_distance:GetInt() * 1.5
+	local maxDistanceSqr = maxDistance * maxDistance
+	local rendered = {}
+
+	for _, seen in ipairs(hg.seenents or {}) do
+		if not IsValid(seen) then continue end
+		local ent = seen
+		if ent:IsPlayer() then
+			local body = getArterySoundEnt(ent)
+			if IsValid(body) then ent = body end
+		end
+		if rendered[ent] or ent:GetPos():DistToSqr(eyePos) > maxDistanceSqr then continue end
+		rendered[ent] = true
+
+		local owner = ent:IsRagdoll() and hg.RagdollOwner(ent) or ent
+		local woundmarks = ent.woundmarks
+		if (not istable(woundmarks) or #woundmarks == 0) and IsValid(owner) then woundmarks = owner.woundmarks end
+		local bloodmarks = ent.persistentBloodMarks
+		if (not istable(bloodmarks) or #bloodmarks == 0) and IsValid(owner) then bloodmarks = owner.persistentBloodMarks end
+		drawPersistentWoundMarks(ent, woundmarks, ent:EntIndex())
+		drawPersistentWoundMarks(ent, bloodmarks, ent:EntIndex() + 41)
+	end
+end)
 
 hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, ent, time)
 	if ent:IsPlayer() then

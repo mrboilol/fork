@@ -498,6 +498,7 @@ function hg.GetHeldWeaponImpactModel(ply, wep)
             if animation.reverse and not animation.cycling then timing = 1 - timing end
             model:SetCycle(timing)
         end
+        if model.InvalidateBoneCache then model:InvalidateBoneCache() end
         SetupEntityBones(model)
         return modelName, transformedPos or model:GetPos(), transformedAng or model:GetAngles(), modelScale, model
     end
@@ -537,8 +538,38 @@ local function TraceHeldWeaponModel(ply, wep, startPos, endPos, padding)
             end
         end
     end
+    if IsValid(pose) and istable(wep.ModularParts) and isfunction(wep.DrawModularParts) then
+        local resolved, resolving = {}, {}
+        local function TracePart(name)
+            if resolved[name] then return resolved[name] end
+            local part = wep.ModularParts[name]
+            if not istable(part) or resolving[name] then return end
+            resolving[name] = true
+            local path = wep.GetModularPartModel and wep:GetModularPartModel(name, part.model, "held") or part.model
+            local basePos, baseAng
+            if isstring(path) and path ~= "" then
+                if part.parent then
+                    local parent = TracePart(part.parent)
+                    if parent then basePos, baseAng = parent.pos, parent.ang end
+                else
+                    local bone = pose:LookupBone(part.bone or "")
+                    local matrix = bone and pose:GetBoneMatrix(bone)
+                    if matrix then basePos, baseAng = matrix:GetTranslation(), matrix:GetAngles() end
+                end
+            end
+            resolving[name] = nil
+            if not basePos then return end
+            local partPos, partAng = LocalToWorld(part.pos or vector_origin, part.ang or angle_zero, basePos, baseAng)
+            if wep.ApplyManagedStockPartOffset then partPos, partAng = wep:ApplyManagedStockPartOffset(name, partPos, partAng) end
+            resolved[name] = {pos = partPos, ang = partAng}
+            local hit = hg.TraceEquipmentModel(path, partPos, partAng, 1, startPos, endPos, padding)
+            if hit and (not best or hit.fraction < best.fraction) then best = hit end
+            return resolved[name]
+        end
+        for name in pairs(wep.ModularParts) do TracePart(name) end
+    end
     local hit = hg.TraceEquipmentModel(model, pos, ang, scale, startPos, endPos, padding, true)
-    if hit and (not best or hit.fraction < best.fraction) then return hit end
+    if hit and (not best or hit.fraction < best.fraction) then best = hit end
     return best
 end
 
@@ -807,6 +838,9 @@ function hg.TraceOrganismArms(body, startPos, endPos, padding)
             Fraction = fraction, HitBox = fallback and 0 or index, HitBoxBone = bone, PhysicsBone = physicsBone or 0,
             HGArmFallback = fallback, SurfaceProps = util.GetSurfaceIndex("flesh"),
             HitGroup = hitSide == "l" and HITGROUP_LEFTARM or HITGROUP_RIGHTARM, MatType = MAT_FLESH}
+        if fallback then
+            best.HGArmBounds = {pos = bonePos, ang = boneAng, mins = mins - expand, maxs = maxs + expand}
+        end
     end
     if body.GetHitBoxCount and body.GetHitBoxBone and body.GetHitBoxBounds and body.GetBoneName then
         for index = 0, (body:GetHitBoxCount(set) or 0) - 1 do
@@ -897,7 +931,7 @@ local function TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, ori
         local body = hg.GetCurrentCharacter(ply)
         if not IsValid(body) then continue end
         SetupEntityBones(body)
-        local armTrace = hg.TraceOrganismArms(body, startPos, endPos, cfg.armHitPadding + projectileRadius)
+        local armTrace = hg.TraceOrganismArms(body, startPos, endPos, (shot.Contact and cfg.armHitPadding or 0) + projectileRadius)
         if armTrace then armTraces[#armTraces + 1] = armTrace end
         checkedBodies[body] = true
         checkedBodies[ply] = true
@@ -940,9 +974,13 @@ local function TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, ori
         local overlapsEquipment = false
         if armTrace.HGArmFallback then
             for _, hit in ipairs(hits) do
-                if (hit.weapon or hit.heldEntity) and IsValid(hit.ply) and hg.GetCurrentCharacter(hit.ply) == armTrace.Entity and hit.fraction <= armTrace.Fraction + 0.0001 then
-                    overlapsEquipment = true
-                    break
+                if (hit.weapon or hit.heldEntity) and IsValid(hit.ply) and hg.GetCurrentCharacter(hit.ply) == armTrace.Entity then
+                    local bounds = armTrace.HGArmBounds
+                    local inside = bounds and WorldToLocal(hit.position, angle_zero, bounds.pos, bounds.ang):WithinAABox(bounds.mins, bounds.maxs)
+                    if hit.fraction <= armTrace.Fraction + 0.0001 or inside then
+                        overlapsEquipment = true
+                        break
+                    end
                 end
             end
         end

@@ -1169,23 +1169,98 @@ end
 
 hg.TourniquetGuys = hg.TourniquetGuys or {}
 
+local tourniquetLimbBones = {
+	larm = {high = "ValveBiped.Bip01_L_UpperArm", bones = {"ValveBiped.Bip01_L_UpperArm", "ValveBiped.Bip01_L_Forearm", "ValveBiped.Bip01_L_Hand"}},
+	rarm = {high = "ValveBiped.Bip01_R_UpperArm", bones = {"ValveBiped.Bip01_R_UpperArm", "ValveBiped.Bip01_R_Forearm", "ValveBiped.Bip01_R_Hand"}},
+	lleg = {high = "ValveBiped.Bip01_L_Thigh", bones = {"ValveBiped.Bip01_L_Thigh", "ValveBiped.Bip01_L_Calf", "ValveBiped.Bip01_L_Foot"}},
+	rleg = {high = "ValveBiped.Bip01_R_Thigh", bones = {"ValveBiped.Bip01_R_Thigh", "ValveBiped.Bip01_R_Calf", "ValveBiped.Bip01_R_Foot"}},
+}
+local tourniquetBoneToLimb = {}
+for limb, data in pairs(tourniquetLimbBones) do
+	tourniquetBoneToLimb[limb] = limb
+	for _, limbBone in ipairs(data.bones) do tourniquetBoneToLimb[limbBone] = limb end
+end
+
+local function getTourniquetLimb(bone)
+	if not bone then return end
+	return tourniquetBoneToLimb[tostring(bone):gsub("artery$", "")]
+end
+
+local function getWearableState(ent, field, netKey)
+	if not IsValid(ent) then return {} end
+	local fallback = {}
+	local entities = {ent}
+	if ent:IsPlayer() then
+		local function addBody(body)
+			if IsValid(body) then entities[#entities + 1] = body end
+		end
+		addBody(ent.FakeRagdoll)
+		addBody(ent:GetNWEntity("FakeRagdoll"))
+		if not ent:Alive() then
+			addBody(ent.RagdollDeath)
+			addBody(ent:GetNWEntity("RagdollDeath"))
+		end
+	end
+
+	for _, stateEnt in ipairs(entities) do
+		if IsValid(stateEnt) then
+			local state = stateEnt[field]
+			if istable(state) then
+				if next(state) then return state end
+				fallback = state
+			end
+			if stateEnt.GetNetVar then
+				state = stateEnt:GetNetVar(netKey, {})
+				if istable(state) then
+					if next(state) then return state end
+					fallback = state
+				end
+			end
+		end
+	end
+	return fallback
+end
+
+function hg.GetTourniquetCountOnLimb(ent, limb)
+	limb = getTourniquetLimb(limb) or limb
+	if not tourniquetLimbBones[limb] then return 0 end
+
+	local count = 0
+	for _, tourniquet in pairs(getWearableState(ent, "tourniquets", "Tourniquets")) do
+		if getTourniquetLimb(tourniquet[3]) == limb then count = count + 1 end
+	end
+	return count
+end
+
+function hg.HasTourniquetOnLimb(ent, limb)
+	return hg.GetTourniquetCountOnLimb(ent, limb) > 0
+end
+
+function hg.GetTourniquetBleedMultiplier(ent, bone)
+	local limb = getTourniquetLimb(bone)
+	if not limb then return 1 end
+	return hg.GetTourniquetCountOnLimb(ent, limb) > 0 and 0 or 1
+end
+
+function hg.HasBandageOnBone(ent, bone)
+	if not bone then return false end
+	bone = tostring(bone):gsub("artery$", "")
+	for bandagedBone in pairs(getWearableState(ent, "bandaged_limbs", "bandaged_limbs")) do
+		if tostring(bandagedBone):gsub("artery$", "") == bone then return true end
+	end
+	return false
+end
+
+function hg.GetBandageBleedMultiplier(ent, bone)
+	return hg.HasBandageOnBone(ent, bone) and 0.55 or 1
+end
+
+function hg.GetBandageClotMultiplier(ent, bone)
+	return hg.HasBandageOnBone(ent, bone) and 1.55 or 1
+end
+
 if SERVER then
 	util.AddNetworkString("send_tourniquets")
-	local tourniquetLimbBones = {
-		larm = {high = "ValveBiped.Bip01_L_UpperArm", bones = {"ValveBiped.Bip01_L_UpperArm", "ValveBiped.Bip01_L_Forearm", "ValveBiped.Bip01_L_Hand"}},
-		rarm = {high = "ValveBiped.Bip01_R_UpperArm", bones = {"ValveBiped.Bip01_R_UpperArm", "ValveBiped.Bip01_R_Forearm", "ValveBiped.Bip01_R_Hand"}},
-		lleg = {high = "ValveBiped.Bip01_L_Thigh", bones = {"ValveBiped.Bip01_L_Thigh", "ValveBiped.Bip01_L_Calf", "ValveBiped.Bip01_L_Foot"}},
-		rleg = {high = "ValveBiped.Bip01_R_Thigh", bones = {"ValveBiped.Bip01_R_Thigh", "ValveBiped.Bip01_R_Calf", "ValveBiped.Bip01_R_Foot"}},
-	}
-	local tourniquetBoneToLimb = {}
-	for limb, data in pairs(tourniquetLimbBones) do
-		for _, limbBone in ipairs(data.bones) do tourniquetBoneToLimb[limbBone] = limb end
-	end
-	local function getTourniquetLimb(bone)
-		if not bone then return end
-		local name = tostring(bone):gsub("artery$", "")
-		return tourniquetBoneToLimb[name]
-	end
 	local function getTourniquetCandidates(org)
 		local candidates = {}
 		for index, wound in ipairs(org.arterialwounds or {}) do
@@ -1211,8 +1286,8 @@ if SERVER then
 	function SWEP:CanTourniquet(ent)
 		local org = IsValid(ent) and ent.organism
 		if not org then return false end
-		for _, entry in pairs(getTourniquetCandidates(org)) do
-			if #entry.arteries > 0 or entry.score >= 10 then return true end
+		for limb, entry in pairs(getTourniquetCandidates(org)) do
+			if hg.GetTourniquetCountOnLimb(ent, limb) < 2 and (#entry.arteries > 0 or entry.score >= 10) then return true end
 		end
 		return false
 	end
@@ -1222,7 +1297,7 @@ if SERVER then
 		local candidates = getTourniquetCandidates(org)
 		local selectedLimb, selected
 		for limb, entry in pairs(candidates) do
-			if (#entry.arteries > 0 or entry.score >= 10) and (not selected or entry.score > selected.score) then
+			if hg.GetTourniquetCountOnLimb(ent, limb) < 2 and (#entry.arteries > 0 or entry.score >= 10) and (not selected or entry.score > selected.score) then
 				selectedLimb, selected = limb, entry
 			end
 		end
@@ -1232,23 +1307,11 @@ if SERVER then
 
 			local placementBone = tourniquetLimbBones[selectedLimb].high
 			ent.tourniquets[#ent.tourniquets + 1] = {vector_origin, angle_zero, placementBone}
-			for i = #org.arterialwounds, 1, -1 do
-				local wound = org.arterialwounds[i]
-				if getTourniquetLimb(wound[4]) == selectedLimb or getTourniquetLimb(wound[7]) == selectedLimb then
-					org[wound[7]] = 0
-					table.remove(org.arterialwounds, i)
-				end
+			local tourniquetCount = hg.GetTourniquetCountOnLimb(ent, selectedLimb)
+			org.painadd = math.min((org.painadd or 0) + (tourniquetCount >= 2 and 18 or 6), 150)
+			if tourniquetCount >= 2 then
+				org.shock = math.min((org.shock or 0) + 8, 95)
 			end
-
-			hg.organism.MarkArterialWoundsNetDirty(org)
-
-			for i = #org.wounds, 1, -1 do
-				if getTourniquetLimb(org.wounds[i][4]) == selectedLimb then
-					table.remove(org.wounds, i)
-				end
-			end
-
-			hg.organism.MarkWoundsNetDirty(org, true)
 
 			ent:SetNetVar("Tourniquets",ent.tourniquets)
 			if IsValid(ent.FakeRagdoll) then

@@ -127,6 +127,7 @@ hook.Add("PostPlayerDeath", "homigrad-organism", function(ply)
 		newOrg.owner.fullsend = true
 		hg.organism.FlushWoundsNet(newOrg, true, true)
 		hg.organism.FlushArterialWoundsNet(newOrg, true)
+		hg.organism.SyncWoundMarksNet(newOrg)
 		hg.send_bareinfo(newOrg, true, true)
 	end
 

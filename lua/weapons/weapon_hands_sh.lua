@@ -1540,9 +1540,11 @@ function SWEP:ApplyForce()
 		end
 
 		-- Apply leg tourniquet penalty to dragging effectiveness
-		if hg.HasTourniquetOnLimb then
-			local weakenedLegs = (hg.HasTourniquetOnLimb(ply, "lleg") and 1 or 0) + (hg.HasTourniquetOnLimb(ply, "rleg") and 1 or 0)
-			mul = mul * (0.6 ^ weakenedLegs)
+		if hg.GetTourniquetCountOnLimb then
+			local leftTourniquets = hg.GetTourniquetCountOnLimb(ply, "lleg")
+			local rightTourniquets = hg.GetTourniquetCountOnLimb(ply, "rleg")
+			mul = mul * (leftTourniquets >= 2 and 0.25 or leftTourniquets == 1 and 0.6 or 1)
+			mul = mul * (rightTourniquets >= 2 and 0.25 or rightTourniquets == 1 and 0.6 or 1)
 		end
 
 		-- Add continuous pain when holding with damaged hands

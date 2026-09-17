@@ -471,6 +471,7 @@ hitArtery = function(artery, org, dmg, dmgInfo, boneindex, dir, hit, impact, for
 	local wound = {arterySize[artery], localPos, localAng, woundBone or boneindex, CurTime(), dir2 * 100, artery}
 	wound.visualBleedRate = math.max((arterySize[artery] or 6) * 4.5, 1)
 	table.insert(org.arterialwounds, wound)
+	hg.organism.RecordWoundMark(org, wound, true)
 	hg.organism.MarkArterialWoundsNetDirty(org)
 	emitArterialImpact(owner, wound)
 	--if IsValid(owner:GetNWEntity("RagdollDeath")) then owner:GetNWEntity("RagdollDeath"):SetNetVar("wounds",org.arterialwounds) end

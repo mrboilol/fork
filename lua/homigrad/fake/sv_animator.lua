@@ -140,11 +140,7 @@ function hg.animator.Apply(ragdoll)
         local _, targetAng = ghost:GetBonePosition(ghostBoneID)
         
         if targetAng then
-            hg.ShadowControl(ragdoll, i, 0.08, targetAng, 1400 * strength, 180 * strength, phys:GetPos(), 0, 0)
+            hg.ShadowControl(ragdoll, i, 0.12, targetAng, math.min(800 * strength, 1100), math.min(300 * strength, 420), phys:GetPos(), 0, 0)
         end
-    end
-
-    if hg.DampenRagdollCommonSpin then
-        hg.DampenRagdollCommonSpin(ragdoll, 110, 0.45)
     end
 end

@@ -232,6 +232,7 @@ hook.Add("Org Clear", "Main", function(org)
 			org.owner:SetHealth(100)
 			org.owner:SetNetVar("wounds",{})
 			org.owner:SetNetVar("arterialwounds",{})
+			org.owner:SetNetVar("woundmarks",{})
 			org.lastWoundsSig = "0"
 			org.lastArterialWoundsSig = "0"
 		end
@@ -301,6 +302,27 @@ local function mirrorWoundsToRagdolls(org, key, wounds)
 			mirrored[rag] = true
 		end
 	end
+end
+
+function hg.organism.SyncWoundMarksNet(org)
+	if not org or not IsValid(org.owner) then return end
+	local marks = org.woundmarks or {}
+	org.owner:SetNetVar("woundmarks", marks)
+	mirrorWoundsToRagdolls(org, "woundmarks", marks)
+end
+
+function hg.organism.RecordWoundMark(org, wound, arterial)
+	if not org or not wound or not isvector(wound[2]) or not isangle(wound[3]) then return end
+	org.woundmarks = org.woundmarks or {}
+	org.woundmarks[#org.woundmarks + 1] = {
+		math.max(tonumber(wound.initialSeverity) or tonumber(wound[1]) or 0.01, 0.01),
+		wound[2],
+		wound[3],
+		wound[4],
+		math.min(tonumber(wound.openedAt) or tonumber(wound[5]) or CurTime(), CurTime()),
+		arterial and true or false,
+	}
+	hg.organism.SyncWoundMarksNet(org)
 end
 
 function hg.organism.FlushWoundsNet(org, force, mirrorDeathRagdoll)
@@ -1535,6 +1557,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		if org.lastArterialWoundsSig != arterialWoundsSig or org.owner.fullsend then
 			hg.organism.FlushArterialWoundsNet(org, org.owner.fullsend)
 		end
+		if org.owner.fullsend then hg.organism.SyncWoundMarksNet(org) end
 		if isPly and owner:Alive() then
 			send_organism(org, owner)
 		else

@@ -1,3 +1,26 @@
+function hg.GetArmEffectiveness(ply, limb)
+	local org = IsValid(ply) and ply.organism
+	if not org then return 1 end
+
+	local hand = limb == "larm" and "lhand" or "rhand"
+	if org[limb .. "amputated"] or org[limb .. "upamputated"] or org[hand .. "amputated"] then return 0 end
+
+	local damage = math.Clamp(tonumber(org[limb]) or 0, 0, 1)
+	local effectiveness = damage < 0.25 and 1 or Lerp((damage - 0.25) / 0.75, 0.82, 0.12)
+	if org[limb .. "dislocation"] or org[limb .. "dislocated"] then
+		effectiveness = math.min(effectiveness, 0.18)
+	end
+
+	local tourniquetCount = hg.GetTourniquetCountOnLimb and hg.GetTourniquetCountOnLimb(ply, limb) or 0
+	if tourniquetCount == 1 then
+		effectiveness = effectiveness * 0.55
+	elseif tourniquetCount >= 2 then
+		effectiveness = effectiveness * 0.18
+	end
+
+	return math.Clamp(effectiveness, 0, 1)
+end
+
 function hg.CanUseLeftHand(ply)
 	local ent = IsValid(ply.FakeRagdoll) and ply.FakeRagdoll or ply
 

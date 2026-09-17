@@ -3401,7 +3401,9 @@ function SWEP:DoSelfHarmCut()
 
             local squirtDir = localPos:LengthSqr() > 0.01 and -localPos:GetNormalized() * 100 or Vector(0, 0, 100)
 
-            table.insert(org.arterialwounds, {6, localPos, localAng, boneName, CurTime(), squirtDir, "larmartery"})
+            local wound = {6, localPos, localAng, boneName, CurTime(), squirtDir, "larmartery"}
+            table.insert(org.arterialwounds, wound)
+            hg.organism.RecordWoundMark(org, wound, true)
             owner:SetNetVar("arterialwounds", org.arterialwounds)
         end
     end

@@ -53,32 +53,6 @@ local COLLISION_SOUNDS = {
     "raminto/ram3.wav"
 }
 
-local function GetCollisionPhysBone(ply, hitPos)
-    local localHit = ply:WorldToLocal(hitPos)
-    local boneName = "ValveBiped.Bip01_Spine2"
-
-    if localHit.z >= 54 then
-        boneName = "ValveBiped.Bip01_Head1"
-    elseif localHit.z <= 20 then
-        boneName = localHit.y >= 0 and "ValveBiped.Bip01_L_Thigh" or "ValveBiped.Bip01_R_Thigh"
-    elseif localHit.y >= 12 then
-        boneName = "ValveBiped.Bip01_L_UpperArm"
-    elseif localHit.y <= -12 then
-        boneName = "ValveBiped.Bip01_R_UpperArm"
-    end
-
-    local bone = ply:LookupBone(boneName)
-    local physbone = bone and ply:TranslateBoneToPhysBone(bone) or 0
-
-    if not physbone or physbone < 0 then
-        boneName = "ValveBiped.Bip01_Spine2"
-        bone = ply:LookupBone(boneName)
-        physbone = bone and ply:TranslateBoneToPhysBone(bone) or 0
-    end
-
-    return physbone, boneName
-end
-
 local function PlayCollisionSound(ply)
     ply:EmitSound(COLLISION_SOUNDS[math.random(#COLLISION_SOUNDS)], 75, math.random(96, 104), 1)
 end
@@ -95,31 +69,71 @@ local function StumbleFromCollision(ply)
     end)
 end
 
-local function ApplyCollisionTripForces(ply, tr, velocity, impactSpeed)
-    local hitEnt = tr.Entity
-    local impactDir = IsValid(hitEnt) and hitEnt:IsPlayer() and ply:WorldSpaceCenter() - hitEnt:WorldSpaceCenter() or -tr.HitNormal
+local function GetRagdollBonePhysics(ragdoll, boneName)
+    local bone = ragdoll:LookupBone(boneName)
+    if not bone then return end
 
-    if impactDir:LengthSqr() <= 0.001 then
-        impactDir = velocity:GetNormalized()
+    local physbone = ragdoll:TranslateBoneToPhysBone(bone)
+    if not physbone or physbone < 0 then return end
+
+    local phys = ragdoll:GetPhysicsObjectNum(physbone)
+    return IsValid(phys) and phys or nil
+end
+
+local function PreserveRagdollMomentum(ragdoll, velocity)
+    local totalMass = 0
+    local momentum = Vector(0, 0, 0)
+
+    for physbone = 0, ragdoll:GetPhysicsObjectCount() - 1 do
+        local phys = ragdoll:GetPhysicsObjectNum(physbone)
+        if not IsValid(phys) or not phys:IsMotionEnabled() then continue end
+
+        local mass = math.max(phys:GetMass(), 0)
+        totalMass = totalMass + mass
+        momentum = momentum + phys:GetVelocity() * mass
     end
 
-    impactDir.z = math.max(impactDir.z, 0.18)
-    impactDir:Normalize()
+    if totalMass <= 0 then return end
+    local correction = velocity - momentum / totalMass
 
-    local hitPhysbone, hitBoneName = GetCollisionPhysBone(ply, tr.HitPos)
-    local torsoBone = ply:LookupBone("ValveBiped.Bip01_Spine2")
-    torsoBone = torsoBone and ply:TranslateBoneToPhysBone(torsoBone) or 0
+    for physbone = 0, ragdoll:GetPhysicsObjectCount() - 1 do
+        local phys = ragdoll:GetPhysicsObjectNum(physbone)
+        if not IsValid(phys) or not phys:IsMotionEnabled() then continue end
+        phys:AddVelocity(correction)
+        phys:Wake()
+    end
+end
 
-    local clampedImpact = math.Clamp(impactSpeed, 0, 260)
-    local hitMass = (hg.IdealMassPlayer and hg.IdealMassPlayer[hitBoneName]) or 4
-    local torsoMass = (hg.IdealMassPlayer and hg.IdealMassPlayer["ValveBiped.Bip01_Spine2"]) or 4
-    local contactForce = impactDir * clampedImpact * hitMass * 0.55
-    local torsoForce = impactDir * clampedImpact * torsoMass * 0.4 + Vector(0, 0, clampedImpact * torsoMass * 0.2)
+local function ApplyTripInertia(ply, ragdoll, tripType, velocity, collisionTrace, highWallHit)
+    local direction = Vector(velocity.x, velocity.y, 0)
+    if direction:LengthSqr() <= 0.001 then
+        direction = ply:EyeAngles():Forward()
+        direction.z = 0
+    end
+    if direction:LengthSqr() <= 0.001 then return end
+    direction:Normalize()
 
-    ply.hgSprintCollisionDamageMul = COLLISION_DAMAGE_MUL
-    ply.hgSprintCollisionDamageUntil = CurTime() + COLLISION_DAMAGE_TIME
-    hg.AddForceRag(ply, hitPhysbone, contactForce, 0.25)
-    hg.AddForceRag(ply, torsoBone, torsoForce, 0.25)
+    local fallsBackward = tripType == "slip" or (tripType == "wall" and highWallHit)
+    local fallDirection = direction * (fallsBackward and -1 or 1)
+    local strength = math.Clamp(velocity:Length2D() * 0.45, 100, 190)
+    local spine = GetRagdollBonePhysics(ragdoll, "ValveBiped.Bip01_Spine2")
+    local pelvis = GetRagdollBonePhysics(ragdoll, "ValveBiped.Bip01_Pelvis")
+    local leftCalf = GetRagdollBonePhysics(ragdoll, "ValveBiped.Bip01_L_Calf")
+    local rightCalf = GetRagdollBonePhysics(ragdoll, "ValveBiped.Bip01_R_Calf")
+
+    if IsValid(spine) then spine:AddVelocity(fallDirection * strength + Vector(0, 0, -strength * 0.45)) end
+    if IsValid(pelvis) then pelvis:AddVelocity(fallDirection * strength * 0.35 + Vector(0, 0, -strength * 0.2)) end
+
+    local legVelocity = -fallDirection * strength * 0.7 + Vector(0, 0, strength * 0.08)
+    if IsValid(leftCalf) then leftCalf:AddVelocity(legVelocity) end
+    if IsValid(rightCalf) then rightCalf:AddVelocity(legVelocity) end
+
+    if collisionTrace then
+        ply.hgSprintCollisionDamageMul = COLLISION_DAMAGE_MUL
+        ply.hgSprintCollisionDamageUntil = CurTime() + COLLISION_DAMAGE_TIME
+    end
+
+    PreserveRagdollMomentum(ragdoll, velocity)
 end
 
 hook.Add("Think", "stanleytumbler", function()
@@ -162,7 +176,6 @@ hook.Add("Think", "stanleytumbler", function()
 
         local pos = ply:GetPos()
         local collisionTrace
-        local collisionImpactSpeed
 
         local trWall = util_TraceHull({
             start = ply:WorldSpaceCenter(),
@@ -188,7 +201,6 @@ hook.Add("Think", "stanleytumbler", function()
                      tripType = "ragdoll"
                      shouldTrip = true
                      tripChance = tripChance + 0.5 
-                     collisionImpactSpeed = IsValid(ent) and ent:IsPlayer() and (velocity - ent:GetVelocity()):Length() or speed
                      collisionTrace = trWall
                  elseif not isLightProp then
                      local highTraceHeight = 35
@@ -211,8 +223,6 @@ hook.Add("Think", "stanleytumbler", function()
                          shouldTrip = true
                          tripType = "wall"
                          tripChance = tripChance + wallChance
-                         collisionImpactSpeed = math.abs(velocity:Dot(-trWall.HitNormal))
-                         collisionImpactSpeed = collisionImpactSpeed > 0 and collisionImpactSpeed or speed
                          collisionTrace = trWall
                      end
                  end
@@ -286,7 +296,7 @@ hook.Add("Think", "stanleytumbler", function()
 
         if shouldTrip then
             if math.random() < tripChance then
-                hg.Fake(ply)
+                hg.Fake(ply, nil, nil, nil, "trip_" .. tripType)
                 --mcity reference?
                 if not org.superfighter then
                     local breakChance = 0.15
@@ -318,39 +328,10 @@ hook.Add("Think", "stanleytumbler", function()
                 
                 local ragdoll = ply.FakeRagdoll
                 if IsValid(ragdoll) then
-                    local b1 = ply:TranslateBoneToPhysBone(ply:LookupBone("ValveBiped.Bip01_L_Calf"))
-                    local phys1 = (hg.IdealMassPlayer and hg.IdealMassPlayer["ValveBiped.Bip01_L_Calf"]) or 7
-                    local b2 = ply:TranslateBoneToPhysBone(ply:LookupBone("ValveBiped.Bip01_R_Calf"))
-                    local phys2 = (hg.IdealMassPlayer and hg.IdealMassPlayer["ValveBiped.Bip01_R_Calf"]) or 7
-                    local torso = ply:TranslateBoneToPhysBone(ply:LookupBone("ValveBiped.Bip01_Spine2"))
-                    local phystorso = (hg.IdealMassPlayer and hg.IdealMassPlayer["ValveBiped.Bip01_Spine2"]) or 20
-
-                    local force = velocity:GetNormalized() * 150
-
                     if collisionTrace then
                         PlayCollisionSound(ply)
-                        ApplyCollisionTripForces(ply, collisionTrace, velocity, collisionImpactSpeed)
-                    elseif tripType == "slip" then
-                        hg.AddForceRag(ply, torso, -force * 5 * phystorso, 0.5)
-                        hg.AddForceRag(ply, b1, (force * 5 - Vector(0,0,2)) * phys1, 0.5)
-                        hg.AddForceRag(ply, b2, (force * 5 - Vector(0,0,2)) * phys2, 0.5)
-                    else
-                        local torsoForce = -force * 5 * phystorso
-                        local legForce = (force * 5 - Vector(0,0,2)) * phys1
-
-                        if tripType == "wall" then
-                            torsoForce = torsoForce * 1.2
-                            legForce = legForce * 0.8 
-                        elseif tripType == "gap" then
-                            legForce = legForce * 1.5
-                        elseif tripType == "ragdoll" then
-                            torsoForce = torsoForce * 0.5
-                        end
-
-                        hg.AddForceRag(ply, torso, torsoForce, 0.5)
-                        hg.AddForceRag(ply, b1, legForce, 0.5)
-                        hg.AddForceRag(ply, b2, legForce, 0.5)
                     end
+                    ApplyTripInertia(ply, ragdoll, tripType, velocity, collisionTrace, trHighHit)
 
                     timer.Simple(0, function()
                         if IsValid(ply) then hg.StunPlayer(ply) end

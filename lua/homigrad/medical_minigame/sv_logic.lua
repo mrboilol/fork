@@ -283,7 +283,7 @@ function hg.MedicalMinigame.StartDislocationMinigame(ply, ent, group)
             target = target,
             limb = limb,
             progress = 0,
-            side = math.random(0, 1) == 1 and 1 or -1
+            side = (limb == "rarm" or limb == "rleg") and -1 or 1
         }
         hg.MedicalMinigame.DislocationSessions[ply] = existingSession
     end
