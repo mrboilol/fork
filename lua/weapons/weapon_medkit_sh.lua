@@ -2,7 +2,7 @@ if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_bandage_sh"
 SWEP.BandageTPIK = false
 SWEP.PrintName = "Medkit"
-SWEP.Instructions = "A military medkit. Contains some usefull medicine ig?."
+SWEP.Instructions = "A small bag containing medical supplies. Has bandages, painkillers, tourniquets and internal bleeding medicine. A necessary thing in hiking, military conditions and just a necessary thing in everyday life. RMB to apply on others, R to change use mode."
 SWEP.Category = "ZCity Medicine"
 SWEP.Spawnable = true
 SWEP.Primary.Wait = 1
@@ -23,26 +23,36 @@ SWEP.SlotPos = 1
 SWEP.WorkWithFake = true
 SWEP.offsetVec = Vector(4, -0.5, -3)
 SWEP.offsetAng = Angle(-30, 20, 90)
-SWEP.modes = 1
+SWEP.modes = 5
 SWEP.modeNames = {
-	[1] = "open",
+	[1] = "bandaging",
+	[2] = "painkiller",
+	[3] = "tranexamic acid",
+	[4] = "tourniquet",
+	[5] = "decompression needle",
 }
-SWEP.showstats = false
-SWEP.ofsV = Vector(-2,-10,8)
-SWEP.ofsA = Angle(90,-90,90)
+SWEP.ofsV = Vector(0,0,0)
+SWEP.ofsA = Angle(0,0,0)
 function SWEP:InitializeAdd()
 	self:SetHold(self.HoldType)
 
 	self.modeValues = {
-		[1] = 1,
+		[1] = 80,
+		[2] = 1,
+		[3] = 10,
+		[4] = 1,
+		[5] = 1,
 	}
 end
 
 SWEP.modeValuesdef = {
-	[1] = {1,false},
+	[1] = {80,true},
+	[2] = {1,false},
+	[3] = {10,true},
+	[4] = {1,true},
+	[5] = {1,false},
 }
 SWEP.ShouldDeleteOnFullUse = true
-SWEP.HGMedkitOpensOnPrimary = true
 
 local math = math
 local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Healing method: 0 = original models + progressive minigames, 1 = Judge animations", 0, 1)
@@ -80,91 +90,69 @@ function SWEP:OwnerChanged()
 end
 
 if SERVER then
-	SWEP.MedkitLootPool = {
-		{weight = 30, class = "weapon_bigbandage_sh"},
-		{weight = 25, class = "weapon_painkillers_tpik"},
-		{weight = 18, class = "weapon_tourniquet"},
-		{weight = 12, class = "weapon_adrenaline"},
-		{weight = 10, class = "weapon_betablock_tpik"},
-		{weight = 7, class = "weapon_morphine"},
-		{weight = 7, class = "weapon_mannitol"},
-		{weight = 6, class = "weapon_naloxone"},
-		{weight = 6, class = "weapon_midazolam"},
-		{weight = 5, class = "weapon_bloodbag"},
-		{weight = 5, class = "weapon_thiamine_tpik"},
-	}
-
-	function SWEP:PickMedkitLoot()
-		local total = 0
-		for _, item in ipairs(self.MedkitLootPool) do total = total + item.weight end
-
-		local roll = math.random(total)
-		for _, item in ipairs(self.MedkitLootPool) do
-			roll = roll - item.weight
-			if roll <= 0 then return item.class end
+	function SWEP:Heal(ent, mode, bone)
+		if ent:IsNPC() then
+			self:SpawnGarbage()
+			self:NPCHeal(ent, 0.6, "snd_jack_hmcd_bandage.ogg")
 		end
 
-		return self.MedkitLootPool[1].class
-	end
-
-	function SWEP:DropMedkitLoot(class)
-		local owner = self:GetOwner()
-		local pos = owner:EyePos() + owner:GetAimVector() * 40
-
-		local wep = ents.Create(class)
-		if not IsValid(wep) then return end
-
-		wep:Spawn()
-		wep:SetPos(pos)
-		wep:SetAngles(AngleRand(-180, 180))
-		wep.IsSpawned = true
-
-		local phys = wep:GetPhysicsObject()
-		if IsValid(phys) then
-			phys:SetVelocity(owner:GetAimVector() * 100 + VectorRand(-30, 30))
-		end
-	end
-
-	function SWEP:OpenMedkit()
-		if self.opened then return end
-		self.opened = true
+		local org = ent.organism
+		if not org then return end
 
 		local owner = self:GetOwner()
-		if not IsValid(owner) or not owner:IsPlayer() or not owner:Alive() then self:Remove() return end
-
-		local loot = {}
-		loot[#loot + 1] = "weapon_bandage_sh"
-		loot[#loot + 1] = "weapon_needle"
-
-		local extra = math.random(1, 2)
-		for i = 1, extra do
-			loot[#loot + 1] = self:PickMedkitLoot()
+		if ent == hg.GetCurrentCharacter(owner) and not hg_healanims:GetBool() then
+			self:SetHolding(math.min(self:GetHolding() + 50, 100))
+			if self:GetHolding() < 100 then return end
 		end
 
 		local entOwner = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
-		entOwner:EmitSound("items/suit_power_up.wav", 40, math.random(95, 105))
+		if self.mode == 2 then
+			if self.modeValues[2] == 0 then return end
+			org.analgesiaAdd = math.min(org.analgesiaAdd + self.modeValues[2] * 0.3, 4)
+			self.modeValues[2] = 0
+			entOwner:EmitSound("snds_jack_gmod/ez_medical/15.ogg", 60, math.random(95, 105))
+		elseif self.mode == 3 then
+			if self.modeValues[3] == 0 then return end
+			local internalBleed = org.internalBleed - org.internalBleedHeal
 
-		for _, class in ipairs(loot) do
-			if owner:HasWeapon(class) then
-				self:DropMedkitLoot(class)
-			else
-				owner:Give(class)
+			if self.poisoned2 then
+				org.poison4 = CurTime()
+				self.poisoned2 = nil
 			end
+
+			if internalBleed > 0 then
+				local healed = math.max(internalBleed - self.modeValues[3], 0)
+				self.modeValues[3] = self.modeValues[3] - (internalBleed - healed) * (owner.Profession == "doctor" and 0.5 or 1)
+				org.internalBleedHeal = org.internalBleedHeal + (internalBleed - healed)
+				entOwner:EmitSound("snds_jack_gmod/ez_medical/" .. math.random(16, 18) .. ".ogg", 60, math.random(95, 105))
+			end
+		elseif self.mode == 1 then
+			self:Bandage(ent, bone)
+		elseif self.mode == 4 then
+			if self:Tourniquet(ent, bone) then self.modeValues[4] = 0 end
+		elseif self.mode == 5 then
+			if self.modeValues[5] == 0 then return end
+			if self.poisoned2 then
+				org.poison4 = CurTime()
+				self.poisoned2 = nil
+			end
+
+			org.needle = 1
+			if org.trachea and org.trachea > 0 then
+				org.trachea = math.max(org.trachea - 0.75, 0)
+			end
+
+			self.modeValues[5] = 0
+			entOwner:EmitSound("snd_jack_hmcd_needleprick.ogg", 60, math.random(95, 105))
 		end
 
-		owner:SelectWeapon("weapon_hands_sh")
-		self:Remove()
+		if self.RefreshPerfusionTreatment then
+			self:RefreshPerfusionTreatment(ent, owner.Profession == "doctor" and 0.25 or 0.18)
+		end
+
+		if self.modeValues[1] <= 0 and self.modeValues[2] <= 0 and self.modeValues[3] <= 0 and self.modeValues[4] <= 0 and self.modeValues[5] <= 0 and self.ShouldDeleteOnFullUse then
+			owner:SelectWeapon("weapon_hands_sh")
+			self:Remove()
+		end
 	end
-
-end
-
-function SWEP:PrimaryAttack()
-	if SERVER then self:OpenMedkit() end
-end
-
-function SWEP:SecondaryAttack()
-	if SERVER then self:OpenMedkit() end
-end
-
-function SWEP:Reload()
 end

@@ -438,7 +438,10 @@ local function Damage(bDoDebugHit, bStartedInWater, bEndNotWater, iFlags, iDamag
 		if IsValid(pInflictor) then pInflictor.bullet = tInfo end
 		hg.BallisticDamageInfo = hg.BallisticDamageInfo or {}
 		hg.BallisticDamageInfo[info] = tInfo
+		hg.BallisticDamageTrace = hg.BallisticDamageTrace or setmetatable({}, {__mode = "k"})
+		hg.BallisticDamageTrace[info] = table.Copy(tr)
 		pEntity:DispatchTraceAttack(info, tr, vShotDir)
+		hg.BallisticDamageTrace[info] = nil
 		hg.BallisticDamageInfo[info] = nil
 		if IsValid(pInflictor) and pInflictor.bullet == tInfo then pInflictor.bullet = previousBullet end
 		

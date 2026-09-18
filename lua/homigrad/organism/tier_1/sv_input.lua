@@ -1402,8 +1402,12 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		dmg = dmgInfo:GetDamage()
 		pen = pen * damageRatio
 	end
-	local tr
-	if meleeContact then
+	local tr = hg.BallisticDamageTrace and hg.BallisticDamageTrace[dmgInfo]
+	if tr and tr.Entity ~= ent then tr = nil end
+	if tr then
+		dmgPos = tr.HitPos
+		dir = (isvector(tr.Normal) and tr.Normal or dmgInfo:GetDamageForce()):GetNormalized() * pen
+	elseif meleeContact then
 		tr = {
 			Entity = ent,
 			Hit = true,
@@ -1413,6 +1417,8 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 			PhysicsBone = meleeContact.physicsBone,
 			HitGroup = meleeContact.hitGroup,
 		}
+	elseif dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) then
+		tr = {Entity = ent, Hit = true, HitPos = dmgPos, Normal = dir:GetNormalized()}
 	else
 		tr = util.QuickTrace(dmgPos, dir:GetNormalized() * 100)
 		if tr.Hit and tr.Entity == ent then
@@ -1523,6 +1529,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		ent.bloodamt = ent.bloodamt or 0
 		ent.bloodamt = ent.bloodamt + 1
 		local exitPos, exitAng, exitBone = hg.organism.GetWoundAnchor(ent, outputHole[#outputHole], (-outputDir):Angle())
+		local exitDirection = dir:GetNormalized()
 		
 		timer.Simple(0, function()
 			if !IsValid(ent) then return end
@@ -1545,7 +1552,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 				local mul = math.Clamp(impact.energy / impact.initialEnergy, 0, 1) * impact.energyRetention
 				local newBullet = table.Copy(bullet)
 				newBullet.Src = outputHole[#outputHole]
-				newBullet.Dir = dir:GetNormalized()
+				newBullet.Dir = exitDirection
 				newBullet.Force = newBullet.Force * mul
 				newBullet.Damage = newBullet.Damage * mul
 				newBullet.Num = 1

@@ -968,6 +968,7 @@ end
 
 function MODE:PlayerSpawn(ply)
 	if zb.ROUND_STATE ~= 1 then return end
+	if OverrideSpawn or (ply.hgOverrideSpawnPending or 0) > 0 then return end
 
 	ply.RealishLoadout = GetClassName(ply.RealishLoadout)
 	ply.RealishChoices = SanitizeChoices(ply.RealishLoadout, ply.RealishChoices)

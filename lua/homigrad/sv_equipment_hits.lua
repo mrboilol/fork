@@ -201,8 +201,8 @@ local function GetGeometry(model)
         end
         if #planes > 0 then geometry.convexes[#geometry.convexes + 1] = planes end
     end
-    if #geometry.convexes == 0 and isfunction(probe.SetupBones) and isfunction(probe.GetHitBoxCount) and isfunction(probe.GetHitBoxBone) and isfunction(probe.GetHitBoxBounds) and isfunction(probe.GetBoneMatrix) then
-        probe:SetupBones()
+    if #geometry.convexes == 0 and isfunction(probe.GetHitBoxCount) and isfunction(probe.GetHitBoxBone) and isfunction(probe.GetHitBoxBounds) and isfunction(probe.GetBoneMatrix) then
+        SetupEntityBones(probe)
         for i = 0, (probe:GetHitBoxCount(0) or 0) - 1 do
             local bone = probe:GetHitBoxBone(i, 0)
             local matrix = bone and probe:GetBoneMatrix(bone)
@@ -528,7 +528,7 @@ local function TraceHeldWeaponModel(ply, wep, startPos, endPos, padding)
             local bone = pose:GetHitBoxBone(index, 0)
             local name = bone and string.lower(pose:GetBoneName(bone) or "") or ""
             local humanBone = name:find("valvebiped", 1, true) or name:find("human", 1, true) or name:find("bip01", 1, true)
-            if humanBone and (name:find("hand", 1, true) or name:find("arm", 1, true) or name:find("palm", 1, true) or name:find("finger", 1, true) or name:find("clavicle", 1, true)) then continue end
+            if (wep.WorldModelFake or wep.WorldModelReal) and humanBone and (name:find("hand", 1, true) or name:find("arm", 1, true) or name:find("palm", 1, true) or name:find("finger", 1, true) or name:find("clavicle", 1, true)) then continue end
             local matrix = bone and pose:GetBoneMatrix(bone)
             local mins, maxs = pose:GetHitBoxBounds(index, 0)
             if not matrix or not mins or not maxs then continue end
@@ -801,6 +801,7 @@ function hg.TraceOrganismArms(body, startPos, endPos, padding)
     local org = body.organism or IsValid(owner) and owner.organism or {}
     local set = body.GetHitboxSet and body:GetHitboxSet() or 0
     local armHitboxBones = {}
+    local modelScale = body.GetModelScale and body:GetModelScale() or 1
     local function IsArmBone(name)
         name = string.lower(tostring(name or ""))
         local side = name:find("_l_", 1, true) and "l" or name:find("_r_", 1, true) and "r"
@@ -829,6 +830,7 @@ function hg.TraceOrganismArms(body, startPos, endPos, padding)
         if not bonePos and body.GetBonePosition then bonePos, boneAng = body:GetBonePosition(bone) end
         if not isvector(bonePos) or not isangle(boneAng) then return end
         local expand = Vector(padding, padding, padding)
+        mins, maxs = mins * modelScale, maxs * modelScale
         local position, normal, fraction = util.IntersectRayWithOBB(startPos, ray, bonePos, boneAng, mins - expand, maxs + expand)
         if not position or best and fraction >= best.Fraction then return end
         local physicsBone

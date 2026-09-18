@@ -163,21 +163,15 @@ local moodleTexts = {
 	}},
 	arrhythmia = {levels = {
 		[1] = {title = "Arrhythmia", description = "Your heartbeat is becoming irregular."},
-		[2] = {title = "Arrhythmia", description = "An abnormal heart rhythm is affecting circulation."},
+		[2] = {title = "Arrhythmia", description = "An abnormal rhythm or conduction problem is affecting circulation."},
 		[3] = {title = "Severe Arrhythmia", description = "Your heart rhythm is dangerously unstable."},
-		[4] = {title = "Critical Arrhythmia", description = "Your heart is struggling to maintain an effective rhythm."},
+		[4] = {title = "Critical Arrhythmia", description = "A critical rhythm disorder is preventing your heart from maintaining effective circulation."},
 	}},
 	palpitations = {levels = {
-		[1] = {title = "Abnormal Heart Rate", description = "Your heart rate is outside its normal range."},
-		[2] = {title = "Severe Heart Rate Disturbance", description = "Your heart rate is becoming dangerously slow or fast."},
-		[3] = {title = "Critical Heart Rate", description = "Your abnormal heart rate is straining circulation."},
-		[4] = {title = "Life-Threatening Heart Rate", description = "Your heart rate may no longer sustain effective circulation."},
-	}},
-	fibrillation = {levels = {
-		[1] = {title = "Palpitations", description = "You can feel an abnormal fluttering heartbeat."},
-		[2] = {title = "Palpitations", description = "Your heartbeat is forceful and irregular."},
-		[3] = {title = "Ventricular Fibrillation", description = "A dangerously fast, irregular rhythm is weakening circulation."},
-		[4] = {title = "Ventricular Fibrillation", description = "Your heart is contracting too chaotically to sustain circulation."},
+		[1] = {title = "Palpitations", description = "Your heart rate is outside its normal range."},
+		[2] = {title = "Severe Palpitations", description = "Your heart rate is becoming dangerously slow or fast."},
+		[3] = {title = "Critical Palpitations", description = "Your abnormal heart rate is straining circulation."},
+		[4] = {title = "Life-Threatening Palpitations", description = "Your heart rate may no longer sustain effective circulation."},
 	}},
 	hypoxemia = {levels = {
 		[1] = {title = "Hypoxemia", description = "Your blood oxygen level is mildly reduced."},
@@ -542,10 +536,10 @@ local function lowRank(value, thresholds)
 	return rank
 end
 
-local function add(effects, name, icon, level, mood, priority, value)
+local function add(effects, name, icon, level, mood, priority, value, title, description)
 	effects[#effects + 1] = {
 		name = name, icon = icon, level = math.Clamp(math.floor(number(level, 1)), 1, 4),
-		mood = mood or "bad", priority = priority or 100, value = value,
+		mood = mood or "bad", priority = priority or 100, value = value, title = title, description = description,
 	}
 end
 
@@ -706,18 +700,20 @@ local function buildEffects(ply, org)
 	local irregular = irregularSeverity > 0 or (not ecgState and unstableRhythm ~= nil)
 	local fibrillating = org.fibrillation == true or ecgState == "atrial_fibrillation" or ecgState == "ventricular_fibrillation"
 		or (not ecgState and unstableRhythm == "atrial_fibrillation")
-	if not org.heartstop and fibrillating then
-		local level = org.fibrillation and 4 or highRank(math.max(palpitations, arrhythmia, irregularSeverity, 0.1), {0.1, 0.3, 0.6, 0.85})
-		add(effects, "fibrillation", "fibrillation", level, "bad", org.fibrillation and -95 or 24, math.floor(heartRate) .. " bpm")
-	elseif not org.heartstop and irregular then
-		local level = highRank(math.max(arrhythmia, irregularSeverity, 0.1), {0.1, 0.3, 0.6, 0.85})
+	local rhythmSeverity = math.max(arrhythmia, irregularSeverity, fibrillating and 1 or 0)
+	if not org.heartstop and (rhythmSeverity >= 0.1 or irregular) then
+		local level = highRank(math.max(rhythmSeverity, 0.1), {0.1, 0.3, 0.6, 0.85})
 		add(effects, "arrhythmia", "arrhythmia", level, "bad", 24.5, math.floor(heartRate) .. " bpm")
 	elseif not org.heartstop and (heartRate >= 150 or (heartRate > 0 and heartRate <= 45)) then
 		local rateSeverity = heartRate >= 150
 			and math.Clamp((heartRate - 150) / 150, 0, 1)
 			or math.Clamp((45 - heartRate) / 30, 0, 1)
 		local level = highRank(math.max(palpitations, rateSeverity, 0.1), {0.1, 0.3, 0.6, 0.85})
-		add(effects, "palpitations", "palpitations", level, "bad", 24.5, math.floor(heartRate) .. " bpm")
+		local rateName = heartRate >= 150 and "Tachycardia" or "Bradycardia"
+		local rateDescription = heartRate >= 150
+			and "Your heart is beating too fast and causing palpitations."
+			or "Your heart is beating too slowly and causing palpitations."
+		add(effects, "palpitations", "palpitations", level, "bad", 24.5, math.floor(heartRate) .. " bpm", rateName .. " Palpitations", rateDescription)
 	end
 
 	local oxygen, oxygenMax = o2Value(org), o2Maximum(org)
@@ -948,8 +944,8 @@ local function drawTooltip(effect, pos, mx, my, berserkActive)
 	local textData = effect.sharedMoodle3Text or moodleTexts[effect.name] or {}
 	local textLevels = textData[tooltipMood] or textData.levels
 	local levelText = rageActive and textData.fixed or textLevels and textLevels[tooltipLevel] or nil
-	local title = levelText and levelText.title or effect.name
-	local description = levelText and levelText.description or "An active condition is affecting you."
+	local title = effect.title or levelText and levelText.title or effect.name
+	local description = effect.description or levelText and levelText.description or "An active condition is affecting you."
 	if effect.name == "depression" and effect.icon == "desolate" then
 		title = "Desolate"
 		description = "Your depression has reached self-harm levels."

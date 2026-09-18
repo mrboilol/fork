@@ -136,6 +136,11 @@ hook.Add("player_spawn", "homigrad-spawn3", function(data)
 	hook.Run("Player Getup", ply)
 
 	local override = (CLIENT and hg.override and hg.override[ply]) or (SERVER and OverrideSpawn)
+	if SERVER and (ply.hgOverrideSpawnPending or 0) > 0 then
+		ply.hgOverrideSpawnPending = ply.hgOverrideSpawnPending - 1
+		if ply.hgOverrideSpawnPending <= 0 then ply.hgOverrideSpawnPending = nil end
+		override = true
+	end
 
 	if eightbit and eightbit.EnableEffect and ply.UserID then
 		eightbit.EnableEffect(ply:UserID(), ply.PlayerClassName == "furry" and eightbit.EFF_PROOT or 0)

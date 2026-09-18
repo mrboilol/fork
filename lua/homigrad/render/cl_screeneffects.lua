@@ -130,11 +130,9 @@ hook.Add("RenderScreenspaceEffects", "homigrad", function()
 
 	hook_Run("Post Post Pre Post Processing")
 
-	-- Keep the vital-state borders above every motion-blur pass, including the
-	-- organism effects dispatched by the hook immediately above.
-	if drawFinalVitalsVignettes then drawFinalVitalsVignettes() end
-
 	hook_Run("Post Pain Processing")
+
+	if drawFinalVitalsVignettes then drawFinalVitalsVignettes() end
 end)
 
 local postprs = hg.postprocess
@@ -1074,6 +1072,22 @@ drawFinalVitalsVignettes = function()
 
 	local org = lply.new_organism or lply.organism
 	if not org or not org.brain then return end
+	local o2Range = math.max(tonumber(org.o2 and org.o2.range) or 30, 1)
+	local o2Value = math.Clamp(tonumber(org.o2 and org.o2[1]) or o2Range, 0, o2Range)
+	local lowOxygenSeverity = math.Clamp((o2Range * 0.5 - o2Value) / (o2Range * 0.5), 0, 1)
+	local unconsciousHypoxia = org.otrub and math.max(lowOxygenSeverity, 0.22) or lowOxygenSeverity
+	local severeShockHypoxia = math.Clamp(((tonumber(org.shock) or 0) - 45) / 40, 0, 1) * 0.35
+	local lowOxygenVignette = math.max(unconsciousHypoxia, severeShockHypoxia)
+	if lowOxygenVignette > 0.005 then
+		local oxygenCoverage = math.Clamp(0.45 + lowOxygenVignette * 2.65, 0, 3.1)
+		local oxygenBorder = math.Clamp(0.12 + lowOxygenVignette ^ 0.82 * 0.7, 0, 0.82)
+		render.UpdateScreenEffectTexture()
+		vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
+		vignetteMat:SetFloat("$c0_z", oxygenBorder)
+		vignetteMat:SetFloat("$c1_y", oxygenCoverage)
+		render.SetMaterial(vignetteMat)
+		render.DrawScreenQuad()
+	end
 	local excruciatingBlend = getServerSoundMode("hg_painsound", 6) == 6
 		and getPainLayerBlend(org.pain or 0, painExcruciatingThreshold)
 		or 0

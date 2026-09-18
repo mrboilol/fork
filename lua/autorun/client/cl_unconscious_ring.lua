@@ -1042,7 +1042,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
                 or Color(220, 220, 220, 255 * ringAlpha)
             local radius = math.min(280, scrH * 0.32)
             incapPromptX = centerX
-            incapPromptY = math.min(centerY + radius + ScreenScaleH(18), scrH - ScreenScaleH(30))
+            incapPromptY = math.min(centerY + radius + ScreenScaleH(10), scrH - ScreenScaleH(30))
 
             surface.SetDrawColor(0, 0, 0, 90 * ringAlpha)
             surface.DrawRect(0, 0, scrW, scrH)
@@ -1088,7 +1088,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         if not incapPromptX then
             local radius = math.min(280, ScrH() * 0.32)
             incapPromptX = ScrW() * 0.5
-            incapPromptY = math.min(ScrH() * 0.5 + radius + ScreenScaleH(18), ScrH() - ScreenScaleH(30))
+            incapPromptY = math.min(ScrH() * 0.5 + radius + ScreenScaleH(10), ScrH() - ScreenScaleH(30))
         end
 
         local messageY = incapPromptY

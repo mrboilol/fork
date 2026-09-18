@@ -447,7 +447,6 @@ local models_female = {
 }
 
 local vector_zero = Vector(0,0,0)
-local vector_usehull = Vector(6, 6, 6)
 local fall_cover_mins = Vector(-6, -6, -6)
 local fall_cover_maxs = Vector(6, 6, 6)
 local fall_cover_offsets = {
@@ -1393,24 +1392,6 @@ hook.Add("Think", "Fake", function()
 				phys = ragdoll:GetPhysicsObjectNum(realPhysNum(ragdoll, 5))
 				if (ragdoll.cooldownLH or 0) < time and not IsValid(ragdoll.ConsLH) and not wepinreload then
 
-					--\\ Find Use Entity in ragdoll
-						local usetrace = util_TraceHull({
-							start = phys:GetPos(),
-							endpos = phys:GetPos(),
-							maxs = vector_usehull,
-							mins = -vector_usehull,
-							filter = {ragdoll, game.GetWorld()},
-							mask = MASK_SOLID
-						})
-
-						local useent = (IsValid(usetrace.Entity) and usetrace.Entity) or false
-						if useent and not useent:IsVehicle() and hook.Run("PlayerUse", ply, useent) then useent:Use(ply) end
-						local wep = useent and useent:IsWeapon() and useent or false
-						ply.force_pickup = true
-						if IsValid(wep) and hook.Run("PlayerCanPickupWeapon", ply, wep) then ply:PickupWeapon(wep) end
-						ply.force_pickup = nil
-					--//
-
 					local trace
 					for i = 1,3 do
 						if trace and trace.Hit and not trace.HitSky then continue end
@@ -1482,24 +1463,6 @@ hook.Add("Think", "Fake", function()
 
 				if (ragdoll.cooldownRH or 0) < time and not IsValid(ragdoll.ConsRH) then
 					
-					--\\ Find Use Entity in ragdoll
-						local usetrace = util_TraceHull({
-							start = phys:GetPos(),
-							endpos = phys:GetPos(),
-							maxs = vector_usehull,
-							mins = -vector_usehull,
-							filter = {ragdoll, game.GetWorld()},
-							mask = MASK_SOLID
-						})
-
-						local useent = (IsValid(usetrace.Entity) and usetrace.Entity) or false
-						if useent and not useent:IsVehicle() and hook.Run("PlayerUse", ply, useent) then useent:Use(ply) end
-						local wep = useent and useent:IsWeapon() and useent or false
-						ply.force_pickup = true
-						if IsValid(wep) and hook.Run("PlayerCanPickupWeapon", ply, wep) then ply:PickupWeapon(wep) end
-						ply.force_pickup = nil
-					--//
-
 					local trace
 					for i = 1,3 do
 						if trace and trace.Hit and not trace.HitSky then continue end

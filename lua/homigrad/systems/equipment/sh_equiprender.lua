@@ -3,6 +3,8 @@ function hg.GetCurrentArmor(ply)
 end
 
 if CLIENT then
+	local ARMOR_RUST_WEAR_THRESHOLD = 0.75
+
 	local whitelist = {
 		weapon_physgun = true,
 		gmod_tool = true,
@@ -309,11 +311,11 @@ if CLIENT then
 				-- when the player respawns and hg.AddArmor resets the player's NWVar.
 				local wear = (ent ~= ply and ent:GetNWFloat("ArmorWear" .. armor, -1) or -1)
 				if wear < 0 then wear = ply:GetNWFloat("ArmorWear" .. armor, 0) end
-				if wear > 0.005 and not (islply and armorData.norender) then
+				if wear >= ARMOR_RUST_WEAR_THRESHOLD and not (islply and armorData.norender) then
 					omodel:SetRenderOrigin(pos)
 					omodel:SetRenderAngles(ang)
 					omodel:SetParent(ent, bone)
-					local a = math.Clamp(wear, 0, 1)
+					local a = math.Clamp((wear - ARMOR_RUST_WEAR_THRESHOLD) / (1 - ARMOR_RUST_WEAR_THRESHOLD), 0, 1)
 					a = a * a * (3 - 2 * a)
 					omodel:SetColor(Color(255, 255, 255, a * 255))
 					omodel:DrawModel()
@@ -455,8 +457,8 @@ if CLIENT then
 				omodel:SetRenderOrigin(parent:GetPos())
 				omodel:SetRenderAngles(parent:GetAngles())
 				local wear = parent:GetNWFloat("ArmorWear", parent:GetNWBool("ArmorBroken", false) and 1 or 0)
-				if wear > 0.005 and not parent:GetNWBool("ArmorUnusable", false) then
-					local a = math.Clamp(wear, 0, 1)
+				if wear >= ARMOR_RUST_WEAR_THRESHOLD and not parent:GetNWBool("ArmorUnusable", false) then
+					local a = math.Clamp((wear - ARMOR_RUST_WEAR_THRESHOLD) / (1 - ARMOR_RUST_WEAR_THRESHOLD), 0, 1)
 					a = a * a * (3 - 2 * a)
 					omodel:SetColor(Color(255, 255, 255, a * 255))
 					omodel:DrawModel()
