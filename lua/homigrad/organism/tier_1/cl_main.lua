@@ -719,7 +719,9 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 
 	disorientation = disorientation + amtflashed * 5
 
-	disorientationLerp = LerpFT(disorientation > disorientationLerp and 1 or 0.15, disorientationLerp, math.max(lply.suiciding and 1.5 or 0, disorientation))
+	local suicScale = lply:GetNWFloat("rem_suicide_aim", 0)
+	if suicScale <= 0 then suicScale = 1 end
+	disorientationLerp = LerpFT(disorientation > disorientationLerp and 1 or 0.15, disorientationLerp, math.max(lply.suiciding and 1.5 * suicScale or 0, disorientation))
 
 	local disVig = math.Clamp((disorientationLerp - 0.4) / 3.6, 0, 1)
 	if disVig > 0.01 and lply:Alive() then

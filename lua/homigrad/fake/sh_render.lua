@@ -38,12 +38,6 @@ local IsValid, math_Clamp = IsValid, math.Clamp
 	end
 --//
 --\\ DrawPlayerRagdoll
-	local hg_ragdollcombat = ConVarExists("hg_ragdollcombat") and GetConVar("hg_ragdollcombat") or CreateConVar("hg_ragdollcombat", 0, FCVAR_REPLICATED, "Toggle ragdoll combat-like ragdoll mode (walking, running in ragdoll, etc.)", 0, 1)
-	
-	function hg.RagdollCombatInUse(ply)
-		return hg_ragdollcombat:GetBool() and IsValid(ply.FakeRagdoll)
-	end
-	
 	local hg_firstperson_ragdoll = ConVarExists("hg_firstperson_ragdoll") and GetConVar("hg_firstperson_ragdoll") or CreateConVar("hg_firstperson_ragdoll", "0", FCVAR_ARCHIVE, "Toggle first-person ragdoll camera view", 0, 1) --!! unused??
 	local hg_firstperson_death = { GetBool = function() return false end }
 	local hg_thirdperson = ConVarExists("hg_thirdperson") and GetConVar("hg_thirdperson") or CreateConVar("hg_thirdperson", 0, FCVAR_REPLICATED, "Toggle third-person camera view", 0, 1)
@@ -207,7 +201,7 @@ local IsValid, math_Clamp = IsValid, math.Clamp
 		local isFountain = ent:GetNW2Bool("hg_fountain", false)
 		local wawanted = (GetViewEntity() != ply) and !isFountain and (!(!lply:Alive() and lply:GetNWEntity("spect") == ply and viewmode == 1) and !(hg_firstperson_death:GetBool() and follow == ent)) and vector_full or vector_small
 		local org = ent.new_organism or ent.organism
-		local hideHead = (ent.headexploded or (org and org.headamputated)) or ((!hg_thirdperson:GetBool() and !hg_gopro:GetBool() and (ent == ply or (!hg_ragdollcombat:GetBool() or hg_firstperson_ragdoll:GetBool()))) or (hg_firstperson_death:GetBool() and follow == ent)) and wawanted == vector_small
+		local hideHead = (ent.headexploded or (org and org.headamputated)) or ((!hg_thirdperson:GetBool() and !hg_gopro:GetBool() and (ent == ply or (!hg.RagdollCombatEnabled() or hg_firstperson_ragdoll:GetBool()))) or (hg_firstperson_death:GetBool() and follow == ent)) and wawanted == vector_small
 		local headScale = hideHead and vector_small or vector_full
 		if not ent:GetManipulateBoneScale(lkp):IsEqualTol(headScale, 0.001) then
 			ent:ManipulateBoneScale(lkp, headScale)
@@ -219,7 +213,7 @@ local IsValid, math_Clamp = IsValid, math.Clamp
 			if mat and (ent.headexploded or (org and org.headamputated)) then
 				mat:SetScale(vector_small)
 			elseif mat and !(Glide and Glide.Camera and !Glide.Camera.isInFirstPerson and lply == ply and lply:InVehicle() and hg_no_camera_in_cars:GetBool()) then
-				if (!hg_thirdperson:GetBool() and !hg_gopro:GetBool() and (ent == ply or (!hg_ragdollcombat:GetBool() or hg_firstperson_ragdoll:GetBool()))) or (hg_firstperson_death:GetBool() and follow == ent) then
+				if (!hg_thirdperson:GetBool() and !hg_gopro:GetBool() and (ent == ply or (!hg.RagdollCombatEnabled() or hg_firstperson_ragdoll:GetBool()))) or (hg_firstperson_death:GetBool() and follow == ent) then
 					mat:SetScale(wawanted)
 				end
 			end

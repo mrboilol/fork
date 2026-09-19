@@ -383,7 +383,6 @@ local function BuildSplitRagdolls(ply, rag, force)
 		lower:SetNWString("PlayerName", rag:GetNWString("PlayerName", "Lower body"))
 	end
 	lower:SetNetVar("wounds", rag:GetNetVar("wounds", {}))
-	lower:SetNetVar("woundmarks", rag:GetNetVar("woundmarks", {}))
 	ApplyOldAmputations(lower, IsValid(ply) and ply.organism or nil)
 
 	local lowerSpine2 = lower:LookupBone("ValveBiped.Bip01_Spine2")
@@ -477,13 +476,9 @@ local function AddTorsoTrauma(ply, rag, fromExplosion)
 			clean[#clean + 1] = wound
 		end
 	end
-	local arteryA = {18, Vector(0, 0, 0), Angle(), "ValveBiped.Bip01_Spine1", CurTime(), Vector(-150, 0, 0), "hg_torso_artery_a"}
-	local arteryB = {16, Vector(0, 0, 0), Angle(), "ValveBiped.Bip01_Spine1", CurTime(), Vector(150, 0, 0), "hg_torso_artery_b"}
-	clean[#clean + 1] = arteryA
-	clean[#clean + 1] = arteryB
+	clean[#clean + 1] = {18, Vector(0, 0, 0), Angle(), "ValveBiped.Bip01_Spine1", CurTime(), Vector(-150, 0, 0), "hg_torso_artery_a"}
+	clean[#clean + 1] = {16, Vector(0, 0, 0), Angle(), "ValveBiped.Bip01_Spine1", CurTime(), Vector(150, 0, 0), "hg_torso_artery_b"}
 	org.arterialwounds = clean
-	hg.organism.RecordWoundMark(org, arteryA, true)
-	hg.organism.RecordWoundMark(org, arteryB, true)
 	ply:SetNetVar("arterialwounds", clean)
 
 	if ply.AddNaturalAdrenaline then ply:AddNaturalAdrenaline(3.5) end

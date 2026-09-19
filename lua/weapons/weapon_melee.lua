@@ -652,7 +652,9 @@ function SWEP:GetLHIKStateOffset()
         return self.SelfHarmLeftPos or self.LHIKSelfHarmPos or vector_origin, self.SelfHarmLeftAng or self.LHIKSelfHarmAng or angle_zero
     end
     if self.CanSuicide and owner.suiciding then
-        return self.LHIKSuicidePos or vector_origin, self.LHIKSuicideAng or angle_zero
+        local aimScale = owner:GetNWFloat("rem_suicide_aim", 0)
+        if aimScale <= 0 then aimScale = 1 end
+        return (self.LHIKSuicidePos or vector_origin) * aimScale, (self.LHIKSuicideAng or angle_zero) * aimScale
     end
     if self.GetBlocking and self:GetBlocking() then
         return self.LHIKBlockPos or vector_origin, self.LHIKBlockAng or angle_zero
@@ -963,8 +965,10 @@ function SWEP:ModelAnim(model, pos, ang)
     addPosLerp.x = addPosLerp.x - wallRetract * (self.MeleeWallRetractAmount or 18)
 
     if self.CanSuicide and owner.suiciding then
-        addPosLerp:Set(self.SuicidePos)
-        addAngLerp:Set(self.SuicideAng)
+        local aimScale = owner:GetNWFloat("rem_suicide_aim", 0)
+        if aimScale <= 0 then aimScale = 1 end
+        addPosLerp:Set(self.SuicidePos * aimScale)
+        addAngLerp:Set(self.SuicideAng * aimScale)
     end
 
     if self.Canselfharm and self:IsSelfHarming() then
@@ -3456,7 +3460,7 @@ function SWEP:CustomThink()
 		return
 	end
 
-    if self.CanSuicide and hg.KeyDown(owner, IN_ATTACK) and owner.suiciding and !self.SuicideStart and owner:GetNWFloat("rem_urges_end", 0) < CurTime() then
+    if self.CanSuicide and hg.KeyDown(owner, IN_ATTACK) and owner.suiciding and !self.SuicideStart and owner:GetNWFloat("rem_suicide_aim", 0) <= 0 and owner:GetNWFloat("rem_urges_end", 0) < CurTime() then
         self.SuicideStart = CurTime()
 
         if SERVER then

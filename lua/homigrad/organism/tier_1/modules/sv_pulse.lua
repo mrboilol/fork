@@ -1090,7 +1090,9 @@ module[2] = function(owner, org, timeValue)
 	local runnin_or_exhausted = org.analgesia < 1 and (org.stamina.sub > 0 or org.stamina[1] < (org.stamina.max * 0.66))
 	org.heartbeat = math.Approach(org.heartbeat, math.max(heartbeat - 10, runnin_or_exhausted and ((1 - math.min(1, org.stamina[1] / (org.stamina.max * 1))) * 110 + 90) or 60), !runnin_or_exhausted and timeValue * 2 or timeValue * 15)
 	
-	heartbeat = heartbeat + (owner.suiciding and 50 or 0)
+	local suicideAim = owner.hgSuicideAim or 1
+	if suicideAim <= 0 then suicideAim = 1 end
+	heartbeat = heartbeat + (owner.suiciding and suicideAim or 0) * 50
 	heartbeat = heartbeat + math.Clamp((org.shock or 0) - 20, 0, 40)
 	heartbeat = heartbeat + math.Clamp(org.pain, 40, 80) - 40
 	heartbeat = heartbeat + exertionHeartBoost

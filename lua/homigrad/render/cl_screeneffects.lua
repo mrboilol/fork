@@ -2762,7 +2762,9 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	if lply.suiciding and lply:Alive() and not org.otrub then
 		local startTime = lply.startsuicide or CurTime()
 		local duration = CurTime() - startTime
-		local targetIntensity = math.Clamp(duration / 3, 0, 1)
+		local aimScale = lply:GetNWFloat("rem_suicide_aim", 0)
+		if aimScale <= 0 then aimScale = 1 end
+		local targetIntensity = math.Clamp(duration / 3, 0, 1) * aimScale
 
 		suicideLerp = math.Approach(suicideLerp, targetIntensity, FrameTime() * 0.4)
 
@@ -3183,11 +3185,13 @@ hook.Add("DrawOverlay", "suicide_text", function()
 
 	local startTime = ply.startsuicide or CurTime()
 	local duration = CurTime() - startTime
+	local aimScale = ply:GetNWFloat("rem_suicide_aim", 0)
+	if aimScale <= 0 then aimScale = 1 end
 
 	-- Only show text after 2 seconds in suicide state
 	if duration < 2 then return end
 
-	local target = math.Clamp((duration - 2) / 3, 0, 1)
+	local target = math.Clamp((duration - 2) / 3, 0, 1) * aimScale
 	suicideTextLerp = LerpFT(0.02, suicideTextLerp, target)
 	if suicideTextLerp <= 0.001 then return end
 

@@ -111,6 +111,15 @@ local depression_minigame_phrases = {
 	"END IT ALREADY.. COME ON..",
 }
 
+local depression_suicide_aim_phrases = {
+	"no-no.. i dont want to do this..",
+	"stop.. please.. dont make me..",
+	"i-i cant.. i wont.. please..",
+	"no-no no.. someone help me..",
+	"dont... i dont want to die..",
+	"not now.. please, not now..",
+}
+
 util.AddNetworkString("rem_selfharm_press")
 util.AddNetworkString("rem_selfharm_end")
 
@@ -581,7 +590,10 @@ module[2] = function(owner, org, timeValue)
 			end
 		end
 
-		if (owner.selfharming or owner.suiciding or owner.remUrgeEnd) and (org.depressionNextMinigamePhrase or 0) < CurTime() then
+		if owner.suiciding and (owner.hgSuicideAim or 0) > 0 and (org.depressionNextMinigamePhrase or 0) < CurTime() then
+			org.depressionNextMinigamePhrase = CurTime() + math.Rand(depression_minigame_phrase_interval_min, depression_minigame_phrase_interval_max)
+			showDepressionThought(owner, table.Random(depression_suicide_aim_phrases), 3, "depression_suicide_aim")
+		elseif (owner.selfharming or owner.suiciding or owner.remUrgeEnd) and (org.depressionNextMinigamePhrase or 0) < CurTime() then
 			org.depressionNextMinigamePhrase = CurTime() + math.Rand(depression_minigame_phrase_interval_min, depression_minigame_phrase_interval_max)
 			showDepressionThought(owner, table.Random(depression_minigame_phrases), 3, "depression_minigame")
 		elseif not owner.selfharming and not owner.suiciding and not owner.remUrgeEnd then

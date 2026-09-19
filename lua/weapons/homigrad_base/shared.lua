@@ -810,6 +810,10 @@ function SWEP:CanPrimaryAttack()
 		return false
 	end
 
+	if owner.suiciding and owner:GetNWFloat("rem_suicide_aim", 0) > 0 and owner:GetNWFloat("willsuicide", 0) > CurTime() then
+		return false
+	end
+
 	//local owner = self:GetOwner()
 	--[[if owner.suiciding then
 		if (owner:GetNetVar("suicide_time",CurTime()) + 8) < CurTime() then if SERVER then owner:SetNetVar("suicide_time",nil) end return true end

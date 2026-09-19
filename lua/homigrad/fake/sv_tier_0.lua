@@ -1392,13 +1392,11 @@ function hg.Fake(ply, huyragdoll, no_freemove, force, reason)
 	end
 end
 
-local hg_ragdollcombat = ConVarExists("hg_ragdollcombat") and GetConVar("hg_ragdollcombat") or CreateConVar("hg_ragdollcombat", 0, FCVAR_REPLICATED, "Toggle ragdoll combat-like ragdoll mode (walking, running in ragdoll, etc.)", 0, 1)
-
 local veczero = Vector(0,0,0)
 function hg.SetFreemove(ply, set)
 	if ply:InVehicle() or IsValid(ply.OldRagdoll) then return end
 	if set then
-		ply.lastFakeTime = hg_ragdollcombat:GetBool() and 9999 or 1
+		ply.lastFakeTime = hg.RagdollCombatEnabled() and 9999 or 1
 		ply.lastFake = CurTime() + ply.lastFakeTime
 		//ply:SetNetVar("lastFake", ply.lastFake)
 		ply:SetMoveType(MOVETYPE_WALK)
