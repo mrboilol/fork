@@ -32,7 +32,7 @@ hook.Add("EntityFireBullets", "NPC_Boolets", function(ent, bullet)
 		bullet.Filter = {ent}
 		bullet.Inflictor = ent
 
-		if (!GetGlobalBool("PhysBullets_ReplaceDefault", false)) and not bullet.NpcShoot then
+		if not (hg.PhysBullet and hg.PhysBullet.CreateBullet) and not bullet.NpcShoot then
 			local oldcallback = bullet.Callback
 			function bullet.Callback(i1, i2, i3)
 				hg.bulletHit(i1, i2, i3, bullet, ent)

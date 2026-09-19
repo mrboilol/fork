@@ -23,6 +23,7 @@ impact.Config = {
     grazingPower = 0.15,
     impactDamage = 80,
     impactForce = 120,
+    dislocationImpulse = 18,
     maxDropChance = 0.98,
     dropCooldown = 0.35,
     maxImpulseSpeed = 320,
@@ -247,7 +248,7 @@ function hg.TraceEquipmentModel(model, pos, ang, scale, startPos, endPos, paddin
     padding = math.max(tonumber(padding) or 0, 0) / scale
     if ray:LengthSqr() < 0.000001 then return end
     local paddingVector = Vector(padding, padding, padding)
-    if not util.IntersectRayWithOBB(startLocal, ray, vector_origin, angle_zero, geometry.mins - paddingVector, geometry.maxs + paddingVector) then return end
+    if #geometry.convexes == 0 and #geometry.boxes == 0 and not util.IntersectRayWithOBB(startLocal, ray, vector_origin, angle_zero, geometry.mins - paddingVector, geometry.maxs + paddingVector) then return end
     local best, exit, normal
     for _, planes in ipairs(geometry.convexes) do
         local expandedPlanes = planes
@@ -455,6 +456,19 @@ function hg.GetWeaponImpactGrip(ply, wep)
     local rightMissing, rightInjury = ArmState(org, "rarm")
     local leftMissing, leftInjury = ArmState(org, "larm")
     local support = wep.GetHandSupportState and wep:GetHandSupportState(ply)
+    if support and support.rightSupport ~= nil and support.leftSupport ~= nil then
+        local right = support.rightSupport and not rightMissing and rightInjury < 1
+        local left = support.leftSupport and not leftMissing and leftInjury < 1
+        return {
+            firingArm = not right and left and "larm" or "rarm",
+            injury = not right and left and leftInjury or rightInjury,
+            braceInjury = right and left and leftInjury or 0,
+            sole = not (right and left),
+            leftRelevant = left,
+            rightRelevant = right,
+            noHands = not right and not left,
+        }
+    end
     local twoHands = wep.TwoHanded == true or (wep.TwoHanded == nil and wep.OneHandedOnly ~= true and wep.IsPistolHoldType and not wep:IsPistolHoldType()) or false
     local rightBusy = support and support.rightBusy
     local leftBusy = support and support.leftBusy
@@ -479,8 +493,12 @@ function hg.GetHeldWeaponImpactModel(ply, wep)
         local model, pos, ang, scale, pose = wep:GetEquipmentImpactModel()
         if model and isvector(pos) and isangle(ang) then return model, pos, ang, scale, pose end
     end
-    local transformedPos, transformedAng
+    local transformedPos, transformedAng, worldPos, worldAng
     if wep.WorldModel_Transform then transformedPos, transformedAng = wep:WorldModel_Transform() end
+    if wep.WorldModelFake and isvector(transformedPos) and isangle(transformedAng) then
+        local inversePos, inverseAng = WorldToLocal(vector_origin, angle_zero, wep.FakePos or vector_origin, wep.FakeAng or angle_zero)
+        worldPos, worldAng = LocalToWorld(inversePos, inverseAng, transformedPos, transformedAng)
+    end
     local model = wep.worldModel
     if IsValid(model) then
         local modelName = model:GetModel()
@@ -500,7 +518,7 @@ function hg.GetHeldWeaponImpactModel(ply, wep)
         end
         if model.InvalidateBoneCache then model:InvalidateBoneCache() end
         SetupEntityBones(model)
-        return modelName, transformedPos or model:GetPos(), transformedAng or model:GetAngles(), modelScale, model
+        return modelName, transformedPos or model:GetPos(), transformedAng or model:GetAngles(), modelScale, model, worldPos, worldAng
     end
     local body = hg.GetCurrentCharacter(ply)
     if not IsValid(body) then return end
@@ -518,20 +536,22 @@ function hg.GetHeldWeaponImpactModel(ply, wep)
 end
 
 local function TraceHeldWeaponModel(ply, wep, startPos, endPos, padding)
-    local model, pos, ang, scale, pose = hg.GetHeldWeaponImpactModel(ply, wep)
+    local model, pos, ang, scale, pose, worldPos, worldAng = hg.GetHeldWeaponImpactModel(ply, wep)
     if not model then return end
-    local best
-    if IsValid(pose) and (pose:GetHitBoxCount(0) or 0) > 0 then
+    local best, hasPoseGeometry
+    local set = IsValid(pose) and pose.GetHitboxSet and pose:GetHitboxSet() or 0
+    if IsValid(pose) and (pose:GetHitBoxCount(set) or 0) > 0 then
         local expand = Vector(padding, padding, padding)
         local ray = endPos - startPos
-        for index = 0, pose:GetHitBoxCount(0) - 1 do
-            local bone = pose:GetHitBoxBone(index, 0)
+        for index = 0, pose:GetHitBoxCount(set) - 1 do
+            local bone = pose:GetHitBoxBone(index, set)
             local name = bone and string.lower(pose:GetBoneName(bone) or "") or ""
             local humanBone = name:find("valvebiped", 1, true) or name:find("human", 1, true) or name:find("bip01", 1, true)
-            if (wep.WorldModelFake or wep.WorldModelReal) and humanBone and (name:find("hand", 1, true) or name:find("arm", 1, true) or name:find("palm", 1, true) or name:find("finger", 1, true) or name:find("clavicle", 1, true)) then continue end
+            if humanBone and (name:find("hand", 1, true) or name:find("arm", 1, true) or name:find("palm", 1, true) or name:find("finger", 1, true) or name:find("clavicle", 1, true)) then continue end
             local matrix = bone and pose:GetBoneMatrix(bone)
-            local mins, maxs = pose:GetHitBoxBounds(index, 0)
+            local mins, maxs = pose:GetHitBoxBounds(index, set)
             if not matrix or not mins or not maxs then continue end
+            hasPoseGeometry = true
             local position, normal, fraction = util.IntersectRayWithOBB(startPos, ray, matrix:GetTranslation(), matrix:GetAngles(), mins * scale - expand, maxs * scale + expand)
             if position and (not best or fraction < best.fraction) then
                 best = {position = position, normal = normal, fraction = fraction, thickness = math.max((maxs - mins):Length() * scale, 0.05)}
@@ -568,9 +588,15 @@ local function TraceHeldWeaponModel(ply, wep, startPos, endPos, padding)
         end
         for name in pairs(wep.ModularParts) do TracePart(name) end
     end
-    local hit = hg.TraceEquipmentModel(model, pos, ang, scale, startPos, endPos, padding, true)
-    if hit and (not best or hit.fraction < best.fraction) then best = hit end
-    return best
+    if not hasPoseGeometry then
+        local traceModel, tracePos, traceAng, traceScale = model, pos, ang, scale
+        if not wep.GetEquipmentImpactModel and wep.WorldModelFake and isstring(wep.WorldModel) and wep.WorldModel ~= "" then
+            traceModel, tracePos, traceAng, traceScale = wep.WorldModel, worldPos or pos, worldAng or ang, 1
+        end
+        local hit = hg.TraceEquipmentModel(traceModel, tracePos, traceAng, traceScale, startPos, endPos, padding)
+        if hit and (not best or hit.fraction < best.fraction) then best = hit end
+    end
+    return best, pose
 end
 
 function hg.DropWeaponFromImpact(ply, wep, direction, strength)
@@ -630,6 +656,16 @@ local function WeaponImpact(ply, wep, hit, damage, force, direction)
     local directness = math.Clamp(-hit.normal:Dot(direction), 0, 1)
     local power = math.Clamp(damage / cfg.impactDamage * cfg.damagePowerWeight + math.max(force or 0, 0) / cfg.impactForce * cfg.forcePowerWeight, 0, 1)
     power = power * (cfg.grazingPower + directness * (1 - cfg.grazingPower))
+    local shot = hit.shot
+    local impulse = hit.impulse or shot and tonumber(shot.ImpactImpulse) or 0
+    local hands = (grip.rightRelevant and 1 or 0) + (grip.leftRelevant and 1 or 0)
+    local perHand = impulse * directness / math.max(hands, 1)
+    if hands > 0 and perHand >= cfg.dislocationImpulse and hg.TryDislocateLimb then
+        local severity = math.Clamp(perHand / cfg.dislocationImpulse - 0.5, 0, 2)
+        if grip.rightRelevant then hg.TryDislocateLimb(ply.organism, "rarm", "up", severity) end
+        if grip.leftRelevant then hg.TryDislocateLimb(ply.organism, "larm", "up", severity) end
+        grip = hg.GetWeaponImpactGrip(ply, wep)
+    end
     local chance = cfg.weaponBaseChance + power ^ 2 * cfg.weaponPowerChance
     chance = chance + power * (grip.injury + grip.braceInjury * cfg.braceInjuryMultiplier) * cfg.weaponInjuryChance
     if grip.sole then chance = chance + power * grip.injury * cfg.weaponSoleInjuryChance end
@@ -792,7 +828,7 @@ function hg.TryAbsorbEquipmentImpact(ent, dmgInfo, hitPos, direction, impactRadi
     return dmgInfo:GetDamage() < damage
 end
 
-function hg.TraceOrganismArms(body, startPos, endPos, padding)
+function hg.TraceOrganismArms(body, startPos, endPos, padding, wep, pose)
     if not IsValid(body) or not isvector(startPos) or not isvector(endPos) then return end
     padding = math.max(tonumber(padding) or 0, 0)
     local ray = endPos - startPos
@@ -826,6 +862,16 @@ function hg.TraceOrganismArms(body, startPos, endPos, padding)
             if isvector(manipulatedScale) and manipulatedScale:LengthSqr() < 0.1 then return end
         end
         local matrix = body.GetBoneMatrix and body:GetBoneMatrix(bone)
+        if IsValid(wep) and IsValid(pose) and body:IsPlayer() then
+            local support = wep.GetHandSupportState and wep:GetHandSupportState()
+            local hand = body:GetBoneName(bone)
+            local supported = support and (hitSide == "l" and support.leftSupport or hitSide == "r" and support.rightSupport)
+            local enabled = hitSide == "l" and wep.setlhik ~= false or hitSide == "r" and wep.setrhik ~= false
+            if supported and enabled and hand:find("_Hand", 1, true) and isfunction(pose.LookupBone) then
+                local poseBone = pose:LookupBone(hand)
+                matrix = poseBone and pose:GetBoneMatrix(poseBone) or matrix
+            end
+        end
         local bonePos, boneAng = matrix and matrix:GetTranslation(), matrix and matrix:GetAngles()
         if not bonePos and body.GetBonePosition then bonePos, boneAng = body:GetBonePosition(bone) end
         if not isvector(bonePos) or not isangle(boneAng) then return end
@@ -928,22 +974,31 @@ local function TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, ori
     end
     local cfg = impact.Config
     local projectileRadius = math.max(tonumber(shot.EquipmentRadius) or 0, 0)
+    local filter = shot.TraceFilter or shot.Filter
+    local function CanHit(ent)
+        if ent == shot.IgnoreEntity then return false end
+        if isfunction(filter) then return filter(ent) == true end
+        if istable(filter) then return not table.HasValue(filter, ent) end
+        return ent ~= filter
+    end
     for _, ply in ipairs(player.GetAll()) do
         if ply == shooter or not ply:Alive() then continue end
         local body = hg.GetCurrentCharacter(ply)
-        if not IsValid(body) then continue end
+        if not IsValid(body) or not CanHit(ply) or not CanHit(body) then continue end
         SetupEntityBones(body)
-        local armTrace = hg.TraceOrganismArms(body, startPos, endPos, (shot.Contact and cfg.armHitPadding or 0) + projectileRadius)
-        if armTrace then armTraces[#armTraces + 1] = armTrace end
         checkedBodies[body] = true
         checkedBodies[ply] = true
         local wep = ply:GetActiveWeapon()
-        if IsValid(wep) and (shot.Contact or not seen[wep]) then
-            local hit = TraceHeldWeaponModel(ply, wep, startPos, endPos, cfg.weaponHitPadding + projectileRadius)
+        local pose
+        if IsValid(wep) and CanHit(wep) and (shot.Contact or not seen[wep]) then
+            local hit
+            hit, pose = TraceHeldWeaponModel(ply, wep, startPos, endPos, cfg.weaponHitPadding + projectileRadius)
             if hit and hit.fraction <= obstructionFraction + 0.0001 then hit.weapon, hit.ply, hit.key = wep, ply, wep; hit.shot = shot; hits[#hits + 1] = hit end
         end
+        local armTrace = hg.TraceOrganismArms(body, startPos, endPos, (shot.Contact and cfg.armHitPadding or 0) + projectileRadius, wep, pose)
+        if armTrace then armTraces[#armTraces + 1] = armTrace end
         for _, heldEnt in ipairs(hg.GetHeldEquipmentEntities(ply)) do
-            if seen[heldEnt] and not shot.Contact then continue end
+            if not CanHit(heldEnt) or seen[heldEnt] and not shot.Contact then continue end
             local model = heldEnt:GetModel()
             local hit = model and hg.TraceEquipmentModel(model, heldEnt:GetPos(), heldEnt:GetAngles(), heldEnt:GetModelScale(), startPos, endPos, projectileRadius)
             if hit and hit.fraction <= obstructionFraction + 0.0001 then
@@ -962,7 +1017,7 @@ local function TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, ori
     if IsValid(originalTrace.Entity) and originalTrace.Entity.HGAccessoryID then impact.DroppedAccessories[originalTrace.Entity] = true end
     for dropped in pairs(impact.DroppedAccessories) do
         if not IsValid(dropped) then impact.DroppedAccessories[dropped] = nil; continue end
-        if seen[dropped] then continue end
+        if seen[dropped] or not CanHit(dropped) then continue end
         local hit = hg.TraceEquipmentModel(dropped:GetModel(), dropped:GetPos(), dropped:GetAngles(), dropped:GetModelScale(), startPos, endPos, projectileRadius, true)
         local boundsHit = TraceEquipmentEntityBounds(dropped, dropped:GetPos(), dropped:GetAngles(), dropped:GetModelScale(), startPos, endPos, projectileRadius)
         if boundsHit and (not hit or boundsHit.fraction < hit.fraction) then hit = boundsHit end
@@ -1088,6 +1143,7 @@ local function TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, ori
             local absorbed, parry
             if hit.weapon then
                 absorbed, parry = GetWeaponImpactAbsorption(hit.weapon, hit, direction)
+                if shot.ImpactImpulse then hit.impulse = shot.ImpactImpulse * math.sqrt(scale) end
                 WeaponImpact(hit.ply, hit.weapon, hit, damage * scale, (force or 0) * scale, direction)
             else
                 absorbed = GetHeldEntityImpactAbsorption(hit.heldEntity, hit, direction)
@@ -1176,7 +1232,7 @@ end)
 if SERVER then
     hook.Add("EntityFireBullets", "HG_EquipmentNativeBulletRoute", function(source, bullet)
         if not istable(bullet) or bullet.HGEquipmentNativeRouted then return end
-        if GetGlobalBool("PhysBullets_ReplaceDefault", false) then return end
+        if hg.PhysBullet and hg.PhysBullet.CreateBullet and not bullet.DontUsePhysBullets and not bullet.ZCityWindDisablePhysBullets then return end
         if ZCityWind and ZCityWind.IsSandboxGamemode and ZCityWind.IsSandboxGamemode() and ZCityWind.Config and ZCityWind.Config.ReplaceSandboxBullets and not bullet.DontUsePhysBullets and not bullet.ZCityWindDisablePhysBullets then return end
 
         local attacker = bullet.Attacker

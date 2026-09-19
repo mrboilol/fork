@@ -896,6 +896,12 @@ end
 function hg.organism.AddWound(ent, tr, bone, dmgInfo, dmgPos, dmgBlood, inputHole, outputHole)
 	local org = ent.organism
 	if org.superfighter then return end
+	local traceNormal = isvector(tr.Normal) and tr.Normal:GetNormalized() or nil
+	if traceNormal and traceNormal:LengthSqr() == 0 then traceNormal = nil end
+	local hitNormal = isvector(tr.HitNormal) and tr.HitNormal:GetNormalized() or nil
+	if hitNormal and hitNormal:LengthSqr() == 0 then hitNormal = nil end
+	hitNormal = hitNormal or (traceNormal and -traceNormal) or vector_up
+	traceNormal = traceNormal or -hitNormal
 	
 	local physBone = isnumber(bone) and bone >= 0 and bone or 0
 	local bone = ent:TranslatePhysBoneToBone(physBone)
@@ -914,7 +920,7 @@ function hg.organism.AddWound(ent, tr, bone, dmgInfo, dmgPos, dmgBlood, inputHol
 
 			if dmgInfo:IsDamageType(DMG_BLAST) or dmgInfo:GetAttacker():IsNPC() or (ent:IsPlayer() and ent:InVehicle()) then dmgPos = bonePos end
 
-			local localPos, localAng, woundBone = hg.organism.GetWoundAnchor(ent, dmgPos + ((i == 1 and 1 or -1) * tr.HitNormal), ((i == 1 and -1 or 1) * tr.Normal):Angle(), bone)
+			local localPos, localAng, woundBone = hg.organism.GetWoundAnchor(ent, dmgPos + ((i == 1 and 1 or -1) * hitNormal), ((i == 1 and -1 or 1) * traceNormal):Angle(), bone)
 			if not localPos then continue end
 			if #org.wounds < 30 then
 				local severity = dmgBlood / 2

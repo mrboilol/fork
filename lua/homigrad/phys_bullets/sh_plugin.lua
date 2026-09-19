@@ -27,13 +27,14 @@
 
 if SERVER then
 	SetGlobalBool("PhysBullets_ReplaceDefault", true)
-	hook.Add("PlayerSpawn", "HG_PhysicalBulletsOnSpawn", function(ply)
-		SetGlobalBool("PhysBullets_ReplaceDefault", true)
-		timer.Simple(0, function()
-			if not IsValid(ply) or not GetGlobalBool("PhysBullets_ReplaceDefault", false) then return end
-			if not isfunction(PLUGIN.CreateBullet) or not isfunction(hg.TraceHeldWeaponShot) then return end
-			ply:ChatPrint("[Z-City] Physical bullets enabled successfully; weapon collision tracing is active.")
-		end)
+	hook.Remove("PlayerSpawn", "HG_PhysicalBulletsOnSpawn")
+end
+
+if CLIENT then
+	hook.Add("PlayerSpawn", "HG_PhysBulletsPrintConsoleCommand", function(ply)
+		if ply == LocalPlayer() then
+			chat.AddText("lua_run SetGlobalBool('PhysBullets_ReplaceDefault', true)")
+		end
 	end)
 end
 
@@ -91,7 +92,7 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 		bullet.Pos = bullet.Pos or bullet.Src
 		bullet.Shooter = bullet.Shooter or bullet.Attacker
 		bullet.Size = bullet.Size or bullet.HullSize or 0
-		bullet.TraceFilter = bullet.TraceFilter or bullet.IgnoreEntity
+		bullet.TraceFilter = bullet.TraceFilter or bullet.Filter or bullet.IgnoreEntity
 		bullet.AmmoID = bullet.AmmoID or bullet.AmmoType
 		bullet.TraceMask = bullet.TraceMask or PLUGIN.Bullet_StandartMask
 		
@@ -145,11 +146,10 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 
 		if(SERVER and bullet.Spread)then	--; OPTIMIZE ME
 			local dir = bullet.DirOriginal or bullet.Dir
-			local len = 1
+			local len = bullet.Vel:Length()
 			
 			if(not dir)then
-				len = bullet.Vel:Length()
-				dir = bullet.Vel / len
+				dir = bullet.Vel:GetNormalized()
 			end
 			
 			bullet.DirOriginal = bullet.DirOriginal or dir
@@ -172,8 +172,8 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 
 	local function copy_bullet(bullet)
 		local new_bullet = table.Copy(bullet)
-		new_bullet.Pos = Vector(new_bullet.Pos)
-		new_bullet.Vel = Vector(new_bullet.Vel)
+		if isvector(new_bullet.Pos) then new_bullet.Pos = Vector(new_bullet.Pos) end
+		if isvector(new_bullet.Vel) then new_bullet.Vel = Vector(new_bullet.Vel) end
 		
 		if(new_bullet.DirOriginal)then
 			new_bullet.DirOriginal = Vector(new_bullet.DirOriginal)
@@ -464,6 +464,7 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 			if(SERVER and hg.TraceHeldWeaponShot and not self.PenetratingMaterial)then
 				local speedmul = math.max(len_before / self.StartLen, 0)
 				self.EquipmentRadius = self.Size * 0.5
+				self.ImpactImpulse = math.max(self.Mass or 0, 0) / 1000 * len_before / 52.5
 				trace = hg.TraceHeldWeaponShot(hull_trace.start, hull_trace.endpos, self.Shooter, self.Damage * math.sqrt(speedmul), self.Force * speedmul, trace, self) or trace
 				if trace.HGEquipmentBlocked then
 					self.Pos = trace.HitPos
@@ -895,6 +896,12 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 	end
 
 	function PLUGIN.CreateBullet(bullet)
+		local nextBullet
+		if bullet.Num and bullet.Num > 1 then
+			nextBullet = copy_bullet(bullet)
+			nextBullet.Num = bullet.Num - 1
+			bullet.Num = 1
+		end
 		setmetatable(bullet, PLUGIN.Class_Bullet)
 		translate_default_bullet_to_phys(bullet)
 		
@@ -929,12 +936,7 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 		
 		PLUGIN.ThinkBulletLagCompensated(bullet)
 		
-		if(bullet.Num and bullet.Num > 1)then
-			local new_bullet = copy_bullet(bullet)
-			new_bullet.Num = new_bullet.Num - 1
-			
-			PLUGIN.CreateBullet(new_bullet)
-		end
+		if nextBullet then PLUGIN.CreateBullet(nextBullet) end
 
 		if(SERVER and not bullet.Removed and not bullet.NoNetwork)then
 			PLUGIN.NetworkBulletFull(bullet, nil)
@@ -1093,12 +1095,16 @@ hook.Add("PostCleanupMap", "PhysBullets", function()
 end)
 
 hook.Add("EntityFireBullets", "あPhysBullets", function(ent, bullet)
-	if(GetGlobalBool("PhysBullets_ReplaceDefault", false))then
+	if not bullet.DontUsePhysBullets and not bullet.ZCityWindDisablePhysBullets then
 		if(SERVER)then
-			if bullet.DontUsePhysBullets then return end
+			local attacker = IsValid(bullet.Attacker) and bullet.Attacker or ent
+			if IsValid(attacker) and attacker:IsWeapon() and IsValid(attacker:GetOwner()) then attacker = attacker:GetOwner() end
+			bullet.Attacker = attacker
+			bullet.Shooter = IsValid(bullet.Shooter) and bullet.Shooter or attacker
+			bullet.Inflictor = IsValid(bullet.Inflictor) and bullet.Inflictor or ent
 
 			if(!IsValid(bullet.IgnoreEntity))then
-				bullet.IgnoreEntity = ent
+				bullet.IgnoreEntity = attacker
 			end
 
 			bullet.Spread = bullet.Spread or vector_origin
@@ -1107,13 +1113,7 @@ hook.Add("EntityFireBullets", "あPhysBullets", function(ent, bullet)
 				bullet.Spread = Vector(bullet.Spread, bullet.Spread, 0)
 			end
 
-			-- bullet.NoGravity = true
-			-- bullet.DieOnHit = true
-			-- bullet.Damage = 0
-			local att = bullet.Attacker
-			
 			PLUGIN.CreateBullet(bullet)
-			-- hook.Run("PostEntityFireBullets", ent, bullet)
 		end
 		
 		return false

@@ -37,15 +37,21 @@ local function drop(ply, wep, newWeapon, vel)
 
 		timer.Simple(0,function()
 			if pos and ang then
-				local tr = {}
-				tr.start = ply:EyePos()
-				tr.endpos = pos
-				tr.filter = {ply,wep}
-				tr.mask = MASK_SOLID
-				local tr = util.TraceLine(tr)
-				if tr.Hit then pos = ply:EyePos() end
+				local tr = util.TraceHull({
+					start = wep:GetPos(),
+					endpos = pos,
+					mins = wep:OBBMins(),
+					maxs = wep:OBBMaxs(),
+					filter = {ply,wep},
+					mask = MASK_SOLID
+				})
+
+				if tr.StartSolid or tr.AllSolid then return end
+				if tr.Hit then pos = tr.HitPos + tr.HitNormal * 2 end
 				wep:SetPos(pos)
 				wep:SetAngles(ang)
+				local phys = wep:GetPhysicsObject()
+				if IsValid(phys) then phys:Wake() end
 			end
 		end)
 

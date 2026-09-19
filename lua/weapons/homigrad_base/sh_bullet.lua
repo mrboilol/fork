@@ -935,6 +935,7 @@ function SWEP:FireBullet()
 
 	bullet.Inflictor = self
 	bullet.DontUsePhysBullets = self.DontUsePhysBullets
+	bullet.ZCityWindDisablePhysBullets = self.ZCityWindDisablePhysBullets
 	if isnpc then
 		--[[self.DontUsePhysBullets = true
 		bullet.DontUsePhysBullets = true]]
@@ -968,7 +969,7 @@ function SWEP:FireBullet()
 			if self.bullet == shot then self.bullet = previousBullet end
 		end
 
-		if(hg.PhysBullet and hg.PhysBullet.CreateBullet and self.UsePhysBullets)then
+		if(hg.PhysBullet and hg.PhysBullet.CreateBullet and self.UsePhysBullets and not shot.DontUsePhysBullets and not shot.ZCityWindDisablePhysBullets)then
 			if(SERVER)then
 				hg.PhysBullet.CreateBullet(shot)
 			end
@@ -976,7 +977,7 @@ function SWEP:FireBullet()
 			--if owner.suiciding then bullet.DisableLagComp = true end
 			self:FireLuaBullets(shot)
 
-			if CLIENT and !GetGlobalBool("PhysBullets_ReplaceDefault") then					
+			if CLIENT and (shot.DontUsePhysBullets or shot.ZCityWindDisablePhysBullets or not (hg.PhysBullet and hg.PhysBullet.CreateBullet)) then
 				if tr then
 					local effectdata1 = EffectData()
 					if tr.HitPos then effectdata1:SetOrigin(tr.HitPos) end

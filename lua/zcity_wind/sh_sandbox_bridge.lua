@@ -5,7 +5,7 @@ local function ShouldReplaceSandboxBullet(bullet)
     if not config.ReplaceSandboxBullets then return false end
     if not ZW.IsSandboxGamemode() then return false end
     if ZW.IsZCityGamemode() then return false end
-    if GetGlobalBool("PhysBullets_ReplaceDefault", false) then return false end
+    if hg and hg.PhysBullet and hg.PhysBullet.CreateBullet then return false end
     if not istable(bullet) or bullet.DontUsePhysBullets or bullet.ZCityWindDisablePhysBullets then return false end
     if not bullet.Src or not bullet.Dir then return false end
 

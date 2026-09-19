@@ -31,3 +31,6 @@
 .aider*
 /readme NOW
 .vscode
+/cache
+/project.local.yml
+.serena
