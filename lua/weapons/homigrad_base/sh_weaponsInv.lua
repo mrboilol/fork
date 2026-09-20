@@ -118,7 +118,7 @@ if SERVER then
 	end)
 
 	hook.Add("PlayerCanPickupWeapon", "homigrad-weapons", function(ply, wep)
-		if (ply:GetUseEntity() ~= wep or not ply:KeyPressed(IN_USE)) and not ply.force_pickup then return false end
+		if (ply:GetUseEntity() ~= wep or not ply:KeyDown(IN_USE)) and not ply.force_pickup then return false end
 		if wep.init and wep.IsSpawned and ((ply.cooldown_grab or 0) > CurTime()) and not ply.force_pickup then return false end
 		if wep.PickupFunc and (wep:PickupFunc(ply) == true) then return false end
 
