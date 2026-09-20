@@ -49,6 +49,7 @@ local thoughtMessages = {
     trachea1 = {"Your trachea is slightly damaged.", "Something hit your windpipe."},
     trachea2 = {"Your trachea is damaged.", "Your windpipe is injured."},
     trachea_critical = {"Your trachea is too damaged to work.", "Your windpipe can't provide air anymore."},
+    phrase = {"You notice something is wrong.", "Your body is warning you that something is wrong."},
     concussion_thought = {"You have a concussion.", "You are concussed."},
     concussion_loc = {"Your consciousness is failing.", "You are about to lose consciousness."},
     concussion_choke = {"Head trauma is making breathing hard.", "You cant breathe due to head trauma."},
@@ -645,6 +646,16 @@ CreateThought = function(ply, msg, delay, msgKey, showTime, clr, func)
     return true
 end
 
+local function CreateModeThought(ply, msg, delay, msgKey, showTime, clr, func)
+    if ply:GetInfoNum("hg_newthoughts", 0) > 0 then
+        local messages = msgKey and thoughtMessages[msgKey]
+        if messages then msg = messages[math.random(#messages)] end
+        return CreateThought(ply, msg, delay, msgKey, showTime, clr, func)
+    end
+
+    return CreateNotification(ply, msg, delay, msgKey, showTime, func, clr)
+end
+
 hg.CreateNotification = CreateNotification
 
 hook.Add("Player Spawn","removeNotifications",function(ply)
@@ -678,6 +689,10 @@ local PLAYER = FindMetaTable("Player")
 
 function PLAYER:Notify(...)
     if self.HasTrait and self:HasTrait("gurajchaka_child") then return end
+    local msg, delay, msgKey, showTime, func, clr = ...
+    if self:GetInfoNum("hg_newthoughts", 0) > 0 and msgKey and thoughtMessages[msgKey] then
+        return CreateModeThought(self, msg, delay, msgKey, showTime, clr, func)
+    end
     return CreateNotification(self, ...)
 end
 
@@ -687,7 +702,7 @@ end
 
 function PLAYER:Thought(...)
     if self.HasTrait and self:HasTrait("gurajchaka_child") then return end
-    return CreateThought(self, ...)
+    return CreateModeThought(self, ...)
 end
 
 function PLAYER:ResetNotification(key)

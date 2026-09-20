@@ -105,12 +105,9 @@ local derealization_color = Color(180, 160, 255)
 
 local function psycheThought(owner, phrases, delay, key, clr)
 	local newThoughts = owner:GetInfoNum("hg_newthoughts", 0) > 0
-	local messages = phrases[newThoughts and "new" or "legacy"]
+	local messages = phrases[newThoughts and "legacy" or "new"]
 	local msg = messages[math.random(#messages)]
-	if newThoughts then
-		return owner:Thought(msg, delay, key, 0, clr)
-	end
-	return owner:Notify(msg, delay, key, 0, nil, clr)
+	return owner:Thought(msg, delay, key, 0, clr)
 end
 
 module[1] = function(org)
