@@ -137,17 +137,29 @@ end
 
 local groundBloodColor = Color(92, 0, 0, 255)
 local render_DrawQuadEasy = render.DrawQuadEasy
+local poolTrace = {mask = MASK_SOLID_BRUSHONLY}
+local poolFlowCursor = 1
+local poolStartVolume = 4
+local poolMaxSize = 34
+local gravity = GetConVar("sv_gravity")
 
-local function addGroundBlood(pos, normal, artery, tiny)
-	if hg_old_blood:GetBool() then return false end
-	if normal.z < 0.55 then return false end
-
+local function findGroundBlood(pos, normal, ignored)
 	local stains = hg.groundbloodstains
-	local limit = math.max(hg_blood_ground_limit:GetInt(), 1)
-	while #stains >= limit do
-		table.remove(stains, 1)
+	local nearest, nearestDistance
+	for _, stain in ipairs(stains) do
+		if stain ~= ignored and stain.normal:Dot(normal) >= 0.75 then
+			local mergeRadius = math.max(4, (stain.size or 1) * 0.35)
+			local distance = stain.pos:DistToSqr(pos)
+			if distance <= mergeRadius * mergeRadius and (not nearestDistance or distance < nearestDistance) then
+				nearest, nearestDistance = stain, distance
+			end
+		end
 	end
+	return nearest
+end
 
+local function depositGroundBlood(pos, normal, artery, tiny, amount, ignored)
+	local stain = findGroundBlood(pos, normal, ignored)
 	local size
 	if tiny then
 		size = math.Rand(0.8, 1.7)
@@ -156,24 +168,87 @@ local function addGroundBlood(pos, normal, artery, tiny)
 	else
 		size = math.Rand(7, 15)
 	end
+	amount = amount or (tiny and 0.2 or artery and 2.5 or 1)
 
-	stains[#stains + 1] = {
+	if stain then
+		stain.volume = (stain.volume or 1) + amount
+		local growth = stain.volume >= poolStartVolume and 1.35 or 0.25
+		stain.size = math.min(math.max(stain.size, size) + amount * growth, poolMaxSize)
+		stain.pos = LerpVector(math.Clamp(amount / stain.volume, 0, 0.35), stain.pos, pos + normal * 0.2)
+		return stain
+	end
+
+	local stains = hg.groundbloodstains
+	local limit = math.max(hg_blood_ground_limit:GetInt(), 1)
+	while #stains >= limit do table.remove(stains, 1) end
+
+	stain = {
 		pos = pos + normal * 0.2,
 		normal = normal,
 		material = groundBloodMaterials[math_random(#groundBloodMaterials)],
 		size = size,
 		rotation = math_random(0, 359),
+		volume = amount,
+		flowAngle = math_random(0, 359),
 	}
+	stains[#stains + 1] = stain
+	return stain
+end
+
+local function addGroundBlood(pos, normal, artery, tiny)
+	if hg_old_blood:GetBool() then return false end
+	if normal.z < 0.55 then return false end
+	depositGroundBlood(pos, normal, artery, tiny)
 
 	return true
+end
+
+local function flowGroundBlood(stain, gravityScale)
+	if (stain.volume or 0) < poolStartVolume or stain.size < 8 then return end
+
+	local down = Vector(0, 0, -1)
+	local direction = down - stain.normal * down:Dot(stain.normal)
+	if direction:LengthSqr() < 0.01 then
+		stain.flowAngle = ((stain.flowAngle or 0) + 137.5) % 360
+		direction = Angle(0, stain.flowAngle, 0):Forward()
+	else
+		direction:Normalize()
+	end
+
+	local distance = math.Clamp(stain.size * 0.65, 8, 22)
+	local target = stain.pos + direction * distance
+	poolTrace.start = target + vector_up * 8
+	poolTrace.endpos = target - vector_up * 32
+	local result = util_TraceLine(poolTrace)
+	if not result.HitWorld or result.HitNormal.z < 0.55 then return end
+
+	local transfer = math.min(((stain.volume or 0) - poolStartVolume + 1) * 0.3, 1.5 * gravityScale)
+	if transfer <= 0 then return end
+	stain.volume = stain.volume - transfer
+	depositGroundBlood(result.HitPos, result.HitNormal, false, true, transfer, stain)
 end
 
 hook.Add("Think", "hg_persistent_ground_blood", function()
 	local stains = hg.groundbloodstains
 	local limit = math.max(hg_blood_ground_limit:GetInt(), 1)
 
-	while #stains > limit do
-		table.remove(stains, 1)
+	while #stains > limit do table.remove(stains, 1) end
+	if #stains == 0 then return end
+
+	local gravityScale = math.Clamp(math.abs(gravity and gravity:GetFloat() or 600) / 600, 0.1, 2)
+	local now = CurTime()
+	local checked = 0
+	local flowed = 0
+	while checked < #stains and flowed < 4 do
+		if poolFlowCursor > #stains then poolFlowCursor = 1 end
+		local stain = stains[poolFlowCursor]
+		poolFlowCursor = poolFlowCursor + 1
+		checked = checked + 1
+		if stain and (stain.volume or 0) >= poolStartVolume and (stain.nextFlow or 0) <= now then
+			stain.nextFlow = now + math.Clamp(0.45 / gravityScale, 0.2, 1)
+			flowGroundBlood(stain, gravityScale)
+			flowed = flowed + 1
+		end
 	end
 end)
 
@@ -290,8 +365,6 @@ function util.IsInWorld( pos )
 
 	return not util.TraceLine( tr2 ).HitWorld
 end
-
-local gravity = GetConVar("sv_gravity")
 
 local radius = 20000
 local radiusSqr = radius * radius

@@ -1774,15 +1774,6 @@ function SWEP:CoreStep()
 
 	--	if SERVER and self.UseCustomWorldModel then self:WorldModel_Transform() end
 
-	if SERVER and not owner:IsNPC() and self != actwep then
-		--local inv = owner:GetNetVar("Inventory",{})
-
-		if not (inv["Weapons"] and inv["Weapons"]["hg_sling"] and not self:IsPistolHoldType()) then
-			//hg.drop(owner, self)
-			hook.Run("PlayerDropWeapon", owner)
-		end
-	end
-
 	if SERVER and not owner:IsNPC() and owner.organism and (not owner.organism.canmove or ((owner.organism.stun - CurTime()) > 0) or (owner.organism.larm == 1 and owner.organism.rarm == 1) or (hg.organism.IsLimbCompoundFractured and (hg.organism.IsLimbCompoundFractured(owner.organism, "larm") or hg.organism.IsLimbCompoundFractured(owner.organism, "rarm")))) and IsValid(actwep) and self == actwep then
 		self:RemoveFake()
 		

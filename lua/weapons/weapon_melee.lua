@@ -24,9 +24,31 @@ SWEP.WorldModelExchange = false
 SWEP.ViewModel = ""
 SWEP.HoldType = "knife"
 SWEP.weight = 0.4
+SWEP.holsteredBone = "ValveBiped.Bip01_Spine2"
+SWEP.holsteredPos = Vector(5, 8, -4)
+SWEP.holsteredAng = Angle(210, 0, 180)
+SWEP.BigMeleeReachTime = 0.28
+SWEP.BigMeleeDeployTime = 1
 SWEP.MeleeWallRetractStart = 36
 SWEP.MeleeWallRetractDistance = 12
 SWEP.MeleeWallRetractAmount = 18
+
+function SWEP:CanHolsterBigMelee()
+    if not self.TwoHanded then return false end
+
+    local owner = self:GetOwner()
+    if not IsValid(owner) or not owner:IsPlayer() then return false end
+
+    for _, wep in ipairs(owner:GetWeapons()) do
+        if wep ~= self and wep.weaponInvCategory == 1 then return false end
+    end
+
+    local slings = GetConVar("hg_slings")
+    if not slings or not slings:GetBool() then return true end
+
+    local inv = owner:GetNetVar("Inventory", {})
+    return inv["Weapons"] and inv["Weapons"]["hg_sling"] == true
+end
 
 function SWEP:CanPrimaryAttack()
     if self:GetNWFloat("HGEquipmentRecovery", 0) > CurTime() then return false end
@@ -375,6 +397,33 @@ if CLIENT then
 		return self.worldModel
 	end
 
+    function SWEP:DrawHolsteredWorldModel(ent)
+        if not self.TwoHanded or not IsValid(ent) then return end
+
+        local modelPath = self.WorldModelExchange or self.WorldModel
+        if not IsValid(self.holsteredWorldModel) or self.holsteredWorldModel:GetModel() ~= modelPath then
+            if IsValid(self.holsteredWorldModel) then self.holsteredWorldModel:Remove() end
+            self.holsteredWorldModel = ClientsideModel(modelPath)
+            self.holsteredWorldModel:SetNoDraw(true)
+        end
+
+        local bone = ent:LookupBone(self.holsteredBone)
+        local matrix = bone and ent:GetBoneMatrix(bone)
+        if not matrix then return end
+
+        local anchorPos, anchorAng = LocalToWorld(self.holsteredPos, self.holsteredAng, matrix:GetTranslation(), matrix:GetAngles())
+        local pos, ang = LocalToWorld(self.weaponPos or vector_origin, self.weaponAng or angle_zero, anchorPos, anchorAng)
+        local model = self.holsteredWorldModel
+
+        model:SetModelScale(self.WorldModelExchange and self.modelscale or self.modelscale2)
+        model:SetRenderOrigin(pos)
+        model:SetRenderAngles(ang)
+        model:SetPos(pos)
+        model:SetAngles(ang)
+        model:SetupBones()
+        model:DrawModel()
+    end
+
 	local npcang = Angle(0, 0, 180)
     function SWEP:DrawWorldModel()
 		local ent = self:GetOwner()
@@ -441,7 +490,12 @@ if CLIENT then
         local inuse = self:InUse()
 
         if updatePose and IsValid(owner) then
-            if not self.cycling then
+            local reachEnd = math.max(self.MeleeDeployReachEnd or 0, self:GetNWFloat("MeleeDeployReachEnd", 0))
+            if reachEnd > CurTime() then
+                local deploySequence = self.AnimList and self.AnimList["deploy"]
+                if deploySequence then WorldModel:SetSequence(deploySequence) end
+                WorldModel:SetCycle(0)
+            elseif not self.cycling then
                 local dtime = SysTime() - (self.lasthuyhuy or SysTime())
                 self.lasthuyhuy = SysTime()
                 
@@ -1260,20 +1314,62 @@ function SWEP:OnRemove()
     if IsValid(self.worldModel) then
         self.worldModel:Remove()
     end
+    if IsValid(self.holsteredWorldModel) then
+        self.holsteredWorldModel:Remove()
+    end
 end
 SWEP.Initialzed = false
 function SWEP:Deploy()
-    if SERVER and self.Initialzed and not self:GetOwner().noSound then self:GetOwner():EmitSound(self.DeploySnd,65) end
+    local owner = self:GetOwner()
+    local stagedDeploy = self.TwoHanded and self.Initialzed and self.picked
+
+    if SERVER and self.Initialzed and not owner.noSound then owner:EmitSound(self.DeploySnd,65) end
     self.Initialzed = true
     self:CancelChargeAttack(false)
     self:ResetCombo()
-    self:PlayAnim("deploy", 1, false, nil, false)
     self:SetHold(self.HoldType)
+
+    self.MeleeDeployToken = (self.MeleeDeployToken or 0) + 1
+    local deployToken = self.MeleeDeployToken
+
+    if stagedDeploy then
+        local reachTime = self.BigMeleeReachTime or 0.28
+        local deployTime = self.BigMeleeDeployTime or 1
+        local reachEnd = CurTime() + reachTime
+
+        self.MeleeDeployReachEnd = reachEnd
+        if SERVER then self:SetNWFloat("MeleeDeployReachEnd", reachEnd) end
+        self:SetNextPrimaryFire(reachEnd + deployTime)
+        self:SetNextSecondaryFire(reachEnd + deployTime)
+
+        if CLIENT then
+            local model = self:GetWM()
+            local deploySequence = self.AnimList and self.AnimList["deploy"]
+            if IsValid(model) and deploySequence then
+                model:SetSequence(deploySequence)
+                model:SetCycle(0)
+            end
+        end
+
+        timer.Simple(reachTime, function()
+            if not IsValid(self) or self.MeleeDeployToken ~= deployToken then return end
+            local owner = self:GetOwner()
+            if not IsValid(owner) or owner:GetActiveWeapon() ~= self then return end
+            self:PlayAnim("deploy", deployTime, false, nil, false)
+        end)
+    else
+        self.MeleeDeployReachEnd = 0
+        if SERVER then self:SetNWFloat("MeleeDeployReachEnd", 0) end
+        self:PlayAnim("deploy", self.BigMeleeDeployTime or 1, false, nil, false)
+    end
 	
 	return true
 end
 
 function SWEP:Holster(wep)
+    self.MeleeDeployToken = (self.MeleeDeployToken or 0) + 1
+    self.MeleeDeployReachEnd = 0
+    if SERVER then self:SetNWFloat("MeleeDeployReachEnd", 0) end
     self:CancelChargeAttack(false)
     self:SetInAttack(false)
     self:ResetCombo()
@@ -4425,6 +4521,10 @@ end
 
 local util = util
 function SWEP:Initialize()
+    if self.TwoHanded then
+        self.weaponInvCategory = 1
+    end
+
     self:ResetCombo()
     self.attackanim = 0
     self.sprintanim = 0

@@ -194,7 +194,10 @@ concommand.Add("hg_reloadfloorweapon", function(ply, cmd, args)
 
 			ply:EmitSound("physics/body/body_medium_impact_soft"..mRandom(7)..".wav", 55)
 			ply:ViewPunch(AngleRand(-2, 2))
+			local forcePickup = ply.force_pickup
+			ply.force_pickup = true
 			ply:PickupWeapon(ent)
+			ply.force_pickup = forcePickup
 			ply:SetActiveWeapon(ent)
 			ent:ReloadEnd()
 

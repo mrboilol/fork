@@ -84,6 +84,8 @@ function ENT:Explode()
         local distance = ply:GetPos():Distance(SelfPos)
         local org = ply.organism  
 
+        ply:AddTinnitus(math.Clamp(12 * (1 - distance / 700), 2, 12), true)
+
         if distance <= burnDamageRadius then
             local dmginfo = DamageInfo()
             dmginfo:SetDamage(50)

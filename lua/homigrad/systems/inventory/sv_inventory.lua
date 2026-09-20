@@ -466,7 +466,10 @@ local functions = {
         weapon.init = false
         weapon.DontEquipInstantly = true
 
-        if hook.Run("PlayerCanPickupWeapon",ply,weapon) == false then 
+        local forcePickup = ply.force_pickup
+        ply.force_pickup = true
+        if hook.Run("PlayerCanPickupWeapon",ply,weapon) == false then
+            ply.force_pickup = forcePickup
             PutLootEntityOnGround(ply, ent, weapon)
             return
         end
@@ -474,6 +477,7 @@ local functions = {
         if IsValid(weapon) and weapon:IsWeapon() then
             ply:PickupWeapon(weapon)
         end
+        ply.force_pickup = forcePickup
 
         if not IsValid(weapon) or weapon:GetOwner() ~= ply then
             PutLootEntityOnGround(ply, ent, weapon)

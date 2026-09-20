@@ -220,7 +220,6 @@ local function Ragdoll_CreateInternal(ply)
 		--print(ragdoll:GetBoneName(ragdoll:TranslatePhysBoneToBone(hg.cachedmodels[model][ragdoll:GetBoneName(bone)])),ragdoll:GetBoneName(bone),IdealMassPlayer[ragdoll:GetBoneName(bone)])
 		
 		phys:SetMass(IdealMassPlayer[ragdoll:GetBoneName(bone)] or 4)
-		phys:SetVelocity(velocity)
 		pendingReactionForce = pendingReactionForce + vel
 
 		--phys:SetContents(bit.band(phys:GetContents(), bit.bnot(MASK_SHOT)))
@@ -338,6 +337,7 @@ local function Ragdoll_CreateInternal(ply)
 			local _,ang = LocalToWorld(vecZero,Angle(-80,0,90),vecZero,ply:EyeAngles())
 			phys:SetAngles(ang)
 		end
+		phys:SetVelocity(velocity)
 		--phys:EnableDrag(true)
 		--phys:SetDragCoefficient( 1500 )
 		--phys:SetDamping(0,2)
@@ -1606,7 +1606,10 @@ function hg.FakeUp(ply, forced, instant)
         if IsValid(wep) then ply:SelectWeapon(wep:GetClass()) else ply:SelectWeapon(hg.GetHandsWeaponClass and hg.GetHandsWeaponClass(ply) or "weapon_hands_sh") end
 	
 	if IsValid(ragdoll) and ragdoll.rope_attach then
+		local forcePickup = ply.force_pickup
+		ply.force_pickup = true
 		ply:PickupWeapon(ragdoll.rope_attach)
+		ply.force_pickup = forcePickup
 		ragdoll.rope_attach = nil
 	end
 

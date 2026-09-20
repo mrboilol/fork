@@ -867,6 +867,55 @@ local function chooseWoundBleedStyle(severity)
 	return math.Rand(0, 1) < venousChance and 2 or 1
 end
 
+local function findNearbyWound(org, bone, localPos)
+	local nearest, nearestDistance
+	for _, wound in pairs(org.wounds or {}) do
+		if wound[4] ~= bone or not isvector(wound[2]) then continue end
+		local distance = wound[2]:DistToSqr(localPos)
+		if distance <= 6.25 and (not nearestDistance or distance < nearestDistance) then
+			nearest, nearestDistance = wound, distance
+		end
+	end
+	return nearest
+end
+
+local function syncReopenedWoundMark(org, wound)
+	for _, mark in pairs(org.woundmarks or {}) do
+		if mark[4] == wound[4] and isvector(mark[2]) and mark[2]:DistToSqr(wound[2]) <= 6.25 then
+			mark[1] = math.max(tonumber(mark[1]) or 0, tonumber(wound[1]) or 0)
+			mark[5] = CurTime()
+			hg.organism.SyncWoundMarksNet(org)
+			return
+		end
+	end
+end
+
+local function worsenWound(org, wound, severity)
+	local now = CurTime()
+	wound[1] = math.max(tonumber(wound[1]) or 0, 0) + math.max(severity, 0.01)
+	wound[5] = now
+	wound.openedAt = now
+	wound.initialSeverity = math.max(tonumber(wound.initialSeverity) or 0, wound[1])
+	wound.visualBleedRate = math.max(wound[1] * 0.24, 0.1)
+	syncReopenedWoundMark(org, wound)
+	return wound
+end
+
+local function addOrReopenWound(org, severity, localPos, localAng, bone, time)
+	local wound = findNearbyWound(org, bone, localPos)
+	if wound then return worsenWound(org, wound, severity) end
+
+	if #org.wounds >= 30 then
+		return org.wounds[1] and worsenWound(org, org.wounds[1], severity)
+	end
+
+	wound = {severity, localPos, localAng, bone, time, chooseWoundBleedStyle(severity)}
+	wound.visualBleedRate = math.max(severity * 0.24, 0.1)
+	table.insert(org.wounds, wound)
+	hg.organism.RecordWoundMark(org, wound, false)
+	return wound
+end
+
 local function emitWoundImpact(ent, wound)
 	if not IsValid(ent) or not wound then return end
 	local body = ent
@@ -905,6 +954,16 @@ function hg.organism.AddWound(ent, tr, bone, dmgInfo, dmgPos, dmgBlood, inputHol
 	
 	local physBone = isnumber(bone) and bone >= 0 and bone or 0
 	local bone = ent:TranslatePhysBoneToBone(physBone)
+	if bone and dmgInfo:IsDamageType(DMG_CLUB + DMG_VEHICLE + DMG_CRUSH + DMG_FALL) then
+		local localPos, _, woundBone = hg.organism.GetWoundAnchor(ent, dmgPos + hitNormal, (-traceNormal):Angle(), bone)
+		local wound = localPos and findNearbyWound(org, woundBone, localPos)
+		if wound then
+			worsenWound(org, wound, math.Clamp(dmgInfo:GetDamage() / 18, 0.15, 6))
+			table.sort(org.wounds, function(a, b) return a[1] > b[1] end)
+			hg.organism.MarkWoundsNetDirty(org, true)
+			return wound
+		end
+	end
 	
 	if bone and dmgBlood > 0 then
 		for i = 1, 2 do
@@ -922,15 +981,7 @@ function hg.organism.AddWound(ent, tr, bone, dmgInfo, dmgPos, dmgBlood, inputHol
 
 			local localPos, localAng, woundBone = hg.organism.GetWoundAnchor(ent, dmgPos + ((i == 1 and 1 or -1) * hitNormal), ((i == 1 and -1 or 1) * traceNormal):Angle(), bone)
 			if not localPos then continue end
-			if #org.wounds < 30 then
-				local severity = dmgBlood / 2
-				local wound = {severity, localPos, localAng, woundBone, CurTime(), chooseWoundBleedStyle(severity)}
-				wound.visualBleedRate = math.max(severity * 0.24, 0.1)
-				table.insert(org.wounds, wound)
-				hg.organism.RecordWoundMark(org, wound, false)
-			else
-				if org.wounds[1] then org.wounds[1][1] = org.wounds[1][1] + dmgBlood / 2 end
-			end
+			addOrReopenWound(org, dmgBlood / 2, localPos, localAng, woundBone, CurTime())
 			
 			table.sort(org.wounds, function(a, b) return a[1] > b[1] end)
 
@@ -946,18 +997,7 @@ function hg.organism.AddWoundManual(ent,dmgBlood,localPos,localAng,bone,time)
 	if isnumber(bone) then bone = ent:GetBoneName(bone) end
 	local wound
 
-	if #org.wounds < 30 then
-		local severity = dmgBlood / 2
-		wound = {severity, localPos, localAng, bone, time, chooseWoundBleedStyle(severity)}
-		wound.visualBleedRate = math.max(severity * 0.24, 0.1)
-		table.insert(org.wounds, wound)
-		hg.organism.RecordWoundMark(org, wound, false)
-	else
-		if org.wounds[1] then
-			org.wounds[1][1] = org.wounds[1][1] + dmgBlood / 2
-			wound = org.wounds[1]
-		end
-	end
+	wound = addOrReopenWound(org, dmgBlood / 2, localPos, localAng, bone, time)
 	
 	table.sort(org.wounds, function(a, b) return a[1] > b[1] end)
 
@@ -1825,7 +1865,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		org.owner:AddNaturalAdrenaline(instaPain * 0.75 * (dmgInfo:IsDamageType(DMG_BLAST) and 4 or 1) * (dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT) and 4 or 1))
 	end
 	
-	if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_BLAST + DMG_SLASH) or (dmgInfo:IsDamageType(DMG_GENERIC + DMG_VEHICLE + DMG_FALL + DMG_CLUB)) then
+	if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_BLAST + DMG_SLASH) or (dmgInfo:IsDamageType(DMG_GENERIC + DMG_VEHICLE + DMG_FALL + DMG_CLUB + DMG_CRUSH)) then
 		local hook_info = {
 			bleed = dmgBlood,
 			input_hole = inputHole,

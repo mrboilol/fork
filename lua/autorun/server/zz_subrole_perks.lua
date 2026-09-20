@@ -64,6 +64,9 @@ hook.Add("PlayerPostThink", "HG_SubRoleSandboxDisarm", function(ply)
 
 	ply.NextSubRoleDisarm = CurTime() + 1
 	victim:DropWeapon(weapon)
+	local forcePickup = ply.force_pickup
+	ply.force_pickup = true
 	ply:PickupWeapon(weapon, false)
+	ply.force_pickup = forcePickup
 	hg.LightStunPlayer(victim)
 end)

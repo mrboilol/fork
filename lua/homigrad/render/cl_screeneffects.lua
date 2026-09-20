@@ -131,8 +131,6 @@ hook.Add("RenderScreenspaceEffects", "homigrad", function()
 	hook_Run("Post Post Pre Post Processing")
 
 	hook_Run("Post Pain Processing")
-
-	if drawFinalVitalsVignettes then drawFinalVitalsVignettes() end
 end)
 
 local postprs = hg.postprocess
@@ -1087,6 +1085,14 @@ drawFinalVitalsVignettes = function()
 		vignetteMat:SetFloat("$c1_y", oxygenCoverage)
 		render.SetMaterial(vignetteMat)
 		render.DrawScreenQuad()
+
+		noiseMat:SetFloat("$c0_y", 1 - lowOxygenVignette * 0.35)
+		noiseMat:SetFloat("$c0_z", 1)
+		noiseMat:SetFloat("$c1_x", math.Clamp(lowOxygenVignette * 0.65, 0, 1.2))
+		noiseMat:SetFloat("$c1_y", lowOxygenVignette * 1.4)
+		noiseMat:SetFloat("$c2_x", CurTime() + 10000)
+		render.SetMaterial(noiseMat)
+		render.DrawScreenQuad()
 	end
 	local excruciatingBlend = getServerSoundMode("hg_painsound", 6) == 6
 		and getPainLayerBlend(org.pain or 0, painExcruciatingThreshold)
@@ -1300,6 +1306,8 @@ drawFinalVitalsVignettes = function()
 		surface.SetDrawColor(255, 255, 255, 255)
 	end
 end
+
+hook.Add("PreDrawHUD", "HG_FinalVitalsVignettes", drawFinalVitalsVignettes)
 
 function canRetrySound(key, station)
 	if IsValid(station) and station:GetState() == GMOD_CHANNEL_PLAYING then return false end
@@ -1722,7 +1730,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	local o2 = org.o2[1] or 0
 	o2 = o2 + (org.CO or 0)
 	local brain = org.brain or 0
-	O2Lerp = LerpFT(0.01, O2Lerp, (30 - o2) * (org.otrub and 2 or 10) + (brain * 100) * (org.otrub and 1 or 5))
+	O2Lerp = LerpFT(0.01, O2Lerp, (30 - o2) * 10 + brain * 500)
 	updateSeizureEffects(org)
 
 	local panicBaseTarget = getPanicAttackFx(org)
@@ -1888,7 +1896,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	shockLerp = LerpFT(0.01, shockLerp or 0, shock)
 	consciousnessLerp = LerpFT(org.consciousness < (consciousnessLerp or 1) and 0.028 or 0.018, consciousnessLerp or 1, org.consciousness)
 	-- local immobilization = org.immobilization
-	PainLerp = LerpFT(0.05, PainLerp, math.max(pain * (org.otrub and 0.2 or 1), 0))
+	PainLerp = LerpFT(0.05, PainLerp, math.max(pain, 0))
 	assimilatedLerp = LerpFT(0.01, assimilatedLerp, (org.assimilated or 0))
 
 	if assimilatedLerp > 0.001 then
@@ -3123,8 +3131,8 @@ hook.Add("Post Pain Processing", "PainEffects", function()
 	render.UpdateScreenEffectTexture()
 
 	vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
-	vignetteMat:SetFloat("$c0_z", org.otrub and 5 * unconsciousPainEffectIntensity or effectIntensity)
-	vignetteMat:SetFloat("$c1_y", org.otrub and 10 * unconsciousPainEffectIntensity or effectIntensity)
+	vignetteMat:SetFloat("$c0_z", org.otrub and math.max(5 * unconsciousPainEffectIntensity, effectIntensity) or effectIntensity)
+	vignetteMat:SetFloat("$c1_y", org.otrub and math.max(10 * unconsciousPainEffectIntensity, effectIntensity) or effectIntensity)
 
 	render.SetMaterial(vignetteMat)
 	render.DrawScreenQuad()
@@ -3133,7 +3141,7 @@ hook.Add("Post Pain Processing", "PainEffects", function()
 
 	painMat:SetFloat("$c2_x", CurTime() + 10000)
 	painMat:SetFloat("$c0_y", 0.8)
-	painMat:SetFloat("$c0_z", org.otrub and unconsciousPainEffectIntensity or painEffectIntensity * intensityMul * zerlkersVisualMul)
+	painMat:SetFloat("$c0_z", org.otrub and math.max(unconsciousPainEffectIntensity, painEffectIntensity * intensityMul * zerlkersVisualMul) or painEffectIntensity * intensityMul * zerlkersVisualMul)
 	painMat:SetFloat("$c1_x", coverage)
 	painMat:SetFloat("$c1_y", coverage)
 

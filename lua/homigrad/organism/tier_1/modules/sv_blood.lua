@@ -294,7 +294,7 @@ end
 -- Negative means clotting; positive means an uncontrolled severe wound is
 -- mechanically opening further. The growth branch is capped from the original
 -- wound size so it cannot become a runaway positive-feedback bleed.
-local function getWoundHemostasisDelta(org, wound, dt, now, arterial, catastrophic, compressionMul)
+local function getWoundHemostasisDelta(org, wound, dt, now, arterial, catastrophic, compressionMul, bandaged)
 	initializeWoundHemostasis(wound, now)
 
 	local cfg = hg.organism.config or {}
@@ -302,7 +302,8 @@ local function getWoundHemostasisDelta(org, wound, dt, now, arterial, catastroph
 	local initial = math.max(tonumber(wound.initialSeverity) or severity, 0.01)
 	local age = math.max(now - (tonumber(wound.openedAt) or now), 0)
 	local treatment = getHemostaticTreatmentDrive(org)
-	local treatedArterialWound = not arterial or wound.bandaged or treatment > 0
+	bandaged = wound.bandaged or bandaged
+	local treatedArterialWound = not arterial or bandaged or treatment > 0
 	local temperature = tonumber(org.temperature) or 36.7
 	local temperatureCoag = math.Clamp((temperature - 27) / 9.7, 0.25, 1)
 	local coag = math.Clamp(tonumber(org.coagulation_multiplier) or 1, 0.15, 2.5) * temperatureCoag
@@ -327,13 +328,13 @@ local function getWoundHemostasisDelta(org, wound, dt, now, arterial, catastroph
 	local clotRate = (tonumber(cfg.WOUND_CLOT_RATE_SCORE_S) or 0.11) * coag * nutrition * maturity
 	clotRate = clotRate * math.max(tonumber(compressionMul) or 1, 0.1)
 	clotRate = clotRate * (1 + treatment * (tonumber(cfg.HEMOSTATIC_TREATMENT_CLOT_GAIN) or 7))
-	if wound.bandaged then clotRate = clotRate * 1.8 end
+	if bandaged then clotRate = clotRate * 1.8 end
 	if arterial then clotRate = clotRate * (tonumber(cfg.ARTERIAL_CLOT_RATE_MULTIPLIER) or 0.32) end
 	if catastrophic then clotRate = clotRate * (tonumber(cfg.CATASTROPHIC_ARTERIAL_CLOT_MULTIPLIER) or 0.08) end
 
 	local clot = clotRate * dt
 	local growth = 0
-	if severityK > 0 and not wound.bandaged then
+	if severityK > 0 and not bandaged then
 		local maxGrowthFraction = (tonumber(cfg.WOUND_UNSTABLE_MAX_GROWTH_FRACTION) or 0.22) * severityK
 		local maxSeverity = initial * (1 + maxGrowthFraction)
 		if severity < maxSeverity then
@@ -556,7 +557,7 @@ module[2] = function(owner, org, mulTime)
 			local bleed = rand1 * wound[1] * mulTime * math.max(pulse, 20) / 70 * wound_bleed_rate_mul * (1 - math.min(adrenaline / 6, 0.5)) * bleedMul * 0.02 * tourniquetBleedMul * bandageBleedMul
 			bleed = bleed * getHeldWoundBleedMul(org, wound)
 			local compressionClotMul = heldClotMul * bandageClotMul * Lerp(math.Clamp(1 - tourniquetBleedMul, 0, 1), 1, 2.4)
-			local hemostasisDelta = getWoundHemostasisDelta(org, wound, mulTime, time, false, false, compressionClotMul)
+			local hemostasisDelta = getWoundHemostasisDelta(org, wound, mulTime, time, false, false, compressionClotMul, bandageClotMul > 1)
 			local woundBleedRate = bleed / rand1 * 3
 			bleedoutspeed = bleedoutspeed + woundBleedRate
 			local visualWoundBleedRate = bleed / math.max(mulTime, 0.001)
@@ -643,7 +644,7 @@ module[2] = function(owner, org, mulTime)
 			local heldClotMul = getHeldWoundClotMul(org, wound)
 			local compressionClotMul = heldClotMul * bandageClotMul * Lerp(math.Clamp(1 - tourniquetBleedMul, 0, 1), 1, 3.0)
 			local catastrophic = isAmputation or isHeadGib
-			local hemostasisDelta = getWoundHemostasisDelta(org, wound, mulTime, time, true, catastrophic, compressionClotMul)
+			local hemostasisDelta = getWoundHemostasisDelta(org, wound, mulTime, time, true, catastrophic, compressionClotMul, bandageClotMul > 1)
 			wound[1] = math.Clamp((wound[1] or 0) + hemostasisDelta, 0, math.max((wound.initialSeverity or wound[1] or 0) * 1.35, wound[1] or 0))
 		end
 

@@ -700,7 +700,7 @@ local function buildEffects(ply, org)
 	local irregular = irregularSeverity > 0 or (not ecgState and unstableRhythm ~= nil)
 	local fibrillating = org.fibrillation == true or ecgState == "atrial_fibrillation" or ecgState == "ventricular_fibrillation"
 		or (not ecgState and unstableRhythm == "atrial_fibrillation")
-	local rhythmSeverity = math.max(arrhythmia, irregularSeverity, fibrillating and 1 or 0)
+	local rhythmSeverity = math.max(arrhythmia, palpitations, irregularSeverity, fibrillating and 1 or 0)
 	if not org.heartstop and (rhythmSeverity >= 0.1 or irregular) then
 		local level = highRank(math.max(rhythmSeverity, 0.1), {0.1, 0.3, 0.6, 0.85})
 		add(effects, "arrhythmia", "arrhythmia", level, "bad", 24.5, math.floor(heartRate) .. " bpm")
@@ -729,21 +729,25 @@ local function buildEffects(ply, org)
 	if org.heartstop == true then add(effects, "asystole", "asystole", 4, "bad", -100) end
 
 	local pulse = math.max(orgNumber(org, "pulse", 70), 0)
+	local rawPressure = tonumber(org.bloodPressure)
+	local pressure = math.max(rawPressure or 0, 0)
+	local hasPressure = rawPressure ~= nil
 	local hypotension = math.Clamp(orgNumber(org, "hypotension", 0), 0, 1)
 	local lowPulseSeverity = math.Clamp((70 - pulse) / 40, 0, 1)
-	local lowCirculationSeverity = math.max(lowPulseSeverity, hypotension)
-	if not org.heartstop and ((pulse > 0 and pulse < 70) or hypotension > 0.01) then
-		local level = highRank(math.max(lowCirculationSeverity, 0.1), {0.1, 0.3, 0.6, 0.85})
-		local pressure = math.floor(math.max(orgNumber(org, "bloodPressure", 0), 0))
-		add(effects, "low_blood", level >= 3 and "superlowblood" or "lowblood", level, "bad", 27, math.floor(pulse) .. " bpm / " .. pressure .. " MAP")
-	end
+	local lowPressureSeverity = hasPressure and math.Clamp((70 - pressure) / 35, 0, 1) or 0
+	local lowCirculationSeverity = math.max(lowPulseSeverity, lowPressureSeverity, hypotension)
 	local hypertension = math.Clamp(orgNumber(org, "hypertension", 0), 0, 1)
 	local highPulseSeverity = math.Clamp((pulse - 100) / 80, 0, 1)
-	local highCirculationSeverity = math.max(highPulseSeverity, hypertension)
-	if not org.heartstop and (pulse > 100 or hypertension > 0.01) then
+	local highPressureSeverity = hasPressure and math.Clamp((pressure - 100) / 45, 0, 1) or 0
+	local highCirculationSeverity = math.max(highPulseSeverity, highPressureSeverity, hypertension)
+	local lowCirculationActive = pulse > 0 and (pulse < 70 or (hasPressure and pressure < 70) or hypotension > 0.01)
+	local highCirculationActive = pulse > 100 or (hasPressure and pressure > 100) or hypertension > 0.01
+	if not org.heartstop and lowCirculationActive and (not highCirculationActive or lowCirculationSeverity >= highCirculationSeverity) then
+		local level = highRank(math.max(lowCirculationSeverity, 0.1), {0.1, 0.3, 0.6, 0.85})
+		add(effects, "low_blood", level >= 3 and "superlowblood" or "lowblood", level, "bad", 27, math.floor(pulse) .. " bpm / " .. math.floor(pressure) .. " MAP")
+	elseif not org.heartstop and highCirculationActive then
 		local level = highRank(math.max(highCirculationSeverity, 0.1), {0.1, 0.3, 0.6, 0.85})
-		local pressure = math.floor(math.max(orgNumber(org, "bloodPressure", 0), 0))
-		add(effects, "high_blood", "highblood", level, "bad", 28, math.floor(pulse) .. " bpm / " .. pressure .. " MAP")
+		add(effects, "high_blood", "highblood", level, "bad", 28, math.floor(pulse) .. " bpm / " .. math.floor(pressure) .. " MAP")
 	end
 
 	local normalBloodVolume = math.max(tonumber(hg and hg.organism and hg.organism.config and hg.organism.config.NORMAL_BLOOD_VOLUME_ML) or tonumber(hg and hg.organism and hg.organism.normalBloodVolume) or 5000, 1)

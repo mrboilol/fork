@@ -1116,6 +1116,8 @@ function hg.RenderWeapons(ent, owner)
 			local wep2 = weps[i]
 			if wep2.ishgweapon and wep2 ~= wep then
 				DrawWorldModel(wep2)
+			elseif wep2 ~= wep and wep2.ismelee2 and wep2.TwoHanded and wep2.DrawHolsteredWorldModel then
+				wep2:DrawHolsteredWorldModel(ent)
 			end
 		end
 	end

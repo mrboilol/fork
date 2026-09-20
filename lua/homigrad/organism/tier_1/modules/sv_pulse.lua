@@ -14,6 +14,10 @@ local cardiacArrestMechanicalDecayTime = 14
 local hypotensionComplicationTime = 45
 local arrhythmiaComplicationTime = 75
 
+local function getLowPulseSeverity(pulse)
+	return Clamp((70 - max(tonumber(pulse) or 0, 0)) / 70, 0, 1)
+end
+
 function hg.organism.BeginCardiacArrestMechanicalDecay(org)
 	if not org or org.cardiacArrestMechanicalInitial then return end
 
@@ -260,9 +264,7 @@ local function getRateOutput(heartbeat)
 end
 
 function hg.organism.GetPulseOxygenPerfusion(pulse)
-	local normalizedPulse = Clamp((tonumber(pulse) or 0) / 70, 0, 1)
-	local curve = 0.8
-	return (1 - math.exp(-curve * normalizedPulse)) / (1 - math.exp(-curve))
+	return (1 - getLowPulseSeverity(pulse)) ^ 1.5
 end
 
 local function getPalpablePulseTarget(org, heartbeat, circulation, hemorrhageCompensation, effectivePalpitations)
@@ -1023,7 +1025,7 @@ module[2] = function(owner, org, timeValue)
 	if org.heartstop and defibGrace then myocardialTarget = math.max(myocardialTarget, 0.25) end
 	org.myocardialOxygen = Approach(org.myocardialOxygen or 1, myocardialTarget, timeValue / 8)
 	local pressureHypotensionTarget = Clamp(Remap(pressureCirculation, 0.98, 0.22, 0, 1), 0, 1)
-	local pulseHypotensionTarget = Clamp((70 - math.max(tonumber(org.pulse) or 0, 0)) / 40, 0, 1)
+	local pulseHypotensionTarget = Clamp(getLowPulseSeverity(org.pulse) / (40 / 70), 0, 1)
 	local rhythmHypotensionTarget = rhythmInstability * (org.fibrillation and 0.85 or 0.48)
 	local hypotensionTarget = math.max(pressureHypotensionTarget, pulseHypotensionTarget, rhythmHypotensionTarget)
 	local hypotensionRate = highSpeedPressureShock > 0.25 and timeValue / 2.5 or timeValue / 8
@@ -1174,12 +1176,10 @@ module[2] = function(owner, org, timeValue)
 	org.heartbeat = math.Approach(org.heartbeat, heartbeat, heartbeat > org.heartbeat and timeValue * riseRate or timeValue * 4.5)
 	org.heartbeat = math.Clamp(org.heartbeat, 0, terminalHeartRate)
 
-	-- Palpitations represent accumulated myocardial strain, rather than a
-	-- momentary high BPM. Even moderate tachycardia eventually matters, while
-	-- extreme rates build the condition rapidly; it then clears only gradually
-	-- once the rhythm settles.
-	local tachycardiaK = math.Clamp((org.heartbeat - 120) / 120, 0, 1)
-	local palpitationGain = (tachycardiaK > 0 and 0.002 or 0) + tachycardiaK * 0.021 + hemorrhageRhythmStress * 0.006
+	-- Palpitations represent accumulated myocardial strain from sustained high
+	-- heart rates; they clear only gradually once the rhythm settles.
+	local tachycardiaK = math.Clamp((org.heartbeat - 140) / 100, 0, 1)
+	local palpitationGain = tachycardiaK > 0 and 0.002 + tachycardiaK * 0.027 or 0
 	local correctingPalpitations = (org.palpitationTreatmentUntil or 0) > CurTime()
 	local heartbeatSettling = (org.heartbeat or 0) <= previousHeartbeat + 0.5
 	local pulseSettling = (org.pulse or 0) <= previousPulse + 0.5
@@ -1288,7 +1288,7 @@ module[2] = function(owner, org, timeValue)
 		local hb = org.heartbeat
 		local chance = 0
 		local sustainedTachy = org._tachycardiaSince and org._tachycardiaSince + 3 < CurTime()
-		local highTachyK = math.Clamp((hb - 130) / 120, 0, 1)
+		local highTachyK = math.Clamp((hb - 250) / 50, 0, 1)
 		if effectivePalpitations > 0.05 and highTachyK > 0 then
 			-- A strained heart is especially likely to fail when it is still
 			-- forced to race. Palpitations alone are mild; blood loss, shock,
@@ -1485,10 +1485,11 @@ module[2] = function(owner, org, timeValue)
 	if organSystemsEnabled then
 		local hemorrhageDrivenLowOutput = criticalHemorrhageDepth > 0 or bloodNow <= 2500
 		local failedCirculation = org.pulse < 10 and not hemorrhageDrivenLowOutput and not restartCirculationActive
-		local failedHypotension = org.prolongedHypotension and not restartCirculationActive
+		local failedHypotension = org.prolongedHypotension and not hemorrhageDrivenLowOutput and not restartCirculationActive
 		local failedBradyOutput = (org.bradycardicLowOutputTime or 0) >= (tonumber(cfg.BRADYCARDIA_ARREST_EXPOSURE) or 8)
 			and (org.cardiacOutput or 0) < (tonumber(cfg.BRADYCARDIA_ARREST_OUTPUT) or 0.22)
 			and (org.perfusion or 0) < (tonumber(cfg.BRADYCARDIA_ARREST_PERFUSION) or 0.28)
+			and not hemorrhageDrivenLowOutput
 			and not restartCirculationActive
 		if failedCirculation or failedHypotension or failedBradyOutput or org.brain >= 0.85 or org.heart >= 0.9 then org.heartstop = true end
 		if org.temperature > 42 then org.heartstop = true end
@@ -1516,7 +1517,8 @@ module[2] = function(owner, org, timeValue)
 	end
 
 	-- temperature
-	local needed_temp = math.min(math.max(37 * (org.pulse / 45), 35), org.lowBloodTemperatureTarget or 36.7)
+	local lowPulseCold = Clamp(getLowPulseSeverity(org.pulse) / (55 / 70), 0, 1)
+	local needed_temp = math.min(36.7 - lowPulseCold * 5.7, org.lowBloodTemperatureTarget or 36.7)
 	local changeRate = timeValue / 60
 	changeRate = changeRate * (org.temperature < needed_temp and math.Clamp(org.heatbuff / 60, 1, 2) or 1)
 	if math.abs(org.tempchanging) < changeRate then

@@ -25,8 +25,13 @@ hook.Add("Player Think", "homigrad-dropholstered", function(ply)
 	local wep
 	for i = 1, #weps do
 		wep = weps[i]
+		local bigMelee = wep.ismelee2 and wep.TwoHanded
+		local cannotHolster = wep.NoHolster
+		if bigMelee then
+			cannotHolster = not (wep.CanHolsterBigMelee and wep:CanHolsterBigMelee())
+		end
 
-		if wep.NoHolster and activewep ~= wep and wep.picked then
+		if cannotHolster and activewep ~= wep and wep.picked then
 			ply:DropWeapon(wep)
 		end
 	end

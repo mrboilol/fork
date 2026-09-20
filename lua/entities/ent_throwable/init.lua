@@ -519,7 +519,9 @@ function ENT:Use(ply)
 		wep:SetAngles(self:GetAngles())
 		wep.poisoned2 = self.poisoned2
 
-		if not hook.Run("PlayerCanPickupWeapon",ply,wep) then wep.IsSpawned = true wep.init = true wep:Remove() self:Remove() return end
+		local forcePickup = ply.force_pickup
+		ply.force_pickup = true
+		if not hook.Run("PlayerCanPickupWeapon",ply,wep) then ply.force_pickup = forcePickup wep.IsSpawned = true wep.init = true wep:Remove() self:Remove() return end
 
 		local tbl = constraint.FindConstraint(self, "Weld")
 		local weldedEnt, weldedBone
@@ -546,5 +548,6 @@ function ENT:Use(ply)
 
 		self:Remove()
 		ply:PickupWeapon(wep)
+		ply.force_pickup = forcePickup
 	end
 end

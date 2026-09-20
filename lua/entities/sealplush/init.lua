@@ -630,13 +630,17 @@ function ENT:Use(activator, caller)
     wep.SealStoredBlood = self.SealBlood
     wep.SealStoredBleedRate = self.SealBleedRate
 
+    local forcePickup = caller.force_pickup
+    caller.force_pickup = true
     if hook.Run("PlayerCanPickupWeapon", caller, wep) == false then
+        caller.force_pickup = forcePickup
         wep:Remove()
         self.SealConverting = false
         return
     end
 
     caller:PickupWeapon(wep)
+    caller.force_pickup = forcePickup
     if wep:GetOwner() ~= caller then
         wep:Remove()
         self.SealConverting = false

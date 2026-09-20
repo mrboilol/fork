@@ -220,8 +220,10 @@ function SWEP:GetLHIKStateOffset()
 end
 
 if CLIENT then
+    local BaseMeleeModelAnim = weapons.GetStored("weapon_melee").ModelAnim
+
     function SWEP:ModelAnim(model)
-        local pos, ang = self.BaseClass.ModelAnim(self, model)
+        local pos, ang = BaseMeleeModelAnim(self, model)
         local isCutting = self.Canselfharm and self:IsSelfHarming() and self.SelfHarmStart and self.SelfHarmStart + self.SelfHarmTime > CurTime()
         local cutTarget = 0
 
