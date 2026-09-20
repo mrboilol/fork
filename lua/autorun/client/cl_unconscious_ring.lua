@@ -33,14 +33,6 @@ surface.CreateFont("HomigradCriticalWarning", {
     shadow = true
 })
 
-surface.CreateFont("OtrubCriticalMessage", {
-    font = "Veteran Typewriter",
-    size = ScreenScaleH(16),
-    weight = 800,
-    antialias = true,
-    shadow = true
-})
-
 surface.CreateFont("HomigradFontTypewriterSmall", {
     font = "Veteran Typewriter",
     size = ScreenScaleH(12),
@@ -1079,7 +1071,6 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     if isUnconscious then
         local terminal = incapacitated and deathStateEnd
         local remaining = terminal and math.max(deathStateEnd - CurTime(), 0) or 0
-        local seconds = terminal and math.max(math.ceil(remaining), 0) or 0
         local fade = terminal and math.Clamp((INCAPACITATION_DEATH_TIME - remaining) / 1.25, 0, 1) or ringAlpha
         local urgency = terminal and math.Clamp((5 - remaining) / 5, 0, 1) or 0
         local pulseAlpha = 0.82 + math.abs(math.sin(CurTime() * 6)) * 0.18 * urgency
@@ -1093,19 +1084,6 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
 
         local messageY = incapPromptY
         if terminal then
-            draw.SimpleTextOutlined(
-                seconds > 0 and "You are incapacitated - death in " .. seconds .. "s" or "You are dying",
-                "OtrubCriticalMessage",
-                incapPromptX,
-                messageY,
-                promptColor,
-                TEXT_ALIGN_CENTER,
-                TEXT_ALIGN_TOP,
-                2,
-                Color(0, 0, 0, 220 * fade)
-            )
-            messageY = messageY + ScreenScaleH(20)
-
             for _, cause in ipairs(GetIncapacitationDeathCauses(replicatedOrg)) do
                 draw.SimpleTextOutlined(
                     cause,

@@ -127,7 +127,7 @@ local limbName = {
 
 local function hasNewThoughts(org)
 	local owner = org.owner
-	return org.isPly and IsValid(owner) and owner:IsPlayer() and owner:GetInfoNum("hg_newthoughts", 0) > 0
+	return IsValid(owner) and owner:IsPlayer() and owner:GetInfoNum("hg_newthoughts", 0) > 0
 end
 
 local function notifyPlayer(ply, ...)
@@ -142,7 +142,9 @@ end
 
 local function sendThought(org, msg, key, delay, clr)
 	if hasNewThoughts(org) then
-		notifyOwner(org, msg, delay or 1, key, 0, nil, clr)
+		local owner = org.owner
+		if owner.Thought then return owner:Thought(msg, delay or 1, key, 0, clr) end
+		return notifyOwner(org, msg, delay or 1, key, 0, nil, clr)
 	end
 end
 

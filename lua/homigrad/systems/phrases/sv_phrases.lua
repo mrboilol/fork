@@ -403,19 +403,10 @@ hg.UniversalScreamSounds = {
 	"screams/universal1/screamtwo.mp3",
 	"screams/universal1/wilhelm_scream.mp3",
 }
-hg.GenderedPainScreamSounds = {
-	female = {
-		"screams/female1/rem_femalepartial1.mp3", "screams/female1/rem_femalepartial2.mp3",
-		"screams/female1/rem_femalepartial3.mp3", "screams/female1/rem_femalepartial4.mp3",
-		"screams/female2/rem_femalepartial1.mp3", "screams/female2/rem_femalepartial2.mp3",
-		"screams/female2/rem_femalepartial3.mp3", "screams/female2/rem_femalepartial4.mp3",
-	},
-	male = {
-		"screams/male1/rem_malepartial1.mp3", "screams/male1/rem_malepartial2.mp3",
-		"screams/male1/rem_malepartial3.mp3", "screams/male1/rem_malepartial4.mp3",
-		"screams/male2/rem_malepartial1.mp3", "screams/male2/rem_malepartial2.mp3",
-		"screams/male2/rem_malepartial3.mp3", "screams/male2/rem_malepartial4.mp3",
-	},
+hg.BigPainSounds = {
+	"notfunnyfella/bigpain1.mp3", "notfunnyfella/bigpain2.mp3", "notfunnyfella/bigpain3.mp3",
+	"notfunnyfella/bigpain4.mp3", "notfunnyfella/bigpain5.mp3", "notfunnyfella/bigpain6.mp3",
+	"notfunnyfella/bigpain7.mp3",
 }
 local painScreamRestartFade = 0.8
 local painScreamEndFade = 0.05
@@ -517,7 +508,7 @@ local function playPainScream(ply, phrases, guaranteed)
 
 	hg.StopPainScream(ply, painScreamRestartFade)
 
-	phrases = phrases or hg.UniversalScreamSounds
+	phrases = phrases or (mRandom(1, 3) == 1 and hg.BigPainSounds or hg.UniversalScreamSounds)
 	local phrase = phrases[mRandom(#phrases)]
 	local rf = RecipientFilter()
 	rf:AddPAS(ent:GetPos())
@@ -608,8 +599,7 @@ hook.Add("Org Think", "HG_PainScreamThink", function(owner, org)
 	end
 
 	if (org.pain or 0) < 65 or owner.painScreamPatch or (org.genderedPainScreamNext or 0) > time then return end
-	local phrases = hg.GenderedPainScreamSounds[ThatPlyIsFemale(owner) and "female" or "male"]
-	if playPainScream(owner, phrases, true) then
+	if playPainScream(owner, hg.BigPainSounds, true) then
 		org.genderedPainScreamNext = time + math.Rand(7, 10)
 	else
 		org.genderedPainScreamNext = time + 2

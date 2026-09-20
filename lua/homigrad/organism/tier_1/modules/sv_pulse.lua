@@ -269,7 +269,8 @@ local function getRateOutput(heartbeat)
 end
 
 function hg.organism.GetPulseOxygenPerfusion(pulse)
-	return Clamp((tonumber(pulse) or 0) / 60, 0, 1) ^ 0.6
+	local normalizedPulse = Clamp((tonumber(pulse) or 0) / 70, 0, 1)
+	return math.max(normalizedPulse ^ 1.5, 0.06)
 end
 
 local function getPalpablePulseTarget(org, heartbeat, circulation, hemorrhageCompensation, effectivePalpitations)

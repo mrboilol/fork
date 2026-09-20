@@ -414,6 +414,8 @@ local function getMoodle3Material(name)
 			local alternateName = name
 			if string.StartWith(name, "blood-loss") then
 				alternateName = "blod-loss" .. string.sub(name, #"blood-loss" + 1)
+			elseif name == "brain-hemorrhage" then
+				alternateName = "terror"
 			end
 			mat = firstValidMaterial({
 				"vgui/moodles 3/" .. name .. ".png",

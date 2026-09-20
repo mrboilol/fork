@@ -77,14 +77,6 @@ local tabblood = {
 	["$pp_colour_mulb"] = 0,
 }
 
-surface.CreateFont("RemDeathStateFont", {
-	font = "Lora",
-	size = ScreenScale(22),
-	weight = 1100,
-	outline = true
-})
-
-local remDeathStateColor = Color(255, 255, 255, 0)
 local remDeathStateStation
 local remDeathStateLoading
 local remDeathStateGeneration = 0
@@ -602,19 +594,6 @@ local function DrawIncapacitatedDeathFade(deathStateEnd)
 	end
 end
 
-local function DrawIncapacitatedDeathText(seconds, deathStateEnd)
-	local remaining = math.max(deathStateEnd - CurTime(), 0)
-	local fade = math.Clamp((INCAPACITATION_DEATH_TIME - remaining) / INCAPACITATION_DEATH_TIME, 0, 1)
-	local radius = math.ease.InOutSine(fade) * math.sqrt(ScrW() * ScrW() + ScrH() * ScrH()) / 2
-	local textValue = math.floor(255 * (1 - math.Clamp((radius - 12) / 80, 0, 1)))
-	remDeathStateColor.r = textValue
-	remDeathStateColor.g = textValue
-	remDeathStateColor.b = textValue
-	remDeathStateColor.a = math.Clamp((INCAPACITATION_DEATH_TIME - remaining) / 2, 0, 1) * 255
-
-	draw.SimpleText("You are incapacitated, You will die in " .. seconds, "RemDeathStateFont", ScrW() / 2, ScrH() / 2, remDeathStateColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-end
-
 hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 	local spect = IsValid(lply:GetNWEntity("spect")) and lply:GetNWEntity("spect")
 	local organism = lply:Alive() and lply.organism or (viewmode == 1 and IsValid(spect) and spect.organism) or {}
@@ -946,9 +925,6 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 			//surface.DrawRect(-1,-1,ScrW()+1,ent.Blinking * ScrH())
 			//surface.DrawRect(-1,ScrH() + 1,ScrW()+1,-ent.Blinking * ScrH())
 		end
-	end
-	if lply:Alive() and (otrub or new_organism.otrub) and incapacitated and deathStateEnd then
-		DrawIncapacitatedDeathText(math.max(math.ceil(deathStateEnd - CurTime()), 0), deathStateEnd)
 	end
 end)
 

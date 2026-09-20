@@ -1968,7 +1968,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 
 		if org.otrub then
 			if not HasBlindTrait() then DrawMotionBlur(0.1, 1, 0.01) end
-			lply:ScreenFade(SCREENFADE.IN, Color(0, 0, 0), 2, 0.5)
 		end
 
 		//if pain > 10 then
