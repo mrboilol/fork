@@ -11,7 +11,10 @@ local thoughtMessages = {
     fear = {"You are afraid.", "You are experiencing intense fear."},
     threatened = {"You are under immediate threat.", "You are in danger."},
     wake = {"You regain consciousness.", "You woke up."},
+    neckslit_save = {"Your neck wound is causing severe blood loss.", "Your neck artery is bleeding dangerously."},
+    cervical_respiratory_arrest = {"Your spinal injury is stopping you from moving or breathing.", "Your cervical spine is causing respiratory failure."},
     dislocations_unlucky = {"You are struggling to fix a dislocation.", "You fail to fix a dislocation."},
+    fix = {"Your dislocation was reduced.", "Your dislocated joint was put back in place."},
     painfromjawspeak = {"Your jaw is hurting due to speech.", "Speaking causes your jaw to hurt."},
     arteria = {"Your neck has ben cut open.", "Your carotid artery is open."},
     take_gasmask = {"Your gas mask is restricting airflow.", "Your gas mask is making it hard to breathe."},
@@ -19,6 +22,8 @@ local thoughtMessages = {
     oxygen_lowintake = {"You cant get enough air.", "You are struggling to breathe."},
     lowoxy = {"You are low on oxygen.", "Your oxygen level is critically low."},
     lowoxy2 = {"You are critically low on oxygen.", "You are experiencing severe oxygen deprivation."},
+    hypoxia_critical = {"Your oxygen level is critically low.", "Your body is failing from oxygen deprivation."},
+    spine3_oxygen_loss = {"Your spinal injury is cutting off oxygen.", "Your body is losing oxygen below the neck."},
     drugged = {"You have been drugged.", "You are overdosing."},
     pneumothorax1 = {"Air or blood is accumulating around a lung.", "Something is building up around your lungs."},
     pneumothorax2 = {"Your lungs are not breathing properly.", "Something causes your lungs to not expand properly."},
@@ -45,9 +50,32 @@ local thoughtMessages = {
     trachea2 = {"Your trachea is damaged.", "Your windpipe is injured."},
     trachea_critical = {"Your trachea is too damaged to work.", "Your windpipe can't provide air anymore."},
     concussion_thought = {"You have a concussion.", "You are concussed."},
+    concussion_loc = {"Your consciousness is failing.", "You are about to lose consciousness."},
     concussion_choke = {"Head trauma is making breathing hard.", "You cant breathe due to head trauma."},
     concussion_dryheave = {"You feel nauseous due to trauma.", "You feel incredibly nauseous."},
     concussion_lucid = {"You are experiencing a temporary lucid interval.", "You feel a temporary relief from concussion symptoms."},
+    cotard_wake = {"You woke up disoriented.", "You are awake but confused."},
+    ["depression_notify_stage_0.35"] = {"You are beginning to feel depressed.", "Your mood is worsening."},
+    ["depression_notify_stage_0.45"] = {"Your depression is becoming severe.", "Your mood is deteriorating."},
+    ["depression_notify_stage_0.55"] = {"Your depression is overwhelming you.", "You are entering a dangerous depressive state."},
+    depression_block_selfharm = {"You are not ready to hurt yourself.", "Your body resists self-harm."},
+    hg_torso_initial = {"Your torso has been severed.", "You have suffered a catastrophic torso injury."},
+    hg_torso_pain = {"Your torso wound is causing severe pain.", "You are suffering from a catastrophic torso injury."},
+    pain = {"You are in severe pain.", "Your injuries are causing intense pain."},
+    pain_severe = {"You are in extreme pain.", "Your pain is overwhelming you."},
+    cold = {"Your body temperature is dangerously low.", "You are becoming hypothermic."},
+    freezing = {"Your body temperature is critically low.", "You are suffering from severe hypothermia."},
+    numb = {"Your body is becoming numb from the cold.", "You are severely hypothermic."},
+    hot = {"Your body temperature is dangerously high.", "You are overheating."},
+    heatstroke = {"You are suffering from heatstroke.", "Your body temperature is critically high."},
+    broken_rleg = {"Your right leg is broken.", "You fractured your right leg."},
+    broken_lleg = {"Your left leg is broken.", "You fractured your left leg."},
+    broken_rarm = {"Your right arm is broken.", "You fractured your right arm."},
+    broken_larm = {"Your left arm is broken.", "You fractured your left arm."},
+    dislocated_rleg = {"Your right leg is dislocated.", "You dislocated your right leg."},
+    dislocated_lleg = {"Your left leg is dislocated.", "You dislocated your left leg."},
+    dislocated_rarm = {"Your right arm is dislocated.", "You dislocated your right arm."},
+    dislocated_larm = {"Your left arm is dislocated.", "You dislocated your left arm."},
     med_err_needle = {"Something went wrong with the needle.", "You placed the needle wrong."},
     med_err_tourniquet = {"The tourniquet was applied incorrectly.", "You botched the tourniquet placement."},
     med_err_transfusion = {"Something happened with the transfusion.", "Something went wrong with the transfusion."},
@@ -393,7 +421,8 @@ local function CreateNotification(ply, msg, delay, msgKey, showTime, func, clr)
     msgKey = msgKey or msg
 
     if ply:GetInfoNum("hg_newthoughts", 0) > 0 and CreateThought then
-        local thought = GetConditionThought(ply, msgKey) or msg
+        local thought = GetConditionThought(ply, msgKey)
+        if not thought then return false end
 
         local conditionCooldown = conditionThoughtCooldowns[msgKey]
         if conditionCooldown and (delay == nil or isnumber(delay)) then

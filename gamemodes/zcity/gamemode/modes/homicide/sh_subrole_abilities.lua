@@ -607,7 +607,12 @@ if SERVER then
 		org.painadd = math.min((org.painadd or 0) + 25, 150)
 		org.shock = math.min((org.shock or 0) + 8, 95)
 		target:EmitSound("physics/body/body_medium_break" .. math.random(2, 4) .. ".wav", 70, math.random(90, 105))
-		target:Notify("Your " .. maLimbNames[limb] .. " was dislocated by the takedown.", true, "ma_dislocation", 3)
+		local message = "Your " .. maLimbNames[limb] .. " was dislocated by the takedown."
+		if target:GetInfoNum("hg_newthoughts", 0) > 0 then
+			target:Thought(message, true, "thought_ma_dislocation", 3)
+		else
+			target:Notify(message, true, "ma_dislocation", 3)
+		end
 	end
 
 	function MODE.RunMartialArtistMove(ply, moveId, target)

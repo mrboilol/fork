@@ -218,7 +218,7 @@ local function fractureSecondSegment(org, key, segment, dmgInfo, severity)
 	end
 	org.owner:AddNaturalAdrenaline(1.5)
 	org.fearadd = org.fearadd + 1
-	if org.isPly then org.just_damaged_bone = CurTime() end
+	if IsValid(org.owner) and org.owner:IsPlayer() then org.just_damaged_bone = CurTime() end
 
 	if hasNewThoughts(org) then
 		sendThought(org, "Your " .. limbName[key] .. " is broken in two places.", "thought_double_broke" .. key, 2, Color(255, 150, 150))
@@ -303,7 +303,7 @@ local function legs(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 		return result, vecrand
 	end
 
-	if org.isPly and !org[key.."amputated"] then org.just_damaged_bone = CurTime() end
+	if IsValid(org.owner) and org.owner:IsPlayer() and !org[key.."amputated"] then org.just_damaged_bone = CurTime() end
 
 	local stabilized = org[key.."stabilized"]
 	
@@ -372,7 +372,7 @@ local function arms(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 		return result, vecrand
 	end
 
-	if org.isPly and !org[key.."amputated"] then org.just_damaged_bone = CurTime() end
+	if IsValid(org.owner) and org.owner:IsPlayer() and !org[key.."amputated"] then org.just_damaged_bone = CurTime() end
 
 	local stabilized = org[key.."stabilized"]
 	
@@ -1045,7 +1045,7 @@ local function upper_limb(org, bone, dmg, dmgInfo, amputate_key, limb_key, segme
 		return result, vecrand
 	end
 
-	if org.isPly and !org[amputate_key.."amputated"] then org.just_damaged_bone = CurTime() end
+	if IsValid(org.owner) and org.owner:IsPlayer() and !org[amputate_key.."amputated"] then org.just_damaged_bone = CurTime() end
 
 	local stabilized = org[limb_key.."stabilized"]
 

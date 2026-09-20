@@ -587,6 +587,12 @@ local function get_status_message(ply)
 
 	local most_wanted_phraselist
 	local statusThoughtKey
+	local function limbStatusKey(kind)
+		for _, limb in ipairs({"rleg", "lleg", "rarm", "larm"}) do
+			if kind == "dislocated" and org[limb .. "dislocation"] then return kind .. "_" .. limb end
+			if kind == "broken" and org[limb] == 1 then return kind .. "_" .. limb end
+		end
+	end
 
 	if org.heartstop then
 		most_wanted_phraselist = near_death_poetic
@@ -602,8 +608,10 @@ local function get_status_message(ply)
 		statusThoughtKey = "blood2"
 	elseif pain > 100 then
 		most_wanted_phraselist = sharp_pain
+		statusThoughtKey = "pain_severe"
 	elseif pain > 75 then
 		most_wanted_phraselist = audible_pain
+		statusThoughtKey = "pain"
 	elseif not suppressArrhythmiaStatus and arrhythmiaActive then
 		most_wanted_phraselist = arrhythmia_phrases
 		statusThoughtKey = "arrhythmia"
@@ -622,13 +630,17 @@ local function get_status_message(ply)
 	elseif temperature < 35 then
 		if temperature < 29 then
 			most_wanted_phraselist = numb_phraselist
+			statusThoughtKey = "numb"
 		elseif temperature < 31 then
 			most_wanted_phraselist = freezing_phraselist
+			statusThoughtKey = "freezing"
 		else
 			most_wanted_phraselist = cold_phraselist
+			statusThoughtKey = "cold"
 		end
 	elseif temperature > 38 then
 		most_wanted_phraselist = temperature >= 40 and heatstroke_phraselist or hot_phraselist
+		statusThoughtKey = temperature >= 40 and "heatstroke" or "hot"
 	elseif ((bleedingOut and blood <= bleedoutStartBlood and heartbeat >= 30 and heartbeat <= 250) or (broken_dislocated) or (broken_notify) or (dislocated_notify)) then
 		if pain > 75 and (broken_dislocated) then
 			most_wanted_phraselist = math.random(2) == 1 and audible_pain or (broken_notify and broken_limb or dislocated_limb)
@@ -669,6 +681,12 @@ local function get_status_message(ply)
 		else
 			most_wanted_phraselist = ((IsAimedAt(ply) > 0.9) and is_aimed_at_phrases or (math.random(10) == 1 and fear_hurt_ironic or fear_phrases))
 		end
+	end
+
+	if most_wanted_phraselist == broken_limb then
+		statusThoughtKey = limbStatusKey("broken") or statusThoughtKey
+	elseif most_wanted_phraselist == dislocated_limb then
+		statusThoughtKey = limbStatusKey("dislocated") or statusThoughtKey
 	end
 
 	if most_wanted_phraselist == near_death_poetic or most_wanted_phraselist == near_death_positive then
