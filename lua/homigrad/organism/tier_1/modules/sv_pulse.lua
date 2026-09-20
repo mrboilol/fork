@@ -989,7 +989,7 @@ module[2] = function(owner, org, timeValue)
 			org, org.heartbeat or 0, circulation, hemorrhageCompensation, effectivePalpitations
 		)
 		local sympatheticPulseSupport = sympatheticCompensation
-			* (8 + 18 * bloodVolume)
+			* 26 * bloodVolume
 			* Clamp(heart, 0, 1)
 			* Clamp(1 - rhythmInstability * 0.4, 0.3, 1)
 		palpablePulseTarget = math.min(palpablePulseTarget + sympatheticPulseSupport, org.heartbeat or 0)

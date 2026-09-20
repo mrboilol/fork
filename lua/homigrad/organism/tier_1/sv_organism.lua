@@ -321,8 +321,22 @@ function hg.organism.RecordWoundMark(org, wound, arterial)
 		wound[4],
 		math.min(tonumber(wound.openedAt) or tonumber(wound[5]) or CurTime(), CurTime()),
 		arterial and true or false,
+		arterial and "arterial" or wound.woundType or "trauma",
 	}
 	hg.organism.SyncWoundMarksNet(org)
+end
+
+function hg.organism.RemoveWoundMark(org, wound, arterial)
+	if not org or not wound then return end
+	local marks = org.woundmarks or {}
+	for index = #marks, 1, -1 do
+		local mark = marks[index]
+		if mark[4] == wound[4] and mark[6] == (arterial and true or false) and isvector(mark[2]) and mark[2]:DistToSqr(wound[2]) <= 6.25 then
+			table.remove(marks, index)
+			hg.organism.SyncWoundMarksNet(org)
+			return true
+		end
+	end
 end
 
 function hg.organism.FlushWoundsNet(org, force, mirrorDeathRagdoll)

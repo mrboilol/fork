@@ -2,7 +2,7 @@ if SERVER then
     resource.AddFile("resource/fonts/arnopro.ttf")
     util.AddNetworkString("HG_SuicideCutscene")
     local hg_cutscene = ConVarExists("hg_cutscene") and GetConVar("hg_cutscene") or CreateConVar("hg_cutscene", "0", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enable suicide cutscene", 0, 1)
-    local hg_suicidal = ConVarExists("hg_suicidal") and GetConVar("hg_suicidal") or CreateConVar("hg_suicidal", "0", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Suicide behavior: 0 = normal, 1 = unrestricted, 2 = unrestricted and increases depression", 0, 2)
+    local hg_suicidal = ConVarExists("hg_suicidal") and GetConVar("hg_suicidal") or CreateConVar("hg_suicidal", "0", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Suicide behavior: 0 = Judge urges and animations, 1 = unrestricted, 2 = unrestricted and increases depression", 0, 2)
 
     concommand.Add("suicide", function(ply)
         if not IsValid(ply) or not ply:Alive() then return end

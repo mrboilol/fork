@@ -576,6 +576,10 @@ module[2] = function(owner, org, mulTime)
 
 			if wound[1] <= 0.001 then
 				wound[1] = 0
+				if not wound.markHealed then
+					wound.markHealed = true
+					hg.organism.RemoveWoundMark(org, wound, false)
+				end
 			end
 		end
 	end
@@ -651,6 +655,10 @@ module[2] = function(owner, org, mulTime)
 		if (wound[1] or 0) <= 0.001 then
 			wound[1] = 0
 			org[wound[7]] = 0
+			if not wound.markHealed then
+				wound.markHealed = true
+				hg.organism.RemoveWoundMark(org, wound, true)
+			end
 		end
 		arterialWoundBleedRates[i] = woundBleedRate
 		wound.visualBleedRate = woundBleedRate

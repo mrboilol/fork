@@ -301,9 +301,3 @@ hook.Add("PlayerCanHearPlayersVoice", "RealisticVoice", function(listener,speake
 
 	return result,is3D
 end)
-
-function hg.CanSuicide(ply)
-	if not IsValid(ply) or not ply.GetActiveWeapon then return false end
-	local wep = ply:GetActiveWeapon()
-	return ishgweapon(wep) and wep.CanSuicide and not wep.reload
-end

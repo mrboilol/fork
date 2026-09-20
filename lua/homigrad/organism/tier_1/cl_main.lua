@@ -952,6 +952,14 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 	end
 end)
 
+local function resetPersistentBodyDecals(ent, clear)
+	if not IsValid(ent) then return end
+	ent.hgPersistentDecalsDirty = true
+	ent.hgPersistentDecalCursor = 1
+	ent.hgPersistentDecalNext = 0
+	ent.hgPersistentDecalsNeedClear = ent.hgPersistentDecalsNeedClear or clear
+end
+
 hook.Add("OnNetVarSet","wounds_netvar",function(index, key, var)
 	if key == "wounds" then
 		local ent = Entity(index)
@@ -1029,11 +1037,19 @@ hook.Add("OnNetVarSet", "woundmarks_netvar", function(index, key, var)
 	local ent = Entity(index)
 	if not IsValid(ent) then return end
 
+	local oldCount = istable(ent.woundmarks) and #ent.woundmarks or 0
 	ent.woundmarks = istable(var) and var or {}
+	resetPersistentBodyDecals(ent, #ent.woundmarks < oldCount)
 	local rag = ent:GetNWEntity("FakeRagdoll")
-	if IsValid(rag) then rag.woundmarks = ent.woundmarks end
+	if IsValid(rag) then
+		rag.woundmarks = ent.woundmarks
+		resetPersistentBodyDecals(rag, #ent.woundmarks < oldCount)
+	end
 	local deathRag = ent:GetNWEntity("RagdollDeath")
-	if IsValid(deathRag) and deathRag != rag then deathRag.woundmarks = ent.woundmarks end
+	if IsValid(deathRag) and deathRag != rag then
+		deathRag.woundmarks = ent.woundmarks
+		resetPersistentBodyDecals(deathRag, #ent.woundmarks < oldCount)
+	end
 end)
 
 hook.Add("Player Spawn", "removewounds", function(ply)
@@ -1043,6 +1059,7 @@ hook.Add("Player Spawn", "removewounds", function(ply)
 	ply.arterialwounds = {}
 	ply.woundmarks = {}
 	ply.persistentBloodMarks = {}
+	resetPersistentBodyDecals(ply, true)
 
 	local rag = ply:GetNWEntity("FakeRagdoll")
 	if IsValid(rag) then
@@ -1050,6 +1067,7 @@ hook.Add("Player Spawn", "removewounds", function(ply)
 		rag.arterialwounds = {}
 		rag.woundmarks = {}
 		rag.persistentBloodMarks = {}
+		resetPersistentBodyDecals(rag, true)
 	end
 end)
 
@@ -1061,6 +1079,7 @@ hook.Add("Fake", "huyhuyhuy235", function(ply,ragdoll)
 	ragdoll.woundmarks = ply.woundmarks
 	ragdoll.persistentBloodMarks = ply.persistentBloodMarks
 	ragdoll.hgBloodVisualReadyAt = CurTime() + 0.2
+	resetPersistentBodyDecals(ragdoll, true)
 end)
 
 function hg.applyFountain(pos, ang, mul, mul2, forward, ent)
@@ -1301,10 +1320,12 @@ function hg.AddPersistentBodyBloodMark(ent, pos, normal, size)
 	if not localPos then return end
 
 	ent.persistentBloodMarks = ent.persistentBloodMarks or {}
-	for _, mark in ipairs(ent.persistentBloodMarks) do
+	for index, mark in ipairs(ent.persistentBloodMarks) do
 		if mark[4] == bone and mark[2]:DistToSqr(localPos) < 2.25 then
 			mark[1] = math.min(math.max(mark[1] or 1, size or 1) + 0.15, 5)
 			mark[5] = CurTime()
+			ent.hgPersistentDecalCursor = (istable(ent.woundmarks) and #ent.woundmarks or 0) + index
+			ent.hgPersistentDecalNext = 0
 			return
 		end
 	end
@@ -1317,31 +1338,62 @@ function hg.AddPersistentBodyBloodMark(ent, pos, normal, size)
 		CurTime(),
 		false,
 	}
+	ent.hgPersistentDecalCursor = (istable(ent.woundmarks) and #ent.woundmarks or 0) + #ent.persistentBloodMarks
+	ent.hgPersistentDecalNext = 0
 end
 
-local woundMarkMaterials = {}
-for i = 1, 6 do woundMarkMaterials[i] = Material("bloodspill/blood" .. i) end
-local woundMarkColor = Color(125, 0, 0, 255)
+local persistentBodyDecalMaterials = {
+	bullet = Material(util.DecalMaterial("Impact.Flesh")),
+	slash = Material(util.DecalMaterial("ManhackCut")),
+	trauma = Material(util.DecalMaterial("Impact.BloodyFlesh")),
+	arterial = Material(util.DecalMaterial("Impact.Flesh")),
+	blood = Material(util.DecalMaterial("Blood")),
+}
 
-local function drawPersistentWoundMarks(ent, marks, materialOffset)
-	if not IsValid(ent) or not istable(marks) or #marks == 0 then return end
-	ent:SetupBones()
+local function paintPersistentBodyDecal(ent, mark, blood)
+	local pos, ang = hg.organism.GetWoundTransform(ent, mark)
+	if not pos or not ang then return end
+	local normal = ang:Forward()
+	local severity = math.max(tonumber(mark[1]) or 0.01, 0.01)
+	local kind = blood and "blood" or mark[7] or (mark[6] and "arterial" or "trauma")
+	local scale = math.Clamp(0.18 + math.sqrt(severity) * 0.055, 0.2, kind == "slash" and 0.8 or 0.65)
+	local width = kind == "slash" and scale * 0.35 or scale
+	local height = kind == "slash" and scale * 1.4 or scale
+	util.DecalEx(persistentBodyDecalMaterials[kind] or persistentBodyDecalMaterials.trauma, ent, pos + normal * 0.2, normal, color_white, width, height)
+end
 
-	for index, wound in ipairs(marks) do
-		local pos, ang = hg.organism.GetWoundTransform(ent, wound)
-		if not pos or not ang then continue end
-		local normal = ang:Forward()
-		local age = math.max(CurTime() - (tonumber(wound[5]) or CurTime()), 0)
-		local ageFade = math.Clamp((age - 120) / 900, 0, 1)
-		local severity = math.max(tonumber(wound[1]) or 0.01, 0.01)
-		local size = math.Clamp(0.75 + math.sqrt(severity) * 0.42, 0.8, wound[6] and 4.8 or 3.8)
-		woundMarkColor.r = Lerp(ageFade, wound[6] and 145 or 125, 48)
-		woundMarkColor.g = Lerp(ageFade, 0, 7)
-		woundMarkColor.b = Lerp(ageFade, 0, 5)
-		woundMarkColor.a = Lerp(ageFade, 245, 72)
-		render.SetMaterial(woundMarkMaterials[(index + materialOffset - 2) % #woundMarkMaterials + 1])
-		render.DrawQuadEasy(pos + normal * 0.03, normal, size, size, woundMarkColor, (index * 137 + materialOffset * 29) % 360)
+local function refreshPersistentBodyDecals(ent, wounds, blood)
+	wounds = istable(wounds) and wounds or {}
+	blood = istable(blood) and blood or {}
+	local count = #wounds + #blood
+	local model = ent:GetModel()
+	if ent.hgPersistentDecalModel != model then
+		ent.hgPersistentDecalModel = model
+		resetPersistentBodyDecals(ent, true)
 	end
+	if ent.hgPersistentDecalsNeedClear then
+		ent:RemoveAllDecals()
+		ent.hgPersistentDecalsNeedClear = nil
+	end
+	if count == 0 then return end
+	ent:SetupBones()
+	if ent.hgPersistentDecalsDirty then
+		for _, mark in ipairs(wounds) do paintPersistentBodyDecal(ent, mark, false) end
+		for _, mark in ipairs(blood) do paintPersistentBodyDecal(ent, mark, true) end
+		ent.hgPersistentDecalsDirty = nil
+		ent.hgPersistentDecalCursor = 1
+		ent.hgPersistentDecalNext = CurTime() + math.max(30 / count, 0.5)
+		return
+	end
+	if (ent.hgPersistentDecalNext or 0) > CurTime() then return end
+	local cursor = math.Clamp(ent.hgPersistentDecalCursor or 1, 1, count)
+	if cursor <= #wounds then
+		paintPersistentBodyDecal(ent, wounds[cursor], false)
+	else
+		paintPersistentBodyDecal(ent, blood[cursor - #wounds], true)
+	end
+	ent.hgPersistentDecalCursor = cursor % count + 1
+	ent.hgPersistentDecalNext = CurTime() + math.max(30 / count, 0.5)
 end
 
 hook.Add("PostDrawTranslucentRenderables", "hg_persistent_organism_blood", function(depth, skybox)
@@ -1366,8 +1418,7 @@ hook.Add("PostDrawTranslucentRenderables", "hg_persistent_organism_blood", funct
 		if (not istable(woundmarks) or #woundmarks == 0) and IsValid(owner) then woundmarks = owner.woundmarks end
 		local bloodmarks = ent.persistentBloodMarks
 		if (not istable(bloodmarks) or #bloodmarks == 0) and IsValid(owner) then bloodmarks = owner.persistentBloodMarks end
-		drawPersistentWoundMarks(ent, woundmarks, ent:EntIndex())
-		drawPersistentWoundMarks(ent, bloodmarks, ent:EntIndex() + 41)
+		refreshPersistentBodyDecals(ent, woundmarks, bloodmarks)
 	end
 end)
 

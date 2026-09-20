@@ -96,7 +96,7 @@ function SWEP:OwnerChanged()
 end
 
 local math = math
-local maxTransfusionBlood = hg.organism.MAX_TRANSFUSION_BLOOD or 6500
+local maxTransfusionBlood = hg and hg.organism and hg.organism.MAX_TRANSFUSION_BLOOD or 6500
 local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Healing method: 0 = original models + progressive minigames, 1 = Judge animations", 0, 1)
 
 local function drainHemothorax(org, bloodRemoved)

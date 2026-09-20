@@ -1418,8 +1418,10 @@ function SWEP:StopPulseCheck(targetPly, skipNotify)
 	end
 end
 
-function SWEP:StartPulseCheck(ply, org)
+function SWEP:StartPulseCheck(ply, org, target)
 	if not IsValid(ply) or not org then return end
+	target = IsValid(target) and target or self.CarryEnt
+	if not IsValid(target) then return end
 
 	self.ActivePulseChecks = self.ActivePulseChecks or {}
 
@@ -1435,7 +1437,7 @@ function SWEP:StartPulseCheck(ply, org)
 	end
     
     umsg.Start("hg_StartPulseCheckECG", ply)
-    umsg.Entity(self.CarryEnt)
+    umsg.Entity(target)
     umsg.End()
 end
 

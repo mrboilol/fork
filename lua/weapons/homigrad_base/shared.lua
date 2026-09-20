@@ -255,16 +255,17 @@ function SWEP:GetArmHealthHandlingMul()
 	local org = owner.organism or {}
 	local firingBroken, firingDislocated, firingAmputated = getSevereArmTrauma(org, firingArm)
 	local braceBroken, braceDislocated, braceAmputated = getSevereArmTrauma(org, braceArm)
+	local limbDebuff = hg.GetLimbDebuffMultiplier and hg.GetLimbDebuffMultiplier(org) or 1
 	local loss = (1 - firing) * 1.55
 	local ignoreOneArm = self.IgnoreOneArmPenalties == true
 	local oneHandPenalty = Lerp(self:GetFirearmProficiency(owner), 1, 0.45)
 	if support.wantsTwoHands and not ignoreOneArm then loss = loss + (1 - brace) * 0.85 * oneHandPenalty end
 	if support.oneHanded and not ignoreOneArm then loss = loss + 0.5 * oneHandPenalty end
-	if firingBroken then loss = loss + 0.5 end
-	if firingDislocated then loss = loss + 0.6 end
+	if firingBroken then loss = loss + 0.5 * limbDebuff end
+	if firingDislocated then loss = loss + 0.6 * limbDebuff end
 	if firingAmputated then loss = loss + 0.7 end
-	if support.wantsTwoHands and braceBroken and not ignoreOneArm then loss = loss + 0.3 * oneHandPenalty end
-	if support.wantsTwoHands and braceDislocated and not ignoreOneArm then loss = loss + 0.4 * oneHandPenalty end
+	if support.wantsTwoHands and braceBroken and not ignoreOneArm then loss = loss + 0.3 * oneHandPenalty * limbDebuff end
+	if support.wantsTwoHands and braceDislocated and not ignoreOneArm then loss = loss + 0.4 * oneHandPenalty * limbDebuff end
 	if support.wantsTwoHands and braceAmputated and not ignoreOneArm then loss = loss + 0.5 * oneHandPenalty end
 	if support.onlyLeft and not ignoreOneArm then loss = loss + 0.25 * oneHandPenalty end
 	if support.leftBusy and not ignoreOneArm then loss = loss + 0.3 * oneHandPenalty end

@@ -137,6 +137,11 @@ local function IsHelpingOtherPlayer()
     return IsValid(target) and target ~= lp and target:IsPlayer()
 end
 
+local function HasMissingRightArm(ply)
+    local org = IsValid(ply) and ply.organism
+    return org and (org.rarmamputated or org.rarmupamputated or org.rhandamputated)
+end
+
 local function GetBandageStressFactors()
     local lp = LocalPlayer()
     if not IsValid(lp) or not lp.organism then return 0, 0, 0, 0 end
@@ -486,6 +491,7 @@ function PANEL:Init()
     
     self.CenterX = ScrW() / 2
     self.CenterY = ScrH() / 2
+	self.InvertHorizontal = HasMissingRightArm(LocalPlayer())
     self.Radius = 150
     self.MaxBandageDistance = 450 / self.MinigameDifficultyMultiplier
     self.BandageFollowSpeed = 3.2 / self.MinigameDifficultyMultiplier
@@ -529,7 +535,7 @@ function PANEL:Init()
     self.SyringeGrabOffsetY = 0
 
     -- Parameters for smooth hand movement
-    self.HandX, self.HandY = self:CursorPos()
+    self.HandX, self.HandY = self:GetInteractionCursorPos()
     self.HandAngle = 0
     self.LastMX, self.LastMY = self.HandX, self.HandY
     self.ShakeX = 0
@@ -629,6 +635,12 @@ function PANEL:Init()
 
 end
 
+function PANEL:GetInteractionCursorPos()
+    local x, y = self:CursorPos()
+    if self.InvertHorizontal then x = self.CenterX * 2 - x end
+    return x, y
+end
+
 function PANEL:DrawTreatmentTarget(w, h)
     if not self.ShowMedkitTreatmentTarget then return end
 
@@ -724,7 +736,7 @@ function PANEL:OnMousePressed(code)
     if code == MOUSE_LEFT then
         self.Dragging = true
         self.HandSqueezeStartTime = CurTime()
-        local mx, my = self:CursorPos()
+        local mx, my = self:GetInteractionCursorPos()
         if self.GameType == "dislocation" then
             local boneX = self.DislocationMoveX or 0
             local boneY = self.DislocationMoveY or 0
@@ -779,7 +791,7 @@ function PANEL:OnMouseReleased(code)
     if code == MOUSE_LEFT then
         local shouldFinishSyringe = self.GameType == "syringe" and self.Progress >= 0.999
         if self.GameType == "dislocation" and self.DislocationAiming then
-            local mx, my = self:CursorPos()
+            local mx, my = self:GetInteractionCursorPos()
             local startX = self.DislocationAimStartX or mx
             local startY = self.DislocationAimStartY or my
             local aimX = (self.DislocationAimX or mx) - startX
@@ -1304,7 +1316,7 @@ function PANEL:Think()
         return
     end
 
-    local mx, my = self:CursorPos()
+    local mx, my = self:GetInteractionCursorPos()
 
     local fear, adrenaline, jitter, stabilizer = GetBandageStressFactors()
     local stress = fear + jitter * 1.5

@@ -22,7 +22,7 @@ SWEP.CanSuicide = true
 SWEP.SuicidePunchAng = Angle(35, 0, 25)
 
 SWEP.Canselfharm = true
-SWEP.harmwhere = {"larmartery = 1"}
+SWEP.harmwhere = {larmartery = 1}
 SWEP.SelfHarmCutLocalPos = Vector(6, -0.8, 0)
 SWEP.SelfHarmCutLocalAng = Angle(0, 0, 0)
 

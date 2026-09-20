@@ -1,3 +1,8 @@
+function hg.GetLimbDebuffMultiplier(org)
+	local analgesia = math.Clamp((tonumber(org.analgesia) or 0) + (tonumber(org.painkiller) or 0) * 0.3, 0, 1)
+	return Lerp(analgesia, 1, 0.35)
+end
+
 function hg.GetArmEffectiveness(ply, limb)
 	local org = IsValid(ply) and ply.organism
 	if not org then return 1 end
@@ -10,6 +15,7 @@ function hg.GetArmEffectiveness(ply, limb)
 	if org[limb .. "dislocation"] or org[limb .. "dislocated"] then
 		effectiveness = math.min(effectiveness, 0.18)
 	end
+	effectiveness = 1 - (1 - effectiveness) * hg.GetLimbDebuffMultiplier(org)
 
 	local tourniquetCount = hg.GetTourniquetCountOnLimb and hg.GetTourniquetCountOnLimb(ply, limb) or 0
 	if tourniquetCount == 1 then

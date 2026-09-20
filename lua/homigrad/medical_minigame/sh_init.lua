@@ -71,5 +71,5 @@ function hg.MedicalMinigame.GetArmSpeedMultiplier(ply)
 end
 
 function hg.MedicalMinigame.GetBandageEaseMultiplier(ply)
-    return 1
+    return 1.5
 end

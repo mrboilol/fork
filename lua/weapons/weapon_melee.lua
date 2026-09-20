@@ -1738,7 +1738,8 @@ end
 
 function SWEP:IsHeadHit(ent, trace)
     local victim = self:GetHitVictim(ent)
-    return self:IsHeadTrace(trace and trace.Entity, trace) or self:IsHeadTrace(victim, trace)
+    local hitEnt = trace and trace.Entity
+    return self:IsHeadTrace(IsValid(hitEnt) and hitEnt or victim, trace)
 end
 
 function SWEP:GetMeleeLodgeChance(attacktype)
@@ -1961,13 +1962,16 @@ end
 
 function SWEP:IsHeadTrace(ent, trace)
     if not trace then return false end
-    if trace.HitGroup == HITGROUP_HEAD then return true end
     if not IsValid(ent) then return false end
 
     local headBone = ent.LookupBone and ent:LookupBone("ValveBiped.Bip01_Head1")
     if not headBone then return false end
 
-    if trace.PhysicsBone ~= nil and ent.TranslateBoneToPhysBone and ent.TranslatePhysBoneToBone then
+    if trace.HitBoxBone ~= nil and ent.GetBoneName then
+        return ent:GetBoneName(trace.HitBoxBone) == "ValveBiped.Bip01_Head1"
+    end
+
+    if ent:IsRagdoll() and trace.PhysicsBone ~= nil and ent.TranslateBoneToPhysBone and ent.TranslatePhysBoneToBone then
         local headPhys = ent:TranslateBoneToPhysBone(headBone)
         if headPhys ~= nil and headPhys >= 0 and trace.PhysicsBone == headPhys then
             return true
@@ -1977,11 +1981,11 @@ function SWEP:IsHeadTrace(ent, trace)
         if bone and bone >= 0 and ent:GetBoneName(bone) == "ValveBiped.Bip01_Head1" then
             return true
         end
+
+        return false
     end
 
-    if trace.HitBoxBone ~= nil and ent.GetBoneName and ent:GetBoneName(trace.HitBoxBone) == "ValveBiped.Bip01_Head1" then
-        return true
-    end
+    if trace.HitGroup == HITGROUP_HEAD then return true end
 
     if trace.HitPos then
         local headMatrix = ent.GetBoneMatrix and ent:GetBoneMatrix(headBone)
@@ -2721,11 +2725,7 @@ function SWEP:ShouldStopAttackOnBlockState(state)
 end
 
 function SWEP:GetAttackHitStopReverse(attacktype)
-    if self:IsSecondaryAttackType(attacktype) or self:IsChargeAttackType(attacktype) then
-        return false
-    end
-
-    return not self.noreverse
+    return true
 end
 
 function SWEP:GetAttackHitStopData(attacktype)
@@ -2749,7 +2749,7 @@ end
 
 function SWEP:ShouldStopAttackOnWorldHit(attacktype, ent)
     if self:IsBreakableProp(ent) then return false end
-    return self.StopOnWorldHit ~= false and not self.noreverse
+    return self.StopOnWorldHit ~= false
 end
 
 function SWEP:FindNearbySoftEntity(hitPos, owner)
@@ -2810,24 +2810,31 @@ end
 function SWEP:SendMeleeSoftHitStop(attacktype, normal, dmg)
     if not SERVER then return end
 
+    local severe = (dmg or 0) >= (self.HitStopSoftReverseDamage or 25)
     local speedMul = self.HitStopSoftSpeedMul or 1.9
-    local pause = self.HitStopSoftPause or 0.05
-    local stopanim = self.HitStopSoftStop or 0.1
+    local pause = self.HitStopSoftPause or 0.16
+    local stopanim = self.HitStopSoftStop or 0.14
 
-    local dmgScale = math.Clamp((dmg or 15) / 25, 0.6, 1.8)
-    pause = pause * dmgScale
-    stopanim = stopanim * dmgScale
+    if severe then
+        speedMul, pause, _, stopanim = self:GetAttackHitStopData(attacktype)
+    else
+        local dmgScale = math.Clamp((dmg or 15) / 25, 0.8, 1.8)
+        pause = pause * dmgScale
+        stopanim = stopanim * dmgScale
+    end
 
     net.Start("hg_melee_hit_stop")
     net.WriteEntity(self)
     net.WriteFloat(speedMul)
     net.WriteFloat(pause)
-    net.WriteBool(false)
+    net.WriteBool(severe)
     net.WriteFloat(stopanim)
     net.WriteVector(normal and normal:GetNormalized() or vector_up)
     net.WriteString("")
     net.WriteFloat(dmg or 0)
     net.SendPVS(self:GetPos())
+
+    return severe
 end
 
 function SWEP:AbortClashAttack()
@@ -3528,6 +3535,55 @@ function SWEP:DoSelfHarmCut()
 	end
 end
 
+function SWEP:StartSuicide()
+    if self.SuicideStart or not self.CanSuicide then return false end
+
+    local owner = self:GetOwner()
+    local org = IsValid(owner) and owner.organism
+    local ent = IsValid(owner) and hg.GetCurrentCharacter(owner)
+    if not org or not org.alive or not IsValid(ent) then return false end
+
+    self.SuicideStart = CurTime()
+
+    if CLIENT then return true end
+
+    self:SetNWFloat("HGMeleeSuicideStart", self.SuicideStart)
+
+    if self.SuicideFunc then
+        self:SuicideFunc()
+        return true
+    end
+
+    local neck = ent:LookupBone("ValveBiped.Bip01_Neck1")
+    local matrix = neck and ent:GetBoneMatrix(neck)
+    if not matrix then
+        self.SuicideStart = nil
+        self:SetNWFloat("HGMeleeSuicideStart", 0)
+        return false
+    end
+
+    local dmgInfo = DamageInfo()
+    dmgInfo:SetDamageType(DMG_SLASH)
+    dmgInfo:SetAttacker(owner)
+    dmgInfo:SetInflictor(self)
+
+    local _, ang = LocalToWorld(vector_origin, Angle(0, -60, 0), vector_origin, matrix:GetAngles())
+
+    hg.organism.input_list["arteria"](org, 0, 5, dmgInfo, nil, -ang:Forward())
+
+    for i = 1, 5 do
+        hg.organism.AddWoundManual(owner, 50, VectorRand(-2, 2), ang, "ValveBiped.Bip01_Neck1", CurTime() + math.Rand(0, 2))
+    end
+
+    owner:AddNaturalAdrenaline(math.max(2 - org.adrenaline, 0))
+    org.fear = math.max(org.fear, 1)
+
+    hook.Run("HomigradDamage", owner, dmgInfo, HITGROUP_HEAD, ent, 15)
+    owner:EmitSound(self.SuicideSound or self.Attack2HitFlesh, 50)
+
+    return true
+end
+
 function SWEP:CustomThink()
     local owner = self:GetOwner()
     local actwep = owner.GetActiveWeapon and owner:GetActiveWeapon()
@@ -3566,48 +3622,21 @@ function SWEP:CustomThink()
 		return
 	end
 
+    if CLIENT then
+        local suicideStart = self:GetNWFloat("HGMeleeSuicideStart", 0)
+        if suicideStart > 0 then self.SuicideStart = suicideStart end
+    end
+
     if self.CanSuicide and hg.KeyDown(owner, IN_ATTACK) and owner.suiciding and !self.SuicideStart and owner:GetNWFloat("rem_suicide_aim", 0) <= 0 and owner:GetNWFloat("rem_urges_end", 0) < CurTime() then
-        self.SuicideStart = CurTime()
-
-        if SERVER then
-            if self.SuicideFunc then
-                self:SuicideFunc()
-            else
-                local dmgInfo = DamageInfo()
-                dmgInfo:SetDamageType(DMG_SLASH)
-                dmgInfo:SetAttacker(owner)
-                dmgInfo:SetInflictor(self)
-
-                local org = owner.organism
-                local ent = hg.GetCurrentCharacter(owner)
-                
-                local ang = ent:GetBoneMatrix(ent:LookupBone("ValveBiped.Bip01_Neck1")):GetAngles()
-                local _, ang = LocalToWorld(vector_origin, Angle(0, -60, 0), vector_origin, ang)
-                
-                hg.organism.input_list["arteria"](org, 0, 5, dmgInfo, nil, -ang:Forward())
-                
-                for i = 1, 5 do
-                    hg.organism.AddWoundManual(owner, 50, VectorRand(-2, 2), ang, "ValveBiped.Bip01_Neck1", CurTime() + math.Rand(0, 2))
-                end
-
-                owner:AddNaturalAdrenaline(math.max(2 - org.adrenaline, 0))
-                org.fear = math.max(org.fear, 1)
-
-                --timer.Simple(0, function()
-                --    hg.organism.Vomit(owner, "player/flesh/flesh_bullet_impact_03.wav")
-                --end)
-                hook.Run("HomigradDamage", owner, dmgInfo, HITGROUP_HEAD, hg.GetCurrentCharacter(org.owner), 15)
-                owner:EmitSound(self.SuicideSound or self.Attack2HitFlesh, 50)
-                
-                --timer.Simple(0.05, function()
-                --    owner:ViewPunch(self.SuicidePunchAng or Angle(5, 10, 0))
-                --end)
-            end
-        end
+        self:StartSuicide()
     end
 
     if self.SuicideStart and self.SuicideStart + self.SuicideTime < CurTime() then
-        owner.suiciding = false
+        if SERVER then
+            owner.suiciding = false
+            owner.startsuicide = nil
+            self:SetNWFloat("HGMeleeSuicideStart", 0)
+        end
         self.cutthroat = CurTime()
         self.SuicideStart = nil
     end
@@ -3837,6 +3866,7 @@ function SWEP:CustomThink()
                 self.slash = self.MultiDmg1
                 self:SetMeleeDamageContact(ent, trace, trauma)
                 ent:TakeDamageInfo(dmginfo)
+                dmg = dmginfo:GetDamage()
                 self.MeleeDamageContact = nil
                 self.attackedOnce = true
                 self.slash = nil
@@ -3879,12 +3909,17 @@ function SWEP:CustomThink()
             end
 
             if blockState == "none" and soft then
-                self:SendMeleeSoftHitStop(1, trace.HitNormal, dmg)
+                local severe = self:SendMeleeSoftHitStop(1, trace.HitNormal, dmg)
 
                 if owner:IsPlayer() then
                     local imul = self:GetMeleeImpactMul(dmg)
                     owner:ViewPunch((self:GetAttackConfigValue(self.ViewPunch1, self.ViewPunch2, self.ChargeViewPunch, false) or self.ViewPunch1) * 0.4 * imul)
                     util.ScreenShake(owner:GetPos(), 15 * imul, 5, 0.15, 60 * imul)
+                end
+
+                if severe then
+                    self:AbortBlockedAttack()
+                    return
                 end
             end
 
@@ -4015,6 +4050,7 @@ function SWEP:CustomThink()
                 self:SetMeleeDamageContact(ent, trace, trauma)
                 --print(dmg)
                 ent:TakeDamageInfo(dmginfo)
+                dmg = dmginfo:GetDamage()
                 self.MeleeDamageContact = nil
                 self.attackedOnce = true
                 self.slash = nil
@@ -4056,12 +4092,17 @@ function SWEP:CustomThink()
             end
 
             if blockState == "none" and soft then
-                self:SendMeleeSoftHitStop(2, trace.HitNormal, dmg)
+                local severe = self:SendMeleeSoftHitStop(2, trace.HitNormal, dmg)
 
                 if owner:IsPlayer() then
                     local imul = self:GetMeleeImpactMul(dmg)
                     owner:ViewPunch((self:GetAttackConfigValue(self.ViewPunch1, self.ViewPunch2, self.ChargeViewPunch, true) or self.ViewPunch2) * 0.4 * imul)
                     util.ScreenShake(owner:GetPos(), 15 * imul, 5, 0.15, 60 * imul)
+                end
+
+                if severe then
+                    self:AbortBlockedAttack()
+                    return
                 end
             end
 
@@ -4208,6 +4249,7 @@ function SWEP:CustomThink()
                 self.slash = self.MultiDmgCharge
                 self:SetMeleeDamageContact(ent, trace, trauma)
                 ent:TakeDamageInfo(dmginfo)
+                dmg = dmginfo:GetDamage()
                 self.MeleeDamageContact = nil
                 self.attackedOnce = true
                 self.slash = nil
@@ -4251,12 +4293,17 @@ function SWEP:CustomThink()
             end
 
             if blockState == "none" and soft then
-                self:SendMeleeSoftHitStop(3, trace.HitNormal, dmg)
+                local severe = self:SendMeleeSoftHitStop(3, trace.HitNormal, dmg)
 
                 if owner:IsPlayer() then
                     local imul = self:GetMeleeImpactMul(dmg)
                     owner:ViewPunch((self:GetAttackConfigValue(self.ViewPunch1, self.ViewPunch2, self.ChargeViewPunch, 3) or self.ViewPunch1) * 0.4 * imul)
                     util.ScreenShake(owner:GetPos(), 15 * imul, 5, 0.15, 60 * imul)
+                end
+
+                if severe then
+                    self:AbortBlockedAttack()
+                    return
                 end
             end
 
@@ -4309,8 +4356,9 @@ SWEP.HitStopWorldPause = 0.25
 SWEP.HitStopWorldStop = 0.3
 SWEP.HitStopSoftSpeedMul = 1.9
 SWEP.HitStopSoftResumeMul = 0.72
-SWEP.HitStopSoftPause = 0.1
-SWEP.HitStopSoftStop = 0.095
+SWEP.HitStopSoftPause = 0.16
+SWEP.HitStopSoftStop = 0.14
+SWEP.HitStopSoftReverseDamage = 25
 SWEP.HitPunchMul = 0.75
 SWEP.HitPunchDiv = 40
 SWEP.HitScreenShakeAmp = 22
@@ -4833,7 +4881,7 @@ elseif CLIENT then
             wep:AddBlockHitShake("parry", normal)
         end
 
-        QueueMeleeHitStop(wep, wep.HitStopWorldSpeedMul or 2.35, wep.HitStopWorldPause or 0.12, not wep.noreverse, wep.HitStopWorldStop or 0.12)
+        QueueMeleeHitStop(wep, wep.HitStopWorldSpeedMul or 2.35, wep.HitStopWorldPause or 0.12, true, wep.HitStopWorldStop or 0.12)
 
         local owner = wep:GetOwner()
         if IsValid(owner) and owner == LocalPlayer() then

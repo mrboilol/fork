@@ -478,8 +478,14 @@ local math_abs, math_Approach, math_AngleDifference, math_Clamp, math_cos, math_
 		k = k * softenDebuff(math.Clamp((org.blood or 0) / 5000, 0, 1))
 		k = k * softenDebuff(math.Clamp(10 / ((org.shock or 0) + 1), 0.45, 1))
 		k = k * (math.min(math.Round((org.adrenaline or 0), 1) / 24, 0.3) + 1)
-		k = k * math.Clamp((org.lleg and org.lleg >= 0.5 and math.max(1 - org.lleg, 0.6) or 1) * (org.lleg and org.rleg >= 0.5 and math.max(1 - org.rleg, 0.6) or 1) * ((org.analgesia * 1 + 1)), 0, 1)
-		k = k * (org.llegdislocation and 0.75 or 1) * (org.rlegdislocation and 0.75 or 1)
+		local limbDebuff = hg.GetLimbDebuffMultiplier and hg.GetLimbDebuffMultiplier(org) or 1
+		local function legMoveMultiplier(limb)
+			local damage = tonumber(org[limb]) or 0
+			local base = damage >= 0.5 and math.max(1 - damage, 0.6) or 1
+			if org[limb .. "dislocation"] then base = base * 0.75 end
+			return 1 - (1 - base) * limbDebuff
+		end
+		k = k * legMoveMultiplier("lleg") * legMoveMultiplier("rleg")
 		if hg.GetTourniquetCountOnLimb then
 			local leftTourniquets = hg.GetTourniquetCountOnLimb(ply, "lleg")
 			local rightTourniquets = hg.GetTourniquetCountOnLimb(ply, "rleg")

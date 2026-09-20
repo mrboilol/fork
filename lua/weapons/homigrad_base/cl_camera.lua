@@ -256,6 +256,9 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	local handling = self.GetArmHealthHandlingMul and self:GetArmHealthHandlingMul() or 1
 	local larmShake = (larm > 0.25 and (larm - 0.25) * 0.45) or 0
 	local rarmShake = (rarm > 0.1 and (rarm - 0.1) * 0.7) or 0
+	local limbDebuff = hg.GetLimbDebuffMultiplier and hg.GetLimbDebuffMultiplier(organism) or 1
+	larmShake = larmShake * limbDebuff
+	rarmShake = rarmShake * limbDebuff
 	if self.IgnoreOneArmPenalties then
 		if support.firingArm == "larm" then rarmShake = 0 else larmShake = 0 end
 	end

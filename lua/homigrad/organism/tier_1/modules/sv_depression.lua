@@ -6,22 +6,24 @@ local depression_max = 1
 local depression_drain_time = 300
 local depression_drain_boost_time = 100
 local depression_pain_threshold = 60
-local depression_pain_gain = 0.006
+local depression_pain_gain = 0.02
 local depression_fear_threshold = 3
-local depression_fear_gain = 0.004
+local depression_fear_gain = 0.015
 local depression_blood_threshold = 3500
-local depression_blood_gain = 0.003
+local depression_blood_gain = 0.01
 local depression_otrub_gain = 0.005
 local depression_adrenaline_suppress_start = 0.5
 local depression_adrenaline_suppress_min = 0.1
 local depression_bleedrate_threshold = 5
-local depression_bleedrate_gain = 0.004
-local depression_bleedrate_maxmul = 2
-local depression_bones_gain = 0.004
+local depression_bleedrate_gain = 0.03
+local depression_bleedrate_maxmul = 4
+local depression_o2_threshold = 15
+local depression_o2_gain = 0.02
+local depression_bones_gain = 0.012
 local depression_cold_threshold = 35
-local depression_cold_gain = 0.003
-local depression_panic_gain = 0.006
-local depression_amputation_gain = 0.005
+local depression_cold_gain = 0.01
+local depression_panic_gain = 0.02
+local depression_amputation_gain = 0.015
 local depression_wake_relief = 0.2
 local depression_wake_relief_time = 35
 local depression_untreated_bleed_threshold = 2
@@ -448,6 +450,11 @@ module[2] = function(owner, org, timeValue)
 	local bleedrate = org.bleed or 0
 	if bleedrate > depression_bleedrate_threshold then
 		add = add + depression_bleedrate_gain * min(bleedrate / depression_bleedrate_threshold, depression_bleedrate_maxmul) * timeValue
+	end
+
+	local o2 = org.o2 and org.o2[1] or 30
+	if o2 < depression_o2_threshold then
+		add = add + depression_o2_gain * timeValue
 	end
 
 	if (org.immobilization or 0) > 0 or (org.spine1 or 0) > 0.5 or (org.spine2 or 0) > 0.5 or (org.spine3 or 0) > 0.5 or (org.lleg or 0) >= 0.5 or (org.rleg or 0) >= 0.5 then

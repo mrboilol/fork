@@ -891,7 +891,7 @@ local function forward(inverse, segments)
     return forward
 end
 
-local function solve(segments, iter, turn)
+local function solve(segments, iter, keepRoot)
     local final = {}
 
     for i = 1, #segments do
@@ -903,7 +903,7 @@ local function solve(segments, iter, turn)
         final = forward(final, segments)
     end
     
-    if segments[1].Pos:DistToSqr(segments[#segments].Pos) < 225 then
+    if not keepRoot and segments[1].Pos:DistToSqr(segments[#segments].Pos) < 225 then
         final = backward(final, segments)
     end
 
@@ -1236,7 +1236,17 @@ local angrotate = math.NormalizeAngle(-eyeang.r + ply_r_hand_matrix:GetAngles().
             local hand = ply_l_hand_matrix:GetTranslation()
             if leftArmRelaxing then
                 segments[3] = segments[3] or {Pos = hand, Len = limblength}
-                segments[3].Pos = LerpVector(self:IsPistolHoldType() and 0.01 or 0.05, segments[3].Pos + (-vector_up * 0.6 + eyeang:Forward() * 0.4 + (self:IsPistolHoldType() and vector_origin or eyeang:Right() * 0.7) + ent:GetVelocity() / 400) * 0.5, hand)
+                local pistolHold = self:IsPistolHoldType()
+                local relaxedHand = hand - vector_up * (pistolHold and 10 or 8) + eyeang:Forward() * 4 + (pistolHold and vector_origin or eyeang:Right() * 5)
+                local shoulder = segments[1].Pos
+                local offset = relaxedHand - shoulder
+                local maxReach = limblength * 1.85
+
+                if offset:LengthSqr() > maxReach * maxReach then
+                    relaxedHand = shoulder + offset:GetNormalized() * maxReach
+                end
+
+                segments[3].Pos = LerpVectorFT(pistolHold and 0.04 or 0.08, segments[3].Pos, relaxedHand)
             else
                 segments[3] = {Pos = Lerp(1 - lerp_lh, ply.last_lh and ply.last_lh:GetTranslation() or segments[3].Pos, ply_l_hand_matrix_old and ply_l_hand_matrix_old:GetTranslation() or hand), Len = 12}
             end
@@ -1247,7 +1257,7 @@ local angrotate = math.NormalizeAngle(-eyeang.r + ply_r_hand_matrix:GetAngles().
                 end
             end
 
-            segments = solve(segments, 4)
+            segments = solve(segments, 4, leftArmRelaxing)
 
             --[[if lply:IsSuperAdmin() then
                 for i = 2, #segments do

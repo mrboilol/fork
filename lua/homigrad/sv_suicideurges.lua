@@ -164,11 +164,14 @@ function hg.PressSuicideAim(ply)
 
 	if ply.hgSuicideAim >= 1 and isMelee then
 		ply.suiciding = true
-		doUrgeCut(ply)
 		ply.hgSuicideAim = 0
-		ply.suiciding = false
 		ply:SetNWFloat("willsuicide", 0)
 		ply:SetNWFloat("rem_suicide_aim", 0)
+
+		if wep.StartSuicide and wep:StartSuicide() then return end
+
+		doUrgeCut(ply)
+		ply.suiciding = false
 		return
 	end
 

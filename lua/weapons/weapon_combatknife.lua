@@ -21,28 +21,28 @@ SWEP.CanSuicide = true
 SWEP.SuicidePunchAng = Angle(-5, -15, 0)
 
 SWEP.Canselfharm = true
-SWEP.harmwhere = {"larmartery = 1"}
-SWEP.SelfHarmCutLocalPos = Vector(0, 0, 0)
+SWEP.harmwhere = {larmartery = 1}
+SWEP.SelfHarmCutLocalPos = Vector(6, -0.8, 0)
 SWEP.SelfHarmCutLocalAng = Angle(0, 0, 0)
 
-SWEP.SelfHarmPos = Vector(6, 0, 0)
-SWEP.SelfHarmAng = Angle(0, 0, 0)
-SWEP.SelfHarmCutVec = Vector(0, 0, 0)
-SWEP.SelfHarmCutAng = Angle(0, 0, 0)
+SWEP.SelfHarmPos = Vector(17, -7, -5)
+SWEP.SelfHarmAng = Angle(-40, 115, 15)
+SWEP.SelfHarmCutVec = Vector(4, -5, 7)
+SWEP.SelfHarmCutAng = Angle(25, 35, 14)
 SWEP.SelfHarmTime = 0.6
-SWEP.SelfHarmPunchAng = Angle(0, 0, 0)
+SWEP.SelfHarmPunchAng = Angle(-1, -1, 0)
 SWEP.SelfHarmHoldType = "revolver"
-SWEP.SelfHarmShakePos = 0
-SWEP.SelfHarmShakeAng = 0
+SWEP.SelfHarmShakePos = 0.04
+SWEP.SelfHarmShakeAng = 0.75
 
-SWEP.LHIKSelfHarmPos = Vector(0, 0, 0)
-SWEP.LHIKSelfHarmAng = Angle(0, 0, 0)
+SWEP.LHIKSelfHarmPos = Vector(2, 1, 15)
+SWEP.LHIKSelfHarmAng = Angle(-12, 70, 85)
 
-SWEP.SelfHarmLeftPos = Vector(0, 0, 0)
-SWEP.SelfHarmLeftAng = Angle(0, 0, 0)
+SWEP.SelfHarmLeftPos = Vector(2, 1, 15)
+SWEP.SelfHarmLeftAng = Angle(-12, 70, 85)
 
-SWEP.SelfHarmCutLeftPos = Vector(0, 0, 0)
-SWEP.SelfHarmCutLeftAng = Angle(0, 0, 0)
+SWEP.SelfHarmCutLeftPos = Vector(-2, 1, 16)
+SWEP.SelfHarmCutLeftAng = Angle(-12, 70, 85)
 
 SWEP.WorldModel = "models/weapons/hammer/w.mdl"
 SWEP.WorldModelReal = "models/weapons/cs2/c_melee_knife_m7_bayo.mdl"

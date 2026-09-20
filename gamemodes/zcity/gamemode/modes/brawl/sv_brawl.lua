@@ -431,7 +431,7 @@ function MODE:PlayerCanPickupWeapon(ply, weapon)
     local class = weapon:GetClass()
     local handsClass = hg.GetHandsWeaponClass and hg.GetHandsWeaponClass(ply) or "weapon_hands_sh"
     if class == handsClass or self._granting[ply] or weapon:GetOwner() == ply then return true end
-    return IsAllowedWeaponClass(class) and ply:KeyDown(IN_USE)
+    return IsAllowedWeaponClass(class) and ply:GetUseEntity() == weapon and ply:KeyPressed(IN_USE)
 end
 
 function MODE:PlayerCanDropWeapon()

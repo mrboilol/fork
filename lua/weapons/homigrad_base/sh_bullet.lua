@@ -870,7 +870,9 @@ function SWEP:FireBullet()
 			accuracyMul = accuracyMul * (self:IsResting() and 0.45 or 1)
 			local organism = owner.organism
 			if organism then
-				accuracyMul = accuracyMul * (1 + ((organism.larm or 0) + (organism.rarm or 0)) * 0.65)
+				local left = hg.GetArmEffectiveness and hg.GetArmEffectiveness(owner, "larm") or math.max(1 - (organism.larm or 0), 0)
+				local right = hg.GetArmEffectiveness and hg.GetArmEffectiveness(owner, "rarm") or math.max(1 - (organism.rarm or 0), 0)
+				accuracyMul = accuracyMul * (1 + ((1 - left) + (1 - right)) * 0.65)
 			end
 			local combat = hg.GetCombatCondition and hg.GetCombatCondition(owner) or nil
 			if combat then accuracyMul = accuracyMul * combat.aim end

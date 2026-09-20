@@ -30,16 +30,17 @@ function SWEP:GetReloadArmPenalty()
 	local penalty = self.ArmReloadPenalty or SWEP.ArmReloadPenalty
 	local pain = 0
 	local speedMul = 1
+	local limbDebuff = hg.GetLimbDebuffMultiplier and hg.GetLimbDebuffMultiplier(org) or 1
 	local rightArmHealthy = org.rarm and org.rarm < 1 and not org.rarmdislocation and not org.rarmamputated
 	local leftArmBroken = ((org.larm and org.larm > 0) or org.larmdislocation) and not org.larmamputated
 
 	if leftArmBroken then
-		pain = pain + (penalty.PainOnReload or 35) * (org.larm or 0)
-		if org.larmdislocation then pain = pain + 15 end
+		pain = pain + (penalty.PainOnReload or 35) * (org.larm or 0) * limbDebuff
+		if org.larmdislocation then pain = pain + 15 * limbDebuff end
 	end
 
 	if leftArmBroken and not rightArmHealthy then
-		speedMul = speedMul * (1 + (penalty.LeftArmBrokenReloadSlow or 0.5))
+		speedMul = speedMul * (1 + (penalty.LeftArmBrokenReloadSlow or 0.5) * limbDebuff)
 	end
 
 	if org.rarmamputated and not org.larmamputated then
@@ -63,7 +64,8 @@ function SWEP:Reload(time)
 	self:ReloadStartPost()
 	local org = self:GetOwner().organism
 	local experienceMul = self.GetWeaponExperienceMul and self:GetWeaponExperienceMul(self:GetOwner()) or 1
-	local armReloadPenalty = org and not self.IgnoreOneArmPenalties and ((org.larm or 0) / 3 + (org.rarm or 0) / 5) or 0
+	local limbDebuff = org and hg.GetLimbDebuffMultiplier and hg.GetLimbDebuffMultiplier(org) or 1
+	local armReloadPenalty = org and not self.IgnoreOneArmPenalties and ((org.larm or 0) / 3 + (org.rarm or 0) / 5) * limbDebuff or 0
 	self.StaminaReloadMul = (org and ((2 - (org.stamina[1] / 180)) + ((org.pain / 40) + armReloadPenalty) - (1 - math.Clamp(org.recoilmul or 1, 0.45, 1.4))) or 1) * experienceMul
 	self.StaminaReloadMul = self.StaminaReloadMul * (self:GetOwner().GetTraitMultiplier and self:GetOwner():GetTraitMultiplier("reload_speed", 1) or 1)
 	self.StaminaReloadMul = math.Clamp(self.StaminaReloadMul,0.65,1.5)

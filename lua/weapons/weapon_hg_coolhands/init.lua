@@ -265,8 +265,9 @@ end
 
 SWEP.Checking = 0
 
-function SWEP:StartPulseCheck(ply, org)
-	if not IsValid(ply) or not org or not IsValid(self.CarryEnt) then return end
+function SWEP:StartPulseCheck(ply, org, target)
+	target = IsValid(target) and target or self.CarryEnt
+	if not IsValid(ply) or not org or not IsValid(target) then return end
 
 	if org.heartstop or (tonumber(org.pulse) or 0) <= 0 then
 		ply:Notify("No Pulse.", 2)
@@ -274,7 +275,7 @@ function SWEP:StartPulseCheck(ply, org)
 	end
 
 	umsg.Start("hg_StartPulseCheckECG", ply)
-	umsg.Entity(self.CarryEnt)
+	umsg.Entity(target)
 	umsg.End()
 end
 

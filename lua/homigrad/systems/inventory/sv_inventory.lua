@@ -675,6 +675,119 @@ local function ResolveLootEntityFromTrace(ply, trace)
     return best or ent
 end
 
+local fakeHandBones = {
+    "ValveBiped.Bip01_L_Hand",
+    "ValveBiped.Bip01_R_Hand"
+}
+
+local fakeDoorClasses = {
+    prop_door_rotating = true,
+    func_door_rotating = true,
+    func_door = true,
+    func_movelinear = true
+}
+
+local function FindFakeHandEntity(ply, below, filter)
+    local ragdoll = ply.FakeRagdoll
+    if not IsValid(ragdoll) then return end
+
+    local best, bestDistance
+    for _, boneName in ipairs(fakeHandBones) do
+        local bone = ragdoll:LookupBone(boneName)
+        local physBone = bone and ragdoll:TranslateBoneToPhysBone(bone)
+        local phys = isnumber(physBone) and physBone >= 0 and ragdoll:GetPhysicsObjectNum(physBone)
+        local handPos = IsValid(phys) and phys:GetPos() or bone and ragdoll:GetBonePosition(bone)
+        if not isvector(handPos) then continue end
+
+        for _, ent in ipairs(ents.FindInBox(handPos + Vector(-12, -12, -(below or 12)), handPos + Vector(12, 12, 12))) do
+            if ent == ply or ent == ragdoll or not filter(ent) then continue end
+            local nearest = ent.NearestPoint and ent:NearestPoint(handPos) or ent:GetPos()
+            local distance = nearest:DistToSqr(handPos)
+            if not bestDistance or distance < bestDistance then
+                best = ent
+                bestDistance = distance
+            end
+        end
+    end
+
+    return best
+end
+
+local function GetBodyFromEntity(ent)
+    if not IsValid(ent) then return end
+    local owner = hg.RagdollOwner(ent)
+    if IsValid(owner) then return owner, ent end
+    if ent:IsPlayer() and IsValid(ent.FakeRagdoll) then return ent, ent.FakeRagdoll end
+    if ent:IsRagdoll() and ent.organism then return ent, ent end
+end
+
+local function TryOpenLoot(ply, ent)
+    local hookPly, hookEnt, canloot = hook.Run("ZB_CanLootInventory", ply, ent)
+    if canloot ~= nil and canloot == false then
+        if not ply.keypressed and IsValid(ent) and hookPly == ply and hookEnt == ent and IsSearchableContainer(ent) and hg.TryZManipInteract then
+            hg.TryZManipInteract(ply, ent, "interact")
+        end
+        return false
+    end
+
+    hook.Run("ZB_InventoryChecked", ply, ent)
+    if not IsValid(ent) or not ent:GetNetVar("Inventory") then return false end
+
+    if not ply.keypressed then
+        ply:OpenInventory(ent)
+        if hg.TryZManipInteract then hg.TryZManipInteract(ply, ent, "interact") end
+    end
+    return true
+end
+
+local function HandleFakeInteraction(ply, key)
+    if not IsValid(ply) or not ply:Alive() or not IsValid(ply.FakeRagdoll) then return end
+    if key ~= IN_USE and key ~= IN_RELOAD then return end
+
+    local bodyEntity = FindFakeHandEntity(ply, 12, function(ent)
+        return ent:IsRagdoll() and GetBodyFromEntity(ent) ~= nil
+    end)
+    local body, bodyRagdoll = GetBodyFromEntity(bodyEntity)
+
+    if key == IN_RELOAD then
+        if not IsValid(body) or not body.organism then return end
+        local handsClass = hg.GetHandsWeaponClass and hg.GetHandsWeaponClass(ply) or "weapon_hands_sh"
+        local hands = ply:GetWeapon(handsClass)
+        if not IsValid(hands) then hands = ply:GetWeapon("weapon_hands_sh") end
+        if IsValid(hands) and hands.StartPulseCheck then
+            hands:StartPulseCheck(ply, body.organism, bodyRagdoll)
+        end
+        return
+    end
+
+    local weapon = FindFakeHandEntity(ply, 24, function(ent)
+        return ent:IsWeapon() and ent.IsSpawned and not IsValid(ent:GetParent()) and not ent:GetNoDraw()
+    end)
+    if IsValid(weapon) then
+        local forcePickup = ply.force_pickup
+        ply.force_pickup = true
+        ply:PickupWeapon(weapon)
+        ply.force_pickup = forcePickup
+        return
+    end
+
+    ply.keypressed = false
+    if IsValid(body) and TryOpenLoot(ply, body) then return end
+
+    local door = FindFakeHandEntity(ply, 12, function(ent)
+        return fakeDoorClasses[ent:GetClass()] == true
+    end)
+    if IsValid(door) then
+        door:Fire("Use", "", 0, ply, ply)
+        return
+    end
+
+    local container = FindFakeHandEntity(ply, 12, IsKnownLootEntity)
+    if IsValid(container) then TryOpenLoot(ply, container) end
+end
+
+hook.Add("KeyPress", "HG_FakeRagdollInteract", HandleFakeInteraction)
+
 local function HandleLootInput(ply)
     if not IsValid(ply) then return end
     if not ply:Alive() then
@@ -684,7 +797,12 @@ local function HandleLootInput(ply)
     ply.keypressed = ply.keypressed or false
 
     local fakeRagdoll = IsValid(ply.FakeRagdoll)
-    local use = fakeRagdoll and (ply:KeyDown(IN_WALK) and ply:KeyDown(IN_SPEED) and not ply:KeyDown(IN_ATTACK) and not ply:KeyDown(IN_ATTACK2)) or (not fakeRagdoll and ply:KeyDown(IN_ATTACK2) and ply:KeyDown(IN_USE))
+    if fakeRagdoll then
+        ply.keypressed = false
+        return
+    end
+
+    local use = ply:KeyDown(IN_ATTACK2) and ply:KeyDown(IN_USE)
     if not use then
         ply.keypressed = false
         return
@@ -708,23 +826,7 @@ local function HandleLootInput(ply)
         return
     end
 
-    local hookPly, hookEnt, canloot = hook.Run("ZB_CanLootInventory", ply, ent)
-    if canloot ~= nil and canloot == false then
-        if not ply.keypressed and IsValid(ent) and hookPly == ply and hookEnt == ent and IsSearchableContainer(ent) and hg.TryZManipInteract then
-            hg.TryZManipInteract(ply, ent, "interact")
-        end
-        ply.keypressed = true
-        return
-    end
-
-    hook.Run("ZB_InventoryChecked", ply, ent)
-    if not IsValid(ent) or not ent:GetNetVar("Inventory") then return end
-
-    if not ply.keypressed then
-        ply:OpenInventory(ent)
-        if hg.TryZManipInteract then hg.TryZManipInteract(ply, ent, "interact") end
-    end
-
+    TryOpenLoot(ply, ent)
     ply.keypressed = true
 end
 

@@ -446,19 +446,6 @@ local function getDamageHitgroup(ent, bone, dmgPos)
 	local hitgroup = bonetohitgroup[bonename] or HITGROUP_GENERIC
 	if not ent:IsRagdoll() or hitgroup ~= HITGROUP_GENERIC then return hitgroup, bonename end
 
-	local headBone = ent:LookupBone("ValveBiped.Bip01_Head1")
-	local headPhysBone = headBone and ent:TranslateBoneToPhysBone(headBone)
-	local headPhys = headPhysBone and headPhysBone >= 0 and ent:GetPhysicsObjectNum(headPhysBone)
-	if IsValid(headPhys) and isvector(dmgPos) and dmgPos:DistToSqr(headPhys:GetPos()) < 1024 then
-		return HITGROUP_HEAD, "ValveBiped.Bip01_Head1"
-	end
-	if headBone and isvector(dmgPos) then
-		local matrix = ent:GetBoneMatrix(headBone)
-		if matrix and dmgPos:DistToSqr(matrix:GetTranslation()) < 784 then
-			return HITGROUP_HEAD, "ValveBiped.Bip01_Head1"
-		end
-	end
-
 	for _, physNum in ipairs({0, 1}) do
 		local realPhysNum = hg.realPhysNum and hg.realPhysNum(ent, physNum) or physNum
 		local phys = ent:GetPhysicsObjectNum(realPhysNum)
@@ -532,20 +519,16 @@ function hg.SetMeleeDamageContact(inflictor, ent, trace, forceHead, trauma)
 
 	local traceEnt = IsValid(trace.Entity) and trace.Entity or ent
 	local boneName
-	if forceHead or trace.HitGroup == HITGROUP_HEAD then
-		boneName = "ValveBiped.Bip01_Head1"
-	elseif trace.HitBoxBone ~= nil and traceEnt.GetBoneName then
+	if trace.HitBoxBone ~= nil and traceEnt.GetBoneName then
 		boneName = traceEnt:GetBoneName(trace.HitBoxBone)
-	elseif trace.PhysicsBone ~= nil and traceEnt.TranslatePhysBoneToBone and traceEnt.GetBoneName then
+	elseif traceEnt:IsRagdoll() and trace.PhysicsBone ~= nil and traceEnt.TranslatePhysBoneToBone and traceEnt.GetBoneName then
 		local bone = traceEnt:TranslatePhysBoneToBone(trace.PhysicsBone)
 		if bone and bone >= 0 then boneName = traceEnt:GetBoneName(bone) end
 	end
 
-	local head = forceHead or boneName == "ValveBiped.Bip01_Head1"
-	local hitGroup = head and HITGROUP_HEAD or trace.HitGroup
-	if (not hitGroup or hitGroup == HITGROUP_GENERIC) and boneName then
-		hitGroup = bonetohitgroup[boneName] or hitGroup
-	end
+	local boneHitGroup = boneName and bonetohitgroup[boneName]
+	local head = boneHitGroup == HITGROUP_HEAD or (not boneHitGroup and (forceHead or trace.HitGroup == HITGROUP_HEAD))
+	local hitGroup = boneHitGroup or (head and HITGROUP_HEAD or trace.HitGroup)
 
 	inflictor.MeleeDamageContact = {
 		entity = ent,
@@ -881,13 +864,15 @@ end
 
 local function syncReopenedWoundMark(org, wound)
 	for _, mark in pairs(org.woundmarks or {}) do
-		if mark[4] == wound[4] and isvector(mark[2]) and mark[2]:DistToSqr(wound[2]) <= 6.25 then
+		if not mark[6] and mark[4] == wound[4] and isvector(mark[2]) and mark[2]:DistToSqr(wound[2]) <= 6.25 then
 			mark[1] = math.max(tonumber(mark[1]) or 0, tonumber(wound[1]) or 0)
 			mark[5] = CurTime()
+			mark[7] = wound.woundType or mark[7] or "trauma"
 			hg.organism.SyncWoundMarksNet(org)
 			return
 		end
 	end
+	hg.organism.RecordWoundMark(org, wound, false)
 end
 
 local function worsenWound(org, wound, severity)
@@ -895,21 +880,28 @@ local function worsenWound(org, wound, severity)
 	wound[1] = math.max(tonumber(wound[1]) or 0, 0) + math.max(severity, 0.01)
 	wound[5] = now
 	wound.openedAt = now
+	wound.markHealed = nil
 	wound.initialSeverity = math.max(tonumber(wound.initialSeverity) or 0, wound[1])
 	wound.visualBleedRate = math.max(wound[1] * 0.24, 0.1)
 	syncReopenedWoundMark(org, wound)
 	return wound
 end
 
-local function addOrReopenWound(org, severity, localPos, localAng, bone, time)
+local function addOrReopenWound(org, severity, localPos, localAng, bone, time, woundType)
 	local wound = findNearbyWound(org, bone, localPos)
-	if wound then return worsenWound(org, wound, severity) end
+	if wound then
+		wound.woundType = woundType or wound.woundType
+		return worsenWound(org, wound, severity)
+	end
 
 	if #org.wounds >= 30 then
-		return org.wounds[1] and worsenWound(org, org.wounds[1], severity)
+		if not org.wounds[1] then return end
+		org.wounds[1].woundType = woundType or org.wounds[1].woundType
+		return worsenWound(org, org.wounds[1], severity)
 	end
 
 	wound = {severity, localPos, localAng, bone, time, chooseWoundBleedStyle(severity)}
+	wound.woundType = woundType or "trauma"
 	wound.visualBleedRate = math.max(severity * 0.24, 0.1)
 	table.insert(org.wounds, wound)
 	hg.organism.RecordWoundMark(org, wound, false)
@@ -951,6 +943,9 @@ function hg.organism.AddWound(ent, tr, bone, dmgInfo, dmgPos, dmgBlood, inputHol
 	if hitNormal and hitNormal:LengthSqr() == 0 then hitNormal = nil end
 	hitNormal = hitNormal or (traceNormal and -traceNormal) or vector_up
 	traceNormal = traceNormal or -hitNormal
+	local woundType = dmgInfo:IsDamageType(DMG_SLASH) and "slash"
+		or dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) and "bullet"
+		or "trauma"
 	
 	local physBone = isnumber(bone) and bone >= 0 and bone or 0
 	local bone = ent:TranslatePhysBoneToBone(physBone)
@@ -981,7 +976,7 @@ function hg.organism.AddWound(ent, tr, bone, dmgInfo, dmgPos, dmgBlood, inputHol
 
 			local localPos, localAng, woundBone = hg.organism.GetWoundAnchor(ent, dmgPos + ((i == 1 and 1 or -1) * hitNormal), ((i == 1 and -1 or 1) * traceNormal):Angle(), bone)
 			if not localPos then continue end
-			addOrReopenWound(org, dmgBlood / 2, localPos, localAng, woundBone, CurTime())
+			addOrReopenWound(org, dmgBlood / 2, localPos, localAng, woundBone, CurTime(), woundType)
 			
 			table.sort(org.wounds, function(a, b) return a[1] > b[1] end)
 
