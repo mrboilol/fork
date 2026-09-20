@@ -118,7 +118,7 @@ if SERVER then
 	end)
 
 	hook.Add("PlayerCanPickupWeapon", "homigrad-weapons", function(ply, wep)
-		if (ply:GetUseEntity() ~= wep or not ply:KeyPressed(IN_USE)) and not ply.force_pickup then return false end
+		if wep.IsSpawned and (ply:GetUseEntity() ~= wep or not ply:KeyPressed(IN_USE)) and not ply.force_pickup then return false end
 		if wep.init and wep.IsSpawned and ((ply.cooldown_grab or 0) > CurTime()) and not ply.force_pickup then return false end
 		if wep.PickupFunc and (wep:PickupFunc(ply) == true) then return false end
 
@@ -152,10 +152,6 @@ if SERVER then
 			return true
 		end
 		ply.cooldown_grab = CurTime() + 0.1
-	end)
-
-	hook.Add("PlayerCanPickupItem", "homigrad-items", function(ply, item)
-		if ply:GetUseEntity() ~= item or not ply:KeyPressed(IN_USE) then return false end
 	end)
 
 	util.AddNetworkString("weaponInv")
