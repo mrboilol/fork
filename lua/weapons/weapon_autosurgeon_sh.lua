@@ -105,22 +105,22 @@ SWEP.Config = {
 local ASConfig = SWEP.Config
 
 local ASSounds = {
-    battery = "autonigger/buttons.wav",
-    mounted = "autonigger/autosurgeonon.wav",
-    pump = "autonigger/pump.wav",
-    modeComplete = "autonigger/completemode.wav",
-    modeSwitch = "autonigger/switchmode.wav",
-    painkillerNeeded = "autonigger/switch.wav",
-    stimulator = "autonigger/stimulator.wav",
-    suddenStop = "autonigger/suddenstop.wav",
-    removed = "autonigger/desert.wav",
-    complete = "autonigger/complete.wav"
+    battery = "autoniceperson/buttons.wav",
+    mounted = "autoniceperson/autosurgeonon.wav",
+    pump = "autoniceperson/pump.wav",
+    modeComplete = "autoniceperson/completemode.wav",
+    modeSwitch = "autoniceperson/switchmode.wav",
+    painkillerNeeded = "autoniceperson/switch.wav",
+    stimulator = "autoniceperson/stimulator.wav",
+    suddenStop = "autoniceperson/suddenstop.wav",
+    removed = "autoniceperson/desert.wav",
+    complete = "autoniceperson/complete.wav"
 }
 
 local ASScanSounds = {
-    "autonigger/atireputas1.wav",
-    "autonigger/atireputas2.wav",
-    "autonigger/atireputas3.wav"
+    "autoniceperson/atireputas1.wav",
+    "autoniceperson/atireputas2.wav",
+    "autoniceperson/atireputas3.wav"
 }
 
 -- The D.I.H. keeps reconstruction, wound closure, and volume/oxygen support as

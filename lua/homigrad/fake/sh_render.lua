@@ -201,7 +201,7 @@ local IsValid, math_Clamp = IsValid, math.Clamp
 		local isFountain = ent:GetNW2Bool("hg_fountain", false)
 		local wawanted = (GetViewEntity() != ply) and !isFountain and (!(!lply:Alive() and lply:GetNWEntity("spect") == ply and viewmode == 1) and !(hg_firstperson_death:GetBool() and follow == ent)) and vector_full or vector_small
 		local org = ent.new_organism or ent.organism
-		local hideHead = (ent.headexploded or (org and org.headamputated)) or ((!hg_thirdperson:GetBool() and !hg_gopro:GetBool() and (ent == ply or (!hg.RagdollCombatEnabled() or hg_firstperson_ragdoll:GetBool()))) or (hg_firstperson_death:GetBool() and follow == ent)) and wawanted == vector_small
+		local hideHead = ent:GetNWBool("hgTorsoLower", false) or (ent.headexploded or (org and org.headamputated)) or ((!hg_thirdperson:GetBool() and !hg_gopro:GetBool() and (ent == ply or (!hg.RagdollCombatEnabled() or hg_firstperson_ragdoll:GetBool()))) or (hg_firstperson_death:GetBool() and follow == ent)) and wawanted == vector_small
 		local headScale = hideHead and vector_small or vector_full
 		if not ent:GetManipulateBoneScale(lkp):IsEqualTol(headScale, 0.001) then
 			ent:ManipulateBoneScale(lkp, headScale)

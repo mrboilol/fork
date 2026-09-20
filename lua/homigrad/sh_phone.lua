@@ -5,7 +5,7 @@ HG_PHONE.DEFAULT_DESK_MODEL = "models/props/cs_office/phone.mdl"
 
 -- Add the preset names used by planted IEDs when they appear as handhelds.
 HG_PHONE.IED_HANDHELD_NAMES = {
-	"nigger",
+	"those who know",
 	"phone",
 	"telephone",
 	"reception",

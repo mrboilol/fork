@@ -141,6 +141,23 @@ function SWEP:ChangeGunPos(dtime)
 	
 	local should = true and not (fakeRagdoll and not (inuse))
 	self:UpdateWeaponReadiness(ply, dtime)
+	local support = self:GetHandSupportState(ply)
+	local proficiency = self:GetFirearmProficiency(ply)
+	local aimDt = math.Clamp(dtime or FrameTime(), 0, 0.1)
+	if self:IsZoom() and not self:IsResting() then
+		self.aimHoldTime = math.min((self.aimHoldTime or 0) + aimDt, 18)
+	else
+		self.aimHoldTime = math.Approach(self.aimHoldTime or 0, 0, aimDt * 3)
+	end
+	local fatigueDelay = Lerp(proficiency, support.oneHanded and 2.5 or 5, support.oneHanded and 4.5 or 8)
+	local fatigue = math.Clamp(((self.aimHoldTime or 0) - fatigueDelay) / 7, 0, 1)
+	local fatigueAmp = fatigue * (support.oneHanded and 1.15 or 0.5) * Lerp(proficiency, 1, 0.62)
+	local fatigueTime = CurTime()
+	self.AimFatigueWobble = Angle(
+		math.sin(fatigueTime * 1.7) * fatigueAmp + math.sin(fatigueTime * 8.3) * fatigueAmp * fatigue * 0.22,
+		math.cos(fatigueTime * 1.35) * fatigueAmp + math.cos(fatigueTime * 7.1) * fatigueAmp * fatigue * 0.18,
+		math.sin(fatigueTime * 2.2) * fatigueAmp * 0.2
+	)
 
 	self.lerped_positioning = Lerp(hg.lerpFrameTime2(0.1, dtime), self.lerped_positioning or 0, should and 1 or 0.3)
 	self.lerped_angle = Lerp(hg.lerpFrameTime2(0.1, dtime), self.lerped_angle or 0, should and 1 or (hg.KeyDown(owner, IN_ATTACK2) and 1 or 0))
@@ -151,8 +168,12 @@ function SWEP:ChangeGunPos(dtime)
 	self.weaponAng[3] = 0
 
 	local recoilDtime = math.min(dtime or FrameTime(), 0.05)
-	local angularSpring, angularDamping = 165, 20
-	local positionSpring, positionDamping = 145, 18
+	local recoverySkill = proficiency
+	local oneHandRecovery = support.oneHanded and not self.IgnoreOneArmPenalties and Lerp(recoverySkill, 0.72, 0.9) or 1
+	local angularSpring = Lerp(recoverySkill, 62, 125) * oneHandRecovery
+	local angularDamping = Lerp(recoverySkill, 8, 16) * oneHandRecovery
+	local positionSpring = Lerp(recoverySkill, 55, 110) * oneHandRecovery
+	local positionDamping = Lerp(recoverySkill, 7, 14) * oneHandRecovery
 	local wobble = self.ShotMuzzleWobble or Angle(0, 0, 0)
 	local wobbleVelocity = self.ShotMuzzleWobbleVelocity or Angle(0, 0, 0)
 	local offset = self.ShotMuzzleOffset or Vector(0, 0, 0)
@@ -381,10 +402,11 @@ function SWEP:PosAngChanges(ply, desiredPos, desiredAng, bNoAdditional, closeani
 
 	desiredPos:Add(desiredAng:Up() * 1)
 
-	if CLIENT and not bNoAdditional then
+	if not bNoAdditional then
 		local muzzleWobble = self.ShotMuzzleWobble
 		local muzzleOffset = self.ShotMuzzleOffset
 		if muzzleWobble then desiredAng:Add(muzzleWobble) end
+		if self.AimFatigueWobble then desiredAng:Add(self.AimFatigueWobble) end
 		if muzzleOffset then
 			desiredPos:Add(desiredAng:Forward() * muzzleOffset.x)
 			desiredPos:Add(desiredAng:Right() * muzzleOffset.y)

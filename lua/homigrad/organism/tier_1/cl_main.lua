@@ -1727,13 +1727,18 @@ local limbParent = {
 }
 
 function hg.GoreCalc(ent, ply)
-	local org = ent.new_organism or ent.organism
-	if !org then return end
-
+	if ent:GetNWBool("hgTorsoLower", false) then return end
 	local torsoSevered = ent:GetNWBool("hgTorsoSevered", false)
+	local org = ent.new_organism or ent.organism
+	if !org and !torsoSevered then return end
 
 	for bone, nam in pairs(limbs) do
-		if torsoSevered and (bone == "lleg" or bone == "rleg") then continue end
+		if torsoSevered and (bone == "lleg" or bone == "rleg" or bone == "llegup" or bone == "rlegup") then
+			local bon = ent:LookupBone(nam)
+			if bon and bon >= 0 then ent:ManipulateBoneScale(bon, vecalmostzero) end
+			continue
+		end
+		if !org then continue end
 
 		local amputated = org[bone.."amputated"] or (bone == "head" and ent.headexploded)
 		if !amputated then

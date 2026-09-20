@@ -50,8 +50,9 @@ end
 function hg.organism.GetBloodDeliveryFraction(blood, scale)
 	local cfg = hg.organism.config or {}
 	local normalBlood = math.max(tonumber(cfg.NORMAL_BLOOD_VOLUME_ML) or hg.organism.normalBloodVolume or 5000, 1)
-	local volumeFraction = math.Clamp((tonumber(blood) or normalBlood) / normalBlood, 0, 1)
-	local curve = math.max(tonumber(cfg.HEMORRHAGE_PERFUSION_EXPONENT) or 1.7, 0.05)
+	local pulselessBlood = math.Clamp(tonumber(hg.organism.PULSELESS_BLOOD_VOLUME) or 1750, 0, normalBlood - 1)
+	local volumeFraction = math.Clamp(((tonumber(blood) or normalBlood) - pulselessBlood) / (normalBlood - pulselessBlood), 0, 1)
+	local curve = math.max(tonumber(cfg.HEMORRHAGE_PERFUSION_EXPONENT) or 0.7, 0.05)
 	return math.Clamp(volumeFraction ^ curve * (tonumber(scale) or 1), 0, 1)
 end
 
@@ -111,6 +112,10 @@ local function updateStrokeRisk(org, timeValue)
 	if strokeRisk > 0.35 then
 		local pressureDominance = math.Clamp((bloodPressureRisk - nonPressureStrokeRisk) / 0.65, 0, 1)
 		local exposureTime = 18 + 72 * pressureDominance
+		local hypertensiveEmergency = math.Clamp(tonumber(org.hypertensiveEmergency) or 0, 0, 1)
+		if hypertensiveEmergency > 0 then
+			exposureTime = math.min(exposureTime, Lerp(hypertensiveEmergency, 60, 12))
+		end
 		exposure = math.min(exposure + timeValue * (strokeRisk - 0.35) / exposureTime, 1)
 	else
 		exposure = math.max(exposure - timeValue / 45, 0)
@@ -264,7 +269,7 @@ local function getRateOutput(heartbeat)
 end
 
 function hg.organism.GetPulseOxygenPerfusion(pulse)
-	return (1 - getLowPulseSeverity(pulse)) ^ 1.5
+	return Clamp((tonumber(pulse) or 0) / 60, 0, 1) ^ 0.6
 end
 
 local function getPalpablePulseTarget(org, heartbeat, circulation, hemorrhageCompensation, effectivePalpitations)
@@ -876,6 +881,14 @@ module[2] = function(owner, org, timeValue)
 	org.pulse = math.Approach(org.pulse, pulse, pulse > org.pulse and timeValue * 2 or timeValue * 2)
 	
 	local bloodNow = org.blood or 5000
+	local normalBloodVolume = (hg.organism.config and hg.organism.config.NORMAL_BLOOD_VOLUME_ML) or 5000
+	local naturallyHypertensive = IsValid(owner) and owner.HasTrait and owner:HasTrait("naturally_hypertensive")
+	local hypervolemia = Clamp(Remap(bloodNow, normalBloodVolume, normalBloodVolume + 1000, 0, 1), 0, 1)
+	local emergencyStart = normalBloodVolume + (naturallyHypertensive and 250 or 500)
+	local emergencyFull = normalBloodVolume + (naturallyHypertensive and 500 or 1000)
+	local hypertensiveEmergency = Clamp(Remap(bloodNow, emergencyStart, emergencyFull, 0, 1), 0, 1)
+	org.hypervolemia = hypervolemia
+	org.hypertensiveEmergency = hypertensiveEmergency
 	local preloadReserve = getBloodPerfusion(bloodNow)
 	local bloodVolume = getBloodVolume(org)
 	-- Blood loss alone should not destabilize the rhythm while the patient is
@@ -993,7 +1006,7 @@ module[2] = function(owner, org, timeValue)
 	local mechanicalPulseReserve = Clamp(palpablePulseTarget / 70, 0, 1)
 	local pressureCirculation = circulation * (0.35 + mechanicalPulseReserve * 0.65) * Clamp(1 - rhythmInstability * 0.24, 0.70, 1)
 	local pulsePressureSupport = Clamp((palpablePulseTarget - 10) / 50, 0, 1)
-	local pressureTarget = Clamp(pressureCirculation * 92 * Lerp(pulsePressureSupport, 0.3, 1), 0, 180)
+	local pressureTarget = Clamp(pressureCirculation * 92 * Lerp(pulsePressureSupport, 0.3, 1) + hypervolemia * 55, 0, 180)
 	local pressureNow = tonumber(org.bloodPressure) or pressureTarget
 	local pressureFallRate = org.heartstop and not (dihSupport or defibGrace or cprSupport) and 22 or 12
 	org.bloodPressure = Approach(pressureNow, pressureTarget, timeValue * (pressureTarget > pressureNow and 12 or pressureFallRate))
@@ -1043,7 +1056,8 @@ module[2] = function(owner, org, timeValue)
 		org.hypotensionExposure = math.Approach(org.hypotensionExposure or 0, 0, timeValue * 1.5)
 	end
 	org.prolongedHypotension = (org.hypotensionExposure or 0) >= hypotensionComplicationTime
-	local hypertensionTarget = Clamp(Remap(circulation, 1.25, 1.68, 0, 1), 0, 1) * (1 - sedativePressureRelief)
+	local volumeHypertension = naturallyHypertensive and 0.7 + hypervolemia * 0.3 or hypervolemia
+	local hypertensionTarget = math.max(Clamp(Remap(circulation, 1.25, 1.68, 0, 1), 0, 1), volumeHypertension) * (1 - sedativePressureRelief)
 	org.hypertension = Approach(org.hypertension or 0, hypertensionTarget, timeValue / (sedativePressureRelief > 0 and 8 or 20))
 	hg.organism.UpdatePerfusion(owner, org, timeValue)
 	updateStrokeRisk(org, timeValue)
@@ -1146,7 +1160,8 @@ module[2] = function(owner, org, timeValue)
 	-- should still exist. Do not multiply BPM down into impossible states like
 	-- 45 pulse / 15 heartbeat unless the heart has actually stopped.
 	local survivalK = math.Clamp(k, 0, 1)
-	local maxCompensatedRate = math.Clamp(150 + survivalK * 110 + hemorrhageCompensation * 60 - hypovolemicShock * 12, 110, terminalHeartRate)
+	local adrenalineRateTolerance = Clamp((activeCatecholamine - 0.5) / 3.5, 0, 1)
+	local maxCompensatedRate = math.Clamp(150 + survivalK * 110 + hemorrhageCompensation * 60 - hypovolemicShock * 12 + adrenalineRateTolerance * 30, 110, terminalHeartRate)
 	maxCompensatedRate = math.max(maxCompensatedRate, bloodCompensationRate)
 	local preloadRateCeiling = bloodCompensationRate + 35
 	if preloadRateCeiling < maxCompensatedRate then
@@ -1170,7 +1185,6 @@ module[2] = function(owner, org, timeValue)
 	-- The cardiovascular response accelerates with blood loss. The old fixed
 	-- 2.4 BPM/s rise lagged so far behind active bleeding that the target curve
 	-- was never reached before pressure collapse.
-	local normalBloodVolume = (hg.organism.config and hg.organism.config.NORMAL_BLOOD_VOLUME_ML) or 5000
 	local compensationResponse = 1 - math.Clamp(bloodNow / normalBloodVolume, 0, 1)
 	local riseRate = Lerp(compensationResponse, 5, 35)
 	org.heartbeat = math.Approach(org.heartbeat, heartbeat, heartbeat > org.heartbeat and timeValue * riseRate or timeValue * 4.5)
@@ -1274,7 +1288,8 @@ module[2] = function(owner, org, timeValue)
 	end
 
 	-- Track sustained ventricular tachycardia for the probabilistic arrest check below.
-	if org.heartbeat > 250 and k < 0.65 then
+	local supportedTachycardia = 225 + adrenalineRateTolerance * 25
+	if org.heartbeat > supportedTachycardia and k < 0.75 then
 		org._tachycardiaSince = org._tachycardiaSince or CurTime()
 	else
 		org._tachycardiaSince = nil
@@ -1288,13 +1303,14 @@ module[2] = function(owner, org, timeValue)
 		local hb = org.heartbeat
 		local chance = 0
 		local sustainedTachy = org._tachycardiaSince and org._tachycardiaSince + 3 < CurTime()
-		local highTachyK = math.Clamp((hb - 250) / 50, 0, 1)
+		local highTachyK = math.Clamp((hb - supportedTachycardia) / math.max(terminalHeartRate - supportedTachycardia, 1), 0, 1)
 		if effectivePalpitations > 0.05 and highTachyK > 0 then
 			-- A strained heart is especially likely to fail when it is still
 			-- forced to race. Palpitations alone are mild; blood loss, shock,
 			-- hypoxia, heart damage, or temperature stress restore their danger.
 			chance = highTachyK * effectivePalpitations * 0.032
 		end
+		chance = math.max(chance, highTachyK * hemorrhageDanger * 0.025, hypertensiveEmergency ^ 2 * 0.035)
 		if bloodNow >= 4500 and sustainedTachy and hb >= 250 and k < 0.8 then
 			chance = 0.06
 		elseif bloodNow >= 4500 and sustainedTachy and hb >= 230 and k < 0.55 then
@@ -1387,6 +1403,12 @@ module[2] = function(owner, org, timeValue)
 	end
 	if org.hypertension > 0.35 then org.heartStrain = Clamp((org.heartStrain or 0) + timeValue * org.hypertension / 360, 0, 1) end
 	if ischemia > 0.35 then org.heartStrain = Clamp((org.heartStrain or 0) + timeValue * ischemia / 260, 0, 1) end
+	local rateDamageStart = 180 + adrenalineRateTolerance * 30
+	local highRateDamage = Clamp((org.heartbeat - rateDamageStart) / math.max(terminalHeartRate - rateDamageStart, 1), 0, 1)
+	local catecholamineOverdrive = adrenalineRateTolerance * Clamp((org.heartbeat - 180) / 80, 0, 1)
+	local pressureDamage = math.max(Clamp(org.hypertension or 0, 0, 1), hypertensiveEmergency)
+	org.heartStrain = Clamp((org.heartStrain or 0) + timeValue * (highRateDamage / 120 + pressureDamage / 150), 0, 1)
+	org.heart = Clamp((org.heart or 0) + timeValue * (highRateDamage ^ 2 * 0.0012 + catecholamineOverdrive * 0.00045 + pressureDamage ^ 2 * 0.001 + hypertensiveEmergency ^ 2 * 0.0025), 0, 1)
 	if ischemia > 0.45 and org.isPly and not org.otrub and (org.lastCardiacPain or 0) < CurTime() then
 		org.lastCardiacPain = CurTime() + math.Rand(14, 24)
 		org.painadd = org.painadd + math.Rand(4, 9) * ischemia

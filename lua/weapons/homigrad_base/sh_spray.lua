@@ -16,6 +16,8 @@ function SWEP:ResetTransientAimState()
 	self.inertialAimVelocity = Angle(0, 0, 0)
 	self.weaponReadiness = nil
 	self.recoilAimPenalty = 0
+	self.aimHoldTime = 0
+	self.AimFatigueWobble = Angle(0, 0, 0)
 	self.cache_trace = nil
 	self:SetLastShootTime(0)
 end

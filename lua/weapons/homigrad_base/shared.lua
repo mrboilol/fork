@@ -179,8 +179,14 @@ function SWEP:GetWeaponExperienceMul(ply)
 	ply = ply or self:GetOwner()
 	if not IsValid(ply) then return 1 end
 
-	local skill = math.Clamp(tonumber(ply:GetNWFloat("hg_experience_skill", 0)) or 0, 0, 4.6)
-	return math.Remap(skill, 0, 4.6, 1, 0.78)
+	return Lerp(self:GetFirearmProficiency(ply), 1, 0.78)
+end
+
+function SWEP:GetFirearmProficiency(ply)
+	ply = ply or self:GetOwner()
+	if not IsValid(ply) then return 0 end
+
+	return math.Clamp((tonumber(ply:GetNWFloat("hg_experience_skill", 0)) or 0) / 4.6, 0, 1)
 end
 
 function SWEP:GetAmmoBallistics()
@@ -251,20 +257,18 @@ function SWEP:GetArmHealthHandlingMul()
 	local braceBroken, braceDislocated, braceAmputated = getSevereArmTrauma(org, braceArm)
 	local loss = (1 - firing) * 1.55
 	local ignoreOneArm = self.IgnoreOneArmPenalties == true
-	if support.wantsTwoHands and not ignoreOneArm then loss = loss + (1 - brace) * 0.85 end
-	if support.oneHanded and not ignoreOneArm then loss = loss + 0.5 end
-	-- A fracture/dislocation is more than gradual weakness: recoil is being
-	-- caught by an unstable joint or a broken lever. Keep this explicit so the
-	-- severe state remains much worse than an arm that is merely wounded.
+	local oneHandPenalty = Lerp(self:GetFirearmProficiency(owner), 1, 0.45)
+	if support.wantsTwoHands and not ignoreOneArm then loss = loss + (1 - brace) * 0.85 * oneHandPenalty end
+	if support.oneHanded and not ignoreOneArm then loss = loss + 0.5 * oneHandPenalty end
 	if firingBroken then loss = loss + 0.5 end
 	if firingDislocated then loss = loss + 0.6 end
 	if firingAmputated then loss = loss + 0.7 end
-	if support.wantsTwoHands and braceBroken and not ignoreOneArm then loss = loss + 0.3 end
-	if support.wantsTwoHands and braceDislocated and not ignoreOneArm then loss = loss + 0.4 end
-	if support.wantsTwoHands and braceAmputated and not ignoreOneArm then loss = loss + 0.5 end
-	if support.onlyLeft and not ignoreOneArm then loss = loss + 0.25 end
-	if support.leftBusy and not ignoreOneArm then loss = loss + 0.3 end
-	if support.rightBusy and not ignoreOneArm then loss = loss + 0.5 end
+	if support.wantsTwoHands and braceBroken and not ignoreOneArm then loss = loss + 0.3 * oneHandPenalty end
+	if support.wantsTwoHands and braceDislocated and not ignoreOneArm then loss = loss + 0.4 * oneHandPenalty end
+	if support.wantsTwoHands and braceAmputated and not ignoreOneArm then loss = loss + 0.5 * oneHandPenalty end
+	if support.onlyLeft and not ignoreOneArm then loss = loss + 0.25 * oneHandPenalty end
+	if support.leftBusy and not ignoreOneArm then loss = loss + 0.3 * oneHandPenalty end
+	if support.rightBusy and not ignoreOneArm then loss = loss + 0.5 * oneHandPenalty end
 
 	loss = loss + math.Clamp(org.aiming_fatigue or 0, 0, 10) * 0.045
 	loss = loss + math.Clamp(org.permanent_aim_impairment or 0, 0, 2) * 0.4
@@ -286,6 +290,7 @@ function SWEP:GetRecoilSupportMul()
 	if support.leftBusy then mul = mul * 1.2 end
 	if support.rightBusy then mul = mul * 1.4 end
 	if support.onlyLeft then mul = mul * 1.18 end
+	mul = Lerp(self:GetFirearmProficiency(owner) * 0.65, mul, 0.82)
 
 	local org = owner.organism or {}
 	if org.armstrength and org.armstrength > 0 and org.armstrength < 1 then mul = mul / org.armstrength end
@@ -321,6 +326,7 @@ function SWEP:GetAimAlignmentTime(ply)
 	if self.IgnoreOneArmPenalties and support.supportHands > 0 then supportMul = 1 end
 	if support.onlyLeft and not self.IgnoreOneArmPenalties then supportMul = supportMul * 1.35 end
 	if (support.leftBusy or support.rightBusy) and not self.IgnoreOneArmPenalties then supportMul = supportMul * 1.2 end
+	if support.oneHanded and not self.IgnoreOneArmPenalties then supportMul = Lerp(self:GetFirearmProficiency(ply) * 0.65, supportMul, 1) end
 
 	local org = ply.organism or {}
 	local brainPenalty = math.Clamp(org.brain or 0, 0, 1) * 2.5
@@ -2530,8 +2536,6 @@ function SWEP:GetAdditionalValues()
 			self.AdditionalPos2[2] = self.AdditionalPos2[2] - animpos2 * (cantedHold and 2.5 or 1) * (self.podkid or 1)
 		end
 
-		-- Recoil moves the shared gun transform, not only the view. Both realms run
-		-- this deterministic tail so the live muzzle ray follows the visible climb.
 		local sinceShot = CurTime() - (self:LastShootTime() or 0)
 		local firing = sinceShot >= 0 and sinceShot < 0.24
 		local weaponMass = math.max(self:GetHandlingWeight(), 0.5)
@@ -2580,16 +2584,15 @@ function SWEP:GetAdditionalValues()
 			self.AdditionalPos2[3] = self.AdditionalPos2[3] + swayPitch * aimWobble * 0.2
 		end
 
-		-- Keep a strong, readable rearward/upward impulse after the instant shot
-		-- offset has started easing. This is what makes automatic fire climb and
-		-- makes an injured shooter visibly fight the weapon back onto target.
-		local recoilDecay = self:GetAnimShoot2(0.18 * mulhuy / host_timescale(), true)
+		local recoilRecoveryTime = Lerp(self:GetFirearmProficiency(ply), 0.36, 0.2)
+		if support.oneHanded and not self.IgnoreOneArmPenalties then recoilRecoveryTime = recoilRecoveryTime * Lerp(self:GetFirearmProficiency(ply), 1.4, 1.12) end
+		local recoilDecay = self:GetAnimShoot2(recoilRecoveryTime * mulhuy / host_timescale(), true)
 		if recoilDecay > 0.001 then
 			local climb = 0.55 + math.Clamp((self.SprayI or 0) / 7, 0, 1) * 0.65
 			local seed = math.floor(self.SprayI or 0)
 			local sideRand = util.SharedRandom("hg_recoil_side", -1, 1, seed)
 			local rollRand = util.SharedRandom("hg_recoil_roll", -1, 1, seed + 9173)
-			local kick = recoilDecay * physicalImpulse * stanceMul * restMul * climb * (self.WeaponRecoilMul or 1) * 1.52
+			local kick = recoilDecay * physicalImpulse * stanceMul * restMul * climb * (self.WeaponRecoilMul or 1) * 0.95
 
 			if cantedHold then
 				self.AdditionalAng2[1] = self.AdditionalAng2[1] - kick * 0.75

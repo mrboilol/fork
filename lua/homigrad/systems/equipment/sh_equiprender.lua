@@ -898,6 +898,7 @@ if CLIENT then
 				//if hg.armor[v][k].nodrop then continue end
 				local but = vgui.Create("DButton")
 				local accessory = isstring(k) and string.StartWith(k, "accessory:") and hg.Accessories and hg.Accessories[v]
+				local equipment = accessory and v or (isnumber(k) and v or k)
 				local displayKey = k
 				if !accessory then
 					local prefix = string.find(displayKey, "_")
@@ -906,8 +907,8 @@ if CLIENT then
 					end
 				end
 
-				local displayName = accessory and (accessory.name or string.NiceName(v)) or hg.armorNames[v] or string.NiceName(displayKey)
-				if not accessory and lply:GetNWFloat("ArmorWear" .. v, 0) >= 1 then
+				local displayName = accessory and (accessory.name or string.NiceName(equipment)) or hg.armorNames[equipment] or string.NiceName(displayKey)
+				if not accessory and lply:GetNWFloat("ArmorWear" .. equipment, 0) >= 1 then
 					displayName = displayName .. " [Damaged]"
 				end
 				but:SetText(displayName)
@@ -924,10 +925,10 @@ if CLIENT then
 				img:SetSize(ScreenScaleH(22), ScreenScaleH(22))
 				img:Dock(LEFT)
 				img:DockMargin( 8, 1, 0, 1 )
-				if hg.armorIcons[v] then img:SetImage( hg.armorIcons[v] ) end
+				if hg.armorIcons[equipment] then img:SetImage( hg.armorIcons[equipment] ) end
 	
 				but.DoClick = function()
-					dropArmor(isnumber(k) and v or k)
+					dropArmor(equipment)
 				end
 	
 				scroll:AddItem(but)

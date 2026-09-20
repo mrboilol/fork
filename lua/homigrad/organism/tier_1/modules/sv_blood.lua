@@ -370,7 +370,7 @@ end
 module[2] = function(owner, org, mulTime)
 	local bloodCapacity = (hg.organism.normalBloodVolume or 5000) + (owner:IsPlayer() and owner.GetTraitBonus and owner:GetTraitBonus("blood_capacity", 0) or 0)
 	org.maxblood = math.max(bloodCapacity, 1)
-	org.blood = math.min(org.blood or org.maxblood, org.maxblood)
+	org.blood = math.max(tonumber(org.blood) or org.maxblood, 0)
 	local adrenaline = math.Clamp(org.adrenaline or 0, 0, 2)
 	local isPlayer = owner:IsPlayer()
 	local now = CurTime()
@@ -421,7 +421,7 @@ module[2] = function(owner, org, mulTime)
 		end
 	end
 
-	if org.internalBleed < 0.5 and org.bleed <= 0 and org.pulse > 5 then
+	if org.internalBleed < 0.5 and org.bleed <= 0 and org.pulse > 5 and org.blood < org.maxblood then
 		local regenRate = (hg.organism.config and hg.organism.config.BLOOD_REGEN_RATE_ML_S) or 4
 		local regenerationMul = math.Clamp(tonumber(org.blood_regeneration_multiplier) or 1, 0.1, 2)
 		org.blood = min(org.blood + mulTime * regenRate * regenerationMul, org.maxblood)

@@ -26,12 +26,10 @@ SWEP.HoldType = "knife"
 SWEP.weight = 0.4
 SWEP.holsteredBone = "ValveBiped.Bip01_Spine2"
 SWEP.holsteredPos = Vector(5, 8, -4)
-SWEP.holsteredAng = Angle(210, 0, 180)
+SWEP.holsteredAng = Angle(270, 0, 180)
+SWEP.BigMeleeHolsterBackOffset = 8
 SWEP.BigMeleeReachTime = 0.28
 SWEP.BigMeleeDeployTime = 1
-SWEP.MeleeWallRetractStart = 36
-SWEP.MeleeWallRetractDistance = 12
-SWEP.MeleeWallRetractAmount = 18
 
 function SWEP:CanHolsterBigMelee()
     if not self.TwoHanded then return false end
@@ -397,6 +395,19 @@ if CLIENT then
 		return self.worldModel
 	end
 
+    function SWEP:GetHolsteredWorldTransform(ent)
+        local bone = ent:LookupBone(self.holsteredBone)
+        local matrix = bone and ent:GetBoneMatrix(bone)
+        if not matrix then return end
+
+        local anchorPos, anchorAng = LocalToWorld(self.holsteredPos, self.holsteredAng, matrix:GetTranslation(), matrix:GetAngles())
+        local pos, ang = LocalToWorld(self.weaponPos or vector_origin, self.weaponAng or angle_zero, anchorPos, anchorAng)
+        local owner = self:GetOwner()
+        local forward = IsValid(owner) and owner:GetForward() or ent:GetForward()
+        local depth = (pos - matrix:GetTranslation()):Dot(forward)
+        return pos - forward * (depth + (self.BigMeleeHolsterBackOffset or 8)), ang
+    end
+
     function SWEP:DrawHolsteredWorldModel(ent)
         if not self.TwoHanded or not IsValid(ent) then return end
 
@@ -407,12 +418,8 @@ if CLIENT then
             self.holsteredWorldModel:SetNoDraw(true)
         end
 
-        local bone = ent:LookupBone(self.holsteredBone)
-        local matrix = bone and ent:GetBoneMatrix(bone)
-        if not matrix then return end
-
-        local anchorPos, anchorAng = LocalToWorld(self.holsteredPos, self.holsteredAng, matrix:GetTranslation(), matrix:GetAngles())
-        local pos, ang = LocalToWorld(self.weaponPos or vector_origin, self.weaponAng or angle_zero, anchorPos, anchorAng)
+        local pos, ang = self:GetHolsteredWorldTransform(ent)
+        if not pos then return end
         local model = self.holsteredWorldModel
 
         model:SetModelScale(self.WorldModelExchange and self.modelscale or self.modelscale2)
@@ -488,9 +495,9 @@ if CLIENT then
         local ent = hg.GetCurrentCharacter(owner)
 
         local inuse = self:InUse()
+        local reachEnd = IsValid(owner) and math.max(self.MeleeDeployReachEnd or 0, self:GetNWFloat("MeleeDeployReachEnd", 0)) or 0
 
         if updatePose and IsValid(owner) then
-            local reachEnd = math.max(self.MeleeDeployReachEnd or 0, self:GetNWFloat("MeleeDeployReachEnd", 0))
             if reachEnd > CurTime() then
                 local deploySequence = self.AnimList and self.AnimList["deploy"]
                 if deploySequence then WorldModel:SetSequence(deploySequence) end
@@ -529,6 +536,15 @@ if CLIENT then
             end
             
             local pos, ang = self:ModelAnim(WorldModel)
+            if self.TwoHanded and reachEnd > CurTime() then
+                local holsteredPos, holsteredAng = self:GetHolsteredWorldTransform(ent)
+                if holsteredPos then
+                    local reachTime = math.max(self.BigMeleeReachTime or 0.28, 0.001)
+                    local fraction = math.ease.InOutSine(math.Clamp(1 - (reachEnd - CurTime()) / reachTime, 0, 1))
+                    pos = LerpVector(fraction, holsteredPos, pos)
+                    ang = LerpAngle(fraction, holsteredAng, ang)
+                end
+            end
 
 			WorldModel:SetRenderOrigin(pos)
 			WorldModel:SetRenderAngles(ang)
@@ -667,7 +683,7 @@ if CLIENT then
                 pos,ang = LocalToWorld(self.weaponPos,self.weaponAng,huy and mat and mat:GetTranslation() or self.worldModel:GetPos(),huy and mat and mat:GetAngles() or self.worldModel:GetAngles())
             end
 
-            if IsValid(owner) and hg.ResolveEquipmentClearance then pos = hg.ResolveEquipmentClearance(self, owner, self.WorldModelExchange, pos, ang, self.modelscale) end
+            if IsValid(owner) and (not self.TwoHanded or math.max(self.MeleeDeployReachEnd or 0, self:GetNWFloat("MeleeDeployReachEnd", 0)) <= CurTime()) and (not self.GetInAttack or not self:GetInAttack()) and hg.ResolveEquipmentClearance then pos = hg.ResolveEquipmentClearance(self, owner, self.WorldModelExchange, pos, ang, self.modelscale) end
             self.worldModel2:SetModelScale(self.modelscale)
             self.worldModel2:SetRenderOrigin(pos)
             self.worldModel2:SetRenderAngles(ang)
@@ -930,7 +946,7 @@ function SWEP:GetEquipmentImpactModel()
     if exchange and not (self.ShouldDrawWorldModelReal and self:ShouldDrawWorldModelReal()) then
         local matrix = model:GetBoneMatrix(self.basebone or 1)
         pos, ang = LocalToWorld(self.weaponPos or vector_origin, self.weaponAng or angle_zero, matrix and matrix:GetTranslation() or pos, matrix and matrix:GetAngles() or ang)
-        if hg.ResolveEquipmentClearance then pos = hg.ResolveEquipmentClearance(self, self:GetOwner(), exchange, pos, ang, self.modelscale) end
+        if (not self.TwoHanded or math.max(self.MeleeDeployReachEnd or 0, self:GetNWFloat("MeleeDeployReachEnd", 0)) <= CurTime()) and (not self.GetInAttack or not self:GetInAttack()) and hg.ResolveEquipmentClearance then pos = hg.ResolveEquipmentClearance(self, self:GetOwner(), exchange, pos, ang, self.modelscale) end
         return exchange, pos, ang, self.modelscale or 1
     end
 	return modelName, pos, ang, self.modelscale2 or 1, model
@@ -1012,12 +1028,6 @@ function SWEP:ModelAnim(model, pos, ang)
        addAngLerp.p = addAngLerp.p - math.min(math.abs(math.max(eyeAng.p,0)),25)
     end
 
-    local wallDistance = tr.HitPos:Distance(tr.StartPos)
-    local retractStart = self.MeleeWallRetractStart or 36
-    local retractRange = math.max(self.MeleeWallRetractDistance or 12, 0.001)
-    local wallRetract = math.Clamp((retractStart - wallDistance) / retractRange, 0, 1)
-    addPosLerp.x = addPosLerp.x - wallRetract * (self.MeleeWallRetractAmount or 18)
-
     if self.CanSuicide and owner.suiciding then
         local aimScale = owner:GetNWFloat("rem_suicide_aim", 0)
         if aimScale <= 0 then aimScale = 1 end
@@ -1087,7 +1097,7 @@ function SWEP:ModelAnim(model, pos, ang)
 
     if self.ModelAnimAdd then pos, ang = self:ModelAnimAdd(model, pos, ang) end
     if hg.EquipmentImpactPose then pos, ang = hg.EquipmentImpactPose(self, pos, ang) end
-    if hg.ResolveEquipmentClearance then pos = hg.ResolveEquipmentClearance(self, owner, self.WorldModelExchange or self.WorldModel, pos, ang, self.WorldModelExchange and self.modelscale or self.modelscale2) end
+    if (not self.TwoHanded or math.max(self.MeleeDeployReachEnd or 0, self:GetNWFloat("MeleeDeployReachEnd", 0)) <= CurTime()) and (not self.GetInAttack or not self:GetInAttack()) and hg.ResolveEquipmentClearance then pos = hg.ResolveEquipmentClearance(self, owner, self.WorldModelExchange or self.WorldModel, pos, ang, self.WorldModelExchange and self.modelscale or self.modelscale2) end
     return pos, ang
 end
 
