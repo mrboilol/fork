@@ -5,8 +5,8 @@ hook.Add("PlayerUse", "nouseinfake", function(ply, ent)
 
 	if class == "momentary_rot_button" then return end
 	if ent.dontPickup then return false end
-	local ductcount = hgCheckDuctTapeObjects(ent)
-	local nailscount = hgCheckBindObjects(ent)
+	local ductcount = hgCheckDuctTapeObjects and hgCheckDuctTapeObjects(ent) or 0
+	local nailscount = hgCheckBindObjects and hgCheckBindObjects(ent) or 0
 	ply.PickUpCooldown = ply.PickUpCooldown or 0
 	if (ductcount and ductcount > 0) or (nailscount and nailscount > 0) then return false end
 	if class == "prop_physics" or class == "prop_physics_multiplayer" or class == "func_physbox" then
@@ -55,7 +55,11 @@ hook.Add("FindUseEntity", "findhguse", function(ply, heldent)
 	if IsValid(heldent) and heldent:GetClass() == "button" then return heldent end
 
 	if not ply:KeyDown(IN_USE) then return false end
-	local eyetr = hg.eyeTrace(ply, 100, nil, nil, nil, checkUse)
+	local eyetr = ply:GetEyeTrace()
+	if not IsValid(eyetr.Entity) and hg.eyeTrace then
+		eyetr = hg.eyeTrace(ply, 100, nil, nil, nil, checkUse)
+	end
+	if not eyetr then return heldent end
 
 	local ent = eyetr.Entity
 
