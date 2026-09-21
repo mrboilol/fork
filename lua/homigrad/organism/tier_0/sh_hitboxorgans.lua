@@ -1,5 +1,6 @@
 hg.organism = hg.organism or {}
 local empty = {}
+local hook_Run = hook.Run
 local Vector = Vector --ыыы
 local vecZero, angZero = Vector(0, 0, 0), Angle(0, 0, 0)
 local box, _mins = Vector(0, 0, 0), Vector(0, 0, 0)
@@ -47,8 +48,11 @@ function hg.organism.ShootMatrix(ent, organs)
 			--print(key,organ[1])
 			local additional = organ[7]
 			if additional then
-				local ent = (ent.armors and next(ent.armors) and ent) or (ent:IsRagdoll() and IsValid(hg.RagdollOwner(ent)) and hg.RagdollOwner(ent)) or ent
-				if ent and ent.armors then
+				local ent = (ent.armors and next(ent.armors) and ent) or (#ent:GetNetVar("zc_equipment", {}) > 0 and ent) or (ent:IsRagdoll() and IsValid(hg.RagdollOwner(ent)) and hg.RagdollOwner(ent)) or ent
+				local result = hook_Run("HG_OrganAvalible", ent, organ[1], organ)
+				if result != nil and result != true then
+					continue
+				elseif !result and ent and ent.armors then
 					if type(additional) == "string" then
 						if not ent.armors[additional] then continue end
 					elseif not table.HasValue(ent.armors, organ[1]) then

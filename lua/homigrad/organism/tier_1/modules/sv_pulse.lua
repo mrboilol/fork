@@ -1544,6 +1544,8 @@ module[2] = function(owner, org, timeValue)
 	local needed_temp = math.min(36.7 - lowPulseCold * 5.7, org.lowBloodTemperatureTarget or 36.7)
 	local changeRate = timeValue / 60
 	changeRate = changeRate * (org.temperature < needed_temp and math.Clamp(org.heatbuff / 60, 1, 2) or 1)
+	local equipmentChangeRate = hook.Run("ZC_BodyTemperature", owner, org, timeValue, changeRate, 1, 1)
+	changeRate = equipmentChangeRate or changeRate
 	if math.abs(org.tempchanging) < changeRate then
 		org.temperature = math.Approach(org.temperature, needed_temp, changeRate)
 	else
