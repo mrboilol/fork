@@ -152,6 +152,7 @@ local fov_mode_lerp = 0
 
 local hg_oldsights = CreateConVar("hg_oldsights", "0", {FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED}, "No camera wobble when aiming")
 
+
 local angZero = Angle(0,0,0)
 
 local scopedLerpAddvec = Vector()
@@ -267,7 +268,7 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 		+ ((handling - 1) * 0.2)
 		+ (support.oneHanded and not self.IgnoreOneArmPenalties and 0.08 or 0)) / 4
 
-	local addview = AngleRand(-shakeMul - 0.01, shakeMul + 0.01) * (organism.holdingbreath and 0.1 or 1)
+	local addview = AngleRand(-shakeMul - 0.02, shakeMul + 0.02) * ((organism.holdingbreath and 0.1 + (((rarm > 0.1 and (rarm - 0.1)) or 0)) / 4) or 1)
 	addview[3] = 0
 
 	if ply == LocalPlayer() then
