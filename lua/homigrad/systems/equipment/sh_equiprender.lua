@@ -901,7 +901,7 @@ if CLIENT then
 				local equipment = accessory and v or (isnumber(k) and v or k)
 				local dropID = accessory and k or equipment
 				local displayKey = k
-				if !accessory then
+				if !accessory and isstring(displayKey) then
 					local prefix = string.find(displayKey, "_")
 					if prefix then
 						displayKey = string.sub(displayKey, prefix + 1)

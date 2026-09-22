@@ -5030,7 +5030,7 @@ elseif CLIENT then
     end
 end
 
-function SWEP:PlayAnim(anim, time, cycling, callback, reverse, sendtoclient)
+function SWEP:PlayAnim(anim, time, cycling, callback, reverse, sendtoclient, retryToken)
     if SERVER then
         self.HGEquipmentAnimation = {sequence = self.AnimList[anim] or anim, start = CurTime(), duration = math.max(time or 0, 0.001), cycling = cycling, reverse = reverse}
         sendtoclient = sendtoclient or false
@@ -5047,12 +5047,14 @@ function SWEP:PlayAnim(anim, time, cycling, callback, reverse, sendtoclient)
             net.WriteBool(sendtoclient)
         net.SendPVS(self:GetPos())
     return end
-    if not IsValid(self:GetWM()) or not IsValid(self:GetOwner()) or self:GetOwner():GetActiveWeapon() ~= self then
+    self.animRequest = retryToken or (self.animRequest or 0) + 1
+    local request = self.animRequest
+    if not IsValid(self:GetWM()) or not IsValid(self:GetOwner()) or (anim ~= "deploy" and self:GetOwner():GetActiveWeapon() ~= self) then
 		self.tries = self.tries - 1
 		if self.tries > 0 then
 			timer.Simple(0.01,function()
-                if not IsValid(self) then return end
-				self:PlayAnim(anim,time,cycling,callback,reverse)
+                if not IsValid(self) or self.animRequest ~= request then return end
+				self:PlayAnim(anim,time,cycling,callback,reverse,nil,request)
 			end)
 		end
 		return
