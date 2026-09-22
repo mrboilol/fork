@@ -542,17 +542,37 @@ function hg.organism:HitBox(strBone, strName, nValue, vLocalPos, aLocalAng, vSiz
 	return HBD
 end
 
-function hg.organism:CreateHitBox(maleHitBoxData, femaleHitBoxData)
-	local MHD = maleHitBoxData
-    table.insert(
-		male[MHD.strBone],
-		1,
-		{MHD.strName, MHD.nValue, MHD.vLocalPos, MHD.aLocalAng, MHD.vSize, MHD.cColor, MHD.bBool, MHD.nProtect}
-	)
-	MHD = femaleHitBoxData or MHD
-	table.insert(
-		female[MHD.strBone],
-		1,
-		{MHD.strName, MHD.nValue, MHD.vLocalPos, MHD.aLocalAng, MHD.vSize, MHD.cColor, MHD.bBool, MHD.nProtect}
-	)
+local HitBoxByName = {}
+
+local function RegisterHitBox(target, key, data)
+	local hitBox = {data.strName, data.nValue, data.vLocalPos, data.aLocalAng, data.vSize, data.cColor, data.bBool, data.nProtect}
+	local registered = HitBoxByName[key]
+
+	if registered then
+		for index, current in ipairs(target[data.strBone]) do
+			if current == registered then
+				target[data.strBone][index] = hitBox
+				HitBoxByName[key] = hitBox
+				return
+			end
+		end
+	end
+
+	table.insert(target[data.strBone], 1, hitBox)
+	HitBoxByName[key] = hitBox
 end
+
+function hg.organism:CreateHitBox(UID, maleHitBoxData, femaleHitBoxData)
+	local MHD = maleHitBoxData
+	RegisterHitBox(male, MHD.strName .. UID, MHD)
+
+	MHD = femaleHitBoxData or MHD
+	RegisterHitBox(female, "F" .. MHD.strName .. UID, MHD)
+end
+
+HG_BaseHitBoxSetLoaded = false
+hook.Add("Think", "RemoveMeHitbox", function()
+	hook.Run("HG_BaseHitBoxSetLoaded")
+	HG_BaseHitBoxSetLoaded = true
+	hook.Remove("Think", "RemoveMeHitbox")
+end)
