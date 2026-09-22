@@ -50,44 +50,35 @@ function hg.ResolveEquipmentClearance(ent, owner, model, pos, ang, scale)
     local mins, maxs = GetEquipmentModelBounds(ent, model)
     if not mins or not maxs then return pos end
     scale = math.max(tonumber(scale) or 1, 0.001)
-    local center = (mins + maxs) * (scale * 0.5)
-    local half = (maxs - mins) * (scale * 0.5)
-    local forward, right, up = ang:Forward(), ang:Right(), ang:Up()
-    local extent = Vector(
-        math.abs(forward.x) * half.x + math.abs(right.x) * half.y + math.abs(up.x) * half.z,
-        math.abs(forward.y) * half.x + math.abs(right.y) * half.y + math.abs(up.y) * half.z,
-        math.abs(forward.z) * half.x + math.abs(right.z) * half.y + math.abs(up.z) * half.z
-    ) + Vector(0.5, 0.5, 0.5)
     local body = hg.GetCurrentCharacter(owner)
     local filter = {owner, ent}
     if IsValid(body) then filter[#filter + 1] = body end
     if IsValid(ent.worldModel) then filter[#filter + 1] = ent.worldModel end
     if IsValid(ent.worldModel2) then filter[#filter + 1] = ent.worldModel2 end
-    local target = LocalToWorld(center, angle_zero, pos, ang)
     local aim = owner.GetAimVector and owner:GetAimVector() or ang:Forward()
     if not isvector(aim) or aim:LengthSqr() <= 0.000001 then aim = ang:Forward() end
     aim = aim:GetNormalized()
-    local backward = -aim
-    local traceData = {start = target, endpos = target, mins = -extent, maxs = extent, filter = filter, mask = MASK_SOLID}
-    local function Blocked(distance)
-        traceData.start = target + backward * distance
-        traceData.endpos = traceData.start
-        local trace = util.TraceHull(traceData)
-        return trace.StartSolid or trace.AllSolid
-    end
-    if not Blocked(0) then return pos end
-    local clear = math.Clamp(extent:Length() + 8, 16, 64)
-    if Blocked(clear) then return pos + backward * clear end
-    local blocked = 0
-    for _ = 1, 5 do
-        local distance = (blocked + clear) * 0.5
-        if Blocked(distance) then
-            blocked = distance
-        else
-            clear = distance
+    local start = owner.EyePos and owner:EyePos() or pos
+    local target, targetDistance
+    for x = 0, 1 do
+        for y = 0, 1 do
+            for z = 0, 1 do
+                local corner = Vector(x == 0 and mins.x or maxs.x, y == 0 and mins.y or maxs.y, z == 0 and mins.z or maxs.z) * scale
+                local world = LocalToWorld(corner, angle_zero, pos, ang)
+                local distance = (world - start):Dot(aim)
+                if not targetDistance or distance > targetDistance then
+                    target, targetDistance = world, distance
+                end
+            end
         end
     end
-    return pos + backward * (clear + 0.5)
+    if not target or targetDistance <= 0 then return pos end
+    local trace = util.TraceLine({start = start, endpos = target, filter = filter, mask = MASK_PLAYERSOLID, collisiongroup = COLLISION_GROUP_PLAYER})
+    local desired = trace.Hit and math.max((target - trace.HitPos):Dot(aim) + 0.5, 0) or 0
+    local current = ent.HGEquipmentClearance or desired
+    local step = (FrameTime and FrameTime() or 0.015) * (desired > current and 160 or 50)
+    ent.HGEquipmentClearance = current + math.Clamp(desired - current, -step, step)
+    return pos - aim * ent.HGEquipmentClearance
 end
 
 function hg.ResolveAnimatedEquipmentClearance(ent, owner, pose, model, pos, ang, scale, bone, offsetPos, offsetAng)

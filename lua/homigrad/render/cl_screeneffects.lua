@@ -83,7 +83,6 @@ local otrubSoundPaths = {
 local OtrubModeStation
 local activeOtrubMode
 local ConsciousnessSleepyStation
-local AltRemDyingStation
 local ItsHopelessStation
 local VitalityStation
 local ITS_HOPELESS_LOOP_START = 5
@@ -534,15 +533,12 @@ local consciousnessTypeBeatVolume = 1.2
 local dying2Volume = 1.2
 local remDying1Fade = 0
 local remDying2Fade = 0
-local alternateDyingForegroundVolume = 1.2
 local dyingSoundVolumeMul = 0.86
 local vitalityDyingVolumeMul = 3.2
 local vitalityDyingVolumeMax = 1.5
 -- sonimcooked is the solo foreground track for hg_dyingsound 7. Its source
 -- file is quieter than the other dying tracks, so give it a higher ceiling.
 local sonimCookedForegroundVolume = 1.2
-local alternateDyingBackgroundVolume = 1
-local alternateDyingBackgroundMul = 0.8
 local painBeatOverlayPath = "sound/rem_pain.mp3"
 local panicattackOverlayPath = "sound/rem_panicattack.mp3"
 local panicattackFadeStart = 0
@@ -572,13 +568,10 @@ local painRapidShakeThreshold = 95
 hg.screeneffects_config = {
 	consciousnessTypeBeatVolume = consciousnessTypeBeatVolume,
 	dying2Volume = dying2Volume,
-	alternateDyingForegroundVolume = alternateDyingForegroundVolume,
 	dyingSoundVolumeMul = dyingSoundVolumeMul,
 	vitalityDyingVolumeMul = vitalityDyingVolumeMul,
 	vitalityDyingVolumeMax = vitalityDyingVolumeMax,
 	sonimCookedForegroundVolume = sonimCookedForegroundVolume,
-	alternateDyingBackgroundVolume = alternateDyingBackgroundVolume,
-	alternateDyingBackgroundMul = alternateDyingBackgroundMul,
 	painBeatOverlayPath = painBeatOverlayPath,
 	panicattackOverlayPath = panicattackOverlayPath,
 	panicattackVisualExponent = panicattackVisualExponent,
@@ -936,10 +929,6 @@ local function stopthings()
 	if IsValid(RemDying1Station) then
 		RemDying1Station:Stop()
 		RemDying1Station = nil
-	end
-	if IsValid(AltRemDyingStation) then
-		AltRemDyingStation:Stop()
-		AltRemDyingStation = nil
 	end
 	if IsValid(ItsHopelessStation) then
 		ItsHopelessStation:Stop()
@@ -1391,6 +1380,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	if not organism then stopthings() return end
 	if not organism.brain then stopthings() return end
 	local org = organism
+	local brain = org.brain or 0
 	local deathStateEnd = tonumber(org.deathStateEnd)
 	local incapacitated = org.otrub and org.incapacitated and deathStateEnd and deathStateEnd > CurTime()
 	local incapacitationProgress = incapacitated and math.Clamp((20 - (deathStateEnd - CurTime())) / 20, 0, 1) or 0
@@ -1604,19 +1594,8 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end)
 	end
 
-	if selectedDyingMode == 9 and canRetrySound("AltRemDyingStation", AltRemDyingStation) then
-		sound.PlayFile("sound/itssofuckingover.mp3", "noblock noplay", function(station)
-			if IsValid(station) then
-				station:SetVolume(0)
-				station:Play()
-				station:SetTime(math.min(math.Rand(0, station:GetLength()), 119))
-				AltRemDyingStation = station
-				station:EnableLooping(true)
-			end
-		end)
-	end
-
-	-- Shared by dying mode 10 and OTRUB mode 7. Keep this channel alive at zero
+	-- Shared by dying mode 9, low-O2 depression ambience, and OTRUB mode 7.
+	-- Keep this channel alive at zero
 	-- volume between states so losing consciousness does not restart the track.
 	if canRetrySound("ItsHopelessStation", ItsHopelessStation) then
 		sound.PlayFile("sound/itshopeless.mp3", "noblock noplay", function(station)
@@ -1630,10 +1609,10 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end)
 	end
 
-	if selectedDyingMode == 11 and canRetrySound("VitalityStation", VitalityStation) then
+	if selectedDyingMode == 10 and canRetrySound("VitalityStation", VitalityStation) then
 		sound.PlayFile("sound/vitality.mp3", "noblock noplay", function(station)
 			if IsValid(station) then
-				if getServerSoundMode("hg_dyingsound", 2) != 11 then
+				if getServerSoundMode("hg_dyingsound", 2) != 10 then
 					station:Stop()
 					return
 				end
@@ -1729,7 +1708,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 
 	local o2 = org.o2[1] or 0
 	o2 = o2 + (org.CO or 0)
-	local brain = org.brain or 0
 	O2Lerp = LerpFT(0.01, O2Lerp, (30 - o2) * 10 + brain * 500)
 	updateSeizureEffects(org)
 
@@ -2211,13 +2189,13 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				end)
 			end
 
-			if (dyingMode == 8 or dyingMode == 9) and not NoiseStation2DyingLoading and canRetrySound("NoiseStation2Dying", NoiseStation2Dying) then
+			if dyingMode == 8 and not NoiseStation2DyingLoading and canRetrySound("NoiseStation2Dying", NoiseStation2Dying) then
 				NoiseStation2DyingLoading = true
 				sound.PlayFile("sound/rem_dying2.mp3", "noblock noplay", function(station)
 					NoiseStation2DyingLoading = false
 					if IsValid(station) then
 						local currentMode = getServerSoundMode("hg_dyingsound", 2)
-						if currentMode != 8 and currentMode != 9 then
+						if currentMode != 8 then
 							station:Stop()
 							return
 						end
@@ -2272,9 +2250,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			end
 			if IsValid(RemDying1Station) then
 				RemDying1Station:SetVolume(0)
-			end
-			if IsValid(AltRemDyingStation) then
-				AltRemDyingStation:SetVolume(0)
 			end
 			if IsValid(ItsHopelessStation) then
 				setItsHopelessVolume(0)
@@ -2510,38 +2485,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 					NoiseStation2Dying:SetVolume(math.Clamp(consciousVol * remDying2Fade, 0, hg.screeneffects_config.dying2Volume))
 				end
 			elseif dyingMode == 9 then
-				-- Alternate REM stack: keep rem_dying2, but replace rem_dying1
-				-- with itssofuckingover as a restrained background.
-				if IsValid(NoiseStation2) then
-					NoiseStation2:SetVolume(0)
-				end
-				if IsValid(EndStation) then
-					EndStation:SetVolume(0)
-				end
-				if IsValid(DyingStation) then
-					DyingStation:SetVolume(0)
-				end
-				if IsValid(AltpainStation) then
-					AltpainStation:SetVolume(0)
-				end
-				if IsValid(SillydyingStation) then
-					SillydyingStation:SetVolume(0)
-				end
-				if IsValid(ItssooverStation) then
-					ItssooverStation:SetVolume(0)
-				end
-				if IsValid(SonimCookedStation) then
-					SonimCookedStation:SetVolume(0)
-				end
-				if IsValid(AltRemDyingStation) then
-					AltRemDyingStation:SetVolume(math.Clamp(consciousVol * hg.screeneffects_config.alternateDyingBackgroundMul, 0, hg.screeneffects_config.alternateDyingBackgroundVolume))
-					if AltRemDyingStation:GetTime() >= 120 then AltRemDyingStation:SetTime(0) end
-				end
-				if IsValid(NoiseStation2Dying) then
-					remDying2Fade = LerpFT(0.018, remDying2Fade, 1)
-					NoiseStation2Dying:SetVolume(math.Clamp(consciousVol * remDying2Fade, 0, hg.screeneffects_config.alternateDyingForegroundVolume))
-				end
-			elseif dyingMode == 10 then
 				-- Only itshopeless.mp3, no screen shake.
 				if IsValid(NoiseStation2) then
 					NoiseStation2:SetVolume(0)
@@ -2570,7 +2513,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				if IsValid(ItsHopelessStation) then
 					setItsHopelessVolume(consciousVol)
 				end
-			elseif dyingMode == 11 then
+			elseif dyingMode == 10 then
 				if IsValid(NoiseStation2) then
 					NoiseStation2:SetVolume(0)
 				end
@@ -2608,16 +2551,15 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			if dyingMode != 8 and IsValid(RemDying1Station) then
 				RemDying1Station:SetVolume(0)
 			end
-			if dyingMode != 9 and IsValid(AltRemDyingStation) then
-				AltRemDyingStation:SetVolume(0)
+			if IsValid(ItsHopelessStation) then
+				local depression = math.Clamp(tonumber(org.depression) or 0, 0, 1)
+				local backgroundVolume = consciousVol * depression * 0.65
+				setItsHopelessVolume(math.max(dyingMode == 9 and consciousVol or 0, backgroundVolume))
 			end
-			if dyingMode != 10 and IsValid(ItsHopelessStation) then
-				setItsHopelessVolume(0)
-			end
-			if dyingMode != 11 and IsValid(VitalityStation) then
+			if dyingMode != 10 and IsValid(VitalityStation) then
 				VitalityStation:SetVolume(0)
 			end
-			if dyingMode != 8 and dyingMode != 9 and IsValid(NoiseStation2Dying) then
+			if dyingMode != 8 and IsValid(NoiseStation2Dying) then
 				NoiseStation2Dying:SetVolume(0)
 			end
 		else
@@ -2650,9 +2592,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			end
 			if IsValid(RemDying1Station) then
 				RemDying1Station:SetVolume(0)
-			end
-			if IsValid(AltRemDyingStation) then
-				AltRemDyingStation:SetVolume(0)
 			end
 			if IsValid(ItsHopelessStation) then
 				setItsHopelessVolume(0)
@@ -2691,7 +2630,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			elseif otrubMode == 6 or otrubMode == 7 then
 				if IsValid(NoiseStation) then NoiseStation:SetVolume(0) end
 				if IsValid(OtrubModeStation) then OtrubModeStation:SetVolume(0) end
-				local sameDyingTrack = incapacitated and ((otrubMode == 6 and selectedDyingMode == 6) or (otrubMode == 7 and selectedDyingMode == 10))
+				local sameDyingTrack = incapacitated and ((otrubMode == 6 and selectedDyingMode == 6) or (otrubMode == 7 and selectedDyingMode == 9))
 				if IsValid(sharedOtrubStation) then
 					local sharedVolume = math.max(otrubVol, sameDyingTrack and terminalDyingVolume or 0)
 					if otrubMode == 7 then
@@ -2734,7 +2673,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			if not incapacitated then
 				if otrubMode != 6 and IsValid(ItssooverStation) then ItssooverStation:SetVolume(0) end
 				if IsValid(RemDying1Station) then RemDying1Station:SetVolume(0) end
-				if IsValid(AltRemDyingStation) then AltRemDyingStation:SetVolume(0) end
 				if otrubMode != 7 and IsValid(ItsHopelessStation) then setItsHopelessVolume(0) end
 				if IsValid(NoiseStation2Dying) then NoiseStation2Dying:SetVolume(0) end
 			end

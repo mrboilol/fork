@@ -498,6 +498,21 @@ end
 net.Receive("hg_drop_equipment", function(len, ply)
     local equipment = net.ReadString()
 
+    local slot = tonumber(equipment)
+    if slot then
+        if not ply:Alive() or not ply.organism or ply.organism.otrub then return end
+
+        for _, index in ipairs(ply:GetNetVar("zc_equipment", {})) do
+            local equipped = Entity(index)
+            if IsValid(equipped) and equipped.SlotOccupation and equipped.SlotOccupation[slot] then
+                equipped:Unwear(ply)
+                return
+            end
+        end
+
+        return
+    end
+
     if string.StartWith(equipment, "accessory:") then
         if not ply.organism or not ply.organism.canmove then return end
         local accessoryID = string.sub(equipment, #"accessory:" + 1)

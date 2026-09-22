@@ -1258,6 +1258,8 @@ function SWEP:SetHandPos(noset)
     end
 
 	local bones = hg.TPIKBonesRH
+	local reachEnd = math.max(self.MeleeDeployReachEnd or 0, self:GetNWFloat("MeleeDeployReachEnd", 0))
+	local reachLerp = reachEnd > CurTime() and math.ease.InOutSine(math.Clamp(1 - (reachEnd - CurTime()) / math.max(self.BigMeleeReachTime or 0.28, 0.001), 0, 1))
 
 	if self.rhandik and self:InUse() then
 		for _, bone in ipairs(bones) do
@@ -1273,6 +1275,14 @@ function SWEP:SetHandPos(noset)
 
 			local bonepos = wm_bonematrix:GetTranslation()
 			local boneang = wm_bonematrix:GetAngles()
+			if reachLerp then
+				local leftBone = wm:LookupBone(string.Replace(bone, "_R_", "_L_"))
+				local leftMatrix = leftBone and wm:GetBoneMatrix(leftBone)
+				if leftMatrix then
+					bonepos = LerpVector(reachLerp, leftMatrix:GetTranslation(), bonepos)
+					boneang = LerpAngle(reachLerp, leftMatrix:GetAngles(), boneang)
+				end
+			end
 
 			bonepos.x = math.Clamp(bonepos.x, wmpos.x - 38, wmpos.x + 38)
 			bonepos.y = math.Clamp(bonepos.y, wmpos.y - 38, wmpos.y + 38)
