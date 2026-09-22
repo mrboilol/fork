@@ -59,6 +59,15 @@ if CLIENT then
 			return Icon, HaveIcon, Overide, GunTable.WepSelectIcon2box
 		end
 
+		if tab == "Equipment" and IsValid(Entity(thing)) then
+			local EquipTable = Entity(thing)
+			local Icon = EquipTable.IconOverride
+			local HaveIcon = true
+
+			if not isstring(Icon) or #Icon < 1 then return end
+			return Icon, HaveIcon, false, true
+		end
+
 		if tab == "Attachments" and hg.attachmentsIcons[thing] then
 			local AttIcon = hg.attachmentsIcons[thing]
 			local HaveIcon = true

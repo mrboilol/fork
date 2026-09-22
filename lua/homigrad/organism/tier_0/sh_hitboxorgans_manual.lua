@@ -545,7 +545,7 @@ end
 local HitBoxByName = {}
 
 local function RegisterHitBox(target, key, data)
-	local hitBox = {data.strName, data.nValue, data.vLocalPos, data.aLocalAng, data.vSize, data.cColor, data.bBool, data.nProtect}
+	local hitBox = {data.strName, data.nValue, data.vLocalPos, data.aLocalAng, data.vSize, data.cColor, data.bBool, data.nProtect, data.UID}
 	local registered = HitBoxByName[key]
 
 	if registered then
@@ -564,9 +564,11 @@ end
 
 function hg.organism:CreateHitBox(UID, maleHitBoxData, femaleHitBoxData)
 	local MHD = maleHitBoxData
+	MHD.UID = UID
 	RegisterHitBox(male, MHD.strName .. UID, MHD)
 
 	MHD = femaleHitBoxData or MHD
+	MHD.UID = UID
 	RegisterHitBox(female, "F" .. MHD.strName .. UID, MHD)
 end
 

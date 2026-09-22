@@ -291,7 +291,7 @@ local function Trace_Bullet(box, hit, ricochet, impact, org, organs, dmg, dmgInf
 	dmg = hook_info.dmg
 	
 	if func and !hook_info.restricted then
-		local resistance = func(org, bone, dmg, dmgInfo, box[6], dir, hit, ricochet, impact)
+		local resistance = func(org, bone, dmg, dmgInfo, box[6], dir, hit, ricochet, impact, organ)
 
 		if isRifleBullet and name == "skull" then resistance = (resistance or 0) * 0.35 end
 		local brainDelta = isBrainLobe and math.max((org[name] or 0) - oldBrainLobe, 0) or 0
@@ -360,7 +360,7 @@ local function Trace_Blast(box, amt, organ, org, organs, dmg, dmgInfo)
 
 	local amount = amt * dmg
 	
-	return func and (func(org, 1, amount, dmgInfo, box[6], vector_origin, true, false) or 0) or 0
+	return func and (func(org, 1, amount, dmgInfo, box[6], vector_origin, true, false, nil, organ) or 0) or 0
 end
 
 local dir = Vector(0, 0, 0)

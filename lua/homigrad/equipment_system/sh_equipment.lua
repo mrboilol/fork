@@ -13,7 +13,7 @@ ZC_ARMOR_SLOT_TORSO = 8
     ZC_ARMOR_SLOT_UPPERARM_L = 9
         ZC_ARMOR_SLOT_FOREARM_L = 10
     ZC_ARMOR_SLOT_UPPERARM_R = 11
-        ZC_ARMOR_SLOT_FOREARM_R = 12
+        ZC_ARMOR_SLOT_FOREARM_R = 12  
 
 ZC_ARMOR_SLOT_BELLY = 13
 
@@ -51,7 +51,7 @@ local function ArmorEffect(placement, armor, dmgInfo, org, hit, prot)
 	local dir = -dmgInfo:GetDamageForce()
 	dir:Normalize()
 	local effdata = EffectData()
-
+	
 	effdata:SetOrigin((hit and isvector(hit) and hit or dmgInfo:GetDamagePosition()) - dir)
 	effdata:SetNormal(dir)
 	effdata:SetMagnitude(0.25)
@@ -83,23 +83,29 @@ end
     --]]
 --//
 local developer = GetConVar("developer")
-local function protec(org, bone, dmg, dmgInfo, placement, boneindex, dir, hit, ricochet)
+local function protec(org, bone, dmg, dmgInfo, placement, boneindex, dir, hit, ricochet, impact, hitbox)
     local armor = org.owner:GetEquipmentBySlot(placement)
 	if !IsValid(armor) then return end
 
-    local durablityMul = math.min(armor.Durability / (armor.DurabilityMax - armor.DurabilityWarranty), 1)
-    local protectionDamageMul = math.min(armor.ProtectionDamageMul * (1 + (1 - durablityMul)), 1)
-    local penetratedDamageMul = math.min(armor.PenetratedDamageMul * (1 + (1 - durablityMul)), 1)
+    local HitBoxName = hitbox and hitbox[9]
+    local plates = armor.PlatesLinks
+    local plateName = plates and plates[HitBoxName]
+    local plate = plateName and armor[plateName] or armor
+    local plateKey = plateName or armor
+
+    local durablityMul = math.min(plate.Durability / (plate.DurabilityMax - plate.DurabilityWarranty), 1)
+    local protectionDamageMul = math.min(plate.ProtectionDamageMul * (1 + (1 - durablityMul)), 1)
+    local penetratedDamageMul = math.min(plate.PenetratedDamageMul * (1 + (1 - durablityMul)), 1)
 
     local penetration = (dmgInfo:GetInflictor().bullet and dmgInfo:GetInflictor().bullet.Penetration or 1)
-    local prot = armor.Protection * durablityMul
-    --print(penetration, prot, durablityMul)
+    local prot = plate.Protection * durablityMul
+
 	prot = prot - penetration
 
-	if armor.NeedPunch then
+	if plate.NeedPunch then
 		if org.owner:IsPlayer() and org.alive and dmgInfo:IsDamageType(DMG_BUCKSHOT + DMG_BULLET) then
 			org.owner:ViewPunch(AngleRand(-30, 30))
-
+			
 			org.owner:EmitSound("homigrad/physics/shield/bullet_hit_shield_0"..math.random(7)..".wav", 80, math.random(95, 105))
 
 			org.owner:AddTinnitus(3, true)
@@ -115,52 +121,55 @@ local function protec(org, bone, dmg, dmgInfo, placement, boneindex, dir, hit, r
 			--org.spine3 = org.spine3 + math.Rand(0.05,1) * dmg / 5
 		end
 	end
+	
+	ArmorEffect(placement, plate, dmgInfo, org, hit, prot)
 
-	//scale = scale * (dmgInfo:IsDamageType(DMG_SLASH) and 0.1 or 1)
-
-	ArmorEffect(placement, armor, dmgInfo, org, hit, prot)
-    //print(dmgInfo:IsDamageType(DMG_BULLET + DMG_SLASH))
-    local oldDurability = armor.Durability
-    if dmgInfo:IsDamageType(DMG_BULLET + DMG_SLASH) and (!org.oldBalisticDamageInfo or org.oldBalisticDamageInfo != dmgInfo) then
-        org.oldBalisticDamageInfo = dmgInfo
-        armor.Durability = math.max(armor.Durability - (penetration * armor.BalisticMaterial), 0)
-        --print(armor.Durability)
+    local oldDurability = plate.Durability
+    if dmgInfo:IsDamageType(DMG_BULLET + DMG_SLASH) and (org.oldPlateDamageInfo != dmgInfo or org.oldPlate != plateKey) then
+        org.oldPlateDamageInfo = dmgInfo
+        org.oldPlate = plateKey
+        plate.Durability = math.max(plate.Durability - (penetration * (plate.BalisticMaterial or 1)), 0)
     end
-    --print(armor.Durability, prot, dmg)
 
     if developer:GetBool() and SERVER then
         local attacker = dmgInfo:GetAttacker()
         if IsValid(attacker) and attacker:IsPlayer() and attacker:IsAdmin() then
-            --print(org.owner)
             attacker:PrintMessage(HUD_PRINTCONSOLE, "\n--// Damage to armor on " .. org.owner:Nick())
-            attacker:PrintMessage(HUD_PRINTCONSOLE, "--|| Armor: " .. armor.PrintName)
-            attacker:PrintMessage(HUD_PRINTCONSOLE, "--|| OldDur ".. oldDurability ..", Dur ".. armor.Durability ..", Prot ".. prot ..", Dmg ".. dmg ..", Pentr ".. penetration)
+			attacker:PrintMessage(HUD_PRINTCONSOLE, "--|| Armor: " .. armor.PrintName .. " | HitBox: " .. tostring(HitBoxName) .. " | Plate: " .. tostring(plateName or "base"))
+            attacker:PrintMessage(HUD_PRINTCONSOLE, "--|| OldDur ".. oldDurability ..", Dur ".. plate.Durability ..", Prot ".. prot ..", Dmg ".. dmg ..", Pentr ".. penetration)
             attacker:PrintMessage(HUD_PRINTCONSOLE, "--\\\\ Penetrated? " .. (prot < 1 and "Yes." or "No.") .. "\n\n" )
         end
     end
 
 	if prot < 0 then
+        org.oldDmgInfo = dmgInfo
 		dmgInfo:ScaleDamage(penetratedDamageMul)
 		dmgInfo:SetDamageForce(dmgInfo:GetDamageForce() * penetratedDamageMul )
-		return
+		return 
 	end
-
-	dmgInfo:SetDamageType(DMG_CLUB)
-	dmgInfo:SetDamageForce(dmgInfo:GetDamageForce() * protectionDamageMul / 2)
-	dmgInfo:ScaleDamage(protectionDamageMul)
+    
+    if not org.oldDmgInfo or org.oldDmgInfo != dmgInfo then
+        dmgInfo:SetDamageType(DMG_CLUB)
+        dmgInfo:SetDamageForce(dmgInfo:GetDamageForce() * protectionDamageMul / 2)
+        dmgInfo:ScaleDamage(protectionDamageMul)
+        org.oldDmgInfo = dmgInfo
+    end
 
 	return 0.9
 end
+
 hg.organism = hg.organism or {}
 hg.organism.input_list = hg.organism.input_list or {}
+
 function hg.organism:AddArmorInputList(strName, nPlacement)
     hg.organism.input_list[strName] = function(org, bone, dmg, dmgInfo, ...)
         local protect = protec(org, bone, dmg, dmgInfo, nPlacement, ...)
         return protect
     end
 end
+
 load_from_armor_file = false
-local function loadArmor()
+local function loadArmor() 
     local path = "homigrad/equipment_system/entities/"
     local files = file.Find(path.."*.lua", "LUA")
     for k,v in ipairs(files) do
@@ -173,6 +182,6 @@ hook.Add("HG_BaseHitBoxSetLoaded","LoadArmor",loadArmor)
 
 hook.Add("Think","RemoveMeLoadArmor",function()
     hook.Remove("Think","RemoveMeLoadArmor")
-    if !HG_BaseHitBoxSetLoaded then return end
+    if !HG_BaseHitBoxSetLoaded then return end 
     loadArmor()
 end)
