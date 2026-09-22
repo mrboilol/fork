@@ -21,6 +21,15 @@ function weaponInv.CanInsert(ply, wep)
 end
 
 if SERVER then
+	local function SelectHandsAfterRemoval(wep, ply)
+		if not IsValid(ply) or ply:GetActiveWeapon() ~= wep then return end
+		timer.Simple(0, function()
+			if not IsValid(ply) or not ply:Alive() then return end
+			local hands = hg.GetHandsWeapon and hg.GetHandsWeapon(ply) or ply:GetWeapon("weapon_hands_sh")
+			if IsValid(hands) then ply:SelectWeapon(hands:GetClass()) end
+		end)
+	end
+
 	function weaponInv.CreateLimit(ply, i, count)
 		local tbl = {
 			limit = count
@@ -106,6 +115,7 @@ if SERVER then
 	end)
 
 	hook.Add("WeaponEquip", "homigrad", function(wep, ply)
+		wep:CallOnRemove("homigrad-select-hands", SelectHandsAfterRemoval, ply)
 		if weaponInv.Insert(ply, wep) then
 			weaponInv.Sync(ply)
 			return

@@ -303,7 +303,7 @@ local function getWoundHemostasisDelta(org, wound, dt, now, arterial, catastroph
 	local age = math.max(now - (tonumber(wound.openedAt) or now), 0)
 	local treatment = getHemostaticTreatmentDrive(org)
 	bandaged = wound.bandaged or bandaged
-	local treatedArterialWound = not arterial or bandaged or treatment > 0
+	local treatedArterialWound = not arterial or bandaged or treatment > 0 or (tonumber(compressionMul) or 1) > 1
 	local temperature = tonumber(org.temperature) or 36.7
 	local temperatureCoag = math.Clamp((temperature - 27) / 9.7, 0.25, 1)
 	local coag = math.Clamp(tonumber(org.coagulation_multiplier) or 1, 0.15, 2.5) * temperatureCoag

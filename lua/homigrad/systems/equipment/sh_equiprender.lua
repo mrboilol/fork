@@ -899,6 +899,7 @@ if CLIENT then
 				local but = vgui.Create("DButton")
 				local accessory = isstring(k) and string.StartWith(k, "accessory:") and hg.Accessories and hg.Accessories[v]
 				local equipment = accessory and v or (isnumber(k) and v or k)
+				local dropID = accessory and k or equipment
 				local displayKey = k
 				if !accessory then
 					local prefix = string.find(displayKey, "_")
@@ -928,7 +929,7 @@ if CLIENT then
 				if hg.armorIcons[equipment] then img:SetImage( hg.armorIcons[equipment] ) end
 	
 				but.DoClick = function()
-					dropArmor(equipment)
+					dropArmor(dropID)
 				end
 	
 				scroll:AddItem(but)

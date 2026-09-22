@@ -1097,7 +1097,13 @@ function SWEP:ModelAnim(model, pos, ang)
 
     if self.ModelAnimAdd then pos, ang = self:ModelAnimAdd(model, pos, ang) end
     if hg.EquipmentImpactPose then pos, ang = hg.EquipmentImpactPose(self, pos, ang) end
-    if (not self.TwoHanded or math.max(self.MeleeDeployReachEnd or 0, self:GetNWFloat("MeleeDeployReachEnd", 0)) <= CurTime()) and (not self.GetInAttack or not self:GetInAttack()) and hg.ResolveEquipmentClearance then pos = hg.ResolveEquipmentClearance(self, owner, self.WorldModelExchange or self.WorldModel, pos, ang, self.WorldModelExchange and self.modelscale or self.modelscale2) end
+    if (not self.TwoHanded or math.max(self.MeleeDeployReachEnd or 0, self:GetNWFloat("MeleeDeployReachEnd", 0)) <= CurTime()) and (not self.GetInAttack or not self:GetInAttack()) then
+        if self.WorldModelExchange and hg.ResolveAnimatedEquipmentClearance then
+            pos = hg.ResolveAnimatedEquipmentClearance(self, owner, model, self.WorldModelExchange, pos, ang, self.modelscale, self.basebone or 1, self.weaponPos, self.weaponAng)
+        elseif hg.ResolveEquipmentClearance then
+            pos = hg.ResolveEquipmentClearance(self, owner, self.WorldModel, pos, ang, self.modelscale2)
+        end
+    end
     return pos, ang
 end
 

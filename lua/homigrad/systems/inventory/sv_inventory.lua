@@ -143,6 +143,7 @@ local vecZero = Vector(0, 0, 0)
 hook.Add("PlayerDropWeapon", "homigrad-inventory", function(ply, weapon)
     local wep = IsValid(weapon) and weapon or ply:GetActiveWeapon()
     if not IsValid(wep) or wep.NoDrop then return end
+	local wasActive = ply:GetActiveWeapon() == wep
     local eyeAngles = ply:EyeAngles()
     eyeAngles.x = 0
     local ent = hg.GetCurrentCharacter(ply)
@@ -155,7 +156,13 @@ hook.Add("PlayerDropWeapon", "homigrad-inventory", function(ply, weapon)
     wep:SetPos(ply:EyePos())
     ply.inventory.Weapons[wep:GetClass()] = nil
     ply:SetNetVar("Inventory", ply.inventory)
-    ply:SetActiveWeapon(NULL)
+	if wasActive and ply:Alive() then
+		local hands = hg.GetHandsWeapon and hg.GetHandsWeapon(ply) or ply:GetWeapon("weapon_hands_sh")
+		if IsValid(hands) then
+			ply:SelectWeapon(hands:GetClass())
+			ply:SetActiveWeapon(hands)
+		end
+	end
 	if ply.organism and ishgweapon(wep) then ply.organism.postureGunfireWeapon = wep end
 
     if ply:Alive() then
@@ -676,8 +683,8 @@ local function ResolveLootEntityFromTrace(ply, trace)
 end
 
 local fakeHandBones = {
-    "ValveBiped.Bip01_L_Hand",
-    "ValveBiped.Bip01_R_Hand"
+    {bone = "ValveBiped.Bip01_L_Hand", key = IN_SPEED, constraint = "ConsLH"},
+    {bone = "ValveBiped.Bip01_R_Hand", key = IN_WALK, constraint = "ConsRH"}
 }
 
 local fakeDoorClasses = {
@@ -692,8 +699,14 @@ local function FindFakeHandEntity(ply, below, filter)
     if not IsValid(ragdoll) then return end
 
     local best, bestDistance
-    for _, boneName in ipairs(fakeHandBones) do
-        local bone = ragdoll:LookupBone(boneName)
+    for _, hand in ipairs(fakeHandBones) do
+        if not ply:KeyDown(hand.key) then continue end
+
+        local held = ragdoll[hand.constraint]
+        held = IsValid(held) and held.Ent2
+        if IsValid(held) and held ~= ragdoll and not held:IsWorld() and filter(held) then return held end
+
+        local bone = ragdoll:LookupBone(hand.bone)
         local physBone = bone and ragdoll:TranslateBoneToPhysBone(bone)
         local phys = isnumber(physBone) and physBone >= 0 and ragdoll:GetPhysicsObjectNum(physBone)
         local handPos = IsValid(phys) and phys:GetPos() or bone and ragdoll:GetBonePosition(bone)

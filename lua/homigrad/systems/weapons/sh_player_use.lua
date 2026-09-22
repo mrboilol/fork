@@ -1,6 +1,38 @@
 local hook_Run = hook.Run
+local FAKE_USE_REACH_SQR = 18 * 18
+
+local function fakeHandTarget(ply, ent)
+	local ragdoll = ply.FakeRagdoll
+	if not IsValid(ragdoll) or not ply:KeyDown(IN_USE) then return ent end
+
+	local best, bestDistance
+	for _, hand in ipairs({
+		{key = IN_SPEED, constraint = ragdoll.ConsLH, bone = "ValveBiped.Bip01_L_Hand"},
+		{key = IN_WALK, constraint = ragdoll.ConsRH, bone = "ValveBiped.Bip01_R_Hand"}
+	}) do
+		if not ply:KeyDown(hand.key) then continue end
+
+		local held = IsValid(hand.constraint) and hand.constraint.Ent2
+		if IsValid(held) and held ~= ragdoll and not held:IsWorld() then return held end
+
+		if IsValid(ent) then
+			local bone = ragdoll:LookupBone(hand.bone)
+			local pos = bone and ragdoll:GetBonePosition(bone)
+			if pos then
+				local distance = pos:DistToSqr(ent:NearestPoint(pos))
+				if distance <= FAKE_USE_REACH_SQR and (not bestDistance or distance < bestDistance) then
+					best, bestDistance = ent, distance
+				end
+			end
+		end
+	end
+
+	return best
+end
 
 hook.Add("PlayerUse", "nouseinfake", function(ply, ent)
+	if IsValid(ply.FakeRagdoll) and fakeHandTarget(ply, ent) ~= ent then return false end
+
 	local class = ent:GetClass()
 
 	if class == "momentary_rot_button" then return end
@@ -49,6 +81,11 @@ local checkUse = {
 }
 
 hook.Add("FindUseEntity", "findhguse", function(ply, heldent)
+	if IsValid(ply.FakeRagdoll) then
+		local eyetr = ply:GetEyeTrace()
+		return fakeHandTarget(ply, IsValid(eyetr.Entity) and eyetr.Entity or heldent) or false
+	end
+
 	local pickupEnt = hg.GetPickupUseEntity and hg.GetPickupUseEntity(ply)
 	if IsValid(pickupEnt) then return pickupEnt end
 

@@ -680,14 +680,17 @@ if SERVER then
 				local groupedArteries = {}
 				for _, artery in ipairs(arteryGroup) do groupedArteries[artery] = true end
 				for i = #org.arterialwounds, 1, -1 do
-					local artery = org.arterialwounds[i][7]
+					local arterialWound = org.arterialwounds[i]
+					local artery = arterialWound[7]
 					if groupedArteries[artery] then
 						org[artery] = 0
+						hg.organism.RemoveWoundMark(org, arterialWound, true)
 						table.remove(org.arterialwounds, i)
 					end
 				end
 			else
 				org[wound[7]] = 0
+				hg.organism.RemoveWoundMark(org, wound, true)
 				table.remove(org.arterialwounds, pw)
 			end
 
@@ -697,7 +700,11 @@ if SERVER then
 
 			table.sort(bonewounds, function(a, b) return a > b end)
 			for _, woundIndex in ipairs(bonewounds) do
-				if org.wounds[woundIndex] then table.remove(org.wounds, woundIndex) end
+				local normalWound = org.wounds[woundIndex]
+				if normalWound then
+					hg.organism.RemoveWoundMark(org, normalWound, false)
+					table.remove(org.wounds, woundIndex)
+				end
 			end
 
 			hg.organism.MarkWoundsNetDirty(org, true)

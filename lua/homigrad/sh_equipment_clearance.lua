@@ -64,35 +64,45 @@ function hg.ResolveEquipmentClearance(ent, owner, model, pos, ang, scale)
     if IsValid(ent.worldModel) then filter[#filter + 1] = ent.worldModel end
     if IsValid(ent.worldModel2) then filter[#filter + 1] = ent.worldModel2 end
     local target = LocalToWorld(center, angle_zero, pos, ang)
-    local previous = ent.HGClearanceCenter
-    local start = target
-    if isvector(previous) and previous:DistToSqr(target) < 128 * 128 then start = previous end
-    local traceData = {start = start, endpos = target, mins = -extent, maxs = extent, filter = filter, mask = MASK_SOLID}
-    local trace = util.TraceHull(traceData)
-    if trace.StartSolid then
-        local previousPos = ent.HGClearancePosition
-        if isvector(previousPos) and isvector(previous) and previousPos:DistToSqr(pos) < 128 * 128 then
-            local previousTrace = util.TraceHull({start = previous, endpos = previous, mins = -extent, maxs = extent, filter = filter, mask = MASK_SOLID})
-            if not previousTrace.StartSolid then return previousPos end
+    local aim = owner.GetAimVector and owner:GetAimVector() or ang:Forward()
+    if not isvector(aim) or aim:LengthSqr() <= 0.000001 then aim = ang:Forward() end
+    aim = aim:GetNormalized()
+    local backward = -aim
+    local traceData = {start = target, endpos = target, mins = -extent, maxs = extent, filter = filter, mask = MASK_SOLID}
+    local function Blocked(distance)
+        traceData.start = target + backward * distance
+        traceData.endpos = traceData.start
+        local trace = util.TraceHull(traceData)
+        return trace.StartSolid or trace.AllSolid
+    end
+    if not Blocked(0) then return pos end
+    local clear = math.Clamp(extent:Length() + 8, 16, 64)
+    if Blocked(clear) then return pos + backward * clear end
+    local blocked = 0
+    for _ = 1, 5 do
+        local distance = (blocked + clear) * 0.5
+        if Blocked(distance) then
+            blocked = distance
+        else
+            clear = distance
         end
-        return pos
     end
-    local resolvedCenter = target
-    for _ = 1, 3 do
-        if not trace.Hit then break end
-        resolvedCenter = trace.HitPos + trace.HitNormal * 0.5
-        local remainder = target - resolvedCenter
-        remainder = remainder - trace.HitNormal * math.min(remainder:Dot(trace.HitNormal), 0)
-        traceData.start, traceData.endpos = resolvedCenter, resolvedCenter + remainder
-        local slide = util.TraceHull(traceData)
-        if slide.StartSolid then break end
-        trace = slide
-        if not trace.Hit then resolvedCenter = traceData.endpos end
+    return pos + backward * (clear + 0.5)
+end
+
+function hg.ResolveAnimatedEquipmentClearance(ent, owner, pose, model, pos, ang, scale, bone, offsetPos, offsetAng)
+    if not hg.ResolveEquipmentClearance then return pos end
+    local modelPos, modelAng = pos, ang
+    if IsValid(pose) and bone then
+        pose:SetPos(pos)
+        pose:SetAngles(ang)
+        if pose.InvalidateBoneCache then pose:InvalidateBoneCache() end
+        if pose.SetupBones then pose:SetupBones() end
+        local matrix = pose:GetBoneMatrix(bone)
+        modelPos, modelAng = LocalToWorld(offsetPos or vector_origin, offsetAng or angle_zero, matrix and matrix:GetTranslation() or pos, matrix and matrix:GetAngles() or ang)
     end
-    local resolved = resolvedCenter - (target - pos)
-    ent.HGClearancePosition = resolved
-    ent.HGClearanceCenter = resolvedCenter
-    return resolved
+    local resolved = hg.ResolveEquipmentClearance(ent, owner, model, modelPos, modelAng, scale)
+    return pos + resolved - modelPos
 end
 
 function hg.EquipmentImpactPose(wep, pos, ang)

@@ -19,18 +19,18 @@ local function drop(ply, wep, newWeapon, vel)
 			pos, ang = wep:WorldModel_Transform(true)
 		end
 		
+		ply:DropWeapon(wep, nil, not IsValid(wep.fakeGun) and (eyeAngles:Forward() * (isnumber(vel) and vel or 250)) + ply:GetVelocity() or nil)
+
 		if not IsValid(newWeapon) then
-                        local hands = hg.GetHandsWeapon and hg.GetHandsWeapon(ply) or ply:GetWeapon("weapon_hands_sh")
-                        if IsValid(hands) then
-                                ply:SelectWeapon(hands:GetClass())
-                                ply:SetActiveWeapon(hands)
-                        end
+			local hands = hg.GetHandsWeapon and hg.GetHandsWeapon(ply) or ply:GetWeapon("weapon_hands_sh")
+			if IsValid(hands) then
+				ply:SelectWeapon(hands:GetClass())
+				ply:SetActiveWeapon(hands)
+			end
 		else
 			ply:SelectWeapon(newWeapon:GetClass())
 			ply:SetActiveWeapon(newWeapon)
 		end
-
-		ply:DropWeapon(wep, nil, not IsValid(wep.fakeGun) and (eyeAngles:Forward() * (isnumber(vel) and vel or 250)) + ply:GetVelocity() or nil)
 		
 		wep.init = true
 		wep.IsSpawned = true
