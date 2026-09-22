@@ -332,8 +332,7 @@ local depressionState = {
 	}
 }
 local depressionTracks = {
-	"sound/rem_track1.mp3",
-	"sound/rem_track2.mp3",
+	"sound/rem_despair.mp3",
 }
 local depressionStation
 local depressionStationLoading = false

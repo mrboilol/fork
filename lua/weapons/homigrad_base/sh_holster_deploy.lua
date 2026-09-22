@@ -5,6 +5,11 @@ SWEP.HolsterSnd = {"homigrad/weapons/holster_rifle.ogg", 55, 100, 110}
 SWEP.CooldownDeploy = 1
 SWEP.DeploySnd = {"homigrad/weapons/draw_rifle.mp3", 65, 100, 110}
 
+function SWEP:GetDeployDuration()
+	local roleDeployMul = hg.GetSubRolePerk and hg.GetSubRolePerk(self:GetOwner(), "DeployMul", 1) or 1
+	return math.max(self.CooldownDeploy / self.Ergonomics * roleDeployMul, 0.35)
+end
+
 --!! fix ts shit
 function SWEP:Step_HolsterDeploy(time)
 	self.deploy = self:GetDeploy() != 0 and self:GetDeploy() or nil
@@ -86,8 +91,7 @@ function SWEP:Deploy()
 	--[[self.holster = nil
 	self:SetHolster(0)]]
 
-	local roleDeployMul = hg.GetSubRolePerk and hg.GetSubRolePerk(self:GetOwner(), "DeployMul", 1) or 1
-	self.deploy = time + self.CooldownDeploy / self.Ergonomics * roleDeployMul
+	self.deploy = time + self:GetDeployDuration()
 	self:SetDeploy(self.deploy)
 
 	return true

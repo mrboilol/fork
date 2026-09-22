@@ -28,7 +28,7 @@ SWEP.holsteredBone = "ValveBiped.Bip01_Spine2"
 SWEP.holsteredPos = Vector(5, 8, -4)
 SWEP.holsteredAng = Angle(270, 0, 180)
 SWEP.BigMeleeHolsterBackOffset = 8
-SWEP.BigMeleeReachTime = 0.28
+SWEP.BigMeleeReachTime = 0.8
 SWEP.BigMeleeDeployTime = 1
 
 function SWEP:CanHolsterBigMelee()
@@ -498,11 +498,7 @@ if CLIENT then
         local reachEnd = IsValid(owner) and math.max(self.MeleeDeployReachEnd or 0, self:GetNWFloat("MeleeDeployReachEnd", 0)) or 0
 
         if updatePose and IsValid(owner) then
-            if reachEnd > CurTime() then
-                local deploySequence = self.AnimList and self.AnimList["deploy"]
-                if deploySequence then WorldModel:SetSequence(deploySequence) end
-                WorldModel:SetCycle(0)
-            elseif not self.cycling then
+            if not self.cycling then
                 local dtime = SysTime() - (self.lasthuyhuy or SysTime())
                 self.lasthuyhuy = SysTime()
                 
@@ -539,7 +535,17 @@ if CLIENT then
             if self.TwoHanded and reachEnd > CurTime() then
                 local holsteredPos, holsteredAng = self:GetHolsteredWorldTransform(ent)
                 if holsteredPos then
-                    local reachTime = math.max(self.BigMeleeReachTime or 0.28, 0.001)
+                    if self.WorldModelExchange then
+                        WorldModel:InvalidateBoneCache()
+                        WorldModel:SetupBones()
+                        local matrix = WorldModel:GetBoneMatrix(self.basebone or 1)
+                        if matrix then
+                            local weaponPos, weaponAng = LocalToWorld(self.weaponPos, self.weaponAng, matrix:GetTranslation(), matrix:GetAngles())
+                            local rootPos, rootAng = WorldToLocal(WorldModel:GetPos(), WorldModel:GetAngles(), weaponPos, weaponAng)
+                            holsteredPos, holsteredAng = LocalToWorld(rootPos, rootAng, holsteredPos, holsteredAng)
+                        end
+                    end
+                    local reachTime = math.max(self.BigMeleeReachTime or 0.8, 0.001)
                     local fraction = math.ease.InOutSine(math.Clamp(1 - (reachEnd - CurTime()) / reachTime, 0, 1))
                     pos = LerpVector(fraction, holsteredPos, pos)
                     ang = LerpAngle(fraction, holsteredAng, ang)
@@ -560,6 +566,7 @@ if CLIENT then
 		end
 
         if updatePose then
+            if self.TwoHanded and reachEnd > CurTime() then WorldModel:InvalidateBoneCache() end
             WorldModel:SetupBones()
         end
 
@@ -1259,7 +1266,7 @@ function SWEP:SetHandPos(noset)
 
 	local bones = hg.TPIKBonesRH
 	local reachEnd = math.max(self.MeleeDeployReachEnd or 0, self:GetNWFloat("MeleeDeployReachEnd", 0))
-	local reachLerp = reachEnd > CurTime() and math.ease.InOutSine(math.Clamp(1 - (reachEnd - CurTime()) / math.max(self.BigMeleeReachTime or 0.28, 0.001), 0, 1))
+	local reachLerp = reachEnd > CurTime() and math.ease.InOutSine(math.Clamp(1 - (reachEnd - CurTime()) / math.max(self.BigMeleeReachTime or 0.8, 0.001), 0, 1))
 
 	if self.rhandik and self:InUse() then
 		for _, bone in ipairs(bones) do
@@ -1316,7 +1323,7 @@ end
 function SWEP:OwnerChanged()
     self:CancelChargeAttack(false)
     if IsValid(self:GetOwner()) and self:GetOwner():IsPlayer() then
-        self:PlayAnim("deploy",0.5,false,nil,false)
+        self:PlayAnim("deploy",self.BigMeleeDeployTime or 1,false,nil,false)
         self:SetHold(self.HoldType)
         self:ResetCombo()
         EnforceOneHandedWeaponLimit(self)
@@ -1355,11 +1362,8 @@ function SWEP:Deploy()
     self:ResetCombo()
     self:SetHold(self.HoldType)
 
-    self.MeleeDeployToken = (self.MeleeDeployToken or 0) + 1
-    local deployToken = self.MeleeDeployToken
-
     if stagedDeploy then
-        local reachTime = self.BigMeleeReachTime or 0.28
+        local reachTime = self.BigMeleeReachTime or 0.8
         local deployTime = self.BigMeleeDeployTime or 1
         local reachEnd = CurTime() + reachTime
 
@@ -1368,21 +1372,7 @@ function SWEP:Deploy()
         self:SetNextPrimaryFire(reachEnd + deployTime)
         self:SetNextSecondaryFire(reachEnd + deployTime)
 
-        if CLIENT then
-            local model = self:GetWM()
-            local deploySequence = self.AnimList and self.AnimList["deploy"]
-            if IsValid(model) and deploySequence then
-                model:SetSequence(deploySequence)
-                model:SetCycle(0)
-            end
-        end
-
-        timer.Simple(reachTime, function()
-            if not IsValid(self) or self.MeleeDeployToken ~= deployToken then return end
-            local owner = self:GetOwner()
-            if not IsValid(owner) or owner:GetActiveWeapon() ~= self then return end
-            self:PlayAnim("deploy", deployTime, false, nil, false)
-        end)
+        self:PlayAnim("deploy", reachTime + deployTime, false, nil, false)
     else
         self.MeleeDeployReachEnd = 0
         if SERVER then self:SetNWFloat("MeleeDeployReachEnd", 0) end
@@ -1393,7 +1383,6 @@ function SWEP:Deploy()
 end
 
 function SWEP:Holster(wep)
-    self.MeleeDeployToken = (self.MeleeDeployToken or 0) + 1
     self.MeleeDeployReachEnd = 0
     if SERVER then self:SetNWFloat("MeleeDeployReachEnd", 0) end
     self:CancelChargeAttack(false)

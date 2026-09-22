@@ -482,11 +482,11 @@ local function DrawWorldModel(self, force)
 			willdraw = true
 		end
 	else
+		self:WorldModel_Transform()
+
 		if self.deploy then
 			self:WorldModel_Transform_Holstered()
 		end
-		
-		self:WorldModel_Transform()
 		
 		willdraw = true
 	end
@@ -1019,11 +1019,8 @@ function SWEP:WorldModel_Transform_Holstered()
 		if self:ShouldUseFakeModel() then
 			newPos, newAng = LocalToWorld(self.FakePos, self.FakeAng, newPos, newAng)
 		end
-		local booba = self.deploy
-		local booba2 = self.deploy and (self.CooldownDeploy / self.Ergonomics)
-		
-		local lerp = (not booba) and 0 or math.Clamp(1 - ((booba - CurTime()) / booba2) * 1.2, 0, 1)
-		lerp = math.ease.InOutExpo(lerp)
+		local lerp = self.deploy and math.Clamp(1 - (self.deploy - CurTime()) / self:GetDeployDuration(), 0, 1) or 0
+		lerp = math.ease.InOutSine(lerp)
 		
 		local newPos = LerpVector(lerp, newPos, model:GetPos())
 		local newAng = LerpAngle(lerp, newAng, model:GetAngles())
