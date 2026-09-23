@@ -313,15 +313,6 @@ if CLIENT then
 	local maxtimefade = 1
 	local oldclick = 0
 
-	sound.Add({
-		name = "peepsnd",
-		channel = CHAN_AUTO,
-		volume = 0.5,
-		level = 30,
-		pitch = {150, 150},
-		sound = "snd_jack_peep.ogg"
-	})
-
 	local last_message
 	local last_time
 
@@ -366,7 +357,7 @@ if CLIENT then
 				end
 
 				if click != oldclick and not last_message then
-					sound.Play("peepsnd", render.GetViewSetup().origin - vector_up * 10)
+					sound.Play("speak" .. math.random(1, 2) .. ".ogg", render.GetViewSetup().origin - vector_up * 10, 30, math.random(97, 103), 0.5)
 					//surface.PlaySound("peepsnd")
 					oldclick = click
 				end
