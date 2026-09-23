@@ -311,13 +311,6 @@ local function TraceEquipmentEntityBounds(ent, pos, ang, scale, startPos, endPos
     }
 end
 
-local armorHelmetPlacements = {
-    head = true,
-    visor = true,
-    helmet_jaw = true,
-    helmet_ears = true,
-}
-
 local function GetArmorWearer(ent)
     if not IsValid(ent) then return end
     if ent:IsPlayer() or ent:IsNPC() then return ent end
@@ -325,50 +318,28 @@ local function GetArmorWearer(ent)
     return IsValid(owner) and owner or ent
 end
 
-local function GetArmorPieceTransform(body, wearer, armorData, piece, placement, primary)
-    local female = ThatPlyIsFemale(body)
-    local bone = body:LookupBone(piece.bone or armorData.bone or "")
-    local matrix = bone and body:GetBoneMatrix(bone)
-    if not matrix then return end
-
-    local matrixPos = matrix:GetTranslation()
-    local bonePos = Vector(matrixPos[1], matrixPos[2], matrixPos[3])
-    local boneAng = matrix:GetAngles()
-    local femaleOffset = piece.femPos or vector_origin
-    if female then
-        bonePos:Add(boneAng:Forward() * femaleOffset[1] + boneAng:Up() * femaleOffset[2] + boneAng:Right() * femaleOffset[3])
-    end
-
-    local localPos = primary and armorData[3] or piece.pos or vector_origin
-    local localAng = female and piece.femAng or (primary and armorData[4] or piece.ang) or angle_zero
-    local pos, ang = LocalToWorld(localPos or vector_origin, localAng, bonePos, boneAng)
-    if armorHelmetPlacements[placement] and IsValid(wearer) and wearer.PlayerClassName == "swat" then
-        pos:Add(Vector(0, 0, 1))
-    end
-
-    local wearerScale = placement == "torso" and IsValid(wearer) and wearer.PlayerClassName == "swat" and 1.08 or 1
-    local scale = ((female and piece.femscale) or piece.scale or 1) * wearerScale
-    return pos, ang, scale
-end
-
-local function ArmorManualBoxIntersects(body, armor, placement, startPos, endPos, padding)
-    if not hg.organism or not hg.organism.GetHitBoxOrgans or not hg.organism.ShootMatrix then return false end
+local function TraceArmorManualBox(body, armor, placement, startPos, endPos, padding)
+    if not hg.organism or not hg.organism.GetHitBoxOrgans or not hg.organism.ShootMatrix then return end
     local organs = hg.organism.GetHitBoxOrgans(body:GetModel(), body)
-    if not organs then return false end
+    if not organs then return end
     local boxes = hg.organism.ShootMatrix(body, organs)
-    if not boxes then return false end
+    if not boxes then return end
 
     local ray = endPos - startPos
     local expand = Vector(padding or 0, padding or 0, padding or 0)
+    local best
     for _, box in ipairs(boxes) do
         local organ = box[6] and organs[box[6]] and organs[box[6]][box[7]]
         if not organ or (organ[1] ~= armor and organ[7] ~= placement) then continue end
-        if util.IntersectRayWithOBB(startPos, ray, box[1], box[2], box[3] - expand, box[4] + expand) then return true end
+        local position, normal, fraction = util.IntersectRayWithOBB(startPos, ray, box[1], box[2], box[3] - expand, box[4] + expand)
+        if position and (not best or fraction < best.fraction) then
+            best = {fraction = fraction, position = position, normal = normal, thickness = (box[4] - box[3]):Length()}
+        end
     end
-    return false
+    return best
 end
 
-function hg.TraceArmorShot(body, startPos, endPos, seen, hits, padding, manualCanResolve)
+function hg.TraceArmorShot(body, startPos, endPos, seen, hits, padding)
     if not IsValid(body) or not istable(hg.armor) then return end
     local wearer = GetArmorWearer(body)
     local armors = istable(body.armors) and body.armors or IsValid(wearer) and wearer.armors
@@ -379,26 +350,11 @@ function hg.TraceArmorShot(body, startPos, endPos, seen, hits, padding, manualCa
     padding = math.max(tonumber(padding) or 0, 0)
     for placement, armor in pairs(armors) do
         local armorData = hg.armor[placement] and hg.armor[placement][armor]
-        local key = "armor:" .. tostring(body:EntIndex()) .. ":" .. tostring(armor)
+        local key = "armor:" .. tostring(wearer:EntIndex()) .. ":" .. tostring(armor)
         if not armorData or seen[key] then continue end
 
-        local best
-        local model = IsValid(wearer) and wearer:GetNWString("ArmorModel" .. armor, "") or ""
-        if model == "" then model = armorData.model or armorData[2] end
-        if isstring(model) and model ~= "" then
-            local pos, ang, scale = GetArmorPieceTransform(body, wearer, armorData, armorData, placement, true)
-            best = pos and hg.TraceEquipmentModel(model, pos, ang, scale, startPos, endPos, padding) or nil
-        end
-
-        local extraModels = armorData.extraModels or (armorData.extraModel and {armorData.extraModel})
-        for _, piece in ipairs(extraModels or {}) do
-            if not isstring(piece.model) or piece.model == "" then continue end
-            local pos, ang, scale = GetArmorPieceTransform(body, wearer, armorData, piece, placement, false)
-            local hit = pos and hg.TraceEquipmentModel(piece.model, pos, ang, scale, startPos, endPos, padding) or nil
-            if hit and (not best or hit.fraction < best.fraction) then best = hit end
-        end
-
-        if not best or manualCanResolve ~= false and ArmorManualBoxIntersects(body, armor, placement, startPos, endPos, padding) then continue end
+        local best = TraceArmorManualBox(body, armor, placement, startPos, endPos, padding)
+        if not best then continue end
         best.armor, best.placement, best.data = armor, placement, armorData
         best.body, best.wearer, best.key = body, wearer, key
         hits[#hits + 1] = best
@@ -775,7 +731,7 @@ function hg.TryAbsorbEquipmentImpact(ent, dmgInfo, hitPos, direction, impactRadi
         end
         if hg.TraceArmorShot then
             SetupEntityBones(ent)
-            hg.TraceArmorShot(ent, startPos, hitPos + dir, {}, equipmentHits, radius, true)
+            hg.TraceArmorShot(ent, startPos, hitPos + dir, {}, equipmentHits, radius)
         end
         table.sort(equipmentHits, function(a, b) return a.fraction < b.fraction end)
         local hit = equipmentHits[1]
@@ -1010,8 +966,7 @@ local function TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, ori
             hg.Appearance.TraceAccessoryShot(body, startPos, endPos, seen, hits, projectileRadius)
         end
         if hg.TraceArmorShot then
-            local manualCanResolve = TraceReachesEquipmentWearer(originalTrace, {body = body, wearer = ply})
-            hg.TraceArmorShot(body, startPos, endPos, seen, hits, projectileRadius, manualCanResolve)
+            hg.TraceArmorShot(body, startPos, endPos, seen, hits, projectileRadius)
         end
     end
     if IsValid(originalTrace.Entity) and originalTrace.Entity.HGAccessoryID then impact.DroppedAccessories[originalTrace.Entity] = true end

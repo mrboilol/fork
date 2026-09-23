@@ -8,7 +8,7 @@ if CLIENT then
 		if not IsValid(ent) then return end
 		local state = ent:GetNetVar("ArmorItemState", {})
 		local frame = vgui.Create("DFrame")
-		frame:SetSize(310, ent.placement == "torso" and 315 or 145)
+		frame:SetSize(310, ent.placement == "torso" and 395 or 265)
 		frame:Center()
 		frame:SetTitle("Configure " .. (hg.armorNames[ent.name] or ent.name or "armor"))
 		frame:MakePopup()
@@ -20,6 +20,23 @@ if CLIENT then
 		quality:SetMax(1.2)
 		quality:SetDecimals(2)
 		quality:SetValue(state.quality or 1)
+
+		local protection = vgui.Create("DNumSlider", frame)
+		protection:Dock(TOP)
+		protection:SetText("Helmet protection")
+		protection:SetMin(0.5)
+		protection:SetMax(2)
+		protection:SetDecimals(2)
+		protection:SetValue(state.protectionMultiplier or 1)
+		protection:SetVisible(ent.placement == "head" or ent.placement == "face")
+
+		local health = vgui.Create("DNumSlider", frame)
+		health:Dock(TOP)
+		health:SetText("Armor health multiplier")
+		health:SetMin(1)
+		health:SetMax(5)
+		health:SetDecimals(0)
+		health:SetValue(state.healthMultiplier or 1)
 
 		local material, level, sides = "ceramic", 3, "none"
 		if ent.placement == "torso" then
@@ -35,7 +52,7 @@ if CLIENT then
 			level = state.plateLevel or level
 			sides = state.plateSides or sides
 			choice("Plate material", {"ceramic", "steel", "polyethylene"}, material, function(value) material = value end)
-			choice("Protection level", {"2", "3", "4", "5", "6"}, level, function(value) level = tonumber(value) end)
+			choice("Protection level", {"1", "2", "3", "4", "5", "6"}, level, function(value) level = tonumber(value) end)
 			choice("Plate coverage", {"none", "front", "back", "both", "all"}, sides, function(value) sides = value end)
 		end
 
@@ -50,6 +67,8 @@ if CLIENT then
 				net.WriteString(material)
 				net.WriteUInt(level, 3)
 				net.WriteString(sides)
+				net.WriteFloat(protection:GetValue())
+				net.WriteUInt(math.Round(health:GetValue()), 3)
 			net.SendToServer()
 			frame:Close()
 		end

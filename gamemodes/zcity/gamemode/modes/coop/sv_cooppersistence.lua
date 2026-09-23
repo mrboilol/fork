@@ -137,6 +137,9 @@ function hg.CoopPersistence.SavePlayerData(ply)
         Ammo = ammoData,
         Armor = armorData,
         Armor_health = armorHealthData,
+        Armor_durability = table.Copy(ply.armors_durability or {}),
+        Armor_states = table.Copy(ply.armor_states or {}),
+        Armor_regions = table.Copy(ply.armors_regions or {}),
         Attachments = inv.Attachments or {},
         Role = roleName,
         RoleColor = {roleColor.r, roleColor.g, roleColor.b},
@@ -212,6 +215,13 @@ function hg.CoopPersistence.RestorePlayerData(ply)
         for placement, health in pairs(data.Armor_health) do
             ply.armors_health[placement] = health
         end
+    end
+    ply.armors_durability = table.Copy(data.Armor_durability or ply.armors_durability or {})
+    ply.armor_states = table.Copy(data.Armor_states or ply.armor_states or {})
+    ply.armors_regions = table.Copy(data.Armor_regions or ply.armors_regions or {})
+    if ply.SyncArmor then ply:SyncArmor() end
+    if hg.SyncArmorWear then
+        for placement, armor in pairs(ply.armors or {}) do hg.SyncArmorWear(ply, armor, placement) end
     end
     
     if data.Health then

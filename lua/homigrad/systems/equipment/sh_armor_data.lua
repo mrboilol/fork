@@ -972,6 +972,29 @@ local vectors = {
 	[5] = Vector(-4.5,0,-2)
 }
 hg.armor.head = {
+	["helmet1"] = {
+		"head",
+		"models/barney_helmet.mdl",
+		Vector(1, -2, 0),
+		Angle(180, 110, 90),
+		protection = 12,
+		bone = "ValveBiped.Bip01_Head1",
+		model = "models/barney_helmet.mdl",
+		femPos = Vector(-1, 0, 0),
+		material = {"sal/hanker", "models/jacky_camouflage/digi",
+			"models/jacky_camouflage/digi2", "models/lightvest/accs_diff_000_g_uni",
+			"sal/acc/armor01_2", "sal/acc/armor01_3", "sal/acc/armor01_4", "sal/acc/armor01_5"},
+		norender = true,
+		customviewrender = function(ply)
+			hg.DrawFirstPersonHelmet(ply, "models/barney_helmet.mdl", vectors[1], -40, "sal/hanker")
+		end,
+		viewmaterial = false,
+		femscale = 0.92,
+		effect = "Impact",
+		surfaceprop = 67,
+		mass = 2,
+		ScrappersSlot = "Armor",
+	},
 	["pot"] = {
 		"head",
 		"models/props_interiors/pot02a.mdl",
@@ -2120,6 +2143,7 @@ hg.armor.back = {
 	}
 }
 local armorNames = {
+	["helmet1"] = "ACH Helmet III",
 	["pot"] = "Cooking Pot Helmet",
 	["aqualung"] = "Scuba Suit",
 	["ego_equalizer"] = "[HE] Equalizer",
@@ -2216,6 +2240,7 @@ local armorNames = {
 }
 hg.armorNames = armorNames
 local armorIcons = {
+	["helmet1"] = "vgui/icons/helmet.png",
 	["aqualung"] = "entities/ent_aqualung.png",
 	["ego_equalizer"] = "entities/ent_jack_gmod_ezarmor_hazmat.png",
 	["headphones1"] = "entities/ent_jack_gmod_ezarmor_sordin.png",

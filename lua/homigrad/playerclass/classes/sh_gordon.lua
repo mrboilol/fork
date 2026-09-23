@@ -36,7 +36,7 @@ local function createhev(ply)
     ply.HEV = {}
     ply.HEV.Morphine = maxMorphine
     ply.HEV.Medicine = maxMedicine
-    ply.HEV.Power = maxPower * (0.75)
+    ply.HEV.Power = maxPower
     ply.organism.HEV = ply.HEV
     ply:SetNetVar("HEVMedicine", ply.HEV.Medicine)
     ply:SetNetVar("HEVPower", ply.HEV.Power)
@@ -49,7 +49,28 @@ local function createhev(ply)
     ply.armors = {}
     ply.armors["torso"] = "gordon_armor"
     ply.armors["head"] = "gordon_helmet"
+    ply.armor_states = ply.armor_states or {}
+    ply.armor_states.gordon_armor = {quality = 1.2, plateMaterial = "ceramic", plateLevel = 6, plateSides = "all", healthMultiplier = 5}
+    ply.armor_states.gordon_helmet = {quality = 1.2, protectionMultiplier = 2, healthMultiplier = 5}
+    ply.armors_health = ply.armors_health or {}
+    ply.armors_durability = ply.armors_durability or {}
+    if ply.armors_broken then
+        ply.armors_broken.gordon_armor = nil
+        ply.armors_broken.gordon_helmet = nil
+    end
+    if ply.armors_broken_mul then
+        ply.armors_broken_mul.gordon_armor = nil
+        ply.armors_broken_mul.gordon_helmet = nil
+    end
+    if ply.armors_regions then
+        ply.armors_regions.gordon_armor = nil
+        ply.armors_regions.gordon_helmet = nil
+    end
+    ply.armors_health.gordon_armor = hg.GetArmorMaxCondition(ply, "torso", "gordon_armor")
+    ply.armors_durability.gordon_helmet = hg.GetArmorMaxCondition(ply, "head", "gordon_helmet")
     ply:SyncArmor()
+    hg.SyncArmorWear(ply, "gordon_armor", "torso")
+    hg.SyncArmorWear(ply, "gordon_helmet", "head")
     
     local Appearance = ply.CurAppearance or hg.Appearance.GetRandomAppearance()
     Appearance.AAttachments = ""
@@ -122,7 +143,7 @@ function CLASS.On(self, data)
         self.HEV = self.HEV or {}
         self.HEV.Morphine = self.HEV.Morphine or maxMorphine
         self.HEV.Medicine = self.HEV.Medicine or maxMedicine
-        self.HEV.Power = self.HEV.Power or (maxPower * 0.75)
+        self.HEV.Power = self.HEV.Power or maxPower
         if self.organism then
             self.organism.HEV = self.HEV
             self.organism.CantCheckPulse = true
@@ -141,6 +162,9 @@ function CLASS.On(self, data)
         if not self.armors["head"] then
             self.armors["head"] = "gordon_helmet"
         end
+        self.armor_states = self.armor_states or {}
+        self.armor_states.gordon_armor = self.armor_states.gordon_armor or {quality = 1.2, plateMaterial = "ceramic", plateLevel = 6, plateSides = "all", healthMultiplier = 5}
+        self.armor_states.gordon_helmet = self.armor_states.gordon_helmet or {quality = 1.2, protectionMultiplier = 2, healthMultiplier = 5}
         self:SyncArmor()
         hevchanged(self)
 
@@ -149,7 +173,7 @@ function CLASS.On(self, data)
 end
 
 if SERVER then
-    hook.Add("PostCleanupMap","huyhuygordonspasjizn",function(ent)
+    local function replaceChargers()
         timer.Simple(1,function()
             for i, ent in ents.Iterator() do
                 if ent:GetClass() == "item_suitcharger" then
@@ -191,7 +215,9 @@ if SERVER then
                 end
             end
         end)
-    end)
+    end
+    hook.Add("InitPostEntity", "gordon_chargers_init", replaceChargers)
+    hook.Add("PostCleanupMap", "huyhuygordonspasjizn", replaceChargers)
 end
 
 hook.Add("Player Think","health_armor_gordonthings",function(ply)
@@ -216,6 +242,16 @@ hook.Add("Player Think","health_armor_gordonthings",function(ply)
 
         if ent.armorcharger then
             local noneedarmor = ply.HEV.Power == maxPower
+            for placement, armor in pairs(ply.armors or {}) do
+                if armor == "gordon_armor" or armor == "gordon_helmet" then
+                    local maximum = hg.GetArmorMaxCondition(ply, placement, armor)
+                    local current = placement == "head" and ply.armors_durability and ply.armors_durability[armor] or ply.armors_health and ply.armors_health[armor]
+                    if (current or maximum) < maximum or ply.armors_broken and ply.armors_broken[armor] then noneedarmor = false end
+                    for _, regionHealth in pairs(ply.armors_regions and ply.armors_regions[armor] or {}) do
+                        if regionHealth < (placement == "torso" and 100 or 70) then noneedarmor = false end
+                    end
+                end
+            end
             if noneedarmor then
                 if not ply.keypresseduse then
                     ent:EmitSound(ent.armorcharger and "items/suitchargeno1.wav" or "items/medshotno1.wav")
@@ -234,6 +270,20 @@ hook.Add("Player Think","health_armor_gordonthings",function(ply)
             ply.HEV.Power = math.min(ply.HEV.Power + 1, maxPower)
             ply:SetNetVar("HEVPower", ply.HEV.Power)
             hevchanged(ply)
+            for placement, armor in pairs(ply.armors or {}) do
+                if armor == "gordon_armor" or armor == "gordon_helmet" then
+                    local maximum = hg.GetArmorMaxCondition(ply, placement, armor)
+                    local condition = placement == "head" and ply.armors_durability or ply.armors_health
+                    if condition then condition[armor] = math.min((condition[armor] or maximum) + maximum / 25, maximum) end
+                    if ply.armors_broken then ply.armors_broken[armor] = nil end
+                    if ply.armors_broken_mul then ply.armors_broken_mul[armor] = nil end
+                    for region, regionHealth in pairs(ply.armors_regions and ply.armors_regions[armor] or {}) do
+                        local regionMaximum = placement == "torso" and 100 or 70
+                        ply.armors_regions[armor][region] = math.min(regionHealth + regionMaximum / 25, regionMaximum)
+                    end
+                    hg.SyncArmorWear(ply, armor, placement)
+                end
+            end
             ent.power = ent.power - 1
         else
             local noneedhealth = (ply:Health() == 100) and (ply.HEV.Medicine == maxMedicine) and (ply.HEV.Morphine == maxMorphine)
@@ -256,6 +306,7 @@ hook.Add("Player Think","health_armor_gordonthings",function(ply)
             ply.HEV.Medicine = math.min(ply.HEV.Medicine + 5, maxMedicine)
             ply.HEV.Morphine = math.min(ply.HEV.Morphine + 0.01, maxMorphine)
             ply:SetHealth(math.min(ply:Health() + 1,100))
+            ply:SetNetVar("HEVMedicine", ply.HEV.Medicine)
             ent.power = ent.power - 1
         end
     else

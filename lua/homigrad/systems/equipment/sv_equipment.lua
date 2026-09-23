@@ -89,12 +89,11 @@ local function GetArmorWear(owner, armor, placement)
 	if owner.armors_broken and owner.armors_broken[armor] then return 1 end
 	local armorData = hg.armor[placement] and hg.armor[placement][armor]
 	if IsDurabilityArmor(placement, armorData) then
-		local baseDurability = (armorData and armorData.durability) or DEFAULT_HELMET_DURABILITY
+		local baseDurability = hg.GetArmorMaxCondition(owner, placement, armor)
 		local current = (owner.armors_durability and owner.armors_durability[armor]) or baseDurability
 		return 1 - math.Clamp(current / baseDurability, 0, 1)
 	else
-		local armorData = (hg.armor[placement] and hg.armor[placement][armor]) or {}
-		local maxHealth = armorData.health or DEFAULT_VEST_HEALTH
+		local maxHealth = hg.GetArmorMaxCondition(owner, placement, armor)
 		local current = (owner.armors_health and owner.armors_health[armor]) or maxHealth
 		return 1 - math.Clamp(current / maxHealth, 0, 1)
 	end
@@ -139,10 +138,10 @@ end
 local function ResetBrokenArmorLife(owner, equipment, placement, armorData)
 	if IsDurabilityArmor(placement, armorData) then
 		owner.armors_durability = owner.armors_durability or {}
-		owner.armors_durability[equipment] = math.max((armorData.durability or DEFAULT_HELMET_DURABILITY) * BROKEN_ARMOR_LIFE_MUL, 1)
+		owner.armors_durability[equipment] = math.max(hg.GetArmorMaxCondition(owner, placement, equipment) * BROKEN_ARMOR_LIFE_MUL, 1)
 	else
 		owner.armors_health = owner.armors_health or {}
-		owner.armors_health[equipment] = math.max((armorData.health or DEFAULT_VEST_HEALTH) * BROKEN_ARMOR_LIFE_MUL, 0.05)
+		owner.armors_health[equipment] = math.max(hg.GetArmorMaxCondition(owner, placement, equipment) * BROKEN_ARMOR_LIFE_MUL, 0.05)
 	end
 	owner.armors_shots = owner.armors_shots or {}
 	owner.armors_shots[equipment] = nil
@@ -163,9 +162,9 @@ function hg.SetArmorBrokenEntity(ent)
 	local armorData = placement and hg.armor[placement] and hg.armor[placement][equipment]
 	if armorData then
 		if IsDurabilityArmor(placement, armorData) then
-			ent.armorDurability = math.max((armorData.durability or DEFAULT_HELMET_DURABILITY) * BROKEN_ARMOR_LIFE_MUL, 1)
+			ent.armorDurability = math.max(hg.GetArmorMaxCondition(ent, placement, equipment) * BROKEN_ARMOR_LIFE_MUL, 1)
 		else
-			ent.armorHealth = math.max((armorData.health or DEFAULT_VEST_HEALTH) * BROKEN_ARMOR_LIFE_MUL, 0.05)
+			ent.armorHealth = math.max(hg.GetArmorMaxCondition(ent, placement, equipment) * BROKEN_ARMOR_LIFE_MUL, 0.05)
 		end
 	end
 	ent.brokenHitsLeft = math.random(BROKEN_ARMOR_WORLD_HITS[1], BROKEN_ARMOR_WORLD_HITS[2])
@@ -796,8 +795,9 @@ end
 util.AddNetworkString("AddFlash")
 util.AddNetworkString("hg_configure_armor")
 
-hook.Add("PlayerSpawnedSENT", "HGConfigureSpawnedArmor", function(ply, ent)
-	if not IsValid(ent) or not ent.name or ent:GetClass() ~= "ent_armor_" .. ent.name or not ent.placement or not hg.armor[ent.placement] or not hg.armor[ent.placement][ent.name] then return end
+local function ConfigureSpawnedArmor(ply, ent)
+	if not IsValid(ply) or not ply:IsPlayer() or not IsValid(ent) or ent.HGArmorConfigurator then return end
+	if not ent.name or ent:GetClass() ~= "ent_armor_" .. ent.name or not ent.placement or not hg.armor[ent.placement] or not hg.armor[ent.placement][ent.name] then return end
 	ent.HGArmorConfigurator = ply
 	ent.HGArmorConfigureUntil = CurTime() + 120
 	timer.Simple(0.1, function()
@@ -805,6 +805,15 @@ hook.Add("PlayerSpawnedSENT", "HGConfigureSpawnedArmor", function(ply, ent)
 		net.Start("hg_configure_armor")
 			net.WriteEntity(ent)
 		net.Send(ply)
+	end)
+end
+
+hook.Add("PlayerSpawnedSENT", "HGConfigureSpawnedArmor", ConfigureSpawnedArmor)
+hook.Add("OnEntityCreated", "HGConfigureCreatedArmor", function(ent)
+	if not string.StartWith(ent:GetClass(), "ent_armor_") then return end
+	timer.Simple(0.1, function()
+		if not IsValid(ent) or not ent.GetCreator then return end
+		ConfigureSpawnedArmor(ent:GetCreator(), ent)
 	end)
 end)
 
@@ -816,16 +825,27 @@ net.Receive("hg_configure_armor", function(_, ply)
 	local material = net.ReadString()
 	local level = net.ReadUInt(3)
 	local sides = net.ReadString()
+	local protection = net.ReadFloat()
+	local healthMultiplier = net.ReadUInt(3)
 	if not hg.ArmorPlateMaterials[material] or not hg.ArmorPlateLevels[level] then return end
 	if sides ~= "none" and sides ~= "front" and sides ~= "back" and sides ~= "both" and sides ~= "all" then return end
+	if protection < 0.5 or protection > 2 or healthMultiplier < 1 or healthMultiplier > 5 then return end
 	ent.armorState = ent.armorState or {}
 	ent.armorState.quality = quality
+	ent.armorState.healthMultiplier = healthMultiplier
+	if ent.placement == "head" or ent.placement == "face" then ent.armorState.protectionMultiplier = protection end
 	if ent.placement == "torso" then
 		ent.armorState.plateMaterial = material
 		ent.armorState.plateLevel = level
 		ent.armorState.plateSides = sides
 	end
 	ent:SetNetVar("ArmorItemState", ent.armorState)
+	local maximum = hg.GetArmorMaxCondition(ent, ent.placement, ent.name)
+	if ent.placement == "head" or ent.placement == "face" then
+		ent.armorDurability = maximum
+	else
+		ent.armorHealth = maximum
+	end
 	local phys = ent:GetPhysicsObject()
 	if IsValid(phys) then phys:SetMass(hg.GetArmorMass(ent, ent.placement, ent.name)) end
 	ent.HGArmorConfigurator = nil
@@ -854,7 +874,7 @@ local function DamageArmor(org, placement, armor, dmgInfo, rawDmg)
 
 	if IsDurabilityArmor(placement, armorData) then
 		owner.armors_durability = owner.armors_durability or {}
-		local baseDurability = armorData.durability or DEFAULT_HELMET_DURABILITY
+		local baseDurability = hg.GetArmorMaxCondition(owner, placement, armor)
 		local currentDurability = owner.armors_durability[armor] or baseDurability
 
 		local absorbMultiplier = armorData.absorbMultiplier or DEFAULT_HELMET_ABSORB_MULTIPLIER
@@ -875,7 +895,7 @@ local function DamageArmor(org, placement, armor, dmgInfo, rawDmg)
 	end
 
 	owner.armors_health = owner.armors_health or {}
-	local currentHealth = owner.armors_health[armor] or DEFAULT_VEST_HEALTH
+	local currentHealth = owner.armors_health[armor] or hg.GetArmorMaxCondition(owner, placement, armor)
 
 	local healthDamageMul = armorData.healthDamageMul or DEFAULT_VEST_HEALTH_DAMAGE_MUL
 		currentHealth = math.max(0, currentHealth - rawDmg * healthDamageMul * ARMOR_DAMAGE_TAKEN_MUL)
@@ -915,13 +935,12 @@ local function GetArmorImpactDamageScale(owner, armor, armorData, dmgType, place
 	if broken then
 		damageScale = 1 - (1 - damageScale) * math.Clamp(brokenMul, 0, 1)
 	else
-		local durability = armorData.durability or DEFAULT_HELMET_DURABILITY
-		local health = armorData.health or DEFAULT_VEST_HEALTH
+		local maximum = hg.GetArmorMaxCondition(owner, placement, armor)
 		local condition
 		if IsDurabilityArmor(placement, armorData) then
-			condition = (owner.armors_durability and owner.armors_durability[armor] or durability) / durability
+			condition = (owner.armors_durability and owner.armors_durability[armor] or maximum) / maximum
 		else
-			condition = (owner.armors_health and owner.armors_health[armor] or health) / health
+			condition = (owner.armors_health and owner.armors_health[armor] or maximum) / maximum
 		end
 		damageScale = 1 - (1 - damageScale) * math.Clamp(condition, 0, 1)
 	end
@@ -934,10 +953,10 @@ local function GetEquippedArmorCondition(owner, armor, placement, armorData)
 		return math.Clamp(owner.armors_broken_mul and owner.armors_broken_mul[armor] or getBrokenArmorProtectionMul(), 0.05, 1)
 	end
 	if IsDurabilityArmor(placement, armorData) then
-		local maximum = armorData.durability or DEFAULT_HELMET_DURABILITY
+		local maximum = hg.GetArmorMaxCondition(owner, placement, armor)
 		return math.Clamp((owner.armors_durability and owner.armors_durability[armor] or maximum) / maximum, 0, 1)
 	end
-	local maximum = armorData.health or DEFAULT_VEST_HEALTH
+	local maximum = hg.GetArmorMaxCondition(owner, placement, armor)
 	return math.Clamp((owner.armors_health and owner.armors_health[armor] or maximum) / maximum, 0, 1)
 end
 
@@ -1087,7 +1106,7 @@ local function protec(org, bone, dmg, dmgInfo, placement, armor, scale, scalepro
 	org.owner.armors_health = org.owner.armors_health or {}
 	org.owner.armors_broken_mul = org.owner.armors_broken_mul or {}
 
-	local maxHealth = (armorData and armorData.health) or DEFAULT_VEST_HEALTH
+	local maxHealth = hg.GetArmorMaxCondition(org.owner, placement, armor)
 	if armorWasBroken then
 		prot = prot * (org.owner.armors_broken_mul[armor] or 1)
 	else
@@ -1225,7 +1244,7 @@ local function protec(org, bone, dmg, dmgInfo, placement, armor, scale, scalepro
 	local wearMul = org.owner.armors_broken_mul[armor] or 1
 	local armorIsBroken = org.owner.armors_broken and org.owner.armors_broken[armor]
 	if not armorIsBroken and not IsDurabilityArmor(placement, armorData) then
-		local conditionMaxHealth = (armorData and armorData.health) or DEFAULT_VEST_HEALTH
+		local conditionMaxHealth = hg.GetArmorMaxCondition(org.owner, placement, armor)
 		local health = org.owner.armors_health[armor] or conditionMaxHealth
 		wearMul = wearMul * math.Clamp(health / conditionMaxHealth, 0, 1)
 	end

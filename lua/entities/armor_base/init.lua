@@ -110,9 +110,8 @@ end
 		ply.armors_broken_mul[equipment] = ply.armors_broken[equipment] and (self.brokenProtectionMul or hg.GetBrokenArmorProtectionMul()) or nil
 		ply.armors_shots[equipment] = ply.armors_broken[equipment] and nil or self.shotsLeft or hg.GetArmorBreakShotCount(equipment)
 		local placement = hg.GetArmorPlacement(equipment)
-		local armorData = placement and hg.armor[placement] and hg.armor[placement][equipment]
-		ply.armors_health[equipment] = self.armorHealth or (armorData and armorData.health) or 1
-		ply.armors_durability[equipment] = self.armorDurability or (armorData and armorData.durability) or 450
+		ply.armors_health[equipment] = self.armorHealth or hg.GetArmorMaxCondition(self, placement, equipment)
+		ply.armors_durability[equipment] = self.armorDurability or hg.GetArmorMaxCondition(self, placement, equipment)
 		ply.armors_regions[equipment] = table.Copy(self.armorRegions or {})
 		ply.armor_states = ply.armor_states or {}
 		ply.armor_states[equipment] = table.Copy(self.armorState or {})

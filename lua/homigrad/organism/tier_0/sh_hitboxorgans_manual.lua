@@ -291,6 +291,9 @@ table.insert(male["ValveBiped.Bip01_Head1"], 1, {"jaw_ears_armor", 1, Vector(3, 
 table.insert(male["ValveBiped.Bip01_Head1"], 1, {"jaw_ears_armor", 1, Vector(3, 0, -4.5), Angle(0, 0, 0), Vector(2.8, 3.5, 0.9), Color(255, 160, 40), "helmet_jaw", 0})
 table.insert(male["ValveBiped.Bip01_Head1"], 1, {"helmet_ears_armor", 1, Vector(3, 0, 4.5), Angle(0, 0, 0), Vector(2.8, 3.5, 0.9), Color(160, 255, 80), "helmet_ears", 0})
 table.insert(male["ValveBiped.Bip01_Head1"], 1, {"helmet_ears_armor", 1, Vector(3, 0, -4.5), Angle(0, 0, 0), Vector(2.8, 3.5, 0.9), Color(160, 255, 80), "helmet_ears", 0})
+table.insert(male["ValveBiped.Bip01_Head1"], 1, {"ears_armor", 1, Vector(3, 0, 4.5), Angle(0, 0, 0), Vector(2.8, 3.5, 0.9), Color(160, 255, 80), "ears", 0})
+table.insert(male["ValveBiped.Bip01_Head1"], 1, {"ears_armor", 1, Vector(3, 0, -4.5), Angle(0, 0, 0), Vector(2.8, 3.5, 0.9), Color(160, 255, 80), "ears", 0})
+table.insert(male["ValveBiped.Bip01_Spine2"], 1, {"back_armor", 1, Vector(3, 8, 0), Angle(0, 0, 0), Vector(8, 2, 6), Color(80, 180, 255), "back", 0})
 local female = {}
 table.CopyFromTo(male, female)
 
@@ -429,6 +432,9 @@ table.insert(female["ValveBiped.Bip01_Head1"], 1, {"jaw_ears_armor", 1, Vector(3
 table.insert(female["ValveBiped.Bip01_Head1"], 1, {"jaw_ears_armor", 1, Vector(3, 0, -4.5), Angle(0, 0, 0), Vector(2.8, 3.5, 0.9), Color(255, 160, 40), "helmet_jaw", 0})
 table.insert(female["ValveBiped.Bip01_Head1"], 1, {"helmet_ears_armor", 1, Vector(3, 0, 4.5), Angle(0, 0, 0), Vector(2.8, 3.5, 0.9), Color(160, 255, 80), "helmet_ears", 0})
 table.insert(female["ValveBiped.Bip01_Head1"], 1, {"helmet_ears_armor", 1, Vector(3, 0, -4.5), Angle(0, 0, 0), Vector(2.8, 3.5, 0.9), Color(160, 255, 80), "helmet_ears", 0})
+table.insert(female["ValveBiped.Bip01_Head1"], 1, {"ears_armor", 1, Vector(3, 0, 4.5), Angle(0, 0, 0), Vector(2.8, 3.5, 0.9), Color(160, 255, 80), "ears", 0})
+table.insert(female["ValveBiped.Bip01_Head1"], 1, {"ears_armor", 1, Vector(3, 0, -4.5), Angle(0, 0, 0), Vector(2.8, 3.5, 0.9), Color(160, 255, 80), "ears", 0})
+table.insert(female["ValveBiped.Bip01_Spine2"], 1, {"back_armor", 1, Vector(3, 8, 0), Angle(0, 0, 0), Vector(8, 2, 6), Color(80, 180, 255), "back", 0})
 
 --[[for i,tbl in pairs(male) do
 	for i,tbl2 in pairs(tbl) do

@@ -13,7 +13,15 @@ hg.ArmorPlateMaterials = {
 	polyethylene = {mass = 1.8, protection = 0.8},
 }
 
-hg.ArmorPlateLevels = {[2] = 8, [3] = 10, [4] = 12, [5] = 15, [6] = 17}
+hg.ArmorPlateLevels = {[1] = 6, [2] = 8, [3] = 10, [4] = 12, [5] = 15, [6] = 17}
+
+function hg.GetArmorMaxCondition(ent, placement, armor)
+	local data = hg.armor[placement] and hg.armor[placement][armor]
+	local durable = placement == "head" or placement == "face"
+	if data and data.durabilityArmor ~= nil then durable = data.durabilityArmor end
+	local base = durable and (data and data.durability or 27) or (data and data.health or 1.5)
+	return base * math.Clamp(tonumber(hg.GetArmorItemState(ent, armor, "healthMultiplier", 1)) or 1, 1, 5)
+end
 
 function hg.GetArmorMass(ent, placement, armor)
 	local data = hg.armor[placement] and hg.armor[placement][armor]
@@ -29,9 +37,11 @@ function hg.GetArmorProtection(ent, placement, armor, hitPos)
 	if not data then return 0, 0, 0 end
 	local quality = math.Clamp(tonumber(hg.GetArmorItemState(ent, armor, "quality", 1)) or 1, 0.8, 1.2)
 	local ballistic = data.protection or 0
-	local melee = (data.meleeProt or ballistic) * quality
-	local stab = (data.stabProt or ballistic) * quality
+	local multiplier = (placement == "head" or placement == "face") and math.Clamp(tonumber(hg.GetArmorItemState(ent, armor, "protectionMultiplier", 1)) or 1, 0.5, 2) or 1
+	local melee = (data.meleeProt or ballistic) * quality * multiplier
+	local stab = (data.stabProt or ballistic) * quality * multiplier
 	if not hg.GetArmorItemState(ent, armor, "fixedLevel", false) then ballistic = ballistic * quality end
+	ballistic = ballistic * multiplier
 	if placement ~= "torso" or not isvector(hitPos) then return ballistic, melee, stab end
 	local sides = hg.GetArmorItemState(ent, armor, "plateSides", "none")
 	if sides == "none" then return ballistic, melee, stab end
