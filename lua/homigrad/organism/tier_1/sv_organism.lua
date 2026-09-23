@@ -1937,9 +1937,6 @@ end)
 hook.Add("OnEntityWaterLevelChanged", "ClearBlood", function(ent, old, new)
 	if new >= 2 then
 		if ent:IsOnFire() then ent:Extinguish() end
-		ent:RemoveAllDecals()
-		net.Start("hg_clear_blood_decals")
-		net.WriteEntity(ent)
-		net.Broadcast()
+		if hg.WashBloodDecals then hg.WashBloodDecals(ent) end
 	end
 end)

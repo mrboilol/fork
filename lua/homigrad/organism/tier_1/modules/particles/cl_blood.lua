@@ -203,6 +203,15 @@ local function addGroundBlood(pos, normal, artery, tiny)
 	return true
 end
 
+function hg.DepositBodyBloodRunoff(pos)
+	poolTrace.start = pos + vector_up * 2
+	poolTrace.endpos = pos - vector_up * 256
+	local result = util_TraceLine(poolTrace)
+	if result.HitWorld and result.HitNormal.z >= 0.55 then
+		depositGroundBlood(result.HitPos, result.HitNormal, false, true, 1)
+	end
+end
+
 local function flowGroundBlood(stain, gravityScale)
 	if (stain.volume or 0) < poolStartVolume or stain.size < 8 then return end
 
@@ -310,14 +319,17 @@ local function decalBlood(pos, normal, tr, artery, owner, tiny)
 		return
 	end
 	if tiny then
+		local target = IsValid(tr.Entity) and tr.Entity or nil
+		if IsValid(target) and hg.AddPersistentBodyBloodMark and (target:IsPlayer() or target:IsNPC() or target:IsRagdoll() or target.organism) then
+			hg.AddPersistentBodyBloodMark(target, pos, normal, math.Rand(1.2, 2.4))
+			if math.random(7) == 1 then playBloodDripImpact(pos, tr) end
+			return
+		end
 		local oldBlood = hg_old_blood:GetBool()
 		local decal = oldBlood and (artery and oldTinyArterialDecal or oldTinyNormalDecals[math.random(#oldTinyNormalDecals)]) or getNewTinyBloodDecal()
-		local target = IsValid(tr.Entity) and tr.Entity or game.GetWorld()
+		target = target or game.GetWorld()
 		local scale = math.Rand(0.12, 0.24)
 		util.DecalEx(decal, target, pos, normal, color_white, scale, scale)
-		if IsValid(target) and hg.AddPersistentBodyBloodMark and (target:IsPlayer() or target:IsNPC() or target:IsRagdoll() or target.organism) then
-			hg.AddPersistentBodyBloodMark(target, pos, normal, scale * 10)
-		end
 		if math.random(7) == 1 then playBloodDripImpact(pos, tr) end
 		return
 	end
@@ -325,6 +337,8 @@ local function decalBlood(pos, normal, tr, artery, owner, tiny)
 	local target = IsValid(tr.Entity) and tr.Entity or nil
 	if IsValid(target) and hg.AddPersistentBodyBloodMark and (target:IsPlayer() or target:IsNPC() or target:IsRagdoll() or target.organism) then
 		hg.AddPersistentBodyBloodMark(target, pos, normal, artery and 2.8 or 2)
+		playBloodDripImpact(pos, tr)
+		return
 	end
 
 	local vec = tostring(math.Round(pos[1]))..tostring(math.Round(pos[2]))..tostring(math.Round(pos[3]))

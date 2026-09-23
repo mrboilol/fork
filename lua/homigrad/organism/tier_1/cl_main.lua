@@ -1318,14 +1318,15 @@ function hg.AddPersistentBodyBloodMark(ent, pos, normal, size)
 	if not localPos then return end
 
 	ent.persistentBloodMarks = ent.persistentBloodMarks or {}
-	for index, mark in ipairs(ent.persistentBloodMarks) do
-		if mark[4] == bone and mark[2]:DistToSqr(localPos) < 2.25 then
-			mark[1] = math.min(math.max(mark[1] or 1, size or 1) + 0.15, 5)
-			mark[5] = CurTime()
-			ent.hgPersistentDecalCursor = (istable(ent.woundmarks) and #ent.woundmarks or 0) + index
-			ent.hgPersistentDecalNext = 0
+	for _, mark in ipairs(ent.persistentBloodMarks) do
+		if mark[4] == bone and mark[2]:DistToSqr(localPos) < 9 then
+			if hg.DepositBodyBloodRunoff then hg.DepositBodyBloodRunoff(pos) end
 			return
 		end
+	end
+	if #ent.persistentBloodMarks >= 64 then
+		if hg.DepositBodyBloodRunoff then hg.DepositBodyBloodRunoff(pos) end
+		return
 	end
 
 	ent.persistentBloodMarks[#ent.persistentBloodMarks + 1] = {
@@ -1338,6 +1339,18 @@ function hg.AddPersistentBodyBloodMark(ent, pos, normal, size)
 	}
 	ent.hgPersistentDecalCursor = (istable(ent.woundmarks) and #ent.woundmarks or 0) + #ent.persistentBloodMarks
 	ent.hgPersistentDecalNext = 0
+end
+
+function hg.ClearPersistentBodyBlood(ent)
+	if not IsValid(ent) then return end
+	local owner = ent:IsRagdoll() and hg.RagdollOwner(ent) or ent
+	local body = IsValid(owner) and owner:IsPlayer() and hg.GetCurrentCharacter(owner) or nil
+	for _, target in ipairs({ent, owner, body}) do
+		if IsValid(target) then
+			target.persistentBloodMarks = {}
+			resetPersistentBodyDecals(target, true)
+		end
+	end
 end
 
 local persistentBodyDecalMaterials = {

@@ -4,6 +4,18 @@ if SERVER then
     util.AddNetworkString("bruise_decal")
     util.AddNetworkString("hg_clear_blood_decals")
 
+    function hg.WashBloodDecals(ent)
+        if not IsValid(ent) then return end
+        local owner = ent:IsRagdoll() and hg.RagdollOwner(ent) or ent
+        local body = IsValid(owner) and owner:IsPlayer() and hg.GetCurrentCharacter(owner) or nil
+        for _, target in ipairs({ent, owner, body}) do
+            if IsValid(target) then target:RemoveAllDecals() end
+        end
+        net.Start("hg_clear_blood_decals")
+        net.WriteEntity(ent)
+        net.Broadcast()
+    end
+
     local bruiseDecalCount = 4
 
     function hg.ApplyBruiseTo(ent, victim, hitPos, hitNormal)
@@ -165,9 +177,16 @@ end)
 net.Receive("hg_clear_blood_decals", function()
 	local ent = net.ReadEntity()
 	if not IsValid(ent) then return end
-	ClearDecalToEnt(ent)
-	local mdl = getBloodDecalModel(ent)
-	if mdl ~= ent then ClearDecalToEnt(mdl) end
+	if hg.ClearPersistentBodyBlood then hg.ClearPersistentBodyBlood(ent) end
+	local owner = ent:IsRagdoll() and hg.RagdollOwner(ent) or ent
+	local body = IsValid(owner) and owner:IsPlayer() and hg.GetCurrentCharacter(owner) or nil
+	for _, target in ipairs({ent, owner, body}) do
+		if IsValid(target) then
+			ClearDecalToEnt(target)
+			local mdl = getBloodDecalModel(target)
+			if mdl ~= target then ClearDecalToEnt(mdl) end
+		end
+	end
 end)
 
 local bruiseSizeCvar = CreateClientConVar("hg_bruise_size", "0.04", true, false, "Bruise decal size (world units)", 0.01, 5)

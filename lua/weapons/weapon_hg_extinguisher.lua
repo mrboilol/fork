@@ -671,6 +671,12 @@ function SWEP:CanSecondaryAttack()
         self.SprayKnockdownCooldowns = self.SprayKnockdownCooldowns or {}
         local target = GetSprayPlayer(tr.Entity)
         if target == owner or not IsValid(target) or not target:Alive() then target = nil end
+		self.BloodWashTimes = self.BloodWashTimes or {}
+
+        if IsValid(tr.Entity) and (tr.Entity:IsNPC() or tr.Entity:IsRagdoll()) and (self.BloodWashTimes[tr.Entity] or 0) <= now then
+            if hg.WashBloodDecals then hg.WashBloodDecals(tr.Entity) end
+            self.BloodWashTimes[tr.Entity] = now + 0.75
+        end
 
         for ply, contact in pairs(self.SprayContacts) do
             if not IsValid(ply) or not ply:Alive() or ply ~= target and now - contact.lastHit > (self.SprayContactGrace or 0.15) then
@@ -743,6 +749,10 @@ function SWEP:CanSecondaryAttack()
             local sprayedPlayer = GetSprayPlayer(ent)
             if IsValid(sprayedPlayer) and sprayedPlayer:Alive() and sprayedPlayer != owner and not sprayedPlayers[sprayedPlayer] then
                 sprayedPlayers[sprayedPlayer] = true
+				if (self.BloodWashTimes[sprayedPlayer] or 0) <= now then
+					if hg.WashBloodDecals then hg.WashBloodDecals(sprayedPlayer) end
+					self.BloodWashTimes[sprayedPlayer] = now + 0.75
+				end
                 local org = sprayedPlayer.organism
                 if org and org.o2 and not org.holdingbreath then
                     org.o2[1] = math.max(0, (org.o2[1] or 0) - 0.5 * (dt / 0.25))
