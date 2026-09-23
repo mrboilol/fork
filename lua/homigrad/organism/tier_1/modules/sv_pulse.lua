@@ -269,8 +269,8 @@ local function getRateOutput(heartbeat)
 end
 
 function hg.organism.GetPulseOxygenPerfusion(pulse)
-	local normalizedPulse = Clamp((tonumber(pulse) or 0) / 70, 0, 1)
-	return math.max(normalizedPulse ^ 1.5, 0.06)
+	local normalizedPulse = Clamp((tonumber(pulse) or 0) / 60, 0, 1)
+	return 0.28 + normalizedPulse * 0.72
 end
 
 local function getPalpablePulseTarget(org, heartbeat, circulation, hemorrhageCompensation, effectivePalpitations)
@@ -1507,8 +1507,10 @@ module[2] = function(owner, org, timeValue)
 	-- low output alone is not an immediate VF/flatline trigger.
 	if organSystemsEnabled then
 		local hemorrhageDrivenLowOutput = criticalHemorrhageDepth > 0 or bloodNow <= 2500
+		local compoundedLowOutput = (org.hypotensionExposure or 0) >= 75
+			and (org.depression or 0) >= 0.5 and (org.temperature or 36.7) <= 34
 		local failedCirculation = org.pulse < 10 and not hemorrhageDrivenLowOutput and not restartCirculationActive
-		local failedHypotension = org.prolongedHypotension and not hemorrhageDrivenLowOutput and not restartCirculationActive
+		local failedHypotension = org.prolongedHypotension and (not hemorrhageDrivenLowOutput or compoundedLowOutput) and not restartCirculationActive
 		local failedBradyOutput = (org.bradycardicLowOutputTime or 0) >= (tonumber(cfg.BRADYCARDIA_ARREST_EXPOSURE) or 8)
 			and (org.cardiacOutput or 0) < (tonumber(cfg.BRADYCARDIA_ARREST_OUTPUT) or 0.22)
 			and (org.perfusion or 0) < (tonumber(cfg.BRADYCARDIA_ARREST_PERFUSION) or 0.28)

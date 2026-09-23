@@ -170,28 +170,6 @@ local function CanPickupOneHandedMeleeWeapon(owner, wep)
     return GetOneHandedMeleeWeaponCount(owner, wep) < (wep.MaxOneHandedWeapons or 2)
 end
 
-local function EnforceOneHandedWeaponLimit(wep)
-    if CLIENT then return end
-    if not IsOneHandedMeleeWeapon(wep) then return end
-
-    local owner = wep:GetOwner()
-
-    if not IsValid(owner) or not owner:IsPlayer() then return end
-
-    if CanPickupOneHandedMeleeWeapon(owner, wep) then return end
-
-    timer.Simple(0, function()
-        if not IsValid(wep) then return end
-
-        local owner = wep:GetOwner()
-
-        if not IsValid(owner) or not owner:IsPlayer() then return end
-        if CanPickupOneHandedMeleeWeapon(owner, wep) then return end
-
-        hg.drop(owner, wep)
-    end)
-end
-
 function SWEP:PickupFunc(ply)
     if CanPickupOneHandedMeleeWeapon(ply, self) then return false end
     return true
@@ -690,7 +668,6 @@ if CLIENT then
                 pos,ang = LocalToWorld(self.weaponPos,self.weaponAng,huy and mat and mat:GetTranslation() or self.worldModel:GetPos(),huy and mat and mat:GetAngles() or self.worldModel:GetAngles())
             end
 
-            if IsValid(owner) and (not self.TwoHanded or math.max(self.MeleeDeployReachEnd or 0, self:GetNWFloat("MeleeDeployReachEnd", 0)) <= CurTime()) and (not self.GetInAttack or not self:GetInAttack()) and hg.ResolveEquipmentClearance then pos = hg.ResolveEquipmentClearance(self, owner, self.WorldModelExchange, pos, ang, self.modelscale) end
             self.worldModel2:SetModelScale(self.modelscale)
             self.worldModel2:SetRenderOrigin(pos)
             self.worldModel2:SetRenderAngles(ang)
@@ -953,7 +930,6 @@ function SWEP:GetEquipmentImpactModel()
     if exchange and not (self.ShouldDrawWorldModelReal and self:ShouldDrawWorldModelReal()) then
         local matrix = model:GetBoneMatrix(self.basebone or 1)
         pos, ang = LocalToWorld(self.weaponPos or vector_origin, self.weaponAng or angle_zero, matrix and matrix:GetTranslation() or pos, matrix and matrix:GetAngles() or ang)
-        if (not self.TwoHanded or math.max(self.MeleeDeployReachEnd or 0, self:GetNWFloat("MeleeDeployReachEnd", 0)) <= CurTime()) and (not self.GetInAttack or not self:GetInAttack()) and hg.ResolveEquipmentClearance then pos = hg.ResolveEquipmentClearance(self, self:GetOwner(), exchange, pos, ang, self.modelscale) end
         return exchange, pos, ang, self.modelscale or 1
     end
 	return modelName, pos, ang, self.modelscale2 or 1, model
@@ -1326,7 +1302,6 @@ function SWEP:OwnerChanged()
         self:PlayAnim("deploy",self.BigMeleeDeployTime or 1,false,nil,false)
         self:SetHold(self.HoldType)
         self:ResetCombo()
-        EnforceOneHandedWeaponLimit(self)
         timer.Simple(0,function() self.picked = true end)
     else
         if self.SetInAttack then

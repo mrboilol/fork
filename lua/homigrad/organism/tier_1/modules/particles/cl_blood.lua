@@ -125,7 +125,7 @@ hg.bloodpositions = hg.bloodpositions or {}
 hg.bloodcount = hg.bloodcount or 0
 local bloodDripSoundChance = 2 / 3
 
-local hg_blood_ground_limit = GetConVar("hg_blood_ground_limit") or CreateClientConVar("hg_blood_ground_limit", 600, true, false, "Maximum persistent ground blood stains", 1, 2000)
+local hg_blood_ground_limit = GetConVar("hg_blood_ground_limit") or CreateClientConVar("hg_blood_ground_limit", 2500, true, false, "Maximum persistent ground blood stains", 1, 5000)
 
 hg.groundbloodstains = hg.groundbloodstains or {}
 hg.fadinggroundbloodstains = hg.fadinggroundbloodstains or {}

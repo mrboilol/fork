@@ -28,16 +28,15 @@ local function GetEquipmentModelBounds(ent, model)
         end
     end
 
-    if IsValid(fallbackCandidate) then
-        local ok, mins, maxs = pcall(fallbackCandidate.GetModelBounds, fallbackCandidate)
+    if util.GetModelBounds then
+        local ok, mins, maxs = pcall(util.GetModelBounds, model)
         if ok and isvector(mins) and isvector(maxs) then
             modelBoundsCache[model] = {mins, maxs}
             return mins, maxs
         end
     end
-
-    if util.GetModelBounds then
-        local ok, mins, maxs = pcall(util.GetModelBounds, model)
+    if IsValid(fallbackCandidate) then
+        local ok, mins, maxs = pcall(fallbackCandidate.GetModelBounds, fallbackCandidate)
         if ok and isvector(mins) and isvector(maxs) then
             modelBoundsCache[model] = {mins, maxs}
             return mins, maxs

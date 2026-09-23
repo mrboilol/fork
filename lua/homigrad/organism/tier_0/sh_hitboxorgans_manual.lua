@@ -243,8 +243,47 @@ local models_female = {
 
 table.insert(male["ValveBiped.Bip01_Spine2"], 1, {"torso_armor", 1, Vector(3, 3, 0), Angle(0, 0, 0), Vector(8, 7, 6), Color(250, 255, 0), "torso", 0})
 table.insert(male["ValveBiped.Bip01_Spine1"], 1, {"torso_armor", 1, Vector(-4, 2, 0), Angle(0, 0, 0), Vector(5, 7, 7), Color(250, 255, 0), "torso", 0})
+table.insert(male["ValveBiped.Bip01_Spine2"], 1, {"vest1", 1, Vector(3, 7, 0), Angle(0, 0, 0), Vector(7, 2, 6), Color(250, 255, 0), true, 0})
+table.insert(male["ValveBiped.Bip01_Spine2"], 1, {"vest1", 1, Vector(3, -2.5, 0), Angle(0, 0, 0), Vector(7, 1, 6), Color(250, 255, 0), true, 0})
+table.insert(male["ValveBiped.Bip01_Spine1"], 1, {"vest2", 1, Vector(-4, 2, 0), Angle(0, 0, 0), Vector(5, 7, 7), Color(140, 0, 255), true, 0})
+table.insert(male["ValveBiped.Bip01_Spine2"], 1, {"vest2", 1, Vector(2, 3, 0), Angle(0, 0, 0), Vector(8, 7, 6), Color(183, 0, 255), true, 0})
+for _, vest in ipairs({"vest3", "vest4"}) do
+	table.insert(male["ValveBiped.Bip01_Spine2"], 1, {vest, 1, Vector(3, 8, 0), Angle(0, 0, 0), Vector(7, 2, 6), Color(55, 0, 255), true, 0})
+	table.insert(male["ValveBiped.Bip01_Spine2"], 1, {vest, 1, Vector(3, -2.5, 0), Angle(0, 0, 0), Vector(7, 2, 6), Color(68, 0, 255), true, 0})
+end
+table.insert(male["ValveBiped.Bip01_Spine1"], 1, {"vest5", 1, Vector(-6, 7, 0), Angle(0, 0, 0), Vector(4, 2, 4), Color(140, 0, 255), true, 0})
+table.insert(male["ValveBiped.Bip01_Spine2"], 1, {"vest5", 1, Vector(3, 7, 0), Angle(0, 0, 0), Vector(8, 2, 5), Color(183, 0, 255), true, 0})
+table.insert(male["ValveBiped.Bip01_Spine2"], 1, {"vest5", 1, Vector(3, -2.5, 0), Angle(0, 0, 0), Vector(8, 2, 5), Color(183, 0, 255), true, 0})
+table.insert(male["ValveBiped.Bip01_Spine2"], 1, {"vest5", 1, Vector(13, 3, 0), Angle(0, 15, 0), Vector(1.5, 4, 4), Color(183, 0, 255), true, 0})
+table.insert(male["ValveBiped.Bip01_L_UpperArm"], 1, {"vest5", 1, Vector(3, -1, 2), Angle(0, 0, 0), Vector(5, 2, 1), Color(183, 0, 255), true, 0})
+table.insert(male["ValveBiped.Bip01_R_UpperArm"], 1, {"vest5", 1, Vector(3, -1, -2), Angle(0, 0, 0), Vector(5, 2, 1), Color(183, 0, 255), true, 0})
+for _, vest in ipairs({"vest6", "vest7", "vest8"}) do
+	local thickness = vest == "vest8" and 2 or 1
+	table.insert(male["ValveBiped.Bip01_Spine2"], 1, {vest, 1, Vector(3, 8, 0), Angle(0, 0, 0), Vector(7, thickness, 6), Color(55, 0, 255), true, 0})
+	table.insert(male["ValveBiped.Bip01_Spine2"], 1, {vest, 1, Vector(3, -2.5, 0), Angle(0, 0, 0), Vector(7, thickness, 6), Color(68, 0, 255), true, 0})
+	table.insert(male["ValveBiped.Bip01_Spine2"], 1, {vest, 1, Vector(-2, 3, 6), Angle(0, 0, 90), Vector(3, vest == "vest8" and 2 or 0.5, 4), Color(255, 242, 0), true, 0})
+	table.insert(male["ValveBiped.Bip01_Spine2"], 1, {vest, 1, Vector(-2, 3, -6), Angle(0, 0, 90), Vector(3, vest == "vest8" and 2 or 0.5, 4), Color(255, 242, 0), true, 0})
+end
+table.insert(male["ValveBiped.Bip01_Spine1"], 1, {"vest8", 1, Vector(-5, 7, 0), Angle(0, 0, 0), Vector(3, 2, 7), Color(55, 0, 255), true, 0})
+table.insert(male["ValveBiped.Bip01_Spine2"], 1, {"vest8", 1, Vector(-7, -2.5, 0), Angle(0, 0, 0), Vector(3, 2, 6), Color(68, 0, 255), true, 0})
+
+local originalVestBoxes = {vest1 = true, vest2 = true, vest3 = true, vest4 = true, vest5 = true, vest6 = true, vest7 = true, vest8 = true}
+local originalHelmetBoxes = {helmet2 = true, helmet3 = true, helmet5 = true, helmet6 = true, helmet7 = true}
+hook.Add("HG_OrganAvalible", "HGOriginalVestBoxes", function(ent, name)
+	if name == "torso_armor" and ent.armors and originalVestBoxes[ent.armors.torso] then return false end
+	if name == "head_armor" and ent.armors and originalHelmetBoxes[ent.armors.head] then return false end
+	if name == "face_armor" and ent.armors and ent.armors.face == "mask1" then return false end
+end)
 table.insert(male["ValveBiped.Bip01_Head1"], 1, {"head_armor", 1, Vector(5, 1, 0), Angle(0, 0, 0), Vector(3.8, 3.5, 4.5), Color(250, 255, 0), "head", 0})
 table.insert(male["ValveBiped.Bip01_Head1"], 1, {"face_armor", 1, Vector(3.5, -4, 0), Angle(0, 0, 0), Vector(5, 3, 4.5), Color(255, 0, 221), "face", 0})
+for _, helmet in ipairs({"helmet2", "helmet3"}) do
+	table.insert(male["ValveBiped.Bip01_Head1"], 1, {helmet, 1, Vector(3.5, -0.9, 0), Angle(0, 0, 0), Vector(5, 6, 5.5), Color(255, 255, 0), true, 0})
+end
+table.insert(male["ValveBiped.Bip01_Head1"], 1, {"helmet5", 1, Vector(6.5, -1, 0), Angle(0, 20, 0), Vector(2.7, 6, 4.5), Color(250, 255, 0), true, 0})
+table.insert(male["ValveBiped.Bip01_Head1"], 1, {"helmet5", 1, Vector(1, 2, 0), Angle(0, 0, 0), Vector(1.5, 1.7, 4.5), Color(250, 255, 0), true, 0})
+table.insert(male["ValveBiped.Bip01_Head1"], 1, {"helmet6", 1, Vector(6.5, -1, 0), Angle(0, 15, 0), Vector(2.7, 6, 4.5), Color(250, 255, 0), true, 0})
+table.insert(male["ValveBiped.Bip01_Head1"], 1, {"helmet7", 1, Vector(6.5, -0.4, 0), Angle(0, 28, 0), Vector(4.2, 6, 4.5), Color(250, 255, 0), true, 0})
+table.insert(male["ValveBiped.Bip01_Head1"], 1, {"mask1", 1, Vector(3.5, -4, 0), Angle(0, 0, 0), Vector(5, 3, 4.5), Color(255, 0, 221), true, 0})
 table.insert(male["ValveBiped.Bip01_Head1"], 1, {"visor_eyes_armor", 1, Vector(4.8, -4, 0), Angle(0, 0, 0), Vector(2.2, 2.5, 4.5), Color(80, 180, 255), "visor", 0})
 table.insert(male["ValveBiped.Bip01_Head1"], 1, {"visor_mouth_armor", 1, Vector(1.2, -4, 0), Angle(0, 0, 0), Vector(1.4, 2.5, 4.5), Color(80, 180, 255), "visor", 0})
 table.insert(male["ValveBiped.Bip01_Head1"], 1, {"jaw_mouth_armor", 1, Vector(1.2, -4, 0), Angle(0, 0, 0), Vector(1.4, 2.5, 4.5), Color(255, 160, 40), "helmet_jaw", 0})

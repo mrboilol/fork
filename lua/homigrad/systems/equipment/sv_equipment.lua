@@ -794,6 +794,42 @@ end
 
 -- armorstuff
 util.AddNetworkString("AddFlash")
+util.AddNetworkString("hg_configure_armor")
+
+hook.Add("PlayerSpawnedSENT", "HGConfigureSpawnedArmor", function(ply, ent)
+	if not IsValid(ent) or not ent.name or ent:GetClass() ~= "ent_armor_" .. ent.name or not ent.placement or not hg.armor[ent.placement] or not hg.armor[ent.placement][ent.name] then return end
+	ent.HGArmorConfigurator = ply
+	ent.HGArmorConfigureUntil = CurTime() + 120
+	timer.Simple(0.1, function()
+		if not IsValid(ent) or not IsValid(ply) then return end
+		net.Start("hg_configure_armor")
+			net.WriteEntity(ent)
+		net.Send(ply)
+	end)
+end)
+
+net.Receive("hg_configure_armor", function(_, ply)
+	local ent = net.ReadEntity()
+	if not IsValid(ent) or ent.HGArmorConfigurator ~= ply or CurTime() > (ent.HGArmorConfigureUntil or 0) then return end
+	if ply:GetPos():DistToSqr(ent:GetPos()) > 512 * 512 then return end
+	local quality = math.Clamp(net.ReadFloat(), 0.8, 1.2)
+	local material = net.ReadString()
+	local level = net.ReadUInt(3)
+	local sides = net.ReadString()
+	if not hg.ArmorPlateMaterials[material] or not hg.ArmorPlateLevels[level] then return end
+	if sides ~= "none" and sides ~= "front" and sides ~= "back" and sides ~= "both" and sides ~= "all" then return end
+	ent.armorState = ent.armorState or {}
+	ent.armorState.quality = quality
+	if ent.placement == "torso" then
+		ent.armorState.plateMaterial = material
+		ent.armorState.plateLevel = level
+		ent.armorState.plateSides = sides
+	end
+	ent:SetNetVar("ArmorItemState", ent.armorState)
+	local phys = ent:GetPhysicsObject()
+	if IsValid(phys) then phys:SetMass(hg.GetArmorMass(ent, ent.placement, ent.name)) end
+	ent.HGArmorConfigurator = nil
+end)
 
 local ArmorEffect
 local force
@@ -856,11 +892,12 @@ local function DamageArmor(org, placement, armor, dmgInfo, rawDmg)
 	return false
 end
 
-local function GetArmorImpactDamageScale(owner, armor, armorData, dmgType, placement)
-	local protection = math.max(tonumber(armorData.protection) or 0, 0)
+local function GetArmorImpactDamageScale(owner, armor, armorData, dmgType, placement, hitPos)
+	local ballistic, melee, stab = hg.GetArmorProtection(owner, placement, armor, hitPos)
 	local isSharp = bit.band(dmgType, DMG_SLASH) ~= 0
 	local isClub = bit.band(dmgType, DMG_CLUB) ~= 0 or bit.band(dmgType, DMG_GENERIC) ~= 0
 	local isPhysics = bit.band(dmgType, DMG_CRUSH) ~= 0 or bit.band(dmgType, DMG_FALL) ~= 0
+	local protection = math.max(isSharp and stab or (isClub or isPhysics) and melee or ballistic, 0)
 	local damageScale
 
 	if isSharp then
@@ -958,7 +995,7 @@ function hg.GetArmorImpactMitigation(org, placement, dmgInfo, rawDmg)
 		return 0, false, true
 	end
 
-	local damageScale, protection, isSharp = GetArmorImpactDamageScale(owner, armor, armorData, dmgInfo:GetDamageType(), placement)
+	local damageScale, protection, isSharp = GetArmorImpactDamageScale(owner, armor, armorData, dmgInfo:GetDamageType(), placement, dmgInfo:GetDamagePosition())
 	local broken, destroyed = DamageArmor(org, placement, armor, dmgInfo, rawDmg or dmgInfo:GetDamage())
 	if destroyed then return 1, false, false end
 
@@ -996,9 +1033,8 @@ local function protec(org, bone, dmg, dmgInfo, placement, armor, scale, scalepro
 	force = nil
 	
 	local armorData = hg.armor[placement] and hg.armor[placement][armor]
-	local ballisticProt = ballisticProtOverride or (armorData and armorData.protection) or 0
-	local meleeProt = armorData and (armorData.meleeProt or armorData.protection or 0) or 0
-	local stabProt = armorData and (armorData.stabProt or armorData.protection or 0) or 0
+	local ballisticProt, meleeProt, stabProt = hg.GetArmorProtection(org.owner, placement, armor, isvector(hit) and hit or dmgInfo:GetDamagePosition())
+	ballisticProt = ballisticProtOverride or ballisticProt
 
 	local isBullet = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
 	local isStab = dmgInfo:IsDamageType(DMG_SLASH)
@@ -1197,7 +1233,7 @@ local function protec(org, bone, dmg, dmgInfo, placement, armor, scale, scalepro
 		dmgScale = 1 - (1 - dmgScale) * math.Clamp(wearMul, 0, 1)
 	end
 	if isStab then
-		local sharpScale, sharpProtection = GetArmorImpactDamageScale(org.owner, armor, armorData, impact and impact.rawDamageType or dmgInfo:GetDamageType(), placement)
+		local sharpScale, sharpProtection = GetArmorImpactDamageScale(org.owner, armor, armorData, impact and impact.rawDamageType or dmgInfo:GetDamageType(), placement, isvector(hit) and hit or dmgInfo:GetDamagePosition())
 		dmgScale = sharpScale
 		org.lastArmorSharpStopped = not armorIsBroken and sharpProtection >= 2.5 and dmgScale <= 0.15
 	end
@@ -1293,7 +1329,7 @@ function hg.ProcessArmorModelHit(hit, damage, forceAmount, direction, shot)
 	if isBullet and owner.armors and owner.armors[placement] == armor and IsDurabilityArmor(placement, armorData) then
 		hg.HandleArmorShot(org, placement, armor, dmgInfo, hit.position, false)
 	end
-	ArmorEffect(placement, armor, dmgInfo, org, hit.position, math.max(tonumber(armorData.protection) or 0, 0))
+	ArmorEffect(placement, armor, dmgInfo, org, hit.position, math.max(hg.GetArmorProtection(owner, placement, armor, hit.position), 0))
 
 	if owner.armors and owner.armors[placement] ~= armor then
 		return {scale = 0, penetration = 0, stopped = true, dropped = placement == "head" or placement == "face", material = MAT_METAL}
@@ -1301,13 +1337,13 @@ function hg.ProcessArmorModelHit(hit, damage, forceAmount, direction, shot)
 	if destroyed then return {scale = 1, penetration = shot and shot.Penetration, material = MAT_METAL} end
 
 	if not isBullet then
-		local damageScale = GetArmorImpactDamageScale(owner, armor, armorData, dmgInfo:GetDamageType(), placement)
+		local damageScale = GetArmorImpactDamageScale(owner, armor, armorData, dmgInfo:GetDamageType(), placement, hit.position)
 		damageScale = math.Clamp(damageScale * 1.2 + 0.05, 0.08, 0.95)
 		return {scale = damageScale, stopped = false, material = MAT_METAL, broken = broken}
 	end
 
 	local penetration = math.max(tonumber(shot and shot.Penetration) or dmgInfo:GetDamage() / 2, 0.01)
-	local protection = math.max(tonumber(armorData.protection) or 0, 0)
+	local protection = math.max(hg.GetArmorProtection(owner, placement, armor, hit.position), 0)
 	local condition = GetEquippedArmorCondition(owner, armor, placement, armorData)
 	local incidence = isvector(hit.normal) and math.abs(dir:Dot(hit.normal)) or 1
 	local angleMul = math.Clamp(1 / math.max(incidence, 0.45), 1, 2.2)
@@ -1397,8 +1433,11 @@ local function makeArmorFunc(placement, punch, scaleTbl)
 end
 
 hg.organism.input_list.torso_armor = makeArmorFunc("torso", false, torsoDmgScale)
+for i = 1, 8 do hg.organism.input_list["vest" .. i] = hg.organism.input_list.torso_armor end
 hg.organism.input_list.head_armor = makeArmorFunc("head", true, headDmgScale)
 hg.organism.input_list.face_armor = makeArmorFunc("face", true, faceDmgScale)
+for _, armor in ipairs({"helmet2", "helmet3", "helmet5", "helmet6", "helmet7"}) do hg.organism.input_list[armor] = hg.organism.input_list.head_armor end
+hg.organism.input_list.mask1 = hg.organism.input_list.face_armor
 
 local function helmetAccessoryArmor(placement, coverage)
 	return function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet, impact)

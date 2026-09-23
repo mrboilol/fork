@@ -69,6 +69,7 @@ function SWEP:GetReloadCapacity()
 end
 
 function SWEP:InsertAmmo(need)
+	if CLIENT then return end
 	local owner = self:GetOwner()
 	if !IsValid(owner) then return end
 

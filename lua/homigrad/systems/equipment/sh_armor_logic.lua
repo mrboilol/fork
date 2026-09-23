@@ -2,8 +2,54 @@
 	if not IsValid(ent) then return default end
 	local states = SERVER and ent.armor_states or ent:GetNetVar("ArmorStates", ent.armor_states or {})
 	local state = states and states[armor]
+	if not state and ent.name == armor then state = SERVER and ent.armorState or ent:GetNetVar("ArmorItemState", {}) end
 	if not state or state[key] == nil then return default end
 	return state[key]
+end
+
+hg.ArmorPlateMaterials = {
+	ceramic = {mass = 2.5, protection = 1},
+	steel = {mass = 4, protection = 0.9},
+	polyethylene = {mass = 1.8, protection = 0.8},
+}
+
+hg.ArmorPlateLevels = {[2] = 8, [3] = 10, [4] = 12, [5] = 15, [6] = 17}
+
+function hg.GetArmorMass(ent, placement, armor)
+	local data = hg.armor[placement] and hg.armor[placement][armor]
+	if not data then return 1 end
+	local sides = hg.GetArmorItemState(ent, armor, "plateSides", "none")
+	local material = hg.ArmorPlateMaterials[hg.GetArmorItemState(ent, armor, "plateMaterial", "ceramic")] or hg.ArmorPlateMaterials.ceramic
+	local count = sides == "all" and 4 or sides == "both" and 2 or (sides == "front" or sides == "back") and 1 or 0
+	return (data.mass or 1) + count * material.mass
+end
+
+function hg.GetArmorProtection(ent, placement, armor, hitPos)
+	local data = hg.armor[placement] and hg.armor[placement][armor]
+	if not data then return 0, 0, 0 end
+	local quality = math.Clamp(tonumber(hg.GetArmorItemState(ent, armor, "quality", 1)) or 1, 0.8, 1.2)
+	local ballistic = data.protection or 0
+	local melee = (data.meleeProt or ballistic) * quality
+	local stab = (data.stabProt or ballistic) * quality
+	if not hg.GetArmorItemState(ent, armor, "fixedLevel", false) then ballistic = ballistic * quality end
+	if placement ~= "torso" or not isvector(hitPos) then return ballistic, melee, stab end
+	local sides = hg.GetArmorItemState(ent, armor, "plateSides", "none")
+	if sides == "none" then return ballistic, melee, stab end
+	local body = hg.GetCurrentCharacter and hg.GetCurrentCharacter(ent) or ent
+	if not IsValid(body) then return ballistic, melee, stab end
+	local bone = body:LookupBone("ValveBiped.Bip01_Spine2")
+	local matrix = bone and body:GetBoneMatrix(bone)
+	if not matrix then return ballistic, melee, stab end
+	local localPos = WorldToLocal(hitPos, angle_zero, matrix:GetTranslation(), matrix:GetAngles())
+	if localPos.x < -4 or localPos.x > 10 then return ballistic, melee, stab end
+	local front = localPos.y >= 2
+	local side = math.abs(localPos.z) > 4.5
+	if side and sides ~= "all" or not side and front and sides ~= "front" and sides ~= "both" and sides ~= "all" or not side and not front and sides ~= "back" and sides ~= "both" and sides ~= "all" then
+		return ballistic, melee, stab
+	end
+	local level = hg.ArmorPlateLevels[hg.GetArmorItemState(ent, armor, "plateLevel", 3)] or 10
+	local material = hg.ArmorPlateMaterials[hg.GetArmorItemState(ent, armor, "plateMaterial", "ceramic")] or hg.ArmorPlateMaterials.ceramic
+	return ballistic + level * material.protection * 0.4, melee + level * 0.2, stab + level * 0.35
 end
 
 function hg.IsVisorLowered(ent, armor, armorData)

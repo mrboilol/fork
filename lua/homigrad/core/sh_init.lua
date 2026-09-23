@@ -67,7 +67,7 @@ function hg.GetCarryWeight(ply)
 		ply.armors = ply:GetNetVar("Armor", {})
 		for plc, arm in pairs(ply.armors) do
 			if hg.armor[plc] and hg.armor[plc][arm] then
-				weight = weight + (hg.armor[plc][arm].mass or 1)
+				weight = weight + hg.GetArmorMass(ply, plc, arm)
 			end
 		end
 	end

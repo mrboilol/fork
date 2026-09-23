@@ -398,8 +398,6 @@ local function AssignLateJoiner(ply)
 	ply:Spectate(OBS_MODE_ROAMING)
 	ply.viewmode = 3
 
-	ply:ConCommand("r_cleardecals")
-
 	timer.Simple(0.3, function()
 		if not IsValid(ply) then return end
 		OpenDeployMenu(ply)
@@ -461,10 +459,6 @@ local function CleanupEntities()
 	if not IsRealishRound() then return end
 
 	local time = CurTime()
-
-	for _, ply in player.Iterator() do
-		ply:ConCommand("r_cleardecals")
-	end
 
 	for _, ent in ents.Iterator() do
 		if not IsValid(ent) or ent.RealishCleanupRemoving then continue end

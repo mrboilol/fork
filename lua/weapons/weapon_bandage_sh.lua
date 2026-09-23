@@ -944,9 +944,12 @@ if SERVER then
 		end
 		hg.organism.MarkWoundsNetDirty(org, true)
 		timer.Create("bandage_limbs"..ent:EntIndex(),0.1,1,function()
+			if not IsValid(ent) then return end
 			ent:SetNetVar("bandaged_limbs",ent.bandaged_limbs)
-			if ent:IsRagdoll() and hg.RagdollOwner(ent) and hg.RagdollOwner(ent):Alive() then
-				hg.RagdollOwner(ent):SetNetVar("bandaged_limbs",ent.bandaged_limbs)
+			local character = hg.GetCurrentCharacter(ent)
+			if IsValid(character) and character ~= ent and ent.bandaged_limbs then
+				character.bandaged_limbs = table.Copy(ent.bandaged_limbs)
+				character:SetNetVar("bandaged_limbs",character.bandaged_limbs)
 			end
 		end)
 

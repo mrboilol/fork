@@ -81,7 +81,15 @@ local remDeathStateStation
 local remDeathStateLoading
 local remDeathStateGeneration = 0
 local remDeathStateActive = false
-local remDeathStateSounds = {"rem_deathstatefull.mp3", "incap1.mp3", "incap2.mp3"}
+surface.CreateFont("RemDeathStateFont", {
+	font = "Lora",
+	size = ScreenScale(22),
+	weight = 1100,
+	outline = true
+})
+
+local remDeathStateColor = Color(255, 255, 255, 0)
+local remDeathStateSound = "rem_deathstatefull.mp3"
 local brainRotStation
 local brainRotLoading
 local nextBrainRotRoll = 0
@@ -162,7 +170,7 @@ local function PlayRemDeathStateSound()
 
 	local generation = remDeathStateGeneration
 	remDeathStateLoading = true
-	sound.PlayFile("sound/" .. remDeathStateSounds[math.random(#remDeathStateSounds)], "noplay", function(station)
+	sound.PlayFile("sound/" .. remDeathStateSound, "noplay", function(station)
 		remDeathStateLoading = nil
 		if not IsValid(station) then return end
 		local _, _, progress = GetLocalDeathState()
@@ -594,6 +602,16 @@ local function DrawIncapacitatedDeathFade(deathStateEnd)
 	end
 end
 
+local function DrawIncapacitatedDeathText(seconds, deathStateEnd)
+	local remaining = math.max(deathStateEnd - CurTime(), 0)
+	local fade = math.Clamp((INCAPACITATION_DEATH_TIME - remaining) / INCAPACITATION_DEATH_TIME, 0, 1)
+	local radius = math.ease.InOutSine(fade) * math.sqrt(ScrW() * ScrW() + ScrH() * ScrH()) / 2
+	local textValue = math.floor(255 * (1 - math.Clamp((radius - 12) / 80, 0, 1)))
+	remDeathStateColor.a = math.Clamp(fade * INCAPACITATION_DEATH_TIME / 2, 0, 1) * 255
+	local textColor = Color(textValue, textValue, textValue, remDeathStateColor.a)
+	draw.SimpleText("You are incapacitated, You will die in " .. seconds, "RemDeathStateFont", ScrW() / 2, ScrH() / 2, textColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+end
+
 hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 	local spect = IsValid(lply:GetNWEntity("spect")) and lply:GetNWEntity("spect")
 	local organism = lply:Alive() and lply.organism or (viewmode == 1 and IsValid(spect) and spect.organism) or {}
@@ -604,6 +622,7 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 	if organism.owner == LocalPlayer() then
 		if new_organism.otrub and !old then
 			PlayLocalImpactSound("harmsting.ogg", 1)
+			lply:ScreenFade(SCREENFADE.IN, Color(0, 0, 0), 2, 0.5)
 			hook.Run("HG_OnOtrub", new_organism.owner)
 		end
 		
@@ -917,6 +936,9 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 	end
 
 	DrawSeizureMemory(org)
+	if lply:Alive() and (otrub or new_organism.otrub) and incapacitated and deathStateEnd then
+		DrawIncapacitatedDeathText(math.max(math.ceil(deathStateEnd - CurTime()), 0), deathStateEnd)
+	end
 	
 	if IsValid(ent) and ent.Blinking and lply:Alive() then
 		surface.SetDrawColor(0,0,0,255)

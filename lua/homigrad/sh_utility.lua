@@ -911,7 +911,7 @@ local IsValid = IsValid
 
 		ply.armors = ply:GetNetVar("Armor",{})
 		for plc,arm in pairs(ply.armors) do
-			weight = weight + (hg.armor[plc][arm].mass or 1)
+			weight = weight + hg.GetArmorMass(ply, plc, arm)
 		end
 
 		local weightmul = (1 / (weight / maxweight + 1))

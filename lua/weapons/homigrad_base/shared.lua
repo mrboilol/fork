@@ -1308,7 +1308,7 @@ if CLIENT then
 			local clip = self:Clip1()
 			local owner = self:GetOwner()
 			local shoot = CurTime() - self:LastShootTime()
-			local ammo = owner:GetAmmoCount(self:GetPrimaryAmmoType())
+			local ammo = owner:IsPlayer() and owner:GetAmmoCount(self:GetPrimaryAmmoType()) or 0
 			local looseRoundReserve = self.AnimInsert or self.ShotgunTubeReload or (self.IsManuallyCycledWeapon and self:IsManuallyCycledWeapon())
 			local magCount = looseRoundReserve and ammo or math.ceil(ammo / clipsize)
 			local visibleReserve = looseRoundReserve and math.min(magCount, 8) or math.min(magCount, 3)
@@ -1408,7 +1408,7 @@ if CLIENT then
 			local sizeX = (clipsize == 1 and 72 or 48) * uiScale
 			local sizeY = (clipsize == 1 and 13.5 or 108) * uiScale
 			local clip = math.max(self:Clip1(), 0)
-			local ammo = math.max(tonumber(owner:GetAmmoCount(self:GetPrimaryAmmoType())) or 0, 0)
+			local ammo = owner:IsPlayer() and math.max(tonumber(owner:GetAmmoCount(self:GetPrimaryAmmoType())) or 0, 0) or 0
 			local looseRoundReserve = self.AnimInsert or self.ShotgunTubeReload or (self.IsManuallyCycledWeapon and self:IsManuallyCycledWeapon())
 			local magCount = looseRoundReserve and math.floor(ammo) or math.ceil(ammo / clipsize)
 			magCount = math.max(math.floor(tonumber(magCount) or 0), 0)

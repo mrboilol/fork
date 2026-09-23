@@ -17,9 +17,9 @@ function hg.organism.CanTouchHealth(org)
 end
 
 local hg_panic = CreateConVar("hg_panic", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enables panic-attack consequences; panic still drives fear, adrenaline, and thoughts", 0, 1)
-local hg_painsound = ConVarExists("hg_painsound") and GetConVar("hg_painsound") or CreateConVar("hg_painsound", "6", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Pain audio: 0 = pain beat + reality, 1 = pain beat, 2 = agony, 3 = altpain, 4 = reality, 5 = sillypain, 6 = REM pain stack", 0, 6)
-local hg_dyingsound = ConVarExists("hg_dyingsound") and GetConVar("hg_dyingsound") or CreateConVar("hg_dyingsound", "2", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Dying audio: 0 = conscious beat + ending, 1 = conscious beat, 2 = dying, 3 = alto2, 4 = ending, 5 = sillydying, 6 = fuck, 7 = sonimcooked, 8 = REM dying 1 + 2, 9 = itshopeless, 10 = vitality", 0, 10)
-local hg_otrubsound = ConVarExists("hg_otrubsound") and GetConVar("hg_otrubsound") or CreateConVar("hg_otrubsound", "4", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Unconscious (otrub) audio: 0 = unconscious beat, 1 = altotrub, 2 = sleepy, 3 = itssoover, 4 = nga im cooked, 5 = REM dying, 6 = fuck, 7 = itshopeless", 0, 7)
+local hg_painsound = ConVarExists("hg_painsound") and GetConVar("hg_painsound") or CreateConVar("hg_painsound", "6", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Pain audio: 0 = pain beat + reality, 1 = pain beat, 2 = agony, 4 = reality, 5 = sillypain, 6 = REM pain stack", 0, 6)
+local hg_dyingsound = ConVarExists("hg_dyingsound") and GetConVar("hg_dyingsound") or CreateConVar("hg_dyingsound", "2", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Dying audio: 0 = conscious beat + ending, 1 = conscious beat, 2 = dying, 4 = ending, 5 = sillydying, 6 = fuck, 7 = sonimcooked, 8 = REM dying 1 + 2, 9 = itshopeless, 10 = vitality", 0, 10)
+local hg_otrubsound = ConVarExists("hg_otrubsound") and GetConVar("hg_otrubsound") or CreateConVar("hg_otrubsound", "0", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Unconscious (otrub) audio: 0 = unconscious beat, 2 = sleepy, 3 = itssoover, 4 = nga im cooked, 5 = REM dying, 6 = fuck, 7 = itshopeless", 0, 7)
 local panicattack_threshold = 0.45
 local panicattack_add_decay_time = 18
 local panicattack_rise_time = 1.4
@@ -1087,6 +1087,7 @@ hook.Add("EntityTakeDamage", "PanicTrackLastAttacker", function(target, dmgInfo)
 	end
 end)
 hook.Add("EntityFireBullets", "PanicTrackGunfightFire", function(ent)
+	if not IsValid(ent) then return end
 	local owner = ent:IsPlayer() and ent or (ent.GetOwner and ent:GetOwner()) or nil
 	if IsValid(owner) and owner:IsPlayer() then hg.organism.MarkPanicGunfight(owner.organism) end
 end)

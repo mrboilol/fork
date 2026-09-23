@@ -13,10 +13,11 @@ local panicFreeze = {
 	badSince = nil,
 	frozenUntil = 0,
 	stableSince = nil,
+	frozen = {},
 }
 
-local severeSimulationMs = 25
-local criticalSimulationMs = 50
+local severeSimulationMs = 50
+local criticalSimulationMs = 100
 local recoverySimulationMs = 12
 
 local ignoredModelHints = {
@@ -149,31 +150,36 @@ local function clearFurnitureRepair(ent)
 	restoreOriginalMapProp(ent)
 end
 
-local function setManagedPropMotion(ent, enabled)
-	if not IsValid(ent) then return false end
-	if ent.hg_collision_repaired ~= "vphysics" and ent.hg_collision_repaired ~= "vphysics_furniture" then return false end
-
-	local phys = ent:GetPhysicsObject()
-	if not IsValid(phys) then return false end
-
-	phys:EnableMotion(enabled)
-	if enabled then
-		phys:Wake()
-		ent.hg_collision_panic_frozen = nil
-	else
-		phys:Sleep()
-		ent.hg_collision_panic_frozen = true
-	end
-
-	return true
-end
-
-local function setPanicFreeze(enabled)
+local function freezeActivePhysics()
+	local candidates = {}
 	for _, ent in ipairs(ents.GetAll()) do
-		if ent.hg_collision_repaired then
-			setManagedPropMotion(ent, not enabled)
+		if not ent:IsPlayer() and not ent:IsNPC() and not ent:IsVehicle() and not ent:IsRagdoll() then
+			local phys = ent:GetPhysicsObject()
+			if IsValid(phys) and phys:IsMotionEnabled() and not phys:IsAsleep() then
+				local speed = phys:GetVelocity():LengthSqr()
+				if speed > 40000 then
+					candidates[#candidates + 1] = {phys = phys, speed = speed}
+				end
+			end
 		end
 	end
+	table.sort(candidates, function(a, b) return a.speed > b.speed end)
+	for i = 1, math.min(#candidates, 8) do
+		local phys = candidates[i].phys
+		phys:EnableMotion(false)
+		phys:Sleep()
+		panicFreeze.frozen[phys] = true
+	end
+end
+
+local function releasePanicFreeze()
+	for phys in pairs(panicFreeze.frozen) do
+		if IsValid(phys) then
+			phys:EnableMotion(true)
+			phys:Wake()
+		end
+	end
+	panicFreeze.frozen = {}
 end
 
 local function updatePanicFreeze()
@@ -186,10 +192,10 @@ local function updatePanicFreeze()
 		panicFreeze.badSince = panicFreeze.badSince or now
 		panicFreeze.stableSince = nil
 
-		if now - panicFreeze.badSince >= 2 then
+		if simulationMs >= criticalSimulationMs or now - panicFreeze.badSince >= 2 then
 			local hold = simulationMs >= criticalSimulationMs and 12 or 4
 			panicFreeze.frozenUntil = math.max(panicFreeze.frozenUntil, now + hold)
-			setPanicFreeze(true)
+			freezeActivePhysics()
 		end
 		return
 	end
@@ -202,7 +208,7 @@ local function updatePanicFreeze()
 		if now >= panicFreeze.frozenUntil and now - panicFreeze.stableSince >= 3 then
 			panicFreeze.frozenUntil = 0
 			panicFreeze.stableSince = nil
-			setPanicFreeze(false)
+			releasePanicFreeze()
 		end
 	else
 		panicFreeze.stableSince = nil
@@ -402,6 +408,7 @@ hook.Add("PostCleanupMap", "zcity_cleanup_map_prop_collision", function()
 	panicFreeze.badSince = nil
 	panicFreeze.frozenUntil = 0
 	panicFreeze.stableSince = nil
+	releasePanicFreeze()
 end)
 
 hook.Add("OnEntityCreated", "zcity_repair_map_prop_collision", function(ent)

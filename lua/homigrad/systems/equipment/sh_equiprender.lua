@@ -3,6 +3,58 @@ function hg.GetCurrentArmor(ply)
 end
 
 if CLIENT then
+	net.Receive("hg_configure_armor", function()
+		local ent = net.ReadEntity()
+		if not IsValid(ent) then return end
+		local state = ent:GetNetVar("ArmorItemState", {})
+		local frame = vgui.Create("DFrame")
+		frame:SetSize(310, ent.placement == "torso" and 315 or 145)
+		frame:Center()
+		frame:SetTitle("Configure " .. (hg.armorNames[ent.name] or ent.name or "armor"))
+		frame:MakePopup()
+
+		local quality = vgui.Create("DNumSlider", frame)
+		quality:Dock(TOP)
+		quality:SetText("Quality")
+		quality:SetMin(0.8)
+		quality:SetMax(1.2)
+		quality:SetDecimals(2)
+		quality:SetValue(state.quality or 1)
+
+		local material, level, sides = "ceramic", 3, "none"
+		if ent.placement == "torso" then
+			local function choice(label, options, initial, changed)
+				local row = vgui.Create("DComboBox", frame)
+				row:Dock(TOP)
+				row:DockMargin(8, 6, 8, 0)
+				row:SetValue(label .. ": " .. tostring(initial))
+				for _, option in ipairs(options) do row:AddChoice(option) end
+				row.OnSelect = function(_, _, value) changed(value) end
+			end
+			material = state.plateMaterial or material
+			level = state.plateLevel or level
+			sides = state.plateSides or sides
+			choice("Plate material", {"ceramic", "steel", "polyethylene"}, material, function(value) material = value end)
+			choice("Protection level", {"2", "3", "4", "5", "6"}, level, function(value) level = tonumber(value) end)
+			choice("Plate coverage", {"none", "front", "back", "both", "all"}, sides, function(value) sides = value end)
+		end
+
+		local apply = vgui.Create("DButton", frame)
+		apply:Dock(BOTTOM)
+		apply:SetTall(32)
+		apply:SetText("Apply armor configuration")
+		apply.DoClick = function()
+			net.Start("hg_configure_armor")
+				net.WriteEntity(ent)
+				net.WriteFloat(quality:GetValue())
+				net.WriteString(material)
+				net.WriteUInt(level, 3)
+				net.WriteString(sides)
+			net.SendToServer()
+			frame:Close()
+		end
+	end)
+
 	local ARMOR_RUST_WEAR_THRESHOLD = 0.75
 
 	local whitelist = {
@@ -913,6 +965,25 @@ if CLIENT then
 					displayName = displayName .. " [Damaged]"
 				end
 				but:SetText(displayName)
+				if accessory then
+					but:SetTooltip("Accessory protection: light ballistic and melee contact absorption where the model is hit; material and wear affect it.")
+				else
+					local placement = hg.GetArmorPlacement(equipment)
+					if placement then
+						local bullet, melee, stab = hg.GetArmorProtection(lply, placement, equipment)
+						local state = lply:GetNetVar("ArmorStates", {})[equipment] or {}
+						local info = string.format("Base ballistic %.1f | Blunt %.1f | Stab %.1f\nWeight %.1f | Quality %.0f%% | Wear %.0f%%", bullet, melee, stab, hg.GetArmorMass(lply, placement, equipment), (state.quality or 1) * 100, lply:GetNWFloat("ArmorWear" .. equipment, 0) * 100)
+						if placement == "torso" then
+							info = info .. string.format("\nPlates: %s, level %s %s", state.plateSides or "none", state.plateLevel or "-", state.plateMaterial or "")
+							if state.plateSides and state.plateSides ~= "none" then
+								local level = hg.ArmorPlateLevels[state.plateLevel] or 10
+								local material = hg.ArmorPlateMaterials[state.plateMaterial] or hg.ArmorPlateMaterials.ceramic
+								info = info .. string.format("\nCovered area: ballistic %.1f | Blunt %.1f | Stab %.1f", bullet + level * material.protection * 0.4, melee + level * 0.2, stab + level * 0.35)
+							end
+						end
+						but:SetTooltip(info)
+					end
+				end
 				but:SetFont("ZCity_Tiny")
 				but:Dock( TOP )
 				but:DockMargin( 6, 6, 6, 0 )

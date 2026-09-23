@@ -71,10 +71,11 @@ local tab = {
 --local potatopc = GetConVar("hg_potatopc") or CreateClientConVar("hg_potatopc", "0", true, false, "enable this if you are noob", 0, 1)
 local function getServerSoundMode(name, fallback)
 	local convar = GetConVar(name)
-	return convar and convar:GetInt() or fallback
+	local mode = convar and convar:GetInt() or fallback
+	if ((name == "hg_painsound" or name == "hg_dyingsound") and mode == 3) or (name == "hg_otrubsound" and mode == 1) then return fallback end
+	return mode
 end
 local otrubSoundPaths = {
-	[1] = "sound/altotrub.mp3",
 	[2] = "sound/sleepy.mp3",
 	[3] = "sound/itssoover.mp3",
 	[4] = "sound/ngaimcooked.mp3",
@@ -900,10 +901,6 @@ local function stopthings()
 		AgonyStation = nil
 	end
 
-	if IsValid(AltpainStation) then
-		AltpainStation:Stop()
-		AltpainStation = nil
-	end
 
 	if IsValid(RemAgonyStation) then
 		RemAgonyStation:Stop()
@@ -978,10 +975,6 @@ local function stopthings()
 	if IsValid(EndStation) then
 		EndStation:Stop()
 		EndStation = nil
-	end
-	if IsValid(Alto2Station) then
-		Alto2Station:Stop()
-		Alto2Station = nil
 	end
 
 	suicideLerp = 0
@@ -1191,12 +1184,12 @@ drawFinalVitalsVignettes = function()
 		render.DrawScreenQuad()
 	end
 
-	if consciousnessVignetteLerp > 0.005 then
+	if consciousnessVignetteLerp > 0.005 or otrubVisualLerp > 0.005 then
 		local consciousnessBorder = math.Clamp(consciousnessVignetteLerp ^ 0.82, 0, 1)
 		render.UpdateScreenEffectTexture()
 		vignetteMat:SetFloat("$c2_x", CurTime() + 9750)
-		vignetteMat:SetFloat("$c0_z", consciousnessBorder * 0.78)
-		vignetteMat:SetFloat("$c1_y", consciousnessBorder * 1.48)
+		vignetteMat:SetFloat("$c0_z", math.max(consciousnessBorder * 0.78, otrubVisualLerp))
+		vignetteMat:SetFloat("$c1_y", math.max(consciousnessBorder * 1.48, otrubVisualLerp * 5))
 		render.SetMaterial(vignetteMat)
 		render.DrawScreenQuad()
 	end
@@ -1360,9 +1353,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	if IsValid(AgonyStation) then
 		AgonyStation:SetVolume(0)
 	end
-	if IsValid(AltpainStation) then
-		AltpainStation:SetVolume(0)
-	end
 	if IsValid(RemAgonyStation) then
 		RemAgonyStation:SetVolume(0)
 	end
@@ -1507,18 +1497,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end)
 	end
 
-	if canRetrySound("AltpainStation", AltpainStation) then
-		sound.PlayFile("sound/altpain.mp3", "noblock noplay", function(station)
-			if IsValid(station) then
-				station:SetVolume(0)
-				station:Play()
-				station:SetTime(math.min(math.Rand(0, station:GetLength()), 139))
-				AltpainStation = station
-				station:EnableLooping(true)
-			end
-		end)
-	end
-
 	if painMode == 6 and not RemAgonyStationLoading and canRetrySound("RemAgonyStation", RemAgonyStation) then
 		RemAgonyStationLoading = true
 		sound.PlayFile("sound/rem_agony.mp3", "noblock noplay", function(station)
@@ -1568,7 +1546,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	end
 
 	if canRetrySound("DyingStation", DyingStation) then
-		sound.PlayFile("sound/dying.mp3", "noblock noplay", function(station)
+		sound.PlayFile("sound/drawyourlastdick.ogg", "noblock noplay", function(station)
 			if IsValid(station) then
 				station:SetVolume(0)
 				station:Play()
@@ -1655,18 +1633,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				station:Play()
 				station:SetTime(math.min(math.Rand(0, station:GetLength()), 139))
 				SonimCookedStation = station
-				station:EnableLooping(true)
-			end
-		end)
-	end
-
-	if canRetrySound("Alto2Station", Alto2Station) then
-		sound.PlayFile("sound/alto2.mp3", "noblock noplay", function(station)
-			if IsValid(station) then
-				station:SetVolume(0)
-				station:Play()
-				station:SetTime(math.min(math.Rand(0, station:GetLength()), 139))
-				Alto2Station = station
 				station:EnableLooping(true)
 			end
 		end)
@@ -1954,7 +1920,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			local targetPainVolume = 0
 			local targetRealityVolume = 0
 			local targetAgonyVolume = 0
-			local targetAltpainVolume = 0
 			local targetSillypainVolume = 0
 			local targetRemPainVolume = 0
 			local targetRemAgonyVolume = 0
@@ -1967,8 +1932,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				targetPainVolume = painVolume
 			elseif painMode == 2 then
 				targetAgonyVolume = painVolume
-			elseif painMode == 3 then
-				targetAltpainVolume = painVolume
 			elseif painMode == 4 then
 				targetRealityVolume = painVolume
 			elseif painMode == 5 then
@@ -1990,7 +1953,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			end
 			if IsValid(RealityStation) then RealityStation:SetVolume(targetRealityVolume) end
 			if IsValid(AgonyStation) then AgonyStation:SetVolume(targetAgonyVolume) end
-			if IsValid(AltpainStation) then AltpainStation:SetVolume(targetAltpainVolume) end
 			if IsValid(RemAgonyStation) then
 				RemAgonyStation:SetVolume(targetRemAgonyVolume)
 				RemAgonyStation:SetPlaybackRate(painPitch / 100)
@@ -2268,9 +2230,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				if IsValid(DyingStation) then
 					DyingStation:SetVolume(0)
 				end
-				if IsValid(AltpainStation) then
-					AltpainStation:SetVolume(0)
-				end
 				if IsValid(SillydyingStation) then
 					SillydyingStation:SetVolume(0)
 				end
@@ -2285,14 +2244,11 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				if IsValid(DyingStation) then
 					DyingStation:SetVolume(0)
 				end
-				if IsValid(AltpainStation) then
-					AltpainStation:SetVolume(0)
-				end
 				if IsValid(SillydyingStation) then
 					SillydyingStation:SetVolume(0)
 				end
 			elseif dyingMode == 2 then
-				-- Only dying.ogg with sound peak detection for screen shake
+				-- Dying track with sound peak detection for screen shake
 				if IsValid(NoiseStation2) then
 					NoiseStation2:SetVolume(0)
 				end
@@ -2326,26 +2282,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 						end
 					end
 				end
-				if IsValid(AltpainStation) then
-					AltpainStation:SetVolume(0)
-				end
-				if IsValid(SillydyingStation) then
-					SillydyingStation:SetVolume(0)
-				end
-			elseif dyingMode == 3 then
-				-- Only alto2.ogg, no screen shake
-				if IsValid(NoiseStation2) then
-					NoiseStation2:SetVolume(0)
-				end
-				if IsValid(EndStation) then
-					EndStation:SetVolume(0)
-				end
-				if IsValid(DyingStation) then
-					DyingStation:SetVolume(0)
-				end
-				if IsValid(Alto2Station) then
-					Alto2Station:SetVolume(consciousVol)
-				end
 				if IsValid(SillydyingStation) then
 					SillydyingStation:SetVolume(0)
 				end
@@ -2359,9 +2295,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				end
 				if IsValid(DyingStation) then
 					DyingStation:SetVolume(0)
-				end
-				if IsValid(AltpainStation) then
-					AltpainStation:SetVolume(0)
 				end
 				if IsValid(SillydyingStation) then
 					SillydyingStation:SetVolume(0)
@@ -2377,9 +2310,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				if IsValid(DyingStation) then
 					DyingStation:SetVolume(0)
 				end
-				if IsValid(AltpainStation) then
-					AltpainStation:SetVolume(0)
-				end
 				if IsValid(SillydyingStation) then
 					SillydyingStation:SetVolume(consciousVol)
 				end
@@ -2393,9 +2323,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				end
 				if IsValid(DyingStation) then
 					DyingStation:SetVolume(0)
-				end
-				if IsValid(AltpainStation) then
-					AltpainStation:SetVolume(0)
 				end
 				if IsValid(SillydyingStation) then
 					SillydyingStation:SetVolume(0)
@@ -2440,9 +2367,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				if IsValid(DyingStation) then
 					DyingStation:SetVolume(0)
 				end
-				if IsValid(AltpainStation) then
-					AltpainStation:SetVolume(0)
-				end
 				if IsValid(SillydyingStation) then
 					SillydyingStation:SetVolume(0)
 				end
@@ -2462,9 +2386,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				end
 				if IsValid(DyingStation) then
 					DyingStation:SetVolume(0)
-				end
-				if IsValid(AltpainStation) then
-					AltpainStation:SetVolume(0)
 				end
 				if IsValid(SillydyingStation) then
 					SillydyingStation:SetVolume(0)
@@ -2494,12 +2415,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				if IsValid(DyingStation) then
 					DyingStation:SetVolume(0)
 				end
-				if IsValid(Alto2Station) then
-					Alto2Station:SetVolume(0)
-				end
-				if IsValid(AltpainStation) then
-					AltpainStation:SetVolume(0)
-				end
 				if IsValid(SillydyingStation) then
 					SillydyingStation:SetVolume(0)
 				end
@@ -2521,12 +2436,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				end
 				if IsValid(DyingStation) then
 					DyingStation:SetVolume(0)
-				end
-				if IsValid(Alto2Station) then
-					Alto2Station:SetVolume(0)
-				end
-				if IsValid(AltpainStation) then
-					AltpainStation:SetVolume(0)
 				end
 				if IsValid(SillydyingStation) then
 					SillydyingStation:SetVolume(0)
@@ -2577,9 +2486,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			if IsValid(DyingStation) then
 				DyingStation:SetVolume(0)
 			end
-			if IsValid(Alto2Station) then
-				Alto2Station:SetVolume(0)
-			end
 			if IsValid(SillydyingStation) then
 				SillydyingStation:SetVolume(0)
 			end
@@ -2601,7 +2507,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end
 		
 		if (o2 > 20 or incapacitated) and org.otrub then
-			local otrubMode = getServerSoundMode("hg_otrubsound", 4)
+			local otrubMode = getServerSoundMode("hg_otrubsound", 0)
 			-- OTRU audio is selected solely by hg_otrubsound.  Remorseism
 			-- incapacitation is a gameplay state, not an audio override: otherwise it
 			-- replaced every configured OTRU track with rem_dying1.
@@ -2651,7 +2557,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 					local requestedMode = otrubMode
 					sound.PlayFile(otrubSoundPaths[requestedMode], "noblock noplay", function(station)
 						if not IsValid(station) then return end
-						if getServerSoundMode("hg_otrubsound", 4) ~= requestedMode then
+						if getServerSoundMode("hg_otrubsound", 0) ~= requestedMode then
 							station:Stop()
 							return
 						end

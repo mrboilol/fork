@@ -181,6 +181,7 @@ end
 	end
 ---------------------------------------------------------------
     function ENT:Unwear(entUser, bDontChangeMaterials, noChange)
+        local trace = entUser:IsPlayer() and hg.eyeTrace(entUser) or nil
         if !noChange then
             local Equipment = entUser:GetNetVar("zc_equipment", {})
             table.RemoveByValue(Equipment, self:EntIndex())
@@ -218,13 +219,13 @@ end
 
         timer.Simple(0,function()
             if !IsValid(self) or !IsValid(entUser) then return end
-            self:SetPos(entUser:IsPlayer() and hg.eyeTrace(entUser).StartPos or entUser:GetPos())
+            self:SetPos(trace and trace.StartPos or entUser:GetPos())
         end)
         if !noChange then
             local phys = self:GetPhysicsObject()
             if IsValid(phys) then
                 phys:Wake()
-                phys:AddVelocity(entUser:IsPlayer() and hg.eyeTrace(entUser).Normal * 65 or vector_origin)
+                phys:AddVelocity(trace and trace.Normal * 65 or vector_origin)
             end
 
             self:SetAngles(entUser:EyeAngles())

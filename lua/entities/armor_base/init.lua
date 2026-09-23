@@ -5,6 +5,17 @@ include("shared.lua")
 
 local vecZero, vec30 = Vector(0,0,0), Vector(0,0,30)
 function ENT:Initialize()
+	local armorData = self.placement and hg.armor[self.placement] and hg.armor[self.placement][self.name]
+	if armorData and not self.armorState then
+		local namedLevel = (hg.armorNames[self.name] or ""):match("%s[IVX]+$") ~= nil
+		self.armorState = {quality = math.Rand(0.8, 1.2), fixedLevel = namedLevel}
+		if self.placement == "torso" then
+			self.armorState.plateMaterial = table.Random({"ceramic", "steel", "polyethylene"})
+			self.armorState.plateLevel = math.random(2, 6)
+			self.armorState.plateSides = table.Random({"none", "front", "back", "both", "all"})
+		end
+	end
+	if self.armorState then self:SetNetVar("ArmorItemState", self.armorState) end
 	self:SetModel(self.PhysModel or self.Model)
 	self:PhysicsInit(SOLID_VPHYSICS)
 	self:SetMoveType(MOVETYPE_VPHYSICS)
@@ -31,7 +42,7 @@ function ENT:Initialize()
 
 	local phys = self:GetPhysicsObject()
 	if IsValid(phys) then
-		phys:SetMass(10)
+		phys:SetMass(hg.GetArmorMass(self, self.placement, self.name))
 		phys:Wake()
 		phys:EnableMotion(true)
 	end
@@ -98,9 +109,9 @@ end
 		ply.armors_broken[equipment] = self.broken or self:GetNWBool("ArmorBroken", false) or nil
 		ply.armors_broken_mul[equipment] = ply.armors_broken[equipment] and (self.brokenProtectionMul or hg.GetBrokenArmorProtectionMul()) or nil
 		ply.armors_shots[equipment] = ply.armors_broken[equipment] and nil or self.shotsLeft or hg.GetArmorBreakShotCount(equipment)
-		ply.armors_health[equipment] = self.armorHealth or ply.armors_health[equipment] or 1
 		local placement = hg.GetArmorPlacement(equipment)
 		local armorData = placement and hg.armor[placement] and hg.armor[placement][equipment]
+		ply.armors_health[equipment] = self.armorHealth or (armorData and armorData.health) or 1
 		ply.armors_durability[equipment] = self.armorDurability or (armorData and armorData.durability) or 450
 		ply.armors_regions[equipment] = table.Copy(self.armorRegions or {})
 		ply.armor_states = ply.armor_states or {}
@@ -121,6 +132,7 @@ end
 		self.armorRegions = ply.armors_regions and table.Copy(ply.armors_regions[equipment] or {})
 		self:SetNWFloat("ArmorWear", ply:GetNWFloat("ArmorWear" .. equipment, 0))
 		self.armorState = ply.armor_states and table.Copy(ply.armor_states[equipment] or {}) or nil
+		self:SetNetVar("ArmorItemState", self.armorState or {})
 		if ply.armors_broken and ply.armors_broken[equipment] then
 			hg.SetArmorBrokenEntity(self)
 			self.shotsLeft = nil

@@ -7,7 +7,7 @@ local internalBleedDefaultComplicationDelay = 120
 hg.organism.module.blood = {}
 local module = hg.organism.module.blood
 local hg_infections = ConVarExists("hg_infections") and GetConVar("hg_infections") or CreateConVar("hg_infections",1,FCVAR_ARCHIVE + FCVAR_NOTIFY,"Enable infections system",0,1)
-local hg_blood_ground_limit = ConVarExists("hg_blood_ground_limit") and GetConVar("hg_blood_ground_limit") or CreateConVar("hg_blood_ground_limit", 600, FCVAR_ARCHIVE + FCVAR_REPLICATED, "Maximum persistent ground blood stains", 1, 2000)
+local hg_blood_ground_limit = ConVarExists("hg_blood_ground_limit") and GetConVar("hg_blood_ground_limit") or CreateConVar("hg_blood_ground_limit", 2500, FCVAR_ARCHIVE + FCVAR_REPLICATED, "Maximum persistent ground blood stains", 1, 5000)
 local tranexamicOnsetDelay = 8
 
 function hg.organism.AdministerTranexamic(org, dose)
