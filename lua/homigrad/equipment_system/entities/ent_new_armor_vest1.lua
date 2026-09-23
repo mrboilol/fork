@@ -102,7 +102,7 @@ ENT.SlotOccupation = {                              -- Slots what armor occupate
     }
     --\\ FrontPlate
         ENT.FrontPlate = {}
-        ENT.FrontPlate.Protection = ZC_ARMOR_PROTCLASS_III
+        ENT.FrontPlate.Protection = ZC_ARMOR_PROTCLASS_IV
             --\\ Protection classes
                 -- ZC_ARMOR_PROTCLASS_II = 4
                 -- ZC_ARMOR_PROTCLASS_IIIA = 8
@@ -134,6 +134,7 @@ ENT.SlotOccupation = {                              -- Slots what armor occupate
         ENT.BackPlate.Protection = ZC_ARMOR_PROTCLASS_III
         ENT.BackPlate.ProtectionDamageMul = 0.4                   -- protected damage mul
         ENT.BackPlate.PenetratedDamageMul = 0.7                   -- penetrated damage mul
+        ENT.BackPlate.Protection = ZC_ARMOR_PROTCLASS_IV
 
         ENT.BackPlate.BalisticMaterial = ZC_ARMOR_MATERIAL_CERAMIC -- actually this is just a mul of degradation armor
         ENT.BackPlate.Durability = 170                            -- durability
