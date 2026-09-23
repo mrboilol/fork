@@ -15,7 +15,7 @@ local tracePos = Vector(0, 0, 0)
 
 function hg.organism.Trace(pos, dir, size, maxpen, boxs, center, endDis, organs, ricochetable, funcInput, impact, ...)
 	local endDisSqr = endDis * endDis
-	tracePos:Set(pos - dir * 1)
+	tracePos:Set(pos - dir * 5)
 
 	local hitBoxs = {}
 	local nearbyRolls = {}
