@@ -1254,7 +1254,10 @@ util.AddNetworkString("Abnormalties(SendOpenedPage)")
 	hook.Add("HG_BloodParticleStartedDropping", "Abnormalties", function(owner, org, wound, dir, artery)
 		if(GetGlobalBool("AbnormaltiesEnabled", false) and IsValid(owner))then
 			local ent = owner:IsPlayer() and IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
-			local pos, ang = ent:GetBonePosition(ent:LookupBone(wound[4]))
+			local woundBone = wound[4]
+			local bone = isnumber(woundBone) and woundBone or isstring(woundBone) and ent:LookupBone(woundBone)
+			if not bone or bone < 0 then return end
+			local pos = ent:GetBonePosition(bone)
 			if not pos then return end
 			local trace_data = {
 				start = pos,

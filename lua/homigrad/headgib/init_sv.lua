@@ -318,11 +318,11 @@ for _, snd in ipairs(sounds) do
 end
 for _, snd in ipairs(fullBodySounds) do util.PrecacheSound(snd) end
 util.PrecacheSound(fullBodyMainSound)
-local function sendGibBloodSpill(ent, stump, trail)
+local function sendGibBloodSpill(ent, stump, trail, amount)
 	if not IsValid(ent) then return end
 	net.Start("hg_gib_bloodspill")
 	net.WriteUInt(ent:EntIndex(), 16)
-	net.WriteFloat(math.Rand(5, 10))
+	net.WriteFloat(amount or math.Rand(5, 10))
 	net.WriteBool(stump or false)
 	net.WriteBool(trail or false)
 	net.SendPVS(ent:GetPos())
@@ -363,7 +363,7 @@ function Gib_UpdateHeadGoreStage(rag, damage)
 	rag.headGoreStage = stage
 	if IsValid(rag.headGore) then
 		rag.headGore:SetModel(headModels[stage])
-		sendGibBloodSpill(rag.headGore, true)
+		sendGibBloodSpill(rag.headGore, true, false, math.Rand(36, 48))
 		SpawnMeatGore(rag.headGore, rag.headGore:GetPos(), 3, VectorRand(-120, 120), 0.45, false, hg.HeadGibModels(rag.organism))
 		return
 	end
@@ -374,7 +374,7 @@ function Gib_UpdateHeadGoreStage(rag, damage)
 	if not pos then gore:Remove() return end
 	gore:Spawn()
 	rag.headGore = gore
-	sendGibBloodSpill(gore, true)
+	sendGibBloodSpill(gore, true, false, math.Rand(36, 48))
 	SpawnMeatGore(gore, pos, 3, VectorRand(-120, 120), 0.45, false, hg.HeadGibModels(rag.organism))
 	rag:CallOnRemove("remove_head_gore", function()
 		if IsValid(gore) then gore:Remove() end
@@ -424,7 +424,7 @@ function Gib_Input(rag, bone, force, damage)
 		headVis:Spawn()
 		rag.headGore = headVis
 		rag.headGoreStage = stage
-		sendGibBloodSpill(headVis, true)
+		sendGibBloodSpill(headVis, true, false, math.Rand(36, 48))
 
 		SpawnMeatGore(headVis, pos, nil, force, nil, false, hg.HeadGibModels(rag.organism))
 		rag:CallOnRemove("remove_head_gore", function()

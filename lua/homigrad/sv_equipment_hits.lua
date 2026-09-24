@@ -720,7 +720,7 @@ function hg.TryAbsorbEquipmentImpact(ent, dmgInfo, hitPos, direction, impactRadi
         local obstruction = util.TraceLine({start = hitPos, endpos = startPos, filter = traceFilter})
         if obstruction.Hit then startPos = obstruction.HitPos end
         local equipmentHits = {}
-        if IsValid(wep) then
+        if IsValid(wep) and wep ~= dmgInfo:GetInflictor() then
             local weaponHit = TraceHeldWeaponModel(ply, wep, startPos, hitPos + dir, impact.Config.weaponHitPadding + radius)
             if weaponHit then weaponHit.weapon, weaponHit.ply = wep, ply; equipmentHits[#equipmentHits + 1] = weaponHit end
         end
@@ -919,6 +919,11 @@ local function TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, ori
     if not isvector(startPos) or not isvector(endPos) or startPos:DistToSqr(endPos) < 0.000001 then return originalTrace end
     originalTrace = originalTrace or {}
     shot = shot or {}
+    local firingWeapon = IsValid(shot.Inflictor) and shot.Inflictor:IsWeapon() and shot.Inflictor or nil
+    if IsValid(shooter) and shooter:IsWeapon() then
+        firingWeapon = firingWeapon or shooter
+        shooter = shooter:GetOwner()
+    end
     shot.EquipmentHits = shot.EquipmentHits or {}
     local seen, hits, checkedBodies, armTraces = shot.EquipmentHits, {}, {}, {}
     local segment = endPos - startPos
@@ -946,7 +951,7 @@ local function TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, ori
         checkedBodies[ply] = true
         local wep = ply:GetActiveWeapon()
         local pose
-        if IsValid(wep) and CanHit(wep) and (shot.Contact or not seen[wep]) then
+        if IsValid(wep) and wep ~= firingWeapon and CanHit(wep) and (shot.Contact or not seen[wep]) then
             local hit
             hit, pose = TraceHeldWeaponModel(ply, wep, startPos, endPos, cfg.weaponHitPadding + projectileRadius)
             if hit and hit.fraction <= obstructionFraction + 0.0001 then hit.weapon, hit.ply, hit.key = wep, ply, wep; hit.shot = shot; hits[#hits + 1] = hit end

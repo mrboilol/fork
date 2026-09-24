@@ -2339,3 +2339,17 @@ do
 		end
 	end
 end
+
+hg.judgeArmor = {}
+for placement, armors in pairs(hg.armor) do hg.judgeArmor[placement] = table.Copy(armors) end
+hg.judgeArmorNames = table.Copy(hg.armorNames)
+hg.judgeArmorIcons = table.Copy(hg.armorIcons)
+
+for placement, armors in pairs(hg.zcityArmor or {}) do
+	hg.armor[placement] = hg.armor[placement] or {}
+	for name, data in pairs(armors) do
+		hg.armor[placement][name] = data
+	end
+end
+for name, label in pairs(hg.zcityArmorNames or {}) do hg.armorNames[name] = label end
+for name, icon in pairs(hg.zcityArmorIcons or {}) do hg.armorIcons[name] = icon end

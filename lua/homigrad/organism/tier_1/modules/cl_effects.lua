@@ -245,7 +245,7 @@ hook.Add("RenderScreenspaceEffects", "overdoseEffect", function()
 		DrawToyTown(2, i * 0.4 * ScrH())
 	end
 	if not ply:HasTrait("blind") and strength > 0.4 then
-		DrawMotionBlur(0.08 * i, 0.25 * i, 0.02)
+		hg.DrawWorldMotionBlur(0.08 * i, 0.25 * i, 0.02)
 	end
 
 	overdose_color_tab["$pp_colour_colour"] = 1 - i * 0.3

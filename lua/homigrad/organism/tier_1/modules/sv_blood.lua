@@ -633,14 +633,18 @@ module[2] = function(owner, org, mulTime)
 		-- not subtract a second packet of blood. That prevents the old tick-rate-
 		-- dependent double loss while preserving pressure-synchronized spraying.
 		if wound[5] + next_arterypump < time then
-			local pos, ang = ent:GetBonePosition(ent:LookupBone(wound[4]))
+			local woundBone = wound[4]
+			local bone = isnumber(woundBone) and woundBone or isstring(woundBone) and ent:LookupBone(woundBone)
 			wound[5] = time
-			if tourniquetBleedMul > 0 and (isAlive or not isPlayer) and arterialDrive > 0.01 then
-				local dir = wound[6]
-				local len = dir:Length()
-				local _, dir = LocalToWorld(vecZero, dir:Angle(), vecZero, ang)
-				dir = -dir:Forward() * len
-				hg.organism.BloodDroplet2(owner, org, wound, ownerVel + VectorRand(-10, 10) + dir, true)
+			if bone and bone >= 0 and tourniquetBleedMul > 0 and (isAlive or not isPlayer) and arterialDrive > 0.01 then
+				local _, ang = ent:GetBonePosition(bone)
+				if ang then
+					local dir = wound[6]
+					local len = dir:Length()
+					local _, dir = LocalToWorld(vecZero, dir:Angle(), vecZero, ang)
+					dir = -dir:Forward() * len
+					hg.organism.BloodDroplet2(owner, org, wound, ownerVel + VectorRand(-10, 10) + dir, true)
+				end
 			end
 		end
 

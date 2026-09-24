@@ -60,6 +60,6 @@ hook.Add("RenderScreenspaceEffects", "PepperSprayVisualsBlur", function()
     end
     if strength > 0.5 then
         local blurAmt = (strength - 0.5) * 2
-        DrawMotionBlur(0.1, blurAmt * 0.8, 0.01)
+        hg.DrawWorldMotionBlur(0.1, blurAmt * 0.8, 0.01)
     end
 end)

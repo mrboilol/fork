@@ -177,7 +177,7 @@ local function Ragdoll_CreateInternal(ply)
 		end
 	end)
 	ragdoll:AddCallback("PhysicsCollide", function(outEnt, data) hook_Run("Ragdoll Collide", ragdoll, data) end)
-	local velocity = ply:GetVelocity()
+	local velocity = ply.hgAirborneImpact and ply.hgAirborneImpact.velocity or ply:GetVelocity()
 	--local phys = ragdoll:GetPhysicsObject()
 	--if IsValid(phys) then --phys:SetMass(20)
 	--end
@@ -337,14 +337,19 @@ local function Ragdoll_CreateInternal(ply)
 			local _,ang = LocalToWorld(vecZero,Angle(-80,0,90),vecZero,ply:EyeAngles())
 			phys:SetAngles(ang)
 		end
-		phys:SetVelocity(velocity)
-		--phys:EnableDrag(true)
-		--phys:SetDragCoefficient( 1500 )
-		--phys:SetDamping(0,2)
 		--print(bone)
 		--[[if !string.find(ragdoll:GetBoneName(bone),"L") then
 			phys:EnableMotion(false)
 		end--]]
+	end
+
+	for physNum = 0, ragdoll:GetPhysicsObjectCount() - 1 do
+		local phys = ragdoll:GetPhysicsObjectNum(physNum)
+		if not IsValid(phys) then continue end
+		local _, angularDamping = phys:GetDamping()
+		phys:SetDamping(0, angularDamping)
+		phys:EnableDrag(false)
+		phys:SetVelocity(velocity)
 		phys:Wake()
 	end
 

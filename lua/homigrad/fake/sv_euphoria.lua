@@ -7,10 +7,10 @@ local EUPHORIA_TENSION_ANG = 12
 local EUPHORIA_TENSION_LIN = 3
 local EUPHORIA_LANDING_MIN_SPEED = 180
 local EUPHORIA_LANDING_MIN_HS = 110
-local EUPHORIA_LANDING_ABSORB = 0.65
+local EUPHORIA_LANDING_ABSORB = 0.15
 local EUPHORIA_LANDING_ABSORB_CONTROL = 0.35
 local EUPHORIA_SETTLE_TIME = 1.1
-local EUPHORIA_SETTLE_LIN = 3
+local EUPHORIA_SETTLE_LIN = 0.5
 local EUPHORIA_SETTLE_ANG = 1.8
 local EUPHORIA_WOUND_GRAB_TIME = 1.4
 local EUPHORIA_WOUND_GRAB_PULL = 700
@@ -39,8 +39,6 @@ local EUPHORIA_CURL_TRIGGER = 2
 local EUPHORIA_CURL_MIN_DAMAGE = 8
 local EUPHORIA_CURL_EASE = 0.3
 
-local EUPHORIA_MAX_HORIZONTAL_VELOCITY = 300
-local EUPHORIA_MAX_UPWARD_VELOCITY = 160
 local EUPHORIA_MAX_RELATIVE_VELOCITY = 200
 local EUPHORIA_MAX_COMMON_ANGULAR = 85
 local EUPHORIA_MAX_RELATIVE_ANGULAR = 180
@@ -75,29 +73,17 @@ hook.Add("Think", "HG_EuphoriaSafety", function()
 
 		commonVelocity = commonVelocity / totalMass
 		commonAngular = commonAngular / totalMass
-		local safeCommon = Vector(commonVelocity.x, commonVelocity.y, math.min(commonVelocity.z, EUPHORIA_MAX_UPWARD_VELOCITY))
 		local safeCommonAngular = clampVec(commonAngular, EUPHORIA_MAX_COMMON_ANGULAR)
-		local horizontal = Vector(safeCommon.x, safeCommon.y, 0)
-		if horizontal:LengthSqr() > EUPHORIA_MAX_HORIZONTAL_VELOCITY * EUPHORIA_MAX_HORIZONTAL_VELOCITY then
-			horizontal = clampVec(horizontal, EUPHORIA_MAX_HORIZONTAL_VELOCITY)
-			safeCommon.x = horizontal.x
-			safeCommon.y = horizontal.y
-		end
-		local commonCorrection = safeCommon - commonVelocity
 		local commonAngularCorrection = safeCommonAngular - commonAngular
 
 		for j = 0, ragdoll:GetPhysicsObjectCount() - 1 do
 			local phys = ragdoll:GetPhysicsObjectNum(j)
 			if not IsValid(phys) or not phys:IsMotionEnabled() then continue end
 
-			local velocity = phys:GetVelocity() + commonCorrection
-			local relativeVelocity = velocity - safeCommon
-			local velocityChanged = commonCorrection:LengthSqr() > 0.0001
+			local relativeVelocity = phys:GetVelocity() - commonVelocity
 			if relativeVelocity:LengthSqr() > EUPHORIA_MAX_RELATIVE_VELOCITY * EUPHORIA_MAX_RELATIVE_VELOCITY then
-				velocity = safeCommon + clampVec(relativeVelocity, EUPHORIA_MAX_RELATIVE_VELOCITY)
-				velocityChanged = true
+				phys:SetVelocity(commonVelocity + clampVec(relativeVelocity, EUPHORIA_MAX_RELATIVE_VELOCITY))
 			end
-			if velocityChanged then phys:SetVelocity(velocity) end
 
 			local angular = phys:GetAngleVelocity() + commonAngularCorrection
 			local relativeAngular = angular - safeCommonAngular
@@ -136,10 +122,23 @@ local function tensionBones(ragdoll, strength, dtime, allowLinear)
 	local linK = allowLinear and math.min(strength * EUPHORIA_TENSION_LIN * dtime, 0.85) or 0
 	if angK <= 0 and linK <= 0 then return end
 
+	local commonVelocity, totalMass = Vector(0, 0, 0), 0
+	if linK > 0 then
+		for i = 0, ragdoll:GetPhysicsObjectCount() - 1 do
+			if isFloppyBone(ragdoll, i) then continue end
+			local phys = ragdoll:GetPhysicsObjectNum(i)
+			if not IsValid(phys) or not phys:IsMotionEnabled() then continue end
+			local mass = phys:GetMass()
+			commonVelocity = commonVelocity + phys:GetVelocity() * mass
+			totalMass = totalMass + mass
+		end
+		if totalMass > 0 then commonVelocity = commonVelocity / totalMass end
+	end
+
 	for i = 0, ragdoll:GetPhysicsObjectCount() - 1 do
 		if isFloppyBone(ragdoll, i) then continue end
 		local phys = ragdoll:GetPhysicsObjectNum(i)
-		if not IsValid(phys) then continue end
+		if not IsValid(phys) or not phys:IsMotionEnabled() then continue end
 
 		if angK > 0 then
 			local av = phys:GetAngleVelocity()
@@ -149,7 +148,7 @@ local function tensionBones(ragdoll, strength, dtime, allowLinear)
 		end
 
 		if linK > 0 then
-			local lv = phys:GetVelocity()
+			local lv = phys:GetVelocity() - commonVelocity
 			if lv:LengthSqr() > 16 then
 				phys:AddVelocity(-lv * linK)
 			end
@@ -199,7 +198,7 @@ local function landingReaction(ragdoll, ply, hSpeed)
 
 	local absorb = EUPHORIA_LANDING_ABSORB * math.min(hSpeed / EUPHORIA_LANDING_MIN_HS, 1)
 	if controlling then absorb = absorb * EUPHORIA_LANDING_ABSORB_CONTROL end
-	absorb = math.Clamp(absorb * (0.5 + conscious * 0.5) * (1 - berserk * 0.12), 0.15, 0.9)
+	absorb = math.Clamp(absorb * (0.5 + conscious * 0.5) * (1 - berserk * 0.12), 0, EUPHORIA_LANDING_ABSORB)
 
 	for i = 0, ragdoll:GetPhysicsObjectCount() - 1 do
 		if isFloppyBone(ragdoll, i) then continue end
@@ -335,12 +334,14 @@ hook.Add("Ragdoll Collide", "HG_EuphoriaLanding", function(ragdoll, data)
 
 	local speed = vel:Length()
 	if speed < EUPHORIA_LANDING_MIN_SPEED then return end
+	if (ragdoll.hgNextLandingReaction or 0) > CurTime() then return end
 
 	local hSpeed = Vector(vel.x, vel.y, 0):Length()
 
 	local ply = hg.RagdollOwner(ragdoll)
 	if not IsValid(ply) then return end
 
+	ragdoll.hgNextLandingReaction = CurTime() + 0.2
 	landingReaction(ragdoll, ply, hSpeed)
 end)
 

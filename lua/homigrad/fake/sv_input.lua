@@ -15,6 +15,44 @@ concommand.Add("fake", function(ply)
 	ply._godFakeBypass = nil
 end)
 
+hook.Add("Move", "HG_AirborneImpact", function(ply, mv)
+	ply.hgAirborneImpact = nil
+	if not ply:Alive() or IsValid(ply.FakeRagdoll) or ply:OnGround() then return end
+	if ply:InVehicle() or ply:GetMoveType() ~= MOVETYPE_WALK or ply:WaterLevel() >= 2 or ply:IsFlagSet(FL_FROZEN) then return end
+
+	local velocity = mv:GetVelocity()
+	if velocity:LengthSqr() <= 1 then return end
+	local mins, maxs
+	if ply:Crouching() then
+		mins, maxs = ply:GetHullDuck()
+	else
+		mins, maxs = ply:GetHull()
+	end
+	local tr = util.TraceHull({
+		start = mv:GetOrigin(),
+		endpos = mv:GetOrigin() + velocity * FrameTime(),
+		mins = mins,
+		maxs = maxs,
+		filter = ply,
+		mask = MASK_PLAYERSOLID,
+		collisiongroup = COLLISION_GROUP_PLAYER_MOVEMENT
+	})
+	if not tr.Hit or tr.StartSolid or tr.AllSolid or tr.HitSky or tr.HitNormal.z >= 0.7 then return end
+	if velocity:Dot(tr.HitNormal) >= -1 then return end
+	ply.hgAirborneImpact = {velocity = velocity, normal = tr.HitNormal}
+end)
+
+hook.Add("FinishMove", "HG_AirborneImpact", function(ply, mv)
+	local impact = ply.hgAirborneImpact
+	if not impact then return end
+	if ply:Alive() and not IsValid(ply.FakeRagdoll) and not ply:InVehicle() and ply:GetMoveType() == MOVETYPE_WALK
+		and mv:GetVelocity():Dot(impact.normal) > impact.velocity:Dot(impact.normal) + 1 then
+		ply:SetPos(mv:GetOrigin())
+		hg.Fake(ply, nil, nil, nil, "airborne_impact")
+	end
+	ply.hgAirborneImpact = nil
+end)
+
 hook.Add("PlayerInitialSpawn", "PlayerColideCallback", function(ply) ply:AddCallback("PhysicsCollide", function(phys, data) hook.Run("PlayerCollide", ply, data.HitEntity, data) end) end)
 hook.Add("PlayerCollide", "Fake", function(ply, ent, data)
 	if not IsValid(ply) or not IsValid(ent) or not data or not isnumber(data.Speed) then return end

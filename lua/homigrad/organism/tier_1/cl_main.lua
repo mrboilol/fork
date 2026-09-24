@@ -580,24 +580,25 @@ local function DrawScreenFillShape(x, y, radius, segments, roughness, timeOffset
 	surface.DrawPoly(poly)
 end
 
-local function DrawIncapacitatedDeathFade(deathStateEnd)
+local function DrawIncapacitatedDeathFade(deathStateEnd, consciousness)
 	local remaining = math.max(deathStateEnd - CurTime(), 0)
 	local fade = math.Clamp((INCAPACITATION_DEATH_TIME - remaining) / INCAPACITATION_DEATH_TIME, 0, 1)
 	local finalFade = math.Clamp((6 - remaining) / 6, 0, 1)
 	local shine = finalFade * (0.65 + math.abs(math.sin(CurTime() * 9)) * 0.35)
+	local wakeFade = 1 - math.Clamp((consciousness - 0.04) / 0.26, 0, 1)
 	local sw, sh = ScrW(), ScrH()
 	local radius = math.ease.InOutSine(fade) * math.sqrt(sw * sw + sh * sh) / 2
 
-	DrawBloom(0.35 + finalFade * 0.45, 0.8 + finalFade * 2.8, 7, 7, 2, 1, 1, 1, 1)
-	surface.SetDrawColor(255, 255, 255, math.Clamp((fade ^ 1.35) * 175 + shine * 35, 0, 255))
+	DrawBloom(0.35 + finalFade * 0.45, (0.8 + finalFade * 2.8) * wakeFade, 7, 7, 2, 1, 1, 1, 1)
+	surface.SetDrawColor(255, 255, 255, math.Clamp(((fade ^ 1.35) * 175 + shine * 35) * wakeFade, 0, 255))
 	DrawScreenFillShape(sw / 2, sh / 2, radius * 1.04, 320, 0.24 * (1 - finalFade * 0.35), 0)
-	surface.SetDrawColor(255, 255, 255, math.Clamp((fade ^ 1.35) * 110 + shine * 25, 0, 255))
+	surface.SetDrawColor(255, 255, 255, math.Clamp(((fade ^ 1.35) * 110 + shine * 25) * wakeFade, 0, 255))
 	DrawScreenFillShape(sw / 2, sh / 2, radius * 0.99, 320, 0.31 * (1 - finalFade * 0.3), 4.7)
-	surface.SetDrawColor(255, 255, 255, math.Clamp((fade ^ 1.35) * 80 + shine * 20, 0, 255))
+	surface.SetDrawColor(255, 255, 255, math.Clamp(((fade ^ 1.35) * 80 + shine * 20) * wakeFade, 0, 255))
 	DrawScreenFillShape(sw / 2, sh / 2, radius * 0.94, 320, 0.38 * (1 - finalFade * 0.25), 9.2)
 
 	if finalFade > 0 then
-		surface.SetDrawColor(255, 255, 255, math.Clamp(finalFade * 180 + shine * 75, 0, 255))
+		surface.SetDrawColor(255, 255, 255, math.Clamp((finalFade * 180 + shine * 75) * wakeFade, 0, 255))
 		DrawScreenFillShape(sw / 2, sh / 2, radius * (0.88 + shine * 0.12), 320, 0.2 * (1 - finalFade * 0.45), 13.5)
 	end
 end
@@ -704,7 +705,7 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 	end
 
 	if lply:Alive() and (otrub or new_organism.otrub) and incapacitated and deathStateEnd then
-		DrawIncapacitatedDeathFade(deathStateEnd)
+		DrawIncapacitatedDeathFade(deathStateEnd, consciousness)
 	end
 
 	if not alive then
@@ -762,9 +763,9 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 		render.DrawScreenQuad()
 	end
 
-	if (disorientationLerp > 1) and lply:Alive() or brain > 0 then
-		local add2 = disorientationLerp - 1
-		if not lply:HasTrait("blind") and not brain_motionblur and lply.PlayerClassName ~= "headcrabzombie" then DrawMotionBlur(0.15 - math.Clamp(add2 / 1, 0, 0.1), add2 * 2, 0.001) end
+	if ((disorientationLerp > 1 or adrenaline > 4) and lply:Alive()) or brain > 0 then
+		local add2 = math.max(disorientationLerp - 1, adrenaline > 4 and 0.35 or 0)
+		if not lply:HasTrait("blind") and not brain_motionblur and lply.PlayerClassName ~= "headcrabzombie" then hg.DrawWorldMotionBlur(0.15 - math.Clamp(add2 / 1, 0, 0.1), add2 * 2, 0.001) end
 		if disorientationLerp > 2 then
 			local add = (disorientationLerp - 2) * 2
 			local time = CurTime() * 3
@@ -1136,9 +1137,9 @@ end
 local function getWoundVisualRate(org, wound, index, arterial)
 	local rates = arterial and org.arterialWoundBleedRates or org.woundBleedRates
 	local liveRate = rates and tonumber(rates[index])
-	if liveRate and liveRate > 0.01 then return liveRate end
+	if liveRate then return math.max(liveRate, 0) end
 	local woundRate = tonumber(wound.visualBleedRate)
-	if woundRate and woundRate > 0.01 then return woundRate end
+	if woundRate then return math.max(woundRate, 0) end
 	local severity = math.max(tonumber(wound[1]) or 0, 0)
 	local totalRate = arterial and tonumber(org.arterialBleed) or tonumber(org.venousBleed)
 	return math.max(totalRate or severity * (arterial and 2.25 or 0.24), 0)
@@ -1161,7 +1162,7 @@ local function emitOrdinaryBleeding(ent, org, wound, pos, ang, visualRate)
 		return
 	end
 
-	if style == 1 then
+	if style == 1 and rateK < 0.5 then
 		local count = math.Clamp(math.floor(1 + rateK * 4), 1, 5)
 		for _ = 1, count do
 			local spread = 3 + rateK * 16
@@ -1172,8 +1173,8 @@ local function emitOrdinaryBleeding(ent, org, wound, pos, ang, visualRate)
 	else
 		local phase = CurTime() * (4.5 + rateK * 2.5) + ent:EntIndex() * 0.37
 		local lateral = ang:Right() * math.sin(phase) * (4 + rateK * 8) + ang:Up() * math.cos(phase * 0.73) * (2 + rateK * 5)
-		local speed = (65 + rateK * 105) * pressureDrive
-		local count = math.Clamp(math.floor(1 + rateK * 2), 1, 3)
+		local speed = (30 + rateK * 150) * pressureDrive
+		local count = math.Clamp(math.floor(1 + rateK * 4), 1, 5)
 		for _ = 1, count do
 			local vel = outward * speed + lateral + VectorRand(-4, 4)
 			local size = math.Rand(0.85, 1.35 + rateK * 1.1)
@@ -1182,7 +1183,7 @@ local function emitOrdinaryBleeding(ent, org, wound, pos, ang, visualRate)
 	end
 end
 
-local function emitArterialBleeding(ent, org, wound, index, pos, ang, dir, water)
+local function emitArterialBleeding(ent, org, wound, index, pos, ang, dir, water, visualRate)
 	if water then
 		for _ = 1, arteryBurstCount do
 			hg.addBloodPart2(pos, VectorRand(-5, 5), nil, nil, nil, nil, true, ent)
@@ -1191,16 +1192,19 @@ local function emitArterialBleeding(ent, org, wound, index, pos, ang, dir, water
 	end
 
 	local pulse = (org.pulse or 70) / 70
-	local size = math.random(1, 2) * math.max(math.min(wound[1], 1), 0.5) * arterySizeMul
+	local rateK = math.Clamp(visualRate / 20, 0, 1)
+	local _, pressureDrive = getBleedPressureDrive(org)
+	local size = math.Rand(0.9, 1.4 + rateK * 2.4) * arterySizeMul
 	local time = CurTime()
 	local velocity = VectorRand(-1, 1) * pulse
-		+ dir * 5 * (math.abs(math.sin(time * 2) + math.cos(time * (5 + index * 2)) + math.sin(time * (1 + index))) * 0.6 + math.sin(time * 2) + 4) * 0.1
-		+ dir:Angle():Right() * 25 * math.sin(time * 2) * math.cos(time * 4)
-		+ ang:Up() * 25 * math.sin(time * 3) * math.cos(time)
+		+ dir * (0.2 + rateK * 1.8) * pressureDrive * (math.abs(math.sin(time * 2) + math.cos(time * (5 + index * 2)) + math.sin(time * (1 + index))) * 0.6 + math.sin(time * 2) + 4) * 0.1
+		+ dir:Angle():Right() * 25 * rateK * math.sin(time * 2) * math.cos(time * 4)
+		+ ang:Up() * 25 * rateK * math.sin(time * 3) * math.cos(time)
 		+ VectorRand(-1, 1) * pulse
+	if pressureDrive <= 0.05 then velocity = bleedDown * math.Rand(12, 28) + VectorRand(-3, 3) end
 
 	hg.addBloodPart(pos, velocity, nil, size, size, true, nil, ent)
-	for _ = 2, arteryBurstCount do
+	for _ = 2, math.Clamp(math.floor(1 + rateK * 3), 1, 4) do
 		hg.addBloodPart(pos, velocity * math.Rand(0.65, 1.05) + VectorRand(-3, 3) * pulse, nil, size * math.Rand(0.85, 1.15), size * math.Rand(0.85, 1.15), true, nil, ent)
 	end
 
@@ -1648,7 +1652,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 						end
 
 						local rateK = math.Clamp(visualRate / 12, 0, 1)
-						local interval = water and 1.5 or Lerp(rateK, 0.9, 0.16)
+						local interval = water and 1.5 or Lerp(rateK, 2.2, 0.12)
 						wound.nextVisualBleed = time + interval * math.Rand(0.78, 1.28)
 					end
 				end
@@ -1681,8 +1685,8 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 						dir = -dir:Forward() * len
 
 						local water = bit.band(util.PointContents(pos), CONTENTS_WATER) == CONTENTS_WATER
-						local underwater = emitArterialBleeding(ent, org, wound, i, pos, ang, dir, water)
-						wound.nextVisualBleed = time + (underwater and 2 or 0.5 / math.max(hg_blood_fps:GetInt(), 1))
+						local underwater = emitArterialBleeding(ent, org, wound, i, pos, ang, dir, water, visualRate)
+						wound.nextVisualBleed = time + (underwater and 2 or Lerp(math.Clamp(visualRate / 20, 0, 1), 0.5, 1 / math.max(hg_blood_fps:GetInt(), 1)))
 					end
 				end
 			end

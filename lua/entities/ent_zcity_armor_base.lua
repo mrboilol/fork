@@ -282,7 +282,8 @@ hook.Add("ItemsTransfered", "TransferEquipmentArmor", function(ply, ragdoll)
 end)
 
 hook.Add("HG_OrganAvalible", "ArmorHitboxAvaliveCheck", function(ent, organ_name) 
-    return IsValid( ent:GetEquipmentByHitBoxSet(organ_name) )
+    if not hg.organism.armor_hitbox_sets or not hg.organism.armor_hitbox_sets[organ_name] then return end
+    return IsValid(ent:GetEquipmentByHitBoxSet(organ_name))
 end)
 
 --[[

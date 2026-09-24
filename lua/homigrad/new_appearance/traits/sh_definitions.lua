@@ -49,7 +49,7 @@ if CLIENT then
 
 	hook.Add("RenderScreenspaceEffects", "HGTraitsJohnVision", function()
 		local ply = LocalPlayer()
-		if IsValid(ply) and ply:Alive() and ply:HasTrait("john") and not ply:HasTrait("blind") then DrawMotionBlur(0.05, 0.08, 0.01) end
+		if IsValid(ply) and ply:Alive() and ply:HasTrait("john") and not ply:HasTrait("blind") then hg.DrawWorldMotionBlur(0.05, 0.08, 0.01) end
 	end)
 
 	hook.Add("EntityEmitSound", "HGTraitsAphasiaVoice", function(data)

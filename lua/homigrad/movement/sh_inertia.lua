@@ -319,7 +319,7 @@ local math_abs, math_Approach, math_AngleDifference, math_Clamp, math_cos, math_
 
 		if ply.hg_isSprinting and runnin and velLen >= 10 then
 			local sprint_mul = ply.sprintDebuff and ply.sprintDebuff > move_time and 0.5 or 1
-			ply.CurrentSpeed = math_Approach(ply.CurrentSpeed, (ply.move or run_speed) * mul * sprint_mul, delta_time * ply.SpeedGainMul)
+			ply.CurrentSpeed = math_Approach(ply.CurrentSpeed, (ply.move or run_speed) * mul * sprint_mul * 0.88, delta_time * ply.SpeedGainMul)
 		elseif ply.hg_isJogging and runnin and velLen >= 10 then
 			ply.CurrentSpeed = math_Approach(ply.CurrentSpeed, (ply.move or (run_speed * 0.55)) * mul, delta_time * ply.SpeedGainMul)
 		else
@@ -477,6 +477,8 @@ local math_abs, math_Approach, math_AngleDifference, math_Clamp, math_cos, math_
 		k = k * softenDebuff(math.Clamp(5 / ((org.immobilization or 0) + 1), 0.45, 1))
 		k = k * softenDebuff(math.Clamp((org.blood or 0) / 5000, 0, 1))
 		k = k * softenDebuff(math.Clamp(10 / ((org.shock or 0) + 1), 0.45, 1))
+		local lowOxygen = math.Clamp((22 - (org.o2 and org.o2[1] or 30)) / 17, 0, 1)
+		k = k * softenDebuff(1 - lowOxygen * 0.4)
 		k = k * (math.min(math.Round((org.adrenaline or 0), 1) / 24, 0.3) + 1)
 		local limbDebuff = hg.GetLimbDebuffMultiplier and hg.GetLimbDebuffMultiplier(org) or 1
 		local function legMoveMultiplier(limb)
@@ -580,11 +582,11 @@ local math_abs, math_Approach, math_AngleDifference, math_Clamp, math_cos, math_
 				local trData = ply.hg_inertia_slip_trace or { filter = ply }
 				ply.hg_inertia_slip_trace = trData
 				trData.start = ply:GetPos()
-				trData.endpos = trData.start - vector_up * 1
+				trData.endpos = trData.start - vector_up * 12
 				trData.filter = ply
 				local tr = util.TraceLine(trData)
 
-				if tr.SurfaceProps and util.GetSurfaceData(tr.SurfaceProps) and util.GetSurfaceData(tr.SurfaceProps).friction < 0.2 then
+				if ply.StormFox2MapIceFriction or (tr.SurfaceProps and util.GetSurfaceData(tr.SurfaceProps) and util.GetSurfaceData(tr.SurfaceProps).friction < 0.2) then
 					local b1 = ply:TranslateBoneToPhysBone(ply:LookupBone("ValveBiped.Bip01_L_Calf"))
 					local phys1 = hg.IdealMassPlayer["ValveBiped.Bip01_L_Calf"]
 

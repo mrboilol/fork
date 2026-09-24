@@ -52,7 +52,7 @@ local function addBloodPart(pos, vel, mat, w, h, artery, kishki, owner, tiny, hi
 
 	if #hg.bloodparticles1 >= 600 then table.remove(hg.bloodparticles1, 1) end
 	
-	local part = {pos, pos2, vel, mat or mat_huy, w or 2, h or 2, CurTime(), artery = artery, kishki = kishki, owner = owner, start_velocity = IsValid(owner) and owner:GetVelocity() or vector_origin, tiny = tiny, hidden = hidden, lifetime = lifetime, maxBeamLength = maxBeamLength}
+	local part = {pos, pos2, vel, mat or mat_huy, w or 2, h or 2, CurTime(), artery = artery, kishki = kishki, owner = owner, start_velocity = IsValid(owner) and owner:GetVelocity() or vector_origin, tiny = tiny, hidden = hidden, lifetime = lifetime, maxBeamLength = maxBeamLength, volume = math.Clamp((w or 2) / 2, 0.2, 4)}
 	hg.bloodparticles1[#hg.bloodparticles1 + 1] = part
 	return part
 end
@@ -86,8 +86,8 @@ local function addGibBloodSpill(ent, stump)
 	if not IsValid(ent) then return end
 	if LocalPlayer():GetNetVar("disappearance", nil) or ent:GetNetVar("disappearance", nil) then return end
 	if #hg.gibbloodspillparticles > 120 then table.remove(hg.gibbloodspillparticles, 1) end
-	local vel = VectorRand(-18, 18) + ent:GetVelocity() * 0.04
-	vel[3] = vel[3] + (stump and Rand(10, 22) or Rand(-2, 10))
+	local vel = VectorRand(stump and -34 or -18, stump and 34 or 18) + ent:GetVelocity() * 0.04
+	vel[3] = vel[3] + (stump and Rand(18, 34) or Rand(-2, 10))
 	hg.gibbloodspillparticles[#hg.gibbloodspillparticles + 1] = {ent:GetPos() + VectorRand(-3, 3), vel, bloodSpillMats[math.random(#bloodSpillMats)], CurTime(), Rand(0.35, 0.55), stump and Rand(1, 2) or Rand(0.25, 0.6), stump and Rand(9, 16) or Rand(3, 6), stump}
 end
 
@@ -110,8 +110,6 @@ end)
 
 local hg_bloodimpacts = ConVarExists("hg_bloodimpacts") and GetConVar("hg_bloodimpacts") or CreateConVar("hg_bloodimpacts", 0, FCVAR_ARCHIVE + FCVAR_REPLICATED, "Enable custom blood impact effects spray cool kill death", 0, 1)
 local bloodImpactCloudSize = 16
-local bloodImpactParticleSize = 0.75
-
 local function impact(pos,vel,mul)
 	local max = math.min(mul,8)
 	local iters = math.ceil(math.random(1, max) * 2.5)
@@ -124,7 +122,7 @@ local function impact(pos,vel,mul)
 	end
 
 	for i = 1, iters do
-		local size = bloodImpactParticleSize
+		local size = math.Clamp(math.sqrt(math.max(mul, 0)) * 0.45, 0.8, 4)
 		addBloodPart(pos, -vel * i / iters + Vector(Rand(-20, 20), Rand(-20, 20), 0), mat_huy, size, size, false, false)
 	end
 end
@@ -248,12 +246,13 @@ end
 
 net.Receive("hg_gib_bloodspill", function()
 	local entIndex = net.ReadUInt(16)
-	net.ReadFloat()
+	local amount = net.ReadFloat()
 	local stump = net.ReadBool()
 	local trail = net.ReadBool()
 	local ent = Entity(entIndex)
 	if not IsValid(ent) then return end
-	for i = 1, stump and 16 or 5 do addGibBloodSpill(ent, stump) end
+	local count = math.Clamp(math.floor(amount + 0.5), stump and 16 or 5, stump and 64 or 12)
+	for i = 1, count do addGibBloodSpill(ent, stump) end
 	if trail then addGibTrail(ent) end
 end)
 
@@ -398,8 +397,8 @@ net.Receive("bloodsquirt", function()
 			local drawPos, drawDir = LocalToWorld(localPos, localDir, drawMat:GetTranslation(), drawMat:GetAngles())
 			drawDir = drawDir:Forward() * len
 			if (drawPos - LocalPlayer():EyePos()):LengthSqr() > dsqr then i = i - 1 return end
-			vechuy = vechuy + VectorRand(-amt * 5,amt * 5)
-			addBloodPart(drawPos, drawDir * amt * 130 + vechuy * amt, mat_huy, math.Rand(3,3), math.Rand(3,3), true, false)
+			vechuy = vechuy + VectorRand(-amt * 11,amt * 11)
+			addBloodPart(drawPos, drawDir * amt * 190 + vechuy * amt, mat_huy, math.Rand(3,3), math.Rand(3,3), true, false)
 			i = i - 1
 		end)
 	end

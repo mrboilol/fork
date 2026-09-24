@@ -112,6 +112,10 @@ bloodparticles_hook[1] = function(anim_pos, mul)
 end
 
 local hg_old_blood = ConVarExists("hg_old_blood") and GetConVar("hg_old_blood") or CreateClientConVar("hg_old_blood", 0, true, false, "new decals, or old", 0, 1)
+local hg_oldblood = ConVarExists("hg_oldblood") and GetConVar("hg_oldblood") or CreateClientConVar("hg_oldblood", 0, true, false, "Use old Z-City blood decals", 0, 1)
+local function useOldBlood()
+	return hg_old_blood:GetBool() or hg_oldblood:GetBool()
+end
 
 cvars.RemoveChangeCallback("hg_old_blood", "hg_refresh_old_blood_decals")
 cvars.AddChangeCallback("hg_old_blood", function(_, oldValue, newValue)
@@ -120,6 +124,13 @@ cvars.AddChangeCallback("hg_old_blood", function(_, oldValue, newValue)
 	hg.groundbloodstains = {}
 	hg.fadinggroundbloodstains = {}
 end, "hg_refresh_old_blood_decals")
+cvars.RemoveChangeCallback("hg_oldblood", "hg_refresh_oldblood_decals")
+cvars.AddChangeCallback("hg_oldblood", function(_, oldValue, newValue)
+	if oldValue == newValue then return end
+	hg.bloodpositions = {}
+	hg.groundbloodstains = {}
+	hg.fadinggroundbloodstains = {}
+end, "hg_refresh_oldblood_decals")
 
 hg.bloodpositions = hg.bloodpositions or {}
 hg.bloodcount = hg.bloodcount or 0
@@ -131,24 +142,24 @@ hg.groundbloodstains = hg.groundbloodstains or {}
 hg.fadinggroundbloodstains = hg.fadinggroundbloodstains or {}
 
 local groundBloodMaterials = {}
-for i = 1, 6 do
-	groundBloodMaterials[i] = Material("bloodspill/blood" .. i)
+for _, i in ipairs({1, 2, 3, 4, 6, 7, 8, 9, 10, 11}) do
+	groundBloodMaterials[#groundBloodMaterials + 1] = Material("effects/droplets/drop" .. i .. "_5")
 end
+local oldGroundBloodMaterials = {}
+for i = 1, 10 do oldGroundBloodMaterials[i] = Material("decals/z_blood" .. i) end
 
 local groundBloodColor = Color(92, 0, 0, 255)
 local render_DrawQuadEasy = render.DrawQuadEasy
 local poolTrace = {mask = MASK_SOLID_BRUSHONLY}
-local poolFlowCursor = 1
 local poolStartVolume = 4
 local poolMaxSize = 34
-local gravity = GetConVar("sv_gravity")
 
 local function findGroundBlood(pos, normal, ignored)
 	local stains = hg.groundbloodstains
 	local nearest, nearestDistance
 	for _, stain in ipairs(stains) do
 		if stain ~= ignored and stain.normal:Dot(normal) >= 0.75 then
-			local mergeRadius = math.max(4, (stain.size or 1) * 0.35)
+			local mergeRadius = math.max(4, (stain.size or 1) * 0.5)
 			local distance = stain.pos:DistToSqr(pos)
 			if distance <= mergeRadius * mergeRadius and (not nearestDistance or distance < nearestDistance) then
 				nearest, nearestDistance = stain, distance
@@ -158,6 +169,7 @@ local function findGroundBlood(pos, normal, ignored)
 	return nearest
 end
 
+local flowGroundBlood
 local function depositGroundBlood(pos, normal, artery, tiny, amount, ignored)
 	local stain = findGroundBlood(pos, normal, ignored)
 	local size
@@ -169,12 +181,16 @@ local function depositGroundBlood(pos, normal, artery, tiny, amount, ignored)
 		size = math.Rand(7, 15)
 	end
 	amount = amount or (tiny and 0.2 or artery and 2.5 or 1)
+	size = math.min(size * math.Clamp(math.sqrt(amount), 0.65, 1.8), poolMaxSize)
 
 	if stain then
+		if stain.size >= poolMaxSize then
+			flowGroundBlood(stain, pos, amount, artery, tiny)
+			return stain
+		end
 		stain.volume = (stain.volume or 1) + amount
 		local growth = stain.volume >= poolStartVolume and 1.35 or 0.25
 		stain.size = math.min(math.max(stain.size, size) + amount * growth, poolMaxSize)
-		stain.pos = LerpVector(math.Clamp(amount / stain.volume, 0, 0.35), stain.pos, pos + normal * 0.2)
 		return stain
 	end
 
@@ -185,20 +201,18 @@ local function depositGroundBlood(pos, normal, artery, tiny, amount, ignored)
 	stain = {
 		pos = pos + normal * 0.2,
 		normal = normal,
-		material = groundBloodMaterials[math_random(#groundBloodMaterials)],
+		material = useOldBlood() and oldGroundBloodMaterials[math_random(#oldGroundBloodMaterials)] or groundBloodMaterials[math_random(#groundBloodMaterials)],
 		size = size,
 		rotation = math_random(0, 359),
 		volume = amount,
-		flowAngle = math_random(0, 359),
 	}
 	stains[#stains + 1] = stain
 	return stain
 end
 
-local function addGroundBlood(pos, normal, artery, tiny)
-	if hg_old_blood:GetBool() then return false end
+local function addGroundBlood(pos, normal, artery, tiny, amount)
 	if normal.z < 0.55 then return false end
-	depositGroundBlood(pos, normal, artery, tiny)
+	depositGroundBlood(pos, normal, artery, tiny, amount)
 
 	return true
 end
@@ -212,29 +226,33 @@ function hg.DepositBodyBloodRunoff(pos)
 	end
 end
 
-local function flowGroundBlood(stain, gravityScale)
-	if (stain.volume or 0) < poolStartVolume or stain.size < 8 then return end
-
-	local down = Vector(0, 0, -1)
-	local direction = down - stain.normal * down:Dot(stain.normal)
-	if direction:LengthSqr() < 0.01 then
-		stain.flowAngle = ((stain.flowAngle or 0) + 137.5) % 360
-		direction = Angle(0, stain.flowAngle, 0):Forward()
-	else
-		direction:Normalize()
+flowGroundBlood = function(stain, impactPos, amount, artery, tiny)
+	local direction = impactPos - stain.pos
+	direction = direction - stain.normal * direction:Dot(stain.normal)
+	if direction:LengthSqr() < 1 then direction = Angle(0, math_random(0, 359), 0):Forward() end
+	direction:Normalize()
+	local distance = stain.size * 0.5 + 2
+	for attempt = 1, 8 do
+		local candidate = direction:Angle()
+		candidate:RotateAroundAxis(stain.normal, (attempt - 1) * 137.5)
+		local target = stain.pos + candidate:Forward() * distance
+		poolTrace.start = target + vector_up * 8
+		poolTrace.endpos = target - vector_up * 32
+		local hit = util_TraceLine(poolTrace)
+		if hit.HitWorld and hit.HitNormal.z >= 0.55 then
+			local covered = false
+			for _, other in ipairs(hg.groundbloodstains) do
+				if other ~= stain and other.normal:Dot(hit.HitNormal) >= 0.75 and other.pos:DistToSqr(hit.HitPos) < (other.size * 0.5 + 2) ^ 2 then
+					covered = true
+					break
+				end
+			end
+			if not covered then
+				depositGroundBlood(hit.HitPos, hit.HitNormal, artery, tiny, amount, stain)
+				return
+			end
+		end
 	end
-
-	local distance = math.Clamp(stain.size * 0.65, 8, 22)
-	local target = stain.pos + direction * distance
-	poolTrace.start = target + vector_up * 8
-	poolTrace.endpos = target - vector_up * 32
-	local result = util_TraceLine(poolTrace)
-	if not result.HitWorld or result.HitNormal.z < 0.55 then return end
-
-	local transfer = math.min(((stain.volume or 0) - poolStartVolume + 1) * 0.3, 1.5 * gravityScale)
-	if transfer <= 0 then return end
-	stain.volume = stain.volume - transfer
-	depositGroundBlood(result.HitPos, result.HitNormal, false, true, transfer, stain)
 end
 
 hook.Add("Think", "hg_persistent_ground_blood", function()
@@ -242,23 +260,6 @@ hook.Add("Think", "hg_persistent_ground_blood", function()
 	local limit = math.max(hg_blood_ground_limit:GetInt(), 1)
 
 	while #stains > limit do table.remove(stains, 1) end
-	if #stains == 0 then return end
-
-	local gravityScale = math.Clamp(math.abs(gravity and gravity:GetFloat() or 600) / 600, 0.1, 2)
-	local now = CurTime()
-	local checked = 0
-	local flowed = 0
-	while checked < #stains and flowed < 4 do
-		if poolFlowCursor > #stains then poolFlowCursor = 1 end
-		local stain = stains[poolFlowCursor]
-		poolFlowCursor = poolFlowCursor + 1
-		checked = checked + 1
-		if stain and (stain.volume or 0) >= poolStartVolume and (stain.nextFlow or 0) <= now then
-			stain.nextFlow = now + math.Clamp(0.45 / gravityScale, 0.2, 1)
-			flowGroundBlood(stain, gravityScale)
-			flowed = flowed + 1
-		end
-	end
 end)
 
 hook.Add("PostDrawTranslucentRenderables", "hg_draw_persistent_ground_blood", function()
@@ -311,10 +312,10 @@ local function getNewTinyBloodDecal()
 	return newTinyBloodDecal
 end
 
-local function decalBlood(pos, normal, tr, artery, owner, tiny)
+local function decalBlood(pos, normal, tr, artery, owner, tiny, amount)
 	if not pos or not normal then return end
 	if normal:LengthSqr() < 0.0001 then normal = vector_up end
-	if tr.HitWorld and addGroundBlood(pos, normal, artery, tiny) then
+	if tr.HitWorld and addGroundBlood(pos, normal, artery, tiny, amount) then
 		if not tiny or math.random(7) == 1 then playBloodDripImpact(pos, tr) end
 		return
 	end
@@ -325,7 +326,7 @@ local function decalBlood(pos, normal, tr, artery, owner, tiny)
 			if math.random(7) == 1 then playBloodDripImpact(pos, tr) end
 			return
 		end
-		local oldBlood = hg_old_blood:GetBool()
+		local oldBlood = useOldBlood()
 		local decal = oldBlood and (artery and oldTinyArterialDecal or oldTinyNormalDecals[math.random(#oldTinyNormalDecals)]) or getNewTinyBloodDecal()
 		target = target or game.GetWorld()
 		local scale = math.Rand(0.12, 0.24)
@@ -353,7 +354,7 @@ local function decalBlood(pos, normal, tr, artery, owner, tiny)
 	-- я не знаю насколько большой можно делать такие таблицы... надеюсь, что это не так страшно выйдет
 
 	if artery then
-		if !hg_old_blood:GetBool() then
+		if !useOldBlood() then
 			util.Decal(newBloodDecal, pos + normal, pos - normal, owner)
 			playBloodDripImpact(pos, tr)
 		else
@@ -361,7 +362,7 @@ local function decalBlood(pos, normal, tr, artery, owner, tiny)
 			playBloodDripImpact(pos, tr)
 		end
 	else
-		if !hg_old_blood:GetBool() then
+		if !useOldBlood() then
 			util.Decal(newBloodDecal, pos + normal, pos - normal, owner)
 			playBloodDripImpact(pos, tr)
 		else
@@ -428,7 +429,7 @@ bloodparticles_hook[2] = function(mul)
 		if result.Hit and result.Entity:IsWorld() then
 			hg.bloodparticles1[i] = hg.bloodparticles1[#hg.bloodparticles1]; table_remove(hg.bloodparticles1)
 			local dir = result.HitNormal
-			decalBlood(result.HitPos, dir, result, part.artery, part.owner, part.tiny)
+			decalBlood(result.HitPos, dir, result, part.artery, part.owner, part.tiny, part.volume)
 			
 			
 			--sound.Play("zbattle/blood_drop.mp3", hitPos, math.random(10, 60), math.random(120, 120))
@@ -448,7 +449,7 @@ bloodparticles_hook[2] = function(mul)
 			
 			result.Hit = result.Hit and shouldhit
 			if result.Hit and part.tiny then
-				decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner, true)
+				decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner, true, part.volume)
 				hg.bloodparticles1[i] = hg.bloodparticles1[#hg.bloodparticles1]
 				table_remove(hg.bloodparticles1)
 				continue
@@ -463,7 +464,7 @@ bloodparticles_hook[2] = function(mul)
 				if !insolid and (part.nextput or 0) < time then
 					part.nextput = time + 1
 
-					decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner, part.tiny)
+					decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner, part.tiny, part.volume)
 				end
 
 				if insolid then
@@ -487,7 +488,7 @@ bloodparticles_hook[2] = function(mul)
 				part.lerpedmove = LerpVector(1, part.lerpedmove or part[3] * mul, nextpos * mul * 2)
 				
 				if part.lerpedmove:LengthSqr() < 0.1 * mul then
-					decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner, part.tiny)
+					decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner, part.tiny, part.volume)
 					
 					hg.bloodparticles1[i] = hg.bloodparticles1[#hg.bloodparticles1]; table_remove(hg.bloodparticles1)
 					

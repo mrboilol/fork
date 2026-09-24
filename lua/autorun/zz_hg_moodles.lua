@@ -741,10 +741,11 @@ local function buildEffects(ply, org)
 	local hypertension = math.Clamp(orgNumber(org, "hypertension", 0), 0, 1)
 	local highPulseSeverity = math.Clamp((pulse - 100) / 80, 0, 1)
 	local highPressureSeverity = hasPressure and math.Clamp((pressure - 100) / 45, 0, 1) or 0
-	local highCirculationSeverity = math.max(highPulseSeverity, highPressureSeverity, hypertension)
+	local adrenalineSurge = orgNumber(org, "adrenaline", 0) > 4
+	local highCirculationSeverity = math.max(highPulseSeverity, highPressureSeverity, hypertension, adrenalineSurge and 0.6 or 0)
 	local lowCirculationActive = pulse > 0 and (pulse < 70 or (hasPressure and pressure < 70) or hypotension > 0.01)
-	local highCirculationActive = pulse > 100 or (hasPressure and pressure > 100) or hypertension > 0.01
-	if not org.heartstop and lowCirculationActive and (not highCirculationActive or lowCirculationSeverity >= highCirculationSeverity) then
+	local highCirculationActive = pulse > 100 or (hasPressure and pressure > 100) or hypertension > 0.01 or adrenalineSurge
+	if not org.heartstop and lowCirculationActive and not adrenalineSurge and (not highCirculationActive or lowCirculationSeverity >= highCirculationSeverity) then
 		local level = highRank(math.max(lowCirculationSeverity, 0.1), {0.1, 0.3, 0.6, 0.85})
 		add(effects, "low_blood", level >= 3 and "superlowblood" or "lowblood", level, "bad", 27, math.floor(pulse) .. " bpm / " .. math.floor(pressure) .. " MAP")
 	elseif not org.heartstop and highCirculationActive then

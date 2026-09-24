@@ -629,6 +629,11 @@ local function painRegionForHitgroup(hitgroup)
 	return "body"
 end
 
+local function hypoxiaShockMultiplier(org)
+	local o2 = org.o2 and tonumber(org.o2[1]) or 30
+	return 1 + math.Clamp((15 - o2) / 15, 0, 1) * 0.5
+end
+
 function hg.organism.AddTraumaticShock(org, trauma, multiplier)
 	if not org then return 0 end
 
@@ -638,7 +643,7 @@ function hg.organism.AddTraumaticShock(org, trauma, multiplier)
 
 	local resistance = math.max(tonumber(org.traumaResistanceMul) or 1, 1)
 	local shock = math.Clamp(excess * 0.55 + math.sqrt(excess) * 0.75, 0, 30)
-	shock = shock * math.max(tonumber(multiplier) or 1, 0) / resistance
+	shock = shock * math.max(tonumber(multiplier) or 1, 0) * hypoxiaShockMultiplier(org) / resistance / (1 + math.max(org.adrenaline or 0, 0) * 0.45)
 	org.shock = math.min((org.shock or 0) + shock, 95)
 
 	return shock
@@ -712,7 +717,7 @@ function hg.organism.AmputateLimb(org, limb, noShake, dmgInfo)
 	local len = boneIdx and boneIdx > 0 and org.owner:BoneLength(boneIdx) or 10
 	local vec = Vector(len, 0, 0)
 	local ang = Angle()
-	local boneup = boneIdx and boneIdx > 0 and org.owner:GetBoneName(boneIdx - 1) or bone
+	local boneup = (boneIdx and boneIdx > 0 and org.owner:GetBoneName(boneIdx - 1)) or bone
 
 	local obsoleteArteries = {}
 	local obsoleteWoundBones = {}
@@ -1029,6 +1034,7 @@ end)
 --util.AddNetworkString("tracePosesSend")
 --util.AddNetworkString("wound_debug")
 util.AddNetworkString("hg_bloodimpact")
+util.AddNetworkString("hg_damage_flash")
 --util.AddNetworkString("blood particle explode")
 util.AddNetworkString("bloodsquirt")
 
@@ -1175,7 +1181,7 @@ function hg.ExplodeHead(ent, damage, slash, force)
 		
 		if mat then
 			local pos = mat:GetTranslation()
-			local dir = mat:GetAngles():Up() * 3
+			local dir = mat:GetAngles():Up() * 5.5
 			
 			net.Start("bloodsquirt")
 			net.WriteEntity(ent)
@@ -1799,9 +1805,14 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		if meleeContact and dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH) then
 			hg.organism.AddTraumaticShock(org, meleeContact.trauma or dmg_before, IsValid(inf) and inf.TraumaShockMultiplier or nil)
 		end
-		org.shock = math.min(org.shock + instaPain * shockMul * 4.5 * instant_pain_shock_scale * math.Clamp(pen / 5,1,2), 70)
+		org.shock = math.min(org.shock + instaPain * shockMul * 4.5 * instant_pain_shock_scale * math.Clamp(pen / 5,1,2) * hypoxiaShockMultiplier(org) / (1 + math.max(org.adrenaline or 0, 0) * 0.45), 70)
 		org.immobilization = math.min(org.immobilization + immobilization * immobilizationMul, 30)
 		org.lasthit = CurTime()
+		if IsValid(org.owner) and org.owner:IsPlayer() then
+			net.Start("hg_damage_flash")
+			net.WriteFloat(math.Clamp(dmg_before / 45, 0.12, 0.7))
+			net.Send(org.owner)
+		end
 		
 		local adrenalineMul = math.min(math.max(1 + org.adrenaline, 1), 1.2)
 		local adrenaline = org.adrenaline

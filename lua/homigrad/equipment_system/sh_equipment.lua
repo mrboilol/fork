@@ -276,6 +276,8 @@ hg.organism = hg.organism or {}
 hg.organism.input_list = hg.organism.input_list or {}
 
 function hg.organism:AddArmorInputList(strName, nPlacement)
+    hg.organism.armor_hitbox_sets = hg.organism.armor_hitbox_sets or {}
+    hg.organism.armor_hitbox_sets[strName] = true
     hg.organism.input_list[strName] = function(org, bone, dmg, dmgInfo, ...)
         local protect = protec(org, bone, dmg, dmgInfo, nPlacement, ...)
         return protect

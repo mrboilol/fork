@@ -15,7 +15,7 @@ local tracePos = Vector(0, 0, 0)
 
 function hg.organism.Trace(pos, dir, size, maxpen, boxs, center, endDis, organs, ricochetable, funcInput, impact, ...)
 	local endDisSqr = endDis * endDis
-	tracePos:Set(pos - dir * 5)
+	tracePos:Set(pos - dir:GetNormalized() * 5)
 
 	local hitBoxs = {}
 	local nearbyRolls = {}
@@ -32,7 +32,7 @@ function hg.organism.Trace(pos, dir, size, maxpen, boxs, center, endDis, organs,
 	local expansion = expansionRadius > 0 and Vector(expansionRadius, expansionRadius, expansionRadius) or nil
 
 	local distance = math_ceil(dir:Length())
-	distance = math.Clamp(distance, 0, 512)
+	distance = math.Clamp(distance + 5, 0, 512)
 	dir:Normalize()
 
 	local segLen = 12

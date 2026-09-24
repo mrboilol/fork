@@ -269,8 +269,8 @@ local function getRateOutput(heartbeat)
 end
 
 function hg.organism.GetPulseOxygenPerfusion(pulse)
-	local normalizedPulse = Clamp((tonumber(pulse) or 0) / 60, 0, 1)
-	return 0.28 + normalizedPulse * 0.72
+	local normalizedPulse = Clamp((tonumber(pulse) or 0) / 70, 0, 1)
+	return math.max(normalizedPulse ^ 1.5, 0.06)
 end
 
 local function getPalpablePulseTarget(org, heartbeat, circulation, hemorrhageCompensation, effectivePalpitations)
@@ -1224,7 +1224,7 @@ module[2] = function(owner, org, timeValue)
 	local electricalO2Failure = math.Clamp((0.58 - hemorrhageO2Transport) / 0.58, 0, 1)
 	local myocardialFailure = math.Clamp((0.45 - (org.myocardialOxygen or 1)) / 0.45, 0, 1)
 	local bloodOnlyElectricalFailure = math.max(electricalO2Failure, myocardialFailure) * hemorrhageDanger
-	local hemorrhageElectricalInstability = math.max(electricalFlowFailure, bloodOnlyElectricalFailure)
+	local hemorrhageElectricalInstability = math.max(electricalFlowFailure * hemorrhageDanger, bloodOnlyElectricalFailure)
 	org.hemorrhageElectricalInstability = hemorrhageElectricalInstability
 	local criticalReserve = cfg.CRITICAL_CIRCULATION_RESERVE or 0.31
 	local criticalRange = math.max(cfg.CRITICAL_CIRCULATION_RANGE or 0.10, 0.01)
@@ -1509,7 +1509,7 @@ module[2] = function(owner, org, timeValue)
 		local hemorrhageDrivenLowOutput = criticalHemorrhageDepth > 0 or bloodNow <= 2500
 		local compoundedLowOutput = (org.hypotensionExposure or 0) >= 75
 			and (org.depression or 0) >= 0.5 and (org.temperature or 36.7) <= 34
-		local failedCirculation = org.pulse < 10 and not hemorrhageDrivenLowOutput and not restartCirculationActive
+		local failedCirculation = (org.pulse < 10 and not hemorrhageDrivenLowOutput or terminalCirculatoryFailure) and not restartCirculationActive
 		local failedHypotension = org.prolongedHypotension and (not hemorrhageDrivenLowOutput or compoundedLowOutput) and not restartCirculationActive
 		local failedBradyOutput = (org.bradycardicLowOutputTime or 0) >= (tonumber(cfg.BRADYCARDIA_ARREST_EXPOSURE) or 8)
 			and (org.cardiacOutput or 0) < (tonumber(cfg.BRADYCARDIA_ARREST_OUTPUT) or 0.22)

@@ -94,6 +94,21 @@ local hg_laivlik = CreateClientConVar("hg_laivlik", "1", true, false, "Show blac
 local hg_damage_corner_distortion = CreateClientConVar("hg_damage_corner_distortion", "1", true, false, "Distort screen corners from pain and head trauma", 0, 1)
 local snd_musicvolume = GetConVar("snd_musicvolume")
 local hook_Run = hook.Run
+-- Collect this frame's requests and blur the next world frame before screen overlays draw.
+local worldMotionBlur = {}
+function hg.DrawWorldMotionBlur(addAlpha, drawAlpha, delay)
+	worldMotionBlur[#worldMotionBlur + 1] = {addAlpha, drawAlpha, delay}
+end
+hook.Add("PreDrawEffects", "HG_WorldMotionBlur", function()
+	local pending = worldMotionBlur
+	worldMotionBlur = {}
+	if #pending == 0 then return end
+	cam.Start2D()
+	for _, blur in ipairs(pending) do
+		DrawMotionBlur(blur[1], blur[2], blur[3])
+	end
+	cam.End2D()
+end)
 local drawFinalVitalsVignettes
 hook.Add("RenderScreenspaceEffects", "homigrad", function()
 	tab["$pp_colour_brightness"] = 0
@@ -445,6 +460,27 @@ local painThresholdIntensityLerp = 1
 local PanicAttackLerp = 0
 local PanicStationVolume = 0
 local O2Lerp = 0
+local damageFlashEnd = 0
+local damageFlashStrength = 0
+local damageFlashColor = {
+	["$pp_colour_addr"] = 0, ["$pp_colour_addg"] = 0, ["$pp_colour_addb"] = 0,
+	["$pp_colour_brightness"] = 0, ["$pp_colour_contrast"] = 1,
+	["$pp_colour_colour"] = 1, ["$pp_colour_mulr"] = 0,
+	["$pp_colour_mulg"] = 0, ["$pp_colour_mulb"] = 0
+}
+net.Receive("hg_damage_flash", function()
+	damageFlashStrength = math.max(damageFlashStrength, net.ReadFloat())
+	damageFlashEnd = CurTime() + 0.09
+end)
+hook.Add("Post Post Pre Post Processing", "HG_DamageFlash", function()
+	local remaining = math.Clamp((damageFlashEnd - CurTime()) / 0.09, 0, 1)
+	if remaining <= 0 then damageFlashStrength = 0 return end
+	local flash = remaining * damageFlashStrength
+	damageFlashColor["$pp_colour_addr"] = flash * 0.16
+	damageFlashColor["$pp_colour_colour"] = 1 - flash * 0.25
+	damageFlashColor["$pp_colour_mulr"] = flash * 0.2
+	DrawColorModify(damageFlashColor)
+end)
 local dyingAudioFade = 0
 local ischemicVignetteLerp = 0
 local shockVignetteLerp = 0
@@ -1216,7 +1252,7 @@ drawFinalVitalsVignettes = function()
 			render.SetMaterial(chromaticMat)
 			render.DrawScreenQuad()
 			if not HasBlindTrait() and motionBlurCause > 0.06 then
-				DrawMotionBlur(0.004 + motionBlurCause * 0.02, (collapseVisualLerp * 0.08 + blink * 0.05) * motionBlurCause, 0.014)
+				hg.DrawWorldMotionBlur(0.004 + motionBlurCause * 0.02, (collapseVisualLerp * 0.08 + blink * 0.05) * motionBlurCause, 0.014)
 			end
 		end
 	end
@@ -1910,7 +1946,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		shock = shockLerp
 
 		if org.otrub then
-			if not HasBlindTrait() then DrawMotionBlur(0.1, 1, 0.01) end
+			if not HasBlindTrait() then hg.DrawWorldMotionBlur(0.1, 1, 0.01) end
 		end
 
 		//if pain > 10 then
@@ -2049,7 +2085,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	disorientationFxLerp = LerpFT(disorientation > (disorientationFxLerp or 0) and 0.35 or 0.025, disorientationFxLerp or 0, math.max(disorientation, concussion * 0.65))
 	if lply:Alive() and not HasBlindTrait() and not org.otrub and disorientationFxLerp > 1.2 then
 		local blurPower = math.Clamp((disorientationFxLerp - 1.2) / 7.5, 0, 1)
-		DrawMotionBlur(0.08 + blurPower * 0.12, 0.45 + blurPower * 1.25, 0.01)
+		hg.DrawWorldMotionBlur(0.08 + blurPower * 0.12, 0.45 + blurPower * 1.25, 0.01)
 		if blurPower > 0.35 then
 			DrawToyTown(blurPower * 2.2, ScrH() / 2)
 		end
@@ -2093,7 +2129,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		if show_some_images_time > 0 then
 			show_some_images_time = show_some_images_time - 1
 
-			if not HasBlindTrait() then DrawMotionBlur(0.035 + brainTrauma * 0.065, 0.22 + brainTrauma * 0.5, 0.018) end
+			if not HasBlindTrait() then hg.DrawWorldMotionBlur(0.035 + brainTrauma * 0.065, 0.22 + brainTrauma * 0.5, 0.018) end
 			local flashRoll = math.max(math.floor(18 * (1 - brainTrauma)), 1)
 			if show_image_time <= 0 and math.random(flashRoll) < 2 then
 				show_image_time = 95 * math.Rand(0.12, 1) * (math.random(2) == 1 and 0.1 or 1)
@@ -2658,7 +2694,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		if not HasBlindTrait() and suicideLerp > 0.15 then
 			local blurAlpha = 0.1 + suicideLerp * 0.15
 			local blurDraw = suicideLerp * 1.5
-			DrawMotionBlur(blurAlpha, blurDraw, 0.001)
+			hg.DrawWorldMotionBlur(blurAlpha, blurDraw, 0.001)
 		end
 
 		-- ToyTown blur at high intensity
@@ -2878,7 +2914,7 @@ hook.Add("Post Pre Post Processing", "BrainLobeEffects", function()
 	end
 
 	if not HasBlindTrait() and parietal > 0.01 then
-		DrawMotionBlur(0.025 + parietal * 0.08, 0.35 + parietal * 0.55, 0.015 + parietal * 0.09)
+		hg.DrawWorldMotionBlur(0.025 + parietal * 0.08, 0.35 + parietal * 0.55, 0.015 + parietal * 0.09)
 		DrawSharpen(parietal * 0.8, parietal * 1.4)
 	end
 
@@ -3207,7 +3243,7 @@ end
 hook.Add("TranslateFOV", "ConsciousBeatZoom", function(ply, fov)
 	local pulse = GetConsciousBeatPulse()
 	if pulse > 0 then
-		return fov - (pulse * 20) -- zooms in slightly
+		return fov - (pulse * 3)
 	end
 end)
 
@@ -3219,7 +3255,13 @@ hook.Add("HG_CalcView", "ConsciousBeatShake", function(ply, pos, angles, fova, z
 		painShake = math.Clamp(math.Remap(org.pain, painRapidShakeThreshold, painThresholdMax, 0.65, 1.4), 0.65, 1.4)
 	end
 
-	local shakeAmt = pulse * 2.5 + painShake
+	local danger = org and math.Clamp((0.65 - (org.consciousness or 1)) / 0.55, 0, 1) or 0
+	local shakeAmt = pulse * (0.08 + danger * 0.55) + painShake
+	local lowOxygen = org and math.Clamp((20 - (org.o2 and org.o2[1] or 30)) / 16, 0, 1) or 0
+	if lowOxygen > 0 and not org.otrub then
+		angles.r = angles.r + math.sin(CurTime() * 1.8) * lowOxygen * 0.55
+		angles.p = angles.p + math.sin(CurTime() * 2.3) * lowOxygen * 0.22
+	end
 	if shakeAmt > 0 then
 		angles.p = angles.p + math.Rand(-shakeAmt, shakeAmt)
 		angles.y = angles.y + math.Rand(-shakeAmt, shakeAmt)
@@ -3228,7 +3270,7 @@ hook.Add("HG_CalcView", "ConsciousBeatShake", function(ply, pos, angles, fova, z
 
 	if pulse > 0 then
 		-- Also modify fova for when RenderScene is disabled
-		fova[1] = (fova[1] or 0) - (pulse * 20)
+		fova[1] = (fova[1] or 0) - (pulse * 3)
 	end
 end)
 

@@ -270,9 +270,10 @@ table.insert(male["ValveBiped.Bip01_Spine2"], 1, {"vest8", 1, Vector(-7, -2.5, 0
 local originalVestBoxes = {vest1 = true, vest2 = true, vest3 = true, vest4 = true, vest5 = true, vest6 = true, vest7 = true, vest8 = true}
 local originalHelmetBoxes = {helmet2 = true, helmet3 = true, helmet5 = true, helmet6 = true, helmet7 = true}
 hook.Add("HG_OrganAvalible", "HGOriginalVestBoxes", function(ent, name)
-	if name == "torso_armor" and ent.armors and originalVestBoxes[ent.armors.torso] then return false end
-	if name == "head_armor" and ent.armors and originalHelmetBoxes[ent.armors.head] then return false end
-	if name == "face_armor" and ent.armors and ent.armors.face == "mask1" then return false end
+	local armors = SERVER and ent.armors or ent:GetNetVar("Armor", ent.armors or {})
+	if name == "torso_armor" and armors and originalVestBoxes[armors.torso] then return false end
+	if name == "head_armor" and armors and originalHelmetBoxes[armors.head] then return false end
+	if name == "face_armor" and armors and armors.face == "mask1" then return false end
 end)
 table.insert(male["ValveBiped.Bip01_Head1"], 1, {"head_armor", 1, Vector(5, 1, 0), Angle(0, 0, 0), Vector(3.8, 3.5, 4.5), Color(250, 255, 0), "head", 0})
 table.insert(male["ValveBiped.Bip01_Head1"], 1, {"face_armor", 1, Vector(3.5, -4, 0), Angle(0, 0, 0), Vector(5, 3, 4.5), Color(255, 0, 221), "face", 0})

@@ -68,6 +68,11 @@ local function applyOrganTrauma(org, dmgInfo, force, delta, previousDamage, orga
 	local repeatThreshold = 0.9 + priorDamage * 1.35
 	local repeatHit = freshDamage <= 0.001 and rawForce >= repeatThreshold
 	if freshDamage <= 0.001 and not repeatHit then return end
+	if IsValid(org.owner) and org.owner:IsPlayer() then
+		net.Start("hg_damage_flash")
+		net.WriteFloat(math.Clamp(freshDamage * 2 + (repeatHit and 0.2 or 0), 0.35, 1))
+		net.Send(org.owner)
+	end
 
 	local staminaMax = math.max(org.stamina.max or 180, 1)
 	local staminaLoss = (freshDamage * 34 + rawForce * 4) * mul
@@ -356,6 +361,15 @@ local arterySize = {
 	["aorta"] = 18,
 }
 
+local arteryBones = {
+	arteria = "ValveBiped.Bip01_Neck1",
+	aorta = "ValveBiped.Bip01_Spine2",
+	rarmartery = "ValveBiped.Bip01_R_Forearm",
+	larmartery = "ValveBiped.Bip01_L_Forearm",
+	rlegartery = "ValveBiped.Bip01_R_Calf",
+	llegartery = "ValveBiped.Bip01_L_Calf",
+}
+
 local arteryMessages ={
 	"I can feel blood rushing from my neck...",
 	"My neck.. it's... pumping out blood.",
@@ -468,7 +482,7 @@ hitArtery = function(artery, org, dmg, dmgInfo, boneindex, dir, hit, impact, for
 	if not localPos then
 		localPos, localAng, dir2 = vecZero, angZero, Vector(-1, 0, 0)
 	end
-	local wound = {arterySize[artery], localPos, localAng, woundBone or boneindex, CurTime(), dir2 * 100, artery}
+	local wound = {arterySize[artery], localPos, localAng, woundBone or (isstring(boneindex) and boneindex) or arteryBones[artery], CurTime(), dir2 * 100, artery}
 	wound.visualBleedRate = math.max((arterySize[artery] or 6) * 4.5, 1)
 	table.insert(org.arterialwounds, wound)
 	hg.organism.RecordWoundMark(org, wound, true)

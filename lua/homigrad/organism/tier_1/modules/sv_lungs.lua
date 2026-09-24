@@ -734,7 +734,7 @@ module[2] = function(owner, org, timeValue)
 
 	if org._lowO2Time > 5 then
 		local buildRate = math.Clamp((org._lowO2Time - 5) / 30, 0, 1)
-		org.CO = math.min(org.CO + timeValue * buildRate * 0.4, 10)
+		org.CO = math.min(org.CO + timeValue * buildRate * 1.4, 30)
 	end
 
 	org.CO = max(org.CO - timeValue, 0)
@@ -980,7 +980,8 @@ module[2] = function(owner, org, timeValue)
 		math.Clamp(org.cardiacOutput or 1, 0, 1),
 		hg.organism.GetPulseOxygenPerfusion(org.pulse),
 		pressureDelivery,
-		bloodDelivery
+		bloodDelivery,
+		1 - math.Clamp(org.hypertension or 0, 0, 1) ^ 2 * 0.85
 	)
 	local tissuePerfusionTarget = rawTissuePerfusion ^ 0.72
 	local currentTissuePerfusion = math.Clamp(tonumber(org.circulatoryO2Reserve) or 1, 0, 1)

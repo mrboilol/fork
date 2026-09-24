@@ -54,14 +54,15 @@ function hg.organism.ShootMatrix(ent, organs)
 			--print(key,organ[1])
 			local additional = organ[7]
 			if additional then
-				local ent = (ent.armors and next(ent.armors) and ent) or (#ent:GetNetVar("zc_equipment", {}) > 0 and ent) or (ent:IsRagdoll() and IsValid(hg.RagdollOwner(ent)) and hg.RagdollOwner(ent)) or ent
-				local result = hook_Run("HG_OrganAvalible", ent, organ[1], organ)
+				local wearer = (ent:IsRagdoll() and IsValid(hg.RagdollOwner(ent)) and hg.RagdollOwner(ent)) or ent
+				local armors = SERVER and wearer.armors or wearer:GetNetVar("Armor", wearer.armors or {})
+				local result = hook_Run("HG_OrganAvalible", wearer, organ[1], organ)
 				if result != nil and result != true then
 					continue
-				elseif !result and ent and ent.armors then
+				elseif !result then
 					if type(additional) == "string" then
-						if not ent.armors[additional] then continue end
-					elseif not table.HasValue(ent.armors, organ[1]) then
+						if not armors or not armors[additional] then continue end
+					elseif not armors or not table.HasValue(armors, organ[1]) then
 						continue
 					end
 				end
@@ -119,7 +120,6 @@ hook.Add("PostDrawTranslucentRenderables", "homigrad-organism", function()
 	if not (hg_show_hitbox:GetBool() or hg_show_hitboxes:GetBool()) then return end
 	if not LocalPlayer():IsAdmin() then return end
 	for i, ply in player.Iterator() do
-		if GetViewEntity() == ply then continue end
 		ply = hg.GetCurrentCharacter(ply)
 		local organs = hg.organism.GetHitBoxOrgans(ply:GetModel(), ply)
 		if not organs then return end

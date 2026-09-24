@@ -812,6 +812,9 @@ local armorIcons = {
 	["helmet6"] = "vgui/icons/helmet.png",
 }
 hg.armorIcons = armorIcons
+hg.zcityArmor = hg.armor
+hg.zcityArmorNames = hg.armorNames
+hg.zcityArmorIcons = hg.armorIcons
 
 local entityMeta = FindMetaTable("Entity")
 function entityMeta:SyncArmor()

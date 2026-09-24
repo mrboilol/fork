@@ -2119,7 +2119,7 @@ function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
         end
     end
     
-    self.HitEnts = self.HitEnts or {owner, ent}
+    self.HitEnts = self.HitEnts or {owner, self, ent}
     
     local awStart = self.MeleeActiveStart or 0.15
     local awEnd = self.MeleeActiveEnd or 0.8
@@ -2134,7 +2134,7 @@ function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
     local defMul = self.MeleeRange and 1 or (isKnife and (self.MeleeKnifeMul or 1.15) or 0.7)
     local reachLen = baseReach * (self.MeleeReachMul or defMul)
     reachLen = math.max(reachLen - (self.MeleeReachTrim or -1), 0)
-    local eyetr = hg.eyeTrace(owner, (self:GetAttackLength() + vellen), ent, owner:GetAimVector())
+    local eyetr = hg.eyeTrace(owner, (self:GetAttackLength() + vellen), ent, owner:GetAimVector(), nil, {owner, ent, self, owner.OldRagdoll})
     local shouldDrawHull = ShouldDrawMeleeAttackHull(owner)
     //debugoverlay.Line(eyetr.StartPos, eyetr.StartPos + eyetr.Normal * (self:GetAttackLength() + vellen), 3, color_white)
     //local ent = ents.Create("prop_physics")
@@ -2172,7 +2172,7 @@ function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
         if conePts then
             conePts[#conePts + 1] = eyetr.StartPos + normal:Forward() * reachLen
         end
-        tr.filter = (secondary and self.MultiDmg2 or charge and self.MultiDmgCharge or self.MultiDmg1) and {owner, ent} or self.HitEnts
+        tr.filter = (secondary and self.MultiDmg2 or charge and self.MultiDmgCharge or self.MultiDmg1) and {owner, ent, self} or self.HitEnts
 
         local clashTrace = self:FindMeleeClash(owner, ent, attacktype, inattackLength, tr)
 
@@ -2185,7 +2185,7 @@ function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
         if SERVER and hg.TraceHeldWeaponShot then
             if self.HGEquipmentHitEnts ~= self.HitEnts then
                 self.HGEquipmentHitEnts = self.HitEnts
-                self.HGEquipmentSwing = {Contact = true, EquipmentHits = {}}
+                self.HGEquipmentSwing = {Contact = true, Inflictor = self, EquipmentHits = {}}
             end
             self.HGEquipmentSwing.DamageType = self:GetClashDamageType(attacktype)
             local damage = self:GetAttackDamageBase(attacktype)

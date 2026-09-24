@@ -203,7 +203,8 @@ module[2] = function(owner, org, timeValue)
 
 	
 
-	if !org.lasthit or org.lasthit + 1.5 < CurTime() then org.shock = max(org.shock - timeValue * 4 * (org.otrub and 1 or 0.5) * (1 + resilience * 0.75 + zerlkersResistance * 2.25), 0) end
+	if !org.lasthit or org.lasthit + 1.5 < CurTime() then org.shock = max(org.shock - timeValue * 4 * (org.otrub and 1 or 0.5) * (1 + resilience * 0.75 + zerlkersResistance * 2.25 + math.Clamp(adrenaline, 0, 5) * 0.6), 0) end
+	if adrenaline > 0 then org.shock = max(org.shock - timeValue * math.Clamp(adrenaline, 0, 5) * 0.9, 0) end
 	org.immobilization = math.Clamp(max((tonumber(org.immobilization) or 0) - timeValue * 5 * adrenalineMul, 0), 0, 100)
 
 	local spine2Broken = (org.spine2 or 0) >= (hg.organism.fake_spine2 or 1)
@@ -253,7 +254,7 @@ module[2] = function(owner, org, timeValue)
 	if org.pain > pain_shock_threshold then
 		local painShockTarget = Clamp(math.Remap(org.pain, pain_shock_threshold, pain_shock_ramp_end, pain_shock_target, pain_shock_max_target), pain_shock_target, pain_shock_max_target)
 		local painShockGain = Clamp(math.Remap(org.pain, pain_shock_threshold, pain_shock_ramp_end, pain_shock_gain, pain_shock_max_gain), pain_shock_gain, pain_shock_max_gain)
-		local shockResistance = math.Clamp(resilience * 0.25 + zerlkersResistance * 0.50, 0, 0.75)
+		local shockResistance = math.Clamp(resilience * 0.25 + zerlkersResistance * 0.50 + math.Clamp(adrenaline, 0, 5) * 0.1, 0, 0.8)
 		painShockTarget = painShockTarget * (1 - shockResistance)
 		org.shock = math.Approach(org.shock, painShockTarget, timeValue * painShockGain * (1 - shockResistance))
 	end
@@ -348,7 +349,7 @@ module[2] = function(owner, org, timeValue)
 
 
 
-	org.pain = org.avgpain * math.max(1 - (org.analgesia + org.painkiller * 0.3), 0) / math.max(org.painResistanceMul or 1, 1)
+	org.pain = org.avgpain * math.max(1 - (org.analgesia + org.painkiller * 0.3), 0) / math.max(org.painResistanceMul or 1, 1) * math.max(1 - math.Clamp(adrenaline, 0, 5) * 0.14, 0.3)
 	if zerlkersDose > 0 or adrenaline >= 3 then
 		org.pain = math.min(org.pain, 69.99)
 	end

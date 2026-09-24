@@ -58,7 +58,7 @@ local hg_coolcamera = ConVarExists("hg_coolcamera") and GetConVar("hg_coolcamera
 		local sprint = hg.KeyDown(ply, IN_SPEED)
 		local speed_mul = 1
 		if ply.hg_isSprinting then
-			speed_mul = 1.5
+			speed_mul = 0.85
 		elseif ply.hg_isJogging then
 			speed_mul = 1.15
 		end

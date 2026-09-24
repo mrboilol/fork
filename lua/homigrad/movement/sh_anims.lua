@@ -19,13 +19,8 @@ end
 			return ply, vel, maxSeqGroundSpeed
 		end
 
-		if lenSqr >= 77000 and lenSqr < 110000 then
-			ply:SetPlaybackRate(1.2)
-			return ply, vel, maxSeqGroundSpeed
-		end
-
 		if lenSqr >= 77000 then
-			ply:SetPlaybackRate(1.4)
+			ply:SetPlaybackRate(math.Clamp(math.sqrt(lenSqr) / math.max(maxSeqGroundSpeed, 1), 1, 1.6))
 			return ply, vel, maxSeqGroundSpeed
 		end
 	end)
