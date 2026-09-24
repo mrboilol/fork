@@ -83,14 +83,14 @@ bloodparticles_hook[1] = function(anim_pos, mul)
 
 		if part.kishki then
 			render_SetMaterial(part[4])
-			lightcolor.r = math.min((part.artery and 45 or 10) * light[1], 255)
+			lightcolor.r = math.Clamp((part.artery and 180 or 140) * light[1], 110, 255)
 			render_DrawSprite(pos, part[5], part[6], lightcolor)
 		else
 			local len = (part[2] - part[1]):LengthSqr()
 			--part.lerpeddiff = LerpVector(FrameTime() * 1, part.lerpeddiff or Vector(), (part[2] - part[1]))
 			--if len > 1 * 1 then
 				render_SetMaterial(mat_huy)
-				lightcolor.r = math.min((part.artery and 45 or 20) * light[1], 255)
+				lightcolor.r = math.Clamp((part.artery and 180 or 140) * light[1], 110, 255)
 				--part.lerpedshit = LerpFT(!part.lasthit and 1 or mul * 1, part.lerpedshit or 1, part.lasthit and 7 or 1)
 				--render_DrawBeam(pos - (len < 2 and (part[2] - part[1]):GetNormalized() * part.lerpedshit or (part[2] - part[1])) * 0.5 / mul / 24,pos + (part[2] - part[1]) * 0.5 / mul / 24, part.lerpedshit, 0, 1, part[9] or lightcolor )
 				--render_DrawBeam(pos - (part[2] - part[1]) * part.lerpedshit / mul / 24 * 0.5,pos + (part[2] - part[1]) * part.lerpedshit / mul / 24 * 0.5, part.lerpedshit, 0, 1, part[9] or lightcolor )
@@ -147,20 +147,29 @@ for _, i in ipairs({1, 2, 3, 4, 6, 7, 8, 9, 10, 11}) do
 	groundBloodMaterials[#groundBloodMaterials + 1] = Material("effects/droplets/drop" .. i .. "_5")
 end
 local oldGroundBloodMaterials = {}
-for i = 1, 10 do oldGroundBloodMaterials[i] = Material("decals/z_blood" .. i) end
+local oldArterialGroundBloodMaterials = {}
+for i = 1, 10 do
+	oldGroundBloodMaterials[i] = CreateMaterial("hg_ground_blood_old_" .. i, "UnlitGeneric", {
+		["$basetexture"] = "decals/z_blood" .. i, ["$translucent"] = "1", ["$vertexcolor"] = "1", ["$vertexalpha"] = "1"
+	})
+	oldArterialGroundBloodMaterials[i] = CreateMaterial("hg_ground_blood_arterial_" .. i, "UnlitGeneric", {
+		["$basetexture"] = "decals/arterial_blood" .. i, ["$translucent"] = "1", ["$vertexcolor"] = "1", ["$vertexalpha"] = "1"
+	})
+end
+local arterialGroundBloodMaterial = Material("effects/droplets/drop12_5")
 
-local groundBloodColor = Color(92, 0, 0, 255)
+local groundBloodColor = Color(210, 0, 0, 255)
 local render_DrawQuadEasy = render.DrawQuadEasy
 local poolTrace = {mask = MASK_SOLID_BRUSHONLY}
-local poolStartVolume = 4
-local poolMaxSize = 34
+local poolStartVolume = 10
+local poolMaxSize = 24
 
 local function findGroundBlood(pos, normal, ignored)
 	local stains = hg.groundbloodstains
 	local nearest, nearestDistance
 	for _, stain in ipairs(stains) do
 		if stain ~= ignored and stain.normal:Dot(normal) >= 0.75 then
-			local mergeRadius = math.max(4, (stain.size or 1) * 0.5)
+			local mergeRadius = math.max(9, (stain.size or 1) * 0.5 + 4)
 			local distance = stain.pos:DistToSqr(pos)
 			if distance <= mergeRadius * mergeRadius and (not nearestDistance or distance < nearestDistance) then
 				nearest, nearestDistance = stain, distance
@@ -173,25 +182,20 @@ end
 local flowGroundBlood
 local function depositGroundBlood(pos, normal, artery, tiny, amount, ignored)
 	local stain = findGroundBlood(pos, normal, ignored)
-	local size
-	if tiny then
-		size = math.Rand(0.8, 1.7)
-	elseif artery then
-		size = math.Rand(11, 22)
-	else
-		size = math.Rand(7, 15)
-	end
 	amount = amount or (tiny and 0.2 or artery and 2.5 or 1)
-	size = math.min(size * math.Clamp(math.sqrt(amount), 0.65, 1.8), poolMaxSize)
+	local size = math.Clamp((tiny and 1.8 or 3) + amount, 1.5, 6)
 
 	if stain then
+		if artery and not stain.artery then
+			stain.artery = true
+			stain.material = useOldBlood() and oldArterialGroundBloodMaterials[math_random(#oldArterialGroundBloodMaterials)] or arterialGroundBloodMaterial
+		end
 		if stain.size >= poolMaxSize then
 			flowGroundBlood(stain, pos, amount, artery, tiny)
 			return stain
 		end
 		stain.volume = (stain.volume or 1) + amount
-		local growth = stain.volume >= poolStartVolume and 1.35 or 0.25
-		stain.size = math.min(math.max(stain.size, size) + amount * growth, poolMaxSize)
+		stain.size = math.min(math.max(stain.size, size) + amount * (stain.volume >= poolStartVolume and 0.85 or 0.25), poolMaxSize)
 		return stain
 	end
 
@@ -202,10 +206,11 @@ local function depositGroundBlood(pos, normal, artery, tiny, amount, ignored)
 	stain = {
 		pos = pos + normal * 0.2,
 		normal = normal,
-		material = useOldBlood() and oldGroundBloodMaterials[math_random(#oldGroundBloodMaterials)] or groundBloodMaterials[math_random(#groundBloodMaterials)],
+		material = useOldBlood() and (artery and oldArterialGroundBloodMaterials[math_random(#oldArterialGroundBloodMaterials)] or oldGroundBloodMaterials[math_random(#oldGroundBloodMaterials)]) or (artery and arterialGroundBloodMaterial or groundBloodMaterials[math_random(#groundBloodMaterials)]),
 		size = size,
 		rotation = math_random(0, 359),
 		volume = amount,
+		artery = artery,
 	}
 	stains[#stains + 1] = stain
 	return stain

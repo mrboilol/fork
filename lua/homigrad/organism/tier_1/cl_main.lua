@@ -1107,7 +1107,7 @@ local function emitOrdinaryBleeding(ent, org, wound, pos, ang, visualRate)
 		for _ = 1, count do
 			local spread = 2 + rateK * 9
 			local vel = bleedDown * math.Rand(12, 28 + rateK * 22) + VectorRand(-spread, spread)
-			local size = math.Rand(0.65, 1.15 + rateK * 1.15)
+			local size = math.Rand(1.1, 1.5 + rateK * 1.1)
 			hg.addBloodPart(pos + VectorRand(-0.3, 0.3), vel, nil, size, size, false, nil, ent)
 		end
 		return
@@ -1118,7 +1118,7 @@ local function emitOrdinaryBleeding(ent, org, wound, pos, ang, visualRate)
 		for _ = 1, count do
 			local spread = 3 + rateK * 16
 			local vel = bleedDown * math.Rand(18, 42 + rateK * 38) + VectorRand(-spread, spread)
-			local size = math.Rand(0.7, 1.2 + rateK * 1.5)
+			local size = math.Rand(1.1, 1.6 + rateK * 1.2)
 			hg.addBloodPart(pos + VectorRand(-0.4, 0.4), vel, nil, size, size, false, nil, ent)
 		end
 	else
@@ -1128,7 +1128,7 @@ local function emitOrdinaryBleeding(ent, org, wound, pos, ang, visualRate)
 		local count = math.Clamp(math.floor(1 + rateK * 4), 1, 5)
 		for _ = 1, count do
 			local vel = outward * speed + lateral + VectorRand(-4, 4)
-			local size = math.Rand(0.85, 1.35 + rateK * 1.1)
+			local size = math.Rand(1.2, 1.7 + rateK * 1.1)
 			hg.addBloodPart(pos + VectorRand(-0.25, 0.25), vel, nil, size, size, false, nil, ent)
 		end
 	end
@@ -1145,13 +1145,14 @@ local function emitArterialBleeding(ent, org, wound, index, pos, ang, dir, water
 	local pulse = (org.pulse or 70) / 70
 	local rateK = math.Clamp(visualRate / 20, 0, 1)
 	local _, pressureDrive = getBleedPressureDrive(org)
-	local size = math.Rand(0.9, 1.4 + rateK * 2.4) * arterySizeMul
+	local size = math.Rand(1.2, 1.6 + rateK * 1.2) * arterySizeMul
 	local time = CurTime()
-	local velocity = VectorRand(-1, 1) * pulse
-		+ dir * (0.2 + rateK * 1.8) * pressureDrive * (math.abs(math.sin(time * 2) + math.cos(time * (5 + index * 2)) + math.sin(time * (1 + index))) * 0.6 + math.sin(time * 2) + 4) * 0.1
-		+ dir:Angle():Right() * 25 * rateK * math.sin(time * 2) * math.cos(time * 4)
-		+ ang:Up() * 25 * rateK * math.sin(time * 3) * math.cos(time)
-		+ VectorRand(-1, 1) * pulse
+	local sprayDir = dir:LengthSqr() > 0.001 and dir:GetNormalized() or getBleedDirection(ang)
+	local velocity = sprayDir * (95 + rateK * 165) * pressureDrive * math.Clamp(pulse, 0.3, 1.5)
+		* (0.8 + 0.2 * math.sin(time * (5 + index)))
+		+ sprayDir:Angle():Right() * 12 * rateK * math.sin(time * 2)
+		+ ang:Up() * 10 * rateK * math.sin(time * 3)
+		+ VectorRand(-3, 3) * pulse
 	if pressureDrive <= 0.05 then velocity = bleedDown * math.Rand(12, 28) + VectorRand(-3, 3) end
 
 	hg.addBloodPart(pos, velocity, nil, size, size, true, nil, ent)
