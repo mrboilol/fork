@@ -81,14 +81,6 @@ local remDeathStateStation
 local remDeathStateLoading
 local remDeathStateGeneration = 0
 local remDeathStateActive = false
-surface.CreateFont("RemDeathStateFont", {
-	font = "Lora",
-	size = ScreenScale(22),
-	weight = 1100,
-	outline = true
-})
-
-local remDeathStateColor = Color(255, 255, 255, 0)
 local remDeathStateSound = "rem_deathstatefull.mp3"
 local brainRotStation
 local brainRotLoading
@@ -580,39 +572,6 @@ local function DrawScreenFillShape(x, y, radius, segments, roughness, timeOffset
 	surface.DrawPoly(poly)
 end
 
-local function DrawIncapacitatedDeathFade(deathStateEnd, consciousness)
-	local remaining = math.max(deathStateEnd - CurTime(), 0)
-	local fade = math.Clamp((INCAPACITATION_DEATH_TIME - remaining) / INCAPACITATION_DEATH_TIME, 0, 1)
-	local finalFade = math.Clamp((6 - remaining) / 6, 0, 1)
-	local shine = finalFade * (0.65 + math.abs(math.sin(CurTime() * 9)) * 0.35)
-	local wakeFade = 1 - math.Clamp((consciousness - 0.04) / 0.26, 0, 1)
-	local sw, sh = ScrW(), ScrH()
-	local radius = math.ease.InOutSine(fade) * math.sqrt(sw * sw + sh * sh) / 2
-
-	DrawBloom(0.35 + finalFade * 0.45, (0.8 + finalFade * 2.8) * wakeFade, 7, 7, 2, 1, 1, 1, 1)
-	surface.SetDrawColor(255, 255, 255, math.Clamp(((fade ^ 1.35) * 175 + shine * 35) * wakeFade, 0, 255))
-	DrawScreenFillShape(sw / 2, sh / 2, radius * 1.04, 320, 0.24 * (1 - finalFade * 0.35), 0)
-	surface.SetDrawColor(255, 255, 255, math.Clamp(((fade ^ 1.35) * 110 + shine * 25) * wakeFade, 0, 255))
-	DrawScreenFillShape(sw / 2, sh / 2, radius * 0.99, 320, 0.31 * (1 - finalFade * 0.3), 4.7)
-	surface.SetDrawColor(255, 255, 255, math.Clamp(((fade ^ 1.35) * 80 + shine * 20) * wakeFade, 0, 255))
-	DrawScreenFillShape(sw / 2, sh / 2, radius * 0.94, 320, 0.38 * (1 - finalFade * 0.25), 9.2)
-
-	if finalFade > 0 then
-		surface.SetDrawColor(255, 255, 255, math.Clamp((finalFade * 180 + shine * 75) * wakeFade, 0, 255))
-		DrawScreenFillShape(sw / 2, sh / 2, radius * (0.88 + shine * 0.12), 320, 0.2 * (1 - finalFade * 0.45), 13.5)
-	end
-end
-
-local function DrawIncapacitatedDeathText(seconds, deathStateEnd)
-	local remaining = math.max(deathStateEnd - CurTime(), 0)
-	local fade = math.Clamp((INCAPACITATION_DEATH_TIME - remaining) / INCAPACITATION_DEATH_TIME, 0, 1)
-	local radius = math.ease.InOutSine(fade) * math.sqrt(ScrW() * ScrW() + ScrH() * ScrH()) / 2
-	local textValue = math.floor(255 * (1 - math.Clamp((radius - 12) / 80, 0, 1)))
-	remDeathStateColor.a = math.Clamp(fade * INCAPACITATION_DEATH_TIME / 2, 0, 1) * 255
-	local textColor = Color(textValue, textValue, textValue, remDeathStateColor.a)
-	draw.SimpleText("You are incapacitated, You will die in " .. seconds, "RemDeathStateFont", ScrW() / 2, ScrH() / 2, textColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-end
-
 hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 	local spect = IsValid(lply:GetNWEntity("spect")) and lply:GetNWEntity("spect")
 	local organism = lply:Alive() and lply.organism or (viewmode == 1 and IsValid(spect) and spect.organism) or {}
@@ -702,10 +661,6 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 		else
 			lply:SetDSP((lply.suiciding and lply:Alive()) and 130 or normaldsp)
 		end
-	end
-
-	if lply:Alive() and (otrub or new_organism.otrub) and incapacitated and deathStateEnd then
-		DrawIncapacitatedDeathFade(deathStateEnd, consciousness)
 	end
 
 	if not alive then
@@ -937,10 +892,6 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 	end
 
 	DrawSeizureMemory(org)
-	if lply:Alive() and (otrub or new_organism.otrub) and incapacitated and deathStateEnd then
-		DrawIncapacitatedDeathText(math.max(math.ceil(deathStateEnd - CurTime()), 0), deathStateEnd)
-	end
-	
 	if IsValid(ent) and ent.Blinking and lply:Alive() then
 		surface.SetDrawColor(0,0,0,255)
 		if amtflashed and amtflashed > 0.1 and amtflashed < 0.8 and ent.Blinking > 0.1 then

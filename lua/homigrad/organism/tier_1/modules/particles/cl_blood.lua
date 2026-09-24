@@ -9,6 +9,7 @@ local col_red_darker = Color(122,0,0)
 local col_red = Color(200,0,0)
 local vecDown = Vector(0, 0, -40)
 local vecZero = Vector(0, 0, 0)
+local gravity = GetConVar("sv_gravity")
 local LerpVector = LerpVector
 local math_random = math.random
 local table_remove = table.remove

@@ -406,7 +406,22 @@ local functions_break = {
     end,
     ["Armor"] = function(ent, armor)
         local ent2 = ents.Create("ent_armor_" .. armor)
+        if not IsValid(ent2) then return end
         ent2:Spawn()
+        if math.random(2) == 1 then
+            local wear = math.Rand(0.05, 0.2)
+            local maximum = hg.GetArmorMaxCondition(ent2, ent2.placement, ent2.name)
+            local data = hg.armor[ent2.placement] and hg.armor[ent2.placement][ent2.name]
+            if data and (data.durabilityArmor ~= nil and data.durabilityArmor or data.durabilityArmor == nil and (ent2.placement == "head" or ent2.placement == "face")) then
+                ent2.armorDurability = maximum * (1 - wear)
+            else
+                ent2.armorHealth = maximum * (1 - wear)
+            end
+            local shots = hg.GetArmorBreakShotCount(armor)
+            ent2.shotsLeft = math.max(1, math.floor(shots * (1 - wear)))
+            ent2.shotsMax = shots
+            ent2:SetNWFloat("ArmorWear", wear)
+        end
         ent2:SetPos(ent:GetPos())
         ent2:SetAngles(ent:GetAngles())
     end,

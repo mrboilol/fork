@@ -978,9 +978,7 @@ local function TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, ori
     for dropped in pairs(impact.DroppedAccessories) do
         if not IsValid(dropped) then impact.DroppedAccessories[dropped] = nil; continue end
         if seen[dropped] or not CanHit(dropped) then continue end
-        local hit = hg.TraceEquipmentModel(dropped:GetModel(), dropped:GetPos(), dropped:GetAngles(), dropped:GetModelScale(), startPos, endPos, projectileRadius, true)
-        local boundsHit = TraceEquipmentEntityBounds(dropped, dropped:GetPos(), dropped:GetAngles(), dropped:GetModelScale(), startPos, endPos, projectileRadius)
-        if boundsHit and (not hit or boundsHit.fraction < hit.fraction) then hit = boundsHit end
+        local hit = hg.TraceEquipmentModel(dropped:GetModel(), dropped:GetPos(), dropped:GetAngles(), dropped:GetModelScale(), startPos, endPos, projectileRadius)
         if hit then
             hit.heldEntity, hit.key, hit.shot = dropped, dropped, shot
             hits[#hits + 1] = hit

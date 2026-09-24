@@ -295,6 +295,9 @@ local function Trace_Bullet(box, hit, ricochet, impact, org, organs, dmg, dmgInf
 
 		if isRifleBullet and name == "skull" then resistance = (resistance or 0) * 0.35 end
 		local brainDelta = isBrainLobe and math.max((org[name] or 0) - oldBrainLobe, 0) or 0
+		if isBrainLobe and brainDelta > 0 and dmgInfo:IsDamageType(DMG_CLUB) then
+			impact.brainHit = true
+		end
 		if name == "jaw" and impact.bullet and impact.bullet.StopsInJaw then
 			return {
 				penetrationCost = impact.penetrationBefore,
@@ -1522,6 +1525,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	org.lastArmorSharpStopped = false
 
 	-- Cache organs/hitboxes for this damage event
+	local skullOpenBeforeTrace = org.skull == 1
 	local cachedOrgans = hg.organism.GetHitBoxOrgans(ent:GetModel(), ent)
 	local cachedBoxs, cachedPos, cachedSphere = hg.organism.ShootMatrix(ent, cachedOrgans)
 
@@ -2107,7 +2111,8 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		end
 	end
 
-	local brokenSkullHeadImpact = hitgroup == HITGROUP_HEAD and org.skull == 1
+	local brokenSkullHeadImpact = hitgroup == HITGROUP_HEAD and skullOpenBeforeTrace
+		and IsValid(inf) and inf:GetClass() == "weapon_hands_sh" and impact.brainHit
 	if brokenSkullHeadImpact or (dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) and dmgBlood > 1 and #inputHole > 0) then
 		net.Start("hg_bloodimpact")
 		net.WriteVector(dmgPos)

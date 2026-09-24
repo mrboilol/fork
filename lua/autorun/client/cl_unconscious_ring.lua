@@ -905,6 +905,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         local remaining = math.max(deathStateEnd - CurTime(), 0)
         incapacitationProgress = math.Clamp((INCAPACITATION_DEATH_TIME - remaining) / INCAPACITATION_DEATH_TIME, 0, 1)
     end
+    local brainDeathProgress = math.Clamp(math.max(brain, brainHemorrhage, tonumber(org.brainSwelling) or 0), 0, 1)
     local incapacitationWhite = math.ease.InOutSine(incapacitationProgress)
     local isCritical = (org.critical == true)
         or (ecgState == "asystole" and brain >= 0.02)
@@ -962,7 +963,10 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         and (abnormalECG or severeMechanicalPulse or sinusECGTail > 0 or admiring)
     
 	local unconsciousElapsed = isUnconscious and (CurTime() - (unconsciousStartTime or CurTime())) or 0
-	if isUnconscious and unconsciousElapsed >= UNCONSCIOUS_RING_DELAY then
+	if isUnconscious and incapacitated then
+		ringAlpha = SmoothAlpha(ringAlpha, 1, 1.5)
+		dotBeat = math.floor(CurTime()) % 3
+	elseif isUnconscious and unconsciousElapsed >= UNCONSCIOUS_RING_DELAY then
         ringAlpha = SmoothAlpha(ringAlpha, 1, 1.5)
         dotBeat = math.floor(CurTime()) % 3
 	elseif isUnconscious then
@@ -1029,18 +1033,19 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
 
         if isUnconscious or lowConsciousness then
             local _, wakeProgress = UpdateWakeEstimate(org)
-            local ringColor = isCritical
+            local ringColor = (isCritical or incapacitated)
                 and Color(210, 35, 30, 255 * ringAlpha)
                 or Color(220, 220, 220, 255 * ringAlpha)
             local radius = math.min(280, scrH * 0.32)
             incapPromptX = centerX
-            incapPromptY = math.min(centerY + radius + ScreenScaleH(10), scrH - ScreenScaleH(30))
+            incapPromptY = math.max(centerY - radius - ScreenScaleH(32), ScreenScaleH(20))
 
             surface.SetDrawColor(0, 0, 0, 90 * ringAlpha)
             surface.DrawRect(0, 0, scrW, scrH)
             DrawArc(centerX, centerY, radius, 12, 0, 360, 60,
                 Color(40, 40, 40, 100 * ringAlpha))
-            DrawArc(centerX, centerY, radius, 12, 90, 90 - wakeProgress * 360, 80, ringColor)
+            local ringProgress = incapacitated and (deathStateEnd and deathStateEnd > CurTime() and (1 - incapacitationProgress) or (1 - brainDeathProgress)) or wakeProgress
+            DrawArc(centerX, centerY, radius, 12, 90, 90 - ringProgress * 360, 80, ringColor)
 
             if hg_unconsciousclassic and hg_unconsciousclassic:GetBool() then
                 lastPhaseMod = 0
@@ -1071,7 +1076,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     if isUnconscious then
         local terminal = incapacitated and deathStateEnd
         local remaining = terminal and math.max(deathStateEnd - CurTime(), 0) or 0
-        local fade = terminal and math.Clamp((INCAPACITATION_DEATH_TIME - remaining) / 1.25, 0, 1) or ringAlpha
+        local fade = ringAlpha
         local urgency = terminal and math.Clamp((5 - remaining) / 5, 0, 1) or 0
         local pulseAlpha = 0.82 + math.abs(math.sin(CurTime() * 6)) * 0.18 * urgency
         local promptColor = terminal and Color(235, 55, 45, 245 * fade * pulseAlpha) or Color(225, 225, 225, 235 * fade)
@@ -1079,7 +1084,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         if not incapPromptX then
             local radius = math.min(280, ScrH() * 0.32)
             incapPromptX = ScrW() * 0.5
-            incapPromptY = math.min(ScrH() * 0.5 + radius + ScreenScaleH(10), ScrH() - ScreenScaleH(30))
+            incapPromptY = math.max(ScrH() * 0.5 - radius - ScreenScaleH(32), ScreenScaleH(20))
         end
 
         local messageY = incapPromptY

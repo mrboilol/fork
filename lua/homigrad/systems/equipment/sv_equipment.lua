@@ -798,6 +798,14 @@ util.AddNetworkString("hg_configure_armor")
 local function ConfigureSpawnedArmor(ply, ent)
 	if not IsValid(ply) or not ply:IsPlayer() or not IsValid(ent) or ent.HGArmorConfigurator then return end
 	if not ent.name or ent:GetClass() ~= "ent_armor_" .. ent.name or not ent.placement or not hg.armor[ent.placement] or not hg.armor[ent.placement][ent.name] then return end
+	ent.armorState = ent.armorState or {}
+	ent.armorState.quality = ent.armorState.quality or 1
+	ent:SetNetVar("ArmorItemState", ent.armorState)
+	local maximum = hg.GetArmorMaxCondition(ent, ent.placement, ent.name)
+	local data = hg.armor[ent.placement][ent.name]
+	if IsDurabilityArmor(ent.placement, data) then ent.armorDurability = maximum else ent.armorHealth = maximum end
+	ent.shotsLeft = hg.GetArmorBreakShotCount(ent.name)
+	ent:SetNWFloat("ArmorWear", 0)
 	ent.HGArmorConfigurator = ply
 	ent.HGArmorConfigureUntil = CurTime() + 120
 	timer.Simple(0.1, function()
@@ -827,13 +835,16 @@ net.Receive("hg_configure_armor", function(_, ply)
 	local sides = net.ReadString()
 	local protection = net.ReadFloat()
 	local healthMultiplier = net.ReadUInt(3)
+	local protectionLevel = net.ReadUInt(3)
 	if not hg.ArmorPlateMaterials[material] or not hg.ArmorPlateLevels[level] then return end
+	if not hg.ArmorPlateLevels[protectionLevel] then return end
 	if sides ~= "none" and sides ~= "front" and sides ~= "back" and sides ~= "both" and sides ~= "all" then return end
 	if protection < 0.5 or protection > 2 or healthMultiplier < 1 or healthMultiplier > 5 then return end
 	ent.armorState = ent.armorState or {}
 	ent.armorState.quality = quality
 	ent.armorState.healthMultiplier = healthMultiplier
-	if ent.placement == "head" or ent.placement == "face" then ent.armorState.protectionMultiplier = protection end
+	ent.armorState.protectionMultiplier = protection
+	ent.armorState.protectionLevel = protectionLevel
 	if ent.placement == "torso" then
 		ent.armorState.plateMaterial = material
 		ent.armorState.plateLevel = level
@@ -841,11 +852,10 @@ net.Receive("hg_configure_armor", function(_, ply)
 	end
 	ent:SetNetVar("ArmorItemState", ent.armorState)
 	local maximum = hg.GetArmorMaxCondition(ent, ent.placement, ent.name)
-	if ent.placement == "head" or ent.placement == "face" then
-		ent.armorDurability = maximum
-	else
-		ent.armorHealth = maximum
-	end
+	local data = hg.armor[ent.placement][ent.name]
+	if IsDurabilityArmor(ent.placement, data) then ent.armorDurability = maximum else ent.armorHealth = maximum end
+	ent.shotsLeft = hg.GetArmorBreakShotCount(ent.name)
+	ent:SetNWFloat("ArmorWear", 0)
 	local phys = ent:GetPhysicsObject()
 	if IsValid(phys) then phys:SetMass(hg.GetArmorMass(ent, ent.placement, ent.name)) end
 	ent.HGArmorConfigurator = nil
@@ -972,6 +982,8 @@ function hg.TryKnockOffHelmet(owner, placement, armor, armorData, dmgInfo, hitPo
 	local diameter = math.max(tonumber(ballistic and ballistic.Diameter) or tonumber(bullet and bullet.Diameter) or 0, 0)
 	local penetration = math.max(tonumber(ballistic and ballistic.Penetration) or tonumber(ballistic and ballistic.penetrationBefore) or tonumber(bullet and bullet.Penetration) or 0, 0)
 	local condition = GetEquippedArmorCondition(owner, armor, placement, armorData)
+	local quality = math.Clamp(tonumber(hg.GetArmorItemState(owner, armor, "quality", 1)) or 1, 0.5, 1.5)
+	local protection = math.Clamp(tonumber(hg.GetArmorItemState(owner, armor, "protectionMultiplier", 1)) or 1, 0.5, 2)
 	local severity = math.Clamp(rawDamage / 85, 0, 1.5)
 	local chance
 	if isBullet then
@@ -980,10 +992,11 @@ function hg.TryKnockOffHelmet(owner, placement, armor, armorData, dmgInfo, hitPo
 	else
 		chance = 0.02 + severity * 0.18
 	end
-	chance = chance + (1 - condition) * 0.12
+	chance = tonumber(armorData.knockoffChance) or chance
+	chance = chance * (1 + (1 - condition) * 0.5) / (quality * protection)
 	chance = chance / math.Clamp((tonumber(armorData.mass) or 2) / 3, 0.8, 2)
 	if modelHit then chance = chance * 1.35 end
-	chance = math.Clamp(tonumber(armorData.knockoffChance) or chance, 0, 0.72)
+	chance = math.Clamp(chance, 0, 0.72)
 	if math.Rand(0, 1) > chance then return false end
 
 	local launchDir = isvector(direction) and direction:GetNormalized() or dmgInfo and dmgInfo:GetDamageForce():GetNormalized() or VectorRand():GetNormalized()

@@ -46,7 +46,9 @@ function hg.GetArmorProtection(ent, placement, armor, hitPos)
 	if not data then return 0, 0, 0 end
 	local quality = math.Clamp(tonumber(hg.GetArmorItemState(ent, armor, "quality", 1)) or 1, 0.8, 1.2)
 	local ballistic = data.protection or 0
-	local multiplier = (placement == "head" or placement == "face") and math.Clamp(tonumber(hg.GetArmorItemState(ent, armor, "protectionMultiplier", 1)) or 1, 0.5, 2) or 1
+	local multiplier = math.Clamp(tonumber(hg.GetArmorItemState(ent, armor, "protectionMultiplier", 1)) or 1, 0.5, 2)
+	local protectionLevel = hg.GetArmorItemState(ent, armor, "protectionLevel", nil)
+	if protectionLevel and hg.ArmorPlateLevels[protectionLevel] then multiplier = multiplier * hg.ArmorPlateLevels[protectionLevel] / hg.ArmorPlateLevels[3] end
 	local melee = (data.meleeProt or ballistic) * quality * multiplier
 	local stab = (data.stabProt or ballistic) * quality * multiplier
 	if not hg.GetArmorItemState(ent, armor, "fixedLevel", false) then ballistic = ballistic * quality end
