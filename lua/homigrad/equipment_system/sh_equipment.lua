@@ -281,7 +281,7 @@ local function protec(org, bone, dmg, dmgInfo, placement, boneindex, dir, hit, r
         org.oldDmgInfo = dmgInfo
     end
 
-	return protectionDamageMul
+	return 1
 end
 
 hg.organism = hg.organism or {}
