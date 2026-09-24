@@ -43,7 +43,7 @@ function hg.organism.Trace(pos, dir, size, maxpen, boxs, center, endDis, organs,
 	while passing < passMax and maxtries > 0 do
 		maxtries = maxtries - 1
 
-		if maxpen ~= 0 and passing >= maxpen then break end
+		if maxpen ~= 0 and passing >= maxpen + 10 then break end
 
 		local frac = 1
 		local iHit, normal, hit
