@@ -11,6 +11,15 @@ hg.ArmorPlateMaterials = {
 	ceramic = {mass = 2.5, protection = 1},
 	steel = {mass = 4, protection = 0.9},
 	polyethylene = {mass = 1.8, protection = 0.8},
+	uhmwpe = {mass = 1.8, protection = 0.95},
+	uhmwpe_ceramic = {mass = 2.2, protection = 1.05},
+	uhmwpe_arsteel = {mass = 2.8, protection = 1},
+	titan = {mass = 3, protection = 1},
+	arsteel = {mass = 3.6, protection = 0.95},
+	kevlar = {mass = 1.5, protection = 0.7},
+	kevlar_ceramic = {mass = 2, protection = 0.9},
+	kevlar_arsteel = {mass = 2.6, protection = 0.85},
+	kevlar_titan = {mass = 2.4, protection = 0.85},
 }
 
 hg.ArmorPlateLevels = {[1] = 6, [2] = 8, [3] = 10, [4] = 12, [5] = 15, [6] = 17}

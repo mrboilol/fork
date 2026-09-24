@@ -28,6 +28,7 @@ ENT.Base = "ent_zcity_armor_base"
 ENT.PrintName = "Police anti-riot vest"
 ENT.Category = "ZCity TestArmor"
 ENT.Spawnable = true
+ENT.CarryMass = 8
 ENT.Model = "models/eu_homicide/armor_prop.mdl"
 ENT.ModelMaterial = nil
 ENT.IconOverride = "vgui/icons/policevest"

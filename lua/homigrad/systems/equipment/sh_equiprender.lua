@@ -51,7 +51,7 @@ if CLIENT then
 			material = state.plateMaterial or material
 			level = state.plateLevel or level
 			sides = state.plateSides or sides
-			choice("Plate material", {"ceramic", "steel", "polyethylene"}, material, function(value) material = value end)
+			choice("Plate material", {"ceramic", "steel", "polyethylene", "titan", "arsteel", "uhmwpe", "uhmwpe_ceramic", "uhmwpe_arsteel", "kevlar", "kevlar_ceramic", "kevlar_arsteel", "kevlar_titan"}, material, function(value) material = value end)
 			choice("Protection level", {"1", "2", "3", "4", "5", "6"}, level, function(value) level = tonumber(value) end)
 			choice("Plate coverage", {"none", "front", "back", "both", "all"}, sides, function(value) sides = value end)
 		end

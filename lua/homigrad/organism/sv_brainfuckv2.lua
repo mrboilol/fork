@@ -522,6 +522,11 @@ local function applyPosture(rag, posture)
 	if elapsed > poseFadeTime + 10 then return end
 	if (rag.brainfuckv2PoseError or 0) > 25 then fade = math.max(fade, 0.4) end
 	if fade <= 0 then return end
+	local spin = reference:GetAngleVelocity()
+	local spinSpeed = spin:Length()
+	if spinSpeed > 90 then
+		reference:AddAngleVelocity(-spin * ((spinSpeed - 90) / spinSpeed) * 0.25)
+	end
 
 	local dampNow = 10 + 40 * fade
 	local ssNow = 0.001 + (1 - fade) * 0.4

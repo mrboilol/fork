@@ -28,6 +28,7 @@ ENT.Base = "ent_zcity_armor_base"
 ENT.PrintName = "Plate Body Armor IV"
 ENT.Category = "ZCity TestArmor"
 ENT.Spawnable = true
+ENT.CarryMass = 8
 ENT.Model = "models/combataegis/body/ballisticvest_d.mdl"
 ENT.ModelMaterial = nil
 ENT.IconOverride = "scrappers/armor1.png"

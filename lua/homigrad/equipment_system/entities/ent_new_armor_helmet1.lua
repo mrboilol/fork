@@ -28,6 +28,7 @@ ENT.Base = "ent_zcity_armor_base"
 ENT.PrintName = "ACH Helmet IIIA"
 ENT.Category = "ZCity TestArmor"
 ENT.Spawnable = true
+ENT.CarryMass = 3
 ENT.Model = "models/barney_helmet.mdl"
 ENT.ModelMaterial = "sal/hanker"
 ENT.IconOverride = "vgui/icons/helmet"

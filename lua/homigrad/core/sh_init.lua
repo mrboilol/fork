@@ -70,6 +70,13 @@ function hg.GetCarryWeight(ply)
 				weight = weight + hg.GetArmorMass(ply, plc, arm)
 			end
 		end
+
+		for _, index in ipairs(ply:GetNetVar("zc_equipment", {})) do
+			local equipment = Entity(index)
+			if IsValid(equipment) and equipment.GetEquiped and equipment:GetEquiped() then
+				weight = weight + (equipment.CarryMass or 1)
+			end
+		end
 	end
 
 	return weight
