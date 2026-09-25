@@ -149,12 +149,8 @@ end
 local oldGroundBloodMaterials = {}
 local oldArterialGroundBloodMaterials = {}
 for i = 1, 10 do
-	oldGroundBloodMaterials[i] = CreateMaterial("hg_ground_blood_old_" .. i, "UnlitGeneric", {
-		["$basetexture"] = "decals/z_blood" .. i, ["$translucent"] = "1", ["$vertexcolor"] = "1", ["$vertexalpha"] = "1"
-	})
-	oldArterialGroundBloodMaterials[i] = CreateMaterial("hg_ground_blood_arterial_" .. i, "UnlitGeneric", {
-		["$basetexture"] = "decals/arterial_blood" .. i, ["$translucent"] = "1", ["$vertexcolor"] = "1", ["$vertexalpha"] = "1"
-	})
+	oldGroundBloodMaterials[i] = Material("decals/z_blood" .. i)
+	oldArterialGroundBloodMaterials[i] = Material("decals/arterial_blood" .. i)
 end
 local arterialGroundBloodMaterial = Material("effects/droplets/drop12_5")
 
@@ -254,8 +250,10 @@ flowGroundBlood = function(stain, impactPos, amount, artery, tiny)
 				end
 			end
 			if not covered then
-				depositGroundBlood(hit.HitPos, hit.HitNormal, artery, tiny, amount, stain)
-				return
+				if not findGroundBlood(hit.HitPos, hit.HitNormal, stain) then
+					depositGroundBlood(hit.HitPos, hit.HitNormal, artery, tiny, amount, stain)
+					return
+				end
 			end
 		end
 	end
@@ -279,7 +277,8 @@ hook.Add("PostDrawTranslucentRenderables", "hg_draw_persistent_ground_blood", fu
 		if offset:LengthSqr() > drawDistanceSqr or offset:Dot(eyeForward) < -stain.size then return end
 		groundBloodColor.a = alpha
 		render_SetMaterial(stain.material)
-		render_DrawQuadEasy(stain.pos, stain.normal, stain.size, stain.size, groundBloodColor, stain.rotation)
+		local size = stain.size * (useOldBlood() and 1 or 1.75)
+		render_DrawQuadEasy(stain.pos, stain.normal, size, size, groundBloodColor, stain.rotation)
 	end
 
 	for i = 1, #hg.groundbloodstains do
@@ -335,7 +334,7 @@ local function decalBlood(pos, normal, tr, artery, owner, tiny, amount)
 		local oldBlood = useOldBlood()
 		local decal = oldBlood and (artery and oldTinyArterialDecal or oldTinyNormalDecals[math.random(#oldTinyNormalDecals)]) or getNewTinyBloodDecal()
 		target = target or game.GetWorld()
-		local scale = math.Rand(0.12, 0.24)
+		local scale = oldBlood and math.Rand(0.12, 0.24) or math.Rand(0.3, 0.5)
 		util.DecalEx(decal, target, pos, normal, color_white, scale, scale)
 		if math.random(7) == 1 then playBloodDripImpact(pos, tr) end
 		return

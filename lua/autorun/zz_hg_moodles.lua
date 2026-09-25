@@ -704,8 +704,8 @@ local function buildEffects(ply, org)
 	local irregular = irregularSeverity > 0 or (not ecgState and unstableRhythm ~= nil)
 	local fibrillating = org.fibrillation == true or ecgState == "atrial_fibrillation" or ecgState == "ventricular_fibrillation"
 		or (not ecgState and unstableRhythm == "atrial_fibrillation")
-	local rhythmSeverity = math.max(arrhythmia, palpitations, irregularSeverity, fibrillating and 1 or 0)
-	if not org.heartstop and (rhythmSeverity >= 0.1 or irregular) then
+	local rhythmSeverity = math.max(arrhythmia, irregularSeverity, fibrillating and 1 or 0, palpitations >= 0.6 and palpitations or 0)
+	if not org.heartstop and (irregular or arrhythmia >= 0.35 or palpitations >= 0.6 or fibrillating) then
 		local level = highRank(math.max(rhythmSeverity, 0.1), {0.1, 0.3, 0.6, 0.85})
 		add(effects, "arrhythmia", "arrhythmia", level, "bad", 24.5, math.floor(heartRate) .. " bpm")
 	elseif not org.heartstop and (heartRate >= 150 or (heartRate > 0 and heartRate <= 45)) then

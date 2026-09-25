@@ -714,7 +714,7 @@ hook.Add("Ragdoll_Create", "hg-torsohalve-resplit", function(ply, rag)
 	end)
 end)
 
-hook.Add("Player Spawn", "hg-torsohalve-reset", function(ply)
+hook.Add("PlayerSpawn", "hg-torsohalve-reset", function(ply)
 	ply:SetNWBool("hgTorsoSevered", false)
 	ply.__hgTorsoPending = nil
 	ply.__hgTorsoBlastQueued = nil
@@ -728,6 +728,8 @@ hook.Add("Player Spawn", "hg-torsohalve-reset", function(ply)
 		ply.organism.torsoamputated = nil
 		ply.organism.llegamputated = false
 		ply.organism.rlegamputated = false
+		ply.organism.needfake = false
+		ply.organism.fake = false
 	end)
 end)
 

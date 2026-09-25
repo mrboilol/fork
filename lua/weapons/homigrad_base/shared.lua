@@ -335,7 +335,7 @@ function SWEP:GetAimAlignmentTime(ply)
 	local combat = hg.GetCombatCondition and hg.GetCombatCondition(ply) or nil
 	local combatMul = combat and combat.aim or 1
 	local recoilPenalty = math.Clamp(self.recoilAimPenalty or 0, 0, 6)
-	return math.Clamp(base * handling * supportMul * fatigueMul * combatMul * self:GetWeaponExperienceMul(ply) + brainPenalty + recoilPenalty * 0.18, 0.2, 8)
+	return math.Clamp(base * handling * supportMul * fatigueMul * combatMul * self:GetWeaponExperienceMul(ply) + brainPenalty + recoilPenalty * 0.18, 0.2, 3)
 end
 
 function SWEP:IsManuallyCycledWeapon()

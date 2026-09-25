@@ -20,7 +20,7 @@ hg.ArmorPlateMaterials = {
 	kevlar_ceramic = {mass = 2, protection = 0.9},
 	kevlar_arsteel = {mass = 2.6, protection = 0.85},
 	kevlar_titan = {mass = 2.4, protection = 0.85},
-	riot = {mass = 3.2, protection = 0.12, melee = 2.5, stab = 0.45},
+	riot = {mass = 3.2, protection = 0.12, melee = 5, stab = 0.45},
 }
 
 hg.ArmorPlateLevels = {[1] = 6, [2] = 8, [3] = 10, [4] = 12, [5] = 15, [6] = 17}

@@ -1615,6 +1615,8 @@ hg.armor.head = {
 		Vector(2, -0.45, 0.15),
 		Angle(180, 100, 90),
 		protection = 1.5,
+		meleeProt = 16,
+		stabProt = 19,
 		bone = "ValveBiped.Bip01_Head1",
 		model = "models/eft_props/gear/helmets/helmet_zsh_1_2m_v2.mdl",
 		blocksHeadphones = true,

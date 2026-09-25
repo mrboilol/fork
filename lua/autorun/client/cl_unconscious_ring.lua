@@ -464,13 +464,13 @@ local function UpdateRingAudio(heartRate, ringAlpha, org)
     if heartRate < 1 or ringAlpha <= 0 then return end
 
     local prev = lastPhaseMod
-    local curr = (lastPhaseMod + FrameTime() * (heartRate / 60)) % 1
+    local curr = heartPhase % 1
     lastPhaseMod = curr
 
     local mechanicalStrength = GetMechanicalPulseStrength(org)
     local beatVolume = GetHeartbeatVolume(org) * ringAlpha * mechanicalStrength
     if PhaseCrossed(prev, curr, 0.239) then
-        if mechanicalStrength > 0.02 then
+        if mechanicalStrength > 0.02 and not (org.ecgState == "sinus_pause" and math.floor(heartPhase) % 4 == 3) then
             EmitRingSound(UseCriticalHeartbeat(org) and SOUND_CRITICAL_HEART or SOUND_HEART, beatVolume)
         end
     end
@@ -524,7 +524,7 @@ local function DrawEKG(state, centerX, centerY, width, height, org, color, ringA
     ), 0, 1)
 
     -- Increment heart phase based on heartbeat (BPM to beats per second)
-    state.phase = state.phase + dt * (heartbeat / 60)
+    state.phase = state == centerEKGState and heartPhase or state.phase + dt * (heartbeat / 60)
 
     local sweepSpeed = width / 4
     local oldSweepPos = state.sweepPos
@@ -1068,7 +1068,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
                     ringColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
             end
 
-            UpdateRingAudio(heartbeat, ringAlpha, org)
+            if not IsValid(g_PulseCheckTarget) then UpdateRingAudio(heartbeat, ringAlpha, org) end
         end
 
         if showLegacyECG and not (hg_unconsciousclassic and hg_unconsciousclassic:GetBool()) then
@@ -1177,7 +1177,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     end
 
 
-    if heartbeat >= 1 and (admiring or isUnconscious or isCheckingPulse or isCritical) then
+    if heartbeat >= 1 and not isCheckingPulse and (admiring or isUnconscious or isCritical) then
         if IsValid(flatlineStation) and flatlineStation:GetState() == GMOD_CHANNEL_PLAYING then
             flatlineStation:Stop()
         end
@@ -1191,7 +1191,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
 
                     local mechanicalStrength = GetMechanicalPulseStrength(org)
                     local vol = GetHeartbeatVolume(org) * mechanicalStrength
-                    if mechanicalStrength > 0.02 then
+                    if mechanicalStrength > 0.02 and not (ecgState == "sinus_pause" and currentHeartBeat % 4 == 3) then
                         EmitRingSound(UseCriticalHeartbeat(org) and SOUND_CRITICAL_HEART or SOUND_HEART, vol)
                     end
                 end

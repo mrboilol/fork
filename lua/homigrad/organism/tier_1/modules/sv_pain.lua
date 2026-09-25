@@ -109,6 +109,8 @@ module[1] = function(org)
 	org.immobilization = 0
 
 	org.painlessen = 0
+	org.adrenalinePainStart = nil
+	org.adrenalinePainBreakthrough = nil
 
 	org.tranquilizer = 0
 	org.zerlkers = 0
@@ -217,6 +219,18 @@ module[2] = function(owner, org, timeValue)
 	-- Adrenaline delays incoming pain. Zerlkers nearly stops it, preserving the
 	-- backlog so the injury catches up once the effect has ended.
 	local adrenalinePainPacing = hg.organism.GetAdrenalinePainPacing(adrenaline)
+	if adrenaline > 0.5 and add > 0 then
+		org.adrenalinePainStart = org.adrenalinePainStart or CurTime()
+		local elapsed = CurTime() - org.adrenalinePainStart
+		if not org.adrenalinePainBreakthrough and elapsed > 5 + adrenaline * 4
+			and math.random() < math.min(timeValue * 0.12 / (1 + adrenaline), 1) then
+			org.adrenalinePainBreakthrough = true
+		end
+	else
+		org.adrenalinePainStart = nil
+		org.adrenalinePainBreakthrough = nil
+	end
+	if org.adrenalinePainBreakthrough then adrenalinePainPacing = math.max(adrenalinePainPacing, 0.5) end
 	add = add * Lerp(zerlkers, adrenalinePainPacing, 0.025)
 	sub = sub * (1 + resilience * 0.35)
 
@@ -350,7 +364,7 @@ module[2] = function(owner, org, timeValue)
 
 
 	org.pain = org.avgpain * math.max(1 - (org.analgesia + org.painkiller * 0.3), 0) / math.max(org.painResistanceMul or 1, 1) * math.max(1 - math.Clamp(adrenaline, 0, 5) * 0.14, 0.3)
-	if zerlkersDose > 0 or adrenaline >= 3 then
+	if zerlkersDose > 0 or (adrenaline >= 3 and not org.adrenalinePainBreakthrough) then
 		org.pain = math.min(org.pain, 69.99)
 	end
 	-- Pain can now produce a vasovagal blackout before the slower shock drain has
@@ -463,10 +477,13 @@ module[2] = function(owner, org, timeValue)
 		adrenalineDecayRate = timeValue / 8 -- Faster than normal, but still a gradual comedown
 
 	end
+	if org.adrenalinePainBreakthrough or org.pain > 20 then
+		adrenalineDecayRate = math.max(adrenalineDecayRate, timeValue / 8)
+	end
 
 
 
-	if org.adrenalineAdd > 0 or CurTime() < (org._adrenalineHoldUntil or 0) then
+	if (org.adrenalineAdd > 0 or CurTime() < (org._adrenalineHoldUntil or 0)) and not org.adrenalinePainBreakthrough and org.pain <= 20 then
 		adrenalineDecayRate = 0
 	end
 

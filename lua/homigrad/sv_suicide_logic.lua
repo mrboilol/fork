@@ -6,7 +6,7 @@ if SERVER then
 
     concommand.Add("suicide", function(ply)
         if not IsValid(ply) or not ply:Alive() then return end
-        if ply.organism and ply.organism.incapacitated then
+        if ply.organism and (ply.organism.incapacitated or (not hg.organism.IncapacitationEnabled() and ply.organism.otrub)) then
             ply.organism.deathStateKilled = true
             ply:Kill()
             return

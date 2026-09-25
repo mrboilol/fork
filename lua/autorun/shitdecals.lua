@@ -131,7 +131,7 @@ if CLIENT then
 			for j = 1, 11 do
 				local mat = Material("effects/droplets/drop"..j.."_"..i)
 				
-				mat:SetFloat("$decalscale", i * 0.07)
+				mat:SetFloat("$decalscale", i == 4 and 0.56 or i * 0.07)
 			end
 		end
 

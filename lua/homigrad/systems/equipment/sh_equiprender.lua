@@ -34,11 +34,11 @@ if CLIENT then
 		local protectionChoices = vgui.Create("DComboBox", frame)
 		protectionChoices:Dock(TOP)
 		protectionChoices:DockMargin(8, 6, 8, 0)
-		protectionChoices:SetValue("Protection level: " .. protectionLevel)
+		protectionChoices:SetValue((ent.placement == "torso" and "Vest protection profile: " or "Protection profile: ") .. (protectionLevel == "stab" and "Stab focused" or protectionLevel))
 		for level = 1, 6 do protectionChoices:AddChoice(tostring(level)) end
-		protectionChoices:AddChoice("stab")
-		protectionChoices:SetTooltip("Levels 1-6 increase all protection. Stab strongly resists blades, gives moderate blunt protection, and barely resists bullets.")
-		protectionChoices.OnSelect = function(_, _, value) protectionLevel = tonumber(value) or value end
+		protectionChoices:AddChoice("Stab focused", "stab")
+		protectionChoices:SetTooltip("Levels 1-6 balance all protection. Stab focused gives strong blade resistance, moderate blunt protection, and little ballistic protection. Vests use this against hits on the carrier and plates.")
+		protectionChoices.OnSelect = function(_, _, value, data) protectionLevel = data or tonumber(value) or value end
 
 		local health = vgui.Create("DNumSlider", frame)
 		health:Dock(TOP)
@@ -51,20 +51,43 @@ if CLIENT then
 
 		local material, level, sides = "ceramic", 3, "none"
 		if ent.placement == "torso" then
-			local function choice(label, options, initial, changed, tooltip)
+			local materialTips = {
+				ceramic = "Strong ballistic protection at moderate weight; less suited to repeated blunt impacts.",
+				steel = "Heavy plate with strong ballistic protection and good durability.",
+				polyethylene = "Light plate with moderate ballistic protection.",
+				titan = "Balanced ballistic protection and weight.",
+				arsteel = "Heavy plate focused on ballistic protection; limited blunt and stab benefit.",
+				uhmwpe = "Very light plate with strong ballistic protection.",
+				uhmwpe_ceramic = "Light composite with stronger ballistic protection than UHMWPE alone.",
+				uhmwpe_arsteel = "Light composite balancing ballistic protection and weight.",
+				kevlar = "Very light, flexible protection with lower ballistic resistance.",
+				kevlar_ceramic = "Light composite improving Kevlar's ballistic resistance.",
+				kevlar_arsteel = "Light composite balancing ballistic protection and weight.",
+				kevlar_titan = "Light composite with balanced ballistic protection.",
+				riot = "Excellent against heavy blunt hits and beanbags; weak against bullets and modest against stabs."
+			}
+			local function choice(label, options, initial, changed, tooltip, optionTips)
 				local row = vgui.Create("DComboBox", frame)
 				row:Dock(TOP)
 				row:DockMargin(8, 6, 8, 0)
 				row:SetValue(label .. ": " .. tostring(initial))
 				for _, option in ipairs(options) do row:AddChoice(option) end
 				row:SetTooltip(tooltip)
+				if optionTips then
+					row.OnMenuOpened = function(_, menu)
+						for _, option in ipairs(menu:GetCanvas():GetChildren()) do
+							local description = optionTips[option:GetText()]
+							if description then option:SetTooltip(description) end
+						end
+					end
+				end
 				row.OnSelect = function(_, _, value) changed(value) end
 			end
 			material = state.plateMaterial or material
 			level = state.plateLevel or level
 			sides = state.plateSides or sides
 			choice("Plate material", {"ceramic", "steel", "polyethylene", "titan", "arsteel", "uhmwpe", "uhmwpe_ceramic", "uhmwpe_arsteel", "kevlar", "kevlar_ceramic", "kevlar_arsteel", "kevlar_titan", "riot"}, material, function(value) material = value end,
-				"Ceramic: strong bullets, lighter. Steel: heavy, durable. Polyethylene/UHMWPE: light bullet protection. Titan: balanced bullet protection and weight. Arsteel: heavy bullet protection. Kevlar: light, weaker bullets. Combined materials balance weight and protection. Riot: excellent blunt, modest stab, poor bullets.")
+				"Hover a material in the list for its strengths.", materialTips)
 			choice("Protection level", {"1", "2", "3", "4", "5", "6"}, level, function(value) level = tonumber(value) end,
 				"Plate rating from 1 (light protection) to 6 (strongest bullet resistance). Higher levels also increase blunt and stab resistance and plate weight stays material-based.")
 			choice("Plate coverage", {"none", "front", "back", "both", "all"}, sides, function(value) sides = value end,
