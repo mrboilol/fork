@@ -87,7 +87,6 @@ local brainRotLoading
 local nextBrainRotRoll = 0
 local brainRotEnd = 0
 local remHeartStopped = false
-local nextRemFibrillationBeat = 0
 local remHeartStopLoading
 local seizureStation
 local seizureLoading
@@ -268,19 +267,6 @@ local function StopSeizureSound()
 	end
 end
 
-local function UpdateRemFibrillationSound(ply, org)
-	if not org or not org.fibrillation then
-		nextRemFibrillationBeat = 0
-		return
-	end
-
-	local time = CurTime()
-	if time < nextRemFibrillationBeat then return end
-	local heartbeat = math.Clamp(tonumber(org.heartbeat) or 180, 60, 240)
-	nextRemFibrillationBeat = time + 60 / heartbeat
-	sound.Play("heartbeat/heartbeat_single.ogg", ply:EyePos(), 65, 100, 0.55)
-end
-
 hook.Add("Think", "RemCardiacSounds", function()
 	local ply = LocalPlayer()
 	if not IsValid(ply) then
@@ -295,11 +281,9 @@ hook.Add("Think", "RemCardiacSounds", function()
 	end
 	lastConcussion = concussion
 	local heartstop = org and org.heartstop or false
-	local fibrillation = org and org.fibrillation or false
-	hg.criticalBeatsActive = fibrillation
+	hg.criticalBeatsActive = org and org.fibrillation or false
 	if heartstop and not remHeartStopped then PlayRemHeartStopSound(org.otrub) end
 	remHeartStopped = heartstop
-	UpdateRemFibrillationSound(ply, org)
 	TryPlayBrainRotSound(org)
 	UpdateBrainRotSound(org)
 	if org and org.seizureActive then StartSeizureSound(org) else StopSeizureSound() end
@@ -1503,25 +1487,26 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 	
 	if org.pulse and org.heartbeat > 30 and (org.lastpulse or 0) + (1 / math.Clamp(org.heartbeat, 1, 600)) * 60 < CurTime() then
 		org.lastpulse = CurTime()
-		local pulse = org.heartbeat or 0
-		local pain = org.pain or 0
-		
 		local dist = owner:GetPos():DistToSqr(lply:GetPos())
 		local carryent = lply:GetNetVar("carryent")
 		local carrybone = lply:GetNetVar("carrybone")
 		local cantcheck = org.CantCheckPulse
 		local checkingplayer = (IsValid(carryent) and carryent.organism == ply.organism and !cantcheck and checkpulsebones[carryent:GetBoneName(carryent:TranslateBoneToPhysBone(carrybone))])
 		
-		if dist < 64 * 64 and ((ply == lply and !checkingplayer) or checkingplayer) then
-			local vol = checkingplayer and 2 or ((pain > 60 and ply == lply) and 1 or (pulse > 200 and ((200 - 95) / 50 + 0.12 - (pulse - 200) / 1000) or pulse > 95 and (pulse - 95) / 50 + 0.12 or 0.12))
-			if not checkingplayer then
-				vol = math.Clamp(vol, 0, 0.7) * hg_heartbeat_volume:GetFloat()
-			end
+		if dist < 64 * 64 and checkingplayer then
+			local rate = org.heartbeat or 0
+			local rhythm = org.ecgState
+			local criticalBeat = org.critical or org.incapacitated or org.heartstop
+				or (rhythm and rhythm ~= "normal_sinus" and rhythm ~= "sinus_bradycardia" and rhythm ~= "sinus_tachycardia")
+				or (org.arrhythmia or 0) >= 0.3 or (org.palpitations or 0) >= 0.6
+				or rate >= 200 or rate <= 35 or (org.bloodPressure or 92) < 50
+			local beatSound = criticalBeat and "health/critbeat.mp3" or "heartbeat/heartbeat_single.ogg"
+			local vol = math.Clamp(hg_heartbeat_volume:GetFloat(), 0, 1)
 
 			if ent:GetVelocity():LengthSqr() < 10 then
-				sound.Play("heartbeat/heartbeat_single.ogg", ply:EyePos(), 55, 60, vol * 1.5)
+				sound.Play(beatSound, ply:EyePos(), 55, 60, vol)
 			else
-				EmitSound("heartbeat/heartbeat_single.ogg", ply:EyePos(), ply:EntIndex(), CHAN_AUTO, vol, 55, nil, 60)
+				EmitSound(beatSound, ply:EyePos(), ply:EntIndex(), CHAN_AUTO, vol, 55, nil, 60)
 			end
 		end
 	end

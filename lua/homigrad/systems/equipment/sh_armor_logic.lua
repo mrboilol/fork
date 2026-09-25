@@ -20,9 +20,11 @@ hg.ArmorPlateMaterials = {
 	kevlar_ceramic = {mass = 2, protection = 0.9},
 	kevlar_arsteel = {mass = 2.6, protection = 0.85},
 	kevlar_titan = {mass = 2.4, protection = 0.85},
+	riot = {mass = 3.2, protection = 0.12, melee = 2.5, stab = 0.45},
 }
 
 hg.ArmorPlateLevels = {[1] = 6, [2] = 8, [3] = 10, [4] = 12, [5] = 15, [6] = 17}
+hg.ArmorProtectionLevels = {stab = {ballistic = 0.12, melee = 0.8, stab = 2}}
 
 function hg.GetArmorMaxCondition(ent, placement, armor)
 	local data = hg.armor[placement] and hg.armor[placement][armor]
@@ -48,11 +50,13 @@ function hg.GetArmorProtection(ent, placement, armor, hitPos)
 	local ballistic = data.protection or 0
 	local multiplier = math.Clamp(tonumber(hg.GetArmorItemState(ent, armor, "protectionMultiplier", 1)) or 1, 0.5, 2)
 	local protectionLevel = hg.GetArmorItemState(ent, armor, "protectionLevel", nil)
-	if protectionLevel and hg.ArmorPlateLevels[protectionLevel] then multiplier = multiplier * hg.ArmorPlateLevels[protectionLevel] / hg.ArmorPlateLevels[3] end
-	local melee = (data.meleeProt or ballistic) * quality * multiplier
-	local stab = (data.stabProt or ballistic) * quality * multiplier
+	local levelScale = protectionLevel and hg.ArmorPlateLevels[protectionLevel]
+	local levelProfile = hg.ArmorProtectionLevels[protectionLevel]
+	if levelScale then multiplier = multiplier * levelScale / hg.ArmorPlateLevels[3] end
+	local melee = (data.meleeProt or ballistic) * quality * multiplier * (levelProfile and levelProfile.melee or 1)
+	local stab = (data.stabProt or ballistic) * quality * multiplier * (levelProfile and levelProfile.stab or 1)
 	if not hg.GetArmorItemState(ent, armor, "fixedLevel", false) then ballistic = ballistic * quality end
-	ballistic = ballistic * multiplier
+	ballistic = ballistic * multiplier * (levelProfile and levelProfile.ballistic or 1)
 	if placement ~= "torso" or not isvector(hitPos) then return ballistic, melee, stab end
 	local sides = hg.GetArmorItemState(ent, armor, "plateSides", "none")
 	if sides == "none" then return ballistic, melee, stab end
@@ -70,7 +74,7 @@ function hg.GetArmorProtection(ent, placement, armor, hitPos)
 	end
 	local level = hg.ArmorPlateLevels[hg.GetArmorItemState(ent, armor, "plateLevel", 3)] or 10
 	local material = hg.ArmorPlateMaterials[hg.GetArmorItemState(ent, armor, "plateMaterial", "ceramic")] or hg.ArmorPlateMaterials.ceramic
-	return ballistic + level * material.protection * 0.4, melee + level * 0.2, stab + level * 0.35
+	return ballistic + level * material.protection * 0.4, melee + level * (material.melee or 1) * 0.2, stab + level * (material.stab or 1) * 0.35
 end
 
 function hg.IsVisorLowered(ent, armor, armorData)

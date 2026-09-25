@@ -416,6 +416,8 @@ local function getMoodle3Material(name)
 				alternateName = "blod-loss" .. string.sub(name, #"blood-loss" + 1)
 			elseif name == "brain-hemorrhage" then
 				alternateName = "terror"
+			elseif name == "arrhythmia" then
+				alternateName = "arrythmia"
 			end
 			mat = firstValidMaterial({
 				"vgui/moodles 3/" .. name .. ".png",

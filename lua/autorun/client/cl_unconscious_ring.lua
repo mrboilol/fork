@@ -121,6 +121,7 @@ end
 
 -- Better sound system from oldring
 local SOUND_HEART = "heartbeat/heartbeat_single.ogg"
+local SOUND_CRITICAL_HEART = "health/critbeat.mp3"
 local SOUND_FLATLINE = "health/gg.mp3"
 
 local lastPhaseMod = 0
@@ -300,6 +301,16 @@ local function IsCirculationCritical(org)
         or (tonumber(org.cardiacTamponade) or 0) > 0.55
 end
 
+local function UseCriticalHeartbeat(org)
+    local rhythm = org.ecgState
+    local rate = tonumber(org.heartbeat) or 0
+    return org.critical == true or org.incapacitated == true or IsCirculationCritical(org)
+        or (rhythm and rhythm ~= "normal_sinus" and rhythm ~= "sinus_bradycardia" and rhythm ~= "sinus_tachycardia")
+        or (tonumber(org.arrhythmia) or 0) >= 0.3
+        or (tonumber(org.palpitations) or 0) >= 0.6
+        or rate >= 200 or (rate > 0 and rate <= 35)
+end
+
 local function GetHeartbeatVolume(org)
     if not org then return 0.2 end
     local hurt = math.Clamp((5000 - (org.blood or 5000)) / 5000, 0, 1) * 0.4
@@ -437,6 +448,8 @@ local function EmitRingSound(soundPath, volume)
                 end
             end)
         end
+    elseif soundPath == SOUND_CRITICAL_HEART then
+        sound.Play(soundPath, LocalPlayer():EyePos(), 65, 100, math.Clamp(volume or 1, 0, 1))
     else
         sound.PlayFile("sound/" .. soundPath, "noblock noplay", function(station)
             if IsValid(station) then
@@ -458,7 +471,7 @@ local function UpdateRingAudio(heartRate, ringAlpha, org)
     local beatVolume = GetHeartbeatVolume(org) * ringAlpha * mechanicalStrength
     if PhaseCrossed(prev, curr, 0.239) then
         if mechanicalStrength > 0.02 then
-            EmitRingSound(SOUND_HEART, beatVolume)
+            EmitRingSound(UseCriticalHeartbeat(org) and SOUND_CRITICAL_HEART or SOUND_HEART, beatVolume)
         end
     end
 end
@@ -1179,7 +1192,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
                     local mechanicalStrength = GetMechanicalPulseStrength(org)
                     local vol = GetHeartbeatVolume(org) * mechanicalStrength
                     if mechanicalStrength > 0.02 then
-                        EmitRingSound(SOUND_HEART, vol)
+                        EmitRingSound(UseCriticalHeartbeat(org) and SOUND_CRITICAL_HEART or SOUND_HEART, vol)
                     end
                 end
             end

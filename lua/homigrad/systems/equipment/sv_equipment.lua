@@ -835,9 +835,10 @@ net.Receive("hg_configure_armor", function(_, ply)
 	local sides = net.ReadString()
 	local protection = net.ReadFloat()
 	local healthMultiplier = net.ReadUInt(3)
-	local protectionLevel = net.ReadUInt(3)
+	local protectionLevel = net.ReadString()
+	protectionLevel = tonumber(protectionLevel) or protectionLevel
 	if not hg.ArmorPlateMaterials[material] or not hg.ArmorPlateLevels[level] then return end
-	if not hg.ArmorPlateLevels[protectionLevel] then return end
+	if not hg.ArmorPlateLevels[protectionLevel] and not hg.ArmorProtectionLevels[protectionLevel] then return end
 	if sides ~= "none" and sides ~= "front" and sides ~= "back" and sides ~= "both" and sides ~= "all" then return end
 	if protection < 0.5 or protection > 2 or healthMultiplier < 1 or healthMultiplier > 5 then return end
 	ent.armorState = ent.armorState or {}
@@ -1071,6 +1072,7 @@ local function protec(org, bone, dmg, dmgInfo, placement, armor, scale, scalepro
 	local isBullet = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
 	local isStab = dmgInfo:IsDamageType(DMG_SLASH)
 	local isClub = dmgInfo:IsDamageType(DMG_CLUB + DMG_GENERIC)
+	local originalDamageType = dmgInfo:GetDamageType()
 	local armorHitKey = "armor:" .. tostring(org.owner:EntIndex()) .. ":" .. tostring(armor)
 	if impact and impact.modelArmorHits and impact.modelArmorHits[armorHitKey] then return 0 end
 	if hg.TryKnockOffHelmet(org.owner, placement, armor, armorData, dmgInfo, hit, impact, dir) then
@@ -1265,7 +1267,7 @@ local function protec(org, bone, dmg, dmgInfo, placement, armor, scale, scalepro
 		dmgScale = 1 - (1 - dmgScale) * math.Clamp(wearMul, 0, 1)
 	end
 	if isStab then
-		local sharpScale, sharpProtection = GetArmorImpactDamageScale(org.owner, armor, armorData, impact and impact.rawDamageType or dmgInfo:GetDamageType(), placement, isvector(hit) and hit or dmgInfo:GetDamagePosition())
+		local sharpScale, sharpProtection = GetArmorImpactDamageScale(org.owner, armor, armorData, originalDamageType, placement, isvector(hit) and hit or dmgInfo:GetDamagePosition())
 		dmgScale = sharpScale
 		org.lastArmorSharpStopped = not armorIsBroken and sharpProtection >= 2.5 and dmgScale <= 0.15
 	end
@@ -1299,7 +1301,10 @@ local function protec(org, bone, dmg, dmgInfo, placement, armor, scale, scalepro
 		local overmatch = math.max(impact.penetrationBefore - resistance, 0) / math.max(impact.penetrationBefore, 1)
 		local penetrationDamageScale = math.Clamp(overmatch * 0.6, 0.04, 0.3)
 		local energyCost = stopped and impact.energyBefore or impact.energyBefore * (1 - penetrationDamageScale)
-		local bluntTransfer = armorData.bluntTransfer or (placement == "head" and 0.22 or 0.18)
+		local quality = math.Clamp(tonumber(hg.GetArmorItemState(org.owner, armor, "quality", 1)) or 1, 0.8, 1.2)
+		local mass = hg.GetArmorMass(org.owner, placement, armor)
+		local bluntTransfer = (armorData.bluntTransfer or (placement == "head" and 0.22 or 0.18))
+			* math.Clamp(3 / (mass * quality), 0.5, 1.5)
 		local bluntDamage = energyCost * bluntTransfer
 
 		org.shock = math.min((org.shock or 0) + bluntDamage * 0.65, 70)

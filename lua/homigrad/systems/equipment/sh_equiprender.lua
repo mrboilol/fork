@@ -20,6 +20,7 @@ if CLIENT then
 		quality:SetMax(1.2)
 		quality:SetDecimals(2)
 		quality:SetValue(state.quality or 1)
+		quality:SetTooltip("Material and build quality. Improves bullet, blunt, and stab protection; also cushions transferred bullet energy.")
 
 		local protection = vgui.Create("DNumSlider", frame)
 		protection:Dock(TOP)
@@ -28,13 +29,16 @@ if CLIENT then
 		protection:SetMax(2)
 		protection:SetDecimals(2)
 		protection:SetValue(state.protectionMultiplier or 1)
+		protection:SetTooltip("Multiplies this armor's bullet, blunt, and stab protection. Higher values reduce penetrating damage, wounds, and pain.")
 		local protectionLevel = state.protectionLevel or 3
 		local protectionChoices = vgui.Create("DComboBox", frame)
 		protectionChoices:Dock(TOP)
 		protectionChoices:DockMargin(8, 6, 8, 0)
 		protectionChoices:SetValue("Protection level: " .. protectionLevel)
 		for level = 1, 6 do protectionChoices:AddChoice(tostring(level)) end
-		protectionChoices.OnSelect = function(_, _, value) protectionLevel = tonumber(value) end
+		protectionChoices:AddChoice("stab")
+		protectionChoices:SetTooltip("Levels 1-6 increase all protection. Stab strongly resists blades, gives moderate blunt protection, and barely resists bullets.")
+		protectionChoices.OnSelect = function(_, _, value) protectionLevel = tonumber(value) or value end
 
 		local health = vgui.Create("DNumSlider", frame)
 		health:Dock(TOP)
@@ -43,23 +47,28 @@ if CLIENT then
 		health:SetMax(5)
 		health:SetDecimals(0)
 		health:SetValue(state.healthMultiplier or 1)
+		health:SetTooltip("Multiplies armor condition. More condition means it withstands more hits before protection wears down.")
 
 		local material, level, sides = "ceramic", 3, "none"
 		if ent.placement == "torso" then
-			local function choice(label, options, initial, changed)
+			local function choice(label, options, initial, changed, tooltip)
 				local row = vgui.Create("DComboBox", frame)
 				row:Dock(TOP)
 				row:DockMargin(8, 6, 8, 0)
 				row:SetValue(label .. ": " .. tostring(initial))
 				for _, option in ipairs(options) do row:AddChoice(option) end
+				row:SetTooltip(tooltip)
 				row.OnSelect = function(_, _, value) changed(value) end
 			end
 			material = state.plateMaterial or material
 			level = state.plateLevel or level
 			sides = state.plateSides or sides
-			choice("Plate material", {"ceramic", "steel", "polyethylene", "titan", "arsteel", "uhmwpe", "uhmwpe_ceramic", "uhmwpe_arsteel", "kevlar", "kevlar_ceramic", "kevlar_arsteel", "kevlar_titan"}, material, function(value) material = value end)
-			choice("Protection level", {"1", "2", "3", "4", "5", "6"}, level, function(value) level = tonumber(value) end)
-			choice("Plate coverage", {"none", "front", "back", "both", "all"}, sides, function(value) sides = value end)
+			choice("Plate material", {"ceramic", "steel", "polyethylene", "titan", "arsteel", "uhmwpe", "uhmwpe_ceramic", "uhmwpe_arsteel", "kevlar", "kevlar_ceramic", "kevlar_arsteel", "kevlar_titan", "riot"}, material, function(value) material = value end,
+				"Ceramic: strong bullets, lighter. Steel: heavy, durable. Polyethylene/UHMWPE: light bullet protection. Titan: balanced bullet protection and weight. Arsteel: heavy bullet protection. Kevlar: light, weaker bullets. Combined materials balance weight and protection. Riot: excellent blunt, modest stab, poor bullets.")
+			choice("Protection level", {"1", "2", "3", "4", "5", "6"}, level, function(value) level = tonumber(value) end,
+				"Plate rating from 1 (light protection) to 6 (strongest bullet resistance). Higher levels also increase blunt and stab resistance and plate weight stays material-based.")
+			choice("Plate coverage", {"none", "front", "back", "both", "all"}, sides, function(value) sides = value end,
+				"Choose which torso directions get plate protection. Each added side adds plate weight; uncovered directions use the carrier alone.")
 		end
 
 		local apply = vgui.Create("DButton", frame)
@@ -75,7 +84,7 @@ if CLIENT then
 				net.WriteString(sides)
 				net.WriteFloat(protection:GetValue())
 				net.WriteUInt(math.Round(health:GetValue()), 3)
-				net.WriteUInt(protectionLevel, 3)
+				net.WriteString(tostring(protectionLevel))
 			net.SendToServer()
 			frame:Close()
 		end
