@@ -27,7 +27,7 @@ local function removeBone(rag, bone, phys_bone, nohuys)
 	phys_obj:SetVelocity(vecZero)
 	phys_obj:SetAngleVelocity(vecZero)
 
-	constraint.RemoveAll(phys_obj)
+	rag:RemoveInternalConstraint(phys_bone)
 	rag.gibRemove[phys_bone] = phys_obj
 end
 

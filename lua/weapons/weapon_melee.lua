@@ -407,7 +407,7 @@ if CLIENT then
         end
 
         local center = LocalToWorld(model:OBBCenter(), angle_zero, pos, ang)
-        return pos - (center - pos) - ent:GetUp() * 8, ang
+        return pos - (center - pos) - ent:GetUp() * 2, ang
     end
 
     function SWEP:DrawHolsteredWorldModel(ent)
@@ -1209,6 +1209,7 @@ function SWEP:SetHandPos(noset)
     if not ply.shouldTransmit or ply.NotSeen then return end
 
     local ent = hg.GetCurrentCharacter(ply)
+	if not IsValid(ent) then return end
 
 	local bones = hg.TPIKBonesLH
 
@@ -1232,9 +1233,18 @@ function SWEP:SetHandPos(noset)
 		and ((ply:GetTable().ChatGestureWeight or 0) < 0.1) and hg.CanUseLeftHand(ply)
 		and not (self:IsSuicidePosing() and self.SuicideNoLH)
 	local leftDraw = self:UsesMeleeSling() and self.lhandik
-	self.rhandik = self.setrh and IsValid(owner) and (not leftDraw or CurTime() >= moveStart)//self.setrh
 
-    local rhmat, lhmat = ent:GetBoneMatrix(ent:LookupBone("ValveBiped.Bip01_R_Hand")), ent:GetBoneMatrix(ent:LookupBone("ValveBiped.Bip01_L_Hand"))
+	local rightHandBone = ent:LookupBone("ValveBiped.Bip01_R_Hand")
+	local leftHandBone = ent:LookupBone("ValveBiped.Bip01_L_Hand")
+	local rhmat = rightHandBone and ent:GetBoneMatrix(rightHandBone)
+	local lhmat = leftHandBone and ent:GetBoneMatrix(leftHandBone)
+	local rightGripBone = wm:LookupBone("ValveBiped.Bip01_R_Hand")
+	local rightGripMatrix = rightGripBone and wm:GetBoneMatrix(rightGripBone)
+	local rightGripPos = rightGripMatrix and rightGripMatrix:GetTranslation() or wm:WorldSpaceCenter()
+	local reachFinished = CurTime() >= math.max(self.MeleeDeployReachEnd or 0, self:GetNWFloat("MeleeDeployReachEnd", 0))
+	self.rhandik = self.setrh and IsValid(owner) and (not leftDraw or reachFinished or
+		(CurTime() >= moveStart and rhmat and
+		rhmat:GetTranslation():DistToSqr(rightGripPos) <= 18 * 18))
 
 	ply.rhold = rhmat
 	ply.lhold = lhmat

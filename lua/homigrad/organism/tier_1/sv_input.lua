@@ -793,6 +793,7 @@ function hg.organism.AmputateLimb(org, limb, noShake, dmgInfo)
 	org.owner:EmitSound(sounds[math.random(#sounds)], 95, math.random(95, 105), 2)
 	
 	local ent = hg.GetCurrentCharacter(org.owner)
+	if not IsValid(ent) then ent = org.owner end
 	local gibBone = ent:LookupBone(bone)
 	local gibPos = ent:WorldSpaceCenter()
 	if gibBone and gibBone > 0 then
