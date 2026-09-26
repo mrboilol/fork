@@ -218,7 +218,9 @@ local function RegisterPhysicsHooks()
 
         local ar = ActiveRagdoll.Get(target)
         if not ar then return end
-     
+        local health = DMS_Health.Active[target]
+        if health and health.zcnpc_shared then return end
+
         if dmginfo:IsDamageType(DMG_CRUSH) then
             local phys = target:GetPhysicsObject()
             if IsValid(phys) and phys:GetVelocity():LengthSqr() < MIN_PHYS_VEL_SQR then
