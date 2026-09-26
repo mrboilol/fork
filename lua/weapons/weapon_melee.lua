@@ -27,10 +27,15 @@ SWEP.weight = 0.4
 SWEP.holsteredBone = "ValveBiped.Bip01_Spine2"
 SWEP.holsteredPos = Vector(5, 8, -4)
 SWEP.holsteredAng = Angle(270, 0, 180)
-SWEP.BigMeleeHolsterBackOffset = 8
+SWEP.BigMeleeHolsterBackOffset = 3
 SWEP.BigMeleeReachTime = 0.8
 SWEP.BigMeleeDeployTime = 1
 SWEP.MeleeDrawGripTime = 0.3
+
+function SWEP:UsesMeleeSling()
+    local slings = GetConVar("hg_slings")
+    return self.TwoHanded and slings and slings:GetBool() or false
+end
 
 function SWEP:CanHolsterBigMelee()
     if not self.TwoHanded then return false end
@@ -381,14 +386,15 @@ if CLIENT then
 
         local anchorPos, anchorAng = LocalToWorld(self.holsteredPos, self.holsteredAng, matrix:GetTranslation(), matrix:GetAngles())
         local pos, ang = LocalToWorld(self.weaponPos or vector_origin, self.weaponAng or angle_zero, anchorPos, anchorAng)
-        local owner = self:GetOwner()
-        local forward = IsValid(owner) and owner:GetForward() or ent:GetForward()
+        local forward = ent:GetForward()
+        local right = ent:GetRight()
         local depth = (pos - matrix:GetTranslation()):Dot(forward)
-        return pos - forward * (depth + (self.BigMeleeHolsterBackOffset or 8)), ang
+        local side = (pos - matrix:GetTranslation()):Dot(right)
+        return pos - forward * (depth + (self.BigMeleeHolsterBackOffset or 3)) - right * (side + 4), ang
     end
 
     function SWEP:DrawHolsteredWorldModel(ent)
-        if not IsValid(ent) then return end
+        if not self:UsesMeleeSling() or not IsValid(ent) then return end
 
         local modelPath = self.WorldModelExchange or self.WorldModel
         if not IsValid(self.holsteredWorldModel) or self.holsteredWorldModel:GetModel() ~= modelPath then
@@ -1202,7 +1208,7 @@ function SWEP:SetHandPos(noset)
 	self.lhandik = self.setlh and not (self.DisableLHIKWhileBlocking and self:GetBlocking()) and IsValid(owner)
 		and ((ply:GetTable().ChatGestureWeight or 0) < 0.1) and hg.CanUseLeftHand(ply)
 		and not (self:IsSuicidePosing() and self.SuicideNoLH)
-	local leftDraw = self.TwoHanded and self.lhandik
+	local leftDraw = self:UsesMeleeSling() and self.lhandik
 	self.rhandik = self.setrh and IsValid(owner) and (not leftDraw or CurTime() >= moveStart)//self.setrh
 
     local rhmat, lhmat = ent:GetBoneMatrix(ent:LookupBone("ValveBiped.Bip01_R_Hand")), ent:GetBoneMatrix(ent:LookupBone("ValveBiped.Bip01_L_Hand"))
@@ -1358,9 +1364,25 @@ function SWEP:Deploy()
         local arm = self.TwoHanded and "larm" or "rarm"
         local effectiveness = hg.GetArmEffectiveness and hg.GetArmEffectiveness(owner, arm) or 1
         local speed = Lerp(effectiveness, 0.5, 1)
+        local deployTime = (self.BigMeleeDeployTime or 1) / speed
+
+        if not self:UsesMeleeSling() then
+            self.MeleeDeployGripStart = 0
+            self.MeleeDeployMoveStart = 0
+            self.MeleeDeployReachEnd = 0
+            if SERVER then
+                self:SetNWFloat("MeleeDeployGripStart", 0)
+                self:SetNWFloat("MeleeDeployMoveStart", 0)
+                self:SetNWFloat("MeleeDeployReachEnd", 0)
+            end
+            self:SetNextPrimaryFire(CurTime() + deployTime)
+            self:SetNextSecondaryFire(CurTime() + deployTime)
+            self:PlayAnim("deploy", deployTime, false, nil, false)
+            return true
+        end
+
         local gripTime = (self.MeleeDrawGripTime or 0.3) / speed
         local reachTime = (self.BigMeleeReachTime or 0.8) / speed
-        local deployTime = (self.BigMeleeDeployTime or 1) / speed
         local moveStart = CurTime() + gripTime
         local reachEnd = moveStart + reachTime
 
