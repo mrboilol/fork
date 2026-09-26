@@ -883,7 +883,15 @@ hook.Add("HUDPaint", "HG_WoundHoldPrompt", function()
 
 	local wounds = ply.wounds
 	local arterialwounds = ply.arterialwounds
-	local hasWounds = wounds and #wounds > 0 or arterialwounds and #arterialwounds > 0
+	local hasWounds = false
+	for _, wound in ipairs(wounds or {}) do
+		if (wound[1] or 0) > 0 then hasWounds = true break end
+	end
+	if not hasWounds then
+		for _, wound in ipairs(arterialwounds or {}) do
+			if (wound[1] or 0) > 0 then hasWounds = true break end
+		end
+	end
 	local inFake = IsValid(ply.FakeRagdoll)
 	local hasBothArms = not (ply.organism and (ply.organism.larmamputated or ply.organism.rarmamputated or ply.organism.larmupamputated or ply.organism.rarmupamputated))
 	local shouldShow = inFake and hasWounds and hasBothArms and not (ply.organism and ply.organism.otrub)

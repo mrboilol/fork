@@ -229,7 +229,6 @@ local function SpawnAccessoryDrop(accessoryID, accessory, owner, position, force
 	dropped:SetCollisionGroup(COLLISION_GROUP_WEAPON)
 	dropped:SetUseType(SIMPLE_USE)
 	dropped.HGAccessoryID = accessoryID
-	if hg.EquipmentImpact then hg.EquipmentImpact.DroppedAccessories[dropped] = true end
 	dropped.HGAccessoryOwner = owner
 	dropped.HGAccessoryDurability = durability
 	dropped.HGAccessoryMaxDurability = maximum

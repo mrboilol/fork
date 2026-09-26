@@ -2111,8 +2111,8 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		end
 	end
 
-	local brokenSkullHeadImpact = hitgroup == HITGROUP_HEAD and skullOpenBeforeTrace
-		and IsValid(inf) and inf:GetClass() == "weapon_hands_sh" and impact.brainHit
+	local brokenSkullHeadImpact = hitgroup == HITGROUP_HEAD and (skullOpenBeforeTrace or org.skull == 1)
+		and not impact.armorStopped and IsValid(inf) and inf:GetClass() == "weapon_hands_sh" and dmgInfo:IsDamageType(DMG_CLUB)
 	if brokenSkullHeadImpact or (dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) and dmgBlood > 1 and #inputHole > 0) then
 		net.Start("hg_bloodimpact")
 		net.WriteVector(dmgPos)
@@ -2623,6 +2623,7 @@ local function velocityDamage(ent, data)
 	local armorPlacement
 	local armorImpactApplied = false
 	local unarmoredImpactDamage = dmg
+	local impactHelmet = org.owner.armors and (org.owner.armors.head == "helmet2" or org.owner.armors.head == "helmet3")
 	if hitgroup == HITGROUP_CHEST or hitgroup == HITGROUP_STOMACH then
 		armorPlacement = "torso"
 	elseif hitgroup == HITGROUP_HEAD then
@@ -2683,6 +2684,7 @@ local function velocityDamage(ent, data)
 
 		if hitgroup == HITGROUP_HEAD then
 			local hadhelmet = armorImpactApplied or org.owner.armors and org.owner.armors["head"] != nil
+			impactHelmet = impactHelmet and armorImpactApplied
 			local headDamageMul = hadhelmet and 0.2 or 1
 			local oldSkull = org.skull
 			local oldSpine3 = org.spine3 or 0
@@ -2702,11 +2704,11 @@ local function velocityDamage(ent, data)
 				hg.BreakNeck(ent)
 			end
 			
-			local headImpactSeverity = math.Clamp(math.max(unarmoredImpactDamage, structuralBudget) * math.Clamp(normalSpeed / 600, 0.7, 2), 0, 3)
+			local headImpactSeverity = math.Clamp(math.max(impactHelmet and dmg or unarmoredImpactDamage, structuralBudget) * math.Clamp(normalSpeed / 600, 0.7, 2), 0, 3)
 			local knockoutChance = math.Clamp((headImpactSeverity - 0.3) * 0.22, 0, 0.45)
 			if hadhelmet then knockoutChance = knockoutChance * 0.2 end
 			if headImpactSeverity > 0.15 and hg.organism.module.concussion then
-				local concussionIntensity = math.Clamp(headImpactSeverity * (hadhelmet and 2.2 or 1.45), 0.25, hadhelmet and 3.6 or 4.5)
+				local concussionIntensity = math.Clamp(headImpactSeverity * (impactHelmet and 1.45 or hadhelmet and 2.2 or 1.45), 0.25, hadhelmet and 3.6 or 4.5)
 				hg.organism.module.concussion.AddConcussion(org, concussionIntensity, math.Clamp(10 + concussionIntensity * 18, 12, 75))
 			end
 			if headImpactSeverity > 0.15 and math.Rand(0, 1) < knockoutChance then

@@ -4,11 +4,20 @@ local Clamp, Approach, Remap = math.Clamp, math.Approach, math.Remap
 hg.organism.module.pulse = {}
 local module = hg.organism.module.pulse
 
--- Blood-volume response is calculated rather than sampled from lookup tables.
--- Delivery approaches zero with actual circulating volume; sustained severe
--- loss also contributes a smooth collapse hazard rather than a hard cutoff.
+-- Interpolate blood-volume bands so heart rate and oxygen delivery deteriorate
+-- together without a hard cutoff between treatable and terminal loss.
 local terminalHeartRate = 300
-local hemorrhageMaxCompensatedHeartRate = 250
+local hemorrhageBands = {
+	{1000, 0, 300, 0},
+	{1500, 0.06, 300, 3},
+	{2000, 0.16, 300, 10},
+	{2500, 0.31, 275, 20},
+	{3000, 0.50, 215, 30},
+	{3500, 0.67, 175, 45},
+	{4000, 0.81, 120, 55},
+	{4500, 0.97, 85, 65},
+	{5000, 1, 70, 70}
+}
 local peaDuration = 6
 local cardiacArrestMechanicalDecayTime = 14
 local hypotensionComplicationTime = 45
@@ -47,13 +56,19 @@ function hg.organism.GetCardiacArrestMechanicalFactor(org)
 	return math.Clamp(1 - elapsed / cardiacArrestMechanicalDecayTime, 0, 1), initial
 end
 
+local function getHemorrhageBandValue(blood, column)
+	local volume = tonumber(blood) or 5000
+	for index = 2, #hemorrhageBands do
+		local upper, lower = hemorrhageBands[index], hemorrhageBands[index - 1]
+		if volume <= upper[1] then
+			return Lerp(math.Clamp((volume - lower[1]) / (upper[1] - lower[1]), 0, 1), lower[column], upper[column])
+		end
+	end
+	return hemorrhageBands[#hemorrhageBands][column]
+end
+
 function hg.organism.GetBloodDeliveryFraction(blood, scale)
-	local cfg = hg.organism.config or {}
-	local normalBlood = math.max(tonumber(cfg.NORMAL_BLOOD_VOLUME_ML) or hg.organism.normalBloodVolume or 5000, 1)
-	local pulselessBlood = math.Clamp(tonumber(hg.organism.PULSELESS_BLOOD_VOLUME) or 1750, 0, normalBlood - 1)
-	local volumeFraction = math.Clamp(((tonumber(blood) or normalBlood) - pulselessBlood) / (normalBlood - pulselessBlood), 0, 1)
-	local curve = math.max(tonumber(cfg.HEMORRHAGE_PERFUSION_EXPONENT) or 0.7, 0.05)
-	return math.Clamp(volumeFraction ^ curve * (tonumber(scale) or 1), 0, 1)
+	return math.Clamp(getHemorrhageBandValue(blood, 2) * (tonumber(scale) or 1), 0, 1)
 end
 
 function hg.organism.GetHemorrhageCompensationDrive(blood)
@@ -244,15 +259,9 @@ end
 
 local function getBloodCompensationRate(blood)
 	local cfg = hg.organism.config or {}
-	local reserve = getBloodPerfusion(blood)
-	local response = hg.organism.GetHemorrhageCompensationDrive and hg.organism.GetHemorrhageCompensationDrive(blood)
-		or math.Clamp(1 - reserve, 0, 1)
-	local maxRate = cfg.HEMORRHAGE_MAX_COMPENSATED_HR or hemorrhageMaxCompensatedHeartRate
-	-- Hemorrhage drives the electrical rate toward terminal tachycardia. The
-	-- weak palpable pulse and falling pressure are downstream consequences of
-	-- poor filling; they must not turn the blood-loss rhythm into an early
-	-- bradycardic death path.
-	return math.Clamp(70 + (maxRate - 70) * math.Clamp(response / 0.9, 0, 1), 0, maxRate)
+	local maxRate = cfg.HEMORRHAGE_MAX_COMPENSATED_HR or terminalHeartRate
+	local rate = getHemorrhageBandValue(blood, 3)
+	return math.Clamp(70 + (rate - 70) * (maxRate - 70) / (terminalHeartRate - 70), 0, maxRate)
 end
 
 local function getRateOutput(heartbeat)
@@ -269,7 +278,7 @@ local function getRateOutput(heartbeat)
 end
 
 function hg.organism.GetPulseOxygenPerfusion(pulse)
-	local normalizedPulse = Clamp((tonumber(pulse) or 0) / 70, 0, 1)
+	local normalizedPulse = Clamp((tonumber(pulse) or 0) / 60, 0, 1)
 	return math.max(normalizedPulse ^ 1.5, 0.06)
 end
 
@@ -569,10 +578,14 @@ function hg.organism.GetECGState(heartbeat, heartstop, org)
 		candidate = "av_block_partial"
 	elseif org.unstableRhythm == "atrial_fibrillation" then
 		candidate = "atrial_fibrillation"
+	elseif org.unstableRhythm == "ventricular_ectopy" and arrhythmia >= 0.28 then
+		candidate = "ventricular_bigeminy"
 	elseif org.unstableRhythm == "ventricular_ectopy" then
 		candidate = "ventricular_ectopy"
 	elseif arrhythmia >= 0.45 and heartbeat > 50 and heartbeat <= 220 and output > 0.12 and perfusion > 0.12 then
 		candidate = "atrial_fibrillation"
+	elseif arrhythmia >= 0.28 and heartbeat > 35 and heartbeat <= 220 and output > 0.12 and perfusion > 0.12 then
+		candidate = "ventricular_bigeminy"
 	elseif arrhythmia >= 0.1 and heartbeat > 35 and heartbeat <= 220 and output > 0.12 and perfusion > 0.12 then
 		candidate = "ventricular_ectopy"
 	elseif cold >= 0.18 and heartbeat > 40 and cold >= math.max(cerebral * 0.9, hypoxia, cardiac * 0.9) then
@@ -930,6 +943,7 @@ module[2] = function(owner, org, timeValue)
 		0,
 		1
 	)
+	local hemorrhagePulseCeiling = getHemorrhageBandValue(bloodNow, 4) + catecholamineDrive * 20
 	local perfusionNeed = Clamp(max(
 		1 - Clamp((org.pulse or 0) / 70, 0, 1),
 		1 - bloodVolume,
@@ -966,7 +980,23 @@ module[2] = function(owner, org, timeValue)
 	if org.fibrillation then rhythmInstability = 1 end
 	local rateOutput = getRateOutput(org.heartstop and 0 or (org.heartbeat or 70))
 	local circulationBase = bloodVolume * heart * compensationPulseMultiplier * rateOutput * vascularTone * accelerationPressureMul * dehydrationPressureMul * tamponadePreload * internalBleedPressureMul * Clamp(Remap(org.temperature, 28, 36.7, 0.55, 1), 0.45, 1.1)
+	local rhythm = org.ecgState
 	local rhythmMul = org.fibrillation and 0.18 or Clamp(1 - rhythmInstability * 0.42, 0.32, 1)
+	if not org.fibrillation then
+		if rhythm == "ventricular_ectopy" then
+			rhythmMul = 0.97 - arrhythmia * 0.12
+		elseif rhythm == "ventricular_bigeminy" then
+			rhythmMul = 0.8 - arrhythmia * 0.1
+		elseif rhythm == "atrial_fibrillation" then
+			rhythmMul = 0.88 - arrhythmia * 0.18
+		elseif rhythm == "av_block_partial" then
+			rhythmMul = math.min(rhythmMul, 0.94)
+		elseif rhythm == "av_block_complete" or rhythm == "ventricular_escape" then
+			rhythmMul = math.min(rhythmMul, 0.7)
+		elseif rhythm == "junctional_escape" or rhythm == "sinus_pause" then
+			rhythmMul = math.min(rhythmMul, 0.85)
+		end
+	end
 	local dihSupport = (org.dihSupportUntil or 0) > CurTime()
 	local defibGrace = (org.defibDeathGrace or 0) > CurTime() or (org.defibSupportUntil or 0) > CurTime()
 	local cprSupport = (org.cprSupportUntil or 0) > CurTime()
@@ -994,6 +1024,7 @@ module[2] = function(owner, org, timeValue)
 			* Clamp(heart, 0, 1)
 			* Clamp(1 - rhythmInstability * 0.4, 0.3, 1)
 		palpablePulseTarget = math.min(palpablePulseTarget + sympatheticPulseSupport, org.heartbeat or 0)
+		if bloodNow < normalBloodVolume then palpablePulseTarget = math.min(palpablePulseTarget, hemorrhagePulseCeiling) end
 		mechanicalPulseCapture = (org.heartbeat or 0) > 0
 			and Clamp(palpablePulseTarget / math.max(org.heartbeat, 1), 0, 1)
 			or 0
@@ -1331,13 +1362,13 @@ module[2] = function(owner, org, timeValue)
 		local fillingK = (1 - math.Clamp((heartbeatNow - 185) / 85, 0, 0.55)) * (1 - effectivePalpitations * 0.2)
 		local maxPumpSupport = 1.1 - math.Clamp((heartbeatNow - 100) / 200, 0, 0.35)
 		local pumpSupport = math.Clamp(pumpRateK * fillingK, 0.25, maxPumpSupport)
-		local supportedPulse = math.Clamp(pulse * pumpSupport, 0, 200)
+		local supportedPulse = math.Clamp(pulse * pumpSupport, 0, bloodNow < normalBloodVolume and hemorrhagePulseCeiling or 200)
 		if supportedPulse > org.pulse then
 			org.pulse = math.Approach(org.pulse, supportedPulse, timeValue * 8)
 		end
 	end
 	
-	heartbeat = heartbeat + (org.hypotension or 0) * 55
+	heartbeat = heartbeat + math.max((org.hypotension or 0) - pressureHypotensionTarget, 0) * 55
 	heartbeat = heartbeat - (org.myocardialOxygen and (1 - org.myocardialOxygen) or 0) * 35
 	if (org.arrhythmia or 0) > 0.05 and not org.fibrillation then heartbeat = heartbeat + math.Rand(-70, 90) * org.arrhythmia end
 	if org.fibrillation then heartbeat = math.Rand(180, 360) end

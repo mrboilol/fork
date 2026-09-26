@@ -135,6 +135,7 @@ hook.Add("Org Clear", "Main", function(org)
 	org.jawdislocation = false
 
 	org.llegamputated = false
+	org.torsoamputated = false
 	org.rlegamputated = false
 	org.rarmamputated = false
 	org.larmamputated = false
@@ -398,6 +399,7 @@ local function send_organism(org, ply, recipientForce, reliable)
 	local sendtable = {}
 	sendtable.alive = org.alive
 	sendtable.otrub = org.otrub
+	sendtable.torsoamputated = org.torsoamputated
 	sendtable.owner = org.owner
 	sendtable.stamina = org.stamina
 	sendtable.immobilization = org.immobilization

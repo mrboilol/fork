@@ -75,6 +75,7 @@ local awakeECGSeverityByState = {
     hypothermia_bradycardia = 0.3,
     atrial_fibrillation = 0.65,
     ventricular_ectopy = 0.75,
+    ventricular_bigeminy = 0.8,
     ventricular_fibrillation = 0.95,
     sinus_pause = 0.4,
     junctional_escape = 0.5,
@@ -713,7 +714,8 @@ local function DrawEKG(state, centerX, centerY, width, height, org, color, ringA
         local h
         local pvcStrength = math.max(arrhythmia * 0.9, palpitations * 0.8, ischemia * 0.55, hypoxia * 0.45)
         local pvcPeriod = math.max(3, math.floor(Lerp(math.Clamp(pvcStrength, 0, 1), 14, 4)))
-        local pvcBeat = pvcStrength >= 0.1 and beatIndex % pvcPeriod == pvcPeriod - 1
+        local pvcBeat = rhythm ~= "normal_sinus" and rhythm ~= "ventricular_ectopy" and rhythm ~= "ventricular_bigeminy"
+            and pvcStrength >= 0.1 and beatIndex % pvcPeriod == pvcPeriod - 1
 
         if rhythm == "ventricular_fibrillation" then
             h = getVentricularFibrillationH(rawPhase)
@@ -721,7 +723,8 @@ local function DrawEKG(state, centerX, centerY, width, height, org, color, ringA
             h = getAtrialFibrillationH(rawPhase)
         elseif rhythm == "ventricular_escape" or rhythm == "terminal_tachycardia" then
             h = getWideComplexH(phase)
-        elseif rhythm == "ventricular_ectopy" and beatIndex % 3 == 2 then
+        elseif (rhythm == "ventricular_bigeminy" and beatIndex % 2 == 1)
+            or (rhythm == "ventricular_ectopy" and beatIndex % 5 == 4) then
             h = getPVCH(phase)
         elseif rhythm == "junctional_escape" then
             h = getJunctionalH(phase)
@@ -972,8 +975,8 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     local severeMechanicalPulse = (pulse > 0 and pulse < 45) or pulse > 125
     local abnormalECG = ecgState ~= "normal_sinus"
     local sinusECGTail = UpdateECGStateAlert(ecgState)
-    local showAwakeECG = isCritical and not isUnconscious and not lowConsciousness
-        and (abnormalECG or severeMechanicalPulse or sinusECGTail > 0 or admiring)
+    local showAwakeECG = not isUnconscious and not lowConsciousness
+        and (abnormalECG or sinusECGTail > 0 or (isCritical and (severeMechanicalPulse or admiring)))
     
 	local unconsciousElapsed = isUnconscious and (CurTime() - (unconsciousStartTime or CurTime())) or 0
 	if isUnconscious and incapacitated then

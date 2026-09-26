@@ -1070,6 +1070,7 @@ local function getBleedDirection(ang)
 end
 
 local function getWoundVisualRate(org, wound, index, arterial)
+	if (tonumber(wound[1]) or 0) <= 0 then return 0 end
 	local rates = arterial and org.arterialWoundBleedRates or org.woundBleedRates
 	local liveRate = rates and tonumber(rates[index])
 	if liveRate then return math.max(liveRate, 0) end
@@ -1132,7 +1133,8 @@ local function emitArterialBleeding(ent, org, wound, index, pos, ang, dir, water
 	local size = math.Rand(1.2, 1.6 + rateK * 1.2) * arterySizeMul
 	local time = CurTime()
 	local sprayDir = dir:LengthSqr() > 0.001 and dir:GetNormalized() or getBleedDirection(ang)
-	local velocity = sprayDir * (95 + rateK * 165) * pressureDrive * math.Clamp(pulse, 0.3, 1.5)
+	local reach = wound[7] == "aorta" and 1.85 or (wound[7] == "arteria" and 1.6 or 1)
+	local velocity = sprayDir * (95 + rateK * 165) * reach * pressureDrive * math.Clamp(pulse, 0.3, 1.5)
 		* (0.8 + 0.2 * math.sin(time * (5 + index)))
 		+ sprayDir:Angle():Right() * 12 * rateK * math.sin(time * 2)
 		+ ang:Up() * 10 * rateK * math.sin(time * 3)

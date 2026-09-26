@@ -360,6 +360,14 @@ if CLIENT then
 				draw.SimpleText( "It will explode creating a fire.", "HomigradFont", toScreen.x+3, toScreen.y + 25 + 62, color_black, TEXT_ALIGN_CENTER )
 				draw.SimpleText( "It will explode creating a fire.", "HomigradFont", toScreen.x, toScreen.y + 25 + 60, colred, TEXT_ALIGN_CENTER )
 			end
+			if not tr.HitWorld then
+				local phys = tr.Entity:GetPhysicsObject()
+				local canPlantInside = (hgIsDoor and hgIsDoor(tr.Entity)) or (IsValid(phys) and phys:GetMass() < 500)
+				if canPlantInside then
+					draw.SimpleText("Hold RMB: plant inside. The blast throws the object.", "HomigradFont", toScreen.x + 3, toScreen.y + 88, color_black, TEXT_ALIGN_CENTER)
+					draw.SimpleText("Hold RMB: plant inside. The blast throws the object.", "HomigradFont", toScreen.x, toScreen.y + 86, color_white, TEXT_ALIGN_CENTER)
+				end
+			end
 			draw.SimpleText( "Plant onto Object.", "HomigradFont", toScreen.x + 3, toScreen.y + 27, color_black, TEXT_ALIGN_CENTER )
 			draw.SimpleText( "Plant onto Object.", "HomigradFont", toScreen.x, toScreen.y + 25, color_white, TEXT_ALIGN_CENTER )
 		elseif self:GetPlanting() then
@@ -587,7 +595,7 @@ local function StartIEDDetonation(self, ent)
 		local sounds = self.SelfDetonationSounds or SWEP.SelfDetonationSounds
 		local soundName = sounds[math.random(#sounds)]
 		ent:EmitSound(soundName, self.SelfDetonationSoundLevel or SWEP.SelfDetonationSoundLevel, 100, 1, CHAN_AUTO)
-		delay = math.max(delay, SoundDuration(soundName), self.SelfDetonationSoundFallbackDuration or SWEP.SelfDetonationSoundFallbackDuration)
+		delay = math.max(delay, math.min(SoundDuration(soundName), 3), self.SelfDetonationSoundFallbackDuration or SWEP.SelfDetonationSoundFallbackDuration)
 	end
 
 	self:SetDialing(true)

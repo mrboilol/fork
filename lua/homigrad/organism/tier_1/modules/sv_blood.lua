@@ -90,6 +90,7 @@ module[1] = function(org)
 	org.cardiacTamponade = 0
 	org.lastBleedTime = CurTime()
 	org.arterialO2Drain = false
+	org.arteriaO2Drain = false
 	org.arterialO2Impairment = 0
 	org.throatcut = false
 	org.throatCutTime = 0
@@ -161,7 +162,7 @@ function hg.organism.RebuildArteryWoundState(org, syncNow)
 
 	local owner = org.owner
 	if IsValid(owner) then
-		hg.organism.SyncWoundsNet(org)
+		hg.organism.SyncArterialWoundsNet(org)
 
 		if syncNow and hg.send_organism then
 			hg.send_organism(org, owner)
@@ -576,6 +577,8 @@ module[2] = function(owner, org, mulTime)
 
 			if wound[1] <= 0.001 then
 				wound[1] = 0
+				woundBleedRates[i] = 0
+				wound.visualBleedRate = 0
 				if not wound.markHealed then
 					wound.markHealed = true
 					hg.organism.RemoveWoundMark(org, wound, false)
@@ -599,13 +602,14 @@ module[2] = function(owner, org, mulTime)
 
 	local hasCarotidWound = false
 	local heldCarotidWound = false
+	local healedArtery = false
 	for i, wound in pairs(org.arterialwounds) do
 		local tourniquetBleedMul = hg.GetTourniquetBleedMultiplier and hg.GetTourniquetBleedMultiplier(owner, wound[4]) or 1
 		local bandageBleedMul = hg.GetBandageBleedMultiplier and hg.GetBandageBleedMultiplier(owner, wound[4]) or 1
 		local bandageClotMul = hg.GetBandageClotMultiplier and hg.GetBandageClotMultiplier(owner, wound[4]) or 1
 		local isAmputation = wound[9] == true
 		local isHeadGib = wound[10] == "headgib"
-		local woundSeverityMul = isAmputation and amputation_arterial_bleed_mul or (isHeadGib and headgib_arterial_bleed_mul or 1)
+		local woundSeverityMul = isAmputation and amputation_arterial_bleed_mul or (isHeadGib and headgib_arterial_bleed_mul or (limbArteryWeakness[wound[7]] and 1.65 or 1))
 		initializeWoundHemostasis(wound, time)
 		local circulationOutput = math.max(tonumber(org.cardiacOutput) or 0, 0)
 		local pressureFactor = math.Clamp((tonumber(org.bloodPressure) or 0) / 92, 0, 1.5)
@@ -658,15 +662,17 @@ module[2] = function(owner, org, mulTime)
 
 		if (wound[1] or 0) <= 0.001 then
 			wound[1] = 0
-			org[wound[7]] = 0
+			woundBleedRate = 0
 			if not wound.markHealed then
 				wound.markHealed = true
+				healedArtery = true
 				hg.organism.RemoveWoundMark(org, wound, true)
 			end
 		end
 		arterialWoundBleedRates[i] = woundBleedRate
 		wound.visualBleedRate = woundBleedRate
 	end
+	if healedArtery then hg.organism.RebuildArteryWoundState(org) end
 
 	if org.throatcut then
 		local severity = math.Clamp(org.throatCutSeverity or 1, 0.35, 1.25)

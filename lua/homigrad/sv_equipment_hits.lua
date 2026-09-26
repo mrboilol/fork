@@ -40,7 +40,6 @@ impact.Config = {
 }
 
 impact.ProcessedDamage = setmetatable({}, {__mode = "k"})
-impact.DroppedAccessories = impact.DroppedAccessories or setmetatable({}, {__mode = "k"})
 local geometryCache = {}
 local materialProfiles = {
     metal = {mat = MAT_METAL, hardness = 0.9, ballisticResistance = 9, contactAbsorption = 0.5, blockAbsorption = 0.82, durability = 150, bulletWear = 0.42, meleeWear = 0.22},
@@ -972,16 +971,6 @@ local function TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, ori
         end
         if hg.TraceArmorShot then
             hg.TraceArmorShot(body, startPos, endPos, seen, hits, projectileRadius)
-        end
-    end
-    if IsValid(originalTrace.Entity) and originalTrace.Entity.HGAccessoryID then impact.DroppedAccessories[originalTrace.Entity] = true end
-    for dropped in pairs(impact.DroppedAccessories) do
-        if not IsValid(dropped) then impact.DroppedAccessories[dropped] = nil; continue end
-        if seen[dropped] or not CanHit(dropped) then continue end
-        local hit = hg.TraceEquipmentModel(dropped:GetModel(), dropped:GetPos(), dropped:GetAngles(), dropped:GetModelScale(), startPos, endPos, projectileRadius)
-        if hit then
-            hit.heldEntity, hit.key, hit.shot = dropped, dropped, shot
-            hits[#hits + 1] = hit
         end
     end
     local fullFraction = originalTrace.Hit and (originalTrace.Fraction or 1) / math.max(obstructionFraction, 0.000001) or 1

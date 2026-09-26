@@ -198,7 +198,7 @@ local function ShouldShock(org)
 	if org.heartstop or rhythm == "asystole" or rhythm == "pea" then return true end
 	if org.fibrillation or rhythm == "ventricular_fibrillation" or rhythm == "terminal_tachycardia" then return true end
 	if rhythm == "av_block_complete" or rhythm == "ventricular_escape" or rhythm == "junctional_escape" then return output < 0.55 or pulse < 35 end
-	if rhythm == "atrial_fibrillation" or rhythm == "ventricular_ectopy" or rhythm == "av_block_partial" then return output < 0.65 or pulse < 45 or heartbeat > 150 end
+	if rhythm == "atrial_fibrillation" or rhythm == "ventricular_ectopy" or rhythm == "ventricular_bigeminy" or rhythm == "av_block_partial" then return output < 0.65 or pulse < 45 or heartbeat > 150 end
 	return (org.arrhythmia or 0) > 0.4 or heartbeat > 200 or (heartbeat < 35 and output < 0.5)
 end
 

@@ -59,8 +59,7 @@ function hg.organism.ClampWoundOffset(ent, bone, offset, direction)
         local mins, maxs = ent:GetHitBoxBounds(index, hitboxSet)
         if not mins or not maxs then continue end
         local point, normal = ProjectWoundToBounds(offset, mins, maxs, direction)
-        local bounded = Vector(math.Clamp(offset.x, mins.x, maxs.x), math.Clamp(offset.y, mins.y, maxs.y), math.Clamp(offset.z, mins.z, maxs.z))
-        local dist = bounded:DistToSqr(offset)
+        local dist = point:DistToSqr(offset)
         if not distance or dist < distance then nearest, nearestNormal, distance = point, normal, dist end
     end
     return nearest or offset, nearestNormal, distance
@@ -77,8 +76,9 @@ function hg.organism.GetWoundAnchor(ent, pos, ang, fallbackBone)
         if not matrix or ent:GetManipulateBoneScale(bone):LengthSqr() < 0.1 then continue end
         local offset, rotation = WorldToLocal(pos, ang, matrix:GetTranslation(), matrix:GetAngles())
         local clamped, normal, distance = hg.organism.ClampWoundOffset(ent, bone, offset, rotation:Forward())
-        if not bestDistance or distance < bestDistance or (distance == bestDistance and bone == fallbackBone) then
-            bestBone, bestPos, bestNormal, bestAng, bestDistance = bone, clamped, normal or rotation:Forward(), rotation, distance
+        local score = distance and distance - (bone == fallbackBone and 16 or 0)
+        if score and (not bestDistance or score < bestDistance) then
+            bestBone, bestPos, bestNormal, bestAng, bestDistance = bone, clamped, normal or rotation:Forward(), rotation, score
         end
     end
     if bestBone then return bestPos, isfunction(bestNormal.Angle) and bestNormal:Angle() or bestAng, ent:GetBoneName(bestBone) end

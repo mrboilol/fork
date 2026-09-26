@@ -591,6 +591,7 @@ end
 
 local irregularECGSeverity = {
 	ventricular_ectopy = 0.35,
+	ventricular_bigeminy = 0.65,
 	atrial_fibrillation = 0.65,
 	hypothermia_bradycardia = 0.45,
 	av_block_partial = 0.45,
