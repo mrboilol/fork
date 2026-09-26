@@ -103,14 +103,18 @@ function SWEP:UpdateWeaponReadiness(owner, dtime)
 	local lowered = (sprinting and !self:CanSprintFire()) or deploying
 	local factor = self:GetWeaponInertiaFactor()
 	local raiseRate = math.Clamp((self.Ergonomics or 1) * 4 / math.sqrt(factor), 1.6, 8)
-	local recoveryRate = math.Clamp(((self.Ergonomics or 1) * 1.8 + 0.6) / (1 + math.sqrt(factor) * 0.35), 0.45, 2.4)
+	local recoveryScale = self.shotRecoveryScale or 1
+	local recoveryRate = math.Clamp(((self.Ergonomics or 1) * 1.8 + 0.6) / (1 + math.sqrt(factor) * 0.35), 0.45, 2.4) / recoveryScale
 	self.recoilAimPenalty = math.Approach(self.recoilAimPenalty or 0, 0, dt * recoveryRate)
 	local readyTarget = lowered and 0 or 1 - math.Clamp(self.recoilAimPenalty * 0.075, 0, 0.45)
 
-	self.weaponReadiness = math.Approach(self.weaponReadiness or readyTarget, readyTarget, dt * raiseRate)
+	self.weaponReadiness = math.Approach(self.weaponReadiness or readyTarget, readyTarget, dt * raiseRate / (self.recoilAimPenalty > 0 and recoveryScale or 1))
 	local velocity = self.inertialAimVelocity or angle_zero
 	local angularSpeed = math.abs(velocity[1]) + math.abs(velocity[2])
-	local stable = not lowered and self.recoilAimPenalty < 0.05 and self.weaponReadiness > 0.98 and owner:GetVelocity():Length2D() < 25 and angularSpeed < 5
+	local wobble = self.ShotMuzzleWobble or angle_zero
+	local offset = self.ShotMuzzleOffset or vector_origin
+	local muzzleSettled = math.abs(wobble[1]) + math.abs(wobble[2]) < 0.3 and offset:LengthSqr() < 0.09
+	local stable = not lowered and muzzleSettled and (self.recoilTail or 0) < 0.01 and self.recoilAimPenalty < 0.05 and self.weaponReadiness > 0.98 and owner:GetVelocity():Length2D() < 25 and angularSpeed < 5
 	local stabilityRate = stable and 2.8 / (1 + self.recoilAimPenalty * 0.35) or 6
 	self.weaponStability = math.Approach(self.weaponStability or 0, stable and 1 or 0, dt * stabilityRate)
 
@@ -171,10 +175,11 @@ function SWEP:ChangeGunPos(dtime)
 	local recoilDtime = math.min(dtime or FrameTime(), 0.05)
 	local recoverySkill = proficiency
 	local oneHandRecovery = support.oneHanded and not self.IgnoreOneArmPenalties and Lerp(recoverySkill, 0.72, 0.9) or 1
-	local angularSpring = Lerp(recoverySkill, 62, 125) * oneHandRecovery
-	local angularDamping = Lerp(recoverySkill, 16, 23) * oneHandRecovery
-	local positionSpring = Lerp(recoverySkill, 55, 110) * oneHandRecovery
-	local positionDamping = Lerp(recoverySkill, 15, 21) * oneHandRecovery
+	local recoveryScale = self.shotRecoveryScale or 1
+	local angularSpring = Lerp(recoverySkill, 62, 125) * oneHandRecovery / recoveryScale ^ 2
+	local angularDamping = Lerp(recoverySkill, 16, 23) * oneHandRecovery / recoveryScale
+	local positionSpring = Lerp(recoverySkill, 55, 110) * oneHandRecovery / recoveryScale ^ 2
+	local positionDamping = Lerp(recoverySkill, 15, 21) * oneHandRecovery / recoveryScale
 	local wobble = self.ShotMuzzleWobble or Angle(0, 0, 0)
 	local wobbleVelocity = self.ShotMuzzleWobbleVelocity or Angle(0, 0, 0)
 	local offset = self.ShotMuzzleOffset or Vector(0, 0, 0)
@@ -1137,7 +1142,7 @@ function hg.RenderWeapons(ent, owner)
 			local wep2 = weps[i]
 			if wep2.ishgweapon and wep2 ~= wep then
 				DrawWorldModel(wep2)
-			elseif wep2 ~= wep and wep2.ismelee2 and wep2.TwoHanded and wep2.DrawHolsteredWorldModel then
+			elseif wep2 ~= wep and wep2.ismelee2 and wep2.DrawHolsteredWorldModel then
 				wep2:DrawHolsteredWorldModel(ent)
 			end
 		end

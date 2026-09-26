@@ -235,10 +235,9 @@ LP.AssaultRifles = {
 
 LP.Marksman = {
 	{0.3, "weapon_mosinnagant"},
-	{0.3, "weapon_vpo209"},
 	{0.3, "weapon_vpo215"},
 	{0.25, "weapon_remington700"},
-	{0.25, "weapon_vpo101"},
+	{0.8, "weapon_vpo101"},
 	{0.2, "weapon_sako_trg"},
 	{0.2, "weapon_sv98"},
 	{0.2, "weapon_svd"},
@@ -253,7 +252,6 @@ LP.Marksman = {
 
 	{0.3, "weapon_kar98"},
 	{0.3, "weapon_sks"},
-	{0.25, "weapon_vpo136"},
 	{0.25, "weapon_sr25"},
 	{0.25, "weapon_m1a1"},
 	{0.2, "weapon_rfb"},

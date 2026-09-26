@@ -134,6 +134,7 @@ SWEP.LocalMuzzleAng = Angle(0.7,-0.1,0)
 SWEP.WeaponEyeAngles = Angle(0,0,0)
 
 SWEP.Primary.ClipSize = 16
+SWEP.NoChamberRound = true
 SWEP.Primary.DefaultClip = 16
 SWEP.Primary.Automatic = false
 SWEP.Primary.Ammo = ".22 Long Rifle"

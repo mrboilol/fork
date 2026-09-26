@@ -388,7 +388,7 @@ if CLIENT then
     end
 
     function SWEP:DrawHolsteredWorldModel(ent)
-        if not self.TwoHanded or not IsValid(ent) then return end
+        if not IsValid(ent) then return end
 
         local modelPath = self.WorldModelExchange or self.WorldModel
         if not IsValid(self.holsteredWorldModel) or self.holsteredWorldModel:GetModel() ~= modelPath then
@@ -1194,11 +1194,16 @@ function SWEP:SetHandPos(noset)
 	-- ent:SetupBones()
 
 	local moveStart = math.max(self.MeleeDeployMoveStart or 0, self:GetNWFloat("MeleeDeployMoveStart", 0))
-	local leftDraw = self.TwoHanded and hg.CanUseLeftHand(ply)
-	self.rhandik = self.setrh and IsValid(owner) and (not leftDraw or CurTime() >= moveStart)//self.setrh
+	local gripStart = math.max(self.MeleeDeployGripStart or 0, self:GetNWFloat("MeleeDeployGripStart", 0))
+	local grip = 1
+	if moveStart > CurTime() then
+		grip = math.ease.InOutSine(math.Clamp((CurTime() - gripStart) / math.max(moveStart - gripStart, 0.001), 0, 1))
+	end
 	self.lhandik = self.setlh and not (self.DisableLHIKWhileBlocking and self:GetBlocking()) and IsValid(owner)
 		and ((ply:GetTable().ChatGestureWeight or 0) < 0.1) and hg.CanUseLeftHand(ply)
 		and not (self:IsSuicidePosing() and self.SuicideNoLH)
+	local leftDraw = self.TwoHanded and self.lhandik
+	self.rhandik = self.setrh and IsValid(owner) and (not leftDraw or CurTime() >= moveStart)//self.setrh
 
     local rhmat, lhmat = ent:GetBoneMatrix(ent:LookupBone("ValveBiped.Bip01_R_Hand")), ent:GetBoneMatrix(ent:LookupBone("ValveBiped.Bip01_L_Hand"))
 
@@ -1224,6 +1229,10 @@ function SWEP:SetHandPos(noset)
 			bonepos.y = math.Clamp(bonepos.y, wmpos.y - 38, wmpos.y + 38)
 			bonepos.z = math.Clamp(bonepos.z, wmpos.z - 38, wmpos.z + 38)
 
+			if leftDraw then
+				bonepos = LerpVector(grip, ply_bonematrix:GetTranslation(), bonepos)
+				boneang = LerpAngle(grip, ply_bonematrix:GetAngles(), boneang)
+			end
 			ply_bonematrix:SetTranslation(bonepos)
 			ply_bonematrix:SetAngles(boneang)
 			
@@ -1272,6 +1281,9 @@ function SWEP:SetHandPos(noset)
 			if reachLerp then
 				bonepos = LerpVector(reachLerp, ply_bonematrix:GetTranslation(), bonepos)
 				boneang = LerpAngle(reachLerp, ply_bonematrix:GetAngles(), boneang)
+			elseif not leftDraw and grip < 1 then
+				bonepos = LerpVector(grip, ply_bonematrix:GetTranslation(), bonepos)
+				boneang = LerpAngle(grip, ply_bonematrix:GetAngles(), boneang)
 			end
 
 			bonepos.x = math.Clamp(bonepos.x, wmpos.x - 38, wmpos.x + 38)
@@ -1352,9 +1364,11 @@ function SWEP:Deploy()
         local moveStart = CurTime() + gripTime
         local reachEnd = moveStart + reachTime
 
+        self.MeleeDeployGripStart = CurTime()
         self.MeleeDeployMoveStart = moveStart
         self.MeleeDeployReachEnd = reachEnd
         if SERVER then
+            self:SetNWFloat("MeleeDeployGripStart", self.MeleeDeployGripStart)
             self:SetNWFloat("MeleeDeployMoveStart", moveStart)
             self:SetNWFloat("MeleeDeployReachEnd", reachEnd)
         end
@@ -1368,9 +1382,11 @@ function SWEP:Deploy()
 end
 
 function SWEP:Holster(wep)
+    self.MeleeDeployGripStart = 0
     self.MeleeDeployMoveStart = 0
     self.MeleeDeployReachEnd = 0
     if SERVER then
+        self:SetNWFloat("MeleeDeployGripStart", 0)
         self:SetNWFloat("MeleeDeployMoveStart", 0)
         self:SetNWFloat("MeleeDeployReachEnd", 0)
     end

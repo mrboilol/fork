@@ -177,7 +177,7 @@ MODE.LootTable = {
 		{1,"weapon_adar215"},
 		{1,"weapon_hk416"},
 
-		{0.8,"weapon_vpo136"},
+		{0.8,"weapon_vpo101"},
 		{0.8,"weapon_sr25"},
 		{0.6,"weapon_musket"},
 	}},
@@ -783,14 +783,14 @@ MODE.Types.suicidelunatic = {
 			hg.AddArmor(ply, {"ent_armor_vest1", "ent_armor_helmet6"})
 		end
 
-		local weapon = ply:Give("weapon_vpo136")
+		local weapon = ply:Give("weapon_vpo101")
 		if IsValid(weapon) then
 			timer.Simple(0, function()
 				if not IsValid(ply) or not ply:Alive() or not IsValid(weapon) then return end
 
 				local ammoType = weapon:GetPrimaryAmmoType()
-				weapon:SetClip1(math.min(10, weapon:GetMaxClip1()))
-				if ammoType >= 0 then ply:GiveAmmo(10, ammoType, true) end
+				weapon:SetClip1(weapon:GetMaxClip1())
+				if ammoType >= 0 then ply:GiveAmmo(weapon:GetMaxClip1() * math.random(1, 2), ammoType, true) end
 			end)
 		end
 

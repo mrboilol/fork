@@ -205,7 +205,7 @@ local CRIM_PRESETS = {
 }
 
 local CRIM_RANDOM_PRIMARIES_SOBR = {
-	"weapon_ak74", "weapon_vpo136", "weapon_vpo209", "weapon_svt",
+	"weapon_ak74", "weapon_vpo101", "weapon_svt",
 	"weapon_toz106", "weapon_m590a1", "weapon_mp5", "weapon_mp5k",
 	"weapon_mp9", "weapon_uzi", "weapon_p90", "weapon_skorpion"
 }
@@ -217,7 +217,7 @@ local CRIM_RANDOM_SECONDARIES_SOBR = {
 
 local CRIM_RANDOM_PRIMARIES_US = {
 	"weapon_adar215", "weapon_vpo101", "weapon_sks", "weapon_stm9",
-	"weapon_vpo136", "weapon_m590a1", "weapon_870", "weapon_kedr",
+	"weapon_m590a1", "weapon_870", "weapon_kedr",
 	"weapon_uzi", "weapon_mp5k", "weapon_mp9"
 }
 

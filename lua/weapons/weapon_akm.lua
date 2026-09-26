@@ -68,10 +68,12 @@ SWEP.ARC9DefaultLHIKSourceModel = "models/weapons/mods/ak_hg_akm_std_wood.mdl"
 
 SWEP.FakePos = Vector(-14, 2.52, 7.5)
 SWEP.FakeAng = Angle(0, 0, 0)
-SWEP.AttachmentPos = Vector(-1, 0, 0)
-SWEP.AttachmentAng = Angle(0, 0, 0)
+SWEP.AttachmentPos = Vector(3, 3, -26.8)
+SWEP.AttachmentAng = Angle(0, -1.5, 0)
 SWEP.FakeAttachment = "1"
 SWEP.FakeBodyGroups = "01010080102"
+SWEP.LocalMuzzlePos = Vector(26.986, -0.2, 2.741)
+SWEP.LocalMuzzleAng = Angle(-0.4, 0, 0)
 
 SWEP.FakeEjectBrassATT = "2"
 
@@ -180,6 +182,7 @@ SWEP.FakeVPShouldUseHand = false
 
 SWEP.weaponInvCategory = 1
 SWEP.Primary.ClipSize = 30
+SWEP.NoChamberRound = true
 SWEP.Primary.DefaultClip = 30
 SWEP.Primary.Automatic = true
 SWEP.Primary.Ammo = "7.62x39 mm"

@@ -772,7 +772,7 @@ MODE.LootTable = {
 		{2,"ent_armor_vest4"},
 
 		{1,"weapon_akmwreked"},
-		{1,"weapon_vpo136"},
+		{1,"weapon_vpo101"},
 		{1,"weapon_sr25"},
 	}},
 	{2, {

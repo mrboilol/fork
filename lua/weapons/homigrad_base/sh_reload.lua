@@ -64,7 +64,7 @@ if SERVER then
 end
 
 function SWEP:GetReloadCapacity()
-	local chambered = not self.OpenBolt
+	local chambered = not self.OpenBolt and not self.NoChamberRound
 	return math.max(self:GetMaxClip1() + (chambered and 1 or 0), 0)
 end
 

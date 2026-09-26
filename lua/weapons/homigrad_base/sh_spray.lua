@@ -12,10 +12,12 @@ function SWEP:ResetTransientAimState()
 	self.ShotMuzzleWobbleVelocity = Angle(0, 0, 0)
 	self.ShotMuzzleOffsetVelocity = Vector(0, 0, 0)
 	self.recoilShotIndex = 0
+	self.shotRecoveryScale = 1
 	self.inertialAim = nil
 	self.inertialAimVelocity = Angle(0, 0, 0)
 	self.weaponReadiness = nil
 	self.recoilAimPenalty = 0
+	self.recoilTail = 0
 	self.aimHoldTime = 0
 	self.AimFatigueWobble = Angle(0, 0, 0)
 	self.cache_trace = nil
@@ -85,6 +87,7 @@ function SWEP:PrimarySpread()
 		self.recoilAimPenalty = math.Clamp((self.recoilAimPenalty or 0) + recoveryImpulse * 0.22, 0, 6)
 		self.weaponReadiness = math.min(self.weaponReadiness or 1, 1 - math.Clamp(recoveryImpulse * 0.055, 0.02, 0.48))
 		self.weaponStability = 0
+		self.recoilTail = 0.5
 	end
 	
 	if SERVER then
@@ -120,8 +123,10 @@ function SWEP:PrimarySpread()
 		local experienceMul = self.GetWeaponExperienceMul and self:GetWeaponExperienceMul(owner) or 1
 		local stanceMul = self:GetPostureStabilityMul(self:IsZoom())
 		local cantedHold = not self:IsZoom() and (owner.posture == 7 or owner.posture == 9)
+		local longGun = not self:IsPistolHoldType() and not self.PistolKinda
 		local restMul = self:IsResting() and 0.35 or 1
 		local recoilImpulse = math.Clamp(caliberMul * weightMul * supportMul * handlingMul * experienceMul * stanceMul * (0.78 + math.min(sprayI / 11, 0.82)) * restMul * (self.WeaponRecoilMul or 1) * self:GetAttachmentRecoilMul() * 1.3, 0.18, 7)
+		self.shotRecoveryScale = math.Clamp(0.75 + recoilImpulse * (longGun and not cantedHold and 0.375 or 0.25), 0.8, 2.5)
 		local lateralImpulse = recoilImpulse * math.Clamp(self.addSprayMul or 1, 0.08, 2.5)
 		self.recoilShotIndex = (self.recoilShotIndex or 0) + 1
 		local seed = self.recoilShotIndex * 43
@@ -138,7 +143,7 @@ function SWEP:PrimarySpread()
 			offsetVelocity[2] = offsetVelocity[2] + lateralImpulse * 6
 			offsetVelocity[3] = offsetVelocity[3] + recoilImpulse * 4
 		else
-			wobbleVelocity[1] = wobbleVelocity[1] - recoilImpulse * (32 + math.abs(side) * 4)
+			wobbleVelocity[1] = wobbleVelocity[1] - recoilImpulse * ((longGun and 78 or 32) + math.abs(side) * 4)
 			wobbleVelocity[2] = wobbleVelocity[2] + side * lateralImpulse * 8
 			wobbleVelocity[3] = wobbleVelocity[3] + roll * lateralImpulse * 3.5
 			offsetVelocity[1] = offsetVelocity[1] - recoilImpulse * 11
@@ -163,7 +168,9 @@ function SWEP:PrimarySpread()
 		local combat = hg.GetCombatCondition and hg.GetCombatCondition(owner) or nil
 		local combatAimMul = combat and combat.aim or 1
 		local cantedHold = not self:IsZoom() and (owner.posture == 7 or owner.posture == 9)
+		local longGun = not self:IsPistolHoldType() and not self.PistolKinda
 		local force = math.Clamp(caliberMul * weightMul * supportMul * handlingMul * experienceMul * stanceMul * (0.75 + math.min(sprayI / 10, 0.75)) * 1.18, 0.18, 5.5)
+		if longGun and not cantedHold then force = force * 1.4 end
 		local panic = organism.panicattackActive and math.Clamp(organism.panicattack or 0, 0.45, 1) or 0
 		local panicRecoilMul = panic > 0 and math.Remap(panic, 0.45, 1, 1.12, 1.42) or 1
 		force = force * panicRecoilMul * combatAimMul

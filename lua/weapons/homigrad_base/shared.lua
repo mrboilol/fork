@@ -2558,6 +2558,7 @@ function SWEP:GetAdditionalValues()
 		local combatInstability = combat and (1 - combat.stability) or 0
 		local armInjury = math.Clamp(handlingMul - 1, 0, 3.5)
 		local stanceMul = self:GetPostureStabilityMul(self:IsZoom())
+		local longGun = not self:IsPistolHoldType() and not self.PistolKinda
 		local restMul = self:IsResting() and 0.35 or 1
 		local burstMul = 0.85 + math.Clamp((self.SprayI or 0) / 7, 0, 1) * 0.65
 		local physicalImpulse = math.Clamp(caliberMul * weightMul * supportMul * handlingMul * experienceMul * 1.2, 0.3, 5.5)
@@ -2571,7 +2572,6 @@ function SWEP:GetAdditionalValues()
 			local frequencyMul = Lerp(armInjury / 3.5, 1, 0.62)
 			local amp = self.recoilWobbleAmp * (1.35 + armInjury * 0.22)
 			local sideAmp = math.Clamp(self.addSprayMul or 1, 0.08, 2.5)
-			local longGun = not self:IsPistolHoldType() and not self.PistolKinda
 			local wobX = math.sin(t * 7.8 * frequencyMul) * 0.65 + math.sin(t * 12.4 * frequencyMul) * 0.35
 			local wobY = math.cos(t * 8.9 * frequencyMul) * 0.65 + math.cos(t * 14.2 * frequencyMul) * 0.35
 			local wobZ = math.sin(t * 10.1 * frequencyMul) * 0.65 + math.cos(t * 15.6 * frequencyMul) * 0.35
@@ -2587,7 +2587,6 @@ function SWEP:GetAdditionalValues()
 		if combatInstability > 0.001 then
 			local t = CurTime()
 			local aimWobble = combatInstability * experienceMul * (self:IsResting() and 0.28 or 1)
-			local longGun = not self:IsPistolHoldType() and not self.PistolKinda
 			local swayPitch = math.sin(t * 2.1) * 0.62 + math.sin(t * 4.7) * 0.38
 			local swayYaw = math.cos(t * 1.7) * 0.67 + math.sin(t * 3.9) * 0.33
 			self.AdditionalAng2[1] = self.AdditionalAng2[1] + swayPitch * aimWobble * (longGun and 2.4 or 1.7)
@@ -2596,9 +2595,10 @@ function SWEP:GetAdditionalValues()
 			self.AdditionalPos2[3] = self.AdditionalPos2[3] + swayPitch * aimWobble * 0.2
 		end
 
-		local recoilRecoveryTime = Lerp(self:GetFirearmProficiency(ply), 0.36, 0.2)
+		local recoilRecoveryTime = Lerp(self:GetFirearmProficiency(ply), 0.36, 0.2) * (self.shotRecoveryScale or 1)
 		if support.oneHanded and not self.IgnoreOneArmPenalties then recoilRecoveryTime = recoilRecoveryTime * Lerp(self:GetFirearmProficiency(ply), 1.4, 1.12) end
 		local recoilDecay = self:GetAnimShoot2(recoilRecoveryTime * mulhuy / host_timescale(), true)
+		self.recoilTail = recoilDecay
 		if recoilDecay > 0.001 then
 			local climb = 0.55 + math.Clamp((self.SprayI or 0) / 7, 0, 1) * 0.65
 			local seed = math.floor(self.SprayI or 0)
@@ -2613,7 +2613,7 @@ function SWEP:GetAdditionalValues()
 				self.AdditionalPos2[2] = self.AdditionalPos2[2] + kick * 1.15
 				self.AdditionalPos2[3] = self.AdditionalPos2[3] + kick * 0.65
 			else
-				self.AdditionalAng2[1] = self.AdditionalAng2[1] - kick * 3.4
+				self.AdditionalAng2[1] = self.AdditionalAng2[1] - kick * (longGun and 6 or 3.4)
 				self.AdditionalAng2[2] = self.AdditionalAng2[2] + sideRand * kick * 0.25
 				self.AdditionalAng2[3] = self.AdditionalAng2[3] + rollRand * kick * 0.18
 				self.AdditionalPos2[3] = self.AdditionalPos2[3] + kick * (self:IsPistolHoldType() and 1.6 or 2.4)
@@ -2949,9 +2949,15 @@ function SWEP:SetHandPos(noset)
 		
 		local vec1, ang1 = LocalToWorld(self.RHPosOffset, self.RHAngOffset, vec1, ang1)
 		local vec2, ang2 = LocalToWorld(self.LHPosOffset, self.LHAngOffset, vec2, ang2)
-	
-		rhmat:SetTranslation(vec1 - addvec2)
-		rhmat:SetAngles(ang1)
+
+		local grip = 1
+		if self.deploy and ply:GetActiveWeapon() == self then
+			local duration = self:GetDeployDuration()
+			local fraction = 1 - (self.deploy - CurTime()) / duration
+			grip = math.ease.InOutSine(math.Clamp(fraction / (self.DeployGripFraction or 0.3), 0, 1))
+		end
+		rhmat:SetTranslation(LerpVector(grip, rhmat:GetTranslation(), vec1 - addvec2))
+		rhmat:SetAngles(LerpAngle(grip, rhmat:GetAngles(), ang1))
 	
 		if SERVER or CLIENT and self:IsLocal() then
 			addvec = LerpFT(0.1, addvec, VectorRand(-0.03,0.03) * (ply.organism and ply.organism.holdingbreath and 0 or 1) * ((ent.organism and (ent.organism.adrenaline or 0) + (36.6 - (ent.organism.temperature or 36.6)) or 0) + 3) / 5)
