@@ -86,6 +86,9 @@ local math_random, math_Rand = math.random, math.Rand
 	end)--]]
 
 	hook.Add("CreateEntityRagdoll", "npcloot", function(ent, rag)
+		if not IsValid(ent) or not IsValid(rag) then return end
+		if ZCNPC and ZCNPC.DropEngineRagdoll and ZCNPC.DropEngineRagdoll(ent, rag) then return end
+		if rag.zcnpc_drop then return end
 		local class = ent:GetClass()
 		local loot = lootNPCs[class]
 

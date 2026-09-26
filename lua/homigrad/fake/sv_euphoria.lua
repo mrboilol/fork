@@ -251,7 +251,6 @@ hook.Add("EntityTakeDamage", "HG_EuphoriaHit", function(ent, dmgInfo)
 	if ent:IsPlayer() then
 		if not ent:Alive() then return end
 		ragdoll = ent.FakeRagdoll
-		if not IsValid(ragdoll) then return end
 		ply = ent
 	elseif ent:IsRagdoll() then
 		ply = hg.RagdollOwner(ent)
@@ -267,6 +266,32 @@ hook.Add("EntityTakeDamage", "HG_EuphoriaHit", function(ent, dmgInfo)
 	local dmg = dmgInfo:GetDamage()
 
 	local now = SysTime()
+	if ply:Alive() and dmg >= 8
+		and dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_CLUB + DMG_BLAST + DMG_SLASH)
+		and (ply.hgLastImpactPush or 0) + 0.08 < now then
+		local force = dmgInfo:GetDamageForce()
+		local direction = Vector(force.x, force.y, 0)
+		if direction:LengthSqr() <= 1 then
+			local attacker = dmgInfo:GetAttacker()
+			if IsValid(attacker) then direction = ply:GetPos() - attacker:GetPos() end
+			direction.z = 0
+		end
+		if direction:LengthSqr() > 1 then
+			direction:Normalize()
+			local push = direction * math.Clamp(dmg * 2, 20, 100)
+			ply.hgLastImpactPush = now
+			if IsValid(ragdoll) then
+				local pelvis = ragdoll:GetPhysicsObjectNum(hg.realPhysNum(ragdoll, 0))
+				local spine = ragdoll:GetPhysicsObjectNum(hg.realPhysNum(ragdoll, 1))
+				if IsValid(pelvis) then pelvis:AddVelocity(push) end
+				if IsValid(spine) then spine:AddVelocity(push * 0.5) end
+				ragdoll.hgStagger = {dir = direction, untilT = now + 0.4, dur = 0.4}
+			else
+				ply:SetVelocity(push)
+			end
+		end
+	end
+	if not IsValid(ragdoll) then return end
 	if dmg >= EUPHORIA_CURL_MIN_DAMAGE then
 		if ragdoll.hgBeat and now > ragdoll.hgBeat.untilT then
 			ragdoll.hgBeat = nil
@@ -285,14 +310,6 @@ hook.Add("EntityTakeDamage", "HG_EuphoriaHit", function(ent, dmgInfo)
 	if dmg < 8 then return end
 
 	local strength = math.Clamp(dmg / 30, 0.4, 1.4)
-
-	if ragdoll.hgGetUp then
-		local fForce = dmgInfo:GetDamageForce()
-		local fDir = Vector(fForce.x, fForce.y, 0)
-		if fDir:LengthSqr() > 1 then
-			ragdoll.hgStagger = { dir = fDir:GetNormalized(), untilT = SysTime() + 0.35, dur = 0.35 }
-		end
-	end
 
 	if hg_euphoria_tension:GetBool() then
 		ragdoll.hgTensionUntil = SysTime() + EUPHORIA_TENSION_TIME * strength

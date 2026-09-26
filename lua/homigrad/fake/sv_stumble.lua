@@ -1,4 +1,4 @@
-local hg_euphoria_getup_stumble = CreateConVar("hg_euphoria_getup_stumble", "1", FCVAR_ARCHIVE + FCVAR_NOTIFY, "euphoria stagger balance while getting up (ARTragdoll-style)", 0, 1)
+local hg_euphoria_getup_stumble = CreateConVar("hg_euphoria_getup_stumble", "1", FCVAR_ARCHIVE + FCVAR_NOTIFY, "grounded fake ragdoll balance and stumbling (Artagdoll-style)", 0, 1)
 
 local STUMBLE_UPRIGHT_Z = 0.4
 local STUMBLE_HIP_HEIGHT = 55
@@ -26,8 +26,9 @@ hook.Add("Think", "HG_EuphoriaStumble", function()
 
 		ragdoll.hgStumbleActive = nil
 
-		if not ragdoll.hgGetUp then continue end
 		if not ply:Alive() then continue end
+		local org = ply.organism
+		if not org or org.otrub or not org.canmove then continue end
 
 		local pelvis = ragdoll:GetPhysicsObjectNum(hg.realPhysNum(ragdoll, 0))
 		local spine = ragdoll:GetPhysicsObjectNum(hg.realPhysNum(ragdoll, 1))
@@ -37,8 +38,6 @@ hook.Add("Think", "HG_EuphoriaStumble", function()
 		if type(spineAng) ~= "Angle" or spineAng.Up().z < STUMBLE_UPRIGHT_Z then continue end
 		local upZ = spineAng.Up().z
 		local balanceMul = math.Clamp((upZ - STUMBLE_UPRIGHT_Z) / 0.4, 0, 1)
-
-		ragdoll.hgStumbleActive = true
 
 		local dtime = (now - (ragdoll.hgStumbleLast or now)) * game.GetTimeScale()
 		ragdoll.hgStumbleLast = now
@@ -58,6 +57,8 @@ hook.Add("Think", "HG_EuphoriaStumble", function()
 
 		if not groundTr.Hit or groundTr.HitSky then continue end
 		local groundZ = groundTr.HitPos.z
+		if pelvisPos.z - groundZ > STUMBLE_HIP_HEIGHT + 20 then continue end
+		ragdoll.hgStumbleActive = true
 
 		local horizVel = Vector(pelvisVel.x, pelvisVel.y, 0)
 		if horizVel:Length() > STUMBLE_PREDICT_MAX then

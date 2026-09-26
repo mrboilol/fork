@@ -689,6 +689,7 @@ end
 
 function ZCNPC.DropEngineRagdoll(ent, rag)
 	if not (IsValid(ent) and IsValid(rag) and ent:IsNPC()) then return false end
+	if rag.zcnpc_drop then return true end
 	if rag == ent.zcnpc_rag or rag == ent.zcnpc_mh_body then return false end
 	if rag.zcnpc_keepbody then return false end
 
@@ -697,7 +698,6 @@ function ZCNPC.DropEngineRagdoll(ent, rag)
 	end
 
 	rag.zcnpc_drop = true
-	rag:Remove()
 	timer.Simple(0, function()
 		if IsValid(rag) then rag:Remove() end
 	end)
