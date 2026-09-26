@@ -607,7 +607,7 @@ local function DeferNativeOrg()
 		end
 
 		timer.Simple(0, function()
-			if IsValid(ent) then old(ent) end
+			if IsValid(ent) and not ent.organism then old(ent) end
 		end)
 	end
 

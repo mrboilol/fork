@@ -801,9 +801,6 @@ local function CanWakeUp(org, rag)
 	-- Burning: stay down until the flames are out. Fire lives on the body after
 	-- MakeUnconscious moves it off the hidden NPC.
 	if IsValid(rag) and rag:IsOnFire() then return false end
-	if HungUp(rag) then return false end
-	if MovingTooFast(rag) then return false end
-	if not OnTheGround(rag) then return false end
 
 	-- Somebody has hold of him. A man being walked out of a doorway by his chest, or knelt
 	-- over with a bandage, does not get to his feet halfway through - and he used to. What
@@ -813,6 +810,9 @@ local function CanWakeUp(org, rag)
 	-- way it finishes (sv_rescue.lua), and it is the rescuer that is asked rather than a
 	-- flag, so nothing can leave a body pinned down here.
 	if ZCNPC.BeingRescued and ZCNPC.BeingRescued(rag) then return false end
+	if HungUp(rag) then return false, true end
+	if MovingTooFast(rag) then return false, true end
+	if not OnTheGround(rag) then return false, true end
 
 	return true
 end
@@ -1305,8 +1305,18 @@ timer.Create("zcnpc_monitor", 0.25, 0, function()
 
 		-- CanWakeUp walks every phys bone + TraceLine — only when the timer is up.
 		local ready = (now - info.downAt) > (info.wakeAfter or wakeAfter)
-		if wakeOn and ready and CanWakeUp(org, rag) then
-			ZCNPC.WakeUp(rag, info)
+		if wakeOn and ready then
+			local canWake, poseBlocked = CanWakeUp(org, rag)
+			if canWake then
+				ZCNPC.WakeUp(rag, info)
+			elseif poseBlocked and ZCNPC.ActiveBodies and ZCNPC.ActiveBodies[rag] then
+				rag.zcnpc_wakecheck = true
+				ZCNPC.ActiveOff(rag)
+			elseif not poseBlocked then
+				rag.zcnpc_wakecheck = nil
+			end
+		else
+			rag.zcnpc_wakecheck = nil
 		end
 	end
 

@@ -25,12 +25,9 @@
 	on a corpse held off it. Dying hands the body back - that is the one moment its
 	full death reaction is exactly what a body wants.
 
-	ArtAgdoll cannot be the other half of this. Two systems pushing the same bones
-	is the launch that the whole of sv_artagdoll.lua exists to avoid. So while
-	ReAgdoll is driving, ArtAgdoll is switched off at the one switch its own bridge
-	already reads - ar_enabled - and nothing in that file is touched. Turn ReAgdoll
-	off (reagdoll_enabled 0, or reagdoll_npcs 0) and the bodies, and the convar, go
-	back to ArtAgdoll on the next second, exactly as if this file had never loaded.
+	Two systems pushing the same bones is the launch that sv_artagdoll.lua avoids.
+	When ArtAgdoll is enabled for NPCs, it drives these bodies. ReAgdoll takes over
+	only when ArtAgdoll is unavailable or disabled.
 
 	There is nothing here to configure beyond that. ReAgdoll's own menu already owns
 	every question worth asking - how hard bodies move (reagdoll_animation_force),
@@ -216,6 +213,9 @@ end
 
 -- Our bodies are NPC bodies. reagdoll_players is held off below.
 function ZCNPC.ReagdollDrives()
+	if ZCNPC.HasArtagdoll and ZCNPC.HasArtagdoll()
+		and Switched("ar_enabled") and Switched("ar_enabled_npcs") then return false end
+
 	return ZCNPC.ReagdollReady() and Switched("reagdoll_npcs")
 end
 --//
@@ -1203,17 +1203,15 @@ function ZCNPC.UpdateReagdoll(rag)
 	end
 end
 
--- The monitor calls this every quarter second for every body on the floor
--- (sv_uncon.lua:1005). The ArtAgdoll half of it still runs and costs almost nothing
--- while it is held off - PushHealth finds no record to write into and ActiveOff finds
--- no active ragdoll to take away - and running it is what puts a body back in
--- ArtAgdoll's hands the moment ReAgdoll is switched off.
+-- The monitor calls this every quarter second for every body on the floor.
+-- Release the previous controller before handing the body to the next one.
 if isfunction(ZCNPC.UpdateActive) and not ZCNPC.__reagUpdateActive then
 	ZCNPC.__reagUpdateActive = ZCNPC.UpdateActive
 
 	function ZCNPC.UpdateActive(rag)
+		if not ZCNPC.ReagdollDrives() then ZCNPC.ReagOff(rag) end
 		ZCNPC.__reagUpdateActive(rag)
-		ZCNPC.UpdateReagdoll(rag)
+		if ZCNPC.ReagdollDrives() then ZCNPC.UpdateReagdoll(rag) end
 	end
 end
 

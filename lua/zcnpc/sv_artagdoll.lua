@@ -204,8 +204,7 @@ cvars.AddChangeCallback("zcnpc_enabled", function()
 end, "zcnpc_holdoff_enabled")
 
 function ZCNPC.ArtagdollReady()
-	-- The organism owns Z-City bodies; Artagdoll remains available for ordinary NPC ragdolls.
-	return false
+	return ZCNPC.Enabled() and Installed() and Switched("ar_enabled")
 end
 
 -- Our bodies are NPC bodies. Player support is held off above on purpose.
@@ -484,7 +483,8 @@ local function InstallCorpseGuard()
 	ZCNPC.__arNew = ActiveRagdoll.new
 
 	function ActiveRagdoll.new(ragdoll, animModel, dmgpos)
-		if IsValid(ragdoll) and ragdoll.organism then return nil end
+		if IsValid(ragdoll) and ragdoll.organism
+			and not (ZCNPC.Enabled() and ZCNPC.Downed[ragdoll] and not ragdoll.zcnpc_wakecheck) then return nil end
 		if ZCNPC.Enabled() and ZCNPC.IsCorpse(ragdoll) then
 			ZCNPC.Debug("refused an active ragdoll on a corpse:", ragdoll)
 
@@ -1156,6 +1156,7 @@ local function WantsActive(rag)
 	if not org then return false end
 
 	if rag.zcnpc_gettingup then return false end
+	if rag.zcnpc_wakecheck then return false end
 	if rag.zcnpc_dead then return false end
 	if rag.headexploded or rag.noHead then return false end
 	if bit.band(rag:GetFlags(), FL_DISSOLVING) == FL_DISSOLVING then return false end
