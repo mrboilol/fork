@@ -365,10 +365,12 @@ if CLIENT then
 	function SWEP:GetWM()
         if IsValid(self.worldModel) then
             return self.worldModel
-        else
+		else
             self.worldModel = ClientsideModel(self.WorldModel)
+            if not IsValid(self.worldModel) then return end
             self.worldModel:SetNoDraw(true)
             self.worldModel:SetupBones()
+            local model = self.worldModel
             self:CallOnRemove("remove_worldmodel1",function()
                 if IsValid(model) then
                     model:Remove()
@@ -379,7 +381,8 @@ if CLIENT then
 		return self.worldModel
 	end
 
-    function SWEP:GetHolsteredWorldTransform(ent)
+    function SWEP:GetHolsteredWorldTransform(ent, model)
+        if not IsValid(ent) or not IsValid(model) then return end
         local bone = ent:LookupBone(self.holsteredBone)
         local matrix = bone and ent:GetBoneMatrix(bone)
         if not matrix then return end
@@ -390,7 +393,21 @@ if CLIENT then
         local right = ent:GetRight()
         local depth = (pos - matrix:GetTranslation()):Dot(forward)
         local side = (pos - matrix:GetTranslation()):Dot(right)
-        return pos - forward * (depth + (self.BigMeleeHolsterBackOffset or 3)) - right * (side + 4), ang
+        pos = pos - forward * (depth + (self.BigMeleeHolsterBackOffset or 3)) - right * (side + 8)
+
+        local size = model:OBBMaxs() - model:OBBMins()
+        local lengthDir = size.x >= size.y and size.x >= size.z and ang:Forward()
+            or size.y >= size.z and ang:Right() or ang:Up()
+        local up = ent:GetUp()
+        if lengthDir:Dot(up) < 0 then up = -up end
+        local axis = lengthDir:Cross(up)
+        if axis:LengthSqr() > 0.0001 then
+            axis:Normalize()
+            ang:RotateAroundAxis(axis, math.deg(math.acos(math.Clamp(lengthDir:Dot(up), -1, 1))))
+        end
+
+        local center = LocalToWorld(model:OBBCenter(), angle_zero, pos, ang)
+        return pos - (center - pos) - ent:GetUp() * 8, ang
     end
 
     function SWEP:DrawHolsteredWorldModel(ent)
@@ -400,14 +417,15 @@ if CLIENT then
         if not IsValid(self.holsteredWorldModel) or self.holsteredWorldModel:GetModel() ~= modelPath then
             if IsValid(self.holsteredWorldModel) then self.holsteredWorldModel:Remove() end
             self.holsteredWorldModel = ClientsideModel(modelPath)
+            if not IsValid(self.holsteredWorldModel) then return end
             self.holsteredWorldModel:SetNoDraw(true)
         end
 
-        local pos, ang = self:GetHolsteredWorldTransform(ent)
-        if not pos then return end
         local model = self.holsteredWorldModel
-
         model:SetModelScale(self.WorldModelExchange and self.modelscale or self.modelscale2)
+        local pos, ang = self:GetHolsteredWorldTransform(ent, model)
+        if not pos then return end
+
         model:SetRenderOrigin(pos)
         model:SetRenderAngles(ang)
         model:SetPos(pos)
@@ -418,9 +436,10 @@ if CLIENT then
 
 	local npcang = Angle(0, 0, 180)
     function SWEP:DrawWorldModel()
-		local ent = self:GetOwner()
+        local ent = self:GetOwner()
         if not IsValid(ent) then
             self:DrawWorldModel2()
+            return
         end
         
         if ent:IsNPC() then
@@ -439,6 +458,7 @@ if CLIENT then
 
 			if not IsValid(self.NPCworldModel) then
 				self.NPCworldModel = ClientsideModel(self.WorldModelExchange and self.WorldModelExchange or self.WorldModel)
+				if not IsValid(self.NPCworldModel) then return end
 				self:CallOnRemove("remove_npcworldmodel1",function()
 					if IsValid(self.NPCworldModel) then
 						self.NPCworldModel:Remove()
@@ -467,6 +487,7 @@ if CLIENT then
         if not IsValid(self.worldModel) then
             self.worldModel = self:GetWM()
         end
+        if not IsValid(self.worldModel) then return end
         
         self.worldModel:SetNoDraw(true)
         
@@ -518,7 +539,8 @@ if CLIENT then
             
             local pos, ang = self:ModelAnim(WorldModel)
             if reachEnd > CurTime() then
-                local holsteredPos, holsteredAng = self:GetHolsteredWorldTransform(ent)
+                local holsterModel = IsValid(self.holsteredWorldModel) and self.holsteredWorldModel or WorldModel
+                local holsteredPos, holsteredAng = self:GetHolsteredWorldTransform(ent, holsterModel)
                 if holsteredPos then
                     if self.WorldModelExchange then
                         WorldModel:InvalidateBoneCache()
@@ -653,6 +675,7 @@ if CLIENT then
         if IsValid(self.worldModel) and self.WorldModelExchange and not drawWorldModelReal then
             if not IsValid(self.worldModel2) then
                 self.worldModel2 = ClientsideModel(self.WorldModelExchange)
+                if not IsValid(self.worldModel2) then return end
                 self.worldModel2:SetNoDraw(true)
                 self.worldModel2:SetupBones()
                 local model = self.worldModel2

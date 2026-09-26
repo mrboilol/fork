@@ -34,3 +34,8 @@
 /cache
 /project.local.yml
 .serena
+.codex
+AGENTS.md
+graphify-out
+.claude
+CLAUDE.md
