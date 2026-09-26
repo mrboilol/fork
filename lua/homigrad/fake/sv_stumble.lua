@@ -35,8 +35,9 @@ hook.Add("Think", "HG_EuphoriaStumble", function()
 		if not IsValid(pelvis) or not IsValid(spine) then continue end
 
 		local spineAng = spine:GetAngles()
-		if type(spineAng) ~= "Angle" or spineAng.Up().z < STUMBLE_UPRIGHT_Z then continue end
-		local upZ = spineAng.Up().z
+		if type(spineAng) ~= "Angle" then continue end
+		local upZ = spineAng:Up().z
+		if upZ < STUMBLE_UPRIGHT_Z then continue end
 		local balanceMul = math.Clamp((upZ - STUMBLE_UPRIGHT_Z) / 0.4, 0, 1)
 
 		local dtime = (now - (ragdoll.hgStumbleLast or now)) * game.GetTimeScale()
