@@ -1297,11 +1297,10 @@ timer.Create("zcnpc_monitor", 0.25, 0, function()
 			ZCNPC.UpdateDownedTargetable(rag, info)
 		end
 
-		-- Open wound: each bleed tick (monitor pass while org.bleed is live) adds
-		-- a short hold so they do not stand up mid-bleedout.
+		-- Open wounds hold wake-up until shortly after bleeding stops.
 		local bleedAdd = cfg.bleed_extend:GetFloat()
 		if bleedAdd > 0 and (org.bleed or 0) > 0.05 then
-			ZCNPC.ExtendDown(rag, bleedAdd)
+			info.wakeAfter = math.max(info.wakeAfter or 0, now - info.downAt + bleedAdd)
 		end
 
 		-- CanWakeUp walks every phys bone + TraceLine — only when the timer is up.

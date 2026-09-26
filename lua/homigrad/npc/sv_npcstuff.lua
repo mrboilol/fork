@@ -92,7 +92,13 @@ local math_random, math_Rand = math.random, math.Rand
 		local class = ent:GetClass()
 		local loot = lootNPCs[class]
 
-		rag:SetCollisionGroup(COLLISION_GROUP_WEAPON)
+		if rag:GetCollisionGroup() ~= COLLISION_GROUP_WEAPON then
+			timer.Simple(0, function()
+				if IsValid(rag) and rag:GetCollisionGroup() ~= COLLISION_GROUP_WEAPON then
+					rag:SetCollisionGroup(COLLISION_GROUP_WEAPON)
+				end
+			end)
+		end
 		if IsValid(ent) and IsValid(rag) and ent:IsNPC() and loot then
 			rag.inventory = {}
 			rag.inventory.Weapons = {}
