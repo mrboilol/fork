@@ -58,10 +58,12 @@ end
 
 local PLAYER = FindMetaTable("Player")
 local oldCreateRagdoll = PLAYER.CreateRagdoll
+local oldGetRagdollEntity = PLAYER.GetRagdollEntity
 
 local dolls = setmetatable({}, { __mode = "k" })
 
 local function CreateRagdoll(self)
+    if self.organism then return end
     SafeRemoveEntity(dolls[self])
 
     local ragdoll = ents.Create("prop_ragdoll")
@@ -95,10 +97,10 @@ local function CreateRagdoll(self)
 end
 
 local function GetRagdollEntity(self)
+    if self.organism then return oldGetRagdollEntity(self) end
     return dolls[self] or NULL
 end
 
-local oldGetRagdollEntity = PLAYER.GetRagdollEntity
 PLAYER.CreateRagdoll = CreateRagdoll
 PLAYER.GetRagdollEntity = GetRagdollEntity
 
@@ -140,6 +142,7 @@ local function RegisterPhysicsHooks()
         if not ArtagdollEnabledCvar or not ArtagdollEnabledNPCSCvar then return end
         if (!ArtagdollEnabledCvar:GetBool() or !ArtagdollEnabledNPCSCvar:GetBool()) then return end
         if not IsValid(owner) or not IsValid(ragdoll) then return end
+        if not owner:IsNPC() or owner.organism or ragdoll.organism then return end
         
         if ragdoll:GetPhysicsObjectCount() < 2 then return end
 
@@ -161,15 +164,16 @@ local function RegisterPhysicsHooks()
 
         timer_Simple(0.05, function()
             if not IsValid(ragdoll) or ragdoll:IsMarkedForDeletion() then return end
+            if ragdoll.organism then return end
             if not ActiveRagdollManager then return end
 
             ActiveRagdollManager.Run(ragdoll, dmgpos)
             ragdoll.DMS_Initialized = true
-            if DMS_Health then DMS_Health.new(ragdoll, 100) end
         end)
     end)
     
     hook.Add("PostPlayerDeath", "Fedhoria", function(ply)
+        if ply.organism then return end
         if not ArtagdollEnabledCvar or not ArtagdollEnabledPLAYERCvar then return end
         if (!ArtagdollEnabledCvar:GetBool() or !ArtagdollEnabledPLAYERCvar:GetBool()) then return end
         
@@ -178,6 +182,7 @@ local function RegisterPhysicsHooks()
             
             local ragdoll = ply:GetRagdollEntity()
             if not IsValid(ragdoll) or ragdoll:GetPhysicsObjectCount() < 2 then return end
+            if ragdoll.organism then return end
 
             local bone = ragdoll:LookupBone("ValveBiped.Bip01_Pelvis")
             if not bone or bone == -1 then return end

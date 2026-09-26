@@ -9,7 +9,7 @@ net.Receive("civilwar_start", function()
         CivilWarSound:Stop()
         CivilWarSound = nil
     end
- 
+
     sound.PlayFile("sound/civilwar_start.wav", "noplay", function(station)
         if IsValid(station) then
             station:SetVolume(1)
@@ -17,7 +17,7 @@ net.Receive("civilwar_start", function()
             CivilWarSound = station
         end
     end)
- 
+
     zb.RemoveFade()
 end)
 
@@ -53,22 +53,22 @@ function MODE:HUDPaint()
     local sw, sh = ScrW(), ScrH()
     local fade = math.Clamp(zb.ROUND_START + 8 - CurTime(), 0, 1)
     local team_id = lply:Team()
-    
+
     if not teams[team_id] then return end
-    
-    draw.SimpleText("ZBattle | American Civil War", "ZB_HomicideMediumLarge", 
+
+    draw.SimpleText("ZBattle | American Civil War", "ZB_HomicideMediumLarge",
         sw * 0.5, sh * 0.1, Color(139, 69, 19, 255 * fade), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-    
+
     local role_color = teams[team_id].color1
     role_color.a = 255 * fade
-    
-    draw.SimpleText("You are " .. teams[team_id].name, "ZB_HomicideMediumLarge", 
+
+    draw.SimpleText("You are " .. teams[team_id].name, "ZB_HomicideMediumLarge",
         sw * 0.5, sh * 0.5, role_color, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-    
+
     local objective_color = teams[team_id].color2
     objective_color.a = 255 * fade
-    
-    draw.SimpleText(teams[team_id].objective, "ZB_HomicideMedium", 
+
+    draw.SimpleText(teams[team_id].objective, "ZB_HomicideMedium",
         sw * 0.5, sh * 0.9, objective_color, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 end
 
@@ -115,7 +115,7 @@ CreateEndMenu = function()
     closebutton:SetPos(5, 5)
     closebutton:SetSize(ScrW() / 20, ScrH() / 30)
     closebutton:SetText("")
-    
+
     closebutton.DoClick = function()
         if IsValid(hmcdEndMenu) then
             hmcdEndMenu:Close()
@@ -128,7 +128,7 @@ CreateEndMenu = function()
         surface.DrawOutlinedRect(0, 0, w, h, 2.5)
         surface.SetFont("ZB_InterfaceMedium")
         surface.SetTextColor(col.r, col.g, col.b, col.a)
-        local lengthX, lengthY = surface.GetTextSize("Close")
+        local lengthX = surface.GetTextSize("Close")
         surface.SetTextPos(lengthX - lengthX / 1.1, 4)
         surface.DrawText("Close")
     end
@@ -137,7 +137,7 @@ CreateEndMenu = function()
         BlurBackground(self)
         surface.SetFont("ZB_InterfaceMediumLarge")
         surface.SetTextColor(col.r, col.g, col.b, col.a)
-        local lengthX, lengthY = surface.GetTextSize("Players:")
+        local lengthX = surface.GetTextSize("Players:")
         surface.SetTextPos(w / 2 - lengthX / 2, 20)
         surface.DrawText("Players:")
         surface.SetDrawColor(139, 69, 19, 128)
@@ -147,7 +147,7 @@ CreateEndMenu = function()
     local DScrollPanel = vgui.Create("DScrollPanel", hmcdEndMenu)
     DScrollPanel:SetPos(10, 80)
     DScrollPanel:SetSize(sizeX - 20, sizeY - 90)
-    
+
     function DScrollPanel:Paint(w, h)
         BlurBackground(self)
         surface.SetDrawColor(139, 69, 19, 128)
@@ -161,16 +161,16 @@ CreateEndMenu = function()
         but:Dock(TOP)
         but:DockMargin(8, 6, 8, -1)
         but:SetText("")
-        
+
         but.Paint = function(self, w, h)
             local teamColor = (ply:Team() == 0 and colBlue) or (ply:Team() == 1 and colRed) or colGray
             local teamColorUp = (ply:Team() == 0 and colBlueUp) or (ply:Team() == 1 and colRedUp) or colSpect1
-            
+
             surface.SetDrawColor(teamColor.r, teamColor.g, teamColor.b, teamColor.a)
             surface.DrawRect(0, 0, w, h)
             surface.SetDrawColor(teamColorUp.r, teamColorUp.g, teamColorUp.b, teamColorUp.a)
             surface.DrawRect(0, h / 2, w, h / 2)
-            
+
             local playerColor = ply:GetPlayerColor():ToColor()
             surface.SetFont("ZB_InterfaceMediumLarge")
             surface.SetTextColor(0, 0, 0, 255)
@@ -179,12 +179,12 @@ CreateEndMenu = function()
             surface.SetTextColor(playerColor.r, playerColor.g, playerColor.b, playerColor.a)
             surface.SetTextPos(w / 2, h / 2 - 12)
             surface.DrawText(ply:GetPlayerName() or "He quited...")
-            
+
             surface.SetFont("ZB_InterfaceMediumLarge")
             surface.SetTextColor(255, 255, 255, 255)
             surface.SetTextPos(15, h / 2 - 12)
             surface.DrawText((ply:Name() .. (not ply:Alive() and " - died" or "")) or "He quited...")
-            
+
             surface.SetFont("ZB_InterfaceMediumLarge")
             surface.SetTextColor(255, 255, 255, 255)
             surface.SetTextPos(w - 45, h / 2 - 12)
@@ -201,7 +201,7 @@ CreateEndMenu = function()
 
         DScrollPanel:AddItem(but)
     end
-    
+
     return true
 end
 

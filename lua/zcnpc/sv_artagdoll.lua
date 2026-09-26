@@ -484,6 +484,7 @@ local function InstallCorpseGuard()
 	ZCNPC.__arNew = ActiveRagdoll.new
 
 	function ActiveRagdoll.new(ragdoll, animModel, dmgpos)
+		if IsValid(ragdoll) and ragdoll.organism then return nil end
 		if ZCNPC.Enabled() and ZCNPC.IsCorpse(ragdoll) then
 			ZCNPC.Debug("refused an active ragdoll on a corpse:", ragdoll)
 
@@ -523,6 +524,7 @@ function ZCNPC.ActiveDie(rag)
 	rag.DMS_IsHeadshot = false
 
 	if not Installed() then return end
+	if not ActiveRagdoll.Get(rag) then return ZCNPC.ActiveOff(rag) end
 
 	local data = HealthEntry(rag)
 	if data then
