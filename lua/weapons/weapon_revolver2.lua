@@ -203,6 +203,7 @@ SWEP.PPSMuzzleEffect = "muzzleflash_pistol_rbull" -- shared in sh_effects.lua
 SWEP.DeploySnd = {"homigrad/weapons/draw_pistol.mp3", 55, 100, 110}
 SWEP.HolsterSnd = {"homigrad/weapons/holster_pistol.ogg", 55, 100, 110}
 SWEP.HoldType = "revolver"
+SWEP.RecoilActionMul = 1.3
 SWEP.AimHold = "revolver"
 SWEP.ZoomPos = Vector(-3, 0.6446, 4.9654)
 SWEP.RHandPos = Vector(0, 0, 1)

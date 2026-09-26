@@ -592,6 +592,8 @@ hook.Add("HomigradDamage", "HG_PainScreamDamage", function(ply, dmgInfo)
 		amount = mClamp(dmg / 12, 0.7, 1.5)
 	elseif dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH + DMG_VEHICLE + DMG_FALL) and dmg >= 7 then
 		amount = mClamp(dmg / 14, 0.7, 1.6)
+	elseif dmg >= 3 then
+		amount = mClamp(dmg / 10, 0.4, 1)
 	end
 
 	if amount then hg.QueuePainScream(ply, amount) end
@@ -609,7 +611,8 @@ hook.Add("Org Think", "HG_PainScreamThink", function(owner, org)
 	if not owner.painScreamPatch and (org.painScreamQueue or 0) >= 1 and (org.painScreamNext or 0) <= time then
 		org.painScreamQueue = math.max((org.painScreamQueue or 0) - 1, 0)
 
-		if playPainScream(owner) then
+		local phrases = (org.avgpain or 0) >= 90 and hg.BigPainSounds or nil
+		if playPainScream(owner, phrases) then
 			org.painScreamNext = time + math.Rand(2.25, 3.25)
 			org.genderedPainScreamNext = math.max(org.genderedPainScreamNext or 0, time + 8)
 		else
@@ -617,8 +620,10 @@ hook.Add("Org Think", "HG_PainScreamThink", function(owner, org)
 		end
 	end
 
-	if (org.pain or 0) < 65 or owner.painScreamPatch or (org.genderedPainScreamNext or 0) > time then return end
-	local phrases = hg.GenderedPainScreamSounds[ThatPlyIsFemale(owner) and "female" or "male"]
+	if math.max(org.pain or 0, org.avgpain or 0) < 65 or owner.painScreamPatch
+		or (org.genderedPainScreamNext or 0) > time then return end
+	local phrases = (org.avgpain or 0) >= 90 and hg.BigPainSounds
+		or hg.GenderedPainScreamSounds[ThatPlyIsFemale(owner) and "female" or "male"]
 	if playPainScream(owner, phrases, true) then
 		org.genderedPainScreamNext = time + math.Rand(7, 10)
 	else

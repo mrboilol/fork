@@ -3,11 +3,13 @@ AddCSLuaFile()
 SWEP.CooldownHolster = 0.75
 SWEP.HolsterSnd = {"homigrad/weapons/holster_rifle.ogg", 55, 100, 110}
 SWEP.CooldownDeploy = 1
+SWEP.DeployGripFraction = 0.3
 SWEP.DeploySnd = {"homigrad/weapons/draw_rifle.mp3", 65, 100, 110}
 
 function SWEP:GetDeployDuration()
 	local roleDeployMul = hg.GetSubRolePerk and hg.GetSubRolePerk(self:GetOwner(), "DeployMul", 1) or 1
-	return math.max(self.CooldownDeploy / self.Ergonomics * roleDeployMul, 0.35)
+	local armEffectiveness = hg.GetArmEffectiveness and hg.GetArmEffectiveness(self:GetOwner(), "rarm") or 1
+	return math.max(self.CooldownDeploy / self.Ergonomics * roleDeployMul / Lerp(armEffectiveness, 0.5, 1), 0.35)
 end
 
 --!! fix ts shit

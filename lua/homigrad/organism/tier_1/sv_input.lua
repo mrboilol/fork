@@ -1783,6 +1783,10 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	dmgHurt = dmgHurt * armMit
 	instaPain = instaPain * armMit
 	immobilization = immobilization * armMit
+	if not org.otrub and org.adrenalineAdd >= 0 then
+		org.owner:AddNaturalAdrenaline(instaPain * 0.75 * (dmgInfo:IsDamageType(DMG_BLAST) and 4 or 1)
+			* (dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) and 4 or 1))
+	end
 	
 	local hitbody = #inputHole > 0 or not dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT)
 	
@@ -1824,7 +1828,8 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		local painkillerMul = (org.painkiller * 0.5 + 1)
 	
 		org.shock_turn = 10 * (!org.otrub and 1 or 0.1)
-		local collapseThreshold = org.shock_turn * 1.5 * analgesiaMul * painkillerMul * math.max(org.traumaResistanceMul or 1, 1)
+		local collapseThreshold = org.shock_turn * 1.5 * analgesiaMul * painkillerMul
+			* math.max(org.traumaResistanceMul or 1, 1) * (1 + math.Clamp(adrenaline, 0, 5) * 0.5)
 
 		if org.shock > collapseThreshold then
 			timer.Simple(0, function() hg.Fake(org.owner) end)
@@ -1870,10 +1875,6 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		end
 	end
 	--end
-	
-	if not org.otrub and org.adrenalineAdd >= 0 then// and dmgInfo:IsDamageType(DMG_BULLET + DMG_BLAST + DMG_BUCKSHOT + DMG_SLASH + DMG_CLUB + DMG_BURN) then
-		org.owner:AddNaturalAdrenaline(instaPain * 0.75 * (dmgInfo:IsDamageType(DMG_BLAST) and 4 or 1) * (dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT) and 4 or 1))
-	end
 	
 	if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_BLAST + DMG_SLASH) or (dmgInfo:IsDamageType(DMG_GENERIC + DMG_VEHICLE + DMG_FALL + DMG_CLUB + DMG_CRUSH)) then
 		local hook_info = {
@@ -2633,6 +2634,7 @@ local function velocityDamage(ent, data)
 		local armorDmgMul
 		armorDmgMul, _, armorImpactApplied = hg.GetArmorImpactMitigation(org, armorPlacement, dmgInfo, dmgInfo:GetDamage())
 		dmg = dmg * armorDmgMul
+		if armorImpactApplied and armorDmgMul == 0 then unarmoredImpactDamage = dmg end
 	end
 
 	if (hitgroup == HITGROUP_LEFTARM and IsValid(ent.ConsLH)) or (hitgroup == HITGROUP_RIGHTARM and IsValid(ent.ConsRH))

@@ -309,13 +309,7 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	//angIdle:Add(-angle_difference*2)
 	//angZoom:Add(-angle_difference*1)
 
-	local mulhuy = (self:IsPistolHoldType() or self.PistolKinda) and 2 or (((ply.posture == 1 and not self:IsZoom()) or ply.posture == 7 or ply.posture == 8) and 2 or 0.75)
-	local shit = 0.2 * mulhuy / game.GetTimeScale()
-	local animpos3 = self:GetAnimShoot2(shit, true) / shit
-	local shit2 = (1 / self.weight) * (self.NumBullet or 3) / 3
-	
 	angZoom:Add(self.prankang or angle_zero)
-	posZoom:Add(VectorRand(-0.05, 0.05) * animpos3 * shit2)
 
 	local fraction2 = math.ease.InCubic(self:GetAnimPos_Shoot2(self.lastShoot or 0, 1))
 	

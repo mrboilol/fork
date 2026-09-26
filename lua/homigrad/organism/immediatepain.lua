@@ -5,7 +5,9 @@ if SERVER then
     local adrenalinePainaddPassiveMin = 15
 
     local function applyPain(org)
-        local pain = (org.avgpain or 0) * math.max(1 - (org.adrenaline or 0) / 4, 0.75) * math.max(1 - (org.analgesia or 0), 0)
+        local adrenaline = math.Clamp(org.adrenaline or 0, 0, 5)
+        local pain = (org.avgpain or 0) * math.max(1 - (org.analgesia or 0) - (org.painkiller or 0) * 0.3, 0)
+            / math.max(org.painResistanceMul or 1, 1) * math.max(1 - adrenaline * 0.14, 0.3)
         if (org.zerlkers or 0) > 0 or (org.adrenaline or 0) >= 3 then
             pain = math.min(pain, 69.99)
         end
@@ -13,6 +15,7 @@ if SERVER then
     end
 
     hook.Add("Org Think", "ImmediatePainApply", function(owner, org, timeValue)
+        if org.otrub then return end
         if not org.painadd or org.painadd <= 0 then
             if org.avgpain > 0 then
                 local extraSub = timeValue * ( (org.painkiller or 0) * 2 + (org.analgesia or 0) * 4 ) * 2
@@ -25,7 +28,8 @@ if SERVER then
             return
         end
         local adrenaline = math.min(org.adrenaline or 0, adrenalinePainaddPassiveCap)
-        local add = math.min(org.painadd, timeValue * painaddDrainRate)
+        local pacing = hg.organism.GetAdrenalinePainPacing and hg.organism.GetAdrenalinePainPacing(adrenaline) or 1
+        local add = math.min(org.painadd, timeValue * painaddDrainRate * pacing)
         local passiveDrain = 0
         if adrenaline > adrenalinePainaddPassiveMin then
             passiveDrain = math.min(org.painadd - add, timeValue * adrenalinePainaddPassiveRate * adrenaline)

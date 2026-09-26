@@ -171,6 +171,9 @@ hook.Add("PlayerDropWeapon", "homigrad-inventory", function(ply, weapon)
         return
     end
 
+    wep.IsSpawned = true
+    wep.init = true
+
     timer.Simple(0.1,function()
         if not IsValid(wep) then return end
         if not IsValid(ply) then return end

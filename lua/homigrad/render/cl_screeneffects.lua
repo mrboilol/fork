@@ -86,6 +86,7 @@ local activeOtrubMode
 local ConsciousnessSleepyStation
 local ItsHopelessStation
 local VitalityStation
+local IncapacitatedStation
 local ITS_HOPELESS_LOOP_START = 5
 local ITS_HOPELESS_LOOP_FADE_DURATION = 12
 local itsHopelessHasLooped = false
@@ -415,7 +416,7 @@ local function DrawDepressionEffect(org)
 		local time = CurTime()
 		local pulse = math.sin(time * 1.4) * 0.5 + 0.5
 		depressionState.greyscaleLerp = LerpFT(0.012, depressionState.greyscaleLerp, math.Clamp(intensity * 1.18, 0, 1))
-		depressionState.vignetteLerp = LerpFT(0.01, depressionState.vignetteLerp, intensity * 11.67)
+		depressionState.vignetteLerp = LerpFT(0.01, depressionState.vignetteLerp, intensity * 4.5)
 		local mat = GetDepressionMaterial()
 		if mat then
 			local wobbleX = math.sin(time * 0.9) * 0.042 + math.sin(time * 0.935) * 0.028
@@ -956,6 +957,10 @@ local function stopthings()
 	if IsValid(DyingStation) then
 		DyingStation:Stop()
 		DyingStation = nil
+	end
+	if IsValid(IncapacitatedStation) then
+		IncapacitatedStation:Stop()
+		IncapacitatedStation = nil
 	end
 
 	if IsValid(RemDying1Station) then
@@ -1582,13 +1587,23 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	end
 
 	if canRetrySound("DyingStation", DyingStation) then
-		sound.PlayFile("sound/drawyourlastdick.ogg", "noblock noplay", function(station)
+		sound.PlayFile("sound/dying.mp3", "noblock noplay", function(station)
 			if IsValid(station) then
 				station:SetVolume(0)
 				station:Play()
 				station:SetTime(math.min(math.Rand(0, station:GetLength()), 139))
 				DyingStation = station
 				station:EnableLooping(true)
+			end
+		end)
+	end
+	if incapacitated and canRetrySound("IncapacitatedStation", IncapacitatedStation) then
+		sound.PlayFile("sound/drawyourlastdick.ogg", "noblock noplay", function(station)
+			if IsValid(station) then
+				station:SetVolume(0)
+				station:Play()
+				station:EnableLooping(true)
+				IncapacitatedStation = station
 			end
 		end)
 	end
@@ -2168,6 +2183,9 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	end
 
 	local terminalDyingVolume = 0
+	if IsValid(IncapacitatedStation) then
+		IncapacitatedStation:SetVolume(0)
+	end
 	if O2Lerp > 1 or incapacitated then
 		o2 = O2Lerp
 		
@@ -2291,13 +2309,19 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				if IsValid(EndStation) then
 					EndStation:SetVolume(0)
 				end
+				local dyingStation = incapacitated and IncapacitatedStation or DyingStation
 				if IsValid(DyingStation) then
-					DyingStation:SetVolume(consciousVol)
+					DyingStation:SetVolume(incapacitated and 0 or consciousVol)
+				end
+				if IsValid(IncapacitatedStation) then
+					IncapacitatedStation:SetVolume(incapacitated and consciousVol or 0)
+				end
+				if IsValid(dyingStation) then
 
 					-- Sound peak detection for screen shake
-					if hg_dyingpulse:GetInt() == 1 and IsValid(DyingStation) and DyingStation.FFT and DyingStation:GetState() == GMOD_CHANNEL_PLAYING then
+					if hg_dyingpulse:GetInt() == 1 and dyingStation.FFT and dyingStation:GetState() == GMOD_CHANNEL_PLAYING then
 						local fft = {}
-						DyingStation:FFT(fft, FFT_512)
+						dyingStation:FFT(fft, FFT_512)
 						if #fft > 0 then
 							local peakSum = 0
 							for i = 1, #fft do

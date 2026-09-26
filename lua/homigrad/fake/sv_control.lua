@@ -723,20 +723,6 @@ hook.Add("Think", "Fake", function()
 		local org = ply.organism
 		if not org then continue end
 		local wep = ply:GetActiveWeapon()
-		local floppyBones = ragdoll.hg_floppy_bones or org.fake_floppy_bones
-		local leftArmFloppy = floppyBones and (floppyBones["ValveBiped.Bip01_L_UpperArm"] or floppyBones["ValveBiped.Bip01_L_Forearm"])
-		local rightArmFloppy = floppyBones and (floppyBones["ValveBiped.Bip01_R_UpperArm"] or floppyBones["ValveBiped.Bip01_R_Forearm"])
-
-		if leftArmFloppy and (org.larm or 0) < 1 and IsValid(ragdoll.ConsLH) then
-			ragdoll.ConsLH:Remove()
-			ragdoll.ConsLH = nil
-		end
-
-		if rightArmFloppy and (org.rarm or 0) < 1 and IsValid(ragdoll.ConsRH) then
-			ragdoll.ConsRH:Remove()
-			ragdoll.ConsRH = nil
-		end
-
 		local tr = {}
 		tr.start = ply:GetPos()
 		tr.endpos = ply:GetPos() - vector_up * 10
@@ -1376,12 +1362,15 @@ hook.Add("Think", "Fake", function()
 				ply:Notify( math.random(1,2) == 1 and "I'm at my limits here!" or "I can't hold much longer...", 25, "ragdoll_almostfall", 0, nil, Color(200, 55, 55))
 			end
 
+			local leftArmInjured = (org.larm or 0) >= 1 or org.larmdislocation or org.larmdislocated
+			local rightArmInjured = (org.rarm or 0) >= 1 or org.rarmdislocation or org.rarmdislocated
+
 			if ply:KeyDown(IN_SPEED) and org.canmove and !org.larmamputated and !org.larmupamputated and (!ply.HandsStun or ply.HandsStun < CurTime()) then
 				if IsValid(ragdoll.ConsLH) then
 					if hg_fake_stamina:GetBool() then
 						org.stamina.subadd = org.stamina.subadd + 0.06 * (ragdoll.staminaLeftModifyer or 0.5) * ( IsValid(ragdoll.ConsRH) and 0.35 or 1.25) * (on_ground and 0.25 or 1) * (ply.GetTraitMultiplier and ply:GetTraitMultiplier("climb_stamina_cost", 1) or 1)
 					end
-					if (org.larm or 0) >= 1 then
+					if leftArmInjured then
 						local heldFor = time - (ragdoll.ConsLH.grabStarted or time)
 						if heldFor >= 1 then org.painadd = org.painadd + ragdoll.dtime * 8 end
 					end
@@ -1417,13 +1406,13 @@ hook.Add("Think", "Fake", function()
 							lhand:SetPos(chokinghead:GetPos(), true)
 						end
 
-						local forceLimit = (org.larm or 0) >= 1 and 600 or ent:IsWorld() and 10000 or 0
+						local forceLimit = leftArmInjured and 600 or ent:IsWorld() and 10000 or 0
 						local cons = constraint.Weld(ragdoll, ent, realPhysNum(ragdoll, 5), IsValid(choking) and realPhysNum(choking, 10) or trace.PhysicsBone, forceLimit, false, false)
 						if IsValid(cons) then
 							ragdoll.cooldownLH = time + 0.5
 							ragdoll.ConsLH = cons
 							cons.grabStarted = time
-							if (org.larm or 0) >= 1 then org.painadd = org.painadd + 2 end
+							if leftArmInjured then org.painadd = org.painadd + 2 end
 
 							cons:CallOnRemove("fingersback", function()
 								for i = 1, 4 do
@@ -1459,7 +1448,7 @@ hook.Add("Think", "Fake", function()
 					if hg_fake_stamina:GetBool() then
 						org.stamina.subadd = org.stamina.subadd + 0.06 * (ragdoll.staminaRightModifyer or 1) * ( IsValid(ragdoll.ConsLH) and 0.35 or 1.25) * (on_ground and 0.25 or 1) * (ply.GetTraitMultiplier and ply:GetTraitMultiplier("climb_stamina_cost", 1) or 1)
 					end
-					if (org.rarm or 0) >= 1 then
+					if rightArmInjured then
 						local heldFor = time - (ragdoll.ConsRH.grabStarted or time)
 						if heldFor >= 1 then org.painadd = org.painadd + ragdoll.dtime * 8 end
 					end
@@ -1494,13 +1483,13 @@ hook.Add("Think", "Fake", function()
 							rhand:SetPos(chokinghead:GetPos(), true)
 						end
 						
-						local forceLimit = (org.rarm or 0) >= 1 and 600 or ent:IsWorld() and 10000 or 0
+						local forceLimit = rightArmInjured and 600 or ent:IsWorld() and 10000 or 0
 						local cons = constraint.Weld(ragdoll, ent, realPhysNum(ragdoll, 7), IsValid(choking) and realPhysNum(choking, 10) or trace.PhysicsBone, forceLimit, false, false)
 						if IsValid(cons) then
 							ragdoll.cooldownRH = time + 0.5
 							ragdoll.ConsRH = cons
 							cons.grabStarted = time
-							if (org.rarm or 0) >= 1 then org.painadd = org.painadd + 2 end
+							if rightArmInjured then org.painadd = org.painadd + 2 end
 
 							cons:CallOnRemove("fingersback", function()
 								for i = 1, 4 do

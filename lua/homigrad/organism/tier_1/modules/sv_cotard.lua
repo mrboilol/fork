@@ -1,5 +1,6 @@
 local Clamp, max, min = math.Clamp, math.max, math.min
 local cotard_unconscious_time = 8
+local hg_cotard = CreateConVar("hg_cotard", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enable Cotard syndrome", 0, 1)
 
 local function chooseType(org)
 	local lungsL = istable(org.lungsL) and org.lungsL[1] or 0
@@ -47,6 +48,13 @@ end)
 
 hook.Add("Org Think", "CotardThink", function(owner, org, timeValue)
 	if not org.isPly then return end
+	if not hg_cotard:GetBool() then
+		org.cotard = 0
+		org.cotardType = 0
+		org.cotardWasUnconscious = false
+		org.cotardUnconTimer = 0
+		return
+	end
 
 	if org.otrub then
 		org.cotardWasUnconscious = true
@@ -60,9 +68,10 @@ hook.Add("Org Think", "CotardThink", function(owner, org, timeValue)
 	local unconsciousTime = org.cotardUnconTimer or 0
 	org.cotardUnconTimer = 0
 	if unconsciousTime < cotard_unconscious_time then return end
-	if (org.cotard or 0) > 0 then return end
 
-	org.cotard = Clamp(unconsciousTime / 90, 0.35, 1)
+	local injury = max(1 - (org.blood or 5000) / 5000, (org.pain or 0) / 150,
+		(org.shock or 0) / 100, org.brain or 0, org.pneumothorax or 0)
+	org.cotard = Clamp((org.cotard or 0) + unconsciousTime / 90 + injury * 0.5, 0.35, 1)
 	org.cotardType = chooseType(org)
 	org.cotardStarted = CurTime()
 	if hg.StopPainScream then hg.StopPainScream(owner, 0.2) end

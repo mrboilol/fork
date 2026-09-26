@@ -316,7 +316,11 @@ function SWEP:Throw(mul, time, nosound, throwPosAdjust, throwAngAdjust)
 	local phys = ent:GetPhysicsObject()
 	if phys then 
 		real_ent = hg.GetCurrentCharacter(owner)
-		phys:SetVelocity(IsValid(real_ent) and (owner:GetAimVector() * mul/1.5) + real_ent:GetVelocity() or Vector(0,0,0)) 
+		local velocity = IsValid(real_ent) and (owner:GetAimVector() * mul/1.5) + real_ent:GetVelocity() or Vector(0,0,0)
+		if mul > 0 and IsValid(owner) and owner:IsPlayer() and owner:HasTrait("clumsy") and math.Rand(0, 1) < 0.2 then
+			velocity = VectorRand() * 35 - Vector(0, 0, 220)
+		end
+		phys:SetVelocity(velocity)
 	end
 	if owner:IsOnGround() then
 		owner:SetVelocity(owner:GetVelocity() - owner:GetVelocity()/2)

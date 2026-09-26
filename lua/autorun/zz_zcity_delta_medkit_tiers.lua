@@ -648,7 +648,7 @@ local function registerBandageGrades()
     normal.Color = Color(235, 235, 235)
     normal.modeValuesdef = {[1] = {40, true}}
     if istable(quality) then
-        quality.PrintName = "Quality bandage"
+        quality.PrintName = "Big bandage"
         quality.Instructions = "A larger sterile dressing with quality gauze for wounds that need more than a basic bandage. RMB to use on someone else."
         quality.Color = Color(165, 165, 165)
     end

@@ -30,6 +30,7 @@ SWEP.holsteredAng = Angle(270, 0, 180)
 SWEP.BigMeleeHolsterBackOffset = 8
 SWEP.BigMeleeReachTime = 0.8
 SWEP.BigMeleeDeployTime = 1
+SWEP.MeleeDrawGripTime = 0.3
 
 function SWEP:CanHolsterBigMelee()
     if not self.TwoHanded then return false end
@@ -510,7 +511,7 @@ if CLIENT then
             end
             
             local pos, ang = self:ModelAnim(WorldModel)
-            if self.TwoHanded and reachEnd > CurTime() then
+            if reachEnd > CurTime() then
                 local holsteredPos, holsteredAng = self:GetHolsteredWorldTransform(ent)
                 if holsteredPos then
                     if self.WorldModelExchange then
@@ -523,8 +524,8 @@ if CLIENT then
                             holsteredPos, holsteredAng = LocalToWorld(rootPos, rootAng, holsteredPos, holsteredAng)
                         end
                     end
-                    local reachTime = math.max(self.BigMeleeReachTime or 0.8, 0.001)
-                    local fraction = math.ease.InOutSine(math.Clamp(1 - (reachEnd - CurTime()) / reachTime, 0, 1))
+                    local moveStart = math.max(self.MeleeDeployMoveStart or 0, self:GetNWFloat("MeleeDeployMoveStart", 0))
+                    local fraction = math.ease.InOutSine(math.Clamp((CurTime() - moveStart) / math.max(reachEnd - moveStart, 0.001), 0, 1))
                     pos = LerpVector(fraction, holsteredPos, pos)
                     ang = LerpAngle(fraction, holsteredAng, ang)
                 end
@@ -544,7 +545,7 @@ if CLIENT then
 		end
 
         if updatePose then
-            if self.TwoHanded and reachEnd > CurTime() then WorldModel:InvalidateBoneCache() end
+            if reachEnd > CurTime() then WorldModel:InvalidateBoneCache() end
             WorldModel:SetupBones()
         end
 
@@ -699,13 +700,19 @@ function SWEP:CustomBlockAnim(addPosLerp, addAngLerp)
     return false
 end
 
+function SWEP:IsSuicidePosing()
+    local owner = self:GetOwner()
+    return owner.suiciding or owner:GetNWBool("suiciding") or self.SuicideStart
+        or owner:GetNWFloat("rem_suicide_aim", 0) > 0
+end
+
 function SWEP:GetLHIKStateOffset()
     local owner = self:GetOwner()
     if not IsValid(owner) then return vector_origin, angle_zero end
     if self.Canselfharm and self:IsSelfHarming() then
         return self.SelfHarmLeftPos or self.LHIKSelfHarmPos or vector_origin, self.SelfHarmLeftAng or self.LHIKSelfHarmAng or angle_zero
     end
-    if self.CanSuicide and owner.suiciding then
+    if self.CanSuicide and self:IsSuicidePosing() then
         local aimScale = owner:GetNWFloat("rem_suicide_aim", 0)
         if aimScale <= 0 then aimScale = 1 end
         return (self.LHIKSuicidePos or vector_origin) * aimScale, (self.LHIKSuicideAng or angle_zero) * aimScale
@@ -1011,7 +1018,7 @@ function SWEP:ModelAnim(model, pos, ang)
        addAngLerp.p = addAngLerp.p - math.min(math.abs(math.max(eyeAng.p,0)),25)
     end
 
-    if self.CanSuicide and owner.suiciding then
+    if self.CanSuicide and self:IsSuicidePosing() then
         local aimScale = owner:GetNWFloat("rem_suicide_aim", 0)
         if aimScale <= 0 then aimScale = 1 end
         addPosLerp:Set(self.SuicidePos * aimScale)
@@ -1080,7 +1087,7 @@ function SWEP:ModelAnim(model, pos, ang)
 
     if self.ModelAnimAdd then pos, ang = self:ModelAnimAdd(model, pos, ang) end
     if hg.EquipmentImpactPose then pos, ang = hg.EquipmentImpactPose(self, pos, ang) end
-    if (not self.TwoHanded or math.max(self.MeleeDeployReachEnd or 0, self:GetNWFloat("MeleeDeployReachEnd", 0)) <= CurTime()) and (not self.GetInAttack or not self:GetInAttack()) then
+    if math.max(self.MeleeDeployReachEnd or 0, self:GetNWFloat("MeleeDeployReachEnd", 0)) <= CurTime() and (not self.GetInAttack or not self:GetInAttack()) then
         if self.WorldModelExchange and hg.ResolveAnimatedEquipmentClearance then
             pos = hg.ResolveAnimatedEquipmentClearance(self, owner, model, self.WorldModelExchange, pos, ang, self.modelscale, self.basebone or 1, self.weaponPos, self.weaponAng)
         elseif hg.ResolveEquipmentClearance then
@@ -1186,8 +1193,12 @@ function SWEP:SetHandPos(noset)
 	if !IsValid(wm) then return end
 	-- ent:SetupBones()
 
-	self.rhandik = self.setrh and IsValid(owner)//self.setrh
-	self.lhandik = self.setlh and not (self.DisableLHIKWhileBlocking and self:GetBlocking()) and IsValid(owner) and ((ply:GetTable().ChatGestureWeight or 0) < 0.1) and hg.CanUseLeftHand(ply) and !(owner.suiciding and self.SuicideNoLH)
+	local moveStart = math.max(self.MeleeDeployMoveStart or 0, self:GetNWFloat("MeleeDeployMoveStart", 0))
+	local leftDraw = self.TwoHanded and hg.CanUseLeftHand(ply)
+	self.rhandik = self.setrh and IsValid(owner) and (not leftDraw or CurTime() >= moveStart)//self.setrh
+	self.lhandik = self.setlh and not (self.DisableLHIKWhileBlocking and self:GetBlocking()) and IsValid(owner)
+		and ((ply:GetTable().ChatGestureWeight or 0) < 0.1) and hg.CanUseLeftHand(ply)
+		and not (self:IsSuicidePosing() and self.SuicideNoLH)
 
     local rhmat, lhmat = ent:GetBoneMatrix(ent:LookupBone("ValveBiped.Bip01_R_Hand")), ent:GetBoneMatrix(ent:LookupBone("ValveBiped.Bip01_L_Hand"))
 
@@ -1242,7 +1253,7 @@ function SWEP:SetHandPos(noset)
 
 	local bones = hg.TPIKBonesRH
 	local reachEnd = math.max(self.MeleeDeployReachEnd or 0, self:GetNWFloat("MeleeDeployReachEnd", 0))
-	local reachLerp = reachEnd > CurTime() and math.ease.InOutSine(math.Clamp(1 - (reachEnd - CurTime()) / math.max(self.BigMeleeReachTime or 0.8, 0.001), 0, 1))
+	local reachLerp = leftDraw and reachEnd > CurTime() and math.ease.InOutSine(math.Clamp((CurTime() - moveStart) / math.max(reachEnd - moveStart, 0.001), 0, 1))
 
 	if self.rhandik and self:InUse() then
 		for _, bone in ipairs(bones) do
@@ -1259,12 +1270,8 @@ function SWEP:SetHandPos(noset)
 			local bonepos = wm_bonematrix:GetTranslation()
 			local boneang = wm_bonematrix:GetAngles()
 			if reachLerp then
-				local leftBone = wm:LookupBone(string.Replace(bone, "_R_", "_L_"))
-				local leftMatrix = leftBone and wm:GetBoneMatrix(leftBone)
-				if leftMatrix then
-					bonepos = LerpVector(reachLerp, leftMatrix:GetTranslation(), bonepos)
-					boneang = LerpAngle(reachLerp, leftMatrix:GetAngles(), boneang)
-				end
+				bonepos = LerpVector(reachLerp, ply_bonematrix:GetTranslation(), bonepos)
+				boneang = LerpAngle(reachLerp, ply_bonematrix:GetAngles(), boneang)
 			end
 
 			bonepos.x = math.Clamp(bonepos.x, wmpos.x - 38, wmpos.x + 38)
@@ -1299,7 +1306,6 @@ end
 function SWEP:OwnerChanged()
     self:CancelChargeAttack(false)
     if IsValid(self:GetOwner()) and self:GetOwner():IsPlayer() then
-        self:PlayAnim("deploy",self.BigMeleeDeployTime or 1,false,nil,false)
         self:SetHold(self.HoldType)
         self:ResetCombo()
         timer.Simple(0,function() self.picked = true end)
@@ -1329,7 +1335,6 @@ end
 SWEP.Initialzed = false
 function SWEP:Deploy()
     local owner = self:GetOwner()
-    local stagedDeploy = self.TwoHanded and self.Initialzed and self.picked
 
     if SERVER and self.Initialzed and not owner.noSound then owner:EmitSound(self.DeploySnd,65) end
     self.Initialzed = true
@@ -1337,29 +1342,38 @@ function SWEP:Deploy()
     self:ResetCombo()
     self:SetHold(self.HoldType)
 
-    if stagedDeploy then
-        local reachTime = self.BigMeleeReachTime or 0.8
-        local deployTime = self.BigMeleeDeployTime or 1
-        local reachEnd = CurTime() + reachTime
+    do
+        local arm = self.TwoHanded and "larm" or "rarm"
+        local effectiveness = hg.GetArmEffectiveness and hg.GetArmEffectiveness(owner, arm) or 1
+        local speed = Lerp(effectiveness, 0.5, 1)
+        local gripTime = (self.MeleeDrawGripTime or 0.3) / speed
+        local reachTime = (self.BigMeleeReachTime or 0.8) / speed
+        local deployTime = (self.BigMeleeDeployTime or 1) / speed
+        local moveStart = CurTime() + gripTime
+        local reachEnd = moveStart + reachTime
 
+        self.MeleeDeployMoveStart = moveStart
         self.MeleeDeployReachEnd = reachEnd
-        if SERVER then self:SetNWFloat("MeleeDeployReachEnd", reachEnd) end
+        if SERVER then
+            self:SetNWFloat("MeleeDeployMoveStart", moveStart)
+            self:SetNWFloat("MeleeDeployReachEnd", reachEnd)
+        end
         self:SetNextPrimaryFire(reachEnd + deployTime)
         self:SetNextSecondaryFire(reachEnd + deployTime)
 
-        self:PlayAnim("deploy", reachTime + deployTime, false, nil, false)
-    else
-        self.MeleeDeployReachEnd = 0
-        if SERVER then self:SetNWFloat("MeleeDeployReachEnd", 0) end
-        self:PlayAnim("deploy", self.BigMeleeDeployTime or 1, false, nil, false)
+        self:PlayAnim("deploy", gripTime + reachTime + deployTime, false, nil, false)
     end
 	
 	return true
 end
 
 function SWEP:Holster(wep)
+    self.MeleeDeployMoveStart = 0
     self.MeleeDeployReachEnd = 0
-    if SERVER then self:SetNWFloat("MeleeDeployReachEnd", 0) end
+    if SERVER then
+        self:SetNWFloat("MeleeDeployMoveStart", 0)
+        self:SetNWFloat("MeleeDeployReachEnd", 0)
+    end
     self:CancelChargeAttack(false)
     self:SetInAttack(false)
     self:ResetCombo()
@@ -2092,6 +2106,10 @@ function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
             -- Custom attacks can end the attack early, so consume the first tick
             -- before invoking them instead of relying on the normal hit path.
             self.FirstAttackTick = true
+            if owner:IsPlayer() and owner:HasTrait("clumsy") and (self.HGClumsySelfHitNext or 0) <= CurTime() and math.Rand(0, 1) < 0.04 then
+                self.HGClumsySelfHitNext = CurTime() + 1.5
+                self:DoSelfHarmCut()
+            end
             
             self:PlaySwingSound(owner, attacktype)
             
@@ -2129,9 +2147,9 @@ function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
 
     local vellen = math.min(owner:GetVelocity():Length() * 0.05, 40)
     local isKnife = self:GetClass():lower():find("knife") ~= nil
-    local knifeBonus = isKnife and (self.MeleeKnifeBonus or 22) or 0
+    local knifeBonus = isKnife and (self.MeleeKnifeBonus or 0) or 0
     local baseReach = self.MeleeRange or (self:GetAttackLength() + vellen + knifeBonus)
-    local defMul = self.MeleeRange and 1 or (isKnife and (self.MeleeKnifeMul or 1.15) or 0.7)
+    local defMul = self.MeleeRange and 1 or (isKnife and (self.MeleeKnifeMul or 1) or 0.7)
     local reachLen = baseReach * (self.MeleeReachMul or defMul)
     reachLen = math.max(reachLen - (self.MeleeReachTrim or -1), 0)
     local eyetr = hg.eyeTrace(owner, (self:GetAttackLength() + vellen), ent, owner:GetAimVector(), nil, {owner, ent, self, owner.OldRagdoll})
@@ -3622,7 +3640,8 @@ function SWEP:CustomThink()
         end
     end
 
-    self:SetHold((self.Canselfharm and self:IsSelfHarming() and self.SelfHarmHoldType) or (owner.suiciding and self.SuicideHoldType) or self.HoldType)
+    self:SetHold((self.Canselfharm and self:IsSelfHarming() and self.SelfHarmHoldType)
+        or (self:IsSuicidePosing() and self.SuicideHoldType) or self.HoldType)
 
     if SERVER and owner.organism and owner.organism.rarmamputated then
         self:RemoveFake()
@@ -4331,6 +4350,7 @@ SWEP.SwingAng2 = 0
 
 function SWEP:PrimaryAttack()
     if not game.SinglePlayer() and not IsFirstTimePredicted() then return end
+    if self:GetNextPrimaryFire() > CurTime() then return end
     local ply = self:GetOwner()
 
     if self.cutthroat and self.cutthroat + 1 > CurTime() then return end
@@ -4465,6 +4485,7 @@ function SWEP:CanBlock()
 end
 
 function SWEP:SecondaryAttack(override)
+    if self:GetNextSecondaryFire() > CurTime() then return end
     local ply = self:GetOwner()
     if ply.organism and ply.organism.larmamputated and self.TwoHanded then return end
 
@@ -5002,7 +5023,7 @@ function SWEP:PlayAnim(anim, time, cycling, callback, reverse, sendtoclient, ret
     self.animRequest = retryToken or (self.animRequest or 0) + 1
     local request = self.animRequest
     if not IsValid(self:GetWM()) or not IsValid(self:GetOwner()) or (anim ~= "deploy" and self:GetOwner():GetActiveWeapon() ~= self) then
-		self.tries = self.tries - 1
+		self.tries = (self.tries or 10) - 1
 		if self.tries > 0 then
 			timer.Simple(0.01,function()
                 if not IsValid(self) or self.animRequest ~= request then return end

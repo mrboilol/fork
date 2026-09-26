@@ -97,12 +97,13 @@ local function doUrgeCut(ply)
 	end
 end
 
-local function endUrge(ply)
+local function endUrge(ply, cancelled)
 	if not IsValid(ply) or not ply:IsPlayer() then return end
 
 	local resisted = (ply.remUrgePresses or 0) >= urge_presses_needed
 
 	ply.remUrgeEnd = nil
+	timer.Remove("rem_urges_end_" .. ply:EntIndex())
 	ply.remUrgePresses = 0
 	ply.remUrgeCooldown = CurTime() + math.Rand(15, 25)
 	ply:SetNWFloat("rem_urges_end", 0)
@@ -117,12 +118,13 @@ local function endUrge(ply)
 		org.selfharmNextRoll = math.max(org.selfharmNextRoll or 0, ply.remUrgeCooldown)
 	end
 
-	if not resisted and ply:Alive() then
+	if not cancelled and not resisted and ply:Alive() then
 		doUrgeCut(ply)
 	end
 end
 
 local function startUrge(ply)
+	if not GetConVar("hg_depression"):GetBool() then return end
 	if not IsValid(ply) or not ply:IsPlayer() then return end
 	if not hasSuicideWeapon(ply) then return end
 	if ply.remUrgeEnd or ply.selfharming then return end
@@ -238,6 +240,12 @@ end)
 
 timer.Create("rem_suicideurges_roll", 1, 0, function()
 	local now = CurTime()
+	if not GetConVar("hg_depression"):GetBool() then
+		for _, ply in ipairs(player.GetAll()) do
+			if ply.remUrgeEnd then endUrge(ply, true) end
+		end
+		return
+	end
 
 	for _, ply in ipairs(player.GetAll()) do
 		local org = ply.organism

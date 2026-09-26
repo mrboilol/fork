@@ -244,7 +244,11 @@ end
 function Traits.GetPlayerMultiplier(ply, key, default)
 	local value = tonumber(default) or 1
 	local hasVibrams = false
-	for _, id in ipairs(Traits.GetPlayerSelection(ply)) do
+	local selection = Traits.GetPlayerSelection(ply)
+	if Traits.SelectionHas(selection, "john") and not Traits.SelectionHas(selection, "sedentary") then
+		selection[#selection + 1] = "sedentary"
+	end
+	for _, id in ipairs(selection) do
 		if id == "vibrams" then hasVibrams = true end
 		local modifier = Traits.Registry[id].Modifiers[key]
 		if isnumber(modifier) then value = value * modifier end
@@ -290,6 +294,7 @@ function Traits.GetSpawnAmputationLimbPool(ply)
 end
 
 function plymeta:HasTrait(id)
+	if id == "sedentary" and self:HasTrait("john") then return true end
 	if SERVER and self.HGTraits then return self.HGTraits[NormalizeTraitID(id) or ""] == true end
 	return Traits.SelectionHas(Traits.GetPlayerSelection(self), id)
 end

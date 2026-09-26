@@ -469,16 +469,17 @@ module[2] = function(owner, org, timeValue)
 	end
 
 	local exertionO2Debt = math.Clamp(org.exertionO2Debt or 0, 0, o2.range)
+	local exertionO2Mul = owner.GetTraitMultiplier and owner:GetTraitMultiplier("exertion_oxygen_debt", 1) or 1
 	if activelyExerting and staminaValue < lowStaminaO2Start then
 		if staminaValue > criticalStaminaO2Start then
 			local severity = math.Clamp((lowStaminaO2Start - staminaValue) / (lowStaminaO2Start - criticalStaminaO2Start), 0, 1)
-			exertionO2Debt = math.Approach(exertionO2Debt, lowStaminaO2DebtMax * severity, timeValue * 0.45)
+			exertionO2Debt = math.Approach(exertionO2Debt, lowStaminaO2DebtMax * severity * exertionO2Mul, timeValue * 0.45 * exertionO2Mul)
 		else
 			local criticalSeverity = math.Clamp((criticalStaminaO2Start - staminaValue) / criticalStaminaO2Start, 0, 1)
 			-- Reaching zero stamina is dangerous only if the player keeps pushing.
 			-- At full exhaustion this takes roughly forty seconds to reach the
 			-- blackout band, giving the player a meaningful chance to stop and rest.
-			exertionO2Debt = math.min(exertionO2Debt + timeValue * (0.2 + criticalSeverity * 0.35), o2.range)
+				exertionO2Debt = math.min(exertionO2Debt + timeValue * (0.2 + criticalSeverity * 0.35) * exertionO2Mul, o2.range)
 		end
 	else
 		exertionO2Debt = math.Approach(exertionO2Debt, 0, timeValue * 1.5)

@@ -63,7 +63,7 @@ function SWEP:Reload(time)
 	self:ReloadStart()
 	self:ReloadStartPost()
 	local org = self:GetOwner().organism
-	local experienceMul = self.GetWeaponExperienceMul and self:GetWeaponExperienceMul(self:GetOwner()) or 1
+	local experienceMul = self.GetReloadExperienceMul and self:GetReloadExperienceMul(self:GetOwner()) or 1
 	local limbDebuff = org and hg.GetLimbDebuffMultiplier and hg.GetLimbDebuffMultiplier(org) or 1
 	local armReloadPenalty = org and not self.IgnoreOneArmPenalties and ((org.larm or 0) / 3 + (org.rarm or 0) / 5) * limbDebuff or 0
 	self.StaminaReloadMul = (org and ((2 - (org.stamina[1] / 180)) + ((org.pain / 40) + armReloadPenalty) - (1 - math.Clamp(org.recoilmul or 1, 0.45, 1.4))) or 1) * experienceMul

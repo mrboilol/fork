@@ -35,6 +35,7 @@ end
 
 function SWEP:CalculateJamChance()
 	local chance = self.JamChanceBase or 0.003
+	local owner = self:GetOwner()
 
 	local ammo = self.Primary.Ammo
 	if ammo and self.LowCaliberAmmo and self.LowCaliberAmmo[ammo] then
@@ -44,6 +45,7 @@ function SWEP:CalculateJamChance()
 	if self.Primary.Automatic then
 		chance = chance + (self.JamChanceAutomatic or 0.006)
 	end
+	if IsValid(owner) and owner:IsPlayer() and owner:HasTrait("clumsy") then chance = chance * 3 end
 
 	return math.Clamp(chance, self.JamChanceMin or 0.001, self.JamChanceMax or 0.05)
 end

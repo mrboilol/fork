@@ -149,12 +149,20 @@ end
 local oldGroundBloodMaterials = {}
 local oldArterialGroundBloodMaterials = {}
 for i = 1, 10 do
-	oldGroundBloodMaterials[i] = Material("decals/z_blood" .. i)
-	oldArterialGroundBloodMaterials[i] = Material("decals/arterial_blood" .. i)
+	local normal = Material("decals/z_blood" .. i)
+	local arterial = Material("decals/arterial_blood" .. i)
+	oldGroundBloodMaterials[i] = CreateMaterial("hg_old_ground_blood_" .. i, "UnlitGeneric", {
+		["$translucent"] = "1", ["$vertexcolor"] = "1", ["$vertexalpha"] = "1"
+	})
+	oldArterialGroundBloodMaterials[i] = CreateMaterial("hg_old_arterial_ground_blood_" .. i, "UnlitGeneric", {
+		["$translucent"] = "1", ["$vertexcolor"] = "1", ["$vertexalpha"] = "1"
+	})
+	oldGroundBloodMaterials[i]:SetTexture("$basetexture", normal:GetTexture("$basetexture"))
+	oldArterialGroundBloodMaterials[i]:SetTexture("$basetexture", arterial:GetTexture("$basetexture"))
 end
 local arterialGroundBloodMaterial = Material("effects/droplets/drop12_5")
 
-local groundBloodColor = Color(210, 0, 0, 255)
+local groundBloodColor = Color(230, 35, 35, 255)
 local render_DrawQuadEasy = render.DrawQuadEasy
 local poolTrace = {mask = MASK_SOLID_BRUSHONLY}
 local poolStartVolume = 10
@@ -165,7 +173,7 @@ local function findGroundBlood(pos, normal, ignored)
 	local nearest, nearestDistance
 	for _, stain in ipairs(stains) do
 		if stain ~= ignored and stain.normal:Dot(normal) >= 0.75 then
-			local mergeRadius = math.max(9, (stain.size or 1) * 0.5 + 4)
+			local mergeRadius = math.max(9, (stain.size or 1) * (useOldBlood() and 0.5 or 1.25) + 4)
 			local distance = stain.pos:DistToSqr(pos)
 			if distance <= mergeRadius * mergeRadius and (not nearestDistance or distance < nearestDistance) then
 				nearest, nearestDistance = stain, distance
@@ -233,7 +241,7 @@ flowGroundBlood = function(stain, impactPos, amount, artery, tiny)
 	direction = direction - stain.normal * direction:Dot(stain.normal)
 	if direction:LengthSqr() < 1 then direction = Angle(0, math_random(0, 359), 0):Forward() end
 	direction:Normalize()
-	local distance = stain.size * 0.5 + 2
+	local distance = stain.size * (useOldBlood() and 0.5 or 1.25) + 2
 	for attempt = 1, 8 do
 		local candidate = direction:Angle()
 		candidate:RotateAroundAxis(stain.normal, (attempt - 1) * 137.5)
@@ -244,7 +252,9 @@ flowGroundBlood = function(stain, impactPos, amount, artery, tiny)
 		if hit.HitWorld and hit.HitNormal.z >= 0.55 then
 			local covered = false
 			for _, other in ipairs(hg.groundbloodstains) do
-				if other ~= stain and other.normal:Dot(hit.HitNormal) >= 0.75 and other.pos:DistToSqr(hit.HitPos) < (other.size * 0.5 + 2) ^ 2 then
+				local otherRadius = other.size * (useOldBlood() and 0.5 or 1.25) + 2
+				if other ~= stain and other.normal:Dot(hit.HitNormal) >= 0.75
+					and other.pos:DistToSqr(hit.HitPos) < otherRadius * otherRadius then
 					covered = true
 					break
 				end
@@ -277,7 +287,8 @@ hook.Add("PostDrawTranslucentRenderables", "hg_draw_persistent_ground_blood", fu
 		if offset:LengthSqr() > drawDistanceSqr or offset:Dot(eyeForward) < -stain.size then return end
 		groundBloodColor.a = alpha
 		render_SetMaterial(stain.material)
-		local size = stain.size * (useOldBlood() and 1 or 1.75)
+		local oldBlood = useOldBlood()
+		local size = stain.size * (oldBlood and 1 or 2.5)
 		render_DrawQuadEasy(stain.pos, stain.normal, size, size, groundBloodColor, stain.rotation)
 	end
 
@@ -298,23 +309,18 @@ end
 
 local oldTinyNormalDecals = {}
 for i = 1, 10 do
-	oldTinyNormalDecals[i] = Material("decals/z_blood" .. i)
+	oldTinyNormalDecals[i] = oldGroundBloodMaterials[i]
 end
-local oldTinyArterialDecal = Material("decals/arterial_blood1")
+local oldTinyArterialDecal = oldArterialGroundBloodMaterials[1]
 local newBloodDecal = "Normal.Blood24"
-local newTinyBloodDecal
-
-local function getNewTinyBloodDecal()
-	if newTinyBloodDecal then return newTinyBloodDecal end
-
+local function getNewBloodDecal()
 	local materialName = util.DecalMaterial(newBloodDecal)
 	if not isstring(materialName) or materialName == "" then return oldTinyNormalDecals[1] end
 
 	local material = Material(materialName)
 	if material:IsError() then return oldTinyNormalDecals[1] end
 
-	newTinyBloodDecal = material
-	return newTinyBloodDecal
+	return material
 end
 
 local function decalBlood(pos, normal, tr, artery, owner, tiny, amount)
@@ -324,17 +330,19 @@ local function decalBlood(pos, normal, tr, artery, owner, tiny, amount)
 		if not tiny or math.random(7) == 1 then playBloodDripImpact(pos, tr) end
 		return
 	end
+	amount = math.max(amount or (tiny and 0.2 or artery and 2.5 or 1), 0.05)
 	if tiny then
 		local target = IsValid(tr.Entity) and tr.Entity or nil
 		if IsValid(target) and hg.AddPersistentBodyBloodMark and (target:IsPlayer() or target:IsNPC() or target:IsRagdoll() or target.organism) then
-			hg.AddPersistentBodyBloodMark(target, pos, normal, math.Rand(1.2, 2.4))
+			hg.AddPersistentBodyBloodMark(target, pos, normal, math.Clamp(0.9 + math.sqrt(amount), 1, 3))
 			if math.random(7) == 1 then playBloodDripImpact(pos, tr) end
 			return
 		end
 		local oldBlood = useOldBlood()
-		local decal = oldBlood and (artery and oldTinyArterialDecal or oldTinyNormalDecals[math.random(#oldTinyNormalDecals)]) or getNewTinyBloodDecal()
+		local decal = oldBlood and (artery and oldTinyArterialDecal or oldTinyNormalDecals[math.random(#oldTinyNormalDecals)]) or getNewBloodDecal()
 		target = target or game.GetWorld()
-		local scale = oldBlood and math.Rand(0.12, 0.24) or math.Rand(0.3, 0.5)
+		local scale = math.Clamp((oldBlood and 0.16 or 0.45) * math.sqrt(amount / 0.2)
+			* math.Rand(0.85, 1.15), 0.08, oldBlood and 0.4 or 0.8)
 		util.DecalEx(decal, target, pos, normal, color_white, scale, scale)
 		if math.random(7) == 1 then playBloodDripImpact(pos, tr) end
 		return
@@ -342,7 +350,7 @@ local function decalBlood(pos, normal, tr, artery, owner, tiny, amount)
 
 	local target = IsValid(tr.Entity) and tr.Entity or nil
 	if IsValid(target) and hg.AddPersistentBodyBloodMark and (target:IsPlayer() or target:IsNPC() or target:IsRagdoll() or target.organism) then
-		hg.AddPersistentBodyBloodMark(target, pos, normal, artery and 2.8 or 2)
+		hg.AddPersistentBodyBloodMark(target, pos, normal, math.Clamp(1.2 + math.sqrt(amount) * 1.2, 1.5, 5))
 		playBloodDripImpact(pos, tr)
 		return
 	end
@@ -358,23 +366,13 @@ local function decalBlood(pos, normal, tr, artery, owner, tiny, amount)
 
 	-- я не знаю насколько большой можно делать такие таблицы... надеюсь, что это не так страшно выйдет
 
-	if artery then
-		if !useOldBlood() then
-			util.Decal(newBloodDecal, pos + normal, pos - normal, owner)
-			playBloodDripImpact(pos, tr)
-		else
-			util.Decal("Arterial.Blood1", pos + normal, pos - normal, owner)
-			playBloodDripImpact(pos, tr)
-		end
-	else
-		if !useOldBlood() then
-			util.Decal(newBloodDecal, pos + normal, pos - normal, owner)
-			playBloodDripImpact(pos, tr)
-		else
-			util.Decal("Normal.Blood1", pos + normal, pos - normal, owner)
-			playBloodDripImpact(pos, tr)
-		end
-	end
+	local oldBlood = useOldBlood()
+	local decal = oldBlood and (artery and oldArterialGroundBloodMaterials[math_random(10)]
+		or oldTinyNormalDecals[math_random(10)]) or getNewBloodDecal()
+	local scale = math.Clamp((oldBlood and 0.3 or 0.95) * math.sqrt(amount)
+		* math.Rand(0.8, 1.2), 0.15, oldBlood and 1.2 or 3)
+	util.DecalEx(decal, target or game.GetWorld(), pos, normal, color_white, scale, scale)
+	playBloodDripImpact(pos, tr)
 end
 --дурак, просто смотри сколько ентити стоит в одном месте
 local tr2 = { collisiongroup = COLLISION_GROUP_WORLD, output = {} }

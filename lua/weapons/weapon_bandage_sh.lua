@@ -366,6 +366,50 @@ local function BoneNamesMatch(ent, first, second)
 	return firstIndex and ent:GetBoneName(firstIndex) == second or false
 end
 
+local bandageBoneOrder = {
+	"skull", "jaw", "spine3", "spine2", "spine1", "pelvis", "chest", "lleg", "rleg", "larm", "rarm"
+}
+local bandageBoneNames = {
+	skull = "ValveBiped.Bip01_Head1", jaw = "ValveBiped.Bip01_Head1",
+	spine3 = "ValveBiped.Bip01_Spine2", spine2 = "ValveBiped.Bip01_Spine2",
+	spine1 = "ValveBiped.Bip01_Spine1", pelvis = "ValveBiped.Bip01_Pelvis",
+	chest = "ValveBiped.Bip01_Spine2", lleg = "ValveBiped.Bip01_L_Calf",
+	rleg = "ValveBiped.Bip01_R_Calf", larm = "ValveBiped.Bip01_L_Forearm",
+	rarm = "ValveBiped.Bip01_R_Forearm"
+}
+
+local function GetBandageBoneKey(org, bone)
+	if not org then return end
+
+	local key
+	if isstring(bone) then
+		if string.find(bone, "Head", 1, true) then key = (org.skull or 0) >= 0.05 and "skull" or "jaw"
+		elseif string.find(bone, "Spine1", 1, true) then key = "spine1"
+		elseif string.find(bone, "Spine2", 1, true) then
+			key = (org.spine2 or 0) >= 0.05 and "spine2" or (org.spine3 or 0) >= 0.05 and "spine3" or "chest"
+		elseif string.find(bone, "Spine3", 1, true) then key = "spine3"
+		elseif string.find(bone, "Pelvis", 1, true) then key = "pelvis"
+		elseif string.find(bone, "L_", 1, true)
+			and (string.find(bone, "Arm", 1, true) or string.find(bone, "Hand", 1, true)) then key = "larm"
+		elseif string.find(bone, "R_", 1, true)
+			and (string.find(bone, "Arm", 1, true) or string.find(bone, "Hand", 1, true)) then key = "rarm"
+		elseif string.find(bone, "L_", 1, true)
+			and (string.find(bone, "Thigh", 1, true) or string.find(bone, "Calf", 1, true)
+				or string.find(bone, "Foot", 1, true)) then key = "lleg"
+		elseif string.find(bone, "R_", 1, true)
+			and (string.find(bone, "Thigh", 1, true) or string.find(bone, "Calf", 1, true)
+				or string.find(bone, "Foot", 1, true)) then key = "rleg"
+		else key = bone end
+	end
+
+	if key and (org[key] or 0) >= 0.05 and not org[key .. "amputated"] then return key end
+	if bone then return end
+
+	for _, fallback in ipairs(bandageBoneOrder) do
+		if (org[fallback] or 0) >= 0.05 and not org[fallback .. "amputated"] then return fallback end
+	end
+end
+
 local function BoneHasBandageableInjury(ent, bone)
 	local org = ent.organism
 	if not org or not bone then return false end
@@ -377,6 +421,7 @@ local function BoneHasBandageableInjury(ent, bone)
 		if BoneNamesMatch(ent, wound[4], bone) then return true end
 	end
 	if hg.organism.GetBandageDislocation and hg.organism.GetBandageDislocation(org, bone) then return true end
+	if GetBandageBoneKey(org, bone) then return true end
 
 	if string.find(bone, "Head", 1, true) then return (org.skull or 0) >= 0.05 end
 	if string.find(bone, "Spine", 1, true) or string.find(bone, "Pelvis", 1, true) then return (org.chest or 0) >= 0.05 end
@@ -397,6 +442,10 @@ function SWEP:GetBandageTargetBone(target, trace)
 
 	local org = target.organism
 	if not org then return end
+	local injuredBone = GetBandageBoneKey(org, bone)
+	if injuredBone then return bone end
+	injuredBone = GetBandageBoneKey(org)
+	if injuredBone then return injuredBone end
 	local _, artery = GetBandageableArteryWound(org, target)
 	if artery and artery[4] then return artery[4] end
 
@@ -785,6 +834,7 @@ function SWEP:GetBandageTreatmentCost(target, bone)
 		local remaining = GetRemainingArteryBandageTreatmentCost(arteryWound)
 		return remaining
 	end
+	if GetBandageBoneKey(org, bone) then return self:GetBandageStructuralTreatmentCost() end
 
 	local woundCost = 0
 	for _, wound in ipairs(org.wounds or {}) do
@@ -813,7 +863,28 @@ if SERVER then
 		local org = ent.organism
 		local owner = self:GetOwner()
 		if not org then return end
+		if IsValid(owner) and owner:IsPlayer() and owner:HasTrait("clumsy") and math.Rand(0, 1) < 0.3 then
+			self.modeValues[1] = self.modeValues[1] * math.Rand(0.25, 0.6)
+		end
 		local arteryIndex, arteryWound = GetBandageableArteryWound(org, ent, bone)
+		local structuralBone = bone or self:GetBandageTargetBone(ent, IsValid(owner) and hg.eyeTrace(owner) or nil)
+		local structuralKey = GetBandageBoneKey(org, structuralBone)
+		local structuralCost = self:GetBandageStructuralTreatmentCost()
+		if not arteryWound and structuralKey and self.modeValues[1] >= structuralCost then
+			if hg.organism.ApplyBandageBoneTreatment(org, structuralKey, 0.25) > 0 then
+				self.modeValues[1] = self.modeValues[1] - structuralCost
+				ent.bandaged_limbs = ent.bandaged_limbs or {}
+				ent.bandaged_limbs[bandageBoneNames[structuralKey] or structuralBone] = true
+				ent:SetNetVar("bandaged_limbs", ent.bandaged_limbs)
+				if IsValid(ent.FakeRagdoll) then
+					ent.FakeRagdoll:SetNetVar("bandaged_limbs", ent.bandaged_limbs)
+				end
+				if not self:UseJudgeBandageTPIK() then
+					owner:EmitSound("snd_jack_hmcd_bandage.wav", 60, math.random(95, 105))
+				end
+				return true
+			end
+		end
 		
 		-- Если растрелять труп а потом его взорвать гранатой, после перевязать - крашнет сервер why?
 		local bandageDislocation = hg.organism.GetBandageDislocation and hg.organism.GetBandageDislocation(org, bone)
@@ -1239,11 +1310,23 @@ function hg.HasTourniquetOnLimb(ent, limb)
 	return hg.GetTourniquetCountOnLimb(ent, limb) > 0
 end
 
-function hg.GetTourniquetBleedMultiplier(ent, bone)
-	local limb = getTourniquetLimb(bone)
-	if not limb then return 1 end
-	return hg.GetTourniquetCountOnLimb(ent, limb) > 0 and 0 or 1
-end
+	function hg.GetTourniquetBleedMultiplier(ent, bone, arterial)
+		local limb = getTourniquetLimb(bone)
+		if not limb then return 1 end
+		for _, tourniquet in pairs(getWearableState(ent, "tourniquets", "Tourniquets")) do
+			if getTourniquetLimb(tourniquet[3]) == limb then
+				local treatment = tourniquet[4]
+				local applies = treatment ~= "none"
+					and not (treatment == "external" and arterial or treatment == "arterial" and not arterial)
+					and not (treatment == "half_external" and arterial or treatment == "half_arterial" and not arterial)
+				if applies then
+					if treatment == "half_external" or treatment == "half_arterial" then return 0.5 end
+					return 0
+				end
+			end
+		end
+		return 1
+	end
 
 function hg.HasBandageOnBone(ent, bone)
 	if not bone then return false end
@@ -1305,11 +1388,23 @@ if SERVER then
 			end
 		end
 		if selectedLimb and selected then
+			local owner = self:GetOwner()
+			local treatment
+			if IsValid(owner) and owner:IsPlayer() and owner:HasTrait("clumsy") and math.Rand(0, 1) < 0.35 then
+				if #selected.arteries > 0 and #selected.wounds > 0 then
+					local kind = math.random(2) == 1 and "external" or "arterial"
+					treatment = math.random(2) == 1 and "half_" .. kind or kind
+				elseif #selected.wounds > 0 then
+					treatment = math.random(2) == 1 and "half_external" or "external"
+				else
+					treatment = "none"
+				end
+			end
 			local ent = org.isPly and org.owner or ent
 			ent.tourniquets = ent.tourniquets or {}
 
 			local placementBone = tourniquetLimbBones[selectedLimb].high
-			ent.tourniquets[#ent.tourniquets + 1] = {vector_origin, angle_zero, placementBone}
+			ent.tourniquets[#ent.tourniquets + 1] = {vector_origin, angle_zero, placementBone, treatment}
 			local tourniquetCount = hg.GetTourniquetCountOnLimb(ent, selectedLimb)
 			org.painadd = math.min((org.painadd or 0) + (tourniquetCount >= 2 and 18 or 6), 150)
 			if tourniquetCount >= 2 then
@@ -1803,7 +1898,7 @@ function SWEP:CanBandageTPIK(target)
 
 	local treatmentCost = self:GetBandageStructuralTreatmentCost()
 	if available < treatmentCost then return false end
-	if (org.skull or 0) >= 0.05 or (org.chest or 0) >= 0.05 then return true end
+	if GetBandageBoneKey(org) then return true end
 	if (org.lleg or 0) >= 0.05 and not org.llegamputated then return true end
 	if (org.rleg or 0) >= 0.05 and not org.rlegamputated then return true end
 	if (org.larm or 0) >= 0.05 and not org.larmamputated then return true end

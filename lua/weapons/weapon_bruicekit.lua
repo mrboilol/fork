@@ -137,6 +137,10 @@ if SERVER then
 		return #bones > 0
 	end
 
+	function SWEP:CanBandageTPIK(target)
+		return self:CanHeal(target)
+	end
+
 	function SWEP:Heal(ent, mode, bone)
 		if ent:IsNPC() then
 			self:NPCHeal(ent, 0.25, "snd_jack_hmcd_bandage.ogg")

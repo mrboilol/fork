@@ -470,14 +470,14 @@ module[2] = function(owner, org, timeValue)
 
 
 
-	local adrenalineDecayRate = timeValue / (org.otrub and 8 or 25)
+	local adrenalineDecayRate = timeValue / 25
 
 	if fastAdrenalineDecay then
 
 		adrenalineDecayRate = timeValue / 8 -- Faster than normal, but still a gradual comedown
 
 	end
-	if org.adrenalinePainBreakthrough or org.pain > 20 then
+	if org.adrenalinePainBreakthrough then
 		adrenalineDecayRate = math.max(adrenalineDecayRate, timeValue / 8)
 	end
 

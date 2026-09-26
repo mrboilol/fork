@@ -8,6 +8,7 @@ local min, max, Round = math.min, math.max, Round
 
 local hg_organism_stamina_sprint_mul = CreateConVar("hg_organism_stamina_sprint_mul","1",{FCVAR_ARCHIVE,FCVAR_NOTIFY,FCVAR_NEVER_AS_STRING},"Multiply stamina drain when sprinting",0,10)
 local low_stamina_drain_max_mul = 1.2
+local untraited_sprint_stamina_cost = 1.5
 local low_stamina_recovery_min_mul = 0.5
 local recent_stamina_loss_recovery_min_mul = 0.65
 local recent_stamina_loss_hold_time = 1
@@ -178,6 +179,9 @@ module[2] = function(owner, org, timeValue)
 		if owner.GetTraitMultiplier and (owner.hg_isJogging or owner.hg_isSprinting) then
 			stamina.sub = stamina.sub * owner:GetTraitMultiplier("sprint_stamina_cost", 1)
 		end
+		if owner.hg_isSprinting and not owner:HasTrait("sprinter") and not owner:HasTrait("endurant") then
+			stamina.sub = stamina.sub * untraited_sprint_stamina_cost
+		end
 
 	end
 
@@ -295,7 +299,7 @@ module[2] = function(owner, org, timeValue)
 		org.lungsfunction and 1 or 0
 	)
 
-	stamina[1] = min(stamina[1] + stamina.regen * (stamina.regenMul or 1) * staminaRecoveryMul * recentLossRecoveryMul * timeValue * stamina_recovery_per_second * (org.noradrenaline / 2 + 1) * (org.adrenaline / 16 + 1) * (org.satiety/700 + 1) * pulseMultiplier * postureRecoveryMul * physiologyRecoveryMul * (1 - heatWeakness * 0.65), stamina.max)
+	stamina[1] = min(stamina[1] + stamina.regen * (stamina.regenMul or 1) * staminaRecoveryMul * recentLossRecoveryMul * timeValue * stamina_recovery_per_second * (org.noradrenaline / 2 + 1) * (org.adrenaline / 16 + 1) * (org.satiety/700 + 1) * pulseMultiplier * postureRecoveryMul * physiologyRecoveryMul * (1 - heatWeakness * 0.65) * (owner.GetTraitMultiplier and owner:GetTraitMultiplier("stamina_recovery", 1) or 1), stamina.max)
 	stamina.regenMul = math.Approach(stamina.regenMul or 1, 1, timeValue * (org.BlockRegenRecoverRate or 0.25))
 
 

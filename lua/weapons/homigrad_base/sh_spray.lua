@@ -119,7 +119,7 @@ function SWEP:PrimarySpread()
 		local handlingMul = self:GetArmHealthHandlingMul()
 		local experienceMul = self.GetWeaponExperienceMul and self:GetWeaponExperienceMul(owner) or 1
 		local stanceMul = self:GetPostureStabilityMul(self:IsZoom())
-		local cantedHold = owner.posture == 7 or owner.posture == 9
+		local cantedHold = not self:IsZoom() and (owner.posture == 7 or owner.posture == 9)
 		local restMul = self:IsResting() and 0.35 or 1
 		local recoilImpulse = math.Clamp(caliberMul * weightMul * supportMul * handlingMul * experienceMul * stanceMul * (0.78 + math.min(sprayI / 11, 0.82)) * restMul * (self.WeaponRecoilMul or 1) * self:GetAttachmentRecoilMul() * 1.3, 0.18, 7)
 		local lateralImpulse = recoilImpulse * math.Clamp(self.addSprayMul or 1, 0.08, 2.5)
@@ -132,17 +132,17 @@ function SWEP:PrimarySpread()
 
 		if cantedHold then
 			wobbleVelocity[1] = wobbleVelocity[1] - recoilImpulse * 8
-			wobbleVelocity[2] = wobbleVelocity[2] - lateralImpulse * (25 + math.abs(side) * 7)
+			wobbleVelocity[2] = wobbleVelocity[2] - lateralImpulse * (29 + math.abs(side) * 7)
 			wobbleVelocity[3] = wobbleVelocity[3] - lateralImpulse * (5 + math.abs(roll) * 4)
 			offsetVelocity[1] = offsetVelocity[1] - recoilImpulse * 10
-			offsetVelocity[2] = offsetVelocity[2] - lateralImpulse * 6
+			offsetVelocity[2] = offsetVelocity[2] + lateralImpulse * 6
 			offsetVelocity[3] = offsetVelocity[3] + recoilImpulse * 4
 		else
 			wobbleVelocity[1] = wobbleVelocity[1] - recoilImpulse * (32 + math.abs(side) * 4)
-			wobbleVelocity[2] = wobbleVelocity[2] + side * lateralImpulse * 5
+			wobbleVelocity[2] = wobbleVelocity[2] + side * lateralImpulse * 8
 			wobbleVelocity[3] = wobbleVelocity[3] + roll * lateralImpulse * 3.5
 			offsetVelocity[1] = offsetVelocity[1] - recoilImpulse * 11
-			offsetVelocity[2] = offsetVelocity[2] + side * lateralImpulse * 2.5
+			offsetVelocity[2] = offsetVelocity[2] + side * lateralImpulse * 3.5
 			offsetVelocity[3] = offsetVelocity[3] + recoilImpulse * 7
 		end
 
@@ -162,7 +162,7 @@ function SWEP:PrimarySpread()
 		local stanceMul = self.GetPostureStabilityMul and self:GetPostureStabilityMul(self:IsZoom()) or 1
 		local combat = hg.GetCombatCondition and hg.GetCombatCondition(owner) or nil
 		local combatAimMul = combat and combat.aim or 1
-		local cantedHold = owner.posture == 7 or owner.posture == 9
+		local cantedHold = not self:IsZoom() and (owner.posture == 7 or owner.posture == 9)
 		local force = math.Clamp(caliberMul * weightMul * supportMul * handlingMul * experienceMul * stanceMul * (0.75 + math.min(sprayI / 10, 0.75)) * 1.18, 0.18, 5.5)
 		local panic = organism.panicattackActive and math.Clamp(organism.panicattack or 0, 0.45, 1) or 0
 		local panicRecoilMul = panic > 0 and math.Remap(panic, 0.45, 1, 1.12, 1.42) or 1
@@ -196,8 +196,7 @@ function SWEP:PrimarySpread()
 
 		local angrand2
 		if cantedHold then
-			-- Clockwise-canted Gangsta/Somalian holds rotate muzzle rise into leftward travel.
-			angrand2 = Angle(math.Rand(-force * 0.18, force * 0.08), -math.Rand(force * 0.72, force * 1.15), -math.Rand(force * 0.12, force * 0.35))
+			angrand2 = Angle(math.Rand(-force * 0.12, force * 0.05), -math.Rand(force * 0.85, force * 1.25), -math.Rand(force * 0.12, force * 0.35))
 		else
 			local downwardKick = util.SharedRandom("hg_recoil_downward", 0, 1, (self.recoilShotIndex or 0) * 79) < 0.025
 			local pitch = downwardKick

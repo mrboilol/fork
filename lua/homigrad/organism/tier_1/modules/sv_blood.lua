@@ -550,7 +550,7 @@ module[2] = function(owner, org, mulTime)
 		local entVel = ent:GetVelocity()
 		
 		for i, wound in pairs(org.wounds) do
-			local tourniquetBleedMul = hg.GetTourniquetBleedMultiplier and hg.GetTourniquetBleedMultiplier(owner, wound[4]) or 1
+			local tourniquetBleedMul = hg.GetTourniquetBleedMultiplier and hg.GetTourniquetBleedMultiplier(owner, wound[4], false) or 1
 			local bandageBleedMul = hg.GetBandageBleedMultiplier and hg.GetBandageBleedMultiplier(owner, wound[4]) or 1
 			local bandageClotMul = hg.GetBandageClotMultiplier and hg.GetBandageClotMultiplier(owner, wound[4]) or 1
 			local heldClotMul = getHeldWoundClotMul(org, wound)
@@ -604,7 +604,7 @@ module[2] = function(owner, org, mulTime)
 	local heldCarotidWound = false
 	local healedArtery = false
 	for i, wound in pairs(org.arterialwounds) do
-		local tourniquetBleedMul = hg.GetTourniquetBleedMultiplier and hg.GetTourniquetBleedMultiplier(owner, wound[4]) or 1
+		local tourniquetBleedMul = hg.GetTourniquetBleedMultiplier and hg.GetTourniquetBleedMultiplier(owner, wound[4], true) or 1
 		local bandageBleedMul = hg.GetBandageBleedMultiplier and hg.GetBandageBleedMultiplier(owner, wound[4]) or 1
 		local bandageClotMul = hg.GetBandageClotMultiplier and hg.GetBandageClotMultiplier(owner, wound[4]) or 1
 		local isAmputation = wound[9] == true

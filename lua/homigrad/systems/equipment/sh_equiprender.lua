@@ -12,6 +12,14 @@ if CLIENT then
 		frame:Center()
 		frame:SetTitle("Configure " .. (hg.armorNames[ent.name] or ent.name or "armor"))
 		frame:MakePopup()
+		local function describeOptions(row, describe)
+			row.OnMenuOpened = function(_, menu)
+				for _, option in ipairs(menu:GetCanvas():GetChildren()) do
+					local description = option.GetText and describe(option:GetText())
+					if description then option:SetTooltip(description) end
+				end
+			end
+		end
 
 		local quality = vgui.Create("DNumSlider", frame)
 		quality:Dock(TOP)
@@ -20,7 +28,7 @@ if CLIENT then
 		quality:SetMax(1.2)
 		quality:SetDecimals(2)
 		quality:SetValue(state.quality or 1)
-		quality:SetTooltip("Material and build quality. Improves bullet, blunt, and stab protection; also cushions transferred bullet energy.")
+		quality:SetTooltip("Scales base blunt and stab protection from 80% to 120%; also ballistic unless its level is fixed.")
 
 		local protection = vgui.Create("DNumSlider", frame)
 		protection:Dock(TOP)
@@ -29,7 +37,7 @@ if CLIENT then
 		protection:SetMax(2)
 		protection:SetDecimals(2)
 		protection:SetValue(state.protectionMultiplier or 1)
-		protection:SetTooltip("Multiplies this armor's bullet, blunt, and stab protection. Higher values reduce penetrating damage, wounds, and pain.")
+		protection:SetTooltip("Multiplies base ballistic, blunt, and stab protection by 0.5x to 2x. Plate bonuses are added separately.")
 		local protectionLevel = state.protectionLevel or 3
 		local protectionChoices = vgui.Create("DComboBox", frame)
 		protectionChoices:Dock(TOP)
@@ -37,7 +45,14 @@ if CLIENT then
 		protectionChoices:SetValue((ent.placement == "torso" and "Vest protection profile: " or "Protection profile: ") .. (protectionLevel == "stab" and "Stab focused" or protectionLevel))
 		for level = 1, 6 do protectionChoices:AddChoice(tostring(level)) end
 		protectionChoices:AddChoice("Stab focused", "stab")
-		protectionChoices:SetTooltip("Levels 1-6 balance all protection. Stab focused gives strong blade resistance, moderate blunt protection, and little ballistic protection. Vests use this against hits on the carrier and plates.")
+		protectionChoices:SetTooltip("Changes base ballistic, blunt, and stab protection. Plate bonuses are added separately at covered hits.")
+		describeOptions(protectionChoices, function(value)
+			if value == "Stab focused" then return "Base protection: ballistic x0.12, blunt x0.8, stab x2. Plate bonuses stay unchanged." end
+			local rating = hg.ArmorPlateLevels[tonumber(value)]
+			if not rating then return end
+			local scale = rating / hg.ArmorPlateLevels[3]
+			return string.format("Base protection: ballistic, blunt, and stab x%.1f (level %s). Plate bonuses stay unchanged.", scale, value)
+		end)
 		protectionChoices.OnSelect = function(_, _, value, data) protectionLevel = data or tonumber(value) or value end
 
 		local health = vgui.Create("DNumSlider", frame)
@@ -47,25 +62,10 @@ if CLIENT then
 		health:SetMax(5)
 		health:SetDecimals(0)
 		health:SetValue(state.healthMultiplier or 1)
-		health:SetTooltip("Multiplies armor condition. More condition means it withstands more hits before protection wears down.")
+		health:SetTooltip("Multiplies maximum armor health or durability by 1x to 5x; does not change protection per hit.")
 
 		local material, level, sides = "ceramic", 3, "none"
 		if ent.placement == "torso" then
-			local materialTips = {
-				ceramic = "Strong ballistic protection at moderate weight; less suited to repeated blunt impacts.",
-				steel = "Heavy plate with strong ballistic protection and good durability.",
-				polyethylene = "Light plate with moderate ballistic protection.",
-				titan = "Balanced ballistic protection and weight.",
-				arsteel = "Heavy plate focused on ballistic protection; limited blunt and stab benefit.",
-				uhmwpe = "Very light plate with strong ballistic protection.",
-				uhmwpe_ceramic = "Light composite with stronger ballistic protection than UHMWPE alone.",
-				uhmwpe_arsteel = "Light composite balancing ballistic protection and weight.",
-				kevlar = "Very light, flexible protection with lower ballistic resistance.",
-				kevlar_ceramic = "Light composite improving Kevlar's ballistic resistance.",
-				kevlar_arsteel = "Light composite balancing ballistic protection and weight.",
-				kevlar_titan = "Light composite with balanced ballistic protection.",
-				riot = "Excellent against heavy blunt hits and beanbags; weak against bullets and modest against stabs."
-			}
 			local function choice(label, options, initial, changed, tooltip, optionTips)
 				local row = vgui.Create("DComboBox", frame)
 				row:Dock(TOP)
@@ -73,25 +73,36 @@ if CLIENT then
 				row:SetValue(label .. ": " .. tostring(initial))
 				for _, option in ipairs(options) do row:AddChoice(option) end
 				row:SetTooltip(tooltip)
-				if optionTips then
-					row.OnMenuOpened = function(_, menu)
-						for _, option in ipairs(menu:GetCanvas():GetChildren()) do
-							local description = optionTips[option:GetText()]
-							if description then option:SetTooltip(description) end
-						end
-					end
-				end
+				if optionTips then describeOptions(row, optionTips) end
 				row.OnSelect = function(_, _, value) changed(value) end
 			end
 			material = state.plateMaterial or material
 			level = state.plateLevel or level
 			sides = state.plateSides or sides
 			choice("Plate material", {"ceramic", "steel", "polyethylene", "titan", "arsteel", "uhmwpe", "uhmwpe_ceramic", "uhmwpe_arsteel", "kevlar", "kevlar_ceramic", "kevlar_arsteel", "kevlar_titan", "riot"}, material, function(value) material = value end,
-				"Hover a material in the list for its strengths.", materialTips)
+				"Changes each plate's weight and its ballistic, blunt, and stab protection on covered hits.", function(value)
+					local plate = hg.ArmorPlateMaterials[value]
+					if not plate then return end
+					local rating = hg.ArmorPlateLevels[level]
+					return string.format("Each plate: +%.1f weight | +%.1f ballistic, +%.1f blunt, +%.1f stab protection at level %d.",
+						plate.mass, rating * plate.protection * 0.4, rating * (plate.melee or 1) * 0.2, rating * (plate.stab or 1) * 0.35, level)
+				end)
 			choice("Protection level", {"1", "2", "3", "4", "5", "6"}, level, function(value) level = tonumber(value) end,
-				"Plate rating from 1 (light protection) to 6 (strongest bullet resistance). Higher levels also increase blunt and stab resistance and plate weight stays material-based.")
+				"Changes plate ballistic, blunt, and stab protection on covered hits; plate weight stays material-based.", function(value)
+					local rating = hg.ArmorPlateLevels[tonumber(value)]
+					if not rating then return end
+					local plate = hg.ArmorPlateMaterials[material]
+					return string.format("Level %s with %s: +%.1f ballistic, +%.1f blunt, +%.1f stab protection per covered hit. Weight: %.1f per plate.",
+						value, material, rating * plate.protection * 0.4, rating * (plate.melee or 1) * 0.2, rating * (plate.stab or 1) * 0.35, plate.mass)
+				end)
 			choice("Plate coverage", {"none", "front", "back", "both", "all"}, sides, function(value) sides = value end,
-				"Choose which torso directions get plate protection. Each added side adds plate weight; uncovered directions use the carrier alone.")
+				"Chooses which torso directions receive plate bonuses. Each covered direction adds one plate's weight.", function(value)
+					local count = value == "all" and 4 or value == "both" and 2 or value == "none" and 0 or 1
+					local covered = {none = "No plate coverage", front = "Front only", back = "Back only", both = "Front and back", all = "Front, back, left, and right"}
+					if not covered[value] then return end
+					return string.format("%s: %d plate%s, +%.1f weight with %s. Uncovered hits use carrier protection only.",
+						covered[value], count, count == 1 and "" or "s", count * hg.ArmorPlateMaterials[material].mass, material)
+				end)
 		end
 
 		local apply = vgui.Create("DButton", frame)

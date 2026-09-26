@@ -25,7 +25,7 @@ function SWEP:GetAnimShoot2(time, force, delay)
 	local animpos = self:GetAnimPos_Shoot2(self.lastShoot or 0, time * (math.max(self:GetWeaponWeight() + (self.addweight or 0) - 1,0.1) * 2 + 2))
 	
 	--/ (FrameTime() / engine.TickInterval())
-	animpos = 1.5 * animpos ^ 3 - 1 * animpos ^ 2
+	animpos = 0.5 * animpos ^ 2
 	
 	if animpos > 0 then
 		--animpos = animpos * math.max(self.Primary.Force / 40, 0) / (math.max((self.weight or 1) - 1,0.1) * 5 + 1) * (self.NumBullet or 1)
@@ -144,14 +144,15 @@ function SWEP:ChangeGunPos(dtime)
 	local support = self:GetHandSupportState(ply)
 	local proficiency = self:GetFirearmProficiency(ply)
 	local aimDt = math.Clamp(dtime or FrameTime(), 0, 0.1)
+	local readyStance = ply.posture == 3 or ply.posture == 4
 	if self:IsZoom() and not self:IsResting() then
-		self.aimHoldTime = math.min((self.aimHoldTime or 0) + aimDt, 18)
+		self.aimHoldTime = math.min((self.aimHoldTime or 0) + aimDt * (readyStance and 0.7 or 1), 18)
 	else
-		self.aimHoldTime = math.Approach(self.aimHoldTime or 0, 0, aimDt * 3)
+		self.aimHoldTime = math.Approach(self.aimHoldTime or 0, 0, aimDt * (readyStance and 7 or 5))
 	end
 	local fatigueDelay = Lerp(proficiency, support.oneHanded and 2.5 or 5, support.oneHanded and 4.5 or 8)
 	local fatigue = math.Clamp(((self.aimHoldTime or 0) - fatigueDelay) / 7, 0, 1)
-	local fatigueAmp = fatigue * (support.oneHanded and 1.15 or 0.5) * Lerp(proficiency, 1, 0.62)
+	local fatigueAmp = fatigue * (support.oneHanded and 1.15 or 0.5) * Lerp(proficiency, 1, 0.62) * (readyStance and 0.75 or 1)
 	local fatigueTime = CurTime()
 	self.AimFatigueWobble = Angle(
 		math.sin(fatigueTime * 1.7) * fatigueAmp + math.sin(fatigueTime * 8.3) * fatigueAmp * fatigue * 0.22,
@@ -171,9 +172,9 @@ function SWEP:ChangeGunPos(dtime)
 	local recoverySkill = proficiency
 	local oneHandRecovery = support.oneHanded and not self.IgnoreOneArmPenalties and Lerp(recoverySkill, 0.72, 0.9) or 1
 	local angularSpring = Lerp(recoverySkill, 62, 125) * oneHandRecovery
-	local angularDamping = Lerp(recoverySkill, 8, 16) * oneHandRecovery
+	local angularDamping = Lerp(recoverySkill, 16, 23) * oneHandRecovery
 	local positionSpring = Lerp(recoverySkill, 55, 110) * oneHandRecovery
-	local positionDamping = Lerp(recoverySkill, 7, 14) * oneHandRecovery
+	local positionDamping = Lerp(recoverySkill, 15, 21) * oneHandRecovery
 	local wobble = self.ShotMuzzleWobble or Angle(0, 0, 0)
 	local wobbleVelocity = self.ShotMuzzleWobbleVelocity or Angle(0, 0, 0)
 	local offset = self.ShotMuzzleOffset or Vector(0, 0, 0)
@@ -1019,7 +1020,8 @@ function SWEP:WorldModel_Transform_Holstered()
 		if self:ShouldUseFakeModel() then
 			newPos, newAng = LocalToWorld(self.FakePos, self.FakeAng, newPos, newAng)
 		end
-		local lerp = self.deploy and math.Clamp(1 - (self.deploy - CurTime()) / self:GetDeployDuration(), 0, 1) or 0
+		local gripFraction = self.DeployGripFraction or 0.3
+		local lerp = self.deploy and math.Clamp((1 - (self.deploy - CurTime()) / self:GetDeployDuration() - gripFraction) / (1 - gripFraction), 0, 1) or 0
 		lerp = math.ease.InOutSine(lerp)
 		
 		local newPos = LerpVector(lerp, newPos, model:GetPos())

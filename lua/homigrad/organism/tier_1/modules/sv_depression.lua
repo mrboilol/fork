@@ -1,6 +1,7 @@
 local max, min, Clamp, Approach = math.max, math.min, math.Clamp, math.Approach
 hg.organism.module.depression = {}
 local module = hg.organism.module.depression
+local hg_depression = CreateConVar("hg_depression", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enable depression and its mechanics", 0, 1)
 
 local depression_max = 1
 local depression_drain_time = 300
@@ -12,6 +13,7 @@ local depression_fear_gain = 0.015
 local depression_blood_threshold = 3500
 local depression_blood_gain = 0.01
 local depression_otrub_gain = 0.005
+local depression_cotard_gain = 0.012
 local depression_adrenaline_suppress_start = 0.5
 local depression_adrenaline_suppress_min = 0.1
 local depression_bleedrate_threshold = 5
@@ -171,6 +173,7 @@ local function autoEquipSelfHarmWeapon(owner)
 end
 
 function hg.organism.StartSelfHarm(owner)
+	if not hg_depression:GetBool() then return end
 	if not IsValid(owner) or not owner:IsPlayer() then return end
 
 	local org = owner.organism
@@ -281,7 +284,7 @@ end
 
 function hg.organism.RecordDepressionTreatment(org, failed)
 	if not org then return end
-	if isDepressionImmune(org) then return end
+	if not hg_depression:GetBool() or isDepressionImmune(org) then return end
 
 	org.depressionTreatmentUntil = CurTime() + depression_untreated_bleed_delay
 	org.depressionUntreatedBleedSince = nil
@@ -403,7 +406,7 @@ local function rollSelfHarm(owner, org)
 end
 
 module[2] = function(owner, org, timeValue)
-	if isDepressionImmune(org) then
+	if not hg_depression:GetBool() or isDepressionImmune(org) then
 		if owner.selfharming then hg.organism.EndSelfHarm(owner) end
 		org.depression = 0
 		org.depressionadd = 0
@@ -457,7 +460,7 @@ module[2] = function(owner, org, timeValue)
 		add = add + depression_o2_gain * timeValue
 	end
 
-	if (org.immobilization or 0) > 0 or (org.spine1 or 0) > 0.5 or (org.spine2 or 0) > 0.5 or (org.spine3 or 0) > 0.5 or (org.lleg or 0) >= 0.5 or (org.rleg or 0) >= 0.5 then
+	if (org.immobilization or 0) > 0 or (org.spine1 or 0) > 0.5 or (org.spine2 or 0) > 0.5 or (org.spine3 or 0) > 0.5 then
 		add = add + depression_bones_gain * timeValue
 	end
 
@@ -475,6 +478,9 @@ module[2] = function(owner, org, timeValue)
 
 	if org.otrub then
 		add = add + depression_otrub_gain * timeValue
+	end
+	if (org.cotard or 0) > 0 then
+		add = add + depression_cotard_gain * org.cotard * timeValue
 	end
 
 	local now = CurTime()
@@ -618,7 +624,7 @@ end
 
 function hg.organism.AddDepression(org, amount)
 	if not org then return 0 end
-	if isDepressionImmune(org) then
+	if not hg_depression:GetBool() or isDepressionImmune(org) then
 		org.depression = 0
 		org.depressionadd = 0
 		return 0
@@ -631,6 +637,7 @@ function hg.organism.AddDepression(org, amount)
 end
 
 concommand.Add("selfharm", function(ply)
+	if not hg_depression:GetBool() then return end
 	if not IsValid(ply) or not ply:IsPlayer() or not ply:Alive() then return end
 	if not ply.organism or ply.selfharming or ply.suiciding or ply.remUrgeEnd then return end
 	if (ply.remUrgeCooldown or 0) > CurTime() then return end

@@ -179,7 +179,20 @@ function SWEP:GetWeaponExperienceMul(ply)
 	ply = ply or self:GetOwner()
 	if not IsValid(ply) then return 1 end
 
-	return Lerp(self:GetFirearmProficiency(ply), 1, 0.78)
+	local baseMul = self:HasFirearmTraining(ply) and 1 or 1.05
+	return Lerp(self:GetFirearmProficiency(ply), baseMul, 0.78)
+end
+
+function SWEP:GetReloadExperienceMul(ply)
+	ply = ply or self:GetOwner()
+	if not IsValid(ply) then return 1 end
+	if self:HasFirearmTraining(ply) then return self:GetWeaponExperienceMul(ply) end
+
+	return Lerp(self:GetFirearmProficiency(ply), 1.1, 0.78)
+end
+
+function SWEP:HasFirearmTraining(ply)
+	return (ply.HasTrait and ply:HasTrait("hunter")) or ply.Profession == "huntsman"
 end
 
 function SWEP:GetFirearmProficiency(ply)
@@ -226,7 +239,7 @@ function SWEP:GetRecoilImpulseFactors()
 	end
 
 	local roundImpulse = (momentumFactor * 0.48 + energyFactor * 0.24 + forceFactor * 0.2 + diameterFactor * 0.08) * payloadFactor
-	roundImpulse = math.Clamp(roundImpulse ^ 1.12 * actionMul * (self.RecoilImpulseMul or 1), 0.18, 6)
+	roundImpulse = math.Clamp(roundImpulse ^ 1.2 * actionMul * (self.RecoilImpulseMul or 1), 0.15, 6)
 	local weightMul = math.Clamp((3 / weaponWeight) ^ 0.8, 0.25, 2)
 	local disturbance = (momentumFactor * 0.5 + energyFactor * 0.32 + forceFactor * 0.13 + diameterFactor * 0.05) * payloadFactor
 	disturbance = math.Clamp(disturbance * math.Clamp(0.82 + math.sqrt(weaponWeight) * 0.08, 0.85, 1.25) * (self.RecoilRecoveryMul or 1), 0.18, 6)
@@ -2509,7 +2522,7 @@ function SWEP:GetAdditionalValues()
 		local weaponRecoilMul = (self.WeaponRecoilMul or 1) * experienceMul
 		local caliberMul, weightMul, _, _, _, ballisticDisturbance = self:GetRecoilImpulseFactors()
 		local ballisticRecoil = math.Clamp(caliberMul * weightMul, 0.2, 4)
-		local cantedHold = ply.posture == 7 or ply.posture == 9
+		local cantedHold = not self:IsZoom() and (ply.posture == 7 or ply.posture == 9)
 		local mulhuy = (self:IsPistolHoldType() or self.PistolKinda) and 2 or (((ply.posture == 1 and not self:IsZoom()) or ply.posture == 7 or ply.posture == 8) and 2 or 0.75)
 		local animpos = self:GetAnimShoot2(0.09 * mulhuy / host_timescale(), true)
 		local shit = 0.2 * mulhuy / host_timescale()
@@ -2524,8 +2537,6 @@ function SWEP:GetAdditionalValues()
 		self.AdditionalPos2[1] = self.AdditionalPos2[1] + math.sin(animpos3) * -1 * shit2
 		self.AdditionalAng2[2] = self.AdditionalAng2[2] + math.sin(animpos3) * -2 * shit2
 		
-		self.AdditionalPos2:Add(VectorRand(-0.07, 0.07) * animpos3 * shit2)
-
 		//self.AdditionalPos2[3] = self.AdditionalPos2[3] + animpos * ply.offsetView[2] * 0.2
 		
 		if self.podkid or self:IsPistolHoldType() then
@@ -2534,7 +2545,7 @@ function SWEP:GetAdditionalValues()
 			self.AdditionalAng2[2] = self.AdditionalAng2[2] + animpos2 * (cantedHold and -24 or 20) * (self.podkid or 1)
 			self.AdditionalAng2[3] = self.AdditionalAng2[3] + animpos2 * (cantedHold and -5 or 10) * (self.podkid or 1)
 			self.AdditionalAng2[1] = self.AdditionalAng2[1] + animpos2 * (cantedHold and -1 or -5) * (self.podkid or 1)
-			self.AdditionalPos2[2] = self.AdditionalPos2[2] - animpos2 * (cantedHold and 2.5 or 1) * (self.podkid or 1)
+			self.AdditionalPos2[2] = self.AdditionalPos2[2] + animpos2 * (cantedHold and 2.5 or -1) * (self.podkid or 1)
 		end
 
 		local sinceShot = CurTime() - (self:LastShootTime() or 0)
@@ -2566,10 +2577,10 @@ function SWEP:GetAdditionalValues()
 			local wobZ = math.sin(t * 10.1 * frequencyMul) * 0.65 + math.cos(t * 15.6 * frequencyMul) * 0.35
 
 			self.AdditionalAng2[1] = self.AdditionalAng2[1] + wobY * amp * (cantedHold and 0.45 or (longGun and 2.3 or 1.7))
-			self.AdditionalAng2[2] = self.AdditionalAng2[2] + wobX * amp * (cantedHold and -1.65 or (longGun and 0.08 or 0.14)) * sideAmp
+			self.AdditionalAng2[2] = self.AdditionalAng2[2] + wobX * amp * (cantedHold and -1.65 or (longGun and 0.22 or 0.3)) * sideAmp
 			self.AdditionalAng2[3] = self.AdditionalAng2[3] + wobZ * amp * (longGun and 0.55 or 1.1) * sideAmp
 			self.AdditionalPos2[1] = self.AdditionalPos2[1] + wobY * amp * 0.6
-			self.AdditionalPos2[2] = self.AdditionalPos2[2] + wobX * amp * (cantedHold and -0.42 or 0.08) * sideAmp
+			self.AdditionalPos2[2] = self.AdditionalPos2[2] + wobX * amp * (cantedHold and 0.42 or 0.16) * sideAmp
 			self.AdditionalPos2[3] = self.AdditionalPos2[3] + wobZ * amp * 0.58
 		end
 
@@ -2599,11 +2610,11 @@ function SWEP:GetAdditionalValues()
 				self.AdditionalAng2[1] = self.AdditionalAng2[1] - kick * 0.75
 				self.AdditionalAng2[2] = self.AdditionalAng2[2] - kick * 2.8
 				self.AdditionalAng2[3] = self.AdditionalAng2[3] - kick * 0.7
-				self.AdditionalPos2[2] = self.AdditionalPos2[2] - kick * 1.15
+				self.AdditionalPos2[2] = self.AdditionalPos2[2] + kick * 1.15
 				self.AdditionalPos2[3] = self.AdditionalPos2[3] + kick * 0.65
 			else
 				self.AdditionalAng2[1] = self.AdditionalAng2[1] - kick * 3.4
-				self.AdditionalAng2[2] = self.AdditionalAng2[2] + sideRand * kick * 0.09
+				self.AdditionalAng2[2] = self.AdditionalAng2[2] + sideRand * kick * 0.25
 				self.AdditionalAng2[3] = self.AdditionalAng2[3] + rollRand * kick * 0.18
 				self.AdditionalPos2[3] = self.AdditionalPos2[3] + kick * (self:IsPistolHoldType() and 1.6 or 2.4)
 			end
