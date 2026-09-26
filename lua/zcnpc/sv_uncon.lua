@@ -204,8 +204,32 @@ local function CreateNPCRagdoll(npc, addVel)
 
 	hg.cacheModel(rag)
 
-	-- Z-City's "Ragdoll Collide" -> fall/impact sounds
-	rag:AddCallback("PhysicsCollide", function(_, data) hook.Run("Ragdoll Collide", rag, data) end)
+	-- Z-City's "Ragdoll Collide" -> fall/impact sounds. Queued out of the physics
+	-- callback: impact damage on an organism body reaches every knockdown, gib,
+	-- loot drop and ArtAgdoll hand-over, and building or tearing down physics
+	-- objects while the engine walks its contact list is a hard crash.
+	rag:AddCallback("PhysicsCollide", function(_, data)
+		local pending = rag.zcnpc_collides
+		if pending then
+			pending[#pending + 1] = data
+			return
+		end
+
+		rag.zcnpc_collides = { data }
+		timer.Simple(0, function()
+			if not IsValid(rag) then return end
+
+			local list = rag.zcnpc_collides
+			rag.zcnpc_collides = nil
+
+			for _, d in ipairs(list) do
+				if not IsValid(rag) then return end
+				if IsValid(d.PhysObject) and IsValid(d.HitObject) then
+					hook.Run("Ragdoll Collide", rag, d)
+				end
+			end
+		end)
+	end)
 
 	local velocity
 	if npc.zcnpc_headkill then
