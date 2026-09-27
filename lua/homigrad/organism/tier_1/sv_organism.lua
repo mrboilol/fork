@@ -314,6 +314,8 @@ end
 
 function hg.organism.RecordWoundMark(org, wound, arterial)
 	if not org or not wound or not isvector(wound[2]) or not isangle(wound[3]) then return end
+	local body = IsValid(org.owner) and hg.GetCurrentCharacter(org.owner)
+	if IsValid(body) and body:WaterLevel() >= 2 then return end
 	org.woundmarks = org.woundmarks or {}
 	org.woundmarks[#org.woundmarks + 1] = {
 		math.max(tonumber(wound.initialSeverity) or tonumber(wound[1]) or 0.01, 0.01),
@@ -326,6 +328,22 @@ function hg.organism.RecordWoundMark(org, wound, arterial)
 	}
 	hg.organism.SyncWoundMarksNet(org)
 end
+
+hook.Add("Org Think", "ExpireWoundMarks", function(owner, org)
+	if (org.nextWoundMarkExpiry or 0) > CurTime() then return end
+	org.nextWoundMarkExpiry = CurTime() + 5
+	local marks = org.woundmarks
+	if not marks or #marks == 0 then return end
+
+	local changed = false
+	for index = #marks, 1, -1 do
+		if CurTime() - (tonumber(marks[index][5]) or 0) >= 120 then
+			table.remove(marks, index)
+			changed = true
+		end
+	end
+	if changed then hg.organism.SyncWoundMarksNet(org) end
+end)
 
 function hg.organism.RemoveWoundMark(org, wound, arterial)
 	if not org or not wound then return end
@@ -1949,6 +1967,12 @@ end)
 hook.Add("OnEntityWaterLevelChanged", "ClearBlood", function(ent, old, new)
 	if new >= 2 then
 		if ent:IsOnFire() then ent:Extinguish() end
+		local owner = ent:IsRagdoll() and hg.RagdollOwner(ent) or ent
+		local org = IsValid(owner) and owner.organism
+		if org and org.woundmarks and #org.woundmarks > 0 then
+			org.woundmarks = {}
+			hg.organism.SyncWoundMarksNet(org)
+		end
 		if hg.WashBloodDecals then hg.WashBloodDecals(ent) end
 	end
 end)

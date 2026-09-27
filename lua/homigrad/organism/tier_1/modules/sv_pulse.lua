@@ -50,8 +50,12 @@ end
 local function getHemorrhageDelivery(blood)
 	local normal = getNormalBloodVolume()
 	local terminal = Clamp(tonumber(hg.organism.BLEEDOUT_DEATH_BLOOD) or normal * 0.3, 0, normal - 1)
-	local x = Clamp(((tonumber(blood) or normal) - terminal) / (normal - terminal), 0, 1)
-	return x * x * (3 - 2 * x)
+	local pulseless = Clamp(tonumber(hg.organism.PULSELESS_BLOOD_VOLUME) or terminal * 0.5, 0, terminal - 1)
+	local volume = tonumber(blood) or normal
+	if volume < terminal then
+		return 0.1 * Clamp((volume - pulseless) / (terminal - pulseless), 0, 1)
+	end
+	return 0.1 + 0.9 * Clamp((volume - terminal) / (normal - terminal), 0, 1)
 end
 
 function hg.organism.GetHemorrhageRateDrive(blood)
@@ -265,7 +269,7 @@ end
 
 function hg.organism.GetPulseOxygenPerfusion(pulse)
 	local normalizedPulse = Clamp((tonumber(pulse) or 0) / 65, 0, 1)
-	return 0.2 + 0.8 * normalizedPulse ^ 1.2
+	return normalizedPulse
 end
 
 local function getPalpablePulseTarget(org, heartbeat, circulation, hemorrhageCompensation, effectivePalpitations)
@@ -1232,8 +1236,8 @@ module[2] = function(owner, org, timeValue)
 	local criticalHemorrhageDepth = math.Clamp((criticalReserve - circulatoryReserve) / criticalRange, 0, 1)
 	local terminalReserve = math.Clamp(cfg.TERMINAL_CIRCULATION_RESERVE or 0.035, 0, 0.25)
 	local terminalOutput = math.Clamp(cfg.TERMINAL_CARDIAC_OUTPUT or 0.04, 0, 0.25)
-	local terminalCirculatoryFailure = circulatoryReserve <= terminalReserve
-		and math.Clamp(circulation, 0, 1) <= terminalOutput
+	local terminalCirculatoryFailure = (bloodNow <= (hg.organism.BLEEDOUT_DEATH_BLOOD or 2000)
+		or circulatoryReserve <= terminalReserve and math.Clamp(circulation, 0, 1) <= terminalOutput)
 		and not (dihSupport or defibGrace or cprSupport)
 	org.terminalCirculatoryFailure = terminalCirculatoryFailure
 	org.hemorrhagicCollapseExposure = math.Approach(

@@ -978,11 +978,12 @@ function hg.DoTPIK(ply, ent)
 	local self = ply:GetActiveWeapon()
 
     local org = ply.organism or ent.organism
-    local leftArmBroken = org and ((org.larm or 0) >= 1 or org.larmdislocation or org.larmdislocated)
-    local leftArmAmputated = org and (org.larmamputated or org.lhandamputated or org.larmupamputated)
-    local leftArmDisabled = leftArmBroken or leftArmAmputated
-    local leftArmRelaxing = leftArmBroken and not leftArmAmputated and IsValid(self) and ishgweapon(self) and not self.reload
-    local lhik2 = leftArmRelaxing or (not leftArmDisabled and ((IsValid(self) and self.lhandik) or ply:InVehicle()) and hg.CanUseLeftHand(ply))
+	local leftArmBroken = org and ((org.larm or 0) >= 1 or org.larmdislocation or org.larmdislocated)
+	local leftArmAmputated = org and (org.larmamputated or org.lhandamputated or org.larmupamputated)
+	local leftArmDisabled = leftArmBroken or leftArmAmputated
+	local brokenFistArm = leftArmBroken and IsValid(self) and self.GetFists and self:GetFists()
+	local leftArmRelaxing = leftArmBroken and not leftArmAmputated and IsValid(self) and ishgweapon(self) and not self.reload and not brokenFistArm
+	local lhik2 = leftArmRelaxing or ((not leftArmDisabled or brokenFistArm) and ((IsValid(self) and self.lhandik) or ply:InVehicle()) and hg.CanUseLeftHand(ply))
     local rhik2 = ((IsValid(self) and self.rhandik) or ply:InVehicle()) and hg.CanUseRightHand(ply)
     
     local shouldrebuild = false

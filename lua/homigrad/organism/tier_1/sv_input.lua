@@ -25,7 +25,7 @@ local full_body_physics_damage_threshold = 4200
 local blast_gib_damage_mul = 700
 local melee_gib_damage_mul = 0.35
 local gore_damage_mul = 0.67
-local ragdoll_fall_skull_damage_mul = 1.2
+local ragdoll_fall_skull_damage_mul = 1.65
 local ragdoll_fall_jaw_damage_mul = 0.45
 local ragdoll_fall_skull_break_blood_mul = 1.15
 local rifle_penetration_threshold = 11
@@ -2439,8 +2439,8 @@ local function resolvePhysicsImpactLane(ent, hitgroup, bonename, data, relativeV
 			collisionNormal and math.abs(headAxis:Dot(collisionNormal)) or 0
 		) or 0
 
-		if axialLoad >= 0.58 and normalSpeed >= 390 then
-			return {name = "spine3", reserve = 1.05, scale = 3.8, axialLoad = axialLoad}
+		if axialLoad >= 0.58 and normalSpeed >= 330 then
+			return {name = "spine3", reserve = 1.05, scale = 4.6, axialLoad = axialLoad}
 		end
 
 		return {name = "skull", reserve = 0.8, scale = 4.5, axialLoad = axialLoad}
@@ -2462,8 +2462,8 @@ local function resolvePhysicsImpactLane(ent, hitgroup, bonename, data, relativeV
 	if hitgroup == HITGROUP_CHEST or hitgroup == HITGROUP_STOMACH then
 		local physAng = IsValid(data.PhysObject) and data.PhysObject:GetAngles()
 		local axialLoad = physAng and collisionNormal and math.abs(physAng:Forward():Dot(collisionNormal)) or 0
-		if axialLoad >= 0.72 and normalSpeed >= 480 then
-			return {name = hitgroup == HITGROUP_CHEST and "spine2" or "spine1", reserve = 0.7, scale = 2.8, axialLoad = axialLoad}
+		if axialLoad >= 0.55 and normalSpeed >= 350 then
+			return {name = hitgroup == HITGROUP_CHEST and "spine2" or "spine1", reserve = 0.9, scale = 4.5, axialLoad = axialLoad}
 		end
 
 		return {name = hitgroup == HITGROUP_CHEST and "chest" or "pelvis", reserve = 0.55, scale = 2.2, axialLoad = axialLoad}
@@ -2522,7 +2522,7 @@ local function velocityDamage(ent, data)
 	
 	if !ent.organism then return end
 	if dmg * 20 < 0.1 then return end
-	dmg = dmg * 1.5
+	dmg = dmg * 2.25
 	local rawPhysicsDamage = dmg * 20
 
 	dmg = math.min(dmg, 5)

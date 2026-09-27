@@ -582,6 +582,7 @@ hook.Add("HomigradDamage", "HG_PainScreamDamage", function(ply, dmgInfo)
 	if !canPainScream(ply) then return end
 
 	local dmg = dmgInfo:GetDamage()
+	if dmg < 25 then return end
 	local amount
 
 	if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) and dmg >= 6 then
@@ -619,16 +620,6 @@ hook.Add("Org Think", "HG_PainScreamThink", function(owner, org)
 			org.painScreamNext = time + 1
 		end
 	end
-
-	if math.max(org.pain or 0, org.avgpain or 0) < 65 or owner.painScreamPatch
-		or (org.genderedPainScreamNext or 0) > time then return end
-	local phrases = (org.avgpain or 0) >= 90 and hg.BigPainSounds
-		or hg.GenderedPainScreamSounds[ThatPlyIsFemale(owner) and "female" or "male"]
-	if playPainScream(owner, phrases, true) then
-		org.genderedPainScreamNext = time + math.Rand(7, 10)
-	else
-		org.genderedPainScreamNext = time + 2
-	end
 end)
 
 hook.Add("PreHomigradDamage","BurnScream", function( ent, dmgInfo )
@@ -644,8 +635,8 @@ hook.Add("PreHomigradDamage","BurnScream", function( ent, dmgInfo )
 		return
 	end
 
-		if dmgInfo:IsDamageType(DMG_BURN)
-	and ply.organism and !ply.organism.otrub and (ply.organism.cotard or 0) <= 0 and ply:Alive() then
+	if dmgInfo:IsDamageType(DMG_BURN) and dmgInfo:GetDamage() >= 25
+		and ply.organism and !ply.organism.otrub and (ply.organism.cotard or 0) <= 0 and ply:Alive() then
 		local phrase = hg.UniversalScreamSounds[mRandom(#hg.UniversalScreamSounds)]
 
 		-- overrides

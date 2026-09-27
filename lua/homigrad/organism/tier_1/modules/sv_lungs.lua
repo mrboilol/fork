@@ -72,6 +72,7 @@ module[1] = function(org)
 	org.o2[1] = org.o2.range
 
 	org.CO = 0
+	org._lowO2Time = 0
 
 	org.COregen = 0
 	org.fireCOExposure = 0
@@ -733,7 +734,7 @@ module[2] = function(owner, org, timeValue)
 		org._lowO2Time = math.max((org._lowO2Time or 0) - timeValue * 2, 0)
 	end
 
-	if org._lowO2Time > 5 then
+	if o2[1] < 8 and org._lowO2Time > 5 then
 		local buildRate = math.Clamp((org._lowO2Time - 5) / 30, 0, 1)
 		org.CO = math.min(org.CO + timeValue * buildRate * 1.4, 30)
 	end
@@ -983,7 +984,7 @@ module[2] = function(owner, org, timeValue)
 		pressureDelivery,
 		1 - math.Clamp(org.hypertension or 0, 0, 1) ^ 2 * 0.85
 	)
-	local tissuePerfusionTarget = rawTissuePerfusion ^ 0.72
+	local tissuePerfusionTarget = rawTissuePerfusion
 	local currentTissuePerfusion = math.Clamp(tonumber(org.circulatoryO2Reserve) or 1, 0, 1)
 	local transitionTime = tissuePerfusionTarget < currentTissuePerfusion
 		and Lerp(1 - tissuePerfusionTarget, 14, 8)

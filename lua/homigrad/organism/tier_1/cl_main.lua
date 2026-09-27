@@ -1238,7 +1238,7 @@ local function GetWoundTransform(ent, wound, mat, boneID)
 end
 
 function hg.AddPersistentBodyBloodMark(ent, pos, normal, size)
-	if not IsValid(ent) or not isvector(pos) then return false end
+	if not IsValid(ent) or not isvector(pos) or ent:WaterLevel() >= 2 then return false end
 	local ang = isvector(normal) and normal:LengthSqr() > 0.001 and normal:Angle() or angle_zero
 	local localPos, localAng, bone = hg.organism.GetWoundAnchor(ent, pos + ang:Forward() * 0.15, ang)
 	if not localPos then return false end
@@ -1295,6 +1295,17 @@ end
 local function refreshPersistentBodyDecals(ent, wounds, blood)
 	wounds = istable(wounds) and wounds or {}
 	blood = istable(blood) and blood or {}
+	if (ent.hgNextBodyDecalExpiry or 0) <= CurTime() then
+		ent.hgNextBodyDecalExpiry = CurTime() + 5
+		for _, marks in ipairs({wounds, blood}) do
+			for index = #marks, 1, -1 do
+				if CurTime() - (tonumber(marks[index][5]) or 0) >= 120 then
+					table.remove(marks, index)
+					ent.hgPersistentDecalsDirty = true
+				end
+			end
+		end
+	end
 	local model = ent:GetModel()
 	if ent.hgPersistentDecalModel != model then
 		ent.hgPersistentDecalModel = model
