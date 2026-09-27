@@ -267,6 +267,17 @@ local function findGroundPosition(cfg, pos, ragdoll, currentFootZ, pelvisZ)
 	return Vector(pos.x, pos.y, currentFootZ), Vector(0, 0, 1)
 end
 
+local function findGroundForBalance(pos, ragdoll)
+	local tr = util.TraceLine({
+		start = Vector(pos.x, pos.y, pos.z + 10),
+		endpos = Vector(pos.x, pos.y, pos.z - 200),
+		mask = MASK_SOLID_BRUSHONLY,
+		filter = ragdoll,
+	})
+	if tr.Hit and sanitizeVector(tr.HitPos, nil) then return tr.HitPos end
+	return Vector(pos.x, pos.y, pos.z - 200)
+end
+
 local function groundTrace(ply, ragdoll, dist)
 	local center = ragdoll:WorldSpaceCenter()
 	return util.TraceLine({
@@ -558,6 +569,26 @@ local function updateStumble(st, ragdoll)
 			chain:Update()
 		end
 	end
+
+	local decayMult = math.Clamp(1 - (now - st.startTime - cfg.TimeBeforeDecay) / cfg.DecayDuration, 0, 1) * st.vigor
+	local groundedLegs = (st.hasGroundContact[1] and 1 or 0) + (st.hasGroundContact[2] and 1 or 0)
+	if groundedLegs == 0 then return end
+
+	local feetMid = (st.footPositions[1] + st.footPositions[2]) / 2
+	local groundBelowFeet = findGroundForBalance(feetMid, ragdoll)
+	local diffZ = groundBelowFeet.z + cfg.HipTargetHeight - pelvisPos.z
+	local damperForce = diffZ < 10 and rawVel.z * -12 or 0
+	local totalZForce = (diffZ * 35 + damperForce) * decayMult
+	if isValidNumber(totalZForce) then
+		st.spine:ApplyForceCenter(Vector(0, 0, math.max(totalZForce, 0)))
+	end
+
+	local lateralOffset = pelvisPos - feetMid
+	lateralOffset.z = 0
+	if not st.push and lateralOffset:Length() > 2 then
+		local correction = lateralOffset * -8 * decayMult
+		if sanitizeVector(correction, nil) then st.pelvis:ApplyForceCenter(correction) end
+	end
 end
 
 local function topple(st)
@@ -636,7 +667,6 @@ local function startStumble(ply, ragdoll)
 	stumbling[ragdoll] = st
 	ragdoll.hgStumbleActive = true
 	ragdoll.hgStumblePending = nil
-	topple(st)
 end
 
 local function queueStumble(ragdoll)

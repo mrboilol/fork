@@ -277,7 +277,7 @@ local function legs(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 	local dmg = dmg * 2.5
 	local amputateThreshold = org.isPly and player_crush_amputation_threshold or 4
 
-	if not org.NoDismembermentPhysics and dmgInfo:IsDamageType(DMG_CRUSH) and dmg > amputateThreshold and !org[key.."amputated"] then
+	if (tonumber(org.NoDismembermentPhysics) or 0) <= CurTime() and dmgInfo:IsDamageType(DMG_CRUSH) and dmg > amputateThreshold and !org[key.."amputated"] then
 		hg.organism.AmputateLimb(org, key, nil, dmgInfo)
 
 		return 0
@@ -346,7 +346,7 @@ local function arms(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 	local dmg = dmg * 2.5
 	local amputateThreshold = org.isPly and player_crush_amputation_threshold or 4
 	
-	if not org.NoDismembermentPhysics and dmgInfo:IsDamageType(DMG_CRUSH) and dmg > amputateThreshold and !org[key.."amputated"] then
+	if (tonumber(org.NoDismembermentPhysics) or 0) <= CurTime() and dmgInfo:IsDamageType(DMG_CRUSH) and dmg > amputateThreshold and !org[key.."amputated"] then
 		hg.organism.AmputateLimb(org, key, nil, dmgInfo)
 
 		return 0

@@ -1947,12 +1947,13 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	if hitgroup == HITGROUP_HEAD and dmgInfo:IsDamageType(DMG_SLASH) then damageStack = damageStack * 25 end
 	local inflictorClass = IsValid(dmgInfo:GetInflictor()) and dmgInfo:GetInflictor():GetClass() or ""
 	local grenadeBlastMul = string.find(inflictorClass, "ent_hg_grenade") and 1.8 or 1
-	damageStack = damageStack * (dmgInfo:IsDamageType(DMG_BLAST) and blast_gib_damage_mul / lend * grenadeBlastMul or 1) * (!dmgInfo:IsDamageType(DMG_CLUB+DMG_SLASH+DMG_BULLET+DMG_BUCKSHOT+DMG_BLAST+DMG_SNIPER) and 0 or 1) * (ent:IsNPC() and 3 or 1)
+	damageStack = damageStack * (dmgInfo:IsDamageType(DMG_BLAST) and blast_gib_damage_mul / lend * grenadeBlastMul or 1) * (!dmgInfo:IsDamageType(DMG_CLUB+DMG_SLASH+DMG_BULLET+DMG_BUCKSHOT+DMG_BLAST+DMG_SNIPER+DMG_GENERIC+DMG_CRUSH+DMG_FALL+DMG_VEHICLE) and 0 or 1) * (ent:IsNPC() and 3 or 1)
 	if impact.armorStopped then damageStack = 0 end
 	if isBallistic then damageStack = damageStack * impact.destructiveMultiplier end
 	damageStack = damageStack * gore_damage_mul
 	--damageStack = damageStack * (bullet and bullet.AmmoType and hg.ammotypeshuy[bullet.AmmoType] and hg.ammotypeshuy[bullet.AmmoType].BulletSettings and hg.ammotypeshuy[bullet.AmmoType].BulletSettings.Mass or 1) / 8
-	if not noDismemberment and hg.FullBodyExplode and not org.fullbodyexploded and dmgInfo:IsDamageType(DMG_BLAST) and (damageStack >= full_body_blast_gib_threshold or dmg_before >= full_body_blast_damage_threshold) then
+	local catastrophicImpact = dmgInfo:IsDamageType(DMG_CLUB+DMG_CRUSH+DMG_FALL+DMG_VEHICLE+DMG_GENERIC) and damageStack > 0 and dmg_before * armorMit >= full_body_blast_damage_threshold
+	if not noDismemberment and hg.FullBodyExplode and not org.fullbodyexploded and ((dmgInfo:IsDamageType(DMG_BLAST) and (damageStack >= full_body_blast_gib_threshold or dmg_before >= full_body_blast_damage_threshold)) or catastrophicImpact) then
 		return hg.FullBodyExplode(ent, dirCool * len, dmgInfo) or true
 	end
 	
@@ -2490,12 +2491,10 @@ local function velocityDamage(ent, data)
 	local speed = relativeVelocity:Length()
 	if speed < 280 then return end
 	if IsValid(data.HitEntity) and data.HitEntity.NoDismemberment then
-		-- A thrown item can transfer momentum before this ragdoll hits the world.
-		-- Keep that secondary impact from becoming projectile-caused dismemberment.
-		ent.NoDismembermentPhysics = true
+		ent.NoDismembermentPhysics = CurTime() + 1
 		return
 	end
-	local noDismemberment = ent.NoDismembermentPhysics
+	local noDismemberment = (tonumber(ent.NoDismembermentPhysics) or 0) > CurTime()
 	
 	ent.hgLastTouched = ent.hgLastTouched or setmetatable({}, {__mode = "k"})
 	local physTouches = ent.hgLastTouched[data.PhysObject]
@@ -2607,11 +2606,9 @@ local function velocityDamage(ent, data)
 			dmgInfo:SetDamage(dmg * 20)
 		end
 	end
-	rawPhysicsDamage = dmg * 20
-
 	local org = ent.organism
-	if ent.NoDismembermentPhysics then org.NoDismembermentPhysics = true end
-	noDismemberment = noDismemberment or org.NoDismembermentPhysics
+	org.NoDismembermentPhysics = math.max(tonumber(org.NoDismembermentPhysics) or 0, tonumber(ent.NoDismembermentPhysics) or 0)
+	noDismemberment = noDismemberment or (tonumber(org.NoDismembermentPhysics) or 0) > CurTime()
 	if org.godmode then return end
 	local throwImpulse = (ent.hgThrowImpulseUntil or 0) > CurTime()
 	local ragdollOwner = hg.RagdollOwner(ent)
@@ -2841,21 +2838,6 @@ function hg.BreakNeck(ent, recipient, soundEnt)
 		if IsValid(ent) and hg.fakeBoneFlop then
 			hg.fakeBoneFlop.ScheduleApply(ent, "ValveBiped.Bip01_Spine3", org)
 			hg.fakeBoneFlop.ScheduleApply(ent, "ValveBiped.Bip01_Head1", org)
-			timer.Simple(0.05, function()
-				if IsValid(ent) and hg.fakeBoneFlop then
-					hg.fakeBoneFlop.BendStored(ent, org, 1.0)
-				end
-			end)
-			timer.Simple(0.15, function()
-				if IsValid(ent) and hg.fakeBoneFlop then
-					hg.fakeBoneFlop.BendStored(ent, org, 0.6)
-				end
-			end)
-			timer.Simple(0.3, function()
-				if IsValid(ent) and hg.fakeBoneFlop then
-					hg.fakeBoneFlop.BendStored(ent, org, 0.3)
-				end
-			end)
 		end
 	end)
 end

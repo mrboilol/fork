@@ -744,7 +744,7 @@ module[2] = function(owner, org, timeValue)
 
 		local oxygenate = hg.organism.OxygenateBlood(org) * 0.5
 
-		local lerp = min(max(org.pulse - 20, 0) / 20, 1)
+		local lerp = math.Clamp((org.pulse or 0) / 30, 0, 1) ^ 0.5
 
 		local regen = Lerp(lerp, 0, o2.regen * oxygenate * math.Rand(0.95, 1.05))
 
@@ -975,10 +975,11 @@ module[2] = function(owner, org, timeValue)
 
 	end
 
-	local bloodDelivery = hg.organism.GetBloodDeliveryFraction(org.blood, 1)
-	local pressureDelivery = math.Clamp(((tonumber(org.bloodPressure) or 90) - 25) / 65, 0, 1)
+	local bloodDelivery = 0.1 + 0.9 * hg.organism.GetBloodDeliveryFraction(org.blood, 1)
+	local pressureDelivery = 0.2 + 0.8 * math.Clamp(((tonumber(org.bloodPressure) or 90) - 20) / 50, 0, 1)
+	local flowDelivery = 0.2 + 0.8 * math.Clamp((tonumber(org.cardiacOutput) or 1) / 0.8, 0, 1)
 	local rawTissuePerfusion = math.min(
-		math.Clamp(org.cardiacOutput or 1, 0, 1),
+		flowDelivery,
 		hg.organism.GetPulseOxygenPerfusion(org.pulse),
 		pressureDelivery,
 		bloodDelivery,

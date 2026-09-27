@@ -345,12 +345,11 @@ function ENT:PhysicsCollide(data, phys)
 	local target = IsValid(ragdollOwner) and ragdollOwner or hitEnt
 	if not IsValid(target) then return end
 	if self.NoDismemberment then
-		-- Direct hits can launch a ragdoll into another surface after this entity
-		-- is gone. Keep that body exempt from physics gibs for its lifetime.
-		hitEnt.NoDismembermentPhysics = true
-		target.NoDismembermentPhysics = true
-		if IsValid(target.FakeRagdoll) then target.FakeRagdoll.NoDismembermentPhysics = true end
-		if target.organism then target.organism.NoDismembermentPhysics = true end
+		local dismembermentGraceUntil = CurTime() + 1
+		hitEnt.NoDismembermentPhysics = dismembermentGraceUntil
+		target.NoDismembermentPhysics = dismembermentGraceUntil
+		if IsValid(target.FakeRagdoll) then target.FakeRagdoll.NoDismembermentPhysics = dismembermentGraceUntil end
+		if target.organism then target.organism.NoDismembermentPhysics = dismembermentGraceUntil end
 	end
 	local targetOrganism = target.organism
 
