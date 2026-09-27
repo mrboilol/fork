@@ -402,6 +402,13 @@ local tr = {
 	filter = {}
 }
 
+local function grabHeld(ply, ragdoll, key, side)
+	if ply:KeyDown(key) then return true end
+	local reflex = ragdoll.hgReflexGrab
+
+	return reflex and (reflex[side] or 0) > CurTime() or false
+end
+
 local hg_fake_stamina = CreateConVar("hg_fake_stamina", "1", FCVAR_ARCHIVE + FCVAR_NOTIFY, "Enables stamina when ragdolled", 0, 1)
 
 local util_TraceLine, util_TraceHull = util.TraceLine, util.TraceHull
@@ -1365,7 +1372,7 @@ hook.Add("Think", "Fake", function()
 			local leftArmInjured = (org.larm or 0) >= 1 or org.larmdislocation or org.larmdislocated
 			local rightArmInjured = (org.rarm or 0) >= 1 or org.rarmdislocation or org.rarmdislocated
 
-			if ply:KeyDown(IN_SPEED) and org.canmove and !org.larmamputated and !org.larmupamputated and (!ply.HandsStun or ply.HandsStun < CurTime()) then
+			if grabHeld(ply, ragdoll, IN_SPEED, "l") and org.canmove and !org.larmamputated and !org.larmupamputated and (!ply.HandsStun or ply.HandsStun < CurTime()) then
 				if IsValid(ragdoll.ConsLH) then
 					if hg_fake_stamina:GetBool() then
 						org.stamina.subadd = org.stamina.subadd + 0.06 * (ragdoll.staminaLeftModifyer or 0.5) * ( IsValid(ragdoll.ConsRH) and 0.35 or 1.25) * (on_ground and 0.25 or 1) * (ply.GetTraitMultiplier and ply:GetTraitMultiplier("climb_stamina_cost", 1) or 1)
@@ -1443,7 +1450,7 @@ hook.Add("Think", "Fake", function()
 				end
 			end
 
-			if ply:KeyDown(IN_WALK) and org.canmove and !(ishgweapon(wep) or wep.ismelee2) and !org.rarmamputated and !org.rarmupamputated and (!ply.HandsStun or ply.HandsStun < CurTime()) then
+			if grabHeld(ply, ragdoll, IN_WALK, "r") and org.canmove and !(ishgweapon(wep) or wep.ismelee2) and !org.rarmamputated and !org.rarmupamputated and (!ply.HandsStun or ply.HandsStun < CurTime()) then
 				if IsValid(ragdoll.ConsRH) then
 					if hg_fake_stamina:GetBool() then
 						org.stamina.subadd = org.stamina.subadd + 0.06 * (ragdoll.staminaRightModifyer or 1) * ( IsValid(ragdoll.ConsLH) and 0.35 or 1.25) * (on_ground and 0.25 or 1) * (ply.GetTraitMultiplier and ply:GetTraitMultiplier("climb_stamina_cost", 1) or 1)

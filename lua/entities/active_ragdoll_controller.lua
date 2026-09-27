@@ -107,6 +107,10 @@ function ENT:GetReactionStrength()
     return self.reaction_strength or 1
 end
 
+function ENT:SetBoneStrength(tbl)
+    self.bone_strength = istable(tbl) and tbl or nil
+end
+
 function ENT:SetResponseSpeed(v)
     self.response_speed = math_clamp(v or 1, 0.1, 1.25)
 end
@@ -370,7 +374,8 @@ function ENT:PhysicsSimulate(phys, dt)
     end
 
     local response = self.response_speed or 1
-    local strength = (self.reaction_strength or 1) * response
+    local boneMul = self.bone_strength and self.bone_strength[data.name] or 1
+    local strength = (self.reaction_strength or 1) * response * boneMul
     angVel:Mul(strength)
     
     local currentVel = Vector(0, 0, 0)

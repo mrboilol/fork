@@ -140,8 +140,8 @@ function SWEP:PrimarySpread()
 			wobbleVelocity[2] = wobbleVelocity[2] - lateralImpulse * (29 + math.abs(side) * 7)
 			wobbleVelocity[3] = wobbleVelocity[3] - lateralImpulse * (5 + math.abs(roll) * 4)
 			offsetVelocity[1] = offsetVelocity[1] - recoilImpulse * 10
-			offsetVelocity[2] = offsetVelocity[2] + lateralImpulse * 6
-			offsetVelocity[3] = offsetVelocity[3] + recoilImpulse * 4
+			offsetVelocity[2] = offsetVelocity[2] + recoilImpulse * 4
+			offsetVelocity[3] = offsetVelocity[3] + lateralImpulse * 6
 		else
 			wobbleVelocity[1] = wobbleVelocity[1] - recoilImpulse * ((longGun and 78 or 32) + math.abs(side) * 4)
 			wobbleVelocity[2] = wobbleVelocity[2] + side * lateralImpulse * 8

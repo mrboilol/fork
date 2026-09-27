@@ -1,6 +1,10 @@
 local hg_euphoria_getup_stumble = CreateConVar("hg_euphoria_getup_stumble", "1", FCVAR_ARCHIVE + FCVAR_NOTIFY, "grounded fake ragdoll balance and stumbling (Artagdoll-style)", 0, 1)
 local hg_euphoria_cover = CreateConVar("hg_euphoria_cover", "1", FCVAR_ARCHIVE + FCVAR_NOTIFY, "fake ragdolls cover their face when hit, falling or tumbling fast (Artagdoll Cower)", 0, 1)
+local hg_euphoria_death_throes = CreateConVar("hg_euphoria_death_throes", "1", FCVAR_ARCHIVE + FCVAR_NOTIFY, "players writhe briefly when they die conscious (Artagdoll Dying)", 0, 1)
+local hg_euphoria_tumble = CreateConVar("hg_euphoria_tumble", "1", FCVAR_ARCHIVE + FCVAR_NOTIFY, "fake ragdolls tuck and roll when tumbling fast along the ground (Artagdoll Tumble)", 0, 1)
+local hg_euphoria_holdenv = CreateConVar("hg_euphoria_holdenv", "1", FCVAR_ARCHIVE + FCVAR_NOTIFY, "fake ragdolls reach for nearby surfaces and grab them with the fake hands (Artagdoll HoldEnv)", 0, 1)
 local hg_euphoria_windmill = CreateConVar("hg_euphoria_windmill", "1", FCVAR_ARCHIVE + FCVAR_NOTIFY, "fake ragdolls windmill while airborne (Artagdoll Falling)", 0, 1)
+local hg_hit_knockdown_energy = CreateConVar("hg_hit_knockdown_energy", "110", FCVAR_ARCHIVE + FCVAR_NOTIFY, "hit energy (damage summed over a short window) that knocks a standing player over, 0 disables", 0, 10000)
 
 local IKSystem = include("system_/utils/IKChain.lua")
 
@@ -23,12 +27,101 @@ local TOPPLE_PUSH = 110
 local TOPPLE_DOWN = 60
 local TOPPLE_ROLL = 200
 
+local ENERGY_WINDOW = 0.3
+local ENERGY_REF = 30
+local ENERGY_PUSH_MIN = 0.5
+local ENERGY_PUSH_MAX = 3
+local ENERGY_PLAYER_PUSH = 2.5
+local ENERGY_PLAYER_PUSH_MAX = 350
+local ENERGY_RAG_PUSH = 2
+local ENERGY_RAG_PUSH_MAX = 300
+local ENERGY_FLING = 1.5
+local ENERGY_FLING_MAX = 320
+local ENERGY_FLING_LIFT = 0.15
+
+local ENERGY_TYPES = {
+	{DMG_BUCKSHOT, 1},
+	{DMG_BULLET, 1},
+	{DMG_CLUB, 1.5},
+	{DMG_SLASH, 0.5},
+}
+
 local REACT_COVER_TIME = 1.5
 local REACT_FAST_SPEED = 350
 local REACT_FAST_COVER_TIME = 0.75
 local REACT_AIR_SPEED = 150
 local REACT_AIR_TRACE = 60
 local REACT_IDLE_REMOVE = 2
+local REACT_WRITHE_TIME = 2.5
+local REACT_CRITICAL_PAIN = 80
+
+local START_MIN_SPEED = 40
+local STILL_GRACE = 0.35
+local DECAY_VIGOR_FLOOR = 0.3
+
+local VIGOR_MIN = 0.15
+local BLOOD_WEAK_FRAC = 0.45
+local BLOOD_FULL_FRAC = 0.85
+local CONSCIOUS_WEAK = 0.3
+local CONSCIOUS_FULL = 0.9
+local STAMINA_FLOOR = 0.35
+local STAMINA_MAX_FALLBACK = 180
+
+local LEG_TRIP_CHANCE = {broken = 0.85, dislocated = 0.6}
+local LIMB_HURT_MIN = 0.3
+local LEG_HURT_TRIP_MUL = 0.5
+local LIMB_HURT_WEAKEN = 0.7
+local TRIP_SIDE_MUL = 1.5
+
+local DEATH_DELAY = 0.25
+local DEATH_TIME = 2.2
+local DEATH_STRENGTH = 3
+local DEATH_FADE_POW = 1.5
+
+local SPINE_REACT_BONES = {
+	"ValveBiped.Bip01_Spine",
+	"ValveBiped.Bip01_Spine1",
+	"ValveBiped.Bip01_Spine2",
+	"ValveBiped.Bip01_Spine4",
+	"ValveBiped.Bip01_Head1",
+}
+
+local DYING_SEQUENCES = {"Dying1", "Dying2", "Dying3", "Dying4", "Dying5", "Dying6"}
+
+local TUMBLE_SPEED = 250
+
+local HOLD_SEARCH_INTERVAL = 0.1
+local HOLD_MIN_SPEED = 120
+local HOLD_SEARCH_RADIUS = 40
+local HOLD_MIN_DIST = 6
+local HOLD_FLOOR_NORMAL = 0.7
+local HOLD_REACH_TIME = 0.6
+local HOLD_GRAB_DIST = 10
+local HOLD_CONFIRM_TIME = 0.3
+local HOLD_TIME_MIN = 0.8
+local HOLD_TIME_MAX = 2.5
+local HOLD_COOLDOWN = 1.5
+local HOLD_REACH_SS = 0.12
+local HOLD_REACH_SPEED = 400
+local HOLD_REACH_DAMP = 250
+local HOLD_SURFACE_OFFSET = 2
+
+local HOLD_DIRS = {
+	Vector(1, 0, 0),
+	Vector(-1, 0, 0),
+	Vector(0, 1, 0),
+	Vector(0, -1, 0),
+	Vector(0, 0, -1),
+	Vector(0.7, 0.7, 0),
+	Vector(-0.7, 0.7, 0),
+	Vector(0.7, -0.7, 0),
+	Vector(-0.7, -0.7, 0),
+}
+
+local HANDS = {
+	l = {phys = 5, limb = "larm", cons = "ConsLH"},
+	r = {phys = 7, limb = "rarm", cons = "ConsRH"},
+}
 
 local REACT_MODES = {
 	cover = {
@@ -38,23 +131,34 @@ local REACT_MODES = {
 		bones = {"ValveBiped.Bip01_Spine2", "ValveBiped.Bip01_Head1"},
 		legs = false,
 	},
+	tumble = {
+		sequences = {"Tumbling", "LEFT_Tumbling"},
+		rate = 1,
+		strength = 3.5,
+		bones = SPINE_REACT_BONES,
+		legs = true,
+	},
 	flail = {
 		sequences = {"Falling", "Falling2"},
 		rate = 1.25,
 		strength = 5,
-		bones = {"ValveBiped.Bip01_Spine", "ValveBiped.Bip01_Spine1", "ValveBiped.Bip01_Spine2", "ValveBiped.Bip01_Spine4", "ValveBiped.Bip01_Head1"},
+		bones = SPINE_REACT_BONES,
+		legs = true,
+	},
+	writhe = {
+		sequences = DYING_SEQUENCES,
+		rate = 0.8,
+		strength = 2.5,
+		bones = SPINE_REACT_BONES,
 		legs = true,
 	},
 }
 
-local ARM_BONES = {
-	l = {"ValveBiped.Bip01_L_UpperArm", "ValveBiped.Bip01_L_Forearm", "ValveBiped.Bip01_L_Hand"},
-	r = {"ValveBiped.Bip01_R_UpperArm", "ValveBiped.Bip01_R_Forearm", "ValveBiped.Bip01_R_Hand"},
-}
-
-local LEG_BONES = {
-	l = {"ValveBiped.Bip01_L_Thigh", "ValveBiped.Bip01_L_Calf", "ValveBiped.Bip01_L_Foot"},
-	r = {"ValveBiped.Bip01_R_Thigh", "ValveBiped.Bip01_R_Calf", "ValveBiped.Bip01_R_Foot"},
+local LIMB_BONES = {
+	larm = {"ValveBiped.Bip01_L_UpperArm", "ValveBiped.Bip01_L_Forearm", "ValveBiped.Bip01_L_Hand"},
+	rarm = {"ValveBiped.Bip01_R_UpperArm", "ValveBiped.Bip01_R_Forearm", "ValveBiped.Bip01_R_Hand"},
+	lleg = {"ValveBiped.Bip01_L_Thigh", "ValveBiped.Bip01_L_Calf", "ValveBiped.Bip01_L_Foot"},
+	rleg = {"ValveBiped.Bip01_R_Thigh", "ValveBiped.Bip01_R_Calf", "ValveBiped.Bip01_R_Foot"},
 }
 
 local AR_DEFAULTS = {
@@ -80,6 +184,7 @@ local AR_DEFAULTS = {
 
 local stumbling = {}
 local reacting = {}
+local dying = {}
 
 local function readConfig()
 	local cfg = {}
@@ -199,15 +304,62 @@ local function isAirborne(ply, ragdoll)
 	return not groundTrace(ply, ragdoll, REACT_AIR_TRACE).Hit
 end
 
+local function limbState(org, limb)
+	if org[limb .. "amputated"] or org[limb .. "upamputated"] then return "gone" end
+	if (org[limb] or 0) >= 1 then return "broken" end
+	if org[limb .. "dislocation"] then return "dislocated" end
+end
+
+local function limbStrength(org, limb)
+	if limbState(org, limb) then return 0 end
+	local dmg = org[limb] or 0
+	if dmg < LIMB_HURT_MIN then return 1 end
+
+	return 1 - dmg * LIMB_HURT_WEAKEN
+end
+
+local function legTripChance(org, limb)
+	local state = limbState(org, limb)
+	if state then return LEG_TRIP_CHANCE[state] or 1 end
+	local dmg = org[limb] or 0
+	if dmg < LIMB_HURT_MIN then return 0 end
+
+	return dmg * LEG_HURT_TRIP_MUL
+end
+
+local function vigor(org)
+	local maxBlood = math.max(org.maxblood or 5000, 1)
+	local bloodFrac = (org.blood or maxBlood) / maxBlood
+	local bloodMul = math.Clamp((bloodFrac - BLOOD_WEAK_FRAC) / (BLOOD_FULL_FRAC - BLOOD_WEAK_FRAC), 0, 1)
+	local consciousMul = math.Clamp(((org.consciousness or 1) - CONSCIOUS_WEAK) / (CONSCIOUS_FULL - CONSCIOUS_WEAK), 0, 1)
+	local stamina = org.stamina
+	local staminaFrac = stamina and stamina[1] and stamina[1] / (stamina.max or STAMINA_MAX_FALLBACK) or 1
+	local staminaMul = math.Clamp(staminaFrac, STAMINA_FLOOR, 1)
+
+	return bloodMul * consciousMul * staminaMul
+end
+
 local function legsUsable(org)
-	return not (org.llegamputated or org.llegupamputated or org.rlegamputated or org.rlegupamputated or org.lleg == 1 or org.rleg == 1)
+	local left = limbState(org, "lleg")
+	local right = limbState(org, "rleg")
+	if left == "gone" or right == "gone" then return false end
+
+	return not (left and right)
 end
 
 local function isAware(ply)
 	if not ply:Alive() then return false end
 	local org = ply.organism
-	return org and not org.otrub and org.canmove and true or false
+	if not org or org.otrub or not org.canmove or org.brainfuckv2Posture then return false end
+
+	return vigor(org) >= VIGOR_MIN
 end
+
+hg.RagdollReflex = {
+	Vigor = vigor,
+	LimbStrength = limbStrength,
+	IsAware = isAware,
+}
 
 local function canStumble(ply, ragdoll)
 	if not isAware(ply) or not legsUsable(ply.organism) then return false end
@@ -219,11 +371,26 @@ local function limbControl(ply)
 	return hg.KeyDown(ply, IN_ATTACK) or hg.KeyDown(ply, IN_ATTACK2) or hg.KeyDown(ply, IN_DUCK)
 end
 
+local function moveControl(ply)
+	return hg.KeyDown(ply, IN_FORWARD) or hg.KeyDown(ply, IN_BACK)
+		or hg.KeyDown(ply, IN_MOVELEFT) or hg.KeyDown(ply, IN_MOVERIGHT)
+end
+
+local function hasMomentum(ply, ragdoll)
+	local hit = ply.hgStumbleHit
+	if hit and CurTime() - hit.time < HIT_WINDOW then return true end
+	local pelvis = getBonePhys(ragdoll, "ValveBiped.Bip01_Pelvis")
+	if not IsValid(pelvis) then return false end
+	local vel = pelvis:GetVelocity()
+
+	return vel.x * vel.x + vel.y * vel.y > START_MIN_SPEED * START_MIN_SPEED
+end
+
 local function triggerCover(ragdoll, duration)
 	ragdoll.hgCoverUntil = math.max(ragdoll.hgCoverUntil or 0, CurTime() + duration)
 end
 
-local function makePush(st, dmgpos, fallbackDir)
+local function makePush(st, dmgpos, fallbackDir, energy)
 	local pelvisPos = st.pelvis:GetPos()
 
 	local dir
@@ -235,7 +402,8 @@ local function makePush(st, dmgpos, fallbackDir)
 	if not dir or dir:LengthSqr() < 0.01 then return end
 	dir:Normalize()
 
-	st.push = {dir = dir, startTime = CurTime(), duration = st.cfg.PushDuration}
+	local scale = math.Clamp((energy or ENERGY_REF) / ENERGY_REF, ENERGY_PUSH_MIN, ENERGY_PUSH_MAX)
+	st.push = {dir = dir, scale = scale, startTime = CurTime(), duration = st.cfg.PushDuration}
 	st.pushDir = dir
 end
 
@@ -321,7 +489,7 @@ local function updateStumble(st, ragdoll)
 	if st.push then
 		local elapsed = now - st.push.startTime
 		if elapsed < st.push.duration then
-			local force = st.push.dir * (cfg.PushPeakForce * math.sin(elapsed / st.push.duration * math.pi))
+			local force = st.push.dir * (cfg.PushPeakForce * st.push.scale * math.sin(elapsed / st.push.duration * math.pi))
 			if sanitizeVector(force, nil) then
 				st.pelvis:ApplyForceCenter(force)
 				st.spine:ApplyForceCenter(force * 0.5)
@@ -337,6 +505,12 @@ local function updateStumble(st, ragdoll)
 	if speed > cfg.MaxVelocityClamp then
 		safeVel = safeVel:GetNormalized() * cfg.MaxVelocityClamp
 		speed = cfg.MaxVelocityClamp
+	end
+
+	if speed < cfg.StationaryThreshold and not st.push then
+		st.stillSince = st.stillSince or now
+	else
+		st.stillSince = nil
 	end
 
 	if now - st.lastGroundCheckTime > 0.05 then
@@ -375,6 +549,11 @@ local function updateStumble(st, ragdoll)
 			if st.footPositions[i]:DistToSqr(st.ghostPositions[i]) > trigger * trigger
 				and not st.legState[i == 1 and 2 or 1].isStepping
 				and now - state.lastStepTime > cfg.MinStepInterval then
+				if math.Rand(0, 1) < st.legTrip[i] then
+					st.tripLeg = i
+					return
+				end
+
 				state.isStepping = true
 				state.progress = 0
 				state.startPos = st.footPositions[i]
@@ -391,7 +570,7 @@ local function updateStumble(st, ragdoll)
 		end
 	end
 
-	local decayMult = math.Clamp(1 - (now - st.startTime - cfg.TimeBeforeDecay) / cfg.DecayDuration, 0, 1)
+	local decayMult = math.Clamp(1 - (now - st.startTime - cfg.TimeBeforeDecay) / cfg.DecayDuration, 0, 1) * st.vigor
 	local groundedLegs = (st.hasGroundContact[1] and 1 or 0) + (st.hasGroundContact[2] and 1 or 0)
 	if groundedLegs == 0 then return end
 
@@ -422,6 +601,13 @@ local function topple(st)
 	if dir:LengthSqr() < 0.01 then return end
 	dir = dir:GetNormalized()
 
+	local tripFoot = st.tripLeg and st.footPositions[st.tripLeg]
+	if tripFoot then
+		local side = tripFoot - st.pelvis:GetPos()
+		side.z = 0
+		if side:LengthSqr() > 0.01 then dir = (dir + side:GetNormalized() * TRIP_SIDE_MUL):GetNormalized() end
+	end
+
 	st.spine:AddVelocity(dir * TOPPLE_PUSH + Vector(0, 0, -TOPPLE_DOWN))
 	st.pelvis:AddVelocity(dir * -TOPPLE_PUSH * 0.3)
 
@@ -440,8 +626,8 @@ local function stopStumble(ragdoll, reason)
 	if IKSystem and IKSystem.RemoveEntityChains then IKSystem.RemoveEntityChains(ragdoll) end
 	if not IsValid(st.pelvis) or not IsValid(st.spine) then return end
 
-	if reason == "decay" then topple(st) end
-	if reason == "decay" or reason == "fell" then triggerCover(ragdoll, REACT_COVER_TIME) end
+	if reason == "decay" or reason == "trip" then topple(st) end
+	if reason == "decay" or reason == "trip" or reason == "fell" then triggerCover(ragdoll, REACT_COVER_TIME) end
 end
 
 local function startStumble(ply, ragdoll)
@@ -449,6 +635,7 @@ local function startStumble(ply, ragdoll)
 	local spine = getBonePhys(ragdoll, "ValveBiped.Bip01_Spine2")
 	if not IsValid(pelvis) or not IsValid(spine) then return end
 
+	local org = ply.organism
 	local st = {
 		ply = ply,
 		cfg = readConfig(),
@@ -458,18 +645,24 @@ local function startStumble(ply, ragdoll)
 		lastGroundCheckTime = 0,
 		smoothedVelocity = Vector(0, 0, 0),
 		ikChains = {},
+		vigor = vigor(org),
+		legTrip = {legTripChance(org, "lleg"), legTripChance(org, "rleg")},
 	}
 
 	local hit = ply.hgStumbleHit
 	if hit and CurTime() - hit.time < HIT_WINDOW then
-		makePush(st, hit.pos, hit.dir)
+		makePush(st, hit.pos, hit.dir, hit.energy)
 	end
 
 	initLegs(st, ragdoll)
 
 	if IKSystem and IKSystem.CreateChain then
-		st.ikChains[1] = IKSystem.CreateChain(ragdoll, LEG_BONES.l, "leftLeg", Vector(0, 0, 50))
-		st.ikChains[2] = IKSystem.CreateChain(ragdoll, LEG_BONES.r, "rightLeg", Vector(0, 0, 50))
+		if not limbState(org, "lleg") then
+			st.ikChains[1] = IKSystem.CreateChain(ragdoll, LIMB_BONES.lleg, "leftLeg", Vector(0, 0, 50))
+		end
+		if not limbState(org, "rleg") then
+			st.ikChains[2] = IKSystem.CreateChain(ragdoll, LIMB_BONES.rleg, "rightLeg", Vector(0, 0, 50))
+		end
 	end
 
 	stumbling[ragdoll] = st
@@ -482,15 +675,59 @@ local function queueStumble(ragdoll)
 	ragdoll.hgStumblePending = {from = now + START_DELAY, untilT = now + START_DELAY + START_WINDOW}
 end
 
-local function reactBones(mode, org)
-	local bones = table.Copy(mode.bones)
-	if not (org.larmamputated or org.larmupamputated) then table.Add(bones, ARM_BONES.l) end
-	if not (org.rarmamputated or org.rarmupamputated) then table.Add(bones, ARM_BONES.r) end
-	if mode.legs then
-		if not (org.llegamputated or org.llegupamputated) then table.Add(bones, LEG_BONES.l) end
-		if not (org.rlegamputated or org.rlegupamputated) then table.Add(bones, LEG_BONES.r) end
+local function isFloppy(ragdoll, org, bone)
+	local ragFloppy = ragdoll.hg_floppy_bones
+	local orgFloppy = org.fake_floppy_bones
+
+	return ragFloppy and ragFloppy[bone] or orgFloppy and orgFloppy[bone] or false
+end
+
+local LIMB_HAND = {larm = "l", rarm = "r"}
+
+local function handBusy(ragdoll, limb)
+	local side = LIMB_HAND[limb]
+	if not side then return false end
+	if IsValid(ragdoll[HANDS[side].cons]) then return true end
+	local reach = ragdoll.hgEnvReach
+
+	return reach and reach[side] and true or false
+end
+
+local function reactBones(mode, org, ragdoll)
+	local bones = {}
+	local strength = {}
+	for _, bone in ipairs(mode.bones) do
+		if not isFloppy(ragdoll, org, bone) then bones[#bones + 1] = bone end
 	end
-	return bones
+
+	for limb, limbBones in pairs(LIMB_BONES) do
+		local isLeg = limb == "lleg" or limb == "rleg"
+		if isLeg and not mode.legs then continue end
+		local mul = limbStrength(org, limb)
+		if mul <= 0 or handBusy(ragdoll, limb) then continue end
+
+		for _, bone in ipairs(limbBones) do
+			if isFloppy(ragdoll, org, bone) then continue end
+			bones[#bones + 1] = bone
+			strength[bone] = mul
+		end
+	end
+
+	return bones, strength
+end
+
+local function limbKey(org, ragdoll)
+	local floppy = ragdoll.hg_floppy_bones and table.Count(ragdoll.hg_floppy_bones) or 0
+
+	return table.concat({
+		limbStrength(org, "larm"),
+		limbStrength(org, "rarm"),
+		limbStrength(org, "lleg"),
+		limbStrength(org, "rleg"),
+		floppy,
+		handBusy(ragdoll, "larm") and 1 or 0,
+		handBusy(ragdoll, "rarm") and 1 or 0,
+	}, "/")
 end
 
 local function spawnController(ragdoll)
@@ -539,8 +776,11 @@ local function setReactMode(rs, modeName, org)
 	local seq = rs.ent:LookupSequence(mode.sequences[math.random(#mode.sequences)])
 	if not seq or seq == -1 then return end
 
-	rs.ent:SetBoneList(reactBones(mode, org))
-	rs.ent:SetReactionStrength(mode.strength)
+	local bones, strength = reactBones(mode, org, rs.ragdoll)
+	rs.ent:SetBoneList(bones)
+	rs.ent:SetBoneStrength(strength)
+	rs.ent:SetReactionStrength(mode.strength * vigor(org))
+	rs.limbKey = limbKey(org, rs.ragdoll)
 	rs.ent:ResetSequence(seq)
 	rs.ent:SetPlaybackRate(mode.rate)
 	rs.ent:SetCycle(0)
@@ -577,14 +817,27 @@ local function wantedReaction(ply, ragdoll)
 	end
 
 	if hg_euphoria_windmill:GetBool() and isAirborne(ply, ragdoll) then return "flail" end
-	if not hg_euphoria_cover:GetBool() then return end
 
 	local root = ragdoll:GetPhysicsObject()
+	if hg_euphoria_tumble:GetBool() and IsValid(root) and not stumbling[ragdoll] and not moveControl(ply) then
+		local vel = root:GetVelocity()
+		local grounded = groundTrace(ply, ragdoll, REACT_AIR_TRACE).Hit
+		if grounded and vel.x * vel.x + vel.y * vel.y > TUMBLE_SPEED * TUMBLE_SPEED then return "tumble" end
+	end
+
+	if not hg_euphoria_cover:GetBool() then return end
+
 	if IsValid(root) and root:GetVelocity():LengthSqr() > REACT_FAST_SPEED * REACT_FAST_SPEED then
 		triggerCover(ragdoll, REACT_FAST_COVER_TIME)
 	end
 
 	if (ragdoll.hgCoverUntil or 0) > CurTime() then return "cover" end
+	if moveControl(ply) or stumbling[ragdoll] then return end
+
+	local org = ply.organism
+	local critical = org.critical or (org.pain or 0) > REACT_CRITICAL_PAIN
+	if not critical and (ragdoll.hgWritheUntil or 0) <= CurTime() then return end
+	if not isUpright(ply, ragdoll) then return "writhe" end
 end
 
 local function updateReaction(ply, ragdoll)
@@ -596,7 +849,14 @@ local function updateReaction(ply, ragdoll)
 		local pelvis = getBonePhys(ragdoll, "ValveBiped.Bip01_Pelvis")
 		local ctrl = IsValid(pelvis) and spawnController(ragdoll)
 		if not ctrl then return end
-		rs = {ply = ply, ent = ctrl, pelvis = pelvis, pelvisBone = ctrl:LookupBone("ValveBiped.Bip01_Pelvis"), idleSince = CurTime()}
+		rs = {
+			ply = ply,
+			ragdoll = ragdoll,
+			ent = ctrl,
+			pelvis = pelvis,
+			pelvisBone = ctrl:LookupBone("ValveBiped.Bip01_Pelvis"),
+			idleSince = CurTime(),
+		}
 		reacting[ragdoll] = rs
 	end
 
@@ -605,14 +865,20 @@ local function updateReaction(ply, ragdoll)
 		return
 	end
 
-	setReactMode(rs, modeName, ply.organism)
+	local org = ply.organism
+	if rs.mode and rs.limbKey ~= limbKey(org, ragdoll) then rs.mode = "stale" end
+	setReactMode(rs, modeName, org)
 
 	if not rs.mode then
 		if CurTime() - rs.idleSince > REACT_IDLE_REMOVE then removeReaction(ragdoll) end
 		return
 	end
 
-	local held = (ragdoll.HGFallCoverActive or ragdoll.hgWoundGrab) and true or false
+	local mode = REACT_MODES[rs.mode]
+	if not mode then return end
+	rs.ent:SetReactionStrength(mode.strength * vigor(org))
+
+	local held = (ragdoll.HGFallCoverActive or ragdoll.hgWoundGrab or ragdoll.hgCurl) and true or false
 	if held ~= rs.held then
 		rs.held = held
 		rs.ent:SetControllerEnabled(not held)
@@ -625,8 +891,9 @@ hook.Add("Fake", "HG_EuphoriaStumble", function(ply, ragdoll)
 	if not IsValid(ragdoll) then return end
 
 	local hit = ply.hgStumbleHit
-	if hit and CurTime() - hit.time < HIT_WINDOW and (hit.dmg or 0) >= HIT_MIN_DMG then
+	if hit and CurTime() - hit.time < HIT_WINDOW and math.max(hit.dmg or 0, hit.energy or 0) >= HIT_MIN_DMG then
 		triggerCover(ragdoll, REACT_COVER_TIME)
+		ragdoll.hgWritheUntil = CurTime() + REACT_COVER_TIME + REACT_WRITHE_TIME
 	end
 
 	if hg_euphoria_getup_stumble:GetBool() then queueStumble(ragdoll) end
@@ -636,16 +903,75 @@ hook.Add("Fake Up", "HG_EuphoriaStumble", function(ply, ragdoll)
 	if not IsValid(ragdoll) then return end
 	stopStumble(ragdoll)
 	removeReaction(ragdoll)
+	ragdoll.hgReflexGrab = nil
+	ragdoll.hgEnvReach = nil
 end)
+
+local function hitEnergy(dmgInfo)
+	for _, entry in ipairs(ENERGY_TYPES) do
+		if dmgInfo:IsDamageType(entry[1]) then return dmgInfo:GetDamage() * entry[2] end
+	end
+	return 0
+end
+
+local function addHitEnergy(ply, energy, flatDir)
+	local now = CurTime()
+	local acc = ply.hgHitEnergy
+	if not acc then
+		acc = {energy = 0, pushed = 0, dir = Vector(0, 0, 0), time = now}
+		ply.hgHitEnergy = acc
+	end
+
+	local keep = math.Clamp(1 - (now - acc.time) / ENERGY_WINDOW, 0, 1)
+	acc.energy = acc.energy * keep + energy
+	acc.pushed = acc.pushed * keep
+	acc.dir:Mul(keep)
+	if flatDir then acc.dir:Add(flatDir * energy) end
+	acc.time = now
+
+	return acc
+end
+
+local function takePush(acc, amount, cap)
+	amount = math.min(amount, math.max(cap - acc.pushed, 0))
+	acc.pushed = acc.pushed + amount
+	return amount
+end
+
+local function knockDown(ply)
+	local acc = ply.hgHitEnergy
+	if acc.knockdown then return end
+	acc.knockdown = true
+
+	timer.Simple(0, function()
+		if not IsValid(ply) then return end
+		acc.knockdown = nil
+		if not ply:Alive() or IsValid(ply.FakeRagdoll) then return end
+
+		hg.Fake(ply)
+		local ragdoll = ply.FakeRagdoll
+		if not IsValid(ragdoll) or acc.dir:LengthSqr() < 0.01 then return end
+
+		local fling = math.min(acc.energy * ENERGY_FLING, ENERGY_FLING_MAX)
+		local vel = acc.dir:GetNormalized() * fling
+		vel.z = fling * ENERGY_FLING_LIFT
+		for i = 0, ragdoll:GetPhysicsObjectCount() - 1 do
+			local phys = ragdoll:GetPhysicsObjectNum(i)
+			if IsValid(phys) then phys:AddVelocity(vel) end
+		end
+	end)
+end
 
 hook.Add("EntityTakeDamage", "HG_EuphoriaStumbleHit", function(ent, dmgInfo)
 	if not IsValid(ent) then return end
 
 	local ply
 	if ent:IsPlayer() then
+		if IsValid(ent.FakeRagdoll) then return end
 		ply = ent
 	elseif ent:IsRagdoll() then
 		ply = hg.RagdollOwner(ent)
+		if IsValid(ply) and ply.FakeRagdoll ~= ent then return end
 	end
 	if not IsValid(ply) or not ply:Alive() then return end
 
@@ -657,32 +983,267 @@ hook.Add("EntityTakeDamage", "HG_EuphoriaStumbleHit", function(ent, dmgInfo)
 		dir = IsValid(attacker) and ply:GetPos() - attacker:GetPos() or nil
 	end
 
+	local flatDir = dir and Vector(dir.x, dir.y, 0)
+	if flatDir and flatDir:LengthSqr() > 0.01 then flatDir:Normalize() else flatDir = nil end
+
+	local energy = hitEnergy(dmgInfo)
+	local acc = addHitEnergy(ply, energy, flatDir)
 	local dmg = dmgInfo:GetDamage()
-	ply.hgStumbleHit = {pos = dmgInfo:GetDamagePosition(), dir = dir, dmg = dmg, time = CurTime()}
+	ply.hgStumbleHit = {pos = dmgInfo:GetDamagePosition(), dir = dir, dmg = dmg, energy = acc.energy, time = CurTime()}
 
 	local ragdoll = ply.FakeRagdoll
-	if not IsValid(ragdoll) or dmg < HIT_MIN_DMG then return end
+	if not IsValid(ragdoll) then
+		if energy <= 0 or not flatDir or acc.knockdown then return end
+
+		local knockdown = hg_hit_knockdown_energy:GetFloat()
+		if knockdown > 0 and acc.energy >= knockdown then
+			knockDown(ply)
+			return
+		end
+
+		local push = takePush(acc, energy * ENERGY_PLAYER_PUSH, ENERGY_PLAYER_PUSH_MAX)
+		if push > 0 then ply:SetVelocity(flatDir * push) end
+		return
+	end
+
+	if energy > 0 and flatDir then
+		local push = takePush(acc, energy * ENERGY_RAG_PUSH, ENERGY_RAG_PUSH_MAX)
+		if push > 0 then
+			local pelvis = getBonePhys(ragdoll, "ValveBiped.Bip01_Pelvis")
+			local spine = getBonePhys(ragdoll, "ValveBiped.Bip01_Spine2")
+			if IsValid(pelvis) then pelvis:AddVelocity(flatDir * push) end
+			if IsValid(spine) then spine:AddVelocity(flatDir * push * 0.5) end
+		end
+	end
+
+	if math.max(dmg, acc.energy) < HIT_MIN_DMG then return end
 
 	triggerCover(ragdoll, REACT_COVER_TIME)
+	ragdoll.hgWritheUntil = CurTime() + REACT_COVER_TIME + REACT_WRITHE_TIME
 
 	if not hg_euphoria_getup_stumble:GetBool() then return end
 
 	local st = stumbling[ragdoll]
 	if st then
-		makePush(st, ply.hgStumbleHit.pos, dir)
+		makePush(st, ply.hgStumbleHit.pos, dir, acc.energy)
 	else
 		queueStumble(ragdoll)
 	end
 end)
+
+local function armControl(ply)
+	return limbControl(ply) or moveControl(ply)
+		or hg.KeyDown(ply, IN_SPEED) or hg.KeyDown(ply, IN_WALK) or hg.KeyDown(ply, IN_USE)
+end
+
+local function handPhys(ragdoll, hand)
+	return ragdoll:GetPhysicsObjectNum(hg.realPhysNum(ragdoll, hand.phys))
+end
+
+local function handFree(ply, ragdoll, org, side, hand)
+	if limbStrength(org, hand.limb) <= 0 or IsValid(ragdoll[hand.cons]) then return false end
+	local phys = handPhys(ragdoll, hand)
+	if not IsValid(phys) then return false end
+	local wound, wall = ragdoll.hgWoundGrab, ragdoll.hgWallGrab
+	if wound and wound.hand == phys or wall and wall.hand == phys then return false end
+	if side ~= "r" then return true end
+	local wep = ply:GetActiveWeapon()
+
+	return not (IsValid(wep) and (ishgweapon(wep) or wep.ismelee2))
+end
+
+local function findHoldPoint(ply, ragdoll, handPos)
+	local best, bestScore
+	for _, dir in ipairs(HOLD_DIRS) do
+		local tr = util.TraceLine({
+			start = handPos,
+			endpos = handPos + dir * HOLD_SEARCH_RADIUS,
+			filter = {ply, ragdoll},
+			mask = MASK_SOLID,
+		})
+		if not tr.Hit or tr.HitSky or tr.HitNormal.z > HOLD_FLOOR_NORMAL then continue end
+		if tr.Fraction * HOLD_SEARCH_RADIUS < HOLD_MIN_DIST then continue end
+		local ent = tr.Entity
+		if IsValid(ent) and (ent:IsPlayer() or ent:IsNPC() or ent:IsRagdoll()) then continue end
+
+		local score = (1 - tr.Fraction) * (2 - math.abs(tr.HitNormal.z))
+		if not bestScore or score > bestScore then best, bestScore = tr, score end
+	end
+
+	return best
+end
+
+local function clearReach(ragdoll, side)
+	ragdoll.hgEnvReach[side] = nil
+	ragdoll.hgEnvCooldown = ragdoll.hgEnvCooldown or {}
+	ragdoll.hgEnvCooldown[side] = CurTime() + HOLD_COOLDOWN
+end
+
+local function releaseHoldEnv(ragdoll)
+	ragdoll.hgReflexGrab = nil
+	ragdoll.hgEnvReach = nil
+end
+
+local function updateHeldHand(ragdoll, reach, side, hand, now)
+	local reflex = ragdoll.hgReflexGrab
+	local holding = (reflex[side] or 0) > now
+	local welded = IsValid(ragdoll[hand.cons])
+	if holding and (welded or now - reach.grabAt < HOLD_CONFIRM_TIME) then return end
+
+	reflex[side] = nil
+	clearReach(ragdoll, side)
+end
+
+local function updateReachingHand(ragdoll, org, reach, side, hand, now)
+	local phys = handPhys(ragdoll, hand)
+	local armMul = limbStrength(org, hand.limb)
+	if now > reach.untilT or not IsValid(phys) or armMul <= 0 then
+		clearReach(ragdoll, side)
+		return
+	end
+
+	local vig = vigor(org)
+	if phys:GetPos():DistToSqr(reach.pos) < HOLD_GRAB_DIST * HOLD_GRAB_DIST then
+		reach.grabAt = now
+		ragdoll.hgReflexGrab[side] = now + math.Rand(HOLD_TIME_MIN, HOLD_TIME_MAX) * math.max(vig, DECAY_VIGOR_FLOOR)
+		return
+	end
+
+	local mul = armMul * vig
+	hg.ShadowControl(ragdoll, hand.phys, HOLD_REACH_SS, nil, nil, nil, reach.pos, HOLD_REACH_SPEED * mul, HOLD_REACH_DAMP * mul)
+end
+
+local function updateIdleHand(ply, ragdoll, org, side, hand, now)
+	local cooldown = ragdoll.hgEnvCooldown
+	if cooldown and (cooldown[side] or 0) > now then return end
+	if not handFree(ply, ragdoll, org, side, hand) then return end
+
+	local tr = findHoldPoint(ply, ragdoll, handPhys(ragdoll, hand):GetPos())
+	if not tr then return end
+
+	ragdoll.hgEnvReach[side] = {pos = tr.HitPos + tr.HitNormal * HOLD_SURFACE_OFFSET, untilT = now + HOLD_REACH_TIME}
+end
+
+local function updateHoldEnv(ply, ragdoll)
+	if not hg_euphoria_holdenv:GetBool() or not isAware(ply) or armControl(ply) or ragdoll.HGFallCoverActive then
+		releaseHoldEnv(ragdoll)
+		return
+	end
+
+	local now = CurTime()
+	local org = ply.organism
+	ragdoll.hgEnvReach = ragdoll.hgEnvReach or {}
+	ragdoll.hgReflexGrab = ragdoll.hgReflexGrab or {}
+
+	local root = ragdoll:GetPhysicsObject()
+	local moving = IsValid(root) and root:GetVelocity():LengthSqr() > HOLD_MIN_SPEED * HOLD_MIN_SPEED
+	local search = moving and (ragdoll.hgEnvNextSearch or 0) <= now
+	if search then ragdoll.hgEnvNextSearch = now + HOLD_SEARCH_INTERVAL end
+
+	for side, hand in pairs(HANDS) do
+		local reach = ragdoll.hgEnvReach[side]
+		if reach and reach.grabAt then
+			updateHeldHand(ragdoll, reach, side, hand, now)
+		elseif reach then
+			updateReachingHand(ragdoll, org, reach, side, hand, now)
+		elseif search then
+			updateIdleHand(ply, ragdoll, org, side, hand, now)
+		end
+	end
+end
 
 local function stumbleEndReason(ply, ragdoll, st)
 	if not hg_euphoria_getup_stumble:GetBool() then return "off" end
 	if not IsValid(ragdoll) or not IsValid(ply) or ply.FakeRagdoll ~= ragdoll then return "gone" end
 	if not IsValid(st.pelvis) or not IsValid(st.spine) or not canStumble(ply, ragdoll) then return "gone" end
 	if hg.KeyDown(ply, IN_DUCK) then return "control" end
-	if CurTime() - st.startTime >= st.cfg.TimeBeforeDecay + st.cfg.DecayDuration then return "decay" end
+	if st.tripLeg then return "trip" end
+
+	local now = CurTime()
+	if st.stillSince and now - st.stillSince > STILL_GRACE then return "decay" end
+
+	st.vigor = vigor(ply.organism)
+	local lifetime = (st.cfg.TimeBeforeDecay + st.cfg.DecayDuration) * math.max(st.vigor, DECAY_VIGOR_FLOOR)
+	if now - st.startTime >= lifetime then return "decay" end
 	if not isUpright(ply, ragdoll) then return "fell" end
 end
+
+local function removeDying(ragdoll)
+	local ds = dying[ragdoll]
+	dying[ragdoll] = nil
+	if ds and IsValid(ds.ent) then ds.ent:Remove() end
+end
+
+local function canDieReacting(org)
+	if not org or org.otrub or org.brainfuckv2Posture or org.headamputated then return false end
+	if (org.spine3 or 0) >= 1 then return false end
+
+	return vigor(org) >= VIGOR_MIN
+end
+
+local function startDeathThroes(ragdoll, org)
+	removeReaction(ragdoll)
+	removeDying(ragdoll)
+
+	local pelvis = getBonePhys(ragdoll, "ValveBiped.Bip01_Pelvis")
+	local ctrl = IsValid(pelvis) and spawnController(ragdoll)
+	if not ctrl then return end
+
+	local mode = REACT_MODES.writhe
+	local seq = ctrl:LookupSequence(mode.sequences[math.random(#mode.sequences)])
+	if not seq or seq == -1 then
+		ctrl:Remove()
+		return
+	end
+
+	local bones, strength = reactBones(mode, org, ragdoll)
+	ctrl:SetBoneList(bones)
+	ctrl:SetBoneStrength(strength)
+	ctrl:SetReactionStrength(DEATH_STRENGTH * vigor(org))
+	ctrl:ResetSequence(seq)
+	ctrl:SetPlaybackRate(mode.rate)
+	ctrl:SetCycle(0)
+
+	local now = CurTime()
+	dying[ragdoll] = {
+		ent = ctrl,
+		pelvis = pelvis,
+		pelvisBone = ctrl:LookupBone("ValveBiped.Bip01_Pelvis"),
+		alignAfter = now,
+		startTime = now,
+		strength = DEATH_STRENGTH * vigor(org),
+	}
+end
+
+local function updateDying(ragdoll, ds)
+	if not IsValid(ragdoll) or not IsValid(ds.ent) or not IsValid(ds.pelvis) then
+		removeDying(ragdoll)
+		return
+	end
+
+	local frac = (CurTime() - ds.startTime) / DEATH_TIME
+	if frac >= 1 then
+		removeDying(ragdoll)
+		return
+	end
+
+	ds.ent:SetReactionStrength(ds.strength * (1 - frac) ^ DEATH_FADE_POW)
+	alignController(ds, ds.pelvis)
+end
+
+hook.Add("RagdollDeath", "HG_EuphoriaDeathThroes", function(ply, ragdoll)
+	if not IsValid(ply) or not ply:IsPlayer() or not IsValid(ragdoll) then return end
+	if not hg_euphoria_death_throes:GetBool() or not canDieReacting(ply.organism) then return end
+
+	local org = ply.organism
+	timer.Simple(DEATH_DELAY, function()
+		if not IsValid(ragdoll) then return end
+		local deadOrg = ragdoll.organism or org
+		if not canDieReacting(deadOrg) then return end
+
+		startDeathThroes(ragdoll, deadOrg)
+	end)
+end)
 
 hook.Add("Think", "HG_EuphoriaStumble", function()
 	for ragdoll, st in pairs(stumbling) do
@@ -701,6 +1262,10 @@ hook.Add("Think", "HG_EuphoriaStumble", function()
 		end
 	end
 
+	for ragdoll, ds in pairs(dying) do
+		updateDying(ragdoll, ds)
+	end
+
 	local now = CurTime()
 	local stumbleEnabled = hg_euphoria_getup_stumble:GetBool()
 	for _, ply in player.Iterator() do
@@ -708,6 +1273,7 @@ hook.Add("Think", "HG_EuphoriaStumble", function()
 		if not IsValid(ragdoll) then continue end
 
 		updateReaction(ply, ragdoll)
+		updateHoldEnv(ply, ragdoll)
 
 		local pending = ragdoll.hgStumblePending
 		if not stumbleEnabled or stumbling[ragdoll] or not pending or now < pending.from then continue end
@@ -716,7 +1282,7 @@ hook.Add("Think", "HG_EuphoriaStumble", function()
 			continue
 		end
 
-		if canStumble(ply, ragdoll) and not hg.KeyDown(ply, IN_DUCK) and isUpright(ply, ragdoll) then
+		if canStumble(ply, ragdoll) and not hg.KeyDown(ply, IN_DUCK) and hasMomentum(ply, ragdoll) and isUpright(ply, ragdoll) then
 			startStumble(ply, ragdoll)
 		end
 	end

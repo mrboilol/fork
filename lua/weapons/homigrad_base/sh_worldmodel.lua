@@ -174,12 +174,12 @@ function SWEP:ChangeGunPos(dtime)
 
 	local recoilDtime = math.min(dtime or FrameTime(), 0.05)
 	local recoverySkill = proficiency
-	local oneHandRecovery = support.oneHanded and not self.IgnoreOneArmPenalties and Lerp(recoverySkill, 0.72, 0.9) or 1
+	local oneHandRecovery = support.oneHanded and not self.IgnoreOneArmPenalties and Lerp(recoverySkill, 0.72, self:HasFirearmTraining(ply) and 1 or 0.9) or 1
 	local recoveryScale = self.shotRecoveryScale or 1
 	local angularSpring = Lerp(recoverySkill, 62, 125) * oneHandRecovery / recoveryScale ^ 2
-	local angularDamping = Lerp(recoverySkill, 16, 23) * oneHandRecovery / recoveryScale
+	local angularDamping = Lerp(recoverySkill, 10, 23) * oneHandRecovery / recoveryScale
 	local positionSpring = Lerp(recoverySkill, 55, 110) * oneHandRecovery / recoveryScale ^ 2
-	local positionDamping = Lerp(recoverySkill, 15, 21) * oneHandRecovery / recoveryScale
+	local positionDamping = Lerp(recoverySkill, 9, 21) * oneHandRecovery / recoveryScale
 	local wobble = self.ShotMuzzleWobble or Angle(0, 0, 0)
 	local wobbleVelocity = self.ShotMuzzleWobbleVelocity or Angle(0, 0, 0)
 	local offset = self.ShotMuzzleOffset or Vector(0, 0, 0)

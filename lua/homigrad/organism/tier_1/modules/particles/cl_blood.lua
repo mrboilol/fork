@@ -212,8 +212,38 @@ local function depositGroundBlood(pos, normal, artery, tiny, amount, ignored)
 	return stain
 end
 
+local wallBloodMaxSize = 8
+
+local function addWallBlood(pos, normal, artery, tiny, amount)
+	amount = amount or (tiny and 0.2 or artery and 2.5 or 1)
+	local stain = findGroundBlood(pos, normal)
+	if stain then
+		stain.size = math.min(stain.size + amount * 0.15, math.max(stain.size, wallBloodMaxSize))
+		return
+	end
+
+	local stains = hg.groundbloodstains
+	local limit = math.max(hg_blood_ground_limit:GetInt(), 1)
+	while #stains >= limit do table.remove(stains, 1) end
+
+	stains[#stains + 1] = {
+		pos = pos + normal * 0.2,
+		normal = normal,
+		material = artery and arterialGroundBloodMaterial or groundBloodMaterials[math_random(#groundBloodMaterials)],
+		size = math.Clamp((tiny and 1.2 or 2.5) + amount * 0.5, 1, 5),
+		rotation = math_random(0, 359),
+		volume = amount,
+		artery = artery,
+		wall = true,
+	}
+end
+
 local function addGroundBlood(pos, normal, artery, tiny, amount)
-	if useOldBlood() or normal.z < 0.55 then return false end
+	if useOldBlood() then return false end
+	if normal.z < 0.55 then
+		addWallBlood(pos, normal, artery, tiny, amount)
+		return true
+	end
 	depositGroundBlood(pos, normal, artery, tiny, amount)
 
 	return true
@@ -313,6 +343,19 @@ local function getNewBloodDecal(artery, amount)
 	return amount < 0.35 and "Normal.Blood22" or amount < 0.8 and "Normal.Blood23" or amount < 1.5 and "Normal.Blood25" or "Normal.Blood24"
 end
 
+local bodyStainChance = 0.5
+
+local function isOrganismEnt(ent)
+	return IsValid(ent) and (ent:IsPlayer() or ent:IsNPC() or ent:IsRagdoll() or ent.organism ~= nil)
+end
+
+local function stainBody(ent, pos, normal, tiny, amount)
+	if not hg.AddPersistentBodyBloodMark then return false end
+	amount = math.max(amount or (tiny and 0.2 or 1), 0.05)
+	local size = tiny and math.Clamp(0.9 + math.sqrt(amount), 1, 3) or math.Clamp(1.2 + math.sqrt(amount) * 1.2, 1.5, 5)
+	return hg.AddPersistentBodyBloodMark(ent, pos, normal, size)
+end
+
 local function decalBlood(pos, normal, tr, artery, owner, tiny, amount)
 	if not pos or not normal then return end
 	if normal:LengthSqr() < 0.0001 then normal = vector_up end
@@ -321,13 +364,12 @@ local function decalBlood(pos, normal, tr, artery, owner, tiny, amount)
 		return
 	end
 	amount = math.max(amount or (tiny and 0.2 or artery and 2.5 or 1), 0.05)
+	if isOrganismEnt(tr.Entity) then
+		if not stainBody(tr.Entity, pos, normal, tiny, amount) then hg.DepositBodyBloodRunoff(pos) end
+		return
+	end
 	if tiny then
 		local target = IsValid(tr.Entity) and tr.Entity or nil
-		if IsValid(target) and hg.AddPersistentBodyBloodMark and (target:IsPlayer() or target:IsNPC() or target:IsRagdoll() or target.organism) then
-			hg.AddPersistentBodyBloodMark(target, pos, normal, math.Clamp(0.9 + math.sqrt(amount), 1, 3))
-			if math.random(7) == 1 then playBloodDripImpact(pos, tr) end
-			return
-		end
 		if useOldBlood() then
 			placeOldBloodDecal(pos, normal, target, artery, math.Clamp(0.16 * math.sqrt(amount / 0.2) * math.Rand(0.85, 1.15), 0.08, 0.4))
 		else
@@ -338,11 +380,6 @@ local function decalBlood(pos, normal, tr, artery, owner, tiny, amount)
 	end
 
 	local target = IsValid(tr.Entity) and tr.Entity or nil
-	if IsValid(target) and hg.AddPersistentBodyBloodMark and (target:IsPlayer() or target:IsNPC() or target:IsRagdoll() or target.organism) then
-		hg.AddPersistentBodyBloodMark(target, pos, normal, math.Clamp(1.2 + math.sqrt(amount) * 1.2, 1.5, 5))
-		playBloodDripImpact(pos, tr)
-		return
-	end
 
 	local vec = tostring(math.Round(pos[1]))..tostring(math.Round(pos[2]))..tostring(math.Round(pos[3]))
 
@@ -439,7 +476,16 @@ bloodparticles_hook[2] = function(mul)
 			end
 			
 			result.Hit = result.Hit and shouldhit
-			if result.Hit and part.tiny then
+			local onBody = result.Hit and isOrganismEnt(result.Entity)
+			if onBody and part.stainTarget ~= result.Entity then
+				part.stainTarget = result.Entity
+				if math.random() < bodyStainChance and stainBody(result.Entity, result.HitPos, result.HitNormal, part.tiny, part.volume) then
+					hg.bloodparticles1[i] = hg.bloodparticles1[#hg.bloodparticles1]
+					table_remove(hg.bloodparticles1)
+					continue
+				end
+			end
+			if result.Hit and part.tiny and not onBody then
 				decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner, true, part.volume)
 				hg.bloodparticles1[i] = hg.bloodparticles1[#hg.bloodparticles1]
 				table_remove(hg.bloodparticles1)
@@ -452,7 +498,7 @@ bloodparticles_hook[2] = function(mul)
 				local down = result.HitNormal
 				local nextpos = (result.Normal + down):GetNormalized() * 5
 				
-				if !insolid and (part.nextput or 0) < time then
+				if !insolid and not onBody and (part.nextput or 0) < time then
 					part.nextput = time + 1
 
 					decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner, part.tiny, part.volume)

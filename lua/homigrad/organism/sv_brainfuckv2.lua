@@ -346,6 +346,9 @@ local function printPose(rag, posture, phase, fade, mul)
 end
 
 local function driveBone(rag, phys, physBone, targetAng, mul, damp, brake, ss)
+	local realPhysBone = hg.realPhysNum and hg.realPhysNum(rag, physBone) or physBone
+	if hg.fakeBoneFlop and hg.fakeBoneFlop.IsFloppyPhys(rag, realPhysBone) then return end
+
 	local pos = vector_origin
 	local maxspeed = 0
 	local maxspeeddamp = 0

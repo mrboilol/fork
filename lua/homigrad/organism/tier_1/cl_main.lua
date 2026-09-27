@@ -1238,22 +1238,16 @@ local function GetWoundTransform(ent, wound, mat, boneID)
 end
 
 function hg.AddPersistentBodyBloodMark(ent, pos, normal, size)
-	if not IsValid(ent) or not isvector(pos) then return end
+	if not IsValid(ent) or not isvector(pos) then return false end
 	local ang = isvector(normal) and normal:LengthSqr() > 0.001 and normal:Angle() or angle_zero
 	local localPos, localAng, bone = hg.organism.GetWoundAnchor(ent, pos + ang:Forward() * 0.15, ang)
-	if not localPos then return end
+	if not localPos then return false end
 
 	ent.persistentBloodMarks = ent.persistentBloodMarks or {}
 	for _, mark in ipairs(ent.persistentBloodMarks) do
-		if mark[4] == bone and mark[2]:DistToSqr(localPos) < 9 then
-			if hg.DepositBodyBloodRunoff then hg.DepositBodyBloodRunoff(pos) end
-			return
-		end
+		if mark[4] == bone and mark[2]:DistToSqr(localPos) < 9 then return false end
 	end
-	if #ent.persistentBloodMarks >= 64 then
-		if hg.DepositBodyBloodRunoff then hg.DepositBodyBloodRunoff(pos) end
-		return
-	end
+	if #ent.persistentBloodMarks >= 64 then return false end
 
 	ent.persistentBloodMarks[#ent.persistentBloodMarks + 1] = {
 		math.Clamp(tonumber(size) or 1.25, 0.55, 5),
@@ -1263,6 +1257,7 @@ function hg.AddPersistentBodyBloodMark(ent, pos, normal, size)
 		CurTime(),
 		false,
 	}
+	return true
 end
 
 function hg.ClearPersistentBodyBlood(ent)
@@ -1284,7 +1279,6 @@ local persistentBodyDecalMaterials = {
 	arterial = Material(util.DecalMaterial("Impact.Flesh")),
 	blood = Material(util.DecalMaterial("Blood")),
 }
-local maxModelDecals = GetConVar("r_maxmodeldecal")
 
 local function paintPersistentBodyDecal(ent, mark, blood)
 	local pos, ang = hg.organism.GetWoundTransform(ent, mark)
@@ -1318,9 +1312,7 @@ local function refreshPersistentBodyDecals(ent, wounds, blood)
 	if ent.hgPersistentDecalsDirty then
 		ent.hgPersistentDecalsDirty = nil
 		ent:RemoveAllDecals()
-		local budget = math.max(maxModelDecals and maxModelDecals:GetInt() or 50, 1)
-		paintedWounds = math.max(#wounds - budget, 0)
-		paintedBlood = math.max(#blood - math.max(budget - (#wounds - paintedWounds), 0), 0)
+		paintedWounds, paintedBlood = 0, 0
 	end
 	if paintedWounds >= #wounds and paintedBlood >= #blood then
 		ent.hgPersistentDecalWoundCount, ent.hgPersistentDecalBloodCount = #wounds, #blood

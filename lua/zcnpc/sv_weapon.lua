@@ -183,10 +183,10 @@ function ZCNPC.HoldsWeapon(npc, rag)
 	if not org then return false end
 
 	if org.alive == false then return false end
-	if org.otrub or org.fake then return false end
+	if org.otrub then return false end
 	if (org.consciousness or 1) <= 0.4 then return false end
-	if org.rarmamputated then return false end
-	if (org.rarm or 0) >= 1 then return false end
+	if org.rarmamputated or org.rarmupamputated then return false end
+	if (org.rarm or 0) >= 1 or org.rarmdislocation then return false end
 	if npc:GetNetVar("handcuffed", false) then return false end
 
 	return true

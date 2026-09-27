@@ -441,6 +441,10 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 	end
 
 	local breakThreshold = name == "spine3" and 1 or hg.organism[name2]
+	if name ~= "spine3" and oldDmg < breakThreshold and org[name] >= breakThreshold and hg.fakeBoneFlop then
+		hg.fakeBoneFlop.SetBoneState(org, "ValveBiped.Bip01_Spine2", true)
+	end
+
 	if oldDmg < breakThreshold and org[name] >= breakThreshold and org.isPly then
 		playBoneFractureSound(org.owner)
 		if hg.QueuePainScream then hg.QueuePainScream(org.owner, 1.1) end

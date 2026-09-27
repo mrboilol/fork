@@ -676,6 +676,7 @@ end
 local fakeBoneParents = {
 	["ValveBiped.Bip01_Head1"] = "ValveBiped.Bip01_Spine3",
 	["ValveBiped.Bip01_Spine3"] = "ValveBiped.Bip01_Spine2",
+	["ValveBiped.Bip01_Spine2"] = "ValveBiped.Bip01_Pelvis",
 	["ValveBiped.Bip01_R_UpperArm"] = "ValveBiped.Bip01_Spine2",
 	["ValveBiped.Bip01_L_UpperArm"] = "ValveBiped.Bip01_Spine2",
 	["ValveBiped.Bip01_R_Forearm"] = "ValveBiped.Bip01_R_UpperArm",
@@ -696,6 +697,11 @@ local fakeBoneLimits = {
 		[0] = {[0] = "45", [1] = "-45"},
 		[1] = {[0] = "45", [1] = "-45"},
 		[2] = {[0] = "45", [1] = "-45"},
+	},
+	["ValveBiped.Bip01_Spine2"] = {
+		[0] = {[0] = "55", [1] = "-55"},
+		[1] = {[0] = "65", [1] = "-65"},
+		[2] = {[0] = "50", [1] = "-50"},
 	},
 	["ValveBiped.Bip01_R_UpperArm"] = {
 		[0] = {[0] = "100", [1] = "-100"},
@@ -881,8 +887,20 @@ function fakeBoneFlop.FlagBone(org, bone, active)
 	return true
 end
 
+function fakeBoneFlop.IsFloppyPhys(rag, physNum)
+	local floppy = IsValid(rag) and rag.hg_floppy_bones
+	if not floppy then return false end
+	local bone = rag:TranslatePhysBoneToBone(physNum)
+	if not bone or bone < 0 then return false end
+
+	return floppy[rag:GetBoneName(bone)] == true
+end
+
 function fakeBoneFlop.SetLimbSegmentState(org, limb, segment, active)
-	local bone = fakeBoneFlop.ResolveBone(limb, segment)
+	return fakeBoneFlop.SetBoneState(org, fakeBoneFlop.ResolveBone(limb, segment), active)
+end
+
+function fakeBoneFlop.SetBoneState(org, bone, active)
 	local changed = fakeBoneFlop.FlagBone(org, bone, active)
 	if not changed or not IsValid(org.owner) then return changed end
 	if not active then
@@ -958,6 +976,24 @@ function fakeBoneFlop.ReconcileLimb(org, limb)
 	end
 	if (tonumber(org[limb]) or 0) < 1 and not org[limb .. "dislocation"] then
 		changed = fakeBoneFlop.ClearStoredLimb(org, limb) or changed
+	end
+
+	return changed
+end
+
+function fakeBoneFlop.ReconcileSpine(org)
+	if not org or not org.fake_floppy_bones then return false end
+
+	local changed = false
+	local backBroken = (org.spine1 or 0) >= (hg.organism.fake_spine1 or 1)
+		or (org.spine2 or 0) >= (hg.organism.fake_spine2 or 1)
+	if not backBroken then
+		changed = fakeBoneFlop.FlagBone(org, "ValveBiped.Bip01_Spine2", false) or changed
+	end
+
+	if (org.spine3 or 0) < 1 then
+		changed = fakeBoneFlop.FlagBone(org, "ValveBiped.Bip01_Spine3", false) or changed
+		changed = fakeBoneFlop.FlagBone(org, "ValveBiped.Bip01_Head1", false) or changed
 	end
 
 	return changed
@@ -1107,7 +1143,6 @@ function fakeBoneFlop.ApplyBone(rag, bone)
 		rag.hg_floppy_bones = rag.hg_floppy_bones or {}
 		rag.hg_floppy_constraints[bone] = cons
 		rag.hg_floppy_bones[bone] = true
-		rag:SetSaveValue("m_ragdoll.allowStretch", org.fake_dislocated_bones and next(org.fake_dislocated_bones) ~= nil or false)
 		return
 	end
 
@@ -1190,9 +1225,6 @@ function fakeBoneFlop.ApplyBone(rag, bone)
 	phys:SetAngleVelocity(avelOri)
 	physParent:SetAngleVelocityInstantaneous(avelOriParent)
 	physParent:SetAngleVelocity(avelOriParent)
-
-	local allowStretch = dislocated or (org.fake_dislocated_bones and next(org.fake_dislocated_bones) ~= nil) or false
-	rag:SetSaveValue("m_ragdoll.allowStretch", allowStretch)
 end
 
 function fakeBoneFlop.ScheduleApply(rag, bone, org)
@@ -1281,6 +1313,7 @@ hook.Add("Org Think", "hg-fakeboneflop-sync", function(owner, org)
 	changed = fakeBoneFlop.ReconcileLimb(org, "rarm") or changed
 	changed = fakeBoneFlop.ReconcileLimb(org, "lleg") or changed
 	changed = fakeBoneFlop.ReconcileLimb(org, "rleg") or changed
+	changed = fakeBoneFlop.ReconcileSpine(org) or changed
 
 	if changed then
 		fakeBoneFlop.ScheduleRebuild(owner)

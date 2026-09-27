@@ -156,18 +156,43 @@ local function tensionBones(ragdoll, strength, dtime, allowLinear)
 	end
 end
 
+local function armStrength(ragdoll, org, limb, cons)
+	if IsValid(ragdoll[cons]) then return 0 end
+	if not org then return 1 end
+	local reflex = hg.RagdollReflex
+	if reflex then return reflex.LimbStrength(org, limb) end
+
+	return (org[limb .. "amputated"] or org[limb .. "upamputated"]) and 0 or 1
+end
+
 local function grabHand(ragdoll, org, pos)
-	local lArm = not (org and (org.larmamputated or org.larmupamputated))
-	local rArm = not (org and (org.rarmamputated or org.rarmupamputated))
+	local lMul = armStrength(ragdoll, org, "larm", "ConsLH")
+	local rMul = armStrength(ragdoll, org, "rarm", "ConsRH")
 	local lHand = ragdoll:GetPhysicsObjectNum(hg.realPhysNum(ragdoll, 5))
 	local rHand = ragdoll:GetPhysicsObjectNum(hg.realPhysNum(ragdoll, 7))
-	local lValid = lArm and IsValid(lHand)
-	local rValid = rArm and IsValid(rHand)
+	local lValid = lMul > 0 and IsValid(lHand)
+	local rValid = rMul > 0 and IsValid(rHand)
 	if lValid and (not rValid or lHand:GetPos():Distance(pos) <= rHand:GetPos():Distance(pos)) then
-		return lHand, 4
+		return lHand, 4, lMul
 	end
-	if rValid then return rHand, 6 end
+	if rValid then return rHand, 6, rMul end
 	return nil
+end
+
+local function armControl(ply)
+	return hg.KeyDown(ply, IN_ATTACK) or hg.KeyDown(ply, IN_ATTACK2) or hg.KeyDown(ply, IN_USE)
+		or hg.KeyDown(ply, IN_SPEED) or hg.KeyDown(ply, IN_WALK)
+		or hg.KeyDown(ply, IN_FORWARD) or hg.KeyDown(ply, IN_BACK)
+		or hg.KeyDown(ply, IN_MOVELEFT) or hg.KeyDown(ply, IN_MOVERIGHT)
+end
+
+local function canWoundGrab(ply)
+	if armControl(ply) then return false end
+	local reflex = hg.RagdollReflex
+	if reflex then return reflex.IsAware(ply) end
+	local org = ply.organism
+
+	return org and not org.otrub and org.canmove and true or false
 end
 
 local function nearestPhys(ragdoll, pos)
@@ -266,30 +291,6 @@ hook.Add("EntityTakeDamage", "HG_EuphoriaHit", function(ent, dmgInfo)
 	local dmg = dmgInfo:GetDamage()
 
 	local now = SysTime()
-	if ply:Alive() and dmg >= 8
-		and dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_CLUB + DMG_BLAST + DMG_SLASH)
-		and (ply.hgLastImpactPush or 0) + 0.08 < now then
-		local force = dmgInfo:GetDamageForce()
-		local direction = Vector(force.x, force.y, 0)
-		if direction:LengthSqr() <= 1 then
-			local attacker = dmgInfo:GetAttacker()
-			if IsValid(attacker) then direction = ply:GetPos() - attacker:GetPos() end
-			direction.z = 0
-		end
-		if direction:LengthSqr() > 1 then
-			direction:Normalize()
-			local push = direction * math.Clamp(dmg * 2, 20, 100)
-			ply.hgLastImpactPush = now
-			if IsValid(ragdoll) then
-				local pelvis = ragdoll:GetPhysicsObjectNum(hg.realPhysNum(ragdoll, 0))
-				local spine = ragdoll:GetPhysicsObjectNum(hg.realPhysNum(ragdoll, 1))
-				if IsValid(pelvis) then pelvis:AddVelocity(push) end
-				if IsValid(spine) then spine:AddVelocity(push * 0.5) end
-			else
-				ply:SetVelocity(push)
-			end
-		end
-	end
 	if not IsValid(ragdoll) then return end
 	if dmg >= EUPHORIA_CURL_MIN_DAMAGE then
 		if ragdoll.hgBeat and now > ragdoll.hgBeat.untilT then
@@ -316,8 +317,8 @@ hook.Add("EntityTakeDamage", "HG_EuphoriaHit", function(ent, dmgInfo)
 		ragdoll.hgTensionLinear = true
 	end
 
-	if dmg >= 12 then
-		if hg_euphoria_detail:GetBool() then
+	if dmg >= EUPHORIA_WOUND_GRAB_MIN_DMG then
+		if hg_euphoria_detail:GetBool() and canWoundGrab(ply) then
 			local hitPos = dmgInfo:GetDamagePosition()
 			local rootPhys = ragdoll:GetPhysicsObject()
 			local rootPos = IsValid(rootPhys) and rootPhys:GetPos() or ragdoll:GetPos()
@@ -329,10 +330,13 @@ hook.Add("EntityTakeDamage", "HG_EuphoriaHit", function(ent, dmgInfo)
 				local fDir = force:Length() > 1 and force:GetNormalized() or Vector(math.Rand(-1, 1), math.Rand(-1, 1), math.Rand(-0.3, 0.6)):GetNormalized()
 				woundPos = rootPos + fDir * 25
 			end
-			local handPhys, forearm = grabHand(ragdoll, ply.organism, woundPos)
+			local org = ply.organism
+			local handPhys, forearm, armMul = grabHand(ragdoll, org, woundPos)
 			local bonePhys = nearestPhys(ragdoll, woundPos)
 			if handPhys and bonePhys then
-				ragdoll.hgWoundGrab = { hand = handPhys, forearm = forearm, bone = bonePhys, untilT = SysTime() + EUPHORIA_WOUND_GRAB_TIME, dur = EUPHORIA_WOUND_GRAB_TIME }
+				local reflex = hg.RagdollReflex
+				local mul = armMul * (reflex and org and reflex.Vigor(org) or 1)
+				ragdoll.hgWoundGrab = { hand = handPhys, forearm = forearm, bone = bonePhys, mul = mul, untilT = SysTime() + EUPHORIA_WOUND_GRAB_TIME, dur = EUPHORIA_WOUND_GRAB_TIME }
 			end
 		end
 	end
@@ -433,8 +437,7 @@ hook.Add("Think", "HG_EuphoriaWound", function()
 		local grab = ragdoll.hgWoundGrab
 		if not grab then continue end
 
-		if now >= grab.untilT or not ply:Alive() or
-			hg.KeyDown(ply, IN_USE) then
+		if now >= grab.untilT or not ply:Alive() or not canWoundGrab(ply) then
 			ragdoll.hgWoundGrab = nil
 			continue
 		end
@@ -452,7 +455,7 @@ hook.Add("Think", "HG_EuphoriaWound", function()
 
 		local forearmPhys = ragdoll:GetPhysicsObjectNum(hg.realPhysNum(ragdoll, grab.forearm))
 
-		local frac = (grab.untilT - now) / grab.dur
+		local frac = (grab.untilT - now) / grab.dur * (grab.mul or 1)
 		local handPos = handPhys:GetPos()
 		local target = bonePhys:GetPos()
 
