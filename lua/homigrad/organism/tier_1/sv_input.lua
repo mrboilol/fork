@@ -904,6 +904,15 @@ local function addOrReopenWound(org, severity, localPos, localAng, bone, time, w
 	end
 
 	if #org.wounds >= 30 then
+		for index = #org.wounds, 1, -1 do
+			if (tonumber(org.wounds[index][1]) or 0) <= 0 then
+				table.remove(org.wounds, index)
+				break
+			end
+		end
+	end
+
+	if #org.wounds >= 30 then
 		if not org.wounds[1] then return end
 		org.wounds[1].woundType = woundType or org.wounds[1].woundType
 		return worsenWound(org, org.wounds[1], severity)
@@ -961,7 +970,7 @@ function hg.organism.AddWound(ent, tr, bone, dmgInfo, dmgPos, dmgBlood, inputHol
 	if bone and dmgInfo:IsDamageType(DMG_CLUB + DMG_VEHICLE + DMG_CRUSH + DMG_FALL) then
 		local localPos, _, woundBone = hg.organism.GetWoundAnchor(ent, dmgPos + hitNormal, (-traceNormal):Angle(), bone)
 		local wound = localPos and findNearbyWound(org, woundBone, localPos)
-		if wound then
+		if wound and (tonumber(wound[1]) or 0) > 0 then
 			worsenWound(org, wound, math.Clamp(dmgInfo:GetDamage() / 18, 0.15, 6))
 			table.sort(org.wounds, function(a, b) return a[1] > b[1] end)
 			hg.organism.MarkWoundsNetDirty(org, true)
@@ -2115,13 +2124,22 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	end
 
 	local brokenSkullHeadImpact = hitgroup == HITGROUP_HEAD and (skullOpenBeforeTrace or org.skull == 1)
-		and not impact.armorStopped and IsValid(inf) and inf:GetClass() == "weapon_hands_sh" and dmgInfo:IsDamageType(DMG_CLUB)
+		and not impact.armorStopped
+	if brokenSkullHeadImpact then
+		local effect = EffectData()
+		effect:SetOrigin(dmgPos)
+		effect:SetNormal(-dirCool:GetNormalized())
+		effect:SetMagnitude(1)
+		effect:SetScale(1)
+		effect:SetRadius(4)
+		util.Effect("BloodImpact", effect, true, true)
+	end
 	if brokenSkullHeadImpact or (dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) and dmgBlood > 1 and #inputHole > 0) then
 		net.Start("hg_bloodimpact")
 		net.WriteVector(dmgPos)
 		net.WriteVector(dirCool / 15)
 		net.WriteFloat(brokenSkullHeadImpact and math.max(dmg / 8, 1) or dmg / 10)
-		net.WriteInt(1, 8)
+		net.WriteInt(brokenSkullHeadImpact and math.random(3, 5) or 1, 8)
 		net.SendPVS(dmgPos)
 	end
 	

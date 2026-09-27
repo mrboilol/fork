@@ -383,6 +383,14 @@ local drop_mask = {
 	"Fucking stinks... Gotta take this mask off...",
 }
 
+local intracranial_bleed_phrases = {
+	"I have a really bad pounding headache...",
+	"My head feels like it's about to burst...",
+	"There's this awful pressure building in my skull...",
+	"Something's really wrong inside my head...",
+	"My head is throbbing like crazy...",
+}
+
 
 
 local drugged = {
@@ -408,6 +416,38 @@ local drugged = {
 }
 
 
+
+local fireCOCheckInterval = 0.5
+local fireCORadius = 450
+local fireCOIndoorMultiplier = 2.2
+
+local function HasGasMaskProtection(owner)
+	return owner.armors and owner.armors["face"] == "mask2"
+end
+
+local function GetNearbyFireCOExposure(owner)
+	local pos = owner:GetPos()
+	local exposure = 0
+
+	for _, fire in ipairs(ents.FindInSphere(pos, fireCORadius)) do
+		if IsValid(fire) and fire:GetClass() == "vfire" then
+			local dist = pos:Distance(fire:GetPos())
+			local proximity = math.Clamp(1 - dist / fireCORadius, 0, 1)
+			local fireStrength = math.Clamp((fire.life or 0) / vFireMaxLife, 0.15, 1)
+			exposure = math.max(exposure, proximity * fireStrength)
+		end
+	end
+
+	if exposure <= 0 then return 0 end
+
+	local tr = util.TraceLine({
+		start = pos,
+		endpos = pos + Vector(0, 0, 8192),
+		mask = MASK_SOLID_BRUSHONLY,
+	})
+
+	return exposure * (tr.HitSky and 1 or fireCOIndoorMultiplier)
+end
 
 local bit_band,util_PointContents = bit.band,util.PointContents
 
@@ -722,6 +762,17 @@ module[2] = function(owner, org, timeValue)
 
 	end
 
+	if (org._nextFireCOCheck or 0) <= CurTime() then
+		org._nextFireCOCheck = CurTime() + fireCOCheckInterval
+		if not HasGasMaskProtection(owner) then
+			local exposure = GetNearbyFireCOExposure(owner)
+			if exposure > 0 then
+				org.fireCOExposure = math.min((org.fireCOExposure or 0) + exposure * 2, 10)
+				org._lastFireCOExposure = CurTime()
+			end
+		end
+	end
+
 	if not org._lastFireCOExposure or org._lastFireCOExposure + 1.5 < CurTime() then
 		org.fireCOExposure = math.Approach(org.fireCOExposure or 0, 0, timeValue * 8)
 	end
@@ -976,12 +1027,8 @@ module[2] = function(owner, org, timeValue)
 
 	end
 
-	local pressureDelivery = math.Clamp((tonumber(org.bloodPressure) or 90) / 70, 0, 1)
-	local flowDelivery = math.Clamp((tonumber(org.cardiacOutput) or 1) / 0.8, 0, 1)
 	local rawTissuePerfusion = math.min(
-		flowDelivery,
-		hg.organism.GetPulseOxygenPerfusion(org.pulse),
-		pressureDelivery,
+		hg.organism.GetCirculatoryOxygenReserve(org.pulse, tonumber(org.bloodPressure) or 90),
 		1 - math.Clamp(org.hypertension or 0, 0, 1) ^ 2 * 0.85
 	)
 	local tissuePerfusionTarget = rawTissuePerfusion
@@ -1437,7 +1484,15 @@ kaz
 			org.owner:Notify(math.random(2) == 1 and "My head hurts..." or "Where am I?", true, "brain", 5)
 		else
 
-			org.owner:ResetNotification("brain") 
+			org.owner:ResetNotification("brain")
+
+		end
+
+		if org.brainHemorrhage > 0.08 then
+			org.owner:Notify(intracranial_bleed_phrases[math.random(#intracranial_bleed_phrases)], true, "intracranial_bleed", 8)
+		else
+
+			org.owner:ResetNotification("intracranial_bleed")
 
 		end
 

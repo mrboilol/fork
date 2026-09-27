@@ -2007,7 +2007,7 @@ function SWEP:ConsumeMeleeStamina(owner, amount)
 	if not SERVER or not IsValid(owner) or not owner.organism then return end
 	local org = owner.organism
 	local stamina = org.stamina
-	if stamina then stamina.subadd = (stamina.subadd or 0) + math.max(tonumber(amount) or 0, 0) end
+	if stamina then stamina.subadd = (stamina.subadd or 0) + math.max(tonumber(amount) or 0, 0) * (self.MeleeStaminaMul or 0.6) end
 
 	local arms = self.TwoHanded and {"rarm", "larm"} or {"rarm"}
 	local pain = 0
@@ -3182,7 +3182,7 @@ function SWEP:BlockingLogic(ent, mul, attacktype, trace)
 
             local perfectblock = CurTime() - wep:GetStartedBlocking() < (wep.GetBlockParryWindow and wep:GetBlockParryWindow() or self:GetBlockParryWindow())
             local tierDiff = attackerTier - defenderTier
-            local blockStaminaCost = math.max(swingStamina * (wep.BlockHitStaminaMul or self.BlockHitStaminaMul or 0.5), 0)
+            local blockStaminaCost = math.max(swingStamina * (wep.BlockHitStaminaMul or self.BlockHitStaminaMul or 0.5), 0) * (wep.MeleeStaminaMul or 0.6)
 
             if perfectblock then
                 trace.HGPreventHeadRagdoll = true

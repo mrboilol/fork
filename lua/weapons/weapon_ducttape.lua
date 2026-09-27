@@ -1151,8 +1151,69 @@ if SERVER then
 		local ragdoll = ply.FakeRagdoll
 
 		if ragdoll.ducttaped_legs then
-			ply.fakecd = CurTime() + 1
+			ply.fakecd = CurTime() + 0.15
+			ragdoll.ducttapeLegsStr = (ragdoll.ducttapeLegsStr or 10) - 1
+			ragdoll:EmitSound("tape_friction" .. math.random(3) .. ".ogg", 65)
+
+			if ragdoll.ducttapeLegsStr <= 0 then
+				RemoveLimbTape(ragdoll, "legs")
+				ragdoll:PhysWake()
+				ply:ChatPrint("Legs freed!")
+			end
+
 			return false
+		end
+	end)
+
+	local UNTAPE_TIME = 2.5
+
+	hook.Add("PlayerPostThink", "DuctTapeLegsHelperUntape", function(ply)
+		if not ply:Alive() or IsValid(ply.FakeRagdoll) or not ply:KeyDown(IN_ATTACK) then
+			ply.untapeTarget = nil
+			return
+		end
+
+		local wep = ply:GetActiveWeapon()
+		local handsClass = hg.GetHandsWeaponClass and hg.GetHandsWeaponClass(ply) or "weapon_hg_coolhands"
+		if not IsValid(wep) or (wep:GetClass() ~= "weapon_hands_sh" and wep:GetClass() ~= handsClass) then
+			ply.untapeTarget = nil
+			return
+		end
+
+		local tr = util.TraceLine({
+			start = ply:EyePos(),
+			endpos = ply:EyePos() + ply:GetAimVector() * 80,
+			filter = ply,
+			mask = MASK_ALL,
+		})
+		local ent = tr.Entity
+		if not IsValid(ent) or not ent:IsRagdoll() or not ent.ducttaped_legs then
+			ply.untapeTarget = nil
+			return
+		end
+
+		local bone = ent:TranslatePhysBoneToBone(tr.PhysicsBone)
+		local boneName = bone and ent:GetBoneName(bone) or ""
+		if not string.find(boneName, "Calf") and not string.find(boneName, "Foot") and not string.find(boneName, "Thigh") then
+			ply.untapeTarget = nil
+			return
+		end
+
+		if ply.untapeTarget ~= ent then
+			ply.untapeTarget = ent
+			ply.untapeStart = CurTime()
+			ply.untapeNextSound = 0
+		end
+
+		if ply.untapeNextSound < CurTime() then
+			ply.untapeNextSound = CurTime() + 0.6
+			ent:EmitSound("tape_friction" .. math.random(3) .. ".ogg", 65)
+		end
+
+		if CurTime() - ply.untapeStart >= UNTAPE_TIME then
+			RemoveLimbTape(ent, "legs")
+			ent:PhysWake()
+			ply.untapeTarget = nil
 		end
 	end)
 

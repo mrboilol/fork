@@ -8,19 +8,19 @@
 end
 
 hg.ArmorPlateMaterials = {
-	ceramic = {mass = 2.5, protection = 1},
-	steel = {mass = 4, protection = 0.9},
-	polyethylene = {mass = 1.8, protection = 0.8},
-	uhmwpe = {mass = 1.8, protection = 0.95},
-	uhmwpe_ceramic = {mass = 2.2, protection = 1.05},
-	uhmwpe_arsteel = {mass = 2.8, protection = 1},
-	titan = {mass = 3, protection = 1},
-	arsteel = {mass = 3.6, protection = 0.95},
-	kevlar = {mass = 1.5, protection = 0.7},
-	kevlar_ceramic = {mass = 2, protection = 0.9},
-	kevlar_arsteel = {mass = 2.6, protection = 0.85},
-	kevlar_titan = {mass = 2.4, protection = 0.85},
-	riot = {mass = 3.2, protection = 0.12, melee = 5, stab = 0.45},
+	ceramic = {mass = 2.5, protection = 1, durability = 30, spall = 0.1},
+	steel = {mass = 4, protection = 0.9, durability = 160, spall = 0.6},
+	polyethylene = {mass = 1.8, protection = 0.8, durability = 65, spall = 0},
+	uhmwpe = {mass = 1.8, protection = 0.95, durability = 75, spall = 0},
+	uhmwpe_ceramic = {mass = 2.2, protection = 1.05, durability = 50, spall = 0.03},
+	uhmwpe_arsteel = {mass = 2.8, protection = 1, durability = 120, spall = 0.15},
+	titan = {mass = 3, protection = 1, durability = 130, spall = 0.3},
+	arsteel = {mass = 3.6, protection = 0.95, durability = 150, spall = 0.4},
+	kevlar = {mass = 1.5, protection = 0.7, durability = 45, spall = 0},
+	kevlar_ceramic = {mass = 2, protection = 0.9, durability = 38, spall = 0.06},
+	kevlar_arsteel = {mass = 2.6, protection = 0.85, durability = 110, spall = 0.25},
+	kevlar_titan = {mass = 2.4, protection = 0.85, durability = 100, spall = 0.2},
+	riot = {mass = 3.2, protection = 0.12, melee = 5, stab = 0.45, durability = 90, spall = 0},
 }
 
 hg.ArmorPlateLevels = {[1] = 6, [2] = 8, [3] = 10, [4] = 12, [5] = 15, [6] = 17}
@@ -57,24 +57,42 @@ function hg.GetArmorProtection(ent, placement, armor, hitPos)
 	local stab = (data.stabProt or ballistic) * quality * multiplier * (levelProfile and levelProfile.stab or 1)
 	if not hg.GetArmorItemState(ent, armor, "fixedLevel", false) then ballistic = ballistic * quality end
 	ballistic = ballistic * multiplier * (levelProfile and levelProfile.ballistic or 1)
-	if placement ~= "torso" or not isvector(hitPos) then return ballistic, melee, stab end
+	if placement ~= "torso" or not hg.IsArmorPlateHit(ent, armor, hitPos) then return ballistic, melee, stab end
+	local level = hg.ArmorPlateLevels[hg.GetArmorItemState(ent, armor, "plateLevel", 3)] or 10
+	local material = hg.GetArmorPlateMaterial(ent, armor)
+	local condition = hg.GetArmorPlateCondition(ent, armor)
+	return ballistic + level * material.protection * 0.4 * condition, melee + level * (material.melee or 1) * 0.2 * condition, stab + level * (material.stab or 1) * 0.35 * condition
+end
+
+function hg.GetArmorPlateMaterial(ent, armor)
+	return hg.ArmorPlateMaterials[hg.GetArmorItemState(ent, armor, "plateMaterial", "ceramic")] or hg.ArmorPlateMaterials.ceramic
+end
+
+function hg.GetArmorPlateMaxHealth(ent, armor)
+	local level = hg.ArmorPlateLevels[hg.GetArmorItemState(ent, armor, "plateLevel", 3)] or 10
+	return (hg.GetArmorPlateMaterial(ent, armor).durability or 60) * level / hg.ArmorPlateLevels[3]
+end
+
+function hg.GetArmorPlateCondition(ent, armor)
+	local maximum = hg.GetArmorPlateMaxHealth(ent, armor)
+	local health = tonumber(hg.GetArmorItemState(ent, armor, "plateHealth", maximum)) or maximum
+	return math.Clamp(health / maximum, 0, 1)
+end
+
+function hg.IsArmorPlateHit(ent, armor, hitPos)
+	if not isvector(hitPos) then return false end
 	local sides = hg.GetArmorItemState(ent, armor, "plateSides", "none")
-	if sides == "none" then return ballistic, melee, stab end
+	if sides == "none" then return false end
 	local body = hg.GetCurrentCharacter and hg.GetCurrentCharacter(ent) or ent
-	if not IsValid(body) then return ballistic, melee, stab end
+	if not IsValid(body) then return false end
 	local bone = body:LookupBone("ValveBiped.Bip01_Spine2")
 	local matrix = bone and body:GetBoneMatrix(bone)
-	if not matrix then return ballistic, melee, stab end
+	if not matrix then return false end
 	local localPos = WorldToLocal(hitPos, angle_zero, matrix:GetTranslation(), matrix:GetAngles())
-	if localPos.x < -4 or localPos.x > 10 then return ballistic, melee, stab end
-	local front = localPos.y >= 2
-	local side = math.abs(localPos.z) > 4.5
-	if side and sides ~= "all" or not side and front and sides ~= "front" and sides ~= "both" and sides ~= "all" or not side and not front and sides ~= "back" and sides ~= "both" and sides ~= "all" then
-		return ballistic, melee, stab
-	end
-	local level = hg.ArmorPlateLevels[hg.GetArmorItemState(ent, armor, "plateLevel", 3)] or 10
-	local material = hg.ArmorPlateMaterials[hg.GetArmorItemState(ent, armor, "plateMaterial", "ceramic")] or hg.ArmorPlateMaterials.ceramic
-	return ballistic + level * material.protection * 0.4, melee + level * (material.melee or 1) * 0.2, stab + level * (material.stab or 1) * 0.35
+	if localPos.x < -4 or localPos.x > 10 then return false end
+	if math.abs(localPos.z) > 4.5 then return sides == "all" end
+	if localPos.y >= 2 then return sides == "front" or sides == "both" or sides == "all" end
+	return sides == "back" or sides == "both" or sides == "all"
 end
 
 function hg.IsVisorLowered(ent, armor, armorData)

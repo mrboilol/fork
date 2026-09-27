@@ -1,6 +1,7 @@
 hg = hg or {}
 hg.organism = hg.organism or {}
 
+hg.organism.HYPOVOLEMIC_FAILURE_BLOOD = 3000
 hg.organism.BLEEDOUT_START_BLOOD = 2500
 hg.organism.BLEEDOUT_DEATH_BLOOD = 2000
 hg.organism.PULSELESS_BLOOD_VOLUME = 1000

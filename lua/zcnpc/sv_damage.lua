@@ -68,10 +68,6 @@ hook.Add("HomigradDamage", "zcnpc_kick", function(victim, dmgInfo)
 	end
 	dir:Normalize()
 
-	-- A kick knocks someone over. It does not throw them across the room, and it
-	-- used to: the shove was well over 300 units a second before the body had even
-	-- worked out which way was down. zcnpc_kick_force is the whole of it now, with
-	-- a little lift so the body leaves its feet instead of skidding.
 	local force = cfg.kick_force:GetFloat()
 	local shove = dir * (force + math.min(dmgInfo:GetDamage(), 25) * force * 0.03) + Vector(0, 0, force * 0.35)
 	local downFor = cfg.kick_downtime:GetFloat()
@@ -254,6 +250,7 @@ hook.Add("HomigradDamage", "zcnpc_knockdown", function(victim, dmgInfo, hitgroup
 	local inflictor = dmgInfo:GetInflictor()
 	local class = IsValid(inflictor) and inflictor:GetClass()
 	if class == "weapon_hands_sh" or class == "weapon_hg_coolhands" then return end
+	if not dmgInfo:IsDamageType(DMG_CLUB + DMG_BLAST + BULLET) then return end
 	if dmgInfo:IsDamageType(BULLET) and not cfg.knockdown_bullets:GetBool() then return end
 
 	local org = victim.organism

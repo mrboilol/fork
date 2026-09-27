@@ -3323,13 +3323,33 @@ if CLIENT then
 	end
 end
 
+local function FindImpactMelee(t)
+	local ent = t.Entity
+	if IsValid(ent) and ent.GetBlockMaterial then return ent end
+	if not t.Pos then return end
+
+	for _, v in ipairs(ents.FindInSphere(t.Pos, 32)) do
+		if v:IsWeapon() and v.GetBlockMaterial and not IsValid(v:GetOwner()) then return v end
+	end
+end
+
 hook.Add( "EntityEmitSound", "WeaponDropSound", function( t )
-	--print(string.find(t.SoundName,"physics/metal/weapon_impact_*"))
-	if string.find(t.SoundName,"physics/metal/weapon_impact_*") then
-		t.SoundName = "weapon_impact_soft"..math_random(1,3)..".wav"
-		t.Pitch = t.Pitch - 10
-		return true
-	end 
+	if not string.find(t.SoundName, "physics/metal/weapon_impact_", 1, true) then return end
+
+	local melee = FindImpactMelee(t)
+	if not melee then return end
+
+	local material = melee:GetBlockMaterial()
+	local hard = string.find(t.SoundName, "hard", 1, true)
+	if material == "wood" then
+		t.SoundName = hard and "physics/wood/wood_solid_impact_hard" .. math_random(1, 3) .. ".wav" or "physics/wood/wood_solid_impact_soft" .. math_random(1, 3) .. ".wav"
+	elseif material == "metal" then
+		t.SoundName = hard and "physics/metal/metal_solid_impact_hard" .. math_random(1, 5) .. ".wav" or "physics/metal/metal_solid_impact_soft" .. math_random(1, 3) .. ".wav"
+	else
+		return
+	end
+
+	return true
 end)
 
 --[[

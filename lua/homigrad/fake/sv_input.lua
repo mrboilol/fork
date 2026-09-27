@@ -103,10 +103,10 @@ hook.Add("OnPlayerHitGround","fallStun",function(ply,inwater,onfloater,speed)
 	if (ply.PlayerClassName == "furry" and speed > 350 or speed > 250) and tr.Entity:IsPlayer() then
 		hg.drop(tr.Entity)
 		hg.LightStunPlayer(tr.Entity,2)
-		--tr.Entity:TakeDamage(speed / 5,ply,ply)
 	end
 
-	if speed > 600 then
+	if speed > 450 and not inwater and not onfloater and ply:Alive() then
+		ply.hgStumbleHit = {pos = ply:GetPos(), dir = ply:GetVelocity(), dmg = speed / 12, energy = speed / 12, time = CurTime()}
 		hg.LightStunPlayer(ply,2)
 
 		if speed > 650 and ply:Alive() then

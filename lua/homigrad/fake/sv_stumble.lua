@@ -4,7 +4,7 @@ local hg_euphoria_death_throes = CreateConVar("hg_euphoria_death_throes", "1", F
 local hg_euphoria_tumble = CreateConVar("hg_euphoria_tumble", "1", FCVAR_ARCHIVE + FCVAR_NOTIFY, "fake ragdolls tuck and roll when tumbling fast along the ground (Artagdoll Tumble)", 0, 1)
 local hg_euphoria_holdenv = CreateConVar("hg_euphoria_holdenv", "1", FCVAR_ARCHIVE + FCVAR_NOTIFY, "fake ragdolls reach for nearby surfaces and grab them with the fake hands (Artagdoll HoldEnv)", 0, 1)
 local hg_euphoria_windmill = CreateConVar("hg_euphoria_windmill", "1", FCVAR_ARCHIVE + FCVAR_NOTIFY, "fake ragdolls windmill while airborne (Artagdoll Falling)", 0, 1)
-local hg_hit_knockdown_energy = CreateConVar("hg_hit_knockdown_energy", "110", FCVAR_ARCHIVE + FCVAR_NOTIFY, "hit energy (damage summed over a short window) that knocks a standing player over, 0 disables", 0, 10000)
+local hg_hit_knockdown_energy = CreateConVar("hg_hit_knockdown_energy", "65", FCVAR_ARCHIVE + FCVAR_NOTIFY, "hit energy (damage summed over a short window) that knocks a standing player over, 0 disables", 0, 10000)
 
 local IKSystem = include("system_/utils/IKChain.lua")
 
@@ -19,16 +19,16 @@ local UPRIGHT_MIN_HEIGHT = 23.5
 local FOOT_HULL_MINS = Vector(-2, -2, 0)
 local FOOT_HULL_MAXS = Vector(2, 2, 2)
 
-local STUMBLE_PUSH_MUL = 2
+local STUMBLE_PUSH_MUL = 3
 local STUMBLE_PUSH_TIME_MUL = 1.5
-local STUMBLE_STEP_TRIGGER_MUL = 0.7
-local STUMBLE_STEP_INTERVAL_MUL = 0.8
-local STUMBLE_LUNGE_MUL = 0.05
-local STUMBLE_LUNGE_MAX = 12
-local STUMBLE_PITCH = 180
+local STUMBLE_STEP_TRIGGER_MUL = 0.55
+local STUMBLE_STEP_INTERVAL_MUL = 0.65
+local STUMBLE_LUNGE_MUL = 0.18
+local STUMBLE_LUNGE_MAX = 35
+local STUMBLE_PITCH = 240
 local STUMBLE_SUPPORT_TIME = 1.5
-local STUMBLE_MAX_TIME = 2.5
-local STUMBLE_FALL_GRACE = 0.65
+local STUMBLE_MAX_TIME = 3.25
+local STUMBLE_FALL_GRACE = 1
 local TOPPLE_PUSH = 110
 local TOPPLE_DOWN = 60
 local TOPPLE_ROLL = 200
@@ -37,12 +37,12 @@ local ENERGY_WINDOW = 0.3
 local ENERGY_REF = 30
 local ENERGY_PUSH_MIN = 0.5
 local ENERGY_PUSH_MAX = 3
-local ENERGY_PLAYER_PUSH = 2.5
-local ENERGY_PLAYER_PUSH_MAX = 350
-local ENERGY_RAG_PUSH = 2
-local ENERGY_RAG_PUSH_MAX = 300
-local ENERGY_FLING = 1.5
-local ENERGY_FLING_MAX = 320
+local ENERGY_PLAYER_PUSH = 4
+local ENERGY_PLAYER_PUSH_MAX = 450
+local ENERGY_RAG_PUSH = 3.5
+local ENERGY_RAG_PUSH_MAX = 420
+local ENERGY_FLING = 2.5
+local ENERGY_FLING_MAX = 420
 
 local ENERGY_TYPES = {
 	{DMG_BUCKSHOT, 1},

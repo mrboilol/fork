@@ -853,6 +853,7 @@ net.Receive("hg_configure_armor", function(_, ply)
 		ent.armorState.plateMaterial = material
 		ent.armorState.plateLevel = level
 		ent.armorState.plateSides = sides
+		ent.armorState.plateHealth = nil
 	end
 	ent:SetNetVar("ArmorItemState", ent.armorState)
 	local maximum = hg.GetArmorMaxCondition(ent, ent.placement, ent.name)
@@ -866,6 +867,7 @@ net.Receive("hg_configure_armor", function(_, ply)
 end)
 
 local ArmorEffect
+local DamageArmorPlate
 local force
 
 local function IsImpactDamage(dmgInfo)
@@ -1068,7 +1070,8 @@ function hg.GetArmorImpactMitigation(org, placement, dmgInfo, rawDmg)
 	end
 
 	local damageScale, protection, isSharp = GetArmorImpactDamageScale(owner, armor, armorData, dmgInfo:GetDamageType(), placement, dmgInfo:GetDamagePosition())
-	local broken, destroyed = DamageArmor(org, placement, armor, dmgInfo, rawDmg or dmgInfo:GetDamage())
+	local vestScale = DamageArmorPlate(org, placement, armor, dmgInfo, dmgInfo:GetDamagePosition(), rawDmg or dmgInfo:GetDamage())
+	local broken, destroyed = DamageArmor(org, placement, armor, dmgInfo, (rawDmg or dmgInfo:GetDamage()) * vestScale)
 	if destroyed then return 1, false, false end
 
 	return damageScale, isSharp and protection >= 2.5 and damageScale <= 0.15, true
@@ -1098,6 +1101,55 @@ local function ApplyArmorShrapnel(org, dmgInfo, dmg, bone, boneindex)
 	if IsValid(ent) then
 		hg.organism.AddWoundManual(ent, frag * 6, vector_origin, angle_zero, boneindex or 0, CurTime() + math.Rand(0, 1))
 	end
+end
+
+local function ApplyPlateSpall(org, dmg, boneindex)
+	local frag = dmg * math.Rand(0.04, 0.1)
+	org.painadd = (org.painadd or 0) + frag * 12
+	org.shock = (org.shock or 0) + frag * 4
+	if math.random() < 0.35 then
+		org.chest = math.min((org.chest or 0) + frag * 0.02, 0.9)
+	end
+	if math.random() < 0.2 then
+		local lung = math.random(2) == 1 and "lungsL" or "lungsR"
+		org[lung] = org[lung] or {0, 0}
+		org[lung][1] = math.min(org[lung][1] + frag * 0.01, 1)
+		org.internalBleed = (org.internalBleed or 0) + frag * 0.1
+	end
+	local ent = IsValid(org.owner) and hg.GetCurrentCharacter(org.owner)
+	if IsValid(ent) and math.random() < 0.5 then
+		hg.organism.AddWoundManual(ent, frag * 2, vector_origin, angle_zero, boneindex or 0, CurTime() + math.Rand(0, 0.5))
+	end
+end
+
+function DamageArmorPlate(org, placement, armor, dmgInfo, hitPos, rawDmg, boneindex)
+	local owner = org.owner
+	local isStab = dmgInfo:IsDamageType(DMG_SLASH)
+	if placement ~= "torso" or not IsValid(owner) or IsArmorBreakProtected(owner) then return 1 end
+	if not hg.IsArmorPlateHit(owner, armor, hitPos) or hg.GetArmorPlateCondition(owner, armor) <= 0 then
+		return isStab and 1.6 or 1
+	end
+	local isBullet = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
+	local isClub = dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH + DMG_GENERIC)
+	local material = hg.GetArmorPlateMaterial(owner, armor)
+	local maximum = hg.GetArmorPlateMaxHealth(owner, armor)
+	owner.armor_states = owner.armor_states or {}
+	owner.armor_states[armor] = owner.armor_states[armor] or {}
+	local state = owner.armor_states[armor]
+	local health = tonumber(state.plateHealth) or maximum
+	local wear = isBullet and 1 or isStab and 0.15 or isClub and 0.4 or 0.6
+	health = math.max(health - rawDmg * wear, 0)
+	state.plateHealth = health
+	owner:SyncArmor()
+	if health <= 0 then
+		sound.Play("physics/concrete/concrete_break" .. math.random(2, 3) .. ".wav", hitPos, 75, math.random(95, 110))
+	end
+	if isBullet and org.alive ~= false and not org.godmode and math.random() < (material.spall or 0) then
+		ApplyPlateSpall(org, rawDmg, boneindex)
+	end
+	if isBullet then return 0.2 end
+	if isStab then return 0.8 end
+	return 0.5
 end
 
 local function protec(org, bone, dmg, dmgInfo, placement, armor, scale, scaleprot, punch, boneindex, dir, hit, ricochet, impact, ballisticProtOverride)
@@ -1211,7 +1263,8 @@ local function protec(org, bone, dmg, dmgInfo, placement, armor, scale, scalepro
 	-- Helmets break and drop, vests wear out and protect less
 	if armorData then
 		local rawDmg = dmgInfo:GetDamage()
-		local broken, destroyed = DamageArmor(org, placement, armor, dmgInfo, ricochetHit and rawDmg * 0.15 or rawDmg)
+		local vestScale = DamageArmorPlate(org, placement, armor, dmgInfo, isvector(hit) and hit or dmgInfo:GetDamagePosition(), rawDmg, boneindex)
+		local broken, destroyed = DamageArmor(org, placement, armor, dmgInfo, (ricochetHit and rawDmg * 0.15 or rawDmg) * vestScale)
 		if broken and placement == "head" and not destroyed then
 			-- The shot that knocks the helmet off fully protects the player:
 			-- the helmet stops the bullet and it does not punch through to the head.
@@ -1401,7 +1454,8 @@ function hg.ProcessArmorModelHit(hit, damage, forceAmount, direction, shot)
 
 	local org = owner.organism or {owner = owner}
 	if not org.owner then org.owner = owner end
-	local broken, destroyed = DamageArmor(org, placement, armor, dmgInfo, dmgInfo:GetDamage() * 1.1)
+	local vestScale = DamageArmorPlate(org, placement, armor, dmgInfo, hit.position, dmgInfo:GetDamage() * 1.1)
+	local broken, destroyed = DamageArmor(org, placement, armor, dmgInfo, dmgInfo:GetDamage() * 1.1 * vestScale)
 	if isBullet and owner.armors and owner.armors[placement] == armor and IsDurabilityArmor(placement, armorData) then
 		hg.HandleArmorShot(org, placement, armor, dmgInfo, hit.position, false)
 	end

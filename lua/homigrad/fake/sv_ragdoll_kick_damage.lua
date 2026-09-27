@@ -159,17 +159,16 @@ end
 local function CalculateImpact(boneName, speed)
     if LEG_BONES[boneName] then
         if speed >= DROP_KICK_SPEED_THRESHOLD then
-            -- A committed ragdoll dropkick should hit harder than the animated hg_kick dropkick.
             return math.min(34 + (speed - DROP_KICK_SPEED_THRESHOLD) * 0.14, 65),
-                math.max(2200, speed * 8),
-                math.Clamp(350 + (speed - DROP_KICK_SPEED_THRESHOLD) * 1.5, 400, 900),
+                math.max(3200, speed * 14),
+                math.Clamp(500 + (speed - DROP_KICK_SPEED_THRESHOLD) * 2, 500, 1100),
                 "dropkick"
         end
 
         if speed >= LEG_SHOVE_SPEED_THRESHOLD then
             return math.min(1 + (speed - LEG_SHOVE_SPEED_THRESHOLD) * 0.035, 9),
-                math.max(1400, speed * 8),
-                math.Clamp(250 + speed * 1.4, 350, 650),
+                math.max(2200, speed * 12),
+                math.Clamp(400 + speed * 1.8, 450, 850),
                 "leg shove"
         end
     elseif speed >= TACKLE_SPEED_THRESHOLD then
@@ -325,8 +324,8 @@ hook.Add("Ragdoll Collide", "RagdollKickDamage", function(ragdoll, data)
 
         hg.TriggerFakeLegKickExtension(attacker, ragdoll, kickSpeed)
         damage = math.min(fakeKick.dmg * speedMul * timingMul, 65)
-        impactForce = math.max(1800, kickSpeed * 9) * timingMul
-        knockback = math.Clamp(280 + kickSpeed * 1.6, 350, 1000) * timingMul
+        impactForce = math.max(3200, kickSpeed * 14) * timingMul
+        knockback = math.Clamp(400 + kickSpeed * 2, 500, 1100) * timingMul
         impactType = timedExtension and "timed fake kick" or "fake kick"
     else
         damage, impactForce, knockback, impactType = CalculateImpact(boneName, speed)

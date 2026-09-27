@@ -244,6 +244,13 @@ hook.Add("Org Clear", "Main", function(org)
 	org.LodgedEntities = nil
 	org.dmgstack = {}
 	org.SpawnedBrainChunks = nil
+	org.brainSwelling = 0
+	org.intracranialPressure = 0
+	for _, key in ipairs({
+		"_zeroO2Time", "cervicalOxygenLoss", "spine3OxygenLossAt", "spine3OxygenLossWarned", "spine3AcutePain", "spine3AcutePainUntil", "choking", "scubaOxygenActive", "neckslit", "neckslitDeadline", "neckslitWarned", "neckBrainOxygenPenalty", "hypoxiaTime", "heartstoptime", "terminalRhythm", "terminalCirculatoryFailure", "unstableRhythm", "hemorrhagicDecompensation", "hemorrhageCompensation", "hemostaticTreatment", "hypovolemia", "hypovolemicShock", "cardiacArrestMechanicalStart", "cardiacArrestMechanicalInitial", "cardiacRestartUntil", "resuscitationAttemptUntil", "sedativePressureRelief", "drugBradycardia", "critical", "incapacitated", "needfake", "needotrub", "uncon_timer", "overdoseShit", "overdoseNausea", "is_sprayed_at", "brokenribs", "limbfractures", "gibdmgstack", "gibhealth", "stamina_damage", "panic"
+	}) do
+		org[key] = nil
+	end
 end)
 hook.Add("Should Fake Up", "organism", function(ply)
 	local org = ply.organism
@@ -317,6 +324,7 @@ function hg.organism.RecordWoundMark(org, wound, arterial)
 	local body = IsValid(org.owner) and hg.GetCurrentCharacter(org.owner)
 	if IsValid(body) and body:WaterLevel() >= 2 then return end
 	org.woundmarks = org.woundmarks or {}
+	while #org.woundmarks >= 24 do table.remove(org.woundmarks, 1) end
 	org.woundmarks[#org.woundmarks + 1] = {
 		math.max(tonumber(wound.initialSeverity) or tonumber(wound[1]) or 0.01, 0.01),
 		wound[2],

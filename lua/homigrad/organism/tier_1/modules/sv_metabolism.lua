@@ -17,6 +17,27 @@ module[1] = function(org)
 end
 
 local colorRed = Color(125,25,25)
+
+local hungryThoughts = {
+    "Mgh, I'm hungry...",
+    "Some food would be great...",
+    "I should eat something.",
+}
+local veryHungryThoughts = {
+    "My stomach... Ugh...",
+    "If I don't eat, I'll feel even worse...",
+    "Stomach... Damn it... I feel sick.",
+}
+local thirstyThoughts = {
+    "I'm thirsty...",
+    "Some water would be great...",
+    "I should drink something.",
+}
+local veryThirstyThoughts = {
+    "My throat is so dry...",
+    "If I don't drink, I'll feel even worse...",
+    "Water... Damn it... I feel sick.",
+}
 module[2] = function(owner, org, timeValue)
     local hungerEnabled = hg_hungersystem:GetBool()
 
@@ -65,7 +86,15 @@ module[2] = function(owner, org, timeValue)
     
     org.hungry = min(max((org.hungry or 0) + hungerRate, 0), 100)
     org.hungry = Round(org.hungry or 0, 3)
-    
+
+    if hungerEnabled and org.isPly and owner:IsPlayer() and not org.otrub then
+        if org.hungry > 70 then
+            owner:Notify(veryHungryThoughts[math.random(#veryHungryThoughts)], 60, "hungry_severe", 0, nil, colorRed)
+        elseif org.hungry > 40 then
+            owner:Notify(hungryThoughts[math.random(#hungryThoughts)], 60, "hungry", 0)
+        end
+    end
+
     -- Pain and O2 loss when really hungry (>70) - only if hunger system enabled
     if hungerEnabled then
         if org.hungry > 70 then
@@ -106,6 +135,14 @@ module[2] = function(owner, org, timeValue)
             org.thirstDmgCd = CurTime() + (math.random(30, 45) - (org.thirst / 6.5))
             -- Pain/damage cadence remains intermittent; the circulation penalty
             -- itself is updated continuously below from the current thirst state.
+        end
+
+        if org.isPly and owner:IsPlayer() and not org.otrub then
+            if org.thirst > 60 then
+                owner:Notify(veryThirstyThoughts[math.random(#veryThirstyThoughts)], 60, "thirsty_severe", 0, nil, colorRed)
+            elseif org.thirst > 30 then
+                owner:Notify(thirstyThoughts[math.random(#thirstyThoughts)], 60, "thirsty", 0)
+            end
         end
     else
         org.thirst = min(max(org.thirst - timeValue * 2, 0), 100)

@@ -113,6 +113,11 @@ local internalBleedThoughts = {
 	"I feel like something ripped inside.",
 	"I think something moved wrong inside.",
 }
+local nosebleedThoughts = {
+	"My nose is bleeding...",
+	"I can taste blood in my throat...",
+	"Something's making my nose bleed.",
+}
 local vecZero = Vector(0, 0, 0)
 local limbArteryWeakness = {
 	rarmartery = {limb = "rarm", damage = 0.65},
@@ -513,6 +518,9 @@ module[2] = function(owner, org, mulTime)
 	-- Nosebleed from severe internal bleeding
 	if org.internalBleed > 0.75 and hg.applyNosebleed and math.random() < org.internalBleed * 0.02 * mulTime then
 		hg.applyNosebleed(owner, org.internalBleed * 8)
+		if org.isPly and IsValid(owner) and not org.otrub then
+			owner:Notify(nosebleedThoughts[math.random(#nosebleedThoughts)], 30, "nosebleed", 0, nil, Color(220, 170, 170))
+		end
 	end
 
 	-- Blood volume supplies circulation inputs only. Consequences such as

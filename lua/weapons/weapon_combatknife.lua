@@ -128,6 +128,7 @@ SWEP.DeploySnd = "snd_jack_hmcd_knifedraw.wav"
 SWEP.SwingAng = -55
 
 SWEP.setlh = true
+SWEP.DisableLHIKWhileBlocking = true
 SWEP.setrh = true
 SWEP.TwoHanded = false
 

@@ -272,6 +272,39 @@ function hg.organism.GetPulseOxygenPerfusion(pulse)
 	return normalizedPulse
 end
 
+function hg.organism.GetCirculatoryOxygenReserve(pulse, pressure)
+	return math.min(hg.organism.GetPulseOxygenPerfusion(pulse), Clamp((tonumber(pressure) or 0) / 70, 0, 1))
+end
+
+local function getHypovolemicFailureBlood()
+	return tonumber(hg.organism.HYPOVOLEMIC_FAILURE_BLOOD) or 3000
+end
+
+local function getCompensatedLossTolerance(blood)
+	local failure = getHypovolemicFailureBlood()
+	local bleedout = tonumber(hg.organism.BLEEDOUT_START_BLOOD) or 2500
+	return Clamp(((tonumber(blood) or 5000) - bleedout) / math.max(failure - bleedout, 1), 0, 1)
+end
+
+local function getHypovolemicFailureDrive(blood)
+	local failure = getHypovolemicFailureBlood()
+	return Clamp((failure + 250 - (tonumber(blood) or 5000)) / 500, 0, 1)
+end
+
+local function getHemorrhageRateCeiling(blood)
+	local failure = getHypovolemicFailureBlood()
+	local death = tonumber(hg.organism.BLEEDOUT_DEATH_BLOOD) or 2000
+	local depth = Clamp((failure - (tonumber(blood) or 5000)) / math.max(failure - death, 1), 0, 1)
+	return Lerp(depth, 215, terminalHeartRate)
+end
+
+local function getHemorrhageRateFloor(blood)
+	local normal = getNormalBloodVolume()
+	local death = tonumber(hg.organism.BLEEDOUT_DEATH_BLOOD) or 2000
+	local depth = Clamp((normal - (tonumber(blood) or normal)) / math.max(normal - death, 1), 0, 1)
+	return 70 + (terminalHeartRate - 70) * depth
+end
+
 local function getPalpablePulseTarget(org, heartbeat, circulation, hemorrhageCompensation, effectivePalpitations)
 	local cfg = hg.organism.config or {}
 	local rate = math.Clamp(tonumber(heartbeat) or 0, 0, terminalHeartRate)
@@ -311,14 +344,8 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 
 	local o2Range = math.max(tonumber(org.o2.range) or 30, 1)
 	local oxygenReserve = Clamp((tonumber(org.o2[1]) or 0) / o2Range, 0, 1)
-	local circulation = Clamp(tonumber(org.cardiacOutput) or 0, 0, 1)
-	local pulseReserve = hg.organism.GetPulseOxygenPerfusion(org.pulse)
-	-- A slow or weak palpable pulse means tissue is not receiving enough
-	-- effective beats, even when stored oxygen and nominal cardiac output have
-	-- not caught up yet. Blood volume reaches O2 through this circulation path.
-	local effectiveCirculation = math.min(circulation, pulseReserve)
-	local pressureReserve = Clamp((tonumber(org.bloodPressure) or 0) / 65, 0, 1)
-	local cerebralPerfusion = math.min(effectiveCirculation * 1.15, pressureReserve)
+	local effectiveCirculation = hg.organism.GetCirculatoryOxygenReserve(org.pulse, org.bloodPressure)
+	local cerebralPerfusion = effectiveCirculation
 	local peripheralPerfusion = effectiveCirculation * Clamp(1 - (org.sympatheticCompensation or 0) * 0.45, 0.55, 1)
 	local neckPenalty = Clamp(tonumber(org.neckBrainOxygenPenalty) or 0, 0, 0.8)
 	local brainTarget = math.max(math.min(oxygenReserve, cerebralPerfusion) - neckPenalty, 0)
@@ -456,6 +483,16 @@ local cardiacArrestThoughts = {
 	"I'M FADING- EVERYTHING IS GOING DARK",
 	"I'M DYING... I CAN'T FEEL MY PULSE",
 	"gg boi im cooked"
+}
+local hypotensionThoughts = {
+	"My limbs feel weak and cold...",
+	"I can barely make myself move...",
+	"My body feels heavy and sluggish...",
+}
+local hypertensionThoughts = {
+	"My blood pressure feels dangerously high...",
+	"My head is pounding from the pressure...",
+	"I feel pressure building in my head...",
 }
 
 local function applyTemperatureTrauma(org)
@@ -1052,7 +1089,12 @@ module[2] = function(owner, org, timeValue)
 	end
 	local coronaryPerfusion = math.min(Clamp(circulation, 0, 1), Clamp(org.bloodPressure / 70, 0, 1))
 	local cardiacSupply = hg.organism.GetLimitingReserve(oxygenation, coronaryPerfusion)
-	local cardiacDemand = 0.55 + 0.45 * (Clamp((org.heartbeat or 70) / 70, 0, 4) ^ 1.3) + catecholamineDrive * 0.2
+	local compensatedLossTolerance = getCompensatedLossTolerance(bloodNow)
+	local compensatoryRate = math.max((org.compensationHeartRateTarget or 70) - 70, 0) * compensatedLossTolerance
+	local demandRate = math.min(org.heartbeat or 70, math.max((org.heartbeat or 70) - compensatoryRate, 70))
+	local cardiacDemand = 0.55 + 0.45 * (Clamp(demandRate / 70, 0, 4) ^ 1.3) + catecholamineDrive * 0.2
+	local volumeCompensatedCoronary = Clamp(coronaryPerfusion / math.max(bloodVolume, 0.1), 0, 1)
+	cardiacSupply = Lerp(compensatedLossTolerance, cardiacSupply, hg.organism.GetLimitingReserve(oxygenation, volumeCompensatedCoronary))
 	local oxygenMismatch = Clamp((cardiacDemand - cardiacSupply) / math.max(cardiacDemand, 1), 0, 1)
 	local myocardialTarget = Clamp(cardiacSupply / math.max(cardiacDemand, 1), 0, 1)
 	if org.heartstop and defibGrace then myocardialTarget = math.max(myocardialTarget, 0.25) end
@@ -1071,8 +1113,10 @@ module[2] = function(owner, org, timeValue)
 	)
 	org.arrhythmiaComplication = arrhythmiaComplication
 	local hypotensionSeverity = Clamp((org.hypotension - 0.35) / 0.65, 0, 1)
-	if hypotensionSeverity > 0 and not org.heartstop then
-		org.hypotensionExposure = math.min((org.hypotensionExposure or 0) + timeValue * hypotensionSeverity ^ 1.5 * oxygenMismatch, hypotensionExposureTime)
+	local hypovolemicFailureDrive = getHypovolemicFailureDrive(bloodNow)
+	local hypotensionExposureRate = math.max(hypotensionSeverity ^ 1.5 * oxygenMismatch, hypovolemicFailureDrive)
+	if hypotensionExposureRate > 0 and not org.heartstop then
+		org.hypotensionExposure = math.min((org.hypotensionExposure or 0) + timeValue * hypotensionExposureRate, hypotensionExposureTime)
 	else
 		org.hypotensionExposure = math.Approach(org.hypotensionExposure or 0, 0, timeValue)
 	end
@@ -1110,6 +1154,7 @@ module[2] = function(owner, org, timeValue)
 		sympatheticCompensation * 0.58 + acuteHemorrhageStress * 0.55 + hypotensionInstability * 0.12,
 		0, 1
 	)
+	cardiacCompensationRate = math.max(cardiacCompensationRate, getHemorrhageRateFloor(bloodNow))
 	org.compensationHeartRateTarget = cardiacCompensationRate
 	local lowVolumeInfluence = 1 - preloadReserve
 	if cardiacCompensationRate < compensationRate then
@@ -1151,8 +1196,10 @@ module[2] = function(owner, org, timeValue)
 	-- Compensation remains effective through mild cold. Below 34 C the sinus
 	-- node and conduction system progressively lose responsiveness.
 	local coldSuppression = math.Clamp((34 - (org.temperature or 36.7)) / 7, 0, 1)
+	local hypovolemicGiveUp = Clamp((hypotensionInstability - 0.6) / 0.4, 0, 1) * Clamp(hypovolemicFailureDrive * 2, 0, 1)
 	local hemorrhagicDecompensation = math.max(Clamp(org.cardiacStressExposure or 0, 0, 1),
-		Clamp((0.3 - (org.myocardialOxygen or 1)) / 0.3, 0, 1) * hypotensionInstability)
+		Clamp((0.3 - (org.myocardialOxygen or 1)) / 0.3, 0, 1) * hypotensionInstability,
+		hypovolemicGiveUp)
 	local zerlkersSuppression = math.Clamp(org.zerlkersOverdose or 0, 0, 1)
 	local drugBradycardia = math.Clamp(((org.drugRespiratoryDepression or 0) - 0.12) / 0.88, 0, 1)
 	local cervicalSuppression = org.cervicalParalysis and 0.58 or 0
@@ -1179,6 +1226,8 @@ module[2] = function(owner, org, timeValue)
 	if preloadRateCeiling < maxCompensatedRate then
 		maxCompensatedRate = Lerp(lowVolumeInfluence, maxCompensatedRate, preloadRateCeiling)
 	end
+	local hemorrhageRateCeiling = bloodNow < normalBloodVolume and getHemorrhageRateCeiling(bloodNow) + adrenalineRateTolerance * 25 or terminalHeartRate
+	maxCompensatedRate = math.min(maxCompensatedRate, hemorrhageRateCeiling)
 	if heart < 0.35 or brain < 0.35 then
 		maxCompensatedRate = math.min(maxCompensatedRate, 85)
 	end
@@ -1335,7 +1384,7 @@ module[2] = function(owner, org, timeValue)
 	end
 
 	org.heartbeat = math.Approach(org.heartbeat, heartbeat, heartbeat > org.heartbeat and timeValue * 5 or timeValue * 3)
-	org.heartbeat = math.Clamp(org.heartbeat, 0, terminalHeartRate)
+	org.heartbeat = math.Clamp(org.heartbeat, 0, org.fibrillation and terminalHeartRate or math.min(hemorrhageRateCeiling, terminalHeartRate))
 	
 	local ischemia = Clamp(1 - (org.myocardialOxygen or 1), 0, 1)
 	local internalBleedPeak = math.max(tonumber(org.internalBleedPeak) or 0, tonumber(org.internalBleed) or 0, 0)
@@ -1432,6 +1481,10 @@ module[2] = function(owner, org, timeValue)
 	if org.hypotension > 0.55 then
 		local disorientK = math.Clamp((org.hypotension - 0.55) / 0.35, 0, 1)
 		org.disorientation = math.max(org.disorientation, 0.25 + disorientK * 1.25)
+
+		if org.isPly and not org.otrub then
+			org.owner:Notify(hypotensionThoughts[math.random(#hypotensionThoughts)], 40, "hypotension", 0, nil, Color(170, 170, 220))
+		end
 	end
 
 	if org.hypotension > 0.64 then
@@ -1447,6 +1500,10 @@ module[2] = function(owner, org, timeValue)
 		if org.isPly and not org.otrub then
 			org.owner:Notify("My limbs feel weak...", true, "low_perfusion", 0, nil, Color(200, 170, 170))
 		end
+	end
+
+	if org.hypertension > 0.35 and org.isPly and not org.otrub then
+		org.owner:Notify(hypertensionThoughts[math.random(#hypertensionThoughts)], 40, "hypertension", 0, nil, Color(220, 170, 170))
 	end
 
 	if org.hypertension > 0 then

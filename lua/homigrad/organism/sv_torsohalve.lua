@@ -1,3 +1,5 @@
+local TORSO_HALVING_ENABLED = false
+
 local TORSO_UPPER_MODEL = "models/torsopartial/torsovar.mdl"
 local TORSO_LOWER_MODEL = "models/torsopartial/abdomenvar.mdl"
 local ZERO_SCALE = Vector(0, 0, 0)
@@ -560,6 +562,7 @@ local function EnsureFakeAndSplit(ply, force, fromExplosion)
 end
 
 function hg.AmputateTorso(ent, force, fromExplosion)
+	if not TORSO_HALVING_ENABLED then return false end
 	local ply = ResolvePlayer(ent)
 	if not IsValid(ply) then return false end
 	return EnsureFakeAndSplit(ply, force or VectorRand(-250, 250), fromExplosion == true)
@@ -626,6 +629,7 @@ local function SplitDeadRagdoll(ply, target, force)
 end
 
 local function QueueBlastTorso(target, dmgInfo)
+	if not TORSO_HALVING_ENABLED then return end
 	if not IsBlastDamage(dmgInfo) then return end
 	local ply = ResolvePlayer(target)
 	if not IsValid(ply) then return end

@@ -134,6 +134,7 @@ if CLIENT then
 end
 
 SWEP.setlh = false
+SWEP.DisableLHIKWhileBlocking = true
 SWEP.setrh = true
 SWEP.TwoHanded = false
 
