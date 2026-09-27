@@ -322,6 +322,10 @@ local function Trace_Bullet(box, hit, ricochet, impact, org, organs, dmg, dmgInf
 				hg.organism.AddBrainHemorrhage(org, math.Clamp(0.01 + brainDelta * 0.35, 0.01, 0.14), math.Clamp(0.0003 + brainDelta * 0.003, 0.0003, 0.004))
 			end
 			impact.brainHit = brainDelta > 0
+			if brainDelta > 0 then
+				impact.brainLobesHit = impact.brainLobesHit or {}
+				impact.brainLobesHit[name] = true
+			end
 			local maxBrainCost = math.Clamp(0.95 - math.Clamp((brainTransfer - 0.45) * 0.22, 0, 0.35), 0.58, 0.95)
 			energyCost = math.max(energyCost, impact.energyBefore * math.Clamp(0.45 + brainDelta * 0.35, 0.45, maxBrainCost))
 		end
@@ -340,7 +344,7 @@ local function Trace_Bullet(box, hit, ricochet, impact, org, organs, dmg, dmgInf
 			if bullet.StopsInBrain or not passesBrain then
 				result.stopped = true
 			end
-			if brainDelta >= 0.75 or (org.brain or 0) >= 0.95 then
+			if table.Count(impact.brainLobesHit or {}) >= 2 or (org.brain or 0) >= 0.95 then
 				org.brain = 1
 				org.alive = false
 				ApplyFatalOrganismDamage(org, dmgInfo)
@@ -1194,7 +1198,11 @@ function hg.ExplodeHead(ent, damage, slash, force)
 		
 		if mat then
 			local pos = mat:GetTranslation()
-			local dir = mat:GetAngles():Up() * 5.5
+			local neckBone = ent:LookupBone("ValveBiped.Bip01_Neck1")
+			local neckMat = neckBone and ent:GetBoneMatrix(neckBone)
+			local outward = neckMat and (pos - neckMat:GetTranslation()) or mat:GetAngles():Forward()
+			if outward:LengthSqr() < 0.01 then outward = mat:GetAngles():Forward() end
+			local dir = outward:GetNormalized() * 5.5
 			
 			net.Start("bloodsquirt")
 			net.WriteEntity(ent)
@@ -1540,12 +1548,21 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	local cachedBoxs, cachedPos, cachedSphere = hg.organism.ShootMatrix(ent, cachedOrgans)
 
 	local lastPos, hitBoxs, inputHole, outputHole, outputDir, distance, tracePoses = nil,{},{},{},{},nil,nil
+	local arterialWoundCount = #org.arterialwounds
 	if dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT+DMG_SLASH+DMG_CLUB+DMG_GENERIC) then
 		lastPos, hitBoxs, inputHole, outputHole, outputDir, distance, tracePoses = hg.organism.Trace(dmgPos, dir, size, maxpen, cachedBoxs, cachedPos, cachedSphere, cachedOrgans, dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT), Trace_Bullet, impact, ent.organism, cachedOrgans, dmg / 25, dmgInfo, dir, isRifleBullet)
 		if isBallistic then dmgInfo:SetDamageType(impact.rawDamageType) end
 		if impact.armorStopped then
 			inputHole = {}
 			outputHole = {}
+		end
+		if dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT) and outputHole[1] and isvector(outputDir) then
+			local exitPos, exitAng, exitBone = hg.organism.GetWoundAnchor(ent, outputHole[#outputHole], (-outputDir):Angle())
+			if exitPos then
+				for i = arterialWoundCount + 1, #org.arterialwounds do
+					org.arterialwounds[i].exitWound = {0, exitPos, exitAng, exitBone}
+				end
+			end
 		end
 	elseif dmgInfo:IsDamageType(DMG_BLAST) then
 		hg.organism.BlastTrace(dmgInfo:GetDamagePosition(), (ent:GetPos() - dmgInfo:GetDamagePosition()):Length() / 200, dmg * 2, cachedBoxs, cachedOrgans, Trace_Blast, ent.organism, cachedOrgans, dmg / 300, dmgInfo)
@@ -2000,7 +2017,8 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	if not noDismemberment and instant and hitgroup == HITGROUP_STOMACH and not org.stomachgibbed and hg.AttachStomachGore then
 		hg.AttachStomachGore(ent, dirCool * len)
 	end
-	local fatalHeadshot = (org.brain or 0) >= 0.7 or not org.alive or (IsValid(ply) and not ply:Alive())
+	local throughAndThrough = outputHole and #outputHole > 0
+	local fatalHeadshot = (org.brain or 0) >= 0.25 or throughAndThrough or not org.alive or (IsValid(ply) and not ply:Alive())
 	if hitgroup == HITGROUP_HEAD and fatalHeadshot and damageStack > 0 and dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_SNIPER) and !ent.headexploded and !ent.headExplodePending then
 		local squirtDirection = getShotTravelDirection(dmgInfo, inputHole, outputHole, dmgPos, ent)
 		local caliber = tonumber(bullet and bullet.Diameter) or tonumber(IsValid(inf) and inf.PenetrationSize) or 0
@@ -2856,6 +2874,21 @@ function hg.BreakNeck(ent, recipient, soundEnt)
 		if IsValid(ent) and hg.fakeBoneFlop then
 			hg.fakeBoneFlop.ScheduleApply(ent, "ValveBiped.Bip01_Spine3", org)
 			hg.fakeBoneFlop.ScheduleApply(ent, "ValveBiped.Bip01_Head1", org)
+			timer.Simple(0.05, function()
+				if IsValid(ent) and hg.fakeBoneFlop then
+					hg.fakeBoneFlop.BendStored(ent, org, 1.0)
+				end
+			end)
+			timer.Simple(0.15, function()
+				if IsValid(ent) and hg.fakeBoneFlop then
+					hg.fakeBoneFlop.BendStored(ent, org, 0.6)
+				end
+			end)
+			timer.Simple(0.3, function()
+				if IsValid(ent) and hg.fakeBoneFlop then
+					hg.fakeBoneFlop.BendStored(ent, org, 0.3)
+				end
+			end)
 		end
 	end)
 end

@@ -175,7 +175,7 @@ function zb:PreRound()
 		return
 	end
 
-	if zb.ROUND_STATE == 0 and #player_GetAll() > 1 then
+	if zb.ROUND_STATE == 0 and (#player_GetAll() > 1 or zb.CROUND == "builder") then
 		zb.END_TIME = nil
 
 		zb.START_TIME = zb.START_TIME or CurTime() + (CurrentRound().start_time or 5)

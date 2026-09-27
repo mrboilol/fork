@@ -79,12 +79,6 @@ end
 local judgeBandageClasses = {
 	weapon_bandage_sh = true,
 	weapon_bigbandage_sh = true,
-	weapon_packedbandage_sh = true,
-	weapon_combatbandage_sh = true,
-	weapon_quikclotbandage_sh = true,
-	weapon_bigpackedbandage_sh = true,
-	weapon_bigcombatbandage_sh = true,
-	weapon_bigquikclotbandage_sh = true,
 	weapon_bruicekit = true
 }
 
@@ -437,37 +431,31 @@ function SWEP:GetBandageTargetBone(target, trace)
 	target = ResolveBandageTarget(target)
 	if not IsValid(target) then return end
 
-	local bone = GetTraceBone(trace, target)
-	if bone and BoneHasBandageableInjury(target, bone) then return bone end
-
 	local org = target.organism
 	if not org then return end
-	local injuredBone = GetBandageBoneKey(org, bone)
-	if injuredBone then return bone end
-	injuredBone = GetBandageBoneKey(org)
-	if injuredBone then return injuredBone end
 	local _, artery = GetBandageableArteryWound(org, target)
 	if artery and artery[4] then return artery[4] end
 
 	local largestWound
 	for _, wound in ipairs(org.wounds or {}) do
-		if (wound[1] or 0) > (largestWound and largestWound[1] or 0) then
+		if wound[4] and (wound[1] or 0) > (largestWound and largestWound[1] or 0) then
 			largestWound = wound
 		end
 	end
 	if largestWound and largestWound[4] then return largestWound[4] end
 
-	if org.jawdislocation then return "ValveBiped.Bip01_Head1" end
-	if org.llegdislocation then return "ValveBiped.Bip01_L_Calf" end
-	if org.rlegdislocation then return "ValveBiped.Bip01_R_Calf" end
-	if org.larmdislocation then return "ValveBiped.Bip01_L_Forearm" end
-	if org.rarmdislocation then return "ValveBiped.Bip01_R_Forearm" end
-	if (org.skull or 0) >= 0.05 then return "ValveBiped.Bip01_Head1" end
-	if (org.lleg or 0) >= 0.05 then return "ValveBiped.Bip01_L_Calf" end
-	if (org.rleg or 0) >= 0.05 then return "ValveBiped.Bip01_R_Calf" end
-	if (org.larm or 0) >= 0.05 then return "ValveBiped.Bip01_L_Forearm" end
-	if (org.rarm or 0) >= 0.05 then return "ValveBiped.Bip01_R_Forearm" end
-	if (org.chest or 0) >= 0.05 then return "ValveBiped.Bip01_Spine2" end
+	for _, key in ipairs(bandageBoneOrder) do
+		local damage = org[key] or 0
+		if not org[key .. "amputated"] and (damage >= 1
+			or key == "chest" and damage >= 0.05 and (org.brokenribs or 0) > 0) then return key end
+	end
+
+	local dislocation = hg.organism.GetBandageDislocation and hg.organism.GetBandageDislocation(org)
+	if dislocation then return bandageBoneNames[dislocation] end
+
+	local bone = GetTraceBone(trace, target)
+	if bone and BoneHasBandageableInjury(target, bone) then return bone end
+	return GetBandageBoneKey(org)
 end
 
 local function IsBandageBone(bone, hitgroup)
@@ -634,7 +622,7 @@ function SWEP:Initialize()
 end
 
 SWEP.modeValuesdef = {
-	[1] = {40,true},
+	[1] = {50,true},
 }
 
 function SWEP:GetInfo()
@@ -834,8 +822,6 @@ function SWEP:GetBandageTreatmentCost(target, bone)
 		local remaining = GetRemainingArteryBandageTreatmentCost(arteryWound)
 		return remaining
 	end
-	if GetBandageBoneKey(org, bone) then return self:GetBandageStructuralTreatmentCost() end
-
 	local woundCost = 0
 	for _, wound in ipairs(org.wounds or {}) do
 		if not bone or BoneNamesMatch(target, wound[4], bone) then
@@ -843,6 +829,7 @@ function SWEP:GetBandageTreatmentCost(target, bone)
 		end
 	end
 	if woundCost > 0 then return woundCost end
+	if GetBandageBoneKey(org, bone) then return self:GetBandageStructuralTreatmentCost() end
 
 	local structuralCost = self:GetBandageStructuralTreatmentCost()
 	if hg.organism.GetBandageDislocation and hg.organism.GetBandageDislocation(org, bone) then return structuralCost end
@@ -870,7 +857,17 @@ if SERVER then
 		local structuralBone = bone or self:GetBandageTargetBone(ent, IsValid(owner) and hg.eyeTrace(owner) or nil)
 		local structuralKey = GetBandageBoneKey(org, structuralBone)
 		local structuralCost = self:GetBandageStructuralTreatmentCost()
-		if not arteryWound and structuralKey and self.modeValues[1] >= structuralCost then
+		local bleedingWound = false
+		for _, wound in ipairs(org.wounds or {}) do
+			if (wound[1] or 0) > 0 and (not bone or BoneNamesMatch(ent, wound[4], bone)) then
+				bleedingWound = true
+				break
+			end
+		end
+		local dislocation = hg.organism.GetBandageDislocation and hg.organism.GetBandageDislocation(org, structuralBone)
+		if not arteryWound and not bleedingWound and structuralKey
+			and ((org[structuralKey] or 0) >= 1 or not dislocation)
+			and self.modeValues[1] >= structuralCost then
 			if hg.organism.ApplyBandageBoneTreatment(org, structuralKey, 0.25) > 0 then
 				self.modeValues[1] = self.modeValues[1] - structuralCost
 				ent.bandaged_limbs = ent.bandaged_limbs or {}
@@ -1024,74 +1021,77 @@ if SERVER then
 			end
 		end)
 
-		local structuralBone = bone
-		if not structuralBone then
-			local trace = IsValid(owner) and hg.eyeTrace(owner) or nil
-			structuralBone = self:GetBandageTargetBone(ent, trace)
-		end
-		bandageDislocation = hg.organism.GetBandageDislocation and hg.organism.GetBandageDislocation(org, structuralBone)
+		if not arteryWound and not bleedingWound then
+			local structuralBone = bone
+			if not structuralBone then
+				local trace = IsValid(owner) and hg.eyeTrace(owner) or nil
+				structuralBone = self:GetBandageTargetBone(ent, trace)
+			end
+			bandageDislocation = hg.organism.GetBandageDislocation and hg.organism.GetBandageDislocation(org, structuralBone)
 
-		local who = (self:GetOwner() == org.owner) and "You" or ((owner.Profession == "doctor") and "A doctor" or "Someone")
-		local amt = self:GetBandageStructuralTreatmentCost()
-		if bandageDislocation and self.modeValues[1] >= amt and hg.organism.CompleteDislocationFix(org, bandageDislocation, owner) then
-			self.modeValues[1] = self.modeValues[1] - amt
-			ent.bandaged_limbs = ent.bandaged_limbs or {}
-			ent.bandaged_limbs[dislocationBandageBones[bandageDislocation]] = true
-			done = true
-		end
-		local treatingSkull = not structuralBone or structuralBone == "skull" or (isstring(structuralBone) and string.find(structuralBone, "Head", 1, true))
-		if treatingSkull and org.skull > 0.05 and self.modeValues[1] >= amt then
-			hg.organism.ApplyBandageBoneTreatment(org, "skull", 0.25)
-			self.modeValues[1] = self.modeValues[1] - amt
-			org.pain = math.max(org.pain - 7, 0)
-			ent.bandaged_limbs = ent.bandaged_limbs or {}
-			ent.bandaged_limbs["ValveBiped.Bip01_Head1"] = true
-			done = true
-		end
+			local who = (self:GetOwner() == org.owner) and "You" or ((owner.Profession == "doctor") and "A doctor" or "Someone")
+			local amt = self:GetBandageStructuralTreatmentCost()
+			if bandageDislocation and self.modeValues[1] >= amt and hg.organism.CompleteDislocationFix(org, bandageDislocation, owner) then
+				self.modeValues[1] = self.modeValues[1] - amt
+				ent.bandaged_limbs = ent.bandaged_limbs or {}
+				ent.bandaged_limbs[dislocationBandageBones[bandageDislocation]] = true
+				done = true
+			end
+			local treatingSkull = not structuralBone or structuralBone == "skull" or (isstring(structuralBone) and string.find(structuralBone, "Head", 1, true))
+			if treatingSkull and org.skull > 0.05 and self.modeValues[1] >= amt then
+				hg.organism.ApplyBandageBoneTreatment(org, "skull", 0.25)
+				self.modeValues[1] = self.modeValues[1] - amt
+				org.pain = math.max(org.pain - 7, 0)
+				ent.bandaged_limbs = ent.bandaged_limbs or {}
+				ent.bandaged_limbs["ValveBiped.Bip01_Head1"] = true
+				done = true
+			end
 
-		if IsBandageBone(structuralBone, HITGROUP_CHEST) and (org.chest or 0) >= 0.05 and self.modeValues[1] >= amt then
-			hg.organism.ApplyBandageBoneTreatment(org, "chest", 0.25)
-			self.modeValues[1] = self.modeValues[1] - amt
-			org.avgpain = math.max(org.avgpain - 7, 0)
-			ent.bandaged_limbs = ent.bandaged_limbs or {}
-			ent.bandaged_limbs[structuralBone] = true
-			done = true
-		end
+			if IsBandageBone(structuralBone, HITGROUP_CHEST) and (org.chest or 0) >= 0.05 and self.modeValues[1] >= amt then
+				hg.organism.ApplyBandageBoneTreatment(org, "chest", 0.25)
+				self.modeValues[1] = self.modeValues[1] - amt
+				org.avgpain = math.max(org.avgpain - 7, 0)
+				ent.bandaged_limbs = ent.bandaged_limbs or {}
+				ent.bandaged_limbs[structuralBone] = true
+				done = true
+			end
 
-		if IsBandageBone(structuralBone, HITGROUP_LEFTLEG) and (org.lleg or 0) >= 0.05 and self.modeValues[1] >= amt and !org.llegamputated then
-			hg.organism.ApplyBandageBoneTreatment(org, "lleg", 0.25)
-			self.modeValues[1] = self.modeValues[1] - amt
-			org.avgpain = math.max(org.avgpain - 7, 0)
-			ent.bandaged_limbs = ent.bandaged_limbs or {}
-			ent.bandaged_limbs[structuralBone] = true
-			done = true
-		end
+			if IsBandageBone(structuralBone, HITGROUP_LEFTLEG) and (org.lleg or 0) >= 0.05 and self.modeValues[1] >= amt and !org.llegamputated then
+				hg.organism.ApplyBandageBoneTreatment(org, "lleg", 0.25)
+				self.modeValues[1] = self.modeValues[1] - amt
+				org.avgpain = math.max(org.avgpain - 7, 0)
+				ent.bandaged_limbs = ent.bandaged_limbs or {}
+				ent.bandaged_limbs[structuralBone] = true
+				done = true
+			end
 
-		if IsBandageBone(structuralBone, HITGROUP_RIGHTLEG) and (org.rleg or 0) >= 0.05 and self.modeValues[1] >= amt and !org.rlegamputated then
-			hg.organism.ApplyBandageBoneTreatment(org, "rleg", 0.25)
-			self.modeValues[1] = self.modeValues[1] - amt
-			org.avgpain = math.max(org.avgpain - 7, 0)
-			ent.bandaged_limbs = ent.bandaged_limbs or {}
-			ent.bandaged_limbs[structuralBone] = true
-			done = true
-		end
+			if IsBandageBone(structuralBone, HITGROUP_RIGHTLEG) and (org.rleg or 0) >= 0.05 and self.modeValues[1] >= amt and !org.rlegamputated then
+				hg.organism.ApplyBandageBoneTreatment(org, "rleg", 0.25)
+				self.modeValues[1] = self.modeValues[1] - amt
+				org.avgpain = math.max(org.avgpain - 7, 0)
+				ent.bandaged_limbs = ent.bandaged_limbs or {}
+				ent.bandaged_limbs[structuralBone] = true
+				done = true
+			end
 
-		if IsBandageBone(structuralBone, HITGROUP_RIGHTARM) and (org.rarm or 0) >= 0.05 and self.modeValues[1] >= amt and !org.rarmamputated then
-			hg.organism.ApplyBandageBoneTreatment(org, "rarm", 0.25)
-			self.modeValues[1] = self.modeValues[1] - amt
-			org.avgpain = math.max(org.avgpain - 7, 0)
-			ent.bandaged_limbs = ent.bandaged_limbs or {}
-			ent.bandaged_limbs[structuralBone] = true
-			done = true
-		end
+			if IsBandageBone(structuralBone, HITGROUP_RIGHTARM) and (org.rarm or 0) >= 0.05 and self.modeValues[1] >= amt and !org.rarmamputated then
+				hg.organism.ApplyBandageBoneTreatment(org, "rarm", 0.25)
+				self.modeValues[1] = self.modeValues[1] - amt
+				org.avgpain = math.max(org.avgpain - 7, 0)
+				ent.bandaged_limbs = ent.bandaged_limbs or {}
+				ent.bandaged_limbs[structuralBone] = true
+				done = true
+			end
 
-		if IsBandageBone(structuralBone, HITGROUP_LEFTARM) and (org.larm or 0) >= 0.05 and self.modeValues[1] >= amt and !org.larmamputated then
-			hg.organism.ApplyBandageBoneTreatment(org, "larm", 0.25)
-			self.modeValues[1] = self.modeValues[1] - amt
-			org.avgpain = math.max(org.avgpain - 7, 0)
-			ent.bandaged_limbs = ent.bandaged_limbs or {}
-			ent.bandaged_limbs[structuralBone] = true
-			done = true
+			if IsBandageBone(structuralBone, HITGROUP_LEFTARM) and (org.larm or 0) >= 0.05 and self.modeValues[1] >= amt and !org.larmamputated then
+				hg.organism.ApplyBandageBoneTreatment(org, "larm", 0.25)
+				self.modeValues[1] = self.modeValues[1] - amt
+				org.avgpain = math.max(org.avgpain - 7, 0)
+				ent.bandaged_limbs = ent.bandaged_limbs or {}
+				ent.bandaged_limbs[structuralBone] = true
+				done = true
+			end
+
 		end
 
 		if done then
@@ -1740,7 +1740,33 @@ else
 
 			model.BodygroupsApplied = true
 		end
-		model:DrawModel()
+		local coloredBones = {}
+		for bone, bandage in pairs(ent.bandaged_limbs) do
+			if bone ~= "ValveBiped.Bip01_Head1" and istable(bandage) and bandage.color then
+				coloredBones[#coloredBones + 1] = bone
+			end
+		end
+
+		if #coloredBones > 0 then
+			for _, bone in ipairs(coloredBones) do
+				local group = model:FindBodygroupByName(ThatPlyIsFemale(ent) and BodyGroupsFemale[bone] or BodyGroupsMale[bone] or "")
+				if group >= 0 then model:SetBodygroup(group, 0) end
+			end
+			model:DrawModel()
+
+			for bone, bandage in pairs(ent.bandaged_limbs) do
+				if bone ~= "ValveBiped.Bip01_Head1" then
+					local group = model:FindBodygroupByName(ThatPlyIsFemale(ent) and BodyGroupsFemale[bone] or BodyGroupsMale[bone] or "")
+					local amputated = ent.organism and hg.amputatedlimbs2[bone] and ent.organism[hg.amputatedlimbs2[bone] .. "amputated"]
+					if group >= 0 then model:SetBodygroup(group, istable(bandage) and bandage.color and not amputated and 1 or 0) end
+				end
+			end
+			model:SetColor(Color(0, 255, 150))
+			model:DrawModel()
+			model.BodygroupsApplied = false
+		else
+			model:DrawModel()
+		end
 
 		if ent.bandaged_limbs["ValveBiped.Bip01_Head1"] and not (ply == LocalPlayer() and GetViewEntity() == LocalPlayer()) then
 			local female = ThatPlyIsFemale(ent)
@@ -1771,7 +1797,8 @@ else
 				end
 			end
 
-			headmodel:SetColor(GetBandageSoakColor(soak))
+			local headBandage = ent.bandaged_limbs["ValveBiped.Bip01_Head1"]
+			headmodel:SetColor(istable(headBandage) and headBandage.color or GetBandageSoakColor(soak))
 			headmodel:DrawModel()
 		end
 	end

@@ -19,7 +19,7 @@ hook.Add("Think", "HG_PhysicsRest", function()
 	for i, ply in player.Iterator() do
 		local ragdoll = ply.FakeRagdoll
 		if not IsValid(ragdoll) then continue end
-		if ragdoll.isSliding or ragdoll.isDropkicking or ragdoll.hgStumbleActive then continue end
+		if ragdoll.isSliding or ragdoll.isDropkicking or ragdoll.hgStumbleActive or ragdoll.hgStumblePending then continue end
 		if not ply:Alive() then continue end
 
 		local rootPhys = ragdoll:GetPhysicsObject()

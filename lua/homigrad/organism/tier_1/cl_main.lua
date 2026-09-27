@@ -1099,7 +1099,7 @@ local function emitOrdinaryBleeding(ent, org, wound, pos, ang, visualRate, inter
 	end
 end
 
-local function emitArterialBleeding(ent, org, wound, index, pos, ang, dir, water, visualRate, interval)
+local function emitArterialBleeding(ent, org, wound, index, pos, ang, dir, water, visualRate, interval, forceMul)
 	if water then
 		for _ = 1, arteryBurstCount do
 			hg.addBloodPart2(pos, VectorRand(-5, 5), nil, nil, nil, nil, true, ent)
@@ -1115,7 +1115,7 @@ local function emitArterialBleeding(ent, org, wound, index, pos, ang, dir, water
 	local time = CurTime()
 	local sprayDir = dir:LengthSqr() > 0.001 and dir:GetNormalized() or getBleedDirection(ang)
 	local reach = wound[7] == "aorta" and 1.85 or (wound[7] == "arteria" and 1.6 or 1)
-	local velocity = sprayDir * (95 + rateK * 165) * reach * pressureDrive * math.Clamp(pulse, 0.3, 1.5)
+	local velocity = sprayDir * (95 + rateK * 165) * reach * pressureDrive * math.Clamp(pulse, 0.3, 1.5) * (forceMul or 1)
 		* (0.8 + 0.2 * math.sin(time * (5 + index)))
 		+ sprayDir:Angle():Right() * 12 * rateK * math.sin(time * 2)
 		+ ang:Up() * 10 * rateK * math.sin(time * 3)
@@ -1605,15 +1605,15 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 						local pos, ang = GetWoundTransform(ent, wound, mat, boneID)
 						if not pos then continue end
 
-						local dir = wound[6]
-						local len = dir:Length() * (org.pulse or 70) / 70
-						local _, dir = LocalToWorld(vector_origin, dir:Angle(), vector_origin, ang)
-						
-						dir = -dir:Forward() * len
-
 						local water = bit.band(util.PointContents(pos), CONTENTS_WATER) == CONTENTS_WATER
 						local interval = Lerp(math.Clamp(visualRate / 20, 0, 1), 0.5, 1 / math.max(hg_blood_fps:GetInt(), 1))
-						local underwater = emitArterialBleeding(ent, org, wound, i, pos, ang, dir, water, visualRate, interval)
+						local exitWound = wound.exitWound
+						local exitPos, exitAng = exitWound and hg.organism.GetWoundTransform(ent, exitWound)
+						local underwater = emitArterialBleeding(ent, org, wound, i, pos, ang, ang:Forward(), water, visualRate * (exitPos and 0.4 or 1), interval, exitPos and 0.4 or 1)
+						if exitPos then
+							local exitWater = bit.band(util.PointContents(exitPos), CONTENTS_WATER) == CONTENTS_WATER
+							emitArterialBleeding(ent, org, wound, i, exitPos, exitAng, exitAng:Forward(), exitWater, visualRate * 0.6, interval, 0.6)
+						end
 						wound.nextVisualBleed = time + (underwater and 2 or interval)
 					end
 				end

@@ -25,5 +25,3 @@ hook.Add("EntityEmitSound", "TimeWarpSounds", function(t)
 		return true
 	end
 end)
-
-hook.Add("PlayerDeathSound", "removesound", function() return true end)

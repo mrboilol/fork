@@ -37,7 +37,7 @@ function SWEP:InitializeAdd()
 	self:SetHold(self.HoldType)
 
 	self.modeValues = {
-		[1] = 80,
+		[1] = 100,
 		[2] = 1,
 		[3] = 10,
 		[4] = 1,
@@ -46,7 +46,7 @@ function SWEP:InitializeAdd()
 end
 
 SWEP.modeValuesdef = {
-	[1] = {80,true},
+	[1] = {100,true},
 	[2] = {1,false},
 	[3] = {10,true},
 	[4] = {1,true},

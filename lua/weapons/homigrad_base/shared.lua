@@ -125,7 +125,7 @@ function SWEP:GetHandSupportState(ply)
 	local rightUsable = not rightBad
 	local leftUsable = not leftBad
 	local leftBusy, rightBusy = false, false
-	local postureOneHanded = IsValid(ply) and (ply.posture == 7 or ply.posture == 8 or ply.posture == 9)
+	local postureOneHanded = IsValid(ply) and (ply.posture == 7 or ply.posture == 8 or (ply.posture == 9 and self:IsPistolHoldType()))
 
 	if IsValid(ply) then
 		local ragdoll = IsValid(ply.FakeRagdoll) and ply.FakeRagdoll or nil
@@ -1801,7 +1801,7 @@ function SWEP:CoreStep()
 		if hg_slings:GetBool() and (zb.CROUND and zb.CROUND == "hmcd" or gamemod == "sandbox") then
 			local inv = owner:GetNetVar("Inventory",{})
 			if not (inv["Weapons"] and inv["Weapons"]["hg_sling"] and not self:IsPistolHoldType()) then
-				hg.drop(owner, self)
+				hg.drop(owner, self, nil, nil, true)
 				hook.Run("PlayerDropWeapon", owner)
 			else
 				hook.Run("PlayerDropWeapon", owner)

@@ -3663,7 +3663,7 @@ function SWEP:CustomThink()
 	if SERVER and not owner:IsNPC() and owner.organism and (not owner.organism.canmove or ((owner.organism.stun - CurTime()) > 0) or (owner.organism.larm == 1 and owner.organism.rarm == 1) or (hg.organism.IsLimbCompoundFractured and (hg.organism.IsLimbCompoundFractured(owner.organism, "larm") or hg.organism.IsLimbCompoundFractured(owner.organism, "rarm")))) and IsValid(actwep) and self == actwep then
 		self:RemoveFake()
 		
-		hg.drop(owner)
+		hg.drop(owner, nil, nil, nil, true)
 
 		return
 	end
@@ -3717,7 +3717,7 @@ function SWEP:CustomThink()
     if SERVER and owner.organism and owner.organism.rarmamputated then
         self:RemoveFake()
 		
-		hg.drop(owner)
+		hg.drop(owner, nil, nil, nil, true)
 
         return
     end

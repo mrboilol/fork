@@ -1975,12 +1975,6 @@ end)
 hook.Add("OnEntityWaterLevelChanged", "ClearBlood", function(ent, old, new)
 	if new >= 2 then
 		if ent:IsOnFire() then ent:Extinguish() end
-		local owner = ent:IsRagdoll() and hg.RagdollOwner(ent) or ent
-		local org = IsValid(owner) and owner.organism
-		if org and org.woundmarks and #org.woundmarks > 0 then
-			org.woundmarks = {}
-			hg.organism.SyncWoundMarksNet(org)
-		end
 		if hg.WashBloodDecals then hg.WashBloodDecals(ent) end
 	end
 end)

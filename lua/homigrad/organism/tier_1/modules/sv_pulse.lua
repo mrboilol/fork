@@ -355,6 +355,7 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	org.cerebralPerfusion = Approach(tonumber(org.cerebralPerfusion) or 1, cerebralPerfusion, timeValue * 1.15)
 	org.peripheralperfusion = Approach(tonumber(org.peripheralperfusion) or 1, peripheralPerfusion, timeValue * 0.8)
 	org.bodyoxygen = Approach(tonumber(org.bodyoxygen) or 1, bodyTarget, timeValue * (bodyTarget < (org.bodyoxygen or 1) and 1.0 or 0.35))
+	org.perfusionMoveMul = math.Clamp(0.35 + math.min(org.bodyoxygen, org.peripheralperfusion) * 0.65, 0.35, 1)
 	org.brainoxygenTarget = brainTarget
 	org.brainoxygen = Approach(tonumber(org.brainoxygen) or 1, brainTarget, timeValue * (brainTarget < (org.brainoxygen or 1) and 1.35 or 0.25))
 

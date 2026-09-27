@@ -6,9 +6,9 @@ local MEDKIT_TYPES = {
     basic = {
         PrintName = "Basic Medkit",
         Instructions = "A compact first-aid kit with a basic bandage roll and one tourniquet. Left click to unpack it; RMB applies the selected treatment.",
-        contents = {bandage = 40, tourniquet = 1},
+        contents = {bandage = 50, tourniquet = 1},
         contentItems = {
-            {class = "weapon_bandage_sh", amount = 40},
+            {class = "weapon_bandage_sh", amount = 50},
             {class = "weapon_tourniquet", amount = 1},
         },
         bandageColor = Color(235, 235, 235),
@@ -16,9 +16,9 @@ local MEDKIT_TYPES = {
     standard = {
         PrintName = "Standard Medkit",
         Instructions = "A general-purpose first-aid kit with bandages, a tourniquet and paracetamol. Left click to unpack it; RMB applies the selected treatment.",
-        contents = {bandage = 60, tourniquet = 1, painkiller = 1},
+        contents = {bandage = 60, tourniquet = 1, painkiller = 1.25},
         contentItems = {
-            {class = "weapon_packedbandage_sh", amount = 60},
+            {class = "weapon_bigbandage_sh", amount = 60},
             {class = "weapon_tourniquet", amount = 1},
             {class = "weapon_painkillers", amount = 1, painkillerType = "paracetamol"},
         },
@@ -27,64 +27,64 @@ local MEDKIT_TYPES = {
     },
     emergency = {
         PrintName = "Emergency Medkit",
-        Instructions = "An emergency trauma kit with extra bandages, two tourniquets, tramadol and naloxone. Left click to unpack it; RMB applies the selected treatment.",
-        contents = {bandage = 120, tourniquet = 2, painkiller = 0.4, naloxone = 1},
+        Instructions = "An emergency trauma kit with extra bandages, two tourniquets, painkillers and naloxone. Left click to unpack it; RMB applies the selected treatment.",
+        contents = {bandage = 120, tourniquet = 2, painkiller = 1.25, naloxone = 1},
         contentItems = {
-            {class = "weapon_combatbandage_sh", amount = 120},
+            {class = "weapon_bigbandage_sh", amount = 120},
             {class = "weapon_tourniquet", amount = 1},
             {class = "weapon_tourniquet", amount = 1},
-            {class = "weapon_tramadol", amount = 0.4},
+            {class = "weapon_painkillers", amount = 1, painkillerType = "paracetamol"},
             {class = "weapon_naloxone", amount = 1},
         },
         bandageColor = Color(165, 165, 165),
-        painkillerType = "tramadol",
+        painkillerType = "paracetamol",
     },
     advanced = {
         PrintName = "Advanced Medkit",
-        Instructions = "An advanced trauma kit with large dressings, two tourniquets, tramadol, tranexamic acid and a decompression needle. Left click to unpack it; RMB applies the selected treatment.",
-        contents = {bandage = 225, tourniquet = 2, painkiller = 0.4, tranexamic = 10, needle = 1},
+        Instructions = "An advanced trauma kit with large dressings, two tourniquets, painkillers, tranexamic acid and a decompression needle. Left click to unpack it; RMB applies the selected treatment.",
+        contents = {bandage = 225, tourniquet = 2, painkiller = 1.25, tranexamic = 10, needle = 1},
         contentItems = {
-            {class = "weapon_bigcombatbandage_sh", amount = 225},
+            {class = "weapon_bigbandage_sh", amount = 225},
             {class = "weapon_tourniquet", amount = 1},
             {class = "weapon_tourniquet", amount = 1},
-            {class = "weapon_tramadol", amount = 0.4},
+            {class = "weapon_painkillers", amount = 1, painkillerType = "paracetamol"},
             {class = "weapon_tranexamic_acid", amount = 10},
             {class = "weapon_needle", amount = 1},
         },
         bandageColor = Color(125, 125, 125),
-        painkillerType = "tramadol",
+        painkillerType = "paracetamol",
     },
     surgical = {
         PrintName = "Surgical Medkit",
-        Instructions = "A fully stocked surgical kit with QuikClot dressings, two tourniquets, tapentadol, tranexamic acid, naloxone, mannitol and a decompression needle. Left click to unpack it; RMB applies the selected treatment.",
-        contents = {bandage = 350, tourniquet = 2, painkiller = 0.6, tranexamic = 10, naloxone = 1, mannitol = 1, needle = 1},
+        Instructions = "A fully stocked surgical kit with large dressings, two tourniquets, painkillers, tranexamic acid, naloxone, mannitol and a decompression needle. Left click to unpack it; RMB applies the selected treatment.",
+        contents = {bandage = 350, tourniquet = 2, painkiller = 1.25, tranexamic = 10, naloxone = 1, mannitol = 1, needle = 1},
         contentItems = {
-            {class = "weapon_bigquikclotbandage_sh", amount = 350},
+            {class = "weapon_bigbandage_sh", amount = 350},
             {class = "weapon_tourniquet", amount = 1},
             {class = "weapon_tourniquet", amount = 1},
-            {class = "weapon_tapentadol", amount = 0.6},
+            {class = "weapon_painkillers", amount = 1, painkillerType = "paracetamol"},
             {class = "weapon_tranexamic_acid", amount = 10},
             {class = "weapon_naloxone", amount = 1},
             {class = "weapon_mannitol", amount = 1},
             {class = "weapon_needle", amount = 1},
         },
         bandageColor = Color(75, 75, 75),
-        painkillerType = "tapentadol",
+        painkillerType = "paracetamol",
     },
 }
 local NORMAL_MEDKIT = {
     PrintName = "Medkit",
-    Instructions = "A standard medical bag with a quality bandage, painkiller, tranexamic acid, a tourniquet and a decompression needle. Left click to unpack it; RMB applies the selected treatment.",
-    contents = {bandage = 150, painkiller = 1, tourniquet = 1, tranexamic = 10, needle = 1},
+    Instructions = "A standard medical bag with a big bandage, painkiller, tranexamic acid, a tourniquet and a decompression needle. Left click to unpack it; RMB applies the selected treatment.",
+    contents = {bandage = 100, painkiller = 1.25, tourniquet = 1, tranexamic = 10, needle = 1},
     contentItems = {
-        {class = "weapon_bigpackedbandage_sh", amount = 150},
+        {class = "weapon_bigbandage_sh", amount = 100},
         {class = "weapon_painkillers", amount = 1, painkillerType = "paracetamol"},
         {class = "weapon_tourniquet", amount = 1},
         {class = "weapon_tranexamic_acid", amount = 10},
         {class = "weapon_needle", amount = 1},
     },
     bandageColor = Color(165, 165, 165),
-    bandageName = "quality bandage",
+    bandageName = "big bandage",
     painkillerType = "paracetamol",
 }
 
@@ -214,13 +214,8 @@ local function applyMedkitMode(wep, ent, mode)
 
     local owner = wep:GetOwner()
     local entOwner = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
-    local definition = getMedkitDefinition(wep)
     if typeName == "painkiller" then
-        if definition.painkillerType == "paracetamol" then
-            org.painkiller = math.min((org.painkiller or 0) + amount, 5)
-        else
-            org.analgesiaAdd = math.min((org.analgesiaAdd or 0) + amount, 4)
-        end
+        org.painkiller = math.min((org.painkiller or 0) + amount, 5)
         wep.modeValues[modeIndex] = 0
         entOwner:EmitSound("snd_jack_hmcd_pillsuse.ogg", 60, math.random(95, 105))
         return true
@@ -471,44 +466,6 @@ local function patchNormalMedkit()
         return true
     end
 end
-local function patchPainkillerWeapons()
-    local base = weapons.GetStored("weapon_painkillers")
-    if not istable(base) then return end
-    for class, config in pairs({
-        weapon_tramadol = {name = "Tramadol", dose = 0.4},
-        weapon_tapentadol = {name = "Tapentadol", dose = 0.8},
-    }) do
-        if not weapons.GetStored(class) then
-            local swep = table.Copy(base)
-            swep.Base = "weapon_painkillers"
-            swep.PrintName = config.name
-            swep.modeNames = {[1] = string.lower(config.name)}
-            swep.modeValuesdef = {[1] = config.dose}
-            swep.InitializeAdd = function(self)
-                self:SetHold(self.HoldType)
-                self.modeValues = {[1] = config.dose}
-            end
-            swep.Heal = function(self, ent, mode)
-                local org = ent.organism
-                if not org or not self.modeValues or self.modeValues[1] <= 0 then return end
-                local owner = self:GetOwner()
-                if ent == hg.GetCurrentCharacter(owner) and not hg_healanims:GetBool() then
-                    self:SetHolding(math.min(self:GetHolding() + 4, 100))
-                    if self:GetHolding() < 100 then return end
-                end
-                org.analgesiaAdd = math.min((org.analgesiaAdd or 0) + self.modeValues[1], 4)
-                self.modeValues[1] = 0
-                owner:EmitSound("snd_jack_hmcd_pillsuse.ogg", 60, math.random(95, 105))
-                owner:SelectWeapon("weapon_hands_sh")
-                self:SpawnGarbage(nil, nil, "snd_jack_hmcd_foodbounce.ogg")
-                self:Remove()
-                return true
-            end
-            weapons.Register(swep, class)
-        end
-    end
-end
-
 if SERVER then
     hook.Add("Org Think", "zcity_delta_painkiller_stat", function(owner, org, timeValue)
         local painkiller = math.max(org.painkiller or 0, 0)
@@ -558,27 +515,9 @@ local function patchMedicalMinigame()
     end
 end
 
-local BANDAGE_GRADES = {
-    weapon_packedbandage_sh = {name = "Packed bandage", amount = 60, color = Color(205, 205, 205), instructions = "A sealed field dressing with more clean gauze than a loose bandage. RMB to use on someone else."},
-    weapon_combatbandage_sh = {name = "Combat bandage", amount = 120, color = Color(125, 125, 125), instructions = "A large military dressing for controlling serious bleeding in the field. RMB to use on someone else."},
-    weapon_quikclotbandage_sh = {name = "QuikClot Bandage", amount = 180, color = Color(75, 75, 75), instructions = "A hemostatic QuikClot dressing for heavy bleeding when ordinary gauze is not enough. RMB to use on someone else."},
-}
-
-local LARGE_BANDAGE_GRADES = {
-    weapon_bigpackedbandage_sh = {name = "Packed Bandage +", amount = 150, color = Color(205, 205, 205), instructions = "An oversized sealed field dressing with enough sterile gauze for several serious wounds. RMB to use on someone else."},
-    weapon_bigcombatbandage_sh = {name = "Combat Bandage +", amount = 225, color = Color(125, 125, 125), instructions = "An oversized military trauma dressing for controlling multiple serious wounds in the field. RMB to use on someone else."},
-    weapon_bigquikclotbandage_sh = {name = "QuikClot Bandage +", amount = 350, color = Color(75, 75, 75), instructions = "An oversized hemostatic QuikClot dressing for catastrophic bleeding and extended field care. RMB to use on someone else."},
-}
-
 local BANDAGE_PICKUP_CLASSES = {
     "weapon_bandage_sh",
     "weapon_bigbandage_sh",
-    "weapon_packedbandage_sh",
-    "weapon_combatbandage_sh",
-    "weapon_quikclotbandage_sh",
-    "weapon_bigpackedbandage_sh",
-    "weapon_bigcombatbandage_sh",
-    "weapon_bigquikclotbandage_sh",
 }
 
 local BANDAGE_PICKUP_CLASS_SET = {}
@@ -587,14 +526,8 @@ for _, class in ipairs(BANDAGE_PICKUP_CLASSES) do
 end
 
 local BANDAGE_PICKUP_WEIGHTS = {
-    {class = "weapon_bandage_sh", weight = 52},
-    {class = "weapon_bigbandage_sh", weight = 18},
-    {class = "weapon_packedbandage_sh", weight = 12},
-    {class = "weapon_combatbandage_sh", weight = 8},
-    {class = "weapon_quikclotbandage_sh", weight = 5},
-    {class = "weapon_bigpackedbandage_sh", weight = 3},
-    {class = "weapon_bigcombatbandage_sh", weight = 1.5},
-    {class = "weapon_bigquikclotbandage_sh", weight = 0.5},
+    {class = "weapon_bandage_sh", weight = 3},
+    {class = "weapon_bigbandage_sh", weight = 1},
 }
 
 local function pickBandageClass(ply)
@@ -642,86 +575,25 @@ local function registerBandageGrades()
     local quality = weapons.GetStored("weapon_bigbandage_sh")
     if not istable(normal) then return end
 
-    -- The existing standard grades remain available under their requested names.
     normal.PrintName = "Bandage"
     normal.Instructions = "A loose roll of gauze for light bleeding. It may not be sterile, but it is better than leaving a wound open. RMB to use on someone else."
     normal.Color = Color(235, 235, 235)
-    normal.modeValuesdef = {[1] = {40, true}}
+
     if istable(quality) then
         quality.PrintName = "Big bandage"
         quality.Instructions = "A larger sterile dressing with quality gauze for wounds that need more than a basic bandage. RMB to use on someone else."
         quality.Color = Color(165, 165, 165)
     end
-
-    for class, grade in pairs(BANDAGE_GRADES) do
-        if not weapons.GetStored(class) then
-            local swep = table.Copy(normal)
-            swep.Base = "weapon_bandage_sh"
-            swep.PrintName = grade.name
-            swep.Instructions = grade.instructions
-            swep.PickupFunc = false -- do not inherit weapon_bandage_sh's generic reroll callback
-            swep.Spawnable = true
-            swep.AdminOnly = false
-            swep.Category = "ZCity Medicine"
-            swep.Color = grade.color
-            swep.modeValuesdef = {[1] = {grade.amount, true}}
-            swep.InitializeAdd = function(self)
-                self.ModelScale = 0.9
-                self.minigameCompletions = 0
-                self.modeValues = {[1] = grade.amount}
-            end
-            weapons.Register(swep, class)
-        end
-
-        local registered = weapons.GetStored(class)
-        if istable(registered) then
-            registered.PrintName = grade.name
-            registered.Instructions = grade.instructions
-            registered.Color = grade.color
-            registered.PickupFunc = false -- do not inherit weapon_bandage_sh's generic reroll callback
-        end
-    end
-
-    if not istable(quality) then return end
-    for class, grade in pairs(LARGE_BANDAGE_GRADES) do
-        if not weapons.GetStored(class) then
-            local swep = table.Copy(quality)
-            swep.Base = "weapon_bigbandage_sh"
-            swep.PrintName = grade.name
-            swep.Instructions = grade.instructions
-            swep.PickupFunc = false
-            swep.Spawnable = true
-            swep.AdminOnly = false
-            swep.Category = "ZCity Medicine"
-            swep.Color = grade.color
-            swep.BandageAmount = grade.amount
-            swep.modeValuesdef = {[1] = {grade.amount, true}}
-            weapons.Register(swep, class)
-        end
-
-        local registered = weapons.GetStored(class)
-        if istable(registered) then
-            registered.PrintName = grade.name
-            registered.Instructions = grade.instructions
-            registered.Color = grade.color
-            registered.BandageAmount = grade.amount
-            registered.modeValuesdef = {[1] = {grade.amount, true}}
-            registered.PickupFunc = false
-        end
-    end
 end
 hook.Add("Initialize", "zcity_delta_medkit_tiers", function()
-    patchPainkillerWeapons()
     registerBandageGrades()
     patchBandagePickupRandomizer()
 end)
 hook.Add("OnReloaded", "zcity_delta_medkit_tiers_reload", function()
-    patchPainkillerWeapons()
     registerBandageGrades()
     patchBandagePickupRandomizer()
 end)
 timer.Simple(0, function()
-    patchPainkillerWeapons()
     registerBandageGrades()
     patchBandagePickupRandomizer()
 end)

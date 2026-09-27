@@ -160,9 +160,10 @@ local function armStrength(ragdoll, org, limb, cons)
 	if IsValid(ragdoll[cons]) then return 0 end
 	if not org then return 1 end
 	local reflex = hg.RagdollReflex
-	if reflex then return reflex.LimbStrength(org, limb) end
+	local controlMul = math.Clamp(ragdoll.power or 1, 0, 1)
+	if reflex then return reflex.LimbStrength(org, limb) * controlMul end
 
-	return (org[limb .. "amputated"] or org[limb .. "upamputated"]) and 0 or 1
+	return (org[limb .. "amputated"] or org[limb .. "upamputated"]) and 0 or controlMul
 end
 
 local function grabHand(ragdoll, org, pos)
@@ -181,9 +182,6 @@ end
 
 local function armControl(ply)
 	return hg.KeyDown(ply, IN_ATTACK) or hg.KeyDown(ply, IN_ATTACK2) or hg.KeyDown(ply, IN_USE)
-		or hg.KeyDown(ply, IN_SPEED) or hg.KeyDown(ply, IN_WALK)
-		or hg.KeyDown(ply, IN_FORWARD) or hg.KeyDown(ply, IN_BACK)
-		or hg.KeyDown(ply, IN_MOVELEFT) or hg.KeyDown(ply, IN_MOVERIGHT)
 end
 
 local function canWoundGrab(ply)
@@ -209,6 +207,24 @@ local function nearestPhys(ragdoll, pos)
 	return best
 end
 
+local function startWoundGrab(ply, ragdoll, hitPos, force)
+	if not hg_euphoria_detail:GetBool() or not canWoundGrab(ply) then return end
+	local rootPhys = ragdoll:GetPhysicsObject()
+	local rootPos = IsValid(rootPhys) and rootPhys:GetPos() or ragdoll:GetPos()
+	local woundPos = hitPos
+	if not woundPos or woundPos:Distance(rootPos) >= 200 then
+		local fDir = force:Length() > 1 and force:GetNormalized() or Vector(math.Rand(-1, 1), math.Rand(-1, 1), math.Rand(-0.3, 0.6)):GetNormalized()
+		woundPos = rootPos + fDir * 25
+	end
+	local org = ply.organism
+	local handPhys, forearm, armMul = grabHand(ragdoll, org, woundPos)
+	local bonePhys = nearestPhys(ragdoll, woundPos)
+	if not handPhys or not bonePhys then return end
+	local reflex = hg.RagdollReflex
+	local mul = armMul * (reflex and org and reflex.Vigor(org) or 1)
+	ragdoll.hgWoundGrab = { hand = handPhys, forearm = forearm, bone = bonePhys, mul = mul, untilT = SysTime() + EUPHORIA_WOUND_GRAB_TIME, dur = EUPHORIA_WOUND_GRAB_TIME }
+end
+
 local function landingReaction(ragdoll, ply, hSpeed)
 	local org = ply.organism
 	local conscious = org and org.consciousness or 1
@@ -221,7 +237,7 @@ local function landingReaction(ragdoll, ply, hSpeed)
 		hg.KeyDown(ply, IN_MOVELEFT) or hg.KeyDown(ply, IN_MOVERIGHT)
 	)
 
-	local absorb = EUPHORIA_LANDING_ABSORB * math.min(hSpeed / EUPHORIA_LANDING_MIN_HS, 1)
+	local absorb = (ragdoll.hgStumbleActive or ragdoll.hgStumblePending) and 0 or EUPHORIA_LANDING_ABSORB * math.min(hSpeed / EUPHORIA_LANDING_MIN_HS, 1)
 	if controlling then absorb = absorb * EUPHORIA_LANDING_ABSORB_CONTROL end
 	absorb = math.Clamp(absorb * (0.5 + conscious * 0.5) * (1 - berserk * 0.12), 0, EUPHORIA_LANDING_ABSORB)
 
@@ -291,7 +307,12 @@ hook.Add("EntityTakeDamage", "HG_EuphoriaHit", function(ent, dmgInfo)
 	local dmg = dmgInfo:GetDamage()
 
 	local now = SysTime()
-	if not IsValid(ragdoll) then return end
+	if not IsValid(ragdoll) then
+		if ent:IsPlayer() and bit.band(dmgType, DMG_BULLET + DMG_BUCKSHOT) ~= 0 and dmg >= EUPHORIA_WOUND_GRAB_MIN_DMG then
+			ply.hgPendingWoundGrab = {pos = dmgInfo:GetDamagePosition(), force = dmgInfo:GetDamageForce(), untilT = now + 0.75}
+		end
+		return
+	end
 	if dmg >= EUPHORIA_CURL_MIN_DAMAGE then
 		if ragdoll.hgBeat and now > ragdoll.hgBeat.untilT then
 			ragdoll.hgBeat = nil
@@ -318,27 +339,15 @@ hook.Add("EntityTakeDamage", "HG_EuphoriaHit", function(ent, dmgInfo)
 	end
 
 	if dmg >= EUPHORIA_WOUND_GRAB_MIN_DMG then
-		if hg_euphoria_detail:GetBool() and canWoundGrab(ply) then
-			local hitPos = dmgInfo:GetDamagePosition()
-			local rootPhys = ragdoll:GetPhysicsObject()
-			local rootPos = IsValid(rootPhys) and rootPhys:GetPos() or ragdoll:GetPos()
-			local woundPos
-			if hitPos and hitPos:Distance(rootPos) < 200 then
-				woundPos = hitPos
-			else
-				local force = dmgInfo:GetDamageForce()
-				local fDir = force:Length() > 1 and force:GetNormalized() or Vector(math.Rand(-1, 1), math.Rand(-1, 1), math.Rand(-0.3, 0.6)):GetNormalized()
-				woundPos = rootPos + fDir * 25
-			end
-			local org = ply.organism
-			local handPhys, forearm, armMul = grabHand(ragdoll, org, woundPos)
-			local bonePhys = nearestPhys(ragdoll, woundPos)
-			if handPhys and bonePhys then
-				local reflex = hg.RagdollReflex
-				local mul = armMul * (reflex and org and reflex.Vigor(org) or 1)
-				ragdoll.hgWoundGrab = { hand = handPhys, forearm = forearm, bone = bonePhys, mul = mul, untilT = SysTime() + EUPHORIA_WOUND_GRAB_TIME, dur = EUPHORIA_WOUND_GRAB_TIME }
-			end
-		end
+		startWoundGrab(ply, ragdoll, dmgInfo:GetDamagePosition(), dmgInfo:GetDamageForce())
+	end
+end)
+
+hook.Add("Fake", "HG_EuphoriaShotWoundGrab", function(ply, ragdoll)
+	local pending = ply.hgPendingWoundGrab
+	ply.hgPendingWoundGrab = nil
+	if pending and IsValid(ragdoll) and SysTime() <= pending.untilT then
+		startWoundGrab(ply, ragdoll, pending.pos, pending.force)
 	end
 end)
 
@@ -375,6 +384,7 @@ hook.Add("Think", "HG_EuphoriaSettle", function()
 
 		local untilT = ragdoll.hgSettleUntil
 		if not untilT then continue end
+		if ragdoll.hgStumbleActive or ragdoll.hgStumblePending then ragdoll.hgSettleUntil = nil continue end
 
 		if untilT <= now or ragdoll.isSliding or ragdoll.isDropkicking then
 			ragdoll.hgSettleUntil = nil
@@ -397,7 +407,7 @@ hook.Add("Think", "HG_EuphoriaSettle", function()
 		ragdoll.hgSettleLast = now
 		if dtime <= 0 then continue end
 
-		local strength = ragdoll.hgSettleStrength or 1
+		local strength = (ragdoll.hgSettleStrength or 1) * math.Clamp(ragdoll.power or 1, 0, 1)
 		local linK = math.min(EUPHORIA_SETTLE_LIN * dtime * strength, 1)
 		local angK = math.min(EUPHORIA_SETTLE_ANG * dtime * strength, 1)
 
@@ -763,7 +773,7 @@ hook.Add("Think", "HG_EuphoriaTension", function()
 		local stepNow = SysTime()
 		local dt = reactionDelta(stepNow, ragdoll.hgEuphoriaLast)
 		ragdoll.hgEuphoriaLast = stepNow
-		tensionBones(ragdoll, ragdoll.hgTensionStrength or 1, dt, ragdoll.hgTensionLinear ~= false)
+		tensionBones(ragdoll, (ragdoll.hgTensionStrength or 1) * math.Clamp(ragdoll.power or 1, 0, 1), dt, ragdoll.hgTensionLinear ~= false)
 	end
 end)
 

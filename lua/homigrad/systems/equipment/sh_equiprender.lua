@@ -6,7 +6,10 @@ if CLIENT then
 	net.Receive("hg_configure_armor", function()
 		local ent = net.ReadEntity()
 		if not IsValid(ent) then return end
-		local state = ent:GetNetVar("ArmorItemState", {})
+		local state = table.Copy(ent:GetNetVar("ArmorItemState", {}))
+		for key, value in pairs(hg.GetArmorDefaultState(ent.name) or {}) do
+			if state[key] == nil then state[key] = value end
+		end
 		local frame = vgui.Create("DFrame")
 		frame:SetSize(310, ent.placement == "torso" and 425 or 300)
 		frame:Center()

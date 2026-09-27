@@ -8,12 +8,6 @@ local HEAL_ANIMATION_RETURN_TIME = 0.35
 local MEDICAL_WEAPON_CLASSES = {
     "weapon_bandage_sh",
     "weapon_bigbandage_sh",
-    "weapon_packedbandage_sh",
-    "weapon_combatbandage_sh",
-    "weapon_quikclotbandage_sh",
-    "weapon_bigpackedbandage_sh",
-    "weapon_bigcombatbandage_sh",
-    "weapon_bigquikclotbandage_sh",
     "weapon_bruicekit",
     "weapon_tourniquet",
     "weapon_morphine",
@@ -26,8 +20,6 @@ local MEDICAL_WEAPON_CLASSES = {
     "weapon_medkit_surgical_sh",
     "weapon_needle",
     "weapon_painkillers",
-    "weapon_tramadol",
-    "weapon_tapentadol",
     "weapon_zerlkers",
     "weapon_adrenaline",
     "weapon_thiamine",
@@ -123,7 +115,7 @@ local function GetMinigameType(wep)
     if medkitModeType == "tourniquet" then return "tourniquet" end
     if medkitModeType then return "syringe" end
 
-    if class == "weapon_bandage_sh" or class == "weapon_bigbandage_sh" or class == "weapon_packedbandage_sh" or class == "weapon_combatbandage_sh" or class == "weapon_quikclotbandage_sh" or class == "weapon_bigpackedbandage_sh" or class == "weapon_bigcombatbandage_sh" or class == "weapon_bigquikclotbandage_sh" or class == "weapon_bruicekit" then
+    if class == "weapon_bandage_sh" or class == "weapon_bigbandage_sh" or class == "weapon_bruicekit" then
         return "bandage"
     end
 
@@ -135,7 +127,7 @@ local function GetMinigameType(wep)
         return "syringe"
     end
 
-    if class == "weapon_painkillers" or class == "weapon_tramadol" or class == "weapon_tapentadol" or class == "weapon_zerlkers" or class == "weapon_thiamine" or class == "weapon_betablock" then
+    if class == "weapon_painkillers" or class == "weapon_zerlkers" or class == "weapon_thiamine" or class == "weapon_betablock" then
         return "syringe"
     end
 

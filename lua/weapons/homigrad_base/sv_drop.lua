@@ -1,7 +1,7 @@
 hg = hg or {}
 
 local vpang = Angle(1,-2,1)
-local function drop(ply, wep, newWeapon, vel)
+local function drop(ply, wep, newWeapon, vel, forced)
 	local wep = isentity(wep) and wep or ply:GetActiveWeapon()
 	if not IsValid(wep) or wep.NoDrop then return end
 	if ply:GetNWFloat("willsuicide", 0) > 0 then return end -- you cant escape.
@@ -20,6 +20,13 @@ local function drop(ply, wep, newWeapon, vel)
 		end
 		
 		ply:DropWeapon(wep, nil, not IsValid(wep.fakeGun) and (eyeAngles:Forward() * (isnumber(vel) and vel or 250)) + ply:GetVelocity() or nil)
+		if forced and ply.Thought then
+			local org = ply.organism
+			local reason = org and org.rarmamputated and "I'm missing my good arm."
+				or org and (org.rarm == 1 or org.larm == 1 or (hg.organism.IsLimbCompoundFractured and (hg.organism.IsLimbCompoundFractured(org, "rarm") or hg.organism.IsLimbCompoundFractured(org, "larm")))) and "My arm is too damaged."
+				or "I can't keep hold of it."
+			ply:Thought(reason, 4, "forced_weapon_drop", 0)
+		end
 
 		if not IsValid(newWeapon) then
 			local hands = hg.GetHandsWeapon and hg.GetHandsWeapon(ply) or ply:GetWeapon("weapon_hands_sh")

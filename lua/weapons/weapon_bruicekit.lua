@@ -200,7 +200,6 @@ if SERVER then
 
 		self.modeValues[1] = math.max((self.modeValues[1] or 0) - totalCost, 0)
 
-		-- Add a green bandage on the healed joint/chest so the treatment is visible
 		if amountHealed > 0 then
 			local bruisemap = {
 				larm = "ValveBiped.Bip01_L_Forearm",
@@ -220,7 +219,7 @@ if SERVER then
 			ent.bandaged_limbs = ent.bandaged_limbs or {}
 			for _, data in ipairs(bones) do
 				local boneName = bruisemap[data.limb or data.key]
-				if boneName and not ent.bandaged_limbs[boneName] then
+				if boneName then
 					ent.bandaged_limbs[boneName] = { pos = vector_origin, ang = angle_zero, color = spearmint }
 				end
 			end

@@ -738,6 +738,7 @@ hook.Add("Think", "Fake", function()
 		
 		local power = org.pain and ((org.pain > 50 or org.blood < 2900 or org.o2[1] < 5) and 0.3) or ((org.pain > 20 or org.blood < 4200 or org.o2[1] < 10) and 0.5) or 1
 		power = power * org.consciousness
+		power = power * math.Clamp(org.perfusionMoveMul or 1, 0.35, 1)
 		power = power * (1 + math.min(org.berserk or 0, 3) * 0.3)
 		ragdoll.power = power
 

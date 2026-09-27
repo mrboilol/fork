@@ -176,8 +176,6 @@ function SWEP:PrimarySpread()
 		local panic = organism.panicattackActive and math.Clamp(organism.panicattack or 0, 0.45, 1) or 0
 		local panicRecoilMul = panic > 0 and math.Remap(panic, 0.45, 1, 1.12, 1.42) or 1
 		force = force * panicRecoilMul * combatAimMul
-		-- Arm trauma can make the physical muzzle movement extreme, but cap the
-		-- camera-side multiplier so recoil cannot pin the player's view vertically.
 		mul = mul * math.Clamp(supportMul * handlingMul, 0.65, 3.75)
 		mul = mul * self.RecoilMul
 		mul = mul * panicRecoilMul * combatAimMul
@@ -196,7 +194,7 @@ function SWEP:PrimarySpread()
 		if sprayI < 3 then
 			spray = angRand
 		else
-			spray = self.Spray[sprayI] or Angle(0.01, 0)
+			spray = Angle(-math.Rand(0.025, 0.055), math.Rand(-0.065, 0.065), 0) * math.Clamp(sprayI / 4, 0.5, 1.25)
 		end
 		
 		local angranda = AngleRand(self.SprayRand[1], self.SprayRand[2])

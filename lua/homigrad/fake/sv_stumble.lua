@@ -201,7 +201,7 @@ local dying = {}
 local function readConfig()
 	local cfg = {}
 	for key, default in pairs(AR_DEFAULTS) do
-		local cv = GetConVar("ar_" .. key)
+		local cv = GetConVar("hg_stumble_" .. key)
 		cfg[key] = cv and cv:GetFloat() or default
 	end
 
@@ -347,7 +347,9 @@ local function vigor(org)
 	local staminaFrac = stamina and stamina[1] and stamina[1] / (stamina.max or STAMINA_MAX_FALLBACK) or 1
 	local staminaMul = math.Clamp(staminaFrac, STAMINA_FLOOR, 1)
 
-	return bloodMul * consciousMul * staminaMul
+	local ragdoll = IsValid(org.owner) and org.owner.FakeRagdoll
+	local controlMul = IsValid(ragdoll) and math.Clamp(ragdoll.power or 1, 0, 1) or 1
+	return bloodMul * consciousMul * staminaMul * controlMul
 end
 
 local function legsUsable(org)
@@ -497,6 +499,7 @@ local function updateStumble(st, ragdoll)
 	local cfg = st.cfg
 	local dt = FrameTime()
 	local now = CurTime()
+	st.vigor = st.ply.organism and vigor(st.ply.organism) or 0
 
 	local pelvisPos = st.pelvis:GetPos()
 	local rawVel = st.pelvis:GetVelocity()

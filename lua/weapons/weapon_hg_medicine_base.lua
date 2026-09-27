@@ -1026,7 +1026,33 @@ else
 
 			model.BodygroupsApplied = true
 		end
-		model:DrawModel()
+		local coloredBones = {}
+		for bone, bandage in pairs(ent.bandaged_limbs) do
+			if bone ~= "ValveBiped.Bip01_Head1" and istable(bandage) and bandage.color then
+				coloredBones[#coloredBones + 1] = bone
+			end
+		end
+
+		if #coloredBones > 0 then
+			for _, bone in ipairs(coloredBones) do
+				local group = model:FindBodygroupByName(ThatPlyIsFemale(ent) and BodyGroupsFemale[bone] or BodyGroupsMale[bone] or "")
+				if group >= 0 then model:SetBodygroup(group, 0) end
+			end
+			model:DrawModel()
+
+			for bone, bandage in pairs(ent.bandaged_limbs) do
+				if bone ~= "ValveBiped.Bip01_Head1" then
+					local group = model:FindBodygroupByName(ThatPlyIsFemale(ent) and BodyGroupsFemale[bone] or BodyGroupsMale[bone] or "")
+					local amputated = ent.organism and hg.amputatedlimbs2[bone] and ent.organism[hg.amputatedlimbs2[bone] .. "amputated"]
+					if group >= 0 then model:SetBodygroup(group, istable(bandage) and bandage.color and not amputated and 1 or 0) end
+				end
+			end
+			model:SetColor(Color(0, 255, 150))
+			model:DrawModel()
+			model.BodygroupsApplied = false
+		else
+			model:DrawModel()
+		end
 	end
 	--end)
 end

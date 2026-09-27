@@ -9,11 +9,8 @@ function ENT:Initialize()
 	if armorData and not self.armorState then
 		local namedLevel = (hg.armorNames[self.name] or ""):match("%s[IVX]+$") ~= nil
 		self.armorState = {quality = math.Rand(0.8, 1.2), fixedLevel = namedLevel}
-		if self.placement == "torso" then
-			self.armorState.plateMaterial = table.Random({"ceramic", "steel", "polyethylene"})
-			self.armorState.plateLevel = math.random(2, 6)
-			self.armorState.plateSides = table.Random({"none", "front", "back", "both", "all"})
-		end
+		local natural = self.placement == "torso" and hg.GetArmorDefaultState(self.name)
+		if natural then table.Merge(self.armorState, table.Copy(natural)) end
 	end
 	if self.armorState then self:SetNetVar("ArmorItemState", self.armorState) end
 	self:SetModel(self.PhysModel or self.Model)

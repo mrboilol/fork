@@ -660,6 +660,8 @@ end
 
 hg.fakeBoneFlop = hg.fakeBoneFlop or {}
 local fakeBoneFlop = hg.fakeBoneFlop
+local fakeBoneMatrixCache = fakeBoneFlop.matrix_cache or {}
+fakeBoneFlop.matrix_cache = fakeBoneMatrixCache
 local serverOnlyEFlag = EFL_SERVER_ONLY or 512
 
 local networkOriginLimit = 16000
@@ -740,6 +742,49 @@ local fakeBoneLimits = {
 		[0] = {[0] = "60", [1] = "-135"},
 		[1] = {[0] = "45", [1] = "-20"},
 		[2] = {[0] = "5", [1] = "-45"},
+	},
+}
+
+local fakeBoneCrookedOffsets = {
+	["ValveBiped.Bip01_R_UpperArm"] = {
+		pos = Vector(2, -4, 0),
+		ang = Angle(20, -35, 45),
+	},
+	["ValveBiped.Bip01_L_UpperArm"] = {
+		pos = Vector(2, 4, 0),
+		ang = Angle(20, 35, -45),
+	},
+	["ValveBiped.Bip01_R_Forearm"] = {
+		pos = Vector(0, -2, -1),
+		ang = Angle(-65, -10, 85),
+	},
+	["ValveBiped.Bip01_L_Forearm"] = {
+		pos = Vector(0, 2, -1),
+		ang = Angle(-65, 10, -85),
+	},
+	["ValveBiped.Bip01_R_Thigh"] = {
+		pos = Vector(0, -3, 1),
+		ang = Angle(25, -20, 20),
+	},
+	["ValveBiped.Bip01_L_Thigh"] = {
+		pos = Vector(0, 3, 1),
+		ang = Angle(25, 20, -20),
+	},
+	["ValveBiped.Bip01_R_Calf"] = {
+		pos = Vector(0, -2, -1),
+		ang = Angle(-55, -10, 30),
+	},
+	["ValveBiped.Bip01_L_Calf"] = {
+		pos = Vector(0, 2, -1),
+		ang = Angle(-55, 10, -30),
+	},
+	["ValveBiped.Bip01_Spine3"] = {
+		pos = Vector(0, 0, -2),
+		ang = Angle(-30, 0, 0),
+	},
+	["ValveBiped.Bip01_Head1"] = {
+		pos = Vector(0, 0, -4),
+		ang = Angle(-45, 0, 0),
 	},
 }
 
@@ -971,6 +1016,78 @@ function fakeBoneFlop.CleanupRagdoll(rag)
 	rag:SetSaveValue("m_ragdoll.allowStretch", false)
 end
 
+function fakeBoneFlop.BendBone(rag, bone, forceMul)
+	if not IsValid(rag) then return end
+	if not (rag.hg_floppy_bones and rag.hg_floppy_bones[bone]) then return end
+	forceMul = forceMul or 1
+
+	local parentBone = fakeBoneParents[bone]
+	local offset = fakeBoneCrookedOffsets[bone]
+	if not parentBone or not offset then return end
+
+	local boneIDChild = rag:LookupBone(bone)
+	local boneIDParent = rag:LookupBone(parentBone)
+	if not boneIDChild or not boneIDParent then return end
+
+	local physIDChild = rag:TranslateBoneToPhysBone(boneIDChild)
+	local physIDParent = rag:TranslateBoneToPhysBone(boneIDParent)
+	if physIDChild < 0 or physIDParent < 0 then return end
+	if rag.gibRemove and (rag.gibRemove[physIDChild] or rag.gibRemove[physIDParent]) then return end
+
+	local phys = rag:GetPhysicsObjectNum(physIDChild)
+	local physParent = rag:GetPhysicsObjectNum(physIDParent)
+	if not IsValid(phys) or not IsValid(physParent) then return end
+
+	local targetPos, targetAng = LocalToWorld(offset.pos, offset.ang, physParent:GetPos(), physParent:GetAngles())
+	local curPos = phys:GetPos()
+	local curAng = phys:GetAngles()
+	local push = targetPos - curPos
+	local angVel = Vector(
+		math.AngleDifference(targetAng.r, curAng.r),
+		math.AngleDifference(targetAng.p, curAng.p),
+		math.AngleDifference(targetAng.y, curAng.y)
+	) * (1.75 * forceMul)
+
+	phys:SetVelocityInstantaneous(push * (2.2 * forceMul) + physParent:GetVelocity() * 0.15)
+	phys:AddAngleVelocity(-phys:GetAngleVelocity() * 0.65)
+	phys:SetAngleVelocityInstantaneous(angVel)
+	phys:Wake()
+
+	physParent:Wake()
+end
+
+function fakeBoneFlop.BendStored(rag, org, forceMul)
+	if not IsValid(rag) or not org or not org.fake_floppy_bones then return end
+
+	for bone in pairs(org.fake_floppy_bones) do
+		fakeBoneFlop.BendBone(rag, bone, forceMul)
+	end
+end
+
+local function fakeBoneBuildMatrixCache(rag)
+	local model = rag:GetModel()
+	if fakeBoneMatrixCache[model] then return fakeBoneMatrixCache[model] end
+
+	local _, meshes = util.GetModelMeshes(model)
+	if not meshes then return end
+
+	fakeBoneMatrixCache[model] = {}
+
+	for i = 0, rag:GetPhysicsObjectCount() - 1 do
+		local boneID = rag:TranslatePhysBoneToBone(i)
+		local mesh = meshes[boneID]
+		if mesh and mesh.matrix then
+			local inv = mesh.matrix:GetInverse()
+			local t = inv:GetTranslation()
+			if isSafeNetworkPos(t) then
+				fakeBoneMatrixCache[model][boneID] = inv
+			end
+		end
+	end
+
+	return fakeBoneMatrixCache[model]
+end
+
 function fakeBoneFlop.ApplyBone(rag, bone)
 	if not IsValid(rag) then return end
 	local org = rag.organism
@@ -995,17 +1112,88 @@ function fakeBoneFlop.ApplyBone(rag, bone)
 	local physParent = rag:GetPhysicsObjectNum(physIDParent)
 	if not IsValid(phys) or not IsValid(physParent) or phys == physParent then return end
 
-	local jointPos = rag:GetBonePosition(boneIDChild)
-	if not isSafeNetworkPos(jointPos)
-		or jointPos:IsEqualTol(rag:GetPos(), 0.01)
-		or jointPos:DistToSqr(phys:GetPos()) > 4096
-		or jointPos:DistToSqr(physParent:GetPos()) > 4096 then return end
+	if bone == "ValveBiped.Bip01_Head1" then
+		local anchor = WorldToLocal(
+			phys:GetPos() + phys:GetAngles():Forward() * -2 + phys:GetAngles():Up() * -1.5,
+			angle_zero,
+			physParent:GetPos(),
+			physParent:GetAngles()
+		)
+
+		rag:RemoveInternalConstraint(physIDChild)
+		phys:SetPos(physParent:GetPos() + physParent:GetAngles():Forward() * 12.9 + physParent:GetAngles():Right() * -1)
+
+		local cons = ents.Create("phys_ragdollconstraint")
+		if not IsValid(cons) then return end
+		cons:AddEFlags(serverOnlyEFlag)
+		cons:SetPos(physParent:LocalToWorld(anchor))
+		cons:SetKeyValue("xmin", "-55")
+		cons:SetKeyValue("xmax", "55")
+		cons:SetKeyValue("ymin", "-90")
+		cons:SetKeyValue("ymax", "35")
+		cons:SetKeyValue("zmin", "-50")
+		cons:SetKeyValue("zmax", "50")
+		cons:SetKeyValue("spawnflags", "0")
+		cons:SetPhysConstraintObjects(physParent, phys)
+		cons:Spawn()
+		cons:Activate()
+		phys:AddAngleVelocity(Vector(0, 45, 20))
+
+		rag.hg_floppy_constraints = rag.hg_floppy_constraints or {}
+		rag.hg_floppy_bones = rag.hg_floppy_bones or {}
+		rag.hg_floppy_constraints[bone] = cons
+		rag.hg_floppy_bones[bone] = true
+		rag:SetSaveValue("m_ragdoll.allowStretch", org.fake_dislocated_bones and next(org.fake_dislocated_bones) ~= nil or false)
+		return
+	end
+
+	local matrixCache = fakeBoneBuildMatrixCache(rag)
+	if not matrixCache then return end
+
+	local matrix = matrixCache[boneIDChild]
+	local matrixParent = matrixCache[boneIDParent]
+	if not matrix or not matrixParent then return end
+
+	local childTrans = matrix:GetTranslation()
+	local parentTrans = matrixParent:GetTranslation()
+	if not isSafeNetworkPos(childTrans) or not isSafeNetworkPos(parentTrans) then return end
+
+	rag.hg_floppy_constraints = rag.hg_floppy_constraints or {}
+	rag.hg_floppy_bones = rag.hg_floppy_bones or {}
+
+	if IsValid(rag.hg_floppy_constraints[bone]) then
+		rag.hg_floppy_constraints[bone]:Remove()
+	end
+
+	rag:RemoveInternalConstraint(physIDChild)
+
+	local posOri = phys:GetPos()
+	local posOriParent = physParent:GetPos()
+	local angOri = phys:GetAngles()
+	local angOriParent = physParent:GetAngles()
+	local velOri = phys:GetVelocity()
+	local velOriParent = physParent:GetVelocity()
+	local avelOri = phys:GetAngleVelocity()
+	local avelOriParent = physParent:GetAngleVelocity()
+
+	local childPos = rag:LocalToWorld(matrix:GetTranslation())
+	local parentPos = rag:LocalToWorld(matrixParent:GetTranslation())
+	if dislocated then
+		local crooked = fakeBoneCrookedOffsets[bone]
+		if crooked then
+			childPos = childPos + physParent:LocalToWorld(crooked.pos * 0.32) - physParent:GetPos()
+		end
+	end
+
+	phys:SetPos(childPos)
+	phys:SetAngles(rag:LocalToWorldAngles(matrix:GetAngles()))
+	physParent:SetPos(parentPos)
+	physParent:SetAngles(rag:LocalToWorldAngles(matrixParent:GetAngles()))
 
 	local cons = ents.Create("phys_ragdollconstraint")
 	if not IsValid(cons) then return end
 	cons:AddEFlags(serverOnlyEFlag)
-	cons:SetPos(jointPos)
-	cons:SetAngles(physParent:GetAngles())
+	cons:SetPos(childPos)
 	local loosen = dislocated and 22 or 0
 	cons:SetKeyValue("xmin", tostring(tonumber(limits[0][1]) - loosen))
 	cons:SetKeyValue("xmax", tostring(tonumber(limits[0][0]) + loosen))
@@ -1014,28 +1202,33 @@ function fakeBoneFlop.ApplyBone(rag, bone)
 	cons:SetKeyValue("zmin", tostring(tonumber(limits[2][1]) - loosen))
 	cons:SetKeyValue("zmax", tostring(tonumber(limits[2][0]) + loosen))
 	cons:SetKeyValue("spawnflags", "0")
-	if bone == "ValveBiped.Bip01_Head1" then
-		cons:SetPhysConstraintObjects(physParent, phys)
-	else
-		cons:SetPhysConstraintObjects(phys, physParent)
-	end
-
-	if rag.hg_floppy_constraints and IsValid(rag.hg_floppy_constraints[bone]) then
-		rag.hg_floppy_constraints[bone]:Remove()
-	end
-	rag:SetSaveValue("m_ragdoll.allowStretch", false)
-	rag:RemoveInternalConstraint(physIDChild)
+	cons:SetPhysConstraintObjects(phys, physParent)
 	cons:Spawn()
 	cons:Activate()
 
-	rag.hg_floppy_constraints = rag.hg_floppy_constraints or {}
-	rag.hg_floppy_bones = rag.hg_floppy_bones or {}
 	rag.hg_floppy_constraints[bone] = cons
 	rag.hg_floppy_bones[bone] = true
 	if dislocated then
 		rag.hg_dislocated_bones = rag.hg_dislocated_bones or {}
 		rag.hg_dislocated_bones[bone] = true
 	end
+
+	phys:SetPos(posOri)
+	phys:SetAngles(angOri)
+	physParent:SetPos(posOriParent)
+	physParent:SetAngles(angOriParent)
+
+	phys:SetVelocityInstantaneous(velOri)
+	phys:SetVelocity(velOri)
+	physParent:SetVelocityInstantaneous(velOriParent)
+	physParent:SetVelocity(velOriParent)
+	phys:SetAngleVelocityInstantaneous(avelOri)
+	phys:SetAngleVelocity(avelOri)
+	physParent:SetAngleVelocityInstantaneous(avelOriParent)
+	physParent:SetAngleVelocity(avelOriParent)
+
+	local allowStretch = dislocated or (org.fake_dislocated_bones and next(org.fake_dislocated_bones) ~= nil) or false
+	rag:SetSaveValue("m_ragdoll.allowStretch", allowStretch)
 end
 
 function fakeBoneFlop.ScheduleApply(rag, bone, org)
@@ -1058,6 +1251,18 @@ function fakeBoneFlop.ApplyStored(rag, org)
 
 	for bone in pairs(org.fake_floppy_bones or {}) do fakeBoneFlop.ScheduleApply(rag, bone, org) end
 	for bone in pairs(org.fake_dislocated_bones or {}) do fakeBoneFlop.ScheduleApply(rag, bone, org) end
+
+	timer.Simple(0.01, function()
+		if IsValid(rag) and org.fake_floppy_bones then
+			fakeBoneFlop.BendStored(rag, rag.organism or org, 0.35)
+		end
+	end)
+
+	timer.Simple(0.12, function()
+		if IsValid(rag) and org.fake_floppy_bones then
+			fakeBoneFlop.BendStored(rag, rag.organism or org, 0.2)
+		end
+	end)
 end
 
 function fakeBoneFlop.ScheduleRebuild(ply)

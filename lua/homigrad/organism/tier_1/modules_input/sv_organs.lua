@@ -228,6 +228,12 @@ local function damageBrainLobe(org, bone, dmg, dmgInfo, key)
 		dmg = dmg / 3 * Lerp(intactSkull, 1, 0.75)
 	end
 
+	if dmgInfo:IsDamageType(DMG_BULLET + DMG_SNIPER) then
+		dmg = math.max(dmg, 0.3)
+	elseif dmgInfo:IsDamageType(DMG_BUCKSHOT) then
+		dmg = math.max(dmg, 0.15)
+	end
+
 	local oldBrainLobeDamage = getBrainLobeDamage(org)
 	local oldDmg = org[key] or 0
 	local result = damageOrgan(org, dmg, dmgInfo, key)

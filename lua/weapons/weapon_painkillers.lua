@@ -26,29 +26,17 @@ SWEP.modeNames = {
 }
 local painkillerTypes = {
 	paracetamol = {
-		name = "Paracetamol", dose = 1,
+		name = "Paracetamol", dose = 1.25,
 		description = "Paracetamol is a OTC medication that tends to alleviate acute and chronic pain. It is classified as a NSAID and is generally safe to take in moderate amounts.",
 		appearance = "This one is a white, thick pill that leaves dust around.",
 	},
-	tramadol = {
-		name = "Tramadol", dose = 0.4,
-		description = "Tramadol is a prescription only medication that is prescribed when non-opioid options seem inadequate. It is a moderate schedule IV opioid that might cause respiratory depression on excess use.",
-		appearance = "This one has a off-white color to it, and is a small pill.",
-	},
-	tapentadol = {
-		name = "Tapentadol", dose = 0.8,
-		description = "Tapentadol is a prescription only medication that is used for severe acute pain, this is used for certain nerve pain or when a opioid-level medication is required/prescribed. It is a strong schedule II opioid that might cause a risk in overdosing or respiratory depression. Do not take more than one.",
-		appearance = "This one has a off white color to it, and is a small pill. It also feels very brittle.",
-	},
 }
-local painkillerTypeOrder = {"paracetamol", "tramadol", "tapentadol"}
 
 function SWEP:RandomizePainkillerType()
 	if not SERVER then return end
 
-	local medicineID = painkillerTypeOrder[math.random(#painkillerTypeOrder)]
-	local medicine = painkillerTypes[medicineID]
-	self:SetNWString("hg_painkiller_type", medicineID)
+	local medicine = painkillerTypes.paracetamol
+	self:SetNWString("hg_painkiller_type", "paracetamol")
 	self:SetNWString("hg_painkiller_label", medicine.name)
 	self:SetNWString("hg_painkiller_detail", medicine.description .. "\n" .. medicine.appearance)
 end
@@ -147,13 +135,7 @@ if SERVER then
 			org.analgesiaAdd = math.min((org.analgesiaAdd or 0) + lacedAmount, 25)
 			self.HG_FentanylLacedAmount = nil
 		end
-		local medicineID = self:GetNWString("hg_painkiller_type", "paracetamol")
-		local medicine = painkillerTypes[medicineID] or painkillerTypes.paracetamol
-		if medicineID == "paracetamol" then
-			org.painkiller = math.min((org.painkiller or 0) + medicine.dose, 5)
-		else
-			org.analgesiaAdd = math.min(org.analgesiaAdd + medicine.dose, 4)
-		end
+		org.painkiller = math.min((org.painkiller or 0) + painkillerTypes.paracetamol.dose, 5)
 
 		if self.modeValues[1] > 0 then
 			self.modeValues[1] = 0

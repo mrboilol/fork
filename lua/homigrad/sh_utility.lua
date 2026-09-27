@@ -1159,7 +1159,8 @@ local IsValid = IsValid
 	end )
 --//
 --\\ remove default death sound
-	hook.Add("PlayerDeathSound", "removesound", function() return true end)
+	local hg_silentdeath = CreateConVar("hg_silentdeath", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Suppress the default player death sound", 0, 1)
+	hook.Add("PlayerDeathSound", "removesound", function() return hg_silentdeath:GetBool() end)
 --//
 --\\ flashlight custom switch
 	hook.Add("PlayerSwitchFlashlight", "removeflashlights", function(ply, enabled)

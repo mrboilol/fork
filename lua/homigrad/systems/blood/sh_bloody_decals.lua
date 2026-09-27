@@ -7,6 +7,11 @@ if SERVER then
     function hg.WashBloodDecals(ent)
         if not IsValid(ent) then return end
         local owner = ent:IsRagdoll() and hg.RagdollOwner(ent) or ent
+        local org = IsValid(owner) and owner.organism
+        if org and org.woundmarks and #org.woundmarks > 0 then
+            org.woundmarks = {}
+            if hg.organism.SyncWoundMarksNet then hg.organism.SyncWoundMarksNet(org) end
+        end
         local body = IsValid(owner) and owner:IsPlayer() and hg.GetCurrentCharacter(owner) or nil
         for _, target in ipairs({ent, owner, body}) do
             if IsValid(target) then target:RemoveAllDecals() end

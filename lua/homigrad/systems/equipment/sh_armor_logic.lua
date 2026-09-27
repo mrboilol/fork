@@ -3,8 +3,10 @@
 	local states = SERVER and ent.armor_states or ent:GetNetVar("ArmorStates", ent.armor_states or {})
 	local state = states and states[armor]
 	if not state and ent.name == armor then state = SERVER and ent.armorState or ent:GetNetVar("ArmorItemState", {}) end
-	if not state or state[key] == nil then return default end
-	return state[key]
+	if state and state[key] ~= nil then return state[key] end
+	local natural = hg.GetArmorDefaultState and hg.GetArmorDefaultState(armor)
+	if natural and natural[key] ~= nil then return natural[key] end
+	return default
 end
 
 hg.ArmorPlateMaterials = {
@@ -25,6 +27,45 @@ hg.ArmorPlateMaterials = {
 
 hg.ArmorPlateLevels = {[1] = 6, [2] = 8, [3] = 10, [4] = 12, [5] = 15, [6] = 17}
 hg.ArmorProtectionLevels = {stab = {ballistic = 0.12, melee = 0.8, stab = 2}}
+
+local softArmorLevels = {IIA = 1, II = 2, IIIA = 3, III = 4, IV = 5}
+local plateArmorLevels = {IIA = 1, II = 2, IIIA = 3, III = 3, IV = 4, V = 5, VI = 6, VII = 6}
+local armorDefaultStates = {}
+
+function hg.GetArmorDefaultState(armor)
+	if not isstring(armor) then return end
+	if armorDefaultStates[armor] ~= nil then return armorDefaultStates[armor] or nil end
+	local data = hg.armor.torso and hg.armor.torso[armor]
+	if not data then
+		armorDefaultStates[armor] = false
+		return
+	end
+
+	local name = (hg.armorNames or {})[armor] or armor
+	local lower = string.lower(name)
+	local rating
+	for token in string.gmatch(name, "[IVXA]+") do
+		if token:match("^[IVX]+A?$") then rating = token end
+	end
+
+	local state
+	if lower:find("riot", 1, true) then
+		state = {plateMaterial = "riot", plateLevel = 3, plateSides = "all", protectionLevel = "stab"}
+	elseif lower:find("kevlar", 1, true) or lower:find("paca", 1, true) or lower:find("soft", 1, true) then
+		state = {plateMaterial = "kevlar", plateLevel = softArmorLevels[rating] or 3, plateSides = "all"}
+	else
+		local material = "ceramic"
+		if lower:find("plate body armor", 1, true) or lower:find("steel", 1, true) or lower:find("iron", 1, true) then
+			material = "steel"
+		elseif lower:find("uhmwpe", 1, true) then
+			material = "uhmwpe"
+		end
+		state = {plateMaterial = material, plateLevel = plateArmorLevels[rating] or 3, plateSides = (data.protection or 0) > 0 and "both" or "none"}
+	end
+
+	armorDefaultStates[armor] = state
+	return state
+end
 
 function hg.GetArmorMaxCondition(ent, placement, armor)
 	local data = hg.armor[placement] and hg.armor[placement][armor]
