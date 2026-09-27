@@ -47,8 +47,12 @@ local function Write(tag, what)
 
 	lines = lines + 1
 	if lines > MAX_LINES then
+		-- the older half is kept, so a crash right after a rollover still has history
 		out:Close()
-		out = file.Open(DIR .. "/" .. REALM .. ".txt", "w", "DATA")
+		local path, part = DIR .. "/" .. REALM .. ".txt", DIR .. "/" .. REALM .. "_part.txt"
+		file.Delete(part)
+		if isfunction(file.Rename) then file.Rename(path, part, "DATA") end
+		out = file.Open(path, "w", "DATA")
 		lines = 0
 		if not out then return end
 	end
@@ -81,8 +85,17 @@ local ALWAYS = {
 
 -- Only when the first argument is an NPC or a ragdoll.
 local FILTERED = {
-	OnEntityCreated = true, EntityRemoved = true, ["Org Think"] = true,
+	OnEntityCreated = true, EntityRemoved = true,
 }
+
+-- Per-tick per-organism: NPC / ragdoll owners only, and only inside the hot window.
+local HOT_FILTERED = {
+	["Org Think"] = true,
+}
+
+-- What each tracer wrapper stands in for, so code that recognises its own hook
+-- entries (sv_uncon.lua's damage wrapper) can see through this one.
+ZCNPC.TraceOriginal = ZCNPC.TraceOriginal or setmetatable({}, { __mode = "k" })
 
 -- Per-frame: only inside the hot window, entry only (the next line says it returned).
 local HOT = {
@@ -106,9 +119,11 @@ local function Wrap(event, name, fn)
 			if hotUntil > SysTime() then Write(">", label) end
 			return fn(...)
 		end
-	elseif FILTERED[event] then
+	elseif FILTERED[event] or HOT_FILTERED[event] then
+		local hotOnly = HOT_FILTERED[event]
+
 		new = function(a, ...)
-			if not Relevant(a) then return fn(a, ...) end
+			if (hotOnly and hotUntil <= SysTime()) or not Relevant(a) then return fn(a, ...) end
 
 			Write(">", label .. " " .. tostring(a))
 			local r1, r2, r3, r4, r5, r6 = fn(a, ...)
@@ -128,6 +143,7 @@ local function Wrap(event, name, fn)
 	end
 
 	wrapped[new] = true
+	ZCNPC.TraceOriginal[new] = fn
 
 	return new
 end
@@ -138,7 +154,7 @@ local function WrapHooks()
 	local ulib = isfunction(hook.GetULibTable) and hook.GetULibTable()
 
 	local function Traced(event)
-		return ALWAYS[event] or FILTERED[event] or HOT[event]
+		return ALWAYS[event] or FILTERED[event] or HOT[event] or HOT_FILTERED[event]
 	end
 
 	if ulib then
@@ -213,27 +229,27 @@ local function WrapTimers()
 	end
 end
 
+-- Receivers are wrapped in place rather than net.Incoming replaced, so any other
+-- addon's net.Incoming stays in the chain exactly as it was.
 local function WrapNet()
-	if SERVER or ZCNPC.__traceNet then return end
+	if SERVER or not istable(net.Receivers) then return end
 
-	local incoming = net.Incoming
-	ZCNPC.__traceNet = incoming
+	for name, fn in pairs(net.Receivers) do
+		if not isfunction(fn) or wrapped[fn] then continue end
 
-	function net.Incoming(len, client)
-		local name = util.NetworkIDToString(net.ReadHeader())
-		if not name then return end
+		local label = "net " .. name
+		local heats = string.find(name, "organism", 1, true) or string.find(name, "zcnpc", 1, true)
+			or string.find(name, "wound", 1, true) or string.find(name, "blood", 1, true)
 
-		local fn = net.Receivers[string.lower(name)]
-		if not fn then return end
-
-		if string.find(name, "organism", 1, true) or string.find(name, "zcnpc", 1, true)
-			or string.find(name, "wound", 1, true) or string.find(name, "blood", 1, true) then
-			Heat()
+		local new = function(...)
+			if heats then Heat() end
+			Write(">", label)
+			fn(...)
+			Write("<", label)
 		end
 
-		Write(">", "net " .. name)
-		fn(len - 16, client)
-		Write("<", "net " .. name)
+		wrapped[new] = true
+		net.Receivers[name] = new
 	end
 end
 

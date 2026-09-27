@@ -667,10 +667,25 @@ end
 -- than leaving the old one behind to run twice.
 ZCNPC.BeforeDamage = ZCNPC.BeforeDamage or {}
 
+-- Something else wrapping the hook entry (a debug tracer, another addon) must not
+-- read as "Z-City put its hook back": wrapping that again stacks one of ours per
+-- heal, each calling the next, until the stack runs out.
+ZCNPC.OwnWrappers = ZCNPC.OwnWrappers or setmetatable({}, { __mode = "k" })
+
+local function Unwrapped(fn)
+	local seen = 0
+	while ZCNPC.TraceOriginal and ZCNPC.TraceOriginal[fn] and seen < 16 do
+		fn = ZCNPC.TraceOriginal[fn]
+		seen = seen + 1
+	end
+
+	return fn
+end
+
 function ZCNPC.InstallDamageWrapper()
 	local hooks = hook.GetTable()["EntityTakeDamage"]
 	local orig = hooks and hooks["homigrad-damage"]
-	if not orig or orig == ZCNPC.__wrapper then return end
+	if not orig or ZCNPC.OwnWrappers[Unwrapped(orig)] then return end
 
 	ZCNPC.__orig = orig
 	ZCNPC.__wrapper = function(ent, dmgInfo)
@@ -694,9 +709,10 @@ function ZCNPC.InstallDamageWrapper()
 			return true -- swallow the kill
 		end
 
-		return ZCNPC.__orig(ent, dmgInfo)
+		return orig(ent, dmgInfo)
 	end
 
+	ZCNPC.OwnWrappers[ZCNPC.__wrapper] = true
 	hook.Add("EntityTakeDamage", "homigrad-damage", ZCNPC.__wrapper)
 	ZCNPC.Debug("damage wrapper installed")
 end
@@ -1186,6 +1202,9 @@ end)
 -- draining), arrest lasted forever — "cardiac arrest cannot kill a NPC".
 local BRAIN_ARREST_FALLBACK = 120
 
+-- How long a body that is otherwise free to stand is held down by its pose alone.
+local POSE_GIVEUP = 5
+
 local function HeartstopDeath()
 	if cfg.death_brain:GetBool() then
 		return BRAIN_ARREST_FALLBACK
@@ -1331,16 +1350,28 @@ timer.Create("zcnpc_monitor", 0.25, 0, function()
 		local ready = (now - info.downAt) > (info.wakeAfter or wakeAfter)
 		if wakeOn and ready then
 			local canWake, poseBlocked = CanWakeUp(org, rag)
+			if poseBlocked then
+				info.poseBlockedSince = info.poseBlockedSince or now
+			else
+				info.poseBlockedSince = nil
+			end
+
 			if canWake then
 				ZCNPC.WakeUp(rag, info)
 			elseif poseBlocked and ZCNPC.ActiveBodies and ZCNPC.ActiveBodies[rag] then
 				rag.zcnpc_wakecheck = true
 				ZCNPC.ActiveOff(rag)
+			elseif poseBlocked and now - info.poseBlockedSince > POSE_GIVEUP and not MovingTooFast(rag) then
+				-- Every other reason to stay down is already clear; only the lie of the
+				-- body is. Lying across a prop or another body can fail the ground and
+				-- speed checks forever, and that was a body that never got up.
+				ZCNPC.WakeUp(rag, info)
 			elseif not poseBlocked then
 				rag.zcnpc_wakecheck = nil
 			end
 		else
 			rag.zcnpc_wakecheck = nil
+			info.poseBlockedSince = nil
 		end
 	end
 
