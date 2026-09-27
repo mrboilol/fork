@@ -1,7 +1,7 @@
 CAI.Target = CAI.Target or {}
 local T = CAI.Target
 
-local ARCH_THREAT = { rocket = 3, lmg = 2.2, sniper = 2, shotgun = 1.6, smg = 1.3, rifle = 1.2, pistol = 0.8 }
+local ARCH_THREAT = { rocket = 3, lmg = 2.2, sniper = 2, shotgun = 1.6, smg = 1.3, rifle = 1.2, pistol = 0.8, melee = 0.6 }
 
 function T.Score(data, enemy, rec)
     local npc = data.ent

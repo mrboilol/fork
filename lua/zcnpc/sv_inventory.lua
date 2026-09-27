@@ -40,8 +40,18 @@ local function InventoryOn()
 	return not cfg.inventory_use or cfg.inventory_use:GetBool()
 end
 
+-- HasWeapon is Player only; NPCs have GetWeapon (and not on every build).
+local function Holding(npc, class)
+	if isfunction(npc.HasWeapon) then return npc:HasWeapon(class) end
+	if isfunction(npc.GetWeapon) then return IsValid(npc:GetWeapon(class)) end
+
+	local wep = npc:GetActiveWeapon()
+
+	return IsValid(wep) and wep:GetClass() == class
+end
+
 local function KitHas(npc, class)
-	if npc:HasWeapon(class) then return true end
+	if Holding(npc, class) then return true end
 	if ZCNPC.KitHasItem then return ZCNPC.KitHasItem(npc, class) end
 
 	local kit = npc.zcnpc_lootkit
@@ -99,7 +109,7 @@ local function ThrowNade(npc, class, from)
 	end
 
 	if ZCNPC.MarkLootSpent then ZCNPC.MarkLootSpent(npc, class) end
-	if npc:HasWeapon(class) then npc:StripWeapon(class) end
+	if Holding(npc, class) and isfunction(npc.StripWeapon) then npc:StripWeapon(class) end
 
 	ZCNPC.Debug("threw kit grenade", npc, class, entClass)
 

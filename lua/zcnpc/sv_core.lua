@@ -562,6 +562,19 @@ function ZCNPC.SetupNPC(ent)
 
 	if not ZCNPC.ShouldManage(ent) then return end
 
+	-- Z-City's own classes get their organism from its npcorg hook, and that hook
+	-- is also what dresses them (Combine / metrocop armour), names them and marks
+	-- Combine pulse-less. It skips anything that already has an organism, so
+	-- hanging ours first left every Combine naked. Give it the first go; the
+	-- retry in TrySetup and the backfill timer hang ours if it never came.
+	local cfg = ZCNPC.Config
+	if cfg and cfg.NativeClasses and cfg.NativeClasses[ent:GetClass()]
+		and ZCNPC.__npcorg and not ent.zcnpc_nativewait then
+		ent.zcnpc_nativewait = true
+
+		return
+	end
+
 	if not ZCNPC.HangOrganism(ent) then return end
 
 	ZCNPC.Tracked[ent] = true

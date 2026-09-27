@@ -285,7 +285,6 @@ hook.Add("EntityTakeDamage", "HG_EuphoriaHit", function(ent, dmgInfo)
 				local spine = ragdoll:GetPhysicsObjectNum(hg.realPhysNum(ragdoll, 1))
 				if IsValid(pelvis) then pelvis:AddVelocity(push) end
 				if IsValid(spine) then spine:AddVelocity(push * 0.5) end
-				ragdoll.hgStagger = {dir = direction, untilT = now + 0.4, dur = 0.4}
 			else
 				ply:SetVelocity(push)
 			end

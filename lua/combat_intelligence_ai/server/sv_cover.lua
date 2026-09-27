@@ -47,7 +47,14 @@ function CV.ScoreSpot(data, spot, enemy, enemyPos)
     if dEnemy < cfg.MinEnemyDist then
         score = score - W.distEnemy * 1.5
     else
-        local ideal = data.enemyWeaponResponse and data.enemyWeaponResponse.idealDist or cfg.IdealEnemyDist
+        -- Close enough to hit them from. Only a weapon worth staying away from
+        -- (shotgun, rocket) pushes the spot further out than our own range.
+        local ideal = CAI.WeaponIntel.OwnIdeal(npc)
+        local resp = data.enemyWeaponResponse
+        if resp and (resp.keepDistance or resp.scatter) and resp.idealDist then
+            ideal = math.max(ideal, resp.idealDist)
+        end
+        ideal = math.max(ideal, cfg.MinEnemyDist + 50)
         score = score + W.distEnemy * (1 - math.Clamp(math.abs(dEnemy - ideal) / ideal, 0, 1))
     end
 

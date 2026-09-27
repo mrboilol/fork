@@ -190,7 +190,7 @@ function SQ.Plan(squad)
             moraleSum = moraleSum + d.morale
             if m:Health() < m:GetMaxHealth() * 0.4 then injured = injured + 1 end
             local wep = m.GetActiveWeapon and m:GetActiveWeapon()
-            if IsValid(wep) and wep.Clip1 and wep:Clip1() == 0 then ammoLow = ammoLow + 1 end
+            if CAI.WeaponIntel.NeedsReload(wep) then ammoLow = ammoLow + 1 end
             local enemy = m.GetEnemy and m:GetEnemy()
             if IsValid(enemy) and CAI.Util.CanSee(m, enemy) then withLOS = withLOS + 1 end
         end

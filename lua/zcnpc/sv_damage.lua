@@ -259,6 +259,7 @@ hook.Add("HomigradDamage", "zcnpc_knockdown", function(victim, dmgInfo, hitgroup
 	-- same scale the player path uses: force length * hitgroup mul * 0.5
 	local len = dmgInfo:GetDamageForce():Length() * (ForceBoneMul[hitgroup] or 1) * 0.5
 	if len <= cfg.knockdown_force:GetFloat() then return end
+	if ZCNPC.ResistKnockdown(victim) then return end
 
 	org.lightstun = math.max(org.lightstun or 0, CurTime() + 2)
 
@@ -417,6 +418,8 @@ local function BodyShot(npc, org)
 	-- a fresh roll for the next time it is on its feet, so an NPC that gets up and
 	-- goes back to the fight is not one round from the floor for the rest of it
 	npc.zcnpc_bodyhits, npc.zcnpc_bodyneed = 0, nil
+
+	if ZCNPC.ResistKnockdown(npc) then return end
 
 	ZCNPC.Debug("floored by", hits, "rounds in the body:", npc)
 

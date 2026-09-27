@@ -120,7 +120,7 @@ C.WeaponPatterns = {
     { pattern = "m249", archetype = "lmg" }, { pattern = "lmg", archetype = "lmg" },
     { pattern = "mg42", archetype = "lmg" }, { pattern = "minigun", archetype = "lmg" },
     { pattern = "rpg", archetype = "rocket" }, { pattern = "rocket", archetype = "rocket" },
-    { pattern = "launcher", archetype = "rocket" }, { pattern = "grenade", archetype = "rocket" },
+    { pattern = "launcher", archetype = "rocket" }, { pattern = "grenadelauncher", archetype = "rocket" },
     { pattern = "smg", archetype = "smg" }, { pattern = "mp5", archetype = "smg" },
     { pattern = "mac10", archetype = "smg" }, { pattern = "uzi", archetype = "smg" },
     { pattern = "pistol", archetype = "pistol" }, { pattern = "357", archetype = "pistol" },
@@ -135,7 +135,14 @@ C.WeaponResponses = {
     smg = { idealDist = 350, aggression = 0.35 },
     pistol = { idealDist = 400, aggression = 0.45 },
     rifle = { idealDist = 700, aggression = 0.0 },
+    -- someone with a club or bare hands: hold ground and shoot, step out of reach
+    melee = { idealDist = 300, aggression = 0.45, melee = true },
 }
+
+-- Inside this an armed, steady NPC fights back instead of running for cover.
+C.CloseContactDist = 380
+-- Close enough for a melee NPC's own attack to land; outside it they chase.
+C.MeleeReach = 85
 
 C.SoundPatterns = {
     { pattern = "footstep", type = "footstep", radius = 450 },

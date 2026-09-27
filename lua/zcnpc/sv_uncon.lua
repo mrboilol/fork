@@ -444,6 +444,54 @@ function ZCNPC.Floor(npc, downFor, shove)
 	return ZCNPC.MakeUnconscious(npc, downFor or cfg.knockdown_time:GetFloat(), shove)
 end
 
+--\\ Staying on your feet
+-- For the soft reasons to go down only: rounds to the body, a heavy hit's force, and
+-- pain or shock on somebody still awake. A resisted one is a stagger, and it buys a
+-- short window in which the next soft one is shrugged off too - otherwise a burst is
+-- five rolls in half a second and the last one always lands.
+local RESIST_GRACE = 2.5
+local ARMOR_RESIST = { torso = 0.2, head = 0.05 }
+
+function ZCNPC.ResistKnockdown(npc)
+	if not IsValid(npc) then return false end
+	if (npc.zcnpc_poise or 0) > CurTime() then return true end
+
+	local chance = cfg.knockdown_resist and cfg.knockdown_resist:GetFloat() or 0
+	if chance <= 0 then return false end
+
+	if istable(npc.armors) then
+		for placement, bonus in pairs(ARMOR_RESIST) do
+			if npc.armors[placement] then chance = chance + bonus end
+		end
+	end
+
+	if math.random() >= math.min(chance, 0.95) then return false end
+
+	npc.zcnpc_poise = CurTime() + RESIST_GRACE
+	ZCNPC.Debug("stayed on its feet", npc)
+
+	return true
+end
+
+-- The organism wants this one on the floor but nothing about it is out of action:
+-- awake, spine whole, a leg to stand on. Everything else is a knockout or a body that
+-- cannot stand, and those are not ours to argue with.
+function ZCNPC.SoftFall(org)
+	if not org then return false end
+	if org.otrub or org.needotrub or org.heartstop then return false end
+	if (org.consciousness or 1) <= 0.4 then return false end
+	if ((org.stun or 0) - CurTime()) > 0 then return false end
+	if org.llegamputated or org.rlegamputated then return false end
+	if (org.lleg or 0) >= 1 or (org.rleg or 0) >= 1 then return false end
+	if (org.spine1 or 0) >= hg.organism.fake_spine1 then return false end
+	if (org.spine2 or 0) >= hg.organism.fake_spine2 then return false end
+	if (org.spine3 or 0) >= hg.organism.fake_spine3 then return false end
+	if org.neckslit or org.choking then return false end
+
+	return true
+end
+--//
+
 -- True while the NPC entity is the hidden half of a body on the ground. That
 -- entity must never take damage or leave an engine death ragdoll - the body is
 -- the only corpse there is.
@@ -695,6 +743,17 @@ function ZCNPC.InstallDamageWrapper()
 
 		if ZCNPC.Enabled() and KillSignature(ent, dmgInfo) then
 			local org = ent.organism
+
+			-- Pain and shock alone, on somebody still awake: a roll to stay up. Z-City
+			-- asks again every tick for as long as the reason lasts, so the grace
+			-- window is what makes this a stagger rather than a coin toss per tick.
+			if not org.zcnpc_pendingdown and ZCNPC.SoftFall(org) and ZCNPC.ResistKnockdown(ent) then
+				org.needfake = false
+				org.fake = false
+
+				return true
+			end
+
 			if not org.zcnpc_pendingdown then
 				org.zcnpc_pendingdown = true
 				-- defer: this fires from inside Z-City's "Org Think" loop over
@@ -811,6 +870,51 @@ local function HungUp(rag)
 	local left, right = hold.left, hold.right
 
 	return (left and left.grabbing) or (right and right.grabbing) or false
+end
+
+-- On its feet as a ragdoll: Artagdoll's balance holding the body up, head well above
+-- the pelvis and the pelvis at standing height. OnTheGround says no to that pose, and
+-- the old answer was to let it fall over first and then stand it up again.
+local UPRIGHT_HEAD = 30
+local UPRIGHT_HIP_MIN, UPRIGHT_HIP_MAX = 22, 60
+
+local function BonePhysPos(rag, name)
+	local bone = rag:LookupBone(name)
+	if not bone then return end
+
+	local phys = rag:GetPhysicsObjectNum(rag:TranslateBoneToPhysBone(bone))
+
+	return IsValid(phys) and phys:GetPos() or nil
+end
+
+local function Upright(rag)
+	local pelvis = PelvisPos(rag)
+	local head = BonePhysPos(rag, "ValveBiped.Bip01_Head1")
+	if not (pelvis and head) then return false end
+	if head.z - pelvis.z < UPRIGHT_HEAD then return false end
+
+	local tr = util.TraceLine({
+		start = pelvis,
+		endpos = pelvis - vector_up * (UPRIGHT_HIP_MAX + 16),
+		mask = MASK_SOLID,
+		filter = rag,
+	})
+	if not tr.Hit then return false end
+
+	local hip = pelvis.z - tr.HitPos.z
+
+	return hip >= UPRIGHT_HIP_MIN and hip <= UPRIGHT_HIP_MAX
+end
+
+-- Lying still and not being thrown about by a stumble / tumble / fall.
+local function Settled(rag)
+	if istable(ActiveRagdoll) and isfunction(ActiveRagdoll.Get) then
+		local ar = ActiveRagdoll.Get(rag)
+		local beh = ar and ar.CurrentBehavior
+		if beh == "stumble" or beh == "tumble" or beh == "falling" then return false end
+	end
+
+	return not MovingTooFast(rag)
 end
 
 local function CanWakeUp(org, rag)
@@ -1205,6 +1309,10 @@ local BRAIN_ARREST_FALLBACK = 120
 -- How long a body that is otherwise free to stand is held down by its pose alone.
 local POSE_GIVEUP = 5
 
+-- Fast recovery: never before this, and a settled body waits this share of its timer.
+local FAST_MIN_DOWN = 0.8
+local FAST_WAIT_MUL = 0.5
+
 local function HeartstopDeath()
 	if cfg.death_brain:GetBool() then
 		return BRAIN_ARREST_FALLBACK
@@ -1347,9 +1455,26 @@ timer.Create("zcnpc_monitor", 0.25, 0, function()
 		end
 
 		-- CanWakeUp walks every phys bone + TraceLine — only when the timer is up.
-		local ready = (now - info.downAt) > (info.wakeAfter or wakeAfter)
+		local elapsed = now - info.downAt
+		local wait = info.wakeAfter or wakeAfter
+		local ready = elapsed > wait
+		local upright = false
+
+		-- Recovering sooner: already balanced upright, or lying still with nothing
+		-- (no bleed, no knockout) holding them there. CanWakeUp still has the last word.
+		if wakeOn and not ready and elapsed > FAST_MIN_DOWN and not org.otrub
+			and (org.bleed or 0) <= 0.05 then
+			upright = Upright(rag)
+			if upright or (elapsed > wait * FAST_WAIT_MUL and Settled(rag)) then
+				ready = true
+			end
+		end
+
 		if wakeOn and ready then
 			local canWake, poseBlocked = CanWakeUp(org, rag)
+			if not canWake and poseBlocked and (upright or Upright(rag)) and not MovingTooFast(rag) then
+				canWake = true
+			end
 			if poseBlocked then
 				info.poseBlockedSince = info.poseBlockedSince or now
 			else
@@ -1452,6 +1577,12 @@ timer.Create("zcnpc_monitor", 0.25, 0, function()
 		-- needotrub (Z-City left that line commented out), so without this
 		-- they walk around with no pulse until someone shoots them.
 		if org.heartstop or org.otrub or org.fake then
+			-- still inside a stagger it just shrugged off (ResistKnockdown)
+			if not (org.heartstop or org.otrub) and (owner.zcnpc_poise or 0) > CurTime()
+				and ZCNPC.SoftFall(org) then
+				continue
+			end
+
 			toDown = toDown or {}
 			toDown[#toDown + 1] = owner
 		end

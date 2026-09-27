@@ -61,7 +61,7 @@ local function Perceive(data)
     end
 
     local wep = npc.GetActiveWeapon and npc:GetActiveWeapon()
-    if IsValid(wep) and wep.Clip1 and wep:Clip1() == 0 and not data.saidReload then
+    if CAI.WeaponIntel.NeedsReload(wep) and not data.saidReload then
         data.saidReload = true
         CAI.Voice.Speak(data, "reload")
         if data.squad then CAI.Squad.Broadcast(data.squad, "reloading", npc) end
@@ -116,18 +116,42 @@ local function Decide(data)
         visible = true
     end
 
+    local ownWep = npc:GetActiveWeapon()
+    local melee = CAI.WeaponIntel.IsMelee(ownWep)
+
+    -- A club is only any use at arm's length. Cover, flanking and suppression are
+    -- all ways of fighting from a distance, and every one of them walked a melee
+    -- NPC away from the person it was meant to be hitting.
+    if melee and IsValid(enemy) then
+        local fresh = rec and (CurTime() - rec.t) < 4
+        if visible or fresh then
+            data.search = nil
+            return S.ENGAGE, "melee_rush"
+        end
+    end
+
     if IsValid(enemy) then
         if visible then
 
             data.search = nil
 
-            if CAI.Suppression.IsPinned(data) then
+            local dist = npc:GetPos():Distance(enemy:GetPos())
+            local closeContact = dist < (CAI.Config.CloseContactDist or 380)
+                and not CAI.WeaponIntel.NeedsReload(ownWep)
+                and data.morale >= CAI.Config.Morale.ShakenThreshold
+
+            if CAI.Suppression.IsPinned(data) and not closeContact then
                 return S.COVER, "pinned_by_fire"
             end
 
-            local ownWep = npc:GetActiveWeapon()
-            if IsValid(ownWep) and ownWep.Clip1 and ownWep:Clip1() == 0 then
+            if CAI.WeaponIntel.NeedsReload(ownWep) then
                 return S.COVER, "reloading_cover"
+            end
+
+            -- Somebody within a few steps: turning your back on them to go find a
+            -- wall is how you get shot in it. Fight.
+            if closeContact then
+                return S.ENGAGE, "close_contact"
             end
 
             if data.flank then
@@ -143,7 +167,6 @@ local function Decide(data)
 
             local resp = data.enemyWeaponResponse
             local agg = CAI.WeaponIntel.EffectiveAggression(data)
-            local dist = npc:GetPos():Distance(enemy:GetPos())
             if resp and resp.scatter then
                 return S.COVER, "rocket_threat"
             end
@@ -224,11 +247,41 @@ Exec[2] = function(data)
         end
         return
     end
+    local dist = npc:GetPos():Distance(enemy:GetPos())
+
+    -- Melee: close the gap, and once in reach leave the schedule alone - the
+    -- NPC's own combat AI throws the swing (a metrocop's stunstick, a SWEP's attack).
+    if CAI.WeaponIntel.IsMelee(npc:GetActiveWeapon()) then
+        if dist > (CAI.Config.MeleeReach or 85) and CurTime() - (data.chaseAt or 0) > 0.6 then
+            data.chaseAt = CurTime()
+            npc:SetSchedule(SCHED_CHASE_ENEMY)
+            if math.random() < 0.15 then CAI.Voice.Speak(data, "moving") end
+        end
+        return
+    end
+
     local ideal = CAI.WeaponIntel.OwnIdeal(npc)
     local resp = data.enemyWeaponResponse
     if resp and resp.keepDistance then ideal = math.max(ideal, resp.idealDist or ideal) end
-    local dist = npc:GetPos():Distance(enemy:GetPos())
-    if dist < ideal * 0.45 then
+
+    if resp and resp.melee then
+        -- Somebody coming at them with a club: stand and shoot, and only take a
+        -- step back once they are nearly close enough to swing.
+        if dist < 150 and CurTime() - (data.backoffAt or 0) > 1.5 then
+            data.backoffAt = CurTime()
+            local away = npc:GetPos() - enemy:GetPos()
+            away.z = 0 away:Normalize()
+            CAI.Nav.MoveTo(data, npc:GetPos() + away * 120, "run")
+        elseif dist > ideal * 1.2 and CurTime() - (data.advanceAt or 0) > 2 then
+            data.advanceAt = CurTime()
+            npc:SetSchedule(SCHED_ESTABLISH_LINE_OF_FIRE)
+        end
+        CAI.FriendlyFire.Update(data)
+        return
+    end
+
+    -- Backing off is a step, not a retreat: past a few metres it is just running.
+    if dist < math.min(ideal * 0.45, 180) then
         if CurTime() - (data.backoffAt or 0) > 2 then
             data.backoffAt = CurTime()
             local away = npc:GetPos() - enemy:GetPos()
@@ -281,7 +334,16 @@ Exec[3] = function(data)
                 npc:SetSchedule(SCHED_TAKE_COVER_FROM_ENEMY)
             end
         else
-            if CurTime() - (data.faceAt or 0) > 1.5 * (1.3 - aggro) then
+            -- Good cover hides you from them and them from you. Sitting in it is
+            -- not fighting: once settled, lean out to where the enemy can be shot.
+            local sees = IsValid(enemy) and CAI.Util.CanSee(npc, enemy)
+            local settled = data.cover and CurTime() - data.cover.since > 1.5
+
+            if IsValid(enemy) and not sees and settled
+               and CurTime() - (data.peekAt or 0) > 3 * (1.3 - aggro) then
+                data.peekAt = CurTime()
+                npc:SetSchedule(SCHED_ESTABLISH_LINE_OF_FIRE)
+            elseif CurTime() - (data.faceAt or 0) > 1.5 * (1.3 - aggro) then
                 data.faceAt = CurTime()
                 npc:SetSchedule(SCHED_COMBAT_FACE)
             end
