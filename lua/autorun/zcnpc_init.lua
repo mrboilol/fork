@@ -16,6 +16,7 @@ ZCNPC.Version = "2.10.21"
 -- for the animation the client replays it while the server reads the angles it
 -- ends on to decide which way a waking NPC should face.
 local sharedFiles = {
+	"zcnpc/sh_crashtrace.lua", -- debug only, off unless zcnpc_crashtrace / zcnpc_crashtrace_cl is 1
 	"zcnpc/sh_settings.lua",
 	"zcnpc/sh_npcweapons.lua", -- spawn loadouts: the groups and the gun list, both realms
 	"zcnpc/sh_npcarmor.lua", -- after npcweapons: the same groups, for the other half of one
