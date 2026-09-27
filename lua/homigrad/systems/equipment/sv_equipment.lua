@@ -1106,7 +1106,7 @@ local function protec(org, bone, dmg, dmgInfo, placement, armor, scale, scalepro
 	
 	local armorData = hg.armor[placement] and hg.armor[placement][armor]
 	local ballisticProt, meleeProt, stabProt = hg.GetArmorProtection(org.owner, placement, armor, isvector(hit) and hit or dmgInfo:GetDamagePosition())
-	ballisticProt = ballisticProtOverride or ballisticProt
+	if isnumber(ballisticProtOverride) then ballisticProt = ballisticProtOverride end
 
 	local isBullet = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
 	local isStab = dmgInfo:IsDamageType(DMG_SLASH)

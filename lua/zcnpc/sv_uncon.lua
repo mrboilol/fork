@@ -1015,6 +1015,7 @@ function ZCNPC.WakeUp(rag, info)
 
 	npc.zcnpc_rag = nil
 	ZCNPC.Downed[rag] = nil
+	if ZCNPC.TransferArmor then ZCNPC.TransferArmor(rag, npc) end
 
 	SyncBody(npc, rag, false, plan ~= nil)
 

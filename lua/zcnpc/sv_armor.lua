@@ -206,6 +206,17 @@ local function SyncWorn(npc)
 	if IsValid(rag) then ZCNPC.TransferArmor(npc, rag) end
 end
 
+local armorStateKeys = {
+	"armors_shots",
+	"armors_health",
+	"armors_durability",
+	"armors_regions",
+	"armors_broken",
+	"armors_broken_mul",
+	"armors_wear_stage",
+	"armor_states",
+}
+
 -- Z-City's npcloot CreateEntityRagdoll only does `rag.armors = ent.armors` and
 -- never SetNetVar("Armor"). Downed bodies get a NetVar from Floor(); standing
 -- one-shot kills (headshot etc.) leave a corpse the client draws naked.
@@ -219,18 +230,24 @@ function ZCNPC.TransferArmor(from, to)
 		if istable(net) and next(net) ~= nil then armors = net end
 	end
 
-	if not istable(armors) or next(armors) == nil then return false end
-
-	to.armors = armors
+	local hasArmor = istable(armors) and next(armors) ~= nil
+	to.armors = hasArmor and table.Copy(armors) or {}
+	for _, key in ipairs(armorStateKeys) do
+		to[key] = istable(from[key]) and table.Copy(from[key]) or {}
+	end
 
 	if to.SyncArmor then
 		to:SyncArmor()
 	elseif to.SetNetVar then
-		to:SetNetVar("Armor", armors)
+		to:SetNetVar("Armor", to.armors)
 	end
 
-	for _, piece in pairs(armors) do
+	if not hasArmor then return false end
+
+	for placement, piece in pairs(to.armors) do
 		if not isstring(piece) then continue end
+
+		if hg.SyncArmorWear then hg.SyncArmorWear(to, piece, placement) end
 
 		local mat = from:GetNWString("ArmorMaterials" .. piece, "")
 		if mat ~= "" then to:SetNWString("ArmorMaterials" .. piece, mat) end

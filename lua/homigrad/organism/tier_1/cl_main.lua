@@ -887,11 +887,8 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 end)
 
 local function resetPersistentBodyDecals(ent, clear)
-	if not IsValid(ent) then return end
+	if not IsValid(ent) or not clear then return end
 	ent.hgPersistentDecalsDirty = true
-	ent.hgPersistentDecalCursor = 1
-	ent.hgPersistentDecalNext = 0
-	ent.hgPersistentDecalsNeedClear = ent.hgPersistentDecalsNeedClear or clear
 end
 
 hook.Add("OnNetVarSet","wounds_netvar",function(index, key, var)
@@ -1266,8 +1263,6 @@ function hg.AddPersistentBodyBloodMark(ent, pos, normal, size)
 		CurTime(),
 		false,
 	}
-	ent.hgPersistentDecalCursor = (istable(ent.woundmarks) and #ent.woundmarks or 0) + #ent.persistentBloodMarks
-	ent.hgPersistentDecalNext = 0
 end
 
 function hg.ClearPersistentBodyBlood(ent)
@@ -1289,6 +1284,7 @@ local persistentBodyDecalMaterials = {
 	arterial = Material(util.DecalMaterial("Impact.Flesh")),
 	blood = Material(util.DecalMaterial("Blood")),
 }
+local maxModelDecals = GetConVar("r_maxmodeldecal")
 
 local function paintPersistentBodyDecal(ent, mark, blood)
 	local pos, ang = hg.organism.GetWoundTransform(ent, mark)
@@ -1305,35 +1301,36 @@ end
 local function refreshPersistentBodyDecals(ent, wounds, blood)
 	wounds = istable(wounds) and wounds or {}
 	blood = istable(blood) and blood or {}
-	local count = #wounds + #blood
 	local model = ent:GetModel()
 	if ent.hgPersistentDecalModel != model then
 		ent.hgPersistentDecalModel = model
-		resetPersistentBodyDecals(ent, true)
+		ent.hgPersistentDecalsDirty = true
 	end
-	if ent.hgPersistentDecalsNeedClear then
-		ent:RemoveAllDecals()
-		ent.hgPersistentDecalsNeedClear = nil
+	if ent.hgPersistentDecalWounds != wounds or ent.hgPersistentDecalBlood != blood then
+		ent.hgPersistentDecalWounds = wounds
+		ent.hgPersistentDecalBlood = blood
+		if #wounds < (ent.hgPersistentDecalWoundCount or 0) or #blood < (ent.hgPersistentDecalBloodCount or 0) then
+			ent.hgPersistentDecalsDirty = true
+		end
 	end
-	if count == 0 then return end
-	ent:SetupBones()
+
+	local paintedWounds, paintedBlood = ent.hgPersistentDecalWoundCount or 0, ent.hgPersistentDecalBloodCount or 0
 	if ent.hgPersistentDecalsDirty then
-		for _, mark in ipairs(wounds) do paintPersistentBodyDecal(ent, mark, false) end
-		for _, mark in ipairs(blood) do paintPersistentBodyDecal(ent, mark, true) end
 		ent.hgPersistentDecalsDirty = nil
-		ent.hgPersistentDecalCursor = 1
-		ent.hgPersistentDecalNext = CurTime() + math.max(30 / count, 0.5)
+		ent:RemoveAllDecals()
+		local budget = math.max(maxModelDecals and maxModelDecals:GetInt() or 50, 1)
+		paintedWounds = math.max(#wounds - budget, 0)
+		paintedBlood = math.max(#blood - math.max(budget - (#wounds - paintedWounds), 0), 0)
+	end
+	if paintedWounds >= #wounds and paintedBlood >= #blood then
+		ent.hgPersistentDecalWoundCount, ent.hgPersistentDecalBloodCount = #wounds, #blood
 		return
 	end
-	if (ent.hgPersistentDecalNext or 0) > CurTime() then return end
-	local cursor = math.Clamp(ent.hgPersistentDecalCursor or 1, 1, count)
-	if cursor <= #wounds then
-		paintPersistentBodyDecal(ent, wounds[cursor], false)
-	else
-		paintPersistentBodyDecal(ent, blood[cursor - #wounds], true)
-	end
-	ent.hgPersistentDecalCursor = cursor % count + 1
-	ent.hgPersistentDecalNext = CurTime() + math.max(30 / count, 0.5)
+
+	ent:SetupBones()
+	for i = paintedWounds + 1, #wounds do paintPersistentBodyDecal(ent, wounds[i], false) end
+	for i = paintedBlood + 1, #blood do paintPersistentBodyDecal(ent, blood[i], true) end
+	ent.hgPersistentDecalWoundCount, ent.hgPersistentDecalBloodCount = #wounds, #blood
 end
 
 hook.Add("PostDrawTranslucentRenderables", "hg_persistent_organism_blood", function(depth, skybox)

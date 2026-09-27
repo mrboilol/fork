@@ -146,19 +146,11 @@ local groundBloodMaterials = {}
 for _, i in ipairs({1, 2, 3, 4, 6, 7, 8, 9, 10, 11}) do
 	groundBloodMaterials[#groundBloodMaterials + 1] = Material("effects/droplets/drop" .. i .. "_5")
 end
-local oldGroundBloodMaterials = {}
-local oldArterialGroundBloodMaterials = {}
+local oldBloodDecals = {}
+local oldArterialBloodDecals = {}
 for i = 1, 10 do
-	local normal = Material("decals/z_blood" .. i)
-	local arterial = Material("decals/arterial_blood" .. i)
-	oldGroundBloodMaterials[i] = CreateMaterial("hg_old_ground_blood_" .. i, "UnlitGeneric", {
-		["$translucent"] = "1", ["$vertexcolor"] = "1", ["$vertexalpha"] = "1"
-	})
-	oldArterialGroundBloodMaterials[i] = CreateMaterial("hg_old_arterial_ground_blood_" .. i, "UnlitGeneric", {
-		["$translucent"] = "1", ["$vertexcolor"] = "1", ["$vertexalpha"] = "1"
-	})
-	oldGroundBloodMaterials[i]:SetTexture("$basetexture", normal:GetTexture("$basetexture"))
-	oldArterialGroundBloodMaterials[i]:SetTexture("$basetexture", arterial:GetTexture("$basetexture"))
+	oldBloodDecals[i] = Material("decals/z_blood" .. i)
+	oldArterialBloodDecals[i] = Material("decals/arterial_blood" .. i)
 end
 local arterialGroundBloodMaterial = Material("effects/droplets/drop12_5")
 
@@ -192,7 +184,7 @@ local function depositGroundBlood(pos, normal, artery, tiny, amount, ignored)
 	if stain then
 		if artery and not stain.artery then
 			stain.artery = true
-			stain.material = useOldBlood() and oldArterialGroundBloodMaterials[math_random(#oldArterialGroundBloodMaterials)] or arterialGroundBloodMaterial
+			stain.material = arterialGroundBloodMaterial
 		end
 		if stain.size >= poolMaxSize then
 			flowGroundBlood(stain, pos, amount, artery, tiny)
@@ -210,7 +202,7 @@ local function depositGroundBlood(pos, normal, artery, tiny, amount, ignored)
 	stain = {
 		pos = pos + normal * 0.2,
 		normal = normal,
-		material = useOldBlood() and (artery and oldArterialGroundBloodMaterials[math_random(#oldArterialGroundBloodMaterials)] or oldGroundBloodMaterials[math_random(#oldGroundBloodMaterials)]) or (artery and arterialGroundBloodMaterial or groundBloodMaterials[math_random(#groundBloodMaterials)]),
+		material = artery and arterialGroundBloodMaterial or groundBloodMaterials[math_random(#groundBloodMaterials)],
 		size = size,
 		rotation = math_random(0, 359),
 		volume = amount,
@@ -221,10 +213,15 @@ local function depositGroundBlood(pos, normal, artery, tiny, amount, ignored)
 end
 
 local function addGroundBlood(pos, normal, artery, tiny, amount)
-	if normal.z < 0.55 then return false end
+	if useOldBlood() or normal.z < 0.55 then return false end
 	depositGroundBlood(pos, normal, artery, tiny, amount)
 
 	return true
+end
+
+local function placeOldBloodDecal(pos, normal, target, artery, scale)
+	local decals = artery and oldArterialBloodDecals or oldBloodDecals
+	util.DecalEx(decals[math_random(#decals)], target or game.GetWorld(), pos, normal, color_white, scale, scale)
 end
 
 function hg.DepositBodyBloodRunoff(pos)
@@ -232,6 +229,10 @@ function hg.DepositBodyBloodRunoff(pos)
 	poolTrace.endpos = pos - vector_up * 256
 	local result = util_TraceLine(poolTrace)
 	if result.HitWorld and result.HitNormal.z >= 0.55 then
+		if useOldBlood() then
+			placeOldBloodDecal(result.HitPos, result.HitNormal, nil, false, math.Rand(0.12, 0.24))
+			return
+		end
 		depositGroundBlood(result.HitPos, result.HitNormal, false, true, 1)
 	end
 end
@@ -307,20 +308,9 @@ local function playBloodDripImpact(pos, tr)
 	end
 end
 
-local oldTinyNormalDecals = {}
-for i = 1, 10 do
-	oldTinyNormalDecals[i] = oldGroundBloodMaterials[i]
-end
-local oldTinyArterialDecal = oldArterialGroundBloodMaterials[1]
-local newBloodDecal = "Normal.Blood24"
-local function getNewBloodDecal()
-	local materialName = util.DecalMaterial(newBloodDecal)
-	if not isstring(materialName) or materialName == "" then return oldTinyNormalDecals[1] end
-
-	local material = Material(materialName)
-	if material:IsError() then return oldTinyNormalDecals[1] end
-
-	return material
+local function getNewBloodDecal(artery, amount)
+	if artery then return "Normal.Blood24" end
+	return amount < 0.35 and "Normal.Blood22" or amount < 0.8 and "Normal.Blood23" or amount < 1.5 and "Normal.Blood25" or "Normal.Blood24"
 end
 
 local function decalBlood(pos, normal, tr, artery, owner, tiny, amount)
@@ -338,12 +328,11 @@ local function decalBlood(pos, normal, tr, artery, owner, tiny, amount)
 			if math.random(7) == 1 then playBloodDripImpact(pos, tr) end
 			return
 		end
-		local oldBlood = useOldBlood()
-		local decal = oldBlood and (artery and oldTinyArterialDecal or oldTinyNormalDecals[math.random(#oldTinyNormalDecals)]) or getNewBloodDecal()
-		target = target or game.GetWorld()
-		local scale = math.Clamp((oldBlood and 0.16 or 0.45) * math.sqrt(amount / 0.2)
-			* math.Rand(0.85, 1.15), 0.08, oldBlood and 0.4 or 0.8)
-		util.DecalEx(decal, target, pos, normal, color_white, scale, scale)
+		if useOldBlood() then
+			placeOldBloodDecal(pos, normal, target, artery, math.Clamp(0.16 * math.sqrt(amount / 0.2) * math.Rand(0.85, 1.15), 0.08, 0.4))
+		else
+			util_Decal(getNewBloodDecal(artery, amount), pos + normal, pos - normal, owner)
+		end
 		if math.random(7) == 1 then playBloodDripImpact(pos, tr) end
 		return
 	end
@@ -366,12 +355,11 @@ local function decalBlood(pos, normal, tr, artery, owner, tiny, amount)
 
 	-- я не знаю насколько большой можно делать такие таблицы... надеюсь, что это не так страшно выйдет
 
-	local oldBlood = useOldBlood()
-	local decal = oldBlood and (artery and oldArterialGroundBloodMaterials[math_random(10)]
-		or oldTinyNormalDecals[math_random(10)]) or getNewBloodDecal()
-	local scale = math.Clamp((oldBlood and 0.3 or 0.95) * math.sqrt(amount)
-		* math.Rand(0.8, 1.2), 0.15, oldBlood and 1.2 or 3)
-	util.DecalEx(decal, target or game.GetWorld(), pos, normal, color_white, scale, scale)
+	if useOldBlood() then
+		util_Decal(artery and "Arterial.Blood1" or "Normal.Blood1", pos + normal, pos - normal, owner)
+	else
+		util_Decal(getNewBloodDecal(artery, amount), pos + normal, pos - normal, owner)
+	end
 	playBloodDripImpact(pos, tr)
 end
 --дурак, просто смотри сколько ентити стоит в одном месте
