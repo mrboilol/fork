@@ -701,6 +701,10 @@ hook.Add("Think", "HG_EuphoriaGetUp", function()
 
 		local getup = ragdoll.hgGetUp
 		if not getup then continue end
+		if ragdoll.hgStumbleActive then
+			ragdoll.hgGetUp = nil
+			continue
+		end
 
 		if now >= getup.untilT or not ply:Alive() then
 			ragdoll.hgGetUp = nil
@@ -726,7 +730,7 @@ hook.Add("Think", "HG_EuphoriaGetUp", function()
 			continue
 		end
 
-		local push = EUPHORIA_GETUP_PUSH * frac * boost * dtime * (ragdoll.hgStumbleActive and 0.25 or 1)
+		local push = EUPHORIA_GETUP_PUSH * frac * boost * dtime
 		pelvis:AddVelocity(Vector(0, 0, 1) * push)
 		spine:AddVelocity(Vector(0, 0, 1) * push * 0.5)
 

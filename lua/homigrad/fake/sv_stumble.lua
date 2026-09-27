@@ -25,9 +25,6 @@ local STUMBLE_STEP_TRIGGER_MUL = 0.55
 local STUMBLE_STEP_INTERVAL_MUL = 0.65
 local STUMBLE_LUNGE_MUL = 0.18
 local STUMBLE_LUNGE_MAX = 35
-local STUMBLE_PITCH = 240
-local STUMBLE_SUPPORT_TIME = 1.5
-local STUMBLE_MAX_TIME = 3.25
 local STUMBLE_FALL_GRACE = 1
 local TOPPLE_PUSH = 110
 local TOPPLE_DOWN = 60
@@ -183,8 +180,13 @@ local AR_DEFAULTS = {
 	SearchHeightBuffer = 25,
 	StepHeight = 20,
 	HipTargetHeight = 50,
-	TimeBeforeDecay = 4,
-	DecayDuration = 3,
+	Duration = 1.8,
+	MinDriveSpeed = 130,
+	MaxDriveSpeed = 450,
+	MomentumGain = 90,
+	DriveAccel = 700,
+	Carry = 0.55,
+	Pitch = 240,
 	MaxSlopeAngle = 45,
 	StepTriggerForward = 15,
 	MinMovementSpeed = 15,
@@ -277,16 +279,6 @@ local function findGroundPosition(cfg, pos, ragdoll, currentFootZ, pelvisZ)
 	if ground then return ground, normal end
 
 	return Vector(pos.x, pos.y, currentFootZ), Vector(0, 0, 1)
-end
-
-local function findGroundForStumble(pos, ragdoll)
-	local tr = util.TraceLine({
-		start = pos + Vector(0, 0, 10),
-		endpos = pos - Vector(0, 0, 200),
-		mask = MASK_SOLID_BRUSHONLY,
-		filter = ragdoll,
-	})
-	if tr.Hit and sanitizeVector(tr.HitPos, nil) then return tr.HitPos end
 end
 
 local function groundTrace(ply, ragdoll, dist)
@@ -491,8 +483,7 @@ local function updateGhostPositions(st, ragdoll, isMoving, horizontalVel)
 end
 
 local function stumbleLifetime(st)
-	return math.min(st.cfg.TimeBeforeDecay + st.cfg.DecayDuration, STUMBLE_MAX_TIME)
-		* math.max(st.vigor, DECAY_VIGOR_FLOOR)
+	return math.max(st.cfg.Duration, 0.1)
 end
 
 local function updateStumble(st, ragdoll)
@@ -525,14 +516,11 @@ local function updateStumble(st, ragdoll)
 		safeVel = safeVel:GetNormalized() * cfg.MaxVelocityClamp
 		speed = cfg.MaxVelocityClamp
 	end
-	local moveDir = Vector(rawVel.x, rawVel.y, 0)
-	if moveDir:LengthSqr() > START_MIN_SPEED * START_MIN_SPEED then
-		moveDir:Normalize()
-	elseif st.pushDir then
-		moveDir = st.pushDir
-	else
-		moveDir = nil
+	local flatVel = Vector(rawVel.x, rawVel.y, 0)
+	if flatVel:LengthSqr() > START_MIN_SPEED * START_MIN_SPEED then
+		st.driveDir = flatVel:GetNormalized()
 	end
+	local moveDir = st.driveDir or st.pushDir
 
 	if speed < cfg.StationaryThreshold and not st.push then
 		st.stillSince = st.stillSince or now
@@ -601,25 +589,27 @@ local function updateStumble(st, ragdoll)
 			chain:Update()
 		end
 	end
-	local supportProgress = math.Clamp((now - st.startTime) / STUMBLE_SUPPORT_TIME, 0, 1)
-	local support = (1 - supportProgress * supportProgress) * st.vigor
-	if support > 0 and (st.hasGroundContact[1] or st.hasGroundContact[2]) then
-		local feetMid = (st.footPositions[1] + st.footPositions[2]) / 2
-		local ground = findGroundForStumble(feetMid, ragdoll)
-		if ground then
-			local heightDeficit = ground.z + cfg.HipTargetHeight - pelvisPos.z
-			if math.abs(feetMid.z - ground.z) < 12 and rawVel.z <= 0 and heightDeficit > 0 then
-				local weight = st.spine:GetMass() * physenv.GetGravity():Length()
-				local brace = math.min(heightDeficit * 35, weight * 0.5)
-				st.spine:ApplyForceCenter(Vector(0, 0, brace * support))
-			end
-		end
+	local instability = math.Clamp((now - st.startTime) / stumbleLifetime(st), 0, 1)
+	local grounded = st.hasGroundContact[1] or st.hasGroundContact[2]
+
+	local carry = math.Clamp(cfg.Carry, 0, 1) * (1 - instability * instability)
+	if carry > 0 and grounded then
+		local lift = Vector(0, 0, physenv.GetGravity():Length() * carry * dt)
+		st.pelvis:AddVelocity(lift)
+		st.spine:AddVelocity(lift)
 	end
 
 	if moveDir then
+		st.driveSpeed = math.min(math.max(st.driveSpeed + cfg.MomentumGain * dt, flatVel:Dot(moveDir)), cfg.MaxDriveSpeed)
+		local deficit = st.driveSpeed - rawVel:Dot(moveDir)
+		if deficit > 0 and grounded then
+			local add = moveDir * math.min(deficit, cfg.DriveAccel * dt)
+			st.pelvis:AddVelocity(add)
+			st.spine:AddVelocity(add * 1.15)
+		end
+
 		local axis = moveDir:Cross(Vector(0, 0, 1))
-		local instability = math.Clamp((now - st.startTime) / stumbleLifetime(st), 0, 1)
-		st.spine:AddAngleVelocity(-axis * STUMBLE_PITCH * (0.5 + instability) * dt)
+		st.spine:AddAngleVelocity(-axis * cfg.Pitch * (0.5 + instability) * dt)
 	end
 end
 
@@ -683,6 +673,12 @@ local function startStumble(ply, ragdoll)
 	if hit and CurTime() - hit.time < HIT_WINDOW then
 		makePush(st, hit.pos, hit.dir, hit.energy)
 	end
+
+	local startVel = pelvis:GetVelocity()
+	startVel.z = 0
+	local startSpeed = startVel:Length()
+	if startSpeed > START_MIN_SPEED then st.driveDir = startVel / startSpeed end
+	st.driveSpeed = math.Clamp(startSpeed, st.cfg.MinDriveSpeed, math.max(st.cfg.MaxDriveSpeed, st.cfg.MinDriveSpeed))
 
 	initLegs(st, ragdoll)
 
