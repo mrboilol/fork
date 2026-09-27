@@ -361,12 +361,8 @@ function B:OnUpdate(ar)
             else
                 state.isLocked = false
                 
-                -- [FIX] SIMPLIFIED DISTANCE TRIGGER
-                -- Instead of relying on WorldToLocal rotation math (which breaks when hips spin),
-                -- we just check the raw distance squared. 
-                -- Since trigger values are 15/15/15, this circle check is mathematically perfect for 360-degree pushes.
                 local distSqr = self.footPositions[i]:DistToSqr(self.ghostPositions[i])
-                local triggerDist = CONFIG.StepTriggerForward -- 15
+                local triggerDist = CONFIG.StepTriggerForward
                 
                 if distSqr > (triggerDist * triggerDist) and not self.legState[i==1 and 2 or 1].isStepping and (currentTime - state.lastStepTime) > CONFIG.MinStepInterval then
                     state.isStepping = true; state.progress = 0; state.startPos = self.footPositions[i]
@@ -422,8 +418,6 @@ function B:OnUpdate(ar)
             local lateralOffset = pelvisPos - ((self.footPositions[1] + self.footPositions[2]) / 2)
             lateralOffset.z = 0 
             if lateralOffset:Length() > 2 then
-                -- [FIX] DISABLE STABILITY FORCE DURING PUSH
-                -- This prevents the "rubber band" effect where the ragdoll stops itself from flying
                 if not self.pushData then 
                     local correctionForce = lateralOffset * -8 * decayMult
                     if SanitizeVector(correctionForce, nil) then self.pelvisPhys:ApplyForceCenter(correctionForce) end

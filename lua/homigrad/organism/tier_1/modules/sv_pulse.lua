@@ -4,20 +4,7 @@ local Clamp, Approach, Remap = math.Clamp, math.Approach, math.Remap
 hg.organism.module.pulse = {}
 local module = hg.organism.module.pulse
 
--- Interpolate blood-volume bands so heart rate and oxygen delivery deteriorate
--- together without a hard cutoff between treatable and terminal loss.
 local terminalHeartRate = 300
-local hemorrhageBands = {
-	{1000, 0, 300, 0},
-	{1500, 0.06, 300, 3},
-	{2000, 0.16, 300, 10},
-	{2500, 0.31, 275, 20},
-	{3000, 0.50, 215, 30},
-	{3500, 0.67, 175, 45},
-	{4000, 0.81, 120, 55},
-	{4500, 0.97, 85, 65},
-	{5000, 1, 70, 70}
-}
 local peaDuration = 6
 local cardiacArrestMechanicalDecayTime = 14
 local hypotensionDeathTime = 90
@@ -56,19 +43,25 @@ function hg.organism.GetCardiacArrestMechanicalFactor(org)
 	return math.Clamp(1 - elapsed / cardiacArrestMechanicalDecayTime, 0, 1), initial
 end
 
-local function getHemorrhageBandValue(blood, column)
-	local volume = tonumber(blood) or 5000
-	for index = 2, #hemorrhageBands do
-		local upper, lower = hemorrhageBands[index], hemorrhageBands[index - 1]
-		if volume <= upper[1] then
-			return Lerp(math.Clamp((volume - lower[1]) / (upper[1] - lower[1]), 0, 1), lower[column], upper[column])
-		end
-	end
-	return hemorrhageBands[#hemorrhageBands][column]
+local function getNormalBloodVolume()
+	return math.max(tonumber((hg.organism.config or {}).NORMAL_BLOOD_VOLUME_ML) or hg.organism.normalBloodVolume or 5000, 1)
+end
+
+local function getHemorrhageDelivery(blood)
+	local normal = getNormalBloodVolume()
+	local pulseless = Clamp(tonumber(hg.organism.PULSELESS_BLOOD_VOLUME) or normal * 0.2, 0, normal - 1)
+	local x = Clamp(((tonumber(blood) or normal) - pulseless) / (normal - pulseless), 0, 1)
+	return x * x * (3 - 2 * x)
+end
+
+function hg.organism.GetHemorrhageRateDrive(blood)
+	local normal = getNormalBloodVolume()
+	local death = Clamp(tonumber(hg.organism.BLEEDOUT_DEATH_BLOOD) or normal * 0.4, 0, normal - 1)
+	return Clamp((normal - (tonumber(blood) or normal)) / (normal - death), 0, 1) ^ 1.35
 end
 
 function hg.organism.GetBloodDeliveryFraction(blood, scale)
-	return math.Clamp(getHemorrhageBandValue(blood, 2) * (tonumber(scale) or 1), 0, 1)
+	return math.Clamp(getHemorrhageDelivery(blood) * (tonumber(scale) or 1), 0, 1)
 end
 
 function hg.organism.GetHemorrhageCompensationDrive(blood)
@@ -258,10 +251,7 @@ local function getBloodPerfusion(blood)
 end
 
 local function getBloodCompensationRate(blood)
-	local cfg = hg.organism.config or {}
-	local maxRate = cfg.HEMORRHAGE_MAX_COMPENSATED_HR or terminalHeartRate
-	local rate = getHemorrhageBandValue(blood, 3)
-	return math.Clamp(70 + (rate - 70) * (maxRate - 70) / (terminalHeartRate - 70), 0, maxRate)
+	return 70 + (terminalHeartRate - 70) * hg.organism.GetHemorrhageRateDrive(blood)
 end
 
 local function getRateOutput(heartbeat)
@@ -905,10 +895,8 @@ module[2] = function(owner, org, timeValue)
 	org.hypertensiveEmergency = hypertensiveEmergency
 	local preloadReserve = getBloodPerfusion(bloodNow)
 	local bloodVolume = getBloodVolume(org)
-	-- Blood loss alone should not destabilize the rhythm while the patient is
-	-- still in the compensated range. Complications can still lower circulation
-	-- and enter the electrical-risk path independently.
 	local hemorrhageDanger = getHemorrhageDanger(bloodNow)
+	local hemorrhageRhythmYield = (1 - hg.organism.GetHemorrhageRateDrive(bloodNow)) ^ 2
 	local hemorrhageRhythmStress = hemorrhageDanger
 	org.hemorrhageRhythmStress = hemorrhageRhythmStress
 	local hemorrhageCompensation = math.Clamp(org.hemorrhageCompensation or 0, 0, 1)
@@ -943,7 +931,7 @@ module[2] = function(owner, org, timeValue)
 		0,
 		1
 	)
-	local hemorrhagePulseCeiling = getHemorrhageBandValue(bloodNow, 4) + catecholamineDrive * 20
+	local hemorrhagePulseCeiling = 70 * preloadReserve + catecholamineDrive * 20
 	local perfusionNeed = Clamp(max(
 		1 - Clamp((org.pulse or 0) / 70, 0, 1),
 		1 - bloodVolume,
@@ -1152,7 +1140,8 @@ module[2] = function(owner, org, timeValue)
 	-- flatline path.
 	local brainHemorrhage = math.Clamp(org.brainHemorrhage or 0, 0, 1)
 	local cerebralSuppression = math.Clamp(math.max((org.brain or 0) * 0.8, brainHemorrhage) * 0.9, 0, 1)
-	local hypoxiaSuppression = math.Clamp((16 - o2Value) / 16, 0, 1)
+	local arterialO2 = math.min(tonumber(org.bloodO2Cap) or o2Value, org.oxygenIntakeAvailable == false and o2Value or math.huge)
+	local hypoxiaSuppression = math.Clamp((16 - arterialO2) / 16, 0, 1)
 	local cardiacSuppression = math.Clamp(org.heart or 0, 0, 1)
 	-- Compensation remains effective through mild cold. Below 34 C the sinus
 	-- node and conduction system progressively lose responsiveness. Extremely low
@@ -1316,7 +1305,6 @@ module[2] = function(owner, org, timeValue)
 		end
 	end
 
-	-- Track sustained ventricular tachycardia for the probabilistic arrest check below.
 	local supportedTachycardia = 225 + adrenalineRateTolerance * 25
 	if org.heartbeat > supportedTachycardia and k < 0.75 then
 		org._tachycardiaSince = org._tachycardiaSince or CurTime()
@@ -1324,19 +1312,14 @@ module[2] = function(owner, org, timeValue)
 		org._tachycardiaSince = nil
 	end
 
-	-- Probabilistic heartstop comes from an unstable rhythm or sustained
-	-- tachycardia. Hemorrhage reaches this path through the heartbeat it drives.
 	if organSystemsEnabled and not org.heartstop and (not org._heart_rate_check_time or CurTime() > org._heart_rate_check_time) then
-		org._heart_rate_check_time = CurTime() + 1 -- check every second
+		org._heart_rate_check_time = CurTime() + 1
 
 		local hb = org.heartbeat
 		local chance = 0
 		local sustainedTachy = org._tachycardiaSince and org._tachycardiaSince + 3 < CurTime()
 		local highTachyK = math.Clamp((hb - supportedTachycardia) / math.max(terminalHeartRate - supportedTachycardia, 1), 0, 1)
 		if effectivePalpitations > 0.05 and highTachyK > 0 then
-			-- A strained heart is especially likely to fail when it is still
-			-- forced to race. Palpitations alone are mild; blood loss, shock,
-			-- hypoxia, heart damage, or temperature stress restore their danger.
 			chance = highTachyK * effectivePalpitations * 0.032
 		end
 		chance = math.max(chance, highTachyK * hemorrhageDanger * 0.025, hypertensiveEmergency ^ 2 * 0.035)
@@ -1347,8 +1330,9 @@ module[2] = function(owner, org, timeValue)
 		end
 
 		if chance > 0 and math.random() < chance then
-			org.heartstop = true
-		elseif effectivePalpitations > 0.35 and math.random() < (effectivePalpitations - 0.35) ^ 2 * 0.04 then
+			hg.organism.StartFibrillation(org)
+			org.terminalRhythm = hb >= 220 and "terminal_tachycardia" or "ventricular_fibrillation"
+		elseif effectivePalpitations > 0.35 and math.random() < (effectivePalpitations - 0.35) ^ 2 * 0.04 * hemorrhageRhythmYield then
 			hg.organism.StartFibrillation(org)
 		end
 	end
@@ -1371,7 +1355,11 @@ module[2] = function(owner, org, timeValue)
 	heartbeat = heartbeat - (org.myocardialOxygen and (1 - org.myocardialOxygen) or 0) * 35
 	if (org.arrhythmia or 0) > 0.05 and not org.fibrillation then heartbeat = heartbeat + math.Rand(-70, 90) * org.arrhythmia end
 	if org.fibrillation then heartbeat = math.Rand(180, 360) end
-	if bradyTarget and not org.fibrillation then heartbeat = math.min(heartbeat, bradyTarget) end
+	if bradyTarget and not org.fibrillation then
+		heartbeat = math.min(heartbeat, bradyTarget)
+	elseif not org.fibrillation then
+		heartbeat = math.max(heartbeat, math.min(bloodCompensationRate, maxCompensatedRate))
+	end
 
 	org.heartbeat = math.Approach(org.heartbeat, heartbeat, heartbeat > org.heartbeat and timeValue * 5 or timeValue * 3)
 	org.heartbeat = math.Clamp(org.heartbeat, 0, terminalHeartRate)
@@ -1392,7 +1380,9 @@ module[2] = function(owner, org, timeValue)
 	end
 	org.arrhythmia = Approach(org.arrhythmia or 0, arrhythmiaTarget, arrhythmiaTarget > (org.arrhythmia or 0) and timeValue / arrhythmiaRiseTime or timeValue / 90)
 	if org.isPly and not org.otrub and not org.heartstop then
-		if org.fibrillation or org.unstableRhythm or org.arrhythmia > 0.35 or (org.palpitations or 0) > 0.35 then
+		if org.heartbeat >= 220 and not org.fibrillation then
+			owner:Notify(tachycardiaThoughts[math.random(#tachycardiaThoughts)], 20, "tachycardia_severe", 0, nil, Color(255, 120, 120))
+		elseif org.fibrillation or org.unstableRhythm or org.arrhythmia > 0.35 or (org.palpitations or 0) > 0.35 then
 			owner:Notify("My heart feels like its beating weird...", 45, "arrhythmia", 0, nil, Color(255, 170, 170))
 		elseif org.heartbeat >= 150 then
 			owner:Notify("My heart is beating faster than normal.", 45, "tachycardia", 0, nil, Color(255, 170, 170))
@@ -1401,12 +1391,11 @@ module[2] = function(owner, org, timeValue)
 		end
 	end
 	if stress > 0.55 and CurTime() >= (org.nextArrhythmiaRoll or 0) then
-		local rollInterval = Clamp(Remap(stress + hemorrhageElectricalInstability, 0.55, 2.3, 10, 1.25), 1.25, 10)
+		local rollInterval = Clamp(Remap(stress, 0.55, 2.3, 10, 1.25), 1.25, 10)
 		org.nextArrhythmiaRoll = CurTime() + rollInterval
-		local vfChance = Clamp((stress - 0.55) * 0.15 + hemorrhageElectricalInstability ^ 2 * 0.42 + traumaRhythmRisk ^ 2 * 0.16 + hypotensionInstability ^ 2 * 0.3, 0.01, 0.65)
+		local vfChance = Clamp((0.01 + (stress - 0.55) * 0.15 + traumaRhythmRisk ^ 2 * 0.16 + hypotensionInstability ^ 2 * 0.3) * hemorrhageRhythmYield, 0, 0.65)
 		if math.Rand(0, 1) < vfChance then
 			hg.organism.StartFibrillation(org)
-			if hemorrhageElectricalInstability > 0.72 then org.terminalRhythm = "ventricular_fibrillation" end
 		end
 	end
 

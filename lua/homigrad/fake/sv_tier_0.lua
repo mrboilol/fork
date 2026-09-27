@@ -995,7 +995,6 @@ function fakeBoneFlop.ApplyBone(rag, bone)
 	local physParent = rag:GetPhysicsObjectNum(physIDParent)
 	if not IsValid(phys) or not IsValid(physParent) or phys == physParent then return end
 
-	rag:SetupBones()
 	local jointPos = rag:GetBonePosition(boneIDChild)
 	if not isSafeNetworkPos(jointPos)
 		or jointPos:IsEqualTol(rag:GetPos(), 0.01)

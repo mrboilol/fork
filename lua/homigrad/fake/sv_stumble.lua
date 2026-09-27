@@ -23,6 +23,9 @@ local STUMBLE_PUSH_MUL = 2
 local STUMBLE_PUSH_TIME_MUL = 1.5
 local STUMBLE_STEP_TRIGGER_MUL = 0.7
 local STUMBLE_STEP_INTERVAL_MUL = 0.8
+local STUMBLE_LUNGE_MUL = 0.05
+local STUMBLE_LUNGE_MAX = 12
+local STUMBLE_PITCH = 180
 local TOPPLE_PUSH = 110
 local TOPPLE_DOWN = 60
 local TOPPLE_ROLL = 200
@@ -124,6 +127,13 @@ local HANDS = {
 }
 
 local REACT_MODES = {
+	stumble = {
+		sequences = {"StumbleV2"},
+		rate = 1.3,
+		strength = 2.5,
+		bones = SPINE_REACT_BONES,
+		legs = false,
+	},
 	cover = {
 		sequences = {"Cower"},
 		rate = 0.5,
@@ -265,17 +275,6 @@ local function findGroundPosition(cfg, pos, ragdoll, currentFootZ, pelvisZ)
 	if ground then return ground, normal end
 
 	return Vector(pos.x, pos.y, currentFootZ), Vector(0, 0, 1)
-end
-
-local function findGroundForBalance(pos, ragdoll)
-	local tr = util.TraceLine({
-		start = Vector(pos.x, pos.y, pos.z + 10),
-		endpos = Vector(pos.x, pos.y, pos.z - 200),
-		mask = MASK_SOLID_BRUSHONLY,
-		filter = ragdoll,
-	})
-	if tr.Hit and sanitizeVector(tr.HitPos, nil) then return tr.HitPos end
-	return Vector(pos.x, pos.y, pos.z - 200)
 end
 
 local function groundTrace(ply, ragdoll, dist)
@@ -506,6 +505,14 @@ local function updateStumble(st, ragdoll)
 		safeVel = safeVel:GetNormalized() * cfg.MaxVelocityClamp
 		speed = cfg.MaxVelocityClamp
 	end
+	local moveDir = Vector(rawVel.x, rawVel.y, 0)
+	if moveDir:LengthSqr() > START_MIN_SPEED * START_MIN_SPEED then
+		moveDir:Normalize()
+	elseif st.pushDir then
+		moveDir = st.pushDir
+	else
+		moveDir = nil
+	end
 
 	if speed < cfg.StationaryThreshold and not st.push then
 		st.stillSince = st.stillSince or now
@@ -529,6 +536,11 @@ local function updateStumble(st, ragdoll)
 				state.lastStepTime = now
 				st.footPositions[i] = state.targetPos
 				st.lockedFootPositions[i] = state.targetPos
+				if moveDir and st.hasGroundContact[i] then
+					st.pelvis:AddVelocity(moveDir * math.min(speed * STUMBLE_LUNGE_MUL, STUMBLE_LUNGE_MAX))
+					local plantSide = moveDir:Cross(state.targetPos - pelvisPos).z
+					st.spine:AddAngleVelocity(moveDir * math.Clamp(plantSide, -12, 12) * 2)
+				end
 			else
 				local t = state.progress
 				local nextPos = LerpVector(t, state.startPos, state.targetPos)
@@ -570,33 +582,19 @@ local function updateStumble(st, ragdoll)
 		end
 	end
 
-	local decayMult = math.Clamp(1 - (now - st.startTime - cfg.TimeBeforeDecay) / cfg.DecayDuration, 0, 1) * st.vigor
-	local groundedLegs = (st.hasGroundContact[1] and 1 or 0) + (st.hasGroundContact[2] and 1 or 0)
-	if groundedLegs == 0 then return end
-
-	local feetMid = (st.footPositions[1] + st.footPositions[2]) / 2
-	local groundBelowFeet = findGroundForBalance(feetMid, ragdoll)
-	local diffZ = groundBelowFeet.z + cfg.HipTargetHeight - pelvisPos.z
-	local damperForce = diffZ < 10 and rawVel.z * -12 or 0
-	local totalZForce = (diffZ * 35 + damperForce) * decayMult
-	if isValidNumber(totalZForce) then
-		st.spine:ApplyForceCenter(Vector(0, 0, math.max(totalZForce, 0)))
-	end
-
-	local lateralOffset = pelvisPos - feetMid
-	lateralOffset.z = 0
-	if not st.push and lateralOffset:Length() > 2 then
-		local correction = lateralOffset * -8 * decayMult
-		if sanitizeVector(correction, nil) then st.pelvis:ApplyForceCenter(correction) end
+	if moveDir then
+		local axis = moveDir:Cross(Vector(0, 0, 1))
+		local lifetime = (cfg.TimeBeforeDecay + cfg.DecayDuration) * math.max(st.vigor, DECAY_VIGOR_FLOOR)
+		local instability = math.Clamp((now - st.startTime) / lifetime, 0, 1)
+		st.spine:AddAngleVelocity(-axis * STUMBLE_PITCH * (0.5 + instability) * dt)
 	end
 end
 
 local function topple(st)
-	local dir = st.pushDir
-	if not dir then
-		local vel = Vector(st.smoothedVelocity.x, st.smoothedVelocity.y, 0)
-		dir = vel:LengthSqr() > 25 and vel or Vector(math.Rand(-1, 1), math.Rand(-1, 1), 0)
-	end
+	local vel = st.pelvis:GetVelocity()
+	local dir = Vector(vel.x, vel.y, 0)
+	if dir:LengthSqr() < START_MIN_SPEED * START_MIN_SPEED then dir = st.pushDir or st.spine:GetAngles():Forward() end
+	dir.z = 0
 	if dir:LengthSqr() < 0.01 then return end
 	dir = dir:GetNormalized()
 
@@ -604,11 +602,11 @@ local function topple(st)
 	if tripFoot then
 		local side = tripFoot - st.pelvis:GetPos()
 		side.z = 0
-		if side:LengthSqr() > 0.01 then dir = (dir + side:GetNormalized() * TRIP_SIDE_MUL):GetNormalized() end
+		if side:LengthSqr() > 0.01 then dir = (dir + side:GetNormalized() * TRIP_SIDE_MUL * 0.25):GetNormalized() end
 	end
 
 	st.spine:AddVelocity(dir * TOPPLE_PUSH + Vector(0, 0, -TOPPLE_DOWN))
-	st.pelvis:AddVelocity(dir * -TOPPLE_PUSH * 0.3)
+	st.pelvis:AddVelocity(dir * TOPPLE_PUSH * 0.3)
 
 	local axis = dir:Cross(Vector(0, 0, 1))
 	if axis:LengthSqr() > 0.01 then st.spine:AddAngleVelocity(-axis * TOPPLE_ROLL) end
@@ -816,6 +814,7 @@ local function wantedReaction(ply, ragdoll)
 	end
 
 	if hg_euphoria_windmill:GetBool() and isAirborne(ply, ragdoll) then return "flail" end
+	if stumbling[ragdoll] then return "stumble" end
 
 	local root = ragdoll:GetPhysicsObject()
 	if hg_euphoria_tumble:GetBool() and IsValid(root) and not stumbling[ragdoll] and not moveControl(ply) then
@@ -875,7 +874,13 @@ local function updateReaction(ply, ragdoll)
 
 	local mode = REACT_MODES[rs.mode]
 	if not mode then return end
-	rs.ent:SetReactionStrength(mode.strength * vigor(org))
+	local strength = mode.strength * vigor(org)
+	if rs.mode == "stumble" then
+		local st = stumbling[ragdoll]
+		local lifetime = (st.cfg.TimeBeforeDecay + st.cfg.DecayDuration) * math.max(st.vigor, DECAY_VIGOR_FLOOR)
+		strength = strength * (1 - 0.8 * math.Clamp((CurTime() - st.startTime) / lifetime, 0, 1))
+	end
+	rs.ent:SetReactionStrength(strength)
 
 	local held = (ragdoll.HGFallCoverActive or ragdoll.hgWoundGrab or ragdoll.hgCurl) and true or false
 	if held ~= rs.held then
