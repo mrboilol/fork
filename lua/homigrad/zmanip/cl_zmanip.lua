@@ -231,12 +231,9 @@ function hg.DoZManip(ent, ply)
 		ply.zmodel:SetNoDraw(true)
 	end
 
-	-- Allow zmanip if left arm is available
 	local org = ply.organism
-	local leftArmUsable = not (org and org.larmamputated)
-
-	-- If left arm is not usable, don't do zmanip
-	if not leftArmUsable then return end
+	local useRight = org and (org.larmamputated or org.lhandamputated or org.larmupamputated) or false
+	if useRight and not hg.CanUseRightHand(ply) then return end
 
 	if not ply.zmanipstart or IsValid(ply:GetNetVar("carryent2")) then return end
 	
@@ -296,7 +293,7 @@ function hg.DoZManip(ent, ply)
 	WorldModel:SetAngles(ang)
 
 	WorldModel:SetupBones()
-	wep.lhandik = true
+	if useRight then wep.rhandik = true else wep.lhandik = true end
 
 	WorldModel:SetCycle(ply.zmanip_revers and 1 - time or time)
 
@@ -318,23 +315,13 @@ function hg.DoZManip(ent, ply)
         end
     end
 
-	-- Always use left arm
-	local chosenArm, isRight, isBroken = hg.GetPrioritizedArm(ply)
-	local handBone = "ValveBiped.Bip01_L_Hand"
-	local bones = hg.TPIKBonesLH
+	local bones = useRight and hg.TPIKBonesRH or hg.TPIKBonesLH
 
-	local lh = ent:LookupBone(handBone)
-	local lhmat = ent:GetBoneMatrix(lh)
-	local wmlh = WorldModel:LookupBone(handBone)
-	local wmlhmat = WorldModel:GetBoneMatrix(wmlh)
-
-	local lpos, lang = WorldToLocal(lhmat:GetTranslation(), lhmat:GetAngles(), wmlhmat:GetTranslation(), angle_zero)
-
-	if ply.zmanipdrawFunc then
+	if ply.zmanipdrawFunc and not useRight then
 		ply.zmanipdrawFunc(ent, ply, WorldModel, time)
 	end
 	for _, bone in ipairs(bones) do
-		local wm_boneindex = WorldModel:LookupBone(bone)
+		local wm_boneindex = WorldModel:LookupBone(useRight and (string.gsub(bone, "_R_", "_L_")) or bone)
 		if !wm_boneindex then continue end
 		local wm_bonematrix = WorldModel:GetBoneMatrix(wm_boneindex)
 		if !wm_bonematrix then continue end
@@ -346,6 +333,13 @@ function hg.DoZManip(ent, ply)
 
 		local bonepos = wm_bonematrix:GetTranslation()
 		local boneang = wm_bonematrix:GetAngles()
+
+		if useRight then
+			local lp, la = WorldToLocal(bonepos, boneang, pos, ang)
+			local f, u = la:Forward(), la:Up()
+			lp.y, f.y, u.y = -lp.y, -f.y, -u.y
+			bonepos, boneang = LocalToWorld(lp, f:AngleEx(u), pos, ang)
+		end
 
 		bonepos.x = math.Clamp(bonepos.x, pos.x - 38, pos.x + 38) -- clamping if something gone wrong so no stretching (or animator is fleshy)
 		bonepos.y = math.Clamp(bonepos.y, pos.y - 38, pos.y + 38)
@@ -377,4 +371,90 @@ function hg.DoZManip(ent, ply)
 		ent:SetBoneMatrix(ply_boneindex, ply_bonematrix)
 		--ply:SetBonePosition(ply_boneindex, bonepos, boneang)
 	end
+end
+
+local HANDOFF_GRAB = 0.35
+local HANDOFF_BLEND = 0.35
+local handoffPos, handoffAng = Vector(4, 0, 0), Angle(0, 0, 0)
+
+local function handoffEnd(ply, wep)
+	local h = ply.hgHandoff
+	return h.select + ((IsValid(wep) and wep.isTPIKBase) and 0 or HANDOFF_BLEND)
+end
+
+local function clearHandoff(ply)
+	if IsValid(ply.hgHandoffModel) then ply.hgHandoffModel:Remove() end
+	ply.hgHandoffModel = nil
+	ply.hgHandoff = nil
+end
+
+net.Receive("hg_pickup_handoff", function()
+	local ply = net.ReadPlayer()
+	local wep = net.ReadEntity()
+	local mdl = net.ReadString()
+	local selectDelay = net.ReadFloat()
+	if not IsValid(ply) then return end
+
+	clearHandoff(ply)
+	if mdl == "" then return end
+
+	local model = ClientsideModel(mdl)
+	if not IsValid(model) then return end
+	model:SetNoDraw(true)
+	if IsValid(wep) then model:SetSkin(wep:GetSkin()) end
+
+	ply.hgHandoffModel = model
+	ply.hgHandoff = {wep = wep, start = CurTime(), select = CurTime() + selectDelay}
+	ply:CallOnRemove("hg_pickup_handoff", clearHandoff)
+end)
+
+function hg.PickupHandoffHides(ply, wep)
+	local h = ply.hgHandoff
+	return h ~= nil and h.wep == wep and CurTime() < handoffEnd(ply, wep)
+end
+
+function hg.DrawPickupHandoff(ent, ply)
+	local h = ply.hgHandoff
+	if not h then return end
+
+	local model = ply.hgHandoffModel
+	local wep = h.wep
+	local now = CurTime()
+	if not IsValid(model) or now >= handoffEnd(ply, wep) or (now > h.select and IsValid(wep) and wep:GetOwner() ~= ply) then
+		clearHandoff(ply)
+		return
+	end
+	if now < h.start + HANDOFF_GRAB then return end
+
+	local org = ply.organism
+	local useRight = org and (org.larmamputated or org.lhandamputated or org.larmupamputated)
+	local bone = ent:LookupBone(useRight and "ValveBiped.Bip01_R_Hand" or "ValveBiped.Bip01_L_Hand")
+	local mat = bone and ent:GetBoneMatrix(bone)
+	if not mat then return end
+
+	local pos, ang = LocalToWorld(handoffPos, handoffAng, mat:GetTranslation(), mat:GetAngles())
+	pos = LocalToWorld(-model:OBBCenter(), angle_zero, pos, ang)
+
+	local real = IsValid(wep) and wep.worldModel
+	if now > h.select and IsValid(real) and real:GetModel() == model:GetModel() then
+		model:SetRenderOrigin(pos)
+		model:SetRenderAngles(ang)
+		model:SetupBones()
+		real:SetupBones()
+		local cm, rm = model:GetBoneMatrix(0), real:GetBoneMatrix(0)
+		if cm and rm then
+			local op, oa = WorldToLocal(cm:GetTranslation(), cm:GetAngles(), pos, ang)
+			local ip, ia = WorldToLocal(vector_origin, angle_zero, op, oa)
+			local tpos, tang = LocalToWorld(ip, ia, rm:GetTranslation(), rm:GetAngles())
+			local frac = math.ease.InOutSine(math.Clamp((now - h.select) / HANDOFF_BLEND, 0, 1))
+			pos = LerpVector(frac, pos, tpos)
+			ang = LerpAngle(frac, ang, tang)
+			model:SetModelScale(Lerp(frac, 1, real:GetModelScale()))
+		end
+	end
+
+	model:SetRenderOrigin(pos)
+	model:SetRenderAngles(ang)
+	model:SetupBones()
+	model:DrawModel()
 end

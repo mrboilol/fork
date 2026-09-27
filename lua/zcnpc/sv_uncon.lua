@@ -1272,6 +1272,9 @@ end
 hook.Add("HomigradDamage", "zcnpc_down_extend", function(victim, dmgInfo, _, hitEnt)
 	if not ZCNPC.Enabled() then return end
 	if not dmgInfo:IsDamageType(DOWN_EXTEND) then return end
+	local inflictor = dmgInfo:GetInflictor()
+	local class = IsValid(inflictor) and inflictor:GetClass()
+	if class == "weapon_hands_sh" or class == "weapon_hg_coolhands" then return end
 
 	local rag = DownedRagFromHit(victim, hitEnt)
 	if not rag then return end

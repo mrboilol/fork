@@ -2525,6 +2525,7 @@ function SWEP:GetAdditionalValues()
 		local caliberMul, weightMul, _, _, _, ballisticDisturbance = self:GetRecoilImpulseFactors()
 		local ballisticRecoil = math.Clamp(caliberMul * weightMul, 0.2, 4)
 		local cantedHold = not self:IsZoom() and (ply.posture == 7 or ply.posture == 9)
+		local cantedDirection = ply.posture == 7 and -1 or 1
 		local mulhuy = (self:IsPistolHoldType() or self.PistolKinda) and 2 or (((ply.posture == 1 and not self:IsZoom()) or ply.posture == 7 or ply.posture == 8) and 2 or 0.75)
 		local animpos = self:GetAnimShoot2(0.09 * mulhuy / host_timescale(), true)
 		local shit = 0.2 * mulhuy / host_timescale()
@@ -2537,21 +2538,21 @@ function SWEP:GetAdditionalValues()
 		local shit2 = ballisticRecoil * ((self:IsPistolHoldType() or self.PistolKinda) and 0.45 or 0.16) * weaponRecoilMul
 		local recoilSide = math.sin(animpos3) * shit2
 		if cantedHold then
-			self.AdditionalPos2[3] = self.AdditionalPos2[3] + recoilSide
+			self.AdditionalPos2[3] = self.AdditionalPos2[3] + recoilSide * cantedDirection
 		else
 			self.AdditionalPos2[2] = self.AdditionalPos2[2] + recoilSide
 		end
 		self.AdditionalPos2[1] = self.AdditionalPos2[1] + math.sin(animpos3) * -1 * shit2
 		local recoilAxis = cantedHold and 1 or 2
-		self.AdditionalAng2[recoilAxis] = self.AdditionalAng2[recoilAxis] - recoilSide * 2
+		self.AdditionalAng2[recoilAxis] = self.AdditionalAng2[recoilAxis] - recoilSide * 2 * (cantedHold and cantedDirection or 1)
 
 		if self.podkid or self:IsPistolHoldType() then
 			local animpos2 = self:GetAnimShoot2(0.05 * mulhuy / host_timescale(), true)
 			animpos2 = animpos2 * weaponRecoilMul * ballisticRecoil
 			self.AdditionalAng2[2] = self.AdditionalAng2[2] + animpos2 * (cantedHold and -1 or 20) * (self.podkid or 1)
 			self.AdditionalAng2[3] = self.AdditionalAng2[3] + animpos2 * (cantedHold and -5 or 10) * (self.podkid or 1)
-			self.AdditionalAng2[1] = self.AdditionalAng2[1] + animpos2 * (cantedHold and -24 or -5) * (self.podkid or 1)
-			self.AdditionalPos2[cantedHold and 3 or 2] = self.AdditionalPos2[cantedHold and 3 or 2] + animpos2 * (cantedHold and 2.5 or -1) * (self.podkid or 1)
+			self.AdditionalAng2[1] = self.AdditionalAng2[1] + animpos2 * (cantedHold and -24 * cantedDirection or -5) * (self.podkid or 1)
+			self.AdditionalPos2[cantedHold and 3 or 2] = self.AdditionalPos2[cantedHold and 3 or 2] + animpos2 * (cantedHold and 2.5 * cantedDirection or -1) * (self.podkid or 1)
 		end
 
 		local sinceShot = CurTime() - (self:LastShootTime() or 0)
@@ -2583,10 +2584,10 @@ function SWEP:GetAdditionalValues()
 			local wobZ = math.sin(t * 10.1 * frequencyMul) * 0.65 + math.cos(t * 15.6 * frequencyMul) * 0.35
 
 			if cantedHold then
-				self.AdditionalAng2[1] = self.AdditionalAng2[1] - wobX * amp * 1.65 * sideAmp
+				self.AdditionalAng2[1] = self.AdditionalAng2[1] - wobX * amp * 1.65 * sideAmp * cantedDirection
 				self.AdditionalAng2[2] = self.AdditionalAng2[2] + wobY * amp * 0.45
 				self.AdditionalPos2[2] = self.AdditionalPos2[2] + wobZ * amp * 0.16
-				self.AdditionalPos2[3] = self.AdditionalPos2[3] + wobX * amp * 0.58 * sideAmp
+				self.AdditionalPos2[3] = self.AdditionalPos2[3] + wobX * amp * 0.58 * sideAmp * cantedDirection
 			else
 				self.AdditionalAng2[1] = self.AdditionalAng2[1] + wobY * amp * (longGun and 2.3 or 1.7)
 				self.AdditionalAng2[2] = self.AdditionalAng2[2] + wobX * amp * (longGun and 0.22 or 0.3) * sideAmp
@@ -2620,11 +2621,11 @@ function SWEP:GetAdditionalValues()
 			local kick = recoilDecay * physicalImpulse * stanceMul * restMul * climb * (self.WeaponRecoilMul or 1) * 0.95
 
 			if cantedHold then
-				self.AdditionalAng2[1] = self.AdditionalAng2[1] - kick * 2.8
+				self.AdditionalAng2[1] = self.AdditionalAng2[1] - kick * 2.8 * cantedDirection
 				self.AdditionalAng2[2] = self.AdditionalAng2[2] - kick * 0.75
 				self.AdditionalAng2[3] = self.AdditionalAng2[3] - kick * 0.7
 				self.AdditionalPos2[2] = self.AdditionalPos2[2] + kick * 0.65
-				self.AdditionalPos2[3] = self.AdditionalPos2[3] + kick * 1.15
+				self.AdditionalPos2[3] = self.AdditionalPos2[3] + kick * 1.15 * cantedDirection
 			else
 				self.AdditionalAng2[1] = self.AdditionalAng2[1] - kick * (longGun and 6 or 3.4)
 				self.AdditionalAng2[2] = self.AdditionalAng2[2] + sideRand * kick * 0.25

@@ -1132,14 +1132,20 @@ end
 function hg.RenderWeapons(ent, owner)
 	local wep = owner.GetActiveWeapon and owner:GetActiveWeapon()
 	
+	local handoffHides = hg.PickupHandoffHides
 	if IsValid(wep) and wep.ishgweapon then
-		DrawWorldModel(wep, owner:GetNWBool("FakeGettingUp", false) and IsValid(owner.OldRagdoll) and owner.OldRagdoll == ent)
+		if handoffHides and handoffHides(owner, wep) then
+			wep:WorldModel_Transform()
+		else
+			DrawWorldModel(wep, owner:GetNWBool("FakeGettingUp", false) and IsValid(owner.OldRagdoll) and owner.OldRagdoll == ent)
+		end
     end
 
 	if owner.GetWeapons then
 		local weps = owner:GetWeapons()
 		for i = 1, #weps do
 			local wep2 = weps[i]
+			if handoffHides and handoffHides(owner, wep2) then continue end
 			if wep2.ishgweapon and wep2 ~= wep then
 				DrawWorldModel(wep2)
 			elseif wep2 ~= wep and wep2.ismelee2 and wep2.DrawHolsteredWorldModel then

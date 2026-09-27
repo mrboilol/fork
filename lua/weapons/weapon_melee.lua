@@ -407,7 +407,7 @@ if CLIENT then
         end
 
         local center = LocalToWorld(model:OBBCenter(), angle_zero, pos, ang)
-        return pos - (center - pos) - ent:GetUp() * 2, ang
+        return pos - (center - pos) + ent:GetUp(), ang
     end
 
     function SWEP:DrawHolsteredWorldModel(ent)

@@ -251,6 +251,9 @@ end)
 hook.Add("HomigradDamage", "zcnpc_knockdown", function(victim, dmgInfo, hitgroup)
 	if not ZCNPC.Enabled() or not cfg.knockdown:GetBool() then return end
 	if not (IsValid(victim) and victim:IsNPC()) then return end
+	local inflictor = dmgInfo:GetInflictor()
+	local class = IsValid(inflictor) and inflictor:GetClass()
+	if class == "weapon_hands_sh" or class == "weapon_hg_coolhands" then return end
 	if dmgInfo:IsDamageType(BULLET) and not cfg.knockdown_bullets:GetBool() then return end
 
 	local org = victim.organism

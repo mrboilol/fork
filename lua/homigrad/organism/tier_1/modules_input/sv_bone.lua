@@ -49,13 +49,13 @@ local bonefracture_sounds = {
 }
 
 local skullfracture_sounds = {
-	"skullfracture/SkullFracture-1.wav",
-	"skullfracture/SkullFracture-2.wav",
-	"skullfracture/SkullFracture-3.wav",
-	"skullfracture/SkullFracture-4.wav",
-	"skullfracture/SkullFracture-5.wav",
-	"skullfracture/SkullFracture-6.wav",
-	"skullfracture/SkullFracture-7.wav",
+	"skullfracture/skullfracture-1.wav",
+	"skullfracture/skullfracture-2.wav",
+	"skullfracture/skullfracture-3.wav",
+	"skullfracture/skullfracture-4.wav",
+	"skullfracture/skullfracture-5.wav",
+	"skullfracture/skullfracture-6.wav",
+	"skullfracture/skullfracture-7.wav",
 }
 
 local function playBoneFractureSound(ent)
@@ -72,9 +72,8 @@ local function playBoneFractureSound(ent)
 	soundEnt:EmitSound(bonefracture_sounds[math.random(#bonefracture_sounds)], 75, math.random(135, 155), 1, CHAN_AUTO, 0, 0, filter)
 end
 
-local function playSkullFractureSound(ent)
-	if not IsValid(ent) then return end
-	ent:EmitSound(skullfracture_sounds[math.random(#skullfracture_sounds)], 75, math.random(90, 110), 1, CHAN_AUTO)
+local function playSkullFractureSound(pos)
+	sound.Play(skullfracture_sounds[math.random(#skullfracture_sounds)], pos, 75, math.random(90, 110), 1)
 end
 
 local huyasd = {
@@ -798,7 +797,30 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		if hg.organism.AddInstantPain then hg.organism.AddInstantPain(org, dmg * 30, "head") else org.avgpain = org.avgpain + dmg * 30 end
 
 		if oldDmg != 1 then
-			playSkullFractureSound(org.owner)
+			local body = hg.GetCurrentCharacter(org.owner)
+			local pos = dmgInfo:GetDamagePosition()
+			if IsValid(body) and (pos:IsZero() or pos:DistToSqr(body:WorldSpaceCenter()) > 200 * 200) then
+				local head = body:LookupBone("ValveBiped.Bip01_Head1")
+				pos = head and body:GetBonePosition(head) or body:WorldSpaceCenter()
+			end
+			playSkullFractureSound(pos)
+			if not (impact and impact.source == "physics") then
+				local normal = dmgInfo:GetDamageForce():GetNormalized()
+				if normal:IsZero() then normal = Vector(0, 0, 1) end
+				local effect = EffectData()
+				effect:SetOrigin(pos)
+				effect:SetNormal(normal)
+				effect:SetMagnitude(2)
+				effect:SetScale(1.2)
+				effect:SetRadius(3)
+				util.Effect("BloodImpact", effect, true, true)
+				net.Start("hg_bloodimpact")
+				net.WriteVector(pos)
+				net.WriteVector(normal / 10)
+				net.WriteFloat(math.max(dmg / 8, 1))
+				net.WriteInt(1, 8)
+				net.SendPVS(pos)
+			end
 			sendThought(org, "Your skull is broken.", "thought_skull", 4, Color(255, 180, 180))
 		end
 	end
@@ -839,21 +861,6 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	end
 	
 	org.shock = org.shock + (dmg > 1 and 50 or dmg * 10)
-
-	if org.skull == 1 then
-		if org.isPly then
-			//org.owner:Notify(huyasd["skull"],true,"skull",4)
-		end
-
-		--[[if dir then
-			net.Start("hg_bloodimpact")
-			net.WriteVector(dmgInfo:GetDamagePosition())
-			net.WriteVector(dir / 10)
-			net.WriteFloat(3)
-			net.WriteInt(1,8)
-			net.Broadcast()
-		end--]]
-	end
 
 	org.disorientation = math.min(org.disorientation + (isCrush(dmgInfo) and dmg * 1 or dmg * 1), 1.5)
 

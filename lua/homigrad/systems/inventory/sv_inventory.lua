@@ -153,6 +153,7 @@ hook.Add("PlayerDropWeapon", "homigrad-inventory", function(ply, weapon)
     hg.SafeSetCollisionGroup(wep, COLLISION_GROUP_WORLD)
     hg.SafeCollisionRulesChanged(wep)
     ply:DropWeapon(wep, ply:EyePos(), vecZero)
+    wep:SetOwner()
     wep:SetPos(ply:EyePos())
     ply.inventory.Weapons[wep:GetClass()] = nil
     ply:SetNetVar("Inventory", ply.inventory)

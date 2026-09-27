@@ -123,6 +123,7 @@ function SWEP:PrimarySpread()
 		local experienceMul = self.GetWeaponExperienceMul and self:GetWeaponExperienceMul(owner) or 1
 		local stanceMul = self:GetPostureStabilityMul(self:IsZoom())
 		local cantedHold = not self:IsZoom() and (owner.posture == 7 or owner.posture == 9)
+		local cantedDirection = owner.posture == 7 and -1 or 1
 		local longGun = not self:IsPistolHoldType() and not self.PistolKinda
 		local restMul = self:IsResting() and 0.35 or 1
 		local recoilImpulse = math.Clamp(caliberMul * weightMul * supportMul * handlingMul * experienceMul * stanceMul * (0.78 + math.min(sprayI / 11, 0.82)) * restMul * (self.WeaponRecoilMul or 1) * self:GetAttachmentRecoilMul() * 1.3, 0.18, 7)
@@ -137,11 +138,11 @@ function SWEP:PrimarySpread()
 
 		if cantedHold then
 			wobbleVelocity[1] = wobbleVelocity[1] - recoilImpulse * 8
-			wobbleVelocity[2] = wobbleVelocity[2] - lateralImpulse * (29 + math.abs(side) * 7)
+			wobbleVelocity[2] = wobbleVelocity[2] - lateralImpulse * (29 + math.abs(side) * 7) * cantedDirection
 			wobbleVelocity[3] = wobbleVelocity[3] - lateralImpulse * (5 + math.abs(roll) * 4)
 			offsetVelocity[1] = offsetVelocity[1] - recoilImpulse * 10
 			offsetVelocity[2] = offsetVelocity[2] + recoilImpulse * 4
-			offsetVelocity[3] = offsetVelocity[3] + lateralImpulse * 6
+			offsetVelocity[3] = offsetVelocity[3] + lateralImpulse * 6 * cantedDirection
 		else
 			wobbleVelocity[1] = wobbleVelocity[1] - recoilImpulse * ((longGun and 78 or 32) + math.abs(side) * 4)
 			wobbleVelocity[2] = wobbleVelocity[2] + side * lateralImpulse * 8
@@ -168,6 +169,7 @@ function SWEP:PrimarySpread()
 		local combat = hg.GetCombatCondition and hg.GetCombatCondition(owner) or nil
 		local combatAimMul = combat and combat.aim or 1
 		local cantedHold = not self:IsZoom() and (owner.posture == 7 or owner.posture == 9)
+		local cantedDirection = owner.posture == 7 and -1 or 1
 		local longGun = not self:IsPistolHoldType() and not self.PistolKinda
 		local force = math.Clamp(caliberMul * weightMul * supportMul * handlingMul * experienceMul * stanceMul * (0.75 + math.min(sprayI / 10, 0.75)) * 1.18, 0.18, 5.5)
 		if longGun and not cantedHold then force = force * 1.4 end
@@ -203,7 +205,7 @@ function SWEP:PrimarySpread()
 
 		local angrand2
 		if cantedHold then
-			angrand2 = Angle(math.Rand(-force * 0.12, force * 0.05), -math.Rand(force * 0.85, force * 1.25), -math.Rand(force * 0.12, force * 0.35))
+			angrand2 = Angle(math.Rand(-force * 0.12, force * 0.05), -math.Rand(force * 0.85, force * 1.25) * cantedDirection, -math.Rand(force * 0.12, force * 0.35))
 		else
 			local downwardKick = util.SharedRandom("hg_recoil_downward", 0, 1, (self.recoilShotIndex or 0) * 79) < 0.025
 			local pitch = downwardKick

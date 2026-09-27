@@ -178,8 +178,10 @@ local IsValid, math_Clamp = IsValid, math.Clamp
 		if IsValid(wep) then
 			//if wep.isTPIKBase then hg.RenderTPIKBase(ent, ply, wep) end
 			//if wep.ismelee then hg.RenderMelees(ent, ply, wep) end
-			if wep.DrawWorldModel2 then wep:DrawWorldModel2() end
+			if wep.DrawWorldModel2 and not (hg.PickupHandoffHides and hg.PickupHandoffHides(ply, wep)) then wep:DrawWorldModel2() end
 		end
+
+		if hg.DrawPickupHandoff then hg.DrawPickupHandoff(ent, ply) end
 
 		local armors = ply:GetNetVar("Armor") or ent.PredictedArmor
 		local hideArmorRender = ply:GetNetVar("HideArmorRender", false) or ent.PredictedHideArmorRender

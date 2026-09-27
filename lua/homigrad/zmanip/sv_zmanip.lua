@@ -49,8 +49,29 @@ hook.Add("PlayerUse", "ZManipUseAnim", function(ply, ent)
 	local pickup = hg.CanPromptPickup and hg.CanPromptPickup(ply, ent)
 	if (string.find(class, "prop") or string.find(class, "breakable") or string.find(class, "ladder")) and not pickup then return end
 
-	hg.TryZManipInteract(ply, ent, pickup and "interact" or (ent:IsWeapon() or ent.IsZPickup) and "interact" or "use")
+	if hg.TryZManipInteract(ply, ent, pickup and "interact" or (ent:IsWeapon() or ent.IsZPickup) and "interact" or "use") and ent:IsWeapon() then
+		ply.hgHandoffWep = ent
+		ply.hgHandoffTime = CurTime()
+	end
 end)
+
+util.AddNetworkString("hg_pickup_handoff")
+
+local HANDOFF_SELECT = 0.55
+
+function hg.PickupHandoffDelay(ply, wep)
+	if not IsValid(ply) or ply.hgHandoffWep ~= wep or CurTime() - (ply.hgHandoffTime or 0) > 0.5 then return 0 end
+	ply.hgHandoffWep = nil
+
+	net.Start("hg_pickup_handoff")
+		net.WritePlayer(ply)
+		net.WriteEntity(wep)
+		net.WriteString(wep:GetModel() or "")
+		net.WriteFloat(HANDOFF_SELECT)
+	net.SendPVS(ply:GetPos())
+
+	return HANDOFF_SELECT
+end
 
 hook.Add("OnPlayerPhysicsPickup", "ZManipPickupAnim", function(ply, ent)
 	if IsValid(ent) then

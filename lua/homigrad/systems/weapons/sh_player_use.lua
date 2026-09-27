@@ -52,11 +52,14 @@ hook.Add("PlayerUse", "nouseinfake", function(ply, ent)
 end)
 
 hook.Add("WeaponEquip", "pickupHuy", function(wep, ply)
+	local handoff = hg.PickupHandoffDelay and hg.PickupHandoffDelay(ply, wep) or 0
 	timer.Simple(0, function()
 		if wep.DontEquipInstantly then wep.DontEquipInstantly = nil return end
 		if not ply.noSound and IsValid(wep) then
 			local oldwep = ply:GetActiveWeapon()
-			timer.Simple(0, function()
+			timer.Simple(handoff, function()
+				if not IsValid(ply) or not IsValid(wep) or wep:GetOwner() ~= ply then return end
+				if handoff > 0 then oldwep = ply:GetActiveWeapon() end
 				hook.Run("PlayerSwitchWeapon", ply, oldwep, wep)
 				ply:SelectWeapon(wep:GetClass())
 				ply:SetActiveWeapon(wep)

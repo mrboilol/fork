@@ -1406,11 +1406,6 @@ hook.Add("HomigradDamage", "zcnpc_headshot", function(victim, dmgInfo)
 		end
 	end
 
-	-- A swing to the head is answered here, before anything below can decide the
-	-- brain is finished. The request is the first hit: the NPC goes down, it does
-	-- not die. Organism totals that would have killed on the same tick are held
-	-- under the line a brain dies on, the punch is starved so ArtAgdoll does not
-	-- take the body, and Floor is what stands them up again a few seconds later.
 	if meleeHead then
 		org.zcnpc_meleehead = CurTime() + 0.35
 		if IsNonlethalHit(dmgInfo) then org.zcnpc_nonlethal = CurTime() + 0.35 end
@@ -1420,11 +1415,16 @@ hook.Add("HomigradDamage", "zcnpc_headshot", function(victim, dmgInfo)
 		StarveHeadPunch(dmgInfo)
 		dmgInfo:SetDamage(math.min(dmgInfo:GetDamage(), 8))
 
-		ZCNPC.Debug("melee to the head on", victim)
-
-		timer.Simple(0, function()
-			if IsValid(victim) then ZCNPC.Floor(victim) end
-		end)
+		local inflictor = dmgInfo:GetInflictor()
+		local class = IsValid(inflictor) and inflictor:GetClass()
+		local fists = class == "weapon_hands_sh" or class == "weapon_hg_coolhands"
+		if not fists or (victim.zcnpc_nextFistFloor or 0) <= CurTime() and math.random(4) == 1 then
+			if fists then victim.zcnpc_nextFistFloor = CurTime() + 8 end
+			ZCNPC.Debug("melee to the head on", victim)
+			timer.Simple(0, function()
+				if IsValid(victim) then ZCNPC.Floor(victim) end
+			end)
+		end
 
 		return
 	end
