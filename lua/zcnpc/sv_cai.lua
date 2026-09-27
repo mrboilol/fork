@@ -331,6 +331,10 @@ local function Install()
 	brain.Think = function(data, dt, ...)
 		local npc = istable(data) and data.ent
 
+		-- The hidden half of a body on the floor. Unregistered on ZCNPC_Downed, but
+		-- CAI registers a tenth of a second after spawn and can land after that.
+		if Enabled() and ZCNPC.IsHidden and ZCNPC.IsHidden(npc) then return end
+
 		if Enabled() and Busy(npc) then
 			if isfunction(brain.Perceive) then pcall(brain.Perceive, data) end
 
