@@ -1,8 +1,5 @@
 if SERVER then
     local painaddDrainRate = 16
-    local adrenalinePainaddPassiveRate = 20
-    local adrenalinePainaddPassiveCap = 2
-    local adrenalinePainaddPassiveMin = 15
 
     local function applyPain(org)
         local adrenaline = math.Clamp(org.adrenaline or 0, 0, 5)
@@ -27,13 +24,9 @@ if SERVER then
             end
             return
         end
-        local adrenaline = math.min(org.adrenaline or 0, adrenalinePainaddPassiveCap)
+        local adrenaline = org.adrenaline or 0
         local pacing = hg.organism.GetAdrenalinePainPacing and hg.organism.GetAdrenalinePainPacing(adrenaline) or 1
         local add = math.min(org.painadd, timeValue * painaddDrainRate * pacing)
-        local passiveDrain = 0
-        if adrenaline > adrenalinePainaddPassiveMin then
-            passiveDrain = math.min(org.painadd - add, timeValue * adrenalinePainaddPassiveRate * adrenaline)
-        end
         local isHero = IsValid(owner) and owner:IsPlayer() and owner.RealishIsHero
         if isHero then
             org.avgpain = 0
@@ -43,7 +36,7 @@ if SERVER then
             return
         end
         org.avgpain = math.min(org.avgpain + add, 150)
-        org.painadd = math.max(org.painadd - add - passiveDrain, 0)
+        org.painadd = math.max(org.painadd - add, 0)
 		applyPain(org)
 
 		if org.avgpain > 0 then

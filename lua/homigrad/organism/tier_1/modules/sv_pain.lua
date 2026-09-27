@@ -38,11 +38,8 @@ local otrub_wake_pain_max = 75
 
 function hg.organism.GetAdrenalinePainPacing(adrenaline)
 	adrenaline = max(adrenaline or 0, 0)
-
-	-- This is a delivery rate, not a pain-reduction multiplier. A full rush
-	-- leaves most new pain in painadd, so it arrives after the rush instead of
-	-- disappearing from the injury entirely.
-	return max(1 / (1 + adrenaline * 2.5), 0.08)
+	if adrenaline <= 0.5 then return 1 end
+	return max(1 - adrenaline, 0.05) / 1.5
 end
 
 function hg.organism.CanFeelPain(org, region)
@@ -77,6 +74,11 @@ function hg.organism.AddInstantPain(org, amount, region)
 	if amount <= 0 or not hg.organism.CanFeelPain(org, region) then return 0 end
 
 	local painCap = IsValid(owner) and owner.HasTrait and owner:HasTrait("gurajchaka_child") and 50 or 150
+	if (org.adrenaline or 0) > 0.5 then
+		local key = region == "head" and "headpainadd" or "painadd"
+		org[key] = math.min((org[key] or 0) + amount, painCap)
+		return amount
+	end
 	org.avgpain = math.min((org.avgpain or 0) + amount, painCap)
 	return amount
 end
@@ -216,13 +218,11 @@ module[2] = function(owner, org, timeValue)
 	local add = org.otrub and 0 or (spine3Broken and 0 or (spine2Broken and queuedHeadPain or queuedPain + queuedHeadPain))
 	local sub = (add <= 0.2) and (timeValue * pain_drain_base * (org.otrub and pain_drain_otrub_mul or 1) + timeValue * ((org.painkiller * 0.3 + org.analgesia) * 4)) or (0)
 
-	-- Adrenaline delays incoming pain. Zerlkers nearly stops it, preserving the
-	-- backlog so the injury catches up once the effect has ended.
 	local adrenalinePainPacing = hg.organism.GetAdrenalinePainPacing(adrenaline)
 	if adrenaline > 0.5 and add > 0 then
 		org.adrenalinePainStart = org.adrenalinePainStart or CurTime()
 		local elapsed = CurTime() - org.adrenalinePainStart
-		if not org.adrenalinePainBreakthrough and elapsed > 5 + adrenaline * 4
+		if not org.adrenalinePainBreakthrough and elapsed > 30 + adrenaline * 4
 			and math.random() < math.min(timeValue * 0.12 / (1 + adrenaline), 1) then
 			org.adrenalinePainBreakthrough = true
 		end
@@ -378,13 +378,10 @@ module[2] = function(owner, org, timeValue)
 		org.needotrub = true
 	end
 	org.nearpainlimit = not org.otrub and org.pain >= org.pain_turn * pain_fake_threshold
---exhale the memes
-	--if org.isPly and org.pain >= 85 and IsValid(owner) and owner.Notify then
-		--owner:Notify("You are experiencing excruciating pain.", 8, "thought_excruciatingpain", 0, nil, Color(255, 160, 160))
-	--end
+	if org.isPly and org.pain >= 85 and not org.otrub and IsValid(owner) and owner.Notify and owner:GetInfoNum("hg_newthoughts", 0) <= 0 then
+		owner:Notify("AAAAAAAAAAAAAGHH!", 8, "pain_scream", 0, nil, Color(255, 80, 80))
+	end
 
-	-- Remove only pain that actually entered avgpain. The old queuedPain
-	-- subtraction made adrenaline and Zerlkers erase deferred damage.
 	local headApplied = spine2Broken and add or math.min(queuedHeadPain, add)
 	local bodyApplied = add - headApplied
 	org.headpainadd = min(max((org.headpainadd or 0) - headApplied * analgesiaMul, 0), 150)

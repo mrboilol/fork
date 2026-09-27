@@ -24,6 +24,7 @@ local thoughtMessages = {
     lowoxy2 = {"You are critically low on oxygen.", "You are experiencing severe oxygen deprivation."},
     hypoxia_critical = {"Your oxygen level is critically low.", "Your body is failing from oxygen deprivation."},
     spine3_oxygen_loss = {"Your spinal injury is cutting off oxygen.", "Your body is losing oxygen below the neck."},
+    cervical_paralysis = {"Your neck is broken. You can't move."},
     drugged = {"You have been drugged.", "You are overdosing."},
     pneumothorax1 = {"Air or blood is accumulating around a lung.", "Something is building up around your lungs."},
     pneumothorax2 = {"Your lungs are not breathing properly.", "Something causes your lungs to not expand properly."},
@@ -414,6 +415,18 @@ local function SCPCBThoughtOwner(ent)
     end
 end
 
+local notificationPriorities = {
+    hypoxia_critical = 100,
+    spine3_oxygen_loss = 90,
+    cervical_paralysis = 80,
+    pain_scream = 110,
+    ribs = 10,
+}
+
+local function LegacyThoughtText(msg)
+    return msg:gsub("^Your ", "My "):gsub("^You ", "I "):gsub(" your ", " my ")
+end
+
 local function CreateNotification(ply, msg, delay, msgKey, showTime, func, clr)
     if not IsValid(ply) or not ply:IsPlayer() then error("player is not valid!") return false end
     if not msg or not isstring(msg) then error("no message or message is invalid!") return false end
@@ -432,6 +445,8 @@ local function CreateNotification(ply, msg, delay, msgKey, showTime, func, clr)
 
         return CreateThought(ply, thought, delay, "thought_" .. msgKey, showTime, clr, func)
     end
+
+    if string.StartWith(msgKey, "thought_") then msg = LegacyThoughtText(msg) end
 
     if msg == "" then return end
 
@@ -485,6 +500,7 @@ local function CreateNotification(ply, msg, delay, msgKey, showTime, func, clr)
         net.WriteString(msg)
         //net.WriteFloat(showTime or 3)
         net.WriteColor(clr2)
+        net.WriteUInt(notificationPriorities[msgKey] or 0, 7)
         net.Send(ply)
     end)
 
@@ -653,7 +669,7 @@ local function CreateModeThought(ply, msg, delay, msgKey, showTime, clr, func)
         return CreateThought(ply, msg, delay, msgKey, showTime, clr, func)
     end
 
-    return CreateNotification(ply, msg, delay, msgKey, showTime, func, clr)
+    return CreateNotification(ply, LegacyThoughtText(msg), delay, msgKey, showTime, func, clr)
 end
 
 hg.CreateNotification = CreateNotification

@@ -421,7 +421,6 @@ end
 
 -- Emit ring sound with station pooling from oldring
 local function EmitRingSound(soundPath, volume)
-    if hg_unconsciousclassic and hg_unconsciousclassic:GetBool() then return end
     if soundPath == SOUND_HEART then
         EnsureHeartStations()
 
@@ -431,11 +430,7 @@ local function EmitRingSound(soundPath, volume)
         if IsValid(st) then
             PlayStation(st, volume)
         else
-            sound.PlayFile("sound/" .. soundPath, "noblock noplay", function(station)
-                if IsValid(station) then
-                    PlayStation(station, volume)
-                end
-            end)
+            sound.Play(SOUND_HEART, LocalPlayer():EyePos(), 65, 100, math.Clamp(volume or 1, 0, 1))
         end
     elseif soundPath == SOUND_FLATLINE then
         EnsureFlatlineStation()
@@ -1100,7 +1095,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         if not incapPromptX then
             local radius = math.min(280, ScrH() * 0.32)
             incapPromptX = ScrW() * 0.5
-            incapPromptY = math.max(ScrH() * 0.5 - radius - ScreenScaleH(32), ScreenScaleH(20))
+            incapPromptY = math.max(ScrH() * 0.5 - radius - ScreenScaleH(64), ScreenScaleH(20))
         end
 
         local messageY = incapPromptY

@@ -1023,6 +1023,7 @@ function fakeBoneFlop.ApplyBone(rag, bone)
 	if rag.hg_floppy_constraints and IsValid(rag.hg_floppy_constraints[bone]) then
 		rag.hg_floppy_constraints[bone]:Remove()
 	end
+	rag:SetSaveValue("m_ragdoll.allowStretch", false)
 	rag:RemoveInternalConstraint(physIDChild)
 	cons:Spawn()
 	cons:Activate()

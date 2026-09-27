@@ -179,7 +179,7 @@ if CLIENT then
 
 	local defaultShowTimer = 3
 
-	local function CreateNotification(msg, showTimer, clr)
+	local function CreateNotification(msg, showTimer, clr, priority)
 		if hg_furcity:GetBool() or lply.PlayerClassName == "furry" then
 			msg = hg.FurrifyPhrase(msg)
 		end
@@ -188,7 +188,27 @@ if CLIENT then
 			return
 		end
 
-		table.insert(hg.notifications, {msg, (showTimer or defaultShowTimer), clr or Color(255, 255, 255, 255)})
+		priority = priority or 0
+		local current = hg.currentNotification
+		if current and priority > (current[5] or 0) then
+			if priority == 110 then
+				local elapsed = math.max(CurTime() - current[2], 0)
+				local speed = 0.06 * ((lply.organism and lply.organism.brain or 0) > 0.1 and 3 or 1)
+				local visible = math.min(math.ceil(elapsed / speed), utf8.len(current[1]))
+				if visible > 0 and visible < utf8.len(current[1]) then
+					msg = utf8.sub(current[1], 1, visible) .. "-" .. msg
+				end
+			else
+				table.insert(hg.notifications, 1, {current[1], current[3], current[4], current[5] or 0})
+			end
+			hg.currentNotification = nil
+		end
+		local notification = {msg, (showTimer or defaultShowTimer), clr or Color(255, 255, 255, 255), priority}
+		local index = #hg.notifications + 1
+		for i, queued in ipairs(hg.notifications) do
+			if notification[4] > (queued[4] or 0) then index = i break end
+		end
+		table.insert(hg.notifications, index, notification)
 	end
 
 	local function CreateNotificationBerserk(msg, showTimer, clr)
@@ -249,10 +269,11 @@ if CLIENT then
 	net.Receive("HGNotificate",function()
 		local msg = net.ReadString()
 		local clr = net.ReadColor()
+		local priority = net.ReadUInt(7)
 
 		if msg == "" then return end
 
-		CreateNotification(msg, showtime, clr)
+		CreateNotification(msg, showtime, clr, priority)
 	end)
 
 	net.Receive("HGNotificateBerserk",function()
@@ -302,7 +323,7 @@ if CLIENT then
 				hg.currentNotification = nil
 			end*/
 
-			hg.currentNotification = {tbl[1], time_spent, tbl[2], tbl[3]}
+			hg.currentNotification = {tbl[1], time_spent, tbl[2], tbl[3], tbl[4]}
 
 			table.remove(hg.notifications,1)
 		end--показываем только одну нотификацию за раз (остальные держим в уме....)

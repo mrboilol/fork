@@ -9,8 +9,8 @@ local hg_hit_knockdown_energy = CreateConVar("hg_hit_knockdown_energy", "110", F
 local IKSystem = include("system_/utils/IKChain.lua")
 
 local AR_MODEL = "models/AREAnims/model_anim.mdl"
-local START_DELAY = 0.05
-local START_WINDOW = 0.5
+local START_DELAY = 0
+local START_WINDOW = 0.75
 local HIT_WINDOW = 0.5
 local HIT_MIN_DMG = 8
 local UPRIGHT_THRESHOLD = 0.05
@@ -26,6 +26,9 @@ local STUMBLE_STEP_INTERVAL_MUL = 0.8
 local STUMBLE_LUNGE_MUL = 0.05
 local STUMBLE_LUNGE_MAX = 12
 local STUMBLE_PITCH = 180
+local STUMBLE_SUPPORT_TIME = 1.5
+local STUMBLE_MAX_TIME = 2.5
+local STUMBLE_FALL_GRACE = 0.65
 local TOPPLE_PUSH = 110
 local TOPPLE_DOWN = 60
 local TOPPLE_ROLL = 200
@@ -40,7 +43,6 @@ local ENERGY_RAG_PUSH = 2
 local ENERGY_RAG_PUSH_MAX = 300
 local ENERGY_FLING = 1.5
 local ENERGY_FLING_MAX = 320
-local ENERGY_FLING_LIFT = 0.15
 
 local ENERGY_TYPES = {
 	{DMG_BUCKSHOT, 1},
@@ -277,6 +279,16 @@ local function findGroundPosition(cfg, pos, ragdoll, currentFootZ, pelvisZ)
 	return Vector(pos.x, pos.y, currentFootZ), Vector(0, 0, 1)
 end
 
+local function findGroundForStumble(pos, ragdoll)
+	local tr = util.TraceLine({
+		start = pos + Vector(0, 0, 10),
+		endpos = pos - Vector(0, 0, 200),
+		mask = MASK_SOLID_BRUSHONLY,
+		filter = ragdoll,
+	})
+	if tr.Hit and sanitizeVector(tr.HitPos, nil) then return tr.HitPos end
+end
+
 local function groundTrace(ply, ragdoll, dist)
 	local center = ragdoll:WorldSpaceCenter()
 	return util.TraceLine({
@@ -476,6 +488,11 @@ local function updateGhostPositions(st, ragdoll, isMoving, horizontalVel)
 	end
 end
 
+local function stumbleLifetime(st)
+	return math.min(st.cfg.TimeBeforeDecay + st.cfg.DecayDuration, STUMBLE_MAX_TIME)
+		* math.max(st.vigor, DECAY_VIGOR_FLOOR)
+end
+
 local function updateStumble(st, ragdoll)
 	local cfg = st.cfg
 	local dt = FrameTime()
@@ -581,11 +598,24 @@ local function updateStumble(st, ragdoll)
 			chain:Update()
 		end
 	end
+	local supportProgress = math.Clamp((now - st.startTime) / STUMBLE_SUPPORT_TIME, 0, 1)
+	local support = (1 - supportProgress * supportProgress) * st.vigor
+	if support > 0 and (st.hasGroundContact[1] or st.hasGroundContact[2]) then
+		local feetMid = (st.footPositions[1] + st.footPositions[2]) / 2
+		local ground = findGroundForStumble(feetMid, ragdoll)
+		if ground then
+			local heightDeficit = ground.z + cfg.HipTargetHeight - pelvisPos.z
+			if math.abs(feetMid.z - ground.z) < 12 and rawVel.z <= 0 and heightDeficit > 0 then
+				local weight = st.spine:GetMass() * physenv.GetGravity():Length()
+				local brace = math.min(heightDeficit * 35, weight * 0.5)
+				st.spine:ApplyForceCenter(Vector(0, 0, brace * support))
+			end
+		end
+	end
 
 	if moveDir then
 		local axis = moveDir:Cross(Vector(0, 0, 1))
-		local lifetime = (cfg.TimeBeforeDecay + cfg.DecayDuration) * math.max(st.vigor, DECAY_VIGOR_FLOOR)
-		local instability = math.Clamp((now - st.startTime) / lifetime, 0, 1)
+		local instability = math.Clamp((now - st.startTime) / stumbleLifetime(st), 0, 1)
 		st.spine:AddAngleVelocity(-axis * STUMBLE_PITCH * (0.5 + instability) * dt)
 	end
 end
@@ -807,14 +837,13 @@ end
 
 local function wantedReaction(ply, ragdoll)
 	if not isAware(ply) then return end
+	if hg_euphoria_windmill:GetBool() and isAirborne(ply, ragdoll) then return "flail" end
+	if stumbling[ragdoll] then return "stumble" end
 
 	if limbControl(ply) then
 		ragdoll.hgCoverUntil = nil
 		return
 	end
-
-	if hg_euphoria_windmill:GetBool() and isAirborne(ply, ragdoll) then return "flail" end
-	if stumbling[ragdoll] then return "stumble" end
 
 	local root = ragdoll:GetPhysicsObject()
 	if hg_euphoria_tumble:GetBool() and IsValid(root) and not stumbling[ragdoll] and not moveControl(ply) then
@@ -877,8 +906,7 @@ local function updateReaction(ply, ragdoll)
 	local strength = mode.strength * vigor(org)
 	if rs.mode == "stumble" then
 		local st = stumbling[ragdoll]
-		local lifetime = (st.cfg.TimeBeforeDecay + st.cfg.DecayDuration) * math.max(st.vigor, DECAY_VIGOR_FLOOR)
-		strength = strength * (1 - 0.8 * math.Clamp((CurTime() - st.startTime) / lifetime, 0, 1))
+		strength = strength * (1 - 0.8 * math.Clamp((CurTime() - st.startTime) / stumbleLifetime(st), 0, 1))
 	end
 	rs.ent:SetReactionStrength(strength)
 
@@ -957,8 +985,7 @@ local function knockDown(ply)
 		if not IsValid(ragdoll) or acc.dir:LengthSqr() < 0.01 then return end
 
 		local fling = math.min(acc.energy * ENERGY_FLING, ENERGY_FLING_MAX)
-		local vel = acc.dir:GetNormalized() * fling
-		vel.z = fling * ENERGY_FLING_LIFT
+		local vel = Vector(acc.dir.x, acc.dir.y, 0):GetNormalized() * fling
 		for i = 0, ragdoll:GetPhysicsObjectCount() - 1 do
 			local phys = ragdoll:GetPhysicsObjectNum(i)
 			if IsValid(phys) then phys:AddVelocity(vel) end
@@ -1160,16 +1187,14 @@ local function stumbleEndReason(ply, ragdoll, st)
 	if not hg_euphoria_getup_stumble:GetBool() then return "off" end
 	if not IsValid(ragdoll) or not IsValid(ply) or ply.FakeRagdoll ~= ragdoll then return "gone" end
 	if not IsValid(st.pelvis) or not IsValid(st.spine) or not canStumble(ply, ragdoll) then return "gone" end
-	if hg.KeyDown(ply, IN_DUCK) then return "control" end
 	if st.tripLeg then return "trip" end
 
 	local now = CurTime()
 	if st.stillSince and now - st.stillSince > STILL_GRACE then return "decay" end
 
 	st.vigor = vigor(ply.organism)
-	local lifetime = (st.cfg.TimeBeforeDecay + st.cfg.DecayDuration) * math.max(st.vigor, DECAY_VIGOR_FLOOR)
-	if now - st.startTime >= lifetime then return "decay" end
-	if not isUpright(ply, ragdoll) then return "fell" end
+	if now - st.startTime >= stumbleLifetime(st) then return "decay" end
+	if now - st.startTime >= STUMBLE_FALL_GRACE and not isUpright(ply, ragdoll) then return "fell" end
 end
 
 local function removeDying(ragdoll)
@@ -1286,7 +1311,9 @@ hook.Add("Think", "HG_EuphoriaStumble", function()
 			continue
 		end
 
-		if canStumble(ply, ragdoll) and not hg.KeyDown(ply, IN_DUCK) and hasMomentum(ply, ragdoll) and isUpright(ply, ragdoll) then
+		local ground = groundTrace(ply, ragdoll, UPRIGHT_TRACE)
+		if canStumble(ply, ragdoll) and not hg.KeyDown(ply, IN_DUCK) and hasMomentum(ply, ragdoll)
+			and ground.Hit and UPRIGHT_TRACE * ground.Fraction > UPRIGHT_MIN_HEIGHT then
 			startStumble(ply, ragdoll)
 		end
 	end

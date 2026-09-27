@@ -975,14 +975,12 @@ module[2] = function(owner, org, timeValue)
 
 	end
 
-	local bloodDelivery = 0.1 + 0.9 * hg.organism.GetBloodDeliveryFraction(org.blood, 1)
-	local pressureDelivery = 0.2 + 0.8 * math.Clamp(((tonumber(org.bloodPressure) or 90) - 20) / 50, 0, 1)
-	local flowDelivery = 0.2 + 0.8 * math.Clamp((tonumber(org.cardiacOutput) or 1) / 0.8, 0, 1)
+	local pressureDelivery = math.Clamp((tonumber(org.bloodPressure) or 90) / 70, 0, 1)
+	local flowDelivery = math.Clamp((tonumber(org.cardiacOutput) or 1) / 0.8, 0, 1)
 	local rawTissuePerfusion = math.min(
 		flowDelivery,
 		hg.organism.GetPulseOxygenPerfusion(org.pulse),
 		pressureDelivery,
-		bloodDelivery,
 		1 - math.Clamp(org.hypertension or 0, 0, 1) ^ 2 * 0.85
 	)
 	local tissuePerfusionTarget = rawTissuePerfusion ^ 0.72

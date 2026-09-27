@@ -272,6 +272,30 @@ function hg.TryDislocateLimb(org, key, segment, severity)
 	return doDislocate(org, key, severity, segment or "up")
 end
 
+local function shouldDislocateLimb(org, key, segment, dmgInfo, hit)
+	if not dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH) or dmgInfo:GetDamageForce():Length() < 40 then return false end
+	if org[key .. "dislocation"] then return false end
+
+	local owner = org.owner
+	if not IsValid(owner) then return false end
+	if IsValid(owner.FakeRagdoll) then owner = owner.FakeRagdoll end
+	local pos = isvector(hit) and hit or dmgInfo:GetDamagePosition()
+	if !isvector(pos) or pos:LengthSqr() < 1 then return false end
+
+	local side = key:sub(1, 1) == "r" and "R" or "L"
+	local arm = key:find("arm", 1, true) ~= nil
+	local joints = arm and (segment == "up" and {"UpperArm", "Forearm"} or {"Forearm", "Hand"})
+		or (segment == "up" and {"Thigh", "Calf"} or {"Calf", "Foot"})
+	for _, joint in ipairs(joints) do
+		local index = owner:LookupBone("ValveBiped.Bip01_" .. side .. "_" .. joint)
+		if index then
+			local jointPos = owner:GetBonePosition(index)
+			if isvector(jointPos) and pos:DistToSqr(jointPos) <= 144 then return true end
+		end
+	end
+	return false
+end
+
 local function legs(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, ricochet)
 	local oldDmg = org[key]
 	local dmg = dmg * 2.5
@@ -295,18 +319,13 @@ local function legs(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 	org[key] = org[key] * 0.5
 
 	if dmg < 0.5 then return 0 end
-	if dmg < 1 and !dmgInfo:IsDamageType(DMG_CLUB+DMG_CRUSH+DMG_FALL) then
-		if math.Rand(0, 1) >= 0.5 then return 0 end
-		doDislocate(org, key, dmg, segment)
-		hg.AddHarmToAttacker(dmgInfo, (org[key] - oldDmg) * 2, "Legs bone damage harm")
-		return result, vecrand
-	end
+	if dmg < 1 then return result, vecrand end
 
 	if IsValid(org.owner) and org.owner:IsPlayer() and !org[key.."amputated"] then org.just_damaged_bone = CurTime() end
 
 	local stabilized = org[key.."stabilized"]
 	
-	if dmg >= 1 and (!dmgInfo:IsDamageType(DMG_CLUB+DMG_CRUSH+DMG_FALL) or math.random(3) != 1) then
+	if not shouldDislocateLimb(org, key, segment, dmgInfo, hit) then
 		org[key] = 1
 		markLimbFracture(org, key, segment)
 		if hg.fakeBoneFlop then
@@ -364,18 +383,13 @@ local function arms(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 	org[key] = org[key] * 0.5
 
 	if dmg < 0.5 then return 0 end
-	if dmg < 1 and !dmgInfo:IsDamageType(DMG_CLUB+DMG_CRUSH+DMG_FALL) then
-		if math.Rand(0, 1) >= 0.5 then return 0 end
-		doDislocate(org, key, dmg, segment)
-		hg.AddHarmToAttacker(dmgInfo, (org[key] - oldDmg) * 1.5, "Arms bone damage harm")
-		return result, vecrand
-	end
+	if dmg < 1 then return result, vecrand end
 
 	if IsValid(org.owner) and org.owner:IsPlayer() and !org[key.."amputated"] then org.just_damaged_bone = CurTime() end
 
 	local stabilized = org[key.."stabilized"]
 	
-	if dmg >= 1 and (!dmgInfo:IsDamageType(DMG_CLUB+DMG_CRUSH+DMG_FALL) or math.random(3) != 1) then
+	if not shouldDislocateLimb(org, key, segment, dmgInfo, hit) then
 		org[key] = 1
 		markLimbFracture(org, key, segment)
 		if hg.fakeBoneFlop then
@@ -471,7 +485,11 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 			org.cervicalParalysis = true
 			org.paralyzed = true
 			if org.isPly then
-				notifyOwner(org, "Your neck is broken. You can't move.", 20, "cervical_paralysis", 0, nil, Color(255, 190, 190))
+				if hasNewThoughts(org) then
+					notifyOwner(org, "Your neck is broken. You can't move.", 20, "cervical_paralysis", 0, nil, Color(255, 190, 190))
+				else
+					notifyOwner(org, "I CANT MOVE, I CANT MOVE PLEASE HELP!", 20, "cervical_paralysis", 0, nil, Color(255, 190, 190))
+				end
 			end
 		end
 		if oldDmg < 1 and org.spine3 >= 1 then
@@ -688,8 +706,11 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 
 			if org.isPly then
 				local message = lost == 1 and "You lost a tooth." or ("You lost " .. lost .. " teeth.")
-				if !hasNewThoughts(org) then notifyOwner(org, message, true, "teeth", 2) end
-				sendThought(org, message, "thought_teeth", 3, Color(255, 210, 210))
+				if hasNewThoughts(org) then
+					sendThought(org, message, "thought_teeth", 3, Color(255, 210, 210))
+				else
+					notifyOwner(org, lost == 1 and "I lost a tooth." or ("I lost " .. lost .. " teeth."), true, "teeth", 2)
+				end
 			end
 		end
 	end
@@ -1050,17 +1071,13 @@ local function upper_limb(org, bone, dmg, dmgInfo, amputate_key, limb_key, segme
 	org[limb_key] = org[limb_key] * 0.5
 
 	if d < 0.5 then return 0 end
-	if d < 1 and !dmgInfo:IsDamageType(DMG_CLUB+DMG_CRUSH+DMG_FALL) then
-		if math.Rand(0, 1) >= 0.5 then return 0 end
-		doDislocate(org, limb_key, d, segment)
-		return result, vecrand
-	end
+	if d < 1 then return result, vecrand end
 
 	if IsValid(org.owner) and org.owner:IsPlayer() and !org[amputate_key.."amputated"] then org.just_damaged_bone = CurTime() end
 
 	local stabilized = org[limb_key.."stabilized"]
 
-	if d >= 1 and (!dmgInfo:IsDamageType(DMG_CLUB+DMG_CRUSH+DMG_FALL) or math.random(3) != 1) then
+	if not shouldDislocateLimb(org, limb_key, segment, dmgInfo, hit) then
 		org[limb_key] = 1
 		markLimbFracture(org, limb_key, segment)
 		if hg.fakeBoneFlop then
