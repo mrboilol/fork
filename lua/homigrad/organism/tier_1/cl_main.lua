@@ -1609,8 +1609,8 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 						local interval = Lerp(math.Clamp(visualRate / 20, 0, 1), 0.5, 1 / math.max(hg_blood_fps:GetInt(), 1))
 						local exitWound = wound.exitWound
 						local exitPos, exitAng = exitWound and hg.organism.GetWoundTransform(ent, exitWound)
-						local underwater = emitArterialBleeding(ent, org, wound, i, pos, ang, ang:Forward(), water, visualRate * (exitPos and 0.4 or 1), interval, exitPos and 0.4 or 1)
-						if exitPos then
+						local underwater = emitArterialBleeding(ent, org, wound, i, pos, ang, ang:Forward(), water, visualRate * (exitPos and exitAng and 0.4 or 1), interval, exitPos and exitAng and 0.4 or 1)
+						if exitPos and exitAng then
 							local exitWater = bit.band(util.PointContents(exitPos), CONTENTS_WATER) == CONTENTS_WATER
 							emitArterialBleeding(ent, org, wound, i, exitPos, exitAng, exitAng:Forward(), exitWater, visualRate * 0.6, interval, 0.6)
 						end

@@ -122,6 +122,7 @@ cvars.RemoveChangeCallback("hg_old_blood", "hg_refresh_old_blood_decals")
 cvars.AddChangeCallback("hg_old_blood", function(_, oldValue, newValue)
 	if oldValue == newValue then return end
 	hg.bloodpositions = {}
+	hg.bloodcount = 0
 	hg.groundbloodstains = {}
 	hg.fadinggroundbloodstains = {}
 end, "hg_refresh_old_blood_decals")
@@ -129,6 +130,7 @@ cvars.RemoveChangeCallback("hg_oldblood", "hg_refresh_oldblood_decals")
 cvars.AddChangeCallback("hg_oldblood", function(_, oldValue, newValue)
 	if oldValue == newValue then return end
 	hg.bloodpositions = {}
+	hg.bloodcount = 0
 	hg.groundbloodstains = {}
 	hg.fadinggroundbloodstains = {}
 end, "hg_refresh_oldblood_decals")

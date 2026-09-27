@@ -51,7 +51,7 @@ local shoveAnimTime = 0.7
 local shoveCooldownPrimary = 1
 local shoveCooldownSecondary = 1.25
 local shoveRange = 50
-local shoveForce = 165
+local shoveForce = 230
 local shoveRagdollChance = 6
 local shoveStumbleChance = 1
 local specialDamageMul = 1.5
@@ -1028,7 +1028,7 @@ function SWEP:ShoveFront(sprintShove)
 
 		if IsValid(ent) and ent:IsRagdoll() then
                 sound.Play("physics/body/body_medium_impact_soft" .. math_random(1, 7) .. ".wav", trace.HitPos, 75, 110)
-                PushRagdoll(ent, trace.PhysicsBone or 0, pushVel * 0.45, trace.HitPos)
+                PushRagdoll(ent, trace.PhysicsBone or 0, pushVel * 0.65, trace.HitPos)
                 WriteShoveHarm(owner, ent, self, sprintShove and 2 or 1.25)
                 owner:LagCompensation(false)
                 return
@@ -1061,7 +1061,7 @@ function SWEP:ShoveFront(sprintShove)
                                 if not IsValid(target) then return end
                                 local rag = hg.GetCurrentCharacter(target)
                                 if not IsValid(rag) or rag == target then return end
-                                PushRagdoll(rag, trace.PhysicsBone or 0, ragdollPushVel * 0.55, trace.HitPos)
+                                PushRagdoll(rag, trace.PhysicsBone or 0, ragdollPushVel * 0.75, trace.HitPos)
                         end)
                 end
 

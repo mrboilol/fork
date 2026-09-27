@@ -321,7 +321,7 @@ local function Trace_Bullet(box, hit, ricochet, impact, org, organs, dmg, dmgInf
 			if brainDelta > 0 and hg.organism.AddBrainHemorrhage then
 				hg.organism.AddBrainHemorrhage(org, math.Clamp(0.01 + brainDelta * 0.35, 0.01, 0.14), math.Clamp(0.0003 + brainDelta * 0.003, 0.0003, 0.004))
 			end
-			impact.brainHit = brainDelta > 0
+			impact.brainHit = impact.brainHit or brainDelta > 0
 			if brainDelta > 0 then
 				impact.brainLobesHit = impact.brainLobesHit or {}
 				impact.brainLobesHit[name] = true
@@ -2018,7 +2018,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		hg.AttachStomachGore(ent, dirCool * len)
 	end
 	local throughAndThrough = outputHole and #outputHole > 0
-	local fatalHeadshot = (org.brain or 0) >= 0.25 or throughAndThrough or not org.alive or (IsValid(ply) and not ply:Alive())
+	local fatalHeadshot = impact.brainHit or (org.brain or 0) >= 0.25 or throughAndThrough or not org.alive or (IsValid(ply) and not ply:Alive())
 	if hitgroup == HITGROUP_HEAD and fatalHeadshot and damageStack > 0 and dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_SNIPER) and !ent.headexploded and !ent.headExplodePending then
 		local squirtDirection = getShotTravelDirection(dmgInfo, inputHole, outputHole, dmgPos, ent)
 		local caliber = tonumber(bullet and bullet.Diameter) or tonumber(IsValid(inf) and inf.PenetrationSize) or 0

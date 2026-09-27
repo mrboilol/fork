@@ -208,10 +208,6 @@ local brainLobeProfiles = {
 	brainOccipital = {brain = 0.75, consciousness = 1.3, disorientation = 1.1, shock = 2, pain = 7, hemorrhage = 0.75}
 }
 
-local function getBrainLobeDamage(org)
-	return math.min(org.brainFrontal or 0, 0.2) + math.min(org.brainParietal or 0, 0.2) + math.min(org.brainTemporal or 0, 0.2) + math.min(org.brainOccipital or 0, 0.2)
-end
-
 local function addBrainHemorrhage(org, amount, rate)
 	org.brainHemorrhage = math.min((org.brainHemorrhage or 0) + amount, 1)
 	org.brainBleedRate = math.min((org.brainBleedRate or 0) + (rate or amount * 0.0015), 0.008)
@@ -219,7 +215,7 @@ end
 
 hg.organism.AddBrainHemorrhage = addBrainHemorrhage
 
-local function damageBrainLobe(org, bone, dmg, dmgInfo, key)
+local function damageBrainLobe(org, bone, dmg, dmgInfo, key, impact)
 	local profile = brainLobeProfiles[key]
 	if not profile then return 0 end
 	if dmgInfo:IsDamageType(DMG_BLAST) then dmg = dmg / 50 end
@@ -234,12 +230,13 @@ local function damageBrainLobe(org, bone, dmg, dmgInfo, key)
 		dmg = math.max(dmg, 0.15)
 	end
 
-	local oldBrainLobeDamage = getBrainLobeDamage(org)
 	local oldDmg = org[key] or 0
+	local diameter = impact and impact.bullet and impact.bullet.Diameter
+	local brainCap = (dmgInfo:IsDamageType(DMG_CLUB) or (diameter and diameter <= 5.7)) and 0.2 or 0.4
 	local result = damageOrgan(org, dmg, dmgInfo, key)
 	local delta = (org[key] or 0) - oldDmg
 
-	org.brain = math.min((org.brain or 0) + (getBrainLobeDamage(org) - oldBrainLobeDamage) * 1.5, 1)
+	org.brain = math.min((org.brain or 0) + (math.min(org[key] or 0, brainCap) - math.min(oldDmg, brainCap)) * 1.5, 1)
 	org.consciousness = math.Approach(org.consciousness, 0, delta * profile.consciousness)
 	org.disorientation = org.disorientation + delta * profile.disorientation
 	if hg.organism.module.concussion and hg.organism.module.concussion.AddHeadTrauma then
@@ -288,10 +285,10 @@ local function damageBrainLobe(org, bone, dmg, dmgInfo, key)
 	return result
 end
 
-input_list.brainFrontal = function(org, bone, dmg, dmgInfo) return damageBrainLobe(org, bone, dmg, dmgInfo, "brainFrontal") end
-input_list.brainParietal = function(org, bone, dmg, dmgInfo) return damageBrainLobe(org, bone, dmg, dmgInfo, "brainParietal") end
-input_list.brainTemporal = function(org, bone, dmg, dmgInfo) return damageBrainLobe(org, bone, dmg, dmgInfo, "brainTemporal") end
-input_list.brainOccipital = function(org, bone, dmg, dmgInfo) return damageBrainLobe(org, bone, dmg, dmgInfo, "brainOccipital") end
+input_list.brainFrontal = function(org, bone, dmg, dmgInfo, _, _, _, _, impact) return damageBrainLobe(org, bone, dmg, dmgInfo, "brainFrontal", impact) end
+input_list.brainParietal = function(org, bone, dmg, dmgInfo, _, _, _, _, impact) return damageBrainLobe(org, bone, dmg, dmgInfo, "brainParietal", impact) end
+input_list.brainTemporal = function(org, bone, dmg, dmgInfo, _, _, _, _, impact) return damageBrainLobe(org, bone, dmg, dmgInfo, "brainTemporal", impact) end
+input_list.brainOccipital = function(org, bone, dmg, dmgInfo, _, _, _, _, impact) return damageBrainLobe(org, bone, dmg, dmgInfo, "brainOccipital", impact) end
 input_list.brain = input_list.brainFrontal
 
 hook.Add("HomigradDamage", "BrainHemorrhageTrauma", function(ply, dmgInfo, hitgroup)
