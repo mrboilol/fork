@@ -1630,7 +1630,7 @@ hook.Add("Think", "Fake", function()
 	local rollLeft = ply:KeyDown(IN_MOVELEFT)
 	local rollRight = ply:KeyDown(IN_MOVERIGHT)
 
-	if (rollLeft or rollRight) and IsValid(spine) and not inmove and !ply:InVehicle() and org.canmove then
+	if (rollLeft or rollRight) and IsValid(spine) and not inmove and !ply:InVehicle() and org.canmove and not ragdoll.hgStumbleActive then
 		local onground = util.TraceLine({
 			start = spine:GetPos(),
 			endpos = spine:GetPos() - vector_up * 36,

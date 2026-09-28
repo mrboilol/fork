@@ -102,7 +102,8 @@ function SWEP:UpdateWeaponReadiness(owner, dtime)
 	local deploying = isnumber(self.deploy) and self.deploy > CurTime()
 	local lowered = (sprinting and !self:CanSprintFire()) or deploying
 	local factor = self:GetWeaponInertiaFactor()
-	local raiseRate = math.Clamp((self.Ergonomics or 1) * 4 / math.sqrt(factor), 1.6, 8)
+	local stance = self:GetHandSupportState(owner)
+	local raiseRate = math.Clamp((self.Ergonomics or 1) * 4 / math.sqrt(factor), 1.6, 8) * (stance.postureOneHanded and 1.35 or 1)
 	local recoveryScale = self.shotRecoveryScale or 1
 	local recoveryRate = math.Clamp(((self.Ergonomics or 1) * 1.8 + 0.6) / (1 + math.sqrt(factor) * 0.35), 0.45, 2.4) / recoveryScale
 	self.recoilAimPenalty = math.Approach(self.recoilAimPenalty or 0, 0, dt * recoveryRate)
@@ -152,7 +153,7 @@ function SWEP:ChangeGunPos(dtime)
 	if self:IsZoom() and not self:IsResting() then
 		self.aimHoldTime = math.min((self.aimHoldTime or 0) + aimDt * (readyStance and 0.7 or 1), 18)
 	else
-		self.aimHoldTime = math.Approach(self.aimHoldTime or 0, 0, aimDt * (readyStance and 7 or 5))
+		self.aimHoldTime = math.Approach(self.aimHoldTime or 0, 0, aimDt * (readyStance and 7 or 5) * (support.postureOneHanded and 1.25 or 1))
 	end
 	local fatigueDelay = Lerp(proficiency, support.oneHanded and 2.5 or 5, support.oneHanded and 4.5 or 8)
 	local fatigue = math.Clamp(((self.aimHoldTime or 0) - fatigueDelay) / 7, 0, 1)
@@ -174,7 +175,8 @@ function SWEP:ChangeGunPos(dtime)
 
 	local recoilDtime = math.min(dtime or FrameTime(), 0.05)
 	local recoverySkill = proficiency
-	local oneHandRecovery = support.oneHanded and not self.IgnoreOneArmPenalties and Lerp(recoverySkill, 0.72, self:HasFirearmTraining(ply) and 1 or 0.9) or 1
+	local stanceOneHanded = support.postureOneHanded and not support.leftBusy and not support.rightBusy
+	local oneHandRecovery = stanceOneHanded and 1.12 or support.oneHanded and not self.IgnoreOneArmPenalties and Lerp(recoverySkill, 0.72, self:HasFirearmTraining(ply) and 1 or 0.9) or 1
 	local recoveryScale = self.shotRecoveryScale or 1
 	local angularSpring = Lerp(recoverySkill, 62, 125) * oneHandRecovery / recoveryScale ^ 2
 	local angularDamping = Lerp(recoverySkill, 10, 23) * oneHandRecovery / recoveryScale
@@ -295,7 +297,10 @@ function SWEP:PosAngChanges(ply, desiredPos, desiredAng, bNoAdditional, closeani
 	self.setlhik = !self:IsResting() and (not (ply.posture == 7 or ply.posture == 8 or ( (self:IsPistolHoldType() or self.CanEpicRun) and self:IsSprinting() and !(ply.organism and ply.organism.rarmamputated) ) or (self:IsPistolHoldType() and ply.posture == 9) or (self:IsPistolHoldType() and ply.suiciding) ) or self.reload and self.setlhik or false)
 	self.setlhik = !(self:IsPistolHoldType() and (self:GetButtstockAttack() - CurTime() > -0.5)) and self.setlhik
 	local handSupport = self.GetHandSupportState and self:GetHandSupportState(ply)
-	if handSupport then self.setlhik = self.setlhik and handSupport.leftSupport end
+	if handSupport then
+		local reloadGrip = self.reload and not self:IsResting() and not handSupport.leftBusy and not (ply.organism and ply.organism.larmamputated)
+		self.setlhik = (self.setlhik and handSupport.leftSupport) or reloadGrip or false
+	end
 	
 	local tr = hg.eyeTrace(ply, 60, ent)
 	if not tr then return end

@@ -1143,7 +1143,6 @@ function fakeBoneFlop.ApplyBone(rag, bone)
 		rag.hg_floppy_bones = rag.hg_floppy_bones or {}
 		rag.hg_floppy_constraints[bone] = cons
 		rag.hg_floppy_bones[bone] = true
-		rag:SetSaveValue("m_ragdoll.allowStretch", org.fake_dislocated_bones and next(org.fake_dislocated_bones) ~= nil or false)
 		return
 	end
 
@@ -1226,9 +1225,6 @@ function fakeBoneFlop.ApplyBone(rag, bone)
 	phys:SetAngleVelocity(avelOri)
 	physParent:SetAngleVelocityInstantaneous(avelOriParent)
 	physParent:SetAngleVelocity(avelOriParent)
-
-	local allowStretch = dislocated or (org.fake_dislocated_bones and next(org.fake_dislocated_bones) ~= nil) or false
-	rag:SetSaveValue("m_ragdoll.allowStretch", allowStretch)
 end
 
 function fakeBoneFlop.ScheduleApply(rag, bone, org)

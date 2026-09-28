@@ -9,7 +9,9 @@ SWEP.DeploySnd = {"homigrad/weapons/draw_rifle.mp3", 65, 100, 110}
 function SWEP:GetDeployDuration()
 	local roleDeployMul = hg.GetSubRolePerk and hg.GetSubRolePerk(self:GetOwner(), "DeployMul", 1) or 1
 	local armEffectiveness = hg.GetArmEffectiveness and hg.GetArmEffectiveness(self:GetOwner(), "rarm") or 1
-	return math.max(self.CooldownDeploy / self.Ergonomics * roleDeployMul / Lerp(armEffectiveness, 0.5, 1), 0.35)
+	local support = self.GetHandSupportState and self:GetHandSupportState(self:GetOwner())
+	local stanceMul = support and (support.postureOneHanded and 0.75 or support.wantsTwoHands and 1.1) or 1
+	return math.max(self.CooldownDeploy / self.Ergonomics * roleDeployMul * stanceMul / Lerp(armEffectiveness, 0.5, 1), 0.3)
 end
 
 --!! fix ts shit

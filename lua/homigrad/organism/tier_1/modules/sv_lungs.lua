@@ -1029,6 +1029,7 @@ module[2] = function(owner, org, timeValue)
 
 	local rawTissuePerfusion = math.min(
 		hg.organism.GetCirculatoryOxygenReserve(org.pulse, tonumber(org.bloodPressure) or 90),
+		math.Clamp(((tonumber(org.blood) or 5000) - 1500) / 500, 0, 1),
 		1 - math.Clamp(org.hypertension or 0, 0, 1) ^ 2 * 0.85
 	)
 	local tissuePerfusionTarget = rawTissuePerfusion

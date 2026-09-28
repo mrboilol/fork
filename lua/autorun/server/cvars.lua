@@ -1,6 +1,7 @@
 if SERVER then
     util.AddNetworkString("change_setting")
     util.AddNetworkString("ar_reset_defaults")
+    util.AddNetworkString("ar_reset_cvars")
 end
 
 local managedCVars = {
@@ -45,10 +46,10 @@ local managedCVars = {
     ["hg_stumble_SearchHeightBuffer"] = "25",
     ["hg_stumble_StepHeight"] = "20",
     ["hg_stumble_HipTargetHeight"] = "50",
-    ["hg_stumble_Duration"] = "1.8",
+    ["hg_stumble_Duration"] = "3.5",
     ["hg_stumble_MinDriveSpeed"] = "130",
     ["hg_stumble_MaxDriveSpeed"] = "450",
-    ["hg_stumble_MomentumGain"] = "90",
+    ["hg_stumble_MomentumGain"] = "140",
     ["hg_stumble_DriveAccel"] = "700",
     ["hg_stumble_Carry"] = "0.55",
     ["hg_stumble_Pitch"] = "240",
@@ -151,5 +152,15 @@ if SERVER then
         end
         
         PrintMessage(HUD_PRINTTALK, "Admin " .. ply:Nick() .. " reset all ragdoll settings.")
+    end)
+
+    net.Receive("ar_reset_cvars", function(len, ply)
+        if not (IsValid(ply) and ply:IsAdmin()) then return end
+
+        for i = 1, net.ReadUInt(8) do
+            local name = net.ReadString()
+            local cvar = managedCVars[name] and GetConVar(name)
+            if cvar then cvar:SetString(managedCVars[name]) end
+        end
     end)
 end

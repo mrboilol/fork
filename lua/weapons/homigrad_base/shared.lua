@@ -186,13 +186,43 @@ end
 function SWEP:GetReloadExperienceMul(ply)
 	ply = ply or self:GetOwner()
 	if not IsValid(ply) then return 1 end
-	if self:HasFirearmTraining(ply) then return self:GetWeaponExperienceMul(ply) end
+	if self:HasFirearmTraining(ply) then return 0.88 end
+	if self:GetFirearmTraining(ply) > 0 then return Lerp(self:GetFirearmProficiency(ply), 1.1, 0.92) end
 
-	return Lerp(self:GetFirearmProficiency(ply), 1.1, 0.78)
+	return Lerp(self:GetFirearmProficiency(ply), 1.3, 0.95)
 end
 
+local partialTrainedClasses = {
+	terrorist = true,
+	bloodz = true,
+	groove = true,
+}
+
+local trainedClasses = {
+	north = true,
+	confederate = true,
+	police = true,
+	swat = true,
+	nationalguard = true,
+	commanderforces = true,
+	ukr = true,
+	wagner = true,
+	Combine = true,
+	Metrocop = true,
+	Gordon = true,
+	Rebel = true,
+}
+
 function SWEP:HasFirearmTraining(ply)
-	return (ply.HasTrait and ply:HasTrait("hunter")) or ply.Profession == "huntsman"
+	return (ply.HasTrait and ply:HasTrait("hunter")) or ply.Profession == "huntsman" or trainedClasses[ply.PlayerClassName] == true
+end
+
+function SWEP:GetFirearmTraining(ply)
+	ply = ply or self:GetOwner()
+	if not IsValid(ply) then return 0 end
+	if self:HasFirearmTraining(ply) then return 1 end
+	if partialTrainedClasses[ply.PlayerClassName] then return 0.5 end
+	return 0
 end
 
 function SWEP:GetFirearmProficiency(ply)
@@ -200,7 +230,9 @@ function SWEP:GetFirearmProficiency(ply)
 	if not IsValid(ply) then return 0 end
 	if self:HasFirearmTraining(ply) then return 1 end
 
-	return math.Clamp((tonumber(ply:GetNWFloat("hg_experience_skill", 0)) or 0) / 4.6, 0, 1)
+	local skill = math.Clamp((tonumber(ply:GetNWFloat("hg_experience_skill", 0)) or 0) / 4.6, 0, 1)
+	if self:GetFirearmTraining(ply) > 0 then skill = math.max(skill, 0.6) end
+	return skill
 end
 
 function SWEP:GetAmmoBallistics()
@@ -275,8 +307,9 @@ function SWEP:GetArmHealthHandlingMul()
 	local oneHandPenalty = self:HasFirearmTraining(owner) and 0.22 or Lerp(self:GetFirearmProficiency(owner), 1, 0.45)
 	if support.wantsTwoHands and not ignoreOneArm then loss = loss + (1 - brace) * 0.85 * oneHandPenalty end
 	if support.oneHanded and not ignoreOneArm then loss = loss + 0.5 * oneHandPenalty end
-	if firingBroken then loss = loss + 0.5 * limbDebuff end
-	if firingDislocated then loss = loss + 0.6 * limbDebuff end
+	local forgive = 1 - self:GetFirearmTraining(owner) * 0.45
+	if firingBroken then loss = loss + 0.5 * limbDebuff * forgive end
+	if firingDislocated then loss = loss + 0.6 * limbDebuff * forgive end
 	if firingAmputated then loss = loss + 0.7 end
 	if support.wantsTwoHands and braceBroken and not ignoreOneArm then loss = loss + 0.3 * oneHandPenalty * limbDebuff end
 	if support.wantsTwoHands and braceDislocated and not ignoreOneArm then loss = loss + 0.4 * oneHandPenalty * limbDebuff end
@@ -285,7 +318,7 @@ function SWEP:GetArmHealthHandlingMul()
 	if support.leftBusy and not ignoreOneArm then loss = loss + 0.3 * oneHandPenalty end
 	if support.rightBusy and not ignoreOneArm then loss = loss + 0.5 * oneHandPenalty end
 
-	loss = loss + math.Clamp(org.aiming_fatigue or 0, 0, 10) * 0.045
+	loss = loss + math.Clamp(org.aiming_fatigue or 0, 0, 10) * 0.045 * forgive
 	loss = loss + math.Clamp(org.permanent_aim_impairment or 0, 0, 2) * 0.4
 	local combat = hg.GetCombatCondition and hg.GetCombatCondition(owner) or nil
 	if combat then loss = loss + (combat.aim - 1) * 0.7 end
@@ -310,7 +343,8 @@ function SWEP:GetRecoilSupportMul()
 	local org = owner.organism or {}
 	if org.armstrength and org.armstrength > 0 and org.armstrength < 1 then mul = mul / org.armstrength end
 	mul = mul / (owner.GetTraitMultiplier and owner:GetTraitMultiplier("weapon_weight", 1) or 1)
-	return math.Clamp(mul, 0.65, 2.8), support.supportHands
+	mul = mul * (1 - self:GetFirearmTraining(owner) * 0.15)
+	return math.Clamp(mul, 0.6, 2.8), support.supportHands
 end
 
 function SWEP:GetPostureStabilityMul(aiming)
@@ -345,7 +379,7 @@ function SWEP:GetAimAlignmentTime(ply)
 
 	local org = ply.organism or {}
 	local brainPenalty = math.Clamp(org.brain or 0, 0, 1) * 2.5
-	local fatigueMul = 1 + math.Clamp(org.aiming_fatigue or 0, 0, 10) * 0.1
+	local fatigueMul = 1 + math.Clamp(org.aiming_fatigue or 0, 0, 10) * 0.1 * (1 - self:GetFirearmTraining(ply) * 0.45)
 	local combat = hg.GetCombatCondition and hg.GetCombatCondition(ply) or nil
 	local combatMul = combat and combat.aim or 1
 	local recoilPenalty = math.Clamp(self.recoilAimPenalty or 0, 0, 6)
@@ -2610,7 +2644,9 @@ function SWEP:GetAdditionalValues()
 		end
 
 		local recoilRecoveryTime = Lerp(self:GetFirearmProficiency(ply), 0.36, 0.2) * (self.shotRecoveryScale or 1)
-		if support.oneHanded and not self.IgnoreOneArmPenalties then recoilRecoveryTime = recoilRecoveryTime * Lerp(self:GetFirearmProficiency(ply), 1.4, trained and 1 or 1.12) end
+		if support.postureOneHanded and not support.leftBusy and not support.rightBusy then
+			recoilRecoveryTime = recoilRecoveryTime * 0.88
+		elseif support.oneHanded and not self.IgnoreOneArmPenalties then recoilRecoveryTime = recoilRecoveryTime * Lerp(self:GetFirearmProficiency(ply), 1.4, trained and 1 or 1.12) end
 		local recoilDecay = self:GetAnimShoot2(recoilRecoveryTime * mulhuy / host_timescale(), true)
 		self.recoilTail = recoilDecay
 		if recoilDecay > 0.001 then

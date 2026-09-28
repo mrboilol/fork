@@ -273,7 +273,7 @@ function hg.organism.GetPulseOxygenPerfusion(pulse)
 end
 
 function hg.organism.GetCirculatoryOxygenReserve(pulse, pressure)
-	return math.min(hg.organism.GetPulseOxygenPerfusion(pulse), Clamp((tonumber(pressure) or 0) / 70, 0, 1))
+	return math.min(hg.organism.GetPulseOxygenPerfusion(pulse), Clamp((tonumber(pressure) or 0) / 45, 0, 1))
 end
 
 local function getHypovolemicFailureBlood()

@@ -898,6 +898,43 @@ local function BuildCreditsPanel(panel)
     panel:AddItem(creditsCard)
 end
 
+local function CreateResetButton(text, question, send, top)
+    local resetBtn = vgui.Create("DButton")
+    resetBtn:SetText(text)
+    resetBtn:Dock(TOP)
+    resetBtn:DockMargin(10, top and 10 or 28, 10, 10)
+    resetBtn:SetTall(40)
+    resetBtn:SetTextColor(Theme.text_main)
+    resetBtn:SetFont("DermaDefaultBold")
+    resetBtn.targetColor = Theme.danger
+    resetBtn.currentColor = Theme.danger
+    resetBtn.hoverAmt = 0
+    
+    local spawnTime = SysTime()
+    resetBtn.Paint = function(self, w, h)
+        local progress = math.Clamp((SysTime() - spawnTime - 0.5) * Theme.entry_speed, 0, 1)
+        progress = smoothstep(progress)
+        
+        self.hoverAmt = Lerp(FrameTime() * 9, self.hoverAmt, self:IsHovered() and 1 or 0)
+        self.targetColor = self:IsHovered() and Theme.danger_hover or Theme.danger
+        self.currentColor = LerpColor(FrameTime() * Theme.anim_speed, self.currentColor, self.targetColor)
+        
+        surface.SetAlphaMultiplier(progress)
+        draw.RoundedBox(Theme.corner_rad, self.hoverAmt * 3, 0, w, h, self.currentColor)
+        surface.SetAlphaMultiplier(1)
+    end
+    
+    resetBtn.DoClick = function()
+        Derma_Query(question, "Confirm", "Yes", function()
+            timer.Simple(0, function()
+                if net then send() end
+            end)
+        end, "No")
+    end
+
+    return resetBtn
+end
+
 hook.Add("PopulateToolMenu", "AR_Menu", function()
     spawnmenu.AddToolTab("AR_Tab", "Artagdoll", "icon16/user_suit.png")
 
@@ -905,42 +942,10 @@ hook.Add("PopulateToolMenu", "AR_Menu", function()
         BuildPanel(panel, AR_STRUCTURE["Main"])
         panel:AddItem(CreatePresetManager())
         
-        local resetBtn = vgui.Create("DButton")
-        resetBtn:SetText("Reset to Defaults")
-        resetBtn:Dock(TOP)
-        resetBtn:DockMargin(10, 28, 10, 10)
-        resetBtn:SetTall(40)
-        resetBtn:SetTextColor(Theme.text_main)
-        resetBtn:SetFont("DermaDefaultBold")
-        resetBtn.targetColor = Theme.danger
-        resetBtn.currentColor = Theme.danger
-        resetBtn.hoverAmt = 0
-        
-        local spawnTime = SysTime()
-        resetBtn.Paint = function(self, w, h)
-            local progress = math.Clamp((SysTime() - spawnTime - 0.5) * Theme.entry_speed, 0, 1)
-            progress = smoothstep(progress)
-            
-            self.hoverAmt = Lerp(FrameTime() * 9, self.hoverAmt, self:IsHovered() and 1 or 0)
-            self.targetColor = self:IsHovered() and Theme.danger_hover or Theme.danger
-            self.currentColor = LerpColor(FrameTime() * Theme.anim_speed, self.currentColor, self.targetColor)
-            
-            surface.SetAlphaMultiplier(progress)
-            draw.RoundedBox(Theme.corner_rad, self.hoverAmt * 3, 0, w, h, self.currentColor)
-            surface.SetAlphaMultiplier(1)
-        end
-        
-        resetBtn.DoClick = function()
-            Derma_Query("Reset all settings to default?", "Confirm", "Yes", function()
-                timer.Simple(0, function()
-                    if net then
-                        net.Start("ar_reset_defaults")
-                        net.SendToServer()
-                    end
-                end)
-            end, "No")
-        end
-        
+        local resetBtn = CreateResetButton("Reset to Defaults", "Reset all settings to default?", function()
+            net.Start("ar_reset_defaults")
+            net.SendToServer()
+        end)
         panel:AddItem(resetBtn)
     end)
 
@@ -957,7 +962,20 @@ hook.Add("PopulateToolMenu", "AR_Menu", function()
 
     for _, menu in ipairs(behaviorMenus) do
         spawnmenu.AddToolMenuOption("AR_Tab", "Behaviours", menu.id, menu.name, "", "", function(panel)
-            BuildPanel(panel, { [menu.key] = AR_STRUCTURE["Behaviours"][menu.key] })
+            local data = AR_STRUCTURE["Behaviours"][menu.key]
+            if menu.key == "PlayerStumble" then
+                panel:AddItem(CreateResetButton("Reset Player Stumbling", "Reset player stumbling settings to default?", function()
+                    local names = {}
+                    for _, setting in ipairs(data) do
+                        if setting[1] then names[#names + 1] = setting[1] end
+                    end
+                    net.Start("ar_reset_cvars")
+                    net.WriteUInt(#names, 8)
+                    for _, name in ipairs(names) do net.WriteString(name) end
+                    net.SendToServer()
+                end, true))
+            end
+            BuildPanel(panel, { [menu.key] = data })
         end)
     end
 

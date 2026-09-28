@@ -37,6 +37,7 @@ function SWEP:GetReloadArmPenalty()
 	if leftArmBroken then
 		pain = pain + (penalty.PainOnReload or 35) * (org.larm or 0) * limbDebuff
 		if org.larmdislocation then pain = pain + 15 * limbDebuff end
+		speedMul = speedMul * 1.3
 	end
 
 	if leftArmBroken and not rightArmHealthy then
@@ -49,6 +50,9 @@ function SWEP:GetReloadArmPenalty()
 			pain = pain + (penalty.MissingRightArmPain or 55)
 		end
 	end
+	local forgive = 1 - self:GetFirearmTraining(ply) * 0.5
+	pain = pain * forgive
+	speedMul = 1 + (speedMul - 1) * forgive
 	if ply.GetTraitMultiplier then speedMul = speedMul * ply:GetTraitMultiplier("reload_speed", 1) end
 
 	return pain, speedMul
@@ -65,10 +69,13 @@ function SWEP:Reload(time)
 	local org = self:GetOwner().organism
 	local experienceMul = self.GetReloadExperienceMul and self:GetReloadExperienceMul(self:GetOwner()) or 1
 	local limbDebuff = org and hg.GetLimbDebuffMultiplier and hg.GetLimbDebuffMultiplier(org) or 1
-	local armReloadPenalty = org and not self.IgnoreOneArmPenalties and ((org.larm or 0) / 3 + (org.rarm or 0) / 5) * limbDebuff or 0
+	local armReloadPenalty = org and not self.IgnoreOneArmPenalties and ((org.larm or 0) / 3 + (org.rarm or 0) / 5) * limbDebuff * (1 - self:GetFirearmTraining(self:GetOwner()) * 0.5) or 0
 	self.StaminaReloadMul = (org and ((2 - (org.stamina[1] / 180)) + ((org.pain / 40) + armReloadPenalty) - (1 - math.Clamp(org.recoilmul or 1, 0.45, 1.4))) or 1) * experienceMul
 	self.StaminaReloadMul = self.StaminaReloadMul * (self:GetOwner().GetTraitMultiplier and self:GetOwner():GetTraitMultiplier("reload_speed", 1) or 1)
 	self.StaminaReloadMul = math.Clamp(self.StaminaReloadMul,0.65,1.5)
+	if org and not self.IgnoreOneArmPenalties and not org.larmamputated and ((org.larm or 0) >= 1 or org.larmdislocation) then
+		self.StaminaReloadMul = self.StaminaReloadMul * (1 + 0.3 * (1 - self:GetFirearmTraining(self:GetOwner()) * 0.5))
+	end
 	local magazine = self:GetAttachmentInfo("magwell")
 	local baseCapacity = self.BaseMagazineCapacity or self.Primary.DefaultClip or self.Primary.ClipSize
 	local magazineCapacity = magazine and magazine.capacity or self.Primary.ClipSize

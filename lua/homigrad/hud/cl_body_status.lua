@@ -10,7 +10,6 @@ local math_sin = math.sin
 local math_cos = math.cos
 local math_atan2 = math.atan2
 local math_exp = math.exp
-local math_ceil = math.ceil
 local math_Clamp = math.Clamp
 
 local TAU = math.pi * 2
@@ -34,9 +33,9 @@ local MIN_SPINE_LENGTH = 4
 local MAX_SPINE_LENGTH = 80
 local MIN_AXIS_LENGTH = 0.05
 local MEDICAL_UPDATE_INTERVAL = 0.1
-local BEAD_SPACING = 1.05
-local MAX_BEADS = 6
-local SPINE_FRONT_OFFSET = 0.28
+local SPINE_BACK_OFFSET = 0.12
+local CHEST_INSET = 0.45
+local PELVIS_INSET = 0.35
 local SKULL_LIFT = 0.12
 local JAW_DROP = 0.13
 local JAW_FORWARD = 0.1
@@ -83,9 +82,10 @@ local RADIUS = {
 	SKULL = 0.2,
 	JAW = 0.11,
 	NECK = 0.1,
-	CHEST = 0.3,
-	PELVIS = 0.24,
-	SPINE = 0.075,
+	CHEST = 0.2,
+	PELVIS = 0.17,
+	SPINE = 0.045,
+	SPINE_JOINT = 0.07,
 	UPPER_ARM = 0.1,
 	LOWER_ARM = 0.09,
 	HAND = 0.085,
@@ -166,8 +166,12 @@ local POINT = {
 	R_KNEE = 20,
 	R_ANKLE = 21,
 	R_FOOT = 22,
+	CHEST_L = 23,
+	CHEST_R = 24,
+	PELVIS_L = 25,
+	PELVIS_R = 26,
 }
-local POINT_COUNT = 22
+local POINT_COUNT = 26
 
 local LIMB_POINT_BONES = {
 	[POINT.L_SHOULDER] = BONE.L_UPPERARM,
@@ -231,8 +235,8 @@ local REGION_SEGMENTS = {
 	skull = {POINT.SKULL, POINT.SKULL, RADIUS.SKULL},
 	jaw = {POINT.JAW, POINT.JAW, RADIUS.JAW},
 	neck = {POINT.NECK, POINT.NECK, RADIUS.NECK},
-	chest = {POINT.CHEST, POINT.CHEST, RADIUS.CHEST},
-	pelvis = {POINT.PELVIS, POINT.PELVIS, RADIUS.PELVIS},
+	chest = {POINT.CHEST_L, POINT.CHEST_R, RADIUS.CHEST},
+	pelvis = {POINT.PELVIS_L, POINT.PELVIS_R, RADIUS.PELVIS},
 	larmup = {POINT.L_SHOULDER, POINT.L_ELBOW, RADIUS.UPPER_ARM},
 	larm = {POINT.L_ELBOW, POINT.L_WRIST, RADIUS.LOWER_ARM},
 	lhand = {POINT.L_WRIST, POINT.L_WRIST, RADIUS.HAND},
@@ -284,11 +288,10 @@ end
 
 local circles, circleOrder = {}, {}
 local circleCount = 0
-local circleCos, circleSin, circlePoly = {}, {}, {}
-for i = 1, CIRCLE_SEGMENTS do
-	local angle = (i - 1) / CIRCLE_SEGMENTS * TAU
-	circleCos[i], circleSin[i] = math_cos(angle), math_sin(angle)
-	circlePoly[i] = {x = 0, y = 0}
+local HALF_SEGMENTS = CIRCLE_SEGMENTS / 2
+local capsulePoly = {}
+for i = 1, (HALF_SEGMENTS + 1) * 2 do
+	capsulePoly[i] = {x = 0, y = 0}
 end
 
 local function getBodyEntity(ply)
@@ -500,8 +503,12 @@ local function placeEmitter(emitter)
 	emitter.valid = true
 end
 
-local function frontOffset(pos)
-	return pos and pos + frameForward * (SPINE_FRONT_OFFSET * frameSpineLength)
+local function backOffset(pos)
+	return pos and pos - frameForward * (SPINE_BACK_OFFSET * frameSpineLength)
+end
+
+local function insetPoint(index, side, center, inset)
+	projectPoint(index, side and LerpVector(inset, side, center) or center)
 end
 
 local function getHeadPoints(neck)
@@ -533,12 +540,18 @@ local function updatePose(snap)
 	local neck = worldPos[BONE.NECK] or worldPos[BONE.SPINE4]
 	local upperChest = worldPos[BONE.SPINE4] or neck
 	local midChest = worldPos[BONE.SPINE2] or LerpVector(0.5, frameRoot, neck)
+	local chestCenter = LerpVector(0.5, upperChest, midChest)
+	local lowerSpine = worldPos[BONE.SPINE1] or LerpVector(0.5, midChest, frameRoot)
 	projectPoint(POINT.PELVIS, frameRoot)
-	projectPoint(POINT.CHEST, LerpVector(0.5, upperChest, midChest))
+	projectPoint(POINT.CHEST, chestCenter)
 	projectPoint(POINT.NECK, neck)
-	projectPoint(POINT.SPINE_TOP, frontOffset(neck))
-	projectPoint(POINT.SPINE_MID, frontOffset(midChest))
-	projectPoint(POINT.SPINE_LOW, frontOffset(frameRoot))
+	projectPoint(POINT.SPINE_TOP, backOffset(midChest))
+	projectPoint(POINT.SPINE_MID, backOffset(lowerSpine))
+	projectPoint(POINT.SPINE_LOW, backOffset(frameRoot))
+	insetPoint(POINT.CHEST_L, worldPos[BONE.L_UPPERARM], chestCenter, CHEST_INSET)
+	insetPoint(POINT.CHEST_R, worldPos[BONE.R_UPPERARM], chestCenter, CHEST_INSET)
+	insetPoint(POINT.PELVIS_L, worldPos[BONE.L_THIGH], frameRoot, PELVIS_INSET)
+	insetPoint(POINT.PELVIS_R, worldPos[BONE.R_THIGH], frameRoot, PELVIS_INSET)
 
 	local skull, jaw = getHeadPoints(neck)
 	projectPoint(POINT.SKULL, skull or neck + frameUp * (SKULL_LIFT * 2 * frameSpineLength))
@@ -721,50 +734,36 @@ local function regionColor(region)
 	return r * mul, g * mul, b * mul
 end
 
-local function queueCircle(depth, x, z, radius, region)
-	circleCount = circleCount + 1
-	local circle = circles[circleCount]
-	if not circle then
-		circle = {}
-		circles[circleCount] = circle
-	end
-	circle.depth, circle.x, circle.z, circle.radius, circle.region = depth, x, z, radius, region
-	circleOrder[circleCount] = circleCount
-end
-
-local function queueNode(point, region, radius)
-	if not smoothValid[point] or missing[region] then return end
-
-	queueCircle(smoothX[point], smoothY[point], smoothZ[point], radius, region)
-end
-
-local function queueSegment(fromPoint, toPoint, region, radius, includeEnd)
+local function queueShape(fromPoint, toPoint, region, radius)
 	if not smoothValid[fromPoint] or not smoothValid[toPoint] or missing[region] then return end
 
-	local x0, y0, z0 = smoothX[fromPoint], smoothY[fromPoint], smoothZ[fromPoint]
-	local dx, dy, dz = smoothX[toPoint] - x0, smoothY[toPoint] - y0, smoothZ[toPoint] - z0
-	local length = math_sqrt(dx * dx + dy * dy + dz * dz)
-	local beads = math_Clamp(math_ceil(length / (radius * DISPLAY_SPINE * BEAD_SPACING)), 1, MAX_BEADS)
-	local last = includeEnd and beads or beads - 1
-
-	for i = 0, last do
-		local t = i / beads
-		queueCircle(x0 + dx * t, y0 + dy * t, z0 + dz * t, radius, region)
+	circleCount = circleCount + 1
+	local shape = circles[circleCount]
+	if not shape then
+		shape = {}
+		circles[circleCount] = shape
 	end
+	shape.ax, shape.az = smoothY[fromPoint], smoothZ[fromPoint]
+	shape.bx, shape.bz = smoothY[toPoint], smoothZ[toPoint]
+	shape.depth = (smoothX[fromPoint] + smoothX[toPoint]) * 0.5
+	shape.radius, shape.region = radius, region
+	circleOrder[circleCount] = circleCount
 end
 
 local function queueLimb(limb)
 	local points, radii = limb.points, limb.radii
-	queueSegment(points[1], points[2], limb.upper, radii[1], false)
+	queueShape(points[1], points[2], limb.upper, radii[1])
 	if missing[limb.upper] then return end
 
-	queueSegment(points[2], points[3], limb.lower, radii[2], false)
+	queueShape(points[2], points[3], limb.lower, radii[2])
+	if missing[limb.lower] then return end
+
 	local foot = points[4]
 	if foot then
-		queueSegment(points[3], foot, limb.lower, radii[3], true)
+		queueShape(foot, foot, limb.lower, radii[3])
 		return
 	end
-	if not missing[limb.lower] then queueNode(points[3], limb.hand, radii[3]) end
+	queueShape(points[3], points[3], limb.hand, radii[3])
 end
 
 local function queueBody()
@@ -773,13 +772,14 @@ local function queueBody()
 	end
 	circleCount = 0
 
-	queueNode(POINT.PELVIS, "pelvis", RADIUS.PELVIS)
-	queueNode(POINT.CHEST, "chest", RADIUS.CHEST)
-	queueNode(POINT.NECK, "neck", RADIUS.NECK)
-	queueSegment(POINT.SPINE_TOP, POINT.SPINE_MID, "spine2", RADIUS.SPINE, false)
-	queueSegment(POINT.SPINE_MID, POINT.SPINE_LOW, "spine1", RADIUS.SPINE, true)
-	queueNode(POINT.SKULL, "skull", RADIUS.SKULL)
-	queueNode(POINT.JAW, "jaw", RADIUS.JAW)
+	queueShape(POINT.PELVIS_L, POINT.PELVIS_R, "pelvis", RADIUS.PELVIS)
+	queueShape(POINT.CHEST_L, POINT.CHEST_R, "chest", RADIUS.CHEST)
+	queueShape(POINT.NECK, POINT.NECK, "neck", RADIUS.NECK)
+	queueShape(POINT.SPINE_TOP, POINT.SPINE_MID, "spine2", RADIUS.SPINE)
+	queueShape(POINT.SPINE_MID, POINT.SPINE_LOW, "spine1", RADIUS.SPINE)
+	queueShape(POINT.SPINE_MID, POINT.SPINE_MID, "spine1", RADIUS.SPINE_JOINT)
+	queueShape(POINT.SKULL, POINT.SKULL, "skull", RADIUS.SKULL)
+	queueShape(POINT.JAW, POINT.JAW, "jaw", RADIUS.JAW)
 	for _, limb in ipairs(LIMBS) do
 		queueLimb(limb)
 	end
@@ -789,13 +789,18 @@ local function farthestFirst(a, b)
 	return circles[a].depth < circles[b].depth
 end
 
-local function polyCircle(x, y, r)
-	for i = 1, CIRCLE_SEGMENTS do
-		local vertex = circlePoly[i]
-		vertex.x = x + circleCos[i] * r
-		vertex.y = y + circleSin[i] * r
+local function polyCapsule(ax, ay, bx, by, r)
+	local angle = math_atan2(by - ay, bx - ax)
+	local startB = angle - math.pi * 0.5
+	local startA = angle + math.pi * 0.5
+	local offset = HALF_SEGMENTS + 1
+	for i = 0, HALF_SEGMENTS do
+		local step = i / HALF_SEGMENTS * math.pi
+		local vertexB, vertexA = capsulePoly[i + 1], capsulePoly[offset + i + 1]
+		vertexB.x, vertexB.y = bx + math_cos(startB + step) * r, by + math_sin(startB + step) * r
+		vertexA.x, vertexA.y = ax + math_cos(startA + step) * r, ay + math_sin(startA + step) * r
 	end
-	surface.DrawPoly(circlePoly)
+	surface.DrawPoly(capsulePoly)
 end
 
 local centerX, centerY, pixelScale, targetZ = 0, 0, 1, 0
@@ -804,17 +809,19 @@ local function drawCircles()
 	table.sort(circleOrder, farthestFirst)
 	draw.NoTexture()
 	for i = 1, circleCount do
-		local circle = circles[circleOrder[i]]
-		local x = centerX + circle.x * pixelScale
-		local y = centerY - (circle.z - targetZ) * pixelScale
-		local depthScale = math_Clamp(1 + circle.depth * DEPTH_SCALE, DEPTH_SCALE_MIN, DEPTH_SCALE_MAX)
-		local r = circle.radius * DISPLAY_SPINE * pixelScale * depthScale
+		local shape = circles[circleOrder[i]]
+		local ax = centerX + shape.ax * pixelScale
+		local ay = centerY - (shape.az - targetZ) * pixelScale
+		local bx = centerX + shape.bx * pixelScale
+		local by = centerY - (shape.bz - targetZ) * pixelScale
+		local depthScale = math_Clamp(1 + shape.depth * DEPTH_SCALE, DEPTH_SCALE_MIN, DEPTH_SCALE_MAX)
+		local r = shape.radius * DISPLAY_SPINE * pixelScale * depthScale
 
 		surface.SetDrawColor(OUTLINE_COLOR[1], OUTLINE_COLOR[2], OUTLINE_COLOR[3], OUTLINE_ALPHA)
-		polyCircle(x, y, r + OUTLINE_WIDTH)
-		local red, green, blue = regionColor(circle.region)
+		polyCapsule(ax, ay, bx, by, r + OUTLINE_WIDTH)
+		local red, green, blue = regionColor(shape.region)
 		surface.SetDrawColor(red, green, blue, FILL_ALPHA)
-		polyCircle(x, y, r)
+		polyCapsule(ax, ay, bx, by, r)
 	end
 end
 

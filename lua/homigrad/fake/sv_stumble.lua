@@ -9,6 +9,7 @@ local hg_hit_knockdown_energy = CreateConVar("hg_hit_knockdown_energy", "65", FC
 local IKSystem = include("system_/utils/IKChain.lua")
 
 local AR_MODEL = "models/AREAnims/model_anim.mdl"
+util.PrecacheModel(AR_MODEL)
 local START_DELAY = 0
 local START_WINDOW = 0.75
 local HIT_WINDOW = 0.5
@@ -27,6 +28,19 @@ local STUMBLE_LUNGE_MUL = 0.18
 local STUMBLE_LUNGE_MAX = 35
 local STUMBLE_FALL_GRACE = 1
 local STUMBLE_INTENT_GRACE = 0.2
+local STUMBLE_HIT_TIME = 1.8
+local STUMBLE_DRIVEN_INSTABILITY = 0.4
+local STUMBLE_STEER = 3
+local STUMBLE_SWAY_RATE = 2.3
+local STUMBLE_SWAY_ANGLE = 22
+local DIVE_PUSH = 260
+local FOOT_ANKLE_HEIGHT = 4
+local FOOT_PLANT_DIST = 8
+local FOOT_STEP_ARRIVE = 0.05
+local FOOT_PLANT_ARRIVE = 0.1
+local FOOT_MAX_SPEED = 1500
+local FOOT_PUSHOFF = 1.6
+local DIVE_UP = 140
 local TOPPLE_PUSH = 110
 local TOPPLE_DOWN = 60
 local TOPPLE_ROLL = 200
@@ -97,7 +111,7 @@ local HOLD_SEARCH_INTERVAL = 0.1
 local HOLD_MIN_SPEED = 120
 local HOLD_SEARCH_RADIUS = 40
 local HOLD_MIN_DIST = 6
-local HOLD_FLOOR_NORMAL = 0.7
+local HOLD_GRAB_CHANCE = 0.45
 local HOLD_REACH_TIME = 0.6
 local HOLD_GRAB_DIST = 10
 local HOLD_CONFIRM_TIME = 0.3
@@ -382,6 +396,17 @@ local function moveControl(ply)
 		or hg.KeyDown(ply, IN_MOVELEFT) or hg.KeyDown(ply, IN_MOVERIGHT)
 end
 
+local function wishDir(ply)
+	local ang = Angle(0, ply:EyeAngles().y, 0)
+	local dir = Vector()
+	if hg.KeyDown(ply, IN_FORWARD) then dir:Add(ang:Forward()) end
+	if hg.KeyDown(ply, IN_BACK) then dir:Sub(ang:Forward()) end
+	if hg.KeyDown(ply, IN_MOVERIGHT) then dir:Add(ang:Right()) end
+	if hg.KeyDown(ply, IN_MOVELEFT) then dir:Sub(ang:Right()) end
+	if dir:LengthSqr() < 0.01 then return end
+	return dir:GetNormalized()
+end
+
 local function hasMomentum(ply, ragdoll)
 	local hit = ply.hgStumbleHit
 	if hit and CurTime() - hit.time < HIT_WINDOW then return true end
@@ -484,7 +509,7 @@ local function updateGhostPositions(st, ragdoll, isMoving, horizontalVel)
 end
 
 local function stumbleLifetime(st)
-	return math.max(st.cfg.Duration, 0.1)
+	return st.hit and STUMBLE_HIT_TIME or math.max(st.cfg.Duration, 0.1)
 end
 
 local function updateStumble(st, ragdoll)
@@ -518,7 +543,11 @@ local function updateStumble(st, ragdoll)
 		speed = cfg.MaxVelocityClamp
 	end
 	local flatVel = Vector(rawVel.x, rawVel.y, 0)
-	if flatVel:LengthSqr() > START_MIN_SPEED * START_MIN_SPEED then
+	local wish = not st.hit and wishDir(st.ply)
+	if wish then
+		wish:Rotate(Angle(0, math.sin((now - st.startTime) * STUMBLE_SWAY_RATE + st.swayPhase) * STUMBLE_SWAY_ANGLE, 0))
+		st.driveDir = LerpVector(math.min(dt * STUMBLE_STEER, 1), st.driveDir or wish, wish):GetNormalized()
+	elseif flatVel:LengthSqr() > START_MIN_SPEED * START_MIN_SPEED then
 		st.driveDir = flatVel:GetNormalized()
 	end
 	local moveDir = st.driveDir or st.pushDir
@@ -546,7 +575,7 @@ local function updateStumble(st, ragdoll)
 				st.footPositions[i] = state.targetPos
 				st.lockedFootPositions[i] = state.targetPos
 				if moveDir and st.hasGroundContact[i] then
-					st.pelvis:AddVelocity(moveDir * math.min(speed * STUMBLE_LUNGE_MUL, STUMBLE_LUNGE_MAX))
+					st.pelvis:AddVelocity(moveDir * math.min(speed * STUMBLE_LUNGE_MUL, STUMBLE_LUNGE_MAX) * FOOT_PUSHOFF)
 					local plantSide = moveDir:Cross(state.targetPos - pelvisPos).z
 					st.spine:AddAngleVelocity(moveDir * math.Clamp(plantSide, -12, 12) * 2)
 				end
@@ -583,17 +612,42 @@ local function updateStumble(st, ragdoll)
 		end
 	end
 
+	local planted = 0
 	for i = 1, 2 do
 		local chain = st.ikChains[i]
+		local target = sanitizeVector(st.footPositions[i], pelvisPos)
 		if chain then
-			chain:SetTarget(sanitizeVector(st.footPositions[i], pelvisPos))
+			chain:SetTarget(target)
 			chain:Update()
 		end
-	end
-	local instability = math.Clamp((now - st.startTime) / stumbleLifetime(st), 0, 1)
-	local grounded = st.hasGroundContact[1] or st.hasGroundContact[2]
 
-	local carry = math.Clamp(cfg.Carry, 0, 1) * (1 - instability * instability)
+		local foot = st.footPhys[i]
+		if chain and IsValid(foot) then
+			local stepping = st.legState[i].isStepping
+			local goal = target + Vector(0, 0, FOOT_ANKLE_HEIGHT)
+			foot:Wake()
+			foot:ComputeShadowControl({
+				pos = goal,
+				angle = foot:GetAngles(),
+				secondstoarrive = stepping and FOOT_STEP_ARRIVE or FOOT_PLANT_ARRIVE,
+				maxspeed = FOOT_MAX_SPEED,
+				maxspeeddamp = FOOT_MAX_SPEED * 2,
+				maxangular = 0,
+				maxangulardamp = 0,
+				dampfactor = 0.8,
+				teleportdistance = 0,
+				deltatime = dt,
+			})
+			if not stepping and st.hasGroundContact[i] and foot:GetPos():DistToSqr(goal) < FOOT_PLANT_DIST * FOOT_PLANT_DIST then
+				planted = planted + 1
+			end
+		end
+	end
+	local instability = math.Clamp((now - st.startTime) / stumbleLifetime(st), 0, st.hit and 1 or STUMBLE_DRIVEN_INSTABILITY)
+	local grounded = planted > 0
+	local support = math.min(planted, 1) + (planted > 1 and 0.25 or 0)
+
+	local carry = math.Clamp(cfg.Carry, 0, 1) * (1 - instability * instability) * support
 	if carry > 0 and grounded then
 		local lift = Vector(0, 0, physenv.GetGravity():Length() * carry * dt)
 		st.pelvis:AddVelocity(lift)
@@ -604,7 +658,7 @@ local function updateStumble(st, ragdoll)
 		st.driveSpeed = math.min(math.max(st.driveSpeed + cfg.MomentumGain * dt, flatVel:Dot(moveDir)), cfg.MaxDriveSpeed)
 		local deficit = st.driveSpeed - rawVel:Dot(moveDir)
 		if deficit > 0 and grounded then
-			local add = moveDir * math.min(deficit, cfg.DriveAccel * dt)
+			local add = moveDir * math.min(deficit, cfg.DriveAccel * dt) * math.min(support, 1)
 			st.pelvis:AddVelocity(add)
 			st.spine:AddVelocity(add * 1.15)
 		end
@@ -647,6 +701,16 @@ local function stopStumble(ragdoll, reason)
 	if IKSystem and IKSystem.RemoveEntityChains then IKSystem.RemoveEntityChains(ragdoll) end
 	if not IsValid(st.pelvis) or not IsValid(st.spine) then return end
 
+	if reason == "dive" then
+		local dir = IsValid(st.ply) and st.ply:EyeAngles():Forward() or st.driveDir or st.spine:GetAngles():Forward()
+		dir = Vector(dir.x, dir.y, 0)
+		if dir:LengthSqr() < 0.01 then return end
+		local vel = dir:GetNormalized() * DIVE_PUSH + Vector(0, 0, DIVE_UP)
+		st.pelvis:AddVelocity(vel)
+		st.spine:AddVelocity(vel * 1.2)
+		return
+	end
+
 	local falls = reason == "decay" or reason == "trip" or reason == "halt" or reason == "getup"
 	if falls then topple(st) end
 	if falls or reason == "fell" then triggerCover(ragdoll, REACT_COVER_TIME) end
@@ -667,19 +731,23 @@ local function startStumble(ply, ragdoll)
 		lastGroundCheckTime = 0,
 		smoothedVelocity = pelvis:GetVelocity(),
 		ikChains = {},
+		footPhys = {getBonePhys(ragdoll, "ValveBiped.Bip01_L_Foot"), getBonePhys(ragdoll, "ValveBiped.Bip01_R_Foot")},
 		vigor = vigor(org),
 		legTrip = {legTripChance(org, "lleg"), legTripChance(org, "rleg")},
 	}
 
 	local hit = ply.hgStumbleHit
 	if hit and CurTime() - hit.time < HIT_WINDOW then
+		st.hit = true
 		makePush(st, hit.pos, hit.dir, hit.energy)
 	end
+	st.swayPhase = math.Rand(0, math.pi * 2)
 
 	local startVel = pelvis:GetVelocity()
 	startVel.z = 0
 	local startSpeed = startVel:Length()
 	if startSpeed > START_MIN_SPEED then st.driveDir = startVel / startSpeed end
+	if st.hit and st.pushDir then st.driveDir = st.pushDir end
 	st.driveSpeed = math.Clamp(startSpeed, st.cfg.MinDriveSpeed, math.max(st.cfg.MaxDriveSpeed, st.cfg.MinDriveSpeed))
 
 	initLegs(st, ragdoll)
@@ -1093,12 +1161,12 @@ local function findHoldPoint(ply, ragdoll, handPos)
 			filter = {ply, ragdoll},
 			mask = MASK_SOLID,
 		})
-		if not tr.Hit or tr.HitSky or tr.HitNormal.z > HOLD_FLOOR_NORMAL then continue end
+		if not tr.Hit or tr.HitSky then continue end
 		if tr.Fraction * HOLD_SEARCH_RADIUS < HOLD_MIN_DIST then continue end
 		local ent = tr.Entity
 		if IsValid(ent) and (ent:IsPlayer() or ent:IsNPC() or ent:IsRagdoll()) then continue end
 
-		local score = (1 - tr.Fraction) * (2 - math.abs(tr.HitNormal.z))
+		local score = 1 - tr.Fraction
 		if not bestScore or score > bestScore then best, bestScore = tr, score end
 	end
 
@@ -1157,7 +1225,7 @@ local function updateIdleHand(ply, ragdoll, org, side, hand, now)
 end
 
 local function updateHoldEnv(ply, ragdoll)
-	if not hg_euphoria_holdenv:GetBool() or not isAware(ply) or armControl(ply) or ragdoll.HGFallCoverActive then
+	if not hg_euphoria_holdenv:GetBool() or not isAware(ply) or armControl(ply) or ragdoll.HGFallCoverActive or stumbling[ragdoll] then
 		releaseHoldEnv(ragdoll)
 		return
 	end
@@ -1169,7 +1237,12 @@ local function updateHoldEnv(ply, ragdoll)
 
 	local root = ragdoll:GetPhysicsObject()
 	local moving = IsValid(root) and root:GetVelocity():LengthSqr() > HOLD_MIN_SPEED * HOLD_MIN_SPEED
-	local search = moving and (ragdoll.hgEnvNextSearch or 0) <= now
+	if not moving then
+		ragdoll.hgEnvKlepto = nil
+	elseif ragdoll.hgEnvKlepto == nil then
+		ragdoll.hgEnvKlepto = math.random() < HOLD_GRAB_CHANCE
+	end
+	local search = moving and ragdoll.hgEnvKlepto and (ragdoll.hgEnvNextSearch or 0) <= now
 	if search then ragdoll.hgEnvNextSearch = now + HOLD_SEARCH_INTERVAL end
 
 	for side, hand in pairs(HANDS) do
@@ -1191,11 +1264,15 @@ local function stumbleEndReason(ply, ragdoll, st)
 	if st.tripLeg then return "trip" end
 
 	local now = CurTime()
-	if now - st.startTime > STUMBLE_INTENT_GRACE and not moveControl(ply) then return "halt" end
+	local elapsed = now - st.startTime
+	if elapsed > STUMBLE_INTENT_GRACE then
+		if hg.KeyDown(ply, IN_JUMP) then return "dive" end
+		if not st.hit and not moveControl(ply) then return "halt" end
+	end
 	if st.stillSince and now - st.stillSince > STILL_GRACE then return "decay" end
 
 	st.vigor = vigor(ply.organism)
-	if now - st.startTime >= stumbleLifetime(st) then return "decay" end
+	if st.hit and elapsed >= stumbleLifetime(st) then return "decay" end
 	if now - st.startTime >= STUMBLE_FALL_GRACE and not isUpright(ply, ragdoll) then return "fell" end
 end
 
