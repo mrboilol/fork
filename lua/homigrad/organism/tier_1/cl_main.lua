@@ -1078,22 +1078,35 @@ local function getWoundVisualRate(org, wound, index, arterial)
 	return math.max(totalRate or severity * (arterial and 2.25 or 0.24), 0)
 end
 
+local function getWoundSizeK(wound, maxSize)
+	return math.Clamp(math.sqrt(math.max(tonumber(wound[1]) or 0, 0) / maxSize), 0, 1)
+end
+
+local function getHeartbeatSpurt(org, index)
+	local bpm = tonumber(org.heartbeat) or tonumber(org.pulse) or 70
+	if bpm <= 1 then return 0.25 end
+	local phase = (CurTime() * bpm / 60 + index * 0.17) % 1
+	if phase >= 0.32 then return 0.28 end
+	return 0.28 + 0.72 * math.sin(phase / 0.32 * math.pi)
+end
+
 local function emitOrdinaryBleeding(ent, org, wound, pos, ang, visualRate, interval)
 	local rateK = math.Clamp((visualRate or 0) / 12, 0, 1)
+	local sizeK = getWoundSizeK(wound, 18)
 	local style = tonumber(wound[6]) == 2 and 2 or 1
 	local _, pressureDrive = getBleedPressureDrive(org)
 	local outward = getBleedDirection(ang)
-	local count = math.Clamp(math.ceil(1 + rateK * 2 + math.Rand(-0.8, 0.8)), 1, 4)
+	local count = math.Clamp(math.ceil(1 + sizeK * 4 + rateK * 2 + math.Rand(-0.8, 0.8)), 1, 7)
 	local volume = math.Clamp(visualRate * interval / count, 0.05, 4)
 	local phase = CurTime() * (4.5 + rateK * 2.5) + ent:EntIndex() * 0.37
-	local lateral = ang:Right() * math.sin(phase) * (2 + rateK * 9)
-		+ ang:Up() * math.cos(phase * 0.73) * (1 + rateK * 6)
+	local lateral = ang:Right() * math.sin(phase) * (2 + sizeK * 9)
+		+ ang:Up() * math.cos(phase * 0.73) * (1 + sizeK * 6)
 	for _ = 1, count do
-		local speed = (style == 2 and 18 or 8) + rateK * (style == 2 and 140 or 95)
-		local vel = outward * speed * pressureDrive + bleedDown * math.Rand(15, 35)
-			+ lateral + VectorRand(-(3 + rateK * 12), 3 + rateK * 12)
+		local speed = ((style == 2 and 14 or 6) + sizeK * (style == 2 and 150 or 85) + rateK * 40) * pressureDrive
+		local vel = outward * speed * math.Rand(0.6, 1.1) + bleedDown * math.Rand(10, 30)
+			+ lateral + VectorRand(-(2 + sizeK * 10), 2 + sizeK * 10)
 		local dropVolume = volume * math.Rand(0.7, 1.3)
-		local size = math.Clamp(0.6 + math.sqrt(dropVolume) * 1.5, 0.8, 4)
+		local size = math.Clamp(0.6 + math.sqrt(dropVolume) * 1.5 + sizeK, 0.8, 4.5)
 		local part = hg.addBloodPart(pos + VectorRand(-0.3, 0.3), vel, nil, size, size, false, nil, ent, dropVolume < 0.25)
 		if part then part.volume = dropVolume end
 	end
@@ -1109,23 +1122,23 @@ local function emitArterialBleeding(ent, org, wound, index, pos, ang, dir, water
 
 	local pulse = (org.pulse or 70) / 70
 	local rateK = math.Clamp(visualRate / 20, 0, 1)
+	local sizeK = math.Clamp((tonumber(wound[1]) or 6) / 18, 0.25, 1)
 	local _, pressureDrive = getBleedPressureDrive(org)
-	local count = math.Clamp(math.ceil(1 + rateK * 3 + math.Rand(-0.8, 0.8)), 1, 5)
+	local spurt = getHeartbeatSpurt(org, index)
+	local count = math.Clamp(math.ceil((1 + sizeK * 3 + rateK * 2) * spurt + math.Rand(-0.5, 0.5)), 1, 7)
 	local volume = math.Clamp(visualRate * interval / count, 0.05, 4)
 	local time = CurTime()
 	local sprayDir = dir:LengthSqr() > 0.001 and dir:GetNormalized() or getBleedDirection(ang)
-	local reach = wound[7] == "aorta" and 1.85 or (wound[7] == "arteria" and 1.6 or 1)
-	local velocity = sprayDir * (95 + rateK * 165) * reach * pressureDrive * math.Clamp(pulse, 0.3, 1.5) * (forceMul or 1)
-		* (0.8 + 0.2 * math.sin(time * (5 + index)))
-		+ sprayDir:Angle():Right() * 12 * rateK * math.sin(time * 2)
-		+ ang:Up() * 10 * rateK * math.sin(time * 3)
-		+ VectorRand(-3, 3) * pulse
+	local reach = wound[7] == "aorta" and 1.2 or (wound[7] == "arteria" and 1.15 or 1)
+	local velocity = sprayDir * (120 + sizeK * 300) * reach * pressureDrive * math.Clamp(pulse, 0.5, 1.3) * spurt * (forceMul or 1)
+		+ sprayDir:Angle():Right() * 12 * sizeK * math.sin(time * 2)
+		+ ang:Up() * 10 * sizeK * math.sin(time * 3)
 	if pressureDrive <= 0.05 then velocity = bleedDown * math.Rand(12, 28) + VectorRand(-3, 3) end
 
 	for _ = 1, count do
 		local dropVolume = volume * math.Rand(0.7, 1.3)
-		local size = math.Clamp(0.6 + math.sqrt(dropVolume) * 1.5, 0.8, 4) * arterySizeMul
-		local vel = velocity * math.Rand(0.65, 1.05) + VectorRand(-3, 3) * pulse
+		local size = math.Clamp(0.8 + math.sqrt(dropVolume) * 1.5 + sizeK * 0.8, 1, 5) * arterySizeMul
+		local vel = velocity * math.Rand(0.85, 1.05) + VectorRand(-3, 3) * (1 + sizeK * 3)
 		local part = hg.addBloodPart(pos, vel, nil, size, size, true, nil, ent, dropVolume < 0.25)
 		if part then part.volume = dropVolume end
 	end
@@ -1574,8 +1587,8 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 						if water then
 							hg.addBloodPart2(pos, VectorRand(-5, 5), nil, nil, nil, nil, true, ent)
 						else
-							local rateK = math.Clamp(visualRate / 12, 0, 1)
-							local interval = Lerp(rateK, 2.2, 0.12) * math.Rand(0.78, 1.28)
+							local rateK = math.max(math.Clamp(visualRate / 12, 0, 1), getWoundSizeK(wound, 18))
+							local interval = Lerp(rateK, 1.8, 0.05) * math.Rand(0.78, 1.28)
 							emitOrdinaryBleeding(ent, org, wound, pos, ang, visualRate, interval)
 							wound.nextVisualBleed = time + interval
 						end
@@ -1606,7 +1619,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 						if not pos then continue end
 
 						local water = bit.band(util.PointContents(pos), CONTENTS_WATER) == CONTENTS_WATER
-						local interval = Lerp(math.Clamp(visualRate / 20, 0, 1), 0.5, 1 / math.max(hg_blood_fps:GetInt(), 1))
+						local interval = Lerp(math.Clamp(visualRate / 20, 0, 1), 0.12, 0.03)
 						local exitWound = wound.exitWound
 						local exitPos, exitAng = exitWound and hg.organism.GetWoundTransform(ent, exitWound)
 						local underwater = emitArterialBleeding(ent, org, wound, i, pos, ang, ang:Forward(), water, visualRate * (exitPos and exitAng and 0.4 or 1), interval, exitPos and exitAng and 0.4 or 1)

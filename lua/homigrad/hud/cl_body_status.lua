@@ -40,15 +40,9 @@ local JAW_DROP = 0.13
 local JAW_FORWARD = 0.1
 
 local WEIGHT = {
-	FRACTURE = 0.85,
-	BONE_DAMAGE = 0.7,
-	SPINE_DAMAGE = 0.75,
 	DISLOCATION = 0.7,
 	ARTERIAL = 0.95,
 	ARTERIAL_CONTROLLED = 0.6,
-	ORGAN = 1.25,
-	BRAIN = 1.6,
-	THORAX = 0.8,
 	HAND_BONE_SHARE = 0.5,
 }
 local ARTERIAL_ACTIVE_RATE = 0.05
@@ -58,31 +52,22 @@ local ARTERIAL_PULSE_DEPTH = 0.3
 local DEFAULT_PULSE = 72
 local SECONDS_PER_MINUTE = 60
 
-local MAX_DRIPS = 96
-local MIN_DRIP_RATE = 0.01
-local DRIP_CAMERA_BIAS = 2
-local VENOUS_DRIP = {
-	color = {150, 10, 10},
-	spawnBase = 0.5, spawnPerRate = 0.5, spawnMax = 4,
-	sizeBase = 1.2, sizePerRate = 0.15, sizeMax = 2.2,
-	speed = 3, spread = 2, gravity = 35, life = 1.2,
-}
-local ARTERIAL_DRIP = {
-	color = {255, 30, 30},
-	spawnBase = 4, spawnPerRate = 0.3, spawnMax = 9,
-	sizeBase = 1.5, sizePerRate = 0.05, sizeMax = 2.8,
-	speed = 30, spread = 8, gravity = 90, life = 0.7,
+local WOUND_CAMERA_BIAS = 2
+local WOUND_MARK = {
+	sizeBase = 1.5, sizePerSize = 0.15, sizeMax = 4,
+	venous = {110, 0, 0},
+	arterial = {255, 30, 30},
 }
 local REFERENCE_SCREEN_HEIGHT = 1080
 
 local HEALTH_STOPS = {
-	{0, 236, 236, 232},
-	{0.35, 232, 200, 60},
-	{0.7, 205, 35, 28},
-	{1, 25, 20, 20},
+	{0, 240, 240, 236},
+	{0.5, 235, 205, 50},
+	{1, 215, 25, 25},
 }
 local COLOR = {
-	BROKEN = {12, 12, 12},
+	ARMOR_FILL = {60, 60, 60, 40},
+	ARMOR_LINE = {70, 70, 74, 210},
 	RING_HEALTHY = {240, 240, 236},
 	RING_BLEEDING = {215, 25, 25},
 	TOURNIQUET_RING = {70, 130, 235},
@@ -92,7 +77,7 @@ local COLOR = {
 	OUTLINE = {20, 20, 22},
 }
 local SHAPE = {
-	RING_FRACTION = 0.3,
+	RING_FRACTION = 0.12,
 	MIN_RING_WIDTH = 1.5,
 	BORDER_WIDTH = 1,
 	STRAP_THICKNESS = 0.8,
@@ -328,11 +313,7 @@ local currentOrg, woundSource
 
 local emitters = {}
 local emitterCount = 0
-local drips = {}
-local nextDripSlot = 1
-for i = 1, MAX_DRIPS do
-	drips[i] = {alive = false, x = 0, z = 0, vx = 0, vz = 0, born = 0, size = 1, style = VENOUS_DRIP}
-end
+local armorBoxes, armorBoxCount = {}, 0
 
 local circles, circleOrder = {}, {}
 local circleCount = 0
@@ -427,8 +408,8 @@ local function lookupNamedBone(ent, cache, bone)
 	return id or nil
 end
 
-local function addEmitter(ent, cache, wound, region, rate, arterialWound)
-	if not region or not isvector(wound[2]) or rate <= MIN_DRIP_RATE then return end
+local function addEmitter(ent, cache, wound, region, arterialWound)
+	if not region or not isvector(wound[2]) then return end
 
 	local id = lookupNamedBone(ent, cache, wound[4])
 	local matrix = id and ent:GetBoneMatrix(id)
@@ -441,14 +422,8 @@ local function addEmitter(ent, cache, wound, region, rate, arterialWound)
 		emitters[emitterCount] = emitter
 	end
 	emitter.world = LocalToWorld(wound[2], angle_zero, matrix:GetTranslation(), matrix:GetAngles())
-	emitter.region, emitter.rate, emitter.arterial = region, rate, arterialWound
+	emitter.region, emitter.size, emitter.arterial = region, tonumber(wound[1]) or 0, arterialWound
 	emitter.valid = false
-end
-
-local function woundRate(rates, index, wound, sizeToRate)
-	local rate = istable(rates) and tonumber(rates[index]) or tonumber(wound.visualBleedRate)
-
-	return rate or (tonumber(wound[1]) or 0) * sizeToRate
 end
 
 local function captureWounds(ent, cache)
@@ -459,8 +434,7 @@ local function captureWounds(ent, cache)
 	if istable(wounds) then
 		for index, wound in ipairs(wounds) do
 			if (tonumber(wound[1]) or 0) > 0 then
-				local rate = woundRate(currentOrg.woundBleedRates, index, wound, WOUND_SIZE_TO_RATE)
-				addEmitter(ent, cache, wound, resolveWoundRegion(wound[4]), rate, false)
+				addEmitter(ent, cache, wound, resolveWoundRegion(wound[4]), false)
 			end
 		end
 	end
@@ -468,9 +442,8 @@ local function captureWounds(ent, cache)
 
 	for index, wound in ipairs(arterialWounds) do
 		if (tonumber(wound[1]) or 0) > 0 then
-			local rate = woundRate(currentOrg.arterialWoundBleedRates, index, wound, 1)
 			local region = ARTERY_REGIONS[wound[7]] or resolveWoundRegion(wound[4])
-			addEmitter(ent, cache, wound, region, rate, true)
+			addEmitter(ent, cache, wound, region, true)
 		end
 	end
 end
@@ -576,7 +549,7 @@ local function placeEmitter(emitter)
 	local along = (wx - ax) * abx + (wy - ay) * aby + (wz - az) * abz
 	local t = lengthSqr > 0.001 and math_Clamp(along / lengthSqr, 0, 1) or 0
 
-	local rx = wx - (ax + abx * t) + DRIP_CAMERA_BIAS
+	local rx = wx - (ax + abx * t) + WOUND_CAMERA_BIAS
 	local ry = wy - (ay + aby * t)
 	local rz = wz - (az + abz * t)
 	local radialLength = math_sqrt(rx * rx + ry * ry + rz * rz)
@@ -740,19 +713,7 @@ local function combine(a, b)
 end
 
 local function boneSeverity(value)
-	if value >= 1 then return WEIGHT.FRACTURE end
-
-	return value * WEIGHT.BONE_DAMAGE
-end
-
-local function spineSeverity(value)
-	if value >= 1 then return 1 end
-
-	return value * WEIGHT.SPINE_DAMAGE
-end
-
-local function organSeverity(org, key)
-	return math_Clamp(orgNumber(org, key) * WEIGHT.ORGAN, 0, 1)
+	return math_Clamp(value, 0, 1)
 end
 
 local function collectWounds(org, wounds, arterialWounds)
@@ -824,24 +785,18 @@ end
 
 local function updateTorsoState(org)
 	local headMissing = org.headamputated == true
-	local thorax = math_Clamp((orgNumber(org, "pneumothorax") + orgNumber(org, "hemothorax")) * WEIGHT.THORAX, 0, 1)
-	local lungs = combine(organSeverity(org, "lungsL"), organSeverity(org, "lungsR"))
-	local chestOrgans = combine(combine(organSeverity(org, "heart"), lungs), thorax)
-	local digestive = combine(organSeverity(org, "stomach"), organSeverity(org, "intestines"))
-	local abdomen = combine(organSeverity(org, "liver"), digestive)
-	local brain = math_Clamp(orgNumber(org, "brain") * WEIGHT.BRAIN, 0, 1)
 	local jawDislocation = org.jawdislocation == true and WEIGHT.DISLOCATION or 0
 	local skull, jaw = orgNumber(org, "skull"), orgNumber(org, "jaw")
 	local ribs, pelvis = orgNumber(org, "chest"), orgNumber(org, "pelvis")
 	local spine1, spine2, spine3 = orgNumber(org, "spine1"), orgNumber(org, "spine2"), orgNumber(org, "spine3")
 
-	severity.skull = combine(boneSeverity(skull), brain)
+	severity.skull = boneSeverity(skull)
 	severity.jaw = combine(boneSeverity(jaw), jawDislocation)
-	severity.neck = combine(spineSeverity(spine3), organSeverity(org, "trachea"))
-	severity.chest = combine(boneSeverity(ribs), chestOrgans)
-	severity.spine2 = spineSeverity(spine2)
-	severity.spine1 = spineSeverity(spine1)
-	severity.pelvis = combine(boneSeverity(pelvis), abdomen)
+	severity.neck = boneSeverity(spine3)
+	severity.chest = boneSeverity(ribs)
+	severity.spine2 = boneSeverity(spine2)
+	severity.spine1 = boneSeverity(spine1)
+	severity.pelvis = boneSeverity(pelvis)
 	broken.skull, broken.jaw, broken.neck = skull >= 1, jaw >= 1, spine3 >= 1
 	broken.chest, broken.pelvis = ribs >= 1, pelvis >= 1
 	broken.spine2, broken.spine1 = spine2 >= 1, spine1 >= 1
@@ -937,8 +892,6 @@ local function lerpColor(from, to, t)
 end
 
 local function healthColor(region)
-	if broken[region] then return COLOR.BROKEN[1], COLOR.BROKEN[2], COLOR.BROKEN[3] end
-
 	local value = math_Clamp(severity[region] or 0, 0, 1)
 	for index = 2, #HEALTH_STOPS do
 		local high = HEALTH_STOPS[index]
@@ -1046,11 +999,11 @@ end
 
 local strapPoly = {{x = 0, y = 0}, {x = 0, y = 0}, {x = 0, y = 0}, {x = 0, y = 0}}
 
-local function drawStrap(ax, ay, bx, by, r, t, red, green, blue)
+local function drawStrap(ax, ay, bx, by, r, t, red, green, blue, horizontal)
 	local dx, dy = bx - ax, by - ay
 	local length = math_sqrt(dx * dx + dy * dy)
 	local ux, uy = 0, 1
-	if length > 0.001 then ux, uy = dx / length, dy / length end
+	if length > 0.001 and not horizontal then ux, uy = dx / length, dy / length end
 	local cx, cy = ax + dx * t, ay + dy * t
 	local half = math.min(r * SHAPE.STRAP_THICKNESS, math.max(length * SHAPE.STRAP_MAX_SEGMENT_SHARE, r * 0.5)) * 0.5
 	local px, py = -uy * (r + SHAPE.BORDER_WIDTH), ux * (r + SHAPE.BORDER_WIDTH)
@@ -1087,7 +1040,7 @@ local function drawShapeExtras(shape, ax, ay, bx, by, r)
 	local soak = bandage[region]
 	if soak then
 		local red, green, blue = lerpColor(COLOR.BANDAGE_CLEAN, COLOR.BANDAGE_SOAKED, math_Clamp(soak, 0, 1))
-		drawStrap(ax, ay, bx, by, r, 0.5, red, green, blue)
+		drawStrap(ax, ay, bx, by, r, 0.5, red, green, blue, true)
 	end
 
 	local limbTop = region == "larmup" or region == "rarmup" or region == "llegup" or region == "rlegup"
@@ -1133,51 +1086,118 @@ local function drawCircles()
 	end
 end
 
-local function spawnDrip(emitter, style)
-	local drip = drips[nextDripSlot]
-	nextDripSlot = nextDripSlot % MAX_DRIPS + 1
-	local speed = style.speed + math.Rand(-style.spread, style.spread)
-	drip.alive, drip.style, drip.born = true, style, CurTime()
-	drip.x, drip.z = emitter.y, emitter.z
-	drip.vx = emitter.dirX * speed + math.Rand(-style.spread, style.spread)
-	drip.vz = emitter.dirZ * speed
-	drip.size = math.min(style.sizeBase + emitter.rate * style.sizePerRate, style.sizeMax)
-end
-
-local function spawnDrips()
-	local dt = FrameTime()
+local function drawWounds()
+	local sizeScale = ScrH() / REFERENCE_SCREEN_HEIGHT
 	for i = 1, emitterCount do
 		local emitter = emitters[i]
 		if emitter.valid then
-			local style = emitter.arterial and ARTERIAL_DRIP or VENOUS_DRIP
-			local perSecond = math.min(style.spawnBase + emitter.rate * style.spawnPerRate, style.spawnMax)
-			local expected = perSecond * dt
-			local count = math.floor(expected) + (math.random() < expected % 1 and 1 or 0)
-			for _ = 1, count do
-				spawnDrip(emitter, style)
-			end
+			local color = emitter.arterial and WOUND_MARK.arterial or WOUND_MARK.venous
+			local radius = math.min(WOUND_MARK.sizeBase + emitter.size * WOUND_MARK.sizePerSize, WOUND_MARK.sizeMax) * sizeScale
+			local x = centerX + emitter.y * pixelScale
+			local y = centerY - (emitter.z - targetZ) * pixelScale
+			surface.SetDrawColor(COLOR.OUTLINE[1], COLOR.OUTLINE[2], COLOR.OUTLINE[3], OUTLINE_ALPHA)
+			polyCapsule(x, y, x, y, radius + SHAPE.BORDER_WIDTH)
+			surface.SetDrawColor(color[1], color[2], color[3], 255)
+			polyCapsule(x, y, x, y, radius)
 		end
 	end
 end
 
-local function drawDrips()
-	local now, dt = CurTime(), FrameTime()
-	local sizeScale = ScrH() / REFERENCE_SCREEN_HEIGHT
-	for i = 1, MAX_DRIPS do
-		local drip = drips[i]
-		if drip.alive then
-			local style = drip.style
-			local age = now - drip.born
-			if age >= style.life then
-				drip.alive = false
-			else
-				drip.vz = drip.vz - style.gravity * dt
-				drip.x, drip.z = drip.x + drip.vx * dt, drip.z + drip.vz * dt
-				local x = centerX + drip.x * pixelScale
-				local y = centerY - (drip.z - targetZ) * pixelScale
-				local color = style.color
-				surface.SetDrawColor(color[1], color[2], color[3], 255 * (1 - age / style.life))
-				polyCapsule(x, y, x, y, drip.size * sizeScale)
+local function collectArmorBoxes(body)
+	armorBoxCount = 0
+	if not IsValid(body) or not hg.organism.GetHitBoxOrgans or not hg.organism.ShootMatrix then return end
+
+	local organs = hg.organism.GetHitBoxOrgans(body:GetModel(), body)
+	local boxes = hg.organism.ShootMatrix(body, organs)
+	if not boxes then return end
+
+	for _, box in ipairs(boxes) do
+		local organ = box[6] and organs[box[6]] and organs[box[6]][box[7]]
+		if organ and organ[7] then
+			armorBoxCount = armorBoxCount + 1
+			local entry = armorBoxes[armorBoxCount]
+			if not entry then
+				entry = {}
+				armorBoxes[armorBoxCount] = entry
+			end
+			entry.bone, entry.pos, entry.ang, entry.size = box[6], organ[3], organ[4], organ[5]
+		end
+	end
+end
+
+local ARMOR_SIGNS = {
+	{-1, -1, -1}, {1, -1, -1}, {1, 1, -1}, {-1, 1, -1},
+	{-1, -1, 1}, {1, -1, 1}, {1, 1, 1}, {-1, 1, 1},
+}
+local armorPoints, armorHull = {}, {}
+for i = 1, #ARMOR_SIGNS do
+	armorPoints[i] = {x = 0, y = 0}
+end
+
+local function cross2(o, a, b)
+	return (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x)
+end
+
+local function buildHull()
+	table.sort(armorPoints, function(a, b)
+		if a.x ~= b.x then return a.x < b.x end
+		return a.y < b.y
+	end)
+
+	local n = 0
+	for i = 1, #armorPoints do
+		while n >= 2 and cross2(armorHull[n - 1], armorHull[n], armorPoints[i]) <= 0 do
+			n = n - 1
+		end
+		n = n + 1
+		armorHull[n] = armorPoints[i]
+	end
+	local lower = n + 1
+	for i = #armorPoints - 1, 1, -1 do
+		while n >= lower and cross2(armorHull[n - 1], armorHull[n], armorPoints[i]) <= 0 do
+			n = n - 1
+		end
+		n = n + 1
+		armorHull[n] = armorPoints[i]
+	end
+
+	return n - 1
+end
+
+local function drawArmor()
+	local body = captureBody
+	if armorBoxCount == 0 or not IsValid(body) or not boneCache then return end
+
+	for index = 1, armorBoxCount do
+		local box = armorBoxes[index]
+		local id = lookupNamedBone(body, boneCache, box.bone)
+		local matrix = id and body:GetBoneMatrix(id)
+		if matrix then
+			local pos, ang = LocalToWorld(box.pos, box.ang, matrix:GetTranslation(), matrix:GetAngles())
+			local size = box.size
+			for corner = 1, #ARMOR_SIGNS do
+				local sign = ARMOR_SIGNS[corner]
+				local world = LocalToWorld(Vector(size.x * sign[1], size.y * sign[2], size.z * sign[3]), angle_zero, pos, ang)
+				local _, py, pz = projectRaw(world)
+				local point = armorPoints[corner]
+				point.x, point.y = centerX + py * pixelScale, centerY - (pz - targetZ) * pixelScale
+			end
+
+			local count = buildHull()
+			if count >= 3 then
+				local fill = COLOR.ARMOR_FILL
+				surface.SetDrawColor(fill[1], fill[2], fill[3], fill[4])
+				local poly = {}
+				for i = count, 1, -1 do
+					poly[#poly + 1] = {x = armorHull[i].x, y = armorHull[i].y}
+				end
+				surface.DrawPoly(poly)
+				local line = COLOR.ARMOR_LINE
+				surface.SetDrawColor(line[1], line[2], line[3], line[4])
+				for i = 1, count do
+					local a, b = armorHull[i], armorHull[i % count + 1]
+					surface.DrawLine(a.x, a.y, b.x, b.y)
+				end
 			end
 		end
 	end
@@ -1191,10 +1211,10 @@ local function renderFigure()
 	targetZ = TARGET_HEIGHT * DISPLAY_SPINE
 
 	draw.NoTexture()
-	spawnDrips()
-	drawDrips()
 	queueBody()
 	drawCircles()
+	drawArmor()
+	drawWounds()
 end
 
 hook.Add("HUDPaint", "homigrad/body-status/draw", function()
@@ -1219,6 +1239,7 @@ hook.Add("HUDPaint", "homigrad/body-status/draw", function()
 
 	if snap or now >= nextMedicalUpdate then
 		updateMedicalState(ply, body)
+		collectArmorBoxes(body)
 		nextMedicalUpdate = now + MEDICAL_UPDATE_INTERVAL
 	end
 	updateStress(body ~= ply and body:IsRagdoll(), snap)

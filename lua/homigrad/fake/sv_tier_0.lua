@@ -833,8 +833,67 @@ function fakeBoneFlop.GetLimbBones(limb)
 	return fakeLimbBoneGroups[limb]
 end
 
+local openFractureBones = {
+	["ValveBiped.Bip01_L_UpperArm"] = {depth = 3, bleed = 9},
+	["ValveBiped.Bip01_R_UpperArm"] = {depth = 3, bleed = 9},
+	["ValveBiped.Bip01_L_Forearm"] = {depth = 4, bleed = 10},
+	["ValveBiped.Bip01_R_Forearm"] = {depth = 4, bleed = 10},
+	["ValveBiped.Bip01_L_Thigh"] = {depth = 4, bleed = 22},
+	["ValveBiped.Bip01_R_Thigh"] = {depth = 4, bleed = 22},
+	["ValveBiped.Bip01_L_Calf"] = {depth = 5, bleed = 15},
+	["ValveBiped.Bip01_R_Calf"] = {depth = 5, bleed = 15},
+}
+
+function fakeBoneFlop.SyncOpenFractures(org, ownerOnly)
+	local owner = org and org.owner
+	if not IsValid(owner) then return end
+
+	local data = table.Copy(org.open_fractures or {})
+	owner:SetNetVar("openfractures", data)
+	if ownerOnly or not owner:IsPlayer() then return end
+
+	if IsValid(owner.FakeRagdoll) then owner.FakeRagdoll:SetNetVar("openfractures", data) end
+	local deathRag = owner:GetNWEntity("RagdollDeath")
+	if IsValid(deathRag) and deathRag ~= owner.FakeRagdoll then deathRag:SetNetVar("openfractures", data) end
+end
+
+local function setOpenFracture(org, bone, active)
+	local cfg = openFractureBones[bone]
+	if not cfg then return false end
+
+	if active then
+		org.open_fractures = org.open_fractures or {}
+		if org.open_fractures[bone] then return false end
+
+		local theta = math.Rand(0, math.pi * 2)
+		local offset = Vector(cfg.depth, 0, 0)
+		local dir = Vector(-0.35, math.cos(theta), math.sin(theta)):Angle()
+		org.open_fractures[bone] = {offset, dir}
+
+		local owner = org.owner
+		if IsValid(owner) and owner.organism == org and hg.organism and hg.organism.AddWoundManual then
+			hg.organism.AddWoundManual(owner, cfg.bleed, offset, dir, bone, CurTime())
+		end
+	else
+		if not org.open_fractures or not org.open_fractures[bone] then return false end
+		org.open_fractures[bone] = nil
+		if not next(org.open_fractures) then org.open_fractures = nil end
+	end
+
+	fakeBoneFlop.SyncOpenFractures(org)
+	return true
+end
+
 function fakeBoneFlop.FlagBone(org, bone, active)
 	if not org or not bone then return false end
+	if openFractureBones[bone] then
+		local legacy = org.fake_floppy_bones and org.fake_floppy_bones[bone]
+		if legacy then
+			org.fake_floppy_bones[bone] = nil
+			if not next(org.fake_floppy_bones) then org.fake_floppy_bones = nil end
+		end
+		return setOpenFracture(org, bone, active) or (legacy and true or false)
+	end
 
 	if active then
 		org.fake_floppy_bones = org.fake_floppy_bones or {}
@@ -866,7 +925,7 @@ end
 function fakeBoneFlop.SetLimbSegmentState(org, limb, segment, active)
 	if active then
 		local down = fakeBoneFlop.ResolveBone(limb, "down")
-		segment = org and org.fake_floppy_bones and down and org.fake_floppy_bones[down] and "up" or "down"
+		segment = org and org.open_fractures and down and org.open_fractures[down] and "up" or "down"
 	end
 	return fakeBoneFlop.SetBoneState(org, fakeBoneFlop.ResolveBone(limb, segment), active)
 end
@@ -1099,7 +1158,11 @@ function fakeBoneFlop.ScheduleApply(rag, bone, org)
 		if not IsValid(rag) then return end
 		rag.hg_floppy_pending[bone] = nil
 		local activeOrg = rag.organism or org
-		if activeOrg and not ((activeOrg.fake_floppy_bones and activeOrg.fake_floppy_bones[bone]) or (activeOrg.fake_dislocated_bones and activeOrg.fake_dislocated_bones[bone])) then return end
+		if activeOrg and not (
+			(activeOrg.open_fractures and activeOrg.open_fractures[bone])
+			or (activeOrg.fake_floppy_bones and activeOrg.fake_floppy_bones[bone])
+			or (activeOrg.fake_dislocated_bones and activeOrg.fake_dislocated_bones[bone])
+		) then return end
 		fakeBoneFlop.ApplyBone(rag, bone, activeOrg)
 	end)
 end
@@ -1108,6 +1171,7 @@ function fakeBoneFlop.ApplyStored(rag, org)
 	if not IsValid(rag) or not org then return end
 
 	for bone in pairs(org.fake_floppy_bones or {}) do fakeBoneFlop.ApplyBone(rag, bone, org) end
+	for bone in pairs(org.open_fractures or {}) do fakeBoneFlop.ApplyBone(rag, bone, org) end
 	for bone in pairs(org.fake_dislocated_bones or {}) do fakeBoneFlop.ApplyBone(rag, bone, org) end
 end
 
@@ -1147,12 +1211,17 @@ hook.Add("Ragdoll_Create", "hg-fakeboneflop-apply", function(ply, rag)
 
 	if ply and ply.organism then
 		fakeBoneFlop.ApplyStored(rag, ply.organism)
+		if ply.organism.open_fractures then rag:SetNetVar("openfractures", table.Copy(ply.organism.open_fractures)) end
 	end
 end)
 
 hook.Add("Org Clear", "hg-fakeboneflop-clear", function(org)
 	org.fake_floppy_bones = nil
 	org.fake_dislocated_bones = nil
+	if org.open_fractures then
+		org.open_fractures = nil
+		fakeBoneFlop.SyncOpenFractures(org, true)
+	end
 end)
 
 hook.Add("Org Think", "hg-fakeboneflop-sync", function(owner, org)

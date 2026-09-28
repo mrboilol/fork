@@ -802,8 +802,12 @@ end
 local function isFloppy(ragdoll, org, bone)
 	local ragFloppy = ragdoll.hg_floppy_bones
 	local orgFloppy = org.fake_floppy_bones
+	local fractures = org.open_fractures
 
-	return ragFloppy and ragFloppy[bone] or orgFloppy and orgFloppy[bone] or false
+	return (ragFloppy and ragFloppy[bone])
+		or (orgFloppy and orgFloppy[bone])
+		or (fractures and fractures[bone])
+		or false
 end
 
 local LIMB_HAND = {larm = "l", rarm = "r"}

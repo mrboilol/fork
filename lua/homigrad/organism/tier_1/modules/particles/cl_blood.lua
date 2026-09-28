@@ -401,6 +401,7 @@ local function decalBlood(pos, normal, tr, artery, owner, tiny, amount)
 	end
 	playBloodDripImpact(pos, tr)
 end
+hg.DecalBloodHit = decalBlood
 --дурак, просто смотри сколько ентити стоит в одном месте
 local tr2 = { collisiongroup = COLLISION_GROUP_WORLD, output = {} }
 

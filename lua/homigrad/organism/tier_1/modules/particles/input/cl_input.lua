@@ -38,11 +38,92 @@ hg.bloodparticles2 = hg.bloodparticles2 or {}
 local vecZero = Vector(0, 0, 0)
 local lastplaced = SysTime()
 local hg_blood_fps = ConVarExists("hg_blood_fps") and GetConVar("hg_blood_fps") or CreateClientConVar("hg_blood_fps", 24, true, nil, "fps to draw blood", 12, 165)
+local hg_blood_physics = ConVarExists("hg_blood_physics") and GetConVar("hg_blood_physics") or CreateClientConVar("hg_blood_physics", 1, true, false, "physics particle blood", 0, 1)
+
+local dropMats = {}
+for i = 1, 11 do
+	local mat = Material("effects/droplets/drop" .. i)
+	if not mat:IsError() then dropMats[#dropMats + 1] = mat end
+end
+if #dropMats == 0 then dropMats = mats end
+
+local physEmitter
+local physGravity = Vector(0, 0, -600)
+local physTrace = {mask = MASK_SOLID}
+local sv_gravity = GetConVar("sv_gravity")
+
+local function physBloodCollide(data, pos, normal)
+	local decal = hg.DecalBloodHit
+	if not decal then return end
+	physTrace.start = pos + normal * 2
+	physTrace.endpos = pos - normal * 4
+	local tr = util.TraceLine(physTrace)
+	if not tr.Hit then tr.HitWorld = true end
+	decal(pos, normal, tr, data.artery, data.owner, data.tiny, data.volume)
+end
+
+local function physBloodThink(part, data)
+	local pos = part:GetPos()
+	if bit.band(util.PointContents(pos), CONTENTS_WATER) == CONTENTS_WATER then
+		if not data.hidden then hg.addBloodPart2(pos, part:GetVelocity() / 20 + VectorRand(-1, 1), nil, nil, nil, nil, true, data.owner) end
+		part:SetDieTime(0)
+		return
+	end
+	part:SetNextThink(CurTime() + 0.1)
+end
+
+local function addPhysBloodPart(pos, vel, w, artery, kishki, owner, tiny, hidden, lifetime)
+	if not IsValid(physEmitter) then
+		physEmitter = ParticleEmitter(pos, false)
+		if not IsValid(physEmitter) then return end
+	end
+
+	local data = {artery = artery, owner = owner, tiny = tiny, hidden = hidden, volume = math.Clamp((w or 2) / 2, 0.2, 4)}
+	physEmitter:SetPos(pos)
+	local part = physEmitter:Add(dropMats[math.random(#dropMats)], pos)
+	if not part then return data end
+
+	if IsValid(owner) then vel = vel + owner:GetVelocity() end
+	physGravity[3] = -(sv_gravity and sv_gravity:GetFloat() or 600)
+
+	local size = kishki and math.Clamp((w or 4) * 0.55, 2, 6) or math.Clamp((w or 2) * 0.7, tiny and 0.5 or 0.8, 3.4)
+	local light = render.GetLightColor(pos)
+	local lum = math.Clamp((light[1] + light[2] + light[3]) * 1.2 + 0.35, 0.5, 1)
+
+	part:SetVelocity(vel)
+	part:SetDieTime(math.Clamp(lifetime or 6, 1.2, 6))
+	part:SetStartAlpha(hidden and 0 or 255)
+	part:SetEndAlpha(hidden and 0 or 160)
+	part:SetStartSize(size)
+	part:SetEndSize(size * 0.75)
+	part:SetRoll(math.Rand(0, 360))
+	part:SetRollDelta(math.Rand(-6, 6))
+	part:SetGravity(physGravity)
+	part:SetAirResistance(tiny and 22 or (artery and 4 or 9))
+	part:SetBounce(0)
+	part:SetCollide(true)
+	if artery then
+		part:SetColor(255 * lum, 14 * lum, 10 * lum)
+	else
+		part:SetColor(215 * lum, 8 * lum, 5 * lum)
+	end
+	part:SetCollideCallback(function(p, hitPos, hitNormal)
+		p:SetDieTime(0)
+		physBloodCollide(data, hitPos, hitNormal)
+	end)
+	part:SetThinkFunction(function(p) physBloodThink(p, data) end)
+	part:SetNextThink(CurTime() + 0.1)
+
+	return data
+end
+
 local function addBloodPart(pos, vel, mat, w, h, artery, kishki, owner, tiny, hidden, lifetime, maxBeamLength)
 	--local fps = 1 / hg_blood_fps:GetInt() * 1
 	--if lastplaced + fps > SysTime() then return end
 	--lastplaced = SysTime()
 	if LocalPlayer():GetNetVar("disappearance", nil) or (IsValid(owner) and owner:GetNetVar("disappearance", nil)) then return end
+
+	if hg_blood_physics:GetBool() then return addPhysBloodPart(pos, vel, w, artery, kishki, owner, tiny, hidden, lifetime) end
 
 	pos = pos + vecZero
 	vel = vel + vecZero

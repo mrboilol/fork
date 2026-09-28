@@ -80,7 +80,21 @@ function SWEP:PlayJammedTriggerSound()
 	if (self.nextJamTriggerSound or 0) > curTime then return end
 	self.nextJamTriggerSound = curTime + (self.JamTriggerCooldown or 0.18)
 
-	self:EmitSound(self.JamTriggerSound or "panoptisscon/uhoh.mp3", 65, math.random(97, 103), 0.9, CHAN_WEAPON)
+	net.Start("hg_jam_click")
+		net.WriteEntity(self)
+	net.Broadcast()
+end
+
+function SWEP:JamRackAnimation()
+	local peak = 1
+	if istable(self.ReloadSlideAnim) then
+		for _, value in ipairs(self.ReloadSlideAnim) do
+			if isnumber(value) and math.abs(value) > math.abs(peak) then peak = value end
+		end
+	end
+
+	self.shooanim = self.ShootAnimMul or 2
+	self.ReloadSlideOffset = peak
 end
 
 function SWEP:TryJam()
@@ -205,8 +219,13 @@ function SWEP:StartJamClear()
 		owner:ViewPunch(AngleRand(-3, 3))
 	end
 
-	-- Eject the stuck casing
 	self:RejectShell(self.ShellEject)
+
+	if SERVER then
+		net.Start("hg_jam_rack")
+			net.WriteEntity(self)
+		net.Broadcast()
+	end
 
 	return true
 end
@@ -238,10 +257,28 @@ function SWEP:ClearJam()
 	return true
 end
 
+if CLIENT then
+	net.Receive("hg_jam_click", function()
+		local wep = net.ReadEntity()
+		if not IsValid(wep) then return end
+
+		wep:EmitSound(wep.JamTriggerSound or "panoptisscon/uhoh.mp3", 65, math.random(97, 103), 0.9, CHAN_WEAPON)
+	end)
+
+	net.Receive("hg_jam_rack", function()
+		local wep = net.ReadEntity()
+		if not IsValid(wep) or not wep.JamRackAnimation then return end
+
+		wep:JamRackAnimation()
+	end)
+end
+
 if SERVER then
-	local hg_jam = ConVarExists("hg_jam") and GetConVar("hg_jam") or CreateConVar("hg_jam", "0", {FCVAR_REPLICATED, FCVAR_CHEAT}, "If set to 1, the next fired round will always jam and then reset to 0.")
+	local hg_jam =ConVarExists("hg_jam") and GetConVar("hg_jam") or CreateConVar("hg_jam", "0", {FCVAR_REPLICATED, FCVAR_CHEAT}, "If set to 1, the next fired round will always jam and then reset to 0.")
 
 	util.AddNetworkString("hg_clear_jam")
+	util.AddNetworkString("hg_jam_click")
+	util.AddNetworkString("hg_jam_rack")
 
 	net.Receive("hg_clear_jam", function(len, ply)
 		local wep = ply:GetActiveWeapon()
