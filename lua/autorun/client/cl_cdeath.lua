@@ -33,6 +33,22 @@ local DEATH_MESSAGES = {
     { title = "yo who said that", desc = "i didnt even say anything" },
 }
 
+local SILENT_DEATH_MESSAGES = {
+    "You died.",
+    "You are dead.",
+    "Your heart stopped.",
+    "It's over.",
+    "You didn't make it.",
+    "Everything went quiet.",
+    "You never woke up.",
+    "Your story ends here.",
+}
+
+local SILENT_BLACK_DURATION = 5
+local SILENT_FADE_OUT_DURATION = 1.5
+local SILENT_TEXT_DELAY = 1
+local SILENT_TEXT_FADE_IN = 1.5
+
 local DEATH_SOUNDS = {
     [0] = "niceone.ogg",
 }
@@ -161,6 +177,27 @@ CDeath.nextCamSync         = 0
 CDeath.nextSoundfade       = 0
 CDeath.nextRagdollSearch   = 0
 CDeath.disabledUnblocked   = false
+CDeath.silent              = false
+CDeath.silentMessage       = SILENT_DEATH_MESSAGES[1]
+CDeath.incapTimerDeath     = false
+
+local function SilentDeathEnabled()
+    local cv = GetConVar("hg_silentdeath")
+    return cv and cv:GetBool() or false
+end
+
+local function IncapTimerExpiring(ply)
+    local org = ply.new_organism or ply.organism
+    if not org or not org.incapacitated then return false end
+    local deathStateEnd = tonumber(org.deathStateEnd)
+    return deathStateEnd ~= nil and deathStateEnd - CurTime() <= 1
+end
+
+local function DeathFadeDurations()
+    if CDeath.silent then return SILENT_BLACK_DURATION, SILENT_FADE_OUT_DURATION end
+    if RealishDeathEffect() then return REALISH_BLACK_FADE_DURATION, REALISH_BLACK_FADE_OUT_DURATION end
+    return BLACK_FADE_DURATION, BLACK_FADE_OUT_DURATION
+end
 
 
 local zcity_RenderScene = nil
@@ -472,6 +509,10 @@ local function CinematicDeathTracker()
         CDeath.hasSpawned = true
     end
 
+    if ply:Alive() then
+        CDeath.incapTimerDeath = IncapTimerExpiring(ply)
+    end
+
 	if not ply:Alive() and not CDeath.isDead and CDeath.hasSpawned then
 		CDeath.isDead           = true
 		if not RealishDeathEffect() then TakeAuthority() end
@@ -492,6 +533,8 @@ local function CinematicDeathTracker()
         CDeath.prevSpecReloadDown = false
         CDeath.deathMessage     = DEATH_MESSAGES[math.random(#DEATH_MESSAGES)]
         CDeath.deathColor       = DEATH_COLORS[math.random(#DEATH_COLORS)]
+        CDeath.silent           = SilentDeathEnabled()
+        CDeath.silentMessage    = SILENT_DEATH_MESSAGES[math.random(#SILENT_DEATH_MESSAGES)]
         MakeRagdollHeadVisible(CDeath.ragdollEnt)
 
         local plyPos = ply:GetPos()
@@ -520,8 +563,10 @@ local function CinematicDeathTracker()
 CDeath.keepSoundAlive = true
 local soundGeneration = CDeath.deathSoundGeneration
 
-for _, deathSound in pairs(DEATH_SOUNDS) do
-    PlayDeathSound(deathSound, soundGeneration)
+if not CDeath.silent or CDeath.incapTimerDeath then
+    for _, deathSound in pairs(DEATH_SOUNDS) do
+        PlayDeathSound(deathSound, soundGeneration)
+    end
 end
 
     elseif ply:Alive() and CDeath.isDead then
@@ -603,8 +648,7 @@ end
     end
 
 	if CDeath.isDead and CDeath.stage2Started and not CDeath.autoCompatTriggered then
-		local fadeDuration = RealishDeathEffect() and REALISH_BLACK_FADE_DURATION or BLACK_FADE_DURATION
-		local fadeOutDuration = RealishDeathEffect() and REALISH_BLACK_FADE_OUT_DURATION or BLACK_FADE_OUT_DURATION
+		local fadeDuration, fadeOutDuration = DeathFadeDurations()
 		if (CurTime() - CDeath.stage2Time) >= (fadeDuration + fadeOutDuration) then
 			CDeath.autoCompatTriggered = true
             ActivateCompatMode()
@@ -774,10 +818,17 @@ local function CinematicDeathBackground()
 	if elapsed >= STAGE_1_DURATION then
 		local stageElapsed = elapsed - STAGE_1_DURATION
 		local realish = RealishDeathEffect()
-		local fadeDuration = realish and REALISH_BLACK_FADE_DURATION or BLACK_FADE_DURATION
-		local fadeOutDuration = realish and REALISH_BLACK_FADE_OUT_DURATION or BLACK_FADE_OUT_DURATION
+		local fadeDuration, fadeOutDuration = DeathFadeDurations()
 		local fadeProgress = math.Clamp(stageElapsed / fadeDuration, 0, 1)
 		local fadeOutProgress = math.Clamp((stageElapsed - fadeDuration) / fadeOutDuration, 0, 1)
+		if CDeath.silent then
+			local alpha = math.floor((1 - fadeOutProgress) * 255)
+			surface.SetDrawColor(0, 0, 0, alpha)
+			surface.DrawRect(0, 0, sw, sh)
+			local textAlpha = math.floor(math.Clamp((stageElapsed - SILENT_TEXT_DELAY) / SILENT_TEXT_FADE_IN, 0, 1) * alpha)
+			draw.SimpleText(CDeath.silentMessage, "DeathEffect_HG", sw / 2, sh / 2, Color(200, 200, 200, textAlpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			return
+		end
 		if realish then
 			local alpha = math.floor((fadeOutProgress > 0 and 1 - fadeOutProgress or fadeProgress) * 255)
 			surface.SetDrawColor(0, 0, 0, alpha)

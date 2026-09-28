@@ -3,47 +3,46 @@ local enabled = CreateClientConVar("hg_bodystatus_enabled", "1", true, false, "S
 local IsValid = IsValid
 local CurTime = CurTime
 local FrameTime = FrameTime
+local FrameNumber = FrameNumber
 local ScrH = ScrH
 local math_sqrt = math.sqrt
 local math_sin = math.sin
 local math_cos = math.cos
 local math_atan2 = math.atan2
-local math_abs = math.abs
 local math_exp = math.exp
 local math_ceil = math.ceil
 local math_Clamp = math.Clamp
-local surface_SetDrawColor = surface.SetDrawColor
-local surface_DrawPoly = surface.DrawPoly
-local surface_DrawLine = surface.DrawLine
 
 local TAU = math.pi * 2
 
-local PANEL_HEIGHT_FRACTION = 0.3
-local PANEL_MARGIN_FRACTION = 0.025
-local FIGURE_EXTENT = 3.8
-local DEPTH_LIFT = 0.35
-local POSE_SMOOTH_RATE = 18
-local ANGLE_SMOOTH_RATE = 10
+local SPHERE_MODEL = "models/hunter/misc/sphere025x025.mdl"
+local SPHERE_MATERIAL = Material("models/debug/debugwhite")
+
+local PANEL_SIZE_FRACTION = 0.36
+local PANEL_MARGIN_FRACTION = 0.02
+local DISPLAY_SPINE = 20
+local CAMERA_DISTANCE = 175
+local CAMERA_PITCH = 14
+local CAMERA_FOV = 30
+local CAMERA_TARGET_HEIGHT = 0.1
+local POSE_SMOOTH_RATE = 20
+local YAW_SMOOTH_RATE = 8
 local SNAP_AFTER_HIDDEN = 0.5
 local MIN_SPINE_LENGTH = 4
 local MAX_SPINE_LENGTH = 80
-local MIN_RIGHT_LENGTH = 1
-local FLAT_TILT_THRESHOLD = 0.3
+local MIN_AXIS_LENGTH = 0.05
 local MEDICAL_UPDATE_INTERVAL = 0.1
-local DEAD_ALPHA_MUL = 0.55
-local FILL_ALPHA = 215
-local OUTLINE_ALPHA = 190
-local OUTLINE_WIDTH = 1.5
-local BEAD_SPACING = 1.3
-local MAX_BEADS = 8
-local SKULL_FALLBACK_OFFSET = 0.12
-local JAW_FACE_BLEND = 0.6
-local JAW_DROP = 0.08
+local BEAD_SPACING = 1.05
+local MAX_BEADS = 6
+local SPINE_BACK_OFFSET = 0.28
+local SKULL_LIFT = 0.12
+local JAW_DROP = 0.13
+local JAW_FORWARD = 0.1
 
-local FRACTURE_SEVERITY = 0.82
+local FRACTURE_SEVERITY = 0.85
 local BONE_DAMAGE_WEIGHT = 0.7
 local SPINE_DAMAGE_WEIGHT = 0.75
-local DISLOCATION_SEVERITY = 0.68
+local DISLOCATION_SEVERITY = 0.7
 local ARTERIAL_SEVERITY = 0.95
 local ARTERIAL_CONTROLLED_SEVERITY = 0.6
 local ARTERIAL_ACTIVE_RATE = 0.05
@@ -58,38 +57,62 @@ local ARTERIAL_PULSE_DEPTH = 0.3
 local DEFAULT_PULSE = 72
 local SECONDS_PER_MINUTE = 60
 
-local COLOR_STOPS = {
-	{0, 196, 208, 200},
-	{0.3, 214, 196, 118},
-	{0.55, 224, 136, 62},
-	{0.8, 196, 48, 40},
-	{1, 96, 18, 24},
+local DRIP_MATERIAL = CreateMaterial("hg_bodystatus_drip", "UnlitGeneric", {
+	["$basetexture"] = "vgui/white",
+	["$vertexcolor"] = 1,
+	["$vertexalpha"] = 1,
+	["$translucent"] = 1,
+})
+local MAX_DRIPS = 96
+local MIN_DRIP_RATE = 0.01
+local DRIP_CAMERA_BIAS = 2
+local VENOUS_DRIP = {
+	color = Color(140, 8, 8),
+	spawnBase = 0.6, spawnPerRate = 0.8, spawnMax = 6,
+	widthBase = 0.6, widthPerRate = 0.15, widthMax = 1.6,
+	speed = 10, length = 4, life = 1.3,
 }
-local OUTLINE_COLOR = {18, 18, 20}
-local STUMP_COLOR = {70, 12, 16}
-local CRACK_COLOR = {25, 8, 8}
+local ARTERIAL_DRIP = {
+	color = Color(255, 25, 25),
+	spawnBase = 5, spawnPerRate = 0.4, spawnMax = 12,
+	widthBase = 1.2, widthPerRate = 0.05, widthMax = 2.2,
+	speed = 36, length = 8, life = 0.8,
+}
 
-local R_PELVIS = 0.2
-local R_CHEST = 0.25
-local R_NECK = 0.1
+local HEALTHY_COLOR = {0.92, 0.92, 0.92}
+local CRITICAL_COLOR = {0.78, 0.08, 0.08}
+local AMBIENT_LIGHT = 0.3
+local LIGHTING = {
+	{BOX_TOP, 1},
+	{BOX_BACK, 0.75},
+	{BOX_LEFT, 0.5},
+	{BOX_RIGHT, 0.5},
+	{BOX_FRONT, 0.35},
+	{BOX_BOTTOM, 0.2},
+}
+
 local R_SKULL = 0.2
-local R_JAW = 0.09
-local R_UPPER_ARM = 0.08
-local R_LOWER_ARM = 0.07
-local R_HAND = 0.075
-local R_THIGH = 0.095
-local R_CALF = 0.08
-local R_FOOT = 0.075
-local STUMP_SCALE = 0.8
+local R_JAW = 0.11
+local R_NECK = 0.1
+local R_CHEST = 0.3
+local R_PELVIS = 0.24
+local R_SPINE = 0.075
+local R_UPPER_ARM = 0.1
+local R_LOWER_ARM = 0.09
+local R_HAND = 0.085
+local R_THIGH = 0.13
+local R_CALF = 0.11
+local R_FOOT = 0.1
 
-local B_PELVIS, B_SPINE2, B_SPINE4, B_NECK, B_HEAD, B_JAW = 1, 2, 3, 4, 5, 6
-local B_L_UPPERARM, B_L_FOREARM, B_L_HAND = 7, 8, 9
-local B_R_UPPERARM, B_R_FOREARM, B_R_HAND = 10, 11, 12
-local B_L_THIGH, B_L_CALF, B_L_FOOT, B_L_TOE = 13, 14, 15, 16
-local B_R_THIGH, B_R_CALF, B_R_FOOT, B_R_TOE = 17, 18, 19, 20
+local B_PELVIS, B_SPINE1, B_SPINE2, B_SPINE4, B_NECK, B_HEAD, B_JAW = 1, 2, 3, 4, 5, 6, 7
+local B_L_UPPERARM, B_L_FOREARM, B_L_HAND = 8, 9, 10
+local B_R_UPPERARM, B_R_FOREARM, B_R_HAND = 11, 12, 13
+local B_L_THIGH, B_L_CALF, B_L_FOOT, B_L_TOE = 14, 15, 16, 17
+local B_R_THIGH, B_R_CALF, B_R_FOOT, B_R_TOE = 18, 19, 20, 21
 
 local BONE_CANDIDATES = {
 	[B_PELVIS] = {"ValveBiped.Bip01_Pelvis", "Bip01 Pelvis", "bip_pelvis", "mixamorig:Hips"},
+	[B_SPINE1] = {"ValveBiped.Bip01_Spine1", "Bip01 Spine1", "bip_spine_1", "mixamorig:Spine"},
 	[B_SPINE2] = {"ValveBiped.Bip01_Spine2", "Bip01 Spine2", "bip_spine_2", "mixamorig:Spine1"},
 	[B_SPINE4] = {"ValveBiped.Bip01_Spine4", "Bip01 Spine4", "bip_spine_3", "mixamorig:Spine2"},
 	[B_NECK] = {"ValveBiped.Bip01_Neck1", "Bip01 Neck", "Bip01 Neck1", "bip_neck", "mixamorig:Neck"},
@@ -113,11 +136,12 @@ local BONE_CANDIDATES = {
 local BONE_COUNT = #BONE_CANDIDATES
 
 local P_PELVIS, P_CHEST, P_NECK, P_SKULL, P_JAW = 1, 2, 3, 4, 5
-local P_L_SHOULDER, P_L_ELBOW, P_L_WRIST = 6, 7, 8
-local P_R_SHOULDER, P_R_ELBOW, P_R_WRIST = 9, 10, 11
-local P_L_HIP, P_L_KNEE, P_L_ANKLE, P_L_FOOT = 12, 13, 14, 15
-local P_R_HIP, P_R_KNEE, P_R_ANKLE, P_R_FOOT = 16, 17, 18, 19
-local POINT_COUNT = 19
+local P_SPINE_TOP, P_SPINE_MID, P_SPINE_LOW = 6, 7, 8
+local P_L_SHOULDER, P_L_ELBOW, P_L_WRIST = 9, 10, 11
+local P_R_SHOULDER, P_R_ELBOW, P_R_WRIST = 12, 13, 14
+local P_L_HIP, P_L_KNEE, P_L_ANKLE, P_L_FOOT = 15, 16, 17, 18
+local P_R_HIP, P_R_KNEE, P_R_ANKLE, P_R_FOOT = 19, 20, 21, 22
+local POINT_COUNT = 22
 
 local LIMB_POINT_BONES = {
 	[P_L_SHOULDER] = B_L_UPPERARM,
@@ -156,11 +180,9 @@ local LIMBS = {
 		radii = {R_UPPER_ARM, R_LOWER_ARM, R_HAND},
 	},
 }
-local LEG_LIMBS = {LIMBS[1], LIMBS[2]}
-local ARM_LIMBS = {LIMBS[3], LIMBS[4]}
 
 local REGIONS = {
-	"skull", "jaw", "neck", "chest", "pelvis",
+	"skull", "jaw", "neck", "chest", "spine2", "spine1", "pelvis",
 	"larmup", "larm", "lhand", "rarmup", "rarm", "rhand",
 	"llegup", "lleg", "rlegup", "rleg",
 }
@@ -179,6 +201,24 @@ local TORSO_BONE_REGIONS = {
 	["ValveBiped.Bip01_R_Toe0"] = "rleg",
 }
 
+local REGION_SEGMENTS = {
+	skull = {P_SKULL, P_SKULL, R_SKULL},
+	jaw = {P_JAW, P_JAW, R_JAW},
+	neck = {P_NECK, P_NECK, R_NECK},
+	chest = {P_CHEST, P_CHEST, R_CHEST},
+	pelvis = {P_PELVIS, P_PELVIS, R_PELVIS},
+	larmup = {P_L_SHOULDER, P_L_ELBOW, R_UPPER_ARM},
+	larm = {P_L_ELBOW, P_L_WRIST, R_LOWER_ARM},
+	lhand = {P_L_WRIST, P_L_WRIST, R_HAND},
+	rarmup = {P_R_SHOULDER, P_R_ELBOW, R_UPPER_ARM},
+	rarm = {P_R_ELBOW, P_R_WRIST, R_LOWER_ARM},
+	rhand = {P_R_WRIST, P_R_WRIST, R_HAND},
+	llegup = {P_L_HIP, P_L_KNEE, R_THIGH},
+	lleg = {P_L_KNEE, P_L_ANKLE, R_CALF},
+	rlegup = {P_R_HIP, P_R_KNEE, R_THIGH},
+	rleg = {P_R_KNEE, P_R_ANKLE, R_CALF},
+}
+
 local ARTERY_REGIONS = {
 	arteria = "neck",
 	aorta = "chest",
@@ -189,33 +229,37 @@ local ARTERY_REGIONS = {
 }
 
 local worldPos = {}
-local figX, figY = {}, {}
+local eyesPos, eyesForward
+local captureFrame, captureBody = -1, nil
+local trackedBody
+
+local poseX, poseY, poseZ = {}, {}, {}
 local pointValid = {}
-local smoothX, smoothY = {}, {}
+local smoothX, smoothY, smoothZ = {}, {}, {}
 local smoothValid = {}
-local smoothAngle = 0
+local smoothYaw = 0
 local lastBody
 local lastDrawTime = 0
 
-local sevA, sevB = {}, {}
-local fractured, arterial, missing = {}, {}, {}
+local severity = {}
+local arterial, missing = {}, {}
 local regionBleed, regionArterial = {}, {}
 local nextMedicalUpdate = 0
 local pulseHz = DEFAULT_PULSE / SECONDS_PER_MINUTE
+local currentOrg, woundSource
 
-local CIRCLE_SEGMENTS = 20
-local HALF_SEGMENTS = CIRCLE_SEGMENTS / 2
-local circleCos, circleSin = {}, {}
-local circlePoly, halfPoly = {}, {}
-for i = 1, CIRCLE_SEGMENTS do
-	local angle = (i - 1) / CIRCLE_SEGMENTS * TAU
-	circleCos[i] = math_cos(angle)
-	circleSin[i] = math_sin(angle)
-	circlePoly[i] = {x = 0, y = 0}
+local emitters = {}
+local emitterCount = 0
+local drips = {}
+local nextDripSlot = 1
+for i = 1, MAX_DRIPS do
+	drips[i] = {alive = false, x = 0, y = 0, z = 0, born = 0, width = 1, style = VENOUS_DRIP}
 end
-for i = 1, HALF_SEGMENTS + 1 do
-	halfPoly[i] = {x = 0, y = 0}
-end
+
+local sphereEnt, sphereRadius
+local sphereMatrix = Matrix()
+local sphereScale = Vector(1, 1, 1)
+local spherePos = Vector()
 
 local function getBodyEntity(ply)
 	if not IsValid(ply) then return end
@@ -253,15 +297,99 @@ local function getBoneCache(ent)
 	return cache
 end
 
-local function readBonePositions(ent, cache)
+local function resolveWoundRegion(bone)
+	if not isstring(bone) then return end
+
+	return TORSO_BONE_REGIONS[bone] or (hg.amputeetable and hg.amputeetable[bone])
+end
+
+local function lookupNamedBone(ent, cache, bone)
+	if isnumber(bone) then return bone end
+	if not isstring(bone) then return end
+
+	cache.named = cache.named or {}
+	local id = cache.named[bone]
+	if id == nil then
+		id = ent:LookupBone(bone) or false
+		cache.named[bone] = id
+	end
+
+	return id or nil
+end
+
+local function addEmitter(ent, cache, wound, region, rate, arterialWound)
+	if not region or not isvector(wound[2]) or rate <= MIN_DRIP_RATE then return end
+
+	local id = lookupNamedBone(ent, cache, wound[4])
+	local matrix = id and ent:GetBoneMatrix(id)
+	if not matrix then return end
+
+	emitterCount = emitterCount + 1
+	local emitter = emitters[emitterCount]
+	if not emitter then
+		emitter = {}
+		emitters[emitterCount] = emitter
+	end
+	emitter.world = LocalToWorld(wound[2], angle_zero, matrix:GetTranslation(), matrix:GetAngles())
+	emitter.region, emitter.rate, emitter.arterial = region, rate, arterialWound
+	emitter.valid = false
+end
+
+local function woundRate(rates, index, wound, sizeToRate)
+	local rate = istable(rates) and tonumber(rates[index]) or tonumber(wound.visualBleedRate)
+
+	return rate or (tonumber(wound[1]) or 0) * sizeToRate
+end
+
+local function captureWounds(ent, cache)
+	emitterCount = 0
+	if not IsValid(woundSource) or not istable(currentOrg) then return end
+
+	local wounds, arterialWounds = woundSource.wounds, woundSource.arterialwounds
+	if istable(wounds) then
+		for index, wound in ipairs(wounds) do
+			if (tonumber(wound[1]) or 0) > 0 then
+				local rate = woundRate(currentOrg.woundBleedRates, index, wound, WOUND_SIZE_TO_RATE)
+				addEmitter(ent, cache, wound, resolveWoundRegion(wound[4]), rate, false)
+			end
+		end
+	end
+	if not istable(arterialWounds) then return end
+
+	for index, wound in ipairs(arterialWounds) do
+		if (tonumber(wound[1]) or 0) > 0 then
+			local rate = woundRate(currentOrg.arterialWoundBleedRates, index, wound, 1)
+			local region = ARTERY_REGIONS[wound[7]] or resolveWoundRegion(wound[4])
+			addEmitter(ent, cache, wound, region, rate, true)
+		end
+	end
+end
+
+local function captureBones(ent)
+	local cache = getBoneCache(ent)
 	for index = 1, BONE_COUNT do
 		local id = cache[index]
 		local matrix = id >= 0 and ent:GetBoneMatrix(id)
 		worldPos[index] = matrix and matrix:GetTranslation() or false
 	end
+
+	eyesPos, eyesForward = nil, nil
+	if cache.eyes > 0 then
+		local attachment = ent:GetAttachment(cache.eyes)
+		if attachment then eyesPos, eyesForward = attachment.Pos, attachment.Ang:Forward() end
+	end
+
+	captureWounds(ent, cache)
+	captureFrame, captureBody = FrameNumber(), ent
 end
 
-local frameRoot, frameRight, frameUp, frameForward, frameSpineLength
+hook.Add("PostDrawAppearance", "homigrad/body-status/capture-rendered-pose", function(ent)
+	if ent ~= trackedBody or not IsValid(ent) then return end
+
+	captureBones(ent)
+end)
+
+local frameRoot, frameUp, frameForward, frameSpineLength, yawCos, yawSin
 
 local function buildFrame()
 	local pelvis, neck = worldPos[B_PELVIS], worldPos[B_NECK] or worldPos[B_SPINE4]
@@ -278,14 +406,23 @@ local function buildFrame()
 	if lThigh and rThigh then right:Add(rThigh - lThigh) end
 	if lArm and rArm then right:Add(rArm - lArm) end
 	right:Sub(up * right:Dot(up))
-	local rightLength = right:Length()
-	if rightLength < MIN_RIGHT_LENGTH then return false end
-	right:Div(rightLength)
+	if right:Length() < MIN_AXIS_LENGTH then return false end
+	right:Normalize()
 
-	frameRoot, frameRight, frameUp, frameSpineLength = pelvis, right, up, spineLength
-	frameForward = up:Cross(right)
+	local forward = up:Cross(right)
+	local headingX, headingY = right.x + forward.y, right.y - forward.x
+	if headingX * headingX + headingY * headingY < MIN_AXIS_LENGTH * MIN_AXIS_LENGTH then return false end
 
-	return true
+	frameRoot, frameUp, frameForward, frameSpineLength = pelvis, up, forward, spineLength
+
+	return true, math.deg(math_atan2(headingX, -headingY))
+end
+
+local function projectRaw(pos)
+	local scale = DISPLAY_SPINE / frameSpineLength
+	local dx, dy = pos.x - frameRoot.x, pos.y - frameRoot.y
+
+	return (dx * yawCos + dy * yawSin) * scale, (dy * yawCos - dx * yawSin) * scale, (pos.z - frameRoot.z) * scale
 end
 
 local function projectPoint(index, pos)
@@ -294,63 +431,80 @@ local function projectPoint(index, pos)
 		return
 	end
 
-	local dx, dy, dz = pos.x - frameRoot.x, pos.y - frameRoot.y, pos.z - frameRoot.z
-	local x = (dx * frameRight.x + dy * frameRight.y + dz * frameRight.z) / frameSpineLength
-	local y = (dx * frameUp.x + dy * frameUp.y + dz * frameUp.z) / frameSpineLength
-	local z = (dx * frameForward.x + dy * frameForward.y + dz * frameForward.z) / frameSpineLength
-	figX[index] = x
-	figY[index] = y + z * DEPTH_LIFT
+	poseX[index], poseY[index], poseZ[index] = projectRaw(pos)
 	pointValid[index] = true
 end
 
-local function getHeadPoints(ent, cache)
-	local head, neck = worldPos[B_HEAD], worldPos[B_NECK] or worldPos[B_SPINE4]
+local function placeEmitter(emitter)
+	local segment = REGION_SEGMENTS[emitter.region]
+	if not segment or missing[emitter.region] then return end
+
+	local a, b = segment[1], segment[2]
+	if not smoothValid[a] or not smoothValid[b] or not pointValid[a] or not pointValid[b] then return end
+
+	local wx, wy, wz = projectRaw(emitter.world)
+	local ax, ay, az = poseX[a], poseY[a], poseZ[a]
+	local abx, aby, abz = poseX[b] - ax, poseY[b] - ay, poseZ[b] - az
+	local lengthSqr = abx * abx + aby * aby + abz * abz
+	local along = (wx - ax) * abx + (wy - ay) * aby + (wz - az) * abz
+	local t = lengthSqr > 0.001 and math_Clamp(along / lengthSqr, 0, 1) or 0
+
+	local rx = wx - (ax + abx * t) - DRIP_CAMERA_BIAS
+	local ry = wy - (ay + aby * t)
+	local rz = wz - (az + abz * t)
+	local radialLength = math_sqrt(rx * rx + ry * ry + rz * rz)
+	if radialLength < 0.001 then rx, ry, rz, radialLength = -1, 0, 0, 1 end
+
+	local surface = segment[3] * DISPLAY_SPINE / radialLength
+	local sx, sy, sz = smoothX[a], smoothY[a], smoothZ[a]
+	emitter.x = sx + (smoothX[b] - sx) * t + rx * surface
+	emitter.y = sy + (smoothY[b] - sy) * t + ry * surface
+	emitter.z = sz + (smoothZ[b] - sz) * t + rz * surface
+	emitter.valid = true
+end
+
+local function backOffset(pos)
+	return pos and pos - frameForward * (SPINE_BACK_OFFSET * frameSpineLength)
+end
+
+local function getHeadPoints(neck)
+	local head = worldPos[B_HEAD]
 	if not head then return end
 
 	local headUp = head - neck
-	local headUpLength = headUp:Length()
-	if headUpLength > 0 then headUp:Div(headUpLength) end
+	if headUp:Length() > 0 then headUp:Normalize() end
+	local face = eyesForward or frameForward
+	local skull = head + headUp * (SKULL_LIFT * frameSpineLength)
+	local jaw = worldPos[B_JAW] or skull + (face * JAW_FORWARD - headUp * JAW_DROP) * frameSpineLength
 
-	local eyesPos
-	if cache.eyes > 0 then
-		local attachment = ent:GetAttachment(cache.eyes)
-		eyesPos = attachment and attachment.Pos
-	end
+	return skull, jaw
+end
 
-	local skull, jaw
-	if eyesPos then
-		skull = LerpVector(0.5, head, eyesPos)
-		jaw = LerpVector(JAW_FACE_BLEND, head, eyesPos) - headUp * (JAW_DROP * frameSpineLength)
+local function updatePose(snap)
+	local ok, targetYaw = buildFrame()
+	if not ok then return false end
+
+	if snap then
+		smoothYaw = targetYaw
 	else
-		skull = head + headUp * (SKULL_FALLBACK_OFFSET * frameSpineLength)
-		jaw = LerpVector(0.5, head, neck)
+		local blend = 1 - math_exp(-FrameTime() * YAW_SMOOTH_RATE)
+		smoothYaw = math.NormalizeAngle(smoothYaw + math.AngleDifference(targetYaw, smoothYaw) * blend)
 	end
-
-	return skull, worldPos[B_JAW] or jaw
-end
-
-local function computeTiltTarget()
-	local zx, zy = frameRight.z, frameUp.z
-	local magnitude = math_sqrt(zx * zx + zy * zy)
-	if magnitude >= FLAT_TILT_THRESHOLD then return math.deg(math_atan2(zx, zy)) end
-
-	local sign = smoothAngle >= 0 and 1 or -1
-
-	return sign * math.max(math_abs(smoothAngle), 90)
-end
-
-local function updatePose(ent)
-	local cache = getBoneCache(ent)
-	readBonePositions(ent, cache)
-	if not buildFrame() then return false end
+	local yawRadians = math.rad(smoothYaw)
+	yawCos, yawSin = math_cos(yawRadians), math_sin(yawRadians)
 
 	local neck = worldPos[B_NECK] or worldPos[B_SPINE4]
+	local upperChest = worldPos[B_SPINE4] or neck
+	local midChest = worldPos[B_SPINE2] or LerpVector(0.5, frameRoot, neck)
 	projectPoint(P_PELVIS, frameRoot)
-	projectPoint(P_CHEST, worldPos[B_SPINE2] or worldPos[B_SPINE4] or LerpVector(0.5, frameRoot, neck))
+	projectPoint(P_CHEST, LerpVector(0.5, upperChest, midChest))
 	projectPoint(P_NECK, neck)
+	projectPoint(P_SPINE_TOP, backOffset(neck))
+	projectPoint(P_SPINE_MID, backOffset(midChest))
+	projectPoint(P_SPINE_LOW, backOffset(frameRoot))
 
-	local skull, jaw = getHeadPoints(ent, cache)
-	projectPoint(P_SKULL, skull or neck + frameUp * (frameSpineLength * SKULL_FALLBACK_OFFSET * 2))
+	local skull, jaw = getHeadPoints(neck)
+	projectPoint(P_SKULL, skull or neck + frameUp * (SKULL_LIFT * 2 * frameSpineLength))
 	projectPoint(P_JAW, jaw)
 
 	for point, bone in pairs(LIMB_POINT_BONES) do
@@ -361,36 +515,25 @@ local function updatePose(ent)
 	projectPoint(P_L_FOOT, lFoot and (worldPos[B_L_TOE] and LerpVector(0.5, lFoot, worldPos[B_L_TOE]) or lFoot))
 	projectPoint(P_R_FOOT, rFoot and (worldPos[B_R_TOE] and LerpVector(0.5, rFoot, worldPos[B_R_TOE]) or rFoot))
 
-	return true
-end
-
-local function smoothPose(snap)
-	local dt = FrameTime()
-	local targetAngle = computeTiltTarget()
-	if snap then
-		smoothAngle = targetAngle
-	else
-		local angleBlend = 1 - math_exp(-dt * ANGLE_SMOOTH_RATE)
-		smoothAngle = smoothAngle + math.AngleDifference(targetAngle, smoothAngle) * angleBlend
-		smoothAngle = math.NormalizeAngle(smoothAngle)
-	end
-
-	local radians = math.rad(smoothAngle)
-	local cosA, sinA = math_cos(radians), math_sin(radians)
-	local blend = 1 - math_exp(-dt * POSE_SMOOTH_RATE)
+	local blend = 1 - math_exp(-FrameTime() * POSE_SMOOTH_RATE)
 	for index = 1, POINT_COUNT do
 		if pointValid[index] then
-			local x, y = figX[index], figY[index]
-			local rx, ry = x * cosA - y * sinA, x * sinA + y * cosA
 			if snap or not smoothValid[index] then
-				smoothX[index], smoothY[index] = rx, ry
+				smoothX[index], smoothY[index], smoothZ[index] = poseX[index], poseY[index], poseZ[index]
 			else
-				smoothX[index] = smoothX[index] + (rx - smoothX[index]) * blend
-				smoothY[index] = smoothY[index] + (ry - smoothY[index]) * blend
+				smoothX[index] = smoothX[index] + (poseX[index] - smoothX[index]) * blend
+				smoothY[index] = smoothY[index] + (poseY[index] - smoothY[index]) * blend
+				smoothZ[index] = smoothZ[index] + (poseZ[index] - smoothZ[index]) * blend
 			end
 		end
 		smoothValid[index] = pointValid[index]
 	end
+
+	for i = 1, emitterCount do
+		placeEmitter(emitters[i])
+	end
+
+	return true
 end
 
 local function orgNumber(org, key)
@@ -423,12 +566,6 @@ local function bleedSeverity(region)
 	return math_Clamp(regionBleed[region] / BLEED_RATE_CRITICAL, 0, BLEED_SEVERITY_MAX)
 end
 
-local function resolveWoundRegion(bone)
-	if not isstring(bone) then return end
-
-	return TORSO_BONE_REGIONS[bone] or (hg.amputeetable and hg.amputeetable[bone])
-end
-
 local function collectWounds(org, wounds, arterialWounds)
 	for _, region in ipairs(REGIONS) do
 		regionBleed[region] = 0
@@ -456,8 +593,8 @@ local function collectWounds(org, wounds, arterialWounds)
 			if region and (tonumber(wound[1]) or 0) > 0 then
 				local rate = istable(rates) and tonumber(rates[index])
 				local active = not rate or rate > ARTERIAL_ACTIVE_RATE
-				local severity = active and ARTERIAL_SEVERITY or ARTERIAL_CONTROLLED_SEVERITY
-				regionArterial[region] = math.max(regionArterial[region], severity)
+				local value = active and ARTERIAL_SEVERITY or ARTERIAL_CONTROLLED_SEVERITY
+				regionArterial[region] = math.max(regionArterial[region], value)
 			end
 		end
 	end
@@ -470,60 +607,49 @@ local function collectWounds(org, wounds, arterialWounds)
 end
 
 local function updateLimbState(org, limb)
-	local value = orgNumber(org, limb.base)
-	local boneSev = boneSeverity(value)
+	local boneSev = boneSeverity(orgNumber(org, limb.base))
 	local dislocation = org[limb.base .. "dislocation"] == true and DISLOCATION_SEVERITY or 0
-	local isFractured = value >= 1
 	local upper, lower, hand = limb.upper, limb.lower, limb.hand
 
-	sevA[upper] = combine(combine(boneSev, dislocation), bleedSeverity(upper))
-	sevA[lower] = combine(combine(boneSev, regionArterial[lower]), bleedSeverity(lower))
-	fractured[upper], fractured[lower] = isFractured, isFractured
+	severity[upper] = combine(combine(boneSev, dislocation), bleedSeverity(upper))
+	severity[lower] = combine(combine(boneSev, regionArterial[lower]), bleedSeverity(lower))
 	arterial[upper], arterial[lower] = regionArterial[upper] > 0, regionArterial[lower] > 0
 	missing[upper] = org[upper .. "amputated"] == true
 	missing[lower] = missing[upper] or org[lower .. "amputated"] == true
 	if not hand then return end
 
-	sevA[hand] = combine(boneSev * HAND_BONE_SHARE, bleedSeverity(hand))
-	fractured[hand], arterial[hand] = false, regionArterial[hand] > 0
+	severity[hand] = combine(boneSev * HAND_BONE_SHARE, bleedSeverity(hand))
+	arterial[hand] = regionArterial[hand] > 0
 	missing[hand] = missing[lower] or org[hand .. "amputated"] == true
 end
 
 local function updateTorsoState(org)
-	local skull, jaw = orgNumber(org, "skull"), orgNumber(org, "jaw")
-	local spine1, spine2, spine3 = orgNumber(org, "spine1"), orgNumber(org, "spine2"), orgNumber(org, "spine3")
-	local ribs, pelvis = orgNumber(org, "chest"), orgNumber(org, "pelvis")
 	local headMissing = org.headamputated == true
-
-	sevA.skull = combine(boneSeverity(skull), bleedSeverity("skull"))
-	sevB.skull = math_Clamp(orgNumber(org, "brain") * BRAIN_WEIGHT, 0, 1)
-	fractured.skull, missing.skull = skull >= 1, headMissing
-
-	sevA.jaw = combine(boneSeverity(jaw), org.jawdislocation == true and DISLOCATION_SEVERITY or 0)
-	fractured.jaw, missing.jaw = jaw >= 1, headMissing
-
-	sevA.neck = spineSeverity(spine3)
-	sevB.neck = combine(combine(regionArterial.neck, organSeverity(org, "trachea")), bleedSeverity("neck"))
-	fractured.neck, arterial.neck = spine3 >= 1, regionArterial.neck > 0
-
 	local thorax = math_Clamp((orgNumber(org, "pneumothorax") + orgNumber(org, "hemothorax")) * THORAX_WEIGHT, 0, 1)
 	local lungs = combine(organSeverity(org, "lungsL"), organSeverity(org, "lungsR"))
-	sevA.chest = combine(spineSeverity(spine2), boneSeverity(ribs))
+	local chestOrgans = combine(combine(organSeverity(org, "heart"), lungs), thorax)
 	local chestBleeding = combine(regionArterial.chest, bleedSeverity("chest"))
-	sevB.chest = combine(combine(organSeverity(org, "heart"), lungs), combine(thorax, chestBleeding))
-	fractured.chest, arterial.chest = spine2 >= 1 or ribs >= 1, regionArterial.chest > 0
-
 	local digestive = combine(organSeverity(org, "stomach"), organSeverity(org, "intestines"))
 	local abdomen = combine(organSeverity(org, "liver"), digestive)
-	sevA.pelvis = combine(spineSeverity(spine1), boneSeverity(pelvis))
-	sevB.pelvis = combine(abdomen, bleedSeverity("pelvis"))
-	fractured.pelvis = spine1 >= 1 or pelvis >= 1
+	local brain = math_Clamp(orgNumber(org, "brain") * BRAIN_WEIGHT, 0, 1)
+	local carotid = combine(regionArterial.neck, organSeverity(org, "trachea"))
+
+	severity.skull = combine(combine(boneSeverity(orgNumber(org, "skull")), brain), bleedSeverity("skull"))
+	local jawDislocation = org.jawdislocation == true and DISLOCATION_SEVERITY or 0
+	severity.jaw = combine(boneSeverity(orgNumber(org, "jaw")), jawDislocation)
+	severity.neck = combine(combine(spineSeverity(orgNumber(org, "spine3")), carotid), bleedSeverity("neck"))
+	severity.chest = combine(combine(boneSeverity(orgNumber(org, "chest")), chestOrgans), chestBleeding)
+	severity.spine2 = spineSeverity(orgNumber(org, "spine2"))
+	severity.spine1 = spineSeverity(orgNumber(org, "spine1"))
+	severity.pelvis = combine(combine(boneSeverity(orgNumber(org, "pelvis")), abdomen), bleedSeverity("pelvis"))
+	arterial.neck, arterial.chest = regionArterial.neck > 0, regionArterial.chest > 0
+	missing.skull, missing.jaw = headMissing, headMissing
 end
 
 local function clearMedicalState()
 	for _, region in ipairs(REGIONS) do
-		sevA[region], sevB[region] = 0, nil
-		fractured[region], arterial[region], missing[region] = false, false, false
+		severity[region] = 0
+		arterial[region], missing[region] = false, false
 	end
 end
 
@@ -532,213 +658,200 @@ local function updateMedicalState(ply, body)
 
 	local org = ply.new_organism or ply.organism
 	if not istable(org) and IsValid(body) and body ~= ply then org = body.new_organism or body.organism end
-	if not istable(org) then return end
+	currentOrg = istable(org) and org or nil
+	if not currentOrg then return end
 
 	local source = ply:Alive() and ply or body
-	local wounds = IsValid(source) and source.wounds or ply.wounds
-	local arterialWounds = IsValid(source) and source.arterialwounds or ply.arterialwounds
-	collectWounds(org, wounds, arterialWounds)
+	collectWounds(org, source.wounds, source.arterialwounds)
 	updateTorsoState(org)
 	for _, limb in ipairs(LIMBS) do
 		updateLimbState(org, limb)
 	end
 
-	local pulse = tonumber(org.pulse) or DEFAULT_PULSE
-	pulseHz = math_Clamp(pulse / SECONDS_PER_MINUTE, 0.5, 3)
+	pulseHz = math_Clamp((tonumber(org.pulse) or DEFAULT_PULSE) / SECONDS_PER_MINUTE, 0.5, 3)
 end
 
-local function severityColor(severity)
-	severity = math_Clamp(severity or 0, 0, 1)
-	for index = 2, #COLOR_STOPS do
-		local high = COLOR_STOPS[index]
-		if severity <= high[1] then
-			local low = COLOR_STOPS[index - 1]
-			local t = (severity - low[1]) / (high[1] - low[1])
+local function getSphereEntity()
+	if IsValid(sphereEnt) then return sphereEnt end
 
-			return low[2] + (high[2] - low[2]) * t, low[3] + (high[3] - low[3]) * t, low[4] + (high[4] - low[4]) * t
-		end
-	end
-	local last = COLOR_STOPS[#COLOR_STOPS]
+	sphereEnt = ClientsideModel(SPHERE_MODEL, RENDERGROUP_OTHER)
+	if not IsValid(sphereEnt) then return end
 
-	return last[2], last[3], last[4]
+	sphereEnt:SetNoDraw(true)
+	sphereRadius = math.max((sphereEnt:OBBMaxs().x - sphereEnt:OBBMins().x) * 0.5, 1)
+
+	return sphereEnt
 end
 
-local drawCenterX, drawCenterY, drawScale, drawAlpha = 0, 0, 1, 1
-
-local function toScreen(index)
-	return drawCenterX + smoothX[index] * drawScale, drawCenterY - smoothY[index] * drawScale
-end
-
-local function polyCircle(x, y, r)
-	for i = 1, CIRCLE_SEGMENTS do
-		local vertex = circlePoly[i]
-		vertex.x = x + circleCos[i] * r
-		vertex.y = y + circleSin[i] * r
-	end
-	surface_DrawPoly(circlePoly)
-end
-
-local function polyHalfCircle(x, y, r, startAngle)
-	for i = 1, HALF_SEGMENTS + 1 do
-		local angle = startAngle + (i - 1) / HALF_SEGMENTS * math.pi
-		local vertex = halfPoly[i]
-		vertex.x = x + math_cos(angle) * r
-		vertex.y = y + math_sin(angle) * r
-	end
-	surface_DrawPoly(halfPoly)
-end
-
-local function setColor(r, g, b, alpha)
-	surface_SetDrawColor(r, g, b, alpha * drawAlpha)
-end
-
-local function setRegionColor(region, severity)
-	local r, g, b = severityColor(severity)
+local function setRegionColor(region)
+	local t = math_Clamp(severity[region] or 0, 0, 1)
+	local r = HEALTHY_COLOR[1] + (CRITICAL_COLOR[1] - HEALTHY_COLOR[1]) * t
+	local g = HEALTHY_COLOR[2] + (CRITICAL_COLOR[2] - HEALTHY_COLOR[2]) * t
+	local b = HEALTHY_COLOR[3] + (CRITICAL_COLOR[3] - HEALTHY_COLOR[3]) * t
 	if arterial[region] then
-		local wave = 0.5 + 0.5 * math_sin(CurTime() * pulseHz * TAU)
-		local mul = 1 - ARTERIAL_PULSE_DEPTH * wave
+		local mul = 1 - ARTERIAL_PULSE_DEPTH * (0.5 + 0.5 * math_sin(CurTime() * pulseHz * TAU))
 		r, g, b = r * mul, g * mul, b * mul
 	end
-	setColor(r, g, b, FILL_ALPHA)
+	render.SetColorModulation(r, g, b)
 end
 
-local function drawOutlineCircle(x, y, r)
-	setColor(OUTLINE_COLOR[1], OUTLINE_COLOR[2], OUTLINE_COLOR[3], OUTLINE_ALPHA)
-	polyCircle(x, y, r + OUTLINE_WIDTH)
-end
-
-local function drawCrack(x, y, r)
-	local offset = r * 0.7
-	setColor(CRACK_COLOR[1], CRACK_COLOR[2], CRACK_COLOR[3], FILL_ALPHA)
-	surface_DrawLine(x - offset, y + offset, x + offset, y - offset)
-	surface_DrawLine(x - offset + 1, y + offset, x + offset + 1, y - offset)
-end
-
-local function drawStump(x, y, r)
-	local stumpRadius = r * STUMP_SCALE
-	drawOutlineCircle(x, y, stumpRadius)
-	setColor(STUMP_COLOR[1], STUMP_COLOR[2], STUMP_COLOR[3], FILL_ALPHA)
-	polyCircle(x, y, stumpRadius)
+local function drawSphere(x, y, z, radius)
+	local scale = radius * DISPLAY_SPINE / sphereRadius
+	sphereScale.x, sphereScale.y, sphereScale.z = scale, scale, scale
+	sphereMatrix:SetScale(sphereScale)
+	sphereEnt:EnableMatrix("RenderMultiply", sphereMatrix)
+	spherePos.x, spherePos.y, spherePos.z = x, y, z
+	sphereEnt:SetPos(spherePos)
+	sphereEnt:SetupBones()
+	sphereEnt:DrawModel()
 end
 
 local function drawNode(point, region, radius)
-	if not smoothValid[point] then return end
+	if not smoothValid[point] or missing[region] then return end
 
-	local x, y = toScreen(point)
-	local r = radius * drawScale
-	if missing[region] then
-		drawStump(x, y, r)
-		return
-	end
-
-	drawOutlineCircle(x, y, r)
-	setRegionColor(region, sevA[region])
-	polyCircle(x, y, r)
-
-	local secondary = sevB[region]
-	if secondary then
-		local radians = math.rad(smoothAngle)
-		local upX, upY = -math_sin(radians), -math_cos(radians)
-		setRegionColor(region, secondary)
-		polyHalfCircle(x, y, r, math_atan2(upY, upX))
-		setColor(OUTLINE_COLOR[1], OUTLINE_COLOR[2], OUTLINE_COLOR[3], OUTLINE_ALPHA)
-		surface_DrawLine(x + upX * r, y + upY * r, x - upX * r, y - upY * r)
-	end
-
-	if fractured[region] then drawCrack(x, y, r) end
-end
-
-local function beadCount(length, r)
-	return math_Clamp(math_ceil(length / (r * BEAD_SPACING)), 1, MAX_BEADS)
+	setRegionColor(region)
+	drawSphere(smoothX[point], smoothY[point], smoothZ[point], radius)
 end
 
 local function drawSegment(fromPoint, toPoint, region, radius, includeEnd)
-	local x0, y0 = toScreen(fromPoint)
-	local x1, y1 = toScreen(toPoint)
-	local r = radius * drawScale
-	local dx, dy = x1 - x0, y1 - y0
-	local beads = beadCount(math_sqrt(dx * dx + dy * dy), r)
+	if not smoothValid[fromPoint] or not smoothValid[toPoint] or missing[region] then return end
+
+	local x0, y0, z0 = smoothX[fromPoint], smoothY[fromPoint], smoothZ[fromPoint]
+	local dx, dy, dz = smoothX[toPoint] - x0, smoothY[toPoint] - y0, smoothZ[toPoint] - z0
+	local length = math_sqrt(dx * dx + dy * dy + dz * dz)
+	local beads = math_Clamp(math_ceil(length / (radius * DISPLAY_SPINE * BEAD_SPACING)), 1, MAX_BEADS)
 	local last = includeEnd and beads or beads - 1
 
+	setRegionColor(region)
 	for i = 0, last do
 		local t = i / beads
-		drawOutlineCircle(x0 + dx * t, y0 + dy * t, r)
+		drawSphere(x0 + dx * t, y0 + dy * t, z0 + dz * t, radius)
 	end
-	setRegionColor(region, sevA[region])
-	for i = 0, last do
-		local t = i / beads
-		polyCircle(x0 + dx * t, y0 + dy * t, r)
-	end
-
-	if fractured[region] then drawCrack(x0 + dx * 0.5, y0 + dy * 0.5, r) end
-end
-
-local function limbPointsValid(limb, count)
-	for i = 1, count do
-		if not smoothValid[limb.points[i]] then return false end
-	end
-
-	return true
 end
 
 local function drawLimb(limb)
 	local points, radii = limb.points, limb.radii
-	if not limbPointsValid(limb, 3) then return end
-
-	local stumpX, stumpY = toScreen(points[1])
-	if missing[limb.upper] then
-		drawStump(stumpX, stumpY, radii[1] * drawScale)
-		return
-	end
 	drawSegment(points[1], points[2], limb.upper, radii[1], false)
+	if missing[limb.upper] then return end
 
-	if missing[limb.lower] then
-		stumpX, stumpY = toScreen(points[2])
-		drawStump(stumpX, stumpY, radii[2] * drawScale)
+	local foot = points[4]
+	if foot then
+		drawSegment(points[2], points[3], limb.lower, radii[2], false)
+		drawSegment(points[3], foot, limb.lower, radii[3], true)
 		return
 	end
-
-	local hasFoot = points[4] and smoothValid[points[4]]
-	drawSegment(points[2], points[3], limb.lower, radii[2], not limb.hand and not hasFoot)
-	if hasFoot then
-		drawSegment(points[3], points[4], limb.lower, radii[3], true)
-		return
-	end
-	if limb.hand then drawNode(points[3], limb.hand, radii[3]) end
+	drawSegment(points[2], points[3], limb.lower, radii[2], false)
+	if not missing[limb.lower] then drawNode(points[3], limb.hand, radii[3]) end
 end
 
 local function drawBody()
-	draw.NoTexture()
-
-	for _, limb in ipairs(LEG_LIMBS) do
-		drawLimb(limb)
-	end
 	drawNode(P_PELVIS, "pelvis", R_PELVIS)
 	drawNode(P_CHEST, "chest", R_CHEST)
 	drawNode(P_NECK, "neck", R_NECK)
-	if not missing.skull then
-		drawNode(P_SKULL, "skull", R_SKULL)
-		drawNode(P_JAW, "jaw", R_JAW)
-	end
-	for _, limb in ipairs(ARM_LIMBS) do
+	drawSegment(P_SPINE_TOP, P_SPINE_MID, "spine2", R_SPINE, false)
+	drawSegment(P_SPINE_MID, P_SPINE_LOW, "spine1", R_SPINE, true)
+	drawNode(P_SKULL, "skull", R_SKULL)
+	drawNode(P_JAW, "jaw", R_JAW)
+	for _, limb in ipairs(LIMBS) do
 		drawLimb(limb)
 	end
 end
 
+local function spawnDrip(emitter, style)
+	local drip = drips[nextDripSlot]
+	nextDripSlot = nextDripSlot % MAX_DRIPS + 1
+	drip.alive, drip.style, drip.born = true, style, CurTime()
+	drip.x, drip.y, drip.z = emitter.x, emitter.y, emitter.z
+	drip.width = math.min(style.widthBase + emitter.rate * style.widthPerRate, style.widthMax)
+end
+
+local function spawnDrips()
+	local dt = FrameTime()
+	for i = 1, emitterCount do
+		local emitter = emitters[i]
+		if emitter.valid then
+			local style = emitter.arterial and ARTERIAL_DRIP or VENOUS_DRIP
+			local perSecond = math.min(style.spawnBase + emitter.rate * style.spawnPerRate, style.spawnMax)
+			local expected = perSecond * dt
+			local count = math.floor(expected) + (math.random() < expected % 1 and 1 or 0)
+			for _ = 1, count do
+				spawnDrip(emitter, style)
+			end
+		end
+	end
+end
+
+local dripStart, dripEnd = Vector(), Vector()
+
+local function drawDrips()
+	local now = CurTime()
+	render.SetMaterial(DRIP_MATERIAL)
+	for i = 1, MAX_DRIPS do
+		local drip = drips[i]
+		if drip.alive then
+			local style = drip.style
+			local age = now - drip.born
+			if age >= style.life then
+				drip.alive = false
+			else
+				local fall = age * style.speed
+				dripStart:SetUnpacked(drip.x, drip.y, drip.z - math.max(fall - style.length, 0))
+				dripEnd:SetUnpacked(drip.x, drip.y, drip.z - fall)
+				local color = style.color
+				color.a = 255 * (1 - age / style.life)
+				render.DrawBeam(dripStart, dripEnd, drip.width, 0, 1, color)
+			end
+		end
+	end
+end
+
+local function renderFigure()
+	if not getSphereEntity() then return end
+
+	local size = ScrH() * PANEL_SIZE_FRACTION
+	local x = ScrH() * PANEL_MARGIN_FRACTION
+	local y = (ScrH() - size) * 0.5
+	local pitch = math.rad(CAMERA_PITCH)
+	local targetZ = CAMERA_TARGET_HEIGHT * DISPLAY_SPINE
+	local camPos = Vector(-CAMERA_DISTANCE * math_cos(pitch), 0, targetZ + CAMERA_DISTANCE * math_sin(pitch))
+	local camAng = Angle(CAMERA_PITCH, 0, 0)
+
+	cam.Start3D(camPos, camAng, CAMERA_FOV, x, y, size, size)
+		render.ClearDepth()
+		render.SuppressEngineLighting(true)
+		render.ResetModelLighting(AMBIENT_LIGHT, AMBIENT_LIGHT, AMBIENT_LIGHT)
+		for _, light in ipairs(LIGHTING) do
+			render.SetModelLighting(light[1], light[2], light[2], light[2])
+		end
+		render.MaterialOverride(SPHERE_MATERIAL)
+
+		drawBody()
+
+		render.MaterialOverride(nil)
+		render.SetColorModulation(1, 1, 1)
+		render.SuppressEngineLighting(false)
+		spawnDrips()
+		drawDrips()
+	cam.End3D()
+end
+
 hook.Add("HUDPaint", "homigrad/body-status/draw", function()
-	if not enabled:GetBool() then return end
+	if not enabled:GetBool() then
+		trackedBody = nil
+		return
+	end
 
 	local ply = LocalPlayer()
 	local body = getBodyEntity(ply)
+	trackedBody = body
 	if not IsValid(body) or body:IsDormant() then return end
+	woundSource = ply:Alive() and ply or body
 
 	local now = CurTime()
 	local snap = body ~= lastBody or now - lastDrawTime > SNAP_AFTER_HIDDEN
 	if snap then smoothValid[P_PELVIS] = false end
-	if updatePose(body) then
-		smoothPose(snap)
-		lastBody = body
-	end
+	if captureBody ~= body or captureFrame ~= FrameNumber() then captureBones(body) end
+	if updatePose(snap) then lastBody = body end
 	lastDrawTime = now
 	if not smoothValid[P_PELVIS] then return end
 
@@ -747,11 +860,5 @@ hook.Add("HUDPaint", "homigrad/body-status/draw", function()
 		nextMedicalUpdate = now + MEDICAL_UPDATE_INTERVAL
 	end
 
-	local panelSize = ScrH() * PANEL_HEIGHT_FRACTION
-	drawScale = panelSize / FIGURE_EXTENT
-	drawCenterX = ScrH() * PANEL_MARGIN_FRACTION + panelSize * 0.5
-	drawCenterY = ScrH() * 0.5
-	drawAlpha = ply:Alive() and 1 or DEAD_ALPHA_MUL
-
-	drawBody()
+	renderFigure()
 end)
