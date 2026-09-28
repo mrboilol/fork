@@ -1078,6 +1078,13 @@ local function getWoundVisualRate(org, wound, index, arterial)
 	return math.max(totalRate or severity * (arterial and 2.25 or 0.24), 0)
 end
 
+local bloodLossFullMl = 2000
+
+local function getBloodLossK(org)
+	local maxBlood = tonumber(org.maxblood) or 5000
+	return math.Clamp((maxBlood - (tonumber(org.blood) or maxBlood)) / bloodLossFullMl, 0, 1)
+end
+
 local function getWoundSizeK(wound, maxSize)
 	return math.Clamp(math.sqrt(math.max(tonumber(wound[1]) or 0, 0) / maxSize), 0, 1)
 end
@@ -1095,7 +1102,8 @@ local function emitOrdinaryBleeding(ent, org, wound, pos, ang, visualRate, inter
 	local style = tonumber(wound[6]) == 2 or wound.woundType == "slash"
 	local _, pressureDrive = getBleedPressureDrive(org)
 	local outward = getBleedDirection(ang)
-	local dropVolume = math.Clamp(visualRate * interval, 0.05, 8)
+	local lossK = getBloodLossK(org)
+	local dropVolume = math.Clamp(math.max(visualRate * interval, lossK * 1.5), 0.05, 8)
 	local concentration = math.Clamp((tonumber(wound[1]) or 0) / math.max(dropVolume, 0.2) / 12, 0, 1)
 	local phase = CurTime() * 4.5 + ent:EntIndex() * 0.37
 	local spread = 1 - concentration * 0.6
@@ -1124,7 +1132,7 @@ local function emitArterialBleeding(ent, org, wound, index, pos, ang, boneAng, w
 	local _, pressureDrive = getBleedPressureDrive(org)
 	local spurt = getHeartbeatSpurt(org, index)
 	local count = math.Clamp(math.ceil(arteryBurstCount + sizeK * 3 * spurt), 2, 5)
-	local volume = math.Clamp(visualRate * interval / count, 0.05, 8)
+	local volume = math.Clamp(math.max(visualRate * interval / count, getBloodLossK(org) * 1.5), 0.05, 8)
 	local time = CurTime()
 	local localDir = wound[6]
 	local sprayDir = getBleedDirection(ang)

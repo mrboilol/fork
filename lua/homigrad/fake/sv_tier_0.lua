@@ -223,6 +223,13 @@ local function Ragdoll_CreateInternal(ply)
 	end
 
 	local seatFrame, seatPivot, seatCorrection
+	local function seatAdjust(pos, ang)
+		if not seatCorrection then return pos, ang end
+		local localPos = seatFrame:WorldToLocal(pos) - seatPivot
+		localPos:Rotate(seatCorrection)
+		local _, localAng = LocalToWorld(vecZero, seatFrame:WorldToLocalAngles(ang), vecZero, seatCorrection)
+		return seatFrame:LocalToWorld(localPos + seatPivot), seatFrame:LocalToWorldAngles(localAng)
+	end
 	if ply:InVehicle() then
 		local seatParent = ply:GetVehicle():GetParent()
 		local hipL, hipR, pelvis = ply:LookupBone("ValveBiped.Bip01_L_Thigh"), ply:LookupBone("ValveBiped.Bip01_R_Thigh"), ply:LookupBone("ValveBiped.Bip01_Pelvis")
@@ -233,7 +240,6 @@ local function Ragdoll_CreateInternal(ply)
 			seatFrame = seatParent
 			seatPivot = seatParent:WorldToLocal(pelvisMatrix and pelvisMatrix:GetTranslation() or hipLMatrix:GetTranslation())
 			seatCorrection = Angle(0, -math.deg(math.atan2(right.x, -right.y)), 0)
-			print("[seatdbg] hipRight local", right, "correction yaw", seatCorrection.y, "plyYawRelVeh", seatParent:WorldToLocalAngles(ply:GetAngles()).y)
 		end
 	end
 
@@ -309,6 +315,7 @@ local function Ragdoll_CreateInternal(ply)
 
 			//ply:GetBoneMatrix(0):GetTranslation()
 			//local pos, ang = hg.RotateAroundPoint2(pos, ang, vector_origin, vector_origin, Angle(-90,0,0))
+			pos, ang = seatAdjust(pos, ang)
 			phys:SetPos(pos)
 			phys:SetAngles(ang)
 
@@ -369,11 +376,9 @@ local function Ragdoll_CreateInternal(ply)
 			phys:SetAngles(ang)
 		end
 		if seatCorrection then
-			local localPos = seatFrame:WorldToLocal(phys:GetPos()) - seatPivot
-			localPos:Rotate(seatCorrection)
-			local _, localAng = LocalToWorld(vecZero, seatFrame:WorldToLocalAngles(phys:GetAngles()), vecZero, seatCorrection)
-			phys:SetPos(seatFrame:LocalToWorld(localPos + seatPivot))
-			phys:SetAngles(seatFrame:LocalToWorldAngles(localAng))
+			local adjustedPos, adjustedAng = seatAdjust(phys:GetPos(), phys:GetAngles())
+			phys:SetPos(adjustedPos)
+			phys:SetAngles(adjustedAng)
 		end
 		--print(bone)
 		--[[if !string.find(ragdoll:GetBoneName(bone),"L") then
@@ -855,6 +860,7 @@ end
 
 function fakeBoneFlop.FlagBone(org, bone, active)
 	if not org or not bone then return false end
+	if hg.FloppyDebug and (active or (org.fake_floppy_bones and org.fake_floppy_bones[bone]) or (org.open_fractures and org.open_fractures[bone])) then hg.FloppyDebug("FlagBone %s active=%s owner=%s\n%s", bone, tostring(active), tostring(org.owner), debug.traceback("", 2)) end
 	if openFractureBones[bone] then
 		local legacy = org.fake_floppy_bones and org.fake_floppy_bones[bone]
 		if legacy then
@@ -1034,6 +1040,12 @@ function fakeBoneFlop.ApplyBone(rag, bone, org)
 	if fracture and isvector(fracture[1]) then
 		local fracturePos = phys:LocalToWorld(fracture[1])
 		if isSafeNetworkPos(fracturePos) then pos = fracturePos end
+	end
+
+	if hg.FloppyDebug then
+		hg.FloppyDebug("ApplyBone %s on %s: child phys %d (%s) -> parent phys %d (%s), fracture=%s, RemoveInternalConstraint(%d)",
+			bone, tostring(rag), physIDChild, rag:GetBoneName(rag:TranslatePhysBoneToBone(physIDChild)),
+			physIDParent, rag:GetBoneName(rag:TranslatePhysBoneToBone(physIDParent)), tostring(fracture ~= nil), physIDChild)
 	end
 
 	local cons = constraint.AdvBallsocket(

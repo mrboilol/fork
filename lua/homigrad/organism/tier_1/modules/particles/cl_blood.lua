@@ -82,14 +82,14 @@ bloodparticles_hook[1] = function(anim_pos, mul)
 
 		if part.kishki then
 			render_SetMaterial(part[4])
-			lightcolor.r = math.Clamp((part.artery and 180 or 140) * light[1], 110, 255)
+			lightcolor.r = math.Clamp((part.artery and 255 or 150) * light[1], 110, 255)
 			render_DrawSprite(pos, part[5], part[6], lightcolor)
 		else
 			local len = (part[2] - part[1]):LengthSqr()
 			--part.lerpeddiff = LerpVector(FrameTime() * 1, part.lerpeddiff or Vector(), (part[2] - part[1]))
 			--if len > 1 * 1 then
 				render_SetMaterial(mat_huy)
-				lightcolor.r = math.Clamp((part.artery and 180 or 140) * light[1], 110, 255)
+				lightcolor.r = math.Clamp((part.artery and 255 or 150) * light[1], 110, 255)
 				--part.lerpedshit = LerpFT(!part.lasthit and 1 or mul * 1, part.lerpedshit or 1, part.lasthit and 7 or 1)
 				--render_DrawBeam(pos - (len < 2 and (part[2] - part[1]):GetNormalized() * part.lerpedshit or (part[2] - part[1])) * 0.5 / mul / 24,pos + (part[2] - part[1]) * 0.5 / mul / 24, part.lerpedshit, 0, 1, part[9] or lightcolor )
 				--render_DrawBeam(pos - (part[2] - part[1]) * part.lerpedshit / mul / 24 * 0.5,pos + (part[2] - part[1]) * part.lerpedshit / mul / 24 * 0.5, part.lerpedshit, 0, 1, part[9] or lightcolor )
@@ -160,35 +160,53 @@ local render_DrawQuadEasy = render.DrawQuadEasy
 local poolTrace = {mask = MASK_SOLID_BRUSHONLY}
 local poolStartVolume = 10
 local poolMaxSize = 24
+local poolFullVolume = 200
+local stainBaseMaxSize = 6
+local poolLocalRadiusSqr = 28 * 28
+
+local function getStainSizeCap(localVolume)
+	local k = math.Clamp((localVolume - poolStartVolume) / (poolFullVolume - poolStartVolume), 0, 1)
+	return Lerp(k, stainBaseMaxSize, poolMaxSize)
+end
 
 local function findGroundBlood(pos, normal, ignored)
 	local stains = hg.groundbloodstains
 	local nearest, nearestDistance
+	local localVolume = 0
 	for _, stain in ipairs(stains) do
 		if stain ~= ignored and stain.normal:Dot(normal) >= 0.75 then
 			local mergeRadius = useOldBlood() and math.max(9, (stain.size or 1) * 0.5 + 4) or math.max(3, (stain.size or 1) * 0.6)
 			local distance = stain.pos:DistToSqr(pos)
+			if distance <= poolLocalRadiusSqr then localVolume = localVolume + (stain.volume or 1) end
 			if distance <= mergeRadius * mergeRadius and (not nearestDistance or distance < nearestDistance) then
 				nearest, nearestDistance = stain, distance
 			end
 		end
 	end
-	return nearest
+	return nearest, localVolume
 end
 
 local function depositGroundBlood(pos, normal, artery, tiny, amount, ignored)
-	local stain = findGroundBlood(pos, normal, ignored)
+	local stain, localVolume = findGroundBlood(pos, normal, ignored)
 	amount = amount or (tiny and 0.2 or artery and 2.5 or 1)
 	local size = math.Clamp((tiny and 1.8 or 3) + amount, 1.5, 6)
 
 	if stain then
-		if artery and not stain.artery then
-			stain.artery = true
-			stain.material = arterialGroundBloodMaterial
+		local cap = getStainSizeCap(localVolume + amount)
+		if stain.size < cap - 0.05 then
+			if artery and not stain.artery then
+				stain.artery = true
+				stain.material = arterialGroundBloodMaterial
+			end
+			stain.volume = (stain.volume or 1) + amount
+			stain.size = math.min(math.max(stain.size, size) + amount * (localVolume >= poolStartVolume and 0.85 or 0.25), cap)
+			return stain
 		end
-		stain.volume = (stain.volume or 1) + amount
-		stain.size = math.min(math.max(stain.size, size) + amount * (stain.volume >= poolStartVolume and 0.85 or 0.25), poolMaxSize)
-		return stain
+
+		local ang = normal:Angle()
+		local spread = math.max(stain.size, 2) * 1.2
+		pos = pos + ang:Right() * math.Rand(-spread, spread) + ang:Up() * math.Rand(-spread, spread)
+		size = size * math.Rand(0.6, 1)
 	end
 
 	local stains = hg.groundbloodstains

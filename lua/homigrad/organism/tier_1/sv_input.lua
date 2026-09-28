@@ -2620,6 +2620,19 @@ local function velocityDamage(ent, data)
 	if traceResult.HitGroup == HITGROUP_HEAD or (hitgroup == HITGROUP_GENERIC and traceResult.HitGroup and traceResult.HitGroup ~= HITGROUP_GENERIC) then
 		hitgroup = traceResult.HitGroup
 	end
+	local impactLimb = hitgrouptolimb[hitgroup]
+	if impactLimb then
+		local now = CurTime()
+		local last = ent.hgLimbImpact
+		if last and last.entity == data.HitEntity and last.time + 0.25 > now and last.limb ~= impactLimb
+			and last.limb:sub(1, 1) ~= impactLimb:sub(1, 1) and last.limb:sub(2) ~= impactLimb:sub(2)
+			and normalSpeed <= last.speed then
+			return
+		end
+		if not last or last.entity ~= data.HitEntity or last.time + 0.25 <= now or normalSpeed > last.speed then
+			ent.hgLimbImpact = {entity = data.HitEntity, limb = impactLimb, time = now, speed = normalSpeed}
+		end
+	end
 	if RagdollDamageBoneMul[hitgroup] then dmgInfo:ScaleDamage(RagdollDamageBoneMul[hitgroup]) end
 	local accessoryDamage = dmgInfo:GetDamage()
 	local collisionEnt = IsValid(data.HitObject) and data.HitObject:GetEntity() or nil

@@ -62,8 +62,27 @@ local function physBloodCollide(data, pos, normal)
 	decal(pos, normal, tr, data.artery, data.owner, data.tiny, data.volume)
 end
 
+local slideTrace = {mask = MASK_SOLID}
+local slideSpawnGrace = 0.25
+
+local function physBloodSlide(part, data, pos)
+	local lastPos = data.lastPos
+	data.lastPos = pos
+	if not lastPos or data.tiny or data.hidden then return false end
+	if CurTime() - data.born < slideSpawnGrace then return false end
+	slideTrace.start = lastPos
+	slideTrace.endpos = pos
+	slideTrace.filter = data.owner
+	local tr = util.TraceLine(slideTrace)
+	if not tr.Hit or tr.HitWorld or not hg.isOrganismBloodTarget(tr.Entity) then return false end
+	part:SetDieTime(0)
+	hg.addSlidingBloodPart(tr.HitPos + tr.HitNormal, tr.HitNormal, data)
+	return true
+end
+
 local function physBloodThink(part, data)
 	local pos = part:GetPos()
+	if physBloodSlide(part, data, pos) then return end
 	if bit.band(util.PointContents(pos), CONTENTS_WATER) == CONTENTS_WATER then
 		if not data.hidden then hg.addBloodPart2(pos, part:GetVelocity() / 20 + VectorRand(-1, 1), nil, nil, nil, nil, true, data.owner) end
 		part:SetDieTime(0)
@@ -78,7 +97,7 @@ local function addPhysBloodPart(pos, vel, w, artery, kishki, owner, tiny, hidden
 		if not IsValid(physEmitter) then return end
 	end
 
-	local data = {artery = artery, owner = owner, tiny = tiny, hidden = hidden, volume = math.Clamp((w or 2) / 2, 0.2, 4)}
+	local data = {artery = artery, owner = owner, tiny = tiny, hidden = hidden, volume = math.Clamp((w or 2) / 2, 0.2, 4), born = CurTime()}
 	physEmitter:SetPos(pos)
 	local part = physEmitter:Add(dropMats[math.random(#dropMats)], pos)
 	if not part then return data end
@@ -87,6 +106,7 @@ local function addPhysBloodPart(pos, vel, w, artery, kishki, owner, tiny, hidden
 	physGravity[3] = -(sv_gravity and sv_gravity:GetFloat() or 600)
 
 	local size = kishki and math.Clamp((w or 4) * 0.55, 2, 6) or math.Clamp((w or 2) * 0.7, tiny and 0.5 or 0.8, 6)
+	size = math.Clamp(size * math.Rand(0.55, 1.6), 0.4, 8)
 	local light = render.GetLightColor(pos)
 	local lum = math.Clamp((light[1] + light[2] + light[3]) * 1.2 + 0.35, 0.5, 1)
 
@@ -103,9 +123,10 @@ local function addPhysBloodPart(pos, vel, w, artery, kishki, owner, tiny, hidden
 	part:SetBounce(0)
 	part:SetCollide(true)
 	if artery then
-		part:SetColor(255 * lum, 14 * lum, 10 * lum)
+		lum = math.max(lum, 0.85)
+		part:SetColor(255 * lum, 22 * lum, 16 * lum)
 	else
-		part:SetColor(215 * lum, 8 * lum, 5 * lum)
+		part:SetColor(165 * lum, 6 * lum, 5 * lum)
 	end
 	part:SetCollideCallback(function(p, hitPos, hitNormal)
 		p:SetDieTime(0)
@@ -117,14 +138,7 @@ local function addPhysBloodPart(pos, vel, w, artery, kishki, owner, tiny, hidden
 	return data
 end
 
-local function addBloodPart(pos, vel, mat, w, h, artery, kishki, owner, tiny, hidden, lifetime, maxBeamLength)
-	--local fps = 1 / hg_blood_fps:GetInt() * 1
-	--if lastplaced + fps > SysTime() then return end
-	--lastplaced = SysTime()
-	if LocalPlayer():GetNetVar("disappearance", nil) or (IsValid(owner) and owner:GetNetVar("disappearance", nil)) then return end
-
-	if hg_blood_physics:GetBool() then return addPhysBloodPart(pos, vel, w, artery, kishki, owner, tiny, hidden, lifetime) end
-
+local function addLegacyBloodPart(pos, vel, mat, w, h, artery, kishki, owner, tiny, hidden, lifetime, maxBeamLength)
 	pos = pos + vecZero
 	vel = vel + vecZero
 
@@ -135,6 +149,25 @@ local function addBloodPart(pos, vel, mat, w, h, artery, kishki, owner, tiny, hi
 	
 	local part = {pos, pos2, vel, mat or mat_huy, w or 2, h or 2, CurTime(), artery = artery, kishki = kishki, owner = owner, start_velocity = IsValid(owner) and owner:GetVelocity() or vector_origin, tiny = tiny, hidden = hidden, lifetime = lifetime, maxBeamLength = maxBeamLength, volume = math.Clamp((w or 2) / 2, 0.2, 4)}
 	hg.bloodparticles1[#hg.bloodparticles1 + 1] = part
+	return part
+end
+
+local function addBloodPart(pos, vel, mat, w, h, artery, kishki, owner, tiny, hidden, lifetime, maxBeamLength)
+	if LocalPlayer():GetNetVar("disappearance", nil) or (IsValid(owner) and owner:GetNetVar("disappearance", nil)) then return end
+
+	if hg_blood_physics:GetBool() then return addPhysBloodPart(pos, vel, w, artery, kishki, owner, tiny, hidden, lifetime) end
+
+	return addLegacyBloodPart(pos, vel, mat, w, h, artery, kishki, owner, tiny, hidden, lifetime, maxBeamLength)
+end
+
+function hg.isOrganismBloodTarget(ent)
+	return IsValid(ent) and (ent:IsPlayer() or ent:IsNPC() or ent:IsRagdoll() or ent.organism ~= nil)
+end
+
+function hg.addSlidingBloodPart(pos, normal, data)
+	local size = math.Clamp((data.volume or 1) * 2 * math.Rand(0.6, 1.3), 1, 6)
+	local part = addLegacyBloodPart(pos, -normal * 12, nil, size, size, data.artery, false, data.owner, false, false, 3)
+	if part then part.volume = data.volume end
 	return part
 end
 
