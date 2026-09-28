@@ -91,93 +91,131 @@ local LIGHTING = {
 	{BOX_BOTTOM, 0.2},
 }
 
-local R_SKULL = 0.2
-local R_JAW = 0.11
-local R_NECK = 0.1
-local R_CHEST = 0.3
-local R_PELVIS = 0.24
-local R_SPINE = 0.075
-local R_UPPER_ARM = 0.1
-local R_LOWER_ARM = 0.09
-local R_HAND = 0.085
-local R_THIGH = 0.13
-local R_CALF = 0.11
-local R_FOOT = 0.1
+local RADIUS = {
+	SKULL = 0.2,
+	JAW = 0.11,
+	NECK = 0.1,
+	CHEST = 0.3,
+	PELVIS = 0.24,
+	SPINE = 0.075,
+	UPPER_ARM = 0.1,
+	LOWER_ARM = 0.09,
+	HAND = 0.085,
+	THIGH = 0.13,
+	CALF = 0.11,
+	FOOT = 0.1,
+}
 
-local B_PELVIS, B_SPINE1, B_SPINE2, B_SPINE4, B_NECK, B_HEAD, B_JAW = 1, 2, 3, 4, 5, 6, 7
-local B_L_UPPERARM, B_L_FOREARM, B_L_HAND = 8, 9, 10
-local B_R_UPPERARM, B_R_FOREARM, B_R_HAND = 11, 12, 13
-local B_L_THIGH, B_L_CALF, B_L_FOOT, B_L_TOE = 14, 15, 16, 17
-local B_R_THIGH, B_R_CALF, B_R_FOOT, B_R_TOE = 18, 19, 20, 21
+local BONE = {
+	PELVIS = 1,
+	SPINE1 = 2,
+	SPINE2 = 3,
+	SPINE4 = 4,
+	NECK = 5,
+	HEAD = 6,
+	JAW = 7,
+	L_UPPERARM = 8,
+	L_FOREARM = 9,
+	L_HAND = 10,
+	R_UPPERARM = 11,
+	R_FOREARM = 12,
+	R_HAND = 13,
+	L_THIGH = 14,
+	L_CALF = 15,
+	L_FOOT = 16,
+	L_TOE = 17,
+	R_THIGH = 18,
+	R_CALF = 19,
+	R_FOOT = 20,
+	R_TOE = 21,
+}
 
 local BONE_CANDIDATES = {
-	[B_PELVIS] = {"ValveBiped.Bip01_Pelvis", "Bip01 Pelvis", "bip_pelvis", "mixamorig:Hips"},
-	[B_SPINE1] = {"ValveBiped.Bip01_Spine1", "Bip01 Spine1", "bip_spine_1", "mixamorig:Spine"},
-	[B_SPINE2] = {"ValveBiped.Bip01_Spine2", "Bip01 Spine2", "bip_spine_2", "mixamorig:Spine1"},
-	[B_SPINE4] = {"ValveBiped.Bip01_Spine4", "Bip01 Spine4", "bip_spine_3", "mixamorig:Spine2"},
-	[B_NECK] = {"ValveBiped.Bip01_Neck1", "Bip01 Neck", "Bip01 Neck1", "bip_neck", "mixamorig:Neck"},
-	[B_HEAD] = {"ValveBiped.Bip01_Head1", "Bip01 Head", "Bip01 Head1", "bip_head", "mixamorig:Head"},
-	[B_JAW] = {"ValveBiped.Bip01_Jaw", "ValveBiped.jaw", "Bip01 Jaw", "jaw", "Jaw"},
-	[B_L_UPPERARM] = {"ValveBiped.Bip01_L_UpperArm", "Bip01 L UpperArm", "bip_upperArm_L", "mixamorig:LeftArm"},
-	[B_L_FOREARM] = {"ValveBiped.Bip01_L_Forearm", "Bip01 L Forearm", "bip_lowerArm_L", "mixamorig:LeftForeArm"},
-	[B_L_HAND] = {"ValveBiped.Bip01_L_Hand", "Bip01 L Hand", "bip_hand_L", "mixamorig:LeftHand"},
-	[B_R_UPPERARM] = {"ValveBiped.Bip01_R_UpperArm", "Bip01 R UpperArm", "bip_upperArm_R", "mixamorig:RightArm"},
-	[B_R_FOREARM] = {"ValveBiped.Bip01_R_Forearm", "Bip01 R Forearm", "bip_lowerArm_R", "mixamorig:RightForeArm"},
-	[B_R_HAND] = {"ValveBiped.Bip01_R_Hand", "Bip01 R Hand", "bip_hand_R", "mixamorig:RightHand"},
-	[B_L_THIGH] = {"ValveBiped.Bip01_L_Thigh", "Bip01 L Thigh", "bip_hip_L", "mixamorig:LeftUpLeg"},
-	[B_L_CALF] = {"ValveBiped.Bip01_L_Calf", "Bip01 L Calf", "bip_knee_L", "mixamorig:LeftLeg"},
-	[B_L_FOOT] = {"ValveBiped.Bip01_L_Foot", "Bip01 L Foot", "bip_foot_L", "mixamorig:LeftFoot"},
-	[B_L_TOE] = {"ValveBiped.Bip01_L_Toe0", "Bip01 L Toe0", "bip_toe_L", "mixamorig:LeftToeBase"},
-	[B_R_THIGH] = {"ValveBiped.Bip01_R_Thigh", "Bip01 R Thigh", "bip_hip_R", "mixamorig:RightUpLeg"},
-	[B_R_CALF] = {"ValveBiped.Bip01_R_Calf", "Bip01 R Calf", "bip_knee_R", "mixamorig:RightLeg"},
-	[B_R_FOOT] = {"ValveBiped.Bip01_R_Foot", "Bip01 R Foot", "bip_foot_R", "mixamorig:RightFoot"},
-	[B_R_TOE] = {"ValveBiped.Bip01_R_Toe0", "Bip01 R Toe0", "bip_toe_R", "mixamorig:RightToeBase"},
+	[BONE.PELVIS] = {"ValveBiped.Bip01_Pelvis", "Bip01 Pelvis", "bip_pelvis", "mixamorig:Hips"},
+	[BONE.SPINE1] = {"ValveBiped.Bip01_Spine1", "Bip01 Spine1", "bip_spine_1", "mixamorig:Spine"},
+	[BONE.SPINE2] = {"ValveBiped.Bip01_Spine2", "Bip01 Spine2", "bip_spine_2", "mixamorig:Spine1"},
+	[BONE.SPINE4] = {"ValveBiped.Bip01_Spine4", "Bip01 Spine4", "bip_spine_3", "mixamorig:Spine2"},
+	[BONE.NECK] = {"ValveBiped.Bip01_Neck1", "Bip01 Neck", "Bip01 Neck1", "bip_neck", "mixamorig:Neck"},
+	[BONE.HEAD] = {"ValveBiped.Bip01_Head1", "Bip01 Head", "Bip01 Head1", "bip_head", "mixamorig:Head"},
+	[BONE.JAW] = {"ValveBiped.Bip01_Jaw", "ValveBiped.jaw", "Bip01 Jaw", "jaw", "Jaw"},
+	[BONE.L_UPPERARM] = {"ValveBiped.Bip01_L_UpperArm", "Bip01 L UpperArm", "bip_upperArm_L", "mixamorig:LeftArm"},
+	[BONE.L_FOREARM] = {"ValveBiped.Bip01_L_Forearm", "Bip01 L Forearm", "bip_lowerArm_L", "mixamorig:LeftForeArm"},
+	[BONE.L_HAND] = {"ValveBiped.Bip01_L_Hand", "Bip01 L Hand", "bip_hand_L", "mixamorig:LeftHand"},
+	[BONE.R_UPPERARM] = {"ValveBiped.Bip01_R_UpperArm", "Bip01 R UpperArm", "bip_upperArm_R", "mixamorig:RightArm"},
+	[BONE.R_FOREARM] = {"ValveBiped.Bip01_R_Forearm", "Bip01 R Forearm", "bip_lowerArm_R", "mixamorig:RightForeArm"},
+	[BONE.R_HAND] = {"ValveBiped.Bip01_R_Hand", "Bip01 R Hand", "bip_hand_R", "mixamorig:RightHand"},
+	[BONE.L_THIGH] = {"ValveBiped.Bip01_L_Thigh", "Bip01 L Thigh", "bip_hip_L", "mixamorig:LeftUpLeg"},
+	[BONE.L_CALF] = {"ValveBiped.Bip01_L_Calf", "Bip01 L Calf", "bip_knee_L", "mixamorig:LeftLeg"},
+	[BONE.L_FOOT] = {"ValveBiped.Bip01_L_Foot", "Bip01 L Foot", "bip_foot_L", "mixamorig:LeftFoot"},
+	[BONE.L_TOE] = {"ValveBiped.Bip01_L_Toe0", "Bip01 L Toe0", "bip_toe_L", "mixamorig:LeftToeBase"},
+	[BONE.R_THIGH] = {"ValveBiped.Bip01_R_Thigh", "Bip01 R Thigh", "bip_hip_R", "mixamorig:RightUpLeg"},
+	[BONE.R_CALF] = {"ValveBiped.Bip01_R_Calf", "Bip01 R Calf", "bip_knee_R", "mixamorig:RightLeg"},
+	[BONE.R_FOOT] = {"ValveBiped.Bip01_R_Foot", "Bip01 R Foot", "bip_foot_R", "mixamorig:RightFoot"},
+	[BONE.R_TOE] = {"ValveBiped.Bip01_R_Toe0", "Bip01 R Toe0", "bip_toe_R", "mixamorig:RightToeBase"},
 }
 local BONE_COUNT = #BONE_CANDIDATES
 
-local P_PELVIS, P_CHEST, P_NECK, P_SKULL, P_JAW = 1, 2, 3, 4, 5
-local P_SPINE_TOP, P_SPINE_MID, P_SPINE_LOW = 6, 7, 8
-local P_L_SHOULDER, P_L_ELBOW, P_L_WRIST = 9, 10, 11
-local P_R_SHOULDER, P_R_ELBOW, P_R_WRIST = 12, 13, 14
-local P_L_HIP, P_L_KNEE, P_L_ANKLE, P_L_FOOT = 15, 16, 17, 18
-local P_R_HIP, P_R_KNEE, P_R_ANKLE, P_R_FOOT = 19, 20, 21, 22
+local POINT = {
+	PELVIS = 1,
+	CHEST = 2,
+	NECK = 3,
+	SKULL = 4,
+	JAW = 5,
+	SPINE_TOP = 6,
+	SPINE_MID = 7,
+	SPINE_LOW = 8,
+	L_SHOULDER = 9,
+	L_ELBOW = 10,
+	L_WRIST = 11,
+	R_SHOULDER = 12,
+	R_ELBOW = 13,
+	R_WRIST = 14,
+	L_HIP = 15,
+	L_KNEE = 16,
+	L_ANKLE = 17,
+	L_FOOT = 18,
+	R_HIP = 19,
+	R_KNEE = 20,
+	R_ANKLE = 21,
+	R_FOOT = 22,
+}
 local POINT_COUNT = 22
 
 local LIMB_POINT_BONES = {
-	[P_L_SHOULDER] = B_L_UPPERARM,
-	[P_L_ELBOW] = B_L_FOREARM,
-	[P_L_WRIST] = B_L_HAND,
-	[P_R_SHOULDER] = B_R_UPPERARM,
-	[P_R_ELBOW] = B_R_FOREARM,
-	[P_R_WRIST] = B_R_HAND,
-	[P_L_HIP] = B_L_THIGH,
-	[P_L_KNEE] = B_L_CALF,
-	[P_L_ANKLE] = B_L_FOOT,
-	[P_R_HIP] = B_R_THIGH,
-	[P_R_KNEE] = B_R_CALF,
-	[P_R_ANKLE] = B_R_FOOT,
+	[POINT.L_SHOULDER] = BONE.L_UPPERARM,
+	[POINT.L_ELBOW] = BONE.L_FOREARM,
+	[POINT.L_WRIST] = BONE.L_HAND,
+	[POINT.R_SHOULDER] = BONE.R_UPPERARM,
+	[POINT.R_ELBOW] = BONE.R_FOREARM,
+	[POINT.R_WRIST] = BONE.R_HAND,
+	[POINT.L_HIP] = BONE.L_THIGH,
+	[POINT.L_KNEE] = BONE.L_CALF,
+	[POINT.L_ANKLE] = BONE.L_FOOT,
+	[POINT.R_HIP] = BONE.R_THIGH,
+	[POINT.R_KNEE] = BONE.R_CALF,
+	[POINT.R_ANKLE] = BONE.R_FOOT,
 }
 
 local LIMBS = {
 	{
 		base = "lleg", upper = "llegup", lower = "lleg",
-		points = {P_L_HIP, P_L_KNEE, P_L_ANKLE, P_L_FOOT},
-		radii = {R_THIGH, R_CALF, R_FOOT},
+		points = {POINT.L_HIP, POINT.L_KNEE, POINT.L_ANKLE, POINT.L_FOOT},
+		radii = {RADIUS.THIGH, RADIUS.CALF, RADIUS.FOOT},
 	},
 	{
 		base = "rleg", upper = "rlegup", lower = "rleg",
-		points = {P_R_HIP, P_R_KNEE, P_R_ANKLE, P_R_FOOT},
-		radii = {R_THIGH, R_CALF, R_FOOT},
+		points = {POINT.R_HIP, POINT.R_KNEE, POINT.R_ANKLE, POINT.R_FOOT},
+		radii = {RADIUS.THIGH, RADIUS.CALF, RADIUS.FOOT},
 	},
 	{
 		base = "larm", upper = "larmup", lower = "larm", hand = "lhand",
-		points = {P_L_SHOULDER, P_L_ELBOW, P_L_WRIST},
-		radii = {R_UPPER_ARM, R_LOWER_ARM, R_HAND},
+		points = {POINT.L_SHOULDER, POINT.L_ELBOW, POINT.L_WRIST},
+		radii = {RADIUS.UPPER_ARM, RADIUS.LOWER_ARM, RADIUS.HAND},
 	},
 	{
 		base = "rarm", upper = "rarmup", lower = "rarm", hand = "rhand",
-		points = {P_R_SHOULDER, P_R_ELBOW, P_R_WRIST},
-		radii = {R_UPPER_ARM, R_LOWER_ARM, R_HAND},
+		points = {POINT.R_SHOULDER, POINT.R_ELBOW, POINT.R_WRIST},
+		radii = {RADIUS.UPPER_ARM, RADIUS.LOWER_ARM, RADIUS.HAND},
 	},
 }
 
@@ -202,21 +240,21 @@ local TORSO_BONE_REGIONS = {
 }
 
 local REGION_SEGMENTS = {
-	skull = {P_SKULL, P_SKULL, R_SKULL},
-	jaw = {P_JAW, P_JAW, R_JAW},
-	neck = {P_NECK, P_NECK, R_NECK},
-	chest = {P_CHEST, P_CHEST, R_CHEST},
-	pelvis = {P_PELVIS, P_PELVIS, R_PELVIS},
-	larmup = {P_L_SHOULDER, P_L_ELBOW, R_UPPER_ARM},
-	larm = {P_L_ELBOW, P_L_WRIST, R_LOWER_ARM},
-	lhand = {P_L_WRIST, P_L_WRIST, R_HAND},
-	rarmup = {P_R_SHOULDER, P_R_ELBOW, R_UPPER_ARM},
-	rarm = {P_R_ELBOW, P_R_WRIST, R_LOWER_ARM},
-	rhand = {P_R_WRIST, P_R_WRIST, R_HAND},
-	llegup = {P_L_HIP, P_L_KNEE, R_THIGH},
-	lleg = {P_L_KNEE, P_L_ANKLE, R_CALF},
-	rlegup = {P_R_HIP, P_R_KNEE, R_THIGH},
-	rleg = {P_R_KNEE, P_R_ANKLE, R_CALF},
+	skull = {POINT.SKULL, POINT.SKULL, RADIUS.SKULL},
+	jaw = {POINT.JAW, POINT.JAW, RADIUS.JAW},
+	neck = {POINT.NECK, POINT.NECK, RADIUS.NECK},
+	chest = {POINT.CHEST, POINT.CHEST, RADIUS.CHEST},
+	pelvis = {POINT.PELVIS, POINT.PELVIS, RADIUS.PELVIS},
+	larmup = {POINT.L_SHOULDER, POINT.L_ELBOW, RADIUS.UPPER_ARM},
+	larm = {POINT.L_ELBOW, POINT.L_WRIST, RADIUS.LOWER_ARM},
+	lhand = {POINT.L_WRIST, POINT.L_WRIST, RADIUS.HAND},
+	rarmup = {POINT.R_SHOULDER, POINT.R_ELBOW, RADIUS.UPPER_ARM},
+	rarm = {POINT.R_ELBOW, POINT.R_WRIST, RADIUS.LOWER_ARM},
+	rhand = {POINT.R_WRIST, POINT.R_WRIST, RADIUS.HAND},
+	llegup = {POINT.L_HIP, POINT.L_KNEE, RADIUS.THIGH},
+	lleg = {POINT.L_KNEE, POINT.L_ANKLE, RADIUS.CALF},
+	rlegup = {POINT.R_HIP, POINT.R_KNEE, RADIUS.THIGH},
+	rleg = {POINT.R_KNEE, POINT.R_ANKLE, RADIUS.CALF},
 }
 
 local ARTERY_REGIONS = {
@@ -392,7 +430,7 @@ end)
 local frameRoot, frameUp, frameForward, frameSpineLength, yawCos, yawSin
 
 local function buildFrame()
-	local pelvis, neck = worldPos[B_PELVIS], worldPos[B_NECK] or worldPos[B_SPINE4]
+	local pelvis, neck = worldPos[BONE.PELVIS], worldPos[BONE.NECK] or worldPos[BONE.SPINE4]
 	if not pelvis or not neck then return false end
 
 	local up = neck - pelvis
@@ -401,8 +439,8 @@ local function buildFrame()
 	up:Div(spineLength)
 
 	local right = Vector(0, 0, 0)
-	local lThigh, rThigh = worldPos[B_L_THIGH], worldPos[B_R_THIGH]
-	local lArm, rArm = worldPos[B_L_UPPERARM], worldPos[B_R_UPPERARM]
+	local lThigh, rThigh = worldPos[BONE.L_THIGH], worldPos[BONE.R_THIGH]
+	local lArm, rArm = worldPos[BONE.L_UPPERARM], worldPos[BONE.R_UPPERARM]
 	if lThigh and rThigh then right:Add(rThigh - lThigh) end
 	if lArm and rArm then right:Add(rArm - lArm) end
 	right:Sub(up * right:Dot(up))
@@ -468,14 +506,14 @@ local function backOffset(pos)
 end
 
 local function getHeadPoints(neck)
-	local head = worldPos[B_HEAD]
+	local head = worldPos[BONE.HEAD]
 	if not head then return end
 
 	local headUp = head - neck
 	if headUp:Length() > 0 then headUp:Normalize() end
 	local face = eyesForward or frameForward
 	local skull = head + headUp * (SKULL_LIFT * frameSpineLength)
-	local jaw = worldPos[B_JAW] or skull + (face * JAW_FORWARD - headUp * JAW_DROP) * frameSpineLength
+	local jaw = worldPos[BONE.JAW] or skull + (face * JAW_FORWARD - headUp * JAW_DROP) * frameSpineLength
 
 	return skull, jaw
 end
@@ -493,27 +531,27 @@ local function updatePose(snap)
 	local yawRadians = math.rad(smoothYaw)
 	yawCos, yawSin = math_cos(yawRadians), math_sin(yawRadians)
 
-	local neck = worldPos[B_NECK] or worldPos[B_SPINE4]
-	local upperChest = worldPos[B_SPINE4] or neck
-	local midChest = worldPos[B_SPINE2] or LerpVector(0.5, frameRoot, neck)
-	projectPoint(P_PELVIS, frameRoot)
-	projectPoint(P_CHEST, LerpVector(0.5, upperChest, midChest))
-	projectPoint(P_NECK, neck)
-	projectPoint(P_SPINE_TOP, backOffset(neck))
-	projectPoint(P_SPINE_MID, backOffset(midChest))
-	projectPoint(P_SPINE_LOW, backOffset(frameRoot))
+	local neck = worldPos[BONE.NECK] or worldPos[BONE.SPINE4]
+	local upperChest = worldPos[BONE.SPINE4] or neck
+	local midChest = worldPos[BONE.SPINE2] or LerpVector(0.5, frameRoot, neck)
+	projectPoint(POINT.PELVIS, frameRoot)
+	projectPoint(POINT.CHEST, LerpVector(0.5, upperChest, midChest))
+	projectPoint(POINT.NECK, neck)
+	projectPoint(POINT.SPINE_TOP, backOffset(neck))
+	projectPoint(POINT.SPINE_MID, backOffset(midChest))
+	projectPoint(POINT.SPINE_LOW, backOffset(frameRoot))
 
 	local skull, jaw = getHeadPoints(neck)
-	projectPoint(P_SKULL, skull or neck + frameUp * (SKULL_LIFT * 2 * frameSpineLength))
-	projectPoint(P_JAW, jaw)
+	projectPoint(POINT.SKULL, skull or neck + frameUp * (SKULL_LIFT * 2 * frameSpineLength))
+	projectPoint(POINT.JAW, jaw)
 
 	for point, bone in pairs(LIMB_POINT_BONES) do
 		projectPoint(point, worldPos[bone])
 	end
 
-	local lFoot, rFoot = worldPos[B_L_FOOT], worldPos[B_R_FOOT]
-	projectPoint(P_L_FOOT, lFoot and (worldPos[B_L_TOE] and LerpVector(0.5, lFoot, worldPos[B_L_TOE]) or lFoot))
-	projectPoint(P_R_FOOT, rFoot and (worldPos[B_R_TOE] and LerpVector(0.5, rFoot, worldPos[B_R_TOE]) or rFoot))
+	local lFoot, rFoot = worldPos[BONE.L_FOOT], worldPos[BONE.R_FOOT]
+	projectPoint(POINT.L_FOOT, lFoot and (worldPos[BONE.L_TOE] and LerpVector(0.5, lFoot, worldPos[BONE.L_TOE]) or lFoot))
+	projectPoint(POINT.R_FOOT, rFoot and (worldPos[BONE.R_TOE] and LerpVector(0.5, rFoot, worldPos[BONE.R_TOE]) or rFoot))
 
 	local blend = 1 - math_exp(-FrameTime() * POSE_SMOOTH_RATE)
 	for index = 1, POINT_COUNT do
@@ -745,13 +783,13 @@ local function drawLimb(limb)
 end
 
 local function drawBody()
-	drawNode(P_PELVIS, "pelvis", R_PELVIS)
-	drawNode(P_CHEST, "chest", R_CHEST)
-	drawNode(P_NECK, "neck", R_NECK)
-	drawSegment(P_SPINE_TOP, P_SPINE_MID, "spine2", R_SPINE, false)
-	drawSegment(P_SPINE_MID, P_SPINE_LOW, "spine1", R_SPINE, true)
-	drawNode(P_SKULL, "skull", R_SKULL)
-	drawNode(P_JAW, "jaw", R_JAW)
+	drawNode(POINT.PELVIS, "pelvis", RADIUS.PELVIS)
+	drawNode(POINT.CHEST, "chest", RADIUS.CHEST)
+	drawNode(POINT.NECK, "neck", RADIUS.NECK)
+	drawSegment(POINT.SPINE_TOP, POINT.SPINE_MID, "spine2", RADIUS.SPINE, false)
+	drawSegment(POINT.SPINE_MID, POINT.SPINE_LOW, "spine1", RADIUS.SPINE, true)
+	drawNode(POINT.SKULL, "skull", RADIUS.SKULL)
+	drawNode(POINT.JAW, "jaw", RADIUS.JAW)
 	for _, limb in ipairs(LIMBS) do
 		drawLimb(limb)
 	end
@@ -849,11 +887,11 @@ hook.Add("HUDPaint", "homigrad/body-status/draw", function()
 
 	local now = CurTime()
 	local snap = body ~= lastBody or now - lastDrawTime > SNAP_AFTER_HIDDEN
-	if snap then smoothValid[P_PELVIS] = false end
+	if snap then smoothValid[POINT.PELVIS] = false end
 	if captureBody ~= body or captureFrame ~= FrameNumber() then captureBones(body) end
 	if updatePose(snap) then lastBody = body end
 	lastDrawTime = now
-	if not smoothValid[P_PELVIS] then return end
+	if not smoothValid[POINT.PELVIS] then return end
 
 	if snap or now >= nextMedicalUpdate then
 		updateMedicalState(ply, body)
