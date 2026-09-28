@@ -112,6 +112,7 @@ local loadouts = {
 	{primary = "weapon_remington700", attachments = "", armor = {"vest3","helmet1"}, ammo = 4},
 	{primary = "weapon_sks", attachments = {{"optic8"},{"holo6"}}, armor = {"vest3","helmet1"}, ammo = 4},
 	{primary = "weapon_pl15", attachments = "", armor = {"vest3","helmet1"}, ammo = 5},
+	{primary = "weapon_ruger", attachments = "", armor = {"vest3","helmet1"}, ammo = 5},
 	{primary = "weapon_vpo101", attachments = {{"optic8"},{"holo6"}}, armor = {"vest3","helmet1"}, ammo = 4},
 	{primary = "weapon_m16a2", attachments = {{"holo6"},{"holo4"}}, armor = {"vest3","helmet1"}, ammo = 3},
 	{primary = "weapon_mk18", secondary = "weapon_cz75", attachments = {{"grip1"},{"holo5","grip3"}}, armor = {"vest3","helmet1"}, ammo = 3, ammo2 = 2},

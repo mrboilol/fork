@@ -95,6 +95,7 @@ MODE.ArenaWeapons = {
 	weapon_mr43 = {name = "MR-43", category = "Shotguns", slot = "primary", weight = 6, clips = 6, attachments = {}},
 	weapon_mts255 = {name = "MTs-255", category = "Shotguns", slot = "primary", weight = 8, clips = 4, attachments = {}},
 	weapon_sks = {name = "SKS", category = "Marksman", slot = "primary", weight = 10, clips = 3, attachments = {"supressor7", "supressor8", "supressor15", "holo6", "holo6fur", "optic4", "optic11"}},
+	weapon_ruger = {name = "Ruger 10/22", category = "Marksman", slot = "primary", weight = 6, clips = 3, attachments = {}},
 	weapon_svd = {name = "SVD", category = "Marksman", slot = "primary", weight = 12, clips = 3, attachments = {"supressor9", "supressor16", "supressor15", "holo6", "holo6fur", "optic4", "optic11"}},
 	weapon_kar98 = {name = "Karabiner 98k", category = "Marksman", slot = "primary", weight = 9, clips = 4, attachments = {"optic12", "supressor7"}},
 	weapon_sr25 = {name = "SR-25", category = "Marksman", slot = "primary", weight = 13, clips = 3, attachments = {"supressor9", "supressor16", "supressor15", "holo2", "holo14", "optic2", "optic5", "optic7", "optic8", "grip1", "grip2", "grip3", "grip4", "grip5", "laser1", "laser2", "laser3", "laser5"}},

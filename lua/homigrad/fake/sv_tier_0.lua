@@ -129,7 +129,7 @@ local function Ragdoll_CreateInternal(ply)
 	bull.ply = ply
 	bull.rag = ragdoll
 	local eyeatt = ragdoll:GetAttachment(ragdoll:LookupAttachment("eyes"))
-	local bodyphy = ragdoll:GetPhysicsObjectNum(10)
+	local bodyphy = ragdoll:GetPhysicsObjectNum(hg.realPhysNum(ragdoll, 10))
 	if not IsValid(bodyphy) then return end
 	bull:SetPos(bodyphy:GetPos()+bodyphy:GetAngles():Right()*7)
 	--bull:SetPos( eyeatt.Pos + eyeatt.Ang:Up() * 3.5 )
@@ -697,89 +697,57 @@ local fakeBoneLimits = {
 		[2] = {[0] = "45", [1] = "-45"},
 	},
 	["ValveBiped.Bip01_Spine2"] = {
-		[0] = {[0] = "70", [1] = "-70"},
-		[1] = {[0] = "85", [1] = "-85"},
-		[2] = {[0] = "65", [1] = "-65"},
+		[0] = {[0] = "50", [1] = "-50"},
+		[1] = {[0] = "60", [1] = "-60"},
+		[2] = {[0] = "90", [1] = "-70"},
 	},
 	["ValveBiped.Bip01_R_UpperArm"] = {
-		[0] = {[0] = "100", [1] = "-100"},
-		[1] = {[0] = "50", [1] = "-50"},
-		[2] = {[0] = "30", [1] = "-30"},
+		[0] = {[0] = "45", [1] = "-45"},
+		[1] = {[0] = "120", [1] = "-110"},
+		[2] = {[0] = "60", [1] = "-130"},
 	},
 	["ValveBiped.Bip01_L_UpperArm"] = {
-		[0] = {[0] = "100", [1] = "-100"},
-		[1] = {[0] = "50", [1] = "-50"},
-		[2] = {[0] = "30", [1] = "-30"},
+		[0] = {[0] = "45", [1] = "-45"},
+		[1] = {[0] = "110", [1] = "-120"},
+		[2] = {[0] = "60", [1] = "-130"},
 	},
 	["ValveBiped.Bip01_R_Forearm"] = {
-		[0] = {[0] = "90", [1] = "-135"},
-		[1] = {[0] = "45", [1] = "-45"},
-		[2] = {[0] = "90", [1] = "-90"},
+		[0] = {[0] = "10", [1] = "-10"},
+		[1] = {[0] = "25", [1] = "-25"},
+		[2] = {[0] = "70", [1] = "-150"},
 	},
 	["ValveBiped.Bip01_L_Forearm"] = {
-		[0] = {[0] = "90", [1] = "-135"},
-		[1] = {[0] = "45", [1] = "-45"},
-		[2] = {[0] = "90", [1] = "-90"},
+		[0] = {[0] = "10", [1] = "-10"},
+		[1] = {[0] = "25", [1] = "-25"},
+		[2] = {[0] = "70", [1] = "-150"},
 	},
 	["ValveBiped.Bip01_R_Thigh"] = {
-		[0] = {[0] = "100", [1] = "-60"},
-		[1] = {[0] = "10", [1] = "-60"},
-		[2] = {[0] = "45", [1] = "-5"},
+		[0] = {[0] = "25", [1] = "-25"},
+		[1] = {[0] = "95", [1] = "-30"},
+		[2] = {[0] = "60", [1] = "-120"},
 	},
 	["ValveBiped.Bip01_L_Thigh"] = {
-		[0] = {[0] = "100", [1] = "-60"},
-		[1] = {[0] = "60", [1] = "-10"},
-		[2] = {[0] = "5", [1] = "-45"},
+		[0] = {[0] = "25", [1] = "-25"},
+		[1] = {[0] = "30", [1] = "-95"},
+		[2] = {[0] = "60", [1] = "-120"},
 	},
 	["ValveBiped.Bip01_R_Calf"] = {
-		[0] = {[0] = "60", [1] = "-135"},
-		[1] = {[0] = "20", [1] = "-45"},
-		[2] = {[0] = "45", [1] = "-5"},
+		[0] = {[0] = "10", [1] = "-10"},
+		[1] = {[0] = "20", [1] = "-20"},
+		[2] = {[0] = "140", [1] = "-60"},
 	},
 	["ValveBiped.Bip01_L_Calf"] = {
-		[0] = {[0] = "60", [1] = "-135"},
-		[1] = {[0] = "45", [1] = "-20"},
-		[2] = {[0] = "5", [1] = "-45"},
+		[0] = {[0] = "10", [1] = "-10"},
+		[1] = {[0] = "20", [1] = "-20"},
+		[2] = {[0] = "140", [1] = "-60"},
 	},
 }
 
-local fakeBoneCrookedOffsets = {
-	["ValveBiped.Bip01_R_UpperArm"] = {
-		pos = Vector(2, -4, 0),
-		ang = Angle(20, -35, 45),
-	},
-	["ValveBiped.Bip01_L_UpperArm"] = {
-		pos = Vector(2, 4, 0),
-		ang = Angle(20, 35, -45),
-	},
-	["ValveBiped.Bip01_R_Forearm"] = {
-		pos = Vector(0, -2, -1),
-		ang = Angle(-65, -10, 85),
-	},
-	["ValveBiped.Bip01_L_Forearm"] = {
-		pos = Vector(0, 2, -1),
-		ang = Angle(-65, 10, -85),
-	},
-	["ValveBiped.Bip01_R_Thigh"] = {
-		pos = Vector(0, -3, 1),
-		ang = Angle(25, -20, 20),
-	},
-	["ValveBiped.Bip01_L_Thigh"] = {
-		pos = Vector(0, 3, 1),
-		ang = Angle(25, 20, -20),
-	},
-	["ValveBiped.Bip01_R_Calf"] = {
-		pos = Vector(0, -2, -1),
-		ang = Angle(-55, -10, 30),
-	},
-	["ValveBiped.Bip01_L_Calf"] = {
-		pos = Vector(0, 2, -1),
-		ang = Angle(-55, 10, -30),
-	},
-	["ValveBiped.Bip01_Spine3"] = {
-		pos = Vector(0, 0, -2),
-		ang = Angle(-30, 0, 0),
-	},
+local fakeBoneDislocationShift = {
+	["ValveBiped.Bip01_R_UpperArm"] = 1,
+	["ValveBiped.Bip01_L_UpperArm"] = -1,
+	["ValveBiped.Bip01_R_Thigh"] = 1,
+	["ValveBiped.Bip01_L_Thigh"] = -1,
 }
 
 local fakeBonePivotShift = {
@@ -830,6 +798,7 @@ hook.Add("Think", "HG_DislocatePulledJoints", function()
 		local rag = ply.FakeRagdoll
 		local org = ply.organism
 		if not IsValid(rag) or not org or not org.alive or org.otrub then continue end
+		if now - rag:GetCreationTime() < 0.6 then continue end
 
 		org.nextJointPullCheck = org.nextJointPullCheck or 0
 		if org.nextJointPullCheck > now then continue end
@@ -895,6 +864,10 @@ function fakeBoneFlop.IsFloppyPhys(rag, physNum)
 end
 
 function fakeBoneFlop.SetLimbSegmentState(org, limb, segment, active)
+	if active then
+		local down = fakeBoneFlop.ResolveBone(limb, "down")
+		segment = org and org.fake_floppy_bones and down and org.fake_floppy_bones[down] and "up" or "down"
+	end
 	return fakeBoneFlop.SetBoneState(org, fakeBoneFlop.ResolveBone(limb, segment), active)
 end
 
@@ -906,7 +879,7 @@ function fakeBoneFlop.SetBoneState(org, bone, active)
 end
 
 function fakeBoneFlop.SetLimbSegmentDislocation(org, limb, segment, active)
-	local bone = fakeBoneFlop.ResolveBone(limb, segment)
+	local bone = fakeBoneFlop.ResolveBone(limb, "up")
 	if not org or not bone then return false end
 	if not active and not org.fake_dislocated_bones then return false end
 	org.fake_dislocated_bones = org.fake_dislocated_bones or {}
@@ -1001,54 +974,6 @@ function fakeBoneFlop.CleanupRagdoll(rag)
 	rag:SetSaveValue("m_ragdoll.allowStretch", false)
 end
 
-function fakeBoneFlop.BendBone(rag, bone, forceMul)
-	if not IsValid(rag) then return end
-	if not (rag.hg_floppy_bones and rag.hg_floppy_bones[bone]) then return end
-	forceMul = forceMul or 1
-
-	local parentBone = fakeBoneParents[bone]
-	local offset = fakeBoneCrookedOffsets[bone]
-	if not parentBone or not offset then return end
-
-	local boneIDChild = rag:LookupBone(bone)
-	local boneIDParent = rag:LookupBone(parentBone)
-	if not boneIDChild or not boneIDParent then return end
-
-	local physIDChild = rag:TranslateBoneToPhysBone(boneIDChild)
-	local physIDParent = rag:TranslateBoneToPhysBone(boneIDParent)
-	if physIDChild < 0 or physIDParent < 0 then return end
-	if rag.gibRemove and (rag.gibRemove[physIDChild] or rag.gibRemove[physIDParent]) then return end
-
-	local phys = rag:GetPhysicsObjectNum(physIDChild)
-	local physParent = rag:GetPhysicsObjectNum(physIDParent)
-	if not IsValid(phys) or not IsValid(physParent) then return end
-
-	local targetPos, targetAng = LocalToWorld(offset.pos, offset.ang, physParent:GetPos(), physParent:GetAngles())
-	local curPos = phys:GetPos()
-	local curAng = phys:GetAngles()
-	local push = targetPos - curPos
-	local angVel = Vector(
-		math.AngleDifference(targetAng.r, curAng.r),
-		math.AngleDifference(targetAng.p, curAng.p),
-		math.AngleDifference(targetAng.y, curAng.y)
-	) * (1.75 * forceMul)
-
-	phys:SetVelocityInstantaneous(push * (2.2 * forceMul) + physParent:GetVelocity() * 0.15)
-	phys:AddAngleVelocity(-phys:GetAngleVelocity() * 0.65)
-	phys:SetAngleVelocityInstantaneous(angVel)
-	phys:Wake()
-
-	physParent:Wake()
-end
-
-function fakeBoneFlop.BendStored(rag, org, forceMul)
-	if not IsValid(rag) or not org or not org.fake_floppy_bones then return end
-
-	for bone in pairs(org.fake_floppy_bones) do
-		fakeBoneFlop.BendBone(rag, bone, forceMul)
-	end
-end
-
 function fakeBoneFlop.ApplyBone(rag, bone, org)
 	if not IsValid(rag) then return end
 	org = org or rag.organism
@@ -1127,11 +1052,9 @@ function fakeBoneFlop.ApplyBone(rag, bone, org)
 	local avelOri = phys:GetAngleVelocity()
 
 	local childPos = posOri
-	if dislocated then
-		local crooked = fakeBoneCrookedOffsets[bone]
-		if crooked then
-			childPos = childPos + physParent:LocalToWorld(crooked.pos * 0.32) - physParent:GetPos()
-		end
+	local side = dislocated and fakeBoneDislocationShift[bone]
+	if side then
+		childPos = childPos + rag:GetRight() * (3.5 * side) - rag:GetUp()
 	end
 	local shift = fakeBonePivotShift[bone]
 	if shift then
@@ -1142,13 +1065,12 @@ function fakeBoneFlop.ApplyBone(rag, bone, org)
 	cons:AddEFlags(serverOnlyEFlag)
 	cons:SetPos(childPos)
 	cons:SetAngles(angOri)
-	local loosen = dislocated and 22 or 0
-	cons:SetKeyValue("xmin", tostring(tonumber(limits[0][1]) - loosen))
-	cons:SetKeyValue("xmax", tostring(tonumber(limits[0][0]) + loosen))
-	cons:SetKeyValue("ymin", tostring(tonumber(limits[1][1]) - loosen))
-	cons:SetKeyValue("ymax", tostring(tonumber(limits[1][0]) + loosen))
-	cons:SetKeyValue("zmin", tostring(tonumber(limits[2][1]) - loosen))
-	cons:SetKeyValue("zmax", tostring(tonumber(limits[2][0]) + loosen))
+	cons:SetKeyValue("xmin", limits[0][1])
+	cons:SetKeyValue("xmax", limits[0][0])
+	cons:SetKeyValue("ymin", limits[1][1])
+	cons:SetKeyValue("ymax", limits[1][0])
+	cons:SetKeyValue("zmin", limits[2][1])
+	cons:SetKeyValue("zmax", limits[2][0])
 	cons:SetKeyValue("spawnflags", "0")
 	cons:SetPhysConstraintObjects(physParent, phys)
 	cons:Spawn()
@@ -1187,18 +1109,6 @@ function fakeBoneFlop.ApplyStored(rag, org)
 
 	for bone in pairs(org.fake_floppy_bones or {}) do fakeBoneFlop.ApplyBone(rag, bone, org) end
 	for bone in pairs(org.fake_dislocated_bones or {}) do fakeBoneFlop.ApplyBone(rag, bone, org) end
-
-	timer.Simple(0.01, function()
-		if IsValid(rag) and org.fake_floppy_bones then
-			fakeBoneFlop.BendStored(rag, rag.organism or org, 0.35)
-		end
-	end)
-
-	timer.Simple(0.12, function()
-		if IsValid(rag) and org.fake_floppy_bones then
-			fakeBoneFlop.BendStored(rag, rag.organism or org, 0.2)
-		end
-	end)
 end
 
 function fakeBoneFlop.ScheduleRebuild(ply)

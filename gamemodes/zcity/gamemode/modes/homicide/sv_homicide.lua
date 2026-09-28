@@ -135,6 +135,7 @@ MODE.LootTable = {
 
 		{12,"weapon_mp-80"},
 		{7,"weapon_pm"},
+		{7,"weapon_ruger"},
 		{6,"weapon_p22"},
 		{4,"weapon_revolver2"},
 		{4,"weapon_px4beretta"},

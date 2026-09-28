@@ -2874,21 +2874,6 @@ function hg.BreakNeck(ent, recipient, soundEnt)
 		if IsValid(ent) and hg.fakeBoneFlop then
 			hg.fakeBoneFlop.ScheduleApply(ent, "ValveBiped.Bip01_Spine3", org)
 			hg.fakeBoneFlop.ScheduleApply(ent, "ValveBiped.Bip01_Head1", org)
-			timer.Simple(0.05, function()
-				if IsValid(ent) and hg.fakeBoneFlop then
-					hg.fakeBoneFlop.BendStored(ent, org, 1.0)
-				end
-			end)
-			timer.Simple(0.15, function()
-				if IsValid(ent) and hg.fakeBoneFlop then
-					hg.fakeBoneFlop.BendStored(ent, org, 0.6)
-				end
-			end)
-			timer.Simple(0.3, function()
-				if IsValid(ent) and hg.fakeBoneFlop then
-					hg.fakeBoneFlop.BendStored(ent, org, 0.3)
-				end
-			end)
 		end
 	end)
 end

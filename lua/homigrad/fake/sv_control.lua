@@ -301,8 +301,8 @@ local function isFloppyPhys(ragdoll, physNumber, alreadyReal)
 	return ragdoll.hg_floppy_bones[ragdoll:GetBoneName(bone)] == true
 end
 
-function hg.ShadowControl(ragdoll, physNumber, ss, ang, maxang, maxangdamp, pos, maxspeed, maxspeeddamp)
-	physNumber = realPhysNum(ragdoll, physNumber) or 0
+function hg.ShadowControl(ragdoll, physNumber, ss, ang, maxang, maxangdamp, pos, maxspeed, maxspeeddamp, alreadyReal)
+	if not alreadyReal then physNumber = realPhysNum(ragdoll, physNumber) or 0 end
 	local phys = ragdoll:GetPhysicsObjectNum(physNumber)
 	if not IsValid(phys) then return end
 	if isFloppyPhys(ragdoll, physNumber, true) then
@@ -1383,7 +1383,7 @@ hook.Add("Think", "Fake", function()
 						ang2:RotateAroundAxis(ang2:Forward(), ishgweapon(wep) and 120 or 0)
 						local punchBone = ((org.rarm or 0) >= 1 or org.rarmdislocation or org.rarmdislocated) and 6 or 7
 						shadowControl(ragdoll, punchBone, 0.001, ang2, forceArm * 2, forceArm_dump, ragdoll:GetPhysicsObjectNum(realPhysNum(ragdoll,punchBone)):GetPos() + ang2:Forward() * 15 + ((vellen > 150 and ragdoll:GetPhysicsObject():GetVelocity() / 224) or vector_zero), ishgweapon(wep) and 500 or 500, ishgweapon(wep) and 50 or 50)
-						if ply:WaterLevel() == 1 then shadowControl(ragdoll, 1, 0.001, nil, nil, nil, ragdoll:GetPhysicsObjectNum(7):GetPos(), 5, 0) end
+						if ply:WaterLevel() == 1 then shadowControl(ragdoll, 1, 0.001, nil, nil, nil, ragdoll:GetPhysicsObjectNum(realPhysNum(ragdoll, 7)):GetPos(), 5, 0) end
 					/*else
 						ang2:Set(angles)
 						ang2:RotateAroundAxis(angles:Up(), 0)
