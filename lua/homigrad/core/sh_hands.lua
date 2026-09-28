@@ -27,6 +27,10 @@ function hg.GetArmEffectiveness(ply, limb)
 	return math.Clamp(effectiveness, 0, 1)
 end
 
+function hg.GetThrowArmMultiplier(ply)
+	return 0.35 + 0.65 * hg.GetArmEffectiveness(ply, "rarm")
+end
+
 function hg.CanUseLeftHand(ply)
 	local ent = IsValid(ply.FakeRagdoll) and ply.FakeRagdoll or ply
 

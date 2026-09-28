@@ -555,7 +555,7 @@ local function send_organism(org, ply, recipientForce, reliable)
 		net.Send(ply)
 	elseif IsValid(org.owner) then
 		local rf = RecipientFilter()
-		rf:AddPVS(org.owner:GetPos())
+		rf:AddPVS((hg.GetCurrentCharacter(org.owner) or org.owner):GetPos())
 		net.Send(rf)
 	else
 		net.Broadcast()
@@ -753,7 +753,7 @@ local function send_bareinfo(org, force, reliable)
 	sendtable.depression = org.depression
 
 	local rf = RecipientFilter()
-	rf:AddPVS(org.owner:GetPos())
+	rf:AddPVS((hg.GetCurrentCharacter(org.owner) or org.owner):GetPos())
 	if org.owner:IsPlayer() then rf:RemovePlayer(org.owner) end
 	net.Start("organism_send", not reliable and hg_unreliable_nets:GetBool())
 	net.WriteTable(not hg_developer:GetBool() and sendtable or org)

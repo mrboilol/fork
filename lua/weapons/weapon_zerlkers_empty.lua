@@ -154,7 +154,7 @@ function SWEP:Throw(velocity, _, nosound, throwPosAdjust, throwAngAdjust)
 	local phys = thrown:GetPhysicsObject()
 	if IsValid(phys) then
 		phys:SetMaterial("metal_barrel")
-		phys:SetVelocity(owner:GetAimVector() * velocity + character:GetVelocity())
+		phys:SetVelocity(owner:GetAimVector() * velocity * hg.GetThrowArmMultiplier(owner) + character:GetVelocity())
 		phys:AddAngleVelocity(VectorRand() * 350)
 	end
 

@@ -470,7 +470,7 @@ function SWEP:Throw(mul, time, nosound)
 	ent:SetPos(hand + (IsValid(owner) and self:GetAngles():Forward() * 5 or vector_origin))
 	ent:SetAngles(IsValid(owner) and owner:EyeAngles() or self:GetAngles())
 	local phys = ent:GetPhysicsObject()
-	if phys then phys:SetVelocity(IsValid(owner) and (owner:GetAimVector() * mul) + owner:GetVelocity() or Vector(0,0,0)) end
+	if phys then phys:SetVelocity(IsValid(owner) and (owner:GetAimVector() * mul * hg.GetThrowArmMultiplier(owner)) + owner:GetVelocity() or Vector(0,0,0)) end
 	ent.timer = time
 	ent.owner = self.lastowner
 	ent.owner2 = self.lastowner

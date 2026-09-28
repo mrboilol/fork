@@ -317,7 +317,7 @@ function SWEP:Throw(mul, time, nosound, throwPosAdjust, throwAngAdjust)
 	local phys = ent:GetPhysicsObject()
 	if phys then 
 		real_ent = hg.GetCurrentCharacter(owner)
-		phys:SetVelocity(IsValid(real_ent) and (owner:GetAimVector() * mul/1.5) + real_ent:GetVelocity() or Vector(0,0,0)) 
+		phys:SetVelocity(IsValid(real_ent) and (owner:GetAimVector() * mul/1.5 * hg.GetThrowArmMultiplier(owner)) + real_ent:GetVelocity() or Vector(0,0,0))
 	end
 	if owner:IsOnGround() then
 		owner:SetVelocity(owner:GetVelocity() - owner:GetVelocity()/2)

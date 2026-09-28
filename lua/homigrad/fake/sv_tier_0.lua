@@ -854,17 +854,17 @@ function fakeBoneFlop.IsFloppyPhys(rag, physNum)
 end
 
 function fakeBoneFlop.SetLimbSegmentState(org, limb, segment, active)
-	if active then
-		local down = fakeBoneFlop.ResolveBone(limb, "down")
-		segment = org and org.open_fractures and down and org.open_fractures[down] and "up" or "down"
-	end
 	return fakeBoneFlop.SetBoneState(org, fakeBoneFlop.ResolveBone(limb, segment), active)
 end
 
 function fakeBoneFlop.SetBoneState(org, bone, active)
 	local changed = fakeBoneFlop.FlagBone(org, bone, active)
 	if not changed or not IsValid(org.owner) then return changed end
-	fakeBoneFlop.ScheduleRebuild(org.owner)
+	if active then
+		fakeBoneFlop.ScheduleApply(org.owner.FakeRagdoll, bone, org)
+	else
+		fakeBoneFlop.ScheduleRebuild(org.owner)
+	end
 	return true
 end
 
@@ -878,7 +878,13 @@ function fakeBoneFlop.SetLimbSegmentDislocation(org, limb, segment, active)
 	org.fake_dislocated_bones[bone] = active or nil
 	if not next(org.fake_dislocated_bones) then org.fake_dislocated_bones = nil end
 
-	if IsValid(org.owner) then fakeBoneFlop.ScheduleRebuild(org.owner) end
+	if IsValid(org.owner) then
+		if active then
+			fakeBoneFlop.ScheduleApply(org.owner.FakeRagdoll, bone, org)
+		else
+			fakeBoneFlop.ScheduleRebuild(org.owner)
+		end
+	end
 	return true
 end
 
@@ -986,10 +992,15 @@ function fakeBoneFlop.ApplyBone(rag, bone, org)
 
 	local pos = phys:GetPos()
 	if not isSafeNetworkPos(pos) or not isSafeNetworkPos(physParent:GetPos()) then return end
+	local fracture = org and org.open_fractures and org.open_fractures[bone]
+	if fracture and isvector(fracture[1]) then
+		local fracturePos = phys:LocalToWorld(fracture[1])
+		if isSafeNetworkPos(fracturePos) then pos = fracturePos end
+	end
 
 	local cons = constraint.AdvBallsocket(
 		rag, rag, physIDChild, physIDParent,
-		vector_origin, physParent:WorldToLocal(pos),
+		phys:WorldToLocal(pos), physParent:WorldToLocal(pos),
 		0, 0, -100, -100, -120, 10, 10, 10,
 		0, 0, 0, 0, 1
 	)
@@ -997,6 +1008,8 @@ function fakeBoneFlop.ApplyBone(rag, bone, org)
 
 	rag:RemoveInternalConstraint(physIDChild)
 	rag:SetSaveValue("m_ragdoll.allowStretch", false)
+	phys:EnableCollisions(true)
+	phys:Wake()
 
 	rag.hg_floppy_constraints = rag.hg_floppy_constraints or {}
 	rag.hg_floppy_bones = rag.hg_floppy_bones or {}

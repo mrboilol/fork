@@ -86,7 +86,7 @@ local function addPhysBloodPart(pos, vel, w, artery, kishki, owner, tiny, hidden
 	if IsValid(owner) then vel = vel + owner:GetVelocity() end
 	physGravity[3] = -(sv_gravity and sv_gravity:GetFloat() or 600)
 
-	local size = kishki and math.Clamp((w or 4) * 0.55, 2, 6) or math.Clamp((w or 2) * 0.7, tiny and 0.5 or 0.8, 3.4)
+	local size = kishki and math.Clamp((w or 4) * 0.55, 2, 6) or math.Clamp((w or 2) * 0.7, tiny and 0.5 or 0.8, 6)
 	local light = render.GetLightColor(pos)
 	local lum = math.Clamp((light[1] + light[2] + light[3]) * 1.2 + 0.35, 0.5, 1)
 

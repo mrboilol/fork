@@ -258,7 +258,14 @@ function ZCityScopeZeroing.SWEP_DoRT(self)
 	angaddhuy[2] = -scope_pos[2] * mul
 	local ang2 = ang + angaddhuy
 	local pos2 = pos
-	local tr = util.QuickTrace(owner:EyePos(), (pos2 - owner:EyePos()) + (pos2 - owner:EyePos()):GetNormalized() * 5, {owner, owner.FakeRagdoll})
+	local traceFilter = {owner, self, gun}
+	if IsValid(owner.FakeRagdoll) then traceFilter[#traceFilter + 1] = owner.FakeRagdoll end
+	if self.modelAtt then
+		for _, model in pairs(self.modelAtt) do
+			if IsValid(model) then traceFilter[#traceFilter + 1] = model end
+		end
+	end
+	local tr = util.QuickTrace(owner:EyePos(), (pos2 - owner:EyePos()) + (pos2 - owner:EyePos()):GetNormalized() * 5, traceFilter)
 
 	local rt = {
 		x = 0,
@@ -268,6 +275,7 @@ function ZCityScopeZeroing.SWEP_DoRT(self)
 		angles = ang2,
 		origin = owner:InVehicle() and pos2 or tr.HitPos - (pos2 - owner:EyePos()):GetNormalized() * 5,
 		drawviewmodel = false,
+		drawviewer = false,
 		fov = zoomFOV / dist * 12,
 		znear = 1,
 		bloomtone = false

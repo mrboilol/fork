@@ -35,6 +35,20 @@ local defaultBones = {
 	[14] = "ValveBiped.Bip01_R_Foot",
 }
 
+local fakePhysLimb = {
+	[2] = "rarm", [6] = "rarm", [7] = "rarm",
+	[3] = "larm", [4] = "larm", [5] = "larm",
+	[8] = "rleg", [9] = "rleg", [14] = "rleg",
+	[11] = "lleg", [12] = "lleg", [13] = "lleg",
+}
+local fakeLimbs = {"larm", "rarm", "lleg", "rleg"}
+
+local function getFakeTourniquetPower(ply, limb)
+	local count = hg.GetTourniquetCountOnLimb and hg.GetTourniquetCountOnLimb(ply, limb) or 0
+	local leg = limb == "lleg" or limb == "rleg"
+	return count >= 2 and (leg and 0.3 or 0.18) or count == 1 and (leg and 0.7 or 0.55) or 1
+end
+
 local right_arm = {
 	["ValveBiped.Bip01_R_UpperArm"] = true,
 	["ValveBiped.Bip01_R_Forearm"] = true,
@@ -302,6 +316,8 @@ local function isFloppyPhys(ragdoll, physNumber, alreadyReal)
 end
 
 function hg.ShadowControl(ragdoll, physNumber, ss, ang, maxang, maxangdamp, pos, maxspeed, maxspeeddamp, alreadyReal)
+	local limb = not alreadyReal and fakePhysLimb[physNumber]
+	local limbPower = limb and ragdoll.hgTourniquetPower and ragdoll.hgTourniquetPower[limb] or 1
 	if not alreadyReal then physNumber = realPhysNum(ragdoll, physNumber) or 0 end
 	local phys = ragdoll:GetPhysicsObjectNum(physNumber)
 	if not IsValid(phys) then return end
@@ -312,10 +328,10 @@ function hg.ShadowControl(ragdoll, physNumber, ss, ang, maxang, maxangdamp, pos,
 
 	shadowparams.secondstoarrive = ss
 	shadowparams.angle = ang
-	shadowparams.maxangular = maxang and maxang * (ragdoll.power or 1)-- * (hg.IdealMassPlayer[physNumber] and hg.IdealMassPlayer[physNumber] / phys:GetMass() or 0)
+	shadowparams.maxangular = maxang and maxang * (ragdoll.power or 1) * limbPower
 	shadowparams.maxangulardamp = maxangdamp
 	shadowparams.pos = pos
-	shadowparams.maxspeed = maxspeed and maxspeed * (ragdoll.power or 1)
+	shadowparams.maxspeed = maxspeed and maxspeed * (ragdoll.power or 1) * limbPower
 	shadowparams.maxspeeddamp = maxspeeddamp
 	shadowparams.dampfactor = 0.9
 
@@ -796,6 +812,11 @@ hook.Add("Think", "Fake", function()
 		power = power * math.Clamp(org.perfusionMoveMul or 1, 0.35, 1)
 		power = power * (1 + math.min(org.berserk or 0, 3) * 0.3)
 		ragdoll.power = power
+		local tourniquetPower = ragdoll.hgTourniquetPower or {}
+		for _, limb in ipairs(fakeLimbs) do
+			tourniquetPower[limb] = getFakeTourniquetPower(ply, limb)
+		end
+		ragdoll.hgTourniquetPower = tourniquetPower
 
 		if ragdoll.StrangleLocked and org.o2 and org.o2.range and org.o2.range > 0 then
 			local o2frac = math.Clamp((org.o2[1] or 0) / org.o2.range, 0, 1)

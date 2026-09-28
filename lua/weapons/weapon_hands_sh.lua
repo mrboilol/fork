@@ -68,9 +68,9 @@ local function GetThrowStrengthMul(ply)
 	local mul = GetCombatStrengthMul(ply)
 	local org = IsValid(ply) and ply.organism
 	if org and (org.fury13 or 0) > 0 then
-		return math.min(mul, 2)
+		mul = math.min(mul, 2)
 	end
-	return mul
+	return mul * hg.GetThrowArmMultiplier(ply)
 end
 
 local function ProtectThrownRagdoll(ent)
@@ -779,7 +779,8 @@ function SWEP:SetHandPos(noset)
 	ply.rhold = rhmat
 	ply.lhold = lhmat
 
-	if self:GetFists() then
+	local wm = self:GetFists() and self:GetWM()
+	if IsValid(wm) then
 		local bones = hg.TPIKBonesRH
 
 		local lastaddpos = self:IsLocal() and self.lastAddPos or vector_origin

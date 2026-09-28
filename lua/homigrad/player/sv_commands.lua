@@ -318,15 +318,24 @@ if SERVER then
 		if not ply:IsAdmin() then return end
 		local plya = #args > 1 and args[1] or ply:Name()
 		local mdl = #args > 1 and args[2] or args[1]
+		if not isstring(mdl) or not util.IsValidModel(mdl) then
+			ply:ChatPrint("Invalid model: " .. tostring(mdl))
+			return
+		end
 
 		for i, ply2 in pairs(player.GetListByName(plya)) do
 			if ply2:Alive() then
 				local Appearance = ply2.CurAppearance or hg.Appearance.GetRandomAppearance()
 				Appearance.AColthes = ""
+				Appearance.AAttachments = {}
 				ply2:SetNetVar("Accessories", "")
+				if IsValid(ply2.FakeRagdoll) then ply2.FakeRagdoll:SetNetVar("Accessories", "") end
 				ply2:SetModel(mdl)
 				ply2:SetSubMaterial()
 				ply2:SetPlayerColor(ply2:GetNWVector("PlayerColor", vector_origin))
+				if IsValid(ply2.FakeRagdoll) and hg.fakeBoneFlop and hg.fakeBoneFlop.ScheduleRebuild then
+					hg.fakeBoneFlop.ScheduleRebuild(ply2)
+				end
 
 				ply:ChatPrint(ply2:Name().. "'s model set to " .. tostring(mdl))
 			end
