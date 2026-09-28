@@ -45,6 +45,22 @@ local function IsPlayerControlling(ply)
            ply:KeyDown(IN_USE)
 end
 
+local function CanMoveArms(org)
+    return org.alive and not org.otrub and not org.paralyzed
+end
+
+local function CanMoveLegs(org)
+    return CanMoveArms(org)
+        and (org.spine1 or 0) < (hg.organism.fake_spine1 or 1)
+        and (org.spine2 or 0) < (hg.organism.fake_spine2 or 1)
+end
+
+local function StopAnim(ragdoll, name)
+    if hg.animator.IsPlaying(ragdoll) and ragdoll.AnimCurrent.Name == name then
+        hg.animator.Stop(ragdoll)
+    end
+end
+
 local function GetTumbleChance(org)
     local chance = 0.4
     chance = chance + math.Clamp((org.brain or 0) * 0.45, 0, 0.45)
@@ -91,7 +107,7 @@ end
 
 -- Neurological Posturing (Decerebrate/Decorticate)
 function hg.reactions.ProcessNeurological(ragdoll, ply, org)
-    if not org.brain then return false end
+    if not org.brain or not org.alive or org.paralyzed then return false end
     
     -- Decerebrate Posturing (Extensor) - Severe damage (brain stem)
     -- Arms extended, legs extended, head arched back, rigid
@@ -144,7 +160,12 @@ end
 
 -- Injured/Dying Behavior (Agonal Breathing / struggling)
 function hg.reactions.ProcessInjured(ragdoll, ply, org)
-    if not org.alive or org.otrub then return false end
+    if not CanMoveArms(org) then
+        if hg.animator.IsPlaying(ragdoll) and string.find(ragdoll.AnimCurrent.Name, "Dying") then
+            hg.animator.Stop(ragdoll)
+        end
+        return false
+    end
     
     -- If in critical condition (high pain, low blood, or just dying)
     local isCritical = (org.pain > 80) or (org.blood < 2000) or (org.dying)
@@ -175,7 +196,10 @@ end
 
 -- Protective Behavior (Cowering)
 function hg.reactions.ProcessCowering(ragdoll, ply, org)
-    if not org.alive or org.otrub then return false end
+    if not CanMoveArms(org) then
+        StopAnim(ragdoll, "cower_idle")
+        return false
+    end
     
     -- Trigger on sudden high pain or explosions
     -- We use org.pain for now.
@@ -196,7 +220,10 @@ end
 function hg.reactions.ProcessHeadshot(ragdoll, ply, org)
     -- Lower threshold to ensure it triggers (0.2 is 20% brain damage)
     -- Also check if we are already playing it
-    if org.brain < 0.2 then return false end 
+    if org.brain < 0.2 or not org.alive or org.paralyzed then
+        StopAnim(ragdoll, "HeadshotCurl")
+        return false
+    end
     
     if IsPlayerControlling(ply) and not org.otrub then 
         if hg.animator.IsPlaying(ragdoll) and ragdoll.AnimCurrent.Name == "HeadshotCurl" then
@@ -221,11 +248,9 @@ end
 
 -- Burning Reaction
 function hg.reactions.ProcessBurning(ragdoll, ply, org)
-    if not ragdoll:IsOnFire() then 
-        if hg.animator.IsPlaying(ragdoll) and ragdoll.AnimCurrent.Name == "Burning" then
-             hg.animator.Stop(ragdoll)
-        end
-        return false 
+    if not ragdoll:IsOnFire() or not CanMoveArms(org) then
+        StopAnim(ragdoll, "Burning")
+        return false
     end
     
     if IsPlayerControlling(ply) then 
@@ -245,7 +270,10 @@ function hg.reactions.ProcessDrowning(ragdoll, ply, org)
         end
         return false 
     end
-    if not org.alive or org.otrub then return false end
+    if not CanMoveArms(org) then
+        StopAnim(ragdoll, "Drowning")
+        return false
+    end
     
     if IsPlayerControlling(ply) then 
         hg.animator.Stop(ragdoll)
@@ -259,7 +287,7 @@ end
 -- Stagger Behavior
 function hg.reactions.ProcessStagger(ragdoll, ply, org)
     -- Only stagger if alive and not paralyzed/unconscious
-    if not org.alive or org.otrub or org.paralyzed then return false end
+    if not CanMoveLegs(org) then return false end
     
     -- Respect player control
     if IsPlayerControlling(ply) then return false end
@@ -362,7 +390,7 @@ end
 
 -- Tripping/Stumbling (Hit obstacle)
 function hg.reactions.ProcessTripping(ragdoll, ply, org)
-    if not org.alive or org.otrub or org.paralyzed then return false end
+    if not CanMoveLegs(org) then return false end
 
     local collisionTrip = (ragdoll.reaction_collision_tumble_until or 0) > CurTime()
     if ply:KeyDown(IN_JUMP) and not collisionTrip then return false end
@@ -439,7 +467,7 @@ hook.Add("Ragdoll Collide", "RagdollReactionTumble", function(ragdoll, data)
 
     local ply = hg.RagdollOwner(ragdoll)
     local org = IsValid(ply) and ply.organism
-    if not org or not org.alive or org.otrub or org.paralyzed then return end
+    if not org or not CanMoveLegs(org) then return end
 
     local hit = data.HitEntity
     if not IsValid(hit) then return end
@@ -458,7 +486,7 @@ end)
 
 -- Protective Behavior (Arms out when falling)
 function hg.reactions.ProcessProtective(ragdoll, ply, org)
-    if not org.alive or org.otrub then return false end
+    if not CanMoveArms(org) then return false end
     
     if IsPlayerControlling(ply) then return false end
     

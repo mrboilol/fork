@@ -162,44 +162,4 @@ hook.Add("PostHeal", "GoodMood_OnHeal", function(wep, target, mode)
             healerOrg.goodmood = math.Clamp(healerOrg.goodmood + boost * GetGoodMoodGainMultiplier(healerOrg), 0, 1)
         end
     end
-
-    -- Apply constraints based on current damage state when healing
-    -- Constraints are applied on heal events and persist until next ragdoll
-    if not (ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool()) then return end
-
-    local ragdoll = target.FakeRagdoll
-    if not IsValid(ragdoll) then return end
-
-    local limbs = {"larm", "rarm", "lleg", "rleg"}
-    for _, limb in ipairs(limbs) do
-        local isAmputated = org[limb .. "amputated"]
-        local isBroken = org[limb] and org[limb] >= 1
-        local isDislocated = org[limb .. "dislocation"]
-
-        if not isAmputated and (isBroken or isDislocated) then
-            local segment = target.HG_FloppyPersistSeg and target.HG_FloppyPersistSeg[limb]
-            hg.BreakLimb(ragdoll, limb, segment, isDislocated)
-        end
-    end
-
-    -- Apply neck constraint if spine3 is broken
-    if org.spine3 and org.spine3 >= 1 and not org.headamputated then
-        timer.Simple(0.1, function()
-            if IsValid(ragdoll) and IsValid(target) then
-                hg.BreakNeck(ragdoll, false)
-            end
-        end)
-    end
-
-    -- Apply spine constraints if thresholds are crossed
-    if hg.BreakSpine then
-        local fake1 = hg.organism and hg.organism.fake_spine1 or 1
-        local fake2 = hg.organism and hg.organism.fake_spine2 or 1
-        if (org.spine1 and org.spine1 >= fake1) or (org.pelvis and org.pelvis >= 1) then
-            hg.BreakSpine(ragdoll, "spine1", false)
-        end
-        if org.spine2 and org.spine2 >= fake2 then
-            hg.BreakSpine(ragdoll, "spine2", false)
-        end
-    end
 end)

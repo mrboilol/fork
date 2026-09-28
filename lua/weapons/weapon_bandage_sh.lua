@@ -1446,6 +1446,19 @@ if SERVER then
 		ply.tourniquets = {}
 	end)
 
+	hook.Add("Org Clear", "remove-tourniquets-on-reset", function(org)
+		local ent = org and org.owner
+		if not IsValid(ent) then return end
+
+		ent.tourniquets = {}
+		ent:SetNetVar("Tourniquets", {})
+		local ragdoll = ent:IsPlayer() and ent:Alive() and ent.FakeRagdoll
+		if IsValid(ragdoll) then
+			ragdoll.tourniquets = {}
+			ragdoll:SetNetVar("Tourniquets", {})
+		end
+	end)
+
 	hook.Add("Player Spawn", "remove-bandages", function(ply)
 		if OverrideSpawn then return end
 		ply:SetNetVar("bandaged_limbs",{})

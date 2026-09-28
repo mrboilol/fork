@@ -189,6 +189,11 @@ function hg.organism.IsLimbCompoundFractured(org, key)
 	return fractures and fractures.up and fractures.down or false
 end
 
+function hg.organism.CantHoldWeapon(org)
+	local function unusable(key) return org[key] == 1 or hg.organism.IsLimbCompoundFractured(org, key) end
+	return unusable("larm") and unusable("rarm")
+end
+
 local function markLimbFracture(org, key, segment)
 	org.limbfractures = org.limbfractures or {}
 	org.limbfractures[key] = org.limbfractures[key] or {}

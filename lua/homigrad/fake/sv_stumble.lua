@@ -34,6 +34,15 @@ local STUMBLE_STEER = 3
 local STUMBLE_SWAY_RATE = 2.3
 local STUMBLE_SWAY_ANGLE = 22
 local DIVE_PUSH = 260
+local STUMBLE_MIN_STEPS = {2, 3}
+local STUMBLE_STRIDE_MUL = 1.5
+local STUMBLE_STRIDE_MAX = 90
+local STUMBLE_WOBBLE = 260
+local STUMBLE_MIN_STEP_TIMEOUT = 2.5
+local STUMBLE_CLUTCH_CHANCE = 0.55
+local FALL_LOCK_TIME = 2
+local FALL_FOLLOW_PUSH = 420
+local FALL_BUCKLE = 260
 local FOOT_ANKLE_HEIGHT = 4
 local FOOT_PLANT_DIST = 8
 local FOOT_STEP_ARRIVE = 0.05
@@ -212,6 +221,7 @@ local AR_DEFAULTS = {
 }
 
 local stumbling = {}
+local falling = {}
 local reacting = {}
 local dying = {}
 
@@ -383,7 +393,7 @@ hg.RagdollReflex = {
 
 local function canStumble(ply, ragdoll)
 	if not isAware(ply) or not legsUsable(ply.organism) then return false end
-	if ragdoll.isSliding or ragdoll.isDropkicking then return false end
+	if ragdoll.isSliding or ragdoll.isDropkicking or ply:InVehicle() or ragdoll.welds then return false end
 	return true
 end
 
@@ -485,8 +495,8 @@ local function updateGhostPositions(st, ragdoll, isMoving, horizontalVel)
 	pelvisAng.p = 0
 	pelvisAng.r = 0
 
-	local prediction = horizontalVel * st.cfg.PredictionTime
-	if prediction:Length() > 60 then prediction = prediction:GetNormalized() * 60 end
+	local prediction = horizontalVel * st.cfg.PredictionTime * STUMBLE_STRIDE_MUL
+	if prediction:Length() > STUMBLE_STRIDE_MAX then prediction = prediction:GetNormalized() * STUMBLE_STRIDE_MAX end
 
 	for i = 1, 2 do
 		if not isMoving and st.legState[i].isLocked then continue end
@@ -572,6 +582,7 @@ local function updateStumble(st, ragdoll)
 			if state.progress >= 1 then
 				state.isStepping = false
 				state.lastStepTime = now
+				st.steps = st.steps + 1
 				st.footPositions[i] = state.targetPos
 				st.lockedFootPositions[i] = state.targetPos
 				if moveDir and st.hasGroundContact[i] then
@@ -599,7 +610,7 @@ local function updateStumble(st, ragdoll)
 			if st.footPositions[i]:DistToSqr(st.ghostPositions[i]) > trigger * trigger
 				and not st.legState[i == 1 and 2 or 1].isStepping
 				and now - state.lastStepTime > cfg.MinStepInterval then
-				if math.Rand(0, 1) < st.legTrip[i] then
+				if st.steps >= st.minSteps and math.Rand(0, 1) < st.legTrip[i] then
 					st.tripLeg = i
 					return
 				end
@@ -643,7 +654,9 @@ local function updateStumble(st, ragdoll)
 			end
 		end
 	end
-	local instability = math.Clamp((now - st.startTime) / stumbleLifetime(st), 0, st.hit and 1 or STUMBLE_DRIVEN_INSTABILITY)
+	local instability = math.Clamp((now - st.startTime) / stumbleLifetime(st), 0, 1)
+	if st.steps < st.minSteps then instability = math.min(instability, STUMBLE_DRIVEN_INSTABILITY) end
+	st.spine:AddAngleVelocity(Vector(math.Rand(-1, 1), math.Rand(-1, 1), 0) * STUMBLE_WOBBLE * (0.5 + instability) * dt)
 	local grounded = planted > 0
 	local support = math.min(planted, 1) + (planted > 1 and 0.25 or 0)
 
@@ -712,7 +725,17 @@ local function stopStumble(ragdoll, reason)
 	end
 
 	local falls = reason == "decay" or reason == "trip" or reason == "halt" or reason == "getup"
-	if falls then topple(st) end
+	if falls then
+		topple(st)
+		local vel = st.pelvis:GetVelocity()
+		local dir = Vector(vel.x, vel.y, 0)
+		if dir:LengthSqr() < START_MIN_SPEED * START_MIN_SPEED then dir = st.pushDir or st.driveDir or st.spine:GetAngles():Forward() end
+		dir = Vector(dir.x, dir.y, 0)
+		if dir:LengthSqr() > 0.01 then
+			falling[ragdoll] = {ply = st.ply, pelvis = st.pelvis, spine = st.spine, dir = dir:GetNormalized(), untilT = CurTime() + FALL_LOCK_TIME}
+			ragdoll.hgStumbleFalling = true
+		end
+	end
 	if falls or reason == "fell" then triggerCover(ragdoll, REACT_COVER_TIME) end
 end
 
@@ -731,6 +754,8 @@ local function startStumble(ply, ragdoll)
 		lastGroundCheckTime = 0,
 		smoothedVelocity = pelvis:GetVelocity(),
 		ikChains = {},
+		steps = 0,
+		minSteps = math.random(STUMBLE_MIN_STEPS[1], STUMBLE_MIN_STEPS[2]),
 		footPhys = {getBonePhys(ragdoll, "ValveBiped.Bip01_L_Foot"), getBonePhys(ragdoll, "ValveBiped.Bip01_R_Foot")},
 		vigor = vigor(org),
 		legTrip = {legTripChance(org, "lleg"), legTripChance(org, "rleg")},
@@ -740,6 +765,9 @@ local function startStumble(ply, ragdoll)
 	if hit and CurTime() - hit.time < HIT_WINDOW then
 		st.hit = true
 		makePush(st, hit.pos, hit.dir, hit.energy)
+		if hg.EuphoriaWoundGrab and math.random() < STUMBLE_CLUTCH_CHANCE then
+			hg.EuphoriaWoundGrab(ply, ragdoll, hit.pos, hit.dir, STUMBLE_HIT_TIME + FALL_LOCK_TIME)
+		end
 	end
 	st.swayPhase = math.Rand(0, math.pi * 2)
 
@@ -784,6 +812,9 @@ local function handBusy(ragdoll, limb)
 	local side = LIMB_HAND[limb]
 	if not side then return false end
 	if IsValid(ragdoll[HANDS[side].cons]) then return true end
+	if ragdoll.hgWoundGrips and ragdoll.hgWoundGrips[side] then return true end
+	local wound = ragdoll.hgWoundGrab
+	if wound and wound.hand == ragdoll:GetPhysicsObjectNum(hg.realPhysNum(ragdoll, HANDS[side].phys)) then return true end
 	local reach = ragdoll.hgEnvReach
 
 	return reach and reach[side] and true or false
@@ -979,7 +1010,7 @@ local function updateReaction(ply, ragdoll)
 	end
 	rs.ent:SetReactionStrength(strength)
 
-	local held = (ragdoll.HGFallCoverActive or ragdoll.hgWoundGrab or ragdoll.hgCurl) and true or false
+	local held = (ragdoll.HGFallCoverActive or ragdoll.hgCurl) and true or false
 	if held ~= rs.held then
 		rs.held = held
 		rs.ent:SetControllerEnabled(not held)
@@ -1002,6 +1033,8 @@ end)
 
 hook.Add("Fake Up", "HG_EuphoriaStumble", function(ply, ragdoll)
 	if not IsValid(ragdoll) then return end
+	falling[ragdoll] = nil
+	ragdoll.hgStumbleFalling = nil
 	stopStumble(ragdoll)
 	removeReaction(ragdoll)
 	ragdoll.hgReflexGrab = nil
@@ -1266,22 +1299,46 @@ local function stumbleEndReason(ply, ragdoll, st)
 	local now = CurTime()
 	local elapsed = now - st.startTime
 	if elapsed > STUMBLE_INTENT_GRACE then
-		if hg.KeyDown(ply, IN_JUMP) then return "dive" end
+		if hg.KeyDown(ply, IN_JUMP) and not hg.KeyDown(ply, IN_USE) then return "dive" end
 		if not st.hit and not moveControl(ply) then return "halt" end
 	end
 	if st.stillSince and now - st.stillSince > STILL_GRACE then return "decay" end
 
 	st.vigor = vigor(ply.organism)
-	if st.hit and elapsed >= stumbleLifetime(st) then return "decay" end
+	if st.steps < st.minSteps and elapsed < STUMBLE_MIN_STEP_TIMEOUT then return end
+	if elapsed >= stumbleLifetime(st) then return "decay" end
 	if now - st.startTime >= STUMBLE_FALL_GRACE and not isUpright(ply, ragdoll) then return "fell" end
 end
 
 hook.Add("Should Fake Up", "HG_EuphoriaStumble", function(ply)
 	local ragdoll = ply.FakeRagdoll
-	if not IsValid(ragdoll) or not stumbling[ragdoll] then return end
+	if not IsValid(ragdoll) then return end
+	if falling[ragdoll] then return false end
+	if not stumbling[ragdoll] then return end
 	stopStumble(ragdoll, "getup")
 	return false
 end)
+
+local function stopFalling(ragdoll)
+	falling[ragdoll] = nil
+	if IsValid(ragdoll) then ragdoll.hgStumbleFalling = nil end
+end
+
+local function updateFalling(ragdoll, fs)
+	local ply = fs.ply
+	if not IsValid(ragdoll) or not IsValid(ply) or ply.FakeRagdoll ~= ragdoll or not IsValid(fs.pelvis) or not IsValid(fs.spine) then
+		stopFalling(ragdoll)
+		return
+	end
+	if CurTime() > fs.untilT or not isUpright(ply, ragdoll) then
+		stopFalling(ragdoll)
+		return
+	end
+
+	local dt = FrameTime()
+	fs.spine:AddVelocity(fs.dir * FALL_FOLLOW_PUSH * dt)
+	fs.pelvis:AddVelocity(Vector(0, 0, -FALL_BUCKLE * dt))
+end
 
 local function removeDying(ragdoll)
 	local ds = dying[ragdoll]
@@ -1369,6 +1426,10 @@ hook.Add("Think", "HG_EuphoriaStumble", function()
 		end
 
 		updateStumble(st, ragdoll)
+	end
+
+	for ragdoll, fs in pairs(falling) do
+		updateFalling(ragdoll, fs)
 	end
 
 	for ragdoll, rs in pairs(reacting) do

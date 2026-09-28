@@ -207,23 +207,31 @@ local function nearestPhys(ragdoll, pos)
 	return best
 end
 
-local function startWoundGrab(ply, ragdoll, hitPos, force)
+local function bleederPos(org, ragdoll)
+	local wound = hg.GetHoldWound and hg.GetHoldWound(org, ragdoll)
+	return wound and hg.GetHoldWoundPos(ragdoll, wound)
+end
+
+local function startWoundGrab(ply, ragdoll, hitPos, force, duration)
 	if not hg_euphoria_detail:GetBool() or not canWoundGrab(ply) then return end
 	local rootPhys = ragdoll:GetPhysicsObject()
 	local rootPos = IsValid(rootPhys) and rootPhys:GetPos() or ragdoll:GetPos()
-	local woundPos = hitPos
+	local org = ply.organism
+	local woundPos = bleederPos(org, ragdoll) or hitPos
 	if not woundPos or woundPos:Distance(rootPos) >= 200 then
-		local fDir = force:Length() > 1 and force:GetNormalized() or Vector(math.Rand(-1, 1), math.Rand(-1, 1), math.Rand(-0.3, 0.6)):GetNormalized()
+		local fDir = force and force:Length() > 1 and force:GetNormalized() or Vector(math.Rand(-1, 1), math.Rand(-1, 1), math.Rand(-0.3, 0.6)):GetNormalized()
 		woundPos = rootPos + fDir * 25
 	end
-	local org = ply.organism
 	local handPhys, forearm, armMul = grabHand(ragdoll, org, woundPos)
 	local bonePhys = nearestPhys(ragdoll, woundPos)
 	if not handPhys or not bonePhys then return end
 	local reflex = hg.RagdollReflex
 	local mul = armMul * (reflex and org and reflex.Vigor(org) or 1)
-	ragdoll.hgWoundGrab = { hand = handPhys, forearm = forearm, bone = bonePhys, mul = mul, untilT = SysTime() + EUPHORIA_WOUND_GRAB_TIME, dur = EUPHORIA_WOUND_GRAB_TIME }
+	duration = duration or EUPHORIA_WOUND_GRAB_TIME
+	ragdoll.hgWoundGrab = { hand = handPhys, forearm = forearm, bone = bonePhys, mul = mul, untilT = SysTime() + duration, dur = duration }
 end
+
+hg.EuphoriaWoundGrab = startWoundGrab
 
 local function landingReaction(ragdoll, ply, hSpeed)
 	local org = ply.organism
@@ -237,7 +245,7 @@ local function landingReaction(ragdoll, ply, hSpeed)
 		hg.KeyDown(ply, IN_MOVELEFT) or hg.KeyDown(ply, IN_MOVERIGHT)
 	)
 
-	local absorb = (ragdoll.hgStumbleActive or ragdoll.hgStumblePending) and 0 or EUPHORIA_LANDING_ABSORB * math.min(hSpeed / EUPHORIA_LANDING_MIN_HS, 1)
+	local absorb = (ragdoll.hgStumbleActive or ragdoll.hgStumblePending or ragdoll.hgStumbleFalling) and 0 or EUPHORIA_LANDING_ABSORB * math.min(hSpeed / EUPHORIA_LANDING_MIN_HS, 1)
 	if controlling then absorb = absorb * EUPHORIA_LANDING_ABSORB_CONTROL end
 	absorb = math.Clamp(absorb * (0.5 + conscious * 0.5) * (1 - berserk * 0.12), 0, EUPHORIA_LANDING_ABSORB)
 
@@ -384,7 +392,7 @@ hook.Add("Think", "HG_EuphoriaSettle", function()
 
 		local untilT = ragdoll.hgSettleUntil
 		if not untilT then continue end
-		if ragdoll.hgStumbleActive or ragdoll.hgStumblePending then ragdoll.hgSettleUntil = nil continue end
+		if ragdoll.hgStumbleActive or ragdoll.hgStumblePending or ragdoll.hgStumbleFalling then ragdoll.hgSettleUntil = nil continue end
 
 		if untilT <= now or ragdoll.isSliding or ragdoll.isDropkicking then
 			ragdoll.hgSettleUntil = nil
@@ -467,7 +475,8 @@ hook.Add("Think", "HG_EuphoriaWound", function()
 
 		local frac = (grab.untilT - now) / grab.dur * (grab.mul or 1)
 		local handPos = handPhys:GetPos()
-		local target = bonePhys:GetPos()
+		local target = bleederPos(ply.organism, ragdoll) or bonePhys:GetPos()
+		if IsValid(forearmPhys) and target:DistToSqr(forearmPhys:GetPos()) < target:DistToSqr(handPos) then target = bonePhys:GetPos() end
 
 		local toTarget = target - handPos
 		local dist = toTarget:Length()
@@ -701,7 +710,7 @@ hook.Add("Think", "HG_EuphoriaGetUp", function()
 
 		local getup = ragdoll.hgGetUp
 		if not getup then continue end
-		if ragdoll.hgStumbleActive then
+		if ragdoll.hgStumbleActive or ragdoll.hgStumbleFalling then
 			ragdoll.hgGetUp = nil
 			continue
 		end

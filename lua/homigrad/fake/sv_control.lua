@@ -57,6 +57,10 @@ local wound_hold_arm_damp = 12
 local realPhysNum
 
 local wound_hold_arterial_priority_mul = 14
+local wound_hold_switch_mul = 1.5
+local wound_hold_weld_dist = 7
+local wound_hold_elastic_force = 2000
+local wound_hold_hand_tip = Vector(2, 0, 0)
 local wound_hold_arteria_offset = Vector(2, -2.85, 0)
 local wound_hold_aorta_offset = Vector(1.5, 0, 4)
 local wound_hold_larmartery_offset = Vector(0.5, 0, 1.5)
@@ -151,71 +155,122 @@ local function getHoldTarget(pos, phys, offset)
 	return pos - dir:GetNormalized() * offset
 end
 
-local function getWoundScore(ragdoll, spinePos, spineAng, wound, priorityMul)
-	local pos = getHoldWoundPos(ragdoll, wound)
-	if not pos then return -math.huge end
+local function woundBleedScore(org, wound, arterial)
+	local severity = wound[1] or 0
+	if severity <= 0.001 then return end
 
-	local dir = pos - spinePos
-	if dir:LengthSqr() <= 0.001 then return (wound[1] or 0) * (priorityMul or 1) end
+	local owner = org.owner
+	local score = severity * (arterial and wound_hold_arterial_priority_mul or 1)
+	if IsValid(owner) then
+		if hg.GetBandageBleedMultiplier then score = score * hg.GetBandageBleedMultiplier(owner, wound[4]) end
+		if hg.GetTourniquetBleedMultiplier then score = score * hg.GetTourniquetBleedMultiplier(owner, wound[4], arterial) end
+	end
 
-	local dot = dir:GetNormalized():Dot(spineAng:Forward())
-	return dot * 100 + (wound[1] or 0) * (priorityMul or 1), dot
+	return score
 end
 
-local function chooseFrontWound(ragdoll, wounds, preferred, priorityMul)
-	if not IsValid(ragdoll) or not wounds or table.IsEmpty(wounds) then return preferred end
+local function pickBleeder(org, ragdoll, wounds, arterial, current, best, bestArterial, bestScore)
+	if not wounds then return best, bestArterial, bestScore end
 
-	local spine = ragdoll:GetPhysicsObjectNum(realPhysNum(ragdoll, 1))
-	if not IsValid(spine) then return preferred end
-
-	local spinePos = spine:GetPos()
-	local spineAng = spine:GetAngles()
-	local best, bestScore
-
-	for i, wound in pairs(wounds) do
-		local score, dot = getWoundScore(ragdoll, spinePos, spineAng, wound, priorityMul)
-		if dot and dot > -0.15 and (not bestScore or score > bestScore) then
-			best = wound
-			bestScore = score
+	for _, wound in pairs(wounds) do
+		local score = woundBleedScore(org, wound, arterial)
+		if not score or score <= 0 or not getHoldWoundPos(ragdoll, wound) then continue end
+		if wound == current then score = score * wound_hold_switch_mul end
+		if not bestScore or score > bestScore then
+			best, bestArterial, bestScore = wound, arterial, score
 		end
 	end
 
-	if best then return best end
+	return best, bestArterial, bestScore
+end
 
-	best = preferred
-	bestScore = preferred and select(1, getWoundScore(ragdoll, spinePos, spineAng, preferred, priorityMul)) or nil
+local function getHoldWound(org, ragdoll)
+	if not org or not IsValid(ragdoll) then return end
 
-	for i, wound in pairs(wounds) do
-		local score = select(1, getWoundScore(ragdoll, spinePos, spineAng, wound, priorityMul))
-		if not bestScore or score > bestScore then
-			best = wound
-			bestScore = score
-		end
+	local current = org.manualHoldWoundTarget or org.holdWound
+	local best, arterial, score = pickBleeder(org, ragdoll, org.wounds, false, current)
+	best, arterial = pickBleeder(org, ragdoll, org.arterialwounds, true, current, best, arterial, score)
+
+	return best, arterial or false
+end
+
+hg.GetHoldWound = getHoldWound
+hg.GetHoldWoundPos = getHoldWoundPos
+
+local function woundPhysNum(ragdoll, wound, pos)
+	local woundBone = wound[4]
+	local bone = isnumber(woundBone) and woundBone or isstring(woundBone) and ragdoll:LookupBone(woundBone)
+	local physNum = bone and bone >= 0 and ragdoll:TranslateBoneToPhysBone(bone)
+	if physNum and physNum >= 0 then return physNum end
+
+	local best, bestDist
+	for i = 0, ragdoll:GetPhysicsObjectCount() - 1 do
+		local phys = ragdoll:GetPhysicsObjectNum(i)
+		if not IsValid(phys) then continue end
+		local dist = phys:GetPos():DistToSqr(pos)
+		if not bestDist or dist < bestDist then best, bestDist = i, dist end
 	end
 
 	return best
 end
 
-local function getHoldWound(org, ragdoll)
-	if not org then return end
+local function releaseWoundGrip(ragdoll, side)
+	local grips = ragdoll.hgWoundGrips
+	local grip = grips and grips[side]
+	if not grip then return end
 
-	local wound = chooseFrontWound(ragdoll, org.wounds, org.holdWoundArterial and nil or org.holdWound, 1)
-	local arterial = chooseFrontWound(ragdoll, org.arterialwounds, org.holdWoundArterial and org.holdWound or nil, wound_hold_arterial_priority_mul)
+	grips[side] = nil
+	if IsValid(grip.elastic) then grip.elastic:Remove() end
+	if IsValid(grip.weld) then grip.weld:Remove() end
+end
 
-	if wound and arterial then
-		local spine = ragdoll:GetPhysicsObjectNum(realPhysNum(ragdoll, 1))
-		if IsValid(spine) then
-			local spinePos = spine:GetPos()
-			local spineAng = spine:GetAngles()
-			local woundScore = select(1, getWoundScore(ragdoll, spinePos, spineAng, wound, 1))
-			local arterialScore = select(1, getWoundScore(ragdoll, spinePos, spineAng, arterial, wound_hold_arterial_priority_mul))
-			if arterialScore >= woundScore then
-				return arterial, true
-			end
-		end
+local function syncWoundGrip(ragdoll, side, want, handNum, wound, pos)
+	local grips = ragdoll.hgWoundGrips
+	local grip = grips and grips[side]
+	if grip and (not want or grip.wound ~= wound or grip.handNum ~= handNum) then
+		releaseWoundGrip(ragdoll, side)
+		grip = nil
+	end
+	if not want or not handNum or handNum < 0 then return false end
+
+	local hand = ragdoll:GetPhysicsObjectNum(handNum)
+	if not IsValid(hand) then return false end
+
+	if not grip then
+		local woundNum = woundPhysNum(ragdoll, wound, pos)
+		local woundPhys = woundNum and ragdoll:GetPhysicsObjectNum(woundNum)
+		if not IsValid(woundPhys) or woundNum == handNum then return false end
+
+		grip = {wound = wound, handNum = handNum, woundNum = woundNum}
+		grip.elastic = constraint.Elastic(ragdoll, ragdoll, woundNum, handNum, woundPhys:WorldToLocal(pos), wound_hold_hand_tip, wound_hold_elastic_force, 0, 0, "cable/cable2", 0, false)
+		if IsValid(grip.elastic) then grip.elastic:Fire("SetSpringLength", 0, 0) end
+		ragdoll.hgWoundGrips = grips or {}
+		ragdoll.hgWoundGrips[side] = grip
 	end
 
-	return arterial and arterial or wound, arterial ~= nil
+	if IsValid(grip.weld) then return true end
+	if hand:GetPos():DistToSqr(pos) > wound_hold_weld_dist * wound_hold_weld_dist then return false end
+
+	grip.weld = constraint.Weld(ragdoll, ragdoll, grip.woundNum, handNum, 0, false)
+	if not IsValid(grip.weld) then return false end
+	if IsValid(grip.elastic) then grip.elastic:Remove() end
+
+	return true
+end
+
+hook.Add("Fake Up", "HG_WoundGrip", function(ply, ragdoll)
+	if not IsValid(ragdoll) then return end
+	releaseWoundGrip(ragdoll, "l")
+	releaseWoundGrip(ragdoll, "r")
+end)
+
+local function woundOnArm(ragdoll, wound, pos, armPhys)
+	local woundNum = woundPhysNum(ragdoll, wound, pos)
+	for _, physNum in ipairs(armPhys) do
+		if physNum == woundNum then return true end
+	end
+
+	return false
 end
 
 hg.cachedmodels = hg.cachedmodels or {}
@@ -1040,9 +1095,20 @@ hook.Add("Think", "Fake", function()
 			end
 		end
 
+		local holdWoundPos = wantsManualHold and getHoldWoundPos(ragdoll, holdWound) or nil
+		local fixedPhys = controlCache.fixedPhys
+		if holdWoundPos and manualUseLeft and woundOnArm(ragdoll, holdWound, holdWoundPos, {fixedPhys[3], fixedPhys[4], fixedPhys[5]}) then
+			manualUseLeft = false
+		end
+		if holdWoundPos and manualUseRight and woundOnArm(ragdoll, holdWound, holdWoundPos, {fixedPhys[2], fixedPhys[6], fixedPhys[7]}) then
+			manualUseRight = false
+		end
+
 		local manualHoldHands = (manualUseLeft and 1 or 0) + (manualUseRight and 1 or 0)
 		local manualHoldWound = wantsManualHold and manualHoldHands > 0
 		setManualWoundHold(ply, org, manualHoldWound, holdWound, manualHoldHands, manualUseRight, holdWoundArterial)
+		local gripLeft = syncWoundGrip(ragdoll, "l", manualHoldWound and manualUseLeft and holdWoundPos, fixedPhys[5], holdWound, holdWoundPos)
+		local gripRight = syncWoundGrip(ragdoll, "r", manualHoldWound and manualUseRight and holdWoundPos, fixedPhys[7], holdWound, holdWoundPos)
 
 		if org.alive and IsValid(spine) and ragdoll.otrubCollapseStart and (CurTime() - ragdoll.otrubCollapseStart) < 1.5 then
 			inmove = true
@@ -1088,12 +1154,12 @@ hook.Add("Think", "Fake", function()
 			if manualHoldWound then
 				local wPos = getHoldWoundPos(ragdoll, holdWound)
 				if wPos then
-					if manualUseLeft then
+					if manualUseLeft and not gripLeft then
 						shadowControl(ragdoll, 3, otrub_ss, nil, nil, nil, getHoldTarget(wPos, lupper, wound_hold_upperarm_offset), wound_hold_arm_speed * strength, wound_hold_arm_damp * strength)
 						shadowControl(ragdoll, 4, otrub_ss, nil, nil, nil, getHoldTarget(wPos, lforearm, wound_hold_forearm_offset), wound_hold_reach_speed * strength, wound_hold_reach_damp * strength)
 						shadowControl(ragdoll, 5, otrub_ss, nil, nil, nil, getHoldTarget(wPos, lhand, wound_hold_hand_offset), wound_hold_reach_speed * strength, wound_hold_reach_damp * strength)
 					end
-					if manualUseRight then
+					if manualUseRight and not gripRight then
 						shadowControl(ragdoll, 2, otrub_ss, nil, nil, nil, getHoldTarget(wPos, rupper, wound_hold_upperarm_offset), wound_hold_arm_speed * strength, wound_hold_arm_damp * strength)
 						shadowControl(ragdoll, 6, otrub_ss, nil, nil, nil, getHoldTarget(wPos, rforearm, wound_hold_forearm_offset), wound_hold_reach_speed * strength, wound_hold_reach_damp * strength)
 						shadowControl(ragdoll, 7, otrub_ss, nil, nil, nil, getHoldTarget(wPos, rhand, wound_hold_hand_offset), wound_hold_reach_speed * strength, wound_hold_reach_damp * strength)
@@ -1165,12 +1231,12 @@ hook.Add("Think", "Fake", function()
 			if tracehuy.Hit then
 				local pos = getHoldWoundPos(ragdoll, holdWound)
 				if pos then
-					if manualUseLeft then
+					if manualUseLeft and not gripLeft then
 						shadowControl(ragdoll, 3, 0.03, nil, nil, nil, getHoldTarget(pos, lupper, wound_hold_upperarm_offset), wound_hold_arm_speed, wound_hold_arm_damp)
 						shadowControl(ragdoll, 4, 0.03, nil, nil, nil, getHoldTarget(pos, lforearm, wound_hold_forearm_offset), wound_hold_reach_speed, wound_hold_reach_damp)
 						shadowControl(ragdoll, 5, 0.03, nil, nil, nil, getHoldTarget(pos, lhand, wound_hold_hand_offset), wound_hold_reach_speed, wound_hold_reach_damp)
 					end
-					if manualUseRight then
+					if manualUseRight and not gripRight then
 						shadowControl(ragdoll, 2, 0.03, nil, nil, nil, getHoldTarget(pos, rupper, wound_hold_upperarm_offset), wound_hold_arm_speed, wound_hold_arm_damp)
 						shadowControl(ragdoll, 6, 0.03, nil, nil, nil, getHoldTarget(pos, rforearm, wound_hold_forearm_offset), wound_hold_reach_speed, wound_hold_reach_damp)
 						shadowControl(ragdoll, 7, 0.03, nil, nil, nil, getHoldTarget(pos, rhand, wound_hold_hand_offset), wound_hold_reach_speed, wound_hold_reach_damp)
