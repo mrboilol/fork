@@ -161,10 +161,6 @@ local poolTrace = {mask = MASK_SOLID_BRUSHONLY}
 local poolStartVolume = 10
 local poolMaxSize = 24
 
-local function stainSpreadRadius(stain)
-	return stain.size * (useOldBlood() and 0.5 or 2) + 2
-end
-
 local function findGroundBlood(pos, normal, ignored)
 	local stains = hg.groundbloodstains
 	local nearest, nearestDistance
@@ -180,7 +176,6 @@ local function findGroundBlood(pos, normal, ignored)
 	return nearest
 end
 
-local flowGroundBlood
 local function depositGroundBlood(pos, normal, artery, tiny, amount, ignored)
 	local stain = findGroundBlood(pos, normal, ignored)
 	amount = amount or (tiny and 0.2 or artery and 2.5 or 1)
@@ -190,10 +185,6 @@ local function depositGroundBlood(pos, normal, artery, tiny, amount, ignored)
 		if artery and not stain.artery then
 			stain.artery = true
 			stain.material = arterialGroundBloodMaterial
-		end
-		if stain.size >= poolMaxSize then
-			flowGroundBlood(stain, pos, amount, artery, tiny)
-			return stain
 		end
 		stain.volume = (stain.volume or 1) + amount
 		stain.size = math.min(math.max(stain.size, size) + amount * (stain.volume >= poolStartVolume and 0.85 or 0.25), poolMaxSize)
@@ -280,39 +271,6 @@ function hg.DepositBodyBloodRunoff(pos)
 	end
 end
 
-flowGroundBlood = function(stain, impactPos, amount, artery, tiny)
-	local direction = impactPos - stain.pos
-	direction = direction - stain.normal * direction:Dot(stain.normal)
-	if direction:LengthSqr() < 1 then direction = Angle(0, math_random(0, 359), 0):Forward() end
-	direction:Normalize()
-	local distance = stainSpreadRadius(stain)
-	for attempt = 1, 8 do
-		local candidate = direction:Angle()
-		candidate:RotateAroundAxis(stain.normal, (attempt - 1) * 137.5)
-		local target = stain.pos + candidate:Forward() * distance
-		poolTrace.start = target + vector_up * 8
-		poolTrace.endpos = target - vector_up * 32
-		local hit = util_TraceLine(poolTrace)
-		if hit.HitWorld and hit.HitNormal.z >= 0.55 then
-			local covered = false
-			for _, other in ipairs(hg.groundbloodstains) do
-				local otherRadius = stainSpreadRadius(other)
-				if other ~= stain and other.normal:Dot(hit.HitNormal) >= 0.75
-					and other.pos:DistToSqr(hit.HitPos) < otherRadius * otherRadius then
-					covered = true
-					break
-				end
-			end
-			if not covered then
-				if not findGroundBlood(hit.HitPos, hit.HitNormal, stain) then
-					depositGroundBlood(hit.HitPos, hit.HitNormal, artery, tiny, amount, stain)
-					return
-				end
-			end
-		end
-	end
-end
-
 hook.Add("Think", "hg_persistent_ground_blood", function()
 	local stains = hg.groundbloodstains
 	local limit = math.max(hg_blood_ground_limit:GetInt(), 1)
@@ -361,7 +319,7 @@ local newBloodDecalMaterials = {}
 local function getBloodDecalScale(amount, pos, normal)
 	local stain = pos and normal and findGroundBlood(pos, normal)
 	local pooling = stain and math.Clamp((stain.volume or 1) / poolStartVolume, 0, 1) or 0
-	return math.Clamp((0.2 + math.sqrt(amount or 0.2) * 0.35) * (1 + pooling * 0.5) * math.Rand(0.85, 1.15), 0.12, 1.25)
+	return math.Clamp((0.2 + math.sqrt(amount or 0.2) * 0.35) * (1 + pooling * 1.5) * math.Rand(0.85, 1.15), 0.12, 3)
 end
 
 local function placeNewBloodDecal(pos, normal, target, artery, amount)

@@ -102,6 +102,20 @@ local fixbones = {
 	//["ValveBiped.Bip01_L_Hand"] = true,
 }
 
+local ragdollCollideQueue = {}
+
+hook.Add("Think", "hg-ragdoll-collide-queue", function()
+	if #ragdollCollideQueue == 0 then return end
+	local queue = ragdollCollideQueue
+	ragdollCollideQueue = {}
+	for i = 1, #queue do
+		local ragdoll, data = queue[i][1], queue[i][2]
+		if IsValid(ragdoll) and IsValid(data.PhysObject) and IsValid(data.HitObject) then
+			hook_Run("Ragdoll Collide", ragdoll, data)
+		end
+	end
+end)
+
 local function Ragdoll_CreateInternal(ply)
 	local Data = duplicator.CopyEntTable( ply )
 	local ragdoll = ents.Create("prop_ragdoll")
@@ -176,7 +190,9 @@ local function Ragdoll_CreateInternal(ply)
 			ragdoll.bull:Remove()
 		end
 	end)
-	ragdoll:AddCallback("PhysicsCollide", function(outEnt, data) hook_Run("Ragdoll Collide", ragdoll, data) end)
+	ragdoll:AddCallback("PhysicsCollide", function(outEnt, data)
+		ragdollCollideQueue[#ragdollCollideQueue + 1] = {ragdoll, data}
+	end)
 	local velocity = ply.hgAirborneImpact and ply.hgAirborneImpact.velocity or ply:GetVelocity()
 	--local phys = ragdoll:GetPhysicsObject()
 	--if IsValid(phys) then --phys:SetMass(20)
@@ -204,6 +220,21 @@ local function Ragdoll_CreateInternal(ply)
 		veh.rags = veh.rags or {}
 		table.insert(veh.rags, ragdoll)
 		ragdoll.hgRagdollVehicle = veh
+	end
+
+	local seatFrame, seatPivot, seatCorrection
+	if ply:InVehicle() then
+		local seatParent = ply:GetVehicle():GetParent()
+		local hipL, hipR, pelvis = ply:LookupBone("ValveBiped.Bip01_L_Thigh"), ply:LookupBone("ValveBiped.Bip01_R_Thigh"), ply:LookupBone("ValveBiped.Bip01_Pelvis")
+		local hipLMatrix, hipRMatrix = hipL and ply:GetBoneMatrix(hipL), hipR and ply:GetBoneMatrix(hipR)
+		if IsValid(seatParent) and seatParent.IsGlideVehicle and hipLMatrix and hipRMatrix then
+			local right = seatParent:WorldToLocal(hipRMatrix:GetTranslation()) - seatParent:WorldToLocal(hipLMatrix:GetTranslation())
+			local pelvisMatrix = pelvis and ply:GetBoneMatrix(pelvis)
+			seatFrame = seatParent
+			seatPivot = seatParent:WorldToLocal(pelvisMatrix and pelvisMatrix:GetTranslation() or hipLMatrix:GetTranslation())
+			seatCorrection = Angle(0, -math.deg(math.atan2(right.x, -right.y)), 0)
+			print("[seatdbg] hipRight local", right, "correction yaw", seatCorrection.y, "plyYawRelVeh", seatParent:WorldToLocalAngles(ply:GetAngles()).y)
+		end
 	end
 
 	local pendingReactionForce = vecZero
@@ -336,6 +367,13 @@ local function Ragdoll_CreateInternal(ply)
 		if ragdoll:GetBoneName(bone) == "ValveBiped.Bip01_Head1" then
 			local _,ang = LocalToWorld(vecZero,Angle(-80,0,90),vecZero,ply:EyeAngles())
 			phys:SetAngles(ang)
+		end
+		if seatCorrection then
+			local localPos = seatFrame:WorldToLocal(phys:GetPos()) - seatPivot
+			localPos:Rotate(seatCorrection)
+			local _, localAng = LocalToWorld(vecZero, seatFrame:WorldToLocalAngles(phys:GetAngles()), vecZero, seatCorrection)
+			phys:SetPos(seatFrame:LocalToWorld(localPos + seatPivot))
+			phys:SetAngles(seatFrame:LocalToWorldAngles(localAng))
 		end
 		--print(bone)
 		--[[if !string.find(ragdoll:GetBoneName(bone),"L") then
@@ -1001,7 +1039,7 @@ function fakeBoneFlop.ApplyBone(rag, bone, org)
 	local cons = constraint.AdvBallsocket(
 		rag, rag, physIDChild, physIDParent,
 		phys:WorldToLocal(pos), physParent:WorldToLocal(pos),
-		0, 0, -100, -100, -120, 10, 10, 10,
+		0, 0, -100, -100, -120, 100, 100, 120,
 		0, 0, 0, 0, 1
 	)
 	if not IsValid(cons) then return end

@@ -254,7 +254,7 @@ local function getBloodPerfusion(blood)
 	return hg.organism.GetBloodDeliveryFraction(blood, 1)
 end
 
-local function getRateOutput(heartbeat)
+local function getRateOutput(heartbeat, bloodReserve)
 	local rate = math.Clamp(tonumber(heartbeat) or 0, 0, terminalHeartRate)
 	-- Cardiac output is fundamentally rate x stroke volume. Bradycardia can gain
 	-- some stroke volume from extra filling time, but that compensation is capped;
@@ -263,7 +263,7 @@ local function getRateOutput(heartbeat)
 	local normalizedRate = rate / 70
 	local slowRateDepth = math.Clamp((70 - rate) / 55, 0, 1)
 	local fillingCompensation = Lerp(slowRateDepth, 1, 1.25)
-	local fastFillingLoss = 1 - math.Clamp((rate - 150) / 150, 0, 0.82)
+	local fastFillingLoss = 1 - math.Clamp((rate - 150) / 150, 0, 0.82) * (1 - Clamp(tonumber(bloodReserve) or 1, 0, 1))
 	return math.Clamp(normalizedRate * fillingCompensation * fastFillingLoss, 0, 1.35)
 end
 
@@ -315,7 +315,7 @@ local function getPalpablePulseTarget(org, heartbeat, circulation, hemorrhageCom
 	-- electrical beat is effectively ejecting instead of multiplying those causes
 	-- into the pulse a second time.
 	local rateFactor = math.max(rate / 70, 0.1)
-	local effectiveStrokeVolume = math.Clamp(circulation / rateFactor, 0, 1)
+	local effectiveStrokeVolume = math.Clamp(circulation / math.min(rateFactor, 1.35), 0, 1)
 
 	-- Arrhythmias/palpitations produce a pulse deficit: some electrical complexes
 	-- do not create enough mechanical ejection to be palpable. This is specifically
@@ -1009,7 +1009,7 @@ module[2] = function(owner, org, timeValue)
 	local rhythmInstability = arrhythmia
 	if org.unstableRhythm then rhythmInstability = math.max(rhythmInstability, 0.35) end
 	if org.fibrillation then rhythmInstability = 1 end
-	local rateOutput = getRateOutput(org.heartstop and 0 or (org.heartbeat or 70))
+	local rateOutput = getRateOutput(org.heartstop and 0 or (org.heartbeat or 70), preloadReserve)
 	local circulationBase = bloodVolume * heart * compensationPulseMultiplier * rateOutput * vascularTone * accelerationPressureMul * dehydrationPressureMul * tamponadePreload * internalBleedPressureMul * Clamp(Remap(org.temperature, 28, 36.7, 0.55, 1), 0.45, 1.1)
 	local rhythm = org.ecgState
 	local rhythmMul = org.fibrillation and 0.18 or Clamp(1 - rhythmInstability * 0.42, 0.32, 1)
@@ -1070,7 +1070,7 @@ module[2] = function(owner, org, timeValue)
 	org.bloodPressure = Approach(pressureNow, pressureTarget, timeValue * (pressureTarget > pressureNow and 12 or pressureFallRate))
 	local pressurePulseReserve = Clamp(org.bloodPressure / 90, 0, 1)
 	local sympatheticSupport = Clamp(math.max(activeCatecholamine - 1.5, 0) / 1.5 + (org.hypertension or 0) * 0.6 + sympatheticCompensation * 0.55, 0, 1)
-	local pressurePulseCap = math.min(70 * pressurePulseReserve + 130 * sympatheticSupport, org.heartbeat or 0)
+	local pressurePulseCap = math.min(70 * pressurePulseReserve + 130 * sympatheticSupport + 300 * Clamp((org.bloodPressure - 80) / 10, 0, 1), org.heartbeat or 0)
 	if not org.heartstop then
 		palpablePulseTarget = math.min(palpablePulseTarget, pressurePulseCap)
 		org.pulse = Approach(org.pulse, palpablePulseTarget, timeValue * 8)
