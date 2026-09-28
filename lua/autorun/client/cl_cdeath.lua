@@ -34,13 +34,26 @@ local DEATH_MESSAGES = {
 }
 
 local SILENT_DEATH_MESSAGES = {
-    "You died.",
+    "gg ez",
     "You are dead.",
-    "Your heart stopped.",
+    "lmao",
     "It's over.",
     "You didn't make it.",
     "Everything went quiet.",
     "You never woke up.",
+    "it's wraps",
+    "The end.",
+    "This is how you died.",
+    "That's all folks!",
+    "nice one",
+    "You died.",
+    "how did you die",
+    "you suck ngl",
+    "End of the line.",
+    "All begginings come to an end.",
+    "It's just a part of life.",
+    "have you tried turning it off",
+    "Sometimes it does not go your way.",
     "Your story ends here.",
 }
 
@@ -178,6 +191,7 @@ CDeath.nextSoundfade       = 0
 CDeath.nextRagdollSearch   = 0
 CDeath.disabledUnblocked   = false
 CDeath.silent              = false
+CDeath.silentUnmuted       = false
 CDeath.silentMessage       = SILENT_DEATH_MESSAGES[1]
 CDeath.incapTimerDeath     = false
 
@@ -534,6 +548,8 @@ local function CinematicDeathTracker()
         CDeath.deathMessage     = DEATH_MESSAGES[math.random(#DEATH_MESSAGES)]
         CDeath.deathColor       = DEATH_COLORS[math.random(#DEATH_COLORS)]
         CDeath.silent           = SilentDeathEnabled()
+        CDeath.silentUnmuted    = false
+        if CDeath.silent then ply:ConCommand("soundfade 100 99999") end
         CDeath.silentMessage    = SILENT_DEATH_MESSAGES[math.random(#SILENT_DEATH_MESSAGES)]
         MakeRagdollHeadVisible(CDeath.ragdollEnt)
 
@@ -591,7 +607,7 @@ end
         if (CurTime() - CDeath.deathTime) >= STAGE_1_DURATION then
             CDeath.stage2Started = true
             CDeath.stage2Time    = CurTime()
-			if not RealishDeathEffect() then
+			if not RealishDeathEffect() and not CDeath.silent then
 				LocalPlayer():SetDSP(17)
 				LocalPlayer():ConCommand("soundfade 100 99999")
 			end
@@ -603,13 +619,25 @@ end
         ply:SetViewPunchAngles(Angle(0,0,0))
         ply:ScreenFade(SCREENFADE.IN, Color(0,0,0,0), 0.1, 0)
 
-		if CDeath.stage2Started and not CDeath.inSpectator then
+		if CDeath.stage2Started and not CDeath.inSpectator and not CDeath.silent then
 			ply:SetDSP(17)
 			-- keep re-applying the sound muting so it can't be bypassed
 			if CurTime() >= CDeath.nextSoundfade then
 				CDeath.nextSoundfade = CurTime() + 0.5
                 ply:ConCommand("soundfade 100 99999")
             end
+        end
+    end
+
+    if CDeath.isDead and CDeath.silent and not CDeath.compatActive and not CDeath.silentUnmuted then
+        if CurTime() - CDeath.deathTime < SILENT_BLACK_DURATION then
+            if CurTime() >= CDeath.nextSoundfade then
+                CDeath.nextSoundfade = CurTime() + 0.5
+                ply:ConCommand("soundfade 100 99999")
+            end
+        else
+            CDeath.silentUnmuted = true
+            ply:ConCommand("soundfade 0 " .. SILENT_FADE_OUT_DURATION)
         end
     end
 
@@ -774,7 +802,10 @@ hook.Add("HG_CalcView", "CinematicDeathHGOverride", CinematicDeathHGCalcView)
 
 local function CinematicDeathMute()
 	local ply = LocalPlayer()
-	if IsValid(ply) and not ply:Alive() and CDeath.isDead and CDeath.stage2Started and not CDeath.inSpectator and not CDeath.compatActive and not RealishDeathEffect() then
+	if not IsValid(ply) or ply:Alive() or not CDeath.isDead or CDeath.inSpectator or CDeath.compatActive then return end
+	if CDeath.silent then
+		if not CDeath.silentUnmuted then return false end
+	elseif CDeath.stage2Started and not RealishDeathEffect() then
 		return false
 	end
 end

@@ -1034,7 +1034,7 @@ module[2] = function(owner, org, timeValue)
 	local tissuePerfusionTarget = rawTissuePerfusion
 	local currentTissuePerfusion = math.Clamp(tonumber(org.circulatoryO2Reserve) or 1, 0, 1)
 	local transitionTime = tissuePerfusionTarget < currentTissuePerfusion
-		and Lerp(1 - tissuePerfusionTarget, 14, 8)
+		and 1
 		or 5
 	local tissuePerfusion = currentTissuePerfusion
 		+ (tissuePerfusionTarget - currentTissuePerfusion) * (1 - math.exp(-timeValue / transitionTime))
@@ -1048,9 +1048,7 @@ module[2] = function(owner, org, timeValue)
 	)
 	local deliveryO2Cap = o2.range * deliveryReserve
 	if not org.heartstop and o2[1] > deliveryO2Cap then
-		local deliveryFailure = math.Clamp(1 - deliveryO2Cap / math.max(o2.range, 1), 0, 1)
-		local decayRate = 0.16 + deliveryFailure * 0.45
-		local deliveryResponse = 1 - math.exp(-timeValue * decayRate)
+		local deliveryResponse = 1 - math.exp(-timeValue * 2)
 		o2[1] = o2[1] + (deliveryO2Cap - o2[1]) * deliveryResponse
 	end
 

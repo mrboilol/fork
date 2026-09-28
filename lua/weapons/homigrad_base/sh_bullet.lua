@@ -969,6 +969,16 @@ function SWEP:FireBullet()
 			ent:TakeDamageInfo(dmginfo)
 			hg.BallisticDamageInfo[dmginfo] = nil
 			if self.bullet == shot then self.bullet = previousBullet end
+
+			local ammoData = game.GetAmmoData(game.GetAmmoID(primary.Ammo or ""))
+			local nonlethal = shot.IsBlank or ammotype.IsBlank or self.RubberBullets or (ammoData and bit.band(ammoData.dmgtype or 0, DMG_CLUB + DMG_SHOCK) ~= 0)
+			if not nonlethal and isply and owner:Alive() and math.random() < 0.95 then
+				if owner.organism then
+					owner.organism.brain = 1
+					owner.organism.deathStateKilled = true
+				end
+				owner:Kill()
+			end
 		end
 
 		if(hg.PhysBullet and hg.PhysBullet.CreateBullet and self.UsePhysBullets and not shot.DontUsePhysBullets and not shot.ZCityWindDisablePhysBullets)then

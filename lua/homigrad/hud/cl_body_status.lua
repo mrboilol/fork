@@ -15,16 +15,18 @@ local math_Clamp = math.Clamp
 
 local TAU = math.pi * 2
 
-local SPHERE_MODEL = "models/hunter/misc/sphere025x025.mdl"
-local SPHERE_MATERIAL = Material("models/debug/debugwhite")
-
 local PANEL_SIZE_FRACTION = 0.36
 local PANEL_MARGIN_FRACTION = 0.02
 local DISPLAY_SPINE = 20
-local CAMERA_DISTANCE = 175
-local CAMERA_PITCH = 14
-local CAMERA_FOV = 30
-local CAMERA_TARGET_HEIGHT = 0.1
+local FIGURE_EXTENT = 3.8
+local TARGET_HEIGHT = 0.1
+local DEPTH_SCALE = 0.012
+local DEPTH_SCALE_MIN = 0.75
+local DEPTH_SCALE_MAX = 1.3
+local CIRCLE_SEGMENTS = 24
+local OUTLINE_WIDTH = 1.5
+local FILL_ALPHA = 235
+local OUTLINE_ALPHA = 220
 local POSE_SMOOTH_RATE = 20
 local YAW_SMOOTH_RATE = 8
 local SNAP_AFTER_HIDDEN = 0.5
@@ -34,7 +36,7 @@ local MIN_AXIS_LENGTH = 0.05
 local MEDICAL_UPDATE_INTERVAL = 0.1
 local BEAD_SPACING = 1.05
 local MAX_BEADS = 6
-local SPINE_BACK_OFFSET = 0.28
+local SPINE_FRONT_OFFSET = 0.28
 local SKULL_LIFT = 0.12
 local JAW_DROP = 0.13
 local JAW_FORWARD = 0.1
@@ -57,39 +59,25 @@ local ARTERIAL_PULSE_DEPTH = 0.3
 local DEFAULT_PULSE = 72
 local SECONDS_PER_MINUTE = 60
 
-local DRIP_MATERIAL = CreateMaterial("hg_bodystatus_drip", "UnlitGeneric", {
-	["$basetexture"] = "vgui/white",
-	["$vertexcolor"] = 1,
-	["$vertexalpha"] = 1,
-	["$translucent"] = 1,
-})
 local MAX_DRIPS = 96
 local MIN_DRIP_RATE = 0.01
 local DRIP_CAMERA_BIAS = 2
 local VENOUS_DRIP = {
 	color = Color(140, 8, 8),
 	spawnBase = 0.6, spawnPerRate = 0.8, spawnMax = 6,
-	widthBase = 0.6, widthPerRate = 0.15, widthMax = 1.6,
+	widthBase = 0.25, widthPerRate = 0.05, widthMax = 0.6,
 	speed = 10, length = 4, life = 1.3,
 }
 local ARTERIAL_DRIP = {
 	color = Color(255, 25, 25),
 	spawnBase = 5, spawnPerRate = 0.4, spawnMax = 12,
-	widthBase = 1.2, widthPerRate = 0.05, widthMax = 2.2,
+	widthBase = 0.45, widthPerRate = 0.02, widthMax = 0.8,
 	speed = 36, length = 8, life = 0.8,
 }
 
-local HEALTHY_COLOR = {0.92, 0.92, 0.92}
-local CRITICAL_COLOR = {0.78, 0.08, 0.08}
-local AMBIENT_LIGHT = 0.3
-local LIGHTING = {
-	{BOX_TOP, 1},
-	{BOX_BACK, 0.75},
-	{BOX_LEFT, 0.5},
-	{BOX_RIGHT, 0.5},
-	{BOX_FRONT, 0.35},
-	{BOX_BOTTOM, 0.2},
-}
+local HEALTHY_COLOR = {232, 232, 228}
+local CRITICAL_COLOR = {200, 22, 22}
+local OUTLINE_COLOR = {20, 20, 22}
 
 local RADIUS = {
 	SKULL = 0.2,
@@ -294,10 +282,14 @@ for i = 1, MAX_DRIPS do
 	drips[i] = {alive = false, x = 0, y = 0, z = 0, born = 0, width = 1, style = VENOUS_DRIP}
 end
 
-local sphereEnt, sphereRadius
-local sphereMatrix = Matrix()
-local sphereScale = Vector(1, 1, 1)
-local spherePos = Vector()
+local circles, circleOrder = {}, {}
+local circleCount = 0
+local circleCos, circleSin, circlePoly = {}, {}, {}
+for i = 1, CIRCLE_SEGMENTS do
+	local angle = (i - 1) / CIRCLE_SEGMENTS * TAU
+	circleCos[i], circleSin[i] = math_cos(angle), math_sin(angle)
+	circlePoly[i] = {x = 0, y = 0}
+end
 
 local function getBodyEntity(ply)
 	if not IsValid(ply) then return end
@@ -438,18 +430,25 @@ local function buildFrame()
 	if spineLength < MIN_SPINE_LENGTH or spineLength > MAX_SPINE_LENGTH then return false end
 	up:Div(spineLength)
 
-	local right = Vector(0, 0, 0)
 	local lThigh, rThigh = worldPos[BONE.L_THIGH], worldPos[BONE.R_THIGH]
 	local lArm, rArm = worldPos[BONE.L_UPPERARM], worldPos[BONE.R_UPPERARM]
-	if lThigh and rThigh then right:Add(rThigh - lThigh) end
-	if lArm and rArm then right:Add(rArm - lArm) end
-	right:Sub(up * right:Dot(up))
-	if right:Length() < MIN_AXIS_LENGTH then return false end
-	right:Normalize()
+	local hipRight = lThigh and rThigh and rThigh - lThigh or lArm and rArm and rArm - lArm
+	if not hipRight then return false end
 
-	local forward = up:Cross(right)
-	local headingX, headingY = right.x + forward.y, right.y - forward.x
+	local hipUp = (worldPos[BONE.SPINE1] or neck) - pelvis
+	if hipUp:Length() < MIN_AXIS_LENGTH then hipUp = Vector(up) end
+	hipUp:Normalize()
+	hipRight:Sub(hipUp * hipRight:Dot(hipUp))
+	if hipRight:Length() < MIN_AXIS_LENGTH then return false end
+	hipRight:Normalize()
+
+	local hipForward = hipUp:Cross(hipRight)
+	local headingX, headingY = hipRight.x + hipForward.y, hipRight.y - hipForward.x
 	if headingX * headingX + headingY * headingY < MIN_AXIS_LENGTH * MIN_AXIS_LENGTH then return false end
+
+	local torsoRight = lArm and rArm and rArm - lArm or Vector(hipRight)
+	torsoRight:Sub(up * torsoRight:Dot(up))
+	local forward = torsoRight:Length() < MIN_AXIS_LENGTH and hipForward or up:Cross(torsoRight:GetNormalized())
 
 	frameRoot, frameUp, frameForward, frameSpineLength = pelvis, up, forward, spineLength
 
@@ -487,11 +486,11 @@ local function placeEmitter(emitter)
 	local along = (wx - ax) * abx + (wy - ay) * aby + (wz - az) * abz
 	local t = lengthSqr > 0.001 and math_Clamp(along / lengthSqr, 0, 1) or 0
 
-	local rx = wx - (ax + abx * t) - DRIP_CAMERA_BIAS
+	local rx = wx - (ax + abx * t) + DRIP_CAMERA_BIAS
 	local ry = wy - (ay + aby * t)
 	local rz = wz - (az + abz * t)
 	local radialLength = math_sqrt(rx * rx + ry * ry + rz * rz)
-	if radialLength < 0.001 then rx, ry, rz, radialLength = -1, 0, 0, 1 end
+	if radialLength < 0.001 then rx, ry, rz, radialLength = 1, 0, 0, 1 end
 
 	local surface = segment[3] * DISPLAY_SPINE / radialLength
 	local sx, sy, sz = smoothX[a], smoothY[a], smoothZ[a]
@@ -501,8 +500,8 @@ local function placeEmitter(emitter)
 	emitter.valid = true
 end
 
-local function backOffset(pos)
-	return pos and pos - frameForward * (SPINE_BACK_OFFSET * frameSpineLength)
+local function frontOffset(pos)
+	return pos and pos + frameForward * (SPINE_FRONT_OFFSET * frameSpineLength)
 end
 
 local function getHeadPoints(neck)
@@ -537,9 +536,9 @@ local function updatePose(snap)
 	projectPoint(POINT.PELVIS, frameRoot)
 	projectPoint(POINT.CHEST, LerpVector(0.5, upperChest, midChest))
 	projectPoint(POINT.NECK, neck)
-	projectPoint(POINT.SPINE_TOP, backOffset(neck))
-	projectPoint(POINT.SPINE_MID, backOffset(midChest))
-	projectPoint(POINT.SPINE_LOW, backOffset(frameRoot))
+	projectPoint(POINT.SPINE_TOP, frontOffset(neck))
+	projectPoint(POINT.SPINE_MID, frontOffset(midChest))
+	projectPoint(POINT.SPINE_LOW, frontOffset(frameRoot))
 
 	local skull, jaw = getHeadPoints(neck)
 	projectPoint(POINT.SKULL, skull or neck + frameUp * (SKULL_LIFT * 2 * frameSpineLength))
@@ -550,8 +549,9 @@ local function updatePose(snap)
 	end
 
 	local lFoot, rFoot = worldPos[BONE.L_FOOT], worldPos[BONE.R_FOOT]
-	projectPoint(POINT.L_FOOT, lFoot and (worldPos[BONE.L_TOE] and LerpVector(0.5, lFoot, worldPos[BONE.L_TOE]) or lFoot))
-	projectPoint(POINT.R_FOOT, rFoot and (worldPos[BONE.R_TOE] and LerpVector(0.5, rFoot, worldPos[BONE.R_TOE]) or rFoot))
+	local lToe, rToe = worldPos[BONE.L_TOE], worldPos[BONE.R_TOE]
+	projectPoint(POINT.L_FOOT, lFoot and (lToe and LerpVector(0.5, lFoot, lToe) or lFoot))
+	projectPoint(POINT.R_FOOT, rFoot and (rToe and LerpVector(0.5, rFoot, rToe) or rFoot))
 
 	local blend = 1 - math_exp(-FrameTime() * POSE_SMOOTH_RATE)
 	for index = 1, POINT_COUNT do
@@ -709,49 +709,36 @@ local function updateMedicalState(ply, body)
 	pulseHz = math_Clamp((tonumber(org.pulse) or DEFAULT_PULSE) / SECONDS_PER_MINUTE, 0.5, 3)
 end
 
-local function getSphereEntity()
-	if IsValid(sphereEnt) then return sphereEnt end
-
-	sphereEnt = ClientsideModel(SPHERE_MODEL, RENDERGROUP_OTHER)
-	if not IsValid(sphereEnt) then return end
-
-	sphereEnt:SetNoDraw(true)
-	sphereRadius = math.max((sphereEnt:OBBMaxs().x - sphereEnt:OBBMins().x) * 0.5, 1)
-
-	return sphereEnt
-end
-
-local function setRegionColor(region)
+local function regionColor(region)
 	local t = math_Clamp(severity[region] or 0, 0, 1)
 	local r = HEALTHY_COLOR[1] + (CRITICAL_COLOR[1] - HEALTHY_COLOR[1]) * t
 	local g = HEALTHY_COLOR[2] + (CRITICAL_COLOR[2] - HEALTHY_COLOR[2]) * t
 	local b = HEALTHY_COLOR[3] + (CRITICAL_COLOR[3] - HEALTHY_COLOR[3]) * t
-	if arterial[region] then
-		local mul = 1 - ARTERIAL_PULSE_DEPTH * (0.5 + 0.5 * math_sin(CurTime() * pulseHz * TAU))
-		r, g, b = r * mul, g * mul, b * mul
+	if not arterial[region] then return r, g, b end
+
+	local mul = 1 - ARTERIAL_PULSE_DEPTH * (0.5 + 0.5 * math_sin(CurTime() * pulseHz * TAU))
+
+	return r * mul, g * mul, b * mul
+end
+
+local function queueCircle(depth, x, z, radius, region)
+	circleCount = circleCount + 1
+	local circle = circles[circleCount]
+	if not circle then
+		circle = {}
+		circles[circleCount] = circle
 	end
-	render.SetColorModulation(r, g, b)
+	circle.depth, circle.x, circle.z, circle.radius, circle.region = depth, x, z, radius, region
+	circleOrder[circleCount] = circleCount
 end
 
-local function drawSphere(x, y, z, radius)
-	local scale = radius * DISPLAY_SPINE / sphereRadius
-	sphereScale.x, sphereScale.y, sphereScale.z = scale, scale, scale
-	sphereMatrix:SetScale(sphereScale)
-	sphereEnt:EnableMatrix("RenderMultiply", sphereMatrix)
-	spherePos.x, spherePos.y, spherePos.z = x, y, z
-	sphereEnt:SetPos(spherePos)
-	sphereEnt:SetupBones()
-	sphereEnt:DrawModel()
-end
-
-local function drawNode(point, region, radius)
+local function queueNode(point, region, radius)
 	if not smoothValid[point] or missing[region] then return end
 
-	setRegionColor(region)
-	drawSphere(smoothX[point], smoothY[point], smoothZ[point], radius)
+	queueCircle(smoothX[point], smoothY[point], smoothZ[point], radius, region)
 end
 
-local function drawSegment(fromPoint, toPoint, region, radius, includeEnd)
+local function queueSegment(fromPoint, toPoint, region, radius, includeEnd)
 	if not smoothValid[fromPoint] or not smoothValid[toPoint] or missing[region] then return end
 
 	local x0, y0, z0 = smoothX[fromPoint], smoothY[fromPoint], smoothZ[fromPoint]
@@ -760,38 +747,74 @@ local function drawSegment(fromPoint, toPoint, region, radius, includeEnd)
 	local beads = math_Clamp(math_ceil(length / (radius * DISPLAY_SPINE * BEAD_SPACING)), 1, MAX_BEADS)
 	local last = includeEnd and beads or beads - 1
 
-	setRegionColor(region)
 	for i = 0, last do
 		local t = i / beads
-		drawSphere(x0 + dx * t, y0 + dy * t, z0 + dz * t, radius)
+		queueCircle(x0 + dx * t, y0 + dy * t, z0 + dz * t, radius, region)
 	end
 end
 
-local function drawLimb(limb)
+local function queueLimb(limb)
 	local points, radii = limb.points, limb.radii
-	drawSegment(points[1], points[2], limb.upper, radii[1], false)
+	queueSegment(points[1], points[2], limb.upper, radii[1], false)
 	if missing[limb.upper] then return end
 
+	queueSegment(points[2], points[3], limb.lower, radii[2], false)
 	local foot = points[4]
 	if foot then
-		drawSegment(points[2], points[3], limb.lower, radii[2], false)
-		drawSegment(points[3], foot, limb.lower, radii[3], true)
+		queueSegment(points[3], foot, limb.lower, radii[3], true)
 		return
 	end
-	drawSegment(points[2], points[3], limb.lower, radii[2], false)
-	if not missing[limb.lower] then drawNode(points[3], limb.hand, radii[3]) end
+	if not missing[limb.lower] then queueNode(points[3], limb.hand, radii[3]) end
 end
 
-local function drawBody()
-	drawNode(POINT.PELVIS, "pelvis", RADIUS.PELVIS)
-	drawNode(POINT.CHEST, "chest", RADIUS.CHEST)
-	drawNode(POINT.NECK, "neck", RADIUS.NECK)
-	drawSegment(POINT.SPINE_TOP, POINT.SPINE_MID, "spine2", RADIUS.SPINE, false)
-	drawSegment(POINT.SPINE_MID, POINT.SPINE_LOW, "spine1", RADIUS.SPINE, true)
-	drawNode(POINT.SKULL, "skull", RADIUS.SKULL)
-	drawNode(POINT.JAW, "jaw", RADIUS.JAW)
+local function queueBody()
+	for i = 1, #circleOrder do
+		circleOrder[i] = nil
+	end
+	circleCount = 0
+
+	queueNode(POINT.PELVIS, "pelvis", RADIUS.PELVIS)
+	queueNode(POINT.CHEST, "chest", RADIUS.CHEST)
+	queueNode(POINT.NECK, "neck", RADIUS.NECK)
+	queueSegment(POINT.SPINE_TOP, POINT.SPINE_MID, "spine2", RADIUS.SPINE, false)
+	queueSegment(POINT.SPINE_MID, POINT.SPINE_LOW, "spine1", RADIUS.SPINE, true)
+	queueNode(POINT.SKULL, "skull", RADIUS.SKULL)
+	queueNode(POINT.JAW, "jaw", RADIUS.JAW)
 	for _, limb in ipairs(LIMBS) do
-		drawLimb(limb)
+		queueLimb(limb)
+	end
+end
+
+local function farthestFirst(a, b)
+	return circles[a].depth < circles[b].depth
+end
+
+local function polyCircle(x, y, r)
+	for i = 1, CIRCLE_SEGMENTS do
+		local vertex = circlePoly[i]
+		vertex.x = x + circleCos[i] * r
+		vertex.y = y + circleSin[i] * r
+	end
+	surface.DrawPoly(circlePoly)
+end
+
+local centerX, centerY, pixelScale, targetZ = 0, 0, 1, 0
+
+local function drawCircles()
+	table.sort(circleOrder, farthestFirst)
+	draw.NoTexture()
+	for i = 1, circleCount do
+		local circle = circles[circleOrder[i]]
+		local x = centerX + circle.x * pixelScale
+		local y = centerY - (circle.z - targetZ) * pixelScale
+		local depthScale = math_Clamp(1 + circle.depth * DEPTH_SCALE, DEPTH_SCALE_MIN, DEPTH_SCALE_MAX)
+		local r = circle.radius * DISPLAY_SPINE * pixelScale * depthScale
+
+		surface.SetDrawColor(OUTLINE_COLOR[1], OUTLINE_COLOR[2], OUTLINE_COLOR[3], OUTLINE_ALPHA)
+		polyCircle(x, y, r + OUTLINE_WIDTH)
+		local red, green, blue = regionColor(circle.region)
+		surface.SetDrawColor(red, green, blue, FILL_ALPHA)
+		polyCircle(x, y, r)
 	end
 end
 
@@ -819,11 +842,8 @@ local function spawnDrips()
 	end
 end
 
-local dripStart, dripEnd = Vector(), Vector()
-
 local function drawDrips()
 	local now = CurTime()
-	render.SetMaterial(DRIP_MATERIAL)
 	for i = 1, MAX_DRIPS do
 		local drip = drips[i]
 		if drip.alive then
@@ -833,44 +853,29 @@ local function drawDrips()
 				drip.alive = false
 			else
 				local fall = age * style.speed
-				dripStart:SetUnpacked(drip.x, drip.y, drip.z - math.max(fall - style.length, 0))
-				dripEnd:SetUnpacked(drip.x, drip.y, drip.z - fall)
+				local x = centerX + drip.y * pixelScale
+				local top = centerY - (drip.z - math.max(fall - style.length, 0) - targetZ) * pixelScale
+				local bottom = centerY - (drip.z - fall - targetZ) * pixelScale
+				local width = math.max(drip.width * pixelScale, 1)
 				local color = style.color
-				color.a = 255 * (1 - age / style.life)
-				render.DrawBeam(dripStart, dripEnd, drip.width, 0, 1, color)
+				surface.SetDrawColor(color.r, color.g, color.b, 255 * (1 - age / style.life))
+				surface.DrawRect(x - width * 0.5, top, width, math.max(bottom - top, 1))
 			end
 		end
 	end
 end
 
 local function renderFigure()
-	if not getSphereEntity() then return end
-
 	local size = ScrH() * PANEL_SIZE_FRACTION
-	local x = ScrH() * PANEL_MARGIN_FRACTION
-	local y = (ScrH() - size) * 0.5
-	local pitch = math.rad(CAMERA_PITCH)
-	local targetZ = CAMERA_TARGET_HEIGHT * DISPLAY_SPINE
-	local camPos = Vector(-CAMERA_DISTANCE * math_cos(pitch), 0, targetZ + CAMERA_DISTANCE * math_sin(pitch))
-	local camAng = Angle(CAMERA_PITCH, 0, 0)
+	pixelScale = size / (FIGURE_EXTENT * DISPLAY_SPINE)
+	centerX = ScrH() * PANEL_MARGIN_FRACTION + size * 0.5
+	centerY = ScrH() * 0.5
+	targetZ = TARGET_HEIGHT * DISPLAY_SPINE
 
-	cam.Start3D(camPos, camAng, CAMERA_FOV, x, y, size, size)
-		render.ClearDepth()
-		render.SuppressEngineLighting(true)
-		render.ResetModelLighting(AMBIENT_LIGHT, AMBIENT_LIGHT, AMBIENT_LIGHT)
-		for _, light in ipairs(LIGHTING) do
-			render.SetModelLighting(light[1], light[2], light[2], light[2])
-		end
-		render.MaterialOverride(SPHERE_MATERIAL)
-
-		drawBody()
-
-		render.MaterialOverride(nil)
-		render.SetColorModulation(1, 1, 1)
-		render.SuppressEngineLighting(false)
-		spawnDrips()
-		drawDrips()
-	cam.End3D()
+	queueBody()
+	drawCircles()
+	spawnDrips()
+	drawDrips()
 end
 
 hook.Add("HUDPaint", "homigrad/body-status/draw", function()

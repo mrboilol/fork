@@ -26,6 +26,7 @@ local STUMBLE_STEP_INTERVAL_MUL = 0.65
 local STUMBLE_LUNGE_MUL = 0.18
 local STUMBLE_LUNGE_MAX = 35
 local STUMBLE_FALL_GRACE = 1
+local STUMBLE_INTENT_GRACE = 0.2
 local TOPPLE_PUSH = 110
 local TOPPLE_DOWN = 60
 local TOPPLE_ROLL = 200
@@ -180,10 +181,10 @@ local AR_DEFAULTS = {
 	SearchHeightBuffer = 25,
 	StepHeight = 20,
 	HipTargetHeight = 50,
-	Duration = 1.8,
+	Duration = 3.5,
 	MinDriveSpeed = 130,
 	MaxDriveSpeed = 450,
-	MomentumGain = 90,
+	MomentumGain = 140,
 	DriveAccel = 700,
 	Carry = 0.55,
 	Pitch = 240,
@@ -646,8 +647,9 @@ local function stopStumble(ragdoll, reason)
 	if IKSystem and IKSystem.RemoveEntityChains then IKSystem.RemoveEntityChains(ragdoll) end
 	if not IsValid(st.pelvis) or not IsValid(st.spine) then return end
 
-	if reason == "decay" or reason == "trip" then topple(st) end
-	if reason == "decay" or reason == "trip" or reason == "fell" then triggerCover(ragdoll, REACT_COVER_TIME) end
+	local falls = reason == "decay" or reason == "trip" or reason == "halt" or reason == "getup"
+	if falls then topple(st) end
+	if falls or reason == "fell" then triggerCover(ragdoll, REACT_COVER_TIME) end
 end
 
 local function startStumble(ply, ragdoll)
@@ -1189,12 +1191,20 @@ local function stumbleEndReason(ply, ragdoll, st)
 	if st.tripLeg then return "trip" end
 
 	local now = CurTime()
+	if now - st.startTime > STUMBLE_INTENT_GRACE and not moveControl(ply) then return "halt" end
 	if st.stillSince and now - st.stillSince > STILL_GRACE then return "decay" end
 
 	st.vigor = vigor(ply.organism)
 	if now - st.startTime >= stumbleLifetime(st) then return "decay" end
 	if now - st.startTime >= STUMBLE_FALL_GRACE and not isUpright(ply, ragdoll) then return "fell" end
 end
+
+hook.Add("Should Fake Up", "HG_EuphoriaStumble", function(ply)
+	local ragdoll = ply.FakeRagdoll
+	if not IsValid(ragdoll) or not stumbling[ragdoll] then return end
+	stopStumble(ragdoll, "getup")
+	return false
+end)
 
 local function removeDying(ragdoll)
 	local ds = dying[ragdoll]

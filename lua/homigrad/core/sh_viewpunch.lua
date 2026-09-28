@@ -44,10 +44,10 @@ local IsValid = IsValid
 			local org = lply.organism
 			if org and org.consciousness then
 				consciousness = consciousness * org.consciousness
-				consciousness = consciousness * math_Clamp(org.blood / 4000, 0.5, 1)
-				consciousness = consciousness * math_Clamp(org.o2[1] / 20, 0.5, 1)
+				consciousness = consciousness * math_Clamp((org.blood or 5000) / 4000, 0.5, 1)
+				consciousness = consciousness * math_Clamp((org.o2 and org.o2[1] or 30) / 20, 0.5, 1)
 				--consciousness = consciousness * (org.larmamputated and 0.8 or 1) * (org.rarmamputated and 0.8 or 1)
-				consciousness = consciousness * (1 - org.disorientation / 10)
+				consciousness = consciousness * (1 - (org.disorientation or 0) / 10)
 				//consciousness = consciousness * math.min(1, org.stamina[1] / (org.stamina.max * 0.3))
 			end
 
