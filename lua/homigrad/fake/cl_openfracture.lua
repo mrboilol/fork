@@ -77,16 +77,39 @@ local function getFractureBody(ent)
 	return ent
 end
 
-local function getFractureTransform(ent, bone, fx)
+local rendered = {}
+
+local function getFractureTransform(ent, bone, fx, matrix)
 	local boneID = ent:LookupBone(bone)
-	local matrix = boneID and ent:GetBoneMatrix(boneID)
-	if not matrix then return end
+	if not boneID or ent:GetManipulateBoneScale(boneID):LengthSqr() < 0.1 then return end
+	matrix = matrix or ent:GetBoneMatrix(boneID)
+	if not matrix or not isvector(fx[1]) or not isangle(fx[2]) then return end
 
-	local pos, ang = hg.organism.GetWoundTransform(ent, {0, fx[1], fx[2], bone})
-	if not pos then return end
+	local offset, normal = hg.organism.ClampWoundOffset(ent, boneID, fx[1], fx[2]:Forward())
+	local localAng = normal and normal:Angle() or fx[2]
+	local bonePos, boneAng = matrix:GetTranslation(), matrix:GetAngles()
+	local pos, ang = LocalToWorld(offset, localAng, bonePos, boneAng)
 
-	return pos, ang:Forward(), matrix:GetAngles():Forward()
+	return pos, ang:Forward(), boneAng:Forward()
 end
+
+hook.Add("PostDrawAppearance", "hg_openfractures", function(ent)
+	if not IsValid(ent) then return end
+	local fractures = tracked[ent:EntIndex()]
+	if not fractures then return end
+
+	local frame = FrameNumber()
+	local entry = rendered[ent]
+	if not entry then
+		entry = {}
+		rendered[ent] = entry
+	end
+	entry.frame = frame
+	for bone in pairs(fractures) do
+		local boneID = ent:LookupBone(bone)
+		entry[bone] = boneID and ent:GetBoneMatrix(boneID) or nil
+	end
+end)
 
 local function fractureBurst(ent, bone, fx)
 	if not hg.addBloodPart then return end
@@ -127,25 +150,30 @@ end)
 hook.Add("EntityRemoved", "hg_openfractures", function(ent, fullUpdate)
 	if fullUpdate then return end
 	tracked[ent:EntIndex()] = nil
+	rendered[ent] = nil
 end)
 
 hook.Add("PostDrawOpaqueRenderables", "hg_openfractures", function(depth, skybox)
 	if depth or skybox or not next(tracked) then return end
 
 	local eyePos = EyePos()
+	local frame = FrameNumber()
 	local mdl
 
 	for index, fractures in pairs(tracked) do
 		local ent = getFractureBody(Entity(index))
 		if not ent or ent:GetPos():DistToSqr(eyePos) > drawDistSqr then continue end
+		local entry = rendered[ent]
+		if not entry or entry.frame ~= frame then continue end
 
 		mdl = mdl or getShard()
 		if not mdl then return end
 
-		ent:SetupBones()
 		render.SetColorModulation(1, 0.8, 0.76)
 		for bone, fx in pairs(fractures) do
-			local pos, normal, along = getFractureTransform(ent, bone, fx)
+			local matrix = entry[bone]
+			if not matrix then continue end
+			local pos, normal, along = getFractureTransform(ent, bone, fx, matrix)
 			if not pos then continue end
 
 			local length = shardLengths[bone] or 6

@@ -29,6 +29,9 @@ local ZB_FORCED_MODE_POOL = {
 	["criresp"] = true,
 	["gwars"] = true
 }
+local ZB_MENU_ONLY_MODES = {
+	["builder"] = true
+}
 local ZB_NO_BACK_TO_BACK_MODES = {
 	["dm"] = true,
 	["tdm"] = true,
@@ -602,7 +605,7 @@ function zb.GetModesInfo()
 	local modesInfo = {}
 
 	for name, mode in pairs(zb.modes) do
-		if ZB_FORCE_LIMITED_MODE_POOL and !ZB_FORCED_MODE_POOL[name] then continue end
+		if ZB_FORCE_LIMITED_MODE_POOL and !ZB_FORCED_MODE_POOL[name] and !ZB_MENU_ONLY_MODES[name] then continue end
 		if name == "hmcd" then
 			table.insert(modesInfo, {
 				key = name,
@@ -641,7 +644,7 @@ function zb.GetModesInfo()
 				name = mode.PrintName or mode.name or name,
 				description = mode.Description or "",
 				forBigMaps = mode.ForBigMaps or false,
-				canlaunch = (mode:CanLaunch() and 1 or 0)
+				canlaunch = ((ZB_MENU_ONLY_MODES[name] or mode:CanLaunch()) and 1 or 0)
 			})
 		end
 	end

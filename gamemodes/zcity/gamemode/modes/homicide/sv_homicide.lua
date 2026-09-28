@@ -1128,18 +1128,14 @@ function MODE:CheckAlivePlayers()
 	}
 	
 	for _, ply in player.Iterator() do
-		if(not ply:Alive())then
-			continue
-		end
-		
-		if(ply.organism and ply.organism.incapacitated)then
-			continue
-		end
-		
-		if ply.isTraitor and not ply:GetNetVar("handcuffed",false) then
-			--print(ply)
-			AlivePlyTbl[1][#AlivePlyTbl[1] + 1] = ply
-		elseif(not ply.isPolice)then
+		if not ply:Alive() or ply:Team() == TEAM_SPECTATOR or ply:Team() == TEAM_UNASSIGNED then continue end
+		if ply.organism and (ply.organism.alive == false or ply.organism.incapacitated) then continue end
+
+		if ply.isTraitor then
+			if not ply:GetNetVar("handcuffed", false) then
+				AlivePlyTbl[1][#AlivePlyTbl[1] + 1] = ply
+			end
+		elseif not ply.isPolice then
 			AlivePlyTbl[0][#AlivePlyTbl[0] + 1] = ply
 		end
 	end

@@ -61,14 +61,16 @@ local WOUND_MARK = {
 local REFERENCE_SCREEN_HEIGHT = 1080
 
 local HEALTH_STOPS = {
-	{0, 240, 240, 236},
-	{0.5, 235, 205, 50},
+	{0, 235, 205, 50},
 	{1, 215, 25, 25},
 }
 local COLOR = {
-	ARMOR_FILL = {60, 60, 60, 40},
-	ARMOR_LINE = {70, 70, 74, 210},
-	RING_HEALTHY = {240, 240, 236},
+	ARMOR_GOOD = {40, 200, 70},
+	ARMOR_DAMAGED = {235, 205, 50},
+	ARMOR_RUINED = {215, 25, 25},
+	ARMOR_FILL_ALPHA = 30,
+	ARMOR_LINE_ALPHA = 220,
+	RING_HEALTHY = {255, 255, 255},
 	RING_BLEEDING = {215, 25, 25},
 	TOURNIQUET_RING = {70, 130, 235},
 	TOURNIQUET_STRAP = {35, 60, 150},
@@ -974,18 +976,43 @@ local function farthestFirst(a, b)
 	return circles[a].depth < circles[b].depth
 end
 
-local function polyCapsule(ax, ay, bx, by, r)
+local function capsuleVertices(ax, ay, bx, by, r, out)
 	local angle = math_atan2(by - ay, bx - ax)
 	local startB = angle - math.pi * 0.5
 	local startA = angle + math.pi * 0.5
 	local offset = HALF_SEGMENTS + 1
 	for i = 0, HALF_SEGMENTS do
 		local step = i / HALF_SEGMENTS * math.pi
-		local vertexB, vertexA = capsulePoly[i + 1], capsulePoly[offset + i + 1]
+		local vertexB, vertexA = out[i + 1], out[offset + i + 1]
 		vertexB.x, vertexB.y = bx + math_cos(startB + step) * r, by + math_sin(startB + step) * r
 		vertexA.x, vertexA.y = ax + math_cos(startA + step) * r, ay + math_sin(startA + step) * r
 	end
+end
+
+local function polyCapsule(ax, ay, bx, by, r)
+	capsuleVertices(ax, ay, bx, by, r, capsulePoly)
 	surface.DrawPoly(capsulePoly)
+end
+
+local ringInner = {}
+for i = 1, (HALF_SEGMENTS + 1) * 2 do
+	ringInner[i] = {x = 0, y = 0}
+end
+local ringQuad = {{x = 0, y = 0}, {x = 0, y = 0}, {x = 0, y = 0}, {x = 0, y = 0}}
+
+local function polyCapsuleRing(ax, ay, bx, by, outer, inner)
+	capsuleVertices(ax, ay, bx, by, outer, capsulePoly)
+	capsuleVertices(ax, ay, bx, by, inner, ringInner)
+	local count = #capsulePoly
+	for i = 1, count do
+		local j = i % count + 1
+		local o1, o2, i1, i2 = capsulePoly[i], capsulePoly[j], ringInner[i], ringInner[j]
+		ringQuad[1].x, ringQuad[1].y = o1.x, o1.y
+		ringQuad[2].x, ringQuad[2].y = o2.x, o2.y
+		ringQuad[3].x, ringQuad[3].y = i2.x, i2.y
+		ringQuad[4].x, ringQuad[4].y = i1.x, i1.y
+		surface.DrawPoly(ringQuad)
+	end
 end
 
 local function polyHalfCircle(x, y, r, startAngle)
@@ -1026,12 +1053,15 @@ local function drawSplit(shape, x, y, r)
 	local towardX = centerX + shape.sx * pixelScale - x
 	local towardY = centerY - (shape.sz - targetZ) * pixelScale - y
 	local angle = math_atan2(towardY, towardX)
-	local red, green, blue = healthColor(shape.splitRegion)
-	surface.SetDrawColor(red, green, blue, FILL_ALPHA)
-	polyHalfCircle(x, y, r, angle - math.pi * 0.5)
+	if (severity[shape.splitRegion] or 0) > 0 then
+		local red, green, blue = healthColor(shape.splitRegion)
+		surface.SetDrawColor(red, green, blue, FILL_ALPHA)
+		polyHalfCircle(x, y, r, angle - math.pi * 0.5)
+	end
 
 	local lineX, lineY = math_cos(angle + math.pi * 0.5) * r, math_sin(angle + math.pi * 0.5) * r
-	surface.SetDrawColor(COLOR.OUTLINE[1], COLOR.OUTLINE[2], COLOR.OUTLINE[3], OUTLINE_ALPHA)
+	local red, green, blue = ringColor(shape.region)
+	surface.SetDrawColor(red, green, blue, OUTLINE_ALPHA)
 	surface.DrawLine(x - lineX, y - lineY, x + lineX, y + lineY)
 end
 
@@ -1064,17 +1094,17 @@ local function drawShape(shape)
 		ax, ay, bx, by = ax + jx, ay + jy, bx + jx, by + jy
 	end
 
-	surface.SetDrawColor(COLOR.OUTLINE[1], COLOR.OUTLINE[2], COLOR.OUTLINE[3], OUTLINE_ALPHA)
-	polyCapsule(ax, ay, bx, by, r + SHAPE.BORDER_WIDTH)
-	local red, green, blue = ringColor(shape.region)
-	surface.SetDrawColor(red, green, blue, FILL_ALPHA)
-	polyCapsule(ax, ay, bx, by, r)
-
 	local inner = math.max(r - math.max(r * SHAPE.RING_FRACTION, SHAPE.MIN_RING_WIDTH), 1)
-	red, green, blue = healthColor(shape.region)
-	surface.SetDrawColor(red, green, blue, FILL_ALPHA)
-	polyCapsule(ax, ay, bx, by, inner)
+	if (severity[shape.region] or 0) > 0 then
+		local red, green, blue = healthColor(shape.region)
+		surface.SetDrawColor(red, green, blue, FILL_ALPHA)
+		polyCapsule(ax, ay, bx, by, inner)
+	end
 	if shape.splitRegion then drawSplit(shape, ax, ay, inner) end
+
+	local red, green, blue = ringColor(shape.region)
+	surface.SetDrawColor(red, green, blue, OUTLINE_ALPHA)
+	polyCapsuleRing(ax, ay, bx, by, r, inner)
 
 	drawShapeExtras(shape, ax, ay, bx, by, r)
 end
@@ -1103,7 +1133,18 @@ local function drawWounds()
 	end
 end
 
-local function collectArmorBoxes(body)
+local function armorWear(ply, body, slot)
+	local armors = body:GetNetVar("Armor") or ply:GetNetVar("Armor")
+	local armor = istable(armors) and (isstring(slot) and armors[slot] or nil)
+	if not isstring(armor) then return 0 end
+
+	local wear = body ~= ply and body:GetNWFloat("ArmorWear" .. armor, -1) or -1
+	if wear < 0 then wear = ply:GetNWFloat("ArmorWear" .. armor, 0) end
+
+	return math_Clamp(wear, 0, 1)
+end
+
+local function collectArmorBoxes(ply, body)
 	armorBoxCount = 0
 	if not IsValid(body) or not hg.organism.GetHitBoxOrgans or not hg.organism.ShootMatrix then return end
 
@@ -1121,8 +1162,15 @@ local function collectArmorBoxes(body)
 				armorBoxes[armorBoxCount] = entry
 			end
 			entry.bone, entry.pos, entry.ang, entry.size = box[6], organ[3], organ[4], organ[5]
+			entry.wear = armorWear(ply, body, organ[7])
 		end
 	end
+end
+
+local function armorColor(wear)
+	if wear <= 0.5 then return lerpColor(COLOR.ARMOR_GOOD, COLOR.ARMOR_DAMAGED, wear * 2) end
+
+	return lerpColor(COLOR.ARMOR_DAMAGED, COLOR.ARMOR_RUINED, (wear - 0.5) * 2)
 end
 
 local ARMOR_SIGNS = {
@@ -1185,15 +1233,14 @@ local function drawArmor()
 
 			local count = buildHull()
 			if count >= 3 then
-				local fill = COLOR.ARMOR_FILL
-				surface.SetDrawColor(fill[1], fill[2], fill[3], fill[4])
+				local red, green, blue = armorColor(box.wear or 0)
+				surface.SetDrawColor(red, green, blue, COLOR.ARMOR_FILL_ALPHA)
 				local poly = {}
 				for i = count, 1, -1 do
 					poly[#poly + 1] = {x = armorHull[i].x, y = armorHull[i].y}
 				end
 				surface.DrawPoly(poly)
-				local line = COLOR.ARMOR_LINE
-				surface.SetDrawColor(line[1], line[2], line[3], line[4])
+				surface.SetDrawColor(red, green, blue, COLOR.ARMOR_LINE_ALPHA)
 				for i = 1, count do
 					local a, b = armorHull[i], armorHull[i % count + 1]
 					surface.DrawLine(a.x, a.y, b.x, b.y)
@@ -1239,7 +1286,7 @@ hook.Add("HUDPaint", "homigrad/body-status/draw", function()
 
 	if snap or now >= nextMedicalUpdate then
 		updateMedicalState(ply, body)
-		collectArmorBoxes(body)
+		collectArmorBoxes(ply, body)
 		nextMedicalUpdate = now + MEDICAL_UPDATE_INTERVAL
 	end
 	updateStress(body ~= ply and body:IsRagdoll(), snap)
