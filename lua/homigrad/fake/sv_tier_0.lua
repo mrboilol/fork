@@ -1028,6 +1028,7 @@ function fakeBoneFlop.ApplyBone(rag, bone, org)
 	local physIDChild = rag:TranslateBoneToPhysBone(boneIDChild)
 	local physIDParent = rag:TranslateBoneToPhysBone(boneIDParent)
 	if physIDChild < 0 or physIDParent < 0 then return end
+	if rag:TranslatePhysBoneToBone(physIDChild) ~= boneIDChild or rag:TranslatePhysBoneToBone(physIDParent) ~= boneIDParent then return end
 	if rag.gibRemove and (rag.gibRemove[physIDChild] or rag.gibRemove[physIDParent]) then return end
 
 	local phys = rag:GetPhysicsObjectNum(physIDChild)

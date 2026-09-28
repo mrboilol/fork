@@ -31,10 +31,13 @@ end
 local function parentPhys(rag, physNum)
 	local bone = rag:TranslatePhysBoneToBone(physNum)
 	if not bone or bone < 0 then return end
+	local physByBone = {}
+	for i = 0, rag:GetPhysicsObjectCount() - 1 do
+		physByBone[rag:TranslatePhysBoneToBone(i)] = i
+	end
 	local parent = rag:GetBoneParent(bone)
 	while parent and parent >= 0 do
-		local p = rag:TranslateBoneToPhysBone(parent)
-		if p and p >= 0 and p ~= physNum then return p end
+		if physByBone[parent] then return physByBone[parent] end
 		parent = rag:GetBoneParent(parent)
 	end
 end
@@ -153,7 +156,7 @@ concommand.Add("hg_floppy_probe", function(ply, _, args)
 				if d > 6 then report[#report + 1] = string.format("%s(%.0f)", physName(rag, i), d) end
 				if d > worstDrift then worst, worstDrift = i, d end
 			end
-			reply(ply, string.format("RemoveInternalConstraint(%2d) [phys %2d = %-26s] -> broke: %s", k, k, physName(rag, k),
+			reply(ply, string.format("phys %2d %-26s -> broke: %s", k, physName(rag, k),
 				#report > 0 and table.concat(report, " ") or "nothing"))
 			rag:Remove()
 			timer.Simple(0.1, function() probe(k + 1) end)
