@@ -146,6 +146,8 @@ function SWEP:GetHandSupportState(ply)
 		rightBusy = rightUsable and (carryingMain or handsUsesRight or fakeRightGrip or holdingRightWound or holdingWithBoth)
 	end
 
+	if leftBad and rightUsable then postureOneHanded = true end
+
 	local rightSupport = rightUsable and not rightBusy
 	-- Normal one-handed postures suppress the brace, but an intact left arm must
 	-- still be able to become the firing arm when the right hand is unavailable.
@@ -305,15 +307,16 @@ function SWEP:GetArmHealthHandlingMul()
 	local loss = (1 - firing) * 1.55
 	local ignoreOneArm = self.IgnoreOneArmPenalties == true
 	local oneHandPenalty = self:HasFirearmTraining(owner) and 0.22 or Lerp(self:GetFirearmProficiency(owner), 1, 0.45)
-	if support.wantsTwoHands and not ignoreOneArm then loss = loss + (1 - brace) * 0.85 * oneHandPenalty end
+	local braceCounts = support.wantsTwoHands and not support.postureOneHanded and not ignoreOneArm
+	if braceCounts then loss = loss + (1 - brace) * 0.85 * oneHandPenalty end
 	if support.oneHanded and not ignoreOneArm then loss = loss + 0.5 * oneHandPenalty end
 	local forgive = 1 - self:GetFirearmTraining(owner) * 0.45
 	if firingBroken then loss = loss + 0.5 * limbDebuff * forgive end
 	if firingDislocated then loss = loss + 0.6 * limbDebuff * forgive end
 	if firingAmputated then loss = loss + 0.7 end
-	if support.wantsTwoHands and braceBroken and not ignoreOneArm then loss = loss + 0.3 * oneHandPenalty * limbDebuff end
-	if support.wantsTwoHands and braceDislocated and not ignoreOneArm then loss = loss + 0.4 * oneHandPenalty * limbDebuff end
-	if support.wantsTwoHands and braceAmputated and not ignoreOneArm then loss = loss + 0.5 * oneHandPenalty end
+	if braceCounts and braceBroken then loss = loss + 0.3 * oneHandPenalty * limbDebuff end
+	if braceCounts and braceDislocated then loss = loss + 0.4 * oneHandPenalty * limbDebuff end
+	if braceCounts and braceAmputated then loss = loss + 0.5 * oneHandPenalty end
 	if firingBroken and braceBroken and not firingAmputated and not braceAmputated then loss = loss + 0.7 * limbDebuff * forgive end
 	if support.onlyLeft and not ignoreOneArm then loss = loss + 0.25 * oneHandPenalty end
 	if support.leftBusy and not ignoreOneArm then loss = loss + 0.3 * oneHandPenalty end

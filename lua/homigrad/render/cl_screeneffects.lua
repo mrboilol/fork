@@ -3300,8 +3300,8 @@ local HEADHIT_VOLUME = 1.0
 local HEADHIT_BASE_BOOST = 1.2 -- every head hit is louder than full volume
 local CONCUSSION_VOLUME = 0.45
 local CONCUSSION_SOUND_PATHS = {
-    "sound/concussion1.mp3",
-    "sound/concussion2.mp3"
+    "sound/concussion3.mp3",
+    "sound/concussion4.mp3"
 }
 local last_headhit_sound = 0
 local last_concussion_sound = 0
@@ -3349,19 +3349,14 @@ net.Receive("headtrauma_flash", function()
 	if lply.organism and lply.organism.otrub then return end
 
 	if trigger_tinnitus then
-        if is_critical then
-            surface.PlaySound("tinnituslong.wav")
-            if IsValid(lply) then lply:AddTinnitus(2.25 + time * 0.35, false, hasBrainDamage) end
-        else
-            surface.PlaySound("tinnitus.wav")
-            if IsValid(lply) then lply:AddTinnitus(1 + time * 0.25, false, hasBrainDamage) end
-        end
+        surface.PlaySound("tinnitus.wav")
+        lply:AddTinnitus(0.6 + time * 0.2, false, hasBrainDamage)
     end
 
 	-- Head impacts need the same visible flare as other flash sources. Passing
 	-- the head-trauma flag suppresses them in the shared flash renderer.
 	if hg.AddFlash then
-		hg.AddFlash(lply:EyePos(), 1, pos, time, size)
+		hg.AddFlash(lply:EyePos(), is_critical and 2 or 1, pos, time, size)
 	end
 
     -- Scale effects by the received flash duration (which is scaled by damage on the server)

@@ -582,7 +582,7 @@ local function applySkullTinnitus(targetPlayer, skullDamage, impactDamage)
 	targetPlayer:AddTinnitus(duration, true)
 end
 
-local function sendHeadTraumaFlash(org, dmg, dmgInfo, boneDelta, concussionGain, brainGain)
+local function sendHeadTraumaFlash(org, dmg, dmgInfo, boneDelta, concussionGain, brainGain, forceSevere)
 	if not org.isPly or not IsValid(org.owner) or not org.owner:IsPlayer() then return end
 
 	local target = org.owner
@@ -596,9 +596,13 @@ local function sendHeadTraumaFlash(org, dmg, dmgInfo, boneDelta, concussionGain,
 
 	local hasBrainDamage = brainGain > 0
 	local hasConcussion = concussionGain > 0.05
-	local isCritical = hasBrainDamage or concussionGain >= 1.5
-	local timeScale = math.Clamp(0.35 + boneDelta * 0.8 + concussionGain * 0.2 + brainGain, 0.35, 1.35)
-	local flashSize = math.Clamp(950 + dmg * 260 + boneDelta * 1500 + concussionGain * 180 + brainGain * 900, 950, 3200)
+	local isSevere = forceSevere or hasBrainDamage or boneDelta >= 0.35 or concussionGain >= 1.5
+	local timeScale = math.Clamp(0.35 + boneDelta * 0.8 + concussionGain * 0.2 + brainGain, 0.35, isSevere and 1.35 or 0.5)
+	local flashSize = math.Clamp(950 + dmg * 260 + boneDelta * 1500 + concussionGain * 180 + brainGain * 900, 950, isSevere and 3200 or 1300)
+	if isSevere then
+		timeScale = math.max(timeScale, 1)
+		flashSize = math.max(flashSize, 2400)
+	end
 
 	local eyePos = target:EyePos()
 	local eyeAng = target:EyeAngles()
@@ -613,12 +617,12 @@ local function sendHeadTraumaFlash(org, dmg, dmgInfo, boneDelta, concussionGain,
 		net.WriteVector(worldPos)
 		net.WriteFloat(timeScale)
 		net.WriteInt(math.floor(flashSize), 20)
-		net.WriteBool(isCritical)
+		net.WriteBool(isSevere)
 		net.WriteBool(false)
 		net.WriteBool(hasBrainDamage)
 		net.WriteBool(hasConcussion)
-		net.WriteBool(hasConcussion and (concussionGain >= 0.35 or hasBrainDamage))
-		net.WriteBool(hasBrainDamage or concussionGain >= 1.5)
+		net.WriteBool(isSevere)
+		net.WriteBool(isSevere)
 	net.Send(target)
 
 	target.HeadDisorientFlashCooldown = CurTime() + 0.15
@@ -805,15 +809,9 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 		local disorientationAdd = dmg * 0.5
 		org.disorientation = math.min(org.disorientation + disorientationAdd, 1.5)
 
-		if org.isPly and disorientationAdd > 0.1 and shouldTriggerTinnitus(dmgInfo, dmg, false) then
-			local targetPlayer = org.owner
-			if IsValid(org.owner.FakeRagdoll) then
-				local ragdoll = org.owner.FakeRagdoll
-				if IsValid(ragdoll.ply) then targetPlayer = ragdoll.ply end
-			end
-			if IsValid(targetPlayer) and targetPlayer:IsPlayer() then
-				targetPlayer:PlayCustomTinnitus("tinnitus.wav")
-			end
+		if org.isPly and (org.jaw == 1 or (org.jaw - oldDmg) > 0.4) then
+			org.owner.HeadDisorientFlashCooldown = nil
+			sendHeadTraumaFlash(org, dmg, dmgInfo, org.jaw - oldDmg, 0, 0, true)
 		end
 	end
 
@@ -971,45 +969,6 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		local effectiveDisorient = hasHelmet and disorientationAdd * 0.3 or disorientationAdd
 		org.disorientation = math.min(org.disorientation + effectiveDisorient, 1.5)
 
-		if org.isPly and effectiveDisorient > 0.05 then
-			local targetPlayer = org.owner
-			if IsValid(org.owner.FakeRagdoll) then
-				local ragdoll = org.owner.FakeRagdoll
-				if IsValid(ragdoll.ply) then targetPlayer = ragdoll.ply end
-			end
-			if IsValid(targetPlayer) and targetPlayer:IsPlayer() then
-				targetPlayer:PlayCustomTinnitus("headhit.mp3")
-				if not hasHelmet or (org.skull - oldDmg) > 0.15 then
-					applySkullTinnitus(targetPlayer, org.skull - oldDmg, dmg)
-				end
-			end
-		end
-
-		if org.isPly and effectiveDisorient > 0.05 and shouldTriggerTinnitus(dmgInfo, dmg, hasHelmet) then
-			local targetPlayer = org.owner
-			if IsValid(org.owner.FakeRagdoll) then
-				local ragdoll = org.owner.FakeRagdoll
-				if IsValid(ragdoll.ply) then targetPlayer = ragdoll.ply end
-			end
-			if IsValid(targetPlayer) and targetPlayer:IsPlayer() then
-				targetPlayer:PlayCustomTinnitus("tinnitus.wav")
-			end
-		end
-	end
-
-	if not ignoreBrainDamage and org.isPly and (org.brain - 0) > 0 and dmg > 0.5 then
-		local targetPlayer = org.owner
-		if IsValid(org.owner.FakeRagdoll) then
-			local ragdoll = org.owner.FakeRagdoll
-			if IsValid(ragdoll.ply) then targetPlayer = ragdoll.ply end
-		end
-		if IsValid(targetPlayer) and targetPlayer:IsPlayer() then
-			local idx = math.random(1, 4)
-			local snd = "concussion" .. idx .. ".mp3"
-			net.Start("hg_play_client_sound_file")
-				net.WriteString(snd)
-			net.Send(targetPlayer)
-		end
 	end
 
 	return result,vecrand
