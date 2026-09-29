@@ -2779,8 +2779,8 @@ local function velocityDamage(ent, data)
 				net.Start("hg_bloodimpact")
 				net.WriteVector(skullImpactPos)
 				net.WriteVector((data.OurOldVelocity - data.TheirOldVelocity):GetNormalized() / 10)
-				net.WriteFloat(math.max(dmg * ragdoll_fall_skull_break_blood_mul, 1))
-				net.WriteInt(1, 8)
+				net.WriteFloat(math.max(dmg * ragdoll_fall_skull_break_blood_mul, 4))
+				net.WriteInt(3, 8)
 				net.SendPVS(skullImpactPos)
 			end
 

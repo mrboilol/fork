@@ -49,13 +49,9 @@ end
 
 local function getHemorrhageDelivery(blood)
 	local normal = getNormalBloodVolume()
-	local terminal = Clamp(tonumber(hg.organism.BLEEDOUT_DEATH_BLOOD) or normal * 0.3, 0, normal - 1)
-	local pulseless = Clamp(tonumber(hg.organism.PULSELESS_BLOOD_VOLUME) or terminal * 0.5, 0, terminal - 1)
+	local pulseless = Clamp(tonumber(hg.organism.PULSELESS_BLOOD_VOLUME) or 2000, 0, normal - 1)
 	local volume = tonumber(blood) or normal
-	if volume < terminal then
-		return 0.1 * Clamp((volume - pulseless) / (terminal - pulseless), 0, 1)
-	end
-	return 0.1 + 0.9 * Clamp((volume - terminal) / (normal - terminal), 0, 1)
+	return Clamp((volume - pulseless) / (normal - pulseless), 0, 1) ^ 0.65
 end
 
 function hg.organism.GetHemorrhageRateDrive(blood)
@@ -66,6 +62,26 @@ end
 
 function hg.organism.GetBloodDeliveryFraction(blood, scale)
 	return math.Clamp(getHemorrhageDelivery(blood) * (tonumber(scale) or 1), 0, 1)
+end
+
+function hg.organism.EnforceBloodCirculationLimit(org)
+	if not org then return false end
+	local cutoff = hg.organism.PULSELESS_BLOOD_VOLUME or 2000
+	if (tonumber(org.blood) or getNormalBloodVolume()) > cutoff then return false end
+
+	org.pulse = 0
+	org.bloodPressure = 0
+	org.systolic = 0
+	org.diastolic = 0
+	org.cardiacOutput = 0
+	org.strokeVolume = 0
+	org.mechanicalPulseCapture = 0
+	org.pulseDeficit = math.max(org.heartbeat or 0, 0)
+	org.circulatoryO2Reserve = 0
+	org.perfusionO2Cap = 0
+	if org.o2 then org.o2[1] = 0 end
+
+	return true
 end
 
 function hg.organism.GetHemorrhageCompensationDrive(blood)
@@ -268,8 +284,8 @@ local function getRateOutput(heartbeat, bloodReserve)
 end
 
 function hg.organism.GetPulseOxygenPerfusion(pulse)
-	local normalizedPulse = Clamp((tonumber(pulse) or 0) / 65, 0, 1)
-	return normalizedPulse
+	local normalizedPulse = Clamp((tonumber(pulse) or 0) / 45, 0, 1)
+	return normalizedPulse ^ 0.65
 end
 
 function hg.organism.GetCirculatoryOxygenReserve(pulse, pressure)
@@ -341,6 +357,7 @@ end
 
 function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	if not org or not org.o2 then return end
+	hg.organism.EnforceBloodCirculationLimit(org)
 
 	local o2Range = math.max(tonumber(org.o2.range) or 30, 1)
 	local oxygenReserve = Clamp((tonumber(org.o2[1]) or 0) / o2Range, 0, 1)
@@ -355,7 +372,7 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	org.cerebralPerfusion = Approach(tonumber(org.cerebralPerfusion) or 1, cerebralPerfusion, timeValue * 1.15)
 	org.peripheralperfusion = Approach(tonumber(org.peripheralperfusion) or 1, peripheralPerfusion, timeValue * 0.8)
 	org.bodyoxygen = Approach(tonumber(org.bodyoxygen) or 1, bodyTarget, timeValue * (bodyTarget < (org.bodyoxygen or 1) and 1.0 or 0.35))
-	org.perfusionMoveMul = math.Clamp(0.35 + math.min(org.bodyoxygen, org.peripheralperfusion) * 0.65, 0.35, 1)
+	org.perfusionMoveMul = 1 - 0.35 * Clamp((0.5 - math.min(org.bodyoxygen, org.peripheralperfusion)) / 0.5, 0, 1)
 	org.brainoxygenTarget = brainTarget
 	org.brainoxygen = Approach(tonumber(org.brainoxygen) or 1, brainTarget, timeValue * (brainTarget < (org.brainoxygen or 1) and 1.35 or 0.25))
 
@@ -882,7 +899,8 @@ module[2] = function(owner, org, timeValue)
 	local heart = getHeartEfficiency(org)
 	local brain = math.Clamp(1 - org.brain * 1.5,0,1)
 	local o2 = org.o2
-	local o2 = halfValue2(o2[1], o2.range, o2.k)
+	local arterialO2 = math.min(tonumber(org.bloodO2Cap) or o2[1], org.oxygenIntakeAvailable == false and o2[1] or math.huge)
+	local o2 = halfValue2(arterialO2, o2.range, o2.k)
 
 	if org.isPly and not org.otrub and (heart == 0) then org.owner:Notify("My torso hurts a lot...",true,"heart",6) end
 
@@ -1668,6 +1686,7 @@ module[2] = function(owner, org, timeValue)
 		org.lastsoundtime = CurTime() + math.Rand(4, 7)
 	end
 
+	hg.organism.EnforceBloodCirculationLimit(org)
 end
 
 --if org.heartstop then org.needotrub = true end --не совсем...
@@ -1680,6 +1699,7 @@ function hg.organism.Pulse(owner, org, timeValue)
 		org.bloodPressure = 82
 		org.hypotension = math.min(org.hypotension or 0, 0.1)
 	end
+	hg.organism.EnforceBloodCirculationLimit(org)
 	if org.o2[1] > 1 and org.alive and org.heart < 1 and org.brain < 0.6 then
 		--org.brain = max(org.brain - timeValue / 30, 0) --regen
 	end--brain damage is usually permanent

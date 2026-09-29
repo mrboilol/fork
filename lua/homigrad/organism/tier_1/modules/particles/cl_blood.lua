@@ -67,62 +67,32 @@ end)
 local mat_huy = Material("effects/blood_core")
 local lightcolor = Color(0, 0, 0, 255)
 bloodparticles_hook[1] = function(anim_pos, mul)
-	 
-	local int = hg_blood_draw_distance:GetInt()
-	--render.OverrideBlend( true, BLEND_SRC_ALPHA, BLEND_ONE, BLENDFUNC_ADD )
-	local dstsqr = int * int
-	local lplypos = EyePos()
-	local lplyang = EyeAngles():Forward()
+	local distance = hg_blood_draw_distance:GetInt()
+	local distanceSqr = distance * distance
+	local eyePos, eyeForward = EyePos(), EyeAngles():Forward()
 	for i = 1, #hg.bloodparticles1 do
 		local part = hg.bloodparticles1[i]
-		if not part then continue end
-		if part.hidden then continue end
-		if (part[2] - lplypos):Dot(lplyang) < 0 then continue end
-		if (part[2] - lplypos):LengthSqr() > dstsqr then continue end
-		--if !hg.isVisible(part[1],LocalPlayer():GetShootPos(),LocalPlayer(),MASK_VISIBLE) then continue end
-		--render_SetMaterial(part[4])
+		if not part or part.hidden then continue end
+		if (part[2] - eyePos):Dot(eyeForward) < 0 then continue end
+		if (part[2] - eyePos):LengthSqr() > distanceSqr then continue end
 		local pos = LerpVector(anim_pos, part[2], part[1])
-
-		local time = CurTime()
-		local light
-		if not part.lightcache_time or time - part.lightcache_time > 0.25 then
-			local light1 = render.GetLightColor(pos)
-			local light2 = render.ComputeLighting(pos, vector_up * 1)
-			local light3 = render.ComputeDynamicLighting(pos, vector_up * 1)
-			part.lightcache = (light1 + light2 + light3) * 3
-			part.lightcache_time = time
-		end
-		light = part.lightcache
-
+		local light1 = render_GetLightColor(pos)
+		local light2 = render.ComputeLighting(pos, vector_up)
+		local light3 = render.ComputeDynamicLighting(pos, vector_up)
+		local light = (light1 + light2 + light3) * 3
+		lightcolor.g = 0
+		lightcolor.b = 0
 		if part.kishki then
 			render_SetMaterial(part[4])
-			lightcolor.r = math.Clamp((part.artery and 255 or 150) * light[1], 110, 255)
+			lightcolor.r = math.min((part.artery and 45 or 10) * light[1], 255)
 			render_DrawSprite(pos, part[5], part[6], lightcolor)
 		else
-			local len = (part[2] - part[1]):LengthSqr()
-			--part.lerpeddiff = LerpVector(FrameTime() * 1, part.lerpeddiff or Vector(), (part[2] - part[1]))
-			--if len > 1 * 1 then
-				render_SetMaterial(mat_huy)
-				lightcolor.r = math.Clamp((part.artery and 255 or 150) * light[1], 110, 255)
-				--part.lerpedshit = LerpFT(!part.lasthit and 1 or mul * 1, part.lerpedshit or 1, part.lasthit and 7 or 1)
-				--render_DrawBeam(pos - (len < 2 and (part[2] - part[1]):GetNormalized() * part.lerpedshit or (part[2] - part[1])) * 0.5 / mul / 24,pos + (part[2] - part[1]) * 0.5 / mul / 24, part.lerpedshit, 0, 1, part[9] or lightcolor )
-				--render_DrawBeam(pos - (part[2] - part[1]) * part.lerpedshit / mul / 24 * 0.5,pos + (part[2] - part[1]) * part.lerpedshit / mul / 24 * 0.5, part.lerpedshit, 0, 1, part[9] or lightcolor )
-				
-				--render_DrawBeam(pos - (len < 2 and (part[2] - part[1]):GetNormalized() * 2 or (part[2] - part[1])) * 0.5 / mul / 24,pos + (part[2] - part[1]) * 0.5 / mul / 24, 1, 0, 1, part[9] or lightcolor )
-				local width = math.Clamp((part[5] or 1) * 0.42, part.tiny and 0.04 or 0.18, 1.35)
-				local beamMotion = (part[2] - part[1]) / mul / 24
-				local maxBeamLength = part.maxBeamLength
-				if maxBeamLength and beamMotion:LengthSqr() > maxBeamLength * maxBeamLength then
-					beamMotion = beamMotion:GetNormalized() * maxBeamLength
-				end
-				render_DrawBeam(pos - beamMotion * 0.5, pos + beamMotion * 0.5, width, 0, 1, part[9] or lightcolor )
-
-				--lightcolor.r = lightcolor.r * 0.25
-				--debugoverlay.Line(part[2], part[1], 1, lightcolor, false)	
-			--end
+			render_SetMaterial(mat_huy)
+			lightcolor.r = math.min((part.artery and 45 or 20) * light[1], 255)
+			local beamMotion = (part[2] - part[1]) / mul / 24
+			render_DrawBeam(pos - beamMotion * 0.5, pos + beamMotion * 0.5, 1, 0, 1, part[9] or lightcolor)
 		end
 	end
-	--render.OverrideBlend( false )
 end
 
 local hg_old_blood = ConVarExists("hg_old_blood") and GetConVar("hg_old_blood") or CreateClientConVar("hg_old_blood", 1, true, false, "new decals, or old", 0, 1)
@@ -181,7 +151,7 @@ end
 
 local newBloodDecalMaterials = {}
 local bloodCellSize = 6
-local bloodMaxLayers = 6
+local bloodMaxLayers = 24
 
 local function getBloodDecalScale(amount)
 	return math.Clamp((0.2 + math.sqrt(amount or 0.2) * 0.35) * math.Rand(0.85, 1.15), 0.12, 3)
@@ -212,7 +182,7 @@ local function placeNewBloodDecal(pos, normal, target, artery, amount)
 		material = Material(util.DecalMaterial(name))
 		newBloodDecalMaterials[name] = material
 	end
-	local scale = getBloodDecalScale(amount) * (1 + (count - 1) * 0.15)
+	local scale = getBloodDecalScale(amount) * (1 + (math.min(count, 6) - 1) * 0.15)
 	util.DecalEx(material, target or game.GetWorld(), pos, normal, color_white, scale, scale)
 end
 

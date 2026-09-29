@@ -367,6 +367,7 @@ function hg.organism.MarkArterialWoundsNetDirty(org)
 end
 local function send_organism(org, ply, recipientForce, reliable)
 	if not IsValid(org.owner) then return end
+	hg.organism.EnforceBloodCirculationLimit(org)
 	local sendtable = {}
 	sendtable.alive = org.alive
 	sendtable.otrub = org.otrub
@@ -458,7 +459,6 @@ local function send_organism(org, ply, recipientForce, reliable)
 	sendtable.panicattackadd = org.panicattackadd
 	sendtable.panicattack = org.panicattack
 	sendtable.psycheAnger = org.psycheAnger or 0
-	sendtable.psycheApathy = org.psycheApathy or 0
 	sendtable.seizure = org.seizure
 	sendtable.seizureActive = org.seizureActive
 	sendtable.seizureStart = org.seizureStart
@@ -596,6 +596,7 @@ end
 
 local function send_bareinfo(org, force, reliable)
 	if not IsValid(org.owner) then return end
+	hg.organism.EnforceBloodCirculationLimit(org)
 	if force == nil then force = true end
 	local time = CurTime()
 	local signature = observer_signature(org)

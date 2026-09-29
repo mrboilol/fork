@@ -1,4 +1,4 @@
-local Clamp, min, max, Approach = math.Clamp, math.min, math.max, math.Approach
+local Clamp = math.Clamp
 
 hg.organism.module.psyche = {}
 local module = hg.organism.module.psyche
@@ -6,77 +6,7 @@ local module = hg.organism.module.psyche
 local combat_response_cooldown = 0.35
 local gunfight_response_cooldown = 1.5
 local gunfight_adrenaline_cap = 1.5
-local apathy_pain_start = 35
-local apathy_pain_speed = 90
-local apathy_blood_start = 3400
-local apathy_blood_speed = 150
-local apathy_otrub_speed = 220
-local apathy_fear_start = 0.6
-local apathy_fear_speed = 150
-local apathy_decay = 180
-local apathy_decay_comfort = 60
-local apathy_fear_cap = 0.4
-local apathy_witness_radius = 700
-local apathy_witness_gain = 0.25
-local apathy_kill_relief = 0.2
-local desens_cap = 20
 
-local anger_phrases = {
-	legacy = {
-	"You feel your blood boiling.",
-	"Your hands are shaking with rage.",
-	"You want to hurt something. Anything.",
-	"A red haze creeps into the edges of your vision.",
-	"Your teeth are clenched so hard it hurts.",
-	"You can barely think straight anymore.",
-	"Every sound they make infuriates you.",
-	"You are going to make them pay.",
-	"The anger swallowed the fear whole.",
-	"Your heartbeat pounds in your ears like a war drum.",
-	"You are no longer thinking. Only reacting.",
-	"Someone is going to answer for this.",
-	"You feel like you could tear a door off its hinges.",
-	"It takes everything you have not to scream."
-},
-	new = {
-		"I want to kill someone so bad.",
-		"I'm so fucking angry.",
-		"I need to make them pay.",
-		"I can't let them get away with this.",
-		"I want to hurt them back.",
-		"I can barely think past how angry I am.",
-		"I need to hit something.",
-		"I'm done being pushed around."
-	}
-}
-local apathy_phrases = {
-	legacy = {
-	"You feel numb inside.",
-	"Nothing seems to matter anymore.",
-	"The world looks faded, like an old photograph.",
-	"You are so tired of all this.",
-	"You watch your own hands like they belong to a stranger.",
-	"Even the noise sounds muffled and distant.",
-	"You can't remember the last time you felt anything.",
-	"What's the point of any of this?",
-	"Your thoughts are slow and grey like ash.",
-	"You just want to sit down and stop.",
-	"Hunger, pain, fear — it all blends into one grey hum.",
-	"Somewhere inside, you know you should care. You don't.",
-	"The light seems weaker than it was yesterday.",
-	"You are merely existing, not living."
-},
-	new = {
-		"I feel completely numb.",
-		"Nothing matters right now.",
-		"I just want to sit down and stop.",
-		"I don't have the energy to care anymore.",
-		"Everything feels distant.",
-		"I feel empty.",
-		"I don't know why I'm still trying.",
-		"I just want this to be over."
-	}
-}
 local derealization_phrases = {
 	legacy = {
 	"This doesn't feel real.",
@@ -99,8 +29,6 @@ local derealization_phrases = {
 		"I feel far away from my body."
 	}
 }
-local anger_color = Color(255, 110, 110)
-local apathy_color = Color(170, 170, 170)
 local derealization_color = Color(180, 160, 255)
 
 local function psycheThought(owner, phrases, delay, key, clr)
@@ -112,50 +40,19 @@ end
 
 module[1] = function(org)
 	org.psycheAnger = 0
-	org.psycheApathy = 0
-	org.psycheDesens = 0
 	org.psycheAngerLastHit = 0
 	org.psychePainMul = 1
 end
 
 module[2] = function(owner, org, timeValue)
 	local anger = Clamp(org.anger or 0, 0, 1)
-	local apathy = org.psycheApathy or 0
-
-	if org.pain > apathy_pain_start then
-		apathy = min(apathy + timeValue / apathy_pain_speed * Clamp((org.pain - apathy_pain_start) / 60, 0, 1), 1)
-	end
-	if (org.blood or 5000) < apathy_blood_start then
-		apathy = min(apathy + timeValue / apathy_blood_speed, 1)
-	end
-	if org.otrub then
-		apathy = min(apathy + timeValue / apathy_otrub_speed, 1)
-	end
-	local fearLevel = Clamp(org.fear or 0, 0, 1)
-	if fearLevel > apathy_fear_start then
-		apathy = min(apathy + timeValue / apathy_fear_speed * Clamp((fearLevel - apathy_fear_start) / (1 - apathy_fear_start), 0, 1), 1)
-	end
-
-	local comfort = (org.satiety or 0) > 500 and org.pain < 20 and (org.blood or 0) > 4500
-	local apathyDecayTime = comfort and apathy_decay_comfort or apathy_decay
-	if anger > 0.5 then apathyDecayTime = min(apathyDecayTime, apathy_decay_comfort) end
-	apathy = Approach(apathy, 0, timeValue / apathyDecayTime)
-
 	org.psycheAnger = anger
-	org.psycheApathy = apathy
 	org.psychePainMul = 1
-	org.fear = min(org.fear, 1 - apathy_fear_cap * apathy)
 
 	if org.isPly and owner:Alive() then
 		local panic = org.panicattack or 0
 		if panic >= 0.55 then
 			psycheThought(owner, derealization_phrases, math.Rand(18, 28), "psyche_derealization", derealization_color)
-		end
-		if anger > 0.55 then
-			psycheThought(owner, anger_phrases, math.Rand(20, 35), "psyche_anger", anger_color)
-		end
-		if apathy > 0.55 then
-			psycheThought(owner, apathy_phrases, math.Rand(30, 50), "psyche_apathy", apathy_color)
 		end
 	end
 end
@@ -222,22 +119,4 @@ hook.Add("EntityFireBullets", "PsycheCombatGunfire", function(shooter)
 	org._gunfightAngerNext = CurTime() + gunfight_response_cooldown
 	local adrenalineAmount = (org.adrenaline or 0) < gunfight_adrenaline_cap and 0.3 or 0
 	hg.organism.RileAnger(org, 0.05, adrenalineAmount)
-end)
-
-hook.Add("PlayerDeath", "PsycheApathyWitness", function(victim, inflictor, attacker)
-	local pos = victim:GetPos()
-	for i, ply in player.Iterator() do
-		if ply == victim or not ply:Alive() then continue end
-		local org = ply.organism
-		if not org then continue end
-		if ply:GetPos():DistToSqr(pos) > apathy_witness_radius * apathy_witness_radius then continue end
-		local desens = org.psycheDesens or 0
-		org.psycheDesens = min(desens + 1, desens_cap)
-		org.psycheApathy = min((org.psycheApathy or 0) + apathy_witness_gain / (1 + desens * 0.35), 1)
-	end
-	if IsValid(attacker) and attacker:IsPlayer() and attacker ~= victim and attacker.organism then
-		local org = attacker.organism
-		org.psycheDesens = min((org.psycheDesens or 0) + 1, desens_cap)
-		org.psycheApathy = max((org.psycheApathy or 0) - apathy_kill_relief, 0)
-	end
 end)

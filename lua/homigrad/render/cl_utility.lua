@@ -999,8 +999,11 @@ players : 1 humans, 0 bots (20 max)
 
 --\\ CL Utils setting adjustments
 	if CLIENT then
-		RunConsoleCommand("mp_decals", "8192")
-		RunConsoleCommand("r_decals", "8192")
+		RunConsoleCommand("mp_decals", "32768")
+		RunConsoleCommand("r_decals", "32768")
+		if ConVarExists("r_decal_overlap_count") then
+			RunConsoleCommand("r_decal_overlap_count", "32")
+		end
 
 		hook.Add("Think","RemoveMe_001",function()
 			hook.Remove("PostPlayerDraw","BA2_GasmaskDraw")

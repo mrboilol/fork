@@ -9,12 +9,17 @@ for i = 1, 6 do
 end
 
 --local mat_huy = Material("sprites/mat_jack_irregularcircle")
-local texture = Material("decals/z_blood1"):GetTexture("$basetexture")
 local mat_huy = Material("effects/blood_core")
-mat_huy:SetTexture("$basetexture",texture)
 
 local cloudmat = Material("effects/smoke_b")
 local hg_old_blood = ConVarExists("hg_old_blood") and GetConVar("hg_old_blood") or CreateClientConVar("hg_old_blood", 1, true, false, "new decals, or old", 0, 1)
+local hg_oldblood = ConVarExists("hg_oldblood") and GetConVar("hg_oldblood") or CreateClientConVar("hg_oldblood", 0, true, false, "Use old Z-City blood decals", 0, 1)
+local hg_old_particle = ConVarExists("hg_old_particle") and GetConVar("hg_old_particle") or CreateClientConVar("hg_old_particle", 0, true, false, "Use Remorseism blood particles", 0, 1)
+local function useOldBloodParticles()
+	return hg_old_blood:GetBool() or hg_oldblood:GetBool() or hg_old_particle:GetBool()
+end
+local texture = Material("decals/z_blood1"):GetTexture("$basetexture")
+if texture then mat_huy:SetTexture("$basetexture", texture) end
 local bloodSpillMats = {}
 for i = 1, 6 do
 	bloodSpillMats[i] = Material("bloodspill/blood" .. i)
@@ -25,7 +30,7 @@ net.Receive("hg_gib_blood_decal", function()
 	local pos = net.ReadVector()
 	local normal = net.ReadVector()
 	if not pos or not normal or normal:LengthSqr() < 0.0001 then return end
-	util.Decal(hg_old_blood:GetBool() and "Normal.Blood1" or "Normal.Blood24", pos - normal, pos + normal, IsValid(ent) and ent or nil)
+	util.Decal((hg_old_blood:GetBool() or hg_oldblood:GetBool()) and "Normal.Blood1" or "Normal.Blood24", pos - normal, pos + normal, IsValid(ent) and ent or nil)
 end)
 
 --оставь это лучше выглядит
@@ -40,12 +45,10 @@ local lastplaced = SysTime()
 local hg_blood_fps = ConVarExists("hg_blood_fps") and GetConVar("hg_blood_fps") or CreateClientConVar("hg_blood_fps", 24, true, nil, "fps to draw blood", 12, 165)
 local hg_blood_physics = ConVarExists("hg_blood_physics") and GetConVar("hg_blood_physics") or CreateClientConVar("hg_blood_physics", 1, true, false, "physics particle blood", 0, 1)
 
-local dropMats = {}
-for i = 1, 11 do
-	local mat = Material("effects/droplets/drop" .. i)
-	if not mat:IsError() then dropMats[#dropMats + 1] = mat end
+local function getBloodParticleMaterial()
+	if useOldBloodParticles() then return mat_huy end
+	return mats[math.random(countmats)] or mat_huy
 end
-if #dropMats == 0 then dropMats = mats end
 
 local physEmitter
 local physGravity = Vector(0, 0, -600)
@@ -98,22 +101,24 @@ local function addPhysBloodPart(pos, vel, w, artery, kishki, owner, tiny, hidden
 	end
 
 	local data = {artery = artery, owner = owner, tiny = tiny, hidden = hidden, volume = math.Clamp((w or 2) / 2, 0.2, 4), born = CurTime()}
-	physEmitter:SetPos(pos)
-	local part = physEmitter:Add(dropMats[math.random(#dropMats)], pos)
+	local emitter = physEmitter
+	if not emitter then return data end
+	emitter:SetPos(pos)
+	local part = emitter:Add(getBloodParticleMaterial():GetName(), pos)
 	if not part then return data end
 
 	if IsValid(owner) then vel = vel + owner:GetVelocity() end
 	physGravity[3] = -(sv_gravity and sv_gravity:GetFloat() or 600)
 
-	local size = kishki and math.Clamp((w or 4) * 0.55, 2, 6) or math.Clamp((w or 2) * 0.7, tiny and 0.5 or 0.8, 6)
-	size = math.Clamp(size * math.Rand(0.55, 1.6), 0.4, 8)
+	local size = kishki and math.Clamp((w or 4) * 0.8, 2, 8) or math.Clamp(w or 2, tiny and 0.7 or 1.2, 8)
+	size = math.Clamp(size * math.Rand(0.7, 1.6), 0.6, 10)
 	local light = render.GetLightColor(pos)
 	local lum = math.Clamp((light[1] + light[2] + light[3]) * 1.2 + 0.35, 0.5, 1)
 
 	part:SetVelocity(vel)
 	part:SetDieTime(math.Clamp(lifetime or 6, 1.2, 6))
 	part:SetStartAlpha(hidden and 0 or 255)
-	part:SetEndAlpha(hidden and 0 or 160)
+	part:SetEndAlpha(hidden and 0 or 220)
 	part:SetStartSize(size)
 	part:SetEndSize(size * 0.75)
 	part:SetRoll(math.Rand(0, 360))
@@ -123,10 +128,10 @@ local function addPhysBloodPart(pos, vel, w, artery, kishki, owner, tiny, hidden
 	part:SetBounce(0)
 	part:SetCollide(true)
 	if artery then
-		lum = math.max(lum, 0.85)
+		lum = math.max(lum, 0.95)
 		part:SetColor(255 * lum, 22 * lum, 16 * lum)
 	else
-		part:SetColor(165 * lum, 6 * lum, 5 * lum)
+		part:SetColor(195 * lum, 8 * lum, 6 * lum)
 	end
 	part:SetCollideCallback(function(p, hitPos, hitNormal)
 		p:SetDieTime(0)
@@ -155,7 +160,7 @@ end
 local function addBloodPart(pos, vel, mat, w, h, artery, kishki, owner, tiny, hidden, lifetime, maxBeamLength)
 	if LocalPlayer():GetNetVar("disappearance", nil) or (IsValid(owner) and owner:GetNetVar("disappearance", nil)) then return end
 
-	if hg_blood_physics:GetBool() then return addPhysBloodPart(pos, vel, w, artery, kishki, owner, tiny, hidden, lifetime) end
+	if hg_blood_physics:GetBool() and not hg_old_particle:GetBool() then return addPhysBloodPart(pos, vel, w, artery, kishki, owner, tiny, hidden, lifetime) end
 
 	return addLegacyBloodPart(pos, vel, mat, w, h, artery, kishki, owner, tiny, hidden, lifetime, maxBeamLength)
 end
@@ -236,7 +241,7 @@ local function impact(pos,vel,mul)
 	end
 
 	for i = 1, iters do
-		local size = math.Clamp(math.sqrt(math.max(mul, 0)) * 0.45, 0.8, 4)
+		local size = hg_old_particle:GetBool() and 0.75 or math.Clamp(math.sqrt(math.max(mul, 0)) * 0.45, 0.8, 4)
 		addBloodPart(pos, -vel * i / iters + Vector(Rand(-20, 20), Rand(-20, 20), 0), mat_huy, size, size, false, false)
 	end
 end

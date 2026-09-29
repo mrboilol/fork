@@ -23,26 +23,26 @@ local function getBurstPos(org, dmgInfo, hit)
 	if IsValid(body) then return body:WorldSpaceCenter() end
 end
 
-local function bloodBurst(org, dmgInfo, amount, hit)
+local function bloodBurst(org, dmgInfo, amount, hit, severe)
 	local pos = getBurstPos(org, dmgInfo, hit)
 	if not pos then return end
 	local force = dmgInfo:GetDamageForce():GetNormalized()
 	if force:IsZero() then force = vector_up end
 
-	for _ = 1, math.random(3, 5) do
+	for _ = 1, (severe and math.random(3, 5) or 1) do
 		local normal = (force + VectorRand(-0.9, 0.9)):GetNormalized()
 		local effect = EffectData()
 		effect:SetOrigin(pos)
 		effect:SetNormal(normal)
-		effect:SetMagnitude(2)
-		effect:SetScale(1.2)
-		effect:SetRadius(3)
+		effect:SetMagnitude(severe and 2 or 1)
+		effect:SetScale(severe and 1.2 or 0.5)
+		effect:SetRadius(severe and 3 or 1)
 		util.Effect("BloodImpact", effect, true, true)
 		net.Start("hg_bloodimpact")
 		net.WriteVector(pos)
 		net.WriteVector(normal / 10)
-		net.WriteFloat(math.Clamp(amount, 1, 8))
-		net.WriteInt(math.random(2, 5), 8)
+		net.WriteFloat(math.Clamp(amount, 1, severe and 8 or 2))
+		net.WriteInt(severe and math.random(2, 5) or 1, 8)
 		net.SendPVS(pos)
 	end
 end
@@ -69,7 +69,7 @@ local function damageBone(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ric
 	local val = org[key]
 	org[key] = math.min(org[key] + dmg, 1)
 	if val < 1 and org[key] >= 1 and key ~= "skull" then
-		bloodBurst(org, dmgInfo, 3, hit)
+		bloodBurst(org, dmgInfo, key == "spine3" and 5 or 1, hit, key == "spine3")
 	end
 	local scale = 1 - (org[key] - val)
 	
@@ -844,7 +844,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	local result, vecrand = damageBone(org, 0.25, dmg, dmgInfo, "skull", boneindex, dir, hit, ricochet, oldDmg >= 1)
 	if oldDmg >= 1 then
 		result = 0
-		bloodBurst(org, dmgInfo, math.max(dmg * 4, 2), hit)
+		bloodBurst(org, dmgInfo, math.max(dmg * 4, 2), hit, true)
 		if not (impact and impact.source == "physics") and not dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_BLAST) and hg.organism.input_list.brainFrontal then
 			hg.organism.input_list.brainFrontal(org, bone, dmg, dmgInfo)
 		end
@@ -881,21 +881,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 			end
 			playSkullFractureSound(pos)
 			if not (impact and impact.source == "physics") then
-				local normal = dmgInfo:GetDamageForce():GetNormalized()
-				if normal:IsZero() then normal = Vector(0, 0, 1) end
-				local effect = EffectData()
-				effect:SetOrigin(pos)
-				effect:SetNormal(normal)
-				effect:SetMagnitude(2)
-				effect:SetScale(1.2)
-				effect:SetRadius(3)
-				util.Effect("BloodImpact", effect, true, true)
-				net.Start("hg_bloodimpact")
-				net.WriteVector(pos)
-				net.WriteVector(normal / 10)
-				net.WriteFloat(math.max(dmg / 8, 1))
-				net.WriteInt(1, 8)
-				net.SendPVS(pos)
+				bloodBurst(org, dmgInfo, math.max(dmg / 8, 4), pos, true)
 			end
 			sendThought(org, "Your skull is broken.", "thought_skull", 4, Color(255, 180, 180))
 		end

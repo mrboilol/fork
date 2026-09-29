@@ -570,7 +570,7 @@ function module.AddConcussion(org, intensity, duration)
         org.concussion_onset = org.concussion_onset + add
         org.concussion_peak = math.max(org.concussion_peak, org.concussion + org.concussion_onset)
         if org.isPly and IsValid(org.owner) and org.owner:IsPlayer() then
-            org.owner:Notify("I feel... okay? Maybe it wasn't that bad...", 6, "concussion_lucid", 0)
+            org.owner:Notify("It hurts so much I can see stars...", 6, "concussion_lucid", 0)
         end
         if hg.organism.AddHeadTraumaSeizureRisk then
             hg.organism.AddHeadTraumaSeizureRisk(org, add, intensity)

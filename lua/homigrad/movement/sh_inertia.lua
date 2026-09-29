@@ -477,9 +477,8 @@ local math_abs, math_Approach, math_AngleDifference, math_Clamp, math_cos, math_
 		k = k * softenDebuff(math.Clamp(5 / ((org.immobilization or 0) + 1), 0.45, 1))
 		k = k * softenDebuff(math.Clamp((org.blood or 0) / 5000, 0, 1))
 		k = k * softenDebuff(math.Clamp(10 / ((org.shock or 0) + 1), 0.45, 1))
-		local lowOxygen = math.Clamp((22 - (org.o2 and org.o2[1] or 30)) / 17, 0, 1)
-		k = k * softenDebuff(1 - lowOxygen * 0.4)
-		k = k * softenDebuff(math.Clamp(org.perfusionMoveMul or 1, 0.35, 1))
+		local lowOxygen = math.Clamp((16 - (org.o2 and org.o2[1] or 30)) / 16, 0, 1)
+		k = k * softenDebuff(math.min(1 - lowOxygen * 0.25, math.Clamp(org.perfusionMoveMul or 1, 0.65, 1)))
 		k = k * (math.min(math.Round((org.adrenaline or 0), 1) / 24, 0.3) + 1)
 		local limbDebuff = hg.GetLimbDebuffMultiplier and hg.GetLimbDebuffMultiplier(org) or 1
 		local function legMoveMultiplier(limb)

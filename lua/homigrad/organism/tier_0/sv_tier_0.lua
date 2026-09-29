@@ -170,6 +170,7 @@ hook.Add("Think", "homigrad-organism", function()
 		if not istable(org.o2) then hg.organism.EnsureO2(org) end
 		if org.godmode then continue end
 		hook_Run("Org Think", owner, org, mulTime)
+		hg.organism.EnforceBloodCirculationLimit(org)
 	end
 end)
 
@@ -181,6 +182,7 @@ hook.Add("Org Think Call", "homigrad-organism", function(owner, org)
 	lastcall = sysTime
 	if not istable(org.o2) then hg.organism.EnsureO2(org) end
 	hook_Run("Org Think", owner, org, 0.00001)
+	hg.organism.EnforceBloodCirculationLimit(org)
 end)
 
 
