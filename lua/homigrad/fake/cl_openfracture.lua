@@ -183,3 +183,62 @@ hook.Add("PostDrawOpaqueRenderables", "hg_openfractures", function(depth, skybox
 		render.SetColorModulation(1, 1, 1)
 	end
 end)
+
+local chestBones = {"ValveBiped.Bip01_Spine2", "ValveBiped.Bip01_Neck1", "ValveBiped.Bip01_L_UpperArm", "ValveBiped.Bip01_R_UpperArm"}
+local chestEntries = {}
+local maxChestShards = 9
+
+local function getChestOrganism(ent)
+	local org = ent.organism or ent.new_organism
+	if org then return org end
+	local owner = ent:IsRagdoll() and hg.RagdollOwner(ent)
+	return IsValid(owner) and (owner.organism or owner.new_organism) or nil
+end
+
+hook.Add("PostDrawAppearance", "hg_chestbones", function(ent)
+	if not IsValid(ent) then return end
+	local org = getChestOrganism(ent)
+	if not org or (org.chest or 0) < 0.08 then chestEntries[ent] = nil return end
+
+	local entry = {frame = FrameNumber()}
+	for _, bone in ipairs(chestBones) do
+		local boneID = ent:LookupBone(bone)
+		local matrix = boneID and ent:GetBoneMatrix(boneID)
+		if not matrix then chestEntries[ent] = nil return end
+		entry[bone] = matrix:GetTranslation()
+	end
+	chestEntries[ent] = entry
+end)
+
+hook.Add("PostDrawOpaqueRenderables", "hg_chestbones", function(depth, skybox)
+	if depth or skybox or not next(chestEntries) then return end
+
+	local eyePos = EyePos()
+	local frame = FrameNumber()
+	local mdl
+
+	for ent, entry in pairs(chestEntries) do
+		if not IsValid(ent) then chestEntries[ent] = nil continue end
+		if entry.frame ~= frame or ent:GetPos():DistToSqr(eyePos) > drawDistSqr then continue end
+		local org = getChestOrganism(ent)
+		if not org then continue end
+		local count = math.Clamp(math.ceil((org.chest or 0) * maxChestShards), 1, maxChestShards)
+
+		local spine = entry["ValveBiped.Bip01_Spine2"]
+		local up = (entry["ValveBiped.Bip01_Neck1"] - spine):GetNormalized()
+		local right = (entry["ValveBiped.Bip01_R_UpperArm"] - entry["ValveBiped.Bip01_L_UpperArm"]):GetNormalized()
+		local front = up:Cross(right):GetNormalized()
+
+		mdl = mdl or getShard()
+		if not mdl then return end
+
+		render.SetColorModulation(1, 0.8, 0.76)
+		for i = 1, count do
+			local col, row = (i - 1) % 3, math.floor((i - 1) / 3)
+			local surface = spine + front * 5.5 + right * ((col - 1) * 2.6 + math.sin(i * 12.9) * 0.8) + up * (row * 2.4 - 2 + math.cos(i * 7.3) * 0.6)
+			local dir = (front + right * math.sin(i * 5.1) * 0.5 + up * math.cos(i * 3.7) * 0.5):GetNormalized()
+			drawShard(mdl, surface, dir, right, 2.5 + (i % 3) * 0.8, 0.35)
+		end
+		render.SetColorModulation(1, 1, 1)
+	end
+end)

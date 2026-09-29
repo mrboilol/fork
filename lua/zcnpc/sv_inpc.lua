@@ -26,6 +26,8 @@
 ]]
 
 -- value: string written to the cvar. kind: "bool" or "float".
+util.AddNetworkString("hg_cleardecals")
+
 local HELD_OFF = {
 	{ name = "inpc_health_regeneration", value = "0", kind = "bool" },
 	{ name = "inpc_cleanup", value = "0", kind = "bool" },
@@ -219,6 +221,8 @@ local function WrapCleanup()
 			end
 
 			RunConsoleCommand("r_cleardecals")
+			net.Start("hg_cleardecals")
+			net.Broadcast()
 		end)
 	end
 end

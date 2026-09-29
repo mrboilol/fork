@@ -121,11 +121,11 @@ function SWEP:GetChargeFraction()
 end
 
 function SWEP:GetChargeDamageScale()
-    return Lerp(self:GetChargeFraction(), 1, self.ChargeDamageMul or 1)
+    return Lerp(self:GetChargeFraction(), self.SlamMinDamageMul or 1, self.ChargeDamageMul or 1)
 end
 
 function SWEP:GetChargeBoneScale()
-    return Lerp(self:GetChargeFraction(), 1, self.ChargeBreakBoneMul or 1)
+    return Lerp(self:GetChargeFraction(), self.SlamMinBoneMul or 1, self.ChargeBreakBoneMul or 1)
 end
 
 function SWEP:GetAttackDamageBase(attacktype)
@@ -260,6 +260,16 @@ SWEP.SlamHoldTime = 0.25
 SWEP.SlamReach = 72
 SWEP.SlamRaisePos = Vector(2, 0, 6)
 SWEP.SlamRaiseAng = Angle(-40, 0, 0)
+SWEP.SlamStaminaMul = 2.5
+SWEP.SlamSpeedMul = 0.7
+SWEP.SlamMinDamageMul = 0.6
+SWEP.SlamMinBoneMul = 0.7
+SWEP.SlamParryWindowMul = 2
+SWEP.SlamBlockCoverBonus = 12
+SWEP.SlamDisarmMul = 1.5
+SWEP.ParryDisarmChance = 0.2
+SWEP.FistParryDisarmChance = 0.35
+SWEP.ClashDisarmChance = 0.15
 SWEP.ChargeAnimTimeBegin = 0.2
 SWEP.ChargeAnimTimeIdle = 0.35
 SWEP.ChargeAnimTimeEnd = 0.8
@@ -1508,7 +1518,7 @@ function SWEP:StartChargeAttack()
     if not owner.organism or owner.organism.stamina[1] < (self.ChargeMinStamina or 90) then return end
 
     local mul = 1 / math.Clamp((180 - owner.organism.stamina[1]) / 90, 1, 2)
-	mul = mul * self:GetMeleeArmSpeedMul(owner)
+	mul = mul * self:GetMeleeArmSpeedMul(owner) * (self.SlamSpeedMul or 1)
 
     self.HitEnts = nil
     self.FirstAttackTick = false
@@ -2194,7 +2204,7 @@ function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
             
             self:PlaySwingSound(owner, attacktype)
             
-			self:ConsumeMeleeStamina(owner, self:GetAttackConfigValue(self.StaminaPrimary, self.StaminaSecondary, self.ChargeStamina, attacktype) * (self.StaminaCostMul or 0.5) * math.Clamp(vellen / 200, 1, 1.25))
+			self:ConsumeMeleeStamina(owner, self:GetAttackConfigValue(self.StaminaPrimary, self.StaminaSecondary, self.ChargeStamina, attacktype) * (self.StaminaCostMul or 0.5) * math.Clamp(vellen / 200, 1, 1.25) * (charge and (self.SlamStaminaMul or 1) or 1))
 
             if charge then
                 if self.CustomChargeAttack and self:CustomChargeAttack() then
@@ -3005,6 +3015,20 @@ function SWEP:SendClashAnimStop(wep, normal)
     net.SendPVS(wep:GetPos())
 end
 
+function SWEP:TryDisarm(chance, slam)
+    if not SERVER then return false end
+
+    chance = (chance or 0) * (slam and (self.SlamDisarmMul or 1) or 1)
+    if math.Rand(0, 1) > chance then return false end
+
+    local owner = self:GetOwner()
+    if not IsValid(owner) or not owner:IsPlayer() then return false end
+
+    hg.drop(owner, self, nil, 150, true)
+
+    return true
+end
+
 function SWEP:HandleMeleeClash(otherWep, clashPos, hitNormal, attacktype, otherAttacktype)
     if not IsValid(otherWep) or not clashPos then return end
     if (self.NextClashTime or 0) > CurTime() or (otherWep.NextClashTime or 0) > CurTime() then return end
@@ -3017,6 +3041,9 @@ function SWEP:HandleMeleeClash(otherWep, clashPos, hitNormal, attacktype, otherA
         HitNormal = hitNormal and hitNormal:GetNormalized() or vector_up,
         HGPreventHeadRagdoll = true,
     }
+
+    self:TryDisarm(self.ClashDisarmChance, self:IsChargeAttackType(attacktype))
+    if otherWep.TryDisarm then otherWep:TryDisarm(otherWep.ClashDisarmChance, otherWep:IsChargeAttackType(otherAttacktype)) end
 
     self:PlayConfiguredWorldSound(self:GetClashSoundData(otherWep, attacktype, otherAttacktype), clashPos, 1)
     self:DispatchBlockImpactFx(clashTrace, self, "parry")
@@ -3099,6 +3126,8 @@ function SWEP:GetAttackSwingAngle(attacktype)
 end
 
 function SWEP:GetAttackBlockDirection(attacktype)
+    if self:IsChargeAttackType(attacktype) then return "neutral" end
+
     local direction = self:GetAttackConfigValue(self.BlockDirectionalPrimary, self.BlockDirectionalSecondary, self.BlockDirectionalCharge, attacktype)
 
     if direction == "right" or direction == "left" or direction == "overhead" or direction == "center" or direction == "neutral" then
@@ -3163,10 +3192,10 @@ function SWEP:CanDirectionalBlock(blockWep, defender, attacker, attacktype, hier
     return sideDot * neededSign >= ((blockWep.BlockDirectionalSideDot or self.BlockDirectionalSideDot or 0.1) - sideLeniency)
 end
 
-function SWEP:IsBlockTraceCovered(defender, trace, eyePos, aimvec, blockWep)
+function SWEP:IsBlockTraceCovered(defender, trace, eyePos, aimvec, blockWep, extraDist)
     if trace and trace.HGEquipmentIntercept then return true end
 
-    local blockDist = (blockWep.BlockTraceDist or self.BlockTraceDist or 10) + (blockWep.BlockTraceCoverageBonus or self.BlockTraceCoverageBonus or 0)
+    local blockDist = (blockWep.BlockTraceDist or self.BlockTraceDist or 10) + (blockWep.BlockTraceCoverageBonus or self.BlockTraceCoverageBonus or 0) + (extraDist or 0)
     local dist = util.DistanceToLine(eyePos + aimvec * 100, eyePos, trace.HitPos)
     if dist < blockDist then
         return true
@@ -3205,7 +3234,9 @@ function SWEP:BlockingLogic(ent, mul, attacktype, trace)
         local selfdmg = math.max(self:GetAttackDamageBase(attacktype), 1)
         local swingStamina = self:GetAttackConfigValue(self.StaminaPrimary, self.StaminaSecondary, self.ChargeStamina, attacktype) or 0
 
-        if wep.GetBlocking and wep:GetBlocking() and wep.SetStartedBlocking and self:IsBlockTraceCovered(ent, trace, pos, aimvec, wep) then
+        local slam = self:IsChargeAttackType(attacktype)
+
+        if wep.GetBlocking and wep:GetBlocking() and wep.SetStartedBlocking and self:IsBlockTraceCovered(ent, trace, pos, aimvec, wep, slam and (self.SlamBlockCoverBonus or 0) or 0) then
             if wep.CanBlockWeapon and not wep:CanBlockWeapon(self) then
                 return 1, "none"
             end
@@ -3217,7 +3248,7 @@ function SWEP:BlockingLogic(ent, mul, attacktype, trace)
                 return 1, "none"
             end
 
-            local perfectblock = CurTime() - wep:GetStartedBlocking() < (wep.GetBlockParryWindow and wep:GetBlockParryWindow() or self:GetBlockParryWindow())
+            local perfectblock = CurTime() - wep:GetStartedBlocking() < (wep.GetBlockParryWindow and wep:GetBlockParryWindow() or self:GetBlockParryWindow()) * (slam and (self.SlamParryWindowMul or 1) or 1)
             local tierDiff = attackerTier - defenderTier
             local blockStaminaCost = math.max(swingStamina * (wep.BlockHitStaminaMul or self.BlockHitStaminaMul or 0.5), 0) * (wep.MeleeStaminaMul or 0.6)
 
@@ -3243,6 +3274,8 @@ function SWEP:BlockingLogic(ent, mul, attacktype, trace)
 
                 wep.RiposteUntil = CurTime() + (self.BlockRiposteWindow or 0.6)
 
+                self:TryDisarm(wep:GetClass() == "weapon_hands_sh" and self.FistParryDisarmChance or self.ParryDisarmChance, slam)
+
                 -- parried attacker is staggered and cannot swing for a moment
                 local lockout = self.BlockParryAttackerLockout or 0.5
                 self:SetInAttack(false)
@@ -3254,7 +3287,7 @@ function SWEP:BlockingLogic(ent, mul, attacktype, trace)
 
 			if hg.organism and hg.organism.ConsumeStamina then hg.organism.ConsumeStamina(ent.organism, blockStaminaCost) end
 
-            if tierDiff >= (self.BlockBreakTierDiff or 2) then
+            if not slam and tierDiff >= (self.BlockBreakTierDiff or 2) then
 				if hg.organism and hg.organism.ConsumeStamina then hg.organism.ConsumeStamina(ent.organism, selfdmg * (wep.BlockBreakStaminaMul or self.BlockBreakStaminaMul or 0.75)) end
 
                 if wep.SetBlocking then

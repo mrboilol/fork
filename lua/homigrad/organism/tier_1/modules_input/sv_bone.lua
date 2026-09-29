@@ -15,9 +15,6 @@ end
 
 local halfValue2 = util.halfValue2
 
-local boneShardModel = Model("models/gibs/hgibs_rib.mdl")
-local boneShards = {}
-
 local function getBurstPos(org, dmgInfo, hit)
 	if isvector(hit) and not hit:IsZero() then return hit end
 	local pos = dmgInfo:GetDamagePosition()
@@ -47,42 +44,6 @@ local function bloodBurst(org, dmgInfo, amount, hit)
 		net.WriteFloat(math.Clamp(amount, 1, 8))
 		net.WriteInt(math.random(2, 5), 8)
 		net.SendPVS(pos)
-	end
-end
-
-local function spawnBoneShards(org, count, hit, dmgInfo)
-	local pos = getBurstPos(org, dmgInfo, hit)
-	if not pos then return end
-	local force = dmgInfo:GetDamageForce():GetNormalized()
-	if force:IsZero() then force = vector_up end
-	local character = IsValid(org.owner) and hg.GetCurrentCharacter(org.owner)
-	local baseVelocity = IsValid(character) and character:GetVelocity() or vector_origin
-
-	for _ = 1, count do
-		local shard = ents.Create("prop_physics")
-		if not IsValid(shard) then continue end
-
-		shard:SetModel(boneShardModel)
-		shard:SetPos(pos + VectorRand(-2, 2))
-		shard:SetAngles(AngleRand())
-		shard:SetModelScale(math.Rand(0.25, 0.5), 0)
-		shard:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
-		shard:Spawn()
-		shard:Activate()
-
-		local phys = shard:GetPhysicsObject()
-		if IsValid(phys) then
-			phys:SetMass(0.1)
-			phys:SetVelocity(baseVelocity + force * math.Rand(60, 160) + VectorRand(-70, 70) + vector_up * math.Rand(20, 80))
-			phys:AddAngleVelocity(VectorRand(-400, 400))
-		end
-
-		boneShards[#boneShards + 1] = shard
-		while #boneShards > 48 do
-			local old = table.remove(boneShards, 1)
-			if IsValid(old) then old:Remove() end
-		end
-		SafeRemoveEntityDelayed(shard, 25)
 	end
 end
 
@@ -1094,7 +1055,6 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 
 	local chestDelta = org.chest - oldDmg
 	if chestDelta > 0 then
-		spawnBoneShards(org, math.Clamp(math.ceil(chestDelta * 12) + math.floor(org.chest * 3), 1, 8), hit, dmgInfo)
 		bloodBurst(org, dmgInfo, 2 + org.chest * 3, hit)
 	end
 

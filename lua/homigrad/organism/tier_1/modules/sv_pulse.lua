@@ -292,16 +292,16 @@ local function getHypovolemicFailureDrive(blood)
 end
 
 local function getHemorrhageRateCeiling(blood)
-	local failure = getHypovolemicFailureBlood()
-	local death = tonumber(hg.organism.BLEEDOUT_DEATH_BLOOD) or 2000
-	local depth = Clamp((failure - (tonumber(blood) or 5000)) / math.max(failure - death, 1), 0, 1)
+	local rampTop = getHypovolemicFailureBlood() + 500
+	local rampBottom = tonumber(hg.organism.BLEEDOUT_START_BLOOD) or 2500
+	local depth = Clamp((rampTop - (tonumber(blood) or 5000)) / math.max(rampTop - rampBottom, 1), 0, 1)
 	return Lerp(depth, 215, terminalHeartRate)
 end
 
 local function getHemorrhageRateFloor(blood)
 	local normal = getNormalBloodVolume()
-	local death = tonumber(hg.organism.BLEEDOUT_DEATH_BLOOD) or 2000
-	local depth = Clamp((normal - (tonumber(blood) or normal)) / math.max(normal - death, 1), 0, 1)
+	local bleedoutStart = tonumber(hg.organism.BLEEDOUT_START_BLOOD) or 2500
+	local depth = Clamp((normal - (tonumber(blood) or normal)) / math.max(normal - bleedoutStart, 1), 0, 1)
 	return 70 + (terminalHeartRate - 70) * depth
 end
 
@@ -1638,6 +1638,13 @@ module[2] = function(owner, org, timeValue)
 		org.cardiacArrestStart = nil
 		org.cardiacArrestO2Start = nil
 		org.ecgState = hg.organism.GetECGState(org.heartbeat or 0, false, org)
+	end
+
+	if org.heartstop and org.terminalCirculatoryFailure and bloodNow <= (tonumber(hg.organism.BLEEDOUT_DEATH_BLOOD) or 2000) and not restartCirculationActive then
+		org.heartbeat = 0
+		org.pulse = 0
+		org.ecgState = "asystole"
+		if org.o2 then org.o2[1] = 0 end
 	end
 
 	if org.heartstop then

@@ -22,12 +22,26 @@ local render_GetLightColor = render.GetLightColor
 local hg_blood_draw_distance = ConVarExists("hg_blood_draw_distance") and GetConVar("hg_blood_draw_distance") or CreateClientConVar("hg_blood_draw_distance", 1024, true, nil, "distance to draw blood", 0, 4096)
 local hg_blood_sprites = ConVarExists("hg_blood_sprites") and GetConVar("hg_blood_sprites") or CreateClientConVar("hg_blood_sprites", 1, true, nil, "blood is sprites or trails", 0, 1)
 
-hook.Add("PostCleanupMap","removeblooddroplets",function()
-	hg.bloodparticles1 = {}
+function hg.ResetBloodDecals()
 	hg.bloodpositions = {}
 	hg.bloodcount = 0
 	hg.groundbloodstains = {}
 	hg.fadinggroundbloodstains = {}
+end
+
+hook.Add("PostCleanupMap","removeblooddroplets",function()
+	hg.bloodparticles1 = {}
+	hg.ResetBloodDecals()
+end)
+
+concommand.Add("hg_cleardecals", function()
+	RunConsoleCommand("r_cleardecals")
+	hg.ResetBloodDecals()
+end)
+
+net.Receive("hg_cleardecals", function()
+	RunConsoleCommand("r_cleardecals")
+	hg.ResetBloodDecals()
 end)
 
 hook.Add("Player Spawn", "removeownblooddroplets", function(ply)
