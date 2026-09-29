@@ -505,7 +505,7 @@ local function AddTorsoTrauma(ply, rag, fromExplosion)
 		SpawnMeatGore(rag, splitPos, 10, VectorRand(-350, 350), 1.15)
 	end
 	if splitPos then
-		util.Decal("Blood", splitPos + Vector(0, 0, 10), splitPos - Vector(0, 0, 35), rag)
+		util.Decal("Normal.Blood24", splitPos + Vector(0, 0, 10), splitPos - Vector(0, 0, 35), rag)
 	end
 
 	ply:EmitSound(tearSounds[math.random(#tearSounds)], 92, math.random(92, 104), 1.15)
@@ -622,7 +622,7 @@ local function SplitDeadRagdoll(ply, target, force)
 	local splitBone = rag:LookupBone("ValveBiped.Bip01_Spine2")
 	local splitPos = splitBone and GetBoneTransform(rag, splitBone) or rag:WorldSpaceCenter()
 	if splitPos and SpawnMeatGore then SpawnMeatGore(rag, splitPos, 10, VectorRand(-350, 350), 1.15) end
-	if splitPos then util.Decal("Blood", splitPos + Vector(0, 0, 10), splitPos - Vector(0, 0, 35), rag) end
+	if splitPos then util.Decal("Normal.Blood24", splitPos + Vector(0, 0, 10), splitPos - Vector(0, 0, 35), rag) end
 	rag:EmitSound(tearSounds[math.random(#tearSounds)], 92, math.random(92, 104), 1.15)
 	rag:EmitSound("physics/body/body_medium_break3.wav", 88, math.random(82, 94), 1)
 	return true

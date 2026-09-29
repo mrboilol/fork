@@ -7,7 +7,7 @@ local internalBleedDefaultComplicationDelay = 120
 hg.organism.module.blood = {}
 local module = hg.organism.module.blood
 local hg_infections = ConVarExists("hg_infections") and GetConVar("hg_infections") or CreateConVar("hg_infections",1,FCVAR_ARCHIVE + FCVAR_NOTIFY,"Enable infections system",0,1)
-local hg_blood_ground_limit = ConVarExists("hg_blood_ground_limit") and GetConVar("hg_blood_ground_limit") or CreateConVar("hg_blood_ground_limit", 2500, FCVAR_ARCHIVE + FCVAR_REPLICATED, "Maximum persistent ground blood stains", 1, 5000)
+local hg_blood_ground_limit = ConVarExists("hg_blood_ground_limit") and GetConVar("hg_blood_ground_limit") or CreateConVar("hg_blood_ground_limit", 8000, FCVAR_ARCHIVE + FCVAR_REPLICATED, "Maximum persistent ground blood stains", 1, 20000)
 local tranexamicOnsetDelay = 8
 
 function hg.organism.AdministerTranexamic(org, dose)
@@ -59,7 +59,6 @@ module[1] = function(org)
 	org.bleedStart = 0
 	org.wounds = {}
 	org.arterialwounds = {}
-	org.woundmarks = {}
 	org.holdWound = nil
 	org.holdWoundArterial = nil
 	org.wantToVomit = 0
@@ -587,10 +586,6 @@ module[2] = function(owner, org, mulTime)
 				wound[1] = 0
 				woundBleedRates[i] = 0
 				wound.visualBleedRate = 0
-				if not wound.markHealed then
-					wound.markHealed = true
-					hg.organism.RemoveWoundMark(org, wound, false)
-				end
 			end
 		end
 	end
@@ -674,7 +669,6 @@ module[2] = function(owner, org, mulTime)
 			if not wound.markHealed then
 				wound.markHealed = true
 				healedArtery = true
-				hg.organism.RemoveWoundMark(org, wound, true)
 			end
 		end
 		arterialWoundBleedRates[i] = woundBleedRate

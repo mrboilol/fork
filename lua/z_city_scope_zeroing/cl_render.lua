@@ -199,6 +199,9 @@ local hg_show_hitposmuzzle = ConVarExists("hg_show_hitposmuzzle") and GetConVar(
 --- Кастомная настройка Render View для 3D picture-in-picture прицелов (DoRT).
 --- @param self Weapon
 function ZCityScopeZeroing.SWEP_DoRT(self)
+	if self.scopedef and ZCityScopeZeroing.BaseDoRT and not ZCityScopeZeroing.GetActiveOpticAttachment(self) then
+		return ZCityScopeZeroing.BaseDoRT(self)
+	end
 	LOW_RENDER = nil
 	local gun = self:GetWeaponEntity()
 	local att = self:GetMuzzleAtt(gun, true)
@@ -411,6 +414,9 @@ function ZCityScopeZeroing.ApplyOverrides()
 	-- Сохраняем оригинальные функции для проверки в цикле, чтобы не перезаписывать
 	-- кастомные реализации в дочерних оружиях
 	local originalDoRT = base.DoRT
+	if originalDoRT ~= ZCityScopeZeroing.SWEP_DoRT then
+		ZCityScopeZeroing.BaseDoRT = originalDoRT
+	end
 	local originalChangeFOV = base.ChangeFOV
 
 	-- Инициализируем Render Targets

@@ -8,10 +8,6 @@ if SERVER then
         if not IsValid(ent) then return end
         local owner = ent:IsRagdoll() and hg.RagdollOwner(ent) or ent
         local org = IsValid(owner) and owner.organism
-        if org and org.woundmarks and #org.woundmarks > 0 then
-            org.woundmarks = {}
-            if hg.organism.SyncWoundMarksNet then hg.organism.SyncWoundMarksNet(org) end
-        end
         local body = IsValid(owner) and owner:IsPlayer() and hg.GetCurrentCharacter(owner) or nil
         for _, target in ipairs({ent, owner, body}) do
             if IsValid(target) then target:RemoveAllDecals() end
@@ -164,7 +160,7 @@ end
 
 local matBlood = Material("zbattle/blood")
 local oldMatBlood = Material("decals/z_blood1")
-local hg_old_blood = ConVarExists("hg_old_blood") and GetConVar("hg_old_blood") or CreateClientConVar("hg_old_blood", 0, true, false, "new decals, or old", 0, 1)
+local hg_old_blood = ConVarExists("hg_old_blood") and GetConVar("hg_old_blood") or CreateClientConVar("hg_old_blood", 1, true, false, "new decals, or old", 0, 1)
 net.Receive("bloody_decal_1", function()
 	local self = net.ReadEntity()
 
@@ -182,7 +178,6 @@ end)
 net.Receive("hg_clear_blood_decals", function()
 	local ent = net.ReadEntity()
 	if not IsValid(ent) then return end
-	if hg.ClearPersistentBodyBlood then hg.ClearPersistentBodyBlood(ent) end
 	local owner = ent:IsRagdoll() and hg.RagdollOwner(ent) or ent
 	local body = IsValid(owner) and owner:IsPlayer() and hg.GetCurrentCharacter(owner) or nil
 	for _, target in ipairs({ent, owner, body}) do

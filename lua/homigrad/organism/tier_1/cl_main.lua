@@ -652,15 +652,9 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 	end
 	
 	local traitScreenEffects = lply:GetTraitMultiplier("screen_effects", 1)
-	local lowO2Visual = math.Clamp((15 - o2) / 15, 0, 1) * traitScreenEffects
-	if lowO2Visual > 0 then
-		local flickerStep = math.floor(CurTime() * (10 + lowO2Visual * 18))
-		local lowO2Flicker = flickerStep % 3 == 0 and 1 or 0.58
-		lowO2Visual = lowO2Visual * lowO2Flicker
-	end
 	local lowConsciousnessVisual = math.Clamp((0.5 - consciousness) / 0.2, 0, 1) * traitScreenEffects
 	local shockVisual = math.Clamp(((org.shock or 0) - 18) / 62, 0, 1) * traitScreenEffects
-	local shockVignette = math.max(lowO2Visual ^ 1.2, lowConsciousnessVisual ^ 1.35, shockVisual * 0.8)
+	local shockVignette = math.max(lowConsciousnessVisual ^ 1.35, shockVisual ^ 2.5 * 0.8)
 	local consciousnessBlackout = lowConsciousnessVisual ^ 2.6 * 0.58
 	k1 = Lerp(FrameTime() * 15, k1 or 0, math.min(math.min(adrenaline / 1, 2),1.5))
 	k2 = (30 - (o2 or 30)) / 30 + consciousnessBlackout
@@ -886,11 +880,6 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 	end
 end)
 
-local function resetPersistentBodyDecals(ent, clear)
-	if not IsValid(ent) or not clear then return end
-	ent.hgPersistentDecalsDirty = true
-end
-
 hook.Add("OnNetVarSet","wounds_netvar",function(index, key, var)
 	if key == "wounds" then
 		local ent = Entity(index)
@@ -963,42 +952,16 @@ hook.Add("OnNetVarSet","wounds_netvar2",function(index, key, var)
 	end
 end)
 
-hook.Add("OnNetVarSet", "woundmarks_netvar", function(index, key, var)
-	if key != "woundmarks" then return end
-	local ent = Entity(index)
-	if not IsValid(ent) then return end
-
-	local oldCount = istable(ent.woundmarks) and #ent.woundmarks or 0
-	ent.woundmarks = istable(var) and var or {}
-	resetPersistentBodyDecals(ent, #ent.woundmarks < oldCount)
-	local rag = ent:GetNWEntity("FakeRagdoll")
-	if IsValid(rag) then
-		rag.woundmarks = ent.woundmarks
-		resetPersistentBodyDecals(rag, #ent.woundmarks < oldCount)
-	end
-	local deathRag = ent:GetNWEntity("RagdollDeath")
-	if IsValid(deathRag) and deathRag != rag then
-		deathRag.woundmarks = ent.woundmarks
-		resetPersistentBodyDecals(deathRag, #ent.woundmarks < oldCount)
-	end
-end)
-
 hook.Add("Player Spawn", "removewounds", function(ply)
 	if OverrideSpawn then return end
 
 	ply.wounds = {}
 	ply.arterialwounds = {}
-	ply.woundmarks = {}
-	ply.persistentBloodMarks = {}
-	resetPersistentBodyDecals(ply, true)
 
 	local rag = ply:GetNWEntity("FakeRagdoll")
 	if IsValid(rag) then
 		rag.wounds = {}
 		rag.arterialwounds = {}
-		rag.woundmarks = {}
-		rag.persistentBloodMarks = {}
-		resetPersistentBodyDecals(rag, true)
 	end
 end)
 
@@ -1007,10 +970,7 @@ hook.Add("Fake", "huyhuyhuy235", function(ply,ragdoll)
 
 	ragdoll.wounds = ply.wounds
 	ragdoll.arterialwounds = ply.arterialwounds
-	ragdoll.woundmarks = ply.woundmarks
-	ragdoll.persistentBloodMarks = ply.persistentBloodMarks
 	ragdoll.hgBloodVisualReadyAt = CurTime() + 0.2
-	resetPersistentBodyDecals(ragdoll, true)
 end)
 
 function hg.applyFountain(pos, ang, mul, mul2, forward, ent)
@@ -1114,9 +1074,13 @@ local function emitOrdinaryBleeding(ent, org, wound, pos, ang, visualRate, inter
 		* (1 + concentration * 0.3), 90)
 	local vel = outward * speed * math.Rand(0.6, 1.1) + bleedDown * math.Rand(10, 30)
 		+ lateral + VectorRand(-(2 + sizeK * 10) * spread, (2 + sizeK * 10) * spread)
-	local size = math.Clamp(0.6 + math.sqrt(dropVolume) * 1.5, 0.8, 5.5)
-	local part = hg.addBloodPart(pos + VectorRand(-0.3, 0.3), vel, nil, size, size, false, nil, ent, dropVolume < 0.25)
-	if part then part.volume = dropVolume end
+	local count = math.Clamp(math.ceil(dropVolume / 2), 1, 3)
+	local volume = dropVolume / count
+	local size = math.Clamp(0.6 + math.sqrt(volume) * 1.5, 0.8, 5.5)
+	for _ = 1, count do
+		local part = hg.addBloodPart(pos + VectorRand(-0.3, 0.3), vel * math.Rand(0.7, 1.2) + VectorRand(-5, 5), nil, size, size, false, nil, ent, volume < 0.25)
+		if part then part.volume = volume end
+	end
 end
 
 local function emitArterialBleeding(ent, org, wound, index, pos, ang, boneAng, water, visualRate, interval, forceMul)
@@ -1141,7 +1105,7 @@ local function emitArterialBleeding(ent, org, wound, index, pos, ang, boneAng, w
 		sprayDir = -sprayAng:Forward()
 	end
 	local reach = wound[7] == "aorta" and 1.2 or (wound[7] == "arteria" and 1.15 or 1)
-	local velocity = sprayDir * (isvector(localDir) and localDir:Length() or 100) * 5.5
+	local velocity = sprayDir * math.Clamp((isvector(localDir) and localDir:Length() or 100) * 2, 90, 260)
 		* reach * pressureDrive * math.Clamp(pulse, 0.5, 1.3) * spurt * (forceMul or 1)
 		+ sprayDir:Angle():Right() * 12 * sizeK * math.sin(time * 2)
 		+ ang:Up() * 10 * sizeK * math.sin(time * 3)
@@ -1150,10 +1114,15 @@ local function emitArterialBleeding(ent, org, wound, index, pos, ang, boneAng, w
 	for _ = 1, count do
 		local dropVolume = volume * math.Rand(0.7, 1.3)
 		local size = math.Clamp(0.8 + math.sqrt(dropVolume) * 1.5, 1, 6) * arterySizeMul
-		local vel = velocity * math.Rand(0.85, 1.05) + VectorRand(-3, 3) * (1 + sizeK * 3)
+		local vel = velocity * math.Rand(0.65, 1.45) + VectorRand(-3, 3) * (1 + sizeK * 3)
 		local part = hg.addBloodPart(pos, vel, nil, size, size, true, nil, ent, dropVolume < 0.25)
 		if part then part.volume = dropVolume end
 	end
+	local dripVolume = volume * 0.35
+	local dripSize = math.Clamp(0.8 + math.sqrt(dripVolume) * 1.5, 1, 4)
+	local dripVel = pressureDrive > 0.05 and -sprayDir * math.Rand(20, 50) or bleedDown * math.Rand(12, 28)
+	local drip = hg.addBloodPart(pos, dripVel + VectorRand(-12, 12), nil, dripSize, dripSize, true, nil, ent, dripVolume < 0.25)
+	if drip then drip.volume = dripVolume end
 
 	return false
 end
@@ -1261,131 +1230,6 @@ end
 local function GetWoundTransform(ent, wound, mat, boneID)
 	return hg.organism.GetWoundTransform(ent, wound)
 end
-
-function hg.AddPersistentBodyBloodMark(ent, pos, normal, size)
-	if not IsValid(ent) or not isvector(pos) or ent:WaterLevel() >= 2 then return false end
-	local ang = isvector(normal) and normal:LengthSqr() > 0.001 and normal:Angle() or angle_zero
-	local localPos, localAng, bone = hg.organism.GetWoundAnchor(ent, pos + ang:Forward() * 0.15, ang)
-	if not localPos then return false end
-
-	ent.persistentBloodMarks = ent.persistentBloodMarks or {}
-	for _, mark in ipairs(ent.persistentBloodMarks) do
-		if mark[4] == bone and mark[2]:DistToSqr(localPos) < 9 then return false end
-	end
-	if #ent.persistentBloodMarks >= 64 then return false end
-
-	ent.persistentBloodMarks[#ent.persistentBloodMarks + 1] = {
-		math.Clamp(tonumber(size) or 1.25, 0.55, 5),
-		localPos,
-		localAng,
-		bone,
-		CurTime(),
-		false,
-	}
-	return true
-end
-
-function hg.ClearPersistentBodyBlood(ent)
-	if not IsValid(ent) then return end
-	local owner = ent:IsRagdoll() and hg.RagdollOwner(ent) or ent
-	local body = IsValid(owner) and owner:IsPlayer() and hg.GetCurrentCharacter(owner) or nil
-	for _, target in ipairs({ent, owner, body}) do
-		if IsValid(target) then
-			target.persistentBloodMarks = {}
-			resetPersistentBodyDecals(target, true)
-		end
-	end
-end
-
-local persistentBodyDecalMaterials = {
-	bullet = Material(util.DecalMaterial("Impact.Flesh")),
-	slash = Material(util.DecalMaterial("ManhackCut")),
-	trauma = Material(util.DecalMaterial("Impact.BloodyFlesh")),
-	arterial = Material(util.DecalMaterial("Impact.Flesh")),
-	blood = Material(util.DecalMaterial("Blood")),
-}
-
-local function paintPersistentBodyDecal(ent, mark, blood)
-	local pos, ang = hg.organism.GetWoundTransform(ent, mark)
-	if not pos or not ang then return end
-	local normal = ang:Forward()
-	local severity = math.max(tonumber(mark[1]) or 0.01, 0.01)
-	local kind = blood and "blood" or mark[7] or (mark[6] and "arterial" or "trauma")
-	local scale = math.Clamp(0.18 + math.sqrt(severity) * 0.055, 0.2, kind == "slash" and 0.8 or 0.65)
-	local width = kind == "slash" and scale * 0.35 or scale
-	local height = kind == "slash" and scale * 1.4 or scale
-	util.DecalEx(persistentBodyDecalMaterials[kind] or persistentBodyDecalMaterials.trauma, ent, pos + normal * 0.2, normal, color_white, width, height)
-end
-
-local function refreshPersistentBodyDecals(ent, wounds, blood)
-	wounds = istable(wounds) and wounds or {}
-	blood = istable(blood) and blood or {}
-	if (ent.hgNextBodyDecalExpiry or 0) <= CurTime() then
-		ent.hgNextBodyDecalExpiry = CurTime() + 5
-		for _, marks in ipairs({wounds, blood}) do
-			for index = #marks, 1, -1 do
-				if CurTime() - (tonumber(marks[index][5]) or 0) >= 120 then
-					table.remove(marks, index)
-					ent.hgPersistentDecalsDirty = true
-				end
-			end
-		end
-	end
-	local model = ent:GetModel()
-	if ent.hgPersistentDecalModel != model then
-		ent.hgPersistentDecalModel = model
-		ent.hgPersistentDecalsDirty = true
-	end
-	if ent.hgPersistentDecalWounds != wounds or ent.hgPersistentDecalBlood != blood then
-		ent.hgPersistentDecalWounds = wounds
-		ent.hgPersistentDecalBlood = blood
-		if #wounds < (ent.hgPersistentDecalWoundCount or 0) or #blood < (ent.hgPersistentDecalBloodCount or 0) then
-			ent.hgPersistentDecalsDirty = true
-		end
-	end
-
-	local paintedWounds, paintedBlood = ent.hgPersistentDecalWoundCount or 0, ent.hgPersistentDecalBloodCount or 0
-	if ent.hgPersistentDecalsDirty then
-		ent.hgPersistentDecalsDirty = nil
-		ent:RemoveAllDecals()
-		paintedWounds, paintedBlood = 0, 0
-	end
-	if paintedWounds >= #wounds and paintedBlood >= #blood then
-		ent.hgPersistentDecalWoundCount, ent.hgPersistentDecalBloodCount = #wounds, #blood
-		return
-	end
-
-	ent:SetupBones()
-	for i = paintedWounds + 1, #wounds do paintPersistentBodyDecal(ent, wounds[i], false) end
-	for i = paintedBlood + 1, #blood do paintPersistentBodyDecal(ent, blood[i], true) end
-	ent.hgPersistentDecalWoundCount, ent.hgPersistentDecalBloodCount = #wounds, #blood
-end
-
-hook.Add("PostDrawTranslucentRenderables", "hg_persistent_organism_blood", function(depth, skybox)
-	if skybox then return end
-	local eyePos = EyePos()
-	local maxDistance = hg_blood_draw_distance:GetInt() * 1.5
-	local maxDistanceSqr = maxDistance * maxDistance
-	local rendered = {}
-
-	for _, seen in ipairs(hg.seenents or {}) do
-		if not IsValid(seen) then continue end
-		local ent = seen
-		if ent:IsPlayer() then
-			local body = getArterySoundEnt(ent)
-			if IsValid(body) then ent = body end
-		end
-		if rendered[ent] or ent:GetPos():DistToSqr(eyePos) > maxDistanceSqr then continue end
-		rendered[ent] = true
-
-		local owner = ent:IsRagdoll() and hg.RagdollOwner(ent) or ent
-		local woundmarks = ent.woundmarks
-		if (not istable(woundmarks) or #woundmarks == 0) and IsValid(owner) then woundmarks = owner.woundmarks end
-		local bloodmarks = ent.persistentBloodMarks
-		if (not istable(bloodmarks) or #bloodmarks == 0) and IsValid(owner) then bloodmarks = owner.persistentBloodMarks end
-		refreshPersistentBodyDecals(ent, woundmarks, bloodmarks)
-	end
-end)
 
 hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, ent, time)
 	if ent:IsPlayer() then

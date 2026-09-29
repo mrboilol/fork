@@ -168,7 +168,8 @@ function hg.ProcessBulletNearMiss(data)
 				net.WriteVector(pos)
 				net.WriteFloat(strength)
 			net.Send(ply)
-			if shotPlayers then shotPlayers[ply] = true end
+			if hg.CombatThought then hg.CombatThought(ply, "near_shot") end
+				if shotPlayers then shotPlayers[ply] = true end
 		end
 	end
 end

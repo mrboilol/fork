@@ -49,6 +49,7 @@ local thoughtMessages = {
     hypotension = {"You are showing signs of hypotension.", "Your blood pressure is dangerously low."},
     hypertension = {"You are showing signs of hypertension.", "Your blood pressure is dangerously high."},
     low_perfusion = {"Your body feels numb.", "Your limbs feel weak."},
+    shortbreath = {"You are short of breath.", "You can't get enough air."},
     barely_breathing = {"You are breathing weakly.", "Your breathing is shallow."},
     low_stamina = {"You are exerted.", "You feel tired."},
     trachea1 = {"Your trachea is slightly damaged.", "Something hit your windpipe."},
@@ -352,12 +353,112 @@ local function GetConditionThought(ply, msgKey)
     return options[index]
 end
 
+local combatThoughts = {
+    stabbed = {
+        "JESUS CHRIST- I GOT STABBED!",
+        "FUCK- HE STABBED ME!",
+        "OH GOD- I'M STABBED-",
+        "SHIT- THAT BLADE WENT IN-",
+        "I'VE BEEN STABBED- FUCK-",
+        "HE CUT ME- HE FUCKING CUT ME-",
+        "AGH- THAT'S STEEL IN ME-",
+    },
+    shot = {
+        "JESUS CHRIST- I GOT SHOT!",
+        "FUCK- I'M HIT-",
+        "OH FUCK- I'M HIT- I'M HIT-",
+        "SHIT- SHIT- I'M SHOT-",
+        "HE SHOT ME- FUCK-",
+        "I'VE BEEN SHOT- OH GOD-",
+    },
+    shot_head = {
+        "MY HEAD- FUCK- MY HEAD-",
+        "JESUS- THAT HIT MY HEAD-",
+        "OH GOD- MY FACE-",
+    },
+    shot_armor = {
+        "FUCK- THE VEST TOOK IT-",
+        "SHIT- THAT HIT MY VEST-",
+        "I'M HIT- THE ARMOR HELD-",
+    },
+    clubbed = {
+        "FUCK- HE HIT ME-",
+        "AGH- SOMETHING JUST SMASHED INTO ME-",
+        "SHIT- I GOT HIT-",
+    },
+    near_shot = {
+        "FUCK- I ALMOST GOT SHOT...",
+        "JESUS- THAT ONE WAS CLOSE-",
+        "SHIT- THAT MISSED ME BY INCHES-",
+        "HOLY SHIT- THAT WAS RIGHT AT MY HEAD-",
+        "THEY'RE SHOOTING AT ME-",
+        "FUCK- I'M BEING SHOT AT-",
+        "THAT ROUND WENT RIGHT PAST ME-",
+    },
+}
+
+function hg.CombatThought(ply, pool)
+    if not IsValid(ply) or not ply:IsPlayer() or not ply:Alive() then return false end
+    if ply.HasTrait and ply:HasTrait("gurajchaka_child") then return false end
+    if ply.PlayerClassName == "Gordon" then return false end
+    if ply:GetInfoNum("hg_showthoughts", 1) == 0 then return false end
+
+    local org = ply.organism
+    if org and org.otrub then return false end
+
+    local options = combatThoughts[pool]
+    if not options then return false end
+
+    local now = CurTime()
+    if (ply.nextCombatThought or 0) > now then return false end
+    ply.nextCombatThought = now + (pool == "near_shot" and 5 or 3)
+
+    local msg = options[math.random(#options)]
+    if ply.lastCombatThoughtText == msg then msg = options[math.random(#options)] end
+    ply.lastCombatThoughtText = msg
+
+    if org then org.nextStatusThought = math.max(org.nextStatusThought or 0, now + 6) end
+
+    if ply:GetInfoNum("hg_newthoughts", 0) > 0 then
+        ply.nextThoughtGlobal = 0
+        net.Start("HGThought")
+        net.WriteString(msg)
+        net.WriteColor(Color(255, 90, 90, 255))
+        net.WriteString("combat")
+        net.Send(ply)
+    else
+        net.Start("HGNotificate")
+        net.WriteString(msg)
+        net.WriteColor(Color(255, 90, 90, 255))
+        net.WriteUInt(110, 7)
+        net.Send(ply)
+    end
+
+    return true
+end
+
 local function SCPCBHitThought(ply, target, dmgType, dmg, hitPos, dmginfo)
     if not dmg or dmg <= 0 then return end
 
     local isLethal = dmg >= ply:Health()
     local hitgroup = SCPCBThoughtHitgroup(target, dmgType, dmginfo, hitPos)
     local category = scpcbHitgroupToCat[hitgroup] or "generic"
+
+    if not isLethal then
+        if dmgType == "slash" then
+            hg.CombatThought(ply, "stabbed")
+        elseif dmgType == "bullet" then
+            if SCPCBArmorProtection(target, ply, hitgroup) > 0 then
+                hg.CombatThought(ply, "shot_armor")
+            elseif hitgroup == HITGROUP_HEAD then
+                hg.CombatThought(ply, "shot_head")
+            else
+                hg.CombatThought(ply, "shot")
+            end
+        elseif dmgType == "blunt" and dmg >= 8 then
+            hg.CombatThought(ply, "clubbed")
+        end
+    end
 
     ply.scpcbThoughtHitTime = CurTime() + 0.25
 

@@ -154,7 +154,7 @@ SWEP.AnimList = {
 
 function SWEP:Reload()
     if SERVER then
-        if self:GetOwner():KeyPressed(IN_ATTACK) then
+        if self:GetOwner():KeyPressed(IN_ATTACK) and not self:IsSlamMode() then
             self:SetNetVar("mode", not self:GetNetVar("mode"))
             self:GetOwner():ChatPrint("Changed mode to "..(self:GetNetVar("mode") and "slash." or "stab."))
         end

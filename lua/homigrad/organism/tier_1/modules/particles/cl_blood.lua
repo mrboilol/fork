@@ -111,7 +111,7 @@ bloodparticles_hook[1] = function(anim_pos, mul)
 	--render.OverrideBlend( false )
 end
 
-local hg_old_blood = ConVarExists("hg_old_blood") and GetConVar("hg_old_blood") or CreateClientConVar("hg_old_blood", 0, true, false, "new decals, or old", 0, 1)
+local hg_old_blood = ConVarExists("hg_old_blood") and GetConVar("hg_old_blood") or CreateClientConVar("hg_old_blood", 1, true, false, "new decals, or old", 0, 1)
 local hg_oldblood = ConVarExists("hg_oldblood") and GetConVar("hg_oldblood") or CreateClientConVar("hg_oldblood", 0, true, false, "Use old Z-City blood decals", 0, 1)
 local function useOldBlood()
 	return hg_old_blood:GetBool() or hg_oldblood:GetBool()
@@ -130,150 +130,19 @@ cvars.AddChangeCallback("hg_oldblood", function(_, oldValue, newValue)
 	if oldValue == newValue then return end
 	hg.bloodpositions = {}
 	hg.bloodcount = 0
-	hg.groundbloodstains = {}
-	hg.fadinggroundbloodstains = {}
 end, "hg_refresh_oldblood_decals")
 
 hg.bloodpositions = hg.bloodpositions or {}
 hg.bloodcount = hg.bloodcount or 0
 local bloodDripSoundChance = 2 / 3
 
-local hg_blood_ground_limit = GetConVar("hg_blood_ground_limit") or CreateClientConVar("hg_blood_ground_limit", 2500, true, false, "Maximum persistent ground blood stains", 1, 5000)
-
-hg.groundbloodstains = hg.groundbloodstains or {}
-hg.fadinggroundbloodstains = hg.fadinggroundbloodstains or {}
-
-local groundBloodMaterials = {}
-for _, i in ipairs({1, 2, 3, 4, 6, 7, 8, 9, 10, 11}) do
-	groundBloodMaterials[#groundBloodMaterials + 1] = Material("effects/droplets/drop" .. i .. "_5")
-end
 local oldBloodDecals = {}
 local oldArterialBloodDecals = {}
 for i = 1, 10 do
 	oldBloodDecals[i] = Material("decals/z_blood" .. i)
 	oldArterialBloodDecals[i] = Material("decals/arterial_blood" .. i)
 end
-local arterialGroundBloodMaterial = Material("effects/droplets/drop12_5")
-
-local groundBloodColor = Color(230, 35, 35, 255)
-local render_DrawQuadEasy = render.DrawQuadEasy
 local poolTrace = {mask = MASK_SOLID_BRUSHONLY}
-local poolStartVolume = 10
-local poolMaxSize = 24
-local poolFullVolume = 200
-local stainBaseMaxSize = 6
-local poolLocalRadiusSqr = 48 * 48
-
-local poolMaxedNeeded = 10
-
-local function getStainSizeCap(localVolume, maxedCount)
-	if maxedCount < poolMaxedNeeded then return stainBaseMaxSize end
-	local k = math.Clamp((localVolume - poolStartVolume) / (poolFullVolume - poolStartVolume), 0, 1)
-	return Lerp(k, stainBaseMaxSize, poolMaxSize)
-end
-
-local function findGroundBlood(pos, normal, ignored)
-	local stains = hg.groundbloodstains
-	local nearest, nearestDistance
-	local localVolume, maxedCount = 0, 0
-	for _, stain in ipairs(stains) do
-		if stain ~= ignored and stain.normal:Dot(normal) >= 0.75 then
-			local mergeRadius = useOldBlood() and math.max(9, (stain.size or 1) * 0.5 + 4) or math.max(3, (stain.size or 1) * 0.8)
-			local distance = stain.pos:DistToSqr(pos)
-			if distance <= poolLocalRadiusSqr then
-				localVolume = localVolume + (stain.volume or 1)
-				if stain.size >= stainBaseMaxSize - 0.05 then maxedCount = maxedCount + 1 end
-			end
-			if distance <= mergeRadius * mergeRadius and (not nearestDistance or distance < nearestDistance) then
-				nearest, nearestDistance = stain, distance
-			end
-		end
-	end
-	return nearest, localVolume, maxedCount
-end
-
-local function depositGroundBlood(pos, normal, artery, tiny, amount, ignored)
-	local stain, localVolume, maxedCount = findGroundBlood(pos, normal, ignored)
-	amount = amount or (tiny and 0.2 or artery and 2.5 or 1)
-	local size = math.Clamp((tiny and 1.8 or 3) + amount, 1.5, 6)
-
-	if stain then
-		local cap = getStainSizeCap(localVolume + amount, maxedCount)
-		if stain.size < cap - 0.05 then
-			if artery and not stain.artery then
-				stain.artery = true
-				stain.material = arterialGroundBloodMaterial
-			end
-			stain.volume = (stain.volume or 1) + amount
-			stain.size = math.min(math.max(stain.size, size) + amount * (maxedCount >= poolMaxedNeeded and 0.85 or 0.25), cap)
-			return stain
-		end
-
-		if localVolume >= poolFullVolume then return stain end
-		local ang = normal:Angle()
-		local spread = math.max(stain.size, 2) * 0.9
-		local dir = math.Rand(0, math.pi * 2)
-		local dist = math.Rand(0.6, 1) * spread
-		pos = pos + ang:Right() * math.cos(dir) * dist + ang:Up() * math.sin(dir) * dist
-		size = math.max(size, cap * math.Rand(0.75, 1))
-	elseif maxedCount >= poolMaxedNeeded then
-		size = math.max(size, getStainSizeCap(localVolume + amount, maxedCount) * math.Rand(0.6, 0.9))
-	end
-
-	local stains = hg.groundbloodstains
-	local limit = math.max(hg_blood_ground_limit:GetInt(), 1)
-	while #stains >= limit do table.remove(stains, 1) end
-
-	stain = {
-		pos = pos + normal * 0.2,
-		normal = normal,
-		material = artery and arterialGroundBloodMaterial or groundBloodMaterials[math_random(#groundBloodMaterials)],
-		size = size,
-		rotation = math_random(0, 359),
-		volume = amount,
-		artery = artery,
-	}
-	stains[#stains + 1] = stain
-	return stain
-end
-
-local wallBloodMaxSize = 8
-
-local function addWallBlood(pos, normal, artery, tiny, amount)
-	amount = amount or (tiny and 0.2 or artery and 2.5 or 1)
-	local stain = findGroundBlood(pos, normal)
-	if stain then
-		stain.size = math.min(stain.size + amount * 0.15, math.max(stain.size, wallBloodMaxSize))
-		return
-	end
-
-	local stains = hg.groundbloodstains
-	local limit = math.max(hg_blood_ground_limit:GetInt(), 1)
-	while #stains >= limit do table.remove(stains, 1) end
-
-	stains[#stains + 1] = {
-		pos = pos + normal * 0.2,
-		normal = normal,
-		material = artery and arterialGroundBloodMaterial or groundBloodMaterials[math_random(#groundBloodMaterials)],
-		size = math.Clamp((tiny and 1.2 or 2.5) + amount * 0.5, 1, 5),
-		rotation = math_random(0, 359),
-		volume = amount,
-		artery = artery,
-		wall = true,
-	}
-end
-
-local function addGroundBlood(pos, normal, artery, tiny, amount)
-	if useOldBlood() then return false end
-	if normal.z < 0.55 then
-		addWallBlood(pos, normal, artery, tiny, amount)
-		return true
-	end
-	depositGroundBlood(pos, normal, artery, tiny, amount)
-
-	return true
-end
-
 local function isDecalExSafe(target)
 	return not IsValid(target) or target:IsWorld() or string.sub(target:GetModel() or "", 1, 1) == "*"
 end
@@ -287,48 +156,6 @@ local function placeOldBloodDecal(pos, normal, target, artery, scale)
 	util.DecalEx(decals[math_random(#decals)], target or game.GetWorld(), pos, normal, color_white, scale, scale)
 end
 
-function hg.DepositBodyBloodRunoff(pos)
-	poolTrace.start = pos + vector_up * 2
-	poolTrace.endpos = pos - vector_up * 256
-	local result = util_TraceLine(poolTrace)
-	if result.HitWorld and result.HitNormal.z >= 0.55 then
-		if useOldBlood() then
-			placeOldBloodDecal(result.HitPos, result.HitNormal, nil, false, math.Rand(0.12, 0.24))
-			return
-		end
-		depositGroundBlood(result.HitPos, result.HitNormal, false, true, 1)
-	end
-end
-
-hook.Add("Think", "hg_persistent_ground_blood", function()
-	local stains = hg.groundbloodstains
-	local limit = math.max(hg_blood_ground_limit:GetInt(), 1)
-
-	while #stains > limit do table.remove(stains, 1) end
-end)
-
-hook.Add("PostDrawTranslucentRenderables", "hg_draw_persistent_ground_blood", function()
-	local eyePos = EyePos()
-	local eyeForward = EyeAngles():Forward()
-	local drawDistance = hg_blood_draw_distance:GetInt()
-	local drawDistanceSqr = drawDistance * drawDistance
-
-	local function drawStain(stain, alpha)
-		local offset = stain.pos - eyePos
-		if offset:LengthSqr() > drawDistanceSqr or offset:Dot(eyeForward) < -stain.size then return end
-		groundBloodColor.a = alpha
-		render_SetMaterial(stain.material)
-		local oldBlood = useOldBlood()
-		local size = stain.size * (oldBlood and 1 or 4)
-		render_DrawQuadEasy(stain.pos, stain.normal, size, size, groundBloodColor, stain.rotation)
-	end
-
-	for i = 1, #hg.groundbloodstains do
-		drawStain(hg.groundbloodstains[i], 255)
-	end
-
-end)
-
 local function playBloodDripImpact(pos, tr)
 	if math.Rand(0, 1) > bloodDripSoundChance then return end
 
@@ -338,21 +165,30 @@ local function playBloodDripImpact(pos, tr)
 	end
 end
 
-local function getNewBloodDecal(artery, amount)
-	if artery then return "Normal.Blood24" end
-	return amount < 0.35 and "Normal.Blood22" or amount < 0.8 and "Normal.Blood23" or amount < 1.5 and "Normal.Blood25" or "Normal.Blood24"
+local newBloodDecalMaterials = {}
+local bloodCellSize = 6
+local bloodMaxLayers = 6
+
+local function getBloodDecalScale(amount)
+	return math.Clamp((0.2 + math.sqrt(amount or 0.2) * 0.35) * math.Rand(0.85, 1.15), 0.12, 3)
 end
 
-local newBloodDecalMaterials = {}
-
-local function getBloodDecalScale(amount, pos, normal)
-	local stain = pos and normal and findGroundBlood(pos, normal)
-	local pooling = stain and math.Clamp((stain.volume or 1) / poolStartVolume, 0, 1) or 0
-	return math.Clamp((0.2 + math.sqrt(amount or 0.2) * 0.35) * (1 + pooling * 1.5) * math.Rand(0.85, 1.15), 0.12, 3)
+local function bumpBloodCount(pos)
+	local key = math.Round(pos[1] / bloodCellSize) .. "," .. math.Round(pos[2] / bloodCellSize) .. "," .. math.Round(pos[3] / bloodCellSize)
+	hg.bloodcount = hg.bloodcount + 1
+	if hg.bloodcount > 40000 then
+		hg.bloodpositions = {}
+		hg.bloodcount = 1
+	end
+	local count = (hg.bloodpositions[key] or 0) + 1
+	hg.bloodpositions[key] = count
+	return count
 end
 
 local function placeNewBloodDecal(pos, normal, target, artery, amount)
-	local name = getNewBloodDecal(artery, amount)
+	local count = bumpBloodCount(pos)
+	if count > bloodMaxLayers then return end
+	local name = artery and "Arterial.Blood2" .. math.Clamp(count, 1, 5) or "Normal.Blood2" .. math.Clamp(count + math_random(0, 2), 1, 5)
 	if not isDecalExSafe(target) then
 		util.Decal(name, pos + normal, pos - normal)
 		return
@@ -362,65 +198,43 @@ local function placeNewBloodDecal(pos, normal, target, artery, amount)
 		material = Material(util.DecalMaterial(name))
 		newBloodDecalMaterials[name] = material
 	end
-	local scale = getBloodDecalScale(amount, pos, normal)
+	local scale = getBloodDecalScale(amount) * (1 + (count - 1) * 0.15)
 	util.DecalEx(material, target or game.GetWorld(), pos, normal, color_white, scale, scale)
 end
 
-local bodyStainChance = 0.5
+function hg.DepositBodyBloodRunoff(pos)
+	poolTrace.start = pos + vector_up * 2
+	poolTrace.endpos = pos - vector_up * 256
+	local result = util_TraceLine(poolTrace)
+	if result.HitWorld and result.HitNormal.z >= 0.55 then
+		if useOldBlood() then
+			placeOldBloodDecal(result.HitPos, result.HitNormal, nil, false, math.Rand(0.12, 0.24))
+			return
+		end
+		placeNewBloodDecal(result.HitPos, result.HitNormal, nil, false, 0.2)
+	end
+end
 
 local function isOrganismEnt(ent)
 	return IsValid(ent) and (ent:IsPlayer() or ent:IsNPC() or ent:IsRagdoll() or ent.organism ~= nil)
 end
 
-local function stainBody(ent, pos, normal, tiny, amount)
-	if not hg.AddPersistentBodyBloodMark then return false end
-	amount = math.max(amount or (tiny and 0.2 or 1), 0.05)
-	local size = tiny and math.Clamp(0.9 + math.sqrt(amount), 1, 3) or math.Clamp(1.2 + math.sqrt(amount) * 1.2, 1.5, 5)
-	return hg.AddPersistentBodyBloodMark(ent, pos, normal, size)
-end
-
 local function decalBlood(pos, normal, tr, artery, owner, tiny, amount)
 	if not pos or not normal then return end
 	if normal:LengthSqr() < 0.0001 then normal = vector_up end
-	if tr.HitWorld and addGroundBlood(pos, normal, artery, tiny, amount) then
-		if not tiny or math.random(7) == 1 then playBloodDripImpact(pos, tr) end
-		return
-	end
 	amount = math.max(amount or (tiny and 0.2 or artery and 2.5 or 1), 0.05)
 	if isOrganismEnt(tr.Entity) then
-		if not stainBody(tr.Entity, pos, normal, tiny, amount) then hg.DepositBodyBloodRunoff(pos) end
-		return
-	end
-	if tiny then
-		local target = IsValid(tr.Entity) and tr.Entity or nil
-		if useOldBlood() then
-			placeOldBloodDecal(pos, normal, target, artery, getBloodDecalScale(amount, pos, normal))
-		else
-			placeNewBloodDecal(pos, normal, target, artery, amount)
-		end
-		if math.random(7) == 1 then playBloodDripImpact(pos, tr) end
+		hg.DepositBodyBloodRunoff(pos)
 		return
 	end
 
 	local target = IsValid(tr.Entity) and tr.Entity or nil
-
-	local vec = tostring(math.Round(pos[1]))..tostring(math.Round(pos[2]))..tostring(math.Round(pos[3]))
-
-	hg.bloodcount = hg.bloodcount + 1
-	
-	if hg.bloodcount > 10000 then
-		hg.bloodpositions = {}
-		hg.bloodcount = 0
-	end
-
-	-- я не знаю насколько большой можно делать такие таблицы... надеюсь, что это не так страшно выйдет
-
 	if useOldBlood() then
-		placeOldBloodDecal(pos, normal, target, artery, getBloodDecalScale(amount, pos, normal))
+		placeOldBloodDecal(pos, normal, target, artery, getBloodDecalScale(amount))
 	else
 		placeNewBloodDecal(pos, normal, target, artery, amount)
 	end
-	playBloodDripImpact(pos, tr)
+	if not tiny or math.random(7) == 1 then playBloodDripImpact(pos, tr) end
 end
 hg.DecalBloodHit = decalBlood
 --дурак, просто смотри сколько ентити стоит в одном месте
@@ -501,14 +315,6 @@ bloodparticles_hook[2] = function(mul)
 			
 			result.Hit = result.Hit and shouldhit
 			local onBody = result.Hit and isOrganismEnt(result.Entity)
-			if onBody and part.stainTarget ~= result.Entity then
-				part.stainTarget = result.Entity
-				if math.random() < bodyStainChance and stainBody(result.Entity, result.HitPos, result.HitNormal, part.tiny, part.volume) then
-					hg.bloodparticles1[i] = hg.bloodparticles1[#hg.bloodparticles1]
-					table_remove(hg.bloodparticles1)
-					continue
-				end
-			end
 			if result.Hit and part.tiny and not onBody then
 				decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner, true, part.volume)
 				hg.bloodparticles1[i] = hg.bloodparticles1[#hg.bloodparticles1]

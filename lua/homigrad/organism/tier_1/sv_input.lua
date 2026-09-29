@@ -291,6 +291,7 @@ local function Trace_Bullet(box, hit, ricochet, impact, org, organs, dmg, dmgInf
 	dmg = hook_info.dmg
 	
 	if func and !hook_info.restricted then
+		local oldSkull = name == "skull" and org.skull or 0
 		local resistance = func(org, bone, dmg, dmgInfo, box[6], dir, hit, ricochet, impact, organ)
 
 		if isRifleBullet and name == "skull" then resistance = (resistance or 0) * 0.35 end
@@ -310,8 +311,11 @@ local function Trace_Bullet(box, hit, ricochet, impact, org, organs, dmg, dmgInf
 
 		local penetrationCost = math.max((resistance or 0) * impact.penetrationBefore, 0)
 		local layerCost = bone > 0 and math.max(bone * 2, 0.35) or 0.2
+		local skullBroken = name == "skull" and org.skull >= 1
+		if skullBroken then layerCost = 0.2 end
 		local energyCost = impact.energyBefore * math.Clamp(layerCost / math.max(impact.initialPenetration, 1), 0.01, 0.45)
 		energyCost = math.min(impact.energyBefore, energyCost + impact.energyBefore * (1 - math.Clamp(impact.energyRetention or 0.85, 0.5, 1)))
+		if skullBroken then energyCost = energyCost * (oldSkull >= 1 and 0.15 or 0.4) end
 		local bullet = impact.bullet or {}
 		local caliberFactor = math.Clamp(math.sqrt(math.max(bullet.Diameter or 7.62, 1) / 7.62), 0.6, 1.35)
 		local penetrationFactor = math.Clamp((bullet.Penetration or impact.initialPenetration) / 8, 0.35, 1.8)
@@ -875,28 +879,13 @@ local function findNearbyWound(org, bone, localPos)
 	return nearest
 end
 
-local function syncReopenedWoundMark(org, wound)
-	for _, mark in pairs(org.woundmarks or {}) do
-		if not mark[6] and mark[4] == wound[4] and isvector(mark[2]) and mark[2]:DistToSqr(wound[2]) <= 6.25 then
-			mark[1] = math.max(tonumber(mark[1]) or 0, tonumber(wound[1]) or 0)
-			mark[5] = CurTime()
-			mark[7] = wound.woundType or mark[7] or "trauma"
-			hg.organism.SyncWoundMarksNet(org)
-			return
-		end
-	end
-	hg.organism.RecordWoundMark(org, wound, false)
-end
-
 local function worsenWound(org, wound, severity)
 	local now = CurTime()
 	wound[1] = math.max(tonumber(wound[1]) or 0, 0) + math.max(severity, 0.01)
 	wound[5] = now
 	wound.openedAt = now
-	wound.markHealed = nil
 	wound.initialSeverity = math.max(tonumber(wound.initialSeverity) or 0, wound[1])
 	wound.visualBleedRate = math.max(wound[1] * 0.24, 0.1)
-	syncReopenedWoundMark(org, wound)
 	return wound
 end
 
@@ -926,7 +915,6 @@ local function addOrReopenWound(org, severity, localPos, localAng, bone, time, w
 	wound.woundType = woundType or "trauma"
 	wound.visualBleedRate = math.max(severity * 0.24, 0.1)
 	table.insert(org.wounds, wound)
-	hg.organism.RecordWoundMark(org, wound, false)
 	return wound
 end
 
@@ -954,6 +942,22 @@ local function emitWoundImpact(ent, wound)
 	effect:SetScale(0.8)
 	effect:SetRadius(2)
 	util.Effect("BloodImpact", effect, true, true)
+end
+
+local woundDecals = {
+	bullet = "Impact.Flesh",
+	slash = "ManhackCut",
+	trauma = "Impact.BloodyFlesh",
+}
+
+local function placeWoundDecal(ent, pos, normal, woundType)
+	local body = ent
+	if ent:IsPlayer() and hg.GetCurrentCharacter then
+		local current = hg.GetCurrentCharacter(ent)
+		if IsValid(current) then body = current end
+	end
+	if not IsValid(body) or body:WaterLevel() >= 2 then return end
+	util.Decal(woundDecals[woundType] or woundDecals.trauma, pos + normal * 2, pos - normal * 2)
 end
 
 function hg.organism.AddWound(ent, tr, bone, dmgInfo, dmgPos, dmgBlood, inputHole, outputHole)
@@ -999,6 +1003,7 @@ function hg.organism.AddWound(ent, tr, bone, dmgInfo, dmgPos, dmgBlood, inputHol
 			local localPos, localAng, woundBone = hg.organism.GetWoundAnchor(ent, dmgPos + ((i == 1 and 1 or -1) * hitNormal), ((i == 1 and -1 or 1) * traceNormal):Angle(), bone)
 			if not localPos then continue end
 			addOrReopenWound(org, dmgBlood / 2, localPos, localAng, woundBone, CurTime(), woundType)
+			placeWoundDecal(ent, dmgPos, hitNormal, woundType)
 			
 			table.sort(org.wounds, function(a, b) return a[1] > b[1] end)
 

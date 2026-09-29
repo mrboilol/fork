@@ -233,7 +233,6 @@ hook.Add("Org Clear", "Main", function(org)
 			org.owner:SetHealth(100)
 			org.owner:SetNetVar("wounds",{})
 			org.owner:SetNetVar("arterialwounds",{})
-			org.owner:SetNetVar("woundmarks",{})
 			org.lastWoundsSig = "0"
 			org.lastArterialWoundsSig = "0"
 		end
@@ -308,60 +307,6 @@ local function mirrorWoundsToRagdolls(org, key, wounds)
 		if IsValid(rag) and not mirrored[rag] then
 			rag:SetNetVar(key, wounds or {})
 			mirrored[rag] = true
-		end
-	end
-end
-
-function hg.organism.SyncWoundMarksNet(org)
-	if not org or not IsValid(org.owner) then return end
-	local marks = org.woundmarks or {}
-	org.owner:SetNetVar("woundmarks", marks)
-	mirrorWoundsToRagdolls(org, "woundmarks", marks)
-end
-
-function hg.organism.RecordWoundMark(org, wound, arterial)
-	if not org or not wound or not isvector(wound[2]) or not isangle(wound[3]) then return end
-	local body = IsValid(org.owner) and hg.GetCurrentCharacter(org.owner)
-	if IsValid(body) and body:WaterLevel() >= 2 then return end
-	org.woundmarks = org.woundmarks or {}
-	while #org.woundmarks >= 24 do table.remove(org.woundmarks, 1) end
-	org.woundmarks[#org.woundmarks + 1] = {
-		math.max(tonumber(wound.initialSeverity) or tonumber(wound[1]) or 0.01, 0.01),
-		wound[2],
-		wound[3],
-		wound[4],
-		math.min(tonumber(wound.openedAt) or tonumber(wound[5]) or CurTime(), CurTime()),
-		arterial and true or false,
-		arterial and "arterial" or wound.woundType or "trauma",
-	}
-	hg.organism.SyncWoundMarksNet(org)
-end
-
-hook.Add("Org Think", "ExpireWoundMarks", function(owner, org)
-	if (org.nextWoundMarkExpiry or 0) > CurTime() then return end
-	org.nextWoundMarkExpiry = CurTime() + 5
-	local marks = org.woundmarks
-	if not marks or #marks == 0 then return end
-
-	local changed = false
-	for index = #marks, 1, -1 do
-		if CurTime() - (tonumber(marks[index][5]) or 0) >= 120 then
-			table.remove(marks, index)
-			changed = true
-		end
-	end
-	if changed then hg.organism.SyncWoundMarksNet(org) end
-end)
-
-function hg.organism.RemoveWoundMark(org, wound, arterial)
-	if not org or not wound then return end
-	local marks = org.woundmarks or {}
-	for index = #marks, 1, -1 do
-		local mark = marks[index]
-		if mark[4] == wound[4] and mark[6] == (arterial and true or false) and isvector(mark[2]) and mark[2]:DistToSqr(wound[2]) <= 6.25 then
-			table.remove(marks, index)
-			hg.organism.SyncWoundMarksNet(org)
-			return true
 		end
 	end
 end
@@ -1610,7 +1555,6 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		if org.lastArterialWoundsSig != arterialWoundsSig or org.owner.fullsend then
 			hg.organism.FlushArterialWoundsNet(org, org.owner.fullsend)
 		end
-		if org.owner.fullsend then hg.organism.SyncWoundMarksNet(org) end
 		if isPly and owner:Alive() then
 			send_organism(org, owner)
 		else

@@ -422,7 +422,8 @@ players : 1 humans, 0 bots (20 max)
 				DrawColorModify(colormodify)
 			end
 
-			if not LocalPlayer():HasTrait("blind") and !hg_potatopc:GetBool() and fraction > 0.1 then DrawToyTown(2,math.min(math.ease.InBack(fraction),0.85) * ScrH() * force / 10) end
+			local blurFraction = math.Clamp((force - 3) / 4, 0, 1)
+			if not LocalPlayer():HasTrait("blind") and !hg_potatopc:GetBool() and blurFraction > 0.1 then DrawToyTown(2, math.min(math.ease.InBack(blurFraction), 0.85) * ScrH() * blurFraction * 0.6) end
 
 		end)
 
@@ -998,7 +999,7 @@ players : 1 humans, 0 bots (20 max)
 
 --\\ CL Utils setting adjustments
 	if CLIENT then
-		--RunConsoleCommand("mp_decals", "4096")  -- "4194304" - if you set this value you will get crashed :3
+		RunConsoleCommand("mp_decals", "4096")   -- "4194304" - if you set this value you will get crashed :3
 
 		hook.Add("Think","RemoveMe_001",function()
 			hook.Remove("PostPlayerDraw","BA2_GasmaskDraw")

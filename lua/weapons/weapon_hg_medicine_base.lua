@@ -684,13 +684,11 @@ if SERVER then
 					local artery = arterialWound[7]
 					if groupedArteries[artery] then
 						org[artery] = 0
-						hg.organism.RemoveWoundMark(org, arterialWound, true)
 						table.remove(org.arterialwounds, i)
 					end
 				end
 			else
 				org[wound[7]] = 0
-				hg.organism.RemoveWoundMark(org, wound, true)
 				table.remove(org.arterialwounds, pw)
 			end
 
@@ -702,7 +700,6 @@ if SERVER then
 			for _, woundIndex in ipairs(bonewounds) do
 				local normalWound = org.wounds[woundIndex]
 				if normalWound then
-					hg.organism.RemoveWoundMark(org, normalWound, false)
 					table.remove(org.wounds, woundIndex)
 				end
 			end

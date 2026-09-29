@@ -151,7 +151,7 @@ function ENT:Detonate()
 					})
 
 					if Tr.Hit and (Tr.Entity == rag) then
-						util.Decal("Blood", Tr.HitPos + Tr.HitNormal, Tr.HitPos - Tr.HitNormal)
+						util.Decal("Normal.Blood24", Tr.HitPos + Tr.HitNormal, Tr.HitPos - Tr.HitNormal)
 					end
 				end
 			end

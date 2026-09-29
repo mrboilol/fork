@@ -40,6 +40,7 @@ SWEP.weaponPos = Vector(0,0,-35)
 SWEP.weaponAng = Angle(90,90,0)
 
 SWEP.DamageType = DMG_SLASH
+SWEP.StabBlood = true
 SWEP.DamagePrimary = 35
 SWEP.DamageSecondary = 35
 

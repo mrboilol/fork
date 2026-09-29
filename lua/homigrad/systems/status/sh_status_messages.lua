@@ -344,6 +344,12 @@ local adrenaline_phrases = {
     "I can't calm down.",
     "I feel at edge.",
     "I need to chill out, literally...",
+    "Everything feels sharp. Too sharp.",
+    "My heart won't slow down.",
+    "I can't stand still.",
+    "Every sound makes me flinch.",
+    "I'm running on nothing but nerves.",
+    "Keep it together. Keep it together.",
 }
 
 local cold_phraselist = {
@@ -421,6 +427,20 @@ local low_perfusion_phrases = {
 	"I can barely make myself move...",
 	"My body feels heavy and sluggish...",
 	"My hands and feet are going numb...",
+}
+
+local short_breath_phrases = {
+	"I can't get enough air...",
+	"I need to catch my breath...",
+	"Every breath feels shallow...",
+	"My chest is tight. I need more air...",
+	"Breathe... just breathe...",
+	"I'm getting lightheaded from the lack of air...",
+	"I can't seem to fill my lungs...",
+	"Why can't I breathe properly...",
+	"My head is swimming... I need oxygen...",
+	"I'm panting and it's not helping...",
+	"The edges of my vision are going dark... I need air...",
 }
 
 local hypertension_phrases = {
@@ -594,6 +614,10 @@ local function get_status_message(ply)
 		end
 	end
 
+	if not (org.heartstop or o2 <= 15 or terminalBloodLoss or (bleedingOut and blood <= bleedoutStartBlood)) then
+		org.dying_phrases_used = nil
+	end
+
 	if org.heartstop then
 		most_wanted_phraselist = near_death_poetic
 		statusThoughtKey = "heartstop"
@@ -621,6 +645,9 @@ local function get_status_message(ply)
 	elseif heartbeat > 0 and heartbeat <= 45 then
 		most_wanted_phraselist = bradycardia_phrases
 		statusThoughtKey = "bradycardia"
+	elseif o2 < 24 or (hypotension > 0.5 and math.random(4) > 1) then
+		most_wanted_phraselist = short_breath_phrases
+		statusThoughtKey = "shortbreath"
 	elseif hypotension > 0.5 then
 		most_wanted_phraselist = low_perfusion_phrases
 		statusThoughtKey = "hypotension"
@@ -699,6 +726,26 @@ local function get_status_message(ply)
 		statusThoughtKey = "threatened"
 	end
 	
+	if most_wanted_phraselist == near_death_poetic or most_wanted_phraselist == near_death_positive then
+		org.dying_phrases_used = org.dying_phrases_used or {}
+		local candidates = {}
+		for i, phrase in ipairs(most_wanted_phraselist) do
+			if not org.dying_phrases_used[phrase] then candidates[#candidates + 1] = i end
+		end
+		if #candidates == 0 then
+			local last = org.last_status_phrase
+			org.dying_phrases_used = {}
+			for i, phrase in ipairs(most_wanted_phraselist) do
+				if phrase ~= last then candidates[#candidates + 1] = i end
+			end
+		end
+		str = most_wanted_phraselist[candidates[math.random(#candidates)]]
+		org.dying_phrases_used[str] = true
+		org.last_status_phrase = str
+		org.arrhythmia_status_streak = 0
+		return str, statusThoughtKey
+	end
+
 	if most_wanted_phraselist then
 		org.recent_status_phrases = org.recent_status_phrases or {}
 		local candidates = {}

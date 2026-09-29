@@ -153,7 +153,7 @@ local function PaintBlood(pos, source)
 		jitter.z = math.abs(jitter.z) + 4
 
 		if util.PaintDown then
-			util.PaintDown(pos + jitter, "Blood", source)
+			util.PaintDown(pos + jitter, "Normal.Blood24", source)
 		else
 			local startPos = pos + jitter
 			local tr = util.TraceLine({
@@ -163,7 +163,7 @@ local function PaintBlood(pos, source)
 			})
 
 			if tr.Hit then
-				util.Decal("Blood", tr.HitPos + tr.HitNormal, tr.HitPos - tr.HitNormal, source)
+				util.Decal("Normal.Blood24", tr.HitPos + tr.HitNormal, tr.HitPos - tr.HitNormal, source)
 			end
 		end
 	end

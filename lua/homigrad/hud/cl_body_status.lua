@@ -79,9 +79,7 @@ local COLOR = {
 	OUTLINE = {20, 20, 22},
 }
 local SHAPE = {
-	RING_FRACTION = 0.12,
-	MIN_RING_WIDTH = 1.5,
-	BORDER_WIDTH = 1,
+	OUTLINE_WIDTH = 1.5,
 	STRAP_THICKNESS = 0.8,
 	STRAP_MAX_SEGMENT_SHARE = 0.35,
 	TOURNIQUET_STRAP_T = 0.25,
@@ -1000,6 +998,19 @@ for i = 1, (HALF_SEGMENTS + 1) * 2 do
 end
 local ringQuad = {{x = 0, y = 0}, {x = 0, y = 0}, {x = 0, y = 0}, {x = 0, y = 0}}
 
+local function drawLine(ax, ay, bx, by, width)
+	local dx, dy = bx - ax, by - ay
+	local length = math_sqrt(dx * dx + dy * dy)
+	if length <= 0 then return end
+
+	local px, py = -dy / length * width * 0.5, dx / length * width * 0.5
+	ringQuad[1].x, ringQuad[1].y = ax - px, ay - py
+	ringQuad[2].x, ringQuad[2].y = bx - px, by - py
+	ringQuad[3].x, ringQuad[3].y = bx + px, by + py
+	ringQuad[4].x, ringQuad[4].y = ax + px, ay + py
+	surface.DrawPoly(ringQuad)
+end
+
 local function polyCapsuleRing(ax, ay, bx, by, outer, inner)
 	capsuleVertices(ax, ay, bx, by, outer, capsulePoly)
 	capsuleVertices(ax, ay, bx, by, inner, ringInner)
@@ -1024,7 +1035,22 @@ local function polyHalfCircle(x, y, r, startAngle)
 	surface.DrawPoly(halfPoly)
 end
 
+local function polyHalfRing(x, y, outer, inner, startAngle)
+	for i = 0, HALF_SEGMENTS - 1 do
+		local angleA = startAngle + i / HALF_SEGMENTS * math.pi
+		local angleB = startAngle + (i + 1) / HALF_SEGMENTS * math.pi
+		local ax, ay = math_cos(angleA), math_sin(angleA)
+		local bx, by = math_cos(angleB), math_sin(angleB)
+		ringQuad[1].x, ringQuad[1].y = x + ax * outer, y + ay * outer
+		ringQuad[2].x, ringQuad[2].y = x + bx * outer, y + by * outer
+		ringQuad[3].x, ringQuad[3].y = x + bx * inner, y + by * inner
+		ringQuad[4].x, ringQuad[4].y = x + ax * inner, y + ay * inner
+		surface.DrawPoly(ringQuad)
+	end
+end
+
 local strapPoly = {{x = 0, y = 0}, {x = 0, y = 0}, {x = 0, y = 0}, {x = 0, y = 0}}
+local outlineWidth = SHAPE.OUTLINE_WIDTH
 
 local function drawStrap(ax, ay, bx, by, r, t, red, green, blue, horizontal)
 	local dx, dy = bx - ax, by - ay
@@ -1033,7 +1059,7 @@ local function drawStrap(ax, ay, bx, by, r, t, red, green, blue, horizontal)
 	if length > 0.001 and not horizontal then ux, uy = dx / length, dy / length end
 	local cx, cy = ax + dx * t, ay + dy * t
 	local half = math.min(r * SHAPE.STRAP_THICKNESS, math.max(length * SHAPE.STRAP_MAX_SEGMENT_SHARE, r * 0.5)) * 0.5
-	local px, py = -uy * (r + SHAPE.BORDER_WIDTH), ux * (r + SHAPE.BORDER_WIDTH)
+	local px, py = -uy * (r + outlineWidth), ux * (r + outlineWidth)
 	local fx, fy = ux * half, uy * half
 
 	strapPoly[1].x, strapPoly[1].y = cx - fx - px, cy - fy - py
@@ -1043,26 +1069,35 @@ local function drawStrap(ax, ay, bx, by, r, t, red, green, blue, horizontal)
 	surface.SetDrawColor(red, green, blue, FILL_ALPHA)
 	surface.DrawPoly(strapPoly)
 	surface.SetDrawColor(COLOR.OUTLINE[1], COLOR.OUTLINE[2], COLOR.OUTLINE[3], OUTLINE_ALPHA)
-	surface.DrawLine(strapPoly[1].x, strapPoly[1].y, strapPoly[4].x, strapPoly[4].y)
-	surface.DrawLine(strapPoly[2].x, strapPoly[2].y, strapPoly[3].x, strapPoly[3].y)
+	drawLine(strapPoly[1].x, strapPoly[1].y, strapPoly[4].x, strapPoly[4].y, outlineWidth)
+	drawLine(strapPoly[2].x, strapPoly[2].y, strapPoly[3].x, strapPoly[3].y, outlineWidth)
 end
 
 local centerX, centerY, pixelScale, targetZ = 0, 0, 1, 0
 
-local function drawSplit(shape, x, y, r)
+local function drawSplit(shape, x, y, outer, inner)
 	local towardX = centerX + shape.sx * pixelScale - x
 	local towardY = centerY - (shape.sz - targetZ) * pixelScale - y
 	local angle = math_atan2(towardY, towardX)
+	if (severity[shape.region] or 0) > 0 then
+		local red, green, blue = healthColor(shape.region)
+		surface.SetDrawColor(red, green, blue, FILL_ALPHA)
+		polyHalfCircle(x, y, inner, angle + math.pi * 0.5)
+	end
 	if (severity[shape.splitRegion] or 0) > 0 then
 		local red, green, blue = healthColor(shape.splitRegion)
 		surface.SetDrawColor(red, green, blue, FILL_ALPHA)
-		polyHalfCircle(x, y, r, angle - math.pi * 0.5)
+		polyHalfCircle(x, y, inner, angle - math.pi * 0.5)
 	end
 
-	local lineX, lineY = math_cos(angle + math.pi * 0.5) * r, math_sin(angle + math.pi * 0.5) * r
 	local red, green, blue = ringColor(shape.region)
 	surface.SetDrawColor(red, green, blue, OUTLINE_ALPHA)
-	surface.DrawLine(x - lineX, y - lineY, x + lineX, y + lineY)
+	polyCapsuleRing(x, y, x, y, outer, inner)
+	red, green, blue = ringColor(shape.splitRegion)
+	surface.SetDrawColor(red, green, blue, OUTLINE_ALPHA)
+	polyHalfRing(x, y, outer, inner, angle - math.pi * 0.5)
+	local lineX, lineY = math_cos(angle + math.pi * 0.5) * inner, math_sin(angle + math.pi * 0.5) * inner
+	drawLine(x - lineX, y - lineY, x + lineX, y + lineY, outlineWidth)
 end
 
 local function drawShapeExtras(shape, ax, ay, bx, by, r)
@@ -1094,17 +1129,19 @@ local function drawShape(shape)
 		ax, ay, bx, by = ax + jx, ay + jy, bx + jx, by + jy
 	end
 
-	local inner = math.max(r - math.max(r * SHAPE.RING_FRACTION, SHAPE.MIN_RING_WIDTH), 1)
-	if (severity[shape.region] or 0) > 0 then
-		local red, green, blue = healthColor(shape.region)
-		surface.SetDrawColor(red, green, blue, FILL_ALPHA)
-		polyCapsule(ax, ay, bx, by, inner)
+	local inner = math.max(r - outlineWidth, 1)
+	if shape.splitRegion then
+		drawSplit(shape, ax, ay, r, inner)
+	else
+		if (severity[shape.region] or 0) > 0 then
+			local red, green, blue = healthColor(shape.region)
+			surface.SetDrawColor(red, green, blue, FILL_ALPHA)
+			polyCapsule(ax, ay, bx, by, inner)
+		end
+		local red, green, blue = ringColor(shape.region)
+		surface.SetDrawColor(red, green, blue, OUTLINE_ALPHA)
+		polyCapsuleRing(ax, ay, bx, by, r, inner)
 	end
-	if shape.splitRegion then drawSplit(shape, ax, ay, inner) end
-
-	local red, green, blue = ringColor(shape.region)
-	surface.SetDrawColor(red, green, blue, OUTLINE_ALPHA)
-	polyCapsuleRing(ax, ay, bx, by, r, inner)
 
 	drawShapeExtras(shape, ax, ay, bx, by, r)
 end
@@ -1126,7 +1163,7 @@ local function drawWounds()
 			local x = centerX + emitter.y * pixelScale
 			local y = centerY - (emitter.z - targetZ) * pixelScale
 			surface.SetDrawColor(COLOR.OUTLINE[1], COLOR.OUTLINE[2], COLOR.OUTLINE[3], OUTLINE_ALPHA)
-			polyCapsule(x, y, x, y, radius + SHAPE.BORDER_WIDTH)
+			polyCapsule(x, y, x, y, radius + outlineWidth)
 			surface.SetDrawColor(color[1], color[2], color[3], 255)
 			polyCapsule(x, y, x, y, radius)
 		end
@@ -1243,7 +1280,7 @@ local function drawArmor()
 				surface.SetDrawColor(red, green, blue, COLOR.ARMOR_LINE_ALPHA)
 				for i = 1, count do
 					local a, b = armorHull[i], armorHull[i % count + 1]
-					surface.DrawLine(a.x, a.y, b.x, b.y)
+					drawLine(a.x, a.y, b.x, b.y, outlineWidth)
 				end
 			end
 		end
@@ -1253,6 +1290,7 @@ end
 local function renderFigure()
 	local size = ScrH() * PANEL_SIZE_FRACTION
 	pixelScale = size / (FIGURE_EXTENT * DISPLAY_SPINE)
+	outlineWidth = math.max(SHAPE.OUTLINE_WIDTH * ScrH() / REFERENCE_SCREEN_HEIGHT, 1)
 	centerX = ScrH() * PANEL_MARGIN_FRACTION + size * 0.5
 	centerY = ScrH() * 0.5
 	targetZ = TARGET_HEIGHT * DISPLAY_SPINE

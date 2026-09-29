@@ -14,7 +14,7 @@ local mat_huy = Material("effects/blood_core")
 mat_huy:SetTexture("$basetexture",texture)
 
 local cloudmat = Material("effects/smoke_b")
-local hg_old_blood = ConVarExists("hg_old_blood") and GetConVar("hg_old_blood") or CreateClientConVar("hg_old_blood", 0, true, false, "new decals, or old", 0, 1)
+local hg_old_blood = ConVarExists("hg_old_blood") and GetConVar("hg_old_blood") or CreateClientConVar("hg_old_blood", 1, true, false, "new decals, or old", 0, 1)
 local bloodSpillMats = {}
 for i = 1, 6 do
 	bloodSpillMats[i] = Material("bloodspill/blood" .. i)

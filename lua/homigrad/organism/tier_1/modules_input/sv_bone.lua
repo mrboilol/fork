@@ -14,6 +14,78 @@ local function isMelee(dmgInfo)
 end
 
 local halfValue2 = util.halfValue2
+
+local boneShardModel = Model("models/gibs/hgibs_rib.mdl")
+local boneShards = {}
+
+local function getBurstPos(org, dmgInfo, hit)
+	if isvector(hit) and not hit:IsZero() then return hit end
+	local pos = dmgInfo:GetDamagePosition()
+	if not pos:IsZero() then return pos end
+	local body = IsValid(org.owner) and hg.GetCurrentCharacter(org.owner)
+	if IsValid(body) then return body:WorldSpaceCenter() end
+end
+
+local function bloodBurst(org, dmgInfo, amount, hit)
+	local pos = getBurstPos(org, dmgInfo, hit)
+	if not pos then return end
+	local force = dmgInfo:GetDamageForce():GetNormalized()
+	if force:IsZero() then force = vector_up end
+
+	for _ = 1, math.random(3, 5) do
+		local normal = (force + VectorRand(-0.9, 0.9)):GetNormalized()
+		local effect = EffectData()
+		effect:SetOrigin(pos)
+		effect:SetNormal(normal)
+		effect:SetMagnitude(2)
+		effect:SetScale(1.2)
+		effect:SetRadius(3)
+		util.Effect("BloodImpact", effect, true, true)
+		net.Start("hg_bloodimpact")
+		net.WriteVector(pos)
+		net.WriteVector(normal / 10)
+		net.WriteFloat(math.Clamp(amount, 1, 8))
+		net.WriteInt(math.random(2, 5), 8)
+		net.SendPVS(pos)
+	end
+end
+
+local function spawnBoneShards(org, count, hit, dmgInfo)
+	local pos = getBurstPos(org, dmgInfo, hit)
+	if not pos then return end
+	local force = dmgInfo:GetDamageForce():GetNormalized()
+	if force:IsZero() then force = vector_up end
+	local character = IsValid(org.owner) and hg.GetCurrentCharacter(org.owner)
+	local baseVelocity = IsValid(character) and character:GetVelocity() or vector_origin
+
+	for _ = 1, count do
+		local shard = ents.Create("prop_physics")
+		if not IsValid(shard) then continue end
+
+		shard:SetModel(boneShardModel)
+		shard:SetPos(pos + VectorRand(-2, 2))
+		shard:SetAngles(AngleRand())
+		shard:SetModelScale(math.Rand(0.25, 0.5), 0)
+		shard:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
+		shard:Spawn()
+		shard:Activate()
+
+		local phys = shard:GetPhysicsObject()
+		if IsValid(phys) then
+			phys:SetMass(0.1)
+			phys:SetVelocity(baseVelocity + force * math.Rand(60, 160) + VectorRand(-70, 70) + vector_up * math.Rand(20, 80))
+			phys:AddAngleVelocity(VectorRand(-400, 400))
+		end
+
+		boneShards[#boneShards + 1] = shard
+		while #boneShards > 48 do
+			local old = table.remove(boneShards, 1)
+			if IsValid(old) then old:Remove() end
+		end
+		SafeRemoveEntityDelayed(shard, 25)
+	end
+end
+
 local function damageBone(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet, nodmgchange)
 	local crush = isCrush(dmgInfo)
 	local owner = org.owner
@@ -35,6 +107,9 @@ local function damageBone(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ric
 
 	local val = org[key]
 	org[key] = math.min(org[key] + dmg, 1)
+	if val < 1 and org[key] >= 1 and key ~= "skull" then
+		bloodBurst(org, dmgInfo, 3, hit)
+	end
 	local scale = 1 - (org[key] - val)
 	
 	if !nodmgchange then dmgInfo:ScaleDamage(1 - (crush and 1 * crush * math.max((1 - org[key]) ^ 0.1, 0.5) or (1 - org[key]) * (bone))) end
@@ -700,6 +775,7 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 			lost = math.min(lost, 32 - org.teethLost)
 			org.teethLost = org.teethLost + lost
 			SpawnTeeth(org, lost, hit, dir)
+			bloodBurst(org, dmgInfo, 2 + lost * 0.5, hit)
 			addPain(org, 4 + lost * 3, "head")
 			org.shock = math.min((org.shock or 0) + 1 + lost * 1.5, 95)
 			hg.AddHarmToAttacker(dmgInfo, lost * 0.08, "Teeth loss harm")
@@ -801,7 +877,17 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	local brainEnergy = impact and impact.source == "physics" and math.max(impact.brainEnergy or impact.residualEnergy or 0, 0) or dmg
 	local headOutcomeHandled = impact and impact.headOutcomeHandled
 	
-	local result, vecrand = damageBone(org, 0.25, dmg, dmgInfo, "skull", boneindex, dir, hit, ricochet)
+	local result, vecrand = damageBone(org, 0.25, dmg, dmgInfo, "skull", boneindex, dir, hit, ricochet, oldDmg >= 1)
+	if oldDmg >= 1 then
+		result = 0
+		bloodBurst(org, dmgInfo, math.max(dmg * 4, 2), hit)
+		if not (impact and impact.source == "physics") and not dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_BLAST) and hg.organism.input_list.brainFrontal then
+			hg.organism.input_list.brainFrontal(org, bone, dmg, dmgInfo)
+		end
+	elseif org.skull >= 1 and not (impact and impact.source == "physics") and not dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_BLAST) and hg.organism.input_list.brainFrontal then
+		local leftover = dmg - (1 - oldDmg)
+		if leftover > 0 then hg.organism.input_list.brainFrontal(org, bone, leftover, dmgInfo) end
+	end
 	local inflictor = dmgInfo:GetInflictor()
 	local rawDamageType = impact and impact.rawDamageType or dmgInfo:GetDamageType()
 	local isStab = bit.band(rawDamageType, DMG_SLASH) != 0 and not (IsValid(inflictor) and inflictor.slash)
@@ -1005,6 +1091,12 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	local result, vecrand = damageBone(org, 0.1, dmg / 4, dmgInfo, "chest", boneindex, dir, hit, ricochet, true)
 	
 	hg.AddHarmToAttacker(dmgInfo, (org.chest - oldDmg) * 3, "Ribs bone damage harm")
+
+	local chestDelta = org.chest - oldDmg
+	if chestDelta > 0 then
+		spawnBoneShards(org, math.Clamp(math.ceil(chestDelta * 12) + math.floor(org.chest * 3), 1, 8), hit, dmgInfo)
+		bloodBurst(org, dmgInfo, 2 + org.chest * 3, hit)
+	end
 
 	addPain(org, dmg * 1.5, "body")
 	org.shock = org.shock + dmg * 1.5

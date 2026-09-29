@@ -237,7 +237,12 @@ if CLIENT then
 		for _, thought in ipairs(hg.thoughts) do
 			if thought[1] == msg and now - (thought[2] or 0) < 18 then return end
 		end
-		if group then
+		if group == "combat" then
+			for _, thought in ipairs(hg.thoughts) do
+				chat.AddText(Color(thought[3].r, thought[3].g, thought[3].b, 255), thought[1] .. "\n")
+			end
+			hg.thoughts = {}
+		elseif group then
 			for i = #hg.thoughts, 1, -1 do
 				if hg.thoughts[i][4] == group then table.remove(hg.thoughts, i) end
 			end

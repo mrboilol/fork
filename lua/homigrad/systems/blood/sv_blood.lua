@@ -6,7 +6,7 @@ local math_random = math.random
 local rawget = rawget
 
 local bloodColors = {
-	[0] = "Blood",
+	[0] = "Normal.Blood24",
 	[1] = "YellowBlood",
 	[2] = "YellowBlood",
 	[3] = "ManhackSparks",

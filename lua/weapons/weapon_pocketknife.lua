@@ -185,7 +185,7 @@ function SWEP:Reload()
     local owner = self:GetOwner()
 
     if not IsValid(owner) then return end
-    if not owner:KeyPressed(IN_ATTACK) then return end
+    if not owner:KeyPressed(IN_ATTACK) or self:IsSlamMode() then return end
     if not self:CanSwitchMode() then return end
 
     local mode = not self:GetNetVar("mode")

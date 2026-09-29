@@ -99,7 +99,7 @@ function SWEP:Reload()
     if owner:KeyDown(IN_ATTACK) then
         self.InspectPending = false
 
-        if SERVER and owner:KeyPressed(IN_ATTACK) then
+        if SERVER and owner:KeyPressed(IN_ATTACK) and not self:IsSlamMode() then
             self:SetNetVar("mode", not self:GetNetVar("mode"))
             owner:ChatPrint("Changed mode to "..(self:GetNetVar("mode") and "slash." or "stab."))
         end

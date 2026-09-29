@@ -166,7 +166,7 @@ local function showExtractionBlood(owner, entry)
 	effect:SetScale(2.2)
 	effect:SetRadius(6)
 	util.Effect("BloodImpact", effect, true, true)
-	util.Decal("Blood", pos + ang:Forward() * 5, pos - ang:Forward() * 7, body)
+	util.Decal("Normal.Blood24", pos + ang:Forward() * 5, pos - ang:Forward() * 7, body)
 end
 
 local function addInternalBleed(org, amount)

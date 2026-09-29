@@ -436,8 +436,8 @@ function ENT:PhysicsCollide(data, phys)
 		self:EmitSound(self.AttackHitFlesh, 65)
 
 		if (self.DamageType or DMG_SLASH) == DMG_SLASH then
-			util.Decal("Blood", data.HitPos + data.HitNormal * 2, data.HitPos - data.HitNormal * 2, hitEnt)
-			util.Decal("Blood", data.HitPos + data.HitNormal * 2, data.HitPos - data.HitNormal * 2)
+			util.Decal("Normal.Blood24", data.HitPos + data.HitNormal * 2, data.HitPos - data.HitNormal * 2, hitEnt)
+			util.Decal("Normal.Blood24", data.HitPos + data.HitNormal * 2, data.HitPos - data.HitNormal * 2)
 		elseif (self.DamageType or DMG_SLASH) == DMG_CLUB then
 			if hitEnt:IsPlayer() then
 				hg.ApplyBruiseTo(hitEnt, hitEnt, data.HitPos, data.HitNormal)
