@@ -1015,7 +1015,6 @@ properties.Add( "door_unlock", {
 local defaultinv = {
     Weapons = {},
     Ammo = {},
-    Armor = {},
     Attachments = {}
 }
 local function Respawn(ply,body)

@@ -504,7 +504,7 @@ function SWEP:Initialize()
 
 	self:WorldModel_Transform()
 
-	table.insert(hg.weapons,self)
+	if not table.HasValue(hg.weapons, self) then table.insert(hg.weapons, self) end
 	self.ishgweapon = true
 
 	if SERVER then
