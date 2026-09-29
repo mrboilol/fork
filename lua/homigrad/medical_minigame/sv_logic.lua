@@ -590,10 +590,7 @@ local function ApplySyringeProgress(wep, ply, target, progressDelta)
         entOwner:EmitSound("pshiksnd")
     elseif class == "weapon_medkit_sh" and wep.mode == 3 then
         local efficiency = owner.Profession == "doctor" and 0.5 or 1
-        local internalBleed = math.max((org.internalBleed or 0) - (org.internalBleedHeal or 0), 0)
-        local healAmount = math.min(internalBleed, consumedAmount / efficiency)
-
-        hg.organism.AdministerTranexamic(org, healAmount)
+        hg.organism.AdministerTranexamic(org, consumedAmount / efficiency)
         entOwner:EmitSound("snds_jack_gmod/ez_medical/" .. math.random(16, 18) .. ".ogg", 60, math.random(95, 105))
     elseif class == "weapon_tranexamic_acid" then
         hg.organism.AdministerTranexamic(org, consumedAmount)

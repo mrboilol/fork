@@ -314,6 +314,7 @@ function SWEP:GetArmHealthHandlingMul()
 	if support.wantsTwoHands and braceBroken and not ignoreOneArm then loss = loss + 0.3 * oneHandPenalty * limbDebuff end
 	if support.wantsTwoHands and braceDislocated and not ignoreOneArm then loss = loss + 0.4 * oneHandPenalty * limbDebuff end
 	if support.wantsTwoHands and braceAmputated and not ignoreOneArm then loss = loss + 0.5 * oneHandPenalty end
+	if firingBroken and braceBroken and not firingAmputated and not braceAmputated then loss = loss + 0.7 * limbDebuff * forgive end
 	if support.onlyLeft and not ignoreOneArm then loss = loss + 0.25 * oneHandPenalty end
 	if support.leftBusy and not ignoreOneArm then loss = loss + 0.3 * oneHandPenalty end
 	if support.rightBusy and not ignoreOneArm then loss = loss + 0.5 * oneHandPenalty end
@@ -416,7 +417,9 @@ function SWEP:GetManualActionBlockReason(ply)
 	if not org then return end
 
 	local leftBroken = org.larmamputated or (org.larm or 0) >= 1 or org.larmdislocation or org.larmdislocated
-	if leftBroken then
+	local rightBroken = (org.rarm or 0) >= 1 or org.rarmdislocation or org.rarmdislocated
+	local bothBrokenNotAmputated = leftBroken and rightBroken and not org.larmamputated and not org.rarmamputated
+	if leftBroken and not bothBrokenNotAmputated then
 		return "I need my left arm to cycle this."
 	end
 

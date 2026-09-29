@@ -98,49 +98,39 @@ local limb_from_bone = {
 	["ValveBiped.Bip01_R_Foot"] = "rleg",
 }
 local function apply_med_error(actor, org, action, ctx)
-	local role = get_role(actor)
-	local skill = get_skill(role)
-	local painPenalty = Clamp((actor.organism and actor.organism.pain or 0) / 180, 0, 0.5)
-	local movePenalty = Clamp((IsValid(org.owner) and org.owner:GetVelocity():Length() or 0) / 350, 0, 0.4)
-	local baseChance = 0.05
-	if action == "needle" then baseChance = 0.18 end
-	if action == "tourniquet" then baseChance = 0.12 end
-	if action == "transfusion" then baseChance = 0.07 end
-	if action == "internal_bleed_treat" then baseChance = 0.09 end
-	if action == "bandage" then baseChance = 0.04 end
-	local chance = baseChance * (1.15 - skill) + painPenalty + movePenalty
-	if math.Rand(0, 1) > chance then return false end
+	if not IsValid(actor) or not actor:IsPlayer() or not actor:HasTrait("clumsy") then return false end
+	local baseChance = 0.12
+	if action == "needle" then baseChance = 0.3 end
+	if action == "tourniquet" then baseChance = 0.25 end
+	if math.Rand(0, 1) > baseChance then return false end
 	org.medical_errors = (org.medical_errors or 0) + 1
 	if action == "needle" then
-		if math.random(2) == 1 then
-			org.lungsL[1] = min(org.lungsL[1] + 0.12, 1)
-		else
-			org.lungsR[1] = min(org.lungsR[1] + 0.12, 1)
-		end
-		org.pneumothorax = min((org.pneumothorax or 0) + 0.15, 1)
-		org.shock = min((org.shock or 0) + 8, 95)
+		org.lungsL[1] = min(org.lungsL[1] + 0.35, 1)
+		org.lungsR[1] = min(org.lungsR[1] + 0.35, 1)
+		org.pneumothorax = min((org.pneumothorax or 0) + 0.5, 1)
+		org.shock = min((org.shock or 0) + 25, 95)
 		org.owner:Notify("Something went wrong with the needle.", 6, "med_err_needle", 0)
 	elseif action == "tourniquet" then
 		local limb = ctx and ctx.bone and limb_from_bone[ctx.bone]
 		if limb and org[limb] ~= nil then
-			org[limb] = min(org[limb] + 0.08, 1)
+			org[limb] = min(org[limb] + 0.3, 1)
 		end
-		org.painadd = min((org.painadd or 0) + 10, 150)
-		org.shock = min((org.shock or 0) + 6, 95)
+		org.painadd = min((org.painadd or 0) + 40, 150)
+		org.shock = min((org.shock or 0) + 20, 95)
 		org.owner:Notify("Tourniquet was applied badly.", 6, "med_err_tourniquet", 0)
 	elseif action == "transfusion" then
-		org.hemotransfusionshock = min((org.hemotransfusionshock or 0) + 0.2, 2)
-		org.internalBleed = min((org.internalBleed or 0) + 0.15, 10)
+		org.hemotransfusionshock = min((org.hemotransfusionshock or 0) + 0.8, 2)
+		org.internalBleed = min((org.internalBleed or 0) + 0.6, 10)
 		org.owner:Notify("Transfusion reaction feels wrong.", 6, "med_err_transfusion", 0)
 	elseif action == "internal_bleed_treat" then
-		org.analgesiaAdd = min((org.analgesiaAdd or 0) + 0.15, 4)
-		org.consciousness = Approach(org.consciousness or 1, 0.65, 0.06)
+		org.analgesiaAdd = min((org.analgesiaAdd or 0) + 0.6, 4)
+		org.consciousness = Approach(org.consciousness or 1, 0.4, 0.2)
 		org.owner:Notify("Wrong dose, feeling dizzy...", 6, "med_err_dose", 0)
 	elseif action == "bandage" then
-		org.medical_infection = min((org.medical_infection or 0) + 0.2, 2)
+		org.medical_infection = min((org.medical_infection or 0) + 0.8, 2)
 		org.owner:Notify("Bandage wasn't clean enough.", 6, "med_err_bandage", 0)
 	end
-	if IsValid(actor) and actor ~= org.owner then
+	if actor ~= org.owner then
 		actor:Notify("Complication occurred.", 4, "med_error_actor", 0)
 	end
 	return true

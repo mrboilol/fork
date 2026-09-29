@@ -265,15 +265,14 @@ local function DropDependentArmorRecursive(ply, basePlacement, baseArmor, visite
 	end
 end
 
-local function IsArmorBreakProtected(ent)
+local function IsArmorBreakProtected(ent, equipment)
 	if not IsValid(ent) then return false end
 	if ent:IsNPC() and ent:GetClass() == "npc_combine_s" then return true end
 
 	local ply = ent:IsPlayer() and ent or (ent:IsRagdoll() and hg.RagdollOwner(ent))
 	if not IsValid(ply) then return false end
-	if ply.PlayerClassName == "Gordon" then return true end
-	-- Combine and Metrocop armor is unbreakable.
-	if ply.PlayerClassName == "Combine" or ply.PlayerClassName == "Metrocop" then return true end
+	if ply.PlayerClassName == "Gordon" then return equipment ~= "gordon_helmet" end
+	if ply.PlayerClassName == "Combine" or ply.PlayerClassName == "Metrocop" or ply.PlayerClassName == "furry" then return true end
 	return false
 end
 
@@ -381,7 +380,7 @@ end
 
 function hg.BreakArmor(ent, equipment, pos, dmgInfo)
 	if not IsValid(ent) then return false end
-	if IsArmorBreakProtected(ent) then return false end
+	if IsArmorBreakProtected(ent, equipment) then return false end
 	if not ent.armors or not table.HasValue(ent.armors, equipment) then return false end
 	local placement = hg.GetArmorPlacement(equipment)
 	if ent.armors_broken and ent.armors_broken[equipment] then
@@ -459,7 +458,7 @@ function hg.HandleArmorShot(org, placement, armor, dmgInfo, hit, ricochet)
 
 	if not IsValid(owner) then return end
 	if ricochet then return end
-	if IsArmorBreakProtected(owner) then return end
+	if IsArmorBreakProtected(owner, armor) then return end
 	if not owner.armors or owner.armors[placement] ~= armor then return end
 	if not dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) then return end
 	if owner.armors_broken and owner.armors_broken[armor] then return end
@@ -867,6 +866,20 @@ net.Receive("hg_configure_armor", function(_, ply)
 end)
 
 local ArmorEffect
+local function EmitMetalArmorHit(pos, dir, isBullet)
+	local sparks = EffectData()
+	sparks:SetOrigin(pos)
+	sparks:SetNormal(dir)
+	sparks:SetMagnitude(2)
+	sparks:SetScale(1)
+	sparks:SetRadius(6)
+	util.Effect("Sparks", sparks, true, true)
+	util.Effect("MetalSpark", sparks, true, true)
+	local snd = isBullet and ("physics/metal/metal_solid_impact_bullet" .. math.random(4) .. ".wav")
+		or ("physics/metal/metal_solid_impact_hard" .. math.random(5) .. ".wav")
+	sound.Play(snd, pos, 75, math.random(95, 108), 1)
+end
+
 local DamageArmorPlate
 local force
 
@@ -881,7 +894,7 @@ end
 local function DamageArmor(org, placement, armor, dmgInfo, rawDmg)
 	local owner = org.owner
 	if not IsValid(owner) then return false end
-	if IsArmorBreakProtected(owner) then return false end
+	if IsArmorBreakProtected(owner, armor) then return false end
 	if not owner.armors or owner.armors[placement] ~= armor then return false end
 	local wasBroken = owner.armors_broken and owner.armors_broken[armor] or false
 
@@ -979,7 +992,7 @@ end
 function hg.TryKnockOffArmor(owner, placement, armor, armorData, dmgInfo, hitPos, ballistic, direction, modelHit)
 	if (placement ~= "head" and placement ~= "torso") or not IsValid(owner)
 		or not armorData or armorData.nodrop then return false end
-	if IsArmorBreakProtected(owner) or not owner.armors or owner.armors[placement] ~= armor then return false end
+	if IsArmorBreakProtected(owner, armor) or not owner.armors or owner.armors[placement] ~= armor then return false end
 
 	local rawDamage = math.max(dmgInfo and dmgInfo:GetDamage() or 0, 0)
 	if rawDamage < MIN_KNOCKOFF_DAMAGE then return false end
@@ -1047,8 +1060,10 @@ function hg.TryKnockOffArmor(owner, placement, armor, armorData, dmgInfo, hitPos
 		if IsValid(org.owner) then org.owner.fullsend = true end
 	end
 	if placement == "head" then ApplyHelmetKnockoffTrauma(owner, dmgInfo, ballistic, rawDamage, 0.25) end
-	local soundName = "physics/metal/metal_solid_impact_hard" .. math.random(1, 5) .. ".wav"
-	sound.Play(soundName, hitPos or dropped:GetPos(), 80, math.random(92, 108), 0.9)
+	local knockPos = hitPos or dropped:GetPos()
+	local knockDir = -dmgInfo:GetDamageForce()
+	knockDir:Normalize()
+	EmitMetalArmorHit(knockPos, knockDir, false)
 	return true
 end
 
@@ -1125,7 +1140,7 @@ end
 function DamageArmorPlate(org, placement, armor, dmgInfo, hitPos, rawDmg, boneindex)
 	local owner = org.owner
 	local isStab = dmgInfo:IsDamageType(DMG_SLASH)
-	if placement ~= "torso" or not IsValid(owner) or IsArmorBreakProtected(owner) then return 1 end
+	if placement ~= "torso" or not IsValid(owner) or IsArmorBreakProtected(owner, armor) then return 1 end
 	if not hg.IsArmorPlateHit(owner, armor, hitPos) or hg.GetArmorPlateCondition(owner, armor) <= 0 then
 		return isStab and 1.6 or 1
 	end
@@ -1512,7 +1527,12 @@ ArmorEffect = function(placement, armor, dmgInfo, org, hit, prot)
 	effdata:SetSurfaceProp(prot < 0 and 67 or armdata.surfaceprop or 67)
 	effdata:SetDamageType(dmgInfo:GetDamageType())
 
-	EmitSound("physics/metal/metal_solid_impact_bullet"..math.random(4)..".wav", hit and isvector(hit) and hit or dmgInfo:GetDamagePosition(), 0, CHAN_AUTO, 1, placement == "torso" and 75 or 55, nil, math.random(95, 105))
+	local hitPos = hit and isvector(hit) and hit or dmgInfo:GetDamagePosition()
+	if placement == "head" or placement == "face" then
+		EmitMetalArmorHit(hitPos, dir, dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT))
+	else
+		EmitSound("physics/metal/metal_solid_impact_bullet"..math.random(4)..".wav", hitPos, 0, CHAN_AUTO, 1, placement == "torso" and 75 or 55, nil, math.random(95, 105))
+	end
 	util.Effect(eff,effdata)
 end
 

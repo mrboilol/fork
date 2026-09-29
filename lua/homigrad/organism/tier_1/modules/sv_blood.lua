@@ -735,8 +735,8 @@ module[2] = function(owner, org, mulTime)
 		treatmentHeal = math.min(internalBleedHeal, mulTime * treatmentRate)
 	end
 
-	local naturalApplied = math.min(bleedBeforeHeal, naturalHeal)
-	local treatmentApplied = math.min(math.max(bleedBeforeHeal - naturalApplied, 0), treatmentHeal)
+	local treatmentApplied = math.min(bleedBeforeHeal, treatmentHeal)
+	local naturalApplied = math.min(math.max(bleedBeforeHeal - treatmentApplied, 0), naturalHeal)
 	org.internalBleed = math.max(bleedBeforeHeal - naturalApplied - treatmentApplied, 0)
 	org.internalBleedHeal = math.max(internalBleedHeal - treatmentApplied, 0)
 	if org.internalBleed <= 0 then org.internalBleedHeal = 0 end

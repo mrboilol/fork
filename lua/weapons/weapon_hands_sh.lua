@@ -2331,13 +2331,6 @@ function SWEP:PrimaryAttack(forcespecial)
 
 	if owner.organism and owner.organism.rarmamputated and owner.organism.larmamputated then return end
 
-	-- Prevent punching if both arms are broken or dislocated
-	if owner.organism then
-		local rarm_broken = (owner.organism.rarm and owner.organism.rarm >= 1) or owner.organism.rarmdislocation or owner.organism.rarmdislocated
-		local larm_broken = (owner.organism.larm and owner.organism.larm >= 1) or owner.organism.larmdislocation or owner.organism.larmdislocated
-		if rarm_broken and larm_broken then return end
-	end
-
 	if owner.organism and owner.organism.larmamputated then
 		rand = true
 		side = "fists_right"
@@ -2582,7 +2575,7 @@ function SWEP:AttackFront(special_attack, rand)
 		local DamageAmt = (math.random(3, 5) * (special_attack and 3 or 1)) * (self.DamageMul or 1) * MELEE_IMPACT_DAMAGE_MULT
 		Ent:PrecacheGibs()
 
-		Mul = Mul * (owner.MeleeDamageMul or 1)
+		Mul = Mul * (owner.MeleeDamageMul or 1) * Lerp(self:GetArmDamageMultiplier(), 0.3, 1)
 
 		if Ent:IsPlayer() and IsValid(Ent:GetActiveWeapon()) and Ent:GetActiveWeapon().GetBlocking then
 			Mul = Mul * (self:GetBlocking() and 0.5 or 1)
