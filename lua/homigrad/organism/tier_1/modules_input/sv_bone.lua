@@ -495,6 +495,11 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 	end
 
 	local breakThreshold = name == "spine3" and 1 or hg.organism[name2]
+	if oldDmg < breakThreshold and org[name] >= breakThreshold and hg.fakeBoneFlop then
+		local fractureBone = number == 1 and "ValveBiped.Bip01_Pelvis"
+			or (number == 2 and "ValveBiped.Bip01_Spine2" or "ValveBiped.Bip01_Neck1")
+		hg.fakeBoneFlop.SetOpenFracture(org, fractureBone, true)
+	end
 	if name ~= "spine3" and oldDmg < breakThreshold and org[name] >= breakThreshold and hg.fakeBoneFlop then
 		hg.fakeBoneFlop.SetBoneState(org, "ValveBiped.Bip01_Spine2", true)
 	end

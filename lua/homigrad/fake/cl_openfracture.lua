@@ -3,6 +3,9 @@ local drawDistSqr = 1800 * 1800
 local burstCooldown = 1.5
 
 local shardLengths = {
+	["ValveBiped.Bip01_Pelvis"] = 4,
+	["ValveBiped.Bip01_Spine2"] = 4,
+	["ValveBiped.Bip01_Neck1"] = 3,
 	["ValveBiped.Bip01_L_UpperArm"] = 6,
 	["ValveBiped.Bip01_R_UpperArm"] = 6,
 	["ValveBiped.Bip01_L_Forearm"] = 5.5,
@@ -87,6 +90,8 @@ local function getFractureTransform(ent, bone, fx, matrix)
 
 	local offset, normal = hg.organism.ClampWoundOffset(ent, boneID, fx[1], fx[2]:Forward())
 	local localAng = normal and normal:Angle() or fx[2]
+	if bone == "ValveBiped.Bip01_Pelvis" or bone == "ValveBiped.Bip01_Spine2"
+		or bone == "ValveBiped.Bip01_Neck1" then localAng = fx[2] end
 	local bonePos, boneAng = matrix:GetTranslation(), matrix:GetAngles()
 	local pos, ang = LocalToWorld(offset, localAng, bonePos, boneAng)
 

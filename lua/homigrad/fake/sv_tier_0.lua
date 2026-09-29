@@ -818,6 +818,12 @@ local openFractureBones = {
 	["ValveBiped.Bip01_R_Calf"] = {depth = 5, bleed = 15},
 }
 
+local spineFractureBones = {
+	["ValveBiped.Bip01_Pelvis"] = {offset = Vector(0, 2, -5), direction = Vector(0, 1, 0)},
+	["ValveBiped.Bip01_Spine2"] = {offset = Vector(4, -1, 0), direction = Vector(0, -1, 0)},
+	["ValveBiped.Bip01_Neck1"] = {offset = Vector(1, 1, 0), direction = Vector(0, 1, 0.65)},
+}
+
 function fakeBoneFlop.SyncOpenFractures(org, ownerOnly)
 	local owner = org and org.owner
 	if not IsValid(owner) then return end
@@ -832,7 +838,7 @@ function fakeBoneFlop.SyncOpenFractures(org, ownerOnly)
 end
 
 local function setOpenFracture(org, bone, active)
-	local cfg = openFractureBones[bone]
+	local cfg = openFractureBones[bone] or spineFractureBones[bone]
 	if not cfg then return false end
 
 	if active then
@@ -840,12 +846,12 @@ local function setOpenFracture(org, bone, active)
 		if org.open_fractures[bone] then return false end
 
 		local theta = math.Rand(0, math.pi * 2)
-		local offset = Vector(cfg.depth, 0, 0)
-		local dir = Vector(-0.35, math.cos(theta), math.sin(theta)):Angle()
+		local offset = cfg.offset or Vector(cfg.depth, 0, 0)
+		local dir = (cfg.direction or Vector(-0.35, math.cos(theta), math.sin(theta))):Angle()
 		org.open_fractures[bone] = {offset, dir}
 
 		local owner = org.owner
-		if IsValid(owner) and owner.organism == org and hg.organism and hg.organism.AddWoundManual then
+		if cfg.bleed and IsValid(owner) and owner.organism == org and hg.organism and hg.organism.AddWoundManual then
 			hg.organism.AddWoundManual(owner, cfg.bleed, offset, dir, bone, CurTime())
 		end
 	else
@@ -857,6 +863,8 @@ local function setOpenFracture(org, bone, active)
 	fakeBoneFlop.SyncOpenFractures(org)
 	return true
 end
+
+fakeBoneFlop.SetOpenFracture = setOpenFracture
 
 function fakeBoneFlop.FlagBone(org, bone, active)
 	if not org or not bone then return false end
@@ -980,16 +988,23 @@ function fakeBoneFlop.ReconcileLimb(org, limb)
 end
 
 function fakeBoneFlop.ReconcileSpine(org)
-	if not org or not org.fake_floppy_bones then return false end
+	if not org then return false end
 
 	local changed = false
 	local backBroken = (org.spine1 or 0) >= (hg.organism.fake_spine1 or 1)
 		or (org.spine2 or 0) >= (hg.organism.fake_spine2 or 1)
+	if (org.spine1 or 0) < (hg.organism.fake_spine1 or 1) then
+		changed = setOpenFracture(org, "ValveBiped.Bip01_Pelvis", false) or changed
+	end
+	if (org.spine2 or 0) < (hg.organism.fake_spine2 or 1) then
+		changed = setOpenFracture(org, "ValveBiped.Bip01_Spine2", false) or changed
+	end
 	if not backBroken then
 		changed = fakeBoneFlop.FlagBone(org, "ValveBiped.Bip01_Spine2", false) or changed
 	end
 
 	if (org.spine3 or 0) < 1 then
+		changed = setOpenFracture(org, "ValveBiped.Bip01_Neck1", false) or changed
 		changed = fakeBoneFlop.FlagBone(org, "ValveBiped.Bip01_Spine3", false) or changed
 		changed = fakeBoneFlop.FlagBone(org, "ValveBiped.Bip01_Head1", false) or changed
 	end
@@ -1038,7 +1053,7 @@ function fakeBoneFlop.ApplyBone(rag, bone, org)
 	local pos = phys:GetPos()
 	if not isSafeNetworkPos(pos) or not isSafeNetworkPos(physParent:GetPos()) then return end
 	local fracture = org and org.open_fractures and org.open_fractures[bone]
-	if fracture and isvector(fracture[1]) then
+	if fracture and not spineFractureBones[bone] and isvector(fracture[1]) then
 		local fracturePos = phys:LocalToWorld(fracture[1])
 		if isSafeNetworkPos(fracturePos) then pos = fracturePos end
 	end
@@ -1097,7 +1112,9 @@ function fakeBoneFlop.ApplyStored(rag, org)
 	if not IsValid(rag) or not org then return end
 
 	for bone in pairs(org.fake_floppy_bones or {}) do fakeBoneFlop.ApplyBone(rag, bone, org) end
-	for bone in pairs(org.open_fractures or {}) do fakeBoneFlop.ApplyBone(rag, bone, org) end
+	for bone in pairs(org.open_fractures or {}) do
+		if not spineFractureBones[bone] then fakeBoneFlop.ApplyBone(rag, bone, org) end
+	end
 	for bone in pairs(org.fake_dislocated_bones or {}) do fakeBoneFlop.ApplyBone(rag, bone, org) end
 end
 
