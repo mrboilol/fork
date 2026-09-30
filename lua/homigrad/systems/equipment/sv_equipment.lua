@@ -440,6 +440,9 @@ syncLinkedArmor = function(ent)
 	if not ent:IsRagdoll() then return end
 
 	local owner = hg.RagdollOwner(ent)
+	if not IsValid(owner) and IsValid(ent.zcnpc_npc) and ent.zcnpc_npc.zcnpc_rag == ent then
+		owner = ent.zcnpc_npc
+	end
 	if not IsValid(owner) then return end
 
 	owner.armors = table.Copy(ent.armors or owner.armors or {})
@@ -449,6 +452,7 @@ syncLinkedArmor = function(ent)
 	owner.armors_regions = table.Copy(ent.armors_regions or owner.armors_regions or {})
 	owner.armors_broken = table.Copy(ent.armors_broken or owner.armors_broken or {})
 	owner.armors_broken_mul = table.Copy(ent.armors_broken_mul or owner.armors_broken_mul or {})
+	owner.armors_wear_stage = table.Copy(ent.armors_wear_stage or owner.armors_wear_stage or {})
 	owner.armor_states = table.Copy(ent.armor_states or owner.armor_states or {})
 	owner:SyncArmor()
 end
@@ -696,7 +700,7 @@ function hg.AddArmor(ply, equipment, ent)
 end
 
 function hg.DropArmorForce(ent, equipment, pos, ang, vel, brokenMul)
-    if not table.HasValue(ent.armors, equipment) then return false end
+    if not IsValid(ent) or not ent.armors or not table.HasValue(ent.armors, equipment) then return false end
     local placement
     for plc, tbl in pairs(hg.armor) do
         placement = tbl[equipment] and tbl[equipment][1] or placement
@@ -709,6 +713,7 @@ function hg.DropArmorForce(ent, equipment, pos, ang, vel, brokenMul)
     
     if hg.armor[placement][equipment] then
         local equipmentEnt = ents.Create("ent_armor_" .. equipment)
+        if not IsValid(equipmentEnt) then return false end
         local dropPos, dropAng = getArmorDropTransform(ent, equipment, pos)
         equipmentEnt:Spawn()
         equipmentEnt:SetPos(dropPos)
@@ -734,7 +739,8 @@ function hg.DropArmorForce(ent, equipment, pos, ang, vel, brokenMul)
 			phys:SetVelocity(vel)
 		end
 
-        if IsValid(equipmentEnt) then table.RemoveByValue(ent.armors, equipment) end
+		if not IsValid(equipmentEnt) then return false end
+		ent.armors[placement] = nil
 		if ent.armors_shots then
 			ent.armors_shots[equipment] = nil
 		end
@@ -750,6 +756,9 @@ function hg.DropArmorForce(ent, equipment, pos, ang, vel, brokenMul)
 		if ent.armors_health then
 			ent.armors_health[equipment] = nil
 		end
+		if ent.armors_regions then ent.armors_regions[equipment] = nil end
+		if ent.armors_wear_stage then ent.armors_wear_stage[equipment] = nil end
+		ent:SetNWFloat("ArmorWear" .. equipment, 0)
 		if ent.armor_states then ent.armor_states[equipment] = nil end
         
         if hg.armor[placement][equipment].voice_change then

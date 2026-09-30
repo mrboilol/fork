@@ -144,7 +144,7 @@ local function queueTimer(ent, name, delay, func)
 	end
 end
 
-local function getHeadshotBloodRagdoll(ent, ply)
+local function getHeadshotBloodBody(ent, ply)
 	if IsValid(ent) and (ent:IsRagdoll() or ent:IsNPC()) then return ent end
 	if not IsValid(ply) then return end
 
@@ -152,6 +152,8 @@ local function getHeadshotBloodRagdoll(ent, ply)
 
 	local deathRagdoll = ply:GetNWEntity("RagdollDeath")
 	if IsValid(deathRagdoll) then return deathRagdoll end
+
+	return ply
 end
 
 local function getShotTravelDirection(dmgInfo, inputHole, outputHole, damagePos, ent)
@@ -176,26 +178,31 @@ local function getShotTravelDirection(dmgInfo, inputHole, outputHole, damagePos,
 end
 
 local function sendHeadshotBloodSquirt(ent, ply, damagePos, direction, outputHole, smallCaliber)
+	local headBoneName = "ValveBiped.Bip01_Head1"
+	local bone = IsValid(ent) and ent:LookupBone(headBoneName)
+	local mat = bone and ent:GetBoneMatrix(bone)
+	local org = IsValid(ent) and ent.organism
 	local attempts = 0
 	local function send()
 		attempts = attempts + 1
-		local rag = getHeadshotBloodRagdoll(ent, ply)
+		local rag = getHeadshotBloodBody(ent, ply)
 		if not IsValid(rag) then
 			if attempts < 20 then timer.Simple(0.05, send) end
 			return
 		end
 
-		if rag.bloodsquirted or rag.headexploded then return end
+		if (org or rag).bloodsquirted or rag.headexploded then return end
 
-		local headBoneName = "ValveBiped.Bip01_Head1"
-		local bone = rag:LookupBone(headBoneName)
-		local mat = bone and rag:GetBoneMatrix(bone)
+		if not mat then
+			bone = rag:LookupBone(headBoneName)
+			mat = bone and rag:GetBoneMatrix(bone)
+		end
 		if not mat then
 			if attempts < 20 then timer.Simple(0.05, send) end
 			return
 		end
 
-		rag.bloodsquirted = true
+		(org or rag).bloodsquirted = true
 
 		local function sendJet(pos, dir)
 			net.Start("bloodsquirt")
@@ -208,17 +215,10 @@ local function sendHeadshotBloodSquirt(ent, ply, damagePos, direction, outputHol
 			net.SendPVS(pos)
 		end
 
-		if smallCaliber then
-			if outputHole and #outputHole > 0 then
-				sendJet(outputHole[1] - direction * 2, direction * 4)
-			else
-				sendJet(damagePos + direction * 2, -direction * 4)
-			end
-		else
-			sendJet(damagePos + direction * 2, -direction * 2)
-			if outputHole and #outputHole > 0 then
-				sendJet(outputHole[1] - direction * 2, direction * 2)
-			end
+		local strength = smallCaliber and 4 or 2
+		sendJet(damagePos, -direction * strength)
+		if outputHole and #outputHole > 0 then
+			sendJet(outputHole[1], direction * strength)
 		end
 	end
 

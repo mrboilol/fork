@@ -483,7 +483,7 @@ local function getBloodEffectBoneMatrix(ent, boneName)
 	if not IsValid(ent) then return end
 	ent:SetupBones()
 	local bone = ent:LookupBone(boneName or "")
-	return bone and bone >= 0 and ent:GetBoneMatrix(bone)
+	return bone and bone >= 0 and ent:GetBoneMatrix(bone), bone
 end
 
 net.Receive("bloodsquirt", function()
@@ -504,7 +504,8 @@ net.Receive("bloodsquirt", function()
 		if not mat then return end
 
 		local localPos, localDir = WorldToLocal(pos, dir:Angle(), mat:GetTranslation(), mat:GetAngles())
-		local source = ent
+		local _, owner = getBloodEffectBody(ent)
+		local source = IsValid(owner) and owner or ent
 
 		bloodSquirtSerial = bloodSquirtSerial + 1
 		local name = "squirtblood"..source:EntIndex().."_"..bloodSquirtSerial
@@ -516,9 +517,10 @@ net.Receive("bloodsquirt", function()
 			local drawEnt = getBloodEffectBody(source)
 			if not IsValid(drawEnt) then timer.Remove(name) return end
 			local amt = i / maxI
-			local drawMat = getBloodEffectBoneMatrix(drawEnt, boneName)
+			local drawMat, drawBone = getBloodEffectBoneMatrix(drawEnt, boneName)
 			if not drawMat then timer.Remove(name) return end
-			local drawPos, drawDir = LocalToWorld(localPos, localDir, drawMat:GetTranslation(), drawMat:GetAngles())
+			local offset = hg.organism.ClampWoundOffset(drawEnt, drawBone, localPos, localDir:Forward())
+			local drawPos, drawDir = LocalToWorld(offset, localDir, drawMat:GetTranslation(), drawMat:GetAngles())
 			drawDir = drawDir:Forward() * len
 			if (drawPos - LocalPlayer():EyePos()):LengthSqr() > dsqr then i = i - 1 return end
 			vechuy = vechuy + VectorRand(-amt * 11,amt * 11)

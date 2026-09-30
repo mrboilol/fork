@@ -540,6 +540,9 @@ function BR.Think(data, dt)
     CAI.Suppression.Decay(data, dt)
     CAI.Morale.Regen(data, dt)
     CAI.Personality.ApplyProficiency(data)
+    if npc.overshootTime and npc.overshootTime > CurTime() and npc.didResetProficiency == false then
+        return
+    end
     CAI.Nav.CheckStuck(data)
 
     local newState, reason = Decide(data)

@@ -5,6 +5,8 @@ local function SVar(name, default, help)
 end
 
 SVar("cai_enabled", "1", "Master switch for Combat Intelligence AI.")
+SVar("cai_god_aim", "0.5", "Aim skill: 0 = Stormtrooper, 0.5 = Average Joe, 1 = God aim.")
+SVar("cai_prioritize_head", "0", "Managed NPCs prefer a visible head when aiming at an enemy.")
 SVar("cai_cover", "1", "Enable the smart cover system.")
 SVar("cai_morale", "1", "Enable the morale system.")
 SVar("cai_suppression", "1", "Enable the suppression system.")
@@ -44,3 +46,4 @@ function CAI.CVBool(name) local c = GetConVar(name) return c and c:GetBool() or 
 function CAI.CVNum(name) local c = GetConVar(name) return c and c:GetFloat() or 0 end
 function CAI.Enabled() return CAI.CVBool("cai_enabled") end
 function CAI.Difficulty() return math.Clamp(CAI.CVNum("cai_difficulty"), 0.25, 3) end
+function CAI.AimSkill() return math.Clamp(CAI.CVNum("cai_god_aim"), 0, 1) end

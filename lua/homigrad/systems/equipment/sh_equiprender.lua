@@ -499,40 +499,37 @@ if CLIENT then
 	
 	hook.Add("OnNetVarSet","ArmorVarSet",function(index, key, var)
 		if key == "Armor" then
-			timer.Simple(.1,function()
-				local ent = Entity(index)
+			local ent = Entity(index)
+			if not IsValid(ent) then return end
 
-				local armors = ent.armors or {}
-
-				for k,v in pairs(ent.modelArmor or {}) do
-					if IsValid(ent.modelArmor[k]) then
-						ent.modelArmor[k]:Remove()
-					end
-					ent.modelArmor[k] = nil
+			for k,v in pairs(ent.modelArmor or {}) do
+				if IsValid(ent.modelArmor[k]) then
+					ent.modelArmor[k]:Remove()
 				end
+				ent.modelArmor[k] = nil
+			end
 
-				for k,models in pairs(ent.modelArmorExtra or {}) do
-					if istable(models) then
-						for _, model in pairs(models) do
-							if IsValid(model) then model:Remove() end
-						end
-					elseif IsValid(models) then
-						models:Remove()
+			for k,models in pairs(ent.modelArmorExtra or {}) do
+				if istable(models) then
+					for _, model in pairs(models) do
+						if IsValid(model) then model:Remove() end
 					end
-					ent.modelArmorExtra[k] = nil
+				elseif IsValid(models) then
+					models:Remove()
 				end
+				ent.modelArmorExtra[k] = nil
+			end
 
-				if ent.modelArmorBroken then
-					for k,v in pairs(ent.modelArmorBroken) do
-						if IsValid(ent.modelArmorBroken[k]) then
-							ent.modelArmorBroken[k]:Remove()
-						end
-						ent.modelArmorBroken[k] = nil
+			if ent.modelArmorBroken then
+				for k,v in pairs(ent.modelArmorBroken) do
+					if IsValid(ent.modelArmorBroken[k]) then
+						ent.modelArmorBroken[k]:Remove()
 					end
+					ent.modelArmorBroken[k] = nil
 				end
+			end
 
-				ent.armors = var
-			end)
+			ent.armors = var
 		elseif key == "ArmorStates" then
 			local ent = Entity(index)
 			if IsValid(ent) then ent.armor_states = var end

@@ -3159,6 +3159,43 @@ local ammoents = {
 	},
 }
 
+local needleAmmo = {
+	[".22longrifleneedle"] = {
+		base = ".22longrifle", name = ".22 Long Rifle Needle",
+		Damage = 35, Force = 20, Penetration = 160, Speed = 1000, Diameter = 1, Mass = 1,
+		WoundMultiplier = 2.5
+	},
+	["9x39mmneedle"] = {
+		base = "9x39mm", name = "9x39 mm Needle",
+		Damage = 65, Force = 42, Penetration = 200, Speed = 1300, Diameter = 1.4, Mass = 3,
+		WoundMultiplier = 3
+	},
+	["7.62x51mmneedle"] = {
+		base = "7.62x51mm", name = "7.62x51 mm Needle",
+		Damage = 85, Force = 69, Penetration = 240, Speed = 1600, Diameter = 1.8, Mass = 4.5,
+		WoundMultiplier = 3.5
+	}
+}
+
+for key, settings in pairs(needleAmmo) do
+	local ammo = table.Copy(ammotypes[settings.base])
+	ammo.name = settings.name
+	ammo.allowed = true
+	for field, value in pairs(settings) do
+		if field ~= "base" and field ~= "name" then ammo.BulletSettings[field] = value end
+	end
+	ammo.BulletSettings.EnergyRetention = 0.98
+	ammo.BulletSettings.BulletFragmentation = false
+	ammo.BulletSettings.ExpansionMultiplier = 0.85
+	ammo.BulletSettings.ExpansionRadius = settings.Diameter / 10
+	ammo.BulletSettings.ExpansionChance = 0.08
+	ammo.TracerSetings.TracerHeadSize = 0.5
+	ammo.TracerSetings.TracerWidth = 0.5
+	ammo.TracerSetings.TracerSpeed = settings.Speed * 52.5
+	ammotypes[key] = ammo
+	ammoents[key] = table.Copy(ammoents[settings.base])
+end
+
 hg.ammoents = ammoents
 
 local defaultAmmoIconPaths = {

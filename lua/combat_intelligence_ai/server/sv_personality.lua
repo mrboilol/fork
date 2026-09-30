@@ -41,22 +41,24 @@ function PS.Generate()
 end
 
 function PS.ApplyProficiency(data)
-    local npc = data.ent
-    if not IsValid(npc) or not npc.SetCurrentWeaponProficiency then return end
-    if npc:GetNWBool("JudgeControlsAccuracy") then return end
-
-    local diff = CAI.Difficulty()
-    local score = 2 + (data.personality.stats.accuracy * 2) + (diff - 1) * 2.2
-
-    if CAI.CVBool("cai_morale") and data.morale < CAI.Config.Morale.ShakenThreshold then
-        score = score - 1
-    end
-
-    if CAI.CVBool("cai_suppression") then
-        for threshold, penalty in pairs(CAI.Config.Suppression.AccuracyPenaltySteps) do
-            if data.suppression >= threshold then score = math.min(score, 4 - penalty) end
-        end
-    end
-    score = math.Clamp(math.Round(score), 0, 4)
-    npc:SetCurrentWeaponProficiency(score)
+	local npc = data.ent
+	if not IsValid(npc) or not npc.SetCurrentWeaponProficiency then return end
+	if npc:GetNWBool("JudgeControlsAccuracy") then return end
+	local aimSkill = CAI.AimSkill()
+	local diff = CAI.Difficulty()
+	local score = 2 + data.personality.stats.accuracy * 2 + (diff - 1) * 2.2 + (aimSkill - 0.5) * 4
+	if aimSkill == 1 then score = WEAPON_PROFICIENCY_PERFECT end
+	if aimSkill < 1 and CAI.CVBool("cai_morale") and data.morale < CAI.Config.Morale.ShakenThreshold then
+		score = score - 1
+	end
+	if aimSkill < 1 and CAI.CVBool("cai_suppression") then
+		for threshold, penalty in pairs(CAI.Config.Suppression.AccuracyPenaltySteps) do
+			if data.suppression >= threshold then score = math.min(score, 4 - penalty) end
+		end
+	end
+	if npc.overshootTime and npc.overshootTime > CurTime() and npc.didResetProficiency == false then
+		local overshootProficiency = GetConVar("nos_overshoot_proficiency")
+		if overshootProficiency then score = math.min(score, overshootProficiency:GetInt()) end
+	end
+	npc:SetCurrentWeaponProficiency(math.Clamp(math.Round(score), 0, 4))
 end

@@ -54,14 +54,18 @@ local function GetAccessoryWearer(ent)
 	if ent:IsPlayer() then return ent end
 
 	local owner = hg.RagdollOwner and hg.RagdollOwner(ent)
-	return IsValid(owner) and owner:IsPlayer() and owner or nil
+	if IsValid(owner) and owner:IsPlayer() then return owner end
+	local npc = ent.zcnpc_npc
+	if IsValid(npc) and npc.zcnpc_rag == ent then return npc end
+	if ent:IsNPC() or ent:IsRagdoll() then return ent end
 end
 
 local function SyncAccessories(ply, accessories)
 	accessories = CopyAccessories(accessories)
 	ply:SetNetVar("Accessories", accessories)
 
-	local character = hg.GetCurrentCharacter and hg.GetCurrentCharacter(ply)
+	local character = IsValid(ply.zcnpc_rag) and ply.zcnpc_rag
+		or hg.GetCurrentCharacter and hg.GetCurrentCharacter(ply)
 	if IsValid(character) and character != ply then
 		character:SetNetVar("Accessories", CopyAccessories(accessories))
 	end

@@ -931,6 +931,10 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 		end
 		
 		PLUGIN:RunHook("BulletPostSetup", bullet)
+		if SERVER and CAI and CAI.Target and CAI.Target.ApplyBulletAim then
+			CAI.Target.ApplyBulletAim(bullet.Shooter, bullet, true)
+			if CAI.Target.ApplyBulletRecoil then CAI.Target.ApplyBulletRecoil(bullet.Shooter, bullet, true) end
+		end
 		
 		if(SERVER and IsValid(bullet.Shooter) and bullet.Shooter:IsPlayer())then
 			bullet.Vel = bullet.Vel + bullet.Shooter:GetVelocity()
@@ -1119,6 +1123,11 @@ hook.Add("EntityFireBullets", "あPhysBullets", function(ent, bullet)
 		end
 		
 		return false
+	end
+	if SERVER and CAI and CAI.Target and CAI.Target.ApplyBulletAim then
+		local adjusted = CAI.Target.ApplyBulletAim(ent, bullet)
+		local recoiled = CAI.Target.ApplyBulletRecoil and CAI.Target.ApplyBulletRecoil(ent, bullet)
+		return adjusted or recoiled
 	end
 end)
 

@@ -1068,7 +1068,7 @@ local function emitOrdinaryBleeding(ent, org, wound, pos, ang, visualRate, inter
 		+ lateral + VectorRand(-(2 + sizeK * 10) * spread, (2 + sizeK * 10) * spread)
 	local count = math.Clamp(math.ceil(dropVolume / 2), 1, 3)
 	local volume = dropVolume / count
-	local size = math.Clamp(0.35 + math.sqrt(visualRate) * 0.18, 0.35, 2)
+	local size = math.Clamp(0.35 + math.sqrt(visualRate) * 0.18, 0.35, 2) * 1.5
 	for _ = 1, count do
 		local part = hg.addBloodPart(pos + VectorRand(-0.3, 0.3), vel * math.Rand(0.7, 1.2) + VectorRand(-5, 5), nil, size, size, false, nil, ent, volume < 0.25)
 		if part then part.volume = volume end
@@ -1110,7 +1110,7 @@ local function emitArterialBleeding(ent, org, wound, index, pos, ang, boneAng, w
 
 	for _ = 1, count do
 		local dropVolume = volume
-		local size = math.Clamp(0.45 + math.sqrt(visualRate) * 0.22, 0.45, 3) * arterySizeMul
+		local size = math.Clamp(0.45 + math.sqrt(visualRate) * 0.22, 0.45, 3) * arterySizeMul * 1.5
 		local spread = (pouring and 30 + sizeK * 100 or 2 + sizeK * 2) * pressureDrive * spurt
 		local vel = velocity * math.Rand(pouring and 0.45 or 0.92, pouring and 1.4 or 1.08)
 			+ VectorRand(-spread, spread)
@@ -1119,7 +1119,7 @@ local function emitArterialBleeding(ent, org, wound, index, pos, ang, boneAng, w
 		if part then part.volume = dropVolume end
 	end
 	local dripVolume = volume * 0.35
-	local dripSize = math.Clamp(0.25 + math.sqrt(dripVolume) * 0.65, 0.35, 1.5)
+	local dripSize = math.Clamp(0.25 + math.sqrt(dripVolume) * 0.65, 0.35, 1.5) * 1.5
 	local dripVel = pressureDrive > 0.05 and -sprayDir * math.Rand(20, 50) or bleedDown * math.Rand(12, 28)
 	local drip = hg.addBloodPart(pos, dripVel + VectorRand(-12, 12), nil, dripSize, dripSize, true, nil, ent, dripVolume < 0.25)
 	if drip then drip.volume = dripVolume end
