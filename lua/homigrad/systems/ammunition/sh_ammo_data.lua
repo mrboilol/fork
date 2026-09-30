@@ -3185,6 +3185,8 @@ for key, settings in pairs(needleAmmo) do
 		if field ~= "base" and field ~= "name" then ammo.BulletSettings[field] = value end
 	end
 	ammo.BulletSettings.EnergyRetention = 0.98
+	ammo.BulletSettings.BrainEnergyRetention = 0.9
+	ammo.BulletSettings.BrainDamageMultiplier = 2
 	ammo.BulletSettings.BulletFragmentation = false
 	ammo.BulletSettings.ExpansionMultiplier = 0.85
 	ammo.BulletSettings.ExpansionRadius = settings.Diameter / 10

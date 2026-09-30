@@ -618,9 +618,6 @@ module[2] = function(owner, org, mulTime)
 		local isAmputation = wound[9] == true
 		local isHeadGib = wound[10] == "headgib"
 		local woundSeverityMul = isAmputation and amputation_arterial_bleed_mul or (isHeadGib and headgib_arterial_bleed_mul or (limbArteryWeakness[wound[7]] and 1.65 or 1))
-		if not isAmputation and not isHeadGib then
-			woundSeverityMul = woundSeverityMul * (wound[7] == "aorta" and 1.25 or wound[7] == "arteria" and 1.2 or 1)
-		end
 		initializeWoundHemostasis(wound, time)
 		local circulationOutput = math.max(tonumber(org.cardiacOutput) or 0, 0)
 		local pressureFactor = math.Clamp((tonumber(org.bloodPressure) or 0) / 92, 0, 1.5)

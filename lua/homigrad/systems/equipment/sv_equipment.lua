@@ -1188,9 +1188,17 @@ local function protec(org, bone, dmg, dmgInfo, placement, armor, scale, scalepro
 	local isStab = dmgInfo:IsDamageType(DMG_SLASH)
 	local isClub = dmgInfo:IsDamageType(DMG_CLUB + DMG_GENERIC)
 	local originalDamageType = dmgInfo:GetDamageType()
+	local ballisticResistance
+	if isBullet and impact and impact.ballisticVersion then
+		local shotDir = (isvector(dir) and dir:GetNormalized()) or dmgInfo:GetDamageForce():GetNormalized()
+		local incidence = isvector(impact.normal) and math.abs(shotDir:Dot(impact.normal)) or 1
+		ballisticResistance = ballisticProt * 2.25 * (org.owner.armors_broken_mul and org.owner.armors_broken_mul[armor] or 1)
+			* math.Clamp(1 / math.max(incidence, 0.4), 1, 2.5)
+	end
+	local penetratesArmor = ballisticResistance and impact.penetrationBefore > ballisticResistance
 	local armorHitKey = "armor:" .. tostring(org.owner:EntIndex()) .. ":" .. tostring(armor)
 	if impact and impact.modelArmorHits and impact.modelArmorHits[armorHitKey] then return 0 end
-	if hg.TryKnockOffArmor(org.owner, placement, armor, armorData, dmgInfo, hit, impact, dir) then
+	if not penetratesArmor and hg.TryKnockOffArmor(org.owner, placement, armor, armorData, dmgInfo, hit, impact, dir) then
 		dmgInfo:ScaleDamage(0)
 		dmgInfo:SetDamageForce(vector_origin)
 		org.lastArmorMitigation = 0
@@ -1289,9 +1297,7 @@ local function protec(org, bone, dmg, dmgInfo, placement, armor, scale, scalepro
 		local rawDmg = dmgInfo:GetDamage()
 		local vestScale = DamageArmorPlate(org, placement, armor, dmgInfo, isvector(hit) and hit or dmgInfo:GetDamagePosition(), rawDmg, boneindex)
 		local broken, destroyed = DamageArmor(org, placement, armor, dmgInfo, (ricochetHit and rawDmg * 0.15 or rawDmg) * vestScale)
-		if broken and placement == "head" and not destroyed then
-			-- The shot that knocks the helmet off fully protects the player:
-			-- the helmet stops the bullet and it does not punch through to the head.
+		if broken and placement == "head" and not destroyed and not penetratesArmor then
 			dmgInfo:ScaleDamage(0)
 			dmgInfo:SetDamageForce(dmgInfo:GetDamageForce() * 0.4)
 			org.lastArmorMitigation = 1
@@ -1407,15 +1413,11 @@ local function protec(org, bone, dmg, dmgInfo, placement, armor, scale, scalepro
 			}
 		end
 
-		local shotDir = (isvector(dir) and dir:GetNormalized()) or dmgInfo:GetDamageForce():GetNormalized()
-		local normal = impact.normal
-		local incidence = isvector(normal) and math.abs(shotDir:Dot(normal)) or 1
-		local angleMul = math.Clamp(1 / math.max(incidence, 0.4), 1, 2.5)
-		local resistance = ballisticProt * 2.25 * regionWear * (org.owner.armors_broken_mul[armor] or 1) * angleMul
+		local resistance = ballisticResistance * regionWear
 		local stopped = impact.penetrationBefore <= resistance
 		local penetrationCost = math.min(resistance, impact.penetrationBefore)
 		local overmatch = math.max(impact.penetrationBefore - resistance, 0) / math.max(impact.penetrationBefore, 1)
-		local penetrationDamageScale = math.Clamp(overmatch * 0.6, 0.04, 0.3)
+		local penetrationDamageScale = math.Clamp(overmatch, 0.04, 0.95)
 		local energyCost = stopped and impact.energyBefore or impact.energyBefore * (1 - penetrationDamageScale)
 		local quality = math.Clamp(tonumber(hg.GetArmorItemState(org.owner, armor, "quality", 1)) or 1, 0.8, 1.2)
 		local mass = hg.GetArmorMass(org.owner, placement, armor)
@@ -1472,7 +1474,14 @@ function hg.ProcessArmorModelHit(hit, damage, forceAmount, direction, shot)
 	dmgInfo:SetDamageForce(forceVector)
 
 	local isBullet = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
-	if hg.TryKnockOffArmor(owner, placement, armor, armorData, dmgInfo, hit.position, shot, dir, true) then
+	local penetration = math.max(tonumber(shot and shot.Penetration) or dmgInfo:GetDamage() / 2, 0.01)
+	local protection = math.max(hg.GetArmorProtection(owner, placement, armor, hit.position), 0)
+	local condition = GetEquippedArmorCondition(owner, armor, placement, armorData)
+	local incidence = isvector(hit.normal) and math.abs(dir:Dot(hit.normal)) or 1
+	local angleMul = math.Clamp(1 / math.max(incidence, 0.45), 1, 2.2)
+	local resistance = protection * 1.55 * condition * angleMul
+	local penetratesArmor = isBullet and penetration > resistance
+	if not penetratesArmor and hg.TryKnockOffArmor(owner, placement, armor, armorData, dmgInfo, hit.position, shot, dir, true) then
 		return {scale = 0, penetration = 0, stopped = true, dropped = true, material = MAT_METAL}
 	end
 
@@ -1485,7 +1494,7 @@ function hg.ProcessArmorModelHit(hit, damage, forceAmount, direction, shot)
 	end
 	ArmorEffect(placement, armor, dmgInfo, org, hit.position, math.max(hg.GetArmorProtection(owner, placement, armor, hit.position), 0))
 
-	if owner.armors and owner.armors[placement] ~= armor then
+	if not penetratesArmor and owner.armors and owner.armors[placement] ~= armor then
 		return {scale = 0, penetration = 0, stopped = true, dropped = placement == "head" or placement == "face", material = MAT_METAL}
 	end
 	if destroyed then return {scale = 1, penetration = shot and shot.Penetration, material = MAT_METAL} end
@@ -1496,19 +1505,13 @@ function hg.ProcessArmorModelHit(hit, damage, forceAmount, direction, shot)
 		return {scale = damageScale, stopped = false, material = MAT_METAL, broken = broken}
 	end
 
-	local penetration = math.max(tonumber(shot and shot.Penetration) or dmgInfo:GetDamage() / 2, 0.01)
-	local protection = math.max(hg.GetArmorProtection(owner, placement, armor, hit.position), 0)
-	local condition = GetEquippedArmorCondition(owner, armor, placement, armorData)
-	local incidence = isvector(hit.normal) and math.abs(dir:Dot(hit.normal)) or 1
-	local angleMul = math.Clamp(1 / math.max(incidence, 0.45), 1, 2.2)
-	local resistance = protection * 1.55 * condition * angleMul
 	local remainingPenetration = math.max(penetration - resistance, 0)
 	if remainingPenetration <= 0 then
 		return {scale = 0, penetration = 0, stopped = true, material = MAT_METAL, broken = broken}
 	end
 
 	local overmatch = remainingPenetration / penetration
-	local scale = math.Clamp(overmatch * 0.72, 0.08, 0.5)
+	local scale = math.Clamp(overmatch, 0.08, 0.95)
 	return {
 		scale = scale,
 		penetration = remainingPenetration,

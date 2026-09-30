@@ -100,6 +100,8 @@ local function applyBallisticProfile(bullet, settings, damage, penetration)
 	bullet.PainMultiplier = settings.PainMultiplier or math.Clamp(damageFactor * 0.5 + energyFactor * 0.35 + bullet.TemporaryCavity * 0.15, 0.6, 2.3)
 	bullet.DestructiveMultiplier = settings.DestructiveMultiplier or math.Clamp(damageFactor * 0.55 + caliberFactor * 0.3 + energyFactor * 0.15, 0.55, 2.35)
 	bullet.EnergyRetention = settings.EnergyRetention or math.Clamp(0.68 + penetration / 100 - (expansionFactor - 1) * 0.08, 0.55, 0.95)
+	bullet.BrainEnergyRetention = settings.BrainEnergyRetention
+	bullet.BrainDamageMultiplier = settings.BrainDamageMultiplier
 
 	if settings.BulletFragmentation ~= nil then
 		bullet.BulletFragmentation = settings.BulletFragmentation
@@ -203,6 +205,8 @@ local function callbackBullet(self, tr, dmg, force, bullet, penetration)
 				Penetration = bullet.Penetration,
 				Diameter = bullet.Diameter,
 				TissueDamage = bullet.TissueDamage,
+				BrainEnergyRetention = bullet.BrainEnergyRetention,
+				BrainDamageMultiplier = bullet.BrainDamageMultiplier,
 				TemporaryCavity = bullet.TemporaryCavity,
 				BulletFragmentation = bullet.BulletFragmentation,
 				EnergyRetention = bullet.EnergyRetention,
@@ -328,6 +332,8 @@ local function callbackBullet(self, tr, dmg, force, bullet, penetration)
 			Penetration = bullet.Penetration,
 			Diameter = bullet.Diameter,
 			TissueDamage = bullet.TissueDamage,
+			BrainEnergyRetention = bullet.BrainEnergyRetention,
+			BrainDamageMultiplier = bullet.BrainDamageMultiplier,
 			TemporaryCavity = bullet.TemporaryCavity,
 			BulletFragmentation = bullet.BulletFragmentation,
 			EnergyRetention = bullet.EnergyRetention,

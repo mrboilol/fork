@@ -231,8 +231,12 @@ local function damageBrainLobe(org, bone, dmg, dmgInfo, key, impact)
 	end
 
 	local oldDmg = org[key] or 0
-	local diameter = impact and impact.bullet and impact.bullet.Diameter
-	local brainCap = (dmgInfo:IsDamageType(DMG_CLUB) or (diameter and diameter <= 5.7)) and 0.2 or 0.4
+	local bullet = impact and impact.bullet
+	local brainDamageMultiplier = math.max(tonumber(bullet and bullet.BrainDamageMultiplier) or 1, 1)
+	dmg = dmg * brainDamageMultiplier
+	local diameter = bullet and bullet.Diameter
+	local brainCap = brainDamageMultiplier > 1 and 1
+		or (dmgInfo:IsDamageType(DMG_CLUB) or (diameter and diameter <= 5.7)) and 0.2 or 0.4
 	local result = damageOrgan(org, dmg, dmgInfo, key)
 	local delta = (org[key] or 0) - oldDmg
 
@@ -356,12 +360,12 @@ local function emitArterialImpact(owner, wound)
 end
 
 local arterySize = {
-	["arteria"] = 14,
-	["rarmartery"] = 6,
-	["larmartery"] = 6,
-	["rlegartery"] = 9,
-	["llegartery"] = 9,
-	["aorta"] = 18,
+	["arteria"] = 8,
+	["rarmartery"] = 4.5,
+	["larmartery"] = 4.5,
+	["rlegartery"] = 6.5,
+	["llegartery"] = 6.5,
+	["aorta"] = 10,
 }
 
 local arteryBones = {
@@ -487,8 +491,9 @@ hitArtery = function(artery, org, dmg, dmgInfo, boneindex, dir, hit, impact, for
 	if not localPos then
 		localPos, localAng, dir2 = vecZero, angZero, Vector(-1, 0, 0)
 	end
-	local wound = {arterySize[artery], localPos, localAng, woundBone or (isstring(boneindex) and boneindex) or arteryBones[artery], CurTime(), dir2 * 100, artery}
-	wound.visualBleedRate = math.max((arterySize[artery] or 6) * 4.5, 1)
+	local woundSeverity = (arterySize[artery] or 4.5) * (forceRupture and 1 or math.Clamp(dmg, 0.25, 1))
+	local wound = {woundSeverity, localPos, localAng, woundBone or (isstring(boneindex) and boneindex) or arteryBones[artery], CurTime(), dir2 * 100, artery}
+	wound.visualBleedRate = math.max(woundSeverity * 4.5, 1)
 	table.insert(org.arterialwounds, wound)
 	hg.organism.MarkArterialWoundsNetDirty(org)
 	emitArterialImpact(owner, wound)

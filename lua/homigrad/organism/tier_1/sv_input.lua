@@ -330,8 +330,13 @@ local function Trace_Bullet(box, hit, ricochet, impact, org, organs, dmg, dmgInf
 				impact.brainLobesHit = impact.brainLobesHit or {}
 				impact.brainLobesHit[name] = true
 			end
-			local maxBrainCost = math.Clamp(0.95 - math.Clamp((brainTransfer - 0.45) * 0.22, 0, 0.35), 0.58, 0.95)
-			energyCost = math.max(energyCost, impact.energyBefore * math.Clamp(0.45 + brainDelta * 0.35, 0.45, maxBrainCost))
+			local brainEnergyRetention = math.Clamp(tonumber(bullet.BrainEnergyRetention) or 0, 0, 1)
+			if brainEnergyRetention > 0 then
+				energyCost = math.max(energyCost, impact.energyBefore * (1 - brainEnergyRetention))
+			else
+				local maxBrainCost = math.Clamp(0.95 - math.Clamp((brainTransfer - 0.45) * 0.22, 0, 0.35), 0.58, 0.95)
+				energyCost = math.max(energyCost, impact.energyBefore * math.Clamp(0.45 + brainDelta * 0.35, 0.45, maxBrainCost))
+			end
 		end
 		if impact.fragmentationActive then
 			energyCost = math.min(impact.energyBefore, energyCost + impact.initialEnergy * impact.fragmentationEnergy)
