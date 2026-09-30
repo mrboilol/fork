@@ -62,7 +62,7 @@ local function physBloodCollide(data, pos, normal)
 	physTrace.endpos = pos - normal * 4
 	local tr = util.TraceLine(physTrace)
 	if not tr.Hit then tr.HitWorld = true end
-	decal(pos, normal, tr, data.artery, data.owner, data.tiny, data.volume)
+	decal(pos, normal, tr, data.artery, data.owner, data.tiny, data.volume, data.size)
 end
 
 local slideTrace = {mask = MASK_SOLID}
@@ -110,8 +110,13 @@ local function addPhysBloodPart(pos, vel, w, artery, kishki, owner, tiny, hidden
 	if IsValid(owner) then vel = vel + owner:GetVelocity() end
 	physGravity[3] = -(sv_gravity and sv_gravity:GetFloat() or 600)
 
-	local size = kishki and math.Clamp((w or 4) * 0.8, 2, 8) or math.Clamp(w or 2, tiny and 0.7 or 1.2, 8)
-	size = math.Clamp(size * math.Rand(0.7, 1.6), 0.6, 10)
+	local size = math.Clamp(w or 1, 0.25, 8)
+	if kishki then
+		size = math.Clamp((w or 4) * 0.8, 2, 8)
+		size = math.Clamp(size * math.Rand(0.7, 1.6), 0.6, 10)
+	end
+	data.size = kishki and size * 2 or size
+	local radius = kishki and size or size * 0.5
 	local light = render.GetLightColor(pos)
 	local lum = math.Clamp((light[1] + light[2] + light[3]) * 1.2 + 0.35, 0.5, 1)
 
@@ -119,8 +124,8 @@ local function addPhysBloodPart(pos, vel, w, artery, kishki, owner, tiny, hidden
 	part:SetDieTime(math.Clamp(lifetime or 6, 1.2, 6))
 	part:SetStartAlpha(hidden and 0 or 255)
 	part:SetEndAlpha(hidden and 0 or 220)
-	part:SetStartSize(size)
-	part:SetEndSize(size * 0.75)
+	part:SetStartSize(radius)
+	part:SetEndSize(radius * 0.75)
 	part:SetRoll(math.Rand(0, 360))
 	part:SetRollDelta(math.Rand(-6, 6))
 	part:SetGravity(physGravity)
@@ -152,7 +157,7 @@ local function addLegacyBloodPart(pos, vel, mat, w, h, artery, kishki, owner, ti
 
 	if #hg.bloodparticles1 >= 600 then table.remove(hg.bloodparticles1, 1) end
 	
-	local part = {pos, pos2, vel, mat or mat_huy, w or 2, h or 2, CurTime(), artery = artery, kishki = kishki, owner = owner, start_velocity = IsValid(owner) and owner:GetVelocity() or vector_origin, tiny = tiny, hidden = hidden, lifetime = lifetime, maxBeamLength = maxBeamLength, volume = math.Clamp((w or 2) / 2, 0.2, 4)}
+	local part = {pos, pos2, vel, mat or mat_huy, w or 1, h or w or 1, CurTime(), artery = artery, kishki = kishki, owner = owner, start_velocity = IsValid(owner) and owner:GetVelocity() or vector_origin, tiny = tiny, hidden = hidden, lifetime = lifetime, maxBeamLength = maxBeamLength, volume = math.Clamp((w or 2) / 2, 0.2, 4), size = math.max(w or 1, h or w or 1, maxBeamLength or 0)}
 	hg.bloodparticles1[#hg.bloodparticles1 + 1] = part
 	return part
 end
@@ -170,7 +175,7 @@ function hg.isOrganismBloodTarget(ent)
 end
 
 function hg.addSlidingBloodPart(pos, normal, data)
-	local size = math.Clamp((data.volume or 1) * 2 * math.Rand(0.6, 1.3), 1, 6)
+	local size = math.Clamp(data.size or (0.25 + math.sqrt(data.volume or 1) * 0.65), 0.25, 8)
 	local part = addLegacyBloodPart(pos, -normal * 12, nil, size, size, data.artery, false, data.owner, false, false, 3)
 	if part then part.volume = data.volume end
 	return part

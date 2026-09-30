@@ -34,7 +34,8 @@ end
 function hg.CanUseLeftHand(ply)
 	local ent = IsValid(ply.FakeRagdoll) and ply.FakeRagdoll or ply
 
-	if IsValid(ply.FakeRagdoll) and ply:GetNWBool("hg_hold_wound_manual", false) then
+	if IsValid(ply.FakeRagdoll) and ply:GetNWBool("hg_hold_wound_manual", false)
+		and (ply:GetNWBool("hg_hold_wound_twohand", false) or not ply:GetNWBool("hg_hold_wound_right", false)) then
 		if hg.DebugTPIK then hg.DebugTPIK(ply, "lh_off", "wound_manual") end
 		return false
 	end

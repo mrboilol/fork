@@ -61,8 +61,9 @@ local WOUND_MARK = {
 local REFERENCE_SCREEN_HEIGHT = 1080
 
 local HEALTH_STOPS = {
-	{0, 235, 205, 50},
-	{1, 215, 25, 25},
+	{0, 245, 245, 240, 180},
+	{0.5, 255, 225, 40, 255},
+	{1, 0, 0, 0, 255},
 }
 local COLOR = {
 	ARMOR_GOOD = {40, 200, 70},
@@ -779,6 +780,7 @@ local function updateLimbState(org, limb)
 	if not hand then return end
 
 	severity[hand] = boneSev * WEIGHT.HAND_BONE_SHARE
+	broken[hand] = isBroken
 	tourniquet[hand] = hasTourniquet
 	missing[hand] = missing[lower] or org[hand .. "amputated"] == true
 end
@@ -892,6 +894,7 @@ local function lerpColor(from, to, t)
 end
 
 local function healthColor(region)
+	if broken[region] then return 0, 0, 0, 255 end
 	local value = math_Clamp(severity[region] or 0, 0, 1)
 	for index = 2, #HEALTH_STOPS do
 		local high = HEALTH_STOPS[index]
@@ -899,12 +902,13 @@ local function healthColor(region)
 			local low = HEALTH_STOPS[index - 1]
 			local t = (value - low[1]) / (high[1] - low[1])
 
-			return low[2] + (high[2] - low[2]) * t, low[3] + (high[3] - low[3]) * t, low[4] + (high[4] - low[4]) * t
+			return low[2] + (high[2] - low[2]) * t, low[3] + (high[3] - low[3]) * t,
+				low[4] + (high[4] - low[4]) * t, low[5] + (high[5] - low[5]) * t
 		end
 	end
 	local last = HEALTH_STOPS[#HEALTH_STOPS]
 
-	return last[2], last[3], last[4]
+	return last[2], last[3], last[4], last[5]
 end
 
 local function ringColor(region)
@@ -1080,13 +1084,13 @@ local function drawSplit(shape, x, y, outer, inner)
 	local towardY = centerY - (shape.sz - targetZ) * pixelScale - y
 	local angle = math_atan2(towardY, towardX)
 	if (severity[shape.region] or 0) > 0 then
-		local red, green, blue = healthColor(shape.region)
-		surface.SetDrawColor(red, green, blue, FILL_ALPHA)
+		local red, green, blue, alpha = healthColor(shape.region)
+		surface.SetDrawColor(red, green, blue, alpha)
 		polyHalfCircle(x, y, inner, angle + math.pi * 0.5)
 	end
 	if (severity[shape.splitRegion] or 0) > 0 then
-		local red, green, blue = healthColor(shape.splitRegion)
-		surface.SetDrawColor(red, green, blue, FILL_ALPHA)
+		local red, green, blue, alpha = healthColor(shape.splitRegion)
+		surface.SetDrawColor(red, green, blue, alpha)
 		polyHalfCircle(x, y, inner, angle - math.pi * 0.5)
 	end
 
@@ -1134,8 +1138,8 @@ local function drawShape(shape)
 		drawSplit(shape, ax, ay, r, inner)
 	else
 		if (severity[shape.region] or 0) > 0 then
-			local red, green, blue = healthColor(shape.region)
-			surface.SetDrawColor(red, green, blue, FILL_ALPHA)
+			local red, green, blue, alpha = healthColor(shape.region)
+			surface.SetDrawColor(red, green, blue, alpha)
 			polyCapsule(ax, ay, bx, by, inner)
 		end
 		local red, green, blue = ringColor(shape.region)

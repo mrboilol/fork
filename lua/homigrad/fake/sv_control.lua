@@ -85,12 +85,6 @@ local wound_hold_larmstump_offset = Vector(2, 0, 2.5)
 local wound_hold_rarmstump_offset = Vector(2, 0, 2.5)
 local wound_hold_llegstump_offset = Vector(2.5, 0, 4)
 local wound_hold_rlegstump_offset = Vector(2.5, 0, 4)
-local stumpArteries = {
-	["ValveBiped.Bip01_L_Forearmartery"] = "larm",
-	["ValveBiped.Bip01_R_Forearmartery"] = "rarm",
-	["ValveBiped.Bip01_L_Calfartery"] = "lleg",
-	["ValveBiped.Bip01_R_Calfartery"] = "rleg"
-}
 
 local function setManualWoundHold(ply, org, active, wound, hands, useRight, arterial)
 	active = active and wound and true or false
@@ -154,10 +148,6 @@ local function getHoldWoundPos(ragdoll, wound)
 	end
 
 	return pos
-end
-
-local function isStumpArterialWound(wound)
-	return wound and stumpArteries[wound[7]] != nil
 end
 
 local function getHoldTarget(pos, phys, offset)
@@ -445,6 +435,7 @@ hook.Add("Player Think", "HG_ClearManualWoundHold", function(ply)
 		ply.organism.manualHoldWound = false
 		ply.organism.manualHoldWoundTarget = nil
 		ply.organism.manualHoldWoundHands = 0
+		ply.organism.manualHoldWoundStrength = 0
 		ply.organism.manualHoldWoundUseRight = false
 		ply.organism.manualHoldWoundArterial = false
 	end
@@ -1080,40 +1071,15 @@ hook.Add("Think", "Fake", function()
 		ragdoll.HGFallCoverActive = fallCoverActive
 		local holdWound, holdWoundArterial = getHoldWound(org, ragdoll)
 		local wantsManualHold = (holdWound and org.canmove and hg.KeyDown(ply, IN_USE) and hg.KeyDown(ply, IN_JUMP)) or (org.neckslit and not org.otrub and holdWoundArterial and org.canmove)
-		local canHoldLeft = IsValid(lupper) and IsValid(lforearm) and IsValid(lhand) and not org.larmamputated and not org.larmupamputated
-		local canHoldRight = IsValid(rupper) and IsValid(rforearm) and IsValid(rhand) and not org.rarmamputated and not org.rarmupamputated
-		local hasBothArms = canHoldLeft and canHoldRight
+		local canHoldLeft = IsValid(lupper) and IsValid(lforearm) and IsValid(lhand) and not org.larmamputated and not org.larmupamputated and not org.lhandamputated
+		local canHoldRight = IsValid(rupper) and IsValid(rforearm) and IsValid(rhand) and not org.rarmamputated and not org.rarmupamputated and not org.rhandamputated
 		local canUseTwoHandHold = not IsValid(wep) or wep:GetClass() == "weapon_hands_sh"
 		local manualUseLeft = false
 		local manualUseRight = false
 
-		if wantsManualHold and hasBothArms then
-			if holdWoundArterial then
-				if canUseTwoHandHold then
-					manualUseLeft = canHoldLeft
-					manualUseRight = canHoldRight
-					if not manualUseLeft or not manualUseRight then
-						if isStumpArterialWound(holdWound) then
-							manualUseLeft = canHoldLeft
-							manualUseRight = canHoldRight
-						else
-							manualUseLeft = false
-							manualUseRight = false
-						end
-					end
-				elseif canHoldLeft then
-					manualUseLeft = true
-				elseif canHoldRight then
-					manualUseRight = true
-				end
-			elseif canUseTwoHandHold and canHoldLeft and canHoldRight then
-				manualUseLeft = true
-				manualUseRight = true
-			elseif canHoldLeft then
-				manualUseLeft = true
-			elseif canHoldRight then
-				manualUseRight = true
-			end
+		if wantsManualHold then
+			manualUseLeft = canHoldLeft
+			manualUseRight = canHoldRight and canUseTwoHandHold
 		end
 
 		local holdWoundPos = wantsManualHold and getHoldWoundPos(ragdoll, holdWound) or nil
@@ -1130,6 +1096,8 @@ hook.Add("Think", "Fake", function()
 		setManualWoundHold(ply, org, manualHoldWound, holdWound, manualHoldHands, manualUseRight, holdWoundArterial)
 		local gripLeft = syncWoundGrip(ragdoll, "l", manualHoldWound and manualUseLeft and holdWoundPos, fixedPhys[5], holdWound, holdWoundPos)
 		local gripRight = syncWoundGrip(ragdoll, "r", manualHoldWound and manualUseRight and holdWoundPos, fixedPhys[7], holdWound, holdWoundPos)
+		org.manualHoldWoundStrength = ((gripLeft and hg.GetArmEffectiveness(ply, "larm") or 0)
+			+ (gripRight and hg.GetArmEffectiveness(ply, "rarm") or 0)) / 2
 
 		if org.alive and IsValid(spine) and ragdoll.otrubCollapseStart and (CurTime() - ragdoll.otrubCollapseStart) < 1.5 then
 			inmove = true
@@ -1644,7 +1612,8 @@ hook.Add("Think", "Fake", function()
 		local keyRight = false
 		local isNeckSlitRolling = false
 
-		if org.neckslit and not org.otrub and ply:Alive() and not ply:InVehicle() then
+		if org.neckslit and (org.neckslitStunUntil or 0) > CurTime()
+			and not org.otrub and ply:Alive() and not ply:InVehicle() then
 			local phase = (CurTime() * 1.5) % 4
 			if phase < 1 then
 				keyLeft = true

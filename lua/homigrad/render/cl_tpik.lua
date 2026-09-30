@@ -1731,13 +1731,6 @@ function hg.DragHandsToPos(ply,self,pos,twohanded,twohanddist,norm,angrh,anglh)
     self.lhandik = true
     
 	if pos then
-        -- Disabled two-handed pickup for right hand - only left hand handles pickups
-        -- if twohanded then
-        --     self.rhandik = true
-        --     ... (right hand manipulation code removed)
-        -- end
-
-
         local oldpos = lhmat:GetTranslation()
         pos.x = math_Clamp(pos.x, oldpos.x - 38, oldpos.x + 38)
         pos.y = math_Clamp(pos.y, oldpos.y - 38, oldpos.y + 38)

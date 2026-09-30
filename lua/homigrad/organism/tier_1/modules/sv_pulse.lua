@@ -1271,6 +1271,7 @@ module[2] = function(owner, org, timeValue)
 	org.heartbeat = math.Clamp(org.heartbeat, 0, terminalHeartRate)
 
 	local tachycardiaK = Clamp(((org.heartbeat or 0) - 140) / 110, 0, 1)
+	local rhythmRiskMul = math.Clamp(org.conditionResistanceMul or 1, 0.05, 1)
 	local palpitationDrive = Clamp(math.max(
 		sympatheticCompensation * 0.45,
 		tachycardiaK * 0.8,
@@ -1280,6 +1281,7 @@ module[2] = function(owner, org, timeValue)
 		acuteHemorrhageStress * 0.9,
 		(org.cardiacStressExposure or 0) * 0.75
 	) - 0.2, 0, 1)
+	palpitationDrive = palpitationDrive * rhythmRiskMul
 	local correctingPalpitations = (org.palpitationTreatmentUntil or 0) > CurTime()
 	if org.fibrillation or org.heartstop or correctingPalpitations then palpitationDrive = 0 end
 	org.palpitations = Approach(palpitations, palpitationDrive, timeValue / (correctingPalpitations and 4 or palpitationDrive > palpitations and 6 or 14))
@@ -1335,15 +1337,15 @@ module[2] = function(owner, org, timeValue)
 		-- real but still uncommon event below 30 C.
 		org.nextColdRhythmRoll = CurTime() + 6
 		local deepCold = math.Clamp((30 - (org.temperature or 36.7)) / 2, 0, 1)
-		if roll < deepCold * 0.08 then
+		if roll < deepCold * 0.08 * rhythmRiskMul then
 			-- Deep cold may destabilize into VF, but temperature itself does not
 			-- directly flip the heartstop flag. VF and/or the resulting failure of
 			-- cardiac output are what progress the organism into arrest.
 			hg.organism.StartFibrillation(org)
 			org.terminalRhythm = "ventricular_fibrillation"
-		elseif roll < 0.03 + hypothermiaInstability * 0.16 then
+		elseif roll < (0.03 + hypothermiaInstability * 0.16) * rhythmRiskMul then
 			org.unstableRhythm = "atrial_fibrillation"
-		elseif roll < 0.15 + hypothermiaInstability * 0.24 then
+		elseif roll < (0.15 + hypothermiaInstability * 0.24) * rhythmRiskMul then
 			org.unstableRhythm = "ventricular_ectopy"
 		else
 			org.unstableRhythm = nil
@@ -1369,11 +1371,13 @@ module[2] = function(owner, org, timeValue)
 		end
 		chance = math.max(chance, highTachyK * hemorrhageDanger * 0.025, hypertensiveEmergency ^ 2 * 0.035)
 		if sustainedTachy then chance = math.max(chance, highTachyK * oxygenMismatch * 0.06) end
+		chance = chance * rhythmRiskMul
 
 		if chance > 0 and math.random() < chance then
 			hg.organism.StartFibrillation(org)
 			org.terminalRhythm = hb >= 220 and "terminal_tachycardia" or "ventricular_fibrillation"
-		elseif effectivePalpitations > 0.35 and math.random() < (effectivePalpitations - 0.35) ^ 2 * 0.04 * rhythmViability then
+		elseif effectivePalpitations > 0.35
+			and math.random() < (effectivePalpitations - 0.35) ^ 2 * 0.04 * rhythmViability * rhythmRiskMul then
 			hg.organism.StartFibrillation(org)
 		end
 	end

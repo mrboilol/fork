@@ -451,6 +451,8 @@ hitArtery = function(artery, org, dmg, dmgInfo, boneindex, dir, hit, impact, for
 		
 		hg.AddHarmToAttacker(dmgInfo, 15, "Carotid artery punctured harm")
 		org.neckslit = true
+		org.neckslitStunUntil = CurTime() + 5
+		org.stun = math.max(org.stun or 0, org.neckslitStunUntil)
 		org.needfake = true
 	end
 

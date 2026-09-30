@@ -295,6 +295,7 @@ function SWEP:SetSuperadminGrab(victim)
 end
 
 function SWEP:OnRemove()
+	self:StopWoundPressure()
 	self:ClearSuperadminGrab()
 	--[[if IsValid(self.worldModel) then
 		self.worldModel:Remove()
@@ -714,6 +715,25 @@ local idleAng = Angle(60,0,50)
 local ang180, ang1, ang2 = Angle(0,180,0), Angle(-110,-90,0), Angle(-70,-90,0)
 function SWEP:SetHandPos(noset)
 	local ply = self:GetOwner()
+	local pressure = self:GetNetVar("WoundPressure")
+	if IsValid(ply) and pressure and IsValid(pressure.body) and not IsValid(ply.FakeRagdoll) then
+		local pos, ang = hg.organism.GetWoundTransform(pressure.body, pressure.wound)
+		if pos and ang then
+			self.rhandik = pressure.right
+			self.lhandik = pressure.left
+			for _, side in ipairs({"L", "R"}) do
+				local enabled = side == "L" and pressure.left or side == "R" and pressure.right
+				local bone = enabled and ply:LookupBone("ValveBiped.Bip01_" .. side .. "_Hand")
+				local matrix = bone and bone >= 0 and ply:GetBoneMatrix(bone)
+				if matrix then
+					matrix:SetTranslation(pos + ang:Right() * (side == "L" and -1 or 1))
+					matrix:SetAngles(ang)
+					hg.bone_apply_matrix(ply, bone, matrix)
+				end
+			end
+			return
+		end
+	end
 	if CLIENT and self.IsLocal and not self:IsLocal() and IsValid(ply) and IsZombieHandsClass(ply.PlayerClassName) and not IsValid(ply:GetNetVar("carryent")) then return end
 
 	if IsValid(ply) and (not ply.shouldTransmit or ply.NotSeen) then return end
@@ -1140,6 +1160,84 @@ local function ShouldCenterCarry(ent, phys)
 	return math.max(size[1], size[2], size[3]) <= smallCarryMaxSize and phys:GetMass() <= smallCarryMaxMass
 end
 
+function SWEP:StopWoundPressure()
+	if not SERVER or not self.WoundPressure then return end
+	local org = self.WoundPressure.org
+	if org.externalWoundPressure then org.externalWoundPressure[self] = nil end
+	self.WoundPressure = nil
+	self:SetNetVar("WoundPressure", nil)
+end
+
+function SWEP:StartWoundPressure()
+	if not SERVER then return false end
+	local owner = self:GetOwner()
+	if IsValid(owner.FakeRagdoll) or IsValid(owner:GetNetVar("carryent2")) then return false end
+	local eye = hg.eye(owner)
+	local trace = util.TraceLine({start = eye, endpos = eye + owner:GetAimVector() * self.ReachDistance, filter = owner})
+	local body = trace.Entity
+	local org = IsValid(body) and body.organism
+	if not org or body == owner or not org.alive then return false end
+	local bestWound, bestArterial, bestDistance
+	for _, arterial in ipairs({false, true}) do
+		for _, wound in pairs((arterial and org.arterialwounds or org.wounds) or {}) do
+			local pos = hg.organism.GetWoundTransform(body, wound)
+			local distance = pos and pos:DistToSqr(trace.HitPos)
+			local treatment = hg.GetTourniquetBleedMultiplier(org.owner, wound[4], arterial)
+			if distance and distance <= 100 and (wound[1] or 0) > 0 and treatment > 0
+				and (not bestDistance or arterial and not bestArterial
+					or arterial == bestArterial and distance < bestDistance) then
+				bestWound, bestArterial, bestDistance = wound, arterial, distance
+			end
+		end
+	end
+	if not bestWound then return false end
+	self:SetCarrying()
+	self.WoundPressure = {body = body, org = org, wound = bestWound, arterial = bestArterial}
+	self:UpdateWoundPressure()
+
+	return self.WoundPressure ~= nil
+end
+
+function SWEP:UpdateWoundPressure()
+	if not SERVER or not self.WoundPressure then return end
+	local pressure = self.WoundPressure
+	local owner = self:GetOwner()
+	local org = IsValid(owner) and owner.organism
+	local pos = IsValid(pressure.body) and hg.organism.GetWoundTransform(pressure.body, pressure.wound)
+	local eye = IsValid(owner) and hg.eye(owner)
+	if not org or not owner:Alive() or not org.canmove or owner:GetActiveWeapon() ~= self
+		or self:GetFists() or not owner:KeyDown(IN_ATTACK2) or IsValid(owner.FakeRagdoll)
+		or owner:GetNetVar("handcuffed", false) or owner:GetNetVar("ducttaped_hands", false)
+		or not pos or not pressure.org.alive or pressure.body.organism ~= pressure.org
+		or (pressure.wound[1] or 0) <= 0 or pos:DistToSqr(eye) > self.ReachDistance ^ 2 then
+		self:StopWoundPressure()
+		return
+	end
+	local trace = util.TraceLine({start = eye, endpos = pos, filter = owner})
+	if trace.Hit and trace.Entity ~= pressure.body then
+		self:StopWoundPressure()
+		return
+	end
+	if not table.HasValue(pressure.arterial and pressure.org.arterialwounds or pressure.org.wounds, pressure.wound) then
+		self:StopWoundPressure()
+		return
+	end
+	local left = hg.CanUseLeftHand(owner) and hg.GetArmEffectiveness(owner, "larm") or 0
+	local right = hg.CanUseRightHand(owner) and hg.GetArmEffectiveness(owner, "rarm") or 0
+	if left + right <= 0 or IsValid(owner:GetNetVar("carryent2")) then
+		self:StopWoundPressure()
+		return
+	end
+	pressure.org.externalWoundPressure = pressure.org.externalWoundPressure or {}
+	pressure.org.externalWoundPressure[self] = {wound = pressure.wound, strength = (left + right) / 2, expires = CurTime() + 0.15}
+	if pressure.left ~= (left > 0) or pressure.right ~= (right > 0) then
+		pressure.left, pressure.right = left > 0, right > 0
+		local wound = pressure.wound
+		self:SetNetVar("WoundPressure", {body = pressure.body, wound = {0, wound[2], wound[3], wound[4]},
+			left = pressure.left, right = pressure.right})
+	end
+end
+
 function SWEP:SecondaryAttack()
 	local owner = self:GetOwner()
 	if owner:InVehicle() then return end
@@ -1153,6 +1251,8 @@ function SWEP:SecondaryAttack()
 		self:SetFists(false)
 	end--]]
 	if owner:GetNetVar("handcuffed",false) or owner:GetNetVar("ducttaped_hands",false) then return end
+	if SERVER and (self.WoundPressure or self:StartWoundPressure()) then return end
+	if CLIENT and self:GetNetVar("WoundPressure") then return end
 	local org = owner.organism
 	if org and (org.larmamputated or org.rarmamputated) then
 		if IsValid(owner:GetNetVar("carryent")) or IsValid(owner:GetNetVar("carryent2")) then return end
@@ -2096,6 +2196,8 @@ local customClassInfo = {
 local blockvp = Angle(-1,-1,0.5)
 function SWEP:Think()
 	local owner = self:GetOwner()
+	if SERVER then self:UpdateWoundPressure() end
+	if self.WoundPressure or CLIENT and self:GetNetVar("WoundPressure") then return end
 
     if CLIENT then
         self.CarryEnt = owner:GetNetVar("carryent")
@@ -2314,6 +2416,7 @@ function SWEP:ShoveFront()
 end
 
 function SWEP:PrimaryAttack(forcespecial)
+	if self.WoundPressure or CLIENT and self:GetNetVar("WoundPressure") then return end
 	local owner = self:GetOwner()
 	if not IsValid(owner) or owner:InVehicle() then return end
 	if (self.attacked or 0) > CurTime() then return end
@@ -3000,6 +3103,7 @@ function SWEP:Animation()
 end
 
 function SWEP:Holster( wep )
+	self:StopWoundPressure()
 	if not IsFirstTimePredicted() then return true end
 	local owner = self:GetOwner()
 

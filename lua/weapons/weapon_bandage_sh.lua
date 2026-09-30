@@ -1244,6 +1244,7 @@ end
 hg.TourniquetGuys = hg.TourniquetGuys or {}
 
 local tourniquetLimbBones = {
+	neck = {high = "ValveBiped.Bip01_Neck1", bones = {"ValveBiped.Bip01_Neck1"}},
 	larm = {high = "ValveBiped.Bip01_L_UpperArm", bones = {"ValveBiped.Bip01_L_UpperArm", "ValveBiped.Bip01_L_Forearm", "ValveBiped.Bip01_L_Hand"}},
 	rarm = {high = "ValveBiped.Bip01_R_UpperArm", bones = {"ValveBiped.Bip01_R_UpperArm", "ValveBiped.Bip01_R_Forearm", "ValveBiped.Bip01_R_Hand"}},
 	lleg = {high = "ValveBiped.Bip01_L_Thigh", bones = {"ValveBiped.Bip01_L_Thigh", "ValveBiped.Bip01_L_Calf", "ValveBiped.Bip01_L_Foot"}},
@@ -1257,6 +1258,7 @@ end
 
 local function getTourniquetLimb(bone)
 	if not bone then return end
+	if bone == "arteria" then return "neck" end
 	return tourniquetBoneToLimb[tostring(bone):gsub("artery$", "")]
 end
 
@@ -1382,8 +1384,9 @@ if SERVER then
 		if not org then return false end
 		local candidates = getTourniquetCandidates(org)
 		local selectedLimb, selected
+		local requestedLimb = getTourniquetLimb(bone)
 		for limb, entry in pairs(candidates) do
-			if hg.GetTourniquetCountOnLimb(ent, limb) < 2 and (#entry.arteries > 0 or entry.score >= 10) and (not selected or entry.score > selected.score) then
+			if (not requestedLimb or limb == requestedLimb) and hg.GetTourniquetCountOnLimb(ent, limb) < 2 and (#entry.arteries > 0 or entry.score >= 10) and (not selected or entry.score > selected.score) then
 				selectedLimb, selected = limb, entry
 			end
 		end
@@ -1405,6 +1408,7 @@ if SERVER then
 
 			local placementBone = tourniquetLimbBones[selectedLimb].high
 			ent.tourniquets[#ent.tourniquets + 1] = {vector_origin, angle_zero, placementBone, treatment}
+			if selectedLimb == "neck" then org.o2.regen = 0 end
 			local tourniquetCount = hg.GetTourniquetCountOnLimb(ent, selectedLimb)
 			org.painadd = math.min((org.painadd or 0) + (tourniquetCount >= 2 and 18 or 6), 150)
 			if tourniquetCount >= 2 then

@@ -67,7 +67,7 @@ hook.Add("Org Think", "HGTraitsPhysiology", function(owner, org, timeValue)
 	if not IsValid(owner) or not owner:IsPlayer() then return end
 	if owner:HasTrait("hemolytic_anemia") or owner:HasTrait("john") then org.blood = math.max((org.blood or 0) - timeValue * 0.35, 0) end
 	if owner:HasTrait("naturally_hypertensive") then org.hypertension = math.max(org.hypertension or 0, 0.7) end
-	org.conditionResistanceMul = owner:GetTraitMultiplier("condition_resistance", owner:HasTrait("biologically_efficient") and 0.7 or 1)
+	org.conditionResistanceMul = owner:GetTraitMultiplier("condition_resistance", owner:HasTrait("biologically_efficient") and 0.55 or 1)
 	org.nyctophobiaDark = owner:HasTrait("nyctophobia") and owner.HGNyctophobiaDark or nil
 	if org.nyctophobiaDark then
 		local exposure = math.max(owner.HGNyctophobiaExposure or 0, 0) + timeValue

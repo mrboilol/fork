@@ -163,6 +163,7 @@ hook.Add("Org Clear", "Main", function(org)
 	org.bleedingmul = 1
 	org.neckslitSoundName = nil
 	org.neckslitSoundEnt = nil
+	org.neckslitStunUntil = nil
 	org.last_heartbeat = CurTime()
 	org.fibrillation = false
 	org.fibrillationStart = 0
@@ -401,6 +402,8 @@ local function send_organism(org, ply, recipientForce, reliable)
 	sendtable.arterialBleed = org.arterialBleed
 	sendtable.woundBleedRates = org.woundBleedRates
 	sendtable.arterialWoundBleedRates = org.arterialWoundBleedRates
+	sendtable.woundPressureMultipliers = org.woundPressureMultipliers
+	sendtable.arterialWoundPressureMultipliers = org.arterialWoundPressureMultipliers
 	sendtable.hurt = org.hurt
 	sendtable.pain = org.pain
 	sendtable.shock = org.shock
@@ -612,6 +615,8 @@ local function send_bareinfo(org, force, reliable)
 	sendtable.arterialBleed = org.arterialBleed
 	sendtable.woundBleedRates = org.woundBleedRates
 	sendtable.arterialWoundBleedRates = org.arterialWoundBleedRates
+	sendtable.woundPressureMultipliers = org.woundPressureMultipliers
+	sendtable.arterialWoundPressureMultipliers = org.arterialWoundPressureMultipliers
 	sendtable.pulse = org.pulse
 	sendtable.heartbeat = org.heartbeat
 	sendtable.heartstop = org.heartstop
@@ -1193,7 +1198,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	org.neckslit = neckslit
 
 	if org.neckslit and not org.otrub then
-		org.needfake = true
+		if (org.neckslitStunUntil or 0) > CurTime() then org.needfake = true end
 		if not org.neckslitDeadline then
 			org.neckslitDeadline = CurTime() + 15
 			org.neckslitWarned = nil
@@ -1403,7 +1408,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.canmove = (org.spine2 < hg.organism.fake_spine2 and not org.paralyzed) and not org.otrub
 		org.canmovehead = (org.spine3 < hg.organism.fake_spine3) and not org.otrub
 		if not (org.canmove and org.canmovehead and (org.stun - CurTime()) < 0) then org.needfake = true end
-		if org.neckslit and not org.otrub then org.needfake = true end
+		if org.neckslit and (org.neckslitStunUntil or 0) > CurTime() and not org.otrub then org.needfake = true end
 	end
 	local just_went_uncon = not org.otrub and org.needotrub
 	if org.brain < 0.4 then

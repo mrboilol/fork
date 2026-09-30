@@ -90,7 +90,12 @@ bloodparticles_hook[1] = function(anim_pos, mul)
 			render_SetMaterial(mat_huy)
 			lightcolor.r = math.min((part.artery and 45 or 20) * light[1], 255)
 			local beamMotion = (part[2] - part[1]) / mul / 24
-			render_DrawBeam(pos - beamMotion * 0.5, pos + beamMotion * 0.5, 1, 0, 1, part[9] or lightcolor)
+			local size = part[5] or 1
+			local maxLength = part.maxBeamLength or size
+			if beamMotion:LengthSqr() > maxLength * maxLength then
+				beamMotion = beamMotion:GetNormalized() * maxLength
+			end
+			render_DrawBeam(pos - beamMotion * 0.5, pos + beamMotion * 0.5, size, 0, 1, part[9] or lightcolor)
 		end
 	end
 end
@@ -131,13 +136,22 @@ local function isDecalExSafe(target)
 	return not IsValid(target) or target:IsWorld() or string.sub(target:GetModel() or "", 1, 1) == "*"
 end
 
-local function placeOldBloodDecal(pos, normal, target, artery, scale)
+local function getBloodDecalScale(amount, particleSize, material)
+	local diameter = math.max(0.5 + math.sqrt(amount or 0.2) * 1.5, particleSize or 0) * 2.5
+	local materialScale = material:GetFloat("$decalscale") or 1
+	if materialScale <= 0 then materialScale = 1 end
+	return diameter / (math.max(material:Width(), material:Height(), 1) * materialScale)
+end
+
+local function placeOldBloodDecal(pos, normal, target, artery, amount, particleSize)
 	if not isDecalExSafe(target) then
 		util.Decal(artery and "Arterial.Blood1" or "Normal.Blood1", pos + normal, pos - normal)
 		return
 	end
 	local decals = artery and oldArterialBloodDecals or oldBloodDecals
-	util.DecalEx(decals[math_random(#decals)], target or game.GetWorld(), pos, normal, color_white, scale, scale)
+	local material = decals[math_random(#decals)]
+	local scale = getBloodDecalScale(amount, particleSize, material)
+	util.DecalEx(material, target or game.GetWorld(), pos, normal, color_white, scale, scale)
 end
 
 local function playBloodDripImpact(pos, tr)
@@ -153,10 +167,6 @@ local newBloodDecalMaterials = {}
 local bloodCellSize = 6
 local bloodMaxLayers = 24
 
-local function getBloodDecalScale(amount)
-	return math.Clamp((0.2 + math.sqrt(amount or 0.2) * 0.35) * math.Rand(0.85, 1.15), 0.12, 3)
-end
-
 local function bumpBloodCount(pos)
 	local key = math.Round(pos[1] / bloodCellSize) .. "," .. math.Round(pos[2] / bloodCellSize) .. "," .. math.Round(pos[3] / bloodCellSize)
 	hg.bloodcount = hg.bloodcount + 1
@@ -169,7 +179,7 @@ local function bumpBloodCount(pos)
 	return count
 end
 
-local function placeNewBloodDecal(pos, normal, target, artery, amount)
+local function placeNewBloodDecal(pos, normal, target, artery, amount, particleSize)
 	local count = bumpBloodCount(pos)
 	if count > bloodMaxLayers then return end
 	local name = artery and "Arterial.Blood2" .. math.Clamp(count, 1, 5) or "Normal.Blood2" .. math.Clamp(count + math_random(0, 2), 1, 5)
@@ -182,20 +192,20 @@ local function placeNewBloodDecal(pos, normal, target, artery, amount)
 		material = Material(util.DecalMaterial(name))
 		newBloodDecalMaterials[name] = material
 	end
-	local scale = getBloodDecalScale(amount) * (1 + (math.min(count, 6) - 1) * 0.15)
+	local scale = getBloodDecalScale(amount, particleSize, material) * (1 + (math.min(count, 6) - 1) * 0.15)
 	util.DecalEx(material, target or game.GetWorld(), pos, normal, color_white, scale, scale)
 end
 
-function hg.DepositBodyBloodRunoff(pos)
+function hg.DepositBodyBloodRunoff(pos, amount, artery, particleSize)
 	poolTrace.start = pos + vector_up * 2
 	poolTrace.endpos = pos - vector_up * 256
 	local result = util_TraceLine(poolTrace)
 	if result.HitWorld and result.HitNormal.z >= 0.55 then
 		if useOldBlood() then
-			placeOldBloodDecal(result.HitPos, result.HitNormal, nil, false, math.Rand(0.12, 0.24))
+			placeOldBloodDecal(result.HitPos, result.HitNormal, nil, artery, amount or 0.2, particleSize)
 			return
 		end
-		placeNewBloodDecal(result.HitPos, result.HitNormal, nil, false, 0.2)
+		placeNewBloodDecal(result.HitPos, result.HitNormal, nil, artery, amount or 0.2, particleSize)
 	end
 end
 
@@ -203,20 +213,20 @@ local function isOrganismEnt(ent)
 	return IsValid(ent) and (ent:IsPlayer() or ent:IsNPC() or ent:IsRagdoll() or ent.organism ~= nil)
 end
 
-local function decalBlood(pos, normal, tr, artery, owner, tiny, amount)
+local function decalBlood(pos, normal, tr, artery, owner, tiny, amount, particleSize)
 	if not pos or not normal then return end
 	if normal:LengthSqr() < 0.0001 then normal = vector_up end
 	amount = math.max(amount or (tiny and 0.2 or artery and 2.5 or 1), 0.05)
 	if isOrganismEnt(tr.Entity) then
-		hg.DepositBodyBloodRunoff(pos)
+		hg.DepositBodyBloodRunoff(pos, amount, artery, particleSize)
 		return
 	end
 
 	local target = IsValid(tr.Entity) and tr.Entity or nil
 	if useOldBlood() then
-		placeOldBloodDecal(pos, normal, target, artery, getBloodDecalScale(amount))
+		placeOldBloodDecal(pos, normal, target, artery, amount, particleSize)
 	else
-		placeNewBloodDecal(pos, normal, target, artery, amount)
+		placeNewBloodDecal(pos, normal, target, artery, amount, particleSize)
 	end
 	if not tiny or math.random(7) == 1 then playBloodDripImpact(pos, tr) end
 end
@@ -279,7 +289,7 @@ bloodparticles_hook[2] = function(mul)
 		if result.Hit and result.Entity:IsWorld() then
 			hg.bloodparticles1[i] = hg.bloodparticles1[#hg.bloodparticles1]; table_remove(hg.bloodparticles1)
 			local dir = result.HitNormal
-			decalBlood(result.HitPos, dir, result, part.artery, part.owner, part.tiny, part.volume)
+			decalBlood(result.HitPos, dir, result, part.artery, part.owner, part.tiny, part.volume, part.size)
 			
 			
 			--sound.Play("zbattle/blood_drop.mp3", hitPos, math.random(10, 60), math.random(120, 120))
@@ -300,7 +310,7 @@ bloodparticles_hook[2] = function(mul)
 			result.Hit = result.Hit and shouldhit
 			local onBody = result.Hit and isOrganismEnt(result.Entity)
 			if result.Hit and part.tiny and not onBody then
-				decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner, true, part.volume)
+				decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner, true, part.volume, part.size)
 				hg.bloodparticles1[i] = hg.bloodparticles1[#hg.bloodparticles1]
 				table_remove(hg.bloodparticles1)
 				continue
@@ -315,7 +325,7 @@ bloodparticles_hook[2] = function(mul)
 				if !insolid and not onBody and (part.nextput or 0) < time then
 					part.nextput = time + 1
 
-					decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner, part.tiny, part.volume)
+					decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner, part.tiny, part.volume, part.size)
 				end
 
 				if insolid then
@@ -339,7 +349,7 @@ bloodparticles_hook[2] = function(mul)
 				part.lerpedmove = LerpVector(1, part.lerpedmove or part[3] * mul, nextpos * mul * 2)
 				
 				if part.lerpedmove:LengthSqr() < 0.1 * mul then
-					decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner, part.tiny, part.volume)
+					decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner, part.tiny, part.volume, part.size)
 					
 					hg.bloodparticles1[i] = hg.bloodparticles1[#hg.bloodparticles1]; table_remove(hg.bloodparticles1)
 					

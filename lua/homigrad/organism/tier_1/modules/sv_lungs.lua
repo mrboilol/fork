@@ -925,8 +925,10 @@ module[2] = function(owner, org, timeValue)
 				local isCerebralInflow = artery == "arteria"
 					and (string.find(boneName, "neck", 1, true) or string.find(boneName, "head", 1, true) or string.find(boneName, "spine4", 1, true))
 				if isCerebralInflow and (wound[1] or 0) > 0 then
-					local held = org.manualHoldWound and org.manualHoldWoundArterial and org.manualHoldWoundTarget == wound
-					local heldMul = held and 0.2 or 1
+					local heldMul = hg.organism.GetWoundPressureBleedMultiplier(org, wound, true)
+					if hg.GetTourniquetBleedMultiplier then
+						heldMul = heldMul * hg.GetTourniquetBleedMultiplier(owner, wound[4], true)
+					end
 					centralImpairment = centralImpairment + heldMul
 				end
 			end
