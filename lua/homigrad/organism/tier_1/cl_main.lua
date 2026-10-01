@@ -77,6 +77,8 @@ local tabblood = {
 	["$pp_colour_mulb"] = 0,
 }
 
+surface.CreateFont("RemDeathStateFont", {font = "Lora", size = ScreenScale(22), weight = 1100, outline = true})
+
 local remDeathStateStation
 local remDeathStateLoading
 local remDeathStateGeneration = 0
@@ -101,11 +103,10 @@ local function GetLocalDeathState()
 	if not IsValid(ply) or not ply:Alive() then return end
 
 	local org = ply.new_organism or ply.organism
-	if not org or not org.otrub or not org.incapacitated then return end
+	if not org or not (org.otrub or ply.organism and ply.organism.otrub) or not org.incapacitated then return end
 
 	local deathStateEnd = tonumber(org.deathStateEnd)
-	if deathStateEnd and deathStateEnd <= CurTime() then return end
-	if not deathStateEnd then return org, nil, 0 end
+	if not deathStateEnd or deathStateEnd <= 0 then return end
 
 	local remaining = math.max(deathStateEnd - CurTime(), 0)
 	local progress = math.Clamp((INCAPACITATION_DEATH_TIME - remaining) / INCAPACITATION_DEATH_TIME, 0, 1)
@@ -556,6 +557,39 @@ local function DrawScreenFillShape(x, y, radius, segments, roughness, timeOffset
 	surface.DrawPoly(poly)
 end
 
+local function DrawIncapacitatedDeathFade(deathStateEnd)
+	local remaining = math.max(deathStateEnd - CurTime(), 0)
+	local fade = math.Clamp((INCAPACITATION_DEATH_TIME - remaining) / INCAPACITATION_DEATH_TIME, 0, 1)
+	local finalFade = math.Clamp((6 - remaining) / 6, 0, 1)
+	local shine = finalFade * (0.65 + math.abs(math.sin(CurTime() * 9)) * 0.35)
+	local sw, sh = ScrW(), ScrH()
+	local radius = math.ease.InOutSine(fade) * math.sqrt(sw * sw + sh * sh) / 2
+
+	DrawBloom(0.35 + finalFade * 0.45, 0.8 + finalFade * 2.8, 7, 7, 2, 1, 1, 1, 1)
+	surface.SetDrawColor(255, 255, 255, math.Clamp((fade ^ 1.35) * 175 + shine * 35, 0, 255))
+	DrawScreenFillShape(sw / 2, sh / 2, radius * 1.04, 320, 0.24 * (1 - finalFade * 0.35), 0)
+	surface.SetDrawColor(255, 255, 255, math.Clamp((fade ^ 1.35) * 110 + shine * 25, 0, 255))
+	DrawScreenFillShape(sw / 2, sh / 2, radius * 0.99, 320, 0.31 * (1 - finalFade * 0.3), 4.7)
+	surface.SetDrawColor(255, 255, 255, math.Clamp((fade ^ 1.35) * 80 + shine * 20, 0, 255))
+	DrawScreenFillShape(sw / 2, sh / 2, radius * 0.94, 320, 0.38 * (1 - finalFade * 0.25), 9.2)
+
+	if finalFade > 0 then
+		surface.SetDrawColor(255, 255, 255, math.Clamp(finalFade * 180 + shine * 75, 0, 255))
+		DrawScreenFillShape(sw / 2, sh / 2, radius * (0.88 + shine * 0.12), 320, 0.2 * (1 - finalFade * 0.45), 13.5)
+	end
+end
+
+local function DrawIncapacitatedDeathText(seconds, deathStateEnd)
+	local remaining = math.max(deathStateEnd - CurTime(), 0)
+	local fade = math.Clamp((INCAPACITATION_DEATH_TIME - remaining) / INCAPACITATION_DEATH_TIME, 0, 1)
+	local radius = math.ease.InOutSine(fade) * math.sqrt(ScrW() * ScrW() + ScrH() * ScrH()) / 2
+	local textDark = math.Clamp((radius - 12) / 80, 0, 1)
+	local textValue = math.floor(255 * (1 - textDark))
+	local textColor = Color(textValue, textValue, textValue, math.Clamp((INCAPACITATION_DEATH_TIME - remaining) / 2, 0, 1) * 255)
+
+	draw.SimpleText("You are incapacitated, You will die in " .. seconds, "RemDeathStateFont", ScrW() / 2, ScrH() / 2, textColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+end
+
 hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 	local spect = IsValid(lply:GetNWEntity("spect")) and lply:GetNWEntity("spect")
 	local organism = lply:Alive() and lply.organism or (viewmode == 1 and IsValid(spect) and spect.organism) or {}
@@ -566,7 +600,6 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 	if organism.owner == LocalPlayer() then
 		if new_organism.otrub and !old then
 			PlayLocalImpactSound("harmsting.ogg", 1)
-			lply:ScreenFade(SCREENFADE.IN, Color(0, 0, 0), 2, 0.5)
 			hook.Run("HG_OnOtrub", new_organism.owner)
 		end
 		
@@ -645,6 +678,10 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 		else
 			lply:SetDSP((lply.suiciding and lply:Alive()) and 130 or normaldsp)
 		end
+	end
+
+	if lply:Alive() and (otrub or new_organism.otrub) and incapacitated and deathStateEnd then
+		DrawIncapacitatedDeathFade(deathStateEnd)
 	end
 
 	if not alive then
@@ -878,6 +915,11 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 			//surface.DrawRect(-1,ScrH() + 1,ScrW()+1,-ent.Blinking * ScrH())
 		end
 	end
+	if lply:Alive() and (otrub or new_organism.otrub) and incapacitated and deathStateEnd then
+		local seconds = math.max(math.ceil(deathStateEnd - CurTime()), 0)
+		DrawIncapacitatedDeathText(seconds, deathStateEnd)
+	end
+
 end)
 
 hook.Add("OnNetVarSet","wounds_netvar",function(index, key, var)

@@ -1,30 +1,3 @@
-local function DrawArc(x, y, radius, thickness, startAng, endAng, segments, color)
-    surface.SetDrawColor(color.r, color.g, color.b, color.a)
-    draw.NoTexture()
-
-    local step = (endAng - startAng) / segments
-    for i = 0, segments - 1 do
-        local a1 = math.rad(startAng + i * step)
-        local a2 = math.rad(startAng + (i + 1) * step)
-        local cos1, sin1 = math.cos(a1), math.sin(a1)
-        local cos2, sin2 = math.cos(a2), math.sin(a2)
-
-        surface.DrawPoly({
-            { x = x + cos1 * (radius - thickness), y = y - sin1 * (radius - thickness) },
-            { x = x + cos1 * radius, y = y - sin1 * radius },
-            { x = x + cos2 * radius, y = y - sin2 * radius },
-            { x = x + cos2 * (radius - thickness), y = y - sin2 * (radius - thickness) }
-        })
-    end
-end
-
-surface.CreateFont("UnconsciousDots", {
-    font = "Bahnschrift",
-    size = 120,
-    weight = 800,
-    antialias = true
-})
-
 surface.CreateFont("HomigradCriticalWarning", {
     font = "Bahnschrift",
     size = ScreenScaleH(14),
@@ -50,15 +23,9 @@ surface.CreateFont("HomigradECGVitals", {
 })
 
 local ringAlpha = 0
-local dotBeat = 0
 local compactBorderInset = 0
 local compactBoxX
 local compactBoxY
-
-local function GetShockConsciousnessThreshold(analgesia, painkiller)
-    local medication = math.max((analgesia or 0) + (painkiller or 0) * 0.3, 0)
-    return 25 * (medication * 4 + 1)
-end
 
 local ecgAlphaPulseCheck = 0
 local awakeECGAlpha = 0
@@ -129,13 +96,7 @@ local lastPhaseMod = 0
 local wasUnconsciousState = false
 local unconsciousStartTime
 local UNCONSCIOUS_RING_DELAY = 1
-local WAKE_CONSCIOUSNESS_THRESHOLD = 0.3
-local OTRUB_CONSCIOUSNESS_RECOVERY_SPEED = 20
-local OTRUB_SHOCK_DECAY_PER_SECOND = 4
-local OTRUB_PAIN_DRAIN_PER_SECOND = 8 * 4.5
 local INCAPACITATION_DEATH_TIME = 20
-local wakeEstimateAnchor = 0
-local wakeEstimateSmoothed
 
 local function GetIncapacitationDeathCauses(org)
     local causes = {}
@@ -190,68 +151,6 @@ local function GetSuicideBinding()
     return binding and binding ~= "" and string.upper(binding) or "K"
 end
 
-local function EstimateWakeSeconds(org)
-    local brainOxygen = math.Clamp(org.brainoxygen or 1, 0, 1)
-    local cannotWake = org.incapacitated
-        or org.heartstop
-        or brainOxygen < 0.20
-        or (org.trachea or 0) >= 0.5
-
-    local brainSeverity = math.Clamp(((org.brain or 0) - 0.325) / 0.675, 0, 1)
-    local hemorrhageSeverity = math.Clamp(((org.brainHemorrhage or 0) - 0.05) / 0.95, 0, 1)
-    local brainDrain = (brainSeverity > 0 and (0.17 + brainSeverity * 0.06) or 0)
-        + hemorrhageSeverity * (0.02 + hemorrhageSeverity * 0.12)
-
-    if cannotWake or brainDrain >= (1 / OTRUB_CONSCIOUSNESS_RECOVERY_SPEED) then return nil end
-
-    local analgesia = math.max(org.analgesia or 0, 0)
-    local painkiller = math.max(org.painkiller or 0, 0)
-    local shockThreshold = GetShockConsciousnessThreshold(analgesia, painkiller)
-    local shockSeconds = math.max((org.shock or 0) - shockThreshold, 0) / OTRUB_SHOCK_DECAY_PER_SECOND
-
-    -- Pain above 80 keeps driving shock toward at least 55 on the server.
-    -- Account for the time needed to drain below that gate instead of letting
-    -- a large shock value fall outside the old ring percentage calculation.
-    local adrenaline = math.max(org.adrenaline or 0, 0)
-    local painModifier = math.max(1 - adrenaline / 4, 0.75)
-        * math.max(1 - (analgesia + painkiller * 0.3), 0)
-    local painSeconds = 0
-    if painModifier > 0.001 and (org.pain or 0) > 80 then
-        local targetAveragePain = 80 / painModifier
-        local adrenalinePacing = math.max(math.max(1 - adrenaline, 0.05) / (1 + adrenaline * 1.5), 0.02)
-        local medicationDrain = (painkiller * 0.3 + analgesia) * 4
-        local painDrain = math.max((OTRUB_PAIN_DRAIN_PER_SECOND + medicationDrain) * adrenalinePacing, 0.05)
-        painSeconds = math.max((org.avgpain or org.pain or 0) - targetAveragePain, 0) / painDrain
-    end
-
-    local tranquilizer = math.max(org.tranquilizer or 0, 0)
-    local sedationSeconds = math.max(tranquilizer - 1, 0) * 5 + math.min(tranquilizer, 1) * 30
-    local settleSeconds = math.max(shockSeconds, painSeconds, sedationSeconds)
-    local recoveryStart = tranquilizer > 0.05 and 0 or math.Clamp(org.consciousness or 0, 0, 1)
-    local recoveryRate = math.max(1 / OTRUB_CONSCIOUSNESS_RECOVERY_SPEED - brainDrain, 0.001)
-    local recoverySeconds = math.max(WAKE_CONSCIOUSNESS_THRESHOLD - recoveryStart, 0) / recoveryRate
-
-    return math.max(settleSeconds + recoverySeconds, 0)
-end
-
-local function UpdateWakeEstimate(org)
-    local estimate = EstimateWakeSeconds(org)
-    if not estimate then
-        wakeEstimateAnchor = 0
-        wakeEstimateSmoothed = nil
-        return nil, 0
-    end
-
-    if not wakeEstimateSmoothed or estimate > wakeEstimateSmoothed + 2 then
-        wakeEstimateSmoothed = estimate
-    else
-        wakeEstimateSmoothed = SmoothAlpha(wakeEstimateSmoothed, estimate, 2)
-    end
-
-    wakeEstimateAnchor = math.max(wakeEstimateAnchor, wakeEstimateSmoothed, 1)
-    local progress = math.Clamp(1 - wakeEstimateSmoothed / wakeEstimateAnchor, 0, 1)
-    return wakeEstimateSmoothed, progress
-end
 local flatlinePlayedThisLife = false
 local wasHeartbeatZero = false
 local soundGen = 0
@@ -895,12 +794,8 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
 	if isUnconscious and not wasUnconsciousState then
 		unconsciousStartTime = CurTime()
 		ringAlpha = 0
-		wakeEstimateAnchor = 0
-		wakeEstimateSmoothed = nil
 	elseif not isUnconscious and wasUnconsciousState then
 		unconsciousStartTime = nil
-		wakeEstimateAnchor = 0
-		wakeEstimateSmoothed = nil
     end
 
     local heartbeat = org.heartbeat or 75
@@ -916,7 +811,6 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         local remaining = math.max(deathStateEnd - CurTime(), 0)
         incapacitationProgress = math.Clamp((INCAPACITATION_DEATH_TIME - remaining) / INCAPACITATION_DEATH_TIME, 0, 1)
     end
-    local brainDeathProgress = math.Clamp(math.max(brain, brainHemorrhage, tonumber(org.brainSwelling) or 0), 0, 1)
     local incapacitationWhite = math.ease.InOutSine(incapacitationProgress)
     local isCritical = (org.critical == true)
         or (ecgState == "asystole" and brain >= 0.02)
@@ -976,15 +870,12 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
 	local unconsciousElapsed = isUnconscious and (CurTime() - (unconsciousStartTime or CurTime())) or 0
 	if isUnconscious and incapacitated then
 		ringAlpha = SmoothAlpha(ringAlpha, 1, 1.5)
-		dotBeat = math.floor(CurTime()) % 3
 	elseif isUnconscious and unconsciousElapsed >= UNCONSCIOUS_RING_DELAY then
         ringAlpha = SmoothAlpha(ringAlpha, 1, 1.5)
-        dotBeat = math.floor(CurTime()) % 3
 	elseif isUnconscious then
 		ringAlpha = SmoothAlpha(ringAlpha, 0, 8)
     elseif lowConsciousness then
         ringAlpha = SmoothAlpha(ringAlpha, 0.4, 3)
-        dotBeat = math.floor(CurTime()) % 3
     else
         ringAlpha = SmoothAlpha(ringAlpha, 0, 4)
         if ringAlpha <= 0.01 and not showAwakeECG then
@@ -1032,44 +923,20 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         return
     end
     local otrubECGAlpha = (isUnconscious or lowConsciousness) and ringAlpha or awakeECGAlpha
-    local incapPromptX, incapPromptY
+    local incapPromptX, incapPromptY = ScrW() * 0.5, math.max(ScrH() * 0.1, ScreenScaleH(20))
     
     if otrubECGAlpha > 0.01 then
         local scrW, scrH = ScrW(), ScrH()
-        local boxScale = math.Clamp(scrH / 1080, 0.75, 1.2)
         local centerX, centerY = scrW * 0.5, scrH * 0.5
-        local ecgCenterY = centerY - math.min(scrH * 0.1, ScreenScaleH(92)) * incapacitationWhite
-        local showLegacyECG = abnormalECG
+        local ecgCenterY = centerY - math.min(scrH * 0.1, ScreenScaleH(92))
+        local showLegacyECG = isUnconscious or lowConsciousness or abnormalECG
             or (not isUnconscious and not lowConsciousness and (sinusECGTail > 0 or admiring))
 
-        if isUnconscious or lowConsciousness then
-            local _, wakeProgress = UpdateWakeEstimate(org)
-            local ringColor = (isCritical or incapacitated)
-                and Color(210, 35, 30, 255 * ringAlpha)
-                or Color(220, 220, 220, 255 * ringAlpha)
-            local radius = math.min(280, scrH * 0.32)
-            incapPromptX = centerX
-            incapPromptY = math.max(centerY - radius - ScreenScaleH(32), ScreenScaleH(20))
-
-            surface.SetDrawColor(0, 0, 0, 90 * ringAlpha)
-            surface.DrawRect(0, 0, scrW, scrH)
-            DrawArc(centerX, centerY, radius, 12, 0, 360, 60,
-                Color(40, 40, 40, 100 * ringAlpha))
-            local ringProgress = incapacitated and (deathStateEnd and deathStateEnd > CurTime() and (1 - incapacitationProgress) or (1 - brainDeathProgress)) or wakeProgress
-            DrawArc(centerX, centerY, radius, 12, 90, 90 - ringProgress * 360, 80, ringColor)
-
-            if hg_unconsciousclassic and hg_unconsciousclassic:GetBool() then
-                lastPhaseMod = 0
-                local dotText = isCritical and ({".!", "..!", "...!"})[dotBeat + 1]
-                    or ({".", "..", "..."})[dotBeat + 1]
-                draw.SimpleText(dotText, "UnconsciousDots", centerX, centerY,
-                    ringColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-            end
-
-            if not IsValid(g_PulseCheckTarget) then UpdateRingAudio(heartbeat, ringAlpha, org) end
+        if (isUnconscious or lowConsciousness) and not IsValid(g_PulseCheckTarget) then
+            UpdateRingAudio(heartbeat, ringAlpha, org)
         end
 
-        if showLegacyECG and not (hg_unconsciousclassic and hg_unconsciousclassic:GetBool()) then
+        if showLegacyECG then
             local severity = GetAwakeECGSeverity(ecgState)
             local ecgR = abnormalECG and Lerp(severity, 220, 255) or 230
             local ecgG = abnormalECG and Lerp(severity, 220, 50) or 230
@@ -1091,12 +958,6 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         local urgency = terminal and math.Clamp((5 - remaining) / 5, 0, 1) or 0
         local pulseAlpha = 0.82 + math.abs(math.sin(CurTime() * 6)) * 0.18 * urgency
         local promptColor = terminal and Color(235, 55, 45, 245 * fade * pulseAlpha) or Color(225, 225, 225, 235 * fade)
-
-        if not incapPromptX then
-            local radius = math.min(280, ScrH() * 0.32)
-            incapPromptX = ScrW() * 0.5
-            incapPromptY = math.max(ScrH() * 0.5 - radius - ScreenScaleH(64), ScreenScaleH(20))
-        end
 
         local messageY = incapPromptY
         if terminal then

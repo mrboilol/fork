@@ -1,7 +1,5 @@
 if not SERVER then return end
 
--- Never run this repair on physics props: map events can create them with a
--- temporary SOLID_NONE state, and reinitializing them here freezes them.
 local repairClasses = {
 	["prop_static"] = true,
 	["prop_dynamic"] = true,
@@ -14,11 +12,13 @@ local panicFreeze = {
 	frozenUntil = 0,
 	stableSince = nil,
 	frozen = {},
+	penetrating = {},
 }
 
 local severeSimulationMs = 50
 local criticalSimulationMs = 100
 local recoverySimulationMs = 12
+local PENETRATION_HOLD_SECONDS = 2
 
 local ignoredModelHints = {
 	"grass",
@@ -150,26 +150,30 @@ local function clearFurnitureRepair(ent)
 	restoreOriginalMapProp(ent)
 end
 
-local function freezeActivePhysics()
-	local candidates = {}
-	for _, ent in ipairs(ents.GetAll()) do
-		if not ent:IsPlayer() and not ent:IsNPC() and not ent:IsVehicle() and not ent:IsRagdoll() then
-			local phys = ent:GetPhysicsObject()
-			if IsValid(phys) and phys:IsMotionEnabled() and not phys:IsAsleep() then
-				local speed = phys:GetVelocity():LengthSqr()
-				if speed > 40000 then
-					candidates[#candidates + 1] = {phys = phys, speed = speed}
-				end
-			end
+local function freezeActivePhysics(now)
+	local penetrating = {}
+	local candidate, candidateSpeed
+	for _, ent in ents.Iterator() do
+		local class = ent:GetClass()
+		local isProp = repairClasses[class] or class == "prop_physics"
+			or class == "prop_physics_multiplayer" or class == "prop_physics_override"
+		if not isProp or ent:IsPlayerHolding() then continue end
+		local phys = ent:GetPhysicsObject()
+		if not IsValid(phys) or not phys:IsMotionEnabled() or phys:IsAsleep() then continue end
+		if not phys:IsPenetrating() then continue end
+		local since = panicFreeze.penetrating[phys] or now
+		penetrating[phys] = since
+		if now - since < PENETRATION_HOLD_SECONDS then continue end
+		local speed = phys:GetVelocity():LengthSqr()
+		if not candidate or speed > candidateSpeed then
+			candidate, candidateSpeed = phys, speed
 		end
 	end
-	table.sort(candidates, function(a, b) return a.speed > b.speed end)
-	for i = 1, math.min(#candidates, 8) do
-		local phys = candidates[i].phys
-		phys:EnableMotion(false)
-		phys:Sleep()
-		panicFreeze.frozen[phys] = true
-	end
+	panicFreeze.penetrating = penetrating
+	if not candidate then return end
+	candidate:EnableMotion(false)
+	candidate:Sleep()
+	panicFreeze.frozen[candidate] = true
 end
 
 local function releasePanicFreeze()
@@ -195,12 +199,13 @@ local function updatePanicFreeze()
 		if simulationMs >= criticalSimulationMs or now - panicFreeze.badSince >= 2 then
 			local hold = simulationMs >= criticalSimulationMs and 12 or 4
 			panicFreeze.frozenUntil = math.max(panicFreeze.frozenUntil, now + hold)
-			freezeActivePhysics()
+			freezeActivePhysics(now)
 		end
 		return
 	end
 
 	panicFreeze.badSince = nil
+	panicFreeze.penetrating = {}
 	if panicFreeze.frozenUntil == 0 then return end
 
 	if simulationMs <= recoverySimulationMs then
@@ -406,6 +411,7 @@ hook.Add("PostCleanupMap", "zcity_cleanup_map_prop_collision", function()
 		end
 	end
 	panicFreeze.badSince = nil
+	panicFreeze.penetrating = {}
 	panicFreeze.frozenUntil = 0
 	panicFreeze.stableSince = nil
 	releasePanicFreeze()

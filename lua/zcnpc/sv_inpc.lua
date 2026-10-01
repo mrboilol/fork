@@ -220,9 +220,6 @@ local function WrapCleanup()
 				end
 			end
 
-			RunConsoleCommand("r_cleardecals")
-			net.Start("hg_cleardecals")
-			net.Broadcast()
 		end)
 	end
 end

@@ -1092,6 +1092,7 @@ drawFinalVitalsVignettes = function()
 
 	local org = lply.new_organism or lply.organism
 	if not org or not org.brain then return end
+	if org.otrub and org.incapacitated and (tonumber(org.deathStateEnd) or 0) > 0 then return end
 	local blood = math.Clamp(tonumber(org.blood) or 5000, 0, 5000)
 	local activeBleed = math.Clamp((tonumber(org.bleed) or 0) / 10, 0, 1)
 	local internalBleed = math.Clamp((tonumber(org.internalBleed) or 0) / 5, 0, 1)
