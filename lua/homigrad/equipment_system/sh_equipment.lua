@@ -206,13 +206,26 @@ local function protec(org, bone, dmg, dmgInfo, placement, boneindex, dir, hit, r
     local plateName = plates and plates[HitBoxName]
     local plate = plateName and armor[plateName] or armor
     local plateKey = plateName or armor
+	local isBullet = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
+	if isBullet and impact and impact.ballisticVersion then
+		impact.zcityArmorHits = impact.zcityArmorHits or {}
+		if impact.zcityArmorHits[plate] then return {penetrationCost = 0, energyCost = 0} end
+		impact.zcityArmorHits[plate] = true
+	end
 
     local durablityMul = math.min(plate.Durability / (plate.DurabilityMax - plate.DurabilityWarranty), 1)
     local protectionDamageMul = math.min(plate.ProtectionDamageMul * (1 + (1 - durablityMul)), 1)
     local penetratedDamageMul = math.min(plate.PenetratedDamageMul * (1 + (1 - durablityMul)), 1)
 
-    local penetration = (dmgInfo:GetInflictor().bullet and dmgInfo:GetInflictor().bullet.Penetration or 1)
-    local prot = plate.Protection * durablityMul
+	local inflictor = dmgInfo:GetInflictor()
+	local bullet = IsValid(inflictor) and inflictor.bullet
+	local bulletPenetration = 1
+	if bullet then bulletPenetration = tonumber(bullet.Penetration) or 1 end
+	local rawDamage = math.max(tonumber(impact and impact.energyBefore) or dmgInfo:GetDamage(), 0)
+	local penetration = math.max(tonumber(impact and impact.penetrationBefore)
+		or bulletPenetration, 0)
+	local resistance = math.max(plate.Protection * durablityMul, 0)
+	local prot = resistance
 
 	prot = prot - penetration
 
@@ -239,10 +252,12 @@ local function protec(org, bone, dmg, dmgInfo, placement, boneindex, dir, hit, r
 	ArmorEffect(placement, plate, dmgInfo, org, hit, prot)
 
     local oldDurability = plate.Durability
-    if dmgInfo:IsDamageType(DMG_BULLET + DMG_SLASH) and (org.oldPlateDamageInfo != dmgInfo or org.oldPlate != plateKey) then
+    if (isBullet or dmgInfo:IsDamageType(DMG_SLASH))
+		and (org.oldPlateDamageInfo != dmgInfo or org.oldPlate != plateKey) then
         org.oldPlateDamageInfo = dmgInfo
         org.oldPlate = plateKey
-        plate.Durability = math.max(plate.Durability - (penetration * (plate.BalisticMaterial or 1)), 0)
+		local wear = penetration + (isBullet and rawDamage * 0.25 or 0)
+		plate.Durability = math.max(plate.Durability - wear * (plate.BalisticMaterial or 1), 0)
     end
 
     if developer:GetBool() and SERVER then
@@ -264,9 +279,41 @@ local function protec(org, bone, dmg, dmgInfo, placement, boneindex, dir, hit, r
         armor.nodamagetypeChange = true
     end
 
+	if isBullet and impact and impact.ballisticVersion then
+		local stopped = penetration <= resistance
+		local remaining = math.max(penetration - resistance, 0)
+		local scale = resistance <= 0 and 1 or stopped and 0 or math.Clamp(math.max(penetratedDamageMul,
+			remaining / math.max(penetration, 0.01)), 0, 0.95)
+		local energyCost = rawDamage * (1 - scale)
+		local transfer = math.Clamp(protectionDamageMul * (1 + rawDamage / 100), 0, 1)
+		local bluntDamage = energyCost * transfer
+		if SERVER and org.alive ~= false and not org.godmode then
+			org.shock = math.min((org.shock or 0) + bluntDamage * 0.65, math.max(org.shock or 0, 70))
+			org.painadd = (org.painadd or 0) + bluntDamage * 1.15
+			org.hurt = (org.hurt or 0) + bluntDamage / 35
+			if bluntDamage > 0 then org.owner.fullsend = true end
+		end
+		org.oldSideLink = armor.SideLinks and armor.SideLinks[HitBoxName] or nil
+		org.oldDmgInfo = dmgInfo
+		dmgInfo:SetDamageType(DMG_CLUB)
+		dmgInfo:SetDamage(bluntDamage)
+		dmgInfo:SetDamageForce(dmgInfo:GetDamageForce() * transfer)
+
+		return {
+			penetrationCost = math.min(resistance, penetration),
+			energyCost = energyCost,
+			stopped = stopped,
+			armorStopped = stopped
+		}
+	end
+
 	if prot < 0 then
         org.oldSideLink = armor.SideLinks and armor.SideLinks[HitBoxName] or nil
         org.oldDmgInfo = dmgInfo
+		if isBullet then
+			penetratedDamageMul = math.Clamp(math.max(penetratedDamageMul,
+				1 - resistance / math.max(penetration, 0.01)), 0, 0.95)
+		end
 		dmgInfo:ScaleDamage(penetratedDamageMul)
 		dmgInfo:SetDamageForce(dmgInfo:GetDamageForce() * penetratedDamageMul )
         if dmgInfo:GetInflictor().bullet then

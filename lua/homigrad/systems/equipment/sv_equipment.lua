@@ -30,8 +30,6 @@ local DEFAULT_VEST_HEALTH_DAMAGE_MUL = 0.01
 local DEFAULT_VEST_WORN_THRESHOLD = 0.25
 local ARMOR_WEAR_STAGES = 3
 
--- Global armor toughness: armor takes this fraction of damage to its HP / durability,
--- so it lasts a bit longer before breaking. Lower = tougher armor.
 local ARMOR_DAMAGE_TAKEN_MUL = 0.5
 local MIN_KNOCKOFF_DAMAGE = 25
 
@@ -998,6 +996,32 @@ local function GetEquippedArmorCondition(owner, armor, placement, armorData)
 	return math.Clamp((owner.armors_health and owner.armors_health[armor] or maximum) / maximum, 0, 1)
 end
 
+local function GetArmorBallisticResistance(owner, placement, armor, armorData, protection, direction, normal)
+	local incidence = isvector(normal) and math.abs(direction:Dot(normal)) or 1
+	local condition = GetEquippedArmorCondition(owner, armor, placement, armorData)
+
+	return math.max(protection, 0) * condition * math.Clamp(1 / math.max(incidence, 0.4), 1, 2.5)
+end
+
+local function ApplyArmorBluntTrauma(org, placement, armor, armorData, rawDamage, absorbedDamage)
+	if org.alive == false or org.godmode then return 0 end
+	local owner = org.owner
+	local quality = math.Clamp(tonumber(hg.GetArmorItemState(owner, armor, "quality", 1)) or 1, 0.8, 1.2)
+	local mass = math.max(hg.GetArmorMass(owner, placement, armor), 0.1)
+	local condition = GetEquippedArmorCondition(owner, armor, placement, armorData)
+	local transfer = (armorData.bluntTransfer or (placement == "head" and 0.22 or 0.18))
+		* math.Clamp(3 / (mass * quality), 0.5, 1.5) * (1 + rawDamage / 100) * (2 - condition)
+	local bluntDamage = math.max(absorbedDamage, 0) * math.Clamp(transfer, 0, 1)
+	org.shock = math.min((org.shock or 0) + bluntDamage * 0.65, math.max(org.shock or 0, 70))
+	org.painadd = (org.painadd or 0) + bluntDamage * 1.15
+	org.immobilization = math.min((org.immobilization or 0) + bluntDamage * 0.2,
+		math.max(org.immobilization or 0, 30))
+	org.hurt = (org.hurt or 0) + bluntDamage / 35
+	if bluntDamage > 0 then owner.fullsend = true end
+
+	return bluntDamage
+end
+
 function hg.TryKnockOffArmor(owner, placement, armor, armorData, dmgInfo, hitPos, ballistic, direction, modelHit)
 	if (placement ~= "head" and placement ~= "torso") or not IsValid(owner)
 		or not armorData or armorData.nodrop then return false end
@@ -1146,7 +1170,7 @@ local function ApplyPlateSpall(org, dmg, boneindex)
 	end
 end
 
-function DamageArmorPlate(org, placement, armor, dmgInfo, hitPos, rawDmg, boneindex)
+function DamageArmorPlate(org, placement, armor, dmgInfo, hitPos, rawDmg, boneindex, ballisticWear)
 	local owner = org.owner
 	local isStab = dmgInfo:IsDamageType(DMG_SLASH)
 	if placement ~= "torso" or not IsValid(owner) or IsArmorBreakProtected(owner, armor) then return 1 end
@@ -1161,7 +1185,7 @@ function DamageArmorPlate(org, placement, armor, dmgInfo, hitPos, rawDmg, bonein
 	owner.armor_states[armor] = owner.armor_states[armor] or {}
 	local state = owner.armor_states[armor]
 	local health = tonumber(state.plateHealth) or maximum
-	local wear = isBullet and 1 or isStab and 0.15 or isClub and 0.4 or 0.6
+	local wear = isBullet and (ballisticWear or 1) or isStab and 0.15 or isClub and 0.4 or 0.6
 	health = math.max(health - rawDmg * wear, 0)
 	state.plateHealth = health
 	owner:SyncArmor()
@@ -1188,14 +1212,14 @@ local function protec(org, bone, dmg, dmgInfo, placement, armor, scale, scalepro
 	local isStab = dmgInfo:IsDamageType(DMG_SLASH)
 	local isClub = dmgInfo:IsDamageType(DMG_CLUB + DMG_GENERIC)
 	local originalDamageType = dmgInfo:GetDamageType()
-	local ballisticResistance
+	local ballisticResistance = 0
 	if isBullet and impact and impact.ballisticVersion then
 		local shotDir = (isvector(dir) and dir:GetNormalized()) or dmgInfo:GetDamageForce():GetNormalized()
-		local incidence = isvector(impact.normal) and math.abs(shotDir:Dot(impact.normal)) or 1
-		ballisticResistance = ballisticProt * 2.25 * (org.owner.armors_broken_mul and org.owner.armors_broken_mul[armor] or 1)
-			* math.Clamp(1 / math.max(incidence, 0.4), 1, 2.5)
+		ballisticResistance = GetArmorBallisticResistance(org.owner, placement, armor, armorData,
+			ballisticProt, shotDir, impact.normal)
 	end
-	local penetratesArmor = ballisticResistance and impact.penetrationBefore > ballisticResistance
+	local penetratesArmor = isBullet and impact and impact.ballisticVersion
+		and impact.penetrationBefore > ballisticResistance
 	local armorHitKey = "armor:" .. tostring(org.owner:EntIndex()) .. ":" .. tostring(armor)
 	if impact and impact.modelArmorHits and impact.modelArmorHits[armorHitKey] then return 0 end
 	if not penetratesArmor and hg.TryKnockOffArmor(org.owner, placement, armor, armorData, dmgInfo, hit, impact, dir) then
@@ -1213,18 +1237,21 @@ local function protec(org, bone, dmg, dmgInfo, placement, armor, scale, scalepro
 	if isStab then baseProt = stabProt elseif isClub then baseProt = meleeProt end
 
 	local inf = dmgInfo:GetInflictor()
-	local pen = (IsValid(inf) and inf.bullet and inf.bullet.Penetration or 0)
-	if isBullet then pen = math.min(pen, baseProt * 0.6) end
+	local pen = math.max(tonumber(impact and impact.penetrationBefore)
+		or tonumber(IsValid(inf) and inf.bullet and inf.bullet.Penetration) or 0, 0)
+	local ballisticWear = isBullet and (1 + pen / math.max(ballisticProt, 1)) or 1
 	local regionWear = 1
 	if isBullet and impact and impact.ballisticVersion and armorData then
 		local hitPos = impact.hitPos or dmgInfo:GetDamagePosition()
-		local _, regionHealth = DamageArmorRegion(org.owner, armor, placement, armorData, hitPos, impact.rawDamage, impact.entity)
+		local _, regionHealth = DamageArmorRegion(org.owner, armor, placement, armorData,
+			hitPos, impact.energyBefore * ballisticWear, impact.entity)
 		regionWear = math.Clamp(0.35 + regionHealth * 0.65, 0.35, 1)
 	end
 
 	local ricochetHit = false
 	local armorWasBroken = org.owner.armors_broken and org.owner.armors_broken[armor]
-	if isBullet and impact and impact.ballisticVersion and IsDurabilityArmor(placement, armorData) and not armorWasBroken then
+	if isBullet and impact and impact.ballisticVersion and not penetratesArmor
+		and IsDurabilityArmor(placement, armorData) and not armorWasBroken then
 		local shotDir = (isvector(dir) and dir:GetNormalized()) or dmgInfo:GetDamageForce():GetNormalized()
 		local normal = impact.normal
 		local incidence = isvector(normal) and math.abs(shotDir:Dot(normal)) or 1
@@ -1232,8 +1259,6 @@ local function protec(org, bone, dmg, dmgInfo, placement, armor, scale, scalepro
 		local bulletFactor = math.Clamp(1 - pen / math.max(baseProt * 1.5, 1), 0, 1)
 		local wearFactor = math.Clamp(0.4 + regionWear * 0.6, 0.4, 1)
 		local baseChance = armorData.ricochetChance or 0.3
-		-- Glancing hits genuinely deflect off the armor; near-perpendicular hits
-		-- mostly absorb so helmets never become flat-on bulletproof.
 		local chance = math.Clamp(baseChance * (0.18 + 0.82 * angleFactor) * (0.42 + 0.58 * bulletFactor) * wearFactor, 0, 0.85)
 		ricochetHit = math.Rand(0, 1) < chance
 	end
@@ -1295,10 +1320,18 @@ local function protec(org, bone, dmg, dmgInfo, placement, armor, scale, scalepro
 	-- Helmets break and drop, vests wear out and protect less
 	if armorData then
 		local rawDmg = dmgInfo:GetDamage()
-		local vestScale = DamageArmorPlate(org, placement, armor, dmgInfo, isvector(hit) and hit or dmgInfo:GetDamagePosition(), rawDmg, boneindex)
-		local broken, destroyed = DamageArmor(org, placement, armor, dmgInfo, (ricochetHit and rawDmg * 0.15 or rawDmg) * vestScale)
+		local vestScale = DamageArmorPlate(org, placement, armor, dmgInfo,
+			isvector(hit) and hit or dmgInfo:GetDamagePosition(), rawDmg, boneindex, ballisticWear)
+		local broken, destroyed = DamageArmor(org, placement, armor, dmgInfo,
+			(ricochetHit and rawDmg * 0.15 or rawDmg) * vestScale * ballisticWear)
 		if broken and placement == "head" and not destroyed and not penetratesArmor then
-			dmgInfo:ScaleDamage(0)
+			if isBullet then
+				local absorbedDamage = impact and impact.energyBefore or rawDmg
+				dmgInfo:SetDamageType(DMG_CLUB)
+				dmgInfo:SetDamage(ApplyArmorBluntTrauma(org, placement, armor, armorData, rawDmg, absorbedDamage))
+			else
+				dmgInfo:ScaleDamage(0)
+			end
 			dmgInfo:SetDamageForce(dmgInfo:GetDamageForce() * 0.4)
 			org.lastArmorMitigation = 1
 			org.lastHeadArmorMitigation = 1
@@ -1417,18 +1450,9 @@ local function protec(org, bone, dmg, dmgInfo, placement, armor, scale, scalepro
 		local stopped = impact.penetrationBefore <= resistance
 		local penetrationCost = math.min(resistance, impact.penetrationBefore)
 		local overmatch = math.max(impact.penetrationBefore - resistance, 0) / math.max(impact.penetrationBefore, 1)
-		local penetrationDamageScale = math.Clamp(overmatch, 0.04, 0.95)
+		local penetrationDamageScale = resistance <= 0 and 1 or math.Clamp(overmatch, 0.04, 0.95)
 		local energyCost = stopped and impact.energyBefore or impact.energyBefore * (1 - penetrationDamageScale)
-		local quality = math.Clamp(tonumber(hg.GetArmorItemState(org.owner, armor, "quality", 1)) or 1, 0.8, 1.2)
-		local mass = hg.GetArmorMass(org.owner, placement, armor)
-		local bluntTransfer = (armorData.bluntTransfer or (placement == "head" and 0.22 or 0.18))
-			* math.Clamp(3 / (mass * quality), 0.5, 1.5)
-		local bluntDamage = energyCost * bluntTransfer
-
-		org.shock = math.min((org.shock or 0) + bluntDamage * 0.65, 70)
-		org.painadd = (org.painadd or 0) + bluntDamage * 1.15
-		org.immobilization = math.min((org.immobilization or 0) + bluntDamage * 0.2, 30)
-		org.hurt = (org.hurt or 0) + bluntDamage / 35
+		local bluntDamage = ApplyArmorBluntTrauma(org, placement, armor, armorData, impact.energyBefore, energyCost)
 		dmgInfo:SetDamage(bluntDamage)
 
 		if placement == "torso" then
@@ -1476,10 +1500,8 @@ function hg.ProcessArmorModelHit(hit, damage, forceAmount, direction, shot)
 	local isBullet = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
 	local penetration = math.max(tonumber(shot and shot.Penetration) or dmgInfo:GetDamage() / 2, 0.01)
 	local protection = math.max(hg.GetArmorProtection(owner, placement, armor, hit.position), 0)
-	local condition = GetEquippedArmorCondition(owner, armor, placement, armorData)
-	local incidence = isvector(hit.normal) and math.abs(dir:Dot(hit.normal)) or 1
-	local angleMul = math.Clamp(1 / math.max(incidence, 0.45), 1, 2.2)
-	local resistance = protection * 1.55 * condition * angleMul
+	local resistance = GetArmorBallisticResistance(owner, placement, armor, armorData, protection, dir, hit.normal)
+	local ballisticWear = isBullet and (1 + penetration / math.max(protection, 1)) or 1
 	local penetratesArmor = isBullet and penetration > resistance
 	if not penetratesArmor and hg.TryKnockOffArmor(owner, placement, armor, armorData, dmgInfo, hit.position, shot, dir, true) then
 		return {scale = 0, penetration = 0, stopped = true, dropped = true, material = MAT_METAL}
@@ -1487,8 +1509,16 @@ function hg.ProcessArmorModelHit(hit, damage, forceAmount, direction, shot)
 
 	local org = owner.organism or {owner = owner}
 	if not org.owner then org.owner = owner end
-	local vestScale = DamageArmorPlate(org, placement, armor, dmgInfo, hit.position, dmgInfo:GetDamage() * 1.1)
-	local broken, destroyed = DamageArmor(org, placement, armor, dmgInfo, dmgInfo:GetDamage() * 1.1 * vestScale)
+	local regionWear = 1
+	if isBullet then
+		local _, regionHealth = DamageArmorRegion(owner, armor, placement, armorData,
+			hit.position, dmgInfo:GetDamage() * ballisticWear, owner)
+		regionWear = math.Clamp(0.35 + regionHealth * 0.65, 0.35, 1)
+	end
+	local vestScale = DamageArmorPlate(org, placement, armor, dmgInfo,
+		hit.position, dmgInfo:GetDamage() * 1.1, nil, ballisticWear)
+	local broken, destroyed = DamageArmor(org, placement, armor, dmgInfo,
+		dmgInfo:GetDamage() * 1.1 * vestScale * ballisticWear)
 	if isBullet and owner.armors and owner.armors[placement] == armor and IsDurabilityArmor(placement, armorData) then
 		hg.HandleArmorShot(org, placement, armor, dmgInfo, hit.position, false)
 	end
@@ -1505,13 +1535,16 @@ function hg.ProcessArmorModelHit(hit, damage, forceAmount, direction, shot)
 		return {scale = damageScale, stopped = false, material = MAT_METAL, broken = broken}
 	end
 
+	resistance = resistance * regionWear
 	local remainingPenetration = math.max(penetration - resistance, 0)
 	if remainingPenetration <= 0 then
+		ApplyArmorBluntTrauma(org, placement, armor, armorData, dmgInfo:GetDamage(), dmgInfo:GetDamage())
 		return {scale = 0, penetration = 0, stopped = true, material = MAT_METAL, broken = broken}
 	end
 
 	local overmatch = remainingPenetration / penetration
-	local scale = math.Clamp(overmatch, 0.08, 0.95)
+	local scale = resistance <= 0 and 1 or math.Clamp(overmatch, 0.08, 0.95)
+	ApplyArmorBluntTrauma(org, placement, armor, armorData, dmgInfo:GetDamage(), dmgInfo:GetDamage() * (1 - scale))
 	return {
 		scale = scale,
 		penetration = remainingPenetration,
