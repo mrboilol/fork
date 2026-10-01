@@ -34,9 +34,14 @@ function hg.organism.Trace(pos, dir, size, maxpen, boxs, center, endDis, organs,
 	local distance = math_ceil(dir:Length())
 	distance = math.Clamp(distance + 5, 0, 512)
 	dir:Normalize()
+	dir = dir * stepDis
 
-	local segLen = 12
-	local passMax = distance
+	tracePos:Set(pos - dir * 10)
+
+	local distancereal = distance
+
+	distance = distance + (dir * 10):Length()
+	
 	local passing = 0
 	local maxtries = 120
 
@@ -56,37 +61,21 @@ function hg.organism.Trace(pos, dir, size, maxpen, boxs, center, endDis, organs,
 
 			box = boxs[i]
 			if not organs[box[6]] then continue end
+			
+			local startpos = tracePos
+			local endpos = dir * 100
 
-			local hit_, normal_, frac_ = util_IntersectRayWithOBB(tracePos, segDir, box[1], box[2], box[3], box[4])
-			local contact = "direct"
-			local contactMul = 1
-			if not hit_ and permanentExpansion and box[6] then
-				local expandedHit, expandedNormal, expandedFrac = util_IntersectRayWithOBB(tracePos, segDir, box[1], box[2], box[3] - permanentExpansion, box[4] + permanentExpansion)
-				if expandedHit then
-					hit_, normal_, frac_ = expandedHit, expandedNormal, expandedFrac
-					contact = "graze"
-					contactMul = grazeDamageMul
+			local hit_, normal_, frac_ = util_IntersectRayWithOBB(startpos, endpos, box[1], box[2], box[3], box[4])
+			
+			if hit_ then
+				//print(organs[box[6]][box[7]][1], distance, passing, passing > distance, 2)
+				if frac_ < frac then
+					iHit = i
+					
+					frac = frac_
+					normal = normal_
+					hit = hit_
 				end
-			end
-			if not hit_ and expansion and box[6] then
-				local expandedHit, expandedNormal, expandedFrac = util_IntersectRayWithOBB(tracePos, segDir, box[1], box[2], box[3] - expansion, box[4] + expansion)
-				if expandedHit then
-					if nearbyRolls[i] == nil then nearbyRolls[i] = math.Rand(0, 1) end
-					if nearbyRolls[i] < expansionChance then
-						hit_, normal_, frac_ = expandedHit, expandedNormal, expandedFrac
-						contact = "cavity"
-						contactMul = nearbyDamageMul
-					end
-				end
-			end
-
-			if hit_ and frac_ < frac then
-				iHit = i
-				frac = frac_
-				normal = normal_
-				hit = tracePos + segDir * frac_
-				impactContact = contact
-				impactContactMul = contactMul
 			end
 		end
 
@@ -129,19 +118,17 @@ function hg.organism.Trace(pos, dir, size, maxpen, boxs, center, endDis, organs,
 				if dirSub.stopped or distance <= 0 or impact.energy <= 0 then passMax = passing end
 			elseif dirSub then
 				distance = distance - dirSub * distance
-				passMax = math.min(passMax, passing + distance)
-				if impact and impact.ballisticVersion then
-					impact.energy = impact.energy * math.Clamp(1 - dirSub, 0, 1)
-					impact.penetrationAfter = distance
-					impact.energyAfter = impact.energy
-					impact.depositedEnergy = impact.energyBefore - impact.energy
-				end
 			end
+			
+			//print(organs[box[6]][box[7]][1], distance, dirSub, passing, passing > distance)
+		end
+		
+		passing = passing + 100 * frac
 
-			if not inBody then
-				inBody = true
-				inputHole[#inputHole + 1] = Vector(tracePos[1], tracePos[2], tracePos[3])
-			end
+		if not inBody and iHit then
+			inBody = true
+			inputHole[#inputHole + 1] = Vector(tracePos[1], tracePos[2], tracePos[3])
+		end
 
 			tracePos = hit
 			tracePoses[#tracePoses + 1] = Vector(tracePos[1], tracePos[2], tracePos[3])
@@ -169,7 +156,7 @@ function hg.organism.Trace(pos, dir, size, maxpen, boxs, center, endDis, organs,
 
 	dir:Normalize()
 
-	return tracePos, hitBoxs, inputHole, outputHole, dir, distance, tracePoses
+	return tracePos, hitBoxs, inputHole, outputHole, dir, distancereal, tracePoses
 end
 
 function hg.organism.BlastTrace(pos, size, dmg, boxs, organs, funcInput, ...)
