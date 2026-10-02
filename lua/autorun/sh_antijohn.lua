@@ -23,7 +23,7 @@ if SERVER then
 	}
 
 	local punishmentWords = {
-		"stop nigga",
+		"stop kid",
 		"back to the lobby",
 		"This is your last mistake.",
 		"ayo diddy"

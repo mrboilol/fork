@@ -52,7 +52,7 @@ end
 
 local function getBerserkMusicPath()
 	if altberserk3:GetBool() then return "sound/rage.mp3" end
-	if altberserk:GetBool() then return "sound/NIGGARUN.mp3" end
+	if altberserk:GetBool() then return "sound/run.mp3" end
 
 	return path:GetString()
 end

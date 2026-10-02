@@ -67,7 +67,7 @@ hook.Add("RenderScreenspaceEffects", "noradrenalineEffect", function()
 				hg.noradrenalineStation:SetVolume(1)
 				hg.noradrenalineFadeOut = false
 			else
-				sound.PlayFile("sound/NIGGARUN.mp3", "noblock", function(channel)
+				sound.PlayFile("sound/run.mp3", "noblock", function(channel)
 					if not isNoradrenalineChannel(channel) or not isfunction(channel.EnableLooping) then return end
 					hg.noradrenalineStation = channel
 					channel:EnableLooping(true)

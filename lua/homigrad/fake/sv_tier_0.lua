@@ -868,7 +868,6 @@ fakeBoneFlop.SetOpenFracture = setOpenFracture
 
 function fakeBoneFlop.FlagBone(org, bone, active)
 	if not org or not bone then return false end
-	if hg.FloppyDebug and (active or (org.fake_floppy_bones and org.fake_floppy_bones[bone]) or (org.open_fractures and org.open_fractures[bone])) then hg.FloppyDebug("FlagBone %s active=%s owner=%s\n%s", bone, tostring(active), tostring(org.owner), debug.traceback("", 2)) end
 	if openFractureBones[bone] then
 		local legacy = org.fake_floppy_bones and org.fake_floppy_bones[bone]
 		if legacy then
@@ -1056,12 +1055,6 @@ function fakeBoneFlop.ApplyBone(rag, bone, org)
 	if fracture and not spineFractureBones[bone] and isvector(fracture[1]) then
 		local fracturePos = phys:LocalToWorld(fracture[1])
 		if isSafeNetworkPos(fracturePos) then pos = fracturePos end
-	end
-
-	if hg.FloppyDebug then
-		hg.FloppyDebug("ApplyBone %s on %s: child phys %d (%s) -> parent phys %d (%s), fracture=%s, RemoveInternalConstraint(%d)",
-			bone, tostring(rag), physIDChild, rag:GetBoneName(rag:TranslatePhysBoneToBone(physIDChild)),
-			physIDParent, rag:GetBoneName(rag:TranslatePhysBoneToBone(physIDParent)), tostring(fracture ~= nil), physIDChild)
 	end
 
 	local cons = constraint.AdvBallsocket(
