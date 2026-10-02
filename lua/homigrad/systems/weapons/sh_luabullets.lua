@@ -538,8 +538,10 @@ function ENTITY:FireLuaBullets(tInfo)
     local owner = tInfo.Attacker and tInfo.Attacker:IsValid() and tInfo.Attacker or IsValid(self) and self:GetOwner() and self:GetOwner():IsValid() and self:GetOwner() or self
 	local bIsPlayer = owner:IsPlayer()
 	
+	local rewoundRagdolls
 	if (bIsPlayer and !tInfo.DisableLagComp) then
 		owner:LagCompensation(true)
+		if SERVER and hg.BeginRagdollLagComp then rewoundRagdolls = hg.BeginRagdollLagComp(owner) end
 	end
 	
 	local pWeapon = tInfo.Inflictor and tInfo.Inflictor:IsValid() and tInfo.Inflictor or IsValid(owner) and owner.GetActiveWeapon and owner:GetActiveWeapon()
@@ -811,6 +813,7 @@ function ENTITY:FireLuaBullets(tInfo)
 			data.NearMissShotID = tInfo.NearMissShotID
 			
 			if (hook.Run("PostEntityFireBullets", self, data) == false) then
+				if rewoundRagdolls then hg.RestoreRagdolls(rewoundRagdolls) end
 				return
 			end
 				
@@ -914,6 +917,7 @@ function ENTITY:FireLuaBullets(tInfo)
 		end
 	end
 	
+	if rewoundRagdolls then hg.RestoreRagdolls(rewoundRagdolls) end
 	if (bIsPlayer and !tInfo.DisableLagComp) then
 		owner:LagCompensation(false)
 	end

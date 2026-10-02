@@ -213,6 +213,7 @@ hook.Add("Org Clear", "Main", function(org)
 	org.lastSeizureTemperature = org.temperature
 	org.deathStateEnd = nil
 	org.deathStateKilled = nil
+	org.fatalBrainDeath = nil
 	org.fatalDamageQueued = nil
 	org.postMortemElapsed = nil
 	org.postMortemSendTime = nil
@@ -720,6 +721,37 @@ local function send_bareinfo(org, force, reliable)
 end
 hg.send_organism = send_organism
 hg.send_bareinfo = send_bareinfo
+
+function hg.organism.GetResilience(org)
+	if not org then return 0 end
+
+	local zerlkers = math.Clamp(org.zerlkers or 0, 0, 1)
+	local adrenaline = math.Clamp((org.adrenaline or 0) / 1.5, 0, 1)
+	return math.max(zerlkers, adrenaline)
+end
+
+function hg.organism.GetZerlkersResistance(org)
+	if not org or (org.zerlkersOverdose or 0) > 0 then return 0 end
+	return math.Clamp(org.zerlkers or 0, 0, 1)
+end
+
+function hg.organism.KillFatalBrainDamage(org)
+	if not org or org.fatalBrainDeath then return false end
+
+	org.fatalBrainDeath = true
+	org.alive = false
+	org.needotrub = false
+	org.otrub = false
+	org.incapacitated = false
+	hg.organism.BeginPostMortemDecay(org)
+
+	local owner = org.owner
+	if IsValid(owner) and owner:IsPlayer() and owner:Alive() then
+		owner:Kill()
+	end
+
+	return true
+end
 
 function hg.organism.BeginPostMortemDecay(org, timeValue)
 	if not org then return end

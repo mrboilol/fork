@@ -1325,6 +1325,103 @@ local IsValid = IsValid
 	end
 --//
 --\\ Can use hands
+	function hg.GetCombatCondition(ent)
+		if not IsValid(ent) then
+			return {power = 1, tempo = 1, stability = 1, aim = 1}
+		end
+
+		local org = ent.organism
+		if not org and hg.RagdollOwner then
+			local owner = hg.RagdollOwner(ent)
+			org = IsValid(owner) and owner.organism or nil
+		end
+		if not org then
+			return {power = 1, tempo = 1, stability = 1, aim = 1}
+		end
+
+		local stamina = org.stamina
+		local staminaFraction = stamina and math.Clamp((tonumber(stamina[1]) or 0) / math.max(tonumber(stamina.max) or tonumber(stamina.range) or 1, 1), 0, 1) or 1
+		local consciousness = math.Clamp(tonumber(org.consciousness) or 1, 0, 1)
+		local perfusion = math.Clamp(tonumber(org.perfusion) or 1, 0, 1)
+		local brainOxygen = math.Clamp(tonumber(org.brainoxygen) or 1, 0, 1)
+		local reserve = math.min(perfusion, brainOxygen)
+		local disorientation = math.Clamp(tonumber(org.disorientation) or 0, 0, 10)
+		local pain = math.Clamp(tonumber(org.pain) or 0, 0, 100)
+		local shock = math.Clamp(tonumber(org.shock) or 0, 0, 100)
+		local concussion = math.Clamp(tonumber(org.concussion) or 0, 0, 6)
+		local nausea = math.Clamp(tonumber(org.nausea) or 0, 0, 6)
+		local hunger = math.Clamp(tonumber(org.hungry) or 0, 0, 100)
+		local temperature = tonumber(org.temperature) or 36.7
+
+		local staminaPower = Lerp(staminaFraction, 0.58, 1)
+		local consciousnessPower = Lerp(consciousness, 0.28, 1)
+		local reservePower = Lerp(reserve, 0.35, 1)
+		local painPower = 1 - pain / 100 * 0.18
+		local shockPower = 1 - shock / 100 * 0.28
+		local disorientationPower = 1 - math.Clamp(disorientation / 6, 0, 1) * 0.28
+		local ailmentPower = 1 - math.Clamp(concussion / 6 * 0.18 + nausea / 6 * 0.08 + hunger / 100 * 0.12 + math.abs(temperature - 36.7) / 8 * 0.12, 0, 0.38)
+		local power = math.Clamp(staminaPower * consciousnessPower * reservePower * painPower * shockPower * disorientationPower * ailmentPower, 0.08, 1)
+
+		local tempo = math.Clamp(power ^ 0.62 * Lerp(staminaFraction, 0.72, 1), 0.18, 1)
+		local instability = math.Clamp(
+			(1 - consciousness) * 0.7 + (1 - reserve) * 0.58 + (1 - staminaFraction) * 0.22
+			+ math.Clamp(disorientation / 4, 0, 1) * 0.95 + pain / 100 * 0.18 + shock / 100 * 0.3
+			+ concussion / 6 * 0.46 + nausea / 6 * 0.14,
+			0, 1
+		)
+
+		return {
+			power = power,
+			tempo = tempo,
+			stability = 1 - instability,
+			aim = 1 + instability * 2.5
+		}
+	end
+
+	function hg.GetLegEffectiveness(ent, side)
+		if not IsValid(ent) then return 1 end
+
+		local limb = side
+		if limb == "left" or limb == "l" then
+			limb = "lleg"
+		elseif limb == "right" or limb == "r" then
+			limb = "rleg"
+		end
+		if limb ~= "lleg" and limb ~= "rleg" then return 1 end
+
+		local org = ent.organism
+		if not org and hg.RagdollOwner then
+			local owner = hg.RagdollOwner(ent)
+			org = IsValid(owner) and owner.organism or nil
+		end
+		if not org then return 1 end
+
+		local foot = limb == "lleg" and "lfoot" or "rfoot"
+		if org[limb .. "amputated"] or org[foot .. "amputated"] or org[limb .. "upamputated"] then
+			return 0
+		end
+
+		local damage = math.Clamp(tonumber(org[limb]) or 0, 0, 1)
+		local effectiveness = damage < 0.2 and 1 or Lerp((damage - 0.2) / 0.8, 0.85, 0.2)
+		if damage >= 1 then
+			effectiveness = math.min(effectiveness, 0.1)
+		end
+		if org[limb .. "dislocation"] or org[limb .. "dislocated"] then
+			effectiveness = math.min(effectiveness, 0.15)
+		end
+		if hg.HasTourniquetOnLimb and hg.HasTourniquetOnLimb(ent, limb) then
+			effectiveness = math.min(effectiveness, 0.2)
+		end
+		if org.legstrength and org.legstrength > 0 and org.legstrength < 1 then
+			effectiveness = effectiveness * org.legstrength
+		end
+		if hg.GetLodgedLimbPenalty then
+			effectiveness = effectiveness * hg.GetLodgedLimbPenalty(ent, limb)
+		end
+
+		return math.Clamp(effectiveness, 0, 1)
+	end
+
 	function hg.CanUseLeftHand(ply)
 		local ent = IsValid(ply.FakeRagdoll) and ply.FakeRagdoll or ply
 
