@@ -154,6 +154,45 @@ function DoorIsOpen2(door)
 	end
 end
 
+local DOOR_KICK_DAMAGE = 35
+local DOOR_KICK_HEALTH = 200
+local DOOR_KICK_FORCE = 125
+
+function hgKickDoor(ent, attacker, impact, direction, isDropkick)
+	if not SERVER or not IsValid(ent) or not hgIsDoor(ent) or ent:GetNoDraw() then return false end
+	impact = math.Clamp(impact or 0, 0, 1.5)
+	if impact <= 0 then return false end
+
+	timer.Simple(0, function()
+		if not IsValid(ent) or ent:GetNoDraw() then return end
+		ent:EmitSound("physics/wood/wood_crate_impact_hard" .. math.random(1, 4) .. ".wav")
+
+		local class = ent:GetClass()
+		if not ent:GetInternalVariable("m_bLocked") and not DoorIsOpen2(ent) then
+			if IsValid(attacker) and attacker:IsPlayer() and (class == "prop_door_rotating" or class == "func_door_rotating") then
+				ent:FastOpenDoor(attacker, isDropkick and 5 or 2, true)
+			end
+			if class == "prop_door_rotating" and IsValid(attacker) then
+				local oldName = attacker:GetName()
+				attacker:SetName(oldName .. attacker:EntIndex())
+				ent:Fire("OpenAwayFrom", attacker:GetName(), 0, attacker, attacker)
+				attacker:SetName(oldName)
+			else
+				ent:Fire("Open")
+			end
+		end
+
+		local damage = impact * DOOR_KICK_DAMAGE
+		if SDD_DamageDoor and SDD_DamageDoor(ent, damage) then return end
+		ent.HP = (ent.HP or DOOR_KICK_HEALTH) - damage
+		if ent.HP <= 0 then
+			hgBlastThatDoor(ent, (direction or ent:GetForward()) * DOOR_KICK_FORCE)
+		end
+	end)
+
+	return true
+end
+
 function hgBlastThatDoor(ent, vel)
 	local meleeHit = ent.SDD_LastMeleeHit and ent.SDD_LastMeleeHit > CurTime() - 0.1
 	if SDD_DamageDoor and (meleeHit or math.random(100) <= 60) and SDD_DamageDoor(ent, math.random(20, 45)) then return end

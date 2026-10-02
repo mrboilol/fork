@@ -163,6 +163,8 @@ local IsValid, math_Clamp = IsValid, math.Clamp
 
 		if not playerBonesSetUp then ent:SetupBones() end
 
+		if hg.FootIK then hg.FootIK(ent, ply) end
+
 		if IsValid(wep) and (wep.ismelee or wep.isTPIKBase) and wep.DrawWorldModel2 then
 			wep:DrawWorldModel2(true)
 		end

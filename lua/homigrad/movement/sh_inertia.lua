@@ -95,6 +95,53 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 	local hg_movement_speed_lose_mul = CreateConVar("hg_movement_speed_lose_mul", "1", {FCVAR_REPLICATED,FCVAR_ARCHIVE,FCVAR_NOTIFY}, "Multiply speed lose", 0.01, 5)
 	local hg_movement_weightmul_mul = CreateConVar("hg_movement_weightmul_mul", "1", {FCVAR_REPLICATED,FCVAR_ARCHIVE,FCVAR_NOTIFY}, "Multiply speed lose", 0.01, 5)
 	local hg_movement_lagcomp = CreateConVar("hg_movement_lagcomp", "1", {FCVAR_REPLICATED,FCVAR_ARCHIVE,FCVAR_NOTIFY}, "Compensate movement inertia for latency", 0, 1)
+	local hg_footstep_push = CreateConVar("hg_footstep_push", "1", {FCVAR_REPLICATED,FCVAR_ARCHIVE,FCVAR_NOTIFY}, "Gain ground speed only while a foot is pushing", 0, 1)
+	local hg_footstep_push_min = CreateConVar("hg_footstep_push_min", "0.25", {FCVAR_REPLICATED,FCVAR_ARCHIVE,FCVAR_NOTIFY}, "Acceleration fraction kept between foot pushes", 0, 1)
+
+	local GAIT_STEP_LENGTH_BASE = 16
+	local GAIT_STEP_LENGTH_PER_SPEED = 0.22
+	local GAIT_MIN_STEP_LENGTH = 20
+	local GAIT_MAX_STEP_LENGTH = 80
+	local GAIT_START_STEP_RATE = 1.6
+	local GAIT_IDLE_STEP_RATE = 0.5
+
+	function hg.GaitStepLength(speed)
+		return math_Clamp(GAIT_STEP_LENGTH_BASE + speed * GAIT_STEP_LENGTH_PER_SPEED, GAIT_MIN_STEP_LENGTH, GAIT_MAX_STEP_LENGTH)
+	end
+
+	function hg.GaitStepRate(speed, intent)
+		local rate = speed / hg.GaitStepLength(speed)
+		if intent then rate = math_max(rate, GAIT_START_STEP_RATE) end
+		if rate < GAIT_IDLE_STEP_RATE then return 0 end
+
+		return rate
+	end
+
+	function hg.GaitPush(phase)
+		local wave = math_sin(math.pi * (phase % 1))
+
+		return wave * wave
+	end
+
+	local function gaitAccelerationMul(ply, vel, intent, advance, tick_interval)
+		local rate = hg.GaitStepRate(vel:Length2D(), intent)
+		local phase = ply.hg_GaitPhase or 0
+
+		if advance then
+			if rate > 0 then
+				phase = (phase + rate * tick_interval) % 2
+			elseif phase % 1 > 0 then
+				phase = (math.floor(phase) + 1) % 2
+			end
+			ply.hg_GaitPhase = phase
+			ply.hg_GaitRate = rate
+		end
+
+		if not intent or not hg_footstep_push:GetBool() then return 1 end
+		local minMul = hg_footstep_push_min:GetFloat()
+
+		return minMul + (1 - minMul) * hg.GaitPush(phase) * 2
+	end
 
 	local function hg_GetMovementLagComp(ply)
 		if not hg_movement_lagcomp:GetBool() or not IsValid(ply) then return 1, 0 end
@@ -486,7 +533,12 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 			end
 			end
 
-			local new_inertia = approach_vector(ply.MovementInertia, inertia_to, delta_time * ply.InertiaBlend)
+			local gait_mul = 1
+			if on_ground and moveType == MOVETYPE_WALK then
+				gait_mul = gaitAccelerationMul(ply, vel, fm ~= 0 or sm ~= 0, process_input, tick_interval)
+			end
+
+			local new_inertia = approach_vector(ply.MovementInertia, inertia_to, delta_time * ply.InertiaBlend * gait_mul)
 
 			ply.MovementInertia = new_inertia
 
