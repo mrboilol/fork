@@ -1,4 +1,18 @@
-spawnmenu.AddCreationTab("Armor", function()
+local function hideDuplicateArmorCategory()
+	local entities = list.GetForEdit("SpawnableEntities")
+	for class, data in pairs(entities) do
+		if data.Category == "ZCity Armor" then entities[class] = nil end
+	end
+end
+
+hook.Add("Initialize", "hg/armor/spawnmenu-category", function()
+	timer.Simple(0, hideDuplicateArmorCategory)
+end)
+hook.Add("HomigradRun", "hg/armor/spawnmenu-category", hideDuplicateArmorCategory)
+hook.Add("OnReloaded", "hg/armor/spawnmenu-category", hideDuplicateArmorCategory)
+hideDuplicateArmorCategory()
+
+spawnmenu.AddCreationTab("working sigma armor", function()
 		local tabs = vgui.Create("DPropertySheet")
 
 		local function addPage(label, entries)
@@ -47,6 +61,6 @@ spawnmenu.AddCreationTab("Armor", function()
 			end
 		end
 		table.sort(judge, function(a, b) return a.nicename < b.nicename end)
-		addPage("Judge", judge)
+		addPage("other armor", judge)
 		return tabs
 end, "icon16/shield.png", 30)

@@ -1624,6 +1624,15 @@ module[2] = function(owner, org, timeValue)
 	-- temperature
 	local lowPulseCold = Clamp(getLowPulseSeverity(org.pulse) / (55 / 70), 0, 1)
 	local needed_temp = math.min(36.7 - lowPulseCold * 5.7, org.lowBloodTemperatureTarget or 36.7)
+	if StormFox2 and StormFox2.Loaded and StormFox2.Setting.SFEnabled() and IsValid(owner) then
+		local character = hg.GetCurrentCharacter(owner)
+		if not IsValid(character) then character = owner end
+		local inWater = character:WaterLevel() > 0
+		if inWater or StormFox2.Wind.IsEntityInWind(character) then
+			local cold = math.max(10 - StormFox2.Temperature.Get(), 0)
+			needed_temp = math.min(needed_temp, math.max(20, 36.7 - cold * (inWater and 0.4 or 0.25)))
+		end
+	end
 	local changeRate = timeValue / 60
 	changeRate = changeRate * (org.temperature < needed_temp and math.Clamp(org.heatbuff / 60, 1, 2) or 1)
 	local equipmentChangeRate = hook.Run("ZC_BodyTemperature", owner, org, timeValue, changeRate, 1, 1)

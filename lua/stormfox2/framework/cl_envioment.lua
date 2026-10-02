@@ -11,7 +11,7 @@ local METAL_ROOF_VERTS = 4
 
 StormFox2.Setting.AddCL("window_enable",render.SupportsPixelShaders_2_0())
 StormFox2.Setting.AddCL("window_distance",800, nil, nil, 0, 4000)
-StormFox2.Setting.AddSV("enable_ice",not game.IsDedicated())
+StormFox2.Setting.AddSV("enable_ice", true)
 StormFox2.Setting.AddSV("enable_wateroverlay",true, nil, "Effects")
 StormFox2.Setting.AddCL("edit_cubemaps",true)
 

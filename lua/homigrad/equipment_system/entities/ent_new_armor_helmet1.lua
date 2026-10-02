@@ -42,7 +42,7 @@ ENT.Overlay.Fov = -40
 ENT.Overlay.ModelMaterial = "sal/hanker"
 ENT.Overlay.Model = "models/barney_helmet.mdl"
 
-ENT.DrawOverlay = hg.DrawFirstPersonHelmet
+ENT.DrawOverlay = hg.DrawFirstPersonEquipment
 --\\ Balistic settings                              -- soon can be enchanced, per plate material, durability and other stuff
 
 --\\ HitBoxSets Hitbox Creation

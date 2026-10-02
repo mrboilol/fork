@@ -63,7 +63,7 @@ hg = hg or {}
 hg.organism = hg.organism or {}
 
 if CLIENT then
-    local function DrawFirstPersonHelmet(self, ply)
+    local function DrawFirstPersonEquipment(self, ply)
         if ply:GetNetVar("headcrab") then return end
         if not ply:Alive() then return end
         if ply.organism and ply.organism.otrub then return end
@@ -163,7 +163,7 @@ if CLIENT then
         cam.End3D()
     end
     
-    hg.DrawFirstPersonHelmet = DrawFirstPersonHelmet
+    hg.DrawFirstPersonEquipment = DrawFirstPersonEquipment
 
     hook.Add("Post Pre Post Processing", "renderEquipmentOverlay", function()
         local Overlay = lply:GetEquipmentBySlot(ZC_ARMOR_SLOT_HEAD)

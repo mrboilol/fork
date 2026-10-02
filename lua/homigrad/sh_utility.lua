@@ -894,28 +894,7 @@ local IsValid = IsValid
 --//
 --\\ Calculate Weight 
 	function hg.CalculateWeight(ply,maxweight)
-		local weight = 0
-
-		local weps = ply:GetWeapons()
-
-		for i,wep in ipairs(weps) do
-			weight = weight + (wep.weight or 1)
-		end
-
-		weight = math.max(weight - 1,0)
-
-		local ammo = ply:GetAmmo()
-		for id,count in pairs(ammo) do
-			weight = weight + (game.GetAmmoForce(id) * count) / 1500
-		end
-
-		ply.armors = ply:GetNetVar("Armor",{})
-		for plc,arm in pairs(ply.armors) do
-			weight = weight + hg.GetArmorMass(ply, plc, arm)
-		end
-
-		local weightmul = (1 / (weight / maxweight + 1))
-		return weightmul
+		return 1 / (hg.GetCarryWeight(ply) / maxweight + 1)
 	end
 --//
 --\\ Shared custom ragdoll mass

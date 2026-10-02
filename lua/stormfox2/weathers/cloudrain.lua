@@ -291,12 +291,12 @@ do
 		if SERVER then
 			StormFox2.Map.w_CallLogicRelay(rain.LogicRelay())
 		end
-		return (StormFox2.Data.GetFinal("Temp") or 0) < -3 and snow or rain_t
+		return GetConVar("hg_snowy"):GetBool() and (StormFox2.Data.GetFinal("Temp") or 0) < -3 and snow or rain_t
 	end)
 
 	-- Make the snow stay, until temp is high or it being replaced.
 	snow:LockUntil(function()
-		return StormFox2.Temperature.Get() > -2
+		return not GetConVar("hg_snowy"):GetBool() or StormFox2.Temperature.Get() > -2
 	end)
 
 	-- Footprints

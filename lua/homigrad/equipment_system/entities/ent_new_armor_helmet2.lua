@@ -54,7 +54,7 @@ function ENT:Initialize()
     self.FeMale.Skin = skin
 end
 
-ENT.DrawOverlay = hg.DrawFirstPersonHelmet
+ENT.DrawOverlay = hg.DrawFirstPersonEquipment
 --\\ Balistic settings                              -- soon can be enchanced, per plate material, durability and other stuff
 
 --\\ HitBoxSets Hitbox Creation

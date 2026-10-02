@@ -36,6 +36,25 @@ debug.getregistry()["SFTerrain"] = meta
 local terrains = {}
 StormFox2.Terrain = {}
 
+local hgSnowy = CreateConVar("hg_snowy", "1", {FCVAR_ARCHIVE, FCVAR_REPLICATED, FCVAR_NOTIFY},
+	"Allow StormFox to cover the map in snow; water can still freeze.", 0, 1)
+local snowyMaps = StormFox2.Setting.AddSV("snowy_maps", not hgSnowy:GetBool(),
+	"For maps that already have snow. Disables ground snow replacement, but keeps snowfall and ice.", "Weather")
+
+if SERVER then
+	StormFox2.Setting.Set("snowy_maps", not hgSnowy:GetBool(), true)
+	snowyMaps:AddCallback(function(enabled)
+		hgSnowy:SetBool(not enabled)
+	end, "HG/SnowyMaps")
+	cvars.AddChangeCallback("hg_snowy", function(_, _, value)
+		StormFox2.Setting.Set("snowy_maps", tonumber(value) == 0)
+		local terrain = StormFox2.Terrain.GetCurrent()
+		if not hgSnowy:GetBool() and terrain and terrain.Name == "snow" then
+			StormFox2.Terrain.Reset()
+		end
+	end, "HG/SnowyMaps")
+end
+
 --- Creates a new terrain type, stores and returns it.
 ---@param sName string
 ---@return SF2Terrain
@@ -269,7 +288,7 @@ end
 function StormFox2.Terrain.Set( sName )
 	-- Apply terrain.
 	local t = StormFox2.Terrain.Get( sName )
-	if not t then
+	if not t or (SERVER and t.Name == "snow" and not hgSnowy:GetBool()) then
 		StormFox2.Terrain.Reset()
 		return false
 	end

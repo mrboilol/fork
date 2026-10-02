@@ -1,5 +1,44 @@
 local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vector, AngleRand, VectorRand, math, hook, util, game
 local math_abs, math_Approach, math_AngleDifference, math_Clamp, math_cos, math_deg, math_max, math_min, math_rad, math_Round, math_sin, math_sqrt = math.abs, math.Approach, math.AngleDifference, math.Clamp, math.cos, math.deg, math.max, math.min, math.rad, math.Round, math.sin, math.sqrt
+
+local surfaceTraceMins, surfaceTraceMaxs = Vector(-8, -8, 0), Vector(8, 8, 8)
+local function getSurfaceFriction(ply)
+	if not ply:Alive() or ply:GetMoveType() ~= MOVETYPE_WALK or not ply:OnGround()
+		or ply:InVehicle() or IsValid(ply.FakeRagdoll) then return end
+	local ground = ply:GetGroundEntity()
+	if IsValid(ground) and ground:GetClass() == "stormfox_mapice" then return 0.08 end
+	local trace = ply.hg_surface_trace or {mins = surfaceTraceMins, maxs = surfaceTraceMaxs, mask = MASK_PLAYERSOLID}
+	ply.hg_surface_trace = trace
+	trace.start = ply:GetPos() + vector_up * 4
+	trace.endpos = ply:GetPos() - vector_up * 12
+	trace.filter = ply
+	local tr = util.TraceHull(trace)
+	if not tr.Hit then return end
+	if IsValid(tr.Entity) and tr.Entity:GetClass() == "stormfox_mapice" then return 0.08 end
+	for _, puddle in ipairs(hg.gasolinePath or {}) do
+		if puddle[2] ~= true and tr.HitPos:DistToSqr(puddle[1]) < 36 * 36 then return 0.08 end
+	end
+	local surface = tr.SurfaceProps and util.GetSurfaceData(tr.SurfaceProps)
+	if surface and surface.friction < 0.2 then return math_Clamp(surface.friction, 0.02, 0.2) end
+end
+
+local function resetSurfaceFriction(ply)
+	if ply.hg_SurfaceOriginalFriction == nil then return end
+	ply:SetFriction(ply.hg_SurfaceOriginalFriction)
+	ply.hg_SurfaceOriginalFriction = nil
+	ply.hg_SurfaceFriction = nil
+end
+
+local function updateSurfaceFriction(ply)
+	local friction = getSurfaceFriction(ply)
+	if not friction then resetSurfaceFriction(ply) return end
+	if ply.hg_SurfaceOriginalFriction == nil then ply.hg_SurfaceOriginalFriction = ply:GetFriction() end
+	ply.hg_SurfaceFriction = friction
+	ply:SetFriction(friction)
+end
+
+hook.Add("PlayerDeath", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
+hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 --\\ Inertia & stuff
 	--\\ Antibhop accelerate (not used anyway)
 		--[[hook.Add("OnPlayerHitGround", "Movement", function(ply, inWater, onFloater, speed)
@@ -66,6 +105,7 @@ local math_abs, math_Approach, math_AngleDifference, math_Clamp, math_cos, math_
 
 	local vomitVPAng, vecZero = Angle(1, 0, 0), Vector()
 	hook.Add("SetupMove", "HG(StartCommand)", function(ply, mv, cmd)
+		updateSurfaceFriction(ply)
 		local curTime = CurTime()
 		local sysTime = SysTime()
 		--\\ DeltaTime
@@ -571,7 +611,7 @@ local math_abs, math_Approach, math_AngleDifference, math_Clamp, math_cos, math_
 		move = move * k
 		ply.move = move
 
-		if SERVER and not IsValid(ply.FakeRagdoll) then
+		if SERVER and on_ground and ply.hg_SurfaceFriction and not IsValid(ply.FakeRagdoll) then
 			local eyeAngles = ply:EyeAngles()
 			ply.eyeAnglesOld = ply.eyeAnglesOld or eyeAngles
 			local cosine = eyeAngles:Forward():Dot(ply.eyeAnglesOld:Forward())
@@ -579,32 +619,23 @@ local math_abs, math_Approach, math_AngleDifference, math_Clamp, math_cos, math_
 
 			local slipChance = ply.GetTraitMultiplier and ply:GetTraitMultiplier("slip_chance", 1) or 1
 			if (velLen > 200 and math.Rand(0, 1) < slipChance and (math.random(150) == 1 or cosine <= 0.99)) then
-				local trData = ply.hg_inertia_slip_trace or { filter = ply }
-				ply.hg_inertia_slip_trace = trData
-				trData.start = ply:GetPos()
-				trData.endpos = trData.start - vector_up * 12
-				trData.filter = ply
-				local tr = util.TraceLine(trData)
+				local b1 = ply:TranslateBoneToPhysBone(ply:LookupBone("ValveBiped.Bip01_L_Calf"))
+				local phys1 = hg.IdealMassPlayer["ValveBiped.Bip01_L_Calf"]
 
-				if ply.StormFox2MapIceFriction or (tr.SurfaceProps and util.GetSurfaceData(tr.SurfaceProps) and util.GetSurfaceData(tr.SurfaceProps).friction < 0.2) then
-					local b1 = ply:TranslateBoneToPhysBone(ply:LookupBone("ValveBiped.Bip01_L_Calf"))
-					local phys1 = hg.IdealMassPlayer["ValveBiped.Bip01_L_Calf"]
+				local b2 = ply:TranslateBoneToPhysBone(ply:LookupBone("ValveBiped.Bip01_R_Calf"))
+				local phys2 = hg.IdealMassPlayer["ValveBiped.Bip01_R_Calf"]
 
-					local b2 = ply:TranslateBoneToPhysBone(ply:LookupBone("ValveBiped.Bip01_R_Calf"))
-					local phys2 = hg.IdealMassPlayer["ValveBiped.Bip01_R_Calf"]
+				local torso = ply:TranslateBoneToPhysBone(ply:LookupBone("ValveBiped.Bip01_Spine2"))
+				local phystorso = hg.IdealMassPlayer["ValveBiped.Bip01_Spine2"]
+				local force = vel:GetNormalized() * 150
 
-					local torso = ply:TranslateBoneToPhysBone(ply:LookupBone("ValveBiped.Bip01_Spine2"))
-					local phystorso = hg.IdealMassPlayer["ValveBiped.Bip01_Spine2"]
-					local force = vel:GetNormalized() * 150
+				hg.AddForceRag(ply, torso, -force * 5 * phystorso, 0.5)
+				hg.AddForceRag(ply, b1, (force * 5 - vector_up * 2) * phys1, 0.5)
+				hg.AddForceRag(ply, b2, (force * 5 - vector_up * 2) * phys2, 0.5)
 
-					hg.AddForceRag(ply, torso, -force * 5 * phystorso, 0.5)
-					hg.AddForceRag(ply, b1, (force * 5 - vector_up * 2) * phys1, 0.5)
-					hg.AddForceRag(ply, b2, (force * 5 - vector_up * 2) * phys2, 0.5)
-
-					timer.Simple(0,function()
-						hg.StunPlayer(ply)
-					end)
-				end
+				timer.Simple(0,function()
+					if IsValid(ply) and ply:Alive() and not IsValid(ply.FakeRagdoll) then hg.StunPlayer(ply) end
+				end)
 			end
 		end
 

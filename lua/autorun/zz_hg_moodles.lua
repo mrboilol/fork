@@ -876,7 +876,9 @@ local function buildEffects(ply, org)
 		end
 	end
 
-	local weight, maxWeight = orgNumber(org, "weight", 0), math.max(orgNumber(org, "maxweight", 60), 1)
+	local weight = orgNumber(org, "weight", 0)
+	if ply == LocalPlayer() and ply:Alive() and hg.GetCarryWeight then weight = hg.GetCarryWeight(ply) end
+	local maxWeight = math.max(orgNumber(org, "maxweight", 60), 1)
 	local weightFraction = weight / maxWeight
 	if weightFraction > 0.5 then add(effects, "encumbered", "encumbered", highRank(weightFraction, {0.5, 0.7, 0.85, 0.95}), "bad", 60, math.floor(weightFraction * 100) .. "%") end
 	local nausea = orgNumber(org, "wantToVomit", 0)

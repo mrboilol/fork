@@ -1286,7 +1286,7 @@ drawFinalVitalsVignettes = function()
 	painThresholdIntensityLerp = LerpFT(painLayerFadeLerp, painThresholdIntensityLerp or 1, 1 + excruciatingBlend * painEffectIntensity)
 
 	if PainLerp > 0.001 or (org.pain or 0) > 5 or org.otrub then
-		local pain = (PainLerp + getPainStrobe(org)) * painThresholdIntensityLerp
+		local pain = (PainLerp + getPainPulse(org)) * painThresholdIntensityLerp
 		local painVignette = math.Clamp(pain / 40 + math.max((shockLerp or 0) - 5, 0) / 6, 0, 5)
 		render.UpdateScreenEffectTexture()
 		vignetteMat:SetFloat("$c2_x", CurTime() + 10000)

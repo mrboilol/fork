@@ -19,6 +19,7 @@ local function BuildPhysics( self )
 	self:SetMoveType( MOVETYPE_NONE )
 	self:SetMaterial( "stormfox2/effects/ice_water" )
 	if ( IsValid( phys ) ) then
+		phys:SetMaterial("ice")
 		phys:EnableMotion( false );
 		phys:AddGameFlag( FVPHYSICS_CONSTRAINT_STATIC )
 		phys:SetMass(4000)

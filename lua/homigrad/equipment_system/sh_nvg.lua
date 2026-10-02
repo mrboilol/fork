@@ -53,7 +53,7 @@ end
 
 function RenderNVGOverlay(self, ply)
 	if not self:GetEnabled() then
-		hg.DrawFirstPersonHelmet(self,ply)
+		hg.DrawFirstPersonEquipment(self, ply)
 	end
     if !self.GetEnabled or !self:GetEnabled() then 
         if IsValid(lply.NVGLamp) then

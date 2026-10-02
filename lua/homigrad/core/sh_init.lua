@@ -53,7 +53,9 @@ function hg.GetCarryWeight(ply)
 
 	local weps = ply:GetWeapons()
 	for i, wep in ipairs(weps) do
-		weight = weight + (wep.weight or 1)
+		if IsValid(wep) and wep:GetOwner() == ply then
+			weight = weight + (wep.weight or 1)
+		end
 	end
 
 	weight = math.max(weight - 1, 0)
@@ -64,17 +66,20 @@ function hg.GetCarryWeight(ply)
 			weight = weight + (game.GetAmmoForce(id) * count) / 1500
 		end
 
-		ply.armors = ply:GetNetVar("Armor", {})
-		for plc, arm in pairs(ply.armors) do
+		local armors = SERVER and ply.armors or ply:GetNetVar("Armor", {})
+		for plc, arm in pairs(armors or {}) do
 			if hg.armor[plc] and hg.armor[plc][arm] then
 				weight = weight + hg.GetArmorMass(ply, plc, arm)
 			end
 		end
 
+		local countedEquipment = {}
 		for _, index in ipairs(ply:GetNetVar("zc_equipment", {})) do
 			local equipment = Entity(index)
-			if IsValid(equipment) and equipment.GetEquiped and equipment:GetEquiped() then
+			if not countedEquipment[index] and IsValid(equipment) and equipment:GetParent() == ply
+				and equipment.GetEquiped and equipment:GetEquiped() then
 				weight = weight + (equipment.CarryMass or 1)
+				countedEquipment[index] = true
 			end
 		end
 	end
