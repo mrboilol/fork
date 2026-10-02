@@ -252,6 +252,25 @@ local function ApplyFatalOrganismDamage(org, dmgInfo)
 	end)
 end
 
+local softLayerEnergy = {
+	lungsL = 0.02,
+	lungsR = 0.02,
+	trachea = 0.01,
+	heart = 0.05,
+	liver = 0.05,
+	stomach = 0.04,
+	intestines = 0.04,
+}
+
+local function getLayerEnergyFraction(name, bone, impact)
+	if name == "aorta" or string.find(name, "arter", 1, true) then return 0.01 end
+	if bone <= 0 then return softLayerEnergy[name] or 0.035 end
+	local fraction = 0.06 + bone * 0.28
+	if name == "chest" then fraction = fraction * 0.75 end
+	local penetrationFactor = math.Clamp(math.sqrt(10 / impact.initialPenetration), 0.6, 1.3)
+	return math.Clamp(fraction * penetrationFactor * math.Rand(0.85, 1.15), 0.01, 0.4)
+end
+
 local function Trace_Bullet(box, hit, ricochet, impact, org, organs, dmg, dmgInfo, dir, isRifleBullet)
 	if impact.ballisticVersion then
 		local energyFraction = math.Clamp(impact.energyBefore / impact.initialEnergy, 0, 1)
@@ -313,8 +332,10 @@ local function Trace_Bullet(box, hit, ricochet, impact, org, organs, dmg, dmgInf
 		local layerCost = bone > 0 and math.max(bone * 2, 0.35) or 0.2
 		local skullBroken = name == "skull" and org.skull >= 1
 		if skullBroken then layerCost = 0.2 end
-		local energyCost = impact.energyBefore * math.Clamp(layerCost / math.max(impact.initialPenetration, 1), 0.01, 0.45)
-		energyCost = math.min(impact.energyBefore, energyCost + impact.energyBefore * (1 - math.Clamp(impact.energyRetention or 0.85, 0.5, 1)))
+		local layerEnergyFraction = getLayerEnergyFraction(name, bone, impact)
+		local energyCost = impact.energyBefore * layerEnergyFraction
+		energyCost = math.min(impact.energyBefore, energyCost + impact.energyBefore * (1 - math.Clamp(impact.energyRetention or 0.85, 0.5, 1)) * 0.35)
+		if bone > 0 then penetrationCost = penetrationCost + impact.penetrationBefore * layerEnergyFraction * 0.5 end
 		if skullBroken then energyCost = energyCost * (oldSkull >= 1 and 0.15 or 0.4) end
 		local bullet = impact.bullet or {}
 		local caliberFactor = math.Clamp(math.sqrt(math.max(bullet.Diameter or 7.62, 1) / 7.62), 0.6, 1.35)
@@ -335,7 +356,7 @@ local function Trace_Bullet(box, hit, ricochet, impact, org, organs, dmg, dmgInf
 				energyCost = math.max(energyCost, impact.energyBefore * (1 - brainEnergyRetention))
 			else
 				local maxBrainCost = math.Clamp(0.95 - math.Clamp((brainTransfer - 0.45) * 0.22, 0, 0.35), 0.58, 0.95)
-				energyCost = math.max(energyCost, impact.energyBefore * math.Clamp(0.45 + brainDelta * 0.35, 0.45, maxBrainCost))
+				energyCost = math.max(energyCost, impact.energyBefore * math.Clamp(0.28 + brainDelta * 0.3, 0.28, maxBrainCost))
 			end
 		end
 		if impact.fragmentationActive then
@@ -363,6 +384,33 @@ local function Trace_Bullet(box, hit, ricochet, impact, org, organs, dmg, dmgInf
 	else
 		return 0
 	end
+end
+
+local exitProbeLength = 40
+local exitTissueDrag = 0.005
+
+local function resolveBulletExit(ent, entryPos, travel, impact, reach, naturalExit)
+	if impact.stopped or impact.armorStopped or impact.energy <= 0 then return {} end
+	travel = travel:GetNormalized()
+	local tr = util.TraceLine({
+		start = entryPos + travel * exitProbeLength,
+		endpos = entryPos + travel,
+		filter = function(hitEnt) return hitEnt == ent end,
+		mask = MASK_SHOT,
+		ignoreworld = true,
+	})
+	if not tr.Hit or tr.StartSolid or tr.Entity ~= ent then return naturalExit end
+
+	local pathLength = tr.HitPos:Distance(entryPos)
+	local exitCos = travel:Dot(tr.HitNormal)
+	local exitEnergy = impact.energy / impact.initialEnergy * (1 - math.Clamp(pathLength * exitTissueDrag, 0, 0.25))
+	local reachFactor = math.Clamp((reach - pathLength) / math.max(pathLength * 0.3, 2) + 0.5, 0, 1)
+	local energyFactor = math.Clamp((exitEnergy - 0.05) / 0.15, 0, 1)
+	local angleFactor = math.Clamp((exitCos - 0.08) * 1.9, 0, 1)
+	if math.Rand(0, 1) >= reachFactor * energyFactor * angleFactor then return {} end
+
+	impact.exitHitNormal = tr.HitNormal
+	return {tr.HitPos}
 end
 
 local function Trace_Blast(box, amt, organ, org, organs, dmg, dmgInfo)
@@ -1008,7 +1056,7 @@ function hg.organism.AddWound(ent, tr, bone, dmgInfo, dmgPos, dmgBlood, inputHol
 			local localPos, localAng, woundBone = hg.organism.GetWoundAnchor(ent, dmgPos + ((i == 1 and 1 or -1) * hitNormal), ((i == 1 and -1 or 1) * traceNormal):Angle(), bone)
 			if not localPos then continue end
 			addOrReopenWound(org, dmgBlood / 2, localPos, localAng, woundBone, CurTime(), woundType)
-			placeWoundDecal(ent, dmgPos, hitNormal, woundType)
+			placeWoundDecal(ent, dmgPos, i == 1 and hitNormal or -hitNormal, woundType)
 			
 			table.sort(org.wounds, function(a, b) return a[1] > b[1] end)
 
@@ -1560,8 +1608,14 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	local lastPos, hitBoxs, inputHole, outputHole, outputDir, distance, tracePoses = nil,{},{},{},{},nil,nil
 	local arterialWoundCount = #org.arterialwounds
 	if dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT+DMG_SLASH+DMG_CLUB+DMG_GENERIC) then
-		lastPos, hitBoxs, inputHole, outputHole, outputDir, distance, tracePoses = hg.organism.Trace(dmgPos, dir, size, maxpen, cachedBoxs, cachedPos, cachedSphere, cachedOrgans, dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT), Trace_Bullet, impact, ent.organism, cachedOrgans, dmg / 25, dmgInfo, dir, isRifleBullet)
-		if isBallistic then dmgInfo:SetDamageType(impact.rawDamageType) end
+		local traceReach
+		lastPos, hitBoxs, inputHole, outputHole, outputDir, distance, tracePoses, traceReach = hg.organism.Trace(dmgPos, dir, size, maxpen, cachedBoxs, cachedPos, cachedSphere, cachedOrgans, dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT), Trace_Bullet, impact, ent.organism, cachedOrgans, dmg / 25, dmgInfo, dir, isRifleBullet)
+		if isBallistic then
+			dmgInfo:SetDamageType(impact.rawDamageType)
+			if not impact.armorStopped then
+				outputHole = resolveBulletExit(ent, dmgPos, outputDir, impact, math.max((traceReach or 0) - 5, 0), outputHole)
+			end
+		end
 		if impact.armorStopped then
 			inputHole = {}
 			outputHole = {}
@@ -1618,7 +1672,8 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		ent.bloodamt = ent.bloodamt + 1
 		local exitPos, exitAng, exitBone = hg.organism.GetWoundAnchor(ent, outputHole[#outputHole], (-outputDir):Angle())
 		local exitDirection = dir:GetNormalized()
-		
+		local exitBloodScale = math.Clamp(impact.energy / impact.initialEnergy, 0.2, 1)
+
 		timer.Simple(0, function()
 			if !IsValid(ent) then return end
 
@@ -1673,16 +1728,16 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 
 				local effdata = EffectData()
 				effdata:SetOrigin(outputHole[#outputHole])
-				effdata:SetRadius(dmg / 10)
-				effdata:SetMagnitude(dmg / 10)
+				effdata:SetRadius(dmg / 10 * exitBloodScale)
+				effdata:SetMagnitude(dmg / 10 * exitBloodScale)
 				effdata:SetScale(1)
 				util.Effect("BloodImpact", effdata)
 
 				net.Start("hg_bloodimpact")
 				net.WriteVector(outputHole[#outputHole])
 				net.WriteVector(-outputDir:GetNormalized() * 0.3)
-				net.WriteFloat(dmg)
-				net.WriteInt(math.Clamp(math.ceil(dmg / 60), 2, 24), 8)
+				net.WriteFloat(dmg * exitBloodScale)
+				net.WriteInt(math.Clamp(math.ceil(dmg / 90 * exitBloodScale), 1, 6), 8)
 				if exitPos then
 					net.WriteEntity(ent)
 					net.WriteVector(exitPos)

@@ -1932,8 +1932,9 @@ function SWEP:TryLodgeMeleeWeapon(ent, trace, attacktype)
     local bone, physBone = self:GetMeleeLodgeBone(ent, trace)
     if not bone or physBone == nil then return false end
 
-    local direction = trace.HitPos - owner:GetShootPos()
+    local direction = isvector(trace.Normal) and trace.Normal or trace.HitPos - trace.StartPos
     if direction:LengthSqr() <= 0.001 then direction = owner:GetAimVector() end
+    direction = Vector(direction.x, direction.y, direction.z)
     direction:Normalize()
 
     local lodgePos = trace.HitPos + direction * (self.MeleeLodgeDepth or 3)

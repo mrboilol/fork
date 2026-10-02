@@ -22,7 +22,7 @@ SWEP.FakeBodyGroups = "00900080302"
 SWEP.MagIndex = 41
 SWEP.FakeScale = 0.79
 
-//SWEP.ZoomPos = Vector(-5, -0.2, 10)
+SWEP.ZoomPos = Vector(0, -3.2616, 8.6141)
 
 SWEP.FakeEjectBrassATT = "2"
 SWEP.FakeViewBobBone = "ValveBiped.Bip01_R_Hand"

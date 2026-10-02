@@ -63,7 +63,7 @@ local REFERENCE_SCREEN_HEIGHT = 1080
 local HEALTH_STOPS = {
 	{0, 245, 245, 240, 180},
 	{0.5, 255, 225, 40, 255},
-	{1, 0, 0, 0, 255},
+	{1, 215, 25, 25, 255},
 }
 local COLOR = {
 	ARMOR_GOOD = {40, 200, 70},
@@ -893,6 +893,51 @@ local function lerpColor(from, to, t)
 	return from[1] + (to[1] - from[1]) * t, from[2] + (to[2] - from[2]) * t, from[3] + (to[3] - from[3]) * t
 end
 
+local OTRUB_CONSCIOUSNESS = 0.3
+local GRAY_CONSCIOUSNESS_START = 0.85
+local GRAY_SHOCK_START = 10
+local GRAY_SHOCK_RANGE = 60
+local GRAY_RATE = 3
+local FADE_OUT_RATE = 3
+local FADE_IN_RATE = 1.5
+local displayGray = 0
+local displayFade = 1
+
+local function setDrawColor(red, green, blue, alpha)
+	local luma = red * 0.299 + green * 0.587 + blue * 0.114
+	surface.SetDrawColor(
+		red + (luma - red) * displayGray,
+		green + (luma - green) * displayGray,
+		blue + (luma - blue) * displayGray,
+		alpha * displayFade
+	)
+end
+
+local function updateDisplayState(ply)
+	if not ply:Alive() then
+		displayGray, displayFade = 0, 1
+		return
+	end
+
+	local org = ply.organism or ply.new_organism
+	local replicated = ply.new_organism
+	local otrub = org and org.otrub or replicated and replicated.otrub or false
+	local grayTarget = 0
+	if org then
+		local consciousness = tonumber(org.consciousness) or 1
+		local consciousnessSeverity = math_Clamp((GRAY_CONSCIOUSNESS_START - consciousness) / (GRAY_CONSCIOUSNESS_START - OTRUB_CONSCIOUSNESS), 0, 1)
+		local shockSeverity = math_Clamp(((tonumber(org.shock) or 0) - GRAY_SHOCK_START) / GRAY_SHOCK_RANGE, 0, 1)
+		grayTarget = math.max(consciousnessSeverity, shockSeverity)
+	end
+	if otrub then grayTarget = 1 end
+
+	local dt = FrameTime()
+	displayGray = displayGray + (grayTarget - displayGray) * (1 - math_exp(-dt * GRAY_RATE))
+	local fadeTarget = otrub and 0 or 1
+	local fadeRate = otrub and FADE_OUT_RATE or FADE_IN_RATE
+	displayFade = displayFade + (fadeTarget - displayFade) * (1 - math_exp(-dt * fadeRate))
+end
+
 local function healthColor(region)
 	if broken[region] then return 0, 0, 0, 255 end
 	local value = math_Clamp(severity[region] or 0, 0, 1)
@@ -1070,9 +1115,9 @@ local function drawStrap(ax, ay, bx, by, r, t, red, green, blue, horizontal)
 	strapPoly[2].x, strapPoly[2].y = cx + fx - px, cy + fy - py
 	strapPoly[3].x, strapPoly[3].y = cx + fx + px, cy + fy + py
 	strapPoly[4].x, strapPoly[4].y = cx - fx + px, cy - fy + py
-	surface.SetDrawColor(red, green, blue, FILL_ALPHA)
+	setDrawColor(red, green, blue, FILL_ALPHA)
 	surface.DrawPoly(strapPoly)
-	surface.SetDrawColor(COLOR.OUTLINE[1], COLOR.OUTLINE[2], COLOR.OUTLINE[3], OUTLINE_ALPHA)
+	setDrawColor(COLOR.OUTLINE[1], COLOR.OUTLINE[2], COLOR.OUTLINE[3], OUTLINE_ALPHA)
 	drawLine(strapPoly[1].x, strapPoly[1].y, strapPoly[4].x, strapPoly[4].y, outlineWidth)
 	drawLine(strapPoly[2].x, strapPoly[2].y, strapPoly[3].x, strapPoly[3].y, outlineWidth)
 end
@@ -1085,20 +1130,20 @@ local function drawSplit(shape, x, y, outer, inner)
 	local angle = math_atan2(towardY, towardX)
 	if (severity[shape.region] or 0) > 0 then
 		local red, green, blue, alpha = healthColor(shape.region)
-		surface.SetDrawColor(red, green, blue, alpha)
+		setDrawColor(red, green, blue, alpha)
 		polyHalfCircle(x, y, inner, angle + math.pi * 0.5)
 	end
 	if (severity[shape.splitRegion] or 0) > 0 then
 		local red, green, blue, alpha = healthColor(shape.splitRegion)
-		surface.SetDrawColor(red, green, blue, alpha)
+		setDrawColor(red, green, blue, alpha)
 		polyHalfCircle(x, y, inner, angle - math.pi * 0.5)
 	end
 
 	local red, green, blue = ringColor(shape.region)
-	surface.SetDrawColor(red, green, blue, OUTLINE_ALPHA)
+	setDrawColor(red, green, blue, OUTLINE_ALPHA)
 	polyCapsuleRing(x, y, x, y, outer, inner)
 	red, green, blue = ringColor(shape.splitRegion)
-	surface.SetDrawColor(red, green, blue, OUTLINE_ALPHA)
+	setDrawColor(red, green, blue, OUTLINE_ALPHA)
 	polyHalfRing(x, y, outer, inner, angle - math.pi * 0.5)
 	local lineX, lineY = math_cos(angle + math.pi * 0.5) * inner, math_sin(angle + math.pi * 0.5) * inner
 	drawLine(x - lineX, y - lineY, x + lineX, y + lineY, outlineWidth)
@@ -1109,7 +1154,7 @@ local function drawShapeExtras(shape, ax, ay, bx, by, r)
 	local soak = bandage[region]
 	if soak then
 		local red, green, blue = lerpColor(COLOR.BANDAGE_CLEAN, COLOR.BANDAGE_SOAKED, math_Clamp(soak, 0, 1))
-		drawStrap(ax, ay, bx, by, r, 0.5, red, green, blue, true)
+		drawStrap(ax, ay, bx, by, r, 0.5, red, green, blue)
 	end
 
 	local limbTop = region == "larmup" or region == "rarmup" or region == "llegup" or region == "rlegup"
@@ -1139,11 +1184,11 @@ local function drawShape(shape)
 	else
 		if (severity[shape.region] or 0) > 0 then
 			local red, green, blue, alpha = healthColor(shape.region)
-			surface.SetDrawColor(red, green, blue, alpha)
+			setDrawColor(red, green, blue, alpha)
 			polyCapsule(ax, ay, bx, by, inner)
 		end
 		local red, green, blue = ringColor(shape.region)
-		surface.SetDrawColor(red, green, blue, OUTLINE_ALPHA)
+		setDrawColor(red, green, blue, OUTLINE_ALPHA)
 		polyCapsuleRing(ax, ay, bx, by, r, inner)
 	end
 
@@ -1166,9 +1211,9 @@ local function drawWounds()
 			local radius = math.min(WOUND_MARK.sizeBase + emitter.size * WOUND_MARK.sizePerSize, WOUND_MARK.sizeMax) * sizeScale
 			local x = centerX + emitter.y * pixelScale
 			local y = centerY - (emitter.z - targetZ) * pixelScale
-			surface.SetDrawColor(COLOR.OUTLINE[1], COLOR.OUTLINE[2], COLOR.OUTLINE[3], OUTLINE_ALPHA)
+			setDrawColor(COLOR.OUTLINE[1], COLOR.OUTLINE[2], COLOR.OUTLINE[3], OUTLINE_ALPHA)
 			polyCapsule(x, y, x, y, radius + outlineWidth)
-			surface.SetDrawColor(color[1], color[2], color[3], 255)
+			setDrawColor(color[1], color[2], color[3], 255)
 			polyCapsule(x, y, x, y, radius)
 		end
 	end
@@ -1275,13 +1320,13 @@ local function drawArmor()
 			local count = buildHull()
 			if count >= 3 then
 				local red, green, blue = armorColor(box.wear or 0)
-				surface.SetDrawColor(red, green, blue, COLOR.ARMOR_FILL_ALPHA)
+				setDrawColor(red, green, blue, COLOR.ARMOR_FILL_ALPHA)
 				local poly = {}
 				for i = count, 1, -1 do
 					poly[#poly + 1] = {x = armorHull[i].x, y = armorHull[i].y}
 				end
 				surface.DrawPoly(poly)
-				surface.SetDrawColor(red, green, blue, COLOR.ARMOR_LINE_ALPHA)
+				setDrawColor(red, green, blue, COLOR.ARMOR_LINE_ALPHA)
 				for i = 1, count do
 					local a, b = armorHull[i], armorHull[i % count + 1]
 					drawLine(a.x, a.y, b.x, b.y, outlineWidth)
@@ -1332,6 +1377,9 @@ hook.Add("HUDPaint", "homigrad/body-status/draw", function()
 		nextMedicalUpdate = now + MEDICAL_UPDATE_INTERVAL
 	end
 	updateStress(body ~= ply and body:IsRagdoll(), snap)
+
+	updateDisplayState(ply)
+	if displayFade < 0.01 then return end
 
 	renderFigure()
 end)

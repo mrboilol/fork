@@ -66,7 +66,7 @@ function hg.PickupHandoffDelay(ply, wep)
 	net.Start("hg_pickup_handoff")
 		net.WritePlayer(ply)
 		net.WriteEntity(wep)
-		net.WriteString(wep:GetModel() or "")
+		net.WriteString(wep.WorldModelFake or wep:GetModel() or "")
 		net.WriteFloat(HANDOFF_SELECT)
 	net.SendPVS(ply:GetPos())
 

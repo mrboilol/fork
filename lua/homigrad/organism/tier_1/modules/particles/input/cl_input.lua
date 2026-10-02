@@ -235,8 +235,8 @@ end)
 local hg_bloodimpacts = ConVarExists("hg_bloodimpacts") and GetConVar("hg_bloodimpacts") or CreateConVar("hg_bloodimpacts", 0, FCVAR_ARCHIVE + FCVAR_REPLICATED, "Enable custom blood impact effects spray cool kill death", 0, 1)
 local bloodImpactCloudSize = 16
 local function impact(pos,vel,mul)
-	local max = math.min(mul,8)
-	local iters = math.ceil(math.random(1, max) * 2.5)
+	local max = math.Clamp(mul, 1, 6)
+	local iters = math.ceil(math.random(1, max) * 1.5)
 	local velnorm = -vel:GetNormalized() * 5
 	
 	if hg_bloodimpacts:GetBool() then

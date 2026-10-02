@@ -401,7 +401,10 @@ net.Receive("hg_pickup_handoff", function()
 	local model = ClientsideModel(mdl)
 	if not IsValid(model) then return end
 	model:SetNoDraw(true)
-	if IsValid(wep) then model:SetSkin(wep:GetSkin()) end
+	if IsValid(wep) then
+		model:SetSkin(wep:GetSkin())
+		if wep.WorldModelFake and wep.FakeScale then model:SetModelScale(wep.FakeScale, 0) end
+	end
 
 	ply.hgHandoffModel = model
 	ply.hgHandoff = {wep = wep, start = CurTime(), select = CurTime() + selectDelay}

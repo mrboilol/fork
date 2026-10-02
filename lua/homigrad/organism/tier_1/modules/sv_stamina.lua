@@ -13,6 +13,7 @@ local low_stamina_recovery_min_mul = 0.5
 local recent_stamina_loss_recovery_min_mul = 0.65
 local recent_stamina_loss_hold_time = 1
 local recent_stamina_loss_fade_time = 4
+local ledge_hang_recovery_bonus = 3
 local stamina_recovery_per_second = 8
 local anger_combat_hold_time = 6
 local anger_decay_per_second = 0.075
@@ -272,12 +273,14 @@ module[2] = function(owner, org, timeValue)
 	-- Apply breathing penalty from spine3 damage
 	local breathingMul = org.breathing or 1
 	local recentLossRecoveryMul = 1
+	local ledgeHang = now < (stamina.ledgeUntil or 0) and stamina.ledge or 0
 	if now < (stamina.recoveryPenaltyUntil or 0) then
 		recentLossRecoveryMul = recent_stamina_loss_recovery_min_mul
 	elseif now < (stamina.recoveryPenaltyFadeUntil or 0) then
 		local fadeProgress = math.Clamp((now - stamina.recoveryPenaltyUntil) / recent_stamina_loss_fade_time, 0, 1)
 		recentLossRecoveryMul = Lerp(fadeProgress, recent_stamina_loss_recovery_min_mul, 1)
 	end
+	recentLossRecoveryMul = Lerp(ledgeHang, recentLossRecoveryMul, 1)
 
 	local postureRecoveryMul = 1
 	if owner:IsPlayer() then
@@ -299,7 +302,7 @@ module[2] = function(owner, org, timeValue)
 		org.lungsfunction and 1 or 0
 	)
 
-	stamina[1] = min(stamina[1] + stamina.regen * (stamina.regenMul or 1) * staminaRecoveryMul * recentLossRecoveryMul * timeValue * stamina_recovery_per_second * (org.noradrenaline / 2 + 1) * (org.adrenaline / 16 + 1) * (org.satiety/700 + 1) * pulseMultiplier * postureRecoveryMul * physiologyRecoveryMul * (1 - heatWeakness * 0.65) * (owner.GetTraitMultiplier and owner:GetTraitMultiplier("stamina_recovery", 1) or 1), stamina.max)
+	stamina[1] = min(stamina[1] + stamina.regen * (stamina.regenMul or 1) * staminaRecoveryMul * recentLossRecoveryMul * timeValue * stamina_recovery_per_second * (org.noradrenaline / 2 + 1) * (org.adrenaline / 16 + 1) * (org.satiety/700 + 1) * pulseMultiplier * postureRecoveryMul * (1 + ledgeHang * ledge_hang_recovery_bonus) * physiologyRecoveryMul * (1 - heatWeakness * 0.65) * (owner.GetTraitMultiplier and owner:GetTraitMultiplier("stamina_recovery", 1) or 1), stamina.max)
 	stamina.regenMul = math.Approach(stamina.regenMul or 1, 1, timeValue * (org.BlockRegenRecoverRate or 0.25))
 
 

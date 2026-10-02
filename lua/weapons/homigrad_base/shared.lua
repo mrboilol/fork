@@ -332,7 +332,7 @@ function SWEP:GetArmHealthHandlingMul()
 	if support.leftBusy and not ignoreOneArm then loss = loss + 0.3 * oneHandPenalty end
 	if support.rightBusy and not ignoreOneArm then loss = loss + 0.5 * oneHandPenalty end
 
-	loss = loss + math.Clamp(org.aiming_fatigue or 0, 0, 10) * 0.045 * forgive
+	loss = loss + math.Clamp(org.aiming_fatigue or 0, 0, 10) * 0.045 * forgive * (1 - self:GetAimSteadiness(owner) * 0.7)
 	loss = loss + math.Clamp(org.permanent_aim_impairment or 0, 0, 2) * 0.4
 	local combat = hg.GetCombatCondition and hg.GetCombatCondition(owner) or nil
 	if combat then loss = loss + (combat.aim - 1) * 0.7 end
@@ -361,11 +361,21 @@ function SWEP:GetRecoilSupportMul()
 	return math.Clamp(mul, 0.6, 2.8), support.supportHands
 end
 
+function SWEP:GetAimSteadiness(owner)
+	owner = owner or self:GetOwner()
+	if not IsValid(owner) then return 0 end
+	if self:IsResting() then return 1 end
+	if IsValid(owner.FakeRagdoll) then return 0.6 end
+	if self:IsOwnerCrouching(owner) then return 0.55 end
+	return 0
+end
+
 function SWEP:GetPostureStabilityMul(aiming)
 	local owner = self:GetOwner()
 	if not IsValid(owner) then return 1 end
 	if self:IsResting() then return 0.32 end
-	if self:IsOwnerCrouching(owner) then return aiming and 0.72 or 0.82 end
+	if IsValid(owner.FakeRagdoll) then return aiming and 0.62 or 0.74 end
+	if self:IsOwnerCrouching(owner) then return aiming and 0.64 or 0.76 end
 	if owner.posture == 3 or owner.posture == 4 then return aiming and 0.78 or 0.88 end
 	if owner.posture == 7 or owner.posture == 8 or owner.posture == 9 then return 1.2 end
 	return aiming and 0.9 or 1
@@ -393,7 +403,9 @@ function SWEP:GetAimAlignmentTime(ply)
 
 	local org = ply.organism or {}
 	local brainPenalty = math.Clamp(org.brain or 0, 0, 1) * 2.5
-	local fatigueMul = 1 + math.Clamp(org.aiming_fatigue or 0, 0, 10) * 0.1 * (1 - self:GetFirearmTraining(ply) * 0.45)
+	local steady = self:GetAimSteadiness(ply)
+	local fatigueMul = 1 + math.Clamp(org.aiming_fatigue or 0, 0, 10) * 0.1 * (1 - self:GetFirearmTraining(ply) * 0.45) * (1 - steady * 0.7)
+	base = base * (1 - steady * 0.25)
 	local combat = hg.GetCombatCondition and hg.GetCombatCondition(ply) or nil
 	local combatMul = combat and combat.aim or 1
 	local recoilPenalty = math.Clamp(self.recoilAimPenalty or 0, 0, 6)

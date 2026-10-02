@@ -68,6 +68,7 @@ SWEP.ARC9DefaultLHIKSourceModel = "models/weapons/mods/ak_hg_akm_std_wood.mdl"
 
 SWEP.FakePos = Vector(-14, 2.52, 7.5)
 SWEP.FakeAng = Angle(0, 0, 0)
+SWEP.ZoomPos = Vector(0, -1.7688, 6.0696)
 SWEP.AttachmentPos = Vector(3, 3, -26.8)
 SWEP.AttachmentAng = Angle(0, -1.5, 0)
 SWEP.FakeAttachment = "1"
@@ -191,6 +192,7 @@ SWEP.Primary.Damage = 42
 SWEP.Primary.Spread = 0
 SWEP.Primary.Force = 50
 SWEP.ShockMultiplier = 2
+SWEP.ReloadTime = 3
 
 SWEP.Primary.Sound = {"weapons/newakm/akmm_tp.wav", 85, 90, 100}
 SWEP.Primary.SoundFP = {"weapons/newakm/akmm_fp.wav", 85, 90, 100}

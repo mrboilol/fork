@@ -3162,18 +3162,23 @@ local ammoents = {
 local needleAmmo = {
 	[".22longrifleneedle"] = {
 		base = ".22longrifle", name = ".22 Long Rifle Needle",
-		Damage = 35, Force = 20, Penetration = 160, Speed = 1000, Diameter = 1, Mass = 1,
+		Damage = 10, Force = 10, Penetration = 160, Speed = 1000, Diameter = 1, Mass = 1,
 		WoundMultiplier = 2.5
 	},
 	["9x39mmneedle"] = {
 		base = "9x39mm", name = "9x39 mm Needle",
-		Damage = 65, Force = 42, Penetration = 200, Speed = 1300, Diameter = 1.4, Mass = 3,
+		Damage = 31, Force = 21, Penetration = 200, Speed = 1300, Diameter = 1.4, Mass = 3,
 		WoundMultiplier = 3
 	},
 	["7.62x51mmneedle"] = {
 		base = "7.62x51mm", name = "7.62x51 mm Needle",
-		Damage = 85, Force = 69, Penetration = 240, Speed = 1600, Diameter = 1.8, Mass = 4.5,
+		Damage = 39, Force = 32, Penetration = 240, Speed = 1600, Diameter = 1.8, Mass = 4.5,
 		WoundMultiplier = 3.5
+	},
+	["pulseneedle"] = {
+		base = "pulse", name = "Pulse Needle",
+		Damage = 30, Force = 22, Penetration = 450, Speed = 3000, Diameter = 1.2, Mass = 2,
+		WoundMultiplier = 3
 	}
 }
 

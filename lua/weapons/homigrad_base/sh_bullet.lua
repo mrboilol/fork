@@ -1101,6 +1101,7 @@ if CLIENT then
 else
 	util.AddNetworkString("reject shell")
 	function SWEP:RejectShell(shell)
+		if not isstring(shell) then return end
 		net.Start("reject shell")
 			net.WriteEntity(self)
 			net.WriteString(shell)

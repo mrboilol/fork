@@ -1201,6 +1201,37 @@ function PANEL:PostInit()
         main:ReturnToMenu()
     end
 
+    local function GetClothesValue(key)
+        return main.AppearanceTable.AClothes and main.AppearanceTable.AClothes[key] or "normal"
+    end
+
+    local function GetAttachmentValue(id)
+        local value = main.AppearanceTable.AAttachments and main.AppearanceTable.AAttachments[id]
+        return value and value != "" and value or "none"
+    end
+
+    local function UpdateAppearance(tbl)
+        main.AppearanceTable = table.Copy(tbl or main.AppearanceTable or {})
+        main.AppearanceTable.AAttachments = main.AppearanceTable.AAttachments or {"none", "none", "none", "none", "none", "none"}
+        main.AppearanceTable.AClothes = main.AppearanceTable.AClothes or {}
+        main.AppearanceTable.ABodygroups = main.AppearanceTable.ABodygroups or {}
+        main.AppearanceTable.AColor = main.AppearanceTable.AColor or color_white
+        main.AppearanceTable.AHeight = APmodule.NormalizeHeight(main.AppearanceTable.AHeight)
+        main.AppearanceTable.ABodySize = APmodule.NormalizeHeight(main.AppearanceTable.ABodySize)
+        local modelData = main:GetCurrentModelData()
+        if modelData and modelData.mdl then
+            local facemapKey = hg.Appearance.FacemapsModels and hg.Appearance.FacemapsModels[modelData.mdl]
+            local facemapSet = facemapKey and hg.Appearance.FacemapsSlots[facemapKey]
+            if facemapSet and not facemapSet[main.AppearanceTable.AFacemap] then
+                main.AppearanceTable.AFacemap = "Default"
+            end
+        end
+        if IsValid(nameEntry) and nameEntry:GetValue() != (main.AppearanceTable.AName or "") then
+            nameEntry:SetText(main.AppearanceTable.AName or "")
+        end
+        main:SyncSharedPreview()
+    end
+
     local function SaveCurrentPreset()
         Derma_StringRequest("Save Preset", "Preset name", main.AppearanceTable.AName or "", function(presetName)
             if not isstring(presetName) then return end

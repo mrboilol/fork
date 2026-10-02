@@ -76,7 +76,12 @@ function SWEP:GetInertialAimAngle(target, dtime)
 	local stiffness = math.Clamp(42 * control, 12, 70)
 	local damping = math.Clamp(7.5 * control, 3.8, 10)
 	if self:IsZoom() then stiffness = stiffness * 1.45 damping = damping * 1.2 end
-	if self:IsResting() then stiffness = stiffness * 3 damping = damping * 2.2 end
+	if self:IsResting() then
+		stiffness = stiffness * 3 damping = damping * 2.2
+	else
+		local steady = self:GetAimSteadiness()
+		stiffness = stiffness * (1 + steady * 0.7) damping = damping * (1 + steady * 0.45)
+	end
 
 	self.inertialAim = self.inertialAim or Angle(target[1], target[2], target[3])
 	self.inertialAimVelocity = self.inertialAimVelocity or Angle(0, 0, 0)
@@ -88,7 +93,7 @@ function SWEP:GetInertialAimAngle(target, dtime)
 
 	local maxLag = math.Clamp(1.5 + factor * 0.85, 2, 10)
 	if self:IsZoom() then maxLag = maxLag * 0.55 end
-	if self:IsResting() then maxLag = maxLag * 0.1 end
+	if self:IsResting() then maxLag = maxLag * 0.1 else maxLag = maxLag * (1 - self:GetAimSteadiness() * 0.4) end
 	self.inertialAim[1] = target[1] + math.Clamp(math.AngleDifference(self.inertialAim[1], target[1]), -maxLag * 0.7, maxLag * 0.7)
 	self.inertialAim[2] = target[2] + math.Clamp(math.AngleDifference(self.inertialAim[2], target[2]), -maxLag, maxLag)
 	self.inertialAim[3] = target[3]
@@ -150,14 +155,15 @@ function SWEP:ChangeGunPos(dtime)
 	local proficiency = self:GetFirearmProficiency(ply)
 	local aimDt = math.Clamp(dtime or FrameTime(), 0, 0.1)
 	local readyStance = ply.posture == 3 or ply.posture == 4
+	local steady = self:GetAimSteadiness(ply)
 	if self:IsZoom() and not self:IsResting() then
-		self.aimHoldTime = math.min((self.aimHoldTime or 0) + aimDt * (readyStance and 0.7 or 1), 18)
+		self.aimHoldTime = math.min((self.aimHoldTime or 0) + aimDt * (readyStance and 0.7 or 1) * (1 - steady * 0.6), 18)
 	else
-		self.aimHoldTime = math.Approach(self.aimHoldTime or 0, 0, aimDt * (readyStance and 7 or 5) * (support.postureOneHanded and 1.25 or 1))
+		self.aimHoldTime = math.Approach(self.aimHoldTime or 0, 0, aimDt * (readyStance and 7 or 5) * (support.postureOneHanded and 1.25 or 1) * (1 + steady))
 	end
-	local fatigueDelay = Lerp(proficiency, support.oneHanded and 2.5 or 5, support.oneHanded and 4.5 or 8)
-	local fatigue = math.Clamp(((self.aimHoldTime or 0) - fatigueDelay) / 7, 0, 1)
-	local fatigueAmp = fatigue * (support.oneHanded and 1.15 or 0.5) * Lerp(proficiency, 1, 0.62) * (readyStance and 0.75 or 1)
+	local fatigueDelay = Lerp(proficiency, support.oneHanded and 3.5 or 7, support.oneHanded and 6 or 11) * (1 + steady * 0.8)
+	local fatigue = math.Clamp(((self.aimHoldTime or 0) - fatigueDelay) / 9, 0, 1)
+	local fatigueAmp = fatigue * (support.oneHanded and 0.85 or 0.36) * Lerp(proficiency, 1, 0.62) * (readyStance and 0.75 or 1) * (1 - steady * 0.8)
 	local fatigueTime = CurTime()
 	self.AimFatigueWobble = Angle(
 		math.sin(fatigueTime * 1.7) * fatigueAmp + math.sin(fatigueTime * 8.3) * fatigueAmp * fatigue * 0.22,

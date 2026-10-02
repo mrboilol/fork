@@ -413,89 +413,18 @@ hook.Remove("radialOptions", "DislocatedJoint")
 hook.Remove("radialOptions", "DislocatedJoint2")
 hook.Remove("radialOptions", "DislocatedJaw")
 
-hook.Add("PostRender", "screenshot_think", function()
-	local org = lply.organism
-	
-	if not org or not org.brain or org.otrub or !lply:Alive() then return end
-	
-	local part = CurTime() - alivestart
-	//print(part)
-	if part % 60 > 59 and (screened != math.Round(part / 60, 0)) then
-		screened = math.Round(part / 60, 0)
-		//gui.HideGameUI()
+hg.MEMORY_BRAIN_THRESHOLD = 0.01
+local blackoutLerp = 0
+local pendingMemoryCapture = false
+local lastMemoryCapture = 0
 
-		if gui.IsGameUIVisible() or gui.IsConsoleVisible() or IsValid(vgui.GetHoveredPanel()) then return end
+local function QueueMemoryCapture()
+	pendingMemoryCapture = true
+end
 
-		local data = render.Capture( {
-			format = "jpeg",
-			x = 0,
-			y = 0,
-			w = ScrW(),
-			h = ScrH(),
-			quality = 1,
-			//alpha = false
-		} )
-
-		if not data then return end
-
-		local name = "dreams/dream"..hg.alivecntr.."_"..(#screens + 1)..".jpeg"
-		
-		if not file.Exists("dreams", "DATA") then file.CreateDir("dreams") end
-		file.Write(name, data)
-		
-		timer.Simple(1, function()
-			screens[#screens + 1] = Material("data/"..name)
-		end)
-	end
-end)
-
-local braindeathstart = CurTime() + 20
-local lerpedpart = 0
-local lerpedbrain = 0
-
-hook.Add("Post Post Pre Post Processing", "ShowScreens", function()
-	local org = lply.organism
-	
-	if !lply:Alive() then return end
-	if not org or not org.brain then return end
-
-	local part = CurTime() - braindeathstart
-
-	local show_multiki = org.brain > 0.1 and org.otrub
-
-	if show_multiki then
-		lerpedbrain = LerpFT(0.05, lerpedbrain, org.brain)
-		local time = 40 - (lerpedbrain - 0.1) * 20
-		if part % time > time / 3 and curscreen <= #screens and screens[curscreen] and !screens[curscreen]:IsError() then
-			switch = true
-			local part2 = math.ease.InOutSine(math.sin(((part % time) - time / 3) / (time / 3 * 2) * math.pi))
-			lerpedpart = LerpFT(0.1, lerpedpart, part2)
-			
-			surface.SetDrawColor(255, 255, 255, math.Clamp(lerpedpart * 50, 0, 255))
-			surface.SetMaterial(screens[curscreen])
-			surface.DrawTexturedRect(0, 0, ScrW(), ScrH())
-			
-			if not lply:HasTrait("blind") then DrawToyTown(4, ScrH()) end
-		else
-			if switch then
-				curscreen = curscreen == #screens and 1 or curscreen + 1
-				switch = false
-			end
-		end
-	else
-		braindeathstart = CurTime()
-	end
-end)
-
-local blindoverlay = Material("zcity/neurotrauma/blindoverlay.png")
-
-local hg_potatopc
-local old = false
-local tinnitusSoundFactor
-local hg_gopro = ConVarExists("hg_gopro") and GetConVar("hg_gopro") or CreateClientConVar("hg_gopro", "0", true, false, "Toggle GoPro-like first-person camera view", 0, 1)
-
-local function CaptureMemoryScreen()
+local function SaveMemoryScreen(tag)
 	if gui.IsGameUIVisible() or gui.IsConsoleVisible() or IsValid(vgui.GetHoveredPanel()) then return end
+
 	local data = render.Capture({
 		format = "jpeg",
 		x = 0,
@@ -506,13 +435,45 @@ local function CaptureMemoryScreen()
 	})
 	if not data then return end
 
-	local name = "dreams/dream"..hg.alivecntr.."_seizure_"..(#screens + 1)..".jpeg"
+	local name = "dreams/dream"..hg.alivecntr.."_"..tag..(#screens + 1)..".jpg"
 	if not file.Exists("dreams", "DATA") then file.CreateDir("dreams") end
 	file.Write(name, data)
-	timer.Simple(0, function()
+	lastMemoryCapture = CurTime()
+
+	timer.Simple(1, function()
 		screens[#screens + 1] = Material("data/"..name)
 	end)
 end
+
+hook.Add("PostRender", "screenshot_think", function()
+	local org = lply.organism
+
+	if not org or not org.brain or !lply:Alive() then return end
+
+	if pendingMemoryCapture then
+		pendingMemoryCapture = false
+		if not org.otrub and blackoutLerp < 0.2 and CurTime() - lastMemoryCapture > 5 then SaveMemoryScreen("event_") end
+	end
+
+	if org.otrub then return end
+
+	local part = CurTime() - alivestart
+	if part % 60 > 59 and (screened != math.Round(part / 60, 0)) then
+		screened = math.Round(part / 60, 0)
+		SaveMemoryScreen("")
+	end
+end)
+
+local braindeathstart = CurTime() + 20
+local lerpedpart = 0
+local lerpedbrain = 0
+
+local blindoverlay = Material("zcity/neurotrauma/blindoverlay.png")
+
+local hg_potatopc
+local old = false
+local tinnitusSoundFactor
+local hg_gopro = ConVarExists("hg_gopro") and GetConVar("hg_gopro") or CreateClientConVar("hg_gopro", "0", true, false, "Toggle GoPro-like first-person camera view", 0, 1)
 
 local function DrawSeizureMemory(org)
 	if not org or not org.seizureActive or #screens == 0 then
@@ -541,54 +502,69 @@ local function DrawSeizureMemory(org)
 	surface.DrawTexturedRect(-jitter, -jitter, ScrW() + jitter * 2, ScrH() + jitter * 2)
 end
 
-local function DrawScreenFillShape(x, y, radius, segments, roughness, timeOffset)
-	local poly = {}
-	local time = CurTime() + (timeOffset or 0)
+local remDeathStateColor = Color(255, 255, 255, 0)
+local wasMemoryDamaged = false
+local wasMemoryOtrub = false
 
-	for i = 0, segments do
-		local part = i / segments
-		local ang = math.rad(part * -360)
-		local wave = math.sin(part * math.pi * 5 + time * 1.8) * 0.34 + math.sin(part * math.pi * 9 - time * 1.25) * 0.28 + math.sin(part * math.pi * 15 + time * 2.35) * 0.22 + math.sin(part * math.pi * 23 - time * 1.6) * 0.16
-		local edgeRadius = radius * (1 + wave * roughness)
-		poly[#poly + 1] = {x = x + math.sin(ang) * edgeRadius, y = y + math.cos(ang) * edgeRadius}
+hook.Add("HUDPaintBackground", "organism-otrub-overlay", function()
+	if not IsValid(lply) or not lply:Alive() then
+		blackoutLerp = 0
+		wasMemoryDamaged = false
+		wasMemoryOtrub = false
+		return
 	end
 
-	draw.NoTexture()
-	surface.DrawPoly(poly)
-end
+	local org = lply.organism
+	local replicated = lply.new_organism or {}
+	if not org or not org.brain then return end
 
-local function DrawIncapacitatedDeathFade(deathStateEnd)
-	local remaining = math.max(deathStateEnd - CurTime(), 0)
-	local fade = math.Clamp((INCAPACITATION_DEATH_TIME - remaining) / INCAPACITATION_DEATH_TIME, 0, 1)
-	local finalFade = math.Clamp((6 - remaining) / 6, 0, 1)
-	local shine = finalFade * (0.65 + math.abs(math.sin(CurTime() * 9)) * 0.35)
-	local sw, sh = ScrW(), ScrH()
-	local radius = math.ease.InOutSine(fade) * math.sqrt(sw * sw + sh * sh) / 2
+	local otrub = org.otrub or replicated.otrub or false
+	local incapacitated = otrub and (org.incapacitated or replicated.incapacitated) or false
+	local brain = org.brain or 0
+	local damaged = brain > hg.MEMORY_BRAIN_THRESHOLD
 
-	DrawBloom(0.35 + finalFade * 0.45, 0.8 + finalFade * 2.8, 7, 7, 2, 1, 1, 1, 1)
-	surface.SetDrawColor(255, 255, 255, math.Clamp((fade ^ 1.35) * 175 + shine * 35, 0, 255))
-	DrawScreenFillShape(sw / 2, sh / 2, radius * 1.04, 320, 0.24 * (1 - finalFade * 0.35), 0)
-	surface.SetDrawColor(255, 255, 255, math.Clamp((fade ^ 1.35) * 110 + shine * 25, 0, 255))
-	DrawScreenFillShape(sw / 2, sh / 2, radius * 0.99, 320, 0.31 * (1 - finalFade * 0.3), 4.7)
-	surface.SetDrawColor(255, 255, 255, math.Clamp((fade ^ 1.35) * 80 + shine * 20, 0, 255))
-	DrawScreenFillShape(sw / 2, sh / 2, radius * 0.94, 320, 0.38 * (1 - finalFade * 0.25), 9.2)
+	if (damaged and not wasMemoryDamaged) or (otrub and not wasMemoryOtrub) then QueueMemoryCapture() end
+	wasMemoryDamaged = damaged
+	wasMemoryOtrub = otrub
 
-	if finalFade > 0 then
-		surface.SetDrawColor(255, 255, 255, math.Clamp(finalFade * 180 + shine * 75, 0, 255))
-		DrawScreenFillShape(sw / 2, sh / 2, radius * (0.88 + shine * 0.12), 320, 0.2 * (1 - finalFade * 0.45), 13.5)
+	blackoutLerp = LerpFT(0.1, blackoutLerp, incapacitated and 1 or 0)
+	if blackoutLerp > 0.99 then blackoutLerp = 1 elseif blackoutLerp < 0.01 then blackoutLerp = 0 end
+	if blackoutLerp > 0 then
+		surface.SetDrawColor(0, 0, 0, blackoutLerp * 255)
+		surface.DrawRect(-1, -1, ScrW() + 2, ScrH() + 2)
 	end
-end
 
-local function DrawIncapacitatedDeathText(seconds, deathStateEnd)
-	local remaining = math.max(deathStateEnd - CurTime(), 0)
-	local fade = math.Clamp((INCAPACITATION_DEATH_TIME - remaining) / INCAPACITATION_DEATH_TIME, 0, 1)
-	local radius = math.ease.InOutSine(fade) * math.sqrt(ScrW() * ScrW() + ScrH() * ScrH()) / 2
-	local textDark = math.Clamp((radius - 12) / 80, 0, 1)
-	local textValue = math.floor(255 * (1 - textDark))
-	local textColor = Color(textValue, textValue, textValue, math.Clamp((INCAPACITATION_DEATH_TIME - remaining) / 2, 0, 1) * 255)
+	DrawSeizureMemory(org)
 
-	draw.SimpleText("You are incapacitated, You will die in " .. seconds, "RemDeathStateFont", ScrW() / 2, ScrH() / 2, textColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-end
+	if otrub and damaged then
+		lerpedbrain = LerpFT(0.05, lerpedbrain, brain)
+		local part = CurTime() - braindeathstart
+		local time = 40 - math.max(lerpedbrain - 0.1, 0) * 20
+		if part % time > time / 3 and curscreen <= #screens and screens[curscreen] and !screens[curscreen]:IsError() then
+			switch = true
+			local part2 = math.ease.InOutSine(math.sin(((part % time) - time / 3) / (time / 3 * 2) * math.pi))
+			lerpedpart = LerpFT(0.1, lerpedpart, part2)
+
+			surface.SetDrawColor(255, 255, 255, math.Clamp(lerpedpart * 160, 0, 255))
+			surface.SetMaterial(screens[curscreen])
+			surface.DrawTexturedRect(0, 0, ScrW(), ScrH())
+
+			if not lply:HasTrait("blind") then DrawToyTown(4, ScrH()) end
+		elseif switch then
+			curscreen = curscreen >= #screens and 1 or curscreen + 1
+			switch = false
+		end
+	else
+		braindeathstart = CurTime() - 14
+	end
+
+	local _, deathStateEnd = GetLocalDeathState()
+	if deathStateEnd then
+		local remaining = math.max(deathStateEnd - CurTime(), 0)
+		remDeathStateColor.a = math.Clamp((INCAPACITATION_DEATH_TIME - remaining) / 2, 0, 1) * 255
+		draw.SimpleText("You are incapacitated, You will die in " .. math.ceil(remaining), "RemDeathStateFont", ScrW() / 2, ScrH() / 2, remDeathStateColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+	end
+end)
 
 hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 	local spect = IsValid(lply:GetNWEntity("spect")) and lply:GetNWEntity("spect")
@@ -642,7 +618,7 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 	local deathStateEnd = new_organism.deathStateEnd or org.deathStateEnd
 	local seizureActive = org.seizureActive or new_organism.seizureActive or false
 	if deathStateEnd and deathStateEnd <= 0 then deathStateEnd = nil end
-	if seizureActive and not wasSeizureActive then timer.Simple(0, CaptureMemoryScreen) end
+	if seizureActive and not wasSeizureActive then QueueMemoryCapture() end
 	wasSeizureActive = seizureActive
 	tinnitusSoundFactor = Lerp(FrameTime()*2.5,tinnitusSoundFactor or 0, math.min(math.max( lply.tinnitus and (lply.tinnitus - CurTime()) or 0, 0)*7.5,120))
 	local tinnitusSoundFactor2 = tinnitusSoundFactor + (hook.Run("ModifyTinnitusFactor", tinnitusSoundFactor) or 0)
@@ -678,10 +654,6 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 		else
 			lply:SetDSP((lply.suiciding and lply:Alive()) and 130 or normaldsp)
 		end
-	end
-
-	if lply:Alive() and (otrub or new_organism.otrub) and incapacitated and deathStateEnd then
-		DrawIncapacitatedDeathFade(deathStateEnd)
 	end
 
 	if not alive then
@@ -906,7 +878,6 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 			render.PopFilterMin()--]]
 	end
 
-	DrawSeizureMemory(org)
 	if IsValid(ent) and ent.Blinking and lply:Alive() then
 		surface.SetDrawColor(0,0,0,255)
 		if amtflashed and amtflashed > 0.1 and amtflashed < 0.8 and ent.Blinking > 0.1 then
@@ -914,10 +885,6 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 			//surface.DrawRect(-1,-1,ScrW()+1,ent.Blinking * ScrH())
 			//surface.DrawRect(-1,ScrH() + 1,ScrW()+1,-ent.Blinking * ScrH())
 		end
-	end
-	if lply:Alive() and (otrub or new_organism.otrub) and incapacitated and deathStateEnd then
-		local seconds = math.max(math.ceil(deathStateEnd - CurTime()), 0)
-		DrawIncapacitatedDeathText(seconds, deathStateEnd)
 	end
 
 end)

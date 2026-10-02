@@ -23,6 +23,8 @@ surface.CreateFont("HomigradECGVitals", {
 })
 
 local ringAlpha = 0
+local ecgRingAlpha = 0
+local ecgMemoryFade = 1
 local compactBorderInset = 0
 local compactBoxX
 local compactBoxY
@@ -96,7 +98,6 @@ local lastPhaseMod = 0
 local wasUnconsciousState = false
 local unconsciousStartTime
 local UNCONSCIOUS_RING_DELAY = 1
-local INCAPACITATION_DEATH_TIME = 20
 
 local function GetIncapacitationDeathCauses(org)
     local causes = {}
@@ -765,6 +766,8 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     if not hg_unconsciousring:GetBool() then
         if hg then hg.healthAlarmActive = false end
         ringAlpha = 0
+        ecgRingAlpha = 0
+        ecgMemoryFade = 1
         lastPhaseMod = 0
         ResetRingAudio()
         return
@@ -774,6 +777,8 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     if not IsValid(ply) or not ply:Alive() then
         if hg then hg.healthAlarmActive = false end
         ringAlpha = 0
+        ecgRingAlpha = 0
+        ecgMemoryFade = 1
         unconsciousStartTime = nil
         lastPhaseMod = 0
         ResetRingAudio()
@@ -784,6 +789,8 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     if not org then 
         if hg then hg.healthAlarmActive = false end
         ringAlpha = 0
+        ecgRingAlpha = 0
+        ecgMemoryFade = 1
         unconsciousStartTime = nil
         lastPhaseMod = 0
         ResetRingAudio()
@@ -794,6 +801,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
 	if isUnconscious and not wasUnconsciousState then
 		unconsciousStartTime = CurTime()
 		ringAlpha = 0
+		ecgRingAlpha = 0
 	elseif not isUnconscious and wasUnconsciousState then
 		unconsciousStartTime = nil
     end
@@ -806,12 +814,6 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     local replicatedOrg = ply.new_organism or org
     local incapacitated = replicatedOrg.incapacitated or org.incapacitated or false
     local deathStateEnd = tonumber(replicatedOrg.deathStateEnd or org.deathStateEnd)
-    local incapacitationProgress = 0
-    if isUnconscious and incapacitated and deathStateEnd then
-        local remaining = math.max(deathStateEnd - CurTime(), 0)
-        incapacitationProgress = math.Clamp((INCAPACITATION_DEATH_TIME - remaining) / INCAPACITATION_DEATH_TIME, 0, 1)
-    end
-    local incapacitationWhite = math.ease.InOutSine(incapacitationProgress)
     local isCritical = (org.critical == true)
         or (ecgState == "asystole" and brain >= 0.02)
         or IsCirculationCritical(org)
@@ -887,6 +889,19 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     end
     wasUnconsciousState = isUnconscious
 
+    if isUnconscious and unconsciousElapsed >= UNCONSCIOUS_RING_DELAY then
+        ecgRingAlpha = SmoothAlpha(ecgRingAlpha, 1, 1.5)
+    elseif isUnconscious then
+        ecgRingAlpha = SmoothAlpha(ecgRingAlpha, 0, 8)
+    elseif lowConsciousness then
+        ecgRingAlpha = SmoothAlpha(ecgRingAlpha, 0.4, 3)
+    else
+        ecgRingAlpha = SmoothAlpha(ecgRingAlpha, 0, 4)
+    end
+
+    local memoriesActive = isUnconscious and brain > (hg.MEMORY_BRAIN_THRESHOLD or 0.01)
+    ecgMemoryFade = SmoothAlpha(ecgMemoryFade, memoriesActive and 0 or 1, memoriesActive and 6 or 1.5)
+
     -- Active non-sinus rhythms remain visible. Severity now increases opacity;
     -- a recovered sinus trace gets a short tail and then fades away.
     if showAwakeECG then
@@ -922,9 +937,13 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     if ringAlpha <= 0 and awakeECGAlpha <= 0.01 and not showPulseCheckECG then
         return
     end
-    local otrubECGAlpha = (isUnconscious or lowConsciousness) and ringAlpha or awakeECGAlpha
+    local otrubECGAlpha = (isUnconscious or lowConsciousness) and ecgRingAlpha * ecgMemoryFade or awakeECGAlpha
     local incapPromptX, incapPromptY = ScrW() * 0.5, math.max(ScrH() * 0.1, ScreenScaleH(20))
     
+    if (isUnconscious or lowConsciousness) and ringAlpha > 0.01 and not IsValid(g_PulseCheckTarget) then
+        UpdateRingAudio(heartbeat, ringAlpha, org)
+    end
+
     if otrubECGAlpha > 0.01 then
         local scrW, scrH = ScrW(), ScrH()
         local centerX, centerY = scrW * 0.5, scrH * 0.5
@@ -932,21 +951,12 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         local showLegacyECG = isUnconscious or lowConsciousness or abnormalECG
             or (not isUnconscious and not lowConsciousness and (sinusECGTail > 0 or admiring))
 
-        if (isUnconscious or lowConsciousness) and not IsValid(g_PulseCheckTarget) then
-            UpdateRingAudio(heartbeat, ringAlpha, org)
-        end
-
         if showLegacyECG then
             local severity = GetAwakeECGSeverity(ecgState)
             local ecgR = abnormalECG and Lerp(severity, 220, 255) or 230
             local ecgG = abnormalECG and Lerp(severity, 220, 50) or 230
             local ecgB = abnormalECG and Lerp(severity, 220, 40) or 230
-            local ecgColor = Color(
-                Lerp(incapacitationWhite, ecgR, abnormalECG and 70 or 24),
-                Lerp(incapacitationWhite, ecgG, abnormalECG and 12 or 24),
-                Lerp(incapacitationWhite, ecgB, abnormalECG and 10 or 24),
-                255 * otrubECGAlpha
-            )
+            local ecgColor = Color(ecgR, ecgG, ecgB, 255 * otrubECGAlpha)
             DrawEKG(centerEKGState, centerX, ecgCenterY, 540, 140, org, ecgColor, otrubECGAlpha)
         end
     end

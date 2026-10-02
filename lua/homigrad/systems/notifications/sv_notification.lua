@@ -409,9 +409,14 @@ function hg.CombatThought(ply, pool)
     local options = combatThoughts[pool]
     if not options then return false end
 
+    local isNear = pool == "near_shot"
+    local useNew = ply:GetInfoNum("hg_newthoughts", 0) > 0
+    if useNew and not isNear then return false end
+
     local now = CurTime()
-    if (ply.nextCombatThought or 0) > now then return false end
-    ply.nextCombatThought = now + (pool == "near_shot" and 5 or 3)
+    local cdKey = isNear and "nextNearShotThought" or "nextCombatThought"
+    if (ply[cdKey] or 0) > now then return false end
+    ply[cdKey] = now + (isNear and 5 or 8)
 
     local msg = options[math.random(#options)]
     if ply.lastCombatThoughtText == msg then msg = options[math.random(#options)] end
@@ -419,7 +424,7 @@ function hg.CombatThought(ply, pool)
 
     if org then org.nextStatusThought = math.max(org.nextStatusThought or 0, now + 6) end
 
-    if ply:GetInfoNum("hg_newthoughts", 0) > 0 then
+    if useNew then
         ply.nextThoughtGlobal = 0
         net.Start("HGThought")
         net.WriteString(msg)

@@ -475,6 +475,37 @@ local hg_fake_stamina = CreateConVar("hg_fake_stamina", "1", FCVAR_ARCHIVE + FCV
 
 local util_TraceLine, util_TraceHull = util.TraceLine, util.TraceHull
 local game_GetWorld = game.GetWorld
+
+local LEDGE_RANGE = 28
+local LEDGE_PROBE_FORWARD = 8
+local LEDGE_PROBE_HEIGHT = 40
+local LEDGE_ABOVE_TOLERANCE = 8
+local ledgeTrace = {}
+
+local function ledgeCloseness(ragdoll, cons)
+	local phys = ragdoll:GetPhysicsObjectNum(cons.Bone1)
+	if not IsValid(phys) then return 0 end
+
+	local pos = phys:GetPos()
+	local grabDir = phys:GetAngles():Right()
+	grabDir.z = 0
+	grabDir:Normalize()
+	local probe = pos + grabDir * LEDGE_PROBE_FORWARD
+
+	ledgeTrace.start = probe + vector_up * LEDGE_PROBE_HEIGHT
+	ledgeTrace.endpos = probe - vector_up * LEDGE_ABOVE_TOLERANCE
+	ledgeTrace.filter = ragdoll
+	ledgeTrace.mask = MASK_SOLID
+	local trace = util.TraceLine(ledgeTrace)
+
+	if not trace.Hit or trace.StartSolid or trace.HitSky or trace.HitNormal.z < 0.7 then return 0 end
+
+	local below = trace.HitPos.z - pos.z
+	if below < -LEDGE_ABOVE_TOLERANCE then return 0 end
+
+	return math.Clamp(1 - math.max(below, 0) / LEDGE_RANGE, 0, 1)
+end
+
 local ang, ang2, ang3 = Angle(0, 0, 0), Angle(0, 0, 0),  Angle(0, 0, 0)
 local spine, time, rupper, lupper, rforearm, lforearm, rhand, lhand
 
@@ -1271,6 +1302,11 @@ hook.Add("Think", "Fake", function()
 					mask = MASK_SOLID,
 				}).Hit or false
 			
+			local ledgeLH = IsValid(ragdoll.ConsLH) and not IsValid(ragdoll.ConsLH.choking) and ledgeCloseness(ragdoll, ragdoll.ConsLH) or 0
+			local ledgeRH = IsValid(ragdoll.ConsRH) and not IsValid(ragdoll.ConsRH.choking) and ledgeCloseness(ragdoll, ragdoll.ConsRH) or 0
+			org.stamina.ledge = math.max(ledgeLH, ledgeRH)
+			org.stamina.ledgeUntil = CurTime() + 0.25
+
 			if not fallCoverActive and forward then
 				if IsValid(ragdoll.ConsRH) then
 					local hand = ragdoll:GetPhysicsObjectNum(ragdoll.ConsRH.Bone1)
@@ -1278,7 +1314,7 @@ hook.Add("Think", "Fake", function()
 
 					local force = angles2:Forward()
 					force:Normalize()
-					force = force * 2000 * math.max((hand:GetPos() - torso:GetPos()):GetNormalized():Dot(angles2:Forward()) + 0.1, 0) * ragdoll.dtime / 0.015 * ragdoll.power * (ply.GetTraitMultiplier and ply:GetTraitMultiplier("climb_force", 1) or 1)
+					force = force * 2000 * math.max((hand:GetPos() - torso:GetPos()):GetNormalized():Dot(angles2:Forward()) + 0.1, 0) * ragdoll.dtime / 0.015 * ragdoll.power * (ply.GetTraitMultiplier and ply:GetTraitMultiplier("climb_force", 1) or 1) * (1 + ledgeRH * 1.5)
 					
 					force = force * 1 / math.max(torso:GetVelocity():Dot(angles2:Forward()) / 25, 1)
 
@@ -1290,7 +1326,7 @@ hook.Add("Think", "Fake", function()
 					end
 
 					if hg_fake_stamina:GetBool() then
-						org.stamina.subadd = org.stamina.subadd + 0.05 * (ragdoll.staminaRightModifyer or 0.5) * (on_ground and 0.25 or 1) * (ply.GetTraitMultiplier and ply:GetTraitMultiplier("climb_stamina_cost", 1) or 1)
+						org.stamina.subadd = org.stamina.subadd + 0.05 * (ragdoll.staminaRightModifyer or 0.5) * (1 - ledgeRH * 0.9) * (on_ground and 0.25 or 1) * (ply.GetTraitMultiplier and ply:GetTraitMultiplier("climb_stamina_cost", 1) or 1)
 					end
 				end
 
@@ -1300,7 +1336,7 @@ hook.Add("Think", "Fake", function()
 
 					local force = angles2:Forward()
 					force:Normalize()
-					force = force * 2000 * math.max((hand:GetPos() - torso:GetPos()):GetNormalized():Dot(angles2:Forward()) + 0.1, 0) * ragdoll.dtime / 0.015 * ragdoll.power * (ply.GetTraitMultiplier and ply:GetTraitMultiplier("climb_force", 1) or 1)
+					force = force * 2000 * math.max((hand:GetPos() - torso:GetPos()):GetNormalized():Dot(angles2:Forward()) + 0.1, 0) * ragdoll.dtime / 0.015 * ragdoll.power * (ply.GetTraitMultiplier and ply:GetTraitMultiplier("climb_force", 1) or 1) * (1 + ledgeLH * 1.5)
 					
 					force = force * 1 / math.max(torso:GetVelocity():Dot(angles2:Forward()) / 25, 1)
 
@@ -1312,7 +1348,7 @@ hook.Add("Think", "Fake", function()
 					end
 
 					if hg_fake_stamina:GetBool() then
-						org.stamina.subadd = org.stamina.subadd + 0.05 * (ragdoll.staminaLeftModifyer or 0.5) * (on_ground and 0.25 or 1) * (ply.GetTraitMultiplier and ply:GetTraitMultiplier("climb_stamina_cost", 1) or 1)
+						org.stamina.subadd = org.stamina.subadd + 0.05 * (ragdoll.staminaLeftModifyer or 0.5) * (1 - ledgeLH * 0.9) * (on_ground and 0.25 or 1) * (ply.GetTraitMultiplier and ply:GetTraitMultiplier("climb_stamina_cost", 1) or 1)
 					end
 				end
 			end
@@ -1431,7 +1467,7 @@ hook.Add("Think", "Fake", function()
 			if grabHeld(ply, ragdoll, IN_SPEED, "l") and org.canmove and !org.larmamputated and !org.larmupamputated and (!ply.HandsStun or ply.HandsStun < CurTime()) then
 				if IsValid(ragdoll.ConsLH) then
 					if hg_fake_stamina:GetBool() then
-						org.stamina.subadd = org.stamina.subadd + 0.06 * (ragdoll.staminaLeftModifyer or 0.5) * ( IsValid(ragdoll.ConsRH) and 0.35 or 1.25) * (on_ground and 0.25 or 1) * (ply.GetTraitMultiplier and ply:GetTraitMultiplier("climb_stamina_cost", 1) or 1)
+						org.stamina.subadd = org.stamina.subadd + 0.06 * (ragdoll.staminaLeftModifyer or 0.5) * ( IsValid(ragdoll.ConsRH) and 0.35 or 1.25) * (1 - ledgeLH * 0.9) * (on_ground and 0.25 or 1) * (ply.GetTraitMultiplier and ply:GetTraitMultiplier("climb_stamina_cost", 1) or 1)
 					end
 					if leftArmInjured then
 						local heldFor = time - (ragdoll.ConsLH.grabStarted or time)
@@ -1509,7 +1545,7 @@ hook.Add("Think", "Fake", function()
 			if grabHeld(ply, ragdoll, IN_WALK, "r") and org.canmove and !(ishgweapon(wep) or wep.ismelee2) and !org.rarmamputated and !org.rarmupamputated and (!ply.HandsStun or ply.HandsStun < CurTime()) then
 				if IsValid(ragdoll.ConsRH) then
 					if hg_fake_stamina:GetBool() then
-						org.stamina.subadd = org.stamina.subadd + 0.06 * (ragdoll.staminaRightModifyer or 1) * ( IsValid(ragdoll.ConsLH) and 0.35 or 1.25) * (on_ground and 0.25 or 1) * (ply.GetTraitMultiplier and ply:GetTraitMultiplier("climb_stamina_cost", 1) or 1)
+						org.stamina.subadd = org.stamina.subadd + 0.06 * (ragdoll.staminaRightModifyer or 1) * ( IsValid(ragdoll.ConsLH) and 0.35 or 1.25) * (1 - ledgeRH * 0.9) * (on_ground and 0.25 or 1) * (ply.GetTraitMultiplier and ply:GetTraitMultiplier("climb_stamina_cost", 1) or 1)
 					end
 					if rightArmInjured then
 						local heldFor = time - (ragdoll.ConsRH.grabStarted or time)

@@ -71,6 +71,11 @@ function SWEP:NotifyJammed()
 	if not IsValid(owner) or not owner:IsPlayer() or not owner.Notify then return end
 
 	owner:Notify("The weapon has jammed!", 5, "jam", 0)
+
+	if SERVER then
+		net.Start("hg_jam_hint")
+		net.Send(owner)
+	end
 end
 
 function SWEP:PlayJammedTriggerSound()
@@ -258,6 +263,27 @@ function SWEP:ClearJam()
 end
 
 if CLIENT then
+	local JAM_HINT_MAX = 10
+	local JAM_HINT_TIME = 5
+	local jamHintEnd = 0
+
+	net.Receive("hg_jam_hint", function()
+		local shown = cookie.GetNumber("hg_jam_hint_count", 0)
+		if shown >= JAM_HINT_MAX then return end
+
+		cookie.Set("hg_jam_hint_count", tostring(shown + 1))
+		jamHintEnd = CurTime() + JAM_HINT_TIME
+	end)
+
+	hook.Add("DrawOverlay", "HG_JamHint", function()
+		local now = CurTime()
+		if jamHintEnd <= now then return end
+
+		local uiScale = hg.UIScale and hg.UIScale() or 1
+		local alpha = math.Clamp((jamHintEnd - now) / 0.5, 0, 1) * 255
+		draw.SimpleTextOutlined("Hold Q and go to the weapon menu to unjam", hg.notificationFont or "DermaDefault", ScrW() / 2, ScrH() - 140 * uiScale, Color(255, 255, 255, alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1.5, Color(40, 40, 40, alpha))
+	end)
+
 	net.Receive("hg_jam_click", function()
 		local wep = net.ReadEntity()
 		if not IsValid(wep) then return end
@@ -279,6 +305,7 @@ if SERVER then
 	util.AddNetworkString("hg_clear_jam")
 	util.AddNetworkString("hg_jam_click")
 	util.AddNetworkString("hg_jam_rack")
+	util.AddNetworkString("hg_jam_hint")
 
 	net.Receive("hg_clear_jam", function(len, ply)
 		local wep = ply:GetActiveWeapon()

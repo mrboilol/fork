@@ -30,6 +30,7 @@ SWEP.HeldMagOffsetAng = Angle(0, -90, 0)
 
 SWEP.FakePos = Vector(-13, 2.52, 7.5)
 SWEP.FakeAng = Angle(0, 0, 0)
+SWEP.ZoomPos = Vector(0, -1.7318, 5.5661)
 SWEP.AttachmentPos = Vector(1,0,0.5)
 SWEP.AttachmentAng = Angle(0,0,0)
 

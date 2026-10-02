@@ -19,6 +19,7 @@ SWEP.holsteredAng = Angle(220, 0, 180)
 
 SWEP.FakePos = Vector(-12, 2.0, 7.5)
 SWEP.FakeAng = Angle(0, -0, 0)
+SWEP.ZoomPos = Vector(0, -2.2752, 5.737)
 SWEP.AttachmentPos = Vector(-1.2, 0, 0)
 SWEP.AttachmentAng = Angle(0, 0, 0)
 SWEP.FakeAttachment = "1"
