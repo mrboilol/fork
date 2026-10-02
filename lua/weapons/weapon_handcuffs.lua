@@ -143,6 +143,12 @@ function SWEP:Tie(tr)
 				local criswat = zb and zb.CROUND == "criresp" and self:GetOwner():Team() == 0
 
 				local victim = hg.RagdollOwner(ent)
+				local owner = self:GetOwner()
+
+				if not IsValid(owner:GetActiveWeapon()) or IsValid(owner:GetActiveWeapon()) and owner:GetActiveWeapon() ~= self then
+					return -- you could just fool your enemy by switching your weapon while trace was active then end up tying them
+				end
+
 				if criswat and IsValid(victim) and victim:IsPlayer() and victim:Team() == 0 then
 					self:GetOwner():ChatPrint("You cant handcuff your buddies >:(")
 					return
