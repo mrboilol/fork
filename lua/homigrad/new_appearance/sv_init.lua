@@ -324,6 +324,8 @@ function APmodule.DropAccessoriesByPlacement(ent, placements, force)
 	return changed
 end
 
+local hatProtect = CreateConVar("hg_hatprotect", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "0 = accessories give no protection but can still be shot off", 0, 1)
+
 function APmodule.TryAbsorbAccessoryImpact(ent, dmgInfo, hitPos, direction, directImpact, impactRadius)
 	if !IsValid(ent) or !dmgInfo or !dmgInfo:IsDamageType(accessoryImpactTypes) then return end
 	if hg.EquipmentImpact and hg.EquipmentImpact.ProcessedDamage[dmgInfo] then return end
@@ -374,7 +376,9 @@ function APmodule.TryAbsorbAccessoryImpact(ent, dmgInfo, hitPos, direction, dire
 		end
 	end
 
-	dmgInfo:ScaleDamage(math.Clamp(1 - absorbed, 0.6, 1))
+	if hatProtect:GetBool() then
+		dmgInfo:ScaleDamage(math.Clamp(1 - absorbed, 0.6, 1))
+	end
 	return true
 end
 

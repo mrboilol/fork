@@ -1,3 +1,6 @@
+local hg_selfpreservation = ConVarExists("hg_selfpreservation") and GetConVar("hg_selfpreservation") or CreateConVar("hg_selfpreservation", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Euphoria self-preservation reactions (wound grabs, stumbling, cover); 0 = Z-City stumbling and manual wound holding", 0, 1)
+local function euphoriaOn(cvar) return hg_selfpreservation:GetBool() and cvar:GetBool() end
+
 local hg_euphoria_getup_stumble = CreateConVar("hg_euphoria_getup_stumble", "1", FCVAR_ARCHIVE + FCVAR_NOTIFY, "fake ragdoll stumbling (Artagdoll-style)", 0, 1)
 local hg_euphoria_cover = CreateConVar("hg_euphoria_cover", "1", FCVAR_ARCHIVE + FCVAR_NOTIFY, "fake ragdolls cover their face when hit, falling or tumbling fast (Artagdoll Cower)", 0, 1)
 local hg_euphoria_death_throes = CreateConVar("hg_euphoria_death_throes", "1", FCVAR_ARCHIVE + FCVAR_NOTIFY, "players writhe briefly when they die conscious (Artagdoll Dying)", 0, 1)
@@ -941,7 +944,7 @@ end
 
 local function wantedReaction(ply, ragdoll)
 	if not isAware(ply) then return end
-	if hg_euphoria_windmill:GetBool() and isAirborne(ply, ragdoll) then return "flail" end
+	if euphoriaOn(hg_euphoria_windmill) and isAirborne(ply, ragdoll) then return "flail" end
 	if stumbling[ragdoll] then return "stumble" end
 
 	if limbControl(ply) then
@@ -950,13 +953,13 @@ local function wantedReaction(ply, ragdoll)
 	end
 
 	local root = ragdoll:GetPhysicsObject()
-	if hg_euphoria_tumble:GetBool() and IsValid(root) and not stumbling[ragdoll] and not moveControl(ply) then
+	if euphoriaOn(hg_euphoria_tumble) and IsValid(root) and not stumbling[ragdoll] and not moveControl(ply) then
 		local vel = root:GetVelocity()
 		local grounded = groundTrace(ply, ragdoll, REACT_AIR_TRACE).Hit
 		if grounded and vel.x * vel.x + vel.y * vel.y > TUMBLE_SPEED * TUMBLE_SPEED then return "tumble" end
 	end
 
-	if not hg_euphoria_cover:GetBool() then return end
+	if not euphoriaOn(hg_euphoria_cover) then return end
 
 	if IsValid(root) and root:GetVelocity():LengthSqr() > REACT_FAST_SPEED * REACT_FAST_SPEED then
 		triggerCover(ragdoll, REACT_FAST_COVER_TIME)
@@ -1032,7 +1035,7 @@ hook.Add("Fake", "HG_EuphoriaStumble", function(ply, ragdoll)
 		ragdoll.hgWritheUntil = CurTime() + REACT_COVER_TIME + REACT_WRITHE_TIME
 	end
 
-	if hg_euphoria_getup_stumble:GetBool() then queueStumble(ragdoll) end
+	if euphoriaOn(hg_euphoria_getup_stumble) then queueStumble(ragdoll) end
 end)
 
 hook.Add("Fake Up", "HG_EuphoriaStumble", function(ply, ragdoll)
@@ -1100,7 +1103,7 @@ local function knockDown(ply)
 end
 
 hook.Add("EntityTakeDamage", "HG_EuphoriaStumbleHit", function(ent, dmgInfo)
-	if not IsValid(ent) then return end
+	if not hg_selfpreservation:GetBool() or not IsValid(ent) then return end
 
 	local ply
 	if ent:IsPlayer() then
@@ -1158,7 +1161,7 @@ hook.Add("EntityTakeDamage", "HG_EuphoriaStumbleHit", function(ent, dmgInfo)
 	triggerCover(ragdoll, REACT_COVER_TIME)
 	ragdoll.hgWritheUntil = CurTime() + REACT_COVER_TIME + REACT_WRITHE_TIME
 
-	if not hg_euphoria_getup_stumble:GetBool() then return end
+	if not euphoriaOn(hg_euphoria_getup_stumble) then return end
 
 	local st = stumbling[ragdoll]
 	if st then
@@ -1262,7 +1265,7 @@ local function updateIdleHand(ply, ragdoll, org, side, hand, now)
 end
 
 local function updateHoldEnv(ply, ragdoll)
-	if not hg_euphoria_holdenv:GetBool() or not isAware(ply) or armControl(ply) or ragdoll.HGFallCoverActive or stumbling[ragdoll] then
+	if not euphoriaOn(hg_euphoria_holdenv) or not isAware(ply) or armControl(ply) or ragdoll.HGFallCoverActive or stumbling[ragdoll] then
 		releaseHoldEnv(ragdoll)
 		return
 	end
@@ -1295,7 +1298,7 @@ local function updateHoldEnv(ply, ragdoll)
 end
 
 local function stumbleEndReason(ply, ragdoll, st)
-	if not hg_euphoria_getup_stumble:GetBool() then return "off" end
+	if not euphoriaOn(hg_euphoria_getup_stumble) then return "off" end
 	if not IsValid(ragdoll) or not IsValid(ply) or ply.FakeRagdoll ~= ragdoll then return "gone" end
 	if not IsValid(st.pelvis) or not IsValid(st.spine) or not canStumble(ply, ragdoll) then return "gone" end
 	if st.tripLeg then return "trip" end
@@ -1409,7 +1412,7 @@ end
 
 hook.Add("RagdollDeath", "HG_EuphoriaDeathThroes", function(ply, ragdoll)
 	if not IsValid(ply) or not ply:IsPlayer() or not IsValid(ragdoll) then return end
-	if not hg_euphoria_death_throes:GetBool() or not canDieReacting(ply.organism) then return end
+	if not euphoriaOn(hg_euphoria_death_throes) or not canDieReacting(ply.organism) then return end
 
 	local org = ply.organism
 	timer.Simple(DEATH_DELAY, function()
@@ -1447,7 +1450,7 @@ hook.Add("Think", "HG_EuphoriaStumble", function()
 	end
 
 	local now = CurTime()
-	local stumbleEnabled = hg_euphoria_getup_stumble:GetBool()
+	local stumbleEnabled = euphoriaOn(hg_euphoria_getup_stumble)
 	for _, ply in player.Iterator() do
 		local ragdoll = ply.FakeRagdoll
 		if not IsValid(ragdoll) then continue end

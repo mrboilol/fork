@@ -32,7 +32,6 @@ local depression_untreated_bleed_threshold = 2
 local depression_untreated_bleed_delay = 45
 local depression_untreated_bleed_gain = 0.006
 local depression_treatment_failure_gain = 0.035
-local suicide_depression_gain = 0.025
 
 local selfharm_threshold = 0.4
 local selfharm_roll_time_min = 5
@@ -532,11 +531,6 @@ module[2] = function(owner, org, timeValue)
 	end
 
 	org.depression = max((org.depression or 0) - drainRate, 0)
-
-	local suicidal = GetConVar("hg_suicidal")
-	if owner.suiciding and suicidal and suicidal:GetInt() == 2 then
-		org.depression = Clamp((org.depression or 0) + suicide_depression_gain * timeValue, 0, depression_max)
-	end
 
 	if owner:IsPlayer() then
 		local dep = org.depression or 0

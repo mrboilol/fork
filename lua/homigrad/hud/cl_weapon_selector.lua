@@ -56,6 +56,9 @@ local WS_StackAnimTime = 0.32
 local WS_StackFadeSplit = 0.55
 local WS_StackRise = 0.03
 local scrW, scrH = ScrW(), ScrH()
+hook.Add("OnScreenSizeChanged", "HG_WS_ScreenSize", function()
+	scrW, scrH = ScrW(), ScrH()
+end)
 local WS_DescriptionWidth = 0.52
 local WS_DescriptionY = 0.32
 

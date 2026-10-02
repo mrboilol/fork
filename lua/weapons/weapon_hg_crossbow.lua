@@ -96,6 +96,12 @@ SWEP.OpenBolt = true
 SWEP.SprayRand = {Angle(-0.05, -0.01, 0), Angle(-0.1, 0.01, 0)}
 SWEP.SprayRandOnly = true
 SWEP.scopedef = true
+SWEP.scopeEyeBoxFree = true
+SWEP.AimInSpeed = 3
+
+function SWEP:GetAimAlignmentTime()
+	return 0.3
+end
 
 SWEP.mat = Material("effects/arc9/rt")
 SWEP.scopemat = Material("decals/scope.png")

@@ -1,3 +1,6 @@
+local hg_selfpreservation = ConVarExists("hg_selfpreservation") and GetConVar("hg_selfpreservation") or CreateConVar("hg_selfpreservation", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Euphoria self-preservation reactions (wound grabs, stumbling, cover); 0 = Z-City stumbling and manual wound holding", 0, 1)
+local function euphoriaOn(cvar) return hg_selfpreservation:GetBool() and cvar:GetBool() end
+
 local hg_impact = CreateConVar("hg_euphoria_impact", "1", FCVAR_ARCHIVE + FCVAR_NOTIFY, "GTA/Ready-or-Not style impact reactions on fake ragdolls (knockback + trip)", 0, 1)
 
 local IMPACT_MIN_DMG = 10
@@ -37,7 +40,7 @@ local function movingDir(ply)
 end
 
 hook.Add("EntityTakeDamage", "HG_EuphoriaImpact", function(ent, dmgInfo)
-	if not hg_impact:GetBool() then return end
+	if not euphoriaOn(hg_impact) then return end
 	if not IsValid(ent) then return end
 
 	local ply, ragdoll

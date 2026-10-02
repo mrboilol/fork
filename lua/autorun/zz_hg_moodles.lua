@@ -12,7 +12,7 @@ if SERVER then
 		resource.AddFile("materials/vgui/moodles 3/" .. name)
 	end
 
-	local moodleType = CreateConVar("hg_moodletype", "2", {FCVAR_ARCHIVE, FCVAR_REPLICATED, FCVAR_NOTIFY}, "Moodle 3 moodles", 2, 2)
+	local moodleType = CreateConVar("hg_moodletype", "2", {FCVAR_ARCHIVE, FCVAR_REPLICATED, FCVAR_NOTIFY}, "if you touch this convar i will break your neck", 2, 2)
 	if moodleType:GetInt() ~= 2 then moodleType:SetInt(2) end
 
 	return
@@ -20,7 +20,7 @@ end
 
 HGCustomMoodlesActive = true
 
-local enabled = CreateClientConVar("hg_moodles_enabled", "1", true, false, "Show Homigrad moodles")
+local enabled = CreateClientConVar("hg_moodles_enabled", "1", true, false, "fading vitality references")
 local moodle3Icons, appearances, lastLevels = {}, {}, {}
 local moodlePositions = {}
 local hover = {index = nil, scale = 1}

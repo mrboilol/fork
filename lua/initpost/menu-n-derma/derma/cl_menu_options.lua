@@ -144,6 +144,12 @@ if not game.IsDedicated() then
     hg.settings:AddOpt("Server-side settings","homicide_traitoramount", "Homicide: Traitor Amount", nil, nil, "int")
 end
 
+hg.settings:AddOpt("Server-side settings","hg_selfpreservation", "EP (euphoria self-preservation)")
+hg.settings:AddOpt("Server-side settings","hg_depression", "Depression")
+hg.settings:AddOpt("Server-side settings","hg_panic", "Panic attacks")
+hg.settings:AddOpt("Server-side settings","hg_hatprotect", "Hat protection")
+hg.settings:AddOpt("Server-side settings","hg_dyingsound", "Dying sound mode", nil, nil, "int")
+hg.settings:AddOpt("Server-side settings","hg_painsound", "Pain sound mode", nil, nil, "int")
 hg.settings:AddOpt("Debug","hg_show_hitposmuzzle", "Show weapon hitpos")
 hg.settings:AddOpt("Debug","hg_setzoompos", "Edit weapon zoompos, check console for results")
 hg.settings:AddOpt("Debug","hg_show_hitbox", "Show hitboxes")
@@ -159,6 +165,8 @@ hg.settings:AddOpt("Blood","hg_blood_draw_distance", "Blood Draw Distance")
 hg.settings:AddOpt("Blood","hg_blood_fps", "Blood FPS")
 hg.settings:AddOpt("Blood","hg_blood_sprites", "Blood Sprites (DISABLED FOR EVERYONE)")
 hg.settings:AddOpt("Blood","hg_old_blood", "Old blood")
+hg.settings:AddOpt("Blood","hg_old_particle", "Old particles")
+hg.settings:AddOpt("UI","hg_moodles_enabled", "Moodles")
 
 hg.settings:AddOpt("UI","hg_font", "Change Custom Font", false, true)
 
@@ -169,6 +177,7 @@ hg.settings:AddOpt("Weapons","hg_highpitchgunfire", "Toggle high pitched gunfire
 hg.settings:AddOpt("Weapons","hg_gollavo_headshot_effect", "Gollavo headshot effect")
 
 hg.settings:AddOpt("View","hg_fov", "Field Of View")
+hg.settings:AddOpt("View","hg_vignette_scale", "Tunnel vision strength", true, nil, "int")
 hg.settings:AddOpt("View","hg_newspectate", "Smooth Spectator Camera")
 hg.settings:AddOpt("View","hg_cshs_fake", "C'sHS Ragdoll Camera")
 hg.settings:AddOpt("View","hg_gun_cam", "Gun Camera (ADMIN ONLY)")

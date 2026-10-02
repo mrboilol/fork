@@ -57,6 +57,12 @@ SWEP.FOVMax = 20
 SWEP.perekrestieSize = false
 SWEP.blackoutsize = 3100
 SWEP.scopedef = true
+SWEP.scopeEyeBoxFree = true
+SWEP.AimInSpeed = 3
+
+function SWEP:GetAimAlignmentTime()
+	return 0.3
+end
 
 SWEP.AnimShootMul = 2
 SWEP.AnimShootHandMul = 5

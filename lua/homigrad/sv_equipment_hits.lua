@@ -1140,7 +1140,7 @@ local function TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, ori
             info:SetDamageType(shot.DamageType or DMG_BULLET)
             hg.Appearance.TryAbsorbAccessoryImpact(hit.body, info, hit.position, direction * (force or damage), hit)
             scale = scale * info:GetDamage() / math.max(damage * scale, 0.001)
-            if hg.IsSmallEquipmentRound(shot) then
+            if hg.IsSmallEquipmentRound(shot) and GetConVar("hg_hatprotect"):GetBool() then
                 local tr = table.Copy(originalTrace)
                 tr.Hit, tr.HitWorld, tr.HitSky = true, false, false
                 tr.Entity, tr.HitPos, tr.HitNormal, tr.Normal = game.GetWorld(), hit.position, hit.normal, direction

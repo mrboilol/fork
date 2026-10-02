@@ -1,4 +1,4 @@
-local enabled = CreateClientConVar("hg_bodystatus_enabled", "1", true, false, "Show the live body status HUD")
+local enabled = CreateClientConVar("hg_subrosa", "1", true, false, "sub rosa hud")
 
 local IsValid = IsValid
 local CurTime = CurTime

@@ -1,3 +1,6 @@
+local hg_selfpreservation = ConVarExists("hg_selfpreservation") and GetConVar("hg_selfpreservation") or CreateConVar("hg_selfpreservation", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Euphoria self-preservation reactions (wound grabs, stumbling, cover); 0 = Z-City stumbling and manual wound holding", 0, 1)
+local function euphoriaOn(cvar) return hg_selfpreservation:GetBool() and cvar:GetBool() end
+
 local hg_euphoria_tension = CreateConVar("hg_euphoria_tension", "1", FCVAR_ARCHIVE + FCVAR_NOTIFY, "euphoria tension on fake ragdolls", 0, 1)
 local hg_euphoria_stumble = CreateConVar("hg_euphoria_stumble", "1", FCVAR_ARCHIVE + FCVAR_NOTIFY, "euphoria landing absorb and settle on fake ragdolls", 0, 1)
 local hg_euphoria_detail = CreateConVar("hg_euphoria_detail", "1", FCVAR_ARCHIVE + FCVAR_NOTIFY, "euphoria detail reactions (wound grab, wall grab, get-up)", 0, 1)
@@ -213,7 +216,7 @@ local function bleederPos(org, ragdoll)
 end
 
 local function startWoundGrab(ply, ragdoll, hitPos, force, duration)
-	if not hg_euphoria_detail:GetBool() or not canWoundGrab(ply) then return end
+	if not euphoriaOn(hg_euphoria_detail) or not canWoundGrab(ply) then return end
 	local rootPhys = ragdoll:GetPhysicsObject()
 	local rootPos = IsValid(rootPhys) and rootPhys:GetPos() or ragdoll:GetPos()
 	local org = ply.organism
@@ -281,7 +284,7 @@ local function landingReaction(ragdoll, ply, hSpeed)
 end
 
 local function startGetUp(ragdoll, ply)
-	if not hg_euphoria_detail:GetBool() then return end
+	if not euphoriaOn(hg_euphoria_detail) then return end
 	if not IsValid(ply) or not ply:Alive() then return end
 	local org = ply.organism
 	if not org or not org.canmove then return end
@@ -316,7 +319,7 @@ hook.Add("EntityTakeDamage", "HG_EuphoriaHit", function(ent, dmgInfo)
 
 	local now = SysTime()
 	if not IsValid(ragdoll) then
-		if ent:IsPlayer() and bit.band(dmgType, DMG_BULLET + DMG_BUCKSHOT) ~= 0 and dmg >= EUPHORIA_WOUND_GRAB_MIN_DMG then
+		if ent:IsPlayer() and bit.band(dmgType, DMG_BULLET + DMG_BUCKSHOT + DMG_SLASH) ~= 0 and dmg >= EUPHORIA_WOUND_GRAB_MIN_DMG and hg_selfpreservation:GetBool() then
 			ply.hgPendingWoundGrab = {pos = dmgInfo:GetDamagePosition(), force = dmgInfo:GetDamageForce(), untilT = now + 0.75}
 		end
 		return
@@ -329,7 +332,7 @@ hook.Add("EntityTakeDamage", "HG_EuphoriaHit", function(ent, dmgInfo)
 			ragdoll.hgBeat = { count = 0, untilT = now + EUPHORIA_CURL_WINDOW }
 		end
 		ragdoll.hgBeat.count = ragdoll.hgBeat.count + 1
-		if ragdoll.hgBeat.count >= EUPHORIA_CURL_TRIGGER and not ragdoll.hgCurl and not ragdoll.hgGetUp and hg_euphoria_detail:GetBool() then
+		if ragdoll.hgBeat.count >= EUPHORIA_CURL_TRIGGER and not ragdoll.hgCurl and not ragdoll.hgGetUp and euphoriaOn(hg_euphoria_detail) then
 			ragdoll.hgBeat = nil
 			ragdoll.hgWoundGrab = nil
 			ragdoll.hgCurl = { untilT = now + EUPHORIA_CURL_TIME, dur = EUPHORIA_CURL_TIME }
@@ -340,7 +343,7 @@ hook.Add("EntityTakeDamage", "HG_EuphoriaHit", function(ent, dmgInfo)
 
 	local strength = math.Clamp(dmg / 30, 0.4, 1.4)
 
-	if hg_euphoria_tension:GetBool() then
+	if euphoriaOn(hg_euphoria_tension) then
 		ragdoll.hgTensionUntil = SysTime() + EUPHORIA_TENSION_TIME * strength
 		ragdoll.hgTensionStrength = strength
 		ragdoll.hgTensionLinear = true
@@ -360,7 +363,7 @@ hook.Add("Fake", "HG_EuphoriaShotWoundGrab", function(ply, ragdoll)
 end)
 
 hook.Add("Ragdoll Collide", "HG_EuphoriaLanding", function(ragdoll, data)
-	if not hg_euphoria_stumble:GetBool() then return end
+	if not euphoriaOn(hg_euphoria_stumble) then return end
 	if not IsValid(ragdoll) then return end
 	if ragdoll.isSliding or ragdoll.isDropkicking then return end
 	if not IsValid(data.HitEntity) or not data.HitEntity:IsWorld() then return end
@@ -383,7 +386,7 @@ hook.Add("Ragdoll Collide", "HG_EuphoriaLanding", function(ragdoll, data)
 end)
 
 hook.Add("Think", "HG_EuphoriaSettle", function()
-	if not hg_euphoria_stumble:GetBool() then return end
+	if not euphoriaOn(hg_euphoria_stumble) then return end
 
 	local now = SysTime()
 	for i, ply in player.Iterator() do
@@ -445,7 +448,7 @@ hook.Add("Think", "HG_EuphoriaSettle", function()
 end)
 
 hook.Add("Think", "HG_EuphoriaWound", function()
-	if not hg_euphoria_detail:GetBool() then return end
+	if not euphoriaOn(hg_euphoria_detail) then return end
 
 	local now = SysTime()
 	for i, ply in player.Iterator() do
@@ -502,7 +505,7 @@ local function legRestShadow(phys, target, stiffness, damping, dtime)
 end
 
 hook.Add("Think", "HG_EuphoriaLegRest", function()
-	if not hg_euphoria_detail:GetBool() then return end
+	if not euphoriaOn(hg_euphoria_detail) then return end
 
 	for i, ply in player.Iterator() do
 		local ragdoll = ply.FakeRagdoll
@@ -565,7 +568,7 @@ local function curlTarget(ragdoll, physNum, target, stiffness, damping, dtime)
 end
 
 hook.Add("Think", "HG_EuphoriaCurl", function()
-	if not hg_euphoria_detail:GetBool() then return end
+	if not euphoriaOn(hg_euphoria_detail) then return end
 
 	local now = SysTime()
 	for i, ply in player.Iterator() do
@@ -626,7 +629,7 @@ hook.Add("Think", "HG_EuphoriaCurl", function()
 end)
 
 hook.Add("Think", "HG_EuphoriaWallGrab", function()
-	if not hg_euphoria_detail:GetBool() then return end
+	if not euphoriaOn(hg_euphoria_detail) then return end
 
 	local now = SysTime()
 	for i, ply in player.Iterator() do
@@ -701,7 +704,7 @@ hook.Add("Think", "HG_EuphoriaWallGrab", function()
 end)
 
 hook.Add("Think", "HG_EuphoriaGetUp", function()
-	if not hg_euphoria_detail:GetBool() then return end
+	if not euphoriaOn(hg_euphoria_detail) then return end
 
 	local now = SysTime()
 	for i, ply in player.Iterator() do
@@ -769,7 +772,7 @@ hook.Add("Think", "HG_EuphoriaGetUp", function()
 end)
 
 hook.Add("Think", "HG_EuphoriaTension", function()
-	if not hg_euphoria_tension:GetBool() then return end
+	if not euphoriaOn(hg_euphoria_tension) then return end
 
 	local now = SysTime()
 	for i, ply in player.Iterator() do
@@ -791,7 +794,7 @@ hook.Add("Think", "HG_EuphoriaTension", function()
 end)
 
 hook.Add("Ragdoll Collide", "HG_EuphoriaWallSmear", function(ragdoll, data)
-	if not hg_euphoria_detail:GetBool() then return end
+	if not euphoriaOn(hg_euphoria_detail) then return end
 	if not IsValid(ragdoll) then return end
 	if ragdoll.isSliding or ragdoll.isDropkicking then return end
 	if not IsValid(data.HitEntity) or not data.HitEntity:IsWorld() then return end
@@ -809,7 +812,7 @@ hook.Add("Ragdoll Collide", "HG_EuphoriaWallSmear", function(ragdoll, data)
 end)
 
 hook.Add("Think", "HG_EuphoriaWallSmear", function()
-	if not hg_euphoria_detail:GetBool() then return end
+	if not euphoriaOn(hg_euphoria_detail) then return end
 
 	local now = SysTime()
 	for i, ply in player.Iterator() do
@@ -853,7 +856,7 @@ hook.Add("Think", "HG_EuphoriaWallSmear", function()
 end)
 
 hook.Add("Think", "HG_EuphoriaAmputee", function()
-	if not hg_euphoria_detail:GetBool() then return end
+	if not euphoriaOn(hg_euphoria_detail) then return end
 
 	local now = SysTime()
 	for i, ply in player.Iterator() do

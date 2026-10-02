@@ -14,7 +14,7 @@ local mat_huy = Material("effects/blood_core")
 local cloudmat = Material("effects/smoke_b")
 local hg_old_blood = ConVarExists("hg_old_blood") and GetConVar("hg_old_blood") or CreateClientConVar("hg_old_blood", 1, true, false, "new decals, or old", 0, 1)
 local hg_oldblood = ConVarExists("hg_oldblood") and GetConVar("hg_oldblood") or CreateClientConVar("hg_oldblood", 0, true, false, "Use old Z-City blood decals", 0, 1)
-local hg_old_particle = ConVarExists("hg_old_particle") and GetConVar("hg_old_particle") or CreateClientConVar("hg_old_particle", 0, true, false, "Use Remorseism blood particles", 0, 1)
+local hg_old_particle = ConVarExists("hg_old_particle") and GetConVar("hg_old_particle") or CreateClientConVar("hg_old_particle", 0, true, false, "unc trail particles", 0, 1)
 local function useOldBloodParticles()
 	return hg_old_blood:GetBool() or hg_oldblood:GetBool() or hg_old_particle:GetBool()
 end

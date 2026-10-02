@@ -452,7 +452,7 @@ function SWEP:DoRT()
 	diffa[2] = diffa[2] * ScrH() * 2
 
 	local eyeReliefLimit = 10000.0 * (rtsize / 512) / (self.scope_blackout / 400)
-	local insideEyeRelief = digitalThermal or diffa:LengthSqr() < eyeReliefLimit
+	local insideEyeRelief = digitalThermal or self.scopeEyeBoxFree or diffa:LengthSqr() < eyeReliefLimit
 
 	if insideEyeRelief then
 		if hg_optimise_scopes:GetInt() >= 2 then
@@ -540,8 +540,10 @@ function SWEP:DoRT()
 				draw.RoundedBox(0, hitPos.x / (scrw / ScrW()) - 2, hitPos.y / (scrh / ScrH()) - 2, 4, 4, color_red)
 			end
 			local blackout = self.blackoutsize * 0.9
+			local reticleOk = self.perekrestie and not self.perekrestie:IsError()
+			local maskOk = self.scopemat and not self.scopemat:IsError()
 			surface.SetDrawColor(255, 255, 255, 255)
-			surface.SetMaterial(self.perekrestie)
+			if reticleOk then surface.SetMaterial(self.perekrestie) end
 			local stableReticle = foundatt and foundatt.stableReticle
 			local reticleX, reticleY
 			if stableReticle then
@@ -551,17 +553,21 @@ function SWEP:DoRT()
 				reticleX = x / (scrw / ScrW())
 				reticleY = y / (scrh / ScrH())
 			end
-			surface.DrawTexturedRectRotatedHuy(0, 0, (self.sizeperekrestie * rtsize / 512) / ((self.perekrestieSize and 4 ) or (self.FOVMax or 10) / 3), (self.sizeperekrestie * rtsize / 512) / ((self.perekrestieSize and 4 ) or (self.FOVMax or 10) / 3), 0, reticleY, reticleX, self.rot)
+			if reticleOk then
+				surface.DrawTexturedRectRotatedHuy(0, 0, (self.sizeperekrestie * rtsize / 512) / ((self.perekrestieSize and 4 ) or (self.FOVMax or 10) / 3), (self.sizeperekrestie * rtsize / 512) / ((self.perekrestieSize and 4 ) or (self.FOVMax or 10) / 3), 0, reticleY, reticleX, self.rot)
+			end
 
-			surface.SetDrawColor(100, 100, 100)
-			surface.SetMaterial(self.scopemat)
-			surface.DrawTexturedRectRotatedHuy(0, 0, blackout * rtsize / 512 * 2 + 512, blackout * rtsize / 512 * 2 + 512, 0, (ScrH() - y / (scrh / ScrH()) - rtsize / 2) * distMul * 1 + rtsize / 2, (ScrW() - x / (scrw / ScrW()) - rtsize / 2) * distMul * 1 + rtsize / 2)
-			surface.SetDrawColor(0, 0, 0, 255)
-			surface.SetMaterial(self.scopemat)
-			local x1 = x * math.atan(math.rad(math.cos(CurTime()) * 1))
-			local y1 = y * math.atan(math.rad(math.sin(CurTime()) * 1))
-			surface.DrawTexturedRectRotatedHuy(0, 0, blackout * 0.75 * rtsize / 512 + 512, blackout * rtsize / 512 * 0.75 + 512, 0, (y1 * 1 / (scrh / ScrH())) * distMul + rtsize / 2, (x1 * 1 / (scrw / ScrW()) * distMul) + rtsize / 2)
-			surface.DrawTexturedRectRotatedHuy(0, 0, blackout * 0.75 * rtsize / 512 + 512, blackout * rtsize / 512 * 0.75 + 512, 0, -diffa[2] * 2 * distMul + rtsize / 2, -diffa[1] * 2 * distMul + rtsize / 2)
+			if maskOk then
+				surface.SetDrawColor(100, 100, 100)
+				surface.SetMaterial(self.scopemat)
+				surface.DrawTexturedRectRotatedHuy(0, 0, blackout * rtsize / 512 * 2 + 512, blackout * rtsize / 512 * 2 + 512, 0, (ScrH() - y / (scrh / ScrH()) - rtsize / 2) * distMul * 1 + rtsize / 2, (ScrW() - x / (scrw / ScrW()) - rtsize / 2) * distMul * 1 + rtsize / 2)
+				surface.SetDrawColor(0, 0, 0, 255)
+				surface.SetMaterial(self.scopemat)
+				local x1 = x * math.atan(math.rad(math.cos(CurTime()) * 1))
+				local y1 = y * math.atan(math.rad(math.sin(CurTime()) * 1))
+				surface.DrawTexturedRectRotatedHuy(0, 0, blackout * 0.75 * rtsize / 512 + 512, blackout * rtsize / 512 * 0.75 + 512, 0, (y1 * 1 / (scrh / ScrH())) * distMul + rtsize / 2, (x1 * 1 / (scrw / ScrW()) * distMul) + rtsize / 2)
+				surface.DrawTexturedRectRotatedHuy(0, 0, blackout * 0.75 * rtsize / 512 + 512, blackout * rtsize / 512 * 0.75 + 512, 0, -diffa[2] * 2 * distMul + rtsize / 2, -diffa[1] * 2 * distMul + rtsize / 2)
+			end
 			if self.SightDrawFunc then self:SightDrawFunc() end
 			if optic and foundatt.SightDrawFunc then foundatt.SightDrawFunc(self) end
 			--surface.DrawTexturedRectRotatedHuy(rtsize / 2, rtsize / 2, blackout * rtsize / 512 + 100, blackout * rtsize / 512 + 100, self.rot, -scope_pos[3] * (self.scope_blackout * blackout / 4000), -scope_pos[2] * (self.scope_blackout * blackout / 4000))

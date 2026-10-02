@@ -153,6 +153,9 @@ function WS.GetWeaponTable( ply )
 end
 
 local scrW, scrH = ScrW(), ScrH()
+hook.Add("OnScreenSizeChanged", "ZC_WS_ScreenSize", function()
+	scrW, scrH = ScrW(), ScrH()
+end)
 
 local AcsentColor = Color(155,0,0)
 local gradient_u = Material("vgui/gradient-d")

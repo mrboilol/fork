@@ -237,7 +237,7 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	local zoom = self:IsZoom() and (IsValid(ply.FakeRagdoll) or ((self.lerpaddcloseanim * self.closeanimdis) < 3)) and (self:GetNetVar("shootgunReload", 0) < CurTime())// and (posIdle:IsEqualTol(posZoom,20))))
 	
 	--if hg_aiminganim:GetBool() then
-		self.k = Lerp(self.Ergonomics * FrameTime() * 2, self.k or 0, zoom and 1 or 0)
+		self.k = Lerp((self.AimInSpeed or self.Ergonomics) * FrameTime() * 2, self.k or 0, zoom and 1 or 0)
 	--else
 		--self.k = math.Approach(self.k or 0, zoom and 1 or 0, FrameTime() * 2)
 	--end
