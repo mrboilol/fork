@@ -1099,7 +1099,6 @@ drawFinalVitalsVignettes = function()
 
 	local org = lply.new_organism or lply.organism
 	if not org or not org.brain then return end
-	if org.otrub and org.incapacitated and (tonumber(org.deathStateEnd) or 0) > 0 then return end
 	local blood = math.Clamp(tonumber(org.blood) or 5000, 0, 5000)
 	local activeBleed = math.Clamp((tonumber(org.bleed) or 0) / 10, 0, 1)
 	local internalBleed = math.Clamp((tonumber(org.internalBleed) or 0) / 5, 0, 1)
@@ -1270,64 +1269,39 @@ drawFinalVitalsVignettes = function()
 		surface.SetDrawColor(255, 255, 255, 255)
 	end
 
-	local o2Range = math.max(tonumber(org.o2 and org.o2.range) or 30, 1)
-	local o2Value = math.Clamp(tonumber(org.o2 and org.o2[1]) or o2Range, 0, o2Range)
-	local lowOxygenSeverity = math.Clamp((o2Range * 0.5 - o2Value) / (o2Range * 0.5), 0, 1)
-	local unconsciousHypoxia = org.otrub and math.max(lowOxygenSeverity, 0.22) or lowOxygenSeverity
-	local lowOxygenVignette = unconsciousHypoxia
-	if lowOxygenVignette > 0.005 then
-		local faintGate = math.max(otrubVisualLerp, consciousnessVignetteLerp)
-		local oxygenVignette = lowOxygenVignette * faintGate
-		if oxygenVignette > 0.005 then
-			local oxygenCoverage = math.Clamp(0.45 + oxygenVignette * 2.65, 0, 3.1)
-			local oxygenBorder = math.Clamp(0.12 + oxygenVignette ^ 0.82 * 0.7, 0, 0.82)
-			render.UpdateScreenEffectTexture()
-			vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
-			vignetteMat:SetFloat("$c0_z", scaleVignette(oxygenBorder))
-			vignetteMat:SetFloat("$c1_y", scaleVignette(oxygenCoverage))
-			render.SetMaterial(vignetteMat)
-			render.DrawScreenQuad()
-		end
-
-		noiseMat:SetFloat("$c0_y", 1 - lowOxygenVignette * 0.35)
+	if O2Lerp > 1 then
+		render.UpdateScreenEffectTexture()
+		noiseMat:SetFloat("$c0_y", 1 - O2Lerp / 200)
 		noiseMat:SetFloat("$c0_z", 1)
-		noiseMat:SetFloat("$c1_x", math.Clamp(lowOxygenVignette * 0.22, 0, 0.5))
-		noiseMat:SetFloat("$c1_y", lowOxygenVignette * 3.2)
+		noiseMat:SetFloat("$c1_x", math.Clamp(O2Lerp / 200, 0, 2))
+		noiseMat:SetFloat("$c1_y", O2Lerp * (org.otrub and 1 or 0.05))
 		noiseMat:SetFloat("$c2_x", CurTime() + 10000)
 		render.SetMaterial(noiseMat)
 		render.DrawScreenQuad()
 	end
+
 	local excruciatingBlend = getServerSoundMode("hg_painsound", 6) == 6
 		and getPainLayerBlend(org.pain or 0, painExcruciatingThreshold)
 		or 0
 	painThresholdIntensityLerp = LerpFT(painLayerFadeLerp, painThresholdIntensityLerp or 1, 1 + excruciatingBlend * painEffectIntensity)
 
 	if PainLerp > 0.001 or (org.pain or 0) > 5 or org.otrub then
-		local strobe = getPainPulse(org)
-		local pain = math.max((PainLerp + strobe) * painThresholdIntensityLerp, math.max((org.pain or 0) - 5, 0))
-		local painSeverity = math.Clamp(pain / painThresholdMax, 0, 1.35)
-		local painBorder = math.Clamp(painSeverity ^ 0.78 * 2.2, 0, Lerp(engulf, 1, 2.2))
-		local painCoverage = math.Clamp(painSeverity ^ 0.72 * 6, 0, Lerp(engulf, 2.4, 6))
-		local painVignette = pain / 32 * painEffectIntensity
-		painBorder = math.max(painBorder, painVignette)
-		painCoverage = math.max(painCoverage, painVignette)
+		local pain = (PainLerp + getPainStrobe(org)) * painThresholdIntensityLerp
+		local painVignette = math.Clamp(pain / 40 + math.max((shockLerp or 0) - 5, 0) / 6, 0, 5)
 		render.UpdateScreenEffectTexture()
 		vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
-		vignetteMat:SetFloat("$c0_z", scaleVignette(painBorder))
-		vignetteMat:SetFloat("$c1_y", scaleVignette(painCoverage))
+		vignetteMat:SetFloat("$c0_z", scaleVignette(org.otrub and 1 or painVignette))
+		vignetteMat:SetFloat("$c1_y", scaleVignette(org.otrub and 5 or painVignette))
 		render.SetMaterial(vignetteMat)
 		render.DrawScreenQuad()
 
 		render.UpdateScreenEffectTexture()
 		painMat:SetFloat("$c2_x", CurTime() + 10000)
-		painMat:SetFloat("$c0_y", math.Clamp(0.3 + painSeverity * 0.65, 0.3, 0.95))
-		painMat:SetFloat("$c0_z", math.Clamp(0.85 + painSeverity * 1.4, 0.85, 2.75))
-		local grainCoverage = math.max(
-			math.Clamp(painSeverity ^ 0.8 * 1.65, 0, 1.65),
-			math.Clamp(pain / 55, 0, 1.3)
-		)
-		painMat:SetFloat("$c1_x", grainCoverage * 0.55)
-		painMat:SetFloat("$c1_y", grainCoverage * 2.1)
+		painMat:SetFloat("$c0_y", 0.3)
+		painMat:SetFloat("$c0_z", 1)
+		local grainCoverage = math.Clamp(pain / 90, 0, 0.75)
+		painMat:SetFloat("$c1_x", grainCoverage)
+		painMat:SetFloat("$c1_y", grainCoverage)
 		render.SetMaterial(painMat)
 		render.DrawScreenQuad()
 	end
@@ -1728,7 +1702,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 
 	local o2 = org.o2[1] or 0
 	o2 = o2 + (org.CO or 0)
-	O2Lerp = LerpFT(0.01, O2Lerp, (30 - o2) * 10 + brain * 500)
+	O2Lerp = LerpFT(0.01, O2Lerp, (30 - o2) * (org.otrub and 2 or 10) + brain * (org.otrub and 100 or 500))
 	updateSeizureEffects(org)
 
 	local panicBaseTarget = getPanicAttackFx(org)
@@ -1894,7 +1868,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	shockLerp = LerpFT(0.01, shockLerp or 0, shock)
 	consciousnessLerp = LerpFT(org.consciousness < (consciousnessLerp or 1) and 0.028 or 0.018, consciousnessLerp or 1, org.consciousness)
 	-- local immobilization = org.immobilization
-	PainLerp = LerpFT(0.05, PainLerp, math.max(pain, 0))
+	PainLerp = LerpFT(0.05, PainLerp, math.max(pain * (org.otrub and 0.2 or 1), 0))
 	assimilatedLerp = LerpFT(0.01, assimilatedLerp, (org.assimilated or 0))
 
 	if assimilatedLerp > 0.001 then
@@ -2174,17 +2148,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		lobotomy_index = 0
 	end
 
-	if O2Lerp > 1 then
-		render.UpdateScreenEffectTexture()
-		local remO2 = O2Lerp
-		noiseMat:SetFloat("$c0_y", 1 - remO2 / 200)
-		noiseMat:SetFloat("$c0_z", 1)
-		noiseMat:SetFloat("$c1_x", math.Clamp(remO2 / 420, 0, 1))
-		noiseMat:SetFloat("$c1_y", remO2 * (!org.otrub and 0.17 or 1.25))
-		noiseMat:SetFloat("$c2_x", CurTime() + 10000)
-		render.SetMaterial(noiseMat)
-		render.DrawScreenQuad()
-	end
+
 
 	local terminalDyingVolume = 0
 	if IsValid(IncapacitatedStation) then

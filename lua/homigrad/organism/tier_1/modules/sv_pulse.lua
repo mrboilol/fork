@@ -79,7 +79,6 @@ function hg.organism.EnforceBloodCirculationLimit(org)
 	org.pulseDeficit = math.max(org.heartbeat or 0, 0)
 	org.circulatoryO2Reserve = 0
 	org.perfusionO2Cap = 0
-	if org.o2 then org.o2[1] = 0 end
 
 	return true
 end
@@ -288,8 +287,17 @@ function hg.organism.GetPulseOxygenPerfusion(pulse)
 	return normalizedPulse ^ 0.65
 end
 
-function hg.organism.GetCirculatoryOxygenReserve(pulse, pressure)
-	return math.min(hg.organism.GetPulseOxygenPerfusion(pulse), Clamp((tonumber(pressure) or 0) / 45, 0, 1))
+function hg.organism.GetCirculatoryOxygenReserve(pulse, pressure, blood)
+	local normalBlood = getNormalBloodVolume()
+	local bleedoutStart = tonumber(hg.organism.BLEEDOUT_START_BLOOD) or normalBlood * 0.5
+	local bloodLoss = Clamp((normalBlood - (tonumber(blood) or normalBlood)) / math.max(normalBlood - bleedoutStart, 1), 0, 1)
+	local peripheralReserve = math.max(getHemorrhageDelivery(blood), 0.01)
+	local oxygenReserve = 1 - bloodLoss ^ 0.65 * 0.5
+	return math.min(
+		hg.organism.GetPulseOxygenPerfusion((tonumber(pulse) or 0) / peripheralReserve),
+		Clamp((tonumber(pressure) or 0) / (45 * peripheralReserve), 0, 1),
+		oxygenReserve
+	)
 end
 
 local function getHypovolemicFailureBlood()
@@ -361,12 +369,12 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 
 	local o2Range = math.max(tonumber(org.o2.range) or 30, 1)
 	local oxygenReserve = Clamp((tonumber(org.o2[1]) or 0) / o2Range, 0, 1)
-	local effectiveCirculation = hg.organism.GetCirculatoryOxygenReserve(org.pulse, org.bloodPressure)
+	local effectiveCirculation = hg.organism.GetCirculatoryOxygenReserve(org.pulse, org.bloodPressure, org.blood)
 	local cerebralPerfusion = effectiveCirculation
 	local peripheralPerfusion = effectiveCirculation * Clamp(1 - (org.sympatheticCompensation or 0) * 0.45, 0.55, 1)
 	local neckPenalty = Clamp(tonumber(org.neckBrainOxygenPenalty) or 0, 0, 0.8)
-	local brainTarget = math.max(math.min(oxygenReserve, cerebralPerfusion) - neckPenalty, 0)
-	local bodyTarget = math.min(oxygenReserve, peripheralPerfusion)
+	local brainTarget = math.max((org.heartstop and oxygenReserve or math.min(oxygenReserve, cerebralPerfusion)) - neckPenalty, 0)
+	local bodyTarget = org.heartstop and oxygenReserve or math.min(oxygenReserve, peripheralPerfusion)
 
 	org.perfusion = Approach(tonumber(org.perfusion) or 1, effectiveCirculation, timeValue * 0.9)
 	org.cerebralPerfusion = Approach(tonumber(org.cerebralPerfusion) or 1, cerebralPerfusion, timeValue * 1.15)
@@ -1222,7 +1230,7 @@ module[2] = function(owner, org, timeValue)
 	local zerlkersSuppression = math.Clamp(org.zerlkersOverdose or 0, 0, 1)
 	local drugBradycardia = math.Clamp(((org.drugRespiratoryDepression or 0) - 0.12) / 0.88, 0, 1)
 	local cervicalSuppression = org.cervicalParalysis and 0.58 or 0
-	local bradycardiaSeverity = math.max(cerebralSuppression, hypoxiaSuppression, cardiacSuppression * 0.9, coldSuppression, zerlkersSuppression, drugBradycardia * 0.9, cervicalSuppression, hemorrhagicDecompensation * 0.85)
+	local bradycardiaSeverity = math.max(cerebralSuppression, hypoxiaSuppression, cardiacSuppression * 0.9, coldSuppression, zerlkersSuppression, drugBradycardia * 0.9, cervicalSuppression)
 	org.bradycardiaSeverity = bradycardiaSeverity
 	org.drugBradycardia = drugBradycardia
 	org.hemorrhagicDecompensation = hemorrhagicDecompensation
@@ -1444,13 +1452,17 @@ module[2] = function(owner, org, timeValue)
 		end
 	end
 
-	if org.heartbeat >= terminalHeartRate then
+	if not org.heartstop and bloodNow < normalBloodVolume and org.heartbeat >= terminalHeartRate - 10
+		and not restartCirculationActive then
+		org.heartstop = true
+		org.terminalRhythm = "terminal_tachycardia"
+	elseif not org.heartstop and org.heartbeat >= terminalHeartRate then
 		org.terminalRhythm = "terminal_tachycardia"
 		hg.organism.StartFibrillation(org)
 	end
 
 	if org.fibrillation then
-		org.o2[1] = max(org.o2[1] - timeValue * 1.8, 0)
+		if not org.heartstop then org.o2[1] = max(org.o2[1] - timeValue * 1.8, 0) end
 		local vfElapsed = CurTime() - (org.fibrillationStart or CurTime())
 		local minVF = math.max(tonumber(cfg.HEMORRHAGE_VF_MIN_SECONDS) or 6, 1)
 		local noUsefulOutput = (org.cardiacOutput or 0) < 0.08
@@ -1666,7 +1678,6 @@ module[2] = function(owner, org, timeValue)
 		org.heartbeat = 0
 		org.pulse = 0
 		org.ecgState = "asystole"
-		if org.o2 then org.o2[1] = 0 end
 	end
 
 	if org.heartstop then

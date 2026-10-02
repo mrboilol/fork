@@ -864,6 +864,7 @@ module[2] = function(owner, org, timeValue)
 		-- The reserve cap must follow remaining lung tissue as well as the intake
 		-- rate above.  A small floor keeps a critically injured but not yet fully
 		-- failed lung from snapping to zero in one tick.
+		if org.heartstop then regenerate = 0 end
 		local lungO2Cap = o2.range * math.max(1 - org.pneumothorax * org.pneumothorax, 0.1) * math.max(1 - (org.hemothorax or 0) * (org.hemothorax or 0), 0.1) * math.max(1 - lungDamage, 0.1)
 		o2[1] = min(o2[1] + regenerate * math.Clamp(org.o2[1] / 30, 0.25, 1) * (org.holdingbreath and 0 or 1) * (sprayed and 0 or 1) * min((10 / max(org.CO,1)),1), min(lungO2Cap, bloodO2Cap, coldO2Cap, altitudeO2Cap, exertionO2Cap))
 
@@ -992,7 +993,7 @@ module[2] = function(owner, org, timeValue)
 
 		-- Struggling to catch breath: when curregen can't match O2 demand, extra drain from shallow breathing
 
-		if o2.curregen >= 0 and o2.curregen < losing_oxy then
+		if not org.heartstop and o2.curregen >= 0 and o2.curregen < losing_oxy then
 
 			local struggleRatio = 1 - (o2.curregen / losing_oxy)
 
@@ -1030,7 +1031,7 @@ module[2] = function(owner, org, timeValue)
 	end
 
 	local rawTissuePerfusion = math.min(
-		hg.organism.GetCirculatoryOxygenReserve(org.pulse, tonumber(org.bloodPressure) or 90),
+		hg.organism.GetCirculatoryOxygenReserve(org.pulse, tonumber(org.bloodPressure) or 90, org.blood),
 		math.Clamp(((tonumber(org.blood) or 5000) - (hg.organism.PULSELESS_BLOOD_VOLUME or 2000)) / 500, 0, 1),
 		1 - math.Clamp(org.hypertension or 0, 0, 1) ^ 2 * 0.85
 	)

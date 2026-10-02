@@ -506,7 +506,7 @@ local remDeathStateColor = Color(255, 255, 255, 0)
 local wasMemoryDamaged = false
 local wasMemoryOtrub = false
 
-hook.Add("HUDPaintBackground", "organism-otrub-overlay", function()
+hook.Add("Post Post Processing", "organism-otrub-overlay", function()
 	if not IsValid(lply) or not lply:Alive() then
 		blackoutLerp = 0
 		wasMemoryDamaged = false
@@ -545,7 +545,7 @@ hook.Add("HUDPaintBackground", "organism-otrub-overlay", function()
 			local part2 = math.ease.InOutSine(math.sin(((part % time) - time / 3) / (time / 3 * 2) * math.pi))
 			lerpedpart = LerpFT(0.1, lerpedpart, part2)
 
-			surface.SetDrawColor(255, 255, 255, math.Clamp(lerpedpart * 160, 0, 255))
+			surface.SetDrawColor(255, 255, 255, math.Clamp(lerpedpart * 50, 0, 255))
 			surface.SetMaterial(screens[curscreen])
 			surface.DrawTexturedRect(0, 0, ScrW(), ScrH())
 
@@ -562,7 +562,7 @@ hook.Add("HUDPaintBackground", "organism-otrub-overlay", function()
 	if deathStateEnd then
 		local remaining = math.max(deathStateEnd - CurTime(), 0)
 		remDeathStateColor.a = math.Clamp((INCAPACITATION_DEATH_TIME - remaining) / 2, 0, 1) * 255
-		draw.SimpleText("You are incapacitated, You will die in " .. math.ceil(remaining), "RemDeathStateFont", ScrW() / 2, ScrH() / 2, remDeathStateColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		draw.SimpleText("You are incapacitated, You will die in " .. math.ceil(remaining), "RemDeathStateFont", ScrW() / 2, ScrH() * 0.62, remDeathStateColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 	end
 end)
 

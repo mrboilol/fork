@@ -34,7 +34,6 @@ local awakeECGAlpha = 0
 local lastECGState
 local ecgStateAlertUntil = 0
 local ecgStateAlertDuration = 1
-local lastHeartBeat = 0
 local heartPhase = 0
 
 local awakeECGSeverityByState = {
@@ -89,7 +88,6 @@ local function UpdateECGStateAlert(ecgState)
     return math.Clamp((ecgStateAlertUntil - CurTime()) / math.max(ecgStateAlertDuration, 0.01), 0, 1)
 end
 
--- Better sound system from oldring
 local SOUND_HEART = "heartbeat/heartbeat_single.ogg"
 local SOUND_CRITICAL_HEART = "health/critbeat.mp3"
 local SOUND_FLATLINE = "health/gg.mp3"
@@ -364,6 +362,9 @@ local function UpdateRingAudio(heartRate, ringAlpha, org)
     lastPhaseMod = curr
 
     local mechanicalStrength = GetMechanicalPulseStrength(org)
+    if not org.heartstop and (tonumber(org.pulse) or 0) > 0 and UseCriticalHeartbeat(org) then
+        mechanicalStrength = math.max(mechanicalStrength, 0.25)
+    end
     local beatVolume = GetHeartbeatVolume(org) * ringAlpha * mechanicalStrength
     if PhaseCrossed(prev, curr, 0.239) then
         if mechanicalStrength > 0.02 and not (org.ecgState == "sinus_pause" and math.floor(heartPhase) % 4 == 3) then
@@ -825,6 +826,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     -- Allow a new flatline only after the heart has actually recovered.
     if ecgState ~= "asystole" and wasHeartbeatZero then
         flatlinePlayedThisLife = false
+        if IsValid(flatlineStation) then flatlineStation:Stop() end
     end
     wasHeartbeatZero = ecgState == "asystole"
 
@@ -883,8 +885,6 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         if ringAlpha <= 0.01 and not showAwakeECG then
             ringAlpha = 0
                 centerEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
-            lastPhaseMod = 0
-            ResetRingAudio()
         end
     end
     wasUnconsciousState = isUnconscious
@@ -932,7 +932,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         showPulseCheckECG = true
     end
 
-    -- Determine if we should show otrub ECG (for unconscious or awake with abnormal heartbeat/admiring/recent sudden drop)
+    UpdateRingAudio(heartbeat, 1, org)
 
     if ringAlpha <= 0 and awakeECGAlpha <= 0.01 and not showPulseCheckECG then
         return
@@ -940,14 +940,10 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     local otrubECGAlpha = (isUnconscious or lowConsciousness) and ecgRingAlpha * ecgMemoryFade or awakeECGAlpha
     local incapPromptX, incapPromptY = ScrW() * 0.5, math.max(ScrH() * 0.1, ScreenScaleH(20))
     
-    if (isUnconscious or lowConsciousness) and ringAlpha > 0.01 and not IsValid(g_PulseCheckTarget) then
-        UpdateRingAudio(heartbeat, ringAlpha, org)
-    end
-
-    if otrubECGAlpha > 0.01 then
+    if otrubECGAlpha > 0.01 and not showPulseCheckECG then
         local scrW, scrH = ScrW(), ScrH()
         local centerX, centerY = scrW * 0.5, scrH * 0.5
-        local ecgCenterY = centerY - math.min(scrH * 0.1, ScreenScaleH(92))
+        local ecgCenterY = centerY
         local showLegacyECG = isUnconscious or lowConsciousness or abnormalECG
             or (not isUnconscious and not lowConsciousness and (sinusECGTail > 0 or admiring))
 
@@ -967,7 +963,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         local fade = ringAlpha
         local urgency = terminal and math.Clamp((5 - remaining) / 5, 0, 1) or 0
         local pulseAlpha = 0.82 + math.abs(math.sin(CurTime() * 6)) * 0.18 * urgency
-        local promptColor = terminal and Color(235, 55, 45, 245 * fade * pulseAlpha) or Color(225, 225, 225, 235 * fade)
+        local promptColor = terminal and Color(235, 55, 45, 80 * fade * pulseAlpha) or Color(225, 225, 225, 70 * fade)
 
         local messageY = incapPromptY
         if terminal then
@@ -981,7 +977,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
                     TEXT_ALIGN_CENTER,
                     TEXT_ALIGN_TOP,
                     1,
-                    Color(0, 0, 0, 220 * fade)
+                    Color(0, 0, 0, 35 * fade)
                 )
                 messageY = messageY + ScreenScaleH(14)
             end
@@ -996,7 +992,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
             TEXT_ALIGN_CENTER,
             TEXT_ALIGN_TOP,
             1,
-            Color(0, 0, 0, 220 * fade)
+            Color(0, 0, 0, 35 * fade)
         )
     end
 
@@ -1013,16 +1009,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
             ecgAlphaPulseCheck = 0
         else
             local boxW, boxH = 300, 150
-            local boxX, boxY = ScrW() / 2 - boxW / 2, ScrH() - boxH - 60
-            local handBone = ply:LookupBone("ValveBiped.Bip01_L_Hand") or ply:LookupBone("ValveBiped.Bip01_R_Hand")
-            local handMatrix = handBone and ply:GetBoneMatrix(handBone)
-            if handMatrix then
-                local handScreen = handMatrix:GetTranslation():ToScreen()
-                if handScreen.visible then
-                    boxX = math.Clamp(handScreen.x - boxW / 2, 10, ScrW() - boxW - 10)
-                    boxY = math.Clamp(handScreen.y - boxH - 36, 10, ScrH() - boxH - 10)
-                end
-            end
+            local boxX, boxY = ScrW() / 2 - boxW / 2, ScrH() / 2 - boxH / 2
 
             surface.SetDrawColor(0, 0, 0, 150 * ecgAlphaPulseCheck)
             surface.DrawRect(boxX, boxY, boxW, boxH)
@@ -1045,28 +1032,6 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         pulseCheckEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
     end
 
-
-    if heartbeat >= 1 and not isCheckingPulse and (admiring or isUnconscious or isCritical) then
-        if IsValid(flatlineStation) and flatlineStation:GetState() == GMOD_CHANNEL_PLAYING then
-            flatlineStation:Stop()
-        end
-
-        if admiring or isUnconscious or isCheckingPulse or isCritical then
-            -- Skip oldring sound system when unconscious ring is active with EKG mode
-            if not (isUnconscious and ringAlpha > 0.01 and not (hg_unconsciousclassic and hg_unconsciousclassic:GetBool())) then
-                local currentHeartBeat = math.floor(heartPhase)
-                if currentHeartBeat > lastHeartBeat then
-                    lastHeartBeat = currentHeartBeat
-
-                    local mechanicalStrength = GetMechanicalPulseStrength(org)
-                    local vol = GetHeartbeatVolume(org) * mechanicalStrength
-                    if mechanicalStrength > 0.02 and not (ecgState == "sinus_pause" and currentHeartBeat % 4 == 3) then
-                        EmitRingSound(UseCriticalHeartbeat(org) and SOUND_CRITICAL_HEART or SOUND_HEART, vol)
-                    end
-                end
-            end
-        end
-    end
 
     if healthAlarmActive then
         local flashCycle = math.floor(CurTime() / 0.65)
