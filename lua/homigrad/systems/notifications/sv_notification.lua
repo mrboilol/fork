@@ -504,6 +504,7 @@ SCPCBCreateThought = function(ply, category, dmgType, isLethal)
 
     if CreateThought(ply, msg, delay, "scpcb_damage_" .. targetCategory, 0, color_white) then
         ply.scpcbThoughtNext = curTime + (isLethal and 1 or (category == "near_miss" and 6 or 4))
+        return true
     end
 end
 
@@ -848,6 +849,36 @@ hook.Add("EntityTakeDamage", "SCPCB_HGThoughtDamage", function(target, dmginfo)
     SCPCBHitThought(ply, target, dmgType, dmginfo:GetDamage(), nil, dmginfo)
 end)
 
+local function SCPCBCheckBulletNearMiss(entity, shooter, src, hitPos, hitEntity, reported)
+	local dir = hitPos - src
+	local length = dir:Length()
+	if length <= 0 then return end
+	dir:Normalize()
+	local hitPly = SCPCBThoughtOwner(hitEntity)
+	local now = CurTime()
+
+	for _, ply in player.Iterator() do
+		if not ply:Alive() or ply == shooter or ply == entity or ply == hitPly then continue end
+		if (ply.scpcbThoughtHitTime or 0) >= now or (reported and reported[ply]) then continue end
+		local body = hg.GetCurrentCharacter(ply)
+		if not IsValid(body) then continue end
+		local plyPos = body:IsPlayer() and body:GetPos() + Vector(0, 0, 50) or body:WorldSpaceCenter()
+		local projection = math.Clamp((plyPos - src):Dot(dir), 0, length)
+		local closestPoint = src + dir * projection
+
+		if plyPos:DistToSqr(closestPoint) < 125 * 125 then
+			if SCPCBCreateThought(ply, "near_miss", "bullet", false) and reported then
+				reported[ply] = true
+			end
+		end
+	end
+end
+
+hook.Add("HG.Plugin.List[PhysBullet].Hooks[BulletNearMiss]", "SCPCB_HGThoughtNearMiss", function(bullet, src, hitPos, hitEntity)
+	bullet.scpcbNearMissPlayers = bullet.scpcbNearMissPlayers or {}
+	SCPCBCheckBulletNearMiss(bullet.Inflictor, bullet.Shooter, src, hitPos, hitEntity, bullet.scpcbNearMissPlayers)
+end)
+
 hook.Add("EntityFireBullets", "SCPCB_HGThoughtNearMiss", function(entity, data)
     if not IsValid(entity) then return end
     if (data.limit_ricochet or 0) > 0 or (data.penetrated or 0) > 0 then return end
@@ -865,25 +896,8 @@ hook.Add("EntityFireBullets", "SCPCB_HGThoughtNearMiss", function(entity, data)
             SCPCBHitThought(hitPly, tr.Entity, "bullet", dmginfo:GetDamage(), tr.HitPos, dmginfo)
         end
 
-        local src = data.Src
-        local hitPos = tr.HitPos
-        local dir = hitPos - src
-        local length = dir:Length()
-
-        if length > 0 then
-            dir:Normalize()
-
-            for _, ply in ipairs(player.GetAll()) do
-                if IsValid(ply) and ply:Alive() and ply != shooter and ply != entity and ply != hitPly and not blocked and (ply.scpcbThoughtHitTime or 0) < CurTime() then
-                    local plyPos = ply:GetPos() + Vector(0, 0, 50)
-                    local projection = math.Clamp((plyPos - src):Dot(dir), 0, length)
-                    local closestPoint = src + dir * projection
-
-                    if plyPos:Distance(closestPoint) < 125 then
-                        SCPCBCreateThought(ply, "near_miss", "bullet", false)
-                    end
-                end
-            end
+        if not blocked then
+            SCPCBCheckBulletNearMiss(entity, shooter, data.Src, tr.HitPos, tr.Entity)
         end
 
         if oldCallback then return oldCallback(attacker, tr, dmginfo) end

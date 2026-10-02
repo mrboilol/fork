@@ -481,6 +481,10 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 				end
 			end
 			
+			if SERVER and not self.PenetratingMaterial then
+				PLUGIN:RunHook("BulletNearMiss", self, hull_trace.start, trace.HitPos, trace.Entity)
+			end
+
 			trace_hit = trace.Hit
 			
 			if(self.PenetratingMaterial)then
