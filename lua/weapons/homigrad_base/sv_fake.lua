@@ -1,6 +1,8 @@
 --
 SWEP.WorkWithFake = true
 
+local RAGDOLL_MISFIRE_CHANCE = 4
+
 local function manipulateRightFingerChainSafe(ragdoll, ang, startIndex)
 	if not IsValid(ragdoll) then return end
 
@@ -54,7 +56,9 @@ hook.Add("Fake", "weapons", function(ply, ragdoll)
 	local wep = ply:GetActiveWeapon()
 	if IsValid(wep) and wep.WorkWithFake and IsValid(ply.ActiveWeapon) then
 		ply:SetActiveWeapon(ply.ActiveWeapon)
-		--wep:CreateFake(ragdoll)
+		if ragdoll.HGFakeReason ~= "voluntary" and wep.ishgweapon and math.random(RAGDOLL_MISFIRE_CHANCE) == 1 then
+			wep:PrimaryAttack(true)
+		end
 	else
 		if IsValid(wep) and wep.Holster then
                         wep:Holster(hg.GetHandsWeapon and hg.GetHandsWeapon(ply) or ply:GetWeapon("weapon_hands_sh"))

@@ -204,7 +204,6 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	
 	if lastPosSelected + 0.1 * (inpain and 0.1 or 1) < CurTime() then
 		lastPosSelected = CurTime()
-		--randomPos = 0.75 * VectorRand(-0.75, 0.75)
 		randomPos = (inpain and 1.5 - (1 * painmul) or 1) * ((lastzoom - CurTime() + tta) < 0 and ply.organism and ply.organism.holdingbreath and 0.25 or 1) * 0.5 * Vector(math.random(2) == 1 and math.Rand(-0.75, -0.5) or math.Rand(0.5, 0.75), math.random(2) == 1 and math.Rand(-0.75, -0.5) or math.Rand(0.5, 0.75), math.random(2) == 1 and math.Rand(-0.75, -0.5) or math.Rand(0.5, 0.75))
 	end
 
@@ -213,7 +212,7 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	scopedLerpAddvec = LerpVectorFT(((false or self.shot2 == 1) and 1 or 0.02) * (cocking and 0.25 or 1) * (inpain and 1 or 1), scopedLerpAddvec, (cocking and 1 or 1) * (justzoomed and 0.5 or 1) * (self.shot2 == 1 and 0.5 or 1) * 3 * randomPosL * slowlyZooming)
 	if !hg_oldsights:GetBool() then
 		if not (ply:IsSuperAdmin() and hg_setzoompos:GetBool()) then
-			posZoom:Add(scopedLerpAddvec)
+			posZoom:Add(angPos:Right() * scopedLerpAddvec[2] + angPos:Up() * scopedLerpAddvec[3])
 		end
 	end
 	oldzoom = zooming
