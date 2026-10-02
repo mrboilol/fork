@@ -52,6 +52,9 @@ local function DrawNoise(amt, alpha)
 end
 
 function RenderNVGOverlay(self, ply)
+	if not self:GetEnabled() then
+		hg.DrawFirstPersonHelmet(self,ply)
+	end
     if !self.GetEnabled or !self:GetEnabled() then 
         if IsValid(lply.NVGLamp) then
             lply.NVGLamp:Remove()

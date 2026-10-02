@@ -114,10 +114,22 @@ if CLIENT then
         cam.Start3D(view.origin,view.angles,view.fov + fFov,nil,nil,nil,nil,1,10)
             --cam.IgnoreZ(true)
             local viewpunching = GetViewPunchAngles() / 2
+            viewpunching.r = 0
             local ang = view.angles + viewpunching
             mdl:SetRenderOrigin(view.origin + ang:Forward() * (vecAdjust.x + (gp and vecAdjust2.x or 0)) + ang:Right() * (vecAdjust.y + (gp and vecAdjust2.y or 0)) + ang:Up() * (vecAdjust.z + (gp and vecAdjust2.z or 0)))
-            mdl:SetRenderAngles(ang)
             mdl2:SetRenderOrigin(view.origin + ang:Forward() * (vecAdjust.x + (gp and vecAdjust2.x or 0)) + ang:Right() * (vecAdjust.y + (gp and vecAdjust2.y or 0)) + ang:Up() * (vecAdjust.z + (gp and vecAdjust2.z or 0)))
+            
+            if self.Overlay.AngAdjust then
+                ang:RotateAroundAxis(ang:Right(), self.Overlay.AngAdjust[1] )
+                ang:RotateAroundAxis(ang:Forward(), self.Overlay.AngAdjust[2] )
+                ang:RotateAroundAxis(ang:Up(), self.Overlay.AngAdjust[3] )
+            end
+
+            if self.RenderModifyPosAng then
+                self:RenderModifyPosAng(entDrawOn, pos, ang)
+            end
+
+            mdl:SetRenderAngles(ang)
             mdl2:SetRenderAngles(ang)
             mdl:SetParent(ply, ply:LookupBone("ValveBiped.Bip01_Head1"))
             render.SetColorModulation(1,1,1)
