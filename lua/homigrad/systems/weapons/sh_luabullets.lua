@@ -1370,5 +1370,6 @@ function PLAYER:FireCSSBullets(tInfo)
 	
 	if (bIsPlayer) then
 		self:LagCompensation(false)
+		self.bullet = nil
 	end
 end
