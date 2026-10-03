@@ -3969,6 +3969,17 @@ function SWEP:CustomThink()
                     dmg = dmg / 1.5
                 end
                                 
+                local hitForce = trace.Normal * math.min(dmg, 35) * 400 * (self.RagdollHitForceMul or 1)
+                if self:IsHeadHit(ent, trace) then
+                    hitForce.x = hitForce.x * (self.HeadRagdollForceMul or 1.35)
+                    hitForce.y = hitForce.y * (self.HeadRagdollForceMul or 1.35)
+                    hitForce.z = hitForce.z * (self.HeadRagdollUpMul or 1.2)
+                end
+                local ragdoll = ent:IsRagdoll() and ent
+                    or ent:IsPlayer() and (IsValid(ent.FakeRagdoll) and ent.FakeRagdoll or ent:GetNWEntity("RagdollDeath"))
+                if IsValid(ragdoll) then ragdoll.hgMeleeImpulseUntil = CurTime() + 0.25 end
+                if not ent:IsRagdoll() then hg.AddForceRag(ent, trace.PhysicsBone or 0, hitForce, 0.5) end
+
                 local dmginfo = DamageInfo()
 
                 dmginfo:SetAttacker(owner)
@@ -3988,17 +3999,6 @@ function SWEP:CustomThink()
                 if blockState == "none" or blockState == "break" then
                     self:PlaySoftHitSounds(owner, ent, trace, false)
                 end
-                
-                local hitForce = trace.Normal * math.min(dmg, 35) * 400 * (self.RagdollHitForceMul or 1)
-                if self:IsHeadHit(ent, trace) then
-                    hitForce.x = hitForce.x * (self.HeadRagdollForceMul or 1.35)
-                    hitForce.y = hitForce.y * (self.HeadRagdollForceMul or 1.35)
-                    hitForce.z = hitForce.z * (self.HeadRagdollUpMul or 1.2)
-                end
-                local ragdoll = ent:IsRagdoll() and ent
-                    or ent:IsPlayer() and (IsValid(ent.FakeRagdoll) and ent.FakeRagdoll or ent:GetNWEntity("RagdollDeath"))
-                if IsValid(ragdoll) then ragdoll.hgMeleeImpulseUntil = CurTime() + 0.25 end
-                if not ent:IsRagdoll() then hg.AddForceRag(ent, trace.PhysicsBone or 0, hitForce, 0.5) end
 
                 self:PunchPlayer(ent, false, trace.Normal, dmg)
 
@@ -4152,6 +4152,18 @@ function SWEP:CustomThink()
                     dmg = dmg / math.max(1,self.AttackRads2 * self.Attack2TimeLength)
                 end
 
+                local hitForce = trace.Normal * math.min(dmg, 35) * 400 * (self.RagdollHitForceMul or 1)
+                if self:IsHeadHit(ent, trace) then
+                    hitForce.x = hitForce.x * (self.HeadRagdollForceMul or 1.35)
+                    hitForce.y = hitForce.y * (self.HeadRagdollForceMul or 1.35)
+                    hitForce.z = hitForce.z * (self.HeadRagdollUpMul or 1.2)
+                end
+
+                local ragdoll = ent:IsRagdoll() and ent
+                    or ent:IsPlayer() and (IsValid(ent.FakeRagdoll) and ent.FakeRagdoll or ent:GetNWEntity("RagdollDeath"))
+                if IsValid(ragdoll) then ragdoll.hgMeleeImpulseUntil = CurTime() + 0.25 end
+                if not ent:IsRagdoll() then hg.AddForceRag(ent, trace.PhysicsBone or 0, hitForce, 0.5) end
+
                 local dmginfo = DamageInfo()
 
                 dmginfo:SetAttacker(owner)
@@ -4174,17 +4186,6 @@ function SWEP:CustomThink()
                 end
 
                 local phys = ent:GetPhysicsObjectNum(trace.PhysicsBone or 0)
-                local hitForce = trace.Normal * math.min(dmg, 35) * 400 * (self.RagdollHitForceMul or 1)
-                if self:IsHeadHit(ent, trace) then
-                    hitForce.x = hitForce.x * (self.HeadRagdollForceMul or 1.35)
-                    hitForce.y = hitForce.y * (self.HeadRagdollForceMul or 1.35)
-                    hitForce.z = hitForce.z * (self.HeadRagdollUpMul or 1.2)
-                end
-
-                local ragdoll = ent:IsRagdoll() and ent
-                    or ent:IsPlayer() and (IsValid(ent.FakeRagdoll) and ent.FakeRagdoll or ent:GetNWEntity("RagdollDeath"))
-                if IsValid(ragdoll) then ragdoll.hgMeleeImpulseUntil = CurTime() + 0.25 end
-                if not ent:IsRagdoll() then hg.AddForceRag(ent, trace.PhysicsBone or 0, hitForce, 0.5) end
 
                 self:PunchPlayer(ent, true, trace.Normal, dmg)
 
@@ -4350,6 +4351,17 @@ function SWEP:CustomThink()
                     dmg = dmg / 1.5
                 end
                                 
+                local hitForce = trace.Normal * math.min(dmg, 35) * 400 * (self.RagdollHitForceMul or 1)
+                if self:IsHeadHit(ent, trace) then
+                    hitForce.x = hitForce.x * (self.HeadRagdollForceMul or 1.35)
+                    hitForce.y = hitForce.y * (self.HeadRagdollForceMul or 1.35)
+                    hitForce.z = hitForce.z * (self.HeadRagdollUpMul or 1.2)
+                end
+                local ragdoll = ent:IsRagdoll() and ent
+                    or ent:IsPlayer() and (IsValid(ent.FakeRagdoll) and ent.FakeRagdoll or ent:GetNWEntity("RagdollDeath"))
+                if IsValid(ragdoll) then ragdoll.hgMeleeImpulseUntil = CurTime() + 0.25 end
+                if not ent:IsRagdoll() then hg.AddForceRag(ent, trace.PhysicsBone or 0, hitForce, 0.5) end
+
                 local dmginfo = DamageInfo()
 
                 dmginfo:SetAttacker(owner)
@@ -4372,17 +4384,6 @@ function SWEP:CustomThink()
                 if blockState == "none" or blockState == "break" then
                     self:PlaySoftHitSounds(owner, ent, trace, 3)
                 end
-                
-                local hitForce = trace.Normal * math.min(dmg, 35) * 400 * (self.RagdollHitForceMul or 1)
-                if self:IsHeadHit(ent, trace) then
-                    hitForce.x = hitForce.x * (self.HeadRagdollForceMul or 1.35)
-                    hitForce.y = hitForce.y * (self.HeadRagdollForceMul or 1.35)
-                    hitForce.z = hitForce.z * (self.HeadRagdollUpMul or 1.2)
-                end
-                local ragdoll = ent:IsRagdoll() and ent
-                    or ent:IsPlayer() and (IsValid(ent.FakeRagdoll) and ent.FakeRagdoll or ent:GetNWEntity("RagdollDeath"))
-                if IsValid(ragdoll) then ragdoll.hgMeleeImpulseUntil = CurTime() + 0.25 end
-                if not ent:IsRagdoll() then hg.AddForceRag(ent, trace.PhysicsBone or 0, hitForce, 0.5) end
 
                 self:PunchPlayer(ent, 3, trace.Normal, dmg)
 
@@ -5305,20 +5306,6 @@ function SWEP:NPCThink()
 					trEnt:PrecacheGibs()
 
 					dmg = dmg * mul
-					local dmginfo = DamageInfo()
-					dmginfo:SetAttacker(npc)
-					dmginfo:SetInflictor(self)
-					dmginfo:SetDamage(dmg)
-					dmginfo:SetDamageForce(trace.Normal * dmg * 1)
-					dmginfo:SetDamageType(self.DamageType)
-					dmginfo:SetDamagePosition(trace.HitPos)
-					self:SetMeleeDamageContact(trEnt, trace, dmg)
-					trEnt:TakeDamageInfo(dmginfo)
-					self.MeleeDamageContact = nil
-					if blockState == "none" or blockState == "break" then
-                        self:PlaySoftHitSounds(npc, trEnt, trace, false)
-                    end
-
 					if trEnt:IsPlayer() then
 						local hitForce = trace.Normal * math.min(dmg, 35) * 400 * (self.RagdollHitForceMul or 1)
 						if self:IsHeadHit(trEnt, trace) then
@@ -5345,6 +5332,21 @@ function SWEP:NPCThink()
 							end)
 						end
 					end
+
+					local dmginfo = DamageInfo()
+					dmginfo:SetAttacker(npc)
+					dmginfo:SetInflictor(self)
+					dmginfo:SetDamage(dmg)
+					dmginfo:SetDamageForce(trace.Normal * dmg * 1)
+					dmginfo:SetDamageType(self.DamageType)
+					dmginfo:SetDamagePosition(trace.HitPos)
+					self:SetMeleeDamageContact(trEnt, trace, dmg)
+					trEnt:TakeDamageInfo(dmginfo)
+					self.MeleeDamageContact = nil
+					if blockState == "none" or blockState == "break" then
+                        self:PlaySoftHitSounds(npc, trEnt, trace, false)
+                    end
+
 				end
 				if timer.Exists(timerId) then timer.Remove(timerId) end
 			end)
