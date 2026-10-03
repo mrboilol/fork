@@ -2,8 +2,8 @@ if (CLIENT) then return end;
 local otm_tempdoortypeslist = {["func_door"] = true,["func_door_rotating"] = true, ["prop_door_rotating"] = true,["func_movelinear"] = true};
 
 local otm_ismapbeingcleanedup_for_areaportaldooraddon = false;
-//hook.Add("PreCleanupMap","otm_door_removal_pairedareaportal_cleanup_variable_1",function() otm_ismapbeingcleanedup_for_areaportaldooraddon = true end);
-//hook.Add("PostCleanupMap","otm_door_removal_pairedareaportal_cleanup_variable_2",function() otm_ismapbeingcleanedup_for_areaportaldooraddon = false end);
+hook.Add("PreCleanupMap","otm_door_removal_pairedareaportal_cleanup_variable_1",function() otm_ismapbeingcleanedup_for_areaportaldooraddon = true end);
+hook.Add("PostCleanupMap","otm_door_removal_pairedareaportal_cleanup_variable_2",function() otm_ismapbeingcleanedup_for_areaportaldooraddon = false end);
 
 
 

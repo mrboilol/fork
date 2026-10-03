@@ -554,10 +554,11 @@ local function patchBandagePickupRandomizer()
 
     normal.PickupFunc = function(self, ply)
         if not IsValid(ply) or not ply:IsPlayer() then return end
+        if not self.IsSpawned then return end
         if not BANDAGE_PICKUP_CLASS_SET[self:GetClass()] then return end
         if self.HGMedkitContent then return end
+        if ply.hgGivingTieredBandage then return end
 
-        if ply.hgGivingTieredBandage then return true end -- Give() already owns this nested pickup
         local class = pickBandageClass(ply)
         if not class then return end
 

@@ -15,6 +15,31 @@ local criticalStaminaO2Start = 10
 local lowStaminaO2DebtMax = 4
 local opioidRespiratoryArrestThreshold = 0.85
 
+function hg.organism.ApplyMannitol(org, dose)
+	if not org then return false end
+	org.mannitol = math.Approach(org.mannitol or 0, 4, (tonumber(dose) or 1) * 2)
+	org.headtrauma = 0
+	org.brainHemorrhage = max((org.brainHemorrhage or 0) - 0.12 * (tonumber(dose) or 1), 0)
+	return true
+end
+
+function hg.organism.ApplyInstantCerebralRelief(org)
+	if not org then return false end
+	local relief = 0.25
+	org.brain = max((org.brain or 0) - relief, 0)
+	org.brainFrontal = max((org.brainFrontal or 0) - relief, 0)
+	org.brainParietal = max((org.brainParietal or 0) - relief, 0)
+	org.brainTemporal = max((org.brainTemporal or 0) - relief, 0)
+	org.brainOccipital = max((org.brainOccipital or 0) - relief, 0)
+	org.brainHemorrhage = max((org.brainHemorrhage or 0) - 0.4, 0)
+	org.brainBleedRate = 0
+	org.brainSwelling = (org.brainSwelling or 0) * 0.2
+	org.intracranialPressure = (org.intracranialPressure or 0) * 0.2
+	org.headtrauma = 0
+	org.lastSeizureBrain = org.brain
+	return true
+end
+
 module[1] = function(org)
 
 	org.lungsL = {
@@ -1359,20 +1384,20 @@ kaz
 	end
 
 	local hemorrhageReliefRate = 0
-	if mannitolK > 0 then hemorrhageReliefRate = hemorrhageReliefRate + (1 / 110) * mannitolK end
+	if mannitolK > 0 then hemorrhageReliefRate = hemorrhageReliefRate + (1 / 60) * mannitolK end
 	if (org.tranexamic_acid or 0) > 0 then hemorrhageReliefRate = hemorrhageReliefRate + 1 / 1200 end
 
 	local skullDamage = math.Clamp(tonumber(org.skull) or 0, 0, 1)
 	local activeConcussion = math.max(tonumber(org.concussion) or 0, tonumber(org.concussion_onset) or 0)
 	local lobeDamage = math.max(frontal, parietal, temporal, occipital)
-	local skullCrisis = math.Clamp((skullDamage - 0.35) / 0.65, 0, 1)
+	local skullCrisis = math.Clamp((skullDamage - 0.15) / 0.85, 0, 1)
 	local concussionCrisis = math.Clamp((activeConcussion - 3.0) / 3.0, 0, 1)
 	local brainCrisis = math.Clamp((lobeDamage - 0.35) / 0.65, 0, 1)
 	local cranialCrisis = math.max(skullCrisis, concussionCrisis, brainCrisis)
 	local skullProtection = org.bandagedskull and 0.22 or 1
 	local medicationMul = (1 - mannitolK * 0.8) * ((org.tranexamic_acid or 0) > 0 and 0.65 or 1)
 	local resistanceMul = 1 - zerlkersResistance * 0.75
-	local crisisBleedRate = skullCrisis * (0.00002 + skullCrisis * 0.00022) * skullProtection
+	local crisisBleedRate = skullCrisis * (0.00004 + skullCrisis * 0.0005) * skullProtection
 		+ concussionCrisis * 0.00004
 		+ brainCrisis * 0.00008
 	crisisBleedRate = crisisBleedRate * medicationMul * resistanceMul
@@ -1389,6 +1414,14 @@ kaz
 	org.disorientation = math.max(org.disorientation, frontal * 0.35 + parietal * 0.65 + temporal * 0.25)
 	org.immobilization = math.max(org.immobilization, parietal * 8)
 	org.consciousness = math.min(org.consciousness, 1 - frontal * 0.35 - temporal * 0.15)
+	local skullDebuff = math.Clamp((skullDamage - 0.1) / 0.9, 0, 1)
+	if skullDebuff > 0 then
+		local skullDebuffMul = org.bandagedskull and 0.5 or 1
+		org.disorientation = math.max(org.disorientation, skullDebuff * 0.9 * skullDebuffMul)
+		org.immobilization = math.max(org.immobilization, skullDebuff ^ 2 * 5 * skullDebuffMul)
+		org.consciousness = math.min(org.consciousness, 1 - skullDebuff * 0.4 * skullDebuffMul)
+		org.painadd = math.min((org.painadd or 0) + timeValue * skullDebuff * 3 * skullDebuffMul, 150)
+	end
 	if hemorrhage > 0 then
 		org.brain = min(org.brain + timeValue * hemorrhage / (hemorrhage < 0.3 and 900 or 300), 1)
 		org.disorientation = math.max(org.disorientation, hemorrhage * 0.9)
@@ -1504,7 +1537,7 @@ kaz
 		org.brainOccipital = max(org.brainOccipital - brainRecovery, 0)
 	end
 
-	org.mannitol = math.Approach(org.mannitol, 0, timeValue / 200)
+	org.mannitol = math.Approach(org.mannitol, 0, timeValue / 600)
 	
 	-- Tissue oxygen no longer writes brain injury. Intracranial bleeding remains
 	-- damaging here; cerebral hypoxia is handled from brainoxygen in UpdatePerfusion.

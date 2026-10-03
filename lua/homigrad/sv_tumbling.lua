@@ -167,6 +167,8 @@ local function ScaleTripChance(ply, org, tripChance)
     return math.Clamp(tripChance, 0, MAX_TRIP_CHANCE)
 end
 
+hg.ScaleTripChance = ScaleTripChance
+
 local function ExecuteTrip(ply, org, tripType, velocity, collisionTrace, trHighHit, breakChance)
     hg.Fake(ply, nil, nil, nil, "trip_" .. tripType)
     --mcity reference?
@@ -358,6 +360,7 @@ hook.Add("Think", "stanleytumbler", function()
                 else
                     ply:ViewPunch(Angle(2, 0, 0))
                 end
+                hg.StartStagger(ply, tripType == "slip" and -forward or forward, math.Clamp(speed / 320, 0.35, 1))
                 ply.nextTumbleCheck = CurTime() + 1
             end
         end
@@ -467,4 +470,6 @@ function hg.FootstepTripCheck(ply, stepIndex, rate, swingFraction)
     else
         ply:ViewPunch(Angle(2 + speedFactor * 3, 0, math.Rand(-2, 2)))
     end
+
+    hg.StartStagger(ply, moveDir, 0.3 + speedFactor * 0.6)
 end

@@ -17,6 +17,7 @@ local START_DELAY = 0
 local START_WINDOW = 0.75
 local HIT_WINDOW = 0.5
 local HIT_MIN_DMG = 8
+local HIT_STAGGER_MIN_FRAC = 0.15
 local UPRIGHT_THRESHOLD = 0.05
 local UPRIGHT_TRACE = 60
 local UPRIGHT_MIN_HEIGHT = 23.5
@@ -1143,6 +1144,11 @@ hook.Add("EntityTakeDamage", "HG_EuphoriaStumbleHit", function(ent, dmgInfo)
 
 		local push = takePush(acc, energy * ENERGY_PLAYER_PUSH, ENERGY_PLAYER_PUSH_MAX)
 		if push > 0 then ply:SetVelocity(flatDir * push) end
+
+		local staggerScale = acc.energy / (knockdown > 0 and knockdown or 100)
+		if staggerScale >= HIT_STAGGER_MIN_FRAC and math.random() < math.Clamp(staggerScale * 1.2, 0.1, 0.9) then
+			hg.StartStagger(ply, flatDir, math.Clamp(staggerScale, 0.3, 1))
+		end
 		return
 	end
 

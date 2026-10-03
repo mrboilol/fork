@@ -1,7 +1,7 @@
 if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_tpik_base"
 SWEP.PrintName = "Midazolam Autoinjector"
-SWEP.Instructions = "Stops seizures. Must be administered to someone else. Hold RMB on someone to inject them."
+SWEP.Instructions = "Stops seizures and instantly relieves brain swelling, pressure, bleeding and some brain damage. Single use, no lasting effect. Must be administered to someone else. Hold RMB on someone to inject them."
 SWEP.Category = "ZCity Medicine"
 SWEP.Spawnable = true
 SWEP.AdminOnly = false
@@ -276,8 +276,30 @@ end
 
 if SERVER then
 	util.AddNetworkString("rem_midazolam_seizure")
-	local midazolamBrainHealing = 0.015
 	local midazolamSeizureProtection = 120
+
+	function hg.organism.ApplyMidazolam(org)
+		local wasSeizing = org.seizureActive == true
+		hg.organism.ApplyInstantCerebralRelief(org)
+
+		if hg.organism.SuppressSeizure then
+			hg.organism.SuppressSeizure(org, midazolamSeizureProtection)
+		else
+			org.seizure = 0
+			org.seizureActive = false
+			org.seizureStart = 0
+			org.seizureEnd = 0
+			org.nextSeizureSpasm = 0
+			org.seizureSuppressedUntil = CurTime() + midazolamSeizureProtection
+		end
+
+		if wasSeizing and IsValid(org.owner) and org.owner:IsPlayer() then
+			net.Start("rem_midazolam_seizure")
+			net.Send(org.owner)
+		end
+
+		return wasSeizing
+	end
 
 	function SWEP:PrimaryAttack()
 	end
@@ -314,25 +336,7 @@ if SERVER then
 		local entOwner = IsValid(victim.FakeRagdoll) and victim.FakeRagdoll or victim
 		entOwner:EmitSound("snd_jack_hmcd_needleprick.wav", 60, math.random(95, 105))
 
-		local wasSeizing = org.seizureActive == true
-		org.brain = math.max((org.brain or 0) - midazolamBrainHealing, 0)
-		org.lastSeizureBrain = org.brain
-
-		if hg.organism.SuppressSeizure then
-			hg.organism.SuppressSeizure(org, midazolamSeizureProtection)
-		else
-			org.seizure = 0
-			org.seizureActive = false
-			org.seizureStart = 0
-			org.seizureEnd = 0
-			org.nextSeizureSpasm = 0
-			org.seizureSuppressedUntil = CurTime() + midazolamSeizureProtection
-		end
-
-		if wasSeizing then
-			net.Start("rem_midazolam_seizure")
-			net.Send(victim)
-		end
+		hg.organism.ApplyMidazolam(org)
 
 		self.healing = false
 		self:SetHealingOther(false)

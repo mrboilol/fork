@@ -54,7 +54,19 @@ if CLIENT then
         return true
     end
 
-    hook.Add("EntityRemoved", "ServerRagdollTransferDecals", function(ent)
+    local cleaningUp = false
+
+    hook.Add("PreCleanupMap", "ServerRagdollTransferDecals", function()
+        cleaningUp = true
+        table.Empty(pending)
+    end)
+
+    hook.Add("PostCleanupMap", "ServerRagdollTransferDecals", function()
+        cleaningUp = false
+    end)
+
+    hook.Add("EntityRemoved", "ServerRagdollTransferDecals", function(ent, fullUpdate)
+        if cleaningUp or fullUpdate then return end
         if not IsTrackedNPC(ent) then return end
 
         local mdl = ent:GetModel()

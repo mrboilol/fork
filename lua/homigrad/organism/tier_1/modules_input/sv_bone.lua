@@ -479,6 +479,8 @@ end
 
 local spine_partial_break_floppiness = 0.3
 local spine_full_break_death_chance = 0.35
+local spine_early_break_threshold = 0.5
+local spine_early_break_chance = 0.3
 
 local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricochet)
 	if dmgInfo:IsDamageType(DMG_BLAST) then dmg = dmg / 3 end
@@ -530,6 +532,9 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 
 	if name == "spine3" then
 		local cervicalLimit = hg.organism.fake_spine3 or 0.75
+		if oldDmg < spine_early_break_threshold and org.spine3 >= spine_early_break_threshold and org.spine3 < cervicalLimit and math.Rand(0, 1) < spine_early_break_chance then
+			org.spine3 = cervicalLimit
+		end
 		if oldDmg < cervicalLimit and org.spine3 >= cervicalLimit then
 			org.cervicalParalysis = true
 			org.paralyzed = true

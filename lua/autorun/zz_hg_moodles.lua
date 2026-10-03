@@ -706,19 +706,32 @@ local function buildEffects(ply, org)
 	local fibrillating = org.fibrillation == true or ecgState == "atrial_fibrillation" or ecgState == "ventricular_fibrillation"
 		or (not ecgState and unstableRhythm == "atrial_fibrillation")
 	local rhythmSeverity = math.max(arrhythmia, irregularSeverity, fibrillating and 1 or 0)
-	if not org.heartstop and (irregular or arrhythmia >= 0.35 or fibrillating) then
-		local level = highRank(math.max(rhythmSeverity, 0.1), {0.1, 0.3, 0.6, 0.85})
-		add(effects, "arrhythmia", "arrhythmia", level, "bad", 24.5, math.floor(heartRate) .. " bpm")
-	elseif not org.heartstop and (heartRate >= 150 or (heartRate > 0 and heartRate <= 45)) then
+	local heartStrain = math.Clamp(orgNumber(org, "heartStrain", 0), 0, 1)
+	local rhythmAbnormal = irregular or arrhythmia >= 0.35 or fibrillating
+	local strained = heartStrain >= 0.3
+	local palpitating = palpitations >= 0.35
+	if not org.heartstop and (rhythmAbnormal or strained or palpitating) then
+		local level = highRank(math.max(rhythmSeverity, heartStrain, palpitations, 0.1), {0.1, 0.3, 0.6, 0.85})
+		if rhythmAbnormal then
+			add(effects, "arrhythmia", "arrhythmia", level, "bad", 24.5, math.floor(heartRate) .. " bpm")
+		elseif strained then
+			add(effects, "arrhythmia", "arrhythmia", level, "bad", 24.5, math.floor(heartStrain * 100) .. "%",
+				"Heart Strain", "Your heart is under heavy strain and may start to lose rhythm.")
+		else
+			add(effects, "arrhythmia", "arrhythmia", level, "bad", 24.5, math.floor(palpitations * 100) .. "%",
+				"Active Palpitations", "Your heart is fluttering and skipping beats.")
+		end
+	end
+	if not org.heartstop and (heartRate >= 150 or (heartRate > 0 and heartRate <= 45)) then
 		local rateSeverity = heartRate >= 150
 			and math.Clamp((heartRate - 150) / 150, 0, 1)
 			or math.Clamp((45 - heartRate) / 30, 0, 1)
-		local level = highRank(math.max(palpitations, rateSeverity, 0.1), {0.1, 0.3, 0.6, 0.85})
+		local level = highRank(math.max(rateSeverity, 0.1), {0.1, 0.3, 0.6, 0.85})
 		local rateName = heartRate >= 150 and "Tachycardia" or "Bradycardia"
 		local rateDescription = heartRate >= 150
-			and "Your heart is beating too fast and causing palpitations."
-			or "Your heart is beating too slowly and causing palpitations."
-		add(effects, "palpitations", "palpitations", level, "bad", 24.5, math.floor(heartRate) .. " bpm", rateName .. " Palpitations", rateDescription)
+			and "Your heart is beating too fast."
+			or "Your heart is beating too slowly."
+		add(effects, "palpitations", "palpitations", level, "bad", 24.4, math.floor(heartRate) .. " bpm", rateName .. " Palpitations", rateDescription)
 	end
 
 	local oxygen, oxygenMax = o2Value(org), o2Maximum(org)
@@ -780,8 +793,7 @@ local function buildEffects(ply, org)
 	local hemorrhage = orgNumber(org, "brainHemorrhage", 0)
 	local skull = orgNumber(org, "skull", 0)
 	local hemorrhageLevel = highRank(hemorrhage, {0.0001, 0.25, 0.5, 0.75})
-	if skull >= 0.6 then hemorrhageLevel = math.max(hemorrhageLevel, skull >= 1 and 4 or 3) end
-	if hemorrhageLevel > 0 then add(effects, "brain_bleed", "brainbleed", hemorrhageLevel, "bad", 31, math.floor(math.max(hemorrhage, skull >= 0.6 and skull or 0) * 100) .. "%") end
+	if hemorrhageLevel > 0 then add(effects, "brain_bleed", "brainbleed", hemorrhageLevel, "bad", 31, math.floor(hemorrhage * 100) .. "%") end
 	if skull >= 0.6 then add(effects, "skull", "brainbleed", skull >= 1 and 4 or 2, "bad", 31, math.floor(skull * 100) .. "%") end
 	local intracranialPressure = orgNumber(org, "intracranialPressure", 0)
 	if intracranialPressure >= 0.15 then add(effects, "intracranial_pressure", "intrapressure", highRank(intracranialPressure, {0.15, 0.35, 0.6, 0.85}), "bad", 32, math.floor(intracranialPressure * 100) .. "%") end

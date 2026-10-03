@@ -1342,7 +1342,8 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	-- Раньше на зимних картах это давало случайные припадки из-за переохлаждения.
 	local temperature = org.temperature or 36.7
 	local curTime = CurTime()
-	local seizureBrainDamage = ignoreBrainDamage and 0 or math.max(org.brain or 0, lobeDamage)
+	local cerebralStress = math.max(org.brainHemorrhage or 0, org.intracranialPressure or 0, (org.brainSwelling or 0) * 0.8)
+	local seizureBrainDamage = ignoreBrainDamage and 0 or math.max(org.brain or 0, lobeDamage, cerebralStress)
 	if seizureBrainDamage > 0.05 then
 		org.nextSeizureRoll = org.nextSeizureRoll or (curTime + seizure_brain_roll_delay)
 		if curTime >= org.nextSeizureRoll then

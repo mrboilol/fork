@@ -67,6 +67,29 @@ local function ComputeFootRotation(samples, scale)
 	return Angle(0, pitch, roll)
 end
 
+local STAGGER_BODY_DROP = 3.5
+local STAGGER_STEP_THIGH = 38
+local STAGGER_STEP_CALF = 44
+local STAGGER_BACK_THIGH = 22
+local STAGGER_BACK_CALF = 14
+local STAGGER_SUPPORT_THIGH = 10
+local STAGGER_SUPPORT_CALF = 14
+local STAGGER_TORSO_PITCH = 18
+local STAGGER_TORSO_ROLL = 14
+
+local function GetStaggerPose(ply)
+	local finish = ply:GetNWFloat("HGStaggerEnd", 0)
+	local now = CurTime()
+	if finish <= now or not hg or not hg.StaggerEnvelope then return end
+
+	local amount = hg.StaggerEnvelope(now, ply:GetNWFloat("HGStaggerStart", 0), finish) * ply:GetNWFloat("HGStaggerPower", 0.5)
+	if amount <= 0.01 then return end
+
+	local yaw = Angle(0, ply:GetAngles().y, 0)
+	local dir = ply:GetNWVector("HGStaggerDir", vector_origin)
+	return amount, dir:Dot(yaw:Forward()), dir:Dot(yaw:Right()), ply:GetNWBool("HGStaggerLeft")
+end
+
 function Controller.Calculate(ply, skeleton)
 	-- the big brain function. takes skeleton and figures out how to bend everything
 	-- should produce natural looking legs. actually produces... close enough
@@ -251,6 +274,12 @@ function Controller.Calculate(ply, skeleton)
 	local lResult = RT.State.UpdateFoot(lFoot, footData(lContactForState, lUsePos, lSpeed, "left"))
 	local rResult = RT.State.UpdateFoot(rFoot, footData(rContactForState, rUsePos, rSpeed, "right"))
 
+	local kickActive = ply:GetNWFloat("InLegKick", 0) > CurTime()
+	if kickActive then
+		rFoot.planted = false
+		rFoot.lockPos = nil
+	end
+
 	local bodyDrop, lReqDrop, rReqDrop = 0, 0, 0
 	local lKnee, rKnee = 0, 0
 	local lFootRot, rFootRot = Angle(), Angle()
@@ -298,6 +327,8 @@ function Controller.Calculate(ply, skeleton)
 			rReqDrop = math.max(rReqDrop - dynSoleCorr, 0)
 		end
 
+
+		if kickActive then rReqDrop = lReqDrop end
 
 		local stairsState = state.stairs or {}
 		local prevLReq = stairsState.prevLeftReq or lReqDrop
@@ -460,6 +491,11 @@ function Controller.Calculate(ply, skeleton)
 	if lKnee ~= lKnee then lKnee = 0 end
 	if rKnee ~= rKnee then rKnee = 0 end
 
+	if kickActive then
+		rKnee = 0
+		rFootRot = Angle()
+	end
+
 	local baseAng = Angle()
 	local leanAng = Angle()
 	if leanEnabled then
@@ -472,6 +508,36 @@ function Controller.Calculate(ply, skeleton)
 		leanAng = Angle(0, 0, -math.Clamp(lateral / 8, -10, 10))
 	end
 
+	local lThighAdd, lCalfAdd, rThighAdd, rCalfAdd = 0, 0, 0, 0
+	local staggerAmount, staggerFwd, staggerSide, staggerLeft = GetStaggerPose(ply)
+	if staggerAmount and onGround then
+		local dropExtra = STAGGER_BODY_DROP * modelScale * staggerAmount
+		local kneeExtra = math.deg(math.asin(math.Clamp(dropExtra / math.max(legLength * 0.50, 10), -1, 1))) * bendBoost
+		bodyDrop = bodyDrop + dropExtra
+		lKnee = lKnee + kneeExtra
+		if not kickActive then rKnee = rKnee + kneeExtra end
+
+		local stepThigh, stepCalf
+		if staggerFwd >= 0 then
+			stepThigh = -STAGGER_STEP_THIGH * staggerAmount * staggerFwd
+			stepCalf = STAGGER_STEP_CALF * staggerAmount * staggerFwd
+		else
+			stepThigh = STAGGER_BACK_THIGH * staggerAmount * -staggerFwd
+			stepCalf = STAGGER_BACK_CALF * staggerAmount * -staggerFwd
+		end
+		local supportThigh = -STAGGER_SUPPORT_THIGH * staggerAmount * math.abs(staggerFwd)
+		local supportCalf = STAGGER_SUPPORT_CALF * staggerAmount * math.abs(staggerFwd)
+
+		if staggerLeft then
+			lThighAdd, lCalfAdd, rThighAdd, rCalfAdd = stepThigh, stepCalf, supportThigh, supportCalf
+		else
+			lThighAdd, lCalfAdd, rThighAdd, rCalfAdd = supportThigh, supportCalf, stepThigh, stepCalf
+		end
+		if kickActive then rThighAdd, rCalfAdd = 0, 0 end
+
+		leanAng = Angle(leanAng.p, leanAng.y + STAGGER_TORSO_PITCH * staggerAmount * staggerFwd, leanAng.r - STAGGER_TORSO_ROLL * staggerAmount * staggerSide)
+	end
+
 	return {
 		basePos = Vector(0, 0, -bodyDrop),
 		baseAng = baseAng,
@@ -480,13 +546,13 @@ function Controller.Calculate(ply, skeleton)
 		lRequiredDrop = lReqDrop,
 		rRequiredDrop = rReqDrop,
 		left = {
-			thigh = Angle(0, -lKnee, 0), calf = Angle(0, lKnee, 0), foot = lFootRot,
+			thigh = Angle(0, -lKnee + lThighAdd, 0), calf = Angle(0, lKnee + lCalfAdd, 0), foot = lFootRot,
 			targetPos = lResult.targetPos, contact = lContact,
 			planted = lResult.planted, lockPos = lResult.lockPos, footSpeed = lSpeed,
 			validation = lValidation,
 		},
 		right = {
-			thigh = Angle(0, -rKnee, 0), calf = Angle(0, rKnee, 0), foot = rFootRot,
+			thigh = Angle(0, -rKnee + rThighAdd, 0), calf = Angle(0, rKnee + rCalfAdd, 0), foot = rFootRot,
 			targetPos = rResult.targetPos, contact = rContact,
 			planted = rResult.planted, lockPos = rResult.lockPos, footSpeed = rSpeed,
 			validation = rValidation,

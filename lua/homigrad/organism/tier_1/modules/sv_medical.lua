@@ -193,7 +193,7 @@ hook.Add("hg_medical_minigame_finished", "organism-medical-system-action", funct
 
 		local class = wep:GetClass()
 		local medkitType = wep.HGMedkitModeTypes and wep.HGMedkitModeTypes[wep.mode]
-		if class == "weapon_tranexamic_acid" or medkitType == "tranexamic" or (class == "weapon_medkit_sh" and wep.mode == 3) then
+		if class == "weapon_tranexamic_acid" or medkitType == "tranexamic" or (class == "weapon_medkit_sh" and wep.mode == 3 and (wep.traumaSlot or "tranexamic") == "tranexamic") then
 			action = "internal_bleed_treat"
 		elseif class == "weapon_needle" or medkitType == "needle" or (class == "weapon_medkit_sh" and wep.mode == 5) then
 			action = "needle"

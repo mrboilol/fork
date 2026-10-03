@@ -179,10 +179,7 @@ if SERVER then
 		local entOwner = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
 		entOwner:EmitSound("snd_jack_hmcd_needleprick.ogg", 60, math.random(95, 105))
 
-		org.mannitol = math.Approach(org.mannitol, 4, self.modeValues[1] * 2)
-
-		-- Head trauma reduction
-		org.headtrauma = 0
+		hg.organism.ApplyMannitol(org, self.modeValues[1])
 
 		if self.poisoned2 then
 			org.poison4 = CurTime()

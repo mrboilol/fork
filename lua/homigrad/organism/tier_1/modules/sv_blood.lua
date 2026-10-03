@@ -14,7 +14,7 @@ function hg.organism.AdministerTranexamic(org, dose)
 	dose = tonumber(dose) or 0
 	if not org or dose <= 0 then return false end
 
-	org.tranexamic_acid_pending = math.min((tonumber(org.tranexamic_acid_pending) or 0) + dose, 10)
+	org.tranexamic_acid_pending = math.min((tonumber(org.tranexamic_acid_pending) or 0) + dose, 20)
 	org.tranexamic_acid_onset = math.max(
 		tonumber(org.tranexamic_acid_onset) or 0,
 		CurTime() + tranexamicOnsetDelay

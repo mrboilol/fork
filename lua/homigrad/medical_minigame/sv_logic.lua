@@ -319,7 +319,7 @@ function hg.MedicalMinigame.StartBandageMinigame(ply, ent)
         local class = wep:GetClass()
         local org = target.organism
         if org then
-            if class == "weapon_bruicekit" then
+            if class == "weapon_bruicekit" or (wep.traumaBruise and wep.mode == 1 and wep.GetHealData) then
                 local totalRotations, _, _ = wep:GetHealData(org)
                 requiredCompletions = totalRotations
             else
@@ -482,6 +482,10 @@ end
 -- Expose function for external use (e.g., zcity_delta weapon patch)
 hg.MedicalMinigame.GetMedicalMinigameType = GetMedicalMinigameType
 
+local function IsMedkitTranexamic(wep)
+    return wep:GetClass() == "weapon_medkit_sh" and wep.mode == 3 and (wep.traumaSlot or "tranexamic") == "tranexamic"
+end
+
 local function GetMinigameModeValueIndex(wep, minigameType)
     if minigameType == "tourniquet" then
         -- Tiered medkits build their supply slots dynamically, so their
@@ -520,7 +524,7 @@ local function ApplySyringeProgress(wep, ply, target, progressDelta)
     local class = wep:GetClass()
     local isIncremental = (class == "weapon_morphine" or class == "weapon_fentanyl" or class == "weapon_horse_tranq" or
                            class == "weapon_tranexamic_acid" or
-                           (class == "weapon_medkit_sh" and wep.mode == 3))
+                           IsMedkitTranexamic(wep))
 
     if not isIncremental then
         -- Just play sound during minigame, don't consume
@@ -588,7 +592,7 @@ local function ApplySyringeProgress(wep, ply, target, progressDelta)
         end
 
         entOwner:EmitSound("pshiksnd")
-    elseif class == "weapon_medkit_sh" and wep.mode == 3 then
+    elseif IsMedkitTranexamic(wep) then
         local efficiency = owner.Profession == "doctor" and 0.5 or 1
         hg.organism.AdministerTranexamic(org, consumedAmount / efficiency)
         entOwner:EmitSound("snds_jack_gmod/ez_medical/" .. math.random(16, 18) .. ".ogg", 60, math.random(95, 105))
@@ -884,7 +888,7 @@ net.Receive("hg_medical_minigame_finish", function(len, ply)
         -- Call Heal for syringe-type weapons that are NOT handled incrementally in ApplySyringeProgress
         local class = wep:GetClass()
         local handledIncrementally = (class == "weapon_morphine" or class == "weapon_fentanyl" or class == "weapon_horse_tranq" or
-                                      (class == "weapon_medkit_sh" and wep.mode == 3))
+                                      IsMedkitTranexamic(wep))
 
         if wep.Heal and not handledIncrementally then
             if wep.SetHolding then
@@ -905,7 +909,7 @@ net.Receive("hg_medical_minigame_finish", function(len, ply)
         if minigameType == "syringe" then
             local isIncremental = (class == "weapon_morphine" or class == "weapon_fentanyl" or class == "weapon_horse_tranq" or
                                  class == "weapon_tranexamic_acid" or
-                                 (class == "weapon_medkit_sh" and wep.mode == 3))
+                                 IsMedkitTranexamic(wep))
 
             if not isIncremental then
                 if class == "weapon_tranexamic_acid" or class == "weapon_adrenaline" or class == "weapon_naloxone" or
