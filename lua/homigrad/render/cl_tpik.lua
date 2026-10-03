@@ -739,6 +739,7 @@ function hg.MainTPIKFunction(ent, ply, wpn)
         hg.DoZManip(ent, ply)
         //local systime = SysTime()
         hg.DoTPIK(ply, ent)
+        if hg.SendTPIKPose then hg.SendTPIKPose(ply, ent, wpn) end
 
 		--hg._DeprecatedDoTPIK(ply, ent)
         //print("DoTPIK: ", SysTime() - systime)

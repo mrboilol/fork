@@ -378,10 +378,12 @@ hook.Add("Bones", "homigrad-lean-bone", function(ply, dtime)
 	local left = ((isragdoll and !ragdollcombat and hg.KeyDown(ply, IN_MOVERIGHT)) or hg.KeyDown(ply, IN_ALT2)) and not hg.KeyDown(ply, IN_ALT1)
 	local right = ((isragdoll and !ragdollcombat and hg.KeyDown(ply, IN_MOVELEFT)) or hg.KeyDown(ply, IN_ALT1)) and not hg.KeyDown(ply, IN_ALT2)
 
+	local tacLean = hg.GetTacticalLean(ply)
+
 	ply.lean = Lerp(
 		hg.lerpFrameTime((left or right) and 0.12 * ply:GetNetVar("leanSpeedMul", 1) or 0.2, dtime * game.GetTimeScale()),
 		ply.lean or 0,
-		hg.IsLocal(ply) and ( (left and right and 0) or (left and 1.3) or (right and -1.3) or 0) or ply:GetNWFloat("PlayerLean", 0)
+		hg.IsLocal(ply) and ( (tacLean ~= 0 and tacLean * hg.TacticalLeanMax) or (left and right and 0) or (left and 1.3) or (right and -1.3) or 0) or ply:GetNWFloat("PlayerLean", 0)
 	)
 
 	if SERVER and !IsValid(ply.FakeRagdoll) then

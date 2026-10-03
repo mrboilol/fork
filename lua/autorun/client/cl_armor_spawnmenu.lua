@@ -31,13 +31,19 @@ spawnmenu.AddCreationTab("armor", function()
 
 		local zcity = {}
 		local zcityNames = {}
-		for _, class in ipairs({"ent_new_armor_helmet1", "ent_new_armor_helmet2", "ent_new_armor_vest1", "ent_new_armor_vest2"}) do
+		local newArmor = {
+			{"ent_new_armor_helmet1", "ACH Helmet IIIA", "vgui/icons/helmet"},
+			{"ent_new_armor_helmet2", "bike helmet but better hitbox", "vgui/icons/mothelmet"},
+			{"ent_new_armor_vest1", "Plate Body Armor IV", "scrappers/armor1.png"},
+			{"ent_new_armor_vest2", "Police anti-riot vest", "vgui/icons/policevest"},
+		}
+		for _, info in ipairs(newArmor) do
+			local class = info[1]
 			local stored = scripted_ents.GetStored(class)
-			local data = stored and stored.t
-			if data and data.Spawnable then
-				zcity[#zcity + 1] = {spawnname = class, nicename = data.PrintName or class, material = data.IconOverride or "entities/" .. class .. ".png", admin = data.AdminOnly}
-				zcityNames[string.lower(data.PrintName or class)] = true
-			end
+			local data = stored and stored.t or {}
+			local label = data.PrintName or info[2]
+			zcity[#zcity + 1] = {spawnname = class, nicename = label, material = data.IconOverride or info[3], admin = data.AdminOnly}
+			zcityNames[string.lower(label)] = true
 		end
 		for _, armors in pairs(hg.zcityArmor or {}) do
 			for name, data in pairs(armors) do

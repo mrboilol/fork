@@ -647,7 +647,6 @@ CalcView = function(ply, origin, angles, fov, znear, zfar)
 
 	--if not RENDERSCENE then
 	view.origin, view.angles = HGAddView(ply, view.origin, view.angles, velLen)
-	view.origin = hg.TacticalLeanView(ply, view.origin)
 	--end
 	
 	realangle = realangle or lply:EyeAngles()

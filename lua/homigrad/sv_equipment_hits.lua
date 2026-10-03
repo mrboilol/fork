@@ -480,6 +480,16 @@ function hg.GetHeldWeaponImpactModel(ply, wep)
     end
     local transformedPos, transformedAng, worldPos, worldAng
     if wep.WorldModel_Transform then transformedPos, transformedAng = wep:WorldModel_Transform() end
+    if hg.ApplyReportedWeaponPose and isvector(transformedPos) and isangle(transformedAng) then
+        local reportedPos, reportedAng = hg.ApplyReportedWeaponPose(wep, transformedPos, transformedAng)
+        if reportedPos then
+            transformedPos, transformedAng = reportedPos, reportedAng
+            if IsValid(wep.worldModel) then
+                wep.worldModel:SetPos(reportedPos)
+                wep.worldModel:SetAngles(reportedAng)
+            end
+        end
+    end
     if wep.WorldModelFake and isvector(transformedPos) and isangle(transformedAng) then
         local inversePos, inverseAng = WorldToLocal(vector_origin, angle_zero, wep.FakePos or vector_origin, wep.FakeAng or angle_zero)
         worldPos, worldAng = LocalToWorld(inversePos, inverseAng, transformedPos, transformedAng)
@@ -665,6 +675,9 @@ local function WeaponImpact(ply, wep, hit, damage, force, direction)
     if grip.sole and grip.injury >= cfg.weaponSoleSevereInjury and power >= cfg.weaponSoleSignificantPower then chance = math.max(chance, cfg.soleArmChance) end
     if grip.noHands then chance = cfg.maxDropChance end
 
+    wep:SetNWFloat("HGEquipmentHitTime", CurTime())
+    hook.Run("HGHeldWeaponHit", ply, wep, hit, damage, direction)
+
     ApplyEquipmentRecovery(wep, ply, direction, power)
     if wep.AbortBlockedAttack and not (hit.shot and hit.shot.Contact) then wep:AbortBlockedAttack() end
     if ply.ViewPunch then ply:ViewPunch(Angle(-power * 3, direction:Dot(ply:EyeAngles():Right()) * power * 4, power)) end
@@ -822,6 +835,10 @@ function hg.TryAbsorbEquipmentImpact(ent, dmgInfo, hitPos, direction, impactRadi
 end
 
 function hg.GetWeaponHandPoints(wep)
+    if hg.GetReportedHandPoints then
+        local reportedRight, reportedLeft = hg.GetReportedHandPoints(wep)
+        if reportedRight then return reportedRight, reportedLeft end
+    end
     local handPos, handAng = wep.handPos, wep.handAng
     if not isvector(handPos) or not isangle(handAng) then return end
     local gripPos = handPos + handAng:Up() * -1
@@ -921,7 +938,7 @@ function hg.TraceOrganismArms(body, startPos, endPos, padding, wep, pose)
             AddArmTrace(nil, bone, Vector(-extent, -3, -3), Vector(extent, 3, 3), hitSide, true)
         end
     end
-    if IsValid(wep) and body:IsPlayer() and isvector(wep.handPos) and isangle(wep.handAng) then
+    if IsValid(wep) and body:IsPlayer() then
         local support = wep.GetHandSupportState and wep:GetHandSupportState(body) or {}
         local rightPos, leftPos = hg.GetWeaponHandPoints(wep)
         for side, handPos in pairs({r = rightPos, l = leftPos}) do
