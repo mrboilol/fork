@@ -35,6 +35,7 @@ local WALL_TRACE_HEIGHT = 10
 local WALL_BACKOFF = 4
 local WALKABLE_NORMAL_Z = 0.6
 local RETRACE_DIST_SQR = 16
+local OVERREACH_RESTEP_MOVE_SQR = 9
 local TARGET_SMOOTH = 14
 local MOVING_SPEED = 12
 local REACH_FRACTION = 0.97
@@ -230,6 +231,7 @@ local function plantFoot(state, foot, pos, normal, groundEnt, bodyYaw)
 	foot.bodyYaw = bodyYaw
 	foot.needsYaw = true
 	foot.swinging = false
+	foot.plantOrigin = nil
 	state.lastPlant = CurTime()
 end
 
@@ -332,6 +334,8 @@ local function updateSwing(ply, state, ctx, index, dt)
 		if foot.stagger then
 			if not foot.stagger.final then state.staggerFollow = 3 - index end
 			foot.stagger = nil
+		elseif ctx.speed <= MOVING_SPEED then
+			foot.plantOrigin = Vector(ctx.origin)
 		end
 
 		return
@@ -385,7 +389,7 @@ local function settleIdleFeet(state, ctx)
 		local foot = state.feet[index]
 		if foot.swinging or not foot.planted then return end
 		local rest = ctx.origin + ctx.right * (LEGS[index].sign * ctx.halfWidth)
-		local distError = (foot.planted - rest):Length2D() / settleDist
+		local distError = (foot.plantOrigin and (ctx.origin - foot.plantOrigin):Length2D() or (foot.planted - rest):Length2D()) / settleDist
 		local yawError = math_abs(math_AngleDifference(ctx.bodyYaw, foot.bodyYaw or ctx.bodyYaw)) / settleAngle
 		local err = math_max(distError, yawError)
 		if err > worstError then
@@ -430,7 +434,8 @@ local function updateFeet(ply, state, ctx, dt)
 		if not foot.swinging then
 			local planted = plantedWorldPos(foot)
 			local reach = ctx.legLength * OVERREACH_FRACTION
-			local overreach = not planted or (planted + vector_up * state.ankleHeight):DistToSqr(ctx.anim[index].hip) > reach * reach
+			local settledInPlace = foot.plantOrigin and (ctx.origin - foot.plantOrigin):Length2DSqr() < OVERREACH_RESTEP_MOVE_SQR
+			local overreach = not planted or (not settledInPlace and (planted + vector_up * state.ankleHeight):DistToSqr(ctx.anim[index].hip) > reach * reach)
 			if overreach then
 				startStep(state, index, SETTLE_SWING_TIME, false)
 			end

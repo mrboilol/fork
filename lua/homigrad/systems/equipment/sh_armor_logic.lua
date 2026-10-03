@@ -136,6 +136,17 @@ function hg.IsArmorPlateHit(ent, armor, hitPos)
 	return sides == "back" or sides == "both" or sides == "all"
 end
 
+function hg.BulletPiercesSoftArmor(dmgInfo, bullet)
+	local ammoID = dmgInfo and dmgInfo:GetAmmoType()
+	local ammoName = ammoID and ammoID >= 0 and game.GetAmmoName(ammoID) or bullet and bullet.AmmoType
+	local ammo = ammoName and hg.ammotypeshuy and hg.ammotypeshuy[ammoName]
+	return ammo and ammo.BulletSettings and ammo.BulletSettings.PierceSoftArmor or false
+end
+
+function hg.IsArmorPlateStopping(ent, placement, armor, hitPos)
+	return placement == "torso" and hg.IsArmorPlateHit(ent, armor, hitPos) and hg.GetArmorPlateCondition(ent, armor) > 0
+end
+
 function hg.IsVisorLowered(ent, armor, armorData)
 	return hg.GetArmorItemState(ent, armor, "lowered", armorData.defaultLowered ~= false)
 end

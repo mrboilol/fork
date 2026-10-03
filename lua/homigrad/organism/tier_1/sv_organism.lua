@@ -133,6 +133,10 @@ hook.Add("Org Clear", "Main", function(org)
 	org.rarmdislocation = false
 	org.larmdislocation = false
 	org.jawdislocation = false
+	for _, limb in ipairs({"lleg", "rleg", "larm", "rarm"}) do
+		org[limb .. "_up"], org[limb .. "_down"], org[limb .. "_agg"] = 0, 0, 0
+		org[limb .. "_up_disl"], org[limb .. "_down_disl"] = false, false
+	end
 
 	org.llegamputated = false
 	org.torsoamputated = false
@@ -248,7 +252,7 @@ hook.Add("Org Clear", "Main", function(org)
 	org.brainSwelling = 0
 	org.intracranialPressure = 0
 	for _, key in ipairs({
-		"_zeroO2Time", "cervicalOxygenLoss", "spine3OxygenLossAt", "spine3OxygenLossWarned", "spine3AcutePain", "spine3AcutePainUntil", "choking", "scubaOxygenActive", "neckslit", "neckslitDeadline", "neckslitWarned", "neckBrainOxygenPenalty", "hypoxiaTime", "heartstoptime", "terminalRhythm", "terminalCirculatoryFailure", "unstableRhythm", "hemorrhagicDecompensation", "hemorrhageCompensation", "hemostaticTreatment", "hypovolemia", "hypovolemicShock", "cardiacArrestMechanicalStart", "cardiacArrestMechanicalInitial", "cardiacRestartUntil", "resuscitationAttemptUntil", "sedativePressureRelief", "drugBradycardia", "critical", "incapacitated", "needfake", "needotrub", "uncon_timer", "overdoseShit", "overdoseNausea", "is_sprayed_at", "brokenribs", "limbfractures", "gibdmgstack", "gibhealth", "stamina_damage", "panic"
+		"_zeroO2Time", "cervicalOxygenLoss", "spine3OxygenLossAt", "spine3OxygenLossWarned", "spine3AcutePain", "spine3AcutePainUntil", "choking", "scubaOxygenActive", "neckslit", "neckslitDeadline", "neckslitWarned", "neckBrainOxygenPenalty", "hypoxiaTime", "heartstoptime", "terminalRhythm", "terminalCirculatoryFailure", "unstableRhythm", "hemorrhagicDecompensation", "hemorrhageCompensation", "hemostaticTreatment", "hypovolemia", "hypovolemicShock", "cardiacArrestMechanicalStart", "cardiacArrestMechanicalInitial", "cardiacRestartUntil", "resuscitationAttemptUntil", "sedativePressureRelief", "drugBradycardia", "critical", "incapacitated", "needfake", "needotrub", "uncon_timer", "overdoseShit", "overdoseNausea", "is_sprayed_at", "brokenribs", "gibdmgstack", "gibhealth", "stamina_damage", "panic"
 	}) do
 		org[key] = nil
 	end
@@ -267,6 +271,12 @@ util.AddNetworkString("hg_dislocation_minigame_success")
 util.AddNetworkString("rem_deathstate_sound")
 local CurTime = CurTime
 local nullTbl = {}
+local limbSegmentNetKeys = {}
+for _, limb in ipairs({"lleg", "rleg", "larm", "rarm"}) do
+	for _, suffix in ipairs({"_up", "_down", "_up_disl", "_down_disl"}) do
+		limbSegmentNetKeys[#limbSegmentNetKeys + 1] = limb .. suffix
+	end
+end
 local hg_developer = ConVarExists("hg_developer") and GetConVar("hg_developer") or CreateConVar("hg_developer", 0, FCVAR_SERVER_CAN_EXECUTE, "Toggle developer mode (enables damage traces)", 0, 1)
 
 -- organism_send net message flags (must match cl_statistics.lua)
@@ -491,6 +501,9 @@ local function send_organism(org, ply, recipientForce, reliable)
 	}) do
 		sendtable[key] = org[key]
 	end
+	for _, key in ipairs(limbSegmentNetKeys) do
+		sendtable[key] = org[key]
+	end
 	sendtable.cotard = org.cotard or 0
 	sendtable.cotardType = org.cotardType or 0
 	sendtable.cotardStarted = org.cotardStarted or 0
@@ -537,10 +550,19 @@ local function lodged_signature(lodged)
 	return signature
 end
 
+local function limb_segment_signature(org)
+	local parts = {}
+	for index, key in ipairs(limbSegmentNetKeys) do
+		parts[index] = observerValue(org[key], 0.01)
+	end
+	return table.concat(parts, ",")
+end
+
 local function observer_signature(org)
 	local o2 = org.o2 or {}
 	local lodged = org.LodgedEntities or {}
 	return table.concat({
+		limb_segment_signature(org),
 		observerValue(org.alive), observerValue(org.otrub), observerValue(org.bloodtype),
 		observerValue(org.blood, 5), observerValue(org.bleed, 0.01), observerValue(org.pulse, 1),
 		observerValue(org.heartbeat, 1), observerValue(org.heartstop), observerValue(org.fibrillation),
@@ -700,6 +722,9 @@ local function send_bareinfo(org, force, reliable)
 		"palpitations", "unstableRhythm", "concussion", "nausea", "consciousness", "temperature",
 		"fear", "satiety", "hemotransfusionshock", "weight", "maxweight", "health", "canmove"
 	}) do
+		sendtable[key] = org[key]
+	end
+	for _, key in ipairs(limbSegmentNetKeys) do
 		sendtable[key] = org[key]
 	end
 	sendtable.depression = org.depression
@@ -1010,6 +1035,7 @@ local function stop_seizure(owner, org)
 	org.seizureStart = 0
 	org.seizureEnd = 0
 	org.seizureFakeCooldownEnd = 0
+	org.seizureOtrubAt = nil
 	org.nextSeizureSpasm = 0
 	if wasActive then
 		org.seizureSuppressedUntil = math.max(org.seizureSuppressedUntil or 0, CurTime() + seizure_recovery_duration)
@@ -1039,9 +1065,8 @@ local function start_seizure(owner, org)
 	org.seizureEnd = time + seizure_min_duration + (seizure_max_duration - seizure_min_duration) * severity
 	org.seizureFakeCooldownEnd = org.seizureEnd
 	org.nextSeizureSpasm = time
-	org.needotrub = true
+	org.seizureOtrubAt = time + (org.seizureEnd - time) * math.Rand(0.5, 1)
 	org.needfake = true
-	org.consciousness = math.min(org.consciousness or 1, 0.04)
 	owner.fullsend = true
 	send_organism(org, owner)
 end
@@ -1396,8 +1421,10 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		end
 		org.seizureFakeCooldownEnd = seizureEnd
 		org.needfake = true
-		org.needotrub = true
-		org.consciousness = math.min(org.consciousness or 1, 0.04)
+		if time >= (tonumber(org.seizureOtrubAt) or seizureEnd) then
+			org.needotrub = true
+			org.consciousness = math.min(org.consciousness or 1, 0.04)
+		end
 		owner.fakecd = math.max(owner.fakecd or 0, seizureEnd)
 		if time >= seizureEnd then
 			stop_seizure(owner, org)
@@ -1810,7 +1837,7 @@ local finally_fixed = {
 }
 local function fixlimb(org, key, fixer)
 	if math.random(100) > (97 + (fixer != org.owner and (fixer.organism and fixer.organism.pain or 0) or 0) - (org.analgesia * 50 + org.painkiller * 15) - (fixer != org.owner and 30 or 0) - (fixer.tries or 0) * 10 - (fixer.Profession == "doctor" and 100 or 0) - (org.owner == fixer and (IsValid(org.owner.FakeRagdoll) or (org.owner.Crouching and org.owner:Crouching())) and 10 or 0)) then
-		org[key.."dislocation"] = false
+		hg.organism.ClearLimbDislocation(org, key)
 		if hg.fakeBoneFlop and hg.fakeBoneFlop.ReconcileLimb and hg.fakeBoneFlop.ReconcileLimb(org, key) then
 			hg.fakeBoneFlop.ScheduleRebuild(org.owner)
 		end
@@ -1929,7 +1956,7 @@ net.Receive("hg_dislocation_minigame_success", function(len, ply)
 	end
 
 	if key then
-		org[key.."dislocation"] = false
+		hg.organism.ClearLimbDislocation(org, key)
 		if hg.fakeBoneFlop and hg.fakeBoneFlop.ReconcileLimb and hg.fakeBoneFlop.ReconcileLimb(org, key) then
 			hg.fakeBoneFlop.ScheduleRebuild(org.owner)
 		end

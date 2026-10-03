@@ -3415,17 +3415,44 @@ local function IsSkullBrokenFully(ent, visited)
 	return false
 end
 
+local skullBrokenRagdolls = {}
+
+local function DrawSkullBlackSquare(ent, localPlayer, camPos, camAngles)
+	local bone = ent:LookupBone("ValveBiped.Bip01_Head1")
+	if not bone then return end
+	local matrix = ent:GetBoneMatrix(bone)
+	if not matrix then return end
+	local headPos = matrix:GetTranslation()
+
+	local tr = util.TraceLine({
+		start = camPos,
+		endpos = headPos,
+		filter = {localPlayer, ent},
+		mask = MASK_VISIBLE
+	})
+	if tr.Hit then return end
+
+	local screenData = headPos:ToScreen()
+	if not screenData.visible then return end
+
+	local screenPosOffset = (headPos + camAngles:Up() * 5):ToScreen()
+	local size = math.max(4, math.abs(screenData.y - screenPosOffset.y) * 4)
+
+	surface.SetDrawColor(0, 0, 0, 255)
+	surface.DrawRect(screenData.x - size / 2, screenData.y - size / 2, size, size)
+end
+
 hook.Add("HUDPaint", "DrawSkullBrokenBlackSquares", function()
 	if hg_laivlik:GetInt() == 0 then return end
-	
+
 	local localPlayer = LocalPlayer()
 	if not IsValid(localPlayer) then return end
 
 	local camPos = EyePos()
 	local camAngles = EyeAngles()
+	local drawn = {}
 
 	for _, ply in ipairs(player.GetAll()) do
-		-- Determine the active entity representing this player (could be player themselves, or their fake ragdoll, or death ragdoll)
 		local ent = ply
 		if not ply:Alive() then
 			local deathRag = ply:GetNWEntity("RagdollDeath")
@@ -3446,38 +3473,21 @@ hook.Add("HUDPaint", "DrawSkullBrokenBlackSquares", function()
 
 		if IsValid(ent) then
 			local skullDestroyed = IsSkullBrokenFully(ply) or IsSkullBrokenFully(ent)
-			if not (ent == localPlayer and not localPlayer:ShouldDrawLocalPlayer()) and skullDestroyed then
-				-- Find head bone
-				local bone = ent:LookupBone("ValveBiped.Bip01_Head1")
-				if bone then
-					local matrix = ent:GetBoneMatrix(bone)
-					if matrix then
-						local headPos = matrix:GetTranslation()
-
-						-- Line-of-sight check to make sure head is not obscured by a wall
-						local tr = util.TraceLine({
-							start = camPos,
-							endpos = headPos,
-							filter = {localPlayer, ent},
-							mask = MASK_VISIBLE
-						})
-
-						if not tr.Hit then
-							-- Project head position to 2D screen coordinates
-							local screenData = headPos:ToScreen()
-							if screenData.visible then
-								-- Calculate size of the square based on distance to maintain visual coverage of the head/face area
-								local screenPosOffset = (headPos + camAngles:Up() * 5):ToScreen()
-								local size = math.max(4, math.abs(screenData.y - screenPosOffset.y) * 4) -- Increased from 2.5 to 4 for larger square
-
-								-- Draw a 2D black square over their head (shows from all directions)
-								surface.SetDrawColor(0, 0, 0, 255)
-								surface.DrawRect(screenData.x - size / 2, screenData.y - size / 2, size, size)
-							end
-						end
-					end
-				end
+			if skullDestroyed and ent:IsRagdoll() then
+				skullBrokenRagdolls[ent] = true
 			end
+			if not (ent == localPlayer and not localPlayer:ShouldDrawLocalPlayer()) and skullDestroyed then
+				drawn[ent] = true
+				DrawSkullBlackSquare(ent, localPlayer, camPos, camAngles)
+			end
+		end
+	end
+
+	for rag in pairs(skullBrokenRagdolls) do
+		if not IsValid(rag) then
+			skullBrokenRagdolls[rag] = nil
+		elseif not drawn[rag] then
+			DrawSkullBlackSquare(rag, localPlayer, camPos, camAngles)
 		end
 	end
 end)

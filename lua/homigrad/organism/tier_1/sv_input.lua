@@ -1606,6 +1606,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	local ballisticProfile = isBallistic and getBallisticProfile(dmgInfo, bullet, dmg_before, pen) or nil
 	local impact = {
 		ballisticVersion = isBallistic and 1 or nil,
+		pierceSoftArmor = isBallistic and hg.BulletPiercesSoftArmor(dmgInfo, bullet) or nil,
 		entity = ent,
 		bullet = bullet,
 		rawDamage = dmg_before,
@@ -2592,7 +2593,8 @@ local function resolvePhysicsImpactLane(ent, hitgroup, bonename, data, relativeV
 	if limb then
 		local axis = getBoneAxis(ent, bonename)
 		local shearLoad = axis and (1 - math.abs(axis:Dot(velocityDirection))) or 0
-		local segment = (string.find(string.lower(bonename or ""), "forearm", 1, true) or string.find(string.lower(bonename or ""), "calf", 1, true)) and "down" or "up"
+		local lowerName = string.lower(bonename or "")
+		local segment = (string.find(lowerName, "forearm", 1, true) or string.find(lowerName, "hand", 1, true) or string.find(lowerName, "calf", 1, true) or string.find(lowerName, "foot", 1, true) or string.find(lowerName, "toe", 1, true)) and "down" or "up"
 
 		if shearLoad >= 0.62 and normalSpeed >= 360 then
 			return {name = "dislocation", limb = limb, segment = segment, reserve = 0.4, scale = 1.25, shearLoad = shearLoad}
@@ -2751,14 +2753,18 @@ local function velocityDamage(ent, data)
 
 	local braceActive, braceBlocking = hg.GetFallBraceState and hg.GetFallBraceState(ply, ent)
 	local groundImpact = relativeVelocity.z < -120 or (isvector(data.HitNormal) and data.HitNormal.z > 0.45)
-	if braceActive and groundImpact and normalSpeed >= 320 then
-		local braceMul = math.Clamp(0.55 + math.Clamp((normalSpeed - 320) / 650, 0, 1) * 0.35, 0, 0.92)
-		if braceBlocking then braceMul = math.min(braceMul + 0.08, 0.97) end
-		local braceDamage = dmg * braceMul
-		local applied = hg.ApplyFallBraceDamage and hg.ApplyFallBraceDamage(ply, ent, dmgInfo, braceDamage * (braceBlocking and 1.35 or 1.15)) or 0
-		if applied > 0 then
-			dmg = math.max(dmg - braceDamage, 0)
-			dmgInfo:SetDamage(dmg * 20)
+	local armImpact = hitgroup == HITGROUP_LEFTARM or hitgroup == HITGROUP_RIGHTARM
+	if braceActive and groundImpact and not armImpact and normalSpeed >= 320 and hg.GetFallBraceContactArms then
+		local contactArms = hg.GetFallBraceContactArms(ent, data.HitPos, data.HitNormal)
+		if #contactArms > 0 then
+			local braceMul = math.Clamp(0.55 + math.Clamp((normalSpeed - 320) / 650, 0, 1) * 0.35, 0, 0.92)
+			if braceBlocking then braceMul = math.min(braceMul + 0.08, 0.97) end
+			local braceDamage = dmg * braceMul * (#contactArms / 2)
+			local applied = hg.ApplyFallBraceDamage(ply, ent, dmgInfo, braceDamage, contactArms)
+			if applied > 0 then
+				dmg = math.max(dmg - braceDamage, 0)
+				dmgInfo:SetDamage(dmg * 20)
+			end
 		end
 	end
 	local org = ent.organism
@@ -2820,10 +2826,23 @@ local function velocityDamage(ent, data)
 
 		if lane.name == "limb" then
 			local limbDamage = structuralBudget * legMul
-			if hitgroup == HITGROUP_LEFTLEG then hg.organism.input_list.llegup(org, bone, limbDamage * math.Rand(1, 2), dmgInfo) end
-			if hitgroup == HITGROUP_RIGHTLEG then hg.organism.input_list.rlegup(org, bone, limbDamage * math.Rand(1, 2), dmgInfo) end
-			if hitgroup == HITGROUP_LEFTARM then hg.organism.input_list.larmup(org, bone, limbDamage * math.Rand(1, 2), dmgInfo) end
-			if hitgroup == HITGROUP_RIGHTARM then hg.organism.input_list.rarmup(org, bone, limbDamage * math.Rand(1, 2), dmgInfo) end
+			local segmentSuffix = lane.segment == "down" and "down" or "up"
+			if hitgroup == HITGROUP_LEFTLEG then hg.organism.input_list["lleg" .. segmentSuffix](org, bone, limbDamage * math.Rand(1, 2), dmgInfo) end
+			if hitgroup == HITGROUP_RIGHTLEG then hg.organism.input_list["rleg" .. segmentSuffix](org, bone, limbDamage * math.Rand(1, 2), dmgInfo) end
+			if hitgroup == HITGROUP_LEFTARM then hg.organism.input_list["larm" .. segmentSuffix](org, bone, limbDamage * math.Rand(1, 2), dmgInfo) end
+			if hitgroup == HITGROUP_RIGHTARM then hg.organism.input_list["rarm" .. segmentSuffix](org, bone, limbDamage * math.Rand(1, 2), dmgInfo) end
+
+			if hitgroup == HITGROUP_LEFTLEG or hitgroup == HITGROUP_RIGHTLEG then
+				local axialLoad = 1 - (lane.shearLoad or 1)
+				if axialLoad >= 0.5 and normalSpeed >= 400 then
+					local transferred = residual * axialLoad
+					hg.organism.input_list.pelvis(org, bone, transferred * 0.9 * legMul, dmgInfo)
+					if normalSpeed >= 700 then
+						hg.organism.input_list.spine1(org, bone, transferred * 0.25 * legMul, dmgInfo)
+					end
+					residual = residual - transferred
+				end
+			end
 		elseif lane.name == "chest" then
 			hg.organism.input_list.chest(org, bone, structuralBudget * lane.scale, dmgInfo)
 		elseif lane.name == "pelvis" then

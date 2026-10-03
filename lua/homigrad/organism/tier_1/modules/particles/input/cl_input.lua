@@ -479,6 +479,16 @@ local function getBloodEffectBody(ent)
 	return ent, ent
 end
 
+local function makeBloodBodyTracker(ent)
+	local locked = IsValid(ent) and ent:IsRagdoll() and ent or nil
+	return function()
+		if locked then return IsValid(locked) and locked or nil end
+		local body = getBloodEffectBody(ent)
+		if IsValid(body) and body:IsRagdoll() then locked = body end
+		return body
+	end
+end
+
 local function getBloodEffectBoneMatrix(ent, boneName)
 	if not IsValid(ent) then return end
 	ent:SetupBones()
@@ -504,17 +514,16 @@ net.Receive("bloodsquirt", function()
 		if not mat then return end
 
 		local localPos, localDir = WorldToLocal(pos, dir:Angle(), mat:GetTranslation(), mat:GetAngles())
-		local _, owner = getBloodEffectBody(ent)
-		local source = IsValid(owner) and owner or ent
+		local getBody = makeBloodBodyTracker(ent)
 
 		bloodSquirtSerial = bloodSquirtSerial + 1
-		local name = "squirtblood"..source:EntIndex().."_"..bloodSquirtSerial
+		local name = "squirtblood"..ent:EntIndex().."_"..bloodSquirtSerial
 		local i = 150
 		local maxI = i
 		local vechuy = Vector(0,0,0)
 		local dsqr = 2000 * 2000
 		timer.Create(name, 0.02, i + 10, function()
-			local drawEnt = getBloodEffectBody(source)
+			local drawEnt = getBody()
 			if not IsValid(drawEnt) then timer.Remove(name) return end
 			local amt = i / maxI
 			local drawMat, drawBone = getBloodEffectBoneMatrix(drawEnt, boneName)
@@ -554,6 +563,7 @@ net.Receive("bloodsquirt2", function()
 	if not mat then return end
 	local source = ent
 	local _, ply = getBloodEffectBody(source)
+	local getBody = makeBloodBodyTracker(source)
 
 	local localPos, localDir = WorldToLocal(pos, dir:Angle(), mat:GetTranslation(), mat:GetAngles())
 
@@ -567,7 +577,7 @@ net.Receive("bloodsquirt2", function()
 	local vechuy = Vector(0,0,0)
 	local dsqr = 2000 * 2000
 	timer.Create(name, 0.01, i + 10, function()
-		local ent = getBloodEffectBody(source)
+		local ent = getBody()
 		if not IsValid(ent) then timer.Remove(name) return end
 		local amt = math.max(i / maxI, 0.2)
 		if math.random(5) == 1 then return end
@@ -606,6 +616,7 @@ net.Receive("vomitConcussionMouth", function()
 	if not mat then return end
 	local source = ent
 	local _, ply = getBloodEffectBody(source)
+	local getBody = makeBloodBodyTracker(source)
 
 	local localPos, localDir = WorldToLocal(pos, dir:Angle(), mat:GetTranslation(), mat:GetAngles())
 
@@ -615,7 +626,7 @@ net.Receive("vomitConcussionMouth", function()
 	local i = 24
 	local maxI = i
 	timer.Create(name, 0.025, i + 5, function()
-		local ent = getBloodEffectBody(source)
+		local ent = getBody()
 		if not IsValid(ent) then timer.Remove(name) return end
 		local amt = math.max(i / maxI, 0.2)
 		if math.random(3) == 1 then return end

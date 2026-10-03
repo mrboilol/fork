@@ -1203,7 +1203,12 @@ end
 local function protec(org, bone, dmg, dmgInfo, placement, armor, scale, scaleprot, punch, boneindex, dir, hit, ricochet, impact, ballisticProtOverride)
 	if not force and org.owner.armors[placement] ~= armor then return 0 end
 	force = nil
-	
+
+	if impact and impact.pierceSoftArmor
+		and not hg.IsArmorPlateStopping(org.owner, placement, armor, isvector(hit) and hit or dmgInfo:GetDamagePosition()) then
+		return {penetrationCost = 0, energyCost = 0}
+	end
+
 	local armorData = hg.armor[placement] and hg.armor[placement][armor]
 	local ballisticProt, meleeProt, stabProt = hg.GetArmorProtection(org.owner, placement, armor, isvector(hit) and hit or dmgInfo:GetDamagePosition())
 	if isnumber(ballisticProtOverride) then ballisticProt = ballisticProtOverride end
@@ -1486,6 +1491,9 @@ function hg.ProcessArmorModelHit(hit, damage, forceAmount, direction, shot)
 	local owner = hit.body
 	local armor, placement, armorData = hit.armor, hit.placement, hit.data
 	if not armorData or not owner.armors or owner.armors[placement] ~= armor then return end
+	if shot and hg.BulletPiercesSoftArmor(nil, shot) and not hg.IsArmorPlateStopping(owner, placement, armor, hit.position) then
+		return {scale = 1, penetration = shot.Penetration, material = MAT_METAL}
+	end
 
 	local dir = isvector(direction) and direction:GetNormalized() or vector_origin
 	local dmgInfo = DamageInfo()

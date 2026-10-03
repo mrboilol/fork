@@ -73,6 +73,7 @@ local COLOR = {
 	ARMOR_LINE_ALPHA = 220,
 	RING_HEALTHY = {255, 255, 255},
 	RING_BLEEDING = {215, 25, 25},
+	DISLOCATION = {45, 130, 255},
 	TOURNIQUET_RING = {70, 130, 235},
 	TOURNIQUET_STRAP = {35, 60, 150},
 	BANDAGE_CLEAN = {225, 215, 190},
@@ -105,6 +106,7 @@ local RADIUS = {
 	THIGH = 0.13,
 	CALF = 0.11,
 	FOOT = 0.1,
+	JOINT = 0.075,
 }
 
 local BONE = {
@@ -204,24 +206,28 @@ local LIMB_POINT_BONES = {
 local LIMBS = {
 	{
 		base = "lleg", upper = "llegup", lower = "lleg",
+		joints = {up = POINT.L_HIP, down = POINT.L_KNEE},
 		points = {POINT.L_HIP, POINT.L_KNEE, POINT.L_ANKLE, POINT.L_FOOT},
 		radii = {RADIUS.THIGH, RADIUS.CALF, RADIUS.FOOT},
 		bones = {BONE.L_THIGH, BONE.L_CALF, BONE.L_FOOT},
 	},
 	{
 		base = "rleg", upper = "rlegup", lower = "rleg",
+		joints = {up = POINT.R_HIP, down = POINT.R_KNEE},
 		points = {POINT.R_HIP, POINT.R_KNEE, POINT.R_ANKLE, POINT.R_FOOT},
 		radii = {RADIUS.THIGH, RADIUS.CALF, RADIUS.FOOT},
 		bones = {BONE.R_THIGH, BONE.R_CALF, BONE.R_FOOT},
 	},
 	{
 		base = "larm", upper = "larmup", lower = "larm", hand = "lhand",
+		joints = {up = POINT.L_SHOULDER, down = POINT.L_ELBOW},
 		points = {POINT.L_SHOULDER, POINT.L_ELBOW, POINT.L_WRIST},
 		radii = {RADIUS.UPPER_ARM, RADIUS.LOWER_ARM, RADIUS.HAND},
 		bones = {BONE.L_UPPERARM, BONE.L_FOREARM, BONE.L_HAND},
 	},
 	{
 		base = "rarm", upper = "rarmup", lower = "rarm", hand = "rhand",
+		joints = {up = POINT.R_SHOULDER, down = POINT.R_ELBOW},
 		points = {POINT.R_SHOULDER, POINT.R_ELBOW, POINT.R_WRIST},
 		radii = {RADIUS.UPPER_ARM, RADIUS.LOWER_ARM, RADIUS.HAND},
 		bones = {BONE.R_UPPERARM, BONE.R_FOREARM, BONE.R_HAND},
@@ -293,17 +299,18 @@ local lastBody
 local lastDrawTime = 0
 
 local STRESS_SEGMENTS = {
-	{child = BONE.L_UPPERARM, parent = BONE.SPINE4, base = "larm", regions = {"larmup"}},
-	{child = BONE.L_FOREARM, parent = BONE.L_UPPERARM, base = "larm", regions = {"larm", "lhand"}},
-	{child = BONE.R_UPPERARM, parent = BONE.SPINE4, base = "rarm", regions = {"rarmup"}},
-	{child = BONE.R_FOREARM, parent = BONE.R_UPPERARM, base = "rarm", regions = {"rarm", "rhand"}},
-	{child = BONE.L_THIGH, parent = BONE.PELVIS, base = "lleg", regions = {"llegup"}},
-	{child = BONE.L_CALF, parent = BONE.L_THIGH, base = "lleg", regions = {"lleg"}},
-	{child = BONE.R_THIGH, parent = BONE.PELVIS, base = "rleg", regions = {"rlegup"}},
-	{child = BONE.R_CALF, parent = BONE.R_THIGH, base = "rleg", regions = {"rleg"}},
+	{child = BONE.L_UPPERARM, parent = BONE.SPINE4, base = "larm", segment = "up", regions = {"larmup"}},
+	{child = BONE.L_FOREARM, parent = BONE.L_UPPERARM, base = "larm", segment = "down", regions = {"larm", "lhand"}},
+	{child = BONE.R_UPPERARM, parent = BONE.SPINE4, base = "rarm", segment = "up", regions = {"rarmup"}},
+	{child = BONE.R_FOREARM, parent = BONE.R_UPPERARM, base = "rarm", segment = "down", regions = {"rarm", "rhand"}},
+	{child = BONE.L_THIGH, parent = BONE.PELVIS, base = "lleg", segment = "up", regions = {"llegup"}},
+	{child = BONE.L_CALF, parent = BONE.L_THIGH, base = "lleg", segment = "down", regions = {"lleg"}},
+	{child = BONE.R_THIGH, parent = BONE.PELVIS, base = "rleg", segment = "up", regions = {"rlegup"}},
+	{child = BONE.R_CALF, parent = BONE.R_THIGH, base = "rleg", segment = "down", regions = {"rleg"}},
 }
 
 local severity, broken = {}, {}
+local dislocated = {}
 local arterial, missing = {}, {}
 local bleedLevel, tourniquet, bandage, stress = {}, {}, {}, {}
 local regionBleed, regionArterial = {}, {}
@@ -762,24 +769,40 @@ local function collectWounds(org, wounds, arterialWounds)
 	end
 end
 
+local function segmentValue(org, base, segment)
+	local value = org[base .. "_" .. segment]
+	if isnumber(value) then return value end
+
+	return orgNumber(org, base)
+end
+
+local function segmentDislocated(org, base, segment)
+	local flagged = org[base .. "_" .. segment .. "_disl"]
+	if flagged ~= nil then return flagged == true end
+
+	return segment == "up" and org[base .. "dislocation"] == true
+end
+
 local function updateLimbState(org, limb)
-	local value = orgNumber(org, limb.base)
-	local boneSev = boneSeverity(value)
-	local dislocation = org[limb.base .. "dislocation"] == true and WEIGHT.DISLOCATION or 0
-	local isBroken = value >= 1
+	local upperValue = segmentValue(org, limb.base, "up")
+	local lowerValue = segmentValue(org, limb.base, "down")
+	local upperSev, lowerSev = boneSeverity(upperValue), boneSeverity(lowerValue)
+	local upperBroken, lowerBroken = upperValue >= 1, lowerValue >= 1
 	local hasTourniquet = hg.HasTourniquetOnLimb and hg.HasTourniquetOnLimb(woundSource, limb.base) or false
 	local upper, lower, hand = limb.upper, limb.lower, limb.hand
 
-	severity[upper] = combine(boneSev, dislocation)
-	severity[lower] = boneSev
-	broken[upper], broken[lower] = isBroken, isBroken
+	severity[upper] = upperSev
+	severity[lower] = lowerSev
+	broken[upper], broken[lower] = upperBroken, lowerBroken
 	tourniquet[upper], tourniquet[lower] = hasTourniquet, hasTourniquet
 	missing[upper] = org[upper .. "amputated"] == true
 	missing[lower] = missing[upper] or org[lower .. "amputated"] == true
+	dislocated[limb.base .. "_up"] = not missing[upper] and segmentDislocated(org, limb.base, "up")
+	dislocated[limb.base .. "_down"] = not missing[upper] and segmentDislocated(org, limb.base, "down")
 	if not hand then return end
 
-	severity[hand] = boneSev * WEIGHT.HAND_BONE_SHARE
-	broken[hand] = isBroken
+	severity[hand] = lowerSev * WEIGHT.HAND_BONE_SHARE
+	broken[hand] = lowerBroken
 	tourniquet[hand] = hasTourniquet
 	missing[hand] = missing[lower] or org[hand .. "amputated"] == true
 end
@@ -835,6 +858,9 @@ local function clearMedicalState()
 		broken[region], arterial[region], missing[region], tourniquet[region] = false, false, false, false
 		bandage[region] = nil
 	end
+	for _, limb in ipairs(LIMBS) do
+		dislocated[limb.base .. "_up"], dislocated[limb.base .. "_down"] = false, false
+	end
 end
 
 local function updateMedicalState(ply, body)
@@ -856,10 +882,10 @@ local function updateMedicalState(ply, body)
 	pulseHz = math_Clamp((tonumber(org.pulse) or DEFAULT_PULSE) / SECONDS_PER_MINUTE, 0.5, 3)
 end
 
-local function limbCanDislocate(base)
+local function limbCanDislocate(base, segment)
 	if not currentOrg then return false end
 
-	return currentOrg[base .. "dislocation"] ~= true and orgNumber(currentOrg, base) < 1
+	return not segmentDislocated(currentOrg, base, segment) and segmentValue(currentOrg, base, segment) < 1
 end
 
 local function updateStress(ragdolled, snap)
@@ -878,7 +904,7 @@ local function updateStress(ragdolled, snap)
 			end
 			segment.ox, segment.oy, segment.oz, segment.valid = ox, oy, oz, true
 			local pull = (segment.speed - STRESS.START_SPEED) / (STRESS.PULL_SPEED - STRESS.START_SPEED)
-			value = limbCanDislocate(segment.base) and math_Clamp(pull, 0, 1) or 0
+			value = limbCanDislocate(segment.base, segment.segment) and math_Clamp(pull, 0, 1) or 0
 		else
 			segment.valid, segment.speed = false, 0
 		end
@@ -1202,6 +1228,23 @@ local function drawCircles()
 	end
 end
 
+local function drawDislocations()
+	local radius = RADIUS.JOINT * DISPLAY_SPINE * pixelScale
+	local color = COLOR.DISLOCATION
+	for _, limb in ipairs(LIMBS) do
+		for segment, point in pairs(limb.joints) do
+			if dislocated[limb.base .. "_" .. segment] and smoothValid[point] then
+				local x = centerX + smoothY[point] * pixelScale
+				local y = centerY - (smoothZ[point] - targetZ) * pixelScale
+				setDrawColor(COLOR.OUTLINE[1], COLOR.OUTLINE[2], COLOR.OUTLINE[3], OUTLINE_ALPHA)
+				polyCapsule(x, y, x, y, radius + outlineWidth)
+				setDrawColor(color[1], color[2], color[3], 255)
+				polyCapsule(x, y, x, y, radius)
+			end
+		end
+	end
+end
+
 local function drawWounds()
 	local sizeScale = ScrH() / REFERENCE_SCREEN_HEIGHT
 	for i = 1, emitterCount do
@@ -1347,6 +1390,7 @@ local function renderFigure()
 	draw.NoTexture()
 	queueBody()
 	drawCircles()
+	drawDislocations()
 	drawArmor()
 	drawWounds()
 end

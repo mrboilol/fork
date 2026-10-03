@@ -223,6 +223,9 @@ local function protec(org, bone, dmg, dmgInfo, placement, boneindex, dir, hit, r
     local plate = plateName and armor[plateName] or armor
     local plateKey = plateName or armor
 	local isBullet = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
+	if impact and impact.pierceSoftArmor and not (plateName and placement >= ZC_ARMOR_SLOT_TORSO) then
+		return {penetrationCost = 0, energyCost = 0}
+	end
 	if isBullet and impact and impact.ballisticVersion then
 		impact.zcityArmorHits = impact.zcityArmorHits or {}
 		if impact.zcityArmorHits[plate] then return {penetrationCost = 0, energyCost = 0} end

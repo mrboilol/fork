@@ -220,58 +220,131 @@ local function canFeelPain(org, region)
 	return not hg.organism.CanFeelPain or hg.organism.CanFeelPain(org, region)
 end
 
-function hg.organism.IsLimbCompoundFractured(org, key)
-	local fractures = org and org.limbfractures and org.limbfractures[key]
-	return fractures and fractures.up and fractures.down or false
+local limbSegments = {"up", "down"}
+
+local segmentName = {
+	rleg = {up = "right thigh", down = "right shin"},
+	lleg = {up = "left thigh", down = "left shin"},
+	rarm = {up = "right upper arm", down = "right forearm"},
+	larm = {up = "left upper arm", down = "left forearm"},
+}
+
+local jointName = {
+	rleg = {up = "hip", down = "knee"},
+	lleg = {up = "hip", down = "knee"},
+	rarm = {up = "shoulder", down = "elbow"},
+	larm = {up = "shoulder", down = "elbow"},
+}
+
+local function otherSegment(segment)
+	return segment == "up" and "down" or "up"
 end
+
+local function segmentHealthKey(key, segment)
+	return key .. "_" .. segment
+end
+
+local function segmentDislocationKey(key, segment)
+	return key .. "_" .. segment .. "_disl"
+end
+
+local function refreshLimbAggregate(org, key)
+	local worst = math.max(tonumber(org[segmentHealthKey(key, "up")]) or 0, tonumber(org[segmentHealthKey(key, "down")]) or 0)
+	org[key] = worst
+	org[key .. "_agg"] = worst
+end
+
+function hg.organism.SyncLimbSegments(org, key)
+	local up, down = segmentHealthKey(key, "up"), segmentHealthKey(key, "down")
+	local aggregate = tonumber(org[key]) or 0
+	local last = org[key .. "_agg"]
+	if last == nil then
+		org[up] = tonumber(org[up]) or 0
+		org[down] = tonumber(org[down]) or aggregate
+	elseif math.abs(aggregate - last) > 0.00001 then
+		if aggregate <= 0 then
+			org[up], org[down] = 0, 0
+		elseif aggregate < last then
+			local scale = aggregate / last
+			org[up], org[down] = (org[up] or 0) * scale, (org[down] or 0) * scale
+		else
+			local target = (org[up] or 0) > (org[down] or 0) and up or down
+			org[target] = math.min(aggregate, 1)
+		end
+	end
+	refreshLimbAggregate(org, key)
+
+	local upFlag, downFlag = segmentDislocationKey(key, "up"), segmentDislocationKey(key, "down")
+	if org[key .. "dislocation"] then
+		if not org[upFlag] and not org[downFlag] then org[upFlag] = true end
+	else
+		org[upFlag], org[downFlag] = false, false
+	end
+end
+
+function hg.organism.ClearLimbDislocation(org, key)
+	if not org or not key then return false end
+	if not limbName[key] then
+		if not org[key .. "dislocation"] then return false end
+		org[key .. "dislocation"] = false
+		return true
+	end
+
+	hg.organism.SyncLimbSegments(org, key)
+	local cleared
+	for _, segment in ipairs(limbSegments) do
+		if not cleared and org[segmentDislocationKey(key, segment)] then
+			org[segmentDislocationKey(key, segment)] = false
+			cleared = segment
+		end
+	end
+	if not cleared then return false end
+
+	org[key .. "dislocation"] = (org[segmentDislocationKey(key, "up")] or org[segmentDislocationKey(key, "down")]) and true or false
+	if hg.fakeBoneFlop then hg.fakeBoneFlop.SetLimbSegmentDislocation(org, key, cleared, false) end
+	return true
+end
+
+function hg.organism.IsLimbCompoundFractured(org, key)
+	return org and (org[segmentHealthKey(key, "up")] or 0) >= 1 and (org[segmentHealthKey(key, "down")] or 0) >= 1 or false
+end
+
+hook.Add("Org Think", "homigrad_limb_segments", function(owner, org)
+	if not org then return end
+	for key in pairs(limbName) do
+		hg.organism.SyncLimbSegments(org, key)
+	end
+end)
 
 function hg.organism.CantHoldWeapon(org)
 	local function unusable(key) return org[key] == 1 or hg.organism.IsLimbCompoundFractured(org, key) end
 	return unusable("larm") and unusable("rarm")
 end
 
-local function markLimbFracture(org, key, segment)
-	org.limbfractures = org.limbfractures or {}
-	org.limbfractures[key] = org.limbfractures[key] or {}
-	org.limbfractures[key][segment] = true
-end
-
-local function fractureSecondSegment(org, key, segment, dmgInfo, severity)
-	if not org[key] or org[key] < 1 or org[key .. "amputated"] then return false end
-	local fractures = org.limbfractures and org.limbfractures[key]
-	if not fractures then
-		markLimbFracture(org, key, segment == "up" and "down" or "up")
-		fractures = org.limbfractures[key]
-	end
-	if fractures[segment] or severity < 0.7 then return false end
-
-	markLimbFracture(org, key, segment)
-	local region = (key == "lleg" or key == "rleg") and "lower" or "body"
-	local stabilized = org[key .. "stabilized"]
-	if hg.fakeBoneFlop then hg.fakeBoneFlop.SetLimbSegmentState(org, key, segment, not stabilized) end
+local function compoundFractureResponse(org, key, region, stabilized)
 	if not stabilized then
-		addBoneFracturePain(org, 95, region)
-		org.immobilization = org.immobilization + 90
+		addBoneFracturePain(org, 40, region)
+		org.immobilization = org.immobilization + 65
 	else
-		addBoneFracturePain(org, 25, region)
-		org.immobilization = org.immobilization + 25
+		addBoneFracturePain(org, 15, region)
+		org.immobilization = org.immobilization + 15
 	end
-	org.owner:AddNaturalAdrenaline(1.5)
-	org.fearadd = org.fearadd + 1
-	if IsValid(org.owner) and org.owner:IsPlayer() then org.just_damaged_bone = CurTime() end
+	org.owner:AddNaturalAdrenaline(0.5)
+	org.fearadd = org.fearadd + 0.5
 
 	if hasNewThoughts(org) then
 		sendThought(org, "Your " .. limbName[key] .. " is broken in two places.", "thought_double_broke" .. key, 2, Color(255, 150, 150))
 	else
 		notifyOwner(org, "MY " .. string.upper(limbName[key]) .. " IS BROKEN IN TWO PLACES!", true, "double_broke" .. key, 2)
 	end
-	playBoneFractureSound(org.owner)
 	if hg.QueuePainScream and canFeelPain(org, region) then hg.QueuePainScream(org.owner, 2) end
-	return true
 end
 
 local function doDislocate(org, key, dmg, segment)
-	if org[key.."dislocation"] then return false end
+	segment = segment == "down" and "down" or "up"
+	local flag = segmentDislocationKey(key, segment)
+	if org[flag] then return false end
+	org[flag] = true
 	org[key.."dislocation"] = true
 	if hg.fakeBoneFlop then
 		hg.fakeBoneFlop.SetLimbSegmentDislocation(org, key, segment, not org[key.."stabilized"])
@@ -289,7 +362,7 @@ local function doDislocate(org, key, dmg, segment)
 	org.fearadd = org.fearadd + 0.5
 
 	if hasNewThoughts(org) then
-		sendThought(org, "Your " .. limbName[key] .. " is dislocated.", "thought_dislocated" .. key, 1, Color(255, 220, 220))
+		sendThought(org, "Your " .. limbName[key] .. " is dislocated at the " .. jointName[key][segment] .. ".", "thought_dislocated" .. key .. segment, 1, Color(255, 220, 220))
 	else
 		notifyOwner(org, (key == "rarm" or key == "larm") and dislocated_arm[math.random(#dislocated_arm)] or dislocated_leg[math.random(#dislocated_leg)], true, "dislocated" .. key, 2)
 	end
@@ -302,20 +375,24 @@ end
 
 function hg.TryDislocateLimb(org, key, segment, severity)
 	if not org or not limbName[key] or org[key .. "amputated"] or org[key .. "upamputated"] then return false end
-	if org[key .. "dislocation"] or (org[key] or 0) >= 1 then return false end
+	segment = segment == "down" and "down" or "up"
+	hg.organism.SyncLimbSegments(org, key)
+	local healthKey = segmentHealthKey(key, segment)
+	if org[segmentDislocationKey(key, segment)] or (org[healthKey] or 0) >= 1 then return false end
 
 	severity = math.max(tonumber(severity) or 0, 0)
 	if severity < 0.18 then return false end
 	local chance = math.Clamp((severity - 0.15) * 0.72, 0.08, 0.82)
 	if math.Rand(0, 1) > chance then return false end
 
-	org[key] = math.min(math.max(org[key] or 0, severity * 0.38), 0.82)
-	return doDislocate(org, key, severity, segment or "up")
+	org[healthKey] = math.min(math.max(org[healthKey] or 0, severity * 0.38), 0.82)
+	refreshLimbAggregate(org, key)
+	return doDislocate(org, key, severity, segment)
 end
 
 local function shouldDislocateLimb(org, key, segment, dmgInfo, hit)
 	if not dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH) or dmgInfo:GetDamageForce():Length() < 40 then return false end
-	if org[key .. "dislocation"] then return false end
+	if org[segmentDislocationKey(key, segment)] then return false end
 
 	local owner = org.owner
 	if not IsValid(owner) then return false end
@@ -338,7 +415,10 @@ local function shouldDislocateLimb(org, key, segment, dmgInfo, hit)
 end
 
 local function legs(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, ricochet)
-	local oldDmg = org[key]
+	hg.organism.SyncLimbSegments(org, key)
+	local healthKey = segmentHealthKey(key, segment)
+	local otherBroken = (org[segmentHealthKey(key, otherSegment(segment))] or 0) >= 1
+	local oldDmg = org[healthKey]
 	local dmg = dmg * 2.5
 	local amputateThreshold = org.isPly and player_crush_amputation_threshold or 4
 
@@ -348,16 +428,13 @@ local function legs(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 		return 0
 	end
 
-	if org[key] == 1 then
-		fractureSecondSegment(org, key, segment, dmgInfo, dmg)
-		return 0
-	end
+	if org[healthKey] == 1 then return 0 end
 
-	local result, vecrand = damageBone(org, 0.3, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
-	
-	local dmg = org[key]
+	local result, vecrand = damageBone(org, 0.3, dmg, dmgInfo, healthKey, boneindex, dir, hit, ricochet)
 
-	org[key] = org[key] * 0.5
+	local dmg = org[healthKey]
+
+	org[healthKey] = org[healthKey] * 0.5
 
 	if dmg < 0.5 then return 0 end
 	if dmg < 1 then return result, vecrand end
@@ -365,10 +442,9 @@ local function legs(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 	if IsValid(org.owner) and org.owner:IsPlayer() and !org[key.."amputated"] then org.just_damaged_bone = CurTime() end
 
 	local stabilized = org[key.."stabilized"]
-	
+
 	if not shouldDislocateLimb(org, key, segment, dmgInfo, hit) then
-		org[key] = 1
-		markLimbFracture(org, key, segment)
+		org[healthKey] = 1
 		if hg.fakeBoneFlop then
 			hg.fakeBoneFlop.SetLimbSegmentState(org, key, segment, not stabilized)
 		end
@@ -384,44 +460,45 @@ local function legs(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 		org.fearadd = org.fearadd + 0.5
 
 		if hasNewThoughts(org) then
-			sendThought(org, "Your " .. limbName[key] .. " is broken.", "thought_broke" .. key, 1, Color(255, 210, 210))
+			sendThought(org, "Your " .. segmentName[key][segment] .. " is broken.", "thought_broke" .. key .. segment, 1, Color(255, 210, 210))
 		else
-			notifyOwner(org, broke_leg[math.random(#broke_leg)], true, "broke" .. key, 2)
+			notifyOwner(org, broke_leg[math.random(#broke_leg)], true, "broke" .. key .. segment, 2)
 		end
 
 		timer.Simple(0, function() hg.LightStunPlayer(org.owner,2) end)
 		playBoneFractureSound(org.owner)
 		if org.isPly and hg.QueuePainScream and canFeelPain(org, "lower") then hg.QueuePainScream(org.owner, 1.35) end
+		if otherBroken then compoundFractureResponse(org, key, "lower", stabilized) end
 	else
 		doDislocate(org, key, dmg, segment)
 	end
 
-	hg.AddHarmToAttacker(dmgInfo, (org[key] - oldDmg) * 2, "Legs bone damage harm")
+	hg.AddHarmToAttacker(dmgInfo, (org[healthKey] - oldDmg) * 2, "Legs bone damage harm")
 
 	return result, vecrand
 end
 
 local function arms(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, ricochet)
-	local oldDmg = org[key]
+	hg.organism.SyncLimbSegments(org, key)
+	local healthKey = segmentHealthKey(key, segment)
+	local otherBroken = (org[segmentHealthKey(key, otherSegment(segment))] or 0) >= 1
+	local oldDmg = org[healthKey]
 	local dmg = dmg * 2.5
 	local amputateThreshold = org.isPly and player_crush_amputation_threshold or 4
-	
+
 	if (tonumber(org.NoDismembermentPhysics) or 0) <= CurTime() and dmgInfo:IsDamageType(DMG_CRUSH) and dmg > amputateThreshold and !org[key.."amputated"] then
 		hg.organism.AmputateLimb(org, key, nil, dmgInfo)
 
 		return 0
 	end
 
-	if org[key] == 1 then
-		fractureSecondSegment(org, key, segment, dmgInfo, dmg)
-		return 0
-	end
+	if org[healthKey] == 1 then return 0 end
 
-	local result, vecrand = damageBone(org, 0.3, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
-	
-	local dmg = org[key]
-	
-	org[key] = org[key] * 0.5
+	local result, vecrand = damageBone(org, 0.3, dmg, dmgInfo, healthKey, boneindex, dir, hit, ricochet)
+
+	local dmg = org[healthKey]
+
+	org[healthKey] = org[healthKey] * 0.5
 
 	if dmg < 0.5 then return 0 end
 	if dmg < 1 then return result, vecrand end
@@ -429,10 +506,9 @@ local function arms(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 	if IsValid(org.owner) and org.owner:IsPlayer() and !org[key.."amputated"] then org.just_damaged_bone = CurTime() end
 
 	local stabilized = org[key.."stabilized"]
-	
+
 	if not shouldDislocateLimb(org, key, segment, dmgInfo, hit) then
-		org[key] = 1
-		markLimbFracture(org, key, segment)
+		org[healthKey] = 1
 		if hg.fakeBoneFlop then
 			hg.fakeBoneFlop.SetLimbSegmentState(org, key, segment, not stabilized)
 		end
@@ -448,20 +524,21 @@ local function arms(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 		org.fearadd = org.fearadd + 0.5
 
 		if hasNewThoughts(org) then
-			sendThought(org, "Your " .. limbName[key] .. " is broken.", "thought_broke" .. key, 1, Color(255, 210, 210))
+			sendThought(org, "Your " .. segmentName[key][segment] .. " is broken.", "thought_broke" .. key .. segment, 1, Color(255, 210, 210))
 		else
-			notifyOwner(org, broke_arm[math.random(#broke_arm)], true, "broke" .. key, 2)
+			notifyOwner(org, broke_arm[math.random(#broke_arm)], true, "broke" .. key .. segment, 2)
 		end
 
 		playBoneFractureSound(org.owner)
 		if org.isPly and hg.QueuePainScream and canFeelPain(org, "body") then hg.QueuePainScream(org.owner, 1.35) end
+		if otherBroken then compoundFractureResponse(org, key, "body", stabilized) end
 	else
 		doDislocate(org, key, dmg, segment)
 	end
 
-	hg.AddHarmToAttacker(dmgInfo, (org[key] - oldDmg) * 1.5, "Arms bone damage harm")
+	hg.AddHarmToAttacker(dmgInfo, (org[healthKey] - oldDmg) * 1.5, "Arms bone damage harm")
 
-	if org[key] == 1 and key == "rarm" and org.isPly then
+	if org[healthKey] == 1 and key == "rarm" and org.isPly then
 		local wep = org.owner.GetActiveWeapon and org.owner:GetActiveWeapon()
 		
 		/*if IsValid(wep) then
@@ -1086,7 +1163,10 @@ input_list.pelvis = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoc
 end
 
 local function upper_limb(org, bone, dmg, dmgInfo, amputate_key, limb_key, segment, boneindex, dir, hit, ricochet)
-	local oldDmg = org[limb_key]
+	hg.organism.SyncLimbSegments(org, limb_key)
+	local healthKey = segmentHealthKey(limb_key, segment)
+	local otherBroken = (org[segmentHealthKey(limb_key, otherSegment(segment))] or 0) >= 1
+	local oldDmg = org[healthKey]
 	local dmg = dmg * 2.0
 	local amputateThreshold = org.isPly and player_crush_amputation_threshold or 4
 
@@ -1096,15 +1176,12 @@ local function upper_limb(org, bone, dmg, dmgInfo, amputate_key, limb_key, segme
 		return 0
 	end
 
-	if org[limb_key] == 1 then
-		fractureSecondSegment(org, limb_key, segment, dmgInfo, dmg)
-		return 0
-	end
+	if org[healthKey] == 1 then return 0 end
 
-	local result, vecrand = damageBone(org, 0.3, dmg, dmgInfo, limb_key, boneindex, dir, hit, ricochet)
+	local result, vecrand = damageBone(org, 0.3, dmg, dmgInfo, healthKey, boneindex, dir, hit, ricochet)
 
-	local d = org[limb_key]
-	org[limb_key] = org[limb_key] * 0.5
+	local d = org[healthKey]
+	org[healthKey] = org[healthKey] * 0.5
 
 	if d < 0.5 then return 0 end
 	if d < 1 then return result, vecrand end
@@ -1114,8 +1191,7 @@ local function upper_limb(org, bone, dmg, dmgInfo, amputate_key, limb_key, segme
 	local stabilized = org[limb_key.."stabilized"]
 
 	if not shouldDislocateLimb(org, limb_key, segment, dmgInfo, hit) then
-		org[limb_key] = 1
-		markLimbFracture(org, limb_key, segment)
+		org[healthKey] = 1
 		if hg.fakeBoneFlop then
 			hg.fakeBoneFlop.SetLimbSegmentState(org, limb_key, segment, not stabilized)
 		end
@@ -1131,30 +1207,37 @@ local function upper_limb(org, bone, dmg, dmgInfo, amputate_key, limb_key, segme
 		org.fearadd = org.fearadd + 0.5
 
 		if hasNewThoughts(org) then
-			sendThought(org, "Your " .. limbName[limb_key] .. " is broken.", "thought_broke" .. limb_key, 1, Color(255, 210, 210))
+			sendThought(org, "Your " .. segmentName[limb_key][segment] .. " is broken.", "thought_broke" .. limb_key .. segment, 1, Color(255, 210, 210))
 		else
-			notifyOwner(org, (limb_key == "rarm" or limb_key == "larm") and broke_arm[math.random(#broke_arm)] or broke_leg[math.random(#broke_leg)], true, "broke" .. limb_key, 2)
+			notifyOwner(org, (limb_key == "rarm" or limb_key == "larm") and broke_arm[math.random(#broke_arm)] or broke_leg[math.random(#broke_leg)], true, "broke" .. limb_key .. segment, 2)
 		end
 
 		playBoneFractureSound(org.owner)
-		if org.isPly and hg.QueuePainScream and canFeelPain(org, (limb_key == "lleg" or limb_key == "rleg") and "lower" or "body") then hg.QueuePainScream(org.owner, 1.35) end
+		local region = (limb_key == "lleg" or limb_key == "rleg") and "lower" or "body"
+		if org.isPly and hg.QueuePainScream and canFeelPain(org, region) then hg.QueuePainScream(org.owner, 1.35) end
+		if otherBroken then compoundFractureResponse(org, limb_key, region, stabilized) end
 	else
 		doDislocate(org, limb_key, d, segment)
 	end
 
-	hg.AddHarmToAttacker(dmgInfo, (org[limb_key] - oldDmg) * 1.5, "Upper limb bone damage harm")
+	hg.AddHarmToAttacker(dmgInfo, (org[healthKey] - oldDmg) * 1.5, "Upper limb bone damage harm")
 
 	return result, vecrand
 end
 
-input_list.rarmup = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return upper_limb(org, bone * 1.25, dmg, dmgInfo, "rarmup", "rarm", "up", boneindex, dir, hit, ricochet) end
-input_list.rarmdown = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return arms(org, bone, dmg, dmgInfo, "rarm", "down", boneindex, dir, hit, ricochet) end
-input_list.larmup = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return upper_limb(org, bone * 1.25, dmg, dmgInfo, "larmup", "larm", "up", boneindex, dir, hit, ricochet) end
-input_list.larmdown = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return arms(org, bone, dmg, dmgInfo, "larm", "down", boneindex, dir, hit, ricochet) end
-input_list.rlegup = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return upper_limb(org, bone, dmg * 1.25, dmgInfo, "rlegup", "rleg", "up", boneindex, dir, hit, ricochet) end
-input_list.rlegdown = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return legs(org, bone, dmg, dmgInfo, "rleg", "down", boneindex, dir, hit, ricochet) end
-input_list.llegup = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return upper_limb(org, bone, dmg * 1.25, dmgInfo, "llegup", "lleg", "up", boneindex, dir, hit, ricochet) end
-input_list.llegdown = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return legs(org, bone, dmg, dmgInfo, "lleg", "down", boneindex, dir, hit, ricochet) end
+local function settleLimb(org, key, ...)
+	refreshLimbAggregate(org, key)
+	return ...
+end
+
+input_list.rarmup = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return settleLimb(org, "rarm", upper_limb(org, bone * 1.25, dmg, dmgInfo, "rarmup", "rarm", "up", boneindex, dir, hit, ricochet)) end
+input_list.rarmdown = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return settleLimb(org, "rarm", arms(org, bone, dmg, dmgInfo, "rarm", "down", boneindex, dir, hit, ricochet)) end
+input_list.larmup = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return settleLimb(org, "larm", upper_limb(org, bone * 1.25, dmg, dmgInfo, "larmup", "larm", "up", boneindex, dir, hit, ricochet)) end
+input_list.larmdown = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return settleLimb(org, "larm", arms(org, bone, dmg, dmgInfo, "larm", "down", boneindex, dir, hit, ricochet)) end
+input_list.rlegup = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return settleLimb(org, "rleg", upper_limb(org, bone, dmg * 1.25, dmgInfo, "rlegup", "rleg", "up", boneindex, dir, hit, ricochet)) end
+input_list.rlegdown = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return settleLimb(org, "rleg", legs(org, bone, dmg, dmgInfo, "rleg", "down", boneindex, dir, hit, ricochet)) end
+input_list.llegup = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return settleLimb(org, "lleg", upper_limb(org, bone, dmg * 1.25, dmgInfo, "llegup", "lleg", "up", boneindex, dir, hit, ricochet)) end
+input_list.llegdown = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return settleLimb(org, "lleg", legs(org, bone, dmg, dmgInfo, "lleg", "down", boneindex, dir, hit, ricochet)) end
 input_list.spine1 = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return spine(org, bone, dmg, dmgInfo, 1, boneindex, dir, hit, ricochet) end
 input_list.spine2 = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return spine(org, bone, dmg, dmgInfo, 2, boneindex, dir, hit, ricochet) end
 input_list.spine3 = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return spine(org, bone, dmg, dmgInfo, 3, boneindex, dir, hit, ricochet) end

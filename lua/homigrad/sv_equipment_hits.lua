@@ -387,16 +387,45 @@ function hg.GetFallBraceState(ply, body)
     return blocking or handsOut, blocking
 end
 
-function hg.ApplyFallBraceDamage(ply, body, dmgInfo, damage)
+local braceContactBones = {
+    rarmup = {"ValveBiped.Bip01_R_Hand", "ValveBiped.Bip01_R_Forearm"},
+    larmup = {"ValveBiped.Bip01_L_Hand", "ValveBiped.Bip01_L_Forearm"},
+}
+local BRACE_CONTACT_REACH = 14
+
+function hg.GetFallBraceContactArms(body, hitPos, hitNormal)
+    local arms = {}
+    if not IsValid(body) or not body:IsRagdoll() or not isvector(hitPos) or not isvector(hitNormal) then return arms end
+
+    local org = body.organism
+    for arm, boneNames in pairs(braceContactBones) do
+        if org and (org[arm:sub(1, 1) .. "armamputated"] or org[arm:sub(1, 1) .. "armupamputated"]) then continue end
+        for _, boneName in ipairs(boneNames) do
+            local bone = body:LookupBone(boneName)
+            local physBone = bone and body:TranslateBoneToPhysBone(bone)
+            local phys = physBone and physBone >= 0 and body:GetPhysicsObjectNum(physBone)
+            if IsValid(phys) and math.abs((phys:GetPos() - hitPos):Dot(hitNormal)) <= BRACE_CONTACT_REACH then
+                arms[#arms + 1] = arm
+                break
+            end
+        end
+    end
+
+    return arms
+end
+
+function hg.ApplyFallBraceDamage(ply, body, dmgInfo, damage, arms)
     if not IsValid(ply) or not isnumber(damage) or damage <= 0 then return 0 end
     local target = IsValid(body) and body or ply
     local org = target.organism or ply.organism
     local input = hg.organism and hg.organism.input_list
     if not org or not input then return 0 end
 
-    local arms = {}
-    if not org.rarmamputated and not org.rarmupamputated then arms[#arms + 1] = "rarmup" end
-    if not org.larmamputated and not org.larmupamputated then arms[#arms + 1] = "larmup" end
+    if not arms then
+        arms = {}
+        if not org.rarmamputated and not org.rarmupamputated then arms[#arms + 1] = "rarmup" end
+        if not org.larmamputated and not org.larmupamputated then arms[#arms + 1] = "larmup" end
+    end
     if #arms == 0 then return 0 end
 
     local perArm = damage / #arms

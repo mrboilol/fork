@@ -779,8 +779,8 @@ hook.Add("Think", "HG_DislocatePulledJoints", function()
 		org.nextJointPullCheck = now + 0.12
 
 		for limb, segments in pairs(fakeLimbBoneSegments) do
-			if org[limb .. "dislocation"] or (org[limb] or 0) >= 1 then continue end
 			for segment, bone in pairs(segments) do
+				if org[limb .. "_" .. segment .. "_disl"] or (org[limb .. "_" .. segment] or 0) >= 1 then continue end
 				local parentBone = fakeBoneParents[bone]
 				local childID = rag:LookupBone(bone)
 				local parentID = parentBone and rag:LookupBone(parentBone)
@@ -924,7 +924,7 @@ function fakeBoneFlop.SetBoneState(org, bone, active, severity)
 end
 
 function fakeBoneFlop.SetLimbSegmentDislocation(org, limb, segment, active)
-	local bone = fakeBoneFlop.ResolveBone(limb, "up")
+	local bone = fakeBoneFlop.ResolveBone(limb, segment == "down" and "down" or "up")
 	if not org or not bone then return false end
 	if not active and not org.fake_dislocated_bones then return false end
 	org.fake_dislocated_bones = org.fake_dislocated_bones or {}
@@ -982,6 +982,12 @@ function fakeBoneFlop.ReconcileLimb(org, limb)
 	local changed = false
 	if not org[limb .. "dislocation"] then
 		changed = fakeBoneFlop.ClearStoredDislocation(org, limb) or changed
+	elseif org.fake_dislocated_bones then
+		for segment, bone in pairs(fakeLimbBoneSegments[limb]) do
+			if org.fake_dislocated_bones[bone] and not org[limb .. "_" .. segment .. "_disl"] then
+				changed = fakeBoneFlop.SetLimbSegmentDislocation(org, limb, segment, false) or changed
+			end
+		end
 	end
 	if (tonumber(org[limb]) or 0) < 1 and not org[limb .. "dislocation"] then
 		changed = fakeBoneFlop.ClearStoredLimb(org, limb) or changed

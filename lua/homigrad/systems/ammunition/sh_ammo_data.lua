@@ -2340,6 +2340,7 @@ hg.ammotypes = {
 			Damage = 35,
 			Speed = 5,
 			PhysPenetrationMul = 0.0,
+			PierceSoftArmor = true,
 		},
 		FunctionInfo = {
 			Model = "models/z_city/nmrih/items/arrow/ammo_arrow_single.mdl",
