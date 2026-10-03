@@ -56,7 +56,7 @@ function SWEP:Animation()
 		return
 	end
 
-	self:AnimApply_ShootRecoil(self:LastShootTime())
+	self:AnimApply_ShootRecoil(self:LastShootTime(), dtime)
 	self:AnimHold()
 
 	self:AnimZoom()
@@ -219,23 +219,40 @@ end
 local angShoot = Angle()
 local angShoot2 = Angle()
 
-function SWEP:AnimApply_ShootRecoil(time)
+local BODY_RECOIL_STIFFNESS = 260
+local BODY_RECOIL_DAMPING = 14.5
+local BODY_RECOIL_IMPULSE = 50
+local BODY_RECOIL_LIMIT = 12
+
+function SWEP:AnimApply_ShootRecoil(time, dtime)
 	local owner = self:GetOwner()
-	local animpos = self:GetAnimPos_Shoot(time, 0.3)
-	animpos = math.ease.InOutSine(animpos)
 	local experienceMul = self.GetWeaponExperienceMul and self:GetWeaponExperienceMul(owner) or 1
 	local caliberMul, weightMul = self:GetRecoilImpulseFactors()
 	local recoilAnimation = math_Clamp(math.sqrt(caliberMul * weightMul), 0.45, 2.2)
-	animpos = animpos * experienceMul * ((self:IsZoom() and self.SpreadMulZoom or self.SpreadMul) + math_max(recoilAnimation - 1, 0) * 0.4) * ((not owner:IsNPC() and self:IsOwnerCrouching(owner)) and self.CrouchMul or 1) * 0.75
-	animpos = animpos * self.AnimShootMul
-	--if animpos > 0 then
-		if CLIENT and (owner ~= LocalPlayer() or LocalPlayer() ~= GetViewEntity()) then
-			angShoot[3] = -15 * animpos * recoilAnimation * 0.65
-			angShoot2[2] = -15 * animpos * recoilAnimation * 0.65
-			self:BoneSet("spine", vecZero, angShoot, "shooting")
-			self:BoneSet("head", vecZero, angShoot2, "shooting")
+	local state = self.bodyRecoil
+	if not state then
+		state = {pos = 0, vel = 0, shot = time}
+		self.bodyRecoil = state
+	end
+
+	if state.shot ~= time then
+		state.shot = time
+		if CurTime() - time < 0.3 then
+			local impulse = experienceMul * ((self:IsZoom() and self.SpreadMulZoom or self.SpreadMul) + math_max(recoilAnimation - 1, 0) * 0.4) * ((not owner:IsNPC() and self:IsOwnerCrouching(owner)) and self.CrouchMul or 1) * 0.75 * self.AnimShootMul
+			state.vel = state.vel + BODY_RECOIL_IMPULSE * impulse * recoilAnimation
 		end
-	--end
+	end
+
+	local dt = math_Clamp(dtime or 0, 0, 0.05)
+	state.vel = (state.vel - state.pos * BODY_RECOIL_STIFFNESS * dt) * math.exp(-BODY_RECOIL_DAMPING * dt)
+	state.pos = math_Clamp(state.pos + state.vel * dt, -BODY_RECOIL_LIMIT, BODY_RECOIL_LIMIT)
+
+	if CLIENT and (owner ~= LocalPlayer() or LocalPlayer() ~= GetViewEntity()) then
+		angShoot[3] = -state.pos
+		angShoot2[2] = -state.pos
+		self:BoneSet("spine", vecZero, angShoot, "shooting")
+		self:BoneSet("head", vecZero, angShoot2, "shooting")
+	end
 end
 
 local hullVec = Vector(0, 0, 0)

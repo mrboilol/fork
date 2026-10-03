@@ -37,8 +37,6 @@ local MOVING_SPEED = 12
 local REACH_FRACTION = 0.97
 local OVERREACH_FRACTION = 0.9
 local LANDING_SPREAD_FRACTION = 0.8
-local MIN_SWING_TIME = 0.14
-local MAX_SWING_TIME = 0.5
 local SETTLE_SWING_TIME = 0.28
 local SETTLE_COOLDOWN = 0.12
 local PHASE_CORRECTION = 8
@@ -50,8 +48,15 @@ local MAX_ANKLE_HEIGHT = 8
 local ANKLE_LEARN_RATE = 2
 local MIN_HALF_WIDTH = 2.5
 local MAX_HALF_WIDTH = 9
-local WALK_SWING_FRACTION = 0.75
-local RUN_SWING_FRACTION = 1.45
+local DROP_DEADZONE = 2
+local DROP_TERRAIN_SCALE = 0.8
+local CROUCH_DROP_SCALE = 0.3
+local POLE_FORWARD_BIAS = 4
+local MIN_LATERAL_FRACTION = 0.5
+local LEDGE_SEARCH = {0.6, 0.3}
+local LIMP_STRIDE_CUT = 0.35
+local LIMP_DRAG = 0.6
+local LIMP_DIP = 2.5
 local DEBUG_BOX = Vector(1.5, 1.5, 1.5)
 local DEBUG_PLANTED = Color(60, 255, 60)
 local DEBUG_SWING = Color(255, 200, 60)
@@ -129,10 +134,23 @@ local function traceGround(state, x, y, originZ)
 	tr.endpos = Vector(x, y, originZ - GROUND_TRACE_DOWN)
 	local result = util.TraceHull(tr)
 	if result.Hit and not result.StartSolid and result.HitNormal.z >= WALKABLE_NORMAL_Z then
-		return result.HitPos, result.HitNormal, not result.HitWorld and result.Entity or nil
+		return result.HitPos, result.HitNormal, not result.HitWorld and result.Entity or nil, true
 	end
 
-	return Vector(x, y, originZ), vector_up, nil
+	return Vector(x, y, originZ), vector_up, nil, false
+end
+
+local function traceSupport(state, origin, target)
+	local pos, normal, groundEnt, hit = traceGround(state, target.x, target.y, origin.z)
+	if hit then return pos, normal, groundEnt end
+
+	for _, fraction in ipairs(LEDGE_SEARCH) do
+		local inward = origin + (target - origin) * fraction
+		local inwardPos, inwardNormal, inwardEnt, inwardHit = traceGround(state, inward.x, inward.y, origin.z)
+		if inwardHit then return inwardPos, inwardNormal, inwardEnt end
+	end
+
+	return pos, normal, groundEnt
 end
 
 local function clampToWalls(state, origin, target)
@@ -155,6 +173,7 @@ local function newState(ply)
 		weight = 0,
 		phase = 0,
 		drop = 0,
+		hop = 0,
 		lastPlant = 0,
 		frame = -1,
 		feet = {{}, {}},
@@ -201,19 +220,25 @@ local function plantedWorldPos(foot)
 	return foot.planted
 end
 
-local function landingTarget(ply, state, ctx, foot, sign)
+local function landingTarget(ply, state, ctx, foot, index)
+	local sign = LEGS[index].sign
 	local rest = ctx.origin + ctx.right * (sign * ctx.halfWidth)
 	if ctx.speed <= MOVING_SPEED then return rest end
 
 	local remaining = (1 - foot.t) * foot.duration
 	local bodyAtLanding = ctx.origin + ctx.vel * remaining
-	local stepLength = hg.GaitStepLength and hg.GaitStepLength(ctx.speed) or 30
-	local lead = (2 - ctx.swingFraction) * stepLength * 0.5 * IKFoot.GetFloat("stride_scale")
+	local lead = hg.GaitLandingLead(ctx.speed, ctx.swingFraction) * IKFoot.GetFloat("stride_scale") * (1 - ctx.limp[index] * LIMP_STRIDE_CUT)
 	local offset = ctx.right * (sign * ctx.halfWidth) + ctx.moveDir * lead
 	local maxSpread = ctx.legLength * LANDING_SPREAD_FRACTION
 	if offset:Length() > maxSpread then
 		offset:Normalize()
 		offset:Mul(maxSpread)
+	end
+
+	local lateral = offset:Dot(ctx.right)
+	local minLateral = ctx.halfWidth * MIN_LATERAL_FRACTION
+	if sign * lateral < minLateral then
+		offset:Add(ctx.right * (sign * minLateral - lateral))
 	end
 
 	return bodyAtLanding + offset
@@ -223,9 +248,9 @@ local function updateSwing(ply, state, ctx, index, dt)
 	local foot = state.feet[index]
 	foot.t = math_min(foot.t + dt / foot.duration, 1)
 
-	local desired = clampToWalls(state, ctx.origin, landingTarget(ply, state, ctx, foot, LEGS[index].sign))
+	local desired = clampToWalls(state, ctx.origin, landingTarget(ply, state, ctx, foot, index))
 	if not foot.target or foot.tracedAt:DistToSqr(desired) > RETRACE_DIST_SQR then
-		local pos, normal, groundEnt = traceGround(state, desired.x, desired.y, ctx.origin.z)
+		local pos, normal, groundEnt = traceSupport(state, ctx.origin, desired)
 		foot.tracedAt = desired
 		foot.target = foot.target and LerpVector(math_min(dt * TARGET_SMOOTH, 1), foot.target, pos) or pos
 		foot.targetNormal = normal
@@ -245,7 +270,7 @@ local function updateSwing(ply, state, ctx, index, dt)
 	local start, target = foot.start, foot.target
 	local rise = target.z - start.z
 	local zProgress = rise > 1 and smoothstep(math_min(t * 1.6, 1)) or s
-	local clearance = IKFoot.GetFloat("step_height") * (0.6 + 0.4 * ctx.speedFraction) + math_abs(rise) * 0.3
+	local clearance = (IKFoot.GetFloat("step_height") * (0.6 + 0.4 * ctx.speedFraction) + math_abs(rise) * 0.3) * (1 - ctx.limp[index] * LIMP_DRAG)
 	local pos = LerpVector(s, start, target)
 	pos.z = Lerp(zProgress, start.z, target.z) + math_sin(math.pi * t) * clearance
 	foot.ground = pos
@@ -255,14 +280,15 @@ end
 local function updatePhase(ply, state, ctx, dt)
 	local rate
 	if ply == LocalPlayer() and ply.hg_GaitPhase then
-		rate = ply.hg_GaitRate or 0
+		rate = (ply.hg_GaitRate or 0) * hg.GaitLimpRateMul(ply, state.phase)
 		state.phase = (state.phase + rate * dt) % 2
 		local diff = (ply.hg_GaitPhase - state.phase + 1) % 2 - 1
 		state.phase = (state.phase + diff * math_min(dt * PHASE_CORRECTION, 1)) % 2
 	else
-		rate = hg.GaitStepRate and hg.GaitStepRate(ctx.speed, ctx.speed > MOVING_SPEED) or 0
+		rate = hg.GaitStepRate(ctx.speed, ctx.speed > MOVING_SPEED) * hg.GaitLimpRateMul(ply, state.phase)
 		state.phase = (state.phase + rate * dt) % 2
 	end
+	state.rate = rate
 
 	if rate <= 0 then
 		state.stepIndex = nil
@@ -273,7 +299,7 @@ local function updatePhase(ply, state, ctx, dt)
 	local stepIndex = math_floor(state.phase) % 2 + 1
 	if stepIndex == state.stepIndex then return end
 	state.stepIndex = stepIndex
-	startStep(state, stepIndex, math_Clamp(ctx.swingFraction / rate, MIN_SWING_TIME, MAX_SWING_TIME), ctx.swingFraction > 1)
+	startStep(state, stepIndex, hg.GaitSwingTime(rate, ctx.swingFraction), ctx.swingFraction > 1)
 end
 
 local function settleIdleFeet(state, ctx)
@@ -318,7 +344,7 @@ local function updateFeet(ply, state, ctx, dt)
 		local foot = state.feet[index]
 		if not foot.planted then
 			local anim = ctx.anim[index]
-			plantFoot(state, foot, traceGround(state, anim.ankle.x, anim.ankle.y, ctx.origin.z))
+			plantFoot(state, foot, traceSupport(state, ctx.origin, anim.ankle))
 			foot.bodyYaw = ctx.bodyYaw
 		end
 
@@ -348,19 +374,27 @@ end
 local function updateDrop(state, ctx, dt)
 	local targetDrop = 0
 	for index = 1, 2 do
-		local foot, anim = state.feet[index], ctx.anim[index]
-		local countsForSupport = not foot.swinging or foot.t > 0.5
-		if anim.usable and countsForSupport and foot.ground then
-			local ankle = foot.ground + vector_up * state.ankleHeight
-			local reach = anim.length * REACH_FRACTION * 0.98
-			local horizontalSqr = (ankle - anim.hip):Length2DSqr()
-			local needed = anim.hip.z - ankle.z - math_sqrt(math_max(reach * reach - horizontalSqr, 0))
-			targetDrop = math_max(targetDrop, needed)
+		local foot = state.feet[index]
+		local supporting = not foot.swinging or foot.t > 0.5
+		if ctx.anim[index].usable and supporting and foot.ground then
+			targetDrop = math_max(targetDrop, ctx.origin.z - foot.ground.z - DROP_DEADZONE)
 		end
 	end
 
-	targetDrop = math_Clamp(targetDrop, 0, IKFoot.GetFloat("max_body_drop"))
+	local maxDrop = IKFoot.GetFloat("max_body_drop") * (ctx.crouching and CROUCH_DROP_SCALE or 1)
+	targetDrop = math_Clamp(targetDrop * DROP_TERRAIN_SCALE, 0, maxDrop)
 	state.drop = state.drop + (targetDrop - state.drop) * (1 - math_exp(-dt * DROP_SMOOTH))
+end
+
+local function gaitBob(state, ctx)
+	if not ctx.onGround or (state.rate or 0) <= 0 then return 0 end
+	local stepProgress = state.phase % 1
+	local stanceIndex = 3 - (math_floor(state.phase) % 2 + 1)
+	local dip = ctx.limp[stanceIndex] * LIMP_DIP * math_sin(math.pi * stepProgress)
+	local flight = hg.GaitFlightFraction(ctx.swingFraction)
+	if stepProgress >= flight then return -dip end
+
+	return math_sin(math.pi * stepProgress / flight) * IKFoot.GetFloat("flight_hop") * ctx.speedFraction - dip
 end
 
 local function readAnim(ent, ply, bones)
@@ -409,7 +443,9 @@ local function buildContext(ply, state, anim, dt)
 		halfWidth = math_Clamp(hipSpan, MIN_HALF_WIDTH, MAX_HALF_WIDTH),
 		legLength = math_max(anim[1].length, anim[2].length),
 		onGround = ply:OnGround(),
-		swingFraction = Lerp(speedFraction, WALK_SWING_FRACTION, RUN_SWING_FRACTION),
+		crouching = ply:Crouching(),
+		limp = {hg.GaitLegLimp(ply.organism, "lleg"), hg.GaitLegLimp(ply.organism, "rleg")},
+		swingFraction = hg.GaitSwingFraction(speed),
 		anim = anim,
 	}
 end
@@ -459,8 +495,9 @@ local function solveLeg(ent, ids, foot, ankleTarget, weight, ctx, state, alignWe
 
 	local animAxis = (ankle0 - hip):GetNormalized()
 	local bend0 = knee0 - hip
-	local pole0 = bend0 - animAxis * bend0:Dot(animAxis)
-	if pole0:LengthSqr() < 0.01 then pole0 = Vector(ctx.forward) end
+	local pole0 = bend0 - animAxis * bend0:Dot(animAxis) + ctx.forward * POLE_FORWARD_BIAS
+	pole0 = pole0 - animAxis * pole0:Dot(animAxis)
+	if pole0:LengthSqr() < 0.0001 then pole0 = ctx.right:Cross(animAxis) end
 	pole0:Normalize()
 	local pole = pole0 - dir * pole0:Dot(dir)
 	if pole:LengthSqr() < 0.0001 then pole = ctx.forward - dir * ctx.forward:Dot(dir) end
@@ -495,12 +532,17 @@ end
 
 local function applyPose(ent, ply, state, bones, ctx)
 	local weight = state.weight
-	if state.drop > 0.01 then
-		local pelvisMat = ent:GetBoneMatrix(bones.pelvis)
-		if pelvisMat then
-			local dropped = Matrix(pelvisMat)
-			dropped:SetTranslation(pelvisMat:GetTranslation() - vector_up * (state.drop * weight))
-			hg.bone_apply_matrix(ent, bones.pelvis, dropped)
+	local pelvisOffset = (state.hop - state.drop) * weight
+	local pelvisMat = ent:GetBoneMatrix(bones.pelvis)
+	if pelvisMat and math_abs(pelvisOffset) > 0.01 then
+		local current = pelvisMat:GetTranslation()
+		local alreadyOffset = state.pelvisFrame == FrameNumber() and current:DistToSqr(state.pelvisSet) < 0.0001
+		if not alreadyOffset then
+			local moved = Matrix(pelvisMat)
+			moved:SetTranslation(current + vector_up * pelvisOffset)
+			hg.bone_apply_matrix(ent, bones.pelvis, moved)
+			state.pelvisSet = moved:GetTranslation()
+			state.pelvisFrame = FrameNumber()
 		end
 	end
 
@@ -578,6 +620,7 @@ function hg.FootIK(ent, ply)
 
 	updateFeet(ply, state, ctx, dt)
 	updateDrop(state, ctx, dt)
+	state.hop = gaitBob(state, ctx)
 	applyPose(ent, ply, state, bones, ctx)
 
 	if IKFoot.GetFloat("debug") > 0 then drawDebug(state) end

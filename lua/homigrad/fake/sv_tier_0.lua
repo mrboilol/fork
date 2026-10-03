@@ -866,7 +866,7 @@ end
 
 fakeBoneFlop.SetOpenFracture = setOpenFracture
 
-function fakeBoneFlop.FlagBone(org, bone, active)
+function fakeBoneFlop.FlagBone(org, bone, active, severity)
 	if not org or not bone then return false end
 	if openFractureBones[bone] then
 		local legacy = org.fake_floppy_bones and org.fake_floppy_bones[bone]
@@ -878,15 +878,19 @@ function fakeBoneFlop.FlagBone(org, bone, active)
 	end
 
 	if active then
+		severity = severity or 1
 		org.fake_floppy_bones = org.fake_floppy_bones or {}
-		if org.fake_floppy_bones[bone] then return false end
+		org.fake_floppy_severity = org.fake_floppy_severity or {}
+		if org.fake_floppy_bones[bone] and (org.fake_floppy_severity[bone] or 1) >= severity then return false end
 		org.fake_floppy_bones[bone] = true
+		org.fake_floppy_severity[bone] = severity
 		return true
 	end
 
 	if not org.fake_floppy_bones then return false end
 	if not org.fake_floppy_bones[bone] then return false end
 	org.fake_floppy_bones[bone] = nil
+	if org.fake_floppy_severity then org.fake_floppy_severity[bone] = nil end
 
 	if not next(org.fake_floppy_bones) then
 		org.fake_floppy_bones = nil
@@ -908,8 +912,8 @@ function fakeBoneFlop.SetLimbSegmentState(org, limb, segment, active)
 	return fakeBoneFlop.SetBoneState(org, fakeBoneFlop.ResolveBone(limb, segment), active)
 end
 
-function fakeBoneFlop.SetBoneState(org, bone, active)
-	local changed = fakeBoneFlop.FlagBone(org, bone, active)
+function fakeBoneFlop.SetBoneState(org, bone, active, severity)
+	local changed = fakeBoneFlop.FlagBone(org, bone, active, severity)
 	if not changed or not IsValid(org.owner) then return changed end
 	if active then
 		fakeBoneFlop.ScheduleApply(org.owner.FakeRagdoll, bone, org)
@@ -1005,7 +1009,9 @@ function fakeBoneFlop.ReconcileSpine(org)
 	if (org.spine3 or 0) < 1 then
 		changed = setOpenFracture(org, "ValveBiped.Bip01_Neck1", false) or changed
 		changed = fakeBoneFlop.FlagBone(org, "ValveBiped.Bip01_Spine3", false) or changed
-		changed = fakeBoneFlop.FlagBone(org, "ValveBiped.Bip01_Head1", false) or changed
+		if (org.spine3 or 0) < (hg.organism.fake_spine3 or 0.75) then
+			changed = fakeBoneFlop.FlagBone(org, "ValveBiped.Bip01_Head1", false) or changed
+		end
 	end
 
 	return changed
@@ -1024,13 +1030,20 @@ function fakeBoneFlop.CleanupRagdoll(rag)
 
 	rag.hg_floppy_constraints = nil
 	rag.hg_floppy_bones = nil
+	rag.hg_floppy_severity = nil
 	rag.hg_dislocated_bones = nil
 	rag:SetSaveValue("m_ragdoll.allowStretch", false)
 end
 
 function fakeBoneFlop.ApplyBone(rag, bone, org)
 	if not IsValid(rag) then return end
-	if rag.hg_floppy_bones and rag.hg_floppy_bones[bone] then return end
+	local severity = org and org.fake_floppy_severity and org.fake_floppy_severity[bone] or 1
+	if rag.hg_floppy_bones and rag.hg_floppy_bones[bone] then
+		if (rag.hg_floppy_severity and rag.hg_floppy_severity[bone] or 1) >= severity then return end
+		local oldCons = rag.hg_floppy_constraints and rag.hg_floppy_constraints[bone]
+		if IsValid(oldCons) then oldCons:Remove() end
+		rag.hg_floppy_bones[bone] = nil
+	end
 
 	local parentBone = fakeBoneParents[bone]
 	if not parentBone then return end
@@ -1057,11 +1070,14 @@ function fakeBoneFlop.ApplyBone(rag, bone, org)
 		if isSafeNetworkPos(fracturePos) then pos = fracturePos end
 	end
 
+	local swingLimit = 15 + 85 * severity
+	local twistLimit = 18 + 102 * severity
+	local stiffness = (1 - severity) * 10
 	local cons = constraint.AdvBallsocket(
 		rag, rag, physIDChild, physIDParent,
 		phys:WorldToLocal(pos), physParent:WorldToLocal(pos),
-		0, 0, -100, -100, -120, 100, 100, 120,
-		0, 0, 0, 0, 1
+		0, 0, -swingLimit, -swingLimit, -twistLimit, swingLimit, swingLimit, twistLimit,
+		stiffness, stiffness, stiffness, 0, 1
 	)
 	if not IsValid(cons) then return end
 
@@ -1074,6 +1090,8 @@ function fakeBoneFlop.ApplyBone(rag, bone, org)
 	rag.hg_floppy_bones = rag.hg_floppy_bones or {}
 	rag.hg_floppy_constraints[bone] = cons
 	rag.hg_floppy_bones[bone] = true
+	rag.hg_floppy_severity = rag.hg_floppy_severity or {}
+	rag.hg_floppy_severity[bone] = severity
 
 	local dislocated = org and org.fake_dislocated_bones and org.fake_dislocated_bones[bone]
 	if dislocated then
@@ -1153,6 +1171,7 @@ end)
 
 hook.Add("Org Clear", "hg-fakeboneflop-clear", function(org)
 	org.fake_floppy_bones = nil
+	org.fake_floppy_severity = nil
 	org.fake_dislocated_bones = nil
 	if org.open_fractures then
 		org.open_fractures = nil

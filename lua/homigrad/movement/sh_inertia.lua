@@ -1,10 +1,43 @@
 local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vector, AngleRand, VectorRand, math, hook, util, game
 local math_abs, math_Approach, math_AngleDifference, math_Clamp, math_cos, math_deg, math_max, math_min, math_rad, math_Round, math_sin, math_sqrt = math.abs, math.Approach, math.AngleDifference, math.Clamp, math.cos, math.deg, math.max, math.min, math.rad, math.Round, math.sin, math.sqrt
 
+hg.WALKABLE_NORMAL_Z = 0.74
+local STEEP_SLOPE_FRICTION = 0.1
+local STEEP_SLIDE_ACCEL = 300
+
+local steepTrace = {mask = MASK_PLAYERSOLID}
+local function getSteepNormal(ply)
+	if not ply:Alive() or ply:GetMoveType() ~= MOVETYPE_WALK or not ply:OnGround()
+		or ply:InVehicle() or IsValid(ply.FakeRagdoll) then return end
+	local pos = ply:GetPos()
+	steepTrace.start = pos + vector_up * 4
+	steepTrace.endpos = pos - vector_up * 12
+	steepTrace.filter = ply
+	local tr = util.TraceLine(steepTrace)
+	if tr.Hit and tr.HitNormal.z < hg.WALKABLE_NORMAL_Z then return tr.HitNormal end
+end
+
+local function steepDownhill(normal)
+	local downhill = Vector(normal.x, normal.y, 0)
+	downhill:Normalize()
+
+	return downhill
+end
+
+local function slideDownSteepSlope(mv, normal)
+	local downhill = steepDownhill(normal)
+	local velocity = mv:GetVelocity()
+	local uphill = -velocity:Dot(downhill)
+	if uphill > 0 then velocity:Add(downhill * uphill) end
+	velocity:Add(downhill * STEEP_SLIDE_ACCEL * engine.TickInterval())
+	mv:SetVelocity(velocity)
+end
+
 local surfaceTraceMins, surfaceTraceMaxs = Vector(-8, -8, 0), Vector(8, 8, 8)
 local function getSurfaceFriction(ply)
 	if not ply:Alive() or ply:GetMoveType() ~= MOVETYPE_WALK or not ply:OnGround()
 		or ply:InVehicle() or IsValid(ply.FakeRagdoll) then return end
+	if ply.hg_SteepNormal then return STEEP_SLOPE_FRICTION end
 	local ground = ply:GetGroundEntity()
 	if IsValid(ground) and ground:GetClass() == "stormfox_mapice" then return 0.08 end
 	local trace = ply.hg_surface_trace or {mins = surfaceTraceMins, maxs = surfaceTraceMaxs, mask = MASK_PLAYERSOLID}
@@ -98,12 +131,19 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 	local hg_footstep_push = CreateConVar("hg_footstep_push", "1", {FCVAR_REPLICATED,FCVAR_ARCHIVE,FCVAR_NOTIFY}, "Gain ground speed only while a foot is pushing", 0, 1)
 	local hg_footstep_push_min = CreateConVar("hg_footstep_push_min", "0.25", {FCVAR_REPLICATED,FCVAR_ARCHIVE,FCVAR_NOTIFY}, "Acceleration fraction kept between foot pushes", 0, 1)
 
+	local hg_sprint_speed_mul = CreateConVar("hg_sprint_speed_mul", "0.8", {FCVAR_REPLICATED,FCVAR_ARCHIVE,FCVAR_NOTIFY}, "Sprint speed multiplier for players without the Sprinter trait", 0.3, 1)
+
 	local GAIT_STEP_LENGTH_BASE = 16
 	local GAIT_STEP_LENGTH_PER_SPEED = 0.22
 	local GAIT_MIN_STEP_LENGTH = 20
 	local GAIT_MAX_STEP_LENGTH = 80
 	local GAIT_START_STEP_RATE = 1.6
 	local GAIT_IDLE_STEP_RATE = 0.5
+	local GAIT_RUN_REFERENCE_SPEED = 350
+	local GAIT_WALK_SWING_FRACTION = 0.75
+	local GAIT_RUN_SWING_FRACTION = 1.45
+	local GAIT_MIN_SWING_TIME = 0.14
+	local GAIT_MAX_SWING_TIME = 0.5
 
 	function hg.GaitStepLength(speed)
 		return math_Clamp(GAIT_STEP_LENGTH_BASE + speed * GAIT_STEP_LENGTH_PER_SPEED, GAIT_MIN_STEP_LENGTH, GAIT_MAX_STEP_LENGTH)
@@ -117,30 +157,101 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 		return rate
 	end
 
-	function hg.GaitPush(phase)
-		local wave = math_sin(math.pi * (phase % 1))
+	function hg.GaitSwingFraction(speed)
+		return Lerp(math_Clamp(speed / GAIT_RUN_REFERENCE_SPEED, 0, 1), GAIT_WALK_SWING_FRACTION, GAIT_RUN_SWING_FRACTION)
+	end
+
+	function hg.GaitFlightFraction(swingFraction)
+		return math_max(swingFraction - 1, 0)
+	end
+
+	function hg.GaitSwingTime(rate, swingFraction)
+		return math_Clamp(swingFraction / math_max(rate, 0.01), GAIT_MIN_SWING_TIME, GAIT_MAX_SWING_TIME)
+	end
+
+	function hg.GaitLandingLead(speed, swingFraction)
+		return (2 - swingFraction) * hg.GaitStepLength(speed) * 0.5
+	end
+
+	function hg.GaitInFlight(phase, swingFraction)
+		return phase % 1 < hg.GaitFlightFraction(swingFraction)
+	end
+
+	local LIMP_DAMAGE_START = 0.3
+	local LIMP_DAMAGE_MAX = 0.8
+	local LIMP_DISLOCATED = 0.7
+	local LIMP_STANCE_HURRY = 0.6
+	local LIMP_SWING_DELAY = 0.3
+	local LIMP_PUSH_SHIFT = 0.6
+
+	function hg.GaitLegLimp(org, leg)
+		if not org then return 0 end
+		local damage = tonumber(org[leg]) or 0
+		if damage >= 1 then return 1 end
+		local limp = org[leg .. "dislocation"] and LIMP_DISLOCATED or 0
+		if damage > LIMP_DAMAGE_START then
+			limp = math_max(limp, (damage - LIMP_DAMAGE_START) / (1 - LIMP_DAMAGE_START) * LIMP_DAMAGE_MAX)
+		end
+
+		return limp
+	end
+
+	local function stanceAndSwingLimp(ply, phase)
+		local org = ply.organism
+		local leftLimp, rightLimp = hg.GaitLegLimp(org, "lleg"), hg.GaitLegLimp(org, "rleg")
+		if math.floor(phase) % 2 == 0 then return rightLimp, leftLimp end
+
+		return leftLimp, rightLimp
+	end
+
+	function hg.GaitLimpRateMul(ply, phase)
+		local stanceLimp, swingLimp = stanceAndSwingLimp(ply, phase)
+
+		return math_Clamp(1 + stanceLimp * LIMP_STANCE_HURRY - swingLimp * LIMP_SWING_DELAY, 0.5, 2)
+	end
+
+	function hg.GaitLimpPushMul(ply, phase)
+		local stanceLimp, swingLimp = stanceAndSwingLimp(ply, phase)
+
+		return math_Clamp(1 - stanceLimp * LIMP_PUSH_SHIFT + swingLimp * LIMP_PUSH_SHIFT, 0.2, 1.8)
+	end
+
+	function hg.GaitPush(phase, swingFraction)
+		local flight = hg.GaitFlightFraction(swingFraction)
+		local stepProgress = phase % 1
+		if stepProgress < flight then return 0 end
+		local wave = math_sin(math.pi * (stepProgress - flight) / (1 - flight))
 
 		return wave * wave
 	end
 
 	local function gaitAccelerationMul(ply, vel, intent, advance, tick_interval)
-		local rate = hg.GaitStepRate(vel:Length2D(), intent)
+		local speed = vel:Length2D()
+		local rate = hg.GaitStepRate(speed, intent)
+		local swingFraction = hg.GaitSwingFraction(speed)
 		local phase = ply.hg_GaitPhase or 0
 
 		if advance then
+			local oldStep = math.floor(phase)
 			if rate > 0 then
-				phase = (phase + rate * tick_interval) % 2
+				phase = (phase + rate * hg.GaitLimpRateMul(ply, phase) * tick_interval) % 2
 			elseif phase % 1 > 0 then
-				phase = (math.floor(phase) + 1) % 2
+				phase = (oldStep + 1) % 2
 			end
 			ply.hg_GaitPhase = phase
 			ply.hg_GaitRate = rate
+
+			if SERVER and rate > 0 and math.floor(phase) ~= oldStep and hg.FootstepTripCheck then
+				hg.FootstepTripCheck(ply, math.floor(phase) + 1, rate, swingFraction)
+			end
 		end
 
 		if not intent or not hg_footstep_push:GetBool() then return 1 end
+		if hg.GaitInFlight(phase, swingFraction) then return 0 end
 		local minMul = hg_footstep_push_min:GetFloat()
+		local supportShare = 1 - hg.GaitFlightFraction(swingFraction)
 
-		return minMul + (1 - minMul) * hg.GaitPush(phase) * 2
+		return (minMul + (1 - minMul) * hg.GaitPush(phase, swingFraction) * 2 / supportShare) * hg.GaitLimpPushMul(ply, phase)
 	end
 
 	local function hg_GetMovementLagComp(ply)
@@ -152,7 +263,9 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 
 	local vomitVPAng, vecZero = Angle(1, 0, 0), Vector()
 	hook.Add("SetupMove", "HG(StartCommand)", function(ply, mv, cmd)
+		ply.hg_SteepNormal = getSteepNormal(ply)
 		updateSurfaceFriction(ply)
+		if ply.hg_SteepNormal then slideDownSteepSlope(mv, ply.hg_SteepNormal) end
 		local curTime = CurTime()
 		local sysTime = SysTime()
 		--\\ DeltaTime
@@ -406,7 +519,8 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 
 		if ply.hg_isSprinting and runnin and velLen >= 10 then
 			local sprint_mul = ply.sprintDebuff and ply.sprintDebuff > move_time and 0.5 or 1
-			ply.CurrentSpeed = math_Approach(ply.CurrentSpeed, (ply.move or run_speed) * mul * sprint_mul * 0.88, delta_time * ply.SpeedGainMul)
+			local trait_sprint_mul = ply.HasTrait and ply:HasTrait("sprinter") and 1 or hg_sprint_speed_mul:GetFloat()
+			ply.CurrentSpeed = math_Approach(ply.CurrentSpeed, (ply.move or run_speed) * mul * sprint_mul * trait_sprint_mul * 0.88, delta_time * ply.SpeedGainMul)
 		elseif ply.hg_isJogging and runnin and velLen >= 10 then
 			ply.CurrentSpeed = math_Approach(ply.CurrentSpeed, (ply.move or (run_speed * 0.55)) * mul, delta_time * ply.SpeedGainMul)
 		else
@@ -541,6 +655,12 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 			local new_inertia = approach_vector(ply.MovementInertia, inertia_to, delta_time * ply.InertiaBlend * gait_mul)
 
 			ply.MovementInertia = new_inertia
+
+			if ply.hg_SteepNormal then
+				local downhill = steepDownhill(ply.hg_SteepNormal)
+				local uphill = -ply.MovementInertia:Dot(downhill)
+				if uphill > 0 then ply.MovementInertia = ply.MovementInertia + downhill * uphill end
+			end
 
 			local inertia_len = math_sqrt(ply.MovementInertia.x * ply.MovementInertia.x + ply.MovementInertia.y * ply.MovementInertia.y)
 

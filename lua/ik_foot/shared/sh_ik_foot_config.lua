@@ -11,6 +11,7 @@ IKFoot.Config = {
 		{ key = "stance_width",    cvar = "ik_foot_stance_width",    type = "float", default = 1,    min = 0.5,  max = 2,    decimals = 2, desc = "Stance Width Scale" },
 		{ key = "settle_distance", cvar = "ik_foot_settle_distance", type = "float", default = 7,    min = 2,    max = 20,   decimals = 1, desc = "Idle Re-step Distance" },
 		{ key = "settle_angle",    cvar = "ik_foot_settle_angle",    type = "float", default = 40,   min = 10,   max = 90,   decimals = 0, desc = "Idle Re-step Turn Angle" },
+		{ key = "flight_hop",      cvar = "ik_foot_flight_hop",      type = "float", default = 2.5,  min = 0,    max = 8,    decimals = 1, desc = "Running Flight Hop Height" },
 		{ key = "max_body_drop",   cvar = "ik_foot_max_body_drop",   type = "float", default = 12,   min = 0,    max = 30,   decimals = 1, desc = "Maximum Pelvis Drop" },
 		{ key = "align_feet",      cvar = "ik_foot_align",           type = "bool",  default = true, min = 0,    max = 1,    decimals = 0, desc = "Align Planted Feet To Ground" },
 	},

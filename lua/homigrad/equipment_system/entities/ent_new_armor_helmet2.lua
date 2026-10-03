@@ -25,7 +25,7 @@ DEFINE_BASECLASS("ent_zcity_armor_base")
 local ENT = {}
 ENT.Type = "anim"
 ENT.Base = "ent_zcity_armor_base"
-ENT.PrintName = "Motorcycle Helmet"
+ENT.PrintName = "bike helmet but better hitbox"
 ENT.Category = "ZCity TestArmor"
 ENT.Spawnable = true
 ENT.Model = "models/dean/gtaiv/helmet.mdl"

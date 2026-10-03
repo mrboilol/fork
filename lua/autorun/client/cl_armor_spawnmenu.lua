@@ -12,7 +12,7 @@ hook.Add("HomigradRun", "hg/armor/spawnmenu-category", hideDuplicateArmorCategor
 hook.Add("OnReloaded", "hg/armor/spawnmenu-category", hideDuplicateArmorCategory)
 hideDuplicateArmorCategory()
 
-spawnmenu.AddCreationTab("working sigma armor", function()
+spawnmenu.AddCreationTab("armor", function()
 		local tabs = vgui.Create("DPropertySheet")
 
 		local function addPage(label, entries)
@@ -49,7 +49,7 @@ spawnmenu.AddCreationTab("working sigma armor", function()
 			end
 		end
 		table.sort(zcity, function(a, b) return a.nicename < b.nicename end)
-		addPage("Z-City", zcity)
+		addPage("working 100%", zcity)
 
 		local judge = {}
 		for placement, armors in pairs(hg.judgeArmor or {}) do

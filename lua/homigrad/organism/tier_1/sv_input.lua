@@ -2540,7 +2540,8 @@ local function resolvePhysicsImpactLane(ent, hitgroup, bonename, data, relativeV
 			collisionNormal and math.abs(headAxis:Dot(collisionNormal)) or 0
 		) or 0
 
-		if axialLoad >= 0.58 and normalSpeed >= 330 then
+		local neckLoadChance = math.Clamp((normalSpeed - 330) / 700, 0.05, 0.6) * axialLoad
+		if normalSpeed >= 330 and (axialLoad >= 0.58 or (axialLoad >= 0.3 and math.Rand(0, 1) < neckLoadChance)) then
 			return {name = "spine3", reserve = 1.05, scale = 4.6, axialLoad = axialLoad}
 		end
 
@@ -2801,7 +2802,6 @@ local function velocityDamage(ent, data)
 			impactHelmet = impactHelmet and armorImpactApplied
 			local headDamageMul = hadhelmet and 0.2 or 1
 			local oldSkull = org.skull
-			local oldSpine3 = org.spine3 or 0
 			physicsImpact.brainEnergy = (structuralBudget + residual) * headDamageMul
 			if lane.name == "spine3" then
 				hg.organism.input_list.spine3(org, bone, structuralBudget * lane.scale * (hadhelmet and 0.65 or 1), dmgInfo)
@@ -2814,12 +2814,8 @@ local function velocityDamage(ent, data)
 					hg.organism.input_list.jaw(org, bone, math.min(residual, 0.8) * headDamageMul * ragdoll_fall_jaw_damage_mul, dmgInfo)
 				end
 			end
-			if oldSpine3 < 1 and org.spine3 >= 1 and hg.BreakNeck then
-				hg.BreakNeck(ent)
-			end
-			
 			local headImpactSeverity = math.Clamp(math.max(impactHelmet and dmg or unarmoredImpactDamage, structuralBudget) * math.Clamp(normalSpeed / 600, 0.7, 2), 0, 3)
-			local knockoutChance = math.Clamp((headImpactSeverity - 0.3) * 0.22, 0, 0.45)
+			local knockoutChance = math.Clamp((headImpactSeverity - 0.2) * 0.4, 0, 0.65)
 			if hadhelmet then knockoutChance = knockoutChance * 0.2 end
 			if headImpactSeverity > 0.15 and hg.organism.module.concussion then
 				local concussionIntensity = math.Clamp(headImpactSeverity * (impactHelmet and 1.45 or hadhelmet and 2.2 or 1.45), 0.25, hadhelmet and 3.6 or 4.5)
@@ -2905,7 +2901,7 @@ local function velocityDamage(ent, data)
 	//end
 end
 
-function hg.BreakNeck(ent, recipient, soundEnt)
+function hg.BreakNeck(ent, recipient, soundEnt, deathChance)
 	if !IsValid(ent) then return end
 	local org = ent.organism
 	if not org then return end
@@ -2916,8 +2912,6 @@ function hg.BreakNeck(ent, recipient, soundEnt)
 	org.heartbeat = math.min(tonumber(org.heartbeat) or 70, 45)
 	org.cervicalRespiratoryArrest = false
 	org.respiratoryArrest = false
-	org.spine3OxygenLossAt = org.spine3OxygenLossAt or CurTime() + 4
-	org.spine3OxygenLossWarned = nil
 	if (org.spine3AcutePainUntil or 0) <= CurTime() then
 		org.spine3AcutePainUntil = CurTime() + 1.5
 		org.spine3AcutePain = 95
@@ -2947,13 +2941,17 @@ function hg.BreakNeck(ent, recipient, soundEnt)
 	
 	timer.Simple(0.1, function()
 		if !IsValid(target) then return end
-		local ent = target:IsRagdoll() and target or target:GetNWEntity("RagdollDeath")
+		local ent = target:IsRagdoll() and target or (IsValid(target.FakeRagdoll) and target.FakeRagdoll) or target:GetNWEntity("RagdollDeath")
 
 		if IsValid(ent) and hg.fakeBoneFlop then
 			hg.fakeBoneFlop.ScheduleApply(ent, "ValveBiped.Bip01_Spine3", org)
 			hg.fakeBoneFlop.ScheduleApply(ent, "ValveBiped.Bip01_Head1", org)
 		end
 	end)
+
+	if deathChance and math.Rand(0, 1) < deathChance and hg.organism.KillFatalBrainDamage then
+		hg.organism.KillFatalBrainDamage(org)
+	end
 end
 
 hook.Add("OnAmputateLimb", "amputate_cuffs", function(org, ent, limb)

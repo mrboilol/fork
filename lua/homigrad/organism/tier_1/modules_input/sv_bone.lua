@@ -477,6 +477,9 @@ local function arms(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 	return result, vecrand
 end
 
+local spine_partial_break_floppiness = 0.3
+local spine_full_break_death_chance = 0.35
+
 local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricochet)
 	if dmgInfo:IsDamageType(DMG_BLAST) then dmg = dmg / 3 end
 
@@ -501,11 +504,11 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 		hg.fakeBoneFlop.SetOpenFracture(org, fractureBone, true)
 	end
 	if name ~= "spine3" and oldDmg < breakThreshold and org[name] >= breakThreshold and hg.fakeBoneFlop then
-		hg.fakeBoneFlop.SetBoneState(org, "ValveBiped.Bip01_Spine2", true)
+		hg.fakeBoneFlop.SetBoneState(org, "ValveBiped.Bip01_Spine2", true, spine_partial_break_floppiness)
 	end
 
 	if oldDmg < breakThreshold and org[name] >= breakThreshold and org.isPly then
-		playBoneFractureSound(org.owner)
+		if name ~= "spine3" then playBoneFractureSound(org.owner) end
 		if hg.QueuePainScream then hg.QueuePainScream(org.owner, 1.1) end
 		if IsValid(org.owner) and org.owner:IsPlayer() and !hasNewThoughts(org) then
 			notifyOwner(org, huyasd[name], true, name, 2)
@@ -530,6 +533,9 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 		if oldDmg < cervicalLimit and org.spine3 >= cervicalLimit then
 			org.cervicalParalysis = true
 			org.paralyzed = true
+			if hg.fakeBoneFlop then
+				hg.fakeBoneFlop.SetBoneState(org, "ValveBiped.Bip01_Head1", true, spine_partial_break_floppiness)
+			end
 			if org.isPly then
 				if hasNewThoughts(org) then
 					notifyOwner(org, "Your neck is broken. You can't move.", 20, "cervical_paralysis", 0, nil, Color(255, 190, 190))
@@ -543,6 +549,9 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 			org.paralyzed = true
 			if org.isPly then
 				notifyOwner(org, "I CAN'T MOVE...", true, "cervical_respiratory_arrest", 0, nil, Color(255, 95, 95))
+			end
+			if hg.BreakNeck and IsValid(org.owner) then
+				hg.BreakNeck(org.owner, nil, nil, spine_full_break_death_chance)
 			end
 		end
 	end
@@ -711,7 +720,7 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 	end
 
 	if org.alive and not org.otrub and incomingDmg > 0.25 then
-		local knockoutChance = math.Clamp(incomingDmg * 0.04 + jawDelta * 0.35, 0, 0.28)
+		local knockoutChance = math.Clamp((incomingDmg - 0.15) * 0.9 + jawDelta * 0.4, 0, 0.7)
 		if math.Rand(0, 1) < knockoutChance then
 			org.needotrub = true
 			org.consciousness = math.min(org.consciousness or 1, 0.18)
@@ -937,6 +946,16 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 			org.needotrub = true
 			org.consciousness = math.min(org.consciousness or 1, 0.08)
 			org.shock = math.min((org.shock or 0) + 12 + brainDelta * 20, 95)
+			headOutcomeHandled = true
+		end
+	end
+	if not headOutcomeHandled and org.alive and not org.otrub and not org.needotrub and not isStab and dmg > 0.2
+		and not (impact and impact.source == "physics") and (isMelee(dmgInfo) or dmgInfo:IsDamageType(DMG_CRUSH)) then
+		local bluntKnockoutChance = math.Clamp((dmg - 0.2) * 0.8, 0, 0.6) * (helmetProtectedHit and 0.25 or 1)
+		if math.Rand(0, 1) < bluntKnockoutChance then
+			org.needotrub = true
+			org.consciousness = math.min(org.consciousness or 1, 0.12)
+			org.shock = math.min((org.shock or 0) + 10, 95)
 			headOutcomeHandled = true
 		end
 	end

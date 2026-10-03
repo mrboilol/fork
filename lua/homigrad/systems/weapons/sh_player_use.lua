@@ -1,5 +1,24 @@
 local hook_Run = hook.Run
 local FAKE_USE_REACH_SQR = 18 * 18
+local PICKUP_REACH_NET = "HG_PickupReach"
+local PICKUP_REACH_COOLDOWN = 0.6
+
+if SERVER then util.AddNetworkString(PICKUP_REACH_NET) end
+
+local function broadcastPickupReach(ply, ent)
+	if IsValid(ply.FakeRagdoll) or (ply.hgNextPickupReach or 0) > CurTime() then return end
+	if not hg.CanPromptPickup or not hg.CanPromptPickup(ply, ent) then return end
+	ply.hgNextPickupReach = CurTime() + PICKUP_REACH_COOLDOWN
+
+	net.Start(PICKUP_REACH_NET)
+	net.WriteEntity(ply)
+	net.WriteEntity(ent)
+	net.WriteVector(ent:WorldSpaceCenter())
+	net.WriteVector(ent:GetPos())
+	net.WriteAngle(ent:GetAngles())
+	net.WriteString(ent:GetModel() or "")
+	net.SendPVS(ply:GetPos())
+end
 
 local function fakeHandTarget(ply, ent)
 	local ragdoll = ply.FakeRagdoll
@@ -49,6 +68,7 @@ hook.Add("PlayerUse", "nouseinfake", function(ply, ent)
 	if ply.PickUpCooldown > CurTime() and not IsValid(ply.FakeRagdoll) then return false end
 
 	ply.PickUpCooldown = CurTime() + 0.15
+	broadcastPickupReach(ply, ent)
 end)
 
 hook.Add("WeaponEquip", "pickupHuy", function(wep, ply)

@@ -32,7 +32,7 @@ local CATEGORIES = {
 	},
 	{
 		title = "Stepping",
-		keys = { "step_height", "stride_scale", "stance_width", "settle_distance", "settle_angle" },
+		keys = { "step_height", "stride_scale", "stance_width", "settle_distance", "settle_angle", "flight_hop" },
 	},
 	{
 		title = "Body & Feet",

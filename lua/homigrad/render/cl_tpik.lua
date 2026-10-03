@@ -735,6 +735,7 @@ function hg.MainTPIKFunction(ent, ply, wpn)
 		end]]
 
         //print("DragHands: ", SysTime() - systime)
+        if hg.PickupReachTPIK then hg.PickupReachTPIK(ent, ply, wpn) end
         hg.DoZManip(ent, ply)
         //local systime = SysTime()
         hg.DoTPIK(ply, ent)
@@ -982,8 +983,9 @@ function hg.DoTPIK(ply, ent)
 	local leftArmAmputated = org and (org.larmamputated or org.lhandamputated or org.larmupamputated)
 	local leftArmDisabled = leftArmBroken or leftArmAmputated
 	local brokenFistArm = leftArmBroken and IsValid(self) and self.GetFists and self:GetFists()
-	local leftArmRelaxing = leftArmBroken and not leftArmAmputated and IsValid(self) and ishgweapon(self) and not self.reload and not brokenFistArm
-	local lhik2 = leftArmRelaxing or ((not leftArmDisabled or brokenFistArm) and ((IsValid(self) and self.lhandik) or ply:InVehicle()) and hg.CanUseLeftHand(ply))
+	local reachingLeft = ply.hgPickupReachLeft and not leftArmAmputated
+	local leftArmRelaxing = not reachingLeft and leftArmBroken and not leftArmAmputated and IsValid(self) and ishgweapon(self) and not self.reload and not brokenFistArm
+	local lhik2 = reachingLeft or leftArmRelaxing or ((not leftArmDisabled or brokenFistArm) and ((IsValid(self) and self.lhandik) or ply:InVehicle()) and hg.CanUseLeftHand(ply))
     local rhik2 = ((IsValid(self) and self.rhandik) or ply:InVehicle()) and hg.CanUseRightHand(ply)
     
     local shouldrebuild = false

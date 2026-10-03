@@ -46,7 +46,7 @@ if SERVER then
 	local function Remove(self, slot)
 		local id
 		for i = 1, #slot do
-			if slot[i] == wep then
+			if slot[i] == self then
 				id = i
 				break
 			end
@@ -57,7 +57,8 @@ if SERVER then
 		end
 
 		table.remove(slot, id)
-		weaponInv.Sync(self:GetOwner())
+		local owner = self:GetOwner()
+		if IsValid(owner) and owner:IsPlayer() then weaponInv.Sync(owner) end
 	end
 
 	function weaponInv.Insert(ply, wep)
@@ -128,6 +129,7 @@ if SERVER then
 	end)
 
 	hook.Add("PlayerCanPickupWeapon", "homigrad-weapons", function(ply, wep)
+		if wep.hgSwapDroppedBy == ply and (wep.hgSwapDroppedUntil or 0) > CurTime() then return false end
 		if wep.IsSpawned and (ply:GetUseEntity() ~= wep or not ply:KeyDown(IN_USE)) and not ply.force_pickup then return false end
 		if wep.init and wep.IsSpawned and ((ply.cooldown_grab or 0) > CurTime()) and not ply.force_pickup then return false end
 		if wep.PickupFunc and (wep:PickupFunc(ply) == true) then return false end
@@ -156,6 +158,8 @@ if SERVER then
 				ply:DropWeapon(wep)
 				wep.IsSpawned = true
 				wep.init = true
+				wep.hgSwapDroppedBy = ply
+				wep.hgSwapDroppedUntil = CurTime() + 1
 			end
 
 			ply.cooldown_grab = CurTime() + 0.1

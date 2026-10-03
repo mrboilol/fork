@@ -900,7 +900,7 @@ module[2] = function(owner, org, timeValue)
 	local organSystemsEnabled = hg.organism.OrganSystemsEnabled and hg.organism.OrganSystemsEnabled() or true
 
 	local o2Value = org.o2 and org.o2[1] or 30
-	if not org.heartstop and not org.fibrillation and (org.arrhythmia or 0) < 0.25 and (org.myocardialOxygen or 1) > 0.55 then
+	if not org.heartstop and not org.fibrillation and (org.arrhythmia or 0) < 0.25 and (org.myocardialOxygen or 1) > 0.55 and (org.hypovolemicBradyStrain or 0) < 0.1 then
 		org.heartStrain = Approach(org.heartStrain or 0, 0, timeValue / 45)
 	end
 
@@ -1585,6 +1585,19 @@ module[2] = function(owner, org, timeValue)
 		org.bradycardicLowOutputTime = math.Approach(org.bradycardicLowOutputTime or 0, 0, timeValue * 1.5)
 	end
 
+	local slowRateK = math.Clamp((55 - (org.heartbeat or 70)) / 30, 0, 1)
+	local hypovolemiaK = math.Clamp((1 - bloodNow / normalBloodVolume) / 0.35, 0, 1)
+	local hypovolemicBradyStrain = org.heartstop and 0 or slowRateK * hypovolemiaK
+	org.hypovolemicBradyStrain = hypovolemicBradyStrain
+	if hypovolemicBradyStrain > 0 then
+		org.heartStrain = Clamp((org.heartStrain or 0) + timeValue * hypovolemicBradyStrain / 25, 0, 1)
+		org.heart = Clamp((org.heart or 0) + timeValue * hypovolemicBradyStrain ^ 2 * 0.002, 0, 1)
+		org.bradycardicLowOutputTime = math.min((org.bradycardicLowOutputTime or 0) + timeValue * hypovolemicBradyStrain, 20)
+		if org.isPly and not org.otrub and hypovolemicBradyStrain > 0.3 then
+			owner:Notify("My heart is struggling to keep going...", 40, "brady_strain", 0, nil, Color(150, 210, 255))
+		end
+	end
+
 	-- Terminal hemorrhage is allowed to reach the tachycardia threshold below;
 	-- low output alone is not an immediate VF/flatline trigger.
 	if organSystemsEnabled then
@@ -1594,9 +1607,10 @@ module[2] = function(owner, org, timeValue)
 		local failedBradyOutput = (org.bradycardicLowOutputTime or 0) >= (tonumber(cfg.BRADYCARDIA_ARREST_EXPOSURE) or 8)
 			and (org.cardiacOutput or 0) < (tonumber(cfg.BRADYCARDIA_ARREST_OUTPUT) or 0.22)
 			and (org.perfusion or 0) < (tonumber(cfg.BRADYCARDIA_ARREST_PERFUSION) or 0.28)
-			and not hemorrhageDrivenLowOutput
+			and (not hemorrhageDrivenLowOutput or hypovolemicBradyStrain > 0.2)
 			and not restartCirculationActive
-		if failedCirculation or failedHypotension or failedBradyOutput or org.brain >= 0.85 or org.heart >= 0.9 then org.heartstop = true end
+		local failedBradyStrain = hypovolemicBradyStrain > 0.25 and (org.heartStrain or 0) >= 0.95 and not restartCirculationActive
+		if failedCirculation or failedHypotension or failedBradyOutput or failedBradyStrain or org.brain >= 0.85 or org.heart >= 0.9 then org.heartstop = true end
 		if org.temperature > 42 then org.heartstop = true end
 	end
 	-- A successful AED/epinephrine restart deliberately has a short window to

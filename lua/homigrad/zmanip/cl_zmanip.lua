@@ -411,6 +411,40 @@ net.Receive("hg_pickup_handoff", function()
 	ply:CallOnRemove("hg_pickup_handoff", clearHandoff)
 end)
 
+local HANDOFF_POS_STIFFNESS = 240
+local HANDOFF_POS_DAMPING = 15
+local HANDOFF_ANG_STIFFNESS = 190
+local HANDOFF_ANG_DAMPING = 13
+
+local function stepHandoffSpring(h, pos, ang)
+	local now = SysTime()
+	if not h.springPos then
+		h.springPos = pos - ang:Forward() * 5 - ang:Up() * 4
+		h.springVel = Vector(0, 0, 0)
+		h.springAng = Angle(ang.p + 28, ang.y, ang.r)
+		h.springAngVel = Vector(0, 0, 0)
+		h.springTime = now
+	end
+
+	local dt = math.Clamp(now - h.springTime, 0, 0.05)
+	h.springTime = now
+
+	local posDrag = math.exp(-HANDOFF_POS_DAMPING * dt)
+	h.springVel = (h.springVel + (pos - h.springPos) * HANDOFF_POS_STIFFNESS * dt) * posDrag
+	h.springPos = h.springPos + h.springVel * dt
+
+	local angDrag = math.exp(-HANDOFF_ANG_DAMPING * dt)
+	local sa, av = h.springAng, h.springAngVel
+	av.x = (av.x + math.AngleDifference(ang.p, sa.p) * HANDOFF_ANG_STIFFNESS * dt) * angDrag
+	av.y = (av.y + math.AngleDifference(ang.y, sa.y) * HANDOFF_ANG_STIFFNESS * dt) * angDrag
+	av.z = (av.z + math.AngleDifference(ang.r, sa.r) * HANDOFF_ANG_STIFFNESS * dt) * angDrag
+	sa.p = sa.p + av.x * dt
+	sa.y = sa.y + av.y * dt
+	sa.r = sa.r + av.z * dt
+
+	return h.springPos, h.springAng
+end
+
 function hg.PickupHandoffHides(ply, wep)
 	local h = ply.hgHandoff
 	return h ~= nil and h.wep == wep and CurTime() < handoffEnd(ply, wep)
@@ -437,6 +471,7 @@ function hg.DrawPickupHandoff(ent, ply)
 
 	local pos, ang = LocalToWorld(handoffPos, handoffAng, mat:GetTranslation(), mat:GetAngles())
 	pos = LocalToWorld(-model:OBBCenter(), angle_zero, pos, ang)
+	pos, ang = stepHandoffSpring(h, pos, ang)
 
 	local real = IsValid(wep) and wep.worldModel
 	if now > h.select and IsValid(real) and real:GetModel() == model:GetModel() then
