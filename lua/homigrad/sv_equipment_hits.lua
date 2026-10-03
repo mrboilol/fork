@@ -28,7 +28,7 @@ impact.Config = {
     dropCooldown = 0.35,
     maxImpulseSpeed = 320,
     inheritedSpeed = 160,
-    weaponHitPadding = 2,
+    weaponHitPadding = 3,
     weaponWearerSlack = 6,
     armHitPadding = 1.25,
     weaponSolidFraction = 0.25,
@@ -792,6 +792,22 @@ function hg.TryAbsorbEquipmentImpact(ent, dmgInfo, hitPos, direction, impactRadi
     return dmgInfo:GetDamage() < damage
 end
 
+function hg.GetWeaponHandPoints(wep)
+    local handPos, handAng = wep.handPos, wep.handAng
+    if not isvector(handPos) or not isangle(handAng) then return end
+    local gripPos = handPos + handAng:Up() * -1
+    local rightPos = LocalToWorld(wep.RHPosOffset or vector_origin, wep.RHAngOffset or angle_zero, gripPos, handAng)
+    local leftPos
+    if isvector(wep.LHPos) and isangle(wep.LHAng) then
+        local leftAng = Angle(handAng)
+        leftAng:RotateAroundAxis(handAng:Forward(), -90)
+        local basePos, baseAng = LocalToWorld(wep.LHPos, wep.LHAng, gripPos, leftAng)
+        leftPos = LocalToWorld(wep.LHPosOffset or vector_origin, wep.LHAngOffset or angle_zero, basePos, baseAng)
+    end
+
+    return rightPos, leftPos
+end
+
 function hg.TraceOrganismArms(body, startPos, endPos, padding, wep, pose)
     if not IsValid(body) or not isvector(startPos) or not isvector(endPos) then return end
     padding = math.max(tonumber(padding) or 0, 0)
@@ -874,6 +890,25 @@ function hg.TraceOrganismArms(body, startPos, endPos, padding, wep, pose)
             if not hitSide or armHitboxBones[bone] or IsAmputated(hitSide, isHand, isForearm, isUpper, isClavicle) then continue end
             local extent = isHand and 3 or isClavicle and 4 or 6
             AddArmTrace(nil, bone, Vector(-extent, -3, -3), Vector(extent, 3, 3), hitSide, true)
+        end
+    end
+    if IsValid(wep) and body:IsPlayer() and isvector(wep.handPos) and isangle(wep.handAng) then
+        local support = wep.GetHandSupportState and wep:GetHandSupportState(body) or {}
+        local rightPos, leftPos = hg.GetWeaponHandPoints(wep)
+        for side, handPos in pairs({r = rightPos, l = leftPos}) do
+            local supported = side == "l" and support.leftSupport or side == "r" and support.rightSupport
+            local bone = body:LookupBone(side == "l" and "ValveBiped.Bip01_L_Hand" or "ValveBiped.Bip01_R_Hand")
+            if not supported or not bone or IsAmputated(side, true, false, false, false) then continue end
+            local expand = Vector(padding, padding, padding)
+            local mins, maxs = Vector(-3.5, -3.5, -3.5) - expand, Vector(3.5, 3.5, 3.5) + expand
+            local position, normal, fraction = util.IntersectRayWithOBB(startPos, ray, handPos, angle_zero, mins, maxs)
+            if not position or best and fraction >= best.Fraction then continue end
+            best = {Hit = true, HitWorld = false, HitSky = false, StartSolid = false, AllSolid = false,
+                Entity = body, HitPos = position, HitNormal = normal, Normal = ray:GetNormalized(), StartPos = startPos,
+                Fraction = fraction, HitBox = 0, HitBoxBone = bone, PhysicsBone = body:TranslateBoneToPhysBone(bone) or 0,
+                HGArmFallback = true, SurfaceProps = util.GetSurfaceIndex("flesh"),
+                HitGroup = side == "l" and HITGROUP_LEFTARM or HITGROUP_RIGHTARM, MatType = MAT_FLESH,
+                HGArmBounds = {pos = handPos, ang = angle_zero, mins = mins, maxs = maxs}}
         end
     end
     return best

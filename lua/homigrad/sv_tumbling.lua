@@ -480,3 +480,90 @@ function hg.FootstepTripCheck(ply, stepIndex, rate, swingFraction)
 
     hg.StartStagger(ply, moveDir, 0.3 + speedFactor * 0.6)
 end
+
+local SUPPORT_CHECK_INTERVAL = 0.1
+local SUPPORT_FOOT_HALF_WIDTH = 4.5
+local SUPPORT_TOE = 6
+local SUPPORT_HEEL = -3
+local SUPPORT_PROBE_HEIGHT = 8
+local SUPPORT_DROP = 20
+local SUPPORT_EDGE_RADIUS = 14
+local SUPPORT_LOSS_TIME = 0.3
+local SUPPORT_RETRY_TIME = 0.6
+local SUPPORT_TRIP_CHANCE = 0.45
+local SUPPORT_TRIP_SPEED = 200
+local SUPPORT_PROBE_OFFSETS = {SUPPORT_TOE, SUPPORT_HEEL}
+local SUPPORT_EDGE_DIRECTIONS = {}
+for i = 0, 7 do
+    local yaw = math.rad(i * 45)
+    SUPPORT_EDGE_DIRECTIONS[i + 1] = Vector(math.cos(yaw), math.sin(yaw), 0)
+end
+
+local function ProbeSupport(ply, x, y, z)
+    local trace = util_TraceLine({
+        start = Vector(x, y, z + SUPPORT_PROBE_HEIGHT),
+        endpos = Vector(x, y, z - SUPPORT_DROP),
+        filter = ply,
+        mask = MASK_PLAYERSOLID,
+    })
+
+    return trace.Hit
+end
+
+local function FootSupported(ply, origin, right, forward, side)
+    local base = origin + right * (side * SUPPORT_FOOT_HALF_WIDTH)
+    for _, offset in ipairs(SUPPORT_PROBE_OFFSETS) do
+        local probe = base + forward * offset
+        if ProbeSupport(ply, probe.x, probe.y, origin.z) then return true end
+    end
+
+    return false
+end
+
+local function UnsupportedDirection(ply, origin, fallback)
+    local direction = Vector()
+    for _, dir in ipairs(SUPPORT_EDGE_DIRECTIONS) do
+        if not ProbeSupport(ply, origin.x + dir.x * SUPPORT_EDGE_RADIUS, origin.y + dir.y * SUPPORT_EDGE_RADIUS, origin.z) then
+            direction:Add(dir)
+        end
+    end
+    if direction:LengthSqr() < 0.01 then return fallback end
+    direction:Normalize()
+
+    return direction
+end
+
+hook.Add("Think", "hg_foot_support_trip", function()
+    local now = CurTime()
+    for _, ply in ipairs(player_GetAll()) do
+        if (ply.hgNextSupportCheck or 0) > now then continue end
+        ply.hgNextSupportCheck = now + SUPPORT_CHECK_INTERVAL
+
+        if not ply:Alive() or IsValid(ply.FakeRagdoll) or ply:InVehicle() or ply:GetMoveType() ~= MOVETYPE_WALK
+            or not ply:IsOnGround() or ply:Crouching() or ply:WaterLevel() >= 2 or (ply.nextTumbleCheck or 0) > now then
+            ply.hgUnsupportedSince = nil
+            continue
+        end
+
+        local origin = ply:GetPos()
+        local yaw = Angle(0, ply:EyeAngles().y, 0)
+        local forward, right = yaw:Forward(), yaw:Right()
+        if FootSupported(ply, origin, right, forward, -1) or FootSupported(ply, origin, right, forward, 1) then
+            ply.hgUnsupportedSince = nil
+            continue
+        end
+
+        ply.hgUnsupportedSince = ply.hgUnsupportedSince or now
+        if now - ply.hgUnsupportedSince < SUPPORT_LOSS_TIME then continue end
+        ply.hgUnsupportedSince = now + SUPPORT_RETRY_TIME - SUPPORT_LOSS_TIME
+
+        local org = ply.organism or {}
+        local dir = UnsupportedDirection(ply, origin, forward)
+        if math.random() < ScaleTripChance(ply, org, SUPPORT_TRIP_CHANCE) then
+            ExecuteTrip(ply, org, "gap", dir * SUPPORT_TRIP_SPEED, nil, false, STEP_BREAK_CHANCE)
+        else
+            ply:ViewPunch(Angle(3, 0, math.Rand(-2, 2)))
+            hg.StartStagger(ply, dir, 0.7)
+        end
+    end
+end)

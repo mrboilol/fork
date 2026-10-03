@@ -2,6 +2,12 @@ if SERVER then AddCSLuaFile() end
 
 local modelBoundsCache = {}
 
+local CLEARANCE_GROW = 700
+local CLEARANCE_SHRINK = 90
+local CLEARANCE_MAX = 45
+local CLEARANCE_PADDING = 0.75
+local CLEARANCE_PROBES = 5
+
 local function GetEquipmentModelBounds(ent, model)
     local cached = modelBoundsCache[model]
     if cached then return cached[1], cached[2] end
@@ -44,39 +50,59 @@ local function GetEquipmentModelBounds(ent, model)
     end
 end
 
+local function FrameKey()
+    return CLIENT and FrameNumber() or engine.TickCount()
+end
+
 function hg.ResolveEquipmentClearance(ent, owner, model, pos, ang, scale)
     if not IsValid(owner) or not isstring(model) or model == "" then return pos end
     local mins, maxs = GetEquipmentModelBounds(ent, model)
     if not mins or not maxs then return pos end
+    local aim = owner.GetAimVector and owner:GetAimVector() or ang:Forward()
+    if not isvector(aim) or aim:LengthSqr() <= 0.000001 then aim = ang:Forward() end
+    aim = aim:GetNormalized()
+
+    local frame = FrameKey()
+    if ent.HGEquipmentClearanceFrame == frame then
+        return pos - aim * (ent.HGEquipmentClearance or 0)
+    end
+    ent.HGEquipmentClearanceFrame = frame
+
     scale = math.max(tonumber(scale) or 1, 0.001)
     local body = hg.GetCurrentCharacter(owner)
     local filter = {owner, ent}
     if IsValid(body) then filter[#filter + 1] = body end
     if IsValid(ent.worldModel) then filter[#filter + 1] = ent.worldModel end
     if IsValid(ent.worldModel2) then filter[#filter + 1] = ent.worldModel2 end
-    local aim = owner.GetAimVector and owner:GetAimVector() or ang:Forward()
-    if not isvector(aim) or aim:LengthSqr() <= 0.000001 then aim = ang:Forward() end
-    aim = aim:GetNormalized()
     local start = owner.EyePos and owner:EyePos() or pos
-    local target, targetDistance
+
+    local probes = {}
     for x = 0, 1 do
         for y = 0, 1 do
             for z = 0, 1 do
                 local corner = Vector(x == 0 and mins.x or maxs.x, y == 0 and mins.y or maxs.y, z == 0 and mins.z or maxs.z) * scale
                 local world = LocalToWorld(corner, angle_zero, pos, ang)
-                local distance = (world - start):Dot(aim)
-                if not targetDistance or distance > targetDistance then
-                    target, targetDistance = world, distance
-                end
+                probes[#probes + 1] = {pos = world, distance = (world - start):Dot(aim)}
             end
         end
     end
-    if not target or targetDistance <= 0 then return pos end
-    local trace = util.TraceLine({start = start, endpos = target, filter = filter, mask = MASK_PLAYERSOLID, collisiongroup = COLLISION_GROUP_PLAYER})
-    local desired = trace.Hit and math.max((target - trace.HitPos):Dot(aim) + 0.5, 0) or 0
+    table.sort(probes, function(a, b) return a.distance > b.distance end)
+
+    local desired = 0
+    for index = 1, math.min(CLEARANCE_PROBES, #probes) do
+        local probe = probes[index]
+        if probe.distance <= 0 then break end
+        local trace = util.TraceLine({start = start, endpos = probe.pos, filter = filter, mask = MASK_PLAYERSOLID, collisiongroup = COLLISION_GROUP_PLAYER})
+        if trace.Hit then
+            desired = math.max(desired, (probe.pos - trace.HitPos):Dot(aim) + CLEARANCE_PADDING)
+        end
+    end
+    desired = math.min(desired, CLEARANCE_MAX)
+
     local current = ent.HGEquipmentClearance or desired
-    local step = (FrameTime and FrameTime() or 0.015) * (desired > current and 160 or 50)
+    local step = (FrameTime and FrameTime() or 0.015) * (desired > current and CLEARANCE_GROW or CLEARANCE_SHRINK)
     ent.HGEquipmentClearance = current + math.Clamp(desired - current, -step, step)
+
     return pos - aim * ent.HGEquipmentClearance
 end
 

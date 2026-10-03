@@ -918,7 +918,11 @@ function SWEP:WorldModel_Transform(bNoApply, bNoAdditional, model)
 		end
 		
 		if hg.EquipmentImpactPose then newPos, newAng = hg.EquipmentImpactPose(self, newPos, newAng) end
-		if hg.ResolveEquipmentClearance then newPos = hg.ResolveEquipmentClearance(self, owner, model:GetModel(), newPos, newAng, model:GetModelScale()) end
+		if hg.ResolveEquipmentClearance then
+			local clearedPos = hg.ResolveEquipmentClearance(self, owner, model:GetModel(), newPos, newAng, model:GetModelScale())
+			desiredPos = desiredPos + (clearedPos - newPos)
+			newPos = clearedPos
+		end
 
 		if bNoApply then
 			return newPos, newAng, desiredPos, desiredAng
@@ -947,7 +951,6 @@ function SWEP:WorldModel_Transform(bNoApply, bNoAdditional, model)
 			renderAng = laggedAng
 		end
 
-		if hg.ResolveEquipmentClearance then renderPos = hg.ResolveEquipmentClearance(self, owner, model:GetModel(), renderPos, renderAng, model:GetModelScale()) end
 		self.visualDesiredPos, self.visualDesiredAng = renderPos, renderAng
 		model:SetRenderOrigin(renderPos)
 		model:SetRenderAngles(renderAng)

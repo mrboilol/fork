@@ -196,6 +196,29 @@ end
 
 local hg_show_hitposmuzzle = ConVarExists("hg_show_hitposmuzzle") and GetConVar("hg_show_hitposmuzzle") or CreateClientConVar("hg_show_hitposmuzzle", "0", false, false, "shows weapons crosshair, work only ведьма admin rank or sv_cheats 1")
 
+local function hideForScope(ent, hiddenDraw, hiddenMat)
+	if not IsValid(ent) or not ent.GetNoDraw then return end
+	hiddenDraw[#hiddenDraw + 1] = {ent, ent:GetNoDraw()}
+	hiddenMat[#hiddenMat + 1] = {ent, ent:GetMaterial()}
+	ent:SetNoDraw(true)
+	ent:SetMaterial("NULL")
+end
+
+local function restoreFromScope(hiddenDraw, hiddenMat)
+	for i = #hiddenDraw, 1, -1 do
+		local entry = hiddenDraw[i]
+		if IsValid(entry[1]) then entry[1]:SetNoDraw(entry[2]) end
+	end
+	for i = #hiddenMat, 1, -1 do
+		local entry = hiddenMat[i]
+		if IsValid(entry[1]) then entry[1]:SetMaterial(entry[2] or "") end
+	end
+end
+
+hook.Add("PrePlayerDraw", "ZCityScopeHideOwnerInRT", function(ply)
+	if IsValid(RENDERING_SCOPE) and ply == RENDERING_SCOPE:GetOwner() then return true end
+end)
+
 --- Кастомная настройка Render View для 3D picture-in-picture прицелов (DoRT).
 --- @param self Weapon
 function ZCityScopeZeroing.SWEP_DoRT(self)
@@ -314,7 +337,20 @@ function ZCityScopeZeroing.SWEP_DoRT(self)
 			render.Clear(1, 1, 1, 255)
 			render.ClearDepth()
 			render.SetWriteDepthToDestAlpha(false)
-			render.RenderView(rt)
+			local hiddenDraw, hiddenMat = {}, {}
+			local oldNoRender, oldTransmit = owner.norender, owner.shouldTransmit
+			owner.norender = true
+			owner.shouldTransmit = false
+			hideForScope(owner, hiddenDraw, hiddenMat)
+			hideForScope(owner.FakeRagdoll, hiddenDraw, hiddenMat)
+			hideForScope(owner.c_hands, hiddenDraw, hiddenMat)
+			hideForScope(owner.flmodel, hiddenDraw, hiddenMat)
+			hideForScope(owner.OwOmodel, hiddenDraw, hiddenMat)
+			local ok, err = pcall(render.RenderView, rt)
+			owner.norender = oldNoRender
+			owner.shouldTransmit = oldTransmit
+			restoreFromScope(hiddenDraw, hiddenMat)
+			if not ok then ErrorNoHalt(tostring(err), "\n") end
 		render.PopRenderTarget()
 		renderedView = true
 

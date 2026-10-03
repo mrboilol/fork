@@ -57,6 +57,12 @@ local CROUCH_DROP_SCALE = 0.3
 local POLE_FORWARD_BIAS = 4
 local MIN_LATERAL_FRACTION = 0.5
 local LEDGE_SEARCH = {0.6, 0.3}
+local TURN_LEAD_MAX = 35
+local TURN_RATE_SMOOTH = 12
+local TURN_FAST_RATE = 360
+local TURN_STEP_SPEEDUP = 0.4
+local CROUCH_STEP_SCALE = 0.55
+local CROUCH_SETTLE_SCALE = 0.75
 local LIMP_STRIDE_CUT = 0.35
 local LIMP_DRAG = 0.6
 local LIMP_DIP = 2.5
@@ -127,12 +133,19 @@ local function setBone(ent, bone, pos, ang, scale)
 	hg.bone_apply_matrix(ent, bone, mat)
 end
 
+local function kickAnimActive(ply)
+	if ply:GetNWFloat("InLegKick", 0) > CurTime() then return true end
+	local anim = ply:GetNWString("hg_CustomAnim", "")
+
+	return anim ~= "" and (anim:find("kick", 1, true) ~= nil or anim:find("curbstomp", 1, true) ~= nil)
+end
+
 local function hardBlocked(ply)
 	return not ply:Alive()
 		or IsValid(ply.FakeRagdoll)
 		or IsValid(ply.OldRagdoll)
 		or ply:GetNWBool("FakeGettingUp", false)
-		or ply:GetNWFloat("InLegKick", 0) > CurTime()
+		or kickAnimActive(ply)
 		or ply:InVehicle()
 		or ply:GetMoveType() ~= MOVETYPE_WALK
 end
@@ -273,7 +286,11 @@ local function landingTarget(ply, state, ctx, foot, index)
 		return rest + ctx.vel * remaining + stagger.dir * stepDist
 	end
 
-	if ctx.speed <= MOVING_SPEED then return rest end
+	if ctx.speed <= MOVING_SPEED then
+		local ahead = Angle(0, ctx.bodyYaw + math_Clamp(ctx.yawRate * remaining, -TURN_LEAD_MAX, TURN_LEAD_MAX), 0)
+
+		return ctx.origin + ahead:Right() * (sign * ctx.halfWidth)
+	end
 
 	local bodyAtLanding = ctx.origin + ctx.vel * remaining
 	local lead = hg.GaitLandingLead(ctx.speed, ctx.swingFraction) * IKFoot.GetFloat("stride_scale") * (1 - ctx.limp[index] * LIMP_STRIDE_CUT)
@@ -325,7 +342,7 @@ local function updateSwing(ply, state, ctx, index, dt)
 	local start, target = foot.start, foot.target
 	local rise = target.z - start.z
 	local zProgress = rise > 1 and smoothstep(math_min(t * 1.6, 1)) or s
-	local clearance = (IKFoot.GetFloat("step_height") * (0.6 + 0.4 * ctx.speedFraction) + math_min(math_abs(rise), MAX_RISE_CLEARANCE) * 0.3) * (1 - ctx.limp[index] * LIMP_DRAG)
+	local clearance = (IKFoot.GetFloat("step_height") * (0.6 + 0.4 * ctx.speedFraction) + math_min(math_abs(rise), MAX_RISE_CLEARANCE) * 0.3) * (1 - ctx.limp[index] * LIMP_DRAG) * (ctx.crouching and CROUCH_STEP_SCALE or 1)
 	local pos = LerpVector(s, start, target)
 	pos.z = Lerp(zProgress, start.z, target.z) + math_sin(math.pi * t) * clearance
 	foot.ground = pos
@@ -359,8 +376,9 @@ end
 
 local function settleIdleFeet(state, ctx)
 	if ctx.speed > MOVING_SPEED or CurTime() - state.lastPlant < SETTLE_COOLDOWN then return end
-	local settleDist = IKFoot.GetFloat("settle_distance")
-	local settleAngle = IKFoot.GetFloat("settle_angle")
+	local settleScale = ctx.crouching and CROUCH_SETTLE_SCALE or 1
+	local settleDist = IKFoot.GetFloat("settle_distance") * settleScale
+	local settleAngle = IKFoot.GetFloat("settle_angle") * settleScale
 	local worstIndex, worstError = nil, 1
 
 	for index = 1, 2 do
@@ -375,7 +393,9 @@ local function settleIdleFeet(state, ctx)
 		end
 	end
 
-	if worstIndex then startStep(state, worstIndex, SETTLE_SWING_TIME, false) end
+	if worstIndex then
+		startStep(state, worstIndex, SETTLE_SWING_TIME * (1 - TURN_STEP_SPEEDUP * math_Clamp(math_abs(ctx.yawRate) / TURN_FAST_RATE, 0, 1)), false)
+	end
 end
 
 local function releaseFeet(state, ctx)
@@ -513,6 +533,12 @@ local function buildContext(ply, state, anim, dt)
 	local speedFraction = math_Clamp(speed / math_max(ply:GetRunSpeed(), 1), 0, 1)
 	local bodyYaw = ply:GetRenderAngles().y
 	local bodyAng = Angle(0, bodyYaw, 0)
+	local yawRate = state.yawRate or 0
+	if state.lastYaw then
+		local rawRate = math_AngleDifference(bodyYaw, state.lastYaw) / math_max(dt, 0.001)
+		yawRate = yawRate + (rawRate - yawRate) * math_min(dt * TURN_RATE_SMOOTH, 1)
+	end
+	state.lastYaw, state.yawRate = bodyYaw, yawRate
 	local hipSpan = (anim[1].hip - anim[2].hip):Length2D() * 0.5 * IKFoot.GetFloat("stance_width")
 	local measuredAnkle = math_Clamp(math_min(anim[1].ankle.z, anim[2].ankle.z) - origin.z, MIN_ANKLE_HEIGHT, MAX_ANKLE_HEIGHT)
 
@@ -529,6 +555,7 @@ local function buildContext(ply, state, anim, dt)
 		moveDir = speed > 0 and vel / speed or bodyAng:Forward(),
 		speedFraction = speedFraction,
 		bodyYaw = bodyYaw,
+		yawRate = yawRate,
 		forward = bodyAng:Forward(),
 		right = bodyAng:Right(),
 		halfWidth = math_Clamp(hipSpan, MIN_HALF_WIDTH, MAX_HALF_WIDTH),
