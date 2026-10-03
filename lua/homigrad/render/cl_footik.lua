@@ -28,6 +28,9 @@ local LEGS = {
 
 local GROUND_TRACE_UP = 22
 local GROUND_TRACE_DOWN = 32
+local SLOPE_TRACE_PER_UNIT = 1
+local SLOPE_TRACE_MAX = 18
+local MAX_RISE_CLEARANCE = 20
 local WALL_TRACE_HEIGHT = 10
 local WALL_BACKOFF = 4
 local WALKABLE_NORMAL_Z = 0.6
@@ -150,25 +153,27 @@ local function legUsable(ply, legIndex)
 	return not (org[leg.amputated] or org[leg.amputatedUpper])
 end
 
-local function traceGround(state, x, y, originZ)
+local function traceGround(state, origin, x, y)
 	local tr = state.groundTrace
-	tr.start = Vector(x, y, originZ + GROUND_TRACE_UP)
-	tr.endpos = Vector(x, y, originZ - GROUND_TRACE_DOWN)
+	local dx, dy = x - origin.x, y - origin.y
+	local slopeReach = math_min(math_sqrt(dx * dx + dy * dy) * SLOPE_TRACE_PER_UNIT, SLOPE_TRACE_MAX)
+	tr.start = Vector(x, y, origin.z + GROUND_TRACE_UP + slopeReach)
+	tr.endpos = Vector(x, y, origin.z - GROUND_TRACE_DOWN - slopeReach)
 	local result = util.TraceHull(tr)
 	if result.Hit and not result.StartSolid and result.HitNormal.z >= WALKABLE_NORMAL_Z then
 		return result.HitPos, result.HitNormal, not result.HitWorld and result.Entity or nil, true
 	end
 
-	return Vector(x, y, originZ), vector_up, nil, false
+	return Vector(x, y, origin.z), vector_up, nil, false
 end
 
 local function traceSupport(state, origin, target)
-	local pos, normal, groundEnt, hit = traceGround(state, target.x, target.y, origin.z)
+	local pos, normal, groundEnt, hit = traceGround(state, origin, target.x, target.y)
 	if hit then return pos, normal, groundEnt end
 
 	for _, fraction in ipairs(LEDGE_SEARCH) do
 		local inward = origin + (target - origin) * fraction
-		local inwardPos, inwardNormal, inwardEnt, inwardHit = traceGround(state, inward.x, inward.y, origin.z)
+		local inwardPos, inwardNormal, inwardEnt, inwardHit = traceGround(state, origin, inward.x, inward.y)
 		if inwardHit then return inwardPos, inwardNormal, inwardEnt end
 	end
 
@@ -320,7 +325,7 @@ local function updateSwing(ply, state, ctx, index, dt)
 	local start, target = foot.start, foot.target
 	local rise = target.z - start.z
 	local zProgress = rise > 1 and smoothstep(math_min(t * 1.6, 1)) or s
-	local clearance = (IKFoot.GetFloat("step_height") * (0.6 + 0.4 * ctx.speedFraction) + math_abs(rise) * 0.3) * (1 - ctx.limp[index] * LIMP_DRAG)
+	local clearance = (IKFoot.GetFloat("step_height") * (0.6 + 0.4 * ctx.speedFraction) + math_min(math_abs(rise), MAX_RISE_CLEARANCE) * 0.3) * (1 - ctx.limp[index] * LIMP_DRAG)
 	local pos = LerpVector(s, start, target)
 	pos.z = Lerp(zProgress, start.z, target.z) + math_sin(math.pi * t) * clearance
 	foot.ground = pos

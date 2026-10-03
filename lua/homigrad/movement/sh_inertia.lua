@@ -2,8 +2,17 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 local math_abs, math_Approach, math_AngleDifference, math_Clamp, math_cos, math_deg, math_max, math_min, math_rad, math_Round, math_sin, math_sqrt = math.abs, math.Approach, math.AngleDifference, math.Clamp, math.cos, math.deg, math.max, math.min, math.rad, math.Round, math.sin, math.sqrt
 
 hg.WALKABLE_NORMAL_Z = 0.74
+hg.VIBRAM_WALKABLE_NORMAL_Z = 0.7
 local STEEP_SLOPE_FRICTION = 0.1
+local VIBRAM_STEEP_SLOPE_FRICTION = 0.6
 local STEEP_SLIDE_ACCEL = 300
+local VIBRAM_STEEP_SLIDE_MUL = 0.3
+
+function hg.WalkableNormalZ(ply)
+	if IsValid(ply) and ply.HasTrait and ply:HasTrait("vibrams") then return hg.VIBRAM_WALKABLE_NORMAL_Z end
+
+	return hg.WALKABLE_NORMAL_Z
+end
 
 local steepTrace = {mask = MASK_PLAYERSOLID}
 local function getSteepNormal(ply)
@@ -14,7 +23,7 @@ local function getSteepNormal(ply)
 	steepTrace.endpos = pos - vector_up * 12
 	steepTrace.filter = ply
 	local tr = util.TraceLine(steepTrace)
-	if tr.Hit and tr.HitNormal.z < hg.WALKABLE_NORMAL_Z then return tr.HitNormal end
+	if tr.Hit and tr.HitNormal.z < hg.WalkableNormalZ(ply) then return tr.HitNormal end
 end
 
 local function steepDownhill(normal)
@@ -24,12 +33,13 @@ local function steepDownhill(normal)
 	return downhill
 end
 
-local function slideDownSteepSlope(mv, normal)
+local function slideDownSteepSlope(ply, mv, normal)
 	local downhill = steepDownhill(normal)
 	local velocity = mv:GetVelocity()
+	local vibram = ply.HasTrait and ply:HasTrait("vibrams")
 	local uphill = -velocity:Dot(downhill)
-	if uphill > 0 then velocity:Add(downhill * uphill) end
-	velocity:Add(downhill * STEEP_SLIDE_ACCEL * engine.TickInterval())
+	if uphill > 0 and not vibram then velocity:Add(downhill * uphill) end
+	velocity:Add(downhill * STEEP_SLIDE_ACCEL * (vibram and VIBRAM_STEEP_SLIDE_MUL or 1) * engine.TickInterval())
 	mv:SetVelocity(velocity)
 end
 
@@ -37,7 +47,7 @@ local surfaceTraceMins, surfaceTraceMaxs = Vector(-8, -8, 0), Vector(8, 8, 8)
 local function getSurfaceFriction(ply)
 	if not ply:Alive() or ply:GetMoveType() ~= MOVETYPE_WALK or not ply:OnGround()
 		or ply:InVehicle() or IsValid(ply.FakeRagdoll) then return end
-	if ply.hg_SteepNormal then return STEEP_SLOPE_FRICTION end
+	if ply.hg_SteepNormal then return ply.HasTrait and ply:HasTrait("vibrams") and VIBRAM_STEEP_SLOPE_FRICTION or STEEP_SLOPE_FRICTION end
 	local ground = ply:GetGroundEntity()
 	if IsValid(ground) and ground:GetClass() == "stormfox_mapice" then return 0.08 end
 	local trace = ply.hg_surface_trace or {mins = surfaceTraceMins, maxs = surfaceTraceMaxs, mask = MASK_PLAYERSOLID}
@@ -265,7 +275,7 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 	hook.Add("SetupMove", "HG(StartCommand)", function(ply, mv, cmd)
 		ply.hg_SteepNormal = getSteepNormal(ply)
 		updateSurfaceFriction(ply)
-		if ply.hg_SteepNormal then slideDownSteepSlope(mv, ply.hg_SteepNormal) end
+		if ply.hg_SteepNormal then slideDownSteepSlope(ply, mv, ply.hg_SteepNormal) end
 		local curTime = CurTime()
 		local sysTime = SysTime()
 		--\\ DeltaTime

@@ -28,7 +28,8 @@ impact.Config = {
     dropCooldown = 0.35,
     maxImpulseSpeed = 320,
     inheritedSpeed = 160,
-    weaponHitPadding = 1.2,
+    weaponHitPadding = 2,
+    weaponWearerSlack = 6,
     armHitPadding = 1.25,
     weaponSolidFraction = 0.25,
     weaponMaxThickness = 8,
@@ -552,6 +553,13 @@ local function TraceHeldWeaponModel(ply, wep, startPos, endPos, padding)
         local hit = hg.TraceEquipmentModel(traceModel, tracePos, traceAng, traceScale, startPos, endPos, padding)
         if hit and (not best or hit.fraction < best.fraction) then best = hit end
     end
+    if traceModel ~= model then
+        local visible = GetGeometry(model)
+        if visible and #visible.convexes > 0 then
+            local hit = hg.TraceEquipmentModel(model, pos, ang, scale, startPos, endPos, padding)
+            if hit and (not best or hit.fraction < best.fraction) then best = hit end
+        end
+    end
     return best, pose
 end
 
@@ -915,6 +923,13 @@ local function PlayEquipmentBulletImpact(hit, material, direction)
     end
 end
 
+local function TraceBelongsToPlayer(trace, ply)
+    local ent = trace and trace.Hit and trace.Entity
+    if not IsValid(ent) or ent:IsWorld() then return false end
+    if ent == ply or ent == hg.GetCurrentCharacter(ply) then return true end
+    return hg.RagdollOwner and hg.RagdollOwner(ent) == ply or false
+end
+
 local function TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, originalTrace, shot)
     if not isvector(startPos) or not isvector(endPos) or startPos:DistToSqr(endPos) < 0.000001 then return originalTrace end
     originalTrace = originalTrace or {}
@@ -951,20 +966,37 @@ local function TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, ori
         checkedBodies[ply] = true
         local wep = ply:GetActiveWeapon()
         local pose
+        local wearerSlack = 0
+        local weaponEnd = endPos
+        if not shot.Contact and TraceBelongsToPlayer(originalTrace, ply) then
+            wearerSlack = cfg.weaponWearerSlack / segmentLength
+            weaponEnd = endPos + direction * cfg.weaponWearerSlack
+        end
+        local weaponRatio = 1 + wearerSlack
         if IsValid(wep) and wep ~= firingWeapon and CanHit(wep) and (shot.Contact or not seen[wep]) then
             local hit
-            hit, pose = TraceHeldWeaponModel(ply, wep, startPos, endPos, cfg.weaponHitPadding + projectileRadius)
-            if hit and hit.fraction <= obstructionFraction + 0.0001 then hit.weapon, hit.ply, hit.key = wep, ply, wep; hit.shot = shot; hits[#hits + 1] = hit end
+            hit, pose = TraceHeldWeaponModel(ply, wep, startPos, weaponEnd, cfg.weaponHitPadding + projectileRadius)
+            if hit then
+                hit.fraction = hit.fraction * weaponRatio
+                if hit.fraction <= obstructionFraction + wearerSlack + 0.0001 then
+                    hit.weapon, hit.ply, hit.key = wep, ply, wep
+                    hit.shot, hit.slack = shot, wearerSlack
+                    hits[#hits + 1] = hit
+                end
+            end
         end
         local armTrace = hg.TraceOrganismArms(body, startPos, endPos, (shot.Contact and cfg.armHitPadding or 0) + projectileRadius, wep, pose)
         if armTrace then armTraces[#armTraces + 1] = armTrace end
         for _, heldEnt in ipairs(hg.GetHeldEquipmentEntities(ply)) do
             if not CanHit(heldEnt) or seen[heldEnt] and not shot.Contact then continue end
             local model = heldEnt:GetModel()
-            local hit = model and hg.TraceEquipmentModel(model, heldEnt:GetPos(), heldEnt:GetAngles(), heldEnt:GetModelScale(), startPos, endPos, cfg.weaponHitPadding + projectileRadius)
-            if hit and hit.fraction <= obstructionFraction + 0.0001 then
-                hit.heldEntity, hit.ply, hit.key, hit.shot = heldEnt, ply, heldEnt, shot
-                hits[#hits + 1] = hit
+            local hit = model and hg.TraceEquipmentModel(model, heldEnt:GetPos(), heldEnt:GetAngles(), heldEnt:GetModelScale(), startPos, weaponEnd, cfg.weaponHitPadding + projectileRadius)
+            if hit then
+                hit.fraction = hit.fraction * weaponRatio
+                if hit.fraction <= obstructionFraction + wearerSlack + 0.0001 then
+                    hit.heldEntity, hit.ply, hit.key, hit.shot, hit.slack = heldEnt, ply, heldEnt, shot, wearerSlack
+                    hits[#hits + 1] = hit
+                end
             end
         end
         if hg.Appearance and hg.Appearance.TraceAccessoryShot then
@@ -996,7 +1028,9 @@ local function TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, ori
     end
     if originalTrace.HGArmFallback ~= nil then originalTrace.Fraction = obstructionFraction * fullFraction end
     for index = #hits, 1, -1 do
-        if hits[index].fraction > obstructionFraction + 0.0001 then table.remove(hits, index) end
+        local hit = hits[index]
+        local slack = hit.slack and TraceBelongsToPlayer(originalTrace, hit.ply) and hit.slack or 0
+        if hit.fraction > obstructionFraction + slack + 0.0001 then table.remove(hits, index) end
     end
     table.sort(hits, function(a, b) return a.fraction < b.fraction end)
     local scale = 1

@@ -388,8 +388,10 @@ local STEP_HAZARD_CHANCE = {
     gap = 0.35,
     toe = 0.2,
     steep = 0.55,
+    slope = 0.14,
     uneven = 0.03,
 }
+local STEP_SLOPE_FLAT_Z = 0.9
 
 local function StepHazard(ply, pos, landing)
     local footStart = Vector(pos.x, pos.y, pos.z + STEP_TOE_HEIGHT)
@@ -408,8 +410,10 @@ local function StepHazard(ply, pos, landing)
         mask = MASK_PLAYERSOLID,
     })
     if not trGround.Hit then return "gap" end
-    if trGround.HitNormal.z < (hg.WALKABLE_NORMAL_Z or 0.7) then return "steep" end
+    local walkableZ = hg.WalkableNormalZ and hg.WalkableNormalZ(ply) or hg.WALKABLE_NORMAL_Z or 0.7
+    if trGround.HitNormal.z < walkableZ then return "steep" end
     local heightDiff = trGround.HitPos.z - pos.z
+    local slopeSeverity = math.Clamp((STEP_SLOPE_FLAT_Z - trGround.HitNormal.z) / (STEP_SLOPE_FLAT_Z - walkableZ), 0, 1)
 
     local trToe = util_TraceHull({
         start = footStart,
@@ -421,6 +425,7 @@ local function StepHazard(ply, pos, landing)
     })
     local toeHit = trToe.Hit and not trToe.StartSolid and trToe.HitNormal.z < 0.7
     if toeHit and heightDiff <= STEP_LEVEL_TOLERANCE then return "toe", trToe end
+    if slopeSeverity > 0 and math.abs(heightDiff) >= STEP_UNEVEN_HEIGHT then return "slope", nil, slopeSeverity end
     if toeHit or math.abs(heightDiff) >= STEP_UNEVEN_HEIGHT then return "uneven" end
 end
 
@@ -439,7 +444,7 @@ function hg.FootstepTripCheck(ply, stepIndex, rate, swingFraction)
     local reach = speed * hg.GaitSwingTime(rate, swingFraction) + hg.GaitLandingLead(speed, swingFraction)
     local landing = pos + moveDir * reach + right * (side * STEP_HALF_WIDTH)
 
-    local hazard, hazardTrace = StepHazard(ply, pos, landing)
+    local hazard, hazardTrace, severity = StepHazard(ply, pos, landing)
     if not hazard then return end
     if hazard ~= "steep" and speed < STEP_TRIP_MIN_SPEED then return end
 
@@ -447,7 +452,7 @@ function hg.FootstepTripCheck(ply, stepIndex, rate, swingFraction)
     local speedFactor = math.Clamp((speed - STEP_TRIP_MIN_SPEED) / (STEP_TRIP_FULL_SPEED - STEP_TRIP_MIN_SPEED), 0, 1)
     if hazard == "steep" then speedFactor = math.max(speedFactor, STEP_STEEP_SPEED_FLOOR) end
     local flightFactor = 1 + hg.GaitFlightFraction(swingFraction) * STEP_FLIGHT_RISK
-    local tripChance = ScaleTripChance(ply, org, STEP_HAZARD_CHANCE[hazard]) * speedFactor * flightFactor
+    local tripChance = ScaleTripChance(ply, org, STEP_HAZARD_CHANCE[hazard] * (severity or 1)) * speedFactor * flightFactor
     if ply.HasTrait and ply:HasTrait("sprinter") then
         tripChance = tripChance * STEP_SPRINTER_MUL
     end
@@ -462,6 +467,8 @@ function hg.FootstepTripCheck(ply, stepIndex, rate, swingFraction)
 
         return
     end
+
+    if (hazard == "slope" or hazard == "uneven") and ply.HasTrait and ply:HasTrait("vibrams") then return end
 
     if hazard == "wall" or hazard == "toe" then
         timer.Simple(0, function()
