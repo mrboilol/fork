@@ -676,6 +676,14 @@ module[2] = function(owner, org, timeValue)
 		org.pneumothorax = max(org.pneumothorax - timeValue / 10, 0)
 	end
 
+	local tensionPneumothorax = math.Clamp((org.pneumothorax - 0.5) / 0.5, 0, 1)
+	if tensionPneumothorax > 0 and org.alive and not org.heartstop then
+		org.heartStrain = math.Clamp((org.heartStrain or 0) + timeValue * tensionPneumothorax / 60, 0, 1)
+		if org.heartStrain > 0.4 and (org.heart or 0) < 0.35 then
+			org.heart = math.min((org.heart or 0) + timeValue * tensionPneumothorax ^ 2 * 0.0015, 0.35)
+		end
+	end
+
 	local internalBleedPeak = math.max(tonumber(org.internalBleedPeak) or 0, tonumber(org.internalBleed) or 0, 0)
 	local internalBleedComplication = math.Clamp(tonumber(org.internalBleedComplication) or 0, 0, 1)
 	local thoracicOrganDamage = math.Clamp(math.max(
