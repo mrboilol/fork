@@ -246,22 +246,23 @@ local near_death_positive = {
 	"This isn't how I pictured it.",
 }
 
+local LIMB_NAMES = {
+	rleg = "right leg",
+	lleg = "left leg",
+	rarm = "right arm",
+	larm = "left arm",
+}
+
 local broken_limb = {
-	"FUCK. I THINK I BROKE SOMETHING.",
-	"I CAN FEEL THE BONE PIECES MOVING!",
-	"IT'S FUCKING BROKEN. I THINK..",
-	"I don't think I can move this limb anymore.",
-	"Jesus christ, I think I broke something.",
-	"Oh fuck. It is snapped.",
-	"I don't see any open fracture, but I feel like I broke something",
+	"MY %s IS BROKEN!",
+	"FUCK! I BROKE MY %s!",
+	"MY %s SNAPPED!",
 }
 
 local dislocated_limb = {
-	"Ugh.. god.. I can see it out of place...",
-	"I have to get this bone back in.",
-	"I think I dislocated my limb.",
-	"I can feel the joint out of place.",
-	"My limb is out of place.",
+	"MY %s IS DISLOCATED!",
+	"FUCK! I DISLOCATED MY %s!",
+	"MY %s JOINT IS OUT OF PLACE!",
 }
 
 local hungry_a_bit = {
@@ -597,7 +598,7 @@ local function get_status_message(ply)
     end
 	
 	local broken_notify = (org.rarm == 1) or (org.larm == 1) or (org.rleg == 1) or (org.lleg == 1)
-	local dislocated_notify = (org.rarm == 0.5) or (org.larm == 0.5) or (org.rleg == 0.5) or (org.lleg == 0.5)
+	local dislocated_notify = org.rarmdislocation or org.larmdislocation or org.rlegdislocation or org.llegdislocation
 	local after_unconscious_notify = org.after_otrub
 	local heartbeat = org.heartbeat or 70
 
@@ -607,10 +608,11 @@ local function get_status_message(ply)
 
 	local most_wanted_phraselist
 	local statusThoughtKey
+	local statusLimbName
 	local function limbStatusKey(kind)
 		for _, limb in ipairs({"rleg", "lleg", "rarm", "larm"}) do
-			if kind == "dislocated" and org[limb .. "dislocation"] then return kind .. "_" .. limb end
-			if kind == "broken" and org[limb] == 1 then return kind .. "_" .. limb end
+			if kind == "dislocated" and org[limb .. "dislocation"] then return kind .. "_" .. limb, LIMB_NAMES[limb] end
+			if kind == "broken" and org[limb] == 1 then return kind .. "_" .. limb, LIMB_NAMES[limb] end
 		end
 	end
 
@@ -622,9 +624,6 @@ local function get_status_message(ply)
 		most_wanted_phraselist = near_death_poetic
 		statusThoughtKey = "heartstop"
 	elseif o2 <= 15 then
-		-- sv_lungs owns the immediate breathing symptom alerts. Keep periodic
-		-- low-O2 thoughts in the shared dying-status pool so they do not repeat
-		-- those callouts.
 		most_wanted_phraselist = near_death_poetic
 		statusThoughtKey = "lowoxy"
 	elseif terminalBloodLoss or (bleedingOut and blood <= bleedoutStartBlood) then
@@ -673,7 +672,7 @@ local function get_status_message(ply)
 			most_wanted_phraselist = math.random(2) == 1 and audible_pain or (broken_notify and broken_limb or dislocated_limb)
 		elseif pain > 75 then
 			most_wanted_phraselist = audible_pain
-		elseif broken_dislocated then
+		elseif broken_dislocated and (broken_notify or dislocated_notify) then
 			most_wanted_phraselist = (broken_notify and broken_limb or dislocated_limb)
 		end
 
@@ -711,9 +710,9 @@ local function get_status_message(ply)
 	end
 
 	if most_wanted_phraselist == broken_limb then
-		statusThoughtKey = limbStatusKey("broken") or statusThoughtKey
+		statusThoughtKey, statusLimbName = limbStatusKey("broken")
 	elseif most_wanted_phraselist == dislocated_limb then
-		statusThoughtKey = limbStatusKey("dislocated") or statusThoughtKey
+		statusThoughtKey, statusLimbName = limbStatusKey("dislocated")
 	end
 
 	if most_wanted_phraselist == near_death_poetic or most_wanted_phraselist == near_death_positive then
@@ -766,7 +765,6 @@ local function get_status_message(ply)
 			org.arrhythmia_status_streak = 0
 		end
 
-		-- Keep only a short rolling memory so a pool eventually becomes reusable.
 		local recentCount = 0
 		for phrase, stamp in pairs(org.recent_status_phrases) do
 			if CurTime() - stamp > 45 then
@@ -780,6 +778,8 @@ local function get_status_message(ply)
 				if phrase ~= str and CurTime() - stamp > 8 then org.recent_status_phrases[phrase] = nil end
 			end
 		end
+
+		if statusLimbName then str = string.format(str, string.upper(statusLimbName)) end
 
 		return str, statusThoughtKey
 	else

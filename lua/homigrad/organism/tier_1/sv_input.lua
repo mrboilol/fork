@@ -310,6 +310,7 @@ local function Trace_Bullet(box, hit, ricochet, impact, org, organs, dmg, dmgInf
 	dmg = hook_info.dmg
 	
 	if func and !hook_info.restricted then
+		if isBrainLobe and impact.organContact == "direct" then impact.brainPenetrated = true end
 		local oldSkull = name == "skull" and org.skull or 0
 		local resistance = func(org, bone, dmg, dmgInfo, box[6], dir, hit, ricochet, impact, organ)
 
@@ -504,9 +505,9 @@ local stomachFallbackBones = {
 	"ValveBiped.Bip01_Pelvis",
 }
 
-local function getDamageHitgroup(ent, bone, dmgPos)
+local function getDamageHitgroup(ent, bone, dmgPos, contactBoneName)
 	local translatedBone = bone and bone >= 0 and ent:TranslatePhysBoneToBone(bone) or -1
-	local bonename = translatedBone and translatedBone >= 0 and ent:GetBoneName(translatedBone) or nil
+	local bonename = contactBoneName or (translatedBone and translatedBone >= 0 and ent:GetBoneName(translatedBone) or nil)
 	local hitgroup = bonetohitgroup[bonename] or HITGROUP_GENERIC
 	if not ent:IsRagdoll() or hitgroup ~= HITGROUP_GENERIC then return hitgroup, bonename end
 
@@ -631,6 +632,38 @@ local hitgrouptobone = {}
 for bon,hitgroup in pairs(bonetohitgroup) do
 	hitgrouptobone[hitgroup] = hitgrouptobone[hitgroup] or {}
 	table.insert(hitgrouptobone[hitgroup],bon)
+end
+
+local function getBulletContactBone(ent, trace, dmgPos)
+	local boneIndex = trace.HitBoxBone
+	if boneIndex == nil and not ent:IsRagdoll() and trace.HitBox ~= nil and ent.GetHitBoxBone then
+		boneIndex = ent:GetHitBoxBone(trace.HitBox, ent.GetHitboxSet and ent:GetHitboxSet() or 0)
+	end
+	if boneIndex and boneIndex < 0 then boneIndex = nil end
+	local boneName = boneIndex and boneIndex >= 0 and ent:GetBoneName(boneIndex) or nil
+	local physicsBone = trace.PhysicsBone
+	if not boneName and physicsBone and physicsBone >= 0 then
+		local translatedBone = ent:TranslatePhysBoneToBone(physicsBone)
+		boneName = translatedBone and translatedBone >= 0 and ent:GetBoneName(translatedBone) or nil
+	end
+	local hitgroup = trace.HitGroup
+	if boneIndex == nil and not ent:IsRagdoll() and hitgrouptobone[hitgroup] and bonetohitgroup[boneName] ~= hitgroup then
+		local nearestDistance = math.huge
+		for _, name in ipairs(hitgrouptobone[hitgroup]) do
+			local candidate = ent:LookupBone(name)
+			local matrix = candidate and ent:GetBoneMatrix(candidate)
+			local distance = matrix and matrix:GetTranslation():DistToSqr(dmgPos)
+			if distance and distance < nearestDistance then
+				boneIndex, boneName, nearestDistance = candidate, name, distance
+			end
+		end
+	end
+	boneIndex = boneIndex or (boneName and ent:LookupBone(boneName))
+	if boneIndex and boneIndex >= 0 then
+		local translated = ent:TranslateBoneToPhysBone(boneIndex)
+		if translated and translated >= 0 then physicsBone = translated end
+	end
+	return physicsBone, boneName
 end
 
 hg.DeathCam = false
@@ -1757,7 +1790,10 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 
 	end
 	
-	local bone
+	local bone, contactBoneName
+	if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_SNIPER) and not meleeContact then
+		bone, contactBoneName = getBulletContactBone(ent, tr, dmgPos)
+	end
 	if meleeContact and meleeContact.boneName then
 		local contactBone = ent:LookupBone(meleeContact.boneName)
 		local contactPhysBone = contactBone and ent:TranslateBoneToPhysBone(contactBone) or nil
@@ -1805,8 +1841,8 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		tr.HGHeadContact = meleeContact.head == true
 	end
 
-	local hitgroup, bonename = getDamageHitgroup(ent, bone, dmgPos)
-	if tr.HitGroup and tr.HitGroup ~= HITGROUP_GENERIC then
+	local hitgroup, bonename = getDamageHitgroup(ent, bone, dmgPos, contactBoneName)
+	if not bonetohitgroup[contactBoneName] and tr.HitGroup and tr.HitGroup ~= HITGROUP_GENERIC then
 		hitgroup = tr.HitGroup
 	end
 	if tr.HGHeadContact then
@@ -2083,8 +2119,12 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		hg.AttachStomachGore(ent, dirCool * len)
 	end
 	local throughAndThrough = outputHole and #outputHole > 0
+	local throughBrain = impact.brainPenetrated and throughAndThrough
+		and not noDismemberment and not (IsValid(inf) and inf.NoGoreDamage)
 	local fatalHeadshot = impact.brainHit or (org.brain or 0) >= 0.25 or throughAndThrough or not org.alive or (IsValid(ply) and not ply:Alive())
-	if hitgroup == HITGROUP_HEAD and fatalHeadshot and damageStack > 0 and dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_SNIPER) and !ent.headexploded and !ent.headExplodePending then
+	if (throughBrain or (hitgroup == HITGROUP_HEAD and fatalHeadshot and damageStack > 0))
+		and dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_SNIPER)
+		and not ent.headexploded and not ent.headExplodePending then
 		local squirtDirection = getShotTravelDirection(dmgInfo, inputHole, outputHole, dmgPos, ent)
 		local caliber = tonumber(bullet and bullet.Diameter) or tonumber(IsValid(inf) and inf.PenetrationSize) or 0
 		sendHeadshotBloodSquirt(ent, ply, dmgPos, squirtDirection, outputHole, caliber > 0 and caliber <= 5.7)

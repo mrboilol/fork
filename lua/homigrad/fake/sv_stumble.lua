@@ -53,6 +53,10 @@ local FOOT_STEP_ARRIVE = 0.05
 local FOOT_PLANT_ARRIVE = 0.1
 local FOOT_MAX_SPEED = 1500
 local FOOT_PUSHOFF = 1.6
+local LEG_REACH_MUL = 0.95
+local HIP_SUPPORT_HEIGHT_MUL = 0.9
+local HIP_SUPPORT_SPRING = 35
+local HIP_SUPPORT_MAX_GRAVITY = 2
 local DIVE_UP = 140
 local TOPPLE_PUSH = 110
 local TOPPLE_DOWN = 60
@@ -266,11 +270,10 @@ local function getBonePhys(ragdoll, boneName)
 end
 
 local function groundFromTrace(cfg, tr, pos, currentFootZ)
-	if not tr.Hit or not sanitizeVector(tr.HitPos, nil) then return end
+	if not tr.Hit or tr.StartSolid or not sanitizeVector(tr.HitPos, nil) then return end
 
 	local normal = tr.HitNormal
 	local slopeAngle = math.deg(math.acos(math.Clamp(normal.z, -1, 1)))
-	if slopeAngle >= 90 then return Vector(pos.x, pos.y, currentFootZ), Vector(0, 0, 1) end
 	if slopeAngle > cfg.MaxSlopeAngle then return end
 
 	local heightChange = tr.HitPos.z - currentFootZ
@@ -306,8 +309,6 @@ local function findGroundPosition(cfg, pos, ragdoll, currentFootZ, pelvisZ)
 		filter = ragdoll,
 	}), pos, currentFootZ)
 	if ground then return ground, normal end
-
-	return Vector(pos.x, pos.y, currentFootZ), Vector(0, 0, 1)
 end
 
 local function groundTrace(ply, ragdoll, dist)
@@ -488,9 +489,37 @@ local function initLegs(st, ragdoll)
 		st.ghostPositions[i] = Vector(finalPos.x, finalPos.y, finalPos.z)
 		st.groundNormals[i] = normal or Vector(0, 0, 1)
 		st.hasGroundContact[i] = ground ~= nil
-		st.footPositions[i] = IsValid(phys) and phys:GetPos() or Vector(finalPos.x, finalPos.y, finalPos.z)
+		st.footPositions[i] = IsValid(phys) and phys:GetPos() - Vector(0, 0, FOOT_ANKLE_HEIGHT) or finalPos
 		st.lockedFootPositions[i] = Vector(st.footPositions[i].x, st.footPositions[i].y, st.footPositions[i].z)
 	end
+end
+
+local function findStepGround(st, ragdoll, i, pos, currentZ)
+	local chain = st.ikChains[i]
+	local root = chain and chain.physObjects[1]
+	if not IsValid(root) then return end
+
+	local pelvisPos = st.pelvis:GetPos()
+	local ground, normal = findGroundPosition(st.cfg, pos, ragdoll, currentZ, pelvisPos.z)
+	if not ground then return end
+
+	local rootPos = root:GetPos()
+	local reach = chain.completeLength * LEG_REACH_MUL
+	local height = rootPos.z - ground.z - FOOT_ANKLE_HEIGHT
+	if math.abs(height) >= reach then return end
+
+	local offset = Vector(ground.x - rootPos.x, ground.y - rootPos.y, 0)
+	local horizontalReach = math.sqrt(reach * reach - height * height)
+	if offset:LengthSqr() > horizontalReach * horizontalReach then
+		offset = offset:GetNormalized() * horizontalReach
+		local clampedPos = Vector(rootPos.x + offset.x, rootPos.y + offset.y, ground.z)
+		ground, normal = findGroundPosition(st.cfg, clampedPos, ragdoll, currentZ, pelvisPos.z)
+	end
+	if not ground then return end
+	local anklePos = ground + Vector(0, 0, FOOT_ANKLE_HEIGHT)
+	if rootPos:DistToSqr(anklePos) > chain.completeLength * chain.completeLength then return end
+
+	return ground, normal
 end
 
 local function updateGhostPositions(st, ragdoll, isMoving, horizontalVel)
@@ -509,7 +538,7 @@ local function updateGhostPositions(st, ragdoll, isMoving, horizontalVel)
 		local idealPos = basePos + prediction
 		local currentZ = st.ghostPositions[i] and st.ghostPositions[i].z or pelvisPos.z
 
-		local ground, normal = findGroundPosition(st.cfg, Vector(idealPos.x, idealPos.y, currentZ), ragdoll, currentZ, pelvisPos.z)
+		local ground, normal = findStepGround(st, ragdoll, i, Vector(idealPos.x, idealPos.y, currentZ), currentZ)
 		st.hasGroundContact[i] = ground ~= nil
 
 		if ground then
@@ -582,7 +611,7 @@ local function updateStumble(st, ragdoll)
 	for i = 1, 2 do
 		local state = st.legState[i]
 		if state.isStepping then
-			state.progress = state.progress + dt * stepSpeed
+			state.progress = state.progress + dt * (state.stepSpeed or stepSpeed)
 			if state.progress >= 1 then
 				state.isStepping = false
 				state.lastStepTime = now
@@ -611,9 +640,12 @@ local function updateStumble(st, ragdoll)
 			state.isLocked = false
 
 			local trigger = cfg.StepTriggerForward
-			if st.footPositions[i]:DistToSqr(st.ghostPositions[i]) > trigger * trigger
+			if st.hasGroundContact[i] and st.ikChains[i]
+				and st.footPositions[i]:DistToSqr(st.ghostPositions[i]) > trigger * trigger
 				and not st.legState[i == 1 and 2 or 1].isStepping
 				and now - state.lastStepTime > cfg.MinStepInterval then
+				local target = findStepGround(st, ragdoll, i, st.ghostPositions[i], st.ghostPositions[i].z)
+				if not target then continue end
 				if st.steps >= st.minSteps and math.Rand(0, 1) < st.legTrip[i] then
 					st.tripLeg = i
 					return
@@ -622,18 +654,25 @@ local function updateStumble(st, ragdoll)
 				state.isStepping = true
 				state.progress = 0
 				state.startPos = st.footPositions[i]
-				state.targetPos = findGroundPosition(cfg, st.ghostPositions[i], ragdoll, st.ghostPositions[i].z, pelvisPos.z) or st.ghostPositions[i]
+				state.targetPos = target
+				local rootPos = st.ikChains[i].physObjects[1]:GetPos()
+				local stride = Vector(target.x - rootPos.x, target.y - rootPos.y, 0):Length()
+				state.stepSpeed = math.max(stepSpeed, speed / math.max(stride, FOOT_PLANT_DIST))
 			end
 		end
 	end
 
 	local planted = 0
+	local supportHeight = 0
 	for i = 1, 2 do
 		local chain = st.ikChains[i]
 		local target = sanitizeVector(st.footPositions[i], pelvisPos)
 		if chain then
-			chain:SetTarget(target)
-			chain:Update()
+			for _, phys in pairs(chain.physObjects) do
+				if IsValid(phys) then phys:Wake() end
+			end
+			chain:SetTarget(target + Vector(0, 0, FOOT_ANKLE_HEIGHT))
+			chain:Update(dt)
 		end
 
 		local foot = st.footPhys[i]
@@ -644,7 +683,9 @@ local function updateStumble(st, ragdoll)
 			foot:ComputeShadowControl({
 				pos = goal,
 				angle = foot:GetAngles(),
-				secondstoarrive = stepping and FOOT_STEP_ARRIVE or FOOT_PLANT_ARRIVE,
+				secondstoarrive = stepping
+					and math.min(FOOT_STEP_ARRIVE, 0.5 / (st.legState[i].stepSpeed or stepSpeed))
+					or FOOT_PLANT_ARRIVE,
 				maxspeed = FOOT_MAX_SPEED,
 				maxspeeddamp = FOOT_MAX_SPEED * 2,
 				maxangular = 0,
@@ -653,8 +694,24 @@ local function updateStumble(st, ragdoll)
 				teleportdistance = 0,
 				deltatime = dt,
 			})
-			if not stepping and st.hasGroundContact[i] and foot:GetPos():DistToSqr(goal) < FOOT_PLANT_DIST * FOOT_PLANT_DIST then
-				planted = planted + 1
+			if not stepping and foot:GetPos():DistToSqr(goal) < FOOT_PLANT_DIST * FOOT_PLANT_DIST then
+				local footPos = foot:GetPos()
+				local root = chain.physObjects[1]
+				if not IsValid(root) then continue end
+				local ground = groundFromTrace(cfg, util.TraceHull({
+					start = footPos,
+					endpos = footPos - Vector(0, 0, FOOT_ANKLE_HEIGHT + FOOT_PLANT_DIST),
+					mins = FOOT_HULL_MINS,
+					maxs = FOOT_HULL_MAXS,
+					mask = MASK_SOLID_BRUSHONLY,
+					filter = ragdoll,
+				}), footPos, footPos.z - FOOT_ANKLE_HEIGHT)
+				if ground then
+					local legHeight = chain.completeLength * HIP_SUPPORT_HEIGHT_MUL + FOOT_ANKLE_HEIGHT
+					local hipHeight = math.min(cfg.HipTargetHeight, legHeight + pelvisPos.z - root:GetPos().z)
+					supportHeight = supportHeight + ground.z + hipHeight
+					planted = planted + 1
+				end
 			end
 		end
 	end
@@ -664,11 +721,15 @@ local function updateStumble(st, ragdoll)
 	local grounded = planted > 0
 	local support = math.min(planted, 1) + (planted > 1 and 0.25 or 0)
 
-	local carry = math.Clamp(cfg.Carry, 0, 1) * (1 - instability * instability) * support
-	if carry > 0 and grounded then
-		local lift = Vector(0, 0, physenv.GetGravity():Length() * carry * dt)
+	local carry = (1 - instability * instability) * math.min(support, 1) * st.vigor
+	local heightDeficit = grounded and supportHeight / planted - pelvisPos.z or 0
+	if cfg.Carry > 0 and carry > 0 and grounded and rawVel.z <= 0 and heightDeficit >= 0 then
+		local gravity = physenv.GetGravity():Length()
+		local supportAccel = gravity + heightDeficit * HIP_SUPPORT_SPRING * math.Clamp(cfg.Carry, 0, 1)
+		local liftSpeed = math.min(supportAccel * carry * dt, gravity * HIP_SUPPORT_MAX_GRAVITY * dt, -rawVel.z)
+		local lift = Vector(0, 0, liftSpeed)
 		st.pelvis:AddVelocity(lift)
-		st.spine:AddVelocity(lift)
+		st.spine:AddVelocity(Vector(0, 0, math.min(liftSpeed, math.max(-st.spine:GetVelocity().z, 0))))
 	end
 
 	if moveDir then
@@ -1146,7 +1207,7 @@ hook.Add("EntityTakeDamage", "HG_EuphoriaStumbleHit", function(ent, dmgInfo)
 		if push > 0 then ply:SetVelocity(flatDir * push) end
 
 		local staggerScale = acc.energy / (knockdown > 0 and knockdown or 100)
-		if staggerScale >= HIT_STAGGER_MIN_FRAC and math.random() < math.Clamp(staggerScale * 1.2, 0.1, 0.9) then
+		if staggerScale >= HIT_STAGGER_MIN_FRAC then
 			hg.StartStagger(ply, flatDir, math.Clamp(staggerScale, 0.3, 1))
 		end
 		return
@@ -1318,9 +1379,9 @@ local function stumbleEndReason(ply, ragdoll, st)
 	if st.stillSince and now - st.stillSince > STILL_GRACE then return "decay" end
 
 	st.vigor = vigor(ply.organism)
+	if elapsed >= STUMBLE_FALL_GRACE and not isUpright(ply, ragdoll) then return "fell" end
 	if st.steps < st.minSteps and elapsed < STUMBLE_MIN_STEP_TIMEOUT then return end
 	if elapsed >= stumbleLifetime(st) then return "decay" end
-	if now - st.startTime >= STUMBLE_FALL_GRACE and not isUpright(ply, ragdoll) then return "fell" end
 end
 
 hook.Add("Should Fake Up", "HG_EuphoriaStumble", function(ply)

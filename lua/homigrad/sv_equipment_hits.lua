@@ -28,7 +28,7 @@ impact.Config = {
     dropCooldown = 0.35,
     maxImpulseSpeed = 320,
     inheritedSpeed = 160,
-    weaponHitPadding = 0.65,
+    weaponHitPadding = 1.2,
     armHitPadding = 1.25,
     weaponSolidFraction = 0.25,
     weaponMaxThickness = 8,
@@ -543,11 +543,12 @@ local function TraceHeldWeaponModel(ply, wep, startPos, endPos, padding)
         end
         for name in pairs(wep.ModularParts) do TracePart(name) end
     end
-    if not hasPoseGeometry then
-        local traceModel, tracePos, traceAng, traceScale = model, pos, ang, scale
-        if not wep.GetEquipmentImpactModel and wep.WorldModelFake and isstring(wep.WorldModel) and wep.WorldModel ~= "" then
-            traceModel, tracePos, traceAng, traceScale = wep.WorldModel, worldPos or pos, worldAng or ang, 1
-        end
+    local traceModel, tracePos, traceAng, traceScale = model, pos, ang, scale
+    if not wep.GetEquipmentImpactModel and wep.WorldModelFake and isstring(wep.WorldModel) and wep.WorldModel ~= "" then
+        traceModel, tracePos, traceAng, traceScale = wep.WorldModel, worldPos or pos, worldAng or ang, 1
+    end
+    local geometry = GetGeometry(traceModel)
+    if not hasPoseGeometry or geometry and #geometry.convexes > 0 then
         local hit = hg.TraceEquipmentModel(traceModel, tracePos, traceAng, traceScale, startPos, endPos, padding)
         if hit and (not best or hit.fraction < best.fraction) then best = hit end
     end
@@ -960,7 +961,7 @@ local function TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, ori
         for _, heldEnt in ipairs(hg.GetHeldEquipmentEntities(ply)) do
             if not CanHit(heldEnt) or seen[heldEnt] and not shot.Contact then continue end
             local model = heldEnt:GetModel()
-            local hit = model and hg.TraceEquipmentModel(model, heldEnt:GetPos(), heldEnt:GetAngles(), heldEnt:GetModelScale(), startPos, endPos, projectileRadius)
+            local hit = model and hg.TraceEquipmentModel(model, heldEnt:GetPos(), heldEnt:GetAngles(), heldEnt:GetModelScale(), startPos, endPos, cfg.weaponHitPadding + projectileRadius)
             if hit and hit.fraction <= obstructionFraction + 0.0001 then
                 hit.heldEntity, hit.ply, hit.key, hit.shot = heldEnt, ply, heldEnt, shot
                 hits[#hits + 1] = hit

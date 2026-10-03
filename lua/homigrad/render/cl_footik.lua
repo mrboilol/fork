@@ -35,7 +35,7 @@ local RETRACE_DIST_SQR = 16
 local TARGET_SMOOTH = 14
 local MOVING_SPEED = 12
 local REACH_FRACTION = 0.97
-local OVERREACH_FRACTION = 0.9
+local OVERREACH_FRACTION = 0.95
 local LANDING_SPREAD_FRACTION = 0.8
 local SETTLE_SWING_TIME = 0.28
 local SETTLE_COOLDOWN = 0.12
@@ -57,6 +57,27 @@ local LEDGE_SEARCH = {0.6, 0.3}
 local LIMP_STRIDE_CUT = 0.35
 local LIMP_DRAG = 0.6
 local LIMP_DIP = 2.5
+local STAGGER_STEP_TIME = 0.22
+local STAGGER_STEP_DIST = 26
+local STAGGER_FOLLOW_MIN = 0.12
+local STAGGER_FOLLOW_SCALE = 0.7
+local STAGGER_DROP = 4
+local STAGGER_LEAN = 16
+local STAGGER_LEAN_IMPULSE = 160
+local BODY_SPRING = 55
+local BODY_DAMPING = 8
+local BODY_MAX_LEAN = 24
+local BODY_ACCEL_GAIN = 0.55
+local BODY_ACCEL_CLAMP = 900
+local BODY_ACCEL_SMOOTH = 10
+local BODY_VELOCITY_LEAN = 0.02
+local LAND_SPRING = 150
+local LAND_DAMPING = 13
+local LAND_MAX_DROP = 9
+local LAND_MIN_SPEED = 220
+local LAND_MAX_SPEED = 900
+local LAND_GAIN = 0.09
+local SPINE_BONE = "ValveBiped.Bip01_Spine"
 local DEBUG_BOX = Vector(1.5, 1.5, 1.5)
 local DEBUG_PLANTED = Color(60, 255, 60)
 local DEBUG_SWING = Color(255, 200, 60)
@@ -108,6 +129,7 @@ local function hardBlocked(ply)
 		or IsValid(ply.FakeRagdoll)
 		or IsValid(ply.OldRagdoll)
 		or ply:GetNWBool("FakeGettingUp", false)
+		or ply:GetNWFloat("InLegKick", 0) > CurTime()
 		or ply:InVehicle()
 		or ply:GetMoveType() ~= MOVETYPE_WALK
 end
@@ -212,6 +234,13 @@ local function startStep(state, index, duration, allowOverlap)
 	foot.target = nil
 end
 
+local function beginStaggerStep(state, stagger, index, dist, final)
+	local foot = state.feet[index]
+	foot.stagger = {dir = stagger.dir, dist = dist, final = final}
+	foot.pending = nil
+	startStep(state, index, STAGGER_STEP_TIME, true)
+end
+
 local function plantedWorldPos(foot)
 	if not foot.localPos then return foot.planted end
 	if not IsValid(foot.groundEnt) then return nil end
@@ -220,14 +249,30 @@ local function plantedWorldPos(foot)
 	return foot.planted
 end
 
+local function reachLead(state, ctx, index)
+	local height = ctx.anim[index].hip.z - ctx.origin.z - state.ankleHeight
+	local reach = ctx.legLength * OVERREACH_FRACTION
+
+	return math_sqrt(math_max(reach * reach - height * height - ctx.halfWidth * ctx.halfWidth, 0))
+end
+
 local function landingTarget(ply, state, ctx, foot, index)
 	local sign = LEGS[index].sign
 	local rest = ctx.origin + ctx.right * (sign * ctx.halfWidth)
+	local remaining = (1 - foot.t) * foot.duration
+
+	local stagger = foot.stagger
+	if stagger then
+		local stepDist = math_min(stagger.dist, ctx.legLength * LANDING_SPREAD_FRACTION)
+
+		return rest + ctx.vel * remaining + stagger.dir * stepDist
+	end
+
 	if ctx.speed <= MOVING_SPEED then return rest end
 
-	local remaining = (1 - foot.t) * foot.duration
 	local bodyAtLanding = ctx.origin + ctx.vel * remaining
 	local lead = hg.GaitLandingLead(ctx.speed, ctx.swingFraction) * IKFoot.GetFloat("stride_scale") * (1 - ctx.limp[index] * LIMP_STRIDE_CUT)
+	lead = math_min(lead, reachLead(state, ctx, index))
 	local offset = ctx.right * (sign * ctx.halfWidth) + ctx.moveDir * lead
 	local maxSpread = ctx.legLength * LANDING_SPREAD_FRACTION
 	if offset:Length() > maxSpread then
@@ -261,6 +306,11 @@ local function updateSwing(ply, state, ctx, index, dt)
 		plantFoot(state, foot, foot.target, foot.targetNormal, foot.targetEnt, ctx.bodyYaw)
 		foot.ground = foot.planted
 		foot.groundNormal = foot.normal
+
+		if foot.stagger then
+			if not foot.stagger.final then state.staggerFollow = 3 - index end
+			foot.stagger = nil
+		end
 
 		return
 	end
@@ -354,13 +404,30 @@ local function updateFeet(ply, state, ctx, dt)
 
 		if not foot.swinging then
 			local planted = plantedWorldPos(foot)
-			local hipGround = ctx.origin + ctx.right * (LEGS[index].sign * ctx.halfWidth)
-			local overreach = not planted or (planted - hipGround):Length2D() > ctx.legLength * OVERREACH_FRACTION
+			local reach = ctx.legLength * OVERREACH_FRACTION
+			local overreach = not planted or (planted + vector_up * state.ankleHeight):DistToSqr(ctx.anim[index].hip) > reach * reach
 			if overreach then
 				startStep(state, index, SETTLE_SWING_TIME, false)
 			end
 			foot.ground = foot.planted
 			foot.groundNormal = foot.normal
+		end
+	end
+
+	local stagger = ctx.stagger
+	if stagger and state.staggerStart ~= stagger.start then
+		state.staggerStart = stagger.start
+		state.staggerFollow = nil
+		beginStaggerStep(state, stagger, stagger.left and 1 or 2, STAGGER_STEP_DIST * (0.4 + 0.6 * stagger.power), false)
+	end
+
+	local follow = state.staggerFollow
+	if follow then
+		if not stagger or stagger.amount < STAGGER_FOLLOW_MIN then
+			state.staggerFollow = nil
+		elseif not state.feet[follow].swinging then
+			state.staggerFollow = nil
+			beginStaggerStep(state, stagger, follow, STAGGER_STEP_DIST * (0.4 + 0.6 * stagger.power) * STAGGER_FOLLOW_SCALE, true)
 		end
 	end
 
@@ -382,7 +449,7 @@ local function updateDrop(state, ctx, dt)
 	end
 
 	local maxDrop = IKFoot.GetFloat("max_body_drop") * (ctx.crouching and CROUCH_DROP_SCALE or 1)
-	targetDrop = math_Clamp(targetDrop * DROP_TERRAIN_SCALE, 0, maxDrop)
+	targetDrop = math_Clamp(targetDrop * DROP_TERRAIN_SCALE + (ctx.stagger and ctx.stagger.amount * STAGGER_DROP or 0), 0, maxDrop)
 	state.drop = state.drop + (targetDrop - state.drop) * (1 - math_exp(-dt * DROP_SMOOTH))
 end
 
@@ -412,6 +479,25 @@ local function readAnim(ent, ply, bones)
 	end
 
 	return anim
+end
+
+local function staggerInfo(ply)
+	local finish = ply:GetNWFloat("HGStaggerEnd", 0)
+	local now = CurTime()
+	if finish <= now or not hg.StaggerEnvelope then return end
+
+	local start = ply:GetNWFloat("HGStaggerStart", 0)
+	local power = ply:GetNWFloat("HGStaggerPower", 0.5)
+	local amount = hg.StaggerEnvelope(now, start, finish) * power
+	if amount <= 0.01 then return end
+
+	return {
+		amount = amount,
+		power = power,
+		start = start,
+		dir = ply:GetNWVector("HGStaggerDir", vector_origin),
+		left = ply:GetNWBool("HGStaggerLeft"),
+	}
 end
 
 local function buildContext(ply, state, anim, dt)
@@ -446,6 +532,7 @@ local function buildContext(ply, state, anim, dt)
 		crouching = ply:Crouching(),
 		limp = {hg.GaitLegLimp(ply.organism, "lleg"), hg.GaitLegLimp(ply.organism, "rleg")},
 		swingFraction = hg.GaitSwingFraction(speed),
+		stagger = staggerInfo(ply),
 		anim = anim,
 	}
 end
@@ -532,7 +619,7 @@ end
 
 local function applyPose(ent, ply, state, bones, ctx)
 	local weight = state.weight
-	local pelvisOffset = (state.hop - state.drop) * weight
+	local pelvisOffset = (state.hop - state.drop - (ply.hg_Body and ply.hg_Body.drop or 0)) * weight
 	local pelvisMat = ent:GetBoneMatrix(bones.pelvis)
 	if pelvisMat and math_abs(pelvisOffset) > 0.01 then
 		local current = pelvisMat:GetTranslation()
@@ -579,13 +666,112 @@ local function drawDebug(state)
 	end
 end
 
+local function stepBody(ply, body, dt)
+	local vel = ply:GetVelocity()
+	local onGround = ply:OnGround()
+	local flatVel = Vector(vel.x, vel.y, 0)
+	local rawAccel = (flatVel - body.lastVel) / dt
+	local accelLength = rawAccel:Length()
+	if accelLength > BODY_ACCEL_CLAMP then rawAccel:Mul(BODY_ACCEL_CLAMP / accelLength) end
+	body.accel = body.accel + (rawAccel - body.accel) * math_min(dt * BODY_ACCEL_SMOOTH, 1)
+	body.lastVel = flatVel
+
+	local stagger = staggerInfo(ply)
+	local target = flatVel * BODY_VELOCITY_LEAN
+	if stagger then
+		target = target + stagger.dir * STAGGER_LEAN * stagger.amount
+		if body.staggerStart ~= stagger.start then
+			body.staggerStart = stagger.start
+			body.leanVel = body.leanVel + stagger.dir * STAGGER_LEAN_IMPULSE * stagger.power
+		end
+	end
+
+	local force = (target - body.lean) * BODY_SPRING - body.leanVel * BODY_DAMPING - body.accel * BODY_ACCEL_GAIN
+	body.leanVel = body.leanVel + force * dt
+	body.lean = body.lean + body.leanVel * dt
+	local leanLength = body.lean:Length()
+	if leanLength > BODY_MAX_LEAN then body.lean:Mul(BODY_MAX_LEAN / leanLength) end
+
+	if onGround then
+		if body.airborne then
+			if body.fallSpeed > LAND_MIN_SPEED then
+				body.dropVel = body.dropVel + math_min(body.fallSpeed, LAND_MAX_SPEED) * LAND_GAIN
+				body.landTime = CurTime()
+			end
+			body.fallSpeed = 0
+		end
+		body.airborne = false
+	else
+		body.airborne = true
+		body.fallSpeed = math_max(body.fallSpeed, -vel.z)
+	end
+
+	body.dropVel = body.dropVel + (-body.drop * LAND_SPRING - body.dropVel * LAND_DAMPING) * dt
+	body.drop = math_Clamp(body.drop + body.dropVel * dt, 0, LAND_MAX_DROP)
+end
+
+local function applyLean(ent, ply, body)
+	local lean = body.lean
+	local leanLength = lean:Length()
+	if leanLength < 0.2 then return end
+
+	if body.model ~= ply:GetModel() then
+		body.model = ply:GetModel()
+		body.spine = ply:LookupBone(SPINE_BONE)
+	end
+	if not body.spine then return end
+
+	local mat = ent:GetBoneMatrix(body.spine)
+	if not mat then return end
+
+	local current = mat:GetAngles()
+	if body.leanFrame == FrameNumber() and body.leanSet and current:Forward():DistToSqr(body.leanSet:Forward()) < 0.00001 and current:Up():DistToSqr(body.leanSet:Up()) < 0.00001 then return end
+
+	local ang = Angle(current)
+	ang:RotateAroundAxis(vector_up:Cross(lean / leanLength), leanLength)
+	mat:SetAngles(ang)
+	hg.bone_apply_matrix(ent, body.spine, mat)
+	body.leanSet = ang
+	body.leanFrame = FrameNumber()
+end
+
+local function updateBody(ent, ply)
+	if IKFoot.GetFloat("enabled") <= 0 then
+		ply.hg_Body = nil
+
+		return
+	end
+	if ply:GetPos():DistToSqr(EyePos()) > IKFoot.GetFloat("draw_distance") ^ 2 then return end
+
+	local body = ply.hg_Body
+	if not body then
+		body = {
+			lean = Vector(), leanVel = Vector(), accel = Vector(), lastVel = Vector(),
+			drop = 0, dropVel = 0, fallSpeed = 0, frame = -1,
+		}
+		ply.hg_Body = body
+	end
+
+	if body.frame ~= FrameNumber() then
+		body.frame = FrameNumber()
+		stepBody(ply, body, math_Clamp(FrameTime(), 1 / 300, 1 / 20))
+	end
+
+	applyLean(ent, ply, body)
+
+	return body
+end
+
 function hg.FootIK(ent, ply)
 	if not ply:IsPlayer() or not IKFoot.GetFloat then return end
 	if ent ~= ply or hardBlocked(ply) then
 		ply.hg_FootIK = nil
+		ply.hg_Body = nil
 
 		return
 	end
+
+	local body = updateBody(ent, ply)
 
 	local eligible = softEligible(ply)
 	local state = ply.hg_FootIK
@@ -607,6 +793,7 @@ function hg.FootIK(ent, ply)
 	local dt = math_min(FrameTime(), 0.1)
 	local blendSpeed = IKFoot.GetFloat("blend_speed")
 	state.weight = math_Clamp(state.weight + (eligible and dt * blendSpeed or -dt * blendSpeed * 2), 0, 1)
+	if eligible and body and body.landTime and CurTime() - body.landTime < 0.1 then state.weight = 1 end
 	if state.weight <= 0 and not eligible then
 		ply.hg_FootIK = nil
 

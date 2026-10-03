@@ -257,6 +257,7 @@ function PLAYER:LegAttack()
                         else
                             local pushKnockback = math.max(150, 230 - horizSpeed / 16) * (isMidAir and 1.7 or 1)
                             ent:SetVelocity(normal * pushKnockback)
+                            hg.StartStagger(ent, normal, math.Clamp(dmg / 35, 0.4, 1))
                         end
                     end
                     if hgIsDoor(ent) and !ent:GetNoDraw() then

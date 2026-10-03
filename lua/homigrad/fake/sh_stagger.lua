@@ -38,6 +38,9 @@ local INERTIA_LOSS_FRAC = 0.35
 local INERTIA_OPPOSE_DOT = -0.25
 local INERTIA_BASE_CHANCE = 0.45
 local INERTIA_COOLDOWN = 1.5
+local PUSH_IMPULSE = 170
+local PUSH_ACCEL = 620
+local SIDE_STEP_FRAC = 0.6
 
 local function flatDirection(dir, ply)
 	local flat = Vector(dir and dir.x or 0, dir and dir.y or 0, 0)
@@ -78,13 +81,34 @@ function hg.StartStagger(ply, dir, power)
 	ply:SetNWFloat("HGStaggerPower", power)
 	ply:SetNWFloat("HGStaggerStart", now)
 	ply:SetNWFloat("HGStaggerEnd", now + DURATION_BASE + DURATION_PER_POWER * power)
-	ply:SetNWBool("HGStaggerLeft", math.random(2) == 1)
+
+	local yaw = Angle(0, ply:GetAngles().y, 0)
+	local side = dir:Dot(yaw:Right())
+	local stepLeft = math.random(2) == 1
+	if math.abs(side) > math.abs(dir:Dot(yaw:Forward())) * SIDE_STEP_FRAC then stepLeft = side < 0 end
+	ply:SetNWBool("HGStaggerLeft", stepLeft)
+
+	ply:SetVelocity(dir * PUSH_IMPULSE * power)
 
 	return true
 end
 
 hook.Add("PlayerDeath", "HG-Stagger", function(ply)
 	ply:SetNWFloat("HGStaggerEnd", 0)
+end)
+
+hook.Add("Think", "HG-StaggerPush", function()
+	local now = CurTime()
+	local dt = FrameTime()
+
+	for _, ply in ipairs(player.GetAll()) do
+		local finish = ply:GetNWFloat("HGStaggerEnd", 0)
+		if finish <= now then continue end
+		if not ply:Alive() or IsValid(ply.FakeRagdoll) or ply:GetMoveType() ~= MOVETYPE_WALK or not ply:OnGround() then continue end
+
+		local env = hg.StaggerEnvelope(now, ply:GetNWFloat("HGStaggerStart", 0), finish)
+		ply:SetVelocity(ply:GetNWVector("HGStaggerDir", vector_origin) * PUSH_ACCEL * ply:GetNWFloat("HGStaggerPower", 0.5) * env * dt)
+	end
 end)
 
 hook.Add("Think", "HG-StaggerInertia", function()

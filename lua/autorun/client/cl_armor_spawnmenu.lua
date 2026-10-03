@@ -1,7 +1,7 @@
 local function hideDuplicateArmorCategory()
 	local entities = list.GetForEdit("SpawnableEntities")
 	for class, data in pairs(entities) do
-		if data.Category == "ZCity Armor" then entities[class] = nil end
+		if data.Category == "ZCity Armor" or data.Category == "ZCity Ammo" then entities[class] = nil end
 	end
 end
 
@@ -31,7 +31,7 @@ spawnmenu.AddCreationTab("armor", function()
 
 		local zcity = {}
 		local zcityNames = {}
-		for _, class in ipairs({"ent_new_armor_helmet1", "ent_new_armor_vest1", "ent_new_armor_vest2"}) do
+		for _, class in ipairs({"ent_new_armor_helmet1", "ent_new_armor_helmet2", "ent_new_armor_vest1", "ent_new_armor_vest2"}) do
 			local stored = scripted_ents.GetStored(class)
 			local data = stored and stored.t
 			if data and data.Spawnable then
