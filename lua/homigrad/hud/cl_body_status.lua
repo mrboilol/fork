@@ -76,7 +76,6 @@ local COLOR = {
 	TOURNIQUET_RING = {70, 130, 235},
 	TOURNIQUET_STRAP = {35, 60, 150},
 	BANDAGE_CLEAN = {225, 215, 190},
-	BANDAGE_SOAKED = {150, 30, 30},
 	OUTLINE = {20, 20, 22},
 }
 local SHAPE = {
@@ -1153,8 +1152,9 @@ local function drawShapeExtras(shape, ax, ay, bx, by, r)
 	local region = shape.region
 	local soak = bandage[region]
 	if soak then
-		local red, green, blue = lerpColor(COLOR.BANDAGE_CLEAN, COLOR.BANDAGE_SOAKED, math_Clamp(soak, 0, 1))
-		drawStrap(ax, ay, bx, by, r, 0.5, red, green, blue)
+		local color = COLOR.BANDAGE_CLEAN
+		local horizontal = region == "chest" or region == "pelvis"
+		drawStrap(ax, ay, bx, by, r, 0.5, color[1], color[2], color[3], horizontal)
 	end
 
 	local limbTop = region == "larmup" or region == "rarmup" or region == "llegup" or region == "rlegup"

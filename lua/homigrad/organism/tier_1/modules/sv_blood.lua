@@ -5,7 +5,7 @@ local internalBleedCatastrophicThreshold = 10
 local internalBleedDefaultComplicationDelay = 120
 --local Organism = hg.organism
 hg.organism.module.blood = {}
-local module = hg.organism.module.blood
+local module = hg.organism.module.blood 
 local hg_infections = ConVarExists("hg_infections") and GetConVar("hg_infections") or CreateConVar("hg_infections",1,FCVAR_ARCHIVE + FCVAR_NOTIFY,"Enable infections system",0,1)
 local hg_blood_ground_limit = ConVarExists("hg_blood_ground_limit") and GetConVar("hg_blood_ground_limit") or CreateConVar("hg_blood_ground_limit", 8000, FCVAR_ARCHIVE + FCVAR_REPLICATED, "Maximum persistent ground blood stains", 1, 20000)
 local tranexamicOnsetDelay = 8
@@ -182,10 +182,7 @@ local hold_wound_pain_threshold = 72
 local hold_wound_painadd_threshold = 8
 local hold_wound_bleed_threshold = 0.35
 local wound_bleed_rate_mul = 2
-local arterial_bleed_ml_s_per_severity = (hg.organism.config and hg.organism.config.ARTERIAL_BLEED_ML_S_PER_SEVERITY) or 6
--- An amputated limb must remain an urgent arterial bleed.  This is lower than
--- the old runaway jet, but high enough to be clearly visible and dangerous
--- until the stump is controlled.
+local arterial_bleed_ml_s_per_severity = (hg.organism.config and hg.organism.config.ARTERIAL_BLEED_ML_S_PER_SEVERITY) or 14
 local amputation_arterial_bleed_mul = (hg.organism.config and hg.organism.config.ARTERIAL_AMPUTATION_BLEED_MULTIPLIER) or 1
 local headgib_arterial_bleed_mul = (hg.organism.config and hg.organism.config.ARTERIAL_HEADGIB_BLEED_MULTIPLIER) or 1.65
 

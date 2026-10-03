@@ -1051,12 +1051,15 @@ local function getWoundSizeK(wound, maxSize)
 	return math.Clamp(math.sqrt(math.max(tonumber(wound[1]) or 0, 0) / maxSize), 0, 1)
 end
 
-local function getHeartbeatSpurt(org, index)
+local arteryStreamFlow = 0.7
+local arteryStreamLift = 0.3
+
+local function getHeartbeatLift(org, index)
 	local bpm = tonumber(org.heartbeat) or tonumber(org.pulse) or 70
-	if bpm <= 1 then return 0.25 end
+	if bpm <= 1 then return -1 end
 	local phase = (CurTime() * bpm / 60 + index * 0.17) % 1
-	if phase >= 0.32 then return 0.28 end
-	return 0.28 + 0.72 * math.sin(phase / 0.32 * math.pi)
+	if phase >= 0.32 then return -1 end
+	return math.sin(phase / 0.32 * math.pi) * 2 - 1
 end
 
 local function emitOrdinaryBleeding(ent, org, wound, pos, ang, visualRate, interval)
@@ -1096,9 +1099,9 @@ local function emitArterialBleeding(ent, org, wound, index, pos, ang, boneAng, w
 	local pulse = math.max(tonumber(org.pulse) or 70, 1) / 70
 	local sizeK = math.Clamp((tonumber(wound[1]) or 6) / 18, 0.25, 1)
 	local _, pressureDrive = getBleedPressureDrive(org)
-	local spurt = getHeartbeatSpurt(org, index)
+	local lift = getHeartbeatLift(org, index)
 	pressureDrive = math.min(pressureDrive, 1.1) * compression
-	local count = math.Clamp(math.ceil((arteryBurstCount + sizeK * 3 * spurt) * compression), 1, 5)
+	local count = math.Clamp(math.ceil((arteryBurstCount + sizeK * 3 * arteryStreamFlow) * compression), 1, 5)
 	local volume = math.min(visualRate * interval / (count + 0.35), 8)
 	local time = CurTime()
 	local localDir = wound[6]
@@ -1113,29 +1116,25 @@ local function emitArterialBleeding(ent, org, wound, index, pos, ang, boneAng, w
 	local sprayAng = sprayDir:Angle()
 	local flowWave = 0.85 + (math.abs(math.sin(phase * 2) + math.cos(phase * (5 + index * 2))
 		+ math.sin(phase * (1 + index))) * 0.6 + math.sin(phase * 2)) * 0.05
-	local sway = (0.5 + sizeK * 0.5) * pressureDrive * spurt * (forceMul or 1)
-	local velocity = sprayDir * math.Clamp((isvector(localDir) and localDir:Length() or 100) * 3.3, 120, 390)
-		* reach * pressureDrive * math.Clamp(pulse, 0.5, 1) * spurt * flowWave * (forceMul or 1)
+	local sway = (0.5 + sizeK * 0.5) * pressureDrive * arteryStreamFlow * (forceMul or 1)
+	local streamSpeed = math.Clamp((isvector(localDir) and localDir:Length() or 100) * 3.3, 120, 390)
+		* reach * pressureDrive * math.Clamp(pulse, 0.5, 1) * arteryStreamFlow * flowWave * (forceMul or 1)
+	local velocity = sprayDir * streamSpeed
+		+ vector_up * streamSpeed * arteryStreamLift * lift
 		+ sprayAng:Right() * (pouring and 30 or 25) * sway * math.sin(phase * 2) * math.cos(phase * 4)
 		+ sprayAng:Up() * (pouring and 25 or 20) * sway * math.sin(phase * 3) * math.cos(phase)
-	if pressureDrive <= 0.05 then velocity = bleedDown * math.Rand(12, 28) + VectorRand(-3, 3) end
+	if pressureDrive <= 0.05 then return false end
 
 	for _ = 1, count do
 		local dropVolume = volume
 		local size = math.Clamp(0.45 + math.sqrt(visualRate) * 0.22, 0.45, 3) * arterySizeMul * 1.2
-		local spread = (pouring and 4 + sizeK * 8 or 1 + sizeK) * pressureDrive * spurt
+		local spread = (pouring and 4 + sizeK * 8 or 1 + sizeK) * pressureDrive * arteryStreamFlow * 0.5
 		local vel = velocity * math.Rand(pouring and 0.85 or 0.95, pouring and 1.05 or 1.02)
 			+ VectorRand(-spread, spread)
-		if pouring and pressureDrive > 0.05 then vel = vel + bleedDown * math.Rand(15, 35) * spurt end
+		if pouring and pressureDrive > 0.05 then vel = vel + bleedDown * math.Rand(15, 35) * arteryStreamFlow end
 		local part = hg.addBloodPart(pos, vel, nil, size, size, true, nil, ent, dropVolume < 0.25)
 		if part then part.volume = dropVolume end
 	end
-	local dripVolume = volume * 0.35
-	local dripSize = math.Clamp(0.25 + math.sqrt(dripVolume) * 0.65, 0.35, 1.5) * 1.2
-	local dripVel = pressureDrive > 0.05 and -sprayDir * math.Rand(20, 50) or bleedDown * math.Rand(12, 28)
-	local drip = hg.addBloodPart(pos, dripVel + VectorRand(-12, 12), nil, dripSize, dripSize, true, nil, ent, dripVolume < 0.25)
-	if drip then drip.volume = dripVolume end
-
 	return false
 end
 

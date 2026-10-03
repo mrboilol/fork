@@ -424,6 +424,8 @@ local function getMoodle3Material(name)
 				"vgui/moodles 3/" .. alternateName .. ".png",
 				"vgui/hud/moodles 3/" .. name .. ".png",
 				"vgui/hud/moodles 3/" .. alternateName .. ".png",
+				"vgui/moodles3/" .. name .. ".png",
+				"vgui/moodles3/" .. alternateName .. ".png",
 			})
 		end
 		moodle3Icons[name] = mat and not mat:IsError() and mat or false
@@ -697,38 +699,33 @@ local function buildEffects(ply, org)
 	end
 
 	local heartRate = orgNumber(org, "heartbeat", orgNumber(org, "pulse", 70))
-	local palpitations = math.Clamp(orgNumber(org, "palpitations", 0), 0, 1)
 	local arrhythmia = math.Clamp(orgNumber(org, "arrhythmia", 0), 0, 1)
 	local unstableRhythm = org.unstableRhythm
 	local ecgState = org.ecgState
 	local irregularSeverity = irregularECGSeverity[ecgState] or 0
-	local irregular = irregularSeverity > 0 or (not ecgState and unstableRhythm ~= nil)
+	local irregular = irregularSeverity > 0 or unstableRhythm ~= nil
 	local fibrillating = org.fibrillation == true or ecgState == "atrial_fibrillation" or ecgState == "ventricular_fibrillation"
 		or (not ecgState and unstableRhythm == "atrial_fibrillation")
 	local rhythmSeverity = math.max(arrhythmia, irregularSeverity, fibrillating and 1 or 0)
 	local heartStrain = math.Clamp(orgNumber(org, "heartStrain", 0), 0, 1)
-	local rhythmAbnormal = irregular or arrhythmia >= 0.35 or fibrillating
-	local strained = heartStrain >= 0.3
-	local palpitating = palpitations >= 0.35
-	if not org.heartstop and (rhythmAbnormal or strained or palpitating) then
-		local level = highRank(math.max(rhythmSeverity, heartStrain, palpitations, 0.1), {0.1, 0.3, 0.6, 0.85})
+	local rhythmAbnormal = irregular or arrhythmia >= 0.1 or fibrillating
+	local strained = heartStrain >= 0.1
+	if not org.heartstop and (rhythmAbnormal or strained) then
+		local level = highRank(math.max(rhythmSeverity, heartStrain, 0.1), {0.1, 0.3, 0.6, 0.85})
 		if rhythmAbnormal then
 			add(effects, "arrhythmia", "arrhythmia", level, "bad", 24.5, math.floor(heartRate) .. " bpm")
-		elseif strained then
+		else
 			add(effects, "arrhythmia", "arrhythmia", level, "bad", 24.5, math.floor(heartStrain * 100) .. "%",
 				"Heart Strain", "Your heart is under heavy strain and may start to lose rhythm.")
-		else
-			add(effects, "arrhythmia", "arrhythmia", level, "bad", 24.5, math.floor(palpitations * 100) .. "%",
-				"Active Palpitations", "Your heart is fluttering and skipping beats.")
 		end
 	end
-	if not org.heartstop and (heartRate >= 150 or (heartRate > 0 and heartRate <= 45)) then
-		local rateSeverity = heartRate >= 150
-			and math.Clamp((heartRate - 150) / 150, 0, 1)
+	if not org.heartstop and (heartRate >= 100 or (heartRate > 0 and heartRate <= 45)) then
+		local rateSeverity = heartRate >= 100
+			and math.Clamp((heartRate - 100) / 150, 0, 1)
 			or math.Clamp((45 - heartRate) / 30, 0, 1)
 		local level = highRank(math.max(rateSeverity, 0.1), {0.1, 0.3, 0.6, 0.85})
-		local rateName = heartRate >= 150 and "Tachycardia" or "Bradycardia"
-		local rateDescription = heartRate >= 150
+		local rateName = heartRate >= 100 and "Tachycardia" or "Bradycardia"
+		local rateDescription = heartRate >= 100
 			and "Your heart is beating too fast."
 			or "Your heart is beating too slowly."
 		add(effects, "palpitations", "palpitations", level, "bad", 24.4, math.floor(heartRate) .. " bpm", rateName .. " Palpitations", rateDescription)
@@ -1115,8 +1112,6 @@ local function drawMoodles()
 
 	local berserkActive = org.berserkActive2 == true
 	local effects, now = buildEffects(ply, org), CurTime()
-	-- Moodle 3 deliberately has no catch-all icon. Do not leave empty slots
-	-- for conditions that do not have a meaningful Moodle 3 representation.
 	local supported = {}
 	for _, effect in ipairs(effects) do
 		if effect.name == "rage" or getMoodle3Icon(effect) then supported[#supported + 1] = effect end
