@@ -178,10 +178,19 @@ local function ScaleSharedBones(rag, phys_bone)
 
 	local count = rag:GetBoneCount()
 	if not count then return end
+	local ownerBone = rag:TranslatePhysBoneToBone(phys_bone)
 
 	for b = 0, count - 1 do
 		if rag:TranslateBoneToPhysBone(b) == phys_bone then
-			rag:ManipulateBoneScale(b, GIB_SCALE)
+			local parent = b
+			for _ = 1, count do
+				if parent == ownerBone then
+					rag:ManipulateBoneScale(b, GIB_SCALE)
+					break
+				end
+				parent = rag:GetBoneParent(parent)
+				if not parent or parent < 0 then break end
+			end
 		end
 	end
 end
@@ -232,10 +241,11 @@ local function SafeRemoveBone(rag, bone, phys_bone, nohuys)
 
 	if not nohuys then
 		rag:ManipulateBoneScale(bone, GIB_SCALE)
-		if phys_bone and phys_bone >= 0 then ScaleSharedBones(rag, phys_bone) end
 	end
 
 	if not phys_bone or phys_bone < 0 then return end
+	if rag:TranslatePhysBoneToBone(phys_bone) ~= bone then return end
+	if not nohuys then ScaleSharedBones(rag, phys_bone) end
 
 	rag.gibRemove = rag.gibRemove or {}
 	if rag.gibRemove[phys_bone] then return end

@@ -604,8 +604,12 @@ function hg.SetMeleeDamageContact(inflictor, ent, trace, forceHead, trauma)
 
 	local traceEnt = IsValid(trace.Entity) and trace.Entity or ent
 	local boneName
-	if trace.HitBoxBone ~= nil and traceEnt.GetBoneName then
-		boneName = traceEnt:GetBoneName(trace.HitBoxBone)
+	local hitBoxBone = trace.HitBoxBone
+	if hitBoxBone == nil and not traceEnt:IsRagdoll() and trace.HitBox ~= nil and traceEnt.GetHitBoxBone then
+		hitBoxBone = traceEnt:GetHitBoxBone(trace.HitBox, traceEnt.GetHitboxSet and traceEnt:GetHitboxSet() or 0)
+	end
+	if hitBoxBone ~= nil and hitBoxBone >= 0 and traceEnt.GetBoneName then
+		boneName = traceEnt:GetBoneName(hitBoxBone)
 	elseif traceEnt:IsRagdoll() and trace.PhysicsBone ~= nil and traceEnt.TranslatePhysBoneToBone and traceEnt.GetBoneName then
 		local bone = traceEnt:TranslatePhysBoneToBone(trace.PhysicsBone)
 		if bone and bone >= 0 then boneName = traceEnt:GetBoneName(bone) end
@@ -655,8 +659,9 @@ for bon,hitgroup in pairs(bonetohitgroup) do
 end
 
 local function getBulletContactBone(ent, trace, dmgPos)
-	local boneIndex = trace.HitBoxBone
-	if ent:IsRagdoll() and trace.PhysicsBone and trace.PhysicsBone >= 0 then boneIndex = nil end
+	local forwardedBone = trace.HGContactBoneName and ent:LookupBone(trace.HGContactBoneName)
+	local boneIndex = forwardedBone or trace.HitBoxBone
+	if not forwardedBone and ent:IsRagdoll() and trace.PhysicsBone and trace.PhysicsBone >= 0 then boneIndex = nil end
 	if boneIndex == nil and not ent:IsRagdoll() and trace.HitBox ~= nil and ent.GetHitBoxBone then
 		boneIndex = ent:GetHitBoxBone(trace.HitBox, ent.GetHitboxSet and ent:GetHitboxSet() or 0)
 	end
@@ -668,7 +673,8 @@ local function getBulletContactBone(ent, trace, dmgPos)
 		boneName = translatedBone and translatedBone >= 0 and ent:GetBoneName(translatedBone) or nil
 	end
 	local hitgroup = trace.HitGroup
-	if boneIndex == nil and not ent:IsRagdoll() and hitgrouptobone[hitgroup] and bonetohitgroup[boneName] ~= hitgroup then
+	if not forwardedBone and trace.HitBoxBone == nil and not ent:IsRagdoll()
+		and hitgrouptobone[hitgroup] and bonetohitgroup[boneName] ~= hitgroup then
 		local nearestDistance = math.huge
 		for _, name in ipairs(hitgrouptobone[hitgroup]) do
 			local candidate = ent:LookupBone(name)
@@ -685,6 +691,35 @@ local function getBulletContactBone(ent, trace, dmgPos)
 		if translated and translated >= 0 then physicsBone = translated end
 	end
 	return physicsBone, boneName
+end
+
+local function forwardOrganismDamage(ent, rag, dmgInfo)
+	local traces = hg.BallisticDamageTrace
+	local original = traces and traces[dmgInfo]
+	if original and original.Entity == ent then
+		local _, boneName = getBulletContactBone(ent, original, original.HitPos)
+		local trace = table.Copy(original)
+		trace.Entity = rag
+		trace.HitBox = nil
+		trace.HitBoxBone = nil
+		trace.HGContactBoneName = boneName
+		local bone = boneName and rag:LookupBone(boneName)
+		trace.PhysicsBone = bone and rag:TranslateBoneToPhysBone(bone) or nil
+		trace.HitGroup = bonetohitgroup[boneName] or HITGROUP_GENERIC
+		local sourceBone = boneName and ent:LookupBone(boneName)
+		local sourceMatrix = sourceBone and ent:GetBoneMatrix(sourceBone)
+		local targetMatrix = bone and rag:GetBoneMatrix(bone)
+		if sourceMatrix and targetMatrix then
+			local direction = isvector(original.Normal) and original.Normal:Angle() or angle_zero
+			local pos, ang = WorldToLocal(original.HitPos, direction, sourceMatrix:GetTranslation(), sourceMatrix:GetAngles())
+			local targetPos, targetAng = LocalToWorld(pos, ang, targetMatrix:GetTranslation(), targetMatrix:GetAngles())
+			trace.HitPos = targetPos
+			if isvector(original.Normal) then trace.Normal = targetAng:Forward() end
+		end
+		traces[dmgInfo] = trace
+	end
+	rag:TakeDamageInfo(dmgInfo)
+	if traces then traces[dmgInfo] = original end
 end
 
 hg.DeathCam = false
@@ -1382,7 +1417,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		local rag = IsValid(ent.rag) and ent.rag or IsValid(ent.ply) and ent.ply
 	
 		if IsValid(rag) then
-			rag:TakeDamageInfo(dmgInfo)
+			forwardOrganismDamage(ent, rag, dmgInfo)
 		end
 		
 		return true
@@ -1423,7 +1458,10 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	end--]]
 	
 	--if ent:IsNPC() and npcDmg[ent:GetClass()] then hg.NPCDamage(ent,dmgInfo,npcDmg[ent:GetClass()]) return end
-	if ent:IsPlayer() and IsValid(ent.FakeRagdoll) then ent.FakeRagdoll:TakeDamageInfo(dmgInfo) return true end
+	if ent:IsPlayer() and IsValid(ent.FakeRagdoll) then
+		forwardOrganismDamage(ent, ent.FakeRagdoll, dmgInfo)
+		return true
+	end
 	
 	if dmgInfo:IsDamageType(DMG_CRUSH) then
 		return true
@@ -1822,13 +1860,14 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		bone, contactBoneName = getBulletContactBone(ent, tr, dmgPos)
 	end
 	if meleeContact and meleeContact.boneName then
+		contactBoneName = meleeContact.boneName
 		local contactBone = ent:LookupBone(meleeContact.boneName)
 		local contactPhysBone = contactBone and ent:TranslateBoneToPhysBone(contactBone) or nil
 		if contactPhysBone and contactPhysBone >= 0 then bone = contactPhysBone end
 	end
 	if bone == nil and meleeContact then bone = meleeContact.physicsBone end
 	if bone == nil and tr.Entity == ent then bone = tr.PhysicsBone end
-	if not bone then
+	if not bone and not dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_SNIPER) then
 		local dir = -(dmgPos - (ent:GetPos() + ent:OBBCenter())):GetNormalized()
 		local tr = util.QuickTrace(dmgPos, dir * 100)
 		bone = tr.PhysicsBone

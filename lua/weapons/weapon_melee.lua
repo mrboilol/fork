@@ -2057,8 +2057,12 @@ function SWEP:IsHeadTrace(ent, trace)
     local headBone = ent.LookupBone and ent:LookupBone("ValveBiped.Bip01_Head1")
     if not headBone then return false end
 
-    if trace.HitBoxBone ~= nil and ent.GetBoneName then
-        return ent:GetBoneName(trace.HitBoxBone) == "ValveBiped.Bip01_Head1"
+    local hitBoxBone = trace.HitBoxBone
+    if hitBoxBone == nil and not ent:IsRagdoll() and trace.HitBox ~= nil and ent.GetHitBoxBone then
+        hitBoxBone = ent:GetHitBoxBone(trace.HitBox, ent.GetHitboxSet and ent:GetHitboxSet() or 0)
+    end
+    if hitBoxBone ~= nil and hitBoxBone >= 0 and ent.GetBoneName then
+        return ent:GetBoneName(hitBoxBone) == "ValveBiped.Bip01_Head1"
     end
 
     if ent:IsRagdoll() and trace.PhysicsBone ~= nil and ent.TranslateBoneToPhysBone and ent.TranslatePhysBoneToBone then
@@ -2075,7 +2079,7 @@ function SWEP:IsHeadTrace(ent, trace)
         return false
     end
 
-    if trace.HitGroup == HITGROUP_HEAD then return true end
+    if trace.HitGroup ~= nil and trace.HitGroup ~= HITGROUP_GENERIC then return trace.HitGroup == HITGROUP_HEAD end
 
     if trace.HitPos then
         local headMatrix = ent.GetBoneMatrix and ent:GetBoneMatrix(headBone)

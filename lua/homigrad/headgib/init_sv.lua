@@ -16,6 +16,7 @@ end
 local function removeBone(rag, bone, phys_bone, nohuys)
 	if not bone or not phys_bone or phys_bone < 0 then return end
 	if !nohuys then rag:ManipulateBoneScale(bone, vecZero) end
+	if rag:TranslatePhysBoneToBone(phys_bone) ~= bone then return end
 	--rag:ManipulateBonePosition(bone,vecInf) -- Thanks Rama (only works on certain graphics cards!)
 
 	if rag.gibRemove[phys_bone] then return end
