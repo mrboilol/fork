@@ -143,6 +143,7 @@ end
 
 function hg.AddForceRag(ent, physbone, force, time)
 	if !IsValid(ent) then return end
+	physbone = physbone or 0
 
 	local ragdoll = nil
 

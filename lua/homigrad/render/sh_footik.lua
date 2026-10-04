@@ -2,6 +2,8 @@ local IsValid, Vector, Angle, Matrix, Lerp, LerpVector, FrameTime, FrameNumber, 
 local WorldToLocal, LocalToWorld = WorldToLocal, LocalToWorld
 local math_Clamp, math_max, math_min, math_abs, math_sqrt, math_sin, math_exp, math_floor = math.Clamp, math.max, math.min, math.abs, math.sqrt, math.sin, math.exp, math.floor
 local math_AngleDifference = math.AngleDifference
+local FrameTime = SERVER and engine.TickInterval or FrameTime
+local FrameNumber = SERVER and engine.TickCount or FrameNumber
 
 IKFoot = IKFoot or {}
 
@@ -39,10 +41,16 @@ local OVERREACH_RESTEP_MOVE_SQR = 9
 local TARGET_SMOOTH = 14
 local MOVING_SPEED = 12
 local REACH_FRACTION = 0.97
+local STANDING_REACH_FRACTION = 0.995
+local UPRIGHT_REACH_FRACTION = 0.99
+local MAX_UPRIGHT_RISE = 6
+local UPRIGHT_SMOOTH = 6
 local OVERREACH_FRACTION = 0.95
 local LEAD_REACH_FRACTION = 0.92
 local STRIDE_REACH_FRACTION = 0.9
 local MAX_STRIDE_DROP = 7
+local STRIDE_BODY_SCALE = 0.25
+local RUN_HOP_SCALE = 0.4
 local STRIDE_REAR_SHIFT = 5
 local LANDING_SPREAD_FRACTION = 0.8
 local SETTLE_SWING_TIME = 0.28
@@ -99,6 +107,33 @@ local DEBUG_SWING = Color(255, 200, 60)
 local groundHullMins, groundHullMaxs = Vector(-2, -2, 0), Vector(2, 2, 1)
 local boneCache = {}
 
+local function resetPelvisOffset(ply)
+	if SERVER and ply.hg_IKPelvisOffset ~= 0 then
+		ply.hg_IKPelvisOffset = 0
+		ply:SetNWFloat("HGIKPelvisOffset", 0)
+	end
+end
+
+local function applyMatrix(ent, bone, matrix)
+	if CLIENT then
+		hg.bone_apply_matrix(ent, bone, matrix)
+		return
+	end
+	local original = ent:GetBoneMatrix(bone)
+	local inverse = original and original:GetInverse()
+	if not inverse then return end
+	local transform = matrix * inverse
+	local function moveChildren(parent)
+		for _, child in ipairs(ent:GetChildBones(parent)) do
+			local childMatrix = ent:GetBoneMatrix(child)
+			if childMatrix then ent.matrices[child] = transform * childMatrix end
+			moveChildren(child)
+		end
+	end
+	moveChildren(bone)
+	ent.matrices[bone] = matrix
+end
+
 local function getBones(ply)
 	local model = ply:GetModel()
 	local cached = boneCache[model]
@@ -135,7 +170,7 @@ local function setBone(ent, bone, pos, ang, scale)
 	mat:SetTranslation(pos)
 	mat:SetAngles(ang)
 	mat:Scale(scale)
-	hg.bone_apply_matrix(ent, bone, mat)
+	applyMatrix(ent, bone, mat)
 end
 
 local function kickAnimActive(ply)
@@ -160,7 +195,7 @@ local function softEligible(ply)
 	if not ply:OnGround() or ply:WaterLevel() >= 2 then return false end
 	local maxDist = IKFoot.GetFloat("draw_distance")
 
-	return ply:GetPos():DistToSqr(EyePos()) <= maxDist * maxDist
+	return SERVER or ply:GetPos():DistToSqr(EyePos()) <= maxDist * maxDist
 end
 
 local function legUsable(ply, legIndex)
@@ -360,7 +395,7 @@ end
 
 local function updatePhase(ply, state, ctx, dt)
 	local rate
-	if ply == LocalPlayer() and ply.hg_GaitPhase then
+	if (SERVER or ply == LocalPlayer()) and ply.hg_GaitPhase then
 		rate = (ply.hg_GaitRate or 0) * hg.GaitLimpRateMul(ply, state.phase)
 		state.phase = (state.phase + rate * dt) % 2
 		local diff = (ply.hg_GaitPhase - state.phase + 1) % 2 - 1
@@ -494,7 +529,7 @@ local function updateDrop(state, ctx, dt)
 	end
 
 	local maxDrop = IKFoot.GetFloat("max_body_drop") * (ctx.crouching and CROUCH_DROP_SCALE or 1)
-	stride = math_min(stride, ctx.maxStrideDrop)
+	stride = math_min(stride, ctx.maxStrideDrop) * STRIDE_BODY_SCALE
 	local targetDrop = math_max(terrainDrop * DROP_TERRAIN_SCALE, stride) + (ctx.stagger and ctx.stagger.amount * STAGGER_DROP or 0)
 	targetDrop = math_Clamp(targetDrop, 0, maxDrop)
 	state.drop = state.drop + (targetDrop - state.drop) * (1 - math_exp(-dt * DROP_SMOOTH))
@@ -508,7 +543,29 @@ local function gaitBob(state, ctx)
 	local flight = hg.GaitFlightFraction(ctx.swingFraction)
 	if stepProgress >= flight then return -dip end
 
-	return math_sin(math.pi * stepProgress / flight) * IKFoot.GetFloat("flight_hop") * ctx.speedFraction - dip
+	local runFraction = smoothstep(math_Clamp((ctx.speedFraction - 0.5) * 2, 0, 1))
+	return math_sin(math.pi * stepProgress / flight) * IKFoot.GetFloat("flight_hop") * runFraction * RUN_HOP_SCALE - dip
+end
+
+local function updateUpright(state, ctx, dt)
+	local targetRise
+	if ctx.onGround and not ctx.crouching then
+		for index, anim in ipairs(ctx.anim) do
+			local foot = state.feet[index]
+			if anim.usable and foot.ground and not foot.swinging then
+				local dx, dy = anim.hip.x - foot.ground.x, anim.hip.y - foot.ground.y
+				local reach = anim.length * UPRIGHT_REACH_FRACTION
+				local height = math_sqrt(math_max(reach * reach - dx * dx - dy * dy, 0))
+				local rise = foot.ground.z + state.ankleHeight + height - anim.hip.z
+				rise = math_Clamp(rise, 0, MAX_UPRIGHT_RISE) * (1 - ctx.limp[index])
+				targetRise = targetRise and math_min(targetRise, rise) or rise
+			end
+		end
+		targetRise = targetRise or state.rise or 0
+		targetRise = targetRise * (1 - (ctx.stagger and ctx.stagger.amount or 0))
+	end
+	local rise = state.rise or 0
+	state.rise = rise + ((targetRise or 0) - rise) * (1 - math_exp(-dt * UPRIGHT_SMOOTH))
 end
 
 local function readAnim(ent, ply, bones)
@@ -553,7 +610,7 @@ local function buildContext(ply, state, anim, dt)
 	vel.z = 0
 	local speed = vel:Length()
 	local speedFraction = math_Clamp(speed / math_max(ply:GetRunSpeed(), 1), 0, 1)
-	local bodyYaw = ply:GetRenderAngles().y
+	local bodyYaw = (SERVER and ply:GetAngles() or ply:GetRenderAngles()).y
 	local bodyAng = Angle(0, bodyYaw, 0)
 	local yawRate = state.yawRate or 0
 	if state.lastYaw then
@@ -629,7 +686,8 @@ local function solveLeg(ent, ids, foot, ankleTarget, weight, ctx, state, alignWe
 
 	local target = LerpVector(weight, ankle0, ankleTarget)
 	local toTarget = target - hip
-	local maxReach = (upperLength + lowerLength) * REACH_FRACTION
+	local reachFraction = ctx.crouching and REACH_FRACTION or STANDING_REACH_FRACTION
+	local maxReach = (upperLength + lowerLength) * reachFraction
 	if toTarget:LengthSqr() > maxReach * maxReach then
 		local flatLength = toTarget:Length2D()
 		local maxFlat = math_sqrt(math_max(maxReach * maxReach - toTarget.z * toTarget.z, 0))
@@ -642,7 +700,7 @@ local function solveLeg(ent, ids, foot, ankleTarget, weight, ctx, state, alignWe
 	local dist = toTarget:Length()
 	if dist < 0.01 then return end
 	local dir = toTarget / dist
-	dist = math_Clamp(dist, math_abs(upperLength - lowerLength) + 0.5, (upperLength + lowerLength) * REACH_FRACTION)
+	dist = math_Clamp(dist, math_abs(upperLength - lowerLength) + 0.5, maxReach)
 	local ankle = hip + dir * dist
 
 	local animAxis = (ankle0 - hip):GetNormalized()
@@ -682,9 +740,18 @@ local function solveLeg(ent, ids, foot, ankleTarget, weight, ctx, state, alignWe
 	return knee
 end
 
-local function applyPose(ent, ply, state, bones, ctx)
+local function applyPelvis(ent, ply, state, bones)
 	local weight = state.weight
-	local pelvisOffset = (state.hop - state.drop - (ply.hg_Body and ply.hg_Body.drop or 0)) * weight
+	local pelvisOffset = ((state.rise or 0) + state.hop - state.drop - (ply.hg_Body and ply.hg_Body.drop or 0)) * weight
+	if SERVER then
+		local networkOffset = math.Round(pelvisOffset, 2)
+		if ply.hg_IKPelvisOffset ~= networkOffset then
+			ply.hg_IKPelvisOffset = networkOffset
+			ply:SetNWFloat("HGIKPelvisOffset", networkOffset)
+		end
+	else
+		pelvisOffset = ply:GetNWFloat("HGIKPelvisOffset", pelvisOffset)
+	end
 	local pelvisMat = ent:GetBoneMatrix(bones.pelvis)
 	if pelvisMat and math_abs(pelvisOffset) > 0.01 then
 		local current = pelvisMat:GetTranslation()
@@ -692,12 +759,17 @@ local function applyPose(ent, ply, state, bones, ctx)
 		if not alreadyOffset then
 			local moved = Matrix(pelvisMat)
 			moved:SetTranslation(current + vector_up * pelvisOffset)
-			hg.bone_apply_matrix(ent, bones.pelvis, moved)
+			applyMatrix(ent, bones.pelvis, moved)
 			state.pelvisSet = moved:GetTranslation()
 			state.pelvisFrame = FrameNumber()
 		end
 	end
 
+end
+
+local function applyPose(ent, ply, state, bones, ctx)
+	applyPelvis(ent, ply, state, bones)
+	local weight = state.weight
 	local alignWeight = IKFoot.GetFloat("align_feet") > 0 and 1 or 0
 	state.appliedKnee = nil
 	for index, ids in ipairs(bones.legs) do
@@ -788,6 +860,7 @@ local function applyLean(ent, ply, body)
 
 	local mat = ent:GetBoneMatrix(body.spine)
 	if not mat then return end
+	mat = Matrix(mat)
 
 	local current = mat:GetAngles()
 	if body.leanFrame == FrameNumber() and body.leanSet and current:Forward():DistToSqr(body.leanSet:Forward()) < 0.00001 and current:Up():DistToSqr(body.leanSet:Up()) < 0.00001 then return end
@@ -795,7 +868,7 @@ local function applyLean(ent, ply, body)
 	local ang = Angle(current)
 	ang:RotateAroundAxis(vector_up:Cross(lean / leanLength), leanLength)
 	mat:SetAngles(ang)
-	hg.bone_apply_matrix(ent, body.spine, mat)
+	applyMatrix(ent, body.spine, mat)
 	body.leanSet = ang
 	body.leanFrame = FrameNumber()
 end
@@ -806,7 +879,7 @@ local function updateBody(ent, ply)
 
 		return
 	end
-	if ply:GetPos():DistToSqr(EyePos()) > IKFoot.GetFloat("draw_distance") ^ 2 then return end
+	if CLIENT and ply:GetPos():DistToSqr(EyePos()) > IKFoot.GetFloat("draw_distance") ^ 2 then return end
 
 	local body = ply.hg_Body
 	if not body then
@@ -829,9 +902,10 @@ end
 
 function hg.FootIK(ent, ply)
 	if not ply:IsPlayer() or not IKFoot.GetFloat then return end
-	if ent ~= ply or hardBlocked(ply) then
+	if CLIENT and ent ~= ply or hardBlocked(ply) then
 		ply.hg_FootIK = nil
 		ply.hg_Body = nil
+		resetPelvisOffset(ply)
 
 		return
 	end
@@ -840,9 +914,17 @@ function hg.FootIK(ent, ply)
 
 	local eligible = softEligible(ply)
 	local state = ply.hg_FootIK
-	if not state and not eligible then return end
 	local bones = getBones(ply)
-	if not bones then return end
+	if not bones then resetPelvisOffset(ply) return end
+	if not state and not eligible then
+		if CLIENT then
+			ply.hg_IKHeight = ply.hg_IKHeight or {weight = 0, hop = 0, drop = 0}
+			applyPelvis(ent, ply, ply.hg_IKHeight, bones)
+		else
+			resetPelvisOffset(ply)
+		end
+		return
+	end
 
 	state = state or newState(ply)
 	ply.hg_FootIK = state
@@ -861,6 +943,8 @@ function hg.FootIK(ent, ply)
 	if eligible and body and body.landTime and CurTime() - body.landTime < 0.1 then state.weight = 1 end
 	if state.weight <= 0 and not eligible then
 		ply.hg_FootIK = nil
+		resetPelvisOffset(ply)
+		if CLIENT then applyPelvis(ent, ply, state, bones) end
 
 		return
 	end
@@ -872,12 +956,70 @@ function hg.FootIK(ent, ply)
 
 	updateFeet(ply, state, ctx, dt)
 	updateDrop(state, ctx, dt)
+	updateUpright(state, ctx, dt)
 	state.hop = gaitBob(state, ctx)
 	applyPose(ent, ply, state, bones, ctx)
 
-	if IKFoot.GetFloat("debug") > 0 then drawDebug(state) end
+	if CLIENT and IKFoot.GetFloat("debug") > 0 then drawDebug(state) end
 end
 
 function IKFoot.HardReset(ply)
-	if IsValid(ply) then ply.hg_FootIK = nil end
+	if not IsValid(ply) then return end
+	ply.hg_FootIK = nil
+	ply.hg_IKPose = nil
+	if SERVER then ply.hg_Body = nil end
+	resetPelvisOffset(ply)
+end
+
+function hg.CaptureIKPose(ent)
+	if not CLIENT or not ent:IsPlayer() then return end
+	local matrices = {}
+	for bone = 0, ent:GetBoneCount() - 1 do
+		local matrix = ent:GetBoneMatrix(bone)
+		if matrix then matrices[bone] = Matrix(matrix) end
+	end
+	ent.hg_IKPose = {frame = FrameNumber(), origin = ent:GetPos(), model = ent:GetModel(), matrices = matrices}
+end
+
+local function updateServerPose(ply)
+	local origin = ply:GetPos()
+	local pose = ply.hg_IKPose
+	if pose and pose.frame == FrameNumber() and pose.model == ply:GetModel() and pose.origin:DistToSqr(origin) < 0.0001 then return pose end
+	if ply.SetupBones then ply:SetupBones() end
+	pose = {frame = FrameNumber(), origin = origin, model = ply:GetModel(), matrices = {}}
+	function pose:GetBoneMatrix(bone)
+		local matrix = self.matrices[bone]
+		if not matrix then
+			local original = ply:GetBoneMatrix(bone)
+			if original then
+				matrix = Matrix(original)
+				self.matrices[bone] = matrix
+			end
+		end
+		return matrix
+	end
+	function pose:GetChildBones(bone)
+		return ply:GetChildBones(bone)
+	end
+	ply.hg_IKPose = pose
+	hg.FootIK(pose, ply)
+	return pose
+end
+
+function hg.GetIKBoneMatrix(ent, bone)
+	if not ent:IsPlayer() then return ent:GetBoneMatrix(bone) end
+	local pose = SERVER and updateServerPose(ent) or ent.hg_IKPose
+	if pose and pose.frame == FrameNumber() and pose.model == ent:GetModel() and pose.origin:DistToSqr(ent:GetPos()) < 0.0001 then
+		return pose.matrices[bone] or ent:GetBoneMatrix(bone)
+	end
+	return ent:GetBoneMatrix(bone)
+end
+
+if SERVER then
+	hook.Add("Tick", "HGFootIKPose", function()
+		if not IKFoot.GetFloat or not hg.GaitStepRate then return end
+		for _, ply in player.Iterator() do
+			if ply:Alive() then updateServerPose(ply) else IKFoot.HardReset(ply) end
+		end
+	end)
 end

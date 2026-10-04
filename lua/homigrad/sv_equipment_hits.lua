@@ -521,7 +521,7 @@ function hg.GetHeldWeaponImpactModel(ply, wep)
     SetupEntityBones(body)
     local grip = hg.GetWeaponImpactGrip(ply, wep)
     local bone = body:LookupBone(grip.firingArm == "larm" and "ValveBiped.Bip01_L_Hand" or "ValveBiped.Bip01_R_Hand")
-    local matrix = bone and body:GetBoneMatrix(bone)
+    local matrix = bone and (hg.GetIKBoneMatrix and hg.GetIKBoneMatrix(body, bone) or body:GetBoneMatrix(bone))
     if not matrix then return end
     local pos, ang = LocalToWorld(wep.weaponPos or wep.WorldPos or vector_origin, wep.weaponAng or wep.WorldAng or angle_zero, matrix:GetTranslation(), matrix:GetAngles())
     local modelName = wep.WorldModelExchange or wep.WorldModel or wep:GetModel()
@@ -888,7 +888,7 @@ function hg.TraceOrganismArms(body, startPos, endPos, padding, wep, pose)
             local manipulatedScale = body:GetManipulateBoneScale(bone)
             if isvector(manipulatedScale) and manipulatedScale:LengthSqr() < 0.1 then return end
         end
-        local matrix = body.GetBoneMatrix and body:GetBoneMatrix(bone)
+        local matrix = body.GetBoneMatrix and (hg.GetIKBoneMatrix and hg.GetIKBoneMatrix(body, bone) or body:GetBoneMatrix(bone))
         if IsValid(wep) and IsValid(pose) and body:IsPlayer() then
             local support = wep.GetHandSupportState and wep:GetHandSupportState()
             local hand = body:GetBoneName(bone)

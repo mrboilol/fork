@@ -196,7 +196,7 @@ local function getArmorDropTransform(ent, equipment, pos)
 	if not armorData then return pos or ent:GetPos(), ent:GetAngles() end
 
 	local bone = ent:LookupBone(armorData.bone or "")
-	local matrix = bone and ent:GetBoneMatrix(bone)
+	local matrix = bone and (hg.GetIKBoneMatrix and hg.GetIKBoneMatrix(ent, bone) or ent:GetBoneMatrix(bone))
 	if not matrix then return pos or ent:GetPos(), ent:GetAngles() end
 
 	local bonePos = matrix:GetTranslation()

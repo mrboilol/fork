@@ -184,6 +184,7 @@ local IsValid, math_Clamp = IsValid, math.Clamp
 		end
 
 		if hg.DrawPickupHandoff then hg.DrawPickupHandoff(ent, ply) end
+		if hg.CaptureIKPose then hg.CaptureIKPose(ent) end
 
 		local armors = ply:GetNetVar("Armor") or ent.PredictedArmor
 		local hideArmorRender = ply:GetNetVar("HideArmorRender", false) or ent.PredictedHideArmorRender

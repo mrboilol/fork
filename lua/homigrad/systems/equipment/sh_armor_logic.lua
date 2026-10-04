@@ -127,7 +127,7 @@ function hg.IsArmorPlateHit(ent, armor, hitPos)
 	local body = hg.GetCurrentCharacter and hg.GetCurrentCharacter(ent) or ent
 	if not IsValid(body) then return false end
 	local bone = body:LookupBone("ValveBiped.Bip01_Spine2")
-	local matrix = bone and body:GetBoneMatrix(bone)
+	local matrix = bone and (hg.GetIKBoneMatrix and hg.GetIKBoneMatrix(body, bone) or body:GetBoneMatrix(bone))
 	if not matrix then return false end
 	local localPos = WorldToLocal(hitPos, angle_zero, matrix:GetTranslation(), matrix:GetAngles())
 	if localPos.x < -4 or localPos.x > 10 then return false end

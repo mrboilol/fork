@@ -26,11 +26,11 @@ function IKFoot.Config.ClampNumber(entry, value)
 	return math.Clamp(tonumber(value) or 0, entry.min, entry.max)
 end
 
-if SERVER then return end
+
 
 IKFoot.CVars = IKFoot.CVars or {}
 
-for _, entry in ipairs(IKFoot.Config.entries) do
+for _, entry in ipairs(CLIENT and IKFoot.Config.entries or {}) do
 	local default = entry.default
 	if entry.type == "bool" then default = default and 1 or 0 end
 	IKFoot.CVars[entry.key] = CreateClientConVar(entry.cvar, tostring(default), true, false, entry.desc, entry.min, entry.max)
