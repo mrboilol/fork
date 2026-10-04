@@ -89,7 +89,6 @@ if CLIENT then
 					local rating = hg.ArmorPlateLevels[level]
 					local profile = hg.ArmorProtectionLevels[protectionLevel] or {}
 					return string.format("Per plate: %.1f kg, %.1f maximum health; +%.2f bullet, +%.1f blunt, +%.1f slash/stab resistance. Covered carrier bullet resistance x%.2f. Spall chance %.0f%%. Front/back/side health is independent.", plate.mass, plate.durability * rating / hg.ArmorPlateLevels[3], rating * plate.protection * 0.4 * (profile.ballistic or 1), rating * (plate.melee or 1) * 0.2 * (profile.melee or 1), rating * (plate.stab or 1) * 0.35 * (profile.stab or 1), plate.ballisticBaseMul or 1, (plate.spall or 0) * 100)
-						plate.mass, rating * plate.protection * 0.4, rating * (plate.melee or 1) * 0.2, rating * (plate.stab or 1) * 0.35, level)
 				end)
 			choice("Protection level", {"1", "2", "3", "4", "5", "6"}, level, function(value) level = tonumber(value) end,
 				"Changes plate ballistic, blunt, and stab protection on covered hits; plate weight stays material-based.", function(value)
@@ -98,7 +97,6 @@ if CLIENT then
 					local plate = hg.ArmorPlateMaterials[material]
 					local profile = hg.ArmorProtectionLevels[protectionLevel] or {}
 					return string.format("Per plate: %.1f kg, %.1f maximum health; +%.2f bullet, +%.1f blunt, +%.1f slash/stab resistance. Covered carrier bullet resistance x%.2f. Spall chance %.0f%%. Front/back/side health is independent.", plate.mass, plate.durability * rating / hg.ArmorPlateLevels[3], rating * plate.protection * 0.4 * (profile.ballistic or 1), rating * (plate.melee or 1) * 0.2 * (profile.melee or 1), rating * (plate.stab or 1) * 0.35 * (profile.stab or 1), plate.ballisticBaseMul or 1, (plate.spall or 0) * 100)
-						value, material, rating * plate.protection * 0.4, rating * (plate.melee or 1) * 0.2, rating * (plate.stab or 1) * 0.35, plate.mass)
 				end)
 			choice("Plate coverage", {"none", "front", "back", "both", "all"}, sides, function(value) sides = value end,
 				"Chooses which torso directions receive plate bonuses. Each covered direction adds one plate's weight.", function(value)

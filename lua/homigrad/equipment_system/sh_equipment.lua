@@ -436,6 +436,7 @@ local function loadArmor()
         AddCSLuaFile(path .. v)
         include(path .. v)
     end
+    hook.Run("hg/armor/registered")
 end
 
 hook.Add("HG_BaseHitBoxSetLoaded","LoadArmor",function() 
