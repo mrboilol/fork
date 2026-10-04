@@ -25,7 +25,7 @@ DEFINE_BASECLASS("ent_zcity_armor_base")
 local ENT = {}
 ENT.Type = "anim"
 ENT.Base = "ent_zcity_armor_base"
-ENT.PrintName = "bike helmet but better hitbox"
+ENT.PrintName = "Motorcycle Helmet"
 ENT.Category = "ZCity TestArmor"
 ENT.Spawnable = true
 ENT.Model = "models/dean/gtaiv/helmet.mdl"
@@ -151,9 +151,12 @@ ENT.DrawOverlay = hg.DrawFirstPersonEquipment
                 -- ZC_ARMOR_MATERIAL_KEVLAR_CERAMIC = 0.75
                 -- ZC_ARMOR_MATERIAL_KEVLAR_ARSTEEL = 0.6
                 -- ZC_ARMOR_MATERIAL_KEVLAR_TITAN = 0.45
-        ENT[FP].Durability = 50                            -- durability
-        ENT[FP].DurabilityMax = 50                         -- max durability, for the future repair armor (yeah i'm doing immersive shit)
-        ENT[FP].DurabilityWarranty = 10                     -- guarantee that the protection level will not decrease (no debuff) upon the degradation
+        ENT[FP].Durability = 25                            -- durability
+        ENT[FP].DurabilityMax = 25                         -- max durability, for the future repair armor (yeah i'm doing immersive shit)
+        ENT[FP].DurabilityWarranty = 5                     -- guarantee that the protection level will not decrease (no debuff) upon the degradation
+
+        ENT[FP].BluntDamageMul = 0.06
+        ENT[FP].BluntWearMul = 0.5
 
         ENT[FP].NeedPunch = true                           -- viewpunch after impact
     --//       
@@ -165,9 +168,12 @@ ENT.DrawOverlay = hg.DrawFirstPersonEquipment
         ENT[BP].PenetratedDamageMul = 1                   -- penetrated damage mul
 
         ENT[BP].BalisticMaterial = ZC_ARMOR_MATERIAL_FIBERGLASS -- actually this is just a mul of degradation armor
-        ENT[BP].Durability = 50                            -- durability
-        ENT[BP].DurabilityMax = 50                         -- max durability, for the future repair armor (yeah i'm doing immersive shit)
-        ENT[BP].DurabilityWarranty = 10                    -- guarantee that the protection level will not decrease (no debuff) upon the degradation
+        ENT[BP].Durability = 25                            -- durability
+        ENT[BP].DurabilityMax = 25                         -- max durability, for the future repair armor (yeah i'm doing immersive shit)
+        ENT[BP].DurabilityWarranty = 5                    -- guarantee that the protection level will not decrease (no debuff) upon the degradation
+
+        ENT[BP].BluntDamageMul = 0.06
+        ENT[BP].BluntWearMul = 0.5
 
         ENT[BP].NeedPunch = true                           -- viewpunch after impact
     --//  
@@ -179,9 +185,12 @@ ENT.DrawOverlay = hg.DrawFirstPersonEquipment
         ENT[GP].PenetratedDamageMul = 1                   -- penetrated damage mul
 
         ENT[GP].BalisticMaterial = ZC_ARMOR_MATERIAL_POLYCARBONATE -- actually this is just a mul of degradation armor
-        ENT[GP].Durability = 50                            -- durability
-        ENT[GP].DurabilityMax = 50                         -- max durability, for the future repair armor (yeah i'm doing immersive shit)
-        ENT[GP].DurabilityWarranty = 10                    -- guarantee that the protection level will not decrease (no debuff) upon the degradation
+        ENT[GP].Durability = 15                            -- durability
+        ENT[GP].DurabilityMax = 15                         -- max durability, for the future repair armor (yeah i'm doing immersive shit)
+        ENT[GP].DurabilityWarranty = 3                    -- guarantee that the protection level will not decrease (no debuff) upon the degradation
+
+        ENT[GP].BluntDamageMul = 0.65
+        ENT[GP].BluntWearMul = 1
 
         ENT[GP].NeedPunch = true                           -- viewpunch after impact
     --// 

@@ -1,7 +1,7 @@
 local function hideDuplicateArmorCategory()
 	local entities = list.GetForEdit("SpawnableEntities")
 	for class, data in pairs(entities) do
-		if data.Category == "ZCity Armor" or data.Category == "ZCity Ammo" then entities[class] = nil end
+		if data.Category == "ZCity Armor" or data.Category == "ZCity Ammo" or data.Category == "ZCity TestArmor" then entities[class] = nil end
 	end
 end
 
@@ -33,10 +33,13 @@ spawnmenu.AddCreationTab("armor", function()
 		local zcityNames = {}
 		local newArmor = {
 			{"ent_new_armor_helmet1", "ACH Helmet IIIA", "vgui/icons/helmet"},
-			{"ent_new_armor_helmet2", "bike helmet but better hitbox", "vgui/icons/mothelmet"},
+			{"ent_new_armor_helmet2", "Motorcycle Helmet", "vgui/icons/mothelmet"},
 			{"ent_new_armor_vest1", "Plate Body Armor IV", "scrappers/armor1.png"},
 			{"ent_new_armor_vest2", "Police anti-riot vest", "vgui/icons/policevest"},
+			{"ent_new_armor_vest3", "Kevlar IIIA Vest", "vgui/icons/armor01"},
+			{"ent_new_armor_vest4", "Kevlar-Plate III Vest", "vgui/icons/armor02"},
 		}
+		local replacements = {head = {helmet1 = true, helmet2 = true}, torso = {vest1 = true, vest2 = true, vest3 = true, vest4 = true}}
 		for _, info in ipairs(newArmor) do
 			local class = info[1]
 			local stored = scripted_ents.GetStored(class)
@@ -45,9 +48,9 @@ spawnmenu.AddCreationTab("armor", function()
 			zcity[#zcity + 1] = {spawnname = class, nicename = label, material = data.IconOverride or info[3], admin = data.AdminOnly}
 			zcityNames[string.lower(label)] = true
 		end
-		for _, armors in pairs(hg.zcityArmor or {}) do
+		for placement, armors in pairs(hg.zcityArmor or {}) do
 			for name, data in pairs(armors) do
-				if not data.inbuilt and data.Spawnable == nil then
+				if not data.inbuilt and data.Spawnable == nil and not (replacements[placement] and replacements[placement][name]) then
 					local label = (hg.zcityArmorNames or {})[name] or name
 					zcity[#zcity + 1] = {spawnname = "ent_armor_" .. name, nicename = label, material = (hg.zcityArmorIcons or {})[name] or "entities/ent_armor_" .. name .. ".png", admin = data.AdminOnly}
 					zcityNames[string.lower(label)] = true

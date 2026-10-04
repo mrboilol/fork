@@ -1101,6 +1101,10 @@ function hg.TryKnockOffArmor(owner, placement, armor, armorData, dmgInfo, hitPos
 end
 
 function hg.GetArmorImpactMitigation(org, placement, dmgInfo, rawDmg)
+	if hg.GetZCityArmorImpactMitigation then
+		local scale, sharp, applied = hg.GetZCityArmorImpactMitigation(org, placement, dmgInfo, rawDmg)
+		if applied then return scale, sharp, applied end
+	end
 	local owner = org and org.owner
 	if not IsValid(owner) or not owner.armors then return 1, false, false end
 

@@ -156,6 +156,13 @@ ENT.PhysicsSounds = true
 local vec30 = Vector(0,0,30)
 function ENT:Initialize()
     BaseClass.Initialize( self )
+    local parts = {}
+    for _, name in pairs(self.PlatesLinks or {}) do
+        if not parts[name] then
+            self[name] = table.Copy(self[name])
+            parts[name] = true
+        end
+    end
     self:SetPos(self:GetPos() + vec30)
     self:SetMaterial(self.ModelMaterial)
 end

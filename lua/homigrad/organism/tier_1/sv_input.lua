@@ -2858,6 +2858,9 @@ local function velocityDamage(ent, data)
 	local armorImpactApplied = false
 	local unarmoredImpactDamage = dmg
 	local impactHelmet = org.owner.armors and (org.owner.armors.head == "helmet2" or org.owner.armors.head == "helmet3")
+	local equippedHelmet = org.owner.GetEquipmentBySlot and org.owner:GetEquipmentBySlot(ZC_ARMOR_SLOT_HEAD)
+	local motorcycleHelmet = IsValid(equippedHelmet) and equippedHelmet:GetClass() == "ent_new_armor_helmet2"
+	impactHelmet = impactHelmet or motorcycleHelmet
 	if hitgroup == HITGROUP_CHEST or hitgroup == HITGROUP_STOMACH then
 		armorPlacement = "torso"
 	elseif hitgroup == HITGROUP_HEAD then
@@ -2931,7 +2934,7 @@ local function velocityDamage(ent, data)
 		org.owner:AddNaturalAdrenaline( math.min( dmg * 0.5, 4) )
 
 		if hitgroup == HITGROUP_HEAD then
-			local hadhelmet = armorImpactApplied or org.owner.armors and org.owner.armors["head"] != nil
+			local hadhelmet = armorImpactApplied and not motorcycleHelmet or org.owner.armors and org.owner.armors["head"] ~= nil
 			impactHelmet = impactHelmet and armorImpactApplied
 			local headDamageMul = hadhelmet and 0.2 or 1
 			local oldSkull = org.skull

@@ -28,6 +28,7 @@ ENT.Base = "ent_zcity_armor_base"
 ENT.PrintName = "Kevlar-Plate III Vest"
 ENT.Category = "ZCity TestArmor"
 ENT.Spawnable = true
+ENT.CarryMass = 8
 ENT.Model = "models/jworld_equipment/kevlar.mdl"
 ENT.ModelMaterial = "models/lightvest/accs_diff_000_a_uni"
 ENT.IconOverride = "vgui/icons/armor02"

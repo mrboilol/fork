@@ -213,6 +213,48 @@ end
     --]]
 --//
 local developer = GetConVar("developer")
+function hg.AbsorbZCityBluntImpact(armor, plate, dmgInfo, rawDamage)
+	if armor.HGBluntDamageInfo == dmgInfo then return armor.HGBluntDamageScale end
+	local durability = math.max(plate.Durability or 0, 0)
+	local condition = math.Clamp(durability / math.max(plate.DurabilityMax or 1, 1), 0, 1)
+	local absorption = (1 - math.Clamp(plate.BluntDamageMul, 0, 1)) * math.sqrt(condition)
+	local wear = math.max(plate.BluntWearMul or 1, 0.01)
+	local damage = math.max(rawDamage or dmgInfo:GetDamage(), 0)
+	local absorbed = math.min(damage * absorption, durability / wear)
+	local scale = damage > 0 and (damage - absorbed) / damage or 1
+	plate.Durability = math.max(durability - absorbed * wear, 0)
+	armor.HGBluntDamageInfo = dmgInfo
+	armor.HGBluntDamageScale = scale
+	dmgInfo:ScaleDamage(scale)
+	dmgInfo:SetDamageForce(dmgInfo:GetDamageForce() * scale)
+
+	return scale
+end
+
+function hg.GetZCityArmorImpactMitigation(org, placement, dmgInfo, rawDamage)
+	local owner = org and org.owner
+	if placement ~= "head" or not IsValid(owner) or not owner.GetEquipmentBySlot then return end
+	if not dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH) then return end
+	local armor = owner:GetEquipmentBySlot(ZC_ARMOR_SLOT_HEAD)
+	if not IsValid(armor) or armor:GetClass() ~= "ent_new_armor_helmet2" then return end
+	local character = hg.GetCurrentCharacter(owner)
+	if not IsValid(character) then return end
+	local organs = hg.organism.GetHitBoxOrgans(character:GetModel(), character)
+	local boxes = hg.organism.ShootMatrix(character, organs)
+	for _, box in ipairs(boxes or {}) do
+		local organ = organs[box[6]] and organs[box[6]][box[7]]
+		if organ and organ[1] == armor.HitBoxSet then
+			local point = WorldToLocal(dmgInfo:GetDamagePosition(), angle_zero, box[1], box[2])
+			local plateName = armor.PlatesLinks[organ[9]]
+			local plate = plateName and armor[plateName]
+			if plate and plate.BluntDamageMul and point:WithinAABox(box[3], box[4]) then
+				local scale = hg.AbsorbZCityBluntImpact(armor, plate, dmgInfo, rawDamage)
+				return scale, false, scale < 1
+			end
+		end
+	end
+end
+
 local function protec(org, bone, dmg, dmgInfo, placement, boneindex, dir, hit, ricochet, impact, hitbox)
     local armor = org.owner:GetEquipmentBySlot(placement)
 	if !IsValid(armor) then return end
@@ -223,6 +265,11 @@ local function protec(org, bone, dmg, dmgInfo, placement, boneindex, dir, hit, r
     local plate = plateName and armor[plateName] or armor
     local plateKey = plateName or armor
 	local isBullet = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
+	if not isBullet and plate.BluntDamageMul and dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH) then
+		local scale = hg.AbsorbZCityBluntImpact(armor, plate, dmgInfo)
+		if scale < 1 then return 1 end
+		return
+	end
 	if impact and impact.pierceSoftArmor and not (plateName and placement >= ZC_ARMOR_SLOT_TORSO) then
 		return {penetrationCost = 0, energyCost = 0}
 	end
