@@ -459,6 +459,10 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 				trace = util.TraceLine(hull_trace)
 			else
 				trace = util.TraceHull(hull_trace)
+				if IsValid(trace.Entity) and (trace.Entity:IsPlayer() or trace.Entity:IsNPC()) then
+					local hitboxTrace = util.TraceLine(hull_trace)
+					if hitboxTrace.Hit and hitboxTrace.Entity == trace.Entity then trace = hitboxTrace end
+				end
 			end
 
 			if(SERVER and hg.TraceHeldWeaponShot and not self.PenetratingMaterial)then

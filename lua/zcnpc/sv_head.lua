@@ -460,7 +460,7 @@ end
 if not ZCNPC.__origGibInput and isfunction(Gib_Input) then
 	ZCNPC.__origGibInput = Gib_Input
 
-	function Gib_Input(rag, bone, force)
+	function Gib_Input(rag, bone, force, damage)
 		if not IsValid(rag) then return end
 
 		local neck = rag.zcnpc_npcbody and cfg.headfix:GetBool() and NeckBone(rag)
@@ -472,9 +472,7 @@ if not ZCNPC.__origGibInput and isfunction(Gib_Input) then
 				return
 			end
 
-			-- Bone walk is patched, but armour drops and attachment math can
-			-- still blow up on odd skeletons. Finish the stump ourselves if so.
-			local ok, err = pcall(ZCNPC.__origGibInput, rag, bone, force)
+			local ok, err = pcall(ZCNPC.__origGibInput, rag, bone, force, damage)
 			if ok then return end
 
 			ErrorNoHalt("[ZCNPC] gore cap: " .. tostring(err) .. "\n")
@@ -1614,34 +1612,16 @@ end)
 --//
 
 --\\ Stock head explosion
--- Z-City fires this as soon as a hitgroup's kinetic stack passes 100, and on a
--- player it is simply lethal: ply:Kill(), head off, done (sv_input.lua:398). On an
--- NPC the same call does two unrelated things - it sets the shock that puts the
--- body down, and then tries to behead a ragdoll it looks up through the
--- "RagdollDeath" net var, which only players ever get (fake/sv_tier_0.lua:449) -
--- so the beheading half quietly does nothing while the shock half is all that
--- lands.
---
--- The wrapper used to return early when the hit was too small for our own gib
--- threshold, and that took the shock with it. A Deagle round to the head fell
--- straight through the gap: strong enough for Z-City to call this at all, too
--- weak for us to behead, and so the NPC walked away from a head shot that would
--- have killed a player outright. A Makarov never reached this code and killed
--- through plain brain damage instead, which is exactly the asymmetry that showed
--- up in game.
---
--- Now the call is always lethal, the same way it is for a player, and
--- zcnpc_headgib_damage only decides whether the head physically comes off.
 if not ZCNPC.__origExplodeHead then
 	ZCNPC.__origExplodeHead = hg.ExplodeHead
 
-	function hg.ExplodeHead(ent)
-		if not (ZCNPC.Enabled() and IsValid(ent)) then return ZCNPC.__origExplodeHead(ent) end
+	function hg.ExplodeHead(ent, damage, slash, force)
+		if not (ZCNPC.Enabled() and IsValid(ent)) then return ZCNPC.__origExplodeHead(ent, damage, slash, force) end
 
 		local org = ZCNPC.ResolveOrganism(ent)
 		local ours = (ent:IsNPC() and org ~= nil) or ent.zcnpc_npcbody == true
 
-		if not ours then return ZCNPC.__origExplodeHead(ent) end
+		if not ours then return ZCNPC.__origExplodeHead(ent, damage, slash, force) end
 
 		-- Once per body. Z-City compares the kinetic stack against its threshold on
 		-- every hit, and once the stack is over it every further hit inside the same

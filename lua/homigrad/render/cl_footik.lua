@@ -42,7 +42,8 @@ local REACH_FRACTION = 0.97
 local OVERREACH_FRACTION = 0.95
 local LEAD_REACH_FRACTION = 0.92
 local STRIDE_REACH_FRACTION = 0.9
-local MAX_STRIDE_DROP = 9
+local MAX_STRIDE_DROP = 7
+local STRIDE_REAR_SHIFT = 5
 local LANDING_SPREAD_FRACTION = 0.8
 local SETTLE_SWING_TIME = 0.28
 local SETTLE_COOLDOWN = 0.12
@@ -299,7 +300,7 @@ local function landingTarget(ply, state, ctx, foot, index)
 
 	local bodyAtLanding = ctx.origin + ctx.vel * remaining
 	local lead = hg.GaitLandingLead(ctx.speed, ctx.swingFraction) * IKFoot.GetFloat("stride_scale") * (1 - ctx.limp[index] * LIMP_STRIDE_CUT)
-	lead = math_min(lead, reachLead(state, ctx, index))
+	lead = math_max(math_min(lead, reachLead(state, ctx, index)) - STRIDE_REAR_SHIFT, 0)
 	local offset = ctx.right * (sign * ctx.halfWidth) + ctx.moveDir * lead
 	local intendedLateral = sign * offset:Dot(ctx.right)
 	local maxSpread = ctx.legLength * LANDING_SPREAD_FRACTION

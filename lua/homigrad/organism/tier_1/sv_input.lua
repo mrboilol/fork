@@ -24,6 +24,9 @@ local full_body_physics_speed_threshold = 3400
 local full_body_physics_damage_threshold = 4200
 local blast_gib_damage_mul = 700
 local melee_gib_damage_mul = 0.35
+local slash_limb_gib_damage_mul = 4.5
+local ballistic_head_gib_damage_mul = 1.25
+local ballistic_limb_gib_damage_mul = 1.75
 local ragdoll_fall_skull_damage_mul = 1.65
 local ragdoll_fall_jaw_damage_mul = 0.45
 local ragdoll_fall_skull_break_blood_mul = 1.15
@@ -2069,7 +2072,11 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	if IsValid(inf) and inf.NoGoreDamage then damageStack = 0 end
 	if noDismemberment then damageStack = 0 end
 	--print(damageStack, 3)
-	if dmgInfo:IsDamageType(DMG_SLASH + DMG_CLUB + DMG_GENERIC) then damageStack = damageStack * melee_gib_damage_mul end
+	if dmgInfo:IsDamageType(DMG_SLASH) and hitgrouptolimb[hitgroup] then
+		damageStack = damageStack * slash_limb_gib_damage_mul
+	elseif dmgInfo:IsDamageType(DMG_SLASH + DMG_CLUB + DMG_GENERIC) then
+		damageStack = damageStack * melee_gib_damage_mul
+	end
 	if hitgroup == HITGROUP_HEAD and IsValid(inf) and inf.HeadGibDamageMul then damageStack = damageStack * inf.HeadGibDamageMul end
 	if hitgroup == HITGROUP_HEAD and isRifleBullet then damageStack = damageStack * 1.5 end
 	if hitgroup == HITGROUP_HEAD and dmgInfo:IsDamageType(DMG_SLASH) then damageStack = damageStack * 25 end
@@ -2077,7 +2084,14 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	local grenadeBlastMul = string.find(inflictorClass, "ent_hg_grenade") and 1.8 or 1
 	damageStack = damageStack * (dmgInfo:IsDamageType(DMG_BLAST) and blast_gib_damage_mul / lend * grenadeBlastMul or 1) * (!dmgInfo:IsDamageType(DMG_CLUB+DMG_SLASH+DMG_BULLET+DMG_BUCKSHOT+DMG_BLAST+DMG_SNIPER+DMG_GENERIC+DMG_CRUSH+DMG_FALL+DMG_VEHICLE) and 0 or 1) * (ent:IsNPC() and 3 or 1)
 	if impact.armorStopped then damageStack = 0 end
-	if isBallistic then damageStack = damageStack * impact.destructiveMultiplier end
+	if isBallistic then
+		damageStack = damageStack * impact.destructiveMultiplier
+		if hitgroup == HITGROUP_HEAD then
+			damageStack = damageStack * ballistic_head_gib_damage_mul
+		elseif hitgrouptolimb[hitgroup] then
+			damageStack = damageStack * ballistic_limb_gib_damage_mul
+		end
+	end
 	--damageStack = damageStack * (bullet and bullet.AmmoType and hg.ammotypeshuy[bullet.AmmoType] and hg.ammotypeshuy[bullet.AmmoType].BulletSettings and hg.ammotypeshuy[bullet.AmmoType].BulletSettings.Mass or 1) / 8
 	local catastrophicImpact = dmgInfo:IsDamageType(DMG_CLUB+DMG_CRUSH+DMG_FALL+DMG_VEHICLE+DMG_GENERIC) and damageStack > 0 and dmg_before * armorMit >= full_body_blast_damage_threshold
 	if not noDismemberment and hg.FullBodyExplode and not org.fullbodyexploded and ((dmgInfo:IsDamageType(DMG_BLAST) and (damageStack >= full_body_blast_gib_threshold or dmg_before >= full_body_blast_damage_threshold)) or catastrophicImpact) then
