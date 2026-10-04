@@ -111,7 +111,23 @@ local function collectClothes(ply)
     return classes
 end
 
+local function collectEquipment(ply)
+	local equipment = {}
+	local wearer = hg.GetCurrentCharacter(ply)
+	if not IsValid(wearer) then wearer = ply end
+	for _, index in ipairs(wearer:GetNetVar("zc_equipment", {})) do
+		local ent = Entity(index)
+		if not IsValid(ent) or not ent.GetEquiped or not ent:GetEquiped() or ent.WearOwner ~= wearer then continue end
+		local class = ent:GetClass()
+		if not string.StartWith(class, "ent_new_armor_") and class ~= "ent_new_nvg_base" then continue end
+		equipment[#equipment + 1] = {class = class, armor = hg.GetZCityArmorConfiguration(ent), mass = ent.CarryMass or 1, enabled = ent.GetEnabled and ent:GetEnabled() or false}
+	end
+	return equipment
+end
+
 local function collectSnapshot(ply)
+	local wearer = hg.GetCurrentCharacter(ply)
+	if not IsValid(wearer) then wearer = ply end
     local activeWep = ""
     if IsValid(ply:GetActiveWeapon()) then
         activeWep = ply:GetActiveWeapon():GetClass()
@@ -145,8 +161,9 @@ local function collectSnapshot(ply)
         },
         weapons = collectWeapons(ply),
         activeWeapon = activeWep,
-        armor = table.Copy(ply:GetNetVar("Armor", {})),
-        armorStates = table.Copy(ply.armor_states or {}),
+        armor = table.Copy(wearer.armors or ply:GetNetVar("Armor", {})),
+        armorStates = table.Copy(wearer.armor_states or ply.armor_states or {}),
+		equipment = collectEquipment(ply),
         clothes = collectClothes(ply),
         ammo = ammoPreset,
         inventoryAttachments = attachmentsPreset
@@ -169,7 +186,18 @@ local function removeCurrentClothes(ply)
 end
 
 local function removeArmor(ply)
+	local wearer = hg.GetCurrentCharacter(ply)
+	if not IsValid(wearer) then wearer = ply end
+	for _, index in ipairs(table.Copy(wearer:GetNetVar("zc_equipment", {}))) do
+		local ent = Entity(index)
+		if IsValid(ent) and ent.WearOwner == wearer then
+			ent:Unwear(wearer)
+			ent:Remove()
+		end
+	end
     ply.armors = {}
+	ply.armor_states = {}
+	for _, key in ipairs({"armors_health", "armors_durability", "armors_regions", "armors_shots", "armors_broken", "armors_broken_mul", "armors_wear_stage"}) do ply[key] = {} end
     if ply.SyncArmor then
         ply:SyncArmor()
     else
@@ -215,7 +243,10 @@ local function applyArmorPreset(ply, armorPreset, armorStates)
                 local saved = armorStates[armor]
                 local state = ply.armor_states[armor] or {}
                 state.quality = math.Clamp(tonumber(saved.quality) or 1, 0.8, 1.2)
-                state.healthMultiplier = math.Clamp(math.floor(tonumber(saved.healthMultiplier) or 1), 1, 5)
+                    state.healthMultiplier = math.Clamp(math.floor(tonumber(saved.healthMultiplier) or 1), 1, 5)
+					state.protectionMultiplier = math.Clamp(tonumber(saved.protectionMultiplier) or 1, 0.5, 2)
+					local protectionLevel = tonumber(saved.protectionLevel) or saved.protectionLevel
+					if hg.ArmorPlateLevels[protectionLevel] or hg.ArmorProtectionLevels[protectionLevel] then state.protectionLevel = protectionLevel end
                 if isbool(saved.fixedLevel) then state.fixedLevel = saved.fixedLevel end
                 if isbool(saved.lowered) then state.lowered = saved.lowered end
                 local placement = hg.GetArmorPlacement(armor)
@@ -224,7 +255,15 @@ local function applyArmorPreset(ply, armorPreset, armorStates)
                 elseif placement == "torso" then
                     state.plateMaterial = hg.ArmorPlateMaterials[saved.plateMaterial] and saved.plateMaterial or "ceramic"
                     state.plateLevel = hg.ArmorPlateLevels[tonumber(saved.plateLevel)] and tonumber(saved.plateLevel) or 3
-                    state.plateSides = ({none = true, front = true, back = true, both = true, all = true})[saved.plateSides] and saved.plateSides or "none"
+                        state.plateSides = ({none = true, front = true, back = true, both = true, all = true})[saved.plateSides] and saved.plateSides or "none"
+						ply.armor_states[armor] = state
+						local maximum = hg.GetArmorPlateMaxHealth(ply, armor)
+						state.plateHealth = math.Clamp(tonumber(saved.plateHealth) or maximum, 0, maximum)
+						state.plateHealthBySide = {}
+						for _, side in ipairs({"front", "back", "left", "right"}) do
+							local health = istable(saved.plateHealthBySide) and saved.plateHealthBySide[side]
+							state.plateHealthBySide[side] = math.Clamp(tonumber(health) or state.plateHealth, 0, maximum)
+						end
                 end
                 ply.armor_states[armor] = state
                 local maximum = hg.GetArmorMaxCondition(ply, placement, armor)
@@ -235,6 +274,30 @@ local function applyArmorPreset(ply, armorPreset, armorStates)
         end
     end
     ply:SyncArmor()
+end
+
+local function applyEquipmentPreset(ply, equipment)
+	if not istable(equipment) then return end
+	local wearer = hg.GetCurrentCharacter(ply)
+	if not IsValid(wearer) then wearer = ply end
+	for index, saved in ipairs(equipment) do
+		if index > 16 then break end
+		if not istable(saved) or not isstring(saved.class) then continue end
+		local stored = scripted_ents.GetStored(saved.class)
+		local data = stored and stored.t
+		if not data or data.Base ~= "ent_zcity_armor_base" then continue end
+		if not string.StartWith(saved.class, "ent_new_armor_") and saved.class ~= "ent_new_nvg_base" then continue end
+		if data.AdminOnly and not ply:IsAdmin() then continue end
+		local ent = ents.Create(saved.class)
+		if not IsValid(ent) then continue end
+		ent:SetPos(ply:GetPos())
+		ent:Spawn()
+		if istable(saved.armor) and not hg.ApplyZCityArmorConfiguration(ent, saved.armor) then ent:Remove() continue end
+		if not hg.SetZCityArmorMass(ent, tonumber(saved.mass) or ent.CarryMass or 1) then ent:Remove() continue end
+		if not ent:CanWear(wearer) then ent:Remove() continue end
+		ent:Wear(wearer)
+		if ent.SetEnabled then ent:SetEnabled(saved.enabled == true) end
+	end
 end
 
 local function applyWeaponsPreset(ply, preset)
@@ -324,6 +387,7 @@ local function applyPreset(ply, preset)
     
     applyWeaponsPreset(ply, preset.weapons)
     applyArmorPreset(ply, preset.armor, preset.armorStates)
+	applyEquipmentPreset(ply, preset.equipment)
     applyClothesPreset(ply, preset.clothes)
     applyAmmoPreset(ply, preset.ammo)
     applyInventoryAttachmentsPreset(ply, preset.inventoryAttachments)

@@ -1,4 +1,4 @@
-function hg.GetCurrentArmor(ply)
+﻿function hg.GetCurrentArmor(ply)
 	return ply:GetNetVar("Armor",{})
 end
 
@@ -48,9 +48,9 @@ if CLIENT then
 		protectionChoices:SetValue((ent.placement == "torso" and "Vest protection profile: " or "Protection profile: ") .. (protectionLevel == "stab" and "Stab focused" or protectionLevel))
 		for level = 1, 6 do protectionChoices:AddChoice(tostring(level)) end
 		protectionChoices:AddChoice("Stab focused", "stab")
-		protectionChoices:SetTooltip("Changes base ballistic, blunt, and stab protection. Plate bonuses are added separately at covered hits.")
+		protectionChoices:SetTooltip("Numeric levels scale base protection. Stab focused scales carrier and plate ballistic resistance x0.08, blunt x0.8 and slash/stab x8.")
 		describeOptions(protectionChoices, function(value)
-			if value == "Stab focused" then return "Base protection: ballistic x0.12, blunt x0.8, stab x2. Plate bonuses stay unchanged." end
+			if value == "Stab focused" then return "Carrier and plates: ballistic x0.08, blunt x0.8, slash/stab x8. Very weak against bullets." end
 			local rating = hg.ArmorPlateLevels[tonumber(value)]
 			if not rating then return end
 			local scale = rating / hg.ArmorPlateLevels[3]
@@ -87,7 +87,8 @@ if CLIENT then
 					local plate = hg.ArmorPlateMaterials[value]
 					if not plate then return end
 					local rating = hg.ArmorPlateLevels[level]
-					return string.format("Each plate: +%.1f weight | +%.1f ballistic, +%.1f blunt, +%.1f stab protection at level %d.",
+					local profile = hg.ArmorProtectionLevels[protectionLevel] or {}
+					return string.format("Per plate: %.1f kg, %.1f maximum health; +%.2f bullet, +%.1f blunt, +%.1f slash/stab resistance. Covered carrier bullet resistance x%.2f. Spall chance %.0f%%. Front/back/side health is independent.", plate.mass, plate.durability * rating / hg.ArmorPlateLevels[3], rating * plate.protection * 0.4 * (profile.ballistic or 1), rating * (plate.melee or 1) * 0.2 * (profile.melee or 1), rating * (plate.stab or 1) * 0.35 * (profile.stab or 1), plate.ballisticBaseMul or 1, (plate.spall or 0) * 100)
 						plate.mass, rating * plate.protection * 0.4, rating * (plate.melee or 1) * 0.2, rating * (plate.stab or 1) * 0.35, level)
 				end)
 			choice("Protection level", {"1", "2", "3", "4", "5", "6"}, level, function(value) level = tonumber(value) end,
@@ -95,7 +96,8 @@ if CLIENT then
 					local rating = hg.ArmorPlateLevels[tonumber(value)]
 					if not rating then return end
 					local plate = hg.ArmorPlateMaterials[material]
-					return string.format("Level %s with %s: +%.1f ballistic, +%.1f blunt, +%.1f stab protection per covered hit. Weight: %.1f per plate.",
+					local profile = hg.ArmorProtectionLevels[protectionLevel] or {}
+					return string.format("Per plate: %.1f kg, %.1f maximum health; +%.2f bullet, +%.1f blunt, +%.1f slash/stab resistance. Covered carrier bullet resistance x%.2f. Spall chance %.0f%%. Front/back/side health is independent.", plate.mass, plate.durability * rating / hg.ArmorPlateLevels[3], rating * plate.protection * 0.4 * (profile.ballistic or 1), rating * (plate.melee or 1) * 0.2 * (profile.melee or 1), rating * (plate.stab or 1) * 0.35 * (profile.stab or 1), plate.ballisticBaseMul or 1, (plate.spall or 0) * 100)
 						value, material, rating * plate.protection * 0.4, rating * (plate.melee or 1) * 0.2, rating * (plate.stab or 1) * 0.35, plate.mass)
 				end)
 			choice("Plate coverage", {"none", "front", "back", "both", "all"}, sides, function(value) sides = value end,
@@ -1047,7 +1049,14 @@ if CLIENT then
 							if state.plateSides and state.plateSides ~= "none" then
 								local level = hg.ArmorPlateLevels[state.plateLevel] or 10
 								local material = hg.ArmorPlateMaterials[state.plateMaterial] or hg.ArmorPlateMaterials.ceramic
-								info = info .. string.format("\nCovered area: ballistic %.1f | Blunt %.1f | Stab %.1f", bullet + level * material.protection * 0.4, melee + level * 0.2, stab + level * 0.35)
+								local profile = hg.ArmorProtectionLevels[state.protectionLevel] or {}
+								local condition = hg.GetArmorPlateCondition(lply, equipment)
+								info = info .. string.format("\nAverage covered area: bullet %.2f | Blunt %.1f | Slash/stab %.1f", bullet * (material.ballisticBaseMul or 1) + level * material.protection * 0.4 * condition * (profile.ballistic or 1), melee + level * (material.melee or 1) * 0.2 * condition * (profile.melee or 1), stab + level * (material.stab or 1) * 0.35 * condition * (profile.stab or 1))
+								local maximum = hg.GetArmorPlateMaxHealth(lply, equipment)
+								for _, side in ipairs(hg.GetArmorPlateSides(lply, equipment)) do
+									local health = (state.plateHealthBySide or {})[side] or state.plateHealth or maximum
+									info = info .. string.format("\n%s plate health: %.1f / %.1f", side, health, maximum)
+								end
 							end
 						end
 						but:SetTooltip(info)

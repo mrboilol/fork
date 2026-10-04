@@ -30,7 +30,7 @@ spawnmenu.AddCreationTab("armor", function()
 		end
 
 		local zcity = {}
-		local zcityNames = {}
+		local legacy = {}
 		local newArmor = {
 			{"ent_new_armor_helmet1", "ACH Helmet IIIA", "vgui/icons/helmet"},
 			{"ent_new_armor_helmet2", "Motorcycle Helmet", "vgui/icons/mothelmet"},
@@ -39,37 +39,27 @@ spawnmenu.AddCreationTab("armor", function()
 			{"ent_new_armor_vest3", "Kevlar IIIA Vest", "vgui/icons/armor01"},
 			{"ent_new_armor_vest4", "Kevlar-Plate III Vest", "vgui/icons/armor02"},
 		}
-		local replacements = {head = {helmet1 = true, helmet2 = true}, torso = {vest1 = true, vest2 = true, vest3 = true, vest4 = true}}
 		for _, info in ipairs(newArmor) do
 			local class = info[1]
 			local stored = scripted_ents.GetStored(class)
-			local data = stored and stored.t or {}
+			local data = stored and stored.t
+			if not data or not data.Spawnable then continue end
 			local label = data.PrintName or info[2]
-			zcity[#zcity + 1] = {spawnname = class, nicename = label, material = data.IconOverride or info[3], admin = data.AdminOnly}
-			zcityNames[string.lower(label)] = true
+			local target = data.PlatesLinks and next(data.PlatesLinks) and zcity or legacy
+			target[#target + 1] = {spawnname = class, nicename = label, material = data.IconOverride or info[3], admin = data.AdminOnly}
 		end
-		for placement, armors in pairs(hg.zcityArmor or {}) do
+		for _, armors in pairs(hg.armor or hg.zcityArmor or {}) do
 			for name, data in pairs(armors) do
-				if not data.inbuilt and data.Spawnable == nil and not (replacements[placement] and replacements[placement][name]) then
-					local label = (hg.zcityArmorNames or {})[name] or name
-					zcity[#zcity + 1] = {spawnname = "ent_armor_" .. name, nicename = label, material = (hg.zcityArmorIcons or {})[name] or "entities/ent_armor_" .. name .. ".png", admin = data.AdminOnly}
-					zcityNames[string.lower(label)] = true
+				if not data.inbuilt and data.Spawnable == nil then
+					local label = (hg.armorNames or hg.zcityArmorNames or {})[name] or name
+					legacy[#legacy + 1] = {spawnname = "ent_armor_" .. name, nicename = label, material = (hg.armorIcons or hg.zcityArmorIcons or {})[name] or "entities/ent_armor_" .. name .. ".png", admin = data.AdminOnly}
 				end
 			end
 		end
 		table.sort(zcity, function(a, b) return a.nicename < b.nicename end)
 		addPage("working 100%", zcity)
 
-		local judge = {}
-		for placement, armors in pairs(hg.judgeArmor or {}) do
-			for name, data in pairs(armors) do
-				local label = (hg.judgeArmorNames or {})[name] or name
-				if not data.inbuilt and data.Spawnable == nil and not ((hg.zcityArmor or {})[placement] or {})[name] and not zcityNames[string.lower(label)] then
-					judge[#judge + 1] = {spawnname = "ent_armor_" .. name, nicename = label, material = (hg.judgeArmorIcons or {})[name] or "entities/ent_armor_" .. name .. ".png", admin = data.AdminOnly}
-				end
-			end
-		end
-		table.sort(judge, function(a, b) return a.nicename < b.nicename end)
-		addPage("other armor", judge)
+		table.sort(legacy, function(a, b) return a.nicename < b.nicename end)
+		addPage("other armor", legacy)
 		return tabs
 end, "icon16/shield.png", 30)

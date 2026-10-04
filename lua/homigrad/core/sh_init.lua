@@ -78,7 +78,8 @@ function hg.GetCarryWeight(ply)
 			local equipment = Entity(index)
 			if not countedEquipment[index] and IsValid(equipment) and equipment:GetParent() == ply
 				and equipment.GetEquiped and equipment:GetEquiped() then
-				weight = weight + (equipment.CarryMass or 1)
+				local mass = SERVER and equipment.CarryMass or equipment:GetNetVar("ZCityArmorMass", equipment.CarryMass or 1)
+				weight = weight + (mass or 1)
 				countedEquipment[index] = true
 			end
 		end

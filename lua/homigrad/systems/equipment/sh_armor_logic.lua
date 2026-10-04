@@ -22,11 +22,11 @@ hg.ArmorPlateMaterials = {
 	kevlar_ceramic = {mass = 2, protection = 0.9, durability = 38, spall = 0.06},
 	kevlar_arsteel = {mass = 2.6, protection = 0.85, durability = 110, spall = 0.25},
 	kevlar_titan = {mass = 2.4, protection = 0.85, durability = 100, spall = 0.2},
-	riot = {mass = 3.2, protection = 0.12, melee = 5, stab = 0.45, durability = 90, spall = 0},
+	riot = {mass = 3.2, protection = 0.04, ballisticBaseMul = 0.12, melee = 12, stab = 0.3, durability = 60, spall = 0},
 }
 
 hg.ArmorPlateLevels = {[1] = 6, [2] = 8, [3] = 10, [4] = 12, [5] = 15, [6] = 17}
-hg.ArmorProtectionLevels = {stab = {ballistic = 0.12, melee = 0.8, stab = 2}}
+hg.ArmorProtectionLevels = {stab = {ballistic = 0.08, melee = 0.8, stab = 8}}
 
 local softArmorLevels = {IIA = 1, II = 2, IIIA = 3, III = 4, IV = 5}
 local plateArmorLevels = {IIA = 1, II = 2, IIIA = 3, III = 3, IV = 4, V = 5, VI = 6, VII = 6}
@@ -101,8 +101,10 @@ function hg.GetArmorProtection(ent, placement, armor, hitPos)
 	if placement ~= "torso" or not hg.IsArmorPlateHit(ent, armor, hitPos) then return ballistic, melee, stab end
 	local level = hg.ArmorPlateLevels[hg.GetArmorItemState(ent, armor, "plateLevel", 3)] or 10
 	local material = hg.GetArmorPlateMaterial(ent, armor)
-	local condition = hg.GetArmorPlateCondition(ent, armor)
-	return ballistic + level * material.protection * 0.4 * condition, melee + level * (material.melee or 1) * 0.2 * condition, stab + level * (material.stab or 1) * 0.35 * condition
+	local condition = hg.GetArmorPlateCondition(ent, armor, hitPos)
+	return ballistic * (material.ballisticBaseMul or 1) + level * material.protection * 0.4 * condition * (levelProfile and levelProfile.ballistic or 1),
+		melee + level * (material.melee or 1) * 0.2 * condition * (levelProfile and levelProfile.melee or 1),
+		stab + level * (material.stab or 1) * 0.35 * condition * (levelProfile and levelProfile.stab or 1)
 end
 
 function hg.GetArmorPlateMaterial(ent, armor)
@@ -114,26 +116,52 @@ function hg.GetArmorPlateMaxHealth(ent, armor)
 	return (hg.GetArmorPlateMaterial(ent, armor).durability or 60) * level / hg.ArmorPlateLevels[3]
 end
 
-function hg.GetArmorPlateCondition(ent, armor)
+function hg.GetArmorPlateSides(ent, armor)
+	local sides = hg.GetArmorItemState(ent, armor, "plateSides", "none")
+	if sides == "all" then return {"front", "back", "left", "right"} end
+	if sides == "both" then return {"front", "back"} end
+	if sides == "front" or sides == "back" then return {sides} end
+	return {}
+end
+
+function hg.GetArmorPlateCondition(ent, armor, hitPos)
 	local maximum = hg.GetArmorPlateMaxHealth(ent, armor)
 	local health = tonumber(hg.GetArmorItemState(ent, armor, "plateHealth", maximum)) or maximum
+	local states = hg.GetArmorItemState(ent, armor, "plateHealthBySide", nil)
+	if istable(states) then
+		local side = hg.GetArmorPlateSide(ent, armor, hitPos)
+		if side then
+			health = tonumber(states[side]) or health
+		else
+			local total, count = 0, 0
+			for _, covered in ipairs(hg.GetArmorPlateSides(ent, armor)) do
+				total = total + (tonumber(states[covered]) or health)
+				count = count + 1
+			end
+			if count > 0 then health = total / count end
+		end
+	end
 	return math.Clamp(health / maximum, 0, 1)
 end
 
-function hg.IsArmorPlateHit(ent, armor, hitPos)
-	if not isvector(hitPos) then return false end
+function hg.GetArmorPlateSide(ent, armor, hitPos)
+	if not isvector(hitPos) then return end
 	local sides = hg.GetArmorItemState(ent, armor, "plateSides", "none")
-	if sides == "none" then return false end
+	if sides == "none" then return end
 	local body = hg.GetCurrentCharacter and hg.GetCurrentCharacter(ent) or ent
-	if not IsValid(body) then return false end
+	if not IsValid(body) then return end
 	local bone = body:LookupBone("ValveBiped.Bip01_Spine2")
 	local matrix = bone and (hg.GetIKBoneMatrix and hg.GetIKBoneMatrix(body, bone) or body:GetBoneMatrix(bone))
-	if not matrix then return false end
+	if not matrix then return end
 	local localPos = WorldToLocal(hitPos, angle_zero, matrix:GetTranslation(), matrix:GetAngles())
-	if localPos.x < -4 or localPos.x > 10 then return false end
-	if math.abs(localPos.z) > 4.5 then return sides == "all" end
-	if localPos.y >= 2 then return sides == "front" or sides == "both" or sides == "all" end
-	return sides == "back" or sides == "both" or sides == "all"
+	if localPos.x < -4 or localPos.x > 10 then return end
+	if math.abs(localPos.z) > 4.5 then return sides == "all" and (localPos.z > 0 and "left" or "right") or nil end
+	if localPos.y >= 2 then return (sides == "front" or sides == "both" or sides == "all") and "front" or nil end
+	return (sides == "back" or sides == "both" or sides == "all") and "back" or nil
+end
+
+function hg.IsArmorPlateHit(ent, armor, hitPos)
+	return hg.GetArmorPlateSide(ent, armor, hitPos) ~= nil
 end
 
 function hg.BulletPiercesSoftArmor(dmgInfo, bullet)
@@ -144,7 +172,7 @@ function hg.BulletPiercesSoftArmor(dmgInfo, bullet)
 end
 
 function hg.IsArmorPlateStopping(ent, placement, armor, hitPos)
-	return placement == "torso" and hg.IsArmorPlateHit(ent, armor, hitPos) and hg.GetArmorPlateCondition(ent, armor) > 0
+	return placement == "torso" and hg.IsArmorPlateHit(ent, armor, hitPos) and hg.GetArmorPlateCondition(ent, armor, hitPos) > 0
 end
 
 function hg.IsVisorLowered(ent, armor, armorData)

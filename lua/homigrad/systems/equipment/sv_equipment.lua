@@ -860,6 +860,7 @@ net.Receive("hg_configure_armor", function(_, ply)
 		ent.armorState.plateLevel = level
 		ent.armorState.plateSides = sides
 		ent.armorState.plateHealth = nil
+		ent.armorState.plateHealthBySide = nil
 	end
 	ent:SetNetVar("ArmorItemState", ent.armorState)
 	local maximum = hg.GetArmorMaxCondition(ent, ent.placement, ent.name)
@@ -1178,7 +1179,7 @@ function DamageArmorPlate(org, placement, armor, dmgInfo, hitPos, rawDmg, bonein
 	local owner = org.owner
 	local isStab = dmgInfo:IsDamageType(DMG_SLASH)
 	if placement ~= "torso" or not IsValid(owner) or IsArmorBreakProtected(owner, armor) then return 1 end
-	if not hg.IsArmorPlateHit(owner, armor, hitPos) or hg.GetArmorPlateCondition(owner, armor) <= 0 then
+	if not hg.IsArmorPlateHit(owner, armor, hitPos) or hg.GetArmorPlateCondition(owner, armor, hitPos) <= 0 then
 		return isStab and 1.6 or 1
 	end
 	local isBullet = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
@@ -1189,9 +1190,21 @@ function DamageArmorPlate(org, placement, armor, dmgInfo, hitPos, rawDmg, bonein
 	owner.armor_states[armor] = owner.armor_states[armor] or {}
 	local state = owner.armor_states[armor]
 	local health = tonumber(state.plateHealth) or maximum
+	local side = hg.GetArmorPlateSide(owner, armor, hitPos)
+	if side then
+		state.plateHealthBySide = state.plateHealthBySide or {}
+		for _, covered in ipairs(hg.GetArmorPlateSides(owner, armor)) do
+			if state.plateHealthBySide[covered] == nil then state.plateHealthBySide[covered] = health end
+		end
+		health = state.plateHealthBySide[side]
+	end
 	local wear = isBullet and (ballisticWear or 1) or isStab and 0.15 or isClub and 0.4 or 0.6
 	health = math.max(health - rawDmg * wear, 0)
 	state.plateHealth = health
+	if side then
+		state.plateHealthBySide[side] = health
+		state.plateHealth = hg.GetArmorPlateCondition(owner, armor) * maximum
+	end
 	owner:SyncArmor()
 	if health <= 0 then
 		sound.Play("physics/concrete/concrete_break" .. math.random(2, 3) .. ".wav", hitPos, 75, math.random(95, 110))
