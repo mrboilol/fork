@@ -1464,6 +1464,11 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.canmove = true
 		org.canmovehead = true
 	else
+		if isPly and owner:GetMoveType() == MOVETYPE_WALK and not owner:InVehicle() then
+			local movementFailure = (owner.hg_OrganismMovementMul or 1) <= 0.1
+			local tissueO2 = org.o2 and (org.o2[1] or 30) / math.max(org.o2.range or 30, 1) or 1
+			if movementFailure or tissueO2 <= 0.25 then org.needfake = true end
+		end
 		org.paralyzed = (org.spine3 or 0) >= (hg.organism.fake_spine3 or 0.75)
 		org.canmove = (org.spine2 < hg.organism.fake_spine2 and not org.paralyzed) and not org.otrub
 		org.canmovehead = (org.spine3 < hg.organism.fake_spine3) and not org.otrub

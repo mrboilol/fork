@@ -306,7 +306,7 @@ local function Trace_Bullet(box, hit, ricochet, impact, org, organs, dmg, dmgInf
 		dmgInfo:SetDamage(impact.rawDamage * energyFraction * organDamageMul)
 	end
 	dmg = dmgInfo:GetDamage() / 25
-	local organ = box[6] and organs[box[6]][box[7]]
+	local organ = box[8] or (box[6] and organs[box[6]][box[7]])
 	if not organ then return 0 end
 	local name = organ[1]
 	if not name then return 0 end

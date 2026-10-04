@@ -1272,9 +1272,9 @@ drawFinalVitalsVignettes = function()
 
 	if O2Lerp > 1 then
 		render.UpdateScreenEffectTexture()
-		noiseMat:SetFloat("$c0_y", 1 - O2Lerp / 125)
+		noiseMat:SetFloat("$c0_y", 1 - O2Lerp / 250)
 		noiseMat:SetFloat("$c0_z", 1)
-		noiseMat:SetFloat("$c1_x", math.Clamp(O2Lerp / 125, 0, 2))
+		noiseMat:SetFloat("$c1_x", math.Clamp(O2Lerp / 250, 0, 2))
 		noiseMat:SetFloat("$c1_y", O2Lerp * (org.otrub and 1 or 0.05))
 		noiseMat:SetFloat("$c2_x", CurTime() + 10000)
 		render.SetMaterial(noiseMat)

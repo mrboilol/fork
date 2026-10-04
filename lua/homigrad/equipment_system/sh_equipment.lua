@@ -251,11 +251,11 @@ function hg.GetZCityArmorImpactMitigation(org, placement, dmgInfo, rawDamage)
 	local organs = hg.organism.GetHitBoxOrgans(character:GetModel(), character)
 	local boxes = hg.organism.ShootMatrix(character, organs)
 	for _, box in ipairs(boxes or {}) do
-		local organ = organs[box[6]] and organs[box[6]][box[7]]
+		local organ = box[8] or (organs[box[6]] and organs[box[6]][box[7]])
 		if organ and organ[1] == armor.HitBoxSet then
 			local point = WorldToLocal(dmgInfo:GetDamagePosition(), angle_zero, box[1], box[2])
 			local plateName = armor.PlatesLinks and armor.PlatesLinks[organ[9]]
-			local plate = plateName and armor[plateName]
+			local plate = plateName and hg.GetZCityArmorContactSection(armor, plateName, organ[10])
 			if plate and plate.BluntDamageMul and point:WithinAABox(box[3], box[4]) then
 				local scale = hg.AbsorbZCityBluntImpact(armor, plate, dmgInfo, rawDamage)
 				return scale, false, scale < 1
@@ -271,8 +271,9 @@ local function protec(org, bone, dmg, dmgInfo, placement, boneindex, dir, hit, r
     local HitBoxName = hitbox and hitbox[9]
     local plates = armor.PlatesLinks
     local plateName = plates and plates[HitBoxName]
-    local plate = plateName and armor[plateName] or armor
-    local plateKey = plateName or armor
+    local plate = hg.GetZCityArmorContactSection(armor, plateName, hitbox and hitbox[10])
+    if not plate then return end
+    local plateKey = plate
 	local isBullet = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
 	if not isBullet and plate.BluntDamageMul and dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH) and not dmgInfo:IsDamageType(DMG_SLASH) then
 		local scale = hg.AbsorbZCityBluntImpact(armor, plate, dmgInfo)
@@ -284,7 +285,7 @@ local function protec(org, bone, dmg, dmgInfo, placement, boneindex, dir, hit, r
 		if scale < 1 then return 1 end
 		return
 	end
-	if impact and impact.pierceSoftArmor and not (plateName and placement >= ZC_ARMOR_SLOT_TORSO) then
+	if impact and impact.pierceSoftArmor and (plate.BalisticMaterial == 0.9 or not (plateName and placement >= ZC_ARMOR_SLOT_TORSO)) then
 		return {penetrationCost = 0, energyCost = 0}
 	end
 	if isBullet and impact and impact.ballisticVersion then
@@ -306,7 +307,7 @@ local function protec(org, bone, dmg, dmgInfo, placement, boneindex, dir, hit, r
 		or bulletPenetration, 0)
 	local resistance = math.max(plate.Protection * durablityMul, 0)
 	if isBullet then
-		resistance = resistance * (plate.RiotPlate and 0.12 or 1) * (plate.ProtectionMode == "stab" and 0.08 or 1)
+		resistance = resistance * (plate.BalisticMaterial == 1 and 0.12 or 1)
 	end
 	local prot = resistance
 

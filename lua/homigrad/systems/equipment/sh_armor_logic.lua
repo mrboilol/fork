@@ -25,8 +25,16 @@ hg.ArmorPlateMaterials = {
 	riot = {mass = 3.2, protection = 0.04, ballisticBaseMul = 0.12, melee = 12, stab = 0.3, durability = 60, spall = 0},
 }
 
-hg.ArmorPlateLevels = {[1] = 6, [2] = 8, [3] = 10, [4] = 12, [5] = 15, [6] = 17}
+hg.ArmorPlateLevels = {[1] = 6, [2] = 8, [3] = 10, [4] = 12, [5] = 15, [6] = 17, stab = 10}
 hg.ArmorProtectionLevels = {stab = {ballistic = 0.08, melee = 0.8, stab = 8}}
+hg.ArmorPlateGeometry = {
+	{field = "plateHeight", label = "Plate height", default = 14, min = 4, max = 28},
+	{field = "plateWidth", label = "Plate width", default = 9, min = 2, max = 18},
+	{field = "plateDepth", label = "Plate depth", default = 18, min = 2, max = 24},
+	{field = "plateOffsetX", label = "Plate offset X", default = 0, min = -5, max = 5},
+	{field = "plateOffsetY", label = "Plate offset Y", default = 0, min = -5, max = 5},
+	{field = "plateOffsetZ", label = "Plate offset Z", default = 0, min = -5, max = 5},
+}
 
 local softArmorLevels = {IIA = 1, II = 2, IIIA = 3, III = 4, IV = 5}
 local plateArmorLevels = {IIA = 1, II = 2, IIIA = 3, III = 3, IV = 4, V = 5, VI = 6, VII = 6}
@@ -50,7 +58,7 @@ function hg.GetArmorDefaultState(armor)
 
 	local state
 	if lower:find("riot", 1, true) then
-		state = {plateMaterial = "riot", plateLevel = 3, plateSides = "all", protectionLevel = "stab"}
+		state = {plateMaterial = "riot", plateLevel = 3, plateSides = "all"}
 	elseif lower:find("kevlar", 1, true) or lower:find("paca", 1, true) or lower:find("soft", 1, true) then
 		state = {plateMaterial = "kevlar", plateLevel = softArmorLevels[rating] or 3, plateSides = "all"}
 	else
@@ -75,13 +83,32 @@ function hg.GetArmorMaxCondition(ent, placement, armor)
 	return base * math.Clamp(tonumber(hg.GetArmorItemState(ent, armor, "healthMultiplier", 1)) or 1, 1, 5)
 end
 
+function hg.GetArmorFabricMass(placement, armor)
+	local data = hg.armor[placement] and hg.armor[placement][armor]
+	if not data then return 1 end
+	local natural = placement == "torso" and hg.GetArmorDefaultState(armor)
+	if not natural or natural.plateMaterial == "kevlar" or natural.plateSides == "none" then return data.mass or 1 end
+	local count = natural.plateSides == "all" and 4 or natural.plateSides == "both" and 2 or 1
+	return math.max(0.6, (data.mass or 1) - count * hg.ArmorPlateMaterials[natural.plateMaterial].mass)
+end
+
+function hg.GetArmorPlateMass(ent, armor, state)
+	local function value(field, default)
+		if state and state[field] ~= nil then return state[field] end
+		return hg.GetArmorItemState(ent, armor, field, default)
+	end
+	local material = hg.ArmorPlateMaterials[value("plateMaterial", "ceramic")] or hg.ArmorPlateMaterials.ceramic
+	local coverage = value("plateHeight", 14) / 14 * value("plateWidth", 9) / 9 * value("plateDepth", 18) / 18
+	local level = hg.ArmorPlateLevels[value("plateLevel", 3)] or 10
+	return material.mass * coverage * (0.5 + 0.5 * level / 10)
+end
+
 function hg.GetArmorMass(ent, placement, armor)
 	local data = hg.armor[placement] and hg.armor[placement][armor]
 	if not data then return 1 end
 	local sides = hg.GetArmorItemState(ent, armor, "plateSides", "none")
-	local material = hg.ArmorPlateMaterials[hg.GetArmorItemState(ent, armor, "plateMaterial", "ceramic")] or hg.ArmorPlateMaterials.ceramic
-	local count = sides == "all" and 4 or sides == "both" and 2 or (sides == "front" or sides == "back") and 1 or 0
-	return (data.mass or 1) + count * material.mass
+	local count = placement ~= "torso" and 0 or sides == "all" and 4 or sides == "both" and 2 or (sides == "front" or sides == "back") and 1 or 0
+	return hg.GetArmorFabricMass(placement, armor) + count * hg.GetArmorPlateMass(ent, armor)
 end
 
 function hg.GetArmorProtection(ent, placement, armor, hitPos)
@@ -89,6 +116,11 @@ function hg.GetArmorProtection(ent, placement, armor, hitPos)
 	if not data then return 0, 0, 0 end
 	local quality = math.Clamp(tonumber(hg.GetArmorItemState(ent, armor, "quality", 1)) or 1, 0.8, 1.2)
 	local ballistic = data.protection or 0
+	local natural = placement == "torso" and hg.GetArmorDefaultState(armor)
+	if natural and natural.plateMaterial ~= "kevlar" and natural.plateSides ~= "none"
+		and (hg.GetArmorItemState(ent, armor, "plateSides", "none") == "none" or hg.GetArmorItemState(ent, armor, "plateLevel", 3) == "stab") then
+		ballistic = math.min(ballistic, 0.2)
+	end
 	local multiplier = math.Clamp(tonumber(hg.GetArmorItemState(ent, armor, "protectionMultiplier", 1)) or 1, 0.5, 2)
 	local protectionLevel = hg.GetArmorItemState(ent, armor, "protectionLevel", nil)
 	local levelScale = protectionLevel and hg.ArmorPlateLevels[protectionLevel]
@@ -102,9 +134,10 @@ function hg.GetArmorProtection(ent, placement, armor, hitPos)
 	local level = hg.ArmorPlateLevels[hg.GetArmorItemState(ent, armor, "plateLevel", 3)] or 10
 	local material = hg.GetArmorPlateMaterial(ent, armor)
 	local condition = hg.GetArmorPlateCondition(ent, armor, hitPos)
-	return ballistic * (material.ballisticBaseMul or 1) + level * material.protection * 0.4 * condition * (levelProfile and levelProfile.ballistic or 1),
-		melee + level * (material.melee or 1) * 0.2 * condition * (levelProfile and levelProfile.melee or 1),
-		stab + level * (material.stab or 1) * 0.35 * condition * (levelProfile and levelProfile.stab or 1)
+	local plateProfile = hg.ArmorProtectionLevels[hg.GetArmorItemState(ent, armor, "plateLevel", 3)] or {}
+	return ballistic * (material.ballisticBaseMul or 1) + level * material.protection * 0.4 * condition * (plateProfile.ballistic or 1),
+		melee + level * (material.melee or 1) * 0.2 * condition * (plateProfile.melee or 1),
+		stab + level * (material.stab or 1) * 0.35 * condition * (plateProfile.stab or 1)
 end
 
 function hg.GetArmorPlateMaterial(ent, armor)
@@ -154,9 +187,15 @@ function hg.GetArmorPlateSide(ent, armor, hitPos)
 	local matrix = bone and (hg.GetIKBoneMatrix and hg.GetIKBoneMatrix(body, bone) or body:GetBoneMatrix(bone))
 	if not matrix then return end
 	local localPos = WorldToLocal(hitPos, angle_zero, matrix:GetTranslation(), matrix:GetAngles())
-	if localPos.x < -4 or localPos.x > 10 then return end
-	if math.abs(localPos.z) > 4.5 then return sides == "all" and (localPos.z > 0 and "left" or "right") or nil end
-	if localPos.y >= 2 then return (sides == "front" or sides == "both" or sides == "all") and "front" or nil end
+	local x = localPos.x - hg.GetArmorItemState(ent, armor, "plateOffsetX", 0)
+	local y = localPos.y - hg.GetArmorItemState(ent, armor, "plateOffsetY", 0)
+	local z = localPos.z - hg.GetArmorItemState(ent, armor, "plateOffsetZ", 0)
+	local height = hg.GetArmorItemState(ent, armor, "plateHeight", 14) / 2
+	local width = hg.GetArmorItemState(ent, armor, "plateWidth", 9) / 2
+	local depth = hg.GetArmorItemState(ent, armor, "plateDepth", 18) / 2
+	if math.abs(x - 3) > height or math.abs(y - 2) > depth or math.abs(z) > width + 3 then return end
+	if math.abs(z) > width then return sides == "all" and (z > 0 and "left" or "right") or nil end
+	if y >= 2 then return (sides == "front" or sides == "both" or sides == "all") and "front" or nil end
 	return (sides == "back" or sides == "both" or sides == "all") and "back" or nil
 end
 

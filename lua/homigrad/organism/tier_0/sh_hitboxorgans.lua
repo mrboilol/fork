@@ -32,6 +32,7 @@ function hg.organism.ShootMatrix(ent, organs)
 	local sphereChunk = 0
 	local obbCenter = ent:GetPos() --да какая же хуйня это))0
 	obbCenter:Add(ent:OBBCenter())
+	local wearer = (ent:IsRagdoll() and IsValid(hg.RagdollOwner(ent)) and hg.RagdollOwner(ent)) or ent
 	for i = 0, ent:GetHitBoxCount(0) - 1 do
 		local bone = ent:GetHitBoxBone(i, 0)
 		matrix = hg.GetIKBoneMatrix and hg.GetIKBoneMatrix(ent, bone) or ent:GetBoneMatrix(bone)
@@ -55,7 +56,6 @@ function hg.organism.ShootMatrix(ent, organs)
 			--print(key,organ[1])
 			local additional = organ[7]
 			if additional then
-				local wearer = (ent:IsRagdoll() and IsValid(hg.RagdollOwner(ent)) and hg.RagdollOwner(ent)) or ent
 				local armors = SERVER and wearer.armors or wearer:GetNetVar("Armor", wearer.armors or {})
 				local result = hook_Run("HG_OrganAvalible", wearer, organ[1], organ)
 				if result != nil and result != true then
@@ -70,12 +70,15 @@ function hg.organism.ShootMatrix(ent, organs)
 			elseif ShowOnlyArmor and ShowOnlyArmor:GetBool() then
 				continue 
 			end
-			mins = -organ[5]
-			maxs = -mins
-			local center, disOfCenter, boxLen = getTransform(pos, ang, mins, maxs, obbCenter)
-			if disOfCenter > sphereChunk then sphereChunk = disOfCenter end
-			local pos, ang = LocalToWorld(organ[3], organ[4], pos, ang)
-			boxs[#boxs + 1] = {pos, ang, mins, maxs, center, nameBone, key}
+			local adjusted = hg.GetZCityArmorHitBoxes and hg.GetZCityArmorHitBoxes(wearer, organ)
+			for _, current in ipairs(adjusted or {organ}) do
+				mins = -current[5]
+				maxs = -mins
+				local boxPos, boxAng = LocalToWorld(current[3], current[4], pos, ang)
+				local center, disOfCenter = getTransform(adjusted and boxPos or pos, adjusted and boxAng or ang, mins, maxs, obbCenter)
+				if disOfCenter > sphereChunk then sphereChunk = disOfCenter end
+				boxs[#boxs + 1] = {boxPos, boxAng, mins, maxs, center, nameBone, key, adjusted and current or nil}
+			end
 		end
 	end
 

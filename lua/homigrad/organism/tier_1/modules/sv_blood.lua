@@ -45,6 +45,8 @@ module[1] = function(org)
 	org.woundBleedRates = {}
 	org.arterialWoundBleedRates = {}
 	org.internalBleedRate = 0
+	org.lastBleedTime = CurTime()
+	org.bloodRegenRate = 0
 	org.internalBleed = 0
 	org.internalBleedHeal = 0
 	org.tranexamic_acid = 0
@@ -375,6 +377,7 @@ module[2] = function(owner, org, mulTime)
 	local bloodCapacity = (hg.organism.normalBloodVolume or 5000) + (owner:IsPlayer() and owner.GetTraitBonus and owner:GetTraitBonus("blood_capacity", 0) or 0)
 	org.maxblood = math.max(bloodCapacity, 1)
 	org.blood = math.max(tonumber(org.blood) or org.maxblood, 0)
+	local bloodBeforeLoss = org.blood
 	local adrenaline = math.Clamp(org.adrenaline or 0, 0, 2)
 	local isPlayer = owner:IsPlayer()
 	local now = CurTime()
@@ -385,8 +388,6 @@ module[2] = function(owner, org, mulTime)
 		org.tranexamic_acid_pending = 0
 		org.tranexamic_acid_onset = 0
 	end
-	-- sv_liver owns the continuous base modifiers. These fallbacks only protect
-	-- hot reloads or unusual construction order before its first tick.
 	org.coagulation_multiplier = tonumber(org.coagulation_multiplier) or 1.2
 	org.blood_regeneration_multiplier = tonumber(org.blood_regeneration_multiplier) or 1.2
 	org.bleedingmul = tonumber(org.bleedingmul) or 1
@@ -423,12 +424,6 @@ module[2] = function(owner, org, mulTime)
 
 			ent:EmitSound("vomit/vomit5.ogg")
 		end
-	end
-
-	if org.internalBleed < 0.5 and org.bleed <= 0 and org.pulse > 5 and org.blood < org.maxblood then
-		local regenRate = (hg.organism.config and hg.organism.config.BLOOD_REGEN_RATE_ML_S) or 4
-		local regenerationMul = math.Clamp(tonumber(org.blood_regeneration_multiplier) or 1, 0.1, 2)
-		org.blood = min(org.blood + mulTime * regenRate * regenerationMul, org.maxblood)
 	end
 
 	local totalAdrenaline = (org.adrenaline or 0) + (org.noradrenaline or 0)
@@ -770,8 +765,6 @@ module[2] = function(owner, org, mulTime)
 
 	org.bleed = (bleedoutspeed + bleedoutspeed2 + bleed)--в секунду
 
-	if org.bleed > 0 then org.lastBleedTime = CurTime() end
-
 	local incapacitationEnabled = not hg.organism.IncapacitationEnabled or hg.organism.IncapacitationEnabled()
 	-- Blood volume and tissue O2 never start the terminal OTRUB timer directly.
 	-- Cerebral oxygen, brain/airway injury, cardiac arrest, and spinal failure do.
@@ -795,6 +788,13 @@ module[2] = function(owner, org, mulTime)
 	org.woundBleedRates = woundBleedRates
 	org.arterialWoundBleedRates = arterialWoundBleedRates
 	org.internalBleedRate = bleed
+	if org.bleed > 0 or org.blood < bloodBeforeLoss then org.lastBleedTime = now end
+	local recoveryTime = math.max(now - (org.lastBleedTime or now) - 15, 0)
+	local recoveryBoost = 1 + 0.75 * (1 - math.exp(-recoveryTime / 60))
+	local regenRate = (hg.organism.config and hg.organism.config.BLOOD_REGEN_RATE_ML_S) or 4.6
+	local regenerationMul = math.Clamp(tonumber(org.blood_regeneration_multiplier) or 1, 0.1, 2)
+	org.bloodRegenRate = org.alive and not org.heartstop and org.pulse > 5 and org.blood < org.maxblood and regenRate * regenerationMul * recoveryBoost or 0
+	if org.bloodRegenRate > 0 then org.blood = min(org.blood + mulTime * org.bloodRegenRate, org.maxblood) end
 	if hg.organism.UpdateVitalHealthToll then
 		hg.organism.UpdateVitalHealthToll(owner, org, mulTime)
 	end

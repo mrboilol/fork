@@ -840,12 +840,19 @@ net.Receive("hg_configure_armor", function(_, ply)
 	if ply:GetPos():DistToSqr(ent:GetPos()) > 512 * 512 then return end
 	local quality = math.Clamp(net.ReadFloat(), 0.8, 1.2)
 	local material = net.ReadString()
-	local level = net.ReadUInt(3)
+	local level = net.ReadString()
+	level = tonumber(level) or level
 	local sides = net.ReadString()
 	local protection = net.ReadFloat()
 	local healthMultiplier = net.ReadUInt(3)
 	local protectionLevel = net.ReadString()
 	protectionLevel = tonumber(protectionLevel) or protectionLevel
+	local geometry = {}
+	for _, setting in ipairs(hg.ArmorPlateGeometry) do
+		local value = net.ReadFloat()
+		if value ~= value or value < setting.min or value > setting.max then return end
+		geometry[setting.field] = value
+	end
 	if not hg.ArmorPlateMaterials[material] or not hg.ArmorPlateLevels[level] then return end
 	if not hg.ArmorPlateLevels[protectionLevel] and not hg.ArmorProtectionLevels[protectionLevel] then return end
 	if sides ~= "none" and sides ~= "front" and sides ~= "back" and sides ~= "both" and sides ~= "all" then return end
@@ -859,6 +866,7 @@ net.Receive("hg_configure_armor", function(_, ply)
 		ent.armorState.plateMaterial = material
 		ent.armorState.plateLevel = level
 		ent.armorState.plateSides = sides
+		for field, value in pairs(geometry) do ent.armorState[field] = value end
 		ent.armorState.plateHealth = nil
 		ent.armorState.plateHealthBySide = nil
 	end

@@ -104,7 +104,6 @@ local STAMINA_MAX_FALLBACK = 180
 local LEG_TRIP_CHANCE = {broken = 0.85, dislocated = 0.6}
 local LIMB_HURT_MIN = 0.3
 local LEG_HURT_TRIP_MUL = 0.5
-local LIMB_HURT_WEAKEN = 0.7
 local TRIP_SIDE_MUL = 1.5
 
 local DEATH_DELAY = 0.25
@@ -344,11 +343,7 @@ local function limbState(org, limb)
 end
 
 local function limbStrength(org, limb)
-	if limbState(org, limb) then return 0 end
-	local dmg = org[limb] or 0
-	if dmg < LIMB_HURT_MIN then return 1 end
-
-	return 1 - dmg * LIMB_HURT_WEAKEN
+	return hg.GetLimbEffectiveness(org, limb)
 end
 
 local function legTripChance(org, limb)
@@ -902,10 +897,10 @@ local function reactBones(mode, org, ragdoll)
 		local mul = limbStrength(org, limb)
 		if mul <= 0 or handBusy(ragdoll, limb) then continue end
 
-		for _, bone in ipairs(limbBones) do
+		for index, bone in ipairs(limbBones) do
 			if isFloppy(ragdoll, org, bone) then continue end
 			bones[#bones + 1] = bone
-			strength[bone] = mul
+			strength[bone] = hg.GetLimbEffectiveness(org, limb, index == 1 and "up" or "down")
 		end
 	end
 
@@ -916,10 +911,10 @@ local function limbKey(org, ragdoll)
 	local floppy = ragdoll.hg_floppy_bones and table.Count(ragdoll.hg_floppy_bones) or 0
 
 	return table.concat({
-		limbStrength(org, "larm"),
-		limbStrength(org, "rarm"),
-		limbStrength(org, "lleg"),
-		limbStrength(org, "rleg"),
+		hg.GetLimbEffectiveness(org, "larm", "up"), hg.GetLimbEffectiveness(org, "larm", "down"),
+		hg.GetLimbEffectiveness(org, "rarm", "up"), hg.GetLimbEffectiveness(org, "rarm", "down"),
+		hg.GetLimbEffectiveness(org, "lleg", "up"), hg.GetLimbEffectiveness(org, "lleg", "down"),
+		hg.GetLimbEffectiveness(org, "rleg", "up"), hg.GetLimbEffectiveness(org, "rleg", "down"),
 		floppy,
 		handBusy(ragdoll, "larm") and 1 or 0,
 		handBusy(ragdoll, "rarm") and 1 or 0,

@@ -45,7 +45,6 @@ local STANDING_REACH_FRACTION = 0.995
 local UPRIGHT_REACH_FRACTION = 0.99
 local MAX_UPRIGHT_RISE = 6
 local UPRIGHT_SMOOTH = 6
-local OVERREACH_FRACTION = 0.95
 local LEAD_REACH_FRACTION = 0.92
 local STRIDE_REACH_FRACTION = 0.9
 local MAX_STRIDE_DROP = 7
@@ -394,6 +393,12 @@ local function updateSwing(ply, state, ctx, index, dt)
 end
 
 local function updatePhase(ply, state, ctx, dt)
+	if ctx.speed <= MOVING_SPEED then
+		state.rate = 0
+
+		return
+	end
+
 	local rate
 	if (SERVER or ply == LocalPlayer()) and ply.hg_GaitPhase then
 		rate = (ply.hg_GaitRate or 0) * hg.GaitLimpRateMul(ply, state.phase)
@@ -473,7 +478,8 @@ local function updateFeet(ply, state, ctx, dt)
 
 		if not foot.swinging then
 			local planted = plantedWorldPos(foot)
-			local reach = ctx.legLength * OVERREACH_FRACTION
+			local reachFraction = ctx.crouching and REACH_FRACTION or STANDING_REACH_FRACTION
+			local reach = ctx.anim[index].length * reachFraction
 			local settledInPlace = foot.plantOrigin and (ctx.origin - foot.plantOrigin):Length2DSqr() < OVERREACH_RESTEP_MOVE_SQR
 			local overreach = not planted or (not settledInPlace and (planted + vector_up * state.ankleHeight):DistToSqr(ctx.anim[index].hip - vector_up * state.drop) > reach * reach)
 			if overreach then
@@ -676,7 +682,7 @@ local function alignFoot(foot, carriedAng, toeDir, weight, ankleHeight, toeLengt
 	return rebase(carriedAng, toeDir, normal, desired, normal)
 end
 
-local function solveLeg(ent, ids, foot, ankleTarget, weight, ctx, state, alignWeight)
+local function solveLeg(ent, ids, foot, ankleTarget, weight, ctx, state, alignWeight, upperPower, lowerPower)
 	local hipMat, kneeMat, ankleMat = ent:GetBoneMatrix(ids.thigh), ent:GetBoneMatrix(ids.calf), ent:GetBoneMatrix(ids.foot)
 	if not (hipMat and kneeMat and ankleMat) then return end
 
@@ -685,6 +691,7 @@ local function solveLeg(ent, ids, foot, ankleTarget, weight, ctx, state, alignWe
 	if upperLength < 1 or lowerLength < 1 then return end
 
 	local target = LerpVector(weight, ankle0, ankleTarget)
+	target = LerpVector(0.3 + lowerPower * 0.7, ankle0, target)
 	local toTarget = target - hip
 	local reachFraction = ctx.crouching and REACH_FRACTION or STANDING_REACH_FRACTION
 	local maxReach = (upperLength + lowerLength) * reachFraction
@@ -715,6 +722,11 @@ local function solveLeg(ent, ids, foot, ankleTarget, weight, ctx, state, alignWe
 
 	local along = (upperLength * upperLength - lowerLength * lowerLength + dist * dist) / (2 * dist)
 	local knee = hip + dir * along + pole * math_sqrt(math_max(upperLength * upperLength - along * along, 0))
+	local injuredPole = (knee0 - hip) - dir * (knee0 - hip):Dot(dir)
+	if injuredPole:LengthSqr() > 0.0001 then
+		pole = LerpVector(upperPower, injuredPole:GetNormalized(), pole):GetNormalized()
+		knee = hip + dir * along + pole * math_sqrt(math_max(upperLength * upperLength - along * along, 0))
+	end
 	local plane0, plane1 = animAxis:Cross(pole0), dir:Cross(pole)
 
 	local footAng0 = ankleMat:GetAngles()
@@ -777,7 +789,10 @@ local function applyPose(ent, ply, state, bones, ctx)
 		if ctx.anim[index].usable and foot.ground then
 			local normal = foot.groundNormal or vector_up
 			local ankleTarget = foot.ground + normal * state.ankleHeight
-			local knee = solveLeg(ent, ids, foot, ankleTarget, weight, ctx, state, alignWeight)
+			local limb = index == 1 and "lleg" or "rleg"
+			local upperPower = hg.GetLimbEffectiveness(ply.organism, limb, "up")
+			local lowerPower = hg.GetLimbEffectiveness(ply.organism, limb, "down")
+			local knee = solveLeg(ent, ids, foot, ankleTarget, weight, ctx, state, alignWeight, upperPower, lowerPower)
 			state.appliedKnee = state.appliedKnee or knee and {bone = ids.calf, pos = knee}
 		end
 	end

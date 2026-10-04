@@ -42,6 +42,10 @@ local fakePhysLimb = {
 	[11] = "lleg", [12] = "lleg", [13] = "lleg",
 }
 local fakeLimbs = {"larm", "rarm", "lleg", "rleg"}
+local fakeBoneLimb = {}
+for physNumber, limb in pairs(fakePhysLimb) do
+	fakeBoneLimb[defaultBones[physNumber]] = {limb, (physNumber == 2 or physNumber == 3 or physNumber == 8 or physNumber == 11) and "up" or "down"}
+end
 
 local function getFakeTourniquetPower(ply, limb)
 	local count = hg.GetTourniquetCountOnLimb and hg.GetTourniquetCountOnLimb(ply, limb) or 0
@@ -311,6 +315,14 @@ function hg.ShadowControl(ragdoll, physNumber, ss, ang, maxang, maxangdamp, pos,
 	if not alreadyReal then physNumber = realPhysNum(ragdoll, physNumber) or 0 end
 	local phys = ragdoll:GetPhysicsObjectNum(physNumber)
 	if not IsValid(phys) then return end
+	local bone = ragdoll:TranslatePhysBoneToBone(physNumber)
+	local limbSegment = bone >= 0 and fakeBoneLimb[ragdoll:GetBoneName(bone)]
+	local org = ragdoll.organism
+	if not org and limbSegment then
+		local owner = hg.RagdollOwner(ragdoll)
+		org = IsValid(owner) and owner.organism
+	end
+	if limbSegment then limbPower = limbPower * hg.GetLimbEffectiveness(org, limbSegment[1], limbSegment[2]) end
 	if isFloppyPhys(ragdoll, physNumber, true) then
 		phys:Wake()
 		return false
@@ -763,7 +775,7 @@ function hg.FakeLegAttack(ply)
 	local duration = speed - animstopAdjust
 	local dmg = 10 * (2 - speedmul)
 	dmg = dmg * (ply:IsBerserk() and org.berserk * 5 or 1)
-	dmg = dmg * (org.legstrength or 1)
+	dmg = dmg * hg.GetLegEffectiveness(ply, "rleg")
 	dmg = dmg * FAKE_LEG_KICK_DAMAGE_MUL
 
 	local ang = ply:EyeAngles()

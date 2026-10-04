@@ -161,6 +161,12 @@ local moodleTexts = {
 		[3] = {title = "Severe CO Poisoning", description = "Toxic gas is seriously impairing your brain and movement."},
 		[4] = {title = "Deadly CO Poisoning", description = "Your blood can no longer deliver enough oxygen to survive."},
 	}},
+	self_harm = {levels = {
+		[1] = {title = "Self-Harm Urges", description = "Your depression is pushing you toward hurting yourself."},
+		[2] = {title = "Self-Harm Risk", description = "You are close to harming yourself."},
+		[3] = {title = "Severe Self-Harm Risk", description = "You are on the verge of hurting yourself."},
+		[4] = {title = "Critical Self-Harm Risk", description = "Despair has you ready to end it."},
+	}},
 	arrhythmia = {levels = {
 		[1] = {title = "Arrhythmia", description = "Your heartbeat is becoming irregular."},
 		[2] = {title = "Arrhythmia", description = "An abnormal rhythm or conduction problem is affecting circulation."},
@@ -442,7 +448,7 @@ local function getMoodle3IconName(effect)
 	local names = {
 		fracture = "fractured", dislocated = "dislocated", analgesia = "drugged",
 		stamina = "exertion", exertion = "exertion", bleeding = level == 1 and "bleeding" or "bleeding" .. level,
-		carbon_monoxide = "hypoxemia", arrhythmia = "arrhythmia", palpitations = "palpitations", fibrillation = "fibrilation",
+		carbon_monoxide = "hypoxemia", arrhythmia = "arrhythmia", palpitations = "fibrilation", self_harm = "self-harm", fibrillation = "fibrilation",
 		hypoxemia = "hypoxemia", brain_hypoxia = "brain-hypoxia", brain_dying = "brain-dying", asystole = "heart-failure",
 		low_blood = "hypotension", high_blood = "hypertension", hypovolemia = level == 1 and "blood-loss" or "blood-loss" .. level, no_eye = "last-stand", blinded = "confused",
 		brain_bleed = "brain-hemorrhage", intracranial_pressure = "terror",
@@ -660,6 +666,9 @@ local function buildEffects(ply, org)
 		end
 		add(effects, "depression", icon, level, "bad", -64, math.floor(depression * 100) .. "%")
 	end
+	if depression >= 0.4 then
+		add(effects, "self_harm", "self-harm", highRank(depression, {0.4, 0.45, 0.5, 0.6}), "bad", -66, math.floor(depression * 100) .. "%")
+	end
 	local cotard = math.Clamp(orgNumber(org, "cotard", 0), 0, 1)
 	if cotard > 0 then
 		add(effects, "cotard", "suicide", highRank(cotard, {0.01, 0.5, 0.75, 0.95}), "bad", -65, math.floor(cotard * 100) .. "%")
@@ -706,16 +715,18 @@ local function buildEffects(ply, org)
 	local irregular = irregularSeverity > 0 or unstableRhythm ~= nil
 	local fibrillating = org.fibrillation == true or ecgState == "atrial_fibrillation" or ecgState == "ventricular_fibrillation"
 		or (not ecgState and unstableRhythm == "atrial_fibrillation")
-	local rhythmSeverity = math.max(arrhythmia, irregularSeverity, fibrillating and 1 or 0)
 	local heartStrain = math.Clamp(orgNumber(org, "heartStrain", 0), 0, 1)
+	local palpitationDrive = math.Clamp(orgNumber(org, "palpitations", 0), 0, 1)
+	local outputDeficit = istable(org) and isnumber(org.cardiacOutput) and math.Clamp(1 - org.cardiacOutput, 0, 1) or 0
+	local rhythmSeverity = math.max(arrhythmia, irregularSeverity, fibrillating and 1 or 0)
 	local rhythmAbnormal = irregular or arrhythmia >= 0.1 or fibrillating
-	local strained = heartStrain >= 0.1
-	if not org.heartstop and (rhythmAbnormal or strained) then
-		local level = highRank(math.max(rhythmSeverity, heartStrain, 0.1), {0.1, 0.3, 0.6, 0.85})
+	local conditionSeverity = math.max(rhythmSeverity, palpitationDrive, heartStrain, outputDeficit >= 0.3 and outputDeficit or 0)
+	if not org.heartstop and (rhythmAbnormal or conditionSeverity >= 0.1) then
+		local level = highRank(math.max(conditionSeverity, 0.1), {0.1, 0.3, 0.6, 0.85})
 		if rhythmAbnormal then
-			add(effects, "arrhythmia", "arrhythmia", level, "bad", 24.5, math.floor(heartRate) .. " bpm")
+			add(effects, "arrhythmia", "arrhythmia", level, "bad", 24.5, math.floor(conditionSeverity * 100) .. "%")
 		else
-			add(effects, "arrhythmia", "arrhythmia", level, "bad", 24.5, math.floor(heartStrain * 100) .. "%",
+			add(effects, "arrhythmia", "arrhythmia", level, "bad", 24.5, math.floor(conditionSeverity * 100) .. "%",
 				"Heart Strain", "Your heart is under heavy strain and may start to lose rhythm.")
 		end
 	end

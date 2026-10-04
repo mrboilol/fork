@@ -11,10 +11,12 @@ if CLIENT then
 			if state[key] == nil then state[key] = value end
 		end
 		local frame = vgui.Create("DFrame")
-		frame:SetSize(310, ent.placement == "torso" and 425 or 300)
+		frame:SetSize(350, math.min(ScrH() - 80, ent.placement == "torso" and 730 or 360))
 		frame:Center()
 		frame:SetTitle("Configure " .. (hg.armorNames[ent.name] or ent.name or "armor"))
 		frame:MakePopup()
+		local controls = vgui.Create("DScrollPanel", frame)
+		controls:Dock(FILL)
 		local function describeOptions(row, describe)
 			row.OnMenuOpened = function(_, menu)
 				for _, option in ipairs(menu:GetCanvas():GetChildren()) do
@@ -24,33 +26,19 @@ if CLIENT then
 			end
 		end
 
-		local quality = vgui.Create("DNumSlider", frame)
-		quality:Dock(TOP)
-		quality:SetText("Quality")
-		quality:SetMin(0.8)
-		quality:SetMax(1.2)
-		quality:SetDecimals(2)
-		quality:SetValue(state.quality or 1)
-		quality:SetTooltip("Scales base blunt and stab protection from 80% to 120%; also ballistic unless its level is fixed.")
-
-		local protection = vgui.Create("DNumSlider", frame)
-		protection:Dock(TOP)
-		protection:SetText("Protection multiplier")
-		protection:SetMin(0.5)
-		protection:SetMax(2)
-		protection:SetDecimals(2)
-		protection:SetValue(state.protectionMultiplier or 1)
-		protection:SetTooltip("Multiplies base ballistic, blunt, and stab protection by 0.5x to 2x. Plate bonuses are added separately.")
+		local quality = state.quality or 1
+		local protection = state.protectionMultiplier or 1
+		local health = state.healthMultiplier or 1
 		local protectionLevel = state.protectionLevel or 3
-		local protectionChoices = vgui.Create("DComboBox", frame)
+		local protectionChoices = vgui.Create("DComboBox", controls)
 		protectionChoices:Dock(TOP)
 		protectionChoices:DockMargin(8, 6, 8, 0)
-		protectionChoices:SetValue((ent.placement == "torso" and "Vest protection profile: " or "Protection profile: ") .. (protectionLevel == "stab" and "Stab focused" or protectionLevel))
+		protectionChoices:SetValue((ent.placement == "torso" and "Fabric protection class: " or "Protection class: ") .. (protectionLevel == "stab" and "Stab focused" or protectionLevel))
 		for level = 1, 6 do protectionChoices:AddChoice(tostring(level)) end
 		protectionChoices:AddChoice("Stab focused", "stab")
-		protectionChoices:SetTooltip("Numeric levels scale base protection. Stab focused scales carrier and plate ballistic resistance x0.08, blunt x0.8 and slash/stab x8.")
+		protectionChoices:SetTooltip("Numeric classes scale fabric/base protection. Stab class gives fabric ballistic x0.08, blunt x0.8 and slash/stab x8. Plates have their own class.")
 		describeOptions(protectionChoices, function(value)
-			if value == "Stab focused" then return "Carrier and plates: ballistic x0.08, blunt x0.8, slash/stab x8. Very weak against bullets." end
+			if value == "Stab focused" then return "Fabric/base armor: ballistic x0.08, blunt x0.8, slash/stab x8. Very weak against bullets. Plate class is independent." end
 			local rating = hg.ArmorPlateLevels[tonumber(value)]
 			if not rating then return end
 			local scale = rating / hg.ArmorPlateLevels[3]
@@ -58,19 +46,10 @@ if CLIENT then
 		end)
 		protectionChoices.OnSelect = function(_, _, value, data) protectionLevel = data or tonumber(value) or value end
 
-		local health = vgui.Create("DNumSlider", frame)
-		health:Dock(TOP)
-		health:SetText("Armor health multiplier")
-		health:SetMin(1)
-		health:SetMax(5)
-		health:SetDecimals(0)
-		health:SetValue(state.healthMultiplier or 1)
-		health:SetTooltip("Multiplies maximum armor health or durability by 1x to 5x; does not change protection per hit.")
-
 		local material, level, sides = "ceramic", 3, "none"
 		if ent.placement == "torso" then
 			local function choice(label, options, initial, changed, tooltip, optionTips)
-				local row = vgui.Create("DComboBox", frame)
+				local row = vgui.Create("DComboBox", controls)
 				row:Dock(TOP)
 				row:DockMargin(8, 6, 8, 0)
 				row:SetValue(label .. ": " .. tostring(initial))
@@ -82,21 +61,27 @@ if CLIENT then
 			material = state.plateMaterial or material
 			level = state.plateLevel or level
 			sides = state.plateSides or sides
+			local function plateMass(materialKey, levelKey)
+				local selected = table.Copy(state)
+				selected.plateMaterial = materialKey
+				selected.plateLevel = levelKey
+				return hg.GetArmorPlateMass(ent, ent.name, selected)
+			end
 			choice("Plate material", {"ceramic", "steel", "polyethylene", "titan", "arsteel", "uhmwpe", "uhmwpe_ceramic", "uhmwpe_arsteel", "kevlar", "kevlar_ceramic", "kevlar_arsteel", "kevlar_titan", "riot"}, material, function(value) material = value end,
 				"Changes each plate's weight and its ballistic, blunt, and stab protection on covered hits.", function(value)
 					local plate = hg.ArmorPlateMaterials[value]
 					if not plate then return end
 					local rating = hg.ArmorPlateLevels[level]
-					local profile = hg.ArmorProtectionLevels[protectionLevel] or {}
-					return string.format("Per plate: %.1f kg, %.1f maximum health; +%.2f bullet, +%.1f blunt, +%.1f slash/stab resistance. Covered carrier bullet resistance x%.2f. Spall chance %.0f%%. Front/back/side health is independent.", plate.mass, plate.durability * rating / hg.ArmorPlateLevels[3], rating * plate.protection * 0.4 * (profile.ballistic or 1), rating * (plate.melee or 1) * 0.2 * (profile.melee or 1), rating * (plate.stab or 1) * 0.35 * (profile.stab or 1), plate.ballisticBaseMul or 1, (plate.spall or 0) * 100)
+				local profile = hg.ArmorProtectionLevels[level] or {}
+					return string.format("Per plate: %.1f kg, %.1f maximum health; +%.2f bullet, +%.1f blunt, +%.1f slash/stab resistance. Covered carrier bullet resistance x%.2f. Spall chance %.0f%%. Front/back/side health is independent.", plateMass(value, level), plate.durability * rating / hg.ArmorPlateLevels[3], rating * plate.protection * 0.4 * (profile.ballistic or 1), rating * (plate.melee or 1) * 0.2 * (profile.melee or 1), rating * (plate.stab or 1) * 0.35 * (profile.stab or 1), plate.ballisticBaseMul or 1, (plate.spall or 0) * 100)
 				end)
-			choice("Protection level", {"1", "2", "3", "4", "5", "6"}, level, function(value) level = tonumber(value) end,
-				"Changes plate ballistic, blunt, and stab protection on covered hits; plate weight stays material-based.", function(value)
-					local rating = hg.ArmorPlateLevels[tonumber(value)]
+			choice("Plate protection class", {"1", "2", "3", "4", "5", "6", "stab"}, level, function(value) level = tonumber(value) or value end,
+				"Changes plate ballistic, blunt, and stab protection on covered hits; weight follows class, material and coverage.", function(value)
+				local rating = hg.ArmorPlateLevels[tonumber(value) or value]
 					if not rating then return end
 					local plate = hg.ArmorPlateMaterials[material]
-					local profile = hg.ArmorProtectionLevels[protectionLevel] or {}
-					return string.format("Per plate: %.1f kg, %.1f maximum health; +%.2f bullet, +%.1f blunt, +%.1f slash/stab resistance. Covered carrier bullet resistance x%.2f. Spall chance %.0f%%. Front/back/side health is independent.", plate.mass, plate.durability * rating / hg.ArmorPlateLevels[3], rating * plate.protection * 0.4 * (profile.ballistic or 1), rating * (plate.melee or 1) * 0.2 * (profile.melee or 1), rating * (plate.stab or 1) * 0.35 * (profile.stab or 1), plate.ballisticBaseMul or 1, (plate.spall or 0) * 100)
+				local profile = hg.ArmorProtectionLevels[tonumber(value) or value] or {}
+					return string.format("Per plate: %.1f kg, %.1f maximum health; +%.2f bullet, +%.1f blunt, +%.1f slash/stab resistance. Covered carrier bullet resistance x%.2f. Spall chance %.0f%%. Front/back/side health is independent.", plateMass(material, tonumber(value) or value), plate.durability * rating / hg.ArmorPlateLevels[3], rating * plate.protection * 0.4 * (profile.ballistic or 1), rating * (plate.melee or 1) * 0.2 * (profile.melee or 1), rating * (plate.stab or 1) * 0.35 * (profile.stab or 1), plate.ballisticBaseMul or 1, (plate.spall or 0) * 100)
 				end)
 			choice("Plate coverage", {"none", "front", "back", "both", "all"}, sides, function(value) sides = value end,
 				"Chooses which torso directions receive plate bonuses. Each covered direction adds one plate's weight.", function(value)
@@ -104,8 +89,20 @@ if CLIENT then
 					local covered = {none = "No plate coverage", front = "Front only", back = "Back only", both = "Front and back", all = "Front, back, left, and right"}
 					if not covered[value] then return end
 					return string.format("%s: %d plate%s, +%.1f weight with %s. Uncovered hits use carrier protection only.",
-						covered[value], count, count == 1 and "" or "s", count * hg.ArmorPlateMaterials[material].mass, material)
+						covered[value], count, count == 1 and "" or "s", count * plateMass(material, level), material)
 				end)
+			for _, setting in ipairs(hg.ArmorPlateGeometry) do
+				state[setting.field] = state[setting.field] or setting.default
+				local row = vgui.Create("DNumSlider", controls)
+				row:Dock(TOP)
+				row:SetText(setting.label)
+				row:SetMin(setting.min)
+				row:SetMax(setting.max)
+				row:SetDecimals(1)
+				row:SetValue(state[setting.field])
+				row:SetTooltip("Actual coverage in torso-bone local Source units. Size changes installed weight; offset changes contact position. Native fabric remains outside the plates.")
+				row.OnValueChanged = function(_, value) state[setting.field] = value end
+			end
 		end
 
 		local apply = vgui.Create("DButton", frame)
@@ -115,13 +112,14 @@ if CLIENT then
 		apply.DoClick = function()
 			net.Start("hg_configure_armor")
 				net.WriteEntity(ent)
-				net.WriteFloat(quality:GetValue())
+				net.WriteFloat(quality)
 				net.WriteString(material)
-				net.WriteUInt(level, 3)
+				net.WriteString(tostring(level))
 				net.WriteString(sides)
-				net.WriteFloat(protection:GetValue())
-				net.WriteUInt(math.Round(health:GetValue()), 3)
+				net.WriteFloat(protection)
+				net.WriteUInt(math.Round(health), 3)
 				net.WriteString(tostring(protectionLevel))
+				for _, setting in ipairs(hg.ArmorPlateGeometry) do net.WriteFloat(state[setting.field] or setting.default) end
 			net.SendToServer()
 			frame:Close()
 		end
@@ -1047,13 +1045,13 @@ if CLIENT then
 							if state.plateSides and state.plateSides ~= "none" then
 								local level = hg.ArmorPlateLevels[state.plateLevel] or 10
 								local material = hg.ArmorPlateMaterials[state.plateMaterial] or hg.ArmorPlateMaterials.ceramic
-								local profile = hg.ArmorProtectionLevels[state.protectionLevel] or {}
+								local profile = hg.ArmorProtectionLevels[state.plateLevel] or {}
 								local condition = hg.GetArmorPlateCondition(lply, equipment)
 								info = info .. string.format("\nAverage covered area: bullet %.2f | Blunt %.1f | Slash/stab %.1f", bullet * (material.ballisticBaseMul or 1) + level * material.protection * 0.4 * condition * (profile.ballistic or 1), melee + level * (material.melee or 1) * 0.2 * condition * (profile.melee or 1), stab + level * (material.stab or 1) * 0.35 * condition * (profile.stab or 1))
 								local maximum = hg.GetArmorPlateMaxHealth(lply, equipment)
 								for _, side in ipairs(hg.GetArmorPlateSides(lply, equipment)) do
 									local health = (state.plateHealthBySide or {})[side] or state.plateHealth or maximum
-									info = info .. string.format("\n%s plate health: %.1f / %.1f", side, health, maximum)
+									info = info .. string.format("\n%s plate: %.1f / %.1f health, %.2f kg", side, health, maximum, hg.GetArmorPlateMass(lply, equipment))
 								end
 							end
 						end

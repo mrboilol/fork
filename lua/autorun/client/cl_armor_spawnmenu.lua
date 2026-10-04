@@ -41,6 +41,16 @@ spawnmenu.AddCreationTab("armor", function()
 				{"ent_new_armor_vest3", "Kevlar IIIA Vest", "vgui/icons/armor01"},
 				{"ent_new_armor_vest4", "Kevlar-Plate III Vest", "vgui/icons/armor02"},
 			}
+			local listed = {}
+			for _, info in ipairs(newArmor) do listed[info[1]] = true end
+			for class in pairs(scripted_ents.GetList()) do
+				if string.StartWith(class, "ent_new_armor_") and not listed[class] then newArmor[#newArmor + 1] = {class, class, "vgui/entities/" .. class} end
+			end
+			local converted = {}
+			for _, info in ipairs(newArmor) do
+				local legacyName = string.match(info[1], "^ent_new_armor_legacy_(.+)$")
+				if legacyName then converted[legacyName] = true end
+			end
 			for _, info in ipairs(newArmor) do
 				local class = info[1]
 				local stored = scripted_ents.GetStored(class)
@@ -52,7 +62,7 @@ spawnmenu.AddCreationTab("armor", function()
 			end
 			for _, armors in pairs(hg.armor or hg.zcityArmor or {}) do
 				for name, data in pairs(armors) do
-					if not data.inbuilt and data.Spawnable == nil then
+					if not data.inbuilt and data.Spawnable == nil and not converted[name] then
 						local label = (hg.armorNames or hg.zcityArmorNames or {})[name] or name
 						legacy[#legacy + 1] = {spawnname = "ent_armor_" .. name, nicename = label, material = (hg.armorIcons or hg.zcityArmorIcons or {})[name] or "entities/ent_armor_" .. name .. ".png", admin = data.AdminOnly}
 					end

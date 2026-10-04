@@ -189,9 +189,6 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 		return phase % 1 < hg.GaitFlightFraction(swingFraction)
 	end
 
-	local LIMP_DAMAGE_START = 0.3
-	local LIMP_DAMAGE_MAX = 0.8
-	local LIMP_DISLOCATED = 0.7
 	local LIMP_STANCE_HURRY = 0.6
 	local LIMP_SWING_DELAY = 0.3
 	local PUSH_LIMP_LOSS = 0.93
@@ -210,16 +207,7 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 	local PUSH_BONUS_MAX = 4
 
 	function hg.GaitLegLimp(org, leg)
-		if not org then return 0 end
-		if org[leg .. "amputated"] or org[leg .. "upamputated"] then return 1 end
-		local damage = tonumber(org[leg]) or 0
-		if damage >= 1 then return 1 end
-		local limp = org[leg .. "dislocation"] and LIMP_DISLOCATED or 0
-		if damage > LIMP_DAMAGE_START then
-			limp = math_max(limp, (damage - LIMP_DAMAGE_START) / (1 - LIMP_DAMAGE_START) * LIMP_DAMAGE_MAX)
-		end
-
-		return limp
+		return org and 1 - hg.GetLimbEffectiveness(org, leg) or 0
 	end
 
 	local function stanceAndSwingLimp(ply, phase)
@@ -822,6 +810,7 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 			k = k * math_Clamp((250 - slwdwn) / 250, 0.75, 1)
 		end
 
+		if SERVER then ply.hg_OrganismMovementMul = math_max(k, 0) end
 		k = math_max(k, 20 / 200)
 
 		if vomitingEnd > (curTime - 3) then
@@ -966,6 +955,7 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 --\\ Remove sandbox jump boost
 	local gamemod = engine.ActiveGamemode()
 	hook.Add("PlayerSpawn", "RemoveSandboxJumpBoost", function(ply)
+		ply.hg_OrganismMovementMul = nil
 		if (gamemod != "sandbox") then return end
 
 		local PLAYER = baseclass.Get("player_sandbox")

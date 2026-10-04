@@ -254,8 +254,12 @@ local function applyArmorPreset(ply, armorPreset, armorStates)
                     state.protectionMultiplier = math.Clamp(tonumber(saved.protectionMultiplier) or 1, 0.5, 2)
                 elseif placement == "torso" then
                     state.plateMaterial = hg.ArmorPlateMaterials[saved.plateMaterial] and saved.plateMaterial or "ceramic"
-                    state.plateLevel = hg.ArmorPlateLevels[tonumber(saved.plateLevel)] and tonumber(saved.plateLevel) or 3
+                    local plateLevel = tonumber(saved.plateLevel) or saved.plateLevel
+                    state.plateLevel = hg.ArmorPlateLevels[plateLevel] and plateLevel or 3
                         state.plateSides = ({none = true, front = true, back = true, both = true, all = true})[saved.plateSides] and saved.plateSides or "none"
+                    for _, setting in ipairs(hg.ArmorPlateGeometry) do
+                        state[setting.field] = math.Clamp(tonumber(saved[setting.field]) or setting.default, setting.min, setting.max)
+                    end
 						ply.armor_states[armor] = state
 						local maximum = hg.GetArmorPlateMaxHealth(ply, armor)
 						state.plateHealth = math.Clamp(tonumber(saved.plateHealth) or maximum, 0, maximum)
@@ -293,7 +297,7 @@ local function applyEquipmentPreset(ply, equipment)
 		ent:SetPos(ply:GetPos())
 		ent:Spawn()
 		if istable(saved.armor) and not hg.ApplyZCityArmorConfiguration(ent, saved.armor) then ent:Remove() continue end
-		if not hg.SetZCityArmorMass(ent, tonumber(saved.mass) or ent.CarryMass or 1) then ent:Remove() continue end
+		if not saved.armor and not hg.SetZCityArmorMass(ent, tonumber(saved.mass) or ent.CarryMass or 1) then ent:Remove() continue end
 		if not ent:CanWear(wearer) then ent:Remove() continue end
 		ent:Wear(wearer)
 		if ent.SetEnabled then ent:SetEnabled(saved.enabled == true) end

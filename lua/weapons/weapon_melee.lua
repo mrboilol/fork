@@ -1631,6 +1631,7 @@ function SWEP:MultiplyDMG(owner, ent, vellen, mul)
 	mul = mul * (ent ~= owner and 0.75 or 1)
 	mul = mul * (owner.MeleeDamageMul or 1)
 	mul = mul * (owner.GetTraitMultiplier and owner:GetTraitMultiplier("melee_damage", 1) or 1)
+	mul = mul * Lerp(self:GetMeleeArmEffectiveness(owner), 0.2, 1)
 
     if owner.organism.superfighter then
         mul = mul * 5
@@ -5321,7 +5322,7 @@ function SWEP:NPCThink()
             npc:SetSchedule(SCHED_MELEE_ATTACK1)
 			timer.Create(timerId, (self.AttackTime + 0.1) or 0.4, 1, function()
 				if IsValid(self) and IsValid(npc) and npc:Alive() and IsValid(trEnt) then
-					local mul = 1
+					local mul = Lerp(self:GetMeleeArmEffectiveness(npc), 0.2, 1)
 					mul = mul * self:GetBehindAttackDamageMul(trEnt, 1)
 					local blockMul, blockState = self:BlockingLogic(trEnt, mul, false, trace)
 					mul = mul * blockMul

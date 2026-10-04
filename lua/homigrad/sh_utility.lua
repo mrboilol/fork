@@ -1357,7 +1357,7 @@ local IsValid = IsValid
 		}
 	end
 
-	function hg.GetLegEffectiveness(ent, side)
+	function hg.GetLegEffectiveness(ent, side, segment)
 		if not IsValid(ent) then return 1 end
 
 		local limb = side
@@ -1380,14 +1380,7 @@ local IsValid = IsValid
 			return 0
 		end
 
-		local damage = math.Clamp(tonumber(org[limb]) or 0, 0, 1)
-		local effectiveness = damage < 0.2 and 1 or Lerp((damage - 0.2) / 0.8, 0.85, 0.2)
-		if damage >= 1 then
-			effectiveness = math.min(effectiveness, 0.1)
-		end
-		if org[limb .. "dislocation"] or org[limb .. "dislocated"] then
-			effectiveness = math.min(effectiveness, 0.15)
-		end
+		local effectiveness = hg.GetLimbEffectiveness(org, limb, segment)
 		if hg.HasTourniquetOnLimb and hg.HasTourniquetOnLimb(ent, limb) then
 			effectiveness = math.min(effectiveness, 0.2)
 		end

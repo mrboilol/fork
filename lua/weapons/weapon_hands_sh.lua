@@ -255,11 +255,11 @@ end
 
 -- Helper function to get arm damage multiplier for item interaction
 -- Returns a multiplier from 1.0 (healthy) to 0.0 (useless)
-function SWEP:GetArmDamageMultiplier()
+function SWEP:GetArmDamageMultiplier(limb)
 	local owner = self:GetOwner()
 	if not IsValid(owner) or not owner:IsPlayer() then return 1.0 end
 
-	-- Use the better arm for item interaction (heavy-lifting threshold)
+	if limb then return hg.GetArmEffectiveness(owner, limb) end
 	return math.max(hg.GetArmEffectiveness(owner, "rarm"), hg.GetArmEffectiveness(owner, "larm"))
 end
 
@@ -2678,7 +2678,7 @@ function SWEP:AttackFront(special_attack, rand)
 		local DamageAmt = (math.random(3, 5) * (special_attack and 3 or 1)) * (self.DamageMul or 1) * MELEE_IMPACT_DAMAGE_MULT
 		Ent:PrecacheGibs()
 
-		Mul = Mul * (owner.MeleeDamageMul or 1) * Lerp(self:GetArmDamageMultiplier(), 0.3, 1)
+		Mul = Mul * (owner.MeleeDamageMul or 1) * Lerp(self:GetArmDamageMultiplier(rand and "rarm" or "larm"), 0.3, 1)
 
 		if Ent:IsPlayer() and IsValid(Ent:GetActiveWeapon()) and Ent:GetActiveWeapon().GetBlocking then
 			Mul = Mul * (self:GetBlocking() and 0.5 or 1)

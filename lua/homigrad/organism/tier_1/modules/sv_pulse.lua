@@ -900,10 +900,6 @@ module[2] = function(owner, org, timeValue)
 	local organSystemsEnabled = hg.organism.OrganSystemsEnabled and hg.organism.OrganSystemsEnabled() or true
 
 	local o2Value = org.o2 and org.o2[1] or 30
-	if not org.heartstop and not org.fibrillation and (org.arrhythmia or 0) < 0.25 and (org.myocardialOxygen or 1) > 0.55 and (org.hypovolemicBradyStrain or 0) < 0.1 then
-		org.heartStrain = Approach(org.heartStrain or 0, 0, timeValue / 45)
-	end
-
 	local heart = getHeartEfficiency(org)
 	local brain = math.Clamp(1 - org.brain * 1.5,0,1)
 	local o2 = org.o2
@@ -1126,8 +1122,14 @@ module[2] = function(owner, org, timeValue)
 	local myocardialTarget = Clamp(cardiacSupply / math.max(cardiacDemand, 1), 0, 1)
 	if org.heartstop and defibGrace then myocardialTarget = math.max(myocardialTarget, 0.25) end
 	org.myocardialOxygen = Approach(org.myocardialOxygen or 1, myocardialTarget, timeValue / 8)
-	org.cardiacStressExposure = Clamp((org.cardiacStressExposure or 0)
-		+ timeValue * (oxygenMismatch ^ 2 / 85 - math.max(cardiacSupply - cardiacDemand * 0.8, 0) / 45), 0, 1)
+	local lowVolumeWork = Clamp((0.8 - bloodNow / math.max(org.maxblood or 5000, 1)) / 0.32, 0, 1)
+		* Clamp(((org.heartbeat or 70) - 70) / 70, 0.25, 1)
+	local cardiacWorkload = math.max(oxygenMismatch, lowVolumeWork)
+	local cardiacRelief = math.max(cardiacSupply - cardiacDemand * 0.8, 0) * (1 - cardiacWorkload) ^ 4
+	org.cardiacStressExposure = Clamp((org.cardiacStressExposure or 0) + timeValue * (oxygenMismatch ^ 2 / 85 + lowVolumeWork ^ 2 / 180 - cardiacRelief / 45), 0, 1)
+	local strainRecovery = not org.heartstop and not org.fibrillation and (org.arrhythmia or 0) < 0.25
+		and (org.myocardialOxygen or 1) > 0.7 and cardiacWorkload < 0.08 and (org.hypovolemicBradyStrain or 0) < 0.1
+	org.heartStrain = Clamp((org.heartStrain or 0) + timeValue * (cardiacWorkload ^ 2 / 120 - (strainRecovery and 1 / 90 or 0)), 0, 1)
 	local pressureHypotensionTarget = Clamp(Remap(pressureTarget, 70, 30, 0, 1), 0, 1)
 	local hypotensionTarget = pressureHypotensionTarget
 	local hypotensionRate = highSpeedPressureShock > 0.25 and timeValue / 2.5 or timeValue / 8
@@ -1425,7 +1427,7 @@ module[2] = function(owner, org, timeValue)
 	local traumaRhythmRisk = math.max(internalBleedRhythmRisk * (0.45 + cardiacTraumaRhythmRisk * 0.55), cardiacTraumaRhythmRisk * 0.6)
 	org.internalBleedRhythmRisk = internalBleedRhythmRisk
 	org.traumaRhythmRisk = traumaRhythmRisk
-	local stress = Clamp((org.heart or 0) * 0.9 + ischemia * 0.8 + (org.hypertension or 0) * 0.35 + (org.hypotension or 0) * 0.3 + hemorrhageRhythmStress * 0.35 + hemorrhageElectricalInstability * 0.95 + hypothermiaInstability * 0.35 + traumaRhythmRisk * 0.8 + hypotensionInstability * 0.9 + Clamp(org.shock, 0, 80) / 180 + max(org.pain - 60, 0) / 220 + max(org.heartbeat - 165, 0) / 190, 0, 2.5)
+	local stress = Clamp((org.heart or 0) * 0.9 + ischemia * 0.8 + (org.heartStrain or 0) * 0.35 + (org.cardiacStressExposure or 0) * 0.45 + (org.hypertension or 0) * 0.35 + (org.hypotension or 0) * 0.3 + hemorrhageRhythmStress * 0.35 + hemorrhageElectricalInstability * 0.95 + hypothermiaInstability * 0.35 + traumaRhythmRisk * 0.8 + hypotensionInstability * 0.9 + Clamp(org.shock, 0, 80) / 180 + max(org.pain - 60, 0) / 220 + max(org.heartbeat - 165, 0) / 190, 0, 2.5)
 	local arrhythmiaTarget = Clamp(math.max(stress * 0.42, hemorrhageElectricalInstability * 0.88, traumaRhythmRisk * 0.72) * math.Clamp(org.conditionResistanceMul or 1, 0.05, 1), 0, 1)
 	local arrhythmiaRiseTime = Lerp(hemorrhageElectricalInstability, 25, 6)
 	if (org.rhythmRecoveryUntil or 0) > CurTime() then
@@ -1483,7 +1485,7 @@ module[2] = function(owner, org, timeValue)
 	local catecholamineOverdrive = adrenalineRateTolerance * Clamp((org.heartbeat - 180) / 80, 0, 1)
 	local pressureDamage = math.max(Clamp(org.hypertension or 0, 0, 1), hypertensiveEmergency)
 	org.heartStrain = Clamp((org.heartStrain or 0) + timeValue * (highRateDamage / 120 + pressureDamage / 150), 0, 1)
-	org.heart = Clamp((org.heart or 0) + timeValue * (highRateDamage ^ 2 * 0.0012 + catecholamineOverdrive * 0.00045 + pressureDamage ^ 2 * 0.001 + hypertensiveEmergency ^ 2 * 0.0025), 0, 1)
+	org.heart = Clamp((org.heart or 0) + timeValue * ((org.cardiacStressExposure or 0) ^ 2 * cardiacWorkload ^ 2 * 0.0005 + highRateDamage ^ 2 * 0.0012 + catecholamineOverdrive * 0.00045 + pressureDamage ^ 2 * 0.001 + hypertensiveEmergency ^ 2 * 0.0025), 0, 1)
 	if ischemia > 0.45 and org.isPly and not org.otrub and (org.lastCardiacPain or 0) < CurTime() then
 		org.lastCardiacPain = CurTime() + math.Rand(14, 24)
 		org.painadd = org.painadd + math.Rand(4, 9) * ischemia

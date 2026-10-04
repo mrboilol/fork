@@ -3,19 +3,40 @@ function hg.GetLimbDebuffMultiplier(org)
 	return Lerp(analgesia, 1, 0.35)
 end
 
-function hg.GetArmEffectiveness(ply, limb)
+function hg.GetLimbEffectiveness(org, limb, segment)
+	if not org then return 1 end
+	local leg = limb == "lleg" or limb == "rleg"
+	local extremity = limb == "lleg" and "lfoot" or limb == "rleg" and "rfoot" or limb == "larm" and "lhand" or "rhand"
+	if org[limb .. "upamputated"] or (segment ~= "up" and (org[limb .. "amputated"] or org[extremity .. "amputated"])) then return 0 end
+
+	local up = math.Clamp(tonumber(org[limb .. "_up"]) or 0, 0, 1)
+	local down = math.Clamp(tonumber(org[limb .. "_down"]) or 0, 0, 1)
+	local aggregate = math.Clamp(tonumber(org[limb]) or 0, 0, 1)
+	if aggregate > math.max(up, down) then down = aggregate end
+	local upDislocated = org[limb .. "_up_disl"]
+	local downDislocated = org[limb .. "_down_disl"]
+	if (org[limb .. "dislocation"] or org[limb .. "dislocated"]) and not upDislocated and not downDislocated then upDislocated = true end
+
+	local debuff = leg and 1 or hg.GetLimbDebuffMultiplier(org)
+	local function strength(damage, dislocated)
+		local mechanical = 1 - (leg and 0.9 or 0.88) * damage ^ 1.3
+		local power = math.min(1 - (1 - mechanical) * debuff, 1 - damage ^ 4 * 0.75)
+		return dislocated and math.min(power, leg and 0.15 or 0.18) or power
+	end
+	up, down = strength(up, upDislocated), strength(down, downDislocated)
+	if segment == "up" then return up * (0.85 + down * 0.15) end
+	if segment == "down" then return down * up ^ 0.5 end
+	return up ^ 0.75 * down ^ 0.9
+end
+
+function hg.GetArmEffectiveness(ply, limb, segment)
 	local org = IsValid(ply) and ply.organism
 	if not org then return 1 end
 
 	local hand = limb == "larm" and "lhand" or "rhand"
 	if org[limb .. "amputated"] or org[limb .. "upamputated"] or org[hand .. "amputated"] then return 0 end
 
-	local damage = math.Clamp(tonumber(org[limb]) or 0, 0, 1)
-	local effectiveness = damage < 0.25 and 1 or Lerp((damage - 0.25) / 0.75, 0.82, 0.12)
-	if org[limb .. "dislocation"] or org[limb .. "dislocated"] then
-		effectiveness = math.min(effectiveness, 0.18)
-	end
-	effectiveness = 1 - (1 - effectiveness) * hg.GetLimbDebuffMultiplier(org)
+	local effectiveness = hg.GetLimbEffectiveness(org, limb, segment)
 
 	local tourniquetCount = hg.GetTourniquetCountOnLimb and hg.GetTourniquetCountOnLimb(ply, limb) or 0
 	if tourniquetCount == 1 then

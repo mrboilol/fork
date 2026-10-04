@@ -383,8 +383,7 @@ if CLIENT then
 				end
 
 				if click != oldclick and not last_message then
-					sound.Play("speak" .. math.random(1, 2) .. ".ogg", render.GetViewSetup().origin - vector_up * 10, 30, math.random(97, 103), 0.5)
-					//surface.PlaySound("peepsnd")
+					sound.Play("speak" .. math.random(1, 2) .. ".ogg", render.GetViewSetup().origin - vector_up * 10, 40, math.random(97, 103), 0.8)
 					oldclick = click
 				end
 

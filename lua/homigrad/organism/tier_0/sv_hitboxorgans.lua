@@ -181,7 +181,7 @@ function hg.organism.BlastTrace(pos, size, dmg, boxs, organs, funcInput, ...)
 		box = boxs[i]
 		center = box[1]
 
-		local organ = box[6] and organs[box[6]] and organs[box[6]][box[7]]
+		local organ = box[8] or (box[6] and organs[box[6]] and organs[box[6]][box[7]])
 		local dist = pos:Distance(center)
 		--size = size * 999
 		local amt = dmg / dist * (1 - (organ and organ[2] or 0)) / size

@@ -912,6 +912,26 @@ local function solve(segments, iter, keepRoot)
     return final
 end
 
+local function weakenArmIK(ply, org, limb, segments, length)
+	local upperPower = hg.GetLimbEffectiveness(org, limb, "up")
+	local lowerPower = hg.GetLimbEffectiveness(org, limb, "down")
+	ply.hgInjuryIKOffsets = ply.hgInjuryIKOffsets or {}
+	if upperPower >= 0.999 and lowerPower >= 0.999 then
+		ply.hgInjuryIKOffsets[limb] = nil
+		return
+	end
+	segments[2].Pos = segments[2].Pos - vector_up * length * (1 - upperPower)
+	local target = segments[3].Pos - segments[1].Pos - vector_up * length * (1 - lowerPower) * 0.7
+	local response = 1 - math.exp(-FrameTime() * game.GetTimeScale() * Lerp(lowerPower, 4, 35))
+	local previous = ply.hgInjuryIKOffsets[limb] or target
+	local offset = LerpVector(response, previous, target)
+	local maxReach = length * 1.85
+	if offset:LengthSqr() > maxReach * maxReach then offset = offset:GetNormalized() * maxReach end
+	ply.hgInjuryIKOffsets[limb] = offset
+	segments[3].Pos = segments[1].Pos + offset
+	return true
+end
+
 function hg.DoTPIK(ply, ent)
     local ply_spine_index = ent:LookupBone("ValveBiped.Bip01_Head1")
     if !ply_spine_index then return end
@@ -982,7 +1002,7 @@ function hg.DoTPIK(ply, ent)
     local org = ply.organism or ent.organism
 	local leftArmBroken = org and ((org.larm or 0) >= 1 or org.larmdislocation or org.larmdislocated)
 	local leftArmAmputated = org and (org.larmamputated or org.lhandamputated or org.larmupamputated)
-	local leftArmDisabled = leftArmBroken or leftArmAmputated
+	local leftArmDisabled = leftArmAmputated
 	local brokenFistArm = leftArmBroken and IsValid(self) and self.GetFists and self:GetFists()
 	local reachingLeft = ply.hgPickupReachLeft and not leftArmAmputated
 	local leftArmRelaxing = not reachingLeft and leftArmBroken and not leftArmAmputated and IsValid(self) and ishgweapon(self) and not self.reload and not brokenFistArm
@@ -1112,7 +1132,8 @@ function hg.DoTPIK(ply, ent)
                 end
             end
 
-            segments = solve(segments, 4)
+            local rightArmWeak = weakenArmIK(ply, org, "rarm", segments, limblength)
+            segments = solve(segments, 4, rightArmWeak)
 
             --[[if lply:IsSuperAdmin() then
                 for i = 2, #segments do
@@ -1261,7 +1282,8 @@ local angrotate = math.NormalizeAngle(-eyeang.r + ply_r_hand_matrix:GetAngles().
                 end
             end
 
-            segments = solve(segments, 4, leftArmRelaxing)
+            local leftArmWeak = weakenArmIK(ply, org, "larm", segments, limblength)
+            segments = solve(segments, 4, leftArmRelaxing or leftArmWeak)
 
             --[[if lply:IsSuperAdmin() then
                 for i = 2, #segments do
@@ -1805,6 +1827,7 @@ local resetPlyTPIKFields = {
 	"BonesLength",
 	"nextrebuild",
 	"ply_r_upperarm_pos",
+	"hgInjuryIKOffsets",
 	"ply_r_forearm_pos",
 	"ply_l_upperarm_pos",
 	"ply_l_forearm_pos",
