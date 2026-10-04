@@ -179,26 +179,40 @@ local function getShotTravelDirection(dmgInfo, inputHole, outputHole, damagePos,
 	return direction:LengthSqr() > 0 and direction:GetNormalized() or ent:GetForward()
 end
 
+local function shouldSquirtHeadshotBlood(org, impact, hitgroup, damage, outputHole)
+	if hitgroup ~= HITGROUP_HEAD or damage <= 0 or impact.armorStopped then return false end
+	local throughHead = outputHole and #outputHole > 0
+	local brainDestroyed = impact.brainHit and (org.brain or 0) >= 0.95
+	local skullPunch = (impact.skullHit or (org.skull or 0) >= 1) and damage >= 20
+	if not throughHead and not (brainDestroyed and skullPunch) then return false end
+	local chance = throughHead and 0.7 or math.Clamp(damage / 80, 0.25, 0.8)
+
+	return math.Rand(0, 1) < chance
+end
+
 local function sendHeadshotBloodSquirt(ent, ply, damagePos, direction, outputHole, smallCaliber)
 	local headBoneName = "ValveBiped.Bip01_Head1"
 	local bone = IsValid(ent) and ent:LookupBone(headBoneName)
 	local mat = bone and ent:GetBoneMatrix(bone)
+	if not mat then return end
+	local localPos, localAng = WorldToLocal(damagePos, direction:Angle(), mat:GetTranslation(), mat:GetAngles())
+	local localExit = outputHole and outputHole[1]
+	if localExit then localExit = WorldToLocal(localExit, direction:Angle(), mat:GetTranslation(), mat:GetAngles()) end
 	local org = IsValid(ent) and ent.organism
 	local attempts = 0
 	local function send()
 		attempts = attempts + 1
+		if org and IsValid(ply) and ply.organism ~= org then return end
 		local rag = getHeadshotBloodBody(ent, ply)
-		if not IsValid(rag) then
+		if not IsValid(rag) or (rag == ply and ply.headExplodePending) then
 			if attempts < 20 then timer.Simple(0.05, send) end
 			return
 		end
 
 		if (org or rag).bloodsquirted or rag.headexploded then return end
 
-		if not mat then
-			bone = rag:LookupBone(headBoneName)
-			mat = bone and rag:GetBoneMatrix(bone)
-		end
+		bone = rag:LookupBone(headBoneName)
+		mat = bone and rag:GetBoneMatrix(bone)
 		if not mat then
 			if attempts < 20 then timer.Simple(0.05, send) end
 			return
@@ -218,13 +232,16 @@ local function sendHeadshotBloodSquirt(ent, ply, damagePos, direction, outputHol
 		end
 
 		local strength = smallCaliber and 4 or 2
-		sendJet(damagePos, -direction * strength)
-		if outputHole and #outputHole > 0 then
-			sendJet(outputHole[1], direction * strength)
+		local pos, ang = LocalToWorld(localPos, localAng, mat:GetTranslation(), mat:GetAngles())
+		local travel = ang:Forward()
+		sendJet(pos, -travel * strength)
+		if localExit then
+			local exitPos = LocalToWorld(localExit, localAng, mat:GetTranslation(), mat:GetAngles())
+			sendJet(exitPos, travel * strength)
 		end
 	end
 
-	send()
+	timer.Simple(0, send)
 end
 
 local function ApplyFatalOrganismDamage(org, dmgInfo)
@@ -238,7 +255,7 @@ local function ApplyFatalOrganismDamage(org, dmgInfo)
 	timer.Simple(0, function()
 		if not IsValid(owner) then return end
 		if owner:IsPlayer() then
-			if owner:Alive() then owner:Kill() end
+			if owner:Alive() and not owner.headExplodePending then owner:Kill() end
 			return
 		end
 		if owner:IsNPC() or owner:IsNextBot() then
@@ -315,6 +332,7 @@ local function Trace_Bullet(box, hit, ricochet, impact, org, organs, dmg, dmgInf
 		if isBrainLobe and impact.organContact == "direct" then impact.brainPenetrated = true end
 		local oldSkull = name == "skull" and org.skull or 0
 		local resistance = func(org, bone, dmg, dmgInfo, box[6], dir, hit, ricochet, impact, organ)
+		if name == "skull" and (org.skull or 0) > oldSkull then impact.skullHit = true end
 
 		if isRifleBullet and name == "skull" then resistance = (resistance or 0) * 0.35 end
 		local brainDelta = isBrainLobe and math.max((org[name] or 0) - oldBrainLobe, 0) or 0
@@ -1232,12 +1250,12 @@ function hg.ExplodeHead(ent, damage, slash, force)
 	if ent.headexploded or ent.headExplodePending then return end
 	ent.headExplodePending = true
 	local sourceEnt = ent
+	local sourceOrg = ent.organism
 
 	local ply = ent:IsRagdoll() and hg.RagdollOwner(ent) or ent
 	if IsValid(ply) and ply:IsPlayer() and ply.RemoveHeadcrabFromTrauma then
 		ply:RemoveHeadcrabFromTrauma(false)
 	end
-	if IsValid(ply) and ply:IsPlayer() and ply:Alive() then ply:Kill() end
 	if ent:IsNPC() and ent.organism then
 		ent.organism.shock = 100
 		ent.organism.alive = false
@@ -1245,6 +1263,7 @@ function hg.ExplodeHead(ent, damage, slash, force)
 
 	local function finishHeadExplosion(attempt, entityReady)
 		if not IsValid(sourceEnt) then return end
+		if sourceOrg and IsValid(ply) and ply.organism ~= sourceOrg then return end
 		local ent = sourceEnt
 		if sourceEnt:IsPlayer() then
 			ent = IsValid(sourceEnt.RagdollDeath) and sourceEnt.RagdollDeath
@@ -1260,8 +1279,6 @@ function hg.ExplodeHead(ent, damage, slash, force)
 			if IsValid(sourceEnt) then sourceEnt.headExplodePending = nil end
 			return
 		end
-		-- A C-menu head amputation can create this death ragdoll in the same
-		-- server tick. Give it time to network before sending entity-based FX.
 		if sourceEnt:IsPlayer() and not entityReady then
 			timer.Simple(0.1, function()
 				finishHeadExplosion(attempt, true)
@@ -1276,11 +1293,12 @@ function hg.ExplodeHead(ent, damage, slash, force)
 		if hg.Appearance and hg.Appearance.DropAccessoriesByPlacement then
 			hg.Appearance.DropAccessoriesByPlacement(ent, {face = true, face2 = true, mask = true}, force)
 		end
-		--[[if not isbool(ent) then
-			hook.Run("OnHeadExplode", ply, ent)
-		end]]
-
 		local headBone = ent:LookupBone("ValveBiped.Bip01_Head1")
+		if not headBone or headBone < 0 then
+			ent.headExplodePending = nil
+			sourceEnt.headExplodePending = nil
+			return
+		end
 		local mat = headBone and ent:GetBoneMatrix(headBone)
 		
 		Gib_Input(ent, headBone, force, damage)
@@ -1323,8 +1341,13 @@ function hg.ExplodeHead(ent, damage, slash, force)
 		hg.send_bareinfo(ent.organism)
 	end
 
-	if sourceEnt:IsPlayer() then
+	if IsValid(ply) and ply:IsPlayer() then
 		timer.Simple(0, function()
+			if not IsValid(ply) or (sourceOrg and ply.organism ~= sourceOrg) then return end
+			if ply:Alive() then
+				if not IsValid(ply.FakeRagdoll) then hg.Fake(ply, nil, nil, true, "forced") end
+				ply:Kill()
+			end
 			finishHeadExplosion(0, false)
 		end)
 	else
@@ -2125,23 +2148,21 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	--print(damageStack, org.dmgstack[hitgroup][1], org.dmgstack[hitgroup][3])
 	local blast = dmgInfo:IsDamageType(DMG_BLAST)
 	local slash = dmgInfo:IsDamageType(DMG_SLASH)
-	if not noDismemberment and instant and hitgroup == HITGROUP_HEAD and !ent.headexploded then hg.ExplodeHead(ent, headGoreStack or gibStack, slash, dirCool * len) end
 	if not noDismemberment and instant and hitgroup == HITGROUP_STOMACH and hg.AmputateTorso then
 		hg.AmputateTorso(ent, dirCool * len, blast)
 	end
 	if not noDismemberment and instant and hitgroup == HITGROUP_STOMACH and not org.stomachgibbed and hg.AttachStomachGore then
 		hg.AttachStomachGore(ent, dirCool * len)
 	end
-	local throughAndThrough = outputHole and #outputHole > 0
-	local throughBrain = impact.brainPenetrated and throughAndThrough
-		and not noDismemberment and not (IsValid(inf) and inf.NoGoreDamage)
-	local fatalHeadshot = impact.brainHit or (org.brain or 0) >= 0.25 or throughAndThrough or not org.alive or (IsValid(ply) and not ply:Alive())
-	if (throughBrain or (hitgroup == HITGROUP_HEAD and fatalHeadshot and damageStack > 0))
-		and dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_SNIPER)
-		and not ent.headexploded and not ent.headExplodePending then
+	if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_SNIPER)
+		and not ent.headexploded and not ent.headExplodePending
+		and shouldSquirtHeadshotBlood(org, impact, hitgroup, damageStack, outputHole) then
 		local squirtDirection = getShotTravelDirection(dmgInfo, inputHole, outputHole, dmgPos, ent)
 		local caliber = tonumber(bullet and bullet.Diameter) or tonumber(IsValid(inf) and inf.PenetrationSize) or 0
 		sendHeadshotBloodSquirt(ent, ply, dmgPos, squirtDirection, outputHole, caliber > 0 and caliber <= 5.7)
+	end
+	if not noDismemberment and instant and hitgroup == HITGROUP_HEAD and not ent.headexploded then
+		hg.ExplodeHead(ent, headGoreStack or gibStack, slash, dirCool * len)
 	end
 	if ply and hitgroup == HITGROUP_HEAD and ply.RemoveHeadcrabFromTrauma
 		and ply.organism and ply.organism.headcrabAttached and damageStack > 0 then
@@ -2149,7 +2170,8 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		local hitChance = math.Clamp(0.08 + damageStack / 180, 0.08, chanceCap)
 		if math.Rand(0, 1) <= hitChance then ply:RemoveHeadcrabFromTrauma(math.Rand(0, 1) < 0.45) end
 	end
-	if not noDismemberment and instant and (hitgrouptolimb[hitgroup] or hg.amputeetable[bonename] or upperBoneLimbs[bonename]) then
+	if not noDismemberment and instant and hitgroup ~= HITGROUP_HEAD
+		and (hitgrouptolimb[hitgroup] or hg.amputeetable[bonename] or upperBoneLimbs[bonename]) then
 		if blast then
 			for _, limb in ipairs({"lleg", "rleg", "larm", "rarm"}) do
 				if !org[limb.."amputated"] and math.random(5) < 200 / lend then hg.organism.AmputateLimb(org, limb, nil, dmgInfo) end

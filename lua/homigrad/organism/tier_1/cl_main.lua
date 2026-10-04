@@ -1064,7 +1064,8 @@ end
 
 local function emitOrdinaryBleeding(ent, org, wound, pos, ang, visualRate, interval)
 	local sizeK = getWoundSizeK(wound, 18)
-	local style = tonumber(wound[6]) == 2 or wound.woundType == "slash"
+	local slash = tonumber(wound[6]) == 2 or wound.woundType == "slash"
+	local bullet = wound.woundType == "bullet"
 	local _, pressureDrive = getBleedPressureDrive(org)
 	local outward = getBleedDirection(ang)
 	local dropVolume = math.min(visualRate * interval, 8)
@@ -1073,9 +1074,9 @@ local function emitOrdinaryBleeding(ent, org, wound, pos, ang, visualRate, inter
 	local spread = 1 - concentration * 0.6
 	local lateral = ang:Right() * math.sin(phase) * (2 + sizeK * 9) * spread
 		+ ang:Up() * math.cos(phase * 0.73) * (1 + sizeK * 6) * spread
-	local speedK = sizeK * sizeK
-	local speed = math.min(((style and 12 or 5) + speedK * (style and 150 or 85)) * pressureDrive
-		* (1 + concentration * 0.3), 90)
+	local opening = math.Clamp(((tonumber(wound[1]) or 0) - 6) / 12, 0, 1)
+	local jetK = opening * opening * math.Clamp(visualRate / 4, 0, 1)
+	local speed = (2 + jetK * (bullet and 150 or (slash and 60 or 35))) * pressureDrive
 	local vel = outward * speed * math.Rand(0.6, 1.1) + bleedDown * math.Rand(10, 30)
 		+ lateral + VectorRand(-(2 + sizeK * 10) * spread, (2 + sizeK * 10) * spread)
 	local count = math.Clamp(math.ceil(dropVolume / 2), 1, 3)
@@ -1097,12 +1098,14 @@ local function emitArterialBleeding(ent, org, wound, index, pos, ang, boneAng, w
 	end
 
 	local pulse = math.max(tonumber(org.pulse) or 70, 1) / 70
-	local sizeK = math.Clamp((tonumber(wound[1]) or 6) / 18, 0.25, 1)
+	local sizeK = math.Clamp((tonumber(wound[1]) or 0) / 18, 0, 1)
+	local opening = math.Clamp((tonumber(wound[1]) or 0) / 10, 0, 1)
+	local jetK = opening * opening * math.Clamp(visualRate / 20, 0, 1)
 	local _, pressureDrive = getBleedPressureDrive(org)
 	local lift = getHeartbeatLift(org, index)
 	pressureDrive = math.min(pressureDrive, 1.1) * compression
-	local count = math.Clamp(math.ceil((arteryBurstCount + sizeK * 3 * arteryStreamFlow) * compression), 1, 5)
-	local volume = math.min(visualRate * interval / (count + 0.35), 8)
+	local count = math.Clamp(math.ceil((1 + jetK * (arteryBurstCount - 1 + 3 * arteryStreamFlow)) * compression), 1, 5)
+	local volume = math.min(visualRate * interval / count, 8)
 	local time = CurTime()
 	local localDir = wound[6]
 	local sprayDir = getBleedDirection(ang)
@@ -1116,14 +1119,13 @@ local function emitArterialBleeding(ent, org, wound, index, pos, ang, boneAng, w
 	local sprayAng = sprayDir:Angle()
 	local flowWave = 0.85 + (math.abs(math.sin(phase * 2) + math.cos(phase * (5 + index * 2))
 		+ math.sin(phase * (1 + index))) * 0.6 + math.sin(phase * 2)) * 0.05
-	local sway = (0.5 + sizeK * 0.5) * pressureDrive * arteryStreamFlow * (forceMul or 1)
+	local sway = jetK * pressureDrive * arteryStreamFlow * (forceMul or 1)
 	local streamSpeed = math.Clamp((isvector(localDir) and localDir:Length() or 100) * 3.3, 120, 390)
-		* reach * pressureDrive * math.Clamp(pulse, 0.5, 1) * arteryStreamFlow * flowWave * (forceMul or 1)
+		* reach * pressureDrive * math.Clamp(pulse, 0.5, 1) * arteryStreamFlow * flowWave * jetK * (forceMul or 1)
 	local velocity = sprayDir * streamSpeed
 		+ vector_up * streamSpeed * arteryStreamLift * lift
 		+ sprayAng:Right() * (pouring and 30 or 25) * sway * math.sin(phase * 2) * math.cos(phase * 4)
 		+ sprayAng:Up() * (pouring and 25 or 20) * sway * math.sin(phase * 3) * math.cos(phase)
-	if pressureDrive <= 0.05 then return false end
 
 	for _ = 1, count do
 		local dropVolume = volume
@@ -1131,6 +1133,7 @@ local function emitArterialBleeding(ent, org, wound, index, pos, ang, boneAng, w
 		local spread = (pouring and 4 + sizeK * 8 or 1 + sizeK) * pressureDrive * arteryStreamFlow * 0.5
 		local vel = velocity * math.Rand(pouring and 0.85 or 0.95, pouring and 1.05 or 1.02)
 			+ VectorRand(-spread, spread)
+		vel = vel + bleedDown * math.Rand(15, 35) * (1 - math.min(jetK * pressureDrive, 1))
 		if pouring and pressureDrive > 0.05 then vel = vel + bleedDown * math.Rand(15, 35) * arteryStreamFlow end
 		local part = hg.addBloodPart(pos, vel, nil, size, size, true, nil, ent, dropVolume < 0.25)
 		if part then part.volume = dropVolume end

@@ -200,6 +200,8 @@ SWEP.AttackLen2 = 45
 SWEP.DamageType = DMG_SLASH
 SWEP.DamagePrimary = 15
 SWEP.DamageSecondary = 8
+SWEP.MeleeDamageMul = 1.5
+SWEP.MeleeBoneMul = 1.75
 SWEP.ArteryChance = 1
 SWEP.MeleeStepLodgeChance = 0.04
 SWEP.ComboEnabled = false
@@ -214,9 +216,9 @@ SWEP.SwingForwardBoostMinSpeed = 20
 SWEP.RagdollHitForceMul = 0.5
 
 SWEP.SwingDamageEnabled = true
-SWEP.SwingDamageMinSpeed = 120
-SWEP.SwingDamageMaxSpeed = 600
-SWEP.SwingDamageMaxMul = 1.4
+SWEP.SwingDamageMinSpeed = 60
+SWEP.SwingDamageMaxSpeed = 420
+SWEP.SwingDamageMaxMul = 1.75
 SWEP.SwingDamageDebug = false
 SWEP.SwingDecayHalfLife = 0.5
 
@@ -251,6 +253,7 @@ SWEP.PenetrationSizeSecondary = 2.5
 SWEP.StaminaPrimary = 10
 SWEP.StaminaSecondary = 8.5
 SWEP.StaminaCostMul = 0.5
+SWEP.MeleeStaminaMul = 0.4
 
 SWEP.ViewPunch1 = Angle(2,0,0)
 SWEP.ViewPunch2 = Angle(0,1,0)
@@ -1623,7 +1626,8 @@ end
 
 function SWEP:MultiplyDMG(owner, ent, vellen, mul)
     mul = mul * 1 / math.Clamp((180 - owner.organism.stamina[1]) / 90,1,1.3)
-    mul = mul * math.Clamp(vellen / 250, 0.9, 1.25)
+	local forwardSpeed = ent:GetVelocity():Dot(owner:GetAimVector())
+	mul = mul * (self.MeleeDamageMul or 1.5) * Lerp(math.Clamp(forwardSpeed / 250, 0, 1), 1, 1.4)
 	mul = mul * (ent ~= owner and 0.75 or 1)
 	mul = mul * (owner.MeleeDamageMul or 1)
 	mul = mul * (owner.GetTraitMultiplier and owner:GetTraitMultiplier("melee_damage", 1) or 1)
@@ -1661,9 +1665,9 @@ end
 function SWEP:GetSwingDamageMul()
     if not self.SwingDamageEnabled then return 1 end
 
-    local minSpeed = self.SwingDamageMinSpeed or 150
-    local maxSpeed = self.SwingDamageMaxSpeed or 900
-    local maxMul = self.SwingDamageMaxMul or 1.5
+    local minSpeed = self.SwingDamageMinSpeed or 60
+    local maxSpeed = self.SwingDamageMaxSpeed or 420
+    local maxMul = self.SwingDamageMaxMul or 1.75
     local speed = self.SwingSpeed or 0
 
     local t = math.Clamp((speed - minSpeed) / math.max(maxSpeed - minSpeed, 0.001), 0, 1)
@@ -2028,7 +2032,7 @@ function SWEP:ConsumeMeleeStamina(owner, amount)
 	if not SERVER or not IsValid(owner) or not owner.organism then return end
 	local org = owner.organism
 	local stamina = org.stamina
-	if stamina then stamina.subadd = (stamina.subadd or 0) + math.max(tonumber(amount) or 0, 0) * (self.MeleeStaminaMul or 0.6) end
+	if stamina then stamina.subadd = (stamina.subadd or 0) + math.max(tonumber(amount) or 0, 0) * (self.MeleeStaminaMul or 0.4) end
 
 	local arms = self.TwoHanded and {"rarm", "larm"} or {"rarm"}
 	local pain = 0
@@ -2178,8 +2182,25 @@ end
 local ShouldDrawMeleeAttackHull
 local DrawMeleeAttackHull
 
+function SWEP:GetMeleeSweepData(owner, ent, attacktype, inattackLength)
+	local speedAdd = math.min(owner:GetVelocity():Length() * 0.05, 40)
+	local isKnife = self:GetClass():lower():find("knife") ~= nil
+	local knifeBonus = isKnife and (self.MeleeKnifeBonus or 0) or 0
+	local baseReach = self.MeleeRange or (self:GetAttackLength() + speedAdd + knifeBonus)
+	local defaultMul = self.MeleeRange and 1 or (isKnife and (self.MeleeKnifeMul or 1) or 0.7)
+	local reach = math.max(baseReach * (self.MeleeReachMul or defaultMul) - (self.MeleeReachTrim or -1), 0)
+	local charge = self:IsChargeAttackType(attacktype)
+	if charge then reach = math.max(reach, self.SlamReach or 72) end
+	local inWindow = inattackLength >= (self.MeleeActiveStart or 0.15)
+		and inattackLength <= (self.MeleeActiveEnd or 0.8)
+	local active = self:IsSecondaryAttackType(attacktype) or charge or inWindow
+	local eyeTrace = hg.eyeTrace(owner, self:GetAttackLength() + speedAdd, ent, owner:GetAimVector(), nil,
+		{owner, ent, self, owner.OldRagdoll})
+
+	return eyeTrace, reach, active, inWindow
+end
+
 function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
-    //if SERVER then owner:SetNetVar("slowDown", owner:GetNetVar("slowDown", 0) + (attacktype and self.DamageSecondary or self.DamagePrimary)) end
     local secondary = self:IsSecondaryAttackType(attacktype)
     local charge = self:IsChargeAttackType(attacktype)
     
@@ -2195,8 +2216,6 @@ function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
         else
             self.Penetration = self:GetAttackConfigValue(self.PenetrationPrimary, self.PenetrationSecondary, self.ChargePenetration, attacktype)
             self.PenetrationSize = self:GetAttackConfigValue(self.PenetrationSizePrimary, self.PenetrationSizeSecondary, self.ChargePenetrationSize, attacktype)
-            -- Custom attacks can end the attack early, so consume the first tick
-            -- before invoking them instead of relying on the normal hit path.
             self.FirstAttackTick = true
             if owner:IsPlayer() and owner:HasTrait("clumsy") and (self.HGClumsySelfHitNext or 0) <= CurTime() and math.Rand(0, 1) < 0.04 then
                 self.HGClumsySelfHitNext = CurTime() + 1.5
@@ -2231,30 +2250,11 @@ function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
     
     self.HitEnts = self.HitEnts or {owner, self, ent}
     
-    local awStart = self.MeleeActiveStart or 0.15
-    local awEnd = self.MeleeActiveEnd or 0.8
-    local inWindow = inattackLength >= awStart and inattackLength <= awEnd
+    local eyetr, reachLen, active, inWindow = self:GetMeleeSweepData(owner, ent, attacktype, inattackLength)
+    if not eyetr then return end
     self.InMeleeActiveWindow = inWindow
-    local windowReach = (secondary or charge) and 1 or (inWindow and 1 or 0)
-
-    local vellen = math.min(owner:GetVelocity():Length() * 0.05, 40)
-    local isKnife = self:GetClass():lower():find("knife") ~= nil
-    local knifeBonus = isKnife and (self.MeleeKnifeBonus or 0) or 0
-    local baseReach = self.MeleeRange or (self:GetAttackLength() + vellen + knifeBonus)
-    local defMul = self.MeleeRange and 1 or (isKnife and (self.MeleeKnifeMul or 1) or 0.7)
-    local reachLen = baseReach * (self.MeleeReachMul or defMul)
-    reachLen = math.max(reachLen - (self.MeleeReachTrim or -1), 0)
-    if charge then reachLen = math.max(reachLen, self.SlamReach or 72) end
-    local eyetr = hg.eyeTrace(owner, (self:GetAttackLength() + vellen), ent, owner:GetAimVector(), nil, {owner, ent, self, owner.OldRagdoll})
+    local windowReach = active and 1 or 0
     local shouldDrawHull = ShouldDrawMeleeAttackHull(owner)
-    //debugoverlay.Line(eyetr.StartPos, eyetr.StartPos + eyetr.Normal * (self:GetAttackLength() + vellen), 3, color_white)
-    //local ent = ents.Create("prop_physics")
-    //ent:SetModel("models/props_interiors/pot01a.mdl")
-    //ent:SetPos(eyetr.HitPos)
-    //ent:Spawn()
-    //ent:SetMoveType(MOVETYPE_NONE)
-    //ent:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
-    --if self:IsEntSoft(eyetr.Entity) then return eyetr end
     
     local trace
 
@@ -2266,7 +2266,9 @@ function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
         conePts = {}
     end
 
-    local centerTrace
+    local closestTrace
+    local closestDistance = math.huge
+    self.MeleeClashChecks = {}
 
     for i = charge and -1 or 0, amt do
         local normal = eyetr.Normal:Angle()
@@ -2277,8 +2279,6 @@ function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
             normal:RotateAroundAxis(normal:Up(), (i - amt * 0.5) * 1)
         end
         
-        --debugoverlay.Line(eyetr.StartPos, eyetr.StartPos + normal:Forward() * (self:GetAttackLength() + vellen), 3, color_white)
-
         local tr = {}
 
         tr.start = eyetr.StartPos
@@ -2289,13 +2289,15 @@ function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
         end
         tr.filter = (secondary and self.MultiDmg2 or charge and self.MultiDmgCharge or self.MultiDmg1) and {owner, ent, self} or self.HitEnts
 
-        local clashTrace = self:FindMeleeClash(owner, ent, attacktype, inattackLength, tr)
-
-        if clashTrace then
-            return clashTrace
-        end
-
         trace = util.TraceLine(tr)
+
+        if active then
+            local clashTrace = self:FindMeleeClash(owner, ent, attacktype, inattackLength, {
+                start = tr.start,
+                endpos = trace.Hit and trace.HitPos or tr.endpos,
+            }, self.MeleeClashChecks)
+            if clashTrace then return clashTrace end
+        end
 
         if SERVER and hg.TraceHeldWeaponShot then
             if self.HGEquipmentHitEnts ~= self.HitEnts then
@@ -2312,19 +2314,19 @@ function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
             DrawMeleeAttackHull(tr, trace)
         end
 
-        //if SERVER then
-        //    local vec = trace.Normal * math.min(self.DamagePrimary * 0.5, 20)
-        //    vec[3] = 0
-    //
-        //    owner:SetVelocity(vec)
-        //end
-
-        if i < 0 and trace.Hit then centerTrace = trace end
+        local hitPos = trace.HitPos
+        if trace.Hit and isvector(hitPos) then
+            local distance = hitPos:DistToSqr(tr.start)
+            if distance < closestDistance then
+                closestTrace = trace
+                closestDistance = distance
+            end
+        end
 
 		if self:IsEntSoft(trace.Entity) then break end
     end
 
-    if centerTrace and not (trace.Hit and self:IsEntSoft(trace.Entity)) then trace = centerTrace end
+    trace = closestTrace or trace
 
     if conePts and #conePts > 0 then
         local col = inWindow and Color(0, 255, 80) or Color(255, 70, 70)
@@ -2588,23 +2590,19 @@ end
 
 function SWEP:GetClashSweep(owner, ent, attacktype, inattackLength)
     if not IsValid(owner) or not IsValid(ent) then return end
+    if self:GetLastAttack() > CurTime() then return end
 
-    local speedAdd = math.min(owner:GetVelocity():Length() * 0.05, 40)
-    local attackLength = self:GetAttackLength() + speedAdd
-    local eyetr = hg.eyeTrace(owner, attackLength, ent, owner:GetAimVector())
-
-    if not eyetr then return end
+    local eyetr, reach, active = self:GetMeleeSweepData(owner, ent, attacktype, inattackLength)
+    if not eyetr or not active then return end
 
     local normal = eyetr.Normal:Angle()
     local swingAng = self:GetAttackConfigValue(self.SwingAng, self.SwingAng2, self.ChargeSwingAng, attacktype) or -90
     local attackRads = self:GetAttackConfigValue(self.AttackRads, self.AttackRads2, self.ChargeAttackRads, attacktype) or 65
-    local lengthMul = self:IsSecondaryAttackType(attacktype) and 1 or math.max(0.5, 1 - math.abs((0.5 - inattackLength) * 2))
-
     normal:RotateAroundAxis(normal:Forward(), swingAng)
     normal:RotateAroundAxis(normal:Up(), (0.5 - inattackLength) * attackRads)
 
     local startPos = eyetr.StartPos
-    local endPos = startPos + normal:Forward() * lengthMul * attackLength
+    local endPos = startPos + normal:Forward() * reach
 
     return startPos, endPos, eyetr
 end
@@ -2667,8 +2665,11 @@ end
 function SWEP:IsClashPointValid(owner, otherOwner, clashPos, otherWep)
     if not IsValid(owner) or not IsValid(otherOwner) or not clashPos then return false end
 
-    local toClash = clashPos - owner:EyePos()
-    local toOtherClash = clashPos - otherOwner:EyePos()
+    local ownerPos = hg.eye(owner) or owner:EyePos()
+    local otherPos = hg.eye(otherOwner) or otherOwner:EyePos()
+    if not isvector(ownerPos) or not isvector(otherPos) then return false end
+    local toClash = clashPos - ownerPos
+    local toOtherClash = clashPos - otherPos
 
     if toClash:LengthSqr() <= 0.001 or toOtherClash:LengthSqr() <= 0.001 then return false end
 
@@ -2680,8 +2681,13 @@ function SWEP:IsClashPointValid(owner, otherOwner, clashPos, otherWep)
 
     if owner:GetAimVector():Dot(toClash) < frontDot then return false end
     if otherOwner:GetAimVector():Dot(toOtherClash) < frontDot then return false end
-    if owner:GetAimVector():Dot((otherOwner:EyePos() - owner:EyePos()):GetNormalized()) < facingDot then return false end
-    if otherOwner:GetAimVector():Dot((owner:EyePos() - otherOwner:EyePos()):GetNormalized()) < facingDot then return false end
+    if owner:GetAimVector():Dot((otherPos - ownerPos):GetNormalized()) < facingDot then return false end
+    if otherOwner:GetAimVector():Dot((ownerPos - otherPos):GetNormalized()) < facingDot then return false end
+
+    local filter = {owner, otherOwner, self, otherWep,
+        hg.GetCurrentCharacter(owner), hg.GetCurrentCharacter(otherOwner)}
+    if util.TraceLine({start = ownerPos, endpos = clashPos, filter = filter}).Hit then return false end
+    if util.TraceLine({start = otherPos, endpos = clashPos, filter = filter}).Hit then return false end
 
     return true
 end
@@ -2797,8 +2803,21 @@ function SWEP:StopAttackOnArmorImpact(trace, attacktype)
 
     local other = trace.HGEquipmentWeapon
     if SERVER and IsValid(other) and IsValid(other:GetOwner()) and other.CanClashWeapon and other:CanClashWeapon() and self:CanClashWeapon() and other:GetInAttack() then
-        self:HandleMeleeClash(other, trace.HitPos, trace.HitNormal, attacktype, other:GetAttackType())
-    elseif SERVER then
+        local otherAttacktype = other:GetAttackType()
+        local otherOwner = other:GetOwner()
+        local otherStart = other:GetClashSweep(otherOwner, hg.GetCurrentCharacter(otherOwner),
+            otherAttacktype, other:GetCurrentAttackLengthFraction())
+        self.MeleeClashChecks = self.MeleeClashChecks or {}
+        if otherStart and not self.MeleeClashChecks[other]
+            and self:IsClashPointValid(self:GetOwner(), otherOwner, trace.HitPos, other) then
+            self.MeleeClashChecks[other] = true
+            if math.Rand(0, 1) <= self:GetClashChance(other)
+                and self:HandleMeleeClash(other, trace.HitPos, trace.HitNormal, attacktype, otherAttacktype) then
+                return true
+            end
+        end
+    end
+    if SERVER then
         self:PlayBlockImpactEffect(trace, other or trace.HGEquipmentHeldEntity, "block")
     end
     self:SendMeleeHitStop(attacktype, trace.HitNormal)
@@ -3072,10 +3091,11 @@ function SWEP:HandleMeleeClash(otherWep, clashPos, hitNormal, attacktype, otherA
     }
 end
 
-function SWEP:FindMeleeClash(owner, ent, attacktype, inattackLength, tr)
+function SWEP:FindMeleeClash(owner, ent, attacktype, inattackLength, tr, checkedClashes)
     if not SERVER then return end
     if not IsValid(owner) or not IsValid(ent) then return end
     if not self:CanClashWeapon() then return end
+    if (self.NextClashTime or 0) > CurTime() then return end
 
     local searchPos = tr.start + (tr.endpos - tr.start) * 0.5
     local radius = math.max(self.ClashSearchRadius or 22, tr.start:Distance(tr.endpos) * 0.5 + (self.ClashDistance or 12))
@@ -3092,6 +3112,8 @@ function SWEP:FindMeleeClash(owner, ent, attacktype, inattackLength, tr)
         if not otherWep.ismelee2 and otherWep.Base ~= "weapon_melee" then continue end
         if not otherWep.CanClashWeapon or not otherWep:CanClashWeapon() then continue end
         if not otherWep.GetInAttack or not otherWep:GetInAttack() then continue end
+        if (otherWep.NextClashTime or 0) > CurTime() then continue end
+        if checkedClashes and checkedClashes[otherWep] then continue end
 
         local otherAttacktype = otherWep.GetAttackType and otherWep:GetAttackType() or 1
         local otherEnt = hg.GetCurrentCharacter(clashOwner)
@@ -3106,6 +3128,7 @@ function SWEP:FindMeleeClash(owner, ent, attacktype, inattackLength, tr)
 
         if not clashPos then continue end
         if not self:IsClashPointValid(owner, clashOwner, clashPos, otherWep) then continue end
+        if checkedClashes then checkedClashes[otherWep] = true end
         if math.Rand(0, 1) > self:GetClashChance(otherWep) then continue end
 
         local hitNormal = (otherEnd - tr.endpos)
@@ -3145,13 +3168,12 @@ end
 
 function SWEP:CanDirectionalBlock(blockWep, defender, attacker, attacktype, hierarchyAdvantage)
     if not IsValid(blockWep) or not IsValid(defender) or not IsValid(attacker) then return true end
-    if attacker:IsNPC() or not defender:IsPlayer() then return true end
+    if not defender:IsPlayer() then return true end
 
-    local _, defenderAim = hg.eye(defender)
-    local attackerPos = attacker:EyePos()
-    local defenderPos = defender:EyePos()
+    local defenderPos, defenderAim = hg.eye(defender)
+    local attackerPos = hg.eye(attacker) or attacker:EyePos()
 
-    if not defenderAim then return true end
+    if not defenderPos or not defenderAim then return false end
 
     local toAttacker = attackerPos - defenderPos
     toAttacker.z = 0
@@ -3176,7 +3198,7 @@ function SWEP:CanDirectionalBlock(blockWep, defender, attacker, attacktype, hier
         return true
     end
 
-    local sideDot = defender:EyeAngles():Right():Dot(toAttacker)
+    local sideDot = defenderAim:Angle():Right():Dot(toAttacker)
     local absSideDot = math.abs(sideDot)
     local sideLeniency = blockWep.BlockDirectionalSideLeniency or self.BlockDirectionalSideLeniency or 0
 
@@ -3214,23 +3236,20 @@ function SWEP:IsBlockTraceCovered(defender, trace, eyePos, aimvec, blockWep, ext
 end
 
 function SWEP:BlockingLogic(ent, mul, attacktype, trace)
-    local ent = hg.RagdollOwner(ent) or ent
+	if not SERVER or not IsValid(ent) or not trace or not trace.HitPos then return 1, "none" end
+    ent = hg.RagdollOwner(ent) or ent
 	local owner = self:GetOwner()
+	if not IsValid(owner) or not IsValid(ent) then return 1, "none" end
 
 	local shieldBlock = hook.Run("hg_MeleeShieldBlock", self, ent, attacktype, trace)
 	if shieldBlock then return 0, "block" end
 
 	if ent:IsPlayer() and ((istable(self.HitEnts) and !table.HasValue(self.HitEnts, ent)) or owner:IsNPC()) then
         local wep = ent:GetActiveWeapon()
+        if not IsValid(wep) then return 1, "none" end
 
         local pos, aimvec = hg.eye(ent)
-        local pos2, aimvec2 = hg.eye(owner)
-
-		if owner:IsNPC() then
-			pos, aimvec, aimvec2 = owner:EyePos(), owner:GetAimVector(), owner:GetAimVector()
-		end
-
-        if not aimvec or not aimvec2 or not trace or not trace.HitPos then return 1, "none" end
+        if not pos or not aimvec then return 1, "none" end
 
         local selfdmg = math.max(self:GetAttackDamageBase(attacktype), 1)
         local swingStamina = self:GetAttackConfigValue(self.StaminaPrimary, self.StaminaSecondary, self.ChargeStamina, attacktype) or 0
@@ -3249,9 +3268,12 @@ function SWEP:BlockingLogic(ent, mul, attacktype, trace)
                 return 1, "none"
             end
 
-            local perfectblock = CurTime() - wep:GetStartedBlocking() < (wep.GetBlockParryWindow and wep:GetBlockParryWindow() or self:GetBlockParryWindow()) * (slam and (self.SlamParryWindowMul or 1) or 1)
+            local parryElapsed = CurTime() - wep:GetStartedBlocking()
+            local perfectblock = parryElapsed >= 0
+                and parryElapsed < (wep.GetBlockParryWindow and wep:GetBlockParryWindow() or self:GetBlockParryWindow())
+                    * (slam and (self.SlamParryWindowMul or 1) or 1)
             local tierDiff = attackerTier - defenderTier
-            local blockStaminaCost = math.max(swingStamina * (wep.BlockHitStaminaMul or self.BlockHitStaminaMul or 0.5), 0) * (wep.MeleeStaminaMul or 0.6)
+            local blockStaminaCost = math.max(swingStamina * (wep.BlockHitStaminaMul or self.BlockHitStaminaMul or 0.5), 0) * (wep.MeleeStaminaMul or 0.4)
 
             if perfectblock then
                 trace.HGPreventHeadRagdoll = true
@@ -3264,10 +3286,8 @@ function SWEP:BlockingLogic(ent, mul, attacktype, trace)
                 self:PunchPlayer(ent, attacktype, owner:GetAimVector(), selfdmg * 0.1)
                 self:PlayBlockImpactEffect(trace, wep, "parry")
 
-                -- single parry ring for all melee parries (clash/rem_clashblunt, pitched up)
                 sound.Play("clash/rem_clashblunt.wav", trace.HitPos, 82, math.random(130, 150))
 
-                -- parry reward: small stamina refund + riposte window (faster counter)
                 if ent.organism and ent.organism.stamina then
                     local reward = self.BlockParryStaminaReward or 4
                     ent.organism.stamina[1] = math.min(ent.organism.stamina.max or ent.organism.stamina[1], ent.organism.stamina[1] + reward)
@@ -3277,7 +3297,6 @@ function SWEP:BlockingLogic(ent, mul, attacktype, trace)
 
                 self:TryDisarm(wep:GetClass() == "weapon_hands_sh" and self.FistParryDisarmChance or self.ParryDisarmChance, slam)
 
-                -- parried attacker is staggered and cannot swing for a moment
                 local lockout = self.BlockParryAttackerLockout or 0.5
                 self:SetInAttack(false)
                 self:SetLastAttack(CurTime() + lockout)
@@ -3288,7 +3307,7 @@ function SWEP:BlockingLogic(ent, mul, attacktype, trace)
 
 			if hg.organism and hg.organism.ConsumeStamina then hg.organism.ConsumeStamina(ent.organism, blockStaminaCost) end
 
-            if not slam and tierDiff >= (self.BlockBreakTierDiff or 2) then
+            if tierDiff >= (self.BlockBreakTierDiff or 2) then
 				if hg.organism and hg.organism.ConsumeStamina then hg.organism.ConsumeStamina(ent.organism, selfdmg * (wep.BlockBreakStaminaMul or self.BlockBreakStaminaMul or 0.75)) end
 
                 if wep.SetBlocking then
