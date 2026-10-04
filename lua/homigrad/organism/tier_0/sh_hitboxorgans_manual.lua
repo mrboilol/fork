@@ -574,7 +574,7 @@ function hg.organism.GetHitBoxOrgans(model, ent)
 	return (models_female[model] and female) or male
 end
 
-function hg.organism:HitBox(strBone, strName, nValue, vLocalPos, aLocalAng, vSize, cColor, bBool, nProtect)
+function hg.organism:HitBox(strBone, strName, nValue, vLocalPos, aLocalAng, vSize, cColor, bBool, nProtect, bFabric)
 	local HBD = {} --HitBoxData
 	HBD.strBone = strBone
 	HBD.strName = strName
@@ -585,13 +585,14 @@ function hg.organism:HitBox(strBone, strName, nValue, vLocalPos, aLocalAng, vSiz
 	HBD.cColor = cColor
 	HBD.bBool = bBool
 	HBD.nProtect = nProtect
+	HBD.bFabric = bFabric
 	return HBD
 end
 
 local HitBoxByName = {}
 
 local function RegisterHitBox(target, key, data)
-	local hitBox = {data.strName, data.nValue, data.vLocalPos, data.aLocalAng, data.vSize, data.cColor, data.bBool, data.nProtect, data.UID}
+	local hitBox = {data.strName, data.nValue, data.vLocalPos, data.aLocalAng, data.vSize, data.cColor, data.bBool, data.nProtect, data.UID, data.bFabric}
 	local registered = HitBoxByName[key]
 
 	if registered then

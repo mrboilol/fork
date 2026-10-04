@@ -486,6 +486,13 @@ end
 
 
 function hg.CanEquipArmorPiece(ply, equipment)
+	if IsValid(ply) and isstring(equipment) and hg.GetNewArmorOnPlacement then
+		local placement = hg.GetArmorPlacement(string.Replace(equipment, "ent_armor_", ""))
+		if placement and IsValid(hg.GetNewArmorOnPlacement(ply, placement)) then
+			if ply:IsPlayer() then ply:Notify("Take off your new armor on that spot first.", true, "armor_conflict", 3) end
+			return false
+		end
+	end
 	if not IsValid(ply) or not ply.ArmorRestrictions or not istable(ply.ArmorRestrictions) then
 		return true
 	end

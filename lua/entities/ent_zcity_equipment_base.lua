@@ -85,6 +85,10 @@ end
     function ENT:CanWear(entUser)
         local Equipment = entUser:GetNetVar("zc_equipment", {})
         if IsValid(self.WearOwner) then return false end
+        if hg.GetOldArmorInSlots and hg.GetOldArmorInSlots(entUser, self.SlotOccupation) then
+            if entUser:IsPlayer() then entUser:Notify("Take off your old armor on that spot first.", true, "armor_conflict", 3) end
+            return false
+        end
 
         for _,v in ipairs(Equipment) do
             local Equip = Entity(v)

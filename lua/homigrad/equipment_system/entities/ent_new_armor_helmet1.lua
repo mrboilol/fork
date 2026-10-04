@@ -50,8 +50,8 @@ ENT.DrawOverlay = hg.DrawFirstPersonEquipment
     ENT.HitBoxSet = HitBoxSet                     -- you can use same hitbox sets on other armor
     --\\ Plates HitBoxSets
         local color_yellow = Color(255,255,0)
-        local HitBox = hg.organism:HitBox("ValveBiped.Bip01_Head1", HitBoxSet, 1, Vector(4, -1, 0), Angle(0, 0, 0), Vector(5.5, 5, 5), color_yellow, true)
-        local HitBoxF = hg.organism:HitBox("ValveBiped.Bip01_Head1", HitBoxSet, 1, Vector(3, 0.5, 0), Angle(0, 0, 0), Vector(5.5, 5, 5), color_yellow, true)
+        local HitBox = hg.organism:HitBox("ValveBiped.Bip01_Head1", HitBoxSet, 1, Vector(4, -1, 0), Angle(0, 0, 0), Vector(5.5, 5, 5), color_yellow, true, nil, true)
+        local HitBoxF = hg.organism:HitBox("ValveBiped.Bip01_Head1", HitBoxSet, 1, Vector(3, 0.5, 0), Angle(0, 0, 0), Vector(5.5, 5, 5), color_yellow, true, nil, true)
         hg.organism:CreateHitBox("Shell",HitBox, HitBoxF)
         -- Fornt Plate
             local HitBox = hg.organism:HitBox("ValveBiped.Bip01_Head1", HitBoxSet, 1, Vector(6.5, -6, 0), Angle(0, 0, 0), Vector(2, 1, 3.5), color_yellow, true)

@@ -45,6 +45,12 @@ ENT.SlotOccupation = {                              -- Slots what armor occupate
     --\\ Plates HitBoxSets
         local color_blue = Color(0,140,255)
         local color_yellow = Color(255,238,0)
+        -- Whole torso fabric
+            local HitBox = hg.organism:HitBox("ValveBiped.Bip01_Spine2", HitBoxSet, 1, Vector(1.5, 2, 0), Angle(0, 0, 0), Vector(8, 5.5, 7.5), color_blue, true, nil, true)
+            local HitBoxF = hg.organism:HitBox("ValveBiped.Bip01_Spine2", HitBoxSet, 1, Vector(1.5, 2, 0), Angle(0, 0, 0), Vector(8, 5.5, 7.5), color_blue, true, nil, true)
+            hg.organism:CreateHitBox("Body",HitBox, HitBoxF)
+        --//
+
         -- Fornt Kevlar
             local HitBox = hg.organism:HitBox("ValveBiped.Bip01_Spine2", HitBoxSet, 1, Vector(2, 7.5, 0), Angle(0, -10, 0), Vector(7.5, 1.5, 5.5), color_blue, true)
             local HitBoxF = hg.organism:HitBox("ValveBiped.Bip01_Spine2", HitBoxSet, 1, Vector(-0.5, 6.5, 0), Angle(0, 0, 0), Vector(7.5, 1.5, 5.5), color_blue, true)
@@ -115,6 +121,7 @@ ENT.SlotOccupation = {                              -- Slots what armor occupate
     local RK = "RightKevlar"
 
     ENT.PlatesLinks = { -- this is links to armor, table down here, key is name of UID HitBox, value is string link ["FrontPlate"] etc.
+        Body =          FK,
         Front =         FK,
 
         FrontPlate =    FP,

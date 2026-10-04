@@ -161,6 +161,37 @@ function hg.GetZCityArmorMass(ent, config)
 	return mass, sections
 end
 
+function hg.GetOldArmorInSlots(ply, slots)
+	local worn = SERVER and ply.armors or ply:GetNetVar("Armor", {})
+	if not worn then return end
+	if slots[ZC_ARMOR_SLOT_HEAD] and worn.head then return "head" end
+	if slots[ZC_ARMOR_SLOT_TORSO] and worn.torso then return "torso" end
+end
+
+function hg.GetNewArmorOnPlacement(ply, placement)
+	local slot = placement == "head" and ZC_ARMOR_SLOT_HEAD or placement == "torso" and ZC_ARMOR_SLOT_TORSO
+	if not slot then return end
+	for _, index in ipairs(ply:GetNetVar("zc_equipment", {})) do
+		local equipment = Entity(index)
+		if IsValid(equipment) and equipment.SlotOccupation and equipment.SlotOccupation[slot] and equipment.GetEquiped and equipment:GetEquiped() then return equipment end
+	end
+end
+
+function hg.SyncZCityArmorCondition(ent)
+	if not SERVER or not IsValid(ent) then return end
+	local condition, changed = {}, false
+	local old = ent:GetNetVar("ZCityArmorCondition", {})
+	for _, name in pairs(ent.PlatesLinks or {}) do
+		local part = ent[name]
+		if part and part.DurabilityMax and not condition[name] then
+			condition[name] = math.Round(math.Clamp(part.Durability / math.max(part.DurabilityMax, 1), 0, 1), 2)
+			if part.Fabric then condition[name .. "Fabric"] = math.Round(math.Clamp(part.Fabric.Durability / math.max(part.Fabric.DurabilityMax, 1), 0, 1), 2) end
+		end
+	end
+	for name, value in pairs(condition) do if old[name] ~= value then changed = true end end
+	if changed then ent:SetNetVar("ZCityArmorCondition", condition) end
+end
+
 function hg.GetZCityArmorContactSection(ent, name, fabricOnly)
 	local part = name and ent[name] or ent
 	if not part then return end

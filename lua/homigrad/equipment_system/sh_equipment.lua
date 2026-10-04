@@ -223,6 +223,7 @@ local function absorbZCityImpact(armor, plate, dmgInfo, rawDamage, transmitted, 
 	local absorbed = math.min(damage * absorption, durability / wear)
 	local scale = damage > 0 and (damage - absorbed) / damage or 1
 	plate.Durability = math.max(durability - absorbed * wear, 0)
+	hg.SyncZCityArmorCondition(armor)
 	armor.HGBluntDamageInfo = dmgInfo
 	armor.HGBluntDamageScale = scale
 	dmgInfo:ScaleDamage(scale)
@@ -342,6 +343,7 @@ local function protec(org, bone, dmg, dmgInfo, placement, boneindex, dir, hit, r
         org.oldPlate = plateKey
 		local wear = penetration + (isBullet and rawDamage * 0.25 or 0)
 		plate.Durability = math.max(plate.Durability - wear * (plate.BalisticMaterial or 1), 0)
+		hg.SyncZCityArmorCondition(armor)
     end
 
     if developer:GetBool() and SERVER then

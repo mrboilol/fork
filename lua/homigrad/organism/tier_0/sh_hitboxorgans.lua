@@ -160,7 +160,10 @@ hook.Add("PostDrawTranslucentRenderables", "homigrad-organism", function()
 end)
 
 local hg_armorhitboxes = CreateClientConVar("hg_armorhitboxes", "0", false, false, "1 = show only armor hitboxes. Yellow = plates, purple = fabric / rest of the armor", 0, 1)
-local color_plate, color_fabric = Color(255, 220, 0), Color(160, 60, 255)
+local color_plate, color_fabric, color_damaged = Color(255, 220, 0), Color(160, 60, 255), Color(100, 100, 100)
+local function lerpColor(t, from, to)
+	return Color(Lerp(t, from.r, to.r), Lerp(t, from.g, to.g), Lerp(t, from.b, to.b))
+end
 hook.Add("PostDrawTranslucentRenderables", "homigrad-organism-armorhitboxes", function()
 	if not hg_armorhitboxes:GetBool() then return end
 	for _, ply in player.Iterator() do
@@ -178,7 +181,12 @@ hook.Add("PostDrawTranslucentRenderables", "homigrad-organism-armorhitboxes", fu
 			local armor = wearer.GetEquipmentByHitBoxSet and wearer:GetEquipmentByHitBoxSet(organ[1])
 			local link = IsValid(armor) and armor.PlatesLinks and armor.PlatesLinks[organ[9]]
 			local isPlate = link and string.find(link, "Plate", 1, true) and not organ[10]
-			render_DrawWireframeBox(box[1], box[2], box[3], box[4], isPlate and color_plate or color_fabric)
+			local condition = IsValid(armor) and armor:GetNetVar("ZCityArmorCondition", nil) or nil
+			local health = 1
+			if condition and link then
+				health = (not isPlate and string.find(link, "Plate", 1, true) and condition[link .. "Fabric"]) or condition[link] or 1
+			end
+			render_DrawWireframeBox(box[1], box[2], box[3], box[4], lerpColor(1 - health, isPlate and color_plate or color_fabric, color_damaged))
 		end
 	end
 end)

@@ -1071,15 +1071,16 @@ local function emitOrdinaryBleeding(ent, org, wound, pos, ang, visualRate, inter
 	local dropVolume = math.min(visualRate * interval, 8)
 	local concentration = math.Clamp((tonumber(wound[1]) or 0) / math.max(dropVolume, 0.2) / 12, 0, 1)
 	local phase = CurTime() * 4.5 + ent:EntIndex() * 0.37
-	local spread = 1 - concentration * 0.6
-	local lateral = ang:Right() * math.sin(phase) * (2 + sizeK * 9) * spread
-		+ ang:Up() * math.cos(phase * 0.73) * (1 + sizeK * 6) * spread
 	local opening = math.Clamp(((tonumber(wound[1]) or 0) - 6) / 12, 0, 1)
 	local jetK = opening * opening * math.Clamp(visualRate / 4, 0, 1)
-	local speed = (2 + jetK * (bullet and 150 or (slash and 60 or 35))) * pressureDrive
+	local spread = (1 - concentration * 0.6) * (1 - jetK * pressureDrive * 0.75)
+	local lateral = ang:Right() * math.sin(phase) * (2 + sizeK * 9) * spread
+		+ ang:Up() * math.cos(phase * 0.73) * (1 + sizeK * 6) * spread
+	local flick = 6 + sizeK * 14
+	local speed = (flick + jetK * (bullet and 150 or (slash and 60 or 35))) * pressureDrive
 	local vel = outward * speed * math.Rand(0.6, 1.1) + bleedDown * math.Rand(10, 30)
 		+ lateral + VectorRand(-(2 + sizeK * 10) * spread, (2 + sizeK * 10) * spread)
-	local count = math.Clamp(math.ceil(dropVolume / 2), 1, 3)
+	local count = math.Clamp(math.ceil(dropVolume / 2 + jetK * pressureDrive * 2), 1, 4)
 	local volume = dropVolume / count
 	local size = math.Clamp(0.35 + math.sqrt(visualRate) * 0.18, 0.35, 2) * 1.5
 	for _ = 1, count do
