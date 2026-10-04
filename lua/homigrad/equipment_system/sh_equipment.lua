@@ -251,17 +251,27 @@ function hg.GetZCityArmorImpactMitigation(org, placement, dmgInfo, rawDamage)
 	if not IsValid(character) then return end
 	local organs = hg.organism.GetHitBoxOrgans(character:GetModel(), character)
 	local boxes = hg.organism.ShootMatrix(character, organs)
+	local nearest, nearestDistance
 	for _, box in ipairs(boxes or {}) do
 		local organ = box[8] or (organs[box[6]] and organs[box[6]][box[7]])
 		if organ and organ[1] == armor.HitBoxSet then
 			local point = WorldToLocal(dmgInfo:GetDamagePosition(), angle_zero, box[1], box[2])
 			local plateName = armor.PlatesLinks and armor.PlatesLinks[organ[9]]
-			local plate = plateName and hg.GetZCityArmorContactSection(armor, plateName, organ[10])
-			if plate and plate.BluntDamageMul and point:WithinAABox(box[3], box[4]) then
-				local scale = hg.AbsorbZCityBluntImpact(armor, plate, dmgInfo, rawDamage)
-				return scale, false, scale < 1
+			local plate = plateName and hg.GetZCityArmorImpactSection(armor, plateName, organ[10])
+			if plate and plate.BluntDamageMul then
+				if point:WithinAABox(box[3], box[4]) then
+					local scale = hg.AbsorbZCityBluntImpact(armor, plate, dmgInfo, rawDamage)
+					return scale, false, scale < 1
+				end
+				local clamped = Vector(math.Clamp(point.x, box[3].x, box[4].x), math.Clamp(point.y, box[3].y, box[4].y), math.Clamp(point.z, box[3].z, box[4].z))
+				local distance = point:Distance(clamped)
+				if not nearestDistance or distance < nearestDistance then nearest, nearestDistance = plate, distance end
 			end
 		end
+	end
+	if nearest and nearestDistance <= 10 then
+		local scale = hg.AbsorbZCityBluntImpact(armor, nearest, dmgInfo, rawDamage)
+		return scale, false, scale < 1
 	end
 end
 
@@ -272,10 +282,11 @@ local function protec(org, bone, dmg, dmgInfo, placement, boneindex, dir, hit, r
     local HitBoxName = hitbox and hitbox[9]
     local plates = armor.PlatesLinks
     local plateName = plates and plates[HitBoxName]
-    local plate = hg.GetZCityArmorContactSection(armor, plateName, hitbox and hitbox[10])
+	local isBullet = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
+    local plate = isBullet and hg.GetZCityArmorContactSection(armor, plateName, hitbox and hitbox[10])
+		or hg.GetZCityArmorImpactSection(armor, plateName, hitbox and hitbox[10])
     if not plate then return end
     local plateKey = plate
-	local isBullet = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
 	if not isBullet and plate.BluntDamageMul and dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH) and not dmgInfo:IsDamageType(DMG_SLASH) then
 		local scale = hg.AbsorbZCityBluntImpact(armor, plate, dmgInfo)
 		if scale < 1 then return 1 end

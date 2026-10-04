@@ -12,7 +12,8 @@ local function nearestClass(protection)
 	return best
 end
 
-local function plateMaterial(class)
+local function plateMaterial(class, key)
+	if string.find(key, "riot", 1, true) and class <= 4 then return 1 end
 	if class <= 1.5 then return 4.5 end
 	if class <= 8 then return 1.2 end
 	if class <= 12 then return 1.4 end
@@ -75,7 +76,7 @@ end
 for key, data in pairs(hg.armor.torso or {}) do
 	local class = nearestClass(data.protection or 0)
 	if class >= 12 then
-		register(key, data, "ent_new_armor_vest4", class, plateMaterial(class))
+		register(key, data, "ent_new_armor_vest4", class, plateMaterial(class, key))
 	else
 		register(key, data, "ent_new_armor_vest3", class, SOFT)
 	end
@@ -85,5 +86,5 @@ for key, data in pairs(hg.armor.head or {}) do
 	if key == "helmet18" or key == "helmet19" then continue end
 	local class = nearestClass(data.protection or 0)
 	if class < 1.5 then class = 1.5 end
-	register(key, data, "ent_new_armor_helmet1", class, plateMaterial(class))
+	register(key, data, "ent_new_armor_helmet1", class, plateMaterial(class, key))
 end

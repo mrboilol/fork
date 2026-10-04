@@ -177,6 +177,23 @@ function hg.GetNewArmorOnPlacement(ply, placement)
 	end
 end
 
+function hg.GetZCityArmorImpactSection(armor, plateName, fabricOnly)
+	local solid = plateName and armor[plateName]
+	if fabricOnly and solid and solid.BalisticMaterial ~= 0 and solid.BluntDamageMul then return solid end
+	return hg.GetZCityArmorContactSection(armor, plateName, fabricOnly)
+end
+
+function hg.GetZCityArmorBoxWear(wearer, organ)
+	if not wearer.GetEquipmentByHitBoxSet then return 0 end
+	local armor = wearer:GetEquipmentByHitBoxSet(organ[1])
+	local link = IsValid(armor) and armor.PlatesLinks and armor.PlatesLinks[organ[9]]
+	local condition = link and armor:GetNetVar("ZCityArmorCondition", nil)
+	if not condition then return 0 end
+	local isPlate = string.find(link, "Plate", 1, true)
+	local health = (isPlate and (organ[10] and condition[link .. "Fabric"] or not organ[10] and condition[link])) or (not isPlate and condition[link]) or 1
+	return 1 - health
+end
+
 function hg.SyncZCityArmorCondition(ent)
 	if not SERVER or not IsValid(ent) then return end
 	local condition, changed = {}, false
@@ -380,30 +397,30 @@ if SERVER then
 	end)
 else
 	local MATERIAL_INFO = {
-		[0] = "Nothing inserted. Only the fabric of the garment protects this spot, using the LEVEL you picked (fabric is weak, usually Level I). Stab fabric is very good against cuts and stabs. Lightest option.",
-		[1] = "Soft riot plastic. Excellent against clubs and fists, good against knives and cuts, weak against bullets.",
-		[3] = "Hard ceramic. Stops bullets very well and is light for its strength, but cracks and wears out fast when hit.",
-		[1.8] = "Titanium. Strong and fairly light, wears more slowly than steel.",
-		[1.4] = "Armor steel. Very tough and cheap, but the heaviest plate.",
-		[1.2] = "UHMWPE (a tough plastic fibre). Very light, good for mid-level protection.",
-		[0.85] = "Plastic fibre with a ceramic layer. Light and strong.",
-		[0.7] = "Plastic fibre with a steel layer. Strong but heavier.",
-		[0.55] = "Plastic fibre with a titanium layer. Strong and balanced.",
-		[0.9] = "Kevlar fabric. Light and flexible, stops pistol bullets but not rifle bullets.",
-		[0.75] = "Kevlar with a ceramic layer. Light and strong.",
-		[0.6] = "Kevlar with a steel layer. Strong but heavier.",
-		[0.45] = "Kevlar with a titanium layer. Strong and balanced.",
-		[5] = "Fiberglass. Very light, only stops weak hits.",
-		[4.5] = "Polycarbonate (clear hard plastic). Extremely light, only stops weak hits.",
+		[0] = "No plate in here, just the cloth of the vest. Cloth is weak vs bullets (about level I) but stab cloth shrugs off knives. Lightest option.",
+		[1] = "Riot plastic. Great vs bats and fists, decent vs knives, bad vs bullets.",
+		[3] = "Ceramic. Stops bullets really well and is light, but it cracks quickly.",
+		[1.8] = "Titanium. Strong, fairly light, lasts longer than ceramic.",
+		[1.4] = "Armor steel. Tough and cheap, but heavy.",
+		[1.2] = "UHMWPE, a tough plastic fibre. Very light, good up to level III.",
+		[0.85] = "UHMWPE with a ceramic face. Light and strong.",
+		[0.7] = "UHMWPE with a steel face. Strong, a bit heavier.",
+		[0.55] = "UHMWPE with a titanium face. Strong, balanced weight.",
+		[0.9] = "Kevlar cloth. Light, stops pistol rounds, not rifle rounds.",
+		[0.75] = "Kevlar with a ceramic face. Light and strong.",
+		[0.6] = "Kevlar with a steel face. Strong, a bit heavier.",
+		[0.45] = "Kevlar with a titanium face. Strong, balanced weight.",
+		[5] = "Fiberglass. Very light, only stops weak stuff.",
+		[4.5] = "Polycarbonate. Barely weighs anything, only stops weak stuff.",
 	}
 	local CLASS_INFO = {
-		[0.5] = "Stops knife stabs and slashes only. Does not stop bullets.",
+		[0.5] = "Stops knives, not bullets.",
 		[1.5] = "Stops weak pistol rounds.",
 		[4] = "Stops most pistol rounds.",
-		[8] = "Stops strong pistol rounds and submachine guns.",
+		[8] = "Stops strong pistol rounds and SMGs.",
 		[12] = "Stops most rifle rounds.",
-		[16] = "Stops strong rifle rounds.",
-		[22] = "Stops armor-piercing rifle rounds. Heaviest.",
+		[16] = "Stops hot rifle rounds.",
+		[22] = "Stops armor piercing rifle rounds. Heaviest.",
 	}
 	local function prettyName(name)
 		local label = string.gsub(name, "(%l)(%u)", "%1 %2")
@@ -414,7 +431,7 @@ else
 		local text = MATERIAL_INFO[material]
 		if material ~= 0 then
 			local stats = hg.BuildZCityArmorSection(material, class)
-			text = text .. string.format("\nHealth: %.0f   Weight factor: %.1f\nWhen it stops a bullet, %.0f%% of the damage still reaches you.\nIf a bullet breaks through, %.0f%% of the damage reaches you.\nBlunt damage that gets through: %.0f%%.\nCut damage that gets through: %.0f%%.",
+			text = text .. string.format("\nHealth %.0f, weight %.1f\nBullet stopped: you still take %.0f%%\nBullet goes through: you take %.0f%%\nBlunt hits: you take %.0f%%\nCuts and stabs: you take %.0f%%",
 				stats.DurabilityMax, MATERIAL_PROFILES[material].mass, stats.ProtectionDamageMul * 100, stats.PenetratedDamageMul * 100, stats.BluntDamageMul * 100, stats.SlashDamageMul * 100)
 		end
 		return text
@@ -426,24 +443,24 @@ else
 		local frame = vgui.Create("DFrame")
 		frame:SetSize(520, math.min(ScrH() - 80, 780))
 		frame:Center()
-		frame:SetTitle("Build your armor: " .. ent.PrintName)
+		frame:SetTitle("Armor setup: " .. ent.PrintName)
 		frame:MakePopup()
 		local apply = vgui.Create("DButton", frame)
 		apply:Dock(BOTTOM)
 		apply:SetTall(34)
-		apply:SetText("Done - use this armor")
+		apply:SetText("Done")
 		local weight = vgui.Create("DLabel", frame)
 		weight:Dock(TOP)
 		weight:SetTall(36)
 		weight:SetWrap(true)
-		weight:SetTooltip("Heavier plates and higher levels make the armor weigh more. Taking a plate out makes it lighter.")
+		weight:SetTooltip("Higher levels and heavier plates add weight. No plate is lightest.")
 		local help = vgui.Create("DLabel", frame)
 		help:Dock(TOP)
 		help:SetTall(70)
 		help:SetWrap(true)
-		help:SetText("How this works: each tab is one spot on the armor (front, back, sides...). For each spot, first pick a LEVEL (how strong), then pick a PLATE type (what it is made of). Hover over anything to read what it does. This armor can only hold plates up to the level it was made for.")
+		help:SetText("Each tab is one spot on the armor. Pick a level, then a plate for it. Hover anything to see what it does. You can't go above the level this armor was made for.")
 		local function updateWeight()
-			weight:SetText(string.format("Total armor weight: %.2f kg. Higher levels and heavier plates make it heavier.", hg.GetZCityArmorMass(ent, config)))
+			weight:SetText(string.format("Total weight: %.2f kg", hg.GetZCityArmorMass(ent, config)))
 		end
 		updateWeight()
 		local tabs = vgui.Create("DPropertySheet", frame)
@@ -470,9 +487,9 @@ else
 					preview.BalisticMaterial = 0.9
 				end
 				local _, sectionMass = hg.GetZCityArmorMass(ent, config)
-				local description = string.format("Weight of this spot: %.2f kg\n", sectionMass[name]) .. hg.GetZCityArmorSectionDescription(preview)
+				local description = string.format("This spot weighs %.2f kg\n", sectionMass[name]) .. hg.GetZCityArmorSectionDescription(preview)
 				if part.BalisticMaterial == 0 then
-					description = "No plate here: only the soft fabric protects this spot.\n" .. description
+					description = "No plate here, just cloth.\n" .. description
 				end
 				summary:SetText(description)
 				updateWeight()
@@ -509,7 +526,7 @@ else
 				markSelected(materialButtons, part.BalisticMaterial)
 			end
 			classLabel:Dock(TOP)
-			classLabel:SetText("Step 1 - Pick a LEVEL (how strong this spot is). If you pick No plate in step 2, this is the strength of the fabric instead. Hover a button to see what it stops.")
+			classLabel:SetText("Level (if you pick no plate below, this is the cloth level instead)")
 			classLabel:SetWrap(true)
 			classLabel:SetAutoStretchVertical(true)
 			classLabel:DockMargin(8, 8, 8, 4)
@@ -535,7 +552,7 @@ else
 			classBox:SetTall(26 * table.Count(classButtons))
 			markSelected(classButtons, part.Protection)
 			materialLabel:Dock(TOP)
-			materialLabel:SetText("Step 2 - Pick a PLATE type (what it is made of). Only plates that fit your level are shown. Hover to see its stats.")
+			materialLabel:SetText("Plate (only ones that fit the level are shown)")
 			materialLabel:SetWrap(true)
 			materialLabel:SetAutoStretchVertical(true)
 			materialLabel:DockMargin(8, 8, 8, 4)

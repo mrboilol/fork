@@ -424,7 +424,10 @@ local function getMoodle3Material(name)
 				alternateName = "terror"
 			elseif name == "arrhythmia" then
 				alternateName = "arrythmia"
+			elseif name == "fibrilation" then
+				alternateName = "fibrillation"
 			end
+			local fallbackName = name == "fibrilation" and "arrythmia" or alternateName
 			mat = firstValidMaterial({
 				"vgui/moodles 3/" .. name .. ".png",
 				"vgui/moodles 3/" .. alternateName .. ".png",
@@ -432,6 +435,9 @@ local function getMoodle3Material(name)
 				"vgui/hud/moodles 3/" .. alternateName .. ".png",
 				"vgui/moodles3/" .. name .. ".png",
 				"vgui/moodles3/" .. alternateName .. ".png",
+				"vgui/moodles 3/" .. fallbackName .. ".png",
+				"vgui/hud/moodles 3/" .. fallbackName .. ".png",
+				"vgui/moodles3/" .. fallbackName .. ".png",
 			})
 		end
 		moodle3Icons[name] = mat and not mat:IsError() and mat or false

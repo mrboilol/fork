@@ -1420,13 +1420,17 @@ kaz
 		org.disorientation = math.max(org.disorientation, skullDebuff * 0.9 * skullDebuffMul)
 		org.immobilization = math.max(org.immobilization, skullDebuff ^ 2 * 5 * skullDebuffMul)
 		org.consciousness = math.min(org.consciousness, 1 - skullDebuff * 0.4 * skullDebuffMul)
-		org.painadd = math.min((org.painadd or 0) + timeValue * skullDebuff * 3 * skullDebuffMul, 150)
+		if (org.pain or 0) + (org.painadd or 0) < skullDebuff * 35 * skullDebuffMul then
+			org.painadd = math.min((org.painadd or 0) + timeValue * skullDebuff * 3 * skullDebuffMul, 150)
+		end
 	end
 	if hemorrhage > 0 then
 		org.brain = min(org.brain + timeValue * hemorrhage / (hemorrhage < 0.3 and 900 or 300), 1)
 		org.disorientation = math.max(org.disorientation, hemorrhage * 0.9)
 		org.consciousness = math.min(org.consciousness, 1 - hemorrhage * 0.45)
-		org.painadd = math.min((org.painadd or 0) + timeValue * hemorrhage * 4, 150)
+		if (org.pain or 0) + (org.painadd or 0) < hemorrhage * 45 then
+			org.painadd = math.min((org.painadd or 0) + timeValue * hemorrhage * 4, 150)
+		end
 	end
 
 	if hg.organism.AddSeizure and temporal > 0.2 then

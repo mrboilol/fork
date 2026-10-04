@@ -1293,7 +1293,8 @@ local function collectArmorBoxes(ply, body)
 				armorBoxes[armorBoxCount] = entry
 			end
 			entry.bone, entry.pos, entry.ang, entry.size = box[6], organ[3], organ[4], organ[5]
-			entry.wear = armorWear(ply, body, organ[7])
+			local wearer = body:IsRagdoll() and IsValid(hg.RagdollOwner(body)) and hg.RagdollOwner(body) or body
+			entry.wear = organ[7] == true and hg.GetZCityArmorBoxWear and hg.GetZCityArmorBoxWear(wearer, organ) or armorWear(ply, body, organ[7])
 		end
 	end
 end
