@@ -82,6 +82,7 @@ for key, data in pairs(hg.armor.torso or {}) do
 end
 
 for key, data in pairs(hg.armor.head or {}) do
+	if key == "helmet18" or key == "helmet19" then continue end
 	local class = nearestClass(data.protection or 0)
 	if class < 1.5 then class = 1.5 end
 	register(key, data, "ent_new_armor_helmet1", class, plateMaterial(class))

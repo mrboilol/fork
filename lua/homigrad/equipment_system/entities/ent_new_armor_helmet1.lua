@@ -50,6 +50,9 @@ ENT.DrawOverlay = hg.DrawFirstPersonEquipment
     ENT.HitBoxSet = HitBoxSet                     -- you can use same hitbox sets on other armor
     --\\ Plates HitBoxSets
         local color_yellow = Color(255,255,0)
+        local HitBox = hg.organism:HitBox("ValveBiped.Bip01_Head1", HitBoxSet, 1, Vector(4, -1, 0), Angle(0, 0, 0), Vector(5.5, 5, 5), color_yellow, true)
+        local HitBoxF = hg.organism:HitBox("ValveBiped.Bip01_Head1", HitBoxSet, 1, Vector(3, 0.5, 0), Angle(0, 0, 0), Vector(5.5, 5, 5), color_yellow, true)
+        hg.organism:CreateHitBox("Shell",HitBox, HitBoxF)
         -- Fornt Plate
             local HitBox = hg.organism:HitBox("ValveBiped.Bip01_Head1", HitBoxSet, 1, Vector(6.5, -6, 0), Angle(0, 0, 0), Vector(2, 1, 3.5), color_yellow, true)
             local HitBoxF = hg.organism:HitBox("ValveBiped.Bip01_Head1", HitBoxSet, 1, Vector(5.5, -4.5, 0), Angle(0, 0, 0), Vector(2, 1, 3.5), color_yellow, true)
@@ -119,6 +122,7 @@ ENT.DrawOverlay = hg.DrawFirstPersonEquipment
         SideL2 =          SLP,
 
         Top =           TP,
+        Shell =         TP,
     }
 
     -- ENT.SideLinks = {                 -- for penetration damage type change, cuz i don't want rewrite organism hitbox system fully

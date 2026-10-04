@@ -24,7 +24,7 @@ hg.ZCityArmorConfigFields = CONFIG_FIELDS
 
 local SHAPE_FIELDS = {"SizeX", "SizeY", "SizeZ", "OffsetX", "OffsetY", "OffsetZ"}
 local MATERIAL_PROFILES = {
-	[1] = {mass = 3.2, health = 120, stopped = 0.6, penetrated = 0.95, blunt = 0.08, slash = 0.7},
+	[1] = {mass = 3.2, health = 120, stopped = 0.6, penetrated = 0.95, blunt = 0.04, slash = 0.12},
 	[3] = {mass = 2.5, health = 170, stopped = 0.4, penetrated = 0.7, blunt = 0.4, slash = 0.4},
 	[1.8] = {mass = 3, health = 150, stopped = 0.4, penetrated = 0.75, blunt = 0.4, slash = 0.35},
 	[1.4] = {mass = 3.6, health = 150, stopped = 0.4, penetrated = 0.8, blunt = 0.4, slash = 0.3},
@@ -69,9 +69,9 @@ local function getFabric(ent, name)
 		fabric.SlashWearMul = fabric.SlashWearMul or 0.25
 		return fabric
 	end
-	return {Protection = 0.2, BalisticMaterial = 0.9, Durability = 30, DurabilityMax = 30,
+	return {Protection = 1.5, BalisticMaterial = 0.9, Durability = 30, DurabilityMax = 30,
 		DurabilityWarranty = 5, ProtectionDamageMul = 0.85, PenetratedDamageMul = 0.98,
-		BluntDamageMul = 0.95, BluntWearMul = 0.18, SlashDamageMul = 0.8, SlashWearMul = 0.25, NeedPunch = false}
+		BluntDamageMul = 0.85, BluntWearMul = 0.18, SlashDamageMul = 0.4, SlashWearMul = 0.25, NeedPunch = false}
 end
 
 function hg.GetZCityArmorMaxClass(ent)
@@ -100,6 +100,8 @@ function hg.DeriveZCityArmorSection(ent, name, selected)
 	if part.BalisticMaterial == 0 then
 		part = getFabric(ent, name)
 		part.ProtectionClass = selected.Protection
+		part.Protection = math.min(selected.Protection, part.Protection)
+		if selected.Protection == 0.5 then part.SlashDamageMul = 0.04 end
 		part.BalisticMaterial = 0
 	elseif part.Protection == base.Protection and part.BalisticMaterial == base.BalisticMaterial then
 		for _, field in ipairs(CONFIG_FIELDS) do part[field] = base[field] end
@@ -346,25 +348,71 @@ if SERVER then
 		end
 	end)
 else
+	local MATERIAL_INFO = {
+		[0] = "Nothing inserted. Only the fabric of the garment protects this spot, using the LEVEL you picked (fabric is weak, usually Level I). Stab fabric is very good against cuts and stabs. Lightest option.",
+		[1] = "Soft riot plastic. Excellent against clubs and fists, good against knives and cuts, weak against bullets.",
+		[3] = "Hard ceramic. Stops bullets very well and is light for its strength, but cracks and wears out fast when hit.",
+		[1.8] = "Titanium. Strong and fairly light, wears more slowly than steel.",
+		[1.4] = "Armor steel. Very tough and cheap, but the heaviest plate.",
+		[1.2] = "UHMWPE (a tough plastic fibre). Very light, good for mid-level protection.",
+		[0.85] = "Plastic fibre with a ceramic layer. Light and strong.",
+		[0.7] = "Plastic fibre with a steel layer. Strong but heavier.",
+		[0.55] = "Plastic fibre with a titanium layer. Strong and balanced.",
+		[0.9] = "Kevlar fabric. Light and flexible, stops pistol bullets but not rifle bullets.",
+		[0.75] = "Kevlar with a ceramic layer. Light and strong.",
+		[0.6] = "Kevlar with a steel layer. Strong but heavier.",
+		[0.45] = "Kevlar with a titanium layer. Strong and balanced.",
+		[5] = "Fiberglass. Very light, only stops weak hits.",
+		[4.5] = "Polycarbonate (clear hard plastic). Extremely light, only stops weak hits.",
+	}
+	local CLASS_INFO = {
+		[0.5] = "Stops knife stabs and slashes only. Does not stop bullets.",
+		[1.5] = "Stops weak pistol rounds.",
+		[4] = "Stops most pistol rounds.",
+		[8] = "Stops strong pistol rounds and submachine guns.",
+		[12] = "Stops most rifle rounds.",
+		[16] = "Stops strong rifle rounds.",
+		[22] = "Stops armor-piercing rifle rounds. Heaviest.",
+	}
+	local function prettyName(name)
+		local label = string.gsub(name, "(%l)(%u)", "%1 %2")
+		label = string.gsub(label, "Kevlar", "soft panel")
+		return (string.gsub(label, "^%l", string.upper))
+	end
+	local function materialTooltip(material, class)
+		local text = MATERIAL_INFO[material]
+		if material ~= 0 then
+			local stats = hg.BuildZCityArmorSection(material, class)
+			text = text .. string.format("\nHealth: %.0f   Weight factor: %.1f\nWhen it stops a bullet, %.0f%% of the damage still reaches you.\nIf a bullet breaks through, %.0f%% of the damage reaches you.\nBlunt damage that gets through: %.0f%%.\nCut damage that gets through: %.0f%%.",
+				stats.DurabilityMax, MATERIAL_PROFILES[material].mass, stats.ProtectionDamageMul * 100, stats.PenetratedDamageMul * 100, stats.BluntDamageMul * 100, stats.SlashDamageMul * 100)
+		end
+		return text
+	end
 	net.Receive("hg_configure_zcity_armor", function()
 		local ent = net.ReadEntity()
 		local config = net.ReadTable()
 		if not IsValid(ent) or not istable(config) then return end
 		local frame = vgui.Create("DFrame")
-		frame:SetSize(480, math.min(ScrH() - 80, 760))
+		frame:SetSize(520, math.min(ScrH() - 80, 780))
 		frame:Center()
-		frame:SetTitle("Configure " .. ent.PrintName)
+		frame:SetTitle("Build your armor: " .. ent.PrintName)
 		frame:MakePopup()
 		local apply = vgui.Create("DButton", frame)
 		apply:Dock(BOTTOM)
-		apply:SetTall(32)
-		apply:SetText("Apply armor configuration")
+		apply:SetTall(34)
+		apply:SetText("Done - use this armor")
 		local weight = vgui.Create("DLabel", frame)
 		weight:Dock(TOP)
-		weight:SetTall(28)
-		weight:SetTooltip("Weight is calculated from installed material and class, relative to the carrier. Removing rigid plates keeps only garment/fabric weight.")
+		weight:SetTall(36)
+		weight:SetWrap(true)
+		weight:SetTooltip("Heavier plates and higher levels make the armor weigh more. Taking a plate out makes it lighter.")
+		local help = vgui.Create("DLabel", frame)
+		help:Dock(TOP)
+		help:SetTall(70)
+		help:SetWrap(true)
+		help:SetText("How this works: each tab is one spot on the armor (front, back, sides...). For each spot, first pick a LEVEL (how strong), then pick a PLATE type (what it is made of). Hover over anything to read what it does. This armor can only hold plates up to the level it was made for.")
 		local function updateWeight()
-			weight:SetText(string.format("Total armor weight: %.2f kg", hg.GetZCityArmorMass(ent, config)))
+			weight:SetText(string.format("Total armor weight: %.2f kg. Higher levels and heavier plates make it heavier.", hg.GetZCityArmorMass(ent, config)))
 		end
 		updateWeight()
 		local tabs = vgui.Create("DPropertySheet", frame)
@@ -374,14 +422,14 @@ else
 		for _, name in ipairs(names) do
 			local part = config[name]
 			local original = table.Copy(part)
-			local maxClass = hg.GetZCityArmorMaxClass(ent)
+			local maxClass = math.max(hg.GetZCityArmorMaxClass(ent), original.Protection)
 			local panel = vgui.Create("DScrollPanel", tabs)
+			local classLabel = vgui.Create("DLabel", panel)
+			local classBox = vgui.Create("DPanel", panel)
+			local materialLabel = vgui.Create("DLabel", panel)
+			local materialBox = vgui.Create("DPanel", panel)
 			local summary = vgui.Create("DLabel", panel)
-			summary:Dock(TOP)
-			summary:SetTall(175)
-			summary:SetWrap(true)
-			summary:SetAutoStretchVertical(true)
-			summary:DockMargin(8, 8, 8, 8)
+			local classButtons, materialButtons = {}, {}
 			local function updateDescription()
 				local preview = hg.DeriveZCityArmorSection(ent, name, part)
 				local backingName = string.gsub(name, "Plate", "Kevlar")
@@ -390,61 +438,85 @@ else
 				elseif part.BalisticMaterial == 0 then
 					preview.BalisticMaterial = 0.9
 				end
-				local description = hg.GetZCityArmorSectionDescription(preview)
 				local _, sectionMass = hg.GetZCityArmorMass(ent, config)
-				description = string.format("This section: %.2f kg (garment/carrier weight is separate).\n", sectionMass[name]) .. description
+				local description = string.format("Weight of this spot: %.2f kg\n", sectionMass[name]) .. hg.GetZCityArmorSectionDescription(preview)
 				if part.BalisticMaterial == 0 then
-					description = "Native fabric only: no installed plate, plate weight or plate wear. Plate class/shape are inactive; fabric keeps its own coverage.\n" .. description
+					description = "No plate here: only the soft fabric protects this spot.\n" .. description
 				end
 				summary:SetText(description)
 				updateWeight()
 			end
-			local classRow, materialRow
-			local function fillMaterials()
-				materialRow:Clear()
-				local selected
+			local function markSelected(buttons, selected)
+				for value, button in pairs(buttons) do button:SetEnabled(value ~= selected) end
+			end
+			local function buildMaterials()
+				for _, button in pairs(materialButtons) do button:Remove() end
+				materialButtons = {}
+				local first
+				local selectedAllowed = false
 				for value, title in SortedPairs(hg.ZCityArmorMaterials) do
-					if hg.IsZCityArmorLoadoutAllowed(ent, part.Protection, value) or (value == original.BalisticMaterial and part.Protection == original.Protection) then
-						materialRow:AddChoice("Material: " .. title, value, value == part.BalisticMaterial)
-						selected = selected or value == part.BalisticMaterial
-					end
-				end
-				if not selected then
-					for value in SortedPairs(hg.ZCityArmorMaterials) do
-						if hg.IsZCityArmorLoadoutAllowed(ent, part.Protection, value) then
+					local keep = value == original.BalisticMaterial and part.Protection == original.Protection
+					if hg.IsZCityArmorLoadoutAllowed(ent, part.Protection, value) or keep then
+						first = first or value
+						selectedAllowed = selectedAllowed or value == part.BalisticMaterial
+						local button = vgui.Create("DButton", materialBox)
+						button:SetText(value == 0 and "No plate" or title)
+						button:SetTall(26)
+						button:Dock(TOP)
+						button:SetTooltip(materialTooltip(value, part.Protection))
+						button.DoClick = function()
 							part.BalisticMaterial = value
 							part.Durability = 500
-							materialRow:SetValue("Material: " .. hg.ZCityArmorMaterials[value])
-							break
+							markSelected(materialButtons, value)
+							updateDescription()
 						end
+						materialButtons[value] = button
 					end
 				end
+				if not selectedAllowed and first then part.BalisticMaterial = first end
+				materialBox:SetTall(26 * table.Count(materialButtons))
+				markSelected(materialButtons, part.BalisticMaterial)
 			end
-			classRow = vgui.Create("DComboBox", panel)
-			classRow:Dock(TOP)
-			classRow:DockMargin(0, 0, 0, 8)
-			classRow:SetTooltip("Limited by what this carrier is built for. Class determines protection and durability. Stab class transmits 4% of fresh slash damage and has only 0.5 bullet penetration resistance.")
+			classLabel:Dock(TOP)
+			classLabel:SetText("Step 1 - Pick a LEVEL (how strong this spot is). If you pick No plate in step 2, this is the strength of the fabric instead. Hover a button to see what it stops.")
+			classLabel:SetWrap(true)
+			classLabel:SetAutoStretchVertical(true)
+			classLabel:DockMargin(8, 8, 8, 4)
+			classBox:Dock(TOP)
+			classBox.Paint = nil
 			for value, title in SortedPairs(hg.ZCityArmorClasses) do
-				if value <= math.max(maxClass, original.Protection) then classRow:AddChoice("Protection class: " .. title, value, value == part.Protection) end
+				if value <= maxClass then
+					local button = vgui.Create("DButton", classBox)
+					button:SetText("Level " .. title)
+					button:SetTall(26)
+					button:Dock(TOP)
+					button:SetTooltip(CLASS_INFO[value])
+					button.DoClick = function()
+						part.Protection = value
+						part.Durability = 500
+						markSelected(classButtons, value)
+						buildMaterials()
+						updateDescription()
+					end
+					classButtons[value] = button
+				end
 			end
-			materialRow = vgui.Create("DComboBox", panel)
-			materialRow:Dock(TOP)
-			materialRow:DockMargin(0, 0, 0, 8)
-			materialRow:SetTooltip("Only materials rated for the chosen class are offered. Heavier materials and higher classes weigh more; weight is relative to what this carrier was built around. No plate uses native fabric only.")
-			classRow.OnSelect = function(_, _, _, value)
-				part.Protection = value
-				part.Durability = 500
-				fillMaterials()
-				updateDescription()
-			end
-			materialRow.OnSelect = function(_, _, _, value)
-				part.BalisticMaterial = value
-				part.Durability = 500
-				updateDescription()
-			end
-			fillMaterials()
+			classBox:SetTall(26 * table.Count(classButtons))
+			markSelected(classButtons, part.Protection)
+			materialLabel:Dock(TOP)
+			materialLabel:SetText("Step 2 - Pick a PLATE type (what it is made of). Only plates that fit your level are shown. Hover to see its stats.")
+			materialLabel:SetWrap(true)
+			materialLabel:SetAutoStretchVertical(true)
+			materialLabel:DockMargin(8, 8, 8, 4)
+			materialBox:Dock(TOP)
+			materialBox.Paint = nil
+			summary:Dock(TOP)
+			summary:SetWrap(true)
+			summary:SetAutoStretchVertical(true)
+			summary:DockMargin(8, 8, 8, 8)
+			buildMaterials()
 			updateDescription()
-			tabs:AddSheet(string.gsub(name, "(%l)(%u)", "%1 %2"), panel)
+			tabs:AddSheet(prettyName(name), panel)
 		end
 		apply.DoClick = function()
 			if not IsValid(ent) then frame:Close() return end

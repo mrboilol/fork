@@ -158,3 +158,27 @@ hook.Add("PostDrawTranslucentRenderables", "homigrad-organism", function()
 		end
 	end
 end)
+
+local hg_armorhitboxes = CreateClientConVar("hg_armorhitboxes", "0", false, false, "1 = show only armor hitboxes. Yellow = plates, purple = fabric / rest of the armor", 0, 1)
+local color_plate, color_fabric = Color(255, 220, 0), Color(160, 60, 255)
+hook.Add("PostDrawTranslucentRenderables", "homigrad-organism-armorhitboxes", function()
+	if not hg_armorhitboxes:GetBool() then return end
+	for _, ply in player.Iterator() do
+		ply = hg.GetCurrentCharacter(ply)
+		if not IsValid(ply) then continue end
+		local organs = hg.organism.GetHitBoxOrgans(ply:GetModel(), ply)
+		if not organs then continue end
+		local boxs = hg.organism.ShootMatrix(ply, organs)
+		if not boxs then continue end
+		local wearer = (ply:IsRagdoll() and IsValid(hg.RagdollOwner(ply)) and hg.RagdollOwner(ply)) or ply
+		for i = 1, #boxs do
+			local box = boxs[i]
+			local organ = box[8] or (box[6] and organs[box[6]] and organs[box[6]][box[7]])
+			if not organ or not organ[7] then continue end
+			local armor = wearer.GetEquipmentByHitBoxSet and wearer:GetEquipmentByHitBoxSet(organ[1])
+			local link = IsValid(armor) and armor.PlatesLinks and armor.PlatesLinks[organ[9]]
+			local isPlate = link and string.find(link, "Plate", 1, true) and not organ[10]
+			render_DrawWireframeBox(box[1], box[2], box[3], box[4], isPlate and color_plate or color_fabric)
+		end
+	end
+end)
