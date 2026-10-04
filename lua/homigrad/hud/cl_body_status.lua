@@ -12,32 +12,46 @@ local math_atan2 = math.atan2
 local math_exp = math.exp
 local math_Clamp = math.Clamp
 
-local TAU = math.pi * 2
+local CFG = {
+	ARTERIAL_ACTIVE_RATE = 0.05,
+	ARTERIAL_PULSE_DEPTH = 0.3,
+	BLEED_RATE_CRITICAL = 8,
+	CHEST_INSET = 0.45,
+	CIRCLE_SEGMENTS = 24,
+	DEPTH_SCALE = 0.012,
+	DEPTH_SCALE_MAX = 1.3,
+	DEPTH_SCALE_MIN = 0.75,
+	FADE_IN_RATE = 1.5,
+	FADE_OUT_RATE = 3,
+	FIGURE_EXTENT = 3.8,
+	FILL_ALPHA = 235,
+	GRAY_RATE = 3,
+	GRAY_SHOCK_RANGE = 60,
+	GRAY_SHOCK_START = 10,
+	JAW_DROP = 0.13,
+	JAW_FORWARD = 0.1,
+	MAX_SPINE_LENGTH = 80,
+	MEDICAL_UPDATE_INTERVAL = 0.1,
+	MIN_SPINE_LENGTH = 4,
+	OTRUB_CONSCIOUSNESS = 0.3,
+	PANEL_MARGIN_FRACTION = 0.02,
+	PANEL_SIZE_FRACTION = 0.36,
+	PELVIS_INSET = 0.35,
+	POSE_SMOOTH_RATE = 20,
+	SNAP_AFTER_HIDDEN = 0.5,
+	SPINE_BACK_OFFSET = 0.12,
+	TARGET_HEIGHT = 0.1,
+	TAU = math.pi * 2,
+	WOUND_CAMERA_BIAS = 2,
+	WOUND_SIZE_TO_RATE = 0.24,
+	YAW_SMOOTH_RATE = 8,
+	GRAY_CONSCIOUSNESS_START = 0.85,
+}
 
-local PANEL_SIZE_FRACTION = 0.36
-local PANEL_MARGIN_FRACTION = 0.02
 local DISPLAY_SPINE = 20
-local FIGURE_EXTENT = 3.8
-local TARGET_HEIGHT = 0.1
-local DEPTH_SCALE = 0.012
-local DEPTH_SCALE_MIN = 0.75
-local DEPTH_SCALE_MAX = 1.3
-local CIRCLE_SEGMENTS = 24
-local FILL_ALPHA = 235
 local OUTLINE_ALPHA = 220
-local POSE_SMOOTH_RATE = 20
-local YAW_SMOOTH_RATE = 8
-local SNAP_AFTER_HIDDEN = 0.5
-local MIN_SPINE_LENGTH = 4
-local MAX_SPINE_LENGTH = 80
 local MIN_AXIS_LENGTH = 0.05
-local MEDICAL_UPDATE_INTERVAL = 0.1
-local SPINE_BACK_OFFSET = 0.12
-local CHEST_INSET = 0.45
-local PELVIS_INSET = 0.35
 local SKULL_LIFT = 0.12
-local JAW_DROP = 0.13
-local JAW_FORWARD = 0.1
 
 local WEIGHT = {
 	DISLOCATION = 0.7,
@@ -45,14 +59,9 @@ local WEIGHT = {
 	ARTERIAL_CONTROLLED = 0.6,
 	HAND_BONE_SHARE = 0.5,
 }
-local ARTERIAL_ACTIVE_RATE = 0.05
-local BLEED_RATE_CRITICAL = 8
-local WOUND_SIZE_TO_RATE = 0.24
-local ARTERIAL_PULSE_DEPTH = 0.3
 local DEFAULT_PULSE = 72
 local SECONDS_PER_MINUTE = 60
 
-local WOUND_CAMERA_BIAS = 2
 local WOUND_MARK = {
 	sizeBase = 1.5, sizePerSize = 0.15, sizeMax = 4,
 	venous = {110, 0, 0},
@@ -324,7 +333,7 @@ local armorBoxes, armorBoxCount = {}, 0
 
 local circles, circleOrder = {}, {}
 local circleCount = 0
-local HALF_SEGMENTS = CIRCLE_SEGMENTS / 2
+local HALF_SEGMENTS = CFG.CIRCLE_SEGMENTS / 2
 local capsulePoly, halfPoly = {}, {}
 for i = 1, HALF_SEGMENTS + 1 do
 	halfPoly[i] = {x = 0, y = 0}
@@ -497,7 +506,7 @@ local function buildFrame()
 
 	local up = neck - pelvis
 	local spineLength = up:Length()
-	if spineLength < MIN_SPINE_LENGTH or spineLength > MAX_SPINE_LENGTH then return false end
+	if spineLength < CFG.MIN_SPINE_LENGTH or spineLength > CFG.MAX_SPINE_LENGTH then return false end
 	up:Div(spineLength)
 
 	local lThigh, rThigh = worldPos[BONE.L_THIGH], worldPos[BONE.R_THIGH]
@@ -556,7 +565,7 @@ local function placeEmitter(emitter)
 	local along = (wx - ax) * abx + (wy - ay) * aby + (wz - az) * abz
 	local t = lengthSqr > 0.001 and math_Clamp(along / lengthSqr, 0, 1) or 0
 
-	local rx = wx - (ax + abx * t) + WOUND_CAMERA_BIAS
+	local rx = wx - (ax + abx * t) + CFG.WOUND_CAMERA_BIAS
 	local ry = wy - (ay + aby * t)
 	local rz = wz - (az + abz * t)
 	local radialLength = math_sqrt(rx * rx + ry * ry + rz * rz)
@@ -578,7 +587,7 @@ local function placeEmitter(emitter)
 end
 
 local function backOffset(pos)
-	return pos and pos - frameForward * (SPINE_BACK_OFFSET * frameSpineLength)
+	return pos and pos - frameForward * (CFG.SPINE_BACK_OFFSET * frameSpineLength)
 end
 
 local function insetPoint(index, side, center, inset)
@@ -639,7 +648,7 @@ local function getHeadPoints(neck)
 	if headUp:Length() > 0 then headUp:Normalize() end
 	local face = eyesForward or frameForward
 	local skull = head + headUp * (SKULL_LIFT * frameSpineLength)
-	local jaw = worldPos[BONE.JAW] or skull + (face * JAW_FORWARD - headUp * JAW_DROP) * frameSpineLength
+	local jaw = worldPos[BONE.JAW] or skull + (face * CFG.JAW_FORWARD - headUp * CFG.JAW_DROP) * frameSpineLength
 
 	return skull, jaw
 end
@@ -651,7 +660,7 @@ local function updatePose(snap)
 	if snap then
 		smoothYaw = targetYaw
 	else
-		local blend = 1 - math_exp(-FrameTime() * YAW_SMOOTH_RATE)
+		local blend = 1 - math_exp(-FrameTime() * CFG.YAW_SMOOTH_RATE)
 		smoothYaw = math.NormalizeAngle(smoothYaw + math.AngleDifference(targetYaw, smoothYaw) * blend)
 	end
 	local yawRadians = math.rad(smoothYaw)
@@ -672,8 +681,8 @@ local function updatePose(snap)
 	local pelvisShapeCenter = hitboxCenter[BONE.PELVIS] or frameRoot
 	local lArm, rArm = worldPos[BONE.L_UPPERARM], worldPos[BONE.R_UPPERARM]
 	local lThigh, rThigh = worldPos[BONE.L_THIGH], worldPos[BONE.R_THIGH]
-	projectTorsoShape(POINT.CHEST_L, POINT.CHEST_R, chestShapeCenter, chestBox, lArm, rArm, CHEST_INSET)
-	projectTorsoShape(POINT.PELVIS_L, POINT.PELVIS_R, pelvisShapeCenter, pelvisBox, lThigh, rThigh, PELVIS_INSET)
+	projectTorsoShape(POINT.CHEST_L, POINT.CHEST_R, chestShapeCenter, chestBox, lArm, rArm, CFG.CHEST_INSET)
+	projectTorsoShape(POINT.PELVIS_L, POINT.PELVIS_R, pelvisShapeCenter, pelvisBox, lThigh, rThigh, CFG.PELVIS_INSET)
 
 	local skull, jaw = getHeadPoints(neck)
 	projectPoint(POINT.SKULL, skull or neck + frameUp * (SKULL_LIFT * 2 * frameSpineLength))
@@ -688,7 +697,7 @@ local function updatePose(snap)
 	projectPoint(POINT.L_FOOT, lFoot and (lToe and LerpVector(0.5, lFoot, lToe) or lFoot))
 	projectPoint(POINT.R_FOOT, rFoot and (rToe and LerpVector(0.5, rFoot, rToe) or rFoot))
 
-	local blend = 1 - math_exp(-FrameTime() * POSE_SMOOTH_RATE)
+	local blend = 1 - math_exp(-FrameTime() * CFG.POSE_SMOOTH_RATE)
 	for index = 1, POINT_COUNT do
 		if pointValid[index] then
 			if snap or not smoothValid[index] then
@@ -737,7 +746,7 @@ local function collectWounds(org, wounds, arterialWounds)
 			if region and size > 0 then
 				local rate = istable(rates) and tonumber(rates[index])
 					or tonumber(wound.visualBleedRate)
-					or size * WOUND_SIZE_TO_RATE
+					or size * CFG.WOUND_SIZE_TO_RATE
 				regionBleed[region] = regionBleed[region] + math.max(rate, 0)
 			end
 		end
@@ -749,7 +758,7 @@ local function collectWounds(org, wounds, arterialWounds)
 			local region = ARTERY_REGIONS[wound[7]] or resolveWoundRegion(wound[4])
 			if region and (tonumber(wound[1]) or 0) > 0 then
 				local rate = istable(rates) and tonumber(rates[index])
-				local active = not rate or rate > ARTERIAL_ACTIVE_RATE
+				local active = not rate or rate > CFG.ARTERIAL_ACTIVE_RATE
 				local value = active and WEIGHT.ARTERIAL or WEIGHT.ARTERIAL_CONTROLLED
 				regionArterial[region] = math.max(regionArterial[region], value)
 			end
@@ -763,7 +772,7 @@ local function collectWounds(org, wounds, arterialWounds)
 	end
 
 	for _, region in ipairs(REGIONS) do
-		local venous = math_Clamp(regionBleed[region] / BLEED_RATE_CRITICAL, 0, 1)
+		local venous = math_Clamp(regionBleed[region] / CFG.BLEED_RATE_CRITICAL, 0, 1)
 		bleedLevel[region] = combine(venous, regionArterial[region])
 		arterial[region] = regionArterial[region] > 0
 	end
@@ -918,13 +927,6 @@ local function lerpColor(from, to, t)
 	return from[1] + (to[1] - from[1]) * t, from[2] + (to[2] - from[2]) * t, from[3] + (to[3] - from[3]) * t
 end
 
-local OTRUB_CONSCIOUSNESS = 0.3
-local GRAY_CONSCIOUSNESS_START = 0.85
-local GRAY_SHOCK_START = 10
-local GRAY_SHOCK_RANGE = 60
-local GRAY_RATE = 3
-local FADE_OUT_RATE = 3
-local FADE_IN_RATE = 1.5
 local displayGray = 0
 local displayFade = 1
 
@@ -950,16 +952,16 @@ local function updateDisplayState(ply)
 	local grayTarget = 0
 	if org then
 		local consciousness = tonumber(org.consciousness) or 1
-		local consciousnessSeverity = math_Clamp((GRAY_CONSCIOUSNESS_START - consciousness) / (GRAY_CONSCIOUSNESS_START - OTRUB_CONSCIOUSNESS), 0, 1)
-		local shockSeverity = math_Clamp(((tonumber(org.shock) or 0) - GRAY_SHOCK_START) / GRAY_SHOCK_RANGE, 0, 1)
+		local consciousnessSeverity = math_Clamp((CFG.GRAY_CONSCIOUSNESS_START - consciousness) / (CFG.GRAY_CONSCIOUSNESS_START - CFG.OTRUB_CONSCIOUSNESS), 0, 1)
+		local shockSeverity = math_Clamp(((tonumber(org.shock) or 0) - CFG.GRAY_SHOCK_START) / CFG.GRAY_SHOCK_RANGE, 0, 1)
 		grayTarget = math.max(consciousnessSeverity, shockSeverity)
 	end
 	if otrub then grayTarget = 1 end
 
 	local dt = FrameTime()
-	displayGray = displayGray + (grayTarget - displayGray) * (1 - math_exp(-dt * GRAY_RATE))
+	displayGray = displayGray + (grayTarget - displayGray) * (1 - math_exp(-dt * CFG.GRAY_RATE))
 	local fadeTarget = otrub and 0 or 1
-	local fadeRate = otrub and FADE_OUT_RATE or FADE_IN_RATE
+	local fadeRate = otrub and CFG.FADE_OUT_RATE or CFG.FADE_IN_RATE
 	displayFade = displayFade + (fadeTarget - displayFade) * (1 - math_exp(-dt * fadeRate))
 end
 
@@ -987,7 +989,7 @@ local function ringColor(region)
 	local r, g, b = lerpColor(COLOR.RING_HEALTHY, COLOR.RING_BLEEDING, bleedLevel[region] or 0)
 	if not arterial[region] then return r, g, b end
 
-	local mul = 1 - ARTERIAL_PULSE_DEPTH * (0.5 + 0.5 * math_sin(CurTime() * pulseHz * TAU))
+	local mul = 1 - CFG.ARTERIAL_PULSE_DEPTH * (0.5 + 0.5 * math_sin(CurTime() * pulseHz * CFG.TAU))
 
 	return r * mul, g * mul, b * mul
 end
@@ -1140,7 +1142,7 @@ local function drawStrap(ax, ay, bx, by, r, t, red, green, blue, horizontal)
 	strapPoly[2].x, strapPoly[2].y = cx + fx - px, cy + fy - py
 	strapPoly[3].x, strapPoly[3].y = cx + fx + px, cy + fy + py
 	strapPoly[4].x, strapPoly[4].y = cx - fx + px, cy - fy + py
-	setDrawColor(red, green, blue, FILL_ALPHA)
+	setDrawColor(red, green, blue, CFG.FILL_ALPHA)
 	surface.DrawPoly(strapPoly)
 	setDrawColor(COLOR.OUTLINE[1], COLOR.OUTLINE[2], COLOR.OUTLINE[3], OUTLINE_ALPHA)
 	drawLine(strapPoly[1].x, strapPoly[1].y, strapPoly[4].x, strapPoly[4].y, outlineWidth)
@@ -1195,7 +1197,7 @@ local function drawShape(shape)
 	local ay = centerY - (shape.az - targetZ) * pixelScale
 	local bx = centerX + shape.bx * pixelScale
 	local by = centerY - (shape.bz - targetZ) * pixelScale
-	local depthScale = math_Clamp(1 + shape.depth * DEPTH_SCALE, DEPTH_SCALE_MIN, DEPTH_SCALE_MAX)
+	local depthScale = math_Clamp(1 + shape.depth * CFG.DEPTH_SCALE, CFG.DEPTH_SCALE_MIN, CFG.DEPTH_SCALE_MAX)
 	local r = shape.radius * DISPLAY_SPINE * pixelScale * depthScale
 	local shake = stress[shape.region] or 0
 	if shake > STRESS.VISIBLE then
@@ -1380,12 +1382,12 @@ local function drawArmor()
 end
 
 local function renderFigure()
-	local size = ScrH() * PANEL_SIZE_FRACTION
-	pixelScale = size / (FIGURE_EXTENT * DISPLAY_SPINE)
+	local size = ScrH() * CFG.PANEL_SIZE_FRACTION
+	pixelScale = size / (CFG.FIGURE_EXTENT * DISPLAY_SPINE)
 	outlineWidth = math.max(SHAPE.OUTLINE_WIDTH * ScrH() / REFERENCE_SCREEN_HEIGHT, 1)
-	centerX = ScrH() * PANEL_MARGIN_FRACTION + size * 0.5
+	centerX = ScrH() * CFG.PANEL_MARGIN_FRACTION + size * 0.5
 	centerY = ScrH() * 0.5
-	targetZ = TARGET_HEIGHT * DISPLAY_SPINE
+	targetZ = CFG.TARGET_HEIGHT * DISPLAY_SPINE
 
 	draw.NoTexture()
 	queueBody()
@@ -1408,7 +1410,7 @@ hook.Add("HUDPaint", "homigrad/body-status/draw", function()
 	woundSource = ply:Alive() and ply or body
 
 	local now = CurTime()
-	local snap = body ~= lastBody or now - lastDrawTime > SNAP_AFTER_HIDDEN
+	local snap = body ~= lastBody or now - lastDrawTime > CFG.SNAP_AFTER_HIDDEN
 	if snap then smoothValid[POINT.PELVIS] = false end
 	if captureBody ~= body or captureFrame ~= FrameNumber() then captureBones(body) end
 	if updatePose(snap) then lastBody = body end
@@ -1418,7 +1420,7 @@ hook.Add("HUDPaint", "homigrad/body-status/draw", function()
 	if snap or now >= nextMedicalUpdate then
 		updateMedicalState(ply, body)
 		collectArmorBoxes(ply, body)
-		nextMedicalUpdate = now + MEDICAL_UPDATE_INTERVAL
+		nextMedicalUpdate = now + CFG.MEDICAL_UPDATE_INTERVAL
 	end
 	updateStress(body ~= ply and body:IsRagdoll(), snap)
 

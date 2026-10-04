@@ -1,7 +1,7 @@
 hg = hg or {}
 
 local ATTACK_FRAC = 0.18
-local INPUT_SLOWDOWN = 0.4
+local INPUT_SLOWDOWN = 0.95
 
 function hg.StaggerEnvelope(now, start, finish)
 	if finish <= start then return 0 end
@@ -20,7 +20,7 @@ hook.Add("HG_MovementCalc_2", "HG-Stagger", function(mul, ply, cmd, mv)
 	cmd:RemoveKey(IN_JUMP)
 	if mv then mv:RemoveKey(IN_JUMP) end
 
-	mul[1] = mul[1] * (1 - INPUT_SLOWDOWN * env * ply:GetNWFloat("HGStaggerPower", 0.5))
+	mul[1] = mul[1] * (1 - INPUT_SLOWDOWN * env * (0.6 + 0.4 * ply:GetNWFloat("HGStaggerPower", 0.5)))
 end)
 
 if CLIENT then return end
@@ -38,8 +38,8 @@ local INERTIA_LOSS_FRAC = 0.35
 local INERTIA_OPPOSE_DOT = -0.25
 local INERTIA_BASE_CHANCE = 0.45
 local INERTIA_COOLDOWN = 1.5
-local PUSH_IMPULSE = 170
-local PUSH_ACCEL = 620
+local PUSH_IMPULSE = 280
+local PUSH_ACCEL = 1300
 local SIDE_STEP_FRAC = 0.6
 
 local function flatDirection(dir, ply)

@@ -101,6 +101,7 @@ function hg.DrawWorldMotionBlur(addAlpha, drawAlpha, delay)
 	worldMotionBlur[#worldMotionBlur + 1] = {addAlpha, drawAlpha, delay}
 end
 hook.Add("PreDrawEffects", "HG_WorldMotionBlur", function()
+	if RENDERING_SCOPE then return end
 	local pending = worldMotionBlur
 	worldMotionBlur = {}
 	if #pending == 0 then return end

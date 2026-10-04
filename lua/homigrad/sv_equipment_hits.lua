@@ -474,6 +474,7 @@ end
 function hg.GetHeldWeaponImpactModel(ply, wep)
     if not IsValid(wep) then return end
     if wep:GetClass() == "weapon_hands_sh" or wep:GetClass() == "weapon_hg_coolhands" then return end
+    if wep.GetEquipmentImpactModel and IsValid(ply.FakeRagdoll) then return end
     if wep.GetEquipmentImpactModel then
         local model, pos, ang, scale, pose = wep:GetEquipmentImpactModel()
         if model and isvector(pos) and isangle(ang) then return model, pos, ang, scale, pose end
@@ -1011,6 +1012,36 @@ local function TraceBelongsToPlayer(trace, ply)
     return hg.RagdollOwner and hg.RagdollOwner(ent) == ply or false
 end
 
+local debugWeaponHits = CreateConVar("hg_debug_weaponhits", "0", FCVAR_NONE)
+
+local function DebugWeaponTrace(ply, wep, startPos, endPos, hit, obstructionFraction, originalTrace)
+    local model, pos, ang, scale, pose = hg.GetHeldWeaponImpactModel(ply, wep)
+    local ray = endPos - startPos
+    local rayLength = math.max(ray:Length(), 0.001)
+    local closest = isvector(pos) and (pos - startPos):Cross(ray / rayLength):Length() or -1
+    local set = IsValid(pose) and pose.GetHitboxSet and pose:GetHitboxSet() or 0
+    local poseBoxes = IsValid(pose) and pose:GetHitBoxCount(set) or -1
+    local realGeometry = isstring(wep.WorldModel) and GetGeometry(wep.WorldModel)
+    local reported = wep.HGReportedPose
+    local entity = originalTrace and originalTrace.Entity
+    print(string.format("[HGWeaponDebug] victim=%s wep=%s model=%s pose=%s boxes=%d realConvex=%s ray->pose=%.1f hit=%s obstruction=%.3f traceEnt=%s reportedAge=%s",
+        ply:Nick(), wep:GetClass(), tostring(model), tostring(IsValid(pose)), poseBoxes, realGeometry and #realGeometry.convexes or "nil", closest,
+        hit and string.format("%.3f", hit.fraction) or "MISS", obstructionFraction, IsValid(entity) and entity:GetClass() or tostring(entity),
+        reported and string.format("%.2f", CurTime() - reported.time) or "none"))
+    debugoverlay.Line(startPos, endPos, 6, Color(255, 255, 0), true)
+    if isvector(pos) and isangle(ang) then debugoverlay.Axis(pos, ang, 12, 6, true) end
+    if IsValid(pose) and poseBoxes > 0 then
+        for index = 0, poseBoxes - 1 do
+            local bone = pose:GetHitBoxBone(index, set)
+            local matrix = bone and pose:GetBoneMatrix(bone)
+            local mins, maxs = pose:GetHitBoxBounds(index, set)
+            if matrix and mins and maxs then
+                debugoverlay.BoxAngles(matrix:GetTranslation(), mins * scale, maxs * scale, matrix:GetAngles(), 6, Color(255, 0, 0, 40))
+            end
+        end
+    end
+end
+
 local function TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, originalTrace, shot)
     if not isvector(startPos) or not isvector(endPos) or startPos:DistToSqr(endPos) < 0.000001 then return originalTrace end
     originalTrace = originalTrace or {}
@@ -1054,9 +1085,15 @@ local function TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, ori
             weaponEnd = endPos + direction * cfg.weaponWearerSlack
         end
         local weaponRatio = 1 + wearerSlack
+        if debugWeaponHits:GetBool() and wearerSlack > 0 and not (IsValid(wep) and wep ~= firingWeapon and CanHit(wep) and (shot.Contact or not seen[wep])) then
+            print(string.format("[HGWeaponDebug] SKIPPED victim=%s wepValid=%s isFiring=%s canHit=%s seen=%s", ply:Nick(), tostring(IsValid(wep)), tostring(wep == firingWeapon), tostring(IsValid(wep) and CanHit(wep)), tostring(IsValid(wep) and seen[wep] == true)))
+        end
         if IsValid(wep) and wep ~= firingWeapon and CanHit(wep) and (shot.Contact or not seen[wep]) then
             local hit
             hit, pose = TraceHeldWeaponModel(ply, wep, startPos, weaponEnd, cfg.weaponHitPadding + projectileRadius)
+            if debugWeaponHits:GetBool() and (hit or TraceBelongsToPlayer(originalTrace, ply)) then
+                DebugWeaponTrace(ply, wep, startPos, weaponEnd, hit, obstructionFraction, originalTrace)
+            end
             if hit then
                 hit.fraction = hit.fraction * weaponRatio
                 if hit.fraction <= obstructionFraction + wearerSlack + 0.0001 then

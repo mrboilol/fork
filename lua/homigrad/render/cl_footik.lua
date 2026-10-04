@@ -298,6 +298,7 @@ local function landingTarget(ply, state, ctx, foot, index)
 	local lead = hg.GaitLandingLead(ctx.speed, ctx.swingFraction) * IKFoot.GetFloat("stride_scale") * (1 - ctx.limp[index] * LIMP_STRIDE_CUT)
 	lead = math_min(lead, reachLead(state, ctx, index))
 	local offset = ctx.right * (sign * ctx.halfWidth) + ctx.moveDir * lead
+	local intendedLateral = sign * offset:Dot(ctx.right)
 	local maxSpread = ctx.legLength * LANDING_SPREAD_FRACTION
 	if offset:Length() > maxSpread then
 		offset:Normalize()
@@ -305,7 +306,7 @@ local function landingTarget(ply, state, ctx, foot, index)
 	end
 
 	local lateral = offset:Dot(ctx.right)
-	local minLateral = ctx.halfWidth * MIN_LATERAL_FRACTION
+	local minLateral = math_min(ctx.halfWidth * MIN_LATERAL_FRACTION, intendedLateral)
 	if sign * lateral < minLateral then
 		offset:Add(ctx.right * (sign * minLateral - lateral))
 	end
@@ -611,6 +612,16 @@ local function solveLeg(ent, ids, foot, ankleTarget, weight, ctx, state, alignWe
 
 	local target = LerpVector(weight, ankle0, ankleTarget)
 	local toTarget = target - hip
+	local maxReach = (upperLength + lowerLength) * REACH_FRACTION
+	if toTarget:LengthSqr() > maxReach * maxReach then
+		local flatLength = toTarget:Length2D()
+		local maxFlat = math_sqrt(math_max(maxReach * maxReach - toTarget.z * toTarget.z, 0))
+		if flatLength > maxFlat and flatLength > 0.01 then
+			local pull = maxFlat / flatLength
+			target = Vector(hip.x + toTarget.x * pull, hip.y + toTarget.y * pull, target.z)
+			toTarget = target - hip
+		end
+	end
 	local dist = toTarget:Length()
 	if dist < 0.01 then return end
 	local dir = toTarget / dist

@@ -635,6 +635,7 @@ end
 
 local function getBulletContactBone(ent, trace, dmgPos)
 	local boneIndex = trace.HitBoxBone
+	if ent:IsRagdoll() and trace.PhysicsBone and trace.PhysicsBone >= 0 then boneIndex = nil end
 	if boneIndex == nil and not ent:IsRagdoll() and trace.HitBox ~= nil and ent.GetHitBoxBone then
 		boneIndex = ent:GetHitBoxBone(trace.HitBox, ent.GetHitboxSet and ent:GetHitboxSet() or 0)
 	end
