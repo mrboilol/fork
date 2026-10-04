@@ -40,6 +40,9 @@ local TARGET_SMOOTH = 14
 local MOVING_SPEED = 12
 local REACH_FRACTION = 0.97
 local OVERREACH_FRACTION = 0.95
+local LEAD_REACH_FRACTION = 0.92
+local STRIDE_REACH_FRACTION = 0.9
+local MAX_STRIDE_DROP = 9
 local LANDING_SPREAD_FRACTION = 0.8
 local SETTLE_SWING_TIME = 0.28
 local SETTLE_COOLDOWN = 0.12
@@ -270,8 +273,8 @@ local function plantedWorldPos(foot)
 end
 
 local function reachLead(state, ctx, index)
-	local height = ctx.anim[index].hip.z - ctx.origin.z - state.ankleHeight
-	local reach = ctx.legLength * OVERREACH_FRACTION
+	local height = ctx.anim[index].hip.z - ctx.origin.z - state.ankleHeight - ctx.maxStrideDrop
+	local reach = ctx.legLength * LEAD_REACH_FRACTION
 
 	return math_sqrt(math_max(reach * reach - height * height - ctx.halfWidth * ctx.halfWidth, 0))
 end
@@ -436,7 +439,7 @@ local function updateFeet(ply, state, ctx, dt)
 			local planted = plantedWorldPos(foot)
 			local reach = ctx.legLength * OVERREACH_FRACTION
 			local settledInPlace = foot.plantOrigin and (ctx.origin - foot.plantOrigin):Length2DSqr() < OVERREACH_RESTEP_MOVE_SQR
-			local overreach = not planted or (not settledInPlace and (planted + vector_up * state.ankleHeight):DistToSqr(ctx.anim[index].hip) > reach * reach)
+			local overreach = not planted or (not settledInPlace and (planted + vector_up * state.ankleHeight):DistToSqr(ctx.anim[index].hip - vector_up * state.drop) > reach * reach)
 			if overreach then
 				startStep(state, index, SETTLE_SWING_TIME, false)
 			end
@@ -469,18 +472,30 @@ local function updateFeet(ply, state, ctx, dt)
 	end
 end
 
+local function strideDrop(state, ctx, index, ground)
+	local hip = ctx.anim[index].hip
+	local dx, dy = hip.x - ground.x, hip.y - ground.y
+	local reach = ctx.legLength * STRIDE_REACH_FRACTION
+	local height = hip.z - ground.z - state.ankleHeight
+
+	return height - math_sqrt(math_max(reach * reach - dx * dx - dy * dy, 0)) - DROP_DEADZONE
+end
+
 local function updateDrop(state, ctx, dt)
-	local targetDrop = 0
+	local terrainDrop, stride = 0, 0
 	for index = 1, 2 do
 		local foot = state.feet[index]
 		local supporting = not foot.swinging or foot.t > 0.5
 		if ctx.anim[index].usable and supporting and foot.ground then
-			targetDrop = math_max(targetDrop, ctx.origin.z - foot.ground.z - DROP_DEADZONE)
+			terrainDrop = math_max(terrainDrop, ctx.origin.z - foot.ground.z - DROP_DEADZONE)
+			stride = math_max(stride, strideDrop(state, ctx, index, foot.ground))
 		end
 	end
 
 	local maxDrop = IKFoot.GetFloat("max_body_drop") * (ctx.crouching and CROUCH_DROP_SCALE or 1)
-	targetDrop = math_Clamp(targetDrop * DROP_TERRAIN_SCALE + (ctx.stagger and ctx.stagger.amount * STAGGER_DROP or 0), 0, maxDrop)
+	stride = math_min(stride, ctx.maxStrideDrop)
+	local targetDrop = math_max(terrainDrop * DROP_TERRAIN_SCALE, stride) + (ctx.stagger and ctx.stagger.amount * STAGGER_DROP or 0)
+	targetDrop = math_Clamp(targetDrop, 0, maxDrop)
 	state.drop = state.drop + (targetDrop - state.drop) * (1 - math_exp(-dt * DROP_SMOOTH))
 end
 
@@ -566,6 +581,7 @@ local function buildContext(ply, state, anim, dt)
 		right = bodyAng:Right(),
 		halfWidth = math_Clamp(hipSpan, MIN_HALF_WIDTH, MAX_HALF_WIDTH),
 		legLength = math_max(anim[1].length, anim[2].length),
+		maxStrideDrop = math_min(MAX_STRIDE_DROP, IKFoot.GetFloat("max_body_drop")) * (ply:Crouching() and CROUCH_DROP_SCALE or 1),
 		onGround = ply:OnGround(),
 		crouching = ply:Crouching(),
 		limp = {hg.GaitLegLimp(ply.organism, "lleg"), hg.GaitLegLimp(ply.organism, "rleg")},

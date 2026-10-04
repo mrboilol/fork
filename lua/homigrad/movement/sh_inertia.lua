@@ -16,6 +16,7 @@ end
 
 local steepTrace = {mask = MASK_PLAYERSOLID}
 local function getSteepNormal(ply)
+	ply.hg_GroundNormal = nil
 	if not ply:Alive() or ply:GetMoveType() ~= MOVETYPE_WALK or not ply:OnGround()
 		or ply:InVehicle() or IsValid(ply.FakeRagdoll) then return end
 	local pos = ply:GetPos()
@@ -23,6 +24,7 @@ local function getSteepNormal(ply)
 	steepTrace.endpos = pos - vector_up * 12
 	steepTrace.filter = ply
 	local tr = util.TraceLine(steepTrace)
+	if tr.Hit then ply.hg_GroundNormal = tr.HitNormal end
 	if tr.Hit and tr.HitNormal.z < hg.WalkableNormalZ(ply) then return tr.HitNormal end
 end
 
@@ -139,7 +141,7 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 	local hg_movement_weightmul_mul = CreateConVar("hg_movement_weightmul_mul", "1", {FCVAR_REPLICATED,FCVAR_ARCHIVE,FCVAR_NOTIFY}, "Multiply speed lose", 0.01, 5)
 	local hg_movement_lagcomp = CreateConVar("hg_movement_lagcomp", "1", {FCVAR_REPLICATED,FCVAR_ARCHIVE,FCVAR_NOTIFY}, "Compensate movement inertia for latency", 0, 1)
 	local hg_footstep_push = CreateConVar("hg_footstep_push", "1", {FCVAR_REPLICATED,FCVAR_ARCHIVE,FCVAR_NOTIFY}, "Gain ground speed only while a foot is pushing", 0, 1)
-	local hg_footstep_push_min = CreateConVar("hg_footstep_push_min", "0.25", {FCVAR_REPLICATED,FCVAR_ARCHIVE,FCVAR_NOTIFY}, "Acceleration fraction kept between foot pushes", 0, 1)
+	local hg_footstep_push_min = CreateConVar("hg_footstep_push_min", "0.1", {FCVAR_REPLICATED,FCVAR_ARCHIVE,FCVAR_NOTIFY}, "Acceleration fraction kept between foot pushes", 0, 1)
 
 	local hg_sprint_speed_mul = CreateConVar("hg_sprint_speed_mul", "0.8", {FCVAR_REPLICATED,FCVAR_ARCHIVE,FCVAR_NOTIFY}, "Sprint speed multiplier for players without the Sprinter trait", 0.3, 1)
 
@@ -192,10 +194,24 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 	local LIMP_DISLOCATED = 0.7
 	local LIMP_STANCE_HURRY = 0.6
 	local LIMP_SWING_DELAY = 0.3
-	local LIMP_PUSH_SHIFT = 0.6
+	local PUSH_LIMP_LOSS = 0.93
+	local PUSH_MIN_MUL = 0.05
+	local PUSH_DRAG_FRACTION = 0.3
+	local PUSH_SLOPE_FRACTION = 0.7
+	local PUSH_OBSTRUCT_LOSS = 0.85
+	local PUSH_OBSTRUCT_DIST = 28
+	local PUSH_OBSTRUCT_LIFT = 18
+	local PUSH_PROP_MASS = 60
+	local PUSH_ADRENALINE_MAX = 0.3
+	local PUSH_CLASS_SHARE = 0.25
+	local PUSH_SUPERFIGHTER_BONUS = 1
+	local PUSH_SPRINT_BONUS = 0.25
+	local PUSH_JOG_BONUS = 0.1
+	local PUSH_BONUS_MAX = 4
 
 	function hg.GaitLegLimp(org, leg)
 		if not org then return 0 end
+		if org[leg .. "amputated"] or org[leg .. "upamputated"] then return 1 end
 		local damage = tonumber(org[leg]) or 0
 		if damage >= 1 then return 1 end
 		local limp = org[leg .. "dislocation"] and LIMP_DISLOCATED or 0
@@ -221,9 +237,62 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 	end
 
 	function hg.GaitLimpPushMul(ply, phase)
-		local stanceLimp, swingLimp = stanceAndSwingLimp(ply, phase)
+		local stanceLimp = stanceAndSwingLimp(ply, phase)
 
-		return math_Clamp(1 - stanceLimp * LIMP_PUSH_SHIFT + swingLimp * LIMP_PUSH_SHIFT, 0.2, 1.8)
+		return math_Clamp(1 - stanceLimp * PUSH_LIMP_LOSS, PUSH_MIN_MUL, 1)
+	end
+
+	local obstructTrace = {mins = Vector(-8, -8, 0), maxs = Vector(8, 8, 36), mask = MASK_PLAYERSOLID}
+	local function gaitObstruction(ply, dir)
+		local pos = ply:GetPos() + vector_up * PUSH_OBSTRUCT_LIFT
+		obstructTrace.start = pos
+		obstructTrace.endpos = pos + dir * PUSH_OBSTRUCT_DIST
+		obstructTrace.filter = ply
+		local tr = util.TraceHull(obstructTrace)
+		if not tr.Hit or tr.StartSolid or tr.HitNormal.z >= hg.WalkableNormalZ(ply) then return 0 end
+
+		local blocked = math_Clamp((1 - tr.Fraction) * -tr.HitNormal:Dot(dir), 0, 1)
+		local ent = tr.Entity
+		if IsValid(ent) and not ent:IsWorld() then
+			local phys = ent:GetPhysicsObject()
+			if IsValid(phys) and phys:IsMotionEnabled() then
+				blocked = blocked * math_Clamp(phys:GetMass() / PUSH_PROP_MASS, 0.25, 1)
+			end
+		end
+
+		return blocked
+	end
+
+	local function gaitTerrainPush(ply, dir)
+		local blocked = gaitObstruction(ply, dir)
+		local normal = ply.hg_GroundNormal
+		local slopeSin = 0
+		if normal and normal.z > 0.01 then
+			local rise = -(normal.x * dir.x + normal.y * dir.y) / normal.z
+			slopeSin = rise / math_sqrt(1 + rise * rise)
+		end
+
+		return 1 - blocked * PUSH_OBSTRUCT_LOSS, slopeSin * PUSH_SLOPE_FRACTION
+	end
+
+	function hg.GaitPushBonus(ply, org)
+		local bonus = 1
+		bonus = bonus + math_min(math_Round(org.adrenaline or 0, 1) / 24, PUSH_ADRENALINE_MAX)
+		bonus = bonus + math_max((ply:GetNWInt("SpeedGainClassMul", 1) or 1) - 1, 0) * PUSH_CLASS_SHARE
+		if org.superfighter then bonus = bonus + PUSH_SUPERFIGHTER_BONUS end
+		if ply.hg_isSprinting then
+			bonus = bonus + PUSH_SPRINT_BONUS
+		elseif ply.hg_isJogging then
+			bonus = bonus + PUSH_JOG_BONUS
+		end
+
+		return math_min(bonus, PUSH_BONUS_MAX)
+	end
+
+	function hg.GaitResist(speed, targetSpeed, slopeFraction, inertiaBlend)
+		if targetSpeed <= 1 then return 0 end
+
+		return math_max(PUSH_DRAG_FRACTION * math_min(speed / targetSpeed, 1) + slopeFraction, 0) * inertiaBlend
 	end
 
 	function hg.GaitPush(phase, swingFraction)
@@ -658,11 +727,29 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 			end
 
 			local gait_mul = 1
+			local gait_resist = 0
+			local has_intent = fm ~= 0 or sm ~= 0
 			if on_ground and moveType == MOVETYPE_WALK then
-				gait_mul = gaitAccelerationMul(ply, vel, fm ~= 0 or sm ~= 0, process_input, tick_interval)
+				gait_mul = gaitAccelerationMul(ply, vel, has_intent, process_input, tick_interval)
+				if has_intent and hg_footstep_push:GetBool() then
+					local target_len = inertia_to:Length2D()
+					if target_len > 1 then
+						local terrain_mul, slope_accel = gaitTerrainPush(ply, inertia_to / target_len)
+						gait_mul = gait_mul * terrain_mul * hg.GaitPushBonus(ply, org)
+						gait_resist = hg.GaitResist(ply.MovementInertia:Length2D(), target_len, slope_accel, ply.InertiaBlend)
+					end
+				end
 			end
 
 			local new_inertia = approach_vector(ply.MovementInertia, inertia_to, delta_time * ply.InertiaBlend * gait_mul)
+			if gait_resist > 0 then
+				local new_len = new_inertia:Length2D()
+				if new_len > 0.01 then
+					local scale = math_max(new_len - gait_resist * delta_time, 0) / new_len
+					new_inertia.x = new_inertia.x * scale
+					new_inertia.y = new_inertia.y * scale
+				end
+			end
 
 			ply.MovementInertia = new_inertia
 
