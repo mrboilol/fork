@@ -392,8 +392,8 @@ function SWEP:ApplyForce()
 			ply.Guilt = math.max(ply.Guilt or 0, 5)
 		end
 
-            if self.CarryEnt:GetClass() == "prop_ragdoll" then
-                    local ply2 = hg.RagdollOwner(self.CarryEnt) or self.CarryEnt
+		if self.CarryEnt:GetClass() == "prop_ragdoll" then
+			local ply2 = hg.RagdollOwner(self.CarryEnt) or self.CarryEnt
 			local bone = self.CarryEnt:GetBoneName(self.CarryEnt:TranslatePhysBoneToBone(self.CarryBone))
 
 			if ply:KeyPressed(IN_RELOAD) then
@@ -912,9 +912,7 @@ function SWEP:PrimaryAttack(forcespecial)
 	self:SetNextDown(CurTime() + 7)
 	if not self:GetFists() then
 		self:SetFists(true)
-		if CLIENT then
-			self:EmitSound("pwb2/weapons/matebahomeprotection/mateba_cloth.ogg", 60, math.random(90, 100), 1, CHAN_BODY)
-		end
+		self:EmitSound("pwb2/weapons/matebahomeprotection/mateba_cloth.wav", 60, math_random(90, 100), 1, CHAN_BODY)
 		owner:ViewPunch(depang)
 		if not isfur then
 			self:PlayAnim("draw",1)
@@ -1330,24 +1328,12 @@ end
 
 local hg_coolhands = CreateConVar("hg_coolhands", 1, {FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED}, "Give cool hands instead of default hands on spawn")
 hook.Add("PlayerSpawn", "Toggle_CoolHands", function(ply)
-        timer.Simple(0, function()
-                if not IsValid(ply) then return end
+	if not IsValid(ply) then return end
+	if not hg_coolhands:GetBool() or ply.PlayerClassName and ply.PlayerClassName == "headcrabzombie" then return end
 
-                local class = hg.GetHandsWeaponClass and hg.GetHandsWeaponClass(ply) or "weapon_hg_coolhands"
-                if class ~= "weapon_hg_coolhands" then return end
-
-                local hands = ply:GetWeapon(class)
-                if not IsValid(hands) then
-                        hands = ply:Give(class)
-                end
-
-                local otherClass = class == "weapon_hg_coolhands" and "weapon_hands_sh" or "weapon_hg_coolhands"
-                if ply:HasWeapon(otherClass) then
-                        ply:StripWeapon(otherClass)
-                end
-
-                if IsValid(hands) then
-                        ply:SelectWeapon(hands:GetClass())
-                end
-        end)
+	if ply:HasWeapon("weapon_hands_sh") then
+		ply:StripWeapon("weapon_hands_sh")
+	end
+	local hands = ply:Give("weapon_hg_coolhands")
+	ply:SelectWeapon("weapon_hg_coolhands")
 end)
