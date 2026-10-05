@@ -435,3 +435,22 @@ hook.Add("ZCNPC_WokeUp", "zcnpc_cai", function(npc)
 	if istable(manager) and isfunction(manager.Register) then manager.Register(npc) end
 end)
 --//
+
+--\ CAI is the only NPC brain
+local ERRAND_CVARS = {
+	"zcnpc_idle_patrol", "inpc_patrol", "zcnpc_weapon_pickup", "zcnpc_melee_pickup", "zcnpc_weapon_upgrade",
+	"zcnpc_armor_pickup", "zcnpc_looting", "zcnpc_allyheal", "zcnpc_rescue",
+}
+
+local function ErrandsOff()
+	if not Enabled() then return end
+
+	for _, name in ipairs(ERRAND_CVARS) do
+		local cvar = GetConVar(name)
+		if cvar and cvar:GetBool() then RunConsoleCommand(name, "0") end
+	end
+end
+
+hook.Add("InitPostEntity", "zcnpc_cai_only", function() timer.Simple(2, ErrandsOff) end)
+timer.Create("zcnpc_cai_only", 5, 0, ErrandsOff)
+--//

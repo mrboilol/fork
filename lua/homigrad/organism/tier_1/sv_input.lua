@@ -718,8 +718,21 @@ local function forwardOrganismDamage(ent, rag, dmgInfo)
 		end
 		traces[dmgInfo] = trace
 	end
+	local activeHit = hg.ActiveBallisticHit
+	local activeTrace = activeHit and activeHit.trace
+	if activeHit and traces then activeHit.trace = traces[dmgInfo] end
 	rag:TakeDamageInfo(dmgInfo)
+	if activeHit then activeHit.trace = activeTrace end
 	if traces then traces[dmgInfo] = original end
+end
+
+local function adoptActiveBallisticHit(dmgInfo)
+	local activeHit = hg.ActiveBallisticHit
+	if not activeHit or not dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_SNIPER) then return end
+	local traces = hg.BallisticDamageTrace
+	if traces and activeHit.trace and not traces[dmgInfo] then traces[dmgInfo] = activeHit.trace end
+	local processed = hg.EquipmentImpact and hg.EquipmentImpact.ProcessedDamage
+	if processed and activeHit.processed and not processed[dmgInfo] then processed[dmgInfo] = activeHit.processed end
 end
 
 hg.DeathCam = false
@@ -1397,6 +1410,7 @@ local takeRagdollDamage
 hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	if ent.hgFatalOrganismDamage then return end
 	if dmgInfo:IsDamageType(DMG_DISSOLVE) then return end
+	adoptActiveBallisticHit(dmgInfo)
 
 	local attacker = dmgInfo:GetAttacker()
 	

@@ -61,4 +61,10 @@ function PS.ApplyProficiency(data)
 		if overshootProficiency then score = math.min(score, overshootProficiency:GetInt()) end
 	end
 	npc:SetCurrentWeaponProficiency(math.Clamp(math.Round(score), 0, 4))
+	if isfunction(npc.SetMaxYawSpeed) and isfunction(npc.GetMaxYawSpeed) then
+		data.baseYawSpeed = data.baseYawSpeed or npc:GetMaxYawSpeed()
+		if data.baseYawSpeed and data.baseYawSpeed > 0 then
+			npc:SetMaxYawSpeed(data.baseYawSpeed * (0.4 + aimSkill * 1.1))
+		end
+	end
 end

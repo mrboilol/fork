@@ -137,6 +137,7 @@ function T.ApplyBulletAim(shooter, bullet, physical)
 			radius = math.max(radius, target:BoundingRadius() * 1.5)
 			horizontal = radius * math.Rand(0.8, 1.2) * (math.random() < 0.5 and -1 or 1)
 		end
+		aim = aim - target:GetVelocity() * (1 - skill) * 0.35
 		local right = dir:GetNormalized():Cross(vector_up)
 		if right:LengthSqr() < 0.0001 then right = Vector(1, 0, 0) end
 		right = right:GetNormalized()

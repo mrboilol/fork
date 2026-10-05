@@ -134,7 +134,7 @@ if SERVER then
 					end
 
 					if enemyVisible then
-						npc.overshootTime = CurTime() + math.Rand(0, math.max(0, maxOvershoot:GetFloat()))
+						npc.overshootTime = CurTime() + math.Rand(0, math.max(0, maxOvershoot:GetFloat()) * (CAI and CAI.AimSkill and (1.5 - CAI.AimSkill()) or 1))
 						if math.random(1, 100) > overshootChance:GetInt() then npc.overshootTime = 0 end
 						npc.defaultProficiency = npc:GetCurrentWeaponProficiency()
 						npc.didResetProficiency = true

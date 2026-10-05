@@ -630,9 +630,12 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 						hg.BallisticDamageInfo[dmg] = self
 						hg.BallisticDamageTrace = hg.BallisticDamageTrace or setmetatable({}, {__mode = "k"})
 						hg.BallisticDamageTrace[dmg] = table.Copy(trace)
+						local previousHit = hg.ActiveBallisticHit
+						hg.ActiveBallisticHit = {trace = hg.BallisticDamageTrace[dmg], processed = hg.EquipmentImpact and hg.EquipmentImpact.ProcessedDamage[dmg]}
 						if not (trace.Entity:IsWeapon() and not IsValid(trace.Entity:GetOwner())) then
 							trace.Entity:DispatchTraceAttack(dmg, trace, dir)
 						end
+						hg.ActiveBallisticHit = previousHit
 						hg.BallisticDamageTrace[dmg] = nil
 						hg.BallisticDamageInfo[dmg] = nil
 						if IsValid(ballisticInflictor) and ballisticInflictor.bullet == self then ballisticInflictor.bullet = previousBullet end

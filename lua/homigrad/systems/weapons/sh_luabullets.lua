@@ -440,9 +440,12 @@ local function Damage(bDoDebugHit, bStartedInWater, bEndNotWater, iFlags, iDamag
 		hg.BallisticDamageInfo[info] = tInfo
 		hg.BallisticDamageTrace = hg.BallisticDamageTrace or setmetatable({}, {__mode = "k"})
 		hg.BallisticDamageTrace[info] = table.Copy(tr)
+		local previousHit = hg.ActiveBallisticHit
+		hg.ActiveBallisticHit = {trace = hg.BallisticDamageTrace[info], processed = SERVER and hg.EquipmentImpact and hg.EquipmentImpact.ProcessedDamage[info] or nil}
 		if not (pEntity:IsWeapon() and not IsValid(pEntity:GetOwner())) then
 			pEntity:DispatchTraceAttack(info, tr, vShotDir)
 		end
+		hg.ActiveBallisticHit = previousHit
 		hg.BallisticDamageTrace[info] = nil
 		hg.BallisticDamageInfo[info] = nil
 		if IsValid(pInflictor) and pInflictor.bullet == tInfo then pInflictor.bullet = previousBullet end
