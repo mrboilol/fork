@@ -7,37 +7,6 @@ local combat_response_cooldown = 0.35
 local gunfight_response_cooldown = 1.5
 local gunfight_adrenaline_cap = 1.5
 
-local derealization_phrases = {
-	legacy = {
-	"This doesn't feel real.",
-	"The world looks wrong, like a rough sketch of itself.",
-	"You are watching yourself from far away.",
-	"Your own voice sounds like a stranger's.",
-	"Everything is moving too slow, or too fast. You can't tell.",
-	"The walls feel like paper. The air feels like water.",
-	"You know this place, but it doesn't know you.",
-	"Reality is coming apart at the edges.",
-	"You are not sure you actually exist right now.",
-	"The world feels like a memory of itself."
-},
-	new = {
-		"This doesn't feel real.",
-		"I feel like I'm watching this happen to someone else.",
-		"I can't tell what is real anymore.",
-		"Everything feels wrong.",
-		"My own voice doesn't sound like mine.",
-		"I feel far away from my body."
-	}
-}
-local derealization_color = Color(180, 160, 255)
-
-local function psycheThought(owner, phrases, delay, key, clr)
-	local newThoughts = owner:GetInfoNum("hg_newthoughts", 0) > 0
-	local messages = phrases[newThoughts and "legacy" or "new"]
-	local msg = messages[math.random(#messages)]
-	return owner:Thought(msg, delay, key, 0, clr)
-end
-
 module[1] = function(org)
 	org.psycheAnger = 0
 	org.psycheAngerLastHit = 0
@@ -48,13 +17,6 @@ module[2] = function(owner, org, timeValue)
 	local anger = Clamp(org.anger or 0, 0, 1)
 	org.psycheAnger = anger
 	org.psychePainMul = 1
-
-	if org.isPly and owner:Alive() then
-		local panic = org.panicattack or 0
-		if panic >= 0.55 then
-			psycheThought(owner, derealization_phrases, math.Rand(18, 28), "psyche_derealization", derealization_color)
-		end
-	end
 end
 
 local function getCombatPlayer(ent)

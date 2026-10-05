@@ -320,6 +320,14 @@ function SWEP:Think()
 				filter = self.Owner
 			})
 			
+			if hg.organism and hg.organism.CauterizeFlame then
+				if IsValid(tr.Entity) then
+					hg.organism.CauterizeFlame(self:GetOwner(), tr.Entity, tr.HitPos)
+				elseif self:GetOwner():EyeAngles().p > 55 then
+					hg.organism.CauterizeSelf(self:GetOwner())
+				end
+			end
+
 			if tr.Hit then
 				if IsValid(tr.Entity) and hg and hg.TrySmallFlameIgnite then
 					hg.TrySmallFlameIgnite(tr.Entity, tr.HitPos, tr.HitNormal, self:GetOwner(), "zippo", self)

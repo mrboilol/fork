@@ -149,6 +149,21 @@ function SWEP:PrimaryAttack()
         return 
     end
 
+    if SERVER and hg.organism and hg.organism.CauterizeFlame then
+        local owner = self:GetOwner()
+        local closed = 0
+        if IsValid(tr.Entity) and tr.HitPos:DistToSqr(owner:GetShootPos()) <= 3600 then
+            closed = hg.organism.CauterizeFlame(owner, tr.Entity, tr.HitPos)
+        elseif owner:EyeAngles().p > 55 then
+            closed = hg.organism.CauterizeSelf(owner)
+        end
+
+        if closed > 0 then
+            self:TakePrimaryAmmo(1)
+            return
+        end
+    end
+
     local targetPly = ResolveWetTarget(tr.Entity)
     if IsValid(targetPly) and targetPly:Alive() and GasWetIgniteFeed(hg.GetGasolineWet(targetPly)) > 0 then
         if SERVER then

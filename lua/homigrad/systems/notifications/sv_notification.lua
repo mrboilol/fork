@@ -832,6 +832,26 @@ function PLAYER:Thought(...)
     return CreateModeThought(self, ...)
 end
 
+function PLAYER:InterruptThought(msg, clr)
+    if self.HasTrait and self:HasTrait("gurajchaka_child") then return end
+    if self.organism and self.organism.otrub then return end
+    clr = clr or color_white
+    if self:GetInfoNum("hg_newthoughts", 0) > 0 then
+        self.nextThoughtGlobal = 0
+        net.Start("HGThought")
+        net.WriteString(msg)
+        net.WriteColor(Color(clr.r, clr.g, clr.b, 255))
+        net.WriteString("faint")
+        net.Send(self)
+    else
+        net.Start("HGNotificate")
+        net.WriteString(LegacyThoughtText(msg))
+        net.WriteColor(Color(clr.r, clr.g, clr.b, 255))
+        net.WriteUInt(110, 7)
+        net.Send(self)
+    end
+end
+
 function PLAYER:ResetNotification(key)
     ResetNotification(self,key)
 end

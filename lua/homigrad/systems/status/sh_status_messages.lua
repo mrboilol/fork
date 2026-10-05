@@ -516,7 +516,7 @@ function hg.likely_to_phrase(ply)
 	-- Terminal states need thoughts quickly.  They commonly force unconsciousness
 	-- before the normal low-blood cadence can reach its next phrase.
 	return (org.heartstop) and 6
-		or (o2 <= 15) and 4.5
+		or (o2 <= 22) and 6
 		or terminalBloodLoss and 4.5
 		or (hypotension > 0.5 and 0.55)
 		or (hypertension > 0.5 and 0.55)
@@ -616,14 +616,14 @@ local function get_status_message(ply)
 		end
 	end
 
-	if not (org.heartstop or o2 <= 15 or terminalBloodLoss or (bleedingOut and blood <= bleedoutStartBlood)) then
+	if not (org.heartstop or o2 <= 22 or terminalBloodLoss or (bleedingOut and blood <= bleedoutStartBlood)) then
 		org.dying_phrases_used = nil
 	end
 
 	if org.heartstop then
 		most_wanted_phraselist = near_death_poetic
 		statusThoughtKey = "heartstop"
-	elseif o2 <= 15 then
+	elseif o2 <= 22 then
 		most_wanted_phraselist = near_death_poetic
 		statusThoughtKey = "lowoxy"
 	elseif terminalBloodLoss or (bleedingOut and blood <= bleedoutStartBlood) then
@@ -635,15 +635,6 @@ local function get_status_message(ply)
 	elseif pain > 75 then
 		most_wanted_phraselist = audible_pain
 		statusThoughtKey = "pain"
-	elseif not suppressArrhythmiaStatus and arrhythmiaActive then
-		most_wanted_phraselist = arrhythmia_phrases
-		statusThoughtKey = "arrhythmia"
-	elseif heartbeat >= 150 then
-		most_wanted_phraselist = tachycardia_phrases
-		statusThoughtKey = "tachycardia"
-	elseif heartbeat > 0 and heartbeat <= 45 then
-		most_wanted_phraselist = bradycardia_phrases
-		statusThoughtKey = "bradycardia"
 	elseif o2 < 24 or (hypotension > 0.5 and math.random(4) > 1) then
 		most_wanted_phraselist = short_breath_phrases
 		statusThoughtKey = "shortbreath"
@@ -838,7 +829,7 @@ function hg.get_notify_color(ply)
 	local bleedoutStartBlood = hg.organism.BLEEDOUT_START_BLOOD or 2500
 	local bleedoutDeathBlood = hg.organism.BLEEDOUT_DEATH_BLOOD or 2000
 	local dyingBlood = blood <= bleedoutStartBlood
-	local dyingO2 = o2 <= 15
+	local dyingO2 = o2 <= 22
 	local dyingPulse = pulse < 40 and pulse > 0
 	local dying = dyingO2 or dyingPulse or blood <= bleedoutDeathBlood or dyingBlood
 	local inPain = pain > 30

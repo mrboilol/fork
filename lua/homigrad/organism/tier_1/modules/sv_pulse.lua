@@ -497,13 +497,6 @@ end
 
 local heatDamageTargets = {"brain", "heart", "liver", "stomach", "intestines"}
 local coldDamageTargets = {"heart", "liver", "stomach", "intestines"}
-local tachycardiaThoughts = {
-	"Your heart rate is dangerously elevated.",
-	"Tachycardia is straining your circulation.",
-	"Your pulse is racing.",
-	"Severe palpitations are affecting your circulation.",
-	"Your heart is beating too fast."
-}
 local cardiacArrestThoughts = {
 	"MY CHEST- IT HURTS...",
 	"I'M FADING- EVERYTHING IS GOING DARK",
@@ -1434,17 +1427,6 @@ module[2] = function(owner, org, timeValue)
 		arrhythmiaRiseTime = math.max(arrhythmiaRiseTime, 20)
 	end
 	org.arrhythmia = Approach(org.arrhythmia or 0, arrhythmiaTarget, arrhythmiaTarget > (org.arrhythmia or 0) and timeValue / arrhythmiaRiseTime or timeValue / 90)
-	if org.isPly and not org.otrub and not org.heartstop then
-		if org.heartbeat >= 220 and not org.fibrillation then
-			owner:Notify(tachycardiaThoughts[math.random(#tachycardiaThoughts)], 20, "tachycardia_severe", 0, nil, Color(255, 120, 120))
-		elseif org.fibrillation or org.unstableRhythm or org.arrhythmia > 0.35 or (org.palpitations or 0) > 0.35 then
-			owner:Notify("My heart feels like its beating weird...", 45, "arrhythmia", 0, nil, Color(255, 170, 170))
-		elseif org.heartbeat >= 150 then
-			owner:Notify("My heart is beating faster than normal.", 45, "tachycardia", 0, nil, Color(255, 170, 170))
-		elseif org.heartbeat > 0 and org.heartbeat <= 45 then
-			owner:Notify("My heart feels too slow...", 45, "bradycardia", 0, nil, Color(150, 210, 255))
-		end
-	end
 	if stress > 0.55 and CurTime() >= (org.nextArrhythmiaRoll or 0) then
 		local rollInterval = Clamp(Remap(stress, 0.55, 2.3, 10, 1.25), 1.25, 10)
 		org.nextArrhythmiaRoll = CurTime() + rollInterval
@@ -1595,9 +1577,6 @@ module[2] = function(owner, org, timeValue)
 		org.heartStrain = Clamp((org.heartStrain or 0) + timeValue * hypovolemicBradyStrain / 25, 0, 1)
 		org.heart = Clamp((org.heart or 0) + timeValue * hypovolemicBradyStrain ^ 2 * 0.002, 0, 1)
 		org.bradycardicLowOutputTime = math.min((org.bradycardicLowOutputTime or 0) + timeValue * hypovolemicBradyStrain, 20)
-		if org.isPly and not org.otrub and hypovolemicBradyStrain > 0.3 then
-			owner:Notify("My heart is struggling to keep going...", 40, "brady_strain", 0, nil, Color(150, 210, 255))
-		end
 	end
 
 	-- Terminal hemorrhage is allowed to reach the tachycardia threshold below;

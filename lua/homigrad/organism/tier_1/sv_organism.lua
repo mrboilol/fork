@@ -77,6 +77,13 @@ local organismModuleInitOrder = {
 	"psyche"
 }
 
+local faintThoughts = {
+	"Everything is going dark...",
+	"I'm about to pass out...",
+	"My head is spinning, I'm going down...",
+	"I can't stay awake...",
+}
+
 local function runOrganismModule(name, stage, owner, org, timeValue)
 	local current = module[name]
 	local callback = current and current[stage]
@@ -1587,10 +1594,16 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 			org.likely_phrase = 0
 			local str, statusThoughtKey = hg.get_status_message(owner)
 			if str and str != "" then
-				local statusCooldown = math.Rand(11, 15)
+				local dyingThought = statusThoughtKey == "heartstop" or statusThoughtKey == "lowoxy" or statusThoughtKey == "blood2"
+				local statusCooldown = dyingThought and math.Rand(4, 7) or math.Rand(11, 15)
 				org.nextStatusThought = CurTime() + statusCooldown
 				owner:Thought(str, statusCooldown, statusThoughtKey or "phrase", 1, Color(255, math.Clamp(1 / hg.likely_to_phrase(owner) * 255, 0, 255), math.Clamp(1 / hg.likely_to_phrase(owner) * 255, 0, 255), 255))
 			end
+		end
+		if not org.otrub and not org.heartstop and CurTime() >= (org.nextFaintThought or 0)
+			and (org.needotrub or (org.consciousness or 1) < 0.48 or (org.brainoxygen or 1) < 0.24) then
+			org.nextFaintThought = CurTime() + math.Rand(14, 20)
+			owner:InterruptThought(faintThoughts[math.random(#faintThoughts)], Color(255, 90, 90, 255))
 		end
 	end
 	if !org.alive then org.otrub = true end

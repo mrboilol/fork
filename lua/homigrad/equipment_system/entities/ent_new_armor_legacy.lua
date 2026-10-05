@@ -82,9 +82,30 @@ for key, data in pairs(hg.armor.torso or {}) do
 	end
 end
 
+local FULL_COVER = {helmet_riot = true, gordon_helmet = true, cmb_helmet = true, metrocop_helmet = true, protovisor = true}
+local FIBERGLASS = 5
+
+local function registerFullCover(key, data, class)
+	local fiberglass = key ~= "protovisor"
+	local frontMat = fiberglass and FIBERGLASS or plateMaterial(class, key)
+	local backMat = (fiberglass and key ~= "helmet_riot") and SOFT or frontMat
+	local backClass = backMat == SOFT and math.min(class, 4) or class
+	register(key, data, "ent_new_armor_helmet2", class, frontMat)
+	local ent = scripted_ents.GetStored("ent_new_armor_legacy_" .. key).t
+	ent.Initialize = nil
+	ent.Overlay.Model = data[2]
+	ent.FrontPlate = hg.BuildZCityArmorSection(frontMat, class, true)
+	ent.Glass = hg.BuildZCityArmorSection(frontMat, class, true)
+	ent.BackPlate = hg.BuildZCityArmorSection(backMat, backClass, true)
+end
+
 for key, data in pairs(hg.armor.head or {}) do
 	if key == "helmet18" or key == "helmet19" then continue end
 	local class = nearestClass(data.protection or 0)
 	if class < 1.5 then class = 1.5 end
-	register(key, data, "ent_new_armor_helmet1", class, plateMaterial(class, key))
+	if FULL_COVER[key] then
+		registerFullCover(key, data, class)
+	else
+		register(key, data, "ent_new_armor_helmet1", class, plateMaterial(class, key))
+	end
 end
