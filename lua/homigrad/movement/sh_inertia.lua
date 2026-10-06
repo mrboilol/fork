@@ -307,6 +307,7 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 			end
 			ply.hg_GaitPhase = phase
 			ply.hg_GaitRate = rate
+			ply.hg_GaitTime = CurTime()
 
 			if SERVER and rate > 0 and math.floor(phase) ~= oldStep and hg.FootstepTripCheck then
 				hg.FootstepTripCheck(ply, math.floor(phase) + 1, rate, swingFraction)

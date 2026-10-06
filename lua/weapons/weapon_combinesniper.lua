@@ -5,9 +5,6 @@ SWEP.PrintName = "Combine Sniper Rifle"
 SWEP.Author = "Universal Union"
 SWEP.Instructions = "A powerful combine semi-automatic sniper rifle. Fires the same pulse ammo, but the force of the bullet is much greater."
 SWEP.Category = "Weapons - Sniper Rifles"
-SWEP.holsteredBone = "ValveBiped.Bip01_Spine2"
-SWEP.holsteredPos = Vector(4, 6, -6)
-SWEP.holsteredAng = Angle(220, 0, 180)
 SWEP.Slot = 2
 SWEP.SlotPos = 10
 SWEP.ViewModel = ""
@@ -21,7 +18,7 @@ SWEP.Primary.DefaultClip = 5
 SWEP.Primary.Automatic = false
 SWEP.Primary.Ammo = "Pulse"
 SWEP.Primary.Cone = 0
-SWEP.Primary.Damage = 84
+SWEP.Primary.Damage = 80
 SWEP.Primary.Spread = 0
 SWEP.Primary.Force = 80
 SWEP.Primary.Sound = {"weapons/tfa_hl2r/ar2/ar2_secondary_fire.ogg", 120, 90, 100}
@@ -44,6 +41,10 @@ SWEP.attAng = Angle(-90,0,0)
 
 SWEP.DistSound = "weapons/tfa_ins2/m40a1/m40a1_fire.ogg"
 
+SWEP.holsteredBone = "ValveBiped.Bip01_Spine2"
+SWEP.holsteredPos = Vector(8,8,-3)
+SWEP.holsteredAng = Angle(-150, -5, 180)
+
 SWEP.mat = Material("combine_sniper/huyhuy")
 SWEP.scopemat = Material("decals/scope.png")
 SWEP.perekrestie = Material("decals/perekrestie6.png")
@@ -57,8 +58,6 @@ SWEP.FOVMax = 20
 SWEP.perekrestieSize = false
 SWEP.blackoutsize = 3100
 SWEP.scopedef = true
-SWEP.scopeEyeBoxFree = true
-SWEP.AimInSpeed = 3
 
 SWEP.AnimShootMul = 2
 SWEP.AnimShootHandMul = 5

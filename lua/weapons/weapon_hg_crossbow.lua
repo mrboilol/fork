@@ -29,7 +29,7 @@ SWEP.AnimList = {
 
 SWEP.FakeViewBobBone = "ValveBiped.Bip01_R_Hand"
 SWEP.FakeViewBobBaseBone = "ValveBiped.Bip01_R_UpperArm"
-SWEP.ViewPunchDiv = 1
+SWEP.ViewPunchDiv = 40
 
 SWEP.FakeReloadSounds = {}
 
@@ -96,8 +96,6 @@ SWEP.OpenBolt = true
 SWEP.SprayRand = {Angle(-0.05, -0.01, 0), Angle(-0.1, 0.01, 0)}
 SWEP.SprayRandOnly = true
 SWEP.scopedef = true
-SWEP.scopeEyeBoxFree = true
-SWEP.AimInSpeed = 3
 
 SWEP.mat = Material("effects/arc9/rt")
 SWEP.scopemat = Material("decals/scope.png")
@@ -151,6 +149,7 @@ function SWEP:Shoot(override)
 	if primary.Next > CurTime() then return false end
 	if (primary.NextFire or 0) > CurTime() then return false end
 	primary.Next = CurTime() + primary.Wait
+	self:SetLastShootTime(CurTime())
 	primary.Automatic = weapons.Get(self:GetClass()).Primary.Automatic
 	
 	local tr,pos,ang = self:GetTrace(true)
@@ -164,8 +163,6 @@ function SWEP:Shoot(override)
 			-- bullet.Num = 1
 		bullet.Pos = point
 		bullet.Dir = ang:Forward()
-		bullet.Spread = vector_origin
-		bullet.NoHiddenSpread = true
 		bullet.Speed = 310
 			-- bullet.Force = ammotype.Force or primary.Force
 		bullet.Damage = 500
@@ -174,7 +171,6 @@ function SWEP:Shoot(override)
 			-- bullet.Spread = ammotype.Spread or self.Primary.Spread or 0
 		bullet.AmmoType = "Armature"
 		bullet.Attacker = owner.suiciding and Entity(0) or owner
-		bullet.Inflictor = self
 		bullet.IgnoreEntity = not owner.suiciding and (owner.InVehicle and owner:InVehicle() and owner:GetVehicle() or hg.GetCurrentCharacter(owner)) or nil
 			-- bullet.Callback = bulletHit
 			-- bullet.TracerName = self.Tracer or "nil"

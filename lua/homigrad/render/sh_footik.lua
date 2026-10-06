@@ -55,6 +55,8 @@ local LANDING_SPREAD_FRACTION = 0.8
 local SETTLE_SWING_TIME = 0.28
 local SETTLE_COOLDOWN = 0.12
 local PHASE_CORRECTION = 8
+local GAIT_STALE_TIME = 0.3
+local DRIFT_STEP_FRACTION = 0.5
 local DROP_SMOOTH = 10
 local TOE_HEIGHT = 1
 local MAX_TOE_DROP = 0.9
@@ -400,7 +402,8 @@ local function updatePhase(ply, state, ctx, dt)
 	end
 
 	local rate
-	if (SERVER or ply == LocalPlayer()) and ply.hg_GaitPhase then
+	local gaitFresh = (SERVER or ply == LocalPlayer()) and ply.hg_GaitPhase and (ply.hg_GaitRate or 0) > 0 and CurTime() - (ply.hg_GaitTime or 0) < GAIT_STALE_TIME
+	if gaitFresh then
 		rate = (ply.hg_GaitRate or 0) * hg.GaitLimpRateMul(ply, state.phase)
 		state.phase = (state.phase + rate * dt) % 2
 		local diff = (ply.hg_GaitPhase - state.phase + 1) % 2 - 1
@@ -484,6 +487,12 @@ local function updateFeet(ply, state, ctx, dt)
 			local overreach = not planted or (not settledInPlace and (planted + vector_up * state.ankleHeight):DistToSqr(ctx.anim[index].hip - vector_up * state.drop) > reach * reach)
 			if overreach then
 				startStep(state, index, SETTLE_SWING_TIME, false)
+			elseif ctx.speed > MOVING_SPEED and not foot.stagger then
+				local rest = ctx.origin + ctx.right * (LEGS[index].sign * ctx.halfWidth)
+				local behind = (rest - planted):Dot(ctx.moveDir)
+				if behind > hg.GaitLandingLead(ctx.speed, ctx.swingFraction) + STRIDE_REAR_SHIFT + hg.GaitStepLength(ctx.speed) * DRIFT_STEP_FRACTION then
+					startStep(state, index, hg.GaitSwingTime(math_max(state.rate or 0, 1), ctx.swingFraction), false)
+				end
 			end
 			foot.ground = foot.planted
 			foot.groundNormal = foot.normal
