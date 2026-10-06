@@ -600,7 +600,7 @@ if SERVER then
 		local tapeStart = tape
 
 
-		if tape <= 0 or not (#org.wounds > 0 or org.lleg == 1 or org.rleg == 1 or org.skull >= 0.6 or org.chest == 1 or org.rarm == 1 or org.larm == 1) then return end
+		if tape <= 0 or not (#org.wounds > 0 or hg.IsLimbFractured(org, "lleg") or hg.IsLimbFractured(org, "rleg") or org.skull >= 0.6 or org.chest == 1 or hg.IsLimbFractured(org, "rarm") or hg.IsLimbFractured(org, "larm")) then return end
 		table.sort(org.wounds, function(a, b) return a[1] > b[1] end)
 
 		local done = false
@@ -691,28 +691,28 @@ if SERVER then
 			done = true
 		end
 
-		if (not bone or bone == "lleg") and org.lleg == 1 and tape >= amt and not org.llegamputated then
+		if (not bone or bone == "lleg") and hg.IsLimbFractured(org, "lleg") and tape >= amt and not org.llegamputated then
 			org.lleg = org.lleg - 0.05
 			tape = tape - amt
 			org.avgpain = math.max(org.avgpain - 7, 0)
 			done = true
 		end
 
-		if (not bone or bone == "rleg") and org.rleg == 1 and tape >= amt and not org.rlegamputated then
+		if (not bone or bone == "rleg") and hg.IsLimbFractured(org, "rleg") and tape >= amt and not org.rlegamputated then
 			org.rleg = org.rleg - 0.05
 			tape = tape - amt
 			org.avgpain = math.max(org.avgpain - 7, 0)
 			done = true
 		end
 
-		if (not bone or bone == "rarm") and org.rarm == 1 and tape >= amt and not org.rarmamputated then
+		if (not bone or bone == "rarm") and hg.IsLimbFractured(org, "rarm") and tape >= amt and not org.rarmamputated then
 			org.rarm = org.rarm - 0.05
 			tape = tape - amt
 			org.avgpain = math.max(org.avgpain - 7, 0)
 			done = true
 		end
 
-		if (not bone or bone == "larm") and org.larm == 1 and tape >= amt and not org.larmamputated then
+		if (not bone or bone == "larm") and hg.IsLimbFractured(org, "larm") and tape >= amt and not org.larmamputated then
 			org.larm = org.larm - 0.05
 			tape = tape - amt
 			org.avgpain = math.max(org.avgpain - 7, 0)

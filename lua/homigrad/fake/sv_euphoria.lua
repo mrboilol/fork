@@ -869,8 +869,8 @@ hook.Add("Think", "HG_EuphoriaAmputee", function()
 		local side = 0
 		if org.larmamputated or org.larmupamputated then side = side - 1 end
 		if org.rarmamputated or org.rarmupamputated then side = side + 1 end
-		if org.llegamputated or org.llegupamputated or org.lleg == 1 or org.llegdislocation then side = side - 1 end
-		if org.rlegamputated or org.rlegupamputated or org.rleg == 1 or org.rlegdislocation then side = side + 1 end
+		if org.llegamputated or org.llegupamputated or hg.IsLimbFractured(org, "lleg") or org.llegdislocation then side = side - 1 end
+		if org.rlegamputated or org.rlegupamputated or hg.IsLimbFractured(org, "rleg") or org.rlegdislocation then side = side + 1 end
 		if side == 0 then continue end
 
 		if hg.KeyDown(ply, IN_FORWARD) or hg.KeyDown(ply, IN_BACK) or

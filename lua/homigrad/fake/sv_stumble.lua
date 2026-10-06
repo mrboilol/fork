@@ -338,7 +338,7 @@ end
 
 local function limbState(org, limb)
 	if org[limb .. "amputated"] or org[limb .. "upamputated"] then return "gone" end
-	if (org[limb] or 0) >= 1 then return "broken" end
+	if hg.IsLimbFractured(org, limb) then return "broken" end
 	if org[limb .. "dislocation"] then return "dislocated" end
 end
 

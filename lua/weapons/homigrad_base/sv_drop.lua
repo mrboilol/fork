@@ -23,7 +23,7 @@ local function drop(ply, wep, newWeapon, vel, forced)
 		if forced and ply.Thought then
 			local org = ply.organism
 			local reason = org and org.rarmamputated and "I'm missing my good arm."
-				or org and (org.rarm == 1 or org.larm == 1 or (hg.organism.IsLimbCompoundFractured and (hg.organism.IsLimbCompoundFractured(org, "rarm") or hg.organism.IsLimbCompoundFractured(org, "larm")))) and "My arm is too damaged."
+				or org and (hg.IsLimbFractured(org, "rarm") or hg.IsLimbFractured(org, "larm") or (hg.organism.IsLimbCompoundFractured and (hg.organism.IsLimbCompoundFractured(org, "rarm") or hg.organism.IsLimbCompoundFractured(org, "larm")))) and "My arm is too damaged."
 				or "I can't keep hold of it."
 			ply:Thought(reason, 4, "forced_weapon_drop", 0)
 		end

@@ -201,7 +201,10 @@ local function applyBallisticProfile(bullet, settings, damage, penetration)
 	local caliberFactor = math.Clamp(math.sqrt(diameter / 9), 0.45, 2.25)
 	local kineticEnergy = mass > 0 and speed > 0 and mass / 2000 * speed * speed or damage * 18
 	local energyFactor = math.Clamp((kineticEnergy / 500) ^ 0.22, 0.65, 1.8)
-	local expansionFactor = settings.ExpansionMultiplier or math.Clamp(0.8 + damageFactor * 0.35 + caliberFactor * 0.2 - penetration / 120, 0.85, 2.1)
+	local penetrationTransfer = math.Clamp(damage / math.max(penetration, 1), 0.03, 1)
+	local expansionFactor = settings.ExpansionMultiplier or math.Clamp(0.8 + damageFactor * 0.35 + caliberFactor * 0.2 - penetration / 120 + math.max(damage - 35, 0) / 150 * penetrationTransfer, 0.85, 2.8)
+	local permanentRadius = settings.PermanentCavityRadius or diameter / 50.8 * expansionFactor
+	local expansionTrauma = math.max(permanentRadius * 50.8 / diameter - 1, 0)
 
 	bullet.Speed = speed
 	bullet.ImpactSpeed = speed
@@ -210,15 +213,15 @@ local function applyBallisticProfile(bullet, settings, damage, penetration)
 	bullet.Diameter = diameter
 	bullet.TissueDamage = settings.TissueDamage or math.Clamp(0.45 + damageFactor * 0.3 + caliberFactor * 0.25 + energyFactor * 0.12, 0.65, 2.25)
 	bullet.TemporaryCavity = settings.TemporaryCavity or math.Clamp(0.2 + energyFactor * 0.45 + math.Clamp(speed / 900, 0, 1) * 0.45, 0.35, 1.8)
-	bullet.PermanentCavityRadius = settings.PermanentCavityRadius or diameter / 50.8 * expansionFactor
+	bullet.PermanentCavityRadius = permanentRadius
 	bullet.ExpansionRadius = settings.ExpansionRadius or math.Clamp(bullet.PermanentCavityRadius * (0.5 + bullet.TemporaryCavity) + math.max(damage - 35, 0) / 45, 0, 4.5)
-	bullet.ExpansionChance = settings.ExpansionChance or math.Clamp(0.08 + math.max(damage - 25, 0) / 130 + bullet.TemporaryCavity * 0.08, 0.08, 0.62)
+	bullet.ExpansionChance = settings.ExpansionChance or math.Clamp(0.08 + math.max(damage - 25, 0) / 130 + bullet.TemporaryCavity * 0.08, 0.08, 0.9)
 	bullet.NearbyDamageMul = settings.NearbyDamageMul or math.Clamp(0.2 + damageFactor * 0.13 + bullet.TemporaryCavity * 0.12, 0.25, 0.72)
 	bullet.GrazeDamageMul = settings.GrazeDamageMul or math.Clamp(0.35 + caliberFactor * 0.16 + damageFactor * 0.08, 0.4, 0.82)
-	bullet.WoundMultiplier = settings.WoundMultiplier or math.Clamp(damageFactor * 0.45 + caliberFactor * 0.35 + energyFactor * 0.2, 0.55, 2.25)
+	bullet.WoundMultiplier = settings.WoundMultiplier or math.Clamp(damageFactor * 0.45 + caliberFactor * 0.35 + energyFactor * 0.2 + expansionTrauma * 0.65, 0.55, 3.5)
 	bullet.PainMultiplier = settings.PainMultiplier or math.Clamp(damageFactor * 0.5 + energyFactor * 0.35 + bullet.TemporaryCavity * 0.15, 0.6, 2.3)
-	bullet.DestructiveMultiplier = settings.DestructiveMultiplier or math.Clamp(damageFactor * 0.55 + caliberFactor * 0.3 + energyFactor * 0.15, 0.55, 2.35)
-	bullet.EnergyRetention = settings.EnergyRetention or math.Clamp(0.68 + penetration / 100 - (expansionFactor - 1) * 0.08, 0.55, 0.95)
+	bullet.DestructiveMultiplier = settings.DestructiveMultiplier or math.Clamp(damageFactor * 0.55 + caliberFactor * 0.3 + energyFactor * 0.15 + expansionTrauma * 0.25, 0.55, 2.5) * penetrationTransfer
+	bullet.EnergyRetention = settings.EnergyRetention or math.Clamp(0.82 + penetration / (penetration + 50) * 0.14 - math.max(expansionFactor - 1, 0) * 0.3, 0.18, 0.97)
 	bullet.BrainEnergyRetention = settings.BrainEnergyRetention
 	bullet.BrainDamageMultiplier = settings.BrainDamageMultiplier
 

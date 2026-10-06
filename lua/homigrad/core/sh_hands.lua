@@ -1,3 +1,27 @@
+function hg.GetLimbSegmentDamage(org, limb)
+	if not org then return 0, 0 end
+	local up, down = tonumber(org[limb .. "_up"]), tonumber(org[limb .. "_down"])
+	if up == nil and down == nil then
+		local aggregate = math.Clamp(tonumber(org[limb]) or 0, 0, 1)
+		if aggregate > 0.75 then up = aggregate else down = aggregate / 0.75 end
+	end
+	return math.Clamp(up or 0, 0, 1), math.Clamp(down or 0, 0, 1)
+end
+
+function hg.IsLimbFractured(org, limb)
+	local up, down = hg.GetLimbSegmentDamage(org, limb)
+	return math.max(up, down) >= 1
+end
+
+function hg.IsLimbIncapacitated(org, limb)
+	if not org then return false end
+	local up, down = hg.GetLimbSegmentDamage(org, limb)
+	local upBroken = up >= 0.95
+	local downBroken = down >= 0.95
+	local dislocated = org[limb .. "_up_disl"] or org[limb .. "_down_disl"] or org[limb .. "dislocation"] or org[limb .. "dislocated"]
+	return upBroken and downBroken or dislocated and (upBroken or downBroken) or false
+end
+
 function hg.GetLimbDebuffMultiplier(org)
 	local analgesia = math.Clamp((tonumber(org.analgesia) or 0) + (tonumber(org.painkiller) or 0) * 0.3, 0, 1)
 	return Lerp(analgesia, 1, 0.35)
@@ -5,14 +29,12 @@ end
 
 function hg.GetLimbEffectiveness(org, limb, segment)
 	if not org then return 1 end
+	if hg.IsLimbIncapacitated(org, limb) then return 0 end
 	local leg = limb == "lleg" or limb == "rleg"
 	local extremity = limb == "lleg" and "lfoot" or limb == "rleg" and "rfoot" or limb == "larm" and "lhand" or "rhand"
 	if org[limb .. "upamputated"] or (segment ~= "up" and (org[limb .. "amputated"] or org[extremity .. "amputated"])) then return 0 end
 
-	local up = math.Clamp(tonumber(org[limb .. "_up"]) or 0, 0, 1)
-	local down = math.Clamp(tonumber(org[limb .. "_down"]) or 0, 0, 1)
-	local aggregate = math.Clamp(tonumber(org[limb]) or 0, 0, 1)
-	if aggregate > math.max(up, down) then down = aggregate end
+	local up, down = hg.GetLimbSegmentDamage(org, limb)
 	local upDislocated = org[limb .. "_up_disl"]
 	local downDislocated = org[limb .. "_down_disl"]
 	if (org[limb .. "dislocation"] or org[limb .. "dislocated"]) and not upDislocated and not downDislocated then upDislocated = true end
@@ -26,7 +48,7 @@ function hg.GetLimbEffectiveness(org, limb, segment)
 	up, down = strength(up, upDislocated), strength(down, downDislocated)
 	if segment == "up" then return up * (0.85 + down * 0.15) end
 	if segment == "down" then return down * up ^ 0.5 end
-	return up ^ 0.75 * down ^ 0.9
+	return up ^ (leg and 0.9 or 0.75) * down ^ (leg and 0.75 or 0.9)
 end
 
 function hg.GetArmEffectiveness(ply, limb, segment)
@@ -61,7 +83,7 @@ function hg.CanUseLeftHand(ply)
 		return false
 	end
 
-	if ent.organism and (ent.organism.larmamputated or ent.organism.lhandamputated or ent.organism.larmupamputated) then
+	if ent.organism and (ent.organism.larmamputated or ent.organism.lhandamputated or ent.organism.larmupamputated or hg.IsLimbIncapacitated(ent.organism, "larm")) then
 		if hg.DebugTPIK then hg.DebugTPIK(ply, "lh_off", "amputated") end
 		return false
 	end
@@ -106,7 +128,7 @@ function hg.CanUseRightHand(ply)
 		return false
 	end
 
-	if ent.organism and (ent.organism.rarmamputated or ent.organism.rhandamputated or ent.organism.rarmupamputated) then
+	if ent.organism and (ent.organism.rarmamputated or ent.organism.rhandamputated or ent.organism.rarmupamputated or hg.IsLimbIncapacitated(ent.organism, "rarm")) then
 		if hg.DebugTPIK then hg.DebugTPIK(ply, "rh_off", "amputated") end
 		return false
 	end
@@ -118,7 +140,7 @@ function hg.GetPrioritizedArm(ply)
 	if not IsValid(ply) or not ply.organism then return "left", false, false end
 
 	local org = ply.organism
-	local isBroken = ((org.larm and org.larm >= 1) or org.larmdislocation) == true
+	local isBroken = ((org.larm and hg.IsLimbFractured(org, "larm")) or org.larmdislocation) == true
 	return "left", false, isBroken
 end
 

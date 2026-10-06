@@ -63,6 +63,8 @@ end
 
 function hg.organism.ApplyBandageBoneTreatment(org, key, amount)
 	if not org or not key then return 0 end
+	local isLimb = key == "lleg" or key == "rleg" or key == "larm" or key == "rarm"
+	if isLimb then hg.organism.SyncLimbSegments(org, key) end
 	local current = math.Clamp(tonumber(org[key]) or 0, 0, 1)
 	if current < 0.05 then return 0 end
 
@@ -74,10 +76,11 @@ function hg.organism.ApplyBandageBoneTreatment(org, key, amount)
 		target = current >= 1 and 0.99 or math.max(current - (amount or 0.25), 0)
 		org.bandagedchest = true
 	else
-		target = current >= 1 and 0.99 or math.max(current - (amount or 0.25), 0)
+		target = isLimb and hg.IsLimbFractured(org, key) and current * 0.99 or current >= 1 and 0.99 or math.max(current - (amount or 0.25), 0)
 	end
 
 	org[key] = target
+	if isLimb then hg.organism.SyncLimbSegments(org, key) end
 	if key ~= "skull" and key ~= "chest" and target < 1 and hg.fakeBoneFlop and hg.fakeBoneFlop.ReconcileLimb and hg.fakeBoneFlop.ReconcileLimb(org, key) then
 		hg.fakeBoneFlop.ScheduleRebuild(org.owner)
 	end

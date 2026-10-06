@@ -181,25 +181,25 @@ function SWEP:DrawHUD()
 		end
 
 		if org.rleg and org.rleg > 0 then
-			hg.DrawAffliction(posx + add_x, posy - h, w, h, org.rleg, org.rleg > 0.999 and hg.afflictions.lfracture or hg.afflictions.lblunt, lerpalpha, org.rleg > 0.999 and "Right leg fracture" or "Right leg blunt trauma")
+			hg.DrawAffliction(posx + add_x, posy - h, w, h, org.rleg, hg.IsLimbFractured(org, "rleg") and hg.afflictions.lfracture or hg.afflictions.lblunt, lerpalpha, hg.IsLimbFractured(org, "rleg") and "Right leg fracture" or "Right leg blunt trauma")
 
 			add_x = add_x + w + add
 		end
 
 		if org.lleg and org.lleg > 0 then
-			hg.DrawAffliction(posx + add_x, posy - h, w, h, org.lleg, org.lleg > 0.999 and hg.afflictions.lfracture or hg.afflictions.lblunt, lerpalpha, org.lleg > 0.999 and "Left leg fracture" or "Left leg blunt trauma")
+			hg.DrawAffliction(posx + add_x, posy - h, w, h, org.lleg, hg.IsLimbFractured(org, "lleg") and hg.afflictions.lfracture or hg.afflictions.lblunt, lerpalpha, hg.IsLimbFractured(org, "lleg") and "Left leg fracture" or "Left leg blunt trauma")
 
 			add_x = add_x + w + add
 		end
 
 		if org.rarm and org.rarm > 0 then
-			hg.DrawAffliction(posx + add_x, posy - h, w, h, org.rarm, org.rarm > 0.999 and hg.afflictions.afracture or hg.afflictions.ablunt, lerpalpha, org.rarm > 0.999 and "Right arm fracture" or "Right arm blunt trauma")
+			hg.DrawAffliction(posx + add_x, posy - h, w, h, org.rarm, hg.IsLimbFractured(org, "rarm") and hg.afflictions.afracture or hg.afflictions.ablunt, lerpalpha, hg.IsLimbFractured(org, "rarm") and "Right arm fracture" or "Right arm blunt trauma")
 
 			add_x = add_x + w + add
 		end
 
 		if org.larm and org.larm > 0 then
-			hg.DrawAffliction(posx + add_x, posy - h, w, h, org.larm, org.larm > 0.999 and hg.afflictions.afracture or hg.afflictions.ablunt, lerpalpha, org.larm > 0.999 and "Left arm fracture" or "Left arm blunt trauma")
+			hg.DrawAffliction(posx + add_x, posy - h, w, h, org.larm, hg.IsLimbFractured(org, "larm") and hg.afflictions.afracture or hg.afflictions.ablunt, lerpalpha, hg.IsLimbFractured(org, "larm") and "Left arm fracture" or "Left arm blunt trauma")
 
 			add_x = add_x + w + add
 		end

@@ -130,8 +130,8 @@ function SWEP:GetHandSupportState(ply)
 	ply = ply or self:GetOwner()
 	local org = IsValid(ply) and ply.organism or {}
 	local wantsTwoHands = self.OneHandedOnly ~= true
-	local rightBad = org.rarmamputated or (org.rarm or 0) >= 1 or org.rarmdislocation or org.rarmdislocated
-	local leftBad = org.larmamputated or (org.larm or 0) >= 1 or org.larmdislocation or org.larmdislocated
+	local rightBad = org.rarmamputated or hg.IsLimbFractured(org, "rarm") or org.rarmdislocation or org.rarmdislocated or hg.IsLimbIncapacitated(org, "rarm")
+	local leftBad = org.larmamputated or hg.IsLimbFractured(org, "larm") or org.larmdislocation or org.larmdislocated or hg.IsLimbIncapacitated(org, "larm")
 	local rightUsable = not rightBad
 	local leftUsable = not leftBad
 	local leftBusy, rightBusy = false, false
@@ -435,14 +435,17 @@ function SWEP:IsManuallyCycledWeapon()
 end
 
 function SWEP:GetManualActionBlockReason(ply)
-	if not self:IsManuallyCycledWeapon() then return end
 	if not IsValid(ply) then return end
 
 	local org = ply.organism
 	if not org then return end
+	if not self.IgnoreOneArmPenalties and (hg.IsLimbIncapacitated(org, "larm") or hg.IsLimbIncapacitated(org, "rarm")) then
+		return "I can't reload or cycle with this arm."
+	end
+	if not self:IsManuallyCycledWeapon() then return end
 
-	local leftBroken = org.larmamputated or (org.larm or 0) >= 1 or org.larmdislocation or org.larmdislocated
-	local rightBroken = (org.rarm or 0) >= 1 or org.rarmdislocation or org.rarmdislocated
+	local leftBroken = org.larmamputated or hg.IsLimbFractured(org, "larm") or org.larmdislocation or org.larmdislocated
+	local rightBroken = hg.IsLimbFractured(org, "rarm") or org.rarmdislocation or org.rarmdislocated
 	local bothBrokenNotAmputated = leftBroken and rightBroken and not org.larmamputated and not org.rarmamputated
 	if leftBroken and not bothBrokenNotAmputated then
 		return "I need my left arm to cycle this."
@@ -585,7 +588,14 @@ function SWEP:TryDropMisfire(chance, speed, force)
 end
 
 function SWEP:PhysicsCollide(ent, data)
-	self:TryDropMisfire(nil, data.Speed)
+	if not SERVER or self.hgImpactMisfirePending then return end
+	local speed = data.Speed
+	self.hgImpactMisfirePending = true
+	timer.Simple(0, function()
+		if not IsValid(self) then return end
+		self.hgImpactMisfirePending = nil
+		self:TryDropMisfire(nil, speed)
+	end)
 end
 
 SWEP.WepSelectIcon2 = Material("null")
@@ -885,6 +895,7 @@ function SWEP:CanPrimaryAttack()
 	if not self:ShotgunCanPrimaryAttack() then return false end
 	local owner = self:GetOwner()
 	if !IsValid(owner) then return end
+	if hg.IsLimbIncapacitated(owner.organism, self:GetHandSupportState(owner).firingArm) then return false end
 
 	if owner.PlayerClassName and owner.PlayerClassName == "furry" and owner.suiciding then
 		if SERVER then
@@ -2315,15 +2326,15 @@ function SWEP:GetAdditionalValues()
 	self.AdditionalPosPreLerp[2] = (CLIENT and !self:IsLocal2()) and self:IsZoom() and 1 - add or 0
 	self.AdditionalPosPreLerp[3] = (CLIENT and !self:IsLocal2()) and self:IsZoom() and -0.5 or 0
 
-	if ply.organism and (ply.organism.larm and !self:IsPistolHoldType()) and ply.organism.rarm and (ply.organism.larm > 0.99 or ply.organism.rarm > 0.99) then
-		--ply.posture = 1
-		self.AdditionalPosPreLerp[2] = self.AdditionalPosPreLerp[2] - 12 * math.Clamp((-ply:EyeAngles()[1] + 75) / 45, 0.5, 1)
-		self.AdditionalPosPreLerp[1] = (self.AdditionalPosPreLerp[1] - (ply.organism.rarmamputated and -1 or 6)) + 0 * math.Clamp((ply:EyeAngles()[1] - 25) / 25, 0, 1)
-		self.AdditionalPosPreLerp[3] = self.AdditionalPosPreLerp[3] + (ply.organism.rarmamputated and -6 or 3) * math.Clamp((-ply:EyeAngles()[1] + 75) / 45, 0.2, 1)
+	if ply.organism and not self:IsPistolHoldType() then
+		local impairment = math.max(1 - hg.GetArmEffectiveness(ply, "larm"), 1 - hg.GetArmEffectiveness(ply, "rarm")) ^ 2
+		self.AdditionalPosPreLerp[2] = self.AdditionalPosPreLerp[2] - 12 * impairment * math.Clamp((-ply:EyeAngles()[1] + 75) / 45, 0.5, 1)
+		self.AdditionalPosPreLerp[1] = self.AdditionalPosPreLerp[1] - (ply.organism.rarmamputated and -1 or 6) * impairment
+		self.AdditionalPosPreLerp[3] = self.AdditionalPosPreLerp[3] + (ply.organism.rarmamputated and -6 or 3) * impairment * math.Clamp((-ply:EyeAngles()[1] + 75) / 45, 0.2, 1)
 
 		if hg.KeyDown(ply, IN_ATTACK2) then
-			self.AdditionalPosPreLerp[2] = self.AdditionalPosPreLerp[2] + 8
-			self.AdditionalPosPreLerp[3] = self.AdditionalPosPreLerp[3] - 3
+			self.AdditionalPosPreLerp[2] = self.AdditionalPosPreLerp[2] + 8 * impairment
+			self.AdditionalPosPreLerp[3] = self.AdditionalPosPreLerp[3] - 3 * impairment
 		end
 	end
 

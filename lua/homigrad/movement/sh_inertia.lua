@@ -831,11 +831,11 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 					org.painadd = org.painadd + delta_time * mul
 				end
 				local dislocationPainMul = ply.hg_isSprinting and 2 or 1.5
-				if (org.lleg == 1) or org.llegdislocation then
+				if (hg.IsLimbFractured(org, "lleg")) or org.llegdislocation then
 					org.painadd = org.painadd + delta_time * mul * (org.llegdislocation and dislocationPainMul or 1)
 				end
 
-				if (org.rleg == 1) or org.rlegdislocation then
+				if (hg.IsLimbFractured(org, "rleg")) or org.rlegdislocation then
 					org.painadd = org.painadd + delta_time * mul * (org.rlegdislocation and dislocationPainMul or 1)
 				end
 			end
@@ -927,7 +927,7 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 			inertia_len = math_min(inertia_len, run_speed * 1.1)
 		end
 
-	if (org.lleg == 1 or org.rleg == 1 or org.llegdislocation or org.rlegdislocation) and ply:OnGround() then
+	if (hg.IsLimbFractured(org, "lleg") or hg.IsLimbFractured(org, "rleg") or org.llegdislocation or org.rlegdislocation) and ply:OnGround() then
 		inertia_len = math.min(inertia_len, (ply:GetSlowWalkSpeed() or 100) * 0.78)
 	end
 

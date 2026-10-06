@@ -37,7 +37,7 @@ end
 		local wep = IsValid(ply:GetActiveWeapon()) and ply:GetActiveWeapon()
 		local org = ply.organism
 		local isAmputated = ply:IsBerserk() and org and (org.llegamputated or org.rlegamputated or org.llegupamputated or org.rlegupamputated)
-		local hasBrokenLeg = org and (org.lleg == 1 or org.rleg == 1 or org.llegdislocation or org.rlegdislocation)
+		local hasBrokenLeg = org and (hg.IsLimbFractured(org, "lleg") or hg.IsLimbFractured(org, "rleg") or org.llegdislocation or org.rlegdislocation)
 		if hasBrokenLeg then return end
 		if (not ply:InVehicle()) and ply:IsOnGround() and vel:Length() > 180 and wep and runHoldTypes[wep:GetHoldType()] and not isAmputated then
 			local isFurry = ply.PlayerClassName == "furry"

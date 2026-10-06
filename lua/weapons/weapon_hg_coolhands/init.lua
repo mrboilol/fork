@@ -214,7 +214,9 @@ function SWEP:SecondaryAttack()
 		self:SetCarrying()
 		local ply = owner
 		local pos = hg.eye(owner)
+		local org = owner.organism
 		local chosenArm, isRight, isBroken = hg.GetPrioritizedArm(owner)
+		if org and hg.IsLimbIncapacitated(org, isRight and "rarm" or "larm") then return end
 		local reachDist = self.ReachDistance
 		if isRight then
 			reachDist = reachDist * 1.25 -- 25% better reach with right arm!
@@ -243,13 +245,9 @@ function SWEP:SecondaryAttack()
 				tr.Entity.Touched = true
 				self:ApplyForce()
 
-				if isBroken and org then
-					local armVal = isRight and (org.rarm or 0) or (org.larm or 0)
-					local disloc = isRight and org.rarmdislocation or org.larmdislocation
-					local painAmount = armVal * 35 + (disloc and 20 or 0)
-					if isRight then
-						painAmount = painAmount * 0.7 -- right arm is better overall (less pain)
-					end
+				if org then
+					local impairment = 1 - hg.GetArmEffectiveness(ply, isRight and "rarm" or "larm", "down")
+					local painAmount = (isRight and 38.5 or 55) * impairment ^ 2
 					org.painadd = (org.painadd or 0) + painAmount
 				end
 			--end

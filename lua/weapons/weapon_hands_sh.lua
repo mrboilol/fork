@@ -259,8 +259,8 @@ function SWEP:GetArmDamageMultiplier(limb)
 	local owner = self:GetOwner()
 	if not IsValid(owner) or not owner:IsPlayer() then return 1.0 end
 
-	if limb then return hg.GetArmEffectiveness(owner, limb) end
-	return math.max(hg.GetArmEffectiveness(owner, "rarm"), hg.GetArmEffectiveness(owner, "larm"))
+	if limb then return hg.GetArmEffectiveness(owner, limb, "down") end
+	return math.max(hg.GetArmEffectiveness(owner, "rarm", "down"), hg.GetArmEffectiveness(owner, "larm", "down"))
 end
 
 function SWEP:ClearSuperadminGrab()
@@ -1025,25 +1025,25 @@ else
 			end
 
 			if org.rleg and org.rleg > 0 then
-				hg.DrawAffliction(posx + add_x, posy - h, w, h, org.rleg, org.rleg > 0.999 and hg.afflictions.lfracture or hg.afflictions.lblunt, lerpalpha, org.rleg > 0.999 and "Right leg fracture" or "Right leg blunt trauma")
+				hg.DrawAffliction(posx + add_x, posy - h, w, h, org.rleg, hg.IsLimbFractured(org, "rleg") and hg.afflictions.lfracture or hg.afflictions.lblunt, lerpalpha, hg.IsLimbFractured(org, "rleg") and "Right leg fracture" or "Right leg blunt trauma")
 
 				add_x = add_x + w + add
 			end
 
 			if org.lleg and org.lleg > 0 then
-				hg.DrawAffliction(posx + add_x, posy - h, w, h, org.lleg, org.lleg > 0.999 and hg.afflictions.lfracture or hg.afflictions.lblunt, lerpalpha, org.lleg > 0.999 and "Left leg fracture" or "Left leg blunt trauma")
+				hg.DrawAffliction(posx + add_x, posy - h, w, h, org.lleg, hg.IsLimbFractured(org, "lleg") and hg.afflictions.lfracture or hg.afflictions.lblunt, lerpalpha, hg.IsLimbFractured(org, "lleg") and "Left leg fracture" or "Left leg blunt trauma")
 
 				add_x = add_x + w + add
 			end
 
 			if org.rarm and org.rarm > 0 then
-				hg.DrawAffliction(posx + add_x, posy - h, w, h, org.rarm, org.rarm > 0.999 and hg.afflictions.afracture or hg.afflictions.ablunt, lerpalpha, org.rarm > 0.999 and "Right arm fracture" or "Right arm blunt trauma")
+				hg.DrawAffliction(posx + add_x, posy - h, w, h, org.rarm, hg.IsLimbFractured(org, "rarm") and hg.afflictions.afracture or hg.afflictions.ablunt, lerpalpha, hg.IsLimbFractured(org, "rarm") and "Right arm fracture" or "Right arm blunt trauma")
 
 				add_x = add_x + w + add
 			end
 
 			if org.larm and org.larm > 0 then
-				hg.DrawAffliction(posx + add_x, posy - h, w, h, org.larm, org.larm > 0.999 and hg.afflictions.afracture or hg.afflictions.ablunt, lerpalpha, org.larm > 0.999 and "Left arm fracture" or "Left arm blunt trauma")
+				hg.DrawAffliction(posx + add_x, posy - h, w, h, org.larm, hg.IsLimbFractured(org, "larm") and hg.afflictions.afracture or hg.afflictions.ablunt, lerpalpha, hg.IsLimbFractured(org, "larm") and "Left arm fracture" or "Left arm blunt trauma")
 
 				add_x = add_x + w + add
 			end
@@ -1281,12 +1281,12 @@ function SWEP:SecondaryAttack()
 		local bothArmsBroken = false
 
 		if org then
-			isRightBroken = (org.rarm and org.rarm >= 1) or org.rarmamputated or org.rarmdislocation or org.rarmdislocated
-			isLeftBroken = (org.larm and org.larm >= 1) or org.larmamputated or org.larmdislocation or org.larmdislocated
+			isRightBroken = (org.rarm and hg.IsLimbFractured(org, "rarm")) or org.rarmamputated or org.rarmdislocation or org.rarmdislocated
+			isLeftBroken = (org.larm and hg.IsLimbFractured(org, "larm")) or org.larmamputated or org.larmdislocation or org.larmdislocated
 			bothArmsBroken = isRightBroken and isLeftBroken
 
-			local rightEff = hg.GetArmEffectiveness(owner, "rarm")
-			local leftEff = hg.GetArmEffectiveness(owner, "larm")
+			local rightEff = hg.GetArmEffectiveness(owner, "rarm", "down")
+			local leftEff = hg.GetArmEffectiveness(owner, "larm", "down")
 			local alreadyHolding = IsValid(owner:GetNetVar("carryent2"))
 			local hasRightArm = not org.rarmamputated
 			local hasLeftArm = not org.larmamputated
@@ -1375,49 +1375,12 @@ function SWEP:SecondaryAttack()
 				tr.Entity.Touched = true
 				self:ApplyForce()
 
-				-- Apply pain based on arm damage and which hands are being used
 				if org then
 					local painAmount = 0
+					if useRightHand then painAmount = 29 * (1 - hg.GetArmEffectiveness(ply, "rarm", "down")) ^ 2 end
+					if useLeftHand then painAmount = painAmount + 26 * (1 - hg.GetArmEffectiveness(ply, "larm", "down")) ^ 2 end
+					org.painadd = (org.painadd or 0) + painAmount
 
-					if bothArmsBroken and (useRightHand or useLeftHand) then
-						-- Both arms broken - severe pain
-						if useRightHand and not org.rarmamputated then
-							painAmount = (org.rarm or 0) * 15 + ((org.rarmdislocation or org.rarmdislocated) and 3 or 0)
-						end
-						if useLeftHand and not org.larmamputated then
-							painAmount = painAmount + (org.larm or 0) * 15 + ((org.larmdislocation or org.larmdislocated) and 3 or 0)
-						end
-						painAmount = painAmount * 0.85
-					else
-						-- Right arm pain
-						if useRightHand and not org.rarmamputated then
-							local armVal = org.rarm or 0
-							local disloc = org.rarmdislocation or org.rarmdislocated
-							if armVal >= 1 or disloc then
-								painAmount = armVal * 25 + (disloc and 4 or 0)
-							elseif armVal >= 0.8 then
-								local severity = (armVal - 0.8) / 0.2
-								painAmount = severity * 10
-							end
-						end
-						-- Left arm pain
-						if useLeftHand and not org.larmamputated then
-							local armVal = org.larm or 0
-							local disloc = org.larmdislocation or org.larmdislocated
-							if armVal >= 1 or disloc then
-								painAmount = painAmount + armVal * 22 + (disloc and 4 or 0)
-							elseif armVal >= 0.8 then
-								local severity = (armVal - 0.8) / 0.2
-								painAmount = painAmount + severity * 8
-							end
-						end
-					end
-
-					if painAmount > 0 then
-						org.painadd = (org.painadd or 0) + painAmount
-					end
-
-					-- Store hand usage info for continuous pain while holding
 					self.UsingBothHands = useBothHands
 					self.UsingRightHand = useRightHand
 					self.UsingLeftHand = useLeftHand
@@ -1629,10 +1592,12 @@ function SWEP:ApplyForce()
 		end
 
 		-- Apply strength multiplier based on which hands are being used and their effectiveness
-		local rightEff = self.RightArmEff or hg.GetArmEffectiveness(ply, "rarm")
-		local leftEff = self.LeftArmEff or hg.GetArmEffectiveness(ply, "larm")
-		rightEff = math.max(rightEff, 0.01)
-		leftEff = math.max(leftEff, 0.01)
+		local rightEff = hg.GetArmEffectiveness(ply, "rarm", "down")
+		local leftEff = hg.GetArmEffectiveness(ply, "larm", "down")
+		if (self.UsingRightHand and rightEff <= 0) or (self.UsingLeftHand and leftEff <= 0) then
+			self:SetCarrying()
+			return
+		end
 
 		if self.UsingBothHands then
 			mul = mul * 1.5 * ((rightEff + leftEff) / 2)
@@ -1650,48 +1615,12 @@ function SWEP:ApplyForce()
 			mul = mul * (rightTourniquets >= 2 and 0.25 or rightTourniquets == 1 and 0.6 or 1)
 		end
 
-		-- Add continuous pain when holding with damaged hands
 		if ply.organism then
 			local org = ply.organism
 			local continuousPain = 0
-
-			if self.BothArmsBroken and (self.UsingRightHand or self.UsingLeftHand) then
-				-- Both arms broken - most pain
-				if self.UsingRightHand and not org.rarmamputated then
-					continuousPain = (org.rarm or 0) * 25 + ((org.rarmdislocation or org.rarmdislocated) and 4 or 0)
-				end
-				if self.UsingLeftHand and not org.larmamputated then
-					continuousPain = continuousPain + (org.larm or 0) * 20 + ((org.larmdislocation or org.larmdislocated) and 4 or 0)
-				end
-				continuousPain = continuousPain * 0.5
-			else
-				-- Right arm pain
-				if self.UsingRightHand and not org.rarmamputated then
-					local armVal = org.rarm or 0
-					local disloc = org.rarmdislocation or org.rarmdislocated
-					if armVal >= 1 or disloc then
-						continuousPain = armVal * 20 + (disloc and 4 or 0)
-					elseif armVal >= 0.8 then
-						local severity = (armVal - 0.8) / 0.2
-						continuousPain = severity * 10
-					end
-				end
-				-- Left arm pain
-				if self.UsingLeftHand and not org.larmamputated then
-					local armVal = org.larm or 0
-					local disloc = org.larmdislocation or org.larmdislocated
-					if armVal >= 1 or disloc then
-						continuousPain = continuousPain + armVal * 15 + (disloc and 4 or 0)
-					elseif armVal >= 0.8 then
-						local severity = (armVal - 0.8) / 0.2
-						continuousPain = continuousPain + severity * 8
-					end
-				end
-			end
-
-			if continuousPain > 0 then
-				org.painadd = (org.painadd or 0) + continuousPain * FrameTime()
-			end
+			if self.UsingRightHand then continuousPain = 24 * (1 - hg.GetArmEffectiveness(ply, "rarm", "down")) ^ 2 end
+			if self.UsingLeftHand then continuousPain = continuousPain + 19 * (1 - hg.GetArmEffectiveness(ply, "larm", "down")) ^ 2 end
+			org.painadd = (org.painadd or 0) + continuousPain * FrameTime()
 		end
 
 		if (ply.organism and ply.organism.noradrenaline >= 0.5) then
@@ -2432,14 +2361,16 @@ function SWEP:PrimaryAttack(forcespecial)
 		side = "fists_right"
 	end
 
-	if owner.organism and owner.organism.rarmamputated and owner.organism.larmamputated then return end
+	local rightUnavailable = hg.GetArmEffectiveness(owner, "rarm") <= 0
+	local leftUnavailable = hg.GetArmEffectiveness(owner, "larm") <= 0
+	if rightUnavailable and leftUnavailable then return end
 
-	if owner.organism and owner.organism.larmamputated then
+	if leftUnavailable then
 		rand = true
 		side = "fists_right"
 	end
 
-	if owner.organism and owner.organism.rarmamputated then
+	if rightUnavailable then
 		rand = false
 		side = "fists_left"
 	end
@@ -2469,7 +2400,7 @@ function SWEP:PrimaryAttack(forcespecial)
 		special_attack = true
 	end
 
-	if owner.organism and owner.organism.rarmamputated then
+	if rightUnavailable then
 		special_attack = false
 	end
 

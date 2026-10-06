@@ -280,7 +280,12 @@ end
 
 local function startStep(state, index, duration, allowOverlap)
 	local foot, other = state.feet[index], state.feet[3 - index]
-	if foot.swinging or not foot.planted then return end
+	if not foot or foot.swinging then return end
+	if not foot.planted then
+		foot.pending = duration
+
+		return
+	end
 	if other.swinging and not allowOverlap then
 		foot.pending = duration
 
@@ -648,7 +653,7 @@ local function buildContext(ply, state, anim, dt)
 	local measuredAnkle = math_Clamp(math_min(anim[1].ankle.z, anim[2].ankle.z) - origin.z, MIN_ANKLE_HEIGHT, MAX_ANKLE_HEIGHT)
 
 	if not state.ankleHeight then
-		state.ankleHeight = measuredAnkle
+		state.ankleHeight = speed > MOVING_SPEED and MIN_ANKLE_HEIGHT or measuredAnkle
 	elseif speed < MOVING_SPEED and not ply:Crouching() then
 		state.ankleHeight = state.ankleHeight + (measuredAnkle - state.ankleHeight) * math_min(dt * ANKLE_LEARN_RATE, 1)
 	end
@@ -820,6 +825,7 @@ local function applyPose(ent, ply, state, bones, ctx)
 				foot.smoothGround = Vector(ground)
 				foot.smoothFrame = FrameNumber()
 			end
+			if ground and not foot.swinging then foot.smoothGround.z = ground.z end
 			local ankleTarget = foot.smoothGround + normal * state.ankleHeight
 			local limb = index == 1 and "lleg" or "rleg"
 			local upperPower = hg.GetLimbEffectiveness(ply.organism, limb, "up")

@@ -290,8 +290,8 @@ function SWEP:Reload(time)
 
 	if self.drawBullet == false and SERVER then
 		-- Add pain if left arm is broken when pumping shotgun
-		if ply.organism and ((ply.organism.larm and ply.organism.larm >= 1) or ply.organism.larmdislocation) and not ply.organism.larmamputated then
-			local painAmount = (ply.organism.larm or 0) * 20 + (ply.organism.larmdislocation and 15 or 0)
+		if ply.organism and not ply.organism.larmamputated then
+			local painAmount = 35 * (1 - hg.GetArmEffectiveness(ply, "larm", "down")) ^ 2
 			ply.organism.painadd = (ply.organism.painadd or 0) + painAmount
 		end
 		cock(self,1)
@@ -301,10 +301,11 @@ function SWEP:Reload(time)
 
 	if not self:CanReload() then return end
 
-	-- Apply arm penalties for reload
-	local armPain, armSpeedMul = self:GetReloadArmPenalty()
-	if armPain > 0 and ply.organism then
-		ply.organism.painadd = (ply.organism.painadd or 0) + armPain
+	if SERVER then
+		local armPain = self:GetReloadArmPenalty()
+		if armPain > 0 and ply.organism then
+			ply.organism.painadd = (ply.organism.painadd or 0) + armPain
+		end
 	end
 
 	--self:GetWM():ManipulateBoneScale(47, vector_full)

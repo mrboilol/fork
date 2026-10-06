@@ -29,7 +29,7 @@ local function applyBoneVisuals(ply, org)
 	local applied = {}
 	for boneName, data in pairs(brokenBoneTbl) do
 		local key = data.key
-		if org[key] == 1 and not org[key .. "amputated"] then
+		if hg.IsLimbFractured(org, key) and not org[key .. "amputated"] then
 			local bid = ply:LookupBone(boneName)
 			if bid then
 				hg.bone.Set(ply, bid, vector_origin, data.ang, boneLayer)
@@ -72,8 +72,8 @@ hook.Add("CalcMainActivity", "hgBrokenLimbVisuals", function(ply, vel)
 		return
 	end
 
-	local brokenLeg = org.lleg == 1 or org.rleg == 1 or org.llegdislocation or org.rlegdislocation
-	local brokenArm = org.larm == 1 or org.rarm == 1
+	local brokenLeg = hg.IsLimbFractured(org, "lleg") or hg.IsLimbFractured(org, "rleg") or org.llegdislocation or org.rlegdislocation
+	local brokenArm = hg.IsLimbFractured(org, "larm") or hg.IsLimbFractured(org, "rarm")
 	local style = hg_limp_style:GetInt()
 	if style == 0 or (not brokenLeg and not brokenArm) then
 		clearBoneVisuals(ply)

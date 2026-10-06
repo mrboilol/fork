@@ -14,7 +14,7 @@ function SWEP:CanReload()
 
 	-- Check if left arm is broken (but not amputated)
 	local org = ply.organism
-	local leftArmBroken = org and ((org.larm and org.larm >= 1) or org.larmdislocation) and not org.larmamputated
+	local leftArmBroken = org and ((org.larm and hg.IsLimbFractured(org, "larm")) or org.larmdislocation) and not org.larmamputated
 
 	-- Bypass ConsLH check if left arm is broken (but not amputated), add pain instead
 	if IsValid(char) and char:IsRagdoll() and IsValid(char.ConsLH) then

@@ -267,9 +267,8 @@ function SWEP:Reload(time)
 	end
 
 	if self.drawBullet == false and SERVER then
-		-- Add pain if left arm is broken when racking bolt
-		if ply.organism and ((ply.organism.larm and ply.organism.larm >= 1) or ply.organism.larmdislocation) and not ply.organism.larmamputated then
-			local painAmount = (ply.organism.larm or 0) * 20 + (ply.organism.larmdislocation and 15 or 0)
+		if ply.organism and not ply.organism.larmamputated then
+			local painAmount = 35 * (1 - hg.GetArmEffectiveness(ply, "larm", "down")) ^ 2
 			ply.organism.painadd = (ply.organism.painadd or 0) + painAmount
 		end
 		cock(self,1.5)

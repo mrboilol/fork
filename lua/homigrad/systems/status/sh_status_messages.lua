@@ -597,7 +597,7 @@ local function get_status_message(ply)
         org.just_damaged_bone = nil
     end
 	
-	local broken_notify = (org.rarm == 1) or (org.larm == 1) or (org.rleg == 1) or (org.lleg == 1)
+	local broken_notify = (hg.IsLimbFractured(org, "rarm")) or (hg.IsLimbFractured(org, "larm")) or (hg.IsLimbFractured(org, "rleg")) or (hg.IsLimbFractured(org, "lleg"))
 	local dislocated_notify = org.rarmdislocation or org.larmdislocation or org.rlegdislocation or org.llegdislocation
 	local after_unconscious_notify = org.after_otrub
 	local heartbeat = org.heartbeat or 70
@@ -612,7 +612,7 @@ local function get_status_message(ply)
 	local function limbStatusKey(kind)
 		for _, limb in ipairs({"rleg", "lleg", "rarm", "larm"}) do
 			if kind == "dislocated" and org[limb .. "dislocation"] then return kind .. "_" .. limb, LIMB_NAMES[limb] end
-			if kind == "broken" and org[limb] == 1 then return kind .. "_" .. limb, LIMB_NAMES[limb] end
+			if kind == "broken" and hg.IsLimbFractured(org, limb) then return kind .. "_" .. limb, LIMB_NAMES[limb] end
 		end
 	end
 

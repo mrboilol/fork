@@ -1397,7 +1397,7 @@ local IsValid = IsValid
 	function hg.CanUseLeftHand(ply)
 		local ent = IsValid(ply.FakeRagdoll) and ply.FakeRagdoll or ply
 
-		if ent.organism and ent.organism.larmamputated then
+		if ent.organism and (ent.organism.larmamputated or hg.IsLimbIncapacitated(ent.organism, "larm")) then
 			return false
 		end
 
@@ -1421,7 +1421,7 @@ local IsValid = IsValid
 	function hg.CanUseRightHand(ply)
 		local ent = IsValid(ply.FakeRagdoll) and ply.FakeRagdoll or ply
 
-		if ent.organism and ent.organism.rarmamputated then
+		if ent.organism and (ent.organism.rarmamputated or hg.IsLimbIncapacitated(ent.organism, "rarm")) then
 			return false
 		end
 

@@ -143,6 +143,7 @@ hook.Add("Org Clear", "Main", function(org)
 	for _, limb in ipairs({"lleg", "rleg", "larm", "rarm"}) do
 		org[limb .. "_up"], org[limb .. "_down"], org[limb .. "_agg"] = 0, 0, 0
 		org[limb .. "_up_disl"], org[limb .. "_down_disl"] = false, false
+		org[limb .. "_disl_agg"] = false
 	end
 
 	org.llegamputated = false
@@ -266,7 +267,8 @@ hook.Add("Org Clear", "Main", function(org)
 end)
 hook.Add("Should Fake Up", "organism", function(ply)
 	local org = ply.organism
-	if org.seizureActive or org.otrub or org.fake or org.nearpainlimit or org.shock > 40 or org.spine1 >= hg.organism.fake_spine1 or org.spine2 >= hg.organism.fake_spine2 or org.spine3 >= hg.organism.fake_spine3 or (org.lleg == 1 and org.rleg == 1) and org.berserk <= 0.3 or org.consciousness <= 0.4 then
+	if hg.IsLimbIncapacitated(org, "lleg") or hg.IsLimbIncapacitated(org, "rleg") then return false end
+	if org.seizureActive or org.otrub or org.fake or org.nearpainlimit or org.shock > 40 or org.spine1 >= hg.organism.fake_spine1 or org.spine2 >= hg.organism.fake_spine2 or org.spine3 >= hg.organism.fake_spine3 or (hg.IsLimbFractured(org, "lleg") and hg.IsLimbFractured(org, "rleg")) and org.berserk <= 0.3 or org.consciousness <= 0.4 then
 		return false
 	end
 end)
@@ -1278,7 +1280,9 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	end
 
 	local compoundLeg = hg.organism.IsLimbCompoundFractured and (hg.organism.IsLimbCompoundFractured(org, "lleg") or hg.organism.IsLimbCompoundFractured(org, "rleg"))
-	local brokenLeg = org.lleg == 1 or org.rleg == 1
+	local incapacitatedLeg = hg.IsLimbIncapacitated(org, "lleg") or hg.IsLimbIncapacitated(org, "rleg")
+	if isPly and incapacitatedLeg and not org.NoKnockdown then org.needfake = true end
+	local brokenLeg = hg.IsLimbFractured(org, "lleg") or hg.IsLimbFractured(org, "rleg")
 	local clumsy = isPly and owner:HasTrait("clumsy")
 	if isPly and (brokenLeg or clumsy) and not org.NoKnockdown then
 		if (org.legBreakFallNext or 0) < CurTime() then
@@ -1656,10 +1660,9 @@ hook.Add("Org Think", "regenerationberserk", function(owner, org, timeValue)
 	end
 	org.internalBleed = math.max(org.internalBleed - timeValue * 10, 0)
 	local regen = timeValue / 120 * org.berserk
-	org.lleg = math.max(org.lleg - regen, 0)
-	org.rleg = math.max(org.rleg - regen, 0)
-	org.rarm = math.max(org.rarm - regen, 0)
-	org.larm = math.max(org.larm - regen, 0)
+	for _, limb in ipairs({"lleg", "rleg", "rarm", "larm"}) do
+		hg.organism.HealLimbSegments(org, limb, regen, true)
+	end
 	org.chest = math.max(org.chest - regen, 0)
 	org.pelvis = math.max(org.pelvis - regen, 0)
 	org.spine1 = math.max(org.spine1 - regen, 0)
@@ -1726,6 +1729,13 @@ hook.Add("Org Think", "regenerationnoradrenaline", function(owner, org, timeValu
 end)
 
 local function set_organism_value(org, key, value)
+	local limb, segment = key:match("^(%a%a%a%a)_?(%a+)$")
+	if (limb == "lleg" or limb == "rleg" or limb == "larm" or limb == "rarm") and (segment == "up" or segment == "down") then
+		hg.organism.SyncLimbSegments(org, limb)
+		org[limb .. "_" .. segment] = math.Clamp(value, 0, 1)
+		hg.organism.SyncLimbSegments(org, limb)
+		return
+	end
 	if key == "o2" then
 		hg.organism.EnsureO2(org)[1] = value
 		return

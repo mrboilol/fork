@@ -14,6 +14,7 @@ function hg.TryZManipInteract(ply, ent, anim, applyPain)
 	if not IsValid(ply) or not ply:Alive() or not IsValid(ent) then return false end
 
 	local org = ply.organism
+	if org and hg.IsLimbIncapacitated(org, "larm") then return false end
 	if org and org.larmamputated then
 		if IsValid(ply:GetNetVar("carryent")) or IsValid(ply:GetNetVar("carryent2")) then
 			return false
@@ -22,15 +23,12 @@ function hg.TryZManipInteract(ply, ent, anim, applyPain)
 
 	if (ply.ZManipInteractCD or 0) >= CurTime() then return false end
 
-	local _, _, isBroken = hg.GetPrioritizedArm(ply)
-	ply.ZManipInteractCD = CurTime() + 0.95
+	local impairment = 1 - hg.GetArmEffectiveness(ply, "larm", "down")
+	ply.ZManipInteractCD = CurTime() + 0.95 * (1 + impairment)
 	ply.ZManipOldUse = ply:KeyDown(IN_USE)
 
-	if applyPain ~= false and org and isBroken then
-		local armVal = org.larm or 0
-		local disloc = org.larmdislocation
-		local painAmount = armVal * 3 + (disloc and 2 or 0)
-		org.painadd = (org.painadd or 0) + painAmount
+	if applyPain ~= false and org then
+		org.painadd = (org.painadd or 0) + 5 * impairment ^ 2
 	end
 
 	timer.Simple(0, function()

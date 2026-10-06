@@ -331,9 +331,8 @@ function SWEP:Reload(time)
 	end
 
 	if self.drawBullet == false and SERVER then
-		-- Add pain if left arm is broken when racking bolt
-		if ply.organism and ((ply.organism.larm and ply.organism.larm >= 1) or ply.organism.larmdislocation) and not ply.organism.larmamputated then
-			local painAmount = (ply.organism.larm or 0) * 20 + (ply.organism.larmdislocation and 15 or 0)
+		if ply.organism and not ply.organism.larmamputated then
+			local painAmount = 35 * (1 - hg.GetArmEffectiveness(ply, "larm", "down")) ^ 2
 			ply.organism.painadd = (ply.organism.painadd or 0) + painAmount
 		end
 		cock(self,1.5)
@@ -344,10 +343,11 @@ function SWEP:Reload(time)
 
 	if not self:CanReload() then return end
 
-	-- Apply arm penalties for reload
-	local armPain, armSpeedMul = self:GetReloadArmPenalty()
-	if armPain > 0 and ply.organism then
-		ply.organism.painadd = (ply.organism.painadd or 0) + armPain
+	if SERVER then
+		local armPain = self:GetReloadArmPenalty()
+		if armPain > 0 and ply.organism then
+			ply.organism.painadd = (ply.organism.painadd or 0) + armPain
+		end
 	end
 
 	if SERVER then
@@ -356,7 +356,7 @@ function SWEP:Reload(time)
 		self:ReloadStart()
 		self:ReloadStartPost()
 		local org = self:GetOwner().organism
-		self.StaminaReloadMul = (org and ((2 - (self:GetOwner().organism.stamina[1] / 180)) + ((org.pain / 40) + (org.larm / 3) + (org.rarm / 5)) - (1 - math.Clamp(org.recoilmul or 1,0.45,1.4))) or 1)
+		self.StaminaReloadMul = (org and ((2 - (self:GetOwner().organism.stamina[1] / 180)) + ((org.pain / 40) + ((1 - hg.GetArmEffectiveness(ply, "larm", "down")) / 3) + ((1 - hg.GetArmEffectiveness(ply, "rarm", "down")) / 5)) - (1 - math.Clamp(org.recoilmul or 1,0.45,1.4))) or 1)
 		self.StaminaReloadMul = math.Clamp(self.StaminaReloadMul,0.65,1.5)
 		self.StaminaReloadTime = self.ReloadTime * self.StaminaReloadMul
 		self.StaminaReloadTime = (self.StaminaReloadTime + (self:Clip1() > 0 and -self.StaminaReloadTime/3 or 0 ))

@@ -570,7 +570,7 @@ local limbKeys = {"larm", "rarm", "lleg", "rleg"}
 local function countFractures(org)
 	local count = 0
 	for _, limb in ipairs(limbKeys) do
-		if orgNumber(org, limb, 0) >= 0.95 and org[limb .. "amputated"] ~= true then count = count + 1 end
+		if hg.IsLimbFractured(org, limb) and org[limb .. "amputated"] ~= true then count = count + 1 end
 	end
 	return count
 end

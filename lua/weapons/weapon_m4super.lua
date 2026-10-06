@@ -154,7 +154,7 @@ if SERVER then
 			self:PlaySnd(self.ReloadSound or "pwb2/weapons/ksg/shellinsert1.ogg",true,CHAN_AUTO)
 		end
 		local org = self:GetOwner().organism
-		self.StaminaReloadTime = self.ReloadTime * ( IsValid( self:GetOwner() ) and org and org.stamina and org.pain and (2 - (self:GetOwner().organism.stamina[1] / 180 ) ) + (( org.pain / 40 ) + (org.larm/3) + (org.rarm/3)) or 1 )
+		self.StaminaReloadTime = self.ReloadTime * ( IsValid( self:GetOwner() ) and org and org.stamina and org.pain and (2 - (self:GetOwner().organism.stamina[1] / 180 ) ) + (( org.pain / 40 ) + ((1 - hg.GetArmEffectiveness(self:GetOwner(), "larm", "down")) / 3) + ((1 - hg.GetArmEffectiveness(self:GetOwner(), "rarm", "down")) / 3)) or 1 )
 		self.reload = self.LastReload + self.StaminaReloadTime
 		self.dwr_reverbDisable = true
 		net.Start("hgwep reload")

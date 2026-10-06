@@ -56,8 +56,9 @@ end
 
 function SWEP:CanPrimaryAttack()
     if self:GetNWFloat("HGEquipmentRecovery", 0) > CurTime() then return false end
-	local owner = self:GetOwner()
+    local owner = self:GetOwner()
 	if IsValid(owner) and owner:GetNetVar("ducttaped_hands", false) then return false end
+	if IsValid(owner) and self:GetMeleeArmEffectiveness(owner) <= 0 then return false end
 	return true
 end
 
@@ -72,6 +73,7 @@ function SWEP:CanSecondaryAttack()
     if self:GetNWFloat("HGEquipmentRecovery", 0) > CurTime() then return false end
 	local owner = self:GetOwner()
 	if IsValid(owner) and owner:GetNetVar("ducttaped_hands", false) then return false end
+	if IsValid(owner) and self:GetMeleeArmEffectiveness(owner) <= 0 then return false end
     if self:GetClass() == "weapon_melee" then return false end
 	return true
 end
@@ -3835,7 +3837,7 @@ function SWEP:CustomThink()
     //if SERVER then
         local oldblocking = self:GetBlocking()
 		local armBlockPenalty = (1 - self:GetMeleeArmEffectiveness(owner)) * 30
-		local blocking = self:GetBlockDisabledUntil() < CurTime() and owner.organism and owner.organism.stamina[1] >= (self.BlockMinStamina or 90) + armBlockPenalty and !self:GetInAttack() and (self:GetAttackTime() - CurTime() - 0) < 0 and self:CanBlock() and hg.KeyDown(owner, IN_ATTACK2) and not (self.Canselfharm and self:IsSelfHarming())
+		local blocking = self:GetMeleeArmEffectiveness(owner) > 0 and self:GetBlockDisabledUntil() < CurTime() and owner.organism and owner.organism.stamina[1] >= (self.BlockMinStamina or 90) + armBlockPenalty and !self:GetInAttack() and (self:GetAttackTime() - CurTime() - 0) < 0 and self:CanBlock() and hg.KeyDown(owner, IN_ATTACK2) and not (self.Canselfharm and self:IsSelfHarming())
         --if self:CutDuct() then return end
         self:SetBlocking(blocking)
 

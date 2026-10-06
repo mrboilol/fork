@@ -978,6 +978,7 @@ end
 
 function fakeBoneFlop.ReconcileLimb(org, limb)
 	if not org or not fakeLimbBoneGroups[limb] then return false end
+	if hg.organism.SyncLimbSegments then hg.organism.SyncLimbSegments(org, limb) end
 
 	local changed = false
 	if not org[limb .. "dislocation"] then
@@ -989,8 +990,14 @@ function fakeBoneFlop.ReconcileLimb(org, limb)
 			end
 		end
 	end
-	if (tonumber(org[limb]) or 0) < 1 and not org[limb .. "dislocation"] then
+	if not hg.IsLimbFractured(org, limb) and not org[limb .. "dislocation"] then
 		changed = fakeBoneFlop.ClearStoredLimb(org, limb) or changed
+	else
+		for segment, bone in pairs(fakeLimbBoneSegments[limb]) do
+			if (org[limb .. "_" .. segment] or 0) < 1 and not org[limb .. "_" .. segment .. "_disl"] then
+				changed = fakeBoneFlop.FlagBone(org, bone, false) or changed
+			end
+		end
 	end
 
 	return changed

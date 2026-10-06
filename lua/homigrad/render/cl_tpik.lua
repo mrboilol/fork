@@ -998,7 +998,7 @@ function hg.DoTPIK(ply, ent)
 	local self = ply:GetActiveWeapon()
 
     local org = ply.organism or ent.organism
-	local leftArmBroken = org and ((org.larm or 0) >= 1 or org.larmdislocation or org.larmdislocated)
+	local leftArmBroken = org and (hg.IsLimbFractured(org, "larm") or org.larmdislocation or org.larmdislocated)
 	local leftArmAmputated = org and (org.larmamputated or org.lhandamputated or org.larmupamputated)
 	local leftArmDisabled = leftArmAmputated
 	local brokenFistArm = leftArmBroken and IsValid(self) and self.GetFists and self:GetFists()

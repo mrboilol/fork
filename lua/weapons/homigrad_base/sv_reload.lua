@@ -30,25 +30,14 @@ function SWEP:GetReloadArmPenalty()
 	local penalty = self.ArmReloadPenalty or SWEP.ArmReloadPenalty
 	local pain = 0
 	local speedMul = 1
-	local limbDebuff = hg.GetLimbDebuffMultiplier and hg.GetLimbDebuffMultiplier(org) or 1
-	local rightArmHealthy = org.rarm and org.rarm < 1 and not org.rarmdislocation and not org.rarmamputated
-	local leftArmBroken = ((org.larm and org.larm > 0) or org.larmdislocation) and not org.larmamputated
-
-	if leftArmBroken then
-		pain = pain + (penalty.PainOnReload or 35) * (org.larm or 0) * limbDebuff
-		if org.larmdislocation then pain = pain + 15 * limbDebuff end
-		speedMul = speedMul * 1.3
-	end
-
-	if leftArmBroken and not rightArmHealthy then
-		speedMul = speedMul * (1 + (penalty.LeftArmBrokenReloadSlow or 0.5) * limbDebuff)
-	end
+	local leftImpairment = org.larmamputated and 0 or 1 - hg.GetArmEffectiveness(ply, "larm", "down")
+	local rightImpairment = 1 - hg.GetArmEffectiveness(ply, "rarm", "down")
+	pain = (penalty.PainOnReload or 35) * leftImpairment ^ 2
+	speedMul = (1 + 0.3 * leftImpairment) * (1 + (penalty.LeftArmBrokenReloadSlow or 0.5) * leftImpairment * rightImpairment)
 
 	if org.rarmamputated and not org.larmamputated then
 		speedMul = speedMul * (penalty.MissingRightArmSpeedMul or 0.4)
-		if leftArmBroken then
-			pain = pain + (penalty.MissingRightArmPain or 55)
-		end
+		pain = pain + (penalty.MissingRightArmPain or 55) * leftImpairment ^ 2
 	end
 	local forgive = 1 - self:GetFirearmTraining(ply) * 0.5
 	pain = pain * forgive
@@ -68,13 +57,15 @@ function SWEP:Reload(time)
 	self:ReloadStartPost()
 	local org = self:GetOwner().organism
 	local experienceMul = self.GetReloadExperienceMul and self:GetReloadExperienceMul(self:GetOwner()) or 1
-	local limbDebuff = org and hg.GetLimbDebuffMultiplier and hg.GetLimbDebuffMultiplier(org) or 1
-	local armReloadPenalty = org and not self.IgnoreOneArmPenalties and ((org.larm or 0) / 3 + (org.rarm or 0) / 5) * limbDebuff * (1 - self:GetFirearmTraining(self:GetOwner()) * 0.5) or 0
+	local leftImpairment = 1 - hg.GetArmEffectiveness(self:GetOwner(), "larm", "down")
+	local rightImpairment = 1 - hg.GetArmEffectiveness(self:GetOwner(), "rarm", "down")
+	local trainingForgiveness = 1 - self:GetFirearmTraining(self:GetOwner()) * 0.5
+	local armReloadPenalty = org and not self.IgnoreOneArmPenalties and (leftImpairment / 3 + rightImpairment / 5) * trainingForgiveness or 0
 	self.StaminaReloadMul = (org and ((2 - (org.stamina[1] / 180)) + ((org.pain / 40) + armReloadPenalty) - (1 - math.Clamp(org.recoilmul or 1, 0.45, 1.4))) or 1) * experienceMul
 	self.StaminaReloadMul = self.StaminaReloadMul * (self:GetOwner().GetTraitMultiplier and self:GetOwner():GetTraitMultiplier("reload_speed", 1) or 1)
 	self.StaminaReloadMul = math.Clamp(self.StaminaReloadMul,0.65,1.5)
-	if org and not self.IgnoreOneArmPenalties and not org.larmamputated and ((org.larm or 0) >= 1 or org.larmdislocation) then
-		self.StaminaReloadMul = self.StaminaReloadMul * (1 + 0.3 * (1 - self:GetFirearmTraining(self:GetOwner()) * 0.5))
+	if org and not self.IgnoreOneArmPenalties and not org.larmamputated then
+		self.StaminaReloadMul = self.StaminaReloadMul * (1 + 0.3 * leftImpairment ^ 2 * trainingForgiveness)
 	end
 	local magazine = self:GetAttachmentInfo("magwell")
 	local baseCapacity = self.BaseMagazineCapacity or self.Primary.DefaultClip or self.Primary.ClipSize

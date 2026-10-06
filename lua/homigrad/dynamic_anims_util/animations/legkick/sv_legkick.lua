@@ -310,7 +310,7 @@ function PLAYER:LegAttack()
             local tr, normal, footPos = getKickTrace(self, inDuck, isCurbstomp)
 
             local org = self.organism
-            if org.rleg == 1 or org.rlegdislocation then
+            if hg.IsLimbFractured(org, "rleg") or org.rlegdislocation then
                 org.painadd = org.painadd + 20
             end
             
@@ -322,7 +322,7 @@ function PLAYER:LegAttack()
             local blacklist = {[self] = true, [hg.GetCurrentCharacter(self)] = true}
             if tr.Hit then
                 soundplayed = true
-                if org.rleg == 1 or org.rlegdislocation then
+                if hg.IsLimbFractured(org, "rleg") or org.rlegdislocation then
                     org.painadd = org.painadd + 20
                 end
                 self:EmitSound("panoptisscon/kick.wav")
@@ -365,7 +365,7 @@ function PLAYER:LegAttack()
                     if not soundplayed then
                         soundplayed = true
 
-                        if org.rleg == 1 or org.rlegdislocation then
+                        if hg.IsLimbFractured(org, "rleg") or org.rlegdislocation then
                             org.painadd = org.painadd + 20
                         end
 

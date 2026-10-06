@@ -233,10 +233,10 @@ local function GetOrganismInjuryScore(org)
 		score = score + 2
 	end
 	if org.chest == 1 then score = score + 1 end
-	if org.lleg == 1 and not org.llegamputated then score = score + 1 end
-	if org.rleg == 1 and not org.rlegamputated then score = score + 1 end
-	if org.larm == 1 and not org.larmamputated then score = score + 1 end
-	if org.rarm == 1 and not org.rarmamputated then score = score + 1 end
+	if hg.IsLimbFractured(org, "lleg") and not org.llegamputated then score = score + 1 end
+	if hg.IsLimbFractured(org, "rleg") and not org.rlegamputated then score = score + 1 end
+	if hg.IsLimbFractured(org, "larm") and not org.larmamputated then score = score + 1 end
+	if hg.IsLimbFractured(org, "rarm") and not org.rarmamputated then score = score + 1 end
 
 	return score
 end

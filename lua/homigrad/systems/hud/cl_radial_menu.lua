@@ -1199,7 +1199,7 @@ hook.Add("HUDPaint","afflictionlist",function()
 	
 	local org = lply.organism
 
-	if org.lleg >= 0.99 then
+	if hg.IsLimbFractured(org, "lleg") then
 		local w, h = 200, 200
 
 		local ent = hg.GetCurrentCharacter(lply)

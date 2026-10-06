@@ -153,38 +153,6 @@ module[2] = function(owner, org, timeValue)
 
 	local painkillerMul = 1
 
-	-- Check for left hand mitigation: working left hand + damaged right hand
-
-	-- Mitigation applies unless one-handing or left arm is damaged
-
-	local leftHandHealthy = not org.larmamputated and not (org.larm and org.larm >= 1) and not (org.larmdislocation or org.larmdislocated)
-
-	local rightHandDamaged = (org.rarm and org.rarm >= 1) or (org.rarmdislocation or org.rarmdislocated) or org.rarmamputated
-
-	local isOneHanding = false
-
-	
-
-	if IsValid(owner) and owner:IsPlayer() then
-
-		local wep = owner:GetActiveWeapon()
-
-		isOneHanding = IsValid(wep) and wep.TwoHanded == false
-
-	end
-
-	
-
-	local painMitigation = 1
-
-	if leftHandHealthy and rightHandDamaged and not isOneHanding then
-
-		painMitigation = 0.5 -- Halve pain
-
-	end
-
-
-
 	org.shock_turn = 10 * (!org.otrub and 1 or 0.1)
 
 
@@ -490,34 +458,8 @@ module[2] = function(owner, org, timeValue)
 
 
 
-	if org.lleg < 1 and !org.llegamputated then
-
-		org.lleg = max(org.lleg - timeValue / 240, 0)
-
-	end
-
-
-
-	if org.rleg < 1 and !org.rlegamputated then
-
-		org.rleg = max(org.rleg - timeValue / 240, 0)
-
-	end
-
-
-
-	if org.rarm < 1 then
-
-		org.rarm = max(org.rarm - timeValue / 240, 0)
-
-	end
-
-
-
-	if org.larm < 1 then
-
-		org.larm = max(org.larm - timeValue / 240, 0)
-
+	for _, limb in ipairs({"lleg", "rleg", "rarm", "larm"}) do
+		hg.organism.HealLimbSegments(org, limb, timeValue / 240)
 	end
 
 	if org.chest < 1 and org.bandagedchest then

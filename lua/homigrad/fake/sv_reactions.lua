@@ -344,8 +344,8 @@ function hg.reactions.ProcessStagger(ragdoll, ply, org)
         
         -- Check for broken legs (organism system)
         local isLeft = (stepLeg == 13)
-        local leftBroken = (org.lleg == 1)
-        local rightBroken = (org.rleg == 1)
+        local leftBroken = (hg.IsLimbFractured(org, "lleg"))
+        local rightBroken = (hg.IsLimbFractured(org, "rleg"))
         
         if (isLeft and leftBroken) then
             stepLeg = 14 -- Try right
@@ -446,11 +446,11 @@ function hg.reactions.ProcessTripping(ragdoll, ply, org)
         local lhand = ragdoll:GetPhysicsObjectNum(hg.realPhysNum(ragdoll, 5))
         local rhand = ragdoll:GetPhysicsObjectNum(hg.realPhysNum(ragdoll, 7))
         
-        if IsValid(lhand) and org.larm ~= 1 then
+        if IsValid(lhand) and hg.GetLimbEffectiveness(org, "larm", "down") > 0 then
             hg.ShadowControl(ragdoll, 5, 0.12, nil, nil, nil, ragdoll:GetPos() + forward * 30 + Vector(0, 0, 12), 400, 250)
         end
         
-        if IsValid(rhand) and org.rarm ~= 1 then
+        if IsValid(rhand) and hg.GetLimbEffectiveness(org, "rarm", "down") > 0 then
             hg.ShadowControl(ragdoll, 7, 0.12, nil, nil, nil, ragdoll:GetPos() + forward * 30 + Vector(0, 0, 12), 400, 250)
         end
         
@@ -513,17 +513,16 @@ function hg.reactions.ProcessProtective(ragdoll, ply, org)
             local head = ragdoll:GetPhysicsObjectNum(hg.realPhysNum(ragdoll, 10))
             local forward = head and head:GetAngles():Forward() or ragdoll:GetAngles():Forward()
             
-            -- Check organism state (broken arms)
-            local leftBroken = (org.larm == 1)
-            local rightBroken = (org.rarm == 1)
+            local leftPower = hg.GetLimbEffectiveness(org, "larm", "down")
+            local rightPower = hg.GetLimbEffectiveness(org, "rarm", "down")
             
-            if IsValid(lhand) and not leftBroken then
+            if IsValid(lhand) and leftPower > 0 then
                 local targetL = ragdoll:GetPos() + forward * 30 + Vector(0, 10, 0)
                 hg.ShadowControl(ragdoll, 5, 0.12, nil, nil, nil, targetL, 325, 250)
                 handled = true
             end
             
-            if IsValid(rhand) and not rightBroken then
+            if IsValid(rhand) and rightPower > 0 then
                 local targetR = ragdoll:GetPos() + forward * 30 + Vector(0, -10, 0)
                 hg.ShadowControl(ragdoll, 7, 0.12, nil, nil, nil, targetR, 325, 250)
                 handled = true

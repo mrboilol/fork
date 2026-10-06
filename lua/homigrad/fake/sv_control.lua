@@ -323,7 +323,7 @@ function hg.ShadowControl(ragdoll, physNumber, ss, ang, maxang, maxangdamp, pos,
 		org = IsValid(owner) and owner.organism
 	end
 	if limbSegment then limbPower = limbPower * hg.GetLimbEffectiveness(org, limbSegment[1], limbSegment[2]) end
-	if isFloppyPhys(ragdoll, physNumber, true) then
+	if limbPower <= 0 or isFloppyPhys(ragdoll, physNumber, true) then
 		phys:Wake()
 		return false
 	end
@@ -686,14 +686,14 @@ local function fakeLegKickHit(ply, ragdoll, state)
 	local tr = getFakeLegKickTrace(ply, ragdoll, state.dir)
 	if not tr then return end
 
-	if org.rleg == 1 or org.rlegdislocation then
+	if hg.IsLimbFractured(org, "rleg") or org.rlegdislocation then
 		org.painadd = org.painadd + 20
 	end
 
 	ply:EmitSound("player/shove_0" .. math.random(1,5) .. ".wav", 65)
 
 	if tr.Hit then
-		if org.rleg == 1 or org.rlegdislocation then
+		if hg.IsLimbFractured(org, "rleg") or org.rlegdislocation then
 			org.painadd = org.painadd + 20
 		end
 
@@ -761,7 +761,7 @@ function hg.FakeLegAttack(ply)
 	local ragdoll = ply.FakeRagdoll
 	local org = ply.organism
 	if not ply:Alive() or not IsValid(ragdoll) or not org or not org.canmove then return end
-	if org.rlegamputated or org.rlegupamputated then return end
+	if org.rlegamputated or org.rlegupamputated or hg.IsLimbIncapacitated(org, "rleg") then return end
 	if ply.InLegKick and ply.InLegKick > CurTime() then return end
 	if ply:GetNWFloat("InLegKick", 0) > CurTime() then return end
 	if hook.Run("PlayerCanLegAttack", ply) == false then return end
@@ -826,7 +826,7 @@ hook.Add("Think", "Fake", function()
 			continue
 		end
 
-		ragdoll.dtime = (SysTime() - (ragdoll.lastCallTime or SysTime())) * game.GetTimeScale()
+		ragdoll.dtime = math.Clamp((SysTime() - (ragdoll.lastCallTime or SysTime())) * game.GetTimeScale(), 0, 0.05)
 		ragdoll.lastCallTime = SysTime()
 
 		local rootPhys = ragdoll:GetPhysicsObject()
@@ -1114,8 +1114,8 @@ hook.Add("Think", "Fake", function()
 		ragdoll.HGFallCoverActive = fallCoverActive
 		local holdWound, holdWoundArterial = getHoldWound(org, ragdoll)
 		local wantsManualHold = (holdWound and org.canmove and hg.KeyDown(ply, IN_USE) and hg.KeyDown(ply, IN_JUMP)) or (org.neckslit and not org.otrub and holdWoundArterial and org.canmove)
-		local canHoldLeft = IsValid(lupper) and IsValid(lforearm) and IsValid(lhand) and not org.larmamputated and not org.larmupamputated and not org.lhandamputated
-		local canHoldRight = IsValid(rupper) and IsValid(rforearm) and IsValid(rhand) and not org.rarmamputated and not org.rarmupamputated and not org.rhandamputated
+		local canHoldLeft = IsValid(lupper) and IsValid(lforearm) and IsValid(lhand) and not org.larmamputated and not org.larmupamputated and not org.lhandamputated and not hg.IsLimbIncapacitated(org, "larm")
+		local canHoldRight = IsValid(rupper) and IsValid(rforearm) and IsValid(rhand) and not org.rarmamputated and not org.rarmupamputated and not org.rhandamputated and not hg.IsLimbIncapacitated(org, "rarm")
 		local canUseTwoHandHold = not IsValid(wep) or wep:GetClass() == "weapon_hands_sh"
 		local manualUseLeft = false
 		local manualUseRight = false
@@ -1294,7 +1294,7 @@ hook.Add("Think", "Fake", function()
 						shadowControl(ragdoll, 4, 0.002, ang2, forceArm * force, forceArm_dump)
 						ang2:RotateAroundAxis(ang2:Forward(), 135)
 						ang2:RotateAroundAxis(ang2:Up(), 20)
-						local punchBone = ((org.larm or 0) >= 1 or org.larmdislocation or org.larmdislocated) and 4 or 5
+						local punchBone = (hg.IsLimbFractured(org, "larm") or org.larmdislocation or org.larmdislocated) and 4 or 5
 						shadowControl(ragdoll, punchBone, 0.001, ang2, forceArm * 2, forceArm_dump, ragdoll:GetPhysicsObjectNum(realPhysNum(ragdoll,punchBone)):GetPos() + ang2:Forward() * 15 + ((vellen > 150 and ragdoll:GetPhysicsObject():GetVelocity() / 224) or vector_zero), 500, 50)
 						if ply:WaterLevel() == 1 then shadowControl(ragdoll, 1, 0.001, nil, nil, nil, ragdoll:GetPhysicsObjectNum(realPhysNum(ragdoll,5)):GetPos(), 5, 0) end
 					/*else
@@ -1333,7 +1333,7 @@ hook.Add("Think", "Fake", function()
 					hand:ApplyForceCenter(-force)
 					torso:ApplyForceCenter(force)
 
-					if org.rarm == 1 or org.rarmdislocation then
+					if hg.IsLimbFractured(org, "rarm") or org.rarmdislocation then
 						org.painadd = org.painadd + ragdoll.dtime * 5
 					end
 
@@ -1355,7 +1355,7 @@ hook.Add("Think", "Fake", function()
 					hand:ApplyForceCenter(-force)
 					torso:ApplyForceCenter(force)
 
-					if org.larm == 1 or org.larmdislocation then
+					if hg.IsLimbFractured(org, "larm") or org.larmdislocation then
 						org.painadd = org.painadd + ragdoll.dtime * 5
 					end
 
@@ -1377,7 +1377,7 @@ hook.Add("Think", "Fake", function()
 					hand:ApplyForceCenter(-force)
 					torso:ApplyForceCenter(force)
 
-					if org.rarm == 1 or org.rarmdislocation then
+					if hg.IsLimbFractured(org, "rarm") or org.rarmdislocation then
 						org.painadd = org.painadd + ragdoll.dtime * 5
 					end
 				end
@@ -1393,7 +1393,7 @@ hook.Add("Think", "Fake", function()
 					hand:ApplyForceCenter(-force)
 					torso:ApplyForceCenter(force)
 
-					if org.larm == 1 or org.larmdislocation then
+					if hg.IsLimbFractured(org, "larm") or org.larmdislocation then
 						org.painadd = org.painadd + ragdoll.dtime * 5
 					end
 				end
@@ -1418,7 +1418,7 @@ hook.Add("Think", "Fake", function()
 						ang2:RotateAroundAxis(ang2:Forward(), 135)
 						ang2:RotateAroundAxis(ang2:Up(), ishgweapon(wep) and 1 or 20)
 						ang2:RotateAroundAxis(ang2:Forward(), ishgweapon(wep) and 120 or 0)
-						local punchBone = ((org.rarm or 0) >= 1 or org.rarmdislocation or org.rarmdislocated) and 6 or 7
+						local punchBone = (hg.IsLimbFractured(org, "rarm") or org.rarmdislocation or org.rarmdislocated) and 6 or 7
 						shadowControl(ragdoll, punchBone, 0.001, ang2, forceArm * 2, forceArm_dump, ragdoll:GetPhysicsObjectNum(realPhysNum(ragdoll,punchBone)):GetPos() + ang2:Forward() * 15 + ((vellen > 150 and ragdoll:GetPhysicsObject():GetVelocity() / 224) or vector_zero), ishgweapon(wep) and 500 or 500, ishgweapon(wep) and 50 or 50)
 						if ply:WaterLevel() == 1 then shadowControl(ragdoll, 1, 0.001, nil, nil, nil, ragdoll:GetPhysicsObjectNum(realPhysNum(ragdoll, 7)):GetPos(), 5, 0) end
 					/*else
@@ -1473,10 +1473,10 @@ hook.Add("Think", "Fake", function()
 				ply:Notify( math.random(1,2) == 1 and "I'm at my limits here!" or "I can't hold much longer...", 25, "ragdoll_almostfall", 0, nil, Color(200, 55, 55))
 			end
 
-			local leftArmInjured = (org.larm or 0) >= 1 or org.larmdislocation or org.larmdislocated
-			local rightArmInjured = (org.rarm or 0) >= 1 or org.rarmdislocation or org.rarmdislocated
+			local leftArmInjured = hg.IsLimbFractured(org, "larm") or org.larmdislocation or org.larmdislocated
+			local rightArmInjured = hg.IsLimbFractured(org, "rarm") or org.rarmdislocation or org.rarmdislocated
 
-			if grabHeld(ply, ragdoll, IN_SPEED, "l") and org.canmove and !org.larmamputated and !org.larmupamputated and (!ply.HandsStun or ply.HandsStun < CurTime()) then
+			if grabHeld(ply, ragdoll, IN_SPEED, "l") and org.canmove and !org.larmamputated and !org.larmupamputated and not hg.IsLimbIncapacitated(org, "larm") and (!ply.HandsStun or ply.HandsStun < CurTime()) then
 				if IsValid(ragdoll.ConsLH) then
 					if hg_fake_stamina:GetBool() then
 						org.stamina.subadd = org.stamina.subadd + 0.06 * (ragdoll.staminaLeftModifyer or 0.5) * ( IsValid(ragdoll.ConsRH) and 0.35 or 1.25) * (1 - ledgeLH * 0.9) * (on_ground and 0.25 or 1) * (ply.GetTraitMultiplier and ply:GetTraitMultiplier("climb_stamina_cost", 1) or 1)
@@ -1554,7 +1554,7 @@ hook.Add("Think", "Fake", function()
 				end
 			end
 
-			if grabHeld(ply, ragdoll, IN_WALK, "r") and org.canmove and !(ishgweapon(wep) or wep.ismelee2) and !org.rarmamputated and !org.rarmupamputated and (!ply.HandsStun or ply.HandsStun < CurTime()) then
+			if grabHeld(ply, ragdoll, IN_WALK, "r") and org.canmove and !(ishgweapon(wep) or wep.ismelee2) and !org.rarmamputated and !org.rarmupamputated and not hg.IsLimbIncapacitated(org, "rarm") and (!ply.HandsStun or ply.HandsStun < CurTime()) then
 				if IsValid(ragdoll.ConsRH) then
 					if hg_fake_stamina:GetBool() then
 						org.stamina.subadd = org.stamina.subadd + 0.06 * (ragdoll.staminaRightModifyer or 1) * ( IsValid(ragdoll.ConsLH) and 0.35 or 1.25) * (1 - ledgeRH * 0.9) * (on_ground and 0.25 or 1) * (ply.GetTraitMultiplier and ply:GetTraitMultiplier("climb_stamina_cost", 1) or 1)
@@ -1782,8 +1782,8 @@ hook.Add("Think", "Fake", function()
 					legAng2:RotateAroundAxis(angles:Forward(), -40)
 					legAng2:RotateAroundAxis(angles:Up(), -70)
 
-					shadowControl(ragdoll, 11, 0.001, legAng1, 200, 10)
-					shadowControl(ragdoll, 8, 0.001, legAng2, 200, 10)
+					shadowControl(ragdoll, 11, 0.001, legAng1, 500, 150)
+					shadowControl(ragdoll, 8, 0.001, legAng2, 500, 150)
 
 					local calfAng1 = Angle(0, 0, 0)
 					local calfAng2 = Angle(0, 0, 0)
@@ -1794,8 +1794,8 @@ hook.Add("Think", "Fake", function()
 					calfAng2:Set(legAng2)
 					calfAng2:RotateAroundAxis(angles:Right(), -90)
 
-					shadowControl(ragdoll, 12, 0.001, calfAng1, 150, 10)
-					shadowControl(ragdoll, 9, 0.001, calfAng2, 150, 10)
+					shadowControl(ragdoll, 12, 0.001, calfAng1, 400, 120)
+					shadowControl(ragdoll, 9, 0.001, calfAng2, 400, 120)
 
 				local slideMinStartSpeed = 150
 				local slideMinKeepSpeed = 40
@@ -1857,34 +1857,6 @@ hook.Add("Think", "Fake", function()
 					ragdoll._slideDir = dir
 
 					ragdoll.isSliding = true
-
-					local legAng1 = Angle(0, 0, 0)
-					local legAng2 = Angle(0, 0, 0)
-
-					legAng1:Set(angles)
-					legAng1:RotateAroundAxis(angles:Right(), 80)
-					legAng1:RotateAroundAxis(angles:Forward(), -40)
-					legAng1:RotateAroundAxis(angles:Up(), -70)
-
-					legAng2:Set(angles)
-					legAng2:RotateAroundAxis(angles:Right(), 65)
-					legAng2:RotateAroundAxis(angles:Forward(), -40)
-					legAng2:RotateAroundAxis(angles:Up(), -70)
-
-					shadowControl(ragdoll, 11, 0.001, legAng1, 500, 150)
-					shadowControl(ragdoll, 8, 0.001, legAng2, 500, 150)
-
-					local calfAng1 = Angle(0, 0, 0)
-					local calfAng2 = Angle(0, 0, 0)
-
-					calfAng1:Set(legAng1)
-					calfAng1:RotateAroundAxis(angles:Right(), -90)
-
-					calfAng2:Set(legAng2)
-					calfAng2:RotateAroundAxis(angles:Right(), -90)
-
-					shadowControl(ragdoll, 12, 0.001, calfAng1, 400, 120)
-					shadowControl(ragdoll, 9, 0.001, calfAng2, 400, 120)
 				end
 
 				if ragdoll._slideActive then
@@ -2023,9 +1995,9 @@ hook.Add("Think", "Fake", function()
 					end
 				end
 
-					if org.lleg >= 1 or org.rleg >= 1 then
-						org.painadd = org.painadd + ragdoll.dtime * 2 * (org.lleg + org.rleg)
-					end
+				local leftImpairment = 1 - hg.GetLimbEffectiveness(org, "lleg")
+				local rightImpairment = 1 - hg.GetLimbEffectiveness(org, "rleg")
+				org.painadd = org.painadd + ragdoll.dtime * 2 * (leftImpairment ^ 2 + rightImpairment ^ 2)
 				end
 			else
 				if IsValid(ragdoll) then

@@ -81,6 +81,15 @@ function SWEP:ShotgunPlay(state, animation, duration, callback)
 	duration = duration or 0
 	local token = self:ShotgunInvalidateCallbacks()
 	local owner = self:GetOwner()
+	if not IsValid(owner) or self:GetManualActionBlockReason(owner) then
+		self:ShotgunSetState(self:Clip1() <= 0 and SG_EMPTY or (self.drawBullet and SG_READY or SG_NEEDS_CYCLE))
+		return
+	end
+	local pain, speedMul = self:GetReloadArmPenalty()
+	duration = duration * speedMul
+	if owner.organism and (state == SG_RELOAD_INSERT or state == SG_CYCLING) then
+		owner.organism.painadd = (owner.organism.painadd or 0) + pain
+	end
 	self:ShotgunSetState(state, duration)
 
 	local function finished(wep)
@@ -199,6 +208,7 @@ function SWEP:ShotgunReload()
 
 	local owner = self:GetOwner()
 	if not IsValid(owner) then return end
+	if self:GetManualActionBlockReason(owner) then return end
 	if self._ShotgunReloadHeld then return end
 	self._ShotgunReloadHeld = true
 	if owner.organism and (owner.organism.larmamputated or owner.organism.rarmamputated) then return end
@@ -255,7 +265,7 @@ function SWEP:Step_Shotgun()
 	local owner = self:GetOwner()
 	if IsValid(owner) and not owner:KeyDown(IN_RELOAD) then self._ShotgunReloadHeld = false end
 	if not self:IsShotgunBusy() then return end
-	if not IsValid(owner) or owner:GetActiveWeapon() ~= self then
+	if not IsValid(owner) or owner:GetActiveWeapon() ~= self or self:GetManualActionBlockReason(owner) then
 		self:ShotgunInvalidateCallbacks()
 		self:ShotgunSetState(self:Clip1() <= 0 and SG_EMPTY or (self.drawBullet and SG_READY or SG_NEEDS_CYCLE))
 		return

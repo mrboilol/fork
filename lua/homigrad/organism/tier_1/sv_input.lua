@@ -12,11 +12,11 @@ local input_list = hg.organism.input_list
 local head_otrub_consciousness_cap = 0.04
 local instant_pain_shock_scale = 0.75
 local traumatic_shock_threshold = 24
-local player_limb_gib_threshold = 110
-local player_head_gib_threshold = 110
-local player_buckshot_head_gib_threshold = 92
+local player_limb_gib_threshold = 220
+local player_head_gib_threshold = 120
+local player_buckshot_head_gib_threshold = 100
 local player_stomach_gib_threshold = 260
-local player_blast_limb_gib_threshold = 130
+local player_blast_limb_gib_threshold = 220
 local player_fall_head_gib_threshold = 1.2
 local full_body_blast_gib_threshold = 5000
 local full_body_blast_damage_threshold = 1400
@@ -26,7 +26,7 @@ local blast_gib_damage_mul = 700
 local melee_gib_damage_mul = 0.35
 local slash_limb_gib_damage_mul = 4.5
 local ballistic_head_gib_damage_mul = 2
-local ballistic_limb_gib_damage_mul = 2.5
+local ballistic_limb_gib_damage_mul = 1.25
 local ragdoll_fall_skull_damage_mul = 1.65
 local ragdoll_fall_jaw_damage_mul = 0.45
 local ragdoll_fall_skull_break_blood_mul = 1.15
@@ -75,8 +75,10 @@ local function getBallisticProfile(dmgInfo, bullet, damage, penetration)
 	local damageFactor = math.Clamp(math.sqrt(math.max(damage, 1) / 25), 0.55, 2.5)
 	local caliberFactor = math.Clamp(math.sqrt(diameter / 9), 0.45, 2.25)
 	local energyFactor = math.Clamp((math.max(kineticEnergy, 1) / 500) ^ 0.22, 0.65, 1.8)
-	local expansionFactor = source.ExpansionMultiplier or settings.ExpansionMultiplier or math.Clamp(0.8 + damageFactor * 0.35 + caliberFactor * 0.2 - penetration / 120, 0.85, 2.1)
+	local penetrationTransfer = math.Clamp(damage / math.max(penetration, 1), 0.03, 1)
+	local expansionFactor = source.ExpansionMultiplier or settings.ExpansionMultiplier or math.Clamp(0.8 + damageFactor * 0.35 + caliberFactor * 0.2 - penetration / 120 + math.max(damage - 35, 0) / 150 * penetrationTransfer, 0.85, 2.8)
 	local permanentRadius = source.PermanentCavityRadius or settings.PermanentCavityRadius or diameter / 50.8 * expansionFactor
+	local expansionTrauma = math.max(permanentRadius * 50.8 / diameter - 1, 0)
 	local temporaryCavity = source.TemporaryCavity or settings.TemporaryCavity or math.Clamp(0.2 + energyFactor * 0.45 + math.Clamp(speed / 900, 0, 1) * 0.45, 0.35, 1.8)
 	local fragmentation = source.BulletFragmentation
 	if fragmentation == nil then fragmentation = settings.BulletFragmentation end
@@ -98,15 +100,16 @@ local function getBallisticProfile(dmgInfo, bullet, damage, penetration)
 		tissueDamage = source.TissueDamage or settings.TissueDamage or math.Clamp(0.45 + damageFactor * 0.3 + caliberFactor * 0.25 + energyFactor * 0.12, 0.65, 2.25),
 		temporaryCavity = temporaryCavity,
 		fragmentation = fragmentation,
-		energyRetention = source.EnergyRetention or settings.EnergyRetention or math.Clamp(0.68 + penetration / 100 - (expansionFactor - 1) * 0.08, 0.55, 0.95),
+		energyRetention = source.EnergyRetention or settings.EnergyRetention or math.Clamp(0.82 + penetration / (penetration + 50) * 0.14 - math.max(expansionFactor - 1, 0) * 0.3, 0.18, 0.97),
+		expansionTrauma = expansionTrauma,
 		permanentCavityRadius = permanentRadius,
 		expansionRadius = source.ExpansionRadius or settings.ExpansionRadius or math.Clamp(permanentRadius * (0.5 + temporaryCavity) + math.max(damage - 35, 0) / 45, 0, 4.5),
-		expansionChance = source.ExpansionChance or settings.ExpansionChance or math.Clamp(0.08 + math.max(damage - 25, 0) / 130 + temporaryCavity * 0.08, 0.08, 0.62),
+		expansionChance = source.ExpansionChance or settings.ExpansionChance or math.Clamp(0.08 + math.max(damage - 25, 0) / 130 + temporaryCavity * 0.08, 0.08, 0.9),
 		nearbyDamageMul = source.NearbyDamageMul or settings.NearbyDamageMul or math.Clamp(0.2 + damageFactor * 0.13 + temporaryCavity * 0.12, 0.25, 0.72),
 		grazeDamageMul = source.GrazeDamageMul or settings.GrazeDamageMul or math.Clamp(0.35 + caliberFactor * 0.16 + damageFactor * 0.08, 0.4, 0.82),
-		woundMultiplier = source.WoundMultiplier or settings.WoundMultiplier or math.Clamp(damageFactor * 0.45 + caliberFactor * 0.35 + energyFactor * 0.2, 0.55, 2.25),
+		woundMultiplier = source.WoundMultiplier or settings.WoundMultiplier or math.Clamp(damageFactor * 0.45 + caliberFactor * 0.35 + energyFactor * 0.2 + expansionTrauma * 0.65, 0.55, 3.5),
 		painMultiplier = source.PainMultiplier or settings.PainMultiplier or math.Clamp(damageFactor * 0.5 + energyFactor * 0.35 + temporaryCavity * 0.15, 0.6, 2.3),
-		destructiveMultiplier = source.DestructiveMultiplier or settings.DestructiveMultiplier or math.Clamp(damageFactor * 0.55 + caliberFactor * 0.3 + energyFactor * 0.15, 0.55, 2.35)
+		destructiveMultiplier = source.DestructiveMultiplier or settings.DestructiveMultiplier or math.Clamp(damageFactor * 0.55 + caliberFactor * 0.3 + energyFactor * 0.15 + expansionTrauma * 0.25, 0.55, 2.5) * penetrationTransfer
 	}
 end
 
@@ -291,9 +294,15 @@ local function getLayerEnergyFraction(name, bone, impact)
 end
 
 local function Trace_Bullet(box, hit, ricochet, impact, org, organs, dmg, dmgInfo, dir, isRifleBullet)
+	local organ = box[8] or (box[6] and organs[box[6]][box[7]])
+	if not organ then return 0 end
+	local name = organ[1]
+	if not name then return 0 end
 	if impact.ballisticVersion then
 		local energyFraction = math.Clamp(impact.energyBefore / impact.initialEnergy, 0, 1)
-		local organDamageMul = impact.tissueDamage * (1 + impact.temporaryCavity * 0.35)
+		local armorContact = string.find(name, "vest", 1, true) or string.find(name, "helmet", 1, true) or string.find(name, "armor", 1, true) or string.find(name, "visor", 1, true)
+		local expansionTrauma = not armorContact and (impact.expansionTrauma or 0) or 0
+		local organDamageMul = impact.tissueDamage * (1 + impact.temporaryCavity * 0.35 + expansionTrauma * 0.5)
 		organDamageMul = organDamageMul * (impact.contactDamageMul or 1)
 		local fragmentation = impact.fragmentation
 		if istable(fragmentation) and not impact.fragmentationOccurred and energyFraction >= (fragmentation.energyThreshold or 0.65) and math.Rand(0, 1) <= (fragmentation.chance or 0) then
@@ -306,10 +315,6 @@ local function Trace_Bullet(box, hit, ricochet, impact, org, organs, dmg, dmgInf
 		dmgInfo:SetDamage(impact.rawDamage * energyFraction * organDamageMul)
 	end
 	dmg = dmgInfo:GetDamage() / 25
-	local organ = box[8] or (box[6] and organs[box[6]][box[7]])
-	if not organ then return 0 end
-	local name = organ[1]
-	if not name then return 0 end
 	if org.superfighter and not (string.find(name,"vest") or string.find(name,"helmet")) then return 0 end
 	if name == "stomach" or name == "intestines" then
 		org.lastGibHitGroup = HITGROUP_STOMACH
@@ -355,7 +360,8 @@ local function Trace_Bullet(box, hit, ricochet, impact, org, organs, dmg, dmgInf
 		if skullBroken then layerCost = 0.2 end
 		local layerEnergyFraction = getLayerEnergyFraction(name, bone, impact)
 		local energyCost = impact.energyBefore * layerEnergyFraction
-		energyCost = math.min(impact.energyBefore, energyCost + impact.energyBefore * (1 - math.Clamp(impact.energyRetention or 0.85, 0.5, 1)) * 0.35)
+		local expansionCost = math.Clamp((impact.expansionTrauma or 0) * 0.22, 0, 0.6)
+		energyCost = math.min(impact.energyBefore, energyCost + impact.energyBefore * ((1 - math.Clamp(impact.energyRetention or 0.85, 0.05, 1)) * 0.35 + expansionCost))
 		if bone > 0 then penetrationCost = penetrationCost + impact.penetrationBefore * layerEnergyFraction * 0.5 end
 		if skullBroken then energyCost = energyCost * (oldSkull >= 1 and 0.15 or 0.4) end
 		local bullet = impact.bullet or {}
@@ -386,7 +392,8 @@ local function Trace_Bullet(box, hit, ricochet, impact, org, organs, dmg, dmgInf
 		end
 		local result = {
 			penetrationCost = penetrationCost + layerCost,
-			energyCost = energyCost
+			energyCost = energyCost,
+			stopped = (impact.expansionTrauma or 0) > 0 and impact.energyBefore - energyCost <= impact.initialEnergy * 0.05
 		}
 		if isBrainLobe and brainDelta > 0 then
 			local energyAfter = math.max(impact.energyBefore - energyCost, 0)
@@ -424,7 +431,11 @@ local function resolveBulletExit(ent, entryPos, travel, impact, reach, naturalEx
 
 	local pathLength = tr.HitPos:Distance(entryPos)
 	local exitCos = travel:Dot(tr.HitNormal)
-	local exitEnergy = impact.energy / impact.initialEnergy * (1 - math.Clamp(pathLength * exitTissueDrag, 0, 0.25))
+	local tissueRetention = math.Clamp(impact.energyRetention or 1, 0.05, 1) ^ (pathLength / 12)
+	local expansionDrag = math.exp(-(impact.expansionTrauma or 0) * pathLength / 18)
+	local exitEnergy = impact.energy / impact.initialEnergy * (1 - math.Clamp(pathLength * exitTissueDrag, 0, 0.25)) * tissueRetention * expansionDrag
+	impact.energy = impact.initialEnergy * exitEnergy
+	impact.energyAfter = impact.energy
 	local reachFactor = math.Clamp((reach - pathLength) / math.max(pathLength * 0.3, 2) + 0.5, 0, 1)
 	local energyFactor = math.Clamp((exitEnergy - 0.05) / 0.15, 0, 1)
 	local angleFactor = math.Clamp((exitCos - 0.08) * 1.9, 0, 1)
@@ -1115,7 +1126,7 @@ local function placeWoundDecal(ent, pos, normal, woundType)
 	util.Decal(woundDecals[woundType] or woundDecals.trauma, pos + normal * 2, pos - normal * 2)
 end
 
-function hg.organism.AddWound(ent, tr, bone, dmgInfo, dmgPos, dmgBlood, inputHole, outputHole)
+function hg.organism.AddWound(ent, tr, bone, dmgInfo, dmgPos, dmgBlood, inputHole, outputHole, impact)
 	local org = ent.organism
 	if org.superfighter then return end
 	local traceNormal = isvector(tr.Normal) and tr.Normal:GetNormalized() or nil
@@ -1157,7 +1168,8 @@ function hg.organism.AddWound(ent, tr, bone, dmgInfo, dmgPos, dmgBlood, inputHol
 
 			local localPos, localAng, woundBone = hg.organism.GetWoundAnchor(ent, dmgPos + ((i == 1 and 1 or -1) * hitNormal), ((i == 1 and -1 or 1) * traceNormal):Angle(), bone)
 			if not localPos then continue end
-			addOrReopenWound(org, dmgBlood / 2, localPos, localAng, woundBone, CurTime(), woundType)
+			local exitBleedMul = i == 2 and impact and 1 + math.min(impact.expansionTrauma or 0, 3) * 0.75 or 1
+			addOrReopenWound(org, dmgBlood / 2 * exitBleedMul, localPos, localAng, woundBone, CurTime(), woundType)
 			placeWoundDecal(ent, dmgPos, i == 1 and hitNormal or -hitNormal, woundType)
 			
 			table.sort(org.wounds, function(a, b) return a[1] > b[1] end)
@@ -1696,6 +1708,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		temporaryCavity = ballisticProfile and ballisticProfile.temporaryCavity or 0.5,
 		fragmentation = ballisticProfile and ballisticProfile.fragmentation or false,
 		energyRetention = ballisticProfile and ballisticProfile.energyRetention or 0.85,
+		expansionTrauma = ballisticProfile and ballisticProfile.expansionTrauma or 0,
 		permanentCavityRadius = ballisticProfile and ballisticProfile.permanentCavityRadius or 0,
 		expansionRadius = ballisticProfile and ballisticProfile.expansionRadius or 0,
 		expansionChance = ballisticProfile and ballisticProfile.expansionChance or 0,
@@ -1804,7 +1817,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 			end*/
 			
 			if bullet and true then
-				local mul = math.Clamp(impact.energy / impact.initialEnergy, 0, 1) * impact.energyRetention
+					local mul = math.Clamp(impact.energy / impact.initialEnergy, 0, 1)
 				local newBullet = table.Copy(bullet)
 				newBullet.Src = outputHole[#outputHole]
 				newBullet.Dir = exitDirection
@@ -1815,19 +1828,26 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 				newBullet.Tracer = 0
 				newBullet.TracerName = "nil"
 				newBullet.IgnoreEntity = ent
-				newBullet.Filter = {ent, ply and ply:InVehicle() and ply:GetVehicle() or nil}
+					newBullet.Filter = {ent, ply and ply:InVehicle() and ply:GetVehicle() or nil}
+					newBullet.TraceFilter = newBullet.Filter
+					newBullet.Pos = newBullet.Src
+					newBullet.Key = nil
+					newBullet.Spread = vector_origin
 				newBullet.penetrated = (newBullet.penetrated or 0) + 1
 				newBullet.limit_ricochet = (newBullet.limit_ricochet or 0) + 1
 				newBullet.Penetration = distance * impact.energyRetention
 				local woundRetention = math.sqrt(math.max(mul, 0))
-				newBullet.ImpactSpeed = math.max(newBullet.ImpactSpeed or newBullet.Speed or 0, 0) * woundRetention
+					newBullet.ImpactSpeed = math.max(newBullet.ImpactSpeed or newBullet.Speed or 0, 0) * woundRetention
+					newBullet.Speed = newBullet.ImpactSpeed
+					newBullet.Vel = exitDirection * newBullet.Speed * 52.5
+					newBullet.StartLen = newBullet.Vel:Length()
 				newBullet.KineticEnergy = math.max(newBullet.KineticEnergy or 0, 0) * mul
 				newBullet.TemporaryCavity = math.max(newBullet.TemporaryCavity or 0, 0) * woundRetention
 				newBullet.ExpansionRadius = math.max(newBullet.ExpansionRadius or 0, 0) * woundRetention
 				newBullet.ExpansionChance = math.Clamp((newBullet.ExpansionChance or 0) * woundRetention, 0, 1)
 				newBullet.WoundMultiplier = math.max((newBullet.WoundMultiplier or 1) * woundRetention, 0.35)
 				newBullet.PainMultiplier = math.max((newBullet.PainMultiplier or 1) * woundRetention, 0.35)
-				newBullet.DestructiveMultiplier = math.max((newBullet.DestructiveMultiplier or 1) * woundRetention, 0.35)
+					newBullet.DestructiveMultiplier = math.max((newBullet.DestructiveMultiplier or 1) * woundRetention, 0)
 				inf:FireLuaBullets(newBullet, true)
 
 				local tr = util.QuickTrace(outputHole[#outputHole], -outputDir:GetNormalized() * 10, ent)
@@ -2096,7 +2116,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		hook_Run("PreHomigradDamageBulletBleedAdd", org.fakePlayer and ent or ply, org, dmgInfo, hitgroup, attacker.harm, hitBoxs, inputHole, hook_info)
 		
 		if(!hook_info.restricted)then
-			hg.organism.AddWound(ent, tr, bone, dmgInfo, dmgPos, hook_info.bleed, inputHole, outputHole)
+			hg.organism.AddWound(ent, tr, bone, dmgInfo, dmgPos, hook_info.bleed, inputHole, outputHole, impact)
 		end
 	end
 	
@@ -2158,7 +2178,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	if hitgroup == HITGROUP_HEAD and dmgInfo:IsDamageType(DMG_SLASH) then damageStack = damageStack * 25 end
 	local inflictorClass = IsValid(dmgInfo:GetInflictor()) and dmgInfo:GetInflictor():GetClass() or ""
 	local grenadeBlastMul = string.find(inflictorClass, "ent_hg_grenade") and 1.8 or 1
-	damageStack = damageStack * (dmgInfo:IsDamageType(DMG_BLAST) and blast_gib_damage_mul / lend * grenadeBlastMul or 1) * (!dmgInfo:IsDamageType(DMG_CLUB+DMG_SLASH+DMG_BULLET+DMG_BUCKSHOT+DMG_BLAST+DMG_SNIPER+DMG_GENERIC+DMG_CRUSH+DMG_FALL+DMG_VEHICLE) and 0 or 1) * (ent:IsNPC() and 3 or 1)
+	damageStack = damageStack * (dmgInfo:IsDamageType(DMG_BLAST) and blast_gib_damage_mul / lend * grenadeBlastMul or 1) * (!dmgInfo:IsDamageType(DMG_CLUB+DMG_SLASH+DMG_BULLET+DMG_BUCKSHOT+DMG_BLAST+DMG_SNIPER+DMG_GENERIC+DMG_CRUSH+DMG_FALL+DMG_VEHICLE) and 0 or 1) * (ent:IsNPC() and not isBallistic and 3 or 1)
 	if impact.armorStopped then damageStack = 0 end
 	if isBallistic then
 		damageStack = damageStack * impact.destructiveMultiplier
@@ -2177,7 +2197,6 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	org.dmgstack = org.dmgstack or {}
 	org.dmgstack[hitgroup] = org.dmgstack[hitgroup] or {}
 	local bodyPartMaxHealth = body_part_health[hitgroup]
-	if bodyPartMaxHealth and (hitgrouptolimb[hitgroup] or hitgroup == HITGROUP_HEAD) and not org.isPly then bodyPartMaxHealth = 100 end
 	local gibStack
 	local headGoreStack
 	if bodyPartMaxHealth then
@@ -2192,8 +2211,8 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	end
 	org.dmgstack[hitgroup][1] = headGoreStack or gibStack
 	if hitgroup == HITGROUP_HEAD and ent.headexploded and Gib_UpdateHeadGoreStage then Gib_UpdateHeadGoreStage(ent, headGoreStack or gibStack) end
-	local hitgroup_max = 100
-	if org.isPly then
+	local hitgroup_max = bodyPartMaxHealth or 100
+	if org.isPly or isBallistic then
 		hitgroup_max = hitgroup == HITGROUP_HEAD and (isBuckshot and player_buckshot_head_gib_threshold or player_head_gib_threshold) or hitgrouptolimb[hitgroup] and player_limb_gib_threshold or hitgroup == HITGROUP_STOMACH and player_stomach_gib_threshold or hitgroup_max
 	end
 	if dmgInfo:IsDamageType(DMG_BLAST) and hitgrouptolimb[hitgroup] then hitgroup_max = player_blast_limb_gib_threshold end

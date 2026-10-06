@@ -253,7 +253,7 @@ local function segmentDislocationKey(key, segment)
 end
 
 local function refreshLimbAggregate(org, key)
-	local worst = math.max(tonumber(org[segmentHealthKey(key, "up")]) or 0, tonumber(org[segmentHealthKey(key, "down")]) or 0)
+	local worst = math.max(tonumber(org[segmentHealthKey(key, "up")]) or 0, (tonumber(org[segmentHealthKey(key, "down")]) or 0) * 0.75)
 	org[key] = worst
 	org[key .. "_agg"] = worst
 end
@@ -263,8 +263,7 @@ function hg.organism.SyncLimbSegments(org, key)
 	local aggregate = tonumber(org[key]) or 0
 	local last = org[key .. "_agg"]
 	if last == nil then
-		org[up] = tonumber(org[up]) or 0
-		org[down] = tonumber(org[down]) or aggregate
+		org[up], org[down] = hg.GetLimbSegmentDamage(org, key)
 	elseif math.abs(aggregate - last) > 0.00001 then
 		if aggregate <= 0 then
 			org[up], org[down] = 0, 0
@@ -272,18 +271,38 @@ function hg.organism.SyncLimbSegments(org, key)
 			local scale = aggregate / last
 			org[up], org[down] = (org[up] or 0) * scale, (org[down] or 0) * scale
 		else
-			local target = (org[up] or 0) > (org[down] or 0) and up or down
-			org[target] = math.min(aggregate, 1)
+			local target = (aggregate > 0.75 or (org[up] or 0) > (org[down] or 0) * 0.75) and up or down
+			org[target] = math.min(aggregate / (target == down and 0.75 or 1), 1)
 		end
 	end
 	refreshLimbAggregate(org, key)
 
 	local upFlag, downFlag = segmentDislocationKey(key, "up"), segmentDislocationKey(key, "down")
-	if org[key .. "dislocation"] then
-		if not org[upFlag] and not org[downFlag] then org[upFlag] = true end
-	else
-		org[upFlag], org[downFlag] = false, false
+	local dislocated = org[key .. "dislocation"] == true
+	local lastDislocated = org[key .. "_disl_agg"]
+	if lastDislocated ~= nil and dislocated ~= lastDislocated then
+		if dislocated then
+			if not org[upFlag] and not org[downFlag] then org[upFlag] = true end
+		else
+			org[upFlag], org[downFlag] = false, false
+		end
+	elseif lastDislocated == nil and dislocated and not org[upFlag] and not org[downFlag] then
+		org[upFlag] = true
 	end
+	org[key .. "dislocation"] = (org[upFlag] or org[downFlag]) and true or false
+	org[key .. "_disl_agg"] = org[key .. "dislocation"]
+end
+
+function hg.organism.HealLimbSegments(org, key, amount, healFractures)
+	hg.organism.SyncLimbSegments(org, key)
+	if org[key .. "upamputated"] then return end
+	for _, segment in ipairs(limbSegments) do
+		local healthKey = segmentHealthKey(key, segment)
+		if (segment == "up" or not org[key .. "amputated"]) and (org[healthKey] < 1 or healFractures) then
+			org[healthKey] = math.max(org[healthKey] - amount, 0)
+		end
+	end
+	refreshLimbAggregate(org, key)
 end
 
 function hg.organism.ClearLimbDislocation(org, key)
@@ -321,7 +340,7 @@ hook.Add("Org Think", "homigrad_limb_segments", function(owner, org)
 end)
 
 function hg.organism.CantHoldWeapon(org)
-	local function unusable(key) return org[key] == 1 or hg.organism.IsLimbCompoundFractured(org, key) end
+	local function unusable(key) return hg.IsLimbFractured(org, key) or hg.IsLimbIncapacitated(org, key) end
 	return unusable("larm") and unusable("rarm")
 end
 
@@ -1259,7 +1278,8 @@ hook.Add("Org Think", "homigrad_bone_stabilization", function(owner, org, timeVa
 	}) do
 		local key = info.key
 		local stabilized = org[key .. "stabilized"]
-		local broke = (org[key] or 0) >= 0.95 or org[key .. "dislocation"]
+		hg.organism.SyncLimbSegments(org, key)
+		local broke = hg.IsLimbFractured(org, key) or org[key .. "dislocation"]
 
 		if not stabilized or not broke then
 			org._zsh_stab_prev[key] = false
