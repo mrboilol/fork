@@ -45,6 +45,7 @@ local STANDING_REACH_FRACTION = 0.995
 local UPRIGHT_REACH_FRACTION = 0.99
 local MAX_UPRIGHT_RISE = 6
 local UPRIGHT_SMOOTH = 6
+local UPRIGHT_FALL_SMOOTH = 20
 local LEAD_REACH_FRACTION = 0.92
 local STRIDE_REACH_FRACTION = 0.9
 local MAX_STRIDE_DROP = 7
@@ -58,6 +59,8 @@ local PHASE_CORRECTION = 8
 local GAIT_STALE_TIME = 0.3
 local DRIFT_STEP_FRACTION = 0.5
 local DROP_SMOOTH = 10
+local DROP_FAST_SMOOTH = 20
+local VELOCITY_SMOOTH = 10
 local TOE_HEIGHT = 1
 local MAX_TOE_DROP = 0.9
 local MIN_ANKLE_HEIGHT = 1.5
@@ -101,7 +104,7 @@ local LAND_MIN_SPEED = 220
 local LAND_MAX_SPEED = 900
 local LAND_GAIN = 0.09
 local FOOT_POSE_SMOOTH = 32
-local FOOT_SNAP_DIST_SQR = 48 * 48
+local FOOT_MAX_LAG = 3
 local SPINE_BONE= "ValveBiped.Bip01_Spine"
 local DEBUG_BOX = Vector(1.5, 1.5, 1.5)
 local DEBUG_PLANTED = Color(60, 255, 60)
@@ -294,6 +297,7 @@ local function startStep(state, index, duration, allowOverlap)
 	foot.startNormal = foot.normal
 	foot.startYaw = foot.toeYaw
 	foot.target = nil
+	foot.tracedPos = nil
 end
 
 local function beginStaggerStep(state, stagger, index, dist, final)
@@ -361,16 +365,14 @@ local function updateSwing(ply, state, ctx, index, dt)
 	foot.t = math_min(foot.t + dt / foot.duration, 1)
 
 	local desired = clampToWalls(state, ctx.origin, landingTarget(ply, state, ctx, foot, index))
-	if not foot.target or foot.tracedAt:DistToSqr(desired) > RETRACE_DIST_SQR then
-		local pos, normal, groundEnt = traceSupport(state, ctx.origin, desired)
+	if not foot.tracedPos or foot.tracedAt:DistToSqr(desired) > RETRACE_DIST_SQR then
+		foot.tracedPos, foot.targetNormal, foot.targetEnt = traceSupport(state, ctx.origin, desired)
 		foot.tracedAt = desired
-		foot.target = foot.target and LerpVector(math_min(dt * TARGET_SMOOTH, 1), foot.target, pos) or pos
-		foot.targetNormal = normal
-		foot.targetEnt = groundEnt
 	end
+	foot.target = foot.target and LerpVector(math_min(dt * TARGET_SMOOTH, 1), foot.target, foot.tracedPos) or Vector(foot.tracedPos)
 
 	if foot.t >= 1 then
-		plantFoot(state, foot, foot.target, foot.targetNormal, foot.targetEnt, ctx.bodyYaw)
+		plantFoot(state, foot, foot.tracedPos, foot.targetNormal, foot.targetEnt, ctx.bodyYaw)
 		foot.ground = foot.planted
 		foot.groundNormal = foot.normal
 
@@ -461,6 +463,10 @@ local function releaseFeet(state, ctx)
 	end
 end
 
+local function pelvisOffsetOf(ply, state)
+	return ((state.rise or 0) + state.hop - state.drop - (ply.hg_Body and ply.hg_Body.drop or 0)) * state.weight
+end
+
 local function updateFeet(ply, state, ctx, dt)
 	updatePhase(ply, state, ctx, dt)
 	if not ctx.onGround then
@@ -486,9 +492,9 @@ local function updateFeet(ply, state, ctx, dt)
 			local reachFraction = ctx.crouching and REACH_FRACTION or STANDING_REACH_FRACTION
 			local reach = ctx.anim[index].length * reachFraction
 			local settledInPlace = foot.plantOrigin and (ctx.origin - foot.plantOrigin):Length2DSqr() < OVERREACH_RESTEP_MOVE_SQR
-			local overreach = not planted or (not settledInPlace and (planted + vector_up * state.ankleHeight):DistToSqr(ctx.anim[index].hip - vector_up * state.drop) > reach * reach)
+			local overreach = not planted or (not settledInPlace and (planted + vector_up * state.ankleHeight):DistToSqr(ctx.anim[index].hip + vector_up * pelvisOffsetOf(ply, state)) > reach * reach)
 			if overreach then
-				startStep(state, index, SETTLE_SWING_TIME, false)
+				startStep(state, index, SETTLE_SWING_TIME, ctx.speed > MOVING_SPEED)
 			elseif ctx.speed > MOVING_SPEED and not foot.stagger then
 				local rest = ctx.origin + ctx.right * (LEGS[index].sign * ctx.halfWidth)
 				local behind = (rest - planted):Dot(ctx.moveDir)
@@ -549,7 +555,7 @@ local function updateDrop(state, ctx, dt)
 	stride = math_min(stride, ctx.maxStrideDrop) * STRIDE_BODY_SCALE
 	local targetDrop = math_max(terrainDrop * DROP_TERRAIN_SCALE, stride) + (ctx.stagger and ctx.stagger.amount * STAGGER_DROP or 0)
 	targetDrop = math_Clamp(targetDrop, 0, maxDrop)
-	state.drop = state.drop + (targetDrop - state.drop) * (1 - math_exp(-dt * DROP_SMOOTH))
+	state.drop = state.drop + (targetDrop - state.drop) * (1 - math_exp(-dt * (targetDrop > state.drop and DROP_FAST_SMOOTH or DROP_SMOOTH)))
 end
 
 local function gaitBob(state, ctx)
@@ -582,7 +588,8 @@ local function updateUpright(state, ctx, dt)
 		targetRise = targetRise * (1 - (ctx.stagger and ctx.stagger.amount or 0))
 	end
 	local rise = state.rise or 0
-	state.rise = rise + ((targetRise or 0) - rise) * (1 - math_exp(-dt * UPRIGHT_SMOOTH))
+	targetRise = targetRise or 0
+	state.rise = rise + (targetRise - rise) * (1 - math_exp(-dt * (targetRise < rise and UPRIGHT_FALL_SMOOTH or UPRIGHT_SMOOTH)))
 end
 
 local function readAnim(ent, ply, bones)
@@ -625,6 +632,10 @@ local function buildContext(ply, state, anim, dt)
 	local origin = ply:GetPos()
 	local vel = ply:GetVelocity()
 	vel.z = 0
+	if CLIENT and ply ~= LocalPlayer() then
+		state.vel = state.vel and LerpVector(math_min(dt * VELOCITY_SMOOTH, 1), state.vel, vel) or vel
+		vel = Vector(state.vel)
+	end
 	local speed = vel:Length()
 	local speedFraction = math_Clamp(speed / math_max(ply:GetRunSpeed(), 1), 0, 1)
 	local bodyYaw = (SERVER and ply:GetAngles() or ply:GetRenderAngles()).y
@@ -764,15 +775,14 @@ local function solveLeg(ent, ids, foot, ankleTarget, weight, ctx, state, alignWe
 end
 
 local function applyPelvis(ent, ply, state, bones)
-	local weight = state.weight
-	local pelvisOffset = ((state.rise or 0) + state.hop - state.drop - (ply.hg_Body and ply.hg_Body.drop or 0)) * weight
+	local pelvisOffset = pelvisOffsetOf(ply, state)
 	if SERVER then
 		local networkOffset = math.Round(pelvisOffset, 2)
 		if ply.hg_IKPelvisOffset ~= networkOffset then
 			ply.hg_IKPelvisOffset = networkOffset
 			ply:SetNWFloat("HGIKPelvisOffset", networkOffset)
 		end
-	else
+	elseif state ~= ply.hg_FootIK then
 		pelvisOffset = ply:GetNWFloat("HGIKPelvisOffset", pelvisOffset)
 	end
 	local pelvisMat = ent:GetBoneMatrix(bones.pelvis)
@@ -800,10 +810,13 @@ local function applyPose(ent, ply, state, bones, ctx)
 		if ctx.anim[index].usable and foot.ground then
 			local normal = foot.groundNormal or vector_up
 			local ground = foot.ground
-			if foot.smoothGround and weight > 0 and foot.smoothGround:DistToSqr(ground) < FOOT_SNAP_DIST_SQR then
+			if foot.smoothGround and weight > 0 then
 				if foot.smoothFrame ~= FrameNumber() then
 					foot.smoothFrame = FrameNumber()
-					foot.smoothGround = LerpVector(1 - math_exp(-FOOT_POSE_SMOOTH * math_Clamp(FrameTime(), 0, 0.1)), foot.smoothGround, ground)
+					local lag = LerpVector(1 - math_exp(-FOOT_POSE_SMOOTH * math_Clamp(FrameTime(), 0, 0.1)), foot.smoothGround, ground) - ground
+					local lagLength = lag:Length()
+					if lagLength > FOOT_MAX_LAG then lag:Mul(FOOT_MAX_LAG / lagLength) end
+					foot.smoothGround = ground + lag
 				end
 			else
 				foot.smoothGround = Vector(ground)

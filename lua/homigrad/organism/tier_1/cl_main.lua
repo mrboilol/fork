@@ -415,6 +415,7 @@ hook.Remove("radialOptions", "DislocatedJaw")
 
 hg.MEMORY_BRAIN_THRESHOLD = 0.01
 local blackoutLerp = 0
+local otrubFadeLerp = 0
 local pendingMemoryCapture = false
 local lastMemoryCapture = 0
 
@@ -458,13 +459,13 @@ hook.Add("PostRender", "screenshot_think", function()
 	if org.otrub then return end
 
 	local part = CurTime() - alivestart
-	if part % 60 > 59 and (screened != math.Round(part / 60, 0)) then
-		screened = math.Round(part / 60, 0)
+	if part % 20 > 19 and (screened != math.Round(part / 20, 0)) then
+		screened = math.Round(part / 20, 0)
 		SaveMemoryScreen("")
 	end
 end)
 
-local braindeathstart = CurTime() + 20
+local braindeathstart = CurTime() + 4
 local lerpedpart = 0
 local lerpedbrain = 0
 
@@ -509,6 +510,7 @@ local wasMemoryOtrub = false
 hook.Add("Post Post Processing", "organism-otrub-overlay", function()
 	if not IsValid(lply) or not lply:Alive() then
 		blackoutLerp = 0
+		otrubFadeLerp = 0
 		wasMemoryDamaged = false
 		wasMemoryOtrub = false
 		return
@@ -534,12 +536,18 @@ hook.Add("Post Post Processing", "organism-otrub-overlay", function()
 		surface.DrawRect(-1, -1, ScrW() + 2, ScrH() + 2)
 	end
 
+	otrubFadeLerp = LerpFT(0.04, otrubFadeLerp, otrub and 1 or 0)
+	if otrubFadeLerp > 0.01 and blackoutLerp < 1 then
+		surface.SetDrawColor(0, 0, 0, otrubFadeLerp * 250)
+		surface.DrawRect(-1, -1, ScrW() + 2, ScrH() + 2)
+	end
+
 	DrawSeizureMemory(org)
 
-	if otrub and damaged then
+	if otrub then
 		lerpedbrain = LerpFT(0.05, lerpedbrain, brain)
 		local part = CurTime() - braindeathstart
-		local time = 40 - math.max(lerpedbrain - 0.1, 0) * 20
+		local time = 12 - math.min(math.max(lerpedbrain - 0.1, 0) * 8, 6)
 		if part % time > time / 3 and curscreen <= #screens and screens[curscreen] and !screens[curscreen]:IsError() then
 			switch = true
 			local part2 = math.ease.InOutSine(math.sin(((part % time) - time / 3) / (time / 3 * 2) * math.pi))
@@ -555,16 +563,18 @@ hook.Add("Post Post Processing", "organism-otrub-overlay", function()
 			switch = false
 		end
 	else
-		braindeathstart = CurTime() - 14
-	end
-
-	local _, deathStateEnd = GetLocalDeathState()
-	if deathStateEnd then
-		local remaining = math.max(deathStateEnd - CurTime(), 0)
-		remDeathStateColor.a = math.Clamp((INCAPACITATION_DEATH_TIME - remaining) / 2, 0, 1) * 255
-		draw.SimpleText("You are incapacitated, You will die in " .. math.ceil(remaining), "RemDeathStateFont", ScrW() / 2, ScrH() * 0.62, remDeathStateColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		braindeathstart = CurTime() - 4
 	end
 end)
+
+function hg.DrawIncapacitatedText()
+	local _, deathStateEnd = GetLocalDeathState()
+	if not deathStateEnd then return end
+
+	local remaining = math.max(deathStateEnd - CurTime(), 0)
+	remDeathStateColor.a = math.Clamp((INCAPACITATION_DEATH_TIME - remaining) / 2, 0, 1) * 255
+	draw.SimpleText("You are incapacitated, You will die in " .. math.ceil(remaining), "RemDeathStateFont", ScrW() / 2, ScrH() * 0.62, remDeathStateColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+end
 
 hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 	local spect = IsValid(lply:GetNWEntity("spect")) and lply:GetNWEntity("spect")
