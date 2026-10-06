@@ -100,7 +100,9 @@ local LAND_MAX_DROP = 9
 local LAND_MIN_SPEED = 220
 local LAND_MAX_SPEED = 900
 local LAND_GAIN = 0.09
-local SPINE_BONE = "ValveBiped.Bip01_Spine"
+local FOOT_POSE_SMOOTH = 32
+local FOOT_SNAP_DIST_SQR = 48 * 48
+local SPINE_BONE= "ValveBiped.Bip01_Spine"
 local DEBUG_BOX = Vector(1.5, 1.5, 1.5)
 local DEBUG_PLANTED = Color(60, 255, 60)
 local DEBUG_SWING = Color(255, 200, 60)
@@ -797,7 +799,17 @@ local function applyPose(ent, ply, state, bones, ctx)
 		local foot = state.feet[index]
 		if ctx.anim[index].usable and foot.ground then
 			local normal = foot.groundNormal or vector_up
-			local ankleTarget = foot.ground + normal * state.ankleHeight
+			local ground = foot.ground
+			if foot.smoothGround and weight > 0 and foot.smoothGround:DistToSqr(ground) < FOOT_SNAP_DIST_SQR then
+				if foot.smoothFrame ~= FrameNumber() then
+					foot.smoothFrame = FrameNumber()
+					foot.smoothGround = LerpVector(1 - math_exp(-FOOT_POSE_SMOOTH * math_Clamp(FrameTime(), 0, 0.1)), foot.smoothGround, ground)
+				end
+			else
+				foot.smoothGround = Vector(ground)
+				foot.smoothFrame = FrameNumber()
+			end
+			local ankleTarget = foot.smoothGround + normal * state.ankleHeight
 			local limb = index == 1 and "lleg" or "rleg"
 			local upperPower = hg.GetLimbEffectiveness(ply.organism, limb, "up")
 			local lowerPower = hg.GetLimbEffectiveness(ply.organism, limb, "down")

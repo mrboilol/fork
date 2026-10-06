@@ -920,15 +920,13 @@ local function weakenArmIK(ply, org, limb, segments, length)
 		ply.hgInjuryIKOffsets[limb] = nil
 		return
 	end
-	segments[2].Pos = segments[2].Pos - vector_up * length * (1 - upperPower)
-	local target = segments[3].Pos - segments[1].Pos - vector_up * length * (1 - lowerPower) * 0.7
-	local response = 1 - math.exp(-FrameTime() * game.GetTimeScale() * Lerp(lowerPower, 4, 35))
+	local droop = math.min(length * (1 - upperPower), length * 0.35)
+	local target = -vector_up * droop
+	local response = 1 - math.exp(-FrameTime() * game.GetTimeScale() * 8)
 	local previous = ply.hgInjuryIKOffsets[limb] or target
 	local offset = LerpVector(response, previous, target)
-	local maxReach = length * 1.85
-	if offset:LengthSqr() > maxReach * maxReach then offset = offset:GetNormalized() * maxReach end
 	ply.hgInjuryIKOffsets[limb] = offset
-	segments[3].Pos = segments[1].Pos + offset
+	segments[2].Pos = segments[2].Pos + offset
 	return true
 end
 

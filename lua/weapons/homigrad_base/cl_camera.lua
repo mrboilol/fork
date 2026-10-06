@@ -264,7 +264,7 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	end
 	local shakeMul = (larmShake
 		+ rarmShake
-		+ ((handling - 1) * 0.2)
+		+ ((handling - 1) * 0.5)
 		+ (support.oneHanded and not self.IgnoreOneArmPenalties and 0.08 or 0)) / 4
 
 	local addview = AngleRand(-shakeMul - 0.02, shakeMul + 0.02) * ((organism.holdingbreath and 0.1 + (((rarm > 0.1 and (rarm - 0.1)) or 0)) / 4) or 1)
