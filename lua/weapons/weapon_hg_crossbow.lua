@@ -99,10 +99,6 @@ SWEP.scopedef = true
 SWEP.scopeEyeBoxFree = true
 SWEP.AimInSpeed = 3
 
-function SWEP:GetAimAlignmentTime()
-	return 0.3
-end
-
 SWEP.mat = Material("effects/arc9/rt")
 SWEP.scopemat = Material("decals/scope.png")
 SWEP.perekrestie = Material("vgui/arc9_eft_shared/reticles/scope_30mm_march_tactical_3-24x42_marks.png")

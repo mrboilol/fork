@@ -330,7 +330,19 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	angle_spray[1] = math.Rand(-self.sprayAngles[3], self.sprayAngles[3]) * 12 * game.GetTimeScale() * 0.7
 	angle_spray[2] = math.Rand(-self.sprayAngles[3], self.sprayAngles[3]) * 12 * game.GetTimeScale() * 0.7
 	outputAng:Add(angle_spray)
-	
+
+	if self.scopeEyeBoxFree and k > 0 and self.localScopePos then
+		local scopeBasePos, scopeBaseAng = self:GetTrace(true, nil, nil, true)
+		if scopeBasePos and scopeBaseAng then
+			local scopeOffset = Vector(self.localScopePos)
+			scopeOffset:Rotate(scopeBaseAng)
+			local toScope = scopeBasePos + scopeOffset - outputPos
+			if toScope:LengthSqr() > 4 then
+				outputAng = LerpAngle(k, outputAng, toScope:Angle())
+			end
+		end
+	end
+
 	local imm = (organism and organism.immobilization) or 0
 	if type(imm) ~= "number" then imm = 0 end
 	local adr = (organism and organism.adrenaline) or 0
