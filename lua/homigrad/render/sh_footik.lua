@@ -45,7 +45,6 @@ local STANDING_REACH_FRACTION = 0.995
 local UPRIGHT_REACH_FRACTION = 0.99
 local MAX_UPRIGHT_RISE = 6
 local UPRIGHT_SMOOTH = 6
-local UPRIGHT_FALL_SMOOTH = 20
 local LEAD_REACH_FRACTION = 0.92
 local STRIDE_REACH_FRACTION = 0.9
 local MAX_STRIDE_DROP = 7
@@ -59,7 +58,6 @@ local PHASE_CORRECTION = 8
 local GAIT_STALE_TIME = 0.3
 local DRIFT_STEP_FRACTION = 0.5
 local DROP_SMOOTH = 10
-local DROP_FAST_SMOOTH = 20
 local VELOCITY_SMOOTH = 10
 local TOE_HEIGHT = 1
 local MAX_TOE_DROP = 0.9
@@ -492,9 +490,9 @@ local function updateFeet(ply, state, ctx, dt)
 			local reachFraction = ctx.crouching and REACH_FRACTION or STANDING_REACH_FRACTION
 			local reach = ctx.anim[index].length * reachFraction
 			local settledInPlace = foot.plantOrigin and (ctx.origin - foot.plantOrigin):Length2DSqr() < OVERREACH_RESTEP_MOVE_SQR
-			local overreach = not planted or (not settledInPlace and (planted + vector_up * state.ankleHeight):DistToSqr(ctx.anim[index].hip + vector_up * pelvisOffsetOf(ply, state)) > reach * reach)
+			local overreach = not planted or (not settledInPlace and (planted + vector_up * state.ankleHeight):DistToSqr(ctx.anim[index].hip - vector_up * state.drop) > reach * reach)
 			if overreach then
-				startStep(state, index, SETTLE_SWING_TIME, ctx.speed > MOVING_SPEED)
+				startStep(state, index, SETTLE_SWING_TIME, false)
 			elseif ctx.speed > MOVING_SPEED and not foot.stagger then
 				local rest = ctx.origin + ctx.right * (LEGS[index].sign * ctx.halfWidth)
 				local behind = (rest - planted):Dot(ctx.moveDir)
@@ -555,7 +553,7 @@ local function updateDrop(state, ctx, dt)
 	stride = math_min(stride, ctx.maxStrideDrop) * STRIDE_BODY_SCALE
 	local targetDrop = math_max(terrainDrop * DROP_TERRAIN_SCALE, stride) + (ctx.stagger and ctx.stagger.amount * STAGGER_DROP or 0)
 	targetDrop = math_Clamp(targetDrop, 0, maxDrop)
-	state.drop = state.drop + (targetDrop - state.drop) * (1 - math_exp(-dt * (targetDrop > state.drop and DROP_FAST_SMOOTH or DROP_SMOOTH)))
+	state.drop = state.drop + (targetDrop - state.drop) * (1 - math_exp(-dt * DROP_SMOOTH))
 end
 
 local function gaitBob(state, ctx)
@@ -589,7 +587,7 @@ local function updateUpright(state, ctx, dt)
 	end
 	local rise = state.rise or 0
 	targetRise = targetRise or 0
-	state.rise = rise + (targetRise - rise) * (1 - math_exp(-dt * (targetRise < rise and UPRIGHT_FALL_SMOOTH or UPRIGHT_SMOOTH)))
+	state.rise = rise + (targetRise - rise) * (1 - math_exp(-dt * UPRIGHT_SMOOTH))
 end
 
 local function readAnim(ent, ply, bones)

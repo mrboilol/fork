@@ -1111,7 +1111,7 @@ end
 
 function SWEP:DrawWorldModel()
 	local owner = self:GetOwner()
-	if IsValid(owner) and owner:IsNPC() then
+	if IsValid(owner) and owner:IsNPC() and not IsValid(owner.FakeRagdoll) then
 		DrawWorldModel(self)
 		//self:DrawModel()
 	end

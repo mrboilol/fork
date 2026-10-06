@@ -159,24 +159,28 @@ local function DrawOnBody(wep, rag)
 	copy:DrawModel()
 end
 
--- Only the ones that need it, and only while they need it. Drawn after the body
--- rather than as part of it, because a weapon is not part of a body: it has its own
--- model, its own materials and its own place in the render list.
-hook.Add("PostDrawOpaqueRenderables", "zcnpc_weapon", function(_, skybox)
-	if skybox then return end
+hook.Add("PostDrawAppearance", "zcnpc_weapon", function(rag)
+	if not (IsValid(rag) and rag.zcnpc_npcbody) then return end
 
-	for npc, rag in pairs(ZCNPC.Bodies) do
-		if not (IsValid(npc) and IsValid(rag)) then continue end
-		if rag:IsDormant() then continue end
+	for npc, body in pairs(ZCNPC.Bodies) do
+		if body ~= rag then continue end
+		if not IsValid(npc) then return end
 
 		local wep = npc.GetActiveWeapon and npc:GetActiveWeapon()
-		if not IsValid(wep) or Scripted(wep) then continue end
+		if not IsValid(wep) or wep:GetNoDraw() then return end
 
-		-- the server shows the weapon exactly while the body is still holding on
-		-- to it (ZCNPC.UpdateWeaponHold), so its own visibility is the answer
-		if wep:GetNoDraw() then continue end
+		if not Scripted(wep) then
+			DrawOnBody(wep, rag)
+		elseif wep.ishgweapon and hg.RenderWeapons then
+			local notSeen, transmit = npc.NotSeen, npc.shouldTransmit
+			npc.NotSeen, npc.shouldTransmit = false, true
 
-		DrawOnBody(wep, rag)
+			hg.RenderWeapons(rag, npc)
+
+			npc.NotSeen, npc.shouldTransmit = notSeen, transmit
+		end
+
+		return
 	end
 end)
 

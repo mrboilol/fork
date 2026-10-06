@@ -78,11 +78,23 @@ if SERVER then
     end
 
     function ENT:PhysicsCollide2(data, physobj)
-        if self.Exploded then return true end
+        if self.Exploded or self.HGImpactQueued then return true end
+        self.HGImpactQueued = true
 
         local hitPos    = data.HitPos
         local hitNormal = data.HitNormal
         local hitEntity = data.HitEntity
+
+        timer.Simple(0, function()
+            if not IsValid(self) then return end
+            self.HGImpactQueued = nil
+            if not self.Exploded then self:HandleImpact(hitPos, hitNormal, hitEntity, self:GetPhysicsObject()) end
+        end)
+
+        return true
+    end
+
+    function ENT:HandleImpact(hitPos, hitNormal, hitEntity, physobj)
 
         local tr = util.TraceHull({
             start  = self:GetPos(),

@@ -171,10 +171,9 @@ local function SetupEntityBones(entity)
     end
 end
 
-local function GetGeometry(model)
-    if geometryCache[model] ~= nil then return geometryCache[model] or nil end
+local function BuildGeometry(model)
     local probe = ents.Create("base_anim")
-    if not IsValid(probe) then return end
+    if not IsValid(probe) then geometryCache[model] = false return end
     probe:SetModel(model)
     probe:SetPos(vector_origin)
     probe:SetAngles(angle_zero)
@@ -217,6 +216,42 @@ local function GetGeometry(model)
     geometryCache[model] = geometry
     return geometry
 end
+
+local geometryQueue, geometryQueued = {}, {}
+
+local function QueueGeometry(model)
+    if not isstring(model) or model == "" or geometryCache[model] ~= nil or geometryQueued[model] then return end
+    geometryQueued[model] = true
+    geometryQueue[#geometryQueue + 1] = model
+end
+
+hook.Add("Think", "HG_EquipmentGeometryBuild", function()
+    local model = table.remove(geometryQueue, 1)
+    if not model then return end
+    geometryQueued[model] = nil
+    if geometryCache[model] == nil then BuildGeometry(model) end
+end)
+
+local function GetGeometry(model)
+    if geometryCache[model] ~= nil then return geometryCache[model] or nil end
+    QueueGeometry(model)
+end
+
+hook.Add("WeaponEquip", "HG_EquipmentGeometryPrewarm", function(wep)
+    if not IsValid(wep) then return end
+    QueueGeometry(wep.WorldModel)
+    QueueGeometry(wep.WorldModelFake)
+    QueueGeometry(wep.WorldModelReal)
+end)
+
+hook.Add("InitPostEntity", "HG_EquipmentGeometryPrewarm", function()
+    for _, accessory in pairs(hg.Accessories or {}) do
+        if istable(accessory) then
+            QueueGeometry(accessory.model)
+            QueueGeometry(accessory.femmodel)
+        end
+    end
+end)
 
 local function ClipConvex(startPos, ray, planes)
     local entry, leave, normal = 0, math.huge, -ray:GetNormalized()
