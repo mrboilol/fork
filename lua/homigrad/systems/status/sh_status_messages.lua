@@ -22,25 +22,34 @@ local audible_pain = {
     "DEATH WOULD BE MERCY NOW...",
     "Just one moment without the pain..",
 	"I WOULD KILL FOR PAINKILLERS RIGHT NOW.",
+	"ANYTHING. ANYTHING TO STOP THE PAIN.",
+	"NO NO NO- GOD IT HURTS, IT HURTS SO BAD...",
+	"Why me why me why is it me why not someone else...",
+	"ow.. oww.. ow.. it hurts.. it hurts so bad...",
+	"Its so painful why does it hurt this much why...",
+	"I would do ANYTHING FOR IT TO STOP. ANYTHING.",
+	"Im losing my FUCKING MIND. MAKE IT STOP.",
+	"I can't escape- I cant make it stop...",
+	"There has to be a limit there has to be one...",
 }
 
 local sharp_pain = {
-	"AAAHH",
-	"AAAH",
-	"AAaaAH",
-	"AAaaAH",
-	"AAaaAAAGH",
-	"AAaaAH",
-	"AAaAaaH",
-	"AAAAAaaH",
-	"AAaaAHHHH",
-	"AAaAA",
-	"AAAAAa",
-	"AAAAaAAAaaaaghh",
-	"AAAaaAa",
-	"AaaAAaghf",
-	"aaAaaAaff",
-	"aaahhh",
+	"AAAGHH FUUCK",
+	"AAAAAAAAAAaaAAaaGHHHH",
+	"IT HURTS IT HURTS IT HURTS IT HURTS",
+	"STOP STOP STOP STOP PLEASE STOP STOP STOP",
+	"AAAAAAAAAAAAaaAAAAaAAAGHHH",
+	"FUUUUCK, FUUCK FUCK FUCK OH GOD HELP PLEASE STOP HELP",
+	"WHY- WHY IS THIS- AAAAAAAAGHHHHHH",
+	"JESUS CHRIST- AAAGHAAAAAAAAAAGHH",
+	"AAAAAAAAAAAAAAAAAAAGHHH",
+	"KILL ME- KILL AAAAAAAAAAGFHHHGHFHHH",
+	"AGNGHHHHGHAAAAAAAAAAAAAAAAFHHH",
+	"AAAAAAAAAAAAGHHGHHGHGAAAAAHH",
+	"KILL ME KILL ME KILL ME KILL ME",
+	"IT HURTS WHY DOES IT HURT WHY AAAAAAGHHH",
+	"EVERYTHING HURTS- EVERYTHAAAGGHHAAAAGHHHHH",
+	"NOOO- NOO PLEASE STOP PLEASE I DONT WANT TO FEEL THIS AAAAAGHHH",
 	"AAAaaGHHH",
 	"AAAaaAAHH",
 	"AAAaaAAAAAaGHHHH",
@@ -213,16 +222,22 @@ local near_death_poetic = {
 	"This is hopeless.",
 	"You have to do something...",
 	"This is it isnt it?",
-	"I regret so much.",
+	"I regret so much. I regret so. so much...",
 	"I can't die like this.",
 	"Why cant I stop dying I cant die yet I cant die...",
 	"I dont want to die like this.",
-	"I cant believe this is how it ends.",
+	"I dont want it to end like this not now please...",
 	"I dont want to die. I dont want to die. I dont want to die.",
-	"Why is this happening to me?",
+	"Why is this happening to me why...",
 	"I dont want to go yet. I have so much left to do.",
 	"I dont want to know what happens next. I dont want to die.",
-	"Stop. Please. Stop. I dont want to die.",
+	"Stop dying stop dying why cant I stop dying stop stop..",
+	"It feels so weird I dont want to die I dont want to go...",
+	"Everything is starting to close in and blur...",
+	"I can't hold on to life for much longer...",
+	"This is the worst day to die...",
+	"Im afraid.. im so afraid of whats in the other side im so afraid...",
+	"I cant die I cant die yet not like this please no... not yet please...",
 }
 
 local near_death_positive = {
@@ -244,6 +259,23 @@ local near_death_positive = {
 	"This cant be how it ends.",
 	"I'm not sure if this is the end.",
 	"This isn't how I pictured it.",
+}
+
+local near_death_mild = {
+	"Reality is starting to slip away...",
+	"Im starting to feel not good.",
+	"Is this how death feels like..?",
+	"I can't... i cant keep going like this.",
+	"I feel so, so weak right now...",
+	"Something is wrong but I dont know what...",
+	"I'm going to die aren't I?",
+	"I'm getting weaker by the minute.",
+	"I can't die. Not like this.",
+	"I refuse to go. Im not done yet..",
+	"It's getting worse I can feel it...",
+	"Something is taking a toll on me...",
+	"The edges of my vision are starting to blur...",
+	"Why.. why am I feeling like this...",
 }
 
 local LIMB_NAMES = {
@@ -516,8 +548,9 @@ function hg.likely_to_phrase(ply)
 	-- Terminal states need thoughts quickly.  They commonly force unconsciousness
 	-- before the normal low-blood cadence can reach its next phrase.
 	return (org.heartstop) and 6
-		or (o2 <= 22) and 6
+		or (o2 <= 12) and 6
 		or terminalBloodLoss and 4.5
+		or (o2 <= 22) and 1.5
 		or (hypotension > 0.5 and 0.55)
 		or (hypertension > 0.5 and 0.55)
 		or (bleedingOut and blood <= bleedoutStartBlood and blood > bleedoutDeathBlood) and 4
@@ -623,12 +656,18 @@ local function get_status_message(ply)
 	if org.heartstop then
 		most_wanted_phraselist = near_death_poetic
 		statusThoughtKey = "heartstop"
-	elseif o2 <= 22 then
+	elseif o2 <= 12 then
 		most_wanted_phraselist = near_death_poetic
 		statusThoughtKey = "lowoxy"
-	elseif terminalBloodLoss or (bleedingOut and blood <= bleedoutStartBlood) then
+	elseif o2 <= 22 then
+		most_wanted_phraselist = math.random(2) == 1 and near_death_mild or short_breath_phrases
+		statusThoughtKey = "lowoxy_mild"
+	elseif terminalBloodLoss then
 		most_wanted_phraselist = near_death_poetic
 		statusThoughtKey = "blood2"
+	elseif bleedingOut and blood <= bleedoutStartBlood then
+		most_wanted_phraselist = near_death_mild
+		statusThoughtKey = "blood_mild"
 	elseif pain > 100 then
 		most_wanted_phraselist = sharp_pain
 		statusThoughtKey = "pain_severe"
@@ -706,7 +745,7 @@ local function get_status_message(ply)
 		statusThoughtKey, statusLimbName = limbStatusKey("dislocated")
 	end
 
-	if most_wanted_phraselist == near_death_poetic or most_wanted_phraselist == near_death_positive then
+	if most_wanted_phraselist == near_death_poetic or most_wanted_phraselist == near_death_positive or most_wanted_phraselist == near_death_mild then
 		statusThoughtKey = statusThoughtKey or (bleedingOut and "blood2" or "fear")
 	elseif most_wanted_phraselist == panicattack_phrases or most_wanted_phraselist == panic_anxious_phrases or most_wanted_phraselist == panic_uneasy_phrases then
 		statusThoughtKey = "panicattack"
@@ -716,7 +755,7 @@ local function get_status_message(ply)
 		statusThoughtKey = "threatened"
 	end
 	
-	if most_wanted_phraselist == near_death_poetic or most_wanted_phraselist == near_death_positive then
+	if most_wanted_phraselist == near_death_poetic or most_wanted_phraselist == near_death_positive or most_wanted_phraselist == near_death_mild then
 		org.dying_phrases_used = org.dying_phrases_used or {}
 		local candidates = {}
 		for i, phrase in ipairs(most_wanted_phraselist) do
