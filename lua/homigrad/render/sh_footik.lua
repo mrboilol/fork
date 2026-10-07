@@ -81,6 +81,10 @@ local CROUCH_SETTLE_SCALE = 0.75
 local LIMP_STRIDE_CUT = 0.35
 local LIMP_DRAG = 0.6
 local LIMP_DIP = 2.5
+local WALK_BOB = 0.5
+local WALK_BOB_SPEED = 120
+local PELVIS_SMOOTH_TIME = 0.08
+local MIN_STEP_LENGTH = 8
 local STAGGER_STEP_TIME = 0.22
 local STAGGER_STEP_DIST = 26
 local STAGGER_FOLLOW_MIN = 0.12
@@ -401,22 +405,46 @@ local function updateSwing(ply, state, ctx, index, dt)
 	foot.groundNormal = LerpVector(s, foot.startNormal or vector_up, foot.targetNormal)
 end
 
-local function updatePhase(ply, state, ctx, dt)
-	if ctx.speed <= MOVING_SPEED then
-		state.rate = 0
+local function remoteGait(ply, state, dt)
+	local netStep = ply:GetNW2Int("HGGaitStep", -1)
+	if netStep < 0 then return end
+	local rate = ply:GetNW2Float("HGGaitRate", 0)
+	if netStep ~= state.netStep then
+		state.netPhase = state.netStep and netStep % 2 or state.phase
+		state.netStep = netStep
+	end
+	local netPhase = state.netPhase or state.phase
+	local stepEnd = math_floor(netPhase) + 0.999
+	state.netPhase = math_min(netPhase + rate * hg.GaitLimpRateMul(ply, netPhase) * dt, stepEnd) % 2
 
-		return
+	return rate, state.netPhase
+end
+
+local function updatePhase(ply, state, ctx, dt)
+	local rate
+	local refPhase
+	if SERVER or ply == LocalPlayer() then
+		if ply.hg_GaitPhase and CurTime() - (ply.hg_GaitTime or 0) < GAIT_STALE_TIME then
+			rate, refPhase = ply.hg_GaitRate or 0, ply.hg_GaitPhase
+		end
+	else
+		rate, refPhase = remoteGait(ply, state, dt)
 	end
 
-	local rate
-	local gaitFresh = (SERVER or ply == LocalPlayer()) and ply.hg_GaitPhase and (ply.hg_GaitRate or 0) > 0 and CurTime() - (ply.hg_GaitTime or 0) < GAIT_STALE_TIME
-	if gaitFresh then
-		rate = (ply.hg_GaitRate or 0) * hg.GaitLimpRateMul(ply, state.phase)
+	if rate then
+		rate = rate * hg.GaitLimpRateMul(ply, state.phase)
 		state.phase = (state.phase + rate * dt) % 2
-		local diff = (ply.hg_GaitPhase - state.phase + 1) % 2 - 1
+		local diff = (refPhase - state.phase + 1) % 2 - 1
 		state.phase = (state.phase + diff * math_min(dt * PHASE_CORRECTION, 1)) % 2
-	else
-		rate = hg.GaitStepRate(ctx.speed, ctx.speed > MOVING_SPEED) * hg.GaitLimpRateMul(ply, state.phase)
+	end
+
+	if not rate then
+		if ctx.speed <= MOVING_SPEED then
+			state.rate = 0
+
+			return
+		end
+		rate = hg.GaitStepRate(ctx.speed, true) * hg.GaitLimpRateMul(ply, state.phase)
 		state.phase = (state.phase + rate * dt) % 2
 	end
 	state.rate = rate
@@ -430,6 +458,11 @@ local function updatePhase(ply, state, ctx, dt)
 	local stepIndex = math_floor(state.phase) % 2 + 1
 	if stepIndex == state.stepIndex then return end
 	state.stepIndex = stepIndex
+	local foot = state.feet[stepIndex]
+	if foot.planted and not foot.swinging and ctx.speed / rate < MIN_STEP_LENGTH then
+		local rest = ctx.origin + ctx.right * (LEGS[stepIndex].sign * ctx.halfWidth)
+		if (foot.planted - rest):Length2D() < IKFoot.GetFloat("settle_distance") then return end
+	end
 	startStep(state, stepIndex, hg.GaitSwingTime(rate, ctx.swingFraction), ctx.swingFraction > 1)
 end
 
@@ -466,8 +499,34 @@ local function releaseFeet(state, ctx)
 	end
 end
 
-local function pelvisOffsetOf(ply, state)
+local function rawPelvisOffset(ply, state)
 	return ((state.rise or 0) + state.hop - state.drop - (ply.hg_Body and ply.hg_Body.drop or 0)) * state.weight
+end
+
+local function pelvisOffsetOf(ply, state)
+	return state.pelvis or rawPelvisOffset(ply, state)
+end
+
+local function springScalar(current, velocity, target, smoothTime, dt)
+	local omega = 2 / smoothTime
+	local x = omega * dt
+	local decay = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x)
+	local change = current - target
+	local temp = (velocity + omega * change) * dt
+	local value = target + (change + temp) * decay
+	if value ~= value or math_abs(value) > 1e4 then return target, 0 end
+
+	return value, (velocity - omega * temp) * decay
+end
+
+local function updatePelvis(ply, state, dt)
+	local target = rawPelvisOffset(ply, state)
+	if not state.pelvis then
+		state.pelvis, state.pelvisVel = target, 0
+
+		return
+	end
+	state.pelvis, state.pelvisVel = springScalar(state.pelvis, state.pelvisVel, target, PELVIS_SMOOTH_TIME, dt)
 end
 
 local function updateFeet(ply, state, ctx, dt)
@@ -567,9 +626,14 @@ local function gaitBob(state, ctx)
 	local stanceIndex = 3 - (math_floor(state.phase) % 2 + 1)
 	local dip = ctx.limp[stanceIndex] * LIMP_DIP * math_sin(math.pi * stepProgress)
 	local flight = hg.GaitFlightFraction(ctx.swingFraction)
-	if stepProgress >= flight then return -dip end
-
 	local runFraction = smoothstep(math_Clamp((ctx.speedFraction - 0.5) * 2, 0, 1))
+	if stepProgress >= flight then
+		local support = (stepProgress - flight) / (1 - flight)
+		local vault = (1 - math_sin(math.pi * support)) * WALK_BOB * math_min(ctx.speed / WALK_BOB_SPEED, 1) * (1 - runFraction)
+
+		return -dip - vault
+	end
+
 	return math_sin(math.pi * stepProgress / flight) * IKFoot.GetFloat("flight_hop") * runFraction * RUN_HOP_SCALE - dip
 end
 
@@ -996,6 +1060,7 @@ function hg.FootIK(ent, ply)
 	if eligible and body and body.landTime and CurTime() - body.landTime < 0.1 then state.weight = 1 end
 	if state.weight <= 0 and not eligible then
 		ply.hg_FootIK = nil
+		state.pelvis = nil
 		resetPelvisOffset(ply)
 		if CLIENT then applyPelvis(ent, ply, state, bones) end
 
@@ -1011,6 +1076,7 @@ function hg.FootIK(ent, ply)
 	updateDrop(state, ctx, dt)
 	updateUpright(state, ctx, dt)
 	state.hop = gaitBob(state, ctx)
+	updatePelvis(ply, state, dt)
 	applyPose(ent, ply, state, bones, ctx)
 
 	if CLIENT and IKFoot.GetFloat("debug") > 0 then drawDebug(state) end

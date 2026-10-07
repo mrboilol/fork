@@ -1528,7 +1528,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.deathStateKilled = nil
 	end
 
-	if isPly and org.brain and org.brain >= 1 and owner:Alive() and not org.deathStateKilled then
+	if isPly and ((org.brain or 0) >= 1 or (org.blood or 5000) < 10) and owner:Alive() and not org.deathStateKilled then
 		org.deathStateKilled = true
 		if org.analgesia > 1.5 or org.painkiller > 2.4 then
 			hg.achievements.AddPlayerAchievement(owner, "drugs", 1)

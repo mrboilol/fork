@@ -193,7 +193,6 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 	local LIMP_SWING_DELAY = 0.3
 	local PUSH_LIMP_LOSS = 0.93
 	local PUSH_MIN_MUL = 0.05
-	local PUSH_DRAG_FRACTION = 0.3
 	local PUSH_SLOPE_FRACTION = 0.7
 	local PUSH_OBSTRUCT_LOSS = 0.85
 	local PUSH_OBSTRUCT_DIST = 28
@@ -205,6 +204,14 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 	local PUSH_SPRINT_BONUS = 0.25
 	local PUSH_JOG_BONUS = 0.1
 	local PUSH_BONUS_MAX = 4
+	local PUSH_DRAG = 5
+	local PUSH_OVERSHOOT = 1.3
+	local PUSH_BRAKE_DRAG = 9
+	local PUSH_UPHILL_MIN = 0.2
+	local PUSH_LIMP_JITTER = 0.35
+	local PUSH_PERFUSION_JITTER = 1.2
+	local PUSH_JITTER_MAX = 0.6
+	local GAIT_SPEED_SMOOTH = 4
 
 	function hg.GaitLegLimp(org, leg)
 		return org and 1 - hg.GetLimbEffectiveness(org, leg) or 0
@@ -277,12 +284,6 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 		return math_min(bonus, PUSH_BONUS_MAX)
 	end
 
-	function hg.GaitResist(speed, targetSpeed, slopeFraction, inertiaBlend)
-		if targetSpeed <= 1 then return 0 end
-
-		return math_max(PUSH_DRAG_FRACTION * math_min(speed / targetSpeed, 1) + slopeFraction, 0) * inertiaBlend
-	end
-
 	function hg.GaitPush(phase, swingFraction)
 		local flight = hg.GaitFlightFraction(swingFraction)
 		local stepProgress = phase % 1
@@ -292,8 +293,21 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 		return wave * wave
 	end
 
-	local function gaitAccelerationMul(ply, vel, intent, advance, tick_interval)
+	function hg.GaitPushStrength(ply, org, phase)
+		local stanceLimp = stanceAndSwingLimp(ply, phase)
+		local perfusionLoss = 1 - math_Clamp(org.perfusionMoveMul or 1, 0, 1)
+		local jitter = math_min(stanceLimp * PUSH_LIMP_JITTER + perfusionLoss * PUSH_PERFUSION_JITTER, PUSH_JITTER_MAX)
+		local stepMul = 1 - jitter * util.SharedRandom("HGGaitPush", 0, 1, ply.hg_GaitSteps or 0)
+
+		return math_min(hg.GaitLimpPushMul(ply, phase) * hg.GaitPushBonus(ply, org), 1) * stepMul
+	end
+
+	local function gaitPushShape(ply, vel, intent, advance, tick_interval)
 		local speed = vel:Length2D()
+		if advance then
+			ply.hg_GaitSpeed = Lerp(1 - math.exp(-tick_interval * GAIT_SPEED_SMOOTH), ply.hg_GaitSpeed or speed, speed)
+		end
+		speed = ply.hg_GaitSpeed or speed
 		local rate = hg.GaitStepRate(speed, intent)
 		local swingFraction = hg.GaitSwingFraction(speed)
 		local phase = ply.hg_GaitPhase or 0
@@ -309,6 +323,19 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 			ply.hg_GaitRate = rate
 			ply.hg_GaitTime = CurTime()
 
+			if math.floor(phase) ~= oldStep then
+				ply.hg_GaitSteps = ((ply.hg_GaitSteps or 0) + 1) % 4096
+				if SERVER then ply:SetNW2Int("HGGaitStep", ply.hg_GaitSteps * 2 + math.floor(phase)) end
+			end
+
+			if SERVER then
+				local netRate = math_Round(rate * 4) / 4
+				if ply.hg_GaitNetRate ~= netRate then
+					ply.hg_GaitNetRate = netRate
+					ply:SetNW2Float("HGGaitRate", netRate)
+				end
+			end
+
 			if SERVER and rate > 0 and math.floor(phase) ~= oldStep and hg.FootstepTripCheck then
 				hg.FootstepTripCheck(ply, math.floor(phase) + 1, rate, swingFraction)
 			end
@@ -319,7 +346,7 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 		local minMul = hg_footstep_push_min:GetFloat()
 		local supportShare = 1 - hg.GaitFlightFraction(swingFraction)
 
-		return (minMul + (1 - minMul) * hg.GaitPush(phase, swingFraction) * 2 / supportShare) * hg.GaitLimpPushMul(ply, phase)
+		return minMul + (1 - minMul) * hg.GaitPush(phase, swingFraction) * 2 / supportShare
 	end
 
 	local function hg_GetMovementLagComp(ply)
@@ -715,32 +742,29 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 			end
 			end
 
-			local gait_mul = 1
-			local gait_resist = 0
 			local has_intent = fm ~= 0 or sm ~= 0
+			local new_inertia
 			if on_ground and moveType == MOVETYPE_WALK then
-				gait_mul = gaitAccelerationMul(ply, vel, has_intent, process_input, tick_interval)
-				if has_intent and hg_footstep_push:GetBool() then
-					local target_len = inertia_to:Length2D()
-					if target_len > 1 then
-						local terrain_mul, slope_accel = gaitTerrainPush(ply, inertia_to / target_len)
-						gait_mul = gait_mul * terrain_mul * hg.GaitPushBonus(ply, org)
-						gait_resist = hg.GaitResist(ply.MovementInertia:Length2D(), target_len, slope_accel, ply.InertiaBlend)
-					end
+				local push_shape = gaitPushShape(ply, vel, has_intent, process_input, tick_interval)
+				local target_len = inertia_to:Length2D()
+				if has_intent and hg_footstep_push:GetBool() and target_len > 1 then
+					local dir = inertia_to / target_len
+					local terrain_mul, slope_accel = gaitTerrainPush(ply, dir)
+					local strength = hg.GaitPushStrength(ply, org, ply.hg_GaitPhase or 0) * terrain_mul * math_max(1 - slope_accel, PUSH_UPHILL_MIN)
+					local push_accel = math_min(PUSH_DRAG * target_len * push_shape * strength, ply.InertiaBlend)
+					local decay = math.exp(-PUSH_DRAG * delta_time)
+					new_inertia = ply.MovementInertia * decay + dir * (push_accel * delta_time)
+					new_inertia.z = 0
+					local new_len = new_inertia:Length2D()
+					local max_len = target_len * PUSH_OVERSHOOT
+					if new_len > max_len then new_inertia:Mul(max_len / new_len) end
+				elseif not has_intent and hg_footstep_push:GetBool() then
+					new_inertia = ply.MovementInertia * math.exp(-PUSH_BRAKE_DRAG * delta_time)
+					new_inertia.z = 0
 				end
 			end
 
-			local new_inertia = approach_vector(ply.MovementInertia, inertia_to, delta_time * ply.InertiaBlend * gait_mul)
-			if gait_resist > 0 then
-				local new_len = new_inertia:Length2D()
-				if new_len > 0.01 then
-					local scale = math_max(new_len - gait_resist * delta_time, 0) / new_len
-					new_inertia.x = new_inertia.x * scale
-					new_inertia.y = new_inertia.y * scale
-				end
-			end
-
-			ply.MovementInertia = new_inertia
+			ply.MovementInertia = new_inertia or approach_vector(ply.MovementInertia, inertia_to, delta_time * ply.InertiaBlend)
 
 			if ply.hg_SteepNormal then
 				local downhill = steepDownhill(ply.hg_SteepNormal)

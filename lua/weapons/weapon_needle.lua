@@ -337,7 +337,7 @@ if SERVER then
 		entOwner:EmitSound("snd_jack_hmcd_needleprick.wav", 60, math.random(95, 105))
 		org.needle = 1
 
-		if not (org.lungsR[2] == 1 or org.lungsL[2] == 1) then
+		if (org.trachea or 0) <= 0 and not (org.lungsR[2] == 1 or org.lungsL[2] == 1) then
 			if math.random(2) == 1 then
 				org.lungsR[2] = 1
 			else

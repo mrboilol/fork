@@ -206,7 +206,8 @@ local function canReceiveResuscitationBreathing(org)
 	local leftLung = istable(org.lungsL) and (tonumber(org.lungsL[1]) or 0) or 0
 	local rightLung = istable(org.lungsR) and (tonumber(org.lungsR[1]) or 0) or 0
 	if leftLung >= 1 and rightLung >= 1 then return false end
-	if (tonumber(org.trachea) or 0) >= 1 or (tonumber(org.hemothorax) or 0) >= 0.9 then return false end
+	if (tonumber(org.trachea) or 0) >= 1 and (tonumber(org.needle) or 0) <= 0 then return false end
+	if (tonumber(org.hemothorax) or 0) >= 0.9 then return false end
 	if (tonumber(org.brain) or 0) >= 0.85 then return false end
 	if (tonumber(org.spine3) or 0) >= 1 then return false end
 	if IsValid(owner) and owner:WaterLevel() >= 3
@@ -226,7 +227,8 @@ function hg.organism.RestoreSupportedOxygen(org, amount, targets)
 	local support = amount * bloodReserve
 	if support <= 0 then return false end
 
-	local oxygenTarget = math.Clamp(tonumber(targets.oxygenTarget) or targets.oxygen or org.o2[1], 0, org.o2.range or 30)
+	local oxygenCap = hg.organism.GetAirwayOxygenCap and hg.organism.GetAirwayOxygenCap(org) or org.o2.range or 30
+	local oxygenTarget = math.Clamp(tonumber(targets.oxygenTarget) or targets.oxygen or org.o2[1], 0, oxygenCap)
 	if targets.oxygen then
 		org.o2[1] = math.min(oxygenTarget, math.max(org.o2[1] or 0, tonumber(targets.oxygen) or 0))
 	end
@@ -392,7 +394,8 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	end
 	if org.brainoxygen < 0.16 then org.needotrub = true end
 	if org.brainoxygen < 0.08 then
-		org.brain = math.min((org.brain or 0) + timeValue * (0.08 - org.brainoxygen) * 0.12, 1)
+		local bloodDeficit = Clamp((1500 - (tonumber(org.blood) or getNormalBloodVolume())) / 1500, 0, 1)
+		org.brain = math.min((org.brain or 0) + timeValue * (0.08 - org.brainoxygen) * 0.12 * (1 + bloodDeficit * 7), 1)
 	end
 end
 

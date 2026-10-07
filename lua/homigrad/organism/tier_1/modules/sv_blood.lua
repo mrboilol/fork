@@ -187,6 +187,14 @@ local wound_bleed_rate_mul = 2
 local arterial_bleed_ml_s_per_severity = (hg.organism.config and hg.organism.config.ARTERIAL_BLEED_ML_S_PER_SEVERITY) or 14
 local amputation_arterial_bleed_mul = (hg.organism.config and hg.organism.config.ARTERIAL_AMPUTATION_BLEED_MULTIPLIER) or 1
 local headgib_arterial_bleed_mul = (hg.organism.config and hg.organism.config.ARTERIAL_HEADGIB_BLEED_MULTIPLIER) or 1.65
+local arteryBleedMultipliers = {
+	arteria = 0.22,
+	aorta = 0.19,
+	rarmartery = 0.16,
+	larmartery = 0.16,
+	rlegartery = 0.11,
+	llegartery = 0.11,
+}
 
 local function hasWound(wounds, target)
 	if not target or not wounds then return false end
@@ -609,13 +617,14 @@ module[2] = function(owner, org, mulTime)
 		local bandageClotMul = hg.GetBandageClotMultiplier and hg.GetBandageClotMultiplier(owner, wound[4]) or 1
 		local isAmputation = wound[9] == true
 		local isHeadGib = wound[10] == "headgib"
-		local woundSeverityMul = isAmputation and amputation_arterial_bleed_mul or (isHeadGib and headgib_arterial_bleed_mul or (limbArteryWeakness[wound[7]] and 1.65 or 1))
+		local woundSeverityMul = isAmputation and amputation_arterial_bleed_mul or (isHeadGib and headgib_arterial_bleed_mul or (arteryBleedMultipliers[wound[7]] or 1))
 		initializeWoundHemostasis(wound, time)
 		local circulationOutput = math.max(tonumber(org.cardiacOutput) or 0, 0)
 		local pressureFactor = math.Clamp((tonumber(org.bloodPressure) or 0) / 92, 0, 1.5)
 		local pulseFactor = math.Clamp((tonumber(org.pulse) or 0) / 70, 0, 1.5)
 		local arterialDrive = math.Clamp(math.sqrt(math.max(circulationOutput * pressureFactor * pulseFactor, 0)), 0, 1.5)
 		local flowDrive = math.max(pulse, 20) / 80
+		if not isAmputation and not isHeadGib then flowDrive = math.min(flowDrive, 1) end
 		if wound[7] == "arteria" and (wound[1] or 0) > 0 then hasCarotidWound = true end
 		local heldBleedMul = getHeldWoundBleedMul(org, wound)
 		org.arterialWoundPressureMultipliers[i] = heldBleedMul
@@ -770,7 +779,7 @@ module[2] = function(owner, org, mulTime)
 	-- Cerebral oxygen, brain/airway injury, cardiac arrest, and spinal failure do.
 	local cerebralFailure = (org.brainoxygen or 1) < 0.16
 	local ignoreBrainDamage = hg.organism.IsBrainDamageIgnored and hg.organism.IsBrainDamageIgnored(org)
-	org.incapacitated = incapacitationEnabled and org.otrub and (cerebralFailure or (not ignoreBrainDamage and org.brain > 0.4) or (org.trachea >= 0.5) or org.heartstop or (org.spine3 >= 1) or (org.spine2 >= hg.organism.fake_spine2)) or false
+	org.incapacitated = incapacitationEnabled and org.otrub and (cerebralFailure or (not ignoreBrainDamage and org.brain > 0.4) or (org.trachea >= 0.5 and org.needle <= 0) or org.heartstop or (org.spine3 >= 1) or (org.spine2 >= hg.organism.fake_spine2)) or false
 
 	local noNeedle = org.needle <= 0
 	local tracheaBlocking = org.trachea > 0.5 and noNeedle

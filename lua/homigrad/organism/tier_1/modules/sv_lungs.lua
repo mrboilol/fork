@@ -14,6 +14,8 @@ local lowStaminaO2Start = 50
 local criticalStaminaO2Start = 10
 local lowStaminaO2DebtMax = 4
 local opioidRespiratoryArrestThreshold = 0.85
+local tracheaHealingTime = 90
+local needleAirwayO2Penalty = 15
 
 function hg.organism.ApplyMannitol(org, dose)
 	if not org then return false end
@@ -131,14 +133,20 @@ end
 
 
 
+function hg.organism.GetAirwayOxygenCap(org)
+	local needleAirwayActive = (org.needle or 0) > 0 and (org.trachea or 0) > 0
+	local oxygenRange = tonumber(org.o2.range) or 30
+
+	return math.max(oxygenRange - (needleAirwayActive and needleAirwayO2Penalty or 0), 0)
+end
+
 function hg.organism.OxygenateBlood(org)
 
 	local canDrawBreath = org.owner:WaterLevel() < 3 or hg.organism.HasUnderwaterOxygen(org)
-	-- Each lung contributes its remaining functional tissue.  The former 50%
-	-- floor let heavily damaged lungs oxygenate blood exactly like a single
-	-- healthy lung, so lung damage never reached tissue O2 until total failure.
 	local lungFunction = math.Clamp(((1 - org.lungsL[1]) + (1 - org.lungsR[1])) / 2, 0, 1)
-	return (lungFunction * (1 - org.trachea * 0.8)) * org.o2.regen / 4 * (canDrawBreath and 1 or 0)// * (1 - org.pneumothorax)
+	local tracheaDamage = (org.needle or 0) > 0 and 0 or org.trachea
+
+	return lungFunction * (1 - tracheaDamage * 0.8) * org.o2.regen / 4 * (canDrawBreath and 1 or 0)
 
 end
 
@@ -671,6 +679,17 @@ module[2] = function(owner, org, timeValue)
 
 	
 
+	org.needle = math.Approach(math.max(tonumber(org.needle) or 0, 0), 0, timeValue / 1200)
+	local needleActive = org.needle > 0
+	local needleAirwayActive = needleActive and (org.trachea or 0) > 0
+	if needleAirwayActive then
+		org.trachea = math.Approach(org.trachea, 0, timeValue / tracheaHealingTime)
+		if org.trachea == 0 then org.tracheaPath = nil end
+		if not (org.heartstop or org.respiratoryArrest or (org.hemothorax or 0) >= 0.9
+			or org.lungsL[1] >= 1 and org.lungsR[1] >= 1) then
+			org.lungsfunction = true
+		end
+	end
 	local success = owner:IsBerserk() or (not org.heartstop and not org.respiratoryArrest and org.alive and not (org.brain >= 0.4 and math.random(10 - (org.brain * 10)) < 4) and org.lungsfunction)
 
 	if success and owner:IsPlayer() and inwater and not scubaOxygenActive then success = false end
@@ -681,7 +700,6 @@ module[2] = function(owner, org, timeValue)
 
 	org.choking = false
 
-	org.needle = math.max(tonumber(org.needle) or 0, 0)
 	org.pneumothorax = math.Clamp(tonumber(org.pneumothorax) or 0, 0, 1)
 	org.hemothorax = math.Clamp(tonumber(org.hemothorax) or 0, 0, 1)
 	org.hemothoraxTrauma = math.Clamp(tonumber(org.hemothoraxTrauma) or 0, 0, 1)
@@ -689,8 +707,6 @@ module[2] = function(owner, org, timeValue)
 	org.hemothoraxR = math.Clamp(tonumber(org.hemothoraxR) or 0, 0, 1)
 
 	local hasPneumothorax = org.lungsR[2] == 1 or org.lungsL[2] == 1
-	local needleActive = org.needle > 0
-	org.needle = math.Approach(org.needle, 0, timeValue / 1200)
 
 	-- A decompression needle vents an existing pneumothorax; it must never make
 	-- an uninjured lung become punctured. The actual puncture remains until the
@@ -754,14 +770,15 @@ module[2] = function(owner, org, timeValue)
 	-- means moderate gas-exchange impairment does not immediately equal severe
 	-- arterial desaturation.
 	local lungGasExchange = 1 - lungDamage
-	local airwayGasExchange = math.Clamp(1 - (org.trachea or 0) * 0.8, 0, 1)
+	local airwayGasExchange = needleActive and 1 or math.Clamp(1 - (org.trachea or 0) * 0.8, 0, 1)
 	local thoracicGasExchange = math.Clamp(1 - (org.pneumothorax or 0) * 0.70 - (org.hemothorax or 0) * 0.65, 0, 1)
 	local respiratoryDrive = math.Clamp(1 - drugRespiratoryDepression * 0.95, 0, 1)
 	local ventilationAvailable = success and 1 or 0
 	local rawGasExchange = math.Clamp(lungGasExchange * airwayGasExchange * thoracicGasExchange * respiratoryDrive * ventilationAvailable, 0, 1)
 	local saturationReserve = rawGasExchange > 0 and (1 - (1 - rawGasExchange) ^ 3.2) or 0
 	local altitudeSaturation = Lerp(altitudeO2K, 0.55, 1)
-	local arterialO2Target = o2.range * saturationReserve * altitudeSaturation
+	local airwayO2Cap = hg.organism.GetAirwayOxygenCap(org)
+	local arterialO2Target = math.min(o2.range * saturationReserve * altitudeSaturation, airwayO2Cap)
 	-- Desaturation/reoxygenation takes time instead of teleporting with one tick.
 	local currentBloodO2 = math.Clamp(tonumber(org.bloodO2Cap) or o2.range, 0, o2.range)
 	local arterialChangeRate = arterialO2Target < currentBloodO2 and 0.055 or 0.22
@@ -870,7 +887,7 @@ module[2] = function(owner, org, timeValue)
 			org.trachea = 0
 			org.tracheaPath = nil
 		end
-		local tracheaDamage = berserkAirwayProtected and 0 or math.Clamp(org.trachea or 0, 0, 1)
+		local tracheaDamage = (berserkAirwayProtected or needleActive) and 0 or math.Clamp(org.trachea or 0, 0, 1)
 		local tracheaIntakeK = 1 - (tracheaDamage * 0.15 + tracheaDamage * tracheaDamage * 0.55)
 		regenerate = regenerate * math.Clamp(tracheaIntakeK, 0.3, 1)
 
@@ -883,7 +900,7 @@ module[2] = function(owner, org, timeValue)
 		-- failed lung from snapping to zero in one tick.
 		if org.heartstop then regenerate = 0 end
 		local lungO2Cap = o2.range * math.max(1 - org.pneumothorax * org.pneumothorax, 0.1) * math.max(1 - (org.hemothorax or 0) * (org.hemothorax or 0), 0.1) * math.max(1 - lungDamage, 0.1)
-		o2[1] = min(o2[1] + regenerate * math.Clamp(org.o2[1] / 30, 0.25, 1) * (org.holdingbreath and 0 or 1) * (sprayed and 0 or 1) * min((10 / max(org.CO,1)),1), min(lungO2Cap, bloodO2Cap, coldO2Cap, altitudeO2Cap, exertionO2Cap))
+		o2[1] = min(o2[1] + regenerate * math.Clamp(org.o2[1] / 30, 0.25, 1) * (org.holdingbreath and 0 or 1) * (sprayed and 0 or 1) * min((10 / max(org.CO,1)),1), min(lungO2Cap, bloodO2Cap, coldO2Cap, altitudeO2Cap, exertionO2Cap, airwayO2Cap))
 
 
 
@@ -1182,19 +1199,13 @@ module[2] = function(owner, org, timeValue)
 
 
 
-	-- Lung function gating:
-	-- * O2 at 0  -> tiny chance per tick of total lung failure
-	-- * O2 > 0   -> only restore lung function if the airway/lungs are not
-	--              catastrophically damaged. Previously this unconditionally
-	--              flipped lungsfunction=true every tick which would resurrect
-	--              breathing through destroyed lungs/trachea.
 	if o2[1] == 0 then
 		if math.random(50) == 1 then
 			org.lungsfunction = false
 		end
 	else
 		local lungsLost = (org.lungsL[1] or 0) >= 1 and (org.lungsR[1] or 0) >= 1
-		local tracheaLost = (org.trachea or 0) >= 1
+		local tracheaLost = (org.trachea or 0) >= 1 and not needleActive
 		if not (lungsLost or tracheaLost or org.heartstop or org.respiratoryArrest) then
 			org.lungsfunction = true
 		end
@@ -1210,7 +1221,7 @@ module[2] = function(owner, org, timeValue)
 
 
 
-	if org.trachea >= 1.0 then
+	if org.trachea >= 1.0 and not needleActive then
 
 		org.lungsfunction = false
 

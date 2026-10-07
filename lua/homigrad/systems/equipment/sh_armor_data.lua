@@ -1648,9 +1648,6 @@ hg.armor.head = {
 		ScrappersSlot = "Armor",
 		restricted = {"head","ears","face"},
 		viewmaterial = false,
-		whitelistClasses = {
-			["Gordon"] = true,
-		},
 		norender = true,
 		AdminOnly = true
 	},

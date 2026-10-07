@@ -395,6 +395,9 @@ function hg.DampenRagdollCommonSpin(ragdoll, maxSpin, damping)
 end
 
 local shadowControl = hg.ShadowControl
+local BURN_ROLL_SPEED = 180
+local BURN_ROLL_ACCELERATION = 360
+local BURN_ROLL_EXTINGUISH_ANGLE = 360
 
 hook.Add("Fake", "Contorl", function(ply, ragdoll)
 	ragdoll.cooldownLH = 0
@@ -1659,74 +1662,51 @@ hook.Add("Think", "Fake", function()
 		local keyLeft = false
 		local keyRight = false
 		local isNeckSlitRolling = false
+		local isRolling = false
+		local burning = ragdoll:IsOnFire() or ply:IsOnFire()
+		if not burning then ragdoll.hgFireRollAngle = nil end
 
 		if org.neckslit and (org.neckslitStunUntil or 0) > CurTime()
 			and not org.otrub and ply:Alive() and not ply:InVehicle() then
-			local phase = (CurTime() * 1.5) % 4
-			if phase < 1 then
-				keyLeft = true
-				isNeckSlitRolling = true
-			elseif phase >= 2 and phase < 3 then
-				keyRight = true
-				isNeckSlitRolling = true
-			end
-	else
-		keyLeft = ply:KeyDown(IN_ALT1)
-		keyRight = ply:KeyDown(IN_ALT2)
-	end
+			local phase = ((org.neckslitStunUntil - CurTime()) * 1.5) % 4
+			keyLeft = phase < 2
+			keyRight = not keyLeft
+			isNeckSlitRolling = true
+		else
+			keyLeft = ply:KeyDown(IN_ALT1)
+			keyRight = ply:KeyDown(IN_ALT2)
+		end
 
 	ply.lean = ply:KeyDown(IN_ALT1) and 1 or ply:KeyDown(IN_ALT2) and -1 or 0
 
-	if keyLeft and IsValid(spine) and not inmove and !ply:InVehicle() and (isNeckSlitRolling or not ply:KeyDown(IN_USE)) then
+		if keyLeft and IsValid(spine) and (isNeckSlitRolling or not inmove) and !ply:InVehicle() and (isNeckSlitRolling or not ply:KeyDown(IN_USE)) then
 			if org.canmove then
 				local angle = spine:GetAngles()
-				angle[3] = angle[3] - 20 * (ragdoll:IsOnFire() and 1.5 or 1)
-				shadowControl(ragdoll, 1, 0.001, angle, 490, 90)
+				isRolling = true
+				angle[3] = angle[3] - (isNeckSlitRolling and 45 or 20) * (burning and 3 or 1)
+				shadowControl(ragdoll, 1, 0.001, angle, burning and 980 or 490, 90)
 				local headPhysID = isnumber(controlCache.headBone) and controlCache.headBone >= 0 and ragdoll:TranslateBoneToPhysBone(controlCache.headBone) or -1
 				local head = headPhysID >= 0 and ragdoll:GetPhysicsObjectNum(headPhysID)
 
-				if math.random(100) == 1 and ragdoll:IsOnFire() and IsValid(head) then
-					local key, fire = next(ragdoll.fires)
-
-					if ragdoll:IsOnFire() then
-						shadowControl(ragdoll, 5, 0.001, angle, 0, 0, head:GetPos() - head:GetAngles():Right() * 10, 5050, 100)
-						shadowControl(ragdoll, 7, 0.001, angle, 0, 0, head:GetPos() - head:GetAngles():Right() * 10, 5050, 100)
-					end
-
-					if key then 
-						ragdoll.fires[key] = nil
-
-						if IsValid(key) then
-							key:Remove()
-						end
-					end
+				if burning and IsValid(head) then
+					shadowControl(ragdoll, 5, 0.001, angle, 0, 0, head:GetPos() - head:GetAngles():Right() * 10, 5050, 100)
+					shadowControl(ragdoll, 7, 0.001, angle, 0, 0, head:GetPos() - head:GetAngles():Right() * 10, 5050, 100)
 				end
 			end
 		end
 
-		if keyRight and IsValid(spine) and not inmove and !ply:InVehicle() and (isNeckSlitRolling or not ply:KeyDown(IN_USE)) then
+		if keyRight and IsValid(spine) and (isNeckSlitRolling or not inmove) and !ply:InVehicle() and (isNeckSlitRolling or not ply:KeyDown(IN_USE)) then
 			if org.canmove and not org.otrub then
 				local angle = spine:GetAngles()
-				angle[3] = angle[3] + 20 * (ragdoll:IsOnFire() and 1.5 or 1)
-				shadowControl(ragdoll, 1, 0.001, angle, 490, 90)
+				isRolling = true
+				angle[3] = angle[3] + (isNeckSlitRolling and 45 or 20) * (burning and 3 or 1)
+				shadowControl(ragdoll, 1, 0.001, angle, burning and 980 or 490, 90)
 				local headPhysID = isnumber(controlCache.headBone) and controlCache.headBone >= 0 and ragdoll:TranslateBoneToPhysBone(controlCache.headBone) or -1
 				local head = headPhysID >= 0 and ragdoll:GetPhysicsObjectNum(headPhysID)
 
-				if ragdoll:IsOnFire() and IsValid(head) then
+				if burning and IsValid(head) then
 					shadowControl(ragdoll, 5, 0.001, angle, 0, 0, head:GetPos() - head:GetAngles():Right() * 10, 5050, 100)
 					shadowControl(ragdoll, 7, 0.001, angle, 0, 0, head:GetPos() - head:GetAngles():Right() * 10, 5050, 100)
-				end
-
-				if math.random(100) == 1 and ragdoll:IsOnFire() then
-					local key, fire = next(ragdoll.fires)
-					
-					if key then 
-						ragdoll.fires[key] = nil
-
-						if IsValid(key) then
-							key:Remove()
-						end
-					end
 				end
 			end
 		end
@@ -1734,7 +1714,9 @@ hook.Add("Think", "Fake", function()
 	local rollLeft = ply:KeyDown(IN_MOVELEFT)
 	local rollRight = ply:KeyDown(IN_MOVERIGHT)
 
-	if (rollLeft or rollRight) and IsValid(spine) and not inmove and !ply:InVehicle() and org.canmove and not ragdoll.hgStumbleActive then
+	local directionalRolling = rollLeft ~= rollRight and not inmove
+	if (directionalRolling or isRolling) and IsValid(spine) and not ply:InVehicle()
+		and org.canmove and not org.otrub and not ragdoll.hgStumbleActive then
 		local onground = util.TraceLine({
 			start = spine:GetPos(),
 			endpos = spine:GetPos() - vector_up * 36,
@@ -1746,18 +1728,31 @@ hook.Add("Think", "Fake", function()
 			local dir = rollLeft and -1 or 1
 			local axis = spine:GetAngles():Forward()
 			local rollPhys = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14}
+			local rollSpeed = burning and BURN_ROLL_SPEED or 6
+			local rollAcceleration = burning and BURN_ROLL_ACCELERATION * ragdoll.dtime or 2
+			local rolledAngle = math.abs(spine:GetAngleVelocity():Dot(axis)) * ragdoll.dtime
 
 			for _, physNum in ipairs(rollPhys) do
+				if not directionalRolling then break end
 				if isFloppyPhys(ragdoll, physNum, true) then continue end
 
 				local phys = ragdoll:GetPhysicsObjectNum(physNum)
 				if IsValid(phys) then
 					local cur = phys:GetAngleVelocity():Dot(axis)
-					phys:AddAngleVelocity(axis * math.Clamp(dir * 6 * (ragdoll.power or 1) - cur, -2, 2))
+					local delta = dir * rollSpeed * (ragdoll.power or 1) - cur
+					phys:AddAngleVelocity(axis * math.Clamp(delta, -rollAcceleration, rollAcceleration))
+				end
+			end
+			if burning then
+				ragdoll.hgFireRollAngle = (ragdoll.hgFireRollAngle or 0) + rolledAngle
+				if ragdoll.hgFireRollAngle >= BURN_ROLL_EXTINGUISH_ANGLE then
+					ragdoll:Extinguish()
+					ply:Extinguish()
+					ragdoll.hgFireRollAngle = nil
 				end
 			end
 
-			if hg_fake_stamina:GetBool() and ply.organism then
+			if directionalRolling and hg_fake_stamina:GetBool() and ply.organism then
 				ply.organism.stamina.subadd = ply.organism.stamina.subadd + 0.04
 			end
 		end

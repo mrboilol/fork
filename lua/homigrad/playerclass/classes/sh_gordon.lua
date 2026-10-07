@@ -468,9 +468,12 @@ if CLIENT then
     local posSight = Vector(ScrW(),ScrH(),0)
     function CLASS.HUDPaint(self)
         if not self:Alive() then return end
-        if not self:GetNetVar("HEVSuit") then return end
-        
+        local armors = self.armors
+        if not armors or armors["head"] ~= "gordon_helmet" then return end
+        local hasSuit = self:GetNetVar("HEVSuit")
+
         local FRT = FrameTime() * 5
+        if hasSuit then
         local pos, size = drawBGPanel(0.065,0.15)
         surface.SetFont("HEVFontDefault")
         local _,txtSizeY = surface.GetTextSize(math.Round(lply:GetNetVar("HEVMedicine",600)/6,0))
@@ -489,8 +492,9 @@ if CLIENT then
 
         draw.DrawText("Medicine","HEVFontSmall",pos[1]+size[1]*0.085+1,pos[2]+(size[2]/1.8)+1,color_bg,TEXT_ALIGN_LEFT)
         draw.DrawText("Medicine","HEVFontSmall",pos[1]+size[1]*0.085,pos[2]+(size[2]/1.8),color_hp,TEXT_ALIGN_LEFT)
-        
-        local armor = self:GetNetVar("HEVPower") or 0
+        end
+
+        local armor = hasSuit and (self:GetNetVar("HEVPower") or 0) or math.Round((1 - math.Clamp(self:GetNWFloat("ArmorWeargordon_helmet", 0), 0, 1)) * 100)
         armorlerp = Lerp(FRT,armorlerp,armor > 1 and 1 or 0)
         local pos, size = drawBGPanel(0.17,0.15,125 * (armor > 1 and 1 or 0))
         surface.SetFont("HEVFontDefault")
@@ -542,6 +546,7 @@ if CLIENT then
             draw.DrawText( "Ammo", "HEVFontSmall",pos[1]+size[1]*0.085,pos[2]+(size[2]/1.8),color_ar,TEXT_ALIGN_LEFT)
         end
         
+        if not hasSuit then return end
         local pos, size = drawBGPanel(0.035,0.25)
         surface.SetFont("HEVFontSmall")
         if not self.organism or not self.organism.blood then return end
@@ -563,10 +568,9 @@ if CLIENT then
 
     local hevMat = Material("sprites/mat_jack_helmoverlay_r")
     hook.Add("RenderScreenspaceEffects","HEV_helmet",function()
-        if not lply:GetNetVar("HEVSuit") then return end
         local armors = lply.armors
-        if armors["head"] ~= "gordon_helmet" then return end
-        if lply:Alive() and lply.PlayerClassName == "Gordon" then			
+        if not armors or armors["head"] ~= "gordon_helmet" then return end
+        if lply:Alive() then
 			surface.SetDrawColor(255,132,0,200)
 			surface.SetMaterial(hevMat)
 			surface.DrawTexturedRectRotated((ScrW()/2) - 5, (ScrH()/2) - 5, ScrW()  + 10, ScrH() + 450,180)
@@ -704,7 +708,7 @@ elseif SERVER then
                     org.COThink = CurTime() + (1 / 120) * 60
 
                     if org.alive then
-                        org.o2[1] = math.min(org.o2[1] + hg.organism.OxygenateBlood(org) * 2, org.o2.range)
+                        org.o2[1] = math.min(org.o2[1] + hg.organism.OxygenateBlood(org) * 2, hg.organism.GetAirwayOxygenCap(org))
                         org.CO = math.Approach(org.CO, 0, 2)
                         org.COregen = math.Approach(org.COregen, 0, 2)
                     end
@@ -794,7 +798,7 @@ elseif SERVER then
                     org.CPRThink = CurTime() + (1 / 120) * 60
                     
                     if org.alive then
-                        org.o2[1] = math.min(org.o2[1] + hg.organism.OxygenateBlood(org) * 2, org.o2.range)
+                        org.o2[1] = math.min(org.o2[1] + hg.organism.OxygenateBlood(org) * 2, hg.organism.GetAirwayOxygenCap(org))
                         org.pulse = math.min(org.pulse + 5,70)
                         org.CO = math.Approach(org.CO, 0, 1)
                         org.COregen = math.Approach(org.COregen, 0, 1)
