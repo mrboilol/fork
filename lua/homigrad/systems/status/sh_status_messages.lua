@@ -522,6 +522,14 @@ function hg.situation_fear(ply)
 	return org and (org.fear or 0) > 0.75 and (org.adrenaline or 0) > 0.5
 end
 
+local function isNearDeath(org)
+	return org.fibrillation
+		or (tonumber(org.brainoxygen) or 1) < 0.3
+		or (tonumber(org.pulse) or 70) < 30
+		or (tonumber(org.bloodPressure) or 90) < 40
+		or (tonumber(org.myocardialOxygen) or 1) < 0.35
+end
+
 function hg.likely_to_phrase(ply)
 	local org = ply.organism
 
@@ -550,6 +558,7 @@ function hg.likely_to_phrase(ply)
 	return (org.heartstop) and 6
 		or (o2 <= 12) and 6
 		or terminalBloodLoss and 4.5
+		or isNearDeath(org) and 5
 		or (o2 <= 22) and 1.5
 		or (hypotension > 0.5 and 0.55)
 		or (hypertension > 0.5 and 0.55)
@@ -634,6 +643,7 @@ local function get_status_message(ply)
 	local dislocated_notify = org.rarmdislocation or org.larmdislocation or org.rlegdislocation or org.llegdislocation
 	local after_unconscious_notify = org.after_otrub
 	local heartbeat = org.heartbeat or 70
+	local nearDeath = isNearDeath(org)
 
 	if not isnumber(pain) then return "" end
 
@@ -649,7 +659,7 @@ local function get_status_message(ply)
 		end
 	end
 
-	if not (org.heartstop or o2 <= 22 or terminalBloodLoss or (bleedingOut and blood <= bleedoutStartBlood)) then
+	if not (org.heartstop or nearDeath or o2 <= 22 or terminalBloodLoss or (bleedingOut and blood <= bleedoutStartBlood)) then
 		org.dying_phrases_used = nil
 	end
 
@@ -659,12 +669,12 @@ local function get_status_message(ply)
 	elseif o2 <= 12 then
 		most_wanted_phraselist = near_death_poetic
 		statusThoughtKey = "lowoxy"
+	elseif nearDeath or terminalBloodLoss then
+		most_wanted_phraselist = near_death_poetic
+		statusThoughtKey = terminalBloodLoss and "blood2" or "neardeath"
 	elseif o2 <= 22 then
 		most_wanted_phraselist = math.random(2) == 1 and near_death_mild or short_breath_phrases
 		statusThoughtKey = "lowoxy_mild"
-	elseif terminalBloodLoss then
-		most_wanted_phraselist = near_death_poetic
-		statusThoughtKey = "blood2"
 	elseif bleedingOut and blood <= bleedoutStartBlood then
 		most_wanted_phraselist = near_death_mild
 		statusThoughtKey = "blood_mild"

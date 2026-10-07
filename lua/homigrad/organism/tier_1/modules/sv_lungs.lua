@@ -1142,18 +1142,10 @@ module[2] = function(owner, org, timeValue)
 
 
 
-		-- The final warning band starts before severe hypoxia so the player gets
-		-- a clear dying message while there is still a brief response window.
-		if o2[1] <= 15 then
+	end
 
-
-
-
-
-			notifyCriticalHypoxia(org)
-
-		end
-
+	if org.isPly and not org.otrub and not org.heartstop and o2[1] <= 15 then
+		notifyCriticalHypoxia(org)
 	end
 
 

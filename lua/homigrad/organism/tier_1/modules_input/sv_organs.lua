@@ -493,7 +493,7 @@ hitArtery = function(artery, org, dmg, dmgInfo, boneindex, dir, hit, impact, for
 	if not localPos then
 		localPos, localAng, dir2 = vecZero, angZero, Vector(-1, 0, 0)
 	end
-	local woundSeverity = (arterySize[artery] or 4.5) * (forceRupture and 1 or math.Clamp(dmg, 0.25, 1))
+	local woundSeverity = (arterySize[artery] or 4.5) * (forceRupture and 1 or math.Clamp(dmg, 0.6, 1))
 	local wound = {woundSeverity, localPos, localAng, woundBone or (isstring(boneindex) and boneindex) or arteryBones[artery], CurTime(), dir2 * 100, artery}
 	wound.visualBleedRate = math.max(woundSeverity * 4.5, 1)
 	table.insert(org.arterialwounds, wound)

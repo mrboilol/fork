@@ -188,16 +188,16 @@ local arterial_bleed_ml_s_per_severity = (hg.organism.config and hg.organism.con
 local amputation_arterial_bleed_mul = (hg.organism.config and hg.organism.config.ARTERIAL_AMPUTATION_BLEED_MULTIPLIER) or 1
 local headgib_arterial_bleed_mul = (hg.organism.config and hg.organism.config.ARTERIAL_HEADGIB_BLEED_MULTIPLIER) or 1.65
 local arteryBleedMultipliers = {
-	arteria = 0.27,
+	arteria = 0.4,
 	aorta = 0.6,
-	rarmartery = 0.095,
-	larmartery = 0.095,
-	rlegartery = 0.11,
-	llegartery = 0.11,
+	rarmartery = 0.13,
+	larmartery = 0.13,
+	rlegartery = 0.165,
+	llegartery = 0.165,
 }
 local proximalArteryBleedMultipliers = {
-	UpperArm = 0.2,
-	Thigh = 0.31,
+	UpperArm = 0.32,
+	Thigh = 0.44,
 }
 
 local function getArteryBleedMultiplier(wound, ent)
@@ -824,7 +824,8 @@ module[2] = function(owner, org, mulTime)
 	local recoveryBoost = 1 + 0.75 * (1 - math.exp(-recoveryTime / 60))
 	local regenRate = (hg.organism.config and hg.organism.config.BLOOD_REGEN_RATE_ML_S) or 4.6
 	local regenerationMul = math.Clamp(tonumber(org.blood_regeneration_multiplier) or 1, 0.1, 2)
-	org.bloodRegenRate = org.alive and not org.heartstop and org.pulse > 5 and org.blood < org.maxblood and regenRate * regenerationMul * recoveryBoost or 0
+	local hemorrhageRegenMul = math.Clamp(1 - bleedoutspeed2 / 8, 0.1, 1)
+	org.bloodRegenRate = org.alive and not org.heartstop and org.pulse > 5 and org.blood < org.maxblood and regenRate * regenerationMul * recoveryBoost * hemorrhageRegenMul or 0
 	if org.bloodRegenRate > 0 then org.blood = min(org.blood + mulTime * org.bloodRegenRate, org.maxblood) end
 	if hg.organism.UpdateVitalHealthToll then
 		hg.organism.UpdateVitalHealthToll(owner, org, mulTime)

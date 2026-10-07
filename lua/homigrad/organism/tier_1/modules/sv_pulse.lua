@@ -285,8 +285,7 @@ local function getRateOutput(heartbeat, bloodReserve)
 end
 
 function hg.organism.GetPulseOxygenPerfusion(pulse)
-	local normalizedPulse = Clamp((tonumber(pulse) or 0) / 45, 0, 1)
-	return normalizedPulse ^ 0.65
+	return Clamp((tonumber(pulse) or 0) / 45, 0, 1)
 end
 
 function hg.organism.GetCirculatoryOxygenReserve(pulse, pressure, blood)
@@ -296,8 +295,8 @@ function hg.organism.GetCirculatoryOxygenReserve(pulse, pressure, blood)
 	local peripheralReserve = math.max(getHemorrhageDelivery(blood), 0.01)
 	local oxygenReserve = 1 - bloodLoss ^ 0.65 * 0.5
 	return math.min(
-		hg.organism.GetPulseOxygenPerfusion((tonumber(pulse) or 0) / peripheralReserve),
-		Clamp((tonumber(pressure) or 0) / (45 * peripheralReserve), 0, 1),
+		hg.organism.GetPulseOxygenPerfusion((tonumber(pulse) or 0) * peripheralReserve),
+		Clamp((tonumber(pressure) or 0) * peripheralReserve / 45, 0, 1),
 		oxygenReserve
 	)
 end

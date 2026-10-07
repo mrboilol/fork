@@ -1123,13 +1123,18 @@ local function emitArterialBleeding(ent, org, wound, index, pos, ang, boneAng, w
 		return true
 	end
 
-	local pulse = math.max(tonumber(org.pulse) or 70, 1) / 70
 	local sizeK = math.Clamp((tonumber(wound[1]) or 0) / 18, 0, 1)
 	local opening = math.Clamp((tonumber(wound[1]) or 0) / 10, 0, 1)
 	local jetK = Lerp(math.Clamp(visualRate / 25, 0, 1), 0.35, 1) * math.Clamp(opening * 2, 0.3, 1)
 	local _, pressureDrive = getBleedPressureDrive(org)
 	local lift = getHeartbeatLift(org, index)
-	local beat = Lerp(math.min(pressureDrive, 1), 0.6, (lift + 1) * 0.5)
+	local liftK = (lift + 1) * 0.5
+	local meanPressure = math.max(tonumber(org.bloodPressure) or 92, 0)
+	local systolic = math.max(tonumber(org.systolic) or meanPressure * 1.3, 0)
+	local diastolic = math.Clamp(tonumber(org.diastolic) or meanPressure * 0.87, 0, systolic)
+	local pulseAmplitude = math.Clamp((systolic - diastolic) / 40, 0, 1)
+	local beat = Lerp(pulseAmplitude, 0.6, liftK)
+	local jetReach = math.sqrt(math.Clamp(Lerp(liftK, diastolic, systolic) / 120, 0, 1.6))
 	pressureDrive = math.min(pressureDrive, 1.1) * compression
 	local count = math.Clamp(math.ceil((1 + jetK * (arteryBurstCount - 1 + 3 * arteryStreamFlow)) * compression * Lerp(beat, 0.35, 1)), 1, 5)
 	local volume = math.min(visualRate * interval / count, 8)
@@ -1148,7 +1153,7 @@ local function emitArterialBleeding(ent, org, wound, index, pos, ang, boneAng, w
 		+ math.sin(phase * (1 + index))) * 0.6 + math.sin(phase * 2)) * 0.05
 	local sway = jetK * pressureDrive * arteryStreamFlow * (forceMul or 1)
 	local streamSpeed = math.Clamp((isvector(localDir) and localDir:Length() or 100) * 3.3, 120, 390)
-		* reach * pressureDrive * math.Clamp(pulse, 0.5, 1) * arteryStreamFlow * flowWave * jetK * (forceMul or 1) * Lerp(beat, 0.25, 1.2)
+		* reach * jetReach * compression * arteryStreamFlow * flowWave * jetK * (forceMul or 1) * Lerp(beat, 0.25, 1.2)
 	local velocity = sprayDir * streamSpeed
 		+ vector_up * streamSpeed * arteryStreamLift * lift
 		+ sprayAng:Right() * (pouring and 30 or 25) * sway * math.sin(phase * 2) * math.cos(phase * 4)

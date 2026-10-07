@@ -1598,7 +1598,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 			org.likely_phrase = 0
 			local str, statusThoughtKey = hg.get_status_message(owner)
 			if str and str != "" then
-				local dyingThought = statusThoughtKey == "heartstop" or statusThoughtKey == "lowoxy" or statusThoughtKey == "blood2"
+				local dyingThought = statusThoughtKey == "heartstop" or statusThoughtKey == "lowoxy" or statusThoughtKey == "blood2" or statusThoughtKey == "neardeath"
 				local statusCooldown = dyingThought and math.Rand(4, 7) or math.Rand(11, 15)
 				org.nextStatusThought = CurTime() + statusCooldown
 				owner:Thought(str, statusCooldown, statusThoughtKey or "phrase", 1, Color(255, math.Clamp(1 / hg.likely_to_phrase(owner) * 255, 0, 255), math.Clamp(1 / hg.likely_to_phrase(owner) * 255, 0, 255), 255))
