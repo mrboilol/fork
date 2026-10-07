@@ -706,6 +706,18 @@ module[2] = function(owner, org, timeValue)
 	org.hemothoraxL = math.Clamp(tonumber(org.hemothoraxL) or 0, 0, 1)
 	org.hemothoraxR = math.Clamp(tonumber(org.hemothoraxR) or 0, 0, 1)
 
+	local owner = org.owner
+	if (org.brokenribs or 0) > 0 and org.lungsL[2] ~= 1 and org.lungsR[2] ~= 1 and IsValid(owner) and owner:IsPlayer() and owner:GetVelocity():Length2D() > 150 then
+		if math.Rand(0, 1) < timeValue * org.brokenribs * 0.002 then
+			local lung = math.random(2) == 1 and org.lungsL or org.lungsR
+			lung[2] = 1
+			org.internalBleed = math.min((org.internalBleed or 0) + math.Rand(0.15, 0.35), 10)
+			if owner.Thought and owner:GetInfoNum("hg_newthoughts", 0) > 0 then
+				owner:Thought("A broken rib punctured my lung.", 4, "thought_ribs_lung", 0, Color(255, 210, 210))
+			end
+		end
+	end
+
 	local hasPneumothorax = org.lungsR[2] == 1 or org.lungsL[2] == 1
 
 	-- A decompression needle vents an existing pneumothorax; it must never make

@@ -1034,9 +1034,8 @@ local arteryBurstCount = 2
 
 local function getBleedPressureDrive(org)
 	local pressure = math.max(tonumber(org.bloodPressure) or 92, 0)
-	if pressure <= 48 then return pressure, 0 end
 	local hypotension = math.Clamp(tonumber(org.hypotension) or 0, 0, 1)
-	return pressure, math.Clamp((pressure - 48) / 44, 0, 1.4) * (1 - hypotension * 0.2)
+	return pressure, math.Clamp(pressure / 92, 0, 1.4) ^ 1.5 * (1 - hypotension * 0.2)
 end
 
 local function getBleedDirection(ang)
@@ -1072,7 +1071,23 @@ local function getHeartbeatLift(org, index)
 	return math.sin(phase / 0.32 * math.pi) * 2 - 1
 end
 
+local function emitJugularBleeding(ent, wound, pos, ang, visualRate, interval)
+	local outward = getBleedDirection(ang)
+	local count = math.Clamp(math.ceil(visualRate / 4), 2, 5)
+	local volume = math.min(visualRate * interval, 8) / count
+	local size = math.Clamp(0.6 + math.sqrt(visualRate) * 0.25, 0.6, 2.4) * 1.5
+	local speed = 10 + math.sqrt(visualRate) * 5
+	local phase = CurTime() * 3 + ent:EntIndex() * 0.37
+	local sway = ang:Right() * math.sin(phase) * 3 + ang:Up() * math.cos(phase * 0.7) * 2
+	for _ = 1, count do
+		local vel = outward * speed * math.Rand(0.8, 1.1) + bleedDown * math.Rand(20, 40) + sway + VectorRand(-3, 3)
+		local part = hg.addBloodPart(pos + VectorRand(-0.4, 0.4), vel, nil, size, size, false, nil, ent, volume < 0.25)
+		if part then part.volume = volume end
+	end
+end
+
 local function emitOrdinaryBleeding(ent, org, wound, pos, ang, visualRate, interval)
+	if wound.vessel == "jugular" then return emitJugularBleeding(ent, wound, pos, ang, visualRate, interval) end
 	local sizeK = getWoundSizeK(wound, 18)
 	local slash = tonumber(wound[6]) == 2 or wound.woundType == "slash"
 	local bullet = wound.woundType == "bullet"
@@ -1087,7 +1102,7 @@ local function emitOrdinaryBleeding(ent, org, wound, pos, ang, visualRate, inter
 	local lateral = ang:Right() * math.sin(phase) * (2 + sizeK * 9) * spread
 		+ ang:Up() * math.cos(phase * 0.73) * (1 + sizeK * 6) * spread
 	local flick = 6 + sizeK * 14
-	local speed = (flick + jetK * (bullet and 150 or (slash and 60 or 35))) * pressureDrive
+	local speed = (flick + jetK * (bullet and 60 or (slash and 40 or 25))) * pressureDrive
 	local vel = outward * speed * math.Rand(0.6, 1.1) + bleedDown * math.Rand(10, 30)
 		+ lateral + VectorRand(-(2 + sizeK * 10) * spread, (2 + sizeK * 10) * spread)
 	local count = math.Clamp(math.ceil(dropVolume / 2 + jetK * pressureDrive * 2), 1, 4)
@@ -1111,11 +1126,12 @@ local function emitArterialBleeding(ent, org, wound, index, pos, ang, boneAng, w
 	local pulse = math.max(tonumber(org.pulse) or 70, 1) / 70
 	local sizeK = math.Clamp((tonumber(wound[1]) or 0) / 18, 0, 1)
 	local opening = math.Clamp((tonumber(wound[1]) or 0) / 10, 0, 1)
-	local jetK = opening * opening * math.Clamp(visualRate / 20, 0, 1)
+	local jetK = Lerp(math.Clamp(visualRate / 25, 0, 1), 0.35, 1) * math.Clamp(opening * 2, 0.3, 1)
 	local _, pressureDrive = getBleedPressureDrive(org)
 	local lift = getHeartbeatLift(org, index)
+	local beat = Lerp(math.min(pressureDrive, 1), 0.6, (lift + 1) * 0.5)
 	pressureDrive = math.min(pressureDrive, 1.1) * compression
-	local count = math.Clamp(math.ceil((1 + jetK * (arteryBurstCount - 1 + 3 * arteryStreamFlow)) * compression), 1, 5)
+	local count = math.Clamp(math.ceil((1 + jetK * (arteryBurstCount - 1 + 3 * arteryStreamFlow)) * compression * Lerp(beat, 0.35, 1)), 1, 5)
 	local volume = math.min(visualRate * interval / count, 8)
 	local time = CurTime()
 	local localDir = wound[6]
@@ -1132,7 +1148,7 @@ local function emitArterialBleeding(ent, org, wound, index, pos, ang, boneAng, w
 		+ math.sin(phase * (1 + index))) * 0.6 + math.sin(phase * 2)) * 0.05
 	local sway = jetK * pressureDrive * arteryStreamFlow * (forceMul or 1)
 	local streamSpeed = math.Clamp((isvector(localDir) and localDir:Length() or 100) * 3.3, 120, 390)
-		* reach * pressureDrive * math.Clamp(pulse, 0.5, 1) * arteryStreamFlow * flowWave * jetK * (forceMul or 1)
+		* reach * pressureDrive * math.Clamp(pulse, 0.5, 1) * arteryStreamFlow * flowWave * jetK * (forceMul or 1) * Lerp(beat, 0.25, 1.2)
 	local velocity = sprayDir * streamSpeed
 		+ vector_up * streamSpeed * arteryStreamLift * lift
 		+ sprayAng:Right() * (pouring and 30 or 25) * sway * math.sin(phase * 2) * math.cos(phase * 4)
@@ -1469,7 +1485,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 							hg.addBloodPart2(pos, VectorRand(-5, 5), nil, nil, nil, nil, true, ent)
 						else
 							local bleeding = math.max(tonumber(wound[1]) or 0, 0.5)
-							local interval = math.Clamp(15 / bleeding * math.Rand(0.5, 1), 0.05, 12)
+							local interval = wound.vessel == "jugular" and math.Rand(0.05, 0.08) or math.Clamp(15 / bleeding * math.Rand(0.5, 1), 0.05, 12)
 							emitOrdinaryBleeding(ent, org, wound, pos, ang, visualRate, interval)
 							wound.nextVisualBleed = time + interval
 						end

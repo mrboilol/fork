@@ -1109,13 +1109,18 @@ local function damageLungFromRibs(org, brokenRibs)
 	if math.Rand(0, 1) > chance then return end
 
 	local lung = math.random(2) == 1 and org.lungsL or org.lungsR
-	if math.random(3) == 1 then
-		lung[1] = math.min((lung[1] or 0) + math.Rand(0.05, 0.12) * (1 + brokenRibs / 12), 1)
-	else
+	local punctured = math.random(3) ~= 1
+	if punctured then
 		lung[2] = 1
+	else
+		lung[1] = math.min((lung[1] or 0) + math.Rand(0.05, 0.12) * (1 + brokenRibs / 12), 1)
 	end
 
 	org.internalBleed = math.min((org.internalBleed or 0) + math.Rand(0.15, 0.35) * (1 + brokenRibs / 12), 10)
+
+	if punctured then
+		sendThought(org, "A broken rib punctured my lung.", "thought_ribs_lung", 4, Color(255, 210, 210))
+	end
 end
 
 input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet)	
@@ -1146,10 +1151,7 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		if org.brokenribs > 0 then
 			damageLungFromRibs(org, org.brokenribs)
 
-			if hasNewThoughts(org) then
-				local ribWord = org.brokenribs == 1 and " rib." or " ribs."
-				sendThought(org, "You broke " .. org.brokenribs .. ribWord, "thought_ribs", 3, Color(255, 210, 210))
-			else
+			if not hasNewThoughts(org) then
 				notifyOwner(org, ribs[math.random(#ribs)], 5, "ribs", 4)
 			end
 

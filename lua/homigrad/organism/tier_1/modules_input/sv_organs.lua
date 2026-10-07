@@ -521,7 +521,27 @@ hook.Add("PreTraceOrganBulletDamage", "hg_melee_artery_chance", function(org, bo
 	hitArtery(artery, org, dmg, dmgInfo, box[6], dir, hit, impact)
 end)
 
+local jugularHitChance = 0.5
+local jugularOnlyChance = 0.5
+
+local function hitJugular(org, dmg, dmgInfo, dir, hit, impact)
+	if isCrush(dmgInfo) or dmgInfo:IsDamageType(DMG_BLAST) then return false end
+	local owner = org.owner
+	if not IsValid(owner) or not hg.organism.AddWoundManual then return false end
+	local localPos, localAng, _, woundBone = getlocalshit(owner, impact and impact.entity, "ValveBiped.Bip01_Neck1", isvector(dir) and dir or vector_up, hit)
+	local severity = Lerp(math.Clamp(dmg, 0.25, 1), 22, 55)
+	local wound = hg.organism.AddWoundManual(owner, severity * 2, localPos or vecZero, localAng or angZero, woundBone or "ValveBiped.Bip01_Neck1", CurTime())
+	if not wound then return false end
+	wound.vessel = "jugular"
+	addPain(org, dmg * 10 + 15, "head")
+	hg.AddHarmToAttacker(dmgInfo, 8, "Jugular vein punctured harm")
+	return true
+end
+
 input_list.arteria = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet, impact)
+	if math.Rand(0, 1) < jugularHitChance and hitJugular(org, dmg, dmgInfo, dir, hit, impact) and dmg < 3 and math.Rand(0, 1) < jugularOnlyChance then
+		return 0
+	end
 	return hitArtery("arteria", org, dmg, dmgInfo, "ValveBiped.Bip01_Neck1", dir, hit, impact)
 end
 

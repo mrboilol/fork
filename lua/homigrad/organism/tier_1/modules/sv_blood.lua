@@ -188,13 +188,34 @@ local arterial_bleed_ml_s_per_severity = (hg.organism.config and hg.organism.con
 local amputation_arterial_bleed_mul = (hg.organism.config and hg.organism.config.ARTERIAL_AMPUTATION_BLEED_MULTIPLIER) or 1
 local headgib_arterial_bleed_mul = (hg.organism.config and hg.organism.config.ARTERIAL_HEADGIB_BLEED_MULTIPLIER) or 1.65
 local arteryBleedMultipliers = {
-	arteria = 0.22,
-	aorta = 0.19,
-	rarmartery = 0.16,
-	larmartery = 0.16,
+	arteria = 0.27,
+	aorta = 0.6,
+	rarmartery = 0.095,
+	larmartery = 0.095,
 	rlegartery = 0.11,
 	llegartery = 0.11,
 }
+local proximalArteryBleedMultipliers = {
+	UpperArm = 0.2,
+	Thigh = 0.31,
+}
+
+local function getArteryBleedMultiplier(wound, ent)
+	local artery = wound[7]
+	local mul = arteryBleedMultipliers[artery] or 1
+	if not limbArteryWeakness[artery] then return mul end
+	local bone = wound[4]
+	if isnumber(bone) and IsValid(ent) then bone = ent:GetBoneName(bone) end
+	if not isstring(bone) then return mul end
+	for key, proximalMul in pairs(proximalArteryBleedMultipliers) do
+		if string.find(bone, key, 1, true) then return proximalMul end
+	end
+	return mul
+end
+
+local function getPressureK(org)
+	return math.Clamp((tonumber(org.bloodPressure) or 92) / 92, 0, 1.5)
+end
 
 local function hasWound(wounds, target)
 	if not target or not wounds then return false end
@@ -555,6 +576,9 @@ module[2] = function(owner, org, mulTime)
 	local bleedMul = org.bleedingmul
 	local coagMul = org.coagulation_multiplier
 	local isAlive = isPlayer and owner:Alive()
+	local pressureK = getPressureK(org)
+	local venousPressureFactor = math.max(math.sqrt(pressureK), 0.15)
+	local arterialPressureFactor = pressureK ^ 0.8
 	
 	if #org.wounds > 0 then
 		local ent = getBleedingBody(owner)
@@ -566,7 +590,7 @@ module[2] = function(owner, org, mulTime)
 			local bandageClotMul = hg.GetBandageClotMultiplier and hg.GetBandageClotMultiplier(owner, wound[4]) or 1
 			local heldClotMul = getHeldWoundClotMul(org, wound)
 			local rand1 = math.Rand(4, 10)
-			local bleed = rand1 * wound[1] * mulTime * math.max(pulse, 20) / 70 * wound_bleed_rate_mul * (1 - math.min(adrenaline / 6, 0.5)) * bleedMul * 0.02 * tourniquetBleedMul * bandageBleedMul
+			local bleed = rand1 * wound[1] * mulTime * venousPressureFactor * wound_bleed_rate_mul * (1 - math.min(adrenaline / 6, 0.5)) * bleedMul * 0.02 * tourniquetBleedMul * bandageBleedMul
 			local heldBleedMul = getHeldWoundBleedMul(org, wound)
 			org.woundPressureMultipliers[i] = heldBleedMul
 			bleed = bleed * heldBleedMul
@@ -617,14 +641,12 @@ module[2] = function(owner, org, mulTime)
 		local bandageClotMul = hg.GetBandageClotMultiplier and hg.GetBandageClotMultiplier(owner, wound[4]) or 1
 		local isAmputation = wound[9] == true
 		local isHeadGib = wound[10] == "headgib"
-		local woundSeverityMul = isAmputation and amputation_arterial_bleed_mul or (isHeadGib and headgib_arterial_bleed_mul or (arteryBleedMultipliers[wound[7]] or 1))
+		local woundSeverityMul = isAmputation and amputation_arterial_bleed_mul or (isHeadGib and headgib_arterial_bleed_mul or getArteryBleedMultiplier(wound, ent))
 		initializeWoundHemostasis(wound, time)
 		local circulationOutput = math.max(tonumber(org.cardiacOutput) or 0, 0)
 		local pressureFactor = math.Clamp((tonumber(org.bloodPressure) or 0) / 92, 0, 1.5)
 		local pulseFactor = math.Clamp((tonumber(org.pulse) or 0) / 70, 0, 1.5)
 		local arterialDrive = math.Clamp(math.sqrt(math.max(circulationOutput * pressureFactor * pulseFactor, 0)), 0, 1.5)
-		local flowDrive = math.max(pulse, 20) / 80
-		if not isAmputation and not isHeadGib then flowDrive = math.min(flowDrive, 1) end
 		if wound[7] == "arteria" and (wound[1] or 0) > 0 then hasCarotidWound = true end
 		local heldBleedMul = getHeldWoundBleedMul(org, wound)
 		org.arterialWoundPressureMultipliers[i] = heldBleedMul
@@ -632,7 +654,7 @@ module[2] = function(owner, org, mulTime)
 		local woundBleedRate = math.max(wound[1] or 0, 0)
 			* arterial_bleed_ml_s_per_severity
 			* woundSeverityMul
-			* flowDrive
+			* arterialPressureFactor
 			* tourniquetBleedMul
 			* bandageBleedMul
 			* heldBleedMul
@@ -664,7 +686,7 @@ module[2] = function(owner, org, mulTime)
 			local compressionClotMul = heldClotMul * bandageClotMul * Lerp(math.Clamp(1 - tourniquetBleedMul, 0, 1), 1, 3.0)
 			local catastrophic = isAmputation or isHeadGib
 			local hemostasisDelta = getWoundHemostasisDelta(org, wound, mulTime, time, true, catastrophic, compressionClotMul, bandageClotMul > 1)
-			wound[1] = math.Clamp((wound[1] or 0) + hemostasisDelta, 0,
+			wound[1] = math.Clamp((wound[1] or 0) + math.max(hemostasisDelta, 0), 0,
 				math.max((wound.initialSeverity or wound[1] or 0) * 1.65, wound[1] or 0))
 		end
 
