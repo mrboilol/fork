@@ -592,24 +592,26 @@ local speedupbones = {
 	["ValveBiped.Bip01_R_Foot"] = true,
 }
 
-local FAKE_LEG_KICK_DAMAGE_MUL = 0.65
-local FAKE_LEG_KICK_RAG_FORCE_MUL = 220
-local FAKE_LEG_KICK_PROP_FORCE_MUL = 150
-local FAKE_LEG_KICK_PLAYER_PUSH = 300
-local FAKE_LEG_KICK_FAKE_CHANCE = 0.65
-local FAKE_LEG_KICK_TRACE_RANGE = 28
-local FAKE_LEG_KICK_TRACE_SIZE = Vector(5, 5, 5)
-local FAKE_LEG_KICK_SEGMENT_SIZE = Vector(6, 6, 6)
-local FAKE_LEG_KICK_EXTEND_TIME = 0.35
-local FAKE_LEG_KICK_VIEWPUNCH = Angle(3, 0, 0)
-local FAKE_LEG_KICK_CHARGE_FORWARD_OFFSET = -90
-local FAKE_LEG_KICK_CHARGE_THIGH_RIGHT_OFFSET = -22
-local FAKE_LEG_KICK_CHARGE_CALF_RIGHT_OFFSET = -10
-local FAKE_LEG_KICK_CHARGE_CALF_UP_OFFSET = 220
-local FAKE_LEG_KICK_EXTEND_THIGH_UP_OFFSET = 46
-local FAKE_LEG_KICK_SHADOW_TIME = 0.001
-local FAKE_LEG_KICK_SHADOW_ANG = 170
-local FAKE_LEG_KICK_SHADOW_DAMP = 60
+local FAKE_LEG_KICK = {
+	DAMAGE_MUL = 0.65,
+	RAG_FORCE_MUL = 220,
+	PROP_FORCE_MUL = 150,
+	PLAYER_PUSH = 300,
+	FAKE_CHANCE = 0.65,
+	TRACE_RANGE = 28,
+	TRACE_SIZE = Vector(5, 5, 5),
+	SEGMENT_SIZE = Vector(6, 6, 6),
+	EXTEND_TIME = 0.35,
+	VIEWPUNCH = Angle(3, 0, 0),
+	CHARGE_FORWARD_OFFSET = -90,
+	CHARGE_THIGH_RIGHT_OFFSET = -22,
+	CHARGE_CALF_RIGHT_OFFSET = -10,
+	CHARGE_CALF_UP_OFFSET = 220,
+	EXTEND_THIGH_UP_OFFSET = 46,
+	SHADOW_TIME = 0.001,
+	SHADOW_ANG = 170,
+	SHADOW_DAMP = 60,
+}
 
 local vecfive = Vector(5,5,5)
 
@@ -669,9 +671,9 @@ local function getFakeLegKickTrace(ply, ragdoll, dir)
 	local calfPos = calf:GetPos()
 	local footPos = foot:GetPos()
 	local traces = {
-		traceFakeLegSegment(ply, ragdoll, thighPos, calfPos, FAKE_LEG_KICK_SEGMENT_SIZE),
-		traceFakeLegSegment(ply, ragdoll, calfPos, footPos, FAKE_LEG_KICK_SEGMENT_SIZE),
-		traceFakeLegSegment(ply, ragdoll, footPos, footPos + dir * FAKE_LEG_KICK_TRACE_RANGE, FAKE_LEG_KICK_TRACE_SIZE)
+		traceFakeLegSegment(ply, ragdoll, thighPos, calfPos, FAKE_LEG_KICK.SEGMENT_SIZE),
+		traceFakeLegSegment(ply, ragdoll, calfPos, footPos, FAKE_LEG_KICK.SEGMENT_SIZE),
+		traceFakeLegSegment(ply, ragdoll, footPos, footPos + dir * FAKE_LEG_KICK.TRACE_RANGE, FAKE_LEG_KICK.TRACE_SIZE)
 	}
 
 	for i = 1, #traces do
@@ -713,17 +715,17 @@ local function fakeLegKickHit(ply, ragdoll, state)
 	dmginfo:SetAttacker(ply)
 	dmginfo:SetInflictor(IsValid(ply:GetActiveWeapon()) and ply:GetActiveWeapon() or ply)
 	dmginfo:SetDamage(state.dmg)
-	dmginfo:SetDamageForce(state.dir * state.dmg * FAKE_LEG_KICK_RAG_FORCE_MUL)
+	dmginfo:SetDamageForce(state.dir * state.dmg * FAKE_LEG_KICK.RAG_FORCE_MUL)
 	dmginfo:SetDamageType((ent:GetClass() == "func_breakable_surf") and DMG_SLASH or DMG_CLUB)
 	dmginfo:SetDamagePosition(tr.HitPos)
 
 	PenetrationGlobal = 1
 	MaxPenLenGlobal = 1
-	if hg.AddForceRag then hg.AddForceRag(ent, tr.PhysicsBone or 0, state.dir * state.dmg * FAKE_LEG_KICK_RAG_FORCE_MUL, 0.25) end
+	if hg.AddForceRag then hg.AddForceRag(ent, tr.PhysicsBone or 0, state.dir * state.dmg * FAKE_LEG_KICK.RAG_FORCE_MUL, 0.25) end
 	ent:TakeDamageInfo(dmginfo)
 
 	if IsValid(phys) then
-		phys:ApplyForceOffset(state.dir * state.dmg * FAKE_LEG_KICK_PROP_FORCE_MUL, tr.HitPos)
+		phys:ApplyForceOffset(state.dir * state.dmg * FAKE_LEG_KICK.PROP_FORCE_MUL, tr.HitPos)
 	end
 
 	if ent:IsPlayer() or ent:GetClass() == "prop_ragdoll" then
@@ -731,13 +733,13 @@ local function fakeLegKickHit(ply, ragdoll, state)
 	end
 
 	if ent:IsPlayer() then
-		if math.Rand(0, 1) <= FAKE_LEG_KICK_FAKE_CHANCE then
+		if math.Rand(0, 1) <= FAKE_LEG_KICK.FAKE_CHANCE then
 			timer.Simple(0, function()
 				if IsValid(ent) then hg.Fake(ent) end
 			end)
 		end
 
-		ent:SetVelocity(state.dir * FAKE_LEG_KICK_PLAYER_PUSH)
+		ent:SetVelocity(state.dir * FAKE_LEG_KICK.PLAYER_PUSH)
 	end
 
 	if hgIsDoor and hgIsDoor(ent) and !ent:GetNoDraw() then
@@ -779,7 +781,7 @@ function hg.FakeLegAttack(ply)
 	local dmg = 10 * (2 - speedmul)
 	dmg = dmg * (ply:IsBerserk() and org.berserk * 5 or 1)
 	dmg = dmg * hg.GetLegEffectiveness(ply, "rleg")
-	dmg = dmg * FAKE_LEG_KICK_DAMAGE_MUL
+	dmg = dmg * FAKE_LEG_KICK.DAMAGE_MUL
 
 	local ang = ply:EyeAngles()
 	ang[1] = 0
@@ -1220,37 +1222,37 @@ hook.Add("Think", "Fake", function()
 
 				local duration = fakeKick.finish - fakeKick.start
 				local phase = math.Clamp((time - fakeKick.start) / duration, 0, 1)
-				if not fakeKick.extended and phase < FAKE_LEG_KICK_EXTEND_TIME then
+				if not fakeKick.extended and phase < FAKE_LEG_KICK.EXTEND_TIME then
 					local contact = getFakeLegKickTrace(ply, ragdoll, fakeKick.dir)
 					if contact and contact.Hit and IsValid(contact.Entity) then
 						hg.TriggerFakeLegKickExtension(ply, ragdoll, ragdoll:GetVelocity():Length())
 					end
 				end
 
-				local kickExtend = fakeKick.extended or phase >= FAKE_LEG_KICK_EXTEND_TIME
+				local kickExtend = fakeKick.extended or phase >= FAKE_LEG_KICK.EXTEND_TIME
 				local angle = -(-angles2)
-				angle:RotateAroundAxis(angle:Forward(), FAKE_LEG_KICK_CHARGE_FORWARD_OFFSET)
+				angle:RotateAroundAxis(angle:Forward(), FAKE_LEG_KICK.CHARGE_FORWARD_OFFSET)
 
 				if kickExtend then
-					angle:RotateAroundAxis(angle:Up(), FAKE_LEG_KICK_EXTEND_THIGH_UP_OFFSET)
+					angle:RotateAroundAxis(angle:Up(), FAKE_LEG_KICK.EXTEND_THIGH_UP_OFFSET)
 				end
 
-				angle:RotateAroundAxis(angle:Right(), FAKE_LEG_KICK_CHARGE_THIGH_RIGHT_OFFSET)
-				shadowControl(ragdoll, 8, FAKE_LEG_KICK_SHADOW_TIME, angle, FAKE_LEG_KICK_SHADOW_ANG, FAKE_LEG_KICK_SHADOW_DAMP)
+				angle:RotateAroundAxis(angle:Right(), FAKE_LEG_KICK.CHARGE_THIGH_RIGHT_OFFSET)
+				shadowControl(ragdoll, 8, FAKE_LEG_KICK.SHADOW_TIME, angle, FAKE_LEG_KICK.SHADOW_ANG, FAKE_LEG_KICK.SHADOW_DAMP)
 
 				if kickExtend then
-					angle:RotateAroundAxis(angle:Up(), -FAKE_LEG_KICK_EXTEND_THIGH_UP_OFFSET)
+					angle:RotateAroundAxis(angle:Up(), -FAKE_LEG_KICK.EXTEND_THIGH_UP_OFFSET)
 				end
 
-				angle:RotateAroundAxis(angle:Right(), FAKE_LEG_KICK_CHARGE_CALF_RIGHT_OFFSET)
+				angle:RotateAroundAxis(angle:Right(), FAKE_LEG_KICK.CHARGE_CALF_RIGHT_OFFSET)
 				if !kickExtend then
-					angle:RotateAroundAxis(angle:Up(), FAKE_LEG_KICK_CHARGE_CALF_UP_OFFSET)
+					angle:RotateAroundAxis(angle:Up(), FAKE_LEG_KICK.CHARGE_CALF_UP_OFFSET)
 				end
-				shadowControl(ragdoll, 9, FAKE_LEG_KICK_SHADOW_TIME, angle, FAKE_LEG_KICK_SHADOW_ANG, FAKE_LEG_KICK_SHADOW_DAMP)
+				shadowControl(ragdoll, 9, FAKE_LEG_KICK.SHADOW_TIME, angle, FAKE_LEG_KICK.SHADOW_ANG, FAKE_LEG_KICK.SHADOW_DAMP)
 
 				if not fakeKick.hit and time >= fakeKick.hitTime then
 					fakeKick.hit = true
-					ply:ViewPunch(FAKE_LEG_KICK_VIEWPUNCH)
+					ply:ViewPunch(FAKE_LEG_KICK.VIEWPUNCH)
 					fakeLegKickHit(ply, ragdoll, fakeKick)
 				end
 			end

@@ -434,8 +434,8 @@ CalcView = function(ply, origin, angles, fov, znear, zfar)
 		view.angles = LerpAngle(blend, view.angles, oldangles)
 	end
 
-	if hg_gopro:GetBool() then
-		return SpecCam(follow, origin, angles, fov, znear, zfar)
+	if hg_gopro:GetBool() and ply:Alive() then
+		return GoProCam(ply, origin, angles, fov, znear, zfar) or view
 	end
 
 	hook.Run("PostHGCalcView", ply, view)

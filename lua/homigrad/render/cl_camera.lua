@@ -395,22 +395,25 @@ hook.Add("HUDPaint", "HUDPaint_DrawABox", function() -- этот код стар
 	end
 end)
 
-local hg_allow_gopro = GetConVar("hg_allow_gopro")
-local hg_allow_gopro_pos = GetConVar("hg_allow_gopro_pos")
 function GoProCam(ply, vec, ang, fov, znear, zfar)
-	if !ply:Alive() then return end
+	if not ply:Alive() then return end
+	local allowGoPro = GetConVar("hg_allow_gopro")
+	if allowGoPro and not allowGoPro:GetBool() then
+		RunConsoleCommand("hg_gopro", "0")
+		return
+	end
+
 	hg.cameraAtHead = true
-	--local hand = ply:GetAttachment(ply:LookupAttachment("anim_attachment_rh"))
-	local eye = getPreferredEyeAttachment(ply)
+	local eye = getPreferredEyeAttachment(hg.GetCurrentCharacter(ply))
 	if not eye then return end
-	--local org = eye.Pos
 	local ang1 = eye.Ang + Angle(5, 2, 0)
 
 	local x = hg_gopro_x:GetFloat()
 	local y = hg_gopro_y:GetFloat()
 	local z = hg_gopro_z:GetFloat()
 	local org1 = eye.Pos + (eye.Ang:Up() * 6) + (eye.Ang:Forward() * -3) + (eye.Ang:Right() * 6.5)
-	if hg_allow_gopro_pos and hg_allow_gopro_pos:GetBool() then
+	local allowGoProPos = GetConVar("hg_allow_gopro_pos")
+	if allowGoProPos and allowGoProPos:GetBool() then
 		org1 = org1 + Vector(x, y, z)
 	end
 
@@ -419,7 +422,8 @@ function GoProCam(ply, vec, ang, fov, znear, zfar)
 		angles = ang1,
 		fov = 110,
 		drawviewer = true,
-		znear = 0.7
+		znear = 0.7,
+		zfar = zfar
 	}
 
 	return view
@@ -671,18 +675,13 @@ CalcView = function(ply, origin, angles, fov, znear, zfar)
 		return view
 	end--]]
 	if hg_gopro:GetBool() then
-		if not hg_allow_gopro:GetBool() then
-			RunConsoleCommand("hg_gopro", 0) -- i ain't gonna make over 9999 exceptions for hg_allow_gopro convar
-			return
-		end
-
 		local vpangs = GetAllViewPunchAngles()
 		local anglegopro = Angle(0, vpangs[1], -vpangs[2]) * 1--Angle(vpangs[2], -vpangs[1], vpangs[3])
 		anglegopro[2] = anglegopro[2] + math.sin(CurTime() * 2) * math.cos(CurTime() * 1) * 2
 		anglegopro[1] = anglegopro[1] + math.cos(CurTime() * 1) * math.sin(CurTime() * 1.25) * 3
 		
 		hg.bone.Set(ply, "head", vector_origin, anglegopro, "gopro")
-		return GoProCam(ply, origin, angles, fov, znear, zfa)
+		return GoProCam(ply, origin, angles, fov, znear, zfar) or view
 	end
 
 	if result == view then
@@ -880,9 +879,6 @@ local function renderscene(pos, angle, fov)
 
 	renderView.w = scrw
 	renderView.h = scrh
-	-- Render the scene with the completed Homigrad view. Reusing RenderScene's
-	-- incoming FOV discarded weapon/camera corrections and could leave clients
-	-- looking through an incorrectly zoomed 4:3 projection on wide displays.
 	renderView.fov = math.Clamp(tonumber(view.fov) or tonumber(fov) or 90, 40, 120)
 	renderView.aspectratio = scrh > 0 and (scrw / scrh) or 1
 	renderView.origin = view.origin

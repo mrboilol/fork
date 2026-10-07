@@ -1793,7 +1793,7 @@ duplicator.Allow( "homigrad_base" )
 	end
 --//
 
-CreateConVar("hg_allow_gopro", 0, {FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED}, "Allow GoPro-like first-person camera")
+CreateConVar("hg_allow_gopro", 1, {FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED}, "Allow GoPro-like first-person camera")
 CreateConVar("hg_allow_gopro_pos", 0, {FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED}, "Allow editing GoPro camera position")
 
 --\\ Custom table.IsEmpty
