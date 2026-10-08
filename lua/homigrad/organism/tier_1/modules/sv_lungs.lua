@@ -6,7 +6,20 @@ hg.organism.module.lungs = {}
 
 local module = hg.organism.module.lungs
 
-local cardiacArrestO2DrainTime = 20
+local cardiacArrestO2DrainTime = 120
+local o2BloodZeroVolume = 1250
+local o2BloodRefVolume = 2000
+local o2BloodRefValue = 5
+local o2BloodMidVolume = 2500
+local o2BloodMidValue = 15
+local o2BloodExponent = math.log(o2BloodMidValue / o2BloodRefValue) / math.log((o2BloodMidVolume - o2BloodZeroVolume) / (o2BloodRefVolume - o2BloodZeroVolume))
+local o2BloodScale = o2BloodRefValue / (o2BloodRefVolume - o2BloodZeroVolume) ^ o2BloodExponent
+
+local function getBloodVolumeO2Limit(blood)
+	local excess = (tonumber(blood) or 0) - o2BloodZeroVolume
+	if excess <= 0 then return 0 end
+	return o2BloodScale * excess ^ o2BloodExponent
+end
 local lowStaminaO2Start = 50
 -- Ordinary fatigue should make breathing harder, not turn a short sprint into
 -- an immediate blackout.  Only sustained, near-total exhaustion is allowed to
@@ -350,18 +363,15 @@ local function notifyCriticalHypoxia(org)
 	local now = CurTime()
 	if (org.nextCriticalStatusNotify or 0) > now then return end
 
-	local multipleCauses = (org.internalBleed or 0) > 0.75
-		or (org.bleed or 0) > 0
-		or (org.brain or 0) > 0.08
-		or (org.heart or 0) > 0.2
-		or (org.pneumothorax or 0) > 0.2
-		or (org.hemothorax or 0) > 0.15
-		or org.cervicalRespiratoryArrest
+	local bleedingOut = (tonumber(org.blood) or 5000) <= 3000
+	local dying = bleedingOut and not org.lastCriticalThoughtDying
+	org.lastCriticalThoughtDying = dying
 
-	local message = (multipleCauses and math.Rand(0, 1) < 0.58)
-		and multiCauseDying[math.random(#multiCauseDying)]
-		or lowoxy[math.random(#lowoxy)]
-	owner:Notify(message, 28, "hypoxia_critical", 0, nil, color_red3)
+	if dying then
+		owner:Thought(multiCauseDying[math.random(#multiCauseDying)], 28, "hypoxia_critical_dying", 0, color_red3)
+	else
+		owner:Thought(lowoxy[math.random(#lowoxy)], 28, "hypoxia_critical_air", 0, color_red3)
+	end
 	org.nextCriticalStatusNotify = now + 24
 end
 
@@ -1076,9 +1086,10 @@ module[2] = function(owner, org, timeValue)
 
 	end
 
+	local bloodVolumeO2Reserve = math.Clamp(getBloodVolumeO2Limit(org.blood) / o2.range, 0, 1)
 	local rawTissuePerfusion = math.min(
 		hg.organism.GetCirculatoryOxygenReserve(org.pulse, tonumber(org.bloodPressure) or 90, org.blood),
-		math.Clamp(((tonumber(org.blood) or 5000) - (hg.organism.PULSELESS_BLOOD_VOLUME or 2000)) / 500, 0, 1),
+		bloodVolumeO2Reserve,
 		1 - math.Clamp(org.hypertension or 0, 0, 1) ^ 2 * 0.85
 	)
 	local tissuePerfusionTarget = rawTissuePerfusion
@@ -1089,7 +1100,9 @@ module[2] = function(owner, org, timeValue)
 	local tissuePerfusion = currentTissuePerfusion
 		+ (tissuePerfusionTarget - currentTissuePerfusion) * (1 - math.exp(-timeValue / transitionTime))
 	org.circulatoryO2Reserve = math.Clamp(tissuePerfusion, 0, 1)
-	if hg.organism.EnforceBloodCirculationLimit(org) then tissuePerfusion = 0 end
+	if hg.organism.EnforceBloodCirculationLimit(org) then
+		tissuePerfusion = bloodVolumeO2Reserve
+	end
 	local perfusionO2Cap = o2.range * tissuePerfusion
 	org.perfusionO2Cap = perfusionO2Cap
 	local deliveryReserve = hg.organism.GetLimitingReserve(

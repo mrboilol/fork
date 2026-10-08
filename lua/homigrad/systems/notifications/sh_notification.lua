@@ -348,10 +348,18 @@ if CLIENT then
 	local function GetThoughtInstability(org)
 		local o2 = istable(org.o2) and (tonumber(org.o2[1]) or 30) or 30
 		local oxygen = math.Clamp((18 - o2) / 18, 0, 1)
-		local blood = math.Clamp((3200 - (tonumber(org.blood) or 5000)) / 2200, 0, 1)
+		local blood = math.Clamp((4300 - (tonumber(org.blood) or 5000)) / 1300, 0, 1)
 		local consciousness = math.Clamp((0.65 - (tonumber(org.consciousness) or 1)) / 0.65, 0, 1)
 		local brainOxygen = math.Clamp((0.55 - (tonumber(org.brainoxygen) or 1)) / 0.55, 0, 1)
 		return math.max(oxygen, blood * 0.8, consciousness, brainOxygen)
+	end
+
+	local function GetThoughtRedness(instability)
+		return math.Clamp(instability, 0, 1) ^ 0.75 * 0.85
+	end
+
+	local function GetThoughtShake(instability)
+		return instability * 4 + instability ^ 2 * 12
 	end
 
 	local function NotificationsDraw()
@@ -392,6 +400,12 @@ if CLIENT then
 				coloruse.r = clr.r
 				coloruse.g = math.min(math.Clamp(((90 - org.pain) / 90) * 255, 0, 255), clr.g)
 				coloruse.b = math.min(math.Clamp(((90 - org.pain) / 90) * 255, 0, 255), clr.g)
+
+				local instability = GetThoughtInstability(org)
+				local redness = GetThoughtRedness(instability)
+				coloruse.r = Lerp(redness, coloruse.r, 255)
+				coloruse.g = Lerp(redness, coloruse.g, 25)
+				coloruse.b = Lerp(redness, coloruse.b, 25)
 
 				if (org.otrub or !lply:Alive()) then
 					if not last_message then
@@ -452,16 +466,16 @@ if CLIENT then
 
 					render.PopFilterMag()
 				elseif lply.PlayerClassName == "furry" then
-					local shake = (org.pain > 10 and org.pain / 12 or 0) + GetThoughtInstability(org) * 10
+					local shake = GetThoughtShake(instability)
 					local uiScale = hg.UIScale and hg.UIScale() or 1
-					local x, y = ScrW() / 2 - txtw / 2 + (math.Rand(0, org.pain > 10 and org.pain / 10 or 0) + math.Rand(0, (255 - clr.g) / 255 * 2)) * uiScale, ScrH() - 180 * uiScale + (math.Rand(0, org.pain > 10 and org.pain / 10 or 0) + math.Rand(0, (255 - clr.g) / 255 * 2)) * uiScale
+					local x, y = ScrW() / 2 - txtw / 2 + (math.Rand(0, org.pain > 10 and org.pain / 10 or 0) + math.Rand(0, (255 - clr.g) / 255 * 2) + math.Rand(-shake, shake)) * uiScale, ScrH() - 180 * uiScale + (math.Rand(0, org.pain > 10 and org.pain / 10 or 0) + math.Rand(0, (255 - clr.g) / 255 * 2) + math.Rand(-shake, shake)) * uiScale
 
 					draw.SimpleText(last_message or txt, "ZB_ProotOSMedium", x + 2, y + 2, ColorAlpha(color_black, col.a), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 					draw.SimpleText(last_message or txt, "ZB_ProotOSMedium", x, y, ColorAlpha(bluewhite, col.a), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 				else
-					local shake = (org.pain > 10 and org.pain / 12 or 0) + GetThoughtInstability(org) * 10
+					local shake = GetThoughtShake(instability)
 					local uiScale = hg.UIScale and hg.UIScale() or 1
-					local x, y = ScrW() / 2 - txtw / 2 + (math.Rand(0, org.pain > 10 and org.pain / 10 or 0) + math.Rand(0, (255 - clr.g) / 255 * 2)) * uiScale, ScrH() - 180 * uiScale + (math.Rand(0, org.pain > 10 and org.pain / 10 or 0) + math.Rand(0, (255 - clr.g) / 255 * 2)) * uiScale
+					local x, y = ScrW() / 2 - txtw / 2 + (math.Rand(0, org.pain > 10 and org.pain / 10 or 0) + math.Rand(0, (255 - clr.g) / 255 * 2) + math.Rand(-shake, shake)) * uiScale, ScrH() - 180 * uiScale + (math.Rand(0, org.pain > 10 and org.pain / 10 or 0) + math.Rand(0, (255 - clr.g) / 255 * 2) + math.Rand(-shake, shake)) * uiScale
 
 					draw.SimpleTextOutlined(last_message or txt, font, x, y, col, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER, 1.5, colBrown)
 				end
@@ -492,7 +506,9 @@ if CLIENT then
 		local duration = 4.5
 		local fade = 0.6
 		local org = LocalPlayer().organism
-		local shake = org and GetThoughtInstability(org) * 10 or 0
+		local instability = org and GetThoughtInstability(org) or 0
+		local shake = GetThoughtShake(instability)
+		local redness = GetThoughtRedness(instability)
 
 		for i = #hg.thoughts, 1, -1 do
 			local tbl = hg.thoughts[i]
@@ -509,7 +525,7 @@ if CLIENT then
 				local y = ScrH() - 270 * uiScale - (i - 1) * 32 * uiScale
 
 				thoughtBrown.a = alpha
-				draw.SimpleTextOutlined(tbl[1], "ThoughtFont", ScrW() / 2 + math.Rand(-shake, shake), y + math.Rand(-shake, shake), Color(clr.r, clr.g, clr.b, alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, thoughtBrown)
+				draw.SimpleTextOutlined(tbl[1], "ThoughtFont", ScrW() / 2 + math.Rand(-shake, shake), y + math.Rand(-shake, shake), Color(Lerp(redness, clr.r, 255), Lerp(redness, clr.g, 25), Lerp(redness, clr.b, 25), alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, thoughtBrown)
 			end
 		end
 	end

@@ -673,7 +673,10 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 	local traitScreenEffects = lply:GetTraitMultiplier("screen_effects", 1)
 	local lowConsciousnessVisual = math.Clamp((0.5 - consciousness) / 0.2, 0, 1) * traitScreenEffects
 	local shockVisual = math.Clamp(((org.shock or 0) - 18) / 62, 0, 1) * traitScreenEffects
-	local shockVignette = math.max(lowConsciousnessVisual ^ 1.35, shockVisual ^ 2.5 * 0.8)
+	local lowBloodVisual = math.Clamp((4300 - blood) / 1300, 0, 1) * traitScreenEffects
+	local lowO2Visual = math.Clamp((18 - o2) / 18, 0, 1) * traitScreenEffects
+	local hypoxicVignette = math.max(lowBloodVisual ^ 1.6 * 0.4, lowO2Visual ^ 1.5 * 0.5)
+	local shockVignette = math.max(lowConsciousnessVisual ^ 1.35, shockVisual ^ 2.5 * 0.8, hypoxicVignette)
 	local consciousnessBlackout = lowConsciousnessVisual ^ 2.6 * 0.58
 	k1 = Lerp(FrameTime() * 15, k1 or 0, math.min(math.min(adrenaline / 1, 2),1.5))
 	k2 = (30 - (o2 or 30)) / 30 + consciousnessBlackout
@@ -788,7 +791,7 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 
 	*/
 
-	tabblood["$pp_colour_colour"] = Lerp(FrameTime() * 30, tabblood["$pp_colour_colour"], math.max(0, (blood / 5000) * (potato and (blood / 5000) or 1) - (!org.otrub and potato and k2 or 0) - k4 * 0.5 - (potato and consciousnessBlackout * 0.05 or consciousnessBlackout * 0.32) + (math.max(analgesiaVisual - 1, 0) * math.sin(CurTime()) * 5)))
+	tabblood["$pp_colour_colour"] = Lerp(FrameTime() * 30, tabblood["$pp_colour_colour"], math.max(0, (blood / 5000) * (potato and (blood / 5000) or 1) * (1 - lowBloodVisual ^ 1.3 * 0.6) - (!org.otrub and potato and k2 or 0) - k4 * 0.5 - (potato and consciousnessBlackout * 0.05 or consciousnessBlackout * 0.32) + (math.max(analgesiaVisual - 1, 0) * math.sin(CurTime()) * 5)))
 	//tabblood["$pp_colour_contrast"] = Lerp(FrameTime() * 30, tabblood["$pp_colour_contrast"], health < 80 and math.max(1.5 * ( 1 - math.min(health / 50, 1) ), 1 ) or 1)
 	tabblood["$pp_colour_brightness"] = Lerp(FrameTime() * 30, tabblood["$pp_colour_brightness"], (potato and ((blood / 5000 - 1) / 2 - (!org.otrub and k2 / 10 or 0) - k4 / 12) or 0) - consciousnessBlackout * 0.09 )
 	tabblood["$pp_colour_addb"] = 0

@@ -527,7 +527,8 @@ local function SCPCBThoughtOwner(ent)
 end
 
 local notificationPriorities = {
-    hypoxia_critical = 100,
+    hypoxia_critical_air = 100,
+    hypoxia_critical_dying = 100,
     spine3_oxygen_loss = 90,
     cervical_paralysis = 80,
     pain_scream = 110,

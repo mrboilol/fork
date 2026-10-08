@@ -50,7 +50,14 @@ local STRIDE_REACH_FRACTION = 0.9
 local MAX_STRIDE_DROP = 7
 local STRIDE_BODY_SCALE = 0.25
 local RUN_HOP_SCALE = 0.4
-local STRIDE_REAR_SHIFT = 5
+local UPRIGHT_FADE_SPEED = 40
+local MIN_PHASE_SPAN = 0.3
+local PHASE_WRAP = 1.8
+local REMOTE_MAX_AHEAD = 1.5
+local ONE_LEG_WIDTH = 0.35
+local ONE_LEG_SWING = 0.85
+local ONE_LEG_HOP = 2
+local SWING_ALIGN_RELEASE = 0.5
 local LANDING_SPREAD_FRACTION = 0.8
 local SETTLE_SWING_TIME = 0.28
 local SETTLE_COOLDOWN = 0.12
@@ -282,23 +289,26 @@ local function plantFoot(state, foot, pos, normal, groundEnt, bodyYaw)
 	state.lastPlant = CurTime()
 end
 
-local function startStep(state, index, duration, allowOverlap)
+local function startStep(state, index, duration, allowOverlap, gait)
 	local foot, other = state.feet[index], state.feet[3 - index]
-	if not foot or foot.swinging then return end
-	if not foot.planted then
-		foot.pending = duration
+	if not foot or foot.disabled then return end
+	if foot.swinging then
+		if gait and not foot.gait then
+			foot.gait, foot.phaseFrom, foot.t0 = true, state.phase, foot.t
+		end
 
 		return
 	end
-	if other.swinging and not allowOverlap then
-		foot.pending = duration
+	if not foot.planted or (other.swinging and not allowOverlap) then
+		foot.pending, foot.pendingGait = duration, gait
 
 		return
 	end
 
-	foot.pending = nil
+	foot.pending, foot.pendingGait = nil, nil
 	foot.swinging = true
-	foot.t = 0
+	foot.t, foot.t0 = 0, 0
+	foot.gait, foot.phaseFrom = gait, state.phase
 	foot.duration = duration
 	foot.start = Vector(foot.planted)
 	foot.startNormal = foot.normal
@@ -308,7 +318,9 @@ local function startStep(state, index, duration, allowOverlap)
 end
 
 local function beginStaggerStep(state, stagger, index, dist, final)
+	if state.feet[index].disabled then index = 3 - index end
 	local foot = state.feet[index]
+	if foot.disabled then return end
 	foot.stagger = {dir = stagger.dir, dist = dist, final = final}
 	foot.pending = nil
 	startStep(state, index, STAGGER_STEP_TIME, true)
@@ -323,16 +335,15 @@ local function plantedWorldPos(foot)
 end
 
 local function reachLead(state, ctx, index)
-	local height = ctx.anim[index].hip.z - ctx.origin.z - state.ankleHeight - ctx.maxStrideDrop
+	local height = ctx.anim[index].hip.z - ctx.origin.z - state.ankleHeight - ctx.strideDrop
 	local reach = ctx.legLength * LEAD_REACH_FRACTION
 
 	return math_sqrt(math_max(reach * reach - height * height - ctx.halfWidth * ctx.halfWidth, 0))
 end
 
-local function landingTarget(ply, state, ctx, foot, index)
+local function landingTarget(ply, state, ctx, foot, index, remaining)
 	local sign = LEGS[index].sign
 	local rest = ctx.origin + ctx.right * (sign * ctx.halfWidth)
-	local remaining = (1 - foot.t) * foot.duration
 
 	local stagger = foot.stagger
 	if stagger then
@@ -348,8 +359,7 @@ local function landingTarget(ply, state, ctx, foot, index)
 	end
 
 	local bodyAtLanding = ctx.origin + ctx.vel * remaining
-	local lead = hg.GaitLandingLead(ctx.speed, ctx.swingFraction) * IKFoot.GetFloat("stride_scale") * (1 - ctx.limp[index] * LIMP_STRIDE_CUT)
-	lead = math_max(math_min(lead, reachLead(state, ctx, index)) - STRIDE_REAR_SHIFT, 0)
+	local lead = math_min(ctx.strideLead * (1 - ctx.limp[index] * LIMP_STRIDE_CUT), reachLead(state, ctx, index))
 	local offset = ctx.right * (sign * ctx.halfWidth) + ctx.moveDir * lead
 	local intendedLateral = sign * offset:Dot(ctx.right)
 	local maxSpread = ctx.legLength * LANDING_SPREAD_FRACTION
@@ -367,11 +377,32 @@ local function landingTarget(ply, state, ctx, foot, index)
 	return bodyAtLanding + offset
 end
 
-local function updateSwing(ply, state, ctx, index, dt)
-	local foot = state.feet[index]
+local function swingWindow(ctx)
+	return ctx.oneLeg and math_min(ctx.swingFraction, ONE_LEG_SWING) or ctx.swingFraction
+end
+
+local function advanceSwing(state, ctx, foot, index, dt)
+	local rate = state.rate or 0
+	if foot.gait and rate > 0 then
+		local offset = (foot.phaseFrom - (index - 1)) % 2
+		if offset > PHASE_WRAP then offset = offset - 2 end
+		local span = math_max(swingWindow(ctx) - offset, MIN_PHASE_SPAN)
+		local elapsed = (state.phase - foot.phaseFrom) % 2
+		if elapsed > PHASE_WRAP then elapsed = 0 end
+		foot.t = math_max(foot.t, foot.t0 + (1 - foot.t0) * math_min(elapsed / span, 1))
+
+		return math_max(span - elapsed, 0) / rate
+	end
 	foot.t = math_min(foot.t + dt / foot.duration, 1)
 
-	local desired = clampToWalls(state, ctx.origin, landingTarget(ply, state, ctx, foot, index))
+	return (1 - foot.t) * foot.duration
+end
+
+local function updateSwing(ply, state, ctx, index, dt)
+	local foot = state.feet[index]
+	local remaining = advanceSwing(state, ctx, foot, index, dt)
+
+	local desired = clampToWalls(state, ctx.origin, landingTarget(ply, state, ctx, foot, index, remaining))
 	if not foot.tracedPos or foot.tracedAt:DistToSqr(desired) > RETRACE_DIST_SQR then
 		foot.tracedPos, foot.targetNormal, foot.targetEnt = traceSupport(state, ctx.origin, desired)
 		foot.tracedAt = desired
@@ -410,14 +441,15 @@ local function remoteGait(ply, state, dt)
 	if netStep < 0 then return end
 	local rate = ply:GetNW2Float("HGGaitRate", 0)
 	if netStep ~= state.netStep then
-		state.netPhase = state.netStep and netStep % 2 or state.phase
+		local nextStep = state.netStep and (math_floor(state.netStep / 2) + 1) % 4096 == math_floor(netStep / 2)
+		state.netAhead = nextStep and math_Clamp((state.netAhead or 0) - 1, 0, 1) or 0
+		state.netBase = netStep % 2
 		state.netStep = netStep
 	end
-	local netPhase = state.netPhase or state.phase
-	local stepEnd = math_floor(netPhase) + 0.999
-	state.netPhase = math_min(netPhase + rate * hg.GaitLimpRateMul(ply, netPhase) * dt, stepEnd) % 2
+	local ahead = state.netAhead
+	state.netAhead = math_min(ahead + rate * hg.GaitLimpRateMul(ply, state.netBase + ahead) * dt, REMOTE_MAX_AHEAD)
 
-	return rate, state.netPhase
+	return rate, (state.netBase + state.netAhead) % 2
 end
 
 local function updatePhase(ply, state, ctx, dt)
@@ -431,6 +463,7 @@ local function updatePhase(ply, state, ctx, dt)
 		rate, refPhase = remoteGait(ply, state, dt)
 	end
 
+	state.baseRate = rate
 	if rate then
 		rate = rate * hg.GaitLimpRateMul(ply, state.phase)
 		state.phase = (state.phase + rate * dt) % 2
@@ -440,11 +473,12 @@ local function updatePhase(ply, state, ctx, dt)
 
 	if not rate then
 		if ctx.speed <= MOVING_SPEED then
-			state.rate = 0
+			state.rate, state.baseRate = 0, 0
 
 			return
 		end
-		rate = hg.GaitStepRate(ctx.speed, true) * hg.GaitLimpRateMul(ply, state.phase)
+		state.baseRate = hg.GaitStepRate(ctx.speed, true)
+		rate = state.baseRate * hg.GaitLimpRateMul(ply, state.phase)
 		state.phase = (state.phase + rate * dt) % 2
 	end
 	state.rate = rate
@@ -463,7 +497,7 @@ local function updatePhase(ply, state, ctx, dt)
 		local rest = ctx.origin + ctx.right * (LEGS[stepIndex].sign * ctx.halfWidth)
 		if (foot.planted - rest):Length2D() < IKFoot.GetFloat("settle_distance") then return end
 	end
-	startStep(state, stepIndex, hg.GaitSwingTime(rate, ctx.swingFraction), ctx.swingFraction > 1)
+	startStep(state, stepIndex, hg.GaitSwingTime(rate, ctx.swingFraction), ctx.swingFraction > 1, true)
 end
 
 local function settleIdleFeet(state, ctx)
@@ -475,13 +509,15 @@ local function settleIdleFeet(state, ctx)
 
 	for index = 1, 2 do
 		local foot = state.feet[index]
-		if foot.swinging or not foot.planted then return end
-		local rest = ctx.origin + ctx.right * (LEGS[index].sign * ctx.halfWidth)
-		local distError = (foot.plantOrigin and (ctx.origin - foot.plantOrigin):Length2D() or (foot.planted - rest):Length2D()) / settleDist
-		local yawError = math_abs(math_AngleDifference(ctx.bodyYaw, foot.bodyYaw or ctx.bodyYaw)) / settleAngle
-		local err = math_max(distError, yawError)
-		if err > worstError then
-			worstIndex, worstError = index, err
+		if not foot.disabled then
+			if foot.swinging or not foot.planted then return end
+			local rest = ctx.origin + ctx.right * (LEGS[index].sign * ctx.halfWidth)
+			local distError = (foot.plantOrigin and (ctx.origin - foot.plantOrigin):Length2D() or (foot.planted - rest):Length2D()) / settleDist
+			local yawError = math_abs(math_AngleDifference(ctx.bodyYaw, foot.bodyYaw or ctx.bodyYaw)) / settleAngle
+			local err = math_max(distError, yawError)
+			if err > worstError then
+				worstIndex, worstError = index, err
+			end
 		end
 	end
 
@@ -530,6 +566,14 @@ local function updatePelvis(ply, state, dt)
 end
 
 local function updateFeet(ply, state, ctx, dt)
+	for index = 1, 2 do
+		local foot = state.feet[index]
+		foot.disabled = not ctx.anim[index].usable
+		if foot.disabled then
+			foot.planted, foot.swinging, foot.pending, foot.stagger = nil, false, nil, nil
+		end
+	end
+
 	updatePhase(ply, state, ctx, dt)
 	if not ctx.onGround then
 		releaseFeet(state, ctx)
@@ -537,35 +581,39 @@ local function updateFeet(ply, state, ctx, dt)
 		return
 	end
 
+	local pelvisLift = pelvisOffsetOf(ply, state) - (state.rise or 0) * state.weight
 	for index = 1, 2 do
 		local foot = state.feet[index]
-		if not foot.planted then
-			local anim = ctx.anim[index]
-			plantFoot(state, foot, traceSupport(state, ctx.origin, anim.ankle))
-			foot.bodyYaw = ctx.bodyYaw
-		end
-
-		if foot.pending and not state.feet[3 - index].swinging then
-			startStep(state, index, foot.pending, false)
-		end
-
-		if not foot.swinging then
-			local planted = plantedWorldPos(foot)
-			local reachFraction = ctx.crouching and REACH_FRACTION or STANDING_REACH_FRACTION
-			local reach = ctx.anim[index].length * reachFraction
-			local settledInPlace = foot.plantOrigin and (ctx.origin - foot.plantOrigin):Length2DSqr() < OVERREACH_RESTEP_MOVE_SQR
-			local overreach = not planted or (not settledInPlace and (planted + vector_up * state.ankleHeight):DistToSqr(ctx.anim[index].hip - vector_up * state.drop) > reach * reach)
-			if overreach then
-				startStep(state, index, SETTLE_SWING_TIME, false)
-			elseif ctx.speed > MOVING_SPEED and not foot.stagger then
-				local rest = ctx.origin + ctx.right * (LEGS[index].sign * ctx.halfWidth)
-				local behind = (rest - planted):Dot(ctx.moveDir)
-				if behind > hg.GaitLandingLead(ctx.speed, ctx.swingFraction) + STRIDE_REAR_SHIFT + hg.GaitStepLength(ctx.speed) * DRIFT_STEP_FRACTION then
-					startStep(state, index, hg.GaitSwingTime(math_max(state.rate or 0, 1), ctx.swingFraction), false)
-				end
+		local other = state.feet[3 - index]
+		if not foot.disabled then
+			if not foot.planted then
+				local anim = ctx.anim[index]
+				plantFoot(state, foot, traceSupport(state, ctx.origin, anim.ankle))
+				foot.bodyYaw = ctx.bodyYaw
 			end
-			foot.ground = foot.planted
-			foot.groundNormal = foot.normal
+
+			if foot.pending and not other.swinging then
+				startStep(state, index, foot.pending, false, foot.pendingGait)
+			end
+
+			if not foot.swinging then
+				local planted = plantedWorldPos(foot)
+				local reachFraction = ctx.crouching and REACH_FRACTION or STANDING_REACH_FRACTION
+				local reach = ctx.anim[index].length * reachFraction
+				local settledInPlace = foot.plantOrigin and (ctx.origin - foot.plantOrigin):Length2DSqr() < OVERREACH_RESTEP_MOVE_SQR
+				local overreach = not planted or (not settledInPlace and (planted + vector_up * state.ankleHeight):DistToSqr(ctx.anim[index].hip + vector_up * pelvisLift) > reach * reach)
+				if overreach then
+					if not planted or not other.swinging then startStep(state, index, SETTLE_SWING_TIME, false) end
+				elseif ctx.speed > MOVING_SPEED and not foot.stagger and not other.swinging then
+					local rest = ctx.origin + ctx.right * (LEGS[index].sign * ctx.halfWidth)
+					local behind = (rest - planted):Dot(ctx.moveDir)
+					if behind > ctx.strideLead + hg.GaitStepLength(ctx.speed) * DRIFT_STEP_FRACTION then
+						startStep(state, index, hg.GaitSwingTime(math_max(state.rate or 0, 1), ctx.swingFraction), false)
+					end
+				end
+				foot.ground = foot.planted
+				foot.groundNormal = foot.normal
+			end
 		end
 	end
 
@@ -615,7 +663,7 @@ local function updateDrop(state, ctx, dt)
 
 	local maxDrop = IKFoot.GetFloat("max_body_drop") * (ctx.crouching and CROUCH_DROP_SCALE or 1)
 	stride = math_min(stride, ctx.maxStrideDrop) * STRIDE_BODY_SCALE
-	local targetDrop = math_max(terrainDrop * DROP_TERRAIN_SCALE, stride) + (ctx.stagger and ctx.stagger.amount * STAGGER_DROP or 0)
+	local targetDrop = math_max(terrainDrop * DROP_TERRAIN_SCALE, stride, ctx.strideDrop) + (ctx.stagger and ctx.stagger.amount * STAGGER_DROP or 0)
 	targetDrop = math_Clamp(targetDrop, 0, maxDrop)
 	state.drop = state.drop + (targetDrop - state.drop) * (1 - math_exp(-dt * DROP_SMOOTH))
 end
@@ -623,7 +671,14 @@ end
 local function gaitBob(state, ctx)
 	if not ctx.onGround or (state.rate or 0) <= 0 then return 0 end
 	local stepProgress = state.phase % 1
-	local stanceIndex = 3 - (math_floor(state.phase) % 2 + 1)
+	local stepIndex = math_floor(state.phase) % 2 + 1
+	if ctx.oneLeg then
+		local window = swingWindow(ctx)
+		if stepIndex ~= ctx.oneLeg or stepProgress >= window then return 0 end
+
+		return math_sin(math.pi * stepProgress / window) * ONE_LEG_HOP * math_min(ctx.speed / WALK_BOB_SPEED, 1)
+	end
+	local stanceIndex = 3 - stepIndex
 	local dip = ctx.limp[stanceIndex] * LIMP_DIP * math_sin(math.pi * stepProgress)
 	local flight = hg.GaitFlightFraction(ctx.swingFraction)
 	local runFraction = smoothstep(math_Clamp((ctx.speedFraction - 0.5) * 2, 0, 1))
@@ -652,7 +707,7 @@ local function updateUpright(state, ctx, dt)
 			end
 		end
 		targetRise = targetRise or state.rise or 0
-		targetRise = targetRise * (1 - (ctx.stagger and ctx.stagger.amount or 0))
+		targetRise = targetRise * (1 - (ctx.stagger and ctx.stagger.amount or 0)) * (1 - math_Clamp((ctx.speed - MOVING_SPEED) / UPRIGHT_FADE_SPEED, 0, 1))
 	end
 	local rise = state.rise or 0
 	targetRise = targetRise or 0
@@ -722,6 +777,21 @@ local function buildContext(ply, state, anim, dt)
 		state.ankleHeight = state.ankleHeight + (measuredAnkle - state.ankleHeight) * math_min(dt * ANKLE_LEARN_RATE, 1)
 	end
 
+	local oneLeg = anim[1].usable ~= anim[2].usable and (anim[1].usable and 1 or 2) or nil
+	local halfWidth = math_Clamp(hipSpan, MIN_HALF_WIDTH, MAX_HALF_WIDTH) * (oneLeg and ONE_LEG_WIDTH or 1)
+	local legLength = math_max(anim[1].length, anim[2].length)
+	local maxStrideDrop = math_min(MAX_STRIDE_DROP, IKFoot.GetFloat("max_body_drop")) * (ply:Crouching() and CROUCH_DROP_SCALE or 1)
+	local swingFraction = hg.GaitSwingFraction(speed)
+	local strideLead, plannedDrop = 0, 0
+	local rate = state.baseRate or 0
+	if speed > MOVING_SPEED and rate > 0 then
+		strideLead = speed * math_max(2 - swingFraction, 0) / (2 * rate) * IKFoot.GetFloat("stride_scale")
+		local reach = legLength * LEAD_REACH_FRACTION
+		local flat = math_min(strideLead * strideLead + halfWidth * halfWidth, reach * reach)
+		local hipHeight = math_max(anim[1].hip.z, anim[2].hip.z) - origin.z - state.ankleHeight
+		plannedDrop = math_Clamp(hipHeight - math_sqrt(reach * reach - flat), 0, maxStrideDrop)
+	end
+
 	return {
 		origin = origin,
 		vel = vel,
@@ -732,13 +802,16 @@ local function buildContext(ply, state, anim, dt)
 		yawRate = yawRate,
 		forward = bodyAng:Forward(),
 		right = bodyAng:Right(),
-		halfWidth = math_Clamp(hipSpan, MIN_HALF_WIDTH, MAX_HALF_WIDTH),
-		legLength = math_max(anim[1].length, anim[2].length),
-		maxStrideDrop = math_min(MAX_STRIDE_DROP, IKFoot.GetFloat("max_body_drop")) * (ply:Crouching() and CROUCH_DROP_SCALE or 1),
+		halfWidth = halfWidth,
+		legLength = legLength,
+		maxStrideDrop = maxStrideDrop,
+		strideLead = strideLead,
+		strideDrop = plannedDrop,
+		oneLeg = oneLeg,
 		onGround = ply:OnGround(),
 		crouching = ply:Crouching(),
 		limp = {hg.GaitLegLimp(ply.organism, "lleg"), hg.GaitLegLimp(ply.organism, "rleg")},
-		swingFraction = hg.GaitSwingFraction(speed),
+		swingFraction = swingFraction,
 		stagger = staggerInfo(ply),
 		anim = anim,
 	}
@@ -756,7 +829,7 @@ local function alignFoot(foot, carriedAng, toeDir, weight, ankleHeight, toeLengt
 	if foot.swinging then
 		local startYaw = foot.startYaw or currentYaw
 		yaw = startYaw + math_AngleDifference(currentYaw, startYaw) * smoothstep(foot.t)
-		weight = weight * (1 - math_sin(math.pi * foot.t))
+		weight = weight * (1 - SWING_ALIGN_RELEASE * math_sin(math.pi * foot.t))
 	end
 	if weight <= 0 then return carriedAng end
 
