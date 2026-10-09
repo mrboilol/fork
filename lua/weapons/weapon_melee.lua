@@ -1377,6 +1377,7 @@ function SWEP:SetupDataTables()
     self:NetworkVar("Float", 7, "AttackLength")
     self:NetworkVar("Float", 8, "AttackTime")
     self:NetworkVar("Float", 9, "BlockDisabledUntil")
+    self:NetworkVar("Float", 10, "ChargeStart")
 end
 
 function SWEP:OwnerChanged()
@@ -1504,6 +1505,7 @@ function SWEP:ClearChargeState()
     self.ReleasedChargeDamageMul = nil
     self.ReleasedChargeBoneMul = nil
     self.ChargeStaminaMul = nil
+    self:SetChargeStart(0)
 end
 
 function SWEP:CancelChargeAttack(playIdle)
@@ -1516,13 +1518,15 @@ function SWEP:CancelChargeAttack(playIdle)
     end
 end
 
-function SWEP:StartChargeAttack()
+function SWEP:StartChargeAttack(serverConfirmed)
     local owner = self:GetOwner()
     if not IsValid(owner) then return end
     if self.Charging then return end
-    if not owner.organism or owner.organism.stamina[1] < (self.ChargeMinStamina or 90) then return end
+    local stamina = owner.organism and owner.organism.stamina and owner.organism.stamina[1]
+    if not serverConfirmed and (not stamina or stamina < (self.ChargeMinStamina or 90)) then return end
+    stamina = stamina or (self.ChargeMinStamina or 90)
 
-    local mul = 1 / math.Clamp((180 - owner.organism.stamina[1]) / 90, 1, 2)
+    local mul = 1 / math.Clamp((180 - stamina) / 90, 1, 2)
 	mul = mul * self:GetMeleeArmSpeedMul(owner) * (self.SlamSpeedMul or 1)
 
     self.HitEnts = nil
@@ -1538,11 +1542,12 @@ function SWEP:StartChargeAttack()
     self.SwingLastTime = nil
     self.Charging = true
     self.ChargeIdleLooping = false
-    self.ChargeStartedAt = CurTime()
+    self.ChargeStartedAt = serverConfirmed and self:GetChargeStart() or CurTime()
     self.ChargeReleasedAt = nil
     self.ReleasedChargeDamageMul = nil
     self.ReleasedChargeBoneMul = nil
     self.ChargeStaminaMul = mul
+    if not serverConfirmed then self:SetChargeStart(self.ChargeStartedAt) end
 
     self:PlayAnim(self:GetAttackAnimToken("charge_begin", "Attack_Charge_Begin"), (self.ChargeAnimTimeBegin or 0.2) / mul, false, nil, false, false)
 end
@@ -1563,6 +1568,7 @@ function SWEP:ReleaseChargeAttack()
     self.ReleasedChargeDamageMul = self:GetChargeDamageScale()
     self.ReleasedChargeBoneMul = self:GetChargeBoneScale()
     self.Charging = nil
+    self:SetChargeStart(0)
     self.ChargeIdleLooping = nil
     self.HitEnts = nil
     self.FirstAttackTick = false
@@ -3861,6 +3867,16 @@ function SWEP:CustomThink()
 		end
 		self.blockPoseSoundState = nil
 	end
+
+    if CLIENT and IsValid(owner) and owner == LocalPlayer() then
+        local serverChargeStart = self:GetChargeStart()
+        if not self.Charging and serverChargeStart > 0 and hg.KeyDown(owner, IN_ATTACK) then
+            self:StartChargeAttack(true)
+        elseif self.Charging and serverChargeStart <= 0 and CurTime() - (self.ChargeStartedAt or CurTime()) > 0.5 then
+            self:CancelChargeAttack(true)
+            return
+        end
+    end
 
     if self.Charging then
         if not self.canchargeattack or not self:InUse() or self:GetBlocking() then

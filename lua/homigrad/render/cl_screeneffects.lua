@@ -1266,7 +1266,11 @@ drawFinalVitalsVignettes = function()
 		surface.SetDrawColor(255, 255, 255, 255)
 	end
 
-	if O2Lerp > 1 then
+	if O2Lerp > 1 and IsAiming and IsAiming(lply) then
+		surface.SetDrawColor(0, 0, 0, math.Clamp(O2Lerp / 250, 0, 1) * 200)
+		surface.DrawRect(0, 0, ScrW(), ScrH())
+		surface.SetDrawColor(255, 255, 255, 255)
+	elseif O2Lerp > 1 then
 		render.UpdateScreenEffectTexture()
 		noiseMat:SetFloat("$c0_y", 1 - O2Lerp / 250)
 		noiseMat:SetFloat("$c0_z", 1)

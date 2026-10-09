@@ -751,8 +751,9 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 					local dir = inertia_to / target_len
 					local terrain_mul, slope_accel = gaitTerrainPush(ply, dir)
 					local strength = hg.GaitPushStrength(ply, org, ply.hg_GaitPhase or 0) * terrain_mul * math_max(1 - slope_accel, PUSH_UPHILL_MIN)
-					local push_accel = math_min(PUSH_DRAG * target_len * push_shape * strength, ply.InertiaBlend)
-					local decay = math.exp(-PUSH_DRAG * delta_time)
+					local drag = PUSH_DRAG * math_min(ply.InertiaBlend / (PUSH_DRAG * target_len), 1)
+					local push_accel = drag * target_len * push_shape * strength
+					local decay = math.exp(-drag * delta_time)
 					new_inertia = ply.MovementInertia * decay + dir * (push_accel * delta_time)
 					new_inertia.z = 0
 					local new_len = new_inertia:Length2D()
