@@ -415,6 +415,7 @@ local function send_organism(org, ply, recipientForce, reliable)
 	sendtable.brainBleedRate = org.brainBleedRate
 	sendtable.o2 = org.o2
 	sendtable.CO = org.CO
+	sendtable.co2 = org.co2
 	sendtable.blood = org.blood
 	sendtable.bloodtype = org.bloodtype
 	sendtable.bleed = org.bleed

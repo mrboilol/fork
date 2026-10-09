@@ -212,6 +212,7 @@ local function Compress(npc, rag, org)
 	org.pulse = math.min((org.pulse or 0) + 5, 70)
 	org.CO = math.Approach(org.CO or 0, 0, 1)
 	org.COregen = math.Approach(org.COregen or 0, 0, 1)
+	org.co2 = math.Approach(org.co2 or 0, 0, 1)
 
 	if math.random(3) == 1 then org.lungsfunction = true end
 

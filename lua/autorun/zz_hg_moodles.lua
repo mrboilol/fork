@@ -614,6 +614,8 @@ local irregularECGSeverity = {
 	junctional_escape = 0.55,
 	sinus_pause = 0.55,
 	cerebral_irregular = 0.55,
+	ventricular_tachycardia = 0.9,
+	torsades_de_pointes = 0.95,
 }
 
 local function buildEffects(ply, org)

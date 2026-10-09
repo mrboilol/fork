@@ -55,6 +55,8 @@ local awakeECGSeverityByState = {
     extreme_tachycardia = 0.75,
     av_block_complete = 0.8,
     terminal_tachycardia = 0.9,
+    ventricular_tachycardia = 0.9,
+    torsades_de_pointes = 0.95,
     pea = 0.95,
     asystole = 1,
 }
@@ -509,6 +511,28 @@ local function DrawEKG(state, centerX, centerY, width, height, org, color, ringA
         return math.Clamp(h * envelope * amplitude, -0.75, 0.75)
     end
 
+    local function getVTH(phase)
+        if phase < 0.55 then return math.sin(phase / 0.55 * math.pi) * 0.9 end
+        return -math.sin((phase - 0.55) / 0.45 * math.pi) * 0.5
+    end
+
+    local function getTorsadesH(rawPhase)
+        local twist = math.sin(rawPhase * math.pi * 2 / 10)
+        twist = twist + (twist >= 0 and 0.15 or -0.15)
+        return math.Clamp(getVTH(rawPhase % 1) * twist, -0.95, 0.95)
+    end
+
+    local seizureArtifact = org.seizureActive and math.Clamp((time - (tonumber(org.seizureStart) or time)) / 1.5, 0, 1) or 0
+
+    local function getSeizureArtifactH(tracePos)
+        local elapsed = time - (tonumber(org.seizureStart) or time)
+        local tonic = math.Clamp(1 - (elapsed - 8) / 4, 0, 1)
+        local clonic = math.max(math.sin(time * math.pi * 2 * 3.2 + (tracePos or 0) * 4), 0) ^ 8
+        return (math.Rand(-1, 1) * Lerp(tonic, 0.12, 0.3)
+            + clonic * math.Rand(-0.9, 0.9) * (1 - tonic)
+            + math.sin(time * 1.7) * 0.15) * seizureArtifact
+    end
+
     local function getPVCH(phase)
         if phase < 0.12 or phase > 0.7 then return 0 end
         local p = (phase - 0.12) / 0.58
@@ -565,8 +589,14 @@ local function DrawEKG(state, centerX, centerY, width, height, org, color, ringA
         local pvcBeat = rhythm ~= "normal_sinus" and rhythm ~= "ventricular_ectopy" and rhythm ~= "ventricular_bigeminy"
             and pvcStrength >= 0.1 and beatIndex % pvcPeriod == pvcPeriod - 1
 
+        local ventricularRun = rhythm == "ventricular_tachycardia" or rhythm == "torsades_de_pointes"
+
         if rhythm == "ventricular_fibrillation" then
             h = getVentricularFibrillationH(rawPhase)
+        elseif rhythm == "torsades_de_pointes" then
+            h = getTorsadesH(rawPhase)
+        elseif rhythm == "ventricular_tachycardia" then
+            h = getVTH(phase)
         elseif rhythm == "atrial_fibrillation" then
             h = getAtrialFibrillationH(rawPhase)
         elseif rhythm == "ventricular_escape" or rhythm == "terminal_tachycardia" then
@@ -601,13 +631,13 @@ local function DrawEKG(state, centerX, centerY, width, height, org, color, ringA
             end
         end
 
-        if pvcBeat and rhythm ~= "ventricular_fibrillation" and rhythm ~= "atrial_fibrillation" and rhythm ~= "terminal_tachycardia" then
+        if pvcBeat and not ventricularRun and rhythm ~= "ventricular_fibrillation" and rhythm ~= "atrial_fibrillation" and rhythm ~= "terminal_tachycardia" then
             h = getPVCH(phase)
         end
 
         local palpitationK = math.Clamp(tonumber(palpitations) or 0, 0, 1)
 		palpitationK = palpitationK * math.Clamp((heartbeat - 120) / 100, 0, 1)
-        if rhythm ~= "asystole" and rhythm ~= "pea" and rhythm ~= "ventricular_fibrillation" and rhythm ~= "atrial_fibrillation" and palpitationK > 0 then
+        if not ventricularRun and rhythm ~= "asystole" and rhythm ~= "pea" and rhythm ~= "ventricular_fibrillation" and rhythm ~= "atrial_fibrillation" and palpitationK > 0 then
             h = Lerp(palpitationK, h, getPalpitationH(phase))
         end
 
@@ -615,7 +645,7 @@ local function DrawEKG(state, centerX, centerY, width, height, org, color, ringA
             h = getSinusH(phase) * 0.72
         end
 
-        if rhythm ~= "ventricular_fibrillation" and rhythm ~= "atrial_fibrillation" and rhythm ~= "asystole" then
+        if not ventricularRun and rhythm ~= "ventricular_fibrillation" and rhythm ~= "atrial_fibrillation" and rhythm ~= "asystole" then
             if phase > 0.33 and phase < 0.44 then
                 h = h - ischemia * 0.12
             elseif phase > 0.45 and phase < 0.65 then
@@ -633,6 +663,10 @@ local function DrawEKG(state, centerX, centerY, width, height, org, color, ringA
                     or (rhythm == "hypothermia_bradycardia" and phase > 0.29 and phase < 0.59)
                 if qrs then h = h * (beatIndex % 2 == 0 and 1 or Lerp(tamponade, 1, 0.45)) end
             end
+        end
+
+        if seizureArtifact > 0 then
+            h = h + getSeizureArtifactH(tracePos)
         end
 
         return h

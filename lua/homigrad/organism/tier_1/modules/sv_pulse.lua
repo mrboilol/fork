@@ -554,7 +554,8 @@ local function stabilizeECGState(org, candidate, heartbeat)
 	end
 
 	local immediate = candidate == "asystole" or candidate == "pea"
-		or candidate == "ventricular_fibrillation"
+		or candidate == "ventricular_fibrillation" or candidate == "ventricular_tachycardia"
+		or candidate == "torsades_de_pointes"
 	if immediate then
 		org._ecgStateSince = CurTime()
 		return candidate
@@ -617,6 +618,10 @@ function hg.organism.GetECGState(heartbeat, heartstop, org)
 		candidate = "terminal_tachycardia"
 	elseif org.fibrillation or org.terminalRhythm == "ventricular_fibrillation" then
 		candidate = "ventricular_fibrillation"
+	elseif org.ventricularTachycardia == "polymorphic" then
+		candidate = "torsades_de_pointes"
+	elseif org.ventricularTachycardia == "monomorphic" then
+		candidate = "ventricular_tachycardia"
 	elseif arrhythmia >= 0.72 and heartbeat >= 140 and (ischemia >= 0.35 or (org.heartStrain or 0) >= 0.3 or heartbeat >= 200) then
 		candidate = "terminal_tachycardia"
 	elseif pulse <= 5 and output <= 0.08 and perfusion <= 0.08 then
@@ -705,10 +710,74 @@ function hg.organism.StartFibrillation(org)
 	org.fibrillation = true
 	-- Fibrillation replaces an organized palpitation rhythm; keeping both
 	-- active makes circulation, ECG, and status displays disagree.
+	org.ventricularTachycardia = nil
 	org.palpitations = 0
 	org.palpitationTreatmentUntil = 0
 	org.arrhythmia = math.max(org.arrhythmia or 0, 0.8)
 	org.fibrillationStart = CurTime()
+end
+
+local function updateVentricularTachycardia(org, timeValue, o2Value, electricalInstability, traumaRisk, rhythmViability, riskMul)
+	if org.heartstop or org.fibrillation then return end
+	local now = CurTime()
+	local arrhythmia = Clamp(org.arrhythmia or 0, 0, 1)
+	local ischemia = Clamp(1 - (org.myocardialOxygen or 1), 0, 1)
+	local hypoxia = Clamp((12 - (o2Value or 30)) / 12, 0, 1)
+	local reentry = math.max(electricalInstability, ischemia * 0.85, traumaRisk * 0.75, Clamp(org.heart or 0, 0, 1) * 0.6)
+	local qtProlongation = math.max(
+		hypoxia * 0.8,
+		Clamp(org.brainHemorrhage or 0, 0, 1) * 0.7,
+		Clamp((33 - (org.temperature or 36.7)) / 5, 0, 1) * 0.6,
+		org.seizureActive and 0.4 or 0
+	)
+	local vt = org.ventricularTachycardia
+
+	if not vt then
+		if arrhythmia < 0.3 or now < (org.nextVTRoll or 0) or (org.rhythmRecoveryUntil or 0) > now then return end
+		org.nextVTRoll = now + 3
+		local polyChance = Clamp((qtProlongation - 0.35) * 0.1 * arrhythmia, 0, 0.12) * riskMul
+		local monoChance = Clamp((reentry - 0.3) * 0.16 * arrhythmia, 0, 0.18) * riskMul
+		local roll = math.Rand(0, 1)
+		if roll < polyChance then
+			org.ventricularTachycardia = "polymorphic"
+			org.vtStart = now
+			org.vtEnd = now + math.Rand(4, 14)
+			org.vtRate = math.Rand(210, 260)
+		elseif roll < polyChance + monoChance then
+			org.ventricularTachycardia = "monomorphic"
+			org.vtStart = now
+			org.vtRate = Lerp(reentry, 150, 230) + math.Rand(-10, 10)
+		end
+		return
+	end
+
+	org.arrhythmia = math.max(arrhythmia, 0.6)
+	org.heartbeat = Approach(org.heartbeat or 0, org.vtRate or 190, timeValue * 80)
+	if vt == "polymorphic" then
+		org.heartbeat = Clamp(org.heartbeat + math.Rand(-25, 25), 180, 280)
+	end
+
+	if now < (org.nextVTRoll or 0) then return end
+	org.nextVTRoll = now + 2
+
+	if vt == "polymorphic" then
+		if now >= (org.vtEnd or now) then
+			org.ventricularTachycardia = nil
+			if math.Rand(0, 1) < (0.15 + qtProlongation * 0.35) * riskMul then
+				hg.organism.StartFibrillation(org)
+			end
+		end
+		return
+	end
+
+	local elapsed = now - (org.vtStart or now)
+	local degenerate = Clamp(0.02 + elapsed / 600 + (1 - rhythmViability) * 0.12 + ischemia * 0.05, 0, 0.35) * riskMul
+	local roll = math.Rand(0, 1)
+	if roll < degenerate then
+		hg.organism.StartFibrillation(org)
+	elseif reentry < 0.25 and roll < degenerate + 0.25 then
+		org.ventricularTachycardia = nil
+	end
 end
 
 local function maintainSimplifiedCirculation(org)
@@ -732,6 +801,7 @@ local function maintainSimplifiedCirculation(org)
 	org.cardiacArrestO2Start = nil
 	org.terminalRhythm = nil
 	org.unstableRhythm = nil
+	org.ventricularTachycardia = nil
 	org.fibrillation = false
 	org.fibrillationStart = 0
 	org.arrhythmia = 0
@@ -752,6 +822,7 @@ local function restoreHeartAfterResuscitation(org, now, resusBloodK)
 	org.fibrillation = false
 	org.terminalRhythm = nil
 	org.unstableRhythm = nil
+	org.ventricularTachycardia = nil
 	org.rhythmRecoveryUntil = now + 12
 	org.nextArrhythmiaRoll = math.max(org.nextArrhythmiaRoll or 0, now + 8)
 	org.nextColdRhythmRoll = math.max(org.nextColdRhythmRoll or 0, now + 8)
@@ -850,6 +921,8 @@ module[1] = function(org)
 	org.arrhythmiaComplication = 0
 	org.fibrillation = false
 	org.fibrillationStart = 0
+	org.ventricularTachycardia = nil
+	org.nextVTRoll = 0
 	org.myocardialOxygen = 1
 	org.perfusion = 1
 	org.peripheralperfusion = 1
@@ -1025,13 +1098,18 @@ module[2] = function(owner, org, timeValue)
 	local arrhythmia = Clamp(tonumber(org.arrhythmia) or 0, 0, 1)
 	local rhythmInstability = arrhythmia
 	if org.unstableRhythm then rhythmInstability = math.max(rhythmInstability, 0.35) end
+	if org.ventricularTachycardia then rhythmInstability = math.max(rhythmInstability, org.ventricularTachycardia == "polymorphic" and 0.9 or 0.7) end
 	if org.fibrillation then rhythmInstability = 1 end
 	local rateOutput = getRateOutput(org.heartstop and 0 or (org.heartbeat or 70), preloadReserve)
 	local circulationBase = bloodVolume * heart * compensationPulseMultiplier * rateOutput * vascularTone * accelerationPressureMul * dehydrationPressureMul * tamponadePreload * internalBleedPressureMul * Clamp(Remap(org.temperature, 28, 36.7, 0.55, 1), 0.45, 1.1)
 	local rhythm = org.ecgState
 	local rhythmMul = org.fibrillation and 0.18 or Clamp(1 - rhythmInstability * 0.42, 0.32, 1)
 	if not org.fibrillation then
-		if rhythm == "ventricular_ectopy" then
+		if org.ventricularTachycardia == "polymorphic" then
+			rhythmMul = math.min(rhythmMul, 0.3)
+		elseif org.ventricularTachycardia then
+			rhythmMul = math.min(rhythmMul, 0.6)
+		elseif rhythm == "ventricular_ectopy" then
 			rhythmMul = 0.97 - arrhythmia * 0.12
 		elseif rhythm == "ventricular_bigeminy" then
 			rhythmMul = 0.8 - arrhythmia * 0.1
@@ -1404,6 +1482,7 @@ module[2] = function(owner, org, timeValue)
 	heartbeat = heartbeat + math.max((org.hypotension or 0) - pressureHypotensionTarget, 0) * 55
 	heartbeat = heartbeat - (org.myocardialOxygen and (1 - org.myocardialOxygen) or 0) * 35
 	if (org.arrhythmia or 0) > 0.05 and not org.fibrillation then heartbeat = heartbeat + math.Rand(-70, 90) * org.arrhythmia end
+	if org.seizureActive and not org.fibrillation then heartbeat = heartbeat + 45 end
 	if org.fibrillation then heartbeat = math.Rand(180, 360) end
 	if bradyTarget and not org.fibrillation then
 		heartbeat = math.min(heartbeat, bradyTarget)
@@ -1422,13 +1501,18 @@ module[2] = function(owner, org, timeValue)
 	local traumaRhythmRisk = math.max(internalBleedRhythmRisk * (0.45 + cardiacTraumaRhythmRisk * 0.55), cardiacTraumaRhythmRisk * 0.6)
 	org.internalBleedRhythmRisk = internalBleedRhythmRisk
 	org.traumaRhythmRisk = traumaRhythmRisk
-	local stress = Clamp((org.heart or 0) * 0.9 + ischemia * 0.8 + (org.heartStrain or 0) * 0.35 + (org.cardiacStressExposure or 0) * 0.45 + (org.hypertension or 0) * 0.35 + (org.hypotension or 0) * 0.3 + hemorrhageRhythmStress * 0.35 + hemorrhageElectricalInstability * 0.95 + hypothermiaInstability * 0.35 + traumaRhythmRisk * 0.8 + hypotensionInstability * 0.9 + Clamp(org.shock, 0, 80) / 180 + max(org.pain - 60, 0) / 220 + max(org.heartbeat - 165, 0) / 190, 0, 2.5)
-	local arrhythmiaTarget = Clamp(math.max(stress * 0.42, hemorrhageElectricalInstability * 0.88, traumaRhythmRisk * 0.72) * math.Clamp(org.conditionResistanceMul or 1, 0.05, 1), 0, 1)
+	local hypercapniaInstability = Clamp(((org.co2 or 0) - 14) / 12, 0, 1)
+	local stress = Clamp(hypercapniaInstability * 0.9 + (org.heart or 0) * 0.9 + ischemia * 0.8 + (org.heartStrain or 0) * 0.35 + (org.cardiacStressExposure or 0) * 0.45 + (org.hypertension or 0) * 0.35 + (org.hypotension or 0) * 0.3 + hemorrhageRhythmStress * 0.35 + hemorrhageElectricalInstability * 0.95 + hypothermiaInstability * 0.35 + traumaRhythmRisk * 0.8 + hypotensionInstability * 0.9 + Clamp(org.shock, 0, 80) / 180 + max(org.pain - 60, 0) / 220 + max(org.heartbeat - 165, 0) / 190, 0, 2.5)
+	local arrhythmiaTarget = Clamp(math.max(stress * 0.42, hemorrhageElectricalInstability * 0.88, traumaRhythmRisk * 0.72, hypercapniaInstability * 0.85) * math.Clamp(org.conditionResistanceMul or 1, 0.05, 1), 0, 1)
+	if org.seizureActive then arrhythmiaTarget = math.max(arrhythmiaTarget, 0.15) end
 	local arrhythmiaRiseTime = Lerp(hemorrhageElectricalInstability, 25, 6)
 	if (org.rhythmRecoveryUntil or 0) > CurTime() then
 		arrhythmiaRiseTime = math.max(arrhythmiaRiseTime, 20)
 	end
 	org.arrhythmia = Approach(org.arrhythmia or 0, arrhythmiaTarget, arrhythmiaTarget > (org.arrhythmia or 0) and timeValue / arrhythmiaRiseTime or timeValue / 90)
+	if organSystemsEnabled then
+		updateVentricularTachycardia(org, timeValue, o2Value, hemorrhageElectricalInstability, traumaRhythmRisk, rhythmViability, rhythmRiskMul)
+	end
 	if stress > 0.55 and CurTime() >= (org.nextArrhythmiaRoll or 0) then
 		local rollInterval = Clamp(Remap(stress, 0.55, 2.3, 10, 1.25), 1.25, 10)
 		org.nextArrhythmiaRoll = CurTime() + rollInterval
@@ -1653,7 +1737,10 @@ module[2] = function(owner, org, timeValue)
 		end
 
 		local arrestElapsed = math.max(CurTime() - org.cardiacArrestStart, 0)
-		if org.terminalRhythm == "ventricular_fibrillation" and arrestElapsed < peaDuration then
+		if org.ventricularTachycardia and arrestElapsed < peaDuration then
+			org.heartbeat = org.vtRate or 200
+			org.ecgState = org.ventricularTachycardia == "polymorphic" and "torsades_de_pointes" or "ventricular_tachycardia"
+		elseif org.terminalRhythm == "ventricular_fibrillation" and arrestElapsed < peaDuration then
 			org.heartbeat = 260
 			org.ecgState = "ventricular_fibrillation"
 		elseif org.terminalRhythm == "terminal_tachycardia" and arrestElapsed < peaDuration then
@@ -1669,6 +1756,7 @@ module[2] = function(owner, org, timeValue)
 		end
 		if arrestElapsed >= peaDuration then
 			org.terminalRhythm = nil
+			org.ventricularTachycardia = nil
 		end
 
 		-- Mechanical/electrical support is already represented by arrestCirculation

@@ -556,6 +556,7 @@ function SWEP:ApplyForce()
 							-- CO removal
 							org.CO = math.Approach(org.CO, 0, skillMult)
 							org.COregen = math.Approach(org.COregen, 0, skillMult)
+							org.co2 = math.Approach(org.co2 or 0, 0, skillMult)
 							
 							-- Blood regeneration boost during CPR
 							if org.blood < 5000 and org.bleed < 1 then

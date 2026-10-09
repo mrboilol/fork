@@ -112,7 +112,7 @@ module[1] = function(org)
 	org.o2[1] = org.o2.range
 
 	org.CO = 0
-	org._lowO2Time = 0
+	org.co2 = 0
 
 	org.COregen = 0
 	org.fireCOExposure = 0
@@ -413,6 +413,12 @@ local function barelyBreathingThoughtExpired(ply)
 	return current.heartstop or current.otrub or current.choking or (current.analgesia or 0) > 1.5 or intake < demand or intake >= demand * 1.3
 end
 
+local hypercapnia_phrases = {
+	"My head is pounding and I feel so drowsy...",
+	"Everything is spinning... I can't breathe it out...",
+	"I feel heavy... like I'm suffocating slowly...",
+}
+
 local low_stamina = {
 	"I'm tired of this...",
 	"I need to slow down and catch my breath...",
@@ -525,6 +531,7 @@ module[2] = function(owner, org, timeValue)
 		org.respiratoryRate = 14
 		org.respiratoryArrest = false
 		org.circulatoryO2Reserve = 1
+		org.co2 = 0
 		org._zeroO2Time = 0
 		if org.brain >= 0.7 and org.alive then
 			if hg.organism.KillFatalBrainDamage then
@@ -540,6 +547,7 @@ module[2] = function(owner, org, timeValue)
 		o2[1] = o2.range
 		o2.curregen = o2.regen
 		org.exertionO2Debt = 0
+		org.co2 = 0
 		org.oxygenIntakeAvailable = true
 		org.lungsfunction = true
 		return
@@ -836,18 +844,36 @@ module[2] = function(owner, org, timeValue)
 
 	
 
-	if o2[1] < 8 then
-		org._lowO2Time = (org._lowO2Time or 0) + timeValue
-	else
-		org._lowO2Time = math.max((org._lowO2Time or 0) - timeValue * 2, 0)
-	end
-
-	if o2[1] < 8 and org._lowO2Time > 5 then
-		local buildRate = math.Clamp((org._lowO2Time - 5) / 30, 0, 1)
-		org.CO = math.min(org.CO + timeValue * buildRate * 1.4, 30)
-	end
-
 	org.CO = max(org.CO - timeValue, 0)
+
+	local ventilating = success and not org.holdingbreath and not (org.is_sprayed_at or owner:GetNetVar("zableval_masku", false))
+	local co2 = math.Clamp(tonumber(org.co2) or 0, 0, 30)
+	if ventilating then
+		local gasImpairment = 1 - math.Clamp(lungGasExchange * airwayGasExchange * thoracicGasExchange, 0, 1)
+		local coExposure = math.Clamp((org.COregen or 0) / 30 + (org.fireCOExposure or 0) / 10, 0, 1)
+		local hyperventilation = org.panicattackActive and math.Clamp(org.panicattack or 0, 0, 1) or 0
+		local retention = math.Clamp(bradyapnea * 0.6 + gasImpairment * 0.5 + coExposure * 0.6 + hyperventilation * 0.4, 0, 1)
+		local co2Target = 30 * retention
+		co2 = math.Approach(co2, co2Target, timeValue * (co2Target > co2 and 0.4 or 0.6))
+	else
+		co2 = math.min(co2 + timeValue * 0.4, 30)
+	end
+	org.co2 = co2
+
+	local hypercapnia = math.Clamp((co2 - 6) / 14, 0, 1)
+	local hypercapniaO2Cap = o2.range * (1 - math.Clamp((co2 - 6) / 24, 0, 0.6))
+	if hypercapnia > 0 then
+		org.disorientation = math.max(org.disorientation or 0, hypercapnia * 1.2)
+	end
+	if co2 > 18 and not org.heartstop then
+		org.heartStrain = math.Clamp((org.heartStrain or 0) + timeValue * (co2 - 18) / 12 / 90, 0, 1)
+	end
+	if co2 > 12 then
+		org.consciousness = math.min(org.consciousness, math.Clamp(1 - (co2 - 12) / 12, 0, 1))
+	end
+	if org.isPly and not org.otrub and not org.heartstop and co2 > 8 then
+		org.owner:Notify(hypercapnia_phrases[math.random(#hypercapnia_phrases)], 40, "hypercapnia", 2)
+	end
 
 	if success then
 
@@ -878,7 +904,6 @@ module[2] = function(owner, org, timeValue)
 		if totalAdrenaline > 0.5 then
 			org.CO = math.max(org.CO - timeValue * math.Clamp(totalAdrenaline * 0.5, 0.25, 2), 0)
 			org.COregen = math.max(org.COregen - timeValue * math.Clamp(totalAdrenaline * 0.5, 0.25, 2), 0)
-			org._lowO2Time = math.max((org._lowO2Time or 0) - timeValue * totalAdrenaline * 2, 0)
 		end
 
 
@@ -922,7 +947,7 @@ module[2] = function(owner, org, timeValue)
 		-- failed lung from snapping to zero in one tick.
 		if org.heartstop then regenerate = 0 end
 		local lungO2Cap = o2.range * math.max(1 - org.pneumothorax * org.pneumothorax, 0.1) * math.max(1 - (org.hemothorax or 0) * (org.hemothorax or 0), 0.1) * math.max(1 - lungDamage, 0.1)
-		o2[1] = min(o2[1] + regenerate * math.Clamp(org.o2[1] / 30, 0.25, 1) * (org.holdingbreath and 0 or 1) * (sprayed and 0 or 1) * min((10 / max(org.CO,1)),1), min(lungO2Cap, bloodO2Cap, coldO2Cap, altitudeO2Cap, exertionO2Cap, airwayO2Cap))
+		o2[1] = min(o2[1] + regenerate * math.Clamp(org.o2[1] / 30, 0.25, 1) * (org.holdingbreath and 0 or 1) * (sprayed and 0 or 1) * min((10 / max(org.CO,1)),1), min(lungO2Cap, bloodO2Cap, coldO2Cap, altitudeO2Cap, exertionO2Cap, airwayO2Cap, hypercapniaO2Cap))
 
 
 

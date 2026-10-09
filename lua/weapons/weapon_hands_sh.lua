@@ -1828,6 +1828,7 @@ function SWEP:ApplyForce()
 							-- CO removal
 							org.CO = math.Approach(org.CO, 0, skillMult)
 							org.COregen = math.Approach(org.COregen, 0, skillMult)
+							org.co2 = math.Approach(org.co2 or 0, 0, skillMult)
 							
 							-- Reduced chest damage chance for doctors
 							if math.random(50) == 1 and (ply.Profession != "doctor") then
