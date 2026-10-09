@@ -83,8 +83,17 @@ local function physBloodSlide(part, data, pos)
 	return true
 end
 
+local function physBloodSmear(part, radius)
+	local vel = part:GetVelocity()
+	local speed = math.sqrt(vel[1] * vel[1] + vel[2] * vel[2] + math.max(vel[3], 0) ^ 2)
+	local len = math.Clamp(radius * 2 + speed * 0.025 * radius, radius * 2, radius * 14)
+	part:SetStartLength(len)
+	part:SetEndLength(len)
+end
+
 local function physBloodThink(part, data)
 	local pos = part:GetPos()
+	if not data.hidden then physBloodSmear(part, data.radius) end
 	if physBloodSlide(part, data, pos) then return end
 	if bit.band(util.PointContents(pos), CONTENTS_WATER) == CONTENTS_WATER then
 		if not data.hidden then hg.addBloodPart2(pos, part:GetVelocity() / 20 + VectorRand(-1, 1), nil, nil, nil, nil, true, data.owner) end
@@ -126,8 +135,8 @@ local function addPhysBloodPart(pos, vel, w, artery, kishki, owner, tiny, hidden
 	part:SetEndAlpha(hidden and 0 or 220)
 	part:SetStartSize(radius)
 	part:SetEndSize(radius * 0.75)
-	part:SetRoll(math.Rand(0, 360))
-	part:SetRollDelta(math.Rand(-6, 6))
+	data.radius = radius
+	if not hidden then physBloodSmear(part, radius) end
 	part:SetGravity(physGravity)
 	part:SetAirResistance(tiny and 22 or (artery and 4 or 9))
 	part:SetBounce(0)

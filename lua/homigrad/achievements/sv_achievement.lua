@@ -242,6 +242,8 @@ function hg.achievements.SetPlayerAchievement(ply, key, val)
     playerAchievements[key].value = val
 
     if completedNow then
+        print(string.format("[Achievement] %s (%s) unlocked \"%s\" [%s]", ply:Nick(), ply:SteamID(), ach.name, key))
+
         local wasObtainedBefore = playerAchievements[key].obtained_at ~= nil
         playerAchievements[key].obtained_at = playerAchievements[key].obtained_at or os.time()
 
@@ -332,7 +334,7 @@ end)
     -- Splinter Cell: unlocks weapon_sam_fisher_glock
     hg.achievements.CreateAchievementType("samfisher", 10, 0, "Kill 10 enemies with a silenced weapon.", "Splinter Cell", "entities/sam.png", true)
     hg.achievements.CreateAchievementType("brawler", 1, 0, "Win a Brawl round.", "Brawler", nil, false)
-    hg.achievements.CreateAchievementType("tooth_fairy", 1, 0, "Knock out all of someone's teeth with a single hit.", "Tooth Fairy's Nightmare", nil, false)
+    hg.achievements.CreateAchievementType("tooth_fairy", 1, 0, "Knock out all of someone's teeth with a single hit.", "Hunter: Call of the wild", nil, false)
 
     //hg.init_ach = true
 //end

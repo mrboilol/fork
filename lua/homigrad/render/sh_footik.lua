@@ -114,7 +114,9 @@ local BODY_MAX_LEAN = 16
 local BODY_ACCEL_GAIN = 0.25
 local BODY_ACCEL_CLAMP = 900
 local BODY_ACCEL_SMOOTH = 10
-local BODY_VELOCITY_LEAN = 0.007
+local BODY_SPRINT_LEAN = 8
+local BODY_LEAN_START_SPEED = 180
+local BODY_LEAN_FULL_SPEED = 420
 local LAND_SPRING = 150
 local LAND_DAMPING = 13
 local LAND_MAX_DROP = 9
@@ -1028,7 +1030,12 @@ local function stepBody(ply, body, dt)
 	body.lastVel = flatVel
 
 	local stagger = staggerInfo(ply)
-	local target = flatVel * BODY_VELOCITY_LEAN
+	local speed = flatVel:Length()
+	local target = Vector()
+	if speed > BODY_LEAN_START_SPEED then
+		local ramp = math_min((speed - BODY_LEAN_START_SPEED) / (BODY_LEAN_FULL_SPEED - BODY_LEAN_START_SPEED), 1)
+		target = flatVel * (BODY_SPRINT_LEAN * ramp * ramp / speed)
+	end
 	if stagger then
 		target = target + stagger.dir * STAGGER_LEAN * stagger.amount
 		if body.staggerStart ~= stagger.start then

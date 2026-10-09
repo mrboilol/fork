@@ -278,25 +278,6 @@ local near_death_mild = {
 	"Why.. why am I feeling like this...",
 }
 
-local LIMB_NAMES = {
-	rleg = "right leg",
-	lleg = "left leg",
-	rarm = "right arm",
-	larm = "left arm",
-}
-
-local broken_limb = {
-	"MY %s IS BROKEN!",
-	"FUCK! I BROKE MY %s!",
-	"MY %s SNAPPED!",
-}
-
-local dislocated_limb = {
-	"MY %s IS DISLOCATED!",
-	"FUCK! I DISLOCATED MY %s!",
-	"MY %s JOINT IS OUT OF PLACE!",
-}
-
 local hungry_a_bit = {
     "Mgh, I'm hungry...",
     "Some food would be great...",
@@ -651,13 +632,6 @@ local function get_status_message(ply)
 
 	local most_wanted_phraselist
 	local statusThoughtKey
-	local statusLimbName
-	local function limbStatusKey(kind)
-		for _, limb in ipairs({"rleg", "lleg", "rarm", "larm"}) do
-			if kind == "dislocated" and org[limb .. "dislocation"] then return kind .. "_" .. limb, LIMB_NAMES[limb] end
-			if kind == "broken" and hg.IsLimbFractured(org, limb) then return kind .. "_" .. limb, LIMB_NAMES[limb] end
-		end
-	end
 
 	if not (org.heartstop or nearDeath or o2 <= 22 or terminalBloodLoss or (bleedingOut and blood <= bleedoutStartBlood)) then
 		org.dying_phrases_used = nil
@@ -708,12 +682,8 @@ local function get_status_message(ply)
 		most_wanted_phraselist = temperature >= 40 and heatstroke_phraselist or hot_phraselist
 		statusThoughtKey = temperature >= 40 and "heatstroke" or "hot"
 	elseif ((bleedingOut and blood <= bleedoutStartBlood and heartbeat >= 30 and heartbeat <= 250) or (broken_dislocated) or (broken_notify) or (dislocated_notify)) then
-		if pain > 75 and (broken_dislocated) then
-			most_wanted_phraselist = math.random(2) == 1 and audible_pain or (broken_notify and broken_limb or dislocated_limb)
-		elseif pain > 75 then
+		if pain > 75 then
 			most_wanted_phraselist = audible_pain
-		elseif broken_dislocated and (broken_notify or dislocated_notify) then
-			most_wanted_phraselist = (broken_notify and broken_limb or dislocated_limb)
 		end
 
 		if not most_wanted_phraselist then
@@ -747,12 +717,6 @@ local function get_status_message(ply)
 		else
 			most_wanted_phraselist = ((IsAimedAt(ply) > 0.9) and is_aimed_at_phrases or (math.random(10) == 1 and fear_hurt_ironic or fear_phrases))
 		end
-	end
-
-	if most_wanted_phraselist == broken_limb then
-		statusThoughtKey, statusLimbName = limbStatusKey("broken")
-	elseif most_wanted_phraselist == dislocated_limb then
-		statusThoughtKey, statusLimbName = limbStatusKey("dislocated")
 	end
 
 	if most_wanted_phraselist == near_death_poetic or most_wanted_phraselist == near_death_positive or most_wanted_phraselist == near_death_mild then
@@ -818,8 +782,6 @@ local function get_status_message(ply)
 				if phrase ~= str and CurTime() - stamp > 8 then org.recent_status_phrases[phrase] = nil end
 			end
 		end
-
-		if statusLimbName then str = string.format(str, string.upper(statusLimbName)) end
 
 		return str, statusThoughtKey
 	else

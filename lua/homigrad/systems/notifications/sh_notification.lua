@@ -423,7 +423,7 @@ if CLIENT then
 					if thoughtSound then thoughtSound:Stop() end
 					thoughtSound = CreateSound(lply, snd)
 					thoughtSound:SetSoundLevel(0)
-					thoughtSound:PlayEx(hg_omori:GetBool() and 0.35 or 0.8, math.random(97, 103))
+					thoughtSound:PlayEx(hg_omori:GetBool() and 0.25 or 0.8, math.random(97, 103))
 					oldclick = hg_omori:GetBool() and isThoughtStart and click == utf8.len(msg) and -1 or click
 				end
 

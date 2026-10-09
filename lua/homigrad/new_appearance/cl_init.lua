@@ -179,6 +179,31 @@ function RenderAccessories(ply, accessories, setup)
 end
 
 local huy_addvec = Vector(0.4,0,0.4)
+
+local function GetPoseBoneMatrix(ent, bone)
+	return hg.GetIKBoneMatrix and hg.GetIKBoneMatrix(ent, bone) or ent:GetBoneMatrix(bone)
+end
+
+local function SyncMergedBones(model, ent)
+	local entModel = ent:GetModel()
+	local map = model.hg_mergeMap
+	if not map or model.hg_mergeModel ~= entModel then
+		map = {}
+		for i = 0, model:GetBoneCount() - 1 do
+			local parentBone = ent:LookupBone(model:GetBoneName(i))
+			if parentBone then map[i] = parentBone end
+		end
+		model.hg_mergeMap = map
+		model.hg_mergeModel = entModel
+	end
+
+	model:SetupBones()
+	for i, parentBone in pairs(map) do
+		local matrix = GetPoseBoneMatrix(ent, parentBone)
+		if matrix then model:SetBoneMatrix(i, matrix) end
+	end
+end
+
 function DrawAccesories(ply, ent, accessories,accessData, islply, force, setup, tAccessories)
 	if not accessories then return end
 	if not accessData then return end
@@ -303,7 +328,7 @@ function DrawAccesories(ply, ent, accessories,accessData, islply, force, setup, 
 
 	if setup != false then
 		if ent:GetManipulateBoneScale(bone):LengthSqr() < 0.1 then return end
-		local matrix = ent:GetBoneMatrix(bone)
+		local matrix = GetPoseBoneMatrix(ent, bone)
 		if not matrix then return end
 
 		local bonePos, boneAng = matrix:GetTranslation(), matrix:GetAngles()
@@ -324,7 +349,8 @@ function DrawAccesories(ply, ent, accessories,accessData, islply, force, setup, 
 			local colorDraw = accessData["vecColorOveride"] or ( ply.GetPlayerColor and ply:GetPlayerColor() or ply:GetNWVector("PlayerColor",Vector(1,1,1)) )
 			render.SetColorModulation( colorDraw[1],colorDraw[2],colorDraw[3] )
 		end
-		
+
+		if accessData.bonemerge and model:GetParent() == ent then SyncMergedBones(model, ent) end
 		model:DrawModel()
 		
 		if accessData["bSetColor"] then
