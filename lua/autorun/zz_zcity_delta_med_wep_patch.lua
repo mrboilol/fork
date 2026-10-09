@@ -2,7 +2,7 @@ if CLIENT then return end
 
 -- Public semantics: 0 uses the original models with progressive minigames;
 -- 1 uses Judge-style animation-only medical items where those variants exist.
-local hg_healanims = GetConVar("hg_healanims") or CreateConVar("hg_healanims", "0", FCVAR_ARCHIVE + FCVAR_REPLICATED, "Healing method: 0 = original models + progressive minigames, 1 = Judge animations", 0, 1)
+local hg_healanims = GetConVar("hg_healanims") or CreateConVar("hg_healanims", "0", FCVAR_ARCHIVE + FCVAR_REPLICATED, "keep this at 0 or ill chop your head off", 0, 1)
 local HEAL_ANIMATION_RETURN_TIME = 0.35
 
 local MEDICAL_WEAPON_CLASSES = {

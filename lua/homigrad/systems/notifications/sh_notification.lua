@@ -153,8 +153,19 @@ if CLIENT then
 	hg.notifications = hg.notifications or {}
 	hg.thoughts = hg.thoughts or {}
 	hg.notificationFont = "HuyFont"
+	local thoughtSound
+	local oldclick = 0
+	local oldNotification
+
+	local function StopThoughtSound()
+		if thoughtSound then thoughtSound:Stop() end
+		thoughtSound = nil
+		oldclick = 0
+		oldNotification = nil
+	end
 
 	cvars.AddChangeCallback("hg_newthoughts", function()
+		StopThoughtSound()
 		hg.currentNotification = nil
 		hg.notifications = {}
 		hg.thoughts = {}
@@ -162,6 +173,7 @@ if CLIENT then
 
 	hook.Add("Player_Death","removeNotifications",function(ply)
 		if ply != lply then return end
+		StopThoughtSound()
 
 		//hg.currentNotification = nil
 		hg.notifications = {}
@@ -170,6 +182,7 @@ if CLIENT then
 
 	hook.Add("Player Spawn","removeNotificationsa",function(ply)
 		if ply != lply then return end
+		StopThoughtSound()
 
 		hg.currentNotification = nil
 		hg.notifications = {}
@@ -178,6 +191,7 @@ if CLIENT then
 
 	hook.Add("HG_OnOtrub","removeNotificationsb",function(ply)
 		if ply != lply then return end
+		StopThoughtSound()
 
 		//hg.currentNotification = nil
 		hg.notifications = {}
@@ -198,6 +212,7 @@ if CLIENT then
 		priority = priority or 0
 		local current = hg.currentNotification
 		if current and priority > (current[5] or 0) then
+			StopThoughtSound()
 			if priority == 110 then
 				local elapsed = math.max(CurTime() - current[2], 0)
 				local speed = 0.06 * ((lply.organism and lply.organism.brain or 0) > 0.1 and 3 or 1)
@@ -219,6 +234,7 @@ if CLIENT then
 	end
 
 	local function CreateNotificationBerserk(msg, showTimer, clr)
+		StopThoughtSound()
 		if hg_furcity:GetBool() or lply.PlayerClassName == "furry" then
 			msg = hg.FurrifyPhrase(msg) -- uhhhh... hate to break it to you but-
 		end
@@ -344,7 +360,6 @@ if CLIENT then
 	local colBrown = Color(40,40,40)
 	local ColorNotification = Color(48,4,4,0)
 	local maxtimefade = 1
-	local oldclick = 0
 
 	local last_message
 	local last_time
@@ -380,6 +395,10 @@ if CLIENT then
 		local tbl = hg.currentNotification
 
 		if tbl and istable(tbl) and not table.IsEmpty(tbl) then
+			if oldNotification != tbl then
+				StopThoughtSound()
+				oldNotification = tbl
+			end
 			local msg, time, timeshow, clr = tbl[1], tbl[2], tbl[3], tbl[4]
 
 			local mul = org.brain > 0.1 and 3 or 1
@@ -398,9 +417,14 @@ if CLIENT then
 				end
 
 				if click != oldclick and not last_message then
-					local snd = hg_omori:GetBool() and "newspeech/speak" .. math.random(1, 15) .. ".mp3" or "speak" .. math.random(1, 2) .. ".ogg"
-					sound.Play(snd, render.GetViewSetup().origin - vector_up * 10, 40, math.random(97, 103), 0.8)
-					oldclick = click
+					local isThoughtStart = oldclick == 0
+					local soundIndex = isThoughtStart and 1 or click == utf8.len(msg) and 15 or math.random(2, 14)
+					local snd = hg_omori:GetBool() and "newspeech/speak" .. soundIndex .. ".mp3" or "speak" .. math.random(1, 2) .. ".ogg"
+					if thoughtSound then thoughtSound:Stop() end
+					thoughtSound = CreateSound(lply, snd)
+					thoughtSound:SetSoundLevel(0)
+					thoughtSound:PlayEx(0.8, math.random(97, 103))
+					oldclick = hg_omori:GetBool() and isThoughtStart and click == utf8.len(msg) and -1 or click
 				end
 
 				local txt = utf8.sub(utf8.force(msg), 1, click)

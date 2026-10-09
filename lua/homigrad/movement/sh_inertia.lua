@@ -189,9 +189,14 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 		return phase % 1 < hg.GaitFlightFraction(swingFraction)
 	end
 
-	local LIMP_STANCE_HURRY = 0.6
-	local LIMP_SWING_DELAY = 0.3
-	local PUSH_LIMP_LOSS = 0.93
+	local SPRINT_SPEED_MUL = 1.15
+	local JOG_SPEED_MUL = 0.6
+	local STAMINA_FULL_SPEED = 90
+	local LIMP_LEG_SPEED_MIN = 0.72
+	local LIMP_MAX_SPEED_FRACTION = 0.8
+	local LIMP_STANCE_HURRY = 0.4
+	local LIMP_SWING_DELAY = 0.2
+	local PUSH_LIMP_LOSS = 0.55
 	local PUSH_MIN_MUL = 0.05
 	local PUSH_SLOPE_FRACTION = 0.7
 	local PUSH_OBSTRUCT_LOSS = 0.85
@@ -596,10 +601,9 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 
 		hook.Run("HG_MovementCalc", vel, velLen, weightmul, ply, cmd, mv)
 
-		local target_run_speed = ply.hg_isJogging and (run_speed * 0.55) or run_speed
 		local mulTable = ply.hg_movement_mul or {1}
 		ply.hg_movement_mul = mulTable
-		mulTable[1] = (ply.move or ply.CurrentSpeed) / target_run_speed
+		mulTable[1] = (ply.move or ply.CurrentSpeed) / run_speed
 
 		hook.Run("HG_MovementCalc_2", mulTable, ply, cmd, mv)
 
@@ -615,9 +619,9 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 		if ply.hg_isSprinting and runnin and velLen >= 10 then
 			local sprint_mul = ply.sprintDebuff and ply.sprintDebuff > move_time and 0.5 or 1
 			local trait_sprint_mul = ply.HasTrait and ply:HasTrait("sprinter") and 1 or hg_sprint_speed_mul:GetFloat()
-			ply.CurrentSpeed = math_Approach(ply.CurrentSpeed, (ply.move or run_speed) * mul * sprint_mul * trait_sprint_mul * 0.88, delta_time * ply.SpeedGainMul)
+			ply.CurrentSpeed = math_Approach(ply.CurrentSpeed, run_speed * mul * sprint_mul * trait_sprint_mul * SPRINT_SPEED_MUL, delta_time * ply.SpeedGainMul)
 		elseif ply.hg_isJogging and runnin and velLen >= 10 then
-			ply.CurrentSpeed = math_Approach(ply.CurrentSpeed, (ply.move or (run_speed * 0.55)) * mul, delta_time * ply.SpeedGainMul)
+			ply.CurrentSpeed = math_Approach(ply.CurrentSpeed, run_speed * mul * JOG_SPEED_MUL, delta_time * ply.SpeedGainMul)
 		else
 			if(crouching)then
 				ply.CurrentSpeed = math_Approach(ply.CurrentSpeed, crouch_walk_speed * mul, delta_time * ply.SpeedLoseMul)
@@ -794,7 +798,7 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 		k = k * math.Clamp(consmul, 0.7, 1)
 		k = k * math.Clamp((org.temperature and (1 - (org.temperature - 38) * 0.25) or 1), 0.5, 1)
 		k = k * math.Clamp((org.temperature and ((org.temperature - 35) * 0.25 + 1) or 1), 0.5, 1)
-		k = k * math.Clamp(math.Round((org.stamina and org.stamina[1] or 180), 0) / 120, hg_movement_stamina_debuff:GetFloat(), 1)
+		k = k * math.Clamp(math.Round((org.stamina and org.stamina[1] or 180), 0) / STAMINA_FULL_SPEED, hg_movement_stamina_debuff:GetFloat(), 1)
 		local debuffResistance = ply.GetTraitMultiplier and ply:GetTraitMultiplier("movement_debuff_resistance", 1) or 1
 		local function softenDebuff(value) return 1 - (1 - value) * debuffResistance end
 		k = k * softenDebuff(math.Clamp(5 / ((org.immobilization or 0) + 1), 0.45, 1))
@@ -806,7 +810,7 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 		local limbDebuff = hg.GetLimbDebuffMultiplier and hg.GetLimbDebuffMultiplier(org) or 1
 		local function legMoveMultiplier(limb)
 			local damage = tonumber(org[limb]) or 0
-			local base = damage >= 0.5 and math.max(1 - damage, 0.6) or 1
+			local base = damage >= 0.5 and math.max(1 - damage, LIMP_LEG_SPEED_MIN) or 1
 			if org[limb .. "dislocation"] then base = base * 0.75 end
 			return 1 - (1 - base) * limbDebuff
 		end
@@ -953,7 +957,7 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 		end
 
 	if (hg.IsLimbFractured(org, "lleg") or hg.IsLimbFractured(org, "rleg") or org.llegdislocation or org.rlegdislocation) and ply:OnGround() then
-		inertia_len = math.min(inertia_len, (ply:GetSlowWalkSpeed() or 100) * 0.78)
+		inertia_len = math.min(inertia_len, run_speed * LIMP_MAX_SPEED_FRACTION)
 	end
 
 	mv:SetMaxSpeed(inertia_len)

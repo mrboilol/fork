@@ -17,9 +17,9 @@ function hg.organism.CanTouchHealth(org)
 end
 
 local hg_panic = CreateConVar("hg_panic", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "im panic", 0, 1)
-local hg_painsound = ConVarExists("hg_painsound") and GetConVar("hg_painsound") or CreateConVar("hg_painsound", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Pain audio: 0 = pain beat + reality, 1 = pain beat, 2 = agony, 4 = reality, 5 = sillypain, 6 = REM pain stack", 0, 6)
-local hg_dyingsound = ConVarExists("hg_dyingsound") and GetConVar("hg_dyingsound") or CreateConVar("hg_dyingsound", "2", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Dying audio: 0 = conscious beat + ending, 1 = conscious beat, 2 = dying, 4 = ending, 5 = sillydying, 6 = fuck, 7 = sonimcooked, 8 = REM dying 1 + 2, 9 = itshopeless, 10 = vitality", 0, 10)
-local hg_otrubsound = ConVarExists("hg_otrubsound") and GetConVar("hg_otrubsound") or CreateConVar("hg_otrubsound", "0", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Unconscious (otrub) audio: 0 = unconscious beat, 2 = sleepy, 3 = itssoover, 4 = nga im cooked, 5 = REM dying, 6 = fuck, 7 = itshopeless", 0, 7)
+local hg_painsound = ConVarExists("hg_painsound") and GetConVar("hg_painsound") or CreateConVar("hg_painsound", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "look at the ones you like (press sound icon for preview)", 0, 6)
+local hg_dyingsound = ConVarExists("hg_dyingsound") and GetConVar("hg_dyingsound") or CreateConVar("hg_dyingsound", "2", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "look at the ones you like (press sound icon for preview)", 0, 11)
+local hg_otrubsound = ConVarExists("hg_otrubsound") and GetConVar("hg_otrubsound") or CreateConVar("hg_otrubsound", "0", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "look at the ones you like (press sound icon for preview)", 0, 7)
 local panicattack_threshold = 0.45
 local panicattack_add_decay_time = 18
 local panicattack_rise_time = 1.4
@@ -908,8 +908,8 @@ function hg.organism.AddPanicAttack(org, amount, silent, combatEvent, ignoreGunf
 	if combatEvent then hg.organism.MarkPanicGunfight(org) end
 	local goodmood = math.Clamp(tonumber(org.goodmood) or 0, 0, 1)
 	if goodmood > 0 then
-		local absorbed = math.min(amount, goodmood / 1.25)
-		org.goodmood = math.max(goodmood - absorbed * 1.25, 0)
+		local absorbed = math.min(amount, goodmood / 2.5)
+		org.goodmood = math.max(goodmood - absorbed * 2.5, 0)
 		amount = amount - absorbed
 		if amount <= 0 then return org.panicattackadd or 0 end
 	end
@@ -1365,8 +1365,27 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	if hg_panic:GetBool() and oldPanicAttack < panicattack_threshold and org.panicattack >= panicattack_threshold and isPly and owner:Alive() then
 		owner:Notify("I can't calm down.", 2, "panicattack_start", 2, nil, Color(255, 140, 140))
 	end
-	org.panicattackActive = false
-	org.panicAdrenalineUntil = 0
+	if oldPanicAttack < panicattack_threshold and org.panicattack >= panicattack_threshold then
+		local combatPanic = (org.panicGunfightUntil or 0) > CurTime()
+		org.panicAdrenalineUntil = CurTime() + (combatPanic and panicattack_combat_adrenaline_duration or panicattack_adrenaline_duration)
+	end
+	local panicDying = org.otrub or org.incapacitated or org.deathStateKilled or (isPly and not owner:Alive())
+	if org.panicattack >= panicattack_threshold then
+		org.panicattackActive = hg_panic:GetBool() and not panicDying
+		if CurTime() < (org.panicAdrenalineUntil or 0) then
+			local combatPanic = (org.panicGunfightUntil or 0) > CurTime()
+			local targetMaximum = combatPanic and panicattack_combat_adrenaline_add_target or panicattack_adrenaline_add_target
+			local adrenalineTarget = math.Remap(org.panicattack, panicattack_threshold, 1, targetMaximum * 0.5, targetMaximum)
+			if not hg_panic:GetBool() then adrenalineTarget = adrenalineTarget * 0.55 end
+			org.adrenalineAdd = math.Approach(org.adrenalineAdd or 0, adrenalineTarget, timeValue / panicattack_adrenaline_add_rise_time)
+		end
+		if org.panicattackActive then
+			org.disorientation = math.max(org.disorientation, 0.6 + panicattack_disorientation * org.panicattack)
+		end
+	else
+		org.panicattackActive = false
+		org.panicAdrenalineUntil = 0
+	end
 	local ignoreBrainDamage = hg.organism.IsBrainDamageIgnored and hg.organism.IsBrainDamageIgnored(org)
 	local brainDelta = ignoreBrainDamage and 0 or (org.brain or 0) - oldSeizureBrain
 	local lobeDelta = ignoreBrainDamage and 0 or lobeDamage - oldSeizureLobeDamage

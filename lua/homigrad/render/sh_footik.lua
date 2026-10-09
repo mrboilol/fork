@@ -85,9 +85,18 @@ local TURN_FAST_RATE = 360
 local TURN_STEP_SPEEDUP = 0.4
 local CROUCH_STEP_SCALE = 0.55
 local CROUCH_SETTLE_SCALE = 0.75
-local LIMP_STRIDE_CUT = 0.35
-local LIMP_DRAG = 0.6
-local LIMP_DIP = 2.5
+local LIMP_STRIDE_CUT = 0.25
+local LIMP_DRAG = 0.45
+local LIMP_DIP = 1.6
+local SPRINT_HOP_SCALE = 1.2
+local SPRINT_COMPRESS = 2
+local FOOT_SPLAY = 7
+local BROKEN_POWER_START = 0.6
+local BROKEN_POWER_RANGE = 0.5
+local BROKEN_FOOT_TWIST = 28
+local BROKEN_FOOT_ROLL = 16
+local BROKEN_KNEE_TWIST = 22
+local BROKEN_CALF_TWIST = 20
 local WALK_BOB = 0.5
 local WALK_BOB_SPEED = 120
 local PELVIS_SMOOTH_TIME = 0.08
@@ -682,14 +691,15 @@ local function gaitBob(state, ctx)
 	local dip = ctx.limp[stanceIndex] * LIMP_DIP * math_sin(math.pi * stepProgress)
 	local flight = hg.GaitFlightFraction(ctx.swingFraction)
 	local runFraction = smoothstep(math_Clamp((ctx.speedFraction - 0.5) * 2, 0, 1))
+	local sprint = ctx.sprinting and runFraction or 0
 	if stepProgress >= flight then
 		local support = (stepProgress - flight) / (1 - flight)
 		local vault = (1 - math_sin(math.pi * support)) * WALK_BOB * math_min(ctx.speed / WALK_BOB_SPEED, 1) * (1 - runFraction)
 
-		return -dip - vault
+		return -dip - vault - math_sin(math.pi * support) * SPRINT_COMPRESS * sprint
 	end
 
-	return math_sin(math.pi * stepProgress / flight) * IKFoot.GetFloat("flight_hop") * runFraction * RUN_HOP_SCALE - dip
+	return math_sin(math.pi * stepProgress / flight) * IKFoot.GetFloat("flight_hop") * runFraction * Lerp(sprint, RUN_HOP_SCALE, SPRINT_HOP_SCALE) - dip
 end
 
 local function updateUpright(state, ctx, dt)
@@ -810,6 +820,7 @@ local function buildContext(ply, state, anim, dt)
 		oneLeg = oneLeg,
 		onGround = ply:OnGround(),
 		crouching = ply:Crouching(),
+		sprinting = ply.hg_isSprinting or ply:GetNWBool("hg_isSprinting", false),
 		limp = {hg.GaitLegLimp(ply.organism, "lleg"), hg.GaitLegLimp(ply.organism, "rleg")},
 		swingFraction = swingFraction,
 		stagger = staggerInfo(ply),
@@ -817,18 +828,21 @@ local function buildContext(ply, state, anim, dt)
 	}
 end
 
-local function alignFoot(foot, carriedAng, toeDir, weight, ankleHeight, toeLength)
+local function brokenAmount(power)
+	return math_Clamp((BROKEN_POWER_START - power) / BROKEN_POWER_RANGE, 0, 1)
+end
+
+local function alignFoot(foot, carriedAng, animAng, animToe, weight, ankleHeight, toeLength, restYaw, roll)
 	local normal = foot.groundNormal or vector_up
-	local currentYaw = toeDir:Angle().y
 	if foot.needsYaw then
-		foot.toeYaw = currentYaw
+		foot.toeYaw = restYaw
 		foot.needsYaw = nil
 	end
 
-	local yaw = foot.toeYaw or currentYaw
+	local yaw = foot.toeYaw or restYaw
 	if foot.swinging then
-		local startYaw = foot.startYaw or currentYaw
-		yaw = startYaw + math_AngleDifference(currentYaw, startYaw) * smoothstep(foot.t)
+		local startYaw = foot.startYaw or restYaw
+		yaw = startYaw + math_AngleDifference(restYaw, startYaw) * smoothstep(foot.t)
 		weight = weight * (1 - SWING_ALIGN_RELEASE * math_sin(math.pi * foot.t))
 	end
 	if weight <= 0 then return carriedAng end
@@ -838,13 +852,14 @@ local function alignFoot(foot, carriedAng, toeDir, weight, ankleHeight, toeLengt
 	flat:Normalize()
 	local drop = math_Clamp((ankleHeight - TOE_HEIGHT) / math_max(toeLength, 1), 0, MAX_TOE_DROP)
 	local desired = flat * math_sqrt(1 - drop * drop) - normal * drop
-	desired = LerpVector(weight, toeDir, desired)
-	desired:Normalize()
+	local aligned = rebase(animAng, animToe, vector_up, desired, normal)
+	if roll ~= 0 then aligned:RotateAroundAxis(desired, roll) end
+	if weight >= 1 then return aligned end
 
-	return rebase(carriedAng, toeDir, normal, desired, normal)
+	return LerpVector(weight, carriedAng:Forward(), aligned:Forward()):AngleEx(LerpVector(weight, carriedAng:Up(), aligned:Up()))
 end
 
-local function solveLeg(ent, ids, foot, ankleTarget, weight, ctx, state, alignWeight, upperPower, lowerPower)
+local function solveLeg(ent, ids, foot, ankleTarget, weight, ctx, state, alignWeight, upperPower, lowerPower, sign)
 	local hipMat, kneeMat, ankleMat = ent:GetBoneMatrix(ids.thigh), ent:GetBoneMatrix(ids.calf), ent:GetBoneMatrix(ids.foot)
 	if not (hipMat and kneeMat and ankleMat) then return end
 
@@ -883,27 +898,36 @@ local function solveLeg(ent, ids, foot, ankleTarget, weight, ctx, state, alignWe
 	pole:Normalize()
 
 	local along = (upperLength * upperLength - lowerLength * lowerLength + dist * dist) / (2 * dist)
-	local knee = hip + dir * along + pole * math_sqrt(math_max(upperLength * upperLength - along * along, 0))
 	local injuredPole = (knee0 - hip) - dir * (knee0 - hip):Dot(dir)
 	if injuredPole:LengthSqr() > 0.0001 then
 		pole = LerpVector(upperPower, injuredPole:GetNormalized(), pole):GetNormalized()
-		knee = hip + dir * along + pole * math_sqrt(math_max(upperLength * upperLength - along * along, 0))
 	end
+	local brokenUpper, brokenLower = brokenAmount(upperPower), brokenAmount(lowerPower)
+	if brokenUpper > 0 then
+		local twist = math.rad(sign * BROKEN_KNEE_TWIST * brokenUpper)
+		pole = pole * math.cos(twist) + dir:Cross(pole) * math_sin(twist)
+	end
+	local knee = hip + dir * along + pole * math_sqrt(math_max(upperLength * upperLength - along * along, 0))
 	local plane0, plane1 = animAxis:Cross(pole0), dir:Cross(pole)
 
 	local footAng0 = ankleMat:GetAngles()
 	local thighAng = rebase(hipMat:GetAngles(), bend0, plane0, knee - hip, plane1)
 	local calfAng = rebase(kneeMat:GetAngles(), ankle0 - knee0, plane0, ankle - knee, plane1)
 	local footAng = rebase(footAng0, ankle0 - knee0, plane0, ankle - knee, plane1)
+	if brokenLower > 0 then
+		local calfAxis = ankle - knee
+		calfAxis:Normalize()
+		calfAng:RotateAroundAxis(calfAxis, sign * BROKEN_CALF_TWIST * brokenLower)
+	end
 
 	local toeMat = ids.toe and ent:GetBoneMatrix(ids.toe)
 	if toeMat and alignWeight > 0 then
-		local toeLocal = WorldToLocal(toeMat:GetTranslation(), angle_zero, ankle0, footAng0)
-		local toeDir = LocalToWorld(toeLocal, angle_zero, ankle, footAng) - ankle
-		local toeLength = toeDir:Length()
+		local animToe = toeMat:GetTranslation() - ankle0
+		local toeLength = animToe:Length()
 		if toeLength > 0.5 then
-			toeDir:Div(toeLength)
-			footAng = alignFoot(foot, footAng, toeDir, alignWeight * weight, state.ankleHeight, toeLength)
+			animToe:Div(toeLength)
+			local restYaw = ctx.bodyYaw - sign * (FOOT_SPLAY + BROKEN_FOOT_TWIST * brokenLower)
+			footAng = alignFoot(foot, footAng, footAng0, animToe, alignWeight * weight, state.ankleHeight, toeLength, restYaw, sign * BROKEN_FOOT_ROLL * brokenLower)
 		end
 	end
 
@@ -967,7 +991,7 @@ local function applyPose(ent, ply, state, bones, ctx)
 			local limb = index == 1 and "lleg" or "rleg"
 			local upperPower = hg.GetLimbEffectiveness(ply.organism, limb, "up")
 			local lowerPower = hg.GetLimbEffectiveness(ply.organism, limb, "down")
-			local knee = solveLeg(ent, ids, foot, ankleTarget, weight, ctx, state, alignWeight, upperPower, lowerPower)
+			local knee = solveLeg(ent, ids, foot, ankleTarget, weight, ctx, state, alignWeight, upperPower, lowerPower, LEGS[index].sign)
 			state.appliedKnee = state.appliedKnee or knee and {bone = ids.calf, pos = knee}
 		end
 	end

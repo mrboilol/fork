@@ -429,6 +429,41 @@ local function StepHazard(ply, pos, landing)
     if toeHit or math.abs(heightDiff) >= STEP_UNEVEN_HEIGHT then return "uneven" end
 end
 
+local LIMP_TRIP_MIN_LIMP = 0.3
+local LIMP_TRIP_SAFE_SPEED = 105
+local LIMP_TRIP_FULL_SPEED = 230
+local LIMP_TRIP_CHANCE = 0.9
+local LIMP_TRIP_COOLDOWN = 0.4
+
+local function LimpTripCheck(ply, stepIndex, speed, velocity, moveDir)
+    if speed <= LIMP_TRIP_SAFE_SPEED or ply:Crouching() then return false end
+    local org = ply.organism
+    if not org or not hg.GaitLegLimp then return false end
+
+    local limp = hg.GaitLegLimp(org, stepIndex == 1 and "rleg" or "lleg")
+    if limp < LIMP_TRIP_MIN_LIMP then return false end
+
+    local overspeed = math.Clamp((speed - LIMP_TRIP_SAFE_SPEED) / (LIMP_TRIP_FULL_SPEED - LIMP_TRIP_SAFE_SPEED), 0, 1)
+    local tripChance = math.min(ScaleTripChance(ply, org, LIMP_TRIP_CHANCE * limp * overspeed), MAX_TRIP_CHANCE)
+
+    if math.random() < tripChance then
+        ply.hgNextStepTrip = CurTime() + LIMP_TRIP_COOLDOWN
+        timer.Simple(0, function()
+            if not IsValid(ply) or not ply:Alive() or IsValid(ply.FakeRagdoll) or ply:GetMoveType() ~= MOVETYPE_WALK then return end
+            ExecuteTrip(ply, org, "limp", velocity, nil, false, 0)
+        end)
+
+        return true
+    end
+    if math.random() > overspeed then return false end
+    ply.hgNextStepTrip = CurTime() + LIMP_TRIP_COOLDOWN
+
+    ply:ViewPunch(Angle(2 + overspeed * 4, 0, (stepIndex == 1 and 1 or -1) * (1 + overspeed * 2)))
+    hg.StartStagger(ply, moveDir, 0.3 + overspeed * 0.5)
+
+    return true
+end
+
 function hg.FootstepTripCheck(ply, stepIndex, rate, swingFraction)
     if not ply:Alive() or IsValid(ply.FakeRagdoll) or ply:InVehicle() or ply:GetMoveType() ~= MOVETYPE_WALK then return end
     if (ply.hgNextStepTrip or 0) > CurTime() or (ply.nextTumbleCheck or 0) > CurTime() + 1 then return end
@@ -438,6 +473,7 @@ function hg.FootstepTripCheck(ply, stepIndex, rate, swingFraction)
     if speed < STEP_STEEP_MIN_SPEED then return end
 
     local moveDir = Vector(velocity.x / speed, velocity.y / speed, 0)
+    if LimpTripCheck(ply, stepIndex, speed, velocity, moveDir) then return end
     local right = Vector(moveDir.y, -moveDir.x, 0)
     local side = stepIndex == 1 and -1 or 1
     local pos = ply:GetPos()

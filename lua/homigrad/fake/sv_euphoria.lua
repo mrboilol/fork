@@ -1,4 +1,4 @@
-local hg_selfpreservation = ConVarExists("hg_selfpreservation") and GetConVar("hg_selfpreservation") or CreateConVar("hg_selfpreservation", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Euphoria self-preservation reactions (wound grabs, stumbling, cover); 0 = Z-City stumbling and manual wound holding", 0, 1)
+local hg_selfpreservation = ConVarExists("hg_selfpreservation") and GetConVar("hg_selfpreservation") or CreateConVar("hg_selfpreservation", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "controls stumbling and cool wound holding", 0, 1)
 local function euphoriaOn(cvar) return hg_selfpreservation:GetBool() and cvar:GetBool() end
 
 local hg_euphoria_tension = CreateConVar("hg_euphoria_tension", "1", FCVAR_ARCHIVE + FCVAR_NOTIFY, "euphoria tension on fake ragdolls", 0, 1)

@@ -236,7 +236,11 @@ function hg.DoZManip(ent, ply)
 	if useRight and not hg.CanUseRightHand(ply) then return end
 
 	if not ply.zmanipstart or IsValid(ply:GetNetVar("carryent2")) then return end
-	
+	if ply.hgPickupReach then
+		ply.zmanipstart = nil
+		return
+	end
+
 	local time = (math.Clamp((CurTime() - ply.zmanipstart) / ply.zmaniptime, 0, 1))
 	
 	if time >= 1 then
@@ -371,128 +375,4 @@ function hg.DoZManip(ent, ply)
 		ent:SetBoneMatrix(ply_boneindex, ply_bonematrix)
 		--ply:SetBonePosition(ply_boneindex, bonepos, boneang)
 	end
-end
-
-local HANDOFF_GRAB = 0.35
-local HANDOFF_BLEND = 0.35
-local handoffPos, handoffAng = Vector(4, 0, 0), Angle(0, 0, 0)
-
-local function handoffEnd(ply, wep)
-	local h = ply.hgHandoff
-	return h.select + ((IsValid(wep) and wep.isTPIKBase) and 0 or HANDOFF_BLEND)
-end
-
-local function clearHandoff(ply)
-	if IsValid(ply.hgHandoffModel) then ply.hgHandoffModel:Remove() end
-	ply.hgHandoffModel = nil
-	ply.hgHandoff = nil
-end
-
-net.Receive("hg_pickup_handoff", function()
-	local ply = net.ReadPlayer()
-	local wep = net.ReadEntity()
-	local mdl = net.ReadString()
-	local selectDelay = net.ReadFloat()
-	if not IsValid(ply) then return end
-
-	clearHandoff(ply)
-	if mdl == "" then return end
-
-	local model = ClientsideModel(mdl)
-	if not IsValid(model) then return end
-	model:SetNoDraw(true)
-	if IsValid(wep) then
-		model:SetSkin(wep:GetSkin())
-		if wep.WorldModelFake and wep.FakeScale then model:SetModelScale(wep.FakeScale, 0) end
-	end
-
-	ply.hgHandoffModel = model
-	ply.hgHandoff = {wep = wep, start = CurTime(), select = CurTime() + selectDelay}
-	ply:CallOnRemove("hg_pickup_handoff", clearHandoff)
-end)
-
-local HANDOFF_POS_STIFFNESS = 240
-local HANDOFF_POS_DAMPING = 15
-local HANDOFF_ANG_STIFFNESS = 190
-local HANDOFF_ANG_DAMPING = 13
-
-local function stepHandoffSpring(h, pos, ang)
-	local now = SysTime()
-	if not h.springPos then
-		h.springPos = pos - ang:Forward() * 5 - ang:Up() * 4
-		h.springVel = Vector(0, 0, 0)
-		h.springAng = Angle(ang.p + 28, ang.y, ang.r)
-		h.springAngVel = Vector(0, 0, 0)
-		h.springTime = now
-	end
-
-	local dt = math.Clamp(now - h.springTime, 0, 0.05)
-	h.springTime = now
-
-	local posDrag = math.exp(-HANDOFF_POS_DAMPING * dt)
-	h.springVel = (h.springVel + (pos - h.springPos) * HANDOFF_POS_STIFFNESS * dt) * posDrag
-	h.springPos = h.springPos + h.springVel * dt
-
-	local angDrag = math.exp(-HANDOFF_ANG_DAMPING * dt)
-	local sa, av = h.springAng, h.springAngVel
-	av.x = (av.x + math.AngleDifference(ang.p, sa.p) * HANDOFF_ANG_STIFFNESS * dt) * angDrag
-	av.y = (av.y + math.AngleDifference(ang.y, sa.y) * HANDOFF_ANG_STIFFNESS * dt) * angDrag
-	av.z = (av.z + math.AngleDifference(ang.r, sa.r) * HANDOFF_ANG_STIFFNESS * dt) * angDrag
-	sa.p = sa.p + av.x * dt
-	sa.y = sa.y + av.y * dt
-	sa.r = sa.r + av.z * dt
-
-	return h.springPos, h.springAng
-end
-
-function hg.PickupHandoffHides(ply, wep)
-	local h = ply.hgHandoff
-	return h ~= nil and h.wep == wep and CurTime() < handoffEnd(ply, wep)
-end
-
-function hg.DrawPickupHandoff(ent, ply)
-	local h = ply.hgHandoff
-	if not h then return end
-
-	local model = ply.hgHandoffModel
-	local wep = h.wep
-	local now = CurTime()
-	if not IsValid(model) or now >= handoffEnd(ply, wep) or (now > h.select and IsValid(wep) and wep:GetOwner() ~= ply) then
-		clearHandoff(ply)
-		return
-	end
-	if now < h.start + HANDOFF_GRAB then return end
-
-	local org = ply.organism
-	local useRight = org and (org.larmamputated or org.lhandamputated or org.larmupamputated)
-	local bone = ent:LookupBone(useRight and "ValveBiped.Bip01_R_Hand" or "ValveBiped.Bip01_L_Hand")
-	local mat = bone and ent:GetBoneMatrix(bone)
-	if not mat then return end
-
-	local pos, ang = LocalToWorld(handoffPos, handoffAng, mat:GetTranslation(), mat:GetAngles())
-	pos = LocalToWorld(-model:OBBCenter(), angle_zero, pos, ang)
-	pos, ang = stepHandoffSpring(h, pos, ang)
-
-	local real = IsValid(wep) and wep.worldModel
-	if now > h.select and IsValid(real) and real:GetModel() == model:GetModel() then
-		model:SetRenderOrigin(pos)
-		model:SetRenderAngles(ang)
-		model:SetupBones()
-		real:SetupBones()
-		local cm, rm = model:GetBoneMatrix(0), real:GetBoneMatrix(0)
-		if cm and rm then
-			local op, oa = WorldToLocal(cm:GetTranslation(), cm:GetAngles(), pos, ang)
-			local ip, ia = WorldToLocal(vector_origin, angle_zero, op, oa)
-			local tpos, tang = LocalToWorld(ip, ia, rm:GetTranslation(), rm:GetAngles())
-			local frac = math.ease.InOutSine(math.Clamp((now - h.select) / HANDOFF_BLEND, 0, 1))
-			pos = LerpVector(frac, pos, tpos)
-			ang = LerpAngle(frac, ang, tang)
-			model:SetModelScale(Lerp(frac, 1, real:GetModelScale()))
-		end
-	end
-
-	model:SetRenderOrigin(pos)
-	model:SetRenderAngles(ang)
-	model:SetupBones()
-	model:DrawModel()
 end

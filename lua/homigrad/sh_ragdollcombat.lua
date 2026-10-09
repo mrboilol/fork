@@ -2,7 +2,7 @@ local ragdollCombat = GetConVar("hg_ragdollcombat") or CreateConVar(
 	"hg_ragdollcombat",
 	"0",
 	FCVAR_ARCHIVE + FCVAR_NOTIFY + FCVAR_REPLICATED,
-	"Toggle ragdoll combat-like ragdoll mode (walking, running in ragdoll, etc.)",
+	"this is very wip dont turn this on",
 	0,
 	1
 )

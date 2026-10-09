@@ -1,4 +1,4 @@
-local hg_limp_style = CreateConVar("hg_limp_style", "1", {FCVAR_ARCHIVE}, "0=off, 1=zombie walk strong, 2=zombie walk mild, 3=bone only")
+local hg_limp_style = CreateConVar("hg_limp_style", "2", {FCVAR_ARCHIVE}, "0=off, 1=zombie walk strong, 2=zombie walk mild, 3=bone only")
 
 local limpActivities = {
 	[1] = ACT_HL2MP_WALK_ZOMBIE_06,

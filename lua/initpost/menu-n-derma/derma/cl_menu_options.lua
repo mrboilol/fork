@@ -78,6 +78,79 @@ local function PlayTypewriterSound()
     surface.PlaySound(SOUND_TYPEWRITER)
 end
 
+local SOUND_PREVIEW_ICON = Material("icon16/sound.png", "smooth")
+local SOUND_PREVIEW_CONVARS = {hg_dyingsound = true, hg_painsound = true, hg_otrubsound = true}
+local SOUND_PREVIEW_FALLBACK = {hg_dyingsound = 2, hg_painsound = 6, hg_otrubsound = 0}
+local SOUND_PREVIEW_PATHS = {
+    hg_dyingsound = {
+        [0] = "sound/itsallcomingtoanend.mp3",
+        [1] = "sound/zbattle/conscioustypebeat.mp3",
+        [2] = "sound/dying.mp3",
+        [4] = "sound/itsallcomingtoanend.mp3",
+        [5] = "sound/sillydying.mp3",
+        [6] = "sound/fuck.mp3",
+        [7] = "sound/sonimcooked.mp3",
+        [8] = "sound/rem_dying1.mp3",
+        [9] = "sound/itshopeless.mp3",
+        [10] = "sound/vitality.mp3",
+        [11] = "sound/asphyxiation.ogg"
+    },
+    hg_painsound = {
+        [0] = "sound/zbattle/pain_beat.mp3",
+        [1] = "sound/zbattle/pain_beat.mp3",
+        [2] = "sound/agony.mp3",
+        [4] = "sound/reality.mp3",
+        [5] = "sound/sillypain.mp3",
+        [6] = "sound/rem_excruciatingpain.mp3"
+    },
+    hg_otrubsound = {
+        [0] = "sound/zbattle/unconscious_type_beat.mp3",
+        [2] = "sound/sleepy.mp3",
+        [3] = "sound/itssoover.mp3",
+        [4] = "sound/ngaimcooked.mp3",
+        [5] = "sound/rem_dying1.mp3",
+        [6] = "sound/fuck.mp3",
+        [7] = "sound/itshopeless.mp3"
+    }
+}
+local settingsSoundPreview = {station = nil, convar = nil, token = 0}
+
+local function StopSettingsSoundPreview()
+    settingsSoundPreview.token = settingsSoundPreview.token + 1
+    if IsValid(settingsSoundPreview.station) then
+        settingsSoundPreview.station:Stop()
+    end
+    settingsSoundPreview.station = nil
+    settingsSoundPreview.convar = nil
+end
+
+local function ToggleSettingsSoundPreview(convarName)
+    local wasActive = settingsSoundPreview.convar == convarName
+    StopSettingsSoundPreview()
+    if wasActive then return end
+
+    local convar = GetConVar(convarName)
+    if not convar then return end
+
+    local paths = SOUND_PREVIEW_PATHS[convarName]
+    local path = paths[convar:GetInt()] or paths[SOUND_PREVIEW_FALLBACK[convarName]]
+    local token = settingsSoundPreview.token
+    settingsSoundPreview.convar = convarName
+    sound.PlayFile(path, "noblock noplay", function(station)
+        if token ~= settingsSoundPreview.token then
+            if IsValid(station) then station:Stop() end
+            return
+        end
+        if not IsValid(station) then
+            settingsSoundPreview.convar = nil
+            return
+        end
+        station:EnableLooping(true)
+        station:Play()
+        settingsSoundPreview.station = station
+    end)
+end
+
 local settings_header_height = 70
 
 local function CreateSettingsFonts()
@@ -147,12 +220,13 @@ if not game.IsDedicated() then
     hg.settings:AddOpt("Server-side settings","homicide_traitoramount", "Homicide: Traitor Amount", nil, nil, "int")
 end
 
-hg.settings:AddOpt("Server-side settings","hg_selfpreservation", "EP (euphoria self-preservation)")
+hg.settings:AddOpt("Server-side settings","hg_selfpreservation", "self preservation")
 hg.settings:AddOpt("Server-side settings","hg_depression", "Depression")
 hg.settings:AddOpt("Server-side settings","hg_panic", "Panic attacks")
 hg.settings:AddOpt("Server-side settings","hg_hatprotect", "Hat protection")
 hg.settings:AddOpt("Server-side settings","hg_dyingsound", "Dying sound mode", nil, nil, "int")
 hg.settings:AddOpt("Server-side settings","hg_painsound", "Pain sound mode", nil, nil, "int")
+hg.settings:AddOpt("Server-side settings","hg_otrubsound", "Otrub sound mode", nil, nil, "int")
 hg.settings:AddOpt("Debug","hg_show_hitposmuzzle", "Show weapon hitpos")
 hg.settings:AddOpt("Debug","hg_setzoompos", "Edit weapon zoompos, check console for results")
 hg.settings:AddOpt("Debug","hg_show_hitbox", "Show hitboxes")
@@ -616,6 +690,7 @@ function SettingsRefreshCategoryButtons()
 end
 
 function SettingsRefreshContent()
+    StopSettingsSoundPreview()
     if not IsValid(settings_content_panel) then return end
     settings_content_panel:Clear()
 
@@ -647,13 +722,35 @@ function SettingsRefreshContent()
     local yOffset = MenuUnit(10)
     local sidebarWidth = math.floor(settings_sw / 3.6)
     local entryWidth = settings_sw - sidebarWidth
+    local soundGroup
+    local soundGroupRows = 0
 
     for convarName, settingData in SortedPairs(hg.settings.tbl[settings_active_category]) do
         if convarName == "hg_gollavo_headshot_effect" and not InfoHasLocalAchievement("gollavo") then continue end
         local convar = GetConVar(settingData[2])
         if not convar then continue end
 
-        local row = vgui.Create("DPanel", scroll)
+        local rowParent = scroll
+        local isSoundRow = SOUND_PREVIEW_CONVARS[convarName]
+        if isSoundRow then
+            if not IsValid(soundGroup) then
+                soundGroup = vgui.Create("DPanel", scroll)
+                soundGroup:Dock(TOP)
+                soundGroup:DockMargin(MenuUnit(10), MenuUnit(4), MenuUnit(10), MenuUnit(4))
+                soundGroup:DockPadding(0, MenuUnit(26), 0, MenuUnit(4))
+                soundGroup.Paint = function(self, w, h)
+                    surface.SetDrawColor(20, 20, 30, 120)
+                    surface.DrawRect(0, 0, w, h)
+                    surface.SetDrawColor(settings_color_whitey.r, settings_color_whitey.g, settings_color_whitey.b, 90)
+                    surface.DrawOutlinedRect(0, 0, w, h, 1)
+                    draw.SimpleText("SOUND PREVIEW", "ZCity_Menu_Settings_Tiny", MenuUnit(12), MenuUnit(6), settings_color_text_dim)
+                end
+            end
+            rowParent = soundGroup
+            soundGroupRows = soundGroupRows + 1
+        end
+
+        local row = vgui.Create("DPanel", rowParent)
         row:SetSize(entryWidth - MenuUnit(20), MenuUnit(56))
         row:Dock(TOP)
         row:DockMargin(MenuUnit(10), MenuUnit(4), MenuUnit(10), MenuUnit(4))
@@ -670,6 +767,24 @@ function SettingsRefreshContent()
         title:SetTextColor(settings_color_text)
         title:SetText(settingData[3])
         title:SizeToContents()
+
+        if isSoundRow then
+            local previewBtn = vgui.Create("DButton", row)
+            previewBtn:SetText("")
+            previewBtn:SetSize(MenuUnit(20), MenuUnit(20))
+            previewBtn:SetPos(title:GetX() + title:GetWide() + MenuUnit(8), MenuUnit(6) + math.floor((title:GetTall() - MenuUnit(20)) / 2))
+            previewBtn:SetCursor("hand")
+            function previewBtn:Paint(w, h)
+                local active = settingsSoundPreview.convar == convarName
+                local col = active and settings_color_whitey or (self:IsHovered() and settings_color_text or settings_color_text_dim)
+                surface.SetMaterial(SOUND_PREVIEW_ICON)
+                surface.SetDrawColor(col.r, col.g, col.b, col.a)
+                surface.DrawTexturedRect(0, 0, w, h)
+            end
+            function previewBtn:DoClick()
+                ToggleSettingsSoundPreview(convarName)
+            end
+        end
 
         local help = vgui.Create("DLabel", row)
         help:SetPos(MenuUnit(12), MenuUnit(28))
@@ -833,6 +948,10 @@ function SettingsRefreshContent()
 
         yOffset = yOffset + row:GetTall() + MenuUnit(8)
     end
+
+    if IsValid(soundGroup) then
+        soundGroup:SetTall(MenuUnit(30) + soundGroupRows * (MenuUnit(56) + MenuUnit(8)))
+    end
 end
 
 function hg.DrawSettings(ParentPanel)
@@ -840,6 +959,7 @@ function hg.DrawSettings(ParentPanel)
     isValidMainMenuPanel = IsValid(ParentPanel)
 
     ParentPanel:SetAlpha(0)
+    ParentPanel.OnRemove = StopSettingsSoundPreview
     ParentPanel.Paint = function(self, w, h)
         if hg.DrawBlur then hg.DrawBlur(self, 5) end
         draw.RoundedBox(0, 0, 0, w, h, settings_clr_verygray)
@@ -968,7 +1088,8 @@ function hg.DrawSettings(ParentPanel)
     function backBtn:DoClick()
         surface.PlaySound(SOUND_SETTINGS_CLICK)
         surface.PlaySound(SOUND_SETTINGS_CLICK)
-        if IsValid(ParentPanel) then 
+        StopSettingsSoundPreview()
+        if IsValid(ParentPanel) then
             local luaMenu = ParentPanel:GetParent()
             ParentPanel:AlphaTo(0, 0.2, 0, function()
                 if IsValid(ParentPanel) then ParentPanel:Remove() end

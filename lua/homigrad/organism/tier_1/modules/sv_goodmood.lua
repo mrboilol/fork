@@ -6,11 +6,25 @@ local function GetGoodMood(org)
     return org.goodmood
 end
 
+local FEAR_SHIELD_COST = 0.35
+
 local function GetGoodMoodGainMultiplier(org)
     local depression = math.Clamp(tonumber(org.depression) or 0, 0, 1)
-    if depression <= 0.05 then return 1 end
+    local panic = math.Clamp(tonumber(org.panicattack) or 0, 0, 1)
+    local mul = 1
+    if depression > 0.05 then mul = math.Clamp(1 - depression * 1.6, 0.05, 0.9) end
+    if panic > 0.05 then mul = mul * math.Clamp(1 - panic * 1.5, 0, 1) end
 
-    return math.Clamp(1 - depression * 1.6, 0.05, 0.9)
+    return mul
+end
+
+local function AbsorbFear(org)
+    local fearadd = tonumber(org.fearadd) or 0
+    if fearadd <= 0 or org.goodmood <= 0 then return end
+
+    local absorbed = math.min(fearadd, org.goodmood / FEAR_SHIELD_COST)
+    org.fearadd = fearadd - absorbed
+    org.goodmood = math.max(org.goodmood - absorbed * FEAR_SHIELD_COST, 0)
 end
 
 module[1] = function(org)
@@ -22,6 +36,7 @@ end
 module[2] = function(owner, org, timeValue)
     local goodmood_add = 0
     GetGoodMood(org)
+    AbsorbFear(org)
 
     -- Natural mood decay towards 0
     org.goodmood = math.Approach(org.goodmood, 0, timeValue / 420)
@@ -89,6 +104,11 @@ module[2] = function(owner, org, timeValue)
     local depression = math.Clamp(tonumber(org.depression) or 0, 0, 1)
     if depression > 0.05 then
         goodmood_add = goodmood_add - timeValue * (0.015 + depression * 0.11)
+    end
+
+    local panic = math.Clamp(tonumber(org.panicattack) or 0, 0, 1)
+    if panic > 0.05 then
+        goodmood_add = goodmood_add - timeValue * (0.04 + panic * 0.16)
     end
 
     -- Decrease goodmood when in fear.

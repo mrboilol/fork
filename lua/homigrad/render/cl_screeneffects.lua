@@ -86,6 +86,7 @@ local activeOtrubMode
 local ConsciousnessSleepyStation
 local ItsHopelessStation
 local VitalityStation
+local AsphyxiationStation
 local IncapacitatedStation
 local ITS_HOPELESS_LOOP_START = 5
 local ITS_HOPELESS_LOOP_FADE_DURATION = 12
@@ -112,27 +113,6 @@ hook.Add("PreDrawEffects", "HG_WorldMotionBlur", function()
 	cam.End2D()
 end)
 local drawFinalVitalsVignettes
-local ironSightMat = Material("homigrad/ironsight_dots.png", "smooth")
-local IRONSIGHT_SCREEN_SCALE = 2.6
-local hg_ironrealism = CreateClientConVar("hg_ironrealism", "1", true, false, "Enables the realistic iron sight aperture overlay", 0, 1)
-
-local function drawIronSightAperture()
-	if not hg_ironrealism:GetBool() then return end
-	local wep = lply:GetActiveWeapon()
-	if not IsValid(wep) or not ishgweapon(wep) or wep.scopedef then return end
-	if not IsAimingNoScope or not IsAimingNoScope(lply) then return end
-	if IsAiming and IsAiming(lply) then return end
-	if wep.HasAttachment and wep:HasAttachment("sight") then return end
-
-	local fade = math.Clamp(((wep.k or 0) - 0.5) / 0.5, 0, 1)
-	if fade <= 0.01 then return end
-
-	local quad = ScrH() * IRONSIGHT_SCREEN_SCALE
-	surface.SetMaterial(ironSightMat)
-	surface.SetDrawColor(255, 255, 255, 215 * fade)
-	surface.DrawTexturedRect(ScrW() / 2 - quad / 2, ScrH() / 2 - quad / 2, quad, quad)
-	surface.SetDrawColor(255, 255, 255, 255)
-end
 hook.Add("RenderScreenspaceEffects", "homigrad", function()
 	tab["$pp_colour_brightness"] = 0
 	tab["$pp_colour_contrast"] = 1
@@ -527,6 +507,7 @@ local collapseBlinkEnd = 0
 local collapseBlinkFlicker = 1
 local nextCollapseBlinkFlicker = 0
 local collapseBlinkWholeScreen = false
+local o2Blink = {lerp = 0, start = 0, peak = 0, finish = 0, nextAt = 0, depth = 0}
 local collapseColor = {
 	["$pp_colour_addr"] = 0,
 	["$pp_colour_addg"] = 0,
@@ -615,7 +596,12 @@ local panicattackShakeIntervalMin = 0.45
 local panicattackShakeIntervalMax = 1.4
 local panicattackShakeMul = 0.85
 local function getPanicAttackFx(org)
-	return 0
+	local panicConVar = GetConVar("hg_panic")
+	if panicConVar and not panicConVar:GetBool() then return 0 end
+	local panic = math.Clamp(tonumber(org.panicattack) or 0, 0, 1)
+	local intensity = math.Clamp(math.Remap(panic, panicattackFadeStart, panicattackThreshold, 0, panicattackVolumeMul), 0, 1)
+	if org.otrub or org.incapacitated then return intensity * 0.22 end
+	return intensity
 end
 local painBeatOverlayVolumeMul = 1.25
 local painThresholdMax = 120
@@ -862,6 +848,9 @@ local function stopthings()
 	collapseBlinkFlicker = 1
 	nextCollapseBlinkFlicker = 0
 	collapseBlinkWholeScreen = false
+	o2Blink.lerp = 0
+	o2Blink.finish = 0
+	o2Blink.nextAt = 0
 	AnalgesiaLerp = 0
 	shockLerp = 0
 	assimilatedLerp = 0
@@ -1002,6 +991,10 @@ local function stopthings()
 		VitalityStation:Stop()
 		VitalityStation = nil
 	end
+	if IsValid(AsphyxiationStation) then
+		AsphyxiationStation:Stop()
+		AsphyxiationStation = nil
+	end
 
 	if IsValid(SillydyingStation) then
 		SillydyingStation:Stop()
@@ -1112,11 +1105,40 @@ local function updateCollapseBlink(severity, consciousnessSeverity, brainSeverit
 	return collapseBlinkLerp, collapseBlinkWholeScreen, blinkSeverity
 end
 
+local function updateO2Blink(severity)
+	local now = CurTime()
+	if severity <= 0.05 then
+		o2Blink.lerp = math.Approach(o2Blink.lerp, 0, FrameTime() * 4)
+		o2Blink.nextAt = now + math.Rand(2, 4)
+		return o2Blink.lerp
+	end
+
+	if now >= o2Blink.nextAt and now >= o2Blink.finish then
+		local duration = math.Rand(Lerp(severity, 0.28, 0.45), Lerp(severity, 0.55, 1.1))
+		o2Blink.start = now
+		o2Blink.peak = now + duration * math.Rand(0.25, 0.4)
+		o2Blink.finish = now + duration
+		o2Blink.depth = math.Rand(0.6, 1) * Lerp(severity, 0.35, 1)
+		o2Blink.nextAt = o2Blink.finish + math.Rand(Lerp(severity, 5, 1.4), Lerp(severity, 10, 3.2))
+	end
+
+	local target = 0
+	if now < o2Blink.finish then
+		if now < o2Blink.peak then
+			target = math.ease.InOutSine(math.TimeFraction(o2Blink.start, o2Blink.peak, now))
+		else
+			target = 1 - math.ease.InOutSine(math.TimeFraction(o2Blink.peak, o2Blink.finish, now))
+		end
+		target = target * o2Blink.depth
+	end
+
+	o2Blink.lerp = math.Approach(o2Blink.lerp, target, FrameTime() * 10)
+	return o2Blink.lerp
+end
+
 drawFinalVitalsVignettes = function()
 	if not IsValid(lply) or not lply:Alive() then return end
 	if IsValid(lply:GetNWEntity("spect")) then return end
-
-	drawIronSightAperture()
 
 	local org = lply.new_organism or lply.organism
 	if not org or not org.brain then return end
@@ -1292,12 +1314,19 @@ drawFinalVitalsVignettes = function()
 
 	if O2Lerp > 1 then
 		local o2Severity = math.Clamp(O2Lerp / 250, 0, 1)
+		local o2BlinkAmount = org.otrub and 0 or updateO2Blink(o2Severity)
 		render.UpdateScreenEffectTexture()
 		vignetteMat:SetFloat("$c2_x", CurTime() + 11000)
-		vignetteMat:SetFloat("$c0_z", scaleVignette(o2Severity * 1.1))
-		vignetteMat:SetFloat("$c1_y", scaleVignette(o2Severity * 1.9))
+		vignetteMat:SetFloat("$c0_z", scaleVignette(o2Severity * 1.1 + o2BlinkAmount * 1.4))
+		vignetteMat:SetFloat("$c1_y", scaleVignette(o2Severity * 1.9 + o2BlinkAmount * 2.6))
 		render.SetMaterial(vignetteMat)
 		render.DrawScreenQuad()
+
+		if o2BlinkAmount > 0.005 then
+			surface.SetDrawColor(0, 0, 0, math.Clamp(o2BlinkAmount * Lerp(o2Severity, 60, 170), 0, 170))
+			surface.DrawRect(0, 0, ScrW(), ScrH())
+			surface.SetDrawColor(255, 255, 255, 255)
+		end
 
 		render.UpdateScreenEffectTexture()
 		noiseMat:SetFloat("$c0_y", 1 - o2Severity)
@@ -1335,6 +1364,49 @@ drawFinalVitalsVignettes = function()
 		render.DrawScreenQuad()
 	end
 end
+
+local engulfedFireStation
+local engulfedFireStationLoading = false
+local engulfedFireVolume = 0
+local engulfedFireVolumeMax = 1
+
+local function getEngulfedFireCount(ply)
+	local character = hg and hg.GetCurrentCharacter and hg.GetCurrentCharacter(ply) or ply
+	local count = 0
+	for _, ent in ipairs({ply, character}) do
+		if IsValid(ent) and ent:IsOnFire() then
+			count = math.max(count, istable(ent.fires) and table.Count(ent.fires) or 0, 1)
+		end
+	end
+	return count
+end
+
+hook.Add("Think", "HG_EngulfedFireSound", function()
+	local ply = LocalPlayer()
+	local count = IsValid(ply) and ply:Alive() and getEngulfedFireCount(ply) or 0
+	local target = math.Clamp(count / 4, 0, 1) * engulfedFireVolumeMax
+	engulfedFireVolume = Lerp(FrameTime() * 4, engulfedFireVolume, target)
+
+	if target > 0 and not engulfedFireStationLoading and not IsValid(engulfedFireStation) then
+		engulfedFireStationLoading = true
+		sound.PlayFile("sound/engulfedinflames.ogg", "noblock noplay", function(station)
+			engulfedFireStationLoading = false
+			if not IsValid(station) then return end
+			station:EnableLooping(true)
+			station:SetVolume(engulfedFireVolume)
+			station:Play()
+			engulfedFireStation = station
+		end)
+	end
+
+	if not IsValid(engulfedFireStation) then return end
+	if target == 0 and engulfedFireVolume < 0.01 then
+		engulfedFireStation:Stop()
+		engulfedFireStation = nil
+		return
+	end
+	engulfedFireStation:SetVolume(engulfedFireVolume)
+end)
 
 hook.Add("PreDrawHUD", "HG_FinalVitalsVignettes", drawFinalVitalsVignettes)
 
@@ -1655,6 +1727,21 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				station:Play()
 				station:SetTime(math.min(math.Rand(0, station:GetLength()), 139))
 				VitalityStation = station
+				station:EnableLooping(true)
+			end
+		end)
+	end
+
+	if selectedDyingMode == 11 and canRetrySound("AsphyxiationStation", AsphyxiationStation) then
+		sound.PlayFile("sound/asphyxiation.ogg", "noblock noplay", function(station)
+			if IsValid(station) then
+				if getServerSoundMode("hg_dyingsound", 2) != 11 then
+					station:Stop()
+					return
+				end
+				station:SetVolume(0)
+				station:Play()
+				AsphyxiationStation = station
 				station:EnableLooping(true)
 			end
 		end)
@@ -2180,6 +2267,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 
 
 	local terminalDyingVolume = 0
+	local asphyxiationVolume = 0
 	if IsValid(IncapacitatedStation) then
 		IncapacitatedStation:SetVolume(0)
 	end
@@ -2509,6 +2597,32 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				if IsValid(VitalityStation) then
 					VitalityStation:SetVolume(math.Clamp(rawConsciousVol * hg.screeneffects_config.vitalityDyingVolumeMul, 0, hg.screeneffects_config.vitalityDyingVolumeMax))
 				end
+			elseif dyingMode == 11 then
+				if IsValid(NoiseStation2) then
+					NoiseStation2:SetVolume(0)
+				end
+				if IsValid(EndStation) then
+					EndStation:SetVolume(0)
+				end
+				if IsValid(DyingStation) then
+					DyingStation:SetVolume(0)
+				end
+				if IsValid(SillydyingStation) then
+					SillydyingStation:SetVolume(0)
+				end
+				if IsValid(ItssooverStation) then
+					ItssooverStation:SetVolume(0)
+				end
+				if IsValid(SonimCookedStation) then
+					SonimCookedStation:SetVolume(0)
+				end
+				if IsValid(ItsHopelessStation) then
+					setItsHopelessVolume(0)
+				end
+				if IsValid(VitalityStation) then
+					VitalityStation:SetVolume(0)
+				end
+				asphyxiationVolume = consciousVol
 			end
 			if dyingMode != 7 and IsValid(SonimCookedStation) then
 				SonimCookedStation:SetVolume(0)
@@ -2563,6 +2677,9 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			end
 		end
 		
+		if IsValid(AsphyxiationStation) then
+			AsphyxiationStation:SetVolume(asphyxiationVolume)
+		end
 		if (o2 > 20 or incapacitated) and org.otrub then
 			local otrubMode = getServerSoundMode("hg_otrubsound", 0)
 			-- OTRU audio is selected solely by hg_otrubsound.  Remorseism

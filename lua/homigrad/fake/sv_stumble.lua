@@ -1,4 +1,4 @@
-local hg_selfpreservation = ConVarExists("hg_selfpreservation") and GetConVar("hg_selfpreservation") or CreateConVar("hg_selfpreservation", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Euphoria self-preservation reactions (wound grabs, stumbling, cover); 0 = Z-City stumbling and manual wound holding", 0, 1)
+local hg_selfpreservation = ConVarExists("hg_selfpreservation") and GetConVar("hg_selfpreservation") or CreateConVar("hg_selfpreservation", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "controls stumbling and cool wound holding", 0, 1)
 local function euphoriaOn(cvar) return hg_selfpreservation:GetBool() and cvar:GetBool() end
 
 local hg_euphoria_getup_stumble = CreateConVar("hg_euphoria_getup_stumble", "1", FCVAR_ARCHIVE + FCVAR_NOTIFY, "fake ragdoll stumbling (Artagdoll-style)", 0, 1)
@@ -18,6 +18,12 @@ local START_WINDOW = 0.75
 local HIT_WINDOW = 0.5
 local HIT_MIN_DMG = 8
 local HIT_STAGGER_MIN_FRAC = 0.15
+local KNOCKDOWN_INSTANT_MUL = 1.8
+local MOMENTUM_SEVERITY = 0.6
+local FALL_CHANCE_FRAC = 0.7
+local FALL_CHANCE_MAX = 0.6
+local FALL_LEG_MUL = 0.5
+local STAGGER_FALL_DELAY = {0.3, 0.55}
 local UPRIGHT_THRESHOLD = 0.05
 local UPRIGHT_TRACE = 60
 local UPRIGHT_MIN_HEIGHT = 23.5
@@ -1193,16 +1199,30 @@ hook.Add("EntityTakeDamage", "HG_EuphoriaStumbleHit", function(ent, dmgInfo)
 		if energy <= 0 or not flatDir or acc.knockdown then return end
 
 		local knockdown = hg_hit_knockdown_energy:GetFloat()
-		if knockdown > 0 and acc.energy >= knockdown then
+		local _, momentum = hg.StaggerMomentum(ply)
+		local severity = acc.energy * (1 + momentum * MOMENTUM_SEVERITY)
+		if knockdown > 0 and severity >= knockdown * KNOCKDOWN_INSTANT_MUL then
 			knockDown(ply)
 			return
+		end
+
+		local staggerScale = severity / (knockdown > 0 and knockdown or 100)
+		local falls = knockdown > 0 and staggerScale >= 1
+		if knockdown > 0 and not falls and staggerScale >= FALL_CHANCE_FRAC then
+			local org = ply.organism or {}
+			local chance = (staggerScale - FALL_CHANCE_FRAC) / (1 - FALL_CHANCE_FRAC) * FALL_CHANCE_MAX
+			chance = hg.ScaleTripChance and hg.ScaleTripChance(ply, org, chance) or chance
+			chance = chance + math.max(legTripChance(org, "lleg"), legTripChance(org, "rleg")) * FALL_LEG_MUL
+			falls = math.random() < chance
 		end
 
 		local push = takePush(acc, energy * ENERGY_PLAYER_PUSH, ENERGY_PLAYER_PUSH_MAX)
 		if push > 0 then ply:SetVelocity(flatDir * push) end
 
-		local staggerScale = acc.energy / (knockdown > 0 and knockdown or 100)
-		if staggerScale >= HIT_STAGGER_MIN_FRAC then
+		if falls then
+			local delay = math.Rand(STAGGER_FALL_DELAY[1], STAGGER_FALL_DELAY[2]) / (1 + momentum)
+			if not hg.StartStagger(ply, flatDir, 1, delay) then knockDown(ply) end
+		elseif staggerScale >= HIT_STAGGER_MIN_FRAC then
 			hg.StartStagger(ply, flatDir, math.Clamp(staggerScale, 0.3, 1))
 		end
 		return

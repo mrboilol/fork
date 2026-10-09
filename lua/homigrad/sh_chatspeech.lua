@@ -15,10 +15,14 @@ if SERVER then
 		util.PrecacheSound(path)
 	end
 
-	local function letterSound(ply, letter)
+	local function letterSound(ply, letter, index, count)
 		local mode = ply:GetInfoNum("hg_otherspeech", 0)
 		if mode == 1 then return "speak" .. math.random(1, 2) .. ".ogg" end
-		if mode == 2 then return "newspeech/speak" .. math.random(1, 15) .. ".mp3" end
+		if mode == 2 then
+			local soundIndex = index == 1 and 1 or index == count and 15 or math.random(2, 14)
+
+			return "newspeech/speak" .. soundIndex .. ".mp3"
+		end
 		return soundPrefix .. letter .. ".wav"
 	end
 
@@ -31,19 +35,25 @@ if SERVER then
 			if #letters >= maxLetters then break end
 		end
 		if #letters == 0 then return end
+		if #letters == 1 and ply:GetInfoNum("hg_otherspeech", 0) == 2 then letters[2] = letters[1] end
 
 		local finishAt = CurTime() + #letters * letterInterval + 0.1
-		ply.HGChatSpeechUntil = math.max(ply.HGChatSpeechUntil or 0, finishAt)
+		local speech = {}
+		ply.HGChatSpeech = speech
+		ply.HGChatSpeechUntil = finishAt
 		hook.Run("StartVoice", ply, ply)
 		for index, letter in ipairs(letters) do
 			timer.Simple((index - 1) * letterInterval, function()
-				if IsValid(ply) and ply:Alive() then
-					ply:EmitSound(letterSound(ply, letter), 70, 100, 0.8, CHAN_VOICE)
+				if IsValid(ply) and ply:Alive() and ply.HGChatSpeech == speech then
+					if ply.HGChatSpeechSound then ply:StopSound(ply.HGChatSpeechSound) end
+					ply.HGChatSpeechSound = letterSound(ply, letter, index, #letters)
+					ply:EmitSound(ply.HGChatSpeechSound, 70, 100, 0.8, CHAN_VOICE)
 				end
 			end)
 		end
 		timer.Simple(#letters * letterInterval + 0.1, function()
-			if IsValid(ply) and (ply.HGChatSpeechUntil or 0) <= CurTime() then
+			if IsValid(ply) and ply.HGChatSpeech == speech then
+				ply.HGChatSpeech = nil
 				ply.HGChatSpeechUntil = nil
 				hook.Run("EndVoice", ply, ply)
 			end

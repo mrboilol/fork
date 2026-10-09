@@ -41,6 +41,12 @@ local INERTIA_COOLDOWN = 1.5
 local PUSH_IMPULSE = 280
 local PUSH_ACCEL = 1300
 local SIDE_STEP_FRAC = 0.6
+local MOMENTUM_FULL_SPEED = 300
+local MOMENTUM_DIR_WEIGHT = 1.4
+local FALL_FLING = 160
+local FALL_TOPPLE = 140
+local FALL_ENERGY = 30
+local HIT_RECENT = 1
 
 local function flatDirection(dir, ply)
 	local flat = Vector(dir and dir.x or 0, dir and dir.y or 0, 0)
@@ -52,7 +58,50 @@ local function flatDirection(dir, ply)
 	return flat
 end
 
-function hg.StartStagger(ply, dir, power)
+function hg.StaggerMomentum(ply)
+	local vel = ply:GetVelocity()
+	vel.z = 0
+	local speed = vel:Length()
+	if speed < 1 then return vector_origin, 0 end
+
+	return vel / speed, math.Clamp(speed / MOMENTUM_FULL_SPEED, 0, 1.5)
+end
+
+local function staggerFall(ply)
+	if not IsValid(ply) then return end
+	ply.hgStaggerFallAt = nil
+	if not ply:Alive() or IsValid(ply.FakeRagdoll) then return end
+
+	local dir = ply:GetNWVector("HGStaggerDir", vector_origin)
+	local power = ply:GetNWFloat("HGStaggerPower", 1)
+	ply:SetNWFloat("HGStaggerEnd", 0)
+
+	local hit = ply.hgStumbleHit
+	if hit and CurTime() - hit.time < HIT_RECENT and dir:LengthSqr() > 0.01 then
+		ply.hgStumbleHit = {
+			dir = dir,
+			dmg = hit.dmg,
+			energy = math.max(hit.energy or 0, FALL_ENERGY * power),
+			time = CurTime(),
+		}
+	end
+
+	hg.Fake(ply, nil, nil, nil, "stagger")
+	local ragdoll = ply.FakeRagdoll
+	if not IsValid(ragdoll) or dir:LengthSqr() < 0.01 then return end
+
+	local fling = dir * FALL_FLING * power
+	for i = 0, ragdoll:GetPhysicsObjectCount() - 1 do
+		local phys = ragdoll:GetPhysicsObjectNum(i)
+		if IsValid(phys) then phys:AddVelocity(fling) end
+	end
+
+	local spineBone = ragdoll:LookupBone("ValveBiped.Bip01_Spine2")
+	local spine = spineBone and ragdoll:GetPhysicsObjectNum(ragdoll:TranslateBoneToPhysBone(spineBone))
+	if IsValid(spine) then spine:AddVelocity(dir * FALL_TOPPLE * power) end
+end
+
+function hg.StartStagger(ply, dir, power, fallDelay)
 	if not hg_stagger:GetBool() or not IsValid(ply) or not ply:Alive() then return false end
 	if IsValid(ply.FakeRagdoll) or ply:InVehicle() or ply:GetMoveType() ~= MOVETYPE_WALK or not ply:OnGround() then return false end
 
@@ -60,20 +109,27 @@ function hg.StartStagger(ply, dir, power)
 	local finish = ply:GetNWFloat("HGStaggerEnd", 0)
 	power = math.Clamp(power or 0.5, 0.1, 1)
 
+	local momentumDir, momentum = hg.StaggerMomentum(ply)
+	dir = flatDirection(dir, ply) + momentumDir * momentum * MOMENTUM_DIR_WEIGHT
+
 	if finish > now then
-		if now - ply:GetNWFloat("HGStaggerStart", 0) < REFRESH_GAP then return false end
+		if now - ply:GetNWFloat("HGStaggerStart", 0) < REFRESH_GAP and not fallDelay then return false end
 
 		local start = ply:GetNWFloat("HGStaggerStart", 0)
 		local remaining = ply:GetNWFloat("HGStaggerPower", 0) * hg.StaggerEnvelope(now, start, finish)
 		if remaining + power >= ESCALATE_POWER then
-			ply:SetNWFloat("HGStaggerEnd", 0)
-			timer.Simple(0, function()
-				if IsValid(ply) and ply:Alive() and not IsValid(ply.FakeRagdoll) then hg.Fake(ply, nil, nil, nil, "stagger") end
-			end)
+			if dir:LengthSqr() > 0.01 then ply:SetNWVector("HGStaggerDir", dir:GetNormalized()) end
+			ply:SetNWFloat("HGStaggerPower", 1)
+			timer.Simple(0, function() staggerFall(ply) end)
 			return true
 		end
 
 		power = math.min(remaining + power, 1)
+		dir = dir + ply:GetNWVector("HGStaggerDir", vector_origin) * remaining
+	end
+
+	if fallDelay then
+		ply.hgStaggerFallAt = math.min(ply.hgStaggerFallAt or math.huge, now + fallDelay)
 	end
 
 	dir = flatDirection(dir, ply)
@@ -95,6 +151,7 @@ end
 
 hook.Add("PlayerDeath", "HG-Stagger", function(ply)
 	ply:SetNWFloat("HGStaggerEnd", 0)
+	ply.hgStaggerFallAt = nil
 end)
 
 hook.Add("Think", "HG-StaggerPush", function()
@@ -102,6 +159,11 @@ hook.Add("Think", "HG-StaggerPush", function()
 	local dt = FrameTime()
 
 	for _, ply in ipairs(player.GetAll()) do
+		if ply.hgStaggerFallAt and ply.hgStaggerFallAt <= now then
+			staggerFall(ply)
+			continue
+		end
+
 		local finish = ply:GetNWFloat("HGStaggerEnd", 0)
 		if finish <= now then continue end
 		if not ply:Alive() or IsValid(ply.FakeRagdoll) or ply:GetMoveType() ~= MOVETYPE_WALK or not ply:OnGround() then continue end

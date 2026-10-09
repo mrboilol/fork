@@ -9,6 +9,8 @@ local min, max, Round = math.min, math.max, Round
 local hg_organism_stamina_sprint_mul = CreateConVar("hg_organism_stamina_sprint_mul","1",{FCVAR_ARCHIVE,FCVAR_NOTIFY,FCVAR_NEVER_AS_STRING},"Multiply stamina drain when sprinting",0,10)
 local low_stamina_drain_max_mul = 1.2
 local untraited_sprint_stamina_cost = 1.5
+local jog_stamina_cost = 0.45
+local sprint_stamina_cost = 0.6
 local low_stamina_recovery_min_mul = 0.5
 local recent_stamina_loss_recovery_min_mul = 0.65
 local recent_stamina_loss_hold_time = 1
@@ -172,9 +174,9 @@ module[2] = function(owner, org, timeValue)
 
 		--print(velLen)
 		if (owner:OnGround() or owner:WaterLevel() >= 2) and walk and not owner:InVehicle() and owner.hg_isJogging and org.stamina[1] > 20 then
-			stamina.sub = (owner:WaterLevel() >= 2 and 2 or 1) * (velLen ^ 0.5) * 0.75
+			stamina.sub = (owner:WaterLevel() >= 2 and 2 or 1) * (velLen ^ 0.5) * jog_stamina_cost
 		elseif (owner:OnGround() or owner:WaterLevel() >= 2) and walk and not owner:InVehicle() and owner.hg_isSprinting and org.stamina[1] > 20 then
-			stamina.sub = (owner:WaterLevel() >= 2 and 2 or 1) * (velLen ^ 0.5) * 1.35
+			stamina.sub = (owner:WaterLevel() >= 2 and 2 or 1) * (velLen ^ 0.5) * sprint_stamina_cost
 		end
 
 		if owner.GetTraitMultiplier and (owner.hg_isJogging or owner.hg_isSprinting) then

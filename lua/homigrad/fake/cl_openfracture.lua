@@ -80,20 +80,63 @@ local function getFractureBody(ent)
 	return ent
 end
 
+local limbShafts = {
+	["ValveBiped.Bip01_L_UpperArm"] = {child = "ValveBiped.Bip01_L_Forearm", radius = 2.3},
+	["ValveBiped.Bip01_R_UpperArm"] = {child = "ValveBiped.Bip01_R_Forearm", radius = 2.3},
+	["ValveBiped.Bip01_L_Forearm"] = {child = "ValveBiped.Bip01_L_Hand", radius = 1.9},
+	["ValveBiped.Bip01_R_Forearm"] = {child = "ValveBiped.Bip01_R_Hand", radius = 1.9},
+	["ValveBiped.Bip01_L_Thigh"] = {child = "ValveBiped.Bip01_L_Calf", radius = 3.8},
+	["ValveBiped.Bip01_R_Thigh"] = {child = "ValveBiped.Bip01_R_Calf", radius = 3.8},
+	["ValveBiped.Bip01_L_Calf"] = {child = "ValveBiped.Bip01_L_Foot", radius = 2.7},
+	["ValveBiped.Bip01_R_Calf"] = {child = "ValveBiped.Bip01_R_Foot", radius = 2.7},
+}
+local shaftFraction = 0.45
+
 local rendered = {}
 
-local function getFractureTransform(ent, bone, fx, matrix)
+local function posedMatrix(ent, boneID)
+	return hg.GetIKBoneMatrix and hg.GetIKBoneMatrix(ent, boneID) or ent:GetBoneMatrix(boneID)
+end
+
+local function samplePose(ent, bone)
 	local boneID = ent:LookupBone(bone)
 	if not boneID or ent:GetManipulateBoneScale(boneID):LengthSqr() < 0.1 then return end
-	matrix = matrix or ent:GetBoneMatrix(boneID)
-	if not matrix or not isvector(fx[1]) or not isangle(fx[2]) then return end
+	local matrix = posedMatrix(ent, boneID)
+	if not matrix then return end
 
-	local offset, normal = hg.organism.ClampWoundOffset(ent, boneID, fx[1], fx[2]:Forward())
-	local localAng = normal and normal:Angle() or fx[2]
-	if bone == "ValveBiped.Bip01_Pelvis" or bone == "ValveBiped.Bip01_Spine2"
-		or bone == "ValveBiped.Bip01_Neck1" then localAng = fx[2] end
-	local bonePos, boneAng = matrix:GetTranslation(), matrix:GetAngles()
-	local pos, ang = LocalToWorld(offset, localAng, bonePos, boneAng)
+	local shaft = limbShafts[bone]
+	if not shaft then return {boneID = boneID, matrix = matrix} end
+	local childID = ent:LookupBone(shaft.child)
+	local childMatrix = childID and posedMatrix(ent, childID)
+	if not childMatrix then return end
+
+	return {boneID = boneID, matrix = matrix, childPos = childMatrix:GetTranslation(), shaft = shaft}
+end
+
+local function getFractureTransform(ent, fx, pose)
+	if not pose or not isvector(fx[1]) or not isangle(fx[2]) then return end
+	local bonePos, boneAng = pose.matrix:GetTranslation(), pose.matrix:GetAngles()
+
+	if pose.shaft then
+		local along = pose.childPos - bonePos
+		local length = along:Length()
+		if length < 1 then return end
+		along:Div(length)
+
+		local _, outAng = LocalToWorld(vector_origin, fx[2], vector_origin, boneAng)
+		local out = outAng:Forward()
+		out:Sub(along * out:Dot(along))
+		if out:LengthSqr() < 0.001 then
+			out = boneAng:Up()
+			out:Sub(along * out:Dot(along))
+		end
+		out:Normalize()
+
+		return bonePos + along * (length * shaftFraction) + out * pose.shaft.radius, out, along
+	end
+
+	local offset = hg.organism.ClampWoundOffset(ent, pose.boneID, fx[1], fx[2]:Forward())
+	local pos, ang = LocalToWorld(offset, fx[2], bonePos, boneAng)
 
 	return pos, ang:Forward(), boneAng:Forward()
 end
@@ -103,23 +146,17 @@ hook.Add("PostDrawAppearance", "hg_openfractures", function(ent)
 	local fractures = tracked[ent:EntIndex()]
 	if not fractures then return end
 
-	local frame = FrameNumber()
-	local entry = rendered[ent]
-	if not entry then
-		entry = {}
-		rendered[ent] = entry
-	end
-	entry.frame = frame
+	local entry = {frame = FrameNumber()}
+	rendered[ent] = entry
 	for bone in pairs(fractures) do
-		local boneID = ent:LookupBone(bone)
-		entry[bone] = boneID and ent:GetBoneMatrix(boneID) or nil
+		entry[bone] = samplePose(ent, bone)
 	end
 end)
 
 local function fractureBurst(ent, bone, fx)
 	if not hg.addBloodPart then return end
 	ent:SetupBones()
-	local pos, normal, along = getFractureTransform(ent, bone, fx)
+	local pos, normal, along = getFractureTransform(ent, fx, samplePose(ent, bone))
 	if not pos then return end
 
 	for _ = 1, math.random(22, 34) do
@@ -176,9 +213,7 @@ hook.Add("PostDrawOpaqueRenderables", "hg_openfractures", function(depth, skybox
 
 		render.SetColorModulation(1, 0.8, 0.76)
 		for bone, fx in pairs(fractures) do
-			local matrix = entry[bone]
-			if not matrix then continue end
-			local pos, normal, along = getFractureTransform(ent, bone, fx, matrix)
+			local pos, normal, along = getFractureTransform(ent, fx, entry[bone])
 			if not pos then continue end
 
 			local length = shardLengths[bone] or 6
