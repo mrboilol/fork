@@ -475,9 +475,10 @@ local hg_potatopc
 local old = false
 local tinnitusSoundFactor
 local hg_gopro = ConVarExists("hg_gopro") and GetConVar("hg_gopro") or CreateClientConVar("hg_gopro", "0", true, false, "Toggle GoPro-like first-person camera view", 0, 1)
+local hg_epilepsy = ConVarExists("hg_epilepsy") and GetConVar("hg_epilepsy") or CreateClientConVar("hg_epilepsy", "1", true, false, "Epilepsy-safe seizures: no color flashes, only shock, low consciousness and shaking", 0, 1)
 
 local function DrawSeizureMemory(org)
-	if not org or not org.seizureActive or #screens == 0 then
+	if not org or not org.seizureActive or #screens == 0 or hg_epilepsy:GetBool() then
 		seizureMemory = nil
 		seizureMemoryEnd = 0
 		return
@@ -574,6 +575,10 @@ function hg.DrawIncapacitatedText()
 	local remaining = math.max(deathStateEnd - CurTime(), 0)
 	remDeathStateColor.a = math.Clamp((INCAPACITATION_DEATH_TIME - remaining) / 2, 0, 1) * 255
 	draw.SimpleText("You are incapacitated, You will die in " .. math.ceil(remaining), "RemDeathStateFont", ScrW() / 2, ScrH() * 0.62, remDeathStateColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+
+	local binding = input.LookupBinding("suicide")
+	binding = binding and binding ~= "" and string.upper(binding) or "K"
+	draw.SimpleText("Press " .. binding .. " to give up.", "HomigradFontTypewriterSmall", ScrW() / 2, ScrH() * 0.62 + ScreenScale(18), Color(210, 210, 210, remDeathStateColor.a * 0.8), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
 end
 
 hook.Add("Post Post Pre Post Processing", "organism-effects", function()
@@ -615,7 +620,7 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 	local otrub = lply:Alive() and org.otrub or false
 	local consciousness = math.Clamp(org.consciousness or 1, 0, 1)
 	local analgesia = organism.analgesia or 0
-	local analgesiaVisual = org.seizureActive and math.max(analgesia * 3, 3) or analgesia
+	local analgesiaVisual = org.seizureActive and not hg_epilepsy:GetBool() and math.max(analgesia * 3, 3) or analgesia
 	local health = health
 	local disorientation = org.disorientation or 0
 	local immobilization = org.immobilization or 0

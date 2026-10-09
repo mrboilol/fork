@@ -1,22 +1,23 @@
 if not load_from_armor_file then return end
 if not hg.armor or not hg.BuildZCityArmorSection then return end
 
-local CLASSES = {0.5, 1.5, 4, 8, 12, 16, 22}
+local LEGACY_CLASSES = {0.5, 1.5, 4, 8, 12, 16, 22}
+local CLASSES = {0.5, ZC_ARMOR_PROTCLASS_I, ZC_ARMOR_PROTCLASS_II, ZC_ARMOR_PROTCLASS_IIIA, ZC_ARMOR_PROTCLASS_III, ZC_ARMOR_PROTCLASS_III_PLUS, ZC_ARMOR_PROTCLASS_IV}
 local SOFT = 0.9
 
 local function nearestClass(protection)
-	local best = CLASSES[1]
-	for _, class in ipairs(CLASSES) do
-		if math.abs(class - protection) < math.abs(best - protection) then best = class end
+	local best = 1
+	for index, class in ipairs(LEGACY_CLASSES) do
+		if math.abs(class - protection) < math.abs(LEGACY_CLASSES[best] - protection) then best = index end
 	end
-	return best
+	return CLASSES[best]
 end
 
 local function plateMaterial(class, key)
-	if string.find(key, "riot", 1, true) and class <= 4 then return 1 end
-	if class <= 1.5 then return 4.5 end
-	if class <= 8 then return 1.2 end
-	if class <= 12 then return 1.4 end
+	if string.find(key, "riot", 1, true) and class <= ZC_ARMOR_PROTCLASS_II then return 1 end
+	if class <= ZC_ARMOR_PROTCLASS_I then return 4.5 end
+	if class <= ZC_ARMOR_PROTCLASS_IIIA then return 1.2 end
+	if class <= ZC_ARMOR_PROTCLASS_III then return 1.4 end
 	return 3
 end
 
@@ -66,7 +67,7 @@ local function register(key, data, templateName, class, plateMat)
 			if string.find(name, "Plate", 1, true) then
 				ENT[name] = hg.BuildZCityArmorSection(plateMat, class, punch)
 			else
-				ENT[name] = hg.BuildZCityArmorSection(SOFT, math.min(class, 8), punch)
+				ENT[name] = hg.BuildZCityArmorSection(SOFT, math.min(class, ZC_ARMOR_PROTCLASS_IIIA), punch)
 			end
 		end
 	end
@@ -75,7 +76,7 @@ end
 
 for key, data in pairs(hg.armor.torso or {}) do
 	local class = nearestClass(data.protection or 0)
-	if class >= 12 then
+	if class >= ZC_ARMOR_PROTCLASS_III then
 		register(key, data, "ent_new_armor_vest4", class, plateMaterial(class, key))
 	else
 		register(key, data, "ent_new_armor_vest3", class, SOFT)
@@ -89,7 +90,7 @@ local function registerFullCover(key, data, class)
 	local fiberglass = key ~= "protovisor"
 	local frontMat = fiberglass and FIBERGLASS or plateMaterial(class, key)
 	local backMat = (fiberglass and key ~= "helmet_riot") and SOFT or frontMat
-	local backClass = backMat == SOFT and math.min(class, 4) or class
+	local backClass = backMat == SOFT and math.min(class, ZC_ARMOR_PROTCLASS_II) or class
 	register(key, data, "ent_new_armor_helmet2", class, frontMat)
 	local ent = scripted_ents.GetStored("ent_new_armor_legacy_" .. key).t
 	ent.Initialize = nil
@@ -102,7 +103,7 @@ end
 for key, data in pairs(hg.armor.head or {}) do
 	if key == "helmet18" or key == "helmet19" then continue end
 	local class = nearestClass(data.protection or 0)
-	if class < 1.5 then class = 1.5 end
+	if class < ZC_ARMOR_PROTCLASS_I then class = ZC_ARMOR_PROTCLASS_I end
 	if FULL_COVER[key] then
 		registerFullCover(key, data, class)
 	else

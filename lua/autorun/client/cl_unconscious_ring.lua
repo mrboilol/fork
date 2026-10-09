@@ -97,54 +97,6 @@ local wasUnconsciousState = false
 local unconsciousStartTime
 local UNCONSCIOUS_RING_DELAY = 1
 
-local function GetIncapacitationDeathCauses(org)
-    local causes = {}
-    local brainOxygen = tonumber(org.brainoxygen) or 1
-    local bloodOxygen = org.o2 and tonumber(org.o2[1]) or 30
-    local leftLungDamage = org.lungsL and tonumber(org.lungsL[1]) or 0
-    local rightLungDamage = org.lungsR and tonumber(org.lungsR[1]) or 0
-    local spine2Threshold = hg.organism and hg.organism.fake_spine2 or 1
-
-    if (tonumber(org.brain) or 0) > 0.4 then
-        causes[#causes + 1] = "Your brain is critically damaged."
-    end
-    if brainOxygen < 0.16 then
-        causes[#causes + 1] = "Your brain is starved of oxygen."
-    end
-    if bloodOxygen <= 8 then
-        causes[#causes + 1] = "Your blood oxygen is critically low."
-    end
-    if (tonumber(org.trachea) or 0) >= 0.5 then
-        causes[#causes + 1] = "Your trachea is too damaged to keep your airway open."
-    end
-    if leftLungDamage >= 1 then
-        causes[#causes + 1] = "Your left lung is destroyed."
-    end
-    if rightLungDamage >= 1 then
-        causes[#causes + 1] = "Your right lung is destroyed."
-    end
-    if org.respiratoryArrest then
-        causes[#causes + 1] = "Your breathing has stopped."
-    end
-    if (tonumber(org.heart) or 0) > 0.6 then
-        causes[#causes + 1] = "Your heart is too damaged to pump blood effectively."
-    end
-    if org.heartstop then
-        causes[#causes + 1] = "Your heart has stopped."
-    end
-    if (tonumber(org.spine3) or 0) >= 1 then
-        causes[#causes + 1] = "Your spinal cord is severed."
-    end
-    if (tonumber(org.spine2) or 0) >= spine2Threshold then
-        causes[#causes + 1] = "Your spine is critically damaged."
-    end
-    if #causes == 0 then
-        causes[1] = "Your injuries have caused irreversible organ failure."
-    end
-
-    return causes
-end
-
 local function GetSuicideBinding()
     local binding = input.LookupBinding and input.LookupBinding("suicide") or nil
     return binding and binding ~= "" and string.upper(binding) or "K"
@@ -957,37 +909,15 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         end
     end
 
-    if isUnconscious then
-        local terminal = incapacitated and deathStateEnd
-        local remaining = terminal and math.max(deathStateEnd - CurTime(), 0) or 0
+    if isUnconscious and not (incapacitated and deathStateEnd) then
         local fade = ringAlpha
-        local urgency = terminal and math.Clamp((5 - remaining) / 5, 0, 1) or 0
-        local pulseAlpha = 0.82 + math.abs(math.sin(CurTime() * 6)) * 0.18 * urgency
-        local promptColor = terminal and Color(235, 55, 45, 80 * fade * pulseAlpha) or Color(225, 225, 225, 70 * fade)
-
-        local messageY = incapPromptY
-        if terminal then
-            for _, cause in ipairs(GetIncapacitationDeathCauses(replicatedOrg)) do
-                draw.SimpleTextOutlined(
-                    cause,
-                    "HomigradFontTypewriterSmall",
-                    incapPromptX,
-                    messageY,
-                    promptColor,
-                    TEXT_ALIGN_CENTER,
-                    TEXT_ALIGN_TOP,
-                    1,
-                    Color(0, 0, 0, 35 * fade)
-                )
-                messageY = messageY + ScreenScaleH(14)
-            end
-        end
+        local promptColor = Color(225, 225, 225, 70 * fade)
 
         draw.SimpleTextOutlined(
             "Press " .. GetSuicideBinding() .. " to give up.",
             "HomigradFontTypewriterSmall",
             incapPromptX,
-            messageY + ScreenScaleH(4),
+            incapPromptY + ScreenScaleH(4),
             promptColor,
             TEXT_ALIGN_CENTER,
             TEXT_ALIGN_TOP,

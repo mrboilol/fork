@@ -854,6 +854,21 @@ local upperBoneLimbs = {
 
 local amputationDamageEvents = setmetatable({}, {__mode = "k"})
 
+local function skullAllowsHeadGib(org)
+	return not org or org.skull == nil or org.skull >= 1
+end
+
+local function headGibJawMul(org)
+	return org and (org.skull or 0) >= 1 and (org.jaw or 0) >= 1 and 0.75 or 1
+end
+
+local function limbSegmentsAllowAmputation(org, limb)
+	local base = requestedLimbBase[limb] or limb
+	if org[base .. "_up"] == nil then return true end
+	if org[base .. "amputated"] then return (org[base .. "_up"] or 0) >= 1 end
+	return (org[base .. "_up"] or 0) >= 1 and (org[base .. "_down"] or 0) >= 1
+end
+
 function hg.organism.ResolveAmputationLimb(org, bonename, hitgroup)
 	if not org then return end
 	local upperLimb = upperBoneLimbs[bonename]
@@ -2216,6 +2231,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		hitgroup_max = hitgroup == HITGROUP_HEAD and (isBuckshot and player_buckshot_head_gib_threshold or player_head_gib_threshold) or hitgrouptolimb[hitgroup] and player_limb_gib_threshold or hitgroup == HITGROUP_STOMACH and player_stomach_gib_threshold or hitgroup_max
 	end
 	if dmgInfo:IsDamageType(DMG_BLAST) and hitgrouptolimb[hitgroup] then hitgroup_max = player_blast_limb_gib_threshold end
+	if hitgroup == HITGROUP_HEAD then hitgroup_max = hitgroup_max * headGibJawMul(org) end
 	local instant = bodyPartMaxHealth and gibStack >= hitgroup_max or gibStack > hitgroup_max
 	--print(damageStack, org.dmgstack[hitgroup][1], org.dmgstack[hitgroup][3])
 	local blast = dmgInfo:IsDamageType(DMG_BLAST)
@@ -2233,7 +2249,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		local caliber = tonumber(bullet and bullet.Diameter) or tonumber(IsValid(inf) and inf.PenetrationSize) or 0
 		sendHeadshotBloodSquirt(ent, ply, dmgPos, squirtDirection, outputHole, caliber > 0 and caliber <= 5.7)
 	end
-	if not noDismemberment and instant and hitgroup == HITGROUP_HEAD and not ent.headexploded then
+	if not noDismemberment and instant and hitgroup == HITGROUP_HEAD and not ent.headexploded and skullAllowsHeadGib(org) then
 		hg.ExplodeHead(ent, headGoreStack or gibStack, slash, dirCool * len)
 	end
 	if ply and hitgroup == HITGROUP_HEAD and ply.RemoveHeadcrabFromTrauma
@@ -2255,7 +2271,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 			end
 		else
 			local limbToAmputate = hg.organism.ResolveAmputationLimb(org, bonename, hitgroup)
-			if limbToAmputate and !org[limbToAmputate.."amputated"] then hg.organism.AmputateLimb(org, limbToAmputate, nil, dmgInfo) end
+			if limbToAmputate and !org[limbToAmputate.."amputated"] and limbSegmentsAllowAmputation(org, limbToAmputate) then hg.organism.AmputateLimb(org, limbToAmputate, nil, dmgInfo) end
 		end
 	end
 
@@ -2303,7 +2319,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 
 			should = hitgroupStack[1] > hitgroup_max
 			--print(rag, should, hitgroup == HITGROUP_HEAD, bonename, hitgroup, HITGROUP_HEAD)
-			if not noDismemberment and should and hitgroup == HITGROUP_HEAD then
+			if not noDismemberment and should and hitgroup == HITGROUP_HEAD and skullAllowsHeadGib(org) then
 				hg.ExplodeHead(ent, hitgroupStack[1], slash, dirCool * len)
 
 				hitgroupStack[1] = nil
@@ -3009,7 +3025,7 @@ local function velocityDamage(ent, data)
 				net.SendPVS(skullImpactPos)
 			end
 
-			if not noDismemberment and !ent.headexploded and lane.name == "skull" and structuralBudget * headDamageMul > player_fall_head_gib_threshold then
+			if not noDismemberment and !ent.headexploded and lane.name == "skull" and skullAllowsHeadGib(org) and structuralBudget * headDamageMul > player_fall_head_gib_threshold * headGibJawMul(org) then
 				hg.ExplodeHead(ent, structuralBudget * 30, false, data.OurOldVelocity - data.TheirOldVelocity)
 			end
 		end

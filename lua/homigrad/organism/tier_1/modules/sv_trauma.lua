@@ -13,6 +13,8 @@ local POST_CONCUSSION_THRESHOLD = 0.3
 local POST_CONCUSSION_DECAY = 0.25
 local SECOND_IMPACT_WINDOW = 8.0
 local SECOND_IMPACT_SCALE = 0.35
+local HEAD_KO_BUILDUP_DECAY = 10.0
+local HEAD_KO_THRESHOLD = 1.0
 local LOC_THRESHOLD = 3.8
 local LOC_CHANCE_BASE = 0.15
 local LOC_CHANCE_PER_POINT = 0.12
@@ -563,6 +565,21 @@ function module.AddConcussion(org, intensity, duration)
 
     org.concussion_lastImpact = now
     org.concussion_impacts = org.concussion_impacts + 1
+
+    org.headHitBuildup = (org.headHitBuildup or 0) * math.exp(-sinceLast / HEAD_KO_BUILDUP_DECAY) + add
+    if org.alive and not org.otrub and not org.needotrub then
+        local pressure = org.headHitBuildup + org.concussion * 0.15
+        if pressure > HEAD_KO_THRESHOLD then
+            local hasHelmet = IsValid(org.owner) and org.owner.armors and org.owner.armors["head"] != nil
+            local koChance = math.Clamp(0.12 + (pressure - HEAD_KO_THRESHOLD) * 0.4, 0, 0.9) * (hasHelmet and 0.5 or 1)
+            if math.random() < koChance then
+                org.needotrub = true
+                org.consciousness = math.min(org.consciousness or 1, 0.1)
+                org.shock = math.min((org.shock or 0) + 8, 95)
+                org.headHitBuildup = 0
+            end
+        end
+    end
 
     if org.concussion_peak > 1.5 and math.random() < LUCID_INTERVAL_CHANCE then
         local lucidDuration = math.Rand(LUCID_INTERVAL_MIN, LUCID_INTERVAL_MAX)

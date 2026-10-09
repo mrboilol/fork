@@ -1078,6 +1078,11 @@ module[2] = function(owner, org, timeValue)
 
 	end
 
+	if not org.heartstop and o2[1] < 15 and o2.curregen * math.Clamp(o2[1] / 30, 0.25, 1) < losing_oxy then
+		local hypoxia = (15 - o2[1]) / 15
+		o2[1] = max(o2[1] - timeValue * (0.4 + hypoxia * 1.2), 0)
+	end
+
 
 
 	if owner:IsBerserk() and not org.heartstop then

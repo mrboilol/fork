@@ -43,13 +43,13 @@ ZC_ARMOR_SLOT_PELVIS = 14
     ZC_ARMOR_MATERIAL_POLYCARBONATE = 4.5
 --//
 --\\ Protection classes
---II - 4 protection, IIIA - 8 protection, III - 12 protection, III+ - 16 protection, IV - 22 protection
-    ZC_ARMOR_PROTCLASS_I = 1.5
-    ZC_ARMOR_PROTCLASS_II = 4
-    ZC_ARMOR_PROTCLASS_IIIA = 8
-    ZC_ARMOR_PROTCLASS_III = 12
-    ZC_ARMOR_PROTCLASS_III_PLUS = 16
-    ZC_ARMOR_PROTCLASS_IV = 22
+--I - 8.5 protection, II - 11.5 protection, IIIA - 15.5 protection, III - 20.5 protection, III+ - 24.5 protection, IV - 28.5 protection
+    ZC_ARMOR_PROTCLASS_I = 8.5
+    ZC_ARMOR_PROTCLASS_II = 11.5
+    ZC_ARMOR_PROTCLASS_IIIA = 15.5
+    ZC_ARMOR_PROTCLASS_III = 20.5
+    ZC_ARMOR_PROTCLASS_III_PLUS = 24.5
+    ZC_ARMOR_PROTCLASS_IV = 28.5
 --//
 
 hg.EquipmentAppearanceSlots = {

@@ -127,11 +127,11 @@ ENT.DrawOverlay = RenderNVGOverlay
         ENT[FP] = {}
         ENT[FP].Protection = ZC_ARMOR_PROTCLASS_II
             --\\ Protection classes
-                -- ZC_ARMOR_PROTCLASS_II = 4
-                -- ZC_ARMOR_PROTCLASS_IIIA = 8
-                -- ZC_ARMOR_PROTCLASS_III = 12
-                -- ZC_ARMOR_PROTCLASS_III_PLUS = 16
-                -- ZC_ARMOR_PROTCLASS_IV = 22
+                -- ZC_ARMOR_PROTCLASS_II = 11.5
+                -- ZC_ARMOR_PROTCLASS_IIIA = 15.5
+                -- ZC_ARMOR_PROTCLASS_III = 20.5
+                -- ZC_ARMOR_PROTCLASS_III_PLUS = 24.5
+                -- ZC_ARMOR_PROTCLASS_IV = 28.5
         ENT[FP].ProtectionDamageMul = 0.6                   -- protected damage mul
         ENT[FP].PenetratedDamageMul = 0.9                   -- penetrated damage mul
 

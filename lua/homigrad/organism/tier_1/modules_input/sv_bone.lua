@@ -751,7 +751,7 @@ local input_list = hg.organism.input_list
 local toothModel = Model("models/phobias/general/tooth/tooth.mdl")
 local toothFallbackModel = Model("models/grub_nugget_small.mdl")
 
-local function SpawnTeeth(org, count, hitPos, forceDir)
+local function SpawnTeeth(org, count, hitPos, forceDir, violent)
 	local owner = org.owner
 	if not IsValid(owner) then return end
 
@@ -768,12 +768,15 @@ local function SpawnTeeth(org, count, hitPos, forceDir)
 	local baseVelocity = character:GetVelocity()
 	local model = util.IsValidModel(toothModel) and toothModel or toothFallbackModel
 
-	for _ = 1, math.min(count, 6) do
+	local speedMul = violent and 1.8 or 1
+	local spread = violent and 110 or 55
+
+	for _ = 1, math.min(count, violent and 16 or 6) do
 		local tooth = ents.Create("prop_physics")
 		if not IsValid(tooth) then continue end
 
 		tooth:SetModel(model)
-		tooth:SetPos(pos + VectorRand(-1.5, 1.5))
+		tooth:SetPos(pos + VectorRand(-2, 2))
 		tooth:SetAngles(AngleRand())
 		tooth:SetModelScale(math.Rand(0.85, 1.1), 0)
 		tooth:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
@@ -783,7 +786,7 @@ local function SpawnTeeth(org, count, hitPos, forceDir)
 		local phys = tooth:GetPhysicsObject()
 		if IsValid(phys) then
 			phys:SetMass(0.05)
-			phys:SetVelocity(baseVelocity + direction * math.Rand(90, 180) + VectorRand(-55, 55) + vector_up * math.Rand(20, 70))
+			phys:SetVelocity(baseVelocity + direction * math.Rand(90, 180) * speedMul + VectorRand(-spread, spread) + vector_up * math.Rand(20, 70) * speedMul)
 			phys:AddAngleVelocity(VectorRand(-500, 500))
 		end
 
@@ -805,7 +808,7 @@ local function SpawnTeeth(org, count, hitPos, forceDir)
 	util.Effect("BloodImpact", effect, true, true)
 end
 
-input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet)
+input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet, impact)
 	local oldDmg = org.jaw
 	local incomingDmg = dmg
 	local rawDamageType = dmgInfo:GetDamageType()
@@ -832,16 +835,22 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 		end
 	end
 
-	if jawDelta > 0 and incomingDmg >= 0.12 and org.teethLost < 32 then
+	if incomingDmg >= 0.08 and org.teethLost < 32 then
 		local typeMul = 0.35
+		local blunt = false
+		local ballistic = false
 		if bit.band(rawDamageType, DMG_CLUB) ~= 0 then
 			typeMul = 1.35
+			blunt = true
 		elseif bit.band(rawDamageType, DMG_CRUSH) ~= 0 or bit.band(rawDamageType, DMG_FALL) ~= 0 then
 			typeMul = 1.15
+			blunt = true
 		elseif bit.band(rawDamageType, DMG_BUCKSHOT) ~= 0 then
 			typeMul = 1
+			ballistic = true
 		elseif bit.band(rawDamageType, DMG_BULLET) ~= 0 then
 			typeMul = 0.75
+			ballistic = true
 		elseif bit.band(rawDamageType, DMG_BLAST) ~= 0 then
 			typeMul = 0.55
 		elseif bit.band(rawDamageType, DMG_SLASH) ~= 0 then
@@ -849,19 +858,34 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 		end
 
 		local severity = math.Clamp(incomingDmg * 0.55 + jawDelta * 1.6, 0, 2)
-		local chance = math.Clamp((severity - 0.12) * 0.42 * typeMul, 0, 0.85)
-		if math.Rand(0, 1) < chance then
-			local lost = math.random(1, math.Clamp(math.ceil(severity * 3.5 * typeMul), 1, 8))
+		local hitEnergy = istable(impact) and impact.ballisticVersion and (impact.energyBefore or 0) or 0
+		local catastrophic = (ballistic and (hitEnergy >= 38 or incomingDmg >= 1.6)) or (blunt and incomingDmg >= 2.2) or incomingDmg >= 3
+
+		local lost = 0
+		if catastrophic then
+			lost = 32 - org.teethLost
+		elseif ballistic or blunt or math.Rand(0, 1) < math.Clamp(severity * typeMul * 1.5, 0.1, 0.85) then
+			lost = math.random(1, math.Clamp(math.ceil(severity * 3.5 * typeMul), 1, 8))
 			if (org.jaw == 1 and oldDmg < 1) or severity > 1.25 then
 				lost = lost + math.random(1, 4)
 			end
+		end
 
-			lost = math.min(lost, 32 - org.teethLost)
+		if lost > 0 then
+			local teethBefore = 32 - org.teethLost
+			lost = math.min(lost, teethBefore)
 			org.teethLost = org.teethLost + lost
-			SpawnTeeth(org, lost, hit, dir)
-			bloodBurst(org, dmgInfo, 2 + lost * 0.5, hit)
-			addPain(org, 4 + lost * 3, "head")
-			org.shock = math.min((org.shock or 0) + 1 + lost * 1.5, 95)
+			SpawnTeeth(org, lost, hit, dir, catastrophic)
+
+			if catastrophic and org.teethLost >= 32 and teethBefore >= 16 then
+				local attacker = dmgInfo:GetAttacker()
+				if IsValid(attacker) and attacker:IsPlayer() and attacker ~= org.owner then
+					hook.Run("HG_AllTeethKnockedOut", attacker, org.owner)
+				end
+			end
+			bloodBurst(org, dmgInfo, math.min(2 + lost * 0.5, 8), hit)
+			addPain(org, math.min(4 + lost * 3, 45), "head")
+			org.shock = math.min((org.shock or 0) + math.min(1 + lost * 1.5, 30), 95)
 			hg.AddHarmToAttacker(dmgInfo, lost * 0.08, "Teeth loss harm")
 
 			if IsValid(org.owner) and hg.organism.AddWoundManual then
@@ -870,11 +894,12 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 			end
 
 			if org.isPly then
-				local message = lost == 1 and "You lost a tooth." or ("You lost " .. lost .. " teeth.")
+				local allGone = org.teethLost >= 32 and lost > 1
+				local message = allGone and "All of your teeth are gone." or lost == 1 and "You lost a tooth." or ("You lost " .. lost .. " teeth.")
 				if hasNewThoughts(org) then
 					sendThought(org, message, "thought_teeth", 3, Color(255, 210, 210))
 				else
-					notifyOwner(org, lost == 1 and "I lost a tooth." or ("I lost " .. lost .. " teeth."), true, "teeth", 2)
+					notifyOwner(org, allGone and "MY TEETH... ALL OF THEM ARE GONE" or lost == 1 and "I lost a tooth." or ("I lost " .. lost .. " teeth."), true, "teeth", 2)
 				end
 			end
 		end

@@ -332,6 +332,7 @@ end)
     -- Splinter Cell: unlocks weapon_sam_fisher_glock
     hg.achievements.CreateAchievementType("samfisher", 10, 0, "Kill 10 enemies with a silenced weapon.", "Splinter Cell", "entities/sam.png", true)
     hg.achievements.CreateAchievementType("brawler", 1, 0, "Win a Brawl round.", "Brawler", nil, false)
+    hg.achievements.CreateAchievementType("tooth_fairy", 1, 0, "Knock out all of someone's teeth with a single hit.", "Tooth Fairy's Nightmare", nil, false)
 
     //hg.init_ach = true
 //end
@@ -733,6 +734,12 @@ end)
 hook.Add("HG_PlayerDropkicked", "hg_dying_light_achievement", function(attacker, victim)
     if IsValid(attacker) and attacker:IsPlayer() and IsValid(victim) and victim:IsPlayer() and attacker ~= victim then
         hg.achievements.AddPlayerAchievement(attacker, "dying_light", 1)
+    end
+end)
+
+hook.Add("HG_AllTeethKnockedOut", "hg_tooth_fairy_achievement", function(attacker, victim)
+    if IsValid(attacker) and attacker:IsPlayer() and attacker ~= victim then
+        hg.achievements.SetPlayerAchievement(attacker, "tooth_fairy", 1)
     end
 end)
 

@@ -1486,7 +1486,11 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.needotrub = true
 		org.needfake = true
 	end
+	if org.otrub and org.alive and (org.otrubMinUntil or 0) > CurTime() then
+		org.needotrub = true
+	end
 	local just_went_uncon = not org.otrub and org.needotrub and not org.NoKnockdown
+	if just_went_uncon then org.otrubMinUntil = CurTime() + 5 end
 	local just_woke_up = not org.needotrub and org.otrub
 	if isPly and just_went_uncon then hook.Run("HG_OnOtrub", owner); hook.Run("PlayerDropWeapon", owner) end
 	if isPly and just_woke_up then hook.Run("HG_OnWakeOtrub", owner) end

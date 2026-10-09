@@ -17,40 +17,66 @@ hg.ZCityArmorMaterials = {
 	[5] = "Fiberglass",
 	[4.5] = "Polycarbonate",
 }
-hg.ZCityArmorClasses = {[0.5] = "Stab / slash", [1.5] = "I", [4] = "II", [8] = "IIIA", [12] = "III", [16] = "III+", [22] = "IV"}
+hg.ZCityArmorClasses = {[0.5] = "Stab / slash", [8.5] = "I", [11.5] = "II", [15.5] = "IIIA", [20.5] = "III", [24.5] = "III+", [28.5] = "IV"}
+local MAX_CLASS = 28.5
 
 local CONFIG_FIELDS = {"Protection", "BalisticMaterial", "Durability", "DurabilityMax", "DurabilityWarranty", "ProtectionDamageMul", "PenetratedDamageMul", "BluntDamageMul", "BluntWearMul", "SlashDamageMul", "SlashWearMul"}
 hg.ZCityArmorConfigFields = CONFIG_FIELDS
 
 local SHAPE_FIELDS = {"SizeX", "SizeY", "SizeZ", "OffsetX", "OffsetY", "OffsetZ"}
 local MATERIAL_PROFILES = {
-	[1] = {mass = 3.2, health = 120, stopped = 0.6, penetrated = 0.95, blunt = 0.04, slash = 0.12},
-	[3] = {mass = 2.5, health = 170, stopped = 0.4, penetrated = 0.7, blunt = 0.4, slash = 0.4},
-	[1.8] = {mass = 3, health = 150, stopped = 0.4, penetrated = 0.75, blunt = 0.4, slash = 0.35},
-	[1.4] = {mass = 3.6, health = 150, stopped = 0.4, penetrated = 0.8, blunt = 0.4, slash = 0.3},
-	[1.2] = {mass = 1.8, health = 75, stopped = 0.5, penetrated = 0.85, blunt = 0.5, slash = 0.5},
-	[0.85] = {mass = 2.2, health = 95, stopped = 0.4, penetrated = 0.75, blunt = 0.4, slash = 0.4},
-	[0.7] = {mass = 2.8, health = 125, stopped = 0.4, penetrated = 0.8, blunt = 0.4, slash = 0.3},
-	[0.55] = {mass = 2.4, health = 100, stopped = 0.4, penetrated = 0.8, blunt = 0.4, slash = 0.35},
+	[1] = {mass = 3.2, health = 120, stopped = 0.6, penetrated = 0.95, blunt = 0.04, slash = 0},
+	[3] = {mass = 2.5, health = 170, stopped = 0.4, penetrated = 0.7, blunt = 0.75, slash = 0},
+	[1.8] = {mass = 3, health = 150, stopped = 0.4, penetrated = 0.75, blunt = 0.75, slash = 0},
+	[1.4] = {mass = 3.6, health = 150, stopped = 0.4, penetrated = 0.8, blunt = 0.75, slash = 0},
+	[1.2] = {mass = 1.8, health = 75, stopped = 0.5, penetrated = 0.85, blunt = 0.8, slash = 0},
+	[0.85] = {mass = 2.2, health = 95, stopped = 0.4, penetrated = 0.75, blunt = 0.75, slash = 0},
+	[0.7] = {mass = 2.8, health = 125, stopped = 0.4, penetrated = 0.8, blunt = 0.75, slash = 0},
+	[0.55] = {mass = 2.4, health = 100, stopped = 0.4, penetrated = 0.8, blunt = 0.75, slash = 0},
 	[0.9] = {mass = 1.5, health = 60, stopped = 0.6, penetrated = 0.9, blunt = 0.6, slash = 0.6},
-	[0.75] = {mass = 2, health = 85, stopped = 0.5, penetrated = 0.8, blunt = 0.5, slash = 0.4},
-	[0.6] = {mass = 2.6, health = 115, stopped = 0.5, penetrated = 0.85, blunt = 0.5, slash = 0.3},
-	[0.45] = {mass = 2.4, health = 105, stopped = 0.5, penetrated = 0.85, blunt = 0.5, slash = 0.35},
+	[0.75] = {mass = 2, health = 85, stopped = 0.5, penetrated = 0.8, blunt = 0.75, slash = 0},
+	[0.6] = {mass = 2.6, health = 115, stopped = 0.5, penetrated = 0.85, blunt = 0.75, slash = 0},
+	[0.45] = {mass = 2.4, health = 105, stopped = 0.5, penetrated = 0.85, blunt = 0.75, slash = 0},
 	[5] = {mass = 1.2, health = 25, stopped = 0.6, penetrated = 1, blunt = 0.06, slash = 0.65},
 	[4.5] = {mass = 0.4, health = 15, stopped = 0.6, penetrated = 1, blunt = 0.65, slash = 0.7},
 }
 
 local MATERIAL_MAX_CLASS = {
-	[1] = 4, [3] = 22, [1.8] = 22, [1.4] = 22, [1.2] = 12, [0.85] = 22, [0.7] = 22, [0.55] = 22,
-	[0.9] = 8, [0.75] = 22, [0.6] = 22, [0.45] = 22, [5] = 1.5, [4.5] = 1.5,
+	[1] = 11.5, [3] = 28.5, [1.8] = 28.5, [1.4] = 28.5, [1.2] = 20.5, [0.85] = 28.5, [0.7] = 28.5, [0.55] = 28.5,
+	[0.9] = 15.5, [0.75] = 28.5, [0.6] = 28.5, [0.45] = 28.5, [5] = 8.5, [4.5] = 8.5,
 }
+
+function hg.GetZCityArmorSlashMul(class, material)
+	if class == 0.5 then return 0.04 end
+	if material == 0 or material == 0.9 then
+		return 0.08 + 0.22 * math.Clamp((class - ZC_ARMOR_PROTCLASS_I) / (ZC_ARMOR_PROTCLASS_IIIA - ZC_ARMOR_PROTCLASS_I), 0, 1)
+	end
+	local profile = MATERIAL_PROFILES[material]
+	return profile and profile.slash or 0
+end
+
+local function fillImpactDefaults(part)
+	local profile = part and MATERIAL_PROFILES[part.BalisticMaterial]
+	if not profile then return end
+	part.BluntDamageMul = part.BluntDamageMul or profile.blunt
+	part.BluntWearMul = part.BluntWearMul or (part.BalisticMaterial == 1 and 0.35 or part.BalisticMaterial * 0.2)
+	part.SlashDamageMul = part.SlashDamageMul or hg.GetZCityArmorSlashMul(part.Protection, part.BalisticMaterial)
+	part.SlashWearMul = part.SlashWearMul or 0.25
+end
+
+hook.Add("hg/armor/registered", "ZCityArmorImpactDefaults", function()
+	for class, stored in pairs(scripted_ents.GetList()) do
+		if not string.StartWith(class, "ent_new_armor_") then continue end
+		for _, name in pairs(stored.t.PlatesLinks or {}) do fillImpactDefaults(stored.t[name]) end
+	end
+end)
 
 function hg.BuildZCityArmorSection(material, class, needPunch)
 	local profile = MATERIAL_PROFILES[material]
-	local max = profile.health * (0.5 + 0.5 * class / 22)
+	local max = profile.health * (0.5 + 0.5 * class / MAX_CLASS)
 	return {Protection = class, BalisticMaterial = material, Durability = max, DurabilityMax = max, DurabilityWarranty = max * 0.25,
 		ProtectionDamageMul = profile.stopped, PenetratedDamageMul = profile.penetrated, BluntDamageMul = profile.blunt,
-		BluntWearMul = material == 1 and 0.35 or material * 0.2, SlashDamageMul = profile.slash, SlashWearMul = 0.25, NeedPunch = needPunch == true}
+		BluntWearMul = material == 1 and 0.35 or material * 0.2, SlashDamageMul = hg.GetZCityArmorSlashMul(class, material), SlashWearMul = 0.25, NeedPunch = needPunch == true}
 end
 
 local function getDefinition(ent)
@@ -65,7 +91,7 @@ local function getFabric(ent, name)
 		local fabric = table.Copy(backing)
 		fabric.BluntDamageMul = fabric.BluntDamageMul or fabric.ProtectionDamageMul
 		fabric.BluntWearMul = fabric.BluntWearMul or 0.18
-		fabric.SlashDamageMul = fabric.SlashDamageMul or fabric.ProtectionDamageMul
+		fabric.SlashDamageMul = fabric.SlashDamageMul or hg.GetZCityArmorSlashMul(fabric.Protection, 0.9)
 		fabric.SlashWearMul = fabric.SlashWearMul or 0.25
 		return fabric
 	end
@@ -108,14 +134,14 @@ function hg.DeriveZCityArmorSection(ent, name, selected)
 		part.NeedPunch = base.NeedPunch == true
 	else
 		local profile = MATERIAL_PROFILES[part.BalisticMaterial]
-		local classScale = 0.5 + 0.5 * part.Protection / 22
+		local classScale = 0.5 + 0.5 * part.Protection / MAX_CLASS
 		part.DurabilityMax = profile.health * classScale
 		part.DurabilityWarranty = part.DurabilityMax * 0.25
 		part.ProtectionDamageMul = profile.stopped
 		part.PenetratedDamageMul = profile.penetrated
 		part.BluntDamageMul = profile.blunt
 		part.BluntWearMul = part.BalisticMaterial == 1 and 0.35 or part.BalisticMaterial * 0.2
-		part.SlashDamageMul = profile.slash
+		part.SlashDamageMul = hg.GetZCityArmorSlashMul(part.Protection, part.BalisticMaterial)
 		part.SlashWearMul = 0.25
 		part.NeedPunch = base.NeedPunch == true
 	end
@@ -152,7 +178,7 @@ function hg.GetZCityArmorMass(ent, config)
 		elseif part.BalisticMaterial ~= 0 then
 			sectionMass = (original - carrier) * weight[name] / totalWeight
 				* MATERIAL_PROFILES[part.BalisticMaterial].mass / MATERIAL_PROFILES[base.BalisticMaterial].mass
-				* (0.5 + 0.5 * part.Protection / 22) / (0.5 + 0.5 * base.Protection / 22)
+				* (0.5 + 0.5 * part.Protection / MAX_CLASS) / (0.5 + 0.5 * base.Protection / MAX_CLASS)
 				* (part.SizeX or 1) * (part.SizeY or 1) * (part.SizeZ or 1)
 		end
 		sections[name] = sectionMass

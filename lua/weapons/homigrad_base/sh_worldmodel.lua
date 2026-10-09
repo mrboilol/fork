@@ -454,7 +454,7 @@ local reloadlerp = 0
 SWEP.GetDebug = false
 
 local ironSightHoleMat = CLIENT and Material("homigrad/ironsight_holes.png", "alphatest smooth")
-local IRONSIGHT_HOLE_SCALE = 0.6
+local IRONSIGHT_HOLE_SCALE = 0.4
 local hg_ironrealism = CLIENT and CreateClientConVar("hg_ironrealism", "1", true, false, "Enables the realistic iron sight aperture overlay", 0, 1)
 
 local function getIronSightHoleFade(self)
@@ -465,9 +465,37 @@ local function getIronSightHoleFade(self)
 	return math.Clamp(((self.k or 0) - 0.4) / 0.6, 0, 1)
 end
 
+local function getIronSightScreenPos(self)
+	local gun = self:GetWeaponEntity()
+	if not IsValid(gun) or not self.ZoomPos then return end
+
+	local muzzlePos, sightAng = self:GetTrace(true, nil, nil, true)
+	if not muzzlePos or not sightAng then return end
+
+	local pos, ang = gun:GetPos(), gun:GetAngles()
+	if self.WorldModelFake and self.FakePos and self.FakeAng then
+		local mat = Matrix()
+		mat:SetTranslation(self.FakePos)
+		mat:SetAngles(self.FakeAng)
+		mat = mat:GetInverse()
+		pos = LocalToWorld(mat:GetTranslation(), mat:GetAngles(), pos, ang)
+	end
+
+	local zoomPos = LocalToWorld(self.ZoomPos, angle_zero, pos, sightAng)
+	local fwd = sightAng:Forward()
+	local frontSight = zoomPos + fwd * math.max((muzzlePos - zoomPos):Dot(fwd), 1)
+	local scr = frontSight:ToScreen()
+	if not scr.visible then return end
+
+	return scr.x, scr.y
+end
+
 local function beginIronSightHoles(self)
 	local fade = getIronSightHoleFade(self)
 	if fade <= 0.01 or not ironSightHoleMat or ironSightHoleMat:IsError() then return false end
+
+	local cx, cy = getIronSightScreenPos(self)
+	if not cx then return false end
 
 	render.SetStencilEnable(true)
 	render.SetStencilWriteMask(255)
@@ -485,7 +513,7 @@ local function beginIronSightHoles(self)
 	cam.Start2D()
 		surface.SetMaterial(ironSightHoleMat)
 		surface.SetDrawColor(255, 255, 255, 255)
-		surface.DrawTexturedRect(ScrW() / 2 - size / 2, ScrH() / 2 - size / 2, size, size)
+		surface.DrawTexturedRect(cx - size / 2, cy - size / 2, size, size)
 	cam.End2D()
 	render.OverrideDepthEnable(false)
 	render.OverrideColorWriteEnable(false)

@@ -717,6 +717,7 @@ local nextSeizureCamShake = 0
 local seizureFinalFlashFired = false
 local seizureMidazolamFadeEnd = 0
 local seizureMidazolamFadeDuration = 15
+local hg_epilepsy = ConVarExists("hg_epilepsy") and GetConVar("hg_epilepsy") or CreateClientConVar("hg_epilepsy", "1", true, false, "Epilepsy-safe seizures: no color flashes, only shock, low consciousness and shaking", 0, 1)
 
 function REM_MidazolamSeizureFade(time)
 	seizureMidazolamFadeDuration = time or 15
@@ -751,9 +752,6 @@ local function addSeizureFlash(isFinal)
 end
 
 local function updateSeizureEffects(org)
-	-- Unconscious players should not receive the seizure's flashing, camera
-	-- punches, or audio. Stop an already-playing station immediately as otrub
-	-- can begin after the seizure effect has started.
 	if org.otrub then
 		stopSeizureEffects()
 		return
@@ -796,7 +794,8 @@ local function updateSeizureEffects(org)
 		end
 
 		local seizureElapsed = math.max(CurTime() - seizureClientStart, 0)
-		if seizureElapsed < seizureIntroDuration then
+		local epilepsySafe = hg_epilepsy:GetBool()
+		if not epilepsySafe and seizureElapsed < seizureIntroDuration then
 			local intensity = math.min(seizureElapsed, seizureIntroDuration)
 			seizureIntroTab["$pp_colour_contrast"] = intensity / 2
 			seizureIntroTab["$pp_colour_addr"] = intensity / 10
@@ -811,7 +810,7 @@ local function updateSeizureEffects(org)
 			render.DrawScreenQuad()
 		end
 
-		if seizureElapsed >= seizureIntroDuration and CurTime() >= nextSeizureFlash then
+		if not epilepsySafe and seizureElapsed >= seizureIntroDuration and CurTime() >= nextSeizureFlash then
 			addSeizureFlash(false)
 			nextSeizureFlash = CurTime() + math.Rand(seizureFlashDelayMin, seizureFlashDelayMax)
 		end
@@ -822,7 +821,7 @@ local function updateSeizureEffects(org)
 			nextSeizureCamShake = CurTime() + math.Rand(0.025, 0.06)
 		end
 
-		if not seizureFinalFlashFired and CurTime() >= seizureClientEnd - seizureFinalFlashLead then
+		if not epilepsySafe and not seizureFinalFlashFired and CurTime() >= seizureClientEnd - seizureFinalFlashLead then
 			addSeizureFlash(true)
 			seizureFinalFlashFired = true
 		end
@@ -1136,12 +1135,78 @@ local function updateO2Blink(severity)
 	return o2Blink.lerp
 end
 
+do
+local o2CenterMat = CreateMaterial("hg_o2_grain_center", "UnlitGeneric", {
+	["$basetexture"] = "_rt_FullFrameFB",
+	["$vertexalpha"] = 1,
+	["$vertexcolor"] = 1,
+	["$ignorez"] = 1,
+	["$nocull"] = 1,
+})
+local O2_CENTER_SEGMENTS = 32
+local WAKE_FADE_TIME = 4
+local wakeFadeStart = 0
+local wasVitalsOtrub = false
+
+local function drawO2GrainCenter(rt, strength)
+	local w, h = ScrW(), ScrH()
+	local cx, cy = w * 0.5, h * 0.5
+	local inner = math.min(w, h) * 0.12
+	local outer = math.min(w, h) * 0.6
+	local alpha = math.floor(255 * math.Clamp(strength, 0, 1))
+	if alpha <= 0 then return end
+
+	o2CenterMat:SetTexture("$basetexture", rt)
+
+	local function vert(x, y, a)
+		mesh.Position(Vector(x, y, 0))
+		mesh.TexCoord(0, x / w, y / h)
+		mesh.Color(255, 255, 255, a)
+		mesh.AdvanceVertex()
+	end
+
+	cam.Start2D()
+	render.SetMaterial(o2CenterMat)
+	mesh.Begin(MATERIAL_TRIANGLES, O2_CENTER_SEGMENTS * 3)
+	for i = 0, O2_CENTER_SEGMENTS - 1 do
+		local a0 = i / O2_CENTER_SEGMENTS * math.pi * 2
+		local a1 = (i + 1) / O2_CENTER_SEGMENTS * math.pi * 2
+		local c0, s0, c1, s1 = math.cos(a0), math.sin(a0), math.cos(a1), math.sin(a1)
+		local ix0, iy0, ix1, iy1 = cx + c0 * inner, cy + s0 * inner, cx + c1 * inner, cy + s1 * inner
+		local ox0, oy0, ox1, oy1 = cx + c0 * outer, cy + s0 * outer, cx + c1 * outer, cy + s1 * outer
+
+		vert(cx, cy, alpha)
+		vert(ix0, iy0, alpha)
+		vert(ix1, iy1, alpha)
+
+		vert(ix0, iy0, alpha)
+		vert(ox0, oy0, 0)
+		vert(ox1, oy1, 0)
+
+		vert(ix0, iy0, alpha)
+		vert(ox1, oy1, 0)
+		vert(ix1, iy1, alpha)
+	end
+	mesh.End()
+	cam.End2D()
+end
+
 drawFinalVitalsVignettes = function()
 	if not IsValid(lply) or not lply:Alive() then return end
 	if IsValid(lply:GetNWEntity("spect")) then return end
 
 	local org = lply.new_organism or lply.organism
 	if not org or not org.brain then return end
+
+	if org.otrub then
+		wasVitalsOtrub = true
+	elseif wasVitalsOtrub then
+		wasVitalsOtrub = false
+		wakeFadeStart = CurTime()
+		shockVignetteLerp = math.max(shockVignetteLerp, 3.8)
+	end
+	local wakeFade = org.otrub and 0 or math.Clamp(1 - (CurTime() - wakeFadeStart) / WAKE_FADE_TIME, 0, 1) ^ 1.5
+
 	local blood = math.Clamp(tonumber(org.blood) or 5000, 0, 5000)
 	local activeBleed = math.Clamp((tonumber(org.bleed) or 0) / 10, 0, 1)
 	local internalBleed = math.Clamp((tonumber(org.internalBleed) or 0) / 5, 0, 1)
@@ -1193,7 +1258,7 @@ drawFinalVitalsVignettes = function()
 	local shockVignetteTarget = math.max(
 		shockVignetteProgress ^ 1.8 * Lerp(shockConsciousnessProgress, 1.6, 5) * Lerp(engulf, 0.3, 1),
 		lowConsciousnessShockVignette * 3.8,
-		0
+		wakeFade * 3.8
 	)
 	local consciousnessVignetteTarget = consciousnessSeverity
 	shockVignetteLerp = LerpFT(0.025, shockVignetteLerp, shockVignetteTarget)
@@ -1244,13 +1309,14 @@ drawFinalVitalsVignettes = function()
 		end
 	end
 
-	local lowConsciousnessGrain = math.Clamp((0.82 - visualConsciousness) / (0.82 - OTRUB_CONSCIOUSNESS_THRESHOLD), 0, 1) ^ 1.6
+	local lowConsciousnessGrain = math.Clamp((1 - visualConsciousness) / (1 - 0.075), 0, 1) ^ 1.1 * 1.6
 	local grainSeverity = math.max(
 		lowConsciousnessGrain,
 		brainDamageSeverity * 0.3,
-		collapseVisualLerp * 0.3
+		collapseVisualLerp * 0.3,
+		wakeFade
 	)
-	if grainSeverity > 0.04 then
+	if grainSeverity > 0.003 then
 		render.UpdateScreenEffectTexture()
 		grainMat:SetFloat("$c0_x", CurTime())
 		grainMat:SetFloat("$c0_y", 0.5)
@@ -1266,7 +1332,7 @@ drawFinalVitalsVignettes = function()
 		render.DrawScreenQuad()
 	end
 
-	local bloodMonochrome = math.Clamp(bloodLossSeverity * 1.6, 0, 1)
+	local bloodMonochrome = math.max(math.Clamp(bloodLossSeverity * 1.6, 0, 1), math.Clamp((5000 - blood) / 3000, 0, 1))
 	local grayscale = math.Clamp(
 		bloodMonochrome
 		+ shockSeverity * 0.2
@@ -1328,6 +1394,9 @@ drawFinalVitalsVignettes = function()
 			surface.SetDrawColor(255, 255, 255, 255)
 		end
 
+		local centerRT = GetRenderTarget("hg_o2_center_" .. ScrW() .. "x" .. ScrH(), ScrW(), ScrH())
+		render.CopyRenderTargetToTexture(centerRT)
+
 		render.UpdateScreenEffectTexture()
 		noiseMat:SetFloat("$c0_y", 1 - o2Severity)
 		noiseMat:SetFloat("$c0_z", 1)
@@ -1336,6 +1405,8 @@ drawFinalVitalsVignettes = function()
 		noiseMat:SetFloat("$c2_x", CurTime() + 10000)
 		render.SetMaterial(noiseMat)
 		render.DrawScreenQuad()
+
+		drawO2GrainCenter(centerRT, org.otrub and 0.45 or 0.8)
 	end
 
 	local excruciatingBlend = getServerSoundMode("hg_painsound", 6) == 6
@@ -1363,6 +1434,7 @@ drawFinalVitalsVignettes = function()
 		render.SetMaterial(painMat)
 		render.DrawScreenQuad()
 	end
+end
 end
 
 local engulfedFireStation
@@ -2061,7 +2133,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		//if pain > 10 then
 			painVolume = math.Clamp(math.Remap(pain, 0, hg.screeneffects_config.painThresholdMax, 0, 2), 0, 2)
 			normalizedPain = math.Clamp(pain / hg.screeneffects_config.painThresholdMax, 0, 1)
-			painPitch = math.Clamp(math.Remap(normalizedPain, 0, 1, 100, hg.screeneffects_config.painPitchMax), 100, hg.screeneffects_config.painPitchMax)
+			painPitch = math.Clamp(math.Remap(pain, 60, hg.screeneffects_config.painThresholdMax, 100, hg.screeneffects_config.painPitchMax), 100, hg.screeneffects_config.painPitchMax)
 			local targetPainVolume = 0
 			local targetRealityVolume = 0
 			local targetAgonyVolume = 0
