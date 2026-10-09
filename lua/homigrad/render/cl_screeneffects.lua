@@ -112,6 +112,69 @@ hook.Add("PreDrawEffects", "HG_WorldMotionBlur", function()
 	cam.End2D()
 end)
 local drawFinalVitalsVignettes
+local ironSightMat
+local IRONSIGHT_RT_SIZE = 1024
+local IRONSIGHT_SCREEN_SCALE = 2.6
+
+local function getIronSightMat()
+	if ironSightMat then return ironSightMat end
+
+	local size = IRONSIGHT_RT_SIZE
+	local rt = GetRenderTargetEx("hg_ironsight_dots", size, size, RT_SIZE_NO_CHANGE, MATERIAL_RT_DEPTH_NONE, 0, 0, IMAGE_FORMAT_RGBA8888)
+	local half = size / 2
+	local spacing = 6
+	local hole = size * 0.075 / IRONSIGHT_SCREEN_SCALE
+	local ramp = size * 0.4 / IRONSIGHT_SCREEN_SCALE
+	local dotColor = Color(0, 0, 0, 255)
+
+	render.PushRenderTarget(rt)
+	render.OverrideAlphaWriteEnable(true, true)
+	render.Clear(0, 0, 0, 0, true, true)
+	cam.Start2D()
+		draw.NoTexture()
+		surface.SetDrawColor(0, 0, 0, 255)
+		for y = spacing / 2, size, spacing do
+			for x = spacing / 2, size, spacing do
+				local t = math.Clamp((math.sqrt((x - half) ^ 2 + (y - half) ^ 2) - hole) / ramp, 0, 1)
+				if t > 0 then
+					local r = spacing * 0.46 * t ^ 0.7
+					if r < 1.5 then
+						surface.DrawRect(x - r, y - r, r * 2, r * 2)
+					else
+						draw.RoundedBox(r, x - r, y - r, r * 2, r * 2, dotColor)
+					end
+				end
+			end
+		end
+	cam.End2D()
+	render.OverrideAlphaWriteEnable(false)
+	render.PopRenderTarget()
+
+	ironSightMat = CreateMaterial("hg_ironsight_dots", "UnlitGeneric", {
+		["$basetexture"] = rt:GetName(),
+		["$translucent"] = 1,
+		["$vertexalpha"] = 1,
+		["$vertexcolor"] = 1
+	})
+	return ironSightMat
+end
+
+local function drawIronSightAperture()
+	local wep = lply:GetActiveWeapon()
+	if not IsValid(wep) or not ishgweapon(wep) or wep.scopedef then return end
+	if not IsAimingNoScope or not IsAimingNoScope(lply) then return end
+	if IsAiming and IsAiming(lply) then return end
+	if wep.HasAttachment and wep:HasAttachment("sight") then return end
+
+	local fade = math.Clamp(((wep.k or 0) - 0.5) / 0.5, 0, 1)
+	if fade <= 0.01 then return end
+
+	local quad = ScrH() * IRONSIGHT_SCREEN_SCALE
+	surface.SetMaterial(getIronSightMat())
+	surface.SetDrawColor(255, 255, 255, 215 * fade)
+	surface.DrawTexturedRect(ScrW() / 2 - quad / 2, ScrH() / 2 - quad / 2, quad, quad)
+	surface.SetDrawColor(255, 255, 255, 255)
+end
 hook.Add("RenderScreenspaceEffects", "homigrad", function()
 	tab["$pp_colour_brightness"] = 0
 	tab["$pp_colour_contrast"] = 1
@@ -1095,6 +1158,8 @@ drawFinalVitalsVignettes = function()
 	if not IsValid(lply) or not lply:Alive() then return end
 	if IsValid(lply:GetNWEntity("spect")) then return end
 
+	drawIronSightAperture()
+
 	local org = lply.new_organism or lply.organism
 	if not org or not org.brain then return end
 	local blood = math.Clamp(tonumber(org.blood) or 5000, 0, 5000)
@@ -1221,20 +1286,21 @@ drawFinalVitalsVignettes = function()
 		render.DrawScreenQuad()
 	end
 
+	local bloodMonochrome = math.Clamp(bloodLossSeverity * 1.6, 0, 1)
 	local grayscale = math.Clamp(
-		bloodLossSeverity * 0.62
+		bloodMonochrome
 		+ shockSeverity * 0.2
 		+ consciousnessSeverity * 0.34,
 		0,
-		0.82
+		1
 	)
 	if grayscale > 0.005 or blink > 0.005 then
 		local oxygenWash = 0
 		collapseColor["$pp_colour_addr"] = oxygenWash * 0.009
 		collapseColor["$pp_colour_addg"] = oxygenWash * 0.01
 		collapseColor["$pp_colour_addb"] = oxygenWash * 0.012
-		collapseColor["$pp_colour_brightness"] = -collapseVisualLerp * 0.07 - lowConsciousnessDarkness * 0.28 - shockDarknessSeverity * 0.08 - blink * 0.05
-		collapseColor["$pp_colour_contrast"] = 1 - collapseVisualLerp * 0.11 - lowConsciousnessDarkness * 0.18 - blink * 0.05
+		collapseColor["$pp_colour_brightness"] = -collapseVisualLerp * 0.07 - lowConsciousnessDarkness * 0.28 - shockDarknessSeverity * 0.08 - blink * 0.05 - bloodMonochrome * 0.1
+		collapseColor["$pp_colour_contrast"] = 1 - collapseVisualLerp * 0.11 - lowConsciousnessDarkness * 0.18 - blink * 0.05 + bloodMonochrome * 0.45
 		collapseColor["$pp_colour_colour"] = 1 - grayscale
 		DrawColorModify(collapseColor)
 	end
@@ -1266,16 +1332,20 @@ drawFinalVitalsVignettes = function()
 		surface.SetDrawColor(255, 255, 255, 255)
 	end
 
-	if O2Lerp > 1 and IsAiming and IsAiming(lply) then
-		surface.SetDrawColor(0, 0, 0, math.Clamp(O2Lerp / 250, 0, 1) * 200)
-		surface.DrawRect(0, 0, ScrW(), ScrH())
-		surface.SetDrawColor(255, 255, 255, 255)
-	elseif O2Lerp > 1 then
+	if O2Lerp > 1 then
+		local o2Severity = math.Clamp(O2Lerp / 250, 0, 1)
 		render.UpdateScreenEffectTexture()
-		noiseMat:SetFloat("$c0_y", 1 - O2Lerp / 250)
+		vignetteMat:SetFloat("$c2_x", CurTime() + 11000)
+		vignetteMat:SetFloat("$c0_z", scaleVignette(o2Severity * 1.1))
+		vignetteMat:SetFloat("$c1_y", scaleVignette(o2Severity * 1.9))
+		render.SetMaterial(vignetteMat)
+		render.DrawScreenQuad()
+
+		render.UpdateScreenEffectTexture()
+		noiseMat:SetFloat("$c0_y", 1 - o2Severity)
 		noiseMat:SetFloat("$c0_z", 1)
-		noiseMat:SetFloat("$c1_x", math.Clamp(O2Lerp / 250, 0, 2))
-		noiseMat:SetFloat("$c1_y", O2Lerp * (org.otrub and 1 or 0.05))
+		noiseMat:SetFloat("$c1_x", math.Clamp(o2Severity * 1.6, 0, 1.6))
+		noiseMat:SetFloat("$c1_y", math.min(O2Lerp, 400) * (org.otrub and 1 or 0.08))
 		noiseMat:SetFloat("$c2_x", CurTime() + 10000)
 		render.SetMaterial(noiseMat)
 		render.DrawScreenQuad()
