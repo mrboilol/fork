@@ -112,54 +112,12 @@ hook.Add("PreDrawEffects", "HG_WorldMotionBlur", function()
 	cam.End2D()
 end)
 local drawFinalVitalsVignettes
-local ironSightMat
-local IRONSIGHT_RT_SIZE = 1024
+local ironSightMat = Material("homigrad/ironsight_dots.png", "smooth")
 local IRONSIGHT_SCREEN_SCALE = 2.6
-
-local function getIronSightMat()
-	if ironSightMat then return ironSightMat end
-
-	local size = IRONSIGHT_RT_SIZE
-	local rt = GetRenderTargetEx("hg_ironsight_dots", size, size, RT_SIZE_NO_CHANGE, MATERIAL_RT_DEPTH_NONE, 0, 0, IMAGE_FORMAT_RGBA8888)
-	local half = size / 2
-	local spacing = 6
-	local hole = size * 0.075 / IRONSIGHT_SCREEN_SCALE
-	local ramp = size * 0.4 / IRONSIGHT_SCREEN_SCALE
-	local dotColor = Color(0, 0, 0, 255)
-
-	render.PushRenderTarget(rt)
-	render.OverrideAlphaWriteEnable(true, true)
-	render.Clear(0, 0, 0, 0, true, true)
-	cam.Start2D()
-		draw.NoTexture()
-		surface.SetDrawColor(0, 0, 0, 255)
-		for y = spacing / 2, size, spacing do
-			for x = spacing / 2, size, spacing do
-				local t = math.Clamp((math.sqrt((x - half) ^ 2 + (y - half) ^ 2) - hole) / ramp, 0, 1)
-				if t > 0 then
-					local r = spacing * 0.46 * t ^ 0.7
-					if r < 1.5 then
-						surface.DrawRect(x - r, y - r, r * 2, r * 2)
-					else
-						draw.RoundedBox(r, x - r, y - r, r * 2, r * 2, dotColor)
-					end
-				end
-			end
-		end
-	cam.End2D()
-	render.OverrideAlphaWriteEnable(false)
-	render.PopRenderTarget()
-
-	ironSightMat = CreateMaterial("hg_ironsight_dots", "UnlitGeneric", {
-		["$basetexture"] = rt:GetName(),
-		["$translucent"] = 1,
-		["$vertexalpha"] = 1,
-		["$vertexcolor"] = 1
-	})
-	return ironSightMat
-end
+local hg_ironrealism = CreateClientConVar("hg_ironrealism", "1", true, false, "Enables the realistic iron sight aperture overlay", 0, 1)
 
 local function drawIronSightAperture()
+	if not hg_ironrealism:GetBool() then return end
 	local wep = lply:GetActiveWeapon()
 	if not IsValid(wep) or not ishgweapon(wep) or wep.scopedef then return end
 	if not IsAimingNoScope or not IsAimingNoScope(lply) then return end
@@ -170,7 +128,7 @@ local function drawIronSightAperture()
 	if fade <= 0.01 then return end
 
 	local quad = ScrH() * IRONSIGHT_SCREEN_SCALE
-	surface.SetMaterial(getIronSightMat())
+	surface.SetMaterial(ironSightMat)
 	surface.SetDrawColor(255, 255, 255, 215 * fade)
 	surface.DrawTexturedRect(ScrW() / 2 - quad / 2, ScrH() / 2 - quad / 2, quad, quad)
 	surface.SetDrawColor(255, 255, 255, 255)

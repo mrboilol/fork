@@ -1047,6 +1047,29 @@ local function TraceBelongsToPlayer(trace, ply)
     return hg.RagdollOwner and hg.RagdollOwner(ent) == ply or false
 end
 
+local function IsUnposedArmTrace(trace, body)
+    if not trace or not trace.Hit or trace.HGArmFallback or not IsValid(body) or not body:IsPlayer() or trace.Entity ~= body then return false end
+    return trace.HitGroup == HITGROUP_LEFTARM or trace.HitGroup == HITGROUP_RIGHTARM
+end
+
+local function BodyHitboxFraction(body, startPos, endPos)
+    local set = body:GetHitboxSet() or 0
+    local scale = body:GetModelScale() or 1
+    local ray = endPos - startPos
+    local best
+    for index = 0, (body:GetHitBoxCount(set) or 0) - 1 do
+        local group = body:GetHitBoxHitGroup(index, set)
+        if group == HITGROUP_LEFTARM or group == HITGROUP_RIGHTARM then continue end
+        local bone = body:GetHitBoxBone(index, set)
+        local matrix = bone and (hg.GetIKBoneMatrix and hg.GetIKBoneMatrix(body, bone) or body:GetBoneMatrix(bone))
+        local mins, maxs = body:GetHitBoxBounds(index, set)
+        if not matrix or not mins or not maxs then continue end
+        local position, _, fraction = util.IntersectRayWithOBB(startPos, ray, matrix:GetTranslation(), matrix:GetAngles(), mins * scale, maxs * scale)
+        if position and (not best or fraction < best) then best = fraction end
+    end
+    return best
+end
+
 local debugWeaponHits = CreateConVar("hg_debug_weaponhits", "0", FCVAR_NONE)
 
 local function DebugWeaponTrace(ply, wep, startPos, endPos, hit, obstructionFraction, originalTrace)
@@ -1116,8 +1139,13 @@ local function TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, ori
         local wearerSlack = 0
         local weaponEnd = endPos
         if not shot.Contact and TraceBelongsToPlayer(originalTrace, ply) then
-            wearerSlack = cfg.weaponWearerSlack / segmentLength
-            weaponEnd = endPos + direction * cfg.weaponWearerSlack
+            local slackUnits = cfg.weaponWearerSlack
+            if IsUnposedArmTrace(originalTrace, body) then
+                local bodyFraction = BodyHitboxFraction(body, startPos, endPos) or 1
+                slackUnits = math.max(slackUnits, (bodyFraction - obstructionFraction) * segmentLength)
+            end
+            wearerSlack = slackUnits / segmentLength
+            weaponEnd = endPos + direction * slackUnits
         end
         local weaponRatio = 1 + wearerSlack
         if debugWeaponHits:GetBool() and wearerSlack > 0 and not (IsValid(wep) and wep ~= firingWeapon and CanHit(wep) and (shot.Contact or not seen[wep])) then
@@ -1162,9 +1190,14 @@ local function TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, ori
     local fullFraction = originalTrace.Hit and (originalTrace.Fraction or 1) / math.max(obstructionFraction, 0.000001) or 1
     for _, armTrace in ipairs(armTraces) do
         local overlapsEquipment = false
-        if armTrace.HGArmFallback then
+        local unposed = IsUnposedArmTrace(armTrace, armTrace.Entity)
+        if armTrace.HGArmFallback or unposed then
             for _, hit in ipairs(hits) do
                 if (hit.weapon or hit.heldEntity) and IsValid(hit.ply) and hg.GetCurrentCharacter(hit.ply) == armTrace.Entity then
+                    if unposed then
+                        overlapsEquipment = true
+                        break
+                    end
                     local bounds = armTrace.HGArmBounds
                     local inside = bounds and WorldToLocal(hit.position, angle_zero, bounds.pos, bounds.ang):WithinAABox(bounds.mins, bounds.maxs)
                     if hit.fraction <= armTrace.Fraction + 0.0001 or inside then

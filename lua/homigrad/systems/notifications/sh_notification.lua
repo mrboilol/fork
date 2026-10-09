@@ -85,7 +85,14 @@ function hg.FurrifyPhrase(msg)
 	return msg
 end
 
+if SERVER then
+	for i = 1, 15 do
+		resource.AddFile("sound/newspeech/speak" .. i .. ".mp3")
+	end
+end
+
 if CLIENT then
+	local hg_omori = CreateClientConVar("hg_omori", "1", true, false, "Thought sounds: 0 - old, 1 - new", 0, 1)
 	local hg_old_notificate = ConVarExists("hg_old_notificate") and GetConVar("hg_old_notificate") or CreateConVar("hg_old_notificate",0,{FCVAR_USERINFO,FCVAR_ARCHIVE},"Toggle old notifications (chatprints)",0,1)
 	local hg_newthoughts = ConVarExists("hg_newthoughts") and GetConVar("hg_newthoughts") or CreateClientConVar("hg_newthoughts", "0", true, true, "Toggle new stacked injury thoughts", 0, 1)
 
@@ -391,7 +398,8 @@ if CLIENT then
 				end
 
 				if click != oldclick and not last_message then
-					sound.Play("speak" .. math.random(1, 2) .. ".ogg", render.GetViewSetup().origin - vector_up * 10, 40, math.random(97, 103), 0.8)
+					local snd = hg_omori:GetBool() and "newspeech/speak" .. math.random(1, 15) .. ".mp3" or "speak" .. math.random(1, 2) .. ".ogg"
+					sound.Play(snd, render.GetViewSetup().origin - vector_up * 10, 40, math.random(97, 103), 0.8)
 					oldclick = click
 				end
 
