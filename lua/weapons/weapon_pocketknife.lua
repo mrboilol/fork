@@ -108,8 +108,8 @@ SWEP.PenetrationSizeSecondary = 1
 SWEP.StaminaPrimary = 15
 SWEP.StaminaSecondary = 12
 
-SWEP.AttackLen1 = 10
-SWEP.AttackLen2 = 13
+SWEP.AttackLen1 = 41
+SWEP.AttackLen2 = 39
 
 function SWEP:GetModeAnimList(mode)
     return self.ModeAnimLists[mode and true or false] or self.ModeAnimLists[false]
@@ -263,7 +263,7 @@ SWEP.WaitTime2 = 0.4
 SWEP.AttackTimeLength = 0.15
 SWEP.Attack2TimeLength = 0.1
 
-SWEP.AttackRads = 2
+SWEP.AttackRads = 35
 SWEP.AttackRads2 = 55
 
 SWEP.SwingAng = 90

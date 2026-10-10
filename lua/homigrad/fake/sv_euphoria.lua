@@ -15,7 +15,13 @@ local EUPHORIA_LANDING_ABSORB_CONTROL = 0.35
 local EUPHORIA_SETTLE_TIME = 1.1
 local EUPHORIA_SETTLE_LIN = 0.5
 local EUPHORIA_SETTLE_ANG = 1.8
-local EUPHORIA_WOUND_GRAB_TIME = 1.4
+local EUPHORIA_WOUND_GRAB_TIME = 4
+local EUPHORIA_WOUND_GRAB_EASE = 0.3
+local EUPHORIA_WOUND_ARM_MARGIN = 3
+local EUPHORIA_WOUND_HAND_DIST = 4
+local EUPHORIA_WOUND_PRESS = 2
+local EUPHORIA_WOUND_WRIST_BACK = 3
+local EUPHORIA_WOUND_PENDING_TIME = 0.75
 local EUPHORIA_WOUND_GRAB_PULL = 700
 local EUPHORIA_WOUND_GRAB_MIN_DMG = 12
 local EUPHORIA_WALL_GRAB_SPEED = -170
@@ -196,18 +202,102 @@ local function canWoundGrab(ply)
 	return org and not org.otrub and org.canmove and true or false
 end
 
-local function nearestPhys(ragdoll, pos)
-	local best, bestDist
+local WOUND_BONES = {
+	"ValveBiped.Bip01_Pelvis", "ValveBiped.Bip01_Spine", "ValveBiped.Bip01_Spine1", "ValveBiped.Bip01_Spine2",
+	"ValveBiped.Bip01_Spine4", "ValveBiped.Bip01_Neck1", "ValveBiped.Bip01_Head1",
+	"ValveBiped.Bip01_L_UpperArm", "ValveBiped.Bip01_L_Forearm", "ValveBiped.Bip01_L_Hand",
+	"ValveBiped.Bip01_R_UpperArm", "ValveBiped.Bip01_R_Forearm", "ValveBiped.Bip01_R_Hand",
+	"ValveBiped.Bip01_L_Thigh", "ValveBiped.Bip01_L_Calf", "ValveBiped.Bip01_L_Foot",
+	"ValveBiped.Bip01_R_Thigh", "ValveBiped.Bip01_R_Calf", "ValveBiped.Bip01_R_Foot",
+}
+
+local function physBoneName(ragdoll, physNum)
+	local bone = ragdoll:TranslatePhysBoneToBone(physNum)
+	return bone and bone >= 0 and ragdoll:GetBoneName(bone) or ""
+end
+
+local function physByName(ragdoll, name)
+	local bone = ragdoll:LookupBone(name)
+	local num = bone and ragdoll:TranslateBoneToPhysBone(bone)
+	local phys = num and num >= 0 and ragdoll:GetPhysicsObjectNum(num)
+	return IsValid(phys) and phys or nil
+end
+
+local function isArmBone(name)
+	return string.find(name, "_Clavicle", 1, true) or string.find(name, "_UpperArm", 1, true) or string.find(name, "_Forearm", 1, true)
+end
+
+local function woundPart(ragdoll, pos)
+	local body, bodyDist, arm, armDist, armName, handDist
 	for i = 0, ragdoll:GetPhysicsObjectCount() - 1 do
 		if isFloppyBone(ragdoll, i) then continue end
 		local phys = ragdoll:GetPhysicsObjectNum(i)
 		if not IsValid(phys) then continue end
+		local name = physBoneName(ragdoll, i)
 		local dist = phys:GetPos():Distance(pos)
-		if not bestDist or dist < bestDist then
-			best, bestDist = phys, dist
+		if string.find(name, "_Hand", 1, true) then
+			handDist = math.min(handDist or dist, dist)
+		elseif isArmBone(name) then
+			if not armDist or dist < armDist then arm, armDist, armName = phys, dist, name end
+		elseif not bodyDist or dist < bodyDist then
+			body, bodyDist = phys, dist
 		end
 	end
-	return best
+
+	local part, best, name = body, bodyDist, nil
+	if arm and (not body or armDist < bodyDist - EUPHORIA_WOUND_ARM_MARGIN) then part, best, name = arm, armDist, armName end
+	if not part or (handDist and handDist < EUPHORIA_WOUND_HAND_DIST and handDist < best) then return end
+	return part, name
+end
+
+local function woundHand(ragdoll, org, pos, armName)
+	local lMul = armStrength(ragdoll, org, "larm", "ConsLH")
+	local rMul = armStrength(ragdoll, org, "rarm", "ConsRH")
+	local lHand = ragdoll:GetPhysicsObjectNum(hg.realPhysNum(ragdoll, 5))
+	local rHand = ragdoll:GetPhysicsObjectNum(hg.realPhysNum(ragdoll, 7))
+	local lValid = lMul > 0 and IsValid(lHand) and not (armName and string.find(armName, "_L_", 1, true))
+	local rValid = rMul > 0 and IsValid(rHand) and not (armName and string.find(armName, "_R_", 1, true))
+
+	local useLeft = lValid
+	if lValid and rValid then
+		local lShoulder = physByName(ragdoll, "ValveBiped.Bip01_L_UpperArm") or lHand
+		local rShoulder = physByName(ragdoll, "ValveBiped.Bip01_R_UpperArm") or rHand
+		useLeft = lShoulder:GetPos():DistToSqr(pos) <= rShoulder:GetPos():DistToSqr(pos)
+	end
+	if useLeft then return lHand, 4, lMul end
+	if rValid then return rHand, 6, rMul end
+end
+
+local function pressPoint(phys, pos)
+	local d = pos - phys:GetPos()
+	local axis = phys:GetAngles():Forward()
+	local n = d - axis * d:Dot(axis)
+	if n:LengthSqr() < 0.01 then n = d end
+	if n:LengthSqr() < 0.01 then return pos end
+	return pos + n:GetNormalized() * EUPHORIA_WOUND_PRESS
+end
+
+local function playerHitLocal(ply, pos)
+	local best, bestDist, bestPos, bestAng
+	for _, name in ipairs(WOUND_BONES) do
+		local bone = ply:LookupBone(name)
+		local bonePos, boneAng
+		if bone then bonePos, boneAng = ply:GetBonePosition(bone) end
+		if not bonePos or not boneAng then continue end
+		local dist = bonePos:DistToSqr(pos)
+		if not bestDist or dist < bestDist then best, bestDist, bestPos, bestAng = name, dist, bonePos, boneAng end
+	end
+	if not best then return end
+	return { bone = best, pos = WorldToLocal(pos, angle_zero, bestPos, bestAng) }
+end
+
+local function resolveHit(ragdoll, hit)
+	if not hit then return end
+	local bone = ragdoll:LookupBone(hit.bone)
+	local bonePos, boneAng
+	if bone then bonePos, boneAng = ragdoll:GetBonePosition(bone) end
+	if not bonePos or not boneAng then return end
+	return LocalToWorld(hit.pos, angle_zero, bonePos, boneAng)
 end
 
 local function bleederPos(org, ragdoll)
@@ -217,21 +307,27 @@ end
 
 local function startWoundGrab(ply, ragdoll, hitPos, force, duration)
 	if not euphoriaOn(hg_euphoria_detail) or not canWoundGrab(ply) then return end
+	local pending = ply.hgPendingWoundGrab
+	if pending and SysTime() <= pending.untilT then
+		hitPos = resolveHit(ragdoll, pending.hit) or hitPos
+		force = force or pending.force
+	end
 	local rootPhys = ragdoll:GetPhysicsObject()
 	local rootPos = IsValid(rootPhys) and rootPhys:GetPos() or ragdoll:GetPos()
 	local org = ply.organism
-	local woundPos = bleederPos(org, ragdoll) or hitPos
+	local woundPos = hitPos or bleederPos(org, ragdoll)
 	if not woundPos or woundPos:Distance(rootPos) >= 200 then
 		local fDir = force and force:Length() > 1 and force:GetNormalized() or Vector(math.Rand(-1, 1), math.Rand(-1, 1), math.Rand(-0.3, 0.6)):GetNormalized()
 		woundPos = rootPos + fDir * 25
 	end
-	local handPhys, forearm, armMul = grabHand(ragdoll, org, woundPos)
-	local bonePhys = nearestPhys(ragdoll, woundPos)
-	if not handPhys or not bonePhys then return end
+	local bonePhys, armName = woundPart(ragdoll, woundPos)
+	if not bonePhys then return end
+	local handPhys, forearm, armMul = woundHand(ragdoll, org, woundPos, armName)
+	if not handPhys then return end
 	local reflex = hg.RagdollReflex
 	local mul = armMul * (reflex and org and reflex.Vigor(org) or 1)
-	duration = duration or EUPHORIA_WOUND_GRAB_TIME
-	ragdoll.hgWoundGrab = { hand = handPhys, forearm = forearm, bone = bonePhys, mul = mul, untilT = SysTime() + duration, dur = duration }
+	duration = math.max(duration or 0, EUPHORIA_WOUND_GRAB_TIME)
+	ragdoll.hgWoundGrab = { hand = handPhys, forearm = forearm, bone = bonePhys, press = bonePhys:WorldToLocal(pressPoint(bonePhys, woundPos)), mul = mul, untilT = SysTime() + duration, dur = duration }
 end
 
 hg.EuphoriaWoundGrab = startWoundGrab
@@ -319,11 +415,13 @@ hook.Add("EntityTakeDamage", "HG_EuphoriaHit", function(ent, dmgInfo)
 
 	local now = SysTime()
 	if not IsValid(ragdoll) then
-		if ent:IsPlayer() and bit.band(dmgType, DMG_BULLET + DMG_BUCKSHOT + DMG_SLASH) ~= 0 and dmg >= EUPHORIA_WOUND_GRAB_MIN_DMG and hg_selfpreservation:GetBool() then
-			ply.hgPendingWoundGrab = {pos = dmgInfo:GetDamagePosition(), force = dmgInfo:GetDamageForce(), untilT = now + 0.75}
+		if ent:IsPlayer() and bit.band(dmgType, DMG_BULLET + DMG_BUCKSHOT + DMG_SLASH + DMG_CLUB) ~= 0 and dmg >= EUPHORIA_WOUND_GRAB_MIN_DMG and hg_selfpreservation:GetBool() then
+			local pos = dmgInfo:GetDamagePosition()
+			ply.hgPendingWoundGrab = {pos = pos, hit = playerHitLocal(ply, pos), force = dmgInfo:GetDamageForce(), untilT = now + EUPHORIA_WOUND_PENDING_TIME}
 		end
 		return
 	end
+	ply.hgPendingWoundGrab = nil
 	if dmg >= EUPHORIA_CURL_MIN_DAMAGE then
 		if ragdoll.hgBeat and now > ragdoll.hgBeat.untilT then
 			ragdoll.hgBeat = nil
@@ -356,7 +454,6 @@ end)
 
 hook.Add("Fake", "HG_EuphoriaShotWoundGrab", function(ply, ragdoll)
 	local pending = ply.hgPendingWoundGrab
-	ply.hgPendingWoundGrab = nil
 	if pending and IsValid(ragdoll) and SysTime() <= pending.untilT then
 		startWoundGrab(ply, ragdoll, pending.pos, pending.force)
 	end
@@ -458,7 +555,7 @@ hook.Add("Think", "HG_EuphoriaWound", function()
 		local grab = ragdoll.hgWoundGrab
 		if not grab then continue end
 
-		if now >= grab.untilT or not ply:Alive() or not canWoundGrab(ply) then
+		if now >= grab.untilT or not ply:Alive() or not canWoundGrab(ply) or ragdoll.hgGetUp or ragdoll:IsPlayerHolding() then
 			ragdoll.hgWoundGrab = nil
 			continue
 		end
@@ -476,10 +573,13 @@ hook.Add("Think", "HG_EuphoriaWound", function()
 
 		local forearmPhys = ragdoll:GetPhysicsObjectNum(hg.realPhysNum(ragdoll, grab.forearm))
 
-		local frac = (grab.untilT - now) / grab.dur * (grab.mul or 1)
+		local frac = math.min((grab.untilT - now) / (grab.dur * EUPHORIA_WOUND_GRAB_EASE), 1) * (grab.mul or 1)
 		local handPos = handPhys:GetPos()
-		local target = bleederPos(ply.organism, ragdoll) or bonePhys:GetPos()
-		if IsValid(forearmPhys) and target:DistToSqr(forearmPhys:GetPos()) < target:DistToSqr(handPos) then target = bonePhys:GetPos() end
+		local target = bonePhys:LocalToWorld(grab.press)
+		if IsValid(forearmPhys) then
+			local back = forearmPhys:GetPos() - handPos
+			if back:LengthSqr() > 0.01 then target = target + back:GetNormalized() * EUPHORIA_WOUND_WRIST_BACK end
+		end
 
 		local toTarget = target - handPos
 		local dist = toTarget:Length()

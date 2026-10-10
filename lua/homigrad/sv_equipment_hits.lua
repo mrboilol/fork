@@ -294,7 +294,9 @@ function hg.TraceEquipmentModel(model, pos, ang, scale, startPos, endPos, paddin
             end
         end
         local entry, leave, hitNormal = ClipConvex(startLocal, ray, expandedPlanes)
-        if entry and (not best or entry < best) then best, exit, normal = entry, leave, hitNormal end
+        if entry and (not best or entry < best) and (startLocal + ray * entry):WithinAABox(geometry.mins - paddingVector, geometry.maxs + paddingVector) then
+            best, exit, normal = entry, leave, hitNormal
+        end
     end
     if #geometry.convexes == 0 or forceBounds and not best then
         local boxes = #geometry.boxes > 0 and geometry.boxes or {{pos = vector_origin, ang = angle_zero, mins = geometry.mins, maxs = geometry.maxs}}

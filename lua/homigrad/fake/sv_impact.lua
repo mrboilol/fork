@@ -10,18 +10,41 @@ local IMPACT_BONE_DIST = 150
 local IMPACT_TRIP_PUSH = 90
 local IMPACT_TRIP_DOWN = 120
 local IMPACT_TRIP_ROLL = 180
+local IMPACT_TICK_BUDGET = 2
+local IMPACT_UP_RATIO = 0.35
+local IMPACT_UP_BASE = 0.15
+local IMPACT_LIGHT_PUSH = 35
+local IMPACT_MID_PUSH = 60
 
 local function nearestImpactPhys(ragdoll, pos)
-	local best, bestDist
+	local best, bestDist, bestNum
 	for i = 0, ragdoll:GetPhysicsObjectCount() - 1 do
 		local phys = ragdoll:GetPhysicsObjectNum(i)
 		if not IsValid(phys) then continue end
 		local dist = phys:GetPos():Distance(pos)
 		if not bestDist or dist < bestDist then
-			best, bestDist = phys, dist
+			best, bestDist, bestNum = phys, dist, i
 		end
 	end
-	return best, bestDist
+	return best, bestDist, bestNum
+end
+
+local function partPushCap(ragdoll, physNum)
+	local bone = ragdoll:TranslatePhysBoneToBone(physNum)
+	local name = bone and bone >= 0 and ragdoll:GetBoneName(bone) or ""
+	if string.find(name, "_Hand", 1, true) or string.find(name, "_Foot", 1, true) or string.find(name, "_Toe", 1, true) then return IMPACT_LIGHT_PUSH end
+	if string.find(name, "Head", 1, true) or string.find(name, "Neck", 1, true) or string.find(name, "_Forearm", 1, true) or string.find(name, "_Calf", 1, true) then return IMPACT_MID_PUSH end
+end
+
+local function takeBudget(ragdoll, strength)
+	local tick = engine.TickCount()
+	if ragdoll.hgImpactTick ~= tick then
+		ragdoll.hgImpactTick = tick
+		ragdoll.hgImpactBudget = IMPACT_TICK_BUDGET
+	end
+	local take = math.min(strength, ragdoll.hgImpactBudget)
+	ragdoll.hgImpactBudget = ragdoll.hgImpactBudget - take
+	return take
 end
 
 local function movingDir(ply)
@@ -66,7 +89,8 @@ hook.Add("EntityTakeDamage", "HG_EuphoriaImpact", function(ent, dmgInfo)
 	local root = ragdoll:GetPhysicsObject()
 	if not IsValid(root) then return end
 
-	local strength = math.Clamp(dmg / 30, 0.4, 1.6)
+	local strength = takeBudget(ragdoll, math.Clamp(dmg / 30, 0.4, 1.6))
+	if strength <= 0 then return end
 
 	local rootPos = root:GetPos()
 	local hitPos = dmgInfo:GetDamagePosition()
@@ -81,6 +105,12 @@ hook.Add("EntityTakeDamage", "HG_EuphoriaImpact", function(ent, dmgInfo)
 	end
 	if dir:LengthSqr() <= 1 then return end
 	dir = dir:GetNormalized()
+	local side = math.sqrt(dir.x * dir.x + dir.y * dir.y)
+	local maxUp = IMPACT_UP_RATIO * side + IMPACT_UP_BASE
+	if dir.z > maxUp then
+		dir.z = maxUp
+		dir:Normalize()
+	end
 
 	local flatDir = Vector(dir.x, dir.y, 0)
 	if flatDir:LengthSqr() > 0.01 then flatDir = flatDir:GetNormalized() else flatDir = Vector(0, 0, 0) end
@@ -88,9 +118,17 @@ hook.Add("EntityTakeDamage", "HG_EuphoriaImpact", function(ent, dmgInfo)
 	root:AddVelocity(flatDir * IMPACT_KNOCKBACK * strength)
 
 	if hitPos and hitPos:Distance(rootPos) < 200 then
-		local hitPhys, hitDist = nearestImpactPhys(ragdoll, hitPos)
+		local hitPhys, hitDist, hitNum = nearestImpactPhys(ragdoll, hitPos)
 		if hitPhys and hitDist < IMPACT_BONE_DIST then
-			hitPhys:AddVelocity(dir * IMPACT_BONE_PUSH * strength)
+			local push = IMPACT_BONE_PUSH * strength
+			local cap = partPushCap(ragdoll, hitNum)
+			if cap and push > cap then
+				hitPhys:AddVelocity(dir * cap)
+				local chest = ragdoll:GetPhysicsObjectNum(hg.realPhysNum(ragdoll, 1))
+				if IsValid(chest) and chest ~= hitPhys then chest:AddVelocity(dir * (push - cap)) end
+			else
+				hitPhys:AddVelocity(dir * push)
+			end
 		end
 	end
 

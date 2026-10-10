@@ -466,6 +466,10 @@ hitArtery = function(artery, org, dmg, dmgInfo, boneindex, dir, hit, impact, for
 
 	local owner = org.owner
 
+	if IsValid(owner) and owner:IsPlayer() and owner:Alive() and hg.QueuePainScream and (not hg.organism.CanFeelPain or hg.organism.CanFeelPain(org, "body")) then
+		hg.QueuePainScream(owner, 2)
+	end
+
 	if artery == "arteria" and IsValid(owner) then
 		local ent = hg.GetCurrentCharacter(owner)
 		if IsValid(ent) and not org.otrub and not org.needotrub and (owner:IsPlayer() and owner:Alive() or not owner:IsPlayer()) then

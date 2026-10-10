@@ -1284,8 +1284,8 @@ local function collectArmorBoxes(ply, body)
 	if not boxes then return end
 
 	for _, box in ipairs(boxes) do
-		local organ = box[6] and organs[box[6]] and organs[box[6]][box[7]]
-		if organ and organ[7] then
+		local organ = box[8] or box[6] and organs[box[6]] and organs[box[6]][box[7]]
+		if organ and organ[7] and not organ[10] then
 			armorBoxCount = armorBoxCount + 1
 			local entry = armorBoxes[armorBoxCount]
 			if not entry then
@@ -1344,6 +1344,20 @@ local function buildHull()
 	return n - 1
 end
 
+local function smoothDelta(x, y, z)
+	local best, bestDistance
+	for index = 1, POINT_COUNT do
+		if pointValid[index] and smoothValid[index] then
+			local dx, dy, dz = poseX[index] - x, poseY[index] - y, poseZ[index] - z
+			local distance = dx * dx + dy * dy + dz * dz
+			if not bestDistance or distance < bestDistance then best, bestDistance = index, distance end
+		end
+	end
+	if not best then return 0, 0 end
+
+	return smoothY[best] - poseY[best], smoothZ[best] - poseZ[best]
+end
+
 local function drawArmor()
 	local body = captureBody
 	if armorBoxCount == 0 or not IsValid(body) or not boneCache then return end
@@ -1354,13 +1368,14 @@ local function drawArmor()
 		local matrix = id and body:GetBoneMatrix(id)
 		if matrix then
 			local pos, ang = LocalToWorld(box.pos, box.ang, matrix:GetTranslation(), matrix:GetAngles())
+			local deltaY, deltaZ = smoothDelta(projectRaw(pos))
 			local size = box.size
 			for corner = 1, #ARMOR_SIGNS do
 				local sign = ARMOR_SIGNS[corner]
 				local world = LocalToWorld(Vector(size.x * sign[1], size.y * sign[2], size.z * sign[3]), angle_zero, pos, ang)
 				local _, py, pz = projectRaw(world)
 				local point = armorPoints[corner]
-				point.x, point.y = centerX + py * pixelScale, centerY - (pz - targetZ) * pixelScale
+				point.x, point.y = centerX + (py + deltaY) * pixelScale, centerY - (pz + deltaZ - targetZ) * pixelScale
 			end
 
 			local count = buildHull()
