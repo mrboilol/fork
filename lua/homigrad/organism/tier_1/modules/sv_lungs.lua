@@ -27,6 +27,7 @@ local lowStaminaO2Start = 50
 local criticalStaminaO2Start = 10
 local lowStaminaO2DebtMax = 4
 local opioidRespiratoryArrestThreshold = 0.85
+local respiratoryArrestAdrenaline = 1.4
 local tracheaHealingTime = 90
 local needleAirwayO2Penalty = 15
 
@@ -145,6 +146,19 @@ function hg.organism.HasUnderwaterOxygen(org)
 end
 
 
+
+function hg.organism.CanRescueRespiratoryArrest(org)
+	local now = CurTime()
+	local rescued = (org.adrenaline or 0) >= respiratoryArrestAdrenaline
+		or (org.cprResuscitationUntil or 0) > now
+		or (org.defibSupportUntil or 0) > now
+	if not rescued then return false end
+
+	local airwayBlown = (org.trachea or 0) >= 1 and (org.needle or 0) <= 0
+	local lungsBlown = (tonumber(org.lungsL[1]) or 0) >= 1 and (tonumber(org.lungsR[1]) or 0) >= 1
+
+	return not (airwayBlown or lungsBlown or (org.hemothorax or 0) >= 0.9 or org.vomitInThroat)
+end
 
 function hg.organism.GetAirwayOxygenCap(org)
 	local needleAirwayActive = (org.needle or 0) > 0 and (org.trachea or 0) > 0
@@ -598,7 +612,11 @@ module[2] = function(owner, org, timeValue)
 	org.drugRespiratoryDepression = drugRespiratoryDepression
 	org.bradyapnea = bradyapnea
 	org.respiratoryRate = math.Round(Lerp(bradyapnea, 14, 4))
-	org.respiratoryArrest = drugRespiratoryDepression >= opioidRespiratoryArrestThreshold
+	if drugRespiratoryDepression >= opioidRespiratoryArrestThreshold then
+		org.respiratoryArrest = true
+	elseif org.respiratoryArrest and hg.organism.CanRescueRespiratoryArrest(org) then
+		org.respiratoryArrest = false
+	end
 
 	-- Blood volume affects oxygen delivery through cardiac output, pulse, and
 	-- pressure. It is not itself an arterial saturation cap; the lungs own the

@@ -130,6 +130,17 @@ local DEBUG_BOX = Vector(1.5, 1.5, 1.5)
 local DEBUG_PLANTED = Color(60, 255, 60)
 local DEBUG_SWING = Color(255, 200, 60)
 
+local cl_interp = CLIENT and GetConVar("cl_interp")
+local cl_interp_ratio = CLIENT and GetConVar("cl_interp_ratio")
+local cl_updaterate = CLIENT and GetConVar("cl_updaterate")
+
+local function interpDelay()
+	if not cl_interp then return 0 end
+	local ratioDelay = cl_interp_ratio and cl_updaterate and cl_interp_ratio:GetFloat() / math_max(cl_updaterate:GetFloat(), 1) or 0
+
+	return math_Clamp(math_max(cl_interp:GetFloat(), ratioDelay), 0, 0.5)
+end
+
 local groundHullMins, groundHullMaxs = Vector(-2, -2, 0), Vector(2, 2, 1)
 local boneCache = {}
 
@@ -460,7 +471,7 @@ local function remoteGait(ply, state, dt)
 	local ahead = state.netAhead
 	state.netAhead = math_min(ahead + rate * hg.GaitLimpRateMul(ply, state.netBase + ahead) * dt, REMOTE_MAX_AHEAD)
 
-	return rate, (state.netBase + state.netAhead) % 2
+	return rate, (state.netBase + state.netAhead - rate * interpDelay()) % 2
 end
 
 local function updatePhase(ply, state, ctx, dt)
@@ -1023,6 +1034,10 @@ local function stepBody(ply, body, dt)
 	local vel = ply:GetVelocity()
 	local onGround = ply:OnGround()
 	local flatVel = Vector(vel.x, vel.y, 0)
+	if CLIENT and ply ~= LocalPlayer() then
+		body.smoothVel = body.smoothVel and LerpVector(math_min(dt * VELOCITY_SMOOTH, 1), body.smoothVel, flatVel) or flatVel
+		flatVel = Vector(body.smoothVel)
+	end
 	local rawAccel = (flatVel - body.lastVel) / dt
 	local accelLength = rawAccel:Length()
 	if accelLength > BODY_ACCEL_CLAMP then rawAccel:Mul(BODY_ACCEL_CLAMP / accelLength) end

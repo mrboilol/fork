@@ -55,14 +55,15 @@ local physGravity = Vector(0, 0, -600)
 local physTrace = {mask = MASK_SOLID}
 local sv_gravity = GetConVar("sv_gravity")
 
-local function physBloodCollide(data, pos, normal)
+local function physBloodCollide(data, pos, normal, vel)
 	local decal = hg.DecalBloodHit
 	if not decal then return end
 	physTrace.start = pos + normal * 2
 	physTrace.endpos = pos - normal * 4
 	local tr = util.TraceLine(physTrace)
 	if not tr.Hit then tr.HitWorld = true end
-	decal(pos, normal, tr, data.artery, data.owner, data.tiny, data.volume, data.size)
+	if not vel or vel:LengthSqr() < 1 then vel = data.vel end
+	decal(pos, normal, tr, data.artery, data.owner, data.tiny, data.volume, data.size, vel)
 end
 
 local slideTrace = {mask = MASK_SOLID}
@@ -83,17 +84,17 @@ local function physBloodSlide(part, data, pos)
 	return true
 end
 
-local function physBloodSmear(part, radius)
+local function physBloodSmear(part, data, radius)
 	local vel = part:GetVelocity()
-	local speed = math.sqrt(vel[1] * vel[1] + vel[2] * vel[2] + math.max(vel[3], 0) ^ 2)
-	local len = math.Clamp(radius * 2 + speed * 0.025 * radius, radius * 2, radius * 14)
+	data.vel = vel
+	local len = math.Clamp(radius * 2 + vel:Length() * 0.025 * radius, radius * 2, radius * 14)
 	part:SetStartLength(len)
 	part:SetEndLength(len)
 end
 
 local function physBloodThink(part, data)
 	local pos = part:GetPos()
-	if not data.hidden then physBloodSmear(part, data.radius) end
+	if not data.hidden then physBloodSmear(part, data, data.radius) end
 	if physBloodSlide(part, data, pos) then return end
 	if bit.band(util.PointContents(pos), CONTENTS_WATER) == CONTENTS_WATER then
 		if not data.hidden then hg.addBloodPart2(pos, part:GetVelocity() / 20 + VectorRand(-1, 1), nil, nil, nil, nil, true, data.owner) end
@@ -136,7 +137,8 @@ local function addPhysBloodPart(pos, vel, w, artery, kishki, owner, tiny, hidden
 	part:SetStartSize(radius)
 	part:SetEndSize(radius * 0.75)
 	data.radius = radius
-	if not hidden then physBloodSmear(part, radius) end
+	data.vel = vel
+	if not hidden then physBloodSmear(part, data, radius) end
 	part:SetGravity(physGravity)
 	part:SetAirResistance(tiny and 22 or (artery and 4 or 9))
 	part:SetBounce(0)
@@ -149,7 +151,7 @@ local function addPhysBloodPart(pos, vel, w, artery, kishki, owner, tiny, hidden
 	end
 	part:SetCollideCallback(function(p, hitPos, hitNormal)
 		p:SetDieTime(0)
-		physBloodCollide(data, hitPos, hitNormal)
+		physBloodCollide(data, hitPos, hitNormal, p:GetVelocity())
 	end)
 	part:SetThinkFunction(function(p) physBloodThink(p, data) end)
 	part:SetNextThink(CurTime() + 0.1)

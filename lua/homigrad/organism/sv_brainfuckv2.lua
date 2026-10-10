@@ -650,9 +650,6 @@ hook.Add("Org Think", "BrainfuckV2", function(owner, org)
 
 	local posture, severity = getPostureState(org)
 	local rag = getRagdoll(owner, org)
-	if posture or (org.brain or 0) > 0 then
-		dbgPrint("[BrainfuckV2] think " .. tostring(owner) .. " brain " .. tostring(org.brain) .. " posture " .. tostring(posture) .. " severity " .. tostring(severity) .. " ragvalid " .. tostring(IsValid(rag)))
-	end
 	setPosture(org, posture, severity, rag)
 
 	if posture and owner:IsPlayer() and owner:Alive() and not IsValid(rag) then

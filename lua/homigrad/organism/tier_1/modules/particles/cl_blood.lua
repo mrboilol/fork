@@ -213,7 +213,11 @@ local function isOrganismEnt(ent)
 	return IsValid(ent) and (ent:IsPlayer() or ent:IsNPC() or ent:IsRagdoll() or ent.organism ~= nil)
 end
 
-local function decalBlood(pos, normal, tr, artery, owner, tiny, amount, particleSize)
+local smearMinSpeed = 80
+local smearSpeedPerStep = 150
+local smearMaxSteps = 4
+
+local function decalBlood(pos, normal, tr, artery, owner, tiny, amount, particleSize, vel)
 	if not pos or not normal then return end
 	if normal:LengthSqr() < 0.0001 then normal = vector_up end
 	amount = math.max(amount or (tiny and 0.2 or artery and 2.5 or 1), 0.05)
@@ -222,11 +226,28 @@ local function decalBlood(pos, normal, tr, artery, owner, tiny, amount, particle
 		return
 	end
 
+	local steps, dir = 0
+	if vel and not tiny then
+		local tangent = vel - normal * vel:Dot(normal)
+		local tangentLen = tangent:Length()
+		if tangentLen > smearMinSpeed then
+			steps = math.min(math.floor(tangentLen / smearSpeedPerStep) + 1, smearMaxSteps)
+			dir = tangent / tangentLen
+		else
+			amount = amount * 1.25
+			particleSize = (particleSize or 0) * 1.15
+		end
+	end
+
 	local target = IsValid(tr.Entity) and tr.Entity or nil
-	if useOldBlood() then
-		placeOldBloodDecal(pos, normal, target, artery, amount, particleSize)
-	else
-		placeNewBloodDecal(pos, normal, target, artery, amount, particleSize)
+	local place = useOldBlood() and placeOldBloodDecal or placeNewBloodDecal
+	place(pos, normal, target, artery, amount, particleSize)
+	if steps > 0 then
+		local diameter = math.max(0.5 + math.sqrt(amount) * 1.5, particleSize or 0) * 2.5
+		for i = 1, steps do
+			local fade = 1 - 0.15 * i
+			place(pos + dir * diameter * 0.45 * i, normal, target, artery, amount * fade * fade, (particleSize or 0) * fade)
+		end
 	end
 	if not tiny or math.random(7) == 1 then playBloodDripImpact(pos, tr) end
 end

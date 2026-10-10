@@ -6,6 +6,17 @@ local ORG_NET_SPECTATOR_SKIP = 2
 local ORG_NET_MORE_INFO = 3
 local ORG_NET_MERGE = 4
 
+local function syncOrganism(target, source, previous)
+	if previous then
+		for key in pairs(previous) do
+			if source[key] == nil then target[key] = nil end
+		end
+	end
+	for key, value in pairs(source) do
+		target[key] = value
+	end
+end
+
 net.Receive("organism_send", function()
 	local org = net.ReadTable()
 	local force = net.ReadBool()
@@ -32,14 +43,17 @@ net.Receive("organism_send", function()
 	if ply.is_lookedat and not moreInfo then return end
 	if spectatorSkip and (ply == LocalPlayer():GetNWEntity("spect",nil)) and not LocalPlayer():Alive() then return end
 
+	if ply:IsPlayer() and ply:Alive() then
+		org.health = ply:Health()
+	end
+
+	local previous = ply.new_organism
 	ply.new_organism = org
 	
 	if not ply.organism or force then
 		ply.organism = org
-	end
-
-	if ply:IsPlayer() and ply:Alive() then
-		org.health = ply:Health()
+	else
+		syncOrganism(ply.organism, org, previous)
 	end
 	
 	local rag = ply:GetNWEntity("FakeRagdoll")
@@ -78,7 +92,15 @@ local list = {
 	{"brainoxygen", 1},
 	{"losing_oxy", true, true},
 	{"respiratoryArrest", true, true},
+	{"respiratoryRate", 14},
+	{"bradyapnea", 1, true},
+	{"drugRespiratoryDepression", 1, true},
+	{"exertionO2Debt", 30, true},
+	{"circulatoryO2Reserve", 1},
 	{"lungsfunction", true, false},
+	{"oxygenIntakeAvailable", true, false},
+	{"vomitInThroat", true, true},
+	{"needle", 1, false},
 	{"lungsL", 1, true},
 	{"lungsR", 1, true},
 	{"trachea", 1, true},
@@ -90,6 +112,9 @@ local list = {
 	{"fibrillation", true, true},
 	{"arrhythmia", 1, true},
 	{"cardiacTamponade", true, true},
+	"ecgState",
+	{"palpitations", 1, true},
+	"unstableRhythm",
 	{"pulse", 70},
 	{"bloodPressure", 90},
 	{"systolic", 120},
@@ -98,6 +123,7 @@ local list = {
 	{"strokeVolume", 1},
 	{"myocardialOxygen", 1},
 	{"perfusion", 1},
+	{"peripheralperfusion", 1},
 	{"cerebralPerfusion", 1},
 	{"heartStrain", 1, true},
 	{"ischemia", 1, true},
@@ -107,6 +133,7 @@ local list = {
 	{"blood", 5000},
 	{"bleed", 100, true},
 	{"internalBleed", 10, true},
+	{"internalBleedComplication", 1, true},
 	{"arteria", 1, true},
 	{"aorta", 1, true},
 	{"rarmartery", 1, true},
@@ -121,6 +148,8 @@ local list = {
 	{"analgesia", 0, true},
 	{"naloxone", 0, true},
 	{"adrenaline", 5, true},
+	{"noradrenaline", 5, true},
+	{"zerlkersOverdose", 1, true},
 	{"temperature", 40},
 	0,
 	{"concussion", 3, true},
@@ -132,6 +161,8 @@ local list = {
 	{"seizureActive", true, true},
 	{"disorientation", 1, true},
 	{"skull", 1, true},
+	{"cervicalParalysis", true, true},
+	{"paralyzed", true, true},
 	0,
 	{"spine1", 1, true},
 	{"spine2", 1, true},
@@ -150,6 +181,48 @@ local function set(set)
 	return set.r, set.g, set.b
 end
 -- твое говно вообще-то это глуаинтер дурак лучше бы вы его не использовали я бы
+
+local function num(org, key)
+	local value = org[key]
+	if istable(value) then value = value[1] end
+
+	return tonumber(value) or 0
+end
+
+local lifeThreats = {
+	{"respiratory arrest", function(o) return o.respiratoryArrest end},
+	{"cardiac arrest", function(o) return o.heartstop end},
+	{"ventricular fibrillation", function(o) return o.fibrillation end},
+	{"cardiac tamponade", function(o) return o.cardiacTamponade end},
+	{"airway blocked (vomit)", function(o) return o.vomitInThroat end},
+	{"trachea destroyed", function(o) return num(o, "trachea") >= 1 and num(o, "needle") <= 0 end},
+	{"trachea damaged", function(o) return num(o, "trachea") >= 0.5 and num(o, "trachea") < 1 end},
+	{"lungs not functioning", function(o) return o.alive and o.lungsfunction == false end},
+	{"both lungs destroyed", function(o) return num(o, "lungsL") >= 1 and num(o, "lungsR") >= 1 end},
+	{"hemothorax", function(o) return num(o, "hemothorax") >= 0.5 end},
+	{"pneumothorax", function(o) return num(o, "pneumothorax") >= 0.5 end},
+	{"hypoxemia", function(o) return istable(o.o2) and o.o2.range and (o.o2[1] or 0) < o.o2.range * 0.4 end},
+	{"hypercapnia", function(o) return num(o, "co2") >= 20 end},
+	{"carbon monoxide poisoning", function(o) return num(o, "CO") >= 0.3 end},
+	{"drug respiratory depression", function(o) return num(o, "drugRespiratoryDepression") >= 0.5 end},
+	{"zerlkers overdose", function(o) return num(o, "zerlkersOverdose") >= 0.5 end},
+	{"hemorrhagic shock", function(o) return o.blood and num(o, "blood") < 3500 end},
+	{"arterial bleeding", function(o) return num(o, "arteria") > 0 or num(o, "aorta") > 0 or num(o, "rarmartery") > 0 or num(o, "larmartery") > 0 or num(o, "rlegartery") > 0 or num(o, "llegartery") > 0 end},
+	{"neck slit", function(o) return o.neckslit end},
+	{"internal bleeding", function(o) return num(o, "internalBleed") >= 3 end},
+	{"hypotension", function(o) return num(o, "hypotension") >= 0.6 end},
+	{"myocardial ischemia", function(o) return num(o, "ischemia") >= 0.5 end},
+	{"heart damage", function(o) return num(o, "heart") >= 0.5 end},
+	{"raised intracranial pressure", function(o) return num(o, "intracranialPressure") >= 0.6 end},
+	{"brain swelling", function(o) return num(o, "brainSwelling") >= 0.6 end},
+	{"brain hemorrhage", function(o) return num(o, "brainHemorrhage") >= 0.5 end},
+	{"brain damage", function(o) return num(o, "brain") >= 0.4 end},
+	{"seizure", function(o) return o.seizureActive end},
+	{"cervical spine paralysis", function(o) return o.cervicalParalysis end},
+	{"hypothermia", function(o) return o.temperature and num(o, "temperature") < 32 end},
+	{"hyperthermia", function(o) return num(o, "temperature") > 40 end},
+	{"fatal damage queued", function(o) return o.fatalDamageQueued end},
+}
 
 local Round = math.Round -- Тут были плохие слова от деке...
 local red, green = Color(255, 0, 0), Color(0, 255, 0)
@@ -204,6 +277,20 @@ local function getTextTable(org)
 		if text1 != "" then
 			shown[text1] = true
 			textList[#textList + 1] = {text1, text2, r, g, b}
+		end
+	end
+
+	local threats = {}
+	for _, threat in ipairs(lifeThreats) do
+		local ok, active = pcall(threat[2], org)
+		if ok and active then threats[#threats + 1] = threat[1] end
+	end
+
+	if #threats > 0 then
+		textList[#textList + 1] = {"", ""}
+		textList[#textList + 1] = {"LIFE THREATS", tostring(#threats), 255, 0, 0}
+		for _, name in ipairs(threats) do
+			textList[#textList + 1] = {name, "!", 255, 0, 0}
 		end
 	end
 
