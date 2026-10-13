@@ -2,6 +2,10 @@
 if SERVER then util.AddNetworkString("headtrauma_flash") end
 
 local player_crush_amputation_threshold = 7
+local melee_skull_bone_mul = 0.42
+local melee_skull_consciousness_mul = 0.3
+local melee_skull_consciousness_max = 0.55
+local melee_skull_knockout_threshold = 1.3
 
 util.AddNetworkString("hg_play_client_sound_file")
 
@@ -88,6 +92,12 @@ local bonefracture_sounds = {
 	"bonefracture/rem_bonebreak3.wav",
 }
 
+local legacy_bonebreak_sounds = {}
+for i = 1, 10 do
+	legacy_bonebreak_sounds[#legacy_bonebreak_sounds + 1] = "owfuck" .. i .. ".mp3"
+	legacy_bonebreak_sounds[#legacy_bonebreak_sounds + 1] = "newbonebreak/break" .. i .. ".wav"
+end
+
 local skullfracture_sounds = {
 	"skullfracture/skullfracture-1.wav",
 	"skullfracture/skullfracture-2.wav",
@@ -109,7 +119,11 @@ local function playBoneFractureSound(ent)
 		filter:AddPAS(soundEnt:GetPos())
 		filter:AddPlayer(recipient)
 	end
-	soundEnt:EmitSound(bonefracture_sounds[math.random(#bonefracture_sounds)], 75, math.random(135, 155), 1, CHAN_AUTO, 0, 0, filter)
+	if math.random(2) == 1 then
+		soundEnt:EmitSound(bonefracture_sounds[math.random(#bonefracture_sounds)], 75, math.random(135, 155), 1, CHAN_AUTO, 0, 0, filter)
+	else
+		soundEnt:EmitSound(legacy_bonebreak_sounds[math.random(#legacy_bonebreak_sounds)], 75, 100, 1, CHAN_AUTO, 0, 0, filter)
+	end
 end
 
 local function playSkullFractureSound(pos)
@@ -979,8 +993,11 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	local ignoreBrainDamage = hg.organism.IsBrainDamageIgnored and hg.organism.IsBrainDamageIgnored(org)
 	local brainEnergy = impact and impact.source == "physics" and math.max(impact.brainEnergy or impact.residualEnergy or 0, 0) or dmg
 	local headOutcomeHandled = impact and impact.headOutcomeHandled
-	
-	local result, vecrand = damageBone(org, 0.25, dmg, dmgInfo, "skull", boneindex, dir, hit, ricochet, oldDmg >= 1)
+	local bluntMelee = dmgInfo:IsDamageType(DMG_CLUB) and not (impact and impact.source == "physics")
+	local meleeContact = IsValid(dmgInfo:GetInflictor()) and dmgInfo:GetInflictor().MeleeDamageContact
+	local fullCharge = meleeContact and meleeContact.fullCharge and not (impact and impact.source == "physics")
+
+	local result, vecrand = damageBone(org, 0.25, bluntMelee and dmg * melee_skull_bone_mul or dmg, dmgInfo, "skull", boneindex, dir, hit, ricochet, oldDmg >= 1)
 	if oldDmg >= 1 then
 		result = 0
 		bloodBurst(org, dmgInfo, math.max(dmg * 4, 2), hit, true)
@@ -1003,6 +1020,16 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	if isStab and functionalHelmet and helmetApplied then
 		org.skull = oldDmg
 	end
+	if fullCharge and not helmetProtectedHit and oldDmg < 1 then
+		org.skull = 1
+		if bit.band(rawDamageType, DMG_SLASH) ~= 0 then
+			if hg.organism.input_list.brainFrontal then hg.organism.input_list.brainFrontal(org, bone, dmg, dmgInfo) end
+			if hg.organism.AddBrainHemorrhage then hg.organism.AddBrainHemorrhage(org, 0.12, 0.003) end
+			for i = 1, 3 do
+				hg.organism.AddWoundManual(org.owner, 40, VectorRand(-2, 2), angle_zero, "ValveBiped.Bip01_Head1", CurTime())
+			end
+		end
+	end
 	if isMelee(dmgInfo) and oldDmg < 1 and org.skull < 1 and dmg > 0.3 and dmg < 1.35 then result = 1 end
 
 	hg.AddHarmToAttacker(dmgInfo, (org.skull - oldDmg) * 4, "Skull bone damage harm")
@@ -1023,7 +1050,18 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 				bloodBurst(org, dmgInfo, math.max(dmg / 8, 4), pos, true)
 			end
 			sendThought(org, "Your skull is broken.", "thought_skull", 4, Color(255, 180, 180))
+
+			if bluntMelee and org.alive and not org.otrub and not helmetProtectedHit then
+				org.needotrub = true
+				org.consciousness = math.min(org.consciousness or 1, 0.08)
+				headOutcomeHandled = true
+			end
 		end
+	end
+
+	if bluntMelee and org.consciousness and not isStab then
+		local drain = math.Clamp(dmg * melee_skull_consciousness_mul, 0, melee_skull_consciousness_max) * (helmetProtectedHit and 0.35 or 1)
+		org.consciousness = math.max(org.consciousness - drain, 0)
 	end
 
 	org.shock = org.shock + dmg * 3
@@ -1081,7 +1119,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	end
 	if not headOutcomeHandled and org.alive and not org.otrub and not org.needotrub and not isStab and dmg > 0.2
 		and not (impact and impact.source == "physics") and (isMelee(dmgInfo) or dmgInfo:IsDamageType(DMG_CRUSH)) then
-		local bluntKnockoutChance = math.Clamp((dmg - 0.2) * 0.8, 0, 0.6) * (helmetProtectedHit and 0.25 or 1)
+		local bluntKnockoutChance = math.Clamp((dmg - melee_skull_knockout_threshold) * 0.5, 0, 0.6) * (helmetProtectedHit and 0.25 or 1)
 		if math.Rand(0, 1) < bluntKnockoutChance then
 			org.needotrub = true
 			org.consciousness = math.min(org.consciousness or 1, 0.12)

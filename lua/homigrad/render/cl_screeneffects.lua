@@ -496,7 +496,8 @@ local ischemicVignetteLerp = 0
 local shockVignetteLerp = 0
 local consciousnessVignetteLerp = 0
 local OTRUB_CONSCIOUSNESS_THRESHOLD = 0.3
-local SHOCK_CONSCIOUSNESS_THRESHOLD = 25
+local SHOCK_CONSCIOUSNESS_THRESHOLD = 40
+local SHOCK_ANALGESIA_RANGE = 60
 local SHOCK_CONSCIOUSNESS_MAX = 85
 local collapseVisualLerp = 0
 local collapseBlinkLerp = 0
@@ -589,12 +590,6 @@ local panicattackOverlayPath = "sound/rem_panicattack.mp3"
 local panicattackFadeStart = 0
 local panicattackThreshold = 0.55
 local panicattackVolumeMul = 1
-local panicattackVisualExponent = 1.75
-local panicattackPulseFloor = 0.78
-local panicattackPulseIntensity = 0.2
-local panicattackShakeIntervalMin = 0.45
-local panicattackShakeIntervalMax = 1.4
-local panicattackShakeMul = 0.85
 local function getPanicAttackFx(org)
 	local panicConVar = GetConVar("hg_panic")
 	if panicConVar and not panicConVar:GetBool() then return 0 end
@@ -624,12 +619,12 @@ hg.screeneffects_config = {
 	sonimCookedForegroundVolume = sonimCookedForegroundVolume,
 	painBeatOverlayPath = painBeatOverlayPath,
 	panicattackOverlayPath = panicattackOverlayPath,
-	panicattackVisualExponent = panicattackVisualExponent,
-	panicattackPulseFloor = panicattackPulseFloor,
-	panicattackPulseIntensity = panicattackPulseIntensity,
-	panicattackShakeIntervalMin = panicattackShakeIntervalMin,
-	panicattackShakeIntervalMax = panicattackShakeIntervalMax,
-	panicattackShakeMul = panicattackShakeMul,
+	panicattackVisualExponent = 1.75,
+	panicattackPulseFloor = 0.78,
+	panicattackPulseIntensity = 0.2,
+	panicattackShakeIntervalMin = 0.45,
+	panicattackShakeIntervalMax = 1.4,
+	panicattackShakeMul = 0.85,
 	painBeatOverlayVolumeMul = painBeatOverlayVolumeMul,
 	painThresholdMax = painThresholdMax,
 	painAgonyThreshold = painAgonyThreshold,
@@ -683,18 +678,19 @@ local function getPainPulse(org)
 	return math.ease.InOutSine(math.abs(math.cos(CurTime() * 2))) * PainLerp * (org.otrub and 0.5 or painPulseIntensity)
 end
 
-local seizureSoundPath = "sound/rem_seizure.mp3"
-local seizureIntroDuration = 3
-local seizureFlashDelayMin = 0.12
-local seizureFlashDelayMax = 0.55
-local seizureFlashDurationMin = 0.35
-local seizureFlashDurationMax = 1.1
-local seizureFlashSizeMin = 9000
-local seizureFlashSizeMax = 18000
-local seizureFinalFlashLead = 2
-local seizureFinalFlashDuration = 5
-local seizureFinalFlashSize = 90000
-local seizureSoundVolume = 1
+local seizureCfg = {}
+seizureCfg.seizureSoundPath = "sound/rem_seizure.mp3"
+seizureCfg.seizureIntroDuration = 3
+seizureCfg.seizureFlashDelayMin = 0.12
+seizureCfg.seizureFlashDelayMax = 0.55
+seizureCfg.seizureFlashDurationMin = 0.35
+seizureCfg.seizureFlashDurationMax = 1.1
+seizureCfg.seizureFlashSizeMin = 9000
+seizureCfg.seizureFlashSizeMax = 18000
+seizureCfg.seizureFinalFlashLead = 2
+seizureCfg.seizureFinalFlashDuration = 5
+seizureCfg.seizureFinalFlashSize = 90000
+seizureCfg.seizureSoundVolume = 1
 local seizureIntroTab = {
 	["$pp_colour_addr"] = 0,
 	["$pp_colour_addg"] = 0,
@@ -745,8 +741,8 @@ local function addSeizureFlash(isFinal)
 
 	local view = render.GetViewSetup(true)
 	local pos = view.origin + view.angles:Forward() * math.Rand(isFinal and 140 or 120, isFinal and 220 or 210) + view.angles:Right() * math.Rand(isFinal and -45 or -110, isFinal and 45 or 110) + view.angles:Up() * math.Rand(isFinal and -45 or -80, isFinal and 45 or 80)
-	local time = isFinal and seizureFinalFlashDuration or math.Rand(seizureFlashDurationMin, seizureFlashDurationMax)
-	local size = isFinal and seizureFinalFlashSize or math.Rand(seizureFlashSizeMin, seizureFlashSizeMax)
+	local time = isFinal and seizureCfg.seizureFinalFlashDuration or math.Rand(seizureCfg.seizureFlashDurationMin, seizureCfg.seizureFlashDurationMax)
+	local size = isFinal and seizureCfg.seizureFinalFlashSize or math.Rand(seizureCfg.seizureFlashSizeMin, seizureCfg.seizureFlashSizeMax)
 
 	hg.AddFlash(view.origin, 1, pos, time, size)
 end
@@ -762,7 +758,7 @@ local function updateSeizureEffects(org)
 			seizureClientActive = true
 			seizureClientStart = org.seizureStart
 			seizureClientEnd = org.seizureEnd
-			nextSeizureFlash = math.max(seizureClientStart + seizureIntroDuration, CurTime() + seizureIntroDuration)
+			nextSeizureFlash = math.max(seizureClientStart + seizureCfg.seizureIntroDuration, CurTime() + seizureCfg.seizureIntroDuration)
 			nextSeizureCamShake = CurTime()
 			seizureFinalFlashFired = false
 		end
@@ -770,7 +766,7 @@ local function updateSeizureEffects(org)
 		if canRetrySound("SeizureStation", SeizureStation) then
 			local seizureDuration = math.max(seizureClientEnd - seizureClientStart, 0.001)
 			local seizureTimeline = math.Clamp((CurTime() - seizureClientStart) / seizureDuration, 0, 1)
-			sound.PlayFile(seizureSoundPath, "noblock noplay", function(station)
+			sound.PlayFile(seizureCfg.seizureSoundPath, "noblock noplay", function(station)
 				if IsValid(station) then
 					local currentPlayer = LocalPlayer()
 					if not seizureClientActive or (IsValid(currentPlayer) and currentPlayer.organism and currentPlayer.organism.otrub) then
@@ -789,14 +785,14 @@ local function updateSeizureEffects(org)
 
 		if IsValid(SeizureStation) then
 			local midazolamFade = seizureMidazolamFadeEnd > CurTime() and math.Clamp((seizureMidazolamFadeEnd - CurTime()) / seizureMidazolamFadeDuration, 0, 1) or 1
-			SeizureStation:SetVolume((org.otrub and seizureSoundOtrubVolume or seizureSoundVolume) * midazolamFade)
+			SeizureStation:SetVolume((org.otrub and seizureSoundOtrubVolume or seizureCfg.seizureSoundVolume) * midazolamFade)
 			SeizureStation:SetPlaybackRate(org.otrub and seizureSoundOtrubPlaybackRate or 1)
 		end
 
 		local seizureElapsed = math.max(CurTime() - seizureClientStart, 0)
 		local epilepsySafe = hg_epilepsy:GetBool()
-		if not epilepsySafe and seizureElapsed < seizureIntroDuration then
-			local intensity = math.min(seizureElapsed, seizureIntroDuration)
+		if not epilepsySafe and seizureElapsed < seizureCfg.seizureIntroDuration then
+			local intensity = math.min(seizureElapsed, seizureCfg.seizureIntroDuration)
 			seizureIntroTab["$pp_colour_contrast"] = intensity / 2
 			seizureIntroTab["$pp_colour_addr"] = intensity / 10
 			seizureIntroTab["$pp_colour_brightness"] = intensity / 10
@@ -810,9 +806,9 @@ local function updateSeizureEffects(org)
 			render.DrawScreenQuad()
 		end
 
-		if not epilepsySafe and seizureElapsed >= seizureIntroDuration and CurTime() >= nextSeizureFlash then
+		if not epilepsySafe and seizureElapsed >= seizureCfg.seizureIntroDuration and CurTime() >= nextSeizureFlash then
 			addSeizureFlash(false)
-			nextSeizureFlash = CurTime() + math.Rand(seizureFlashDelayMin, seizureFlashDelayMax)
+			nextSeizureFlash = CurTime() + math.Rand(seizureCfg.seizureFlashDelayMin, seizureCfg.seizureFlashDelayMax)
 		end
 
 		if CurTime() >= nextSeizureCamShake then
@@ -821,7 +817,7 @@ local function updateSeizureEffects(org)
 			nextSeizureCamShake = CurTime() + math.Rand(0.025, 0.06)
 		end
 
-		if not epilepsySafe and not seizureFinalFlashFired and CurTime() >= seizureClientEnd - seizureFinalFlashLead then
+		if not epilepsySafe and not seizureFinalFlashFired and CurTime() >= seizureClientEnd - seizureCfg.seizureFinalFlashLead then
 			addSeizureFlash(true)
 			seizureFinalFlashFired = true
 		end
@@ -1063,13 +1059,13 @@ local function updateCollapseBlink(severity, consciousnessSeverity, brainSeverit
 
 	if blinkSeverity <= 0.01 then
 		collapseBlinkLerp = math.Approach(collapseBlinkLerp, 0, FrameTime() * 5)
-		nextCollapseBlink = now + math.Rand(2.5, 5.5)
+		nextCollapseBlink = now + math.Rand(1.2, 3)
 		collapseBlinkWholeScreen = false
 		return collapseBlinkLerp, false, blinkSeverity
 	end
 
 	if now >= nextCollapseBlink and now >= collapseBlinkEnd then
-		local duration = math.Rand(Lerp(blinkSeverity, 0.09, 0.22), Lerp(blinkSeverity, 0.24, 0.72))
+		local duration = math.Rand(Lerp(blinkSeverity, 0.06, 0.14), Lerp(blinkSeverity, 0.16, 0.42))
 		local criticalBlink = math.Clamp((blinkSeverity - 0.68) / 0.32, 0, 1)
 		collapseBlinkStart = now
 		collapseBlinkAttackEnd = now + math.min(duration * math.Rand(0.12, 0.3), 0.11)
@@ -1078,8 +1074,8 @@ local function updateCollapseBlink(severity, consciousnessSeverity, brainSeverit
 		nextCollapseBlinkFlicker = now + math.Rand(0.025, 0.09)
 		collapseBlinkWholeScreen = criticalBlink > 0 and math.Rand(0, 1) < criticalBlink * 0.52
 		nextCollapseBlink = collapseBlinkEnd + math.Rand(
-			Lerp(blinkSeverity, 4.5, 0.72),
-			Lerp(blinkSeverity, 9, 2.15)
+			Lerp(blinkSeverity, 2, 0.35),
+			Lerp(blinkSeverity, 4.5, 1.1)
 		)
 	end
 
@@ -1100,7 +1096,7 @@ local function updateCollapseBlink(severity, consciousnessSeverity, brainSeverit
 		collapseBlinkWholeScreen = false
 	end
 
-	collapseBlinkLerp = math.Approach(collapseBlinkLerp, target, FrameTime() * (target > collapseBlinkLerp and 16 or 8))
+	collapseBlinkLerp = math.Approach(collapseBlinkLerp, target, FrameTime() * (target > collapseBlinkLerp and 24 or 14))
 	return collapseBlinkLerp, collapseBlinkWholeScreen, blinkSeverity
 end
 
@@ -1108,17 +1104,17 @@ local function updateO2Blink(severity)
 	local now = CurTime()
 	if severity <= 0.05 then
 		o2Blink.lerp = math.Approach(o2Blink.lerp, 0, FrameTime() * 4)
-		o2Blink.nextAt = now + math.Rand(2, 4)
+		o2Blink.nextAt = now + math.Rand(1, 2.5)
 		return o2Blink.lerp
 	end
 
 	if now >= o2Blink.nextAt and now >= o2Blink.finish then
-		local duration = math.Rand(Lerp(severity, 0.28, 0.45), Lerp(severity, 0.55, 1.1))
+		local duration = math.Rand(Lerp(severity, 0.16, 0.26), Lerp(severity, 0.32, 0.6))
 		o2Blink.start = now
 		o2Blink.peak = now + duration * math.Rand(0.25, 0.4)
 		o2Blink.finish = now + duration
 		o2Blink.depth = math.Rand(0.6, 1) * Lerp(severity, 0.35, 1)
-		o2Blink.nextAt = o2Blink.finish + math.Rand(Lerp(severity, 5, 1.4), Lerp(severity, 10, 3.2))
+		o2Blink.nextAt = o2Blink.finish + math.Rand(Lerp(severity, 2.2, 0.6), Lerp(severity, 5, 1.5))
 	end
 
 	local target = 0
@@ -1131,7 +1127,7 @@ local function updateO2Blink(severity)
 		target = target * o2Blink.depth
 	end
 
-	o2Blink.lerp = math.Approach(o2Blink.lerp, target, FrameTime() * 10)
+	o2Blink.lerp = math.Approach(o2Blink.lerp, target, FrameTime() * 18)
 	return o2Blink.lerp
 end
 
@@ -1151,8 +1147,8 @@ local wasVitalsOtrub = false
 local function drawO2GrainCenter(rt, strength)
 	local w, h = ScrW(), ScrH()
 	local cx, cy = w * 0.5, h * 0.5
-	local inner = math.min(w, h) * 0.12
-	local outer = math.min(w, h) * 0.6
+	local inner = math.min(w, h) * 0.2
+	local outer = math.min(w, h) * 0.72
 	local alpha = math.floor(255 * math.Clamp(strength, 0, 1))
 	if alpha <= 0 then return end
 
@@ -1248,15 +1244,16 @@ drawFinalVitalsVignettes = function()
 	), 0, 1)
 
 	local medication = math.max((tonumber(org.analgesia) or 0) + (tonumber(org.painkiller) or 0) * 0.3, 0)
-	local shockDrainThreshold = SHOCK_CONSCIOUSNESS_THRESHOLD * (medication * 4 + 1)
-	local shockOtrubLevel = shockDrainThreshold + (SHOCK_CONSCIOUSNESS_MAX - shockDrainThreshold) * 0.4
-	local shockVignetteProgress = math.Clamp((shock - shockDrainThreshold) / math.max(shockOtrubLevel - shockDrainThreshold, 1), 0, 1)
+	local shockDrainThreshold = SHOCK_CONSCIOUSNESS_THRESHOLD + SHOCK_ANALGESIA_RANGE * math.Clamp(medication, 0, 1)
+	local shockMax = math.max(SHOCK_CONSCIOUSNESS_MAX, shockDrainThreshold + 45)
+	local shockVignetteStart = shockDrainThreshold * 0.45
+	local shockVignetteProgress = math.Clamp((shock - shockVignetteStart) / math.max(shockDrainThreshold - shockVignetteStart, 1), 0, 1)
 	local shockConsciousnessProgress = math.Clamp((0.5 - consciousness) / (0.5 - OTRUB_CONSCIOUSNESS_THRESHOLD), 0, 1) ^ 2
 	local lowConsciousnessShockVignette = math.Clamp((0.64 - visualConsciousness) / (0.64 - OTRUB_CONSCIOUSNESS_THRESHOLD), 0, 1) ^ 1.35
-	local nearMaxShock = math.Clamp((shock - shockDrainThreshold) / math.max(SHOCK_CONSCIOUSNESS_MAX - shockDrainThreshold, 1), 0, 1) ^ 1.5
-	local engulf = math.max(nearMaxShock, lowConsciousnessDarkness)
+	local nearMaxShock = math.Clamp((shock - shockDrainThreshold) / math.max(shockMax - shockDrainThreshold, 1), 0, 1) ^ 1.5
+	local engulf = math.max(shockVignetteProgress ^ 2 * 0.6, nearMaxShock, lowConsciousnessDarkness)
 	local shockVignetteTarget = math.max(
-		shockVignetteProgress ^ 1.8 * Lerp(shockConsciousnessProgress, 1.6, 5) * Lerp(engulf, 0.3, 1),
+		shockVignetteProgress ^ 1.6 * Lerp(math.max(shockConsciousnessProgress, nearMaxShock), 3.3, 4.2),
 		lowConsciousnessShockVignette * 3.8,
 		wakeFade * 3.8
 	)
@@ -1309,7 +1306,7 @@ drawFinalVitalsVignettes = function()
 		end
 	end
 
-	local lowConsciousnessGrain = math.Clamp((1 - visualConsciousness) / (1 - 0.075), 0, 1) ^ 1.1 * 1.6
+	local lowConsciousnessGrain = math.Clamp((1 - visualConsciousness) / (1 - 0.075), 0, 1) ^ 0.9 * 1.9
 	local grainSeverity = math.max(
 		lowConsciousnessGrain,
 		brainDamageSeverity * 0.3,
@@ -1406,7 +1403,7 @@ drawFinalVitalsVignettes = function()
 		render.SetMaterial(noiseMat)
 		render.DrawScreenQuad()
 
-		drawO2GrainCenter(centerRT, org.otrub and 0.45 or 0.8)
+		drawO2GrainCenter(centerRT, org.otrub and 0.45 or 0.93)
 	end
 
 	local excruciatingBlend = getServerSoundMode("hg_painsound", 6) == 6
@@ -1757,6 +1754,9 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				IncapacitatedStation = station
 			end
 		end)
+	elseif not incapacitated and IsValid(IncapacitatedStation) then
+		IncapacitatedStation:Stop()
+		IncapacitatedStation = nil
 	end
 
 	local selectedDyingMode = getServerSoundMode("hg_dyingsound", 2)
@@ -2826,6 +2826,16 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				if IsValid(RemDying1Station) then RemDying1Station:SetVolume(0) end
 				if otrubMode != 7 and IsValid(ItsHopelessStation) then setItsHopelessVolume(0) end
 				if IsValid(NoiseStation2Dying) then NoiseStation2Dying:SetVolume(0) end
+			else
+				if IsValid(NoiseStation) then NoiseStation:SetVolume(0) end
+				if IsValid(OtrubModeStation) then OtrubModeStation:SetVolume(0) end
+				if IsValid(ItssooverStation) then ItssooverStation:SetVolume(0) end
+				if IsValid(RemDying1Station) then RemDying1Station:SetVolume(0) end
+				if IsValid(ItsHopelessStation) then setItsHopelessVolume(0) end
+				if IsValid(NoiseStation2Dying) then NoiseStation2Dying:SetVolume(0) end
+				if IsValid(IncapacitatedStation) then
+					IncapacitatedStation:SetVolume(Lerp(incapacitationProgress, 0.9, 0.6) * hg.screeneffects_config.dyingSoundVolumeMul)
+				end
 			end
 		else
 			if IsValid(NoiseStation) then

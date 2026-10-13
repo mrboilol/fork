@@ -36,6 +36,7 @@ end
 local organTraumaMul = {
 	heart = 1.35,
 	liver = 1.15,
+	kidneys = 1.15,
 	lungsL = 1.1,
 	lungsR = 1.1,
 	trachea = 1.2,
@@ -159,9 +160,36 @@ input_list.liver = function(org, bone, dmg, dmgInfo)
 		end)
 	end
 
-	addInternalBleed(org, harmed * 4, "liver")
+	addInternalBleed(org, harmed * 8, "liver")
 	applyOrganTrauma(org, dmgInfo, dmg, harmed, oldDmg, "liver")
 	
+	dmgInfo:ScaleDamage(0.8)
+
+	return 0
+end
+
+input_list.kidneys = function(org, bone, dmg, dmgInfo)
+	local oldDmg = org.kidneys or 0
+
+	org.kidneys = math.min(oldDmg + dmg / math.max(org.organStrengthMul or 1, 1), 1)
+	local harmed = org.kidneys - oldDmg
+
+	hg.AddHarmToAttacker(dmgInfo, harmed * 3, "Kidney damage harm")
+
+	if harmed > 0 then
+		org.shock = org.shock + dmg * 20
+		addPain(org, dmg * 40, "body")
+	end
+	if org.analgesia < 0.4 and harmed >= 0.2 then
+		local owner = org.owner
+		timer.Simple(0, function()
+			if IsValid(owner) then hg.StunPlayer(owner, 2) end
+		end)
+	end
+
+	addInternalBleed(org, harmed * 8, "kidneys")
+	applyOrganTrauma(org, dmgInfo, dmg, harmed, oldDmg, "kidneys")
+
 	dmgInfo:ScaleDamage(0.8)
 
 	return 0
@@ -176,10 +204,10 @@ input_list.stomach = function(org, bone, dmg, dmgInfo)
 
 	local delta = org.stomach - oldDmg
 	if delta > 0 then
-		addPain(org, dmg * 3, "body")
-		org.shock = org.shock + dmg * 1.5
+		addPain(org, dmg * 25, "body")
+		org.shock = org.shock + dmg * 6
 	end
-	addInternalBleed(org, delta * 2, "stomach")
+	addInternalBleed(org, delta, "stomach")
 	applyOrganTrauma(org, dmgInfo, dmg, delta, oldDmg, "stomach")
 	return result
 end
@@ -193,10 +221,10 @@ input_list.intestines = function(org, bone, dmg, dmgInfo)
 
 	local delta = org.intestines - oldDmg
 	if delta > 0 then
-		addPain(org, dmg * 2, "body")
-		org.shock = org.shock + dmg
+		addPain(org, dmg * 20, "body")
+		org.shock = org.shock + dmg * 5
 	end
-	addInternalBleed(org, delta * 2, "intestines")
+	addInternalBleed(org, delta, "intestines")
 	applyOrganTrauma(org, dmgInfo, dmg, delta, oldDmg, "intestines")
 	return result
 end
@@ -457,7 +485,6 @@ hitArtery = function(artery, org, dmg, dmgInfo, boneindex, dir, hit, impact, for
 		org.neckslit = true
 		if math.Rand(0, 1) < 0.75 then
 			org.neckslitStunUntil = CurTime() + 5
-			org.stun = math.max(org.stun or 0, org.neckslitStunUntil)
 			org.needfake = true
 		end
 	end

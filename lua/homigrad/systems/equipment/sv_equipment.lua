@@ -1671,7 +1671,7 @@ hg.organism.input_list.torso_armor = makeArmorFunc("torso", false, torsoDmgScale
 for i = 1, 8 do hg.organism.input_list["vest" .. i] = hg.organism.input_list.torso_armor end
 hg.organism.input_list.head_armor = makeArmorFunc("head", true, headDmgScale)
 hg.organism.input_list.face_armor = makeArmorFunc("face", true, faceDmgScale)
-for _, armor in ipairs({"helmet2", "helmet3", "helmet5", "helmet6", "helmet7"}) do hg.organism.input_list[armor] = hg.organism.input_list.head_armor end
+for _, armor in ipairs({"helmet2", "helmet3", "helmet_riot", "helmet5", "helmet6", "helmet7"}) do hg.organism.input_list[armor] = hg.organism.input_list.head_armor end
 hg.organism.input_list.mask1 = hg.organism.input_list.face_armor
 
 local function helmetAccessoryArmor(placement, coverage)

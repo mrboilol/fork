@@ -327,6 +327,22 @@ hook.Add("HomigradDamage", "GuiltReg", function(ply, dmgInfo, hitgroup, ent, har
     end
 end)
 
+function zb.DrainKarma(Attacker, Victim, amount)
+    if not IsValid(Attacker) or not Attacker:IsPlayer() or amount <= 0 then return end
+
+    Victim = hg.RagdollOwner(Victim) or Victim
+    if not IsValid(Victim) or not Victim:IsPlayer() or Attacker == Victim then return end
+
+    local rnd = CurrentRound()
+    if rnd.GuiltDisabled or GetConVar("zb_dev"):GetBool() then return end
+    if zb.ROUND_STATE != 1 and (rnd.name != "cstrike" or !zb.RoundsLeft) then return end
+    if Victim.Guilt and Victim.Guilt > 1 then return end
+    if rnd.name == "hmcd" and Victim.isTraitor != Attacker.isTraitor then return end
+
+    SetKarma(Attacker, (Attacker.Karma or 100) - amount)
+    AddRoundKarmaLoss(Attacker, amount)
+end
+
 function zb.IsForce(Attacker)
     return Attacker.PlayerClassName == "police" or Attacker.PlayerClassName == "nationalguard" or Attacker.PlayerClassName == "swat"
 end

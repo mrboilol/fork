@@ -36,6 +36,7 @@ local function PrintPerfusionDiagnosis(ply, org)
 	if hypotension > 0.92 or perfusion < 0.22 or arterial > 3 or venous > 12 then ply:ChatPrint("Circulation is crashing.") end
 	if arterial > 0.5 then ply:ChatPrint("Active arterial bleeding needs immediate control.") elseif venous > 4 then ply:ChatPrint("They have significant venous bleeding.") end
 	if org.throatcut then ply:ChatPrint("Their throat is cut; control the neck bleeding and airway.") end
+	if (tonumber(org.cardiacTamponade) or 0) > 0.1 then ply:ChatPrint("Their heart sounds muffled.") end
 	if (org.intracranialPressure or 0) >= 0.72 then ply:ChatPrint("Signs suggest critically raised pressure inside the skull.") end
 	if (org.cerebralPerfusion or perfusion) < 0.35 or brainoxygen < 0.35 then ply:ChatPrint("Their brain is being poorly oxygenated and perfused.") end
 end

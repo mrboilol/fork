@@ -119,7 +119,12 @@ function SWEP:GetAttackAnimToken(token, fallback)
 end
 
 function SWEP:GetChargeFraction()
-    return math.Clamp(((self.ChargeReleasedAt or CurTime()) - (self.ChargeStartedAt or CurTime())) / math.max(self.ChargeFullTime or 0.35, 0.001), 0, 1)
+    return math.Clamp(((self.ChargeReleasedAt or CurTime()) - (self.ChargeStartedAt or CurTime())) / math.max(self.ChargeFullTime or 10, 0.001), 0, 1)
+end
+
+function SWEP:IsChargeReady()
+    local chargeStart = self:GetChargeStart()
+    return chargeStart > 0 and CurTime() - chargeStart >= (self.ChargeFullTime or 10)
 end
 
 function SWEP:GetChargeDamageScale()
@@ -278,7 +283,7 @@ SWEP.ClashDisarmChance = 0.15
 SWEP.ChargeAnimTimeBegin = 0.2
 SWEP.ChargeAnimTimeIdle = 0.35
 SWEP.ChargeAnimTimeEnd = 0.8
-SWEP.ChargeFullTime = 0.35
+SWEP.ChargeFullTime = 10
 SWEP.ChargeAttackTime = 0.2
 SWEP.ChargeWaitTime = 0.5
 SWEP.ChargeAttackLen = 55
@@ -1104,6 +1109,15 @@ function SWEP:ModelAnim(model, pos, ang)
 
     end
 
+    if self:IsChargeReady() then
+        local t = CurTime()
+        addPos.x = addPos.x + math.sin(t * 47) * 0.3
+        addPos.y = addPos.y + math.cos(t * 53) * 0.3
+        addPos.z = addPos.z + math.sin(t * 61) * 0.25
+        addAng.p = addAng.p + math.sin(t * 43) * 1.5
+        addAng.r = addAng.r + math.cos(t * 59) * 1.5
+    end
+
     self.lastAddPos = addPos
 
     //local inattack1 = self:GetAttackType() == 1 and math.max(self:GetLastAttack() - CurTime(),0) / self.AttackTime > 0 or false
@@ -1504,6 +1518,7 @@ function SWEP:ClearChargeState()
     self.ChargeReleasedAt = nil
     self.ReleasedChargeDamageMul = nil
     self.ReleasedChargeBoneMul = nil
+    self.ReleasedFullCharge = nil
     self.ChargeStaminaMul = nil
     self:SetChargeStart(0)
 end
@@ -1546,6 +1561,7 @@ function SWEP:StartChargeAttack(serverConfirmed)
     self.ChargeReleasedAt = nil
     self.ReleasedChargeDamageMul = nil
     self.ReleasedChargeBoneMul = nil
+    self.ReleasedFullCharge = nil
     self.ChargeStaminaMul = mul
     if not serverConfirmed then self:SetChargeStart(self.ChargeStartedAt) end
 
@@ -1567,6 +1583,7 @@ function SWEP:ReleaseChargeAttack()
     self.ChargeReleasedAt = CurTime()
     self.ReleasedChargeDamageMul = self:GetChargeDamageScale()
     self.ReleasedChargeBoneMul = self:GetChargeBoneScale()
+    self.ReleasedFullCharge = self:GetChargeFraction() >= 1
     self.Charging = nil
     self:SetChargeStart(0)
     self.ChargeIdleLooping = nil
@@ -2977,6 +2994,7 @@ function SWEP:AbortClashAttack()
     self.ChargeReleasedAt = nil
     self.ReleasedChargeDamageMul = nil
     self.ReleasedChargeBoneMul = nil
+    self.ReleasedFullCharge = nil
     self.ChargeStaminaMul = nil
     self.ClashAbortUntil = CurTime() + 0.12
     self:SetLastAttack(CurTime())
@@ -4417,6 +4435,7 @@ function SWEP:CustomThink()
                 self.BreakBoneMul = (self.BreakBoneMul or 1) * (self.ReleasedChargeBoneMul or 1)
                 self.slash = self.MultiDmgCharge
                 self:SetMeleeDamageContact(ent, trace, trauma)
+                if self.ReleasedFullCharge and self.MeleeDamageContact then self.MeleeDamageContact.fullCharge = true end
                 ent:TakeDamageInfo(dmginfo)
                 dmg = dmginfo:GetDamage()
                 self.MeleeDamageContact = nil

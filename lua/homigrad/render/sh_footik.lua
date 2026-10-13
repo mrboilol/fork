@@ -45,7 +45,7 @@ local STANDING_REACH_FRACTION = 0.995
 local UPRIGHT_REACH_FRACTION = 0.99
 local MAX_UPRIGHT_RISE = 6
 local UPRIGHT_SMOOTH = 6
-local LEAD_REACH_FRACTION = 0.92
+local LEAD_REACH_FRACTION = 0.98
 local STRIDE_REACH_FRACTION = 0.9
 local MAX_STRIDE_DROP = 2
 local STRIDE_BODY_SCALE = 0.25
@@ -66,8 +66,12 @@ local GAIT_STALE_TIME = 0.3
 local DRIFT_STEP_FRACTION = 0.5
 local DROP_SMOOTH = 10
 local VELOCITY_SMOOTH = 10
+local HIP_SHIFT_SMOOTH = 3
+local MAX_HIP_SHIFT = 10
 local TOE_HEIGHT = 1
 local MAX_TOE_DROP = 0.9
+local TOE_OFF_RELEASE = 0.35
+local TOE_OFF_SEARCH_STEPS = 8
 local MIN_ANKLE_HEIGHT = 1.5
 local MAX_ANKLE_HEIGHT = 8
 local ANKLE_LEARN_RATE = 2
@@ -356,6 +360,30 @@ local function plantedWorldPos(foot)
 	return foot.planted
 end
 
+local function toeOffAnkle(ankle, toeDir, toeLength, base, pitch)
+	local toe = ankle + toeDir * (math.cos(base) * toeLength) - vector_up * (math_sin(base) * toeLength)
+
+	return toe - toeDir * (math.cos(pitch) * toeLength) + vector_up * (math_sin(pitch) * toeLength)
+end
+
+local function toeOffTarget(foot, hip, ankle, reach, toeLength, ankleHeight, bodyYaw)
+	local reachSqr = reach * reach
+	if toeLength < 0.5 or ankle:DistToSqr(hip) <= reachSqr then return ankle, 0 end
+	local toeDir = Angle(0, foot.toeYaw or bodyYaw, 0):Forward()
+	if (ankle - hip):Dot(toeDir) >= 0 then return ankle, 0 end
+
+	local base = math.asin(math_Clamp((ankleHeight - TOE_HEIGHT) / toeLength, 0, MAX_TOE_DROP))
+	local lo, hi = base, math.asin(MAX_TOE_DROP)
+	if toeOffAnkle(ankle, toeDir, toeLength, base, hi):DistToSqr(hip) <= reachSqr then
+		for _ = 1, TOE_OFF_SEARCH_STEPS do
+			local mid = (lo + hi) * 0.5
+			if toeOffAnkle(ankle, toeDir, toeLength, base, mid):DistToSqr(hip) <= reachSqr then hi = mid else lo = mid end
+		end
+	end
+
+	return toeOffAnkle(ankle, toeDir, toeLength, base, hi), (math_sin(hi) - math_sin(base)) * toeLength
+end
+
 local function reachLead(state, ctx, index)
 	local height = ctx.anim[index].hip.z - ctx.origin.z - state.ankleHeight - ctx.strideDrop
 	local reach = ctx.legLength * LEAD_REACH_FRACTION
@@ -365,7 +393,7 @@ end
 
 local function landingTarget(ply, state, ctx, foot, index, remaining)
 	local sign = LEGS[index].sign
-	local rest = ctx.origin + ctx.right * (sign * ctx.halfWidth)
+	local rest = ctx.stance + ctx.right * (sign * ctx.halfWidth)
 
 	local stagger = foot.stagger
 	if stagger then
@@ -377,10 +405,10 @@ local function landingTarget(ply, state, ctx, foot, index, remaining)
 	if ctx.speed <= MOVING_SPEED then
 		local ahead = Angle(0, ctx.bodyYaw + math_Clamp(ctx.yawRate * remaining, -TURN_LEAD_MAX, TURN_LEAD_MAX), 0)
 
-		return ctx.origin + ahead:Right() * (sign * ctx.halfWidth)
+		return ctx.stance + ahead:Right() * (sign * ctx.halfWidth)
 	end
 
-	local bodyAtLanding = ctx.origin + ctx.vel * remaining
+	local bodyAtLanding = ctx.stance + ctx.vel * remaining
 	local lead = math_min(ctx.strideLead * (1 - ctx.limp[index] * LIMP_STRIDE_CUT), reachLead(state, ctx, index))
 	local offset = ctx.right * (sign * ctx.halfWidth) + ctx.moveDir * lead
 	local intendedLateral = sign * offset:Dot(ctx.right)
@@ -516,7 +544,7 @@ local function updatePhase(ply, state, ctx, dt)
 	state.stepIndex = stepIndex
 	local foot = state.feet[stepIndex]
 	if foot.planted and not foot.swinging and ctx.speed / rate < MIN_STEP_LENGTH then
-		local rest = ctx.origin + ctx.right * (LEGS[stepIndex].sign * ctx.halfWidth)
+		local rest = ctx.stance + ctx.right * (LEGS[stepIndex].sign * ctx.halfWidth)
 		if (foot.planted - rest):Length2D() < IKFoot.GetFloat("settle_distance") then return end
 	end
 	startStep(state, stepIndex, hg.GaitSwingTime(rate, ctx.swingFraction), ctx.swingFraction > 1, true)
@@ -533,7 +561,7 @@ local function settleIdleFeet(state, ctx)
 		local foot = state.feet[index]
 		if not foot.disabled then
 			if foot.swinging or not foot.planted then return end
-			local rest = ctx.origin + ctx.right * (LEGS[index].sign * ctx.halfWidth)
+			local rest = ctx.stance + ctx.right * (LEGS[index].sign * ctx.halfWidth)
 			local distError = (foot.plantOrigin and (ctx.origin - foot.plantOrigin):Length2D() or (foot.planted - rest):Length2D()) / settleDist
 			local yawError = math_abs(math_AngleDifference(ctx.bodyYaw, foot.bodyYaw or ctx.bodyYaw)) / settleAngle
 			local err = math_max(distError, yawError)
@@ -623,11 +651,16 @@ local function updateFeet(ply, state, ctx, dt)
 				local reachFraction = ctx.crouching and REACH_FRACTION or STANDING_REACH_FRACTION
 				local reach = ctx.anim[index].length * reachFraction
 				local settledInPlace = foot.plantOrigin and (ctx.origin - foot.plantOrigin):Length2DSqr() < OVERREACH_RESTEP_MOVE_SQR
-				local overreach = not planted or (not settledInPlace and (planted + vector_up * state.ankleHeight):DistToSqr(ctx.anim[index].hip + vector_up * pelvisLift) > reach * reach)
+				local overreach = not planted
+				if planted and not settledInPlace then
+					local hip = ctx.anim[index].hip + vector_up * pelvisLift
+					local ankle = toeOffTarget(foot, hip, planted + vector_up * state.ankleHeight, reach, state.toeLength or 0, state.ankleHeight, ctx.bodyYaw)
+					overreach = ankle:DistToSqr(hip) > reach * reach
+				end
 				if overreach then
 					if not planted or not other.swinging then startStep(state, index, SETTLE_SWING_TIME, false) end
 				elseif ctx.speed > MOVING_SPEED and not foot.stagger and not other.swinging then
-					local rest = ctx.origin + ctx.right * (LEGS[index].sign * ctx.halfWidth)
+					local rest = ctx.stance + ctx.right * (LEGS[index].sign * ctx.halfWidth)
 					local behind = (rest - planted):Dot(ctx.moveDir)
 					if behind > ctx.strideLead + hg.GaitStepLength(ctx.speed) * DRIFT_STEP_FRACTION then
 						startStep(state, index, hg.GaitSwingTime(math_max(state.rate or 0, 1), ctx.swingFraction), false)
@@ -791,6 +824,14 @@ local function buildContext(ply, state, anim, dt)
 		yawRate = yawRate + (rawRate - yawRate) * math_min(dt * TURN_RATE_SMOOTH, 1)
 	end
 	state.lastYaw, state.yawRate = bodyYaw, yawRate
+	local forward, right = bodyAng:Forward(), bodyAng:Right()
+	local hipShift = (anim[1].hip + anim[2].hip) * 0.5 - origin
+	local shiftForward = math_Clamp(hipShift:Dot(forward), -MAX_HIP_SHIFT, MAX_HIP_SHIFT)
+	local shiftRight = math_Clamp(hipShift:Dot(right), -MAX_HIP_SHIFT, MAX_HIP_SHIFT)
+	local shiftBlend = 1 - math_exp(-dt * HIP_SHIFT_SMOOTH)
+	state.hipForward = state.hipForward and state.hipForward + (shiftForward - state.hipForward) * shiftBlend or shiftForward
+	state.hipRight = state.hipRight and state.hipRight + (shiftRight - state.hipRight) * shiftBlend or shiftRight
+	local stance = origin + forward * state.hipForward + right * state.hipRight
 	local hipSpan = (anim[1].hip - anim[2].hip):Length2D() * 0.5 * IKFoot.GetFloat("stance_width")
 	local measuredAnkle = math_Clamp(math_min(anim[1].ankle.z, anim[2].ankle.z) - origin.z, MIN_ANKLE_HEIGHT, MAX_ANKLE_HEIGHT)
 
@@ -823,8 +864,9 @@ local function buildContext(ply, state, anim, dt)
 		speedFraction = speedFraction,
 		bodyYaw = bodyYaw,
 		yawRate = yawRate,
-		forward = bodyAng:Forward(),
-		right = bodyAng:Right(),
+		stance = stance,
+		forward = forward,
+		right = right,
 		halfWidth = halfWidth,
 		legLength = legLength,
 		maxStrideDrop = maxStrideDrop,
@@ -880,11 +922,28 @@ local function solveLeg(ent, ids, foot, ankleTarget, weight, ctx, state, alignWe
 	local upperLength, lowerLength = hip:Distance(knee0), knee0:Distance(ankle0)
 	if upperLength < 1 or lowerLength < 1 then return end
 
+	local reachFraction = ctx.crouching and REACH_FRACTION or STANDING_REACH_FRACTION
+	local maxReach = (upperLength + lowerLength) * reachFraction
+	local toeMat = ids.toe and ent:GetBoneMatrix(ids.toe)
+	local toeLength = toeMat and toeMat:GetTranslation():Distance(ankle0) or 0
+	state.toeLength = toeLength
+	local liftHeight = 0
+	if foot.swinging then
+		if foot.lift then
+			local fade = 1 - smoothstep(math_min(foot.t / TOE_OFF_RELEASE, 1))
+			ankleTarget = ankleTarget + foot.lift * fade
+			liftHeight = foot.liftHeight * fade
+		end
+	else
+		local lifted
+		lifted, liftHeight = toeOffTarget(foot, hip, ankleTarget, maxReach, toeLength, state.ankleHeight, ctx.bodyYaw)
+		foot.lift, foot.liftHeight = lifted - ankleTarget, liftHeight
+		ankleTarget = lifted
+	end
+
 	local target = LerpVector(weight, ankle0, ankleTarget)
 	target = LerpVector(0.3 + lowerPower * 0.7, ankle0, target)
 	local toTarget = target - hip
-	local reachFraction = ctx.crouching and REACH_FRACTION or STANDING_REACH_FRACTION
-	local maxReach = (upperLength + lowerLength) * reachFraction
 	if toTarget:LengthSqr() > maxReach * maxReach then
 		local flatLength = toTarget:Length2D()
 		local maxFlat = math_sqrt(math_max(maxReach * maxReach - toTarget.z * toTarget.z, 0))
@@ -933,14 +992,12 @@ local function solveLeg(ent, ids, foot, ankleTarget, weight, ctx, state, alignWe
 		calfAng:RotateAroundAxis(calfAxis, sign * BROKEN_CALF_TWIST * brokenLower)
 	end
 
-	local toeMat = ids.toe and ent:GetBoneMatrix(ids.toe)
 	if toeMat and alignWeight > 0 then
 		local animToe = toeMat:GetTranslation() - ankle0
-		local toeLength = animToe:Length()
 		if toeLength > 0.5 then
 			animToe:Div(toeLength)
 			local restYaw = ctx.bodyYaw - sign * (FOOT_SPLAY + BROKEN_FOOT_TWIST * brokenLower)
-			footAng = alignFoot(foot, footAng, footAng0, animToe, alignWeight * weight, state.ankleHeight, toeLength, restYaw, sign * BROKEN_FOOT_ROLL * brokenLower)
+			footAng = alignFoot(foot, footAng, footAng0, animToe, alignWeight * weight, state.ankleHeight + liftHeight, toeLength, restYaw, sign * BROKEN_FOOT_ROLL * brokenLower)
 		end
 	end
 

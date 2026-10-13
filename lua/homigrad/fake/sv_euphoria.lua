@@ -22,6 +22,9 @@ local EUPHORIA_WOUND_HAND_DIST = 4
 local EUPHORIA_WOUND_PRESS = 2
 local EUPHORIA_WOUND_WRIST_BACK = 3
 local EUPHORIA_WOUND_PENDING_TIME = 0.75
+local EUPHORIA_AGONY_CLUTCH = 0.9
+local EUPHORIA_DYING_CLUTCH_TIME = 3.5
+local EUPHORIA_DYING_CLUTCH_MUL = 0.6
 local EUPHORIA_WOUND_GRAB_PULL = 700
 local EUPHORIA_WOUND_GRAB_MIN_DMG = 12
 local EUPHORIA_WALL_GRAB_SPEED = -170
@@ -165,11 +168,11 @@ local function tensionBones(ragdoll, strength, dtime, allowLinear)
 	end
 end
 
-local function armStrength(ragdoll, org, limb, cons)
+local function armStrength(ragdoll, org, limb, cons, minControl)
 	if IsValid(ragdoll[cons]) then return 0 end
 	if not org then return 1 end
 	local reflex = hg.RagdollReflex
-	local controlMul = math.Clamp(ragdoll.power or 1, 0, 1)
+	local controlMul = math.max(math.Clamp(ragdoll.power or 1, 0, 1), minControl or 0)
 	if reflex then return reflex.LimbStrength(org, limb) * controlMul end
 
 	return (org[limb .. "amputated"] or org[limb .. "upamputated"]) and 0 or controlMul
@@ -196,7 +199,7 @@ end
 local function canWoundGrab(ply)
 	if armControl(ply) then return false end
 	local reflex = hg.RagdollReflex
-	if reflex then return reflex.IsAware(ply) end
+	if reflex then return reflex.IsAware(ply) or reflex.Agony(ply) > 0 end
 	local org = ply.organism
 
 	return org and not org.otrub and org.canmove and true or false
@@ -250,9 +253,9 @@ local function woundPart(ragdoll, pos)
 	return part, name
 end
 
-local function woundHand(ragdoll, org, pos, armName)
-	local lMul = armStrength(ragdoll, org, "larm", "ConsLH")
-	local rMul = armStrength(ragdoll, org, "rarm", "ConsRH")
+local function woundHand(ragdoll, org, pos, armName, minControl)
+	local lMul = armStrength(ragdoll, org, "larm", "ConsLH", minControl)
+	local rMul = armStrength(ragdoll, org, "rarm", "ConsRH", minControl)
 	local lHand = ragdoll:GetPhysicsObjectNum(hg.realPhysNum(ragdoll, 5))
 	local rHand = ragdoll:GetPhysicsObjectNum(hg.realPhysNum(ragdoll, 7))
 	local lValid = lMul > 0 and IsValid(lHand) and not (armName and string.find(armName, "_L_", 1, true))
@@ -305,6 +308,14 @@ local function bleederPos(org, ragdoll)
 	return wound and hg.GetHoldWoundPos(ragdoll, wound)
 end
 
+local function buildWoundGrab(ragdoll, org, woundPos, drive, duration)
+	local bonePhys, armName = woundPart(ragdoll, woundPos)
+	if not bonePhys then return end
+	local handPhys, forearm, armMul = woundHand(ragdoll, org, woundPos, armName, drive)
+	if not handPhys then return end
+	return { hand = handPhys, forearm = forearm, bone = bonePhys, press = bonePhys:WorldToLocal(pressPoint(bonePhys, woundPos)), mul = armMul * drive, untilT = SysTime() + duration, dur = duration }
+end
+
 local function startWoundGrab(ply, ragdoll, hitPos, force, duration)
 	if not euphoriaOn(hg_euphoria_detail) or not canWoundGrab(ply) then return end
 	local pending = ply.hgPendingWoundGrab
@@ -320,14 +331,10 @@ local function startWoundGrab(ply, ragdoll, hitPos, force, duration)
 		local fDir = force and force:Length() > 1 and force:GetNormalized() or Vector(math.Rand(-1, 1), math.Rand(-1, 1), math.Rand(-0.3, 0.6)):GetNormalized()
 		woundPos = rootPos + fDir * 25
 	end
-	local bonePhys, armName = woundPart(ragdoll, woundPos)
-	if not bonePhys then return end
-	local handPhys, forearm, armMul = woundHand(ragdoll, org, woundPos, armName)
-	if not handPhys then return end
 	local reflex = hg.RagdollReflex
-	local mul = armMul * (reflex and org and reflex.Vigor(org) or 1)
-	duration = math.max(duration or 0, EUPHORIA_WOUND_GRAB_TIME)
-	ragdoll.hgWoundGrab = { hand = handPhys, forearm = forearm, bone = bonePhys, press = bonePhys:WorldToLocal(pressPoint(bonePhys, woundPos)), mul = mul, untilT = SysTime() + duration, dur = duration }
+	local drive = reflex and org and math.max(reflex.Vigor(org), reflex.Agony(ply) * EUPHORIA_AGONY_CLUTCH * reflex.BodyStrength(org)) or 1
+	local grab = buildWoundGrab(ragdoll, org, woundPos, drive, math.max(duration or 0, EUPHORIA_WOUND_GRAB_TIME))
+	if grab then ragdoll.hgWoundGrab = grab end
 end
 
 hg.EuphoriaWoundGrab = startWoundGrab
@@ -544,13 +551,49 @@ hook.Add("Think", "HG_EuphoriaSettle", function()
 	end
 end)
 
+local dyingClutch = {}
+
+local function driveWoundGrab(ragdoll, grab, now, dtime)
+	local handPhys = grab.hand
+	local bonePhys = grab.bone
+	if not IsValid(handPhys) or not IsValid(bonePhys) then return false end
+
+	local forearmPhys = ragdoll:GetPhysicsObjectNum(hg.realPhysNum(ragdoll, grab.forearm))
+
+	local frac = math.min((grab.untilT - now) / (grab.dur * EUPHORIA_WOUND_GRAB_EASE), 1) * (grab.mul or 1)
+	local handPos = handPhys:GetPos()
+	local target = bonePhys:LocalToWorld(grab.press)
+	if IsValid(forearmPhys) then
+		local back = forearmPhys:GetPos() - handPos
+		if back:LengthSqr() > 0.01 then target = target + back:GetNormalized() * EUPHORIA_WOUND_WRIST_BACK end
+	end
+
+	local toTarget = target - handPos
+	local dist = toTarget:Length()
+	if dist > 1 then
+		local pull = toTarget / dist * EUPHORIA_WOUND_GRAB_PULL * frac * dtime
+		handPhys:AddVelocity(pull)
+		if IsValid(forearmPhys) then
+			forearmPhys:AddVelocity(pull * 0.6)
+		end
+	end
+
+	springPull(handPhys, target, 600 * frac, 30, dtime)
+
+	if IsValid(forearmPhys) then
+		local forearmTarget = target + (forearmPhys:GetPos() - handPos)
+		springPull(forearmPhys, forearmTarget, 400 * frac, 20, dtime)
+	end
+	return true
+end
+
 hook.Add("Think", "HG_EuphoriaWound", function()
 	if not euphoriaOn(hg_euphoria_detail) then return end
 
 	local now = SysTime()
 	for i, ply in player.Iterator() do
 		local ragdoll = ply.FakeRagdoll
-		if not IsValid(ragdoll) then continue end
+		if not IsValid(ragdoll) or dyingClutch[ragdoll] then continue end
 
 		local grab = ragdoll.hgWoundGrab
 		if not grab then continue end
@@ -564,40 +607,48 @@ hook.Add("Think", "HG_EuphoriaWound", function()
 		ragdoll.hgWoundLast = now
 		if dtime <= 0 then continue end
 
-		local handPhys = grab.hand
-		local bonePhys = grab.bone
-		if not IsValid(handPhys) or not IsValid(bonePhys) then
-			ragdoll.hgWoundGrab = nil
+		if not driveWoundGrab(ragdoll, grab, now, dtime) then ragdoll.hgWoundGrab = nil end
+	end
+
+	for ragdoll, grab in pairs(dyingClutch) do
+		if not IsValid(ragdoll) or ragdoll.hgWoundGrab ~= grab or now >= grab.untilT or ragdoll:IsPlayerHolding() then
+			if IsValid(ragdoll) and ragdoll.hgWoundGrab == grab then ragdoll.hgWoundGrab = nil end
+			dyingClutch[ragdoll] = nil
 			continue
 		end
 
-		local forearmPhys = ragdoll:GetPhysicsObjectNum(hg.realPhysNum(ragdoll, grab.forearm))
+		local dtime = reactionDelta(now, ragdoll.hgWoundLast)
+		ragdoll.hgWoundLast = now
+		if dtime <= 0 then continue end
 
-		local frac = math.min((grab.untilT - now) / (grab.dur * EUPHORIA_WOUND_GRAB_EASE), 1) * (grab.mul or 1)
-		local handPos = handPhys:GetPos()
-		local target = bonePhys:LocalToWorld(grab.press)
-		if IsValid(forearmPhys) then
-			local back = forearmPhys:GetPos() - handPos
-			if back:LengthSqr() > 0.01 then target = target + back:GetNormalized() * EUPHORIA_WOUND_WRIST_BACK end
-		end
-
-		local toTarget = target - handPos
-		local dist = toTarget:Length()
-		if dist > 1 then
-			local pull = toTarget / dist * EUPHORIA_WOUND_GRAB_PULL * frac * dtime
-			handPhys:AddVelocity(pull)
-			if IsValid(forearmPhys) then
-				forearmPhys:AddVelocity(pull * 0.6)
-			end
-		end
-
-		springPull(handPhys, target, 600 * frac, 30, dtime)
-
-		if IsValid(forearmPhys) then
-			local forearmTarget = target + (forearmPhys:GetPos() - handPos)
-			springPull(forearmPhys, forearmTarget, 400 * frac, 20, dtime)
+		if not driveWoundGrab(ragdoll, grab, now, dtime) then
+			ragdoll.hgWoundGrab = nil
+			dyingClutch[ragdoll] = nil
 		end
 	end
+end)
+
+hook.Add("RagdollDeath", "HG_EuphoriaDyingClutch", function(ply, ragdoll)
+	if not IsValid(ply) or not ply:IsPlayer() or not IsValid(ragdoll) then return end
+	if not euphoriaOn(hg_euphoria_detail) then return end
+	local org = ply.organism
+	if not org or org.otrub then return end
+
+	local now = SysTime()
+	local grab = ragdoll.hgWoundGrab
+	local pending = ply.hgPendingWoundGrab
+	if not grab and pending and now <= pending.untilT then
+		local pos = resolveHit(ragdoll, pending.hit) or pending.pos
+		grab = pos and buildWoundGrab(ragdoll, org, pos, EUPHORIA_DYING_CLUTCH_MUL, EUPHORIA_DYING_CLUTCH_TIME)
+	end
+	ply.hgPendingWoundGrab = nil
+	if not grab then return end
+
+	grab.untilT = now + EUPHORIA_DYING_CLUTCH_TIME
+	grab.dur = EUPHORIA_DYING_CLUTCH_TIME
+	grab.mul = math.max(grab.mul or 0, EUPHORIA_DYING_CLUTCH_MUL)
+	ragdoll.hgWoundGrab = grab
+	dyingClutch[ragdoll] = grab
 end)
 
 local function legRestShadow(phys, target, stiffness, damping, dtime)

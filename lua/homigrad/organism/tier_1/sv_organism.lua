@@ -504,7 +504,7 @@ local function send_organism(org, ply, recipientForce, reliable)
 		"painkiller", "goodmood", "hungry", "satiety", "palpitations", "unstableRhythm", "ecgState",
 		"strokeVolume", "hypoxiaTime", "intracranialPressure", "peripheralperfusion", "perfusionMoveMul",
 		"legstrength", "armstrength", "losing_oxy", "respiratoryArrest", "pneumothorax", "hemothorax",
-		"skull", "chest", "heart", "trachea", "liver", "stomach", "intestines", "lungsL", "lungsR",
+		"skull", "chest", "heart", "trachea", "liver", "kidneys", "stomach", "intestines", "lungsL", "lungsR",
 		"spine1", "spine2", "spine3", "internalBleed", "internalBleedComplication", "wantToVomit",
 		"weight", "maxweight", "ischemia", "hemotransfusionshock", "zerlkers", "zerlkersOverdose", "anger",
 		"brainSwelling", "cardiacTamponade"
@@ -723,7 +723,7 @@ local function send_bareinfo(org, force, reliable)
 	sendtable.deathStateEnd = org.deathStateEnd or 0
 	for _, key in ipairs({
 		"stamina", "immobilization", "adrenaline", "adrenalineAdd", "pain", "shock", "hurt",
-		"pelvis", "chest", "skull", "heart", "stomach", "liver", "intestines", "trachea",
+		"pelvis", "chest", "skull", "heart", "stomach", "liver", "kidneys", "intestines", "trachea",
 		"lungsL", "lungsR", "spine1", "spine2", "spine3", "internalBleed", "internalBleedHeal",
 		"arteria", "rarmartery", "larmartery", "rlegartery", "llegartery", "aorta",
 		"cardiacTamponade", "ischemia", "brainSwelling", "intracranialPressure", "hypoxiaTime",
@@ -1515,6 +1515,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		local naturalHeal = org.thiamine > 0 and timeValue / 480 or timeValue / 1800
 		org.thiamine = math.Approach(org.thiamine, 0, timeValue / 240)
 		if org.liver < 1 then org.liver = math.Approach(org.liver, 0, naturalHeal) end
+		if (org.kidneys or 0) < 1 then org.kidneys = math.Approach(org.kidneys or 0, 0, naturalHeal) end
 		if org.heart < 1 then org.heart = math.Approach(org.heart, 0, naturalHeal) end
 		org.heartStrain = math.Approach(org.heartStrain or 0, 0, naturalHeal * 0.5)
 		org.arrhythmia = math.Approach(org.arrhythmia or 0, 0, naturalHeal)
@@ -1623,7 +1624,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 			local str, statusThoughtKey = hg.get_status_message(owner)
 			if str and str != "" then
 				local dyingThought = statusThoughtKey == "heartstop" or statusThoughtKey == "lowoxy" or statusThoughtKey == "blood2" or statusThoughtKey == "neardeath"
-				local statusCooldown = dyingThought and math.Rand(4, 7) or math.Rand(11, 15)
+				local statusCooldown = dyingThought and math.Rand(9, 13) or math.Rand(15, 22)
 				org.nextStatusThought = CurTime() + statusCooldown
 				owner:Thought(str, statusCooldown, statusThoughtKey or "phrase", 1, Color(255, math.Clamp(1 / hg.likely_to_phrase(owner) * 255, 0, 255), math.Clamp(1 / hg.likely_to_phrase(owner) * 255, 0, 255), 255))
 			end
@@ -1694,6 +1695,7 @@ hook.Add("Org Think", "regenerationberserk", function(owner, org, timeValue)
 	org.spine3 = math.max(org.spine3 - regen, 0)
 	org.skull = math.max(org.skull - regen, 0)
 	org.liver = math.max(org.liver - regen, 0)
+	org.kidneys = math.max((org.kidneys or 0) - regen, 0)
 	org.intestines = math.max(org.intestines - regen, 0)
 	org.heart = math.max(org.heart - regen, 0)
 	org.stomach = math.max(org.stomach - regen, 0)

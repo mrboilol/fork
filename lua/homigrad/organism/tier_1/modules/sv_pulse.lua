@@ -1776,11 +1776,13 @@ module[2] = function(owner, org, timeValue)
 
 	if org.heartstop then
 		org.heartstoptime = org.heartstoptime or CurTime()
-		if org.isPly then
-	        org.owner:Notify(cardiacArrestThoughts[math.random(#cardiacArrestThoughts)], true, "heartstop", 10)
+		if org.isPly and not org.otrub and not org.owner.hgHeartstopThought then
+			org.owner.hgHeartstopThought = true
+			org.owner:InterruptThought(cardiacArrestThoughts[math.random(#cardiacArrestThoughts)], Color(255, 90, 90, 255))
 		end
 	else
 		if org.isPly then
+			org.owner.hgHeartstopThought = nil
 			org.owner:ResetNotification("heartstop")
 		end
 		org.heartstoptime = nil

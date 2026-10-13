@@ -425,7 +425,7 @@ function hg.CombatThought(ply, pool)
     if org then org.nextStatusThought = math.max(org.nextStatusThought or 0, now + 6) end
 
     if useNew then
-        ply.nextThoughtGlobal = 0
+        ply.nextThoughtGlobal = now + 3
         net.Start("HGThought")
         net.WriteString(msg)
         net.WriteColor(Color(255, 90, 90, 255))
@@ -749,9 +749,9 @@ CreateThought = function(ply, msg, delay, msgKey, showTime, clr, func)
     delay = delay or 0
 
     if msgKey then ply.thoughtmsgs[msgKey] = delay and (not isnumber(delay) or now + delay) or nil end
-    ply.nextThoughtGlobal = now + 0.85
-    ply.thoughtGroupCooldowns[group] = now + (group == "misc" and 1.5 or 3.25)
-    ply.recentThoughtText[msg] = now + 18
+    ply.nextThoughtGlobal = now + 3
+    ply.thoughtGroupCooldowns[group] = now + (group == "misc" and 5 or 10)
+    ply.recentThoughtText[msg] = now + 25
 
     showTime = showTime or 0
     local clr = clr or color_white
@@ -787,6 +787,7 @@ end
 hg.CreateNotification = CreateNotification
 
 hook.Add("Player Spawn","removeNotifications",function(ply)
+    ply.hgHeartstopThought = nil
     ply.msgs = {}
     ply.thoughtmsgs = {}
     ply.lastConditionThought = {}
@@ -837,8 +838,8 @@ function PLAYER:InterruptThought(msg, clr)
     if self.HasTrait and self:HasTrait("gurajchaka_child") then return end
     if self.organism and self.organism.otrub then return end
     clr = clr or color_white
+    self.nextThoughtGlobal = CurTime() + 4
     if self:GetInfoNum("hg_newthoughts", 0) > 0 then
-        self.nextThoughtGlobal = 0
         net.Start("HGThought")
         net.WriteString(msg)
         net.WriteColor(Color(clr.r, clr.g, clr.b, 255))

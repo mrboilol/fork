@@ -63,8 +63,9 @@ SWEP.modeValuesdef = {
 SWEP.showstats = true
 
 SWEP.modeNames2 = {
-	[1] = "take blood",
-	[2] = "give blood"
+	[1] = "give blood",
+	[2] = "take blood",
+	[3] = "drainage"
 }
 
 function SWEP:GetInfo()
@@ -99,20 +100,64 @@ local math = math
 local maxTransfusionBlood = hg and hg.organism and hg.organism.MAX_TRANSFUSION_BLOOD or 6500
 local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Healing method: 0 = original models + progressive minigames, 1 = Judge animations", 0, 1)
 
-local function drainHemothorax(org, bloodRemoved)
-	if bloodRemoved <= 0 then return end
-
-	-- Drawing blood from yourself can relieve blood trapped in the chest. One
-	-- full 500 ml bag removes half a hemothorax; repeat extraction can finish it.
-	local relief = math.Clamp(bloodRemoved / 1000, 0, 1)
-	org.hemothoraxTrauma = math.max((org.hemothoraxTrauma or org.hemothorax or 0) - relief, 0)
-	org.hemothoraxL = math.max((org.hemothoraxL or 0) - relief, 0)
-	org.hemothoraxR = math.max((org.hemothoraxR or 0) - relief, 0)
-	org.hemothorax = math.max(org.hemothoraxTrauma, (org.hemothoraxL + org.hemothoraxR) / 2)
-	org.internalBleedComplication = math.max((org.internalBleedComplication or 0) - relief, 0)
-end
+local drainKarmaThreshold = 250
+local drainKarmaPerMl = 0.04
+local drainClearCooldown = 5
 
 if SERVER then
+	function SWEP:DrainThink(owner)
+		if (self.drainCooldown or 0) > CurTime() then return end
+
+		local takingSelf = owner:KeyDown(IN_ATTACK)
+		if not takingSelf and not owner:KeyDown(IN_ATTACK2) then return end
+
+		local ent = takingSelf and owner or hg.eyeTrace(owner).Entity
+		if not IsValid(ent) or not ent.organism then return end
+		ent = hg.GetCurrentCharacter(ent)
+		local org = ent.organism
+		if not org or ent:GetVelocity():LengthSqr() >= 1000 then return end
+
+		if (org.hemothorax or 0) > 0.01 or (org.cardiacTamponade or 0) > 0.01 then
+			if not owner:KeyPressed(takingSelf and IN_ATTACK or IN_ATTACK2) then return end
+
+			org.hemothorax = 0
+			org.hemothoraxTrauma = 0
+			org.hemothoraxL = 0
+			org.hemothoraxR = 0
+			org.internalBleedLungSide = nil
+			org.cardiacTamponade = 0
+
+			self.drainCooldown = CurTime() + drainClearCooldown
+			self.sndcd = CurTime() + 1
+			owner:EmitSound("zcity/healing/bloodbag_spear_0.ogg")
+			self:RefreshPerfusionTreatment(ent, 0.3)
+			return
+		end
+
+		if (org.blood or 0) <= 0 then return end
+
+		local drained = math.min(FrameTime() * math.max((org.pulse or 70) / 70, 0.3) * 250, org.blood)
+		org.blood = org.blood - drained
+
+		local victim = hg.RagdollOwner(ent) or ent
+		self.drainedFrom = self.drainedFrom or {}
+		local total = (self.drainedFrom[victim] or 0) + drained
+		self.drainedFrom[victim] = total
+
+		if total > drainKarmaThreshold and zb and zb.DrainKarma then
+			zb.DrainKarma(owner, victim, math.min(drained, total - drainKarmaThreshold) * drainKarmaPerMl)
+		end
+
+		if (self.nextPerfusionRefresh or 0) < CurTime() then
+			self.nextPerfusionRefresh = CurTime() + 0.25
+			self:RefreshPerfusionTreatment(ent, 0.18)
+		end
+		if self.sndcd < CurTime() then
+			owner:EmitSound("zcity/healing/bloodbag_loop_".. math.random(8) ..".ogg")
+			self.sndcd = CurTime() + 0.7
+		end
+	end
+
 	function SWEP:SecondaryAttack()
 		if not self:GetOwner():KeyPressed(IN_ATTACK2) then return end
 		local ent = hg.eyeTrace(self:GetOwner()).Entity
@@ -141,7 +186,7 @@ if SERVER then
 	function SWEP:Reload()
 		if self:GetOwner():KeyPressed(IN_RELOAD) then
 			local mode = self:GetNetVar("mode",2)
-			self:SetNetVar("mode",((mode + 1) > 2) and 1 or (mode + 1))
+			self:SetNetVar("mode",((mode + 1) > 3) and 1 or (mode + 1))
 			--self:GetOwner():ChatPrint("You have chosen the " .. self.modeNames2[mode] .. " mode")
 		end
 	end
@@ -158,7 +203,10 @@ if SERVER then
 			self:SetHolding(math.max(self:GetHolding() - 12, 0))
 		end
 		
-		if self:GetNetVar("mode",2) == 2 then
+		local mode = self:GetNetVar("mode",2)
+		if mode == 3 then
+			self:DrainThink(owner)
+		elseif mode == 2 then
 			if self.modeValues[1] != 1 then
 				if owner:KeyDown(IN_ATTACK) or owner:KeyDown(IN_ATTACK2) then
 					local takingSelf = owner:KeyDown(IN_ATTACK)
@@ -181,9 +229,6 @@ if SERVER then
 						end
 						
 						ent.organism.blood = math.max(ent.organism.blood - (self.modeValues[1] - old) * 500,0)
-						if takingSelf then
-							drainHemothorax(ent.organism, (self.modeValues[1] - old) * 500)
-						end
 						if old ~= self.modeValues[1] and (self.nextPerfusionRefresh or 0) < CurTime() then
 							self.nextPerfusionRefresh = CurTime() + 0.25
 							self:RefreshPerfusionTreatment(ent, 0.18)
@@ -280,9 +325,7 @@ else
 		local ent = hg.eyeTrace(owner).Entity
 		ent = IsValid(ent) and ent.organism and ent or owner
 		local recipientBloodType = ent.organism and ent.organism.bloodtype or "unknown"
-		local mode = self:GetNetVar("mode",2) - 1
-		if mode == 0 then mode = 2 end
-		local modeStr = self.modeNames2[mode]
+		local modeStr = self.modeNames2[self:GetNetVar("mode",2)] or self.modeNames2[2]
 		self.modeNames[1] = self:GetNetVar("modeValues", {})[1] == 0 and modeStr .. " | Recipent: " .. recipientBloodType or modeStr .. " | in: "..self:GetNetVar("type","o-").." | recipent: "..recipientBloodType
 	end
 

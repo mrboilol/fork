@@ -15,8 +15,10 @@ local consciousness_recovery_speed = 12
 local low_consciousness_recovery_speed = 16
 local otrub_consciousness_recovery_speed = 20
 local otrub_rouse_consciousness_recovery_speed = 3.5
-local shock_consciousness_threshold = 25
+local shock_consciousness_threshold = 40
+local shock_consciousness_analgesia_range = 60
 local shock_consciousness_max = 85
+local shock_consciousness_span = 45
 local pain_shock_threshold = 80
 local pain_shock_target = 55
 local pain_shock_gain = 2
@@ -241,11 +243,15 @@ module[2] = function(owner, org, timeValue)
 		org.shock = math.Approach(org.shock, painShockTarget, timeValue * painShockGain * (1 - shockResistance))
 	end
 
-	local shockThreshold = shock_consciousness_threshold * analgesiaMul * painkillerMul * (1 + resilience * 0.6 + zerlkersResistance * 1.4) * math.max(org.traumaResistanceMul or 1, 1)
+	local shockAnalgesia = Clamp(org.analgesia + org.painkiller * 0.3, 0, 1)
+	local shockThreshold = (shock_consciousness_threshold + shock_consciousness_analgesia_range * shockAnalgesia) * (1 + resilience * 0.6 + zerlkersResistance * 1.4) * math.max(org.traumaResistanceMul or 1, 1)
+	local shockMax = math.max(shock_consciousness_max, shockThreshold + shock_consciousness_span)
 	local shockActive = org.shock > shockThreshold
+	local o2Value = org.o2 and tonumber(org.o2[1]) or 30
+	local hypoxicDrain = o2Value < 4 and 0.06 or o2Value < 8 and 0.015 or 0
 	if shockActive then
-		local shockTarget = Clamp(math.Remap(org.shock, shockThreshold, shock_consciousness_max, shock_consciousness_soft_target, shock_consciousness_hard_target), shock_consciousness_hard_target, shock_consciousness_soft_target)
-		local shockDrain = Clamp(math.Remap(org.shock, shockThreshold, shock_consciousness_max, shock_consciousness_drain_start, shock_consciousness_drain_end), shock_consciousness_drain_end, shock_consciousness_drain_start)
+		local shockTarget = Clamp(math.Remap(org.shock, shockThreshold, shockMax, shock_consciousness_soft_target, shock_consciousness_hard_target), shock_consciousness_hard_target, shock_consciousness_soft_target)
+		local shockDrain = Clamp(math.Remap(org.shock, shockThreshold, shockMax, shock_consciousness_drain_start, shock_consciousness_drain_end), shock_consciousness_drain_end, shock_consciousness_drain_start)
 		org.consciousness = Approach(org.consciousness, shockTarget, timeValue / shockDrain)
 	end
 	if org.tranquilizer > 0 then
@@ -255,7 +261,7 @@ module[2] = function(owner, org, timeValue)
 		--org.shock = math.Approach(org.shock, 50, timeValue * org.tranquilizer * 5)
 
 		org.consciousness = math.Approach(org.consciousness, 0, timeValue / 30 * org.tranquilizer)
-	elseif not shockActive then
+	elseif not shockActive and hypoxicDrain <= 0 then
 		-- Blood pressure applies its own continuous consciousness ceiling in the
 		-- circulation modules. Recovery itself must not contain a second hidden
 		-- low-volume path to OTRUB.
@@ -270,6 +276,9 @@ module[2] = function(owner, org, timeValue)
 			recovery_speed = low_consciousness_recovery_speed
 		end
 		org.consciousness = Approach(org.consciousness, target, timeValue / recovery_speed)
+	end
+	if hypoxicDrain > 0 then
+		org.consciousness = math.max((org.consciousness or 1) - hypoxicDrain * timeValue, 0)
 	end
 
 

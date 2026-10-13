@@ -83,25 +83,34 @@ for key, data in pairs(hg.armor.torso or {}) do
 	end
 end
 
-local FULL_COVER = {helmet_riot = true, gordon_helmet = true, cmb_helmet = true, metrocop_helmet = true, protovisor = true}
-local FIBERGLASS = 5
+local FIBERGLASS = ZC_ARMOR_MATERIAL_FIBERGLASS
+local TITAN = ZC_ARMOR_MATERIAL_TITAN
+local RIOT = {1, ZC_ARMOR_PROTCLASS_II}
+local FULL_COVER = {
+	helmet_riot = {front = RIOT, back = RIOT, glass = RIOT},
+	gordon_helmet = {front = {TITAN}, back = {TITAN}, glass = {TITAN}},
+	cmb_helmet = {front = {TITAN}, back = {TITAN}, glass = {TITAN}},
+	protovisor = {front = {TITAN}, back = {TITAN}, glass = {FIBERGLASS, ZC_ARMOR_PROTCLASS_I}},
+	metrocop_helmet = {front = {FIBERGLASS}, back = {SOFT, ZC_ARMOR_PROTCLASS_II}, glass = {FIBERGLASS}},
+}
+
+local function fullCoverSection(section, class)
+	return hg.BuildZCityArmorSection(section[1], math.min(class, section[2] or class), true)
+end
 
 local function registerFullCover(key, data, class)
-	local fiberglass = key ~= "protovisor"
-	local frontMat = fiberglass and FIBERGLASS or plateMaterial(class, key)
-	local backMat = (fiberglass and key ~= "helmet_riot") and SOFT or frontMat
-	local backClass = backMat == SOFT and math.min(class, ZC_ARMOR_PROTCLASS_II) or class
-	register(key, data, "ent_new_armor_helmet2", class, frontMat)
+	local spec = FULL_COVER[key]
+	register(key, data, "ent_new_armor_helmet2", class, spec.front[1])
 	local ent = scripted_ents.GetStored("ent_new_armor_legacy_" .. key).t
 	ent.Initialize = nil
 	ent.Overlay.Model = data[2]
-	ent.FrontPlate = hg.BuildZCityArmorSection(frontMat, class, true)
-	ent.Glass = hg.BuildZCityArmorSection(frontMat, class, true)
-	ent.BackPlate = hg.BuildZCityArmorSection(backMat, backClass, true)
+	ent.FrontPlate = fullCoverSection(spec.front, class)
+	ent.Glass = fullCoverSection(spec.glass, class)
+	ent.BackPlate = fullCoverSection(spec.back, class)
 end
 
 for key, data in pairs(hg.armor.head or {}) do
-	if key == "helmet18" or key == "helmet19" then continue end
+	if key == "helmet2" or key == "helmet18" or key == "helmet19" then continue end
 	local class = nearestClass(data.protection or 0)
 	if class < ZC_ARMOR_PROTCLASS_I then class = ZC_ARMOR_PROTCLASS_I end
 	if FULL_COVER[key] then

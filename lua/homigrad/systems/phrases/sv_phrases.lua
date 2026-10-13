@@ -517,6 +517,17 @@ function hg.QueuePainScream(ply, amount)
 	org.painScreamUntil = CurTime() + 8
 end
 
+local painScreamPitchStart = 60
+local painScreamPitchFull = 150
+
+local function painScreamPitch(ply)
+	local base = mClamp(ply.VoicePitch or 100, 92, 108)
+	local pain = ply.organism and ply.organism.pain or 0
+	local t = mClamp((pain - painScreamPitchStart) / (painScreamPitchFull - painScreamPitchStart), 0, 1)
+
+	return math.Round(base * (1 + t))
+end
+
 local function playPainScream(ply, phrases, guaranteed)
 	if !canPainScream(ply) then return false end
 	if not guaranteed and mRandom(1, 100) > (mClamp(painScreamChance, 0, 1) * 100) then return true end
@@ -535,11 +546,13 @@ local function playPainScream(ply, phrases, guaranteed)
 	local patch = CreateSound(ent, phrase, rf)
 	if !patch then return false end
 
+	local pitch = painScreamPitch(ply)
 	local duration = SoundDuration(phrase)
 	if duration <= 0 then duration = 2 end
+	duration = duration * 100 / pitch
 
 	patch:SetSoundLevel(75)
-	patch:PlayEx(1, mClamp(ply.VoicePitch or 100, 92, 108))
+	patch:PlayEx(1, pitch)
 
 	ply:SetNWFloat("PainScreamUntil", CurTime() + duration + 0.15)
 

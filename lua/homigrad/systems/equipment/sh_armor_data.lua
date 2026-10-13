@@ -983,6 +983,7 @@ hg.armor.head = {
 		femPos = Vector(-1, 0, 0),
 		norender = true,
 		skins = {0,1,3,7,10,11,14},
+		Spawnable = false,
 		customviewrender = function(ply)
 			hg.DrawFirstPersonHelmet(ply, "models/dean/gtaiv/helmet.mdl", vectors[2], 20)
 		end,
@@ -1636,7 +1637,7 @@ hg.armor.head = {
 		"models/dpfilms/props/hev_helmet.mdl",
 		Vector(-9, 2.5, 0),
 		Angle(0, 92, 90),
-		protection = 12,
+		protection = 22,
 		bone = "ValveBiped.Bip01_Spine2",
 		model = "models/dpfilms/props/hev_helmet.mdl",
 		femPos = Vector(0, 0, 0),

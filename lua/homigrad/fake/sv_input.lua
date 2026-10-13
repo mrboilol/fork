@@ -105,6 +105,10 @@ hook.Add("OnPlayerHitGround","fallStun",function(ply,inwater,onfloater,speed)
 		hg.LightStunPlayer(tr.Entity,2)
 	end
 
+	if tr.Hit and hg.GetImpactTransfer then
+		speed = speed * hg.GetImpactTransfer(tr.Entity, IsValid(tr.Entity) and tr.Entity:GetPhysicsObject() or nil, tr.SurfaceProps, 80, tr.HitPos, -vector_up)
+	end
+
 	if speed > 450 and not inwater and not onfloater and ply:Alive() then
 		ply.hgStumbleHit = {pos = ply:GetPos(), dir = ply:GetVelocity(), dmg = speed / 12, energy = speed / 12, time = CurTime()}
 		hg.LightStunPlayer(ply,2)

@@ -179,9 +179,10 @@ local function bumpBloodCount(pos)
 	return count
 end
 
-local function placeNewBloodDecal(pos, normal, target, artery, amount, particleSize)
+local function placeNewBloodDecal(pos, normal, target, artery, amount, particleSize, trail)
 	local count = bumpBloodCount(pos)
 	if count > bloodMaxLayers then return end
+	if trail then count = 1 end
 	local name = artery and "Arterial.Blood2" .. math.Clamp(count, 1, 5) or "Normal.Blood2" .. math.Clamp(count + math_random(0, 2), 1, 5)
 	if not isDecalExSafe(target) then
 		util.Decal(name, pos + normal, pos - normal)
@@ -213,9 +214,25 @@ local function isOrganismEnt(ent)
 	return IsValid(ent) and (ent:IsPlayer() or ent:IsNPC() or ent:IsRagdoll() or ent.organism ~= nil)
 end
 
-local smearMinSpeed = 80
-local smearSpeedPerStep = 150
-local smearMaxSteps = 4
+local smearMinSpeed = 30
+local smearSpeedPerStep = 45
+local smearMaxSteps = 12
+local dripMinSteps = 4
+local dripMaxSteps = 10
+local dripChance = 0.65
+
+local function placeBloodStreak(place, pos, normal, target, artery, dir, headSize, steps, startFade)
+	local side = normal:Cross(dir)
+	local drift = math.Rand(-0.1, 0.1)
+	local spacing = headSize * 2.5 * 0.32
+	local p = pos
+	for i = 1, steps do
+		local fade = startFade * (1 - (i - 1) / steps)
+		drift = drift + math.Rand(-0.04, 0.04)
+		p = p + (dir + side * drift) * spacing * math.max(fade, 0.3)
+		place(p, normal, target, artery, 0, headSize * fade, true)
+	end
+end
 
 local function decalBlood(pos, normal, tr, artery, owner, tiny, amount, particleSize, vel)
 	if not pos or not normal then return end
@@ -231,7 +248,7 @@ local function decalBlood(pos, normal, tr, artery, owner, tiny, amount, particle
 		local tangent = vel - normal * vel:Dot(normal)
 		local tangentLen = tangent:Length()
 		if tangentLen > smearMinSpeed then
-			steps = math.min(math.floor(tangentLen / smearSpeedPerStep) + 1, smearMaxSteps)
+			steps = math.min(math.floor(tangentLen / smearSpeedPerStep) + 3, smearMaxSteps)
 			dir = tangent / tangentLen
 		else
 			amount = amount * 1.25
@@ -242,11 +259,22 @@ local function decalBlood(pos, normal, tr, artery, owner, tiny, amount, particle
 	local target = IsValid(tr.Entity) and tr.Entity or nil
 	local place = useOldBlood() and placeOldBloodDecal or placeNewBloodDecal
 	place(pos, normal, target, artery, amount, particleSize)
-	if steps > 0 then
-		local diameter = math.max(0.5 + math.sqrt(amount) * 1.5, particleSize or 0) * 2.5
-		for i = 1, steps do
-			local fade = 1 - 0.15 * i
-			place(pos + dir * diameter * 0.45 * i, normal, target, artery, amount * fade * fade, (particleSize or 0) * fade)
+	if not tiny and isDecalExSafe(target) then
+		local headSize = math.max(0.5 + math.sqrt(amount) * 1.5, particleSize or 0)
+		if steps > 0 then
+			placeBloodStreak(place, pos, normal, target, artery, dir, headSize, steps, 0.8)
+		end
+		if math.abs(normal.z) < 0.7 and math.Rand(0, 1) < dripChance then
+			local down = vecDown - normal * vecDown:Dot(normal)
+			if down:LengthSqr() > 0.01 then
+				down:Normalize()
+				local side = normal:Cross(down)
+				local runs = (artery or amount > 1.5) and math_random(1, 3) or 1
+				for _ = 1, runs do
+					local start = pos + side * math.Rand(-0.6, 0.6) * headSize * 1.25
+					placeBloodStreak(place, start, normal, target, artery, down, headSize, math_random(dripMinSteps, dripMaxSteps), math.Rand(0.3, 0.5))
+				end
+			end
 		end
 	end
 	if not tiny or math.random(7) == 1 then playBloodDripImpact(pos, tr) end
@@ -310,8 +338,8 @@ bloodparticles_hook[2] = function(mul)
 		if result.Hit and result.Entity:IsWorld() then
 			hg.bloodparticles1[i] = hg.bloodparticles1[#hg.bloodparticles1]; table_remove(hg.bloodparticles1)
 			local dir = result.HitNormal
-			decalBlood(result.HitPos, dir, result, part.artery, part.owner, part.tiny, part.volume, part.size)
-			
+			decalBlood(result.HitPos, dir, result, part.artery, part.owner, part.tiny, part.volume, part.size, part[3])
+
 			
 			--sound.Play("zbattle/blood_drop.mp3", hitPos, math.random(10, 60), math.random(120, 120))
 			--sound.Play("homigrad/blooddrip" .. math_random(1, 4) .. ".wav", hitPos, math.random(10, 60), math.random(80, 120))

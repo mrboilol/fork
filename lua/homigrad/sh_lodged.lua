@@ -116,7 +116,7 @@ if CLIENT then
 end
 
 local chestOrgansUpper = {"lungsL", "lungsR", "heart"}
-local chestOrgansLower = {"liver", "stomach", "intestines"}
+local chestOrgansLower = {"liver", "kidneys", "stomach", "intestines"}
 local brainLobes = {"brainFrontal", "brainParietal", "brainTemporal", "brainOccipital"}
 
 local lodgedExtractionBleed = {

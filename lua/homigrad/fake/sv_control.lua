@@ -479,6 +479,16 @@ local tr = {
 	filter = {}
 }
 
+local controlInputKeys = {IN_FORWARD, IN_BACK, IN_MOVELEFT, IN_MOVERIGHT, IN_ATTACK, IN_ATTACK2, IN_USE, IN_JUMP, IN_SPEED, IN_WALK, IN_DUCK, IN_ALT1, IN_ALT2, IN_RELOAD}
+
+local function hasControlInput(ply)
+	for i = 1, #controlInputKeys do
+		if ply:KeyDown(controlInputKeys[i]) then return true end
+	end
+
+	return false
+end
+
 local function grabHeld(ply, ragdoll, key, side)
 	if ply:KeyDown(key) then return true end
 	local reflex = ragdoll.hgReflexGrab
@@ -1126,8 +1136,10 @@ hook.Add("Think", "Fake", function()
 		local manualUseRight = false
 
 		if wantsManualHold then
-			manualUseLeft = canHoldLeft
-			manualUseRight = canHoldRight and canUseTwoHandHold
+			local leftBusy = IsValid(ragdoll.ConsLH) or ply:KeyDown(IN_SPEED) or (ply:KeyDown(IN_ATTACK) and not ishgweapon(wep))
+			local rightBusy = IsValid(ragdoll.ConsRH) or ply:KeyDown(IN_WALK) or ply:KeyDown(IN_ATTACK2)
+			manualUseLeft = canHoldLeft and not leftBusy
+			manualUseRight = canHoldRight and canUseTwoHandHold and not rightBusy
 		end
 
 		local holdWoundPos = wantsManualHold and getHoldWoundPos(ragdoll, holdWound) or nil
@@ -1144,8 +1156,9 @@ hook.Add("Think", "Fake", function()
 		setManualWoundHold(ply, org, manualHoldWound, holdWound, manualHoldHands, manualUseRight, holdWoundArterial)
 		local gripLeft = syncWoundGrip(ragdoll, "l", manualHoldWound and manualUseLeft and holdWoundPos, fixedPhys[5], holdWound, holdWoundPos)
 		local gripRight = syncWoundGrip(ragdoll, "r", manualHoldWound and manualUseRight and holdWoundPos, fixedPhys[7], holdWound, holdWoundPos)
+		local holdBody = hg.RagdollReflex and hg.RagdollReflex.BodyStrength and hg.RagdollReflex.BodyStrength(org) or 1
 		org.manualHoldWoundStrength = ((gripLeft and hg.GetArmEffectiveness(ply, "larm") or 0)
-			+ (gripRight and hg.GetArmEffectiveness(ply, "rarm") or 0)) / 2
+			+ (gripRight and hg.GetArmEffectiveness(ply, "rarm") or 0)) / 2 * Lerp(holdBody, 0.25, 1)
 
 		if org.alive and IsValid(spine) and ragdoll.otrubCollapseStart and (CurTime() - ragdoll.otrubCollapseStart) < 1.5 then
 			inmove = true
@@ -1285,7 +1298,7 @@ hook.Add("Think", "Fake", function()
 		if not wep.RagdollFunc then
 			local force = hg.GetArmEffectiveness and hg.GetArmEffectiveness(ply, "larm") or math.max(1 - org.larm / 1.3, 0)
 			local meleeHandControl = wep.ismelee2 and (ply:KeyDown(IN_ATTACK) or ply:KeyDown(IN_ATTACK2) or ply:KeyDown(IN_USE))
-			if not fallCoverActive and not manualHoldWound and (!IsValid(ragdoll.ConsLH) and (ply:KeyDown(IN_ATTACK) and !ishgweapon(wep)) or (((ishgweapon(wep) and (!wep:IsResting() or ply:KeyDown(IN_FORWARD) or ply:KeyDown(IN_BACK))) and (ply:KeyDown(IN_USE) or ply:KeyDown(IN_ATTACK2))) or meleeHandControl)) then// || ply:InVehicle() then
+			if not fallCoverActive and not (manualHoldWound and manualUseLeft) and (!IsValid(ragdoll.ConsLH) and (ply:KeyDown(IN_ATTACK) and !ishgweapon(wep)) or (((ishgweapon(wep) and (!wep:IsResting() or ply:KeyDown(IN_FORWARD) or ply:KeyDown(IN_BACK))) and (ply:KeyDown(IN_USE) or ply:KeyDown(IN_ATTACK2))) or meleeHandControl)) then// || ply:InVehicle() then
 				if org.canmove then
 					//if !ply:InVehicle() then
 						ang2:Set(angles)
@@ -1406,7 +1419,7 @@ hook.Add("Think", "Fake", function()
 
 			local force = hg.GetArmEffectiveness and hg.GetArmEffectiveness(ply, "rarm") or math.max(1 - org.rarm / 1.3, 0)
 
-			if not fallCoverActive and (!IsValid(ragdoll.ConsRH) and ply:KeyDown(IN_ATTACK2) or (ishgweapon(wep) and ply:KeyDown(IN_USE)) or meleeHandControl) then// || ply:InVehicle() then
+			if not fallCoverActive and not (manualHoldWound and manualUseRight) and (!IsValid(ragdoll.ConsRH) and ply:KeyDown(IN_ATTACK2) or (ishgweapon(wep) and ply:KeyDown(IN_USE)) or meleeHandControl) then// || ply:InVehicle() then
 				if org.canmove then
 					--if org.shock > 1 and not ply:KeyDown(IN_ATTACK2) then angles = spine:GetAngles() end
 					//if !ply:InVehicle() then
@@ -1668,9 +1681,9 @@ hook.Add("Think", "Fake", function()
 		local burning = ragdoll:IsOnFire() or ply:IsOnFire()
 		if not burning then ragdoll.hgFireRollAngle = nil end
 
-		if org.neckslit and (org.neckslitStunUntil or 0) > CurTime()
-			and not org.otrub and ply:Alive() and not ply:InVehicle() then
-			local phase = ((org.neckslitStunUntil - CurTime()) * 1.5) % 4
+		if org.neckslit and not org.otrub and ply:Alive() and not ply:InVehicle()
+			and ((org.neckslitStunUntil or 0) > CurTime() or not hasControlInput(ply)) then
+			local phase = (CurTime() * 1.5) % 4
 			keyLeft = phase < 2
 			keyRight = not keyLeft
 			isNeckSlitRolling = true

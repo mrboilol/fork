@@ -175,7 +175,7 @@ local organismEditorFields = {
 	"bruises", "bulletwounds", "burns", "canmove", "canmovehead", "cardiacOutput", "cerebralPerfusion", "chest", "consciousness",
 	"diastolic", "disorientation", "energy", "eyeL", "eyeR", "explosionwounds", "fear", "fearadd", "fibrillation", "goodmood",
 	"handcuffed", "health", "heart", "heartbeat", "heartstop", "heartStrain", "hemothorax", "hydration", "hypertension", "hypotension",
-	"immobilization", "incapacitated", "internalBleed", "intestines", "intracranialPressure", "jaw", "jawdislocation", "legstrength", "liver",
+	"immobilization", "incapacitated", "internalBleed", "intestines", "intracranialPressure", "jaw", "jawdislocation", "kidneys", "legstrength", "liver",
 	"larm", "larmamputated", "larmdislocation", "larmupamputated", "lhandamputated", "lleg", "llegamputated", "llegdislocation", "llegupamputated",
 	"lungsfunction", "maxweight", "meleespeed", "myocardialOxygen", "nausea", "needfake", "needotrub", "neckslit", "noHead", "noradrenaline",
 	"o2.current", "o2.range", "o2.regen", "o2.curregen", "otrub", "pain", "painadd", "painkiller", "panicattack", "panicattackActive",
@@ -193,7 +193,7 @@ local organismEditorUnitFields = {
 	adrenaline = true, analgesia = true, anger = true, arrhythmia = true, assimilated = true, brain = true, brainFrontal = true,
 	brainHemorrhage = true, brainOccipital = true, brainParietal = true, brainSwelling = true, chest = true, consciousness = true,
 	disorientation = true, eyeL = true, eyeR = true, fear = true, heart = true, hemothorax = true, immobilization = true,
-	intestines = true, jaw = true, larm = true, lleg = true, liver = true, myocardialOxygen = true, painkiller = true,
+	intestines = true, jaw = true, kidneys = true, larm = true, lleg = true, liver = true, myocardialOxygen = true, painkiller = true,
 	pelvis = true, perfusion = true, peripheralperfusion = true, pneumothorax = true, rarm = true, rleg = true, shock = true,
 	skull = true, spine1 = true, spine2 = true, spine3 = true, stomach = true, survivalchance = true, trachea = true
 }

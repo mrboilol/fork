@@ -51,7 +51,6 @@ SWEP.canchargeattack = true
 SWEP.ChargeAnimTimeBegin = 1.45
 SWEP.ChargeAnimTimeIdle = 1
 SWEP.ChargeAnimTimeEnd = 1.65
-SWEP.ChargeFullTime = 0.65
 SWEP.ChargeAttackTime = 0.37
 SWEP.ChargeWaitTime = 2.5
 SWEP.ChargeAttackLen = 65

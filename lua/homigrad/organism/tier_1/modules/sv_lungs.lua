@@ -785,11 +785,7 @@ module[2] = function(owner, org, timeValue)
 	local delayedBleed = internalBleedComplication * bleedSeverity
 	local incidentalHemothorax = org.internalBleedHemothoraxRisk and delayedBleed * 0.35 or 0
 	local hemothoraxDrive = math.max(thoracicOrganDamage * delayedBleed, incidentalHemothorax)
-	if needleActive then
-		org.hemothoraxTrauma = max(org.hemothoraxTrauma - timeValue / 120, 0)
-		org.hemothoraxL = max(org.hemothoraxL - timeValue / 120, 0)
-		org.hemothoraxR = max(org.hemothoraxR - timeValue / 120, 0)
-	elseif hemothoraxDrive > 0.005 then
+	if hemothoraxDrive > 0.005 then
 		if org.internalBleedLungSide != "L" and org.internalBleedLungSide != "R" then
 			org.internalBleedLungSide = math.random(2) == 1 and "L" or "R"
 		end
@@ -801,15 +797,8 @@ module[2] = function(owner, org, timeValue)
 		local targetR = (bilateral or org.internalBleedLungSide == "R") and hemothoraxTarget or 0
 
 		local conditionMul = math.Clamp(org.conditionResistanceMul or 1, 0.05, 1)
-		org.hemothoraxL = math.Approach(org.hemothoraxL, targetL, timeValue / fillTime * conditionMul)
-		org.hemothoraxR = math.Approach(org.hemothoraxR, targetR, timeValue / fillTime * conditionMul)
-	else
-		-- Blood in the pleural space does not vanish on its own. It needs a
-		-- prolonged recovery period unless the player uses a needle.
-		org.hemothoraxTrauma = max(org.hemothoraxTrauma - timeValue / 480, 0)
-		org.hemothoraxL = max(org.hemothoraxL - timeValue / 360, 0)
-		org.hemothoraxR = max(org.hemothoraxR - timeValue / 360, 0)
-		if org.hemothoraxL <= 0 and org.hemothoraxR <= 0 then org.internalBleedLungSide = nil end
+		org.hemothoraxL = max(org.hemothoraxL, math.Approach(org.hemothoraxL, targetL, timeValue / fillTime * conditionMul))
+		org.hemothoraxR = max(org.hemothoraxR, math.Approach(org.hemothoraxR, targetR, timeValue / fillTime * conditionMul))
 	end
 
 	org.hemothorax = math.Clamp(max(org.hemothoraxTrauma, (org.hemothoraxL + org.hemothoraxR) / 2), 0, 1)
@@ -1173,6 +1162,9 @@ module[2] = function(owner, org, timeValue)
 		o2[1] = min(o2[1], org.cardiacArrestO2Start)
 		local arrestDrainRate = max(org.cardiacArrestO2Start, 0.1) / cardiacArrestO2DrainTime
 		o2[1] = math.Approach(o2[1], 0, timeValue * arrestDrainRate)
+	end
+	if (tonumber(org.pulse) or 0) <= 0 and (tonumber(org.bloodPressure) or 0) <= 0 then
+		o2[1] = math.Approach(o2[1], 0, timeValue * o2.range / cardiacArrestO2DrainTime)
 	end
 
 	

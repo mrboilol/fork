@@ -134,8 +134,7 @@ local StitchFields = {
 -- Complex mode is reserved for immediately life-threatening trauma: vital
 -- organs, thoracic/cranial damage, and complications from internal bleeding.
 local ComplexFields = {
-    "skull", "chest", "heart", "brain", "trachea", "hemothoraxTrauma", "cardiacTamponade",
-    "hemothoraxL", "hemothoraxR", "brainFrontal",
+    "skull", "chest", "heart", "brain", "trachea", "brainFrontal",
     "brainParietal", "brainTemporal", "brainOccipital", "brainHemorrhage",
     "brainBleedRate"
 }
@@ -144,7 +143,7 @@ local ComplexFields = {
 -- Relieve them during surgery, but never use them by themselves to select a new
 -- complex pass or the unit can repeatedly announce the same completed mode.
 local ComplexReliefFields = {
-    "hemothorax", "brainSwelling", "intracranialPressure", "internalBleedComplication",
+    "brainSwelling", "intracranialPressure", "internalBleedComplication",
     "neckBrainOxygenPenalty", "arterialO2Impairment", "throatCutPressureShock"
 }
 

@@ -280,6 +280,7 @@ local softLayerEnergy = {
 	trachea = 0.01,
 	heart = 0.05,
 	liver = 0.05,
+	kidneys = 0.05,
 	stomach = 0.04,
 	intestines = 0.04,
 }
@@ -759,6 +760,7 @@ function hg.organism.RadDamage(org, dmg, dmgInfo)
 	hg.organism.GasDamage(org, dmg, dmgInfo)
 
 	hg.organism.input_list.liver(org,nil,dmg / 20,dmgInfo)
+	hg.organism.input_list.kidneys(org,nil,dmg / 20,dmgInfo)
 	hg.organism.input_list.stomach(org,nil,dmg / 20,dmgInfo)
 	hg.organism.input_list.intestines(org,nil,dmg / 20,dmgInfo)
 end
@@ -2249,7 +2251,8 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		local caliber = tonumber(bullet and bullet.Diameter) or tonumber(IsValid(inf) and inf.PenetrationSize) or 0
 		sendHeadshotBloodSquirt(ent, ply, dmgPos, squirtDirection, outputHole, caliber > 0 and caliber <= 5.7)
 	end
-	if not noDismemberment and instant and hitgroup == HITGROUP_HEAD and not ent.headexploded and skullAllowsHeadGib(org) then
+	local fullChargeHeadGib = meleeContact and meleeContact.fullCharge and IsValid(inf) and inf.FullChargeHeadExplode
+	if not noDismemberment and (instant or fullChargeHeadGib) and hitgroup == HITGROUP_HEAD and not ent.headexploded and skullAllowsHeadGib(org) then
 		hg.ExplodeHead(ent, headGoreStack or gibStack, slash, dirCool * len)
 	end
 	if ply and hitgroup == HITGROUP_HEAD and ply.RemoveHeadcrabFromTrauma
@@ -2753,6 +2756,61 @@ local function applyPhysicsResidual(ent, org, hitgroup, residual, lane)
 	end
 end
 
+local softImpactSurfaces = {
+	{"mattress", 0.25}, {"foam", 0.3}, {"cushion", 0.3}, {"pillow", 0.3}, {"hay", 0.4},
+	{"cloth", 0.55}, {"fabric", 0.55}, {"flesh", 0.55}, {"watermelon", 0.6}, {"rubber", 0.6},
+	{"cardboard", 0.55}, {"paper", 0.6}, {"foliage", 0.65}, {"slime", 0.6}, {"snow", 0.7},
+	{"mud", 0.75}, {"sand", 0.8}, {"carpet", 0.85}, {"plastic_barrel", 0.8}, {"wood_box", 0.85},
+	{"wood_crate", 0.85}, {"wood_lowdensity", 0.85}, {"dirt", 0.9}, {"grass", 0.9},
+}
+
+local softImpactModels = {
+	{"mattress", 0.25}, {"cushion", 0.3}, {"pillow", 0.3}, {"beanbag", 0.3}, {"couch", 0.4},
+	{"sofa", 0.4}, {"[/_]bed", 0.35}, {"armchair", 0.45}, {"hay", 0.4}, {"tire", 0.6},
+}
+
+local function softnessFromList(name, list)
+	local mul = 1
+	if not name or name == "" then return mul end
+	name = string.lower(name)
+	for i = 1, #list do
+		if string.find(name, list[i][1]) then mul = math.min(mul, list[i][2]) end
+	end
+	return mul
+end
+
+local function totalPhysMass(ent)
+	local mass = 0
+	for i = 0, ent:GetPhysicsObjectCount() - 1 do
+		local phys = ent:GetPhysicsObjectNum(i)
+		if IsValid(phys) then mass = mass + phys:GetMass() end
+	end
+	return mass
+end
+
+function hg.GetImpactTransfer(hitEnt, hitPhys, surfaceProps, ourMass, hitPos, dir)
+	local mul = softnessFromList(surfaceProps and util.GetSurfacePropName(surfaceProps), softImpactSurfaces)
+	if not IsValid(hitEnt) or hitEnt:IsWorld() then return math.max(mul, 0.1) end
+
+	mul = math.min(mul, softnessFromList(hitEnt:GetModel(), softImpactModels))
+	if hitEnt:IsRagdoll() or hitEnt:IsPlayer() then mul = math.min(mul, 0.55) end
+
+	if IsValid(hitPhys) and hitPhys:IsMotionEnabled() and not hitEnt:IsPlayer() then
+		local otherMass = hitEnt:IsRagdoll() and totalPhysMass(hitEnt) or hitPhys:GetMass()
+		local yield = otherMass / (otherMass + ourMass)
+		local reach = hitEnt:IsRagdoll() and 24 or hitEnt:OBBMins():Distance(hitEnt:OBBMaxs()) * 0.5
+		local backing = util.TraceLine({
+			start = hitPhys:GetPos(),
+			endpos = hitPhys:GetPos() + dir * (reach + 12),
+			mask = MASK_SOLID_BRUSHONLY,
+		})
+		if backing.Hit then yield = 0.9 end
+		mul = mul * math.min(yield, otherMass / 20, 1)
+	end
+
+	return math.max(mul, 0.1)
+end
+
 local function velocityDamage(ent, data)
 	local relativeVelocity = data.OurOldVelocity - data.TheirOldVelocity
 	local speed = relativeVelocity:Length()
@@ -2779,10 +2837,11 @@ local function velocityDamage(ent, data)
 	physTouches[data.HitEntity] = CurTime()
 
 	--print(data.HitObject:GetEntity():IsWorld())
-	local normalSpeed = math.abs(relativeVelocity:Dot(data.HitNormal))
-	local impactMassMul = (IsValid(data.HitObject) && !data.HitObject:GetEntity():IsWorld()) && math.min(data.HitObject:GetMass() / 20, 1) || 1
+	local impactTransfer = hg.GetImpactTransfer(data.HitObject:GetEntity(), data.HitObject, data.TheirSurfaceProps, math.Clamp(data.PhysObject:GetMass() * 3, 8, 60), data.HitPos, relativeVelocity:GetNormalized())
+	speed = speed * impactTransfer
+	local normalSpeed = math.abs(relativeVelocity:Dot(data.HitNormal)) * impactTransfer
 	local dmg = math.max(normalSpeed - 170, 0) / 900
-	dmg = dmg ^ 1.28 * 0.95 * impactMassMul
+	dmg = dmg ^ 1.28 * 0.95
 	if !data.HitObject:GetEntity():IsWorld() && !data.HitObject:GetEntity():IsRagdoll() then
 		//dmg = dmg * math.max(data.HitObject:GetMass()*(speed/50000),5)
 	end

@@ -5,6 +5,8 @@ male["ValveBiped.Bip01_Spine1"] = {}
 male["ValveBiped.Bip01_Spine"] = {
 	{"liver", nil, Vector(4, 3, -2.5), Angle(0, 0, 0), Vector(2, 2, 3.5), Color(125, 50, 0)},
 	{"stomach", nil, Vector(3, 2, 2), Angle(0, 0, 0), Vector(2.5, 2, 3), Color(255, 125, 0)},
+	{"kidneys", nil, Vector(1.5, -0.25, -3.5), Angle(0, 0, 0), Vector(2, 1, 1.25), Color(150, 40, 60)},
+	{"kidneys", nil, Vector(2.5, -0.25, 3.5), Angle(0, 0, 0), Vector(2, 1, 1.25), Color(150, 40, 60)},
 	{"aorta", 0, Vector(2, 0, 0), Angle(0, 0, 0), Vector(5, 0.5, 0.5), Color(255, 0, 0)}
 }
 male["ValveBiped.Bip01_Head1"] = {
@@ -268,7 +270,7 @@ table.insert(male["ValveBiped.Bip01_Spine1"], 1, {"vest8", 1, Vector(-5, 7, 0), 
 table.insert(male["ValveBiped.Bip01_Spine2"], 1, {"vest8", 1, Vector(-7, -2.5, 0), Angle(0, 0, 0), Vector(3, 2, 6), Color(68, 0, 255), true, 0})
 
 local originalVestBoxes = {vest1 = true, vest2 = true, vest3 = true, vest4 = true, vest5 = true, vest6 = true, vest7 = true, vest8 = true}
-local fullCoverHelmets = {"helmet2", "helmet3", "gordon_helmet", "cmb_helmet", "metrocop_helmet", "protovisor"}
+local fullCoverHelmets = {"helmet2", "helmet3", "helmet_riot", "gordon_helmet", "cmb_helmet", "metrocop_helmet", "protovisor"}
 local originalHelmetBoxes = {helmet5 = true, helmet6 = true, helmet7 = true}
 for _, helmet in ipairs(fullCoverHelmets) do originalHelmetBoxes[helmet] = true end
 hook.Add("HG_OrganAvalible", "HGOriginalVestBoxes", function(ent, name)
@@ -493,6 +495,7 @@ hg.organism.translationTbl = {
 	["rlegdown"] = "Right calf",
 	["liver"] = "Liver",
 	["stomach"] = "Stomach",
+	["kidneys"] = "Kidney",
 	["llegdown"] = "Left calf",
 	["rlegup"] = "Right thigh",
 	["rlegartery"] = "Right leg artery",

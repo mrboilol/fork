@@ -171,6 +171,7 @@ local list = {
 	{"pelvis", 1, true},
 	{"stomach", 1, true},
 	{"liver", 1, true},
+	{"kidneys", 1, true},
 	{"intestines", 1, true},
 }
 local function LerpColor(lerp, source, set)

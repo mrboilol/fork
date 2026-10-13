@@ -535,7 +535,9 @@ module[2] = function(owner, org, mulTime)
 	local heartDamage = math.Clamp(tonumber(org.heart) or 0, 0, 1)
 	local severeCardiacBleed = math.Clamp(org.internalBleedComplication or 0, 0, 1) * math.Clamp(((org.internalBleedPeak or internalBleedSeverity) - 7.5) / 2.5, 0, 1)
 	local tamponadeTarget = heartDamage * severeCardiacBleed * 0.65
-	org.cardiacTamponade = math.Approach(org.cardiacTamponade or 0, tamponadeTarget, mulTime / 24 * math.Clamp(org.conditionResistanceMul or 1, 0.05, 1))
+	if tamponadeTarget > (org.cardiacTamponade or 0) then
+		org.cardiacTamponade = math.Approach(org.cardiacTamponade or 0, tamponadeTarget, mulTime / 24 * math.Clamp(org.conditionResistanceMul or 1, 0.05, 1))
+	end
 
 	-- Nosebleed from severe internal bleeding
 	if org.internalBleed > 0.75 and hg.applyNosebleed and math.random() < org.internalBleed * 0.02 * mulTime then
@@ -739,7 +741,7 @@ module[2] = function(owner, org, mulTime)
 	local bleed = math.Clamp(org.internalBleed / 300, 0, 0.11) -- + org.lungsR[3] + org.lungsL[3]
 	
 	-- Damaged liver prevents natural internal bleeding healing unless tranexamic acid is present
-	local canHealInternalBleed = org.liver <= 0 or (org.tranexamic_acid or 0) > 0
+	local canHealInternalBleed = (org.liver <= 0 and (org.kidneys or 0) <= 0) or (org.tranexamic_acid or 0) > 0
 	local internalBleedHeal = org.internalBleedHeal or 0
 
 	-- Internal hemostasis also has an opening phase. Large internal injuries take

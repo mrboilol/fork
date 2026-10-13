@@ -1377,6 +1377,7 @@ hook.Add("Should Fake Up","speedhuy",function(ply)
 		if ply.FakeRagdoll:GetVelocity():Length() > 200 then return false end
 		if (ply.organism.stun - CurTime()) > 0 then return false end
 		if (ply.organism.lightstun - CurTime()) > 0 then return false end
+		if ply.organism.neckslit and (ply.organism.neckslitStunUntil or 0) > CurTime() then return false end
 		if bit.band(ply.FakeRagdoll:GetFlags(),FL_DISSOLVING) == FL_DISSOLVING then return false end
 	end
 end)
