@@ -21,6 +21,7 @@ end
 
 local input_list = hg.organism.input_list
 local hitArtery
+local openRenalHemorrhage
 local function addPain(org, amount, region)
 	if hg.organism.AddPain then return hg.organism.AddPain(org, amount, region) end
 	org.painadd = math.min((org.painadd or 0) + amount, 150)
@@ -168,7 +169,7 @@ input_list.liver = function(org, bone, dmg, dmgInfo)
 	return 0
 end
 
-input_list.kidneys = function(org, bone, dmg, dmgInfo)
+input_list.kidneys = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet, impact)
 	local oldDmg = org.kidneys or 0
 
 	org.kidneys = math.min(oldDmg + dmg / math.max(org.organStrengthMul or 1, 1), 1)
@@ -188,6 +189,9 @@ input_list.kidneys = function(org, bone, dmg, dmgInfo)
 	end
 
 	addInternalBleed(org, harmed * 8, "kidneys")
+	if harmed > 0 and not isCrush(dmgInfo) and not dmgInfo:IsDamageType(DMG_BLAST) then
+		openRenalHemorrhage(org, dmgInfo, boneindex, dir, hit, impact)
+	end
 	applyOrganTrauma(org, dmgInfo, dmg, harmed, oldDmg, "kidneys")
 
 	dmgInfo:ScaleDamage(0.8)
@@ -532,6 +536,27 @@ hitArtery = function(artery, org, dmg, dmgInfo, boneindex, dir, hit, impact, for
 	emitArterialImpact(owner, wound)
 	--if IsValid(owner:GetNWEntity("RagdollDeath")) then owner:GetNWEntity("RagdollDeath"):SetNetVar("wounds",org.arterialwounds) end
 	return 0
+end
+
+local renalHemorrhageFraction = 0.5
+local renalHemorrhageDuration = 2.5
+
+openRenalHemorrhage = function(org, dmgInfo, boneindex, dir, hit, impact)
+	local owner = org.owner
+	if not IsValid(owner) or not org.arterialwounds then return end
+	dir = isvector(dir) and dir:LengthSqr() > 0.001 and dir or traumaDirection(org, dmgInfo)
+	local localPos, localAng, dir2, woundBone = getlocalshit(owner, impact and impact.entity, boneindex or "ValveBiped.Bip01_Spine1", dir, hit)
+	if not localPos then
+		localPos, localAng, dir2 = vecZero, angZero, Vector(-1, 0, 0)
+	end
+	local volume = math.max(tonumber(org.maxblood) or 5000, 1) * renalHemorrhageFraction
+	local wound = {arterySize.aorta, localPos, localAng, woundBone or (isstring(boneindex) and boneindex) or "ValveBiped.Bip01_Spine1", CurTime(), dir2 * 100, "renal"}
+	wound.renalRemaining = volume
+	wound.renalRate = volume / renalHemorrhageDuration
+	wound.visualBleedRate = wound.renalRate
+	table.insert(org.arterialwounds, wound)
+	hg.organism.MarkArterialWoundsNetDirty(org)
+	emitArterialImpact(owner, wound)
 end
 
 hook.Add("PreTraceOrganBulletDamage", "hg_melee_artery_chance", function(org, bone, dmg, dmgInfo, box, dir, hit, ricochet, organ, hookInfo, impact)

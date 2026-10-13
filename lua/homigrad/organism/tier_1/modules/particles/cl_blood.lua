@@ -136,8 +136,10 @@ local function isDecalExSafe(target)
 	return not IsValid(target) or target:IsWorld() or string.sub(target:GetModel() or "", 1, 1) == "*"
 end
 
+local bloodDecalDiameterMul = 7
+
 local function getBloodDecalScale(amount, particleSize, material)
-	local diameter = math.max(0.5 + math.sqrt(amount or 0.2) * 1.5, particleSize or 0) * 2.5
+	local diameter = math.max(0.5 + math.sqrt(amount or 0.2) * 1.5, particleSize or 0) * bloodDecalDiameterMul
 	local materialScale = material:GetFloat("$decalscale") or 1
 	if materialScale <= 0 then materialScale = 1 end
 	return diameter / (math.max(material:Width(), material:Height(), 1) * materialScale)
@@ -224,7 +226,7 @@ local dripChance = 0.65
 local function placeBloodStreak(place, pos, normal, target, artery, dir, headSize, steps, startFade)
 	local side = normal:Cross(dir)
 	local drift = math.Rand(-0.1, 0.1)
-	local spacing = headSize * 2.5 * 0.32
+	local spacing = headSize * bloodDecalDiameterMul * 0.32
 	local p = pos
 	for i = 1, steps do
 		local fade = startFade * (1 - (i - 1) / steps)

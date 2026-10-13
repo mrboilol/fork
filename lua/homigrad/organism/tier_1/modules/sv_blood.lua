@@ -653,14 +653,23 @@ module[2] = function(owner, org, mulTime)
 		local heldBleedMul = getHeldWoundBleedMul(org, wound)
 		org.arterialWoundPressureMultipliers[i] = heldBleedMul
 		local bandageCoverage = math.Clamp(tonumber(wound.bandageCoverage) or 0, 0, 1)
-		local woundBleedRate = math.max(wound[1] or 0, 0)
-			* arterial_bleed_ml_s_per_severity
-			* woundSeverityMul
-			* arterialPressureFactor
-			* tourniquetBleedMul
-			* bandageBleedMul
-			* heldBleedMul
-			* (1 - bandageCoverage)
+		local renalRemaining = tonumber(wound.renalRemaining)
+		local woundBleedRate
+		if renalRemaining then
+			woundBleedRate = math.min((tonumber(wound.renalRate) or 0) * tourniquetBleedMul * bandageBleedMul * heldBleedMul * (1 - bandageCoverage),
+				math.max(renalRemaining, 0) / math.max(mulTime, 0.001))
+			wound.renalRemaining = renalRemaining - woundBleedRate * mulTime
+			if wound.renalRemaining <= 0.5 then wound[1] = 0 end
+		else
+			woundBleedRate = math.max(wound[1] or 0, 0)
+				* arterial_bleed_ml_s_per_severity
+				* woundSeverityMul
+				* arterialPressureFactor
+				* tourniquetBleedMul
+				* bandageBleedMul
+				* heldBleedMul
+				* (1 - bandageCoverage)
+		end
 		bleedoutspeed2 = bleedoutspeed2 + woundBleedRate
 		org.blood = max(org.blood - woundBleedRate * mulTime, 1)
 
@@ -683,7 +692,7 @@ module[2] = function(owner, org, mulTime)
 			end
 		end
 
-		if isAlive or not isPlayer then
+		if (isAlive or not isPlayer) and not renalRemaining then
 			local heldClotMul = getHeldWoundClotMul(org, wound)
 			local compressionClotMul = heldClotMul * bandageClotMul * Lerp(math.Clamp(1 - tourniquetBleedMul, 0, 1), 1, 3.0)
 			local catastrophic = isAmputation or isHeadGib
