@@ -404,6 +404,9 @@ local function send_organism(org, ply, recipientForce, reliable)
 	sendtable.rarm = org.rarm
 	sendtable.larm = org.larm
 	sendtable.chest = org.chest
+	sendtable.spine1 = org.spine1
+	sendtable.spine2 = org.spine2
+	sendtable.spine3 = org.spine3
 	sendtable.pelvis = org.pelvis
 	sendtable.disorientation = org.disorientation
 	sendtable.brain = org.brain

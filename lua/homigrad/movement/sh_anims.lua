@@ -1,7 +1,12 @@
 local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vector, AngleRand, VectorRand, math, hook, util, game
 local function IsJogging(ply)
 	if CLIENT and ply == LocalPlayer() then return ply.hg_isJogging == true end
-	return ply.hg_isJogging or ply:GetNWBool("hg_isJogging", false)
+	return ply.hg_isJogging == true or ply:GetNWBool("hg_isJogging", false)
+end
+
+local function isSprinting(ply)
+	if CLIENT and ply == LocalPlayer() then return ply.hg_isSprinting == true end
+	return ply.hg_isSprinting == true or ply:GetNWBool("hg_isSprinting", false)
 end
 --\\ Custom running anim rate
 	hook.Add("UpdateAnimation", "NormAnimki", function(ply, vel, maxSeqGroundSpeed)
@@ -39,7 +44,9 @@ end
 		local isAmputated = ply:IsBerserk() and org and (org.llegamputated or org.rlegamputated or org.llegupamputated or org.rlegupamputated)
 		local hasBrokenLeg = org and (hg.IsLimbFractured(org, "lleg") or hg.IsLimbFractured(org, "rleg") or org.llegdislocation or org.rlegdislocation)
 		if hasBrokenLeg then return end
-		if (not ply:InVehicle()) and ply:IsOnGround() and vel:Length() > 180 and wep and runHoldTypes[wep:GetHoldType()] and not isAmputated then
+		local speed = vel:Length()
+		if (isSprinting(ply) or IsJogging(ply)) and hg.KeyDown(ply, IN_FORWARD) then speed = math.max(speed, IsJogging(ply) and 210 or 280) end
+		if (not ply:InVehicle()) and ply:IsOnGround() and not hg.KeyDown(ply, IN_JUMP) and speed > 180 and wep and runHoldTypes[wep:GetHoldType()] and not isAmputated then
 			local isFurry = ply.PlayerClassName == "furry"
 			local anim = ACT_HL2MP_RUN_FAST
 			

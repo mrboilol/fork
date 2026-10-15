@@ -17,6 +17,7 @@ local depression_cotard_gain = 0.012
 local depression_adrenaline_suppress_start = 0.5
 local depression_adrenaline_suppress_min = 0.1
 local selfharm_adrenaline_threshold = 1.5
+local selfharm_adrenaline_delay = 3
 local depression_bleedrate_threshold = 5
 local depression_bleedrate_gain = 0.03
 local depression_bleedrate_maxmul = 4
@@ -380,8 +381,11 @@ local function updatePending(owner, org)
 end
 
 local function rollSelfHarm(owner, org)
+	if hasStrongAdrenaline(org) then
+		org.selfharmNextRoll = CurTime() + selfharm_adrenaline_delay
+		return
+	end
 	if (org.depression or 0) < selfharm_threshold then return end
-	if hasStrongAdrenaline(org) then return end
 	if (org.selfharmNextRoll or 0) > CurTime() then return end
 
 	org.selfharmNextRoll = CurTime() + math.Rand(selfharm_roll_time_min, selfharm_roll_time_max)
