@@ -901,12 +901,14 @@ function hg.organism.Vomit(owner, snd)
 	if !hg.IsValidPlayer(owner) then return end
 	
 	local org = owner.organism
+	if not org then return end
 	local ent = hg.GetCurrentCharacter(owner)
+	if not IsValid(ent) then return end
 	applyVomitBloodLoss(org)
 
 	local bon = "ValveBiped.Bip01_Head1"
 	local bone = ent:LookupBone(bon)
-	local mat = ent:GetBoneMatrix(bone)
+	local mat = bone and ent:GetBoneMatrix(bone)
 
 	if not mat then return end
 
@@ -919,7 +921,8 @@ function hg.organism.Vomit(owner, snd)
 
 	ent:EmitSound(snd or "vomit/vomit5.ogg")
 	
-	if owner.armors and owner.armors.face and hg.armor.face[owner.armors.face].voice_change then
+	local faceArmor = owner.armors and owner.armors.face and hg.armor and hg.armor.face and hg.armor.face[owner.armors.face]
+	if faceArmor and faceArmor.voice_change then
 		owner:SetNetVar("zableval_masku", true)
 	else
 		if !on_spine then

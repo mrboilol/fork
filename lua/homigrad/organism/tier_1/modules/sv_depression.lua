@@ -16,6 +16,7 @@ local depression_otrub_gain = 0.005
 local depression_cotard_gain = 0.012
 local depression_adrenaline_suppress_start = 0.5
 local depression_adrenaline_suppress_min = 0.1
+local selfharm_adrenaline_threshold = 1.5
 local depression_bleedrate_threshold = 5
 local depression_bleedrate_gain = 0.03
 local depression_bleedrate_maxmul = 4
@@ -171,6 +172,10 @@ local function autoEquipSelfHarmWeapon(owner)
 	return true
 end
 
+local function hasStrongAdrenaline(org)
+	return (org.adrenaline or 0) >= selfharm_adrenaline_threshold
+end
+
 function hg.organism.StartSelfHarm(owner)
 	if not hg_depression:GetBool() then return end
 	if not IsValid(owner) or not owner:IsPlayer() then return end
@@ -178,6 +183,7 @@ function hg.organism.StartSelfHarm(owner)
 	local org = owner.organism
 	if not org or not org.alive or owner.selfharming then return end
 	if isDepressionImmune(org) then return end
+	if hasStrongAdrenaline(org) then return end
 	if owner.suiciding or owner.remUrgeEnd then return end
 	if (owner.remUrgeCooldown or 0) > CurTime() then return end
 
@@ -325,7 +331,7 @@ local function updateSelfHarm(owner, org)
 		return
 	end
 
-	if org.otrub or owner.suiciding or org.larmamputated then
+	if org.otrub or owner.suiciding or org.larmamputated or hasStrongAdrenaline(org) then
 		hg.organism.EndSelfHarm(owner)
 		return
 	end
@@ -352,7 +358,7 @@ local function updatePending(owner, org)
 		return
 	end
 
-	if org.otrub or owner.suiciding or org.larmamputated then
+	if org.otrub or owner.suiciding or org.larmamputated or hasStrongAdrenaline(org) then
 		org.selfharmPendingUntil = nil
 		owner:SetNWFloat("rem_selfharm_pending", 0)
 		return
@@ -375,6 +381,7 @@ end
 
 local function rollSelfHarm(owner, org)
 	if (org.depression or 0) < selfharm_threshold then return end
+	if hasStrongAdrenaline(org) then return end
 	if (org.selfharmNextRoll or 0) > CurTime() then return end
 
 	org.selfharmNextRoll = CurTime() + math.Rand(selfharm_roll_time_min, selfharm_roll_time_max)

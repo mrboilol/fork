@@ -1865,6 +1865,7 @@ hook.Add("HG_OnWakeOtrub", "afterOtrub", function( owner )
 end)
 hook.Add("HG_OnOtrub", "fearful", function( plya )// ЧЕ
 	local ent = hg.GetCurrentCharacter(plya)
+	if not IsValid(ent) then return end
 	for i,ply in ipairs(ents.FindInSphere(ent:GetPos(),256)) do
 		if not ply:IsPlayer() or not ply.organism or plya == ply then continue end
 		local tr = {}
@@ -1921,29 +1922,34 @@ local function fixlimb(org, key, fixer)
 end
 concommand.Add("hg_fixdislocation", function(ply, cmd, args)
 	local fixer = ply
-	if math.Round(tonumber(args[2])) == 1 then
+	local limb = tonumber(args[1])
+	local targetMode = tonumber(args[2])
+	if not IsValid(fixer) or not fixer:IsPlayer() or not fixer:Alive() or not limb then return end
+
+	if math.Round(targetMode or 0) == 1 then
 		ply = hg.eyeTrace(fixer).Entity
 	end
 	if !IsValid(ply) or !ply.organism then return end
 	ply = ply.organism.owner
+	if !IsValid(ply) or !ply.organism then return end
 	local org = ply.organism
-	if !fixer:Alive() or !org or fixer.organism.otrub then return end
+	if !fixer.organism or !fixer:Alive() or !org or fixer.organism.otrub then return end
 	if (fixer.tried_fixing_limb or 0) > CurTime() then return end
 	if !fixer.organism.canmove or !fixer.organism.canmovehead then return end
 	fixer.tried_fixing_limb = CurTime() + fixer.organism.pain / 30
-	if math.Round(tonumber(args[1])) == 1 then
+	if math.Round(limb) == 1 then
 		if org.llegdislocation then
 			fixlimb(org, "lleg", fixer)
 		elseif org.rlegdislocation then
 			fixlimb(org, "rleg", fixer)
 		end
-	elseif math.Round(tonumber(args[1])) == 2 then
+	elseif math.Round(limb) == 2 then
 		if org.larmdislocation then
 			fixlimb(org, "larm", fixer)
 		elseif org.rarmdislocation then
 			fixlimb(org, "rarm", fixer)
 		end
-	elseif math.Round(tonumber(args[1])) == 3 then
+	elseif math.Round(limb) == 3 then
 		if org.jawdislocation then
 			fixlimb(org, "jaw", fixer)
 		end
