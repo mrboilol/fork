@@ -1447,16 +1447,16 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 		end
 	end
 
-	if hg.BloodTakenOver and hg.BloodTakenOver() then return end
-
 	local bloodDrawDistance = hg_blood_draw_distance:GetInt()
 	local entDistSqr = ent:GetPos():DistToSqr(LocalPlayer():EyePos())
 
 	if seen and entDistSqr <= bloodDrawDistance * bloodDrawDistance and ent:GetNW2Bool("hg_fountain", false) then
 		ent.hgFountainNextParticle = ent.hgFountainNextParticle or 0
-		if ent.hgFountainNextParticle < CurTime() and (org.pulse or 0) > 0 then
-			local mul = 1 / math.max(org.pulse / 40 * 25, 2) * 0.75
-			local mul2 = math.max(org.pulse, 1) / 15
+		ent.hgFountainStart = ent.hgFountainStart or CurTime()
+		local fountainPulse = math.max(org.pulse or 0, 70 * (1 - (CurTime() - ent.hgFountainStart) / 8))
+		if ent.hgFountainNextParticle < CurTime() and fountainPulse > 0 then
+			local mul = 1 / math.max(fountainPulse / 40 * 25, 2) * 0.75
+			local mul2 = math.max(fountainPulse, 1) / 15
 			local forward = mul2 * 150
 			ent.hgFountainNextParticle = CurTime() + math.max(mul * 0.5, 1 / math.max(hg_blood_fps:GetInt(), 1))
 			
@@ -1475,6 +1475,8 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 		end
 	end
 	
+	if hg.BloodTakenOver and hg.BloodTakenOver() then return end
+
 	local bloodDistSqr = 1.5 * bloodDrawDistance
 	bloodDistSqr = bloodDistSqr * bloodDistSqr
 

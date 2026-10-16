@@ -245,6 +245,7 @@ local function decalBlood(pos, normal, tr, artery, owner, tiny, amount, particle
 		hg.DepositBodyBloodRunoff(pos, amount, artery, particleSize)
 		return
 	end
+	if hg.BloodLandRedirect and hg.BloodLandRedirect(pos, normal, tr, artery, amount, particleSize, vel) then return end
 
 	local steps, dir = 0
 	if vel and not tiny then

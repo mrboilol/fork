@@ -915,8 +915,20 @@ function P.Deposit(x, y, z, n, vol, surf, ent, kind, dx, dy, dz, K)
 	end
 	if s.vol >= need then
 		local cx, cy, cz = s.sx / s.w, s.sy / s.w, s.sz / s.w
+		local cnt, _, gx, gy, gz = ABL.Ground.Near(cx, cy, cz, n.x, n.y, n.z, PC.attractR)
+		local tr
+		if cnt >= PC.attractMin then
+			local dx, dy, dz = gx - cx, gy - cy, gz - cz
+			local h = dx * n.x + dy * n.y + dz * n.z
+			dx, dy, dz = dx - n.x * h, dy - n.y * h, dz - n.z * h
+			local d = sqrt(dx * dx + dy * dy + dz * dz)
+			local k = d > 0.01 and min(d * 0.8, PC.attractMax) / d or 0
+			local ax, ay, az = cx + dx * k, cy + dy * k, cz + dz * k
+			tr = util.TraceLine({ start = Vector(ax, ay, az) + n * 3, endpos = Vector(ax, ay, az) - n * 3, mask = MASK_SOLID, filter = ABL.Surface.ProbeFilter })
+			if not (tr.Hit and tr.HitNormal:Dot(n) > 0.85) then tr = nil end
+		end
 		-- snap the centre onto the surface
-		local tr = util.TraceLine({ start = Vector(cx, cy, cz) + n * 3, endpos = Vector(cx, cy, cz) - n * 3, mask = MASK_SOLID, filter = ABL.Surface.ProbeFilter })
+		tr = tr or util.TraceLine({ start = Vector(cx, cy, cz) + n * 3, endpos = Vector(cx, cy, cz) - n * 3, mask = MASK_SOLID, filter = ABL.Surface.ProbeFilter })
 		if tr.Hit and tr.HitNormal:Dot(n) > 0.85 then
 			cx, cy, cz = tr.HitPos.x, tr.HitPos.y, tr.HitPos.z
 		end
@@ -940,6 +952,14 @@ function P.Deposit(x, y, z, n, vol, surf, ent, kind, dx, dy, dz, K)
 		end
 		return np
 	end
+end
+
+local function EatStains(p)
+	ABL.Ground.Near(p.x, p.y, p.z, p.nx, p.ny, p.nz, p.rad + 2, function(x, y, z, a)
+		local v = a * pi * PC.eatFilm * ML
+		ABL.FlowCore.Move("surface", "pool", v)
+		P.Feed(p, v, x, y, z, "seep")
+	end)
 end
 
 function P.Disturb(p, x, y, z, dx, dy, dz, take, push)
@@ -1814,6 +1834,7 @@ function P.Think()
 					Consolidate(p)
 					if p.wet > 0.3 then Necks(p) end
 					Clots(p, now)
+					if p.wet > 0.2 and p.rad then EatStains(p) end
 					if p.sim and p.wet > 0 and p.bmVer ~= ABL.BloodMap.ver then StainPin(p) end
 					-- (the lattice holds what the pool's volume says: rounding is taken out here)
 					if p.sim then

@@ -99,6 +99,28 @@ local function Kill(s)
 	G.stats.removed = G.stats.removed + 1
 end
 
+function G.Near(x, y, z, nx, ny, nz, R, eat)
+	local n, w, sx, sy, sz = 0, 0, 0, 0, 0
+	local R2 = R * R
+	for i = head, tail do
+		local s = fifo[i]
+		if s and not s.dead and s.nx * nx + s.ny * ny + s.nz * nz > 0.9 then
+			local dx, dy, dz = s.x - x, s.y - y, s.z - z
+			if abs(dx * nx + dy * ny + dz * nz) < 3 and dx * dx + dy * dy + dz * dz < R2 then
+				local a = s.h * s.h
+				n, w = n + 1, w + a
+				sx, sy, sz = sx + s.x * a, sy + s.y * a, sz + s.z * a
+				if eat then
+					Kill(s)
+					eat(s.x, s.y, s.z, a)
+				end
+			end
+		end
+	end
+	if w <= 0 then return 0, 0 end
+	return n, w, sx / w, sy / w, sz / w
+end
+
 -- Over the cap: remove the oldest, preferring one that is out of view among the oldest few.
 local function RemoveOldest()
 	while head <= tail and (fifo[head] == nil or fifo[head].dead) do fifo[head] = nil head = head + 1 end

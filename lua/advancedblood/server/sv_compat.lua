@@ -6,43 +6,27 @@
 -- server code puts on the world by itself, next to the blood AdvancedBlood shows for the same
 -- injury:
 --
---   1. hook PostEntityTakeDamage / "ResponsiveHits_PostEntityTakeDamage" (homigrad/sv_util.lua):
+--   hook PostEntityTakeDamage / "ResponsiveHits_PostEntityTakeDamage" (homigrad/sv_util.lua):
 --      an engine blood decal behind and another below every bullet hit;
---   2. util.Decal with a blood decal name: a cut or a claw (on the victim and on what stands behind
---      it), the meat of a burst head wherever it lands, a breach charge on every body around it,
---      the flesh splat Z-City's own bullets stamp where they hit;
---   3. util.Effect with a blood effect name: the engine's red puff at a bullet hit on the brain.
---
--- 2 and 3 have no hook to go through: the calls sit in weapon methods, physics callbacks and
--- timers. They are caught where all of them end, in util.Decal and util.Effect, by name
--- (ABL.Config.ZCity). Only those names, only on a server that runs Z-City, only while abl_enabled
--- is 1 and abl_zcity_hitdecals is 0; every other call goes to the original function as it came.
--- Z-City's own decal names are its blood wherever they are asked for. The engine's names ("Blood",
--- "Impact.Flesh", the "BloodImpact" puff) are anybody's: those are left out only where a body
--- with a Z-City organism is close by, a body ABL bleeds for. Blood on something Z-City runs no
--- organism for is not ABL's to replace and stays as it is.
--- A Z-City file that keeps its own reference to one of the two (local Effect = util.Effect, as its
--- helicopter rotor does) is not reached.
 
 local C, N, Z = ABL.Config, ABL.Net, ABL.ZC
 
 ABL.CompatSV = ABL.CompatSV or {}
 local SV = ABL.CompatSV
-SV.stat = SV.stat or { hits = 0, decals = 0, effects = 0, names = {} }
+SV.stat = SV.stat or { hits = 0 }
 local stat = SV.stat
+
+if SV.wrapDecal and util.Decal == SV.wrapDecal then util.Decal = SV.origDecal end
+if SV.wrapEffect and util.Effect == SV.wrapEffect then util.Effect = SV.origEffect end
+SV.wrapDecal, SV.wrapEffect = nil, nil
 
 local function Suppressing()
 	return ABL.Enabled() and not C.sv.hitDecals:GetBool() and Z.Present()
 end
 SV.Suppressing = Suppressing
 
-local function Count(kind, name)
-	stat[kind] = stat[kind] + 1
-	stat.names[name] = (stat.names[name] or 0) + 1
-end
-
 ------------------------------------------------------------------------------------------
--- 1. Z-City's canned hit decals: on every bullet hit it stamps an engine blood decal on whatever
+-- Z-City's canned hit decals: on every bullet hit it stamps an engine blood decal on whatever
 -- lies 25 to 200 units behind the victim and another on the floor under that point, whatever the
 -- bullet did. With ABL the blood that leaves a body is thrown, flies and lands where it lands (and
 -- none is thrown forward without an exit), so for bodies ABL bleeds for the pair is left out. The
@@ -74,84 +58,12 @@ local function WrapResponsiveHits()
 	hook.Add("PostEntityTakeDamage", "ResponsiveHits_PostEntityTakeDamage", wrapped)
 end
 
-------------------------------------------------------------------------------------------
--- 2 and 3. Blood decals and blood effects by name.
-------------------------------------------------------------------------------------------
--- 0 = not blood, 1 = one of Z-City's own blood decals, 2 = an engine blood decal
-local isBlood = {}
-local function BloodDecal(name)
-	local v = isBlood[name]
-	if v == nil then
-		v = 0
-		for _, pat in ipairs(C.ZCity.decals) do
-			if string.find(name, pat) then v = 1 break end
-		end
-		if v == 0 then
-			for _, pat in ipairs(C.ZCity.engineDecals) do
-				if string.find(name, pat) then v = 2 break end
-			end
-		end
-		isBlood[name] = v
-	end
-	return v
-end
-
--- Is a body Z-City runs an organism for close to this point?
-local function NearOrganism(pos)
-	if not isvector(pos) then return false end
-	for _, e in ipairs(ents.FindInSphere(pos, C.ZCity.nearBody)) do
-		if istable(e.organism) then return true end
-	end
-	return false
-end
-
--- (an effect of another blood colour, yellow or green, is not this blood)
-local function Red(data)
-	if data == nil then return true end
-	local ok, col = pcall(function() return data:GetColor() end)
-	return not ok or col == nil or col == 0
-end
-
--- (lua refresh: the wrappers of the previous load come off first, if they are still on top)
-if SV.wrapDecal and util.Decal == SV.wrapDecal then util.Decal = SV.origDecal end
-if SV.wrapEffect and util.Effect == SV.wrapEffect then util.Effect = SV.origEffect end
-SV.wrapDecal, SV.wrapEffect = nil, nil
-
-local function WrapUtil()
-	if SV.wrapDecal then return end
-	local decal, effect = util.Decal, util.Effect
-	if not isfunction(decal) or not isfunction(effect) then return end
-	SV.origDecal, SV.origEffect = decal, effect
-	SV.wrapDecal = function(name, from, ...)
-		if isstring(name) then
-			local kind = BloodDecal(name)
-			if kind ~= 0 and Suppressing() and (kind == 1 or NearOrganism(from)) then
-				Count("decals", name)
-				return
-			end
-		end
-		return decal(name, from, ...)
-	end
-	SV.wrapEffect = function(name, data, ...)
-		if isstring(name) and C.ZCity.effects[name] and Suppressing() and Red(data) then
-			local ok, at = pcall(function() return data:GetOrigin() end)
-			if ok and NearOrganism(at) then
-				Count("effects", name)
-				return
-			end
-		end
-		return effect(name, data, ...)
-	end
-	util.Decal, util.Effect = SV.wrapDecal, SV.wrapEffect
-end
-
 local function Install()
 	if not Z.Present() then return false end
 	WrapResponsiveHits()
-	WrapUtil()
 	if not SV.told then
 		SV.told = true
-		ABL.Print("Z-City found: its blood decals and blood puffs are %s", Suppressing() and "left to AdvancedBlood" or "kept (abl_zcity_hitdecals 1 or abl_enabled 0)")
+		ABL.Print("Z-City found: its canned hit decals are %s", Suppressing() and "left to AdvancedBlood" or "kept (abl_zcity_hitdecals 1 or abl_enabled 0)")
 	end
 	return true
 end
@@ -191,11 +103,7 @@ net.Receive(N.ZCS, function(_, ply)
 	net.WriteBool(Suppressing())
 	-- 0 = Z-City has no such hook, 1 = it is there and not wrapped, 2 = wrapped
 	net.WriteUInt(not isfunction(rh) and 0 or (rh == ABL.wrapResponsiveHits and 2 or 1), 2)
-	net.WriteBool(SV.wrapDecal ~= nil and util.Decal == SV.wrapDecal)
-	net.WriteBool(SV.wrapEffect ~= nil and util.Effect == SV.wrapEffect)
 	net.WriteUInt(math.min(stat.hits, 16777215), 24)
-	net.WriteUInt(math.min(stat.decals, 16777215), 24)
-	net.WriteUInt(math.min(stat.effects, 16777215), 24)
 	net.WriteUInt(math.min(orgs, 255), 8)
 	net.WriteBool(org ~= nil)
 	if org then

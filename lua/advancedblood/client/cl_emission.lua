@@ -788,7 +788,6 @@ function E.OnHit(ev)
 	if not src then return end
 	local entry = BoneWorld(body, ev.bone, ev.lpos)
 	if not entry then return end
-	ABL.Compat.NoteHit(entry.x, entry.y, entry.z)
 	-- the engine's own splat decal at the hit gives way to the wound (cl_stains.lua)
 	if (ev.class == ABL.Net.DMG_BULLET or ev.class == ABL.Net.DMG_BUCKSHOT) and ABL.Compat.Takeover() and not C.cl.fleshDecals:GetBool() then
 		ABL.Stains.ClearEngineHitDecal(body)

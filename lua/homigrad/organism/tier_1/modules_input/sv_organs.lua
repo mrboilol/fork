@@ -538,12 +538,15 @@ hitArtery = function(artery, org, dmg, dmgInfo, boneindex, dir, hit, impact, for
 	return 0
 end
 
-local renalHemorrhageFraction = 0.5
-local renalHemorrhageDuration = 2.5
+local renalHemorrhageFraction = 0.3
+local renalHemorrhageDuration = 90
 
 openRenalHemorrhage = function(org, dmgInfo, boneindex, dir, hit, impact)
 	local owner = org.owner
 	if not IsValid(owner) or not org.arterialwounds then return end
+	for _, wound in ipairs(org.arterialwounds) do
+		if wound[7] == "renal" then return end
+	end
 	dir = isvector(dir) and dir:LengthSqr() > 0.001 and dir or traumaDirection(org, dmgInfo)
 	local localPos, localAng, dir2, woundBone = getlocalshit(owner, impact and impact.entity, boneindex or "ValveBiped.Bip01_Spine1", dir, hit)
 	if not localPos then

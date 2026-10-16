@@ -18,7 +18,7 @@ C.sv = {
 	netHits      = CreateConVar("abl_net_hits", "1", SVFLAGS, "Send compact wound-impact events to clients.", 0, 1),
 	netCollide   = CreateConVar("abl_net_collisions", "1", SVFLAGS, "Send bloody ragdoll collision events to clients.", 0, 1),
 	persist      = CreateConVar("abl_persist", "1", SVFLAGS, "Track coarse pools on the server so late joiners see existing blood.", 0, 1),
-	hitDecals    = CreateConVar("abl_zcity_hitdecals", "0", SVFLAGS, "Z-City's server-made blood decals and blood puffs (behind every bullet hit, at cuts and claws, where the meat of a burst head lands): keep them (1) or leave all blood to AdvancedBlood (0).", 0, 1),
+	hitDecals    = CreateConVar("abl_zcity_hitdecals", "0", SVFLAGS, "Z-City's canned blood decals behind and below every bullet hit: keep them (1) or leave them out (0).", 0, 1),
 	dev          = CreateConVar("abl_dev", "0", SVFLAGS, "Enable admin developer commands (abl_dev_*).", 0, 1),
 }
 
@@ -61,20 +61,9 @@ C.DEFAULT_GRAVITY = 600
 -- bright red: red light passes, green and blue are absorbed within a fraction of a millimetre.
 -- Z-City compatibility (sh_zcity.lua, client/cl_compat.lua, server/sv_compat.lua).
 C.ZCity = {
-	-- Blood decals by name (Lua patterns). While abl_zcity_hitdecals is 0 the server's Lua code
-	-- stamps none of Z-City's own (decals), and none of the engine's (engineDecals: the red
-	-- splat, the splat at a bullet hit on flesh) within nearBody units of a body with a Z-City
-	-- organism. Blood of another colour (YellowBlood) is not AdvancedBlood's and is left alone.
-	decals = { "^Normal%.Blood", "^Arterial%.Blood", "^Water%.Blood$" },
-	engineDecals = { "^Blood$", "^Impact%.Flesh$" },
-	-- Engine effects that are a puff of red blood, by name; near such a body, the same rule.
-	effects = { BloodImpact = true, bloodspray = true },
-	nearBody = 110,
 	-- A headless body: Z-City keeps a "fountain" at its neck and no wound. ABL bleeds it as one
 	-- arterial wound of this size, the size Z-City itself gives the stump of an amputated limb.
 	stumpSize = 10,
-	-- Volume of one blob of a burst (a limb or a head coming off), ml: [1] to [2].
-	burstVol = { 0.1, 0.35 },
 }
 
 C.Colors = {
@@ -143,7 +132,7 @@ C.Profiles = {
 		spurtRate = 0.0, spurtSpeed = 0, beadMax = 0.5, spreadCap = 1.2,
 	},
 }
-C.ProfileRate = { minor = 1.0, moderate = 4.0, severe = 10.0 } -- ml/s upper bounds
+C.ProfileRate = { minor = 1.5, moderate = 5.0, severe = 12.0 } -- ml/s upper bounds
 C.FRESH_WOUND_TIME = 3.0      -- seconds of HIGH-OUTPUT behaviour after a strong hit
 
 -- Posture and movement. Venous pressure at a wound grows with its depth below the heart
@@ -423,6 +412,10 @@ C.Pool = {
 	minVolume   = 2.0,     -- ml collected in one 8-unit cell (decaying) before it becomes a pool
 	minVolumeRunoff = 0.2, -- the same for blood that a stream brings (the pool begins where the stream arrives)
 	mergeFactor = 0.9,     -- pools merge when their outlines come this close (fraction of the reach)
+	attractR    = 30,
+	attractMin  = 3,
+	attractMax  = 22,
+	eatFilm     = 0.02,
 	overflow    = 0.05,    -- fraction of the pool per second (per unit of overshoot) running over a ledge
 	sheen       = 0.9,     -- strength of the view-dependent wet reflection on fresh pools
 	envStrength = 1.0,     -- brightness of the mirrored cubemap (abl_pool_envmap 1), as the map stores it. How much

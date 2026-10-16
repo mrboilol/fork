@@ -184,12 +184,14 @@ local hold_wound_pain_threshold = 72
 local hold_wound_painadd_threshold = 8
 local hold_wound_bleed_threshold = 0.35
 local wound_bleed_rate_mul = 2
+local venous_bleed_cap = 7
+local venous_type_mul = {slash = 0.45, trauma = 0.3}
 local arterial_bleed_ml_s_per_severity = (hg.organism.config and hg.organism.config.ARTERIAL_BLEED_ML_S_PER_SEVERITY) or 28
 local amputation_arterial_bleed_mul = (hg.organism.config and hg.organism.config.ARTERIAL_AMPUTATION_BLEED_MULTIPLIER) or 1
 local headgib_arterial_bleed_mul = (hg.organism.config and hg.organism.config.ARTERIAL_HEADGIB_BLEED_MULTIPLIER) or 1.65
 local arteryBleedMultipliers = {
 	arteria = 0.4,
-	aorta = 0.6,
+	aorta = 0.2,
 	rarmartery = 0.13,
 	larmartery = 0.13,
 	rlegartery = 0.165,
@@ -430,7 +432,7 @@ module[2] = function(owner, org, mulTime)
 
 	-- Internal bleeding increases external wound bleeding rate
 	if org.internalBleed > 0 then
-		org.bleedingmul = org.bleedingmul * (1 + org.internalBleed * 0.15)
+		org.bleedingmul = org.bleedingmul * math.min(1 + org.internalBleed * 0.15, 1.5)
 	end
 
 	if org.vomitInThroat then
@@ -596,6 +598,10 @@ module[2] = function(owner, org, mulTime)
 			local heldBleedMul = getHeldWoundBleedMul(org, wound)
 			org.woundPressureMultipliers[i] = heldBleedMul
 			bleed = bleed * heldBleedMul
+			if mulTime > 0 then
+				local rate = bleed / mulTime * (wound.vessel and 1 or venous_type_mul[wound.woundType] or 1)
+				bleed = venous_bleed_cap * (1 - math.exp(-rate / venous_bleed_cap)) * mulTime
+			end
 			local compressionClotMul = heldClotMul * bandageClotMul * Lerp(math.Clamp(1 - tourniquetBleedMul, 0, 1), 1, 2.4)
 			local hemostasisDelta = getWoundHemostasisDelta(org, wound, mulTime, time, false, false, compressionClotMul, bandageClotMul > 1)
 			local woundBleedRate = bleed / rand1 * 3
