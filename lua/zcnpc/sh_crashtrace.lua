@@ -81,6 +81,7 @@ local ALWAYS = {
 	ZCNPC_Downed = true, ZCNPC_Died = true, ZCNPC_GetUp = true, ZCNPC_WokeUp = true,
 	ZCNPC_TargetLost = true, ZCNPC_ClientDowned = true, ZCNPC_ClientWokeUp = true,
 	OnNetVarSet = true,
+	PreCleanupMap = true, PostCleanupMap = true, ShutDown = true, InitPostEntity = true,
 }
 
 -- Only when the first argument is an NPC or a ragdoll.

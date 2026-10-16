@@ -13,6 +13,7 @@ local HEARTBEAT_INTERVAL = 2
 local NET_WRAP_INTERVAL = 10
 local HELLO_DELAY = 2
 local MAX_CAUSE = 200
+local START_ARM_TIME = 20
 local RELEASE_COMMANDS = {
 	"-attack", "-attack2", "-forward", "-back", "-moveleft", "-moveright",
 	"-jump", "-duck", "-speed", "-walk", "-use", "-reload",
@@ -301,7 +302,9 @@ hook.Add("Think", "hg_freezeguard", function()
 	CheckConnection(now)
 end)
 
-hook.Add("InitPostEntity", "hg_freezeguard", function()
+local function Start()
+	if loaded then return end
+
 	local state, body = FG.ReadPreviousSession()
 
 	FG.sessionState = "running"
@@ -321,7 +324,12 @@ hook.Add("InitPostEntity", "hg_freezeguard", function()
 
 		if state then ShowPrevious(state, body) end
 	end)
-end)
+	FG.ArmWatchdog(START_ARM_TIME)
+end
+
+FG.WatchdogWanted = function() return cvWatchdog:GetBool() end
+hook.Add("InitPostEntity", "hg_freezeguard", Start)
+timer.Simple(0, Start)
 
 hook.Add("ShutDown", "hg_freezeguard", function()
 	if not loaded then return end

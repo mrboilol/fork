@@ -435,28 +435,15 @@ local function SafeGibInput(rag, bone, force)
 	rag.noHead = true
 	rag:SetNWString("PlayerName", "Beheaded body")
 
-	if istable(hg) and not (hg.fountains and hg.fountains[rag]) then
-		local neck = rag:LookupBone(NECK_BONE) or NeckBone(rag)
-
-		hg.fountains = hg.fountains or {}
-		hg.fountains[rag] = {
-			bone = neck,
-			lpos = (isfunction(ThatPlyIsFemale) and ThatPlyIsFemale(rag)) and Vector(4, 0, 0) or Vector(5, 0, 0),
-			lang = Angle(0, 0, 0),
-		}
+	if not rag:GetNW2Bool("hg_fountain", false) then
+		rag:SetNW2Bool("hg_fountain", true)
+		rag:SetNW2Vector("ABL_Neck", (isfunction(ThatPlyIsFemale) and ThatPlyIsFemale(rag)) and Vector(4, 0, 0) or Vector(5, 0, 0))
 
 		net.Start("addfountain")
 		net.WriteEntity(rag)
+		net.WriteUInt(rag:EntIndex(), 16)
 		net.WriteVector(force or vector_origin)
-		net.Broadcast()
-
-		if isfunction(SetNetVar) then SetNetVar("fountains", hg.fountains) end
-
-		rag:CallOnRemove("removefountain", function()
-			if not istable(hg) then return end
-			hg.fountains[rag] = nil
-			if isfunction(SetNetVar) then SetNetVar("fountains", hg.fountains) end
-		end)
+		net.SendPVS(rag:GetPos())
 	end
 end
 

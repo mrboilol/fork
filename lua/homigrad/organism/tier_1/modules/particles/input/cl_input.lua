@@ -417,6 +417,11 @@ net.Receive("hg_fullbody_gibspill", function()
 	applyGroup(1)
 end)
 
+hook.Add("PostCleanupMap", "hg_gib_blood_reset", function()
+	table.Empty(hg.gibbloodspillparticles)
+	table.Empty(hg.gibTrails)
+end)
+
 hook.Add("Think", "hg_gib_trail", function()
 	for ent, data in pairs(hg.gibTrails) do
 		if not IsValid(ent) then

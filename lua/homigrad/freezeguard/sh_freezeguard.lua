@@ -23,6 +23,7 @@ local SUSPECT_SLACK = 0.1
 local WATCHDOG_LIMIT = 5
 local WATCHDOG_COUNT = 100000
 local WATCHDOG_IDLE = 2
+local ARM_TIME = 15
 local ERROR_REPORT_COUNTS = {[1] = true, [10] = true, [100] = true, [1000] = true}
 local ORGANISM_KEYS = {"alive", "otrub", "consciousness", "blood", "pain", "heartbeat", "o2", "brain", "stamina"}
 local LOG_COLOR = Color(255, 90, 90)
@@ -257,3 +258,19 @@ function FG.SetWatchdog(on)
 		FG.watchdogFn = nil
 	end
 end
+
+function FG.ArmWatchdog(duration)
+	FG.SetWatchdog(true)
+	timer.Create("hg_freezeguard_arm", duration, 1, function()
+		FG.SetWatchdog(FG.WatchdogWanted and FG.WatchdogWanted() or false)
+	end)
+end
+
+hook.Add("PreCleanupMap", "hg_freezeguard", function()
+	FG.Event("map cleanup started")
+	FG.ArmWatchdog(ARM_TIME)
+end)
+
+hook.Add("PostCleanupMap", "hg_freezeguard", function()
+	FG.Event("map cleanup finished")
+end)

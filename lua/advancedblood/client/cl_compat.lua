@@ -25,7 +25,7 @@ CP.recv = {}
 CP.stat = CP.stat or {}
 local stat = CP.stat
 for _, k in ipairs({ "adopted", "clouds", "impacts", "covered", "coughs", "bursts", "drained",
-	"zDrawn", "zDecals", "leakDrawn", "leakDecals", "rewraps" }) do
+	"zDrawn", "zDecals", "leakDrawn", "leakDecals", "rewraps", "gibs" }) do
 	stat[k] = stat[k] or 0
 end
 
@@ -199,6 +199,84 @@ RECEIVERS["bloodsquirt2"] = function(orig, len, ply)
 	local owner = isfunction(hg.RagdollOwner) and hg.RagdollOwner(ent) or nil
 	local ok, err = pcall(ABL.Emission.Cough, IsValid(owner) and owner or ent, boneName, m, pos, dir)
 	if not ok then ErrorNoHalt("[AdvancedBlood] cough: " .. tostring(err) .. "\n") end
+end
+
+local gibRng
+local NECK_BONE = "ValveBiped.Bip01_Neck1"
+
+local function Burst(pos, dir, base, n, spMin, spMax, spread, vmin, vmax, lift)
+	local _, near = ABL.LOD.PointImportance(pos.x, pos.y, pos.z)
+	if near > C.cl.drawDist:GetFloat() then return end
+	gibRng = gibRng or ABL.RNG(4099)
+	local Cone, Spawn = ABL.Emission.Cone, ABL.Drops.Spawn
+	local dx, dy, dz = ABL.Norm(dir.x, dir.y, dir.z)
+	if dx == 0 and dy == 0 and dz == 0 then dx, dy, dz = 0, 0, 1 end
+	local ox, oy, oz = pos.x + dx * 2, pos.y + dy * 2, pos.z + dz * 2
+	local bx, by, bz = base.x, base.y, base.z + lift
+	for _ = 1, n do
+		local s = gibRng:Next() ^ 1.7
+		local cx, cy, cz = Cone(gibRng, dx, dy, dz, spread * (1.3 - 0.5 * s))
+		local sp = gibRng:Range(spMin, spMax) * (1.15 - 0.3 * s)
+		Spawn(ox, oy, oz, bx + cx * sp, by + cy * sp, bz + cz * sp, vmin * (vmax / vmin) ^ s, nil, 1, 2)
+	end
+end
+
+local function TrailGib(ent)
+	local trails = istable(hg) and hg.gibTrails
+	if istable(trails) and not trails[ent] then trails[ent] = { lastSpawn = 0 } end
+end
+
+local function NeckBurst(ent, force)
+	local bone = ent:LookupBone(NECK_BONE)
+	local m = bone and ent:GetBoneMatrix(bone)
+	if not m then return end
+	local fwd = m:GetForward()
+	local pos = m:GetTranslation() + fwd * 5
+	local base = ent:GetVelocity()
+	local f = force:Length()
+	if f > 1 then base = base + force * (math.min(f * 0.02, 150) / f) end
+	stat.gibs = stat.gibs + 1
+	Burst(pos, fwd, base, 46, 90, 340, 0.7, 0.004, 0.09, 20)
+	local v = C.ZCity.burstVol
+	Burst(pos, fwd, base, 10, 20, 90, 1.4, v[1], v[2], 10)
+	ABL.Drops.Mist(pos, fwd * 70 + base, 8, 14)
+end
+
+RECEIVERS["addfountain"] = function(orig, len, ply)
+	if not Takeover() then return orig(len, ply) end
+	local ent = net.ReadEntity()
+	local idx = net.ReadUInt(16)
+	local force = net.ReadVector()
+	local function Try(attempt)
+		ent = IsValid(ent) and ent or Entity(idx)
+		if IsValid(ent) and not ent:IsDormant() then return NeckBurst(ent, force) end
+		if attempt < 20 then timer.Simple(0.05, function() Try(attempt + 1) end) end
+	end
+	Try(0)
+end
+
+RECEIVERS["hg_gib_bloodspill"] = function(orig, len, ply)
+	if not Takeover() then return orig(len, ply) end
+	local ent = Entity(net.ReadUInt(16))
+	local amount = net.ReadFloat()
+	local stump = net.ReadBool()
+	net.ReadBool()
+	if not IsValid(ent) or ent:IsDormant() then return end
+	local pos, vel = ent:WorldSpaceCenter(), ent:GetVelocity()
+	if stump then
+		Burst(pos, vector_up, vel, math.Clamp(math.floor(amount * 0.6), 12, 32), 25, 120, 1.1, 0.01, 0.12, 15)
+	else
+		Burst(pos, vel:LengthSqr() > 1 and vel or vector_up, vel * 0.3, math.Clamp(math.floor(amount * 3), 3, 8), 15, 70, 1.3, 0.008, 0.06, 10)
+	end
+	TrailGib(ent)
+end
+
+RECEIVERS["hg_gib_blood_decal"] = function(orig, len, ply)
+	if not Takeover() then return orig(len, ply) end
+	net.ReadEntity()
+	local pos, normal = net.ReadVector(), net.ReadVector()
+	if normal:LengthSqr() < 0.0001 then return end
+	Burst(pos - normal * 4, normal, vector_origin, 4, 60, 140, 0.5, 0.03, 0.12, 0)
 end
 
 local function WrapReceivers()

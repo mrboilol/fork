@@ -15,6 +15,7 @@ local REVIVE_DELAY = 1
 local MSG_COOLDOWN = 2
 local MAX_CAUSE = 200
 local MAX_STATE = 16
+local START_ARM_TIME = 20
 
 local cvWatchdog = CreateConVar("hg_freezeguard_watchdog", "0", FCVAR_ARCHIVE,
 	"Break server Lua hangs longer than 5s and log where they were stuck. Slows LuaJIT while on.", 0, 1)
@@ -264,7 +265,9 @@ hook.Add("Think", "hg_freezeguard", function()
 	hadPlayers = player.GetCount() > 0
 end)
 
-hook.Add("InitPostEntity", "hg_freezeguard", function()
+local function Start()
+	if loaded then return end
+
 	local state, body = FG.ReadPreviousSession()
 	if state then
 		FG.SaveLog("crash", "=== the server's last session ended without shutting down (" .. state .. ") ===\n" .. body)
@@ -279,7 +282,12 @@ hook.Add("InitPostEntity", "hg_freezeguard", function()
 	timer.Create("hg_freezeguard_heartbeat", HEARTBEAT_INTERVAL, 0, FG.WriteSession)
 	lastThink = SysTime()
 	loaded = true
-end)
+	FG.ArmWatchdog(START_ARM_TIME)
+end
+
+FG.WatchdogWanted = function() return cvWatchdog:GetBool() end
+hook.Add("InitPostEntity", "hg_freezeguard", Start)
+timer.Simple(0, Start)
 
 hook.Add("ShutDown", "hg_freezeguard", function()
 	if not loaded then return end

@@ -171,21 +171,6 @@ timer.Create("ABL_CompatSVWatch", 10, 0, function()
 end)
 
 ------------------------------------------------------------------------------------------
--- A headless body's neck (sh_zcity.lua, Z.StumpWounds): the point Z-City keeps its fountain at,
--- put on the body itself so that it reaches every client together with the body.
-------------------------------------------------------------------------------------------
-timer.Create("ABL_CompatNeck", 0.5, 0, function()
-	local all = Z.Fountains()
-	if not all or not ABL.Enabled() then return end
-	for rag, f in pairs(all) do
-		if IsValid(rag) and not rag.ABL_neck and istable(f) then
-			rag.ABL_neck = true
-			rag:SetNW2Vector("ABL_Neck", isvector(f.lpos) and not f.lpos:IsZero() and f.lpos or Vector(4, 0, 0))
-		end
-	end
-end)
-
-------------------------------------------------------------------------------------------
 -- abl_zcity_status: the server's part of the answer (asked for by the client command, at most
 -- once a second per player).
 ------------------------------------------------------------------------------------------

@@ -203,7 +203,7 @@ hook.Add("PreDrawTranslucentRenderables", "ABL_Draw", function(depth, skybox, sk
 end)
 
 hook.Add("PostCleanupMap", "ABL_Cleanup", function()
-	ABL.ClearAll(true)
+	ABL.ClearAll(false)
 end)
 
 hook.Add("ShutDown", "ABL_Shutdown", function()

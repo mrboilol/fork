@@ -322,8 +322,8 @@ hook.Add("Player Spawn", "zcnpc_ensure_hands", function(ply)
 	end)
 end)
 
-hook.Add("HomigradRun", "zcnpc_player_org", Install)
-hook.Add("InitPostEntity", "zcnpc_player_org", Install)
+hook.Add("HomigradRun", "zcnpc_player_org", function() Install() end)
+hook.Add("InitPostEntity", "zcnpc_player_org", function() Install() end)
 
 Install()
 

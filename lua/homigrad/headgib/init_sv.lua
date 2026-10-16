@@ -449,6 +449,7 @@ function Gib_Input(rag, bone, force, damage)
 		rag:SetNWString("PlayerName", "Beheaded body")
 
 		rag:SetNW2Bool("hg_fountain", true)
+		rag:SetNW2Vector("ABL_Neck", ThatPlyIsFemale(rag) and Vector(4, 0, 0) or Vector(5, 0, 0))
 
 		net.Start("addfountain")
 		net.WriteEntity(rag)

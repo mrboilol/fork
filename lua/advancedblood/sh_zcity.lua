@@ -86,22 +86,6 @@ function Z.GetWoundLists(ent)
 	return w, a
 end
 
--- A headless body. Z-City keeps a "fountain" for it (hg.fountains on the server, the global netvar
--- "fountains" for clients: the neck bone and a point in its space) and drips its particles from
--- there for as long as the body lies; it stores no wound for it, so ABL would show nothing at the
--- neck. The same state is handed to ABL as one arterial wound at that point, in the layout of
--- Z-City's own wound lists: it bleeds like any other, with the pulse while there is one and
--- running dry after. The netvar is keyed by entity and often reaches a client before the body
--- does (a head that comes off as its owner dies: the key is then no entity at all, for Z-City's
--- own fountain as well), so the server puts the point on the body itself (server/sv_compat.lua).
-if SERVER then
-	-- Bodies Z-City has a fountain for: { [ragdoll] = { bone, lpos, lang } }, or nil.
-	function Z.Fountains()
-		local all = istable(hg) and hg.fountains or nil
-		return istable(all) and all or nil
-	end
-end
-
 -- Returns a list of one wound, or nil.
 local stumps = setmetatable({}, { __mode = "k" })
 function Z.StumpWounds(ent)

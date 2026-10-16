@@ -221,8 +221,8 @@ local function WrapKick()
 end
 
 WrapKick()
-hook.Add("InitPostEntity", "zcnpc_kick_wrap", WrapKick)
-hook.Add("HomigradRun", "zcnpc_kick_wrap", WrapKick)
+hook.Add("InitPostEntity", "zcnpc_kick_wrap", function() WrapKick() end)
+hook.Add("HomigradRun", "zcnpc_kick_wrap", function() WrapKick() end)
 timer.Create("zcnpc_kick_wrap", 1, 8, function()
 	if WrapKick() then timer.Remove("zcnpc_kick_wrap") end
 end)
