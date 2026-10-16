@@ -2374,7 +2374,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	end
 
 	local brokenSkullHeadImpact = hitgroup == HITGROUP_HEAD and (skullOpenBeforeTrace or org.skull == 1)
-		and not impact.armorStopped
+		and not impact.armorStopped and not dmgInfo:IsDamageType(DMG_CRUSH + DMG_FALL)
 	if brokenSkullHeadImpact then
 		local effect = EffectData()
 		effect:SetOrigin(dmgPos)

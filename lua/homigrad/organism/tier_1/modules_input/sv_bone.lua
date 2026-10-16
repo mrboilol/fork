@@ -1000,7 +1000,6 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	local result, vecrand = damageBone(org, 0.25, bluntMelee and dmg * melee_skull_bone_mul or dmg, dmgInfo, "skull", boneindex, dir, hit, ricochet, oldDmg >= 1)
 	if oldDmg >= 1 then
 		result = 0
-		bloodBurst(org, dmgInfo, math.max(dmg * 4, 2), hit, true)
 		if not (impact and impact.source == "physics") and not dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_BLAST) and hg.organism.input_list.brainFrontal then
 			hg.organism.input_list.brainFrontal(org, bone, dmg, dmgInfo)
 		end
@@ -1199,11 +1198,6 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	local result, vecrand = damageBone(org, 0.1, dmg / 4, dmgInfo, "chest", boneindex, dir, hit, ricochet, true)
 	
 	hg.AddHarmToAttacker(dmgInfo, (org.chest - oldDmg) * 3, "Ribs bone damage harm")
-
-	local chestDelta = org.chest - oldDmg
-	if chestDelta > 0 then
-		bloodBurst(org, dmgInfo, 2 + org.chest * 3, hit)
-	end
 
 	addPain(org, dmg * 1.5, "body")
 	org.shock = org.shock + dmg * 1.5

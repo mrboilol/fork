@@ -65,10 +65,10 @@ C.ZCity = {
 	-- stamps none of Z-City's own (decals), and none of the engine's (engineDecals: the red
 	-- splat, the splat at a bullet hit on flesh) within nearBody units of a body with a Z-City
 	-- organism. Blood of another colour (YellowBlood) is not AdvancedBlood's and is left alone.
-	decals = { "^Normal%.Blood", "^Arterial%.Blood", "^Water%.Blood$" },
+	decals = { "^Normal%.Blood", "^Water%.Blood$" },
 	engineDecals = { "^Blood$", "^Impact%.Flesh$" },
 	-- Engine effects that are a puff of red blood, by name; near such a body, the same rule.
-	effects = { BloodImpact = true, bloodspray = true },
+	effects = {},
 	nearBody = 110,
 	-- A headless body: Z-City keeps a "fountain" at its neck and no wound. ABL bleeds it as one
 	-- arterial wound of this size, the size Z-City itself gives the stump of an amputated limb.

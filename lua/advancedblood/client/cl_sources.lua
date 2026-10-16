@@ -106,9 +106,9 @@ end
 ------------------------------------------------------------------------------------------
 -- Wound mirror
 ------------------------------------------------------------------------------------------
-local function SyncList(src, list, arterial, now)
+local function SyncList(src, list, arterial, now, rated)
 	if not list then return end
-	for _, w in ipairs(list) do
+	for i, w in ipairs(list) do
 		if istable(w) and isvector(w[2]) and isstring(w[4]) then
 			local id = WoundId(w, arterial)
 			local wd = src.wounds[id]
@@ -118,6 +118,7 @@ local function SyncList(src, list, arterial, now)
 				src.woundList[#src.woundList + 1] = wd
 			end
 			wd.sev = tonumber(w[1]) or 0
+			wd.zi = rated and i or nil
 			-- (it was on its way out and is in the list again: it comes back from where it stood)
 			wd.closing = nil
 			if arterial and isvector(w[6]) then
@@ -137,11 +138,8 @@ function S.Sync(src)
 		return
 	end
 	local now = CurTime()
-	local vlist, alist = Z.GetWoundLists(src.key)
-	SyncList(src, vlist, false, now)
-	SyncList(src, alist, true, now)
-	-- (the neck of a headless body: Z-City has a fountain there and no wound)
-	SyncList(src, Z.StumpWounds(src.key), true, now)
+	local vlist = Z.GetWoundLists(src.key)
+	SyncList(src, vlist, false, now, true)
 	-- wounds that disappeared (bandaged, healed, coagulated) stop emitting; blood already out stays
 	local wl = src.woundList
 	for i = #wl, 1, -1 do
@@ -415,7 +413,8 @@ function S.Update()
 			if now >= src.nextSync then
 				src.nextSync = now + 0.35
 				S.Sync(src)
-				local pulse, alive, blood = Z.Vitals(src.body or key, src.owner)
+				local pulse, alive, blood, org = Z.Vitals(src.body or key, src.owner)
+				src.org = IsValid(src.owner) and istable(src.owner.organism) and src.owner.organism or org
 				if src.alive and not alive then src.deathTime = src.deathTime or now end
 				if alive then src.deathTime = nil end
 				src.pulse, src.alive, src.blood = pulse, alive, blood

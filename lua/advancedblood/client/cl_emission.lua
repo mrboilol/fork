@@ -199,8 +199,13 @@ end
 -- with its flow established (ml/s).
 function E.Rate(src, wd)
 	local pulse = src.pulse or 70
+	local org = src.org
+	local rates = wd.zi and org and (wd.arterial and org.arterialWoundBleedRates or org.woundBleedRates)
+	local synced = istable(rates) and tonumber(rates[wd.zi]) or nil
 	local base
-	if wd.arterial then
+	if synced and src.alive then
+		base = max(synced, 0)
+	elseif wd.arterial then
 		base = C.ARTERIAL_K * wd.sev * max(pulse, 20)
 	else
 		base = C.VENOUS_K * wd.sev * max(pulse, 20) / 70
@@ -212,13 +217,13 @@ function E.Rate(src, wd)
 		base = passive * C.POSTMORTEM_OOZE * exp(-t / C.POSTMORTEM_DECAY)
 	end
 	local now = CurTime()
-	if wd.fresh > now then
+	if wd.fresh > now and not (synced and src.alive) then
 		local k = (wd.fresh - now) / C.FRESH_WOUND_TIME
 		base = base * (1 + C.Wound.surge * min(k, 1))
 	end
 	-- the wound it bleeds through: how much of the blood lost there reaches the outside
 	local r = wd.rec
-	if r then
+	if r and not (synced and src.alive) then
 		if r.graze then
 			-- skin and the fat under it: it oozes, whatever volume the hit was booked with
 			base = base * C.Wound.grazeBleed

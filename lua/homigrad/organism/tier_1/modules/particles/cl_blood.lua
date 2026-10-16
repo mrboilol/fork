@@ -80,15 +80,16 @@ bloodparticles_hook[1] = function(anim_pos, mul)
 		local light2 = render.ComputeLighting(pos, vector_up)
 		local light3 = render.ComputeDynamicLighting(pos, vector_up)
 		local light = (light1 + light2 + light3) * 3
-		lightcolor.g = 0
 		lightcolor.b = 0
 		if part.kishki then
 			render_SetMaterial(part[4])
-			lightcolor.r = math.min((part.artery and 45 or 10) * light[1], 255)
+			lightcolor.r = part.artery and math.Clamp(90 * light[1], 150, 255) or math.min(10 * light[1], 255)
+			lightcolor.g = part.artery and lightcolor.r * 0.06 or 0
 			render_DrawSprite(pos, part[5], part[6], lightcolor)
 		else
 			render_SetMaterial(mat_huy)
-			lightcolor.r = math.min((part.artery and 45 or 20) * light[1], 255)
+			lightcolor.r = part.artery and math.Clamp(90 * light[1], 150, 255) or math.min(20 * light[1], 255)
+			lightcolor.g = part.artery and lightcolor.r * 0.06 or 0
 			local beamMotion = (part[2] - part[1]) / mul / 24
 			local size = part[5] or 1
 			local maxLength = part.maxBeamLength or size

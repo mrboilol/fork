@@ -11,17 +11,11 @@
 --   * from its wound think (hook "Player-Ragdoll think" / "organism-think-client-blood"): drips
 --     from every wound, arterial spurts, the fountain of a headless body. The think is wrapped;
 --     while it runs, the particles it asks for are swallowed (ABL bleeds those wounds itself);
---   * from other callers of hg.addBloodPart / hg.addBloodPart2: wrapped, turned into ABL drops
---     (clouds are left out);
---   * from net messages: "hg_bloodimpact" (spray at a bullet's entry; ABL's abl_hit carries the
---     same hit), "bloodsquirt" (250 particles out of a head wound; the wound ABL made of that hit
---     bleeds as its vessels and the pulse allow), "bloodsquirt2" (blood coughed or vomited up:
---     becomes ABL drops from the mouth). Their receivers are replaced;
---   * from functions local to Z-City's files that no wrapper reaches: the burst of an amputation
---     (hook HG_OrganismChanged) and of a head coming off (net "addfountain"). For these, and for
---     whatever a later Z-City version adds, the two lists themselves are emptied before every
---     frame is drawn: a burst's blobs become ABL drops, everything else is dropped. Nothing of
---     Z-City's is on screen for even one frame, and none of its decals is stamped.
+--   * from other callers of hg.addBloodPart: wrapped, turned into ABL drops;
+--   * from net message "bloodsquirt2" (blood coughed or vomited up: becomes ABL drops from the
+--     mouth). Its receiver is replaced.
+--
+-- Arterial jets, fountains, gore bursts, head squirts and impact sprays stay Z-City's own.
 --
 -- With the convar at 0 every wrapper passes straight through to the original function and the
 -- lists are left alone. abl_zcity_status prints what is in place and what was caught.
@@ -35,6 +29,7 @@ local C, N, Z = ABL.Config, ABL.Net, ABL.ZC
 if CP.Uninstall then pcall(CP.Uninstall) end
 
 local suppress = false
+local fountain = false
 CP.installed = false
 CP.recv = {}
 CP.stat = CP.stat or {}
@@ -57,28 +52,6 @@ local function Adopt(pos, vel, artery)
 	local vol = (artery and 0.05 or 0.025) * math.Rand(0.6, 1.4)
 	ABL.Drops.Spawn(pos.x, pos.y, pos.z, vel.x, vel.y, vel.z, vol, nil, 1, artery and 1 or 0)
 	stat.adopted = stat.adopted + 1
-end
-
--- One blob of a burst (a limb or a head coming off).
-local function Burst(pos, vel)
-	local v = C.ZCity.burstVol
-	ABL.Drops.Spawn(pos.x, pos.y, pos.z, vel.x, vel.y, vel.z, math.Rand(v[1], v[2]), nil, 1, 0)
-	stat.bursts = stat.bursts + 1
-end
-
--- A short spray back along a shot, for a server that sends no abl_hit (abl_net_hits 0).
-local sprayRng
-local function Spray(pos, dir, amt)
-	if not (isvector(pos) and isvector(dir)) or not ABL.InWorld(pos.x, pos.y, pos.z) then return end
-	local dx, dy, dz = ABL.Norm(-dir.x, -dir.y, -dir.z)
-	if dx == 0 and dy == 0 and dz == 0 then return end
-	sprayRng = sprayRng or ABL.RNG(1977)
-	local n = math.Clamp(math.floor(tonumber(amt) or 1), 1, 8) * 4
-	for _ = 1, n do
-		local cx, cy, cz = ABL.Emission.Cone(sprayRng, dx, dy, dz, 0.3)
-		local s = sprayRng:Range(60, 220)
-		ABL.Drops.Spawn(pos.x + dx * 2, pos.y + dy * 2, pos.z + dz * 2, cx * s, cy * s, cz * s, sprayRng:Range(0.02, 0.06), nil, 1, 0)
-	end
 end
 
 ------------------------------------------------------------------------------------------
@@ -112,11 +85,9 @@ local function WrapAdd()
 		local orig = hg.addBloodPart
 		CP.origAdd = orig
 		CP.wrapAdd = function(pos, vel, mat, w, h, artery, kishki, owner, ...)
-			if Takeover() and isvector(pos) and isvector(vel) then
+			if Takeover() and isvector(pos) and isvector(vel) and not (artery or kishki or fountain) then
 				if suppress then
 					stat.swallowed = stat.swallowed + 1
-				elseif kishki then
-					Burst(pos, vel)
 				else
 					Adopt(pos, vel, artery)
 				end
@@ -126,18 +97,17 @@ local function WrapAdd()
 		end
 		hg.addBloodPart = CP.wrapAdd
 	end
-	if isfunction(hg.addBloodPart2) and hg.addBloodPart2 ~= CP.wrapAdd2 then
-		local orig2 = hg.addBloodPart2
-		CP.origAdd2 = orig2
-		-- (clouds: mist at a hit, blood in water. ABL's drops make their own where they meet water)
-		CP.wrapAdd2 = function(...)
-			if Takeover() then
-				stat.clouds = stat.clouds + 1
-				return
-			end
-			return orig2(...)
+	if isfunction(hg.applyFountain) and hg.applyFountain ~= CP.wrapFountain then
+		local origF = hg.applyFountain
+		CP.origFountain = origF
+		CP.wrapFountain = function(...)
+			local was = fountain
+			fountain = true
+			local ok, err = pcall(origF, ...)
+			fountain = was
+			if not ok then ErrorNoHalt("[AdvancedBlood] Z-City fountain error: " .. tostring(err) .. "\n") end
 		end
-		hg.addBloodPart2 = CP.wrapAdd2
+		hg.applyFountain = CP.wrapFountain
 	end
 end
 
@@ -158,24 +128,6 @@ local function Replace(name)
 	CP.recv[name] = { orig = orig, wrap = wrap }
 	net.Receive(name, wrap)
 	return true
-end
-
--- Entry-wound spray: abl_hit carries the same event with bone-space positions and the exit.
-RECEIVERS["hg_bloodimpact"] = function(orig, len, ply)
-	if not Takeover() then return orig(len, ply) end
-	stat.impacts = stat.impacts + 1
-	if C.sv.netHits:GetBool() then return end
-	local pos, dir = net.ReadVector(), net.ReadVector()
-	net.ReadFloat()
-	Spray(pos, dir, net.ReadInt(8))
-end
-
--- Head squirt: on some headshots Z-City sprays 250 of its own particles out of the entry and the
--- exit for two and a half seconds (they stamp engine blood decals where they land). The wound ABL
--- made of that hit already bleeds as its vessels and the pulse allow.
-RECEIVERS["bloodsquirt"] = function(orig, len, ply)
-	if not Takeover() then return orig(len, ply) end
-	stat.squirts = stat.squirts + 1
 end
 
 -- Blood coughed or vomited up (a lung or stomach wound, bleeding inside): the same event, as ABL
@@ -199,12 +151,8 @@ local function WrapReceivers()
 end
 
 ------------------------------------------------------------------------------------------
--- Z-City's particle lists, emptied before every frame is drawn (see the head of this file). The
--- same hook keeps count of what Z-City shows all the same: particles that are in its lists when it
--- draws, and decals its particle code stamps (hg.bloodcount is Z-City's own counter of them).
--- With the takeover on both must stay at nothing; abl_zcity_status reports them.
+-- Counts of what Z-City's particle code draws and stamps, for abl_zcity_status.
 ------------------------------------------------------------------------------------------
-local ADOPT_MAX = 48 -- burst blobs turned into drops per frame; more than that are dropped
 local lastCount, lastOn
 
 local function Lists()
@@ -228,26 +176,6 @@ local function Drain()
 		end
 	end
 	lastCount, lastOn = bc, on
-	if not on then return end
-	if t1 then
-		local n = #t1
-		local left = ADOPT_MAX
-		for i = 1, n do
-			local p = t1[i]
-			t1[i] = nil
-			if istable(p) and p.kishki and left > 0 and isvector(p[2]) and isvector(p[3]) then
-				left = left - 1
-				Burst(p[2], p[3])
-			else
-				stat.drained = stat.drained + 1
-			end
-		end
-	end
-	if t2 then
-		local n = #t2
-		for i = 1, n do t2[i] = nil end
-		stat.clouds = stat.clouds + n
-	end
 end
 
 local function Witness(depth, skybox)
@@ -287,14 +215,14 @@ function CP.Uninstall()
 	end
 	if istable(hg) then
 		if CP.wrapAdd and hg.addBloodPart == CP.wrapAdd then hg.addBloodPart = CP.origAdd end
-		if CP.wrapAdd2 and hg.addBloodPart2 == CP.wrapAdd2 then hg.addBloodPart2 = CP.origAdd2 end
+		if CP.wrapFountain and hg.applyFountain == CP.wrapFountain then hg.applyFountain = CP.origFountain end
 	end
 	for name, r in pairs(CP.recv or {}) do
 		if net.Receivers and net.Receivers[name] == r.wrap then net.Receive(name, r.orig) end
 	end
 	hook.Remove("PreRender", "ABL_CompatDrain")
 	hook.Remove("PostDrawTranslucentRenderables", "ABL_CompatWitness")
-	CP.wrapThink, CP.wrapAdd, CP.wrapAdd2, CP.recv = nil, nil, nil, {}
+	CP.wrapThink, CP.wrapAdd, CP.wrapFountain, CP.recv = nil, nil, nil, {}
 	CP.installed = false
 end
 
@@ -315,7 +243,7 @@ local function InPlace()
 	local think = set and set["organism-think-client-blood"]
 	if isfunction(think) and think ~= CP.wrapThink then return false end
 	if isfunction(hg.addBloodPart) and hg.addBloodPart ~= CP.wrapAdd then return false end
-	if isfunction(hg.addBloodPart2) and hg.addBloodPart2 ~= CP.wrapAdd2 then return false end
+	if isfunction(hg.applyFountain) and hg.applyFountain ~= CP.wrapFountain then return false end
 	for name in pairs(RECEIVERS) do
 		local cur = net.Receivers and net.Receivers[name]
 		local r = CP.recv[name]
@@ -371,22 +299,14 @@ function CP.Status()
 	P("Takeover: %s (abl_zcity_takeover %d)%s", on and "ON" or "OFF", C.cl.takeover:GetInt(), CP.installed and "" or " - NOT INSTALLED YET")
 	Path("wound drips, spurts, neck fountain (think)", isfunction(think), think == CP.wrapThink, string.format("swallowed, %d particles", stat.swallowed))
 	Path("hg.addBloodPart (other callers)", isfunction(hg.addBloodPart), hg.addBloodPart == CP.wrapAdd, string.format("as AdvancedBlood drops, %d", stat.adopted))
-	Path("hg.addBloodPart2 (mist, clouds in water)", isfunction(hg.addBloodPart2), hg.addBloodPart2 == CP.wrapAdd2, string.format("left out, %d", stat.clouds))
-	for _, e in ipairs({ { "hg_bloodimpact", "net hg_bloodimpact (entry spray)", "abl_hit instead, %d", "impacts" },
-		{ "bloodsquirt", "net bloodsquirt (head squirt)", "left out, %d", "squirts" },
-		{ "bloodsquirt2", "net bloodsquirt2 (blood coughed up)", "as AdvancedBlood drops, %d", "coughs" } }) do
+	for _, e in ipairs({ { "bloodsquirt2", "net bloodsquirt2 (blood coughed up)", "as AdvancedBlood drops, %d", "coughs" } }) do
 		local cur = net.Receivers and net.Receivers[e[1]]
 		local r = CP.recv[e[1]]
 		Path(e[2], isfunction(cur), r ~= nil and r.wrap == cur, string.format(e[3], stat[e[4]]))
 	end
-	local drainOn = hook.GetTable().PreRender ~= nil and hook.GetTable().PreRender["ABL_CompatDrain"] ~= nil
-	Path("particle lists (amputation, head burst, the rest)", t1 ~= nil or t2 ~= nil, drainOn,
-		string.format("emptied every frame: %d burst blobs as drops, %d dropped", stat.bursts, stat.drained))
 	if stat.rewraps > 0 then P("  put back in place %d time(s)%s", stat.rewraps, stat.rewraps >= REWRAP_MAX and " - GIVEN UP, something keeps undoing it" or "") end
-	local recent = stat.lastLeak ~= nil and RealTime() - stat.lastLeak < 60
-	if on and recent then open = open + 1 end
 	P("Z-City visual blood: %s", not on and "RUNNING (takeover off)" or (open == 0 and "SUPPRESSED" or "PARTLY RUNNING"))
-	P("  Z-City particles on screen with the takeover on: %d particle-frames; Z-City decals stamped with it on: %d%s",
+	P("  Z-City arterial/gore particles on screen with the takeover on: %d particle-frames; their decals: %d%s",
 		stat.leakDrawn, stat.leakDecals, stat.lastLeak and string.format(" (last %.0f s ago)", RealTime() - stat.lastLeak) or "")
 	P("  seen in all, takeover on or off: %d particle-frames, %d decals; in the lists now: %d", stat.zDrawn, stat.zDecals, (t1 and #t1 or 0) + (t2 and #t2 or 0))
 	-- physiology: Z-City's organism, as this client has it

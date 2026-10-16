@@ -29,7 +29,7 @@ local function Remember(x, y, z, nx, ny, nz, K, kind)
 end
 
 ------------------------------------------------------------------------------------------
--- Sounds (rate limited, Z-City's drip sounds when available, HL2 drips otherwise)
+-- Sounds (rate limited, Z-City's gore/blood sounds when available, HL2 drips otherwise)
 ------------------------------------------------------------------------------------------
 local dripSounds
 local nextSound = 0
@@ -42,8 +42,8 @@ local function DripSound(x, y, z, vol, metal)
 	nextSound = now + 0.07
 	if not dripSounds then
 		dripSounds = {}
-		for i = 1, 4 do
-			if file.Exists("sound/homigrad/blooddrip" .. i .. ".wav", "GAME") then dripSounds[#dripSounds + 1] = "homigrad/blooddrip" .. i .. ".wav" end
+		for i = 1, 6 do
+			if file.Exists("sound/gore/blood" .. i .. ".mp3", "GAME") then dripSounds[#dripSounds + 1] = "gore/blood" .. i .. ".mp3" end
 		end
 		if #dripSounds == 0 then dripSounds = { "ambient/water/drip1.wav", "ambient/water/drip2.wav", "ambient/water/drip3.wav", "ambient/water/drip4.wav" } end
 	end
