@@ -439,6 +439,15 @@ function S.BodySoak(ent, x, y, z, nx, ny, nz, size)
 	S.stats.decals = S.stats.decals + 1
 end
 
+function S.BodySplat(ent, x, y, z, nx, ny, nz, size)
+	if not IsValid(ent) or not (ABL.InWorld(x, y, z) and ABL.Finite3(nx, ny, nz) and size > 0) or not TakeDecal(size) then return end
+	vecPos:SetUnpacked(x + nx * 2, y + ny * 2, z + nz * 2)
+	vecNorm:SetUnpacked(nx, ny, nz)
+	colTmp.r, colTmp.g, colTmp.b, colTmp.a = 255, 255, 255, 255
+	BodyDecal(M.decal.splat[math.random(1, M.families.splat)], ent, vecPos, vecNorm, size, size)
+	S.stats.decals = S.stats.decals + 1
+end
+
 -- Wound mark on a body (studio decal at the wound)
 function S.WoundMark(ent, x, y, z, nx, ny, nz, size)
 	if not IsValid(ent) or not (ABL.InWorld(x, y, z) and ABL.Finite3(nx, ny, nz) and size > 0) or not TakeDecal() then return end

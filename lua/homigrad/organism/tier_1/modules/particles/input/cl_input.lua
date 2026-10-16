@@ -175,6 +175,7 @@ end
 
 local function addBloodPart(pos, vel, mat, w, h, artery, kishki, owner, tiny, hidden, lifetime, maxBeamLength)
 	if LocalPlayer():GetNetVar("disappearance", nil) or (IsValid(owner) and owner:GetNetVar("disappearance", nil)) then return end
+	if hg.BloodPartRedirect and hg.BloodPartRedirect(pos, vel, w, artery, kishki, owner, hidden) then return end
 
 	if hg_blood_physics:GetBool() and not hg_old_particle:GetBool() then return addPhysBloodPart(pos, vel, w, artery, kishki, owner, tiny, hidden, lifetime) end
 
@@ -194,6 +195,7 @@ end
 
 local function addBloodPart2(pos, vel, mat, w, h, time, water, owner)
 	if LocalPlayer():GetNetVar("disappearance", nil) or (IsValid(owner) and owner:GetNetVar("disappearance", nil)) then return end
+	if hg.BloodCloudRedirect and hg.BloodCloudRedirect(pos, vel, w, water, owner) then return end
 
 	time = time or 30
 
@@ -223,6 +225,7 @@ local function addGibBloodSpill(ent, stump)
 	if #hg.gibbloodspillparticles > 120 then table.remove(hg.gibbloodspillparticles, 1) end
 	local vel = VectorRand(stump and -34 or -18, stump and 34 or 18) + ent:GetVelocity() * 0.04
 	vel[3] = vel[3] + (stump and Rand(18, 34) or Rand(-2, 10))
+	if hg.BloodPartRedirect and hg.BloodPartRedirect(ent:GetPos() + VectorRand(-3, 3), vel, 1, false, stump, nil) then return end
 	hg.gibbloodspillparticles[#hg.gibbloodspillparticles + 1] = {ent:GetPos() + VectorRand(-3, 3), vel, bloodSpillMats[math.random(#bloodSpillMats)], CurTime(), Rand(0.35, 0.55), stump and Rand(1, 2) or Rand(0.25, 0.6), stump and Rand(9, 16) or Rand(3, 6), stump}
 end
 
@@ -544,7 +547,7 @@ net.Receive("bloodsquirt", function()
 			drawDir = drawDir:Forward() * len
 			if (drawPos - LocalPlayer():EyePos()):LengthSqr() > dsqr then i = i - 1 return end
 			vechuy = vechuy + VectorRand(-amt * 11,amt * 11)
-			addBloodPart(drawPos, drawDir * amt * 190 + vechuy * amt, mat_huy, math.Rand(3,3), math.Rand(3,3), true, false)
+			addBloodPart(drawPos, drawDir * amt * 190 + vechuy * amt, mat_huy, math.Rand(3,3), math.Rand(3,3), true, false, drawEnt)
 			i = i - 1
 		end)
 	end

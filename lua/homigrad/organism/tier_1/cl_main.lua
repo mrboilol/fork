@@ -1447,6 +1447,8 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 		end
 	end
 
+	if hg.BloodTakenOver and hg.BloodTakenOver() then return end
+
 	local bloodDrawDistance = hg_blood_draw_distance:GetInt()
 	local entDistSqr = ent:GetPos():DistToSqr(LocalPlayer():EyePos())
 

@@ -249,8 +249,7 @@ function E.Rate(src, wd)
 	-- conservation: no more leaves the wounds than the circulation loses (ABL.Wounds.Govern).
 	-- Second value: what the wound asks for before that (the governor works from it).
 	if src.alive then
-		local gov = src.gov or 1
-		-- (what it gave with the heart beating: see below)
+		local gov = synced and 1 or (src.gov or 1)
 		wd.liveRate = full * gov
 		return base * gov, base, full * gov, full
 	end
@@ -559,7 +558,7 @@ local function EmitWound(src, wd, dt, stepIdx, bodyflow, heartH)
 			local px, py, pz = ABL.Perp(jx, jy, jz)
 			local qx, qy, qz = jy * pz - jz * py, jz * px - jx * pz, jx * py - jy * px
 			jx, jy, jz = ABL.Norm(jx + px * wd.wobP * 0.25 + qx * wd.wobY * 0.25, jy + py * wd.wobP * 0.25 + qy * wd.wobY * 0.25, jz + pz * wd.wobP * 0.25 + qz * wd.wobY * 0.25)
-			local pressure = sqrt(max(src.pulse, 20) / 75) * math.Clamp((wd.sev / 10) ^ 0.3, 0.6, 1.3) * (0.3 + 0.7 * press)
+			local pressure = sqrt(max(src.pulse, 20) / 75) * math.Clamp((wd.zi and rate / 15 or wd.sev / 10) ^ 0.3, 0.6, 1.4) * (0.3 + 0.7 * press)
 			-- (speed follows the pulse smoothly, with a slow drift: neighbouring parts of the stream
 			-- leave at nearly the same speed, so it stays one curve until the pulse stretches it)
 			local sk = (wd.wobS or 0) + (rng:Normal() * 0.012 - (wd.wobS or 0) * 0.05)
@@ -789,6 +788,7 @@ function E.OnHit(ev)
 	if not src then return end
 	local entry = BoneWorld(body, ev.bone, ev.lpos)
 	if not entry then return end
+	ABL.Compat.NoteHit(entry.x, entry.y, entry.z)
 	-- the engine's own splat decal at the hit gives way to the wound (cl_stains.lua)
 	if (ev.class == ABL.Net.DMG_BULLET or ev.class == ABL.Net.DMG_BUCKSHOT) and ABL.Compat.Takeover() and not C.cl.fleshDecals:GetBool() then
 		ABL.Stains.ClearEngineHitDecal(body)
@@ -843,6 +843,22 @@ function E.OnHit(ev)
 	if near > C.cl.drawDist:GetFloat() then return end
 	local dx, dy, dz = ev.dir.x, ev.dir.y, ev.dir.z
 	local bv = body:GetVelocity()
+
+	if not (bullet and rec.pen == WD.PEN_ARMOR) then
+		local sev = energy * (cls == N.DMG_BLAST and 2 or (cls == N.DMG_SLASH and 1.2 or (bullet and 0.8 + (rec.cavity or 0) or 0.6)))
+		if rec.graze then sev = sev * 0.5 end
+		local size = Clamp(1 + sev * 0.9, 1, 7)
+		local ST = ABL.Stains
+		ST.BodySplat(body, entry.x, entry.y, entry.z, -dx, -dy, -dz, size)
+		local px, py, pz = ABL.Perp(-dx, -dy, -dz)
+		local qx, qy, qz = -dy * pz + dz * py, -dz * px + dx * pz, -dx * py + dy * px
+		for _ = 1, min(math.floor(sev / 2.5), 3) do
+			local a = rng:Next() * 2 * pi
+			local r = size * rng:Range(1, 2)
+			local ox, oy, oz = (px * cos(a) + qx * sin(a)) * r, (py * cos(a) + qy * sin(a)) * r, (pz * cos(a) + qz * sin(a)) * r
+			ST.BodySplat(body, entry.x + ox, entry.y + oy, entry.z + oz, -dx, -dy, -dz, size * rng:Range(0.4, 0.7))
+		end
+	end
 	local released = 0
 
 	if bullet then

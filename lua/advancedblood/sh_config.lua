@@ -65,10 +65,10 @@ C.ZCity = {
 	-- stamps none of Z-City's own (decals), and none of the engine's (engineDecals: the red
 	-- splat, the splat at a bullet hit on flesh) within nearBody units of a body with a Z-City
 	-- organism. Blood of another colour (YellowBlood) is not AdvancedBlood's and is left alone.
-	decals = { "^Normal%.Blood", "^Water%.Blood$" },
+	decals = { "^Normal%.Blood", "^Arterial%.Blood", "^Water%.Blood$" },
 	engineDecals = { "^Blood$", "^Impact%.Flesh$" },
 	-- Engine effects that are a puff of red blood, by name; near such a body, the same rule.
-	effects = {},
+	effects = { BloodImpact = true, bloodspray = true },
 	nearBody = 110,
 	-- A headless body: Z-City keeps a "fountain" at its neck and no wound. ABL bleeds it as one
 	-- arterial wound of this size, the size Z-City itself gives the stump of an amputated limb.
@@ -138,7 +138,7 @@ C.Profiles = {
 		spurtRate = 0.15, spurtSpeed = 55, beadMax = 0.5, spreadCap = 1.6,
 	},
 	pulsed = {
-		name = "PULSED", seep = 0.18, gush = 0.0, jet = 0.82, jetSpeed = 120,
+		name = "PULSED", seep = 0.18, gush = 0.0, jet = 0.82, jetSpeed = 165,
 		beat = 0.65, noiseSigma = 0.2, noiseTau = 2.0,
 		spurtRate = 0.0, spurtSpeed = 0, beadMax = 0.5, spreadCap = 1.2,
 	},
@@ -244,7 +244,7 @@ C.MESH_IDLE = 60
 C.DROP_TRACE_HZ = 66      -- collision look-ahead traces per droplet per second (at most)
 C.DROP_LOOK_MAX = 0.12    -- s: how far ahead a drop in free flight looks once nothing is near (then ~8 traces/s)
 C.DROP_BODY_HZ = 40       -- own-body hitbox tests per droplet per second while it is inside the body's bounds
-C.JET_HZ = 90             -- arterial jet segments per second at most (the stream is drawn continuous)
+C.JET_HZ = 50             -- arterial jet segments per second at most (the stream is drawn continuous)
 -- A stream in the air is a thread only for so long: surface tension pinches it into drops
 -- (Rayleigh: about 12 sqrt(density d^3 / surface tension) for a thread d across; 0.05 s for one
 -- of 1 mm, 0.15 s for one of 2 mm). k: seconds per mm^1.5; the limits in seconds.

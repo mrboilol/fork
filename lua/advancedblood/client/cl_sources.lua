@@ -138,8 +138,10 @@ function S.Sync(src)
 		return
 	end
 	local now = CurTime()
-	local vlist = Z.GetWoundLists(src.key)
+	local vlist, alist = Z.GetWoundLists(src.key)
 	SyncList(src, vlist, false, now, true)
+	SyncList(src, alist, true, now, true)
+	SyncList(src, Z.StumpWounds(src.key), true, now)
 	-- wounds that disappeared (bandaged, healed, coagulated) stop emitting; blood already out stays
 	local wl = src.woundList
 	for i = #wl, 1, -1 do
