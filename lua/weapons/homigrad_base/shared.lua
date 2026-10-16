@@ -749,10 +749,31 @@ function SWEP:CanUse(ignoreSprint)
 	return not (self.reload or self.deploy or (owner:IsPlayer() and ((!ignoreSprint and self:IsSprinting()) or (owner.organism and owner.organism.otrub))))
 end
 
+local hg_gunbase_allow_jumpshoot = CreateConVar("hg_gunbase_allow_jumpshoot", 0, {FCVAR_ARCHIVE,FCVAR_REPLICATED,FCVAR_NOTIFY},"Allow/Disallow shooting in air when you jump", 0, 1)
+
 function SWEP:IsSprinting()
 	local ply = self:GetOwner()
-	if hg_aimtoshoot:GetBool() then
-		return not ply:IsNPC() and (self:KeyDown(IN_SPEED) and ply:GetVelocity():LengthSqr() > 150 * 150) or not self:KeyDown(IN_ATTACK2) and not IsValid(ply.FakeRagdoll)
+
+	if ply:IsNPC() then
+		return false
+	end
+
+	local jumpshoot = hg_gunbase_allow_jumpshoot:GetBool()
+
+	local isfast = ply:GetVelocity():LengthSqr() > 150 * 150
+	local sprinting = self:KeyDown(IN_SPEED)
+	local validrag = IsValid(ply.FakeRagdoll)
+
+	if not jumpshoot and not ply:IsOnGround() and ply:GetMoveType() == MOVETYPE_WALK and isfast then
+		return true
+	elseif not jumpshoot then
+		ply.InAirTime = 0
+	end
+
+	if hg_aimtoshoot:GetInt() > 0 then
+		local sprintCondition = sprinting and isfast
+		local aimCondition = not self:KeyDown(IN_ATTACK2) and not validrag
+		return sprintCondition or aimCondition
 	else
 		return not ply:IsNPC() and self:KeyDown(IN_SPEED) and ply:GetVelocity():LengthSqr() > 150 * 150 and not IsValid(ply.FakeRagdoll)
 	end
