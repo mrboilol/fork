@@ -1197,7 +1197,7 @@ local function updateBody(ent, ply)
 	return body
 end
 
-function hg.FootIK(ent, ply)
+local function footIK(ent, ply)
 	if not ply:IsPlayer() or not IKFoot.GetFloat then return end
 	if CLIENT and ent ~= ply or hardBlocked(ply) then
 		ply.hg_FootIK = nil
@@ -1260,6 +1260,34 @@ function hg.FootIK(ent, ply)
 	applyPose(ent, ply, state, bones, ctx)
 
 	if CLIENT and IKFoot.GetFloat("debug") > 0 then drawDebug(state) end
+end
+
+local headBoneCache = {}
+
+function hg.FootIK(ent, ply)
+	if SERVER or ent ~= ply or ply.hg_IKHeadFrame == FrameNumber() then return footIK(ent, ply) end
+
+	local model = ply:GetModel()
+	local head = headBoneCache[model]
+	if head == nil then
+		head = ply:LookupBone("ValveBiped.Bip01_Head1") or false
+		headBoneCache[model] = head
+	end
+	local before = head and ent:GetBoneMatrix(head)
+	before = before and before:GetTranslation()
+
+	footIK(ent, ply)
+
+	local after = before and ent:GetBoneMatrix(head)
+	ply.hg_IKHeadOffset = after and after:GetTranslation() - before or nil
+	ply.hg_IKHeadFrame = FrameNumber()
+end
+
+function hg.GetIKHeadOffset(ply)
+	local offset = ply.hg_IKHeadOffset
+	if not offset or FrameNumber() - (ply.hg_IKHeadFrame or 0) > 2 then return end
+
+	return offset
 end
 
 function IKFoot.HardReset(ply)

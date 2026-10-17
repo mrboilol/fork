@@ -524,7 +524,10 @@ CalcView = function(ply, origin, angles, fov, znear, zfar)
 	
 	att = getPreferredEyeAttachment(ply)
 	if not att or not istable(att) then return end
-	
+
+	local ikHeadOffset = hg.GetIKHeadOffset and hg.GetIKHeadOffset(ply)
+	if ikHeadOffset then att.Pos = att.Pos + ikHeadOffset end
+
 	--ply:SetupBones()
 	--selfdraw = true
 	--ply:DrawModel()

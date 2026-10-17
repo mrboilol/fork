@@ -25,6 +25,8 @@ if not CLIENT then return end
 	local noiseTimer  = 0
 	local tiltLerp    = 0
 	local sfLerp      = 0
+	local gaitPhase
+	local gaitStrides = 0
 
 	local function speedFactor(vel)
 		return math_Clamp((vel:Length2D() - SPEED_MIN) / (SPEED_MAX - SPEED_MIN), 0, 1)
@@ -57,7 +59,13 @@ hook.Add("HGAddView", "RunBob_Extra", function(ply, origin, angles)
 	local tiltMul  = hg_runbob_tilt:GetFloat()
 	local noiseMul = hg_runbob_noise:GetFloat()
 
-	if sf > 0.01 then
+	local gait = ply.hg_FootIK
+	if gait and gait.phase and (gait.weight or 0) > 0.5 and hg.GetIKHeadOffset and hg.GetIKHeadOffset(ply) then
+		if gaitPhase and gait.phase < gaitPhase - 1 then gaitStrides = (gaitStrides + 1) % 1000 end
+		gaitPhase = gait.phase
+		bobTime = (gaitStrides * 2 + gaitPhase - 0.5) * math.pi
+	elseif sf > 0.01 then
+		gaitPhase = nil
 		bobTime = bobTime + ft * (3.2 + sf * 4.5) * ts
 	end
 
