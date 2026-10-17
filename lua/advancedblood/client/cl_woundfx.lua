@@ -192,7 +192,10 @@ local function BuildLayers(mk, r, rng)
 	local S = 0
 	for i = 1, #layers do
 		local l = layers[i]
-		local ext = l.half * max(l.st, 1) + max(abs(l.ox), abs(l.oy))
+		if kind ~= "soak" and (l.kind == K_BLOOD or l.kind == K_CRUST or l.kind == K_SOAK) then
+			l.gmax = max(1, min(WC.spreadMax, WC.spreadHalf / l.half))
+		end
+		local ext = l.half * (l.gmax or 1) * max(l.st, 1) + max(abs(l.ox), abs(l.oy))
 		if ext > S then S = ext end
 	end
 	return layers, S
@@ -674,6 +677,7 @@ function W.Draw(src, pose, off)
 							local crust = Clamp((clot - 0.25) / 0.6, 0, 1)
 							-- blood in the cloth: grows with what has come out of the wound
 							local soak = r.soakOnly and r.soak or Clamp(0.3 + r.released / 14, 0, 1)
+							local spread = Clamp(sqrt(max(r.released or 0, 0) / WC.spreadMl), 0, 1)
 							local detailOK = d < WC.detailDist
 							local layers, S = mk.layers, mk.S
 							cam.PushModelMatrix(boneMat)
@@ -681,6 +685,9 @@ function W.Draw(src, pose, off)
 								local l = layers[k]
 								local kind = l.kind
 								local a = l.a
+								if l.gmax then
+									l.half = l.half0 * (WC.spreadMin + (l.gmax - WC.spreadMin) * spread)
+								end
 								if l.detail and not detailOK then
 									a = 0
 								elseif kind == K_BRUISE then
@@ -698,7 +705,6 @@ function W.Draw(src, pose, off)
 										l.half = l.half0 * (0.22 + 0.78 * sqrt(soak))
 									else
 										a = a * (0.45 + 0.55 * soak)
-										l.half = l.half0 * (0.55 + 0.45 * soak)
 									end
 								end
 								if a > 0.02 then

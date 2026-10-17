@@ -619,6 +619,7 @@ end
 -- reflection strips queued during the filter pass: { mesh, x, y, z, nx, ny, nz }
 local glossQ, glossN = {}, 0
 local function QueueGloss(m, x, y, z, nx, ny, nz)
+	if not C.Ground.gloss then return end
 	glossN = glossN + 1
 	local q = glossQ[glossN] or {}
 	glossQ[glossN] = q

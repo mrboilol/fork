@@ -134,6 +134,7 @@ C.Profiles = {
 	},
 }
 C.ProfileRate = { minor = 1.5, moderate = 5.0, severe = 12.0 } -- ml/s upper bounds
+C.DropSize = { min = 0.3, max = 1.6 }
 C.FRESH_WOUND_TIME = 3.0      -- seconds of HIGH-OUTPUT behaviour after a strong hit
 
 -- Posture and movement. Venous pressure at a wound grows with its depth below the heart
@@ -579,6 +580,7 @@ C.Ground = {
 	drawDist = 2200,
 	sheen    = 0.5,              -- what a wet stain mirrors of the light around it, times Fresnel: half of what a
 	                             -- smooth liquid would (a film on a rough floor is no mirror)
+	gloss    = false,
 }
 
 -- impact physics thresholds on K = sqrt(We) * Re^(1/4)
@@ -646,4 +648,8 @@ C.WoundFX = {
 	exitReach    = 24,      -- units: how far along the bullet line the far surface is looked for
 	warmDist     = 1500,    -- players this close get their surface model built before they are hit
 	gloss        = 0.34,    -- wet-blood reflection on a wound at most (of the light on it)
+	spreadMl     = 120,
+	spreadMin    = 0.6,
+	spreadMax    = 2.6,
+	spreadHalf   = 7,
 }

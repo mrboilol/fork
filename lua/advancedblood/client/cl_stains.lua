@@ -288,7 +288,7 @@ function S.Draw()
 				if vis and d2 < (maxD + c.rad) ^ 2 then
 					if not set then render.SetMaterial(M.atlas) set = true end
 					c.mesh:Draw()
-					if c.gloss and d2 < 1200 * 1200 then ng = ng + 1 glossList[ng] = c end
+					if c.gloss and C.Ground.gloss and d2 < 1200 * 1200 then ng = ng + 1 glossList[ng] = c end
 				end
 			end
 		end

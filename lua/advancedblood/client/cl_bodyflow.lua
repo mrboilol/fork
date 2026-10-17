@@ -540,9 +540,10 @@ local function StepBlob(b, src, pose, m, dt, gx, gy, gz, gmag)
 
 	-- pendant drop on undersides: the detach volume shrinks as the surface faces more downward;
 	-- the drop visibly swells (hangK) before gravity beats surface tension
+	local dk = src.dropK or 1
 	b.hangK = 0
 	if gn > 0.3 * gmag then
-		local vd = B.pendant * gmag / gn * b.pendMul
+		local vd = B.pendant * dk * gmag / gn * b.pendMul
 		b.hangK = b.vol / vd
 		if b.vol > vd and not b.tethered then
 			b.hang = b.hang + dt
@@ -671,11 +672,12 @@ local function StepBlob(b, src, pose, m, dt, gx, gy, gz, gmag)
 	else
 		b.trapT = 0
 	end
-	if b.trapT >= 1 and b.vol > B.edgePendant then
+	local ep = B.edgePendant * dk
+	if b.trapT >= 1 and b.vol > ep then
 		b.hangK = max(b.hangK, 1)
 		local since = CurTime() - b.lastDrip
 		if since > 0.06 then
-			local dv = max(B.pendant, min(b.vol * 0.5, 0.3))
+			local dv = max(B.pendant * dk, min(b.vol * 0.5, 0.3))
 			Detach(b, src, dv, px, py, pz, nx, ny, nz, bvx, bvy, bvz, 1, since < 0.15 and 1 or 0, true)
 		end
 	end
@@ -684,13 +686,13 @@ local function StepBlob(b, src, pose, m, dt, gx, gy, gz, gmag)
 	if b.atEdge then
 		-- a bead parked on an open edge no longer belongs to its wound: it drips from the lip
 		if b.tethered then Untether(b) end
-		if b.vol > B.edgePendant then
+		if b.vol > ep then
 			-- a drop needs time to form on the lip; strong inflow makes bigger, faster drops that
 			-- visually join into a stream
-			b.hangK = max(b.hangK, b.vol / (B.edgePendant * 1.6))
+			b.hangK = max(b.hangK, b.vol / (ep * 1.6))
 			local since = CurTime() - (b.lastDrip or 0)
 			if since > 0.06 then
-				local dv = max(rng:Range(0.8, 1.2) * B.edgePendant, min(b.vol * 0.5, 0.3))
+				local dv = max(rng:Range(0.8, 1.2) * ep, min(b.vol * 0.5, 0.3))
 				Detach(b, src, dv, px, py, pz, nx, ny, nz, bvx, bvy, bvz, 3, since < 0.15 and 1 or 0)
 			end
 		end

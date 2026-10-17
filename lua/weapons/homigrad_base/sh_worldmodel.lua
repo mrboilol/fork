@@ -184,21 +184,36 @@ function SWEP:ChangeGunPos(dtime)
 	local stanceOneHanded = support.postureOneHanded and not support.leftBusy and not support.rightBusy
 	local oneHandRecovery = stanceOneHanded and 1.12 or support.oneHanded and not self.IgnoreOneArmPenalties and Lerp(recoverySkill, 0.72, self:HasFirearmTraining(ply) and 1 or 0.9) or 1
 	local recoveryScale = self.shotRecoveryScale or 1
-	local angularSpring = Lerp(recoverySkill, 62, 125) * oneHandRecovery / recoveryScale ^ 2
-	local angularDamping = Lerp(recoverySkill, 10, 23) * oneHandRecovery / recoveryScale
-	local positionSpring = Lerp(recoverySkill, 55, 110) * oneHandRecovery / recoveryScale ^ 2
-	local positionDamping = Lerp(recoverySkill, 9, 21) * oneHandRecovery / recoveryScale
+	local angularSpring = Lerp(recoverySkill, 62, 125) * 0.8 * oneHandRecovery / recoveryScale ^ 2
+	local angularDamping = Lerp(recoverySkill, 10, 23) * 0.85 * oneHandRecovery / recoveryScale
+	local positionSpring = Lerp(recoverySkill, 55, 110) * 0.8 * oneHandRecovery / recoveryScale ^ 2
+	local positionDamping = Lerp(recoverySkill, 9, 21) * 0.85 * oneHandRecovery / recoveryScale
+	local lateralAngularSpring = angularSpring * 0.5
+	local lateralPositionSpring = positionSpring * 0.5
 	local wobble = self.ShotMuzzleWobble or Angle(0, 0, 0)
 	local wobbleVelocity = self.ShotMuzzleWobbleVelocity or Angle(0, 0, 0)
 	local offset = self.ShotMuzzleOffset or Vector(0, 0, 0)
 	local offsetVelocity = self.ShotMuzzleOffsetVelocity or Vector(0, 0, 0)
 	local angularDrag = math.exp(-angularDamping * recoilDtime)
 	local positionDrag = math.exp(-positionDamping * recoilDtime)
+	local lateralAngularDrag = math.exp(-angularDamping * 0.5 * recoilDtime)
+	local lateralPositionDrag = math.exp(-positionDamping * 0.5 * recoilDtime)
+
+	local disturbed = math.min(math.abs(wobble[1]) + math.abs(wobble[2]) * 1.5, 8)
+	if disturbed > 0.02 then
+		local t = CurTime()
+		local drift = disturbed * Lerp(recoverySkill, 22, 11) * recoilDtime
+		wobbleVelocity[2] = wobbleVelocity[2] + (math.sin(t * 5.3) * 0.6 + math.sin(t * 9.1 + 1.7) * 0.4) * drift
+		wobbleVelocity[3] = wobbleVelocity[3] + (math.cos(t * 6.7 + 0.4) * 0.6 + math.sin(t * 11.3) * 0.4) * drift * 0.5
+		offsetVelocity[2] = offsetVelocity[2] + math.sin(t * 4.1 + 2.3) * drift * 0.12
+	end
 
 	for i = 1, 3 do
-		wobbleVelocity[i] = (wobbleVelocity[i] - wobble[i] * angularSpring * recoilDtime) * angularDrag
+		local lateral = i ~= 1
+		wobbleVelocity[i] = (wobbleVelocity[i] - wobble[i] * (lateral and lateralAngularSpring or angularSpring) * recoilDtime) * (lateral and lateralAngularDrag or angularDrag)
 		wobble[i] = wobble[i] + wobbleVelocity[i] * recoilDtime
-		offsetVelocity[i] = (offsetVelocity[i] - offset[i] * positionSpring * recoilDtime) * positionDrag
+		local lateralOffset = i == 2
+		offsetVelocity[i] = (offsetVelocity[i] - offset[i] * (lateralOffset and lateralPositionSpring or positionSpring) * recoilDtime) * (lateralOffset and lateralPositionDrag or positionDrag)
 		offset[i] = offset[i] + offsetVelocity[i] * recoilDtime
 	end
 

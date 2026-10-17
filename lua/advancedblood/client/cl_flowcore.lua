@@ -919,9 +919,10 @@ local function StepHead(hd, ch, s, src, pose, m, dt, gx, gy, gz, gmag, now)
 	end
 
 	-- on an underside the head hangs, swells and lets go as a drop
+	local dk = ch.wd and ch.wd.dropK or src.dropK or 1
 	hd.hangK = 0
 	if gn > 0.3 * gmag then
-		local vd = B.pendant * gmag / gn * hd.pendMul
+		local vd = B.pendant * dk * gmag / gn * hd.pendMul
 		hd.hangK = hd.vol / vd
 		if hd.vol > vd then
 			hd.hang = hd.hang + dt
@@ -1139,22 +1140,23 @@ local function StepHead(hd, ch, s, src, pose, m, dt, gx, gy, gz, gmag, now)
 		hd.trapT = 0
 	end
 	if hd.trapT >= 1 then hd.freezeT = now + 2.5 end
-	if now < hd.freezeT and hd.vol > B.edgePendant then
+	local ep = B.edgePendant * dk
+	if now < hd.freezeT and hd.vol > ep then
 		hd.hangK = max(hd.hangK, 1)
 		local since = now - hd.lastDrip
 		if since > 0.06 then
-			local dv = max(B.pendant, min(hd.vol * 0.5, 0.3))
+			local dv = max(B.pendant * dk, min(hd.vol * 0.5, 0.3))
 			Detach(hd, s, src, dv, px, py, pz, nx, ny, nz, bvx, bvy, bvz, 1, since < 0.15 and 1 or 0, true)
 		end
 	end
 
 	-- at an open edge (sleeve, hem, fingertip) a drop forms on the lip; strong inflow makes bigger,
 	-- faster drops that join into a stream
-	if hd.atEdge and hd.vol > B.edgePendant then
-		hd.hangK = max(hd.hangK, hd.vol / (B.edgePendant * 1.6))
+	if hd.atEdge and hd.vol > ep then
+		hd.hangK = max(hd.hangK, hd.vol / (ep * 1.6))
 		local since = now - (hd.lastDrip or 0)
 		if since > 0.06 then
-			local dv = max(rng:Range(0.8, 1.2) * B.edgePendant, min(hd.vol * 0.5, 0.3))
+			local dv = max(rng:Range(0.8, 1.2) * ep, min(hd.vol * 0.5, 0.3))
 			Detach(hd, s, src, dv, px, py, pz, nx, ny, nz, bvx, bvy, bvz, 3, since < 0.15 and 1 or 0)
 		end
 	end

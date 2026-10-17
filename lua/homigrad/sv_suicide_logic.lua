@@ -17,9 +17,29 @@ if SERVER then
         ply:SetNWBool("suiciding", false)
     end
 
+    local function isParalyzedOrDying(org)
+        if not org then return false end
+        local cfg = hg.organism or {}
+        local ecg = org.ecgState
+        return org.paralyzed or org.cervicalParalysis
+            or (tonumber(org.spine1) or 0) >= (cfg.fake_spine1 or 1)
+            or (tonumber(org.spine2) or 0) >= (cfg.fake_spine2 or 1)
+            or (tonumber(org.spine3) or 0) >= (cfg.fake_spine3 or 0.75)
+            or org.critical == true or org.heartstop
+            or ecg == "asystole" or ecg == "pea" or ecg == "ventricular_fibrillation" or org.fibrillation == true
+            or (tonumber(org.systolic) or 999) < 75
+            or (tonumber(org.bloodPressure) or 999) < 50
+            or (tonumber(org.cardiacOutput) or 999) < 0.3
+            or (tonumber(org.strokeVolume) or 999) < 0.25
+            or (tonumber(org.cardiacTamponade) or 0) > 0.55
+            or (tonumber(org.brain) or 0) > 0.4
+            or (tonumber(org.brainHemorrhage) or 0) >= 0.4
+            or (tonumber(org.brainSwelling) or 0) >= 0.45
+    end
+
     concommand.Add("suicide", function(ply)
         if not IsValid(ply) or not ply:Alive() then return end
-        if ply.organism and (ply.organism.incapacitated or (not hg.organism.IncapacitationEnabled() and ply.organism.otrub)) then
+        if ply.organism and (ply.organism.incapacitated or (not hg.organism.IncapacitationEnabled() and ply.organism.otrub) or isParalyzedOrDying(ply.organism)) then
             ply.organism.deathStateKilled = true
             ply:Kill()
             return
