@@ -1144,7 +1144,7 @@ local WAKE_FADE_TIME = 4
 local wakeFadeStart = 0
 local wasVitalsOtrub = false
 
-local function drawO2GrainCenter(rt, strength)
+local function drawO2GrainCenter(strength)
 	local w, h = ScrW(), ScrH()
 	local cx, cy = w * 0.5, h * 0.5
 	local inner = math.min(w, h) * 0.2
@@ -1152,7 +1152,7 @@ local function drawO2GrainCenter(rt, strength)
 	local alpha = math.floor(255 * math.Clamp(strength, 0, 1))
 	if alpha <= 0 then return end
 
-	o2CenterMat:SetTexture("$basetexture", rt)
+	o2CenterMat:SetTexture("$basetexture", render.GetScreenEffectTexture())
 
 	local function vert(x, y, a)
 		mesh.Position(Vector(x, y, 0))
@@ -1391,9 +1391,6 @@ drawFinalVitalsVignettes = function()
 			surface.SetDrawColor(255, 255, 255, 255)
 		end
 
-		local centerRT = GetRenderTarget("hg_o2_center_" .. ScrW() .. "x" .. ScrH(), ScrW(), ScrH())
-		render.CopyRenderTargetToTexture(centerRT)
-
 		render.UpdateScreenEffectTexture()
 		noiseMat:SetFloat("$c0_y", 1 - o2Severity)
 		noiseMat:SetFloat("$c0_z", 1)
@@ -1403,7 +1400,7 @@ drawFinalVitalsVignettes = function()
 		render.SetMaterial(noiseMat)
 		render.DrawScreenQuad()
 
-		drawO2GrainCenter(centerRT, org.otrub and 0.45 or 0.93)
+		drawO2GrainCenter(org.otrub and 0.45 or 0.93)
 	end
 
 	local excruciatingBlend = getServerSoundMode("hg_painsound", 6) == 6
