@@ -1,2 +1,2 @@
 
-AddCSLuaFile("daddonmap/squaremap.lua")
+AddCSLuaFile("external/daddonmap/squaremap.lua")

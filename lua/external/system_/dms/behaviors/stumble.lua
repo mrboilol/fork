@@ -1,4 +1,4 @@
-local IKSystem = include("system_/utils/IKChain.lua")
+local IKSystem = include("external/system_/utils/IKChain.lua")
 
 local function IsValidNumber(n)
     return type(n) == "number" and n == n and n ~= math.huge and n ~= -math.huge

@@ -29,23 +29,23 @@ Msg( "///////////////////////////////\n" )
 Msg( "// ULX GUI -- by Stickly Man //\n" )
 Msg( "///////////////////////////////\n" )
 Msg( "// Adding Main Modules..     //\n" )
-for _, file in ipairs( file.Find( "ulx/xgui/*.lua", "LUA" ) ) do
-	AddCSLuaFile( "ulx/xgui/" .. file )
+for _, file in ipairs( file.Find( "external/ulx/xgui/*.lua", "LUA" ) ) do
+	AddCSLuaFile( "external/ulx/xgui/" .. file )
 	Msg( "//  " .. file .. string.rep( " ", 25 - file:len() ) .. "//\n" )
 end
 Msg( "// Adding Setting Modules..  //\n" )
-for _, file in ipairs( file.Find( "ulx/xgui/settings/*.lua", "LUA" ) ) do
-	AddCSLuaFile( "ulx/xgui/settings/" .. file )
+for _, file in ipairs( file.Find( "external/ulx/xgui/settings/*.lua", "LUA" ) ) do
+	AddCSLuaFile( "external/ulx/xgui/settings/" .. file )
 	Msg( "//  " .. file .. string.rep( " ", 25 - file:len() ) .. "//\n" )
 end
 Msg( "// Adding Gamemode Modules.. //\n" )
-for _, file in ipairs( file.Find( "ulx/xgui/gamemodes/*.lua", "LUA" ) ) do
-	AddCSLuaFile( "ulx/xgui/gamemodes/" .. file )
+for _, file in ipairs( file.Find( "external/ulx/xgui/gamemodes/*.lua", "LUA" ) ) do
+	AddCSLuaFile( "external/ulx/xgui/gamemodes/" .. file )
 	Msg( "//  " .. file .. string.rep( " ", 25 - file:len() ) .. "//\n" )
 end
 Msg( "// Loading Server Modules..  //\n" )
-for _, file in ipairs( file.Find( "ulx/xgui/server/*.lua", "LUA" ) ) do
-	include( "ulx/xgui/server/" .. file )
+for _, file in ipairs( file.Find( "external/ulx/xgui/server/*.lua", "LUA" ) ) do
+	include( "external/ulx/xgui/server/" .. file )
 	Msg( "//  " .. file .. string.rep( " ", 25 - file:len() ) .. "//\n" )
 end
 Msg( "// XGUI modules added!       //\n" )

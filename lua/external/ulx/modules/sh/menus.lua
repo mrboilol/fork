@@ -1,6 +1,6 @@
 local CATEGORY_NAME = "Menus"
 
-if ULib.fileExists( "lua/ulx/modules/cl/motdmenu.lua" ) or ulx.motdmenu_exists then
+if ULib.fileExists( "lua/external/ulx/modules/cl/motdmenu.lua" ) or ulx.motdmenu_exists then
 	local function sendMotd( ply, showMotd )
 		if ply.ulxHasMotd then return end -- This player already has the motd data
 		if showMotd == "1" then -- Assume it's a file

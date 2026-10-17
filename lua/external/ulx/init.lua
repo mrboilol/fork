@@ -4,9 +4,9 @@ if not ulx then
 	-- Get data folder up to speed
 	include( "data.lua" )
 
-	local sv_modules = file.Find( "ulx/modules/*.lua", "LUA" )
-	local sh_modules = file.Find( "ulx/modules/sh/*.lua", "LUA" )
-	local cl_modules = file.Find( "ulx/modules/cl/*.lua", "LUA" )
+	local sv_modules = file.Find( "external/ulx/modules/*.lua", "LUA" )
+	local sh_modules = file.Find( "external/ulx/modules/sh/*.lua", "LUA" )
+	local cl_modules = file.Find( "external/ulx/modules/cl/*.lua", "LUA" )
 
 	Msg( "///////////////////////////////\n" )
 	Msg( "//       ULX Admin Mod       //\n" )
@@ -39,17 +39,17 @@ if not ulx then
 	Msg( "// Load Complete!            //\n" )
 	Msg( "///////////////////////////////\n" )
 
-	AddCSLuaFile( "ulx/cl_init.lua" )
-	AddCSLuaFile( "ulx/sh_defines.lua" )
-	AddCSLuaFile( "ulx/sh_base.lua" )
-	AddCSLuaFile( "ulx/cl_lib.lua" )
+	AddCSLuaFile( "external/ulx/cl_init.lua" )
+	AddCSLuaFile( "external/ulx/sh_defines.lua" )
+	AddCSLuaFile( "external/ulx/sh_base.lua" )
+	AddCSLuaFile( "external/ulx/cl_lib.lua" )
 
 	-- Find c-side modules and load them
 	for _, file in ipairs( cl_modules ) do
-		AddCSLuaFile( "ulx/modules/cl/" .. file )
+		AddCSLuaFile( "external/ulx/modules/cl/" .. file )
 	end
 
 	for _, file in ipairs( sh_modules ) do
-		AddCSLuaFile( "ulx/modules/sh/" .. file )
+		AddCSLuaFile( "external/ulx/modules/sh/" .. file )
 	end
 end

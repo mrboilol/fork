@@ -10,7 +10,7 @@ local gpeek_legacy_addon = GetConVar("gpeek_legacy_addon")
 local function extensionsIterator()
 
 	local i = 0
-	local files = file.Find("vgui/daddonbrowser/*", "LUA")
+	local files = file.Find("external/vgui/daddonbrowser/*", "LUA")
 	return function()
 
 		i = i + 1
@@ -43,7 +43,7 @@ function PANEL:Setup()
 
 	for k,v in extensionsIterator() do
 
-		local extension = include("vgui/daddonbrowser/" .. v.fileName)
+		local extension = include("external/vgui/daddonbrowser/" .. v.fileName)
 
 		self.Extensions[v.fileExtension] = extension
 

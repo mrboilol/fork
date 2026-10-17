@@ -1,6 +1,6 @@
 -- Short and sweet
 if SERVER then
-	include( "ulib/init.lua" )
+	include( "external/ulib/init.lua" )
 else
-	include( "ulib/cl_init.lua" )
+	include( "external/ulib/cl_init.lua" )
 end

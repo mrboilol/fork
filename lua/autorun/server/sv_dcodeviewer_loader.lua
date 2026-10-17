@@ -1,12 +1,12 @@
 
-for k,v in pairs(file.Find("vgui/dcodeviewer/themes/*", "LUA")) do
-	AddCSLuaFile("vgui/dcodeviewer/themes/" .. v)
+for k,v in pairs(file.Find("external/vgui/dcodeviewer/themes/*", "LUA")) do
+	AddCSLuaFile("external/vgui/dcodeviewer/themes/" .. v)
 end
 
-for k,v in pairs(file.Find("vgui/dcodeviewer/scripts/*", "LUA")) do
-	AddCSLuaFile("vgui/dcodeviewer/scripts/" .. v)
+for k,v in pairs(file.Find("external/vgui/dcodeviewer/scripts/*", "LUA")) do
+	AddCSLuaFile("external/vgui/dcodeviewer/scripts/" .. v)
 end
 
-for k,v in pairs(file.Find("vgui/dcodeviewer/languages/*", "LUA")) do
-	AddCSLuaFile("vgui/dcodeviewer/languages/" .. v)
+for k,v in pairs(file.Find("external/vgui/dcodeviewer/languages/*", "LUA")) do
+	AddCSLuaFile("external/vgui/dcodeviewer/languages/" .. v)
 end

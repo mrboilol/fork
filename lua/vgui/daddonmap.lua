@@ -48,7 +48,7 @@ end
 -- ensure workshop preview data is available.
 function PANEL:Setup()
 
-	local squaremap   = include("daddonmap/squaremap.lua")
+	local squaremap   = include("external/daddonmap/squaremap.lua")
 	self.SquareMap    = squaremap.new(1024, 1024)
 	self.SquareMapRT  = GetRenderTarget("daddonmap", 1024, 1024)
 	self.SquareMapMat = CreateMaterial("daddonmap", "UnlitGeneric", {

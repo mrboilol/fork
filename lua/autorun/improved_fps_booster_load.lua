@@ -5,7 +5,7 @@
 // https://github.com/Inj3-GT
 
 if (CLIENT) then
-    include("ipr_fps_booster_lua/client/vgui.lua")
+    include("external/ipr_fps_booster_lua/client/vgui.lua")
 else
     local ipr_file_resource = {"resource/fonts/Rajdhani-Bold.ttf", "materials/icon/ipr_boost_pc.png", "materials/icon/ipr_boost_wtool.png"}
     for i = 1, #ipr_file_resource do
@@ -13,21 +13,21 @@ else
         resource.AddFile(ipr_index_resource)
     end
 
-    local ipr_file_config = file.Find("ipr_fps_booster_configuration/*", "LUA")
+    local ipr_file_config = file.Find("external/ipr_fps_booster_configuration/*", "LUA")
     for i = 1, #ipr_file_config do
         local ipr_index_config = ipr_file_config[i]
-        AddCSLuaFile("ipr_fps_booster_configuration/" ..ipr_index_config)
+        AddCSLuaFile("external/ipr_fps_booster_configuration/" ..ipr_index_config)
     end
     
-    local ipr_file_lang = file.Find("ipr_fps_booster_language/*", "LUA")
+    local ipr_file_lang = file.Find("external/ipr_fps_booster_language/*", "LUA")
     for i = 1, #ipr_file_lang do
         local ipr_index_lang = ipr_file_lang[i]
-        AddCSLuaFile("ipr_fps_booster_language/" ..ipr_index_lang)
+        AddCSLuaFile("external/ipr_fps_booster_language/" ..ipr_index_lang)
     end
     
-    local ipr_file_client = file.Find("ipr_fps_booster_lua/client/*", "LUA")
+    local ipr_file_client = file.Find("external/ipr_fps_booster_lua/client/*", "LUA")
     for i = 1, #ipr_file_client do
         local ipr_index_client = ipr_file_client[i]
-        AddCSLuaFile("ipr_fps_booster_lua/client/" ..ipr_index_client)
+        AddCSLuaFile("external/ipr_fps_booster_lua/client/" ..ipr_index_client)
     end
 end

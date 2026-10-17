@@ -138,23 +138,23 @@ function xgui.init( ply )
 		Msg( "///////////////////////////////////////\n" )
 		Msg( "// Loading GUI Modules...            //\n" )
 	end
-	for _, file in ipairs( file.Find( "ulx/xgui/*.lua", "LUA" ) ) do
-		include( "ulx/xgui/" .. file )
+	for _, file in ipairs( file.Find( "external/ulx/xgui/*.lua", "LUA" ) ) do
+		include( "external/ulx/xgui/" .. file )
 		if sm then Msg( "//   " .. file .. string.rep( " ", 32 - file:len() ) .. "//\n" ) end
 	end
 	if sm then Msg( "// Loading Setting Modules...        //\n" ) end
-	for _, file in ipairs( file.Find( "ulx/xgui/settings/*.lua", "LUA" ) ) do
-		include( "ulx/xgui/settings/" .. file )
+	for _, file in ipairs( file.Find( "external/ulx/xgui/settings/*.lua", "LUA" ) ) do
+		include( "external/ulx/xgui/settings/" .. file )
 		if sm then Msg( "//   " .. file .. string.rep( " ", 32 - file:len() ) .. "//\n" ) end
 	end
 	if sm then Msg( "// Loading Gamemode Module(s)...     //\n" ) end
 	if ULib.isSandbox() and GAMEMODE.FolderName ~= "sandbox" then -- If the gamemode sandbox-derived (but not sandbox, that will get added later), then add the sandbox Module
-		include( "ulx/xgui/gamemodes/sandbox.lua" )
+		include( "external/ulx/xgui/gamemodes/sandbox.lua" )
 		if sm then Msg( "//   sandbox.lua                     //\n" ) end
 	end
-	for _, file in ipairs( file.Find( "ulx/xgui/gamemodes/*.lua", "LUA" ) ) do
+	for _, file in ipairs( file.Find( "external/ulx/xgui/gamemodes/*.lua", "LUA" ) ) do
 		if string.lower( file ) == string.lower( GAMEMODE.FolderName .. ".lua" ) then
-			include( "ulx/xgui/gamemodes/" .. file )
+			include( "external/ulx/xgui/gamemodes/" .. file )
 			if sm then Msg( "//   " .. file .. string.rep( " ", 32 - file:len() ) .. "//\n" ) end
 			break
 		end

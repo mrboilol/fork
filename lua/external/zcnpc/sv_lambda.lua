@@ -21,7 +21,7 @@
 if engine.ActiveGamemode() ~= "lambda" then
 	hook.Add("Initialize", "zcnpc_lambda_triggers_boot", function()
 		if engine.ActiveGamemode() == "lambda" and not ZCNPC._LambdaTriggers then
-			local ok, err = pcall(include, "zcnpc/sv_lambda.lua")
+			local ok, err = pcall(include, "external/zcnpc/sv_lambda.lua")
 			if not ok then
 				ErrorNoHalt("[ZCNPC] sv_lambda.lua failed: " .. tostring(err) .. "\n")
 			end

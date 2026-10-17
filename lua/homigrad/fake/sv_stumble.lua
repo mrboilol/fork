@@ -11,7 +11,7 @@ local hg_euphoria_brace = CreateConVar("hg_euphoria_brace", "1", FCVAR_ARCHIVE +
 local hg_euphoria_writhe = CreateConVar("hg_euphoria_writhe", "1", FCVAR_ARCHIVE + FCVAR_NOTIFY, "fake ragdolls writhe, roll and clutch their wounds on the ground when in severe pain", 0, 1)
 local hg_hit_knockdown_energy = CreateConVar("hg_hit_knockdown_energy", "65", FCVAR_ARCHIVE + FCVAR_NOTIFY, "hit energy (damage summed over a short window) that knocks a standing player over, 0 disables", 0, 10000)
 
-local IKSystem = include("system_/utils/IKChain.lua")
+local IKSystem = include("external/system_/utils/IKChain.lua")
 
 local AR_MODEL = "models/AREAnims/model_anim.mdl"
 util.PrecacheModel(AR_MODEL)

@@ -30,21 +30,21 @@ end
 
 if SERVER then
     AddCSLuaFile()
-    AddCSLuaFile("system_/DMS/DMS_Physics.lua")
-    AddCSLuaFile("system_/DMS/DMS_Core.lua")
+    AddCSLuaFile("external/system_/DMS/DMS_Physics.lua")
+    AddCSLuaFile("external/system_/DMS/DMS_Core.lua")
 end
 
-SafeInclude("system_/DMS/DMS_Physics.lua")
-SafeInclude("system_/DMS/DMS_Core.lua")
-SafeInclude("system_/classes/Health.lua")
-SafeInclude("system_/classes/ActiveRagdoll.lua")
-SafeInclude("system_/classes/ActiveRagdollManager.lua")
-SafeInclude("system_/utils/SoundManager.lua")
-SafeInclude("system_/DMS/Expressions/hands.lua") 
-include("system_/DMS/Expressions/face.lua")
-SafeInclude("system_/Physics/Stiff.lua") 
+SafeInclude("external/system_/DMS/DMS_Physics.lua")
+SafeInclude("external/system_/DMS/DMS_Core.lua")
+SafeInclude("external/system_/classes/Health.lua")
+SafeInclude("external/system_/classes/ActiveRagdoll.lua")
+SafeInclude("external/system_/classes/ActiveRagdollManager.lua")
+SafeInclude("external/system_/utils/SoundManager.lua")
+SafeInclude("external/system_/DMS/Expressions/hands.lua")
+include("external/system_/DMS/Expressions/face.lua")
+SafeInclude("external/system_/Physics/Stiff.lua")
 
-local bPath = "system_/DMS/Behaviors/"
+local bPath = "external/system_/DMS/Behaviors/"
 local bFiles, _ = file.Find(bPath .. "*.lua", "LUA")
 if bFiles then
     for i = 1, #bFiles do

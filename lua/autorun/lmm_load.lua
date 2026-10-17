@@ -55,13 +55,13 @@ end;
 
 -- ( SERVER
     -- Helpers
-    AddLuaFile( "lmm/sv/detection/lags/player_ping.lua" );
-    AddLuaFile( "lmm/sv/lib/fixed_lags.lua" );
+    AddLuaFile( "external/lmm/sv/detection/lags/player_ping.lua" );
+    AddLuaFile( "external/lmm/sv/lib/fixed_lags.lua" );
     -- Scripts
-    AddLuaFile( "lmm/sv/detection/lags/detector.lua" );
-    AddLuaFile( "lmm/sv/detection/anti_crash/bad_props_detector.lua" );
-    AddLuaFile( "lmm/sv/detection/lags/frame_rate_lags.lua" );
-    AddLuaFile( "lmm/sv/detection/lags/anti_multiple_collisions.lua" );
+    AddLuaFile( "external/lmm/sv/detection/lags/detector.lua" );
+    AddLuaFile( "external/lmm/sv/detection/anti_crash/bad_props_detector.lua" );
+    AddLuaFile( "external/lmm/sv/detection/lags/frame_rate_lags.lua" );
+    AddLuaFile( "external/lmm/sv/detection/lags/anti_multiple_collisions.lua" );
 -- )
 
 -- ( SHARED

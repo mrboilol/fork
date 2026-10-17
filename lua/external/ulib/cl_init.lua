@@ -1,36 +1,36 @@
 ULib = ULib or {} -- Init table
 
-include( "ulib/shared/defines.lua" )
-include( "ulib/shared/misc.lua" )
-include( "ulib/shared/util.lua" )
-include( "ulib/shared/hook.lua" )
-include( "ulib/shared/tables.lua" )
-include( "ulib/client/commands.lua" )
-include( "ulib/shared/messages.lua" )
-include( "ulib/shared/player.lua" )
-include( "ulib/client/cl_util.lua" )
-include( "ulib/client/draw.lua" )
-include( "ulib/shared/commands.lua" )
-include( "ulib/shared/sh_ucl.lua" )
-include( "ulib/shared/plugin.lua" )
-include( "ulib/shared/cami_global.lua" )
-include( "ulib/shared/cami_ulib.lua" )
+include( "external/ulib/shared/defines.lua" )
+include( "external/ulib/shared/misc.lua" )
+include( "external/ulib/shared/util.lua" )
+include( "external/ulib/shared/hook.lua" )
+include( "external/ulib/shared/tables.lua" )
+include( "external/ulib/client/commands.lua" )
+include( "external/ulib/shared/messages.lua" )
+include( "external/ulib/shared/player.lua" )
+include( "external/ulib/client/cl_util.lua" )
+include( "external/ulib/client/draw.lua" )
+include( "external/ulib/shared/commands.lua" )
+include( "external/ulib/shared/sh_ucl.lua" )
+include( "external/ulib/shared/plugin.lua" )
+include( "external/ulib/shared/cami_global.lua" )
+include( "external/ulib/shared/cami_ulib.lua" )
 
 --Shared modules
-local files = file.Find( "ulib/modules/*.lua", "LUA" )
+local files = file.Find( "external/ulib/modules/*.lua", "LUA" )
 if #files > 0 then
 	for _, file in ipairs( files ) do
 		Msg( "[ULIB] Loading SHARED module: " .. file .. "\n" )
-		include( "ulib/modules/" .. file )
+		include( "external/ulib/modules/" .. file )
 	end
 end
 
 --Client modules
-local files = file.Find( "ulib/modules/client/*.lua", "LUA" )
+local files = file.Find( "external/ulib/modules/client/*.lua", "LUA" )
 if #files > 0 then
 	for _, file in ipairs( files ) do
 		Msg( "[ULIB] Loading CLIENT module: " .. file .. "\n" )
-		include( "ulib/modules/client/" .. file )
+		include( "external/ulib/modules/client/" .. file )
 	end
 end
 

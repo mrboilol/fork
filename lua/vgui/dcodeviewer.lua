@@ -29,17 +29,17 @@ local htmlOpen, themes, preferences, scripts, languages, htmlClose =
 </html>]=]
 
 -- load hljs css themes and store them onto singleton.
-for k,v in pairs(file.Find("vgui/dcodeviewer/themes/*", "LUA")) do
-	THEMES[string.gsub(v, "%.lua", "")] = include("vgui/dcodeviewer/themes/" .. v)
+for k,v in pairs(file.Find("external/vgui/dcodeviewer/themes/*", "LUA")) do
+	THEMES[string.gsub(v, "%.lua", "")] = include("external/vgui/dcodeviewer/themes/" .. v)
 end
 
 -- load hljs and hljs-line-numbers in order of dependency.
-scripts = scripts .. include("vgui/dcodeviewer/scripts/hljs.lua")
-scripts = scripts .. include("vgui/dcodeviewer/scripts/hljs-line-numbers.lua")
+scripts = scripts .. include("external/vgui/dcodeviewer/scripts/hljs.lua")
+scripts = scripts .. include("external/vgui/dcodeviewer/scripts/hljs-line-numbers.lua")
 
 -- load hljs languages and append to html head.
-for k,v in pairs(file.Find("vgui/dcodeviewer/languages/*", "LUA")) do
-	languages = languages .. include("vgui/dcodeviewer/languages/" .. v)
+for k,v in pairs(file.Find("external/vgui/dcodeviewer/languages/*", "LUA")) do
+	languages = languages .. include("external/vgui/dcodeviewer/languages/" .. v)
 end
 
 --- Initialize DCodeViewer component

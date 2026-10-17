@@ -1,4 +1,4 @@
-local IKSystem = include("system_/utils/IKChain.lua")
+local IKSystem = include("external/system_/utils/IKChain.lua")
 
 local B = {}
 

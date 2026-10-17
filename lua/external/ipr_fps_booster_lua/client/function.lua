@@ -703,6 +703,6 @@ ipr.Function.SettingsVgui = {
     end,
 }
 
-ipr.Cmd = include("ipr_fps_booster_configuration/commands.lua")
+ipr.Cmd = include("external/ipr_fps_booster_configuration/commands.lua")
 
 return ipr
