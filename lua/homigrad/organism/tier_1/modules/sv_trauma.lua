@@ -314,7 +314,7 @@ module[2] = function(ply, org, timeValue)
         end
 
         if effectiveConcussion > 1.8 then
-            org.needfake = true
+            if not hg.organism.IsHitKnockdownImmune(org) then org.needfake = true end
             local immobScale = (effectiveConcussion - 1.8) * 6.0
             org.immobilization = math.max(org.immobilization or 0, immobScale)
         end
@@ -630,7 +630,7 @@ function module.AddConcussion(org, intensity, duration)
     end
     if add > 1.8 then
         org.panic = math.max(org.panic or 0, add * 0.25)
-        org.needfake = true
+        if not hg.organism.IsHitKnockdownImmune(org) then org.needfake = true end
     end
     if add > 2.5 and org.alive then
         org.shock = math.min((org.shock or 0) + add * 3, 60)

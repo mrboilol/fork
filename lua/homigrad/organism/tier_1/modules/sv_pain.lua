@@ -202,7 +202,7 @@ module[2] = function(owner, org, timeValue)
 	end
 	if org.adrenalinePainBreakthrough then adrenalinePainPacing = math.max(adrenalinePainPacing, 0.5) end
 	add = add * Lerp(zerlkers, adrenalinePainPacing, 0.025)
-	sub = sub * (1 + resilience * 0.35)
+	sub = sub * (1 + resilience * 0.35 + zerlkersResistance * 1.5)
 
 
 
@@ -380,7 +380,7 @@ module[2] = function(owner, org, timeValue)
 
 	//org.painkiller = Approach(org.painkiller, 0, timeValue / 240 * (org.naloxone * 25 + 1))
 
-	if org.nearpainlimit then
+	if org.nearpainlimit and not hg.organism.IsHitKnockdownImmune(org) then
 		org.needfake = true
 	end
 	

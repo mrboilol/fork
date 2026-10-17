@@ -1803,11 +1803,11 @@ function SWEP:ApplyForce()
 							-- CPR improves oxygen delivery gradually; destroyed heart, airway,
 							-- lungs or critically low blood volume still require treatment first.
 							if hg.organism.RestoreSupportedOxygen then
-								hg.organism.RestoreSupportedOxygen(org, 0.018 * skillMult, {
+								hg.organism.RestoreSupportedOxygen(org, 0.03 * skillMult, {
 									artificialSupport = true,
-									oxygen = math.min(24, org.o2.range or 30), bodyoxygen = 0.52,
-									brainoxygen = 0.48, perfusion = 0.42, peripheralperfusion = 0.38,
-									cerebralPerfusion = 0.42, myocardialOxygen = 0.45,
+									oxygen = math.min(24, org.o2.range or 30), bodyoxygen = 0.6,
+									brainoxygen = 0.56, perfusion = 0.5, peripheralperfusion = 0.45,
+									cerebralPerfusion = 0.5, myocardialOxygen = 0.52,
 									hypoxiaTime = 14, severeHypoxiaTime = 4, systemicIschemiaTime = 14
 								})
 							end
@@ -1821,10 +1821,12 @@ function SWEP:ApplyForce()
 							if hg.organism and hg.organism.TryRestoreBreathingWithResuscitation then hg.organism.TryRestoreBreathingWithResuscitation(org, 0.5 * skillMult) end
 							
 							-- Chest compressions temporarily improve hypotension.
-							org.hypotension = math.Approach(org.hypotension or 1, 0, 0.05 * skillMult)
-							org.arrhythmia = math.Approach(org.arrhythmia or 0, 0, 0.025 * skillMult)
-							org.heartStrain = math.Approach(org.heartStrain or 0, 0, 0.015 * skillMult)
-							org.myocardialOxygen = math.Approach(org.myocardialOxygen or 0, 1, 0.02 * skillMult)
+							local severeRhythm = org.heartstop or org.fibrillation or (org.arrhythmia or 0) > 0.6
+							local rhythmMul = severeRhythm and 0.15 or 1
+							org.hypotension = math.Approach(org.hypotension or 1, 0, 0.08 * skillMult)
+							org.arrhythmia = math.Approach(org.arrhythmia or 0, 0, 0.03 * skillMult * rhythmMul)
+							org.heartStrain = math.Approach(org.heartStrain or 0, 0, 0.025 * skillMult)
+							org.myocardialOxygen = math.Approach(org.myocardialOxygen or 0, 1, 0.035 * skillMult)
 							
 							-- CO removal
 							org.CO = math.Approach(org.CO, 0, skillMult)
@@ -1832,7 +1834,7 @@ function SWEP:ApplyForce()
 							org.co2 = math.Approach(org.co2 or 0, 0, skillMult)
 							
 							-- Reduced chest damage chance for doctors
-							if math.random(50) == 1 and (ply.Profession != "doctor") then
+							if math.random(50) == 1 and (ply.Profession != "doctor") and (org.chest or 0) < 0.4 then
 								local dmginfo = DamageInfo()
 								dmginfo:SetDamageType(DMG_CRUSH)
 								dmginfo:SetInflictor(self)

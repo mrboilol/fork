@@ -268,7 +268,8 @@ end)
 hook.Add("Should Fake Up", "organism", function(ply)
 	local org = ply.organism
 	if hg.IsLimbIncapacitated(org, "lleg") or hg.IsLimbIncapacitated(org, "rleg") then return false end
-	if org.seizureActive or org.otrub or org.fake or org.nearpainlimit or org.shock > 40 or org.spine1 >= hg.organism.fake_spine1 or org.spine2 >= hg.organism.fake_spine2 or org.spine3 >= hg.organism.fake_spine3 or (hg.IsLimbFractured(org, "lleg") and hg.IsLimbFractured(org, "rleg")) and org.berserk <= 0.3 or org.consciousness <= 0.4 then
+	local hitImmune = hg.organism.IsHitKnockdownImmune(org)
+	if org.seizureActive or org.otrub or org.fake or (not hitImmune and (org.nearpainlimit or org.shock > 40)) or org.spine1 >= hg.organism.fake_spine1 or org.spine2 >= hg.organism.fake_spine2 or org.spine3 >= hg.organism.fake_spine3 or (hg.IsLimbFractured(org, "lleg") and hg.IsLimbFractured(org, "rleg")) and org.berserk <= 0.3 or org.consciousness <= 0.4 then
 		return false
 	end
 end)
@@ -768,6 +769,11 @@ function hg.organism.GetResilience(org)
 	return math.max(zerlkers, adrenaline)
 end
 
+function hg.organism.IsHitKnockdownImmune(org)
+	if not org then return false end
+	return (org.zerlkers or 0) > 0 or (org.adrenaline or 0) >= 3
+end
+
 function hg.organism.GetZerlkersResistance(org)
 	if not org or (org.zerlkersOverdose or 0) > 0 then return 0 end
 	return math.Clamp(org.zerlkers or 0, 0, 1)
@@ -1021,16 +1027,6 @@ function hg.organism.AddHeadTraumaSeizureRisk(org, concussionGain, impactDamage)
 	end
 
 	return false
-end
-
-function hg.organism.StartFibrillation(org)
-	if not org or not org.alive or org.deathStateKilled or org.heartstop then return false end
-	org.fibrillation = true
-	org.heartstop = false
-	org.arrhythmia = math.max(org.arrhythmia or 0, 0.8)
-	org.heartStrain = math.max(org.heartStrain or 0, 0.8)
-	org.fibrillationStart = CurTime()
-	return true
 end
 
 local function getSeizureLobeDamage(org)

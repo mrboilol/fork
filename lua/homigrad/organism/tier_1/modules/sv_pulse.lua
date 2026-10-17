@@ -742,9 +742,10 @@ function hg.organism.AddCardiacStress(org, amount)
 	return org.arrhythmia
 end
 
-function hg.organism.StartFibrillation(org)
+function hg.organism.StartFibrillation(org, force)
 	if not org or org.heartstop then return end
 	if hg.organism.OrganSystemsEnabled and not hg.organism.OrganSystemsEnabled() then return false end
+	if not force and (org.rhythmRecoveryUntil or 0) > CurTime() then return false end
 	-- Do not restart the VF clock every Think while the same fibrillation episode
 	-- is already active; progression to arrest depends on elapsed VF duration.
 	if org.fibrillation then return true end
@@ -864,9 +865,10 @@ local function restoreHeartAfterResuscitation(org, now, resusBloodK)
 	org.terminalRhythm = nil
 	org.unstableRhythm = nil
 	org.ventricularTachycardia = nil
-	org.rhythmRecoveryUntil = now + 12
-	org.nextArrhythmiaRoll = math.max(org.nextArrhythmiaRoll or 0, now + 8)
-	org.nextColdRhythmRoll = math.max(org.nextColdRhythmRoll or 0, now + 8)
+	org.rhythmRecoveryUntil = now + 30
+	org.arrhythmia = math.min(org.arrhythmia or 0, 0.3)
+	org.nextArrhythmiaRoll = math.max(org.nextArrhythmiaRoll or 0, now + 30)
+	org.nextColdRhythmRoll = math.max(org.nextColdRhythmRoll or 0, now + 30)
 	org.heart = math.max((org.heart or 0) - 0.08, 0)
 	org.heartStrain = math.max((org.heartStrain or 0) - 0.2, 0)
 	org.ischemia = math.max((org.ischemia or 0) - 0.15, 0)
@@ -912,8 +914,7 @@ function hg.organism.TryRestartHeartWithResuscitation(org, cprDuration)
 	local hasAED = (org.aedResuscitationUntil or 0) > now
 	local hasEpinephrine = (org.epinephrineResuscitationUntil or 0) > now
 	local hasCPR = (org.cprResuscitationUntil or 0) > now
-	local sustainedCPR = hasCPR and (tonumber(cprDuration) or 0) >= 8
-	if not ((hasAED and (hasEpinephrine or hasCPR)) or (hasEpinephrine and hasCPR) or sustainedCPR) then return false end
+	if not ((hasAED and (hasEpinephrine or hasCPR)) or (hasEpinephrine and hasCPR)) then return false end
 
 	if (org.resuscitationAttemptUntil or 0) > now then return false end
 	org.resuscitationAttemptUntil = now + 6

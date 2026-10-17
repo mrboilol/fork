@@ -438,8 +438,9 @@ local function BeginAEDShock(defib, ply, getTarget, uses, accidental)
 		ApplyAEDShock(org, accidental)
 
 		if org then
-			org.painadd = (org.painadd or 0) + 150
-			org.shock = (org.shock or 0) + 150
+			local shockLoad = accidental and 150 or 40
+			org.painadd = (org.painadd or 0) + shockLoad
+			org.shock = (org.shock or 0) + shockLoad
 		end
 
 		for _, otherPly in ipairs(player.GetAll()) do
@@ -463,7 +464,7 @@ local function BeginAEDShock(defib, ply, getTarget, uses, accidental)
 				if otherOrg then
 					otherOrg.painadd = (otherOrg.painadd or 0) + 150
 					otherOrg.shock = (otherOrg.shock or 0) + 150
-					
+
 					if hg and hg.StunPlayer then
 						hg.StunPlayer(otherPly, 2)
 					end

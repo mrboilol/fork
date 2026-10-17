@@ -105,7 +105,7 @@ local function applyOrganTrauma(org, dmgInfo, force, delta, previousDamage, orga
 
 	if severity >= 1.7 and math.Rand(0, 1) < math.Clamp((severity - 1.5) * 0.16 / resistance, 0, 0.35) then
 		org.needotrub = true
-	else
+	elseif not hg.organism.IsHitKnockdownImmune(org) then
 		org.needfake = true
 	end
 end
@@ -129,7 +129,7 @@ input_list.heart = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	org.heartStrain = math.Clamp((org.heartStrain or 0) + delta * 1.4, 0, 1)
 	if hg.organism.AddCardiacStress then hg.organism.AddCardiacStress(org, delta * (dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) and 2.4 or 1.2)) end
 	if delta > 0.08 and dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_SLASH) and math.Rand(0, 1) < math.Clamp(delta * 1.8, 0, 0.75) then
-		hg.organism.StartFibrillation(org)
+		hg.organism.StartFibrillation(org, true)
 	end
 	if delta > 0 and (org.aorta or 0) < 1 and math.Rand(0, 1) < math.Clamp(0.18 + delta * 0.7, 0.18, 0.72) then
 		local arteryDir = isvector(dir) and dir:LengthSqr() > 0.001 and dir or traumaDirection(org, dmgInfo)
@@ -487,7 +487,7 @@ hitArtery = function(artery, org, dmg, dmgInfo, boneindex, dir, hit, impact, for
 		
 		hg.AddHarmToAttacker(dmgInfo, 15, "Carotid artery punctured harm")
 		org.neckslit = true
-		if math.Rand(0, 1) < 0.75 then
+		if math.Rand(0, 1) < 0.75 and not hg.organism.IsHitKnockdownImmune(org) then
 			org.neckslitStunUntil = CurTime() + 5
 			org.needfake = true
 		end

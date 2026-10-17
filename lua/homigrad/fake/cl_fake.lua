@@ -893,8 +893,9 @@ hook.Add("HUDPaint", "HG_WoundHoldPrompt", function()
 		end
 	end
 	local inFake = IsValid(ply.FakeRagdoll)
-	local hasBothArms = not (ply.organism and (ply.organism.larmamputated or ply.organism.rarmamputated or ply.organism.larmupamputated or ply.organism.rarmupamputated))
-	local shouldShow = inFake and hasWounds and hasBothArms and not (ply.organism and ply.organism.otrub)
+	local org = ply.organism
+	local hasArm = not org or not ((org.larmamputated or org.larmupamputated) and (org.rarmamputated or org.rarmupamputated))
+	local shouldShow = inFake and hasWounds and hasArm and not (org and org.otrub)
 
 	woundHoldPromptFade = LerpFT(0.12, woundHoldPromptFade, shouldShow and 1 or 0)
 	if woundHoldPromptFade <= 0.01 then return end
