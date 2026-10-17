@@ -81,16 +81,20 @@ local hg_coolcamera = ConVarExists("hg_coolcamera") and GetConVar("hg_coolcamera
 			elseif footcl == 0 then
 				footcl = 1
 			end
-			local mul = 1 * len / 300 * math_max((350 - ply.move) / 50, 0.4)
+			local moveMul = math.Clamp((350 - ply.move) / 50, 0.4, 2)
+			local mul = 1 * len / 300 * moveMul
 
 			if not ply.organism then return end
 			local leftImpairment = 1 - hg.GetLimbEffectiveness(ply.organism, "lleg")
 			local rightImpairment = 1 - hg.GetLimbEffectiveness(ply.organism, "rleg")
 			local legsDamaged = leftImpairment + rightImpairment
-			local mul2 = (leftImpairment * 3 + 1) * (rightImpairment * 3 + 1) * (hg_coolcamera:GetBool() and legsDamaged < 0.2 and 1.5 or 0.5)
+			local stepImpairment = foot == 0 and leftImpairment or rightImpairment
+			local mul2 = (stepImpairment * 2 + 1) * (hg_coolcamera:GetBool() and legsDamaged < 0.2 and 1.5 or 0.5)
 			mul2 = mul2 * (ply.GetTraitMultiplier and ply:GetTraitMultiplier("headbob", 1) or 1)
 
-			ViewPunch(Angle((hg_gopro:GetBool() and 5 or 1) * len / 200 * math_max((350 - ply.move) / 50, 1) * mul2, footcl * mul * mul2, footcl * mul * mul2))
+			local pitch = math.min(len / 200 * math_max(moveMul, 1) * mul2, 2)
+			local side = math.Clamp(footcl * mul * mul2, -1.2, 1.2)
+			SmoothViewPunch(Angle((hg_gopro:GetBool() and 5 or 1) * pitch, side, side))
 		end
 
 		if SERVER and ply.organism then

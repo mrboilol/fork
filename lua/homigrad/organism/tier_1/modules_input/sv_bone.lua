@@ -195,6 +195,13 @@ local function notifyOwner(org, ...)
 	return notifyPlayer(org and org.owner, ...)
 end
 
+local function notifyBoneBreak(org, limb, msg, msgKey)
+	org.boneBreakNotifyUntil = org.boneBreakNotifyUntil or {}
+	local now = CurTime()
+	if (org.boneBreakNotifyUntil[limb] or 0) > now then return end
+	if notifyOwner(org, msg, true, msgKey, 2) then org.boneBreakNotifyUntil[limb] = now + 5 end
+end
+
 local function sendThought(org, msg, key, delay, clr)
 	if hasNewThoughts(org) then
 		local owner = org.owner
@@ -374,7 +381,7 @@ local function compoundFractureResponse(org, key, region, stabilized)
 	if hasNewThoughts(org) then
 		sendThought(org, "Your " .. limbName[key] .. " is broken in two places.", "thought_double_broke" .. key, 2, Color(255, 150, 150))
 	else
-		notifyOwner(org, "MY " .. string.upper(limbName[key]) .. " IS BROKEN IN TWO PLACES!", true, "double_broke" .. key, 2)
+		notifyBoneBreak(org, key, "MY " .. string.upper(limbName[key]) .. " IS BROKEN IN TWO PLACES!", "double_broke" .. key)
 	end
 	if hg.QueuePainScream and canFeelPain(org, region) then hg.QueuePainScream(org.owner, 2) end
 end
@@ -501,7 +508,7 @@ local function legs(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 		if hasNewThoughts(org) then
 			sendThought(org, "Your " .. segmentName[key][segment] .. " is broken.", "thought_broke" .. key .. segment, 1, Color(255, 210, 210))
 		else
-			notifyOwner(org, broke_leg[math.random(#broke_leg)], true, "broke" .. key .. segment, 2)
+			notifyBoneBreak(org, key, broke_leg[math.random(#broke_leg)], "broke" .. key .. segment)
 		end
 
 		timer.Simple(0, function() hg.LightStunPlayer(org.owner,2) end)
@@ -565,7 +572,7 @@ local function arms(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 		if hasNewThoughts(org) then
 			sendThought(org, "Your " .. segmentName[key][segment] .. " is broken.", "thought_broke" .. key .. segment, 1, Color(255, 210, 210))
 		else
-			notifyOwner(org, broke_arm[math.random(#broke_arm)], true, "broke" .. key .. segment, 2)
+			notifyBoneBreak(org, key, broke_arm[math.random(#broke_arm)], "broke" .. key .. segment)
 		end
 
 		playBoneFractureSound(org.owner)
@@ -732,6 +739,9 @@ local function sendHeadTraumaFlash(org, dmg, dmgInfo, boneDelta, concussionGain,
 	local hasBrainDamage = brainGain > 0
 	local hasConcussion = concussionGain > 0.05
 	local isSevere = forceSevere or hasBrainDamage or boneDelta >= 0.35 or concussionGain >= 1.5
+	local skullNow = org.skull or 0
+	local skullFissured = boneDelta > 0.01 and skullNow >= 0.6 and skullNow - boneDelta < 0.6
+	local playConcussionSound = brainGain > 0.01 or boneDelta >= 0.35 or skullFissured or concussionGain >= 1.5 or org.needotrub or org.otrub
 	local timeScale = math.Clamp(0.35 + boneDelta * 0.8 + concussionGain * 0.2 + brainGain, 0.35, isSevere and 1.35 or 0.5)
 	local flashSize = math.Clamp(950 + dmg * 260 + boneDelta * 1500 + concussionGain * 180 + brainGain * 900, 950, isSevere and 3200 or 1300)
 	if isSevere then
@@ -756,7 +766,7 @@ local function sendHeadTraumaFlash(org, dmg, dmgInfo, boneDelta, concussionGain,
 		net.WriteBool(false)
 		net.WriteBool(hasBrainDamage)
 		net.WriteBool(hasConcussion)
-		net.WriteBool(isSevere)
+		net.WriteBool(playConcussionSound and true or false)
 		net.WriteBool(isSevere)
 	net.Send(target)
 
@@ -1301,7 +1311,7 @@ local function upper_limb(org, bone, dmg, dmgInfo, amputate_key, limb_key, segme
 		if hasNewThoughts(org) then
 			sendThought(org, "Your " .. segmentName[limb_key][segment] .. " is broken.", "thought_broke" .. limb_key .. segment, 1, Color(255, 210, 210))
 		else
-			notifyOwner(org, (limb_key == "rarm" or limb_key == "larm") and broke_arm[math.random(#broke_arm)] or broke_leg[math.random(#broke_leg)], true, "broke" .. limb_key .. segment, 2)
+			notifyBoneBreak(org, limb_key, (limb_key == "rarm" or limb_key == "larm") and broke_arm[math.random(#broke_arm)] or broke_leg[math.random(#broke_leg)], "broke" .. limb_key .. segment)
 		end
 
 		playBoneFractureSound(org.owner)

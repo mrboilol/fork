@@ -14,6 +14,47 @@ local function getLowPulseSeverity(pulse)
 	return Clamp((70 - max(tonumber(pulse) or 0, 0)) / 70, 0, 1)
 end
 
+local ENCLOSURE_SAMPLE_INTERVAL = 2
+local ENCLOSURE_TRACE_LEN = 32768
+local ENCLOSURE_INDOOR_COLD = 0.35
+local ENCLOSURE_ROCK_COLD = 1.9
+local ENCLOSURE_ROCK_FULL = 768
+local enclosureUp = Vector(0, 0, ENCLOSURE_TRACE_LEN)
+local enclosureTrace = {mask = MASK_SOLID_BRUSHONLY}
+
+local function measureOverheadRock(start)
+	local rock, enclosed = 0, false
+	for _ = 1, 6 do
+		enclosureTrace.start = start
+		enclosureTrace.endpos = start + enclosureUp
+		local tr = util.TraceLine(enclosureTrace)
+		if not tr.Hit or tr.HitSky then return rock, enclosed end
+		enclosed = true
+		local entry = tr.HitPos + vector_up
+		enclosureTrace.start = entry
+		enclosureTrace.endpos = entry + enclosureUp
+		local inside = util.TraceLine(enclosureTrace)
+		if inside.AllSolid then return ENCLOSURE_ROCK_FULL, true end
+		if not inside.StartSolid then return rock, true end
+		local thickness = inside.FractionLeftSolid * ENCLOSURE_TRACE_LEN
+		rock = rock + thickness + 1
+		if rock >= ENCLOSURE_ROCK_FULL then return rock, true end
+		start = entry + vector_up * (thickness + 1)
+	end
+	return rock, enclosed
+end
+
+local function getEnclosureCold(ent)
+	local now = CurTime()
+	if (ent.hgEnclosureColdNext or 0) > now then return ent.hgEnclosureCold or 0 end
+	ent.hgEnclosureColdNext = now + ENCLOSURE_SAMPLE_INTERVAL
+
+	local rock, enclosed = measureOverheadRock(ent:WorldSpaceCenter())
+	local cold = enclosed and ENCLOSURE_INDOOR_COLD + Clamp(rock / ENCLOSURE_ROCK_FULL, 0, 1) * ENCLOSURE_ROCK_COLD or 0
+	ent.hgEnclosureCold = cold
+	return cold
+end
+
 function hg.organism.BeginCardiacArrestMechanicalDecay(org)
 	if not org or org.cardiacArrestMechanicalInitial then return end
 
@@ -1705,6 +1746,12 @@ module[2] = function(owner, org, timeValue)
 	-- temperature
 	local lowPulseCold = Clamp(getLowPulseSeverity(org.pulse) / (55 / 70), 0, 1)
 	local needed_temp = math.min(36.7 - lowPulseCold * 5.7, org.lowBloodTemperatureTarget or 36.7)
+	if IsValid(owner) then
+		local character = hg.GetCurrentCharacter(owner)
+		if not IsValid(character) then character = owner end
+		local envCold = getEnclosureCold(character)
+		if envCold > 0 then needed_temp = math.min(needed_temp, 36.7 - envCold) end
+	end
 	if StormFox2 and StormFox2.Loaded and StormFox2.Setting.SFEnabled() and IsValid(owner) then
 		local character = hg.GetCurrentCharacter(owner)
 		if not IsValid(character) then character = owner end

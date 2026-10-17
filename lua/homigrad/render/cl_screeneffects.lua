@@ -621,9 +621,9 @@ hg.screeneffects_config = {
 	panicattackOverlayPath = panicattackOverlayPath,
 	panicattackVisualExponent = 1.75,
 	panicattackPulseFloor = 0.78,
-	panicattackPulseIntensity = 0.2,
-	panicattackShakeIntervalMin = 0.45,
-	panicattackShakeIntervalMax = 1.4,
+	panicattackPulseIntensity = 0.3,
+	panicattackShakeIntervalMin = 0.2,
+	panicattackShakeIntervalMax = 0.6,
 	panicattackShakeMul = 0.85,
 	painBeatOverlayVolumeMul = painBeatOverlayVolumeMul,
 	painThresholdMax = painThresholdMax,
@@ -1047,6 +1047,7 @@ local stations = {
 local choosera = 1
 local tempolerp = 0
 local grayscaleLerp = 0
+stressSharpenLerp = 0
 local soundRetry = {}
 
 local function updateCollapseBlink(severity, consciousnessSeverity, brainSeverity)
@@ -1891,11 +1892,11 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	updateSeizureEffects(org)
 
 	local panicBaseTarget = getPanicAttackFx(org)
-	PanicAttackLerp = LerpFT(0.03, PanicAttackLerp, panicBaseTarget ^ hg.screeneffects_config.panicattackVisualExponent)
+	PanicAttackLerp = LerpFT(0.12, PanicAttackLerp, panicBaseTarget ^ hg.screeneffects_config.panicattackVisualExponent)
 	local panicDying = org.otrub or org.incapacitated
 	if PanicAttackLerp > 0.001 then
 		local panicBase = PanicAttackLerp
-		local panicPulse = panicDying and 0 or panicBase * (hg.screeneffects_config.panicattackPulseFloor + math.ease.InOutSine(math.abs(math.cos(CurTime() * 2))) * hg.screeneffects_config.panicattackPulseIntensity)
+		local panicPulse = panicDying and 0 or panicBase * (hg.screeneffects_config.panicattackPulseFloor + math.ease.InOutSine(math.abs(math.cos(CurTime() * 3.5))) * hg.screeneffects_config.panicattackPulseIntensity)
 
 		render.UpdateScreenEffectTexture()
 		heatMat:SetFloat("$c0_x", -CurTime() * 0.1)
@@ -1939,7 +1940,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			end)
 		end
 		if IsValid(PanicStation) then
-			PanicStationVolume = math.Approach(PanicStationVolume, panicDying and 0 or math.Clamp(PanicAttackLerp, 0, 1), FrameTime() * 1.8)
+			PanicStationVolume = math.Approach(PanicStationVolume, panicDying and 0 or math.Clamp(PanicAttackLerp, 0, 1), FrameTime() * 4)
 			PanicStation:SetVolume(PanicStationVolume)
 			if PanicStationVolume <= 0.001 then
 				PanicStation:Stop()
@@ -1949,7 +1950,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	else
 		nextPanicAttackShake = 0
 		if IsValid(PanicStation) then
-			PanicStationVolume = math.Approach(PanicStationVolume, 0, FrameTime() * 1.8)
+			PanicStationVolume = math.Approach(PanicStationVolume, 0, FrameTime() * 3)
 			PanicStation:SetVolume(PanicStationVolume)
 			if PanicStationVolume <= 0.001 then
 				PanicStation:Stop()
@@ -3007,9 +3008,20 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		if grayscaleLerp > 0.005 then
 			tab["$pp_colour_colour"] = math.min(tab["$pp_colour_colour"] or 1, 1 - grayscaleLerp)
 		end
+
+		local painSharpen = math.Clamp(((org.pain or 0) - 15) / (hg.screeneffects_config.painAgonyThreshold - 15), 0, 1)
+		local adrenalineSharpen = math.Clamp(((org.adrenaline or 0) - 0.4) / 1.6, 0, 1)
+		local o2Sharpen = math.Clamp((45 - o2) / 30, 0, 1)
+		local panicSharpen = getPanicAttackFx(org)
+		local stressSharpen = math.max(painSharpen, adrenalineSharpen, o2Sharpen, panicSharpen)
+		stressSharpenLerp = LerpFT(0.05, stressSharpenLerp, stressSharpen)
+		if stressSharpenLerp > 0.01 then
+			DrawSharpen(stressSharpenLerp * 1.3, 0.4 + stressSharpenLerp * 0.9)
+		end
 		else
 			grayscaleLerp = LerpFT(0.04, grayscaleLerp, 0)
 			ischemicVignetteLerp = LerpFT(0.04, ischemicVignetteLerp, 0)
+			stressSharpenLerp = LerpFT(0.08, stressSharpenLerp, 0)
 		end
 	end
 
@@ -3496,10 +3508,14 @@ end)
 local HEADHIT_VOLUME = 1.0
 local HEADHIT_BASE_BOOST = 1.2 -- every head hit is louder than full volume
 local CONCUSSION_VOLUME = 0.45
-local CONCUSSION_SOUND_PATHS = {
-    "sound/concussion3.mp3",
-    "sound/concussion4.mp3"
-}
+local CONCUSSION_SOUND_PATHS = {}
+for _, path in ipairs({"sound/concussion3.mp3", "sound/concussion4.mp3"}) do
+    if file.Exists(path, "GAME") then CONCUSSION_SOUND_PATHS[#CONCUSSION_SOUND_PATHS + 1] = path end
+end
+if #CONCUSSION_SOUND_PATHS == 0 then
+    CONCUSSION_SOUND_PATHS = {"sound/concussion1.mp3", "sound/concussion2.mp3"}
+end
+local CONCUSSION_SOUND_COOLDOWN = 2.5
 local last_headhit_sound = 0
 local last_concussion_sound = 0
 
@@ -3518,7 +3534,7 @@ local function PlayHeadhitSound(volumeScale)
 end
 
 local function PlayConcussionSound(volumeScale)
-    if CurTime() < last_concussion_sound + 0.15 then return end
+    if CurTime() < last_concussion_sound + CONCUSSION_SOUND_COOLDOWN then return false end
     last_concussion_sound = CurTime()
     volumeScale = math.Clamp(volumeScale or 1, 0.3, 1.2)
     local soundPath = CONCUSSION_SOUND_PATHS[math.random(#CONCUSSION_SOUND_PATHS)]
@@ -3528,7 +3544,9 @@ local function PlayConcussionSound(volumeScale)
             station:Play()
         end
     end)
+    return true
 end
+hg.PlayConcussionSound = PlayConcussionSound
 
 net.Receive("headtrauma_flash", function()
     local pos = net.ReadVector()
@@ -3562,9 +3580,8 @@ net.Receive("headtrauma_flash", function()
         headtraumaSaturation = math.max(headtraumaSaturation or 0, math.min(time * 9, 10))
     end
 
-    PlayHeadhitSound(damageScale)
-    if playConcussionSound then
-        PlayConcussionSound(damageScale)
+    if not (playConcussionSound and PlayConcussionSound(math.max(damageScale, 0.8))) then
+        PlayHeadhitSound(damageScale)
     end
 
     -- Scaled view punch based on damage

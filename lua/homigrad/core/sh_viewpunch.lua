@@ -31,12 +31,17 @@ local IsValid = IsValid
 		local vp_punch_angle_velocity4 = Angle()
 		vp_punch_angle_last4 = vp_punch_angle_last4 or vp_punch_angle4
 
-		-- Suppression needs a forceful camera jolt, not another oscillating spring.
-		-- This channel applies the impulse immediately and eases it straight back
-		-- slowly enough that the heavier kick does not feel like a single-frame snap.
 		local QUICK_PUNCH_RETURN_SPEED = 14
 		local vp_quick_angle = Angle()
 		local vp_quick_angle_last = Angle()
+
+		local SMOOTH_PUNCH_RISE = 10
+		local SMOOTH_PUNCH_DECAY = 6
+		local SMOOTH_PUNCH_GAIN = 2.1
+		local SMOOTH_PUNCH_LIMIT = 8
+		local vp_smooth_target = Angle()
+		local vp_smooth_angle = Angle()
+		local vp_smooth_angle_last = Angle()
 
 		function hg.CalculateConsciousnessMul()
 			local consciousness = 1
@@ -135,14 +140,24 @@ local IsValid = IsValid
 				end
 			end
 
-			if not lply:Alive() and (not vp_punch_angle:IsZero() or not vp_quick_angle:IsZero()) then
+			if not vp_smooth_target:IsZero() or not vp_smooth_angle:IsZero() then
+				vp_smooth_angle = LerpAngle(math_Clamp(ftlerped * SMOOTH_PUNCH_RISE, 0, 1), vp_smooth_angle, vp_smooth_target)
+				vp_smooth_target = LerpAngle(math_Clamp(ftlerped * SMOOTH_PUNCH_DECAY, 0, 1), vp_smooth_target, angle_zero)
+				if math.abs(vp_smooth_angle.p) + math.abs(vp_smooth_angle.y) + math.abs(vp_smooth_angle.r) + math.abs(vp_smooth_target.p) + math.abs(vp_smooth_target.y) + math.abs(vp_smooth_target.r) < 0.005 then
+					vp_smooth_angle:Zero()
+					vp_smooth_target:Zero()
+				end
+			end
+
+			if not lply:Alive() and (not vp_punch_angle:IsZero() or not vp_quick_angle:IsZero() or not vp_smooth_angle:IsZero()) then
 				vp_punch_angle:Zero() vp_punch_angle_velocity:Zero() vp_punch_angle2:Zero() vp_punch_angle_velocity2:Zero()
 				vp_quick_angle:Zero()
+				vp_smooth_angle:Zero() vp_smooth_target:Zero()
 			end
 
 			local consmulrev = 1 - consmul
-			if vp_punch_angle:IsZero() and vp_punch_angle_velocity:IsZero() and vp_punch_angle2:IsZero() and vp_punch_angle_velocity2:IsZero() and vp_punch_angle3:IsZero() and vp_punch_angle_velocity3:IsZero() and vp_punch_angle4:IsZero() and vp_punch_angle_velocity4:IsZero() and vp_quick_angle:IsZero() and vp_quick_angle_last:IsZero() then return end
-			local add = vp_punch_angle - vp_punch_angle_last + vp_punch_angle2 - vp_punch_angle_last2 + vp_punch_angle3 - vp_punch_angle_last3 + vp_punch_angle4 * consmulrev - vp_punch_angle_last4 * consmulrev + vp_quick_angle - vp_quick_angle_last
+			if vp_punch_angle:IsZero() and vp_punch_angle_velocity:IsZero() and vp_punch_angle2:IsZero() and vp_punch_angle_velocity2:IsZero() and vp_punch_angle3:IsZero() and vp_punch_angle_velocity3:IsZero() and vp_punch_angle4:IsZero() and vp_punch_angle_velocity4:IsZero() and vp_quick_angle:IsZero() and vp_quick_angle_last:IsZero() and vp_smooth_angle:IsZero() and vp_smooth_angle_last:IsZero() then return end
+			local add = vp_punch_angle - vp_punch_angle_last + vp_punch_angle2 - vp_punch_angle_last2 + vp_punch_angle3 - vp_punch_angle_last3 + vp_punch_angle4 * consmulrev - vp_punch_angle_last4 * consmulrev + vp_quick_angle - vp_quick_angle_last + vp_smooth_angle - vp_smooth_angle_last
 			if lply.organism and lply.organism.otrub then add:Zero() end
 			
 			if hg.InGame() then
@@ -164,6 +179,7 @@ local IsValid = IsValid
 			vp_punch_angle_last3 = vp_punch_angle3
 			vp_punch_angle_last4 = vp_punch_angle4 * consmul
 			vp_quick_angle_last = Angle(vp_quick_angle.p, vp_quick_angle.y, vp_quick_angle.r)
+			vp_smooth_angle_last = Angle(vp_smooth_angle.p, vp_smooth_angle.y, vp_smooth_angle.r)
 		end)
 
 		function SetViewPunchAngles(angle)
@@ -242,6 +258,14 @@ local IsValid = IsValid
 			vp_quick_angle.p = math_Clamp(vp_quick_angle.p, -12, 12)
 			vp_quick_angle.y = math_Clamp(vp_quick_angle.y, -12, 12)
 			vp_quick_angle.r = math_Clamp(vp_quick_angle.r, -5, 5)
+		end
+
+		function SmoothViewPunch(angle)
+			if not angle then return end
+			vp_smooth_target = vp_smooth_target + angle * SMOOTH_PUNCH_GAIN
+			vp_smooth_target.p = math_Clamp(vp_smooth_target.p, -SMOOTH_PUNCH_LIMIT, SMOOTH_PUNCH_LIMIT)
+			vp_smooth_target.y = math_Clamp(vp_smooth_target.y, -SMOOTH_PUNCH_LIMIT, SMOOTH_PUNCH_LIMIT)
+			vp_smooth_target.r = math_Clamp(vp_smooth_target.r, -SMOOTH_PUNCH_LIMIT, SMOOTH_PUNCH_LIMIT)
 		end
 
 		function GetAllViewPunchAngles()

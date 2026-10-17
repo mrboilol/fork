@@ -119,8 +119,7 @@ local function StopRemDeathStateSound()
 	if IsValid(remDeathStateStation) then remDeathStateStation:Stop() end
 	remDeathStateStation = nil
 end
-local lastConcussion = 0
-local lastConcussionSound = 0
+local lastConcussionStage = 0
 
 local function PlayLocalImpactSound(path, volume)
 	sound.PlayFile("sound/" .. path, "noblock noplay", function(station)
@@ -276,11 +275,11 @@ hook.Add("Think", "RemCardiacSounds", function()
 	end
 	local org = ply:Alive() and (ply.new_organism or ply.organism)
 	local concussion = org and org.concussion or 0
-	if concussion > lastConcussion + 0.1 and CurTime() >= lastConcussionSound then
-		PlayLocalImpactSound("concussion2.mp3", 1)
-		lastConcussionSound = CurTime() + 1.5
+	local concussionStage = concussion >= 2.5 and 3 or concussion >= 1 and 2 or concussion >= 0.5 and 1 or 0
+	if concussionStage > lastConcussionStage and not org.otrub and hg.PlayConcussionSound then
+		hg.PlayConcussionSound(0.8 + concussionStage * 0.15)
 	end
-	lastConcussion = concussion
+	lastConcussionStage = concussionStage
 	local heartstop = org and org.heartstop or false
 	hg.criticalBeatsActive = org and org.fibrillation or false
 	if heartstop and not remHeartStopped then PlayRemHeartStopSound(org.otrub) end

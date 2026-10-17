@@ -1126,10 +1126,10 @@ players : 1 humans, 0 bots (20 max)
 		end
 		if (#hg.flashes <= 0) and (amtflashed2 <= 0) then return end
 		amtflashed = 0
-		for i = 1,#hg.flashes do
+		for i = #hg.flashes, 1, -1 do
 			flash = hg.flashes[i]
 
-			if (flash.time or 0) < CurTime() then table.remove(hg.flashes[i]) continue end
+			if (flash.time or 0) <= CurTime() then table.remove(hg.flashes, i) continue end
 
 			local animpos = (flash.time - CurTime()) / flash.lentime
 			local size = flash.size

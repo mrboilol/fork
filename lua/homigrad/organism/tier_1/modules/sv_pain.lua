@@ -356,7 +356,8 @@ module[2] = function(owner, org, timeValue)
 	end
 	org.nearpainlimit = not org.otrub and org.pain >= org.pain_turn * pain_fake_threshold
 	if org.isPly and org.pain >= 85 and not org.otrub and IsValid(owner) and owner.Notify and owner:GetInfoNum("hg_newthoughts", 0) <= 0 then
-		owner:Notify("AAAAAAAAAAAAAGHH!", 8, "pain_scream", 0, nil, Color(255, 80, 80))
+		local sharpPain = hg.sharp_pain
+		owner:Notify(sharpPain and sharpPain[math.random(#sharpPain)] or "AAAAAAAAAAAAAGHH!", 8, "pain_scream", 0, nil, Color(255, 80, 80))
 	end
 
 	local headApplied = spine2Broken and add or math.min(queuedHeadPain, add)

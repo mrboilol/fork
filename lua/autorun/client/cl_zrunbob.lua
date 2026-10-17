@@ -24,6 +24,7 @@ if not CLIENT then return end
 	local noiseTarget = Angle(0, 0, 0)
 	local noiseTimer  = 0
 	local tiltLerp    = 0
+	local sfLerp      = 0
 
 	local function speedFactor(vel)
 		return math_Clamp((vel:Length2D() - SPEED_MIN) / (SPEED_MAX - SPEED_MIN), 0, 1)
@@ -48,20 +49,21 @@ hook.Add("HGAddView", "RunBob_Extra", function(ply, origin, angles)
 	local ft       = FrameTime()
 	local vel      = ply:GetVelocity()
 	local onGround = ply:OnGround()
-	local sf       = onGround and speedFactor(vel) or 0
+	sfLerp         = Lerp(math_Clamp(FrameTime() * 4, 0, 1), sfLerp, onGround and speedFactor(vel) or 0)
+	local sf       = sfLerp
 	local ts       = game.GetTimeScale()
 
 	local bobMul   = hg_runbob_bob:GetFloat()
 	local tiltMul  = hg_runbob_tilt:GetFloat()
 	local noiseMul = hg_runbob_noise:GetFloat()
 
-	if onGround and sf > 0.01 then
+	if sf > 0.01 then
 		bobTime = bobTime + ft * (3.2 + sf * 4.5) * ts
 	end
 
 -- cam tilt
 	local tiltTarget = 0
-	if sf > 0 and onGround then
+	if sf > 0 then
 		local sideVel  = vel:Dot(ply:EyeAngles():Right())
 		local strafeLean = math_Clamp(sideVel / SPEED_MAX, -1, 1) * 2 * sf * tiltMul
 
@@ -85,7 +87,7 @@ hook.Add("HGAddView", "RunBob_Extra", function(ply, origin, angles)
 		end
 	end
 
-	local ns = ft * (sf > 0.01 and 12 or 8)
+	local ns = math_Clamp(ft * 4, 0, 1)
 	noiseAng[1] = Lerp(ns, noiseAng[1], noiseTarget[1])
 	noiseAng[2] = Lerp(ns, noiseAng[2], noiseTarget[2])
 
@@ -114,13 +116,12 @@ hook.Add("HG_PlayerFootstep_Notify", "RunBob_StepPulse", function(ply, pos, foot
 	local stepMul = hg_runbob_step:GetFloat()
 	if stepMul <= 0 then return end
 
-	local vel = ply:GetVelocity()
-	local sf  = speedFactor(vel)
+	local sf = sfLerp
 	if sf < 0.06 then return end
 
 	local side = (foot == 0) and -1 or 1
 
-	ViewPunch(Angle(
+	SmoothViewPunch(Angle(
 		math_Rand(0.35, 0.90) * sf * stepMul,
 		side * math_Rand(-0.08, 0.08) * sf * stepMul,
 		side * math_Rand(0.50, 1.15)  * sf * stepMul

@@ -23,6 +23,10 @@ local brokenBoneTbl = {
 local zeroAng = Angle(0, 0, 0)
 local boneLayer = "brokenlimbs"
 local spineLayer = "brokenlimbs_limp"
+local limpSpineAng = Angle(0, 10, 0)
+local LIMP_START_SPEED = 60
+local LIMP_HOLD_TIME = 0.5
+local LIMP_BLEND_SPEED = 3
 
 local function applyBoneVisuals(ply, org)
 	ply.hg_BrokenLimbBones = ply.hg_BrokenLimbBones or {}
@@ -47,6 +51,8 @@ local function applyBoneVisuals(ply, org)
 end
 
 local function clearBoneVisuals(ply)
+	ply.hg_LimpBlend = 0
+	ply.hg_LimpUntil = nil
 	if ply.hg_LimpSpine then
 		hg.bone.Set(ply, ply.hg_LimpSpine, vector_origin, zeroAng, spineLayer)
 		ply.hg_LimpSpine = nil
@@ -82,18 +88,30 @@ hook.Add("CalcMainActivity", "hgBrokenLimbVisuals", function(ply, vel)
 
 	applyBoneVisuals(ply, org)
 
-	local limping = brokenLeg and not ply:Crouching() and not ply:InVehicle() and ply:IsOnGround() and vel and vel:Length() > 60
-	if limping then
-		local spineBid = ply:LookupBone("ValveBiped.Bip01_Spine")
+	local now = UnPredictedCurTime()
+	local canLimp = brokenLeg and not ply:Crouching() and not ply:InVehicle() and ply:IsOnGround()
+	if canLimp and vel and vel:Length2D() > LIMP_START_SPEED then
+		ply.hg_LimpUntil = now + LIMP_HOLD_TIME
+	end
+	local limping = canLimp and (ply.hg_LimpUntil or 0) > now
+
+	local dt = math.Clamp(now - (ply.hg_LimpBlendTime or now), 0, 0.1)
+	ply.hg_LimpBlendTime = now
+	ply.hg_LimpBlend = math.Approach(ply.hg_LimpBlend or 0, limping and 1 or 0, dt * LIMP_BLEND_SPEED)
+
+	if ply.hg_LimpBlend > 0 then
+		local spineBid = ply.hg_LimpSpine or ply:LookupBone("ValveBiped.Bip01_Spine")
 		if spineBid then
-			hg.bone.Set(ply, spineBid, vector_origin, Angle(0, 10, 0), spineLayer)
+			local blend = ply.hg_LimpBlend
+			hg.bone.Set(ply, spineBid, vector_origin, limpSpineAng * (blend * blend * (3 - 2 * blend)), spineLayer)
 			ply.hg_LimpSpine = spineBid
-		end
-		if style == 1 or style == 2 then
-			return limpActivities[style], 0
 		end
 	elseif ply.hg_LimpSpine then
 		hg.bone.Set(ply, ply.hg_LimpSpine, vector_origin, zeroAng, spineLayer)
 		ply.hg_LimpSpine = nil
+	end
+
+	if limping and (style == 1 or style == 2) then
+		return limpActivities[style], 0
 	end
 end)

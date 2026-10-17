@@ -21,19 +21,19 @@ local hg_painsound = ConVarExists("hg_painsound") and GetConVar("hg_painsound") 
 local hg_dyingsound = ConVarExists("hg_dyingsound") and GetConVar("hg_dyingsound") or CreateConVar("hg_dyingsound", "2", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "look at the ones you like (press sound icon for preview)", 0, 11)
 local hg_otrubsound = ConVarExists("hg_otrubsound") and GetConVar("hg_otrubsound") or CreateConVar("hg_otrubsound", "0", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "look at the ones you like (press sound icon for preview)", 0, 7)
 local panicattack_threshold = 0.45
-local panicattack_add_decay_time = 18
-local panicattack_rise_time = 1.4
-local panicattack_decay_time = 24
+local panicattack_add_decay_time = 11
+local panicattack_rise_time = 0.5
+local panicattack_decay_time = 9
 local panicattack_gain_chance = 1
 local panicattack_gain_mul = 1
 local panicattack_disorientation = 0.45
 local panicattack_adrenaline_add_target = 0.65
 local panicattack_combat_adrenaline_add_target = 3
-local panicattack_adrenaline_add_rise_time = 2.5
+local panicattack_adrenaline_add_rise_time = 1
 local panicattack_adrenaline_duration = 5
 local panicattack_combat_adrenaline_duration = 10
-local panicattack_damage_scale = 0.011
-local panicattack_damage_cooldown = 2.5
+local panicattack_damage_scale = 0.014
+local panicattack_damage_cooldown = 0.75
 local panicattack_witness_radius = 700
 local panicattack_death_radius = 900
 local panicattack_gunfight_hold_time = 8
@@ -1515,7 +1515,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	end
 	local just_went_uncon = not org.otrub and org.needotrub
 	if org.brain < 0.4 then
-		local naturalHeal = org.thiamine > 0 and timeValue / 480 or timeValue / 1800
+		local naturalHeal = org.thiamine > 0 and timeValue / 140 or timeValue / 1800
 		org.thiamine = math.Approach(org.thiamine, 0, timeValue / 240)
 		if org.liver < 1 then org.liver = math.Approach(org.liver, 0, naturalHeal) end
 		if (org.kidneys or 0) < 1 then org.kidneys = math.Approach(org.kidneys or 0, 0, naturalHeal) end

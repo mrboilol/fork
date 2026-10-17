@@ -124,13 +124,18 @@ if SERVER then
 	end)
 
 	hook.Add("PlayerDroppedWeapon", "homigrad-weaponInv", function(ply, wep)
+		if IsValid(wep) then
+			wep.IsSpawned = true
+			wep.init = true
+		end
 		weaponInv.Remove(ply, wep)
 		weaponInv.Sync(ply)
 	end)
 
 	hook.Add("PlayerCanPickupWeapon", "homigrad-weapons", function(ply, wep)
 		if wep.hgSwapDroppedBy == ply and (wep.hgSwapDroppedUntil or 0) > CurTime() then return false end
-		if wep.IsSpawned and (ply:GetUseEntity() ~= wep or not ply:KeyDown(IN_USE)) and not ply.force_pickup then return false end
+		local onGround = wep.IsSpawned or (wep.IsSpawned == nil and not IsValid(wep:GetOwner()) and wep:GetCreationTime() < CurTime())
+		if onGround and (ply:GetUseEntity() ~= wep or not ply:KeyDown(IN_USE)) and not ply.force_pickup then return false end
 		if wep.init and wep.IsSpawned and ((ply.cooldown_grab or 0) > CurTime()) and not ply.force_pickup then return false end
 		if wep.PickupFunc and (wep:PickupFunc(ply) == true) then return false end
 

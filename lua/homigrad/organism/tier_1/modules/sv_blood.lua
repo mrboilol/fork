@@ -505,9 +505,10 @@ module[2] = function(owner, org, mulTime)
 		local internalBleedPeak = org.internalBleedPeak or 0
 		local catastrophic = internalBleedPeak >= internalBleedCatastrophicThreshold
 		local severityK = math.Clamp(internalBleedPeak / internalBleedCatastrophicThreshold, 0, 1)
-		local complicationDelay = catastrophic and 0 or Lerp(severityK, internalBleedDefaultComplicationDelay, 60)
-		local progressionTime = catastrophic and 1 or Lerp(severityK, 360, 240)
-		local severityLimit = catastrophic and 1 or math.Clamp(severityK, 0.05, 0.9)
+		local abdominalDamage = math.Clamp((tonumber(org.liver) or 0) + (tonumber(org.kidneys) or 0) * 0.6 + (tonumber(org.stomach) or 0) * 0.45 + (tonumber(org.intestines) or 0) * 0.4, 0, 1)
+		local complicationDelay = catastrophic and 0 or Lerp(severityK, 100, 50) * (1 - abdominalDamage * 0.4)
+		local progressionTime = catastrophic and 1 or Lerp(severityK, 300, 200) * (1 - abdominalDamage * 0.4)
+		local severityLimit = catastrophic and 1 or math.Clamp(severityK + abdominalDamage * 0.35, 0.05, 0.9)
 		local complicationTarget = math.Clamp(((org.internalBleedDuration or 0) - complicationDelay) / progressionTime, 0, 1) * severityLimit
 
 		org.internalBleedComplicationDelay = complicationDelay
@@ -789,7 +790,7 @@ module[2] = function(owner, org, mulTime)
 	if (org.internalBleed > 1 or org.pneumothorax > 0 or (org.hemothorax or 0) > 0.3) and org.blood > 0 and org.o2[1] > 0 then
 		org.wantToVomit = org.wantToVomit or 0
 
-		org.wantToVomit = org.wantToVomit + math.Rand(0, org.internalBleed / 1000 + org.pneumothorax / 200 + (org.hemothorax or 0) / 150) * mulTime * 5
+		org.wantToVomit = org.wantToVomit + math.Rand(0, org.internalBleed / 1000 + org.pneumothorax / 200 + (org.hemothorax or 0) / 150) * mulTime * 6.5
 		
 		if org.wantToVomit > 0.90 then
 			//owner:Notify(about_to_puke[math.random(#about_to_puke)], 15, "internalbleed_pre")

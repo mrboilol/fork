@@ -60,7 +60,18 @@ local function GetAccessoryWearer(ent)
 	if ent:IsNPC() or ent:IsRagdoll() then return ent end
 end
 
-local function SyncAccessories(ply, accessories)
+local function RemoveAccessoryID(accessories, accessoryID)
+	local removed = false
+	for key, value in pairs(accessories) do
+		if value == accessoryID then
+			accessories[key] = "none"
+			removed = true
+		end
+	end
+	return removed
+end
+
+local function SyncAccessories(ply, accessories, source)
 	accessories = CopyAccessories(accessories)
 	ply:SetNetVar("Accessories", accessories)
 
@@ -77,6 +88,10 @@ local function SyncAccessories(ply, accessories)
 	local deathRagdoll = ply:GetNWEntity("RagdollDeath", NULL)
 	if IsValid(deathRagdoll) and deathRagdoll != character and deathRagdoll != ply.OldRagdoll then
 		deathRagdoll:SetNetVar("Accessories", CopyAccessories(accessories))
+	end
+
+	if IsValid(source) and source != ply and source != character and source != ply.OldRagdoll and source != deathRagdoll then
+		source:SetNetVar("Accessories", CopyAccessories(accessories))
 	end
 
 	if ply.CurAppearance then
@@ -172,7 +187,8 @@ function APmodule.GetEntityImpactRadius(ent)
 		math.max(math.abs(mins.z), math.abs(maxs.z)),
 	}
 	table.sort(extents)
-	local modelScale = tonumber(ent:GetModelScale()) or 1
+	local modelScale = ent:GetModelScale()
+	if !isnumber(modelScale) then modelScale = 1 end
 	return math.Clamp(extents[2] * math.max(modelScale, 0.01), 0, 5)
 end
 
@@ -291,19 +307,15 @@ function APmodule.DropAccessoriesByPlacement(ent, placements, force)
 	if !istable(accessories) then return false end
 
 	accessories = CopyAccessories(accessories)
-	local drops = {}
-	for index, accessoryID in pairs(accessories) do
+	local drops, queued = {}, {}
+	for _, accessoryID in pairs(accessories) do
 		local accessory = hg.Accessories[accessoryID]
-		if IsDroppableAccessory(accessory) and placements[accessory.placement] then
-			drops[#drops + 1] = {index = index, id = accessoryID, data = accessory}
+		if !queued[accessoryID] and IsDroppableAccessory(accessory) and placements[accessory.placement] then
+			queued[accessoryID] = true
+			drops[#drops + 1] = {id = accessoryID, data = accessory}
 		end
 	end
 	if #drops == 0 then return false end
-
-	table.sort(drops, function(a, b)
-		if isnumber(a.index) and isnumber(b.index) then return a.index > b.index end
-		return isnumber(a.index)
-	end)
 
 	local launchForce = isvector(force) and force or ent:GetVelocity() + VectorRand() * 180 + vector_up * 120
 	local changed = false
@@ -312,15 +324,11 @@ function APmodule.DropAccessoriesByPlacement(ent, placements, force)
 		local durability, maximum = GetAccessoryCondition(wearer, drop.id, drop.data)
 		local dropped = SpawnAccessoryDrop(drop.id, drop.data, wearer, position, launchForce + VectorRand() * 90, durability, maximum)
 		if !IsValid(dropped) then continue end
-		if isnumber(drop.index) then
-			table.remove(accessories, drop.index)
-		else
-			accessories[drop.index] = nil
-		end
+		RemoveAccessoryID(accessories, drop.id)
 		changed = true
 	end
 
-	if changed then SyncAccessories(wearer, accessories) end
+	if changed then SyncAccessories(wearer, accessories, ent) end
 	return changed
 end
 
@@ -352,8 +360,7 @@ function APmodule.TryAbsorbAccessoryImpact(ent, dmgInfo, hitPos, direction, dire
 	local impact = directImpact or FindAccessoryImpact(ent, hitPos, direction, impactRadius)
 	if !impact then return end
 	accessories = CopyAccessories(accessories)
-	local index = table.KeyFromValue(accessories, impact.id)
-	if !index then return end
+	if !table.KeyFromValue(accessories, impact.id) then return end
 
 	local severity = math.Clamp((damage - cfg.minDamage) / cfg.fullDamage, 0, 1)
 	local broken, durability, maximum, materialProfile = DamageAccessoryCondition(wearer, impact.id, impact.data, damage)
@@ -367,12 +374,8 @@ function APmodule.TryAbsorbAccessoryImpact(ent, dmgInfo, hitPos, direction, dire
 	if broken or math.Rand(0, 1) <= dropChance then
 		if QueueAccessoryDrop(impact.id, impact.data, wearer, impact.position, direction, durability, maximum) then
 			absorbed = cfg.dropAbsorption + severity * cfg.dropSeverityAbsorption
-			if isnumber(index) then
-				table.remove(accessories, index)
-			else
-				accessories[index] = nil
-			end
-			SyncAccessories(wearer, accessories)
+			RemoveAccessoryID(accessories, impact.id)
+			SyncAccessories(wearer, accessories, ent)
 		end
 	end
 
@@ -435,15 +438,14 @@ function APmodule.DropAccessory(ply, accessoryID)
 	if !IsValid(ply) or !ply:IsPlayer() or !isstring(accessoryID) then return false end
 
 	local accessories = CopyAccessories(ply:GetNetVar("Accessories", {}))
-	local index = table.KeyFromValue(accessories, accessoryID)
 	local accessory = hg.Accessories[accessoryID]
-	if !index or !IsDroppableAccessory(accessory) then return false end
+	if !table.KeyFromValue(accessories, accessoryID) or !IsDroppableAccessory(accessory) then return false end
 
 	local durability, maximum = GetAccessoryCondition(ply, accessoryID, accessory)
 	local dropped = SpawnAccessoryDrop(accessoryID, accessory, ply, ply:EyePos() + ply:EyeAngles():Forward() * 18, ply:EyeAngles():Forward() * 150, durability, maximum)
 	if !IsValid(dropped) then return false end
 
-	table.remove(accessories, index)
+	RemoveAccessoryID(accessories, accessoryID)
 	SyncAccessories(ply, accessories)
 	return true
 end
