@@ -116,13 +116,13 @@ hook.Add("Think", "Abnormalties_Heal", function()
 				owner.organism.pneumothorax = 0
 				owner.organism.llegartery = 0
 				owner.organism.rlegartery = 0
-				owner.organism.spineartery = 0
+				owner.organism.aorta = 0
 				owner.organism.brain = 0
 				owner.organism.heartstop = false
 				owner.organism.jaw = 0
 				owner.AbnormaltiesHealGrace = (owner.AbnormaltiesHealGrace or CurTime()) + 120
 				
-				owner:SetNetVar("wounds", owner.organism.wounds)
+				hg.organism.MarkWoundsNetDirty(owner.organism, true)
 				
 				if(zone)then
 					PLUGIN.ShowMessageInSphere("Healed " .. owner:GetNWString("PlayerName"), zone.Pos, zone.Radius)

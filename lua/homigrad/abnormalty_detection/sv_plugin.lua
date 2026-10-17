@@ -125,14 +125,19 @@ util.AddNetworkString("Abnormalties(SendOpenedPage)")
 		end
 	end
 
+	local nextSQLSaveCheck = 0
 	hook.Add("Think", "Abnormalties_SQLSave", function()
+		local time = CurTime()
+		if nextSQLSaveCheck > time then return end
+		nextSQLSaveCheck = time + 1
+
 		for steam_id_64, stats in pairs(PLUGIN.PlayerStats) do
 			local ply = PLUGIN.PlayerStatsPlayers[steam_id_64]
 			
 			if(IsValid(ply))then
 				if(ply.AbnormaltiesReady)then
-					if(!ply.AbnormaltiesNextStatsSaveTime or ply.AbnormaltiesNextStatsSaveTime <= CurTime())then
-						ply.AbnormaltiesNextStatsSaveTime = CurTime() + PLUGIN.PlayerStatsSaveCD
+					if(!ply.AbnormaltiesNextStatsSaveTime or ply.AbnormaltiesNextStatsSaveTime <= time)then
+						ply.AbnormaltiesNextStatsSaveTime = time + PLUGIN.PlayerStatsSaveCD
 						
 						if(next(stats) != nil)then
 							local query = mysql:Update("abnormalties_player_info")
@@ -1249,7 +1254,10 @@ util.AddNetworkString("Abnormalties(SendOpenedPage)")
 	hook.Add("HG_BloodParticleStartedDropping", "Abnormalties", function(owner, org, wound, dir, artery)
 		if(GetGlobalBool("AbnormaltiesEnabled", false) and IsValid(owner))then
 			local ent = owner:IsPlayer() and IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
-			local pos, ang = ent:GetBonePosition(ent:LookupBone(wound[4]))
+			local woundBone = wound[4]
+			local bone = isnumber(woundBone) and woundBone or isstring(woundBone) and ent:LookupBone(woundBone)
+			if not bone or bone < 0 then return end
+			local pos = ent:GetBonePosition(bone)
 			if not pos then return end
 			local trace_data = {
 				start = pos,
