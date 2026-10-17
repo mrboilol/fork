@@ -900,8 +900,8 @@ function E.OnHit(ev)
 				released = released + vol
 			end
 			-- mist only where there is the energy (or the gas, or the pressure of a skull) for it
-			local mistBack = math.floor((cav * 4 + (rec.range == WD.RANGE_CONTACT and 2 or 0)) * (skull and 1.4 or 1))
-			if mistBack > 0 then Drops.Mist(Vector(ex0 - dx * 2, ey0 - dy * 2, ez0 - dz * 2), -ev.dir * 40 + bv, mistBack, 5 + cav * 6) end
+			local mistBack = math.max(math.floor((cav * 4 + (rec.range == WD.RANGE_CONTACT and 2 or 0)) * (skull and 1.4 or 1)), skull and 3 or (pellet and 1 or 2))
+			Drops.Mist(Vector(ex0 - dx * 2, ey0 - dy * 2, ez0 - dz * 2), -ev.dir * 40 + bv, mistBack, (skull and 10 or 8) + cav * 8)
 
 			-- forward spatter: out of the exit, with the projectile. More, larger and faster than
 			-- back spatter, in a narrower cone; bone on the way adds to it
@@ -916,8 +916,8 @@ function E.OnHit(ev)
 					Drops.Spawn(out.x + dx, out.y + dy, out.z + dz, bv.x + cx * sp, bv.y + cy * sp, bv.z + cz * sp, vol, src, 1, 2)
 					released = released + vol
 				end
-				local mistFwd = math.floor((1 + cav * 7) * (skull and 1.4 or 1))
-				if mistFwd > 0 then Drops.Mist(out + ev.dir * 3, ev.dir * 90 + bv, mistFwd, 7 + cav * 7) end
+				local mistFwd = math.max(math.floor((1 + cav * 7) * (skull and 1.4 or 1)), skull and 3 or 2)
+				Drops.Mist(out + ev.dir * 3, ev.dir * 90 + bv, mistFwd, (skull and 12 or 9) + cav * 8)
 			end
 		end
 	elseif cls == N.DMG_SLASH then

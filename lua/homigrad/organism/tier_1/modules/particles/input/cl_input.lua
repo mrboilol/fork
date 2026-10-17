@@ -252,10 +252,12 @@ local function impact(pos,vel,mul)
 	local max = math.Clamp(mul, 1, 6)
 	local iters = math.ceil(math.random(1, max) * 1.5)
 	local velnorm = -vel:GetNormalized() * 5
-	
+	local cloudSize = bloodImpactCloudSize * math.Clamp(math.sqrt(math.max(mul, 0)) * 0.5, 1, 2.5)
+
+	addBloodPart2(pos + velnorm, -vel / 2 + Vector(Rand(-10, 10), Rand(-10, 10), Rand(-10, 10)) * 5, nil, cloudSize, cloudSize, 0.45)
+
 	if hg_bloodimpacts:GetBool() then
 		addBloodPart2(pos + velnorm, -vel + Vector(Rand(-10, 10), Rand(-10, 10), Rand(-10, 10)) * 5, nil, bloodImpactCloudSize, bloodImpactCloudSize, 0.3)
-		addBloodPart2(pos + velnorm, -vel / 2 + Vector(Rand(-10, 10), Rand(-10, 10), Rand(-10, 10)) * 5, nil, bloodImpactCloudSize, bloodImpactCloudSize, 0.3)
 		addBloodPart2(pos + velnorm, -vel / 3 + Vector(Rand(-10, 10), Rand(-10, 10), Rand(-10, 10)) * 5, nil, bloodImpactCloudSize, bloodImpactCloudSize, 0.3)
 	end
 

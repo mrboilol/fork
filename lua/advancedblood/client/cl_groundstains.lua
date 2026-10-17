@@ -244,9 +244,9 @@ local function Place(q)
 	return true
 end
 
--- Blood that lands on a spot already covered by several stains adds to them instead of piling
--- up more quads: the newest one there grows a little and is wet again.
-local function Crowded(x, y, z)
+-- Blood that lands on a spot already covered by several stains, or on one that is still wet, adds
+-- to them instead of piling up more quads: the newest one there grows a little and is wet again.
+local function Crowded(x, y, z, wet)
 	local k = ABL.CellKey(x, y, z, 2.5)
 	local now = CurTime()
 	local e = crowd[k]
@@ -255,7 +255,7 @@ local function Crowded(x, y, z)
 		crowd[k] = e
 	end
 	e.t = now
-	if e.n >= GC.cellCap and e.last and not e.last.dead then
+	if (e.n >= GC.cellCap or wet) and e.last and not e.last.dead then
 		local s = e.last
 		local g = min(1.06, s.h0 * 1.5 / s.h)
 		if g > 1.001 then
@@ -283,7 +283,7 @@ end
 --   vol: ml, stainD: stain diameter (units) for this drop at this impact speed, sinA: impact
 --   angle sine, tx..: downstream direction in the surface plane (nil for a vertical impact),
 --   K: splash parameter, surf: surface category, rng: seeded RNG, wetT: seconds to dry.
-function G.Impact(x, y, z, nx, ny, nz, vol, stainD, sinA, tx, ty, tz, K, surf, rng, wetT)
+function G.Impact(x, y, z, nx, ny, nz, vol, stainD, sinA, tx, ty, tz, K, surf, rng, wetT, wet)
 	-- rate limit: a burst of spatter places at most `rate` stains per second
 	local rt = RealTime()
 	tokens = min(GC.rate * 0.5, tokens + (rt - lastRefill) * GC.rate)
@@ -316,7 +316,7 @@ function G.Impact(x, y, z, nx, ny, nz, vol, stainD, sinA, tx, ty, tz, K, surf, r
 		cell = Variant(fam, rng)
 	end
 
-	local crowded, ce = Crowded(x, y, z)
+	local crowded, ce = Crowded(x, y, z, wet)
 	if crowded then return end
 
 	local f = FAM[fam]

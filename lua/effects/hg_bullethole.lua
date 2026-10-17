@@ -38,9 +38,23 @@ local function decalMaterial(name)
 	return entry[1], entry[2]
 end
 
-local function stamp(name, ent, pos, normal, scale)
-	local mat = decalMaterial(name)
-	if mat then util.DecalEx(mat, ent, pos, normal, color_white, scale, scale) end
+local SIN_45 = math.sqrt(0.5)
+local axisX, axisDown = Vector(1, 0, 0), Vector(0, 0, -1)
+
+local function decalBasis(normal)
+	if math.abs(normal.z) > SIN_45 then
+		local t = axisX:Cross(normal)
+		local s = normal:Cross(t)
+		s:Normalize()
+		t:Normalize()
+		return s, t
+	end
+
+	local s = normal:Cross(axisDown)
+	local t = s:Cross(normal)
+	s:Normalize()
+	t:Normalize()
+	return s, t
 end
 
 function EFFECT:Init(data)
@@ -68,46 +82,32 @@ function EFFECT:Init(data)
 	local exit = bit.band(flags, holes.FLAG_EXIT) ~= 0
 	local scrape = bit.band(flags, holes.FLAG_SCRAPE) ~= 0
 
-	local _, size = decalMaterial(name)
-	if not size then return end
+	local mat, size = decalMaterial(name)
+	if not mat then return end
 
-	local holeScale = math.max(data:GetScale(), 0.2) * (exit and 1.35 or ricochet and 0.7 or 1) * (soft and 1.2 or 1)
-	local unit = size * holeScale
-
-	if not scrape then stamp(name, ent, pos, normal, holeScale) end
+	local holeScale = math.max(data:GetScale(), 0.2) * (exit and 1.6 or ricochet and 0.8 or 1) * (soft and 1.2 or 1)
 
 	local dot = dir:Dot(normal)
 	local tangent = dir - normal * dot
 	local tangentLen = tangent:Length()
 
-	if exit then
-		local side = tangentLen > 0.001 and tangent / tangentLen or normal:Angle():Right()
-		local up = normal:Cross(side)
-		for i = 1, 2 do
-			local ang = math.Rand(0, math.pi * 2)
-			stamp(name, ent, pos + (side * math.cos(ang) + up * math.sin(ang)) * unit * math.Rand(0.2, 0.35), normal, holeScale * math.Rand(0.5, 0.7))
-		end
-		return
+	local elong = 1
+	if not exit and tangentLen > 0.001 then
+		tangent:Div(tangentLen)
+		elong = math.min(1 / math.Clamp(-dot, 0.05, 1), soft and 1.6 or 4)
+		if ricochet or scrape then elong = math.max(elong, 2.5) + 1 end
 	end
 
-	if tangentLen < 0.001 then return end
-	tangent:Div(tangentLen)
-
-	local cosInc = math.Clamp(-dot, 0.05, 1)
-	local elong = math.min(1 / cosInc, soft and 1.6 or 5)
-	if ricochet then elong = math.max(elong, 2.5) + 1 end
-	if elong < 1.25 then return end
-
-	stamp(name, ent, pos + tangent * unit * 0.25 * math.min(elong - 1, 2), normal, holeScale * 0.8)
-
-	local tailLen = math.min(unit * (elong - 1) * 1.1, unit * 6)
-	local spacing = unit * 0.38
-	local count = math.min(math.floor(tailLen / spacing), 8)
-
-	for i = 1, count do
-		local f = i / (count + 1)
-		stamp(name, ent, pos - tangent * spacing * i, normal, holeScale * (0.85 - f * 0.6))
+	local w, h = holeScale, holeScale
+	if elong > 1.05 then
+		local s, t = decalBasis(normal)
+		local ts, tt = tangent:Dot(s), tangent:Dot(t)
+		w = holeScale * (1 + (elong - 1) * ts * ts)
+		h = holeScale * (1 + (elong - 1) * tt * tt)
+		pos = pos - tangent * size * holeScale * (elong - 1) * 0.3
 	end
+
+	util.DecalEx(mat, ent, pos, normal, color_white, w, h)
 end
 
 function EFFECT:Think()

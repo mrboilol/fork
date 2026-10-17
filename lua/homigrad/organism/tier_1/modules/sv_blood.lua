@@ -570,7 +570,6 @@ module[2] = function(owner, org, mulTime)
 	org.hypovolemia = symptomaticLoss
 	org.hemorrhageCompensation = compensationDemand * (1 - decompensation)
 	org.hypovolemicShock = decompensation
-	local beatsPerSecond = max(min(60 / math.max(org.pulse,2) / (org.bleed / 15), 7), 0.3)
 	time = CurTime()
 
 	local bleedoutspeed = 0
@@ -605,9 +604,8 @@ module[2] = function(owner, org, mulTime)
 			end
 			local compressionClotMul = heldClotMul * bandageClotMul * Lerp(math.Clamp(1 - tourniquetBleedMul, 0, 1), 1, 2.4)
 			local hemostasisDelta = getWoundHemostasisDelta(org, wound, mulTime, time, false, false, compressionClotMul, bandageClotMul > 1)
-			local woundBleedRate = bleed / rand1 * 3
-			bleedoutspeed = bleedoutspeed + woundBleedRate
 			local visualWoundBleedRate = bleed / math.max(mulTime, 0.001)
+			bleedoutspeed = bleedoutspeed + visualWoundBleedRate
 			woundBleedRates[i] = visualWoundBleedRate
 			wound.visualBleedRate = visualWoundBleedRate
 			
@@ -631,10 +629,8 @@ module[2] = function(owner, org, mulTime)
 
 	if org.heart == 1 then
 		org.blood = math.max(org.blood - mulTime * 100 * org.pulse / 70,0)
-		bleedoutspeed = bleedoutspeed + mulTime * 100 * org.pulse / 70
+		bleedoutspeed = bleedoutspeed + 100 * org.pulse / 70
 	end
-
-	bleedoutspeed = bleedoutspeed / (beatsPerSecond + 2)
 
 	local bleedoutspeed2 = 0
 	local arterialWoundBleedRates = {}

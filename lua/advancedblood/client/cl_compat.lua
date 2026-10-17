@@ -73,7 +73,7 @@ local function CloudRedirect(pos, vel, w, water)
 	if water then
 		ABL.Drops.WaterCloud(pos, vel, 0.05)
 	else
-		ABL.Drops.Mist(pos, vel, 1, math.Clamp((w or 60) * 0.15, 4, 24))
+		ABL.Drops.Mist(pos, vel, 2, math.Clamp((w or 60) * 0.4, 8, 24))
 	end
 	return true
 end

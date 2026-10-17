@@ -2811,6 +2811,8 @@ function hg.GetImpactTransfer(hitEnt, hitPhys, surfaceProps, ourMass, hitPos, di
 	return math.max(mul, 0.1)
 end
 
+local fullCoverImpactHelmets = {helmet2 = true, helmet3 = true, helmet_riot = true, gordon_helmet = true, cmb_helmet = true, metrocop_helmet = true, protovisor = true}
+
 local function velocityDamage(ent, data)
 	local relativeVelocity = data.OurOldVelocity - data.TheirOldVelocity
 	local speed = relativeVelocity:Length()
@@ -2965,9 +2967,9 @@ local function velocityDamage(ent, data)
 	local armorPlacement
 	local armorImpactApplied = false
 	local unarmoredImpactDamage = dmg
-	local impactHelmet = org.owner.armors and (org.owner.armors.head == "helmet2" or org.owner.armors.head == "helmet3")
+	local impactHelmet = org.owner.armors and fullCoverImpactHelmets[org.owner.armors.head] or false
 	local equippedHelmet = org.owner.GetEquipmentBySlot and org.owner:GetEquipmentBySlot(ZC_ARMOR_SLOT_HEAD)
-	local motorcycleHelmet = IsValid(equippedHelmet) and equippedHelmet:GetClass() == "ent_new_armor_helmet2"
+	local motorcycleHelmet = IsValid(equippedHelmet) and equippedHelmet.HitBoxSet == "new_helmet2"
 	impactHelmet = impactHelmet or motorcycleHelmet
 	if hitgroup == HITGROUP_CHEST or hitgroup == HITGROUP_STOMACH then
 		armorPlacement = "torso"

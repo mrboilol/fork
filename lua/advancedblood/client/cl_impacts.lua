@@ -172,7 +172,7 @@ function I.Handle(d, tr)
 	if up > 0.64 and not ent then
 		-- the ground (floor-like world surface): ABL's own capped ground stains
 		kind = "ground"
-		ABL.Ground.Impact(x, y, z, nx, ny, nz, vol, stainD, sinA, tx, ty, tz, K, surf, rng, wetT)
+		ABL.Ground.Impact(x, y, z, nx, ny, nz, vol, stainD, sinA, tx, ty, tz, K, surf, rng, wetT, wet)
 	else
 		if L.PointImportance(x, y, z) < 0.05 then wetT = 0 end
 		kind = I.WallStain(surf, x, y, z, nx, ny, nz, tx, ty, tz, stainD, sinA, K, vol, dc, alpha, ent, wetT, rng, tierSat)
