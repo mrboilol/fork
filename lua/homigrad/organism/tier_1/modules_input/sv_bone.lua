@@ -94,6 +94,12 @@ local bonefracture_sounds = {
 	"bonefracture/rem_bonebreak3.wav",
 }
 
+local severe_bonebreak_sounds = {
+	"gore/rotten_break.mp3",
+	"gore/rotten_break2.mp3",
+	"gore/rotten_break3.mp3",
+}
+
 local legacy_bonebreak_sounds = {}
 for i = 1, 10 do
 	legacy_bonebreak_sounds[#legacy_bonebreak_sounds + 1] = "owfuck" .. i .. ".mp3"
@@ -110,7 +116,7 @@ local skullfracture_sounds = {
 	"skullfracture/skullfracture-7.wav",
 }
 
-local function playBoneFractureSound(ent)
+local function playBoneFractureSound(ent, soundList)
 	if not IsValid(ent) then return end
 	local org = ent.organism
 	local soundEnt = org and IsValid(org.forcedBoneBreakSoundEnt) and org.forcedBoneBreakSoundEnt or ent
@@ -120,6 +126,10 @@ local function playBoneFractureSound(ent)
 		filter = RecipientFilter()
 		filter:AddPAS(soundEnt:GetPos())
 		filter:AddPlayer(recipient)
+	end
+	if soundList then
+		soundEnt:EmitSound(soundList[math.random(#soundList)], 75, 100, 1, CHAN_AUTO, 0, 0, filter)
+		return
 	end
 	if math.random(2) == 1 then
 		soundEnt:EmitSound(bonefracture_sounds[math.random(#bonefracture_sounds)], 75, math.random(135, 155), 1, CHAN_AUTO, 0, 0, filter)
@@ -384,6 +394,7 @@ local function compoundFractureResponse(org, key, region, stabilized)
 		notifyBoneBreak(org, key, "MY " .. string.upper(limbName[key]) .. " IS BROKEN IN TWO PLACES!", "double_broke" .. key)
 	end
 	if hg.QueuePainScream and canFeelPain(org, region) then hg.QueuePainScream(org.owner, 2) end
+	playBoneFractureSound(org.owner, severe_bonebreak_sounds)
 end
 
 local function doDislocate(org, key, dmg, segment)
@@ -949,6 +960,7 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 			if hg.organism.AddInstantPain then hg.organism.AddInstantPain(org, 30, "head") else org.avgpain = math.min((org.avgpain or 0) + 30, 150) end
 			playBoneFractureSound(org.owner)
 			if org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner, 1) end
+			playBoneFractureSound(org.owner, severe_bonebreak_sounds)
 		end
 	end
 
@@ -1219,6 +1231,8 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	
 	hg.AddHarmToAttacker(dmgInfo, (org.chest - oldDmg) * 3, "Ribs bone damage harm")
 
+	if oldDmg < 1 and org.chest >= 1 then playBoneFractureSound(org.owner, severe_bonebreak_sounds) end
+
 	addPain(org, dmg * 1.5, "body")
 	org.shock = org.shock + dmg * 1.5
 
@@ -1250,6 +1264,8 @@ input_list.pelvis = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoc
 	local result = damageBone(org, 0.15, dmg * 0.5, dmgInfo, "pelvis", boneindex, dir, hit, ricochet)
 	
 	hg.AddHarmToAttacker(dmgInfo, (org.pelvis - oldDmg) / 2, "Pelvis bone damage harm")
+
+	if oldDmg < 1 and org.pelvis == 1 then playBoneFractureSound(org.owner, severe_bonebreak_sounds) end
 
 	if org.isPly and oldDmg < 1 and org.pelvis == 1 then
 		org.internalBleed = math.min((org.internalBleed or 0) + 4.5, 10)

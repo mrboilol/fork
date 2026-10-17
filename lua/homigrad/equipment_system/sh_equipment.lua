@@ -175,6 +175,12 @@ if CLIENT then
 end
 
 
+local armorSpallHardness = {
+	[ZC_ARMOR_MATERIAL_ARSTEEL] = 1,
+	[ZC_ARMOR_MATERIAL_TITAN] = 0.6,
+	[ZC_ARMOR_MATERIAL_CERAMIC] = 0.5,
+}
+
 local function ArmorEffect(placement, armor, dmgInfo, org, hit, prot)
 	if prot < 0 then return end
 	local eff = "Impact"
@@ -195,6 +201,15 @@ local function ArmorEffect(placement, armor, dmgInfo, org, hit, prot)
 
 	EmitSound("physics/metal/metal_solid_impact_bullet"..math.random(4)..".wav",dmgInfo:GetDamagePosition(),0,CHAN_AUTO,1,55,nil,100)
 	util.Effect(eff,effdata)
+
+	local spallHardness = SERVER and armor and armorSpallHardness[armor.BalisticMaterial]
+	if spallHardness and dir:LengthSqr() > 0.5 and hg.PhysBullet and hg.PhysBullet.ArmorSpall then
+		local inflictor = dmgInfo:GetInflictor()
+		local bullet = IsValid(inflictor) and inflictor.bullet
+		if bullet and bullet.HG_IsBullet and not bullet.IsFragment then
+			hg.PhysBullet.ArmorSpall(bullet, hit and isvector(hit) and hit or dmgInfo:GetDamagePosition(), dir, spallHardness)
+		end
+	end
 end
 
 --\\ Armor balistic settings

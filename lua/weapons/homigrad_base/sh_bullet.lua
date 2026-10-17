@@ -289,7 +289,11 @@ local function callbackBullet(self, tr, dmg, force, bullet, penetration)
 		end
 
 		if Penetrated then
-			util.Decal("Impact.Concrete",SearchPos + dir*5, SearchPos - dir*15)
+			if hit and HG_BulletHoles and HG_BulletHoles.Handles(hit) then
+				HG_BulletHoles.Emit(hit, dir, bullet.Diameter, bullet.KineticEnergy, HG_BulletHoles.FLAG_EXIT)
+			else
+				util.Decal("Impact.Concrete",SearchPos + dir*5, SearchPos - dir*15)
+			end
 			timer.Simple(0.15,function()
 				if effect[tr.MatType] then
 					local effectdata2 = EffectData()
@@ -434,7 +438,11 @@ local function callbackBullet(self, tr, dmg, force, bullet, penetration)
 		end
 		--sound.Play("snd_jack_hmcd_ricochet_" .. math.random(1, 2) .. ".ogg", hitPos, 75, math.random(90, 110))
 		--sound.Play("weapons/arccw/ricochet0" .. math.random(1, 5) .. "_quiet.ogg", hitPos, 75, math.random(90, 110))
-		util.Decal("ManhackCut", tr.HitPos + tr.HitNormal, tr.HitPos - tr.HitNormal)
+		if HG_BulletHoles and HG_BulletHoles.Handles(tr) then
+			HG_BulletHoles.Emit(tr, dir, bullet.Diameter, bullet.KineticEnergy, HG_BulletHoles.FLAG_RICOCHET + HG_BulletHoles.FLAG_SCRAPE)
+		else
+			util.Decal("ManhackCut", tr.HitPos + tr.HitNormal, tr.HitPos - tr.HitNormal)
+		end
 		local NewVec = dir:Angle()
 		NewVec:RotateAroundAxis(hitNormal, 180)
 		NewVec = NewVec:Forward()

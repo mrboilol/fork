@@ -329,9 +329,11 @@ local function Splash(vHitPos, bStartedInWater, bEndNotWater, vSrc, pWeapon, bFi
 	end
 end
 
-local function Impact(Weapon, iAmmoDamageType, bFirstTimePredicted, vSrc, tr, sImpactEffect, sRagdollImpactEffect)
+local function Impact(Weapon, iAmmoDamageType, bFirstTimePredicted, vSrc, tr, sImpactEffect, sRagdollImpactEffect, tInfo, bExit)
 	if (not (Weapon and Weapon.DoImpactEffect and Weapon:DoImpactEffect(tr, iAmmoDamageType))) then
 		if (bFirstTimePredicted) then
+			local bHole = sImpactEffect == "Impact" and HG_BulletHoles and HG_BulletHoles.Handles(tr)
+
 			local data = EffectData()
 				data:SetOrigin(tr.HitPos)
 				data:SetStart(vSrc)
@@ -348,9 +350,18 @@ local function Impact(Weapon, iAmmoDamageType, bFirstTimePredicted, vSrc, tr, sI
 			local replacedSound = SERVER and HG_BulletImpactSounds and HG_BulletImpactSounds.PlayMaterialImpact(tr)
 			if (replacedSound) then
 				HG_BulletImpactSounds.MakeEffectSilent(data)
+				if (bHole) then data:SetFlags(bit.bor(data:GetFlags(), HG_BulletHoles.IMPACT_NODECAL)) end
+				util.Effect("Impact_GMOD", data, true, true)
+			elseif (bHole) then
+				data:SetFlags(HG_BulletHoles.IMPACT_NODECAL)
 				util.Effect("Impact_GMOD", data, true, true)
 			else
 				util.Effect(sImpactEffect, data, true, true)
+			end
+
+			if (bHole and SERVER) then
+				local tBullet = tInfo or {}
+				HG_BulletHoles.Emit(tr, bExit and -tr.Normal or tr.Normal, tBullet.Diameter, tBullet.KineticEnergy, bExit and HG_BulletHoles.FLAG_EXIT or 0)
 			end
 		end
 	elseif (bFirstTimePredicted) then
@@ -451,7 +462,7 @@ local function Damage(bDoDebugHit, bStartedInWater, bEndNotWater, iFlags, iDamag
 		if IsValid(pInflictor) and pInflictor.bullet == tInfo then pInflictor.bullet = previousBullet end
 		
 		if (bEndNotWater or bit.band(iFlags, FIRE_BULLETS_ALLOW_WATER_SURFACE_IMPACTS) ~= 0) then
-			Impact(Weapon, iAmmoDamageType, bFirstTimePredicted, vSrc, tr, sImpactEffect, sRagdollImpactEffect)
+			Impact(Weapon, iAmmoDamageType, bFirstTimePredicted, vSrc, tr, sImpactEffect, sRagdollImpactEffect, tInfo)
 		end
 	end
 	
@@ -896,7 +907,7 @@ function ENTITY:FireLuaBullets(tInfo)
 					output = tr
 				})
 				// bullet did penetrate object, exit Decal
-				Impact(bWeaponValid and pWeapon, iAmmoDamageType, bFirstTimePredicted, vSrc, tr, sImpactEffect, sRagdollImpactEffect)
+				Impact(bWeaponValid and pWeapon, iAmmoDamageType, bFirstTimePredicted, vSrc, tr, sImpactEffect, sRagdollImpactEffect, tInfo, true)
 				
 				vNewSrc = tr.HitPos
 				
@@ -1335,7 +1346,7 @@ function PLAYER:FireCSSBullets(tInfo)
 			end
 			
 			// bullet did penetrate object, exit Decal
-			Impact(bWeaponValid and pWeapon, iAmmoDamageType, bFirstTimePredicted, vSrc, tr, sImpactEffect, sRagdollImpactEffect)
+			Impact(bWeaponValid and pWeapon, iAmmoDamageType, bFirstTimePredicted, vSrc, tr, sImpactEffect, sRagdollImpactEffect, tInfo, true)
 			
 			// penetration was successful
 			flTraceDistance = math.sqrt(flTraceDistance)

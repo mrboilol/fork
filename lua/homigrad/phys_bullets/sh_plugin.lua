@@ -114,6 +114,7 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 			bullet.AirResistMul = bullet.AirResistMul or hg_ammo_table.BulletSettings.AirResistMul
 			bullet.LifeTime = bullet.LifeTime or hg_ammo_table.BulletSettings.LifeTime
 			bullet.Mass = bullet.Mass or hg_ammo_table.BulletSettings.Mass or 1
+			bullet.Diameter = bullet.Diameter or hg_ammo_table.BulletSettings.Diameter
 			bullet.DamageType = bullet.DamageType or hg_ammo_table.dmgtype or DMG_BULLET
 			bullet.PhysPenetrationMul = bullet.PhysPenetrationMul or hg_ammo_table.BulletSettings.PhysPenetrationMul or 1
 			bullet.ForceMul = bullet.ForceMul or hg_ammo_table.ForceMul or 1
@@ -485,7 +486,7 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 				end
 			end
 			
-			if SERVER and not self.PenetratingMaterial then
+			if SERVER and not self.PenetratingMaterial and not self.IsFragment then
 				PLUGIN:RunHook("BulletNearMiss", self, hull_trace.start, trace.HitPos, trace.Entity)
 			end
 
@@ -534,9 +535,9 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 							tr_back.mask = self.TraceMask
 							local trace_backwards = util.TraceLine(tr_back)
 							
-							if(!trace_backwards.StartSolid)then
+							if(!trace_backwards.StartSolid and not self.IsFragment)then
 								local effectdata = EffectData()
-								
+
 								effectdata:SetOrigin(trace_backwards.HitPos)
 								effectdata:SetEntity(trace_backwards.Entity)
 								effectdata:SetStart(trace_backwards.StartPos)
@@ -544,13 +545,16 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 								effectdata:SetDamageType(DMG_BULLET)
 								effectdata:SetHitBox(trace_backwards.HitBox)
 
-								local replacedSound = HG_BulletImpactSounds and HG_BulletImpactSounds.PlayMaterialImpact(trace_backwards)
-								if(replacedSound)then
-									HG_BulletImpactSounds.MakeEffectSilent(effectdata)
-									util.Effect("Impact_GMOD", effectdata, true, true)
-								else
-									util.Effect("Impact", effectdata, true, true)
+								local exitDir = move_vector:GetNormalized()
+								local exitEnergy = PLUGIN.BulletEnergy(self, len_before)
+								local makeHole = trace_backwards.Hit and HG_BulletHoles and HG_BulletHoles.Handles(trace_backwards)
+								PLUGIN.SetImpactEffect(effectdata, trace_backwards, makeHole)
+
+								if(makeHole)then
+									HG_BulletHoles.Emit(trace_backwards, exitDir, self.Diameter, exitEnergy, HG_BulletHoles.FLAG_EXIT)
 								end
+
+								PLUGIN.ExitSpall(self, penetration_pos, exitDir, self.PenetratingMaterial, (self.PenetratingEnergy or 0) - exitEnergy)
 							end
 						end
 						
@@ -564,6 +568,10 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 						-- if(self.PenetratingSky)then
 							-- self.Pos = self.Pos + move_vector
 						-- else
+							if(SERVER and self.PenetratingTrace and not self.IsFragment)then
+								PLUGIN.BackSpall(self, self.PenetratingTrace, self.PenetratingTrace.Normal, self.PenetratingEnergy or 0)
+							end
+
 							if(self.OnStopped)then
 								self:OnStopped(last_unsure_penetration_pos, "penetration", self.PenetratingTrace)
 							end
@@ -658,7 +666,10 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 			--=//
 			
 			if(trace_hit)then
-				if(SERVER and not trace.StartSolid)then
+				local impactFX = SERVER and not trace.StartSolid and not self.IsFragment
+				local makeHole = impactFX and HG_BulletHoles and HG_BulletHoles.Handles(trace)
+
+				if(impactFX)then
 					local effectdata = EffectData()
 					effectdata:SetOrigin(trace.HitPos)
 					effectdata:SetEntity(trace.Entity)
@@ -666,20 +677,23 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 					effectdata:SetSurfaceProp(trace.SurfaceProps or 0)
 					effectdata:SetDamageType(DMG_BULLET)
 					effectdata:SetHitBox(trace.HitBox or 0)
-
-					local replacedSound = HG_BulletImpactSounds and HG_BulletImpactSounds.PlayMaterialImpact(trace)
-					if(replacedSound)then
-						HG_BulletImpactSounds.MakeEffectSilent(effectdata)
-						util.Effect("Impact_GMOD", effectdata, true, true)
-					else
-						util.Effect("Impact", effectdata, true, true)
-					end
+					PLUGIN.SetImpactEffect(effectdata, trace, makeHole)
 				end
-				
+
 				if(self.PenetratingMaterial)then
-				
+
 				else
+					local impactEnergy = impactFX and PLUGIN.BulletEnergy(self, len_before)
+					self.LastHitRicochet = nil
 					vel_normal, len, len_before = self:Hit(trace, len, len_before)
+
+					if(impactFX)then
+						if(self.PenetratingMaterial)then
+							self.PenetratingEnergy = impactEnergy
+						end
+
+						PLUGIN.ImpactAftermath(self, trace, impactEnergy, makeHole)
+					end
 				end
 			end
 			
@@ -814,7 +828,8 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 		end
 		
 		local new_vel_normal, len, ricochet, ang_diff, stopped = PLUGIN.CalcHit(trace, len, len_before, self.TraceMask, self.Penetration, self.SizeMins, self.SizeMaxs)
-		
+		self.LastHitRicochet = ricochet
+
 		--[[if(stopped)then
 			self:Die()
 
@@ -878,7 +893,7 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 		self.Removed = true
 		PLUGIN.BulletsTable[self.Key] = nil
 		
-		if(SERVER)then
+		if(SERVER and not self.NoNetwork)then
 			if(self.CreationTime ~= CurTime())then
 				PLUGIN.NetworkBulletRemove(self)
 			end
@@ -893,7 +908,7 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 --\\Creation
 	function PLUGIN.ThinkBulletLagCompensated(bullet)
 		local shooter = bullet.Shooter
-		local lag_compensate = SERVER and IsValid(shooter) and shooter:IsPlayer() and (bullet.CreationTime + 1 >= CurTime())
+		local lag_compensate = SERVER and not bullet.IsFragment and IsValid(shooter) and shooter:IsPlayer() and (bullet.CreationTime + 1 >= CurTime())
 
 		if(lag_compensate)then
 			shooter:LagCompensation(true)
@@ -942,12 +957,12 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 		end
 		
 		PLUGIN:RunHook("BulletPostSetup", bullet)
-		if SERVER and CAI and CAI.Target and CAI.Target.ApplyBulletAim then
+		if SERVER and not bullet.IsFragment and CAI and CAI.Target and CAI.Target.ApplyBulletAim then
 			CAI.Target.ApplyBulletAim(bullet.Shooter, bullet, true)
 			if CAI.Target.ApplyBulletRecoil then CAI.Target.ApplyBulletRecoil(bullet.Shooter, bullet, true) end
 		end
-		
-		if(SERVER and IsValid(bullet.Shooter) and bullet.Shooter:IsPlayer())then
+
+		if(SERVER and not bullet.IsFragment and IsValid(bullet.Shooter) and bullet.Shooter:IsPlayer())then
 			bullet.Vel = bullet.Vel + bullet.Shooter:GetVelocity()
 		end
 		
@@ -986,6 +1001,185 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 		end
 		
 		return false
+	end
+
+	PLUGIN.FragmentHardness = {
+		[MAT_METAL] = 1,
+		[MAT_VENT] = 0.9,
+		[MAT_GRATE] = 0.8,
+		[MAT_CONCRETE] = 0.8,
+		[MAT_TILE] = 0.7,
+		[MAT_COMPUTER] = 0.6,
+		[MAT_GLASS] = 0.6,
+		[MAT_PLASTIC] = 0.25,
+		[MAT_WOOD] = 0.2,
+	}
+
+	PLUGIN.SpallDepth = {
+		[MAT_METAL] = 0.8,
+		[MAT_VENT] = 0.8,
+		[MAT_GRATE] = 0.8,
+		[MAT_COMPUTER] = 0.5,
+		[MAT_CONCRETE] = 0.45,
+		[MAT_TILE] = 0.4,
+		[MAT_GLASS] = 0.6,
+	}
+
+	PLUGIN.MetalMats = {
+		[MAT_METAL] = true,
+		[MAT_VENT] = true,
+		[MAT_GRATE] = true,
+		[MAT_COMPUTER] = true,
+	}
+
+	PLUGIN.MaxFragmentsPerTick = 16
+
+	local fragment_budget, fragment_budget_tick = 0, -1
+
+	function PLUGIN.BulletEnergy(bullet, len)
+		local speed = (len or 0) / 52.5
+
+		return math.max(bullet.Mass or 0, 0) / 2000 * speed * speed
+	end
+
+	function PLUGIN.SetImpactEffect(effectdata, trace, no_decal)
+		local flags = no_decal and HG_BulletHoles.IMPACT_NODECAL or 0
+		local replacedSound = HG_BulletImpactSounds and HG_BulletImpactSounds.PlayMaterialImpact(trace)
+
+		if(replacedSound)then
+			HG_BulletImpactSounds.MakeEffectSilent(effectdata)
+			flags = bit.bor(flags, effectdata:GetFlags())
+		end
+
+		if(flags ~= 0)then
+			effectdata:SetFlags(flags)
+			util.Effect("Impact_GMOD", effectdata, true, true)
+		else
+			util.Effect("Impact", effectdata, true, true)
+		end
+	end
+
+	function PLUGIN.FragmentCount(energy, hardness, mul)
+		if(not energy or energy <= 0)then return 0 end
+
+		local expected = hardness * (energy / 2000) ^ 0.75 * (mul or 1)
+		local count = math.floor(expected)
+
+		if(math.random() < expected - count)then
+			count = count + 1
+		end
+
+		return math.min(count, 8)
+	end
+
+	function PLUGIN.SpawnFragments(parent, pos, dir, spread, count, energy, metal)
+		if(not SERVER or count <= 0)then return end
+
+		local tick = engine.TickCount()
+		if(fragment_budget_tick ~= tick)then
+			fragment_budget_tick, fragment_budget = tick, 0
+		end
+
+		count = math.min(count, PLUGIN.MaxFragmentsPerTick - fragment_budget)
+		if(count <= 0)then return end
+		fragment_budget = fragment_budget + count
+
+		local effectdata = EffectData()
+		effectdata:SetOrigin(pos)
+		effectdata:SetNormal(dir)
+		effectdata:SetMagnitude(count)
+		effectdata:SetScale(spread)
+		effectdata:SetFlags(metal and 1 or 0)
+		util.Effect("hg_bulletfrags", effectdata, true, true)
+
+		local shooter, inflictor = parent.Shooter, parent.Inflictor
+		local damage = math.Clamp(1.5 + math.sqrt(math.max(energy, 0)) * 0.05, 1.5, 10)
+
+		timer.Simple(0, function()
+			for i = 1, count do
+				PLUGIN.CreateBullet({
+					IsFragment = true,
+					Pos = Vector(pos),
+					Vel = (dir + VectorRand() * spread):GetNormalized() * math.Rand(140, 300) * 52.5,
+					Shooter = IsValid(shooter) and shooter or nil,
+					Inflictor = IsValid(inflictor) and inflictor or nil,
+					AmmoID = -1,
+					AmmoForce = 10,
+					Damage = damage * math.Rand(0.6, 1.2),
+					Force = 0.2,
+					Mass = 0.6,
+					Diameter = 2,
+					Penetration = 1,
+					Size = 0,
+					DieOnHit = true,
+					NoNetwork = true,
+					LifeTime = 0.4,
+					Distance = 700,
+					AirResistMul = 0.002,
+					TraceFilter = {},
+					TracerSetings = {MaxPathPoints = 1},
+				})
+			end
+		end)
+	end
+
+	function PLUGIN.ImpactAftermath(bullet, trace, energy, make_hole)
+		local ricochet = bullet.LastHitRicochet
+		local in_dir = trace.Normal
+
+		if(make_hole)then
+			HG_BulletHoles.Emit(trace, in_dir, bullet.Diameter, energy, ricochet and HG_BulletHoles.FLAG_RICOCHET or 0)
+		end
+
+		local hardness = PLUGIN.FragmentHardness[trace.MatType]
+		if(not hardness or trace.HitSky)then return end
+
+		local normal = trace.HitNormal
+		local reflect = in_dir - normal * (2 * in_dir:Dot(normal))
+		local count = PLUGIN.FragmentCount(energy, hardness, ricochet and 0.5 or 1)
+		PLUGIN.SpawnFragments(bullet, trace.HitPos + normal, (normal + reflect):GetNormalized(), 0.6, count, energy * 0.4, PLUGIN.MetalMats[trace.MatType])
+
+		if(bullet.Removed and not ricochet)then
+			PLUGIN.BackSpall(bullet, trace, in_dir, energy)
+		end
+	end
+
+	function PLUGIN.ExitSpall(bullet, pos, dir, mat_type, energy)
+		local hardness = PLUGIN.FragmentHardness[mat_type]
+		if(not hardness or hardness < 0.7 or energy <= 0)then return end
+
+		PLUGIN.SpawnFragments(bullet, pos + dir, dir, 0.35, PLUGIN.FragmentCount(energy, hardness, 0.6), energy * 0.5, PLUGIN.MetalMats[mat_type])
+	end
+
+	function PLUGIN.BackSpall(bullet, trace, dir, energy)
+		local mat_type = trace.MatType
+		local hardness = PLUGIN.FragmentHardness[mat_type]
+		local depth_mul = PLUGIN.SpallDepth[mat_type]
+		if(not hardness or not depth_mul or energy <= 0)then return end
+
+		local depth = math.sqrt(energy / 1000) * depth_mul
+		if(depth < 0.5)then return end
+
+		local back = util.TraceLine({
+			start = trace.HitPos + dir * depth,
+			endpos = trace.HitPos + dir * 0.25,
+			mask = bullet.TraceMask or MASK_SHOT,
+		})
+		if(back.StartSolid or not back.Hit)then return end
+
+		local metal = PLUGIN.MetalMats[mat_type]
+
+		if(HG_BulletHoles and HG_BulletHoles.Handles(back))then
+			HG_BulletHoles.Emit(back, dir, bullet.Diameter, energy, HG_BulletHoles.FLAG_EXIT, metal and 0.6 or 1.2)
+		end
+
+		PLUGIN.SpawnFragments(bullet, back.HitPos + dir, dir, 0.45, PLUGIN.FragmentCount(energy, hardness, 0.8), energy * 0.5, metal)
+	end
+
+	function PLUGIN.ArmorSpall(bullet, pos, out_dir, hardness)
+		local energy = bullet.KineticEnergy or 0
+
+		PLUGIN.SpawnFragments(bullet, pos + out_dir * 2, out_dir, 0.9, PLUGIN.FragmentCount(energy, hardness, 0.8), energy * 0.4, true)
 	end
 
 	function PLUGIN.CalcVelocityLostInMaterial(material, dist, len_before)
