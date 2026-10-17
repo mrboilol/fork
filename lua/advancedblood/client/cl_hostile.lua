@@ -629,7 +629,7 @@ hook.Add("Think", "ABL_HostileOnset", function()
 			body = ent:Alive() and ABL.ZC.GetBody(ent) or (ABL.ZC.GetCorpse(ent) or ent)
 		end
 		local bi = IsValid(body) and body:LookupBone(o.bone) or nil
-		local m = bi and body:GetBoneMatrix(bi) or nil
+		local m = bi and ABL.BoneMatrix(body, bi) or nil
 		if m then
 			local at = m:GetTranslation()
 			-- (it follows with a little lag, so that a flinch does not shake the picture)

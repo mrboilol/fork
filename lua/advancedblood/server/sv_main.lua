@@ -40,7 +40,7 @@ local function NearestHitboxBone(ent, pos)
 	for hb = 0, count - 1 do
 		local bone = ent:GetHitBoxBone(hb, set)
 		if bone then
-			local m = ent:GetBoneMatrix(bone)
+			local m = ABL.BoneMatrix(ent, bone)
 			if m then
 				local mins, maxs = ent:GetHitBoxBounds(hb, set)
 				local lp = WorldToLocal(pos, angle_zero, m:GetTranslation(), m:GetAngles())
@@ -57,7 +57,7 @@ local function NearestHitboxBone(ent, pos)
 end
 
 local function ToBoneLocal(ent, bone, pos)
-	local m = ent:GetBoneMatrix(bone)
+	local m = ABL.BoneMatrix(ent, bone)
 	if not m then return nil end
 	return (WorldToLocal(pos, angle_zero, m:GetTranslation(), m:GetAngles()))
 end
@@ -114,8 +114,9 @@ local function WoundSpace(ent, physBone, entry, exit)
 	if not IsValid(ent) or not isnumber(physBone) or physBone < 0 then return nil end
 	local bone = ent:TranslatePhysBoneToBone(physBone)
 	if not bone or bone < 0 or bone > 255 then return nil end
-	local pos, ang = ent:GetBonePosition(bone)
-	if not pos or not ang then return nil end
+	local m = ABL.BoneMatrix(ent, bone)
+	if not m then return nil end
+	local pos, ang = m:GetTranslation(), m:GetAngles()
 	local le = WorldToLocal(entry, angle_zero, pos, ang)
 	local lx = exit and WorldToLocal(exit, angle_zero, pos, ang) or nil
 	return bone, le, lx
@@ -126,7 +127,7 @@ local function SendHit(body, rec)
 	if body:IsPlayer() and not body:Alive() then return end
 	local entry = rec.entry
 	local bone, lEntry, lExit = rec.bone, rec.lEntry, rec.lExit
-	if not bone or not body:GetBoneMatrix(bone) then
+	if not bone or not ABL.BoneMatrix(body, bone) then
 		-- (no bone named by Z-City: the closest one, as the body stands now)
 		bone = NearestHitboxBone(body, entry)
 		if not bone or bone > 255 then return end

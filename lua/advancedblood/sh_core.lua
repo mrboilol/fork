@@ -23,6 +23,11 @@ end
 local Pool = {}
 Pool.__index = Pool
 
+function ABL.BoneMatrix(ent, bone)
+	if hg and hg.GetIKBoneMatrix then return hg.GetIKBoneMatrix(ent, bone) end
+	return ent:GetBoneMatrix(bone)
+end
+
 function ABL.NewPool(ctor)
 	return setmetatable({ free = {}, n = 0, ctor = ctor, made = 0 }, Pool)
 end

@@ -343,7 +343,7 @@ local BODY_LOG = 12
 local function NearestBone(ent, pos)
 	local best, bd
 	for b = 0, (ent:GetBoneCount() or 0) - 1 do
-		local m = ent:GetBoneMatrix(b)
+		local m = ABL.BoneMatrix(ent, b)
 		if m then
 			local d = m:GetTranslation():DistToSqr(pos)
 			if not bd or d < bd then best, bd = b, d end
@@ -355,7 +355,7 @@ end
 local function BodyDecal(mat, ent, pos, normal, w, h)
 	Decal(mat, ent, pos, normal, colTmp, w, h)
 	local bone = NearestBone(ent, pos)
-	local m = bone and ent:GetBoneMatrix(bone)
+	local m = bone and ABL.BoneMatrix(ent, bone)
 	if not m then return end
 	local ang = m:GetAngles()
 	local log = bodyLog[ent]
@@ -382,7 +382,7 @@ local function ClearBody(ent)
 	colTmp.r, colTmp.g, colTmp.b, colTmp.a = 255, 255, 255, 255
 	for i = 1, #log do
 		local d = log[i]
-		local m = ent:GetBoneMatrix(d.bone)
+		local m = ABL.BoneMatrix(ent, d.bone)
 		if m then
 			local ang = m:GetAngles()
 			local pos = LocalToWorld(d.lpos, angle_zero, m:GetTranslation(), ang)

@@ -110,7 +110,7 @@ function WS.Create(src, body, ev, rng)
 
 	-- direction of the bullet in the wound bone's space (the body moves on). By the bone's
 	-- rotation alone: the matrix of a destroyed part (a head Z-City has scaled away) has no inverse
-	local M = body:GetBoneMatrix(ev.bone)
+	local M = ABL.BoneMatrix(body, ev.bone)
 	if M then r.ldir = WorldToLocal(ev.dir, angle_zero, vector_origin, M:GetAngles()) end
 
 	-- what is left on the skin around the entry, by range. Soot and powder reach further from a

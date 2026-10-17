@@ -1335,7 +1335,17 @@ end
 
 function hg.GetIKBoneMatrix(ent, bone)
 	if not ent:IsPlayer() then return ent:GetBoneMatrix(bone) end
-	local pose = SERVER and updateServerPose(ent) or ent.hg_IKPose
+	if CLIENT then
+		local pose = ent.hg_IKPose
+		local matrix = pose and FrameNumber() - pose.frame <= 2 and pose.model == ent:GetModel() and pose.matrices[bone]
+		if not matrix then return ent:GetBoneMatrix(bone) end
+		local shift = ent:GetPos() - pose.origin
+		if shift:IsZero() then return matrix end
+		matrix = Matrix(matrix)
+		matrix:SetTranslation(matrix:GetTranslation() + shift)
+		return matrix
+	end
+	local pose = updateServerPose(ent)
 	if pose and pose.frame == FrameNumber() and pose.model == ent:GetModel() and pose.origin:DistToSqr(ent:GetPos()) < 0.0001 then
 		return pose.matrices[bone] or ent:GetBoneMatrix(bone)
 	end

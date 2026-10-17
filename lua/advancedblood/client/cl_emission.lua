@@ -623,7 +623,7 @@ local function StepSpouts(h)
 		local ent = sp.ent
 		local body = IsValid(ent) and (ent:IsPlayer() and Z.GetBody(ent) or ent) or nil
 		local bone = IsValid(body) and body:LookupBone(sp.boneName) or nil
-		local m = bone and body:GetBoneMatrix(bone) or nil
+		local m = bone and ABL.BoneMatrix(body, bone) or nil
 		sp.t = sp.t + h
 		if not m or sp.t >= sp.dur then
 			table.remove(spouts, i)
@@ -753,7 +753,7 @@ end
 -- Everything is drawn from the event's seed, so every client sees the same burst.
 ------------------------------------------------------------------------------------------
 local function BoneWorld(body, bone, lp)
-	local m = body:GetBoneMatrix(bone)
+	local m = ABL.BoneMatrix(body, bone)
 	if not m then return nil end
 	return LocalToWorld(lp, angle_zero, m:GetTranslation(), m:GetAngles())
 end

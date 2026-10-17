@@ -1,0 +1,1 @@
+return [[hljs.registerLanguage("json",function(e){var t={literal:"true false null"},r=[e.CLCM,e.CBCM],a=[e.QSM,e.CNM],n={e:",",eW:!0,eE:!0,c:a,k:t},i={b:"{",e:"}",c:[{cN:"attr",b:/"/,e:/"/,c:[e.BE],i:"\\n"},e.inherit(n,{b:/:/})].concat(r),i:"\\S"},s={b:"\\[",e:"\\]",c:[e.inherit(n)],i:"\\S"};return a.push(i,s),r.forEach(function(e){a.push(e)}),{c:a,k:t,i:"\\S"}});]]

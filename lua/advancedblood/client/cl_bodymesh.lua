@@ -424,7 +424,7 @@ function Pose:Bone(b)
 	if e and e.f == self.frame then return e end
 	local ent = self.ent
 	if not IsValid(ent) then return nil end
-	local M = ent:GetBoneMatrix(b)
+	local M = ABL.BoneMatrix(ent, b)
 	if not M then return nil end
 	local a11, a12, a13, a14, a21, a22, a23, a24, a31, a32, a33, a34 = M:Unpack()
 	if not e then e = { f = -1 } self.bones[b] = e end

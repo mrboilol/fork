@@ -1,0 +1,514 @@
+
+local PANEL = {}
+
+-- caching.
+local gpeek_batch_size   = GetConVar("gpeek_batch_size")
+local gpeek_batch_delay  = GetConVar("gpeek_batch_delay")
+local gpeek_multi_addon  = GetConVar("gpeek_multi_addon")
+local gpeek_legacy_addon = GetConVar("gpeek_legacy_addon")
+
+local function extensionsIterator()
+
+	local i = 0
+	local files = file.Find("vgui/daddonbrowser/*", "LUA")
+	return function()
+
+		i = i + 1
+
+		if (files[i]) then
+			return i, { fileName = files[i], fileExtension = files[i]:match("(.+)%..+$") }
+		end
+	end
+end
+
+function PANEL:Setup()
+
+	self.Extensions = {
+
+		-- fallback, does nothing.
+		["error"] = {
+			Icon       = "icon16/page_white.png",
+			Initialize = function(container)
+				local msg = vgui.Create("DLabel", container)
+				msg:Dock(TOP)
+				msg:DockMargin(5, 0, 5, 0)
+				msg:SetText("#gpeek.extensions.error.message")
+				msg:SetDark(true)
+			end,
+			Browse     = function() end,
+			RightClick = function() end,
+			Invalidate = function() end
+		}
+	}
+
+	for k,v in extensionsIterator() do
+
+		local extension = include("vgui/daddonbrowser/" .. v.fileName)
+
+		self.Extensions[v.fileExtension] = extension
+
+		CreateClientConVar("gpeek_ignore_" .. v.fileExtension, extension.BaseClass == "error" && "1" || "0", true, false, "Show/Hide " .. v.fileExtension .. " files in gPeek.", 0, 1)
+	end
+
+	for k,v in pairs(self.Extensions) do
+		if (!v.BaseClass) then continue end
+		v.Base = self.Extensions[v.BaseClass]
+	end
+end
+
+--- Component initialization
+-- Initializes the DAddonBrowser panel, creating the horizontal divider layout
+-- and sidebar navigation, then loading all mounted addons into the tree.
+function PANEL:Init()
+
+	self:Setup()
+
+	-- Load generation is used when game content changes, cancelling all coroutines.
+	self.LoadGeneration = 0
+
+	self.HorizontalDivider = vgui.Create("DHorizontalDivider", self)
+	self.HorizontalDivider:Dock(FILL)
+	self.HorizontalDivider:SetLeftMin(250)
+	self.HorizontalDivider:SetLeftWidth(192)
+	self.HorizontalDivider:SetRightMin(100)
+	self.HorizontalDivider:SetDividerWidth(6)
+
+	self.ContentNavBar = vgui.Create("ContentSidebar", self.HorizontalDivider)
+	self.HorizontalDivider:SetLeft(self.ContentNavBar)
+
+	self:CreateSearchBar()
+	self:LoadAddons()
+
+	hook.Add("GameContentChanged", self, function()
+		self:LoadAddons()
+	end)
+end
+
+function PANEL:CreateSearchBar()
+
+	local container = self.ContentNavBar:Add("DPanel")
+	container:Dock(TOP)
+
+	self.Search = container:Add("DTextEntry")
+	self.Search:Dock(FILL)
+	self.Search:DockMargin(0, 0, 0, 4)
+	self.Search:SetPlaceholderText("#spawnmenu.search")
+	self.Search.OnEnter = function(this, term)
+		self:LoadAddons(term)
+	end
+
+	local searchButton = self.Search:Add("DImageButton")
+	searchButton:SetImage("icon16/magnifier.png")
+	searchButton:SetText("")
+	searchButton:Dock(RIGHT)
+	searchButton:DockMargin(4, 2, 4, 2)
+	searchButton:SetSize(16, 16)
+	searchButton:SetTooltip("#spawnmenu.press_search")
+	searchButton.DoClick = function(this)
+		self.Search:OnEnter(self.Search:GetText())
+	end
+	searchButton.DoRightClick = function(this)
+		self.Search:SetText("")
+		self:LoadAddons()
+	end
+end
+
+function PANEL:ParseLegacyAddons(out)
+
+	if (!gpeek_legacy_addon:GetBool()) then return end
+
+	local _, directories = file.Find("addons/*", "GAME")
+
+	for k,v in pairs(directories) do
+
+		local addon = {}
+		addon.downloaded = false
+		addon.file = ""
+		addon.models = -1
+		addon.mounted = "legacy"
+		addon.size = -1
+		addon.tags = ""
+		addon.timeadded = -1
+		addon.title = v
+		addon.updated = -1
+		addon.wsid = nil
+		addon.path = "GAME"
+		addon.dir = "addons/" .. v
+
+		table.insert(out, addon)
+	end
+end
+
+--- Load addons
+-- Clears and repopulates the navigation tree with all currently installed addons,
+-- sorted alphabetically by title. Unmounted addons are visually flagged.
+function PANEL:LoadAddons(searchTerm)
+
+	self.LoadGeneration = self.LoadGeneration + 1
+	self.ContentNavBar.Tree:Clear()
+
+	local addons = engine.GetAddons()
+	self:ParseLegacyAddons(addons)
+
+	table.sort(addons, function(a, b) return string.lower(a.title) < string.lower(b.title) end)
+
+	for k,v in ipairs(addons) do
+
+		if (searchTerm && !string.find(string.lower(v.title), string.lower(searchTerm), 1, true)) then
+			continue
+		end
+
+		self:BuildAddonFolderNode(self.ContentNavBar.Tree, nil, v.title, v.path || v.title, nil, v.mounted, v.wsid, v.dir)
+	end
+
+	self:SetContent()
+end
+
+--- Build addon tree node
+-- Recursively builds the file and folder nodes for a given addon directory.
+-- @param path string The addon path or search path root used for file lookups.
+-- @param dir string The current subdirectory being scanned, or nil for the root.
+-- @param parent panel The parent tree node to attach children to.
+function PANEL:BuildAddonNodeAsync(path, dir, parent, cancellationToken)
+
+	local files, folders = file.Find(dir && (dir .. "/*") || "*", path)
+
+	local co = coroutine.create(function()
+		self:BatchProcessAddonDataAsync(cancellationToken, folders, self.BuildAddonFolderNode, parent, dir, path)
+		self:BatchProcessAddonDataAsync(cancellationToken, files,   self.BuildAddonFileNode,   parent, dir)
+	end)
+
+	local generation = self.LoadGeneration
+	local batchDelay = gpeek_batch_delay:GetFloat()
+
+	local function processNode()
+
+		if (!IsValid(self)) then return end
+		if (self.LoadGeneration != generation) then return end
+		if (cancellationToken.Cancelled) then return end
+		if (coroutine.status(co) == "dead") then return end
+
+		coroutine.resume(co)
+		timer.Simple(batchDelay, processNode)
+	end
+
+	processNode()
+end
+
+--- Batch addon data processing
+-- Iterates over a dataset and dispatches each entry to a processor function,
+-- yielding after every item to avoid blocking the game thread. Respects a
+-- cancellation token to abort mid-iteration if the owning node is collapsed
+-- or the panel is invalidated.
+-- @param cancellationToken table A table with a Cancelled boolean field.
+-- @param data table Sequential array of items to process (files or folders).
+-- @param processor function The handler to invoke for each item.
+-- @param parent panel The parent tree node to attach built nodes to.
+-- @param dir string The current subdirectory being scanned, or nil for root.
+-- @param path string The addon path or search path root used for file lookups.
+function PANEL:BatchProcessAddonDataAsync(cancellationToken, data, processor, parent, dir, path)
+
+	local batchSize = gpeek_batch_size:GetInt()
+
+	local count = 0
+	for k,v in ipairs(data) do
+
+		if (cancellationToken.Cancelled) then return end
+
+		processor(self, parent, dir, v, path, dir && (dir .. "/" .. v) || v)
+		count = count + 1
+
+		if (count >= batchSize) then
+			count = 0
+			coroutine.yield()
+		end
+	end
+end
+
+--- Build addon folder node
+-- Creates a collapsible folder node in the tree. Children are built lazily on
+-- first expand and disposed on collapse to conserve memory. Provides a right-click
+-- menu to copy the directory path to the clipboard.
+-- @param parent panel The parent tree or node to attach this folder node to.
+-- @param dir string The subdirectory this node represents, or nil for the root.
+-- @param name string The display label for the folder node.
+-- @param path string The addon path or search path root used for file lookups.
+-- @param resolvedPath string The addon full to file.
+-- @param mounted boolean Whether the addon is mounted; unmounted addons show a warning icon.
+-- @param wsid string Workshop id.
+function PANEL:BuildAddonFolderNode(parent, dir, name, path, resolvedPath, mounted, wsid, legacy)
+
+	local icon = nil
+	if (mounted == false) then icon = "icon16/folder_delete.png" end
+	if (mounted == "legacy") then icon = "icon16/folder_link.png" end
+
+	local node = parent:AddNode(name, icon)
+	node:SetDoubleClickToOpen(false)
+
+	node.CancellationToken = { Cancelled = false }
+	node.DoClick = function(this)
+
+		local wasExpanded = this:GetExpanded()
+		this.CancellationToken.Cancelled = wasExpanded
+
+		-- dispose of child nodes when collapsing to save on memory.
+		if (wasExpanded) then
+
+			-- free reference if change tracking was on us.
+			if (self.CurrentAddon == this) then
+				self.CurrentAddon = nil
+			end
+
+			for k,v in pairs(this:GetChildNodes()) do
+				v:Remove()
+			end
+		else
+			if (!this.Built) then
+				self:BuildAddonNodeAsync(path, legacy || resolvedPath, this, this.CancellationToken)
+			end
+
+			self:HandleAddonRootCollapse(parent, this)
+		end
+
+		this.Built = !wasExpanded
+	end
+
+	node.DoRightClick = function(this)
+
+		local menu = DermaMenu()
+
+		if (wsid) then
+			menu:AddOption("#spawnmenu.openaddononworkshop", function()
+				steamworks.ViewFile(wsid)
+			end):SetIcon("icon16/link_go.png")
+		end
+
+		menu:AddOption("#spawnmenu.menu.copy", function()
+			SetClipboardText(resolvedPath || path)
+		end):SetIcon("icon16/page_copy.png")
+
+		menu:Open()
+	end
+end
+
+--- Collapse addon roots
+-- Relies on the 'gpeek_multi_addon' convar to determine if multi-addon browsing
+-- is enabled. If disabled (default), only one root node can be expanded at
+-- any given time in the viewer to save on memory.
+-- @param parent panel The current node's parent.
+-- @param node panel The node currently being expanded.
+function PANEL:HandleAddonRootCollapse(parent, node)
+
+	if (parent != self.ContentNavBar.Tree) then return end
+	if (gpeek_multi_addon:GetBool()) then return end
+
+	local currentAddon = self.CurrentAddon
+
+	if (!IsValid(currentAddon)) then
+		self.CurrentAddon = node
+		return
+	end
+
+	if (currentAddon != node) then
+
+		-- dispatch cancellation to previous root.
+		currentAddon.CancellationToken.Cancelled = true
+
+		for k,v in pairs(currentAddon:GetChildNodes()) do
+			v:Remove()
+		end
+
+		currentAddon.Built = false
+		self.CurrentAddon = node
+	end
+end
+
+--- Build addon file node
+-- Creates a file leaf in the tree, resolved to its appropriate extension
+-- handler for icon display and content browsing. Provides a right-click menu
+-- to copy the full file path to the clipboard.
+-- @param parent panel The parent tree node to attach this file node to.
+-- @param dir string The subdirectory containing this file.
+-- @param name string The filename including extension.
+function PANEL:BuildAddonFileNode(parent, dir, name)
+
+	local fileExtension = string.GetExtensionFromFilename(name)
+	local ignore = GetConVar("gpeek_ignore_" .. fileExtension)
+
+	if (ignore && ignore:GetBool()) then return end
+
+	-- fetch file extension plugin for addon browser content.
+	local extension = self.Extensions[fileExtension] || self.Extensions["error"]
+	local node = parent:AddNode(name, extension.Icon)
+
+	node.DoClick = function(this)
+		self:OpenAddonFile(extension, dir .. "/" .. name)
+	end
+
+	node.DoRightClick = function(this)
+
+		this:DoClick()
+
+		local menu = DermaMenu()
+
+		menu:AddOption("#spawnmenu.menu.copy", function()
+			SetClipboardText(dir .. "/" .. name)
+		end):SetIcon("icon16/page_copy.png")
+
+		if (extension.RightClick) then
+			extension.RightClick(menu, dir .. "/" .. name)
+		end
+
+		menu:Open()
+	end
+end
+
+local function removeLegacyFolders(path)
+	return path:match("^[^/]+/[^/]+/(.+)$") || path
+end
+
+--- Open and display file contents
+-- Lazily build the extension's UI singleton context to display file data.
+-- @param extension obj The extension object representing the file.
+-- @param filePath string Full file path.
+function PANEL:OpenAddonFile(extension, filePath)
+
+	self:InvalidateExtensions()
+
+	local base = extension.Base || extension
+
+	if (!IsValid(base.Container)) then
+
+		base.Container = vgui.Create("DPanel")
+
+		base.FileName = vgui.Create("DLabel", base.Container)
+		base.FileName:Dock(TOP)
+		base.FileName:DockMargin(5, 0, 0, 5)
+		base.FileName:SetDark(true)
+
+		if (!pcall(extension.Initialize, base.Container)) then
+			MsgN("[gPeek] Extension failed to initialize: " .. filePath)
+			base.Container:Remove()
+			base.Container = nil
+			return
+		end
+
+		self:SetContent(base.Container)
+	end
+
+	if (string.StartsWith(filePath, "addons")) then
+		filePath = removeLegacyFolders(filePath)
+	end
+
+	base.FileName:SetText("/" .. filePath)
+	extension.Browse(filePath)
+end
+
+--- Load content into viewer
+-- Replaces the right-hand content panel of the divider with the provided panel.
+-- The previous content panel is fully removed to free memory.
+-- @param content panel The new content panel to display on the right side.
+function PANEL:SetContent(content)
+
+	local currentContent = self.HorizontalDivider:GetRight()
+
+	if (!IsValid(content)) then
+
+		if (!IsValid(self.Heatmap)) then
+
+			self.Heatmap = vgui.Create("DAddonMap")
+			self.Heatmap.OnClickAddon = function(this, addon)
+				self.Search:SetText(addon.title)
+				self:LoadAddons(addon.title)
+			end
+			self.Heatmap.OnRightClickAddon = function(this, addon)
+
+				local menu = DermaMenu()
+
+				menu:AddOption("#spawnmenu.openaddononworkshop", function()
+					steamworks.ViewFile(addon.wsid)
+				end):SetIcon("icon16/link_go.png")
+
+				menu:Open()
+			end
+		end
+
+		if (currentContent == self.Heatmap) then return end
+		if (IsValid(currentContent)) then
+			currentContent:Remove()
+		end
+
+		self.HorizontalDivider:SetRight(self.Heatmap)
+		return
+	end
+
+	if (currentContent == content) then return end
+
+	if (IsValid(currentContent)) then
+		currentContent:Remove()
+	end
+
+	self.HorizontalDivider:SetRight(content)
+	self.HorizontalDivider:InvalidateLayout(true)
+end
+
+--- Invalidation
+-- Calls the Invalidate callback on every registered extension handler,
+-- allowing extensions to clean up or reset any active state or UI they own.
+function PANEL:InvalidateExtensions()
+	for k,v in pairs(self.Extensions) do
+		v.Invalidate()
+	end
+end
+
+vgui.Register("DAddonBrowser", PANEL, "EditablePanel")
+
+local gPeekZero = vgui.GetControlTable("DAddonBrowser")
+spawnmenu.AddCreationTab("gPeek", function()
+
+	local gPeek = vgui.CreateFromTable(gPeekZero)
+	local id = tostring(gPeek)
+
+	cvars.AddChangeCallback("gpeek_legacy_addon", function()
+		if (IsValid(gPeek)) then gPeek:LoadAddons() end
+	end, "gpeek_legacy_addon" .. "_" .. id)
+
+	local oldOnRemove = gPeek.OnRemove
+	gPeek.OnRemove = function(self)
+		cvars.RemoveChangeCallback("gpeek_legacy_addon", "gpeek_legacy_addon" .. "_" .. id)
+		if (oldOnRemove) then oldOnRemove(self) end
+	end
+
+	return gPeek
+
+end, "icon16/gpeek.png", 999, "#gpeek.spawnmenu.daddonbrowser.tooltip")
+
+local anonymous = { IsValid = function() return true end }
+hook.Add("PopulateToolMenu", anonymous, function()
+
+	spawnmenu.AddToolMenuOption("Utilities", "User", "gPeek", "#gpeek.settings", "", "", function(pnl)
+
+		pnl:Clear()
+
+		pnl:CheckBox("#gpeek.settings.multiaddon", "gpeek_multi_addon")
+		pnl:ControlHelp("#gpeek.settings.multiaddon.help")
+
+		pnl:CheckBox("#gpeek.settings.legacyaddon", "gpeek_legacy_addon")
+		pnl:ControlHelp("#gpeek.settings.legacyaddon.help")
+
+		pnl:NumSlider("#gpeek.settings.batchsize", "gpeek_batch_size", 1, 100, 0)
+		pnl:ControlHelp("#gpeek.settings.batchsize.help")
+
+		pnl:NumSlider("#gpeek.settings.batchdelay", "gpeek_batch_delay", 0, 1, 2)
+		pnl:ControlHelp("#gpeek.settings.batchdelay.help")
+
+		local blacklist = vgui.Create("DLabel", pnl)
+		blacklist:Dock(TOP)
+		blacklist:DockMargin(10, 15, 0, 0)
+		blacklist:SetText("#gpeek.settings.blacklist")
+
+		for k,v in extensionsIterator() do
+			pnl:CheckBox("*." .. v.fileExtension, "gpeek_ignore_" .. v.fileExtension)
+		end
+	end)
+end)

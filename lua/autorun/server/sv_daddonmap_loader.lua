@@ -1,0 +1,2 @@
+
+AddCSLuaFile("daddonmap/squaremap.lua")

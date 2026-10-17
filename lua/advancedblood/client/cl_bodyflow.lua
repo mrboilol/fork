@@ -1752,11 +1752,11 @@ function F.DrawSource(src, body, immediate)
 				local fm, gm = src.segMesh[bone], gloss and src.segGloss[bone]
 				if fm or gm then
 					local ok
-					if body.CopyBoneMatrix then
+					if body.CopyBoneMatrix and not body:IsPlayer() then
 						body:CopyBoneMatrix(bone, boneMat)
 						ok = true
 					else
-						local bm = body:GetBoneMatrix(bone)
+						local bm = ABL.BoneMatrix(body, bone)
 						if bm then boneMat = bm ok = true end
 					end
 					if ok then

@@ -18,7 +18,7 @@ local workedFrame, worked = -1, 0
 -- entity is gone: a prop made in that moment is no body, and gets no wounds, no source and no
 -- surface model.)
 local function Ready(body, ev)
-	return IsValid(body) and (body:IsPlayer() or body:IsRagdoll() or body:IsNPC()) and not body:IsDormant() and body:GetBoneMatrix(ev.bone) ~= nil
+	return IsValid(body) and (body:IsPlayer() or body:IsRagdoll() or body:IsNPC()) and not body:IsDormant() and ABL.BoneMatrix(body, ev.bone) ~= nil
 end
 
 -- The same event a second time would make a second wound record, a second set of marks and a

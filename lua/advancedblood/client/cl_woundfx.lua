@@ -354,7 +354,7 @@ end
 -- The body mesh is still being built: remember the hit in bone space (position and bullet
 -- direction: the body may fall and turn before the mark can be placed) and place it once ready.
 function W.Pending(src, body, bone, lpos, dir, r)
-	local M = body:GetBoneMatrix(bone)
+	local M = ABL.BoneMatrix(body, bone)
 	if not M then return end
 	local ldir = WorldToLocal(dir, angle_zero, vector_origin, M:GetAngles())
 	src.pendingMarks = src.pendingMarks or {}
@@ -654,10 +654,10 @@ function W.Draw(src, pose, off)
 						local ms = mk.mesh
 						local ok = ms ~= nil
 						if ok then
-							if body.CopyBoneMatrix then
+							if body.CopyBoneMatrix and not body:IsPlayer() then
 								body:CopyBoneMatrix(mk.bone, boneMat)
 							else
-								local bm = body:GetBoneMatrix(mk.bone)
+								local bm = ABL.BoneMatrix(body, mk.bone)
 								if bm then boneMat = bm else ok = false end
 							end
 						end
