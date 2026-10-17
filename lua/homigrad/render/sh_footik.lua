@@ -92,8 +92,10 @@ local CROUCH_SETTLE_SCALE = 0.75
 local LIMP_STRIDE_CUT = 0.25
 local LIMP_DRAG = 0.45
 local LIMP_DIP = 1.6
-local SPRINT_HOP_SCALE = 0.9
-local SPRINT_COMPRESS = 1.5
+local SPRINT_HOP_SCALE = 1.4
+local SPRINT_COMPRESS = 2.2
+local SPRINT_SWING_LIFT = 2.4
+local SPRINT_SWING_PEAK = 0.7
 local FOOT_SPLAY = 7
 local BROKEN_POWER_START = 0.6
 local BROKEN_POWER_RANGE = 0.5
@@ -480,8 +482,10 @@ local function updateSwing(ply, state, ctx, index, dt)
 	local rise = target.z - start.z
 	local zProgress = rise > 1 and smoothstep(math_min(t * 1.6, 1)) or s
 	local clearance = (IKFoot.GetFloat("step_height") * (0.6 + 0.4 * ctx.speedFraction) + math_min(math_abs(rise), MAX_RISE_CLEARANCE) * 0.3) * (1 - ctx.limp[index] * LIMP_DRAG) * (ctx.crouching and CROUCH_STEP_SCALE or 1)
+	local sprint = ctx.sprintBlend
+	clearance = clearance * Lerp(sprint, 1, SPRINT_SWING_LIFT)
 	local pos = LerpVector(s, start, target)
-	pos.z = Lerp(zProgress, start.z, target.z) + math_sin(math.pi * t) * clearance
+	pos.z = Lerp(zProgress, start.z, target.z) + math_sin(math.pi * t ^ Lerp(sprint, 1, SPRINT_SWING_PEAK)) * clearance
 	foot.ground = pos
 	foot.groundNormal = LerpVector(s, foot.startNormal or vector_up, foot.targetNormal)
 end
@@ -737,7 +741,7 @@ local function gaitBob(state, ctx)
 	local dip = ctx.limp[stanceIndex] * LIMP_DIP * math_sin(math.pi * stepProgress)
 	local flight = hg.GaitFlightFraction(ctx.swingFraction)
 	local runFraction = smoothstep(hg.GaitRunBlend(ctx.speed))
-	local sprint = ctx.sprinting and runFraction or 0
+	local sprint = ctx.sprintBlend
 	if stepProgress >= flight then
 		local support = (stepProgress - flight) / (1 - flight)
 		local vault = (1 - math_sin(math.pi * support)) * WALK_BOB * math_min(ctx.speed / WALK_BOB_SPEED, 1) * (1 - runFraction)
@@ -875,7 +879,7 @@ local function buildContext(ply, state, anim, dt)
 		oneLeg = oneLeg,
 		onGround = ply:OnGround(),
 		crouching = ply:Crouching(),
-		sprinting = ply.hg_isSprinting or ply:GetNWBool("hg_isSprinting", false),
+		sprintBlend = (ply.hg_isSprinting or ply:GetNWBool("hg_isSprinting", false)) and smoothstep(hg.GaitRunBlend(speed)) or 0,
 		limp = {hg.GaitLegLimp(ply.organism, "lleg"), hg.GaitLegLimp(ply.organism, "rleg")},
 		swingFraction = swingFraction,
 		stagger = staggerInfo(ply),

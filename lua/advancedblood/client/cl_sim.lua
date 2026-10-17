@@ -216,6 +216,9 @@ end)
 cvars.AddChangeCallback("abl_cl_enabled", function(_, _, new)
 	if new == "0" then ABL.ClearAll(true) end
 end, "ABL_Toggle")
+cvars.AddChangeCallback("hg_old_blood", function(_, _, new)
+	if new == "0" then ABL.ClearAll(true) end
+end, "ABL_Toggle")
 
 concommand.Add("abl_clear", function()
 	ABL.ClearAll(false)

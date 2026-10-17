@@ -955,10 +955,13 @@ function P.Deposit(x, y, z, n, vol, surf, ent, kind, dx, dy, dz, K)
 end
 
 local function EatStains(p)
-	ABL.Ground.Near(p.x, p.y, p.z, p.nx, p.ny, p.nz, p.rad + 2, function(x, y, z, a)
+	ABL.Ground.Near(p.cx or p.x, p.cy or p.y, p.cz or p.z, p.nx, p.ny, p.nz, p.rad + 2, function(x, y, z, a, h)
+		local u, w = ToLocal(p, x, y, z)
+		if not Covers(p, u, w, h) then return false end
 		local v = a * pi * PC.eatFilm * ML
 		ABL.FlowCore.Move("surface", "pool", v)
 		P.Feed(p, v, x, y, z, "seep")
+		return true
 	end)
 end
 

@@ -25,6 +25,7 @@ C.sv = {
 if CLIENT then
 	C.cl = {
 		enabled     = CreateClientConVar("abl_cl_enabled", "1", true, false, "Client-side AdvancedBlood simulation/rendering.", 0, 1),
+		newBlood    = ConVarExists("hg_old_blood") and GetConVar("hg_old_blood") or CreateClientConVar("hg_old_blood", "1", true, false, "1 = AdvancedBlood system, 0 = old Z-City blood particles and decals", 0, 1),
 		quality     = CreateClientConVar("abl_quality", "3", true, false, "0 = low, 1 = medium, 2 = high, 3 = ultra, 4 = extreme.", 0, 4),
 		budget      = CreateClientConVar("abl_budget_ms", "2.5", true, false, "Target CPU milliseconds per frame for the blood simulation.", 0.3, 20),
 		simHz       = CreateClientConVar("abl_sim_hz", "165", true, false, "Target update rate (Hz) of high-priority blood (near, visible); lowered automatically when over abl_budget_ms.", 30, 240),
@@ -40,7 +41,7 @@ if CLIENT then
 		decalRate   = CreateClientConVar("abl_decals_per_sec", "60", true, false, "Hard cap: engine decals placed per second.", 1, 1000),
 		drawDist    = CreateClientConVar("abl_draw_distance", "3500", true, false, "Blood effects beyond this distance are skipped.", 256, 20000),
 		sounds      = CreateClientConVar("abl_sounds", "1", true, false, "Drip / splash sounds.", 0, 1),
-		takeover    = CreateClientConVar("abl_zcity_takeover", "1", true, false, "In Z-City: AdvancedBlood is the only blood on screen (1), or Z-City's own blood particles and decals run next to it (0). Z-City's physiology runs either way.", 0, 1),
+		takeover    = CreateClientConVar("abl_zcity_takeover", "1", false, false, "In Z-City: AdvancedBlood is the only blood on screen (1), or Z-City's own blood particles and decals run next to it (0). Z-City's physiology runs either way.", 0, 1),
 		fleshDecals = CreateClientConVar("abl_engine_hit_decals", "0", true, false, "The engine's own red splat decal on a body at every bullet hit: keep it (1), or clear it and show AdvancedBlood's wound alone (0).", 0, 1),
 		stainScale  = CreateClientConVar("abl_stain_scale", "1", true, false, "Stain size multiplier.", 0.25, 4),
 		dropScale   = CreateClientConVar("abl_drop_size", "1", true, false, "Size of airborne drops relative to their true size (1: a drop of 0.05 ml is 4.6 mm across).", 0.5, 3),
@@ -412,9 +413,9 @@ C.Pool = {
 	minVolume   = 2.0,     -- ml collected in one 8-unit cell (decaying) before it becomes a pool
 	minVolumeRunoff = 0.2, -- the same for blood that a stream brings (the pool begins where the stream arrives)
 	mergeFactor = 0.9,     -- pools merge when their outlines come this close (fraction of the reach)
-	attractR    = 30,
+	attractR    = 14,
 	attractMin  = 3,
-	attractMax  = 22,
+	attractMax  = 6,
 	eatFilm     = 0.02,
 	overflow    = 0.05,    -- fraction of the pool per second (per unit of overshoot) running over a ledge
 	sheen       = 0.9,     -- strength of the view-dependent wet reflection on fresh pools

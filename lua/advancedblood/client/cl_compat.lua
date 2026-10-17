@@ -9,7 +9,7 @@ CP.installed = false
 CP.recv = {}
 CP.stat = CP.stat or {}
 local stat = CP.stat
-for _, k in ipairs({ "landed", "coughs", "drained", "zDrawn", "zDecals", "leakDrawn", "leakDecals", "rewraps" }) do
+for _, k in ipairs({ "landed", "adopted", "clouds", "coughs", "drained", "zDrawn", "zDecals", "leakDrawn", "leakDecals", "rewraps" }) do
 	stat[k] = stat[k] or 0
 end
 
@@ -33,15 +33,48 @@ local function Budget()
 end
 
 local function LandRedirect(pos, normal, tr, artery, amount, size, vel)
-	if not Takeover() or normal.z < 0.7 then return false end
-	local target = tr and tr.Entity
-	if IsValid(target) and not target:IsWorld() then return false end
+	if not Takeover() then return false end
 	if not Budget() then return true end
 	stat.landed = stat.landed + 1
 	local vol = math.Clamp((amount or 0.2) * (artery and 0.09 or 0.06), 0.004, 0.45)
-	local vx, vy, vz = 0, 0, -60
-	if isvector(vel) then vx, vy, vz = vel.x, vel.y, math.min(vel.z, -60) end
+	local vx, vy, vz = -normal.x * 60, -normal.y * 60, -normal.z * 60
+	if isvector(vel) then
+		local into = vel:Dot(normal)
+		vx, vy, vz = vel.x, vel.y, vel.z
+		if into > -60 then
+			local k = -60 - into
+			vx, vy, vz = vx + normal.x * k, vy + normal.y * k, vz + normal.z * k
+		end
+	end
 	ABL.Drops.Spawn(pos.x + normal.x, pos.y + normal.y, pos.z + normal.z, vx, vy, vz, vol, nil, 1, artery and 1 or 0)
+	return true
+end
+
+local BURST_VOL_MIN, BURST_VOL_MAX = 0.1, 0.35
+
+local function PartRedirect(pos, vel, w, artery, kishki, owner, hidden)
+	if not Takeover() then return false end
+	if hidden or not (isvector(pos) and isvector(vel)) or not Budget() then return true end
+	local vol
+	if kishki then
+		vol = math.Rand(BURST_VOL_MIN, BURST_VOL_MAX)
+	else
+		vol = (artery and 0.05 or 0.025) * math.Rand(0.6, 1.4)
+	end
+	stat.adopted = stat.adopted + 1
+	ABL.Drops.Spawn(pos.x, pos.y, pos.z, vel.x, vel.y, vel.z, vol, nil, 1, artery and 1 or 0)
+	return true
+end
+
+local function CloudRedirect(pos, vel, w, water)
+	if not Takeover() then return false end
+	if not (isvector(pos) and isvector(vel)) or not Budget() then return true end
+	stat.clouds = stat.clouds + 1
+	if water then
+		ABL.Drops.WaterCloud(pos, vel, 0.05)
+	else
+		ABL.Drops.Mist(pos, vel, 1, math.Clamp((w or 60) * 0.15, 4, 24))
+	end
 	return true
 end
 
@@ -52,6 +85,8 @@ end
 local function SetRedirects()
 	if not istable(hg) then return end
 	hg.BloodLandRedirect = LandRedirect
+	hg.BloodPartRedirect = PartRedirect
+	hg.BloodCloudRedirect = CloudRedirect
 	hg.BloodTakenOver = TakenOver
 end
 
@@ -139,6 +174,8 @@ CP.Install = Install
 function CP.Uninstall()
 	if istable(hg) then
 		if hg.BloodLandRedirect == LandRedirect then hg.BloodLandRedirect = nil end
+		if hg.BloodPartRedirect == PartRedirect then hg.BloodPartRedirect = nil end
+		if hg.BloodCloudRedirect == CloudRedirect then hg.BloodCloudRedirect = nil end
 		if hg.BloodTakenOver == TakenOver then hg.BloodTakenOver = nil end
 	end
 	for name, r in pairs(CP.recv or {}) do
@@ -161,7 +198,7 @@ hook.Add("HomigradRun", "ABL_CompatInstall", function() timer.Simple(0, Install)
 local REWRAP_MAX = 8
 local function InPlace()
 	if not istable(hg) then return true end
-	if hg.BloodLandRedirect ~= LandRedirect or hg.BloodTakenOver ~= TakenOver then return false end
+	if hg.BloodLandRedirect ~= LandRedirect or hg.BloodPartRedirect ~= PartRedirect or hg.BloodCloudRedirect ~= CloudRedirect or hg.BloodTakenOver ~= TakenOver then return false end
 	for name in pairs(RECEIVERS) do
 		local cur = net.Receivers and net.Receivers[name]
 		local r = CP.recv[name]

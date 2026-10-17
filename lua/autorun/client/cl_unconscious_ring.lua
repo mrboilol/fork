@@ -98,6 +98,9 @@ local lastPhaseMod = 0
 local wasUnconsciousState = false
 local unconsciousStartTime
 local UNCONSCIOUS_RING_DELAY = 1
+local AWAKE_GIVEUP_DELAY = 4
+local awakeGiveUpStart
+local awakeGiveUpAlpha = 0
 
 local function GetSuicideBinding()
     local binding = input.LookupBinding and input.LookupBinding("suicide") or nil
@@ -916,6 +919,33 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
 
     if isCheckingPulse then
         showPulseCheckECG = true
+    end
+
+    local orgCfg = hg and hg.organism or {}
+    local isParalyzed = (tonumber(org.spine1) or 0) >= (orgCfg.fake_spine1 or 1)
+        or (tonumber(org.spine2) or 0) >= (orgCfg.fake_spine2 or 1)
+        or (tonumber(org.spine3) or 0) >= (orgCfg.fake_spine3 or 0.75)
+    local awakeGiveUp = not isUnconscious and not (incapacitated and deathStateEnd)
+        and (isParalyzed or isCritical or incapacitated)
+    if awakeGiveUp then
+        awakeGiveUpStart = awakeGiveUpStart or CurTime()
+    else
+        awakeGiveUpStart = nil
+    end
+    local showAwakeGiveUp = awakeGiveUpStart and CurTime() - awakeGiveUpStart >= AWAKE_GIVEUP_DELAY
+    awakeGiveUpAlpha = SmoothAlpha(awakeGiveUpAlpha, showAwakeGiveUp and 1 or 0, showAwakeGiveUp and 1.5 or 6)
+    if awakeGiveUpAlpha > 0.01 then
+        draw.SimpleTextOutlined(
+            "Press " .. GetSuicideBinding() .. " to give up.",
+            "HomigradFontTypewriterSmall",
+            ScrW() * 0.5,
+            math.max(ScrH() * 0.1, ScreenScaleH(20)) + ScreenScaleH(4),
+            Color(225, 225, 225, 70 * awakeGiveUpAlpha),
+            TEXT_ALIGN_CENTER,
+            TEXT_ALIGN_TOP,
+            1,
+            Color(0, 0, 0, 35 * awakeGiveUpAlpha)
+        )
     end
 
     UpdateRingAudio(heartbeat, 1, org)

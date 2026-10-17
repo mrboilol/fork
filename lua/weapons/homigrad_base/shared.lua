@@ -1580,7 +1580,7 @@ if CLIENT then
 
 	function SWEP:DrawHUD()
 		if not IsValid(self:GetOwner()) then return end
-		local ammotype = hg.ammotypeshuy[self.Primary.Ammo] and hg.ammotypeshuy[self.Primary.Ammo].BulletSettings and hg.ammotypeshuy[self.Primary.Ammo].BulletSettings.Icon or matPistolAmmo
+		local ammotype = hg.GetAmmoIconMaterial and hg.GetAmmoIconMaterial(self.Primary.Ammo) or matPistolAmmo
 		hg_weird_mags = hg_weird_mags or GetConVar("hg_weirdmags")
 		local drawMethod = hg_weird_mags and hg_weird_mags:GetBool() and "MagazineBlocks" or self.AmmoDrawMetod
 		local drawFunc = self.DrawAmmoMetods[drawMethod] or self.DrawAmmoMetods.Default

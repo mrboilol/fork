@@ -32,14 +32,16 @@ end
 -- Sounds (rate limited, Z-City's gore/blood sounds when available, HL2 drips otherwise)
 ------------------------------------------------------------------------------------------
 local dripSounds
-local nextSound = 0
+local soundBudget, soundBudgetT = 8, 0
 local function DripSound(x, y, z, vol, metal)
 	if not C.cl.sounds:GetBool() then return end
 	local now = RealTime()
-	if now < nextSound then return end
+	soundBudget = min(8, soundBudget + (now - soundBudgetT) * 40)
+	soundBudgetT = now
+	if soundBudget < 1 then return end
 	local dx, dy, dz = x - L.eyeX, y - L.eyeY, z - L.eyeZ
 	if dx * dx + dy * dy + dz * dz > 450 * 450 then return end
-	nextSound = now + 0.07
+	soundBudget = soundBudget - 1
 	if not dripSounds then
 		dripSounds = {}
 		for i = 1, 6 do
@@ -48,8 +50,11 @@ local function DripSound(x, y, z, vol, metal)
 		if #dripSounds == 0 then dripSounds = { "ambient/water/drip1.wav", "ambient/water/drip2.wav", "ambient/water/drip3.wav", "ambient/water/drip4.wav" } end
 	end
 	local snd = dripSounds[math.random(#dripSounds)]
-	local level = math.Clamp(45 + vol * 150, 45, 70)
-	sound.Play(snd, Vector(x, y, z), level, math.Clamp((metal and 115 or 100) - vol * 60 + math.random(-8, 8), 70, 140), math.Clamp(0.25 + vol * 3, 0.2, 0.9))
+	local level = math.Clamp(45 + vol * 150 + math.Rand(-4, 4), 42, 72)
+	local pitch = math.Clamp((metal and 115 or 100) - vol * 60 + math.Rand(-18, 18), 65, 150)
+	local gain = math.Clamp((0.25 + vol * 3) * math.Rand(0.55, 1.2), 0.12, 0.95)
+	local pos = Vector(x, y, z)
+	timer.Simple(math.Rand(0, 0.09), function() sound.Play(snd, pos, level, pitch, gain) end)
 end
 
 ------------------------------------------------------------------------------------------

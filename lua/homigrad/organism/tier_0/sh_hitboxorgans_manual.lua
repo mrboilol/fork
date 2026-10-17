@@ -281,8 +281,26 @@ hook.Add("HG_OrganAvalible", "HGOriginalVestBoxes", function(ent, name)
 end)
 table.insert(male["ValveBiped.Bip01_Head1"], 1, {"head_armor", 1, Vector(5, 1, 0), Angle(0, 0, 0), Vector(3.8, 3.5, 4.5), Color(250, 255, 0), "head", 0})
 table.insert(male["ValveBiped.Bip01_Head1"], 1, {"face_armor", 1, Vector(3.5, -4, 0), Angle(0, 0, 0), Vector(5, 3, 4.5), Color(255, 0, 221), "face", 0})
+local motorcycleShapeHelmets = {helmet_riot = true, gordon_helmet = true, cmb_helmet = true, metrocop_helmet = true, protovisor = true}
+local motorcycleHelmetBoxes = {
+	{Vector(7.5, -4, 0), Angle(0, 15, 0), Vector(1.5, 3.5, 4), Vector(6.5, -2.5, 0), Angle(0, 15, 0), Vector(1.5, 3.5, 4)},
+	{Vector(0.2, -7, 0), Angle(0, 0, 0), Vector(1.5, 1, 2.5), Vector(-0.5, -7, 0), Angle(0, 0, 0), Vector(1.5, 1, 2.5)},
+	{Vector(0.2, -4.5, -3), Angle(0, -6, 70), Vector(1.5, 0.8, 3.5), Vector(-0.2, -4, -3), Angle(0, -6, 70), Vector(1.5, 0.8, 3.5)},
+	{Vector(0.2, -4.5, 3), Angle(0, -6, -70), Vector(1.5, 0.8, 3.5), Vector(-0.2, -4, 3), Angle(0, -6, -70), Vector(1.5, 0.8, 3.5)},
+	{Vector(3.5, 1, 0), Angle(0, 5, 0), Vector(5, 3, 4), Vector(3, 2, 0), Angle(0, 5, 0), Vector(5, 4, 4)},
+	{Vector(4, -4, 0), Angle(0, 0, 0), Vector(3, 3.5, 3.8), Vector(3.2, -3, 0), Angle(0, 0, 0), Vector(3, 3.2, 3.8)},
+}
+local function insertMotorcycleHelmetBoxes(target, helmet, offset)
+	for _, box in ipairs(motorcycleHelmetBoxes) do
+		table.insert(target["ValveBiped.Bip01_Head1"], 1, {helmet, 1, box[offset], box[offset + 1], box[offset + 2], Color(255, 255, 0), true, 0})
+	end
+end
 for _, helmet in ipairs(fullCoverHelmets) do
-	table.insert(male["ValveBiped.Bip01_Head1"], 1, {helmet, 1, Vector(3.5, -0.9, 0), Angle(0, 0, 0), Vector(5, 6, 5.5), Color(255, 255, 0), true, 0})
+	if motorcycleShapeHelmets[helmet] then
+		insertMotorcycleHelmetBoxes(male, helmet, 1)
+	else
+		table.insert(male["ValveBiped.Bip01_Head1"], 1, {helmet, 1, Vector(3.5, -0.9, 0), Angle(0, 0, 0), Vector(5, 6, 5.5), Color(255, 255, 0), true, 0})
+	end
 end
 table.insert(male["ValveBiped.Bip01_Head1"], 1, {"helmet5", 1, Vector(6.5, -1, 0), Angle(0, 20, 0), Vector(2.7, 6, 4.5), Color(250, 255, 0), true, 0})
 table.insert(male["ValveBiped.Bip01_Head1"], 1, {"helmet5", 1, Vector(1, 2, 0), Angle(0, 0, 0), Vector(1.5, 1.7, 4.5), Color(250, 255, 0), true, 0})
@@ -439,6 +457,9 @@ table.insert(female["ValveBiped.Bip01_Head1"], 1, {"helmet_ears_armor", 1, Vecto
 table.insert(female["ValveBiped.Bip01_Head1"], 1, {"helmet_ears_armor", 1, Vector(3, 0, -4.5), Angle(0, 0, 0), Vector(2.8, 3.5, 0.9), Color(160, 255, 80), "helmet_ears", 0})
 table.insert(female["ValveBiped.Bip01_Head1"], 1, {"ears_armor", 1, Vector(3, 0, 4.5), Angle(0, 0, 0), Vector(2.8, 3.5, 0.9), Color(160, 255, 80), "ears", 0})
 table.insert(female["ValveBiped.Bip01_Head1"], 1, {"ears_armor", 1, Vector(3, 0, -4.5), Angle(0, 0, 0), Vector(2.8, 3.5, 0.9), Color(160, 255, 80), "ears", 0})
+for helmet in pairs(motorcycleShapeHelmets) do
+	insertMotorcycleHelmetBoxes(female, helmet, 4)
+end
 table.insert(female["ValveBiped.Bip01_Spine2"], 1, {"back_armor", 1, Vector(3, 8, 0), Angle(0, 0, 0), Vector(8, 2, 6), Color(80, 180, 255), "back", 0})
 
 --[[for i,tbl in pairs(male) do

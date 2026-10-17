@@ -149,14 +149,16 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 	local GAIT_STEP_LENGTH_PER_SPEED = 0.22
 	local GAIT_MIN_STEP_LENGTH = 20
 	local GAIT_MAX_STEP_LENGTH = 80
+	local GAIT_RUN_STEP_LENGTH_SCALE = 1.15
+	local GAIT_MAX_RUN_STEP_LENGTH = 96
 	local GAIT_START_STEP_RATE = 1.6
 	local GAIT_IDLE_STEP_RATE = 0.5
 	local GAIT_WALK_MAX_STEP_LENGTH = 56
 	local GAIT_WALK_REFERENCE_SPEED = 125
-	local GAIT_FLIGHT_START_SPEED = 260
-	local GAIT_RUN_REFERENCE_SPEED = 350
+	local GAIT_FLIGHT_START_SPEED = 230
+	local GAIT_RUN_REFERENCE_SPEED = 280
 	local GAIT_WALK_SWING_FRACTION = 0.75
-	local GAIT_RUN_SWING_FRACTION = 1.3
+	local GAIT_RUN_SWING_FRACTION = 1.4
 	local GAIT_MIN_SWING_TIME = 0.14
 	local GAIT_MAX_SWING_TIME = 0.5
 
@@ -167,7 +169,7 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 	function hg.GaitStepLength(speed)
 		local runLength = math_Clamp(GAIT_STEP_LENGTH_BASE + speed * GAIT_STEP_LENGTH_PER_SPEED, GAIT_MIN_STEP_LENGTH, GAIT_MAX_STEP_LENGTH)
 
-		return Lerp(hg.GaitRunBlend(speed), math_min(runLength, GAIT_WALK_MAX_STEP_LENGTH), runLength)
+		return Lerp(hg.GaitRunBlend(speed), math_min(runLength, GAIT_WALK_MAX_STEP_LENGTH), math_min(runLength * GAIT_RUN_STEP_LENGTH_SCALE, GAIT_MAX_RUN_STEP_LENGTH))
 	end
 
 	function hg.GaitStepRate(speed, intent)
@@ -201,7 +203,7 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 	end
 
 	local SPRINT_SPEED_MUL = 1.15
-	local JOG_SPEED_MUL = 0.6
+	local JOG_SPEED_MUL = 0.68
 	local STAMINA_FULL_SPEED = 90
 	local LIMP_LEG_SPEED_MIN = 0.72
 	local LIMP_MAX_SPEED_FRACTION = 0.8

@@ -12,11 +12,10 @@ end
 local mat_huy = Material("effects/blood_core")
 
 local cloudmat = Material("effects/smoke_b")
-local hg_old_blood = ConVarExists("hg_old_blood") and GetConVar("hg_old_blood") or CreateClientConVar("hg_old_blood", 1, true, false, "new decals, or old", 0, 1)
+local hg_old_blood = ConVarExists("hg_old_blood") and GetConVar("hg_old_blood") or CreateClientConVar("hg_old_blood", 1, true, false, "1 = AdvancedBlood system, 0 = old Z-City blood particles and decals", 0, 1)
 local hg_oldblood = ConVarExists("hg_oldblood") and GetConVar("hg_oldblood") or CreateClientConVar("hg_oldblood", 0, true, false, "Use old Z-City blood decals", 0, 1)
-local hg_old_particle = ConVarExists("hg_old_particle") and GetConVar("hg_old_particle") or CreateClientConVar("hg_old_particle", 0, true, false, "unc trail particles", 0, 1)
 local function useOldBloodParticles()
-	return hg_old_blood:GetBool() or hg_oldblood:GetBool() or hg_old_particle:GetBool()
+	return not hg_old_blood:GetBool() or hg_oldblood:GetBool()
 end
 local texture = Material("decals/z_blood1"):GetTexture("$basetexture")
 if texture then mat_huy:SetTexture("$basetexture", texture) end
@@ -30,7 +29,8 @@ net.Receive("hg_gib_blood_decal", function()
 	local pos = net.ReadVector()
 	local normal = net.ReadVector()
 	if not pos or not normal or normal:LengthSqr() < 0.0001 then return end
-	util.Decal((hg_old_blood:GetBool() or hg_oldblood:GetBool()) and "Normal.Blood1" or "Normal.Blood24", pos - normal, pos + normal, IsValid(ent) and ent or nil)
+	if hg.BloodLandRedirect and hg.BloodLandRedirect(pos, -normal:GetNormalized(), nil, false, 4) then return end
+	util.Decal(useOldBloodParticles() and "Normal.Blood1" or "Normal.Blood24", pos - normal, pos + normal, IsValid(ent) and ent or nil)
 end)
 
 --оставь это лучше выглядит
@@ -175,8 +175,9 @@ end
 
 local function addBloodPart(pos, vel, mat, w, h, artery, kishki, owner, tiny, hidden, lifetime, maxBeamLength)
 	if LocalPlayer():GetNetVar("disappearance", nil) or (IsValid(owner) and owner:GetNetVar("disappearance", nil)) then return end
+	if hg.BloodPartRedirect and hg.BloodPartRedirect(pos, vel, w, artery, kishki, owner, hidden) then return end
 
-	if hg_blood_physics:GetBool() and not hg_old_particle:GetBool() then return addPhysBloodPart(pos, vel, w, artery, kishki, owner, tiny, hidden, lifetime) end
+	if hg_blood_physics:GetBool() and not useOldBloodParticles() then return addPhysBloodPart(pos, vel, w, artery, kishki, owner, tiny, hidden, lifetime) end
 
 	return addLegacyBloodPart(pos, vel, mat, w, h, artery, kishki, owner, tiny, hidden, lifetime, maxBeamLength)
 end
@@ -194,6 +195,7 @@ end
 
 local function addBloodPart2(pos, vel, mat, w, h, time, water, owner)
 	if LocalPlayer():GetNetVar("disappearance", nil) or (IsValid(owner) and owner:GetNetVar("disappearance", nil)) then return end
+	if hg.BloodCloudRedirect and hg.BloodCloudRedirect(pos, vel, w, water, owner) then return end
 
 	time = time or 30
 
@@ -223,6 +225,7 @@ local function addGibBloodSpill(ent, stump)
 	if #hg.gibbloodspillparticles > 120 then table.remove(hg.gibbloodspillparticles, 1) end
 	local vel = VectorRand(stump and -34 or -18, stump and 34 or 18) + ent:GetVelocity() * 0.04
 	vel[3] = vel[3] + (stump and Rand(18, 34) or Rand(-2, 10))
+	if hg.BloodPartRedirect and hg.BloodPartRedirect(ent:GetPos() + VectorRand(-3, 3), vel, 1, false, stump, nil) then return end
 	hg.gibbloodspillparticles[#hg.gibbloodspillparticles + 1] = {ent:GetPos() + VectorRand(-3, 3), vel, bloodSpillMats[math.random(#bloodSpillMats)], CurTime(), Rand(0.35, 0.55), stump and Rand(1, 2) or Rand(0.25, 0.6), stump and Rand(9, 16) or Rand(3, 6), stump}
 end
 
@@ -257,7 +260,7 @@ local function impact(pos,vel,mul)
 	end
 
 	for i = 1, iters do
-		local size = hg_old_particle:GetBool() and 0.75 or math.Clamp(math.sqrt(math.max(mul, 0)) * 0.45, 0.8, 4)
+		local size = useOldBloodParticles() and 0.75 or math.Clamp(math.sqrt(math.max(mul, 0)) * 0.45, 0.8, 4)
 		addBloodPart(pos, -vel * i / iters + Vector(Rand(-20, 20), Rand(-20, 20), 0), mat_huy, size, size, false, false)
 	end
 end

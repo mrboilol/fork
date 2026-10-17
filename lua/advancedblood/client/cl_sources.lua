@@ -99,7 +99,12 @@ function S.Remove(src)
 end
 
 function S.ClearAll()
-	for i = #S.list, 1, -1 do S.Remove(S.list[i]) end
+	for i = #S.list, 1, -1 do
+		local src = S.list[i]
+		FreeBodyState(src)
+		src.removed = true
+		ABL.Drops.ForgetSource(src)
+	end
 	S.list, S.byKey, S.byBody = {}, {}, {}
 end
 

@@ -3208,9 +3208,9 @@ end
 hg.ammoents = ammoents
 
 local defaultAmmoIconPaths = {
-	low = "vgui/hud/bullets/low_caliber.png",
-	high = "vgui/hud/bullets/high_caliber.png",
-	buck = "vgui/hud/bullets/buck_caliber.png"
+	low = {"vgui/hud/m882.png", "vgui/hud/hmcd_round_9.vmt", "vgui/hud/bullets/low_caliber.png"},
+	high = {"vgui/hud/556fmj.png", "vgui/hud/hmcd_round_556", "vgui/hud/bullets/high_caliber.png"},
+	buck = {"vgui/hud/def.png", "vgui/hud/12_70blankzcity.vmt", "vgui/hud/bullets/buck_caliber.png"}
 }
 
 local function normalizeAmmoLookupName(value)
@@ -3235,6 +3235,18 @@ local function getExistingAmmoIconPath(path)
 	path = string.Replace(path, "\\", "/")
 	path = string.gsub(path, "^materials/", "")
 	if file.Exists("materials/" .. path, "GAME") then return path end
+	if string.GetExtensionFromFilename(path) then return end
+	if file.Exists("materials/" .. path .. ".vmt", "GAME") then return path end
+	if file.Exists("materials/" .. path .. ".png", "GAME") then return path .. ".png" end
+end
+
+local function getDefaultAmmoIconPath(class)
+	local candidates = defaultAmmoIconPaths[class] or defaultAmmoIconPaths.low
+	for _, path in ipairs(candidates) do
+		local existing = getExistingAmmoIconPath(path)
+		if existing then return existing end
+	end
+	return candidates[#candidates]
 end
 
 function hg.GetAmmoCaliberClass(ammoName)
@@ -3257,16 +3269,24 @@ function hg.GetAmmoCaliberClass(ammoName)
 
 	local diameter = tonumber(bulletSettings.Diameter) or 0
 	local damage = tonumber(bulletSettings.Damage) or 0
-	if damage >= 40 or diameter >= 12
-		or string.find(lowerName, "5.45", 1, true)
-		or string.find(lowerName, "5.56", 1, true)
-		or string.find(lowerName, "7.62", 1, true)
+	if diameter >= 12
 		or string.find(lowerName, "12.7", 1, true)
 		or string.find(lowerName, "14.5", 1, true)
 		or string.find(lowerName, ".338", 1, true)
+		or string.find(lowerName, ".50", 1, true)
 		or string.find(lowerName, "rpg", 1, true)
 		or string.find(lowerName, "rocket", 1, true)
 		or string.find(lowerName, "grenade", 1, true) then
+		return "buck"
+	end
+
+	if damage >= 40
+		or string.find(lowerName, "5.45", 1, true)
+		or string.find(lowerName, "5.56", 1, true)
+		or string.find(lowerName, "7.62", 1, true)
+		or string.find(lowerName, "6.8", 1, true)
+		or string.find(lowerName, ".300", 1, true)
+		or string.find(lowerName, ".366", 1, true) then
 		return "high"
 	end
 
@@ -3278,25 +3298,24 @@ function hg.GetAmmoIconPath(ammoName)
 	local ammoEntityData = key and ammoents[key]
 	local exactPath = ammoEntityData and getExistingAmmoIconPath(ammoEntityData.Icon)
 	if exactPath then return exactPath end
-	if ammoEntityData and ammoEntityData.Icon == matPistolAmmo then return defaultAmmoIconPaths.low end
-	if ammoEntityData and ammoEntityData.Icon == matRfileAmmo then return defaultAmmoIconPaths.high end
-	if ammoEntityData and ammoEntityData.Icon == matShotgunAmmo then return defaultAmmoIconPaths.buck end
 
 	local ammoData = key and ammotypes[key]
 	exactPath = ammoData and ammoData.BulletSettings and getExistingAmmoIconPath(ammoData.BulletSettings.Icon)
 	if exactPath then return exactPath end
-	if ammoData and ammoData.BulletSettings and ammoData.BulletSettings.Icon == matPistolAmmo then return defaultAmmoIconPaths.low end
-	if ammoData and ammoData.BulletSettings and ammoData.BulletSettings.Icon == matRfileAmmo then return defaultAmmoIconPaths.high end
-	if ammoData and ammoData.BulletSettings and ammoData.BulletSettings.Icon == matShotgunAmmo then return defaultAmmoIconPaths.buck end
 
-	return defaultAmmoIconPaths[hg.GetAmmoCaliberClass(ammoName)] or defaultAmmoIconPaths.low
+	return getDefaultAmmoIconPath(hg.GetAmmoCaliberClass(ammoName))
 end
 
 if CLIENT then
 	local ammoIconMaterials = {}
+	local ammoIconByName = {}
 	function hg.GetAmmoIconMaterial(ammoName)
+		if ammoName == nil then return end
+		local cached = ammoIconByName[ammoName]
+		if cached then return cached end
 		local path = hg.GetAmmoIconPath(ammoName)
-		ammoIconMaterials[path] = ammoIconMaterials[path] or Material(path)
+		ammoIconMaterials[path] = ammoIconMaterials[path] or Material(path, "smooth mips")
+		ammoIconByName[ammoName] = ammoIconMaterials[path]
 		return ammoIconMaterials[path]
 	end
 end

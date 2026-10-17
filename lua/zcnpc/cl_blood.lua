@@ -237,16 +237,16 @@ local function WrapBlood()
 	local old1 = hg.addBloodPart
 	local old2 = hg.addBloodPart2
 
-	hg.addBloodPart = function(pos, vel, mat, w, h, artery, kishki, owner)
+	hg.addBloodPart = function(pos, vel, mat, w, h, artery, kishki, owner, ...)
 		if IsNpcBloodOwner(owner) and not ShouldKeepNPCBlood(owner) then return end
 
-		return old1(pos, vel, mat, w, h, artery, kishki, owner)
+		return old1(pos, vel, mat, w, h, artery, kishki, owner, ...)
 	end
 
-	hg.addBloodPart2 = function(pos, vel, mat, w, h, time, water, owner)
+	hg.addBloodPart2 = function(pos, vel, mat, w, h, time, water, owner, ...)
 		if IsNpcBloodOwner(owner) and not ShouldKeepNPCBlood(owner) then return end
 
-		return old2(pos, vel, mat, w, h, time, water, owner)
+		return old2(pos, vel, mat, w, h, time, water, owner, ...)
 	end
 
 	ZCNPC._bloodWrapped = true

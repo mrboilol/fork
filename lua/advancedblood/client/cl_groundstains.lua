@@ -110,10 +110,7 @@ function G.Near(x, y, z, nx, ny, nz, R, eat)
 				local a = s.h * s.h
 				n, w = n + 1, w + a
 				sx, sy, sz = sx + s.x * a, sy + s.y * a, sz + s.z * a
-				if eat then
-					Kill(s)
-					eat(s.x, s.y, s.z, a)
-				end
+				if eat and eat(s.x, s.y, s.z, a, s.h) then Kill(s) end
 			end
 		end
 	end
@@ -180,6 +177,17 @@ local function Fits(x, y, z, nx, ny, nz, ux, uy, uz, vx, vy, vz, r)
 		if dev > up then up = dev end
 	end
 	return true, up
+end
+
+local function OnFloor(x, y, z, nx, ny, nz)
+	if not L.TakeTrace() then return false end
+	vA:SetUnpacked(x + nx, y + ny, z + nz)
+	vB:SetUnpacked(x - nx * 1.2, y - ny * 1.2, z - nz * 1.2)
+	tr.start, tr.endpos = vA, vB
+	util.TraceLine(tr)
+	if not trOut.Hit or trOut.StartSolid or not trOut.HitWorld then return false end
+	local hn = trOut.HitNormal
+	return hn.x * nx + hn.y * ny + hn.z * nz > 0.85
 end
 
 ------------------------------------------------------------------------------------------
@@ -292,7 +300,7 @@ function G.Impact(x, y, z, nx, ny, nz, vol, stainD, sinA, tx, ty, tz, K, surf, r
 	elseif stainD < GC.tinyD or vol < 0.004 then
 		fam = "tiny"
 	elseif tx and sinA < 0.82 then
-		elong = math.Clamp(1 / max(sinA, 0.2), 1.2, 4)
+		elong = math.Clamp(1 / max(sinA, 0.2), 1.2, 5)
 		fam = elong > 2.4 and "elong2" or "elong"
 	elseif K > IC.kCrown or vol > 0.15 then
 		fam = "splat"
@@ -317,7 +325,7 @@ function G.Impact(x, y, z, nx, ny, nz, vol, stainD, sinA, tx, ty, tz, K, surf, r
 	local hu = h
 	if f.ratio then
 		-- the texture carries the elongation; a slight stretch matches the exact angle
-		hu = h * math.Clamp(elong / f.ratio, 0.87, 1.15)
+		hu = h * math.Clamp(elong / f.ratio, 0.87, 1.4)
 	end
 	if h > GC.maxHalf then hu = hu * GC.maxHalf / h h = GC.maxHalf end
 
@@ -347,6 +355,20 @@ function G.Impact(x, y, z, nx, ny, nz, vol, stainD, sinA, tx, ty, tz, K, surf, r
 	}
 	Queue(q)
 	ABL.BloodMap.Add(x, y, z, nx, ny, nz, max(R, hu * f.frac), q.alpha / 255, wetT or 60)
+
+	if f.ratio and sinA < 0.55 and vol > 0.008 then
+		local n = min(4, floor((0.55 - sinA) * 9 + rng:Next()))
+		local d = (f.shift + 0.75) * hu
+		local r = R * 0.38
+		for _ = 1, n do
+			d = d + r * rng:Range(2.2, 3.6)
+			local side = rng:Range(-0.12, 0.12) * r
+			local px, py, pz = x + ux * d + vx * side, y + uy * d + vy * side, z + uz * d + vz * side
+			if not OnFloor(px, py, pz, nx, ny, nz) then break end
+			G.Impact(px, py, pz, nx, ny, nz, vol * 0.04, r * 2, 1, nil, nil, nil, IC.kDeposit, surf, rng, wetT)
+			r = r * rng:Range(0.6, 0.8)
+		end
+	end
 end
 
 -- Fallback particles that land on a floor leave a tiny spot (no footprint check needed).

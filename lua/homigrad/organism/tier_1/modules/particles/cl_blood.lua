@@ -101,15 +101,17 @@ bloodparticles_hook[1] = function(anim_pos, mul)
 	end
 end
 
-local hg_old_blood = ConVarExists("hg_old_blood") and GetConVar("hg_old_blood") or CreateClientConVar("hg_old_blood", 1, true, false, "new decals, or old", 0, 1)
+local hg_old_blood = ConVarExists("hg_old_blood") and GetConVar("hg_old_blood") or CreateClientConVar("hg_old_blood", 1, true, false, "1 = AdvancedBlood system, 0 = old Z-City blood particles and decals", 0, 1)
 local hg_oldblood = ConVarExists("hg_oldblood") and GetConVar("hg_oldblood") or CreateClientConVar("hg_oldblood", 0, true, false, "Use old Z-City blood decals", 0, 1)
 local function useOldBlood()
-	return hg_old_blood:GetBool() or hg_oldblood:GetBool()
+	return not hg_old_blood:GetBool() or hg_oldblood:GetBool()
 end
 
 cvars.RemoveChangeCallback("hg_old_blood", "hg_refresh_old_blood_decals")
 cvars.AddChangeCallback("hg_old_blood", function(_, oldValue, newValue)
 	if oldValue == newValue then return end
+	table.Empty(hg.bloodparticles1)
+	if hg.bloodparticles2 then table.Empty(hg.bloodparticles2) end
 	hg.bloodpositions = {}
 	hg.bloodcount = 0
 	hg.groundbloodstains = {}
@@ -201,6 +203,7 @@ local function placeNewBloodDecal(pos, normal, target, artery, amount, particleS
 end
 
 function hg.DepositBodyBloodRunoff(pos, amount, artery, particleSize)
+	if hg.BloodLandRedirect and hg.BloodLandRedirect(pos, vector_up, nil, artery, amount, particleSize) then return end
 	poolTrace.start = pos + vector_up * 2
 	poolTrace.endpos = pos - vector_up * 256
 	local result = util_TraceLine(poolTrace)

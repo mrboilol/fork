@@ -453,8 +453,10 @@ local lpos2, lang2 = Vector(0,5,0), Angle(0,0,0)
 local reloadlerp = 0
 SWEP.GetDebug = false
 
-local ironSightHoleMat = CLIENT and Material("homigrad/ironsight_holes.png", "alphatest smooth")
-local IRONSIGHT_HOLE_SCALE = 0.4
+local IRONSIGHT_INNER = 0.03
+local IRONSIGHT_OUTER = 0.1
+local IRONSIGHT_PITCH = 0.011
+local IRONSIGHT_DOT = 0.5
 local hg_ironrealism = CLIENT and CreateClientConVar("hg_ironrealism", "1", true, false, "Enables the realistic iron sight aperture overlay", 0, 1)
 
 local function getIronSightHoleFade(self)
@@ -492,7 +494,7 @@ end
 
 local function beginIronSightHoles(self)
 	local fade = getIronSightHoleFade(self)
-	if fade <= 0.01 or not ironSightHoleMat or ironSightHoleMat:IsError() then return false end
+	if fade <= 0.01 then return false end
 
 	local cx, cy = getIronSightScreenPos(self)
 	if not cx then return false end
@@ -509,11 +511,26 @@ local function beginIronSightHoles(self)
 
 	render.OverrideColorWriteEnable(true, false)
 	render.OverrideDepthEnable(true, false)
-	local size = ScrH() * IRONSIGHT_HOLE_SCALE * fade
+	local h = ScrH()
+	local inner, outer = h * IRONSIGHT_INNER, h * IRONSIGHT_OUTER
+	local pitch = math.max(h * IRONSIGHT_PITCH, 3)
+	local dot = math.max(pitch * IRONSIGHT_DOT * fade, 1)
+	local rowStep = pitch * 0.866
+	local rows = math.ceil(outer / rowStep)
 	cam.Start2D()
-		surface.SetMaterial(ironSightHoleMat)
+		draw.NoTexture()
 		surface.SetDrawColor(255, 255, 255, 255)
-		surface.DrawTexturedRect(cx - size / 2, cy - size / 2, size, size)
+		for row = -rows, rows do
+			local y = row * rowStep
+			local xOff = (row % 2) * pitch * 0.5
+			for x = -outer - xOff, outer, pitch do
+				local px = x + xOff
+				local d = math.sqrt(px * px + y * y)
+				if d >= inner and d <= outer then
+					surface.DrawRect(cx + px - dot / 2, cy + y - dot / 2, dot, dot)
+				end
+			end
+		end
 	cam.End2D()
 	render.OverrideDepthEnable(false)
 	render.OverrideColorWriteEnable(false)

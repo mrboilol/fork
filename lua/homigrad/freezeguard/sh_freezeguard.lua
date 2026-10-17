@@ -273,4 +273,6 @@ end)
 
 hook.Add("PostCleanupMap", "hg_freezeguard", function()
 	FG.Event("map cleanup finished")
+	timer.Remove("hg_freezeguard_arm")
+	FG.SetWatchdog(FG.WatchdogWanted and FG.WatchdogWanted() or false)
 end)

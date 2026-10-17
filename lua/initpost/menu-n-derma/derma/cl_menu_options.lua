@@ -241,8 +241,7 @@ hg.settings:AddOpt("Optimization","hg_tpik_distance", "TPIK Render Distance", tr
 hg.settings:AddOpt("Blood","hg_blood_draw_distance", "Blood Draw Distance")
 hg.settings:AddOpt("Blood","hg_blood_fps", "Blood FPS")
 hg.settings:AddOpt("Blood","hg_blood_sprites", "Blood Sprites (DISABLED FOR EVERYONE)")
-hg.settings:AddOpt("Blood","hg_old_blood", "Old blood")
-hg.settings:AddOpt("Blood","hg_old_particle", "Old particles")
+hg.settings:AddOpt("Blood","hg_old_blood", "New blood system (off = old particles and decals)")
 hg.settings:AddOpt("UI","hg_moodles_enabled", "Moodles")
 
 hg.settings:AddOpt("UI","hg_font", "Change Custom Font", false, true)

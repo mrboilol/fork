@@ -1932,7 +1932,10 @@ hook.Add("Think", "Fake", function()
 
 					local slidePending = checkSpeed >= slideMinStartSpeed and onGround and not ragdoll._slideCooldown
 
-					local isDropkicking = ply:KeyDown(IN_ATTACK) and ply:KeyDown(IN_ATTACK2) and not slidePending and not onGround
+					local legsFree = not ishgweapon(wep) and not slidePending
+					local kickLeft = legsFree and ply:KeyDown(IN_ATTACK)
+					local kickRight = legsFree and ply:KeyDown(IN_ATTACK2)
+					local isDropkicking = kickLeft or kickRight
 					if isDropkicking and not ragdoll.isDropkicking then
 						ragdoll.dropkickAchievementHit = false
 					end
@@ -1994,14 +1997,17 @@ hook.Add("Think", "Fake", function()
 						foot2:Set(calfAng2)
 						foot2:RotateAroundAxis(angles:Right(), 90)
 
-						shadowControl(ragdoll, 11, 0.001, legAng1, 600, 200)
-						shadowControl(ragdoll, 8, 0.001, legAng2, 600, 200)
+						if kickLeft then
+							shadowControl(ragdoll, 11, 0.001, legAng1, 600, 200)
+							shadowControl(ragdoll, 12, 0.001, calfAng1, 600, 200)
+							shadowControl(ragdoll, 13, 0.001, foot1, 600, 200)
+						end
 
-						shadowControl(ragdoll, 13, 0.001, foot1, 600, 200)
-						shadowControl(ragdoll, 14, 0.001, foot2, 600, 200)
-
-						shadowControl(ragdoll, 12, 0.001, calfAng1, 600, 200)
-						shadowControl(ragdoll, 9, 0.001, calfAng2, 600, 200)
+						if kickRight then
+							shadowControl(ragdoll, 8, 0.001, legAng2, 600, 200)
+							shadowControl(ragdoll, 9, 0.001, calfAng2, 600, 200)
+							shadowControl(ragdoll, 14, 0.001, foot2, 600, 200)
+						end
 					end
 				end
 

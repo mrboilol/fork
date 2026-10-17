@@ -6,6 +6,8 @@ local melee_skull_bone_mul = 0.42
 local melee_skull_consciousness_mul = 0.3
 local melee_skull_consciousness_max = 0.55
 local melee_skull_knockout_threshold = 1.3
+local skull_break_brain_mul = 0.8
+local skull_break_neck_mul = 2.5
 
 util.AddNetworkString("hg_play_client_sound_file")
 
@@ -83,7 +85,7 @@ local function damageBone(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ric
 	
 	if !nodmgchange then dmgInfo:ScaleDamage(1 - (crush and 1 * crush * math.max((1 - org[key]) ^ 0.1, 0.5) or (1 - org[key]) * (bone))) end
 
-	return (crush and 1 * crush * math.max((1 - org[key]) ^ 0.1, 0.5) or (1 - org[key]) * (bone)), VectorRand(-0.2,0.2) / math.Clamp(dmg,0.4,0.8)
+	return (crush and 1 * crush * math.max((1 - org[key]) ^ 0.1, 0.5) or (1 - org[key]) * (bone)), VectorRand(-0.2,0.2) / math.Clamp(dmg,0.4,0.8), dmg
 end
 
 local bonefracture_sounds = {
@@ -997,15 +999,12 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	local meleeContact = IsValid(dmgInfo:GetInflictor()) and dmgInfo:GetInflictor().MeleeDamageContact
 	local fullCharge = meleeContact and meleeContact.fullCharge and not (impact and impact.source == "physics")
 
-	local result, vecrand = damageBone(org, 0.25, bluntMelee and dmg * melee_skull_bone_mul or dmg, dmgInfo, "skull", boneindex, dir, hit, ricochet, oldDmg >= 1)
+	local result, vecrand, appliedSkullDmg = damageBone(org, 0.25, bluntMelee and dmg * melee_skull_bone_mul or dmg, dmgInfo, "skull", boneindex, dir, hit, ricochet, oldDmg >= 1)
 	if oldDmg >= 1 then
 		result = 0
 		if not (impact and impact.source == "physics") and not dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_BLAST) and hg.organism.input_list.brainFrontal then
 			hg.organism.input_list.brainFrontal(org, bone, dmg, dmgInfo)
 		end
-	elseif org.skull >= 1 and not (impact and impact.source == "physics") and not dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_BLAST) and hg.organism.input_list.brainFrontal then
-		local leftover = dmg - (1 - oldDmg)
-		if leftover > 0 then hg.organism.input_list.brainFrontal(org, bone, leftover, dmgInfo) end
 	end
 	local inflictor = dmgInfo:GetInflictor()
 	local rawDamageType = impact and impact.rawDamageType or dmgInfo:GetDamageType()
@@ -1026,6 +1025,17 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 			if hg.organism.AddBrainHemorrhage then hg.organism.AddBrainHemorrhage(org, 0.12, 0.003) end
 			for i = 1, 3 do
 				hg.organism.AddWoundManual(org.owner, 40, VectorRand(-2, 2), angle_zero, "ValveBiped.Bip01_Head1", CurTime())
+			end
+		end
+	end
+	if oldDmg < 1 and org.skull >= 1 and not dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_BLAST) then
+		local excess = math.max((appliedSkullDmg or 0) - (1 - oldDmg), 0)
+		if excess > 0 then
+			if impact and impact.lane == "spine3" and hg.organism.input_list.spine3 then
+				hg.organism.input_list.spine3(org, bone, excess * skull_break_neck_mul, dmgInfo)
+			else
+				if hg.organism.input_list.brainFrontal then hg.organism.input_list.brainFrontal(org, bone, excess, dmgInfo) end
+				if not ignoreBrainDamage then org.brain = math.min((org.brain or 0) + excess * skull_break_brain_mul, 1) end
 			end
 		end
 	end

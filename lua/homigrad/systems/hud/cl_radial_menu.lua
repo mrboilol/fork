@@ -1006,7 +1006,7 @@ local randomGestures = {
 	{"wait", function() RunConsoleCommand("hg_hand_gesture", "wait") end},
 	{"danger", function() RunConsoleCommand("hg_hand_gesture", "danger") end},
 	{"thanks", function() RunConsoleCommand("hg_hand_gesture", "thanks") end},
-	{"on my way", function() RunConsoleCommand("hg_hand_gesture", "omw") end},
+	{"boii", function() RunConsoleCommand("hg_hand_gesture", "omw") end},
 	{"regroup", function() RunConsoleCommand("hg_hand_gesture", "regroup") end},
 	{"help", function() RunConsoleCommand("hg_hand_gesture", "help") end},
 	{"point", function() RunConsoleCommand("hg_hand_gesture", "point_of") end},
