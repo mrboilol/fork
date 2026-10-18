@@ -360,13 +360,16 @@ local function BoneNamesMatch(ent, first, second)
 	return firstIndex and ent:GetBoneName(firstIndex) == second or false
 end
 
+local bandageVitalKeys = {"skull", "chest"}
+local bandageVitalSet = {}
+for _, key in ipairs(bandageVitalKeys) do bandageVitalSet[key] = true end
+local bandageSpineKeys = {spine1 = true, spine2 = true, spine3 = true}
 local bandageBoneOrder = {
-	"skull", "jaw", "spine3", "spine2", "spine1", "pelvis", "chest", "lleg", "rleg", "larm", "rarm"
+	"skull", "chest", "jaw", "pelvis", "lleg", "rleg", "larm", "rarm"
 }
 local bandageBoneNames = {
 	skull = "ValveBiped.Bip01_Head1", jaw = "ValveBiped.Bip01_Head1",
-	spine3 = "ValveBiped.Bip01_Spine2", spine2 = "ValveBiped.Bip01_Spine2",
-	spine1 = "ValveBiped.Bip01_Spine1", pelvis = "ValveBiped.Bip01_Pelvis",
+	pelvis = "ValveBiped.Bip01_Pelvis",
 	chest = "ValveBiped.Bip01_Spine2", lleg = "ValveBiped.Bip01_L_Calf",
 	rleg = "ValveBiped.Bip01_R_Calf", larm = "ValveBiped.Bip01_L_Forearm",
 	rarm = "ValveBiped.Bip01_R_Forearm"
@@ -378,10 +381,7 @@ local function GetBandageBoneKey(org, bone)
 	local key
 	if isstring(bone) then
 		if string.find(bone, "Head", 1, true) then key = (org.skull or 0) >= 0.05 and "skull" or "jaw"
-		elseif string.find(bone, "Spine1", 1, true) then key = "spine1"
-		elseif string.find(bone, "Spine2", 1, true) then
-			key = (org.spine2 or 0) >= 0.05 and "spine2" or (org.spine3 or 0) >= 0.05 and "spine3" or "chest"
-		elseif string.find(bone, "Spine3", 1, true) then key = "spine3"
+		elseif string.find(bone, "Spine", 1, true) then key = "chest"
 		elseif string.find(bone, "Pelvis", 1, true) then key = "pelvis"
 		elseif string.find(bone, "L_", 1, true)
 			and (string.find(bone, "Arm", 1, true) or string.find(bone, "Hand", 1, true)) then key = "larm"
@@ -396,6 +396,7 @@ local function GetBandageBoneKey(org, bone)
 		else key = bone end
 	end
 
+	if key and bandageSpineKeys[key] then key = nil end
 	if key and (org[key] or 0) >= 0.05 and not org[key .. "amputated"] then return key end
 	if bone then return end
 
@@ -444,10 +445,12 @@ function SWEP:GetBandageTargetBone(target, trace)
 	end
 	if largestWound and largestWound[4] then return largestWound[4] end
 
+	for _, key in ipairs(bandageVitalKeys) do
+		if not org[key .. "amputated"] and (org[key] or 0) >= 1 then return key end
+	end
+
 	for _, key in ipairs(bandageBoneOrder) do
-		local damage = org[key] or 0
-		if not org[key .. "amputated"] and (damage >= 1
-			or key == "chest" and damage >= 0.05 and (org.brokenribs or 0) > 0) then return key end
+		if not bandageVitalSet[key] and not org[key .. "amputated"] and (org[key] or 0) >= 1 then return key end
 	end
 
 	local dislocation = hg.organism.GetBandageDislocation and hg.organism.GetBandageDislocation(org)

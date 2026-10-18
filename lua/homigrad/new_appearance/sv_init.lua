@@ -202,7 +202,9 @@ local function FindAccessoryImpact(ent, hitPos, direction, impactRadius)
 	return hits[1]
 end
 
-local function SpawnAccessoryDrop(accessoryID, accessory, owner, position, force, durability, maximum)
+local KNOCKOUT_PICKUP_DELAY = 4
+
+local function SpawnAccessoryDrop(accessoryID, accessory, owner, position, force, durability, maximum, knockedOut)
 	local model = accessory[ThatPlyIsFemale(owner) and "femmodel"] or accessory.model
 	if !model then return end
 	local scale = (accessory[ThatPlyIsFemale(owner) and "fempos"] or accessory.malepos or {})[3] or 1
@@ -252,6 +254,7 @@ local function SpawnAccessoryDrop(accessoryID, accessory, owner, position, force
 	dropped.HGAccessoryOwner = owner
 	dropped.HGAccessoryDurability = durability
 	dropped.HGAccessoryMaxDurability = maximum
+	if knockedOut then dropped.HGAccessoryPickupAt = CurTime() + KNOCKOUT_PICKUP_DELAY end
 	if isnumber(durability) and isnumber(maximum) and maximum > 0 then
 		dropped:SetNWFloat("HGEquipmentCondition", math.Clamp(durability / maximum, 0, 1))
 	end
@@ -289,7 +292,7 @@ local function QueueAccessoryDrop(accessoryID, accessory, owner, position, force
 	local dropForce = isvector(force) and Vector(force.x, force.y, force.z) or vector_origin
 	timer.Simple(0, function()
 		if !IsValid(owner) then return end
-		SpawnAccessoryDrop(accessoryID, accessory, owner, dropPosition, dropForce, durability, maximum)
+		SpawnAccessoryDrop(accessoryID, accessory, owner, dropPosition, dropForce, durability, maximum, true)
 	end)
 	return true
 end
@@ -322,7 +325,7 @@ function APmodule.DropAccessoriesByPlacement(ent, placements, force)
 	for _, drop in ipairs(drops) do
 		local position = GetAccessoryTransform(ent, drop.data) or ent:WorldSpaceCenter()
 		local durability, maximum = GetAccessoryCondition(wearer, drop.id, drop.data)
-		local dropped = SpawnAccessoryDrop(drop.id, drop.data, wearer, position, launchForce + VectorRand() * 90, durability, maximum)
+		local dropped = SpawnAccessoryDrop(drop.id, drop.data, wearer, position, launchForce + VectorRand() * 90, durability, maximum, true)
 		if !IsValid(dropped) then continue end
 		RemoveAccessoryID(accessories, drop.id)
 		changed = true
@@ -392,27 +395,18 @@ function APmodule.EquipFallenAccessory(ply, dropped)
 	local accessory = hg.Accessories[accessoryID]
 	if !IsDroppableAccessory(accessory) then return false end
 
+	if dropped.HGAccessoryPickupAt and CurTime() < dropped.HGAccessoryPickupAt then return false end
+
 	local accessories = CopyAccessories(ply:GetNetVar("Accessories", {}))
-	local replacement
-	for index, equippedID in pairs(accessories) do
+	for _, equippedID in pairs(accessories) do
 		local equipped = hg.Accessories[equippedID]
 		if equipped and equipped.placement == accessory.placement then
-			replacement = index
-			break
+			ply:Notify("Take your other accessory off first.", true, "accessory_slot_occupied", 3)
+			return false
 		end
 	end
 
-	if replacement then
-		local replacedID = accessories[replacement]
-		local replacedAccessory = hg.Accessories[replacedID]
-		if IsDroppableAccessory(replacedAccessory) then
-			local durability, maximum = GetAccessoryCondition(ply, replacedID, replacedAccessory)
-			SpawnAccessoryDrop(replacedID, replacedAccessory, ply, dropped:GetPos(), dropped:GetVelocity(), durability, maximum)
-		end
-		accessories[replacement] = accessoryID
-	else
-		accessories[#accessories + 1] = accessoryID
-	end
+	accessories[#accessories + 1] = accessoryID
 	if isnumber(dropped.HGAccessoryDurability) then
 		ply.HGAccessoryDurability = ply.HGAccessoryDurability or {}
 		ply.HGAccessoryDurability[accessoryID] = dropped.HGAccessoryDurability

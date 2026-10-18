@@ -87,6 +87,24 @@ local COLOR = {
 	TOURNIQUET_STRAP = {35, 60, 150},
 	BANDAGE_CLEAN = {225, 215, 190},
 	OUTLINE = {20, 20, 22},
+	ORGAN_GRAY = {110, 110, 112},
+	ORGAN_BRAIN = {235, 150, 175},
+	ORGAN_HEART = {200, 20, 20},
+	ORGAN_LUNG = {30, 90, 200},
+	ORGAN_TRACHEA = {0, 200, 255},
+}
+local ORGAN = {
+	SHOW_DAMAGE = 0.01,
+	LUNG_SHOW_DAMAGE = 0.5,
+	PUNCTURE_DAMAGE = 0.6,
+	BRAIN_RADIUS = 0.6,
+	HEART_RADIUS = 0.28,
+	HEART_DROP = 0.3,
+	LUNG_RADIUS = 0.4,
+	LUNG_SPREAD = 0.55,
+	LUNG_RISE = 0.15,
+	TRACHEA_RADIUS = 0.45,
+	TRACHEA_DROP = 0.3,
 }
 local SHAPE = {
 	OUTLINE_WIDTH = 1.5,
@@ -321,6 +339,7 @@ local STRESS_SEGMENTS = {
 local severity, broken = {}, {}
 local dislocated = {}
 local arterial, missing = {}, {}
+local organDamage = {brain = 0, heart = 0, trachea = 0, lungsL = 0, lungsR = 0}
 local bleedLevel, tourniquet, bandage, stress = {}, {}, {}, {}
 local regionBleed, regionArterial = {}, {}
 local nextMedicalUpdate = 0
@@ -861,7 +880,35 @@ local function updateBandages(ply, body)
 	end
 end
 
+local function vitalDamage(org, key)
+	local damage = orgNumber(org, key)
+
+	return damage > ORGAN.SHOW_DAMAGE and damage or 0
+end
+
+local function lungDamage(org, key)
+	local lung = org[key]
+	if not istable(lung) then return 0 end
+
+	local damage = tonumber(lung[1]) or 0
+	local punctured = (tonumber(lung[2]) or 0) >= 1
+	if punctured then return math.max(damage, ORGAN.PUNCTURE_DAMAGE) end
+
+	return damage > ORGAN.LUNG_SHOW_DAMAGE and damage or 0
+end
+
+local function updateOrganState(org)
+	organDamage.brain = vitalDamage(org, "brain")
+	organDamage.heart = vitalDamage(org, "heart")
+	organDamage.trachea = vitalDamage(org, "trachea")
+	organDamage.lungsL = lungDamage(org, "lungsL")
+	organDamage.lungsR = lungDamage(org, "lungsR")
+end
+
 local function clearMedicalState()
+	for key in pairs(organDamage) do
+		organDamage[key] = 0
+	end
 	for _, region in ipairs(REGIONS) do
 		severity[region], bleedLevel[region] = 0, 0
 		broken[region], arterial[region], missing[region], tourniquet[region] = false, false, false, false
@@ -883,6 +930,7 @@ local function updateMedicalState(ply, body)
 	local source = ply:Alive() and ply or body
 	collectWounds(org, source.wounds, source.arterialwounds)
 	updateTorsoState(org)
+	updateOrganState(org)
 	for _, limb in ipairs(LIMBS) do
 		updateLimbState(org, limb)
 	end
@@ -1264,6 +1312,58 @@ local function drawWounds()
 	end
 end
 
+local function pointScreen(point)
+	return centerX + smoothY[point] * pixelScale, centerY - (smoothZ[point] - targetZ) * pixelScale
+end
+
+local function drawOrgan(ax, ay, bx, by, radius, color, damage)
+	local red, green, blue = lerpColor(color, COLOR.ORGAN_GRAY, math_Clamp(damage, 0, 1))
+	setDrawColor(COLOR.OUTLINE[1], COLOR.OUTLINE[2], COLOR.OUTLINE[3], OUTLINE_ALPHA)
+	polyCapsule(ax, ay, bx, by, radius + outlineWidth)
+	setDrawColor(red, green, blue, 255)
+	polyCapsule(ax, ay, bx, by, radius)
+end
+
+local function drawOrgans()
+	local unit = DISPLAY_SPINE * pixelScale
+
+	if organDamage.brain > 0 and not missing.skull and smoothValid[POINT.SKULL] then
+		local x, y = pointScreen(POINT.SKULL)
+		drawOrgan(x, y, x, y, skullRadius * unit * ORGAN.BRAIN_RADIUS, COLOR.ORGAN_BRAIN, organDamage.brain)
+	end
+
+	if organDamage.trachea > 0 and not missing.neck and smoothValid[POINT.NECK] and smoothValid[POINT.CHEST] then
+		local ax, ay = pointScreen(POINT.NECK)
+		local cx, cy = pointScreen(POINT.CHEST)
+		drawOrgan(ax, ay, ax + (cx - ax) * ORGAN.TRACHEA_DROP, ay + (cy - ay) * ORGAN.TRACHEA_DROP,
+			RADIUS.NECK * unit * ORGAN.TRACHEA_RADIUS, COLOR.ORGAN_TRACHEA, organDamage.trachea)
+	end
+
+	if missing.chest or not smoothValid[POINT.CHEST] then return end
+
+	local x, y = pointScreen(POINT.CHEST)
+	local chestUnit = chestRadius * unit
+	local side = 1
+	if smoothValid[POINT.CHEST_L] and smoothValid[POINT.CHEST_R] and smoothY[POINT.CHEST_L] > smoothY[POINT.CHEST_R] then
+		side = -1
+	end
+
+	local lungRadius = chestUnit * ORGAN.LUNG_RADIUS
+	local spread = chestUnit * ORGAN.LUNG_SPREAD * side
+	local rise = chestUnit * ORGAN.LUNG_RISE
+	if organDamage.lungsL > 0 then
+		drawOrgan(x - spread, y - rise, x - spread, y - rise, lungRadius, COLOR.ORGAN_LUNG, organDamage.lungsL)
+	end
+	if organDamage.lungsR > 0 then
+		drawOrgan(x + spread, y - rise, x + spread, y - rise, lungRadius, COLOR.ORGAN_LUNG, organDamage.lungsR)
+	end
+
+	if organDamage.heart > 0 then
+		local drop = chestUnit * ORGAN.HEART_DROP
+		drawOrgan(x - spread * 0.3, y + drop, x - spread * 0.3, y + drop, chestUnit * ORGAN.HEART_RADIUS, COLOR.ORGAN_HEART, organDamage.heart)
+	end
+end
+
 local function armorWear(ply, body, slot)
 	local armors = body:GetNetVar("Armor") or ply:GetNetVar("Armor")
 	local armor = istable(armors) and (isstring(slot) and armors[slot] or nil)
@@ -1410,6 +1510,7 @@ local function renderFigure()
 	drawCircles()
 	drawDislocations()
 	drawArmor()
+	drawOrgans()
 	drawWounds()
 end
 

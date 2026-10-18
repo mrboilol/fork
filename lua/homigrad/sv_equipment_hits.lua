@@ -11,12 +11,7 @@ impact.Config = {
     leftInjuryMultiplier = 0.65,
     soleArmSignificantDamage = 18,
     soleArmChance = 0.92,
-    weaponBaseChance = 0.018,
     weaponPowerChance = 0.52,
-    weaponInjuryChance = 0.55,
-    weaponSoleInjuryChance = 0.45,
-    weaponSoleSignificantPower = 0.3,
-    weaponSoleSevereInjury = 0.5,
     braceInjuryMultiplier = 0.3,
     damagePowerWeight = 0.8,
     forcePowerWeight = 0.2,
@@ -26,10 +21,11 @@ impact.Config = {
     dislocationImpulse = 18,
     maxDropChance = 0.98,
     dropCooldown = 0.35,
-    maxImpulseSpeed = 320,
+    maxImpulseSpeed = 520,
+    weaponThrowChance = 0.5,
     inheritedSpeed = 160,
-    weaponHitPadding = 3,
-    weaponWearerSlack = 6,
+    weaponHitPadding = 0,
+    weaponWearerSlack = 0,
     armHitPadding = 1.25,
     weaponSolidFraction = 0.25,
     weaponMaxThickness = 8,
@@ -806,12 +802,6 @@ local function WeaponImpact(ply, wep, hit, damage, force, direction)
         if grip.leftRelevant then hg.TryDislocateLimb(ply.organism, "larm", "up", severity) end
         grip = hg.GetWeaponImpactGrip(ply, wep)
     end
-    local chance = cfg.weaponBaseChance + power ^ 2 * cfg.weaponPowerChance
-    chance = chance + power * (grip.injury + grip.braceInjury * cfg.braceInjuryMultiplier) * cfg.weaponInjuryChance
-    if grip.sole then chance = chance + power * grip.injury * cfg.weaponSoleInjuryChance end
-    if grip.sole and grip.injury >= cfg.weaponSoleSevereInjury and power >= cfg.weaponSoleSignificantPower then chance = math.max(chance, cfg.soleArmChance) end
-    if grip.noHands then chance = cfg.maxDropChance end
-
     wep:SetNWFloat("HGEquipmentHitTime", CurTime())
     hook.Run("HGHeldWeaponHit", ply, wep, hit, damage, direction)
 
@@ -830,7 +820,7 @@ local function WeaponImpact(ply, wep, hit, damage, force, direction)
         return
     end
 
-    if math.Rand(0, 1) < math.min(chance, cfg.maxDropChance) then hg.DropWeaponFromImpact(ply, wep, direction, power) end
+    hg.DropWeaponFromImpact(ply, wep, direction, math.Rand(0, 1) < cfg.weaponThrowChance and 1 or 0)
 end
 
 local function GetWeaponImpactAbsorption(wep, hit, direction, dmgInfo)

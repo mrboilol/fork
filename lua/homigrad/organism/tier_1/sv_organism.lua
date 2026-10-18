@@ -21,18 +21,17 @@ local hg_painsound = ConVarExists("hg_painsound") and GetConVar("hg_painsound") 
 local hg_dyingsound = ConVarExists("hg_dyingsound") and GetConVar("hg_dyingsound") or CreateConVar("hg_dyingsound", "2", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "look at the ones you like (press sound icon for preview)", 0, 11)
 local hg_otrubsound = ConVarExists("hg_otrubsound") and GetConVar("hg_otrubsound") or CreateConVar("hg_otrubsound", "0", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "look at the ones you like (press sound icon for preview)", 0, 7)
 local panicattack_threshold = 0.35
-local panicattack_add_decay_time = 150
-local panicattack_decay_hold_time = 8
-local panicattack_combat_decay_mul = 1.6
+local panicattack_add_decay_time = 45
+local panicattack_decay_hold_time = 4
+local panicattack_combat_decay_mul = 1.3
 local panicattack_rise_time = 3
-local panicattack_decay_time = 10
+local panicattack_decay_time = 4
 local panicattack_gain_chance = 1
 local panicattack_gain_mul = 0.3
 local panicattack_event_cap = 0.09
 local panicattack_streak_window = 12
 local panicattack_streak_step = 0.15
 local panicattack_streak_max = 6
-local panicattack_disorientation = 0.4
 local panicattack_adrenaline_add_target = 0.8
 local panicattack_combat_adrenaline_add_target = 2
 local panicattack_adrenaline_add_rise_time = 3
@@ -1397,9 +1396,6 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 			if (org.adrenalineAdd or 0) < adrenalineTarget then
 				org.adrenalineAdd = math.Approach(org.adrenalineAdd or 0, adrenalineTarget, timeValue / panicattack_adrenaline_add_rise_time)
 			end
-		end
-		if org.panicattackActive then
-			org.disorientation = math.max(org.disorientation, 0.1 + panicattack_disorientation * panicSeverity)
 		end
 	else
 		org.panicattackActive = false

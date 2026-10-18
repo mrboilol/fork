@@ -468,7 +468,6 @@ end
 local PainLerp = 0
 local painThresholdIntensityLerp = 1
 local PanicAttackLerp = 0
-local PanicStationVolume = 0
 local O2Lerp = 0
 local damageFlashEnd = 0
 local damageFlashStrength = 0
@@ -563,7 +562,6 @@ adrenalineVisualLerp = 0
 lastDisorientationFx = 0
 lastConcussionFx = 0
 nextNeuroTinnitus = 0
-nextPanicAttackShake = 0
 lobotomy_mats = {
 	[1] = Material("overlays/photopsiaoverlay1.png"),
 	[2] = Material("overlays/photopsiaoverlay2.png"),
@@ -587,7 +585,6 @@ local vitalityDyingVolumeMax = 1.5
 -- file is quieter than the other dying tracks, so give it a higher ceiling.
 local sonimCookedForegroundVolume = 1.2
 local painBeatOverlayPath = "sound/rem_pain.mp3"
-local panicattackOverlayPath = "sound/rem_panicattack.mp3"
 local panicattackFadeStart = 0.2
 local panicattackThreshold = 0.9
 local panicattackVolumeMul = 1
@@ -619,13 +616,7 @@ hg.screeneffects_config = {
 	vitalityDyingVolumeMax = vitalityDyingVolumeMax,
 	sonimCookedForegroundVolume = sonimCookedForegroundVolume,
 	painBeatOverlayPath = painBeatOverlayPath,
-	panicattackOverlayPath = panicattackOverlayPath,
 	panicattackVisualExponent = 1.75,
-	panicattackPulseFloor = 0.78,
-	panicattackPulseIntensity = 0.3,
-	panicattackShakeIntervalMin = 0.2,
-	panicattackShakeIntervalMax = 0.6,
-	panicattackShakeMul = 0.85,
 	painBeatOverlayVolumeMul = painBeatOverlayVolumeMul,
 	painThresholdMax = painThresholdMax,
 	painAgonyThreshold = painAgonyThreshold,
@@ -658,7 +649,6 @@ local hiddenPainColor = {
 	["$pp_colour_mulb"] = 0
 }
 local PainStationLoading = false
-local PanicStationLoading = false
 local PainStationOverlayLoading = false
 local RemAgonyStationLoading = false
 local RemExcruciatingPainStationLoading = false
@@ -831,7 +821,6 @@ local function stopthings()
 	PainLerp = 0
 	painThresholdIntensityLerp = 1
 	PanicAttackLerp = 0
-	PanicStationVolume = 0
 	O2Lerp = 0
 	shockVignetteLerp = 0
 	consciousnessVignetteLerp = 0
@@ -871,7 +860,6 @@ local function stopthings()
 	end
 
 	lply.tinnitus = 0
-	nextPanicAttackShake = 0
 	stopSeizureEffects()
 	
 	if IsValid(PainStation) then
@@ -995,11 +983,6 @@ local function stopthings()
 	if IsValid(SillydyingStation) then
 		SillydyingStation:Stop()
 		SillydyingStation = nil
-	end
-
-	if IsValid(PanicStation) then
-		PanicStation:Stop()
-		PanicStation = nil
 	end
 
 	if IsValid(ItssooverStation) then
@@ -1582,11 +1565,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
         blurAmount = math.max(blurAmount, hypotensionBlur * 3 * sensoryMix)
     end
 
-    local panicFx = getPanicAttackFx(org) ^ hg.screeneffects_config.panicattackVisualExponent
-    if sensoryActive and panicFx > 0.3 then
-        blurAmount = math.max(blurAmount, (panicFx - 0.3) / 0.7 * 1.8 * sensoryMix)
-    end
-
     local adrenaline = org.adrenaline or 0
     local adrenalineIntensity = math.Clamp((adrenaline - 1) / 1.5, 0, 1)
     if adrenalineIntensity > 0 and sensoryActive then
@@ -1594,7 +1572,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		-- jumping straight to its final visual strength.
 		adrenalineVisualLerp = math.Approach(adrenalineVisualLerp, 1, FrameTime() * (0.08 + adrenalineIntensity * 0.22))
 		local adrenalineShock = adrenalineIntensity * (0.2 + adrenalineVisualLerp * 1.0) * sensoryMix
-		blurAmount = math.max(blurAmount, adrenalineShock * 0.4)
+		blurAmount = math.max(blurAmount, adrenalineShock * 0.15 * (1 - math.Clamp((adrenaline - 2.5) / 0.5, 0, 1)))
 
 		if not (lply:IsBerserk() or lply:IsStimulated()) then
             render.UpdateScreenEffectTexture()
@@ -1915,79 +1893,64 @@ hook.Add("Post Post Processing", "ItHurts", function()
 
 	local panicBaseTarget = getPanicAttackFx(org)
 	PanicAttackLerp = LerpFT(0.12, PanicAttackLerp, panicBaseTarget ^ hg.screeneffects_config.panicattackVisualExponent)
-	local panicDying = org.otrub or org.incapacitated
-	if PanicAttackLerp > 0.001 then
+	if PanicAttackLerp > 0.001 and not (org.otrub or org.incapacitated) then
 		local panicBase = PanicAttackLerp
-		local panicPulse = panicDying and 0 or panicBase * (hg.screeneffects_config.panicattackPulseFloor + math.ease.InOutSine(math.abs(math.cos(CurTime() * 3.5))) * hg.screeneffects_config.panicattackPulseIntensity)
+		local sw, sh = ScrW(), ScrH()
+		local steps = 4
+		local innerScale = Lerp(math.min(panicBase * 1.5, 1), 1.3, 0.55)
 
 		render.UpdateScreenEffectTexture()
-		heatMat:SetFloat("$c0_x", -CurTime() * 0.1)
-		heatMat:SetFloat("$c0_y", panicBase * 0.014 + panicPulse * 0.055)
-		heatMat:SetFloat("$c2_x", panicBase * 0.28 + panicPulse * 1.7)
-		render.SetMaterial(heatMat)
+		vignetteMat:SetFloat("$c2_x", CurTime() + 9500)
+		vignetteMat:SetFloat("$c0_z", scaleVignette(panicBase * 0.7))
+		vignetteMat:SetFloat("$c1_y", scaleVignette(panicBase * 2.6))
+		render.SetMaterial(vignetteMat)
 		render.DrawScreenQuad()
 
-		if not panicDying then
-			render.UpdateScreenEffectTexture()
-			vignetteMat:SetFloat("$c2_x", CurTime() + 9500)
-			vignetteMat:SetFloat("$c0_z", scaleVignette(panicBase * 0.7))
-			vignetteMat:SetFloat("$c1_y", scaleVignette(panicBase * 2.6))
-			render.SetMaterial(vignetteMat)
-			render.DrawScreenQuad()
+		render.ClearStencil()
+		render.SetStencilEnable(true)
+		render.SetStencilWriteMask(0xFF)
+		render.SetStencilTestMask(0xFF)
+		render.SetStencilReferenceValue(0)
+		render.SetStencilCompareFunction(STENCIL_ALWAYS)
+		render.SetStencilPassOperation(STENCIL_INCR)
+		render.SetStencilFailOperation(STENCIL_KEEP)
+		render.SetStencilZFailOperation(STENCIL_KEEP)
+		render.OverrideColorWriteEnable(true, false)
+		draw.NoTexture()
+		surface.SetDrawColor(255, 255, 255, 255)
+		for i = 1, steps do
+			local scale = Lerp(i / steps, innerScale, 1.3)
+			local rx, ry = sw * 0.5 * scale, sh * 0.5 * scale
+			local poly = {}
+			for k = 0, 31 do
+				local ang = k / 32 * math.pi * 2
+				poly[#poly + 1] = {x = sw * 0.5 + math.cos(ang) * rx, y = sh * 0.5 + math.sin(ang) * ry}
+			end
+			surface.DrawPoly(poly)
+		end
+		render.OverrideColorWriteEnable(false, false)
 
+		render.SetStencilPassOperation(STENCIL_KEEP)
+		render.SetStencilCompareFunction(STENCIL_GREATER)
+		local grain = panicBase * 0.5
+		for j = 1, steps do
+			render.SetStencilReferenceValue(j)
 			render.UpdateScreenEffectTexture()
 			render.UpdateFullScreenDepthTexture()
 			grainMat:SetFloat("$c0_x", CurTime())
 			grainMat:SetFloat("$c0_y", -1)
-			grainMat:SetFloat("$c0_z", 1 + panicBase * 1.4)
-			grainMat:SetFloat("$c1_x", panicBase * 3.2 + panicPulse * 5.8)
-			grainMat:SetFloat("$c1_y", panicBase * 0.08 + panicPulse * 0.22)
-			grainMat:SetFloat("$c1_z", panicBase * 0.08 + panicPulse * 0.24)
-			grainMat:SetFloat("$c2_x", panicBase * 0.04 + panicPulse * 0.12)
-			grainMat:SetFloat("$c2_y", 0.075 * panicBase)
+			grainMat:SetFloat("$c0_z", 1 + grain * 1.4)
+			grainMat:SetFloat("$c1_x", grain * 3.2)
+			grainMat:SetFloat("$c1_y", grain * 0.08)
+			grainMat:SetFloat("$c1_z", grain * 0.08)
+			grainMat:SetFloat("$c2_x", grain * 0.04)
+			grainMat:SetFloat("$c2_y", 0.075 * grain)
 			grainMat:SetFloat("$c2_z", 0)
 			grainMat:SetFloat("$c3_x", 0)
 			render.SetMaterial(grainMat)
 			render.DrawScreenQuad()
 		end
-
-		if not panicDying and CurTime() >= nextPanicAttackShake then
-			local shakeMul = (0.25 + panicBase * 0.9) * hg.screeneffects_config.panicattackShakeMul
-			ViewPunch(Angle(math.Rand(-0.8, 0.6), math.Rand(-1, 1), math.Rand(-0.2, 0.2)) * shakeMul)
-			ViewPunch2(Angle(math.Rand(-0.25, 0.35), math.Rand(-0.55, 0.55), math.Rand(-0.4, 0.4)) * shakeMul)
-			nextPanicAttackShake = CurTime() + math.Rand(hg.screeneffects_config.panicattackShakeIntervalMin, hg.screeneffects_config.panicattackShakeIntervalMax)
-		end
-
-		if not panicDying and canRetrySound("PanicStation", PanicStation) then
-			sound.PlayFile(hg.screeneffects_config.panicattackOverlayPath, "noblock noplay", function(station)
-				if IsValid(station) then
-					station:SetVolume(0)
-					station:EnableLooping(true)
-					station:Play()
-					PanicStation = station
-				end
-			end)
-		end
-		if IsValid(PanicStation) then
-			PanicStationVolume = math.Approach(PanicStationVolume, panicDying and 0 or math.Clamp(PanicAttackLerp, 0, 1), FrameTime() * 4)
-			PanicStation:SetVolume(PanicStationVolume)
-			if PanicStationVolume <= 0.001 then
-				PanicStation:Stop()
-				PanicStation = nil
-			end
-		end
-	else
-		nextPanicAttackShake = 0
-		if IsValid(PanicStation) then
-			PanicStationVolume = math.Approach(PanicStationVolume, 0, FrameTime() * 3)
-			PanicStation:SetVolume(PanicStationVolume)
-			if PanicStationVolume <= 0.001 then
-				PanicStation:Stop()
-				PanicStation = nil
-			end
-		else
-			PanicStationVolume = 0
-		end
+		render.SetStencilEnable(false)
 	end
 
 	local analgesia = org.analgesia or 0
@@ -3010,10 +2973,9 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end
 
 		local painSharpen = math.Clamp(((org.pain or 0) - 15) / (hg.screeneffects_config.painAgonyThreshold - 15), 0, 1)
-		local adrenalineSharpen = math.Clamp(((org.adrenaline or 0) - 0.4) / 1.6, 0, 1)
+		local adrenalineSharpen = math.Clamp(((org.adrenaline or 0) - 3) / 1.5, 0, 1)
 		local o2Sharpen = math.Clamp((45 - o2) / 30, 0, 1)
-		local panicSharpen = getPanicAttackFx(org)
-		local stressSharpen = math.max(painSharpen, adrenalineSharpen, o2Sharpen, panicSharpen)
+		local stressSharpen = math.max(painSharpen, adrenalineSharpen, o2Sharpen)
 		stressSharpenLerp = LerpFT(0.05, stressSharpenLerp, stressSharpen)
 		if stressSharpenLerp > 0.01 then
 			DrawSharpen(stressSharpenLerp * 1.3, 0.4 + stressSharpenLerp * 0.9)

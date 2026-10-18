@@ -60,7 +60,6 @@ hook.Add("Player_Death", "hg_psyche_sound_stop", function(ply)
 end)
 
 local vignetteMat = Material("effects/shaders/zb_vignette")
-local PANIC_THRESHOLD = 0.45
 
 local psyche_color_tab = {
 	["$pp_colour_addr"] = 0,
@@ -79,20 +78,18 @@ hook.Add("RenderScreenspaceEffects", "hg_psyche_color", function()
 	local org = lply.organism
 	local anger = Clamp(org.psycheAnger or 0, 0, 1)
 	local fear = Clamp(org.fear or 0, 0, 1)
-	local panic = Clamp(org.panicattack or 0, 0, 1)
 	local angerFrac = Clamp((anger - 0.5) / 0.5, 0, 1)
 	local fearFrac = Clamp((fear - 0.3) / 0.7, 0, 1)
-	local panicFrac = Clamp((panic - PANIC_THRESHOLD) / (1 - PANIC_THRESHOLD), 0, 1)
 
 	psyche_color_tab["$pp_colour_addr"] = 0.07 * angerFrac
 	psyche_color_tab["$pp_colour_addg"] = 0
 	psyche_color_tab["$pp_colour_addb"] = 0.025 * fearFrac
-	psyche_color_tab["$pp_colour_brightness"] = -0.02 * fearFrac - 0.03 * panicFrac
-	psyche_color_tab["$pp_colour_contrast"] = 1 + 0.05 * fearFrac + 0.03 * panicFrac
-	psyche_color_tab["$pp_colour_colour"] = 1 - 0.15 * fearFrac - 0.25 * panicFrac
+	psyche_color_tab["$pp_colour_brightness"] = -0.02 * fearFrac
+	psyche_color_tab["$pp_colour_contrast"] = 1 + 0.05 * fearFrac
+	psyche_color_tab["$pp_colour_colour"] = 1 - 0.15 * fearFrac
 	DrawColorModify(psyche_color_tab)
 
-	local vignette = fearFrac * 0.8 + panicFrac * 1.8
+	local vignette = fearFrac * 0.8
 	if vignette > 0.02 then
 		render.UpdateScreenEffectTexture()
 		vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
@@ -100,12 +97,5 @@ hook.Add("RenderScreenspaceEffects", "hg_psyche_color", function()
 		vignetteMat:SetFloat("$c1_y", vignette * 1.2)
 		render.SetMaterial(vignetteMat)
 		render.DrawScreenQuad()
-	end
-
-	if panicFrac > 0 then
-		local potato = hg.ConVars and hg.ConVars.potatopc and hg.ConVars.potatopc:GetBool() or false
-		if not lply:HasTrait("blind") and not potato then
-			DrawToyTown(2, panicFrac * ScrH())
-		end
 	end
 end)
