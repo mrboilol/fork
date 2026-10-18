@@ -789,7 +789,8 @@ if CLIENT then
 			end
 		end
 	
-		if not organism.otrub and table.Count(tbl) > 0 then
+		local newEquipment = LocalPlayer():GetNetVar("zc_equipment", {})
+		if not organism.otrub and (table.Count(tbl) > 0 or #newEquipment > 0) then
 			hg.radialOptions = hg.radialOptions or {}
 			local newEntry = {equipmentMenu, "Drop Equipment"}
 			hg.radialOptions[#hg.radialOptions + 1] = newEntry
@@ -870,10 +871,10 @@ if CLIENT then
 	end
 
 	hook.Add("OnNetVarSet", "equipmentPanelRefresh", function(index, key, var)
-		if IsValid(hg.armorMenuPanel) and (key == "Armor" or key == "Inventory" or key == "Accessories") then
-			if hg.armorMenuPanel.RefreshTbl and Entity(index) == lply then
-				hg.armorMenuPanel:RefreshTbl()
-			end
+		if not IsValid(hg.armorMenuPanel) or not hg.armorMenuPanel.RefreshTbl then return end
+		if (key == "Armor" or key == "Inventory" or key == "Accessories" or key == "zc_equipment") and Entity(index) == lply
+			or key == "ZCityArmorCondition" then
+			hg.armorMenuPanel:RefreshTbl()
 		end
 	end)
 
@@ -932,6 +933,64 @@ if CLIENT then
 			local col = 255 * self.lerpcolor
 			surface.SetDrawColor(col, col, col, 255)
 			surface.DrawRect(0, 0, w, h)
+		end
+	end
+
+	local function describeNewArmor(armor)
+		local condition = armor:GetNetVar("ZCityArmorCondition", {})
+		local shape = armor:GetNetVar("ZCityArmorShape", {})
+		local names, listed = {}, {}
+		for _, name in pairs(armor.PlatesLinks or {}) do
+			if not listed[name] then
+				listed[name] = true
+				names[#names + 1] = name
+			end
+		end
+		table.sort(names)
+		local lines = {string.format("%s | Weight %.1f", armor.PrintName or armor:GetClass(), armor:GetNetVar("ZCityArmorMass", armor.CarryMass or 0))}
+		for _, name in ipairs(names) do
+			local part = istable(shape[name]) and shape[name] or armor[name]
+			if not istable(part) then continue end
+			local isPlate = string.find(name, "Plate", 1, true) ~= nil
+			local ratio = condition[name] or 1
+			local text = string.format("%s %s: %d%%", string.gsub(name, "(%l)(%u)", "%1 %2"), isPlate and "plate" or "fabric", math.Round(ratio * 100))
+			if part.DurabilityMax then text = text .. string.format(" (%.0f/%.0f)", ratio * part.DurabilityMax, part.DurabilityMax) end
+			text = text .. string.format(" | %s %s", hg.ZCityArmorClasses[part.ProtectionClass or part.Protection] or "?", hg.ZCityArmorMaterials[part.BalisticMaterial] or "")
+			if condition[name .. "Fabric"] then text = text .. string.format(" | fabric %d%%", math.Round(condition[name .. "Fabric"] * 100)) end
+			lines[#lines + 1] = text
+		end
+		return table.concat(lines, "\n")
+	end
+
+	local function addNewEquipmentButtons(scroll)
+		local equipment = lply:GetNetVar("zc_equipment", {})
+		for i = 1, #equipment do
+			local armor = Entity(equipment[i])
+			if not IsValid(armor) then continue end
+			local but = vgui.Create("DButton")
+			but:SetText(armor.PrintName or armor:GetClass())
+			if string.StartWith(armor:GetClass(), "ent_new_armor_") then but:SetTooltip(describeNewArmor(armor)) end
+			but:SetFont("ZCity_Tiny")
+			but:Dock(TOP)
+			but:DockMargin(6, 6, 6, 0)
+			but:SetSize(0, ScreenScaleH(24))
+			but.Paint = function(self, w, h)
+				PaintEquipmentButton(self, w, h)
+			end
+
+			if isstring(armor.IconOverride) and #armor.IconOverride > 0 then
+				local img = vgui.Create("DImage", but)
+				img:SetSize(ScreenScaleH(22), ScreenScaleH(22))
+				img:Dock(LEFT)
+				img:DockMargin(8, 1, 0, 1)
+				img:SetImage(armor.IconOverride)
+			end
+
+			but.DoClick = function()
+				RunConsoleCommand("hg_drop_new_equipment", i)
+			end
+
+			scroll:AddItem(but)
 		end
 	end
 
@@ -1011,6 +1070,7 @@ if CLIENT then
 			scroll:DockMargin(10, 44, 10, 8)
 			frame.scroll = scroll
 			StyleEquipmentScroll(scroll)
+			addNewEquipmentButtons(scroll)
 			
 			for k, v in pairs(tblcpy) do
 				if !hg.armorNames[v] and isnumber(k) then continue end

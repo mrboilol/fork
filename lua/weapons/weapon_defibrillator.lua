@@ -440,7 +440,7 @@ local function BeginAEDShock(defib, ply, getTarget, uses, accidental)
 		if org then
 			local shockLoad = accidental and 150 or 40
 			org.painadd = (org.painadd or 0) + shockLoad
-			org.shock = (org.shock or 0) + shockLoad
+			org.shock = math.max((org.shock or 0) + shockLoad, 130)
 		end
 
 		for _, otherPly in ipairs(player.GetAll()) do

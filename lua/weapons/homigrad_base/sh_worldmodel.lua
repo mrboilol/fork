@@ -185,9 +185,9 @@ function SWEP:ChangeGunPos(dtime)
 	local oneHandRecovery = stanceOneHanded and 1.12 or support.oneHanded and not self.IgnoreOneArmPenalties and Lerp(recoverySkill, 0.72, self:HasFirearmTraining(ply) and 1 or 0.9) or 1
 	local recoveryScale = self.shotRecoveryScale or 1
 	local angularSpring = Lerp(recoverySkill, 62, 125) * 0.8 * oneHandRecovery / recoveryScale ^ 2
-	local angularDamping = Lerp(recoverySkill, 10, 23) * 0.85 * oneHandRecovery / recoveryScale
+	local angularDamping = Lerp(recoverySkill, 10, 23) * 1.0 * oneHandRecovery / recoveryScale
 	local positionSpring = Lerp(recoverySkill, 55, 110) * 0.8 * oneHandRecovery / recoveryScale ^ 2
-	local positionDamping = Lerp(recoverySkill, 9, 21) * 0.85 * oneHandRecovery / recoveryScale
+	local positionDamping = Lerp(recoverySkill, 9, 21) * 1.0 * oneHandRecovery / recoveryScale
 	local lateralAngularSpring = angularSpring * 0.5
 	local lateralPositionSpring = positionSpring * 0.5
 	local wobble = self.ShotMuzzleWobble or Angle(0, 0, 0)
@@ -202,7 +202,7 @@ function SWEP:ChangeGunPos(dtime)
 	local disturbed = math.min(math.abs(wobble[1]) + math.abs(wobble[2]) * 1.5, 8)
 	if disturbed > 0.02 then
 		local t = CurTime()
-		local drift = disturbed * Lerp(recoverySkill, 22, 11) * recoilDtime
+		local drift = disturbed * Lerp(recoverySkill, 18, 9) * recoilDtime
 		wobbleVelocity[2] = wobbleVelocity[2] + (math.sin(t * 5.3) * 0.6 + math.sin(t * 9.1 + 1.7) * 0.4) * drift
 		wobbleVelocity[3] = wobbleVelocity[3] + (math.cos(t * 6.7 + 0.4) * 0.6 + math.sin(t * 11.3) * 0.4) * drift * 0.5
 		offsetVelocity[2] = offsetVelocity[2] + math.sin(t * 4.1 + 2.3) * drift * 0.12
@@ -220,7 +220,7 @@ function SWEP:ChangeGunPos(dtime)
 	wobble[1] = math.Clamp(wobble[1], -11, 5)
 	wobble[2] = math.Clamp(wobble[2], -6, 6)
 	wobble[3] = math.Clamp(wobble[3], -6, 6)
-	offset[1] = math.Clamp(offset[1], -6, 1)
+	offset[1] = math.Clamp(offset[1], -8, 1)
 	offset[2] = math.Clamp(offset[2], -3, 3)
 	offset[3] = math.Clamp(offset[3], -3, 4)
 	self.ShotMuzzleWobble = wobble

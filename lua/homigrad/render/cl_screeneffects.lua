@@ -588,8 +588,8 @@ local vitalityDyingVolumeMax = 1.5
 local sonimCookedForegroundVolume = 1.2
 local painBeatOverlayPath = "sound/rem_pain.mp3"
 local panicattackOverlayPath = "sound/rem_panicattack.mp3"
-local panicattackFadeStart = 0
-local panicattackThreshold = 0.55
+local panicattackFadeStart = 0.2
+local panicattackThreshold = 0.9
 local panicattackVolumeMul = 1
 local function getPanicAttackFx(org)
 	local panicConVar = GetConVar("hg_panic")
@@ -1146,11 +1146,15 @@ local WAKE_FADE_TIME = 4
 local wakeFadeStart = 0
 local wasVitalsOtrub = false
 
-local function drawO2GrainCenter(strength)
+local O2_CENTER_TOP_CUT = 0.45
+
+local function drawO2GrainCenter(strength, severity)
 	local w, h = ScrW(), ScrH()
 	local cx, cy = w * 0.5, h * 0.5
-	local inner = math.min(w, h) * 0.2
-	local outer = math.min(w, h) * 0.72
+	local sizeScale = Lerp(severity, 1, 0.7)
+	local inner = math.min(w, h) * 0.12 * sizeScale
+	local outer = math.min(w, h) * 0.45 * sizeScale
+	strength = strength * Lerp(severity, 1, 0.33)
 	local alpha = math.floor(255 * math.Clamp(strength, 0, 1))
 	if alpha <= 0 then return end
 
@@ -1170,8 +1174,10 @@ local function drawO2GrainCenter(strength)
 		local a0 = i / O2_CENTER_SEGMENTS * math.pi * 2
 		local a1 = (i + 1) / O2_CENTER_SEGMENTS * math.pi * 2
 		local c0, s0, c1, s1 = math.cos(a0), math.sin(a0), math.cos(a1), math.sin(a1)
-		local ix0, iy0, ix1, iy1 = cx + c0 * inner, cy + s0 * inner, cx + c1 * inner, cy + s1 * inner
-		local ox0, oy0, ox1, oy1 = cx + c0 * outer, cy + s0 * outer, cx + c1 * outer, cy + s1 * outer
+		local k0 = 1 - O2_CENTER_TOP_CUT * math.max(-s0, 0)
+		local k1 = 1 - O2_CENTER_TOP_CUT * math.max(-s1, 0)
+		local ix0, iy0, ix1, iy1 = cx + c0 * inner * k0, cy + s0 * inner * k0, cx + c1 * inner * k1, cy + s1 * inner * k1
+		local ox0, oy0, ox1, oy1 = cx + c0 * outer * k0, cy + s0 * outer * k0, cx + c1 * outer * k1, cy + s1 * outer * k1
 
 		vert(cx, cy, alpha)
 		vert(ix0, iy0, alpha)
@@ -1402,7 +1408,7 @@ drawFinalVitalsVignettes = function()
 		render.SetMaterial(noiseMat)
 		render.DrawScreenQuad()
 
-		drawO2GrainCenter(org.otrub and 0.45 or 0.93)
+		drawO2GrainCenter(org.otrub and 0.35 or 0.6, o2Severity)
 	end
 
 	local excruciatingBlend = getServerSoundMode("hg_painsound", 6) == 6
@@ -1574,6 +1580,11 @@ hook.Add("Post Post Processing", "ItHurts", function()
     if sensoryActive and hypotension > 0.25 then
         local hypotensionBlur = math.Clamp((hypotension - 0.25) / 0.75, 0, 1) ^ 1.35
         blurAmount = math.max(blurAmount, hypotensionBlur * 3 * sensoryMix)
+    end
+
+    local panicFx = getPanicAttackFx(org) ^ hg.screeneffects_config.panicattackVisualExponent
+    if sensoryActive and panicFx > 0.3 then
+        blurAmount = math.max(blurAmount, (panicFx - 0.3) / 0.7 * 1.8 * sensoryMix)
     end
 
     local adrenaline = org.adrenaline or 0
@@ -1917,6 +1928,13 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		render.DrawScreenQuad()
 
 		if not panicDying then
+			render.UpdateScreenEffectTexture()
+			vignetteMat:SetFloat("$c2_x", CurTime() + 9500)
+			vignetteMat:SetFloat("$c0_z", scaleVignette(panicBase * 0.7))
+			vignetteMat:SetFloat("$c1_y", scaleVignette(panicBase * 2.6))
+			render.SetMaterial(vignetteMat)
+			render.DrawScreenQuad()
+
 			render.UpdateScreenEffectTexture()
 			render.UpdateFullScreenDepthTexture()
 			grainMat:SetFloat("$c0_x", CurTime())
@@ -2684,7 +2702,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			end
 			if IsValid(ItsHopelessStation) then
 				local depression = math.Clamp(tonumber(org.depression) or 0, 0, 1)
-				local backgroundVolume = consciousVol * depression * 0.65
+				local backgroundVolume = consciousVol * depression * (dyingMode == 4 and 0.25 or 0.65)
 				setItsHopelessVolume(math.max(dyingMode == 9 and consciousVol or 0, backgroundVolume))
 			end
 			if dyingMode != 10 and IsValid(VitalityStation) then

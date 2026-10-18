@@ -246,9 +246,15 @@ module[2] = function(owner, org, timeValue)
 	local shockAnalgesia = Clamp(org.analgesia + org.painkiller * 0.3, 0, 1)
 	local shockThreshold = (shock_consciousness_threshold + shock_consciousness_analgesia_range * shockAnalgesia) * (1 + resilience * 0.6 + zerlkersResistance * 1.4) * math.max(org.traumaResistanceMul or 1, 1)
 	local shockMax = math.max(shock_consciousness_max, shockThreshold + shock_consciousness_span)
-	local shockActive = org.shock > shockThreshold
 	local o2Value = org.o2 and tonumber(org.o2[1]) or 30
-	local hypoxicDrain = o2Value < 4 and 0.06 or o2Value < 8 and 0.015 or 0
+	local hypoxicDrain = o2Value < 4 and 0.1 or o2Value < 8 and 0.03 or o2Value < 10 and 0.01 or 0
+	if not org.otrub then
+		local hypoxicShockTarget = o2Value < 4 and 80 or o2Value < 8 and 30 or 0
+		if org.shock < hypoxicShockTarget then
+			org.shock = math.Approach(org.shock, hypoxicShockTarget, timeValue * (o2Value < 4 and 12 or 5))
+		end
+	end
+	local shockActive = org.shock > shockThreshold
 	if shockActive then
 		local shockTarget = Clamp(math.Remap(org.shock, shockThreshold, shockMax, shock_consciousness_soft_target, shock_consciousness_hard_target), shock_consciousness_hard_target, shock_consciousness_soft_target)
 		local shockDrain = Clamp(math.Remap(org.shock, shockThreshold, shockMax, shock_consciousness_drain_start, shock_consciousness_drain_end), shock_consciousness_drain_end, shock_consciousness_drain_start)

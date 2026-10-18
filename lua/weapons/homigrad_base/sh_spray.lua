@@ -144,10 +144,10 @@ function SWEP:PrimarySpread()
 			offsetVelocity[2] = offsetVelocity[2] + recoilImpulse * 4
 			offsetVelocity[3] = offsetVelocity[3] + lateralImpulse * 6 * cantedDirection
 		else
-			wobbleVelocity[1] = wobbleVelocity[1] - recoilImpulse * ((longGun and 78 or 32) + math.abs(side) * 4)
+			wobbleVelocity[1] = wobbleVelocity[1] - recoilImpulse * ((longGun and 90 or 37) + math.abs(side) * 4)
 			wobbleVelocity[2] = wobbleVelocity[2] + side * lateralImpulse * 8
 			wobbleVelocity[3] = wobbleVelocity[3] + roll * lateralImpulse * 3.5
-			offsetVelocity[1] = offsetVelocity[1] - recoilImpulse * 11
+			offsetVelocity[1] = offsetVelocity[1] - recoilImpulse * (self:HasFirearmTraining(owner) and 11.5 or 16)
 			offsetVelocity[2] = offsetVelocity[2] + side * lateralImpulse * 3.5
 			offsetVelocity[3] = offsetVelocity[3] + recoilImpulse * 7
 		end
@@ -173,8 +173,8 @@ function SWEP:PrimarySpread()
 		local longGun = not self:IsPistolHoldType() and not self.PistolKinda
 		local force = math.Clamp(caliberMul * weightMul * supportMul * handlingMul * experienceMul * stanceMul * (0.75 + math.min(sprayI / 10, 0.75)) * 1.18, 0.18, 5.5)
 		if longGun and not cantedHold then force = force * 1.4 end
-		local panic = organism.panicattackActive and math.Clamp(organism.panicattack or 0, 0.45, 1) or 0
-		local panicRecoilMul = panic > 0 and math.Remap(panic, 0.45, 1, 1.12, 1.42) or 1
+		local panic = organism.panicattackActive and math.Clamp(organism.panicattack or 0, 0.35, 1) or 0
+		local panicRecoilMul = panic > 0 and math.Remap(panic, 0.35, 1, 1.1, 1.4) or 1
 		force = force * panicRecoilMul * combatAimMul
 		mul = mul * math.Clamp(supportMul * handlingMul, 0.65, 3.75)
 		mul = mul * self.RecoilMul
@@ -208,7 +208,7 @@ function SWEP:PrimarySpread()
 			local downwardKick = util.SharedRandom("hg_recoil_downward", 0, 1, (self.recoilShotIndex or 0) * 79) < 0.025
 			local pitch = downwardKick
 				and math.Rand(force * 0.06, force * 0.18)
-				or -math.Rand(force * 0.78, force * 1.12)
+				or -math.Rand(force * 1.0, force * 1.45)
 			angrand2 = Angle(pitch, math.Rand(-force * 0.12, force * 0.12), math.Rand(-force * 0.05, force * 0.05))
 		end
 		self.LastRecoilDirection = Angle(angrand2[1] / math.max(force, 0.001), angrand2[2] / math.max(force, 0.001), angrand2[3] / math.max(force, 0.001))

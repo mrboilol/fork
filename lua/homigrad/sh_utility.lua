@@ -1339,6 +1339,7 @@ local IsValid = IsValid
 		local shockPower = 1 - shock / 100 * 0.28
 		local disorientationPower = 1 - math.Clamp(disorientation / 6, 0, 1) * 0.28
 		local ailmentPower = 1 - math.Clamp(concussion / 6 * 0.18 + nausea / 6 * 0.08 + hunger / 100 * 0.12 + math.abs(temperature - 36.7) / 8 * 0.12, 0, 0.38)
+		local panic = org.panicattackActive and math.Clamp(((tonumber(org.panicattack) or 0) - 0.35) / 0.65, 0, 1) or 0
 		local power = math.Clamp(staminaPower * consciousnessPower * reservePower * painPower * shockPower * disorientationPower * ailmentPower, 0.08, 1)
 
 		local tempo = math.Clamp(power ^ 0.62 * Lerp(staminaFraction, 0.72, 1), 0.18, 1)
@@ -1348,10 +1349,13 @@ local IsValid = IsValid
 			+ concussion / 6 * 0.46 + nausea / 6 * 0.14,
 			0, 1
 		)
+		instability = math.min(instability + panic * 0.28, 1)
 
 		return {
-			power = power,
+			power = power * Lerp(panic, 1, 0.75),
 			tempo = tempo,
+			speed = tempo * Lerp(panic, 1, 1.4),
+			effort = Lerp(panic, 1, 0.8),
 			stability = 1 - instability,
 			aim = 1 + instability * 2.5
 		}

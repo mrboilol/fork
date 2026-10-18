@@ -682,7 +682,14 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 			--end
 		--//
 
-		local inertia_to = calc_forward_side_moves_to_vector2d(fm, sm, ply_angles) * speed
+		local fireWep = ply:GetActiveWeapon()
+		local fireDragTarget = IsValid(fireWep) and fireWep.GetFireMoveDrag and fireWep:GetFireMoveDrag() or 0
+		local fireDrag = ply.hg_fireDrag or 0
+		fireDrag = math_Approach(fireDrag, fireDragTarget, delta_time * (fireDragTarget > fireDrag and 6 or 2.5))
+		ply.hg_fireDrag = fireDrag
+		if fm > 0 and fireDrag > 0 then speed = speed * (1 - fireDrag) end
+
+		local inertia_to =calc_forward_side_moves_to_vector2d(fm, sm, ply_angles) * speed
 		--\\ Air & water walking debuffs
 			local water_level = ply:WaterLevel()
 

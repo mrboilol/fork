@@ -42,15 +42,11 @@ local TARGET_SMOOTH = 14
 local MOVING_SPEED = 12
 local REACH_FRACTION = 0.97
 local STANDING_REACH_FRACTION = 0.995
-local UPRIGHT_REACH_FRACTION = 0.99
-local MAX_UPRIGHT_RISE = 6
-local UPRIGHT_SMOOTH = 6
 local LEAD_REACH_FRACTION = 0.98
 local STRIDE_REACH_FRACTION = 0.9
 local MAX_STRIDE_DROP = 2
 local STRIDE_BODY_SCALE = 0.25
 local RUN_HOP_SCALE = 0.4
-local UPRIGHT_FADE_SPEED = 40
 local MIN_PHASE_SPAN = 0.3
 local PHASE_WRAP = 1.8
 local REMOTE_MAX_AHEAD = 1.5
@@ -590,7 +586,7 @@ local function releaseFeet(state, ctx)
 end
 
 local function rawPelvisOffset(ply, state)
-	return ((state.rise or 0) + state.hop - state.drop - (ply.hg_Body and ply.hg_Body.drop or 0)) * state.weight
+	return (state.hop - state.drop - (ply.hg_Body and ply.hg_Body.drop or 0)) * state.weight
 end
 
 local function pelvisOffsetOf(ply, state)
@@ -635,7 +631,7 @@ local function updateFeet(ply, state, ctx, dt)
 		return
 	end
 
-	local pelvisLift = pelvisOffsetOf(ply, state) - (state.rise or 0) * state.weight
+	local pelvisLift = pelvisOffsetOf(ply, state)
 	for index = 1, 2 do
 		local foot = state.feet[index]
 		local other = state.feet[3 - index]
@@ -750,28 +746,6 @@ local function gaitBob(state, ctx)
 	end
 
 	return math_sin(math.pi * stepProgress / flight) * IKFoot.GetFloat("flight_hop") * runFraction * Lerp(sprint, RUN_HOP_SCALE, SPRINT_HOP_SCALE) - dip
-end
-
-local function updateUpright(state, ctx, dt)
-	local targetRise
-	if ctx.onGround and not ctx.crouching then
-		for index, anim in ipairs(ctx.anim) do
-			local foot = state.feet[index]
-			if anim.usable and foot.ground and not foot.swinging then
-				local dx, dy = anim.hip.x - foot.ground.x, anim.hip.y - foot.ground.y
-				local reach = anim.length * UPRIGHT_REACH_FRACTION
-				local height = math_sqrt(math_max(reach * reach - dx * dx - dy * dy, 0))
-				local rise = foot.ground.z + state.ankleHeight + height - anim.hip.z
-				rise = math_Clamp(rise, 0, MAX_UPRIGHT_RISE) * (1 - ctx.limp[index])
-				targetRise = targetRise and math_min(targetRise, rise) or rise
-			end
-		end
-		targetRise = targetRise or state.rise or 0
-		targetRise = targetRise * (1 - (ctx.stagger and ctx.stagger.amount or 0)) * (1 - math_Clamp((ctx.speed - MOVING_SPEED) / UPRIGHT_FADE_SPEED, 0, 1))
-	end
-	local rise = state.rise or 0
-	targetRise = targetRise or 0
-	state.rise = rise + (targetRise - rise) * (1 - math_exp(-dt * UPRIGHT_SMOOTH))
 end
 
 local function readAnim(ent, ply, bones)
@@ -1254,7 +1228,6 @@ local function footIK(ent, ply)
 
 	updateFeet(ply, state, ctx, dt)
 	updateDrop(state, ctx, dt)
-	updateUpright(state, ctx, dt)
 	state.hop = gaitBob(state, ctx)
 	updatePelvis(ply, state, dt)
 	applyPose(ent, ply, state, bones, ctx)

@@ -579,6 +579,19 @@ hook.Add("Fake", "SyncArmorToFakeRagdoll", function(ply)
 	ply:SyncArmor()
 end)
 
+function hg.GetLegacyNewArmorClass(equipment)
+	local class = "ent_new_armor_legacy_" .. string.Replace(tostring(equipment), "ent_armor_", "")
+	return scripted_ents.GetStored(class) and class or nil
+end
+
+function hg.CreateLegacyNewArmor(equipment)
+	local class = hg.GetLegacyNewArmorClass(equipment)
+	local armor = class and ents.Create(class)
+	if not IsValid(armor) then return end
+	armor:Spawn()
+	return armor
+end
+
 function hg.AddArmor(ply, equipment, ent)
     if not IsValid(ply) then return end
 	if IsValid(ent) and (ent.unusable or ent:GetNWBool("ArmorUnusable", false)) then
@@ -625,6 +638,17 @@ function hg.AddArmor(ply, equipment, ent)
 			ply:Notify("You need a compatible helmet equipped to wear this.", true, "armor_dependency_" .. equipment, 3)
 		end
 		return false
+	end
+
+	if not ent and ply:IsPlayer() and (placement == "torso" or placement == "head") then
+		local newArmor = hg.CreateLegacyNewArmor(equipment)
+		if IsValid(newArmor) then
+			if newArmor:CanWear(ply) then
+				newArmor:Wear(ply)
+				return true
+			end
+			newArmor:Remove()
+		end
 	end
 
 	if placement == "ears" then
@@ -1520,6 +1544,7 @@ end
 
 function hg.ProcessArmorModelHit(hit, damage, forceAmount, direction, shot)
 	if not hit or not IsValid(hit.body) then return end
+	if hit.zcityArmor then return hg.ProcessZCityArmorModelHit(hit, damage, forceAmount, direction, shot) end
 	local owner = hit.body
 	local armor, placement, armorData = hit.armor, hit.placement, hit.data
 	if not armorData or not owner.armors or owner.armors[placement] ~= armor then return end

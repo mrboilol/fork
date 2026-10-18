@@ -405,6 +405,12 @@ local functions_break = {
 		ent2.AmmoCount = ent.inventory.Ammo[ammo]
     end,
     ["Armor"] = function(ent, armor)
+        local newArmor = hg.CreateLegacyNewArmor(armor)
+        if IsValid(newArmor) then
+            newArmor:SetPos(ent:GetPos())
+            newArmor:SetAngles(ent:GetAngles())
+            return
+        end
         local ent2 = ents.Create("ent_armor_" .. armor)
         if not IsValid(ent2) then return end
         ent2:Spawn()
@@ -746,7 +752,7 @@ hook.Add("Boxes Think", "SpawnBoxes", function()
 	//print(entName)
 	if not entName or entName == "" then return end
 
-	local huy = ents.Create(entName)
+	local huy = ents.Create(hg.GetLegacyNewArmorClass(entName) or entName)
 	if not IsValid(huy) then return end
 	huy.IsSpawned = true
 	huy:SetPos(spawnPos)

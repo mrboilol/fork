@@ -2431,7 +2431,7 @@ function SWEP:PrimaryAttack(forcespecial)
 	local strikingArm = rand and "rarm" or "larm"
 	local armSpeedMul = Lerp(hg.GetArmEffectiveness and hg.GetArmEffectiveness(owner, strikingArm) or 1, 0.35, 1)
 	local combat = hg.GetCombatCondition and hg.GetCombatCondition(owner) or nil
-	armSpeedMul = armSpeedMul * (combat and combat.tempo or 1)
+	armSpeedMul = armSpeedMul * (combat and (combat.speed or combat.tempo) or 1)
 	self:SetNextPrimaryFire(CurTime() + self.SwingCooldown / math.max(armSpeedMul, 0.1) * math.Clamp((180 - owner.organism.stamina[1]) / 90,1,2) + (math.max(special_attack and 0.5 or 0, clawClasses[owner.PlayerClassName] or 0)))
 	self:SetNextSecondaryFire(CurTime() + self.SwingCooldown / math.max(armSpeedMul, 0.1) + (math.max(special_attack and 0.5 or 0, clawClasses[owner.PlayerClassName] or 0)))
 	self:SetLastShootTime(CurTime())

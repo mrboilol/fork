@@ -948,7 +948,7 @@ function SWEP:PrimaryAttack(forcespecial)
 	self:UpdateNextIdle()
 
 	local combat = hg.GetCombatCondition and hg.GetCombatCondition(owner) or nil
-	local combatTempo = combat and combat.tempo or 1
+	local combatTempo = combat and (combat.speed or combat.tempo) or 1
 	self:SetNextPrimaryFire(CurTime() + .6 * math_Clamp((180 - owner.organism.stamina[1]) / 90,1,2) / math.max((owner.organism.meleespeed or 1) * combatTempo, 0.1) + (special_attack and 0.5 or isfur and 0.4 or 0))
 	self:SetNextSecondaryFire(CurTime() + .6 / math.max((owner.organism.meleespeed or 1) * combatTempo, 0.1) + (special_attack and 0.5 or isfur and 0.4 or 0))
 	self:SetLastShootTime(CurTime())

@@ -20,18 +20,22 @@ local hg_panic = CreateConVar("hg_panic", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED 
 local hg_painsound = ConVarExists("hg_painsound") and GetConVar("hg_painsound") or CreateConVar("hg_painsound", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "look at the ones you like (press sound icon for preview)", 0, 6)
 local hg_dyingsound = ConVarExists("hg_dyingsound") and GetConVar("hg_dyingsound") or CreateConVar("hg_dyingsound", "2", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "look at the ones you like (press sound icon for preview)", 0, 11)
 local hg_otrubsound = ConVarExists("hg_otrubsound") and GetConVar("hg_otrubsound") or CreateConVar("hg_otrubsound", "0", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "look at the ones you like (press sound icon for preview)", 0, 7)
-local panicattack_threshold = 0.45
-local panicattack_add_decay_time = 11
-local panicattack_rise_time = 0.5
-local panicattack_decay_time = 9
+local panicattack_threshold = 0.35
+local panicattack_add_decay_time = 150
+local panicattack_decay_hold_time = 8
+local panicattack_combat_decay_mul = 1.6
+local panicattack_rise_time = 3
+local panicattack_decay_time = 10
 local panicattack_gain_chance = 1
-local panicattack_gain_mul = 1
-local panicattack_disorientation = 0.45
-local panicattack_adrenaline_add_target = 0.65
-local panicattack_combat_adrenaline_add_target = 3
-local panicattack_adrenaline_add_rise_time = 1
-local panicattack_adrenaline_duration = 5
-local panicattack_combat_adrenaline_duration = 10
+local panicattack_gain_mul = 0.3
+local panicattack_event_cap = 0.09
+local panicattack_streak_window = 12
+local panicattack_streak_step = 0.15
+local panicattack_streak_max = 6
+local panicattack_disorientation = 0.4
+local panicattack_adrenaline_add_target = 0.8
+local panicattack_combat_adrenaline_add_target = 2
+local panicattack_adrenaline_add_rise_time = 3
 local panicattack_damage_scale = 0.014
 local panicattack_damage_cooldown = 0.75
 local panicattack_witness_radius = 700
@@ -915,7 +919,12 @@ function hg.organism.AddPanicAttack(org, amount, silent, combatEvent, ignoreGunf
 	end
 	if not isnumber(amount) or amount <= 0 then return org.panicattackadd or 0 end
 	if IsValid(org.owner) and org.owner.GetTraitMultiplier then amount = amount * org.owner:GetTraitMultiplier("panic_gain", 1) end
-	if combatEvent then hg.organism.MarkPanicGunfight(org) end
+	if combatEvent then
+		hg.organism.MarkPanicGunfight(org)
+		if (org.panicLastHit or 0) > CurTime() - panicattack_streak_window then
+			amount = amount * (1 + math.min(org.panicHitStreak or 0, panicattack_streak_max) * panicattack_streak_step)
+		end
+	end
 	local goodmood = math.Clamp(tonumber(org.goodmood) or 0, 0, 1)
 	if goodmood > 0 then
 		local absorbed = math.min(amount, goodmood / 2.5)
@@ -925,7 +934,8 @@ function hg.organism.AddPanicAttack(org, amount, silent, combatEvent, ignoreGunf
 	end
 	if not hg_panic:GetBool() then
 		if not universalStressApplied then apply_panic_disabled_stress(org, amount) end
-		org.panicattackadd = math.Clamp((org.panicattackadd or 0) + amount * panicattack_gain_mul, 0, 1)
+		org.panicattackadd = math.Clamp((org.panicattackadd or 0) + math.min(amount * panicattack_gain_mul, panicattack_event_cap), 0, 1)
+		org.panicLastGain = CurTime()
 		return org.panicattackadd
 	end
 	if not ignoreGunfightProtection and panic_has_gunfight_protection(org) then return org.panicattackadd or 0 end
@@ -933,7 +943,8 @@ function hg.organism.AddPanicAttack(org, amount, silent, combatEvent, ignoreGunf
 		return org.panicattackadd or 0
 	end
 	if math.random(panicattack_gain_chance) != 1 then return org.panicattackadd or 0 end
-	org.panicattackadd = math.Clamp((org.panicattackadd or 0) + amount * panicattack_gain_mul, 0, 1)
+	org.panicattackadd = math.Clamp((org.panicattackadd or 0) + math.min(amount * panicattack_gain_mul, panicattack_event_cap), 0, 1)
+	org.panicLastGain = CurTime()
 	return org.panicattackadd
 end
 
@@ -1186,6 +1197,12 @@ hook.Add("HomigradDamage", "PanicAttackDamage", function(ply, dmgInfo)
 	local combatEvent = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_BLAST)
 		or (IsValid(attacker) and attacker != ply and dmgInfo:IsDamageType(DMG_SLASH + DMG_CLUB))
 	local amount = math.Clamp(dmgInfo:GetDamage() * panicattack_damage_scale + (dmgInfo:IsDamageType(DMG_BLAST) and 0.08 or 0), 0.03, 0.55)
+	local victimOrg = ply.organism
+	if combatEvent then
+		local streakActive = (victimOrg.panicLastHit or 0) > CurTime() - panicattack_streak_window
+		victimOrg.panicHitStreak = (streakActive and (victimOrg.panicHitStreak or 0) or 0) + 1
+		victimOrg.panicLastHit = CurTime()
+	end
 	hg.organism.AddPanicAttack(ply.organism, amount, false, combatEvent, combatEvent, true)
 	if dmgInfo:GetDamage() <= 0 and not dmgInfo:IsDamageType(DMG_BLAST) then return end
 	panic_witness_event(ply, attacker, math.Clamp(amount * 0.75, 0.04, 0.2), panicattack_witness_radius, combatEvent)
@@ -1340,7 +1357,10 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.panicattackActive = false
 		org.panicAdrenalineUntil = 0
 	else
-		org.panicattackadd = math.Approach(org.panicattackadd or 0, 0, timeValue / panicattack_add_decay_time)
+		if (org.panicLastGain or 0) + panicattack_decay_hold_time <= CurTime() then
+			local decayTime = panicattack_add_decay_time * ((org.panicGunfightUntil or 0) > CurTime() and panicattack_combat_decay_mul or 1)
+			org.panicattackadd = math.Approach(org.panicattackadd or 0, 0, timeValue / decayTime)
+		end
 		org.panicattack = math.Approach(oldPanicAttack, org.panicattackadd or 0, timeValue / ((org.panicattackadd or 0) > oldPanicAttack and panicattack_rise_time or panicattack_decay_time))
 	end
 	local oldSeizureBrain = org.lastSeizureBrain or (org.brain or 0)
@@ -1365,22 +1385,21 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	if hg_panic:GetBool() and oldPanicAttack < panicattack_threshold and org.panicattack >= panicattack_threshold and isPly and owner:Alive() then
 		owner:Notify("I can't calm down.", 2, "panicattack_start", 2, nil, Color(255, 140, 140))
 	end
-	if oldPanicAttack < panicattack_threshold and org.panicattack >= panicattack_threshold then
-		local combatPanic = (org.panicGunfightUntil or 0) > CurTime()
-		org.panicAdrenalineUntil = CurTime() + (combatPanic and panicattack_combat_adrenaline_duration or panicattack_adrenaline_duration)
-	end
 	local panicDying = org.otrub or org.incapacitated or org.deathStateKilled or (isPly and not owner:Alive())
 	if org.panicattack >= panicattack_threshold then
 		org.panicattackActive = hg_panic:GetBool() and not panicDying
-		if CurTime() < (org.panicAdrenalineUntil or 0) then
+		local panicSeverity = math.Clamp(math.Remap(org.panicattack, panicattack_threshold, 1, 0, 1), 0, 1)
+		if not panicDying then
 			local combatPanic = (org.panicGunfightUntil or 0) > CurTime()
 			local targetMaximum = combatPanic and panicattack_combat_adrenaline_add_target or panicattack_adrenaline_add_target
-			local adrenalineTarget = math.Remap(org.panicattack, panicattack_threshold, 1, targetMaximum * 0.5, targetMaximum)
+			local adrenalineTarget = Lerp(panicSeverity, targetMaximum * 0.4, targetMaximum)
 			if not hg_panic:GetBool() then adrenalineTarget = adrenalineTarget * 0.55 end
-			org.adrenalineAdd = math.Approach(org.adrenalineAdd or 0, adrenalineTarget, timeValue / panicattack_adrenaline_add_rise_time)
+			if (org.adrenalineAdd or 0) < adrenalineTarget then
+				org.adrenalineAdd = math.Approach(org.adrenalineAdd or 0, adrenalineTarget, timeValue / panicattack_adrenaline_add_rise_time)
+			end
 		end
 		if org.panicattackActive then
-			org.disorientation = math.max(org.disorientation, 0.6 + panicattack_disorientation * org.panicattack)
+			org.disorientation = math.max(org.disorientation, 0.1 + panicattack_disorientation * panicSeverity)
 		end
 	else
 		org.panicattackActive = false

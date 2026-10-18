@@ -335,34 +335,4 @@ end
             Equip:Unwear(ply)
         end)
     end
-    
-    hook.Add("radialOptions", "1_zc_equipment", function()
-        local ply = LocalPlayer()
-        local organism = ply.organism or {}
-
-        if ply:Alive() and !organism.otrub then
-            local Equipment = ply:GetNetVar("zc_equipment", {})
-            if !Equipment or #Equipment < 1 then return end
-            local tbl = {function()
-                local commands = {}
-                for i = 1, #Equipment do
-                    local Equip = Entity(Equipment[i])
-
-                    for slot, _ in pairs(Equip.SlotOccupation) do
-                        --Equip.IconInv = isstring(Equip.IconOverride) and Material(Equip.IconOverride) or Equip.IconInv or nil -- soon
-                        commands[i] = {
-                            [1] = function()
-                                RunConsoleCommand("hg_drop_new_equipment", i)
-                                return 0
-                            end,
-                            [2] = "Drop:" .. " " .. Equip.PrintName,
-                        }
-                    end
-                end
-                hg.CreateRadialMenu(commands)
-                return -1
-            end, "Drop\nEquipment"}
-            hg.radialOptions[#hg.radialOptions + 1] = tbl
-        end
-    end)
 --//

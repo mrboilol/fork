@@ -290,6 +290,10 @@ function hg.GetZCityArmorImpactMitigation(org, placement, dmgInfo, rawDamage)
 	end
 end
 
+function hg.GetZCityArmorPlateKey(armor, plateName)
+	return "zcplate:" .. armor:EntIndex() .. ":" .. tostring(plateName)
+end
+
 local function protec(org, bone, dmg, dmgInfo, placement, boneindex, dir, hit, ricochet, impact, hitbox)
     local armor = org.owner:GetEquipmentBySlot(placement)
 	if !IsValid(armor) then return end
@@ -301,6 +305,9 @@ local function protec(org, bone, dmg, dmgInfo, placement, boneindex, dir, hit, r
     local plate = isBullet and hg.GetZCityArmorContactSection(armor, plateName, hitbox and hitbox[10])
 		or hg.GetZCityArmorImpactSection(armor, plateName, hitbox and hitbox[10])
     if not plate then return end
+	if isBullet and impact and impact.modelArmorHits and impact.modelArmorHits[hg.GetZCityArmorPlateKey(armor, plateName)] then
+		return {penetrationCost = 0, energyCost = 0}
+	end
     local plateKey = plate
 	if not isBullet and plate.BluntDamageMul and dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH) and not dmgInfo:IsDamageType(DMG_SLASH) then
 		local scale = hg.AbsorbZCityBluntImpact(armor, plate, dmgInfo)
@@ -442,6 +449,68 @@ local function protec(org, bone, dmg, dmgInfo, placement, boneindex, dir, hit, r
     end
 
 	return 1
+end
+
+if SERVER then
+	function hg.ProcessZCityArmorModelHit(hit, damage, forceAmount, direction, shot)
+		local armor, wearer, organ = hit.zcityArmor, hit.wearer, hit.organ
+		if not IsValid(armor) or not IsValid(wearer) or not organ then return end
+		local org = wearer.organism or IsValid(hit.body) and hit.body.organism
+		if not org then return end
+		if not org.owner then org.owner = wearer end
+		if istable(shot) and istable(shot.EquipmentHits) then shot.EquipmentHits[hit.armorKey] = true end
+		local damageType = shot and shot.DamageType or DMG_BULLET
+		if bit.band(damageType, DMG_BULLET + DMG_BUCKSHOT) == 0 then return end
+
+		local dir = isvector(direction) and direction:GetNormalized() or vector_origin
+		local energy = math.max(tonumber(damage) or 0, 0.01)
+		local penetration = math.max(tonumber(shot and shot.Penetration) or energy / 2, 0.01)
+		local source = istable(shot) and (shot.HG_IsBullet and shot or shot.bullet) or nil
+		local inflictor = istable(source) and (IsValid(source.Inflictor) and source.Inflictor or IsValid(source.Shooter) and source.Shooter)
+			or istable(shot) and IsValid(shot.Inflictor) and shot.Inflictor or nil
+
+		local dmgInfo = DamageInfo()
+		dmgInfo:SetAttacker(istable(source) and IsValid(source.Shooter) and source.Shooter or game.GetWorld())
+		dmgInfo:SetInflictor(inflictor or game.GetWorld())
+		dmgInfo:SetDamage(energy)
+		dmgInfo:SetDamageType(damageType)
+		dmgInfo:SetDamagePosition(hit.position)
+		dmgInfo:SetDamageForce(isvector(forceAmount) and forceAmount or dir * math.max(tonumber(forceAmount) or energy, 0.01))
+
+		local impact = {
+			ballisticVersion = 1,
+			pierceSoftArmor = hg.BulletPiercesSoftArmor and hg.BulletPiercesSoftArmor(nil, shot) or nil,
+			entity = hit.body,
+			bullet = source,
+			rawDamage = energy,
+			rawDamageType = damageType,
+			initialEnergy = energy,
+			energy = energy,
+			energyBefore = energy,
+			initialPenetration = penetration,
+			penetrationBefore = penetration,
+			hitPos = hit.position,
+			normal = hit.normal,
+			layerIndex = 1,
+		}
+
+		local previousBullet = inflictor and inflictor.bullet
+		if inflictor and istable(source) and source.HG_IsBullet then inflictor.bullet = source end
+		local result = protec(org, organ[2] or 0, energy / 25, dmgInfo, hit.placement, hit.box[6], dir * penetration, hit.position, false, impact, organ)
+		if inflictor and inflictor.bullet == source then inflictor.bullet = previousBullet end
+
+		if not istable(result) then return end
+		if result.stopped then
+			return {scale = 0, penetration = 0, penetrationCost = result.penetrationCost, stopped = true, material = MAT_METAL}
+		end
+		return {
+			scale = math.Clamp((energy - (result.energyCost or 0)) / energy, 0, 1),
+			penetration = math.max(penetration - (result.penetrationCost or 0), 0),
+			penetrationCost = result.penetrationCost,
+			stopped = false,
+			material = MAT_METAL,
+		}
+	end
 end
 
 hg.organism = hg.organism or {}

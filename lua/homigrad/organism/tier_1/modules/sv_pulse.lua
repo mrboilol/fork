@@ -432,7 +432,6 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	if org.brainoxygen < 0.28 then
 		org.consciousness = math.min(org.consciousness or 1, 0.15 + org.brainoxygen / 0.28 * 0.55)
 	end
-	if org.brainoxygen < 0.16 then org.needotrub = true end
 	if org.brainoxygen < 0.08 then
 		local bloodDeficit = Clamp((1500 - (tonumber(org.blood) or getNormalBloodVolume())) / 1500, 0, 1)
 		org.brain = math.min((org.brain or 0) + timeValue * (0.08 - org.brainoxygen) * 0.12 * (1 + bloodDeficit * 7), 1)

@@ -341,6 +341,23 @@ function SWEP:GetArmHealthHandlingMul()
 	return math.Clamp(1 + loss, 0.8, 4.5), loss
 end
 
+function SWEP:GetFireMoveDrag()
+	if self.norecoil then return 0 end
+
+	local sinceShot = CurTime() - (self:LastShootTime() or 0)
+	if sinceShot < 0 or sinceShot > 0.6 then return 0 end
+
+	local caliberMul, weightMul = self:GetRecoilImpulseFactors()
+	local strength = math.Clamp((caliberMul - 0.4) * 0.55, 0, 0.5)
+	if strength <= 0 then return 0 end
+	if sinceShot > 0.2 + strength * 0.5 then return 0 end
+
+	if self:IsPistolHoldType() or self.PistolKinda then strength = strength * 0.6 end
+	if self:HasFirearmTraining(self:GetOwner()) then strength = strength * 0.8 end
+
+	return strength * math.Clamp(weightMul, 0.6, 1.4)
+end
+
 function SWEP:GetRecoilSupportMul()
 	local owner = self:GetOwner()
 	if not IsValid(owner) then return 1 end
@@ -2626,7 +2643,7 @@ function SWEP:GetAdditionalValues()
 		animpos = animpos * 0.15 * mulhuy * (self:IsPistolHoldType() and 1 or 1) * weaponRecoilMul
 		animpos = animpos * ballisticRecoil * 1.7 * (self.animposmul or 1) // * 4
 
-		self.AdditionalPos2 = self.AdditionalPos2 - (self.AdditionalAng + self.AdditionalAng2):Forward() * animpos * 9
+		self.AdditionalPos2 = self.AdditionalPos2 - (self.AdditionalAng + self.AdditionalAng2):Forward() * animpos * 14 * (trained and 0.7 or 1)
 		local shit2 = ballisticRecoil * ((self:IsPistolHoldType() or self.PistolKinda) and 0.45 or 0.16) * weaponRecoilMul
 		local recoilSide = math.sin(animpos3) * shit2
 		if cantedHold then
@@ -2634,7 +2651,7 @@ function SWEP:GetAdditionalValues()
 		else
 			self.AdditionalPos2[2] = self.AdditionalPos2[2] + recoilSide
 		end
-		self.AdditionalPos2[1] = self.AdditionalPos2[1] + math.sin(animpos3) * -1 * shit2
+		self.AdditionalPos2[1] = self.AdditionalPos2[1] + math.sin(animpos3) * (trained and -1.1 or -1.6) * shit2
 		local recoilAxis = cantedHold and 1 or 2
 		self.AdditionalAng2[recoilAxis] = self.AdditionalAng2[recoilAxis] - recoilSide * 2 * (cantedHold and cantedDirection or 1)
 
@@ -2669,7 +2686,7 @@ function SWEP:GetAdditionalValues()
 		if (self.recoilWobbleAmp or 0) > 0.0001 then
 			local t = CurTime()
 			local frequencyMul = Lerp(armInjury / 3.5, 1, 0.62)
-			local amp = self.recoilWobbleAmp * (1.55 + armInjury * 0.22) * (trained and 0.55 or 1)
+			local amp = self.recoilWobbleAmp * (1.3 + armInjury * 0.22) * (trained and 0.45 or 1)
 			local sideAmp = math.Clamp(self.addSprayMul or 1, 0.08, 2.5)
 			local wobX = math.sin(t * 7.8 * frequencyMul) * 0.65 + math.sin(t * 12.4 * frequencyMul) * 0.35
 			local wobY = math.cos(t * 8.9 * frequencyMul) * 0.65 + math.cos(t * 14.2 * frequencyMul) * 0.35
@@ -2721,12 +2738,12 @@ function SWEP:GetAdditionalValues()
 				self.AdditionalPos2[2] = self.AdditionalPos2[2] + kick * 0.65
 				self.AdditionalPos2[3] = self.AdditionalPos2[3] + kick * 1.15 * cantedDirection
 			else
-				self.AdditionalAng2[1] = self.AdditionalAng2[1] - kick * (longGun and 6 or 3.4)
+				self.AdditionalAng2[1] = self.AdditionalAng2[1] - kick * (longGun and 7.5 or 4.3)
 				self.AdditionalAng2[2] = self.AdditionalAng2[2] + sideRand * kick * 0.25
 				self.AdditionalAng2[3] = self.AdditionalAng2[3] + rollRand * kick * 0.18
 				self.AdditionalPos2[3] = self.AdditionalPos2[3] + kick * (self:IsPistolHoldType() and 1.6 or 2.4)
 			end
-			self.AdditionalPos2[1] = self.AdditionalPos2[1] + kick * 0.85
+			self.AdditionalPos2[1] = self.AdditionalPos2[1] - kick * (trained and 0.75 or 1.1)
 		end
 	end
 

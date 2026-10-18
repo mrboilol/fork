@@ -491,18 +491,20 @@ local function EmitWound(src, wd, dt, stepIdx, bodyflow, heartH)
 		if wd.dripAcc > 1.5 then wd.dripAcc = 1.5 end
 		local dv = max(wd.dripTarget, wd.dripAcc * 0.2)
 		wd.dripAcc = wd.dripAcc - dv
-		wd.dripTarget = rng:Range(0.03, 0.075) * wd.dropK
+		local lowFlowDrop = min(full / 1.5, 0.5) * (1 - Clamp((full - C.ProfileRate.minor) / (C.ProfileRate.moderate - C.ProfileRate.minor), 0, 1))
+		wd.dripTarget = max(rng:Range(0.03, 0.075) * wd.dropK, lowFlowDrop)
 		Drops.Spawn(ox, oy, oz, wvx + nx * 4 + rng:Range(-2, 2), wvy + ny * 4 + rng:Range(-2, 2), wvz + nz * 4, dv, src, 0, 0)
 	end
 
 	-- what the wound's opening does not hold and the stream below it does not carry away
 	-- (cl_flowcore.lua FC.Feed) pours off the wound: one stream of linked drops, not a spray of them
-	if (wd.pourAcc or 0) > 0.04 and now >= (wd.pourT or 0) then
-		wd.pourT = now + 0.05
+	local trickle = full < C.ProfileRate.moderate
+	if (wd.pourAcc or 0) > (trickle and 0.3 or 0.04) and now >= (wd.pourT or 0) then
+		wd.pourT = now + (trickle and 0.25 or 0.05)
 		local dv = wd.pourAcc
 		wd.pourAcc = 0
 		local d = Drops.Spawn(ox, oy, oz, wvx + nx * 5 + rng:Range(-0.6, 0.6), wvy + ny * 5 + rng:Range(-0.6, 0.6), wvz + nz * 5, dv, src, 0, 0)
-		Drops.Link(d, wd, "pour")
+		if not trickle then Drops.Link(d, wd, "pour") end
 	end
 
 	-- gush: low-speed pour from large wounds. Consecutive gush drops are linked, so a steady pour

@@ -1685,7 +1685,7 @@ function SWEP:GetMeleeArmSpeedMul(owner)
 	local armSpeed = Lerp(self:GetMeleeArmEffectiveness(owner), 0.35, 1)
 	local combat = hg.GetCombatCondition and hg.GetCombatCondition(owner) or nil
 	local weaponWeight = owner.GetTraitMultiplier and owner:GetTraitMultiplier("weapon_weight", 1) or 1
-	return armSpeed * (combat and combat.tempo or 1) * weaponWeight
+	return armSpeed * (combat and (combat.speed or combat.tempo) or 1) * weaponWeight
 end
 
 function SWEP:GetSwingDamageMul()
@@ -1726,6 +1726,9 @@ function SWEP:GetComboDamageMul()
 end
 
 function SWEP:ApplyComboDamage(dmg)
+    local combat = hg.GetCombatCondition and hg.GetCombatCondition(self:GetOwner()) or nil
+    dmg = dmg * (combat and combat.effort or 1)
+
     if not self.ComboEnabled then
         return dmg
     end

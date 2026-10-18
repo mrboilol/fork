@@ -376,15 +376,114 @@ local function TraceArmorManualBox(body, armor, placement, startPos, endPos, pad
     return best
 end
 
-function hg.TraceArmorShot(body, startPos, endPos, seen, hits, padding)
-    if not IsValid(body) or not istable(hg.armor) then return end
-    local wearer = GetArmorWearer(body)
-    local armors = istable(body.armors) and body.armors or IsValid(wearer) and wearer.armors
-    if not istable(armors) then return end
+local zcityArmorMargin, zcityArmorReach = 3, 12
 
+local function GetZCityArmorRenderTransform(body, armor)
+    local data = ThatPlyIsFemale(body) and armor.FeMale or armor.Male
+    if not istable(data) or not isstring(data.Model) or data.Model == "" or data.BoneMerge then return end
+    local bone = body:LookupBone(data.ParentBone)
+    if not bone or body:GetManipulateBoneScale(bone):LengthSqr() < 0.1 then return end
+    local matrix = hg.GetIKBoneMatrix and hg.GetIKBoneMatrix(body, bone) or body:GetBoneMatrix(bone)
+    if not matrix then return end
+    local pos, ang = LocalToWorld(data.OffsetPos or vector_origin, data.OffsetAng or angle_zero, matrix:GetTranslation(), matrix:GetAngles())
+    return data.Model, pos, ang, data.ModelSize or 1
+end
+
+local function GetZCityArmorBoxes(body, armor)
+    local organs = hg.organism.GetHitBoxOrgans(body:GetModel(), body)
+    local boxes = organs and hg.organism.ShootMatrix(body, organs)
+    if not boxes then return end
+    local found = {}
+    for _, box in ipairs(boxes) do
+        local organ = box[8] or (box[6] and organs[box[6]] and organs[box[6]][box[7]])
+        if organ and organ[1] == armor.HitBoxSet then found[#found + 1] = {box = box, organ = organ} end
+    end
+    return found
+end
+
+local function GetZCityArmorSlot(wearer, armor)
+    for slot in pairs(armor.SlotOccupation or {}) do
+        if isnumber(slot) and wearer:GetEquipmentBySlot(slot) == armor then return slot end
+    end
+end
+
+local function DistanceToBox(point, box)
+    local localPoint = WorldToLocal(point, angle_zero, box[1], box[2])
+    local clamped = Vector(math.Clamp(localPoint.x, box[3].x, box[4].x), math.Clamp(localPoint.y, box[3].y, box[4].y), math.Clamp(localPoint.z, box[3].z, box[4].z))
+    return localPoint:Distance(clamped)
+end
+
+function hg.TraceZCityArmorShot(body, startPos, endPos, seen, hits, padding, bodyHit, shot)
+    if not IsValid(body) or not hg.organism or not hg.organism.GetHitBoxOrgans or not hg.organism.ShootMatrix then return end
+    local damageType = shot and shot.DamageType or DMG_BULLET
+    if shot and shot.Contact or bit.band(damageType, DMG_BULLET + DMG_BUCKSHOT) == 0 then return end
+    local wearer = GetArmorWearer(body)
+    if not IsValid(wearer) or not wearer.GetNetVar then return end
+    local equipment = wearer:GetNetVar("zc_equipment", {})
+    if not istable(equipment) or #equipment == 0 then return end
+
+    local ray = endPos - startPos
+    local rayLength = ray:Length()
+    if rayLength < 0.001 then return end
+    local dir = ray / rayLength
+    local reach = rayLength + 64
+    for _, index in ipairs(equipment) do
+        local armor = Entity(index)
+        if not IsValid(armor) or not armor.HitBoxSet or not string.StartWith(armor:GetClass(), "ent_new_armor_") then continue end
+        local armorKey = "zcarmor:" .. armor:EntIndex()
+        if seen[armorKey] then continue end
+        local model, pos, ang, scale = GetZCityArmorRenderTransform(body, armor)
+        if not model then continue end
+        local hit = hg.TraceEquipmentModel(model, pos, ang, scale, startPos, endPos, padding, true)
+        if not hit then continue end
+        local placement = GetZCityArmorSlot(wearer, armor)
+        local boxes = placement and GetZCityArmorBoxes(body, armor)
+        if not boxes or #boxes == 0 then continue end
+
+        local modelDistance = hit.fraction * rayLength
+        local catchStart = endPos - dir * 5
+        local nearest, nearestDistance, caught
+        for _, entry in ipairs(boxes) do
+            local box = entry.box
+            local distance = DistanceToBox(hit.position, box)
+            if not nearestDistance or distance < nearestDistance then nearest, nearestDistance = entry, distance end
+            if bodyHit and not caught and util.IntersectRayWithOBB(catchStart, dir * 64, box[1], box[2], box[3], box[4]) then
+                local _, _, fraction = util.IntersectRayWithOBB(startPos, dir * reach, box[1], box[2], box[3], box[4])
+                if distance <= 0.5 or fraction and math.abs(fraction * reach - modelDistance) <= zcityArmorMargin then caught = true end
+            end
+        end
+        if caught or not nearest or nearestDistance > zcityArmorReach then continue end
+
+        local plateKey = hg.GetZCityArmorPlateKey(armor, armor.PlatesLinks and armor.PlatesLinks[nearest.organ[9]])
+        if seen[plateKey] then continue end
+        hit.zcityArmor, hit.armor, hit.placement = armor, armor, placement
+        hit.organ, hit.box, hit.armorKey = nearest.organ, nearest.box, armorKey
+        hit.body, hit.wearer, hit.key = body, wearer, plateKey
+        hits[#hits + 1] = hit
+    end
+end
+
+hook.Add("hg/armor/registered", "HG_ZCityArmorGeometryPrewarm", function()
+    for class, entry in pairs(scripted_ents.GetList()) do
+        if not string.StartWith(class, "ent_new_armor_") then continue end
+        local data = entry.t
+        if not istable(data) then continue end
+        QueueGeometry(istable(data.Male) and data.Male.Model)
+        QueueGeometry(istable(data.FeMale) and data.FeMale.Model)
+    end
+end)
+
+function hg.TraceArmorShot(body, startPos, endPos, seen, hits, padding, bodyHit, shot)
+    if not IsValid(body) then return end
     seen = seen or {}
     hits = hits or {}
     padding = math.max(tonumber(padding) or 0, 0)
+    if hg.TraceZCityArmorShot then hg.TraceZCityArmorShot(body, startPos, endPos, seen, hits, padding, bodyHit, shot) end
+    if not istable(hg.armor) then return hits end
+    local wearer = GetArmorWearer(body)
+    local armors = istable(body.armors) and body.armors or IsValid(wearer) and wearer.armors
+    if not istable(armors) then return hits end
+
     for placement, armor in pairs(armors) do
         local armorData = hg.armor[placement] and hg.armor[placement][armor]
         local key = "armor:" .. tostring(wearer:EntIndex()) .. ":" .. tostring(armor)
@@ -819,7 +918,7 @@ function hg.TryAbsorbEquipmentImpact(ent, dmgInfo, hitPos, direction, impactRadi
         end
         if hg.TraceArmorShot then
             SetupEntityBones(ent)
-            hg.TraceArmorShot(ent, startPos, hitPos + dir, {}, equipmentHits, radius)
+            hg.TraceArmorShot(ent, startPos, hitPos + dir, {}, equipmentHits, radius, true, {DamageType = dmgInfo:GetDamageType()})
         end
         table.sort(equipmentHits, function(a, b) return a.fraction < b.fraction end)
         local hit = equipmentHits[1]
@@ -1186,7 +1285,7 @@ local function TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, ori
             hg.Appearance.TraceAccessoryShot(body, startPos, endPos, seen, hits, projectileRadius)
         end
         if hg.TraceArmorShot then
-            hg.TraceArmorShot(body, startPos, endPos, seen, hits, projectileRadius)
+            hg.TraceArmorShot(body, startPos, endPos, seen, hits, projectileRadius, TraceBelongsToPlayer(originalTrace, ply), shot)
         end
     end
     local fullFraction = originalTrace.Hit and (originalTrace.Fraction or 1) / math.max(obstructionFraction, 0.000001) or 1

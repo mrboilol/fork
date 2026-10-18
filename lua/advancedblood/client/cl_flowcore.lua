@@ -1350,7 +1350,7 @@ local function StepChannel(ch, s, pose, dt, now, gx, gy, gz, gmag, stamp, gscale
 
 	-- what moves between neighbours
 	local tx, ty, tz = ch.tx, ch.ty, ch.tz
-	local shedI, shedEx = 0, 0.03
+	local shedI, shedEx = 0, 0.35
 	-- (gravity in the space of the bone the node hangs on: asked for when the bone changes, and
 	-- most nodes of a stretch hang on the same one)
 	local gB, g1, g2, g3
@@ -1416,7 +1416,7 @@ local function StepChannel(ch, s, pose, dt, now, gx, gy, gz, gmag, stamp, gscale
 		if ex > shedEx then shedI, shedEx = n, ex end
 		if shedI > 0 and now - (ch.shedT or 0) > 0.07 then
 			local d = shedEx * 0.3
-			if d < 0.06 then d = 0.06 elseif d > 0.8 then d = 0.8 end
+			if d < 0.3 then d = 0.3 elseif d > 0.8 then d = 0.8 end
 			Shed(ch, s, ch.src, pose, shedI, d, now)
 		end
 	end

@@ -245,6 +245,17 @@ hook.Add("PlayerLoadout", "giveHands", function(ply)
     return true
 end)
 
+hook.Add("Player Spawn", "hg_ensure_hands", function(ply)
+    timer.Simple(0.3, function()
+        if not IsValid(ply) or not ply:IsPlayer() or not ply:Alive() then return end
+        if ply.PlayerClassName == "headcrabzombie" then return end
+        if not hg.GetHandsWeapon then return end
+        if IsValid(hg.GetHandsWeapon(ply)) and not IsValid(ply:GetActiveWeapon()) then
+            ply:SelectWeapon(hg.GetHandsWeaponClass(ply))
+        end
+    end)
+end)
+
 hook.Add("DoPlayerDeath", "homigrad-inventory", function(ply)
     hook.Run("PlayerDropWeapon", ply)
 end)
