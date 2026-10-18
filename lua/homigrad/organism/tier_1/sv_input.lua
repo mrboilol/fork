@@ -182,10 +182,16 @@ local function getShotTravelDirection(dmgInfo, inputHole, outputHole, damagePos,
 	return direction:LengthSqr() > 0 and direction:GetNormalized() or ent:GetForward()
 end
 
+local function isFatalHeadshot(org)
+	return org.alive == false or (org.brain or 0) >= 0.7
+end
+
 local function shouldSquirtHeadshotBlood(org, impact, hitgroup, damage, outputHole)
-	if hitgroup ~= HITGROUP_HEAD or damage <= 0 or impact.armorStopped then return false end
+	if hitgroup ~= HITGROUP_HEAD or impact.armorStopped then return false end
+	if isFatalHeadshot(org) then return true end
+	if damage <= 0 then return false end
 	local throughHead = outputHole and #outputHole > 0
-	local brainDestroyed = impact.brainHit and (org.brain or 0) >= 0.95
+	local brainDestroyed = impact.brainHit and (org.brain or 0) >= 0.7
 	local skullPunch = (impact.skullHit or (org.skull or 0) >= 1) and damage >= 20
 	if not throughHead and not (brainDestroyed and skullPunch) then return false end
 	local chance = throughHead and 0.7 or math.Clamp(damage / 80, 0.25, 0.8)
@@ -193,7 +199,7 @@ local function shouldSquirtHeadshotBlood(org, impact, hitgroup, damage, outputHo
 	return math.Rand(0, 1) < chance
 end
 
-local function sendHeadshotBloodSquirt(ent, ply, damagePos, direction, outputHole, smallCaliber)
+local function sendHeadshotBloodSquirt(ent, ply, damagePos, direction, outputHole, smallCaliber, fatal)
 	local headBoneName = "ValveBiped.Bip01_Head1"
 	local bone = IsValid(ent) and ent:LookupBone(headBoneName)
 	local mat = bone and ent:GetBoneMatrix(bone)
@@ -207,12 +213,13 @@ local function sendHeadshotBloodSquirt(ent, ply, damagePos, direction, outputHol
 		attempts = attempts + 1
 		if org and IsValid(ply) and ply.organism ~= org then return end
 		local rag = getHeadshotBloodBody(ent, ply)
-		if not IsValid(rag) or (rag == ply and ply.headExplodePending) then
+		if not IsValid(rag) or (rag == ply and (ply.headExplodePending or (fatal and not ply:Alive() and attempts < 20))) then
 			if attempts < 20 then timer.Simple(0.05, send) end
 			return
 		end
 
-		if (org or rag).bloodsquirted or rag.headexploded then return end
+		local holder = org or rag
+		if rag.headexploded or (holder.bloodsquirtedAt and CurTime() - holder.bloodsquirtedAt < 1) then return end
 
 		bone = rag:LookupBone(headBoneName)
 		mat = bone and rag:GetBoneMatrix(bone)
@@ -221,7 +228,7 @@ local function sendHeadshotBloodSquirt(ent, ply, damagePos, direction, outputHol
 			return
 		end
 
-		(org or rag).bloodsquirted = true
+		holder.bloodsquirtedAt = CurTime()
 
 		local function sendJet(pos, dir)
 			net.Start("bloodsquirt")
@@ -2249,7 +2256,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		and shouldSquirtHeadshotBlood(org, impact, hitgroup, damageStack, outputHole) then
 		local squirtDirection = getShotTravelDirection(dmgInfo, inputHole, outputHole, dmgPos, ent)
 		local caliber = tonumber(bullet and bullet.Diameter) or tonumber(IsValid(inf) and inf.PenetrationSize) or 0
-		sendHeadshotBloodSquirt(ent, ply, dmgPos, squirtDirection, outputHole, caliber > 0 and caliber <= 5.7)
+		sendHeadshotBloodSquirt(ent, ply, dmgPos, squirtDirection, outputHole, caliber > 0 and caliber <= 5.7, isFatalHeadshot(org))
 	end
 	local fullChargeHeadGib = meleeContact and meleeContact.fullCharge and IsValid(inf) and inf.FullChargeHeadExplode
 	if not noDismemberment and (instant or fullChargeHeadGib) and hitgroup == HITGROUP_HEAD and not ent.headexploded and skullAllowsHeadGib(org) then

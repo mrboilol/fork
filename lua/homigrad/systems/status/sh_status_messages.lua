@@ -466,7 +466,7 @@ local hypertension_phrases = {
 local hg_showthoughts = ConVarExists("hg_showthoughts") and GetConVar("hg_showthoughts") or CreateClientConVar("hg_showthoughts", "1", true, true, "Show the thoughts of your character", 0, 1)
 
 function hg.IsActivelyBleeding(org)
-	return istable(org) and (tonumber(org.bleed) or 0) > 0.05
+	return istable(org) and (tonumber(org.bleed) or 0) > 0.2
 end
 
 function string.Random(length)

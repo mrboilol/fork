@@ -442,11 +442,19 @@ local function StainPin(p)
 	local n = ABL.BloodMap.Query(cx, cy, cz, p.nx, p.ny, p.nz, R, stainList)
 	if n == 0 then return end
 	local now = CurTime()
+	local total = 0
 	for i = 1, n do
 		local r = stainList[i]
-		local u, v = ToLocal(p, r.x, r.y, r.z)
-		local wet = ABL.BloodMap.Wet(r, now)
-		PS.StainPin(g, u, v, r.r, r.m * (BK.pinDry + (BK.pinWet - BK.pinDry) * wet))
+		total = total + pi * r.r * r.r * r.m
+	end
+	local enough = total >= BK.pinMinArea
+	for i = 1, n do
+		local r = stainList[i]
+		if enough or r.r >= BK.pinMinR then
+			local u, v = ToLocal(p, r.x, r.y, r.z)
+			local wet = ABL.BloodMap.Wet(r, now)
+			PS.StainPin(g, u, v, r.r, r.m * (BK.pinDry + (BK.pinWet - BK.pinDry) * wet))
+		end
 		stainList[i] = nil
 	end
 end
@@ -911,13 +919,15 @@ function P.Deposit(x, y, z, n, vol, surf, ent, kind, dx, dy, dz, K)
 	local need = kind == "runoff" and PC.minVolumeRunoff or PC.minVolume
 	if s.vol < need and s.vol >= need * (1 - C.BloodMap.seedK) then
 		local cov, wet = ABL.BloodMap.Coverage(s.sx / s.w, s.sy / s.w, s.sz / s.w, n.x, n.y, n.z, 6, s.t0 - 1)
-		need = need * (1 - C.BloodMap.seedK * min(1, cov * 0.5 + wet * 0.5))
+		if cov >= C.BloodMap.seedMinCov then
+			need = need * (1 - C.BloodMap.seedK * min(1, cov * 0.5 + wet * 0.5))
+		end
 	end
 	if s.vol >= need then
 		local cx, cy, cz = s.sx / s.w, s.sy / s.w, s.sz / s.w
-		local cnt, _, gx, gy, gz = ABL.Ground.Near(cx, cy, cz, n.x, n.y, n.z, PC.attractR)
+		local cnt, garea, gx, gy, gz = ABL.Ground.Near(cx, cy, cz, n.x, n.y, n.z, PC.attractR)
 		local tr
-		if cnt >= PC.attractMin then
+		if cnt >= PC.attractMin and garea >= PC.attractArea then
 			local dx, dy, dz = gx - cx, gy - cy, gz - cz
 			local h = dx * n.x + dy * n.y + dz * n.z
 			dx, dy, dz = dx - n.x * h, dy - n.y * h, dz - n.z * h

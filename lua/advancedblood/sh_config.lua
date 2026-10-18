@@ -417,6 +417,7 @@ C.Pool = {
 	attractR    = 14,
 	attractMin  = 3,
 	attractMax  = 6,
+	attractArea = 60,
 	eatFilm     = 0.02,
 	overflow    = 0.05,    -- fraction of the pool per second (per unit of overshoot) running over a ledge
 	sheen       = 0.9,     -- strength of the view-dependent wet reflection on fresh pools
@@ -540,6 +541,9 @@ C.BloodMap = {
 	pinWet = 0.7,
 	pinDry = 0.35,
 	seedK  = 0.6,
+	seedMinCov = 0.35,
+	pinMinR    = 6,
+	pinMinArea = 250,
 }
 
 C.Smear = {

@@ -838,7 +838,7 @@ module[2] = function(owner, org, mulTime)
 	local recoveryBoost = 1 + 0.75 * (1 - math.exp(-recoveryTime / 60))
 	local regenRate = (hg.organism.config and hg.organism.config.BLOOD_REGEN_RATE_ML_S) or 4.6
 	local regenerationMul = math.Clamp(tonumber(org.blood_regeneration_multiplier) or 1, 0.1, 2)
-	local hemorrhageRegenMul = math.Clamp(1 - bleedoutspeed2 / 8, 0.1, 1)
+	local hemorrhageRegenMul = org.bleed > 0.2 and 0 or 1
 	org.bloodRegenRate = org.alive and not org.heartstop and org.pulse > 5 and org.blood < org.maxblood and regenRate * regenerationMul * recoveryBoost * hemorrhageRegenMul or 0
 	if org.bloodRegenRate > 0 then org.blood = min(org.blood + mulTime * org.bloodRegenRate, org.maxblood) end
 	if hg.organism.UpdateVitalHealthToll then

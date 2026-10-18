@@ -693,8 +693,8 @@ local function buildEffects(ply, org)
 	end
 
 	local bleed = orgNumber(org, "bleed", 0)
-	if bleed > 0 then
-		local level = bleed > 0.15 and 4 or bleed > 0.1 and 3 or bleed > 0.05 and 2 or 1
+	if bleed > 0.2 then
+		local level = bleed >= 12 and 4 or bleed >= 5 and 3 or bleed >= 1.5 and 2 or 1
 		add(effects, "bleeding", ({"lowbleed", "bleeding", "bigbleed", "bigbadbleed"})[level], level, "bad", 20, math.Round(bleed, 2))
 	end
 	local pain = orgNumber(org, "pain", 0)
