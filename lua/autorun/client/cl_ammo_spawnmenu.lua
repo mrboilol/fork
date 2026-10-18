@@ -30,8 +30,7 @@ local function getAmmoTooltip(data)
 	addStat("Pellets", bullet.NumBullet or 1, "%d")
 	addStat("Size", bullet.Diameter, "%g mm")
 	addStat("Speed", bullet.Speed, "%g m/s")
-	return table.concat(lines, "
-")
+	return table.concat(lines, "\n")
 end
 
 spawnmenu.AddCreationTab("Ammo", function()

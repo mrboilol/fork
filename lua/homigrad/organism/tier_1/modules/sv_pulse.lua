@@ -1558,13 +1558,15 @@ module[2] = function(owner, org, timeValue)
 	local stress = Clamp(hypercapniaInstability * 0.9 + myocardialInstability * 1.2 + ischemia * 0.8 + (org.heartStrain or 0) * 0.35 + (org.cardiacStressExposure or 0) * 0.45 + (org.hypertension or 0) * 0.35 + (org.hypotension or 0) * 0.3 + hemorrhageRhythmStress * 0.35 + hemorrhageElectricalInstability * 0.95 + hypothermiaInstability * 0.35 + traumaRhythmRisk * 0.8 + hypotensionInstability * 0.9 + Clamp(org.shock, 0, 80) / 180 + max(org.pain - 60, 0) / 220 + max(org.heartbeat - 165, 0) / 190, 0, 2.5)
 	local arrhythmiaTarget = Clamp(math.max(stress * 0.42, hemorrhageElectricalInstability * 0.88, traumaRhythmRisk * 0.72, hypercapniaInstability * 0.85) * math.Clamp(org.conditionResistanceMul or 1, 0.05, 1), 0, 1)
 	if org.seizureActive then arrhythmiaTarget = math.max(arrhythmiaTarget, 0.15) end
-	local arrhythmiaTolerance = Clamp((0.4 - arrhythmiaTarget) / 0.28, 0, 1)
-	local rhythmThreat = org.fibrillation or org.heartstop or org.unstableRhythm ~= nil or org.seizureActive
-		or hemorrhageElectricalInstability >= 0.3 or hypotensionInstability >= 0.3
-	if rhythmThreat then arrhythmiaTolerance = 0 end
-	org.arrhythmiaAdapt = Approach(org.arrhythmiaAdapt or 0, arrhythmiaTolerance > 0 and 1 or 0,
-		arrhythmiaTolerance > 0 and timeValue / Lerp(arrhythmiaTolerance, 90, 8) or timeValue / 6)
-	arrhythmiaTarget = arrhythmiaTarget * (1 - org.arrhythmiaAdapt * arrhythmiaTolerance)
+	do
+		local arrhythmiaTolerance = Clamp((0.4 - arrhythmiaTarget) / 0.28, 0, 1)
+		local rhythmThreat = org.fibrillation or org.heartstop or org.unstableRhythm ~= nil or org.seizureActive
+			or hemorrhageElectricalInstability >= 0.3 or hypotensionInstability >= 0.3
+		if rhythmThreat then arrhythmiaTolerance = 0 end
+		org.arrhythmiaAdapt = Approach(org.arrhythmiaAdapt or 0, arrhythmiaTolerance > 0 and 1 or 0,
+			arrhythmiaTolerance > 0 and timeValue / Lerp(arrhythmiaTolerance, 90, 8) or timeValue / 6)
+		arrhythmiaTarget = arrhythmiaTarget * (1 - org.arrhythmiaAdapt * arrhythmiaTolerance)
+	end
 	local arrhythmiaRiseTime = Lerp(hemorrhageElectricalInstability, 25, 6)
 	if (org.rhythmRecoveryUntil or 0) > CurTime() then
 		arrhythmiaRiseTime = math.max(arrhythmiaRiseTime, 20)
