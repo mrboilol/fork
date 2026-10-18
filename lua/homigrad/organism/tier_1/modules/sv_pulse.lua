@@ -721,8 +721,17 @@ local function getBloodVolume(org)
 	return getBloodPerfusion(org.blood)
 end
 
+local function getMyocardialFunction(org)
+	local damage = Clamp(tonumber(org.heart) or 0, 0, 1)
+	local contractility = (1 - damage * 0.84) * (1 - damage) ^ 0.1
+	local reflexTachycardia = 120 * (damage * damage * (1 - damage ^ 4)) ^ 0.75
+	local conductionFailure = damage ^ 20
+	local electricalInstability = damage * damage
+	return contractility, reflexTachycardia, conductionFailure, electricalInstability
+end
+
 local function getHeartEfficiency(org)
-	local heart = Clamp(1 - org.heart, 0, 1)
+	local heart = getMyocardialFunction(org)
 	local ischemia = Clamp(1 - (org.myocardialOxygen or 1), 0, 1)
 	local strain = Clamp(org.heartStrain or 0, 0, 1)
 	local oxygenDebt = Clamp(org.cardiacStressExposure or 0, 0, 1)
@@ -1009,6 +1018,7 @@ module[2] = function(owner, org, timeValue)
 	local organSystemsEnabled = hg.organism.OrganSystemsEnabled and hg.organism.OrganSystemsEnabled() or true
 
 	local o2Value = org.o2 and org.o2[1] or 30
+	local _, myocardialTachycardia, myocardialConductionFailure, myocardialInstability = getMyocardialFunction(org)
 	local heart = getHeartEfficiency(org)
 	local brain = math.Clamp(1 - org.brain * 1.5,0,1)
 	local o2 = org.o2
@@ -1323,6 +1333,7 @@ module[2] = function(owner, org, timeValue)
 	local adrenalineHeartBoost = 9 * math.min(math.max(activeCatecholamine - 1.5, 0), 3)
 	heartbeat = heartbeat + adrenalineHeartBoost
 	heartbeat = heartbeat + sympatheticCompensation * (10 + 30 * perfusionNeed)
+	heartbeat = heartbeat + myocardialTachycardia
 	heartbeat = heartbeat - 40 * math.min(org.analgesia / 2.5, 1)
 	heartbeat = heartbeat + 100 * math.Clamp(math.Remap(org.temperature, 40, 42, 0, 1), 0, 1)
 	heartbeat = heartbeat - 160 * (1 - math.Clamp(math.Remap(org.temperature, 28, 36.7, 0, 1), 0, 1))
@@ -1335,7 +1346,7 @@ module[2] = function(owner, org, timeValue)
 	local cerebralSuppression = math.Clamp(math.max((org.brain or 0) * 0.8, brainHemorrhage) * 0.9, 0, 1)
 	local arterialO2 = math.min(tonumber(org.bloodO2Cap) or o2Value, org.oxygenIntakeAvailable == false and o2Value or math.huge)
 	local hypoxiaSuppression = math.Clamp((16 - arterialO2) / 16, 0, 1)
-	local cardiacSuppression = math.Clamp(org.heart or 0, 0, 1)
+	local cardiacSuppression = myocardialConductionFailure
 	-- Compensation remains effective through mild cold. Below 34 C the sinus
 	-- node and conduction system progressively lose responsiveness.
 	local coldSuppression = math.Clamp((34 - (org.temperature or 36.7)) / 7, 0, 1)
@@ -1346,7 +1357,7 @@ module[2] = function(owner, org, timeValue)
 	local zerlkersSuppression = math.Clamp(org.zerlkersOverdose or 0, 0, 1)
 	local drugBradycardia = math.Clamp(((org.drugRespiratoryDepression or 0) - 0.12) / 0.88, 0, 1)
 	local cervicalSuppression = org.cervicalParalysis and 0.58 or 0
-	local bradycardiaSeverity = math.max(cerebralSuppression, hypoxiaSuppression, cardiacSuppression * 0.9, coldSuppression, zerlkersSuppression, drugBradycardia * 0.9, cervicalSuppression)
+	local bradycardiaSeverity = math.max(cerebralSuppression, hypoxiaSuppression, cardiacSuppression, coldSuppression, zerlkersSuppression, drugBradycardia * 0.9, cervicalSuppression)
 	org.bradycardiaSeverity = bradycardiaSeverity
 	org.drugBradycardia = drugBradycardia
 	org.hemorrhagicDecompensation = hemorrhagicDecompensation
@@ -1371,9 +1382,10 @@ module[2] = function(owner, org, timeValue)
 	end
 	local hemorrhageRateCeiling = bloodNow < normalBloodVolume and getHemorrhageRateCeiling(bloodNow) + adrenalineRateTolerance * 25 or terminalHeartRate
 	maxCompensatedRate = math.min(maxCompensatedRate, hemorrhageRateCeiling)
-	if heart < 0.35 or brain < 0.35 then
+	if brain < 0.35 then
 		maxCompensatedRate = math.min(maxCompensatedRate, 85)
 	end
+	maxCompensatedRate = Lerp(Clamp(heart / 0.35, 0, 1), math.min(maxCompensatedRate, 85), maxCompensatedRate)
 	if org.heartstop then
 		maxCompensatedRate = 0
 	else
@@ -1538,12 +1550,12 @@ module[2] = function(owner, org, timeValue)
 	local internalBleedPeak = math.max(tonumber(org.internalBleedPeak) or 0, tonumber(org.internalBleed) or 0, 0)
 	local internalBleedRhythmRisk = Clamp(internalBleedComplication * math.Clamp(internalBleedPeak / 6, 0, 1), 0, 1)
 	local chestRhythmRisk = Clamp(((org.chest or 0) - 0.45) / 0.55, 0, 1)
-	local cardiacTraumaRhythmRisk = math.max(Clamp(((org.heart or 0) - 0.3) / 0.7, 0, 1), chestRhythmRisk * 0.65)
+	local cardiacTraumaRhythmRisk = math.max(myocardialInstability ^ 1.5, chestRhythmRisk * 0.65)
 	local traumaRhythmRisk = math.max(internalBleedRhythmRisk * (0.45 + cardiacTraumaRhythmRisk * 0.55), cardiacTraumaRhythmRisk * 0.6)
 	org.internalBleedRhythmRisk = internalBleedRhythmRisk
 	org.traumaRhythmRisk = traumaRhythmRisk
 	local hypercapniaInstability = Clamp(((org.co2 or 0) - 14) / 12, 0, 1)
-	local stress = Clamp(hypercapniaInstability * 0.9 + (org.heart or 0) * 0.9 + ischemia * 0.8 + (org.heartStrain or 0) * 0.35 + (org.cardiacStressExposure or 0) * 0.45 + (org.hypertension or 0) * 0.35 + (org.hypotension or 0) * 0.3 + hemorrhageRhythmStress * 0.35 + hemorrhageElectricalInstability * 0.95 + hypothermiaInstability * 0.35 + traumaRhythmRisk * 0.8 + hypotensionInstability * 0.9 + Clamp(org.shock, 0, 80) / 180 + max(org.pain - 60, 0) / 220 + max(org.heartbeat - 165, 0) / 190, 0, 2.5)
+	local stress = Clamp(hypercapniaInstability * 0.9 + myocardialInstability * 1.2 + ischemia * 0.8 + (org.heartStrain or 0) * 0.35 + (org.cardiacStressExposure or 0) * 0.45 + (org.hypertension or 0) * 0.35 + (org.hypotension or 0) * 0.3 + hemorrhageRhythmStress * 0.35 + hemorrhageElectricalInstability * 0.95 + hypothermiaInstability * 0.35 + traumaRhythmRisk * 0.8 + hypotensionInstability * 0.9 + Clamp(org.shock, 0, 80) / 180 + max(org.pain - 60, 0) / 220 + max(org.heartbeat - 165, 0) / 190, 0, 2.5)
 	local arrhythmiaTarget = Clamp(math.max(stress * 0.42, hemorrhageElectricalInstability * 0.88, traumaRhythmRisk * 0.72, hypercapniaInstability * 0.85) * math.Clamp(org.conditionResistanceMul or 1, 0.05, 1), 0, 1)
 	if org.seizureActive then arrhythmiaTarget = math.max(arrhythmiaTarget, 0.15) end
 	local arrhythmiaRiseTime = Lerp(hemorrhageElectricalInstability, 25, 6)
@@ -1718,7 +1730,7 @@ module[2] = function(owner, org, timeValue)
 			and (not hemorrhageDrivenLowOutput or hypovolemicBradyStrain > 0.2)
 			and not restartCirculationActive
 		local failedBradyStrain = hypovolemicBradyStrain > 0.25 and (org.heartStrain or 0) >= 0.95 and not restartCirculationActive
-		if failedCirculation or failedHypotension or failedBradyOutput or failedBradyStrain or org.brain >= 0.85 or org.heart >= 0.9 then org.heartstop = true end
+		if failedCirculation or failedHypotension or failedBradyOutput or failedBradyStrain or org.brain >= 0.85 or org.heart >= 1 then org.heartstop = true end
 		if org.temperature > 42 then org.heartstop = true end
 	end
 	-- A successful AED/epinephrine restart deliberately has a short window to

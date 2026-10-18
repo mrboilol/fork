@@ -156,18 +156,18 @@ C.MOVE_PUMP_MAX = 0.3
 --  tint     : colour multiplier                               soak   : use fibrous soak stains
 ------------------------------------------------------------------------------------------
 C.Surfaces = {
-	default  = { adhesion = 1.0, spread = 1.0,  absorb = 0.2,  splash = 1.0,  runoff = 0.9,  film = 0.09, dry = 1.0, alpha = 0.95, tint = { 1, 1, 1 } },
-	concrete = { adhesion = 1.1, spread = 1.0,  absorb = 0.25, splash = 1.0,  runoff = 0.8,  film = 0.085, dry = 1.1, alpha = 0.93, tint = { 1, 0.95, 0.95 } },
-	metal    = { adhesion = 0.6, spread = 1.1,  absorb = 0.0,  splash = 1.25, runoff = 1.3,  film = 0.12, dry = 0.8, alpha = 1.0,  tint = { 1, 1, 1 } },
-	wood     = { adhesion = 1.0, spread = 1.0,  absorb = 0.35, splash = 0.9,  runoff = 0.75, film = 0.09, dry = 1.1, alpha = 0.92, tint = { 0.95, 0.95, 0.95 } },
-	glass    = { adhesion = 0.45, spread = 1.15, absorb = 0.0, splash = 1.35, runoff = 1.5,  film = 0.13, dry = 0.75, alpha = 0.9, tint = { 1.05, 1, 1 } },
-	tile     = { adhesion = 0.55, spread = 1.1, absorb = 0.03, splash = 1.3,  runoff = 1.35, film = 0.12, dry = 0.8, alpha = 0.97, tint = { 1, 1, 1 } },
-	stone    = { adhesion = 1.0, spread = 0.95, absorb = 0.2,  splash = 1.0,  runoff = 0.85, film = 0.1,  dry = 1.0, alpha = 0.93, tint = { 0.95, 0.95, 0.95 } },
-	plastic  = { adhesion = 0.6, spread = 1.05, absorb = 0.0,  splash = 1.2,  runoff = 1.3,  film = 0.12, dry = 0.85, alpha = 0.97, tint = { 1, 1, 1 } },
+	default  = { adhesion = 1.0, spread = 1.0,  absorb = 0.2,  splash = 1.0,  runoff = 0.9,  film = 0.063, dry = 1.0, alpha = 0.95, tint = { 1, 1, 1 } },
+	concrete = { adhesion = 1.1, spread = 1.0,  absorb = 0.25, splash = 1.0,  runoff = 0.8,  film = 0.068, dry = 1.1, alpha = 0.93, tint = { 1, 0.95, 0.95 } },
+	metal    = { adhesion = 0.6, spread = 1.1,  absorb = 0.0,  splash = 1.25, runoff = 1.3,  film = 0.061, dry = 0.8, alpha = 1.0,  tint = { 1, 1, 1 } },
+	wood     = { adhesion = 1.0, spread = 1.0,  absorb = 0.35, splash = 0.9,  runoff = 0.75, film = 0.068, dry = 1.1, alpha = 0.92, tint = { 0.95, 0.95, 0.95 } },
+	glass    = { adhesion = 0.45, spread = 1.15, absorb = 0.0, splash = 1.35, runoff = 1.5,  film = 0.057, dry = 0.75, alpha = 0.9, tint = { 1.05, 1, 1 } },
+	tile     = { adhesion = 0.55, spread = 1.1, absorb = 0.03, splash = 1.3,  runoff = 1.35, film = 0.061, dry = 0.8, alpha = 0.97, tint = { 1, 1, 1 } },
+	stone    = { adhesion = 1.0, spread = 0.95, absorb = 0.2,  splash = 1.0,  runoff = 0.85, film = 0.072, dry = 1.0, alpha = 0.93, tint = { 0.95, 0.95, 0.95 } },
+	plastic  = { adhesion = 0.6, spread = 1.05, absorb = 0.0,  splash = 1.2,  runoff = 1.3,  film = 0.061, dry = 0.85, alpha = 0.97, tint = { 1, 1, 1 } },
 	dirt     = { adhesion = 1.7, spread = 0.8,  absorb = 0.7,  splash = 0.6,  runoff = 0.25, film = 0.2,  dry = 1.4, alpha = 0.8,  tint = { 0.7, 0.8, 0.8 }, soak = true },
 	grass    = { adhesion = 1.7, spread = 0.75, absorb = 0.65, splash = 0.5,  runoff = 0.2,  film = 0.22, dry = 1.2, alpha = 0.7,  tint = { 0.8, 0.9, 0.9 }, soak = true },
 	fabric   = { adhesion = 2.2, spread = 1.35, absorb = 0.92, splash = 0.35, runoff = 0.05, film = 0.3,  dry = 0.7, alpha = 0.85, tint = { 0.85, 0.9, 0.9 }, soak = true },
-	flesh    = { adhesion = 1.2, spread = 1.0,  absorb = 0.1,  splash = 0.8,  runoff = 0.9,  film = 0.1,  dry = 1.0, alpha = 0.95, tint = { 1, 1, 1 } },
+	flesh    = { adhesion = 1.2, spread = 1.0,  absorb = 0.1,  splash = 0.8,  runoff = 0.9,  film = 0.065, dry = 1.0, alpha = 0.95, tint = { 1, 1, 1 } },
 	snow     = { adhesion = 1.5, spread = 1.2,  absorb = 0.8,  splash = 0.4,  runoff = 0.15, film = 0.25, dry = 0.3, alpha = 0.9,  tint = { 1.2, 1.1, 1.1 }, soak = true },
 }
 
@@ -413,6 +413,8 @@ C.Runoff = {
 C.Pool = {
 	minVolume   = 2.0,     -- ml collected in one 8-unit cell (decaying) before it becomes a pool
 	minVolumeRunoff = 0.2, -- the same for blood that a stream brings (the pool begins where the stream arrives)
+	minStains   = 25,      -- ground stains within minStainsR before dripped blood may become a pool
+	minStainsR  = 16,
 	mergeFactor = 0.9,     -- pools merge when their outlines come this close (fraction of the reach)
 	attractR    = 14,
 	attractMin  = 3,
@@ -496,7 +498,7 @@ C.Pool = {
 		crackSpan = 1.0,    -- ... and over how many more the cracks reach their full width
 		crackMax  = 0.8,    -- how far a crack opens at most (1: the mask's whole width)
 		budget    = 0.6,    -- ms a frame for the liquid's steps at full quality (pools wait their turn beyond it)
-		evap      = 0.00028, -- units of layer that dry off a wet cell per second (a film on concrete in about
+		evap      = 0.000224, -- units of layer that dry off a wet cell per second (a film on concrete in about
 		                    -- five minutes: game time, like the drying of everything else; abl_drying_scale)
 		soak      = 0.55,   -- the surface takes up this much of a film, times its absorbency
 		edgeDry   = 1.3,    -- films that stand at a ledge before the first blood goes over it

@@ -128,10 +128,10 @@ input_list.heart = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	applyOrganTrauma(org, dmgInfo, dmg, delta, oldDmg, "heart")
 	org.heartStrain = math.Clamp((org.heartStrain or 0) + delta * 1.4, 0, 1)
 	if hg.organism.AddCardiacStress then hg.organism.AddCardiacStress(org, delta * (dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) and 2.4 or 1.2)) end
-	if delta > 0.08 and dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_SLASH) and math.Rand(0, 1) < math.Clamp(delta * 1.8, 0, 0.75) then
+	if delta > 0 and dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_SLASH) and math.Rand(0, 1) < math.Clamp(delta * delta * 5, 0, 0.75) then
 		hg.organism.StartFibrillation(org, true)
 	end
-	if delta > 0 and (org.aorta or 0) < 1 and math.Rand(0, 1) < math.Clamp(0.18 + delta * 0.7, 0.18, 0.72) then
+	if delta > 0 and (org.aorta or 0) < 1 and math.Rand(0, 1) < 0.72 * (1 - math.exp(-delta * 5)) then
 		local arteryDir = isvector(dir) and dir:LengthSqr() > 0.001 and dir or traumaDirection(org, dmgInfo)
 		hitArtery("aorta", org, math.max(dmg, 0.2), dmgInfo, boneindex or "ValveBiped.Bip01_Spine2", arteryDir, hit, impact, true)
 	end

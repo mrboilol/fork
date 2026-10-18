@@ -923,6 +923,10 @@ function P.Deposit(x, y, z, n, vol, surf, ent, kind, dx, dy, dz, K)
 			need = need * (1 - C.BloodMap.seedK * min(1, cov * 0.5 + wet * 0.5))
 		end
 	end
+	if s.vol >= need and kind ~= "runoff" and kind ~= "seep" and PC.minStains > 0 then
+		local scnt = ABL.Ground.Near(s.sx / s.w, s.sy / s.w, s.sz / s.w, n.x, n.y, n.z, PC.minStainsR)
+		if scnt < PC.minStains then return end
+	end
 	if s.vol >= need then
 		local cx, cy, cz = s.sx / s.w, s.sy / s.w, s.sz / s.w
 		local cnt, garea, gx, gy, gz = ABL.Ground.Near(cx, cy, cz, n.x, n.y, n.z, PC.attractR)

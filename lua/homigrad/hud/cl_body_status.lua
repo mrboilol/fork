@@ -89,6 +89,7 @@ local COLOR = {
 	OUTLINE = {20, 20, 22},
 	ORGAN_GRAY = {110, 110, 112},
 	ORGAN_BRAIN = {235, 150, 175},
+	ORGAN_BRAIN_DEAD = {215, 25, 25},
 	ORGAN_HEART = {200, 0, 0},
 	ORGAN_LUNG = {0, 255, 255},
 	ORGAN_TRACHEA = {0, 125, 255},
@@ -101,6 +102,8 @@ local ORGAN = {
 	SHOW_DAMAGE = 0.01,
 	LUNG_SHOW_DAMAGE = 0.5,
 	PUNCTURE_DAMAGE = 0.6,
+	BRAIN_GRAY_AT = 0.3,
+	BRAIN_RED_AT = 0.7,
 	BRAIN_RADIUS = 0.8,
 	LOBE_RADIUS = 0.2,
 	LOBE_OFFSET_Y = 0.45,
@@ -1331,8 +1334,23 @@ local function pointScreen(point)
 	return centerX + smoothY[point] * pixelScale, centerY - (smoothZ[point] - targetZ) * pixelScale
 end
 
-local function drawOrgan(ax, ay, bx, by, radius, color, damage)
-	local red, green, blue = lerpColor(color, COLOR.ORGAN_GRAY, math_Clamp(damage, 0, 1))
+local function brainColor(color, damage)
+	if damage <= ORGAN.BRAIN_GRAY_AT then
+		return lerpColor(color, COLOR.ORGAN_GRAY, damage / ORGAN.BRAIN_GRAY_AT)
+	end
+
+	local t = math_Clamp((damage - ORGAN.BRAIN_GRAY_AT) / (ORGAN.BRAIN_RED_AT - ORGAN.BRAIN_GRAY_AT), 0, 1)
+
+	return lerpColor(COLOR.ORGAN_GRAY, COLOR.ORGAN_BRAIN_DEAD, t)
+end
+
+local function drawOrgan(ax, ay, bx, by, radius, color, damage, brain)
+	local red, green, blue
+	if brain then
+		red, green, blue = brainColor(color, damage)
+	else
+		red, green, blue = lerpColor(color, COLOR.ORGAN_GRAY, math_Clamp(damage, 0, 1))
+	end
 	setDrawColor(COLOR.OUTLINE[1], COLOR.OUTLINE[2], COLOR.OUTLINE[3], OUTLINE_ALPHA)
 	polyCapsule(ax, ay, bx, by, radius + outlineWidth)
 	setDrawColor(red, green, blue, 255)
@@ -1345,22 +1363,22 @@ local function drawOrgans()
 	if organDamage.brain > 0 and not missing.skull and smoothValid[POINT.SKULL] then
 		local x, y = pointScreen(POINT.SKULL)
 		local skullUnit = skullRadius * unit
-		drawOrgan(x, y, x, y, skullUnit * ORGAN.BRAIN_RADIUS, COLOR.ORGAN_BRAIN, organDamage.brain)
+		drawOrgan(x, y, x, y, skullUnit * ORGAN.BRAIN_RADIUS, COLOR.ORGAN_BRAIN, organDamage.brain, true)
 
 		local lobeRadius = skullUnit * ORGAN.LOBE_RADIUS
 		local offsetX, offsetY = skullUnit * ORGAN.LOBE_OFFSET_X, skullUnit * ORGAN.LOBE_OFFSET_Y
 		if organDamage.brainFrontal > 0 then
-			drawOrgan(x, y - offsetY, x, y - offsetY, lobeRadius, COLOR.LOBE_FRONTAL, organDamage.brainFrontal)
+			drawOrgan(x, y - offsetY, x, y - offsetY, lobeRadius, COLOR.LOBE_FRONTAL, organDamage.brainFrontal, true)
 		end
 		if organDamage.brainParietal > 0 then
-			drawOrgan(x, y, x, y, lobeRadius, COLOR.LOBE_PARIETAL, organDamage.brainParietal)
+			drawOrgan(x, y, x, y, lobeRadius, COLOR.LOBE_PARIETAL, organDamage.brainParietal, true)
 		end
 		if organDamage.brainOccipital > 0 then
-			drawOrgan(x, y + offsetY, x, y + offsetY, lobeRadius, COLOR.LOBE_OCCIPITAL, organDamage.brainOccipital)
+			drawOrgan(x, y + offsetY, x, y + offsetY, lobeRadius, COLOR.LOBE_OCCIPITAL, organDamage.brainOccipital, true)
 		end
 		if organDamage.brainTemporal > 0 then
-			drawOrgan(x - offsetX, y, x - offsetX, y, lobeRadius, COLOR.LOBE_TEMPORAL, organDamage.brainTemporal)
-			drawOrgan(x + offsetX, y, x + offsetX, y, lobeRadius, COLOR.LOBE_TEMPORAL, organDamage.brainTemporal)
+			drawOrgan(x - offsetX, y, x - offsetX, y, lobeRadius, COLOR.LOBE_TEMPORAL, organDamage.brainTemporal, true)
+			drawOrgan(x + offsetX, y, x + offsetX, y, lobeRadius, COLOR.LOBE_TEMPORAL, organDamage.brainTemporal, true)
 		end
 	end
 

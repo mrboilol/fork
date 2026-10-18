@@ -735,6 +735,7 @@ function hg.MainTPIKFunction(ent, ply, wpn)
 		end]]
 
         //print("DragHands: ", SysTime() - systime)
+        if hg.WallBangTPIK then hg.WallBangTPIK(ent, ply, wpn) end
         if hg.PickupReachTPIK then hg.PickupReachTPIK(ent, ply, wpn) end
         hg.DoZManip(ent, ply)
         //local systime = SysTime()

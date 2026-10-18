@@ -235,7 +235,7 @@ local function Place(q)
 	local off = GC.offset + up + q.jit
 	local s = {
 		x = cx + nx * off, y = cy + ny * off, z = cz + nz * off, nx = nx, ny = ny, nz = nz,
-		ux = ux * hu, uy = uy * hu, uz = uz * hu, vx = vx * h, vy = vy * h, vz = vz * h, h = max(h, hu), h0 = h,
+		ux = ux * hu, uy = uy * hu, uz = uz * hu, vx = vx * h, vy = vy * h, vz = vz * h, h = max(h, hu), h0 = h, vol = q.vol,
 		u0 = u0, v0 = v0, u1 = u1, v1 = v1,
 		alpha = q.alpha, tone = q.tone, tg = q.tg, born = CurTime(), dryT = q.dryT,
 	}
@@ -245,8 +245,9 @@ local function Place(q)
 end
 
 -- Blood that lands on a spot already covered by several stains, or on one that is still wet, adds
--- to them instead of piling up more quads: the newest one there grows a little and is wet again.
-local function Crowded(x, y, z, wet)
+-- to them instead of piling up more quads: the newest one there grows by the blood's volume (its
+-- area with the volume it holds, to twice its first size) and is wet again.
+local function Crowded(x, y, z, wet, vol)
 	local k = ABL.CellKey(x, y, z, 2.5)
 	local now = CurTime()
 	local e = crowd[k]
@@ -257,7 +258,9 @@ local function Crowded(x, y, z, wet)
 	e.t = now
 	if (e.n >= GC.cellCap or wet) and e.last and not e.last.dead then
 		local s = e.last
-		local g = min(1.06, s.h0 * 1.5 / s.h)
+		local sv = s.vol or 0.01
+		local g = min(sqrt((sv + vol) / sv), s.h0 * 2 / s.h, GC.maxHalf / s.h)
+		s.vol = sv + vol
 		if g > 1.001 then
 			s.ux, s.uy, s.uz, s.vx, s.vy, s.vz = s.ux * g, s.uy * g, s.uz * g, s.vx * g, s.vy * g, s.vz * g
 			s.h = s.h * g
@@ -316,7 +319,7 @@ function G.Impact(x, y, z, nx, ny, nz, vol, stainD, sinA, tx, ty, tz, K, surf, r
 		cell = Variant(fam, rng)
 	end
 
-	local crowded, ce = Crowded(x, y, z, wet)
+	local crowded, ce = Crowded(x, y, z, wet, vol)
 	if crowded then return end
 
 	local f = FAM[fam]
@@ -345,7 +348,7 @@ function G.Impact(x, y, z, nx, ny, nz, vol, stainD, sinA, tx, ty, tz, K, surf, r
 
 	local q = {
 		x = x, y = y, z = z, nx = nx, ny = ny, nz = nz, ux = ux, uy = uy, uz = uz, vx = vx, vy = vy, vz = vz,
-		fam = fam, cell = cell, h = h, hu = hu, flip = rng:Next() < 0.5,
+		fam = fam, cell = cell, h = h, hu = hu, flip = rng:Next() < 0.5, vol = vol,
 		-- a fresh film of whole blood is nearly opaque; the texture keeps the thin rim translucent
 		alpha = 255 * (0.6 + 0.4 * (surf.alpha or 1)) * rng:Range(0.92, 1) * (fam == "tiny" and 0.94 or 1),
 		-- per-stain variation of the filter: darker (venous) to brighter red, a little more or less

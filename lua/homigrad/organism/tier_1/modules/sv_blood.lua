@@ -360,7 +360,12 @@ local function getWoundHemostasisDelta(org, wound, dt, now, arterial, catastroph
 	maturity = math.max(maturity, treatment * 0.88)
 	if not treatedArterialWound then maturity = 0 end
 
-	local clotRate = (tonumber(cfg.WOUND_CLOT_RATE_SCORE_S) or 0.11) * coag * nutrition * maturity
+	local clotAbility = arterial and 1 or 1 - severityK
+	if bandaged or (tonumber(compressionMul) or 1) > 1.05 then clotAbility = 1 end
+	clotAbility = math.max(clotAbility, treatment)
+	maturity = maturity * clotAbility
+
+	local clotRate = ((tonumber(cfg.WOUND_CLOT_RATE_SCORE_S) or 0.11) + severity * (tonumber(cfg.WOUND_CLOT_FRACTION_S) or 0.012)) * coag * nutrition * maturity
 	clotRate = clotRate * math.max(tonumber(compressionMul) or 1, 0.1)
 	clotRate = clotRate * (1 + treatment * (tonumber(cfg.HEMOSTATIC_TREATMENT_CLOT_GAIN) or 7))
 	if bandaged then clotRate = clotRate * 1.8 end
@@ -371,7 +376,7 @@ local function getWoundHemostasisDelta(org, wound, dt, now, arterial, catastroph
 	local growth = 0
 	if severityK > 0 and not bandaged then
 		local maxGrowthFraction = (arterial and (tonumber(cfg.ARTERIAL_UNSTABLE_MAX_GROWTH_FRACTION) or 0.6)
-			or (tonumber(cfg.WOUND_UNSTABLE_MAX_GROWTH_FRACTION) or 0.22)) * severityK
+			or (tonumber(cfg.WOUND_UNSTABLE_MAX_GROWTH_FRACTION) or 0.35)) * severityK
 		local maxSeverity = initial * (1 + maxGrowthFraction)
 		if severity < maxSeverity then
 			local pressure = math.Clamp((tonumber(org.bloodPressure) or 92) / 92, 0.25, 1.4)
@@ -418,6 +423,9 @@ module[2] = function(owner, org, mulTime)
 		org.internalBleedHeal = math.min((tonumber(org.internalBleedHeal) or 0) + pendingDose, 20)
 		org.tranexamic_acid_pending = 0
 		org.tranexamic_acid_onset = 0
+	end
+	if not (isPlayer and org.alive) then
+		org.coagulation_multiplier, org.blood_regeneration_multiplier, org.bleedingmul = nil, nil, nil
 	end
 	org.coagulation_multiplier = tonumber(org.coagulation_multiplier) or 1.2
 	org.blood_regeneration_multiplier = tonumber(org.blood_regeneration_multiplier) or 1.2
