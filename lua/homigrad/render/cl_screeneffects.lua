@@ -578,6 +578,7 @@ lobotomy_mats = {
 local consciousnessTypeBeatVolume = 1.2
 local dying2Volume = 1.2
 local remDying1Fade = 0
+local RemDying1Path
 local remDying2Fade = 0
 local dyingSoundVolumeMul = 0.86
 local vitalityDyingVolumeMul = 3.2
@@ -1758,9 +1759,19 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	end
 
 	local selectedDyingMode = getServerSoundMode("hg_dyingsound", 2)
-	if selectedDyingMode == 8 and canRetrySound("RemDying1Station", RemDying1Station) then
-		sound.PlayFile("sound/rem_dying1.mp3", "noblock noplay", function(station)
+	local remBackgroundPath = selectedDyingMode == 4 and "sound/itssofuckingover.mp3" or selectedDyingMode == 5 and "sound/rem_dying1.mp3"
+	if IsValid(RemDying1Station) and RemDying1Path != remBackgroundPath then
+		RemDying1Station:Stop()
+		RemDying1Station = nil
+	end
+	if remBackgroundPath and canRetrySound("RemDying1Station", RemDying1Station) then
+		sound.PlayFile(remBackgroundPath, "noblock noplay", function(station)
 			if IsValid(station) then
+				if getServerSoundMode("hg_dyingsound", 2) != selectedDyingMode then
+					station:Stop()
+					return
+				end
+				RemDying1Path = remBackgroundPath
 				station:SetVolume(0)
 				station:Play()
 				station:SetTime(math.min(brain / 0.5 * station:GetLength(), 87))
@@ -2359,13 +2370,13 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				end)
 			end
 
-			if dyingMode == 8 and not NoiseStation2DyingLoading and canRetrySound("NoiseStation2Dying", NoiseStation2Dying) then
+			if (dyingMode == 4 or dyingMode == 5) and not NoiseStation2DyingLoading and canRetrySound("NoiseStation2Dying", NoiseStation2Dying) then
 				NoiseStation2DyingLoading = true
 				sound.PlayFile("sound/rem_dying2.mp3", "noblock noplay", function(station)
 					NoiseStation2DyingLoading = false
 					if IsValid(station) then
 						local currentMode = getServerSoundMode("hg_dyingsound", 2)
-						if currentMode != 8 then
+						if currentMode != 4 and currentMode != 5 then
 							station:Stop()
 							return
 						end
@@ -2500,34 +2511,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				if IsValid(SillydyingStation) then
 					SillydyingStation:SetVolume(0)
 				end
-			elseif dyingMode == 4 then
-				-- Only itsallcomingtoanend, no screen shake
-				if IsValid(NoiseStation2) then
-					NoiseStation2:SetVolume(0)
-				end
-				if IsValid(EndStation) then
-					EndStation:SetVolume(consciousVol)
-				end
-				if IsValid(DyingStation) then
-					DyingStation:SetVolume(0)
-				end
-				if IsValid(SillydyingStation) then
-					SillydyingStation:SetVolume(0)
-				end
-			elseif dyingMode == 5 then
-				-- Only sillydying.mp3, no screen shake
-				if IsValid(NoiseStation2) then
-					NoiseStation2:SetVolume(0)
-				end
-				if IsValid(EndStation) then
-					EndStation:SetVolume(0)
-				end
-				if IsValid(DyingStation) then
-					DyingStation:SetVolume(0)
-				end
-				if IsValid(SillydyingStation) then
-					SillydyingStation:SetVolume(consciousVol)
-				end
 			elseif dyingMode == 6 then
 				-- Only fuck.mp3 with sound peak detection for screen shake
 				if IsValid(NoiseStation2) then
@@ -2591,8 +2574,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				if IsValid(SonimCookedStation) then
 					SonimCookedStation:SetVolume(math.Clamp(consciousVol * 1.5, 0, hg.screeneffects_config.sonimCookedForegroundVolume))
 				end
-			elseif dyingMode == 8 then
-				-- REM low-O2 stack from the reference: rem_dying1 + rem_dying2.
+			elseif dyingMode == 4 or dyingMode == 5 then
 				if IsValid(NoiseStation2) then
 					NoiseStation2:SetVolume(0)
 				end
@@ -2697,7 +2679,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			if dyingMode != 7 and IsValid(SonimCookedStation) then
 				SonimCookedStation:SetVolume(0)
 			end
-			if dyingMode != 8 and IsValid(RemDying1Station) then
+			if dyingMode != 4 and dyingMode != 5 and IsValid(RemDying1Station) then
 				RemDying1Station:SetVolume(0)
 			end
 			if IsValid(ItsHopelessStation) then
@@ -2708,7 +2690,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			if dyingMode != 10 and IsValid(VitalityStation) then
 				VitalityStation:SetVolume(0)
 			end
-			if dyingMode != 8 and IsValid(NoiseStation2Dying) then
+			if dyingMode != 4 and dyingMode != 5 and IsValid(NoiseStation2Dying) then
 				NoiseStation2Dying:SetVolume(0)
 			end
 		else

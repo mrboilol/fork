@@ -216,6 +216,7 @@ CDeath.silent              = false
 CDeath.silentUnmuted       = false
 CDeath.silentMessage       = SILENT_DEATH_MESSAGES[1]
 CDeath.incapTimerDeath     = false
+CDeath.incapDeadline       = nil
 
 local function SilentDeathEnabled()
     local cv = GetConVar("hg_silentdeath")
@@ -224,9 +225,14 @@ end
 
 local function IncapTimerExpiring(ply)
     local org = ply.new_organism or ply.organism
-    if not org or not org.incapacitated then return false end
-    local deathStateEnd = tonumber(org.deathStateEnd)
-    return deathStateEnd ~= nil and deathStateEnd - CurTime() <= 1
+    local deathStateEnd = org and org.incapacitated and tonumber(org.deathStateEnd)
+    if deathStateEnd and deathStateEnd > 0 then
+        CDeath.incapDeadline = deathStateEnd
+    elseif ply:Alive() then
+        CDeath.incapDeadline = nil
+    end
+    local deadline = CDeath.incapDeadline
+    return deadline ~= nil and deadline - CurTime() <= 2
 end
 
 local function DeathFadeDurations()
@@ -545,8 +551,9 @@ local function CinematicDeathTracker()
         CDeath.hasSpawned = true
     end
 
+    local incapExpiring = IncapTimerExpiring(ply)
     if ply:Alive() then
-        CDeath.incapTimerDeath = IncapTimerExpiring(ply)
+        CDeath.incapTimerDeath = incapExpiring
     end
 
 	if not ply:Alive() and not CDeath.isDead and CDeath.hasSpawned then
@@ -569,6 +576,7 @@ local function CinematicDeathTracker()
         CDeath.prevSpecReloadDown = false
         CDeath.deathMessage     = DEATH_MESSAGES[math.random(#DEATH_MESSAGES)]
         CDeath.deathColor       = DEATH_COLORS[math.random(#DEATH_COLORS)]
+        CDeath.incapTimerDeath  = CDeath.incapTimerDeath or incapExpiring
         CDeath.silent           = SilentDeathEnabled()
         CDeath.silentUnmuted    = false
         if CDeath.silent then ply:ConCommand("soundfade 100 99999") end

@@ -1005,13 +1005,8 @@ function PROP_SHARPNESS.HandlePropSticking( thing, into, sharpData, dir )
     thing:EmitSound( path, 80, pitch, 1 )
 
     if weld then -- check if we can do this weld
-        local block, freezeInstead = hook.Run( "prop_sharpness_blockweld", thing, into )
-        if block then
+        if hook.Run( "prop_sharpness_blockweld", thing, into ) then
             weld = nil
-
-        end
-        if freezeInstead then
-            freeze = true
 
         end
     end
@@ -1019,55 +1014,26 @@ function PROP_SHARPNESS.HandlePropSticking( thing, into, sharpData, dir )
     local strength = math.min( thingsObj:GetMass() * 100, intoObj and intoObj:GetMass() * 100 or math.huge )
 
     if freeze then
-        local time
-        local newWeld
-        if #constraint.GetTable( thing ) >= 1 then -- if we're part of a contraption, weld then freeze later
-            -- welding to world, any sensible prop protection will handle this but here's a hook anyway
-            local block = hook.Run( "prop_sharpness_blockworldweld", thing, into )
-            if not block then
-                strength = strength / 2
-                newWeld = constraint.Weld( thing, game.GetWorld(), 0, 0, strength, false )
+        if not thingsObj:IsMotionEnabled() then return end
 
-            end
+        local anchor = into:IsWorld() and game.GetWorld() or into
+        if hook.Run( "prop_sharpness_blockworldweld", thing, into ) then return end
+
+        local newWeld = constraint.Weld( thing, anchor, 0, 0, strength / 2, false )
+        if not IsValid( newWeld ) then return end
+
+        nudgeSize = nudgeSize / 4
+        thing:ForcePlayerDrop()
+
+        local noCollide = constraint.NoCollide( thing, anchor, 0, 0, true )
+        newWeld:DeleteOnRemove( noCollide )
+        hook.Run( "prop_sharpness_createweld", newWeld, "fakefrozen" )
+        if debugging then
+            print( "SHARPNESS: made world weld" )
+
         end
 
-        local wasWeld
-
-        if newWeld and IsValid( newWeld ) then
-            time = 10 -- kill constraint and freeze ent if its forgotten about
-            wasWeld = true
-            nudgeSize = nudgeSize / 4
-            thing:ForcePlayerDrop()
-
-            local noCollide = constraint.NoCollide( thing, game.GetWorld(), 0, 0, true )
-            newWeld:DeleteOnRemove( noCollide )
-            hook.Run( "prop_sharpness_createweld", newWeld, "fakefrozen" )
-            if debugging then
-                print( "SHARPNESS: made fakefreezing world weld" )
-
-            end
-
-            thingsObj:SetVelocity( vec_zero )
-
-        else
-            time = 0 -- freeze now
-            if debugging then
-                print( "SHARPNESS: froze sharp obj" )
-
-            end
-        end
-
-        timer.Simple( time, function()
-            if not IsValid( thing ) then return end
-            if not IsValid( thingsObj ) then return end -- might happen 
-            if time ~= 0 and thingsObj:GetVelocity():Length() > 15 then return end -- dont break whatever is making this move
-            if wasWeld and not IsValid( newWeld ) then return end -- weld broke
-
-            thing.sharpness_FrozenStuck = true
-            thingsObj:EnableMotion( false )
-            SafeRemoveEntity( newWeld )
-
-        end )
+        thingsObj:SetVelocity( vec_zero )
     elseif weld then
         local newWeld = constraint.Weld( thing, into, 0, 0, strength, false )
         if not IsValid( newWeld ) then return end
@@ -1101,27 +1067,6 @@ function PROP_SHARPNESS.HandlePropSticking( thing, into, sharpData, dir )
 
     end
 end
-
-hook.Add( "GravGunPickupAllowed", "sharpness_unfreezestuck", function( ply, ent )
-    if not ent.sharpness_FrozenStuck then return end
-    local entsObj = entsMeta.GetPhysicsObject( ent )
-    if not IsValid( entsObj ) then return end
-    if entsObj:IsMotionEnabled() then ent.sharpness_FrozenStuck = nil return end
-
-    if not ply:KeyPressed( IN_ATTACK2 ) then return end
-    entsObj:EnableMotion( true )
-    ent.sharpness_FrozenStuck = nil
-    ent.sharpness_NextDealDamage = CurTime() + 0.5
-
-end )
-
-hook.Add( "OnPhysgunPickup", "sharpness_clearstuck", function( ply, ent )
-    if not ent.sharpness_FrozenStuck then return end
-    ent.sharpness_FrozenStuck = nil
-    ent.sharpness_NextDealDamage = CurTime() + 0.5
-
-end )
-
 
 local function manageThrownSharpThing( thrower, thrown, throwType ) -- GIVE CORRECT ATTACKER
     local thrownsObj = entsMeta.GetPhysicsObject( thrown )

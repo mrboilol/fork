@@ -27,6 +27,17 @@ local function IsValidObject( ent )
     return false;
 end
 
+local PHYSICS_LAG_MS = 25;
+
+llm.FixedLags.IsPhysicsLagging = function()
+    return physenv.GetLastSimulationTime() * 1000 >= PHYSICS_LAG_MS;
+end;
+
+local function CanFreezeForLag( ent )
+    local phys = ent:GetPhysicsObject();
+    return IsValid( phys ) and phys:IsMotionEnabled() and not phys:IsAsleep();
+end;
+
 local FixedLag_1_Theard;
 llm.FixedLags.Method_1 = function()
 
@@ -71,6 +82,8 @@ llm.FixedLags.Method_1 = function()
 end;
 
 llm.FixedLags.Method_2 = function()
+
+    if ( not llm.FixedLags.IsPhysicsLagging() ) then return; end;
 
     local Objects = ents.GetAll();
     local ObjectsCount = table.Count( Objects );
@@ -136,9 +149,8 @@ llm.FixedLags.Method_2 = function()
 
                             if ( not table.HasValue( ignore_ent, ent ) and IsValidObject( ent ) ) then
 
-                                local phys = ent:GetPhysicsObject();
-                                if ( IsValid( phys ) and phys:IsMotionEnabled() ) then
-                                    phys:EnableMotion( false ); 
+                                if ( CanFreezeForLag( ent ) ) then
+                                    ent:GetPhysicsObject():EnableMotion( false );
                                 end;
 
                             end;
@@ -164,16 +176,15 @@ end;
 
 llm.FixedLags.Method_3 = function()
 
+    if ( not llm.FixedLags.IsPhysicsLagging() ) then return; end;
+
     local objects = ents.GetAll();
 
     for i = 1, table.Count( objects ) do
         local ent = objects[ i ];
 
-        if ( IsValidObject( ent ) ) then
-            local phys = ent:GetPhysicsObject();
-            if ( phys:IsMotionEnabled() ) then
-                phys:EnableMotion( false );
-            end;
+        if ( IsValidObject( ent ) and CanFreezeForLag( ent ) ) then
+            ent:GetPhysicsObject():EnableMotion( false );
         end
     end;
 

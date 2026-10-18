@@ -32,8 +32,10 @@ function MODE:AssignTeams()
 	local numPlayers = #players
 	local numSWAT = 1
 
-	if numPlayers <= 4 then
+	if numPlayers <= 3 then
 		numSWAT = 1
+	elseif numPlayers == 4 then
+		numSWAT = 2
 	elseif numPlayers == 5 then
 		numSWAT = 2
 	elseif numPlayers == 6 then
@@ -252,7 +254,7 @@ function MODE:CanLaunch()
 	local points = zb.GetMapPoints( "HMCD_CRI_CT" )
 	local points2 = zb.GetMapPoints( "HMCD_CRI_T" )
 	local plramount = zb:CheckPlaying()
-	return (#points > 3) and (#points2 > 0) and (#plramount > 5)
+	return (#points > 3) and (#points2 > 0) and (#plramount >= 4)
 end
 
 local function GiveSuspect(ply)

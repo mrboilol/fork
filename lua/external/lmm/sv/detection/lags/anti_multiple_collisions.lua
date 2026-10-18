@@ -30,7 +30,7 @@ hook.Add( "EntityTakeDamage", prefix .. "Critical_Collisions", function( ent, dm
 
             MsgN( "[LLM]: An endless collision of props has been prevented." );
             
-            if ( IsValid( phy ) ) then
+            if ( IsValid( phy ) and llm.FixedLags.IsPhysicsLagging() ) then
 
                 if ( DPP ~= nil ) then
                     DPP.SetGhosted( ent, true );

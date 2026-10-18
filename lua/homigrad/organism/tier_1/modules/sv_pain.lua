@@ -351,8 +351,7 @@ module[2] = function(owner, org, timeValue)
 	local syncopeResistance = Clamp(resilience * 0.35 + zerlkersResistance * 0.8 + (math.max(org.traumaResistanceMul or 1, 1) - 1) * 0.2, 0, 0.9)
 	local syncopeRate = syncopeSeverity ^ 1.7 * pain_syncope_max_rate * (1 - syncopeResistance)
 	if not org.otrub and syncopeRate > 0 and math.random() < Clamp(syncopeRate * timeValue, 0, 1) then
-		org.consciousness = math.min(org.consciousness or 1, 0.2)
-		org.needotrub = true
+		org.consciousness = math.min(org.consciousness or 1, consciousness_otrub_threshold * consciousnessResistance * 0.8)
 	end
 	org.nearpainlimit = not org.otrub and org.pain >= org.pain_turn * pain_fake_threshold
 	if org.isPly and org.pain >= 85 and not org.otrub and IsValid(owner) and owner.Notify and owner:GetInfoNum("hg_newthoughts", 0) <= 0 then
