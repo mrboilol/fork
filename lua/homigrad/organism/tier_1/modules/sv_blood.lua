@@ -824,6 +824,14 @@ module[2] = function(owner, org, mulTime)
 	local cerebralFailure = (org.brainoxygen or 1) < 0.16
 	local ignoreBrainDamage = hg.organism.IsBrainDamageIgnored and hg.organism.IsBrainDamageIgnored(org)
 	org.incapacitated = incapacitationEnabled and org.otrub and (cerebralFailure or (not ignoreBrainDamage and org.brain > 0.4) or (org.trachea >= 0.5 and org.needle <= 0) or org.heartstop or (org.spine3 >= 1) or (org.spine2 >= hg.organism.fake_spine2)) or false
+	local incapReasons = {}
+	if cerebralFailure then incapReasons[#incapReasons + 1] = "brainO2<0.16" end
+	if not ignoreBrainDamage and org.brain > 0.4 then incapReasons[#incapReasons + 1] = "brain>0.4" end
+	if org.trachea >= 0.5 and org.needle <= 0 then incapReasons[#incapReasons + 1] = "trachea" end
+	if org.heartstop then incapReasons[#incapReasons + 1] = "heartstop" end
+	if org.spine3 >= 1 then incapReasons[#incapReasons + 1] = "spine3" end
+	if org.spine2 >= hg.organism.fake_spine2 then incapReasons[#incapReasons + 1] = "spine2" end
+	org.incapReason = #incapReasons > 0 and table.concat(incapReasons, ",") or nil
 
 	local noNeedle = org.needle <= 0
 	local tracheaBlocking = org.trachea > 0.5 and noNeedle

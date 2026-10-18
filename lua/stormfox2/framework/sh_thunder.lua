@@ -402,7 +402,7 @@ else
 	local function Strike( tList, b_InSkybox, n_Length, n_Light )
 		table.insert(lightningStrikes, {CurTime() + n_Length, n_Length, b_InSkybox, tList, true})
 		local pos = tList[#tList][1]
-		sound.Play("ambient/energy/weld" .. math.random(1,2) .. ".ogg", pos)
+		sound.Play("ambient/energy/weld" .. math.random(1,2) .. ".wav", pos)
 		if not b then
 			hook.Add("Think","StormFox2.Thunder.SndDis", SndThink)
 		end
@@ -419,7 +419,7 @@ else
 		_Light = n_Light
 		_Length = n_Length
 		_Stop = math.max(c + n_Length, _Stop)
-		sound.Play("ambient/atmosphere/thunder" .. math.random(3,4) .. ".ogg", StormFox2.util.ViewEntity():GetPos(), 150)
+		sound.Play("ambient/atmosphere/thunder" .. math.random(3,4) .. ".wav", StormFox2.util.ViewEntity():GetPos(), 150)
 
 	end
 	local Sway = 120
@@ -451,6 +451,7 @@ else
 
 	-- Render Strikes
 	local tex = {(Material("stormfox2/effects/lightning"))}
+	local mat_lightning_light = Material("stormfox2/effects/lightning_light")
 	local texend = {(Material("stormfox2/effects/lightning_end")),(Material("stormfox2/effects/lightning_end2"))}
 	for k, v in ipairs( texend ) do
 		v:SetFloat("$nofog",1)
@@ -514,7 +515,7 @@ else
 				local vc2 = Vector(vc.x,vc.y,v1.z)
 				local a = math.max(0, 1 - life - 0.2)
 					col.a = a * 1275
-				render.SetMaterial(Material("stormfox2/effects/lightning_light"))
+				render.SetMaterial(mat_lightning_light)
 				render.DrawBeam(vc, vc2, 24400, 0.3 , 0.7, col)
 			end
 		end

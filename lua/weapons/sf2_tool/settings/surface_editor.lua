@@ -4,7 +4,7 @@ TOOL.RealName  = "Surface Editor"
 TOOL.PrintName = "#sf_tool.surface_editor"
 TOOL.ToolTip = "#sf_tool.surface_editor.desc"
 TOOL.NoPrintName = false
-TOOL.ShootSound = Sound("weapons/irifle/irifle_fire2.ogg")
+TOOL.ShootSound = Sound("weapons/irifle/irifle_fire2.wav")
 
 local mat = Material("stormfox2/weapons/sf_tool_mat")
 local function FindTexture( str )

@@ -100,7 +100,7 @@ local function Kill(s)
 end
 
 function G.Near(x, y, z, nx, ny, nz, R, eat)
-	local n, w, sx, sy, sz = 0, 0, 0, 0, 0
+	local n, w, sx, sy, sz, drops = 0, 0, 0, 0, 0, 0
 	local R2 = R * R
 	for i = head, tail do
 		local s = fifo[i]
@@ -108,14 +108,14 @@ function G.Near(x, y, z, nx, ny, nz, R, eat)
 			local dx, dy, dz = s.x - x, s.y - y, s.z - z
 			if abs(dx * nx + dy * ny + dz * nz) < 3 and dx * dx + dy * dy + dz * dz < R2 then
 				local a = s.h * s.h
-				n, w = n + 1, w + a
+				n, w, drops = n + 1, w + a, drops + 1 + (s.mn or 0)
 				sx, sy, sz = sx + s.x * a, sy + s.y * a, sz + s.z * a
 				if eat and eat(s.x, s.y, s.z, a, s.h) then Kill(s) end
 			end
 		end
 	end
 	if w <= 0 then return 0, 0 end
-	return n, w, sx / w, sy / w, sz / w
+	return n, w, sx / w, sy / w, sz / w, drops
 end
 
 -- Over the cap: remove the oldest, preferring one that is out of view among the oldest few.
@@ -261,6 +261,7 @@ local function Crowded(x, y, z, wet, vol)
 		local sv = s.vol or 0.01
 		local g = min(sqrt((sv + vol) / sv), s.h0 * 2 / s.h, GC.maxHalf / s.h)
 		s.vol = sv + vol
+		s.mn = (s.mn or 0) + 1
 		if g > 1.001 then
 			s.ux, s.uy, s.uz, s.vx, s.vy, s.vz = s.ux * g, s.uy * g, s.uz * g, s.vx * g, s.vy * g, s.vz * g
 			s.h = s.h * g

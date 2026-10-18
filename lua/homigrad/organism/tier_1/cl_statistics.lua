@@ -84,6 +84,9 @@ local list = {
 	{"incapacitated", true, true},
 	{"critical", true, true},
 	{"consciousness", 1, false},
+	"incapReason",
+	"deathCause",
+	{"uncon_timer", 20, true},
 	0,
 	{"o2", {"o2", "range"}},
 	{"co2", 30, true},
@@ -155,6 +158,8 @@ local list = {
 	{"concussion", 3, true},
 	{"concussion_tinnitus", 1, true},
 	{"brain", 1, true},
+	{"brainRate", 0.01, true},
+	{"brainBleedRate", 0.01, true},
 	{"brainHemorrhage", 1, true},
 	{"brainSwelling", 1, true},
 	{"intracranialPressure", 1, true},
@@ -230,6 +235,11 @@ local red, green = Color(255, 0, 0), Color(0, 255, 0)
 local function getTextTable(org)
 	local textList = {}
 	local shown = {}
+	local now = CurTime()
+	for _, entry in ipairs({{"DEATH TIMER", "deathStateEnd"}, {"defib grace", "defibDeathGrace"}, {"otrub min", "otrubMinUntil"}}) do
+		local left = (tonumber(org[entry[2]]) or 0) - now
+		if left > 0 then textList[#textList + 1] = {entry[1], string.format("%.1fs", left), 255, 0, 0} end
+	end
 	for i, v in pairs(list) do
 		local text1, text2 = "", ""
 		local value

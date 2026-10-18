@@ -1,8 +1,12 @@
 hg.WallBang = hg.WallBang or {}
 local WB = hg.WallBang
 
-WB.Reach = 30
+WB.Reach = 80
 WB.MaxDist = 36
+WB.BraceDist = 22
+WB.HandReach = 32
+WB.ApproachTime = 3
+WB.ApproachSpeed = 120
 WB.Windup = 0.22
 WB.Impact = 0.29
 WB.Duration = 0.68
@@ -59,8 +63,19 @@ hook.Add("StartCommand", "hg_wallbang_input", function(ply, cmd)
 	cmd:RemoveKey(IN_ATTACK2)
 	cmd:RemoveKey(IN_JUMP)
 	cmd:RemoveKey(IN_SPEED)
-	cmd:SetForwardMove(0)
-	cmd:SetSideMove(0)
+
+	local _, norm = WB.Plane(ply)
+	local fwd, side = 0, 0
+	local dist = WB.WallDist(ply)
+	if dist > WB.BraceDist then
+		local ang = cmd:GetViewAngles()
+		ang.p = 0
+		local speed = WB.ApproachSpeed * math.Clamp((dist - WB.BraceDist) / 10, 0.3, 1)
+		fwd = ang:Forward():Dot(-norm) * speed
+		side = ang:Right():Dot(-norm) * speed
+	end
+	cmd:SetForwardMove(fwd)
+	cmd:SetSideMove(side)
 end)
 
 local angBend = Angle()
@@ -70,7 +85,8 @@ hook.Add("Bones", "hg_wallbang_bones", function(ply, dtime)
 		return
 	end
 
-	ply.wallbangBrace = math.Approach(ply.wallbangBrace or 0, 1, (dtime or FrameTime()) * 3)
+	local close = WB.WallDist(ply) <= WB.HandReach
+	ply.wallbangBrace = math.Approach(ply.wallbangBrace or 0, close and 1 or 0, (dtime or FrameTime()) * 3)
 	local brace = math.ease.InOutSine(ply.wallbangBrace)
 
 	local reach = math.Clamp((WB.WallDist(ply) - 5) / 28, 0, 0.9)
@@ -102,7 +118,7 @@ if CLIENT then
 	end
 
 	function hg.WallBangTPIK(ent, ply, wpn)
-		if ent ~= ply or not IsValid(wpn) or not WB.Active(ply) then return end
+		if ent ~= ply or not IsValid(wpn) or not WB.Active(ply) or WB.WallDist(ply) > WB.HandReach then return end
 
 		local wallPos, norm = WB.Plane(ply)
 		local eye = ply:EyePos()
@@ -130,6 +146,8 @@ local function stop(ply)
 	ply:SetNWBool("hg_wallbang", false)
 	ply:SetNWFloat("hg_wallbang_slam", 0)
 	ply.wallbangNext = nil
+	ply.wallbangReached = nil
+	ply.wallbangApproachEnd = nil
 end
 WB.Stop = stop
 
@@ -180,7 +198,8 @@ function WB.Start(ply)
 	ply:SetNWFloat("hg_wallbang_slam", 0)
 	ply:SetNWBool("hg_wallbang", true)
 	ply.wallbangCount = ply.wallbangCount or 0
-	ply:EmitSound("physics/body/body_medium_impact_soft" .. math.random(1, 7) .. ".wav", 55, math.random(95, 110), 0.5)
+	ply.wallbangReached = nil
+	ply.wallbangApproachEnd = CurTime() + WB.ApproachTime
 
 	return true
 end
@@ -255,7 +274,7 @@ end
 
 function WB.Slam(ply)
 	if (ply.wallbangNext or 0) > CurTime() then return end
-	if WB.WallDist(ply) > WB.MaxDist then return end
+	if not ply.wallbangReached or WB.WallDist(ply) > WB.HandReach then return end
 
 	ply.wallbangNext = CurTime() + WB.Cooldown
 	local start = CurTime()
@@ -272,7 +291,14 @@ hook.Add("Player Think", "hg_wallbang_think", function(ply)
 	if not WB.Active(ply) then return end
 
 	local dist = WB.WallDist(ply)
-	if not canBrace(ply) or dist > WB.MaxDist or dist < 1 then
+	if not ply.wallbangReached and dist <= WB.HandReach then
+		ply.wallbangReached = true
+		ply:EmitSound("physics/body/body_medium_impact_soft" .. math.random(1, 7) .. ".wav", 55, math.random(95, 110), 0.5)
+	end
+
+	if not canBrace(ply) or dist < 1
+		or (ply.wallbangReached and dist > WB.MaxDist)
+		or (not ply.wallbangReached and (dist > WB.Reach + 8 or (ply.wallbangApproachEnd or 0) < CurTime())) then
 		stop(ply)
 	end
 end)

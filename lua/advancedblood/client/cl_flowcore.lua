@@ -920,9 +920,10 @@ local function StepHead(hd, ch, s, src, pose, m, dt, gx, gy, gz, gmag, now)
 
 	-- on an underside the head hangs, swells and lets go as a drop
 	local dk = ch.wd and ch.wd.dropK or src.dropK or 1
+	local low = ch.wd and ch.wd.lowDrop or src.lowDrop or 0
 	hd.hangK = 0
 	if gn > 0.3 * gmag then
-		local vd = B.pendant * dk * gmag / gn * hd.pendMul
+		local vd = max(B.pendant * dk * gmag / gn, low) * hd.pendMul
 		hd.hangK = hd.vol / vd
 		if hd.vol > vd then
 			hd.hang = hd.hang + dt
@@ -1140,12 +1141,12 @@ local function StepHead(hd, ch, s, src, pose, m, dt, gx, gy, gz, gmag, now)
 		hd.trapT = 0
 	end
 	if hd.trapT >= 1 then hd.freezeT = now + 2.5 end
-	local ep = B.edgePendant * dk
+	local ep = max(B.edgePendant * dk, low)
 	if now < hd.freezeT and hd.vol > ep then
 		hd.hangK = max(hd.hangK, 1)
 		local since = now - hd.lastDrip
 		if since > 0.06 then
-			local dv = max(B.pendant * dk, min(hd.vol * 0.5, 0.3))
+			local dv = max(B.pendant * dk, low, min(hd.vol * 0.5, 0.3))
 			Detach(hd, s, src, dv, px, py, pz, nx, ny, nz, bvx, bvy, bvz, 1, since < 0.15 and 1 or 0, true)
 		end
 	end

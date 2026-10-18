@@ -73,21 +73,13 @@ local function collectWeapons(ply)
             info = sanitizeWeaponInfo(wep:GetInfo())
         end
 
-        local weaponData = {
+        out[#out + 1] = {
             class = class,
             clip1 = wep:Clip1(),
-            clip2 = wep:Clip2()
-        }
-
-        if istable(info) then
-            weaponData.info = info
-        end
-
-        out[#out + 1] = {
-            class = weaponData.class,
-            clip1 = weaponData.clip1,
-            clip2 = weaponData.clip2,
-            info = weaponData.info
+            clip2 = wep:Clip2(),
+            info = istable(info) and info or nil,
+            ammoType = wep.AmmoTypes and wep.newammotype or nil,
+            ammoName = wep.AmmoTypes and (wep.RealAmmoType or wep.Primary and wep.Primary.Ammo) or nil
         }
     end
     return out
@@ -137,11 +129,10 @@ local function collectSnapshot(ply)
     local ammoPreset = {}
     local attachmentsPreset = {}
 
-    if istable(inv.Ammo) then
-        for ammoId, count in pairs(inv.Ammo) do
-            if isnumber(ammoId) and isnumber(count) and count > 0 then
-                ammoPreset[ammoId] = math.floor(count)
-            end
+    for ammoId, count in pairs(ply:GetAmmo()) do
+        local ammoName = game.GetAmmoName(ammoId)
+        if ammoName and count > 0 then
+            ammoPreset[ammoName] = math.floor(count)
         end
     end
 
@@ -234,11 +225,16 @@ local function clearPlayerLoadout(ply)
     end
 end
 
-local function applyArmorPreset(ply, armorPreset, armorStates)
+local function applyArmorPreset(ply, armorPreset, armorStates, equipment)
     if not istable(armorPreset) then return end
 
+    local savedEquipment = {}
+    for _, saved in ipairs(istable(equipment) and equipment or {}) do
+        if istable(saved) and isstring(saved.class) then savedEquipment[saved.class] = true end
+    end
+
     for _, armor in pairs(armorPreset) do
-        if isstring(armor) then
+        if isstring(armor) and not savedEquipment[hg.GetLegacyNewArmorClass(armor) or ""] then
             if hg.AddArmor(ply, armor) and istable(armorStates) and istable(armorStates[armor]) then
                 local saved = armorStates[armor]
                 local state = ply.armor_states[armor] or {}
@@ -300,6 +296,7 @@ local function applyEquipmentPreset(ply, equipment)
 		if not saved.armor and not hg.SetZCityArmorMass(ent, tonumber(saved.mass) or ent.CarryMass or 1) then ent:Remove() continue end
 		if not ent:CanWear(wearer) then ent:Remove() continue end
 		ent:Wear(wearer)
+		hg.SyncZCityArmorCondition(ent)
 		if ent.SetEnabled then ent:SetEnabled(saved.enabled == true) end
 	end
 end
@@ -324,6 +321,17 @@ local function applyWeaponsPreset(ply, preset)
 
                 if isnumber(data.clip2) and data.clip2 >= 0 then
                     wep:SetClip2(data.clip2)
+                end
+
+                if isnumber(data.ammoType) or isstring(data.ammoName) then
+                    timer.Simple(0.2, function()
+                        if not IsValid(wep) or not wep.AmmoTypes or not wep.ApplyAmmoChanges then return end
+                        local ammoType = wep.AmmoTypes[data.ammoType] and data.ammoType
+                        for index, ammo in ipairs(wep.AmmoTypes) do
+                            if ammo[1] == data.ammoName then ammoType = index break end
+                        end
+                        if ammoType then wep:ApplyAmmoChanges(ammoType) end
+                    end)
                 end
             end
         end
@@ -356,9 +364,9 @@ local function applyAmmoPreset(ply, ammoPreset)
         end
     end
 
-    for ammoId, count in pairs(ammoPreset) do
-        if not isnumber(ammoId) or not isnumber(count) then continue end
-        local ammoName = game.GetAmmoName(ammoId)
+    for ammoKey, count in pairs(ammoPreset) do
+        if not isnumber(count) then continue end
+        local ammoName = game.GetAmmoID(tostring(ammoKey)) ~= -1 and tostring(ammoKey) or isnumber(ammoKey) and game.GetAmmoName(ammoKey)
         if not ammoName then continue end
         ply:GiveAmmo(math.max(0, math.floor(count)), ammoName, true)
     end
@@ -390,7 +398,7 @@ local function applyPreset(ply, preset)
     clearPlayerLoadout(ply)
     
     applyWeaponsPreset(ply, preset.weapons)
-    applyArmorPreset(ply, preset.armor, preset.armorStates)
+    applyArmorPreset(ply, preset.armor, preset.armorStates, preset.equipment)
 	applyEquipmentPreset(ply, preset.equipment)
     applyClothesPreset(ply, preset.clothes)
     applyAmmoPreset(ply, preset.ammo)

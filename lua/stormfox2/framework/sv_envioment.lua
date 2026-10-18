@@ -1,7 +1,7 @@
 local INVALID_VERTS = 0
 local WATER_VERTS = 1
 
-StormFox2.Setting.AddSV("enable_ice", true)
+StormFox2.Setting.AddSV("enable_ice",not game.IsDedicated())
 StormFox2.Setting.AddSV("enable_wateroverlay",true, nil, "Effects")
 
 --[[-------------------------------------------------------------------------
@@ -302,10 +302,9 @@ local function SpawnIce()
 		v:Remove()
 	end
 	local e = ents.Create("stormfox_mapice")
-	if not IsValid(e) then return end
 	e:SetPos(Vector(0,0,0))
 	e:Spawn()
-	bIce = IsValid(e)
+	bIce = true
 end
 
 local function RemoveIce()
@@ -316,17 +315,15 @@ local function RemoveIce()
 end
 
 timer.Create("stormfox2.spawnice", 8, 0, function()
-	if bIce and #ents.FindByClass("stormfox_mapice") == 0 then bIce = false end
 	if not StormFox2.Setting.GetCache("enable_ice") then
 		if bIce then
 			RemoveIce()
 		end
 		return
 	end
-	if bIce and StormFox2.Temperature.Get() > 1 then
+	if bIce and StormFox2.Temperature.Get() > -1 then
 		RemoveIce()
-	elseif not bIce and StormFox2.Temperature.Get() <= 0
-		and STORMFOX_WATERMESHCOLLISON and #STORMFOX_WATERMESHCOLLISON > 0 then
+	elseif not bIce and StormFox2.Temperature.Get() <= -8 then
 		SpawnIce()
 	end
 end)

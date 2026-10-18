@@ -152,6 +152,26 @@ local function SeedAdd(x, y, z, n, vol, surf, ent, kind, dx, dy, dz)
 	return s, k
 end
 
+local function SeedGather(s, k, R)
+	local cx, cy, cz = s.sx / s.w, s.sy / s.w, s.sz / s.w
+	local R2 = R * R
+	local now = CurTime()
+	for k2, o in pairs(seeds) do
+		if k2 ~= k and o.w > 0 and o.nx * s.nx + o.ny * s.ny + o.nz * s.nz > 0.9 then
+			local dx, dy, dz = o.sx / o.w - cx, o.sy / o.w - cy, o.sz / o.w - cz
+			if dx * dx + dy * dy + dz * dz < R2 then
+				local decay = exp(-(now - o.t) / 45)
+				ABL.FlowCore.Move("pool", "dried", o.vol * (1 - decay))
+				s.vol = s.vol + o.vol * decay
+				s.sx, s.sy, s.sz, s.w = s.sx + o.sx * decay, s.sy + o.sy * decay, s.sz + o.sz * decay, s.w + o.w * decay
+				for kk, v in pairs(o.kinds) do s.kinds[kk] = (s.kinds[kk] or 0) + v * decay end
+				s.t0 = min(s.t0, o.t0)
+				seeds[k2] = nil
+			end
+		end
+	end
+end
+
 local function SeedKind(s)
 	local best, bv = "drip", -1
 	for k, v in pairs(s.kinds) do if v > bv then best, bv = k, v end end
@@ -923,9 +943,15 @@ function P.Deposit(x, y, z, n, vol, surf, ent, kind, dx, dy, dz, K)
 			need = need * (1 - C.BloodMap.seedK * min(1, cov * 0.5 + wet * 0.5))
 		end
 	end
-	if s.vol >= need and kind ~= "runoff" and kind ~= "seep" and PC.minStains > 0 then
-		local scnt = ABL.Ground.Near(s.sx / s.w, s.sy / s.w, s.sz / s.w, n.x, n.y, n.z, PC.minStainsR)
-		if scnt < PC.minStains then return end
+	if kind ~= "runoff" and kind ~= "seep" and PC.minStains > 0 then
+		local now = CurTime()
+		if (s.gateT or 0) > now then return end
+		s.gateT = now + 0.25
+		local _, _, _, _, _, drops = ABL.Ground.Near(s.sx / s.w, s.sy / s.w, s.sz / s.w, n.x, n.y, n.z, PC.minStainsR)
+		if (drops or 0) < PC.minStains then return end
+		SeedGather(s, k, PC.minStainsR)
+		if s.vol < PC.minStainVolume then return end
+		need = min(need, s.vol)
 	end
 	if s.vol >= need then
 		local cx, cy, cz = s.sx / s.w, s.sy / s.w, s.sz / s.w

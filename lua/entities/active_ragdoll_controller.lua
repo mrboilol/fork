@@ -125,12 +125,23 @@ local function ProcessBone(self, target, physID, enable)
     
     if not physSuccess or not IsValid(phys) then return false end
 
+    self._attached = self._attached or {}
+    local attached = self._attached[physID]
+    if attached and attached ~= phys then
+        self._attached[physID] = nil
+        attached = nil
+    end
+
     pcall(function()
         if enable then
-            self:AddToMotionController(phys)
+            if not attached then
+                self:AddToMotionController(phys)
+                self._attached[physID] = phys
+            end
             phys:Wake()
-        else
+        elseif attached then
             self:RemoveFromMotionController(phys)
+            self._attached[physID] = nil
         end
     end)
 
@@ -274,16 +285,17 @@ end
 function ENT:OnRemove()
     if CLIENT then return end
 
-    if self._physCache then
-        for _, data in pairs(self._physCache) do
-            if IsValid(data.phys) then
+    if self._attached then
+        for _, phys in pairs(self._attached) do
+            if IsValid(phys) then
                 pcall(function()
-                    self:RemoveFromMotionController(data.phys)
+                    self:RemoveFromMotionController(phys)
                 end)
             end
         end
     end
 
+    self._attached = nil
     self._physCache = nil
     self._boneNameCache = nil
 end
@@ -342,12 +354,7 @@ function ENT:PhysicsSimulate(phys, dt)
     if pid == -1 then return SIM_NOTHING end
     
     local data = self._physCache[pid]
-    if not data or not IsValid(data.phys) then
-        pcall(function()
-            self:RemoveFromMotionController(phys)
-        end)
-        return SIM_NOTHING
-    end
+    if not data or not IsValid(data.phys) then return SIM_NOTHING end
 
     local boneID = self._boneNameCache[data.name]
     if not boneID then return SIM_NOTHING end

@@ -19,6 +19,21 @@ local function getCarriedAmmoNames()
 	return names
 end
 
+local function getAmmoTooltip(data)
+	local bullet = data.BulletSettings or {}
+	local lines = {data.name}
+	local function addStat(label, value, fmt)
+		if isnumber(value) then lines[#lines + 1] = label .. ": " .. string.format(fmt, value) end
+	end
+	addStat("Damage", bullet.Damage, "%g")
+	addStat("Penetration", bullet.Penetration, "%g")
+	addStat("Pellets", bullet.NumBullet or 1, "%d")
+	addStat("Size", bullet.Diameter, "%g mm")
+	addStat("Speed", bullet.Speed, "%g m/s")
+	return table.concat(lines, "
+")
+end
+
 spawnmenu.AddCreationTab("Ammo", function()
 	local scroll = vgui.Create("DScrollPanel")
 	local entries = {}
@@ -32,7 +47,8 @@ spawnmenu.AddCreationTab("Ammo", function()
 			spawnname = class,
 			nicename = data.name,
 			material = hg.GetAmmoIconPath(key),
-			admin = stored.t.AdminOnly
+			admin = stored.t.AdminOnly,
+			tooltip = getAmmoTooltip(data)
 		}
 	end
 	table.sort(entries, function(a, b) return a.nicename < b.nicename end)
@@ -59,7 +75,9 @@ spawnmenu.AddCreationTab("Ammo", function()
 
 	local function addIcon(layout, entry)
 		local icon = spawnmenu.CreateContentIcon("entity", layout, entry)
-		if IsValid(icon) then layout:Add(icon) end
+		if not IsValid(icon) then return end
+		icon:SetTooltip(entry.tooltip)
+		layout:Add(icon)
 	end
 
 	addHeading("stuff you can use")

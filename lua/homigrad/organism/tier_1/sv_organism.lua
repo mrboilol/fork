@@ -230,6 +230,10 @@ hook.Add("Org Clear", "Main", function(org)
 	org.deathStateKilled = nil
 	org.fatalBrainDeath = nil
 	org.fatalDamageQueued = nil
+	org.deathCause = nil
+	org.incapReason = nil
+	org.brainRate = 0
+	org.lastBrainSample = nil
 	org.postMortemElapsed = nil
 	org.postMortemSendTime = nil
 	org.lastWoundsSig = nil
@@ -514,7 +518,9 @@ local function send_organism(org, ply, recipientForce, reliable)
 		"skull", "chest", "heart", "trachea", "liver", "kidneys", "stomach", "intestines", "lungsL", "lungsR",
 		"spine1", "spine2", "spine3", "internalBleed", "internalBleedComplication", "wantToVomit",
 		"weight", "maxweight", "ischemia", "hemotransfusionshock", "zerlkers", "zerlkersOverdose", "anger",
-		"brainSwelling", "cardiacTamponade"
+		"brainSwelling", "cardiacTamponade", "needle", "respiratoryRate", "bradyapnea", "drugRespiratoryDepression",
+		"exertionO2Debt", "circulatoryO2Reserve", "oxygenIntakeAvailable", "vomitInThroat", "otrub", "alive",
+		"incapReason", "deathCause", "defibDeathGrace", "brainRate", "uncon_timer", "otrubMinUntil", "fatalDamageQueued"
 	}) do
 		sendtable[key] = org[key]
 	end
@@ -782,9 +788,27 @@ function hg.organism.GetZerlkersResistance(org)
 	return math.Clamp(org.zerlkers or 0, 0, 1)
 end
 
+function hg.organism.SetDeathCause(org, cause)
+	if not org or org.deathCause then return end
+	org.deathCause = cause
+
+	local o2 = istable(org.o2) and org.o2 or {}
+	local snapshot = string.format("[organism] %s died: %s | incap=%s brain=%.3f brainRate=%.4f/s brainO2=%.3f cerebralPerf=%.3f o2=%.1f/%.1f co2=%.1f CO=%.2f heartstop=%s fib=%s pulse=%.0f bp=%.0f blood=%.0f trachea=%.2f needle=%s spine2=%.2f spine3=%.2f unconFor=%.1fs",
+		IsValid(org.owner) and (org.owner.Nick and org.owner:Nick() or tostring(org.owner)) or "?",
+		cause, tostring(org.incapReason or "-"), org.brain or 0, org.brainRate or 0, org.brainoxygen or 1, org.cerebralPerfusion or 1,
+		o2[1] or 0, o2.range or 0, org.co2 or 0, org.CO or 0, tostring(org.heartstop), tostring(org.fibrillation),
+		org.pulse or 0, org.bloodPressure or 0, org.blood or 0, org.trachea or 0, tostring(org.needle), org.spine2 or 0, org.spine3 or 0, org.uncon_timer or 0)
+
+	MsgN(snapshot)
+	if IsValid(org.owner) and org.owner:IsPlayer() then
+		org.owner:PrintMessage(HUD_PRINTCONSOLE, snapshot)
+	end
+end
+
 function hg.organism.KillFatalBrainDamage(org)
 	if not org or org.fatalBrainDeath then return false end
 
+	hg.organism.SetDeathCause(org, "fatal brain damage (brain >= 0.7 or fatal head hit)")
 	org.fatalBrainDeath = true
 	org.alive = false
 	org.needotrub = false
@@ -1242,6 +1266,11 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.ownerFake = false
 	end
 	org.timeValue = timeValue
+	if timeValue > 0 then
+		local brainNow = org.brain or 0
+		org.brainRate = Lerp(0.2, org.brainRate or 0, (brainNow - (org.lastBrainSample or brainNow)) / timeValue)
+		org.lastBrainSample = brainNow
+	end
 	org.incapacitated = false
 	org.critical = false
 	if isPly then
@@ -1556,6 +1585,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 
 		if CurTime() >= org.deathStateEnd and not org.deathStateKilled then
 			org.deathStateKilled = true
+			hg.organism.SetDeathCause(org, "death-state timer expired (unconscious + incapacitated)")
 			if org.analgesia > 1.5 or org.painkiller > 2.4 then
 				hg.achievements.AddPlayerAchievement(owner, "drugs", 1)
 			end
@@ -1569,6 +1599,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 
 	if isPly and ((org.brain or 0) >= 1 or (org.blood or 5000) < 10) and owner:Alive() and not org.deathStateKilled then
 		org.deathStateKilled = true
+		hg.organism.SetDeathCause(org, (org.brain or 0) >= 1 and "brain >= 1" or "blood < 10")
 		if org.analgesia > 1.5 or org.painkiller > 2.4 then
 			hg.achievements.AddPlayerAchievement(owner, "drugs", 1)
 		end
@@ -1623,6 +1654,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	if isPly then
 		if org.otrub or org.fake then hg.Fake(owner,nil,true) end
 		if not org.alive and owner:Alive() then
+			hg.organism.SetDeathCause(org, org.fatalDamageQueued and "fatal damage queued" or "org.alive set false")
 			if org.analgesia > 1.5 or org.painkiller > 2.4 then
 				hg.achievements.AddPlayerAchievement(owner, "drugs", 1)
 			end

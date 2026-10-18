@@ -543,7 +543,7 @@ local function StepBlob(b, src, pose, m, dt, gx, gy, gz, gmag)
 	local dk = src.dropK or 1
 	b.hangK = 0
 	if gn > 0.3 * gmag then
-		local vd = B.pendant * dk * gmag / gn * b.pendMul
+		local vd = math.max(B.pendant * dk * gmag / gn, src.lowDrop or 0) * b.pendMul
 		b.hangK = b.vol / vd
 		if b.vol > vd and not b.tethered then
 			b.hang = b.hang + dt

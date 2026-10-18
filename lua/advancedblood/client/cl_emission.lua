@@ -300,6 +300,10 @@ function E.DropK(rate)
 	return math.Clamp(sqrt(max(rate, 0) / C.ProfileRate.minor), C.DropSize.min, C.DropSize.max)
 end
 
+function E.LowFlowDrop(rate)
+	return min(rate / 1.5, 0.5) * (1 - math.Clamp((rate - C.ProfileRate.minor) / (C.ProfileRate.moderate - C.ProfileRate.minor), 0, 1))
+end
+
 ------------------------------------------------------------------------------------------
 -- Per step
 ------------------------------------------------------------------------------------------
@@ -362,6 +366,7 @@ local function EmitWound(src, wd, dt, stepIdx, bodyflow, heartH)
 	local p = E.Profile(src, wd, rate)
 	wd.profile = p
 	wd.dropK = E.DropK(full)
+	wd.lowDrop = E.LowFlowDrop(full)
 	-- How the blood leaves (seeping, pouring, in a jet) changes with the profile, and the profile
 	-- with the rate: the shares follow it over a moment instead of switching.
 	local ks = min(1, dt / C.Wound.shareTau)
@@ -491,8 +496,7 @@ local function EmitWound(src, wd, dt, stepIdx, bodyflow, heartH)
 		if wd.dripAcc > 1.5 then wd.dripAcc = 1.5 end
 		local dv = max(wd.dripTarget, wd.dripAcc * 0.2)
 		wd.dripAcc = wd.dripAcc - dv
-		local lowFlowDrop = min(full / 1.5, 0.5) * (1 - Clamp((full - C.ProfileRate.minor) / (C.ProfileRate.moderate - C.ProfileRate.minor), 0, 1))
-		wd.dripTarget = max(rng:Range(0.03, 0.075) * wd.dropK, lowFlowDrop)
+		wd.dripTarget = max(rng:Range(0.03, 0.075) * wd.dropK, wd.lowDrop)
 		Drops.Spawn(ox, oy, oz, wvx + nx * 4 + rng:Range(-2, 2), wvy + ny * 4 + rng:Range(-2, 2), wvz + nz * 4, dv, src, 0, 0)
 	end
 
@@ -695,6 +699,7 @@ function E.Step(h)
 				end
 				src.flowRate = total
 				src.dropK = E.DropK(total)
+				src.lowDrop = E.LowFlowDrop(total)
 				src.flowNominal = asked
 				src.flowFull = askedFull
 				src.flowShare = lossSum > 0 and asked / lossSum or 1

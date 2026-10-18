@@ -170,7 +170,7 @@ else
 					continue
 				end
 				v:TakeDamageInfo(dmg)
-				v:EmitSound("player/geiger" .. math.random(1,3) .. ".ogg")
+				v:EmitSound("player/geiger" .. math.random(1,3) .. ".wav")
 			end
 		end
 	end

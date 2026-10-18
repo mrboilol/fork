@@ -99,7 +99,7 @@ end
 			label:SetTextColor( Color( 255,255,255, 105) )
 			sv:SetToolTip(niceName(language.GetPhrase("#administrator_applications")))
 		end
-		surface.PlaySound("garrysmod/ui_click.ogg")
+		surface.PlaySound("garrysmod/ui_click.wav")
 	end
 
 	local function OpenWindow(icon, window)

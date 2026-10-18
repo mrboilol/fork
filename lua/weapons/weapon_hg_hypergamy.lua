@@ -166,44 +166,43 @@ if SERVER then
 end
 
 if CLIENT then
-	local paperMat = Material("hypogamy.png", "smooth mips")
-	local paperColor = Color(255, 255, 255)
-	local backColor = Color(240, 240, 235)
+	local imageMat = CreateMaterial("hg_hypergamy_image", "UnlitGeneric", {
+		["$basetexture"] = "color/white",
+		["$vertexcolor"] = 1,
+		["$nocull"] = 1,
+	})
+	local backMat = CreateMaterial("hg_hypergamy_back", "UnlitGeneric", {
+		["$basetexture"] = "color/white",
+		["$vertexcolor"] = 1,
+		["$nocull"] = 1,
+	})
+	local pngTex = Material("hypogamy.png", "smooth mips"):GetTexture("$basetexture")
+	if pngTex then imageMat:SetTexture("$basetexture", pngTex) end
 
-	local function litColor(base, pos, normal)
+	local backTint = Vector(0.94, 0.94, 0.92)
+	local litCol = Color(255, 255, 255)
+
+	local function litColor(pos, normal, tint)
 		local light = render.ComputeLighting(pos, normal)
-		local r = math.Clamp(light.x, 0.08, 1)
-		local g = math.Clamp(light.y, 0.08, 1)
-		local b = math.Clamp(light.z, 0.08, 1)
+		litCol.r = 255 * math.Clamp(light.x, 0.08, 1) * (tint and tint.x or 1)
+		litCol.g = 255 * math.Clamp(light.y, 0.08, 1) * (tint and tint.y or 1)
+		litCol.b = 255 * math.Clamp(light.z, 0.08, 1) * (tint and tint.z or 1)
 
-		return base.r * r, base.g * g, base.b * b
-	end
-
-	local function sheetAngle(right, up, normal)
-		local m = Matrix()
-		m:SetForward(right)
-		m:SetRight(-up)
-		m:SetUp(normal)
-
-		return m:GetAngles()
+		return litCol
 	end
 
 	local function drawSheet(center, right, up, normal, w, h, back)
-		local r, g, b = litColor(paperColor, center, normal)
-		cam.Start3D2D(center - right * (w * 0.5) + up * (h * 0.5) + normal * 0.05, sheetAngle(right, up, normal), w / IMG_W)
-			surface.SetDrawColor(r, g, b, 255)
-			surface.SetMaterial(paperMat)
-			surface.DrawTexturedRect(0, 0, IMG_W, IMG_W * h / w)
-		cam.End3D2D()
+		local front = (EyePos() - center):Dot(normal) >= 0
+		if not front and not back then return end
 
-		if not back then return end
+		if not front then
+			right = -right
+			normal = -normal
+		end
 
-		r, g, b = litColor(backColor, center, -normal)
-		cam.Start3D2D(center + right * (w * 0.5) + up * (h * 0.5) - normal * 0.05, sheetAngle(-right, up, -normal), w / IMG_W)
-			surface.SetDrawColor(r, g, b, 255)
-			draw.NoTexture()
-			surface.DrawRect(0, 0, IMG_W, IMG_W * h / w)
-		cam.End3D2D()
+		local hr, hu = right * (w * 0.5), up * (h * 0.5)
+		render.SetMaterial(front and imageMat or backMat)
+		render.DrawQuad(center - hr + hu, center + hr + hu, center + hr - hu, center - hr - hu, litColor(center, normal, not front and backTint or nil))
 	end
 
 	function SWEP:UpdateShowLerp()
@@ -244,7 +243,8 @@ if CLIENT then
 		if not lp or not rp then return end
 
 		local across = rp - lp
-		local w = math.Clamp(across:Length() + 2, 9, 14)
+		local w = math.Clamp(across:Length() + 3, 6, 14)
+		local h = w * IMG_ASPECT
 		across:Normalize()
 
 		local fwd = owner:EyeAngles():Forward()
@@ -257,7 +257,7 @@ if CLIENT then
 		local normal = n0 * c + across * s
 		local right = across * c - n0 * s
 
-		local center = (lp + rp) * 0.5 + u * 2
-		drawSheet(center, right, u, normal, w, w * IMG_ASPECT, true)
+		local center = (lp + rp) * 0.5 + u * (h * 0.5 - 1.5) - n0 * 0.3
+		drawSheet(center, right, u, normal, w, h, true)
 	end
 end

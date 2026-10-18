@@ -6,7 +6,6 @@ include("shared.lua")
 local ice = Material("stormfox2/effects/ice_water")
 
 local Props = {}
-
 hook.Add( "PhysgunPickup", "StormFox2.MapIce.DisallowPickup", function( ply, ent )
 	if ent:GetClass() == "stormfox_mapice" then return false end
 	if Props[ent] then return false end
@@ -125,10 +124,10 @@ function ENT:Initialize()
 	self:SetMaterial( "stormfox2/effects/ice_water" )
 	self:SetPos(Vector(0,0,0))
 	self:PhysicsInitMultiConvex(STORMFOX_WATERMESHCOLLISON)
+	--self:GetPhysicsObjectNum(0):SetMaterial('ice')		People report this breaking ice sadly.
 	local phys = self:GetPhysicsObject()
 	self:SetMoveType( MOVETYPE_NONE )
 	if ( IsValid( phys ) ) then
-		phys:SetMaterial("ice")
 		phys:EnableMotion( false );
 		phys:AddGameFlag( FVPHYSICS_CONSTRAINT_STATIC )
 		phys:SetMass(4000)

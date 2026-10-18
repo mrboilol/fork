@@ -3,7 +3,7 @@ TOOL.RealName  = "Light Editor"
 TOOL.PrintName = "#sf_tool.light_editor"
 TOOL.ToolTip = "#sf_tool.light_editor.desc"
 TOOL.NoPrintName = false
--- TOOL.ShootSound = Sound("weapons/irifle/irifle_fire2.ogg")
+-- TOOL.ShootSound = Sound("weapons/irifle/irifle_fire2.wav")
 
 local SPAWN 	= 0
 local DELETE 	= 1
@@ -142,7 +142,7 @@ if SERVER then
 		end
 	end
 
-	local popsnd = Sound("garrysmod/balloon_pop_cute.ogg")
+	local popsnd = Sound("garrysmod/balloon_pop_cute.wav")
 	function TOOL:SendFunc( a, b, c, d )
 		if a == SPAWN and type(b) == "number" and c and d then -- Spawn, n_type, pos, ang
 			if IsLightNear(c) then return end 

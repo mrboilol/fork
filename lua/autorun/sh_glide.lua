@@ -365,5 +365,13 @@ end
 -- Automatically include files under
 -- `lua/glide/autoload/`, on both server and client.
 Glide.IncludeDir( "glide/autoload/", true, true )
+Glide.IncludeDir( "external/glide_extras/autoload/", true, true )
+
+if SERVER then
+    Glide.IncludeDir( "external/glide_extras/server/", true, false )
+    Glide.IncludeDir( "external/glide_extras/client/", false, true )
+else
+    Glide.IncludeDir( "external/glide_extras/client/", true, false )
+end
 
 Glide.InitializeVSWEPS()

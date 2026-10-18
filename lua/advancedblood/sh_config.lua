@@ -415,6 +415,7 @@ C.Pool = {
 	minVolumeRunoff = 0.2, -- the same for blood that a stream brings (the pool begins where the stream arrives)
 	minStains   = 25,      -- ground stains within minStainsR before dripped blood may become a pool
 	minStainsR  = 16,
+	minStainVolume = 0.5,
 	mergeFactor = 0.9,     -- pools merge when their outlines come this close (fraction of the reach)
 	attractR    = 14,
 	attractMin  = 3,
