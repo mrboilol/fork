@@ -89,15 +89,22 @@ local COLOR = {
 	OUTLINE = {20, 20, 22},
 	ORGAN_GRAY = {110, 110, 112},
 	ORGAN_BRAIN = {235, 150, 175},
-	ORGAN_HEART = {200, 20, 20},
-	ORGAN_LUNG = {30, 90, 200},
-	ORGAN_TRACHEA = {0, 200, 255},
+	ORGAN_HEART = {200, 0, 0},
+	ORGAN_LUNG = {0, 255, 255},
+	ORGAN_TRACHEA = {0, 125, 255},
+	LOBE_FRONTAL = {255, 80, 120},
+	LOBE_PARIETAL = {255, 180, 40},
+	LOBE_TEMPORAL = {80, 160, 255},
+	LOBE_OCCIPITAL = {170, 80, 255},
 }
 local ORGAN = {
 	SHOW_DAMAGE = 0.01,
 	LUNG_SHOW_DAMAGE = 0.5,
 	PUNCTURE_DAMAGE = 0.6,
-	BRAIN_RADIUS = 0.6,
+	BRAIN_RADIUS = 0.8,
+	LOBE_RADIUS = 0.2,
+	LOBE_OFFSET_Y = 0.45,
+	LOBE_OFFSET_X = 0.5,
 	HEART_RADIUS = 0.28,
 	HEART_DROP = 0.3,
 	LUNG_RADIUS = 0.4,
@@ -339,7 +346,10 @@ local STRESS_SEGMENTS = {
 local severity, broken = {}, {}
 local dislocated = {}
 local arterial, missing = {}, {}
-local organDamage = {brain = 0, heart = 0, trachea = 0, lungsL = 0, lungsR = 0}
+local organDamage = {
+	brain = 0, brainFrontal = 0, brainParietal = 0, brainTemporal = 0, brainOccipital = 0,
+	heart = 0, trachea = 0, lungsL = 0, lungsR = 0,
+}
 local bleedLevel, tourniquet, bandage, stress = {}, {}, {}, {}
 local regionBleed, regionArterial = {}, {}
 local nextMedicalUpdate = 0
@@ -898,7 +908,12 @@ local function lungDamage(org, key)
 end
 
 local function updateOrganState(org)
-	organDamage.brain = vitalDamage(org, "brain")
+	organDamage.brainFrontal = vitalDamage(org, "brainFrontal")
+	organDamage.brainParietal = vitalDamage(org, "brainParietal")
+	organDamage.brainTemporal = vitalDamage(org, "brainTemporal")
+	organDamage.brainOccipital = vitalDamage(org, "brainOccipital")
+	organDamage.brain = math.max(vitalDamage(org, "brain"), organDamage.brainFrontal, organDamage.brainParietal,
+		organDamage.brainTemporal, organDamage.brainOccipital)
 	organDamage.heart = vitalDamage(org, "heart")
 	organDamage.trachea = vitalDamage(org, "trachea")
 	organDamage.lungsL = lungDamage(org, "lungsL")
@@ -1329,7 +1344,24 @@ local function drawOrgans()
 
 	if organDamage.brain > 0 and not missing.skull and smoothValid[POINT.SKULL] then
 		local x, y = pointScreen(POINT.SKULL)
-		drawOrgan(x, y, x, y, skullRadius * unit * ORGAN.BRAIN_RADIUS, COLOR.ORGAN_BRAIN, organDamage.brain)
+		local skullUnit = skullRadius * unit
+		drawOrgan(x, y, x, y, skullUnit * ORGAN.BRAIN_RADIUS, COLOR.ORGAN_BRAIN, organDamage.brain)
+
+		local lobeRadius = skullUnit * ORGAN.LOBE_RADIUS
+		local offsetX, offsetY = skullUnit * ORGAN.LOBE_OFFSET_X, skullUnit * ORGAN.LOBE_OFFSET_Y
+		if organDamage.brainFrontal > 0 then
+			drawOrgan(x, y - offsetY, x, y - offsetY, lobeRadius, COLOR.LOBE_FRONTAL, organDamage.brainFrontal)
+		end
+		if organDamage.brainParietal > 0 then
+			drawOrgan(x, y, x, y, lobeRadius, COLOR.LOBE_PARIETAL, organDamage.brainParietal)
+		end
+		if organDamage.brainOccipital > 0 then
+			drawOrgan(x, y + offsetY, x, y + offsetY, lobeRadius, COLOR.LOBE_OCCIPITAL, organDamage.brainOccipital)
+		end
+		if organDamage.brainTemporal > 0 then
+			drawOrgan(x - offsetX, y, x - offsetX, y, lobeRadius, COLOR.LOBE_TEMPORAL, organDamage.brainTemporal)
+			drawOrgan(x + offsetX, y, x + offsetX, y, lobeRadius, COLOR.LOBE_TEMPORAL, organDamage.brainTemporal)
+		end
 	end
 
 	if organDamage.trachea > 0 and not missing.neck and smoothValid[POINT.NECK] and smoothValid[POINT.CHEST] then
@@ -1510,8 +1542,8 @@ local function renderFigure()
 	drawCircles()
 	drawDislocations()
 	drawArmor()
-	drawOrgans()
 	drawWounds()
+	drawOrgans()
 end
 
 hook.Add("HUDPaint", "homigrad/body-status/draw", function()
