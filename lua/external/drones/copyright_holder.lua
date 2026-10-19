@@ -1,1 +1,0 @@
--- This addon has been created by Business Cat, and the "H" in "HBOMBS" stands for Happy, which correlates to my previous username, happyfaic72.
