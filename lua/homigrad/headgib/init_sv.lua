@@ -186,9 +186,13 @@ function SpawnMeatGore(mainent, pos, count, force, scale, spawnEyes, models)
 			net.WriteUInt(entIndex, 16)
 			net.WriteFloat(math.Rand(1, 2))
 			net.WriteBool(false)
-			net.WriteBool(false)
+			net.WriteBool(true)
 			net.SendPVS(ent:GetPos())
 		end)
+	end
+
+	if hg.GoreSpray and isvector(pos) then
+		hg.GoreSpray(pos, force, (count or 9) * 0.35 * (scale or 1) + force:Length() / 600, true)
 	end
 
 	if spawnEyes then

@@ -438,6 +438,9 @@ local function BeginAEDShock(defib, ply, getTarget, uses, accidental)
 		ApplyAEDShock(org, accidental)
 
 		if org then
+			if not accidental then
+				org.aedShockGuard = {shock = org.shock or 0, pain = org.pain or 0, untilTime = CurTime() + 90}
+			end
 			local shockLoad = accidental and 150 or 40
 			org.painadd = (org.painadd or 0) + shockLoad
 			org.shock = math.max((org.shock or 0) + shockLoad, 130)

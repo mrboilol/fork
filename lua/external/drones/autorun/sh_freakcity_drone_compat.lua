@@ -39,11 +39,12 @@ if SERVER then
     net.Receive("FreakCityDrone_CameraAim", function(_, ply)
         local pitch = math.Clamp(net.ReadFloat(), -85, 85)
         local yaw = math.NormalizeAngle(net.ReadFloat())
+        local roll = math.Clamp(net.ReadFloat(), -70, 70)
         local drone = FreakCityDrone.GetActive(ply)
         if not IsValid(drone) or not drone.GetDriver or drone:GetDriver() ~= ply then return end
         if CurTime() < (ply.FCNextDroneAimUpdate or 0) then return end
         ply.FCNextDroneAimUpdate = CurTime() + 0.01
-        drone.FCCameraAim = Angle(pitch, yaw, 0)
+        drone.FCCameraAim = Angle(pitch, yaw, roll)
     end)
 
     hook.Add("StartCommand", "FreakCityDrone_LockPlayerBody", function(ply, cmd)
@@ -57,13 +58,27 @@ if SERVER then
     end)
 
     hook.Add("KeyPress", "FreakCityDrone_Controls", function(ply, key)
-        local drone = FreakCityDrone.GetActive(ply)
+        local drone, kind = FreakCityDrone.GetActive(ply)
         if not IsValid(drone) or drone:GetDriver() ~= ply then return end
 
-        if key == IN_USE and drone.SetDriver then
+        local exitKey = kind == "mavic" and IN_USE or IN_RELOAD
+        if key == exitKey and drone.SetDriver then
             drone:SetNWBool("Kamikaze_Flashlight", false)
             drone:SetDriver(NULL)
         end
+    end)
+
+    hook.Add("PlayerButtonDown", "FreakCityDrone_Detonate", function(ply, button)
+        if button ~= KEY_F then return end
+        local drone, kind = FreakCityDrone.GetActive(ply)
+        if kind == "mavic" or not IsValid(drone) or drone:GetDriver() ~= ply then return end
+        if drone.TriggerDroneExplosion then drone:TriggerDroneExplosion(ply) end
+    end)
+
+    hook.Add("PlayerSwitchFlashlight", "FreakCityDrone_NoFlashlight", function(ply, enabled)
+        if not enabled then return end
+        local drone = FreakCityDrone.GetActive(ply)
+        if IsValid(drone) and drone.GetDriver and drone:GetDriver() == ply then return false end
     end)
 
     hook.Add("SetupPlayerVisibility", "FreakCityDrone_PVS", function(ply)
@@ -88,10 +103,16 @@ end
 
 local fullscreen = CreateClientConVar("fc_drone_fullscreen", "1", true, false, "Use fullscreen drone camera", 0, 1)
 local sensitivity = CreateClientConVar("fc_drone_camera_sensitivity", "1", true, false, "Drone free camera sensitivity", 0.1, 5)
+local FPV_YAW_RATE = 110
+local FPV_BANK_TURN = 1.6
+local FPV_ROLL_RETURN = 45
+local FPV_ROLL_MAX = 70
+
 local freeLook = {
     drone = NULL,
     pitch = 0,
     yaw = 0,
+    roll = 0,
     bodyPitch = 0,
     bodyYaw = 0,
     nextSend = 0
@@ -105,12 +126,14 @@ local function resetFreeLook(drone)
         local bodyAng = LocalPlayer():EyeAngles()
         freeLook.pitch = math.Clamp(math.NormalizeAngle(ang.p), -85, 85)
         freeLook.yaw = math.NormalizeAngle(ang.y)
+        freeLook.roll = 0
         freeLook.bodyPitch = math.NormalizeAngle(bodyAng.p)
         freeLook.bodyYaw = math.NormalizeAngle(bodyAng.y)
         freeLook.nextSend = 0
     else
         freeLook.pitch = 0
         freeLook.yaw = 0
+        freeLook.roll = 0
         freeLook.bodyPitch = 0
         freeLook.bodyYaw = 0
         freeLook.nextSend = 0
@@ -133,7 +156,13 @@ local function sendCameraAim(drone, force)
     net.Start("FreakCityDrone_CameraAim")
         net.WriteFloat(freeLook.pitch)
         net.WriteFloat(freeLook.yaw)
+        net.WriteFloat(freeLook.roll)
     net.SendToServer()
+end
+
+local function isFPV()
+    local _, kind = FreakCityDrone.GetActive(LocalPlayer())
+    return kind ~= "mavic"
 end
 
 hook.Add("InputMouseApply", "FreakCityDrone_FreeCamera", function(cmd, x, y)
@@ -141,16 +170,43 @@ hook.Add("InputMouseApply", "FreakCityDrone_FreeCamera", function(cmd, x, y)
     if not IsValid(drone) or drone:GetDriver() ~= LocalPlayer() then return end
 
     local scale = 0.022 * sensitivity:GetFloat()
-    freeLook.yaw = math.NormalizeAngle(freeLook.yaw - x * scale)
+    if isFPV() then
+        freeLook.roll = math.Clamp(freeLook.roll + x * scale, -FPV_ROLL_MAX, FPV_ROLL_MAX)
+    else
+        freeLook.yaw = math.NormalizeAngle(freeLook.yaw - x * scale)
+    end
     freeLook.pitch = math.Clamp(freeLook.pitch + y * scale, -85, 85)
     cmd:SetViewAngles(Angle(freeLook.bodyPitch, freeLook.bodyYaw, 0))
     sendCameraAim(drone, true)
     return true
 end)
 
+local lastFlightUpdate = 0
+
+local function updateFPVFlight()
+    local now = RealTime()
+    local dt = math.min(now - lastFlightUpdate, 0.1)
+    lastFlightUpdate = now
+    if dt <= 0 then return end
+
+    local yawInput = 0
+    if not vgui.CursorVisible() then
+        if input.IsKeyDown(KEY_Q) then yawInput = yawInput + 1 end
+        if input.IsKeyDown(KEY_E) then yawInput = yawInput - 1 end
+    end
+
+    freeLook.yaw = math.NormalizeAngle(freeLook.yaw + (yawInput * FPV_YAW_RATE - freeLook.roll * FPV_BANK_TURN) * dt)
+    freeLook.roll = math.Approach(freeLook.roll, 0, FPV_ROLL_RETURN * dt)
+end
+
 hook.Add("CreateMove", "FreakCityDrone_SyncFlightDirection", function(cmd)
     local drone = updateFreeLookDrone()
     if not IsValid(drone) or drone:GetDriver() ~= LocalPlayer() then return end
+
+    if isFPV() then
+        updateFPVFlight()
+        cmd:RemoveKey(IN_USE)
+    end
 
     cmd:SetViewAngles(Angle(freeLook.bodyPitch, freeLook.bodyYaw, 0))
     sendCameraAim(drone, false)
@@ -179,7 +235,7 @@ function FreakCityDrone.BuildView(ply, pos, ang, fov, znear, zfar)
 
     result = istable(result) and result or {}
     result.origin = isvector(result.origin) and copyVector(result.origin) or drone:GetPos() + drone:GetForward() * 2 + drone:GetUp() * 4
-    result.angles = Angle(freeLook.pitch, freeLook.yaw, 0)
+    result.angles = Angle(freeLook.pitch, freeLook.yaw, freeLook.roll)
     result.fov = tonumber(result.fov) or tonumber(fov) or 90
     result.znear = tonumber(result.znear) or 1
     result.zfar = tonumber(result.zfar) or zfar
@@ -197,7 +253,7 @@ end
 function FreakCityDrone.GetCameraAngles(ply)
     local drone = updateFreeLookDrone()
     if not IsValid(drone) or drone:GetDriver() ~= ply then return nil end
-    return Angle(freeLook.pitch, freeLook.yaw, 0)
+    return Angle(freeLook.pitch, freeLook.yaw, freeLook.roll)
 end
 
 local function applyView(target, source)

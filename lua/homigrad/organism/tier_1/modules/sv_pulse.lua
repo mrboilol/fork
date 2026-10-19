@@ -520,14 +520,25 @@ local function updateHighSpeedPressureShock(owner, org, timeValue)
 	return org.highSpeedPressureShock
 end
 
-local function getPalpitationThreat(org, blood, o2Value)
+local function getRhythmShockPain(org)
+	local shock, pain = tonumber(org.shock) or 0, tonumber(org.pain) or 0
+	local guard = org.aedShockGuard
+	if not guard then return shock, pain end
+	if CurTime() > (guard.untilTime or 0) or (shock <= guard.shock and pain <= guard.pain) then
+		org.aedShockGuard = nil
+		return shock, pain
+	end
+	return math.min(shock, guard.shock), math.min(pain, guard.pain)
+end
+
+local function getPalpitationThreat(org, blood, o2Value, rhythmShock)
 	-- Hemorrhage-related rhythm danger follows the same preload reserve as cardiac
 	-- output. It stays near zero through compensated loss, then rises through the
 	-- 3000-2000 mL danger band instead of switching on around normal volume.
 	local lowBlood = getHemorrhageDanger(blood)
 	local lowCirculation = math.Clamp(((org.hypotension or 0) - 0.5) / 0.5, 0, 1)
 	local hypoxia = math.Clamp((12 - o2Value) / 12, 0, 1)
-	local shock = math.Clamp(((org.shock or 0) - 20) / 40, 0, 1)
+	local shock = math.Clamp(((rhythmShock or org.shock or 0) - 20) / 40, 0, 1)
 	local heartDamage = math.Clamp(org.heart or 0, 0, 1)
 	local temperatureStress = math.max(
 		math.Clamp((34 - (org.temperature or 36.7)) / 6, 0, 1),
@@ -875,6 +886,12 @@ local function restoreHeartAfterResuscitation(org, now, resusBloodK)
 	org.ventricularTachycardia = nil
 	org.rhythmRecoveryUntil = now + 30
 	org.arrhythmia = math.min(org.arrhythmia or 0, 0.3)
+	org.arrhythmiaComplication = 0
+	org.cardiacStressExposure = 0
+	org.hypotensionExposure = 0
+	org.hemorrhagicCollapseExposure = 0
+	org.palpitations = 0
+	org.fibrillationStart = 0
 	org.nextArrhythmiaRoll = math.max(org.nextArrhythmiaRoll or 0, now + 30)
 	org.nextColdRhythmRoll = math.max(org.nextColdRhythmRoll or 0, now + 30)
 	org.heart = math.max((org.heart or 0) - 0.08, 0)
@@ -992,6 +1009,7 @@ module[1] = function(org)
 	org.hypotensionExposure = 0
 	org.highSpeedPressureShock = 0
 	org.rhythmRecoveryUntil = 0
+	org.aedShockGuard = nil
 	org.lastHighSpeedVelocity = nil
 	org.lastHighSpeedVelocityTime = nil
 	org.nextArrhythmiaRoll = 0
@@ -1084,7 +1102,8 @@ module[2] = function(owner, org, timeValue)
 	local hemorrhageCompensation = math.Clamp(org.hemorrhageCompensation or 0, 0, 1)
 	local hypovolemicShock = math.Clamp(org.hypovolemicShock or 0, 0, 1)
 	local palpitations = math.Clamp(org.palpitations or 0, 0, 1)
-	local palpitationThreat = getPalpitationThreat(org, bloodNow, o2Value)
+	local rhythmShock, rhythmPain = getRhythmShockPain(org)
+	local palpitationThreat = getPalpitationThreat(org, bloodNow, o2Value, rhythmShock)
 	local effectivePalpitations = palpitations * Lerp(palpitationThreat, 0.2, 1)
 	-- Compensation raises vascular tone below; it should not simultaneously
 	-- suppress the pump. Only true decompensation and rhythm instability reduce it.
@@ -1327,8 +1346,8 @@ module[2] = function(owner, org, timeValue)
 	local suicideAim = owner.hgSuicideAim or 1
 	if suicideAim <= 0 then suicideAim = 1 end
 	heartbeat = heartbeat + (owner.suiciding and suicideAim or 0) * 50
-	heartbeat = heartbeat + math.Clamp((org.shock or 0) - 20, 0, 40)
-	heartbeat = heartbeat + math.Clamp(org.pain, 40, 80) - 40
+	heartbeat = heartbeat + math.Clamp(rhythmShock - 20, 0, 40)
+	heartbeat = heartbeat + math.Clamp(rhythmPain, 40, 80) - 40
 	heartbeat = heartbeat + exertionHeartBoost
 	local adrenalineHeartBoost = 9 * math.min(math.max(activeCatecholamine - 1.5, 0), 3)
 	heartbeat = heartbeat + adrenalineHeartBoost
@@ -1422,7 +1441,7 @@ module[2] = function(owner, org, timeValue)
 	if org.fibrillation or org.heartstop or correctingPalpitations then palpitationDrive = 0 end
 	org.palpitations = Approach(palpitations, palpitationDrive, timeValue / (correctingPalpitations and 4 or palpitationDrive > palpitations and 6 or 14))
 	palpitations = org.palpitations
-	palpitationThreat = getPalpitationThreat(org, bloodNow, o2Value)
+	palpitationThreat = getPalpitationThreat(org, bloodNow, o2Value, rhythmShock)
 	effectivePalpitations = palpitations * Lerp(palpitationThreat, 0.2, 1)
 	-- Severe hemorrhage decompensates from the circulation it produces. The
 	-- weaker of preload reserve and actual pump output owns the collapse curve,
@@ -1555,7 +1574,7 @@ module[2] = function(owner, org, timeValue)
 	org.internalBleedRhythmRisk = internalBleedRhythmRisk
 	org.traumaRhythmRisk = traumaRhythmRisk
 	local hypercapniaInstability = Clamp(((org.co2 or 0) - 14) / 12, 0, 1)
-	local stress = Clamp(hypercapniaInstability * 0.9 + myocardialInstability * 1.2 + ischemia * 0.8 + (org.heartStrain or 0) * 0.35 + (org.cardiacStressExposure or 0) * 0.45 + (org.hypertension or 0) * 0.35 + (org.hypotension or 0) * 0.3 + hemorrhageRhythmStress * 0.35 + hemorrhageElectricalInstability * 0.95 + hypothermiaInstability * 0.35 + traumaRhythmRisk * 0.8 + hypotensionInstability * 0.9 + Clamp(org.shock, 0, 80) / 180 + max(org.pain - 60, 0) / 220 + max(org.heartbeat - 165, 0) / 190, 0, 2.5)
+	local stress = Clamp(hypercapniaInstability * 0.9 + myocardialInstability * 1.2 + ischemia * 0.8 + (org.heartStrain or 0) * 0.35 + (org.cardiacStressExposure or 0) * 0.45 + (org.hypertension or 0) * 0.35 + (org.hypotension or 0) * 0.3 + hemorrhageRhythmStress * 0.35 + hemorrhageElectricalInstability * 0.95 + hypothermiaInstability * 0.35 + traumaRhythmRisk * 0.8 + hypotensionInstability * 0.9 + Clamp(rhythmShock, 0, 80) / 180 + max(rhythmPain - 60, 0) / 220 + max(org.heartbeat - 165, 0) / 190, 0, 2.5)
 	local arrhythmiaTarget = Clamp(math.max(stress * 0.42, hemorrhageElectricalInstability * 0.88, traumaRhythmRisk * 0.72, hypercapniaInstability * 0.85) * math.Clamp(org.conditionResistanceMul or 1, 0.05, 1), 0, 1)
 	if org.seizureActive then arrhythmiaTarget = math.max(arrhythmiaTarget, 0.15) end
 	do

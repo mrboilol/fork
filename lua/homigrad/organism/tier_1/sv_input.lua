@@ -1247,7 +1247,21 @@ end)
 --util.AddNetworkString("tracePosesSend")
 --util.AddNetworkString("wound_debug")
 util.AddNetworkString("hg_bloodimpact")
+util.AddNetworkString("hg_gore_spray")
 util.AddNetworkString("hg_damage_flash")
+
+function hg.GoreSpray(pos, dir, intensity, radial, exitPos)
+	if not isvector(pos) or not intensity or intensity < 0.75 then return end
+	dir = isvector(dir) and dir:LengthSqr() > 0.0001 and dir:GetNormalized() or vector_up
+	net.Start("hg_gore_spray")
+	net.WriteVector(pos)
+	net.WriteNormal(dir)
+	net.WriteFloat(math.min(intensity, 24))
+	net.WriteBool(radial and true or false)
+	net.WriteBool(isvector(exitPos))
+	if isvector(exitPos) then net.WriteVector(exitPos) end
+	net.SendPVS(pos)
+end
 --util.AddNetworkString("blood particle explode")
 util.AddNetworkString("bloodsquirt")
 
@@ -1780,6 +1794,11 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	elseif dmgInfo:IsDamageType(DMG_BLAST) then
 		hg.organism.BlastTrace(dmgInfo:GetDamagePosition(), (ent:GetPos() - dmgInfo:GetDamagePosition()):Length() / 200, dmg * 2, cachedBoxs, cachedOrgans, Trace_Blast, ent.organism, cachedOrgans, dmg / 300, dmgInfo)
 		hg.organism.AddWoundManual(ent,dmg,vector_origin,angle_zero,math.random(0,ent:GetBoneCount()),CurTime())
+		if (ent.hgGoreBlastNext or 0) < CurTime() then
+			ent.hgGoreBlastNext = CurTime() + 0.15
+			local center = ent:WorldSpaceCenter()
+			hg.GoreSpray(center, center - dmgInfo:GetDamagePosition(), dmg / 12, true)
+		end
 	end
 
 	if attacker:IsPlayer() then
@@ -2016,6 +2035,10 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 			net.SendPVS(inputHole[1])
 			ent.bloodamt2 = 0
 		end)
+
+		local goreMul = 1 + (impact.expansionTrauma or 0) * 0.6 + math.max((impact.temporaryCavity or 0.5) - 0.5, 0) * 0.8 + math.max((impact.woundMultiplier or 1) - 1, 0) * 0.4
+		local goreExit = outputHole and outputHole[1] and outputHole[#outputHole] or nil
+		hg.GoreSpray(inputHole[1], dir, dmg / 30 * goreMul, false, goreExit)
 	end
 
 	--print(dmg_before, 2)

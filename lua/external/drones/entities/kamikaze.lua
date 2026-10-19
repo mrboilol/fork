@@ -1,6 +1,5 @@
 AddCSLuaFile()
 
-DEFINE_BASECLASS( "hb_base_advanced" )
 game.AddParticles( "particles/kamik_bomb.pcf")
 ENT.Base = "drone_kamikaze_entity"
 ENT.PrintName		= "FPV infantry"
@@ -537,10 +536,6 @@ function ENT:Think()
 			weapon:SetNextPrimaryFire(CurTime() + 2)
 			weapon:SetNextSecondaryFire(CurTime() + 2)
 		end
-
-		if user:KeyDown(IN_RELOAD) then
-			self:TriggerDroneExplosion(user)
-		end
 	end
 
 	self:NextThink(CurTime())
@@ -679,55 +674,7 @@ function ENT:CalcView(ply, pos, ang, fov)
 end
 
 function ENT:PhysicsSimulate(phys, delta)
-	if CLIENT then return end
-	if not self.Enabled then return SIM_NOTHING end
-
-	local ang = phys:GetAngles()
-	local avel = phys:GetAngleVelocity()
-	local vel = phys:GetVelocity()
-	local angf = Vector(0, 0, 0)
-	local angp = math.NormalizeAngle(ang.p)
-	local angr = math.NormalizeAngle(ang.r)
-	local user = self:GetDriver()
-	local gravity = physenv.GetGravity and physenv.GetGravity() or Vector(0, 0, -600)
-	local vecf = gravity * -1
-
-	if user:IsValid() then
-		local sourceAim = self.FCCameraAim or Angle(0, self:GetAngles().y, 0)
-		local aim = Angle(
-			math.Clamp(math.NormalizeAngle(sourceAim.p), -85, 85),
-			math.NormalizeAngle(sourceAim.y),
-			0
-		)
-		local forward = aim:Forward()
-		local right = aim:Right()
-		local moveDir = Vector(0, 0, 0)
-
-		if user:KeyDown(IN_FORWARD) then moveDir = moveDir + forward end
-		if user:KeyDown(IN_BACK) then moveDir = moveDir - forward end
-		if user:KeyDown(IN_MOVELEFT) then moveDir = moveDir - right end
-		if user:KeyDown(IN_MOVERIGHT) then moveDir = moveDir + right end
-		if user:KeyDown(IN_JUMP) or user:KeyDown(IN_ATTACK) then moveDir = moveDir + vector_up end
-		if user:KeyDown(IN_DUCK) or user:KeyDown(IN_ATTACK2) then moveDir = moveDir - vector_up end
-
-		if moveDir:LengthSqr() > 1 then
-			moveDir:Normalize()
-		end
-
-		local maxSpeed = user:KeyDown(IN_SPEED) and 1450 or 760
-		local targetVelocity = moveDir * maxSpeed
-		local response = moveDir:LengthSqr() > 0 and 8.5 or 6.5
-		vecf = vecf + (targetVelocity - vel) * response
-
-		local yawError = math.AngleDifference(aim.y, ang.y)
-		angf.z = angf.z + yawError * 14
-	end
-
-	angf.x = angf.x - angr * 7
-	angf.y = angf.y - angp * 7
-	angf = angf - avel * delta * 100
-
-	return angf, vecf, SIM_GLOBAL_ACCELERATION
+	return self:_HeavyFlightSimulate(phys, delta)
 end
 -- 🛠️ ФИКС: Добавляем глобальный хук для PVS, чтобы карта и пропы не пропадали
 if SERVER then

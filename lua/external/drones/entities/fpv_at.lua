@@ -1,6 +1,5 @@
 AddCSLuaFile()
 
-DEFINE_BASECLASS( "hb_base_advanced" )
 game.AddParticles( "particles/kamik_bomb.pcf")
 
 ENT.Base = "drone_kamikaze_entity"
@@ -97,10 +96,6 @@ function ENT:Think()
             if user:GetMoveType() ~= MOVETYPE_NONE then
                 user:SetMoveType(MOVETYPE_NONE)
             end
-
-            if user:KeyDown(IN_RELOAD) then
-                self:TriggerDroneExplosion(user)
-            end
         end
 
         if self.Enabled then
@@ -117,58 +112,7 @@ function ENT:Think()
 end
 
 function ENT:PhysicsSimulate(phys, delta)
-    if CLIENT then return end
-    if not self.Enabled then return end
-
-    local ang = phys:GetAngles()
-    local avel = phys:GetAngleVelocity()
-    local vel = phys:GetVelocity()
-
-    local vecf = Vector(0, 0, 0)
-    local angf = Vector(0, 0, 0)
-
-    vecf = vecf + self:GetUp() * (573 + math.sin(CurTime() * 2) * 3)
- 
-    local angp = math.NormalizeAngle(ang.p)
-    local angr = math.NormalizeAngle(ang.r)
-
-    local user = self:GetDriver()
-    local speedx, speedx2
-    
-    if user:IsValid() then
-        local speed = user:KeyDown(IN_SPEED) and 6.0 or 1.2 
-        if user:KeyDown(IN_SPEED) then 
-            speedx = speed - 3
-            speedx2 = speed * 4.8
-        else 
-            speedx = 1 
-            speedx2 = 1
-        end
-
-        if user:KeyDown(IN_MOVELEFT) then angf = angf + Vector(-100, 0, 150) * speedx end
-        if user:KeyDown(IN_MOVERIGHT) then angf = angf + Vector(100, 0, -150) * speedx end
-
-        if user:KeyDown(IN_JUMP) then vecf = vecf + vector_up * 500 * speed end
-        if user:KeyDown(IN_ATTACK) then vecf = vecf + vector_up * 700 * speed end
-        if user:KeyDown(IN_DUCK) then vecf = vecf - vector_up * 500 * speed end
-        if user:KeyDown(IN_ATTACK2) then vecf = vecf - vector_up * 700 * speed end
-
-        if user:KeyDown(IN_FORWARD) then
-            vecf = vecf + self:GetForward() * 1020 * speed + self:GetUp() * 13 * speedx2
-            angf = angf + Vector(0, 10 * speed, 0)
-        end
-
-        if user:KeyDown(IN_BACK) then
-            vecf = vecf - self:GetForward() * 1020 * speed + self:GetUp() * 13 * speedx2
-            angf = angf - Vector(0, 10 * speed, 0)
-        end
-    end
-
-    angf = angf - Vector(angr, angp, 0) * 7
-    angf = angf - avel * delta * 100
-    vecf = vecf - vel * delta * 200
-
-    return angf, vecf, SIM_GLOBAL_ACCELERATION
+    return self:_HeavyFlightSimulate(phys, delta)
 end
 
 function ENT:TriggerDroneExplosion(user)

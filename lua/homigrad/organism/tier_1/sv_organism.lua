@@ -3,6 +3,7 @@ local module = hg.organism.module
 hg.organism.lastindex = hg.organism.lastindex or 1000000
 local hg_huyorgans = ConVarExists("hg_huyorgans") and GetConVar("hg_huyorgans") or CreateConVar("hg_huyorgans", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enables the full cardiopulmonary organ-failure model; 0 keeps simplified stable vitals", 0, 1)
 local hg_incapacitation = ConVarExists("hg_incapacitation") and GetConVar("hg_incapacitation") or CreateConVar("hg_incapacitation", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enables incapacitation and its terminal death timer", 0, 1)
+local hg_deathtimer_restart = ConVarExists("hg_deathtimer_restart") and GetConVar("hg_deathtimer_restart") or CreateConVar("hg_deathtimer_restart", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "1 = death timer restarts every time the organism wakes up, 0 = remaining time carries over", 0, 1)
 
 function hg.organism.OrganSystemsEnabled()
 	return hg_huyorgans:GetBool()
@@ -227,6 +228,7 @@ hook.Add("Org Clear", "Main", function(org)
 	org.lastSeizureLobeDamage = 0
 	org.lastSeizureTemperature = org.temperature
 	org.deathStateEnd = nil
+	org.deathStateRemaining = nil
 	org.deathStateKilled = nil
 	org.fatalBrainDeath = nil
 	org.fatalDamageQueued = nil
@@ -626,7 +628,10 @@ local function observer_signature(org)
 		observerValue(org.internalBleed, 0.01), observerValue(org.pain, 0.01),
 		observerValue(org.shock, 0.01), observerValue(org.consciousness, 0.01),
 		observerValue(org.deathStateEnd, 0.1), observerValue(org.critical),
-		observerValue(org.incapacitated)
+		observerValue(org.incapacitated), observerValue(org.brain, 0.01),
+		observerValue(org.co2, 0.1), observerValue(org.cardiacStressExposure, 0.01),
+		observerValue(org.hypotensionExposure, 1), observerValue(org.arrhythmiaComplication, 0.01),
+		observerValue(org.ventricularTachycardia), observerValue(org.terminalRhythm)
 	}, ":")
 end
 
@@ -743,7 +748,10 @@ local function send_bareinfo(org, force, reliable)
 		"peripheralperfusion", "perfusionMoveMul", "legstrength", "armstrength", "losing_oxy",
 		"respiratoryArrest", "pneumothorax", "hemothorax", "strokeVolume", "ecgState",
 		"palpitations", "unstableRhythm", "concussion", "nausea", "consciousness", "temperature",
-		"fear", "satiety", "hemotransfusionshock", "weight", "maxweight", "health", "canmove"
+		"fear", "satiety", "hemotransfusionshock", "weight", "maxweight", "health", "canmove",
+		"brain", "co2", "CO", "bradyapnea", "respiratoryRate", "oxygenIntakeAvailable",
+		"cardiacStressExposure", "hypotensionExposure", "arrhythmiaComplication",
+		"ventricularTachycardia", "terminalRhythm", "rhythmRecoveryUntil", "defibDeathGrace"
 	}) do
 		sendtable[key] = org[key]
 	end
@@ -1580,7 +1588,8 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	local incapacitationEnabled = not hg.organism.IncapacitationEnabled or hg.organism.IncapacitationEnabled()
 	local terminalIncapacitation = incapacitationEnabled and org.otrub and org.incapacitated
 	if isPly and owner:Alive() and terminalIncapacitation then
-		org.deathStateEnd = org.deathStateEnd or CurTime() + 20
+		org.deathStateEnd = org.deathStateEnd or CurTime() + (org.deathStateRemaining or 20)
+		org.deathStateRemaining = nil
 		if (org.defibDeathGrace or 0) > CurTime() then org.deathStateEnd = org.defibDeathGrace end
 
 		if CurTime() >= org.deathStateEnd and not org.deathStateKilled then
@@ -1593,6 +1602,11 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 			return
 		end
 	else
+		if hg_deathtimer_restart:GetBool() then
+			org.deathStateRemaining = nil
+		elseif org.deathStateEnd then
+			org.deathStateRemaining = math.max(org.deathStateEnd - CurTime(), 0)
+		end
 		org.deathStateEnd = nil
 		org.deathStateKilled = nil
 	end

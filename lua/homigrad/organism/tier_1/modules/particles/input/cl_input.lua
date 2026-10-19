@@ -379,10 +379,62 @@ end)
 hg.explode = explode
 
 hg.gibTrails = hg.gibTrails or {}
+local gibTrailCount = table.Count(hg.gibTrails)
+local maxGibTrails = 96
 local function addGibTrail(ent)
-	if not IsValid(ent) or hg.gibTrails[ent] then return end
-	hg.gibTrails[ent] = {lastSpawn = 0}
+	if not IsValid(ent) or hg.gibTrails[ent] or gibTrailCount >= maxGibTrails then return end
+	gibTrailCount = gibTrailCount + 1
+	hg.gibTrails[ent] = {lastSpawn = 0, bleedUntil = CurTime() + Rand(5, 9)}
 end
+
+local goreSprayDistSqr = 3000 * 3000
+net.Receive("hg_gore_spray", function()
+	local pos = net.ReadVector()
+	local dir = net.ReadNormal()
+	local intensity = net.ReadFloat()
+	local radial = net.ReadBool()
+	local exitPos = net.ReadBool() and net.ReadVector() or nil
+	if not IsValid(LocalPlayer()) or LocalPlayer():GetNetVar("disappearance", nil) then return end
+	if (pos - LocalPlayer():EyePos()):LengthSqr() > goreSprayDistSqr then return end
+
+	local count = math.floor(math.Clamp(intensity * 5, 3, 110))
+	local speed = 110 + math.min(intensity, 16) * 32
+	local size = math.Clamp(1 + math.sqrt(intensity) * 0.7, 1, 5)
+
+	local function spray(origin, sprayDir, n, spread, speedMul)
+		for i = 1, n do
+			local v
+			if radial then
+				v = VectorRand():GetNormalized() + sprayDir * 0.6
+				v[3] = v[3] + Rand(0.15, 0.8)
+			else
+				v = sprayDir + VectorRand() * spread
+			end
+			v:Normalize()
+			v:Mul(speed * speedMul * Rand(0.4, 1.25))
+			local s = size * Rand(0.6, 1.4)
+			addBloodPart(origin + VectorRand(-2, 2), v, mat_huy, s, s, false, i % 4 == 0)
+		end
+	end
+
+	if exitPos then
+		spray(exitPos, dir, math.ceil(count * 0.75), 0.35 + math.min(intensity, 12) * 0.03, 1.15)
+		spray(pos, -dir, math.ceil(count * 0.25), 0.55, 0.45)
+	elseif radial then
+		spray(pos, dir, count, 1, 1)
+	else
+		spray(pos, -dir, count, 0.45 + math.min(intensity, 12) * 0.04, 0.7)
+	end
+
+	if intensity >= 3 then
+		local mistOrigin = exitPos or pos
+		local mistDir = exitPos and dir or (radial and dir or -dir)
+		for i = 1, math.min(math.floor(intensity / 2), 10) do
+			local cloud = Rand(28, 50) * math.Clamp(math.sqrt(intensity) * 0.45, 1, 2.5)
+			addBloodPart2(mistOrigin + VectorRand(-6, 6), mistDir * Rand(30, 120) + VectorRand(-40, 40), cloudmat, cloud, cloud, Rand(0.6, 1.4))
+		end
+	end
+end)
 
 net.Receive("hg_gib_bloodspill", function()
 	local entIndex = net.ReadUInt(16)
@@ -422,16 +474,17 @@ end)
 hook.Add("PostCleanupMap", "hg_gib_blood_reset", function()
 	table.Empty(hg.gibbloodspillparticles)
 	table.Empty(hg.gibTrails)
+	gibTrailCount = 0
 end)
 
+local gibBleedDistSqr = 2500 * 2500
 hook.Add("Think", "hg_gib_trail", function()
+	if next(hg.gibTrails) == nil or not IsValid(LocalPlayer()) then return end
+	local eye = LocalPlayer():EyePos()
 	for ent, data in pairs(hg.gibTrails) do
-		if not IsValid(ent) then
+		if not IsValid(ent) or LocalPlayer():GetNetVar("disappearance", nil) or ent:GetNetVar("disappearance", nil) then
 			hg.gibTrails[ent] = nil
-			continue
-		end
-		if LocalPlayer():GetNetVar("disappearance", nil) or ent:GetNetVar("disappearance", nil) then
-			hg.gibTrails[ent] = nil
+			gibTrailCount = math.max(gibTrailCount - 1, 0)
 			continue
 		end
 
@@ -440,7 +493,18 @@ hook.Add("Think", "hg_gib_trail", function()
 		local speedSqr = vel:LengthSqr()
 		if speedSqr < 22 * 22 then
 			data.settleTime = data.settleTime or now
-			if data.settleTime + 1 <= now then hg.gibTrails[ent] = nil end
+			if data.settleTime + 1 <= now and (data.bleedUntil or 0) <= now then
+				hg.gibTrails[ent] = nil
+				gibTrailCount = math.max(gibTrailCount - 1, 0)
+				continue
+			end
+			if (data.bleedUntil or 0) > now and data.lastSpawn <= now and (ent:GetPos() - eye):LengthSqr() < gibBleedDistSqr then
+				local left = (data.bleedUntil - now) / 9
+				data.lastSpawn = now + Rand(0.12, 0.3) / math.max(left, 0.25)
+				local dripVel = Vector(Rand(-4, 4), Rand(-4, 4), Rand(-20, -5))
+				local s = Rand(0.8, 1.6)
+				addBloodPart(ent:GetPos() + VectorRand(-2, 2), dripVel, mats[math.random(countmats)], s, s, false, false)
+			end
 			continue
 		end
 		data.settleTime = nil

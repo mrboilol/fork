@@ -118,6 +118,11 @@ local list = {
 	"ecgState",
 	{"palpitations", 1, true},
 	"unstableRhythm",
+	"ventricularTachycardia",
+	"terminalRhythm",
+	{"arrhythmiaComplication", 1, true},
+	{"cardiacStressExposure", 1, true},
+	{"hypotensionExposure", 90, true},
 	{"pulse", 70},
 	{"bloodPressure", 90},
 	{"systolic", 120},
@@ -236,7 +241,7 @@ local function getTextTable(org)
 	local textList = {}
 	local shown = {}
 	local now = CurTime()
-	for _, entry in ipairs({{"DEATH TIMER", "deathStateEnd"}, {"defib grace", "defibDeathGrace"}, {"otrub min", "otrubMinUntil"}}) do
+	for _, entry in ipairs({{"DEATH TIMER", "deathStateEnd"}, {"defib grace", "defibDeathGrace"}, {"rhythm recovery", "rhythmRecoveryUntil"}, {"otrub min", "otrubMinUntil"}}) do
 		local left = (tonumber(org[entry[2]]) or 0) - now
 		if left > 0 then textList[#textList + 1] = {entry[1], string.format("%.1fs", left), 255, 0, 0} end
 	end

@@ -947,9 +947,14 @@ function P.Deposit(x, y, z, n, vol, surf, ent, kind, dx, dy, dz, K)
 		local now = CurTime()
 		if (s.gateT or 0) > now then return end
 		s.gateT = now + 0.25
-		local _, _, _, _, _, drops = ABL.Ground.Near(s.sx / s.w, s.sy / s.w, s.sz / s.w, n.x, n.y, n.z, PC.minStainsR)
+		local _, garea, _, _, _, drops = ABL.Ground.Near(s.sx / s.w, s.sy / s.w, s.sz / s.w, n.x, n.y, n.z, PC.minStainsR)
 		if (drops or 0) < PC.minStains then return end
 		SeedGather(s, k, PC.minStainsR)
+		local fit = garea * pi * (surf or C.Surfaces.default).film * ML * PC.stainFill
+		if s.vol > fit then
+			ABL.FlowCore.Move("pool", "dried", s.vol - fit)
+			s.vol = fit
+		end
 		if s.vol < PC.minStainVolume then return end
 		need = min(need, s.vol)
 	end

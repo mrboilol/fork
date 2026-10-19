@@ -517,6 +517,75 @@ function ENT:PhysicsSimulate(phys, delta)
 
 	return angf, vecf, SIM_GLOBAL_ACCELERATION
 end
+
+ENT.HeavyIdleThrust = 0.6
+ENT.HeavyClimbThrust = 1.7
+ENT.HeavyBoostThrust = 2.2
+ENT.HeavyDropThrust = 0.1
+ENT.HeavyTilt = 30
+ENT.HeavyBoostTilt = 50
+ENT.HeavyDrag = 0.6
+
+function ENT:_HeavyFlightSimulate(phys, delta)
+	if CLIENT then return end
+	if not self.Enabled then return SIM_NOTHING end
+
+	local ang = phys:GetAngles()
+	local avel = phys:GetAngleVelocity()
+	local vel = phys:GetVelocity()
+	local gravity = physenv.GetGravity and physenv.GetGravity() or Vector(0, 0, -600)
+	local g = math.max(-gravity.z, 1)
+	local user = self:GetDriver()
+
+	local throttle = self.HeavyIdleThrust
+	local tilt = 0
+	local moveDir = Vector(0, 0, 0)
+	local yawError = 0
+
+	if user:IsValid() then
+		local boost = user:KeyDown(IN_SPEED)
+		local sourceAim = self.FCCameraAim or Angle(0, ang.y, 0)
+		local flatAim = Angle(0, math.NormalizeAngle(sourceAim.y), 0)
+
+		if user:KeyDown(IN_FORWARD) then moveDir = moveDir + flatAim:Forward() end
+		if user:KeyDown(IN_BACK) then moveDir = moveDir - flatAim:Forward() end
+		if user:KeyDown(IN_MOVELEFT) then moveDir = moveDir - flatAim:Right() end
+		if user:KeyDown(IN_MOVERIGHT) then moveDir = moveDir + flatAim:Right() end
+
+		if moveDir:LengthSqr() > 0 then
+			moveDir:Normalize()
+			tilt = boost and self.HeavyBoostTilt or self.HeavyTilt
+		end
+
+		local up = user:KeyDown(IN_JUMP) or user:KeyDown(IN_ATTACK)
+		local down = user:KeyDown(IN_DUCK) or user:KeyDown(IN_ATTACK2)
+		if up and not down then
+			throttle = boost and self.HeavyBoostThrust or self.HeavyClimbThrust
+		elseif down and not up then
+			throttle = self.HeavyDropThrust
+		end
+
+		yawError = math.AngleDifference(flatAim.y, ang.y)
+	end
+
+	local tiltRad = math.rad(tilt)
+	local desiredUp = vector_up * math.cos(tiltRad) + moveDir * math.sin(tiltRad)
+	local curUp = self:GetUp()
+	local axis = phys:WorldToLocalVector(curUp:Cross(desiredUp))
+	local tiltError = math.deg(math.acos(math.Clamp(curUp:Dot(desiredUp), -1, 1)))
+
+	local angf = Vector(0, 0, 0)
+	if axis:LengthSqr() > 0.000001 then
+		axis:Normalize()
+		angf = axis * tiltError * 8
+	end
+	angf.z = yawError * 14
+	angf = angf - avel * delta * 100
+
+	local vecf = curUp * (throttle * g) - vel * self.HeavyDrag
+
+	return angf, vecf, SIM_GLOBAL_ACCELERATION
+end
 function ENT:EMPaffect()
 	if self:GetDriver():IsValid() then self:SetDriver(NULL) end
 	
