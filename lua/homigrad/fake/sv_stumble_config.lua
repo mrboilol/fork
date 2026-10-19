@@ -1,0 +1,239 @@
+local K = {}
+
+K.AR_MODEL = "models/AREAnims/model_anim.mdl"
+K.START_DELAY = 0
+K.START_WINDOW = 0.75
+K.HIT_WINDOW = 0.5
+K.HIT_MIN_DMG = 8
+K.HIT_STAGGER_MIN_FRAC = 0.15
+K.KNOCKDOWN_INSTANT_MUL = 1.8
+K.MOMENTUM_SEVERITY = 0.6
+K.FALL_CHANCE_FRAC = 0.7
+K.FALL_CHANCE_MAX = 0.6
+K.FALL_LEG_MUL = 0.5
+K.STAGGER_FALL_DELAY = {0.3, 0.55}
+K.UPRIGHT_THRESHOLD = 0.05
+K.UPRIGHT_TRACE = 60
+K.UPRIGHT_MIN_HEIGHT = 23.5
+K.FOOT_HULL_MINS = Vector(-2, -2, 0)
+K.FOOT_HULL_MAXS = Vector(2, 2, 2)
+K.STUMBLE_PUSH_MUL = 2.2
+K.STUMBLE_PUSH_TIME_MUL = 1.8
+K.STUMBLE_STEP_TRIGGER_MUL = 0.55
+K.STUMBLE_STEP_INTERVAL_MUL = 0.9
+K.STUMBLE_DRIVE_SPEED_MUL = 0.62
+K.STUMBLE_DRIVE_ACCEL_MUL = 0.6
+K.STUMBLE_MOMENTUM_MUL = 0.5
+K.STUMBLE_MIN_DRIVE_MUL = 0.85
+K.STUMBLE_DURATION_MUL = 1.3
+K.STUMBLE_FOOT_LAG = 0.55
+K.STUMBLE_CARRY_POW = 1.5
+K.STEP_RATE_MIN = 2.5
+K.STEP_RATE_SPEED = 80
+K.STEP_RATE_MAX = 5.5
+K.STEP_RATE_CAP = 7
+K.STUMBLE_LUNGE_MUL = 0.18
+K.STUMBLE_LUNGE_MAX = 35
+K.STUMBLE_FALL_GRACE = 1.5
+K.STUMBLE_INTENT_GRACE = 0.6
+K.STUMBLE_HIT_TIME = 2.8
+K.STUMBLE_DRIVEN_INSTABILITY = 0.4
+K.STUMBLE_STEER = 3
+K.STUMBLE_SWAY_RATE = 2.3
+K.STUMBLE_SWAY_ANGLE = 22
+K.DIVE_PUSH = 260
+K.STUMBLE_MIN_STEPS = {3, 5}
+K.STUMBLE_STRIDE_MUL = 1.8
+K.STUMBLE_STRIDE_MAX = 110
+K.STUMBLE_WOBBLE = 170
+K.STUMBLE_MIN_STEP_TIMEOUT = 3.5
+K.STUMBLE_CLUTCH_CHANCE = 0.55
+K.FALL_LOCK_TIME = 2
+K.FALL_FOLLOW_PUSH = 420
+K.FALL_BUCKLE = 260
+K.FOOT_ANKLE_HEIGHT = 4
+K.FOOT_PLANT_DIST = 8
+K.FOOT_STEP_ARRIVE = 0.05
+K.FOOT_PLANT_ARRIVE = 0.1
+K.FOOT_MAX_SPEED = 1500
+K.FOOT_PUSHOFF = 1.6
+K.LEG_REACH_MUL = 0.95
+K.HIP_SUPPORT_HEIGHT_MUL = 0.9
+K.HIP_SUPPORT_SPRING = 35
+K.HIP_SUPPORT_MAX_GRAVITY = 2
+K.DIVE_UP = 140
+K.TOPPLE_PUSH = 110
+K.TOPPLE_DOWN = 60
+K.TOPPLE_ROLL = 200
+K.ENERGY_WINDOW = 0.3
+K.ENERGY_REF = 30
+K.ENERGY_PUSH_MIN = 0.5
+K.ENERGY_PUSH_MAX = 3
+K.ENERGY_PLAYER_PUSH = 4
+K.ENERGY_PLAYER_PUSH_MAX = 450
+K.ENERGY_RAG_PUSH = 3.5
+K.ENERGY_RAG_PUSH_MAX = 420
+K.ENERGY_FLING = 2.5
+K.ENERGY_FLING_MAX = 420
+K.ENERGY_TYPES = {
+	{DMG_BUCKSHOT, 1},
+	{DMG_BULLET, 1},
+	{DMG_CLUB, 1.5},
+	{DMG_SLASH, 0.5},
+}
+K.REACT_COVER_TIME = 1.5
+K.REACT_FAST_SPEED = 350
+K.REACT_FAST_COVER_TIME = 0.75
+K.REACT_AIR_SPEED = 150
+K.REACT_AIR_TRACE = 60
+K.REACT_IDLE_REMOVE = 2
+K.REACT_WRITHE_TIME = 2.5
+K.REACT_CRITICAL_PAIN = 80
+K.AGONY_PAIN_START = 50
+K.AGONY_PAIN_FULL = 100
+K.WRITHE_MIN_AGONY = 0.2
+K.WRITHE_OVERRIDE_AGONY = 0.7
+K.WRITHE_BASE = 0.35
+K.WRITHE_WEAK_FLOOR = 0.15
+K.WRITHE_SWITCH = {3, 5.5}
+K.WRITHE_ROLL = 140
+K.WRITHE_ROLL_GAP = {0.7, 1.6}
+K.WRITHE_CLUTCH_GAP = {1, 2.5}
+K.WRITHE_CLUTCH_TIME = {4, 6}
+K.BRACE_TRACE = 55
+K.BRACE_MIN_FALL = 70
+K.BRACE_LEAD = 0.2
+K.BRACE_SPREAD = 9
+K.BRACE_LIFT = 4
+K.BRACE_SS = 0.1
+K.BRACE_SPEED = 420
+K.BRACE_DAMP = 260
+K.BRACE_HOLD = 0.2
+K.START_MIN_SPEED = 40
+K.STILL_GRACE = 0.5
+K.DECAY_VIGOR_FLOOR = 0.3
+K.VIGOR_MIN = 0.15
+K.BLOOD_WEAK_FRAC = 0.45
+K.BLOOD_FULL_FRAC = 0.85
+K.CONSCIOUS_WEAK = 0.3
+K.CONSCIOUS_FULL = 0.9
+K.STAMINA_FLOOR = 0.35
+K.STAMINA_MAX_FALLBACK = 180
+K.LEG_TRIP_CHANCE = {broken = 0.85, dislocated = 0.6}
+K.LIMB_HURT_MIN = 0.3
+K.LEG_HURT_TRIP_MUL = 0.5
+K.TRIP_SIDE_MUL = 1.5
+K.DEATH_DELAY = 0.25
+K.DEATH_TIME = 2.2
+K.DEATH_STRENGTH = 3
+K.DEATH_FADE_POW = 1.5
+K.SPINE_REACT_BONES = {
+	"ValveBiped.Bip01_Spine",
+	"ValveBiped.Bip01_Spine1",
+	"ValveBiped.Bip01_Spine2",
+	"ValveBiped.Bip01_Spine4",
+	"ValveBiped.Bip01_Head1",
+}
+K.DYING_SEQUENCES = {"Dying1", "Dying2", "Dying3", "Dying4", "Dying5", "Dying6"}
+K.TUMBLE_SPEED = 250
+K.HOLD_SEARCH_INTERVAL = 0.1
+K.HOLD_MIN_SPEED = 120
+K.HOLD_SEARCH_RADIUS = 40
+K.HOLD_MIN_DIST = 6
+K.HOLD_GRAB_CHANCE = 0.45
+K.HOLD_REACH_TIME = 0.6
+K.HOLD_GRAB_DIST = 10
+K.HOLD_CONFIRM_TIME = 0.3
+K.HOLD_TIME_MIN = 0.8
+K.HOLD_TIME_MAX = 2.5
+K.HOLD_COOLDOWN = 1.5
+K.HOLD_REACH_SS = 0.12
+K.HOLD_REACH_SPEED = 400
+K.HOLD_REACH_DAMP = 250
+K.HOLD_SURFACE_OFFSET = 2
+K.HOLD_DIRS = {
+	Vector(1, 0, 0),
+	Vector(-1, 0, 0),
+	Vector(0, 1, 0),
+	Vector(0, -1, 0),
+	Vector(0, 0, -1),
+	Vector(0.7, 0.7, 0),
+	Vector(-0.7, 0.7, 0),
+	Vector(0.7, -0.7, 0),
+	Vector(-0.7, -0.7, 0),
+}
+K.HANDS = {
+	l = {phys = 5, limb = "larm", cons = "ConsLH"},
+	r = {phys = 7, limb = "rarm", cons = "ConsRH"},
+}
+K.REACT_MODES = {
+	stumble = {
+		sequences = {"StumbleV2"},
+		rate = 1,
+		strength = 2.5,
+		bones = K.SPINE_REACT_BONES,
+		legs = false,
+	},
+	cover = {
+		sequences = {"Cower"},
+		rate = 0.5,
+		strength = 3,
+		bones = {"ValveBiped.Bip01_Spine2", "ValveBiped.Bip01_Head1"},
+		legs = false,
+	},
+	tumble = {
+		sequences = {"Tumbling", "LEFT_Tumbling"},
+		rate = 1,
+		strength = 3.5,
+		bones = K.SPINE_REACT_BONES,
+		legs = true,
+	},
+	flail = {
+		sequences = {"Falling", "Falling2"},
+		rate = 1.25,
+		strength = 5,
+		bones = K.SPINE_REACT_BONES,
+		legs = true,
+	},
+	writhe = {
+		sequences = K.DYING_SEQUENCES,
+		rate = 0.8,
+		strength = 2.5,
+		bones = K.SPINE_REACT_BONES,
+		legs = true,
+	},
+}
+K.LIMB_BONES = {
+	larm = {"ValveBiped.Bip01_L_UpperArm", "ValveBiped.Bip01_L_Forearm", "ValveBiped.Bip01_L_Hand"},
+	rarm = {"ValveBiped.Bip01_R_UpperArm", "ValveBiped.Bip01_R_Forearm", "ValveBiped.Bip01_R_Hand"},
+	lleg = {"ValveBiped.Bip01_L_Thigh", "ValveBiped.Bip01_L_Calf", "ValveBiped.Bip01_L_Foot"},
+	rleg = {"ValveBiped.Bip01_R_Thigh", "ValveBiped.Bip01_R_Calf", "ValveBiped.Bip01_R_Foot"},
+}
+K.AR_DEFAULTS = {
+	PushDuration = 2,
+	PushPeakForce = 100,
+	MaxVelocityClamp = 350,
+	VelocitySmoothing = 10,
+	MaxStepUpHeight = 18,
+	MaxStepDownHeight = 80,
+	SearchHeightBuffer = 25,
+	StepHeight = 20,
+	HipTargetHeight = 50,
+	Duration = 3.5,
+	MinDriveSpeed = 130,
+	MaxDriveSpeed = 450,
+	MomentumGain = 140,
+	DriveAccel = 700,
+	Carry = 0.55,
+	Pitch = 240,
+	MaxSlopeAngle = 45,
+	StepTriggerForward = 15,
+	MinMovementSpeed = 15,
+	StationaryThreshold = 15,
+	AbsoluteTraceDepth = 8192,
+	PredictionTime = 0.35,
+	MinStepInterval = 0.25,
+}
+K.LIMB_HAND = {larm = "l", rarm = "r"}
+
+return K

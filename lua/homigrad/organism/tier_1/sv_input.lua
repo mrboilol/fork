@@ -9,49 +9,7 @@ hg.organism.input_list = hg.organism.input_list or {}
 local vecZero, angZero = Vector(), Angle()
 local hook_Run = hook.Run
 local input_list = hg.organism.input_list
-local head_otrub_consciousness_cap = 0.04
-local instant_pain_shock_scale = 0.75
-local traumatic_shock_threshold = 24
-local player_limb_gib_threshold = 220
-local player_head_gib_threshold = 120
-local player_buckshot_head_gib_threshold = 100
-local player_stomach_gib_threshold = 260
-local player_blast_limb_gib_threshold = 220
-local player_fall_head_gib_threshold = 1.2
-local full_body_blast_gib_threshold = 5000
-local full_body_blast_damage_threshold = 1400
-local full_body_physics_speed_threshold = 3400
-local full_body_physics_damage_threshold = 4200
-local blast_gib_damage_mul = 700
-local melee_gib_damage_mul = 0.35
-local slash_limb_gib_damage_mul = 4.5
-local ballistic_head_gib_damage_mul = 2
-local ballistic_limb_gib_damage_mul = 1.25
-local ragdoll_fall_skull_damage_mul = 1.65
-local ragdoll_fall_jaw_damage_mul = 0.45
-local ragdoll_fall_skull_break_blood_mul = 1.15
-local rifle_penetration_threshold = 11
-local rifle_low_penetration_threshold = 9.5
-local rifle_low_penetration_damage_threshold = 55
-local gib_damage_decay = {
-	[HITGROUP_HEAD] = 3,
-}
-local body_part_health = {
-	[HITGROUP_HEAD] = player_head_gib_threshold,
-	[HITGROUP_LEFTLEG] = player_limb_gib_threshold,
-	[HITGROUP_RIGHTLEG] = player_limb_gib_threshold,
-	[HITGROUP_LEFTARM] = player_limb_gib_threshold,
-	[HITGROUP_RIGHTARM] = player_limb_gib_threshold,
-	[HITGROUP_STOMACH] = player_stomach_gib_threshold,
-}
-local body_part_heal = {
-	[HITGROUP_HEAD] = 1,
-	[HITGROUP_LEFTLEG] = 1,
-	[HITGROUP_RIGHTLEG] = 1,
-	[HITGROUP_LEFTARM] = 1,
-	[HITGROUP_RIGHTARM] = 1,
-	[HITGROUP_STOMACH] = 1,
-}
+local K = include("homigrad/organism/tier_1/sv_input_config.lua")
 
 local function getDamageAmmoSettings(dmgInfo, bullet)
 	local ammoName
@@ -476,20 +434,20 @@ local function AddGibDamageStack(org, hitgroup, damage)
 	org.gibdmgstack[hitgroup] = org.gibdmgstack[hitgroup] or {0, CurTime()}
 	local stack = org.gibdmgstack[hitgroup]
 	local curtime = CurTime()
-	stack[1] = math.max((stack[1] or 0) - (curtime - (stack[2] or curtime)) * (gib_damage_decay[hitgroup] or 0), 0) + damage
+	stack[1] = math.max((stack[1] or 0) - (curtime - (stack[2] or curtime)) * (K.gib_damage_decay[hitgroup] or 0), 0) + damage
 	stack[2] = curtime
 	return stack[1]
 end
 
 local function DamageBodyPart(org, hitgroup, damage, maxHealth)
-	maxHealth = maxHealth or body_part_health[hitgroup]
+	maxHealth = maxHealth or K.body_part_health[hitgroup]
 	if not maxHealth then return end
 	org.gibhealth = org.gibhealth or {}
 	org.gibhealth[hitgroup] = org.gibhealth[hitgroup] or {maxHealth, CurTime()}
 
 	local health = org.gibhealth[hitgroup]
 	local curtime = CurTime()
-	health[1] = math.min((health[1] or maxHealth) + (curtime - (health[2] or curtime)) * (body_part_heal[hitgroup] or 0), maxHealth)
+	health[1] = math.min((health[1] or maxHealth) + (curtime - (health[2] or curtime)) * (K.body_part_heal[hitgroup] or 0), maxHealth)
 	health[1] = math.max(health[1] - damage, 0)
 	health[2] = curtime
 	return maxHealth - health[1]
@@ -824,7 +782,7 @@ function hg.organism.AddTraumaticShock(org, trauma, multiplier)
 	if not org then return 0 end
 
 	trauma = math.max(tonumber(trauma) or 0, 0)
-	local excess = trauma - traumatic_shock_threshold
+	local excess = trauma - K.traumatic_shock_threshold
 	if excess <= 0 then return 0 end
 
 	local resistance = math.max(tonumber(org.traumaResistanceMul) or 1, 1)
@@ -1728,8 +1686,8 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	local dmg_before = dmgInfo:GetDamage()
 	local bulletDamage = (bullet ~= nil and bullet.Damage) or dmg_before
 	local isRifleBullet = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) and
-		(pen >= rifle_penetration_threshold or
-		(pen >= rifle_low_penetration_threshold and bulletDamage >= rifle_low_penetration_damage_threshold))
+		(pen >= K.rifle_penetration_threshold or
+		(pen >= K.rifle_low_penetration_threshold and bulletDamage >= K.rifle_low_penetration_damage_threshold))
 	local isBallistic = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
 	local ballisticProfile = isBallistic and getBallisticProfile(dmgInfo, bullet, dmg_before, pen) or nil
 	local impact = {
@@ -2088,7 +2046,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		if meleeContact and dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH) then
 			hg.organism.AddTraumaticShock(org, meleeContact.trauma or dmg_before, IsValid(inf) and inf.TraumaShockMultiplier or nil)
 		end
-		org.shock = math.min(org.shock + instaPain * shockMul * 4.5 * instant_pain_shock_scale * math.Clamp(pen / 5,1,2) * hypoxiaShockMultiplier(org) / (1 + math.max(org.adrenaline or 0, 0) * 0.45), 70)
+		org.shock = math.min(org.shock + instaPain * shockMul * 4.5 * K.instant_pain_shock_scale * math.Clamp(pen / 5,1,2) * hypoxiaShockMultiplier(org) / (1 + math.max(org.adrenaline or 0, 0) * 0.45), 70)
 		org.immobilization = math.min(org.immobilization + immobilization * immobilizationMul, 30)
 		org.lasthit = CurTime()
 		if IsValid(org.owner) and org.owner:IsPlayer() then
@@ -2216,34 +2174,34 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	if noDismemberment then damageStack = 0 end
 	--print(damageStack, 3)
 	if dmgInfo:IsDamageType(DMG_SLASH) and hitgrouptolimb[hitgroup] then
-		damageStack = damageStack * slash_limb_gib_damage_mul
+		damageStack = damageStack * K.slash_limb_gib_damage_mul
 	elseif dmgInfo:IsDamageType(DMG_SLASH + DMG_CLUB + DMG_GENERIC) then
-		damageStack = damageStack * melee_gib_damage_mul
+		damageStack = damageStack * K.melee_gib_damage_mul
 	end
 	if hitgroup == HITGROUP_HEAD and IsValid(inf) and inf.HeadGibDamageMul then damageStack = damageStack * inf.HeadGibDamageMul end
 	if hitgroup == HITGROUP_HEAD and isRifleBullet then damageStack = damageStack * 1.5 end
 	if hitgroup == HITGROUP_HEAD and dmgInfo:IsDamageType(DMG_SLASH) then damageStack = damageStack * 25 end
 	local inflictorClass = IsValid(dmgInfo:GetInflictor()) and dmgInfo:GetInflictor():GetClass() or ""
 	local grenadeBlastMul = string.find(inflictorClass, "ent_hg_grenade") and 1.8 or 1
-	damageStack = damageStack * (dmgInfo:IsDamageType(DMG_BLAST) and blast_gib_damage_mul / lend * grenadeBlastMul or 1) * (!dmgInfo:IsDamageType(DMG_CLUB+DMG_SLASH+DMG_BULLET+DMG_BUCKSHOT+DMG_BLAST+DMG_SNIPER+DMG_GENERIC+DMG_CRUSH+DMG_FALL+DMG_VEHICLE) and 0 or 1) * (ent:IsNPC() and not isBallistic and 3 or 1)
+	damageStack = damageStack * (dmgInfo:IsDamageType(DMG_BLAST) and K.blast_gib_damage_mul / lend * grenadeBlastMul or 1) * (!dmgInfo:IsDamageType(DMG_CLUB+DMG_SLASH+DMG_BULLET+DMG_BUCKSHOT+DMG_BLAST+DMG_SNIPER+DMG_GENERIC+DMG_CRUSH+DMG_FALL+DMG_VEHICLE) and 0 or 1) * (ent:IsNPC() and not isBallistic and 3 or 1)
 	if impact.armorStopped then damageStack = 0 end
 	if isBallistic then
 		damageStack = damageStack * impact.destructiveMultiplier
 		if hitgroup == HITGROUP_HEAD then
-			damageStack = damageStack * ballistic_head_gib_damage_mul
+			damageStack = damageStack * K.ballistic_head_gib_damage_mul
 		elseif hitgrouptolimb[hitgroup] then
-			damageStack = damageStack * ballistic_limb_gib_damage_mul
+			damageStack = damageStack * K.ballistic_limb_gib_damage_mul
 		end
 	end
 	--damageStack = damageStack * (bullet and bullet.AmmoType and hg.ammotypeshuy[bullet.AmmoType] and hg.ammotypeshuy[bullet.AmmoType].BulletSettings and hg.ammotypeshuy[bullet.AmmoType].BulletSettings.Mass or 1) / 8
-	local catastrophicImpact = dmgInfo:IsDamageType(DMG_CLUB+DMG_CRUSH+DMG_FALL+DMG_VEHICLE+DMG_GENERIC) and damageStack > 0 and dmg_before * armorMit >= full_body_blast_damage_threshold
-	if not noDismemberment and hg.FullBodyExplode and not org.fullbodyexploded and ((dmgInfo:IsDamageType(DMG_BLAST) and (damageStack >= full_body_blast_gib_threshold or dmg_before >= full_body_blast_damage_threshold)) or catastrophicImpact) then
+	local catastrophicImpact = dmgInfo:IsDamageType(DMG_CLUB+DMG_CRUSH+DMG_FALL+DMG_VEHICLE+DMG_GENERIC) and damageStack > 0 and dmg_before * armorMit >= K.full_body_blast_damage_threshold
+	if not noDismemberment and hg.FullBodyExplode and not org.fullbodyexploded and ((dmgInfo:IsDamageType(DMG_BLAST) and (damageStack >= K.full_body_blast_gib_threshold or dmg_before >= K.full_body_blast_damage_threshold)) or catastrophicImpact) then
 		return hg.FullBodyExplode(ent, dirCool * len, dmgInfo) or true
 	end
 	
 	org.dmgstack = org.dmgstack or {}
 	org.dmgstack[hitgroup] = org.dmgstack[hitgroup] or {}
-	local bodyPartMaxHealth = body_part_health[hitgroup]
+	local bodyPartMaxHealth = K.body_part_health[hitgroup]
 	local gibStack
 	local headGoreStack
 	if bodyPartMaxHealth then
@@ -2260,9 +2218,9 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	if hitgroup == HITGROUP_HEAD and ent.headexploded and Gib_UpdateHeadGoreStage then Gib_UpdateHeadGoreStage(ent, headGoreStack or gibStack) end
 	local hitgroup_max = bodyPartMaxHealth or 100
 	if org.isPly or isBallistic then
-		hitgroup_max = hitgroup == HITGROUP_HEAD and (isBuckshot and player_buckshot_head_gib_threshold or player_head_gib_threshold) or hitgrouptolimb[hitgroup] and player_limb_gib_threshold or hitgroup == HITGROUP_STOMACH and player_stomach_gib_threshold or hitgroup_max
+		hitgroup_max = hitgroup == HITGROUP_HEAD and (isBuckshot and K.player_buckshot_head_gib_threshold or K.player_head_gib_threshold) or hitgrouptolimb[hitgroup] and K.player_limb_gib_threshold or hitgroup == HITGROUP_STOMACH and K.player_stomach_gib_threshold or hitgroup_max
 	end
-	if dmgInfo:IsDamageType(DMG_BLAST) and hitgrouptolimb[hitgroup] then hitgroup_max = player_blast_limb_gib_threshold end
+	if dmgInfo:IsDamageType(DMG_BLAST) and hitgrouptolimb[hitgroup] then hitgroup_max = K.player_blast_limb_gib_threshold end
 	if hitgroup == HITGROUP_HEAD then hitgroup_max = hitgroup_max * headGibJawMul(org) end
 	local instant = bodyPartMaxHealth and gibStack >= hitgroup_max or gibStack > hitgroup_max
 	--print(damageStack, org.dmgstack[hitgroup][1], org.dmgstack[hitgroup][3])
@@ -2990,7 +2948,7 @@ local function velocityDamage(ent, data)
 	if not throwImpulse and IsValid(ragdollOwner) then
 		throwImpulse = (ragdollOwner.hgThrowImpulseUntil or 0) > CurTime()
 	end
-	if not noDismemberment and not throwImpulse and (not ent.hgMeleeImpulseUntil or ent.hgMeleeImpulseUntil <= CurTime()) and hg.FullBodyExplode and not org.fullbodyexploded and (speed >= full_body_physics_speed_threshold or rawPhysicsDamage >= full_body_physics_damage_threshold) then
+	if not noDismemberment and not throwImpulse and (not ent.hgMeleeImpulseUntil or ent.hgMeleeImpulseUntil <= CurTime()) and hg.FullBodyExplode and not org.fullbodyexploded and (speed >= K.full_body_physics_speed_threshold or rawPhysicsDamage >= K.full_body_physics_damage_threshold) then
 		if hg.FullBodyExplode(ent, data.OurOldVelocity - data.TheirOldVelocity, dmgInfo) then return end
 	end
 
@@ -3084,10 +3042,10 @@ local function velocityDamage(ent, data)
 			end
 
 			local skullImpactScale = lane.name == "spine3" and 2.25 or lane.scale
-			hg.organism.input_list.skull(org, bone, structuralBudget * skullImpactScale * headDamageMul * ragdoll_fall_skull_damage_mul, dmgInfo, nil, nil, nil, nil, physicsImpact)
+			hg.organism.input_list.skull(org, bone, structuralBudget * skullImpactScale * headDamageMul * K.ragdoll_fall_skull_damage_mul, dmgInfo, nil, nil, nil, nil, physicsImpact)
 			if lane.name ~= "spine3" then
 				if residual > 0.15 then
-					hg.organism.input_list.jaw(org, bone, math.min(residual, 0.8) * headDamageMul * ragdoll_fall_jaw_damage_mul, dmgInfo)
+					hg.organism.input_list.jaw(org, bone, math.min(residual, 0.8) * headDamageMul * K.ragdoll_fall_jaw_damage_mul, dmgInfo)
 				end
 			end
 			local headImpactSeverity = math.Clamp(math.max(impactHelmet and dmg or unarmoredImpactDamage, structuralBudget) * math.Clamp(normalSpeed / 600, 0.7, 2), 0, 3)
@@ -3100,7 +3058,7 @@ local function velocityDamage(ent, data)
 			if headImpactSeverity > 0.15 and math.Rand(0, 1) < knockoutChance then
 				org.needotrub = true
 				org.shock = org.shock + 10
-				org.consciousness = math.min(org.consciousness, head_otrub_consciousness_cap)
+				org.consciousness = math.min(org.consciousness, K.head_otrub_consciousness_cap)
 			else
 				local consciousnessLoss = headImpactSeverity * (hadhelmet and 0.04 or 0.12)
 				org.consciousness = math.max((org.consciousness or 1) - consciousnessLoss, hadhelmet and 0.5 or 0.3)
@@ -3111,12 +3069,12 @@ local function velocityDamage(ent, data)
 				net.Start("hg_bloodimpact")
 				net.WriteVector(skullImpactPos)
 				net.WriteVector((data.OurOldVelocity - data.TheirOldVelocity):GetNormalized() / 10)
-				net.WriteFloat(math.max(dmg * ragdoll_fall_skull_break_blood_mul, 4))
+				net.WriteFloat(math.max(dmg * K.ragdoll_fall_skull_break_blood_mul, 4))
 				net.WriteInt(3, 8)
 				net.SendPVS(skullImpactPos)
 			end
 
-			if not noDismemberment and !ent.headexploded and lane.name == "skull" and skullAllowsHeadGib(org) and structuralBudget * headDamageMul > player_fall_head_gib_threshold * headGibJawMul(org) then
+			if not noDismemberment and !ent.headexploded and lane.name == "skull" and skullAllowsHeadGib(org) and structuralBudget * headDamageMul > K.player_fall_head_gib_threshold * headGibJawMul(org) then
 				hg.ExplodeHead(ent, structuralBudget * 30, false, data.OurOldVelocity - data.TheirOldVelocity)
 			end
 		end
