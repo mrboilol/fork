@@ -22,7 +22,7 @@ SWEP.ViewModelFOV = 80
 SWEP.HoldType = "grenade"
 SWEP.DrawAmmo = false
 SWEP.DrawCrosshair = true
-SWEP.Instructions = "ЛКМ — бросить и подключиться
+SWEP.Instructions = [[ЛКМ — бросить и подключиться
 Мышь влево/вправо — крен (поворот)
 Мышь вверх/вниз — тангаж
 Q/E — рысканье
@@ -31,7 +31,7 @@ W/A/S/D — движение
 R — отключиться, дрон останется
 E рядом — подключиться снова
 F — взорвать дрон
-Z — включить/выключить фонарь"
+Z — включить/выключить фонарь]]
 
 SWEP.Primary.ClipSize = -1
 SWEP.Primary.DefaultClip = -1
