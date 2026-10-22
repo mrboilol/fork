@@ -123,6 +123,10 @@ end
 local function HelmetRules(host)
 	local armors = HostArmors(host)
 	local helm = istable(armors) and armors.head
+	if not helm and host:IsPlayer() and hg.GetNewArmorOnPlacement then
+		local worn = hg.GetNewArmorOnPlacement(host, "head")
+		helm = IsValid(worn) and string.match(worn:GetClass(), "^ent_new_armor_legacy_(.+)$")
+	end
 	if not helm then return end
 	if Droppable("head", helm) then return end -- droppable pieces are knocked off instead
 

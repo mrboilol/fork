@@ -379,7 +379,6 @@ local function GiveContainedLaw(ply, lawIndex)
     ply:Give("weapon_handcuffs_key")
     hg.AddArmor(ply, "vest_riot")
     hg.AddArmor(ply, "helmet_riot")
-    hg.AddArmor(ply, "visor_riot")
     ply:SetNetVar("CurPluv", "pluvberet")
 
     if lawIndex == 1 then
@@ -406,7 +405,6 @@ local function GiveEscalatedLaw(ply, lawIndex, glockIndex)
     ply:SetNetVar("CurPluv", "pluvberet")
     hg.AddArmor(ply, "vest_riot")
     hg.AddArmor(ply, "helmet_riot")
-    hg.AddArmor(ply, "visor_riot")
 
     if lawIndex == 1 then
         ply:Give("weapon_ram")

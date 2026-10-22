@@ -57,11 +57,11 @@ if SERVER then
             return
         end
 
-        if isDepressionBlocking(ply) then return end
         if not hg.CanSuicide(ply) then
             hg.WallBang.Start(ply)
             return
         end
+        if isDepressionBlocking(ply) then return end
 
         ply.suiciding = true
         ply:SetNWBool("suiciding", true)
@@ -71,9 +71,6 @@ if SERVER then
     hook.Add("Player Think", "HG_SuicideDepressionStop", function(ply)
         if ply.suiciding and ply:Alive() and isDepressionBlocking(ply) then
             stopSuicide(ply)
-        end
-        if hg.WallBang.Active(ply) and isDepressionBlocking(ply) then
-            hg.WallBang.Stop(ply)
         end
     end)
 

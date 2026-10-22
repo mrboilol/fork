@@ -110,7 +110,7 @@ function G.Near(x, y, z, nx, ny, nz, R, eat)
 				local a = s.h * s.h
 				n, w, drops = n + 1, w + a, drops + 1 + (s.mn or 0)
 				sx, sy, sz = sx + s.x * a, sy + s.y * a, sz + s.z * a
-				if eat and eat(s.x, s.y, s.z, a, s.h) then Kill(s) end
+				if eat and eat(s.x, s.y, s.z, a, s.h, s) then Kill(s) end
 			end
 		end
 	end

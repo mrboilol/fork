@@ -219,6 +219,7 @@ function CLASS.Off(self)
 	end
 
     RemoveCombineFromSquad(self)
+    hg.RemoveClassArmor(self, "cmb_helmet")
 
     for k,v in ipairs(ents.FindByClass("npc_*")) do
         if table.HasValue(combines,v:GetClass()) then
@@ -308,7 +309,9 @@ function CLASS.On(self, data)
     --;; Армор
     self.armors = {}
     self.armors["torso"] = "cmb_armor"
-    self.armors["head"] = "cmb_helmet"
+    self.armor_states = self.armor_states or {}
+    self.armor_states.cmb_armor = {plateMaterial = "titan", plateLevel = 5, plateSides = "all"}
+    if not hg.EquipClassArmor(self, "cmb_helmet") then self.armors["head"] = "cmb_helmet" end
     self:SyncArmor()
 
     if not data.bNoEquipment then

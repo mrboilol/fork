@@ -592,6 +592,35 @@ function hg.CreateLegacyNewArmor(equipment)
 	return armor
 end
 
+function hg.RemoveClassArmor(ply, equipment)
+	local class = hg.GetLegacyNewArmorClass(equipment)
+	local placement = class and hg.GetArmorPlacement(equipment)
+	local worn = placement and hg.GetNewArmorOnPlacement(ply, placement)
+	if not IsValid(worn) or worn:GetClass() ~= class then return end
+	worn:Unwear(ply)
+	SafeRemoveEntity(worn)
+end
+
+function hg.EquipClassArmor(ply, equipment)
+	local class = hg.GetLegacyNewArmorClass(equipment)
+	local placement = class and hg.GetArmorPlacement(equipment)
+	if not placement then return false end
+	local worn = hg.GetNewArmorOnPlacement(ply, placement)
+	if IsValid(worn) then
+		if worn:GetClass() == class then return true end
+		worn:Unwear(ply)
+		SafeRemoveEntity(worn)
+	end
+	local armor = hg.CreateLegacyNewArmor(equipment)
+	if not IsValid(armor) then return false end
+	if armor:CanWear(ply) then
+		armor:Wear(ply)
+		return true
+	end
+	armor:Remove()
+	return false
+end
+
 function hg.AddArmor(ply, equipment, ent)
     if not IsValid(ply) then return end
 	if IsValid(ent) and (ent.unusable or ent:GetNWBool("ArmorUnusable", false)) then

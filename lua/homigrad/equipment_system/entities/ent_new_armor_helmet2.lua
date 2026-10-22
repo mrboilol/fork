@@ -156,7 +156,9 @@ ENT.DrawOverlay = hg.DrawFirstPersonEquipment
         ENT[FP].DurabilityWarranty = 5                     -- guarantee that the protection level will not decrease (no debuff) upon the degradation
 
         ENT[FP].BluntDamageMul = 0.06
-        ENT[FP].BluntWearMul = 0.5
+        ENT[FP].BluntWearMul = 1.2
+        ENT[FP].SlashDamageMul = 0.08
+        ENT[FP].SlashWearMul = 1.2
 
         ENT[FP].NeedPunch = true                           -- viewpunch after impact
     --//       
@@ -173,7 +175,9 @@ ENT.DrawOverlay = hg.DrawFirstPersonEquipment
         ENT[BP].DurabilityWarranty = 5                    -- guarantee that the protection level will not decrease (no debuff) upon the degradation
 
         ENT[BP].BluntDamageMul = 0.06
-        ENT[BP].BluntWearMul = 0.5
+        ENT[BP].BluntWearMul = 1.2
+        ENT[BP].SlashDamageMul = 0.08
+        ENT[BP].SlashWearMul = 1.2
 
         ENT[BP].NeedPunch = true                           -- viewpunch after impact
     --//  
@@ -189,8 +193,10 @@ ENT.DrawOverlay = hg.DrawFirstPersonEquipment
         ENT[GP].DurabilityMax = 15                         -- max durability, for the future repair armor (yeah i'm doing immersive shit)
         ENT[GP].DurabilityWarranty = 3                    -- guarantee that the protection level will not decrease (no debuff) upon the degradation
 
-        ENT[GP].BluntDamageMul = 0.65
-        ENT[GP].BluntWearMul = 1
+        ENT[GP].BluntDamageMul = 0.25
+        ENT[GP].BluntWearMul = 1.2
+        ENT[GP].SlashDamageMul = 0.1
+        ENT[GP].SlashWearMul = 1.2
 
         ENT[GP].NeedPunch = true                           -- viewpunch after impact
     --// 

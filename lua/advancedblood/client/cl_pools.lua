@@ -172,6 +172,27 @@ local function SeedGather(s, k, R)
 	end
 end
 
+-- What of a stain's blood is still liquid in the seed cell it went to (the rest dried there)
+local function SeedTake(x, y, z, vol)
+	local k = ABL.CellKey(x, y, z, SEED_CELL)
+	local s = seeds[k]
+	if not s or not (vol > 0) then return 0 end
+	local now = CurTime()
+	local decay = exp(-(now - s.t) / 45)
+	ABL.FlowCore.Move("pool", "dried", s.vol * (1 - decay))
+	local have = s.vol * decay
+	local got = min(vol, have)
+	local keep = have > got and decay * (1 - got / have) or 0
+	if keep <= 0 then
+		seeds[k] = nil
+		return have
+	end
+	s.vol, s.sx, s.sy, s.sz, s.w = s.vol * keep, s.sx * keep, s.sy * keep, s.sz * keep, s.w * keep
+	for kk, v in pairs(s.kinds) do s.kinds[kk] = v * keep end
+	s.t = now
+	return got
+end
+
 local function SeedKind(s)
 	local best, bv = "drip", -1
 	for k, v in pairs(s.kinds) do if v > bv then best, bv = k, v end end
@@ -999,13 +1020,33 @@ function P.Deposit(x, y, z, n, vol, surf, ent, kind, dx, dy, dz, K)
 	end
 end
 
+-- A pool reaching a ground stain takes it in: what of the stain is still liquid, and its dried
+-- film wetted again, are laid along the stain's long axis, so the pool runs on over the stain the
+-- way the stain lies and grows by what the stain held.
 local function EatStains(p)
-	ABL.Ground.Near(p.cx or p.x, p.cy or p.y, p.cz or p.z, p.nx, p.ny, p.nz, p.rad + 2, function(x, y, z, a, h)
+	local now = CurTime()
+	ABL.Ground.Near(p.cx or p.x, p.cy or p.y, p.cz or p.z, p.nx, p.ny, p.nz, p.rad + 2, function(x, y, z, a, h, s)
 		local u, w = ToLocal(p, x, y, z)
-		if not Covers(p, u, w, h) then return false end
-		local v = a * pi * PC.eatFilm * ML
-		ABL.FlowCore.Move("surface", "pool", v)
-		P.Feed(p, v, x, y, z, "seep")
+		if not (Covers(p, u, w, h) or p.sim and PS.Covers(p.sim, u, w, h * 0.45)) then return false end
+		local film = a * pi * PC.eatFilm * ML
+		ABL.FlowCore.Move("dried", "pool", film)
+		local wet = Clamp(1 - 2 * (now - s.born) / s.dryT, 0, 1)
+		local vol = film + SeedTake(x, y, z, (s.vol or 0) * wet)
+		local lx, ly, lz = s.ux, s.uy, s.uz
+		local lu = s.ux * s.ux + s.uy * s.uy + s.uz * s.uz
+		local lv = s.vx * s.vx + s.vy * s.vy + s.vz * s.vz
+		if lv > lu then lx, ly, lz, lu, lv = s.vx, s.vy, s.vz, lv, lu end
+		if lu < lv * 1.69 or lu < 0.25 then
+			if p.sim and PS.Fit(p.sim, SimNMax(), u - 1, w - 1, u + 1, w + 1) then SimGround(p) end
+			P.Feed(p, vol, x, y, z, "seep")
+			return true
+		end
+		local du, dv = ToLocal(p, x + lx * 0.5, y + ly * 0.5, z + lz * 0.5)
+		du, dv = du - u, dv - w
+		if p.sim and PS.Fit(p.sim, SimNMax(), u - abs(du) - 1, w - abs(dv) - 1, u + abs(du) + 1, w + abs(dv) + 1) then SimGround(p) end
+		for k = -1, 1 do
+			P.Feed(p, vol / 3, x + lx * 0.5 * k, y + ly * 0.5 * k, z + lz * 0.5 * k, "seep")
+		end
 		return true
 	end)
 end

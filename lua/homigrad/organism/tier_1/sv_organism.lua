@@ -1541,6 +1541,9 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	if org.otrub and org.alive and (org.otrubMinUntil or 0) > CurTime() then
 		org.needotrub = true
 	end
+	if org.needotrub and not org.otrub and org.alive and (org.wallbangGritUntil or 0) > CurTime() and (org.consciousness or 0) > 0.04 then
+		org.needotrub = false
+	end
 	local just_went_uncon = not org.otrub and org.needotrub and not org.NoKnockdown
 	if just_went_uncon then org.otrubMinUntil = CurTime() + 5 end
 	local just_woke_up = not org.needotrub and org.otrub

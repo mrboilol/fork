@@ -37,6 +37,7 @@ end)
 
 local diff = Angle()
 hook.Add("InputMouseApply", "fakeCameraAngles", function(cmd, x, y, angle)
+	if FreakCityDrone and IsValid(FreakCityDrone.GetActive(lply)) then return end
 	local tbl = {}
 	local cc = GetCoolCameraBool()
 	if cc then

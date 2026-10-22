@@ -50,7 +50,7 @@ local function createhev(ply)
     ply.armors["torso"] = "gordon_armor"
     ply.armors["head"] = "gordon_helmet"
     ply.armor_states = ply.armor_states or {}
-    ply.armor_states.gordon_armor = {quality = 1.2, plateMaterial = "ceramic", plateLevel = 6, plateSides = "all", healthMultiplier = 5}
+    ply.armor_states.gordon_armor = {quality = 1.2, plateMaterial = "uhmwpe_ceramic", plateLevel = 6, plateSides = "all", healthMultiplier = 5}
     ply.armor_states.gordon_helmet = {quality = 1.2, protectionMultiplier = 2, healthMultiplier = 5}
     ply.armors_health = ply.armors_health or {}
     ply.armors_durability = ply.armors_durability or {}
@@ -163,7 +163,7 @@ function CLASS.On(self, data)
             self.armors["head"] = "gordon_helmet"
         end
         self.armor_states = self.armor_states or {}
-        self.armor_states.gordon_armor = self.armor_states.gordon_armor or {quality = 1.2, plateMaterial = "ceramic", plateLevel = 6, plateSides = "all", healthMultiplier = 5}
+        self.armor_states.gordon_armor = self.armor_states.gordon_armor or {quality = 1.2, plateMaterial = "uhmwpe_ceramic", plateLevel = 6, plateSides = "all", healthMultiplier = 5}
         self.armor_states.gordon_helmet = self.armor_states.gordon_helmet or {quality = 1.2, protectionMultiplier = 2, healthMultiplier = 5}
         self:SyncArmor()
         hevchanged(self)

@@ -23,6 +23,7 @@ SWEP.HoldType = "grenade"
 SWEP.DrawAmmo = false
 SWEP.DrawCrosshair = true
 SWEP.Instructions = [[ЛКМ — бросить и подключиться
+R (с пультом в руках) — сменить тип дрона
 Мышь влево/вправо — крен (поворот)
 Мышь вверх/вниз — тангаж
 Q/E — рысканье
@@ -42,8 +43,18 @@ SWEP.Secondary.DefaultClip = -1
 SWEP.Secondary.Automatic = false
 SWEP.Secondary.Ammo = "none"
 
+SWEP.DroneTypes = {
+    {class = "kamikaze", name = "FPV infantry"},
+    {class = "fpv_at", name = "FPV AT"},
+    {class = "dji_mavic3", name = "DJI Mavic 3"}
+}
+
 function SWEP:Initialize()
     self:SetHoldType(self.HoldType)
+end
+
+function SWEP:GetDroneType()
+    return self.DroneTypes[self:GetNWInt("FCDroneType", 1)] or self.DroneTypes[1]
 end
 
 function SWEP:CanDeployDrone()
@@ -95,7 +106,7 @@ function SWEP:PrimaryAttack()
             return
         end
 
-        local drone = ents.Create("kamikaze")
+        local drone = ents.Create(self:GetDroneType().class)
         if not IsValid(drone) then
             self:SetNWBool("FCDroneUsed", false)
             owner:ChatPrint("Не удалось создать дрон.")
@@ -143,4 +154,23 @@ function SWEP:SecondaryAttack()
 end
 
 function SWEP:Reload()
+    if CLIENT then return end
+    if CurTime() < (self.FCNextTypeSwitch or 0) then return end
+    if self:GetNWBool("FCDroneUsed", false) then return end
+    self.FCNextTypeSwitch = CurTime() + 0.4
+
+    local index = self:GetNWInt("FCDroneType", 1) % #self.DroneTypes + 1
+    self:SetNWInt("FCDroneType", index)
+
+    local owner = self:GetOwner()
+    if IsValid(owner) then
+        owner:EmitSound("buttons/button14.wav", 60, 100)
+        owner:ChatPrint("Дрон: " .. self.DroneTypes[index].name)
+    end
+end
+
+if CLIENT then
+    function SWEP:DrawHUD()
+        draw.SimpleTextOutlined("Дрон: " .. self:GetDroneType().name .. "  [R]", "DermaLarge", ScrW() * 0.5, ScrH() * 0.85, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, color_black)
+    end
 end

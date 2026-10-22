@@ -105,8 +105,8 @@ hook.Add("Bones", "hg_wallbang_bones", function(ply, dtime)
 end)
 
 if CLIENT then
-	local angLH = Angle(-135, -90, 0)
-	local angRH = Angle(-135, 90, 180)
+	local angLH = Angle(-135, -90, 180)
+	local angRH = Angle(-135, 90, 0)
 
 	local function placeHand(ply, bone, pos, ang)
 		local id = ply:LookupBone(bone)
@@ -148,13 +148,27 @@ local function stop(ply)
 	ply.wallbangNext = nil
 	ply.wallbangReached = nil
 	ply.wallbangApproachEnd = nil
+	ply.wallbangQueued = nil
 end
 WB.Stop = stop
 
-local function canBrace(ply)
-	if not IsValid(ply) or not ply:Alive() or IsValid(ply.FakeRagdoll) or ply:InVehicle() then return false end
+local handsClasses = {
+	weapon_hands_sh = true,
+	weapon_hg_coolhands = true,
+}
+
+local function handsClass(ply)
+	return hg.GetHandsWeaponClass and hg.GetHandsWeaponClass(ply) or "weapon_hands_sh"
+end
+
+local function holdingHands(ply)
 	local wep = ply:GetActiveWeapon()
-	if not IsValid(wep) or wep:GetClass() ~= "weapon_hands_sh" then return false end
+	return IsValid(wep) and handsClasses[wep:GetClass()] and wep or nil
+end
+
+local function canBrace(ply, allowSwitch)
+	if not IsValid(ply) or not ply:Alive() or IsValid(ply.FakeRagdoll) or ply:InVehicle() then return false end
+	if not holdingHands(ply) and not (allowSwitch and ply:HasWeapon(handsClass(ply))) then return false end
 	if IsValid(ply:GetNetVar("carryent")) or IsValid(ply:GetNetVar("carryent2")) then return false end
 	if ply:GetNetVar("handcuffed", false) then return false end
 	local org = ply.organism
@@ -169,37 +183,60 @@ local function wallSurface(ent)
 	return not IsValid(phys) or not phys:IsMotionEnabled()
 end
 
-function WB.Start(ply)
-	if not canBrace(ply) then return false end
+local sweepYaw = {0, 25, -25, 50, -50, 75, -75, 100, -100}
 
-	local dir = ply:GetAimVector()
-	dir.z = 0
-	dir:Normalize()
-
+local function findWall(ply)
 	local eye = ply:EyePos()
-	local tr = util.TraceLine({
-		start = eye,
-		endpos = eye + dir * WB.Reach,
-		filter = ply,
-		mask = MASK_PLAYERSOLID
-	})
+	local ang = ply:EyeAngles()
+	local baseYaw = ang.y
+	ang.p = 0
+	ang.r = 0
 
-	if not tr.Hit or math.abs(tr.HitNormal.z) > 0.4 then return false end
-	if not tr.HitWorld and not wallSurface(tr.Entity) then return false end
+	local bestPos, bestNorm, bestDist
+	for _, yaw in ipairs(sweepYaw) do
+		ang.y = baseYaw + yaw
+		local tr = util.TraceLine({
+			start = eye,
+			endpos = eye + ang:Forward() * WB.Reach,
+			filter = ply,
+			mask = MASK_PLAYERSOLID
+		})
 
-	local norm = Vector(tr.HitNormal.x, tr.HitNormal.y, 0)
-	norm:Normalize()
+		if tr.Hit and not tr.StartSolid and math.abs(tr.HitNormal.z) <= 0.4 and (tr.HitWorld or wallSurface(tr.Entity)) then
+			local norm = Vector(tr.HitNormal.x, tr.HitNormal.y, 0)
+			norm:Normalize()
+			local dist = (eye - tr.HitPos):Dot(norm)
+			if dist >= 1 and (not bestDist or dist < bestDist) then
+				bestPos, bestNorm, bestDist = tr.HitPos, norm, dist
+			end
+		end
+	end
 
-	local wep = ply:GetActiveWeapon()
+	return bestPos, bestNorm
+end
+
+function WB.Start(ply)
+	if not canBrace(ply, true) then return false end
+
+	local hitPos, norm = findWall(ply)
+	if not hitPos then return false end
+
+	local wep = holdingHands(ply)
+	if not wep then
+		ply:SelectWeapon(handsClass(ply))
+		wep = holdingHands(ply)
+		if not wep then return false end
+	end
 	if wep.SetFists then wep:SetFists(false) end
 
-	ply:SetNWVector("hg_wallbang_pos", tr.HitPos)
+	ply:SetNWVector("hg_wallbang_pos", hitPos)
 	ply:SetNWVector("hg_wallbang_norm", norm)
 	ply:SetNWFloat("hg_wallbang_slam", 0)
 	ply:SetNWBool("hg_wallbang", true)
 	ply.wallbangCount = ply.wallbangCount or 0
 	ply.wallbangReached = nil
 	ply.wallbangApproachEnd = CurTime() + WB.ApproachTime
+	ply.wallbangQueued = nil
 
 	return true
 end
@@ -231,35 +268,42 @@ local function impact(ply)
 	dmgInfo:SetDamageForce(-norm * 50)
 
 	local oldSkull = org.skull or 0
+	local oldConsciousness = org.consciousness or 1
 	local input = hg.organism.input_list
 
-	if input.skull then input.skull(org, 0, math.Rand(0.12, 0.2) * mul, dmgInfo, nil, -norm) end
-	if input.brainFrontal then input.brainFrontal(org, 0, math.Rand(0.05, 0.1) * mul, dmgInfo) end
+	if oldSkull < 1 then org.skull = math.min(oldSkull + math.Rand(0.22, 0.32) * mul, 0.999) end
+	if input.skull then input.skull(org, 0, 0.35 * mul, dmgInfo, nil, -norm) end
+	if input.brainFrontal then input.brainFrontal(org, 0, math.Rand(0.1, 0.18) * mul, dmgInfo) end
 
-	if oldSkull >= 1 then
-		org.brain = math.min((org.brain or 0) + 0.07 * mul, 1)
-		if hg.organism.AddBrainHemorrhage then hg.organism.AddBrainHemorrhage(org, 0.05 * mul, 0.002) end
+	local skull = org.skull or 0
+	if skull >= 1 then
+		local opened = oldSkull >= 1
+		org.brain = math.min((org.brain or 0) + (opened and 0.07 or 0.04) * mul, 1)
+		if hg.organism.AddBrainHemorrhage then hg.organism.AddBrainHemorrhage(org, (opened and 0.12 or 0.08) * mul, 0.004 * mul) end
 	end
 
 	local concussion = hg.organism.module and hg.organism.module.concussion
 	if concussion and concussion.AddConcussion then
-		local intensity = math.Clamp(0.4 + ply.wallbangCount * 0.15, 0.4, 3) * mul
+		local intensity = math.Clamp(0.5 + ply.wallbangCount * 0.2, 0.5, 3.5) * mul
 		concussion.AddConcussion(org, intensity, math.Clamp(10 + intensity * 15, 12, 60))
 	end
 
 	if hg.organism.AddInstantPain then
-		hg.organism.AddInstantPain(org, 12 * mul, "head")
+		hg.organism.AddInstantPain(org, (25 + (skull >= 1 and 15 or 0)) * mul, "head")
 	end
 
-	org.consciousness = math.max((org.consciousness or 1) - 0.06 * mul, 0.2)
-	org.disorientation = (org.disorientation or 0) + 0.4 * mul
+	org.consciousness = math.max(org.consciousness or 0, math.min(oldConsciousness, math.max(oldConsciousness - 0.1 * mul, 0.25)))
+	org.disorientation = (org.disorientation or 0) + 0.5 * mul
 
 	if oldSkull >= 0.5 and math.Rand(0, 1) < math.min(0.04 * ply.wallbangCount, 0.3) * mul then
-		org.needotrub = true
+		hg.LightStunPlayer(ply, 2)
 	end
 
-	if (org.skull or 0) >= 0.3 then
-		hg.organism.AddWoundManual(ply, 6 + (org.skull or 0) * 6, VectorRand(-1.5, 1.5), angle_zero, "ValveBiped.Bip01_Head1", CurTime())
+	if skull >= 0.2 then
+		local headBone = ply:LookupBone("ValveBiped.Bip01_Head1")
+		local headMat = headBone and ply:GetBoneMatrix(headBone)
+		local forehead = headMat and WorldToLocal(hit + norm + vecUp * 3, angle_zero, headMat:GetTranslation(), headMat:GetAngles()) or Vector()
+		hg.organism.AddWoundManual(ply, (14 + skull * 16) * mul, forehead, angle_zero, "ValveBiped.Bip01_Head1", CurTime())
 		util.Decal("Blood", hit + norm * 4, hit - norm * 8, ply)
 	end
 
@@ -269,13 +313,17 @@ local function impact(ply)
 	ply:EmitSound("physics/body/body_medium_impact_hard" .. math.random(1, 6) .. ".wav", 70, math.random(90, 105))
 	ply:EmitSound("physics/flesh/flesh_impact_hard" .. math.random(1, 6) .. ".wav", 65, math.random(85, 100), 0.7)
 
-	hook.Run("HomigradDamage", ply, dmgInfo, HITGROUP_HEAD, ply, 2 * mul)
+	hook.Run("HomigradDamage", ply, dmgInfo, HITGROUP_HEAD, ply, 4 * mul)
 end
 
 function WB.Slam(ply)
-	if (ply.wallbangNext or 0) > CurTime() then return end
-	if not ply.wallbangReached or WB.WallDist(ply) > WB.HandReach then return end
+	if (ply.wallbangNext or 0) > CurTime() or not ply.wallbangReached then
+		ply.wallbangQueued = true
+		return
+	end
+	if WB.WallDist(ply) > WB.HandReach then return end
 
+	ply.wallbangQueued = nil
 	ply.wallbangNext = CurTime() + WB.Cooldown
 	local start = CurTime()
 	ply:SetNWFloat("hg_wallbang_slam", start)
@@ -293,7 +341,14 @@ hook.Add("Player Think", "hg_wallbang_think", function(ply)
 	local dist = WB.WallDist(ply)
 	if not ply.wallbangReached and dist <= WB.HandReach then
 		ply.wallbangReached = true
+		ply.wallbangNext = math.max(ply.wallbangNext or 0, CurTime() + 0.3)
 		ply:EmitSound("physics/body/body_medium_impact_soft" .. math.random(1, 7) .. ".wav", 55, math.random(95, 110), 0.5)
+	end
+
+	if ply.organism then ply.organism.wallbangGritUntil = CurTime() + 1.5 end
+
+	if ply.wallbangQueued and ply.wallbangReached and (ply.wallbangNext or 0) <= CurTime() then
+		WB.Slam(ply)
 	end
 
 	if not canBrace(ply) or dist < 1

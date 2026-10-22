@@ -918,6 +918,8 @@ end)
 
 hook.Add( "PlayerBindPress", "PlayerBindPressExample2huy", function( ply, bind, pressed )
 	if bind == "+menu" then
+		if FreakCityDrone and IsValid(FreakCityDrone.GetActive(ply)) then return true end
+
 		if (lply.organism and lply.organism.otrub) then
 			return true
 		end

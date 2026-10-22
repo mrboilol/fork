@@ -15,6 +15,7 @@ function CLASS.Off(self)
 		self:SetBloodColor(BLOOD_COLOR_RED)
 		
 		hg.ClearArmorRestrictions(self)
+		hg.RemoveClassArmor(self, "protovisor")
 	end
 
 	if eightbit and eightbit.EnableEffect and self.UserID then
@@ -119,7 +120,7 @@ function CLASS.On(self, data)
 	
 			self.armors = {}
 			//self.armors["torso"] = "cmb_armor"
-			self.armors["head"] = "protovisor"
+			if not hg.EquipClassArmor(self, "protovisor") then self.armors["head"] = "protovisor" end
 			self:SyncArmor()
 
 			zb.GiveRole(self, "Specimen", col1)
@@ -181,7 +182,7 @@ function CLASS.On(self, data)
 
 		self.armors = {}
 		//self.armors["torso"] = "cmb_armor"
-		self.armors["head"] = "protovisor"
+		if not hg.EquipClassArmor(self, "protovisor") then self.armors["head"] = "protovisor" end
 		self:SyncArmor()
 
 		if zb and zb.GiveRole then zb.GiveRole(self, "Specimen", col1) end

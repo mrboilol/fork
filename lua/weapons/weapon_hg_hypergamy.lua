@@ -61,10 +61,14 @@ local function flatFrame(ent)
 	local axes = {ang:Forward(), -ang:Right(), ang:Up()}
 	local thin = (size.x <= size.y and size.x <= size.z) and 1 or (size.y <= size.z and 2 or 3)
 	local a, b = thin % 3 + 1, (thin + 1) % 3 + 1
-	local normal = axes[thin]
+	local normal, right = axes[thin], axes[a]
+	if normal.z < 0 then
+		normal = -normal
+		right = -right
+	end
 	local center = ent:LocalToWorld((mins + maxs) * 0.5) + normal * (size[thin] * 0.5 + 0.05)
 
-	return center, normal, axes[a], axes[b], size[a], size[b]
+	return center, normal, right, axes[b], size[a], size[b]
 end
 
 function SWEP:SetupDataTables()
@@ -166,43 +170,52 @@ if SERVER then
 end
 
 if CLIENT then
-	local imageMat = CreateMaterial("hg_hypergamy_image", "UnlitGeneric", {
+	local BOARD = 13
+	local THICK = 0.6
+	local INSET = 0.8
+
+	local imageMat = Material("hypogamy.png", "smooth mips nocull")
+	local boardMat = CreateMaterial("hg_hypergamy_board", "UnlitGeneric", {
 		["$basetexture"] = "color/white",
 		["$vertexcolor"] = 1,
 		["$nocull"] = 1,
 	})
-	local backMat = CreateMaterial("hg_hypergamy_back", "UnlitGeneric", {
-		["$basetexture"] = "color/white",
-		["$vertexcolor"] = 1,
-		["$nocull"] = 1,
-	})
-	local pngTex = Material("hypogamy.png", "smooth mips"):GetTexture("$basetexture")
-	if pngTex then imageMat:SetTexture("$basetexture", pngTex) end
 
-	local backTint = Vector(0.94, 0.94, 0.92)
-	local litCol = Color(255, 255, 255)
+	local faceTint = Vector(0.66, 0.5, 0.32)
+	local edgeTint = Vector(0.5, 0.37, 0.22)
+	local imageTint = Vector(1, 1, 1)
+	local light = Vector(1, 1, 1)
+	local quadCol = Color(255, 255, 255)
 
-	local function litColor(pos, normal, tint)
-		local light = render.ComputeLighting(pos, normal)
-		litCol.r = 255 * math.Clamp(light.x, 0.08, 1) * (tint and tint.x or 1)
-		litCol.g = 255 * math.Clamp(light.y, 0.08, 1) * (tint and tint.y or 1)
-		litCol.b = 255 * math.Clamp(light.z, 0.08, 1) * (tint and tint.z or 1)
-
-		return litCol
+	local function quad(mat, center, a, b, tint)
+		quadCol.r = 255 * light.x * tint.x
+		quadCol.g = 255 * light.y * tint.y
+		quadCol.b = 255 * light.z * tint.z
+		render.SetMaterial(mat)
+		render.DrawQuad(center - a + b, center + a + b, center + a - b, center - a - b, quadCol)
 	end
 
-	local function drawSheet(center, right, up, normal, w, h, back)
-		local front = (EyePos() - center):Dot(normal) >= 0
-		if not front and not back then return end
+	local function drawBoard(center, right, up, normal)
+		local raw = render.GetLightColor(center)
+		light:SetUnpacked(math.Clamp(raw.x ^ 0.4545, 0.2, 1), math.Clamp(raw.y ^ 0.4545, 0.2, 1), math.Clamp(raw.z ^ 0.4545, 0.2, 1))
 
-		if not front then
-			right = -right
-			normal = -normal
-		end
+		local r, u, n = right * (BOARD * 0.5), up * (BOARD * 0.5), normal * (THICK * 0.5)
+		quad(boardMat, center + n, r, u, faceTint)
+		quad(boardMat, center - n, r, u, faceTint)
+		quad(boardMat, center + u, r, n, edgeTint)
+		quad(boardMat, center - u, r, n, edgeTint)
+		quad(boardMat, center + r, n, u, edgeTint)
+		quad(boardMat, center - r, n, u, edgeTint)
 
-		local hr, hu = right * (w * 0.5), up * (h * 0.5)
-		render.SetMaterial(front and imageMat or backMat)
-		render.DrawQuad(center - hr + hu, center + hr + hu, center + hr - hu, center - hr - hu, litColor(center, normal, not front and backTint or nil))
+		local ih = BOARD * 0.9
+		quad(imageMat, center + normal * (THICK * 0.5 + 0.04), right * (ih * 0.5 / IMG_ASPECT), up * (ih * 0.5), imageTint)
+	end
+
+	local function bonePos(ent, name)
+		local bone = ent:LookupBone(name)
+		local mat = bone and ent:GetBoneMatrix(bone)
+
+		return mat and mat:GetTranslation()
 	end
 
 	function SWEP:UpdateShowLerp()
@@ -217,47 +230,70 @@ if CLIENT then
 		return holdPos + self.ShowPos * math.ease.InOutSine(self:UpdateShowLerp())
 	end
 
-	local function gripPos(wm, finger, hand)
-		local bone = wm:LookupBone(finger) or wm:LookupBone(hand)
-		local mat = bone and wm:GetBoneMatrix(bone)
+	function SWEP:BoardFrame()
+		local owner = self:GetOwner()
+		local wm = self.worldModel
+		if not IsValid(owner) or not IsValid(wm) or wm:GetModel() ~= self.WorldModelReal then return end
 
-		return mat and mat:GetTranslation()
+		local lp = bonePos(wm, "ValveBiped.Bip01_L_Finger2") or bonePos(wm, "ValveBiped.Bip01_L_Hand")
+		local rp = bonePos(wm, "ValveBiped.Bip01_R_Finger2") or bonePos(wm, "ValveBiped.Bip01_R_Hand")
+		if not lp or not rp then return end
+
+		local across = rp - lp
+		across:Normalize()
+
+		local fwd = owner:EyeAngles():Forward()
+		local n0 = across * fwd:Dot(across) - fwd
+		n0:Normalize()
+		local up = n0:Cross(across)
+
+		local theta = math.pi * math.ease.InOutSine(self:UpdateShowLerp())
+		local c, s = math.cos(theta), math.sin(theta)
+
+		return (lp + rp) * 0.5 - n0 * 0.5, across * c - n0 * s, up, n0 * c + across * s, c
+	end
+
+	local function gripHand(ent, hand, finger, target, weight)
+		local bone = ent:LookupBone(hand)
+		local mat = bone and ent:GetBoneMatrix(bone)
+		local grip = bonePos(ent, finger)
+		if not mat or not grip then return end
+
+		mat:SetTranslation(mat:GetTranslation() + (target - grip) * weight)
+		hg.bone_apply_matrix(ent, bone, mat)
+	end
+
+	function SWEP:PostSetHandPos()
+		local ply = self:GetOwner()
+		if not IsValid(ply) then return end
+
+		local ent = hg.GetTPIKCharacter(ply)
+		if not IsValid(ent) then return end
+		if not (ent == ply or hg.KeyDown(ply, IN_USE) or ply:GetNetVar("lastFake", 0) > CurTime()) then return end
+
+		local center, right, _, _, c = self:BoardFrame()
+		if not center then return end
+
+		local edge = right * ((BOARD * 0.5 - INSET) * (c >= 0 and 1 or -1))
+		local weight = math.abs(c)
+
+		if self.lhandik and hg.CanUseLeftHand(ply) then
+			gripHand(ent, "ValveBiped.Bip01_L_Hand", "ValveBiped.Bip01_L_Finger2", center - edge, weight)
+		end
+		if self.rhandik and hg.CanUseRightHand(ply) then
+			gripHand(ent, "ValveBiped.Bip01_R_Hand", "ValveBiped.Bip01_R_Finger2", center + edge, weight)
+		end
 	end
 
 	function SWEP:DrawPostWorldModel()
-		local owner = self:GetOwner()
-
-		if not IsValid(owner) then
-			local center, normal, right, up, sw, sh = flatFrame(self)
-			local w = math.min(sw, sh / IMG_ASPECT)
-			drawSheet(center, right, up, normal, w, w * IMG_ASPECT)
+		if not IsValid(self:GetOwner()) then
+			local center, normal, right, up = flatFrame(self)
+			drawBoard(center + normal * (THICK * 0.5), right, up, normal)
 
 			return
 		end
 
-		local wm = self.worldModel
-		if not IsValid(wm) or wm:GetModel() ~= self.WorldModelReal then return end
-
-		local lp = gripPos(wm, "ValveBiped.Bip01_L_Finger2", "ValveBiped.Bip01_L_Hand")
-		local rp = gripPos(wm, "ValveBiped.Bip01_R_Finger2", "ValveBiped.Bip01_R_Hand")
-		if not lp or not rp then return end
-
-		local across = rp - lp
-		local w = math.Clamp(across:Length() + 3, 6, 14)
-		local h = w * IMG_ASPECT
-		across:Normalize()
-
-		local fwd = owner:EyeAngles():Forward()
-		local n0 = -(fwd - across * fwd:Dot(across))
-		n0:Normalize()
-		local u = n0:Cross(across)
-
-		local theta = math.pi * math.ease.InOutSine(self:UpdateShowLerp())
-		local c, s = math.cos(theta), math.sin(theta)
-		local normal = n0 * c + across * s
-		local right = across * c - n0 * s
-
-		local center = (lp + rp) * 0.5 + u * (h * 0.5 - 1.5) - n0 * 0.3
-		drawSheet(center, right, u, normal, w, h, true)
+		local center, right, up, normal = self:BoardFrame()
+		if center then drawBoard(center, right, up, normal) end
 	end
 end

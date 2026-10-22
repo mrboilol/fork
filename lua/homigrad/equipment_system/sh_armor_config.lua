@@ -37,9 +37,19 @@ local MATERIAL_PROFILES = {
 	[0.75] = {mass = 2, health = 85, stopped = 0.5, penetrated = 0.8, blunt = 0.75, slash = 0},
 	[0.6] = {mass = 2.6, health = 115, stopped = 0.5, penetrated = 0.85, blunt = 0.75, slash = 0},
 	[0.45] = {mass = 2.4, health = 105, stopped = 0.5, penetrated = 0.85, blunt = 0.75, slash = 0},
-	[5] = {mass = 1.2, health = 25, stopped = 0.6, penetrated = 1, blunt = 0.06, slash = 0.65},
-	[4.5] = {mass = 0.4, health = 15, stopped = 0.6, penetrated = 1, blunt = 0.65, slash = 0.7},
+	[5] = {mass = 1.2, health = 25, stopped = 0.6, penetrated = 1, blunt = 0.06, slash = 0.08, wear = 1.2},
+	[4.5] = {mass = 0.4, health = 15, stopped = 0.6, penetrated = 1, blunt = 0.25, slash = 0.1, wear = 1.2},
 }
+
+local function getBluntWear(material)
+	local profile = MATERIAL_PROFILES[material]
+	return profile and profile.wear or material == 1 and 0.35 or material * 0.2
+end
+
+local function getSlashWear(material)
+	local profile = MATERIAL_PROFILES[material]
+	return profile and profile.wear or 0.25
+end
 
 local MATERIAL_MAX_CLASS = {
 	[1] = 11.5, [3] = 28.5, [1.8] = 28.5, [1.4] = 28.5, [1.2] = 20.5, [0.85] = 28.5, [0.7] = 28.5, [0.55] = 28.5,
@@ -59,9 +69,9 @@ local function fillImpactDefaults(part)
 	local profile = part and MATERIAL_PROFILES[part.BalisticMaterial]
 	if not profile then return end
 	part.BluntDamageMul = part.BluntDamageMul or profile.blunt
-	part.BluntWearMul = part.BluntWearMul or (part.BalisticMaterial == 1 and 0.35 or part.BalisticMaterial * 0.2)
+	part.BluntWearMul = part.BluntWearMul or getBluntWear(part.BalisticMaterial)
 	part.SlashDamageMul = part.SlashDamageMul or hg.GetZCityArmorSlashMul(part.Protection, part.BalisticMaterial)
-	part.SlashWearMul = part.SlashWearMul or 0.25
+	part.SlashWearMul = part.SlashWearMul or getSlashWear(part.BalisticMaterial)
 end
 
 hook.Add("hg/armor/registered", "ZCityArmorImpactDefaults", function()
@@ -76,7 +86,7 @@ function hg.BuildZCityArmorSection(material, class, needPunch)
 	local max = profile.health * (0.5 + 0.5 * class / MAX_CLASS)
 	return {Protection = class, BalisticMaterial = material, Durability = max, DurabilityMax = max, DurabilityWarranty = max * 0.25,
 		ProtectionDamageMul = profile.stopped, PenetratedDamageMul = profile.penetrated, BluntDamageMul = profile.blunt,
-		BluntWearMul = material == 1 and 0.35 or material * 0.2, SlashDamageMul = hg.GetZCityArmorSlashMul(class, material), SlashWearMul = 0.25, NeedPunch = needPunch == true}
+		BluntWearMul = getBluntWear(material), SlashDamageMul = hg.GetZCityArmorSlashMul(class, material), SlashWearMul = getSlashWear(material), NeedPunch = needPunch == true}
 end
 
 local function getDefinition(ent)
@@ -95,6 +105,7 @@ local function getFabric(ent, name)
 		fabric.SlashWearMul = fabric.SlashWearMul or 0.25
 		return fabric
 	end
+	if definition.StabFabric then return hg.BuildZCityArmorSection(0.9, 0.5) end
 	return {Protection = 1.5, BalisticMaterial = 0.9, Durability = 30, DurabilityMax = 30,
 		DurabilityWarranty = 5, ProtectionDamageMul = 0.85, PenetratedDamageMul = 0.98,
 		BluntDamageMul = 0.85, BluntWearMul = 0.18, SlashDamageMul = 0.4, SlashWearMul = 0.25, NeedPunch = false}
@@ -140,9 +151,9 @@ function hg.DeriveZCityArmorSection(ent, name, selected)
 		part.ProtectionDamageMul = profile.stopped
 		part.PenetratedDamageMul = profile.penetrated
 		part.BluntDamageMul = profile.blunt
-		part.BluntWearMul = part.BalisticMaterial == 1 and 0.35 or part.BalisticMaterial * 0.2
+		part.BluntWearMul = getBluntWear(part.BalisticMaterial)
 		part.SlashDamageMul = hg.GetZCityArmorSlashMul(part.Protection, part.BalisticMaterial)
-		part.SlashWearMul = 0.25
+		part.SlashWearMul = getSlashWear(part.BalisticMaterial)
 		part.NeedPunch = base.NeedPunch == true
 	end
 	part.BluntDamageMul = part.BluntDamageMul or part.ProtectionDamageMul
@@ -436,8 +447,8 @@ else
 		[0.75] = "Kevlar with a ceramic face. Light and strong.",
 		[0.6] = "Kevlar with a steel face. Strong, a bit heavier.",
 		[0.45] = "Kevlar with a titanium face. Strong, balanced weight.",
-		[5] = "Fiberglass. Very light, only stops weak stuff.",
-		[4.5] = "Polycarbonate. Barely weighs anything, only stops weak stuff.",
+		[5] = "Fiberglass. Very light, soaks up hits and cuts really well, but cracks after a hit or two. Only stops weak bullets.",
+		[4.5] = "Polycarbonate. Barely weighs anything, good vs cuts and decent vs hits, but shatters fast. Only stops weak bullets.",
 	}
 	local CLASS_INFO = {
 		[0.5] = "Stops knives, not bullets.",

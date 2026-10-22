@@ -74,21 +74,41 @@ local function register(key, data, templateName, class, plateMat)
 	scripted_ents.Register(ENT, "ent_new_armor_legacy_" .. key)
 end
 
+local FIBERGLASS = ZC_ARMOR_MATERIAL_FIBERGLASS
+local TITAN = ZC_ARMOR_MATERIAL_TITAN
+local CERAMIC = ZC_ARMOR_MATERIAL_CERAMIC
+local RIOT = {1, ZC_ARMOR_PROTCLASS_II}
+local TORSO_SPEC = {
+	vest_riot = {class = ZC_ARMOR_PROTCLASS_II, plate = RIOT, soft = {SOFT, 0.5}},
+	cmb_armor = {class = ZC_ARMOR_PROTCLASS_III, plate = {TITAN}, soft = {TITAN}},
+	gordon_armor = {class = ZC_ARMOR_PROTCLASS_IV, plate = {CERAMIC}, soft = {CERAMIC}},
+}
+
+local function registerTorsoSpec(key, data, spec)
+	register(key, data, "ent_new_armor_vest4", spec.class, spec.plate[1])
+	local stored = scripted_ents.GetStored("ent_new_armor_legacy_" .. key)
+	if not stored then return end
+	local ent = stored.t
+	for _, name in pairs(ent.PlatesLinks) do
+		local section = string.find(name, "Plate", 1, true) and spec.plate or spec.soft
+		ent[name] = hg.BuildZCityArmorSection(section[1], math.min(spec.class, section[2] or spec.class), ent[name].NeedPunch)
+	end
+end
+
 for key, data in pairs(hg.armor.torso or {}) do
 	local class = nearestClass(data.protection or 0)
-	if class >= ZC_ARMOR_PROTCLASS_III then
+	if TORSO_SPEC[key] then
+		registerTorsoSpec(key, data, TORSO_SPEC[key])
+	elseif class >= ZC_ARMOR_PROTCLASS_III then
 		register(key, data, "ent_new_armor_vest4", class, plateMaterial(class, key))
 	else
 		register(key, data, "ent_new_armor_vest3", class, SOFT)
 	end
 end
 
-local FIBERGLASS = ZC_ARMOR_MATERIAL_FIBERGLASS
-local TITAN = ZC_ARMOR_MATERIAL_TITAN
-local RIOT = {1, ZC_ARMOR_PROTCLASS_II}
 local FULL_COVER = {
-	helmet_riot = {front = RIOT, back = RIOT, glass = RIOT},
-	gordon_helmet = {front = {TITAN}, back = {TITAN}, glass = {TITAN}},
+	helmet_riot = {front = RIOT, back = RIOT, glass = RIOT, stab = true},
+	gordon_helmet = {front = {CERAMIC}, back = {CERAMIC}, glass = {CERAMIC}},
 	cmb_helmet = {front = {TITAN}, back = {TITAN}, glass = {TITAN}},
 	protovisor = {front = {TITAN}, back = {TITAN}, glass = {FIBERGLASS, ZC_ARMOR_PROTCLASS_I}},
 	metrocop_helmet = {front = {FIBERGLASS}, back = {SOFT, ZC_ARMOR_PROTCLASS_II}, glass = {FIBERGLASS}},
@@ -101,9 +121,16 @@ end
 local function registerFullCover(key, data, class)
 	local spec = FULL_COVER[key]
 	register(key, data, "ent_new_armor_helmet2", class, spec.front[1])
-	local ent = scripted_ents.GetStored("ent_new_armor_legacy_" .. key).t
+	local stored = scripted_ents.GetStored("ent_new_armor_legacy_" .. key)
+	if not stored then return end
+	local ent = stored.t
 	ent.Initialize = nil
+	ent.StabFabric = spec.stab
 	ent.Overlay.Model = data[2]
+	if data[2] == "" then
+		ent.RenderOnBody = function() end
+		ent.DrawOverlay = function() end
+	end
 	ent.FrontPlate = fullCoverSection(spec.front, class)
 	ent.Glass = fullCoverSection(spec.glass, class)
 	ent.BackPlate = fullCoverSection(spec.back, class)
