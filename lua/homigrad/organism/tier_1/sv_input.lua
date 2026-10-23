@@ -1208,6 +1208,19 @@ util.AddNetworkString("hg_bloodimpact")
 util.AddNetworkString("hg_gore_spray")
 util.AddNetworkString("hg_damage_flash")
 
+function hg.SendDamageFlash(ply, strength, dmgInfo)
+	if not IsValid(ply) or not ply:IsPlayer() then return end
+	local hitPos = dmgInfo and dmgInfo:GetDamagePosition() or vector_origin
+	if hitPos:IsZero() and dmgInfo then
+		local source = IsValid(dmgInfo:GetInflictor()) and dmgInfo:GetInflictor() or dmgInfo:GetAttacker()
+		if IsValid(source) and source ~= ply then hitPos = source:WorldSpaceCenter() end
+	end
+	net.Start("hg_damage_flash")
+	net.WriteFloat(strength)
+	net.WriteVector(hitPos)
+	net.Send(ply)
+end
+
 function hg.GoreSpray(pos, dir, intensity, radial, exitPos)
 	if not isvector(pos) or not intensity or intensity < 0.75 then return end
 	dir = isvector(dir) and dir:LengthSqr() > 0.0001 and dir:GetNormalized() or vector_up
@@ -2049,11 +2062,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		org.shock = math.min(org.shock + instaPain * shockMul * 4.5 * K.instant_pain_shock_scale * math.Clamp(pen / 5,1,2) * hypoxiaShockMultiplier(org) / (1 + math.max(org.adrenaline or 0, 0) * 0.45), 70)
 		org.immobilization = math.min(org.immobilization + immobilization * immobilizationMul, 30)
 		org.lasthit = CurTime()
-		if IsValid(org.owner) and org.owner:IsPlayer() then
-			net.Start("hg_damage_flash")
-			net.WriteFloat(math.Clamp(dmg_before / 45, 0.12, 0.7))
-			net.Send(org.owner)
-		end
+		hg.SendDamageFlash(org.owner, math.Clamp(dmg_before / 45, 0.12, 0.7), dmgInfo)
 		
 		local adrenalineMul = math.min(math.max(1 + org.adrenaline, 1), 1.2)
 		local adrenaline = org.adrenaline

@@ -70,10 +70,8 @@ local function applyOrganTrauma(org, dmgInfo, force, delta, previousDamage, orga
 	local repeatThreshold = 0.9 + priorDamage * 1.35
 	local repeatHit = freshDamage <= 0.001 and rawForce >= repeatThreshold
 	if freshDamage <= 0.001 and not repeatHit then return end
-	if IsValid(org.owner) and org.owner:IsPlayer() then
-		net.Start("hg_damage_flash")
-		net.WriteFloat(math.Clamp(freshDamage * 2 + (repeatHit and 0.2 or 0), 0.35, 1))
-		net.Send(org.owner)
+	if hg.SendDamageFlash then
+		hg.SendDamageFlash(org.owner, math.Clamp(freshDamage * 2 + (repeatHit and 0.2 or 0), 0.35, 1), dmgInfo)
 	end
 
 	local staminaMax = math.max(org.stamina.max or 180, 1)

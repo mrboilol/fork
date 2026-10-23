@@ -77,14 +77,14 @@ net.Receive("ZCity_Wind_SuppressionForce", function()
         PlaySuppressionCrack(pos, subsonic, soundOnly)
     end
 
-	if not soundOnly and (not hg_suppression_viewpunch or hg_suppression_viewpunch:GetBool()) then
+	if not soundOnly and not (wasHit and hg and hg.GetPunchAwayAngle) and (not hg_suppression_viewpunch or hg_suppression_viewpunch:GetBool()) then
 		-- Force is calculated from the bullet's closest approach on the server.
 		-- Keep grazing shots noticeable, but make a round passing right by the
 		-- player's head violently kick the view.
 		local proximity = math.Clamp((force - 0.8) / 13.2, 0, 1)
 		local punchScale = Lerp(proximity * proximity, 1, 10)
 		local hitScale = wasHit and 1.75 or 1
-		local punch = Angle(math.Rand(-5.5, 3.5), math.Rand(-4.5, 4.5), math.Rand(-1.5, 1.5)) * punchScale * hitScale
+		local punch = hg and hg.GetPunchAwayAngle and hg.GetPunchAwayAngle(pos) * 4.5 * punchScale or Angle(math.Rand(-5.5, 3.5), math.Rand(-4.5, 4.5), math.Rand(-1.5, 1.5)) * punchScale * hitScale
 
 		if type(QuickViewPunch) == "function" then
 			QuickViewPunch(punch)

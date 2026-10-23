@@ -100,6 +100,10 @@ SWEP.HeadbuttConcussionTarget = 1.85
 SWEP.HeadbuttConcussionSelf = 1
 SWEP.HeadbuttDisorientationTarget = 1.15
 SWEP.HeadbuttDisorientationSelf = 0.55
+SWEP.HeadbuttConcussionWall = 0.6
+SWEP.HeadbuttDisorientationWall = 0.35
+SWEP.HeadbuttMissCooldown = 0.6
+SWEP.HeadbuttClickSwingSpeed = 90
 
 SWEP.BlockTier = 1
 SWEP.MeleeMaterial = "none"
@@ -194,9 +198,15 @@ function SWEP:TryDownwardHeadbutt()
 	local swingSpeed = delta / math.max(elapsed, 0.01)
 	self.HeadbuttState = "idle"
 	if swingSpeed < self.HeadbuttMinSwingSpeed then return end
-	local velocity = owner:GetVelocity()
-	local speed = velocity:Length()
+	local speed = owner:GetVelocity():Length()
 	if speed < self.HeadbuttMinBodySpeed then return end
+	self:DoHeadbutt(swingSpeed)
+end
+
+function SWEP:DoHeadbutt(swingSpeed)
+	local owner = self:GetOwner()
+	local now = CurTime()
+	local speed = owner:GetVelocity():Length()
 	local startPos = owner:EyePos()
 	local tr = util.TraceHull({
 		start = startPos,
@@ -220,8 +230,19 @@ function SWEP:TryDownwardHeadbutt()
 			hitPos = trLine.HitPos
 		end
 	end
-	if not IsValid(target) or not target:IsPlayer() or target == owner then return end
-	if not self:IsValidStandingHeadbutter(target) then return end
+	if not IsValid(target) or not target:IsPlayer() or target == owner or not self:IsValidStandingHeadbutter(target) then
+		self.HeadbuttNextHit = now + self.HeadbuttMissCooldown
+		if tr.Hit and not (IsValid(target) and target:IsPlayer()) then
+			sound.Play("Flesh.ImpactHard", tr.HitPos, 70, math.random(90, 100), 1)
+			owner:ViewPunch(Angle(12, math.Rand(-3, 3), 0))
+			owner:SetVelocity(-owner:GetAimVector() * self.HeadbuttSelfVelocityMul)
+			self:ApplyHeadbuttNeuro(owner, self.HeadbuttConcussionWall, self.HeadbuttDisorientationWall)
+			self.HeadbuttNextHit = now + self.HeadbuttCooldown
+		else
+			owner:ViewPunch(Angle(6, 0, 0))
+		end
+		return false
+	end
 	local forward = owner:EyeAngles():Forward()
 	local forceDir = (forward - Vector(0, 0, 0.85)):GetNormalized()
 	local totalForce = self.HeadbuttBaseForce + swingSpeed * self.HeadbuttSpeedForceMul + speed * self.HeadbuttVelocityForceMul
@@ -243,6 +264,7 @@ function SWEP:TryDownwardHeadbutt()
 	self.HeadbuttNextHit = now + self.HeadbuttCooldown
 	self:SetNextPrimaryFire(math.max(self:GetNextPrimaryFire(), self.HeadbuttNextHit))
 	self:SetNextSecondaryFire(math.max(self:GetNextSecondaryFire(), self.HeadbuttNextHit))
+	return true
 end
 
 function SWEP:Initialize()
@@ -2393,6 +2415,16 @@ function SWEP:PrimaryAttack(forcespecial)
 	if self:GetBlocking() then return end
 	--if owner:KeyDown(IN_SPEED) then return end
 
+	if owner:KeyDown(IN_USE) and not IsValid(self.CarryEnt) and self:IsValidStandingHeadbutter(owner) then
+		self:SetNextPrimaryFire(CurTime() + self.HeadbuttMissCooldown)
+		if SERVER and CurTime() >= (self.HeadbuttNextHit or 0) then
+			self.HeadbuttState = "idle"
+			self:DoHeadbutt(self.HeadbuttClickSwingSpeed)
+			self:SetNextPrimaryFire(math.max(self:GetNextPrimaryFire(), self.HeadbuttNextHit or 0))
+		end
+		return
+	end
+
 	if not IsFirstTimePredicted() then
 		self:DoBFSAnimation(side, clawClasses[owner.PlayerClassName] and 1 or self.JabAnimTime)
 		return
@@ -2435,7 +2467,7 @@ function SWEP:PrimaryAttack(forcespecial)
 	self:SetNextPrimaryFire(CurTime() + self.SwingCooldown / math.max(armSpeedMul, 0.1) * math.Clamp((180 - owner.organism.stamina[1]) / 90,1,2) + (math.max(special_attack and 0.5 or 0, clawClasses[owner.PlayerClassName] or 0)))
 	self:SetNextSecondaryFire(CurTime() + self.SwingCooldown / math.max(armSpeedMul, 0.1) + (math.max(special_attack and 0.5 or 0, clawClasses[owner.PlayerClassName] or 0)))
 	self:SetLastShootTime(CurTime())
-	if SERVER and owner.organism and owner.organism.stamina then owner.organism.stamina.subadd = owner.organism.stamina.subadd + (special_attack and HEAVY_PUNCH_STAMINA_COST or LIGHT_PUNCH_STAMINA_COST) end
+	if SERVER and owner.organism and owner.organism.stamina then owner.organism.stamina.subadd = owner.organism.stamina.subadd + (special_attack and HEAVY_PUNCH_STAMINA_COST or LIGHT_PUNCH_STAMINA_COST) * (combat and combat.exertion or 1) end
 	if rand then
 		self.swingBackRightEnd = CurTime() + self.SwingBackDuration
 		self.swingBackLeftEnd = CurTime()

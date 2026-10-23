@@ -2061,7 +2061,8 @@ function SWEP:ConsumeMeleeStamina(owner, amount)
 	if not SERVER or not IsValid(owner) or not owner.organism then return end
 	local org = owner.organism
 	local stamina = org.stamina
-	if stamina then stamina.subadd = (stamina.subadd or 0) + math.max(tonumber(amount) or 0, 0) * (self.MeleeStaminaMul or 0.4) end
+	local combat = hg.GetCombatCondition and hg.GetCombatCondition(owner) or nil
+	if stamina then stamina.subadd = (stamina.subadd or 0) + math.max(tonumber(amount) or 0, 0) * (self.MeleeStaminaMul or 0.4) * (combat and combat.exertion or 1) end
 
 	local arms = self.TwoHanded and {"rarm", "larm"} or {"rarm"}
 	local pain = 0

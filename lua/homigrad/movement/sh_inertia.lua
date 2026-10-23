@@ -809,6 +809,8 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 		local lowOxygen = math.Clamp((16 - (org.o2 and org.o2[1] or 30)) / 16, 0, 1)
 		k = k * softenDebuff(math.min(1 - lowOxygen * 0.25, math.Clamp(org.perfusionMoveMul or 1, 0.65, 1)))
 		k = k * (math.min(math.Round((org.adrenaline or 0), 1) / 24, 0.3) + 1)
+		local combat = hg.GetCombatCondition and hg.GetCombatCondition(ply) or nil
+		k = k * (combat and combat.move or 1)
 		local limbDebuff = hg.GetLimbDebuffMultiplier and hg.GetLimbDebuffMultiplier(org) or 1
 		local function legMoveMultiplier(limb)
 			local damage = tonumber(org[limb]) or 0

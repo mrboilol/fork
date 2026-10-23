@@ -378,6 +378,12 @@ function SWEP:PosAngChanges(ply, desiredPos, desiredAng, bNoAdditional, closeani
 
 	if CLIENT and self:IsLocal() then
 		ang[3] = ang[3] + position_difference3[2] * -4 - GetViewPunchAngles2()[2] * 0.25
+		if hg.GetWeaponHitKick then
+			local hitKick = hg.GetWeaponHitKick()
+			ang[1] = math.Clamp(ang[1] + hitKick[1], -90, 90)
+			ang[2] = ang[2] + hitKick[2]
+			ang[3] = ang[3] + hitKick[3]
+		end
 
 		local leancam = ConVarExists("hg_leancam_mul") and GetConVar("hg_leancam_mul") or nil
 		if leancam then ang[3] = ang[3] + (lean_lerp or 0) * leancam:GetInt() end

@@ -173,8 +173,7 @@ function SWEP:PrimarySpread()
 		local longGun = not self:IsPistolHoldType() and not self.PistolKinda
 		local force = math.Clamp(caliberMul * weightMul * supportMul * handlingMul * experienceMul * stanceMul * (0.75 + math.min(sprayI / 10, 0.75)) * 1.18, 0.18, 5.5)
 		if longGun and not cantedHold then force = force * 1.4 end
-		local panic = organism.panicattackActive and math.Clamp(organism.panicattack or 0, 0.35, 1) or 0
-		local panicRecoilMul = panic > 0 and math.Remap(panic, 0.35, 1, 1.1, 1.4) or 1
+		local panicRecoilMul = combat and combat.recoil or 1
 		force = force * panicRecoilMul * combatAimMul
 		mul = mul * math.Clamp(supportMul * handlingMul, 0.65, 3.75)
 		mul = mul * self.RecoilMul

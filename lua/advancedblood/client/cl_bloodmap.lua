@@ -40,7 +40,24 @@ function B.Add(x, y, z, nx, ny, nz, r, m, wetT)
 	if not list then list = {} grid[key] = list end
 	list[#list + 1] = rec
 	B.ver = B.ver + 1
+	rec.ver = B.ver
 	return rec
+end
+
+function B.Since(ver, x, y, z, R)
+	local n = B.ver - (ver or 0)
+	if n <= 0 then return false end
+	if n >= K.cap then return true end
+	local i = head
+	for _ = 1, n do
+		local r = recs[i]
+		if not r or r.ver <= ver then break end
+		local lim = R + r.r
+		local dx, dy, dz = r.x - x, r.y - y, r.z - z
+		if dx * dx + dy * dy + dz * dz < lim * lim then return true end
+		i = i > 1 and i - 1 or K.cap
+	end
+	return false
 end
 
 function B.Wet(rec, now)

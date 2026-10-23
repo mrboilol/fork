@@ -477,17 +477,30 @@ local damageFlashColor = {
 	["$pp_colour_colour"] = 1, ["$pp_colour_mulr"] = 0,
 	["$pp_colour_mulg"] = 0, ["$pp_colour_mulb"] = 0
 }
+local damageFlashDuration = 0.5
+local nextDamagePunch = 0
 net.Receive("hg_damage_flash", function()
-	damageFlashStrength = math.max(damageFlashStrength, net.ReadFloat())
-	damageFlashEnd = CurTime() + 0.09
+	local strength = net.ReadFloat()
+	local hitPos = net.ReadVector()
+	local remaining = math.Clamp((damageFlashEnd - CurTime()) / damageFlashDuration, 0, 1)
+	damageFlashStrength = math.max(damageFlashStrength * remaining, strength)
+	damageFlashDuration = 0.35 + damageFlashStrength * 0.65
+	damageFlashEnd = CurTime() + damageFlashDuration
+
+	local lply = LocalPlayer()
+	if CurTime() < nextDamagePunch or not IsValid(lply) or not lply:Alive() or not hg.GetPunchAwayAngle then return end
+	nextDamagePunch = CurTime() + 0.05
+	local punch = hg.GetPunchAwayAngle(hitPos) * (2.5 + strength * 7)
+	QuickViewPunch(punch)
+	hg.AddWeaponHitKick(punch * 0.45)
 end)
 hook.Add("Post Post Pre Post Processing", "HG_DamageFlash", function()
-	local remaining = math.Clamp((damageFlashEnd - CurTime()) / 0.09, 0, 1)
+	local remaining = math.Clamp((damageFlashEnd - CurTime()) / damageFlashDuration, 0, 1)
 	if remaining <= 0 then damageFlashStrength = 0 return end
-	local flash = remaining * damageFlashStrength
-	damageFlashColor["$pp_colour_addr"] = flash * 0.16
-	damageFlashColor["$pp_colour_colour"] = 1 - flash * 0.25
-	damageFlashColor["$pp_colour_mulr"] = flash * 0.2
+	local flash = remaining * remaining * damageFlashStrength
+	damageFlashColor["$pp_colour_addr"] = flash * 0.2
+	damageFlashColor["$pp_colour_colour"] = 1 - flash * 0.35
+	damageFlashColor["$pp_colour_mulr"] = flash * 0.35
 	DrawColorModify(damageFlashColor)
 end)
 local dyingAudioFade = 0
@@ -1894,16 +1907,26 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	local panicBaseTarget = getPanicAttackFx(org)
 	PanicAttackLerp = LerpFT(0.12, PanicAttackLerp, panicBaseTarget ^ hg.screeneffects_config.panicattackVisualExponent)
 	if PanicAttackLerp > 0.001 and not (org.otrub or org.incapacitated) then
-		local panicBase = PanicAttackLerp
+		local modeMul = org.panicattackActive and (org.panicMode == "fight" and 1.4 or org.panicMode == "flight" and 0.6) or 1
+		local panicBase = math.min(PanicAttackLerp * modeMul, 1.4)
+		local panicPulse = panicBase * (0.78 + math.ease.InOutSine(math.abs(math.cos(CurTime() * 2))) * 0.2)
 		local sw, sh = ScrW(), ScrH()
 		local steps = 4
-		local innerScale = Lerp(math.min(panicBase * 1.5, 1), 1.3, 0.55)
+		local innerScale = Lerp(math.min(panicBase * 1.5, 1), 1.3, 0.55) - math.sin(CurTime() * 0.7) * 0.04 * panicBase
 
 		render.UpdateScreenEffectTexture()
-		vignetteMat:SetFloat("$c2_x", CurTime() + 9500)
-		vignetteMat:SetFloat("$c0_z", scaleVignette(panicBase * 0.7))
-		vignetteMat:SetFloat("$c1_y", scaleVignette(panicBase * 2.6))
-		render.SetMaterial(vignetteMat)
+		render.UpdateFullScreenDepthTexture()
+		grainMat:SetFloat("$c0_x", CurTime())
+		grainMat:SetFloat("$c0_y", -1)
+		grainMat:SetFloat("$c0_z", 1 + panicBase * 1.4)
+		grainMat:SetFloat("$c1_x", panicBase * 3.2 + panicPulse * 5.8)
+		grainMat:SetFloat("$c1_y", panicBase * 0.08 + panicPulse * 0.22)
+		grainMat:SetFloat("$c1_z", panicBase * 0.08 + panicPulse * 0.24)
+		grainMat:SetFloat("$c2_x", panicBase * 0.04 + panicPulse * 0.12)
+		grainMat:SetFloat("$c2_y", 0.075 * panicBase)
+		grainMat:SetFloat("$c2_z", 0)
+		grainMat:SetFloat("$c3_x", 0)
+		render.SetMaterial(grainMat)
 		render.DrawScreenQuad()
 
 		render.ClearStencil()

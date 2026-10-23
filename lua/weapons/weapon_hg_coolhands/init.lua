@@ -1279,7 +1279,8 @@ function SWEP:AttackFront(special_attack, rand)
         end
 
         if SERVER then
-				owner.organism.stamina.subadd = owner.organism.stamina.subadd + (special_attack and owner:KeyDown(IN_SPEED) and 13 or 4)
+				local combat = hg.GetCombatCondition and hg.GetCombatCondition(owner) or nil
+				owner.organism.stamina.subadd = owner.organism.stamina.subadd + (special_attack and owner:KeyDown(IN_SPEED) and 13 or 4) * (combat and combat.exertion or 1)
         end
 
         owner:LagCompensation(false)

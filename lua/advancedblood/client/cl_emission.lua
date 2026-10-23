@@ -895,12 +895,13 @@ function E.OnHit(ev)
 			end
 		else
 			-- back spatter: fine, few, against the bullet
-			local back = (1.5 + 3.5 * cav + rng:Next() * 2.5) * (pellet and 0.5 or 1)
-			if rec.range == WD.RANGE_CONTACT then back = back * 2.2 elseif rec.range == WD.RANGE_NEAR then back = back * 1.3 end
+			local contact = rec.range == WD.RANGE_CONTACT
+			local back = (1.5 + 3.5 * cav + rng:Next() * 2.5) * (pellet and 0.5 or 1) * C.Wound.backSpray
+			if contact then back = back * 2.2 elseif rec.range == WD.RANGE_NEAR then back = back * 1.3 end
 			if skull then back = back * 1.5 end
 			local nBack = math.floor(back)
 			for _ = 1, nBack do
-				local vol, s = Spatter(rng, 0.0015, 0.012)
+				local vol, s = Spatter(rng, 0.0015, contact and 0.02 or 0.012)
 				local cx, cy, cz = Cone(rng, -dx, -dy, -dz, 0.75 * (1.25 - 0.5 * s))
 				local sp = rng:Range(45, 150) * eK * (1.1 - 0.25 * s)
 				Drops.Spawn(ex0 - dx, ey0 - dy, ez0 - dz, bv.x + cx * sp, bv.y + cy * sp, bv.z + cz * sp, vol, src, 1, 2)
@@ -912,9 +913,24 @@ function E.OnHit(ev)
 
 			-- forward spatter: out of the exit, with the projectile. More, larger and faster than
 			-- back spatter, in a narrower cone; bone on the way adds to it
-			local out = exitMark and exitMark.hitPos or ((rec.pen == WD.PEN_THROUGH and not src.mesh) and exitPos) or nil
+			local out = exitMark and exitMark.hitPos or (rec.pen == WD.PEN_THROUGH and exitPos) or nil
+			local gush = (C.Wound.gushDrops + 10 * cav) * (skull and 1.5 or 1) * (contact and 1.5 or 1) * (pellet and 0.4 or 1)
+			for _ = 1, math.floor(gush * (out and 0.35 or 0.6)) do
+				local vol = Spatter(rng, 0.01, 0.06)
+				local cx, cy, cz = Cone(rng, -dx, -dy, -dz, 0.55)
+				local sp = rng:Range(25, 90) * eK
+				Drops.Spawn(ex0 - dx, ey0 - dy, ez0 - dz, bv.x + cx * sp, bv.y + cy * sp, bv.z + cz * sp, vol, src, 1, 0)
+				released = released + vol
+			end
 			if out then
-				local fwd = (3 + 11 * cav + rng:Next() * 6) * (pellet and 0.5 or 1) * (rec.boneHit and 1.3 or 1) * (skull and 1.3 or 1)
+				for _ = 1, math.floor(gush) do
+					local vol = Spatter(rng, 0.02, skull and 0.15 or 0.1)
+					local cx, cy, cz = Cone(rng, dx, dy, dz, 0.3)
+					local sp = rng:Range(35, 140) * eK
+					Drops.Spawn(out.x + dx, out.y + dy, out.z + dz, bv.x + cx * sp, bv.y + cy * sp, bv.z + cz * sp, vol, src, 1, 0)
+					released = released + vol
+				end
+				local fwd = (3 + 11 * cav + rng:Next() * 6) * (pellet and 0.5 or 1) * (rec.boneHit and 1.3 or 1) * (skull and 1.3 or 1) * C.Wound.fwdSpray * (contact and 1.4 or 1)
 				local nFwd = math.floor(fwd)
 				for _ = 1, nFwd do
 					local vol, s = Spatter(rng, 0.004, skull and 0.06 or 0.05)

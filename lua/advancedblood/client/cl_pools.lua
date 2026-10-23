@@ -473,13 +473,15 @@ end
 -- Pinning, tilt, relief, walls and edges under the lattice: again whenever one of them or the
 -- lattice itself has changed.
 local stainList = {}
-local function StainPin(p)
+local function StainPin(p, onlyNew)
 	local g = p.sim
 	local BK = C.BloodMap
+	local since = p.bmVer
 	p.bmVer = ABL.BloodMap.ver
 	local R = g.n * g.a * 0.71
 	local cu, cv = (g.i0 + g.n * 0.5) * g.a, (g.j0 + g.n * 0.5) * g.a
 	local cx, cy, cz = ToWorld(p, cu, cv)
+	if onlyNew and not ABL.BloodMap.Since(since, cx, cy, cz, R) then return end
 	local n = ABL.BloodMap.Query(cx, cy, cz, p.nx, p.ny, p.nz, R, stainList)
 	if n == 0 then return end
 	local now = CurTime()
@@ -1924,7 +1926,7 @@ function P.Think()
 					if p.wet > 0.3 then Necks(p) end
 					Clots(p, now)
 					if p.wet > 0.2 and p.rad then EatStains(p) end
-					if p.sim and p.wet > 0 and p.bmVer ~= ABL.BloodMap.ver then StainPin(p) end
+					if p.sim and p.wet > 0 and p.bmVer ~= ABL.BloodMap.ver then StainPin(p, true) end
 					-- (the lattice holds what the pool's volume says: rounding is taken out here)
 					if p.sim then
 						local v = PS.Volume(p.sim) * ML

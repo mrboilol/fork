@@ -259,7 +259,7 @@ local function Crowded(x, y, z, wet, vol)
 	if (e.n >= GC.cellCap or wet) and e.last and not e.last.dead then
 		local s = e.last
 		local sv = s.vol or 0.01
-		local g = min(sqrt((sv + vol) / sv), s.h0 * 2 / s.h, GC.maxHalf / s.h)
+		local g = min(sqrt((sv + vol) / sv), s.h0 * GC.mergeGrow / s.h, GC.maxHalf / s.h)
 		s.vol = sv + vol
 		s.mn = (s.mn or 0) + 1
 		if g > 1.001 then
@@ -438,7 +438,7 @@ local function Build(c, now)
 	for i = j + 1, #items do items[i] = nil end
 	if j == 0 then return end
 	local R = ABL.Render
-	local sx, sy, sz, anx, any, anz, young, wet = 0, 0, 0, 0, 0, 0, 0, 0
+	local sx, sy, sz, anx, any, anz, young, wet, done = 0, 0, 0, 0, 0, 0, 0, 0, 0
 	local m = Mesh()
 	mesh.Begin(m, MATERIAL_QUADS, j)
 	for i = 1, j do
@@ -451,6 +451,7 @@ local function Build(c, now)
 		sx, sy, sz = sx + s.x, sy + s.y, sz + s.z
 		anx, any, anz = anx + s.nx, any + s.ny, anz + s.nz
 		if s.born > young then young = s.born end
+		if s.born + s.dryT > done then done = s.born + s.dryT end
 	end
 	mesh.End()
 	c.mesh = m
@@ -464,6 +465,7 @@ local function Build(c, now)
 	end
 	c.rad = rad
 	c.youngest = young
+	c.doneAt = done
 	c.wetCount = wet
 	c.sheenK = -1
 end
@@ -509,7 +511,7 @@ function G.Draw()
 			-- colours keep ageing while any stain in the chunk is still drying
 			if rt > c.nextAge then
 				c.nextAge = rt + 2 + math.random()
-				if now - c.youngest < GC.maxDry * C.sv.drying:GetFloat() then c.dirty = true end
+				if now < min(c.doneAt or 0, c.youngest + GC.maxDry * C.sv.drying:GetFloat()) then c.dirty = true end
 			end
 			if (c.dirty or not c.mesh) and builds < 4 and rt > c.nextBuild then
 				Build(c, now)

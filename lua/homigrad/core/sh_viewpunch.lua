@@ -268,6 +268,36 @@ local IsValid = IsValid
 			vp_smooth_target.r = math_Clamp(vp_smooth_target.r, -SMOOTH_PUNCH_LIMIT, SMOOTH_PUNCH_LIMIT)
 		end
 
+		function hg.GetPunchAwayAngle(pos)
+			local ply = LocalPlayer()
+			local jitter = Angle(math.Rand(-0.25, 0.25), math.Rand(-0.25, 0.25), math.Rand(-0.15, 0.15))
+			if not IsValid(ply) or not isvector(pos) or pos:IsZero() then return jitter * 3 end
+			local dir = pos - ply:EyePos()
+			if dir:IsZero() then return jitter * 3 end
+			dir:Normalize()
+			local eyeAng = ply:EyeAngles()
+			local side = dir:Dot(eyeAng:Right())
+			local up = dir:Dot(eyeAng:Up())
+			local fwd = dir:Dot(eyeAng:Forward())
+			return Angle(up - fwd * 0.5, side, -side * 0.5) + jitter
+		end
+
+		local hitKick, hitKickTime = Angle(), 0
+		local HIT_KICK_RISE = 0.06
+		local HIT_KICK_DECAY = 6
+
+		function hg.GetWeaponHitKick()
+			if hitKickTime == 0 then return Angle() end
+			local t = CurTime() - hitKickTime
+			if t > 1.5 then return Angle() end
+			return hitKick * (math.min(t / HIT_KICK_RISE, 1) * math.exp(-t * HIT_KICK_DECAY))
+		end
+
+		function hg.AddWeaponHitKick(angle)
+			hitKick = hitKick * math.exp(-(CurTime() - hitKickTime) * HIT_KICK_DECAY) + angle
+			hitKickTime = CurTime()
+		end
+
 		function GetAllViewPunchAngles()
 			return GetViewPunchAngles2() + GetViewPunchAngles3() + GetViewPunchAngles4()
 		end

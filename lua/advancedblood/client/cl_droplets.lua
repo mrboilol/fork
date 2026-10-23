@@ -160,12 +160,18 @@ local function Release(i)
 	pool:Put(d)
 end
 
+local EVICT_SCAN = 48
+local evictAt = 0
+
 local function Evict(minImp)
 	-- replace the least important droplet by a particle
 	local worst, wi = minImp, nil
-	for i = 1, #list do
-		local imp = list[i].imp
-		if imp < worst then worst, wi = imp, i end
+	local n = #list
+	if n == 0 then return false end
+	for _ = 1, min(n, EVICT_SCAN) do
+		evictAt = evictAt % n + 1
+		local imp = list[evictAt].imp
+		if imp < worst then worst, wi = imp, evictAt end
 	end
 	if not wi then return false end
 	local d = list[wi]

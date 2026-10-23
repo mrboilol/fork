@@ -210,6 +210,7 @@ hook.Add("Org Clear", "Main", function(org)
 	org.panicattackadd = 0
 	org.panicattack = 0
 	org.panicattackActive = false
+	org.panicMode = nil
 	org.panicAdrenalineUntil = 0
 	org.panicGunfightUntil = 0
 	org.panicSustainedFearSince = 0
@@ -726,6 +727,7 @@ local function send_bareinfo(org, force, reliable)
 	sendtable.panicattackadd = org.panicattackadd
 	sendtable.panicattack = org.panicattack
 	sendtable.panicattackActive = org.panicattackActive
+	sendtable.panicMode = org.panicMode or false
 	sendtable.seizure = org.seizure
 	sendtable.seizureActive = org.seizureActive
 	sendtable.seizureStart = org.seizureStart
@@ -1424,6 +1426,14 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	local panicDying = org.otrub or org.incapacitated or org.deathStateKilled or (isPly and not owner:Alive())
 	if org.panicattack >= panicattack_threshold then
 		org.panicattackActive = hg_panic:GetBool() and not panicDying
+		if not org.panicattackActive then
+			org.panicMode = nil
+		elseif not org.panicMode then
+			org.panicMode = math.random(2) == 1 and "fight" or "flight"
+			if isPly then
+				owner:Notify(org.panicMode == "fight" and "I have to fight." or "I need to get out of here.", 2, "panicattack_mode", 2, nil, Color(255, 170, 120))
+			end
+		end
 		local panicSeverity = math.Clamp(math.Remap(org.panicattack, panicattack_threshold, 1, 0, 1), 0, 1)
 		if not panicDying then
 			local combatPanic = (org.panicGunfightUntil or 0) > CurTime()
@@ -1436,6 +1446,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		end
 	else
 		org.panicattackActive = false
+		org.panicMode = nil
 		org.panicAdrenalineUntil = 0
 	end
 	local ignoreBrainDamage = hg.organism.IsBrainDamageIgnored and hg.organism.IsBrainDamageIgnored(org)

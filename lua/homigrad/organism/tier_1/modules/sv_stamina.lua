@@ -185,6 +185,10 @@ module[2] = function(owner, org, timeValue)
 		if owner.hg_isSprinting and not owner:HasTrait("sprinter") and not owner:HasTrait("endurant") then
 			stamina.sub = stamina.sub * untraited_sprint_stamina_cost
 		end
+		if owner.hg_isJogging or owner.hg_isSprinting then
+			local combat = hg.GetCombatCondition and hg.GetCombatCondition(owner) or nil
+			stamina.sub = stamina.sub * (combat and combat.sprintCost or 1)
+		end
 
 	end
 

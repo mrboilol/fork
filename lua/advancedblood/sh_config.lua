@@ -29,16 +29,16 @@ if CLIENT then
 		quality     = CreateClientConVar("abl_quality", "3", true, false, "0 = low, 1 = medium, 2 = high, 3 = ultra, 4 = extreme.", 0, 4),
 		budget      = CreateClientConVar("abl_budget_ms", "2.5", true, false, "Target CPU milliseconds per frame for the blood simulation.", 0.3, 20),
 		simHz       = CreateClientConVar("abl_sim_hz", "165", true, false, "Target update rate (Hz) of high-priority blood (near, visible); lowered automatically when over abl_budget_ms.", 30, 240),
-		maxDrops    = CreateClientConVar("abl_max_droplets", "420", true, false, "Hard cap: simulated droplets.", 16, 4000),
+		maxDrops    = CreateClientConVar("abl_max_droplets", "1000", true, false, "Hard cap: simulated droplets.", 16, 4000),
 		maxBlobs    = CreateClientConVar("abl_max_blobs", "120", true, false, "Hard cap: body-surface blobs.", 8, 1000),
 		maxSegs     = CreateClientConVar("abl_max_body_segments", "2400", true, false, "Hard cap: body-surface streak segments (all characters).", 64, 20000),
-		maxPools    = CreateClientConVar("abl_max_pools", "56", true, false, "Hard cap: dynamic pools.", 4, 400),
+		maxPools    = CreateClientConVar("abl_max_pools", "80", true, false, "Hard cap: dynamic pools.", 4, 400),
 		maxRunoff   = CreateClientConVar("abl_max_runoff", "72", true, false, "Hard cap: world runoff rivulets.", 4, 600),
-		maxOverlays = CreateClientConVar("abl_max_overlays", "450", true, false, "Hard cap: wet-stain overlays.", 16, 4000),
-		maxParts    = CreateClientConVar("abl_max_particles", "260", true, false, "Hard cap: cheap GMod particles.", 0, 3000),
-		maxTraces   = CreateClientConVar("abl_max_traces", "150", true, false, "Hard cap: collision traces per frame.", 10, 2000),
-		maxGround   = CreateClientConVar("abl_max_ground_stains", "320", true, false, "Hard cap: blood stains from droplets landing on the ground (oldest removed first).", 16, 4000),
-		decalRate   = CreateClientConVar("abl_decals_per_sec", "60", true, false, "Hard cap: engine decals placed per second.", 1, 1000),
+		maxOverlays = CreateClientConVar("abl_max_overlays", "700", true, false, "Hard cap: wet-stain overlays.", 16, 4000),
+		maxParts    = CreateClientConVar("abl_max_particles", "500", true, false, "Hard cap: cheap GMod particles.", 0, 3000),
+		maxTraces   = CreateClientConVar("abl_max_traces", "220", true, false, "Hard cap: collision traces per frame.", 10, 2000),
+		maxGround   = CreateClientConVar("abl_max_ground_stains", "1200", true, false, "Hard cap: blood stains from droplets landing on the ground (oldest removed first).", 16, 4000),
+		decalRate   = CreateClientConVar("abl_decals_per_sec", "120", true, false, "Hard cap: engine decals placed per second.", 1, 1000),
 		drawDist    = CreateClientConVar("abl_draw_distance", "3500", true, false, "Blood effects beyond this distance are skipped.", 256, 20000),
 		sounds      = CreateClientConVar("abl_sounds", "1", true, false, "Drip / splash sounds.", 0, 1),
 		takeover    = CreateClientConVar("abl_zcity_takeover", "1", false, false, "In Z-City: AdvancedBlood is the only blood on screen (1), or Z-City's own blood particles and decals run next to it (0). Z-City's physiology runs either way.", 0, 1),
@@ -48,6 +48,21 @@ if CLIENT then
 		debug       = CreateClientConVar("abl_debug", "0", false, false, "Debug overlay bitmask (see abl_debug_help).", 0, 65535),
 		debugHud    = CreateClientConVar("abl_debug_hud", "0", false, false, "Show the statistics HUD.", 0, 1),
 	}
+	if cookie.GetNumber("abl_caps_v", 0) < 1 then
+		for name, old in pairs({
+			abl_max_droplets = 420,
+			abl_max_pools = 56,
+			abl_max_overlays = 450,
+			abl_max_particles = 260,
+			abl_max_traces = 150,
+			abl_max_ground_stains = 320,
+			abl_decals_per_sec = 60,
+		}) do
+			local cv = GetConVar(name)
+			if cv and cv:GetInt() == old then RunConsoleCommand(name, cv:GetDefault()) end
+		end
+		cookie.Set("abl_caps_v", "1")
+	end
 end
 
 ------------------------------------------------------------------------------------------
@@ -209,10 +224,10 @@ C.LODTiers = {
 	-- dist: max distance for the tier; drops: per-source droplet quota
 	-- hz: update rate of wound emission and droplets; flowHz: body-surface flow (0: none);
 	-- runoffHz: world rivulets. The tick itself runs at abl_sim_hz (165), so ULTRA gets every tick.
-	[5] = { dist = 420,  bodyflow = true,  hz = 165, flowHz = 165, runoffHz = 82, drops = 110, secondary = 1.0, satellites = 1.0, particlesOnly = false },
-	[4] = { dist = 950,  bodyflow = true,  hz = 82,  flowHz = 82,  runoffHz = 41, drops = 70,  secondary = 0.55, satellites = 0.7, particlesOnly = false },
-	[3] = { dist = 1700, bodyflow = false, hz = 41,  flowHz = 0,   runoffHz = 20, drops = 36,  secondary = 0.0, satellites = 0.4, particlesOnly = false },
-	[2] = { dist = 3000, bodyflow = false, hz = 20,  flowHz = 0,   runoffHz = 10, drops = 12,  secondary = 0.0, satellites = 0.0, particlesOnly = true },
+	[5] = { dist = 420,  bodyflow = true,  hz = 165, flowHz = 165, runoffHz = 82, drops = 260, secondary = 1.0, satellites = 1.0, particlesOnly = false },
+	[4] = { dist = 950,  bodyflow = true,  hz = 82,  flowHz = 82,  runoffHz = 41, drops = 160, secondary = 0.55, satellites = 0.7, particlesOnly = false },
+	[3] = { dist = 1700, bodyflow = false, hz = 41,  flowHz = 0,   runoffHz = 20, drops = 80,  secondary = 0.0, satellites = 0.4, particlesOnly = false },
+	[2] = { dist = 3000, bodyflow = false, hz = 20,  flowHz = 0,   runoffHz = 10, drops = 24,  secondary = 0.0, satellites = 0.0, particlesOnly = true },
 	[1] = { dist = 6000, bodyflow = false, hz = 12,  flowHz = 0,   runoffHz = 5,  drops = 0,   secondary = 0.0, satellites = 0.0, particlesOnly = true },
 }
 C.QualityScale = { [0] = 0.4, 0.6, 0.8, 1.0, 1.4 }
@@ -581,9 +596,10 @@ C.Ground = {
 	agingK   = 0.45,
 	offset   = 0.07,             -- units above the surface (plus any bump found under the footprint)
 	cellCap  = 6,                -- stains per 2.5-unit spot before new blood adds to the newest one
-	rate     = 90,               -- max new ground stains per second
+	rate     = 160,              -- max new ground stains per second
 	tinyD    = 0.3,              -- stain diameter (units) below which a drop leaves a tiny spot
-	maxHalf  = 14,               -- largest quad half-size (units)
+	maxHalf  = 7,                -- largest quad half-size (units)
+	mergeGrow = 1.3,
 	maxDry   = 400,              -- seconds after which a chunk's colours stop being refreshed
 	drawDist = 2200,
 	sheen    = 0.5,              -- what a wet stain mirrors of the light around it, times Fresnel: half of what a
@@ -646,6 +662,9 @@ C.Wound = {
 	bruiseTime   = 40,      -- seconds for the bruise around a wound to come up
 	internalDelay = 5,      -- seconds until a retained projectile's track has filled and bleeds outward at full rate
 	grazeBleed   = 0.12,    -- share of the booked bleed a graze shows (Z-City books a graze like any other hit; skin and fat ooze)
+	backSpray    = 2,
+	fwdSpray     = 2.5,
+	gushDrops    = 8,
 }
 
 -- wound marks on the body (cl_woundfx.lua)
