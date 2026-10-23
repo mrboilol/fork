@@ -499,7 +499,7 @@ function G.Draw()
 	local maxD = min(C.cl.drawDist:GetFloat(), GC.drawDist)
 	local builds, set, ns = 0, false, 0
 	local dbg = cvDebug:GetInt()
-	local noGloss, noFilter = not GC.gloss or bit.band(dbg, 1) ~= 0, bit.band(dbg, 2) ~= 0
+	local noGloss, noFilter = not C.Shine or bit.band(dbg, 1) ~= 0, bit.band(dbg, 2) ~= 0
 	for i = #chunks, 1, -1 do
 		local c = chunks[i]
 		if c.live <= 0 then

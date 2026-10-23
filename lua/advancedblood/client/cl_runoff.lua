@@ -561,7 +561,7 @@ local function Build(r)
 	WriteStrip(r, now, false)
 	mesh.End()
 	r.mesh = m
-	if Wet(r, now) then
+	if C.Shine and Wet(r, now) then
 		local g = Mesh()
 		mesh.Begin(g, MATERIAL_QUADS, r.tn - 1)
 		WriteStrip(r, now, true)
@@ -579,7 +579,7 @@ local function BuildChunk(c, now)
 	local total, wetTotal = 0, 0
 	for _, it in ipairs(c.items) do
 		total = total + it.tn - 1
-		if Wet(it, now) then wetTotal = wetTotal + it.tn - 1 end
+		if C.Shine and Wet(it, now) then wetTotal = wetTotal + it.tn - 1 end
 	end
 	if total <= 0 then return end
 	local m = Mesh()
@@ -619,7 +619,7 @@ end
 -- reflection strips queued during the filter pass: { mesh, x, y, z, nx, ny, nz }
 local glossQ, glossN = {}, 0
 local function QueueGloss(m, x, y, z, nx, ny, nz)
-	if not C.Ground.gloss then return end
+	if not C.Shine then return end
 	glossN = glossN + 1
 	local q = glossQ[glossN] or {}
 	glossQ[glossN] = q

@@ -132,7 +132,7 @@ function ZW.SendServerSuppressionForBullet(bullet, startPos, endPos)
                 end
             end
 
-            if dist <= 120 and isLooking then
+            if dist <= 180 and isLooking then
                 local suppressionResponse = math.Clamp(0.25 * damage / math.max(dist / 2, 10), 0.08, 0.4)
                 if ply.AddNaturalAdrenaline then
                     ply:AddNaturalAdrenaline(suppressionResponse)
@@ -144,11 +144,9 @@ function ZW.SendServerSuppressionForBullet(bullet, startPos, endPos)
                 end
                 org.fearadd = (org.fearadd or 0) + 0.2
 
-                -- Near misses now feed the panic system as well as short-term
-                -- fear. Throttle rapid pellets so one shotgun blast cannot fill it.
                 if hg.organism and hg.organism.AddPanicAttack and CurTime() >= (org._panicSuppressionNext or 0) then
                     org._panicSuppressionNext = CurTime() + 0.15
-                    hg.organism.AddPanicAttack(org, 0.07 + suppressionResponse * 0.2, true, true, true, true)
+                    hg.organism.AddPanicAttack(org, 0.1 + suppressionResponse * 0.35, true, true, true, true)
                 end
             end
         end

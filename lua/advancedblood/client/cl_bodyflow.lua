@@ -1174,7 +1174,7 @@ local function BuildBone(src, bone, lr, lg, lb, now, dryT, near, m, pose, quiet,
 	end
 	mesh.End()
 	src.segMesh[bone] = mm
-	if nWet > 0 then
+	if C.Shine and nWet > 0 then
 		-- reflection of the wet ribbons: wetness and light per vertex, the view-dependent strength
 		-- per draw (from the mean normal of this bone's wet blood)
 		local gm = Mesh()
@@ -1693,7 +1693,7 @@ function F.DrawSource(src, body, immediate)
 	local m = src.mesh
 	local near = m ~= nil and src.dist < B.nearDist
 	local mode = near and 1 or 2
-	local gloss = near and src.dist < B.glossDist
+	local gloss = C.Shine and near and src.dist < B.glossDist
 	src.tone = src.tone or math.Rand(C.ToneRange[1], 1)
 
 	VW.lr, VW.lg, VW.lb = lr, lg, lb

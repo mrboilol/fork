@@ -835,7 +835,7 @@ end
 local specang1, specang2, specangfur = Angle(-1, -3, 3), Angle(4, 12, 3), Angle(-15, 2, 2)
 function SWEP:PrimaryAttack(forcespecial)
 	local owner = self:GetOwner()
-	if not IsValid(owner) or owner:InVehicle() then return end
+	if not IsValid(owner) or owner:InVehicle() or hg.WallBang.Active(owner) then return end
 	if (self.attacked or 0) > CurTime() then return end
 	if owner.organism and owner.organism.rarmamputated and owner.organism.larmamputated then return end
 	local isfur = owner.PlayerClassName == "furry"

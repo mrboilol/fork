@@ -7,18 +7,15 @@ hg.organism.module.pain = {}
 local module = hg.organism.module.pain
 local consciousness_otrub_threshold = 0.3
 local consciousness_fake_threshold = 0.38
-local shock_consciousness_soft_target = 0.5
-local shock_consciousness_hard_target = 0
-local shock_consciousness_drain_start = 10
-local shock_consciousness_drain_end = 4
+local shock_heavy_offset = 30
+local shock_critical_offset = 60
+local shock_critical_ramp = 30
 local consciousness_recovery_speed = 12
 local low_consciousness_recovery_speed = 16
 local otrub_consciousness_recovery_speed = 20
 local otrub_rouse_consciousness_recovery_speed = 3.5
 local shock_consciousness_threshold = 40
 local shock_consciousness_analgesia_range = 60
-local shock_consciousness_max = 85
-local shock_consciousness_span = 45
 local pain_shock_threshold = 80
 local pain_shock_target = 55
 local pain_shock_gain = 2
@@ -245,7 +242,8 @@ module[2] = function(owner, org, timeValue)
 
 	local shockAnalgesia = Clamp(org.analgesia + org.painkiller * 0.3, 0, 1)
 	local shockThreshold = (shock_consciousness_threshold + shock_consciousness_analgesia_range * shockAnalgesia) * (1 + resilience * 0.6 + zerlkersResistance * 1.4) * math.max(org.traumaResistanceMul or 1, 1)
-	local shockMax = math.max(shock_consciousness_max, shockThreshold + shock_consciousness_span)
+	local shockHeavy = shockThreshold + shock_heavy_offset
+	local shockCritical = shockThreshold + shock_critical_offset
 	local o2Value = org.o2 and tonumber(org.o2[1]) or 30
 	local hypoxicDrain = o2Value < 4 and 0.1 or o2Value < 8 and 0.03 or o2Value < 10 and 0.01 or 0
 	if not org.otrub then
@@ -256,9 +254,20 @@ module[2] = function(owner, org, timeValue)
 	end
 	local shockActive = org.shock > shockThreshold
 	if shockActive then
-		local shockTarget = Clamp(math.Remap(org.shock, shockThreshold, shockMax, shock_consciousness_soft_target, shock_consciousness_hard_target), shock_consciousness_hard_target, shock_consciousness_soft_target)
-		local shockDrain = Clamp(math.Remap(org.shock, shockThreshold, shockMax, shock_consciousness_drain_start, shock_consciousness_drain_end), shock_consciousness_drain_end, shock_consciousness_drain_start)
-		org.consciousness = Approach(org.consciousness, shockTarget, timeValue / shockDrain)
+		local shockTarget, shockRate
+		if org.shock >= shockCritical then
+			shockTarget = 0
+			shockRate = Clamp(math.Remap(org.shock, shockCritical, shockCritical + shock_critical_ramp, 0.4, 0.8), 0.4, 0.8)
+		elseif org.shock >= shockHeavy then
+			local frac = (org.shock - shockHeavy) / (shockCritical - shockHeavy)
+			shockTarget = Lerp(frac, 0.42, 0.32)
+			shockRate = Lerp(frac, 0.4, 0.6)
+		else
+			local frac = (org.shock - shockThreshold) / (shockHeavy - shockThreshold)
+			shockTarget = Lerp(frac, 0.6, 0.42)
+			shockRate = Lerp(frac, 0.12, 0.2)
+		end
+		org.consciousness = Approach(org.consciousness, shockTarget, timeValue * shockRate)
 	end
 	if org.tranquilizer > 0 then
 

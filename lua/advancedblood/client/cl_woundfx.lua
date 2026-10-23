@@ -671,7 +671,7 @@ function W.Draw(src, pose, off)
 							local dk = 1 - 0.22 * clot - 0.28 * dry
 							local cosT = (vx * anx + vy * any + vz * anz) / max(d, 1)
 							-- (the reflection of a small wet patch: never a white sticker)
-							local gk = (wet ^ 1.5) * (1 - 0.8 * clot) * min(WC.gloss, 0.05 + 0.6 * C.Ground.sheen * R.Fresnel(cosT))
+							local gk = C.Shine and (wet ^ 1.5) * (1 - 0.8 * clot) * min(WC.gloss, 0.05 + 0.6 * C.Ground.sheen * R.Fresnel(cosT)) or 0
 							-- the film is there within a second, and gives way to the crust as it dries
 							local film = Clamp((now - mk.born) / 0.8, 0, 1) * (1 - 0.75 * dry)
 							local crust = Clamp((clot - 0.25) / 0.6, 0, 1)

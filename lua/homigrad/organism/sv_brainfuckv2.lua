@@ -266,7 +266,40 @@ local function getRequestedPosture(severity)
 	return selected
 end
 
-local function getPostureState(org)
+local headlessChance = 0.12
+local corpseChance = 0.35
+local corpses = {}
+
+local function isHeadless(org, rag)
+	return IsValid(rag) and (rag.noHead or rag.headexploded) or org and (org.headamputated or org.noHead) or false
+end
+
+local function resetPose(rag)
+	rag.brainfuckv2Base = nil
+	rag.brainfuckv2PoseStart = nil
+	rag.brainfuckv2Skip = nil
+	rag.brainfuckv2Flop = nil
+	rag.brainfuckv2Legs = nil
+	rag.brainfuckv2Spent = nil
+end
+
+local function getHeadlessPosture(rag)
+	if not IsValid(rag) then return end
+
+	local posture = rag.brainfuckv2Headless
+	if posture == nil then
+		posture = math.Rand(0, 1) < headlessChance and (math.Rand(0, 1) < 0.5 and "decorticate" or "decerebrate") or false
+		rag.brainfuckv2Headless = posture
+		resetPose(rag)
+	end
+	if not posture or rag.brainfuckv2Spent then return end
+
+	return posture, 1
+end
+
+local function getPostureState(org, rag)
+	if isHeadless(org, rag) then return getHeadlessPosture(rag) end
+
 	local selected
 	local selectedSeverity
 	local selectedData
@@ -322,6 +355,8 @@ end
 local shadowParams = {}
 local brainfuckv2Rev = 10
 local poseFadeTime = 8
+local headlessFadeTime = 3.5
+local tremorAmp = 5
 local taserPhaseTime = 0.5
 local skipChance = 0.25
 local flopChance = 0.25
@@ -398,7 +433,7 @@ local function driveTaser(rag, skip, legs, referenceAng, mul, damp, brake, ss)
 	end
 end
 
-local function driveStatic(rag, skip, modelOffsets, legs, referenceAng, mul, damp, brake, ss)
+local function driveStatic(rag, skip, modelOffsets, legs, referenceAng, mul, damp, brake, ss, tremor)
 	local baseTbl = rag.brainfuckv2Base or {}
 	local worst = 0
 	for physBone, offset in pairs(modelOffsets) do
@@ -418,6 +453,7 @@ local function driveStatic(rag, skip, modelOffsets, legs, referenceAng, mul, dam
 		local cur = phys:GetAngles()
 		local err = math.abs(targetAng.p - cur.p) + math.abs(((targetAng.y - cur.y + 180) % 360) - 180) + math.abs(targetAng.r - cur.r)
 		if err > worst then worst = err end
+		if tremor and tremor > 0 then targetAng:Add(Angle(math.Rand(-tremor, tremor), 0, math.Rand(-tremor, tremor))) end
 		driveBone(rag, phys, physBone, targetAng, mul, damp, brake, ss)
 	end
 	return worst
@@ -458,12 +494,13 @@ local function getLegOffsets(rag, female)
 end
 
 local function applyPosture(rag, posture)
-	if not IsValid(rag) then return end
+	if not IsValid(rag) or rag.hgHeadshotFade then return end
 
 	local data = hg.brainfuckv2.postures[posture]
 	if not data then return end
 
 	local org = rag.organism or {}
+	local headless = isHeadless(org, rag)
 	local referenceNumber = hg.realPhysNum and hg.realPhysNum(rag, 0) or 0
 	local reference = rag:GetPhysicsObjectNum(referenceNumber)
 	if not IsValid(reference) then return end
@@ -511,6 +548,7 @@ local function applyPosture(rag, posture)
 		end
 		rag.brainfuckv2RefAng = reference:GetAngles()
 	end
+	if headless then skip[10] = true end
 
 	local elapsed = CurTime() - start
 	local pulseMul = 1500
@@ -521,15 +559,20 @@ local function applyPosture(rag, posture)
 		brake = data.taser and {160, 25} or {40, 60}
 	end
 
-	local fade = math.Clamp(1 - elapsed / poseFadeTime, 0, 1)
-	if elapsed > poseFadeTime + 10 then return end
-	if (rag.brainfuckv2PoseError or 0) > 25 then fade = math.max(fade, 0.4) end
+	local fadeTime = headless and headlessFadeTime or poseFadeTime
+	local fade = math.Clamp(1 - elapsed / fadeTime, 0, 1)
+	if elapsed > fadeTime + (headless and 1 or 10) then
+		rag.brainfuckv2Spent = true
+		return
+	end
+	if not headless and (rag.brainfuckv2PoseError or 0) > 25 then fade = math.max(fade, 0.4) end
 	if fade <= 0 then return end
 	local spin = reference:GetAngleVelocity()
 	local spinSpeed = spin:Length()
 	if spinSpeed > 90 then
-		reference:AddAngleVelocity(-spin * ((spinSpeed - 90) / spinSpeed) * 0.25)
+		reference:AddAngleVelocity(-spin * ((spinSpeed - 90) / spinSpeed) * (headless and 0.6 or 0.25))
 	end
+	local tremor = tremorAmp * fade
 
 	local dampNow = 10 + 40 * fade
 	local ssNow = 0.001 + (1 - fade) * 0.4
@@ -563,7 +606,7 @@ local function applyPosture(rag, posture)
 	local modelOffsets = female and offsets.female06 or offsets.male09
 	if not modelOffsets then return end
 
-	rag.brainfuckv2PoseError = driveStatic(rag, skip, modelOffsets, legs, reference:GetAngles(), pulseMul * fade, dampNow, brake, ssNow)
+	rag.brainfuckv2PoseError = driveStatic(rag, skip, modelOffsets, legs, reference:GetAngles(), pulseMul * fade, dampNow, brake, ssNow, tremor)
 end
 
 local function setPosture(org, posture, severity, rag)
@@ -575,26 +618,16 @@ local function setPosture(org, posture, severity, rag)
 		local data = posture and hg.brainfuckv2.postures[posture]
 		org.brainfuckv2Variant = data and data.variants and math.max(#data.variants, 1) > 1 and math.random(#data.variants) or 1
 		if IsValid(rag) then
-			local smooth = (oldPosture == "decorticate" and posture == "decerebrate") or (oldPosture == "decerebrate" and posture == "decorticate")
+			local smooth = not isHeadless(org, rag) and ((oldPosture == "decorticate" and posture == "decerebrate") or (oldPosture == "decerebrate" and posture == "decorticate"))
 			if smooth then
 				rag.brainfuckv2PoseStart = CurTime() - poseFadeTime * 0.4
 			else
-				rag.brainfuckv2Base = nil
-				rag.brainfuckv2PoseStart = nil
-				rag.brainfuckv2Skip = nil
-				rag.brainfuckv2Flop = nil
-				rag.brainfuckv2Legs = nil
+				resetPose(rag)
 			end
 		end
 	elseif posture then
 		org.brainfuckv2Severity = severity
-		if (severity or 0) - lastSeverity > 0.15 and IsValid(rag) then
-			rag.brainfuckv2Base = nil
-			rag.brainfuckv2PoseStart = nil
-			rag.brainfuckv2Skip = nil
-			rag.brainfuckv2Flop = nil
-			rag.brainfuckv2Legs = nil
-		end
+		if (severity or 0) - lastSeverity > 0.15 and IsValid(rag) then resetPose(rag) end
 	end
 
 	if posture then
@@ -648,8 +681,8 @@ end)
 hook.Add("Org Think", "BrainfuckV2", function(owner, org)
 	if not IsValid(owner) or not org then return end
 
-	local posture, severity = getPostureState(org)
 	local rag = getRagdoll(owner, org)
+	local posture, severity = getPostureState(org, rag)
 	setPosture(org, posture, severity, rag)
 
 	if posture and owner:IsPlayer() and owner:Alive() and not IsValid(rag) then
@@ -667,10 +700,34 @@ hook.Add("RagdollDeath", "BrainfuckV2", function(ply, rag)
 	timer.Simple(0.1, function()
 		if not IsValid(rag) then return end
 		rag.organism = rag.organism or org
-		local posture, severity = getPostureState(rag.organism)
-		dbgPrint("[BrainfuckV2] death " .. tostring(rag) .. " brain " .. tostring(rag.organism.brain) .. " posture " .. tostring(posture) .. " severity " .. tostring(severity))
-		setPosture(rag.organism, posture, severity, rag)
+		local deadOrg = rag.organism
+		local posture, severity = getPostureState(deadOrg, rag)
+		if posture and not isHeadless(deadOrg, rag) and math.Rand(0, 1) >= corpseChance then posture = nil end
+		dbgPrint("[BrainfuckV2] death " .. tostring(rag) .. " brain " .. tostring(deadOrg.brain) .. " posture " .. tostring(posture) .. " severity " .. tostring(severity))
+		setPosture(deadOrg, posture, severity, rag)
+		if posture then corpses[rag] = deadOrg end
 	end)
+end)
+
+hook.Add("HG Decapitated", "BrainfuckV2", function(rag)
+	local org = IsValid(rag) and rag.organism
+	if not org then return end
+
+	local posture, severity = getPostureState(org, rag)
+	setPosture(org, posture, severity, rag)
+	if posture and org.alive == false then corpses[rag] = org end
+end)
+
+timer.Create("BrainfuckV2Corpse", 0.1, 0, function()
+	for rag, org in pairs(corpses) do
+		local posture = IsValid(rag) and not rag.brainfuckv2Spent and org.brainfuckv2Posture
+		if not posture then
+			corpses[rag] = nil
+			continue
+		end
+
+		applyPosture(rag, posture)
+	end
 end)
 
 util.AddNetworkString("hg_brainfuck_posture_maker")

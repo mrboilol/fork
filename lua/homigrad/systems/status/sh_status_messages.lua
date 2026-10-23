@@ -185,6 +185,26 @@ local panicattack_phrases = {
     "I don't want to die.",
 }
 
+local panic_fight_phrases = {
+	"I need to fight back.",
+	"They're not getting me without a fight.",
+	"Hit them before they hit me.",
+	"Stand your ground.",
+	"I'm not going down like this.",
+	"Push forward. Don't stop.",
+	"Make them regret this.",
+}
+
+local panic_flight_phrases = {
+	"I need to get out of here now.",
+	"Run. Just run.",
+	"I have to get away from here!",
+	"Find cover, anywhere!",
+	"Don't look back, just move!",
+	"I can't stay here.",
+	"Get out, get out, get out!",
+}
+
 local panic_uneasy_phrases = {
 	"Something feels wrong.",
 	"Stay alert.",
@@ -695,6 +715,8 @@ local function get_status_message(ply)
 		end
 	elseif after_unconscious_notify then
 		most_wanted_phraselist = after_unconscious
+	elseif org.panicattackActive and (org.panicMode == "fight" or org.panicMode == "flight") and not (panicattack > 0.55 and math.random(3) == 1) then
+		most_wanted_phraselist = org.panicMode == "fight" and panic_fight_phrases or panic_flight_phrases
 	elseif panicattack > 0.55 then
 		most_wanted_phraselist = panicattack_phrases
 	elseif panicattack > 0.3 then
@@ -721,7 +743,7 @@ local function get_status_message(ply)
 
 	if most_wanted_phraselist == near_death_poetic or most_wanted_phraselist == near_death_positive or most_wanted_phraselist == near_death_mild then
 		statusThoughtKey = statusThoughtKey or (bleedingOut and "blood2" or "fear")
-	elseif most_wanted_phraselist == panicattack_phrases or most_wanted_phraselist == panic_anxious_phrases or most_wanted_phraselist == panic_uneasy_phrases then
+	elseif most_wanted_phraselist == panicattack_phrases or most_wanted_phraselist == panic_anxious_phrases or most_wanted_phraselist == panic_uneasy_phrases or most_wanted_phraselist == panic_fight_phrases or most_wanted_phraselist == panic_flight_phrases then
 		statusThoughtKey = "panicattack"
 	elseif most_wanted_phraselist == fear_phrases or most_wanted_phraselist == fear_hurt_ironic or most_wanted_phraselist == situation_fear_phrases then
 		statusThoughtKey = "fear"

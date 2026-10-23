@@ -289,11 +289,5 @@ function hg.organism.UpdateCardiacRhythm(owner, org, timeValue, s)
 		org.heartstoptime = nil
 	end
 
-	local noOxygen = org.o2 and (org.o2[1] or 0) <= 0.25
-	if org.alive and org.otrub and (org.heartstop or noOxygen) and (org.lastsoundtime or 0) < CurTime() then
-		org.owner:EmitSound("breathing/agonalbreathing_" .. math.random(13) .. ".ogg", 60)
-		org.lastsoundtime = CurTime() + math.Rand(4, 7)
-	end
-
 	hg.organism.EnforceBloodCirculationLimit(org)
 end

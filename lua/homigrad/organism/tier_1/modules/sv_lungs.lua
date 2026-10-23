@@ -728,11 +728,17 @@ module[2] = function(owner, org, timeValue)
 	end
 	local success = owner:IsBerserk() or (not org.heartstop and not org.respiratoryArrest and org.alive and not (org.brain >= 0.4 and math.random(10 - (org.brain * 10)) < 4) and org.lungsfunction)
 
+	local couldBreathe = success
+
 	if success and owner:IsPlayer() and inwater and not scubaOxygenActive then success = false end
 
 	if success and org.choking then org.needfake = true success = false end
 
 	if success and org.vomitInThroat then success = false end
+
+	org.breathObstructed = couldBreathe and not success
+	org.breathFailed = not couldBreathe
+	org.breathStateAt = CurTime()
 
 	org.choking = false
 
@@ -1126,8 +1132,7 @@ module[2] = function(owner, org, timeValue)
 	local bloodVolumeO2Reserve = math.Clamp(getBloodVolumeO2Limit(org.blood) / o2.range, 0, 1)
 	local rawTissuePerfusion = math.min(
 		hg.organism.GetCirculatoryOxygenReserve(org.pulse, tonumber(org.bloodPressure) or 90, org.blood),
-		bloodVolumeO2Reserve,
-		1 - math.Clamp(org.hypertension or 0, 0, 1) ^ 2 * 0.85
+		bloodVolumeO2Reserve
 	)
 	local tissuePerfusionTarget = rawTissuePerfusion
 	local currentTissuePerfusion = math.Clamp(tonumber(org.circulatoryO2Reserve) or 1, 0, 1)
@@ -1458,7 +1463,8 @@ kaz
 	local skullDamage = math.Clamp(tonumber(org.skull) or 0, 0, 1)
 	local activeConcussion = math.max(tonumber(org.concussion) or 0, tonumber(org.concussion_onset) or 0)
 	local lobeDamage = math.max(frontal, parietal, temporal, occipital)
-	local skullCrisis = math.Clamp((skullDamage - 0.15) / 0.85, 0, 1)
+	local skullBroken = skullDamage >= 1
+	local skullCrisis = skullBroken and 1 or 0
 	local concussionCrisis = math.Clamp((activeConcussion - 3.0) / 3.0, 0, 1)
 	local brainCrisis = math.Clamp((lobeDamage - 0.35) / 0.65, 0, 1)
 	local cranialCrisis = math.max(skullCrisis, concussionCrisis, brainCrisis)
@@ -1482,15 +1488,15 @@ kaz
 	org.disorientation = math.max(org.disorientation, frontal * 0.35 + parietal * 0.65 + temporal * 0.25)
 	org.immobilization = math.max(org.immobilization, parietal * 8)
 	org.consciousness = math.min(org.consciousness, 1 - frontal * 0.35 - temporal * 0.15)
-	local skullDebuff = math.Clamp((skullDamage - 0.1) / 0.9, 0, 1)
-	if skullDebuff > 0 then
-		local skullDebuffMul = org.bandagedskull and 0.5 or 1
-		org.disorientation = math.max(org.disorientation, skullDebuff * 0.9 * skullDebuffMul)
-		org.immobilization = math.max(org.immobilization, skullDebuff ^ 2 * 5 * skullDebuffMul)
-		org.consciousness = math.min(org.consciousness, 1 - skullDebuff * 0.4 * skullDebuffMul)
-		if (org.pain or 0) + (org.painadd or 0) < skullDebuff * 35 * skullDebuffMul then
-			org.painadd = math.min((org.painadd or 0) + timeValue * skullDebuff * 3 * skullDebuffMul, 150)
-		end
+	local skullDebuffMul = org.bandagedskull and 0.5 or 1
+	local skullPain = math.Clamp((skullDamage - 0.1) / 0.9, 0, 1)
+	if skullPain > 0 and (org.pain or 0) + (org.painadd or 0) < skullPain * 35 * skullDebuffMul then
+		org.painadd = math.min((org.painadd or 0) + timeValue * skullPain * 3 * skullDebuffMul, 150)
+	end
+	if skullBroken then
+		org.disorientation = math.max(org.disorientation, 0.9 * skullDebuffMul)
+		org.immobilization = math.max(org.immobilization, 5 * skullDebuffMul)
+		org.consciousness = math.min(org.consciousness, 1 - 0.4 * skullDebuffMul)
 	end
 	if hemorrhage > 0 then
 		org.brain = min(org.brain + timeValue * hemorrhage / (hemorrhage < 0.3 and 900 or 300), 1)

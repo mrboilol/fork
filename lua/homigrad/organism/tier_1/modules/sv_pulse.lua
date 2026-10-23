@@ -373,7 +373,8 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	local cerebralPerfusion = effectiveCirculation
 	local peripheralPerfusion = effectiveCirculation * Clamp(1 - (org.sympatheticCompensation or 0) * 0.45, 0.55, 1)
 	local neckPenalty = Clamp(tonumber(org.neckBrainOxygenPenalty) or 0, 0, 0.8)
-	local brainTarget = math.max((org.heartstop and oxygenReserve or math.min(oxygenReserve, cerebralPerfusion)) - neckPenalty, 0)
+	local convulsionPenalty = org.convulsing and hg.organism.convulsionConfig.hypoxiaPenalty or 0
+	local brainTarget = math.max((org.heartstop and oxygenReserve or math.min(oxygenReserve, cerebralPerfusion)) - neckPenalty - convulsionPenalty, 0)
 	local bodyTarget = org.heartstop and oxygenReserve or math.min(oxygenReserve, peripheralPerfusion)
 
 	org.perfusion = Approach(tonumber(org.perfusion) or 1, effectiveCirculation, timeValue * 0.9)
@@ -751,6 +752,7 @@ local function maintainSimplifiedCirculation(org)
 	org.hypotension = 0
 	org.hypotensionExposure = 0
 	org.hypertension = 0
+	org.hypertensionCrisis = 0
 	org.hemorrhagicCollapseExposure = 0
 	hg.organism.UpdatePerfusion(org.owner, org, org.timeValue or 0)
 end
@@ -879,6 +881,8 @@ module[1] = function(org)
 	org.severeHypoxiaTime = 0
 	org.heartStrain = 0
 	org.hypertension = 0
+	org.hypertensionCrisis = 0
+	org.hypertensionPanicLoad = 0
 	org.strokeRisk = 0
 	org.strokeExposure = 0
 	org.nextStrokeTime = 0

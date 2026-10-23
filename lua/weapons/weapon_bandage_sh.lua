@@ -360,6 +360,22 @@ local function BoneNamesMatch(ent, first, second)
 	return firstIndex and ent:GetBoneName(firstIndex) == second or false
 end
 
+local function IsTourniquetStopped(ent, org, bone, arterial)
+	if not hg.GetTourniquetBleedMultiplier then return false end
+	local owner = IsValid(org.owner) and org.owner or ent
+	return hg.GetTourniquetBleedMultiplier(owner, bone, arterial) <= 0
+end
+
+local function GetBandageableWounds(ent, org, bone)
+	local wounds = {}
+	for _, wound in ipairs(org.wounds or {}) do
+		if (not bone or BoneNamesMatch(ent, wound[4], bone)) and not IsTourniquetStopped(ent, org, wound[4], false) then
+			wounds[#wounds + 1] = wound
+		end
+	end
+	return wounds
+end
+
 local bandageVitalKeys = {"skull", "chest"}
 local bandageVitalSet = {}
 for _, key in ipairs(bandageVitalKeys) do bandageVitalSet[key] = true end
@@ -412,9 +428,7 @@ local function BoneHasBandageableInjury(ent, bone)
 	local _, artery = GetBandageableArteryWound(org, ent, bone)
 	if artery then return true end
 
-	for _, wound in ipairs(org.wounds or {}) do
-		if BoneNamesMatch(ent, wound[4], bone) then return true end
-	end
+	if #GetBandageableWounds(ent, org, bone) > 0 then return true end
 	if hg.organism.GetBandageDislocation and hg.organism.GetBandageDislocation(org, bone) then return true end
 	if GetBandageBoneKey(org, bone) then return true end
 
@@ -438,7 +452,7 @@ function SWEP:GetBandageTargetBone(target, trace)
 	if artery and artery[4] then return artery[4] end
 
 	local largestWound
-	for _, wound in ipairs(org.wounds or {}) do
+	for _, wound in ipairs(GetBandageableWounds(target, org)) do
 		if wound[4] and (wound[1] or 0) > (largestWound and largestWound[1] or 0) then
 			largestWound = wound
 		end
@@ -776,7 +790,7 @@ GetBandageableArteryWound = function(org, ent, bone)
 
 	local selectedIndex, selectedWound
 	for index, wound in ipairs(org.arterialwounds) do
-		if (wound[1] or 0) > 0 then
+		if (wound[1] or 0) > 0 and not IsTourniquetStopped(ent, org, wound[4], true) then
 			local matchesBone = not bone or wound[4] == bone
 			local woundBone = ent:LookupBone(wound[4] or "")
 			if not matchesBone and woundBone and woundBone >= 0 and ent:GetBoneName(woundBone) == bone then
@@ -826,10 +840,8 @@ function SWEP:GetBandageTreatmentCost(target, bone)
 		return remaining
 	end
 	local woundCost = 0
-	for _, wound in ipairs(org.wounds or {}) do
-		if not bone or BoneNamesMatch(target, wound[4], bone) then
-			woundCost = math.max(woundCost, wound[1] or 0)
-		end
+	for _, wound in ipairs(GetBandageableWounds(target, org, bone)) do
+		woundCost = math.max(woundCost, wound[1] or 0)
 	end
 	if woundCost > 0 then return woundCost end
 	if GetBandageBoneKey(org, bone) then return self:GetBandageStructuralTreatmentCost() end
@@ -861,8 +873,8 @@ if SERVER then
 		local structuralKey = GetBandageBoneKey(org, structuralBone)
 		local structuralCost = self:GetBandageStructuralTreatmentCost()
 		local bleedingWound = false
-		for _, wound in ipairs(org.wounds or {}) do
-			if (wound[1] or 0) > 0 and (not bone or BoneNamesMatch(ent, wound[4], bone)) then
+		for _, wound in ipairs(GetBandageableWounds(ent, org, bone)) do
+			if (wound[1] or 0) > 0 then
 				bleedingWound = true
 				break
 			end
@@ -942,14 +954,13 @@ if SERVER then
 		end
 		
 		if not bone then
-			--print(#org.wounds)
-			for i = 1, #org.wounds do
-				if self.modeValues[1] > 0 and #org.wounds > 0 then
-					local biggestWound = org.wounds[1][1]
+			for _, wound in ipairs(GetBandageableWounds(ent, org)) do
+				if self.modeValues[1] > 0 then
+					local biggestWound = wound[1]
 					local healedWound = math.max(biggestWound - self.modeValues[1], 0)
-					local woundHeal = self.modeValues[1] - (biggestWound - healedWound)-- * ((owner.Profession == "doctor") and 0.33 or 1)
+					local woundHeal = self.modeValues[1] - (biggestWound - healedWound)
 					org.bleed = math.max(org.bleed - (biggestWound - healedWound), 0)
-					org.wounds[1][1] = healedWound
+					wound[1] = healedWound
 					self.modeValues[1] = woundHeal > 0.1 and woundHeal or 0
 					
 					if (biggestWound - healedWound) > 0.1 then
@@ -964,23 +975,17 @@ if SERVER then
 						--owner.Karma = math.Clamp(owner.Karma + 0.25,0,zb.MaxKarma)
 					end
 					ent.bandaged_limbs = ent.bandaged_limbs or {}
-					local bone_name = org.wounds[1][4]
+					local bone_name = wound[4]
 					if not ent.bandaged_limbs[bone_name] then
 						ent.bandaged_limbs[bone_name] = true
 						done = true
 					end
-					if org.wounds[1][1] == 0 then table.remove(org.wounds, 1) end
+					if wound[1] == 0 then table.RemoveByValue(org.wounds, wound) end
 				end
 			end
 		else
-			local bonewounds = {}
-			
-			for _, tbl in pairs(org.wounds) do
-				if BoneNamesMatch(ent, tbl[4], bone) then
-					table.insert(bonewounds, tbl)
-				end
-			end
-			
+			local bonewounds = GetBandageableWounds(ent, org, bone)
+
 			for _, wound in ipairs(bonewounds) do
 				if self.modeValues[1] ~= 0 and #bonewounds > 0 then
 					if wound then
@@ -1936,7 +1941,7 @@ function SWEP:CanBandageTPIK(target)
 	local available = self.modeValues and self.modeValues[1] or 0
 	if not org or available <= 0 then return false end
 
-	for _, wound in ipairs(org.wounds or {}) do
+	for _, wound in ipairs(GetBandageableWounds(target, org)) do
 		if (wound[1] or 0) > 0.1 then return true end
 	end
 

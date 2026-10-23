@@ -691,14 +691,16 @@ local function Draw3D(ex, ey, ez, gx, gy, gz)
 			DV(VX[id], VY[id], VZ[id], VR[id], VG[id], VB[id])
 		end
 		-- the key light's reflection: on a sphere it sits where the normal is the half vector
-		local wx, wy, wz = ABL.Norm(ex - x, ey - y, ez - z)
-		local hx, hy, hz = ABL.Norm(wx + sx, wy + sy, wz + sz)
-		glintN = glintN + 1
-		local gI = glints[glintN] or {}
-		glints[glintN] = gI
-		gI[1], gI[2], gI[3] = x + hx * rad * 0.9 + wx * rad * 0.2, y + hy * rad * 0.9 + wy * rad * 0.2, z + hz * rad * 0.9 + wz * rad * 0.2
-		gI[4], gI[5] = rad * 0.55, 150 + 105 * sunVis
-		gI[6], gI[7], gI[8] = lr, lg, lb
+		if C.Shine then
+			local wx, wy, wz = ABL.Norm(ex - x, ey - y, ez - z)
+			local hx, hy, hz = ABL.Norm(wx + sx, wy + sy, wz + sz)
+			glintN = glintN + 1
+			local gI = glints[glintN] or {}
+			glints[glintN] = gI
+			gI[1], gI[2], gI[3] = x + hx * rad * 0.9 + wx * rad * 0.2, y + hy * rad * 0.9 + wy * rad * 0.2, z + hz * rad * 0.9 + wz * rad * 0.2
+			gI[4], gI[5] = rad * 0.55, 150 + 105 * sunVis
+			gI[6], gI[7], gI[8] = lr, lg, lb
+		end
 	end
 	mesh.End()
 	-- glints: queued into the additive sprite batch (flushed after this)

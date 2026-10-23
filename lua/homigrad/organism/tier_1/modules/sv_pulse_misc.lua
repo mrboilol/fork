@@ -55,6 +55,12 @@ local hypertensionThoughts = {
 	"My blood pressure feels dangerously high...",
 	"My head is pounding from the pressure...",
 	"I feel pressure building in my head...",
+	"Everything is spinning...",
+}
+local hypertensionCrisisThoughts = {
+	"My vision keeps swimming in and out...",
+	"I'm going to black out if this keeps up...",
+	"My head is pounding so hard I can't think...",
 }
 
 function hg.organism.UpdateCirculatoryEffects(owner, org, timeValue, o2Value, arrhythmiaComplication)
@@ -105,12 +111,34 @@ function hg.organism.UpdateCirculatoryEffects(owner, org, timeValue, o2Value, ar
 		org.owner:Notify(hypertensionThoughts[math.random(#hypertensionThoughts)], 40, "hypertension", 0, nil, Color(220, 170, 170))
 	end
 
+	local panicLoad = org.panicattackActive and Clamp(((org.panicattack or 0) - 0.35) / 0.65, 0, 1) or 0
+	org.hypertensionPanicLoad = math.max(math.Approach(org.hypertensionPanicLoad or 0, 0, timeValue / 120), panicLoad)
+
+	local crisisK = Clamp(((org.hypertension or 0) - 0.35) / 0.65, 0, 1)
+	if crisisK > 0 and not org.otrub then
+		org.hypertensionCrisis = math.min((org.hypertensionCrisis or 0) + timeValue * crisisK * (1 + org.hypertensionPanicLoad * 3) / 240, 1)
+	else
+		org.hypertensionCrisis = math.max((org.hypertensionCrisis or 0) - timeValue / 90, 0)
+	end
+	local crisis = org.hypertensionCrisis
+
 	if org.hypertension > 0 then
 		local highK = math.Clamp(org.hypertension * 1.27, 0, 1)
 		local adrenalineMitigation = math.Clamp(org.adrenaline / 3, 0, 1) * 0.25
 		local effectiveHighK = highK * (1 - adrenalineMitigation)
-		org.disorientation = math.max(org.disorientation, 0.25 + effectiveHighK * 1.5)
-		org.shock = math.Approach(org.shock, math.max(org.shock, 10 + effectiveHighK * 20), timeValue * (0.4 + effectiveHighK * 1.4))
+		org.disorientation = math.max(org.disorientation, 0.4 + effectiveHighK * 1.9 + crisis * 0.6)
+	end
+
+	if crisis > 0.3 then
+		org.consciousness = math.min(org.consciousness, Lerp((crisis - 0.3) / 0.7, 1, 0.2))
+		if org.isPly and not org.otrub then
+			org.owner:Notify(hypertensionCrisisThoughts[math.random(#hypertensionCrisisThoughts)], 30, "hypertension_crisis", 0, nil, Color(230, 150, 150))
+		end
+	end
+
+	if crisis > 0.5 and not org.otrub and not org.seizureActive and (org.nextHypertensionSeizureRoll or 0) <= CurTime() then
+		org.nextHypertensionSeizureRoll = CurTime() + 5
+		if math.Rand(0, 1) < (crisis - 0.5) * 0.12 then hg.organism.AddSeizure(org, 1) end
 	end
 
 	local fearless = IsValid(owner) and owner.HasTrait and owner:HasTrait("gurajchaka_child")

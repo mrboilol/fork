@@ -134,7 +134,7 @@ function S.Place(fam, idx, x, y, z, nx, ny, nz, dx, dy, dz, w, h, col, alpha, en
 	ABL.Surface.CountDecal(x, y, z)
 	ABL.BloodMap.Add(x, y, z, nx, ny, nz, max(w, h) * 0.5, alpha / 255, wetT)
 
-	if wetT and wetT > 0 then
+	if C.Shine and wetT and wetT > 0 then
 		local qa = step * 6.2831853 / steps
 		local ca, sa = cos(qa), sin(qa)
 		-- in-plane axes of the texture after rotation
@@ -288,7 +288,7 @@ function S.Draw()
 				if vis and d2 < (maxD + c.rad) ^ 2 then
 					if not set then render.SetMaterial(M.atlas) set = true end
 					c.mesh:Draw()
-					if c.gloss and C.Ground.gloss and d2 < 1200 * 1200 then ng = ng + 1 glossList[ng] = c end
+					if c.gloss and C.Shine and d2 < 1200 * 1200 then ng = ng + 1 glossList[ng] = c end
 				end
 			end
 		end

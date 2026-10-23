@@ -59,7 +59,7 @@ hook.Add("StartCommand", "hg_wallbang_input", function(ply, cmd)
 	end
 	ply.wallbangAttackHeld = attack
 
-	cmd:RemoveKey(IN_ATTACK)
+	if SERVER then cmd:RemoveKey(IN_ATTACK) end
 	cmd:RemoveKey(IN_ATTACK2)
 	cmd:RemoveKey(IN_JUMP)
 	cmd:RemoveKey(IN_SPEED)
@@ -246,18 +246,17 @@ local function headPos(ply)
 	return bone and ply:GetBonePosition(bone) or ply:EyePos()
 end
 
-local function impact(ply)
+local function impact(ply, wallPos, norm, scale)
 	local org = ply.organism
 	if not org or not hg.organism or not hg.organism.input_list then return end
 
-	local wallPos, norm = WB.Plane(ply)
 	local pos = headPos(ply)
 	local hit = pos - norm * (pos - wallPos):Dot(norm)
 
 	ply.wallbangCount = (ply.wallbangCount or 0) + 1
 
 	local helmet = ply.armors and ply.armors["head"]
-	local mul = helmet and 0.25 or 1
+	local mul = (helmet and 0.25 or 1) * (scale or 1)
 
 	local dmgInfo = DamageInfo()
 	dmgInfo:SetDamageType(DMG_CLUB)
@@ -331,9 +330,128 @@ function WB.Slam(ply)
 	timer.Simple(WB.Impact, function()
 		if not IsValid(ply) or not WB.Active(ply) or ply:GetNWFloat("hg_wallbang_slam", 0) ~= start then return end
 		if not ply:Alive() then return end
-		impact(ply)
+		impact(ply, WB.Plane(ply))
 	end)
 end
+
+WB.HeadbuttReach = 25
+WB.HeadbuttTilt = 20
+WB.HeadbuttWindow = 0.35
+WB.HeadbuttCooldown = 2.35
+WB.HeadbuttMissCooldown = 0.6
+WB.HeadbuttWallScale = 0.3
+WB.HeadbuttDamage = 19
+WB.HeadbuttBaseForce = 55000
+WB.HeadbuttSpeedForceMul = 225
+WB.HeadbuttVelocityForceMul = 110
+WB.HeadbuttTargetVelocityMul = 95
+WB.HeadbuttSelfVelocityMul = 65
+WB.HeadbuttConcussionTarget = 1.85
+WB.HeadbuttConcussionSelf = 1
+WB.HeadbuttDisorientationTarget = 1.15
+WB.HeadbuttDisorientationSelf = 0.55
+
+local headbuttMins, headbuttMaxs = Vector(-10, -10, -10), Vector(10, 10, 10)
+
+local function standingHeadbutter(ply)
+	if not IsValid(ply) or not ply:IsPlayer() or not ply:Alive() or ply:InVehicle() or ply:Crouching() or not ply:OnGround() then return false end
+	local org = ply.organism
+	return not (ply.fake or IsValid(ply.FakeRagdoll) or (org and (org.fake or org.otrub)))
+end
+
+local function headbuttNeuro(ply, concussion, disorientation)
+	local org = ply.organism
+	if not org then return end
+	local module = hg.organism.module and hg.organism.module.concussion
+	if module and module.AddImmediateConcussion then module.AddImmediateConcussion(org, concussion) end
+	org.disorientation = math.min((org.disorientation or 0) + disorientation, 10)
+end
+
+function WB.Headbutt(ply, swingSpeed)
+	local now = CurTime()
+	local speed = ply:GetVelocity():Length()
+	local start = ply:EyePos()
+	local aim = ply:GetAimVector()
+	local filter = {ply, hg.GetCurrentCharacter(ply)}
+	local tr = util.TraceHull({
+		start = start,
+		endpos = start + aim * WB.HeadbuttReach,
+		filter = filter,
+		mins = headbuttMins,
+		maxs = headbuttMaxs,
+		mask = MASK_SHOT_HULL
+	})
+	local target, hitPos = tr.Entity, tr.HitPos
+	if not (IsValid(target) and target:IsPlayer()) then
+		local trLine = util.TraceLine({
+			start = start,
+			endpos = start + aim * (WB.HeadbuttReach + 16),
+			filter = filter,
+			mask = MASK_SHOT
+		})
+		if IsValid(trLine.Entity) and trLine.Entity:IsPlayer() then
+			target, hitPos = trLine.Entity, trLine.HitPos
+		end
+	end
+
+	if IsValid(target) and target:IsPlayer() and target ~= ply and standingHeadbutter(target) then
+		local forceDir = (ply:EyeAngles():Forward() - Vector(0, 0, 0.85)):GetNormalized()
+		local dmg = DamageInfo()
+		dmg:SetDamage(WB.HeadbuttDamage)
+		dmg:SetAttacker(ply)
+		dmg:SetInflictor(ply)
+		dmg:SetDamageType(DMG_CRUSH)
+		dmg:SetDamagePosition(hitPos)
+		dmg:SetDamageForce(forceDir * (WB.HeadbuttBaseForce + swingSpeed * WB.HeadbuttSpeedForceMul + speed * WB.HeadbuttVelocityForceMul))
+		target:TakeDamageInfo(dmg)
+		target:SetVelocity(forceDir * (WB.HeadbuttTargetVelocityMul + speed * 0.25))
+		ply:SetVelocity(-forceDir * (WB.HeadbuttSelfVelocityMul + speed * 0.08))
+		sound.Play("Flesh.ImpactHard", hitPos, 75, math.random(96, 104), 1)
+		ply:ViewPunch(Angle(8, 0, 0))
+		target:ViewPunch(Angle(14, 0, 0))
+		headbuttNeuro(target, WB.HeadbuttConcussionTarget, WB.HeadbuttDisorientationTarget)
+		headbuttNeuro(ply, WB.HeadbuttConcussionSelf, WB.HeadbuttDisorientationSelf)
+		ply.headbuttNext = now + WB.HeadbuttCooldown
+		return true
+	end
+
+	if tr.Hit and (tr.HitWorld or (IsValid(target) and not (target:IsPlayer() or target:IsNPC() or target:IsRagdoll()))) then
+		impact(ply, tr.HitPos, tr.HitNormal, WB.HeadbuttWallScale)
+		ply:SetVelocity(-aim * WB.HeadbuttSelfVelocityMul)
+		ply.headbuttNext = now + WB.HeadbuttCooldown
+		return true
+	end
+
+	ply:ViewPunch(Angle(6, 0, 0))
+	ply.headbuttNext = now + WB.HeadbuttMissCooldown
+	return false
+end
+
+hook.Add("Player Think", "hg_headbutt_think", function(ply)
+	local now = CurTime()
+	if not ply:KeyDown(IN_USE) or ply:KeyDown(IN_ATTACK2) or (ply.headbuttNext or 0) > now or WB.Active(ply)
+		or not standingHeadbutter(ply) or IsValid(ply:GetNetVar("carryent")) or IsValid(ply:GetNetVar("carryent2")) then
+		ply.headbuttPitch = nil
+		return
+	end
+	local wep = holdingHands(ply)
+	if not wep or IsValid(wep.CarryEnt) then
+		ply.headbuttPitch = nil
+		return
+	end
+
+	local pitch = math.NormalizeAngle(ply:EyeAngles().p)
+	local anchor = ply.headbuttPitch
+	if not anchor or pitch < anchor or now - ply.headbuttPitchTime > WB.HeadbuttWindow then
+		ply.headbuttPitch, ply.headbuttPitchTime = pitch, now
+		return
+	end
+
+	local delta = pitch - anchor
+	if delta < WB.HeadbuttTilt then return end
+	ply.headbuttPitch = nil
+	WB.Headbutt(ply, delta / math.max(now - ply.headbuttPitchTime, 0.01))
+end)
 
 hook.Add("Player Think", "hg_wallbang_think", function(ply)
 	if not WB.Active(ply) then return end

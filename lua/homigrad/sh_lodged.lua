@@ -102,6 +102,7 @@ if CLIENT then
 		local class = entry.takeent
 		local weapon = isstring(class) and weapons.GetStored(class) or nil
 		local name = entry.CrossbowBolt and "crossbow bolt"
+			or isstring(entry.PrintName) and entry.PrintName
 			or weapon and weapon.PrintName
 			or "embedded item"
 		hg.radialOptions[#hg.radialOptions + 1] = {
@@ -214,6 +215,12 @@ end
 function hg.ApplyLodgedExtraction(owner, extractor, entry)
 	if not IsValid(owner) or not owner.organism or not istable(entry) then return end
 	local org = owner.organism
+	if entry.Superficial then
+		addLodgedWound(owner, org, entry, math.Rand(20, 40), math.Rand(20, 40))
+		showExtractionBlood(owner, entry)
+		org.painadd = math.min((org.painadd or 0) + math.Rand(6, 10), 150)
+		return
+	end
 	local body = lodgedBody(owner)
 	local region = hg.GetLodgedRegion(entry, body)
 	local vitalRegion = region == "head" or region == "neck" or region == "chest"
@@ -257,6 +264,13 @@ function hg.TakeLodged(ent, ply)
 			end
 		else
 			ply:Give(entry.takeent)
+		end
+	elseif isstring(entry.DropModel) then
+		local prop = ents.Create("prop_physics")
+		if IsValid(prop) then
+			prop:SetModel(entry.DropModel)
+			prop:SetPos(ply:EyePos() + ply:GetAimVector() * 20)
+			prop:Spawn()
 		end
 	else
 		local ammoType = entry.CrossbowBolt and "Armature" or "Arrow"
@@ -319,6 +333,11 @@ hook.Add("Org Think", "LodgedObjectComplications", function(owner, org)
 		local region = hg.GetLodgedRegion(entry, body)
 		entry.Region = region
 		org.painadd = math.min((org.painadd or 0) + 0.015, 150)
+
+		if entry.Superficial then
+			if moving and math.Rand(0, 1) < (fast and 0.02 or 0.006) then addLodgedWound(owner, org, entry, math.Rand(2, 4), math.Rand(6, 12)) end
+			continue
+		end
 
 		if (region == "lleg" or region == "rleg" or region == "leg") and moving then
 			org.painadd = math.min((org.painadd or 0) + (fast and 0.12 or 0.045), 150)

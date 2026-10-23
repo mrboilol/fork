@@ -25,18 +25,18 @@ local panicattack_threshold = 0.35
 local panicattack_add_decay_time = 45
 local panicattack_decay_hold_time = 4
 local panicattack_combat_decay_mul = 1.3
-local panicattack_rise_time = 3
+local panicattack_rise_time = 1.5
 local panicattack_decay_time = 4
 local panicattack_gain_chance = 1
-local panicattack_gain_mul = 0.3
-local panicattack_event_cap = 0.09
+local panicattack_gain_mul = 0.6
+local panicattack_event_cap = 0.18
 local panicattack_streak_window = 12
 local panicattack_streak_step = 0.15
 local panicattack_streak_max = 6
 local panicattack_adrenaline_add_target = 0.8
 local panicattack_combat_adrenaline_add_target = 2
 local panicattack_adrenaline_add_rise_time = 3
-local panicattack_damage_scale = 0.014
+local panicattack_damage_scale = 0.02
 local panicattack_damage_cooldown = 0.75
 local panicattack_witness_radius = 700
 local panicattack_death_radius = 900
@@ -216,6 +216,10 @@ hook.Add("Org Clear", "Main", function(org)
 	org.panicSustainedFearSince = 0
 	org.seizure = 0
 	org.seizureActive = false
+	org.convulsing = false
+	org.convulsionCure = 0
+	org.nextConvulsionRoll = 0
+	org.nextConvulsionSound = 0
 	org.seizureStart = 0
 	org.seizureEnd = 0
 	org.seizureFakeCooldownEnd = 0
@@ -815,18 +819,26 @@ function hg.organism.SetDeathCause(org, cause)
 	end
 end
 
-function hg.organism.KillFatalBrainDamage(org)
+function hg.organism.KillFatalBrainDamage(org, silent)
 	if not org or org.fatalBrainDeath then return false end
 
 	hg.organism.SetDeathCause(org, "fatal brain damage (brain >= 0.7 or fatal head hit)")
 	org.fatalBrainDeath = true
+
+	local owner = org.owner
+	if not silent and IsValid(owner) then
+		local char = hg.GetCurrentCharacter(owner)
+		local pos = IsValid(char) and char:GetPos() or owner:GetPos()
+		local bone = IsValid(char) and char:LookupBone("ValveBiped.Bip01_Head1")
+		if bone then pos = char:GetBonePosition(bone) or pos end
+		sound.Play("gore/headshot/headshot" .. math.random(1, 5) .. ".wav", pos, 85, 100, 1)
+	end
 	org.alive = false
 	org.needotrub = false
 	org.otrub = false
 	org.incapacitated = false
 	hg.organism.BeginPostMortemDecay(org)
 
-	local owner = org.owner
 	if IsValid(owner) and owner:IsPlayer() and owner:Alive() then
 		owner:Kill()
 	end
@@ -1077,12 +1089,45 @@ local function getSeizureLobeDamage(org)
 	return math.Clamp((org.brainFrontal or 0) + (org.brainParietal or 0) + (org.brainTemporal or 0) + (org.brainOccipital or 0), 0, 1)
 end
 
+hg.organism.convulsionConfig = {
+	rollDelay = 3,
+	riskStart = 0.25,
+	chanceMin = 0.03,
+	chanceMax = 0.25,
+	recoveryRisk = 0.1,
+	brainRate = 1 / 80,
+	hypoxiaPenalty = 0.35,
+	mannitolBlock = 0.25,
+	mannitolBrainShield = 1.6,
+	mannitolCureProgress = 15,
+	soundMin = 5,
+	soundMax = 9,
+	spasmVelocity = 55,
+	spasmAngVelocity = 420,
+	otrubDelayMin = 1,
+	otrubDelayMax = 3,
+	sounds = {"rotten_agony/convulse1.ogg", "rotten_agony/convulse2.ogg"}
+}
+
 local function apply_seizure_pose(rag, org, time)
-	if hg.applySeizurePostureToRagdoll then hg.applySeizurePostureToRagdoll(rag, org, 1) end
+	if hg.applySeizurePostureToRagdoll then hg.applySeizurePostureToRagdoll(rag, org, 1) return end
+	if time < (org.nextSeizureSpasm or 0) then return end
+	org.nextSeizureSpasm = time + math.Rand(0.6, 1.4) / seizure_shake_freq
+	local cfg = hg.organism.convulsionConfig
+	local amp = seizure_shake_amp * (org.convulsing and 1.4 or 1)
+	for i = 0, rag:GetPhysicsObjectCount() - 1 do
+		local phys = rag:GetPhysicsObjectNum(i)
+		if IsValid(phys) then
+			phys:AddVelocity(VectorRand() * cfg.spasmVelocity * amp)
+			phys:AddAngleVelocity(VectorRand() * cfg.spasmAngVelocity * amp)
+		end
+	end
 end
 local function stop_seizure(owner, org)
 	local wasActive = org.seizureActive
 	local seizureFakeCooldownEnd = tonumber(org.seizureFakeCooldownEnd) or tonumber(org.seizureEnd) or 0
+	org.convulsing = false
+	org.convulsionCure = 0
 	org.seizure = 0
 	org.seizureActive = false
 	org.seizureStart = 0
@@ -1122,6 +1167,91 @@ local function start_seizure(owner, org)
 	org.needfake = true
 	owner.fullsend = true
 	send_organism(org, owner)
+end
+
+function hg.organism.GetConvulsionRisk(org, ignoreBrainDamage)
+	local risk = 0
+	if not ignoreBrainDamage then
+		risk = math.Clamp(math.Remap(org.brain or 0, 0.3, 0.7, 0, 1), 0, 1)
+	end
+	risk = math.max(risk, math.Clamp((0.28 - (org.brainoxygen or 1)) / 0.28, 0, 1))
+	local bleedoutDeathBlood = hg.organism.BLEEDOUT_DEATH_BLOOD or 2000
+	risk = math.max(risk, math.Clamp((3000 - (org.blood or 5000)) / (3000 - bleedoutDeathBlood), 0, 1))
+	if org.heartstop then risk = math.max(risk, 0.8) end
+	if org.incapacitated then risk = math.max(risk, 0.5) end
+	if org.otrub and risk >= 0.15 then
+		risk = math.min(risk + math.Clamp(((org.uncon_timer or 0) - 30) / 120, 0, 0.5), 1)
+	end
+	return risk
+end
+
+function hg.organism.StartConvulsion(owner, org)
+	if org.convulsing then return end
+	local time = CurTime()
+	if not org.seizureActive then start_seizure(owner, org) end
+	if not org.seizureActive then return end
+	local cfg = hg.organism.convulsionConfig
+	org.convulsing = true
+	org.convulsionStart = time
+	org.convulsionCure = 0
+	org.nextConvulsionSound = 0
+	org.seizureOtrubAt = math.min(tonumber(org.seizureOtrubAt) or math.huge, time + math.Rand(cfg.otrubDelayMin, cfg.otrubDelayMax))
+	org.seizureEnd = time + 10
+	org.seizureFakeCooldownEnd = org.seizureEnd
+	owner.fullsend = true
+end
+
+function hg.organism.TickConvulsion(owner, org, timeValue, ignoreBrainDamage)
+	if not IsValid(owner) or not owner:IsPlayer() or not owner:Alive() then return end
+	local cfg = hg.organism.convulsionConfig
+	local time = CurTime()
+	local risk = hg.organism.GetConvulsionRisk(org, ignoreBrainDamage)
+	local mannitolK = math.Clamp((org.mannitol or 0) / 4, 0, 1)
+
+	if not org.convulsing then
+		if time < (org.nextConvulsionRoll or 0) then return end
+		org.nextConvulsionRoll = time + cfg.rollDelay
+		if risk < cfg.riskStart or mannitolK > cfg.mannitolBlock or (org.seizureSuppressedUntil or 0) > time then return end
+		local chance = math.Remap(risk, cfg.riskStart, 1, cfg.chanceMin, cfg.chanceMax)
+		if math.Rand(0, 1) < chance then hg.organism.StartConvulsion(owner, org) end
+		return
+	end
+
+	if not org.seizureActive then
+		org.convulsing = false
+		return
+	end
+
+	if risk < cfg.recoveryRisk then
+		stop_seizure(owner, org)
+		return
+	end
+
+	if mannitolK > 0 then
+		org.convulsionCure = (org.convulsionCure or 0) + timeValue * mannitolK
+		if org.convulsionCure >= cfg.mannitolCureProgress then
+			stop_seizure(owner, org)
+			return
+		end
+	end
+
+	if not ignoreBrainDamage then
+		local shield = math.Clamp(1 - mannitolK * cfg.mannitolBrainShield, 0, 1)
+		if shield > 0 then
+			org.brain = math.min((org.brain or 0) + timeValue * cfg.brainRate * shield, 1)
+		end
+	end
+
+	if (org.seizureEnd or 0) - time < 5 then
+		org.seizureEnd = time + 10
+		org.seizureFakeCooldownEnd = org.seizureEnd
+	end
+
+	if time >= (org.nextConvulsionSound or 0) then
+		org.nextConvulsionSound = time + math.Rand(cfg.soundMin, cfg.soundMax)
+		local source = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
+		source:EmitSound(cfg.sounds[math.random(#cfg.sounds)], 75, math.random(95, 105))
+	end
 end
 local function resolve_panic_attacker(victim, attacker)
 	if IsValid(attacker) then
@@ -1431,7 +1561,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		elseif not org.panicMode then
 			org.panicMode = math.random(2) == 1 and "fight" or "flight"
 			if isPly then
-				owner:Notify(org.panicMode == "fight" and "I have to fight." or "I need to get out of here.", 2, "panicattack_mode", 2, nil, Color(255, 170, 120))
+				owner:Notify(org.panicMode == "fight" and "I need to fight back." or "I need to get out of here now.", 2, "panicattack_mode", 2, nil, Color(255, 170, 120))
 			end
 		end
 		local panicSeverity = math.Clamp(math.Remap(org.panicattack, panicattack_threshold, 1, 0, 1), 0, 1)
@@ -1490,6 +1620,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	org.lastSeizureBrain = org.brain or 0
 	org.lastSeizureLobeDamage = lobeDamage
 	org.lastSeizureTemperature = temperature
+	hg.organism.TickConvulsion(owner, org, timeValue, ignoreBrainDamage)
 	if org.seizure >= 1 and !org.seizureActive and isPly and owner:Alive() then
 		start_seizure(owner, org)
 	elseif org.seizureActive and org.seizure <= 0 then
@@ -1503,7 +1634,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 			seizureStart = time
 			org.seizureStart = time
 		end
-		local maximumEnd = seizureStart + seizure_max_duration
+		local maximumEnd = org.convulsing and math.huge or seizureStart + seizure_max_duration
 		local seizureEnd = tonumber(org.seizureEnd)
 		if not seizureEnd or seizureEnd != seizureEnd or seizureEnd <= seizureStart or seizureEnd > maximumEnd then
 			seizureEnd = maximumEnd

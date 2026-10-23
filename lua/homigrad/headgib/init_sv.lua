@@ -461,6 +461,7 @@ function Gib_Input(rag, bone, force, damage)
 		net.WriteVector(force or vector_origin)
 		net.SendPVS(rag:GetPos())
 
+		hook.Run("HG Decapitated", rag)
 	end
 end
 

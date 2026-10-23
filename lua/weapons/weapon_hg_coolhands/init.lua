@@ -857,7 +857,7 @@ end
 local depang = Angle(0.5, 0, 0)
 function SWEP:PrimaryAttack(forcespecial)
 	local owner = self:GetOwner()
-	if not IsValid(owner) or owner:InVehicle() then return end
+	if not IsValid(owner) or owner:InVehicle() or hg.WallBang.Active(owner) then return end
 	if (self.attacked or 0) > CurTime() then return end
 	if owner.organism and owner.organism.rarmamputated and owner.organism.larmamputated then return end
 

@@ -141,6 +141,8 @@ hook.Add("FindUseEntity", "findhguse", function(ply, heldent)
 		ent = heldent
 	end
 
+	if IsValid(ent) and (ent:IsPlayer() or ent:IsNPC() or ent:IsNextBot()) then return false end
+
 	return ent
 end)
 

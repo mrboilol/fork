@@ -3073,14 +3073,22 @@ local function velocityDamage(ent, data)
 				org.consciousness = math.max((org.consciousness or 1) - consciousnessLoss, hadhelmet and 0.5 or 0.3)
 			end
 
-			if oldSkull < 1 and org.skull == 1 then
+			local skullBroke = oldSkull < 1 and org.skull == 1
+			if skullBroke or (oldSkull >= 1 and normalSpeed >= 500 and (org.lastSkullImpactBurst or 0) < CurTime()) then
+				org.lastSkullImpactBurst = CurTime() + 0.25
 				local skullImpactPos = getHeadImpactPos(ent, data.HitPos)
-				net.Start("hg_bloodimpact")
-				net.WriteVector(skullImpactPos)
-				net.WriteVector((data.OurOldVelocity - data.TheirOldVelocity):GetNormalized() / 10)
-				net.WriteFloat(math.max(dmg * K.ragdoll_fall_skull_break_blood_mul, 4))
-				net.WriteInt(3, 8)
-				net.SendPVS(skullImpactPos)
+				local impactDir = (data.OurOldVelocity - data.TheirOldVelocity):GetNormalized()
+				for _ = 1, skullBroke and 4 or 2 do
+					net.Start("hg_bloodimpact")
+					net.WriteVector(skullImpactPos)
+					net.WriteVector((impactDir + VectorRand(-0.6, 0.6)):GetNormalized() * math.Rand(0.15, 0.35))
+					net.WriteFloat(math.max(dmg * K.ragdoll_fall_skull_break_blood_mul, 4))
+					net.WriteInt(math.random(4, 7), 8)
+					net.SendPVS(skullImpactPos)
+				end
+				if hg.organism.BoneBloodDecals and (skullBroke or normalSpeed >= 700) then
+					hg.organism.BoneBloodDecals(skullImpactPos, impactDir, skullBroke and math.random(4, 7) or math.random(1, 3), ent)
+				end
 			end
 
 			if not noDismemberment and !ent.headexploded and lane.name == "skull" and skullAllowsHeadGib(org) and structuralBudget * headDamageMul > K.player_fall_head_gib_threshold * headGibJawMul(org) then
@@ -3193,7 +3201,7 @@ function hg.BreakNeck(ent, recipient, soundEnt, deathChance)
 	end)
 
 	if deathChance and math.Rand(0, 1) < deathChance and hg.organism.KillFatalBrainDamage then
-		hg.organism.KillFatalBrainDamage(org)
+		hg.organism.KillFatalBrainDamage(org, true)
 	end
 end
 

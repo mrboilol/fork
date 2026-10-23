@@ -3,8 +3,6 @@ if SERVER then util.AddNetworkString("headtrauma_flash") end
 
 local player_crush_amputation_threshold = 7
 local melee_skull_bone_mul = 0.42
-local melee_skull_consciousness_mul = 0.3
-local melee_skull_consciousness_max = 0.55
 local melee_skull_knockout_threshold = 1.3
 local skull_break_brain_mul = 0.8
 local skull_break_neck_mul = 2.5
@@ -29,13 +27,32 @@ local function getBurstPos(org, dmgInfo, hit)
 	if IsValid(body) then return body:WorldSpaceCenter() end
 end
 
-local function bloodBurst(org, dmgInfo, amount, hit, severe)
+local severe_burst_bones = {skull = true, spine3 = true}
+local repeat_burst_cooldown = 0.12
+local repeat_burst_min_dmg = 0.12
+local brutal_blunt_dmg = 1.2
+local rare_decal_chance = 0.15
+
+local function bloodDecals(pos, dir, count, filter)
+	for _ = 1, count do
+		local decalDir = (dir * 0.6 + VectorRand() - vector_up * 0.5):GetNormalized()
+		util.Decal("Blood", pos, pos + decalDir * 150, filter)
+	end
+end
+hg.organism.BoneBloodDecals = bloodDecals
+
+local function isBrutalHit(dmgInfo, dmg)
+	if dmgInfo:IsDamageType(DMG_BUCKSHOT + DMG_BLAST) then return true end
+	return (dmg or 0) >= brutal_blunt_dmg and dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH + DMG_FALL)
+end
+
+local function bloodBurst(org, dmgInfo, amount, hit, severe, dmg)
 	local pos = getBurstPos(org, dmgInfo, hit)
 	if not pos then return end
 	local force = dmgInfo:GetDamageForce():GetNormalized()
 	if force:IsZero() then force = vector_up end
 
-	for _ = 1, (severe and math.random(3, 5) or 1) do
+	for _ = 1, (severe and math.random(6, 8) or math.random(2, 3)) do
 		local normal = (force + VectorRand(-0.9, 0.9)):GetNormalized()
 		local effect = EffectData()
 		effect:SetOrigin(pos)
@@ -46,16 +63,35 @@ local function bloodBurst(org, dmgInfo, amount, hit, severe)
 		util.Effect("BloodImpact", effect, true, true)
 		net.Start("hg_bloodimpact")
 		net.WriteVector(pos)
-		net.WriteVector(normal / 10)
-		net.WriteFloat(math.Clamp(amount, 1, severe and 8 or 2))
-		net.WriteInt(severe and math.random(2, 5) or 1, 8)
+		net.WriteVector(normal * (severe and math.Rand(0.2, 0.45) or 0.15))
+		net.WriteFloat(math.Clamp(amount, 1, severe and 10 or 3))
+		net.WriteInt(severe and math.random(5, 8) or math.random(2, 3), 8)
 		net.SendPVS(pos)
 	end
+
+	local decals = 0
+	if isBrutalHit(dmgInfo, dmg) then
+		decals = severe and math.random(4, 7) or math.random(1, 3)
+	elseif severe and math.Rand(0, 1) < rare_decal_chance then
+		decals = math.random(1, 2)
+	end
+	if decals > 0 then bloodDecals(pos, force, decals, IsValid(org.owner) and hg.GetCurrentCharacter(org.owner) or nil) end
+end
+
+local function repeatBloodBurst(org, dmgInfo, key, dmg, hit)
+	if dmg < repeat_burst_min_dmg or dmgInfo:IsDamageType(DMG_CRUSH + DMG_FALL) then return end
+	org.boneBurstTimes = org.boneBurstTimes or {}
+	local now = CurTime()
+	if (org.boneBurstTimes[key] or 0) > now then return end
+	org.boneBurstTimes[key] = now + repeat_burst_cooldown
+	local severe = severe_burst_bones[key]
+	bloodBurst(org, dmgInfo, severe and math.Clamp(3 + dmg * 4, 4, 10) or math.Clamp(1 + dmg * 2, 1, 3), hit, severe, dmg)
 end
 
 local function damageBone(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet, nodmgchange)
 	local crush = isCrush(dmgInfo)
 	local owner = org.owner
+	local rawDmg = dmg
 	if IsValid(owner) and owner.GetTraitMultiplier then dmg = dmg * owner:GetTraitMultiplier("bone_damage", 1) end
 	
 	if dmgInfo:IsDamageType(DMG_SLASH) and dmg > 1.5 then
@@ -78,8 +114,12 @@ local function damageBone(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ric
 
 	local val = org[key]
 	org[key] = math.min(org[key] + dmg, 1)
-	if val < 1 and org[key] >= 1 and key ~= "skull" then
-		bloodBurst(org, dmgInfo, key == "spine3" and 5 or 1, hit, key == "spine3")
+	if key ~= "skull" then
+		if val < 1 and org[key] >= 1 then
+			bloodBurst(org, dmgInfo, severe_burst_bones[key] and 6 or 2, hit, severe_burst_bones[key], rawDmg)
+		elseif val >= 1 then
+			repeatBloodBurst(org, dmgInfo, key, rawDmg, hit)
+		end
 	end
 	local scale = 1 - (org[key] - val)
 	
@@ -1011,6 +1051,16 @@ hook.Add("CanListenOthers", "CantHaveShitInDetroit", function(output, input, isC
 end)
 
 
+local function getSkullBurstPos(org, dmgInfo)
+	local body = hg.GetCurrentCharacter(org.owner)
+	local pos = dmgInfo:GetDamagePosition()
+	if IsValid(body) and (pos:IsZero() or pos:DistToSqr(body:WorldSpaceCenter()) > 200 * 200) then
+		local head = body:LookupBone("ValveBiped.Bip01_Head1")
+		pos = head and body:GetBonePosition(head) or body:WorldSpaceCenter()
+	end
+	return pos
+end
+
 input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet, impact)
 	local oldDmg = org.skull
 	local oldBrain = org.brain or 0
@@ -1024,8 +1074,11 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	local result, vecrand, appliedSkullDmg = damageBone(org, 0.25, bluntMelee and dmg * melee_skull_bone_mul or dmg, dmgInfo, "skull", boneindex, dir, hit, ricochet, oldDmg >= 1)
 	if oldDmg >= 1 then
 		result = 0
-		if not (impact and impact.source == "physics") and not dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_BLAST) and hg.organism.input_list.brainFrontal then
-			hg.organism.input_list.brainFrontal(org, bone, dmg, dmgInfo)
+		if not (impact and impact.source == "physics") then
+			repeatBloodBurst(org, dmgInfo, "skull", dmg, getSkullBurstPos(org, dmgInfo))
+			if not dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_BLAST) and hg.organism.input_list.brainFrontal then
+				hg.organism.input_list.brainFrontal(org, bone, dmg, dmgInfo)
+			end
 		end
 	end
 	local inflictor = dmgInfo:GetInflictor()
@@ -1070,15 +1123,10 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		if hg.organism.AddInstantPain then hg.organism.AddInstantPain(org, dmg * 30, "head") else org.avgpain = org.avgpain + dmg * 30 end
 
 		if oldDmg != 1 then
-			local body = hg.GetCurrentCharacter(org.owner)
-			local pos = dmgInfo:GetDamagePosition()
-			if IsValid(body) and (pos:IsZero() or pos:DistToSqr(body:WorldSpaceCenter()) > 200 * 200) then
-				local head = body:LookupBone("ValveBiped.Bip01_Head1")
-				pos = head and body:GetBonePosition(head) or body:WorldSpaceCenter()
-			end
+			local pos = getSkullBurstPos(org, dmgInfo)
 			playSkullFractureSound(pos)
 			if not (impact and impact.source == "physics") then
-				bloodBurst(org, dmgInfo, math.max(dmg / 8, 4), pos, true)
+				bloodBurst(org, dmgInfo, math.Clamp(4 + dmg * 2, 7, 10), pos, true, dmg)
 			end
 			sendThought(org, "Your skull is broken.", "thought_skull", 4, Color(255, 180, 180))
 
@@ -1090,15 +1138,9 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		end
 	end
 
-	if bluntMelee and org.consciousness and not isStab then
-		local drain = math.Clamp(dmg * melee_skull_consciousness_mul, 0, melee_skull_consciousness_max) * (helmetProtectedHit and 0.35 or 1)
-		org.consciousness = math.max(org.consciousness - drain, 0)
-	end
-
 	org.shock = org.shock + dmg * 3
 
 	local rnd = not headOutcomeHandled and (math.random(10) == 1 or dmgInfo:IsDamageType(DMG_CRUSH)) and brainEnergy > 0.05
-	org.consciousness = math.Approach(org.consciousness, 0, rnd and dmg * 2 or 0)
 
 	org.brain = math.min(org.brain + (rnd and dmg * 0.05 or 0), 1)
 	if not ignoreBrainDamage and impact and impact.source == "physics" and oldDmg >= 1 and brainEnergy > 0.05 then
@@ -1136,9 +1178,11 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 
 	local skullDelta = math.max(org.skull - oldDmg, 0)
 	local brainDelta = math.max(org.brain - oldBrain, 0)
+	local skullBrokeNow = oldDmg < 1 and org.skull >= 1
+	local skullConsciousDelta = skullBrokeNow and skullDelta or 0
 	local hasHelmet = org.owner.armors and org.owner.armors["head"] != nil
 	local concussionGain = 0
-	local headTraumaSeverity = skullDelta * 2.8 + brainDelta * 5.5 + math.Clamp(brainEnergy * 0.1, 0, 1)
+	local headTraumaSeverity = skullConsciousDelta * 2.8 + brainDelta * 5.5 + math.Clamp(brainEnergy * 0.1, 0, 1)
 	if not headOutcomeHandled and org.alive and not org.otrub and headTraumaSeverity >= 0.85 then
 		local knockoutChance = math.Clamp((headTraumaSeverity - 0.65) * 0.18 + brainDelta * 0.35, 0, helmetProtectedHit and 0.06 or 0.34)
 		if math.Rand(0, 1) < knockoutChance then
@@ -1149,7 +1193,8 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		end
 	end
 	if not headOutcomeHandled and org.alive and not org.otrub and not org.needotrub and not isStab and dmg > 0.2
-		and not (impact and impact.source == "physics") and (isMelee(dmgInfo) or dmgInfo:IsDamageType(DMG_CRUSH)) then
+		and not (impact and impact.source == "physics") and (isMelee(dmgInfo) or dmgInfo:IsDamageType(DMG_CRUSH))
+		and (org.skull >= 1 or brainDelta > 0) then
 		local bluntKnockoutChance = math.Clamp((dmg - melee_skull_knockout_threshold) * 0.5, 0, 0.6) * (helmetProtectedHit and 0.25 or 1)
 		if math.Rand(0, 1) < bluntKnockoutChance then
 			org.needotrub = true
@@ -1159,7 +1204,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		end
 	end
 	if not (impact and impact.headOutcomeHandled) and hg.organism.module.concussion and hg.organism.module.concussion.AddHeadTrauma then
-		concussionGain = hg.organism.module.concussion.AddHeadTrauma(org, skullDelta, brainDelta, brainEnergy * (helmetProtectedHit and 1.8 or 1), dmgInfo)
+		concussionGain = hg.organism.module.concussion.AddHeadTrauma(org, skullConsciousDelta, brainDelta, brainEnergy * (helmetProtectedHit and 1.8 or 1), dmgInfo)
 	end
 
 	if not ignoreBrainDamage and not isStab and brainEnergy > 0.05 then

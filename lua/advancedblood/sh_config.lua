@@ -604,8 +604,9 @@ C.Ground = {
 	drawDist = 2200,
 	sheen    = 0.5,              -- what a wet stain mirrors of the light around it, times Fresnel: half of what a
 	                             -- smooth liquid would (a film on a rough floor is no mirror)
-	gloss    = false,
 }
+
+C.Shine = false
 
 -- impact physics thresholds on K = sqrt(We) * Re^(1/4)
 C.Impact = {

@@ -503,6 +503,28 @@ hook.Add("Post Post Pre Post Processing", "HG_DamageFlash", function()
 	damageFlashColor["$pp_colour_mulr"] = flash * 0.35
 	DrawColorModify(damageFlashColor)
 end)
+local painBlinkStart = -1
+local painBlinkPulse = 0.15
+local painBlinkCount = 3
+local painBlinkColor = {
+	["$pp_colour_addr"] = 0, ["$pp_colour_addg"] = 0, ["$pp_colour_addb"] = 0,
+	["$pp_colour_brightness"] = 0, ["$pp_colour_contrast"] = 1,
+	["$pp_colour_colour"] = 1, ["$pp_colour_mulr"] = 0,
+	["$pp_colour_mulg"] = 0, ["$pp_colour_mulb"] = 0
+}
+net.Receive("hg_pain_blink", function()
+	painBlinkStart = CurTime()
+end)
+hook.Add("Post Post Pre Post Processing", "HG_PainBlink", function()
+	local elapsed = CurTime() - painBlinkStart
+	if elapsed < 0 or elapsed >= painBlinkPulse * painBlinkCount then return end
+
+	local flash = math.sin((elapsed % painBlinkPulse) / painBlinkPulse * math.pi)
+	painBlinkColor["$pp_colour_addr"] = flash * 0.4
+	painBlinkColor["$pp_colour_colour"] = 1 - flash * 0.6
+	painBlinkColor["$pp_colour_mulr"] = flash * 0.6
+	DrawColorModify(painBlinkColor)
+end)
 local dyingAudioFade = 0
 local ischemicVignetteLerp = 0
 local shockVignetteLerp = 0
@@ -598,14 +620,15 @@ local vitalityDyingVolumeMax = 1.5
 -- file is quieter than the other dying tracks, so give it a higher ceiling.
 local sonimCookedForegroundVolume = 1.2
 local painBeatOverlayPath = "sound/rem_pain.mp3"
-local panicattackFadeStart = 0.2
-local panicattackThreshold = 0.9
+local panicattackFadeStart = 0.1
+local panicattackThreshold = 0.65
 local panicattackVolumeMul = 1
 local function getPanicAttackFx(org)
 	local panicConVar = GetConVar("hg_panic")
 	if panicConVar and not panicConVar:GetBool() then return 0 end
 	local panic = math.Clamp(tonumber(org.panicattack) or 0, 0, 1)
 	local intensity = math.Clamp(math.Remap(panic, panicattackFadeStart, panicattackThreshold, 0, panicattackVolumeMul), 0, 1)
+	if org.panicattackActive then intensity = math.max(intensity, 0.45) end
 	if org.otrub or org.incapacitated then return intensity * 0.22 end
 	return intensity
 end
@@ -629,7 +652,7 @@ hg.screeneffects_config = {
 	vitalityDyingVolumeMax = vitalityDyingVolumeMax,
 	sonimCookedForegroundVolume = sonimCookedForegroundVolume,
 	painBeatOverlayPath = painBeatOverlayPath,
-	panicattackVisualExponent = 1.75,
+	panicattackVisualExponent = 1.1,
 	painBeatOverlayVolumeMul = painBeatOverlayVolumeMul,
 	painThresholdMax = painThresholdMax,
 	painAgonyThreshold = painAgonyThreshold,
@@ -2258,7 +2281,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	local hypertension = math.Clamp(org.hypertension or 0, 0, 1)
 	local hypertensionK = math.Clamp(hypertension * 1.27, 0, 1)
 	local adrenalineMitigation = math.Clamp((org.adrenaline or 0) / 3, 0, 1) * 0.25
-	local hypertensionDisorientation = hypertension > 0 and (0.25 + hypertensionK * (1 - adrenalineMitigation) * 1.5) or 0
+	local hypertensionDisorientation = hypertension > 0 and (0.4 + hypertensionK * (1 - adrenalineMitigation) * 1.9) or 0
 	local neuroDisorientation = math.max(disorientation - hypertensionDisorientation, 0)
 	local disorientationSpike = math.max(neuroDisorientation - (lastDisorientationFx or 0), 0)
 	local concussionSpike = math.max(concussion - (lastConcussionFx or 0), 0)
