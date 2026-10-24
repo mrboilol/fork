@@ -796,6 +796,8 @@ function SWEP:ThinkAdd()
 end
 
 function SWEP:Holster(wep)
+    if hg.HolsterGate(self, wep) then return false end
+
     self:StopChainsawSounds()
     self.ChainsawOn = false
     self.ChainsawAttacking = false

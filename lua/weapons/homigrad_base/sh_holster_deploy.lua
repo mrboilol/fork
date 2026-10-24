@@ -14,13 +14,72 @@ function SWEP:GetDeployDuration()
 	return math.max(self.CooldownDeploy / self.Ergonomics * roleDeployMul * stanceMul / Lerp(armEffectiveness, 0.5, 1), 0.3)
 end
 
---!! fix ts shit
+function SWEP:GetHolsterDuration()
+	return self:GetDeployDuration()
+end
+
+function SWEP:GetDrawFraction()
+	local owner = self:GetOwner()
+	if IsValid(owner) and owner.GetActiveWeapon and owner:GetActiveWeapon() ~= self then return end
+
+	local now = CurTime()
+	if self.holster then
+		return math.Clamp((self.holster - now) / math.max(hg.GetHolsterTotal(self), 0.001), 0, 1)
+	end
+	if self.deploy then
+		return math.Clamp(1 - (self.deploy - now) / self:GetDeployDuration(), 0, 1)
+	end
+end
+
+local drawAnims = {"deploy", "draw"}
+
+function SWEP:GetDrawAnim()
+	local wm = self:GetWM()
+	if not wm then return end
+	for _, name in ipairs(drawAnims) do
+		local sequence = self.AnimList[name]
+		if isstring(sequence) and wm:LookupSequence(sequence) >= 0 then return name end
+	end
+end
+
+function SWEP:UpdateDrawAnim()
+	local owner = self:GetOwner()
+	if not IsValid(owner) or owner:GetActiveWeapon() ~= self then
+		self.drawAnimKey = nil
+		return
+	end
+
+	if not self:GetWM() then return end
+
+	local key = self.holster or (self.deploy and -self.deploy)
+	if key == self.drawAnimKey then return end
+
+	local previous = self.drawAnimKey
+	self.drawAnimKey = key
+
+	local anim = self:GetDrawAnim()
+	if not anim then return end
+
+	local duration = self:GetDeployDuration()
+	local now = CurTime()
+	if self.holster then
+		local fraction = self:GetDrawFraction()
+		self.SuppressAnimEvents = true
+		self:PlayAnim(anim, {duration, duration * (1 - fraction)}, false, nil, true)
+		self.SuppressAnimEvents = nil
+	elseif self.deploy then
+		self:PlayAnim(anim, {duration, math.Clamp(duration - (self.deploy - now), 0, duration)}, false)
+	elseif previous then
+		self:PlayAnim("idle", 1, not self.NoIdleLoop)
+	end
+end
+
 function SWEP:Step_HolsterDeploy(time)
 	self.deploy = self:GetDeploy() != 0 and self:GetDeploy() or nil
-	--self.holster = self:GetHolster() != 0 and self:GetHolster() or nil
+	self.holster = hg.GetHolsterEnd(self)
 
 	if self.deploy and self.deploy < time then if self.Deploy_End then self:Deploy_End() end end
-	--if self.holster and self.holster < time then if self.Holster_End then self:Holster_End() end end
+	if CLIENT then self:UpdateDrawAnim() end
 end
 
 function SWEP:WeaponDeployPost()
@@ -28,16 +87,8 @@ end
 
 if SERVER then return end
 
---SWEP.endedholster = false
 function SWEP:Holster(wep)
-	--[[if self.endedholster == true then
-		input.SelectWeapon(wep)
-		return true
-	end]]
-
-	--self.endedholster = false
-
-	--if self.holster ~= nil then return false end
+	if hg.HolsterGate(self, wep) then return false end
 
 	if not IsFirstTimePredicted() then return end
 
@@ -49,40 +100,10 @@ function SWEP:Holster(wep)
 
 	if self.WorldModelFake then self:PlayAnim("idle", 1, not self.NoIdleLoop) end
 
-	do return true end --!!
-
-	self:AttachAnim()
-
-	local time = CurTime()
-	if self.holster and self.holster - CurTime() < 0 then self:Holster_End() end
-
-        wep = IsValid(wep) and wep or (hg.GetHandsWeapon and hg.GetHandsWeapon(self:GetOwner()) or self:GetOwner():GetWeapon("weapon_hands_sh"))
-	self:SetHolsterWep(wep)
-
-	self.holster = time + self.CooldownHolster / self.Ergonomics
-	self:SetHolster(self.holster)
-
-	--self.endedholster = true
-
 	return true
 end
 
-function SWEP:Holster_End()
-	if IsValid(self:GetHolsterWep()) then
-		input.SelectWeapon(self:GetHolsterWep())
-	end
-
-	if not IsValid(self:GetOwner()) or self:GetOwner():GetActiveWeapon() ~= self then
-		self:SetHolsterWep(NULL)
-		self.holster = nil
-		self:SetHolster(0)
-	end
-
-	--self.endedholster = false
-end
-
 function SWEP:Deploy()
-	--if not IsFirstTimePredicted() then return end
 	local time = CurTime()
 	self:ResetTransientAimState()
 
@@ -90,10 +111,7 @@ function SWEP:Deploy()
 		self:GetWM():ManipulateBoneScale(self.MagIndex, vector_origin)
 	end
 
-	if self.WorldModelFake then self:PlayAnim("idle", 1, not self.NoIdleLoop) end
-
-	--[[self.holster = nil
-	self:SetHolster(0)]]
+	if self.WorldModelFake and not self:GetDrawAnim() then self:PlayAnim("idle", 1, not self.NoIdleLoop) end
 
 	self.deploy = time + self:GetDeployDuration()
 	self:SetDeploy(self.deploy)

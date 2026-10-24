@@ -594,12 +594,29 @@ function SWEP:Deploy()
     self.Initialzed = true
     self:PlayAnim("deploy")
     self:SetHold(self.HoldType)
-	
+
+	local drawEnd = CurTime() + self:GetHolsterDuration()
+	self:SetNextPrimaryFire(drawEnd)
+	self:SetNextSecondaryFire(drawEnd)
+
 	return true
 end
 
+function SWEP:GetHolsterDuration()
+	local deploy = self.AnimList and self.AnimList.deploy
+	return istable(deploy) and deploy[2] or 0.6
+end
+
+function SWEP:OnHolsterBegin(total, fraction)
+	local remaining = total * fraction
+	self:SetNextPrimaryFire(CurTime() + remaining)
+	self:SetNextSecondaryFire(CurTime() + remaining)
+	self:PlayAnim("deploy", remaining, nil, nil, true)
+end
+
 function SWEP:Holster(wep)
-    --self:SetInAttack(false)
+    if hg.HolsterGate(self, wep) then return false end
+
     return true
 end
 

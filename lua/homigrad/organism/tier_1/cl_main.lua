@@ -682,7 +682,7 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 	local hypoxicVignette = math.max(lowBloodVisual ^ 1.6 * 0.4, lowO2Visual ^ 1.5 * 0.5)
 	local shockVignette = math.max(lowConsciousnessVisual ^ 1.35, shockVisual ^ 2.5 * 0.8, hypoxicVignette)
 	local consciousnessBlackout = lowConsciousnessVisual ^ 2.6 * 0.58
-	k1 = Lerp(FrameTime() * 15, k1 or 0, math.min(math.min(adrenaline / 1, 2),1.5))
+	k1 = Lerp(FrameTime() * 15, k1 or 0, math.Clamp((adrenaline - 3) / 0.5, 0, 1.5))
 	k2 = (30 - (o2 or 30)) / 30 + consciousnessBlackout
 	k3 = ((5000 / math.max(blood, 1000)) - 1) * 1.5
 
@@ -722,8 +722,8 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 		render.DrawScreenQuad()
 	end
 
-	if ((disorientationLerp > 1 or adrenaline > 4) and lply:Alive()) or brain > 0 then
-		local add2 = math.max(disorientationLerp - 1, adrenaline > 4 and 0.35 or 0)
+	if ((disorientationLerp > 1 or adrenaline >= 4) and lply:Alive()) or brain > 0 then
+		local add2 = math.max(disorientationLerp - 1, adrenaline >= 4 and 0.35 or 0)
 		if not lply:HasTrait("blind") and not brain_motionblur and lply.PlayerClassName ~= "headcrabzombie" then hg.DrawWorldMotionBlur(0.15 - math.Clamp(add2 / 1, 0, 0.1), add2 * 2, 0.001) end
 		if disorientationLerp > 2 then
 			local add = (disorientationLerp - 2) * 2

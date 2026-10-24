@@ -192,16 +192,16 @@ local moodleTexts = {
 		[4] = {title = "Cardiac Arrest", description = "Your heart has stopped producing effective circulation."},
 	}},
 	low_blood = {levels = {
-		[1] = {title = "Low Circulation", description = "Your pulse or blood pressure is slightly below normal."},
-		[2] = {title = "Slow Pulse or Hypotension", description = "A slow pulse or reduced blood pressure is causing weakness and lightheadedness."},
-		[3] = {title = "Severe Low Circulation", description = "Your pulse or blood pressure is dangerously low."},
-		[4] = {title = "Critical Low Circulation", description = "Your circulation may no longer sustain your vital organs."},
+		[1] = {title = "Slow Pulse", description = "Your pulse is slightly below normal."},
+		[2] = {title = "Bradycardia", description = "A slow pulse is causing weakness and lightheadedness."},
+		[3] = {title = "Severe Bradycardia", description = "Your pulse is dangerously low."},
+		[4] = {title = "Critical Bradycardia", description = "Your heart rate may no longer sustain your vital organs."},
 	}},
 	high_blood = {levels = {
-		[1] = {title = "Elevated Circulation", description = "Your pulse or blood pressure is slightly above normal."},
-		[2] = {title = "Fast Pulse or Hypertension", description = "A fast pulse or high blood pressure is straining your cardiovascular system."},
-		[3] = {title = "Severe High Circulation", description = "Your pulse or blood pressure is dangerously high."},
-		[4] = {title = "Critical High Circulation", description = "Extreme pulse or pressure threatens immediate organ and vessel damage."},
+		[1] = {title = "Elevated Pulse", description = "Your pulse is slightly above normal."},
+		[2] = {title = "Fast Pulse", description = "A fast pulse is straining your cardiovascular system."},
+		[3] = {title = "Tachycardia", description = "Your pulse is dangerously high."},
+		[4] = {title = "Critical Tachycardia", description = "An extreme pulse threatens immediate organ and vessel damage."},
 	}},
 	hypovolemia = {levels = {
 		[1] = {title = "Mild Blood Loss", description = "Your circulating blood volume is below normal."},
@@ -763,20 +763,13 @@ local function buildEffects(ply, org)
 	if org.heartstop == true then add(effects, "asystole", "asystole", 4, "bad", -100) end
 
 	local pulse = math.max(orgNumber(org, "pulse", 70), 0)
-	local rawPressure = tonumber(org.bloodPressure)
-	local pressure = math.max(rawPressure or 0, 0)
-	local hasPressure = rawPressure ~= nil
-	local hypotension = math.Clamp(orgNumber(org, "hypotension", 0), 0, 1)
-	local lowPulseSeverity = math.Clamp((70 - pulse) / 40, 0, 1)
-	local lowPressureSeverity = hasPressure and math.Clamp((70 - pressure) / 35, 0, 1) or 0
-	local lowCirculationSeverity = math.max(lowPulseSeverity, lowPressureSeverity, hypotension)
-	local hypertension = math.Clamp(orgNumber(org, "hypertension", 0), 0, 1)
+	local pressure = math.max(tonumber(org.bloodPressure) or 0, 0)
+	local lowCirculationSeverity = math.Clamp((70 - pulse) / 40, 0, 1)
 	local highPulseSeverity = math.Clamp((pulse - 100) / 80, 0, 1)
-	local highPressureSeverity = hasPressure and math.Clamp((pressure - 100) / 45, 0, 1) or 0
 	local adrenalineSurge = orgNumber(org, "adrenaline", 0) > 4
-	local highCirculationSeverity = math.max(highPulseSeverity, highPressureSeverity, hypertension, adrenalineSurge and 0.6 or 0)
-	local lowCirculationActive = pulse > 0 and (pulse < 70 or (hasPressure and pressure < 70) or hypotension > 0.01)
-	local highCirculationActive = pulse > 100 or (hasPressure and pressure > 100) or hypertension > 0.01 or adrenalineSurge
+	local highCirculationSeverity = math.max(highPulseSeverity, adrenalineSurge and 0.6 or 0)
+	local lowCirculationActive = pulse > 0 and pulse < 70
+	local highCirculationActive = pulse > 100 or adrenalineSurge
 	if not org.heartstop and lowCirculationActive and not adrenalineSurge and (not highCirculationActive or lowCirculationSeverity >= highCirculationSeverity) then
 		local level = highRank(math.max(lowCirculationSeverity, 0.1), {0.1, 0.3, 0.6, 0.85})
 		add(effects, "low_blood", level >= 3 and "superlowblood" or "lowblood", level, "bad", 27, math.floor(pulse) .. " bpm / " .. math.floor(pressure) .. " MAP")

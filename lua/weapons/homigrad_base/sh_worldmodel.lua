@@ -74,21 +74,24 @@ function SWEP:GetInertialAimAngle(target, dtime)
 	local dt = math.Clamp(dtime, 0, 0.05)
 	local control = (self.Ergonomics or 1) / math.sqrt(factor)
 	local stiffness = math.Clamp(42 * control, 12, 70)
-	local damping = math.Clamp(7.5 * control, 3.8, 10)
-	if self:IsZoom() then stiffness = stiffness * 1.45 damping = damping * 1.2 end
+	if self:IsZoom() then stiffness = stiffness * 1.45 end
 	if self:IsResting() then
-		stiffness = stiffness * 3 damping = damping * 2.2
+		stiffness = stiffness * 3
 	else
-		local steady = self:GetAimSteadiness()
-		stiffness = stiffness * (1 + steady * 0.7) damping = damping * (1 + steady * 0.45)
+		stiffness = stiffness * (1 + self:GetAimSteadiness() * 0.7)
 	end
+	local damping = 2 * math.sqrt(stiffness)
 
 	self.inertialAim = self.inertialAim or Angle(target[1], target[2], target[3])
 	self.inertialAimVelocity = self.inertialAimVelocity or Angle(0, 0, 0)
-	for axis = 1, 2 do
-		local error = math.AngleDifference(target[axis], self.inertialAim[axis])
-		self.inertialAimVelocity[axis] = self.inertialAimVelocity[axis] + (error * stiffness - self.inertialAimVelocity[axis] * damping) * dt
-		self.inertialAim[axis] = self.inertialAim[axis] + self.inertialAimVelocity[axis] * dt
+	local steps = math.max(math.ceil(dt / 0.008), 1)
+	local stepDt = dt / steps
+	for _ = 1, steps do
+		for axis = 1, 2 do
+			local error = math.AngleDifference(target[axis], self.inertialAim[axis])
+			self.inertialAimVelocity[axis] = self.inertialAimVelocity[axis] + (error * stiffness - self.inertialAimVelocity[axis] * damping) * stepDt
+			self.inertialAim[axis] = self.inertialAim[axis] + self.inertialAimVelocity[axis] * stepDt
+		end
 	end
 
 	local maxLag = math.Clamp(1.5 + factor * 0.85, 2, 10)
@@ -104,7 +107,7 @@ end
 function SWEP:UpdateWeaponReadiness(owner, dtime)
 	local dt = math.Clamp(dtime, 0, 0.05)
 	local sprinting = self:IsSprinting()
-	local deploying = isnumber(self.deploy) and self.deploy > CurTime()
+	local deploying = (isnumber(self.deploy) and self.deploy > CurTime()) or self.holster ~= nil
 	local lowered = (sprinting and !self:CanSprintFire()) or deploying
 	local factor = self:GetWeaponInertiaFactor()
 	local stance = self:GetHandSupportState(owner)
@@ -598,8 +601,8 @@ local function DrawWorldModel(self, force)
 			end
 		elseif owner:IsNPC() or owner.GetActiveWeapon and owner:GetActiveWeapon() == self then
 			self:WorldModel_Transform()
-			
-			if self.deploy then
+
+			if self.deploy or self.holster then
 				self:WorldModel_Transform_Holstered()
 			end
 			willdraw = true
@@ -610,7 +613,7 @@ local function DrawWorldModel(self, force)
 	else
 		self:WorldModel_Transform()
 
-		if self.deploy then
+		if self.deploy or self.holster then
 			self:WorldModel_Transform_Holstered()
 		end
 		
@@ -1153,7 +1156,8 @@ function SWEP:WorldModel_Transform_Holstered()
 			newPos, newAng = LocalToWorld(self.FakePos, self.FakeAng, newPos, newAng)
 		end
 		local gripFraction = self.DeployGripFraction or 0.3
-		local lerp = self.deploy and math.Clamp((1 - (self.deploy - CurTime()) / self:GetDeployDuration() - gripFraction) / (1 - gripFraction), 0, 1) or 0
+		local drawFraction = self:GetDrawFraction()
+		local lerp = drawFraction and math.Clamp((drawFraction - gripFraction) / (1 - gripFraction), 0, 1) or 0
 		lerp = math.ease.InOutSine(lerp)
 		
 		local newPos = LerpVector(lerp, newPos, model:GetPos())

@@ -609,6 +609,37 @@ local function applyPosture(rag, posture)
 	rag.brainfuckv2PoseError = driveStatic(rag, skip, modelOffsets, legs, reference:GetAngles(), pulseMul * fade, dampNow, brake, ssNow, tremor)
 end
 
+local seizureTremor = 9
+
+function hg.applySeizurePostureToRagdoll(rag, org)
+	if not IsValid(rag) or rag.hgHeadshotFade then return end
+
+	local data = hg.brainfuckv2.postures.decorticate
+	local reference = rag:GetPhysicsObjectNum(hg.realPhysNum and hg.realPhysNum(rag, 0) or 0)
+	if not data or not IsValid(reference) then return end
+
+	local base = rag.brainfuckv2Base
+	if not istable(base) then
+		base = getNeutralBase(rag)
+		if not istable(base) then return end
+		rag.brainfuckv2Base = base
+	end
+
+	local offsets = getOffsets(data, org)
+	local female = string.find(string.lower(rag:GetModel() or ""), "female", 1, true) ~= nil
+	local modelOffsets = offsets and (female and offsets.female06 or offsets.male09)
+	if not modelOffsets then return end
+
+	local spin = reference:GetAngleVelocity()
+	local spinSpeed = spin:Length()
+	if spinSpeed > 90 then
+		reference:AddAngleVelocity(-spin * ((spinSpeed - 90) / spinSpeed) * 0.25)
+	end
+
+	local skip = isHeadless(org, rag) and {[10] = true} or {}
+	driveStatic(rag, skip, modelOffsets, nil, reference:GetAngles(), 1500, 50, nil, 0.001, seizureTremor)
+end
+
 local function setPosture(org, posture, severity, rag)
 	local oldPosture = org.brainfuckv2Posture
 	local lastSeverity = org.brainfuckv2LastSeverity or 0

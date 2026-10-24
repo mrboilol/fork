@@ -456,13 +456,6 @@ local bradycardia_phrases = {
 	"My heart is barely keeping up...",
 }
 
-local low_perfusion_phrases = {
-	"My limbs feel weak and cold...",
-	"I can barely make myself move...",
-	"My body feels heavy and sluggish...",
-	"My hands and feet are going numb...",
-}
-
 local short_breath_phrases = {
 	"I can't get enough air...",
 	"I need to catch my breath...",
@@ -475,12 +468,6 @@ local short_breath_phrases = {
 	"My head is swimming... I need oxygen...",
 	"I'm panting and it's not helping...",
 	"The edges of my vision are going dark... I need air...",
-}
-
-local hypertension_phrases = {
-	"My blood pressure feels dangerously high...",
-	"My head is pounding from the pressure...",
-	"I feel pressure building in my head...",
 }
 
 local hg_showthoughts = ConVarExists("hg_showthoughts") and GetConVar("hg_showthoughts") or CreateClientConVar("hg_showthoughts", "1", true, true, "Show the thoughts of your character", 0, 1)
@@ -540,8 +527,6 @@ function hg.likely_to_phrase(ply)
 	local fear = org.fear
 	local panicattack = org.panicattack or 0
 	local arrhythmia = org.arrhythmia or 0
-	local hypotension = org.hypotension or 0
-	local hypertension = org.hypertension or 0
 	local temperature = org.temperature
 	local o2 = org.o2 and org.o2[1] or 30
 	local bleedingOut = hg.IsActivelyBleeding(org)
@@ -561,8 +546,6 @@ function hg.likely_to_phrase(ply)
 		or terminalBloodLoss and 4.5
 		or isNearDeath(org) and 5
 		or (o2 <= 22) and 1.5
-		or (hypotension > 0.5 and 0.55)
-		or (hypertension > 0.5 and 0.55)
 		or (bleedingOut and blood <= bleedoutStartBlood and blood > bleedoutDeathBlood) and 4
 		or (bleedingOut and blood <= bleedoutDeathBlood) and 3
 		or (broken_dislocated) and 5
@@ -619,8 +602,6 @@ local function get_status_message(ply)
 	local fear = org.fear or 0
 	local adrenaline = org.adrenaline or 0
 	local arrhythmia = org.arrhythmia or 0
-	local hypotension = org.hypotension or 0
-	local hypertension = org.hypertension or 0
 	local arrhythmiaActive = org.fibrillation or org.unstableRhythm or arrhythmia > 0.35
 	local arrhythmiaStatusStreak = org.arrhythmia_status_streak or 0
 	if not arrhythmiaActive and arrhythmiaStatusStreak > 0 then
@@ -678,15 +659,9 @@ local function get_status_message(ply)
 	elseif pain > 75 then
 		most_wanted_phraselist = audible_pain
 		statusThoughtKey = "pain"
-	elseif o2 < 24 or (hypotension > 0.5 and math.random(4) > 1) then
+	elseif o2 < 24 then
 		most_wanted_phraselist = short_breath_phrases
 		statusThoughtKey = "shortbreath"
-	elseif hypotension > 0.5 then
-		most_wanted_phraselist = low_perfusion_phrases
-		statusThoughtKey = "hypotension"
-	elseif hypertension > 0.5 then
-		most_wanted_phraselist = hypertension_phrases
-		statusThoughtKey = "hypertension"
 	elseif temperature < 35 then
 		if temperature < 29 then
 			most_wanted_phraselist = numb_phraselist

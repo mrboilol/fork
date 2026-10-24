@@ -9,14 +9,25 @@ hg.weaponInv = hg.weaponInv or {}
 local weaponInv = hg.weaponInv
 local ammoType
 
+local hg_slings = ConVarExists("hg_slings") and GetConVar("hg_slings") or CreateConVar("hg_slings", 0, FCVAR_SERVER_CAN_EXECUTE + FCVAR_ARCHIVE, "Toggle sling system", 0, 1)
+
+function weaponInv.GetLimit(ply, category, slot)
+	if category ~= 1 or hg_slings:GetBool() then return slot.limit end
+
+	local inv = IsValid(ply) and ply:GetNetVar("Inventory")
+	if inv and inv["Weapons"] and inv["Weapons"]["hg_sling"] then return math.max(slot.limit, 2) end
+
+	return slot.limit
+end
+
 function weaponInv.CanInsert(ply, wep)
 	local category = wep.weaponInvCategory
 	if not category then return true end
 	local slot = (CLIENT and weaponInv.invWeapon[category]) or (SERVER and ply.weaponInv[category])
-	
+
 	if not slot then return true end
 
-	if #slot + 1 > slot.limit then return false end
+	if #slot + 1 > weaponInv.GetLimit(ply, category, slot) then return false end
 	return slot
 end
 
@@ -172,6 +183,29 @@ if SERVER then
 		end
 		ply.cooldown_grab = CurTime() + 0.1
 	end)
+
+	local function GuardGiveSWEP()
+		local orig = hg.giveSWEPOrig or concommand.GetTable()["gm_giveswep"]
+		if not isfunction(orig) then return end
+		hg.giveSWEPOrig = orig
+
+		concommand.Add("gm_giveswep", function(ply, cmd, args, argStr)
+			if not IsValid(ply) then return orig(ply, cmd, args, argStr) end
+
+			local force, instant = ply.force_pickup, ply.hgInstantSwitch
+			ply.force_pickup = true
+			ply.hgInstantSwitch = true
+			local ok, err = pcall(orig, ply, cmd, args, argStr)
+			ply.force_pickup = force
+			ply.hgInstantSwitch = instant
+
+			if not ok then ErrorNoHalt(err, "\n") end
+		end)
+	end
+
+	GuardGiveSWEP()
+	hook.Add("InitPostEntity", "homigrad-guard-giveswep", GuardGiveSWEP)
+	hook.Add("HomigradRun", "homigrad-guard-giveswep", GuardGiveSWEP)
 
 	util.AddNetworkString("weaponInv")
 	local packet = {}

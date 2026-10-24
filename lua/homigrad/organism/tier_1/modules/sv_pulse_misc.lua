@@ -5,6 +5,13 @@ local function getLowPulseSeverity(pulse)
 	return Clamp((70 - max(tonumber(pulse) or 0, 0)) / 70, 0, 1)
 end
 
+local ADRENALINE_OVERDOSE_START = 4
+local OVERLOAD_ADRENALINE_START = 3.5
+local OVERLOAD_PANIC_START = 0.65
+local OVERLOAD_BUILD_TIME = 30
+local OVERLOAD_RECOVERY_TIME = 15
+local OVERLOAD_SHOCK_PEAK = 105
+
 local ENCLOSURE_SAMPLE_INTERVAL = 2
 local ENCLOSURE_TRACE_LEN = 32768
 local ENCLOSURE_INDOOR_COLD = 0.35
@@ -46,17 +53,6 @@ local function getEnclosureCold(ent)
 	return cold
 end
 
-local hypotensionThoughts = {
-	"My limbs feel weak and cold...",
-	"I can barely make myself move...",
-	"My body feels heavy and sluggish...",
-}
-local hypertensionThoughts = {
-	"My blood pressure feels dangerously high...",
-	"My head is pounding from the pressure...",
-	"I feel pressure building in my head...",
-	"Everything is spinning...",
-}
 local hypertensionCrisisThoughts = {
 	"My vision keeps swimming in and out...",
 	"I'm going to black out if this keeps up...",
@@ -88,10 +84,6 @@ function hg.organism.UpdateCirculatoryEffects(owner, org, timeValue, o2Value, ar
 	if org.hypotension > 0.55 then
 		local disorientK = math.Clamp((org.hypotension - 0.55) / 0.35, 0, 1)
 		org.disorientation = math.max(org.disorientation, 0.25 + disorientK * 1.25)
-
-		if org.isPly and not org.otrub then
-			org.owner:Notify(hypotensionThoughts[math.random(#hypotensionThoughts)], 40, "hypotension", 0, nil, Color(170, 170, 220))
-		end
 	end
 
 	if org.hypotension > 0.64 then
@@ -102,13 +94,6 @@ function hg.organism.UpdateCirculatoryEffects(owner, org, timeValue, o2Value, ar
 	if org.hypotension > 0.5 and o2Value <= 15 then
 		local lowK = math.Clamp((org.hypotension - 0.35) / 0.5, 0, 1)
 		org.consciousness = math.Approach(org.consciousness, 0.75, timeValue * (0.08 + lowK * 0.11))
-		if org.isPly and not org.otrub then
-			org.owner:Notify("My limbs feel weak...", true, "low_perfusion", 0, nil, Color(200, 170, 170))
-		end
-	end
-
-	if org.hypertension > 0.35 and org.isPly and not org.otrub then
-		org.owner:Notify(hypertensionThoughts[math.random(#hypertensionThoughts)], 40, "hypertension", 0, nil, Color(220, 170, 170))
 	end
 
 	local panicLoad = org.panicattackActive and Clamp(((org.panicattack or 0) - 0.35) / 0.65, 0, 1) or 0
@@ -122,11 +107,47 @@ function hg.organism.UpdateCirculatoryEffects(owner, org, timeValue, o2Value, ar
 	end
 	local crisis = org.hypertensionCrisis
 
-	if org.hypertension > 0 then
+	local adrenaline = org.adrenaline or 0
+	local adrenalineOnlyPressure = org.hypertension < 0.35 and adrenaline > 0.5 and adrenaline < ADRENALINE_OVERDOSE_START
+	if org.hypertension > 0 and not adrenalineOnlyPressure then
 		local highK = math.Clamp(org.hypertension * 1.27, 0, 1)
 		local adrenalineMitigation = math.Clamp(org.adrenaline / 3, 0, 1) * 0.25
 		local effectiveHighK = highK * (1 - adrenalineMitigation)
 		org.disorientation = math.max(org.disorientation, 0.4 + effectiveHighK * 1.9 + crisis * 0.6)
+	end
+
+	if adrenaline >= ADRENALINE_OVERDOSE_START and not org.otrub then
+		local overdoseK = Clamp(adrenaline - ADRENALINE_OVERDOSE_START, 0, 1)
+		org.disorientation = math.max(org.disorientation, 0.8 + overdoseK * 1.2)
+	end
+
+	local panicK = org.panicattackActive and Clamp(((org.panicattack or 0) - OVERLOAD_PANIC_START) / (1 - OVERLOAD_PANIC_START), 0, 1) or 0
+	local adrenalineK = Clamp((adrenaline - OVERLOAD_ADRENALINE_START) / (ADRENALINE_OVERDOSE_START - OVERLOAD_ADRENALINE_START), 0, 1)
+	local overloadDrive = panicK * adrenalineK
+	local overload = org.panicOverload or 0
+	if org.otrub then
+		if overload > 0.5 or org.panicOverloadPending then
+			hg.organism.AddSeizure(org, 1)
+			org.panicattackadd = math.min(org.panicattackadd or 0, 0.25)
+			org.panicattack = math.min(org.panicattack or 0, 0.4)
+			org.adrenalineAdd = math.min(org.adrenalineAdd or 0, 0)
+		end
+		org.panicOverloadPending = false
+		overload = 0
+	elseif overloadDrive > 0 then
+		overload = math.min(overload + timeValue * overloadDrive / OVERLOAD_BUILD_TIME, 1)
+	else
+		overload = math.max(overload - timeValue / OVERLOAD_RECOVERY_TIME, 0)
+	end
+	org.panicOverload = overload
+	if overload > 0.5 then org.panicOverloadPending = true end
+
+	if overload > 0 and not org.otrub then
+		org.shock = math.max(org.shock, overload * OVERLOAD_SHOCK_PEAK)
+		if overload >= 1 then
+			org.needotrub = true
+			org.consciousness = math.min(org.consciousness or 1, 0.04)
+		end
 	end
 
 	if crisis > 0.3 then

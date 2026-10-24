@@ -174,7 +174,8 @@ module[2] = function(owner, org, timeValue)
 
 	
 
-	if !org.lasthit or org.lasthit + 1.5 < CurTime() then org.shock = max(org.shock - timeValue * 4 * (org.otrub and 1 or 0.5) * (1 + resilience * 0.75 + zerlkersResistance * 2.25 + math.Clamp(adrenaline, 0, 5) * 0.6), 0) end
+	local shockDecayMul = 1.5 + math.Clamp((org.shock - 25) / 15, 0, 1) * 1.5 + math.Clamp((org.shock - 40) / 30, 0, 1) ^ 2 * 5
+	if !org.lasthit or org.lasthit + 1.5 < CurTime() then org.shock = max(org.shock - timeValue * 4 * shockDecayMul * (org.otrub and 1 or 0.5) * (1 + resilience * 0.75 + zerlkersResistance * 2.25 + math.Clamp(adrenaline, 0, 5) * 0.6), 0) end
 	if adrenaline > 0 then org.shock = max(org.shock - timeValue * math.Clamp(adrenaline, 0, 5) * 0.9, 0) end
 	org.immobilization = math.Clamp(max((tonumber(org.immobilization) or 0) - timeValue * 5 * adrenalineMul, 0), 0, 100)
 
@@ -423,6 +424,13 @@ module[2] = function(owner, org, timeValue)
 	--end
 
 
+
+	local betaBlocked = CurTime() < (org.betaBlockerUntil or 0)
+	if betaBlocked then
+		org.adrenalineAdd = min(org.adrenalineAdd, 0)
+		org._adrenalineHoldUntil = 0
+		org.adrenaline = Approach(org.adrenaline, 0, timeValue * (0.15 + org.adrenaline * 0.25))
+	end
 
 	if org.adrenalineAdd > 0 then
 

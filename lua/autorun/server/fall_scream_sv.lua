@@ -120,11 +120,6 @@ if SERVER then
     
     local function StopScream(ply)
         if IsValid(ply) and ply._isScreaming then
-            if ply._screamSound then
-                ply:StopSound(ply._screamSound)
-            else
-                ply:StopSound("*")
-            end
             ply._isScreaming = false
             ply._screamSound = nil
         end

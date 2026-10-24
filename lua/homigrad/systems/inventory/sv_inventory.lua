@@ -229,31 +229,42 @@ hook.Add("PlayerDropWeapon", "homigrad-inventory", function(ply, weapon)
     end)
 end)
 
+function hg.EnsureHands(ply)
+    if not (IsValid(ply) and ply:IsPlayer() and ply:Alive()) then return end
+    if ply.PlayerClassName == "headcrabzombie" or ply:GetObserverMode() ~= OBS_MODE_NONE then return end
+    if not hg.GetHandsWeapon then return end
+
+    local hands = hg.GetHandsWeapon(ply)
+    if IsValid(hands) and not IsValid(ply:GetActiveWeapon()) then
+        ply:SelectWeapon(hands:GetClass())
+    end
+
+    return hands
+end
+
 hook.Add("PlayerLoadout", "giveHands", function(ply)
-    local class = hg.GetHandsWeaponClass and hg.GetHandsWeaponClass(ply) or "weapon_hg_coolhands"
-    local hands = ply:GetWeapon(class)
-    if not IsValid(hands) then
-        hands = ply:Give(class)
-    end
-    local otherClass = class == "weapon_hg_coolhands" and "weapon_hands_sh" or "weapon_hg_coolhands"
-    if ply:HasWeapon(otherClass) then
-        ply:StripWeapon(otherClass)
-    end
+    local hands = hg.EnsureHands(ply)
     if IsValid(hands) then
         ply:SelectWeapon(hands:GetClass())
     end
     return true
 end)
 
-hook.Add("Player Spawn", "hg_ensure_hands", function(ply)
-    timer.Simple(0.3, function()
-        if not IsValid(ply) or not ply:IsPlayer() or not ply:Alive() then return end
-        if ply.PlayerClassName == "headcrabzombie" then return end
-        if not hg.GetHandsWeapon then return end
-        if IsValid(hg.GetHandsWeapon(ply)) and not IsValid(ply:GetActiveWeapon()) then
-            ply:SelectWeapon(hg.GetHandsWeaponClass(ply))
-        end
-    end)
+local function ensureHandsAfterSpawn(ply)
+    for _, delay in ipairs({0, 0.3, 1}) do
+        timer.Simple(delay, function()
+            hg.EnsureHands(ply)
+        end)
+    end
+end
+
+hook.Add("PlayerSpawn", "hg_ensure_hands", ensureHandsAfterSpawn)
+hook.Add("Player Spawn", "hg_ensure_hands", ensureHandsAfterSpawn)
+
+timer.Create("hg_ensure_hands", 1, 0, function()
+    for _, ply in player.Iterator() do
+        hg.EnsureHands(ply)
+    end
 end)
 
 hook.Add("DoPlayerDeath", "homigrad-inventory", function(ply)

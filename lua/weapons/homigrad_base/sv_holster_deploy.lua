@@ -1,19 +1,7 @@
 local CurTime = CurTime
 
---!! fix ts shit
---SWEP.endedholster = false
-function SWEP:Holster(wep)--
-	--[[if self.endedholster == true then
-		return true
-	end]]
-
-	--self.endedholster = false
-
-	--[[if wep.deploy ~= nil then
-		return true
-	end
-
-	if self.holster ~= nil then return false end]]
+function SWEP:Holster(wep)
+	if hg.HolsterGate(self, wep) then return false end
 
 	if self.deploy then
 		self:SetDeploy(0)
@@ -22,51 +10,20 @@ function SWEP:Holster(wep)--
 
 	self.reload = nil
 
-	do return true end --!!
-
-	local time = CurTime()
-	if IsValid(wep) then
-		self:SetHolsterWep(wep)
-	end
-
-	if self.holster and self.holster - time < 0 then
-		self:Holster_End()
-	end
-
-	if self.reload then
-		self.reload = nil
-		self.StaminaReloadTime = nil
-	end
-
-	self.holster = time + self.CooldownHolster / self.Ergonomics
-	self:SetHolster(self.holster)
-
-	--self.endedholster = true
-
 	return true
 end
 
-local vecZero = Vector(0, 0, 0)
-function SWEP:Holster_End()
+function SWEP:OnHolsterBegin()
 	local owner = self:GetOwner()
-        local wep = IsValid(self:GetHolsterWep()) and self:GetHolsterWep() or (hg.GetHandsWeapon and hg.GetHandsWeapon(owner) or owner:GetWeapon("weapon_hands_sh"))
-	
-	if IsValid(wep) then
-		owner:SetActiveWeapon(wep)
-		wep:Deploy()
-		if wep.holster then
-			wep.holster = nil
-			wep:SetHolster(0)
-		end
-		self:SetHolsterWep(NULL)
-	end
+	self.holster = hg.GetHolsterEnd(self)
+	self.deploy = nil
+	self:SetDeploy(0)
+	self.reload = nil
+	self.StaminaReloadTime = nil
 
-	if not IsValid(owner) or owner:GetActiveWeapon() ~= self then
-		self.holster = nil
-		self:SetHolster(0)
+	if not owner.noSound then
+		owner:EmitSound(self.HolsterSnd[1], 65)
 	end
-
-	--self.endedholster = false
 end
 
 local gamemod = engine.ActiveGamemode()
@@ -83,7 +40,7 @@ hook.Add("PlayerSwitchInFake","slingDrop",function(ply,oldWeapon,newWeapon)
 					hg.drop(ply, oldWeapon, newWeapon)
 				end
 			end)
-			
+
 			if not IsValid(ply.FakeRagdoll) then return true end
 		end
 	end
@@ -102,13 +59,11 @@ function SWEP:Deploy()
 	end
     self.Initialzed = true
 
+	hg.ClearHolster(self)
 	self.holster = nil
-	self:SetHolster(0)
-	
+
 	self.deploy = time + self:GetDeployDuration()
 	self:SetDeploy(self.deploy)
-
-	--self.endedholster = false
 
 	return true
 end

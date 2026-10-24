@@ -114,6 +114,7 @@ hook.Add("PreDrawEffects", "HG_WorldMotionBlur", function()
 end)
 local drawFinalVitalsVignettes
 hook.Add("RenderScreenspaceEffects", "homigrad", function()
+	if RENDERING_SCOPE then return end
 	tab["$pp_colour_brightness"] = 0
 	tab["$pp_colour_contrast"] = 1
 	tab["$pp_colour_colour"] = 1
@@ -504,8 +505,8 @@ hook.Add("Post Post Pre Post Processing", "HG_DamageFlash", function()
 	DrawColorModify(damageFlashColor)
 end)
 local painBlinkStart = -1
-local painBlinkPulse = 0.15
-local painBlinkCount = 3
+local painBlinkPulse = 0.07
+local painBlinkCount = 4
 local painBlinkColor = {
 	["$pp_colour_addr"] = 0, ["$pp_colour_addg"] = 0, ["$pp_colour_addb"] = 0,
 	["$pp_colour_brightness"] = 0, ["$pp_colour_contrast"] = 1,
@@ -1068,6 +1069,26 @@ local choosera = 1
 local tempolerp = 0
 local grayscaleLerp = 0
 stressSharpenLerp = 0
+
+hg.SharpenLimit = hg.SharpenLimit or {contrast = 2.6, distance = 1.5}
+hg.SharpenState = hg.SharpenState or {frame = 0, used = 0}
+hg.DrawSharpenRaw = hg.DrawSharpenRaw or DrawSharpen
+function DrawSharpen(contrast, distance)
+	local state = hg.SharpenState
+	local frame = FrameNumber()
+	if state.frame ~= frame then
+		state.frame = frame
+		state.used = 0
+	end
+
+	local limit = hg.SharpenLimit
+	contrast = math.min(contrast, limit.contrast - state.used)
+	if contrast <= 0.01 then return end
+
+	state.used = state.used + contrast
+	hg.DrawSharpenRaw(contrast, math.min(distance, limit.distance))
+end
+
 local soundRetry = {}
 
 local function updateCollapseBlink(severity, consciousnessSeverity, brainSeverity)
@@ -1214,7 +1235,37 @@ local function drawO2GrainCenter(strength, severity)
 	cam.End2D()
 end
 
+function hg.DrawO2Vignette(org)
+	if O2Lerp <= 1 then return end
+	local o2Severity = math.Clamp(O2Lerp / 250, 0, 1)
+	local o2BlinkAmount = org.otrub and 0 or updateO2Blink(o2Severity)
+	render.UpdateScreenEffectTexture()
+	vignetteMat:SetFloat("$c2_x", CurTime() + 11000)
+	vignetteMat:SetFloat("$c0_z", scaleVignette(o2Severity * 1.1 + o2BlinkAmount * 1.4))
+	vignetteMat:SetFloat("$c1_y", scaleVignette(o2Severity * 1.9 + o2BlinkAmount * 2.6))
+	render.SetMaterial(vignetteMat)
+	render.DrawScreenQuad()
+
+	if o2BlinkAmount > 0.005 then
+		surface.SetDrawColor(0, 0, 0, math.Clamp(o2BlinkAmount * Lerp(o2Severity, 60, 170), 0, 170))
+		surface.DrawRect(0, 0, ScrW(), ScrH())
+		surface.SetDrawColor(255, 255, 255, 255)
+	end
+
+	render.UpdateScreenEffectTexture()
+	noiseMat:SetFloat("$c0_y", 1 - o2Severity)
+	noiseMat:SetFloat("$c0_z", 1)
+	noiseMat:SetFloat("$c1_x", math.Clamp(o2Severity * 1.6, 0, 1.6))
+	noiseMat:SetFloat("$c1_y", math.min(O2Lerp, 400) * (org.otrub and 0.2 or 0.08))
+	noiseMat:SetFloat("$c2_x", CurTime() + 10000)
+	render.SetMaterial(noiseMat)
+	render.DrawScreenQuad()
+
+	drawO2GrainCenter(org.otrub and 0.35 or 0.6, o2Severity)
+end
+
 drawFinalVitalsVignettes = function()
+	if RENDERING_SCOPE then return end
 	if not IsValid(lply) or not lply:Alive() then return end
 	if IsValid(lply:GetNWEntity("spect")) then return end
 
@@ -1402,34 +1453,6 @@ drawFinalVitalsVignettes = function()
 		surface.SetDrawColor(255, 255, 255, 255)
 	end
 
-	if O2Lerp > 1 then
-		local o2Severity = math.Clamp(O2Lerp / 250, 0, 1)
-		local o2BlinkAmount = org.otrub and 0 or updateO2Blink(o2Severity)
-		render.UpdateScreenEffectTexture()
-		vignetteMat:SetFloat("$c2_x", CurTime() + 11000)
-		vignetteMat:SetFloat("$c0_z", scaleVignette(o2Severity * 1.1 + o2BlinkAmount * 1.4))
-		vignetteMat:SetFloat("$c1_y", scaleVignette(o2Severity * 1.9 + o2BlinkAmount * 2.6))
-		render.SetMaterial(vignetteMat)
-		render.DrawScreenQuad()
-
-		if o2BlinkAmount > 0.005 then
-			surface.SetDrawColor(0, 0, 0, math.Clamp(o2BlinkAmount * Lerp(o2Severity, 60, 170), 0, 170))
-			surface.DrawRect(0, 0, ScrW(), ScrH())
-			surface.SetDrawColor(255, 255, 255, 255)
-		end
-
-		render.UpdateScreenEffectTexture()
-		noiseMat:SetFloat("$c0_y", 1 - o2Severity)
-		noiseMat:SetFloat("$c0_z", 1)
-		noiseMat:SetFloat("$c1_x", math.Clamp(o2Severity * 1.6, 0, 1.6))
-		noiseMat:SetFloat("$c1_y", math.min(O2Lerp, 400) * (org.otrub and 1 or 0.08))
-		noiseMat:SetFloat("$c2_x", CurTime() + 10000)
-		render.SetMaterial(noiseMat)
-		render.DrawScreenQuad()
-
-		drawO2GrainCenter(org.otrub and 0.35 or 0.6, o2Severity)
-	end
-
 	local excruciatingBlend = getServerSoundMode("hg_painsound", 6) == 6
 		and getPainLayerBlend(org.pain or 0, painExcruciatingThreshold)
 		or 0
@@ -1608,27 +1631,32 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		-- jumping straight to its final visual strength.
 		adrenalineVisualLerp = math.Approach(adrenalineVisualLerp, 1, FrameTime() * (0.08 + adrenalineIntensity * 0.22))
 		local adrenalineShock = adrenalineIntensity * (0.2 + adrenalineVisualLerp * 1.0) * sensoryMix
-		blurAmount = math.max(blurAmount, adrenalineShock * 0.15 * (1 - math.Clamp((adrenaline - 2.5) / 0.5, 0, 1)))
+		local adrenalineDizzy = adrenaline >= 4 and (0.35 + math.Clamp(adrenaline - 4, 0, 1) * 0.65) or 0
+		local dizzyShock = adrenalineShock * adrenalineDizzy
+		blurAmount = math.max(blurAmount, dizzyShock * 0.4)
 
-		if not (lply:IsBerserk() or lply:IsStimulated()) then
+		if dizzyShock > 0 and not (lply:IsBerserk() or lply:IsStimulated()) then
             render.UpdateScreenEffectTexture()
             heatMat:SetFloat("$c0_x", -CurTime() * 0.18)
-            heatMat:SetFloat("$c0_y", adrenalineShock * 0.01)
-            heatMat:SetFloat("$c2_x", (math.sin(CurTime() * 0.75) - 1.5) * (adrenalineShock * 0.1))
+            heatMat:SetFloat("$c0_y", dizzyShock * 0.01)
+            heatMat:SetFloat("$c2_x", (math.sin(CurTime() * 0.75) - 1.5) * (dizzyShock * 0.1))
             render.SetMaterial(heatMat)
             render.DrawScreenQuad()
 		end
 		render.UpdateScreenEffectTexture()
-		chromaticMat:SetFloat("$c0_x", adrenalineShock * (0.18 + math.abs(math.sin(CurTime() * 5)) * 0.08))
+		local chromaticBoost = 1 + math.Clamp((adrenaline - 2.5) / 1.5, 0, 1) * 0.3
+		chromaticMat:SetFloat("$c0_x", adrenalineShock * (0.4 + math.abs(math.sin(CurTime() * 5)) * 0.18) * chromaticBoost)
 		chromaticMat:SetInt("$c0_y", 1)
 		render.SetMaterial(chromaticMat)
 		render.DrawScreenQuad()
-		render.UpdateScreenEffectTexture()
-		vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
-		vignetteMat:SetFloat("$c0_z", scaleVignette(adrenalineShock * 0.6))
-		vignetteMat:SetFloat("$c1_y", scaleVignette(adrenalineShock * 0.8))
-		render.SetMaterial(vignetteMat)
-		render.DrawScreenQuad()
+		if dizzyShock > 0 then
+			render.UpdateScreenEffectTexture()
+			vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
+			vignetteMat:SetFloat("$c0_z", scaleVignette(dizzyShock * 0.6))
+			vignetteMat:SetFloat("$c1_y", scaleVignette(dizzyShock * 0.8))
+			render.SetMaterial(vignetteMat)
+			render.DrawScreenQuad()
+		end
 	else
 		adrenalineVisualLerp = math.Approach(adrenalineVisualLerp, 0, FrameTime() * 0.45)
     end
@@ -1924,8 +1952,9 @@ hook.Add("Post Post Processing", "ItHurts", function()
 
 	local o2 = org.o2[1] or 0
 	o2 = o2 + (org.CO or 0)
-	O2Lerp = LerpFT(0.01, O2Lerp, (30 - o2) * (org.otrub and 2 or 10) + brain * (org.otrub and 100 or 500))
+	O2Lerp = LerpFT(0.01, O2Lerp, (30 - o2) * 10 + brain * (org.otrub and 100 or 500))
 	updateSeizureEffects(org)
+	hg.DrawO2Vignette(org)
 
 	local panicBaseTarget = getPanicAttackFx(org)
 	PanicAttackLerp = LerpFT(0.12, PanicAttackLerp, panicBaseTarget ^ hg.screeneffects_config.panicattackVisualExponent)
@@ -1935,21 +1964,29 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		local panicPulse = panicBase * (0.78 + math.ease.InOutSine(math.abs(math.cos(CurTime() * 2))) * 0.2)
 		local sw, sh = ScrW(), ScrH()
 		local steps = 4
-		local innerScale = Lerp(math.min(panicBase * 1.5, 1), 1.3, 0.55) - math.sin(CurTime() * 0.7) * 0.04 * panicBase
+		local innerScale = Lerp(math.min(panicBase * 1.5, 1), 1.3, 0.65) - math.sin(CurTime() * 0.7) * 0.04 * panicBase
 
+		local fightBlack = org.panicattackActive and org.panicMode == "fight"
 		render.UpdateScreenEffectTexture()
 		render.UpdateFullScreenDepthTexture()
-		grainMat:SetFloat("$c0_x", CurTime())
-		grainMat:SetFloat("$c0_y", -1)
-		grainMat:SetFloat("$c0_z", 1 + panicBase * 1.4)
-		grainMat:SetFloat("$c1_x", panicBase * 3.2 + panicPulse * 5.8)
-		grainMat:SetFloat("$c1_y", panicBase * 0.08 + panicPulse * 0.22)
-		grainMat:SetFloat("$c1_z", panicBase * 0.08 + panicPulse * 0.24)
-		grainMat:SetFloat("$c2_x", panicBase * 0.04 + panicPulse * 0.12)
-		grainMat:SetFloat("$c2_y", 0.075 * panicBase)
-		grainMat:SetFloat("$c2_z", 0)
-		grainMat:SetFloat("$c3_x", 0)
-		render.SetMaterial(grainMat)
+		if fightBlack then
+			vignetteMat:SetFloat("$c2_x", CurTime() + 10500)
+			vignetteMat:SetFloat("$c0_z", scaleVignette(math.min(panicPulse * 0.9, 1)))
+			vignetteMat:SetFloat("$c1_y", scaleVignette(panicPulse * 2.4))
+			render.SetMaterial(vignetteMat)
+		else
+			grainMat:SetFloat("$c0_x", 0)
+			grainMat:SetFloat("$c0_y", -1)
+			grainMat:SetFloat("$c0_z", 4096)
+			grainMat:SetFloat("$c1_x", panicBase * 3.2 + panicPulse * 5.8)
+			grainMat:SetFloat("$c1_y", (panicBase * 0.08 + panicPulse * 0.22) * 1.3)
+			grainMat:SetFloat("$c1_z", 0)
+			grainMat:SetFloat("$c2_x", panicBase * 0.04 + panicPulse * 0.12)
+			grainMat:SetFloat("$c2_y", 0.075 * panicBase)
+			grainMat:SetFloat("$c2_z", 0)
+			grainMat:SetFloat("$c3_x", 0)
+			render.SetMaterial(grainMat)
+		end
 		render.DrawScreenQuad()
 
 		render.ClearStencil()
@@ -1978,7 +2015,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 
 		render.SetStencilPassOperation(STENCIL_KEEP)
 		render.SetStencilCompareFunction(STENCIL_GREATER)
-		local grain = panicBase * 0.5
+		local grain = math.min(panicBase, 1.2)
 		for j = 1, steps do
 			render.SetStencilReferenceValue(j)
 			render.UpdateScreenEffectTexture()
@@ -1986,12 +2023,12 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			grainMat:SetFloat("$c0_x", CurTime())
 			grainMat:SetFloat("$c0_y", -1)
 			grainMat:SetFloat("$c0_z", 1 + grain * 1.4)
-			grainMat:SetFloat("$c1_x", grain * 3.2)
-			grainMat:SetFloat("$c1_y", grain * 0.08)
-			grainMat:SetFloat("$c1_z", grain * 0.08)
-			grainMat:SetFloat("$c2_x", grain * 0.04)
-			grainMat:SetFloat("$c2_y", 0.075 * grain)
-			grainMat:SetFloat("$c2_z", 0)
+			grainMat:SetFloat("$c1_x", 0.1 + grain * 0.14)
+			grainMat:SetFloat("$c1_y", 1.4)
+			grainMat:SetFloat("$c1_z", grain * 0.1)
+			grainMat:SetFloat("$c2_x", fightBlack and 0 or grain * 0.55)
+			grainMat:SetFloat("$c2_y", fightBlack and 0 or grain * 0.22)
+			grainMat:SetFloat("$c2_z", fightBlack and 0 or grain * 0.02)
 			grainMat:SetFloat("$c3_x", 0)
 			render.SetMaterial(grainMat)
 			render.DrawScreenQuad()
@@ -2764,7 +2801,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			-- OTRU audio is selected solely by hg_otrubsound.  Remorseism
 			-- incapacitation is a gameplay state, not an audio override: otherwise it
 			-- replaced every configured OTRU track with rem_dying1.
-			local otrubVol = math.Clamp((o2 - 30) / 100 + (brain > 0.3 and (brain - 0.3) * 5 or 0), 0, 1)
+			local otrubVol = math.Clamp((o2 - 20) / 80 +(brain > 0.3 and (brain - 0.3) * 5 or 0), 0, 1)
 			if incapacitated then
 				otrubVol = math.max(otrubVol, 0.3) * Lerp(incapacitationProgress, 0.45, 0.12)
 			end
@@ -2954,7 +2991,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 
 		local adrenaline = org.adrenaline or 0
 		local adrenalineIntensity = math.Clamp((adrenaline - 1) / 1.5, 0, 1)
-		if adrenalineIntensity > 0 then
+		if adrenalineIntensity > 0 and adrenaline >= 4 then
 			grayscaleTarget = grayscaleTarget + adrenalineIntensity * (0.03 + adrenalineVisualLerp * 0.17)
 		end
 
@@ -3019,9 +3056,8 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end
 
 		local painSharpen = math.Clamp(((org.pain or 0) - 15) / (hg.screeneffects_config.painAgonyThreshold - 15), 0, 1)
-		local adrenalineSharpen = math.Clamp(((org.adrenaline or 0) - 3) / 1.5, 0, 1)
 		local o2Sharpen = math.Clamp((45 - o2) / 30, 0, 1)
-		local stressSharpen = math.max(painSharpen, adrenalineSharpen, o2Sharpen)
+		local stressSharpen = math.min(painSharpen + o2Sharpen, 1.5)
 		stressSharpenLerp = LerpFT(0.05, stressSharpenLerp, stressSharpen)
 		if stressSharpenLerp > 0.01 then
 			DrawSharpen(stressSharpenLerp * 1.3, 0.4 + stressSharpenLerp * 0.9)

@@ -110,10 +110,10 @@ if SERVER then
 		org.panicattack = 0
 		org.panicattackActive = false
 		org.adrenalineAdd = math.Approach(org.adrenalineAdd, -8, self.modeValues[1] * 2)
-		org.adrenaline = math.Approach(org.adrenaline, 0, self.modeValues[1] * 0.5)
-        
-		-- Beta blockers stop the acute panic response.
-        -- Beta blockers provide mild analgesic effect
+		org.adrenaline = math.max(org.adrenaline * 0.4 - self.modeValues[1] * 0.5, 0)
+		org._adrenalineHoldUntil = 0
+		org.betaBlockerUntil = math.max(org.betaBlockerUntil or 0, CurTime()) + 90 * self.modeValues[1]
+
         org.analgesiaAdd = (org.analgesiaAdd or 0) + 0.15
 
 		self.modeValues[1] = 0

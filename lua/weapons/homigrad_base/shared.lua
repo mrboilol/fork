@@ -699,10 +699,10 @@ function SWEP:OwnerChanged()
 	if not IsValid(self:GetOwner()) then
 		self.deploy = nil
 		self:SetDeploy(0)
-	
+
 		self.holster = nil
-		self:SetHolster(0)
-		
+		hg.ClearHolster(self)
+
 		return
 	else
 		self.SlotPos = self:IsPistolHoldType() and 1 or 2
@@ -763,7 +763,7 @@ function SWEP:CanUse(ignoreSprint)
 	if owner:IsPlayer() and owner:GetNWBool("hg_hold_wound_twohand", false) then return false end
 	if owner.organism and owner.organism.rarmamputated and !self:IsPistolHoldType() then return false end
 	if owner:IsPlayer() and owner:GetNetVar("ducttaped_hands", false) then return false end
-	return not (self.reload or self.deploy or (owner:IsPlayer() and ((!ignoreSprint and self:IsSprinting()) or (owner.organism and owner.organism.otrub))))
+	return not (self.reload or self.deploy or self.holster or (owner:IsPlayer() and ((!ignoreSprint and self:IsSprinting()) or (owner.organism and owner.organism.otrub))))
 end
 
 local hg_gunbase_allow_jumpshoot = CreateConVar("hg_gunbase_allow_jumpshoot", 0, {FCVAR_ARCHIVE,FCVAR_REPLICATED,FCVAR_NOTIFY},"Allow/Disallow shooting in air when you jump", 0, 1)
@@ -2365,7 +2365,7 @@ function SWEP:GetAdditionalValues()
 
 	--self.AdditionalPosPreLerp[3] = self.AdditionalPosPreLerp[3] - ((ply.lean or 0) * 2)
 	
-	local val = math.Clamp((self.deploy and ((self.deploy - CurTime()) * 10) --[[or self.holster and (((self.CooldownDeploy / self.Ergonomics) - (self.holster - CurTime())) * 10)]] or 0) / (self.CooldownDeploy / self.Ergonomics),0,10)
+	local val = math.Clamp((self.deploy and ((self.deploy - CurTime()) * 10) or self.holster and ((1 - (self:GetDrawFraction() or 1)) *self.CooldownDeploy / self.Ergonomics * 10) or 0) / (self.CooldownDeploy / self.Ergonomics),0,10)
 
 	self.AdditionalPosPreLerp[2] = self.AdditionalPosPreLerp[2] - val * 1.5
 	self.AdditionalPosPreLerp[1] = self.AdditionalPosPreLerp[1] - val * 2 * (self:IsPistolHoldType() and 0.5 or 0.75)
@@ -3055,10 +3055,9 @@ function SWEP:SetHandPos(noset)
 		local vec2, ang2 = LocalToWorld(self.LHPosOffset, self.LHAngOffset, vec2, ang2)
 
 		local grip = 1
-		if self.deploy and ply:GetActiveWeapon() == self then
-			local duration = self:GetDeployDuration()
-			local fraction = 1 - (self.deploy - CurTime()) / duration
-			grip = math.ease.InOutSine(math.Clamp(fraction / (self.DeployGripFraction or 0.3), 0, 1))
+		local fraction = ply:GetActiveWeapon() == self and self:GetDrawFraction()
+		if fraction then
+			grip =math.ease.InOutSine(math.Clamp(fraction / (self.DeployGripFraction or 0.3), 0, 1))
 		end
 		rhmat:SetTranslation(LerpVector(grip, rhmat:GetTranslation(), vec1 - addvec2))
 		rhmat:SetAngles(LerpAngle(grip, rhmat:GetAngles(), ang1))

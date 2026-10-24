@@ -159,14 +159,12 @@ function hg.organism.UpdateCardiacRhythm(owner, org, timeValue, s)
 		org.heartStrain = Clamp((org.heartStrain or 0) + timeValue * complicationBurden / 160, 0, 1)
 		org.ischemia = math.min((org.ischemia or 0) + timeValue * complicationBurden * 0.05, 6)
 	end
-	if org.hypertension > 0.35 then org.heartStrain = Clamp((org.heartStrain or 0) + timeValue * org.hypertension / 360, 0, 1) end
 	if ischemia > 0.35 then org.heartStrain = Clamp((org.heartStrain or 0) + timeValue * ischemia / 260, 0, 1) end
 	local rateDamageStart = 180 + adrenalineRateTolerance * 30
 	local highRateDamage = Clamp((org.heartbeat - rateDamageStart) / math.max(terminalHeartRate - rateDamageStart, 1), 0, 1)
 	local catecholamineOverdrive = adrenalineRateTolerance * Clamp((org.heartbeat - 180) / 80, 0, 1)
-	local pressureDamage = math.max(Clamp(org.hypertension or 0, 0, 1), hypertensiveEmergency)
-	org.heartStrain = Clamp((org.heartStrain or 0) + timeValue * (highRateDamage / 120 + pressureDamage / 150), 0, 1)
-	org.heart = Clamp((org.heart or 0) + timeValue * ((org.cardiacStressExposure or 0) ^ 2 * cardiacWorkload ^ 2 * 0.0005 + highRateDamage ^ 2 * 0.0012 + catecholamineOverdrive * 0.00045 + pressureDamage ^ 2 * 0.001 + hypertensiveEmergency ^ 2 * 0.0025), 0, 1)
+	org.heartStrain = Clamp((org.heartStrain or 0) + timeValue * (highRateDamage / 120), 0, 1)
+	org.heart = Clamp((org.heart or 0) + timeValue * ((org.cardiacStressExposure or 0) ^ 2 * cardiacWorkload ^ 2 * 0.0005 + highRateDamage ^ 2 * 0.0012 + catecholamineOverdrive * 0.00045), 0, 1)
 	if ischemia > 0.45 and org.isPly and not org.otrub and (org.lastCardiacPain or 0) < CurTime() then
 		org.lastCardiacPain = CurTime() + math.Rand(14, 24)
 		org.painadd = org.painadd + math.Rand(4, 9) * ischemia

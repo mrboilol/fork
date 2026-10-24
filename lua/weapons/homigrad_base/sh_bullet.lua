@@ -955,7 +955,7 @@ function SWEP:FireBullet()
 	end
 
 	local willsuicideNet = IsValid(owner) and owner:GetNWFloat("willsuicide", 0) or 0
-	local willsuicide = willsuicideNet != 0 and willsuicideNet or ((owner.startsuicide or curTime) + 1) or curTime + 1
+	local willsuicide = willsuicideNet != 0 and willsuicideNet or (owner.startsuicide and owner.startsuicide + 1 or 0)
 	local suiciding = owner.suiciding
 	local willsuicidereal = (suiciding and (willsuicide == 0 or willsuicide < curTime))
 	if isnpc then
@@ -1089,7 +1089,8 @@ function SWEP:FireBullet()
 		shot.Penetration = penetration
 		applyBallisticProfile(shot, ammotype, shot.Damage, penetration)
 
-		if SERVER and owner.suiciding and willsuicidereal then
+		local suicideShot = SERVER and owner.suiciding and willsuicidereal and headpos ~= nil
+		if suicideShot then
 			local dmginfo = DamageInfo()
 			dmginfo:SetDamage(shot.Damage)
 			dmginfo:SetInflictor(self)
@@ -1102,7 +1103,23 @@ function SWEP:FireBullet()
 			self.bullet = shot
 			hg.BallisticDamageInfo = hg.BallisticDamageInfo or {}
 			hg.BallisticDamageInfo[dmginfo] = shot
+			hg.BallisticDamageTrace = hg.BallisticDamageTrace or setmetatable({}, {__mode = "k"})
+			local headTrace = {
+				Entity = ent,
+				Hit = true,
+				HitPos = headpos,
+				Normal = dir,
+				HitNormal = -dir,
+				HitGroup = HITGROUP_HEAD,
+				HGHeadContact = true,
+				HGContactBoneName = "ValveBiped.Bip01_Head1",
+			}
+			hg.BallisticDamageTrace[dmginfo] = headTrace
+			local previousHit = hg.ActiveBallisticHit
+			hg.ActiveBallisticHit = {trace = headTrace}
 			ent:TakeDamageInfo(dmginfo)
+			hg.ActiveBallisticHit = previousHit
+			hg.BallisticDamageTrace[dmginfo] = nil
 			hg.BallisticDamageInfo[dmginfo] = nil
 			if self.bullet == shot then self.bullet = previousBullet end
 
@@ -1116,6 +1133,8 @@ function SWEP:FireBullet()
 				owner:Kill()
 			end
 		end
+
+		if suicideShot then continue end
 
 		if(hg.PhysBullet and hg.PhysBullet.CreateBullet and self.UsePhysBullets and not shot.DontUsePhysBullets and not shot.ZCityWindDisablePhysBullets)then
 			if(SERVER)then

@@ -45,7 +45,8 @@ function SWEP:CanReload()
 		return false
 	end
 
-	if self.ReloadNext or not self:CanUse() or self:IsJamClearing() or self:GetJammed() or self:Clip1() >= self:GetReloadCapacity() then --shit
+	local npcJamReload = self.NPCJamReload
+	if self.ReloadNext or not self:CanUse() or self:IsJamClearing() or (self:GetJammed() and not npcJamReload) or (self:Clip1() >= self:GetReloadCapacity() and not npcJamReload) then --shit
 		return
 	end
 
@@ -128,6 +129,10 @@ function SWEP:ReloadEnd()
 	self:InsertAmmo(math.max(self:GetReloadCapacity() - self:Clip1(), 0))
 	--end
 	self.ReloadNext = CurTime() + self.ReloadCooldown --я хуй знает чо это
+	if SERVER and self.NPCJamReload then
+		self.NPCJamReload = nil
+		self:SetJammed(false)
+	end
 	self:Draw()
 end
 
@@ -139,8 +144,19 @@ function SWEP:Step_NPCWeaponState(time)
 	if (self.NPCWeaponActionAt or 0) > time then return end
 
 	if self.GetJammed and self:GetJammed() then
-		self.NPCWeaponActionAt = time + (self.JamTriggerCooldown or 0.18)
-		if self.StartJamClear then self:StartJamClear() end
+		if self.reload then return end
+		self.NPCWeaponActionAt = time + 0.5
+		if self.ShotgunTubeReload then
+			if self.StartJamClear then self:StartJamClear() end
+			return
+		end
+
+		self.NPCJamReload = true
+		self:Reload()
+		if not self.reload then
+			self.NPCJamReload = nil
+			if self.StartJamClear then self:StartJamClear() end
+		end
 		return
 	end
 

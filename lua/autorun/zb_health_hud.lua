@@ -1900,19 +1900,6 @@ local function draw_status_effects()
 				currentEffectNames["dislocation"] = true
 			end
 			
-			local hypotension = math.Clamp(getOrgVal(org, "hypotension", 0), 0, 1)
-			if hypotension > 0 then
-				local level_num = math.Clamp(math.ceil(hypotension * 4), 1, 4)
-				
-				table.insert(effects, {
-					name = "hypotension",
-					level_num = level_num,
-					has_levels = true,
-					priority = 0.1
-				})
-				currentEffectNames["hypotension"] = true
-			end
-			
 			if org.heartstop == true then
 				table.insert(effects, {
 					name = "cardiac_arrest",

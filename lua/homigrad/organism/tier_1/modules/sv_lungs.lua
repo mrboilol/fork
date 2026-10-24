@@ -279,10 +279,6 @@ local function togglebreath(ply, toggle)
 
 
 
-	local ent = hg.GetCurrentCharacter(ply)
-
-	ent:StopSound(ply.lastPhr or "")
-
 	ply.phrCld = 0
 
 end

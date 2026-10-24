@@ -1564,8 +1564,10 @@ local IsValid = IsValid
 					if not IsValid(ply) or not IsValid(wep) or wep:GetOwner() ~= ply then return end
 					if handoff > 0 then oldwep = ply:GetActiveWeapon() end
 					hook.Run("PlayerSwitchWeapon",ply,oldwep,wep)
+					ply.hgInstantSwitch = true
 					ply:SelectWeapon(wep:GetClass())
 					ply:SetActiveWeapon(wep)
+					ply.hgInstantSwitch = nil
 
 					if wep.Deploy then
 						wep:Deploy()

@@ -123,10 +123,12 @@ local function updateStrokeRisk(org, timeValue)
 		Remap(1 - math.Clamp(tonumber(org.brainoxygen) or 1, 0, 1), 0.4, 0.85, 0, 1)
 	)
 	local internalStrokeRisk = math.Clamp(internalBleedRisk * 0.75 + internalBleedComplication * 0.25 + cerebralPerfusionRisk * 0.25, 0, 1)
+	local adrenalineStrokeRisk = (tonumber(org.adrenaline) or 0) >= 4 and 0.5 + math.Clamp((org.adrenaline or 0) - 4, 0, 1) * 0.5 or 0
 	local nonPressureStrokeRisk = math.max(
 		brainDamageRisk * 0.85,
 		cranialPressureRisk * 0.9,
-		internalStrokeRisk
+		internalStrokeRisk,
+		adrenalineStrokeRisk
 	)
 	local strokeRisk = math.Clamp(math.max(
 		bloodPressureRisk,
@@ -143,19 +145,26 @@ local function updateStrokeRisk(org, timeValue)
 			exposureTime = math.min(exposureTime, Lerp(hypertensiveEmergency, 60, 12))
 		end
 		exposure = math.min(exposure + timeValue * (strokeRisk - 0.35) / exposureTime, 1)
+		org.strokeBadTime = (tonumber(org.strokeBadTime) or 0) + timeValue * (0.5 + (strokeRisk - 0.35) / 0.65)
 	else
 		exposure = math.max(exposure - timeValue / 45, 0)
+		org.strokeBadTime = math.max((tonumber(org.strokeBadTime) or 0) - timeValue / 2, 0)
 	end
 	org.strokeExposure = exposure
 	if exposure < 1 or (org.nextStrokeTime or 0) > CurTime() then return end
 
 	local severity = math.Clamp((strokeRisk - 0.35) / 0.65, 0, 1)
+	local sustained = math.Clamp((tonumber(org.strokeBadTime) or 0) / 120, 0, 1)
+	local harm = math.Clamp(severity * 0.6 + sustained * 0.5, 0, 1)
 	if hg.organism.AddBrainHemorrhage then
-		hg.organism.AddBrainHemorrhage(org, 0.025 + severity * 0.095, 0.00035 + severity * 0.00165)
+		hg.organism.AddBrainHemorrhage(org, 0.025 + harm * 0.095, 0.00035 + harm * 0.00165)
 	else
-		org.brainHemorrhage = math.min((org.brainHemorrhage or 0) + 0.025 + severity * 0.095, 1)
-		org.brainBleedRate = math.min((org.brainBleedRate or 0) + 0.00035 + severity * 0.00165, 0.008)
+		org.brainHemorrhage = math.min((org.brainHemorrhage or 0) + 0.025 + harm * 0.095, 1)
+		org.brainBleedRate = math.min((org.brainBleedRate or 0) + 0.00035 + harm * 0.00165, 0.008)
 	end
+	org.brain = math.min((org.brain or 0) + 0.03 + harm * 0.3, 1)
+	if math.Rand(0, 1) < 0.5 + harm * 0.5 then hg.organism.AddSeizure(org, 1) end
+	org.strokeBadTime = 0
 	org.strokeExposure = 0
 	org.nextStrokeTime = CurTime() + 8 + (1 - severity) * 16
 end
@@ -885,6 +894,7 @@ module[1] = function(org)
 	org.hypertensionPanicLoad = 0
 	org.strokeRisk = 0
 	org.strokeExposure = 0
+	org.strokeBadTime = 0
 	org.nextStrokeTime = 0
 	org.sympatheticCompensation = 0
 	org.hypotension = 0
@@ -1403,7 +1413,7 @@ module[2] = function(owner, org, timeValue)
 		if effectivePalpitations > 0.05 and highTachyK > 0 then
 			chance = highTachyK * effectivePalpitations * 0.032
 		end
-		chance = math.max(chance, highTachyK * hemorrhageDanger * 0.025, hypertensiveEmergency ^ 2 * 0.035)
+		chance = math.max(chance, highTachyK * hemorrhageDanger * 0.025)
 		if sustainedTachy then chance = math.max(chance, highTachyK * oxygenMismatch * 0.06) end
 		chance = chance * rhythmRiskMul
 

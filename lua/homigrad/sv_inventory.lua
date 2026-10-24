@@ -124,7 +124,11 @@ local VirtualItems = {
     end)
 
     hook.Add("PlayerLoadout", "giveHands", function(ply)
-        ply:Give("weapon_hands_sh")
+        if hg.EnsureHands then
+            hg.EnsureHands(ply)
+        else
+            ply:Give("weapon_hands_sh")
+        end
         return true
     end)
 

@@ -207,6 +207,8 @@ hook.Add("Org Clear", "Main", function(org)
 	org.assimilated = 0
 	org.berserk = 0
 	org.noradrenaline = 0
+	org.panicOverload = 0
+	org.panicOverloadPending = false
 	org.panicattackadd = 0
 	org.panicattack = 0
 	org.panicattackActive = false
@@ -1095,6 +1097,10 @@ hg.organism.convulsionConfig = {
 	chanceMin = 0.03,
 	chanceMax = 0.25,
 	recoveryRisk = 0.1,
+	brainStart = 0.3,
+	brainFull = 0.5,
+	brainChanceMin = 0.05,
+	brainChanceMax = 0.5,
 	brainRate = 1 / 80,
 	hypoxiaPenalty = 0.35,
 	mannitolBlock = 0.25,
@@ -1211,9 +1217,12 @@ function hg.organism.TickConvulsion(owner, org, timeValue, ignoreBrainDamage)
 	if not org.convulsing then
 		if time < (org.nextConvulsionRoll or 0) then return end
 		org.nextConvulsionRoll = time + cfg.rollDelay
-		if risk < cfg.riskStart or mannitolK > cfg.mannitolBlock or (org.seizureSuppressedUntil or 0) > time then return end
-		local chance = math.Remap(risk, cfg.riskStart, 1, cfg.chanceMin, cfg.chanceMax)
-		if math.Rand(0, 1) < chance then hg.organism.StartConvulsion(owner, org) end
+		if mannitolK > cfg.mannitolBlock or (org.seizureSuppressedUntil or 0) > time then return end
+		local chance = risk >= cfg.riskStart and math.Remap(risk, cfg.riskStart, 1, cfg.chanceMin, cfg.chanceMax) or 0
+		if not ignoreBrainDamage and (org.brain or 0) >= cfg.brainStart then
+			chance = math.max(chance, math.Remap(math.min(org.brain, cfg.brainFull), cfg.brainStart, cfg.brainFull, cfg.brainChanceMin, cfg.brainChanceMax))
+		end
+		if chance > 0 and math.Rand(0, 1) < chance then hg.organism.StartConvulsion(owner, org) end
 		return
 	end
 
@@ -1222,7 +1231,7 @@ function hg.organism.TickConvulsion(owner, org, timeValue, ignoreBrainDamage)
 		return
 	end
 
-	if risk < cfg.recoveryRisk then
+	if risk < cfg.recoveryRisk and (ignoreBrainDamage or (org.brain or 0) < cfg.brainStart) then
 		stop_seizure(owner, org)
 		return
 	end

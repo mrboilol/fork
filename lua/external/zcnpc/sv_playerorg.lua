@@ -278,6 +278,10 @@ local function EnsureHands(ply)
 	if not (isentity(ply) and IsValid(ply) and ply:IsPlayer() and ply:Alive()) then
 		return
 	end
+	if hg.EnsureHands then
+		hg.EnsureHands(ply)
+		return
+	end
 	if ply:HasWeapon("weapon_hands_sh") then return end
 	if not (istable(weapons) and isfunction(weapons.GetStored) and weapons.GetStored("weapon_hands_sh")) then
 		return

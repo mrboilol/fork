@@ -304,7 +304,8 @@ function ZCityScopeZeroing.SWEP_DoRT(self)
 		drawviewer = false,
 		fov = zoomFOV / dist * 12,
 		znear = 1,
-		bloomtone = false
+		bloomtone = false,
+		dopostprocess = false
 	}
 	local zeroingOffsetX, zeroingOffsetY = ZCityScopeZeroing.GetScopeClickOffset(self, rt.fov, foundatt)
 	local scrw, scrh = ScrW(), ScrH()

@@ -14,6 +14,13 @@ WB.Cooldown = 0.75
 WB.HandSpread = 9
 WB.HandDrop = 7
 WB.HandOff = 5
+WB.ConcussionScale = 0.4
+WB.BrainScale = 0.4
+WB.SkullHit = 0.4
+WB.AdrenalinePerHit = 0.45
+WB.AdrenalineMax = 4
+WB.WoundMul = 1.6
+WB.TerminalBrain = 0.4
 
 local vecUp = Vector(0, 0, 1)
 
@@ -246,6 +253,11 @@ local function headPos(ply)
 	return bone and ply:GetBonePosition(bone) or ply:EyePos()
 end
 
+local function scaleGain(org, key, before, scale)
+	local now = org[key] or 0
+	if now > before then org[key] = before + (now - before) * scale end
+end
+
 local function impact(ply, wallPos, norm, scale)
 	local org = ply.organism
 	if not org or not hg.organism or not hg.organism.input_list then return end
@@ -262,17 +274,23 @@ local function impact(ply, wallPos, norm, scale)
 	dmgInfo:SetDamageType(DMG_CLUB)
 	dmgInfo:SetAttacker(ply)
 	dmgInfo:SetInflictor(ply)
-	dmgInfo:SetDamage(8 * mul)
+	dmgInfo:SetDamage(12 * mul)
 	dmgInfo:SetDamagePosition(hit)
 	dmgInfo:SetDamageForce(-norm * 50)
 
 	local oldSkull = org.skull or 0
 	local oldConsciousness = org.consciousness or 1
 	local input = hg.organism.input_list
+	local fakeBefore = org.needfake
+	local concussionBefore = org.concussion or 0
+	local onsetBefore = org.concussion_onset or 0
+	local brainBefore = org.brain or 0
+	local frontalBefore = org.brainFrontal or 0
 
-	if oldSkull < 1 then org.skull = math.min(oldSkull + math.Rand(0.22, 0.32) * mul, 0.999) end
-	if input.skull then input.skull(org, 0, 0.35 * mul, dmgInfo, nil, -norm) end
-	if input.brainFrontal then input.brainFrontal(org, 0, math.Rand(0.1, 0.18) * mul, dmgInfo) end
+	local otrubBefore = org.needotrub
+	if input.skull then input.skull(org, 0, (oldSkull < 1 and WB.SkullHit * math.Rand(0.7, 1.3) or 0.38) * mul, dmgInfo, nil, -norm) end
+	if oldSkull >= 1 and input.brainFrontal then input.brainFrontal(org, 0, math.Rand(0.1, 0.18) * mul, dmgInfo) end
+	if oldSkull < 1 and (org.skull or 0) >= 1 and not otrubBefore then org.needotrub = false end
 
 	local skull = org.skull or 0
 	if skull >= 1 then
@@ -283,36 +301,49 @@ local function impact(ply, wallPos, norm, scale)
 
 	local concussion = hg.organism.module and hg.organism.module.concussion
 	if concussion and concussion.AddConcussion then
-		local intensity = math.Clamp(0.5 + ply.wallbangCount * 0.2, 0.5, 3.5) * mul
+		local intensity = math.Clamp(0.5 + ply.wallbangCount * 0.05, 0.5, 1.5) * mul
 		concussion.AddConcussion(org, intensity, math.Clamp(10 + intensity * 15, 12, 60))
 	end
 
-	if hg.organism.AddInstantPain then
-		hg.organism.AddInstantPain(org, (25 + (skull >= 1 and 15 or 0)) * mul, "head")
+	if not org.otrub then
+		org.adrenaline = math.min((org.adrenaline or 0) + WB.AdrenalinePerHit * mul, WB.AdrenalineMax)
+		org._adrenalineHoldUntil = math.max(org._adrenalineHoldUntil or 0, CurTime() + 8)
+		org.nextAdrenalineRegen = math.max(org.nextAdrenalineRegen or 0, CurTime() + 30)
 	end
+
+	if hg.organism.AddInstantPain then
+		hg.organism.AddInstantPain(org, (35 + (skull >= 1 and 15 or 0)) * mul, "head")
+	end
+
+	scaleGain(org, "concussion", concussionBefore, WB.ConcussionScale)
+	scaleGain(org, "concussion_onset", onsetBefore, WB.ConcussionScale)
+	scaleGain(org, "brain", brainBefore, WB.BrainScale)
+	scaleGain(org, "brainFrontal", frontalBefore, WB.BrainScale)
+	if not fakeBefore and not org.seizureActive then org.needfake = false end
 
 	org.consciousness = math.max(org.consciousness or 0, math.min(oldConsciousness, math.max(oldConsciousness - 0.1 * mul, 0.25)))
 	org.disorientation = (org.disorientation or 0) + 0.5 * mul
 
-	if oldSkull >= 0.5 and math.Rand(0, 1) < math.min(0.04 * ply.wallbangCount, 0.3) * mul then
-		hg.LightStunPlayer(ply, 2)
-	end
-
-	if skull >= 0.2 then
+	if skull > 0 then
 		local headBone = ply:LookupBone("ValveBiped.Bip01_Head1")
 		local headMat = headBone and ply:GetBoneMatrix(headBone)
 		local forehead = headMat and WorldToLocal(hit + norm + vecUp * 3, angle_zero, headMat:GetTranslation(), headMat:GetAngles()) or Vector()
-		hg.organism.AddWoundManual(ply, (14 + skull * 16) * mul, forehead, angle_zero, "ValveBiped.Bip01_Head1", CurTime())
+		hg.organism.AddWoundManual(ply, (14 + skull * 16) * WB.WoundMul * mul, forehead, angle_zero, "ValveBiped.Bip01_Head1", CurTime())
 		util.Decal("Blood", hit + norm * 4, hit - norm * 8, ply)
 	end
 
-	ply:AddNaturalAdrenaline(0.2)
 	ply:ViewPunch(Angle(math.Rand(6, 9), math.Rand(-2, 2), math.Rand(-4, 4)))
 
 	ply:EmitSound("physics/body/body_medium_impact_hard" .. math.random(1, 6) .. ".wav", 70, math.random(90, 105))
 	ply:EmitSound("physics/flesh/flesh_impact_hard" .. math.random(1, 6) .. ".wav", 65, math.random(85, 100), 0.7)
 
 	hook.Run("HomigradDamage", ply, dmgInfo, HITGROUP_HEAD, ply, 4 * mul)
+
+	local braindead = hg.organism.IsBrainDamageIgnored and hg.organism.IsBrainDamageIgnored(org)
+	if oldSkull >= 1 and (scale or 1) >= 1 and not braindead and ply:Alive() then
+		org.brain = math.max(org.brain or 0, WB.TerminalBrain)
+		if hg.organism.StartConvulsion then hg.organism.StartConvulsion(ply, org) end
+	end
 end
 
 function WB.Slam(ply)

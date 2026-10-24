@@ -150,8 +150,8 @@ function SWEP:AnimHold()
 	if not self.attachments then return end
 	//self.holdtype = self.attachments.grip and #self.attachments.grip ~= 0 and hg.attachments.grip[self.attachments.grip[1]].holdtype or self.HoldType
 	self.holdtype = self.HoldType
-	--self.holdtype = self.holster and (self.holster - CurTime()) / (self.CooldownHolster / self.Ergonomics) < 0.5 and "normal" or self.holdtype
-	self.holdtype = ((self.deploy and (self.deploy - CurTime()) / self:GetDeployDuration() > 0.5)) and "normal" or self.holdtype
+	local drawFraction = self:GetDrawFraction()
+	self.holdtype = (drawFraction and drawFraction < 0.5) and "normal" or self.holdtype
 	self.holdtype = ((self:IsPistolHoldType() or self.CanEpicRun) and ((ply.posture == 7 or ply.posture == 8 or self:IsSprinting()) or (self:IsPistolHoldType() and ply.posture == 9) and not self.reload)) and "slam" or self.holdtype
 	self.holdtype = ((ply:IsFlagSet(FL_ANIMDUCKING)) and self.holdtype == "rpg") and "smg" or self.holdtype
 	self.holdtype = (self:IsPistolHoldType() and (self:GetButtstockAttack() - CurTime() > -0.5)) and "melee" or self.holdtype

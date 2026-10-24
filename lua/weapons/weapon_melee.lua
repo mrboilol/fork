@@ -32,9 +32,32 @@ SWEP.BigMeleeReachTime = 0.8
 SWEP.BigMeleeDeployTime = 1
 SWEP.MeleeDrawGripTime = 0.3
 
+SWEP.BigMeleeHipSide = 9
+SWEP.BigMeleeHipForward = 2
+
 function SWEP:UsesMeleeSling()
-    local slings = GetConVar("hg_slings")
-    return self.TwoHanded and slings and slings:GetBool() or false
+    return self.TwoHanded == true
+end
+
+function SWEP:GetHolsterSlot()
+    local owner = self:GetOwner()
+    if not IsValid(owner) or not owner.GetWeapons then return "back" end
+
+    for _, wep in ipairs(owner:GetWeapons()) do
+        if wep ~= self and wep.weaponInvCategory == 1 then return "front" end
+    end
+
+    return "back"
+end
+
+function SWEP:GetDeployClock()
+    local finish = hg.GetHolsterEnd(self)
+    if not finish then return CurTime() end
+
+    local gripStart = math.max(self.MeleeDeployGripStart or 0, self:GetNWFloat("MeleeDeployGripStart", 0))
+    if gripStart == 0 then return CurTime() end
+
+    return gripStart + (finish - CurTime())
 end
 
 function SWEP:CanHolsterBigMelee()
@@ -43,15 +66,18 @@ function SWEP:CanHolsterBigMelee()
     local owner = self:GetOwner()
     if not IsValid(owner) or not owner:IsPlayer() then return false end
 
+    local others = 0
     for _, wep in ipairs(owner:GetWeapons()) do
-        if wep ~= self and wep.weaponInvCategory == 1 then return false end
+        if wep ~= self and wep.weaponInvCategory == 1 then others = others + 1 end
     end
 
-    local slings = GetConVar("hg_slings")
-    if not slings or not slings:GetBool() then return true end
-
     local inv = owner:GetNetVar("Inventory", {})
-    return inv["Weapons"] and inv["Weapons"]["hg_sling"] == true
+    local hasSling = inv["Weapons"] and inv["Weapons"]["hg_sling"] == true
+
+    local slings = GetConVar("hg_slings")
+    if slings and slings:GetBool() then return others == 0 and hasSling end
+
+    return others == 0 or (hasSling and others == 1)
 end
 
 function SWEP:CanPrimaryAttack()
@@ -411,31 +437,47 @@ if CLIENT then
 
     function SWEP:GetHolsteredWorldTransform(ent, model)
         if not IsValid(ent) or not IsValid(model) then return end
-        local bone = ent:LookupBone(self.holsteredBone)
+        local front = self:GetHolsterSlot() == "front"
+        local bone = ent:LookupBone(front and "ValveBiped.Bip01_Pelvis" or self.holsteredBone)
         local matrix = bone and ent:GetBoneMatrix(bone)
         if not matrix then return end
 
-        local anchorPos, anchorAng = LocalToWorld(self.holsteredPos, self.holsteredAng, matrix:GetTranslation(), matrix:GetAngles())
-        local pos, ang = LocalToWorld(self.weaponPos or vector_origin, self.weaponAng or angle_zero, anchorPos, anchorAng)
         local forward = ent:GetForward()
         local right = ent:GetRight()
-        local depth = (pos - matrix:GetTranslation()):Dot(forward)
-        local side = (pos - matrix:GetTranslation()):Dot(right)
-        pos = pos - forward * (depth + (self.BigMeleeHolsterBackOffset or 3)) - right * (side + 8)
+        local entUp = ent:GetUp()
+        local pos, ang, target
+
+        if front then
+            pos = matrix:GetTranslation() - right * self.BigMeleeHipSide + forward * self.BigMeleeHipForward
+            local _, baseAng = LocalToWorld(vector_origin, self.weaponAng or angle_zero, vector_origin, ent:GetAngles())
+            ang = baseAng
+            target = entUp * 0.8 + forward * 0.6
+            target:Normalize()
+        else
+            local anchorPos, anchorAng = LocalToWorld(self.holsteredPos, self.holsteredAng, matrix:GetTranslation(), matrix:GetAngles())
+            pos, ang = LocalToWorld(self.weaponPos or vector_origin, self.weaponAng or angle_zero, anchorPos, anchorAng)
+            local depth = (pos - matrix:GetTranslation()):Dot(forward)
+            local side = (pos - matrix:GetTranslation()):Dot(right)
+            pos = pos - forward * (depth + (self.BigMeleeHolsterBackOffset or 3)) - right * (side + 8)
+            target = entUp
+        end
 
         local size = model:OBBMaxs() - model:OBBMins()
         local lengthDir = size.x >= size.y and size.x >= size.z and ang:Forward()
             or size.y >= size.z and ang:Right() or ang:Up()
-        local up = ent:GetUp()
-        if lengthDir:Dot(up) < 0 then up = -up end
-        local axis = lengthDir:Cross(up)
+        local aim = lengthDir:Dot(target) < 0 and -target or target
+        local axis = lengthDir:Cross(aim)
         if axis:LengthSqr() > 0.0001 then
             axis:Normalize()
-            ang:RotateAroundAxis(axis, math.deg(math.acos(math.Clamp(lengthDir:Dot(up), -1, 1))))
+            ang:RotateAroundAxis(axis, math.deg(math.acos(math.Clamp(lengthDir:Dot(aim), -1, 1))))
+        end
+
+        if front then
+            pos = pos - target * math.min(math.max(size.x, size.y, size.z) * 0.35, 22)
         end
 
         local center = LocalToWorld(model:OBBCenter(), angle_zero, pos, ang)
-        return pos - (center - pos) + ent:GetUp(), ang
+        return pos - (center - pos) + entUp, ang
     end
 
     function SWEP:DrawHolsteredWorldModel(ent)
@@ -566,7 +608,8 @@ if CLIENT then
             end
             
             local pos, ang = self:ModelAnim(WorldModel)
-            if reachEnd > CurTime() then
+            local clock = self:GetDeployClock()
+            if reachEnd > clock then
                 local holsterModel = IsValid(self.holsteredWorldModel) and self.holsteredWorldModel or WorldModel
                 local holsteredPos, holsteredAng = self:GetHolsteredWorldTransform(ent, holsterModel)
                 if holsteredPos then
@@ -581,7 +624,7 @@ if CLIENT then
                         end
                     end
                     local moveStart = math.max(self.MeleeDeployMoveStart or 0, self:GetNWFloat("MeleeDeployMoveStart", 0))
-                    local fraction = math.ease.InOutSine(math.Clamp((CurTime() - moveStart) / math.max(reachEnd - moveStart, 0.001), 0, 1))
+                    local fraction = math.ease.InOutSine(math.Clamp((clock - moveStart) / math.max(reachEnd - moveStart, 0.001), 0, 1))
                     pos = LerpVector(fraction, holsteredPos, pos)
                     ang = LerpAngle(fraction, holsteredAng, ang)
                 end
@@ -601,7 +644,7 @@ if CLIENT then
 		end
 
         if updatePose then
-            if reachEnd > CurTime() then WorldModel:InvalidateBoneCache() end
+            if reachEnd > self:GetDeployClock() then WorldModel:InvalidateBoneCache() end
             WorldModel:SetupBones()
         end
 
@@ -1155,7 +1198,7 @@ function SWEP:ModelAnim(model, pos, ang)
 
     if self.ModelAnimAdd then pos, ang = self:ModelAnimAdd(model, pos, ang) end
     if hg.EquipmentImpactPose then pos, ang = hg.EquipmentImpactPose(self, pos, ang) end
-    if math.max(self.MeleeDeployReachEnd or 0, self:GetNWFloat("MeleeDeployReachEnd", 0)) <= CurTime() and (not self.GetInAttack or not self:GetInAttack()) then
+    if math.max(self.MeleeDeployReachEnd or 0, self:GetNWFloat("MeleeDeployReachEnd", 0)) <= self:GetDeployClock() and (not self.GetInAttack or not self:GetInAttack()) then
         if self.WorldModelExchange and hg.ResolveAnimatedEquipmentClearance then
             pos = hg.ResolveAnimatedEquipmentClearance(self, owner, model, self.WorldModelExchange, pos, ang, self.modelscale, self.basebone or 1, self.weaponPos, self.weaponAng)
         elseif hg.ResolveEquipmentClearance then
@@ -1264,9 +1307,10 @@ function SWEP:SetHandPos(noset)
 
 	local moveStart = math.max(self.MeleeDeployMoveStart or 0, self:GetNWFloat("MeleeDeployMoveStart", 0))
 	local gripStart = math.max(self.MeleeDeployGripStart or 0, self:GetNWFloat("MeleeDeployGripStart", 0))
+	local clock = self:GetDeployClock()
 	local grip = 1
-	if moveStart > CurTime() then
-		grip = math.ease.InOutSine(math.Clamp((CurTime() - gripStart) / math.max(moveStart - gripStart, 0.001), 0, 1))
+	if moveStart > clock then
+		grip = math.ease.InOutSine(math.Clamp((clock - gripStart) / math.max(moveStart - gripStart, 0.001), 0, 1))
 	end
 	self.lhandik = self.setlh and not (self.DisableLHIKWhileBlocking and self:GetBlocking()) and IsValid(owner)
 		and ((ply:GetTable().ChatGestureWeight or 0) < 0.1) and hg.CanUseLeftHand(ply)
@@ -1280,9 +1324,9 @@ function SWEP:SetHandPos(noset)
 	local rightGripBone = wm:LookupBone("ValveBiped.Bip01_R_Hand")
 	local rightGripMatrix = rightGripBone and wm:GetBoneMatrix(rightGripBone)
 	local rightGripPos = rightGripMatrix and rightGripMatrix:GetTranslation() or wm:WorldSpaceCenter()
-	local reachFinished = CurTime() >= math.max(self.MeleeDeployReachEnd or 0, self:GetNWFloat("MeleeDeployReachEnd", 0))
+	local reachFinished = clock >= math.max(self.MeleeDeployReachEnd or 0, self:GetNWFloat("MeleeDeployReachEnd", 0))
 	self.rhandik = self.setrh and IsValid(owner) and (not leftDraw or reachFinished or
-		(CurTime() >= moveStart and rhmat and
+		(clock >= moveStart and rhmat and
 		rhmat:GetTranslation():DistToSqr(rightGripPos) <= 18 * 18))
 
 	ply.rhold = rhmat
@@ -1340,7 +1384,7 @@ function SWEP:SetHandPos(noset)
 
 	local bones = hg.TPIKBonesRH
 	local reachEnd = math.max(self.MeleeDeployReachEnd or 0, self:GetNWFloat("MeleeDeployReachEnd", 0))
-	local reachLerp = leftDraw and reachEnd > CurTime() and math.ease.InOutSine(math.Clamp((CurTime() - moveStart) / math.max(reachEnd - moveStart, 0.001), 0, 1))
+	local reachLerp = leftDraw and reachEnd > clock and math.ease.InOutSine(math.Clamp((clock - moveStart) / math.max(reachEnd - moveStart, 0.001), 0, 1))
 
 	if self.rhandik and self:InUse() then
 		for _, bone in ipairs(bones) do
@@ -1476,7 +1520,42 @@ function SWEP:Deploy()
 	return true
 end
 
+function SWEP:GetHolsterDuration()
+    local arm = self.TwoHanded and "larm" or "rarm"
+    local effectiveness = hg.GetArmEffectiveness and hg.GetArmEffectiveness(self:GetOwner(), arm) or 1
+    local speed = Lerp(effectiveness, 0.5, 1)
+    local total = (self.BigMeleeDeployTime or 1) / speed
+    if self.TwoHanded then
+        total = total + ((self.MeleeDrawGripTime or 0.3) + (self.BigMeleeReachTime or 0.8)) / speed
+    end
+    return total
+end
+
+function SWEP:GetDrawFraction()
+    if not self.TwoHanded then return end
+
+    local gripStart = math.max(self.MeleeDeployGripStart or 0, self:GetNWFloat("MeleeDeployGripStart", 0))
+    if gripStart == 0 then return end
+
+    local finish = hg.GetHolsterEnd(self)
+    local total = math.max(self:GetHolsterDuration(), 0.001)
+    if finish then return math.Clamp((finish - CurTime()) / total, 0, 1) end
+
+    return math.Clamp((CurTime() - gripStart) / total, 0, 1)
+end
+
+function SWEP:OnHolsterBegin(total, fraction)
+    local remaining = total * fraction
+    self:CancelChargeAttack(false)
+    self:SetInAttack(false)
+    self:SetNextPrimaryFire(CurTime() + remaining)
+    self:SetNextSecondaryFire(CurTime() + remaining)
+    self:PlayAnim("deploy", remaining, false, nil, true, true)
+end
+
 function SWEP:Holster(wep)
+    if hg.HolsterGate(self, wep) then return false end
+
     self.MeleeDeployGripStart = 0
     self.MeleeDeployMoveStart = 0
     self.MeleeDeployReachEnd = 0
@@ -1656,7 +1735,7 @@ function SWEP:MultiplyDMG(owner, ent, vellen, mul)
 	mul = mul * (ent ~= owner and 0.75 or 1)
 	mul = mul * (owner.MeleeDamageMul or 1)
 	mul = mul * (owner.GetTraitMultiplier and owner:GetTraitMultiplier("melee_damage", 1) or 1)
-	mul = mul * Lerp(self:GetMeleeArmEffectiveness(owner), 0.2, 1)
+	mul = mul * Lerp(self:GetMeleeArmEffectiveness(owner), 0.1, 1)
 
     if owner.organism.superfighter then
         mul = mul * 5
@@ -1673,16 +1752,31 @@ function SWEP:MultiplyDMG(owner, ent, vellen, mul)
     return mul
 end
 
+local MELEE_CRIPPLED_ARM_FLOOR = 0.05
+
+local function meleeArmEffectiveness(owner, limb)
+	local org = owner.organism
+	if org and (org[limb .. "amputated"] or org[limb .. "upamputated"] or org[(limb == "larm" and "lhand" or "rhand") .. "amputated"]) then return 0 end
+	return math.max(hg.GetArmEffectiveness(owner, limb), MELEE_CRIPPLED_ARM_FLOOR)
+end
+
 function SWEP:GetMeleeArmEffectiveness(owner)
 	if not IsValid(owner) or not hg.GetArmEffectiveness then return 1 end
-	local right = hg.GetArmEffectiveness(owner, "rarm")
+	local right = meleeArmEffectiveness(owner, "rarm")
 	if not self.TwoHanded then return right end
-	local left = hg.GetArmEffectiveness(owner, "larm")
+	local left = meleeArmEffectiveness(owner, "larm")
 	return math.Clamp(math.sqrt(math.max(right * left, 0)), 0, 1)
 end
 
+function SWEP:ApplyBlockArmPain(owner, damage)
+	if not SERVER or not IsValid(owner) or not owner.organism then return end
+	local impairment = 1 - self:GetMeleeArmEffectiveness(owner)
+	if impairment <= 0.3 then return end
+	owner.organism.painadd = (owner.organism.painadd or 0) + impairment ^ 2 * math.Clamp(damage * 0.4, 3, 14)
+end
+
 function SWEP:GetMeleeArmSpeedMul(owner)
-	local armSpeed = Lerp(self:GetMeleeArmEffectiveness(owner), 0.35, 1)
+	local armSpeed = Lerp(self:GetMeleeArmEffectiveness(owner), 0.2, 1)
 	local combat = hg.GetCombatCondition and hg.GetCombatCondition(owner) or nil
 	local weaponWeight = owner.GetTraitMultiplier and owner:GetTraitMultiplier("weapon_weight", 1) or 1
 	return armSpeed * (combat and (combat.speed or combat.tempo) or 1) * weaponWeight
@@ -3310,6 +3404,8 @@ function SWEP:BlockingLogic(ent, mul, attacktype, trace)
             local tierDiff = attackerTier - defenderTier
             local blockStaminaCost = math.max(swingStamina * (wep.BlockHitStaminaMul or self.BlockHitStaminaMul or 0.5), 0) * (wep.MeleeStaminaMul or 0.4)
 
+            if wep.ApplyBlockArmPain then wep:ApplyBlockArmPain(ent, selfdmg) end
+
             if perfectblock then
                 trace.HGPreventHeadRagdoll = true
 
@@ -3794,9 +3890,9 @@ function SWEP:CustomThink()
         end
     end
 
-	if SERVER and not owner:IsNPC() and owner.organism and (not owner.organism.canmove or ((owner.organism.stun - CurTime()) > 0) or (hg.organism.CantHoldWeapon and hg.organism.CantHoldWeapon(owner.organism))) and IsValid(actwep) and self == actwep then
+	if SERVER and not owner:IsNPC() and owner.organism and (not owner.organism.canmove or ((owner.organism.stun - CurTime()) > 0)) and IsValid(actwep) and self == actwep then
 		self:RemoveFake()
-		
+
 		hg.drop(owner, nil, nil, nil, true)
 
 		return
@@ -3864,7 +3960,7 @@ function SWEP:CustomThink()
 
     //if SERVER then
         local oldblocking = self:GetBlocking()
-		local armBlockPenalty = (1 - self:GetMeleeArmEffectiveness(owner)) * 30
+		local armBlockPenalty = (1 - self:GetMeleeArmEffectiveness(owner)) * 50
 		local blocking = self:GetMeleeArmEffectiveness(owner) > 0 and self:GetBlockDisabledUntil() < CurTime() and owner.organism and owner.organism.stamina[1] >= (self.BlockMinStamina or 90) + armBlockPenalty and !self:GetInAttack() and (self:GetAttackTime() - CurTime() - 0) < 0 and self:CanBlock() and hg.KeyDown(owner, IN_ATTACK2) and not (self.Canselfharm and self:IsSelfHarming())
         --if self:CutDuct() then return end
         self:SetBlocking(blocking)
@@ -5093,7 +5189,7 @@ elseif CLIENT then
         local ent = net.ReadEntity()
         local sendtoclient = net.ReadBool()
 
-        if ent.IsLocal and !ent:IsLocal() then
+        if ent.IsLocal and (sendtoclient or !ent:IsLocal()) then
             if IsValid(ent) and ent.PlayAnim then
                 ent:PlayAnim(tbl.anim,tbl.time,tbl.cycling,tbl.callback,tbl.reverse)
 
