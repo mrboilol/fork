@@ -225,17 +225,20 @@ SWEP.ScrappersSlot = "Secondary"
 
 SWEP.CustomShell = "10mm"
 
+SWEP.DrumSize = 6
+
 function SWEP:ShiftDrum(val)
-	val = math.Round(val % 6)
-	
+	local size = #self.Drum
+	val = math.Round(val % size)
+
 	if val == 0 then val = 1 end
 
 	local drumCopy = table.Copy(self.Drum)
 
 	for i = 1,#self.Drum do
 		local nextval = i + val
-		
-		local setval = nextval < 1 and #self.Drum - nextval or nextval > 6 and nextval - 6 or nextval
+
+		local setval = nextval < 1 and #self.Drum - nextval or nextval > size and nextval - size or nextval
 		
 		self.Drum[i] = drumCopy[setval]
 	end
@@ -263,14 +266,10 @@ function SWEP:Step()
 end
 
 function SWEP:InitializePost()
-	self.Drum = {
-		[1] = 1,
-		[2] = 1,
-		[3] = 1,
-		[4] = 1,
-		[5] = 1,
-		[6] = 1
-	}
+	self.Drum = {}
+	for i = 1, self.DrumSize do
+		self.Drum[i] = 1
+	end
 	self:RevolverPostInit()
 end
 
@@ -313,7 +312,7 @@ if SERVER then
 		local wep = ply:GetActiveWeapon()
 		if IsValid(wep) and wep.Drum and (ply.DrumCD or 0) < CurTime() then
 			wep:AttachAnim()
-			wep:ShiftDrum(math.random(6))
+			wep:ShiftDrum(math.random(#wep.Drum))
 			ply:EmitSound("weapons/357/357_spin1.wav")
 			wep.Rolled = true
 			ply.DrumCD = CurTime() + 0.5
@@ -431,11 +430,11 @@ function SWEP:InsertAmmo(need)
 	need = math.min(need, self:GetMaxClip1())
 	self:SetClip1(need)
 
-	for i = 1, 6 do
+	for i = 1, #self.Drum do
 		self.Drum[i] = 0
 	end
 
-	for i = 1, math.min(need,6) do
+	for i = 1, math.min(need, #self.Drum) do
 		self.Drum[i] = 1
 	end
 	

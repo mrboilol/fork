@@ -2,6 +2,9 @@
 local matPistolAmmo = Material("vgui/hud/bullets/low_caliber.png")
 local matRfileAmmo = Material("vgui/hud/bullets/high_caliber.png")
 local matShotgunAmmo = Material("vgui/hud/bullets/buck_caliber.png")
+local matBushwhackerRaptor = Material("bushwhacking/340frag.png")
+local matBushwhackerSolid = Material("bushwhacking/400solid.png")
+local matBushwhackerXPB = Material("bushwhacking/275hollow.png")
 hg.ammotypes = {
 	["5.56x45mm"] = {
 		name = "5.56x45 mm",
@@ -2164,6 +2167,128 @@ hg.ammotypes = {
 			Icon = matRfileAmmo
 		}
 	},
+	[".500bushwhackerraptor"] = {
+		name = ".500 Bushwhacker Raptor",
+		dmgtype = DMG_BULLET,
+		tracer = TRACER_LINE,
+		plydmg = 0,
+		npcdmg = 0,
+		force = 400,
+		maxcarry = 120,
+		minsplash = 15,
+		maxsplash = 15,
+		TracerSetings = {
+			TracerBody = Material("particle/fire"),
+			TracerTail = Material("effects/laser_tracer"),
+			TracerHeadSize = 5,
+			TracerLength = 105,
+			TracerWidth = 5,
+			TracerColor = Color(255, 237, 155),
+			TracerTPoint1 = 0.25,
+			TracerTPoint2 = 1,
+			TracerSpeed = 25000
+		},
+		BulletSettings = {
+			Damage = 190,
+			Force = 65,
+			Penetration = 16,
+			Shell = "50ae",
+			Speed = 716,
+			Diameter = 12.7,
+			Mass = 22.03,
+			ExpansionMultiplier = 1.35,
+			ExpansionRadius = 2.4,
+			ExpansionChance = 0.6,
+			WoundMultiplier = 2.6,
+			DestructiveMultiplier = 1.5,
+			EnergyRetention = 0.8,
+			BulletFragmentation = {
+				chance = 0.75,
+				energyThreshold = 0.45,
+				energyFraction = 0.25,
+				damageMul = 0.85
+			},
+			Icon = matBushwhackerRaptor
+		}
+	},
+	[".500bushwhackersolid"] = {
+		name = ".500 Bushwhacker Solid",
+		dmgtype = DMG_BULLET,
+		tracer = TRACER_LINE,
+		plydmg = 0,
+		npcdmg = 0,
+		force = 400,
+		maxcarry = 120,
+		minsplash = 15,
+		maxsplash = 15,
+		TracerSetings = {
+			TracerBody = Material("particle/fire"),
+			TracerTail = Material("effects/laser_tracer"),
+			TracerHeadSize = 5,
+			TracerLength = 105,
+			TracerWidth = 5,
+			TracerColor = Color(255, 237, 155),
+			TracerTPoint1 = 0.25,
+			TracerTPoint2 = 1,
+			TracerSpeed = 25000
+		},
+		BulletSettings = {
+			Damage = 160,
+			Force = 70,
+			Penetration = 28,
+			Shell = "50ae",
+			Speed = 655,
+			Diameter = 12.7,
+			Mass = 25.92,
+			ExpansionMultiplier = 0.9,
+			ExpansionRadius = 1.27,
+			ExpansionChance = 0.08,
+			WoundMultiplier = 1.7,
+			DestructiveMultiplier = 1.4,
+			EnergyRetention = 0.94,
+			BulletFragmentation = false,
+			Icon = matBushwhackerSolid
+		}
+	},
+	[".500bushwhackerxpb"] = {
+		name = ".500 Bushwhacker XPB",
+		dmgtype = DMG_BULLET,
+		tracer = TRACER_LINE,
+		plydmg = 0,
+		npcdmg = 0,
+		force = 400,
+		maxcarry = 120,
+		minsplash = 15,
+		maxsplash = 15,
+		TracerSetings = {
+			TracerBody = Material("particle/fire"),
+			TracerTail = Material("effects/laser_tracer"),
+			TracerHeadSize = 5,
+			TracerLength = 105,
+			TracerWidth = 5,
+			TracerColor = Color(255, 237, 155),
+			TracerTPoint1 = 0.25,
+			TracerTPoint2 = 1,
+			TracerSpeed = 25000
+		},
+		BulletSettings = {
+			Damage = 170,
+			Force = 57,
+			Penetration = 18,
+			Shell = "50ae",
+			Speed = 777,
+			Diameter = 12.7,
+			Mass = 17.82,
+			ExpansionMultiplier = 2.2,
+			ExpansionRadius = 3,
+			ExpansionChance = 0.85,
+			WoundMultiplier = 2.9,
+			DestructiveMultiplier = 1.8,
+			EnergyRetention = 0.5,
+			BulletFragmentation = false,
+			Icon = matBushwhackerXPB
+		}
+	},
 	[".22longrifle"] = {
 		name = ".22 Long Rifle",
 		allowed = true,
@@ -3059,6 +3184,27 @@ local ammoents = {
 		Scale = 1,
 		Color = Color(125, 255, 125),
 		Count = 20,
+	},
+	[".500bushwhackerraptor"] = {
+		Icon = "bushwhacking/340frag.png",
+		Material = "models/hmcd_ammobox_22",
+		Scale = 1,
+		Color = Color(255, 140, 60),
+		Count = 10,
+	},
+	[".500bushwhackersolid"] = {
+		Icon = "bushwhacking/400solid.png",
+		Material = "models/hmcd_ammobox_22",
+		Scale = 1,
+		Color = Color(190, 190, 200),
+		Count = 10,
+	},
+	[".500bushwhackerxpb"] = {
+		Icon = "bushwhacking/275hollow.png",
+		Material = "models/hmcd_ammobox_22",
+		Scale = 1,
+		Color = Color(240, 200, 70),
+		Count = 10,
 	},
 	["12.7x108mm"] = {
 		Icon = "vgui/hud/127108.png",

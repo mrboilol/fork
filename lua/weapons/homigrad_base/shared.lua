@@ -104,6 +104,11 @@ SWEP.AmmoTypes2 = {
 		[2] = {".50 Action Express Copper Solid"},
 		[3] = {".50 Action Express JHP"}
 	},
+	[".500 Bushwhacker Raptor"] = {
+		[1] = {".500 Bushwhacker Raptor"},
+		[2] = {".500 Bushwhacker Solid"},
+		[3] = {".500 Bushwhacker XPB"}
+	},
 	["9mm PAK Blank"] = {
 		[1] = {"9mm PAK Blank"},
 		[2] = {"9mm PAK Flash Defense"},
