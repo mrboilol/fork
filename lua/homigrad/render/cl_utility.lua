@@ -999,7 +999,7 @@ players : 1 humans, 0 bots (20 max)
 
 --\\ CL Utils setting adjustments
 	if CLIENT then
-		RunConsoleCommand("r_decals", "32768")
+		RunConsoleCommand("r_decals", "8192")
 		if ConVarExists("r_decal_overlap_count") then
 			RunConsoleCommand("r_decal_overlap_count", "32")
 		end

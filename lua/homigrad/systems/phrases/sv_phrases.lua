@@ -397,9 +397,6 @@ hg.UniversalScreamSounds = {
 	"screams/universal1/screamthree.mp3",
 	"screams/universal1/screamtwo.mp3",
 	"screams/universal1/wilhelm_scream.mp3",
-	"notfunnyfella/bigpain1.mp3", "notfunnyfella/bigpain2.mp3", "notfunnyfella/bigpain3.mp3",
-	"notfunnyfella/bigpain4.mp3", "notfunnyfella/bigpain5.mp3", "notfunnyfella/bigpain6.mp3",
-	"notfunnyfella/bigpain7.mp3",
 }
 local painVoiceAgony = 60
 local painVoiceRush = 85

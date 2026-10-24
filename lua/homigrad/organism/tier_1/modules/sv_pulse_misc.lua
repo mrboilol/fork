@@ -6,6 +6,8 @@ local function getLowPulseSeverity(pulse)
 end
 
 local ADRENALINE_OVERDOSE_START = 4
+local ADRENALINE_DIZZY_START = 3.5
+local ADRENALINE_SLIGHT_DIZZY = 0.8
 local OVERLOAD_ADRENALINE_START = 3.5
 local OVERLOAD_PANIC_START = 0.65
 local OVERLOAD_BUILD_TIME = 30
@@ -99,7 +101,13 @@ function hg.organism.UpdateCirculatoryEffects(owner, org, timeValue, o2Value, ar
 	local panicLoad = org.panicattackActive and Clamp(((org.panicattack or 0) - 0.35) / 0.65, 0, 1) or 0
 	org.hypertensionPanicLoad = math.max(math.Approach(org.hypertensionPanicLoad or 0, 0, timeValue / 120), panicLoad)
 
-	local crisisK = Clamp(((org.hypertension or 0) - 0.35) / 0.65, 0, 1)
+	local adrenaline = org.adrenaline or 0
+	local naturallyHypertensive = IsValid(owner) and owner.HasTrait and owner:HasTrait("naturally_hypertensive")
+	local volumePressure = max(org.hypervolemia or 0, naturallyHypertensive and 0.7 or 0)
+	local adrenalineOnlyPressure = volumePressure < 0.35 and adrenaline > 0.5 and adrenaline < ADRENALINE_OVERDOSE_START
+	local adrenalinePressureK = adrenalineOnlyPressure and Clamp((adrenaline - ADRENALINE_DIZZY_START) / (ADRENALINE_OVERDOSE_START - ADRENALINE_DIZZY_START), 0, 1) or 1
+
+	local crisisK = Clamp(((org.hypertension or 0) - 0.35) / 0.65, 0, 1) * adrenalinePressureK
 	if crisisK > 0 and not org.otrub then
 		org.hypertensionCrisis = math.min((org.hypertensionCrisis or 0) + timeValue * crisisK * (1 + org.hypertensionPanicLoad * 3) / 240, 1)
 	else
@@ -107,13 +115,15 @@ function hg.organism.UpdateCirculatoryEffects(owner, org, timeValue, o2Value, ar
 	end
 	local crisis = org.hypertensionCrisis
 
-	local adrenaline = org.adrenaline or 0
-	local adrenalineOnlyPressure = org.hypertension < 0.35 and adrenaline > 0.5 and adrenaline < ADRENALINE_OVERDOSE_START
-	if org.hypertension > 0 and not adrenalineOnlyPressure then
-		local highK = math.Clamp(org.hypertension * 1.27, 0, 1)
-		local adrenalineMitigation = math.Clamp(org.adrenaline / 3, 0, 1) * 0.25
-		local effectiveHighK = highK * (1 - adrenalineMitigation)
-		org.disorientation = math.max(org.disorientation, 0.4 + effectiveHighK * 1.9 + crisis * 0.6)
+	if org.hypertension > 0 then
+		if adrenalineOnlyPressure then
+			org.disorientation = math.max(org.disorientation, adrenalinePressureK * ADRENALINE_SLIGHT_DIZZY)
+		else
+			local highK = math.Clamp(org.hypertension * 1.27, 0, 1)
+			local adrenalineMitigation = math.Clamp(org.adrenaline / 3, 0, 1) * 0.25
+			local effectiveHighK = highK * (1 - adrenalineMitigation)
+			org.disorientation = math.max(org.disorientation, 0.4 + effectiveHighK * 1.9 + crisis * 0.6)
+		end
 	end
 
 	if adrenaline >= ADRENALINE_OVERDOSE_START and not org.otrub then

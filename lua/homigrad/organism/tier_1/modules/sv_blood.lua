@@ -589,8 +589,9 @@ module[2] = function(owner, org, mulTime)
 	local coagMul = org.coagulation_multiplier
 	local isAlive = isPlayer and owner:Alive()
 	local pressureK = getPressureK(org)
-	local venousPressureFactor = math.max(math.sqrt(pressureK), 0.15)
+	local venousPressureFactor = math.max(math.sqrt(pressureK), 0.03)
 	local arterialPressureFactor = pressureK ^ 0.8
+	local bloodLeftK = math.Clamp((blood - 10) / 290, 0, 1)
 	
 	if #org.wounds > 0 then
 		local ent = getBleedingBody(owner)
@@ -602,7 +603,7 @@ module[2] = function(owner, org, mulTime)
 			local bandageClotMul = hg.GetBandageClotMultiplier and hg.GetBandageClotMultiplier(owner, wound[4]) or 1
 			local heldClotMul = getHeldWoundClotMul(org, wound)
 			local rand1 = math.Rand(4, 10)
-			local bleed = rand1 * wound[1] * mulTime * venousPressureFactor * wound_bleed_rate_mul * (1 - math.min(adrenaline / 6, 0.5)) * bleedMul * 0.02 * tourniquetBleedMul * bandageBleedMul
+			local bleed = rand1 * wound[1] * mulTime * venousPressureFactor * wound_bleed_rate_mul * (1 - math.min(adrenaline / 6, 0.5)) * bleedMul * 0.02 * tourniquetBleedMul * bandageBleedMul * bloodLeftK
 			local heldBleedMul = getHeldWoundBleedMul(org, wound)
 			org.woundPressureMultipliers[i] = heldBleedMul
 			bleed = bleed * heldBleedMul
@@ -620,7 +621,7 @@ module[2] = function(owner, org, mulTime)
 			wound[5] = time
 			org.blood = max(org.blood - bleed, 1)
 				
-			if tourniquetBleedMul > 0 and (isAlive or not isPlayer) then
+			if tourniquetBleedMul > 0 and visualWoundBleedRate > 0.002 and (isAlive or not isPlayer) then
 				hg.organism.BloodDroplet2(owner, org, wound, entVel + VectorRand(-50, 50), false)
 			end
 			if isAlive or not isPlayer then
@@ -681,6 +682,7 @@ module[2] = function(owner, org, mulTime)
 				* heldBleedMul
 				* (1 - bandageCoverage)
 		end
+		woundBleedRate = woundBleedRate * bloodLeftK
 		bleedoutspeed2 = bleedoutspeed2 + woundBleedRate
 		org.blood = max(org.blood - woundBleedRate * mulTime, 1)
 
@@ -691,7 +693,7 @@ module[2] = function(owner, org, mulTime)
 			local woundBone = wound[4]
 			local bone = isnumber(woundBone) and woundBone or isstring(woundBone) and ent:LookupBone(woundBone)
 			wound[5] = time
-			if bone and bone >= 0 and tourniquetBleedMul > 0 and (isAlive or not isPlayer) and arterialDrive > 0.01 then
+			if bone and bone >= 0 and tourniquetBleedMul > 0 and woundBleedRate > 0.002 and (isAlive or not isPlayer) and arterialDrive > 0.01 then
 				local _, ang = ent:GetBonePosition(bone)
 				if ang then
 					local dir = wound[6]
@@ -758,7 +760,7 @@ module[2] = function(owner, org, mulTime)
 	-- existing x100 application below); lower injuries scale proportionally.
 	-- This keeps a score around 1.0 as an urgent injury instead of an
 	-- immediate blood-loss death sentence.
-	local bleed = math.Clamp(org.internalBleed / 300, 0, 0.11) -- + org.lungsR[3] + org.lungsL[3]
+	local bleed = math.Clamp(org.internalBleed / 300, 0, 0.11) * bloodLeftK
 	
 	-- Damaged liver prevents natural internal bleeding healing unless tranexamic acid is present
 	local canHealInternalBleed = (org.liver <= 0 and (org.kidneys or 0) <= 0) or (org.tranexamic_acid or 0) > 0

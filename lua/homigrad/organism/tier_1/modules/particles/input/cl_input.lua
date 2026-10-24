@@ -30,6 +30,7 @@ net.Receive("hg_gib_blood_decal", function()
 	local normal = net.ReadVector()
 	if not pos or not normal or normal:LengthSqr() < 0.0001 then return end
 	if hg.BloodLandRedirect and hg.BloodLandRedirect(pos, -normal:GetNormalized(), nil, false, 4) then return end
+	if hg.BloodPoolCovers and hg.BloodPoolCovers(pos, -normal:GetNormalized()) then return end
 	util.Decal(useOldBloodParticles() and "Normal.Blood1" or "Normal.Blood24", pos - normal, pos + normal, IsValid(ent) and ent or nil)
 end)
 

@@ -27,27 +27,22 @@ SWEP.weight = 0.4
 SWEP.holsteredBone = "ValveBiped.Bip01_Spine2"
 SWEP.holsteredPos = Vector(5, 8, -4)
 SWEP.holsteredAng = Angle(270, 0, 180)
-SWEP.BigMeleeHolsterBackOffset = 3
+SWEP.BigMeleeHolsterBackOffset = 6
+SWEP.BigMeleeHolsterSide = 5
 SWEP.BigMeleeReachTime = 0.8
 SWEP.BigMeleeDeployTime = 1
 SWEP.MeleeDrawGripTime = 0.3
-
-SWEP.BigMeleeHipSide = 9
-SWEP.BigMeleeHipForward = 2
 
 function SWEP:UsesMeleeSling()
     return self.TwoHanded == true
 end
 
-function SWEP:GetHolsterSlot()
+function SWEP:GetHolsterOnLeft()
     local owner = self:GetOwner()
-    if not IsValid(owner) or not owner.GetWeapons then return "back" end
+    local org = IsValid(owner) and owner.organism
+    if not org then return true end
 
-    for _, wep in ipairs(owner:GetWeapons()) do
-        if wep ~= self and wep.weaponInvCategory == 1 then return "front" end
-    end
-
-    return "back"
+    return not (org.larmamputated or org.larmupamputated or org.lhandamputated)
 end
 
 function SWEP:GetDeployClock()
@@ -435,32 +430,34 @@ if CLIENT then
 		return self.worldModel
 	end
 
+    local function holsterBoneMatrix(ent, name)
+        local bone = ent:LookupBone(name)
+        return bone and ent:GetBoneMatrix(bone)
+    end
+
     function SWEP:GetHolsteredWorldTransform(ent, model)
         if not IsValid(ent) or not IsValid(model) then return end
-        local front = self:GetHolsterSlot() == "front"
-        local bone = ent:LookupBone(front and "ValveBiped.Bip01_Pelvis" or self.holsteredBone)
-        local matrix = bone and ent:GetBoneMatrix(bone)
-        if not matrix then return end
 
-        local forward = ent:GetForward()
-        local right = ent:GetRight()
-        local entUp = ent:GetUp()
-        local pos, ang, target
+        local spine = holsterBoneMatrix(ent, self.holsteredBone)
+        local pelvis = holsterBoneMatrix(ent, "ValveBiped.Bip01_Pelvis")
+        local lClavicle = holsterBoneMatrix(ent, "ValveBiped.Bip01_L_Clavicle")
+        local rClavicle = holsterBoneMatrix(ent, "ValveBiped.Bip01_R_Clavicle")
+        if not (spine and pelvis and lClavicle and rClavicle) then return end
 
-        if front then
-            pos = matrix:GetTranslation() - right * self.BigMeleeHipSide + forward * self.BigMeleeHipForward
-            local _, baseAng = LocalToWorld(vector_origin, self.weaponAng or angle_zero, vector_origin, ent:GetAngles())
-            ang = baseAng
-            target = entUp * 0.8 + forward * 0.6
-            target:Normalize()
-        else
-            local anchorPos, anchorAng = LocalToWorld(self.holsteredPos, self.holsteredAng, matrix:GetTranslation(), matrix:GetAngles())
-            pos, ang = LocalToWorld(self.weaponPos or vector_origin, self.weaponAng or angle_zero, anchorPos, anchorAng)
-            local depth = (pos - matrix:GetTranslation()):Dot(forward)
-            local side = (pos - matrix:GetTranslation()):Dot(right)
-            pos = pos - forward * (depth + (self.BigMeleeHolsterBackOffset or 3)) - right * (side + 8)
-            target = entUp
-        end
+        local up = spine:GetTranslation() - pelvis:GetTranslation()
+        up:Normalize()
+        local left = lClavicle:GetTranslation() - rClavicle:GetTranslation()
+        left = left - up * left:Dot(up)
+        left:Normalize()
+        local forward = left:Cross(up)
+        local side = self:GetHolsterOnLeft() and left or -left
+
+        local anchorPos, anchorAng = LocalToWorld(self.holsteredPos, self.holsteredAng, spine:GetTranslation(), spine:GetAngles())
+        local _, ang = LocalToWorld(self.weaponPos or vector_origin, self.weaponAng or angle_zero, anchorPos, anchorAng)
+        local pos = spine:GetTranslation() - forward * (self.BigMeleeHolsterBackOffset or 6) + side * (self.BigMeleeHolsterSide or 5)
+
+        local target = up * 0.85 + side * 0.5
+        target:Normalize()
 
         local size = model:OBBMaxs() - model:OBBMins()
         local lengthDir = size.x >= size.y and size.x >= size.z and ang:Forward()
@@ -472,12 +469,8 @@ if CLIENT then
             ang:RotateAroundAxis(axis, math.deg(math.acos(math.Clamp(lengthDir:Dot(aim), -1, 1))))
         end
 
-        if front then
-            pos = pos - target * math.min(math.max(size.x, size.y, size.z) * 0.35, 22)
-        end
-
         local center = LocalToWorld(model:OBBCenter(), angle_zero, pos, ang)
-        return pos - (center - pos) + entUp, ang
+        return pos - (center - pos) + up, ang
     end
 
     function SWEP:DrawHolsteredWorldModel(ent)
@@ -1735,7 +1728,7 @@ function SWEP:MultiplyDMG(owner, ent, vellen, mul)
 	mul = mul * (ent ~= owner and 0.75 or 1)
 	mul = mul * (owner.MeleeDamageMul or 1)
 	mul = mul * (owner.GetTraitMultiplier and owner:GetTraitMultiplier("melee_damage", 1) or 1)
-	mul = mul * Lerp(self:GetMeleeArmEffectiveness(owner), 0.1, 1)
+	mul = mul * Lerp(self:GetMeleeDamageEffectiveness(owner), 0.1, 1)
 
     if owner.organism.superfighter then
         mul = mul * 5
@@ -1753,6 +1746,10 @@ function SWEP:MultiplyDMG(owner, ent, vellen, mul)
 end
 
 local MELEE_CRIPPLED_ARM_FLOOR = 0.05
+local MELEE_ONE_ARM_SPEED = 0.4
+local MELEE_ONE_ARM_DAMAGE = 0.75
+local MELEE_FUMBLE_BELOW = 0.5
+local MELEE_FUMBLE_MAX_CHANCE = 0.3
 
 local function meleeArmEffectiveness(owner, limb)
 	local org = owner.organism
@@ -1765,7 +1762,35 @@ function SWEP:GetMeleeArmEffectiveness(owner)
 	local right = meleeArmEffectiveness(owner, "rarm")
 	if not self.TwoHanded then return right end
 	local left = meleeArmEffectiveness(owner, "larm")
-	return math.Clamp(math.sqrt(math.max(right * left, 0)), 0, 1)
+	local both = math.sqrt(math.max(right * left, 0))
+	return math.Clamp(math.max(both, math.max(right, left) * MELEE_ONE_ARM_SPEED), 0, 1)
+end
+
+function SWEP:GetMeleeDamageEffectiveness(owner)
+	if not IsValid(owner) or not hg.GetArmEffectiveness then return 1 end
+	local right = meleeArmEffectiveness(owner, "rarm")
+	if not self.TwoHanded then return right end
+	local left = meleeArmEffectiveness(owner, "larm")
+	local both = math.sqrt(math.max(right * left, 0))
+	return math.Clamp(math.max(both, math.max(right, left) * MELEE_ONE_ARM_DAMAGE), 0, 1)
+end
+
+function SWEP:GetOneArmFumbleChance(owner)
+	if not self.TwoHanded or not IsValid(owner) or not hg.GetArmEffectiveness then return 0 end
+	local weak = math.min(meleeArmEffectiveness(owner, "rarm"), meleeArmEffectiveness(owner, "larm"))
+	if weak >= MELEE_FUMBLE_BELOW then return 0 end
+	return Lerp(1 - weak / MELEE_FUMBLE_BELOW, 0, MELEE_FUMBLE_MAX_CHANCE)
+end
+
+function SWEP:QueueOneArmFumble(owner, delay)
+	if not SERVER then return end
+	if math.Rand(0, 1) >= self:GetOneArmFumbleChance(owner) then return end
+
+	timer.Simple(delay, function()
+		if not IsValid(self) or not IsValid(owner) or not self:GetInAttack() then return end
+		if owner:GetActiveWeapon() ~= self then return end
+		self:TryDisarm(1)
+	end)
 end
 
 function SWEP:ApplyBlockArmPain(owner, damage)
@@ -3952,8 +3977,6 @@ function SWEP:CustomThink()
         return
     end
 
-    if owner.organism and owner.organism.larmamputated and self.TwoHanded then return end
-
     self:ThinkAdd()
     
     if CLIENT and owner ~= lply then return end
@@ -4661,8 +4684,6 @@ function SWEP:PrimaryAttack()
 
     if ply:GetNetVar("ducttaped_hands", false) then return end
 
-    if ply.organism and ply.organism.larmamputated and self.TwoHanded then return end
-    
     if self:GetLastBlocked() + (self.BlockRecoverDelay or 0.35) > CurTime() then
         //return
     end
@@ -4728,6 +4749,7 @@ function SWEP:PrimaryAttack()
     end
 
     self.viewpunch = true
+    self:QueueOneArmFumble(owner, (self.AttackTime + self.AttackTimeLength * 0.5) / mul)
 end
 
 function SWEP:CutDuct()
@@ -4788,7 +4810,6 @@ end
 function SWEP:SecondaryAttack(override)
     if self:GetNextSecondaryFire() > CurTime() then return end
     local ply = self:GetOwner()
-    if ply.organism and ply.organism.larmamputated and self.TwoHanded then return end
 
     if self.Canselfharm and self:IsSelfHarming() then return end
 
@@ -4847,6 +4868,7 @@ function SWEP:SecondaryAttack(override)
     end
 
     self.viewpunch = true
+    self:QueueOneArmFumble(ply, (self.Attack2Time + self.Attack2TimeLength * 0.5) / mul)
 end
 
 function SWEP:InitAdd()

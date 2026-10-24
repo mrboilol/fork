@@ -160,6 +160,18 @@ function hg.organism.CanRescueRespiratoryArrest(org)
 	return not (airwayBlown or lungsBlown or (org.hemothorax or 0) >= 0.9 or org.vomitInThroat)
 end
 
+function hg.organism.ApplyNeedle(org)
+	org.needle = 1
+	if (org.trachea or 0) <= 0 then return end
+
+	org.trachea = 0
+	org.tracheaPath = nil
+	if not (org.heartstop or org.respiratoryArrest or (org.hemothorax or 0) >= 0.9
+		or org.lungsL[1] >= 1 and org.lungsR[1] >= 1) then
+		org.lungsfunction = true
+	end
+end
+
 function hg.organism.GetAirwayOxygenCap(org)
 	local needleAirwayActive = (org.needle or 0) > 0 and (org.trachea or 0) > 0
 	local oxygenRange = tonumber(org.o2.range) or 30
@@ -478,7 +490,9 @@ local drugged = {
 
 local fireCOCheckInterval = 0.5
 local fireCORadius = 450
-local fireCOIndoorMultiplier = 2.2
+local fireCOOpenAirMax = 5
+local fireCOEnclosedMax = 10
+local fireCORampRate = 0.4
 
 local function HasGasMaskProtection(owner)
 	return owner.armors and owner.armors["face"] == "mask2"
@@ -505,7 +519,7 @@ local function GetNearbyFireCOExposure(owner)
 		mask = MASK_SOLID_BRUSHONLY,
 	})
 
-	return exposure * (tr.HitSky and 1 or fireCOIndoorMultiplier)
+	return exposure * (tr.HitSky and fireCOOpenAirMax or fireCOEnclosedMax)
 end
 
 local bit_band,util_PointContents = bit.band,util.PointContents
@@ -841,7 +855,7 @@ module[2] = function(owner, org, timeValue)
 		if not HasGasMaskProtection(owner) then
 			local exposure = GetNearbyFireCOExposure(owner)
 			if exposure > 0 then
-				org.fireCOExposure = math.min((org.fireCOExposure or 0) + exposure * 2, 10)
+				org.fireCOExposure = math.Approach(org.fireCOExposure or 0, exposure, fireCOCheckInterval * fireCORampRate)
 				org._lastFireCOExposure = CurTime()
 			end
 		end
@@ -859,9 +873,8 @@ module[2] = function(owner, org, timeValue)
 	local co2 = math.Clamp(tonumber(org.co2) or 0, 0, 30)
 	if ventilating then
 		local gasImpairment = 1 - math.Clamp(lungGasExchange * airwayGasExchange * thoracicGasExchange, 0, 1)
-		local coExposure = math.Clamp((org.COregen or 0) / 30 + (org.fireCOExposure or 0) / 10, 0, 1)
 		local hyperventilation = org.panicattackActive and math.Clamp(org.panicattack or 0, 0, 1) or 0
-		local retention = math.Clamp(bradyapnea * 0.6 + gasImpairment * 0.5 + coExposure * 0.6 + hyperventilation * 0.4, 0, 1)
+		local retention = math.Clamp(bradyapnea * 0.6 + gasImpairment * 0.5 + hyperventilation * 0.4, 0, 1)
 		local co2Target = 30 * retention
 		co2 = math.Approach(co2, co2Target, timeValue * (co2Target > co2 and 0.4 or 0.6))
 	else

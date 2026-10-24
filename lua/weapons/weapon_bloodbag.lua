@@ -2,7 +2,7 @@ if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_bandage_sh"
 SWEP.BandageTPIK = false
 SWEP.PrintName = "Bloodbag"
-SWEP.Instructions = "A plastic bag containing neccesary instruments to acknowledge blood and transfuse it. Can be used to help with large blood loss."
+SWEP.Instructions = "A plastic bag containing neccesary instruments to acknowledge blood and transfuse it. Can be used to help with large blood loss. In drainage mode it works as a decompression needle and clears blood from the chest."
 SWEP.Category = "ZCity Medicine"
 SWEP.Spawnable = true
 SWEP.Primary.Wait = 1
@@ -65,7 +65,7 @@ SWEP.showstats = true
 SWEP.modeNames2 = {
 	[1] = "give blood",
 	[2] = "take blood",
-	[3] = "drainage"
+	[3] = "drainage / needle"
 }
 
 function SWEP:GetInfo()
@@ -103,6 +103,7 @@ local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") 
 local drainKarmaThreshold = 250
 local drainKarmaPerMl = 0.04
 local drainClearCooldown = 5
+local punctureChance = 0.25
 
 if SERVER then
 	function SWEP:DrainThink(owner)
@@ -117,15 +118,38 @@ if SERVER then
 		local org = ent.organism
 		if not org or ent:GetVelocity():LengthSqr() >= 1000 then return end
 
-		if (org.hemothorax or 0) > 0.01 or (org.cardiacTamponade or 0) > 0.01 then
+		local pleuralBlood = (org.hemothorax or 0) > 0.01 or (org.cardiacTamponade or 0) > 0.01
+		local needleReady = (org.needle or 0) <= 0
+		local pleuralAir = needleReady and ((org.pneumothorax or 0) > 0.01 or org.lungsL[2] == 1 or org.lungsR[2] == 1)
+		local blockedAirway = needleReady and (org.trachea or 0) >= 0.5
+
+		if pleuralBlood or pleuralAir or blockedAirway then
 			if not owner:KeyPressed(takingSelf and IN_ATTACK or IN_ATTACK2) then return end
 
-			org.hemothorax = 0
-			org.hemothoraxTrauma = 0
-			org.hemothoraxL = 0
-			org.hemothoraxR = 0
-			org.internalBleedLungSide = nil
-			org.cardiacTamponade = 0
+			if pleuralBlood then
+				org.hemothorax = 0
+				org.hemothoraxTrauma = 0
+				org.hemothoraxL = 0
+				org.hemothoraxR = 0
+				org.internalBleedLungSide = nil
+				org.cardiacTamponade = 0
+			end
+
+			if org.lungsL[2] ~= 1 and org.lungsR[2] ~= 1 and math.random() < punctureChance then
+				if math.random(2) == 1 then
+					org.lungsL[2] = 1
+				else
+					org.lungsR[2] = 1
+				end
+			end
+
+			if pleuralAir or blockedAirway then
+				hg.organism.ApplyNeedle(org)
+				if self.poisoned2 then
+					org.poison4 = CurTime()
+					self.poisoned2 = nil
+				end
+			end
 
 			self.drainCooldown = CurTime() + drainClearCooldown
 			self.sndcd = CurTime() + 1

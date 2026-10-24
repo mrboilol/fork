@@ -592,6 +592,20 @@ function hg.CreateLegacyNewArmor(equipment)
 	return armor
 end
 
+hook.Add("OnEntityCreated", "hg/armor/override-old-armor", function(ent)
+	if not string.StartWith(ent:GetClass(), "ent_armor_") then return end
+	timer.Simple(0, function()
+		if not IsValid(ent) or ent.HGKeepOld or ent.broken or ent.unusable then return end
+		if ent:GetNWBool("ArmorBroken", false) or ent:GetNWBool("ArmorUnusable", false) then return end
+		if ent.placement ~= "torso" and ent.placement ~= "head" then return end
+		local armor = hg.CreateLegacyNewArmor(ent.name)
+		if not IsValid(armor) then return end
+		armor:SetPos(ent:GetPos())
+		armor:SetAngles(ent:GetAngles())
+		SafeRemoveEntity(ent)
+	end)
+end)
+
 function hg.RemoveClassArmor(ply, equipment)
 	local class = hg.GetLegacyNewArmorClass(equipment)
 	local placement = class and hg.GetArmorPlacement(equipment)
@@ -669,7 +683,7 @@ function hg.AddArmor(ply, equipment, ent)
 		return false
 	end
 
-	if not ent and ply:IsPlayer() and (placement == "torso" or placement == "head") then
+	if ply:IsPlayer() and (placement == "torso" or placement == "head") and (not ent or ent.Base == "armor_base" and ent.name == equipment and not (ent.broken or ent:GetNWBool("ArmorBroken", false))) then
 		local newArmor = hg.CreateLegacyNewArmor(equipment)
 		if IsValid(newArmor) then
 			if newArmor:CanWear(ply) then
@@ -772,6 +786,7 @@ function hg.DropArmorForce(ent, equipment, pos, ang, vel, brokenMul)
     if hg.armor[placement][equipment] then
         local equipmentEnt = ents.Create("ent_armor_" .. equipment)
         if not IsValid(equipmentEnt) then return false end
+		equipmentEnt.HGKeepOld = true
         local dropPos, dropAng = getArmorDropTransform(ent, equipment, pos)
         equipmentEnt:Spawn()
         equipmentEnt:SetPos(dropPos)

@@ -161,6 +161,12 @@ local moodleTexts = {
 		[3] = {title = "Severe CO Poisoning", description = "Toxic gas is seriously impairing your brain and movement."},
 		[4] = {title = "Deadly CO Poisoning", description = "Your blood can no longer deliver enough oxygen to survive."},
 	}},
+	hypercapnia = {levels = {
+		[1] = {title = "Air Hunger", description = "Exhaled gas is building up faster than you clear it."},
+		[2] = {title = "Hypercapnia", description = "Trapped CO2 is clouding your head and making you drowsy."},
+		[3] = {title = "Severe Hypercapnia", description = "CO2 buildup is dulling your mind and straining your heart."},
+		[4] = {title = "Critical Hypercapnia", description = "You are close to blacking out from CO2 retention."},
+	}},
 	self_harm = {levels = {
 		[1] = {title = "Self-Harm Urges", description = "Your depression is pushing you toward hurting yourself."},
 		[2] = {title = "Self-Harm Risk", description = "You are close to harming yourself."},
@@ -394,6 +400,12 @@ local moodleTexts = {
 		[3] = {title = "Heavily Armored", description = "Multiple protected areas give strong defensive coverage."},
 		[4] = {title = "Fully Armored", description = "Two or more major armor pieces provide excellent protection."},
 	}},
+	poisoning = {levels = {
+		[1] = {title = "Sedated", description = "A sedative is slowing your body and clouding your mind."},
+		[2] = {title = "Poisoned", description = "Something toxic is working through your body."},
+		[3] = {title = "Severe Poisoning", description = "Toxins or heavy sedation are overwhelming your body."},
+		[4] = {title = "Critical Poisoning", description = "Lethal toxins or sedatives are shutting your body down."},
+	}},
 }
 local function getMoodle3Material(name)
 	if moodle3Icons[name] == nil then
@@ -454,7 +466,7 @@ local function getMoodle3IconName(effect)
 	local names = {
 		fracture = "fractured", dislocated = "dislocated", analgesia = "drugged",
 		stamina = "exertion", exertion = "exertion", bleeding = level == 1 and "bleeding" or "bleeding" .. level,
-		carbon_monoxide = "hypoxemia", arrhythmia = "arrhythmia", palpitations = "fibrilation", self_harm = "self-harm", fibrillation = "fibrilation",
+		carbon_monoxide = "hypoxemia", hypercapnia = "dyspnea", arrhythmia = "arrhythmia", palpitations = "fibrilation", self_harm = "self-harm", fibrillation = "fibrilation",
 		hypoxemia = "hypoxemia", brain_hypoxia = "brain-hypoxia", brain_dying = "brain-dying", asystole = "heart-failure",
 		low_blood = "hypotension", high_blood = "hypertension", hypovolemia = level == 1 and "blood-loss" or "blood-loss" .. level, no_eye = "last-stand", blinded = "confused",
 		brain_bleed = "brain-hemorrhage", intracranial_pressure = "terror",
@@ -464,7 +476,7 @@ local function getMoodle3IconName(effect)
 		shock = "shock", seizure = "seizure", internal_bleed = "internal-bleeding",
 		panic = "panic", fear = "trauma", tinnitus = "tinnitus", deaf = "deafness", encumbered = "encumbered",
 		nausea = "sick", amputated = "amputation", concussion = "stress", sepsis = "sepsis",
-		adrenaline = "adrenaline", zerlked = "zerlked",
+		adrenaline = "adrenaline", zerlked = "zerlked", poisoning = "radiation",
 		cotard = "suicide",
 		rage = "anger5",
 		hunger = level == 1 and "hunger" or "hunger" .. level, full = level == 1 and "full" or "full2",
@@ -618,6 +630,34 @@ local irregularECGSeverity = {
 	torsades_de_pointes = 0.95,
 }
 
+hg = hg or {}
+hg.MoodlePleuralTexts = {
+	pneumothorax = {thresholds = {0.01, 0.1, 0.3, 0.5},
+		[1] = {title = "Chest Tightness", description = "A small amount of air is leaking into the space around a lung."},
+		[2] = {title = "Pneumothorax", description = "Air trapped around a lung is partially collapsing it."},
+		[3] = {title = "Collapsed Lung", description = "Trapped air has collapsed a lung and breathing is severely restricted."},
+		[4] = {title = "Tension Pneumothorax", description = "Trapped air is crushing your lung and heart. It needs a needle decompression."},
+	},
+	hemothorax = {thresholds = {0.01, 0.1, 0.3, 0.7},
+		[1] = {title = "Pleural Blood", description = "Blood is beginning to pool around a lung."},
+		[2] = {title = "Hemothorax", description = "Blood in the chest is compressing a lung."},
+		[3] = {title = "Massive Hemothorax", description = "Blood is filling your chest and severely restricting breathing."},
+		[4] = {title = "Exsanguinating Hemothorax", description = "Your chest is filling with blood. It needs to be drained."},
+	},
+	hemopneumothorax = {thresholds = {0.01, 0.1, 0.3, 0.7},
+		[1] = {title = "Pleural Air and Blood", description = "Air and blood are beginning to collect around a lung."},
+		[2] = {title = "Hemopneumothorax", description = "Air and blood in the chest are compressing a lung."},
+		[3] = {title = "Severe Hemopneumothorax", description = "Trapped air and blood are collapsing your lung and restricting breathing."},
+		[4] = {title = "Critical Hemopneumothorax", description = "Your chest is full of air and blood. It needs decompression and drainage."},
+	},
+	tamponade = {thresholds = {0.01, 0.15, 0.3, 0.5},
+		[1] = {title = "Pericardial Pressure", description = "Fluid is beginning to collect around your heart."},
+		[2] = {title = "Cardiac Tamponade", description = "Fluid around the heart is limiting how well it can fill."},
+		[3] = {title = "Severe Cardiac Tamponade", description = "Pressure on your heart is collapsing your circulation."},
+		[4] = {title = "Obstructive Shock", description = "Your heart can barely fill. The fluid around it needs to be drained."},
+	},
+}
+
 local function buildEffects(ply, org)
 	local effects = {}
 
@@ -642,6 +682,13 @@ local function buildEffects(ply, org)
 		elseif analgesia >= 0.5 then level, icon = 3, "analgesia2"
 		elseif analgesia >= 0.25 or painkiller >= 1.5 then level = 2 end
 		add(effects, "analgesia", icon, level, mood, 10, math.Round(math.max(analgesia, painkiller), 1))
+	end
+
+	local tranquilizer, poisonLoad = orgNumber(org, "tranquilizer", 0), orgNumber(org, "poisonLoad", 0)
+	if tranquilizer > 0 or poisonLoad > 0 then
+		local level = math.max(tranquilizer > 0 and highRank(tranquilizer, {0.01, 3, 10, 25}) or 0, poisonLoad > 0 and poisonLoad + 1 or 0)
+		if tranquilizer > 0 and poisonLoad > 0 then level = level + 1 end
+		add(effects, "poisoning", "poisoning", level, "bad", 12)
 	end
 
 	local stamina = istable(org.stamina) and org.stamina or nil
@@ -713,6 +760,11 @@ local function buildEffects(ply, org)
 	if co > 5 then
 		local level = co >= 25 and 4 or co >= 20 and 3 or co >= 10 and 2 or 1
 		add(effects, "carbon_monoxide", "crabon", level, "bad", 22, math.floor(math.Clamp(co / 30, 0, 1) * 100) .. "%")
+	end
+	local co2 = orgNumber(org, "co2", 0)
+	if co2 >= 8 then
+		local level = co2 >= 24 and 4 or co2 >= 18 and 3 or co2 >= 12 and 2 or 1
+		add(effects, "hypercapnia", "bradyapnea", level, "bad", 23, math.floor(math.Clamp(co2 / 30, 0, 1) * 100) .. "%")
 	end
 
 	local heartRate = orgNumber(org, "heartbeat", orgNumber(org, "pulse", 70))
@@ -827,8 +879,25 @@ local function buildEffects(ply, org)
 		add(effects, "bradypnea", "bradyapnea", highRank(deficit, {0.1, 0.3, 0.55, 0.8}), "bad", 34, math.floor(deficit * 100) .. "%")
 	end
 	local pneumothorax, hemothorax = orgNumber(org, "pneumothorax", 0), orgNumber(org, "hemothorax", 0)
-	local thorax = math.max(pneumothorax, hemothorax)
-	if thorax > 0.01 then add(effects, "thorax", "superthorax", highRank(thorax, {0.01, 0.1, 0.3, 0.7}), "bad", 35, math.floor(thorax * 100) .. "%") end
+	local tamponade = orgNumber(org, "cardiacTamponade", 0)
+	local thorax = math.max(pneumothorax, hemothorax, tamponade)
+	if thorax > 0.01 then
+		local kind
+		if pneumothorax > 0.05 and hemothorax > 0.05 then
+			kind = "hemopneumothorax"
+		elseif tamponade >= pneumothorax and tamponade >= hemothorax then
+			kind = "tamponade"
+		elseif hemothorax > pneumothorax then
+			kind = "hemothorax"
+		else
+			kind = "pneumothorax"
+		end
+		local pleural = hg.MoodlePleuralTexts[kind]
+		local severity = kind == "tamponade" and tamponade or kind == "pneumothorax" and pneumothorax or thorax
+		local level = highRank(severity, pleural.thresholds)
+		local text = pleural[math.max(level, 1)]
+		add(effects, "thorax", "superthorax", level, "bad", 35, math.floor(severity * 100) .. "%", text.title, text.description)
+	end
 	if org.lungsfunction == false or org.respiratoryArrest == true then add(effects, "respiratory_arrest", "nolungs", 4, "bad", -90) end
 
 	local jawBroken = orgNumber(org, "jaw", 0) >= 1

@@ -33,9 +33,12 @@ local panicattack_event_cap = 0.18
 local panicattack_streak_window = 12
 local panicattack_streak_step = 0.15
 local panicattack_streak_max = 6
-local panicattack_adrenaline_add_target = 0.8
-local panicattack_combat_adrenaline_add_target = 2
-local panicattack_adrenaline_add_rise_time = 3
+local panicattack_threat_adrenaline_cap = 1.5
+local panicattack_threat_adrenaline_min = 0.1
+local panicattack_threat_adrenaline_max = 0.4
+local panicattack_fire_adrenaline_target = 1.2
+local panicattack_fire_adrenaline_rise_time = 1.5
+local panicattack_fire_panic_rate = 0.4
 local panicattack_damage_scale = 0.02
 local panicattack_damage_cooldown = 0.75
 local panicattack_witness_radius = 700
@@ -403,10 +406,29 @@ function hg.organism.MarkArterialWoundsNetDirty(org)
 	org.arterialWoundsNetDirty = true
 	scheduleWoundNetFlush(org)
 end
+local poisonOnsetDelay = {poison1 = 20, poison2 = 15, poison3 = 20, poison4 = 20}
+function hg.organism.GetPoisonLoad(org)
+	local time = CurTime()
+	local load = 0
+	for key, delay in pairs(poisonOnsetDelay) do
+		local started = org[key]
+		if isnumber(started) and started + delay < time then load = load + 1 end
+	end
+	local kcn = org.Poison_KCN
+	if istable(kcn) and isnumber(kcn.StartTime) then
+		local potency = math.max(tonumber(kcn.Potency) or 1, 0.1)
+		if kcn.StartTime + 20 / potency < time then load = load + (potency > 1 and 2 or 1) end
+	end
+	return load
+end
+
 local function send_organism(org, ply, recipientForce, reliable)
 	if not IsValid(org.owner) then return end
 	hg.organism.EnforceBloodCirculationLimit(org)
+	org.poisonLoad = hg.organism.GetPoisonLoad(org)
 	local sendtable = {}
+	sendtable.tranquilizer = org.tranquilizer
+	sendtable.poisonLoad = org.poisonLoad
 	sendtable.alive = org.alive
 	sendtable.otrub = org.otrub
 	sendtable.torsoamputated = org.torsoamputated
@@ -954,6 +976,11 @@ local function apply_panic_disabled_stress(org, amount)
 	org.fearadd = math.min((org.fearadd or 0) + math.Clamp(amount * 2.5, 0.04, 0.6), 3)
 end
 
+local function panic_threat_adrenaline_spike(org, amount)
+	local spike = math.Clamp(amount * 1.5, panicattack_threat_adrenaline_min, panicattack_threat_adrenaline_max)
+	org.adrenalineAdd = math.max(org.adrenalineAdd or 0, math.min((org.adrenalineAdd or 0) + spike, panicattack_threat_adrenaline_cap))
+end
+
 function hg.organism.AddPanicAttack(org, amount, silent, combatEvent, ignoreGunfightProtection, universalStressApplied)
 	if not org then return 0 end
 	if IsValid(org.owner) and org.owner.HasTrait and org.owner:HasTrait("gurajchaka_child") then return 0 end
@@ -971,6 +998,7 @@ function hg.organism.AddPanicAttack(org, amount, silent, combatEvent, ignoreGunf
 		if (org.panicLastHit or 0) > CurTime() - panicattack_streak_window then
 			amount = amount * (1 + math.min(org.panicHitStreak or 0, panicattack_streak_max) * panicattack_streak_step)
 		end
+		panic_threat_adrenaline_spike(org, amount)
 	end
 	local goodmood = math.Clamp(tonumber(org.goodmood) or 0, 0, 1)
 	if goodmood > 0 then
@@ -1563,27 +1591,39 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		owner:Notify("I can't calm down.", 2, "panicattack_start", 2, nil, Color(255, 140, 140))
 	end
 	local panicDying = org.otrub or org.incapacitated or org.deathStateKilled or (isPly and not owner:Alive())
+	local panicOnFire = false
+	if not panicDying and org.fury13 <= 0 then
+		local panicChar = hg.GetCurrentCharacter(owner)
+		panicOnFire = IsValid(panicChar) and panicChar:IsOnFire()
+	end
+	if panicOnFire then
+		org.panicFireUntil = CurTime() + 2
+		hg.organism.AddPanicAttack(org, timeValue * panicattack_fire_panic_rate, true, false, true, true)
+		if (org.adrenalineAdd or 0) < panicattack_fire_adrenaline_target then
+			org.adrenalineAdd = math.Approach(org.adrenalineAdd or 0, panicattack_fire_adrenaline_target, timeValue / panicattack_fire_adrenaline_rise_time)
+		end
+	end
 	if org.panicattack >= panicattack_threshold then
 		org.panicattackActive = hg_panic:GetBool() and not panicDying
 		if not org.panicattackActive then
 			org.panicMode = nil
-		elseif not org.panicMode then
-			org.panicMode = math.random(2) == 1 and "fight" or "flight"
-			if isPly then
-				owner:Notify(org.panicMode == "fight" and "I need to fight back." or "I need to get out of here now.", 2, "panicattack_mode", 2, nil, Color(255, 170, 120))
+			org.panicModeNotified = nil
+		else
+			if (org.panicFireUntil or 0) > CurTime() then
+				org.panicMode = "flight"
 			end
-		end
-		local panicSeverity = math.Clamp(math.Remap(org.panicattack, panicattack_threshold, 1, 0, 1), 0, 1)
-		if not panicDying then
-			local combatPanic = (org.panicGunfightUntil or 0) > CurTime()
-			local targetMaximum = combatPanic and panicattack_combat_adrenaline_add_target or panicattack_adrenaline_add_target
-			local adrenalineTarget = Lerp(panicSeverity, targetMaximum * 0.4, targetMaximum)
-			if not hg_panic:GetBool() then adrenalineTarget = adrenalineTarget * 0.55 end
-			if (org.adrenalineAdd or 0) < adrenalineTarget then
-				org.adrenalineAdd = math.Approach(org.adrenalineAdd or 0, adrenalineTarget, timeValue / panicattack_adrenaline_add_rise_time)
+			if not org.panicMode then
+				org.panicMode = math.random(2) == 1 and "fight" or "flight"
+			end
+			if org.panicMode != org.panicModeNotified then
+				org.panicModeNotified = org.panicMode
+				if isPly then
+					owner:Notify(org.panicMode == "fight" and "I need to fight back." or "I need to get out of here now.", 2, "panicattack_mode", 2, nil, Color(255, 170, 120))
+				end
 			end
 		end
 	else
+		org.panicModeNotified = nil
 		org.panicattackActive = false
 		org.panicMode = nil
 		org.panicAdrenalineUntil = 0

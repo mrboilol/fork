@@ -366,6 +366,15 @@ local slowTime = 3
 local legBones = {[8] = true, [9] = true, [11] = true, [12] = true, [13] = true, [14] = true}
 local taserBones = {2, 3, 4, 5, 6, 7, 8, 9, 11, 12}
 
+local airDropSpeed = -100
+local airClearance = 56
+
+local function isAirborne(rag, phys)
+	if phys:GetVelocity().z < airDropSpeed then return true end
+	local pos = phys:GetPos()
+	return not util.TraceLine({start = pos, endpos = pos - Vector(0, 0, airClearance), filter = rag, mask = MASK_SOLID}).Hit
+end
+
 local function dbgPrint(msg)
 	local dev = GetConVar("developer")
 	if not dev or dev:GetInt() < 1 then return end
@@ -555,7 +564,7 @@ local function applyPosture(rag, posture)
 	local damp = 50
 	local brake = nil
 	local brakeOwner = org.owner
-	if (org.brainfuckv2SlowUntil or 0) > CurTime() and not rag.brainfuckv2Flop and IsValid(brakeOwner) and brakeOwner:IsPlayer() and brakeOwner:Alive() then
+	if (org.brainfuckv2SlowUntil or 0) > CurTime() and not rag.brainfuckv2Flop and IsValid(brakeOwner) and brakeOwner:IsPlayer() and brakeOwner:Alive() and not isAirborne(rag, reference) then
 		brake = data.taser and {160, 25} or {40, 60}
 	end
 
@@ -567,11 +576,7 @@ local function applyPosture(rag, posture)
 	end
 	if not headless and (rag.brainfuckv2PoseError or 0) > 25 then fade = math.max(fade, 0.4) end
 	if fade <= 0 then return end
-	local spin = reference:GetAngleVelocity()
-	local spinSpeed = spin:Length()
-	if spinSpeed > 90 then
-		reference:AddAngleVelocity(-spin * ((spinSpeed - 90) / spinSpeed) * (headless and 0.6 or 0.25))
-	end
+	if hg.StabilizeRagdollReaction then hg.StabilizeRagdollReaction(rag, 35, 180, 200, headless and 1 or 0.8) end
 	local tremor = tremorAmp * fade
 
 	local dampNow = 10 + 40 * fade

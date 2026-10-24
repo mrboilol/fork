@@ -954,10 +954,8 @@ function SWEP:FireBullet()
 		owner:LagCompensation(false)
 	end
 
-	local willsuicideNet = IsValid(owner) and owner:GetNWFloat("willsuicide", 0) or 0
-	local willsuicide = willsuicideNet != 0 and willsuicideNet or (owner.startsuicide and owner.startsuicide + 1 or 0)
 	local suiciding = owner.suiciding
-	local willsuicidereal = (suiciding and (willsuicide == 0 or willsuicide < curTime))
+	local willsuicidereal = suiciding
 	if isnpc then
 		suiciding, willsuicidereal = false, false
 	end

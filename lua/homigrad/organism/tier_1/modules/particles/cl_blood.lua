@@ -240,6 +240,11 @@ local function placeBloodStreak(place, pos, normal, target, artery, dir, headSiz
 	end
 end
 
+function hg.BloodPoolCovers(pos, normal)
+	if normal.z < 0.64 or not (ABL and ABL.Pools and ABL.Pools.Find) then return false end
+	return ABL.Pools.Find(pos.x, pos.y, pos.z, normal.x, normal.y, normal.z, 1.5) ~= nil
+end
+
 local function decalBlood(pos, normal, tr, artery, owner, tiny, amount, particleSize, vel)
 	if not pos or not normal then return end
 	if normal:LengthSqr() < 0.0001 then normal = vector_up end
@@ -249,6 +254,10 @@ local function decalBlood(pos, normal, tr, artery, owner, tiny, amount, particle
 		return
 	end
 	if hg.BloodLandRedirect and hg.BloodLandRedirect(pos, normal, tr, artery, amount, particleSize, vel) then return end
+	if hg.BloodPoolCovers(pos, normal) then
+		if not tiny or math.random(7) == 1 then playBloodDripImpact(pos, tr) end
+		return
+	end
 
 	local steps, dir = 0
 	if vel and not tiny then

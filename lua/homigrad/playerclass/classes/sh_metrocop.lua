@@ -81,6 +81,8 @@ function CLASS.Off(self)
 		eightbit.EnableEffect(self:UserID(), 0)
 	end
 
+    hg.RemoveClassArmor(self, "metrocop_helmet")
+
     for k,v in ipairs(ents.FindByClass("npc_*")) do
         if table.HasValue(combines,v:GetClass()) then
             v:AddEntityRelationship( self, D_HT, 99 )
@@ -162,7 +164,7 @@ function CLASS.On(self, data)
     --;; Армор
     self.armors = {}
     self.armors["torso"] = "metrocop_armor"
-    self.armors["head"] = "metrocop_helmet"
+    if not hg.EquipClassArmor(self, "metrocop_helmet") then self.armors["head"] = "metrocop_helmet" end
     self:SyncArmor()
 
     if not data.bNoEquipment then

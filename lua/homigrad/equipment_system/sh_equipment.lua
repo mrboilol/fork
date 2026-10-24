@@ -181,35 +181,101 @@ local armorSpallHardness = {
 	[ZC_ARMOR_MATERIAL_CERAMIC] = 0.5,
 }
 
+local armorDispersion = {
+	[0] = 0.7, [0.9] = 0.65,
+	[0.75] = 0.4, [0.6] = 0.4, [0.45] = 0.4,
+	[1.2] = 0.5, [0.85] = 0.35, [0.7] = 0.3, [0.55] = 0.35,
+	[1] = 0.2, [4.5] = 0.15, [5] = 0.1,
+	[3] = 0.1, [1.8] = 0.1, [1.4] = 0.05,
+}
+local SOFT_DISPERSION = 0.6
+
+local function getArmorDispersion(plate)
+	return armorDispersion[plate and plate.BalisticMaterial or 0] or 0.2
+end
+
 local function ArmorEffect(placement, armor, dmgInfo, org, hit, prot)
-	if prot < 0 then return end
-	local eff = "Impact"
+	local pos = hit and isvector(hit) and hit or dmgInfo:GetDamagePosition()
 	local dir = -dmgInfo:GetDamageForce()
 	dir:Normalize()
-	local effdata = EffectData()
-	
-	effdata:SetOrigin((hit and isvector(hit) and hit or dmgInfo:GetDamagePosition()) - dir)
-	effdata:SetNormal(dir)
-	effdata:SetMagnitude(0.25)
-	effdata:SetRadius(2)
-	effdata:SetScale(0.1)
-	effdata:SetNormal(dir)
-	effdata:SetStart((hit and isvector(hit) and hit or dmgInfo:GetDamagePosition()) + dir)
-	effdata:SetEntity(hg.GetCurrentCharacter(org.owner))
-	effdata:SetSurfaceProp(77)
-	effdata:SetDamageType(dmgInfo:GetDamageType())
+	local isBullet = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
 
-	EmitSound("physics/metal/metal_solid_impact_bullet"..math.random(4)..".wav",dmgInfo:GetDamagePosition(),0,CHAN_AUTO,1,55,nil,100)
-	util.Effect(eff,effdata)
+	if getArmorDispersion(armor) >= SOFT_DISPERSION then
+		sound.Play("physics/body/body_medium_impact_hard" .. math.random(6) .. ".wav", pos, 70, math.random(90, 110), 1)
+	else
+		local sparks = EffectData()
+		sparks:SetOrigin(pos)
+		sparks:SetNormal(dir)
+		sparks:SetMagnitude(2)
+		sparks:SetScale(1)
+		sparks:SetRadius(6)
+		util.Effect("Sparks", sparks, true, true)
+		util.Effect("MetalSpark", sparks, true, true)
 
-	local spallHardness = SERVER and armor and armorSpallHardness[armor.BalisticMaterial]
+		local effdata = EffectData()
+		effdata:SetOrigin(pos - dir)
+		effdata:SetNormal(dir)
+		effdata:SetMagnitude(0.25)
+		effdata:SetRadius(2)
+		effdata:SetScale(0.1)
+		effdata:SetStart(pos + dir)
+		effdata:SetEntity(hg.GetCurrentCharacter(org.owner))
+		effdata:SetSurfaceProp(67)
+		effdata:SetDamageType(dmgInfo:GetDamageType())
+		util.Effect("Impact", effdata)
+
+		local snd = isBullet and ("physics/metal/metal_solid_impact_bullet" .. math.random(4) .. ".wav")
+			or ("physics/metal/metal_solid_impact_hard" .. math.random(5) .. ".wav")
+		sound.Play(snd, pos, 75, math.random(95, 108), 1)
+	end
+
+	local spallHardness = SERVER and prot >= 0 and armor and armorSpallHardness[armor.BalisticMaterial]
 	if spallHardness and dir:LengthSqr() > 0.5 and hg.PhysBullet and hg.PhysBullet.ArmorSpall then
 		local inflictor = dmgInfo:GetInflictor()
 		local bullet = IsValid(inflictor) and inflictor.bullet
 		if bullet and bullet.HG_IsBullet and not bullet.IsFragment then
-			hg.PhysBullet.ArmorSpall(bullet, hit and isvector(hit) and hit or dmgInfo:GetDamagePosition(), dir, spallHardness)
+			hg.PhysBullet.ArmorSpall(bullet, pos, dir, spallHardness)
 		end
 	end
+end
+
+local function meleeArmorEffect(placement, plate, dmgInfo, org, hit)
+	if not SERVER or dmgInfo:IsDamageType(DMG_CRUSH + DMG_FALL + DMG_VEHICLE) or dmgInfo:GetDamage() < 3 then return end
+	if (org.hgArmorFxTime or 0) > CurTime() then return end
+	org.hgArmorFxTime = CurTime() + 0.15
+	ArmorEffect(placement, plate, dmgInfo, org, hit, 0)
+end
+
+local CHEST_TRANSFER = 0.5
+local bluntTransferTargets = {
+	[ZC_ARMOR_SLOT_TORSO] = "chest",
+	[ZC_ARMOR_SLOT_BELLY] = "chest",
+	[ZC_ARMOR_SLOT_PELVIS] = "pelvis",
+}
+
+local function transferArmorBlunt(org, placement, plate, bluntDamage, stopped, dmgInfo)
+	local dispersion = getArmorDispersion(plate)
+	local spread = bluntDamage * (1 - dispersion * 0.5)
+	if not SERVER or spread <= 0 or org.alive == false or org.godmode then return spread end
+
+	org.shock = math.min((org.shock or 0) + spread * 0.65, math.max(org.shock or 0, 70))
+	org.painadd = (org.painadd or 0) + spread * 1.15
+	org.hurt = (org.hurt or 0) + spread / 35
+	org.owner.fullsend = true
+
+	local target = stopped and bluntTransferTargets[placement]
+	local transferTo = target and hg.organism.input_list[target]
+	if transferTo then
+		local bluntInfo = DamageInfo()
+		bluntInfo:SetAttacker(dmgInfo:GetAttacker())
+		bluntInfo:SetInflictor(game.GetWorld())
+		bluntInfo:SetDamage(bluntDamage)
+		bluntInfo:SetDamageType(DMG_CLUB)
+		bluntInfo:SetDamagePosition(dmgInfo:GetDamagePosition())
+		transferTo(org, nil, bluntDamage * (1 - dispersion) / 25 * CHEST_TRANSFER, bluntInfo)
+	end
+
+	return spread
 end
 
 --\\ Armor balistic settings
@@ -310,11 +376,13 @@ local function protec(org, bone, dmg, dmgInfo, placement, boneindex, dir, hit, r
 	end
     local plateKey = plate
 	if not isBullet and plate.BluntDamageMul and dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH) and not dmgInfo:IsDamageType(DMG_SLASH) then
+		if armor.HGBluntDamageInfo ~= dmgInfo then meleeArmorEffect(placement, plate, dmgInfo, org, hit) end
 		local scale = hg.AbsorbZCityBluntImpact(armor, plate, dmgInfo)
 		if scale < 1 then return 1 end
 		return
 	end
 	if not isBullet and plate.SlashDamageMul and dmgInfo:IsDamageType(DMG_SLASH) then
+		if armor.HGBluntDamageInfo ~= dmgInfo then meleeArmorEffect(placement, plate, dmgInfo, org, hit) end
 		local scale = hg.AbsorbZCitySlashImpact(armor, plate, dmgInfo)
 		if scale < 1 then return 1 end
 		return
@@ -405,13 +473,7 @@ local function protec(org, bone, dmg, dmgInfo, placement, boneindex, dir, hit, r
 			remaining / math.max(penetration, 0.01)), 0, 0.95)
 		local energyCost = rawDamage * (1 - scale)
 		local transfer = math.Clamp(protectionDamageMul * (1 + rawDamage / 100), 0, 1)
-		local bluntDamage = energyCost * transfer
-		if SERVER and org.alive ~= false and not org.godmode then
-			org.shock = math.min((org.shock or 0) + bluntDamage * 0.65, math.max(org.shock or 0, 70))
-			org.painadd = (org.painadd or 0) + bluntDamage * 1.15
-			org.hurt = (org.hurt or 0) + bluntDamage / 35
-			if bluntDamage > 0 then org.owner.fullsend = true end
-		end
+		local bluntDamage = transferArmorBlunt(org, placement, plate, energyCost * transfer, stopped, dmgInfo)
 		org.oldSideLink = armor.SideLinks and armor.SideLinks[HitBoxName] or nil
 		org.oldDmgInfo = dmgInfo
 		dmgInfo:SetDamageType(DMG_CLUB)
