@@ -191,6 +191,28 @@ local moodleTexts = {
 		[3] = {title = "Asphyxia", description = "Your tissues are starved of oxygen and consciousness is fading."},
 		[4] = {title = "Anoxemia", description = "Extreme oxygen deprivation is causing widespread organ failure."},
 	}},
+	brain_hypoxia = {levels = {
+		[1] = {title = "Hypoxic", description = "Your brain is not getting enough oxygen."},
+		[2] = {title = "Cerebral Hypoxia", description = "Oxygen starvation is clouding your thinking and slowing your reactions."},
+		[3] = {title = "Severe Cerebral Hypoxia", description = "Your brain is starved of oxygen and consciousness is slipping."},
+		[4] = {title = "Critical Cerebral Hypoxia", description = "Brain cells are dying from lack of oxygen."},
+	}},
+	brain_dying = {levels = {
+		[1] = {title = "Failing Brain", description = "Brain damage is becoming life-threatening."},
+		[2] = {title = "Failing Brain", description = "Brain damage is becoming life-threatening."},
+		[3] = {title = "Failing Brain", description = "Brain damage is becoming life-threatening."},
+		[4] = {title = "Dying Brain", description = "Your brain is failing and death is close."},
+	}},
+	hunger = {levels = {
+		[1] = {title = "Peckish", description = "You could use something to eat."},
+		[2] = {title = "Hungry", description = "Your stomach is empty and food is on your mind."},
+		[3] = {title = "Very Hungry", description = "Hunger is sapping your strength."},
+		[4] = {title = "Starving", description = "You are starving and need food immediately."},
+	}},
+	full = {levels = {
+		[1] = {title = "Full", description = "You have eaten well."},
+		[2] = {title = "Stuffed", description = "You cannot fit any more food."},
+	}},
 	asystole = {levels = {
 		[1] = {title = "Failing Rhythm", description = "Your heart rhythm is losing effective output."},
 		[2] = {title = "Critical Arrhythmia", description = "Circulation is failing as your heart loses rhythm."},
@@ -466,7 +488,7 @@ local function getMoodle3IconName(effect)
 	local names = {
 		fracture = "fractured", dislocated = "dislocated", analgesia = "drugged",
 		stamina = "exertion", exertion = "exertion", bleeding = level == 1 and "bleeding" or "bleeding" .. level,
-		carbon_monoxide = "hypoxemia", hypercapnia = "hypercapnia", arrhythmia = "arrhythmia", palpitations = "fibrilation", self_harm = "self-harm", fibrillation = "fibrilation",
+		carbon_monoxide = "carbon-monoxide", hypercapnia = "hypercapnia", arrhythmia = "arrhythmia", palpitations = "fibrilation", self_harm = "self-harm", fibrillation = "fibrilation",
 		hypoxemia = "hypoxemia", brain_hypoxia = "brain-hypoxia", brain_dying = "brain-dying", asystole = "heart-failure",
 		low_blood = "hypotension", high_blood = "hypertension", hypovolemia = level == 1 and "blood-loss" or "blood-loss" .. level, no_eye = "last-stand", blinded = "confused",
 		brain_bleed = "brain-hemorrhage", intracranial_pressure = "terror",
@@ -498,9 +520,15 @@ local function getMoodle3IconName(effect)
 	return name
 end
 
+local moodle3IconFallbacks = {
+	["carbon-monoxide"] = "hypoxemia",
+	["brain-hypoxia"] = "hypoxemia",
+}
+
 local function getMoodle3Icon(effect)
 	local name = getMoodle3IconName(effect)
-	return name and getMoodle3Material(name) or nil
+	if not name then return nil end
+	return getMoodle3Material(name) or (moodle3IconFallbacks[name] and getMoodle3Material(moodle3IconFallbacks[name])) or nil
 end
 
 local sharedMoodle3Texts = {

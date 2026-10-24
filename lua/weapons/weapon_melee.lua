@@ -1314,13 +1314,7 @@ function SWEP:SetHandPos(noset)
 	local leftHandBone = ent:LookupBone("ValveBiped.Bip01_L_Hand")
 	local rhmat = rightHandBone and ent:GetBoneMatrix(rightHandBone)
 	local lhmat = leftHandBone and ent:GetBoneMatrix(leftHandBone)
-	local rightGripBone = wm:LookupBone("ValveBiped.Bip01_R_Hand")
-	local rightGripMatrix = rightGripBone and wm:GetBoneMatrix(rightGripBone)
-	local rightGripPos = rightGripMatrix and rightGripMatrix:GetTranslation() or wm:WorldSpaceCenter()
-	local reachFinished = clock >= math.max(self.MeleeDeployReachEnd or 0, self:GetNWFloat("MeleeDeployReachEnd", 0))
-	self.rhandik = self.setrh and IsValid(owner) and (not leftDraw or reachFinished or
-		(clock >= moveStart and rhmat and
-		rhmat:GetTranslation():DistToSqr(rightGripPos) <= 18 * 18))
+	self.rhandik = self.setrh and IsValid(owner)
 
 	ply.rhold = rhmat
 	ply.lhold = lhmat
@@ -1377,7 +1371,7 @@ function SWEP:SetHandPos(noset)
 
 	local bones = hg.TPIKBonesRH
 	local reachEnd = math.max(self.MeleeDeployReachEnd or 0, self:GetNWFloat("MeleeDeployReachEnd", 0))
-	local reachLerp = leftDraw and reachEnd > clock and math.ease.InOutSine(math.Clamp((clock - moveStart) / math.max(reachEnd - moveStart, 0.001), 0, 1))
+	local reachLerp = leftDraw and reachEnd > clock and grip
 
 	if self.rhandik and self:InUse() then
 		for _, bone in ipairs(bones) do
@@ -1487,7 +1481,7 @@ function SWEP:Deploy()
             end
             self:SetNextPrimaryFire(CurTime() + deployTime)
             self:SetNextSecondaryFire(CurTime() + deployTime)
-            self:PlayAnim("deploy", deployTime, false, nil, false)
+            self:PlayAnim("deploy", deployTime, false, nil, false, true)
             return true
         end
 
@@ -1507,7 +1501,7 @@ function SWEP:Deploy()
         self:SetNextPrimaryFire(reachEnd + deployTime)
         self:SetNextSecondaryFire(reachEnd + deployTime)
 
-        self:PlayAnim("deploy", gripTime + reachTime + deployTime, false, nil, false)
+        self:PlayAnim("deploy", gripTime + reachTime + deployTime, false, nil, false, true)
     end
 	
 	return true

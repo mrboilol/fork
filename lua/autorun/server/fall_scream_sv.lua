@@ -120,10 +120,15 @@ if SERVER then
     
     local function StopScream(ply)
         if IsValid(ply) and ply._isScreaming then
+            if ply._screamSound then ply:StopSound(ply._screamSound) end
             ply._isScreaming = false
             ply._screamSound = nil
         end
     end
+
+    hg = hg or {}
+    hg.GetFallScreamSound = GetScreamSound
+    hg.StopFallScream = StopScream
     
     local playerStates = {}
     
@@ -141,6 +146,7 @@ if SERVER then
             
             if not IsPlayerConscious(ply) then
                 playerStates[ply] = nil
+                StopScream(ply)
                 continue
             end
             
@@ -210,6 +216,7 @@ if SERVER then
             
             if not IsPlayerConscious(ply) then
                 playerStates["fake_" .. ply:EntIndex()] = nil
+                StopScream(ply)
                 continue
             end
             

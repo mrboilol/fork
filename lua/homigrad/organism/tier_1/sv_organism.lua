@@ -1285,7 +1285,7 @@ function hg.organism.TickConvulsion(owner, org, timeValue, ignoreBrainDamage)
 	end
 
 	if time >= (org.nextConvulsionSound or 0) then
-		org.nextConvulsionSound = time + math.Rand(cfg.soundMin, cfg.soundMax)
+		org.nextConvulsionSound = math.huge
 		local source = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
 		source:EmitSound(cfg.sounds[math.random(#cfg.sounds)], 75, math.random(95, 105))
 	end
@@ -1822,6 +1822,9 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		if math.random(600) < org.brain * 20 then
 			org.needfake = true
 		end
+	end
+	if org.needfake and isPly and (org.adrenaline or 0) > 0 and not (org.seizureActive or org.convulsing or org.needotrub) and hg.WallBang and hg.WallBang.Active(owner) then
+		org.needfake = false
 	end
 	if org.NoKnockdown then
 		org.otrub = false

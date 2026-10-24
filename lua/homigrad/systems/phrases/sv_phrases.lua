@@ -447,8 +447,16 @@ end
 function hg.StopPainScream(ply)
 	if !IsValid(ply) then return end
 
+	local phrase = ply.painVoicePhrase
+	if phrase then
+		if IsValid(ply.painVoiceEnt) then ply.painVoiceEnt:StopSound(phrase) end
+		ply:StopSound(phrase)
+	end
+
 	ply.painVoicePhrase = nil
 	ply.painVoiceEnt = nil
+
+	if hg.StopFallScream then hg.StopFallScream(ply) end
 end
 
 function hg.QueuePainScream(ply, amount)
@@ -525,7 +533,10 @@ local function breathSounds(ply, org, now)
 end
 
 hook.Add("Org Think", "HG_PainVoice", function(ply, org)
-	if !canVoice(ply) then return end
+	if !canVoice(ply) then
+		if ply.painVoicePhrase then hg.StopPainScream(ply) end
+		return
+	end
 
 	local now = CurTime()
 
@@ -584,7 +595,11 @@ hook.Add("Org Think", "HG_PainVoice", function(ply, org)
 	if agony then
 		local phrases = ThatPlyIsFemale(ply) and agonyFemale or agonyMale
 		if numbed then phrases = painBigSounds end
-		local duration = voice(ply, custom or phrases[mRandom(#phrases)], 80, true)
+		local phrase = custom or phrases[mRandom(#phrases)]
+		if burning and !custom and hg.GetFallScreamSound and mRandom(2) == 1 then
+			phrase = hg.GetFallScreamSound(ply) or phrase
+		end
+		local duration = voice(ply, phrase, 80, true)
 		org.painVoiceNext = now + duration + math.Rand(2.5, 4)
 		if rush then org.painRushNext = now + 1.5 end
 	end

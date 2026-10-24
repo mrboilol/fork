@@ -14,7 +14,8 @@ SWEP.WorldModelFake = "models/weapons/c_ins2_revolver_sw500.mdl"
 SWEP.DrumSize = 5
 SWEP.MagIndex = false
 
-SWEP.FakePos = Vector(-18.59, 2.31, 7.42)
+SWEP.FakeScale = 1.25
+SWEP.FakePos = Vector(-20.43, 2.94, 8.44)
 SWEP.FakeAng = Angle(0, 0, 0)
 SWEP.FakeAttachment = "muzzle"
 SWEP.AttachmentPos = Vector(0, 0, 0)
@@ -33,10 +34,10 @@ SWEP.AnimList = {
 }
 
 SWEP.FakeReloadSounds = {
-	[0.11] = "weapons/tfa_ins2/swmodel10/revolver_open_chamber.wav",
-	[0.3] = "weapons/tfa_ins2/thanez_cobra/revolver_dump_rounds_01.wav",
-	[0.64] = "weapons/tfa_ins2/thanez_cobra/revolver_speed_loader_insert_01.wav",
-	[0.84] = "weapons/tfa_ins2/thanez_cobra/revolver_close_chamber.ogg"
+	[0.26] = "weapons/tfa_ins2/swmodel10/revolver_open_chamber.wav",
+	[0.45] = "weapons/tfa_ins2/thanez_cobra/revolver_dump_rounds_01.wav",
+	[0.79] = "weapons/tfa_ins2/thanez_cobra/revolver_speed_loader_insert_01.wav",
+	[0.99] = "weapons/tfa_ins2/thanez_cobra/revolver_close_chamber.ogg"
 }
 
 SWEP.FakeEmptyReloadSounds = SWEP.FakeReloadSounds
@@ -71,7 +72,7 @@ SWEP.podkid = 3
 SWEP.RecoilActionMul = 1.6
 SWEP.ShockMultiplier = 4
 
-SWEP.LocalMuzzlePos = Vector(5.1, 0.22, 6.25)
+SWEP.LocalMuzzlePos = Vector(8.94, 0.33, 7.1)
 SWEP.LocalMuzzleAng = Angle(0, 0, 0)
 SWEP.WeaponEyeAngles = Angle(0, 0, 0)
 
@@ -93,7 +94,7 @@ SWEP.ReloadTime = 4
 
 SWEP.HoldType = "revolver"
 SWEP.AimHold = "revolver"
-SWEP.ZoomPos = Vector(25, 0.3, 7.33)
+SWEP.ZoomPos = Vector(25, 0.45, 8.32)
 SWEP.RHandPos = Vector(-13.5, 0, 3)
 SWEP.LHandPos = false
 SWEP.SprayRand = {Angle(-0.15, -0.25, 0), Angle(-0.3, 0.25, 0)}
@@ -133,19 +134,17 @@ if CLIENT then
 	local vector_full = Vector(1, 1, 1)
 	local loaderBones = {"sw500-loader", "sw500-loaded1", "sw500-loaded2", "sw500-loaded3", "sw500-loaded4"}
 
-	local function setLoaderScale(wm, scale)
+	local function setLoaderScale(self, wm, scale)
 		if not IsValid(wm) then return end
 		for _, name in ipairs(loaderBones) do
 			local bone = wm:LookupBone(name)
 			if bone then wm:ManipulateBoneScale(bone, scale) end
 		end
+		self.loaderShown = scale == vector_full
 	end
 
 	SWEP.FakeReloadEvents = {
-		[0.05] = function(self)
-			setLoaderScale(self:GetWM(), vector_full)
-		end,
-		[0.46] = function(self)
+		[0.61] = function(self)
 			local wm = self:GetWM()
 			if not IsValid(wm) then return end
 			local bone = wm:LookupBone("sw500-drum")
@@ -157,19 +156,27 @@ if CLIENT then
 				end
 			end
 		end,
-		[0.8] = function(self)
-			setLoaderScale(self:GetWM(), vector_origin)
+		[0.65] = function(self)
+			setLoaderScale(self, self:GetWM(), vector_full)
+		end,
+		[1.1] = function(self)
+			setLoaderScale(self, self:GetWM(), vector_origin)
 		end
 	}
 
 	function SWEP:ModelCreated(model)
-		setLoaderScale(model, vector_origin)
+		model:SetRenderBounds(Vector(-80, -80, -80), Vector(80, 80, 80))
+		setLoaderScale(self, model, vector_origin)
 	end
 
 	function SWEP:DrawPost()
 		local wm = self:GetWM()
 		if not IsValid(wm) then return end
-		self.DrumAng = LerpFT(0.05, self.DrumAng or 0, self:GetNWInt("drumroll", 0))
+		if self.loaderShown and not self.reload then setLoaderScale(self, wm, vector_origin) end
+		local target = self:GetNWInt("drumroll", 0)
+		local current = self.DrumAng or 0
+		if current ~= current or math.abs(current - target) > 1000 then current = target end
+		self.DrumAng = LerpFT(0.05, current, target)
 		local bone = wm:LookupBone("sw500-drum")
 		if bone then
 			wm:ManipulateBoneAngles(bone, Angle((360 / self.DrumSize) * (self.reload and 0 or self.DrumAng), 0, 0))
