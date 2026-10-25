@@ -34,6 +34,8 @@ local mat = Material("engine/lightsprite")
 
 local offsetVec1,offsetAng1 = Vector(4,5,6.7),Angle(0,-90,0)
 
+local DrawReadout, ScreenRect
+
 if IsValid(modelHuybombb) then
 	modelHuybombb:Remove()
 	modelHuybombb = nil
@@ -100,6 +102,13 @@ function ENT:Draw()
 		vgui.Start3D2D(pos, ang, 0.012 * 0.5 / size)
 			bombMenu:Paint3D2D()
 		vgui.End3D2D()
+	elseif self:GetNetVar("timer") and view.origin:DistToSqr(self:GetPos()) < 90000 then
+		local pos, ang = LocalToWorld(offsetVec1, offsetAng1, self.pos, self.ang)
+		local x, y, w, h, size = ScreenRect()
+
+		cam.Start3D2D(pos, ang, 0.012 * 0.5 / size)
+			DrawReadout(self, x, y, w, h, size)
+		cam.End3D2D()
 	end
 
 	if self:GetNetVar("timer") then
@@ -171,6 +180,46 @@ local colorBGBlacky = Color(40,40,40,255)
 local blurMat = Material("pp/blurscreen")
 local Dynamic = 0
 
+surface.CreateFont("ZCity_Bomb_Display", {font = "Courier New", size = 150, weight = 800})
+surface.CreateFont("ZCity_Bomb_Display_Small", {font = "Courier New", size = 64, weight = 800})
+
+ScreenRect = function()
+	local size = ScrW() / 1920
+	return ScrW() / 2 + 60 * size, 100 * size, ScrW() / 2 - 175 * size, ScrH() / 2 - 125 * size, size
+end
+
+local function DrawCentered(text, font, cx, y, r, g, b)
+	surface.SetFont(font)
+	surface.SetTextColor(r, g, b, 255)
+	local tw = surface.GetTextSize(text)
+	surface.SetTextPos(cx - tw / 2, y)
+	surface.DrawText(text)
+end
+
+DrawReadout = function(bomb, x, y, w, h, size, input)
+	surface.SetDrawColor(0, 0, 0, 160)
+	surface.DrawRect(x, y, w, h)
+
+	local cx = x + w / 2
+	local timer = bomb:GetNetVar("timer")
+	local known = bomb:GetNetVar("knowncode", "******")
+
+	if timer then
+		local left = math.max(timer - CurTime(), 0)
+		local blink = math.Round(CurTime() * 2) % 2 == 0
+		DrawCentered(string.format("%02d:%02d", math.floor(left / 60), math.floor(left % 60)), "ZCity_Bomb_Display_Small", cx, y + 15 * size, blink and 255 or 120, 30, 30)
+	else
+		DrawCentered("DISARMED", "ZCity_Bomb_Display_Small", cx, y + 15 * size, 90, 200, 90)
+	end
+
+	if input then
+		DrawCentered(input .. string.rep("_", 6 - #input), "ZCity_Bomb_Display", cx, y + 90 * size, 255, 255, 255)
+		DrawCentered(known, "ZCity_Bomb_Display_Small", cx, y + 270 * size, 200, 200, 60)
+	else
+		DrawCentered(known, "ZCity_Bomb_Display", cx, y + 90 * size, 200, 200, 60)
+	end
+end
+
 CreateMenu = function(bomb)
 	if IsValid(bombMenu) then
 		bombMenu:Remove()
@@ -207,21 +256,7 @@ CreateMenu = function(bomb)
 
 	bombMenu.keypress = false
 	bombMenu.Paint = function(self,w,h)
-		surface.SetDrawColor(0, 0, 0, 122)
-		surface.DrawRect(x,y,w1,h1)
-		surface.SetDrawColor(122, 122, 122, 255)
-		--surface.DrawOutlinedRect(x,y,w1,h1)
-		surface.SetDrawColor(math.Round(CurTime() * 2)%2==0 and 255 or 0, 0, 0, 255)
-		surface.DrawRect(x + 50 * size,y + 50 * size,20,20)
-
-		surface.SetFont( "ZCity_Fixed_Big" )
-		surface.SetTextColor(col.r,col.g,col.b,col.a)
-		local lengthX, lengthY = surface.GetTextSize(txt)
-		
-		local txtcopy = txt
-		
-		surface.SetTextPos(x + 30 * size,y + 25 * size)
-		surface.DrawText(txt)
+		DrawReadout(bomb, x, y, w1, h1, size, txt)
 	end
 
 	function bombMenu:OnKeyCodePressed() 
@@ -311,19 +346,15 @@ CreateMenu = function(bomb)
 	end
 
 	enterbut.DoClick = function()
-		if IsValid(bombMenu) then
-			bombMenu.bomb.islooked = nil
-			bombMenu:Remove()
-			bombMenu = nil
-		end
 		if #txt < 6 then
 			chat.AddText("The code must be of 6 numbers.")
-			return 
+			return
 		end
 		surface.PlaySound("weapons/tfa_ins2_sr25_eft/m14_empty.ogg")
 		net.Start("bomb_enter")
 		net.WriteString(txt)
 		net.SendToServer()
+		txt = ""
 	end
 
 	enterbut.Paint = function(self,w,h)

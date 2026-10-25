@@ -5,7 +5,7 @@ SWEP.Spawnable = true
 SWEP.AdminOnly = false
 SWEP.PrintName = "Karabiner 98k"
 SWEP.Author = "Mauser"
-SWEP.Instructions = "Sniper rifle chambered in 7.62x51"
+SWEP.Instructions = "Sniper rifle chambered in 7.92x57 mm Mauser"
 SWEP.Category = "Weapons - Sniper Rifles"
 SWEP.holsteredBone = "ValveBiped.Bip01_Spine2"
 SWEP.holsteredPos = Vector(4, 6, -6)
@@ -43,7 +43,7 @@ SWEP.LocalMuzzlePos = Vector(36.739, -0.25, 8)
 SWEP.LocalMuzzleAng = Angle(0.4,-0.0,0)
 SWEP.WeaponEyeAngles = Angle(-0.7,0.1,0)
 
-SWEP.CustomShell = "762x51"
+SWEP.CustomShell = "762x54"
 
 SWEP.ReloadSound = "weapons/tfa_ins2/k98/m40a1_boltlatch.wav"
 SWEP.CockSound = "weapons/tfa_ins2/k98/m40a1_boltlatch.wav"
@@ -57,7 +57,7 @@ SWEP.UseCustomWorldModel = false
 SWEP.Primary.ClipSize = 5
 SWEP.Primary.DefaultClip = 5
 SWEP.Primary.Automatic = false
-SWEP.Primary.Ammo = "7.62x51 mm"
+SWEP.Primary.Ammo = "7.92x57 mm"
 SWEP.Primary.Cone = 0
 SWEP.Primary.Spread = 0
 SWEP.Primary.Sound = {"weapons/tfa_ins2/k98/m40a1_fp.wav", 80, 90, 100}

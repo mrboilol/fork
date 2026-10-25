@@ -56,11 +56,12 @@ net.Receive("bomb_enter",function(len, ply)
 	--ply:ChatPrint(txt)
 	local ent = ply.bomb
 	
-	if ent.isbomb then
+	if IsValid(ent) and ent.isbomb and #txt == 6 then
 		if not ent.active then
 			local isSandbox = engine.ActiveGamemode() == "sandbox"
 			if isSandbox or BombInSite(ent:GetPos(), 1) or BombInSite(ent:GetPos(), 2) then
 				ent.code = txt
+				ent.planter = ply
 				ply:ChatPrint("The bomb's code is: "..ent.code)
 				ent:ActivateBomb()
 			else
@@ -68,9 +69,11 @@ net.Receive("bomb_enter",function(len, ply)
 			end
 		else
 			if ent.code == txt then
+				local left = ent:GetNetVar("timer") - CurTime()
 				ent:DisableBomb()
 				ent:SetNetVar("knowncode", "******")
 				ply:ChatPrint("The bomb has been disarmed.")
+				hg.BombDisarmCrash(ply, left)
 			else
 				local bombtxt = ent.code
 				local knownnumbers = ent:GetNetVar("knowncode","******")
@@ -180,10 +183,14 @@ function ENT:Think()
 	self:NextThink(CurTime())
 	if self.active then
 		if self:GetNetVar("timer") < CurTime() then
-			zb.bombexploded = true
-			util.ScreenShake( selfPos, 95, 500, 4, 1000 )
-			hg.PropExplosion(self, "Fire", 300, 100)
-			zb.bomb:SetNWBool("active",false)
+			if not self.exploded then
+				self.exploded = true
+				zb.bombexploded = true
+				util.ScreenShake(self:GetPos(), 95, 500, 4, 1000)
+				self:SetNWBool("active",false)
+				hg.BombExplode(self, self.planter, self:GetPower())
+			end
+			return true
 		end
 
 		--;; WHAT THE FAK YUUUUUUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH

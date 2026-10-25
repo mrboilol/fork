@@ -2167,6 +2167,138 @@ hg.ammotypes = {
 			Icon = matRfileAmmo
 		}
 	},
+	[".308winchester"] = {
+		name = ".308 Winchester",
+		allowed = true,
+		dmgtype = DMG_BULLET,
+		tracer = TRACER_LINE,
+		plydmg = 0,
+		npcdmg = 0,
+		force = 250,
+		maxcarry = 120,
+		minsplash = 10,
+		maxsplash = 10,
+		TracerSetings = {
+			TracerBody = Material("particle/fire"),
+			TracerTail = Material("effects/laser_tracer"),
+			TracerHeadSize = 5,
+			TracerLength = 75,
+			TracerWidth = 1.5,
+			TracerColor = Color(255, 237, 155),
+			TracerTPoint1 = 0.25,
+			TracerTPoint2 = 1,
+			TracerSpeed = 25000
+		},
+		BulletSettings = {
+			Damage = 66,
+			Force = 65,
+			Penetration = 13.8,
+			Shell = "762x51",
+			Speed = 820,
+			Diameter = 7.82,
+			Mass = 10.9,
+			Icon = matRfileAmmo
+		}
+	},
+	[".308marlinexpress"] = {
+		name = ".308 Marlin Express",
+		allowed = true,
+		dmgtype = DMG_BULLET,
+		tracer = TRACER_LINE,
+		plydmg = 0,
+		npcdmg = 0,
+		force = 220,
+		maxcarry = 120,
+		minsplash = 10,
+		maxsplash = 10,
+		TracerSetings = {
+			TracerBody = Material("particle/fire"),
+			TracerTail = Material("effects/laser_tracer"),
+			TracerHeadSize = 5,
+			TracerLength = 75,
+			TracerWidth = 1.5,
+			TracerColor = Color(255, 237, 155),
+			TracerTPoint1 = 0.25,
+			TracerTPoint2 = 1,
+			TracerSpeed = 25000
+		},
+		BulletSettings = {
+			Damage = 60,
+			Force = 58,
+			Penetration = 9.5,
+			Shell = "762x51",
+			Speed = 810,
+			Diameter = 7.82,
+			Mass = 10.4,
+			Icon = matRfileAmmo
+		}
+	},
+	["7.92x57mm"] = {
+		name = "7.92x57 mm",
+		allowed = true,
+		dmgtype = DMG_BULLET,
+		tracer = TRACER_LINE,
+		plydmg = 0,
+		npcdmg = 0,
+		force = 260,
+		maxcarry = 120,
+		minsplash = 11,
+		maxsplash = 11,
+		TracerSetings = {
+			TracerBody = Material("particle/fire"),
+			TracerTail = Material("effects/laser_tracer"),
+			TracerHeadSize = 5,
+			TracerLength = 75,
+			TracerWidth = 2,
+			TracerColor = Color(255, 237, 155),
+			TracerTPoint1 = 0.25,
+			TracerTPoint2 = 1,
+			TracerSpeed = 25000
+		},
+		BulletSettings = {
+			Damage = 74,
+			Force = 72,
+			Penetration = 12.5,
+			Shell = "762x54",
+			Speed = 760,
+			Diameter = 8.2,
+			Mass = 12.8,
+			Icon = matRfileAmmo
+		}
+	},
+	["9.3x64mm"] = {
+		name = "9.3x64 mm",
+		allowed = true,
+		dmgtype = DMG_BULLET,
+		tracer = TRACER_LINE,
+		plydmg = 0,
+		npcdmg = 0,
+		force = 300,
+		maxcarry = 100,
+		minsplash = 12,
+		maxsplash = 12,
+		TracerSetings = {
+			TracerBody = Material("particle/fire"),
+			TracerTail = Material("effects/laser_tracer"),
+			TracerHeadSize = 5,
+			TracerLength = 90,
+			TracerWidth = 3,
+			TracerColor = Color(255, 237, 155),
+			TracerTPoint1 = 0.25,
+			TracerTPoint2 = 1,
+			TracerSpeed = 25000
+		},
+		BulletSettings = {
+			Damage = 84,
+			Force = 82,
+			Penetration = 10.5,
+			Shell = "366tkm",
+			Speed = 790,
+			Diameter = 9.3,
+			Mass = 18.5,
+			Icon = matRfileAmmo
+		}
+	},
 	[".500bushwhackerraptor"] = {
 		name = ".500 Bushwhacker Raptor",
 		dmgtype = DMG_BULLET,
@@ -3183,6 +3315,32 @@ local ammoents = {
 		Material = "models/hmcd_ammobox_792",
 		Scale = 1,
 		Color = Color(125, 255, 125),
+		Count = 20,
+	},
+	[".308winchester"] = {
+		Icon = "vgui/hud/308win.png",
+		Model = "models/items/ammo_76251.mdl",
+		Scale = 1,
+		Count = 20,
+	},
+	[".308marlinexpress"] = {
+		Icon = "vgui/hud/308me.png",
+		Model = "models/items/ammo_76251.mdl",
+		Scale = 1,
+		Count = 20,
+	},
+	["7.92x57mm"] = {
+		Icon = "vgui/hud/792x57.png",
+		Material = "models/hmcd_ammobox_792",
+		Scale = 1,
+		Color = Color(150, 140, 100),
+		Count = 20,
+	},
+	["9.3x64mm"] = {
+		Icon = "vgui/hud/93x64.png",
+		Material = "models/hmcd_ammobox_792",
+		Scale = 1,
+		Color = Color(190, 150, 90),
 		Count = 20,
 	},
 	[".500bushwhackerraptor"] = {

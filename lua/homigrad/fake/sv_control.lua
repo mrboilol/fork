@@ -266,7 +266,18 @@ local function isFloppyPhys(ragdoll, physNumber, alreadyReal)
 	return ragdoll.hg_floppy_bones[ragdoll:GetBoneName(bone)] == true
 end
 
+function hg.IsFinite(v)
+	local s = isnumber(v) and v or v[1] + v[2] + v[3]
+	return s - s == 0
+end
+
 function hg.ShadowControl(ragdoll, physNumber, ss, ang, maxang, maxangdamp, pos, maxspeed, maxspeeddamp, alreadyReal)
+	if (ang and not hg.IsFinite(ang)) or (pos and not hg.IsFinite(pos))
+		or (maxang and not hg.IsFinite(maxang)) or (maxangdamp and not hg.IsFinite(maxangdamp))
+		or (maxspeed and not hg.IsFinite(maxspeed)) or (maxspeeddamp and not hg.IsFinite(maxspeeddamp)) then
+		return false
+	end
+
 	local limb = not alreadyReal and K.fakePhysLimb[physNumber]
 	local limbPower = limb and ragdoll.hgTourniquetPower and ragdoll.hgTourniquetPower[limb] or 1
 	if not alreadyReal then physNumber = realPhysNum(ragdoll, physNumber) or 0 end
@@ -847,8 +858,10 @@ hook.Add("Think", "Fake", function()
 						p.maxspeeddamp = 100 * (ragdollcombat and 1 or 0.75) * mass * amt_impulse
 						p.teleportdistance = 0
 
+						if not (hg.IsFinite(bonepos) and hg.IsFinite(boneang) and hg.IsFinite(p.maxangular) and hg.IsFinite(p.maxangulardamp) and hg.IsFinite(p.maxspeed) and hg.IsFinite(p.maxspeeddamp)) then continue end
+
 						physobj:Wake()
-						
+
 						if ragdollcombat and ply:KeyDown(IN_JUMP) and not holdingWoundInput then
 							if !ply.jumpedfake then
 								ply.jumpedfake = true
@@ -888,7 +901,7 @@ hook.Add("Think", "Fake", function()
 
 			if ply:InVehicle() then
 				ply:SetPos(vector_origin)
-			else
+			elseif hg.IsFinite(pos) then
 				ply:SetPos(pos)
 				--ply:SetVelocity(vector_origin)
 			end

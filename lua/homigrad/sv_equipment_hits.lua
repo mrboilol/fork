@@ -208,6 +208,13 @@ local function BuildGeometry(model)
             end
         end
     end
+    SetupEntityBones(probe)
+    geometry.bones = {}
+    for i = 0, (probe:GetBoneCount() or 0) - 1 do
+        local name = probe:GetBoneName(i)
+        local matrix = name and probe:GetBoneMatrix(i)
+        if matrix then geometry.bones[name] = matrix end
+    end
     probe:Remove()
     geometryCache[model] = geometry
     return geometry
@@ -376,11 +383,21 @@ local zcityArmorMargin, zcityArmorReach = 3, 12
 
 local function GetZCityArmorRenderTransform(body, armor)
     local data = ThatPlyIsFemale(body) and armor.FeMale or armor.Male
-    if not istable(data) or not isstring(data.Model) or data.Model == "" or data.BoneMerge then return end
-    local bone = body:LookupBone(data.ParentBone)
+    if not istable(data) or not isstring(data.Model) or data.Model == "" then return end
+    local mergedHead = data.BoneMerge and istable(armor.SlotOccupation) and armor.SlotOccupation[ZC_ARMOR_SLOT_HEAD]
+    if data.BoneMerge and not mergedHead then return end
+    local bone = body:LookupBone(mergedHead and "ValveBiped.Bip01_Head1" or data.ParentBone)
     if not bone or body:GetManipulateBoneScale(bone):LengthSqr() < 0.1 then return end
     local matrix = hg.GetIKBoneMatrix and hg.GetIKBoneMatrix(body, bone) or body:GetBoneMatrix(bone)
     if not matrix then return end
+    if mergedHead then
+        local geometry = GetGeometry(data.Model)
+        local refMatrix = geometry and geometry.bones and geometry.bones["ValveBiped.Bip01_Head1"]
+        local inverse = refMatrix and refMatrix:GetInverse()
+        if not inverse then return end
+        local merged = matrix * inverse
+        return data.Model, merged:GetTranslation(), merged:GetAngles(), 1
+    end
     local pos, ang = LocalToWorld(data.OffsetPos or vector_origin, data.OffsetAng or angle_zero, matrix:GetTranslation(), matrix:GetAngles())
     return data.Model, pos, ang, data.ModelSize or 1
 end

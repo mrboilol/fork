@@ -40,7 +40,7 @@ SWEP.LocalMuzzlePos = Vector(36.8, -0.4, 5)
 SWEP.LocalMuzzleAng = Angle(0, -0, 0)
 SWEP.WeaponEyeAngles = Angle(-0.7, 0.1, 0)
 
-SWEP.CustomShell = "762x51"
+SWEP.CustomShell = "762x54"
 
 SWEP.weight = 4
 SWEP.ScrappersSlot = "Primary"
@@ -55,7 +55,7 @@ SWEP.UseCustomWorldModel = true
 SWEP.Primary.ClipSize = 5
 SWEP.Primary.DefaultClip = 5
 SWEP.Primary.Automatic = false
-SWEP.Primary.Ammo = "7.62x51 mm"
+SWEP.Primary.Ammo = "7.62x54 mm"
 SWEP.Primary.Damage = 59 -- Высокий урон для снайперки
 SWEP.Primary.Force = 55
 SWEP.Primary.Cone = 0

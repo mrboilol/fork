@@ -5,7 +5,7 @@ SWEP.Spawnable = true
 SWEP.AdminOnly = false
 SWEP.PrintName = "SV-98"
 SWEP.Author = ""
-SWEP.Instructions = "Sniper rifle chambered in 7.62x51"
+SWEP.Instructions = "Sniper rifle chambered in 7.62x54R"
 SWEP.Category = "Weapons - Sniper Rifles"
 SWEP.holsteredBone = "ValveBiped.Bip01_Spine2"
 SWEP.holsteredPos = Vector(4, 6, -6)
@@ -85,7 +85,7 @@ SWEP.LocalMuzzlePos = Vector(37.5, -0.66, 3.66)
 SWEP.LocalMuzzleAng = Angle(0, -0, 0)
 SWEP.WeaponEyeAngles = Angle(-0.7, 0.1, 0)
 
-SWEP.CustomShell = "762x51"
+SWEP.CustomShell = "762x54"
 
 SWEP.weight = 4
 SWEP.ScrappersSlot = "Primary"
@@ -102,7 +102,7 @@ SWEP.UseCustomWorldModel = true
 SWEP.Primary.ClipSize = 10
 SWEP.Primary.DefaultClip = 10
 SWEP.Primary.Automatic = false
-SWEP.Primary.Ammo = "7.62x51 mm"
+SWEP.Primary.Ammo = "7.62x54 mm"
 SWEP.Primary.Damage = 89 -- Высокий урон для снайперки
 SWEP.Primary.Force = 85
 SWEP.Primary.Cone = 0

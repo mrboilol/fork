@@ -135,6 +135,8 @@ SWEP.ShootAnimMul = 4
 SWEP.AnimShootMul = 3
 
 SWEP.podkid = 1
+SWEP.ImpactMisfireChance = 2
+SWEP.ImpactMisfireMinSpeed = 80
 
 SWEP.availableAttachments = {
 	barrel = {

@@ -11,7 +11,7 @@ local function muzzleCalibersForWeapon(wep)
 	if ammo == "5.45x39 mm" then calibers["545"] = true end
 	if ammo == "7.62x39 mm" or (isstring(ammo) and string.find(ammo, ".366", 1, true)) then calibers["762x39"] = true end
 	if ammo == "5.56x45 mm" then calibers["556"] = true end
-	if ammo == "7.62x51 mm" or ammo == "7.62x54 mm" or ammo == "7.62x54R mm" or ammo == ".300 Blackout" then calibers["762x51"] = true end
+	if ammo == "7.62x51 mm" or ammo == ".308 Winchester" or ammo == ".308 Marlin Express" or ammo == "7.92x57 mm" or ammo == "7.62x54 mm" or ammo == "7.62x54R mm" or ammo == ".300 Blackout" then calibers["762x51"] = true end
 	local class = wep.GetClass and wep:GetClass() or wep.ClassName
 	if class == "weapon_nl545" then calibers["556"] = true end
 	if class == "weapon_mk47" then calibers["762x51"] = true end

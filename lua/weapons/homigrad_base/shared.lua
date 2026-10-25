@@ -82,6 +82,16 @@ SWEP.AmmoTypes2 = {
 		[2] = {"7.62x51 mm M993"},
 		[3] = {"7.62x51 mm Needle"}
 	},
+	[".366 TKM BP-M"] = {
+		[1] = {".366 TKM BP-M"},
+		[2] = {".366 TKM"},
+		[3] = {".366 TKM 'Geksa'"}
+	},
+	[".366 TKM"] = {
+		[1] = {".366 TKM"},
+		[2] = {".366 TKM BP-M"},
+		[3] = {".366 TKM 'Geksa'"}
+	},
 	[".22 Long Rifle"] = {
 		[1] = {".22 Long Rifle"},
 		[2] = {".22 Long Rifle Needle"}

@@ -208,9 +208,14 @@ hook.Add("hg_medical_minigame_finished", "organism-medical-system-action", funct
 	end
 end)
 
+local WAKE_DIZZY_DURATION = 30
+local WAKE_DIZZY_MAX = 2
+local WAKE_DIZZY_MIN = 1.5
+
 module[1] = function(org)
 	org.rehab_otrub = 0
 	org.rehab_otrub_duration = 0
+	org.rehab_dizzy_until = 0
 	org.medical_errors = 0
 	org.medical_infection = 0
 	org.next_med_error_check = 0
@@ -228,9 +233,12 @@ module[2] = function(owner, org, timeValue)
 	if now < (org.rehab_otrub or 0) then
 		local dur = max(org.rehab_otrub_duration or 1, 1)
 		local remain = Clamp((org.rehab_otrub - now) / dur, 0, 1)
-		org.disorientation = min((org.disorientation or 0) + timeValue * (0.8 + remain), 10)
 		org.immobilization = min((org.immobilization or 0) + timeValue * (3 + 5 * remain), 80)
 		org.stamina.subadd = (org.stamina.subadd or 0) + remain * 0.2
+	end
+	if now < (org.rehab_dizzy_until or 0) then
+		local dizzyRemain = Clamp((org.rehab_dizzy_until - now) / WAKE_DIZZY_DURATION, 0, 1)
+		org.disorientation = max(org.disorientation or 0, WAKE_DIZZY_MIN + (WAKE_DIZZY_MAX - WAKE_DIZZY_MIN) * dizzyRemain)
 	end
 end
 hook.Add("HG_OnWakeOtrub", "organism-rehab-after-otrub", function(owner)
@@ -246,4 +254,5 @@ hook.Add("HG_OnWakeOtrub", "organism-rehab-after-otrub", function(owner)
 	end
 	org.rehab_otrub_duration = duration
 	org.rehab_otrub = CurTime() + duration
+	org.rehab_dizzy_until = CurTime() + WAKE_DIZZY_DURATION
 end)

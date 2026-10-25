@@ -144,6 +144,9 @@ if CLIENT then
 	end
 
 	SWEP.FakeReloadEvents = {
+		[0.3] = false,
+		[0.5] = false,
+		[0.9] = false,
 		[0.61] = function(self)
 			local wm = self:GetWM()
 			if not IsValid(wm) then return end

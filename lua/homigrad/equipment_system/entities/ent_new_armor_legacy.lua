@@ -37,7 +37,7 @@ local function renderData(data, female)
 		HideSubMaterails = {},
 		Skin = 0,
 		Bodygroups = "0000000000000",
-		BoneMerge = not data.nobonemerge and data[1] ~= "head",
+		BoneMerge = not data.nobonemerge,
 		ParentBone = data.bone,
 		OffsetPos = pos,
 		OffsetAng = ang,

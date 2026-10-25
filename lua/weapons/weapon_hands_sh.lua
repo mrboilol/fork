@@ -1561,11 +1561,11 @@ function SWEP:ApplyForce()
 						end
 
 						if org.blood < 3500 then
-							//if org.blood < 1000 then
-								//ply:ChatPrint("The skin looks almost white.")
-							//else
+							if org.blood < 2500 then
+								ply:ChatPrint("The skin looks almost white.")
+							else
 								ply:ChatPrint("The skin is pale.")
-							//end
+							end
 						end
 
 						if org.bleed > 0 then

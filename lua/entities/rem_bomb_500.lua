@@ -27,16 +27,10 @@ ENT.PhysLift = 20000
 function ENT:SpawnFunction(ply, tr)
 	if not tr.Hit then return end
 	if IsValid(ply) and not ply:IsAdmin() then return end
-	self.GBOWNER = ply
-	local ent = ents.Create("rem_bomb_500")
+	local ent = ents.Create("bomb")
 	if not IsValid(ent) then return end
-	ent.GBOWNER = ply
 	ent:SetPos(tr.HitPos + tr.HitNormal * 16)
-	ent:SetAngles(Angle(0, 90, 0))
 	ent:Spawn()
-	ent:Activate()
-	if IsValid(ply) then
-		ent:SetPhysicsAttacker(ply)
-	end
+	ent:SetPower(3)
 	return ent
 end
