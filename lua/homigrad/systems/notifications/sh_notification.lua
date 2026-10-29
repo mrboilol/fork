@@ -260,7 +260,9 @@ if CLIENT then
 		for _, thought in ipairs(hg.thoughts) do
 			if thought[1] == msg and now - (thought[2] or 0) < 18 then return end
 		end
-		if group == "combat" or group == "faint" then
+		if group == "despair" or group == "dying" or group == "trauma" then
+			hg.thoughts = {}
+		elseif group == "combat" or group == "faint" then
 			for _, thought in ipairs(hg.thoughts) do
 				chat.AddText(Color(thought[3].r, thought[3].g, thought[3].b, 255), thought[1] .. "\n")
 			end
@@ -317,6 +319,14 @@ if CLIENT then
 		local msg = net.ReadString()
 		local clr = net.ReadColor()
 		local group = net.ReadString()
+
+		if group == "clear" then
+			StopThoughtSound()
+			hg.currentNotification = nil
+			hg.notifications = {}
+			hg.thoughts = {}
+			return
+		end
 
 		if msg == "" then return end
 		if not hg_newthoughts:GetBool() then return end

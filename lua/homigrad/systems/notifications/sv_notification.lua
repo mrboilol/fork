@@ -5,6 +5,11 @@ util.AddNetworkString("HGThought")
 --local hg_old_notificate = ConVarExists("hg_old_notificate") and GetConVar("hg_old_notificate") or CreateConVar("hg_old_notificate",0,FCVAR_SERVER_CAN_EXECUTE,"enable old notifications (chatprints)",0,1)
 local hev_color = Color(255,125,0)
 local CreateThought
+
+local function InDespair(ply)
+    return (ply.despairUntil or 0) > CurTime()
+end
+
 local thoughtMessages = {
     panicattack_start = {"Panic is disrupting your focus.", "Panic is starting to settle."},
     panicattack = {"You are experiencing a panic attack.", "You are panicking."},
@@ -399,6 +404,7 @@ function hg.CombatThought(ply, pool)
     if ply.HasTrait and ply:HasTrait("gurajchaka_child") then return false end
     if ply.PlayerClassName == "Gordon" then return false end
     if ply:GetInfoNum("hg_showthoughts", 1) == 0 then return false end
+    if InDespair(ply) then return false end
 
     local org = ply.organism
     if org and org.otrub then return false end
@@ -443,6 +449,22 @@ local function SCPCBHitThought(ply, target, dmgType, dmg, hitPos, dmginfo)
     if not dmg or dmg <= 0 then return end
 
     local isLethal = dmg >= ply:Health()
+
+    if not isLethal and (dmgType == "bullet" or dmgType == "slash" or dmgType == "blunt") then
+        local now = CurTime()
+        local hits = ply.despairHits or {}
+        for i = #hits, 1, -1 do
+            if now - hits[i] > 2.5 then table.remove(hits, i) end
+        end
+        hits[#hits + 1] = now
+        ply.despairHits = hits
+
+        if #hits >= 4 then
+            ply.despairHits = {}
+            hg.DespairThought(ply)
+        end
+    end
+
     local hitgroup = SCPCBThoughtHitgroup(target, dmgType, dmginfo, hitPos)
     local category = scpcbHitgroupToCat[hitgroup] or "generic"
 
@@ -540,6 +562,7 @@ local function CreateNotification(ply, msg, delay, msgKey, showTime, func, clr)
     if not IsValid(ply) or not ply:IsPlayer() then error("player is not valid!") return false end
     if not msg or not isstring(msg) then error("no message or message is invalid!") return false end
     if ply.organism and ply.organism.otrub then return end
+    if InDespair(ply) then return false end
     if ply.PlayerClassName and ply.PlayerClassName == "Gordon" and clr != hev_color then return end
     msgKey = msgKey or msg
 
@@ -593,7 +616,7 @@ local function CreateNotification(ply, msg, delay, msgKey, showTime, func, clr)
         if !IsValid(ply) then return end
         if !ply.msgs[msgKey] then return end
 
-        if (ply.organism and ply.organism.otrub) or !ply:Alive() then
+        if (ply.organism and ply.organism.otrub) or !ply:Alive() or InDespair(ply) then
             return
         end
 
@@ -717,6 +740,7 @@ CreateThought = function(ply, msg, delay, msgKey, showTime, clr, func)
     if not msg or not isstring(msg) then error("no message or message is invalid!") return false end
     if ply.organism and ply.organism.otrub then return end
     if msg == "" then return end
+    if InDespair(ply) then return false end
     if ply:GetInfoNum("hg_newthoughts", 0) <= 0 then return false end
 
     msgKey = msgKey or msg
@@ -758,7 +782,7 @@ CreateThought = function(ply, msg, delay, msgKey, showTime, clr, func)
         if !IsValid(ply) then return end
         if !ply.thoughtmsgs[msgKey] then return end
         if ply:GetInfoNum("hg_newthoughts", 0) <= 0 then return end
-        if (ply.organism and ply.organism.otrub) or !ply:Alive() then return end
+        if (ply.organism and ply.organism.otrub) or !ply:Alive() or InDespair(ply) then return end
         if func and isfunction(func) and func(ply) then return end
 
         net.Start("HGThought")
@@ -781,9 +805,136 @@ local function CreateModeThought(ply, msg, delay, msgKey, showTime, clr, func)
     return CreateNotification(ply, LegacyThoughtText(msg), delay, msgKey, showTime, func, clr)
 end
 
+local despairThoughts = {
+    "STOP STOP STOP HELP HELP IT HURTS WHY IM GONNA DIE IM GONNA DIE",
+    "NO NO NO NO PLEASE IT HURTS IT HURTS HELP ME HELP ME",
+    "AAAGH HELP HELP SOMEBODY HELP ME I'M DYING I'M DYING",
+    "MAKE IT STOP MAKE IT STOP PLEASE GOD MAKE IT STOP",
+    "OH GOD OH GOD IT HURTS SO MUCH I'M GONNA DIE I'M GONNA DIE",
+    "PLEASE PLEASE PLEASE STOP IT HURTS WHY WHY WHY",
+}
+
+local dyingThoughts = {
+    "I dont want to die... i dont want to die...",
+    "Please... not like this... not yet...",
+    "I dont want to die... please... I dont want to die...",
+    "It's getting so cold... I dont want to go...",
+    "I'm so scared... please... somebody...",
+    "I'm not ready... I'm not ready yet...",
+    "Why me... why does it have to end like this...",
+}
+
+local function SendThoughtClear(ply)
+    net.Start("HGThought")
+    net.WriteString("")
+    net.WriteColor(color_white)
+    net.WriteString("clear")
+    net.Send(ply)
+end
+
+local function SendDespairLine(ply, msg, clr, group)
+    if ply:GetInfoNum("hg_newthoughts", 0) > 0 then
+        net.Start("HGThought")
+        net.WriteString(msg)
+        net.WriteColor(clr)
+        net.WriteString(group)
+    else
+        net.Start("HGNotificate")
+        net.WriteString(msg)
+        net.WriteColor(clr)
+        net.WriteUInt(110, 7)
+    end
+    net.Send(ply)
+end
+
+local function DespairActive(ply, id)
+    if not IsValid(ply) or ply.despairId ~= id or not ply:Alive() then return false end
+    return not (ply.organism and ply.organism.otrub)
+end
+
+function hg.DespairThought(ply)
+    if not IsValid(ply) or not ply:IsPlayer() or not ply:Alive() then return false end
+
+    local org = ply.organism
+    if org and org.otrub then return false end
+
+    local now = CurTime()
+    if (ply.despairNext or 0) > now then return false end
+    ply.despairNext = now + 45
+
+    if ply.HasTrait and ply:HasTrait("gurajchaka_child") then return false end
+    if ply.PlayerClassName == "Gordon" then return false end
+    if ply:GetInfoNum("hg_showthoughts", 1) == 0 then return false end
+
+    ply.despairUntil = now + 14
+    ply.despairId = (ply.despairId or 0) + 1
+    local id = ply.despairId
+
+    ply.msgs = {}
+    ply.thoughtmsgs = {}
+    if org then org.nextStatusThought = math.max(org.nextStatusThought or 0, now + 14) end
+
+    SendThoughtClear(ply)
+    SendDespairLine(ply, despairThoughts[math.random(#despairThoughts)], Color(255, 40, 40, 255), "despair")
+
+    timer.Simple(3.2, function()
+        if not DespairActive(ply, id) then return end
+        SendThoughtClear(ply)
+
+        timer.Simple(0.5, function()
+            if not DespairActive(ply, id) then return end
+            SendDespairLine(ply, dyingThoughts[math.random(#dyingThoughts)], Color(215, 150, 150, 255), "dying")
+        end)
+    end)
+
+    return true
+end
+
+local traumaThoughts = {
+    "HOLY SHIT- EVERYTHING IS BROKEN- EVERYTHING IS BROKEN-",
+    "OH FUCK- OH FUCK- EVERYTHING'S BROKEN-",
+    "AAAGH- EVERYTHING HURTS- EVERYTHING HURTS-",
+    "WHAT THE FUCK- I HEARD EVERYTHING CRACK-",
+    "OH GOD- OH GOD- I'M ALL BROKEN- I'M ALL BROKEN-",
+    "NO NO NO- EVERYTHING SNAPPED- EVERYTHING SNAPPED-",
+    "FUCK- FUCK- I CAN'T- EVERYTHING'S BROKEN-",
+}
+
+function hg.TraumaThought(ply, followMsg, followClr)
+    if not IsValid(ply) or not ply:IsPlayer() or not ply:Alive() then return false end
+    if ply.organism and ply.organism.otrub then return false end
+    if InDespair(ply) then return false end
+    if ply.HasTrait and ply:HasTrait("gurajchaka_child") then return false end
+    if ply.PlayerClassName == "Gordon" then return false end
+    if ply:GetInfoNum("hg_showthoughts", 1) == 0 then return false end
+
+    local now = CurTime()
+    if (ply.traumaNext or 0) > now then return false end
+    ply.traumaNext = now + 20
+    ply.traumaThoughtUntil = now + 8
+    ply.nextThoughtGlobal = now + 3.5
+    ply.traumaId = (ply.traumaId or 0) + 1
+    local id = ply.traumaId
+
+    SendDespairLine(ply, traumaThoughts[math.random(#traumaThoughts)], Color(255, 60, 40, 255), "trauma")
+
+    if followMsg then
+        timer.Simple(3.5, function()
+            if not IsValid(ply) or ply.traumaId ~= id or not ply:Alive() then return end
+            if (ply.organism and ply.organism.otrub) or InDespair(ply) then return end
+            ply.nextThoughtGlobal = CurTime() + 3
+            SendDespairLine(ply, followMsg, followClr or Color(255, 210, 210), "skeletal")
+        end)
+    end
+
+    return true
+end
+
 hg.CreateNotification = CreateNotification
 
 hook.Add("Player Spawn","removeNotifications",function(ply)
+    ply.despairUntil = nil
+    ply.despairNext = nil
     ply.hgHeartstopThought = nil
     ply.msgs = {}
     ply.thoughtmsgs = {}
@@ -794,6 +945,7 @@ hook.Add("Player Spawn","removeNotifications",function(ply)
 end)
 
 hook.Add("HG_OnOtrub","removeNotifications",function(ply)
+    ply.despairUntil = nil
     ply.msgs = {}
     ply.thoughtmsgs = {}
     ply.lastConditionThought = {}
@@ -803,6 +955,7 @@ hook.Add("HG_OnOtrub","removeNotifications",function(ply)
 end)
 
 hook.Add("Player_Death","removeNotifications",function(ply)
+    ply.despairUntil = nil
     ply.msgs = {}
     ply.thoughtmsgs = {}
     ply.lastConditionThought = {}
@@ -834,6 +987,7 @@ end
 function PLAYER:InterruptThought(msg, clr)
     if self.HasTrait and self:HasTrait("gurajchaka_child") then return end
     if self.organism and self.organism.otrub then return end
+    if InDespair(self) then return end
     clr = clr or color_white
     self.nextThoughtGlobal = CurTime() + 4
     if self:GetInfoNum("hg_newthoughts", 0) > 0 then

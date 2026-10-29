@@ -1873,6 +1873,9 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		end
 	end
 	if not org.otrub and isPly then
+		if hg.DespairThought and ((org.blood or 5000) <= (hg.organism.BLEEDOUT_DEATH_BLOOD or 2000) or (org.shock or 0) >= 70) then
+			hg.DespairThought(owner)
+		end
 		local mul = hg.likely_to_phrase(owner)
 		if not org.likely_phrase then org.likely_phrase = 0 end
 		org.likely_phrase = math.max(org.likely_phrase + math.Rand(0, mul) / 100, 0)

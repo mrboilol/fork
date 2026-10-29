@@ -252,12 +252,56 @@ local function notifyBoneBreak(org, limb, msg, msgKey)
 	if notifyOwner(org, msg, true, msgKey, 2) then org.boneBreakNotifyUntil[limb] = now + 5 end
 end
 
-local function sendThought(org, msg, key, delay, clr)
+local function deliverThought(org, msg, key, delay, clr)
 	if hasNewThoughts(org) then
 		local owner = org.owner
 		if owner.Thought then return owner:Thought(msg, delay or 1, key, 0, clr) end
 		return notifyOwner(org, msg, delay or 1, key, 0, nil, clr)
 	end
+end
+
+local traumaBurstWindow = 0.3
+local traumaBurstWeight = 2
+
+local function traumaWeight(key)
+	if string.StartWith(key, "thought_dislocated") or key == "thought_jawdislocated" or key == "thought_teeth" then return 0.5 end
+	if string.StartWith(key, "thought_double_broke") or string.StartWith(key, "thought_spine") then return 2 end
+	if key == "thought_skull" or key == "thought_pelvis" or key == "thought_ribs_lung" then return 2 end
+	return 1
+end
+
+local function flushTraumaThoughts(org)
+	local pending = org.pendingTraumaThoughts
+	org.pendingTraumaThoughts = nil
+	if not pending or #pending == 0 then return end
+
+	local owner = org.owner
+	if not IsValid(owner) or not owner:Alive() or org.otrub then return end
+
+	local weight, worst = 0, pending[1]
+	for _, thought in ipairs(pending) do
+		weight = weight + thought.weight
+		if thought.weight > worst.weight then worst = thought end
+	end
+
+	if weight >= traumaBurstWeight and hg.TraumaThought and hg.TraumaThought(owner, worst.msg, worst.clr) then return end
+
+	for _, thought in ipairs(pending) do
+		deliverThought(org, thought.msg, thought.key, thought.delay, thought.clr)
+	end
+end
+
+local function sendThought(org, msg, key, delay, clr)
+	if not hasNewThoughts(org) then return end
+
+	if not org.pendingTraumaThoughts then
+		org.pendingTraumaThoughts = {}
+		timer.Simple(traumaBurstWindow, function() flushTraumaThoughts(org) end)
+	end
+
+	local pending = org.pendingTraumaThoughts
+	pending[#pending + 1] = {msg = msg, key = key, delay = delay, clr = clr, weight = traumaWeight(key)}
+	return true
 end
 
 local function addPain(org, amount, region)

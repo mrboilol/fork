@@ -806,6 +806,25 @@ GetBandageableArteryWound = function(org, ent, bone)
 	return selectedIndex, selectedWound
 end
 
+hg.BANDAGE_MAX_LAYERS = 4
+
+function hg.AddBandageLayer(ent, bone, applied)
+	if not bone or applied[bone] then return false end
+	applied[bone] = true
+
+	ent.bandaged_limbs = ent.bandaged_limbs or {}
+	local state = ent.bandaged_limbs[bone]
+	if not state then
+		ent.bandaged_limbs[bone] = true
+	elseif istable(state) then
+		state.layers = math.min((tonumber(state.layers) or 1) + 1, hg.BANDAGE_MAX_LAYERS)
+	else
+		ent.bandaged_limbs[bone] = math.min((tonumber(state) or 1) + 1, hg.BANDAGE_MAX_LAYERS)
+	end
+
+	return true
+end
+
 local neckArteryBandageCostMultiplier = 4
 
 local function GetArteryBandageTreatmentCost(wound)
@@ -868,6 +887,7 @@ if SERVER then
 		if IsValid(owner) and owner:IsPlayer() and owner:HasTrait("clumsy") and math.Rand(0, 1) < 0.3 then
 			self.modeValues[1] = self.modeValues[1] * math.Rand(0.25, 0.6)
 		end
+		local layered = {}
 		local arteryIndex, arteryWound = GetBandageableArteryWound(org, ent, bone)
 		local structuralBone = bone or self:GetBandageTargetBone(ent, IsValid(owner) and hg.eyeTrace(owner) or nil)
 		local structuralKey = GetBandageBoneKey(org, structuralBone)
@@ -886,7 +906,7 @@ if SERVER then
 			if hg.organism.ApplyBandageBoneTreatment(org, structuralKey, 0.25) > 0 then
 				self.modeValues[1] = self.modeValues[1] - structuralCost
 				ent.bandaged_limbs = ent.bandaged_limbs or {}
-				ent.bandaged_limbs[bandageBoneNames[structuralKey] or structuralBone] = true
+				hg.AddBandageLayer(ent, bandageBoneNames[structuralKey] or structuralBone, layered)
 				ent:SetNetVar("bandaged_limbs", ent.bandaged_limbs)
 				if IsValid(ent.FakeRagdoll) then
 					ent.FakeRagdoll:SetNetVar("bandaged_limbs", ent.bandaged_limbs)
@@ -920,7 +940,7 @@ if SERVER then
 				self.modeValues[1] = self.modeValues[1] - usedMaterial
 
 				ent.bandaged_limbs = ent.bandaged_limbs or {}
-				ent.bandaged_limbs[arteryName == "arteria" and "ValveBiped.Bip01_Neck1" or arteryWound[4]] = true
+				hg.AddBandageLayer(ent, arteryName == "arteria" and "ValveBiped.Bip01_Neck1" or arteryWound[4], layered)
 				bandaged = true
 				done = true
 
@@ -976,9 +996,8 @@ if SERVER then
 					end
 					ent.bandaged_limbs = ent.bandaged_limbs or {}
 					local bone_name = wound[4]
-					if not ent.bandaged_limbs[bone_name] then
-						ent.bandaged_limbs[bone_name] = true
-						done = true
+					if biggestWound > healedWound or not ent.bandaged_limbs[bone_name] then
+						if hg.AddBandageLayer(ent, bone_name, layered) then done = true end
 					end
 					if wound[1] == 0 then table.RemoveByValue(org.wounds, wound) end
 				end
@@ -1008,9 +1027,8 @@ if SERVER then
 						ent.bandaged_limbs = ent.bandaged_limbs or {}
 						local bone_name = wound[4] or bone
 						
-						if not ent.bandaged_limbs[bone_name] then
-							ent.bandaged_limbs[bone_name] = true
-							done = true
+						if biggestWound > healedWound or not ent.bandaged_limbs[bone_name] then
+							if hg.AddBandageLayer(ent, bone_name, layered) then done = true end
 						end
 
 						if wound[1] == 0 then table.RemoveByValue(org.wounds, wound) end
@@ -1042,7 +1060,7 @@ if SERVER then
 			if bandageDislocation and self.modeValues[1] >= amt and hg.organism.CompleteDislocationFix(org, bandageDislocation, owner) then
 				self.modeValues[1] = self.modeValues[1] - amt
 				ent.bandaged_limbs = ent.bandaged_limbs or {}
-				ent.bandaged_limbs[dislocationBandageBones[bandageDislocation]] = true
+				hg.AddBandageLayer(ent, dislocationBandageBones[bandageDislocation], layered)
 				done = true
 			end
 			local treatingSkull = not structuralBone or structuralBone == "skull" or (isstring(structuralBone) and string.find(structuralBone, "Head", 1, true))
@@ -1051,7 +1069,7 @@ if SERVER then
 				self.modeValues[1] = self.modeValues[1] - amt
 				org.pain = math.max(org.pain - 7, 0)
 				ent.bandaged_limbs = ent.bandaged_limbs or {}
-				ent.bandaged_limbs["ValveBiped.Bip01_Head1"] = true
+				hg.AddBandageLayer(ent, "ValveBiped.Bip01_Head1", layered)
 				done = true
 			end
 
@@ -1060,7 +1078,7 @@ if SERVER then
 				self.modeValues[1] = self.modeValues[1] - amt
 				org.avgpain = math.max(org.avgpain - 7, 0)
 				ent.bandaged_limbs = ent.bandaged_limbs or {}
-				ent.bandaged_limbs[structuralBone] = true
+				hg.AddBandageLayer(ent, structuralBone, layered)
 				done = true
 			end
 
@@ -1069,7 +1087,7 @@ if SERVER then
 				self.modeValues[1] = self.modeValues[1] - amt
 				org.avgpain = math.max(org.avgpain - 7, 0)
 				ent.bandaged_limbs = ent.bandaged_limbs or {}
-				ent.bandaged_limbs[structuralBone] = true
+				hg.AddBandageLayer(ent, structuralBone, layered)
 				done = true
 			end
 
@@ -1078,7 +1096,7 @@ if SERVER then
 				self.modeValues[1] = self.modeValues[1] - amt
 				org.avgpain = math.max(org.avgpain - 7, 0)
 				ent.bandaged_limbs = ent.bandaged_limbs or {}
-				ent.bandaged_limbs[structuralBone] = true
+				hg.AddBandageLayer(ent, structuralBone, layered)
 				done = true
 			end
 
@@ -1087,7 +1105,7 @@ if SERVER then
 				self.modeValues[1] = self.modeValues[1] - amt
 				org.avgpain = math.max(org.avgpain - 7, 0)
 				ent.bandaged_limbs = ent.bandaged_limbs or {}
-				ent.bandaged_limbs[structuralBone] = true
+				hg.AddBandageLayer(ent, structuralBone, layered)
 				done = true
 			end
 
@@ -1096,7 +1114,7 @@ if SERVER then
 				self.modeValues[1] = self.modeValues[1] - amt
 				org.avgpain = math.max(org.avgpain - 7, 0)
 				ent.bandaged_limbs = ent.bandaged_limbs or {}
-				ent.bandaged_limbs[structuralBone] = true
+				hg.AddBandageLayer(ent, structuralBone, layered)
 				done = true
 			end
 
@@ -1347,12 +1365,34 @@ function hg.HasBandageOnBone(ent, bone)
 	return false
 end
 
+function hg.GetBandageLayerCount(state)
+	if not state then return 0 end
+
+	local layers = istable(state) and state.layers or state
+	return math.Clamp(math.floor(tonumber(layers) or 1), 1, hg.BANDAGE_MAX_LAYERS)
+end
+
+function hg.GetBandageLayers(ent, bone)
+	if not bone then return 0 end
+	bone = tostring(bone):gsub("artery$", "")
+	for bandagedBone, state in pairs(getWearableState(ent, "bandaged_limbs", "bandaged_limbs")) do
+		if tostring(bandagedBone):gsub("artery$", "") == bone then return hg.GetBandageLayerCount(state) end
+	end
+	return 0
+end
+
 function hg.GetBandageBleedMultiplier(ent, bone)
-	return hg.HasBandageOnBone(ent, bone) and 0.55 or 1
+	local layers = hg.GetBandageLayers(ent, bone)
+	if layers < 1 then return 1 end
+
+	return math.max(0.55 * 0.8 ^ (layers - 1), 0.25)
 end
 
 function hg.GetBandageClotMultiplier(ent, bone)
-	return hg.HasBandageOnBone(ent, bone) and 1.55 or 1
+	local layers = hg.GetBandageLayers(ent, bone)
+	if layers < 1 then return 1 end
+
+	return 1.55 + 0.5 * (layers - 1)
 end
 
 if SERVER then
@@ -1625,26 +1665,32 @@ else
 	end
 
 	hook.Add("OnNetVarSet","bandage_netvar",function(index, key, var)
-		if key == "bandaged_limbs" then
-			local ent = Entity(index)
-	
-			if IsValid(ent) then
-	
-				remove_bandages(ent)
+		if key ~= "bandaged_limbs" then return end
 
-				ent.bandaged_limbs = var
+		local ent = Entity(index)
+		if not IsValid(ent) then return end
 
-				local oldSoak = ent.bandagesSoak
-				ent.bandagesSoak = {}
-				for bone in pairs(ent.bandaged_limbs) do
-					ent.bandagesSoak[bone] = (oldSoak and oldSoak[bone]) or 0
-				end
+		local oldSoak, oldLimbs = ent.bandagesSoak, ent.bandaged_limbs
+		remove_bandages(ent)
 
-				ent:CallOnRemove("remove_bandages",function()
-					remove_bandages(ent)
-				end)
+		if not istable(var) then var = {} end
+		ent.bandaged_limbs = var
+
+		local org = ent.organism
+		local bloodied = org and (tonumber(org.blood) or 5000) < 4900
+		ent.bandagesSoak = {}
+		for bone, state in pairs(var) do
+			local soak = oldSoak and oldSoak[bone] or 0
+			local oldState = oldLimbs and oldLimbs[bone]
+			if bloodied and (not oldState or hg.GetBandageLayerCount(state) > hg.GetBandageLayerCount(oldState)) then
+				soak = math.max(soak, 0.1)
 			end
+			ent.bandagesSoak[bone] = soak
 		end
+
+		ent:CallOnRemove("remove_bandages",function()
+			remove_bandages(ent)
+		end)
 	end)
 
 	local BadagesModelMale = "models/distac/newbandage.mdl"
@@ -1690,40 +1736,129 @@ else
 		["ValveBiped.Bip01_R_Calf"] = "LegDownRught-f",
 	}
 
-	--hook.Add("PostDrawPlayerRagdoll", "draw_bandages", function(ent,ply)
-	local function GetBandageSoakRate(org)
-		if not org then return 0.0015 end
+	local BandageNeighbors = {
+		["ValveBiped.Bip01_Spine2"] = {"ValveBiped.Bip01_Spine1", "ValveBiped.Bip01_Neck1"},
+		["ValveBiped.Bip01_Spine1"] = {"ValveBiped.Bip01_Spine2", "ValveBiped.Bip01_Pelvis"},
+		["ValveBiped.Bip01_Pelvis"] = {"ValveBiped.Bip01_Spine1", "ValveBiped.Bip01_Spine"},
+		["ValveBiped.Bip01_Spine"] = {"ValveBiped.Bip01_Pelvis", "ValveBiped.Bip01_L_Thigh", "ValveBiped.Bip01_R_Thigh"},
+		["ValveBiped.Bip01_Neck1"] = {"ValveBiped.Bip01_Spine2"},
+		["ValveBiped.Bip01_L_UpperArm"] = {"ValveBiped.Bip01_L_Forearm", "ValveBiped.Bip01_Spine2"},
+		["ValveBiped.Bip01_L_Forearm"] = {"ValveBiped.Bip01_L_UpperArm", "ValveBiped.Bip01_L_Hand"},
+		["ValveBiped.Bip01_L_Hand"] = {"ValveBiped.Bip01_L_Forearm"},
+		["ValveBiped.Bip01_R_UpperArm"] = {"ValveBiped.Bip01_R_Forearm", "ValveBiped.Bip01_Spine2"},
+		["ValveBiped.Bip01_R_Forearm"] = {"ValveBiped.Bip01_R_UpperArm", "ValveBiped.Bip01_R_Hand"},
+		["ValveBiped.Bip01_R_Hand"] = {"ValveBiped.Bip01_R_Forearm"},
+		["ValveBiped.Bip01_L_Thigh"] = {"ValveBiped.Bip01_L_Calf", "ValveBiped.Bip01_Spine"},
+		["ValveBiped.Bip01_L_Calf"] = {"ValveBiped.Bip01_L_Thigh"},
+		["ValveBiped.Bip01_R_Thigh"] = {"ValveBiped.Bip01_R_Calf", "ValveBiped.Bip01_Spine"},
+		["ValveBiped.Bip01_R_Calf"] = {"ValveBiped.Bip01_R_Thigh"},
+	}
 
-		local rate = 0.0015
-		rate = rate + math.Clamp((org.bleed or 0) / 0.6, 0, 1) * 0.03
-		rate = rate + math.Clamp((5000 - (org.blood or 5000)) / 5000, 0, 1) * 0.006
+	local HEAD_BONE = "ValveBiped.Bip01_Head1"
 
-		return rate
+	hg.BANDAGE_ABSORB_ML = 45
+
+	local function ExpandBandage(bone, layers, soak, out)
+		out[bone] = math.max(out[bone] or 0, soak)
+
+		local seen = {[bone] = true}
+		local frontier = {bone}
+		for _ = 1, math.min(layers - 1, 2) do
+			local reached = {}
+			for _, current in ipairs(frontier) do
+				for _, neighbor in ipairs(BandageNeighbors[current] or {}) do
+					if not seen[neighbor] then
+						seen[neighbor] = true
+						reached[#reached + 1] = neighbor
+						out[neighbor] = math.max(out[neighbor] or 0, soak)
+					end
+				end
+			end
+			frontier = reached
+		end
 	end
+
 	local function GetBandageSoakColor(soak)
 		if not soak or soak <= 0 then return Color(255, 255, 255, 255) end
 
 		return Color(255 - math.floor(255 * soak * 0.12), 255 - math.floor(255 * soak * 0.85), 255 - math.floor(255 * soak * 0.9), 255)
 	end
 
+	function hg.BandageAbsorbBlood(ent, bone, ml)
+		local limbs = IsValid(ent) and ent.bandaged_limbs
+		if not limbs or not bone or not (ml > 0) then return false end
+
+		local key = bone
+		local state = limbs[key]
+		if not state then
+			key = nil
+			local plain = tostring(bone):gsub("artery$", "")
+			for limbBone, limbState in pairs(limbs) do
+				if tostring(limbBone):gsub("artery$", "") == plain then
+					key, state = limbBone, limbState
+					break
+				end
+			end
+			if not key then return false end
+		end
+
+		local soakTable = ent.bandagesSoak
+		if not soakTable then
+			soakTable = {}
+			ent.bandagesSoak = soakTable
+		end
+
+		local soak = soakTable[key] or 0
+		if soak >= 1 then return false end
+
+		soakTable[key] = math.min(soak + ml / (hg.BANDAGE_ABSORB_ML * hg.GetBandageLayerCount(state)), 1)
+
+		return true
+	end
+
+	local function GetBandageGroup(model, groups, bone)
+		local cache = model.BandageGroupCache
+		if not cache then
+			cache = {}
+			model.BandageGroupCache = cache
+		end
+
+		local group = cache[bone]
+		if group == nil then
+			group = model:FindBodygroupByName(groups[bone] or "")
+			cache[bone] = group
+		end
+
+		return group
+	end
+
+	local function DrawBandagePass(model, groups, bones, color)
+		local enabled = {}
+		for bone in pairs(bones) do
+			local group = GetBandageGroup(model, groups, bone)
+			if group >= 0 then enabled[group] = true end
+		end
+
+		for bone in pairs(groups) do
+			local group = GetBandageGroup(model, groups, bone)
+			if group >= 0 then model:SetBodygroup(group, enabled[group] and 1 or 0) end
+		end
+
+		model:SetColor(color)
+		model:DrawModel()
+	end
+
 	function hg.RenderBandages(ent, ply)
-		--PrintTable(ent.bandaged_limbs)
-		if not ent.bandaged_limbs then return end
-		if !next(ent.bandaged_limbs) then return end
+		local limbs = ent.bandaged_limbs
+		if not limbs then return end
+		if !next(limbs) then return end
 
 		if not ent.bandagesSoak then
 			ent.bandagesSoak = {}
-			for bone in pairs(ent.bandaged_limbs) do ent.bandagesSoak[bone] = 0 end
+			for bone in pairs(limbs) do ent.bandagesSoak[bone] = 0 end
 		end
 
-		local org = ent and ent.organism or (IsValid(ply) and ply.organism)
-		local soak = 0
-		for bone, v in pairs(ent.bandagesSoak) do
-			if ent.bandaged_limbs[bone] then
-				ent.bandagesSoak[bone] = math.min((ent.bandagesSoak[bone] or 0) + GetBandageSoakRate(org) * FrameTime(), 1)
-				soak = math.max(soak, ent.bandagesSoak[bone])
-			end
-		end
+		local org = ent.organism or (IsValid(ply) and ply.organism)
 
 		if not IsValid( ent.bandagesModel ) then
 			ent.bandagesModel = (ThatPlyIsFemale(ent) and ClientsideModel(BadagesModelFemale) or ClientsideModel(BadagesModelMale))
@@ -1735,65 +1870,55 @@ else
 				end
 			end)
 		end
-		
+
 		local model = ent.bandagesModel
 		model:SetNoDraw(true)
 		model:SetPos(ent:GetPos() + vector_up * 1)
 		model:SetParent(ent)
 		model:AddEffects(EF_BONEMERGE)
-		model:SetColor(GetBandageSoakColor(soak))
+
+		local groups = ThatPlyIsFemale(ent) and BodyGroupsFemale or BodyGroupsMale
 		local dontmakehands = false
 		if !hg.Appearance.FuckYouModels[1][ent:GetModel()] and !hg.Appearance.FuckYouModels[2][ent:GetModel()] then dontmakehands = true end
-		
-		if not model.BodygroupsApplied then 
-			for k, v in pairs(ent.bandaged_limbs) do
-				if k == "ValveBiped.Bip01_Head1" then continue end -- head uses separate model
-				if dontmakehands and (k == "ValveBiped.Bip01_L_Hand" or k == "ValveBiped.Bip01_R_Hand") then continue end -- ez
-				model:SetBodygroup(model:FindBodygroupByName( ThatPlyIsFemale(ent) and BodyGroupsFemale[k] or BodyGroupsMale[k] or ""), 1)
-			end
 
-			for k, v in pairs(hg.amputatedlimbs2) do
-				local children = hg.get_children(ent, k)
-				table.insert(children, k)
-				
-				for k2, v2 in ipairs(children) do
-					if ent.bandaged_limbs[v2] and ent.organism and ent.organism[hg.amputatedlimbs2[v2].."amputated"] then
-						model:SetBodygroup(model:FindBodygroupByName( ThatPlyIsFemale(ent) and BodyGroupsFemale[v2] or BodyGroupsMale[v2] or ""), 0)
-					end
+		local function isHidden(bone)
+			if dontmakehands and (bone == "ValveBiped.Bip01_L_Hand" or bone == "ValveBiped.Bip01_R_Hand") then return true end
+			local limb = hg.amputatedlimbs2[bone]
+			return limb and org and org[limb .. "amputated"]
+		end
+
+		local segments, colored = {}, {}
+		for bone, state in pairs(limbs) do
+			if bone ~= HEAD_BONE then
+				if istable(state) and state.color then
+					colored[bone] = true
+				else
+					ExpandBandage(bone, hg.GetBandageLayerCount(state), ent.bandagesSoak[bone] or 0, segments)
 				end
 			end
-
-			model.BodygroupsApplied = true
 		end
-		local coloredBones = {}
-		for bone, bandage in pairs(ent.bandaged_limbs) do
-			if bone ~= "ValveBiped.Bip01_Head1" and istable(bandage) and bandage.color then
-				coloredBones[#coloredBones + 1] = bone
+
+		local buckets = {}
+		for bone, soak in pairs(segments) do
+			if not isHidden(bone) then
+				local level = math.floor(soak * 10 + 0.5)
+				buckets[level] = buckets[level] or {}
+				buckets[level][bone] = true
 			end
 		end
 
-		if #coloredBones > 0 then
-			for _, bone in ipairs(coloredBones) do
-				local group = model:FindBodygroupByName(ThatPlyIsFemale(ent) and BodyGroupsFemale[bone] or BodyGroupsMale[bone] or "")
-				if group >= 0 then model:SetBodygroup(group, 0) end
-			end
-			model:DrawModel()
-
-			for bone, bandage in pairs(ent.bandaged_limbs) do
-				if bone ~= "ValveBiped.Bip01_Head1" then
-					local group = model:FindBodygroupByName(ThatPlyIsFemale(ent) and BodyGroupsFemale[bone] or BodyGroupsMale[bone] or "")
-					local amputated = ent.organism and hg.amputatedlimbs2[bone] and ent.organism[hg.amputatedlimbs2[bone] .. "amputated"]
-					if group >= 0 then model:SetBodygroup(group, istable(bandage) and bandage.color and not amputated and 1 or 0) end
-				end
-			end
-			model:SetColor(Color(0, 255, 150))
-			model:DrawModel()
-			model.BodygroupsApplied = false
-		else
-			model:DrawModel()
+		for level, bones in pairs(buckets) do
+			DrawBandagePass(model, groups, bones, GetBandageSoakColor(level / 10))
 		end
 
-		if ent.bandaged_limbs["ValveBiped.Bip01_Head1"] and not (ply == LocalPlayer() and GetViewEntity() == LocalPlayer()) then
+		for bone in pairs(colored) do
+			if isHidden(bone) then colored[bone] = nil end
+		end
+		if next(colored) then
+			DrawBandagePass(model, groups, colored, Color(0, 255, 150))
+		end
+
+		if limbs[HEAD_BONE] and not (ply == LocalPlayer() and GetViewEntity() == LocalPlayer()) then
 			local female = ThatPlyIsFemale(ent)
 			local mdlpath = female and HeadBandageModelFemale or HeadBandageModelMale
 			if not IsValid(ent.bandagesHeadModel) or ent.bandagesHeadModel:GetModel() ~= mdlpath then
@@ -1822,8 +1947,8 @@ else
 				end
 			end
 
-			local headBandage = ent.bandaged_limbs["ValveBiped.Bip01_Head1"]
-			headmodel:SetColor(istable(headBandage) and headBandage.color or GetBandageSoakColor(soak))
+			local headBandage = limbs[HEAD_BONE]
+			headmodel:SetColor(istable(headBandage) and headBandage.color or GetBandageSoakColor(ent.bandagesSoak[HEAD_BONE] or 0))
 			headmodel:DrawModel()
 		end
 	end

@@ -1502,7 +1502,9 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 						else
 							local bleeding = math.max(tonumber(wound[1]) or 0, 0.5)
 							local interval = wound.vessel == "jugular" and math.Rand(0.05, 0.08) or math.Clamp(15 / bleeding * math.Rand(0.5, 1), 0.05, 12)
-							emitOrdinaryBleeding(ent, org, wound, pos, ang, visualRate, interval)
+							if not (hg.BandageAbsorbBlood and hg.BandageAbsorbBlood(ent, bone, visualRate * interval)) then
+								emitOrdinaryBleeding(ent, org, wound, pos, ang, visualRate, interval)
+							end
 							wound.nextVisualBleed = time + interval
 						end
 
@@ -1534,6 +1536,10 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 						local water = bit.band(util.PointContents(pos), CONTENTS_WATER) == CONTENTS_WATER
 						local interval = math.Clamp(0.25 / math.Clamp(org.pulse or 70, 1, 15),
 							1 / math.max(hg_blood_fps:GetInt(), 1), 0.12)
+						if not water and hg.BandageAbsorbBlood and hg.BandageAbsorbBlood(ent, bone, visualRate * interval) then
+							wound.nextVisualBleed = time + interval
+							continue
+						end
 						local exitWound = wound.exitWound
 						local exitPos, exitAng = exitWound and hg.organism.GetWoundTransform(ent, exitWound)
 						local underwater = emitArterialBleeding(ent, org, wound, i, pos, ang, mat:GetAngles(), water, visualRate * (exitPos and exitAng and 0.4 or 1), interval, exitPos and exitAng and 0.4 or 1)

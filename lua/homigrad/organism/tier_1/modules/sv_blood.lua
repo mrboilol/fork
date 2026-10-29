@@ -112,7 +112,7 @@ local about_to_puke = {
 
 local internalBleedThoughts = {
 	"Im feeling something weird inside.",
-	"My tummy hurts...",
+	"My gut is killing me...",
 	"Something is wrong inside me.",
 	"I feel like something ripped inside.",
 	"I think something moved wrong inside.",
@@ -354,6 +354,7 @@ local function getWoundHemostasisDelta(org, wound, dt, now, arterial, catastroph
 	local delay = Lerp(math.Clamp(initial / severeFull, 0, 1), tonumber(cfg.WOUND_CLOT_DELAY_MIN_S) or 6, tonumber(cfg.WOUND_CLOT_DELAY_MAX_S) or 18)
 	if arterial then delay = delay * (tonumber(cfg.ARTERIAL_CLOT_DELAY_MULTIPLIER) or 1.6) end
 	delay = math.max(delay * (1 - treatment * (tonumber(cfg.HEMOSTATIC_TREATMENT_DELAY_REDUCTION) or 0.82)), 1.5)
+	if bandaged then delay = math.max(delay * 0.55 / math.max(tonumber(compressionMul) or 1, 1), 1.5) end
 
 	local rampSeconds = math.max(tonumber(cfg.WOUND_CLOT_RAMP_S) or 12, 0.1)
 	local maturity = math.Clamp((age - delay) / rampSeconds, 0, 1)
@@ -496,7 +497,7 @@ module[2] = function(owner, org, mulTime)
 	local internalBleedSeverity = math.max(tonumber(org.internalBleed) or 0, 0)
 	local internalThoughtLevel = internalBleedSeverity >= 3 and 3 or internalBleedSeverity >= 1.5 and 2 or internalBleedSeverity > 0.75 and 1 or 0
 	if internalThoughtLevel > 0 and org.isPly and IsValid(owner) and not org.otrub then
-		if internalThoughtLevel > (org.internalBleedThoughtLevel or 0) and (org.nextInternalBleedThought or 0) <= CurTime() and (org.nextCriticalStatusNotify or 0) <= CurTime() then
+		if internalThoughtLevel > (org.internalBleedThoughtLevel or 0) and (org.nextInternalBleedThought or 0) <= CurTime() and (org.nextCriticalStatusNotify or 0) <= CurTime() and (owner.traumaThoughtUntil or 0) <= CurTime() then
 			owner:Notify(internalBleedThoughts[math.random(#internalBleedThoughts)], 45, "internalbleed", 0, nil, Color(220, 170, 170))
 			org.internalBleedThoughtLevel = internalThoughtLevel
 			org.nextInternalBleedThought = CurTime() + 45

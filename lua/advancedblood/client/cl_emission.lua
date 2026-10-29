@@ -363,6 +363,7 @@ local function EmitWound(src, wd, dt, stepIdx, bodyflow, heartH)
 	local rng = wd.rng
 	Respond(wd, dt)
 	local rate, asked, full, askedFull = E.Rate(src, wd)
+	if hg.BandageAbsorbBlood and hg.BandageAbsorbBlood(src.body, wd.boneName, rate * dt) then return 0, 0 end
 	local p = E.Profile(src, wd, rate)
 	wd.profile = p
 	wd.dropK = E.DropK(full)
