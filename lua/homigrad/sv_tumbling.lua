@@ -34,16 +34,17 @@ end
 
 local TUMBLE_SPEED_THRESHOLD = 250
 local TUMBLE_COOLDOWN = 2
-local GAP_CHECK_DIST = 30 
-local WALL_CHECK_DIST = 20
-local WALL_CHECK_HEIGHT = 10
+local GAP_CHECK_DIST = 30
 
 local BASE_TRIP_CHANCE = 0.1
 local MAX_TRIP_CHANCE = 0.8
 local TRIP_BREAK_CHANCE = 0.15
-local COLLISION_TRACE_MINS = Vector(-12, -12, -20)
-local COLLISION_TRACE_MAXS = Vector(12, 12, 20)
-local COLLISION_FULL_SPEED_MUL = 0.6
+local GAP_CHECK_AHEAD = 18
+local COLLISION_TRACE_MINS = Vector(-15, -15, -16)
+local COLLISION_TRACE_MAXS = Vector(15, 15, 24)
+local COLLISION_CONTACT_SKIN = 2
+local COLLISION_MIN_HEAD_ON = 0.5
+local COLLISION_COOLDOWN = 1
 local COLLISION_STUMBLE_SLOWDOWN = 450
 local COLLISION_STUMBLE_TIME = 0.18
 local COLLISION_DAMAGE_MUL = 0.08
@@ -215,40 +216,101 @@ local function ExecuteTrip(ply, org, tripType, velocity, collisionTrace, trHighH
     end
 
     ply.nextTumbleCheck = CurTime() + TUMBLE_COOLDOWN
+    ply.hgNextCollisionTrip = CurTime() + TUMBLE_COOLDOWN
+end
+
+local function TumbleThreshold(org)
+    local stamina = org.stamina and org.stamina[1] or 100
+    local threshold = TUMBLE_SPEED_THRESHOLD * math.Clamp(org.consciousness or 1, 0.5, 1.0)
+    if stamina < 20 then
+        threshold = threshold * 0.8
+    end
+
+    return threshold * math.Clamp(1 - (org.disorientation or 0) * 0.05, 0.5, 1.0)
+end
+
+local function CollisionTripCheck(ply, org, velocity)
+    local speed = velocity:Length2D()
+    local threshold = TumbleThreshold(org)
+    if speed < threshold then return false end
+
+    local forward = Vector(velocity.x / speed, velocity.y / speed, 0)
+    local center = ply:WorldSpaceCenter()
+    local trWall = util_TraceHull({
+        start = center,
+        endpos = center + forward * (speed * engine.TickInterval() + COLLISION_CONTACT_SKIN),
+        mins = COLLISION_TRACE_MINS,
+        maxs = COLLISION_TRACE_MAXS,
+        filter = {ply, ply:GetVehicle()},
+        mask = MASK_PLAYERSOLID
+    })
+    if not trWall.Hit or trWall.HitSky or trWall.StartSolid or trWall.HitNormal.z >= 0.3 then return false end
+
+    local headOn = -trWall.HitNormal:Dot(forward)
+    local impactSpeed = speed * headOn
+    if headOn < COLLISION_MIN_HEAD_ON or impactSpeed < threshold then return false end
+
+    local ent = trWall.Entity
+    local isBody = IsValid(ent) and (ent:IsPlayer() or ent:IsNPC() or ent:IsRagdoll())
+    if IsValid(ent) and not isBody then
+        local phys = ent:GetPhysicsObject()
+        if IsValid(phys) and phys:GetMass() < 8 then return false end
+    end
+
+    local tripType, trHighHit, tripChance = "ragdoll", false, BASE_TRIP_CHANCE + 0.5
+    if not isBody then
+        local highStart = ply:GetPos() + Vector(0, 0, 35)
+        trHighHit = util_TraceLine({
+            start = highStart,
+            endpos = highStart + forward * 30,
+            filter = ply,
+            mask = MASK_PLAYERSOLID
+        }).Hit
+        tripType = "wall"
+        tripChance = BASE_TRIP_CHANCE + math.Clamp((impactSpeed - 250) / 300, 0, 1) * (trHighHit and 1 or 0.3)
+    end
+
+    local canTrip = ply.hg_isSprinting or (isBody and ply.HasTrait and ply:HasTrait("clumsy"))
+    if canTrip and math.random() < ScaleTripChance(ply, org, tripChance) then
+        ExecuteTrip(ply, org, tripType, velocity, trWall, trHighHit, TRIP_BREAK_CHANCE)
+    else
+        StumbleFromCollision(ply)
+        hg.StartStagger(ply, -forward, math.Clamp(impactSpeed / 320, 0.35, 1))
+        ply.hgNextCollisionTrip = CurTime() + COLLISION_COOLDOWN
+    end
+
+    return true
 end
 
 hook.Add("Think", "stanleytumbler", function()
     for _, ply in ipairs(player_GetAll()) do
+        local prevVelocity = ply.hgTumblePrevVelocity
+        ply.hgTumblePrevVelocity = nil
+
         if not IsValid(ply) or not ply:Alive() or ply:InVehicle() then continue end
-        
+
         if IsValid(ply.FakeRagdoll) then continue end
-        
+
         if ply:GetMoveType() == MOVETYPE_NOCLIP or not ply:IsOnGround() then continue end
-        
-        if (ply.nextTumbleCheck or 0) > CurTime() then continue end
-        ply.nextTumbleCheck = CurTime() + 0.1
+
         local velocity = ply:GetVelocity()
-        local speed = velocity:Length2D()
+        ply.hgTumblePrevVelocity = velocity
         local org = ply.organism or {}
-        local consciousness = org.consciousness or 1
-		local disorientation = org.disorientation or 0
-        local stamina = org.stamina and org.stamina[1] or 100
-        local effectiveThreshold = TUMBLE_SPEED_THRESHOLD
-        effectiveThreshold = effectiveThreshold * math.Clamp(consciousness, 0.5, 1.0)
-        
-        if stamina < 20 then
-            effectiveThreshold = effectiveThreshold * 0.8
+
+        if (ply.hgNextCollisionTrip or 0) <= CurTime() then
+            local impactVelocity = prevVelocity and prevVelocity:Length2DSqr() > velocity:Length2DSqr() and prevVelocity or velocity
+            if CollisionTripCheck(ply, org, impactVelocity) then continue end
         end
 
-        -- Disorientation lowers the speed required to tumble (max 50% reduction at 10 disorientation)
-        effectiveThreshold = effectiveThreshold * math.Clamp(1 - disorientation * 0.05, 0.5, 1.0)
+        if (ply.nextTumbleCheck or 0) > CurTime() then continue end
+        ply.nextTumbleCheck = CurTime() + 0.1
+        local speed = velocity:Length2D()
 
-        if speed < effectiveThreshold then continue end
+        if speed < TumbleThreshold(org) then continue end
 
         local tripChance = BASE_TRIP_CHANCE
         local shouldTrip = false
         local tripType = "none"
-        local trHighHit = false
 
         local forward = Vector(velocity.x, velocity.y, 0)
         if forward:LengthSqr() <= 0.001 then continue end
@@ -256,62 +318,9 @@ hook.Add("Think", "stanleytumbler", function()
         forward:Normalize()
 
         local pos = ply:GetPos()
-        local collisionTrace
 
-        local trWall = util_TraceHull({
-            start = ply:WorldSpaceCenter(),
-            endpos = ply:WorldSpaceCenter() + forward * math.Clamp(speed * engine.TickInterval() * 1.5, 18, 42),
-            mins = COLLISION_TRACE_MINS,
-            maxs = COLLISION_TRACE_MAXS,
-            filter = {ply, ply:GetVehicle()},
-            mask = MASK_PLAYERSOLID
-        })
-
-        if trWall.Hit and not trWall.HitSky and not trWall.StartSolid then
-             if trWall.HitNormal.z < 0.3 then
-                 local ent = trWall.Entity
-                 local isEntity = IsValid(ent) and (ent:IsPlayer() or ent:IsNPC() or ent:IsRagdoll())
-                 local isLightProp = false
-
-                 if IsValid(ent) and not isEntity then
-                    local phys = ent:GetPhysicsObject()
-                    isLightProp = IsValid(phys) and phys:GetMass() < 8
-                 end
-
-                 if not isLightProp and isEntity then
-                     tripType = "ragdoll"
-                     shouldTrip = true
-                     tripChance = tripChance + 0.5 
-                     collisionTrace = trWall
-                 elseif not isLightProp then
-                     local highTraceHeight = 35
-                     local trHigh = util_TraceLine({
-                         start = pos + Vector(0,0,highTraceHeight),
-                         endpos = pos + Vector(0,0,highTraceHeight) + forward * 30,
-                         filter = ply,
-                         mask = MASK_PLAYERSOLID
-                     })
-                     trHighHit = trHigh.Hit
-                     
-                     local speedFactor = math.Clamp((speed - 250) / 300, 0, 1)
-                     
-                     local wallChance = speedFactor
-                     if not trHigh.Hit then
-                         wallChance = wallChance * 0.3
-                     end
-                     
-                     if wallChance > 0 then
-                         shouldTrip = true
-                         tripType = "wall"
-                         tripChance = tripChance + wallChance
-                         collisionTrace = trWall
-                     end
-                 end
-             end
-        end
-
-        if not shouldTrip then
-            local checkPos = pos + forward * 30
+        do
+            local checkPos = pos + forward * GAP_CHECK_AHEAD
             local trGround = util_TraceLine({
                 start = checkPos + Vector(0,0,10),
                 endpos = checkPos - Vector(0,0,GAP_CHECK_DIST),
@@ -345,21 +354,10 @@ hook.Add("Think", "stanleytumbler", function()
         tripChance = ScaleTripChance(ply, org, tripChance)
 
         if shouldTrip then
-            local fullSpeed = math.max(ply:GetRunSpeed(), ply.move or 0)
-            if collisionTrace and speed < fullSpeed * COLLISION_FULL_SPEED_MUL then
-                shouldTrip = false
-            end
-        end
-
-        if shouldTrip then
             if math.random() < tripChance then
-                ExecuteTrip(ply, org, tripType, velocity, collisionTrace, trHighHit, TRIP_BREAK_CHANCE)
+                ExecuteTrip(ply, org, tripType, velocity, nil, false, TRIP_BREAK_CHANCE)
             else
-                if collisionTrace then
-                    StumbleFromCollision(ply)
-                else
-                    ply:ViewPunch(Angle(2, 0, 0))
-                end
+                ply:ViewPunch(Angle(2, 0, 0))
                 hg.StartStagger(ply, tripType == "slip" and -forward or forward, math.Clamp(speed / 320, 0.35, 1))
                 ply.nextTumbleCheck = CurTime() + 1
             end
@@ -495,26 +493,29 @@ function hg.FootstepTripCheck(ply, stepIndex, rate, swingFraction)
     tripChance = math.min(tripChance, MAX_TRIP_CHANCE)
     ply.hgNextStepTrip = CurTime() + STEP_TRIP_COOLDOWN
 
-    if math.random() < tripChance then
-        timer.Simple(0, function()
-            if not IsValid(ply) or not ply:Alive() or IsValid(ply.FakeRagdoll) then return end
-            ExecuteTrip(ply, org, hazard, velocity, hazardTrace, false, STEP_BREAK_CHANCE)
-        end)
+    local tripped = math.random() < tripChance
+    if not tripped and (hazard == "slope" or hazard == "uneven") and ply.HasTrait and ply:HasTrait("vibrams") then return end
 
-        return
-    end
+    local contactDelay = hg.GaitSwingTime(rate, swingFraction) * (hazardTrace and hazardTrace.Fraction or 1)
+    timer.Simple(contactDelay, function()
+        if not IsValid(ply) or not ply:Alive() or IsValid(ply.FakeRagdoll) or ply:GetMoveType() ~= MOVETYPE_WALK then return end
+        local contactVelocity = ply:GetVelocity()
+        if contactVelocity:Length2D() < STEP_STEEP_MIN_SPEED then return end
 
-    if (hazard == "slope" or hazard == "uneven") and ply.HasTrait and ply:HasTrait("vibrams") then return end
+        if tripped then
+            ExecuteTrip(ply, org, hazard, contactVelocity, hazardTrace, false, STEP_BREAK_CHANCE)
 
-    if hazard == "wall" or hazard == "toe" then
-        timer.Simple(0, function()
-            if IsValid(ply) and ply:Alive() and not IsValid(ply.FakeRagdoll) then StumbleFromCollision(ply) end
-        end)
-    else
-        ply:ViewPunch(Angle(2 + speedFactor * 3, 0, math.Rand(-2, 2)))
-    end
+            return
+        end
 
-    hg.StartStagger(ply, moveDir, 0.3 + speedFactor * 0.6)
+        if hazard == "wall" or hazard == "toe" then
+            StumbleFromCollision(ply)
+        else
+            ply:ViewPunch(Angle(2 + speedFactor * 3, 0, math.Rand(-2, 2)))
+        end
+
+        hg.StartStagger(ply, moveDir, 0.3 + speedFactor * 0.6)
+    end)
 end
 
 local SUPPORT_CHECK_INTERVAL = 0.1

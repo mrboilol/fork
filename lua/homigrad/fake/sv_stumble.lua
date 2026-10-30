@@ -22,6 +22,7 @@ local falling = {}
 local reacting = {}
 local dying = {}
 local fading = {}
+local posing = {}
 
 local function readConfig()
 	local cfg = {}
@@ -831,6 +832,7 @@ local function writheDrive(ply, org)
 end
 
 local function wantedReaction(ply, ragdoll)
+	if fading[ragdoll] then return end
 	local pain = agony(ply)
 	if not isAware(ply) then
 		if pain > 0 and writheWanted(ply, ragdoll, pain) then return "writhe" end
@@ -959,6 +961,8 @@ hook.Add("Fake Up", "HG_EuphoriaStumble", function(ply, ragdoll)
 	if not IsValid(ragdoll) then return end
 	falling[ragdoll] = nil
 	ragdoll.hgStumbleFalling = nil
+	fading[ragdoll] = nil
+	ragdoll.hgHeadshotFade = nil
 	stopStumble(ragdoll)
 	removeReaction(ragdoll)
 	ragdoll.hgReflexGrab = nil
@@ -1387,8 +1391,37 @@ local function updateDying(ragdoll, ds)
 end
 
 local function stopFade(ragdoll)
+	local fs = fading[ragdoll]
 	fading[ragdoll] = nil
-	if IsValid(ragdoll) then ragdoll.hgHeadshotFade = nil end
+	if not IsValid(ragdoll) then return end
+	ragdoll.hgHeadshotFade = nil
+	if fs and fs.freeze then
+		local now = CurTime()
+		posing[ragdoll] = {posture = fs.posture, startTime = now, untilT = now + K.FADE_FREEZE_ARMS_AFTER}
+	end
+end
+
+local function driveFreezeArms(ragdoll, posture, strength)
+	if strength <= 0 or not hg.brainfuckv2 or not hg.brainfuckv2.DriveUpper then return end
+	hg.brainfuckv2.DriveUpper(ragdoll, posture, K.FADE_FREEZE_ARM_TORQUE * strength, K.FADE_FREEZE_TREMOR * strength)
+end
+
+local function updatePosing(ragdoll, ps)
+	local now = CurTime()
+	if not IsValid(ragdoll) or now >= ps.untilT or ragdoll.brainfuckv2PoseStart or ragdoll.noHead or ragdoll.headexploded then
+		posing[ragdoll] = nil
+		return
+	end
+
+	driveFreezeArms(ragdoll, ps.posture, (1 - (now - ps.startTime) / (ps.untilT - ps.startTime)) ^ K.FADE_FREEZE_ARMS_POW)
+end
+
+local function freezePosture(org, posture)
+	if posture == "decorticate" or posture == "decerebrate" then return posture end
+	posture = org and org.brainfuckv2Posture
+	if posture == "decorticate" or posture == "decerebrate" then return posture end
+
+	return math.random() < 0.5 and "decorticate" or "decerebrate"
 end
 
 local function fadeGroundZ(ragdoll, pos)
@@ -1437,7 +1470,16 @@ local function fadeDir(ply, ragdoll)
 	return aim:GetNormalized()
 end
 
-local function startHeadshotFade(ply, ragdoll)
+local fadeSpans = {freeze = K.FADE_FREEZE_TIME, kneel = K.FADE_KNEEL_TIME, stagger = K.FADE_STAGGER_TIME}
+
+local function pickFadeStyle()
+	local roll = math.random()
+	if roll < K.FADE_FREEZE_CHANCE then return "freeze" end
+
+	return (roll - K.FADE_FREEZE_CHANCE) / (1 - K.FADE_FREEZE_CHANCE) < K.FADE_KNEEL_CHANCE and "kneel" or "stagger"
+end
+
+local function startHeadshotFade(ply, ragdoll, style, posture)
 	local pelvis = getBonePhys(ragdoll, "ValveBiped.Bip01_Pelvis")
 	local spine = getBonePhys(ragdoll, "ValveBiped.Bip01_Spine2")
 	if not IsValid(pelvis) or not IsValid(spine) or not isUpright(ply, ragdoll) then return end
@@ -1448,16 +1490,27 @@ local function startHeadshotFade(ply, ragdoll)
 	if height < K.FADE_MIN_HEIGHT then return end
 
 	removeDying(ragdoll)
+	removeReaction(ragdoll)
+	stopStumble(ragdoll)
+	falling[ragdoll] = nil
+	posing[ragdoll] = nil
+	ragdoll.hgStumbleFalling = nil
+	ragdoll.hgStumblePending = nil
 
-	local kneel = math.random() < K.FADE_KNEEL_CHANCE
-	local span = kneel and K.FADE_KNEEL_TIME or K.FADE_STAGGER_TIME
+	style = style or pickFadeStyle()
+	local span = fadeSpans[style]
+	local dir = fadeDir(ply, ragdoll)
+	local freeze = style == "freeze"
 	local now = CurTime()
 	fading[ragdoll] = {
 		pelvis = pelvis,
 		spine = spine,
 		calves = {getBonePhys(ragdoll, "ValveBiped.Bip01_L_Calf"), getBonePhys(ragdoll, "ValveBiped.Bip01_R_Calf")},
-		dir = fadeDir(ply, ragdoll),
-		kneel = kneel,
+		dir = dir,
+		kneel = style == "kneel",
+		freeze = freeze,
+		side = freeze and dir:Cross(vector_up) * (math.random() < 0.5 and 1 or -1) or nil,
+		posture = freeze and freezePosture(ragdoll.organism or ply.organism, posture) or nil,
 		height = height,
 		groundZ = groundZ,
 		startTime = now,
@@ -1470,10 +1523,59 @@ end
 local function releaseFade(ragdoll, fs)
 	stopFade(ragdoll)
 
-	local dir = Vector(fs.dir)
-	dir:Rotate(Angle(0, math.Rand(-K.FADE_TOPPLE_SPREAD, K.FADE_TOPPLE_SPREAD), 0))
-	fs.spine:AddVelocity(dir * K.FADE_TOPPLE_PUSH + Vector(0, 0, -K.FADE_TOPPLE_DOWN))
-	fs.pelvis:AddVelocity(dir * K.FADE_TOPPLE_PUSH * 0.25)
+	local dir = Vector(fs.freeze and fs.side or fs.dir)
+	local spread = fs.freeze and K.FADE_FREEZE_SPREAD or K.FADE_TOPPLE_SPREAD
+	local push = fs.freeze and K.FADE_FREEZE_TOPPLE or K.FADE_TOPPLE_PUSH
+	dir:Rotate(Angle(0, math.Rand(-spread, spread), 0))
+	fs.spine:AddVelocity(dir * push + Vector(0, 0, -K.FADE_TOPPLE_DOWN))
+	fs.pelvis:AddVelocity(dir * push * 0.25)
+end
+
+local function fadeLift(fs, pelvisPos, height, hold, dt)
+	local gravity = physenv.GetGravity():Length()
+	local accel = gravity + (fs.groundZ + height - pelvisPos.z) * K.FADE_SPRING - fs.pelvis:GetVelocity().z * K.FADE_DAMP
+	local lift = Vector(0, 0, math.Clamp(accel * hold, 0, gravity * K.FADE_MAX_GRAVITY) * dt)
+	fs.pelvis:AddVelocity(lift)
+	fs.spine:AddVelocity(lift)
+end
+
+local function driveFadeSpine(fs, want, torque, dt)
+	fs.spine:Wake()
+	fs.spine:ComputeShadowControl({
+		secondstoarrive = K.FADE_SPINE_ARRIVE,
+		pos = fs.spine:GetPos(),
+		angle = uprightAngle(fs.spine:GetAngles(), want),
+		maxangular = torque,
+		maxangulardamp = torque,
+		maxspeed = 0,
+		maxspeeddamp = 0,
+		dampfactor = 0.8,
+		teleportdistance = 0,
+		deltatime = dt,
+	})
+end
+
+local function updateFreeze(ragdoll, fs, t, dt, pelvisPos)
+	local u = math.max(t - K.FADE_FREEZE_LOCK, 0) / (1 - K.FADE_FREEZE_LOCK)
+	local hold = (1 - u) ^ K.FADE_HOLD_POW
+	fadeLift(fs, pelvisPos, fs.height * Lerp(u * u, 1, K.FADE_FREEZE_SAG), hold, dt)
+
+	if u <= 0 then
+		local brake = math.min(K.FADE_FREEZE_BRAKE * dt, 1)
+		for _, phys in ipairs({fs.pelvis, fs.spine}) do
+			local vel = phys:GetVelocity()
+			phys:AddVelocity(Vector(-vel.x * brake, -vel.y * brake, 0))
+		end
+	end
+
+	local lean = K.FADE_FREEZE_TILT * u * u
+	local want = fs.side * lean + fs.dir * (lean * K.FADE_FREEZE_FORWARD) + vector_up
+	want:Normalize()
+	driveFadeSpine(fs, want, K.FADE_SPINE_TORQUE * K.FADE_FREEZE_STIFF * (K.FADE_FREEZE_MIN_STIFF + (1 - K.FADE_FREEZE_MIN_STIFF) * hold), dt)
+	fs.spine:AddAngleVelocity(VectorRand() * K.FADE_FREEZE_SHAKE * dt)
+	fs.spine:AddVelocity(fs.side * (K.FADE_FREEZE_DRIFT * u * dt))
+
+	driveFreezeArms(ragdoll, fs.posture, math.Clamp(t / K.FADE_FREEZE_ARM_RAMP, 0, 1))
 end
 
 local function updateFade(ragdoll, fs)
@@ -1488,7 +1590,7 @@ local function updateFade(ragdoll, fs)
 		releaseFade(ragdoll, fs)
 		return
 	end
-	if fs.spine:GetAngles():Forward().z < K.FADE_LOST_UPRIGHT then
+	if fs.spine:GetAngles():Forward().z < (fs.freeze and K.FADE_FREEZE_LOST_UPRIGHT or K.FADE_LOST_UPRIGHT) then
 		stopFade(ragdoll)
 		return
 	end
@@ -1497,32 +1599,19 @@ local function updateFade(ragdoll, fs)
 	local pelvisPos = fs.pelvis:GetPos()
 	fs.groundZ = fadeGroundZ(ragdoll, pelvisPos) or fs.groundZ
 
+	if fs.freeze then
+		updateFreeze(ragdoll, fs, t, dt, pelvisPos)
+		return
+	end
+
 	local hold = (1 - t) ^ K.FADE_HOLD_POW
 	local sink = fs.kneel and math.Clamp(t / K.FADE_KNEEL_DROP, 0, 1) or t
-	local height = fs.height * Lerp(sink * (2 - sink), 1, fs.kneel and K.FADE_KNEEL_HEIGHT or K.FADE_STAGGER_SAG)
-
-	local gravity = physenv.GetGravity():Length()
-	local accel = gravity + (fs.groundZ + height - pelvisPos.z) * K.FADE_SPRING - fs.pelvis:GetVelocity().z * K.FADE_DAMP
-	local lift = Vector(0, 0, math.Clamp(accel * hold, 0, gravity * K.FADE_MAX_GRAVITY) * dt)
-	fs.pelvis:AddVelocity(lift)
-	fs.spine:AddVelocity(lift)
+	fadeLift(fs, pelvisPos, fs.height * Lerp(sink * (2 - sink), 1, fs.kneel and K.FADE_KNEEL_HEIGHT or K.FADE_STAGGER_SAG), hold, dt)
 
 	local lean = Lerp(t, K.FADE_LEAN[1], K.FADE_LEAN[2])
 	local want = Vector(fs.dir.x * lean, fs.dir.y * lean, 1)
 	want:Normalize()
-	fs.spine:Wake()
-	fs.spine:ComputeShadowControl({
-		secondstoarrive = K.FADE_SPINE_ARRIVE,
-		pos = fs.spine:GetPos(),
-		angle = uprightAngle(fs.spine:GetAngles(), want),
-		maxangular = K.FADE_SPINE_TORQUE * hold,
-		maxangulardamp = K.FADE_SPINE_TORQUE * hold,
-		maxspeed = 0,
-		maxspeeddamp = 0,
-		dampfactor = 0.8,
-		teleportdistance = 0,
-		deltatime = dt,
-	})
+	driveFadeSpine(fs, want, K.FADE_SPINE_TORQUE * hold, dt)
 	fs.spine:AddAngleVelocity(VectorRand() * K.FADE_SWAY * dt)
 
 	if fs.kneel then
@@ -1541,8 +1630,15 @@ local function updateFade(ragdoll, fs)
 	fs.spine:AddVelocity(push * 1.2)
 end
 
+function hg.EuphoriaBrainFreeze(ply, ragdoll, posture)
+	if not euphoriaOn(hg_euphoria_headshot_fade) then return end
+	timer.Simple(0, function()
+		if IsValid(ply) and IsValid(ragdoll) and ply.FakeRagdoll == ragdoll and not fading[ragdoll] then startHeadshotFade(ply, ragdoll, "freeze", posture) end
+	end)
+end
+
 hook.Add("RagdollDeath", "HG_EuphoriaDeathThroes", function(ply, ragdoll)
-	if not IsValid(ply) or not ply:IsPlayer() or not IsValid(ragdoll) then return end
+	if not IsValid(ply) or not ply:IsPlayer() or not IsValid(ragdoll) or fading[ragdoll] then return end
 
 	if euphoriaOn(hg_euphoria_headshot_fade) and isFatalHeadshot(ply, ragdoll, ply.organism) then
 		if math.random() >= K.FADE_CHANCE then return end
@@ -1591,6 +1687,10 @@ hook.Add("Think", "HG_EuphoriaStumble", function()
 
 	for ragdoll, fs in pairs(fading) do
 		updateFade(ragdoll, fs)
+	end
+
+	for ragdoll, ps in pairs(posing) do
+		updatePosing(ragdoll, ps)
 	end
 
 	local now = CurTime()

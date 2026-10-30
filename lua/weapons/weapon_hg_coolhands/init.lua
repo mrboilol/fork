@@ -41,6 +41,46 @@ local function PrintPerfusionDiagnosis(ply, org)
 	if (org.cerebralPerfusion or perfusion) < 0.35 or brainoxygen < 0.35 then ply:ChatPrint("Their brain is being poorly oxygenated and perfused.") end
 end
 
+local function PrintReactionCheck(ply, org, head)
+	if not IsValid(ply) or not org or not org.alive then return end
+
+	local brain = tonumber(org.brain) or 0
+	local brainIgnored = hg.organism.IsBrainDamageIgnored and hg.organism.IsBrainDamageIgnored(org)
+	if not brainIgnored and (brain >= 0.6 or (brain >= 0.4 and org.otrub)) then
+		ply:ChatPrint("No response to anything.")
+		if head then ply:ChatPrint("Pupils are fixed and dilated.") end
+		return
+	end
+
+	local pain = tonumber(org.pain) or 0
+	if org.otrub then
+		ply:ChatPrint("No reaction.")
+		ply:ChatPrint(pain > 30 and "They groan when you pinch them." or "They do not react to pain.")
+	else
+		ply:ChatPrint("Reaction present.")
+		if pain > 70 then
+			ply:ChatPrint("They are in agony.")
+		elseif pain > 30 then
+			ply:ChatPrint("They wince in pain.")
+		end
+		if (tonumber(org.disorientation) or 0) > 1 then ply:ChatPrint("They seem confused.") end
+		if (tonumber(org.consciousness) or 1) < 0.6 then ply:ChatPrint("They are drowsy and slow to respond.") end
+	end
+
+	if not head then return end
+
+	local opioids = (tonumber(org.analgesia) or 0) > 1 or (tonumber(org.painkiller) or 0) > 1 or (tonumber(org.zerlkersOverdose) or 0) > 0.1
+	if opioids then
+		ply:ChatPrint("Pupils are pinpoint.")
+	elseif (tonumber(org.adrenaline) or 0) >= 1.5 then
+		ply:ChatPrint("Pupils are dilated.")
+	else
+		ply:ChatPrint("Pupils react normally.")
+	end
+
+	ply:ChatPrint(((org.o2 and org.o2.curregen == 0) or org.holdingbreath or org.respiratoryArrest) and "Not breathing." or "Breathing.")
+end
+
 local ang4 = Angle(0,0,180)
 local ang5 = Angle(0,0,0)
 
@@ -463,16 +503,9 @@ function SWEP:ApplyForce()
 							ply:ChatPrint("The body appears to have blast trauma.")
 						end
 
+						PrintReactionCheck(ply, org, bone == "ValveBiped.Bip01_Head1")
+
 						if (bone == "ValveBiped.Bip01_Head1") then
-						if (org.o2.curregen == 0 or not org.alive or org.holdingbreath) then
-							--ply:ChatPrint("Not breathing.")
-						else
-							--ply:ChatPrint("Breathing.")
-						end
-
-							--ply:ChatPrint(org.otrub and "No reaction." or "Reaction present.")
-							--ply:ChatPrint(org.otrub and "No reaction." or "Reaction present.")
-
 							if org.isPly and not org.otrub then
 								org.owner:ChatPrint("You were checked for reaction.")
 							end
@@ -1280,7 +1313,11 @@ function SWEP:AttackFront(special_attack, rand)
 
         if SERVER then
 				local combat = hg.GetCombatCondition and hg.GetCombatCondition(owner) or nil
-				owner.organism.stamina.subadd = owner.organism.stamina.subadd + (special_attack and owner:KeyDown(IN_SPEED) and 13 or 4) * (combat and combat.exertion or 1)
+				local org = owner.organism
+				local cost = (special_attack and owner:KeyDown(IN_SPEED) and 13 or 4) * (combat and combat.exertion or 1)
+				org.stamina.subadd = org.stamina.subadd + cost
+				hg.organism.ConsumeStamina(org, cost * 0.6 / (org.superfighter and 4 or 1))
+				hg.organism.RecordMeleeExertion(org, cost)
         end
 
         owner:LagCompensation(false)

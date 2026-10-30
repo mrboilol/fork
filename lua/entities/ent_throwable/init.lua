@@ -94,39 +94,72 @@ local function PlayPhysicsImpact(ent, data, phys)
 	ent:EmitSound(soundName, 60 + volume * 15, math.random(94, 106), volume, CHAN_BODY)
 end
 
-local function FindAnchorBone(ent, hitPos, trace)
+local function PhysBoneOf(ent, modelBone)
+	local physBone = ent:TranslateBoneToPhysBone(modelBone)
+	if physBone and physBone >= 0 and ent:TranslatePhysBoneToBone(physBone) == modelBone then return physBone end
+end
+
+local function PhysicsAncestor(ent, modelBone)
+	while modelBone and modelBone >= 0 do
+		local physBone = PhysBoneOf(ent, modelBone)
+		if physBone then return modelBone, physBone end
+		modelBone = ent:GetBoneParent(modelBone)
+	end
+end
+
+local function AnchorResult(ent, modelBone, physBone)
+	local matrix = modelBone and modelBone >= 0 and ent:GetBoneMatrix(modelBone)
+	if matrix then return modelBone, ent:GetBoneName(modelBone), physBone, matrix end
+end
+
+local function FindAnchorBone(ent, hitPos, trace, hitObject)
 	if not IsValid(ent) then return end
 
-	if ent:IsRagdoll() and trace and trace.Entity == ent and trace.PhysicsBone ~= nil then
-		local modelBone = ent:TranslatePhysBoneToBone(trace.PhysicsBone)
-		local matrix = modelBone and modelBone >= 0 and ent:GetBoneMatrix(modelBone)
-		if matrix then return modelBone, ent:GetBoneName(modelBone), trace.PhysicsBone, matrix end
+	if ent:IsRagdoll() then
+		if IsValid(hitObject) then
+			for physBone = 0, ent:GetPhysicsObjectCount() - 1 do
+				if ent:GetPhysicsObjectNum(physBone) == hitObject then
+					local bone, name, pb, matrix = AnchorResult(ent, ent:TranslatePhysBoneToBone(physBone), physBone)
+					if matrix then return bone, name, pb, matrix end
+					break
+				end
+			end
+		end
+		if trace and trace.Entity == ent and trace.PhysicsBone ~= nil then
+			local bone, name, pb, matrix = AnchorResult(ent, ent:TranslatePhysBoneToBone(trace.PhysicsBone), trace.PhysicsBone)
+			if matrix then return bone, name, pb, matrix end
+		end
+	elseif trace and trace.Entity == ent and trace.HitBox ~= nil and ent.GetHitBoxBone then
+		local hitBoxBone = ent:GetHitBoxBone(trace.HitBox, ent:GetHitboxSet() or 0)
+		local bone, physBone = PhysicsAncestor(ent, hitBoxBone)
+		local foundBone, name, pb, matrix = AnchorResult(ent, bone, physBone)
+		if matrix then return foundBone, name, pb, matrix end
 	end
 
 	local wantedHitGroup = trace and trace.HitGroup
 	local function FindNearestBone(filterHitGroup)
-		local bestBone, bestMatrix, bestDistance
+		local bestBone, bestPhysBone, bestMatrix, bestDistance
 		for modelBone = 0, ent:GetBoneCount() - 1 do
+			local physBone = PhysBoneOf(ent, modelBone)
 			local boneName = ent:GetBoneName(modelBone)
-			if not filterHitGroup or not hg.bonetohitgroup or hg.bonetohitgroup[boneName] == filterHitGroup then
+			if physBone and (not filterHitGroup or not hg.bonetohitgroup or hg.bonetohitgroup[boneName] == filterHitGroup) then
 				local matrix = ent:GetBoneMatrix(modelBone)
 				if matrix then
 					local distance = hitPos:DistToSqr(matrix:GetTranslation())
 					if not bestDistance or distance < bestDistance then
-						bestBone, bestMatrix, bestDistance = modelBone, matrix, distance
+						bestBone, bestPhysBone, bestMatrix, bestDistance = modelBone, physBone, matrix, distance
 					end
 				end
 			end
 		end
-		return bestBone, bestMatrix
+		return bestBone, bestPhysBone, bestMatrix
 	end
 
 	local filteredHitGroup = wantedHitGroup and wantedHitGroup ~= HITGROUP_GENERIC and wantedHitGroup or nil
-	local bestBone, bestMatrix = FindNearestBone(filteredHitGroup)
-	if not bestBone and filteredHitGroup then bestBone, bestMatrix = FindNearestBone() end
+	local bestBone, bestPhysBone, bestMatrix = FindNearestBone(filteredHitGroup)
+	if not bestBone and filteredHitGroup then bestBone, bestPhysBone, bestMatrix = FindNearestBone() end
 	if not bestBone then return end
-	local physBone = ent:TranslateBoneToPhysBone(bestBone)
-	return bestBone, ent:GetBoneName(bestBone), physBone and physBone >= 0 and physBone or nil, bestMatrix
+	return bestBone, ent:GetBoneName(bestBone), bestPhysBone, bestMatrix
 end
 
 local function GetEmbeddedTransform(ent, hitPos, hitNormal, direction, depth)
@@ -374,7 +407,7 @@ function ENT:PhysicsCollide(data, phys)
 	local anchorBone, anchorBoneName, anchorPhysBone, anchorMatrix
 	if targetOrganism and (self.DamageType or DMG_SLASH) == DMG_SLASH then
 		local anchorTrace = headTrace.Entity == hitEnt and headTrace or nil
-		anchorBone, anchorBoneName, anchorPhysBone, anchorMatrix = FindAnchorBone(hitEnt, data.HitPos, anchorTrace)
+		anchorBone, anchorBoneName, anchorPhysBone, anchorMatrix = FindAnchorBone(hitEnt, data.HitPos, anchorTrace, data.HitObject)
 	end
 	local lodgedEntry
 	if anchorMatrix then

@@ -139,13 +139,18 @@ function SWEP:GetAttackAnimToken(token, fallback)
     return fallback
 end
 
+function SWEP:GetChargeFullTime(chargeStart)
+    chargeStart = chargeStart or self.ChargeStartedAt or self:GetChargeStart()
+    return util.SharedRandom("hg_melee_charge_time", self.ChargeFullTimeMin or 4, self.ChargeFullTimeMax or 6, math.floor((chargeStart or 0) * 10))
+end
+
 function SWEP:GetChargeFraction()
-    return math.Clamp(((self.ChargeReleasedAt or CurTime()) - (self.ChargeStartedAt or CurTime())) / math.max(self.ChargeFullTime or 10, 0.001), 0, 1)
+    return math.Clamp(((self.ChargeReleasedAt or CurTime()) - (self.ChargeStartedAt or CurTime())) / math.max(self:GetChargeFullTime(), 0.001), 0, 1)
 end
 
 function SWEP:IsChargeReady()
     local chargeStart = self:GetChargeStart()
-    return chargeStart > 0 and CurTime() - chargeStart >= (self.ChargeFullTime or 10)
+    return chargeStart > 0 and CurTime() - chargeStart >= self:GetChargeFullTime(chargeStart)
 end
 
 function SWEP:GetChargeDamageScale()
@@ -280,7 +285,7 @@ SWEP.PenetrationSizeSecondary = 2.5
 
 SWEP.StaminaPrimary = 10
 SWEP.StaminaSecondary = 8.5
-SWEP.StaminaCostMul = 0.5
+SWEP.StaminaCostMul = 0.25
 SWEP.MeleeStaminaMul = 0.4
 
 SWEP.ViewPunch1 = Angle(2,0,0)
@@ -304,7 +309,8 @@ SWEP.ClashDisarmChance = 0.15
 SWEP.ChargeAnimTimeBegin = 0.2
 SWEP.ChargeAnimTimeIdle = 0.35
 SWEP.ChargeAnimTimeEnd = 0.8
-SWEP.ChargeFullTime = 10
+SWEP.ChargeFullTimeMin = 4
+SWEP.ChargeFullTimeMax = 6
 SWEP.ChargeAttackTime = 0.2
 SWEP.ChargeWaitTime = 0.5
 SWEP.ChargeAttackLen = 55
@@ -1145,15 +1151,6 @@ function SWEP:ModelAnim(model, pos, ang)
 
     end
 
-    if self:IsChargeReady() then
-        local t = CurTime()
-        addPos.x = addPos.x + math.sin(t * 47) * 0.3
-        addPos.y = addPos.y + math.cos(t * 53) * 0.3
-        addPos.z = addPos.z + math.sin(t * 61) * 0.25
-        addAng.p = addAng.p + math.sin(t * 43) * 1.5
-        addAng.r = addAng.r + math.cos(t * 59) * 1.5
-    end
-
     self.lastAddPos = addPos
 
     //local inattack1 = self:GetAttackType() == 1 and math.max(self:GetLastAttack() - CurTime(),0) / self.AttackTime > 0 or false
@@ -1541,7 +1538,11 @@ function SWEP:OnHolsterBegin(total, fraction)
 end
 
 function SWEP:Holster(wep)
-    if hg.HolsterGate(self, wep) then return false end
+    if self.TwoHanded and not self:CanHolsterBigMelee() then
+        hg.ClearHolster(self)
+    elseif hg.HolsterGate(self, wep) then
+        return false
+    end
 
     self.MeleeDeployGripStart = 0
     self.MeleeDeployMoveStart = 0
@@ -2175,7 +2176,12 @@ function SWEP:ConsumeMeleeStamina(owner, amount)
 	local org = owner.organism
 	local stamina = org.stamina
 	local combat = hg.GetCombatCondition and hg.GetCombatCondition(owner) or nil
-	if stamina then stamina.subadd = (stamina.subadd or 0) + math.max(tonumber(amount) or 0, 0) * (self.MeleeStaminaMul or 0.4) * (combat and combat.exertion or 1) end
+	if stamina then
+		local cost = math.max(tonumber(amount) or 0, 0) * (combat and combat.exertion or 1)
+		stamina.subadd = (stamina.subadd or 0) + cost * (self.MeleeStaminaMul or 0.4)
+		hg.organism.ConsumeStamina(org, cost * (self.MeleeDirectStaminaMul or 0.9) / (org.superfighter and 4 or 1))
+		hg.organism.RecordMeleeExertion(org, cost)
+	end
 
 	local arms = self.TwoHanded and {"rarm", "larm"} or {"rarm"}
 	local pain = 0
@@ -2371,7 +2377,7 @@ function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
             
             self:PlaySwingSound(owner, attacktype)
             
-			self:ConsumeMeleeStamina(owner, self:GetAttackConfigValue(self.StaminaPrimary, self.StaminaSecondary, self.ChargeStamina, attacktype) * (self.StaminaCostMul or 0.5) * math.Clamp(vellen / 200, 1, 1.25) * (charge and (self.SlamStaminaMul or 1) or 1))
+			self:ConsumeMeleeStamina(owner, self:GetAttackConfigValue(self.StaminaPrimary, self.StaminaSecondary, self.ChargeStamina, attacktype) * (self.StaminaCostMul or 0.25) * math.Clamp(vellen / 200, 1, 1.25) * (charge and (self.SlamStaminaMul or 1) or 1))
 
             if charge then
                 if self.CustomChargeAttack and self:CustomChargeAttack() then
@@ -3139,7 +3145,7 @@ function SWEP:Feint()
 		local attacktype = self:GetAttackType()
 		local vellen = IsValid(owner) and owner:GetVelocity():Length() or 0
 		local staminaCost = self:GetAttackConfigValue(self.StaminaPrimary, self.StaminaSecondary, self.ChargeStamina, attacktype) or 0
-		self:ConsumeMeleeStamina(owner, staminaCost * (self.StaminaCostMul or 0.5) * 0.5 * math.Clamp(vellen / 200, 1, 1.25))
+		self:ConsumeMeleeStamina(owner, staminaCost * (self.StaminaCostMul or 0.25) * 0.5 * math.Clamp(vellen / 200, 1, 1.25))
     end
 
     self:SetInAttack(false)

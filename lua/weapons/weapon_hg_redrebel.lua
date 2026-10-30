@@ -114,7 +114,10 @@ SWEP.hitsoundextra = {
 }
 
 SWEP.swingsoundextra = {
-    {"weapons/darsu_eft/melee/scythe_whoosh_04.ogg", 90, {95, 105}},
+    {"bat/baseball_swing_1st_layer_01.wav", 60, {80, 95}},
+    {"bat/baseball_swing_1st_layer_02.wav", 60, {80, 95}},
+    {"bat/baseball_swing_1st_layer_03.wav", 60, {80, 95}},
+    {"bat/baseball_swing_1st_layer_04.wav", 60, {80, 95}},
 }
 
 SWEP.AnimList = {

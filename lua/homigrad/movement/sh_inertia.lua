@@ -202,7 +202,7 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 		return phase % 1 < hg.GaitFlightFraction(swingFraction)
 	end
 
-	local SPRINT_SPEED_MUL = 1.15
+	local SPRINT_SPEED_MUL = 1.45
 	local JOG_SPEED_MUL = 0.68
 	local STAMINA_FULL_SPEED = 90
 	local LIMP_LEG_SPEED_MIN = 0.72
@@ -229,7 +229,7 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 	local PUSH_LIMP_JITTER = 0.35
 	local PUSH_PERFUSION_JITTER = 1.2
 	local PUSH_JITTER_MAX = 0.6
-	local GAIT_SPEED_SMOOTH = 4
+	local GAIT_SPEED_SMOOTH = 9
 
 	function hg.GaitLegLimp(org, leg)
 		return org and 1 - hg.GetLimbEffectiveness(org, leg) or 0

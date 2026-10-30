@@ -174,9 +174,20 @@ module[2] = function(owner, org, timeValue)
 
 	
 
+	local painShockActive = org.pain > pain_shock_threshold
+	local painShockTarget, painShockGain, shockResistance
+	local painShockFloor = 0
+	if painShockActive then
+		painShockTarget = Clamp(math.Remap(org.pain, pain_shock_threshold, pain_shock_ramp_end, pain_shock_target, pain_shock_max_target), pain_shock_target, pain_shock_max_target)
+		painShockGain = Clamp(math.Remap(org.pain, pain_shock_threshold, pain_shock_ramp_end, pain_shock_gain, pain_shock_max_gain), pain_shock_gain, pain_shock_max_gain)
+		shockResistance = math.Clamp(resilience * 0.25 + zerlkersResistance * 0.50 + math.Clamp(adrenaline, 0, 5) * 0.1, 0, 0.8)
+		painShockTarget = painShockTarget * (1 - shockResistance)
+		painShockFloor = math.min(org.shock, painShockTarget)
+	end
+
 	local shockDecayMul = 1.5 + math.Clamp((org.shock - 25) / 15, 0, 1) * 1.5 + math.Clamp((org.shock - 40) / 30, 0, 1) ^ 2 * 5
-	if !org.lasthit or org.lasthit + 1.5 < CurTime() then org.shock = max(org.shock - timeValue * 4 * shockDecayMul * (org.otrub and 1 or 0.5) * (1 + resilience * 0.75 + zerlkersResistance * 2.25 + math.Clamp(adrenaline, 0, 5) * 0.6), 0) end
-	if adrenaline > 0 then org.shock = max(org.shock - timeValue * math.Clamp(adrenaline, 0, 5) * 0.9, 0) end
+	if !org.lasthit or org.lasthit + 1.5 < CurTime() then org.shock = max(org.shock - timeValue * 4 * shockDecayMul * (org.otrub and 1 or 0.5) * (1 + resilience * 0.75 + zerlkersResistance * 2.25 + math.Clamp(adrenaline, 0, 5) * 0.6), painShockFloor) end
+	if adrenaline > 0 then org.shock = max(org.shock - timeValue * math.Clamp(adrenaline, 0, 5) * 0.9, painShockFloor) end
 	org.immobilization = math.Clamp(max((tonumber(org.immobilization) or 0) - timeValue * 5 * adrenalineMul, 0), 0, 100)
 
 	local spine2Broken = (org.spine2 or 0) >= (hg.organism.fake_spine2 or 1)
@@ -233,11 +244,7 @@ module[2] = function(owner, org, timeValue)
 
 
 
-	if org.pain > pain_shock_threshold then
-		local painShockTarget = Clamp(math.Remap(org.pain, pain_shock_threshold, pain_shock_ramp_end, pain_shock_target, pain_shock_max_target), pain_shock_target, pain_shock_max_target)
-		local painShockGain = Clamp(math.Remap(org.pain, pain_shock_threshold, pain_shock_ramp_end, pain_shock_gain, pain_shock_max_gain), pain_shock_gain, pain_shock_max_gain)
-		local shockResistance = math.Clamp(resilience * 0.25 + zerlkersResistance * 0.50 + math.Clamp(adrenaline, 0, 5) * 0.1, 0, 0.8)
-		painShockTarget = painShockTarget * (1 - shockResistance)
+	if painShockActive then
 		org.shock = math.Approach(org.shock, painShockTarget, timeValue * painShockGain * (1 - shockResistance))
 	end
 
@@ -490,13 +497,21 @@ module[2] = function(owner, org, timeValue)
 
 
 
+	local recoveryMul = hg.organism.RecoveryMul(org)
+
 	for _, limb in ipairs({"lleg", "rleg", "rarm", "larm"}) do
-		hg.organism.HealLimbSegments(org, limb, timeValue / 240)
+		hg.organism.HealLimbSegments(org, limb, timeValue / 240 * recoveryMul * (hg.GetBandageRegenMultiplier and hg.GetBandageRegenMultiplier(org.owner, limb) or 1))
 	end
 
-	if org.chest < 1 and org.bandagedchest then
+	if org.chest < 1 then
 
-		org.chest = max(org.chest - timeValue / 420, 0)
+		org.chest = max(org.chest - timeValue / (org.bandagedchest and 420 or 900) * recoveryMul, 0)
+
+	end
+
+	if org.pelvis < 1 then
+
+		org.pelvis = max(org.pelvis - timeValue / 900 * recoveryMul * (hg.GetBandageRegenMultiplier and hg.GetBandageRegenMultiplier(org.owner, "pelvis") or 1), 0)
 
 	end
 

@@ -260,7 +260,7 @@ if CLIENT then
 		for _, thought in ipairs(hg.thoughts) do
 			if thought[1] == msg and now - (thought[2] or 0) < 18 then return end
 		end
-		if group == "despair" or group == "dying" or group == "trauma" then
+		if group == "despair" or group == "trauma" then
 			hg.thoughts = {}
 		elseif group == "combat" or group == "faint" then
 			for _, thought in ipairs(hg.thoughts) do

@@ -124,11 +124,6 @@ function SWEP:Initialize()
     self:InitAdd()
 end
 
-SWEP.swingsoundextra = {
-    {"knife/knife_bayonet_swing1.ogg", 60, {80, 90}},
-    {"knife/knife_bayonet_swing2.ogg", 60, {80, 90}},
-}
-
 SWEP.hitsoundextra = nil
 
 SWEP.AttackTime = 0.2

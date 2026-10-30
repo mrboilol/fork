@@ -502,6 +502,28 @@ local function getLegOffsets(rag, female)
 	return female and variant.female06 or variant.male09
 end
 
+local upperSkip = {[1] = true, [8] = true, [9] = true, [11] = true, [12] = true, [13] = true, [14] = true}
+
+function hg.brainfuckv2.DriveUpper(rag, posture, mul, tremor)
+	local data = hg.brainfuckv2.GetPosture(posture)
+	if not data or data.taser then return end
+
+	local reference = rag:GetPhysicsObjectNum(hg.realPhysNum and hg.realPhysNum(rag, 0) or 0)
+	if not IsValid(reference) then return end
+
+	if not istable(rag.brainfuckv2Base) then
+		rag.brainfuckv2Base = getNeutralBase(rag)
+		if not istable(rag.brainfuckv2Base) then return end
+	end
+
+	local offsets = getOffsets(data, rag.organism)
+	local female = string.find(string.lower(rag:GetModel() or ""), "female", 1, true) ~= nil
+	local modelOffsets = offsets and (female and offsets.female06 or offsets.male09)
+	if not modelOffsets then return end
+
+	driveStatic(rag, upperSkip, modelOffsets, nil, reference:GetAngles(), mul, 50, nil, 0.05, tremor)
+end
+
 local function applyPosture(rag, posture)
 	if not IsValid(rag) or rag.hgHeadshotFade then return end
 
@@ -689,6 +711,7 @@ local function forceFake(ply, org)
 		if not IsValid(ply) or ply.organism ~= org or not ply:Alive() or IsValid(ply.FakeRagdoll) or not org.brainfuckv2Posture then return end
 		dbgPrint("[BrainfuckV2] forcefake " .. tostring(ply))
 		if hg.Fake then hg.Fake(ply, nil, true) end
+		if hg.EuphoriaBrainFreeze and IsValid(ply.FakeRagdoll) then hg.EuphoriaBrainFreeze(ply, ply.FakeRagdoll, org.brainfuckv2Posture) end
 	end)
 end
 

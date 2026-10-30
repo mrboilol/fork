@@ -829,6 +829,44 @@ end
 	ent:PrimaryAttack()
 end*/
 
+function SWEP:GetPelletSpread(owner, ammotype)
+	ammotype = ammotype or self:GetBulletSettings()
+	local isShotgun = self.IsShotgun or self.Category == "Weapons - Shotguns"
+	local baseSpread = isShotgun and Vector(0.04, 0.04, 0) or (ammotype.Spread or self.Primary.Spread or 0) * 3
+	if self.ShotgunTubeReload and self.ShotgunManualCycle then
+		baseSpread = baseSpread * (self.ShotgunSpreadMul or 1 / 3)
+	end
+
+	local accuracyMul = 1
+	if IsValid(owner) and owner:IsPlayer() then
+		if isnumber(baseSpread) then baseSpread = math.max(baseSpread, 0.00075) end
+		local speed = owner:GetVelocity():Length2D()
+		local speedMul = self:CanSprintFire() and 0.28 * self:GetSprintFireShake() or 0.9
+		accuracyMul = accuracyMul * (1 + math.Clamp(speed / 220, 0, 1) * speedMul)
+		accuracyMul = accuracyMul * (self:IsOwnerCrouching(owner) and 0.75 or 1)
+		accuracyMul = accuracyMul * (self:IsZoom() and 0.72 or 1)
+		accuracyMul = accuracyMul * (owner:OnGround() and 1 or 2.25)
+		accuracyMul = accuracyMul * (self:IsResting() and 0.45 or 1)
+		local organism = owner.organism
+		if organism then
+			local left = hg.GetArmEffectiveness and hg.GetArmEffectiveness(owner, "larm") or math.max(1 - (organism.larm or 0), 0)
+			local right = hg.GetArmEffectiveness and hg.GetArmEffectiveness(owner, "rarm") or math.max(1 - (organism.rarm or 0), 0)
+			accuracyMul = accuracyMul * (1 + ((1 - left) + (1 - right)) * 0.65)
+		end
+		local combat = hg.GetCombatCondition and hg.GetCombatCondition(owner) or nil
+		if combat then accuracyMul = accuracyMul * combat.aim end
+		local experienceMul = self.GetWeaponExperienceMul and self:GetWeaponExperienceMul(owner) or 1
+		accuracyMul = accuracyMul * experienceMul
+		accuracyMul = accuracyMul * (owner.GetTraitMultiplier and owner:GetTraitMultiplier("gun_accuracy", 1) or 1)
+		local readiness = self.weaponReadiness or 1
+		local stability = self.weaponStability or 0
+		accuracyMul = accuracyMul * Lerp(readiness, 2.2, 1)
+		accuracyMul = accuracyMul * Lerp(stability, 1, 0.82)
+	end
+
+	return baseSpread * accuracyMul
+end
+
 function SWEP:FireBullet()
     local gun = self:GetWeaponEntity()
     local owner = self:GetOwner()
@@ -986,39 +1024,7 @@ function SWEP:FireBullet()
 	bullet.Damage = bullet.Damage * 0.95 * (self.Supressor and (self.SupressorDamageMultiplier or 0.9) or 1) * (self.DamageMultiplier or 1)
 
 	if numbullet > 1 then
-		local isShotgun = self.IsShotgun or self.Category == "Weapons - Shotguns"
-		local baseSpread = isShotgun and Vector(0.04, 0.04, 0) or (ammotype.Spread or self.Primary.Spread or 0) * 3
-		if self.ShotgunTubeReload and self.ShotgunManualCycle then
-			baseSpread = baseSpread * (self.ShotgunSpreadMul or 1 / 3)
-		end
-
-		local accuracyMul = 1
-		if isply then
-			if isnumber(baseSpread) then baseSpread = math.max(baseSpread, 0.00075) end
-			local speed = owner:GetVelocity():Length2D()
-			local speedMul = self:CanSprintFire() and 0.28 * self:GetSprintFireShake() or 0.9
-			accuracyMul = accuracyMul * (1 + math.Clamp(speed / 220, 0, 1) * speedMul)
-			accuracyMul = accuracyMul * (self:IsOwnerCrouching(owner) and 0.75 or 1)
-			accuracyMul = accuracyMul * (self:IsZoom() and 0.72 or 1)
-			accuracyMul = accuracyMul * (owner:OnGround() and 1 or 2.25)
-			accuracyMul = accuracyMul * (self:IsResting() and 0.45 or 1)
-			local organism = owner.organism
-			if organism then
-				local left = hg.GetArmEffectiveness and hg.GetArmEffectiveness(owner, "larm") or math.max(1 - (organism.larm or 0), 0)
-				local right = hg.GetArmEffectiveness and hg.GetArmEffectiveness(owner, "rarm") or math.max(1 - (organism.rarm or 0), 0)
-				accuracyMul = accuracyMul * (1 + ((1 - left) + (1 - right)) * 0.65)
-			end
-			local combat = hg.GetCombatCondition and hg.GetCombatCondition(owner) or nil
-			if combat then accuracyMul = accuracyMul * combat.aim end
-			local experienceMul = self.GetWeaponExperienceMul and self:GetWeaponExperienceMul(owner) or 1
-			accuracyMul = accuracyMul * experienceMul
-			accuracyMul = accuracyMul * traitAccuracyMul
-			local readiness = self.weaponReadiness or 1
-			local stability = self.weaponStability or 0
-			accuracyMul = accuracyMul * Lerp(readiness, 2.2, 1)
-			accuracyMul = accuracyMul * Lerp(stability, 1, 0.82)
-		end
-		bullet.Spread = baseSpread * accuracyMul
+		bullet.Spread = self:GetPelletSpread(owner, ammotype)
 	else
 		-- Recoil, sway and spray already move the physical weapon/camera. Do not
 		-- add a second invisible cone after resolving the live muzzle direction.

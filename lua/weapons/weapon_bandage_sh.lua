@@ -366,6 +366,10 @@ local function IsTourniquetStopped(ent, org, bone, arterial)
 	return hg.GetTourniquetBleedMultiplier(owner, bone, arterial) <= 0
 end
 
+local function BandageKeyTreatable(org, key)
+	return org and key and not org[key .. "amputated"] and (tonumber(org[key]) or 0) >= 0.05 or false
+end
+
 local function GetBandageableWounds(ent, org, bone)
 	local wounds = {}
 	for _, wound in ipairs(org.wounds or {}) do
@@ -377,8 +381,6 @@ local function GetBandageableWounds(ent, org, bone)
 end
 
 local bandageVitalKeys = {"skull", "chest"}
-local bandageVitalSet = {}
-for _, key in ipairs(bandageVitalKeys) do bandageVitalSet[key] = true end
 local bandageSpineKeys = {spine1 = true, spine2 = true, spine3 = true}
 local bandageBoneOrder = {
 	"skull", "chest", "jaw", "pelvis", "lleg", "rleg", "larm", "rarm"
@@ -390,6 +392,28 @@ local bandageBoneNames = {
 	rleg = "ValveBiped.Bip01_R_Calf", larm = "ValveBiped.Bip01_L_Forearm",
 	rarm = "ValveBiped.Bip01_R_Forearm"
 }
+local bandageKeyBones = {
+	larm = {"ValveBiped.Bip01_L_UpperArm", "ValveBiped.Bip01_L_Forearm", "ValveBiped.Bip01_L_Hand"},
+	rarm = {"ValveBiped.Bip01_R_UpperArm", "ValveBiped.Bip01_R_Forearm", "ValveBiped.Bip01_R_Hand"},
+	lleg = {"ValveBiped.Bip01_L_Thigh", "ValveBiped.Bip01_L_Calf", "ValveBiped.Bip01_L_Foot"},
+	rleg = {"ValveBiped.Bip01_R_Thigh", "ValveBiped.Bip01_R_Calf", "ValveBiped.Bip01_R_Foot"},
+}
+
+function hg.GetBandageKeyLayers(ent, key)
+	if not IsValid(ent) or not hg.GetBandageLayers then return 0 end
+	local layers = 0
+	for _, bone in ipairs(bandageKeyBones[key] or {bandageBoneNames[key]}) do
+		layers = math.max(layers, hg.GetBandageLayers(ent, bone))
+	end
+	return layers
+end
+
+function hg.GetBandageRegenMultiplier(ent, key)
+	local layers = hg.GetBandageKeyLayers(ent, key)
+	if layers < 1 then return 1 end
+
+	return 1.5 + 0.5 * (layers - 1)
+end
 
 local function GetBandageBoneKey(org, bone)
 	if not org then return end
@@ -413,12 +437,17 @@ local function GetBandageBoneKey(org, bone)
 	end
 
 	if key and bandageSpineKeys[key] then key = nil end
-	if key and (org[key] or 0) >= 0.05 and not org[key .. "amputated"] then return key end
+	if BandageKeyTreatable(org, key) then return key end
 	if bone then return end
 
+	local best, bestLayers
 	for _, fallback in ipairs(bandageBoneOrder) do
-		if (org[fallback] or 0) >= 0.05 and not org[fallback .. "amputated"] then return fallback end
+		if BandageKeyTreatable(org, fallback) then
+			local layers = hg.GetBandageKeyLayers(org.owner, fallback)
+			if not best or layers < bestLayers then best, bestLayers = fallback, layers end
+		end
 	end
+	return best
 end
 
 local function BoneHasBandageableInjury(ent, bone)
@@ -431,13 +460,7 @@ local function BoneHasBandageableInjury(ent, bone)
 	if #GetBandageableWounds(ent, org, bone) > 0 then return true end
 	if hg.organism.GetBandageDislocation and hg.organism.GetBandageDislocation(org, bone) then return true end
 	if GetBandageBoneKey(org, bone) then return true end
-
-	if string.find(bone, "Head", 1, true) then return (org.skull or 0) >= 0.05 end
-	if string.find(bone, "Spine", 1, true) or string.find(bone, "Pelvis", 1, true) then return (org.chest or 0) >= 0.05 end
-	if string.find(bone, "L_", 1, true) and string.find(bone, "Arm", 1, true) then return (org.larm or 0) >= 0.05 end
-	if string.find(bone, "R_", 1, true) and string.find(bone, "Arm", 1, true) then return (org.rarm or 0) >= 0.05 end
-	if string.find(bone, "L_", 1, true) and (string.find(bone, "Leg", 1, true) or string.find(bone, "Thigh", 1, true) or string.find(bone, "Calf", 1, true)) then return (org.lleg or 0) >= 0.05 end
-	if string.find(bone, "R_", 1, true) and (string.find(bone, "Leg", 1, true) or string.find(bone, "Thigh", 1, true) or string.find(bone, "Calf", 1, true)) then return (org.rleg or 0) >= 0.05 end
+	if string.find(bone, "Pelvis", 1, true) then return BandageKeyTreatable(org, "chest") end
 
 	return false
 end
@@ -451,6 +474,9 @@ function SWEP:GetBandageTargetBone(target, trace)
 	local _, artery = GetBandageableArteryWound(org, target)
 	if artery and artery[4] then return artery[4] end
 
+	local aimed = GetTraceBone(trace, target)
+	if aimed and BoneHasBandageableInjury(target, aimed) then return aimed end
+
 	local largestWound
 	for _, wound in ipairs(GetBandageableWounds(target, org)) do
 		if wound[4] and (wound[1] or 0) > (largestWound and largestWound[1] or 0) then
@@ -463,15 +489,9 @@ function SWEP:GetBandageTargetBone(target, trace)
 		if not org[key .. "amputated"] and (org[key] or 0) >= 1 then return key end
 	end
 
-	for _, key in ipairs(bandageBoneOrder) do
-		if not bandageVitalSet[key] and not org[key .. "amputated"] and (org[key] or 0) >= 1 then return key end
-	end
-
 	local dislocation = hg.organism.GetBandageDislocation and hg.organism.GetBandageDislocation(org)
 	if dislocation then return bandageBoneNames[dislocation] end
 
-	local bone = GetTraceBone(trace, target)
-	if bone and BoneHasBandageableInjury(target, bone) then return bone end
 	return GetBandageBoneKey(org)
 end
 
@@ -871,10 +891,10 @@ function SWEP:GetBandageTreatmentCost(target, bone)
 		if (org.skull or 0) >= 0.05 then return structuralCost end
 	end
 	if IsBandageBone(bone, HITGROUP_CHEST) and (org.chest or 0) >= 0.05 then return structuralCost end
-	if IsBandageBone(bone, HITGROUP_LEFTLEG) and (org.lleg or 0) >= 0.05 and not org.llegamputated then return structuralCost end
-	if IsBandageBone(bone, HITGROUP_RIGHTLEG) and (org.rleg or 0) >= 0.05 and not org.rlegamputated then return structuralCost end
-	if IsBandageBone(bone, HITGROUP_LEFTARM) and (org.larm or 0) >= 0.05 and not org.larmamputated then return structuralCost end
-	if IsBandageBone(bone, HITGROUP_RIGHTARM) and (org.rarm or 0) >= 0.05 and not org.rarmamputated then return structuralCost end
+	if IsBandageBone(bone, HITGROUP_LEFTLEG) and BandageKeyTreatable(org, "lleg") then return structuralCost end
+	if IsBandageBone(bone, HITGROUP_RIGHTLEG) and BandageKeyTreatable(org, "rleg") then return structuralCost end
+	if IsBandageBone(bone, HITGROUP_LEFTARM) and BandageKeyTreatable(org, "larm") then return structuralCost end
+	if IsBandageBone(bone, HITGROUP_RIGHTARM) and BandageKeyTreatable(org, "rarm") then return structuralCost end
 
 	return 0
 end
@@ -1082,7 +1102,7 @@ if SERVER then
 				done = true
 			end
 
-			if IsBandageBone(structuralBone, HITGROUP_LEFTLEG) and (org.lleg or 0) >= 0.05 and self.modeValues[1] >= amt and !org.llegamputated then
+			if IsBandageBone(structuralBone, HITGROUP_LEFTLEG) and BandageKeyTreatable(org, "lleg") and self.modeValues[1] >= amt then
 				hg.organism.ApplyBandageBoneTreatment(org, "lleg", 0.25)
 				self.modeValues[1] = self.modeValues[1] - amt
 				org.avgpain = math.max(org.avgpain - 7, 0)
@@ -1091,7 +1111,7 @@ if SERVER then
 				done = true
 			end
 
-			if IsBandageBone(structuralBone, HITGROUP_RIGHTLEG) and (org.rleg or 0) >= 0.05 and self.modeValues[1] >= amt and !org.rlegamputated then
+			if IsBandageBone(structuralBone, HITGROUP_RIGHTLEG) and BandageKeyTreatable(org, "rleg") and self.modeValues[1] >= amt then
 				hg.organism.ApplyBandageBoneTreatment(org, "rleg", 0.25)
 				self.modeValues[1] = self.modeValues[1] - amt
 				org.avgpain = math.max(org.avgpain - 7, 0)
@@ -1100,7 +1120,7 @@ if SERVER then
 				done = true
 			end
 
-			if IsBandageBone(structuralBone, HITGROUP_RIGHTARM) and (org.rarm or 0) >= 0.05 and self.modeValues[1] >= amt and !org.rarmamputated then
+			if IsBandageBone(structuralBone, HITGROUP_RIGHTARM) and BandageKeyTreatable(org, "rarm") and self.modeValues[1] >= amt then
 				hg.organism.ApplyBandageBoneTreatment(org, "rarm", 0.25)
 				self.modeValues[1] = self.modeValues[1] - amt
 				org.avgpain = math.max(org.avgpain - 7, 0)
@@ -1109,7 +1129,7 @@ if SERVER then
 				done = true
 			end
 
-			if IsBandageBone(structuralBone, HITGROUP_LEFTARM) and (org.larm or 0) >= 0.05 and self.modeValues[1] >= amt and !org.larmamputated then
+			if IsBandageBone(structuralBone, HITGROUP_LEFTARM) and BandageKeyTreatable(org, "larm") and self.modeValues[1] >= amt then
 				hg.organism.ApplyBandageBoneTreatment(org, "larm", 0.25)
 				self.modeValues[1] = self.modeValues[1] - amt
 				org.avgpain = math.max(org.avgpain - 7, 0)
@@ -2076,10 +2096,6 @@ function SWEP:CanBandageTPIK(target)
 	local treatmentCost = self:GetBandageStructuralTreatmentCost()
 	if available < treatmentCost then return false end
 	if GetBandageBoneKey(org) then return true end
-	if (org.lleg or 0) >= 0.05 and not org.llegamputated then return true end
-	if (org.rleg or 0) >= 0.05 and not org.rlegamputated then return true end
-	if (org.larm or 0) >= 0.05 and not org.larmamputated then return true end
-	if (org.rarm or 0) >= 0.05 and not org.rarmamputated then return true end
 	if hg.organism.GetBandageDislocation and hg.organism.GetBandageDislocation(org) then return true end
 
 	return false

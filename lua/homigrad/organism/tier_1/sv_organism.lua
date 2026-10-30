@@ -17,6 +17,16 @@ function hg.organism.CanTouchHealth(org)
 	return not hg.organism.OrganSystemsEnabled() or (org and org.superfighter)
 end
 
+function hg.organism.RecoveryMul(org)
+	local calmTime = CurTime() - (org.lastSignificantDamage or 0) - 20
+	return Lerp(math.Clamp(calmTime / 180, 0, 1), 1.25, 2.5)
+end
+
+hook.Add("HomigradDamage", "NaturalRecoveryCalm", function(ply, dmgInfo)
+	local org = IsValid(ply) and ply.organism
+	if org and dmgInfo:GetDamage() > 5 then org.lastSignificantDamage = CurTime() end
+end)
+
 local hg_panic = CreateConVar("hg_panic", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "im panic", 0, 1)
 local hg_painsound = ConVarExists("hg_painsound") and GetConVar("hg_painsound") or CreateConVar("hg_painsound", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "look at the ones you like (press sound icon for preview)", 0, 6)
 local hg_dyingsound = ConVarExists("hg_dyingsound") and GetConVar("hg_dyingsound") or CreateConVar("hg_dyingsound", "2", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "look at the ones you like (press sound icon for preview)", 0, 11)
@@ -1757,7 +1767,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	end
 	local just_went_uncon = not org.otrub and org.needotrub
 	if org.brain < 0.4 then
-		local naturalHeal = org.thiamine > 0 and timeValue / 140 or timeValue / 1800
+		local naturalHeal = (org.thiamine > 0 and timeValue / 140 or timeValue / 1800) * hg.organism.RecoveryMul(org)
 		org.thiamine = math.Approach(org.thiamine, 0, timeValue / 240)
 		if org.liver < 1 then org.liver = math.Approach(org.liver, 0, naturalHeal) end
 		if (org.kidneys or 0) < 1 then org.kidneys = math.Approach(org.kidneys or 0, 0, naturalHeal) end
@@ -1847,7 +1857,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		if hg.organism.OrganSystemsEnabled() then
 			healthCeiling = math.min(healthCeiling, org.vitalHealthCeiling or healthCeiling)
 		end
-		owner:SetHealth(math.min(healthCeiling, owner:Health() + math.max(1.5 - org.hurt, 0)))
+		owner:SetHealth(math.min(healthCeiling, owner:Health() + math.max(1.5 - org.hurt, 0) * hg.organism.RecoveryMul(org)))
 	end
 	org.health = owner:Health()
 	local rag = owner:IsPlayer() and owner.FakeRagdoll or owner

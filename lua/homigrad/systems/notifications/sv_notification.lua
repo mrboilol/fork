@@ -877,14 +877,9 @@ function hg.DespairThought(ply)
     SendThoughtClear(ply)
     SendDespairLine(ply, despairThoughts[math.random(#despairThoughts)], Color(255, 40, 40, 255), "despair")
 
-    timer.Simple(3.2, function()
+    timer.Simple(5.2, function()
         if not DespairActive(ply, id) then return end
-        SendThoughtClear(ply)
-
-        timer.Simple(0.5, function()
-            if not DespairActive(ply, id) then return end
-            SendDespairLine(ply, dyingThoughts[math.random(#dyingThoughts)], Color(215, 150, 150, 255), "dying")
-        end)
+        SendDespairLine(ply, dyingThoughts[math.random(#dyingThoughts)], Color(215, 150, 150, 255), "dying")
     end)
 
     return true

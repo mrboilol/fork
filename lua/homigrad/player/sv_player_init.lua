@@ -31,7 +31,7 @@ hook.Add("Player Think", "homigrad-dropholstered", function(ply)
 			cannotHolster = not (wep.CanHolsterBigMelee and wep:CanHolsterBigMelee())
 		end
 
-		if cannotHolster and activewep ~= wep and wep.picked then
+		if cannotHolster and activewep ~= wep and wep.picked and ply.hgPendingEquip ~= wep then
 			ply:DropWeapon(wep)
 		end
 	end

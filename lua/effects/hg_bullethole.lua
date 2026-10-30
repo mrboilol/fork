@@ -39,6 +39,7 @@ local function decalMaterial(name)
 end
 
 local SIN_45 = math.sqrt(0.5)
+local AXIS_ALIGN_MIN = math.cos(math.rad(25))
 local axisX, axisDown = Vector(1, 0, 0), Vector(0, 0, -1)
 
 local function decalBasis(normal)
@@ -63,7 +64,8 @@ function EFFECT:Init(data)
 
 	local flags = data:GetFlags()
 	local ent = data:GetEntity()
-	if bit.band(flags, holes.FLAG_ENTITY) ~= 0 then
+	local onEntity = bit.band(flags, holes.FLAG_ENTITY) ~= 0
+	if onEntity then
 		if not IsValid(ent) then return end
 	else
 		ent = game.GetWorld()
@@ -92,7 +94,7 @@ function EFFECT:Init(data)
 	local tangentLen = tangent:Length()
 
 	local elong = 1
-	if not exit and tangentLen > 0.001 then
+	if not exit and not onEntity and tangentLen > 0.001 then
 		tangent:Div(tangentLen)
 		elong = math.min(1 / math.Clamp(-dot, 0.05, 1), soft and 1.6 or 4)
 		if ricochet or scrape then elong = math.max(elong, 2.5) + 1 end
@@ -102,9 +104,12 @@ function EFFECT:Init(data)
 	if elong > 1.05 then
 		local s, t = decalBasis(normal)
 		local ts, tt = tangent:Dot(s), tangent:Dot(t)
-		w = holeScale * (1 + (elong - 1) * ts * ts)
-		h = holeScale * (1 + (elong - 1) * tt * tt)
-		pos = pos - tangent * size * holeScale * (elong - 1) * 0.3
+		local axis, along = s, ts
+		if math.abs(tt) > math.abs(ts) then axis, along = t, tt end
+
+		elong = 1 + (elong - 1) * math.Clamp((math.abs(along) - AXIS_ALIGN_MIN) / (1 - AXIS_ALIGN_MIN), 0, 1)
+		if axis == s then w = holeScale * elong else h = holeScale * elong end
+		pos = pos + axis * (along > 0 and 1 or -1) * size * holeScale * (elong - 1) * 0.3
 	end
 
 	util.DecalEx(mat, ent, pos, normal, color_white, w, h)

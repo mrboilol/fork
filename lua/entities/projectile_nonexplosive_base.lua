@@ -254,7 +254,10 @@ if SERVER then
 					arrow = hg.lodgedmodels[settings.model]
 				end
 
-				local mat = ent:GetBoneMatrix(ent:TranslatePhysBoneToBone(settings.PhysBoneID))
+				local bone = settings.BoneName and ent:LookupBone(settings.BoneName)
+				if not bone or bone < 0 then bone = ent:TranslatePhysBoneToBone(tonumber(settings.PhysBoneID) or 0) end
+				local mat = bone and bone >= 0 and ent:GetBoneMatrix(bone)
+				if not mat then continue end
 				local pos, ang = LocalToWorld(settings.OffsetPos, settings.OffsetAng, mat:GetTranslation(), mat:GetAngles())
 	
 				arrow:SetPos(pos)
