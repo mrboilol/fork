@@ -29,7 +29,8 @@ end)
 
 local hg_panic = CreateConVar("hg_panic", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "im panic", 0, 1)
 local hg_painsound = ConVarExists("hg_painsound") and GetConVar("hg_painsound") or CreateConVar("hg_painsound", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "look at the ones you like (press sound icon for preview)", 0, 6)
-local hg_dyingsound = ConVarExists("hg_dyingsound") and GetConVar("hg_dyingsound") or CreateConVar("hg_dyingsound", "2", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "look at the ones you like (press sound icon for preview)", 0, 11)
+local hg_dyingsound = ConVarExists("hg_dyingsound") and GetConVar("hg_dyingsound") or CreateConVar("hg_dyingsound", "12", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "look at the ones you like (press sound icon for preview)", 0, 12)
+if not ConVarExists("hg_oldsoundoptions") then CreateConVar("hg_oldsoundoptions", "0", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Unlock old dying/pain sound modes (hg_dyingsound, hg_painsound)", 0, 1) end
 local hg_otrubsound = ConVarExists("hg_otrubsound") and GetConVar("hg_otrubsound") or CreateConVar("hg_otrubsound", "0", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "look at the ones you like (press sound icon for preview)", 0, 7)
 local panicattack_threshold = 0.35
 local panicattack_add_decay_time = 45
@@ -190,8 +191,6 @@ hook.Add("Org Clear", "Main", function(org)
 	org.CantCheckPulse = nil
 	org.HEV = nil
 	org.bleedingmul = 1
-	org.neckslitSoundName = nil
-	org.neckslitSoundEnt = nil
 	org.neckslitStunUntil = nil
 	org.last_heartbeat = CurTime()
 	org.fibrillation = false
@@ -539,6 +538,7 @@ local function send_organism(org, ply, recipientForce, reliable)
 	sendtable.seizureActive = org.seizureActive
 	sendtable.seizureStart = org.seizureStart
 	sendtable.seizureEnd = org.seizureEnd
+	sendtable.convulsing = org.convulsing or false
 	sendtable.LodgedEntities = org.LodgedEntities
 	sendtable.CantCheckPulse = org.CantCheckPulse
 	sendtable.blindness = org.blindness
@@ -770,6 +770,7 @@ local function send_bareinfo(org, force, reliable)
 	sendtable.seizureActive = org.seizureActive
 	sendtable.seizureStart = org.seizureStart
 	sendtable.seizureEnd = org.seizureEnd
+	sendtable.convulsing = org.convulsing or false
 	sendtable.brainFrontal = org.brainFrontal
 	sendtable.brainParietal = org.brainParietal
 	sendtable.brainTemporal = org.brainTemporal
@@ -1418,17 +1419,6 @@ hook.Add("HomigradDamage", "PanicAttackDamage", function(ply, dmgInfo)
 	panic_witness_event(ply, attacker, math.Clamp(amount * 0.75, 0.04, 0.2), panicattack_witness_radius, combatEvent)
 	ply.nextPanicAttackTime = CurTime() + panicattack_damage_cooldown
 end)
-local function stopNeckSlitSound(owner, org)
-	if not org or not org.neckslitSoundName then return end
-	if IsValid(org.neckslitSoundEnt) then org.neckslitSoundEnt:StopSound(org.neckslitSoundName) end
-	if IsValid(owner) then owner:StopSound(org.neckslitSoundName) end
-	org.neckslitSoundName = nil
-	org.neckslitSoundEnt = nil
-end
-
-hook.Add("PlayerDeath", "HG_StopNeckSlitSound", function(ply)
-	stopNeckSlitSound(ply, ply.organism)
-end)
 
 hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	if not IsValid(owner) then
@@ -1785,14 +1775,11 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	end
 	if not org.otrub and isPly and org.owner:Alive() then
 	end
-	if org.neckslitSoundName and (not org.alive or org.otrub or org.needotrub or isPly and not owner:Alive()) then
-		stopNeckSlitSound(owner, org)
-	end
 
 	local incapacitationEnabled = not hg.organism.IncapacitationEnabled or hg.organism.IncapacitationEnabled()
 	local terminalIncapacitation = incapacitationEnabled and org.otrub and org.incapacitated
 	if isPly and owner:Alive() and terminalIncapacitation then
-		org.deathStateEnd = org.deathStateEnd or CurTime() + (org.deathStateRemaining or 20)
+		org.deathStateEnd = org.deathStateEnd or CurTime() + (org.deathStateRemaining or 25)
 		org.deathStateRemaining = nil
 		if (org.defibDeathGrace or 0) > CurTime() then org.deathStateEnd = org.defibDeathGrace end
 

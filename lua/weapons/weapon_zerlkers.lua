@@ -27,7 +27,7 @@ SWEP.offsetAng = Angle(-30, 20, 180)
 SWEP.modeNames = {[1] = "zerlkers"}
 SWEP.modeValuesdef = {[1] = 1}
 SWEP.DeploySnd = "snd_jack_hmcd_pillsbounce.ogg"
-SWEP.FallSnd = "Metal_Barrel.ImpactHard"
+SWEP.FallSnd = "snd_jack_hmcd_pillsbounce.ogg"
 SWEP.showstats = false
 
 local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Healing method: 0 = original models + progressive minigames, 1 = Judge animations", 0, 1)

@@ -410,6 +410,27 @@ local function getBleedingBody(owner)
 	return owner
 end
 
+local function gutOrganNausea(value)
+	value = tonumber(value) or 0
+	if value >= 1 then return 0.35 end
+	return value
+end
+
+function hg.organism.GutNauseaLevel(org)
+	return gutOrganNausea(org.stomach) + gutOrganNausea(org.intestines) * 0.75
+end
+
+function hg.organism.AddGutHitNausea(org, delta, previousDamage, dmg)
+	local bump
+	if (previousDamage or 0) >= 1 then
+		bump = math.min((dmg or 0) * 0.15, 0.08)
+	else
+		bump = math.min(delta * (0.6 + previousDamage * 1.2), 0.5)
+	end
+	if bump <= 0 then return end
+	org.wantToVomit = (org.wantToVomit or 0) + bump
+end
+
 module[2] = function(owner, org, mulTime)
 	local bloodCapacity = (hg.organism.normalBloodVolume or 5000) + (owner:IsPlayer() and owner.GetTraitBonus and owner:GetTraitBonus("blood_capacity", 0) or 0)
 	org.maxblood = math.max(bloodCapacity, 1)
@@ -794,10 +815,11 @@ module[2] = function(owner, org, mulTime)
 
 	if bleed > 0 then org.blood = max(org.blood - bleed * mulTime * 100 * org.pulse / 70, 1) end
 
-	if (org.internalBleed > 1 or org.pneumothorax > 0 or (org.hemothorax or 0) > 0.3) and org.blood > 0 and org.o2[1] > 0 then
+	org.gutNausea = hg.organism.GutNauseaLevel(org)
+	if (org.internalBleed > 1 or org.pneumothorax > 0 or (org.hemothorax or 0) > 0.3 or org.gutNausea > 0.15) and org.blood > 0 and org.o2[1] > 0 then
 		org.wantToVomit = org.wantToVomit or 0
 
-		org.wantToVomit = org.wantToVomit + math.Rand(0, org.internalBleed / 1000 + org.pneumothorax / 200 + (org.hemothorax or 0) / 150) * mulTime * 6.5
+		org.wantToVomit = org.wantToVomit + math.Rand(0, org.internalBleed * (1 + org.gutNausea) / 1000 + org.pneumothorax / 200 + (org.hemothorax or 0) / 150 + org.gutNausea / 150) * mulTime * 6.5
 		
 		if org.wantToVomit > 0.90 then
 			//owner:Notify(about_to_puke[math.random(#about_to_puke)], 15, "internalbleed_pre")
@@ -814,6 +836,8 @@ module[2] = function(owner, org, mulTime)
 			else
 				hg.organism.VomitNormal(owner)
 			end
+		elseif org.gutNausea > 0.15 and org.internalBleed <= 1 and org.pneumothorax <= 0 and (org.hemothorax or 0) <= 0.3 then
+			hg.organism.VomitNormal(owner)
 		else
 			hg.organism.Vomit(owner)
 		end

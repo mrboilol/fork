@@ -48,6 +48,7 @@ local physicsProfiles = {
 	weapon_hg_spear = {"wood", "physics/wood/wood_solid_impact_hard1.wav", "physics/wood/wood_solid_impact_hard2.wav", "physics/wood/wood_solid_impact_hard3.wav"},
 	weapon_hg_spear_knife = {"wood", "physics/wood/wood_solid_impact_hard1.wav", "physics/wood/wood_solid_impact_hard2.wav", "physics/wood/wood_solid_impact_hard3.wav"},
 	weapon_hg_spear_pro = {"metal", "physics/metal/metal_solid_impact_hard1.wav", "physics/metal/metal_solid_impact_hard4.wav"},
+	weapon_zerlkers_empty = {"popcan", "physics/metal/soda_can_impact_hard1.wav", "physics/metal/soda_can_impact_hard2.wav", "physics/metal/soda_can_impact_hard3.wav"},
 	weapon_tpik_microphone = {"plastic", "physics/plastic/plastic_box_impact_hard1.wav", "physics/plastic/plastic_box_impact_hard2.wav", "physics/plastic/plastic_box_impact_hard3.wav"},
 }
 

@@ -13,6 +13,8 @@ local MEDICAL_WEAPON_CLASSES = {
     "weapon_morphine",
     "weapon_fentanyl",
     "weapon_medkit_sh",
+    "weapon_medical_splint",
+    "weapon_surgicalkit_sh",
     "weapon_medkit_basic_sh",
     "weapon_medkit_standard_sh",
     "weapon_medkit_emergency_sh",
@@ -101,6 +103,7 @@ end
 local function GetMinigameType(wep)
     if not IsValid(wep) then return nil end
     if wep.HGMedicalMinigameType then return wep.HGMedicalMinigameType end
+    if wep.IsSplintMode and wep:IsSplintMode() then return "bandage" end
 
     -- Use homigrad's function if available to avoid duplication
     if hg and hg.MedicalMinigame and hg.MedicalMinigame.GetMedicalMinigameType then
@@ -136,7 +139,7 @@ local function GetMinigameType(wep)
     end
 
     if class == "weapon_medkit_sh" then
-        if wep.mode == 1 then return "bandage" end
+        if wep.mode == 1 then return wep.traumaSuture and "suture" or "bandage" end
         if wep.mode == 2 or wep.mode == 3 or wep.mode == 5 then return "syringe" end
         if wep.mode == 4 then return "tourniquet" end
     end
@@ -192,7 +195,7 @@ local function CanUseMedicalArms(owner)
 
     if (owner.HGMedicalNoArmsNotice or 0) <= CurTime() then
         owner.HGMedicalNoArmsNotice = CurTime() + 1
-        owner:ChatPrint("You need at least one usable arm to perform treatment.")
+        owner:ChatPrint("You need at least one hand to perform treatment.")
     end
     return false
 end
@@ -242,6 +245,8 @@ local function StartMinigame(wep, owner, minigameType, target)
         started = hg.MedicalMinigame.StartBandageMinigame(owner, wep.healbuddy) == true
     elseif minigameType == "tourniquet" and hg and hg.MedicalMinigame and hg.MedicalMinigame.StartTourniquetMinigame then
         started = hg.MedicalMinigame.StartTourniquetMinigame(owner, wep.healbuddy) == true
+    elseif minigameType == "suture" then
+        started = hg.Suture and hg.Suture.Start(owner, wep, wep.healbuddy, 1) == true
     else
         net.Start("hg_medical_minigame_start")
             net.WriteString(minigameType)

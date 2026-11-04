@@ -2624,8 +2624,8 @@ function SWEP:GetAdditionalValues()
 	
 	if not suiciding and !self.norecoil then
 		local trained = self:HasFirearmTraining(ply)
-		local weaponRecoilMul = (self.WeaponRecoilMul or 1) * experienceMul
-		local caliberMul, weightMul, _, _, _, ballisticDisturbance = self:GetRecoilImpulseFactors()
+		local weaponRecoilMul = self.WeaponRecoilMul or 1
+		local caliberMul, weightMul = self:GetRecoilImpulseFactors()
 		local ballisticRecoil = math.Clamp(caliberMul * weightMul, 0.2, 4)
 		local cantedHold = not self:IsZoom() and (ply.posture == 7 or ply.posture == 9)
 		local cantedDirection = ply.posture == 7 and -1 or 1
@@ -2637,7 +2637,7 @@ function SWEP:GetAdditionalValues()
 		animpos = animpos * 0.15 * mulhuy * (self:IsPistolHoldType() and 1 or 1) * weaponRecoilMul
 		animpos = animpos * ballisticRecoil * 1.7 * (self.animposmul or 1) // * 4
 
-		self.AdditionalPos2 = self.AdditionalPos2 - (self.AdditionalAng + self.AdditionalAng2):Forward() * animpos * 14 * (trained and 0.7 or 1)
+		self.AdditionalPos2 = self.AdditionalPos2 - (self.AdditionalAng + self.AdditionalAng2):Forward() * animpos * 12
 		local shit2 = ballisticRecoil * ((self:IsPistolHoldType() or self.PistolKinda) and 0.45 or 0.16) * weaponRecoilMul
 		local recoilSide = math.sin(animpos3) * shit2
 		if cantedHold then
@@ -2645,7 +2645,7 @@ function SWEP:GetAdditionalValues()
 		else
 			self.AdditionalPos2[2] = self.AdditionalPos2[2] + recoilSide
 		end
-		self.AdditionalPos2[1] = self.AdditionalPos2[1] + math.sin(animpos3) * (trained and -1.1 or -1.6) * shit2
+		self.AdditionalPos2[1] = self.AdditionalPos2[1] + math.sin(animpos3) * -1.35 * shit2
 		local recoilAxis = cantedHold and 1 or 2
 		self.AdditionalAng2[recoilAxis] = self.AdditionalAng2[recoilAxis] - recoilSide * 2 * (cantedHold and cantedDirection or 1)
 
@@ -2658,59 +2658,13 @@ function SWEP:GetAdditionalValues()
 			self.AdditionalPos2[cantedHold and 3 or 2] = self.AdditionalPos2[cantedHold and 3 or 2] + animpos2 * (cantedHold and 2.5 * cantedDirection or -1) * (self.podkid or 1)
 		end
 
-		local sinceShot = CurTime() - (self:LastShootTime() or 0)
-		local firing = sinceShot >= 0 and sinceShot < 0.24
-		local weaponMass = math.max(self:GetHandlingWeight(), 0.5)
 		local support = self:GetHandSupportState(ply)
 		local supportMul = self:GetRecoilSupportMul()
 		local handlingMul = self:GetArmHealthHandlingMul()
-		local combat = hg.GetCombatCondition and hg.GetCombatCondition(ply) or nil
-		local combatInstability = combat and (1 - combat.stability) or 0
-		local armInjury = math.Clamp(handlingMul - 1, 0, 3.5)
 		local stanceMul = self:GetPostureStabilityMul(self:IsZoom())
 		local longGun = not self:IsPistolHoldType() and not self.PistolKinda
 		local restMul = self:IsResting() and 0.35 or 1
-		local burstMul = 0.85 + math.Clamp((self.SprayI or 0) / 7, 0, 1) * 0.65
-		local physicalImpulse = math.Clamp(caliberMul * weightMul * supportMul * handlingMul * experienceMul * 1.2, 0.3, 5.5)
-		local recoveryImpulse = math.Clamp(ballisticDisturbance * supportMul * math.sqrt(handlingMul) * experienceMul, 0.2, 6)
-		local recoveryRate = math.Clamp(0.34 / (1 + armInjury * 0.35 + weaponMass * 0.04 + ballisticDisturbance * 0.1 + (support.oneHanded and not self.IgnoreOneArmPenalties and not trained and 0.2 or 0)), 0.1, 0.28)
-		local wobbleTarget = firing and math.min((physicalImpulse * 0.7 + recoveryImpulse * 0.3) * burstMul * stanceMul * restMul, 2.8) or 0
-		self.recoilWobbleAmp = Lerp(hg.lerpFrameTime2(firing and 0.32 or (trained and 0.5 or recoveryRate), dtime), self.recoilWobbleAmp or 0, wobbleTarget)
-
-		if (self.recoilWobbleAmp or 0) > 0.0001 then
-			local t = CurTime()
-			local frequencyMul = Lerp(armInjury / 3.5, 1, 0.62)
-			local amp = self.recoilWobbleAmp * (1.3 + armInjury * 0.22) * (trained and 0.45 or 1)
-			local sideAmp = math.Clamp(self.addSprayMul or 1, 0.08, 2.5)
-			local wobX = math.sin(t * 7.8 * frequencyMul) * 0.65 + math.sin(t * 12.4 * frequencyMul) * 0.35
-			local wobY = math.cos(t * 8.9 * frequencyMul) * 0.65 + math.cos(t * 14.2 * frequencyMul) * 0.35
-			local wobZ = math.sin(t * 10.1 * frequencyMul) * 0.65 + math.cos(t * 15.6 * frequencyMul) * 0.35
-
-			if cantedHold then
-				self.AdditionalAng2[1] = self.AdditionalAng2[1] - wobX * amp * 1.65 * sideAmp * cantedDirection
-				self.AdditionalAng2[2] = self.AdditionalAng2[2] + wobY * amp * 0.45
-				self.AdditionalPos2[2] = self.AdditionalPos2[2] + wobZ * amp * 0.16
-				self.AdditionalPos2[3] = self.AdditionalPos2[3] + wobX * amp * 0.58 * sideAmp * cantedDirection
-			else
-				self.AdditionalAng2[1] = self.AdditionalAng2[1] + wobY * amp * (longGun and 2.3 or 1.7)
-				self.AdditionalAng2[2] = self.AdditionalAng2[2] + wobX * amp * (longGun and 0.22 or 0.3) * sideAmp
-				self.AdditionalPos2[2] = self.AdditionalPos2[2] + wobX * amp * 0.16 * sideAmp
-				self.AdditionalPos2[3] = self.AdditionalPos2[3] + wobZ * amp * 0.58
-			end
-			self.AdditionalAng2[3] = self.AdditionalAng2[3] + wobZ * amp * (longGun and 0.55 or 1.1) * sideAmp
-			self.AdditionalPos2[1] = self.AdditionalPos2[1] + wobY * amp * 0.6
-		end
-
-		if combatInstability > 0.001 then
-			local t = CurTime()
-			local aimWobble = combatInstability * experienceMul * (self:IsResting() and 0.28 or 1)
-			local swayPitch = math.sin(t * 2.1) * 0.62 + math.sin(t * 4.7) * 0.38
-			local swayYaw = math.cos(t * 1.7) * 0.67 + math.sin(t * 3.9) * 0.33
-			self.AdditionalAng2[1] = self.AdditionalAng2[1] + swayPitch * aimWobble * (longGun and 2.4 or 1.7)
-			self.AdditionalAng2[2] = self.AdditionalAng2[2] + swayYaw * aimWobble * (longGun and 1.35 or 1.7)
-			self.AdditionalPos2[2] = self.AdditionalPos2[2] + swayYaw * aimWobble * 0.16
-			self.AdditionalPos2[3] = self.AdditionalPos2[3] + swayPitch * aimWobble * 0.2
-		end
+		local physicalImpulse = math.Clamp(caliberMul * weightMul * supportMul * handlingMul * 1.2, 0.3, 5.5)
 
 		local recoilRecoveryTime = Lerp(self:GetFirearmProficiency(ply), 0.36, 0.2) * (self.shotRecoveryScale or 1)
 		if support.postureOneHanded and not support.leftBusy and not support.rightBusy then
@@ -2737,7 +2691,7 @@ function SWEP:GetAdditionalValues()
 				self.AdditionalAng2[3] = self.AdditionalAng2[3] + rollRand * kick * 0.18
 				self.AdditionalPos2[3] = self.AdditionalPos2[3] + kick * (self:IsPistolHoldType() and 1.6 or 2.4)
 			end
-			self.AdditionalPos2[1] = self.AdditionalPos2[1] - kick * (trained and 0.75 or 1.1)
+			self.AdditionalPos2[1] = self.AdditionalPos2[1] - kick * 0.9
 		end
 	end
 

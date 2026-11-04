@@ -23,6 +23,20 @@ impact.Config = {
     dropCooldown = 0.35,
     maxImpulseSpeed = 520,
     weaponThrowChance = 0.5,
+    meleeDropChance = 0.08,
+    meleeThrowChance = 0.25,
+    meleeStaggerMin = 0.2,
+    meleeStaggerPower = 0.7,
+    gunDropChance = 0.35,
+    gunDropPowerChance = 0.5,
+    gunThrowChance = 0.85,
+    otherDropChance = 0.4,
+    smallDropBonus = 0.3,
+    smallRadius = 6,
+    largeRadius = 24,
+    handHitRadius = 6,
+    handHitChance = 0.05,
+    handBreakChance = 0.25,
     inheritedSpeed = 160,
     weaponHitPadding = 1,
     weaponWearerSlack = 6,
@@ -782,6 +796,23 @@ function hg.DropWeaponFromImpact(ply, wep, direction, strength)
     return true
 end
 
+local function IsWeaponHandHit(wep, body, side, pos)
+    if not isvector(pos) or pos:IsZero() then return false end
+    local radius = impact.Config.handHitRadius
+    local rightPos, leftPos = hg.GetWeaponHandPoints(wep)
+    local handPos = side == "rarm" and rightPos or leftPos
+    if isvector(handPos) and handPos:Distance(pos) <= radius then return true end
+    local bone = IsValid(body) and body:LookupBone(side == "rarm" and "ValveBiped.Bip01_R_Hand" or "ValveBiped.Bip01_L_Hand")
+    local bonePos = bone and body:GetBonePosition(bone)
+    return isvector(bonePos) and bonePos:Distance(pos) <= radius
+end
+
+local function HeldWeaponKind(wep)
+    if wep.ismelee or wep.ismelee2 or wep.Base == "weapon_melee" then return "melee" end
+    if wep.ishgweapon then return "gun" end
+    return "other"
+end
+
 function hg.TryArmTraumaDrop(ent, dmgInfo, hitgroup, body, rawDamage)
     if hitgroup ~= HITGROUP_RIGHTARM and hitgroup ~= HITGROUP_LEFTARM then return end
     local ply = IsValid(ent) and ent:IsPlayer() and ent or hg.RagdollOwner(IsValid(body) and body or ent)
@@ -793,11 +824,16 @@ function hg.TryArmTraumaDrop(ent, dmgInfo, hitgroup, body, rawDamage)
     if damage < cfg.traumaMinDamage or not dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_CLUB + DMG_SLASH + DMG_CRUSH + DMG_FALL + DMG_BLAST + DMG_VEHICLE) then return end
     local grip = hg.GetWeaponImpactGrip(ply, wep)
     local right = hitgroup == HITGROUP_RIGHTARM
-    if not right and not grip.leftRelevant then return end
-    local _, injury = ArmState(ply.organism or {}, right and "rarm" or "larm")
+    local side = right and "rarm" or "larm"
+    local main = grip.firingArm == side
+    if not main and not (right and grip.rightRelevant or not right and grip.leftRelevant) then return end
+    local _, injury = ArmState(ply.organism or {}, side)
     local severity = math.Clamp(damage / cfg.traumaFullDamage, 0, 1)
-    local chance = (right and cfg.rightChance or cfg.leftChance) + severity ^ 2 * cfg.traumaSeverityChance
-    chance = chance + injury * cfg.traumaInjuryChance * math.Clamp(damage / cfg.soleArmSignificantDamage, 0, 1) * (right and 1 or cfg.leftInjuryMultiplier)
+    local chance = (main and cfg.rightChance or cfg.leftChance) + severity ^ 2 * cfg.traumaSeverityChance
+    chance = chance + injury * cfg.traumaInjuryChance * math.Clamp(damage / cfg.soleArmSignificantDamage, 0, 1) * (main and 1 or cfg.leftInjuryMultiplier)
+    if main and IsWeaponHandHit(wep, body, side, dmgInfo:GetDamagePosition()) then
+        chance = chance + cfg.handHitChance + (injury >= 1 and cfg.handBreakChance or 0)
+    end
     if grip.firingArm == "larm" and not right and damage >= cfg.soleArmSignificantDamage then chance = math.max(chance, cfg.soleArmChance) end
     if grip.noHands then chance = cfg.maxDropChance end
     if math.Rand(0, 1) < math.min(chance, cfg.maxDropChance) then hg.DropWeaponFromImpact(ply, wep, dmgInfo:GetDamageForce(), severity * 0.35) end
@@ -824,7 +860,18 @@ local function WeaponImpact(ply, wep, hit, damage, force, direction)
 
     ApplyEquipmentRecovery(wep, ply, direction, power)
     if wep.AbortBlockedAttack and not (hit.shot and hit.shot.Contact) then wep:AbortBlockedAttack() end
-    if ply.ViewPunch then ply:ViewPunch(Angle(-power * 3, direction:Dot(ply:EyeAngles():Right()) * power * 4, power)) end
+    local kind = HeldWeaponKind(wep)
+    local side = direction:Dot(ply:EyeAngles():Right())
+    if ply.ViewPunch then
+        if kind == "melee" then
+            if math.abs(side) < 0.3 then side = side < 0 and -0.3 or 0.3 end
+            ply:ViewPunch(Angle(-power * 1.5, -side * power * 12, -side * power * 6))
+        elseif kind == "gun" then
+            ply:ViewPunch(Angle(-power * 8, -side * power * 10, -side * power * 4))
+        else
+            ply:ViewPunch(Angle(-power * 3, -side * power * 6, power))
+        end
+    end
 
     if isfunction(wep.OnHeldWeaponImpact) then
         wep:OnHeldWeaponImpact(hit, damage, force, direction, hit.shot)
@@ -837,7 +884,23 @@ local function WeaponImpact(ply, wep, hit, damage, force, direction)
         return
     end
 
-    hg.DropWeaponFromImpact(ply, wep, direction, math.Rand(0, 1) < cfg.weaponThrowChance and 1 or 0)
+    if kind == "melee" and hg.StartStagger and power >= cfg.meleeStaggerMin then
+        hg.StartStagger(ply, direction, power * cfg.meleeStaggerPower)
+    end
+
+    local chance, throw
+    if kind == "melee" then
+        chance, throw = power * power * cfg.meleeDropChance, cfg.meleeThrowChance
+    elseif kind == "gun" then
+        chance, throw = cfg.gunDropChance + power * cfg.gunDropPowerChance, cfg.gunThrowChance
+    else
+        local radius = wep.GetModelRadius and wep:GetModelRadius() or cfg.largeRadius
+        local small = 1 - math.Clamp((radius - cfg.smallRadius) / (cfg.largeRadius - cfg.smallRadius), 0, 1)
+        chance, throw = (cfg.otherDropChance + small * cfg.smallDropBonus) * Lerp(power, 0.7, 1.15), cfg.weaponThrowChance + small * 0.3
+    end
+    if grip.noHands then chance = cfg.maxDropChance end
+    if math.Rand(0, 1) >= math.min(chance, cfg.maxDropChance) then return end
+    hg.DropWeaponFromImpact(ply, wep, direction, math.Rand(0, 1) < throw and 1 or 0.3)
 end
 
 local function GetWeaponImpactAbsorption(wep, hit, direction, dmgInfo)

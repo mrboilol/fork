@@ -37,10 +37,6 @@ local NECK = "ValveBiped.Bip01_Neck1"
 -- usually goes and not the way it always goes.
 local SURPRISE = 2
 
--- Sounds like the cut it is rather than like a stab. Z-City voices its own
--- suicide with the blade's flesh hit, so a blade that brought one is asked first.
-local CUT_SOUND = "player/flesh/flesh_bullet_impact_03.wav"
-
 -- How much of an artery this counts as opening. Z-City's own cut throat passes 5
 -- (weapon_melee.lua:1064) and anything at or above 2 is past hitArtery's own
 -- one-in-five gate for a light slash, which has already had its say by the time
@@ -162,8 +158,6 @@ local function Cut(ent, org, dmgInfo, pos)
 			hg.organism.AddWoundManual(ent, 50, VectorRand(-2, 2), angle_zero, NECK, CurTime() + math.Rand(0, 2))
 		end
 	end
-
-	ent:EmitSound(CUT_SOUND, 60, math.random(95, 105))
 
 	-- A cut throat is a thing to panic about. Both are Z-City's own numbers for
 	-- somebody who has just had theirs cut (weapon_melee.lua:1070).

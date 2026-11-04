@@ -1139,10 +1139,11 @@ module[2] = function(owner, org, timeValue)
 	end
 
 	local bloodVolumeO2Reserve = math.Clamp(getBloodVolumeO2Limit(org.blood) / o2.range, 0, 1)
-	local rawTissuePerfusion = math.min(
+	local circulationFloor = hg.organism.GetSupportedCirculationFloor(org)
+	local rawTissuePerfusion = max(math.min(
 		hg.organism.GetCirculatoryOxygenReserve(org.pulse, tonumber(org.bloodPressure) or 90, org.blood),
 		bloodVolumeO2Reserve
-	)
+	), circulationFloor, hg.organism.GetHypertensionPerfusionFloor and hg.organism.GetHypertensionPerfusionFloor(org) or 0)
 	local tissuePerfusionTarget = rawTissuePerfusion
 	local currentTissuePerfusion = math.Clamp(tonumber(org.circulatoryO2Reserve) or 1, 0, 1)
 	local transitionTime = tissuePerfusionTarget < currentTissuePerfusion
@@ -1152,7 +1153,7 @@ module[2] = function(owner, org, timeValue)
 		+ (tissuePerfusionTarget - currentTissuePerfusion) * (1 - math.exp(-timeValue / transitionTime))
 	org.circulatoryO2Reserve = math.Clamp(tissuePerfusion, 0, 1)
 	if hg.organism.EnforceBloodCirculationLimit(org) then
-		tissuePerfusion = bloodVolumeO2Reserve
+		tissuePerfusion = max(bloodVolumeO2Reserve, circulationFloor)
 	end
 	local perfusionO2Cap = o2.range * tissuePerfusion
 	org.perfusionO2Cap = perfusionO2Cap
@@ -1173,11 +1174,11 @@ module[2] = function(owner, org, timeValue)
 		-- Arrest stops new delivery, but it does not erase already oxygenated tissue.
 		-- Drain the captured reserve over the arrest window without snapping it to
 		-- an arbitrary low cap first.
-		o2[1] = min(o2[1], org.cardiacArrestO2Start)
+		o2[1] = min(o2[1], max(org.cardiacArrestO2Start, o2.range * circulationFloor))
 		local arrestDrainRate = max(org.cardiacArrestO2Start, 0.1) / cardiacArrestO2DrainTime
-		o2[1] = math.Approach(o2[1], 0, timeValue * arrestDrainRate)
+		o2[1] = math.Approach(o2[1], 0, timeValue * arrestDrainRate * (1 - circulationFloor))
 	end
-	if (tonumber(org.pulse) or 0) <= 0 and (tonumber(org.bloodPressure) or 0) <= 0 then
+	if circulationFloor <= 0 and (tonumber(org.pulse) or 0) <= 0 and (tonumber(org.bloodPressure) or 0) <= 0 then
 		o2[1] = math.Approach(o2[1], 0, timeValue * o2.range / cardiacArrestO2DrainTime)
 	end
 

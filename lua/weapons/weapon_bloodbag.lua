@@ -10,6 +10,7 @@ SWEP.Primary.Next = 0
 SWEP.HoldType = "slam"
 SWEP.ViewModel = ""
 SWEP.WorldModel = "models/zcity/other/bloodbag.mdl"
+SWEP.BagVolume = 500
 if CLIENT then
 	SWEP.WepSelectIcon = Material("zcity/hud/wepicons/bloodbag.png")
 	SWEP.IconOverride = "zcity/hud/wepicons/bloodbag.png"
@@ -239,7 +240,7 @@ if SERVER then
 					local ent = hg.GetCurrentCharacter(ent)
 					if ent:GetVelocity():LengthSqr() < 25 and ent.organism.blood > 2000 and (not self.bloodtype or ent.organism.bloodtype == self.bloodtype) then
 						local old = -(-self.modeValues[1])
-						self.modeValues[1] = math.min(self.modeValues[1] + FrameTime() * (math.max(ent.organism.pulse / 70,0.3)) * 0.5,1)
+						self.modeValues[1] = math.min(self.modeValues[1] + FrameTime() * (math.max(ent.organism.pulse / 70,0.3)) * 0.5 * 500 / self.BagVolume,1)
 						self.bloodtype = ent.organism.bloodtype
 
 						if ent.organism.furryinfected then
@@ -252,7 +253,7 @@ if SERVER then
 							self.poisoned2 = nil
 						end
 						
-						ent.organism.blood = math.max(ent.organism.blood - (self.modeValues[1] - old) * 500,0)
+						ent.organism.blood = math.max(ent.organism.blood - (self.modeValues[1] - old) * self.BagVolume,0)
 						if old ~= self.modeValues[1] and (self.nextPerfusionRefresh or 0) < CurTime() then
 							self.nextPerfusionRefresh = CurTime() + 0.25
 							self:RefreshPerfusionTreatment(ent, 0.18)
@@ -272,6 +273,8 @@ if SERVER then
 					local ent = hg.GetCurrentCharacter(ent)
 					if ent:GetVelocity():LengthSqr() < 1000 then
 						local old = -(-ent.organism.blood)
+						local volume = self.BagVolume
+						local rateScale = 500 / volume
 						local good_type = hg.organism.bloodtypes[self.bloodtype or "o-"][ent.organism.bloodtype or "o-"]
 
 						if self.poisoned2 then
@@ -282,17 +285,17 @@ if SERVER then
 
 						--print(good_type)
 						if good_type then
-							ent.organism.blood = math.min(ent.organism.blood + math.min(FrameTime() * 0.5 * (math.max(ent.organism.pulse / 70,0.3)),self.modeValues[1]) * 500, maxTransfusionBlood)
+							ent.organism.blood = math.min(ent.organism.blood + math.min(FrameTime() * 0.5 * rateScale * (math.max(ent.organism.pulse / 70,0.3)),self.modeValues[1]) * volume, maxTransfusionBlood)
 						else
-							ent.organism.blood = math.min(ent.organism.blood + math.min(FrameTime() * 0.5 * (math.max(ent.organism.pulse / 70,0.3)),self.modeValues[1]) * 200, maxTransfusionBlood)
-							ent.organism.hemotransfusionshock = ent.organism.hemotransfusionshock + math.min(FrameTime() * 0.5,self.modeValues[1])
+							ent.organism.blood = math.min(ent.organism.blood + math.min(FrameTime() * 0.5 * rateScale * (math.max(ent.organism.pulse / 70,0.3)),self.modeValues[1]) * volume * 0.4, maxTransfusionBlood)
+							ent.organism.hemotransfusionshock = ent.organism.hemotransfusionshock + math.min(FrameTime() * 0.5,self.modeValues[1] / rateScale)
 						end
 
 						if (self.bloodtype == "c-" or self.furryinfected) and ent.PlayerClassName != "furry" and (ent.organism.blood - old) > 0 then
 							ent.organism.furryinfected = true
 						end
 
-						self.modeValues[1] = math.max(self.modeValues[1] - (ent.organism.blood - old) / (good_type and 500 or 200),0)
+						self.modeValues[1] = math.max(self.modeValues[1] - (ent.organism.blood - old) / (good_type and volume or volume * 0.4),0)
 						if old ~= ent.organism.blood and (self.nextPerfusionRefresh or 0) < CurTime() then
 							self.nextPerfusionRefresh = CurTime() + 0.25
 							self:RefreshPerfusionTreatment(ent, good_type and 0.3 or 0.12)

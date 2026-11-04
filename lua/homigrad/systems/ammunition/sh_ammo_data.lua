@@ -2444,9 +2444,9 @@ hg.ammotypes = {
 			TracerSpeed = 10000
 		},
 		BulletSettings = {
-			Damage = 16,
+			Damage = 20,
 			Force = 20,
-			Penetration = 2.4,
+			Penetration = 3.4,
 			Shell = ".22lr",
 			Speed = 330,
 			Diameter = 5.72,
@@ -3497,7 +3497,6 @@ for key, settings in pairs(needleAmmo) do
 	ammo.BulletSettings.EnergyRetention = 0.98
 	ammo.BulletSettings.DestructiveMultiplier = 0.12
 	ammo.BulletSettings.BrainEnergyRetention = 0.9
-	ammo.BulletSettings.BrainDamageMultiplier = 2
 	ammo.BulletSettings.BulletFragmentation = false
 	ammo.BulletSettings.ExpansionMultiplier = 0.85
 	ammo.BulletSettings.ExpansionRadius = settings.Diameter / 10

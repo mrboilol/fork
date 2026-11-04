@@ -1674,7 +1674,7 @@ function SWEP:ApplyForce()
 							-- lungs or critically low blood volume still require treatment first.
 							if hg.organism.RestoreSupportedOxygen then
 								hg.organism.RestoreSupportedOxygen(org, 0.03 * skillMult, {
-									artificialSupport = true,
+									artificialSupport = true, cpr = true,
 									oxygen = math.min(24, org.o2.range or 30), bodyoxygen = 0.6,
 									brainoxygen = 0.56, perfusion = 0.5, peripheralperfusion = 0.45,
 									cerebralPerfusion = 0.5, myocardialOxygen = 0.52,

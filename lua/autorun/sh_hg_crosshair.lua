@@ -229,21 +229,15 @@ local function updateGun(wep, owner)
 	local scr = tr.HitPos:ToScreen()
 	if not scr.visible then return false end
 
-	local angle = gunConeAngle(wep, owner, tr)
-	local dist = tr.StartPos:Distance(tr.HitPos)
-	local edge = (tr.HitPos + tr.Normal:Angle():Right() * dist * math.tan(math.min(angle, 1.2))):ToScreen()
-	local target = math.Clamp(math.Distance(scr.x, scr.y, edge.x, edge.y), 3, 250)
-
 	if state.kind ~= "gun" then
 		state.kind = "gun"
 		state.x, state.y = scr.x, scr.y
-		state.radius = target
 	end
 
 	local s = smooth(18)
 	state.x = Lerp(s, state.x, scr.x)
 	state.y = Lerp(s, state.y, scr.y)
-	state.radius = Lerp(smooth(target > state.radius and 10 or 3), state.radius, target)
+	state.radius = 3
 	state.color = white
 	return true
 end
@@ -325,41 +319,79 @@ local meleeThrowSpeed = {
 	weapon_wrench = 700,
 }
 
-local function getThrowSpeed(wep, owner)
-	local class = wep:GetClass()
-	if wep.GetMeleeSweepData then
-		if not wep.CustomAttack2 or not wep:GetBlocking() then return end
-		return meleeThrowSpeed[class] or 1500, false
+local meleeThrowOwnerVelocity = {
+	weapon_wrench = 0.5,
+}
+
+local frontalThrow = {
+	weapon_hg_spear = true,
+	weapon_hg_spear_knife = true,
+	weapon_hg_spear_pro = true,
+}
+
+local dragAreaCache = {}
+
+local function getDragArea(model, frontal)
+	if not isstring(model) or model == "" then return 0 end
+	local key = frontal and model .. "|frontal" or model
+	if dragAreaCache[key] then return dragAreaCache[key] end
+
+	local area = 0
+	local cent = ClientsideModel(model, RENDERGROUP_OTHER)
+	if IsValid(cent) then
+		local size = (cent:OBBMaxs() - cent:OBBMins()) * 0.0254
+		cent:Remove()
+		area = frontal and size.y * size.z or (size.y * size.z + size.x * size.z + size.x * size.y) * 0.5
 	end
+	dragAreaCache[key] = area
+	return area
+end
+
+local function getThrow(wep, owner, ent)
+	local class = wep:GetClass()
+	local aim = owner:GetAimVector()
+	local arm = hg.GetThrowArmMultiplier and hg.GetThrowArmMultiplier(owner) or 1
+
+	if wep.ThrowShuriken or (wep.GetMeleeSweepData and (wep.CustomAttack2 or wep.ThrowHammer)) then
+		if wep.GetMeleeSweepData and not wep:GetBlocking() then return end
+		local pos = hg.eye(owner, 60, ent)
+		pos = (isvector(pos) and pos or owner:EyePos()) - aim * 2
+		local vel = aim * (meleeThrowSpeed[class] or 1500) + owner:GetVelocity() * (meleeThrowOwnerVelocity[class] or 0)
+		return pos, vel, wep.WorldModelExchange or wep.WorldModel, 2, frontalThrow[class]
+	end
+
+	if wep.GetMeleeSweepData then return end
 
 	if wep.ThrowVelocity then
 		local low = owner:KeyDown(IN_ATTACK2) and not owner:KeyDown(IN_ATTACK)
-		return low and (wep.LowThrowVelocity or wep.ThrowVelocity) or wep.ThrowVelocity, false
+		local speed = low and (wep.LowThrowVelocity or wep.ThrowVelocity) or wep.ThrowVelocity
+		return owner:EyePos(), aim * speed * arm + ent:GetVelocity(), wep.WorldModel, 2
 	end
 
 	if not wep.ENT or not wep.Throw then return end
-	local arm = hg.GetThrowArmMultiplier and hg.GetThrowArmMultiplier(owner) or 1
+	local stored = scripted_ents.GetStored(wep.ENT)
+	local model = stored and stored.t and stored.t.Model
+	local forward = wep:GetAngles():Forward() * 5
 	if weapons.IsBasedOn(class, "weapon_hg_legacy_grenade") or class == "weapon_hg_legacy_grenade" then
-		return 800 * arm, true
+		return owner:EyePos() - vector_up * 5 + forward, aim * 800 * arm + owner:GetVelocity(), model, 5
 	end
 
 	local low = wep.IsLowThrow or (owner:KeyDown(IN_ATTACK2) and not owner:KeyDown(IN_ATTACK))
-	return (low and (wep.ThrowLowMul or 600) or (wep.ThrowHighMul or 1200)) / 1.5 * arm, true
+	local speed = (low and (wep.ThrowLowMul or 600) or (wep.ThrowHighMul or 1200)) / 1.5 * arm
+	return owner:EyePos() + forward, aim * speed + ent:GetVelocity(), model, 5
 end
 
-local function updateThrow(wep, owner, speed, addVelocity)
-	local ent = hg.GetCurrentCharacter(owner)
-	if not IsValid(ent) then return false end
-
-	local pos = owner:EyePos()
-	local vel = owner:GetAimVector() * speed + (addVelocity and ent:GetVelocity() or vector_origin)
+local function updateThrow(wep, owner, ent, pos, vel, model, mass, frontal)
 	local gravity = physenv.GetGravity()
+	local airDensity = physenv.GetAirDensity and physenv.GetAirDensity() or 2
+	local dragK = 0.5 * airDensity * getDragArea(model, frontal) / math.max(mass, 0.01) * 0.0254
 	local filter = {owner, ent, wep, owner.OldRagdoll}
 	local points = {}
 	local landing
 
 	for _ = 1, 60 do
-		local nextVel = vel + gravity * 0.05
+		local drag = math.min(dragK * vel:Length() * 0.05, 1)
+		local nextVel = vel * (1 - drag) + gravity * 0.05
 		local nextPos = pos + (vel + nextVel) * 0.025
 		local tr = util.TraceLine({start = pos, endpos = nextPos, filter = filter, mask = MASK_SHOT})
 		points[#points + 1] = pos:ToScreen()
@@ -402,11 +434,12 @@ hook.Add("HUDPaint", "hg_crosshair", function()
 	local wep = IsValid(owner) and owner:Alive() and owner:GetActiveWeapon()
 	local visible = false
 
-	local throwSpeed, throwAddVel
-	if IsValid(wep) then throwSpeed, throwAddVel = getThrowSpeed(wep, owner) end
+	local char = IsValid(wep) and hg.GetCurrentCharacter(owner)
+	local throwPos, throwVel, throwModel, throwMass, throwFrontal
+	if IsValid(char) then throwPos, throwVel, throwModel, throwMass, throwFrontal = getThrow(wep, owner, char) end
 
-	if throwSpeed then
-		visible = updateThrow(wep, owner, throwSpeed, throwAddVel)
+	if throwPos then
+		visible = updateThrow(wep, owner, char, throwPos, throwVel, throwModel, throwMass, throwFrontal)
 	elseif IsValid(wep) then
 		if wep.GetMeleeSweepData then
 			visible = updateMelee(wep, owner)
@@ -432,7 +465,7 @@ hook.Add("HUDPaint", "hg_crosshair", function()
 		end
 		drawCircle(state.x, state.y, state.radius, 16)
 	elseif state.kind == "gun" then
-		drawCircle(state.x, state.y, state.radius, math.Clamp(math.floor(state.radius * 0.8), 24, 64))
+		surface.DrawRect(state.x - 1, state.y - 1, 3, 3)
 	elseif state.kind == "melee" then
 		local first, last = state.points[1], state.points[#state.points]
 		if state.stab and math.Distance(first.x, first.y, last.x, last.y) < 12 then

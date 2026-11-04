@@ -12,12 +12,18 @@ surface.CreateFont("HGMedicalTreating", {
 
 local circleMat = Material("vgui/circle")
 
-local function IsBruiceKitActive()
+local colWrapWhite = Color(255, 255, 255)
+local colWrapBruise = Color(120, 255, 120)
+local colWrapSplint = Color(255, 160, 50)
+
+local function GetBandageWrapColor()
     local lp = LocalPlayer()
-    if not IsValid(lp) then return false end
+    if not IsValid(lp) then return colWrapWhite end
     local wep = lp:GetActiveWeapon()
-    if not IsValid(wep) then return false end
-    return wep:GetClass() == "weapon_bruicekit"
+    if not IsValid(wep) then return colWrapWhite end
+    if wep.IsSplintMode and wep:IsSplintMode() then return colWrapSplint end
+    if wep:GetClass() == "weapon_bruicekit" or (wep.traumaBruise and wep.mode == 1) then return colWrapBruise end
+    return colWrapWhite
 end
 
 local function LoadHudMaterial(path, fallbackPath)
@@ -662,6 +668,26 @@ function PANEL:DrawTreatmentTarget(w, h)
         2,
         Color(0, 0, 0, 220)
     )
+end
+
+function PANEL:DrawBandageChoice(w, h)
+    local info = hg.MedicalMinigame.BandageTarget
+    if not info or info.label == "" then return end
+
+    local top = math.max(ScreenScaleH(14), 28)
+    draw.SimpleTextOutlined("Treating: " .. info.label, "HGMedicalTreating", w * 0.5, top, Color(255, 255, 255, 245), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP, 2, Color(0, 0, 0, 220))
+    if info.count > 1 then
+        draw.SimpleTextOutlined("[R] switch (" .. info.index .. "/" .. info.count .. ")", "ZCity_Small", w * 0.5, top + math.max(ScreenScaleH(14), 30), Color(200, 200, 200, 230), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP, 1.5, Color(0, 0, 0, 220))
+    end
+end
+
+function PANEL:OnKeyCodePressed(code)
+    if code ~= KEY_R or self.GameType ~= "bandage" then return end
+    local info = hg.MedicalMinigame.BandageTarget
+    if not info or info.count <= 1 then return end
+
+    net.Start("hg_medical_minigame_bandage_cycle")
+    net.SendToServer()
 end
 
 function PANEL:StartMusic()
@@ -1640,7 +1666,7 @@ function PANEL:DrawCommonOverlays(progress, showBleedIndicator)
     local endAngle = startAngle + (progress * 2 * math.pi)
     
     if progress > 0 then
-        local ringCol = (self.GameType == "bandage" and IsBruiceKitActive()) and Color(120, 255, 120) or Color(255, 255, 255)
+        local ringCol = self.GameType == "bandage" and GetBandageWrapColor() or colWrapWhite
         surface.SetDrawColor(ringCol.r, ringCol.g, ringCol.b, 40)
         for i = 0, progressSegments * progress do
             local a1 = startAngle + (i / progressSegments) * 2 * math.pi
@@ -1932,7 +1958,7 @@ function PANEL:Paint(w, h)
     local completedBandThickness = baseWrapThickness + (self.CompletedWraps * wrapThicknessStep)
     local activeBandThickness = baseWrapThickness + ((self.CompletedWraps + currentWrapProgress) * wrapThicknessStep)
 
-    local wrapCol = IsBruiceKitActive() and Color(120, 255, 120) or Color(255, 255, 255)
+    local wrapCol = GetBandageWrapColor()
     if self.CompletedWraps > 0 then
         DrawBandageRing(self, limbRadius, 215, completedBandThickness, wrapCol)
     end
@@ -1964,6 +1990,7 @@ function PANEL:Paint(w, h)
 
     self:DrawCommonOverlays(self.Progress, false)
     self:DrawTreatmentTarget(w, h)
+    self:DrawBandageChoice(w, h)
 end
 
 vgui.Register("hg_medical_minigame", PANEL, "DFrame")
@@ -2007,6 +2034,7 @@ net.Receive("hg_medical_minigame_start", function()
     hg.MedicalMinigame.NextProgress = 0
     hg.MedicalMinigame.NextCompletions = nil
     hg.MedicalMinigame.NextRequiredCompletions = nil
+    hg.MedicalMinigame.BandageTarget = nil
 
     if hg.MedicalMinigame.NextType == "amputation" then
         hg.MedicalMinigame.NextTarget = net.ReadEntity()
@@ -2027,6 +2055,20 @@ net.Receive("hg_medical_minigame_start", function()
     end
 
     hg.MedicalMinigame.Panel = vgui.Create("hg_medical_minigame")
+end)
+
+net.Receive("hg_medical_minigame_bandage_target", function()
+    hg.MedicalMinigame.BandageTarget = {
+        label = net.ReadString(),
+        index = net.ReadUInt(6),
+        count = net.ReadUInt(6),
+    }
+    local required = net.ReadUInt(8)
+
+    local panel = hg.MedicalMinigame.Panel
+    if IsValid(panel) and panel.GameType == "bandage" and required > 0 then
+        panel.BandageRequiredCompletions = required
+    end
 end)
 
 --/////////////////////////////////////////////////////////////////////////////

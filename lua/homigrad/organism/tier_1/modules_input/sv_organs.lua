@@ -210,6 +210,7 @@ input_list.stomach = function(org, bone, dmg, dmgInfo)
 		org.shock = org.shock + dmg * 6
 	end
 	addInternalBleed(org, delta, "stomach")
+	if hg.organism.AddGutHitNausea then hg.organism.AddGutHitNausea(org, delta, oldDmg, dmg) end
 	applyOrganTrauma(org, dmgInfo, dmg, delta, oldDmg, "stomach")
 	return result
 end
@@ -227,6 +228,7 @@ input_list.intestines = function(org, bone, dmg, dmgInfo)
 		org.shock = org.shock + dmg * 5
 	end
 	addInternalBleed(org, delta, "intestines")
+	if hg.organism.AddGutHitNausea then hg.organism.AddGutHitNausea(org, delta * 0.8, oldDmg, dmg) end
 	applyOrganTrauma(org, dmgInfo, dmg, delta, oldDmg, "intestines")
 	return result
 end
@@ -500,23 +502,9 @@ hitArtery = function(artery, org, dmg, dmgInfo, boneindex, dir, hit, impact, for
 	end
 
 	if artery == "arteria" and IsValid(owner) then
-		local ent = hg.GetCurrentCharacter(owner)
-		if IsValid(ent) and not org.otrub and not org.needotrub and (owner:IsPlayer() and owner:Alive() or not owner:IsPlayer()) then
-			ent:EmitSound("neckslit.ogg", 70, 100, 1, CHAN_AUTO)
-		end
-
-		local snd = (ThatPlyIsFemale and ThatPlyIsFemale(owner)) and "femaleneck.mp3" or "maleneck.mp3"
 		timer.Simple(0, function()
-			if IsValid(owner) then
-				if owner:IsPlayer() and owner:Alive() and (org.neckslitStunUntil or 0) > CurTime() then
-					hg.Fake(owner, nil, true, true)
-				end
-				local rag = hg.GetCurrentCharacter(owner)
-				if IsValid(rag) and not org.otrub and not org.needotrub and (owner:IsPlayer() and owner:Alive() or not owner:IsPlayer()) then
-					rag:EmitSound(snd, 70, 100, 1, CHAN_VOICE)
-					org.neckslitSoundName = snd
-					org.neckslitSoundEnt = rag
-				end
+			if IsValid(owner) and owner:IsPlayer() and owner:Alive() and (org.neckslitStunUntil or 0) > CurTime() then
+				hg.Fake(owner, nil, true, true)
 			end
 		end)
 	end

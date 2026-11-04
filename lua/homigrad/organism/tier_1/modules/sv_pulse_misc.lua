@@ -167,6 +167,14 @@ function hg.organism.UpdateCirculatoryEffects(owner, org, timeValue, o2Value, ar
 		end
 	end
 
+	if not adrenalineOnlyPressure and (org.hypertension or 0) > 0.4 and not org.otrub and (org.nextHypertensionSyncopeRoll or 0) <= CurTime() then
+		org.nextHypertensionSyncopeRoll = CurTime() + 5
+		if math.Rand(0, 1) < ((org.hypertension - 0.4) * 0.05 + crisis * 0.08) then
+			org.consciousness = math.min(org.consciousness or 1, 0.2)
+			org.needotrub = true
+		end
+	end
+
 	if crisis > 0.5 and not org.otrub and not org.seizureActive and (org.nextHypertensionSeizureRoll or 0) <= CurTime() then
 		org.nextHypertensionSeizureRoll = CurTime() + 5
 		if math.Rand(0, 1) < (crisis - 0.5) * 0.12 then hg.organism.AddSeizure(org, 1) end

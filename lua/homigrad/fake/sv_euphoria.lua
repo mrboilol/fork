@@ -664,7 +664,7 @@ hook.Add("Think", "HG_EuphoriaLegRest", function()
 		if not ply:Alive() then continue end
 
 		if ragdoll.hgGetUp or ragdoll.hgCurl or ragdoll.hgStumbleActive or
-			ragdoll.isSliding or ragdoll.isDropkicking or ragdoll.hgWallSmear then continue end
+			ragdoll.isSliding or ragdoll.isDropkicking or ragdoll.hgWallSmear or ragdoll.hgArteryKick then continue end
 
 		if hg.KeyDown(ply, IN_FORWARD) or hg.KeyDown(ply, IN_BACK) or
 			hg.KeyDown(ply, IN_MOVELEFT) or hg.KeyDown(ply, IN_MOVERIGHT) then continue end

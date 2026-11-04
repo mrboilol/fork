@@ -805,10 +805,28 @@ function SWEP:IsSuicidePosing()
         or owner:GetNWFloat("rem_suicide_aim", 0) > 0
 end
 
+local wristCutHints = {
+    "knife", "machete", "blade", "shard", "glass", "axe", "hatchet", "tomahawk",
+    "katana", "kukri", "bottle", "scythe", "labrys", "taiga", "akula", "rebel", "hultafors",
+}
+
+function SWEP:IsSharpBlade()
+    if self.Canselfharm then return true end
+    local class = string.lower(self:GetClass())
+    for _, hint in ipairs(wristCutHints) do
+        if string.find(class, hint, 1, true) then return true end
+    end
+    return false
+end
+
+function SWEP:IsWristSuicide()
+    return self.CanSuicide and self:IsSharpBlade() and self:GetOwner():GetNWBool("hg_wrist_suicide", false) and self:IsSuicidePosing()
+end
+
 function SWEP:GetLHIKStateOffset()
     local owner = self:GetOwner()
     if not IsValid(owner) then return vector_origin, angle_zero end
-    if self.Canselfharm and self:IsSelfHarming() then
+    if (self.Canselfharm and self:IsSelfHarming()) or self:IsWristSuicide() then
         return self.SelfHarmLeftPos or self.LHIKSelfHarmPos or vector_origin, self.SelfHarmLeftAng or self.LHIKSelfHarmAng or angle_zero
     end
     if self.CanSuicide and self:IsSuicidePosing() then
@@ -1117,7 +1135,10 @@ function SWEP:ModelAnim(model, pos, ang)
        addAngLerp.p = addAngLerp.p - math.min(math.abs(math.max(eyeAng.p,0)),25)
     end
 
-    if self.CanSuicide and self:IsSuicidePosing() then
+    if self:IsWristSuicide() then
+        addPosLerp:Set(self.SelfHarmPos)
+        addAngLerp:Set(self.SelfHarmAng)
+    elseif self.CanSuicide and self:IsSuicidePosing() then
         local aimScale = owner:GetNWFloat("rem_suicide_aim", 0)
         if aimScale <= 0 then aimScale = 1 end
         addPosLerp:Set(self.SuicidePos * aimScale)
@@ -1167,19 +1188,23 @@ function SWEP:ModelAnim(model, pos, ang)
     local hpos = LerpVector(self.chargeHoldLerp, self.HoldPos, chargePos)
     local hang = LerpAngle(self.chargeHoldLerp, self.HoldAng, chargeAng)
     
+    local wristCut = self:IsWristSuicide()
+    local cutVec = wristCut and self.SelfHarmCutVec or self.SuicideCutVec
+    local cutAng = wristCut and self.SelfHarmCutAng or self.SuicideCutAng
+
     if self.SuicideStart and self.SuicideStart + self.SuicideTime > CurTime() then
         local animpos = (1 - math.Clamp((self.SuicideStart + self.SuicideTime - CurTime()) / self.SuicideTime, 0, 1))
         animpos = math.ease.InOutCubic(animpos)
         
-        addPos:Add(self.SuicideCutVec * animpos)
-        addAng:Add(self.SuicideCutAng * animpos)
+        addPos:Add(cutVec * animpos)
+        addAng:Add(cutAng * animpos)
     end
 
     if self.cutthroat then
         local animpos = math.Clamp((self.cutthroat - CurTime() + 1) / 1, 0, 1)
         animpos = math.ease.InOutCubic(animpos)
-        addPos:Add(self.SuicideCutVec * animpos)
-        addAng:Add(self.SuicideCutAng * animpos)
+        addPos:Add(cutVec * animpos)
+        addAng:Add(cutAng * animpos)
     end
 
     local pos, ang = LocalToWorld(hpos + addPos + self.lerpedAddPos, hang + addAng + self.lerpedAddAng, tr.StartPos, eyeAng)
@@ -1304,7 +1329,7 @@ function SWEP:SetHandPos(noset)
 	end
 	self.lhandik = self.setlh and not (self.DisableLHIKWhileBlocking and self:GetBlocking()) and IsValid(owner)
 		and ((ply:GetTable().ChatGestureWeight or 0) < 0.1) and hg.CanUseLeftHand(ply)
-		and not (self:IsSuicidePosing() and self.SuicideNoLH)
+		and not (self:IsSuicidePosing() and self.SuicideNoLH and not self:IsWristSuicide())
 	local leftDraw = self:UsesMeleeSling() and self.lhandik
 
 	local rightHandBone = ent:LookupBone("ValveBiped.Bip01_R_Hand")
@@ -3216,8 +3241,17 @@ function SWEP:HandleMeleeClash(otherWep, clashPos, hitNormal, attacktype, otherA
         HGPreventHeadRagdoll = true,
     }
 
-    self:TryDisarm(self.ClashDisarmChance, self:IsChargeAttackType(attacktype))
-    if otherWep.TryDisarm then otherWep:TryDisarm(otherWep.ClashDisarmChance, otherWep:IsChargeAttackType(otherAttacktype)) end
+    local selfWeight = (self.ClashDisarmChance or 0) * (self:IsChargeAttackType(attacktype) and (self.SlamDisarmMul or 1) or 1)
+    local otherWeight = otherWep.IsChargeAttackType and (otherWep.ClashDisarmChance or 0) * (otherWep:IsChargeAttackType(otherAttacktype) and (otherWep.SlamDisarmMul or 1) or 1) or 0
+    if selfWeight + otherWeight > 0 and hg.DropWeaponFromImpact then
+        local loser = math.Rand(0, selfWeight + otherWeight) < selfWeight and self or otherWep
+        local loserOwner = loser:GetOwner()
+        local winnerOwner = (loser == self and otherWep or self):GetOwner()
+        if IsValid(loserOwner) and loserOwner:IsPlayer() then
+            local dir = IsValid(winnerOwner) and loserOwner:WorldSpaceCenter() - winnerOwner:WorldSpaceCenter() or -loserOwner:GetAimVector()
+            hg.DropWeaponFromImpact(loserOwner, loser, dir:GetNormalized() + vector_up * 0.5, 1)
+        end
+    end
 
     self:PlayConfiguredWorldSound(self:GetClashSoundData(otherWep, attacktype, otherAttacktype), clashPos, 1)
     self:DispatchBlockImpactFx(clashTrace, self, "parry")
@@ -3389,6 +3423,22 @@ function SWEP:IsBlockTraceCovered(defender, trace, eyePos, aimvec, blockWep, ext
     return loweredDist < crouchDist
 end
 
+function SWEP:SlamCrushGuard(defender, wep, attacker)
+    if wep.SetBlocking then wep:SetBlocking(false) end
+    if wep.SetBlockDisabledUntil then wep:SetBlockDisabledUntil(CurTime() + (self.SlamGuardCrushCooldown or 0.8)) end
+    if wep.SetLastBlocked then wep:SetLastBlocked(CurTime()) end
+
+    local dir = defender:WorldSpaceCenter() - attacker:WorldSpaceCenter()
+    dir.z = 0
+    defender:SetVelocity(dir:GetNormalized() * (self.SlamGuardCrushPush or 220))
+
+    if math.Rand(0, 1) > (self.SlamGuardCrushStunChance or 0.3) then return end
+    local stunTime = self.SlamGuardCrushStunTime or 0.75
+    timer.Simple(0, function()
+        if IsValid(defender) and defender:Alive() and hg.LightStunPlayer then hg.LightStunPlayer(defender, stunTime) end
+    end)
+end
+
 function SWEP:BlockingLogic(ent, mul, attacktype, trace)
 	if not SERVER or not IsValid(ent) or not trace or not trace.HitPos then return 1, "none" end
     ent = hg.RagdollOwner(ent) or ent
@@ -3453,6 +3503,13 @@ function SWEP:BlockingLogic(ent, mul, attacktype, trace)
 
                 self:TryDisarm(wep:GetClass() == "weapon_hands_sh" and self.FistParryDisarmChance or self.ParryDisarmChance, slam)
 
+                if slam and owner:IsPlayer() then
+                    local stunTime = self.SlamParryStunTime or 0.75
+                    timer.Simple(0, function()
+                        if IsValid(owner) and owner:Alive() and hg.LightStunPlayer then hg.LightStunPlayer(owner, stunTime) end
+                    end)
+                end
+
                 local lockout = self.BlockParryAttackerLockout or 0.5
                 self:SetInAttack(false)
                 self:SetLastAttack(CurTime() + lockout)
@@ -3462,6 +3519,10 @@ function SWEP:BlockingLogic(ent, mul, attacktype, trace)
             end
 
 			if hg.organism and hg.organism.ConsumeStamina then hg.organism.ConsumeStamina(ent.organism, blockStaminaCost) end
+
+            if slam and tierDiff < (self.BlockBreakTierDiff or 2) then
+                self:SlamCrushGuard(ent, wep, owner)
+            end
 
             if tierDiff >= (self.BlockBreakTierDiff or 2) then
 				if hg.organism and hg.organism.ConsumeStamina then hg.organism.ConsumeStamina(ent.organism, selfdmg * (wep.BlockBreakStaminaMul or self.BlockBreakStaminaMul or 0.75)) end
@@ -3533,6 +3594,11 @@ SWEP.BlockRiposteSpeedMul = 0.7
 SWEP.BlockParryAttackerLockout = 0.9
 SWEP.BlockParryHitStopMul = 1.0
 SWEP.BlockParryHitStopSpeedMul = 1.2
+SWEP.SlamParryStunTime = 0.75
+SWEP.SlamGuardCrushCooldown = 0.8
+SWEP.SlamGuardCrushPush = 220
+SWEP.SlamGuardCrushStunChance = 0.3
+SWEP.SlamGuardCrushStunTime = 0.75
 SWEP.BlockMinStamina = 70
 SWEP.BlockRecoverDelay = 0.35
 SWEP.BlockDirectionalFrontDot = 0.05
@@ -3818,12 +3884,47 @@ function SWEP:DoSelfHarmCut()
 
     org.depression = math.max((org.depression or 0) - totalDmg * 0.05, 0)
 
-    owner:EmitSound(self.SelfHarmSound or self.Attack2HitFlesh or self.AttackHitFlesh, 50)
     owner:ViewPunch(self.SelfHarmPunchAng or Angle(5, 10, 0))
 
 	if SERVER then
 		owner:SetNWFloat("rem_selfharm_cut", CurTime())
 	end
+end
+
+function SWEP:DoWristSuicideCut()
+    local owner = self:GetOwner()
+    local org = owner.organism
+    local ent = hg.GetCurrentCharacter(owner)
+    if not IsValid(ent) then return false end
+
+    local localPos, localAng, boneName = self:GetSelfHarmCutLocal(ent)
+    local bone = localPos and ent:LookupBone(boneName)
+    if not bone then return false end
+    local bonePos, boneAng = ent:GetBonePosition(bone)
+    if not bonePos or not boneAng then return false end
+
+    local cutPos = LocalToWorld(localPos, angle_zero, bonePos, boneAng)
+
+    local dmgInfo = DamageInfo()
+    dmgInfo:SetDamageType(DMG_SLASH)
+    dmgInfo:SetAttacker(owner)
+    dmgInfo:SetInflictor(self)
+    dmgInfo:SetDamagePosition(cutPos)
+
+    hg.organism.input_list.larmartery(org, 0, math.Rand(2, 3) * math.max(self.ArteryChance or 1, 1), dmgInfo, boneName, boneAng:Up(), cutPos)
+
+    for i = 1, 3 do
+        hg.organism.AddWoundManual(owner, math.Rand(30, 45), localPos + VectorRand(-1, 1), localAng, boneName, CurTime() + math.Rand(0, 1.5))
+    end
+
+    org.painadd = org.painadd + 25
+    owner:AddNaturalAdrenaline(math.max(1.6 - (org.adrenaline or 0), 0))
+    org.fear = math.max(org.fear, 1)
+
+    hook.Run("HomigradDamage", owner, dmgInfo, HITGROUP_LEFTARM, ent, 6)
+    owner:ViewPunch(self.SelfHarmPunchAng or Angle(5, 10, 0))
+
+    return true
 end
 
 function SWEP:StartSuicide()
@@ -3843,6 +3944,14 @@ function SWEP:StartSuicide()
     if self.SuicideFunc then
         self:SuicideFunc()
         return true
+    end
+
+    if self:IsWristSuicide() then
+        if self:DoWristSuicideCut() then return true end
+
+        self.SuicideStart = nil
+        self:SetNWFloat("HGMeleeSuicideStart", 0)
+        return false
     end
 
     local neck = ent:LookupBone("ValveBiped.Bip01_Neck1")
@@ -3870,7 +3979,6 @@ function SWEP:StartSuicide()
     org.fear = math.max(org.fear, 1)
 
     hook.Run("HomigradDamage", owner, dmgInfo, HITGROUP_HEAD, ent, 15)
-    owner:EmitSound(self.SuicideSound or self.Attack2HitFlesh, 50)
 
     return true
 end
@@ -3928,14 +4036,20 @@ function SWEP:CustomThink()
         if suicideStart > 0 then self.SuicideStart = suicideStart end
     end
 
-    if self.CanSuicide and hg.KeyDown(owner, IN_ATTACK) and owner.suiciding and !self.SuicideStart and owner:GetNWFloat("rem_suicide_aim", 0) <= 0 and owner:GetNWFloat("rem_urges_end", 0) < CurTime() then
+    local attackDown = hg.KeyDown(owner, IN_ATTACK)
+    local attackHeld = self.SuicideAttackHeld
+    self.SuicideAttackHeld = attackDown
+
+    if self.CanSuicide and attackDown and not (attackHeld and self:IsWristSuicide()) and owner.suiciding and !self.SuicideStart and owner:GetNWFloat("rem_suicide_aim", 0) <= 0 and owner:GetNWFloat("rem_urges_end", 0) < CurTime() then
         self:StartSuicide()
     end
 
     if self.SuicideStart and self.SuicideStart + self.SuicideTime < CurTime() then
         if SERVER then
-            owner.suiciding = false
-            owner.startsuicide = nil
+            if not self:IsWristSuicide() then
+                owner.suiciding = false
+                owner.startsuicide = nil
+            end
             self:SetNWFloat("HGMeleeSuicideStart", 0)
         end
         self.cutthroat = CurTime()
@@ -3967,6 +4081,7 @@ function SWEP:CustomThink()
     end
 
     self:SetHold((self.Canselfharm and self:IsSelfHarming() and self.SelfHarmHoldType)
+        or (self:IsWristSuicide() and (self.SelfHarmHoldType or self.SuicideHoldType))
         or (self:IsSuicidePosing() and self.SuicideHoldType) or self.HoldType)
 
     if SERVER and owner.organism and owner.organism.rarmamputated then

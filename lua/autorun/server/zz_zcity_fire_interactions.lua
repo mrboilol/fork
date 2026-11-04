@@ -159,6 +159,31 @@ function hg.SmotherEntityFire(ent, amount, hitPos)
 	return true
 end
 
+function hg.SmokeSmotherFires(pos, radius, strength)
+	strength = strength or 1
+	local radiusSqr = radius * radius
+
+	for _, ent in ipairs(ents.FindInSphere(pos, radius)) do
+		if not IsValid(ent) then continue end
+
+		local class = ent:GetClass()
+		local falloff = 1 - math.Clamp(ent:GetPos():DistToSqr(pos) / radiusSqr, 0, 1) * 0.6
+
+		if class == "vfire" then
+			if not ent.life or math.Rand(0, 1) > 0.85 * falloff then continue end
+
+			ent.feed = (ent.feed or 0) * (1 - 0.35 * falloff * strength)
+			ent:SoftExtinguish((ent.life * 0.3 + 4) * falloff * strength)
+		elseif class == "vfire_ball" then
+			if ent.ChangeLife and ent.life then
+				ent:ChangeLife(ent.life * (1 - 0.4 * falloff * strength))
+			end
+		elseif not ent.fires and ent:IsOnFire() and math.Rand(0, 1) < 0.3 * falloff * strength then
+			ent:Extinguish()
+		end
+	end
+end
+
 local function AddImpactSmothering(ent)
 	if not IsValid(ent) or ent.hgFireImpactCallback then return end
 	if ent:GetMoveType() ~= MOVETYPE_VPHYSICS then return end

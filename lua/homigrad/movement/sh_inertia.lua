@@ -822,8 +822,8 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 		if hg.GetTourniquetCountOnLimb then
 			local leftTourniquets = hg.GetTourniquetCountOnLimb(ply, "lleg")
 			local rightTourniquets = hg.GetTourniquetCountOnLimb(ply, "rleg")
-			k = k * (leftTourniquets >= 2 and 0.3 or leftTourniquets == 1 and 0.7 or 1)
-			k = k * (rightTourniquets >= 2 and 0.3 or rightTourniquets == 1 and 0.7 or 1)
+			k = k * (leftTourniquets >= 2 and 0.3 or leftTourniquets == 1 and 0.7 or hg.GetArteryWeakness(org, "lleg"))
+			k = k * (rightTourniquets >= 2 and 0.3 or rightTourniquets == 1 and 0.7 or hg.GetArteryWeakness(org, "rleg"))
 		end
 		k = k * (org.pelvis == 1 and 0.4 or 1)
 		local carryent = ply:GetNetVar("carryent")

@@ -39,6 +39,7 @@ function ENT:DoParticle()
 	self.Burn = (self.Burn or 0) + 1
 	if self.Burn == 24 then self:StopLoopingSound(self.snd or 0) end
 	ParticleEffect("pcf_jack_smokebomb3", pos, -vector_up:Angle())
+	if hg.SmokeSmotherFires then hg.SmokeSmotherFires(pos, math.min(60 + self.Burn * 12, 260)) end
 end
 
 function ENT:Explode()

@@ -93,10 +93,6 @@ local function doUrgeCut(ply)
 	org.fear = math.max(org.fear, 1)
 
 	hook.Run("HomigradDamage", ply, dmgInfo, HITGROUP_HEAD, ent, 15)
-
-	if IsValid(wep) then
-		ply:EmitSound(wep.SuicideSound or wep.Attack2HitFlesh or wep.AttackHitFlesh, 50)
-	end
 end
 
 local function endUrge(ply, cancelled)

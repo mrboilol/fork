@@ -69,7 +69,15 @@ local tab = {
 }
 
 --local potatopc = GetConVar("hg_potatopc") or CreateClientConVar("hg_potatopc", "0", true, false, "enable this if you are noob", 0, 1)
+if not ConVarExists("hg_incapacitation") then CreateConVar("hg_incapacitation", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED, "Enables incapacitation and its terminal death timer", 0, 1) end
+if not ConVarExists("hg_oldsoundoptions") then CreateConVar("hg_oldsoundoptions", "0", FCVAR_ARCHIVE + FCVAR_REPLICATED, "Unlock old dying/pain sound modes (hg_dyingsound, hg_painsound)", 0, 1) end
 local function getServerSoundMode(name, fallback)
+	local oldOptions = GetConVar("hg_oldsoundoptions")
+	if not (oldOptions and oldOptions:GetBool()) then
+		if name == "hg_dyingsound" then return 12 end
+		if name == "hg_painsound" then return 7 end
+		if name == "hg_otrubsound" then return 8 end
+	end
 	local convar = GetConVar(name)
 	local mode = convar and convar:GetInt() or fallback
 	if ((name == "hg_painsound" or name == "hg_dyingsound") and mode == 3) or (name == "hg_otrubsound" and mode == 1) then return fallback end
@@ -663,7 +671,41 @@ hg.screeneffects_config = {
 	painPitchMax = painPitchMax,
 	itsHopelessLoopStart = ITS_HOPELESS_LOOP_START,
 	itsHopelessLoopFadeDuration = ITS_HOPELESS_LOOP_FADE_DURATION,
+	hellDyingPath = "sound/playersounds/hell.mp3",
+	painLayerPath = "sound/playersounds/agony.mp3",
+	painLayerThreshold = 80,
+	painLayerVolumeMul = 1,
+	criticalLoopPath = "sound/playersounds/criticalloop.ogg",
+	criticalLoopOtrubPath = "sound/playersounds/criticalloop-unconscious.ogg",
+	criticalHeartbeatStart = 160,
+	criticalHeartbeatFull = 200,
+	criticalLoopVolume = 0.8,
+	painOtrubPath = "sound/playersounds/painotrub.mp3",
+	wrapsPath = "sound/playersounds/wraps.ogg",
+	wrapsVolume = 1,
+	convulsionWhiteAlpha = 225,
+	hellLoopFade = 8,
+	hellOtrubVolumeMul = 0.45,
+	hellWrapsDuckMul = 0.08,
 }
+hg.screeneffects_sound = hg.screeneffects_sound or {}
+function hg.ScreenEffectsLoop(key, path, volume)
+	local sounds = hg.screeneffects_sound
+	local station = sounds[key]
+	if volume > 0 and not sounds[key .. "Loading"] and canRetrySound(key, station) then
+		sounds[key .. "Loading"] = true
+		sound.PlayFile(path, "noblock noplay", function(newStation)
+			sounds[key .. "Loading"] = false
+			if not IsValid(newStation) then return end
+			if IsValid(sounds[key]) then sounds[key]:Stop() end
+			newStation:SetVolume(0)
+			newStation:Play()
+			newStation:EnableLooping(true)
+			sounds[key] = newStation
+		end)
+	end
+	if IsValid(station) then station:SetVolume(volume) end
+end
 local hiddenPainFlickerSeverity = 0
 local hiddenPainFlickerStart = 0
 local hiddenPainFlickerAttackEnd = 0
@@ -1016,6 +1058,14 @@ local function stopthings()
 		AsphyxiationStation:Stop()
 		AsphyxiationStation = nil
 	end
+	for key, station in pairs(hg.screeneffects_sound) do
+		if isnumber(station) then
+			hg.screeneffects_sound[key] = 0
+		elseif not isbool(station) and IsValid(station) then
+			station:Stop()
+			hg.screeneffects_sound[key] = nil
+		end
+	end
 
 	if IsValid(SillydyingStation) then
 		SillydyingStation:Stop()
@@ -1235,9 +1285,56 @@ local function drawO2GrainCenter(strength, severity)
 	cam.End2D()
 end
 
+function hg.SetHellVolume(volume)
+	local sounds = hg.screeneffects_sound
+	local main = sounds.hell
+	if not IsValid(main) then return end
+	volume = volume * Lerp(math.Clamp(sounds.wrapsFade or 0, 0, 1), 1, hg.screeneffects_config.hellWrapsDuckMul)
+	local fadeTime = hg.screeneffects_config.hellLoopFade
+	local length = main:GetLength()
+	local remaining = length - main:GetTime()
+	if length <= fadeTime * 2 or (remaining > fadeTime and main:GetState() == GMOD_CHANNEL_PLAYING) then
+		main:SetVolume(volume)
+		return
+	end
+	if not IsValid(sounds.hellNext) and not sounds.hellNextLoading then
+		sounds.hellNextLoading = true
+		sound.PlayFile(hg.screeneffects_config.hellDyingPath, "noblock noplay", function(station)
+			sounds.hellNextLoading = false
+			if not IsValid(station) then return end
+			if not IsValid(sounds.hell) or IsValid(sounds.hellNext) then station:Stop() return end
+			station:SetVolume(0)
+			station:EnableLooping(false)
+			station:Play()
+			sounds.hellNext = station
+		end)
+	end
+	local fade = math.Clamp(remaining / fadeTime, 0, 1)
+	main:SetVolume(volume * fade)
+	if IsValid(sounds.hellNext) then
+		sounds.hellNext:SetVolume(volume * (1 - fade))
+		if remaining <= 0.05 or main:GetState() != GMOD_CHANNEL_PLAYING then
+			main:Stop()
+			sounds.hell = sounds.hellNext
+			sounds.hellNext = nil
+		end
+	end
+end
+
+function hg.DrawConvulsionWhiteout(org)
+	local sounds = hg.screeneffects_sound
+	sounds.convulsionWhite = (LerpFT or Lerp)(0.04, sounds.convulsionWhite or 0, org and org.convulsing and 1 or 0)
+	local white = sounds.convulsionWhite
+	if white < 0.005 then return end
+	surface.SetDrawColor(255, 255, 255, math.Clamp(white * hg.screeneffects_config.convulsionWhiteAlpha + math.Rand(-12, 12) * white, 0, 255))
+	surface.DrawRect(-1, -1, ScrW() + 2, ScrH() + 2)
+	drawO2GrainCenter(0.5, white)
+end
+
 function hg.DrawO2Vignette(org)
-	if O2Lerp <= 1 then return end
-	local o2Severity = math.Clamp(O2Lerp / 250, 0, 1)
+	local convulsionWhite = hg.screeneffects_sound.convulsionWhite or 0
+	if O2Lerp <= 1 and convulsionWhite < 0.005 then return end
+	local o2Severity = math.max(math.Clamp(O2Lerp / 250, 0, 1), convulsionWhite)
 	local o2BlinkAmount = org.otrub and 0 or updateO2Blink(o2Severity)
 	render.UpdateScreenEffectTexture()
 	vignetteMat:SetFloat("$c2_x", CurTime() + 11000)
@@ -1453,7 +1550,7 @@ drawFinalVitalsVignettes = function()
 		surface.SetDrawColor(255, 255, 255, 255)
 	end
 
-	local excruciatingBlend = getServerSoundMode("hg_painsound", 6) == 6
+	local excruciatingBlend = (getServerSoundMode("hg_painsound", 6) == 6 or getServerSoundMode("hg_painsound", 6) == 7)
 		and getPainLayerBlend(org.pain or 0, painExcruciatingThreshold)
 		or 0
 	painThresholdIntensityLerp = LerpFT(painLayerFadeLerp, painThresholdIntensityLerp or 1, 1 + excruciatingBlend * painEffectIntensity)
@@ -1557,6 +1654,7 @@ local function setItsHopelessVolume(volume)
 	ItsHopelessStation:SetVolume(volume * fade)
 end
 hook.Add("Post Post Processing", "ItHurts", function()
+	hg.O2VignetteOrg = nil
 	if not IsValid(lply) then return end
 	if IsValid(lply:GetNWEntity("spect")) then
 		stopthings()
@@ -1608,7 +1706,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	local brain = org.brain or 0
 	local deathStateEnd = tonumber(org.deathStateEnd)
 	local incapacitated = org.otrub and org.incapacitated and deathStateEnd and deathStateEnd > CurTime()
-	local incapacitationProgress = incapacitated and math.Clamp((20 - (deathStateEnd - CurTime())) / 20, 0, 1) or 0
+	local incapacitationProgress = incapacitated and math.Clamp((25 - (deathStateEnd - CurTime())) / 25, 0, 1) or 0
 	local sensoryActive = not org.otrub or incapacitated
 	local sensoryMix = incapacitated and Lerp(incapacitationProgress, 1, 0.35) or 1
 
@@ -1738,12 +1836,12 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end)
 	end
 
-	if painMode == 6 and not RemAgonyStationLoading and canRetrySound("RemAgonyStation", RemAgonyStation) then
+	if (painMode == 6 or painMode == 7) and not RemAgonyStationLoading and canRetrySound("RemAgonyStation", RemAgonyStation) then
 		RemAgonyStationLoading = true
 		sound.PlayFile("sound/rem_agony.mp3", "noblock noplay", function(station)
 			RemAgonyStationLoading = false
 			if IsValid(station) then
-				if getServerSoundMode("hg_painsound", 6) != 6 then
+				if getServerSoundMode("hg_painsound", 6) != 6 and getServerSoundMode("hg_painsound", 6) != 7 then
 					station:Stop()
 					return
 				end
@@ -1774,6 +1872,18 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end)
 	end
 
+	if painMode == 7 and hg.screeneffects_config.painLayerPath and canRetrySound("PainLayerStation", hg.screeneffects_sound.painLayer) then
+		sound.PlayFile(hg.screeneffects_config.painLayerPath, "noblock noplay", function(station)
+			if IsValid(station) then
+				station:SetVolume(0)
+				station:Play()
+				station:SetTime(math.min(math.Rand(0, station:GetLength()), 139))
+				hg.screeneffects_sound.painLayer = station
+				station:EnableLooping(true)
+			end
+		end)
+	end
+
 	if canRetrySound("SillypainStation", SillypainStation) then
 		sound.PlayFile("sound/sillypain.mp3", "noblock noplay", function(station)
 			if IsValid(station) then
@@ -1797,12 +1907,11 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			end
 		end)
 	end
-	if incapacitated and canRetrySound("IncapacitatedStation", IncapacitatedStation) then
+	if incapacitated and not IsValid(IncapacitatedStation) and canRetrySound("IncapacitatedStation", IncapacitatedStation) then
 		sound.PlayFile("sound/drawyourlastdick.ogg", "noblock noplay", function(station)
 			if IsValid(station) then
 				station:SetVolume(0)
-				station:Play()
-				station:EnableLooping(true)
+				station:EnableLooping(false)
 				IncapacitatedStation = station
 			end
 		end)
@@ -1810,8 +1919,16 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		IncapacitatedStation:Stop()
 		IncapacitatedStation = nil
 	end
+	if incapacitated and IsValid(IncapacitatedStation) and deathStateEnd - CurTime() > 0.05 and IncapacitatedStation:GetLength() - (deathStateEnd - CurTime()) >= 0 then
+		if IncapacitatedStation:GetState() != GMOD_CHANNEL_PLAYING then
+			IncapacitatedStation:Play()
+			IncapacitatedStation:SetTime(IncapacitatedStation:GetLength() - (deathStateEnd - CurTime()))
+		elseif math.abs(IncapacitatedStation:GetTime() - (IncapacitatedStation:GetLength() - (deathStateEnd - CurTime()))) > 0.35 then
+			IncapacitatedStation:SetTime(IncapacitatedStation:GetLength() - (deathStateEnd - CurTime()))
+		end
+	end
 
-	local selectedDyingMode = getServerSoundMode("hg_dyingsound", 2)
+	local selectedDyingMode = getServerSoundMode("hg_dyingsound", 12)
 	local remBackgroundPath = selectedDyingMode == 4 and "sound/itssofuckingover.mp3" or selectedDyingMode == 5 and "sound/rem_dying1.mp3"
 	if IsValid(RemDying1Station) and RemDying1Path != remBackgroundPath then
 		RemDying1Station:Stop()
@@ -1820,7 +1937,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	if remBackgroundPath and canRetrySound("RemDying1Station", RemDying1Station) then
 		sound.PlayFile(remBackgroundPath, "noblock noplay", function(station)
 			if IsValid(station) then
-				if getServerSoundMode("hg_dyingsound", 2) != selectedDyingMode then
+				if getServerSoundMode("hg_dyingsound", 12) != selectedDyingMode then
 					station:Stop()
 					return
 				end
@@ -1853,7 +1970,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	if selectedDyingMode == 10 and canRetrySound("VitalityStation", VitalityStation) then
 		sound.PlayFile("sound/vitality.mp3", "noblock noplay", function(station)
 			if IsValid(station) then
-				if getServerSoundMode("hg_dyingsound", 2) != 10 then
+				if getServerSoundMode("hg_dyingsound", 12) != 10 then
 					station:Stop()
 					return
 				end
@@ -1866,10 +1983,30 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end)
 	end
 
+	if selectedDyingMode == 12 and not IsValid(hg.screeneffects_sound.hellNext) and not hg.screeneffects_sound.hellNextLoading and canRetrySound("HellStation", hg.screeneffects_sound.hell) then
+		sound.PlayFile(hg.screeneffects_config.hellDyingPath, "noblock noplay", function(station)
+			if IsValid(station) then
+				if getServerSoundMode("hg_dyingsound", 12) != 12 then
+					station:Stop()
+					return
+				end
+				station:SetVolume(0)
+				station:Play()
+				if IsValid(hg.screeneffects_sound.hell) and hg.screeneffects_sound.hell:GetState() == GMOD_CHANNEL_PLAYING then
+					station:Stop()
+					return
+				end
+				station:SetTime(math.min(math.Rand(0, math.max(station:GetLength() - hg.screeneffects_config.hellLoopFade * 2, 0)), 139))
+				hg.screeneffects_sound.hell = station
+				station:EnableLooping(false)
+			end
+		end)
+	end
+
 	if selectedDyingMode == 11 and canRetrySound("AsphyxiationStation", AsphyxiationStation) then
 		sound.PlayFile("sound/asphyxiation.ogg", "noblock noplay", function(station)
 			if IsValid(station) then
-				if getServerSoundMode("hg_dyingsound", 2) != 11 then
+				if getServerSoundMode("hg_dyingsound", 12) != 11 then
 					station:Stop()
 					return
 				end
@@ -1954,7 +2091,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	o2 = o2 + (org.CO or 0)
 	O2Lerp = LerpFT(0.01, O2Lerp, (30 - o2) * 10 + brain * (org.otrub and 100 or 500))
 	updateSeizureEffects(org)
-	hg.DrawO2Vignette(org)
+	hg.O2VignetteOrg = org
 
 	local panicBaseTarget = getPanicAttackFx(org)
 	PanicAttackLerp = LerpFT(0.12, PanicAttackLerp, panicBaseTarget ^ hg.screeneffects_config.panicattackVisualExponent)
@@ -2231,6 +2368,9 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				targetRemPainVolume = painVolume * hg.screeneffects_config.painBeatOverlayVolumeMul
 				targetRemAgonyVolume = getPainLayerBlend(rawPain, hg.screeneffects_config.painAgonyThreshold) * painVolume * hg.screeneffects_config.painAgonyVolumeMul
 				targetRemExcruciatingVolume = getPainLayerBlend(rawPain, hg.screeneffects_config.painExcruciatingThreshold) * painVolume * hg.screeneffects_config.painExcruciatingVolumeMul
+			elseif painMode == 7 and not org.otrub then
+				targetPainVolume = painVolume
+				targetRemAgonyVolume = getPainLayerBlend(rawPain, hg.screeneffects_config.painAgonyThreshold) * painVolume * hg.screeneffects_config.painAgonyVolumeMul
 			end
 
 			if IsValid(PainStation) then
@@ -2252,6 +2392,11 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				RemExcruciatingPainStation:SetPlaybackRate(painPitch / 100)
 			end
 			if IsValid(SillypainStation) then SillypainStation:SetVolume(targetSillypainVolume) end
+			if IsValid(hg.screeneffects_sound.painLayer) then
+				hg.screeneffects_sound.painLayer:SetVolume(painMode == 7 and not org.otrub and getPainLayerBlend(rawPain, hg.screeneffects_config.painLayerThreshold) * painVolume * hg.screeneffects_config.painLayerVolumeMul or 0)
+				hg.screeneffects_sound.painLayer:SetPlaybackRate(painPitch / 100)
+			end
+			hg.ScreenEffectsLoop("painOtrub", hg.screeneffects_config.painOtrubPath, painMode == 7 and org.otrub and math.min(painVolume, 1.5) or 0)
 		//else
 		//	if IsValid(PainStation) then
 		//		PainStation:Stop()
@@ -2420,7 +2565,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		o2 = O2Lerp
 		
 		if o2 > 1 and not org.otrub then
-			local dyingMode = getServerSoundMode("hg_dyingsound", 2)
+			local dyingMode = getServerSoundMode("hg_dyingsound", 12)
 
 			if canRetrySound("NoiseStation2", NoiseStation2) then
 				sound.PlayFile("sound/zbattle/conscioustypebeat.mp3", "noblock noplay", function(station)
@@ -2439,7 +2584,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				sound.PlayFile("sound/rem_dying2.mp3", "noblock noplay", function(station)
 					NoiseStation2DyingLoading = false
 					if IsValid(station) then
-						local currentMode = getServerSoundMode("hg_dyingsound", 2)
+						local currentMode = getServerSoundMode("hg_dyingsound", 12)
 						if currentMode != 4 and currentMode != 5 then
 							station:Stop()
 							return
@@ -2739,6 +2884,26 @@ hook.Add("Post Post Processing", "ItHurts", function()
 					VitalityStation:SetVolume(0)
 				end
 				asphyxiationVolume = consciousVol
+			elseif dyingMode == 12 then
+				if IsValid(NoiseStation2) then
+					NoiseStation2:SetVolume(0)
+				end
+				if IsValid(EndStation) then
+					EndStation:SetVolume(0)
+				end
+				if IsValid(DyingStation) then
+					DyingStation:SetVolume(0)
+				end
+				if IsValid(SillydyingStation) then
+					SillydyingStation:SetVolume(0)
+				end
+				if IsValid(ItssooverStation) then
+					ItssooverStation:SetVolume(0)
+				end
+				hg.SetHellVolume(consciousVol)
+			end
+			if dyingMode != 12 then
+				hg.SetHellVolume(0)
 			end
 			if dyingMode != 7 and IsValid(SonimCookedStation) then
 				SonimCookedStation:SetVolume(0)
@@ -2791,6 +2956,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			if IsValid(VitalityStation) then
 				VitalityStation:SetVolume(0)
 			end
+			hg.SetHellVolume(0)
 		end
 		
 		if IsValid(AsphyxiationStation) then
@@ -2822,6 +2988,10 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			if otrubMode == 0 then
 				if IsValid(NoiseStation) then NoiseStation:SetVolume(otrubVol) end
 				if IsValid(OtrubModeStation) then OtrubModeStation:SetVolume(0) end
+			elseif otrubMode == 8 then
+				if IsValid(NoiseStation) then NoiseStation:SetVolume(0) end
+				if IsValid(OtrubModeStation) then OtrubModeStation:SetVolume(0) end
+				hg.SetHellVolume(otrubVol * hg.screeneffects_config.hellOtrubVolumeMul)
 			elseif otrubMode == 6 or otrubMode == 7 then
 				if IsValid(NoiseStation) then NoiseStation:SetVolume(0) end
 				if IsValid(OtrubModeStation) then OtrubModeStation:SetVolume(0) end
@@ -2893,7 +3063,14 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			NoiseStation:Stop()
 			NoiseStation = nil
 		end
+		hg.SetHellVolume(0)
 	end
+
+	hg.screeneffects_sound.criticalFade = LerpFT(0.03, hg.screeneffects_sound.criticalFade or 0, painMode == 7 and math.Clamp(((org.heartbeat or 0) - hg.screeneffects_config.criticalHeartbeatStart) / (hg.screeneffects_config.criticalHeartbeatFull - hg.screeneffects_config.criticalHeartbeatStart), 0, 1) * hg.screeneffects_config.criticalLoopVolume or 0)
+	hg.ScreenEffectsLoop("criticalLoop", hg.screeneffects_config.criticalLoopPath, org.otrub and 0 or hg.screeneffects_sound.criticalFade)
+	hg.ScreenEffectsLoop("criticalLoopOtrub", hg.screeneffects_config.criticalLoopOtrubPath, org.otrub and hg.screeneffects_sound.criticalFade or 0)
+	hg.screeneffects_sound.wrapsFade = LerpFT(org.convulsing and 0.06 or 0.03, hg.screeneffects_sound.wrapsFade or 0, painMode == 7 and math.max(org.otrub and math.Clamp((O2Lerp - 20) / 80, 0, 1) or 0, org.convulsing and not (GetConVar("hg_incapacitation") and GetConVar("hg_incapacitation"):GetBool()) and 1 or 0) or 0)
+	hg.ScreenEffectsLoop("wraps", hg.screeneffects_config.wrapsPath, hg.screeneffects_sound.wrapsFade * hg.screeneffects_config.wrapsVolume)
 
 	-- Play noises.ogg when brain health is between 0.6 and 0.7
 	if brain >= 0.6 and brain <= 0.7 and not org.otrub then
@@ -3494,7 +3671,7 @@ local function GetConsciousBeatPulse()
 	-- Check if dying pulse detection is enabled
 	if not hg_dyingpulse:GetBool() then return 0 end
 
-	local dyingMode = getServerSoundMode("hg_dyingsound", 2)
+	local dyingMode = getServerSoundMode("hg_dyingsound", 12)
 	-- The camera pulse belongs only to the modes that actually play
 	-- conscioustypebeat. Keep the other dying tracks visually quiet.
 	if dyingMode != 0 and dyingMode != 1 then return 0 end

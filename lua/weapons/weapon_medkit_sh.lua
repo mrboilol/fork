@@ -2,7 +2,7 @@ if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_bandage_sh"
 SWEP.BandageTPIK = false
 SWEP.PrintName = "Trauma Pack"
-SWEP.Instructions = "A small bag containing medical supplies. Has a bandage or bruise pack, painkillers, a tourniquet, a decompression needle and one random emergency item. A necessary thing in hiking, military conditions and just a necessary thing in everyday life. RMB to apply on others, R to change use mode."
+SWEP.Instructions = "A small bag containing medical supplies. Has a bandage, bruise pack or suture kit, painkillers, a tourniquet, a decompression needle, a splint and one random emergency item. A necessary thing in hiking, military conditions and just a necessary thing in everyday life. RMB to apply on others, R to change use mode."
 SWEP.Category = "ZCity Medicine"
 SWEP.Spawnable = true
 SWEP.Primary.Wait = 1
@@ -23,20 +23,23 @@ SWEP.SlotPos = 1
 SWEP.WorkWithFake = true
 SWEP.offsetVec = Vector(4, -0.5, -3)
 SWEP.offsetAng = Angle(-30, 20, 90)
-SWEP.modes = 5
+SWEP.modes = 6
 SWEP.modeNames = {
 	[1] = "bandaging",
 	[2] = "painkiller",
 	[3] = "tranexamic acid",
 	[4] = "tourniquet",
 	[5] = "decompression needle",
+	[6] = "splint",
 }
 SWEP.ofsV = Vector(0,0,0)
 SWEP.ofsA = Angle(0,0,0)
 
 local TRAUMA_BRUISE_CHANCE = 0.35
-local BASE_MODE_NAMES = {"bandaging", "painkiller", "tranexamic acid", "tourniquet", "decompression needle"}
-local BASE_MODE_DEFS = {{100, true}, {1, false}, {10, true}, {1, true}, {1, false}}
+local TRAUMA_SUTURE_CHANCE = 0.25
+local TRAUMA_SUTURE_AMOUNT = 4
+local BASE_MODE_NAMES = {"bandaging", "painkiller", "tranexamic acid", "tourniquet", "decompression needle", "splint"}
+local BASE_MODE_DEFS = {{100, true}, {1, false}, {10, true}, {1, true}, {1, false}, {1, false}}
 local TRAUMA_SLOTS = {
 	tranexamic = {name = "tranexamic acid", amount = 10},
 	mannitol = {name = "mannitol", amount = 1},
@@ -60,7 +63,10 @@ function SWEP:ApplyTraumaLoadout()
 	local slot = TRAUMA_SLOTS[slotKey]
 	local names = table.Copy(BASE_MODE_NAMES)
 	local defs = table.Copy(BASE_MODE_DEFS)
-	if self.traumaBruise then
+	if self.traumaSuture then
+		names[1] = "suture kit"
+		defs[1] = {TRAUMA_SUTURE_AMOUNT, false}
+	elseif self.traumaBruise then
 		names[1] = "bruise pack"
 		defs[1] = {1.5, false}
 	end
@@ -73,9 +79,11 @@ end
 function SWEP:SyncTraumaLoadout()
 	local slot = self:GetNWString("hg_trauma_slot", "")
 	local bruise = self:GetNWBool("hg_trauma_bruise", false)
-	if slot == "" or (slot == self.traumaSlot and bruise == self.traumaBruise) then return end
+	local suture = self:GetNWBool("hg_trauma_suture", false)
+	if slot == "" or (slot == self.traumaSlot and bruise == self.traumaBruise and suture == self.traumaSuture) then return end
 	self.traumaSlot = slot
 	self.traumaBruise = bruise
+	self.traumaSuture = suture
 	self:ApplyTraumaLoadout()
 end
 
@@ -84,18 +92,21 @@ function SWEP:InitializeAdd()
 
 	if SERVER then
 		self.traumaSlot = TRAUMA_SLOT_ORDER[math.random(#TRAUMA_SLOT_ORDER)]
-		self.traumaBruise = math.random() < TRAUMA_BRUISE_CHANCE
+		self.traumaSuture = math.random() < TRAUMA_SUTURE_CHANCE
+		self.traumaBruise = not self.traumaSuture and math.random() < TRAUMA_BRUISE_CHANCE
 		self:SetNWString("hg_trauma_slot", self.traumaSlot)
 		self:SetNWBool("hg_trauma_bruise", self.traumaBruise)
+		self:SetNWBool("hg_trauma_suture", self.traumaSuture)
 	end
 	self:ApplyTraumaLoadout()
 
 	self.modeValues = {
-		[1] = self.traumaBruise and 1.5 or 100,
+		[1] = self.traumaSuture and TRAUMA_SUTURE_AMOUNT or self.traumaBruise and 1.5 or 100,
 		[2] = 1,
 		[3] = TRAUMA_SLOTS[self.traumaSlot or "tranexamic"].amount,
 		[4] = 1,
 		[5] = 1,
+		[6] = 1,
 	}
 end
 
@@ -105,6 +116,7 @@ SWEP.modeValuesdef = {
 	[3] = {10,true},
 	[4] = {1,true},
 	[5] = {1,false},
+	[6] = {1,false},
 }
 SWEP.ShouldDeleteOnFullUse = true
 
@@ -144,7 +156,13 @@ function SWEP:OwnerChanged()
 	end
 end
 
+function SWEP:IsSplintMode()
+	return self.mode == 6
+end
+
 function SWEP:CanBandageTPIK(target)
+	if self.mode == 6 then return (self.modeValues[6] or 0) > 0 and hg.GetSplintTarget(target) ~= nil end
+	if self.traumaSuture and self.mode == 1 then return false end
 	if self.traumaBruise and self.mode == 1 then
 		local bruise = weapons.GetStored("weapon_bruicekit")
 		return bruise ~= nil and bruise.CanHeal ~= nil and bruise.CanHeal(self, target) or false
@@ -256,6 +274,11 @@ if SERVER then
 		if not org then return end
 
 		local owner = self:GetOwner()
+		if self.mode == 1 and self.traumaSuture then
+			if (self.modeValues[1] or 0) <= 0 or not owner:IsPlayer() then return end
+			return hg.Suture.Start(owner, self, ent, 1)
+		end
+
 		if ent == hg.GetCurrentCharacter(owner) and not hg_healanims:GetBool() then
 			self:SetHolding(math.min(self:GetHolding() + 50, 100))
 			if self:GetHolding() < 100 then return end
@@ -292,6 +315,9 @@ if SERVER then
 			end
 		elseif self.mode == 4 then
 			if self:Tourniquet(ent, bone) then self.modeValues[4] = 0 end
+		elseif self.mode == 6 then
+			if self.modeValues[6] == 0 then return end
+			if hg.ApplySplint and hg.ApplySplint(owner, ent, bone) then self.modeValues[6] = 0 end
 		elseif self.mode == 5 then
 			if self.modeValues[5] == 0 then return end
 			if self.poisoned2 then
@@ -312,9 +338,21 @@ if SERVER then
 			self:RefreshPerfusionTreatment(ent, owner.Profession == "doctor" and 0.25 or 0.18)
 		end
 
-		if self.modeValues[1] <= 0 and self.modeValues[2] <= 0 and self.modeValues[3] <= 0 and self.modeValues[4] <= 0 and self.modeValues[5] <= 0 and self.ShouldDeleteOnFullUse then
-			owner:SelectWeapon("weapon_hands_sh")
-			self:Remove()
+		self:RemoveIfEmpty()
+	end
+
+	function SWEP:RemoveIfEmpty()
+		for i = 1, self.modes do
+			if (self.modeValues[i] or 0) > 0 then return end
 		end
+		if not self.ShouldDeleteOnFullUse then return end
+
+		local owner = self:GetOwner()
+		if IsValid(owner) then owner:SelectWeapon("weapon_hands_sh") end
+		self:Remove()
+	end
+
+	function SWEP:OnSutureUsed()
+		self:RemoveIfEmpty()
 	end
 end

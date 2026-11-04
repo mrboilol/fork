@@ -45,6 +45,7 @@ local COLLISION_TRACE_MAXS = Vector(15, 15, 24)
 local COLLISION_CONTACT_SKIN = 2
 local COLLISION_MIN_HEAD_ON = 0.5
 local COLLISION_COOLDOWN = 1
+local BODY_TRIP_SPRINT_RUN_MUL = 1.25
 local COLLISION_STUMBLE_SLOWDOWN = 450
 local COLLISION_STUMBLE_TIME = 0.18
 local COLLISION_DAMAGE_MUL = 0.08
@@ -270,7 +271,10 @@ local function CollisionTripCheck(ply, org, velocity)
         tripChance = BASE_TRIP_CHANCE + math.Clamp((impactSpeed - 250) / 300, 0, 1) * (trHighHit and 1 or 0.3)
     end
 
-    local canTrip = ply.hg_isSprinting or (isBody and ply.HasTrait and ply:HasTrait("clumsy"))
+    local canTrip = ply.hg_isSprinting
+    if isBody then
+        canTrip = (ply.HasTrait and ply:HasTrait("clumsy")) or (canTrip and speed >= ply:GetRunSpeed() * BODY_TRIP_SPRINT_RUN_MUL)
+    end
     if canTrip and math.random() < ScaleTripChance(ply, org, tripChance) then
         ExecuteTrip(ply, org, tripType, velocity, trWall, trHighHit, TRIP_BREAK_CHANCE)
     else
@@ -390,41 +394,120 @@ local STEP_HAZARD_CHANCE = {
     uneven = 0.03,
 }
 local STEP_SLOPE_FLAT_Z = 0.9
+local STEP_PLANE_DOT = 0.97
+local STEP_CONTACT_REACH = 24
+local UP = Vector(0, 0, 1)
 
-local function StepHazard(ply, pos, landing)
+local function StepTraceFilter(ply)
+    return function(ent)
+        return ent ~= ply and not ent:IsPlayer() and not ent:IsNPC()
+    end
+end
+
+local function GroundNormal(pos, filter)
+    local tr = util_TraceLine({
+        start = pos + Vector(0, 0, 2),
+        endpos = pos - Vector(0, 0, STEP_LEDGE_DROP),
+        filter = filter,
+        mask = MASK_PLAYERSOLID,
+    })
+    if tr.Hit and tr.HitNormal.z >= 0.5 then return tr.HitNormal end
+
+    return UP
+end
+
+local function PlaneZ(pos, normal, x, y)
+    return pos.z - (normal.x * (x - pos.x) + normal.y * (y - pos.y)) / normal.z
+end
+
+local function GroundAt(x, y, topZ, bottomZ, filter)
+    return util_TraceLine({
+        start = Vector(x, y, topZ),
+        endpos = Vector(x, y, bottomZ),
+        filter = filter,
+        mask = MASK_PLAYERSOLID,
+    })
+end
+
+local function StepHazard(ply, pos, landing, filter)
+    local normal = GroundNormal(pos, filter)
+    local expectedZ = PlaneZ(pos, normal, landing.x, landing.y)
     local footStart = Vector(pos.x, pos.y, pos.z + STEP_TOE_HEIGHT)
     local trWall = util_TraceLine({
         start = footStart + Vector(0, 0, STEP_UP_LIMIT),
-        endpos = Vector(landing.x, landing.y, pos.z + STEP_TOE_HEIGHT + STEP_UP_LIMIT),
-        filter = ply,
+        endpos = Vector(landing.x, landing.y, expectedZ + STEP_TOE_HEIGHT + STEP_UP_LIMIT),
+        filter = filter,
         mask = MASK_PLAYERSOLID,
     })
     if trWall.Hit and not trWall.StartSolid and trWall.HitNormal.z < 0.7 then return "wall", trWall end
 
-    local trGround = util_TraceLine({
-        start = Vector(landing.x, landing.y, pos.z + STEP_UP_LIMIT + 2),
-        endpos = Vector(landing.x, landing.y, pos.z - STEP_LEDGE_DROP),
-        filter = ply,
-        mask = MASK_PLAYERSOLID,
-    })
+    local trGround = GroundAt(landing.x, landing.y, math.max(pos.z, expectedZ) + STEP_UP_LIMIT + 2, math.min(pos.z, expectedZ) - STEP_LEDGE_DROP, filter)
     if not trGround.Hit then return "gap" end
-    local walkableZ = hg.WalkableNormalZ and hg.WalkableNormalZ(ply) or hg.WALKABLE_NORMAL_Z or 0.7
-    if trGround.HitNormal.z < walkableZ then return "steep" end
+    local clumsy = ply.HasTrait and ply:HasTrait("clumsy")
     local heightDiff = trGround.HitPos.z - pos.z
+    local deviation = trGround.HitPos.z - expectedZ
+    local coplanar = normal:Dot(trGround.HitNormal) >= STEP_PLANE_DOT and math.abs(deviation) < STEP_UNEVEN_HEIGHT
+    local walkableZ = hg.WalkableNormalZ and hg.WalkableNormalZ(ply) or hg.WALKABLE_NORMAL_Z or 0.7
+    if trGround.HitNormal.z < walkableZ then
+        if coplanar and not clumsy then return end
+
+        return "steep"
+    end
     local slopeSeverity = math.Clamp((STEP_SLOPE_FLAT_Z - trGround.HitNormal.z) / (STEP_SLOPE_FLAT_Z - walkableZ), 0, 1)
 
     local trToe = util_TraceHull({
         start = footStart,
-        endpos = Vector(landing.x, landing.y, footStart.z),
+        endpos = Vector(landing.x, landing.y, expectedZ + STEP_TOE_HEIGHT),
         mins = STEP_HULL_MINS,
         maxs = STEP_HULL_MAXS,
-        filter = ply,
+        filter = filter,
         mask = MASK_PLAYERSOLID,
     })
     local toeHit = trToe.Hit and not trToe.StartSolid and trToe.HitNormal.z < 0.7
-    if toeHit and heightDiff <= STEP_LEVEL_TOLERANCE then return "toe", trToe end
-    if slopeSeverity > 0 and math.abs(heightDiff) >= STEP_UNEVEN_HEIGHT then return "slope", nil, slopeSeverity end
-    if toeHit or math.abs(heightDiff) >= STEP_UNEVEN_HEIGHT then return "uneven" end
+    if toeHit and deviation <= STEP_LEVEL_TOLERANCE then return "toe", trToe end
+    if coplanar then
+        if clumsy and slopeSeverity > 0 and math.abs(heightDiff) >= STEP_UNEVEN_HEIGHT then return "slope", nil, slopeSeverity end
+
+        return
+    end
+    if slopeSeverity > 0 and math.abs(deviation) >= STEP_UNEVEN_HEIGHT then return "slope", nil, slopeSeverity end
+    if toeHit or math.abs(deviation) >= STEP_UNEVEN_HEIGHT then return "uneven" end
+end
+
+local function StepContact(ply, hazard, moveDir, filter)
+    if hazard ~= "wall" and hazard ~= "toe" and hazard ~= "gap" then return true end
+    if not ply:IsOnGround() then return hazard == "gap" end
+
+    local pos = ply:GetPos()
+    local normal = GroundNormal(pos, filter)
+    local ahead = pos + moveDir * STEP_CONTACT_REACH
+    local aheadZ = PlaneZ(pos, normal, ahead.x, ahead.y)
+
+    if hazard == "wall" then
+        local tr = util_TraceLine({
+            start = pos + Vector(0, 0, STEP_TOE_HEIGHT + STEP_UP_LIMIT),
+            endpos = Vector(ahead.x, ahead.y, aheadZ + STEP_TOE_HEIGHT + STEP_UP_LIMIT),
+            filter = filter,
+            mask = MASK_PLAYERSOLID,
+        })
+
+        return tr.Hit and not tr.StartSolid and tr.HitNormal.z < 0.7
+    end
+
+    if hazard == "toe" then
+        local tr = util_TraceHull({
+            start = pos + Vector(0, 0, STEP_TOE_HEIGHT),
+            endpos = Vector(ahead.x, ahead.y, aheadZ + STEP_TOE_HEIGHT),
+            mins = STEP_HULL_MINS,
+            maxs = STEP_HULL_MAXS,
+            filter = filter,
+            mask = MASK_PLAYERSOLID,
+        })
+
+        return tr.Hit and not tr.StartSolid and tr.HitNormal.z < 0.7
+    end
+
+    return not GroundAt(ahead.x, ahead.y, math.max(pos.z, aheadZ) + 2, math.min(pos.z, aheadZ) - STEP_LEDGE_DROP, filter).Hit
 end
 
 local LIMP_TRIP_MIN_LIMP = 0.3
@@ -478,7 +561,8 @@ function hg.FootstepTripCheck(ply, stepIndex, rate, swingFraction)
     local reach = speed * hg.GaitSwingTime(rate, swingFraction) + hg.GaitLandingLead(speed, swingFraction)
     local landing = pos + moveDir * reach + right * (side * STEP_HALF_WIDTH)
 
-    local hazard, hazardTrace, severity = StepHazard(ply, pos, landing)
+    local filter = StepTraceFilter(ply)
+    local hazard, hazardTrace, severity = StepHazard(ply, pos, landing, filter)
     if not hazard then return end
     if hazard ~= "steep" and speed < STEP_TRIP_MIN_SPEED then return end
 
@@ -501,6 +585,7 @@ function hg.FootstepTripCheck(ply, stepIndex, rate, swingFraction)
         if not IsValid(ply) or not ply:Alive() or IsValid(ply.FakeRagdoll) or ply:GetMoveType() ~= MOVETYPE_WALK then return end
         local contactVelocity = ply:GetVelocity()
         if contactVelocity:Length2D() < STEP_STEEP_MIN_SPEED then return end
+        if not StepContact(ply, hazard, moveDir, filter) then return end
 
         if tripped then
             ExecuteTrip(ply, org, hazard, contactVelocity, hazardTrace, false, STEP_BREAK_CHANCE)

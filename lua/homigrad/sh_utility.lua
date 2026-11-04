@@ -1394,6 +1394,8 @@ local IsValid = IsValid
 		local effectiveness = hg.GetLimbEffectiveness(org, limb, segment)
 		if hg.HasTourniquetOnLimb and hg.HasTourniquetOnLimb(ent, limb) then
 			effectiveness = math.min(effectiveness, 0.2)
+		else
+			effectiveness = effectiveness * hg.GetArteryWeakness(org, limb)
 		end
 		if org.legstrength and org.legstrength > 0 and org.legstrength < 1 then
 			effectiveness = effectiveness * org.legstrength

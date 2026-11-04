@@ -63,6 +63,27 @@ function hg.organism.GetBloodDeliveryFraction(blood, scale)
 	return math.Clamp(getHemorrhageDelivery(blood) * (tonumber(scale) or 1), 0, 1)
 end
 
+local function getCPRBloodReserve(blood)
+	local normal = getNormalBloodVolume()
+	local cprMin = Clamp(tonumber(hg.organism.CPR_MIN_BLOOD) or 1750, 0, normal - 1)
+	return Clamp(((tonumber(blood) or normal) - cprMin) / (normal - cprMin), 0, 1) ^ 0.65
+end
+
+function hg.organism.GetSupportedCirculationFloor(org)
+	if not org or not org.alive then return 0 end
+	local blood = tonumber(org.blood) or getNormalBloodVolume()
+	local floor = 0
+	local cprMin = tonumber(hg.organism.CPR_MIN_BLOOD) or 1750
+	if (org.cprSupportUntil or 0) > CurTime() and blood > cprMin then
+		floor = Lerp(Clamp((blood - cprMin) / 1250, 0, 1), 0.2, 0.55)
+	end
+	local pulseless = tonumber(hg.organism.PULSELESS_BLOOD_VOLUME) or 2000
+	if not org.heartstop and (tonumber(org.heartbeat) or 0) > 0 and blood > pulseless then
+		floor = max(floor, Lerp(Clamp((blood - pulseless) / 1000, 0, 1), 0.1, 0.3))
+	end
+	return floor
+end
+
 function hg.organism.EnforceBloodCirculationLimit(org)
 	if not org then return false end
 	local cutoff = hg.organism.PULSELESS_BLOOD_VOLUME or 2000
@@ -231,7 +252,7 @@ function hg.organism.RestoreSupportedOxygen(org, amount, targets)
 	targets = targets or {}
 	if org.oxygenIntakeAvailable == false
 		and not (targets.artificialSupport == true and canReceiveResuscitationBreathing(org)) then return false end
-	local bloodReserve = hg.organism.GetBloodDeliveryFraction(org.blood, 1)
+	local bloodReserve = targets.cpr == true and getCPRBloodReserve(org.blood) or hg.organism.GetBloodDeliveryFraction(org.blood, 1)
 	local support = amount * bloodReserve
 	if support <= 0 then return false end
 
@@ -309,6 +330,14 @@ function hg.organism.GetCirculatoryOxygenReserve(pulse, pressure, blood)
 	)
 end
 
+function hg.organism.GetHypertensionPerfusionFloor(org)
+	if not org or org.heartstop or org.fibrillation then return 0 end
+	local hypertension = Clamp(tonumber(org.hypertension) or 0, 0, 1)
+	if hypertension <= 0 then return 0 end
+	local pressureK = Clamp(((tonumber(org.bloodPressure) or 0) - 80) / 15, 0, 1)
+	return Clamp(hypertension * 4, 0, 1) * pressureK * getHemorrhageDelivery(org.blood)
+end
+
 local function getHypovolemicFailureBlood()
 	return tonumber(hg.organism.HYPOVOLEMIC_FAILURE_BLOOD) or 3000
 end
@@ -378,8 +407,8 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 
 	local o2Range = math.max(tonumber(org.o2.range) or 30, 1)
 	local oxygenReserve = Clamp((tonumber(org.o2[1]) or 0) / o2Range, 0, 1)
-	local effectiveCirculation = hg.organism.GetCirculatoryOxygenReserve(org.pulse, org.bloodPressure, org.blood)
-	local cerebralPerfusion = effectiveCirculation
+	local effectiveCirculation = max(hg.organism.GetCirculatoryOxygenReserve(org.pulse, org.bloodPressure, org.blood), hg.organism.GetHypertensionPerfusionFloor(org))
+	local cerebralPerfusion = max(effectiveCirculation, hg.organism.GetSupportedCirculationFloor(org))
 	local peripheralPerfusion = effectiveCirculation * Clamp(1 - (org.sympatheticCompensation or 0) * 0.45, 0.55, 1)
 	local neckPenalty = Clamp(tonumber(org.neckBrainOxygenPenalty) or 0, 0, 0.8)
 	local convulsionPenalty = org.convulsing and hg.organism.convulsionConfig.hypoxiaPenalty or 0
@@ -1235,8 +1264,8 @@ module[2] = function(owner, org, timeValue)
 	local suicideAim = owner.hgSuicideAim or 1
 	if suicideAim <= 0 then suicideAim = 1 end
 	heartbeat = heartbeat + (owner.suiciding and suicideAim or 0) * 50
-	heartbeat = heartbeat + math.Clamp(rhythmShock - 20, 0, 40)
-	heartbeat = heartbeat + math.Clamp(rhythmPain, 40, 80) - 40
+	heartbeat = heartbeat + math.Clamp(rhythmShock - 20, 0, 40) * 0.6
+	heartbeat = heartbeat + (math.Clamp(rhythmPain, 40, 80) - 40) * 0.75
 	heartbeat = heartbeat + exertionHeartBoost
 	local adrenalineHeartBoost = 9 * math.min(math.max(activeCatecholamine - 1.5, 0), 3)
 	heartbeat = heartbeat + adrenalineHeartBoost

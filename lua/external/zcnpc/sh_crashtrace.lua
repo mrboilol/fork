@@ -24,6 +24,7 @@ local cvar = CreateConVar(CVAR, "0", FCVAR_ARCHIVE, "Write a crash trace to data
 
 local out, lines = nil, 0
 local hotUntil = 0
+local cleaning = false
 
 local function Open()
 	if out then return true end
@@ -124,7 +125,8 @@ local function Wrap(event, name, fn)
 		local hotOnly = HOT_FILTERED[event]
 
 		new = function(a, ...)
-			if (hotOnly and hotUntil <= SysTime()) or not Relevant(a) then return fn(a, ...) end
+			if hotOnly and hotUntil <= SysTime() then return fn(a, ...) end
+			if not (Relevant(a) or (cleaning and not hotOnly)) then return fn(a, ...) end
 
 			Write(">", label .. " " .. tostring(a))
 			local r1, r2, r3, r4, r5, r6 = fn(a, ...)
@@ -309,6 +311,14 @@ local function Beat()
 
 	Write("*", "alive, npcs " .. npcs)
 end
+
+hook.Add("PreCleanupMap", "zcnpc_crashtrace", function()
+	cleaning = true
+end)
+
+hook.Add("PostCleanupMap", "zcnpc_crashtrace", function()
+	cleaning = false
+end)
 
 hook.Add("InitPostEntity", "zcnpc_crashtrace", function()
 	Install()

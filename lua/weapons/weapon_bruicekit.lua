@@ -1,9 +1,9 @@
 if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_bandage_sh"
 SWEP.PrintName = "Bruice kit"
-SWEP.Color = Color(0, 255, 150)
+SWEP.Color = Color(60, 200, 60)
 SWEP.BandageTPIKColor = SWEP.Color
-SWEP.Instructions = "A medical kit designed to restore limb condition and a small amount of internal bleeding. RMB to use on someone else."
+SWEP.Instructions = "A roll of green trauma bandages designed to restore limb condition and a small amount of internal bleeding. RMB to use on someone else."
 SWEP.Category = "ZCity Medicine"
 SWEP.Spawnable = true
 SWEP.Primary.Wait = 1
@@ -12,8 +12,8 @@ SWEP.Primary.Next = 0
 local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Healing method: 0 = original models + progressive minigames, 1 = Judge animations", 0, 1)
 
 if CLIENT then
-	SWEP.WepSelectIcon = Material("vgui/wep_jack_hmcd_medkit")
-	SWEP.IconOverride = "vgui/wep_jack_hmcd_medkit.vmt"
+	SWEP.WepSelectIcon = Material("vgui/wep_jack_hmcd_bandage")
+	SWEP.IconOverride = "vgui/wep_jack_hmcd_bandage.png"
 	SWEP.BounceWeaponIcon = false
 end
 
@@ -214,13 +214,13 @@ if SERVER then
 				skull = "ValveBiped.Bip01_Head1",
 				jaw = "ValveBiped.Bip01_Head1",
 			}
-			local spearmint = Color(0, 255, 150)
+			local green = Color(60, 200, 60)
 
 			ent.bandaged_limbs = ent.bandaged_limbs or {}
 			for _, data in ipairs(bones) do
 				local boneName = bruisemap[data.limb or data.key]
 				if boneName then
-					ent.bandaged_limbs[boneName] = { pos = vector_origin, ang = angle_zero, color = spearmint }
+					ent.bandaged_limbs[boneName] = { pos = vector_origin, ang = angle_zero, color = green }
 				end
 			end
 

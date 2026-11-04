@@ -26,7 +26,7 @@ end
 local function getFakeTourniquetPower(ply, limb)
 	local count = hg.GetTourniquetCountOnLimb and hg.GetTourniquetCountOnLimb(ply, limb) or 0
 	local leg = limb == "lleg" or limb == "rleg"
-	return count >= 2 and (leg and 0.3 or 0.18) or count == 1 and (leg and 0.7 or 0.55) or 1
+	return count >= 2 and (leg and 0.3 or 0.18) or count == 1 and (leg and 0.7 or 0.55) or hg.GetArteryWeakness(ply.organism, limb)
 end
 
 local realPhysNum
@@ -411,7 +411,7 @@ hook.Add("Player Think", "HG_ClearManualWoundHold", function(ply)
 		ply:SetNWBool("hg_hold_wound_right", false)
 	end
 
-	if ply.organism then
+	if ply.organism and not ply.hgStandingWoundHold then
 		ply.organism.manualHoldWound = false
 		ply.organism.manualHoldWoundTarget = nil
 		ply.organism.manualHoldWoundHands = 0
@@ -1028,7 +1028,7 @@ hook.Add("Think", "Fake", function()
 		ply.HGFallCoverActive = fallCoverActive
 		ragdoll.HGFallCoverActive = fallCoverActive
 		local holdWound, holdWoundArterial = getHoldWound(org, ragdoll)
-		local wantsManualHold = (holdWound and org.canmove and hg.KeyDown(ply, IN_USE) and hg.KeyDown(ply, IN_JUMP)) or (org.neckslit and not org.otrub and holdWoundArterial and org.canmove)
+		local wantsManualHold = (holdWound and org.canmove and hg.KeyDown(ply, IN_USE) and hg.KeyDown(ply, IN_JUMP)) or (holdWoundArterial and not org.otrub and org.canmove and (org.neckslit or holdWound[7] ~= "aorta" and holdWound[7] ~= "renal"))
 		local canHoldLeft = IsValid(lupper) and IsValid(lforearm) and IsValid(lhand) and not org.larmamputated and not org.larmupamputated and not org.lhandamputated and not hg.IsLimbIncapacitated(org, "larm")
 		local canHoldRight = IsValid(rupper) and IsValid(rforearm) and IsValid(rhand) and not org.rarmamputated and not org.rarmupamputated and not org.rhandamputated and not hg.IsLimbIncapacitated(org, "rarm")
 		local canUseTwoHandHold = not IsValid(wep) or wep:GetClass() == "weapon_hands_sh"

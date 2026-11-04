@@ -8,13 +8,15 @@ local module = hg.organism.module.pain
 local consciousness_otrub_threshold = 0.3
 local consciousness_fake_threshold = 0.38
 local shock_heavy_offset = 30
-local shock_critical_offset = 60
-local shock_critical_ramp = 30
+local shock_critical_ramp = 40
 local consciousness_recovery_speed = 12
 local low_consciousness_recovery_speed = 16
 local otrub_consciousness_recovery_speed = 20
 local otrub_rouse_consciousness_recovery_speed = 3.5
 local shock_consciousness_threshold = 40
+local shock_adrenaline_offset = 10
+local shock_blackout_rate = 0.14
+local shock_heavy_blackout_rate = 0.5
 local shock_consciousness_analgesia_range = 60
 local pain_shock_threshold = 80
 local pain_shock_target = 55
@@ -118,6 +120,7 @@ module[1] = function(org)
 	org.zerlkersOverdose = 0
 
 	org.shock_turn = 0
+	org.shockBlackout = nil
 
 
 
@@ -249,9 +252,8 @@ module[2] = function(owner, org, timeValue)
 	end
 
 	local shockAnalgesia = Clamp(org.analgesia + org.painkiller * 0.3, 0, 1)
-	local shockThreshold = (shock_consciousness_threshold + shock_consciousness_analgesia_range * shockAnalgesia) * (1 + resilience * 0.6 + zerlkersResistance * 1.4) * math.max(org.traumaResistanceMul or 1, 1)
+	local shockThreshold = (shock_consciousness_threshold + shock_adrenaline_offset * Clamp(adrenaline, 0, 1) + shock_consciousness_analgesia_range * shockAnalgesia) *(1 + resilience * 0.6 + zerlkersResistance * 1.4) * math.max(org.traumaResistanceMul or 1, 1)
 	local shockHeavy = shockThreshold + shock_heavy_offset
-	local shockCritical = shockThreshold + shock_critical_offset
 	local o2Value = org.o2 and tonumber(org.o2[1]) or 30
 	local hypoxicDrain = o2Value < 4 and 0.1 or o2Value < 8 and 0.03 or o2Value < 10 and 0.01 or 0
 	if not org.otrub then
@@ -260,22 +262,19 @@ module[2] = function(owner, org, timeValue)
 			org.shock = math.Approach(org.shock, hypoxicShockTarget, timeValue * (o2Value < 4 and 12 or 5))
 		end
 	end
-	local shockActive = org.shock > shockThreshold
+	if org.otrub then
+		org.shockBlackout = nil
+	elseif org.shock > shockThreshold then
+		org.shockBlackout = math.max(org.shockBlackout or 0, org.shock >= shockHeavy and 2 or 1)
+	end
+	local shockActive = org.shockBlackout ~= nil
 	if shockActive then
-		local shockTarget, shockRate
-		if org.shock >= shockCritical then
-			shockTarget = 0
-			shockRate = Clamp(math.Remap(org.shock, shockCritical, shockCritical + shock_critical_ramp, 0.4, 0.8), 0.4, 0.8)
-		elseif org.shock >= shockHeavy then
-			local frac = (org.shock - shockHeavy) / (shockCritical - shockHeavy)
-			shockTarget = Lerp(frac, 0.42, 0.32)
-			shockRate = Lerp(frac, 0.4, 0.6)
-		else
-			local frac = (org.shock - shockThreshold) / (shockHeavy - shockThreshold)
-			shockTarget = Lerp(frac, 0.6, 0.42)
-			shockRate = Lerp(frac, 0.12, 0.2)
+		local heavy = org.shockBlackout >= 2
+		if heavy then
+			local climb = Clamp((org.shock - shockHeavy) / shock_critical_ramp, 0, 1)
+			org.disorientation = math.max(org.disorientation or 0, 1.5 + climb * 2)
 		end
-		org.consciousness = Approach(org.consciousness, shockTarget, timeValue * shockRate)
+		org.consciousness = Approach(org.consciousness, 0, timeValue * (heavy and shock_heavy_blackout_rate or shock_blackout_rate))
 	end
 	if org.tranquilizer > 0 then
 
@@ -398,6 +397,12 @@ module[2] = function(owner, org, timeValue)
 		end
 	elseif spine2Broken then
 		org.painadd = 0
+	end
+
+	if org.otrub then
+		local queueDrain = timeValue * pain_drain_base * pain_drain_otrub_mul * analgesiaMul
+		org.painadd = max((org.painadd or 0) - queueDrain, 0)
+		org.headpainadd = max((org.headpainadd or 0) - queueDrain, 0)
 	end
 
 	//org.painkiller = Approach(org.painkiller, 0, timeValue / 240 * (org.naloxone * 25 + 1))

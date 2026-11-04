@@ -96,7 +96,7 @@ local seizureStopping
 
 local MUSIC_VOLUME = 0.75
 local BRAINROT_VOLUME = 0.45
-local INCAPACITATION_DEATH_TIME = 20
+local INCAPACITATION_DEATH_TIME = 25
 
 local function GetLocalDeathState()
 	local ply = LocalPlayer()
@@ -358,6 +358,8 @@ local nextSeizureMemory = 0
 local seizureMemory
 local seizureMemoryEnd = 0
 local wasSeizureActive = false
+local earlyMemoryTaken = false
+local lastMemoryHealth
 
 local function remove_imgs()
 	if file.Exists("dreams", "DATA") then
@@ -391,6 +393,11 @@ hook.Add("Player Spawn", "screenshot_game", function(ply)
 		lply.tried_fixing_limb = nil
 
 		hg.alivecntr = hg.alivecntr + 1
+		curscreen = 1
+		switch = false
+		screened = 0
+		earlyMemoryTaken = false
+		lastMemoryHealth = nil
 
 		for i, screen in ipairs(hg.screens) do
 			hg.screens[i] = nil
@@ -450,15 +457,22 @@ hook.Add("PostRender", "screenshot_think", function()
 
 	if not org or not org.brain or !lply:Alive() then return end
 
+	local health = lply:Health()
+	if lastMemoryHealth and health < lastMemoryHealth then QueueMemoryCapture() end
+	lastMemoryHealth = health
+
 	if pendingMemoryCapture then
 		pendingMemoryCapture = false
-		if not org.otrub and blackoutLerp < 0.2 and CurTime() - lastMemoryCapture > 5 then SaveMemoryScreen("event_") end
+		if not org.otrub and blackoutLerp < 0.2 and CurTime() - lastMemoryCapture > 2 then SaveMemoryScreen("event_") end
 	end
 
 	if org.otrub then return end
 
 	local part = CurTime() - alivestart
-	if part % 20 > 19 and (screened != math.Round(part / 20, 0)) then
+	if not earlyMemoryTaken and part > 3 then
+		earlyMemoryTaken = true
+		SaveMemoryScreen("")
+	elseif part % 20 > 19 and (screened != math.Round(part / 20, 0)) then
 		screened = math.Round(part / 20, 0)
 		SaveMemoryScreen("")
 	end
@@ -542,18 +556,22 @@ hook.Add("Post Post Processing", "organism-otrub-overlay", function()
 		surface.DrawRect(-1, -1, ScrW() + 2, ScrH() + 2)
 	end
 
+	if hg.O2VignetteOrg and hg.DrawO2Vignette then hg.DrawO2Vignette(hg.O2VignetteOrg) end
+	if hg.DrawConvulsionWhiteout then hg.DrawConvulsionWhiteout(org) end
+
 	DrawSeizureMemory(org)
 
 	if otrub then
 		lerpedbrain = LerpFT(0.05, lerpedbrain, brain)
 		local part = CurTime() - braindeathstart
-		local time = 12 - math.min(math.max(lerpedbrain - 0.1, 0) * 8, 6)
+		local time = 6 - math.min(math.max(lerpedbrain - 0.1, 0) * 4, 3)
+		if curscreen > #screens then curscreen = 1 end
 		if part % time > time / 3 and curscreen <= #screens and screens[curscreen] and !screens[curscreen]:IsError() then
 			switch = true
 			local part2 = math.ease.InOutSine(math.sin(((part % time) - time / 3) / (time / 3 * 2) * math.pi))
 			lerpedpart = LerpFT(0.1, lerpedpart, part2)
 
-			surface.SetDrawColor(255, 255, 255, math.Clamp(lerpedpart * 50, 0, 255))
+			surface.SetDrawColor(255, 255, 255, math.Clamp(lerpedpart * 110, 0, 255))
 			surface.SetMaterial(screens[curscreen])
 			surface.DrawTexturedRect(0, 0, ScrW(), ScrH())
 
@@ -563,7 +581,7 @@ hook.Add("Post Post Processing", "organism-otrub-overlay", function()
 			switch = false
 		end
 	else
-		braindeathstart = CurTime() - 4
+		braindeathstart = CurTime() - 2
 	end
 end)
 
@@ -945,7 +963,6 @@ hook.Add("OnNetVarSet","wounds_netvar2",function(index, key, var)
 		
 		if IsValid(ent) then
 			var = istable(var) and var or {}
-			local hadBaseline = ent.arterialwounds != nil
 			if ent.arterialwounds then
 				for i = 1, #ent.arterialwounds do
 					if not var[i] then continue end
@@ -955,13 +972,6 @@ hook.Add("OnNetVarSet","wounds_netvar2",function(index, key, var)
 			end
 			for _, wound in ipairs(var) do
 				wound.visualReadyAt = wound.visualReadyAt or (CurTime() + 0.2)
-			end
-
-			if hadBaseline then
-				for i = 1, #var do
-					if ent.arterialwounds[i] then continue end
-					hg.queueArterialWoundSound(ent, var[i])
-				end
 			end
 
 			ent.arterialwounds = var
@@ -1022,19 +1032,6 @@ local checkpulsebones = {
 }
 local hg_blood_fps = ConVarExists("hg_blood_fps") and GetConVar("hg_blood_fps") or CreateClientConVar("hg_blood_fps", 24, true, nil, "fps to draw blood", 12, 165)
 local hg_blood_draw_distance = ConVarExists("hg_blood_draw_distance") and GetConVar("hg_blood_draw_distance") or CreateClientConVar("hg_blood_draw_distance", 1024, true, nil, "distance to draw blood", 0, 4096)
-local arteryDelayedDripSounds = {
-	"gore/blood1.mp3",
-	"gore/blood2.mp3",
-	"gore/blood3.mp3",
-	"gore/blood4.mp3",
-	"gore/blood5.mp3",
-	"gore/blood6.mp3",
-}
-local arteryNeckSlitSound = "rem_neckslit.ogg"
-local arterySoundDelayMin = 1
-local arterySoundDelayMax = 1.25
-local arterySoundPitchMin = 95
-local arterySoundPitchMax = 110
 local arterySizeMul = 1.35
 local bleedDown = Vector(0, 0, -1)
 local arteryBurstCount = 2
@@ -1198,63 +1195,6 @@ local function getArterySoundEnt(ent)
 	if IsValid(rag) and (not ent:IsPlayer() or not ent:Alive()) then return rag end
 
 	return ent
-end
-
-local function getArterialWoundPos(ent, wound)
-	local target = getArterySoundEnt(ent)
-	if not IsValid(target) then return end
-	target:SetupBones()
-	local pos = hg.organism.GetWoundTransform(target, wound)
-	return pos, target
-end
-
-local function randomArteryPitch()
-	return math.random(arterySoundPitchMin, arterySoundPitchMax)
-end
-
-local function isArterySoundAlive(ent)
-	if not IsValid(ent) then return false end
-	local owner = ent:IsRagdoll() and hg.RagdollOwner(ent) or ent
-	if IsValid(owner) and owner:IsPlayer() then
-		return owner:Alive() and (not owner.organism or owner.organism.alive ~= false)
-	end
-	local org = ent.organism
-	return org and org.alive ~= false or ent.Health and ent:Health() > 0
-end
-
-local function playRandomArteryDrip(ent, wound, vol)
-	local pos = getArterialWoundPos(ent, wound)
-	if not pos then return end
-
-	sound.Play(arteryDelayedDripSounds[math.random(#arteryDelayedDripSounds)], pos, 70, randomArteryPitch(), vol or 1)
-end
-
-function hg.queueArterialWoundSound(ent, wound)
-	if not IsValid(ent) or not wound or not isArterySoundAlive(ent) then return end
-
-	local delay = math.Rand(arterySoundDelayMin, arterySoundDelayMax)
-	local artery = wound[7]
-	local org = ent.organism or {}
-
-	if artery == "arteria" and isArterySoundAlive(ent) and not org.otrub then
-		local _, target = getArterialWoundPos(ent, wound)
-		if IsValid(target) then
-			local snd = CreateSound(target, arteryNeckSlitSound)
-			if snd then
-				snd:SetSoundLevel(75)
-				snd:PlayEx(1, randomArteryPitch())
-				snd:ChangeVolume(0, delay)
-				timer.Simple(delay + 0.05, function()
-					if snd then snd:Stop() end
-				end)
-			end
-		end
-	end
-
-	timer.Simple(delay, function()
-		if not isArterySoundAlive(ent) then return end
-		playRandomArteryDrip(ent, wound, artery == "arteria" and 0.85 or 1)
-	end)
 end
 
 local hg_heartbeat_volume = ConVarExists("hg_heartbeat_volume") and GetConVar("hg_heartbeat_volume") or CreateClientConVar("hg_heartbeat_volume", 1, true, nil, "heartbeat loudness", 0, 4)

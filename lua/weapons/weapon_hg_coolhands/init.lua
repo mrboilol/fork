@@ -566,7 +566,7 @@ function SWEP:ApplyForce()
 							-- destroyed heart, airway, lungs, or critically low blood volume.
 							if hg.organism.RestoreSupportedOxygen then
 								hg.organism.RestoreSupportedOxygen(org, 0.018 * skillMult, {
-									artificialSupport = true,
+									artificialSupport = true, cpr = true,
 									oxygen = math.min(24, org.o2.range or 30), bodyoxygen = 0.52,
 									brainoxygen = 0.48, perfusion = 0.42, peripheralperfusion = 0.38,
 									cerebralPerfusion = 0.42, myocardialOxygen = 0.45,

@@ -152,6 +152,7 @@ if CLIENT then
 
 	hg.notifications = hg.notifications or {}
 	hg.thoughts = hg.thoughts or {}
+	hg.overlapNotifications = hg.overlapNotifications or {}
 	hg.notificationFont = "HuyFont"
 	local thoughtSound
 	local oldclick = 0
@@ -169,6 +170,7 @@ if CLIENT then
 		hg.currentNotification = nil
 		hg.notifications = {}
 		hg.thoughts = {}
+		hg.overlapNotifications = {}
 	end, "hg_clear_notification_mode_switch")
 
 	hook.Add("Player_Death","removeNotifications",function(ply)
@@ -178,6 +180,7 @@ if CLIENT then
 		//hg.currentNotification = nil
 		hg.notifications = {}
 		hg.thoughts = {}
+		hg.overlapNotifications = {}
 	end)
 
 	hook.Add("Player Spawn","removeNotificationsa",function(ply)
@@ -187,6 +190,7 @@ if CLIENT then
 		hg.currentNotification = nil
 		hg.notifications = {}
 		hg.thoughts = {}
+		hg.overlapNotifications = {}
 	end)
 
 	hook.Add("HG_OnOtrub","removeNotificationsb",function(ply)
@@ -196,6 +200,7 @@ if CLIENT then
 		//hg.currentNotification = nil
 		hg.notifications = {}
 		hg.thoughts = {}
+		hg.overlapNotifications = {}
 	end)
 
 	local defaultShowTimer = 3
@@ -248,6 +253,7 @@ if CLIENT then
 
 		hg.currentNotification = nil
 		hg.notifications = {}
+		hg.overlapNotifications = {}
 
 		table.insert(hg.notifications, {msg, (showTimer or defaultShowTimer), clr or Color(255, 255, 255, 255)})
 	end
@@ -325,6 +331,7 @@ if CLIENT then
 			hg.currentNotification = nil
 			hg.notifications = {}
 			hg.thoughts = {}
+			hg.overlapNotifications = {}
 			return
 		end
 
@@ -341,10 +348,37 @@ if CLIENT then
 
 	local time_spent = CurTime()
 	local coloruse = Color(255,255,255,255)
+	local function GetThoughtInstability(org)
+		local o2 = istable(org.o2) and (tonumber(org.o2[1]) or 30) or 30
+		local oxygen = math.Clamp((18 - o2) / 18, 0, 1)
+		local blood = math.Clamp((4300 - (tonumber(org.blood) or 5000)) / 1300, 0, 1)
+		local consciousness = math.Clamp((0.65 - (tonumber(org.consciousness) or 1)) / 0.65, 0, 1)
+		local brainOxygen = math.Clamp((0.55 - (tonumber(org.brainoxygen) or 1)) / 0.55, 0, 1)
+		return math.max(oxygen, blood * 0.8, consciousness, brainOxygen)
+	end
+
+	local overlapStagger = 0.35
+	local overlapMax = 3
+	local function ThoughtsOverlap(org)
+		if not org then return false end
+		return org.panicattackActive or org.critical or org.incapacitated or GetThoughtInstability(org) > 0.35
+	end
+
 	local function NotificationsThink()
 		//if hg.currentNotification or #hg.notifications == 0 then return end
 		if #hg.notifications == 0 then return end
-		if hg.currentNotification then return end
+		if hg.currentNotification then
+			local overlap = hg.overlapNotifications
+			local last = overlap[#overlap] or hg.currentNotification
+			local now = CurTime()
+			if #overlap < overlapMax and now - (last[2] or 0) >= overlapStagger and lply:Alive() and not (lply.organism and lply.organism.otrub) and ThoughtsOverlap(lply.organism) then
+				local tbl = table.remove(hg.notifications, 1)
+				if istable(tbl) and tbl[1] then
+					overlap[#overlap + 1] = {tbl[1], now, tbl[2], tbl[3], tbl[4]}
+				end
+			end
+			return
+		end
 		if !lply:Alive() then hg.notifications = {} return end
 		if lply.organism and lply.organism.otrub then return end
 		local tbl = hg.notifications[1]
@@ -377,15 +411,6 @@ if CLIENT then
 	local vector_one = Vector( 1, 1, 0)
 
 	local bluewhite = Color(187, 187, 255)
-	local function GetThoughtInstability(org)
-		local o2 = istable(org.o2) and (tonumber(org.o2[1]) or 30) or 30
-		local oxygen = math.Clamp((18 - o2) / 18, 0, 1)
-		local blood = math.Clamp((4300 - (tonumber(org.blood) or 5000)) / 1300, 0, 1)
-		local consciousness = math.Clamp((0.65 - (tonumber(org.consciousness) or 1)) / 0.65, 0, 1)
-		local brainOxygen = math.Clamp((0.55 - (tonumber(org.brainoxygen) or 1)) / 0.55, 0, 1)
-		return math.max(oxygen, blood * 0.8, consciousness, brainOxygen)
-	end
-
 	local function GetThoughtRedness(instability)
 		return math.Clamp(instability, 0, 1) ^ 0.75 * 0.85
 	end
@@ -538,6 +563,57 @@ if CLIENT then
 		end
 	end
 
+	local overlapColor = Color(255, 255, 255, 255)
+	local function OverlapNotificationsDraw()
+		local overlap = hg.overlapNotifications
+		if #overlap == 0 then return end
+		local org = lply.organism
+		if not org or not org.pain or not org.brain then return end
+
+		local now = CurTime()
+		local finished = org.otrub or not lply:Alive()
+		local instability = GetThoughtInstability(org)
+		local redness = GetThoughtRedness(instability)
+		local shake = GetThoughtShake(instability)
+		local uiScale = hg.UIScale and hg.UIScale() or 1
+		local font = hg.notificationFont
+		surface.SetFont(font)
+
+		for i = #overlap, 1, -1 do
+			local tbl = overlap[i]
+			local msg, time, timeshow, clr = tbl[1], tbl[2], tbl[3], tbl[4] or color_white
+			local len = utf8.len(msg) or #msg
+			local time_one_symbol = 0.06 * (org.brain > 0.1 and 3 or 1)
+			local time_to_read = len * time_one_symbol
+			local wait = math.Clamp(time_to_read / 3, 1, 4) + (timeshow or defaultShowTimer)
+
+			if finished or time + time_to_read + wait <= now then
+				local click = math.Clamp(math.ceil((now - time) / time_one_symbol), 0, len)
+				local txt = finished and click < len and utf8.sub(utf8.force(msg), 1, click) .. "-" or msg
+				chat.AddText(Color(clr.r, clr.g, clr.b, 255), txt .. "\n")
+				table.remove(overlap, i)
+			else
+				local part = math.min(1 - (time + time_to_read - now) / time_to_read, 1)
+				local part2 = (wait + math.min(time + time_to_read - now, 0)) / wait
+				local txt = utf8.sub(utf8.force(msg), 1, math.ceil(part * len))
+				local painFade = math.Clamp(((90 - org.pain) / 90) * 255, 0, 255)
+
+				overlapColor.r = Lerp(redness, clr.r, 255)
+				overlapColor.g = Lerp(redness, math.min(painFade, clr.g), 25)
+				overlapColor.b = Lerp(redness, math.min(painFade, clr.g), 25)
+				overlapColor.a = 255 * math.Clamp(part2, 0, 1)
+				colBrown.a = overlapColor.a
+
+				local txtw = surface.GetTextSize(txt)
+				local jitter = math.Rand(0, org.pain > 10 and org.pain / 10 or 0) + math.Rand(-shake, shake)
+				local x = ScrW() / 2 - txtw / 2 + jitter * uiScale
+				local y = ScrH() - 180 * uiScale - i * 30 * uiScale + math.Rand(-shake, shake) * uiScale
+
+				draw.SimpleTextOutlined(txt, font, x, y, overlapColor, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER, 1.5, colBrown)
+			end
+		end
+	end
+
 	local thoughtBrown = Color(20, 20, 20)
 	local function ThoughtsDraw()
 		if not hg_newthoughts:GetBool() then return end
@@ -574,6 +650,7 @@ if CLIENT then
 
 	hook.Add("DrawOverlay", "HGNotificationsThink", function()
 		NotificationsDraw()
+		OverlapNotificationsDraw()
 		ThoughtsDraw()
 	end)
 	hook.Add("Think", "HGNotificationsThink", NotificationsThink)

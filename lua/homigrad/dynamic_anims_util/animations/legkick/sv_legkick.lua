@@ -32,6 +32,80 @@ local CURBSTOMP_SEGMENT_SIZE = Vector(7, 7, 7)
 local CURBSTOMP_HEAD_RADIUS = 16
 local CURBSTOMP_HEAD_STOMPS_TO_POP = 5
 local CURBSTOMP_HEAD_RESET = 8
+local CURB_FLOOR_RANGE = 14
+local CURB_SIDE_RANGE = 14
+local CURB_LIP_RANGE = 9
+local CURB_MIN_HEIGHT = 3
+local CURB_MAX_HEIGHT = 30
+local CURB_LIP_DROP = 5
+local CURB_JAW_DMG_MIN = 1.6
+local CURB_JAW_DMG_MAX = 2.8
+local KICK_BLOCK_FRONT_DOT = 0.2
+local KICK_DEFAULT_PARRY_WINDOW = 0.43
+local KICK_PARRY_STUN = 1
+local KICK_PARRY_PUSH = 160
+local KICK_PARRY_STAMINA_REWARD = 6
+local KICK_BLOCK_PUSH = 260
+local KICK_BLOCK_DISABLE = 0.8
+local KICK_BLOCK_STUN_CHANCE = 0.4
+local KICK_BLOCK_STUN = 0.75
+
+local function lightStunNextTick(ply, time)
+    timer.Simple(0, function()
+        if IsValid(ply) and ply:Alive() and hg.LightStunPlayer then hg.LightStunPlayer(ply, time) end
+    end)
+end
+
+local function playKickBlockFx(ent, wep, trace, state)
+    if wep.PlayBlockImpactEffect then
+        wep:PlayBlockImpactEffect(trace, wep, state)
+    else
+        ent:EmitSound("physics/body/body_medium_impact_soft6.wav", 70, state == "parry" and 120 or 95)
+    end
+end
+
+local function resolveKickBlock(kicker, ent, hitPos, normal)
+    if not ent:IsPlayer() or IsValid(ent.FakeRagdoll) then return false end
+    local wep = ent:GetActiveWeapon()
+    if not IsValid(wep) or not wep.GetBlocking or not wep:GetBlocking() or not wep.GetStartedBlocking then return false end
+
+    local toKicker = kicker:WorldSpaceCenter() - ent:WorldSpaceCenter()
+    toKicker.z = 0
+    toKicker:Normalize()
+    local aim = ent:GetAimVector()
+    aim.z = 0
+    aim:Normalize()
+    if aim:Dot(toKicker) < KICK_BLOCK_FRONT_DOT then return false end
+
+    local trace = {HitPos = hitPos, HitNormal = -normal}
+    local elapsed = CurTime() - wep:GetStartedBlocking()
+    local window = wep.GetBlockParryWindow and wep:GetBlockParryWindow() or KICK_DEFAULT_PARRY_WINDOW
+
+    if elapsed >= 0 and elapsed < window then
+        playKickBlockFx(ent, wep, trace, "parry")
+        sound.Play("clash/rem_clashblunt.wav", hitPos, 82, math.random(130, 150))
+
+        local stamina = ent.organism and ent.organism.stamina
+        if stamina then
+            stamina[1] = math.min(stamina.max or stamina[1], stamina[1] + KICK_PARRY_STAMINA_REWARD)
+        end
+
+        kicker:SetVelocity(-normal * KICK_PARRY_PUSH)
+        lightStunNextTick(kicker, KICK_PARRY_STUN)
+        return true
+    end
+
+    playKickBlockFx(ent, wep, trace, "break")
+    if wep.SetBlocking then wep:SetBlocking(false) end
+    if wep.SetBlockDisabledUntil then wep:SetBlockDisabledUntil(CurTime() + KICK_BLOCK_DISABLE) end
+    if wep.SetLastBlocked then wep:SetLastBlocked(CurTime()) end
+    ent:SetVelocity(normal * KICK_BLOCK_PUSH)
+
+    if math.Rand(0, 1) <= KICK_BLOCK_STUN_CHANCE then
+        lightStunNextTick(ent, KICK_BLOCK_STUN)
+    end
+    return true
+end
 
 local function getKickDamageMul(ply)
 	local mul = ply.MeleeDamageMul or 1
@@ -211,6 +285,100 @@ local function handleCurbstompHead(ent, hitPos)
     end
 end
 
+local function curbTraceFilter(ent)
+    return not (ent:IsPlayer() or ent:IsNPC() or ent:IsRagdoll())
+end
+
+local function curbTrace(startPos, endPos)
+    return util.TraceLine({start = startPos, endpos = endPos, filter = curbTraceFilter, mask = MASK_SOLID})
+end
+
+local function findCurbEdge(headPos)
+    local floor = curbTrace(headPos, headPos - Vector(0, 0, CURB_FLOOR_RANGE))
+    if not floor.Hit or floor.StartSolid or floor.HitNormal.z < 0.7 then return end
+    local floorZ = floor.HitPos.z
+
+    for i = 0, 7 do
+        local dir = Angle(0, i * 45, 0):Forward()
+        local side = curbTrace(headPos, headPos + dir * CURB_SIDE_RANGE)
+
+        if side.Hit then
+            if math.abs(side.HitNormal.z) < 0.6 then
+                local probe = side.HitPos + dir * 3
+                local top = curbTrace(Vector(probe.x, probe.y, floorZ + CURB_MAX_HEIGHT + 2), Vector(probe.x, probe.y, floorZ))
+                if top.Hit and not top.StartSolid then
+                    local height = top.HitPos.z - floorZ
+                    if height >= CURB_MIN_HEIGHT and height <= CURB_MAX_HEIGHT then
+                        return Vector(side.HitPos.x, side.HitPos.y, math.min(top.HitPos.z, headPos.z)), side.HitNormal
+                    end
+                end
+            end
+        else
+            local lipStart = Vector(headPos.x, headPos.y, floorZ + 2)
+            local lipEnd = lipStart + dir * CURB_LIP_RANGE
+            if not curbTrace(lipStart, lipEnd).Hit then
+                local drop = curbTrace(lipEnd, lipEnd - Vector(0, 0, CURB_MAX_HEIGHT + 10))
+                if not drop.Hit or (floorZ - drop.HitPos.z) >= CURB_LIP_DROP then
+                    return floor.HitPos + dir * (CURB_LIP_RANGE * 0.5), dir
+                end
+            end
+        end
+    end
+end
+
+local function tryCurbStompJaw(attacker, ent, inflictor, kickDir)
+    local input = hg.organism and hg.organism.input_list and hg.organism.input_list.jaw
+    if not input then return end
+
+    local owner = hg.RagdollOwner(ent) or ent
+    local org = (IsValid(owner) and owner.organism) or ent.organism
+    if not org or not IsValid(org.owner) then return end
+
+    local headPos = getHeadPos(ent)
+    if not headPos then return end
+
+    local edgePos, edgeNormal = findCurbEdge(headPos)
+    if not edgePos then return end
+
+    local dmginfo = DamageInfo()
+    dmginfo:SetAttacker(attacker)
+    dmginfo:SetInflictor(inflictor)
+    dmginfo:SetDamage(30)
+    dmginfo:SetDamageType(DMG_CLUB)
+    dmginfo:SetDamageForce(kickDir * 3000)
+    dmginfo:SetDamagePosition(headPos)
+
+    local sprayDir = (edgeNormal + vector_up):GetNormalized()
+    input(org, nil, math.Rand(CURB_JAW_DMG_MIN, CURB_JAW_DMG_MAX), dmginfo, nil, sprayDir, headPos)
+
+    org.painadd = (org.painadd or 0) + 30
+    org.shock = math.min((org.shock or 0) + 25, 95)
+    if hg.organism.AddInstantPain then hg.organism.AddInstantPain(org, 25, "head") end
+
+    for _ = 1, math.random(4, 6) do
+        local normal = (sprayDir + VectorRand(-0.8, 0.8)):GetNormalized()
+        local effect = EffectData()
+        effect:SetOrigin(headPos)
+        effect:SetNormal(normal)
+        effect:SetMagnitude(2)
+        effect:SetScale(1.2)
+        effect:SetRadius(3)
+        util.Effect("BloodImpact", effect, true, true)
+        net.Start("hg_bloodimpact")
+        net.WriteVector(headPos)
+        net.WriteVector(normal * math.Rand(0.2, 0.45))
+        net.WriteFloat(math.Rand(5, 9))
+        net.WriteInt(math.random(5, 8), 8)
+        net.SendPVS(headPos)
+    end
+
+    util.Decal("Blood", edgePos + edgeNormal * 4, edgePos - edgeNormal * 8, ent)
+    util.Decal("Blood", headPos, headPos - Vector(0, 0, 24), ent)
+
+    ent:EmitSound("physics/body/body_medium_break" .. math.random(2, 4) .. ".wav", 70, math.random(90, 105))
+    ent:EmitSound("physics/flesh/flesh_bloody_break.wav", 65, math.random(95, 110))
+end
+
 function PLAYER:LegAttack()
     if not self:Alive() or hg.GetCurrentCharacter(self):IsRagdoll() or self:GetNWFloat("InLegKick",0) > CurTime() then return end
     if self.InLegKick and self.InLegKick > CurTime() then return end
@@ -361,6 +529,7 @@ function PLAYER:LegAttack()
 						inflictor = self
 					end
 					if IsValid(shieldTarget) and shieldTarget:IsPlayer() and hook.Run("hg_ShieldKickBlock", shieldTarget, self, inflictor, self:EyePos(), tr.HitPos) then continue end
+					if not isCurbstomp and resolveKickBlock(self, ent, tr.HitPos, normal) then continue end
 
                     if not soundplayed then
                         soundplayed = true
@@ -422,6 +591,10 @@ function PLAYER:LegAttack()
                         end
 
                         ent:SetVelocity(normal * playerPush)
+                    end
+
+                    if stompHeadHit then
+                        tryCurbStompJaw(self, ent, inflictor, normal)
                     end
 
                     if isCurbstomp then

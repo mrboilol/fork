@@ -80,7 +80,7 @@ end
 
 local SOUND_PREVIEW_ICON = Material("icon16/sound.png", "smooth")
 local SOUND_PREVIEW_CONVARS = {hg_dyingsound = true, hg_painsound = true, hg_otrubsound = true}
-local SOUND_PREVIEW_FALLBACK = {hg_dyingsound = 2, hg_painsound = 6, hg_otrubsound = 0}
+local SOUND_PREVIEW_FALLBACK = {hg_dyingsound = 12, hg_painsound = 6, hg_otrubsound = 0}
 local SOUND_PREVIEW_PATHS = {
     hg_dyingsound = {
         [0] = "sound/itsallcomingtoanend.mp3",
@@ -92,7 +92,8 @@ local SOUND_PREVIEW_PATHS = {
         [7] = "sound/sonimcooked.mp3",
         [9] = "sound/itshopeless.mp3",
         [10] = "sound/vitality.mp3",
-        [11] = "sound/asphyxiation.ogg"
+        [11] = "sound/asphyxiation.ogg",
+        [12] = "sound/playersounds/hell.mp3"
     },
     hg_painsound = {
         [0] = "sound/zbattle/pain_beat.mp3",
@@ -223,6 +224,7 @@ hg.settings:AddOpt("Server-side settings","hg_selfpreservation", "self preservat
 hg.settings:AddOpt("Server-side settings","hg_depression", "Depression")
 hg.settings:AddOpt("Server-side settings","hg_panic", "Panic attacks")
 hg.settings:AddOpt("Server-side settings","hg_hatprotect", "Hat protection")
+hg.settings:AddOpt("Server-side settings","hg_oldsoundoptions", "Old dying/pain/otrub sound options")
 hg.settings:AddOpt("Server-side settings","hg_dyingsound", "Dying sound mode", nil, nil, "int")
 hg.settings:AddOpt("Server-side settings","hg_painsound", "Pain sound mode", nil, nil, "int")
 hg.settings:AddOpt("Server-side settings","hg_otrubsound", "Otrub sound mode", nil, nil, "int")
@@ -727,6 +729,7 @@ function SettingsRefreshContent()
         if convarName == "hg_gollavo_headshot_effect" and not InfoHasLocalAchievement("gollavo") then continue end
         local convar = GetConVar(settingData[2])
         if not convar then continue end
+        if (convarName == "hg_dyingsound" or convarName == "hg_painsound" or convarName == "hg_otrubsound") and not (GetConVar("hg_oldsoundoptions") and GetConVar("hg_oldsoundoptions"):GetBool()) then continue end
 
         local rowParent = scroll
         local isSoundRow = SOUND_PREVIEW_CONVARS[convarName]

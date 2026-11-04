@@ -367,6 +367,16 @@ local function Trace_Bullet(box, hit, ricochet, impact, org, organs, dmg, dmgInf
 			local passesBrain = energyAfterFraction > 0.08 and energyAfterFraction * brainTransfer > 0.06
 			if bullet.StopsInBrain or not passesBrain then
 				result.stopped = true
+				local lobes = impact.brainLobesHit
+				if table.Count(lobes) == 1 and math.Rand(0, 1) < math.Clamp(1 - brainTransfer * 0.9, 0.05, 0.85) then
+					local others = {}
+					for _, lobe in ipairs({"brainFrontal", "brainParietal", "brainTemporal", "brainOccipital"}) do
+						if not lobes[lobe] then others[#others + 1] = lobe end
+					end
+					local other = others[math.random(#others)]
+					input_list[other](org, bone, dmg * 0.7, dmgInfo, box[6], dir, hit, ricochet, impact, organ)
+					lobes[other] = true
+				end
 			end
 			if table.Count(impact.brainLobesHit or {}) >= 2 or (org.brain or 0) >= 0.95 then
 				org.brain = 1

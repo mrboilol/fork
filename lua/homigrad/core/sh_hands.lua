@@ -51,6 +51,14 @@ function hg.GetLimbEffectiveness(org, limb, segment)
 	return up ^ (leg and 0.9 or 0.75) * down ^ (leg and 0.75 or 0.9)
 end
 
+local arteryWeakness = {larm = 0.7, rarm = 0.7, lleg = 0.82, rleg = 0.82}
+
+function hg.GetArteryWeakness(org, limb)
+	local floor = arteryWeakness[limb]
+	if not org or not floor then return 1 end
+	return Lerp(math.Clamp(tonumber(org[limb .. "artery"]) or 0, 0, 1), 1, floor)
+end
+
 function hg.GetArmEffectiveness(ply, limb, segment)
 	local org = IsValid(ply) and ply.organism
 	if not org then return 1 end
@@ -61,7 +69,9 @@ function hg.GetArmEffectiveness(ply, limb, segment)
 	local effectiveness = hg.GetLimbEffectiveness(org, limb, segment)
 
 	local tourniquetCount = hg.GetTourniquetCountOnLimb and hg.GetTourniquetCountOnLimb(ply, limb) or 0
-	if tourniquetCount == 1 then
+	if tourniquetCount == 0 then
+		effectiveness = effectiveness * hg.GetArteryWeakness(org, limb)
+	elseif tourniquetCount == 1 then
 		effectiveness = effectiveness * 0.55
 	elseif tourniquetCount >= 2 then
 		effectiveness = effectiveness * 0.18

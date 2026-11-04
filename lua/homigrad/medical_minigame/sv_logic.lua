@@ -299,6 +299,54 @@ function hg.MedicalMinigame.StartDislocationMinigame(ply, ent, group)
     return true
 end
 
+local function CanCycleBandageChoice(wep)
+    return IsValid(wep) and wep.CycleBandageChoice ~= nil and wep:GetClass() ~= "weapon_bruicekit" and not wep.traumaBruise
+        and not (wep.IsSplintMode and wep:IsSplintMode())
+end
+
+local function GetBandageRequiredCompletions(ply, wep, target)
+    local requiredCompletions = 3
+    if IsValid(wep) then
+        local class = wep:GetClass()
+        local org = target.organism
+        if org then
+            if wep.IsSplintMode and wep:IsSplintMode() then
+                requiredCompletions = 3
+            elseif class == "weapon_bruicekit" or (wep.traumaBruise and wep.mode == 1 and wep.GetHealData) then
+                local totalRotations, _, _ = wep:GetHealData(org)
+                requiredCompletions = totalRotations
+            else
+                local mode = wep.mode or 1
+                local amount = wep.modeValues and wep.modeValues[mode] or 0
+                local treatmentCost = wep.GetBandageTreatmentCost and wep:GetBandageTreatmentCost(target) or amount
+                requiredCompletions = math.Clamp(math.ceil(math.min(treatmentCost, amount) / (350 / 15)), 1, 15)
+            end
+        else
+            requiredCompletions = 1
+        end
+    end
+
+    local bandageEase = hg.MedicalMinigame.GetBandageEaseMultiplier(ply)
+    return math.max(math.ceil(requiredCompletions * GetMedicalMinigameOtherSpeedMultiplier(ply, target) / bandageEase), 1)
+end
+
+local function SendBandageTarget(ply, wep, target, requiredCompletions)
+    local option, options, index = nil, {}, 0
+    if CanCycleBandageChoice(wep) then
+        option, options, index = wep:GetBandageChoice(target, hg.eyeTrace(ply))
+    elseif IsValid(wep) and wep.IsSplintMode and wep:IsSplintMode() then
+        local limb = hg.GetSplintTarget and hg.GetSplintTarget(target)
+        option = limb and {label = "Splint - " .. hg.SPLINT_LIMB_LABELS[limb]} or nil
+    end
+
+    net.Start("hg_medical_minigame_bandage_target")
+        net.WriteString(option and option.label or "")
+        net.WriteUInt(math.min(index or 0, 63), 6)
+        net.WriteUInt(math.min(#options, 63), 6)
+        net.WriteUInt(math.Clamp(requiredCompletions, 0, 255), 8)
+    net.Send(ply)
+end
+
 function hg.MedicalMinigame.StartBandageMinigame(ply, ent)
     if not HealingMinigamesEnabled() then return false end
     local target = ResolveMinigameTarget(ent) or ply
@@ -308,7 +356,6 @@ function hg.MedicalMinigame.StartBandageMinigame(ply, ent)
     if IsValid(wep) and wep.CanBandageTPIK and not wep:CanBandageTPIK(target) then return false end
     local completions = 0
     local progress = 0
-    local requiredCompletions = 3
     if IsValid(wep) then
         completions = wep.minigameCompletions or 0
         if wep.HGMedicalMinigameBandageTarget == target then
@@ -316,26 +363,9 @@ function hg.MedicalMinigame.StartBandageMinigame(ply, ent)
         else
             completions = 0
         end
-        local class = wep:GetClass()
-        local org = target.organism
-        if org then
-            if class == "weapon_bruicekit" or (wep.traumaBruise and wep.mode == 1 and wep.GetHealData) then
-                local totalRotations, _, _ = wep:GetHealData(org)
-                requiredCompletions = totalRotations
-            else
-                local mode = wep.mode or 1
-                local amount = wep.modeValues and wep.modeValues[mode] or 0
-                local bone = wep.GetBandageTargetBone and wep:GetBandageTargetBone(target, hg.eyeTrace(ply)) or nil
-                local treatmentCost = wep.GetBandageTreatmentCost and wep:GetBandageTreatmentCost(target, bone) or amount
-                requiredCompletions = math.Clamp(math.ceil(math.min(treatmentCost, amount) / (350 / 15)), 1, 15)
-            end
-        else
-            requiredCompletions = 1
-        end
     end
 
-    local bandageEase = hg.MedicalMinigame.GetBandageEaseMultiplier(ply)
-    requiredCompletions = math.max(math.ceil(requiredCompletions * GetMedicalMinigameOtherSpeedMultiplier(ply, target) / bandageEase), 1)
+    local requiredCompletions = GetBandageRequiredCompletions(ply, wep, target)
 
     -- The weapon wrapper uses this to map each completed wrap to the same
     -- fraction of its animation instead of conflicting with normal medicines.
@@ -365,6 +395,7 @@ function hg.MedicalMinigame.StartBandageMinigame(ply, ent)
         net.WriteInt(existingSession.completions or 0, 8)
         net.WriteInt(requiredCompletions, 8)
     net.Send(ply)
+    SendBandageTarget(ply, wep, target, requiredCompletions)
 
     return true
 end
@@ -421,6 +452,25 @@ net.Receive("hg_medical_minigame_bandage_state", function(len, ply)
     SaveBandageProgress(session, progress, completions)
 end)
 
+net.Receive("hg_medical_minigame_bandage_cycle", function(len, ply)
+    local session = hg.MedicalMinigame.BandageSessions[ply]
+    if not session or (session.nextCycle or 0) > CurTime() then return end
+    session.nextCycle = CurTime() + 0.15
+
+    local wep = session.weapon
+    local target = session.target
+    if not CanCycleBandageChoice(wep) or wep:GetOwner() ~= ply or not IsValid(target) then return end
+    if not CanUseMedicalMinigameTarget(ply, target) then return end
+
+    local option = wep:CycleBandageChoice(target, hg.eyeTrace(ply))
+    if not option then return end
+
+    session.bone = option.bone
+    session.requiredCompletions = GetBandageRequiredCompletions(ply, wep, target)
+    wep.HGMedicalMinigameRequiredProgress = session.requiredCompletions
+    SendBandageTarget(ply, wep, target, session.requiredCompletions)
+end)
+
 net.Receive("hg_medical_minigame_cancel", function(len, ply)
     local minigameType = net.ReadString()
     hook.Run("hg_medical_minigame_ended", ply, minigameType, false)
@@ -455,12 +505,15 @@ end)
 
 local function GetMedicalMinigameType(wep)
     if wep.HGMedicalMinigameType then return wep.HGMedicalMinigameType end
+    if wep.IsSplintMode and wep:IsSplintMode() then return "bandage" end
 
     local class = wep:GetClass()
     local medkitModeType = wep.HGMedkitTier and wep.HGMedkitModeTypes and wep.HGMedkitModeTypes[wep.mode]
     if medkitModeType == "bandage" then return "bandage" end
     if medkitModeType == "tourniquet" then return "tourniquet" end
     if medkitModeType then return "syringe" end
+
+    if class == "weapon_medkit_sh" and wep.mode == 1 and wep.traumaSuture then return "suture" end
 
     if class == "weapon_bruicekit" or class == "weapon_bandage_sh" or class == "weapon_bigbandage_sh" or (class == "weapon_medkit_sh" and wep.mode == 1) then
         return "bandage"
@@ -617,7 +670,7 @@ net.Receive("hg_medical_minigame_progress", function(len, ply)
 
     if minigameType then
         if not HealingMinigamesEnabled() then return end
-        if minigameType == "bandage" and wep:GetClass() == "weapon_medkit_sh" and wep.mode ~= 1 then return end
+        if minigameType == "bandage" and wep:GetClass() == "weapon_medkit_sh" and wep.mode ~= 1 and not wep:IsSplintMode() then return end
         if minigameType == "syringe" and wep:GetClass() == "weapon_medkit_sh" and wep.mode ~= 3 then return end
 
         local target = wep.healbuddy or ply

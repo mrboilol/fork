@@ -154,7 +154,8 @@ module[2] = function(owner, org, timeValue)
 	if (org.intestines > 0.5 or org.stomach > 0.5) and not org.otrub and (org.cotard or 0) <= 0 and owner:IsPlayer() and org.satiety > 1 then
 		if not org.randomPainSound or org.randomPainSound < CurTime() then
 			org.randomPainSound = CurTime() + math.random(20,45)
-			org.painadd = org.painadd + 20
+			local gutSeverity = math.Clamp((math.max(org.intestines, org.stomach) - 0.5) / 0.5, 0, 1)
+			hg.organism.AddPain(org, 6 + gutSeverity * 14)
 			//owner:TakeDamage(5,owner,owner)
 		end
     end

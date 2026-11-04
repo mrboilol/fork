@@ -14,8 +14,10 @@ SWEP.Primary.Wait = 2
 SWEP.Primary.Next = 0
 SWEP.ThrowVelocity = 1600
 SWEP.LowThrowVelocity = 900
--- A little harder than a thrown brick (16), but still a light plastic box.
-SWEP.ThrowDamage = 18
+
+SWEP.ThrowDamage = 22
+SWEP.HeadshotMultiplier = 2.2
+SWEP.ThrowableMass = 6
 SWEP.HeadGibDamageMul = 1000
 
 SWEP.WorldModel = "models/tic tacs/winter_green.mdl"
@@ -119,6 +121,7 @@ function SWEP:Throw(velocity, _, nosound, throwPosAdjust, throwAngAdjust)
 	if not IsValid(thrown) then return end
 
 	thrown.WorldModel = self.WorldModel
+	thrown.ThrowableMass = self.ThrowableMass
 	thrown:SetPos(spawnPos)
 	thrown:SetOwner(character)
 	thrown:Spawn()
@@ -135,19 +138,15 @@ function SWEP:Throw(velocity, _, nosound, throwPosAdjust, throwAngAdjust)
 	thrown.owner = owner
 	thrown.damage = self.ThrowDamage
 	thrown.MaxSpeed = velocity > 0 and velocity or self.ThrowVelocity
-	-- HeadGibDamageMul is consumed by Homigrad only for a confirmed head hit.
-	-- Do not force standing-player gibs: body impacts from this empty plastic box
-	-- should remain harmless.
 	thrown.HeadGibDamageMul = self.HeadGibDamageMul
-	-- Match thrown bricks and bottles so impact damage enters Homigrad's blunt
-	-- trauma path (bruising, pain, wounds) instead of only reducing health.
+	thrown.HeadshotMultiplier = self.HeadshotMultiplier
 	thrown.DamageType = DMG_CLUB
 	thrown.PainMultiplier = 0
 	thrown.ShockMultiplier = 0
 	thrown.BleedMultiplier = 0
 	thrown.ImmobilizationMul = 0
 	thrown.HurtMultiplier = 0
-	thrown.AttackHit = "Metal_Barrel.ImpactHard"
+	thrown.AttackHit = "physics/metal/soda_can_impact_hard1.wav"
 	thrown.AttackHitFlesh = "Flesh.ImpactHard"
 	thrown.noStuck = true
 
@@ -190,8 +189,6 @@ function SWEP:ThinkAdd()
 	self:SetShowGrenade(false)
 end
 
--- Throw immediately so the inherited Molotov pullback sequence (and its lighter
--- motion) is never played for the empty tic-tac box.
 function SWEP:PrimaryAttack()
 	if CLIENT then return end
 	if self.InThrowing or self.CoolDown > CurTime() then return end

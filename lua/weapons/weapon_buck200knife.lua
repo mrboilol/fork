@@ -206,7 +206,7 @@ SWEP.LHIKSuicideAng = Angle(75,155,-245)
 function SWEP:GetLHIKStateOffset()
     local owner = self:GetOwner()
     if not IsValid(owner) then return vector_origin, angle_zero end
-    if self.Canselfharm and self:IsSelfHarming() then
+    if (self.Canselfharm and self:IsSelfHarming()) or self:IsWristSuicide() then
         return self.SelfHarmLeftPos or self.LHIKSelfHarmPos or vector_origin, self.SelfHarmLeftAng or self.LHIKSelfHarmAng or angle_zero
     end
     if self.CanSuicide and owner.suiciding then

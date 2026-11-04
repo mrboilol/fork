@@ -249,22 +249,28 @@ end)
 
 local hg_bloodimpacts = ConVarExists("hg_bloodimpacts") and GetConVar("hg_bloodimpacts") or CreateConVar("hg_bloodimpacts", 0, FCVAR_ARCHIVE + FCVAR_REPLICATED, "Enable custom blood impact effects spray cool kill death", 0, 1)
 local bloodImpactCloudSize = 16
-local function impact(pos,vel,mul)
-	local max = math.Clamp(mul, 1, 6)
-	local iters = math.ceil(math.random(1, max) * 1.5)
-	local velnorm = -vel:GetNormalized() * 5
-	local cloudSize = bloodImpactCloudSize * math.Clamp(math.sqrt(math.max(mul, 0)) * 0.5, 1, 2.5)
+local function bloodMist(pos, vel, mul)
+	local sev = math.Clamp(math.sqrt(math.max(mul, 0)) * 0.5, 1, 2.5)
+	local origin = pos - vel:GetNormalized() * 5
 
-	addBloodPart2(pos + velnorm, -vel / 2 + Vector(Rand(-10, 10), Rand(-10, 10), Rand(-10, 10)) * 5, nil, cloudSize, cloudSize, 0.45)
-
-	if hg_bloodimpacts:GetBool() then
-		addBloodPart2(pos + velnorm, -vel + Vector(Rand(-10, 10), Rand(-10, 10), Rand(-10, 10)) * 5, nil, bloodImpactCloudSize, bloodImpactCloudSize, 0.3)
-		addBloodPart2(pos + velnorm, -vel / 3 + Vector(Rand(-10, 10), Rand(-10, 10), Rand(-10, 10)) * 5, nil, bloodImpactCloudSize, bloodImpactCloudSize, 0.3)
+	for _ = 1, math.ceil(sev) do
+		local size = bloodImpactCloudSize * sev * Rand(1.1, 1.5)
+		addBloodPart2(origin + VectorRand(-2, 2), -vel * 0.12 + VectorRand(-25, 25), nil, size, size, Rand(0.6, 0.9))
 	end
 
-	for i = 1, iters do
-		local size = useOldBloodParticles() and 0.75 or math.Clamp(math.sqrt(math.max(mul, 0)) * 0.45, 0.8, 4)
-		addBloodPart(pos, -vel * i / iters + Vector(Rand(-20, 20), Rand(-20, 20), 0), mat_huy, size, size, false, false)
+	if hg_bloodimpacts:GetBool() then
+		addBloodPart2(origin, -vel + VectorRand(-50, 50), nil, bloodImpactCloudSize, bloodImpactCloudSize, 0.3)
+		addBloodPart2(origin, -vel / 3 + VectorRand(-50, 50), nil, bloodImpactCloudSize, bloodImpactCloudSize, 0.3)
+	end
+end
+
+local function bloodSpray(pos, vel, mul)
+	local sev = math.Clamp(mul, 1, 10)
+	local size = useOldBloodParticles() and 0.75 or math.Clamp(math.sqrt(sev) * 0.6, 1.2, 4.5)
+
+	for _ = 1, math.random(1, 2) + math.floor(sev / 4) do
+		local s = size * Rand(0.8, 1.25)
+		addBloodPart(pos, -vel * Rand(0.4, 1) + VectorRand(-20, 20) * (1 + sev * 0.1), mat_huy, s, s, false, false)
 	end
 end
 
@@ -284,6 +290,7 @@ net.Receive("hg_bloodimpact", function()
 	local index = 0
 	while amt > 0 do
 		local n = math.min(amt, batch)
+		local first = index == 0
 		amt = amt - n
 		timer.Simple(index * 0.04, function()
 			local origin, velocity = pos, vel
@@ -301,7 +308,8 @@ net.Receive("hg_bloodimpact", function()
 				if not point then return end
 				origin, velocity = point, angle:Forward() * vel:Length()
 			end
-			for i = 1, n do impact(origin, velocity, mul) end
+			if first then bloodMist(origin, velocity, mul) end
+			for i = 1, n do bloodSpray(origin, velocity, mul) end
 		end)
 		index = index + 1
 	end

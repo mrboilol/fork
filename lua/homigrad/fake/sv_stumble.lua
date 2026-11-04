@@ -1023,6 +1023,75 @@ local function knockDown(ply)
 	end)
 end
 
+local function brokenBones(org)
+	return {
+		pelvis = (org.pelvis or 0) >= 1,
+		chest = (org.chest or 0) >= 1,
+		lleg = hg.IsLimbFractured(org, "lleg"),
+		rleg = hg.IsLimbFractured(org, "rleg"),
+		larm = hg.IsLimbFractured(org, "larm"),
+		rarm = hg.IsLimbFractured(org, "rarm"),
+	}
+end
+
+hook.Add("PreHomigradDamage", "HG_StumbleBreakSnapshot", function(ply)
+	if not IsValid(ply) or not ply:IsPlayer() or not ply.organism then return end
+	ply.hgBonesBefore = brokenBones(ply.organism)
+end)
+
+hook.Add("HomigradDamage", "HG_StumbleFreshBreak", function(ply)
+	local before = IsValid(ply) and ply:IsPlayer() and ply.hgBonesBefore
+	if not before or not ply.organism then return end
+	ply.hgBonesBefore = nil
+
+	local chance = 0
+	for bone, broken in pairs(brokenBones(ply.organism)) do
+		if broken and not before[bone] then chance = math.max(chance, K.FRESH_BREAK_FALL[bone] or 0) end
+	end
+	if chance <= 0 then return end
+
+	local fresh = ply.hgFreshBreak
+	if fresh and CurTime() - fresh.time < K.HIT_WINDOW then chance = math.max(chance, fresh.chance) end
+	ply.hgFreshBreak = {chance = chance, time = CurTime()}
+end)
+
+local function standingHitReact(ply)
+	local acc = ply.hgHitEnergy
+	if not acc or acc.knockdown or not ply:Alive() or IsValid(ply.FakeRagdoll) then return end
+	if acc.dir:LengthSqr() < 0.01 then return end
+	local flatDir = Vector(acc.dir.x, acc.dir.y, 0):GetNormalized()
+
+	local knockdown = hg_hit_knockdown_energy:GetFloat()
+	local _, momentum = hg.StaggerMomentum(ply)
+	local severity = acc.energy * (1 + momentum * K.MOMENTUM_SEVERITY)
+	if knockdown > 0 and severity >= knockdown * K.KNOCKDOWN_INSTANT_MUL then
+		knockDown(ply)
+		return
+	end
+
+	local org = ply.organism or {}
+	local staggerScale = severity / (knockdown > 0 and knockdown or 100)
+	local falls = knockdown > 0 and staggerScale >= 1
+	if knockdown > 0 and not falls and staggerScale >= K.FALL_CHANCE_FRAC then
+		local chance = (staggerScale - K.FALL_CHANCE_FRAC) / (1 - K.FALL_CHANCE_FRAC) * K.FALL_CHANCE_MAX
+		chance = hg.ScaleTripChance and hg.ScaleTripChance(ply, org, chance) or chance
+		chance = chance + math.max(legTripChance(org, "lleg"), legTripChance(org, "rleg")) * K.FALL_LEG_MUL
+		falls = math.random() < chance
+	end
+
+	local fresh = ply.hgFreshBreak
+	ply.hgFreshBreak = nil
+	local freshBreak = fresh and CurTime() - fresh.time < K.HIT_WINDOW and not falls and math.random() < fresh.chance
+
+	if falls or freshBreak then
+		local delay = math.Rand(K.STAGGER_FALL_DELAY[1], K.STAGGER_FALL_DELAY[2]) / (1 + momentum)
+		if freshBreak then delay = delay * K.FRESH_BREAK_DELAY_MUL end
+		if not hg.StartStagger(ply, flatDir, 1, delay) then knockDown(ply) end
+	elseif staggerScale >= K.HIT_STAGGER_MIN_FRAC then
+		hg.StartStagger(ply, flatDir, math.Clamp(staggerScale, K.HIT_STAGGER_POWER_MIN, 1))
+	end
+end
+
 hook.Add("EntityTakeDamage", "HG_EuphoriaStumbleHit", function(ent, dmgInfo)
 	if not hg_selfpreservation:GetBool() or not IsValid(ent) then return end
 
@@ -1056,33 +1125,16 @@ hook.Add("EntityTakeDamage", "HG_EuphoriaStumbleHit", function(ent, dmgInfo)
 	if not IsValid(ragdoll) then
 		if energy <= 0 or not flatDir or acc.knockdown then return end
 
-		local knockdown = hg_hit_knockdown_energy:GetFloat()
-		local _, momentum = hg.StaggerMomentum(ply)
-		local severity = acc.energy * (1 + momentum * K.MOMENTUM_SEVERITY)
-		if knockdown > 0 and severity >= knockdown * K.KNOCKDOWN_INSTANT_MUL then
-			knockDown(ply)
-			return
-		end
-
-		local staggerScale = severity / (knockdown > 0 and knockdown or 100)
-		local falls = knockdown > 0 and staggerScale >= 1
-		if knockdown > 0 and not falls and staggerScale >= K.FALL_CHANCE_FRAC then
-			local org = ply.organism or {}
-			local chance = (staggerScale - K.FALL_CHANCE_FRAC) / (1 - K.FALL_CHANCE_FRAC) * K.FALL_CHANCE_MAX
-			chance = hg.ScaleTripChance and hg.ScaleTripChance(ply, org, chance) or chance
-			chance = chance + math.max(legTripChance(org, "lleg"), legTripChance(org, "rleg")) * K.FALL_LEG_MUL
-			falls = math.random() < chance
-		end
-
 		local push = takePush(acc, energy * K.ENERGY_PLAYER_PUSH, K.ENERGY_PLAYER_PUSH_MAX)
 		if push > 0 then ply:SetVelocity(flatDir * push) end
 
-		if falls then
-			local delay = math.Rand(K.STAGGER_FALL_DELAY[1], K.STAGGER_FALL_DELAY[2]) / (1 + momentum)
-			if not hg.StartStagger(ply, flatDir, 1, delay) then knockDown(ply) end
-		elseif staggerScale >= K.HIT_STAGGER_MIN_FRAC then
-			hg.StartStagger(ply, flatDir, math.Clamp(staggerScale, 0.3, 1))
-		end
+		if ply.hgStaggerHitPending then return end
+		ply.hgStaggerHitPending = true
+		timer.Simple(0, function()
+			if not IsValid(ply) then return end
+			ply.hgStaggerHitPending = nil
+			standingHitReact(ply)
+		end)
 		return
 	end
 

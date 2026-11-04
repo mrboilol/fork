@@ -206,14 +206,15 @@ hook.Add("PostDrawOpaqueRenderables", "hg_openfractures", function(depth, skybox
 		local ent = getFractureBody(Entity(index))
 		if not ent or ent:GetPos():DistToSqr(eyePos) > drawDistSqr then continue end
 		local entry = rendered[ent]
-		if not entry or entry.frame ~= frame then continue end
+		local fresh = entry and entry.frame == frame
+		if not fresh then ent:SetupBones() end
 
 		mdl = mdl or getShard()
 		if not mdl then return end
 
 		render.SetColorModulation(1, 0.8, 0.76)
 		for bone, fx in pairs(fractures) do
-			local pos, normal, along = getFractureTransform(ent, fx, entry[bone])
+			local pos, normal, along = getFractureTransform(ent, fx, fresh and entry[bone] or samplePose(ent, bone))
 			if not pos then continue end
 
 			local length = shardLengths[bone] or 6
