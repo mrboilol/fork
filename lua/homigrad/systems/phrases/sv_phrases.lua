@@ -405,6 +405,7 @@ local painGapBlink = 25
 local painRiseWindow = 0.4
 local painRiseAmount = 12
 local voiceGap = 0.35
+local voiceMaxDuration = 9
 local painBlinkDelay = 0.15
 local breathSustain = 1
 
@@ -455,6 +456,7 @@ function hg.StopPainScream(ply)
 
 	ply.painVoicePhrase = nil
 	ply.painVoiceEnt = nil
+	ply:SetNWFloat("PainScreamUntil", 0)
 
 	if hg.StopFallScream then hg.StopFallScream(ply) end
 end
@@ -472,7 +474,7 @@ end
 
 local function voice(ply, phrase, level, mouth)
 	local ent = hg.GetCurrentCharacter(ply)
-	if !IsValid(ent) then return 0 end
+	if !IsValid(ent) or !file.Exists("sound/" .. phrase, "GAME") then return 0 end
 
 	hg.StopPainScream(ply)
 
@@ -481,6 +483,7 @@ local function voice(ply, phrase, level, mouth)
 
 	local duration = SoundDuration(phrase)
 	if duration <= 0 then duration = 2 end
+	duration = math.min(duration, voiceMaxDuration)
 
 	ply.painVoiceEnt = ent
 	ply.painVoicePhrase = phrase

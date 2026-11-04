@@ -268,9 +268,11 @@ function hg.organism.UpdateCardiacRhythm(owner, org, timeValue, s)
 	end
 
 	if org.heartstop and org.terminalCirculatoryFailure and bloodNow <= (tonumber(hg.organism.BLEEDOUT_DEATH_BLOOD) or 2000) and not restartCirculationActive then
-		org.heartbeat = 0
-		org.pulse = 0
-		org.ecgState = "asystole"
+		org.terminalHeartbeat = math.Approach(org.terminalHeartbeat or org.heartbeat or 0, 0, timeValue * 9)
+		org.heartbeat = org.terminalHeartbeat
+		org.ecgState = org.heartbeat < 1 and "asystole" or "pea"
+	else
+		org.terminalHeartbeat = nil
 	end
 
 	if org.heartstop then

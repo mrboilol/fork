@@ -242,9 +242,94 @@ function hg.ApplyLodgedExtraction(owner, extractor, entry)
 	end
 end
 
+local function lodgedDropTransform(owner, ply, entry)
+	local _, _, _, pos, ang = lodgedTransform(owner, entry)
+	if not isvector(pos) then
+		return ply:EyePos() + ply:GetAimVector() * 20, ply:EyeAngles()
+	end
+
+	local tr = util.TraceLine({start = ply:EyePos(), endpos = pos, mask = MASK_SOLID_BRUSHONLY})
+	return tr.Hit and tr.HitPos + tr.HitNormal * 4 or pos, ang
+end
+
+local function settleLodgedDrop(item, pos, ang)
+	item:SetPos(pos)
+	item:SetAngles(ang)
+	item:SetCollisionGroup(COLLISION_GROUP_WEAPON)
+
+	local phys = item:GetPhysicsObject()
+	if IsValid(phys) then phys:Wake() end
+end
+
+local function dropLodgedProp(entry, pos, ang)
+	local model = entry.DropModel or entry.model
+	if not isstring(model) or model == "" then return end
+
+	local prop = ents.Create("prop_physics")
+	if not IsValid(prop) then return end
+	prop:SetModel(model)
+	prop:SetPos(pos)
+	prop:SetAngles(ang)
+	prop:Spawn()
+	if isnumber(entry.modelscale) and entry.modelscale ~= 1 then prop:SetModelScale(entry.modelscale) end
+	settleLodgedDrop(prop, pos, ang)
+end
+
+local function lodgedWeaponFits(ply, weapon)
+	if ply:HasWeapon(weapon:GetClass()) then return false end
+	if not weapon.weaponInvCategory then return true end
+	return ply.weaponInv ~= nil and hg.weaponInv.CanInsert(ply, weapon) ~= false
+end
+
+local function returnLodgedWeapon(ply, entry, pos, ang)
+	local weapon = ents.Create(entry.takeent)
+	if not IsValid(weapon) then return false end
+
+	weapon:SetPos(ply:EyePos())
+	weapon:Spawn()
+	weapon.poisoned2 = entry.poisoned2
+
+	if lodgedWeaponFits(ply, weapon) then
+		local forcePickup = ply.force_pickup
+		ply.force_pickup = true
+		if hook.Run("PlayerCanPickupWeapon", ply, weapon) ~= false then ply:PickupWeapon(weapon) end
+		ply.force_pickup = forcePickup
+		if not IsValid(weapon) or weapon:GetOwner() == ply then return true end
+	end
+
+	weapon.IsSpawned = true
+	weapon.init = true
+	settleLodgedDrop(weapon, pos, ang)
+	return true
+end
+
+local function returnLodgedAmmo(ply, entry, pos, ang)
+	local ammoType = entry.CrossbowBolt and "Armature" or "Arrow"
+	local before = ply:GetAmmoCount(ammoType)
+	ply:GiveAmmo(1, ammoType, true)
+	if ply:GetAmmoCount(ammoType) > before then
+		if ammoType == "Arrow" then
+			ply:EmitSound("weapons/bow_deerhunter/arrow_load_0" .. math.random(3) .. ".wav", 55)
+		else
+			ply:EmitSound("weapons/crossbow/reload1.wav", 55)
+		end
+		return
+	end
+
+	local class = "ent_ammo_" .. string.lower(ammoType)
+	local ammoBox = scripted_ents.GetStored(class) and ents.Create(class)
+	if not IsValid(ammoBox) then return dropLodgedProp(entry, pos, ang) end
+	ammoBox.AmmoCount = 1
+	ammoBox:SetPos(pos)
+	ammoBox:SetAngles(ang)
+	ammoBox:Spawn()
+	settleLodgedDrop(ammoBox, pos, ang)
+end
+
 function hg.TakeLodged(ent, ply)
 	if not IsValid(ent) or not ent.organism or not istable(ent.organism.LodgedEntities) then return false end
 	if not IsValid(ply) or not ply:IsPlayer() or not ply.organism or not ply.organism.canmove then return false end
+	if (ply.hgNextLodgedTake or 0) > CurTime() then return false end
 
 	local i = hg.BestLodgedToTake(ent)
 	if not i then return false end
@@ -252,33 +337,16 @@ function hg.TakeLodged(ent, ply)
 	local entry = table.remove(ent.organism.LodgedEntities, i)
 	if not entry then return false end
 
+	ply.hgNextLodgedTake = CurTime() + 0.75
 	hg.ApplyLodgedExtraction(ent, ply, entry)
 
-	if isstring(entry.takeent) and entry.takeent ~= "" then
-		if ply:HasWeapon(entry.takeent) then
-			local weapon = ents.Create(entry.takeent)
-			if IsValid(weapon) then
-				weapon:SetPos(ply:EyePos())
-				weapon.IsSpawned = true
-				weapon:Spawn()
-			end
+	local dropPos, dropAng = lodgedDropTransform(ent, ply, entry)
+	local hasWeapon = isstring(entry.takeent) and entry.takeent ~= ""
+	if not hasWeapon or not returnLodgedWeapon(ply, entry, dropPos, dropAng) then
+		if entry.CrossbowBolt ~= nil then
+			returnLodgedAmmo(ply, entry, dropPos, dropAng)
 		else
-			ply:Give(entry.takeent)
-		end
-	elseif isstring(entry.DropModel) then
-		local prop = ents.Create("prop_physics")
-		if IsValid(prop) then
-			prop:SetModel(entry.DropModel)
-			prop:SetPos(ply:EyePos() + ply:GetAimVector() * 20)
-			prop:Spawn()
-		end
-	else
-		local ammoType = entry.CrossbowBolt and "Armature" or "Arrow"
-		ply:GiveAmmo(1, ammoType, true)
-		if ammoType == "Arrow" then
-			ply:EmitSound("weapons/bow_deerhunter/arrow_load_0" .. math.random(3) .. ".wav", 55)
-		else
-			ply:EmitSound("weapons/crossbow/reload1.wav", 55)
+			dropLodgedProp(entry, dropPos, dropAng)
 		end
 	end
 
@@ -310,7 +378,6 @@ hook.Add("KeyPress", "TakeLodgedObject", function(ply, key)
 	if (ply.hgNextLodgedTake or 0) > CurTime() then return end
 
 	if hg.TakeLodged(owner, ply) then
-		ply.hgNextLodgedTake = CurTime() + 0.75
 		if hg.TryZManipInteract then hg.TryZManipInteract(ply, ent, "interact", false) end
 	end
 end)

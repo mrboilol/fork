@@ -77,38 +77,13 @@ hook.Add("PlayerSpawn", "homigrad-organism-oxygen-safety", function(ply)
 end)
 hook.Add("PlayerDisconnected", "homigrad-organism", function(ply) hg.organism.Remove(ply) end)
 
-local function stopVitalSigns(org)
-	if not org then return end
-
-	org.alive = false
-	org.heartstop = true
-	org.heartbeat = 0
-	org.pulse = 0
-	org.bloodPressure = 0
-	org.systolic = 0
-	org.diastolic = 0
-	org.cardiacOutput = 0
-	org.strokeVolume = 0
-	org.mechanicalPulseCapture = 0
-	org.pulseDeficit = 0
-	org.ecgState = "asystole"
-	org.perfusion = 0
-	org.peripheralperfusion = 0
-	org.cerebralPerfusion = 0
-	org.myocardialOxygen = 0
-	org.bodyoxygen = 0
-	org.brainoxygen = 0
-	org.brainoxygenTarget = 0
-	if org.o2 then org.o2[1] = 0 end
-end
-
 hook.Add("PostPlayerDeath", "homigrad-organism", function(ply)
 	local ragdoll = ply:GetNWEntity("RagdollDeath")
 	
 	if not IsValid(ragdoll) then ragdoll = ply.FakeRagdoll end
 
 	if IsValid(ragdoll) then
-		stopVitalSigns(ply.organism)
+		hg.organism.BeginPostMortemDecay(ply.organism)
 		local newOrg = hg.organism.Add(ragdoll)
 		table.Merge(newOrg, ply.organism)
 		newOrg.woundNetGeneration = (newOrg.woundNetGeneration or 0) + 1

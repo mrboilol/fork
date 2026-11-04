@@ -1913,10 +1913,14 @@ else
 		model:DrawModel()
 	end
 
+	hg.SPLINT_BANDAGE_COLOR = Color(255, 130, 20)
+
 	function hg.RenderBandages(ent, ply)
 		local limbs = ent.bandaged_limbs
-		if not limbs then return end
-		if !next(limbs) then return end
+		local splints = ent.splints or (IsValid(ply) and ply.splints)
+		local hasSplints = istable(splints) and next(splints) ~= nil
+		if not hasSplints and (not limbs or !next(limbs)) then return end
+		limbs = limbs or {}
 
 		if not ent.bandagesSoak then
 			ent.bandagesSoak = {}
@@ -1964,6 +1968,15 @@ else
 			end
 		end
 
+		local splinted = {}
+		if hasSplints then
+			for _, bone in ipairs(splints) do
+				segments[bone] = nil
+				colored[bone] = nil
+				if not isHidden(bone) then splinted[bone] = true end
+			end
+		end
+
 		local buckets = {}
 		for bone, soak in pairs(segments) do
 			if not isHidden(bone) then
@@ -1982,6 +1995,10 @@ else
 		end
 		if next(colored) then
 			DrawBandagePass(model, groups, colored, Color(coloredTint.r, coloredTint.g, coloredTint.b))
+		end
+
+		if next(splinted) then
+			DrawBandagePass(model, groups, splinted, hg.SPLINT_BANDAGE_COLOR)
 		end
 
 		if limbs[HEAD_BONE] and not (ply == LocalPlayer() and GetViewEntity() == LocalPlayer()) then

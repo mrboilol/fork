@@ -75,7 +75,6 @@ local function getFractureBody(ent)
 	if not IsValid(ent) or ent:IsDormant() then return end
 	if ent:IsPlayer() then
 		if not ent:Alive() or IsValid(ent:GetNWEntity("FakeRagdoll")) then return end
-		if ent == LocalPlayer() and not ent:ShouldDrawLocalPlayer() then return end
 	end
 	return ent
 end
@@ -132,7 +131,7 @@ local function getFractureTransform(ent, fx, pose)
 		end
 		out:Normalize()
 
-		return bonePos + along * (length * shaftFraction) + out * pose.shaft.radius, out, along
+		return bonePos + along * (fx.joint and 0 or length * shaftFraction) + out * pose.shaft.radius, out, along
 	end
 
 	local offset = hg.organism.ClampWoundOffset(ent, pose.boneID, fx[1], fx[2]:Forward())
@@ -180,7 +179,7 @@ hook.Add("OnNetVarSet", "hg_openfractures", function(index, key, var)
 		local ownerKey = IsValid(owner) and owner:EntIndex() or index
 
 		for bone, fx in pairs(var) do
-			if old and old[bone] then continue end
+			if fx.joint or (old and old[bone] and not old[bone].joint) then continue end
 			local burstKey = ownerKey .. bone
 			if (lastBurst[burstKey] or 0) > CurTime() then continue end
 			lastBurst[burstKey] = CurTime() + burstCooldown
@@ -207,6 +206,7 @@ hook.Add("PostDrawOpaqueRenderables", "hg_openfractures", function(depth, skybox
 		if not ent or ent:GetPos():DistToSqr(eyePos) > drawDistSqr then continue end
 		local entry = rendered[ent]
 		local fresh = entry and entry.frame == frame
+		if not fresh and ent == LocalPlayer() and not ent:ShouldDrawLocalPlayer() then continue end
 		if not fresh then ent:SetupBones() end
 
 		mdl = mdl or getShard()
@@ -215,7 +215,7 @@ hook.Add("PostDrawOpaqueRenderables", "hg_openfractures", function(depth, skybox
 		render.SetColorModulation(1, 0.8, 0.76)
 		for bone, fx in pairs(fractures) do
 			local pos, normal, along = getFractureTransform(ent, fx, fresh and entry[bone] or samplePose(ent, bone))
-			if not pos then continue end
+			if not pos or pos:DistToSqr(eyePos) < 36 then continue end
 
 			local length = shardLengths[bone] or 6
 			drawShard(mdl, pos, (normal - along * 0.55):GetNormalized(), along, length, 0.4)

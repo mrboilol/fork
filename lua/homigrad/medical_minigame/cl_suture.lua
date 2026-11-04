@@ -35,10 +35,10 @@ local function DrawThickLine(x1, y1, x2, y2, width, col)
 	surface.SetDrawColor(col)
 	draw.NoTexture()
 	surface.DrawPoly({
-		{x = x1 + nx, y = y1 + ny},
-		{x = x2 + nx, y = y2 + ny},
-		{x = x2 - nx, y = y2 - ny},
 		{x = x1 - nx, y = y1 - ny},
+		{x = x2 - nx, y = y2 - ny},
+		{x = x2 + nx, y = y2 + ny},
+		{x = x1 + nx, y = y1 + ny},
 	})
 end
 
@@ -61,19 +61,19 @@ local function DistanceToSegment(px, py, ax, ay, bx, by)
 	return math.sqrt((px - cx) ^ 2 + (py - cy) ^ 2)
 end
 
-local function DrawFallbackHemostat(x, y, scale)
-	DrawThickLine(x, y, x + 20 * scale, y + 300 * scale, 5, colSteel)
-	DrawThickLine(x, y, x - 20 * scale, y + 300 * scale, 5, colSteelDark)
+local function DrawFallbackHemostat(x, y)
+	DrawThickLine(x, y, x + 20, y + 300, 5, colSteel)
+	DrawThickLine(x, y, x - 20, y + 300, 5, colSteelDark)
 end
 
-local function DrawTweezers(x, y, angle, scale, closed)
+local function DrawTweezers(x, y, angle, closed)
 	local mat = closed and tweezerClosedMat or tweezerOpenMat
 	if not mat then
-		DrawFallbackHemostat(x, y, scale)
+		DrawFallbackHemostat(x, y)
 		return
 	end
 
-	local w, h = TWEEZER_W * scale, TWEEZER_H * scale
+	local w, h = TWEEZER_W, TWEEZER_H
 	local offX, offY = (0.5 - TWEEZER_TIP_X) * w, (0.5 - TWEEZER_TIP_Y) * h
 	local rad = math.rad(-angle)
 	local cx = x + offX * math.cos(rad) - offY * math.sin(rad)
@@ -230,9 +230,9 @@ function PANEL:Paint(w, h)
 		lastLeftX, lastRightX, lastY = cx - bulge, cx + bulge, y
 	end
 
-	for i = 2, self.Done do
+	for i = 2, self.Stitches do
 		local a, b = self.Dots[i - 1], self.Dots[i]
-		DrawThickLine(a.x + ox, a.y + oy, b.x + ox, b.y + oy, 3, colThread)
+		DrawThickLine(a.x + ox, a.y + oy, b.x + ox, b.y + oy, i <= self.Done and 3 or 2, i <= self.Done and colThread or colDot)
 	end
 
 	for i, dot in ipairs(self.Dots) do
@@ -256,15 +256,15 @@ function PANEL:Paint(w, h)
 		surface.DrawRect(0, 0, w, h)
 	end
 
-	DrawTweezers(self.HandX, self.HandY, self.HandAngle, 1 + progress * 0.45, self.Squeeze > 0.5)
+	DrawTweezers(self.HandX, self.HandY, self.HandAngle, self.Squeeze > 0.5)
 
-	local topY = math.max(ScreenScaleH(14), 28)
-	draw.SimpleTextOutlined("Suturing: " .. self.Choice.label, "HGMedicalTreating", w * 0.5, topY, Color(255, 255, 255, 245), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP, 2, Color(0, 0, 0, 220))
+	local edgeY = math.max(ScreenScaleH(14), 28)
+	draw.SimpleTextOutlined(self.Choice.label, "ZCity_Small", w * 0.5, edgeY, Color(255, 255, 255, 245), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP, 1.5, Color(0, 0, 0, 220))
 	local hint = "Hold LMB and trace the dots in order   [RMB] stop"
 	if self.Choice.count > 1 then
 		hint = hint .. "   [R] switch wound (" .. self.Choice.index .. "/" .. self.Choice.count .. ")"
 	end
-	draw.SimpleTextOutlined(hint, "ZCity_Small", w * 0.5, topY + math.max(ScreenScaleH(14), 30), Color(200, 200, 200, 230), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP, 1.5, Color(0, 0, 0, 220))
+	draw.SimpleTextOutlined(hint, "ZCity_Small", w * 0.5, h - edgeY, Color(200, 200, 200, 230), TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM, 1.5, Color(0, 0, 0, 220))
 	draw.DrawText(self.Done .. "/" .. self.Stitches, "HomigradFontLarge", cx - SLIT_GAP - 120, cy - 20, Color(255, 255, 255), TEXT_ALIGN_RIGHT)
 end
 

@@ -257,6 +257,10 @@ hook.Add("Org Clear", "Main", function(org)
 	org.lastBrainSample = nil
 	org.postMortemElapsed = nil
 	org.postMortemSendTime = nil
+	org.postMortemVitals = nil
+	org.postMortemStart = nil
+	org.circulationLimitTime = nil
+	org.terminalHeartbeat = nil
 	org.lastWoundsSig = nil
 	org.lastArterialWoundsSig = nil
 	org.lastObserverSig = nil
@@ -881,6 +885,25 @@ function hg.organism.KillFatalBrainDamage(org, silent)
 	return true
 end
 
+hg.organism.postMortemCascadeTime = 30
+hg.organism.postMortemO2Cascade = {5, 25}
+hg.organism.postMortemCascade = {
+	{"pulse", 0, 8},
+	{"cardiacOutput", 0, 8},
+	{"strokeVolume", 0, 8},
+	{"heartbeat", 0, 10},
+	{"bloodPressure", 1, 11},
+	{"systolic", 1, 11},
+	{"diastolic", 1, 11},
+	{"peripheralperfusion", 2, 10},
+	{"perfusion", 2, 12},
+	{"cerebralPerfusion", 2, 12},
+	{"brainoxygen", 3, 19},
+	{"brainoxygenTarget", 3, 19},
+	{"myocardialOxygen", 4, 16},
+	{"bodyoxygen", 5, 23},
+}
+
 function hg.organism.BeginPostMortemDecay(org, timeValue)
 	if not org then return end
 
@@ -888,28 +911,37 @@ function hg.organism.BeginPostMortemDecay(org, timeValue)
 	org.otrub = true
 	org.incapacitated = true
 	org.heartstop = true
-	org.heartbeat = 0
-	org.pulse = 0
-	org.bloodPressure = 0
-	org.systolic = 0
-	org.diastolic = 0
-	org.cardiacOutput = 0
-	org.strokeVolume = 0
 	org.mechanicalPulseCapture = 0
 	org.pulseDeficit = 0
-	org.ecgState = "asystole"
-	org.perfusion = 0
-	org.peripheralperfusion = 0
-	org.cerebralPerfusion = 0
-	org.myocardialOxygen = 0
-	org.bodyoxygen = 0
-	org.brainoxygen = 0
-	org.brainoxygenTarget = 0
 	org.oxygenIntakeAvailable = false
 	org.lungsfunction = false
-	if org.o2 then
-		org.o2[1] = 0
-		org.o2.curregen = 0
+
+	local cascade = hg.organism.postMortemCascade
+	local o2 = org.o2
+	local now = CurTime()
+	local initial = org.postMortemVitals
+	if not initial then
+		initial = {o2 = o2 and tonumber(o2[1]) or 0}
+		for _, entry in ipairs(cascade) do
+			initial[entry[1]] = tonumber(org[entry[1]]) or 0
+		end
+		org.postMortemVitals = initial
+		org.postMortemStart = now
+	end
+
+	local elapsed = math.max(now - (org.postMortemStart or now), 0)
+	for _, entry in ipairs(cascade) do
+		local key = entry[1]
+		org[key] = initial[key] * (1 - math.Clamp((elapsed - entry[2]) / entry[3], 0, 1))
+	end
+	org.systolic = math.Round(org.systolic)
+	org.diastolic = math.Round(org.diastolic)
+	org.ecgState = org.heartbeat < 1 and "asystole" or "pea"
+
+	if o2 then
+		local o2Cascade = hg.organism.postMortemO2Cascade
+		o2[1] = initial.o2 * (1 - math.Clamp((elapsed - o2Cascade[1]) / o2Cascade[2], 0, 1))
+		o2.curregen = 0
 	end
 	org.postMortemElapsed = (org.postMortemElapsed or 0) + math.max(timeValue or 0, 0)
 end
@@ -919,7 +951,7 @@ hook.Add("Org PostMortem Think", "Main", function(owner, org, timeValue)
 
 	local now = CurTime()
 	if (org.postMortemSendTime or 0) > now then return end
-	org.postMortemSendTime = now + 1
+	org.postMortemSendTime = now + ((now - (org.postMortemStart or now)) < hg.organism.postMortemCascadeTime and 0.5 or 1)
 	send_bareinfo(org, true, true)
 end)
 

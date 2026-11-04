@@ -1271,7 +1271,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 			vecTorso[2] = amt * 2
 			vecTorso[3] = 0
 			
-			if sin < 0.1 and org.analgesia <= 1.5 and not org.breathed then
+			if sin < 0.1 and org.analgesia <= 1.5 and not org.breathed and org.alive ~= false then
 				org.lastbreathed = CurTime()
 				org.breathed = true
 				local heartbeat = org.heartbeat or 0
@@ -1367,7 +1367,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 		local heartbeat = org.heartbeat or 0
 		ent.pulse_breathe.lastbreathe = CurTime() + (1 / math.Clamp(org.heartbeat + (org.o2[1] - 30) * 1, 1, 120)) * 90 + ( org.o2[1] < 20 and 5 or 0)
 		
-		if org.analgesia <= 1.5 and org.heartbeat > 1 then
+		if org.analgesia <= 1.5 and org.heartbeat > 1 and org.alive ~= false then
 			if (ent:WaterLevel() < 3) then
 				local muffed
 

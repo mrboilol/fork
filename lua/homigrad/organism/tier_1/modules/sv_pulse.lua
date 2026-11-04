@@ -85,16 +85,23 @@ function hg.organism.GetSupportedCirculationFloor(org)
 end
 
 function hg.organism.EnforceBloodCirculationLimit(org)
-	if not org then return false end
+	if not org or org.alive == false then return false end
 	local cutoff = hg.organism.PULSELESS_BLOOD_VOLUME or 2000
-	if (tonumber(org.blood) or getNormalBloodVolume()) > cutoff then return false end
+	if (tonumber(org.blood) or getNormalBloodVolume()) > cutoff then
+		org.circulationLimitTime = nil
+		return false
+	end
 
-	org.pulse = 0
-	org.bloodPressure = 0
-	org.systolic = 0
-	org.diastolic = 0
-	org.cardiacOutput = 0
-	org.strokeVolume = 0
+	local now = CurTime()
+	local fade = math.max(now - (org.circulationLimitTime or now), 0)
+	org.circulationLimitTime = now
+
+	org.pulse = math.Approach(tonumber(org.pulse) or 0, 0, fade * 9)
+	org.bloodPressure = math.Approach(tonumber(org.bloodPressure) or 0, 0, fade * 8)
+	org.systolic = math.Approach(tonumber(org.systolic) or 0, 0, fade * 11)
+	org.diastolic = math.Approach(tonumber(org.diastolic) or 0, 0, fade * 7)
+	org.cardiacOutput = math.Approach(tonumber(org.cardiacOutput) or 0, 0, fade * 0.125)
+	org.strokeVolume = math.Approach(tonumber(org.strokeVolume) or 0, 0, fade * 9)
 	org.mechanicalPulseCapture = 0
 	org.pulseDeficit = math.max(org.heartbeat or 0, 0)
 	org.circulatoryO2Reserve = 0
@@ -972,6 +979,8 @@ module[2] = function(owner, org, timeValue)
 		org.heartstop = true
 		return
 	end
+	org.postMortemVitals = nil
+	org.postMortemStart = nil
 
 	if not organSystemsEnabled then
 		maintainSimplifiedCirculation(org)

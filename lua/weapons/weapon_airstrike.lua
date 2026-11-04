@@ -4,7 +4,7 @@ end
 
 SWEP.Base = "weapon_carpetbomber"
 SWEP.PrintName = "Airstrike"
-SWEP.Instructions = "Primary attack to mark an area, then aim and press primary attack again to set the bombing direction."
+SWEP.Instructions = "welcome to aviation brother"
 SWEP.Category = "ZCity Other"
 SWEP.Spawnable = true
 SWEP.AdminOnly = true

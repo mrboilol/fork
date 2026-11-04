@@ -2078,6 +2078,7 @@ function SWEP:AddMeleeLodgedEntity(victim, body, bone, physBone, lodgePos, lodge
         model = lodgedModel,
         modelscale = self.modelscale or 1,
         takeent = self:GetClass(),
+        poisoned2 = self.poisoned2,
     }
 
     net.Start("organism_send")

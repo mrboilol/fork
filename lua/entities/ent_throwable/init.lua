@@ -503,6 +503,7 @@ function ENT:PhysicsCollide(data, phys)
 			while #org.LodgedEntities >= maxLodged do
 				table.remove(org.LodgedEntities, 1)
 			end
+			lodgedEntry.poisoned2 = self.poisoned2
 			org.LodgedEntities[#org.LodgedEntities + 1] = lodgedEntry
 
 			net.Start("organism_send")

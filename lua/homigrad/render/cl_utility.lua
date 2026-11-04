@@ -788,13 +788,39 @@ players : 1 humans, 0 bots (20 max)
 
 		local cachedLerp = Lerp
 
+		local mouthFlexes = {"jaw_drop", "left_part", "right_part", "left_mouth_drop", "right_mouth_drop", "lower_lip"}
+		local openMouths = {}
+
+		local function setMouthWeight(ent, weight)
+			for i = 1, #mouthFlexes do
+				local id = ent:GetFlexIDByName(mouthFlexes[i])
+				if id then ent:SetFlexWeight(id, weight) end
+			end
+		end
+
+		local function closeMouth(ply)
+			local ent = openMouths[ply]
+			if IsValid(ent) then setMouthWeight(ent, 0) end
+			openMouths[ply] = nil
+		end
+
+		hook.Add("Think", "MouthClose", function()
+			for ply in pairs(openMouths) do
+				if not IsValid(ply) or not ply:Alive() or (not ply:IsSpeaking() and ply:GetNWFloat("PainScreamUntil", 0) <= CurTime()) then
+					closeMouth(ply)
+				end
+			end
+		end)
+
 		local function mouthmove(ply)
 			ply:SetVoiceVolumeScale(!hg.muteall and (!hg.mutespect or ply:Alive()) and (hg.playerInfo[ply:SteamID()] and hg.playerInfo[ply:SteamID()][2] or 1) or 0)
 
 			if not ply:Alive() then return end
-			
+
 			local ent = IsValid(ply.FakeRagdoll) and ply.FakeRagdoll or ply
-			
+
+			if openMouths[ply] and openMouths[ply] != ent then closeMouth(ply) end
+
 			if ply:VoiceVolume() != 0 then
 				if (ply.timedupdate or 0) < CurTime() then
 					UpdateVoiceDSP(lply, ply)
@@ -805,25 +831,14 @@ players : 1 humans, 0 bots (20 max)
 
 			if lply:GetPos():DistToSqr(ent:GetPos()) > 1500 * 1500 then return end
 			
-			local flexes = {
-				[1] = ent:GetFlexIDByName( "jaw_drop" ),
-				[2] = ent:GetFlexIDByName( "left_part" ),
-				[3] = ent:GetFlexIDByName( "right_part" ),
-				[4] = ent:GetFlexIDByName( "left_mouth_drop" ),
-				[5] = ent:GetFlexIDByName( "right_mouth_drop" ),
-				[6] = ent:GetFlexIDByName( "lower_lip" )
-			}
-
 			local weight = (ply:IsSpeaking() and math.Clamp( ply:VoiceVolume() * 5, 0, 2 )) or 0
 
 			if (ply:GetNWFloat("PainScreamUntil", 0) or 0) > CurTime() then
 				weight = math.max(weight, 1.8)
 			end
 
-			for k = 1, #flexes do
-				v = flexes[ k ]
-				ent:SetFlexWeight( v, weight )
-			end
+			setMouthWeight(ent, weight)
+			openMouths[ply] = weight > 0 and ent or nil
 
 			local org = ent.organism
 			if not org then return end
