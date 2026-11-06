@@ -1105,7 +1105,7 @@ end
 local woundDecals = {
 	bullet = "Impact.Flesh",
 	slash = "ManhackCut",
-	trauma = "Impact.BloodyFlesh",
+	trauma = "Impact.Flesh",
 }
 
 local function placeWoundDecal(ent, pos, normal, woundType)

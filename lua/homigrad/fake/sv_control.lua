@@ -290,7 +290,10 @@ function hg.ShadowControl(ragdoll, physNumber, ss, ang, maxang, maxangdamp, pos,
 		local owner = hg.RagdollOwner(ragdoll)
 		org = IsValid(owner) and owner.organism
 	end
-	if limbSegment then limbPower = limbPower * hg.GetLimbEffectiveness(org, limbSegment[1], limbSegment[2]) end
+	if limbSegment then
+		limbPower = limbPower * hg.GetLimbEffectiveness(org, limbSegment[1], limbSegment[2])
+		limbPower = limbPower * Lerp(hg.GetLimbFatigue(org, K.LIMB_STAMINA_POOL[limbSegment[1]]), 1, K.LIMB_FATIGUE_POWER)
+	end
 	if limbPower <= 0 or isFloppyPhys(ragdoll, physNumber, true) then
 		phys:Wake()
 		return false
@@ -367,9 +370,6 @@ local shadowControl = hg.ShadowControl
 hook.Add("Fake", "Contorl", function(ply, ragdoll)
 	ragdoll.cooldownLH = 0
 	ragdoll.cooldownRH = 0
-	if ply.otrubCollapseStart then
-		ragdoll.otrubCollapseStart = ply.otrubCollapseStart
-	end
 	
 	hg.ClearRagdollSlideState(ragdoll)
 	
@@ -377,22 +377,6 @@ hook.Add("Fake", "Contorl", function(ply, ragdoll)
 	ragdoll._slideEntrySpeed = Vector(plyVel.x, plyVel.y, 0):Length()
 	ragdoll._slideEntryDir = Vector(plyVel.x, plyVel.y, 0):GetNormalized()
 	ragdoll._slideEntryTime = CurTime()
-end)
-
-hook.Add("HG_OnOtrub", "OtrubCollapseStart", function(ply)
-	ply.otrubCollapseStart = CurTime()
-	local ragdoll = ply.FakeRagdoll
-	if IsValid(ragdoll) then
-		ragdoll.otrubCollapseStart = CurTime()
-	end
-end)
-
-hook.Add("HG_OnWakeOtrub", "OtrubCollapseEnd", function(ply)
-	ply.otrubCollapseStart = nil
-	local ragdoll = ply.FakeRagdoll
-	if IsValid(ragdoll) then
-		ragdoll.otrubCollapseStart = nil
-	end
 end)
 
 hook.Add("Player Think", "HG_ClearManualWoundHold", function(ply)
@@ -418,23 +402,6 @@ hook.Add("Player Think", "HG_ClearManualWoundHold", function(ply)
 		ply.organism.manualHoldWoundStrength = 0
 		ply.organism.manualHoldWoundUseRight = false
 		ply.organism.manualHoldWoundArterial = false
-	end
-end)
-
-local function triggerOtrubCollapse(ply)
-	if not IsValid(ply) or not ply:IsPlayer() then return end
-	if ply.otrubCollapseStart and CurTime() - ply.otrubCollapseStart < 1.5 then return end
-	ply.otrubCollapseStart = CurTime()
-	local ragdoll = ply.FakeRagdoll
-	if IsValid(ragdoll) then
-		ragdoll.otrubCollapseStart = CurTime()
-	end
-end
-
-hook.Add("EntityTakeDamage", "OtrubCollapseDmg", function(ent, dmgInfo)
-	if not IsValid(ent) or not ent:IsPlayer() then return end
-	if dmgInfo:IsDamageType(DMG_CRUSH + DMG_FALL + DMG_CLUB) and ent:Alive() then
-		triggerOtrubCollapse(ent)
 	end
 end)
 
@@ -647,7 +614,7 @@ local function fakeLegKickHit(ply, ragdoll, state)
 			end)
 		end
 
-		ent:SetVelocity(state.dir * K.FAKE_LEG_KICK.PLAYER_PUSH)
+		ent:SetVelocity(state.dir * K.FAKE_LEG_KICK.PLAYER_PUSH * Lerp(state.charge or 0, 1, K.FAKE_LEG_KICK.CHARGE_PUSH_MUL))
 	end
 
 	if hgIsDoor and hgIsDoor(ent) and !ent:GetNoDraw() then
@@ -658,7 +625,11 @@ local function fakeLegKickHit(ply, ragdoll, state)
 	end
 end
 
-function hg.TriggerFakeLegKickExtension(ply, ragdoll, impactSpeed)
+function hg.FakeLegKickPower(dmg)
+	return math.Clamp(dmg / K.FAKE_LEG_KICK.EXTEND_POWER_DAMAGE, K.FAKE_LEG_KICK.EXTEND_POWER_MIN, 1)
+end
+
+function hg.TriggerFakeLegKickExtension(ply, ragdoll, impactSpeed, dmg)
 	if not IsValid(ply) or not IsValid(ragdoll) then return false end
 	local state = ragdoll.fakeLegKick
 	if not state or state.hit then return false end
@@ -667,17 +638,67 @@ function hg.TriggerFakeLegKickExtension(ply, ragdoll, impactSpeed)
 	state.extendTime = CurTime()
 	state.hitTime = math.min(state.hitTime, CurTime())
 	state.impactSpeed = math.max(impactSpeed or 0, state.launchSpeed or 0)
+	if dmg then state.extendPower = math.max(state.extendPower, hg.FakeLegKickPower(dmg)) end
 	return true
 end
 
-function hg.FakeLegAttack(ply)
+function hg.PoseFakeLegKick(ragdoll, angles, extend, power)
+	local kick = K.FAKE_LEG_KICK
+	local shadowAng = Lerp(power, kick.SHADOW_ANG, kick.EXTEND_SHADOW_ANG)
+	local shadowDamp = Lerp(power, kick.SHADOW_DAMP, kick.EXTEND_SHADOW_DAMP)
+	local angle = -(-angles)
+	angle:RotateAroundAxis(angle:Forward(), kick.CHARGE_FORWARD_OFFSET)
+
+	if extend then
+		angle:RotateAroundAxis(angle:Up(), kick.EXTEND_THIGH_UP_OFFSET)
+	end
+
+	angle:RotateAroundAxis(angle:Right(), kick.CHARGE_THIGH_RIGHT_OFFSET)
+	shadowControl(ragdoll, 8, kick.SHADOW_TIME, angle, shadowAng, shadowDamp)
+
+	if extend then
+		angle:RotateAroundAxis(angle:Up(), -kick.EXTEND_THIGH_UP_OFFSET)
+	end
+
+	angle:RotateAroundAxis(angle:Right(), kick.CHARGE_CALF_RIGHT_OFFSET)
+	if not extend then
+		angle:RotateAroundAxis(angle:Up(), kick.CHARGE_CALF_UP_OFFSET)
+	end
+	shadowControl(ragdoll, 9, kick.SHADOW_TIME, angle, shadowAng, shadowDamp)
+end
+
+function hg.ThrustFakeLegKick(ragdoll, org, state)
+	local applied = state.extendApplied or 0
+	if state.extendPower <= applied then return end
+
+	local speed = (state.extendPower - applied) * K.FAKE_LEG_KICK.EXTEND_SPEED * hg.GetLimbEffectiveness(org, "rleg")
+	state.extendApplied = state.extendPower
+
+	local calf = ragdoll:GetPhysicsObjectNum(realPhysNum(ragdoll, 9))
+	local foot = ragdoll:GetPhysicsObjectNum(realPhysNum(ragdoll, 14))
+	if IsValid(calf) then calf:AddVelocity(state.dir * speed) end
+	if IsValid(foot) then foot:AddVelocity(state.dir * speed) end
+end
+
+function hg.CanFakeLegAttack(ply)
 	local ragdoll = ply.FakeRagdoll
 	local org = ply.organism
-	if not ply:Alive() or not IsValid(ragdoll) or not org or not org.canmove then return end
-	if org.rlegamputated or org.rlegupamputated or hg.IsLimbIncapacitated(org, "rleg") then return end
-	if ply.InLegKick and ply.InLegKick > CurTime() then return end
-	if ply:GetNWFloat("InLegKick", 0) > CurTime() then return end
-	if hook.Run("PlayerCanLegAttack", ply) == false then return end
+	if not ply:Alive() or not IsValid(ragdoll) or not org or not org.canmove then return false end
+	if org.rlegamputated or org.rlegupamputated or hg.IsLimbIncapacitated(org, "rleg") then return false end
+	if ply.InLegKick and ply.InLegKick > CurTime() then return false end
+	if ply:GetNWFloat("InLegKick", 0) > CurTime() then return false end
+	if hook.Run("PlayerCanLegAttack", ply) == false then return false end
+
+	return true
+end
+
+function hg.FakeLegAttack(ply, charge)
+	if not hg.CanFakeLegAttack(ply) then return end
+
+	local ragdoll = ply.FakeRagdoll
+	local org = ply.organism
+	local kick = K.FAKE_LEG_KICK
+	charge = charge or 0
 
 	ply:EmitSound("player/clothes_generic_foley_0" .. math.random(1,5) .. ".wav", 65)
 	org.stamina.subadd = org.stamina.subadd + 20 / (org.superfighter and 2 or 1)
@@ -685,28 +706,64 @@ function hg.FakeLegAttack(ply)
 	local speedmul = (2 - (org.stamina[1] / org.stamina.max))
 	local speed = 1.5 * speedmul
 	local animstopAdjust = 0.3 * speedmul
-	local duration = speed - animstopAdjust
+	local duration = (speed - animstopAdjust) * Lerp(charge, 1, kick.CHARGE_DURATION_MUL)
 	local dmg = 10 * (2 - speedmul)
 	dmg = dmg * (ply:IsBerserk() and org.berserk * 5 or 1)
 	dmg = dmg * hg.GetLegEffectiveness(ply, "rleg")
-	dmg = dmg * K.FAKE_LEG_KICK.DAMAGE_MUL
+	dmg = dmg * kick.DAMAGE_MUL
+	dmg = dmg * Lerp(charge, 1, kick.CHARGE_DAMAGE_MUL)
+	dmg = dmg * Lerp(hg.GetLimbFatigue(org, "legs"), 1, kick.FATIGUE_DAMAGE_MUL)
+
+	hg.organism.ConsumeLimbStamina(org, "legs", Lerp(charge, kick.LEG_COST, kick.LEG_COST_CHARGED))
 
 	local ang = ply:EyeAngles()
 	ang[1] = 0
 
+	local released = charge >= kick.CHARGE_INSTANT_FRACTION
 	hook.Run("HomigradLegKick", ply)
 	ply.InLegKick = CurTime() + duration
 	ply:SetNWFloat("InLegKick", CurTime() + duration)
 	ragdoll.fakeLegKick = {
 		start = CurTime(),
 		finish = CurTime() + duration,
-		hitTime = CurTime() + duration * 0.55,
+		hitTime = CurTime() + (released and kick.RELEASE_HIT_DELAY or duration * 0.55),
+		extended = released or nil,
+		extendPower = hg.FakeLegKickPower(dmg),
+		charge = charge,
 		dmg = dmg,
 		dir = ang:Forward(),
 		launchSpeed = ragdoll:GetVelocity():Length(),
 		hit = false
 	}
 end
+
+function hg.FakeLegKickChargeStart(ply)
+	if not hg.CanFakeLegAttack(ply) then return end
+
+	local ragdoll = ply.FakeRagdoll
+	if ragdoll.fakeKickCharge or ragdoll.fakeLegKick then return end
+	if (ply.organism.stamina.legs or hg.LIMB_STAMINA_MAX) < K.FAKE_LEG_KICK.MIN_LEG_STAMINA then return end
+
+	ragdoll.fakeKickCharge = CurTime()
+	ply:EmitSound("player/clothes_generic_foley_0" .. math.random(1,5) .. ".wav", 55)
+end
+
+function hg.FakeLegKickChargeRelease(ply)
+	local ragdoll = ply.FakeRagdoll
+	if not IsValid(ragdoll) or not ragdoll.fakeKickCharge then return end
+
+	local charge = math.Clamp((CurTime() - ragdoll.fakeKickCharge) / K.FAKE_LEG_KICK.CHARGE_TIME, 0, 1)
+	ragdoll.fakeKickCharge = nil
+	hg.FakeLegAttack(ply, charge)
+end
+
+concommand.Add("+hg_fakekick", function(ply)
+	if IsValid(ply) then hg.FakeLegKickChargeStart(ply) end
+end)
+
+concommand.Add("-hg_fakekick", function(ply)
+	if IsValid(ply) then hg.FakeLegKickChargeRelease(ply) end
+end)
 
 hook.Add("Think", "Fake", function()
 	hg.humans_cached = player_GetHumans()
@@ -936,7 +993,7 @@ hook.Add("Think", "Fake", function()
 		end
 
 		local fakeKick = ragdoll.fakeLegKick
-		local fakeKickActive = fakeKick and CurTime() < fakeKick.finish and org.canmove
+		local fakeKickActive = (fakeKick and CurTime() < fakeKick.finish or ragdoll.fakeKickCharge) and org.canmove
 
 		if (!ply:InVehicle() && (ply:KeyDown(IN_USE) || ((ishgweapon(wep)) && (ply:KeyDown(IN_ATTACK2) || (wep.IsResting and wep:IsResting()))) || (wep.ismelee && (ply:KeyDown(IN_ATTACK2) || ply:KeyDown(IN_ATTACK))))) || (ply:InVehicle() && not ply:KeyDown(IN_USE)) or ragdollcombat then
 			if org.canmove and (!((ply:KeyDown(IN_MOVELEFT) or ply:KeyDown(IN_MOVERIGHT)) and ragdoll:IsOnFire()) or ply:InVehicle()) then
@@ -1060,70 +1117,27 @@ hook.Add("Think", "Fake", function()
 		org.manualHoldWoundStrength = ((gripLeft and hg.GetArmEffectiveness(ply, "larm") or 0)
 			+ (gripRight and hg.GetArmEffectiveness(ply, "rarm") or 0)) / 2 * Lerp(holdBody, 0.25, 1)
 
-		if org.alive and IsValid(spine) and ragdoll.otrubCollapseStart and (CurTime() - ragdoll.otrubCollapseStart) < 1.5 then
-			inmove = true
-
-			local t = (CurTime() - ragdoll.otrubCollapseStart) / 1.5
-			local strength = 1 - t
-
-			local otrub_ss = 0.4
-			local otrub_maxang = 15 * strength
-			local otrub_maxangdamp = 8 * strength
-			local otrub_maxspeed = 15 * strength
-			local otrub_maxspeeddamp = 8 * strength
-
-			local jitterA = AngleRand(-2, 2)
-			local jitterV = VectorRand() * 2
-
-			local sPos = spine:GetPos()
-			local sAng = spine:GetAngles()
-			local fetalPos = sPos + sAng:Up() * -10 + sAng:Forward() * 10 + jitterV
-			local armHoldPos = sPos + sAng:Up() * 15 + sAng:Forward() * 5 + jitterV
-
-			shadowControl(ragdoll, 1, otrub_ss, Angle(sAng.p + 30, sAng.y, 0) + jitterA, otrub_maxang, otrub_maxangdamp)
-			shadowControl(ragdoll, 10, otrub_ss, Angle(sAng.p + 40, sAng.y, 0) + jitterA, otrub_maxang, otrub_maxangdamp)
-
-			shadowControl(ragdoll, 8, otrub_ss, nil, nil, nil, fetalPos, otrub_maxspeed, otrub_maxspeeddamp)
-			shadowControl(ragdoll, 11, otrub_ss, nil, nil, nil, fetalPos, otrub_maxspeed, otrub_maxspeeddamp)
-			shadowControl(ragdoll, 9, otrub_ss, nil, nil, nil, fetalPos, otrub_maxspeed, otrub_maxspeeddamp)
-			shadowControl(ragdoll, 12, otrub_ss, nil, nil, nil, fetalPos, otrub_maxspeed, otrub_maxspeeddamp)
-			shadowControl(ragdoll, 13, otrub_ss, nil, nil, nil, fetalPos, otrub_maxspeed, otrub_maxspeeddamp)
-			shadowControl(ragdoll, 14, otrub_ss, nil, nil, nil, fetalPos, otrub_maxspeed, otrub_maxspeeddamp)
-
-			if not fallCoverActive and ((org.larm or 0) > 0 or org.larmdislocation) then
-				shadowControl(ragdoll, 3, otrub_ss, nil, nil, nil, armHoldPos, otrub_maxspeed, otrub_maxspeeddamp)
-				shadowControl(ragdoll, 4, otrub_ss, nil, nil, nil, armHoldPos, otrub_maxspeed, otrub_maxspeeddamp)
-				shadowControl(ragdoll, 5, otrub_ss, nil, nil, nil, armHoldPos, otrub_maxspeed, otrub_maxspeeddamp)
-			end
-			if not fallCoverActive and ((org.rarm or 0) > 0 or org.rarmdislocation) then
-				shadowControl(ragdoll, 2, otrub_ss, nil, nil, nil, armHoldPos, otrub_maxspeed, otrub_maxspeeddamp)
-				shadowControl(ragdoll, 6, otrub_ss, nil, nil, nil, armHoldPos, otrub_maxspeed, otrub_maxspeeddamp)
-				shadowControl(ragdoll, 7, otrub_ss, nil, nil, nil, armHoldPos, otrub_maxspeed, otrub_maxspeeddamp)
-			end
-
-			if manualHoldWound then
-				local wPos = getHoldWoundPos(ragdoll, holdWound)
-				if wPos then
-					if manualUseLeft and not gripLeft then
-						shadowControl(ragdoll, 3, otrub_ss, nil, nil, nil, getHoldTarget(wPos, lupper, K.wound_hold_upperarm_offset), K.wound_hold_arm_speed * strength, K.wound_hold_arm_damp * strength)
-						shadowControl(ragdoll, 4, otrub_ss, nil, nil, nil, getHoldTarget(wPos, lforearm, K.wound_hold_forearm_offset), K.wound_hold_reach_speed * strength, K.wound_hold_reach_damp * strength)
-						shadowControl(ragdoll, 5, otrub_ss, nil, nil, nil, getHoldTarget(wPos, lhand, K.wound_hold_hand_offset), K.wound_hold_reach_speed * strength, K.wound_hold_reach_damp * strength)
-					end
-					if manualUseRight and not gripRight then
-						shadowControl(ragdoll, 2, otrub_ss, nil, nil, nil, getHoldTarget(wPos, rupper, K.wound_hold_upperarm_offset), K.wound_hold_arm_speed * strength, K.wound_hold_arm_damp * strength)
-						shadowControl(ragdoll, 6, otrub_ss, nil, nil, nil, getHoldTarget(wPos, rforearm, K.wound_hold_forearm_offset), K.wound_hold_reach_speed * strength, K.wound_hold_reach_damp * strength)
-						shadowControl(ragdoll, 7, otrub_ss, nil, nil, nil, getHoldTarget(wPos, rhand, K.wound_hold_hand_offset), K.wound_hold_reach_speed * strength, K.wound_hold_reach_damp * strength)
-					end
-				end
-			end
-		end
-
 		local angles2 = -(-angles)
 		angles2:RotateAroundAxis(angles2:Right(),30)
 
 		local forward = ply:KeyDown(IN_FORWARD)
 		local back = ply:KeyDown(IN_BACK)
 		time = CurTime()
+
+		if ragdoll.fakeKickCharge then
+			if not org.canmove then
+				ragdoll.fakeKickCharge = nil
+			else
+				inmove = true
+				hg.PoseFakeLegKick(ragdoll, angles2, false, 0)
+				if hg_fake_stamina:GetBool() then
+					hg.organism.ConsumeLimbStamina(org, "legs", K.FAKE_LEG_KICK.CHARGE_LEG_DRAIN * ragdoll.dtime)
+				end
+				if (org.stamina.legs or hg.LIMB_STAMINA_MAX) <= 0 then
+					hg.FakeLegKickChargeRelease(ply)
+				end
+			end
+		end
 
 		if fakeKick then
 			if time >= fakeKick.finish or not org.canmove then
@@ -1143,25 +1157,8 @@ hook.Add("Think", "Fake", function()
 				end
 
 				local kickExtend = fakeKick.extended or phase >= K.FAKE_LEG_KICK.EXTEND_TIME
-				local angle = -(-angles2)
-				angle:RotateAroundAxis(angle:Forward(), K.FAKE_LEG_KICK.CHARGE_FORWARD_OFFSET)
-
-				if kickExtend then
-					angle:RotateAroundAxis(angle:Up(), K.FAKE_LEG_KICK.EXTEND_THIGH_UP_OFFSET)
-				end
-
-				angle:RotateAroundAxis(angle:Right(), K.FAKE_LEG_KICK.CHARGE_THIGH_RIGHT_OFFSET)
-				shadowControl(ragdoll, 8, K.FAKE_LEG_KICK.SHADOW_TIME, angle, K.FAKE_LEG_KICK.SHADOW_ANG, K.FAKE_LEG_KICK.SHADOW_DAMP)
-
-				if kickExtend then
-					angle:RotateAroundAxis(angle:Up(), -K.FAKE_LEG_KICK.EXTEND_THIGH_UP_OFFSET)
-				end
-
-				angle:RotateAroundAxis(angle:Right(), K.FAKE_LEG_KICK.CHARGE_CALF_RIGHT_OFFSET)
-				if !kickExtend then
-					angle:RotateAroundAxis(angle:Up(), K.FAKE_LEG_KICK.CHARGE_CALF_UP_OFFSET)
-				end
-				shadowControl(ragdoll, 9, K.FAKE_LEG_KICK.SHADOW_TIME, angle, K.FAKE_LEG_KICK.SHADOW_ANG, K.FAKE_LEG_KICK.SHADOW_DAMP)
+				hg.PoseFakeLegKick(ragdoll, angles2, kickExtend, kickExtend and fakeKick.extendPower or 0)
+				if kickExtend then hg.ThrustFakeLegKick(ragdoll, org, fakeKick) end
 
 				if not fakeKick.hit and time >= fakeKick.hitTime then
 					fakeKick.hit = true
@@ -1257,6 +1254,7 @@ hook.Add("Think", "Fake", function()
 
 					if hg_fake_stamina:GetBool() then
 						org.stamina.subadd = org.stamina.subadd + 0.05 * (ragdoll.staminaRightModifyer or 0.5) * (1 - ledgeRH * 0.9) * (on_ground and 0.25 or 1) * (ply.GetTraitMultiplier and ply:GetTraitMultiplier("climb_stamina_cost", 1) or 1)
+						hg.organism.ConsumeLimbStamina(org, "arms", K.ARM_GRIP_DRAIN * ragdoll.dtime * (1 - ledgeRH * 0.9) * (on_ground and 0.25 or 1))
 					end
 				end
 
@@ -1279,6 +1277,7 @@ hook.Add("Think", "Fake", function()
 
 					if hg_fake_stamina:GetBool() then
 						org.stamina.subadd = org.stamina.subadd + 0.05 * (ragdoll.staminaLeftModifyer or 0.5) * (1 - ledgeLH * 0.9) * (on_ground and 0.25 or 1) * (ply.GetTraitMultiplier and ply:GetTraitMultiplier("climb_stamina_cost", 1) or 1)
+						hg.organism.ConsumeLimbStamina(org, "arms", K.ARM_GRIP_DRAIN * ragdoll.dtime * (1 - ledgeLH * 0.9) * (on_ground and 0.25 or 1))
 					end
 				end
 			end
@@ -1382,12 +1381,12 @@ hook.Add("Think", "Fake", function()
 				end
 			end
 
-			if org.stamina[1] < 2 then
+			if org.stamina[1] < 2 or (org.stamina.arms or hg.LIMB_STAMINA_MAX) < 2 then
 				ply.HandsStun = CurTime() + 2
 				--ply:Notify(math.random(1,2) == 1 and "SHIT!" or "OH NOO!", 2, "ragdoll_fall", 0, nil, Color(255, 0, 0))
 			end
 
-			if org.stamina[1] < 50 and (IsValid(ragdoll.ConsRH) or IsValid(ragdoll.ConsLH)) then
+			if (org.stamina[1] < 50 or (org.stamina.arms or hg.LIMB_STAMINA_MAX) < 25) and (IsValid(ragdoll.ConsRH) or IsValid(ragdoll.ConsLH)) then
 				ply:Notify( math.random(1,2) == 1 and "I'm at my limits here!" or "I can't hold much longer...", 25, "ragdoll_almostfall", 0, nil, Color(200, 55, 55))
 			end
 
@@ -1398,6 +1397,7 @@ hook.Add("Think", "Fake", function()
 				if IsValid(ragdoll.ConsLH) then
 					if hg_fake_stamina:GetBool() then
 						org.stamina.subadd = org.stamina.subadd + 0.06 * (ragdoll.staminaLeftModifyer or 0.5) * ( IsValid(ragdoll.ConsRH) and 0.35 or 1.25) * (1 - ledgeLH * 0.9) * (on_ground and 0.25 or 1) * (ply.GetTraitMultiplier and ply:GetTraitMultiplier("climb_stamina_cost", 1) or 1)
+						hg.organism.ConsumeLimbStamina(org, "arms", K.ARM_GRIP_DRAIN * ragdoll.dtime * (IsValid(ragdoll.ConsRH) and 0.5 or 1.5) * (1 - ledgeLH * 0.9) * (on_ground and 0.25 or 1))
 					end
 					if leftArmInjured then
 						local heldFor = time - (ragdoll.ConsLH.grabStarted or time)
@@ -1476,6 +1476,7 @@ hook.Add("Think", "Fake", function()
 				if IsValid(ragdoll.ConsRH) then
 					if hg_fake_stamina:GetBool() then
 						org.stamina.subadd = org.stamina.subadd + 0.06 * (ragdoll.staminaRightModifyer or 1) * ( IsValid(ragdoll.ConsLH) and 0.35 or 1.25) * (1 - ledgeRH * 0.9) * (on_ground and 0.25 or 1) * (ply.GetTraitMultiplier and ply:GetTraitMultiplier("climb_stamina_cost", 1) or 1)
+						hg.organism.ConsumeLimbStamina(org, "arms", K.ARM_GRIP_DRAIN * ragdoll.dtime * (IsValid(ragdoll.ConsLH) and 0.5 or 1.5) * (1 - ledgeRH * 0.9) * (on_ground and 0.25 or 1))
 					end
 					if rightArmInjured then
 						local heldFor = time - (ragdoll.ConsRH.grabStarted or time)
@@ -1674,6 +1675,10 @@ hook.Add("Think", "Fake", function()
 
 	if org.canmove and ply.FakeRagdoll == ragdoll and IsValid(spine) then
 		if ply:KeyDown(IN_DUCK) and !ply:InVehicle() then
+				if hg_fake_stamina:GetBool() then
+					hg.organism.ConsumeLimbStamina(org, "legs", K.LEG_CONTROL_DRAIN * ragdoll.dtime)
+				end
+
 				local lthigh = ragdoll:GetPhysicsObjectNum(realPhysNum(ragdoll, 11))
 				local rthigh = ragdoll:GetPhysicsObjectNum(realPhysNum(ragdoll, 8))
 
@@ -1817,6 +1822,7 @@ hook.Add("Think", "Fake", function()
 
 					if hg_fake_stamina:GetBool() then
 						org.stamina.subadd = org.stamina.subadd + 0.08
+						hg.organism.ConsumeLimbStamina(org, "legs", K.LEG_CONTROL_DRAIN * ragdoll.dtime)
 					end
 				else
 					restoreSlideMaterials(ragdoll)
@@ -1869,6 +1875,10 @@ hook.Add("Think", "Fake", function()
 					end
 
 					if isDropkicking then
+						if hg_fake_stamina:GetBool() then
+							hg.organism.ConsumeLimbStamina(org, "legs", K.LEG_CONTROL_DRAIN * ragdoll.dtime)
+						end
+
 						legAng1:Set(angles)
 						legAng1:RotateAroundAxis(angles:Right(), 75)
 						legAng1:RotateAroundAxis(angles:Forward(), -100)

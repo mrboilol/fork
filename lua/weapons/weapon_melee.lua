@@ -2207,6 +2207,7 @@ function SWEP:ConsumeMeleeStamina(owner, amount)
 		stamina.subadd = (stamina.subadd or 0) + cost * (self.MeleeStaminaMul or 0.4)
 		hg.organism.ConsumeStamina(org, cost * (self.MeleeDirectStaminaMul or 0.9) / (org.superfighter and 4 or 1))
 		hg.organism.RecordMeleeExertion(org, cost)
+		hg.organism.ConsumeLimbStamina(org, "arms", cost * (self.TwoHanded and 0.6 or 0.8))
 	end
 
 	local arms = self.TwoHanded and {"rarm", "larm"} or {"rarm"}

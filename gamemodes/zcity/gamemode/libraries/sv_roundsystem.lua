@@ -19,7 +19,6 @@ local ZB_FORCED_TEMP_MODE_WEIGHTS = {
 local ZB_FORCED_MODE_POOL = {
         ["hmcd"] = true,
 	["standard"] = true,
-	["suicidelunatic"] = true,
 	["active_shooter"] = true,
 	["dm"] = true,
 	["tdm"] = true,
@@ -89,6 +88,7 @@ end
 
 local function ZB_ResolveNextRound(round)
 	round = ZB_NormalizeModeKey(round)
+	if ZB_MENU_ONLY_MODES[round] then return round end
 
 	if ZB_FORCE_LIMITED_MODE_POOL then
 		local previous = ZB_NormalizeModeKey(zb.CROUND)

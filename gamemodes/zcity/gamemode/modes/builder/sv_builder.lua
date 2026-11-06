@@ -1,7 +1,5 @@
 local MODE = MODE
 
-local respawnDelay = 5
-
 function MODE:CanLaunch()
 	return false
 end
@@ -39,15 +37,13 @@ function MODE:ShouldRoundEnd()
 end
 
 function MODE:CanSpawn()
-	return true
 end
 
-function MODE:PlayerDeath(ply)
-	timer.Create("zb_builder_respawn_" .. ply:EntIndex(), respawnDelay, 1, function()
-		if not IsValid(ply) or ply:Alive() or zb.CROUND ~= "builder" or zb.ROUND_STATE ~= 1 then return end
-		ply:Spawn()
-		timer.Simple(0, function() giveBuilderLoadout(ply) end)
-	end)
+function MODE:RespawnPlayer(ply)
+	if ply:Team() == TEAM_SPECTATOR then return end
+
+	ply:Spawn()
+	timer.Simple(0, function() giveBuilderLoadout(ply) end)
 end
 
 function MODE:GiveWeapons()

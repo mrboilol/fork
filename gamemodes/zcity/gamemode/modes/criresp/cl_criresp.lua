@@ -12,6 +12,8 @@ local introReady = false
 local introPending = false
 local introGeneration = 0
 
+local PreloadIntro
+
 local function StopIntro()
 	introGeneration = introGeneration + 1
 	introReady = false
@@ -50,7 +52,7 @@ local function StartIntro()
 	end)
 end
 
-local function PreloadIntro(autoPlay)
+PreloadIntro = function(autoPlay)
 	introGeneration = introGeneration + 1
 	local gen = introGeneration
 	introReady = false
@@ -60,7 +62,7 @@ local function PreloadIntro(autoPlay)
 	end
 	introPending = autoPlay or introPending
 
-	sound.PlayFile("sound/Crirespstart.mp3", "noplay noblock", function(channel)
+	sound.PlayFile("sound/shooterround.mp3", "noplay noblock", function(channel)
 		if gen ~= introGeneration then
 			if IsValid(channel) then channel:Stop() end
 			return

@@ -140,16 +140,20 @@ local pressed
 hook.Add("HUDPaint","shownotification",function()
     if LocalPlayer():Alive() then return end
 
-    if showstuff > CurTime() then
+    local builder = zb.IsBuilderRound()
+
+    if (builder and zb.ROUND_STATE == 1) or (not builder and showstuff > CurTime()) then
         local w, h = ScrW(), ScrH()
         local x, y = w / 2, h / 25 * 24
-        local txt = "Press F to open forgiveness menu."
+        local txt = builder and "Press R to respawn." or "Press F to open forgiveness menu."
         surface.SetFont( "HomigradFontBig" )
         surface.SetTextColor(255,255,255,255)
         local w, h = surface.GetTextSize(txt)
         surface.SetTextPos(x - w / 2, y - h / 2)
         surface.DrawText(txt)
     end
+
+    if builder then return end
 
     if input.IsKeyDown(KEY_F) and not gui.IsGameUIVisible() and not IsValid(vgui.GetKeyboardFocus()) then
         if not pressed then

@@ -44,6 +44,22 @@ local vecup = Vector(0, 0, 64)
 
 local spawners = {}
 
+local function getMapSpawns()
+	local spots = {}
+
+	for i, ent in RandomPairs(ents.FindByClass("info_player_start")) do
+		spots[#spots + 1] = ent:GetPos()
+	end
+
+	for i, str in ipairs(default_spawns) do
+		for k, v in RandomPairs(ents.FindByClass(str)) do
+			spots[#spots + 1] = v:GetPos()
+		end
+	end
+
+	return spots
+end
+
 local function getRandSpawn()
 	spawners = {}
 
@@ -52,15 +68,7 @@ local function getRandSpawn()
 			spawners[#spawners + 1] = v.pos
 		end
 	else
-		for i, ent in RandomPairs(ents.FindByClass("info_player_start")) do
-			spawners[#spawners + 1] = ent:GetPos()
-		end
-		
-		for i, str in ipairs(default_spawns) do
-			for k, v in RandomPairs(ents.FindByClass(str)) do
-				spawners[#spawners + 1] = v:GetPos()
-			end
-		end
+		spawners = getMapSpawns()
 
 		--[[for k, v in ipairs(navmesh.GetAllNavAreas()) do
 			local Randompos = v:GetCenter()
@@ -185,6 +193,13 @@ function PLAYER:GetRandomSpawn()
 end
 
 local function PlayerSelectSpawn(ply, transition)
+	if CurrentRound().sandboxSpawns then
+		local mapSpawn = zb:GetRandomSpawn(ply, getMapSpawns())
+		if mapSpawn then ply:SetPos(mapSpawn) end
+
+		return
+	end
+
 	if CurrentRound().randomSpawns then
 		local randSpawn = zb:GetRandomSpawn()
 		if randSpawn then ply:SetPos(randSpawn) end
@@ -260,6 +275,13 @@ net.Receive("ZB_ChooseSpecPly",function(len,ply)
 	if ply:Alive() then return end
 	
 	local key = net.ReadInt(32)
+	local round = CurrentRound()
+
+	if key == IN_RELOAD and zb.ROUND_STATE == 1 and round.RespawnPlayer then
+		round:RespawnPlayer(ply)
+		return
+	end
+
 	local tbl = zb:CheckAlive()
 	
 	if #tbl == 0 then return end

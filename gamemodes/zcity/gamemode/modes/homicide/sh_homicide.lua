@@ -335,7 +335,6 @@ Despite being zombie, still bears appearance of a normal human.]],
 --\\Professions
 MODE.ProfessionsRoundTypes = {
 	["standard"] = true,
-	["suicidelunatic"] = true,
 }
 
 MODE.Professions = {
@@ -424,24 +423,6 @@ MODE.Roles.standard = {
 
 	innocent = {
 		name = "Victim",
-		color = Color(0,120,190)
-	},
-}
-
-MODE.Roles.suicidelunatic = {
-	traitor = {
-		objective = "You are the Suicide Lunatic. You have a bomb strapped to your chest. Walk into a crowd and detonate.",
-		name = "Lunatic",
-		color = Color(190,0,0)
-	},
-
-	gunner = {
-		name = "Innocent",
-		color = Color(0,120,190)
-	},
-
-	innocent = {
-		name = "Innocent",
 		color = Color(0,120,190)
 	},
 }

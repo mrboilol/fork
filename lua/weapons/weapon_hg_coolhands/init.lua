@@ -1318,6 +1318,7 @@ function SWEP:AttackFront(special_attack, rand)
 				org.stamina.subadd = org.stamina.subadd + cost
 				hg.organism.ConsumeStamina(org, cost * 0.6 / (org.superfighter and 4 or 1))
 				hg.organism.RecordMeleeExertion(org, cost)
+				hg.organism.ConsumeLimbStamina(org, "arms", cost)
         end
 
         owner:LagCompensation(false)

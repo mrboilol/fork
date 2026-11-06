@@ -1039,6 +1039,8 @@ function SWEP:PrimaryAttack(broadcast)
 	local huy = self:Shoot() ~= false
 	
 	if SERVER and huy then
+		local caliberMul, weightMul = self:GetRecoilImpulseFactors()
+		hg.organism.ConsumeLimbStamina(owner.organism, "arms", math.Clamp(caliberMul * weightMul * 0.8, 0.2, 3))
 		self.hgShootEventID = ((self.hgShootEventID or 0) % 65535) + 1
 		net.Start("hgwep shoot", true)
 		net.WriteEntity(self)
@@ -1985,6 +1987,7 @@ function SWEP:CoreStep()
 					end
 
 					owner.organism.stamina.subadd = owner.organism.stamina.subadd + 3 * self:GetWeaponWeight()
+					hg.organism.ConsumeLimbStamina(owner.organism, "arms", 1.5 * self:GetWeaponWeight())
 				end
 
 				owner:LagCompensation(false)

@@ -39,6 +39,7 @@ function PLAYER:LegAttack()
 
     local org = self.organism
     org.stamina.subadd = org.stamina.subadd + ((string.find(anim, "curbstomp")) and 8 or 30)
+    hg.organism.ConsumeLimbStamina(org, "legs", string.find(anim, "curbstomp") and 7 or 6)
     local speedmul = (2 - (org.stamina[1] / org.stamina.max))
     local speed = 1.42 * speedmul
     local animstopAdjust = 0.3 * speedmul
@@ -58,6 +59,7 @@ function PLAYER:LegAttack()
     end
     dmg = dmg * (self.KickDamageMul or 1)
     dmg = dmg * kickNerf
+    dmg = dmg * Lerp(hg.GetLimbFatigue(org, "legs"), 1, 0.5)
     -- Apply legstrength penalty from spine1 damage
     if org.legstrength and org.legstrength < 1 then
         dmg = dmg * org.legstrength

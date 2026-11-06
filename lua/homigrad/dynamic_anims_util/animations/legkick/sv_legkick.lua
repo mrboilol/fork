@@ -407,6 +407,7 @@ function PLAYER:LegAttack()
     local isCurbstomp = anim == "curbstomp_base"
     local staminaCost = isMidAir and DROP_KICK_STAMINA_COST or (isCurbstomp and CURBSTOMP_STAMINA_COST or (isCrouchKick and CROUCH_KICK_STAMINA_COST or KICK_STAMINA_COST))
     org.stamina.subadd = org.stamina.subadd + staminaCost
+    hg.organism.ConsumeLimbStamina(org, "legs", staminaCost * 0.6)
     local speedmul = (2 - (org.stamina[1] / org.stamina.max))
     local speed = 1.5 * speedmul
     local animstopAdjust = 0.3 * speedmul
@@ -417,6 +418,7 @@ function PLAYER:LegAttack()
     dmg = dmg * getKickDamageMul(self)
     dmg = dmg * (self.KickDamageMul or 1)
 	dmg = dmg * Lerp(kickingLegEffectiveness, 0.2, 1)
+	dmg = dmg * Lerp(hg.GetLimbFatigue(org, "legs"), 1, 0.5)
     dmg = dmg * (isCurbstomp and CURBSTOMP_DAMAGE_MUL or LEG_KICK_DAMAGE_MUL)
     dmg = dmg * (isCrouchKick and CROUCH_KICK_DAMAGE_MUL or 1)
     dmg = dmg * (isMidAir and DROP_KICK_DAMAGE_MUL or 1)

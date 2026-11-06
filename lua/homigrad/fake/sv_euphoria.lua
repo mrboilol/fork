@@ -45,11 +45,6 @@ local EUPHORIA_WALL_SMEAR_TIME = 0.9
 local EUPHORIA_WALL_SMEAR_STICK = 8
 local EUPHORIA_WALL_SLIDE_SPEED = 55
 local EUPHORIA_WALL_STICK = 20
-local EUPHORIA_CURL_TIME = 2.5
-local EUPHORIA_CURL_WINDOW = 1.2
-local EUPHORIA_CURL_TRIGGER = 2
-local EUPHORIA_CURL_MIN_DAMAGE = 8
-local EUPHORIA_CURL_EASE = 0.3
 
 local EUPHORIA_MAX_RELATIVE_VELOCITY = 200
 local EUPHORIA_MAX_COMMON_ANGULAR = 85
@@ -429,20 +424,6 @@ hook.Add("EntityTakeDamage", "HG_EuphoriaHit", function(ent, dmgInfo)
 		return
 	end
 	ply.hgPendingWoundGrab = nil
-	if dmg >= EUPHORIA_CURL_MIN_DAMAGE then
-		if ragdoll.hgBeat and now > ragdoll.hgBeat.untilT then
-			ragdoll.hgBeat = nil
-		end
-		if not ragdoll.hgBeat then
-			ragdoll.hgBeat = { count = 0, untilT = now + EUPHORIA_CURL_WINDOW }
-		end
-		ragdoll.hgBeat.count = ragdoll.hgBeat.count + 1
-		if ragdoll.hgBeat.count >= EUPHORIA_CURL_TRIGGER and not ragdoll.hgCurl and not ragdoll.hgGetUp and euphoriaOn(hg_euphoria_detail) then
-			ragdoll.hgBeat = nil
-			ragdoll.hgWoundGrab = nil
-			ragdoll.hgCurl = { untilT = now + EUPHORIA_CURL_TIME, dur = EUPHORIA_CURL_TIME }
-		end
-	end
 
 	if dmg < 8 then return end
 
@@ -663,7 +644,7 @@ hook.Add("Think", "HG_EuphoriaLegRest", function()
 		if not IsValid(ragdoll) then continue end
 		if not ply:Alive() then continue end
 
-		if ragdoll.hgGetUp or ragdoll.hgCurl or ragdoll.hgStumbleActive or
+		if ragdoll.hgGetUp or ragdoll.hgStumbleActive or
 			ragdoll.isSliding or ragdoll.isDropkicking or ragdoll.hgWallSmear or ragdoll.hgArteryKick then continue end
 
 		if hg.KeyDown(ply, IN_FORWARD) or hg.KeyDown(ply, IN_BACK) or
@@ -709,73 +690,6 @@ hook.Add("Think", "HG_EuphoriaLegRest", function()
 
 		legRestShadow(lFoot, target - right * 3, 800, 40, dtime)
 		legRestShadow(rFoot, target + right * 3, 800, 40, dtime)
-	end
-end)
-
-local function curlTarget(ragdoll, physNum, target, stiffness, damping, dtime)
-	local phys = ragdoll:GetPhysicsObjectNum(hg.realPhysNum(ragdoll, physNum))
-	if not IsValid(phys) then return end
-	springPull(phys, target, stiffness, damping, dtime)
-end
-
-hook.Add("Think", "HG_EuphoriaCurl", function()
-	if not euphoriaOn(hg_euphoria_detail) then return end
-
-	local now = SysTime()
-	for i, ply in player.Iterator() do
-		local ragdoll = ply.FakeRagdoll
-		if not IsValid(ragdoll) then continue end
-		if not ply:Alive() then continue end
-
-		local curl = ragdoll.hgCurl
-		if not curl then continue end
-
-		if now >= curl.untilT or ragdoll.hgGetUp or
-			hg.KeyDown(ply, IN_FORWARD) or hg.KeyDown(ply, IN_BACK) or
-			hg.KeyDown(ply, IN_MOVELEFT) or hg.KeyDown(ply, IN_MOVERIGHT) or
-			hg.KeyDown(ply, IN_USE) then
-			ragdoll.hgCurl = nil
-			continue
-		end
-
-		local frac = (curl.untilT - now) / curl.dur
-		local ease = math.Clamp(frac / EUPHORIA_CURL_EASE, 0, 1)
-
-		local pelvis = ragdoll:GetPhysicsObjectNum(hg.realPhysNum(ragdoll, 0))
-		local spine = ragdoll:GetPhysicsObjectNum(hg.realPhysNum(ragdoll, 1))
-		if not IsValid(pelvis) or not IsValid(spine) then
-			ragdoll.hgCurl = nil
-			continue
-		end
-
-		local pelvisPos = pelvis:GetPos()
-		local pelvisAng = pelvis:GetAngles()
-		if type(pelvisAng) ~= "Angle" then
-			ragdoll.hgCurl = nil
-			continue
-		end
-		local chestPos = spine:GetPos()
-
-		local stiffness = 700 * ease
-		local damping = 45
-
-		local dtime = reactionDelta(now, ragdoll.hgCurlLast)
-		ragdoll.hgCurlLast = now
-		if dtime <= 0 or dtime > 0.1 then continue end
-
-		local up = pelvisAng:Up()
-		local fwd = pelvisAng:Forward()
-		local right = pelvisAng:Right()
-
-		curlTarget(ragdoll, 12, pelvisPos + up * 20 + fwd * 8, stiffness, damping, dtime)
-		curlTarget(ragdoll, 13, pelvisPos + up * 16 + fwd * 6, stiffness, damping, dtime)
-		curlTarget(ragdoll, 9, pelvisPos + up * 20 + fwd * 8, stiffness, damping, dtime)
-		curlTarget(ragdoll, 14, pelvisPos + up * 16 + fwd * 6, stiffness, damping, dtime)
-		curlTarget(ragdoll, 5, chestPos + up * 10 - right * 10, stiffness, damping, dtime)
-		curlTarget(ragdoll, 4, chestPos + up * 12 - right * 15, stiffness, damping, dtime)
-		curlTarget(ragdoll, 7, chestPos + up * 10 + right * 10, stiffness, damping, dtime)
-		curlTarget(ragdoll, 6, chestPos + up * 12 + right * 15, stiffness, damping, dtime)
-		curlTarget(ragdoll, 10, chestPos + up * 4, stiffness, damping, dtime)
 	end
 end)
 

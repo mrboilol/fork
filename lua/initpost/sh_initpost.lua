@@ -183,6 +183,7 @@ end
 RemoveOldBinds()
 
 hg.Binds:CreateBind("hg_kick", KEY_NONE, nil, true, "Kick", "hg_kick")
+hg.Binds:CreateBind("+hg_fakekick", KEY_T, nil, true, "Charge kick (ragdoll)", "+hg_fakekick")
 hg.Binds:CreateBind("fake", KEY_NONE, nil, true, "Ragdoll/Get up", "fake")
 hg.Binds:CreateBind("hmcd_togglelaser", KEY_NONE, nil, true, "Toggle weapon laser", "hmcd_togglelaser")
 hg.Binds:CreateBind("+alt1", KEY_NONE, nil, true, "Lean left", "+alt1")

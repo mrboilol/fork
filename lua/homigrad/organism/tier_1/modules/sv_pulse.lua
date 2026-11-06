@@ -436,9 +436,8 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	if org.brainoxygen < 0.28 then
 		org.consciousness = math.min(org.consciousness or 1, 0.15 + org.brainoxygen / 0.28 * 0.55)
 	end
-	if org.brainoxygen < 0.08 then
-		local bloodDeficit = Clamp((1500 - (tonumber(org.blood) or getNormalBloodVolume())) / 1500, 0, 1)
-		org.brain = math.min((org.brain or 0) + timeValue * (0.08 - org.brainoxygen) * 0.12 * (1 + bloodDeficit * 7), 1)
+	if org.brainoxygen < 0.08 and not org.convulsing then
+		org.brain = math.min((org.brain or 0) + timeValue * (0.08 - org.brainoxygen) / 0.08 * hg.organism.convulsionConfig.hypoxiaBrainRate, 1)
 	end
 end
 
@@ -1156,7 +1155,7 @@ module[2] = function(owner, org, timeValue)
 	org.pulseDeficit = math.max((org.heartbeat or 0) - palpablePulseTarget, 0)
 	org.pulse = Approach(org.pulse, palpablePulseTarget, heart == 0 and timeValue * 10 or timeValue * 8)
 	local pressureCirculation = circulation * Clamp(1 - rhythmInstability * 0.24, 0.70, 1)
-	local pressureTarget = Clamp(92 * pressureCirculation ^ 0.75 + hypervolemia * 55, 0, 180)
+	local pressureTarget = Clamp((92 * pressureCirculation ^ 0.75 + hypervolemia * 55) * (1 - Clamp(org.hemotransfusionshock or 0, 0, 2) * 0.2), 0, 180)
 	local pressureNow = tonumber(org.bloodPressure) or pressureTarget
 	local pressureFallRate = org.heartstop and not (dihSupport or defibGrace or cprSupport) and 22 or 12
 	org.bloodPressure = Approach(pressureNow, pressureTarget, timeValue * (pressureTarget > pressureNow and 12 or pressureFallRate))

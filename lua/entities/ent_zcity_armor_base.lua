@@ -210,7 +210,7 @@ end
             model:SetBodyGroups(data.Bodygroups)
             model:SetParent(entDrawOn)
             --print(data.BoneMerge)
-            if data.BoneMerge then
+            if data.BoneMerge and (not data.ParentBone or model:LookupBone(data.ParentBone)) then
                 model:AddEffects(EF_BONEMERGE)
             else
                 model.ParentBone = entDrawOn:LookupBone( data.ParentBone ) 

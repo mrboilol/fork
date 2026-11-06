@@ -52,6 +52,7 @@ function SWEP:GetPrimaryMul()
 	self:ApplyForce(mul)
 	local experienceMul = self.GetWeaponExperienceMul and self:GetWeaponExperienceMul(owner) or 1
 	mul = (mul or 0) * (owner.organism and owner.organism.recoilmul or 1) * experienceMul
+	mul = mul * Lerp(hg.GetLimbFatigue(owner.organism, "arms"), 1, 1.5)
 	return mul
 end
 
@@ -237,7 +238,7 @@ function SWEP:PrimarySpread()
 		sprayAng:RotateAroundAxis(angle_zero:Forward(), eyeang.roll)
 		sprayAng.roll = 0
 
-		owner:SetEyeAngles(eyeang + sprayAng * (organism.recoilmul or 1) * experienceMul * (owner.posture == 1 and not self:IsZoom() and 0.1 or 1) * 0.18 * screenRecoilMul)
+		owner:SetEyeAngles(eyeang + sprayAng * (organism.recoilmul or 1) * Lerp(hg.GetLimbFatigue(organism, "arms"), 1, 1.5) * experienceMul * (owner.posture == 1 and not self:IsZoom() and 0.1 or 1) * 0.18 * screenRecoilMul)
 		
 		local max_clip1 = self:GetMaxClip1()
 		

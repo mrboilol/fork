@@ -76,6 +76,7 @@ module[1] = function(org)
 	end
 
 	org.hemotransfusionshock = 0
+	org.sepsisBloodPrev = nil
 	org.ischemia = 0
 	org.internalBleedDuration = 0
 	org.internalBleedPeak = 0
@@ -431,8 +432,32 @@ function hg.organism.AddGutHitNausea(org, delta, previousDamage, dmg)
 	org.wantToVomit = (org.wantToVomit or 0) + bump
 end
 
+function hg.organism.UpdateSepsis(org, mulTime, adrenalineStabilizer)
+	local bloodLost = max((org.sepsisBloodPrev or org.blood) - org.blood, 0)
+	org.sepsisBloodPrev = org.blood
+
+	local sepsis = org.hemotransfusionshock
+	if sepsis <= 0 then return end
+
+	local thiamine = (org.thiamine or 0) > 0
+	local txa = (org.tranexamic_acid or 0) > 0
+	local severity = min(sepsis, 2)
+	local organDamage = mulTime * max(severity - 0.5, 0) * (thiamine and 0.5 or 1) * (txa and 0.5 or 1)
+
+	org.internalBleed = org.internalBleed + mulTime * severity * 0.3 * (txa and 0.5 or 1)
+	org.liver = min(org.liver + organDamage * 0.012, 1)
+	org.kidneys = min((org.kidneys or 0) + organDamage * 0.012, 1)
+	org.heart = min(org.heart + organDamage * 0.006, 1)
+	if not adrenalineStabilizer and not thiamine and not txa then
+		org.ischemia = org.ischemia + mulTime * severity * 0.3
+	end
+
+	local clearance = mulTime * (1 / 45 + (thiamine and 1 / 30 or 0) + (txa and 1 / 30 or 0)) + bloodLost / 600
+	org.hemotransfusionshock = max(sepsis - clearance, 0)
+end
+
 module[2] = function(owner, org, mulTime)
-	local bloodCapacity = (hg.organism.normalBloodVolume or 5000) + (owner:IsPlayer() and owner.GetTraitBonus and owner:GetTraitBonus("blood_capacity", 0) or 0)
+	local bloodCapacity =(hg.organism.normalBloodVolume or 5000) + (owner:IsPlayer() and owner.GetTraitBonus and owner:GetTraitBonus("blood_capacity", 0) or 0)
 	org.maxblood = math.max(bloodCapacity, 1)
 	org.blood = math.max(tonumber(org.blood) or org.maxblood, 0)
 	local bloodBeforeLoss = org.blood
@@ -491,13 +516,7 @@ module[2] = function(owner, org, mulTime)
 	local adrenalineStabilizer = totalAdrenaline > 0.2
 	local hasAntiIschemia = (org.tranexamic_acid or 0) > 0 or (org.thiamine or 0) > 0
 
-	if org.hemotransfusionshock > 0 then
-		org.hemotransfusionshock = math.max(org.hemotransfusionshock - mulTime / 150,0)
-		org.internalBleed = org.internalBleed + mulTime / 20
-		if not adrenalineStabilizer and not hasAntiIschemia then
-			org.ischemia = org.ischemia + mulTime / 15
-		end
-	end
+	hg.organism.UpdateSepsis(org, mulTime, adrenalineStabilizer)
 
 	if org.arterialwounds and #org.arterialwounds > 0 then
 		for _, wound in pairs(org.arterialwounds) do

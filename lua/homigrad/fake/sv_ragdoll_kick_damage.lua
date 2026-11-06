@@ -322,8 +322,8 @@ hook.Add("Ragdoll Collide", "RagdollKickDamage", function(ragdoll, data)
         local speedMul = math.Clamp(1 + math.max(kickSpeed - FAKE_KICK_SPEED_DAMAGE_START, 0) * FAKE_KICK_SPEED_DAMAGE_PER_UNIT, 1, FAKE_KICK_SPEED_DAMAGE_MAX)
         local timingMul = timedExtension and 1.45 or 1
 
-        hg.TriggerFakeLegKickExtension(attacker, ragdoll, kickSpeed)
         damage = math.min(fakeKick.dmg * speedMul * timingMul, 65)
+        hg.TriggerFakeLegKickExtension(attacker, ragdoll, kickSpeed, damage)
         impactForce = math.max(3200, kickSpeed * 14) * timingMul
         knockback = math.Clamp(400 + kickSpeed * 2, 500, 1100) * timingMul
         impactType = timedExtension and "timed fake kick" or "fake kick"
@@ -352,6 +352,7 @@ hook.Add("Ragdoll Collide", "RagdollKickDamage", function(ragdoll, data)
         if attackerOrg and (attackerOrg._ragdollDropkickStaminaUntil or 0) < CurTime() then
             attackerOrg._ragdollDropkickStaminaUntil = CurTime() + 0.75
             attackerOrg.stamina.subadd = (attackerOrg.stamina.subadd or 0) + DROP_KICK_STAMINA_COST
+            hg.organism.ConsumeLimbStamina(attackerOrg, "legs", DROP_KICK_STAMINA_COST * 0.6)
 
             if attackerOrg.lleg == 1 or attackerOrg.rleg == 1 or attackerOrg.llegdislocation or attackerOrg.rlegdislocation then
                 attackerOrg.painadd = (attackerOrg.painadd or 0) + 35

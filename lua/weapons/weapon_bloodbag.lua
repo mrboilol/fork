@@ -286,9 +286,12 @@ if SERVER then
 						--print(good_type)
 						if good_type then
 							ent.organism.blood = math.min(ent.organism.blood + math.min(FrameTime() * 0.5 * rateScale * (math.max(ent.organism.pulse / 70,0.3)),self.modeValues[1]) * volume, maxTransfusionBlood)
+							ent.organism.hemotransfusionshock = math.max(ent.organism.hemotransfusionshock - math.max(ent.organism.blood - old, 0) / 600, 0)
 						else
 							ent.organism.blood = math.min(ent.organism.blood + math.min(FrameTime() * 0.5 * rateScale * (math.max(ent.organism.pulse / 70,0.3)),self.modeValues[1]) * volume * 0.4, maxTransfusionBlood)
-							ent.organism.hemotransfusionshock = ent.organism.hemotransfusionshock + math.min(FrameTime() * 0.5,self.modeValues[1] / rateScale)
+							if ent.organism.blood > old then
+								ent.organism.hemotransfusionshock = math.min(ent.organism.hemotransfusionshock + math.min(FrameTime() * 0.5,self.modeValues[1] / rateScale), 2)
+							end
 						end
 
 						if (self.bloodtype == "c-" or self.furryinfected) and ent.PlayerClassName != "furry" and (ent.organism.blood - old) > 0 then

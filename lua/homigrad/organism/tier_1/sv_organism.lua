@@ -504,6 +504,7 @@ local function send_organism(org, ply, recipientForce, reliable)
 	sendtable.arteria = org.arteria
 	sendtable.aorta = org.aorta
 	sendtable.recoilmul = org.recoilmul
+	sendtable.aiming_fatigue = org.aiming_fatigue
 	sendtable.meleespeed = org.meleespeed
 	sendtable.temperature = org.temperature
 	sendtable.canmove = org.canmove
@@ -1173,6 +1174,8 @@ hg.organism.convulsionConfig = {
 	brainChanceMin = 0.05,
 	brainChanceMax = 0.5,
 	brainRate = 1 / 80,
+	hypoxiaConvulsionBrainRate = 1 / 600,
+	hypoxiaBrainRate = 1 / 300,
 	hypoxiaPenalty = 0.35,
 	mannitolBlock = 0.25,
 	mannitolBrainShield = 1.6,
@@ -1318,7 +1321,8 @@ function hg.organism.TickConvulsion(owner, org, timeValue, ignoreBrainDamage)
 	if not ignoreBrainDamage then
 		local shield = math.Clamp(1 - mannitolK * cfg.mannitolBrainShield, 0, 1)
 		if shield > 0 then
-			org.brain = math.min((org.brain or 0) + timeValue * cfg.brainRate * shield, 1)
+			local brainRate = (org.brain or 0) < cfg.brainStart and cfg.hypoxiaConvulsionBrainRate or cfg.brainRate
+			org.brain = math.min((org.brain or 0) + timeValue * brainRate * shield, 1)
 		end
 	end
 
@@ -1902,8 +1906,11 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		end
 	end
 	if not org.otrub and isPly then
-		if hg.DespairThought and ((org.blood or 5000) <= (hg.organism.BLEEDOUT_DEATH_BLOOD or 2000) or (org.shock or 0) >= 70) then
-			hg.DespairThought(owner)
+		if hg.DespairThought then
+			local bleedingToDeath = (org.blood or 5000) <= (hg.organism.BLEEDOUT_DEATH_BLOOD or 2000)
+			if bleedingToDeath or (org.shock or 0) >= 70 then
+				hg.DespairThought(owner, not bleedingToDeath)
+			end
 		end
 		local mul = hg.likely_to_phrase(owner)
 		if not org.likely_phrase then org.likely_phrase = 0 end

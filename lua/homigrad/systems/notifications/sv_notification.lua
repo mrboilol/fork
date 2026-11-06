@@ -461,7 +461,7 @@ local function SCPCBHitThought(ply, target, dmgType, dmg, hitPos, dmginfo)
 
         if #hits >= 4 then
             ply.despairHits = {}
-            hg.DespairThought(ply)
+            hg.DespairThought(ply, true)
         end
     end
 
@@ -852,7 +852,32 @@ local function DespairActive(ply, id)
     return not (ply.organism and ply.organism.otrub)
 end
 
-function hg.DespairThought(ply)
+local DESPAIR_DAMAGE_CHANCE = 0.25
+local DESPAIR_ROLL_COOLDOWN = 45
+local DESPAIR_BROKEN_REGIONS = 5
+local despairLimbs = {"larm", "rarm", "lleg", "rleg"}
+
+local function IsEverythingBroken(org)
+    if not org then return false end
+
+    local broken = 0
+    for _, limb in ipairs(despairLimbs) do
+        if org[limb .. "amputated"] or (hg.IsLimbFractured and hg.IsLimbFractured(org, limb)) then broken = broken + 1 end
+    end
+
+    if (org.chest or 0) >= 1 then broken = broken + 1 end
+    if (org.pelvis or 0) >= 1 then broken = broken + 1 end
+    if (org.skull or 0) >= 1 then broken = broken + 1 end
+
+    local orgLib = hg.organism
+    if (org.spine1 or 0) >= (orgLib.fake_spine1 or 1) or (org.spine2 or 0) >= (orgLib.fake_spine2 or 1) or (org.spine3 or 0) >= (orgLib.fake_spine3 or 1) then
+        broken = broken + 1
+    end
+
+    return broken >= DESPAIR_BROKEN_REGIONS
+end
+
+function hg.DespairThought(ply, fromDamage)
     if not IsValid(ply) or not ply:IsPlayer() or not ply:Alive() then return false end
 
     local org = ply.organism
@@ -860,6 +885,13 @@ function hg.DespairThought(ply)
 
     local now = CurTime()
     if (ply.despairNext or 0) > now then return false end
+
+    if fromDamage and not IsEverythingBroken(org) then
+        if (ply.despairRollNext or 0) > now then return false end
+        ply.despairRollNext = now + DESPAIR_ROLL_COOLDOWN
+        if math.Rand(0, 1) > DESPAIR_DAMAGE_CHANCE then return false end
+    end
+
     ply.despairNext = now + 45
 
     if ply.HasTrait and ply:HasTrait("gurajchaka_child") then return false end

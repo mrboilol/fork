@@ -9,7 +9,7 @@ local hg_euphoria_holdenv = CreateConVar("hg_euphoria_holdenv", "1", FCVAR_ARCHI
 local hg_euphoria_windmill = CreateConVar("hg_euphoria_windmill", "1", FCVAR_ARCHIVE + FCVAR_NOTIFY, "fake ragdolls windmill while airborne (Artagdoll Falling)", 0, 1)
 local hg_euphoria_brace = CreateConVar("hg_euphoria_brace", "1", FCVAR_ARCHIVE + FCVAR_NOTIFY, "fake ragdolls put their hands out to catch the ground right before they hit it", 0, 1)
 local hg_euphoria_headshot_fade = CreateConVar("hg_euphoria_headshot_fade", "1", FCVAR_ARCHIVE + FCVAR_NOTIFY, "players killed standing by a headshot sometimes stumble or drop to their knees before collapsing", 0, 1)
-local hg_euphoria_writhe = CreateConVar("hg_euphoria_writhe", "1", FCVAR_ARCHIVE + FCVAR_NOTIFY, "fake ragdolls writhe, roll and clutch their wounds on the ground when in severe pain", 0, 1)
+local hg_euphoria_writhe = CreateConVar("hg_euphoria_writhe", "1", FCVAR_ARCHIVE + FCVAR_NOTIFY, "fake ragdolls writhe and clutch their wounds on the ground when in extreme pain", 0, 1)
 local hg_hit_knockdown_energy = CreateConVar("hg_hit_knockdown_energy", "65", FCVAR_ARCHIVE + FCVAR_NOTIFY, "hit energy (damage summed over a short window) that knocks a standing player over, 0 disables", 0, 10000)
 
 local IKSystem = include("external/system_/utils/IKChain.lua")
@@ -314,6 +314,9 @@ local function findStepGround(st, ragdoll, i, pos, currentZ)
 	if not ground then return end
 
 	local rootPos = root:GetPos()
+	local lead = Vector(st.smoothedVelocity.x, st.smoothedVelocity.y, 0) * K.STUMBLE_STEP_LEAD
+	if lead:LengthSqr() > K.STUMBLE_STEP_LEAD_MAX * K.STUMBLE_STEP_LEAD_MAX then lead = lead:GetNormalized() * K.STUMBLE_STEP_LEAD_MAX end
+	rootPos:Add(lead)
 	local reach = chain.completeLength * K.LEG_REACH_MUL
 	local height = rootPos.z - ground.z - K.FOOT_ANKLE_HEIGHT
 	if math.abs(height) >= reach then return end
@@ -365,13 +368,65 @@ local function stumbleLifetime(st)
 	return st.hit and K.STUMBLE_HIT_TIME or math.max(st.cfg.Duration, 0.1)
 end
 
+local function stumbleRelease(st, now)
+	if not st.stepsDoneAt or not (st.hit or not moveControl(st.ply)) then return 0 end
+	return (now - st.stepsDoneAt) / K.STUMBLE_RELEASE_TIME
+end
+
+local function fadeGroundZ(ragdoll, pos)
+	local tr = util.TraceLine({
+		start = pos,
+		endpos = pos - Vector(0, 0, K.FADE_GROUND_TRACE),
+		mask = MASK_SOLID_BRUSHONLY,
+		filter = ragdoll,
+	})
+	if tr.Hit and not tr.StartSolid then return tr.HitPos.z end
+end
+
+local function uprightAngle(cur, want)
+	local fwd = cur:Forward()
+	local axis = fwd:Cross(want)
+	local len = axis:Length()
+	if len < 0.001 then return cur end
+	axis:Div(len)
+
+	local deg = math.deg(math.atan2(len, fwd:Dot(want)))
+	local ang = Angle(cur.p, cur.y, cur.r)
+	ang:RotateAroundAxis(axis, deg)
+	if ang:Forward():Dot(want) >= fwd:Dot(want) then return ang end
+
+	ang = Angle(cur.p, cur.y, cur.r)
+	ang:RotateAroundAxis(axis, -deg)
+	return ang
+end
+
+local function driveFadeSpine(fs, want, torque, dt)
+	fs.spine:Wake()
+	fs.spine:ComputeShadowControl({
+		secondstoarrive = K.FADE_SPINE_ARRIVE,
+		pos = fs.spine:GetPos(),
+		angle = uprightAngle(fs.spine:GetAngles(), want),
+		maxangular = torque,
+		maxangulardamp = torque,
+		maxspeed = 0,
+		maxspeeddamp = 0,
+		dampfactor = 0.8,
+		teleportdistance = 0,
+		deltatime = dt,
+	})
+end
+
 local function updateStumble(st, ragdoll)
 	local cfg = st.cfg
 	local dt = FrameTime()
 	local now = CurTime()
 	st.vigor = st.ply.organism and vigor(st.ply.organism) or 0
 	st.instability = math.Clamp((now - st.startTime) / stumbleLifetime(st), 0, 1)
-	if st.steps < st.minSteps then st.instability = math.min(st.instability, K.STUMBLE_DRIVEN_INSTABILITY) end
+	if st.steps < st.minSteps then
+		st.instability = math.min(st.instability, K.STUMBLE_DRIVEN_INSTABILITY)
+	else
+		st.instability = math.Clamp(math.max(st.instability, stumbleRelease(st, now)), 0, 1)
+	end
 
 	local pelvisPos = st.pelvis:GetPos()
 	local rawVel = st.pelvis:GetVelocity()
@@ -398,6 +453,12 @@ local function updateStumble(st, ragdoll)
 		speed = cfg.MaxVelocityClamp
 	end
 	local flatVel = Vector(rawVel.x, rawVel.y, 0)
+	local excess = flatVel:Length() - math.max(cfg.MaxDriveSpeed, cfg.MinDriveSpeed)
+	if excess > 0 then
+		local brake = flatVel:GetNormalized() * -math.min(excess, excess * K.STUMBLE_BRAKE * dt)
+		st.pelvis:AddVelocity(brake)
+		st.spine:AddVelocity(brake)
+	end
 	local wish = not st.hit and wishDir(st.ply)
 	if wish then
 		wish:Rotate(Angle(0, math.sin((now - st.startTime) * K.STUMBLE_SWAY_RATE + st.swayPhase) * K.STUMBLE_SWAY_ANGLE, 0))
@@ -428,6 +489,7 @@ local function updateStumble(st, ragdoll)
 				state.isStepping = false
 				state.lastStepTime = now
 				st.steps = st.steps + 1
+				if st.steps >= st.minSteps and not st.stepsDoneAt then st.stepsDoneAt = now end
 				st.footPositions[i] = state.targetPos
 				st.lockedFootPositions[i] = state.targetPos
 				if moveDir and st.hasGroundContact[i] then
@@ -475,7 +537,6 @@ local function updateStumble(st, ragdoll)
 	end
 
 	local planted = 0
-	local supportHeight = 0
 	for i = 1, 2 do
 		local chain = st.ikChains[i]
 		local target = sanitizeVector(st.footPositions[i], pelvisPos)
@@ -508,8 +569,6 @@ local function updateStumble(st, ragdoll)
 			})
 			if not stepping and foot:GetPos():DistToSqr(goal) < K.FOOT_PLANT_DIST * K.FOOT_PLANT_DIST then
 				local footPos = foot:GetPos()
-				local root = chain.physObjects[1]
-				if not IsValid(root) then continue end
 				local ground = groundFromTrace(cfg, util.TraceHull({
 					start = footPos,
 					endpos = footPos - Vector(0, 0, K.FOOT_ANKLE_HEIGHT + K.FOOT_PLANT_DIST),
@@ -518,12 +577,7 @@ local function updateStumble(st, ragdoll)
 					mask = MASK_SOLID_BRUSHONLY,
 					filter = ragdoll,
 				}), footPos, footPos.z - K.FOOT_ANKLE_HEIGHT)
-				if ground then
-					local legHeight = chain.completeLength * K.HIP_SUPPORT_HEIGHT_MUL + K.FOOT_ANKLE_HEIGHT
-					local hipHeight = math.min(cfg.HipTargetHeight, legHeight + pelvisPos.z - root:GetPos().z)
-					supportHeight = supportHeight + ground.z + hipHeight
-					planted = planted + 1
-				end
+				if ground then planted = planted + 1 end
 			end
 		end
 	end
@@ -532,15 +586,26 @@ local function updateStumble(st, ragdoll)
 	local grounded = planted > 0
 	local support = math.min(planted, 1) + (planted > 1 and 0.25 or 0)
 
-	local carry = (1 - instability ^ K.STUMBLE_CARRY_POW) * math.min(support, 1) * st.vigor
-	local heightDeficit = grounded and supportHeight / planted - pelvisPos.z or 0
-	if cfg.Carry > 0 and carry > 0 and grounded and rawVel.z <= 0 and heightDeficit >= 0 then
+	local hold = st.steps < st.minSteps and 1 or 1 - instability ^ K.STUMBLE_CARRY_POW
+	hold = hold * math.max(st.vigor, K.STUMBLE_HOLD_VIGOR_FLOOR)
+	if st.spine:GetAngles():Forward().z < K.FADE_LOST_UPRIGHT then hold = 0 end
+
+	local groundZ = cfg.Carry > 0 and hold > 0 and st.hipHeight and fadeGroundZ(ragdoll, pelvisPos)
+	if groundZ then
 		local gravity = physenv.GetGravity():Length()
-		local supportAccel = gravity + heightDeficit * K.HIP_SUPPORT_SPRING * math.Clamp(cfg.Carry, 0, 1)
-		local liftSpeed = math.min(supportAccel * carry * dt, gravity * K.HIP_SUPPORT_MAX_GRAVITY * dt, -rawVel.z)
-		local lift = Vector(0, 0, liftSpeed)
+		local heightDeficit = groundZ + st.hipHeight - pelvisPos.z
+		local accel = gravity + heightDeficit * K.HIP_SUPPORT_SPRING * math.Clamp(cfg.Carry, 0, 1) - rawVel.z * K.HIP_SUPPORT_DAMP
+		local lift = Vector(0, 0, math.Clamp(accel * hold, 0, gravity * K.HIP_SUPPORT_MAX_GRAVITY) * dt)
 		st.pelvis:AddVelocity(lift)
-		st.spine:AddVelocity(Vector(0, 0, math.min(liftSpeed, math.max(-st.spine:GetVelocity().z, 0))))
+		st.spine:AddVelocity(lift)
+	end
+
+	if hold > 0 then
+		local lean = Lerp(instability, K.STUMBLE_LEAN[1], K.STUMBLE_LEAN[2]) * cfg.Pitch / K.STUMBLE_PITCH_REF
+		local leanDir = moveDir or vector_origin
+		local want = Vector(leanDir.x * lean, leanDir.y * lean, 1)
+		want:Normalize()
+		driveFadeSpine(st, want, K.STUMBLE_SPINE_TORQUE * hold, dt)
 	end
 
 	if moveDir then
@@ -549,11 +614,8 @@ local function updateStumble(st, ragdoll)
 		if deficit > 0 and grounded then
 			local add = moveDir * math.min(deficit, cfg.DriveAccel * dt) * math.min(support, 1)
 			st.pelvis:AddVelocity(add)
-			st.spine:AddVelocity(add * 1.15)
+			st.spine:AddVelocity(add)
 		end
-
-		local axis = moveDir:Cross(Vector(0, 0, 1))
-		st.spine:AddAngleVelocity(-axis * cfg.Pitch * (0.5 + instability) * dt)
 	end
 end
 
@@ -600,7 +662,7 @@ local function stopStumble(ragdoll, reason)
 		return
 	end
 
-	local falls = reason == "decay" or reason == "trip" or reason == "halt" or reason == "getup"
+	local falls = reason == "decay" or reason == "trip" or reason == "getup"
 	if falls then
 		topple(st)
 		local vel = st.pelvis:GetVelocity()
@@ -663,6 +725,15 @@ local function startStumble(ply, ragdoll)
 		if not limbState(org, "rleg") then
 			st.ikChains[2] = IKSystem.CreateChain(ragdoll, K.LIMB_BONES.rleg, "rightLeg", Vector(0, 0, 50))
 		end
+	end
+
+	if not (st.ikChains[1] and st.ikChains[2]) then st.minSteps = math.min(st.minSteps, K.STUMBLE_HURT_STEPS) end
+
+	local supportChain = st.ikChains[1] or st.ikChains[2]
+	local supportRoot = supportChain and supportChain.physObjects[1]
+	if IsValid(supportRoot) then
+		local legHeight = supportChain.completeLength * K.HIP_SUPPORT_HEIGHT_MUL + K.FOOT_ANKLE_HEIGHT
+		st.hipHeight = math.min(st.cfg.HipTargetHeight, legHeight + pelvis:GetPos().z - supportRoot:GetPos().z)
 	end
 
 	stumbling[ragdoll] = st
@@ -818,8 +889,7 @@ local function writheWanted(ply, ragdoll, pain)
 	if moveControl(ply) and pain < K.WRITHE_OVERRIDE_AGONY then return false end
 
 	local org = ply.organism
-	local critical = org.critical or (org.pain or 0) > K.REACT_CRITICAL_PAIN or pain >= K.WRITHE_MIN_AGONY
-	if not critical and (ragdoll.hgWritheUntil or 0) <= CurTime() then return false end
+	if not org.critical and pain < K.WRITHE_TRIGGER_AGONY then return false end
 
 	return not isUpright(ply, ragdoll)
 end
@@ -828,7 +898,7 @@ local function writheDrive(ply, org)
 	local pain = agony(ply)
 	local body = math.max(bodyStrength(org), K.WRITHE_WEAK_FLOOR)
 
-	return (K.WRITHE_BASE + (1 - K.WRITHE_BASE) * pain) * body, pain, body
+	return (K.WRITHE_BASE + (1 - K.WRITHE_BASE) * pain) * body, body
 end
 
 local function wantedReaction(ply, ragdoll)
@@ -864,22 +934,11 @@ local function wantedReaction(ply, ragdoll)
 	if writheWanted(ply, ragdoll, pain) then return "writhe" end
 end
 
-local function updateWrithe(ply, ragdoll, rs, org, pain, body)
+local function updateWrithe(ply, ragdoll, rs, org, body)
 	local now = CurTime()
 	if now >= (rs.writheSwitch or 0) then
 		if rs.writheSwitch then rs.mode = "stale" end
 		rs.writheSwitch = now + math.Rand(K.WRITHE_SWITCH[1], K.WRITHE_SWITCH[2])
-	end
-
-	if now >= (rs.writheRollAt or 0) then
-		rs.writheRollAt = now + math.Rand(K.WRITHE_ROLL_GAP[1], K.WRITHE_ROLL_GAP[2]) * (1.3 - pain * 0.6) * (2 - body)
-		rs.writheRollSign = -(rs.writheRollSign or (math.random() < 0.5 and 1 or -1))
-		local spine = getBonePhys(ragdoll, "ValveBiped.Bip01_Spine2")
-		if IsValid(spine) then
-			local spin = K.WRITHE_ROLL * (0.3 + 0.7 * pain) * body * rs.writheRollSign
-			spine:AddAngleVelocity(Vector(spin, 0, 0))
-			if IsValid(rs.pelvis) then rs.pelvis:AddAngleVelocity(rs.pelvis:WorldToLocalVector(spine:GetAngles():Forward()) * spin * 0.6) end
-		end
 	end
 
 	if ragdoll.hgWoundGrab or now < (rs.writheClutchAt or 0) then return end
@@ -930,13 +989,13 @@ local function updateReaction(ply, ragdoll)
 		local st = stumbling[ragdoll]
 		strength = strength * (1 - 0.8 * math.Clamp((CurTime() - st.startTime) / stumbleLifetime(st), 0, 1))
 	elseif rs.mode == "writhe" then
-		local drive, pain, body = writheDrive(ply, org)
+		local drive, body = writheDrive(ply, org)
 		strength = mode.strength * drive
-		updateWrithe(ply, ragdoll, rs, org, pain, body)
+		updateWrithe(ply, ragdoll, rs, org, body)
 	end
 	rs.ent:SetReactionStrength(strength)
 
-	local held = (ragdoll.HGFallCoverActive or ragdoll.hgCurl or (ragdoll.hgBraceUntil or 0) > CurTime()) and true or false
+	local held = (ragdoll.HGFallCoverActive or (ragdoll.hgBraceUntil or 0) > CurTime()) and true or false
 	if held ~= rs.held then
 		rs.held = held
 		rs.ent:SetControllerEnabled(not held)
@@ -947,12 +1006,6 @@ end
 
 hook.Add("Fake", "HG_EuphoriaStumble", function(ply, ragdoll)
 	if not IsValid(ragdoll) then return end
-
-	local hit = ply.hgStumbleHit
-	if hit and CurTime() - hit.time < K.HIT_WINDOW and math.max(hit.dmg or 0, hit.energy or 0) >= K.HIT_MIN_DMG then
-		triggerCover(ragdoll, K.REACT_COVER_TIME)
-		ragdoll.hgWritheUntil = CurTime() + K.REACT_COVER_TIME + K.REACT_WRITHE_TIME
-	end
 
 	if euphoriaOn(hg_euphoria_getup_stumble) then queueStumble(ragdoll) end
 end)
@@ -1150,9 +1203,6 @@ hook.Add("EntityTakeDamage", "HG_EuphoriaStumbleHit", function(ent, dmgInfo)
 
 	if math.max(dmg, acc.energy) < K.HIT_MIN_DMG then return end
 
-	triggerCover(ragdoll, K.REACT_COVER_TIME)
-	ragdoll.hgWritheUntil = CurTime() + K.REACT_COVER_TIME + K.REACT_WRITHE_TIME
-
 	if not euphoriaOn(hg_euphoria_getup_stumble) then return end
 
 	local st = stumbling[ragdoll]
@@ -1291,7 +1341,7 @@ end
 
 local function updateBrace(ply, ragdoll)
 	if not euphoriaOn(hg_euphoria_brace) or not isAware(ply) or limbControl(ply) or stumbling[ragdoll] then return end
-	if ragdoll.HGFallCoverActive or ragdoll.hgCurl or isAirborne(ply, ragdoll) then return end
+	if ragdoll.HGFallCoverActive or isAirborne(ply, ragdoll) then return end
 
 	local spine = getBonePhys(ragdoll, "ValveBiped.Bip01_Spine2")
 	if not IsValid(spine) then return end
@@ -1333,8 +1383,8 @@ local function stumbleEndReason(ply, ragdoll, st)
 	local elapsed = now - st.startTime
 	if elapsed > K.STUMBLE_INTENT_GRACE then
 		if hg.KeyDown(ply, IN_JUMP) and not hg.KeyDown(ply, IN_USE) then return "dive" end
-		if not st.hit and not moveControl(ply) then return "halt" end
 	end
+	if stumbleRelease(st, now) >= 1 then return "decay" end
 	if st.stillSince and now - st.stillSince > K.STILL_GRACE then return "decay" end
 
 	st.vigor = vigor(ply.organism)
@@ -1476,33 +1526,6 @@ local function freezePosture(org, posture)
 	return math.random() < 0.5 and "decorticate" or "decerebrate"
 end
 
-local function fadeGroundZ(ragdoll, pos)
-	local tr = util.TraceLine({
-		start = pos,
-		endpos = pos - Vector(0, 0, K.FADE_GROUND_TRACE),
-		mask = MASK_SOLID_BRUSHONLY,
-		filter = ragdoll,
-	})
-	if tr.Hit and not tr.StartSolid then return tr.HitPos.z end
-end
-
-local function uprightAngle(cur, want)
-	local fwd = cur:Forward()
-	local axis = fwd:Cross(want)
-	local len = axis:Length()
-	if len < 0.001 then return cur end
-	axis:Div(len)
-
-	local deg = math.deg(math.atan2(len, fwd:Dot(want)))
-	local ang = Angle(cur.p, cur.y, cur.r)
-	ang:RotateAroundAxis(axis, deg)
-	if ang:Forward():Dot(want) >= fwd:Dot(want) then return ang end
-
-	ang = Angle(cur.p, cur.y, cur.r)
-	ang:RotateAroundAxis(axis, -deg)
-	return ang
-end
-
 local function isFatalHeadshot(ply, ragdoll, org)
 	if not org or org.headamputated or (org.brain or 0) < K.FADE_BRAIN_MIN then return false end
 
@@ -1589,22 +1612,6 @@ local function fadeLift(fs, pelvisPos, height, hold, dt)
 	local lift = Vector(0, 0, math.Clamp(accel * hold, 0, gravity * K.FADE_MAX_GRAVITY) * dt)
 	fs.pelvis:AddVelocity(lift)
 	fs.spine:AddVelocity(lift)
-end
-
-local function driveFadeSpine(fs, want, torque, dt)
-	fs.spine:Wake()
-	fs.spine:ComputeShadowControl({
-		secondstoarrive = K.FADE_SPINE_ARRIVE,
-		pos = fs.spine:GetPos(),
-		angle = uprightAngle(fs.spine:GetAngles(), want),
-		maxangular = torque,
-		maxangulardamp = torque,
-		maxspeed = 0,
-		maxspeeddamp = 0,
-		dampfactor = 0.8,
-		teleportdistance = 0,
-		deltatime = dt,
-	})
 end
 
 local function updateFreeze(ragdoll, fs, t, dt, pelvisPos)

@@ -600,6 +600,7 @@ module[2] = function(owner, org, timeValue)
 	else
 		exertionO2Debt = math.Approach(exertionO2Debt, 0, timeValue * 1.5)
 	end
+	exertionO2Debt = math.max(exertionO2Debt, math.Approach(exertionO2Debt, org.stamina and (org.stamina.o2Strain or 0) * exertionO2Mul or 0, timeValue * 2.5))
 	org.exertionO2Debt = exertionO2Debt
 	local exertionO2Cap = math.max(o2.range - exertionO2Debt, 0)
 
@@ -764,7 +765,7 @@ module[2] = function(owner, org, timeValue)
 			local lung = math.random(2) == 1 and org.lungsL or org.lungsR
 			lung[2] = 1
 			org.internalBleed = math.min((org.internalBleed or 0) + math.Rand(0.15, 0.35), 10)
-			if owner.Thought and owner:GetInfoNum("hg_newthoughts", 0) > 0 then
+			if owner.Thought then
 				owner:Thought("A broken rib punctured my lung.", 4, "thought_ribs_lung", 0, Color(255, 210, 210))
 			end
 		end

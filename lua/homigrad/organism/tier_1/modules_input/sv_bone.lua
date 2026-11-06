@@ -1272,13 +1272,6 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	return result,vecrand
 end
 
-local ribs = {
-	"I think something snapped in my chest.",
-	"Something feels wrong in my chest.",
-	"I think there is something sharp in my chest.",
-	"My chest hurts. Something may be broken.",
-}
-
 local pelvis_broken = {
 	"MY PELVIS HURTS SO MUCH.",
 	"MY PELVIS IS BROKEN. I CAN'T MOVE RIGHT.",
@@ -1301,8 +1294,11 @@ local function damageLungFromRibs(org, brokenRibs)
 
 	org.internalBleed = math.min((org.internalBleed or 0) + math.Rand(0.15, 0.35) * (1 + brokenRibs / 12), 10)
 
-	if punctured then
-		sendThought(org, "A broken rib punctured my lung.", "thought_ribs_lung", 4, Color(255, 210, 210))
+	local msg = punctured and "A broken rib punctured my lung." or "I felt a broken rib dig into my lung."
+	if hasNewThoughts(org) then
+		sendThought(org, msg, punctured and "thought_ribs_lung" or "thought_ribs_lung_bruise", 4, Color(255, 210, 210))
+	else
+		notifyOwner(org, msg, 5, "ribs", 4)
 	end
 end
 
@@ -1330,10 +1326,6 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		
 		if org.brokenribs > 0 then
 			damageLungFromRibs(org, org.brokenribs)
-
-			if not hasNewThoughts(org) then
-				notifyOwner(org, ribs[math.random(#ribs)], 5, "ribs", 4)
-			end
 
 			playBoneFractureSound(org.owner)
 			if hg.QueuePainScream then hg.QueuePainScream(org.owner, 0.8) end

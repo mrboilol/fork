@@ -715,101 +715,12 @@ MODE.Types.soe = {
 	PoliceSound = "snd_jack_hmcd_heli2.mp3"
 }
 
-MODE.Types.suicidelunatic = {
-	PrintName = "Suicide Lunatic",
-	Description = "One executioner carries a hidden suicide bomb. Everyone wears the Allah accessory.",
-	Chance = 0.2,
-	ChanceFunction = function() return zb.ModesChances["suicidelunatic"] or zb.modes["hmcd"].Types.suicidelunatic.Chance end,
-	LootTable = MODE.LootTableStandard,
-	Messages = {
-		[3] = "The blast left nothing behind.",
-		[1] = "The lunatic took everyone with him.",
-		[0] = "The lunatic was",
-	},
-	Message = "The lunatic was ",
-	TraitorLoot = function(ply)
-		ply:StripWeapons()
-		ply:RemoveAllAmmo()
-		ply:Give("weapon_hg_ritual")
-		ply:Give("weapon_apb")
-		local iedController = ply:Give("weapon_traitor_ied")
-		ply:Give("weapon_hg_pipebomb_tpik")
-		ply:Give("weapon_hg_eft_rgn")
-		ply:Give("weapon_adrenaline")
-		ply.organism.stamina.range = 220
-
-		local wep = ply:Give("weapon_traitor_c4")
-		if not IsValid(wep) or not IsValid(iedController) then return end
-		ply.HMCD_IEDController = iedController
-
-		timer.Simple(0.5, function()
-			if not IsValid(ply) or not ply:Alive() or not IsValid(iedController) or iedController:GetPlanted() then return end
-
-			local charge = ents.Create("prop_physics")
-			if not IsValid(charge) then return end
-
-			charge:SetModel("models/saraphines/insurgency explosives/ied/insurgency_ied.mdl")
-			charge:SetPos(ply:WorldSpaceCenter() + ply:GetForward() * 8)
-			charge:SetAngles(ply:EyeAngles())
-			charge:SetModelScale(0.8, 0)
-			charge:SetCollisionGroup(COLLISION_GROUP_WEAPON)
-			charge:Spawn()
-			charge:Activate()
-			charge:SetOwner(ply)
-			charge:SetNoDraw(true)
-			charge:DrawShadow(false)
-			charge:SetNotSolid(true)
-			charge:SetParent(ply)
-			charge:SetLocalPos(Vector(8, 0, 0))
-			charge:SetLocalAngles(Angle(0, 90, 90))
-			charge:SetMoveType(MOVETYPE_NONE)
-
-			if not iedController:RegisterExternalIEDBomb(charge) then
-				charge:Remove()
-				return
-			end
-
-			ply.HMCD_BombCharge = charge
-
-			ply:ChatPrint("You are the Suicide Lunatic! A bomb is strapped to you. Run into a crowd and detonate it with LMB.")
-		end)
-	end,
-	GunManLoot = function(ply)
-		ply:StripWeapons()
-		ply:RemoveAllAmmo()
-		ply.armors = {}
-		if ply.SyncArmor then ply:SyncArmor() end
-
-		if hg and hg.AddArmor then
-			hg.AddArmor(ply, {"ent_armor_vest1", "ent_armor_helmet6"})
-		end
-
-		local weapon = ply:Give("weapon_vpo101")
-		if IsValid(weapon) then
-			timer.Simple(0, function()
-				if not IsValid(ply) or not ply:Alive() or not IsValid(weapon) then return end
-
-				local ammoType = weapon:GetPrimaryAmmoType()
-				weapon:SetClip1(weapon:GetMaxClip1())
-				if ammoType >= 0 then ply:GiveAmmo(weapon:GetMaxClip1() * math.random(1, 2), ammoType, true) end
-			end)
-		end
-
-		ply.organism.recoilmul = 1
-	end,
-	PoliceTime = 220,
-	SkillIssue = 4,
-	PoliceAllowed = false,
-}
-
 MODE.Types = {
 	standard = MODE.Types.standard,
-	suicidelunatic = MODE.Types.suicidelunatic,
 }
 
 local modes = {
 	"standard",
-	"suicidelunatic",
 }
 
 util.AddNetworkString("HMCD_RoundStart")
@@ -889,7 +800,7 @@ function MODE:Intermission()
 	MODE.TraitorWord = MODE.TraitorWords[math.random(1, #MODE.TraitorWords)]
 	MODE.TraitorWordSecond = MODE.TraitorWords[math.random(1, #MODE.TraitorWords)]
 
-	local traitors_needed = self.Type == "suicidelunatic" and math.min(player_count, 1) or GetHomicideTraitorCount(player_count)
+	local traitors_needed = GetHomicideTraitorCount(player_count)
 	local main_traitor = nil
 	local traitors = {}
 	local forced_main
@@ -906,7 +817,7 @@ function MODE:Intermission()
 		end
 	end
 
-	local max_traitors = self.Type == "suicidelunatic" and player_count or player_count - 1
+	local max_traitors = player_count - 1
 	traitors_needed = math.min(max_traitors, math.max(traitors_needed, #forced_assistants + (IsValid(forced_main) and 1 or (#forced_assistants > 0 and 1 or 0))))
 	MODE.TraitorExpectedAmt = traitors_needed
 
@@ -1918,32 +1829,6 @@ function MODE.SpawnPlayers(spawn_with_subroles)
                 MODE.Types.supermario.CustomJump(current_ply)
             end
 
-            if(MODE.Type == "suicidelunatic")then
-				local appearance = table.Copy(current_ply.CurAppearance or {})
-				local oldAccessories = appearance.AAttachments or {}
-				local accessories = {}
-
-				for i = 1, 6 do
-					accessories[i] = oldAccessories[i] or "none"
-				end
-
-				for i = 1, 6 do
-					local accessory = hg.Accessories and hg.Accessories[accessories[i]]
-					if i ~= 5 and (accessories[i] == "Allah" or (accessory and accessory.placement == "face2")) then
-						accessories[i] = "none"
-					end
-				end
-
-				accessories[5] = "Allah"
-				appearance.AAttachments = accessories
-
-				if hg.Appearance and hg.Appearance.ForceApplyAppearance and current_ply.CurAppearance then
-					hg.Appearance.ForceApplyAppearance(current_ply, appearance, true)
-				else
-					current_ply:SetNetVar("Accessories", accessories)
-				end
-            end
-
             local sub_role = nil
             if(spawn_with_subroles and MODE.RoleChooseRoundTypes[MODE.Type])then
                 if(current_ply.isTraitor)then
@@ -2194,16 +2079,4 @@ hook.Add("PlayerDeath", "HMCD_UpdateTraitorsList", function(ply)
 			end
 		end)
 	end)
-end)
-
-hook.Add("PlayerDeath", "HMCD_SuicideLunaticDetonate", function(ply)
-	if not IsValid(ply) or not ply.isTraitor then return end
-	if MODE.Type ~= "suicidelunatic" then return end
-
-	local iedController = ply.HMCD_IEDController
-	if IsValid(iedController) and iedController.DetonateExternalIED then
-		ply.HMCD_BombCharge = nil
-		ply.HMCD_IEDController = nil
-		iedController:DetonateExternalIED()
-	end
 end)

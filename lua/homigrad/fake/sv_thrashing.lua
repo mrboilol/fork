@@ -155,7 +155,7 @@ local function clear(ply)
 end
 
 local function busy(ply, rag)
-	return rag.hgGetUp or rag.hgCurl or rag.hgStumbleActive or rag.isSliding or rag.isDropkicking
+	return rag.hgGetUp or rag.hgStumbleActive or rag.isSliding or rag.isDropkicking
 		or hg.KeyDown(ply, IN_FORWARD) or hg.KeyDown(ply, IN_BACK)
 		or hg.KeyDown(ply, IN_MOVELEFT) or hg.KeyDown(ply, IN_MOVERIGHT)
 end

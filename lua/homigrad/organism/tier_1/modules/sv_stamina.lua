@@ -19,6 +19,22 @@ local ledge_hang_recovery_bonus = 3
 local stamina_recovery_per_second = 8
 local anger_combat_hold_time = 6
 local anger_decay_per_second = 0.075
+local limb_stamina_recovery_per_second = 7
+local limb_stamina_rest_time = 1
+local leg_sprint_drain_per_second = 3.5
+local leg_jog_recovery_mul = 0.35
+local leg_jump_cost = 6
+local arm_aim_drain_per_second = 0.35
+local arm_aim_drain_per_weight = 0.12
+local arm_aim_fatigue_scale = 6
+local fatigued_limb_cost_mul = 0.4
+local fatigued_limb_core_share = 2
+local empty_limb_core_share = 2.5
+local core_fatigue_limb_recovery_min_mul = 0.4
+local leg_fatigue_o2_debt = 3
+local arm_fatigue_o2_debt = 2
+local core_fatigue_o2_debt = 8
+local LIMB_REST_KEYS = {legs = "legsRestUntil", arms = "armsRestUntil"}
 --local Organism = hg.organism
 
 hg.organism.module.stamina = {}
@@ -43,6 +59,52 @@ function hg.organism.ConsumeStamina(org, amount)
 		stamina.recoveryPenaltyFadeUntil = stamina.recoveryPenaltyUntil + recent_stamina_loss_fade_time
 	end
 	return spent
+end
+
+function hg.organism.ConsumeLimbStamina(org, pool, amount)
+	if not org or not org.stamina or not LIMB_REST_KEYS[pool] or hg_infstamina:GetBool() then return 0 end
+	amount = math.max(tonumber(amount) or 0, 0)
+	if amount <= 0 then return 0 end
+
+	local stamina = org.stamina
+	local owner = org.owner
+	amount = amount * (IsValid(owner) and owner.StaminaExhaustMul or 1)
+	amount = amount * (IsValid(owner) and owner.GetTraitMultiplier and owner:GetTraitMultiplier("stamina_cost", 1) or 1)
+	if pool == "legs" then amount = amount * (1 + (stamina.weight or 0)) end
+	amount = amount / (1 + math.max(org.berserk or 0, 0)) / (org.superfighter and 4 or 1)
+	amount = amount * (1 + hg.GetLimbFatigue(org, pool) * fatigued_limb_cost_mul)
+
+	local current = stamina[pool] or hg.LIMB_STAMINA_MAX
+	local limbFatigue = hg.GetLimbStaminaFatigue(org, pool)
+	stamina[pool] = math.max(current - amount, 0)
+	stamina[LIMB_REST_KEYS[pool]] = CurTime() + limb_stamina_rest_time
+
+	local spent = current - stamina[pool]
+	local coreCost = spent * limbFatigue * fatigued_limb_core_share + (amount - spent) * empty_limb_core_share
+	if coreCost > 0 then
+		stamina[1] = math.max((stamina[1] or 0) - coreCost, 0)
+		stamina.recoveryPenaltyUntil = CurTime() + recent_stamina_loss_hold_time
+		stamina.recoveryPenaltyFadeUntil = stamina.recoveryPenaltyUntil + recent_stamina_loss_fade_time
+	end
+
+	return spent
+end
+
+local function recoverLimbStamina(stamina, pool, amount, now)
+	if now < (stamina[LIMB_REST_KEYS[pool]] or 0) then return end
+	stamina[pool] = min((stamina[pool] or hg.LIMB_STAMINA_MAX) + amount, hg.LIMB_STAMINA_MAX)
+end
+
+local function drainAimingArms(owner, org, timeValue)
+	local wep = owner:GetActiveWeapon()
+	if not IsValid(wep) or not wep.ishgwep or not wep.GetWeaponWeight then return end
+	if wep.IsResting and wep:IsResting() then return end
+
+	local aiming = owner:KeyDown(IN_ATTACK2) or (wep.IsZoom and wep:IsZoom())
+	if not aiming then return end
+
+	local drain = arm_aim_drain_per_second + wep:GetWeaponWeight() * arm_aim_drain_per_weight
+	hg.organism.ConsumeLimbStamina(org, "arms", drain * timeValue)
 end
 
 function hg.organism.RecordMeleeExertion(org, amount)
@@ -91,6 +153,14 @@ module[1] = function(org)
 		meleeExertionTime = 0,
 
 		max = 60 * 4,
+
+		legs = hg.LIMB_STAMINA_MAX,
+
+		arms = hg.LIMB_STAMINA_MAX,
+
+		legsRestUntil = 0,
+
+		armsRestUntil = 0,
 
 	}
 
@@ -177,7 +247,10 @@ module[2] = function(owner, org, timeValue)
 			stamina.sub = (owner:WaterLevel() >= 2 and 2 or 1) * (velLen ^ 0.5) * jog_stamina_cost
 		elseif (owner:OnGround() or owner:WaterLevel() >= 2) and walk and not owner:InVehicle() and owner.hg_isSprinting and org.stamina[1] > 20 then
 			stamina.sub = (owner:WaterLevel() >= 2 and 2 or 1) * (velLen ^ 0.5) * sprint_stamina_cost
+			hg.organism.ConsumeLimbStamina(org, "legs", leg_sprint_drain_per_second * (velLen ^ 0.5) * timeValue)
 		end
+
+		drainAimingArms(owner, org, timeValue)
 
 		if owner.GetTraitMultiplier and (owner.hg_isJogging or owner.hg_isSprinting) then
 			stamina.sub = stamina.sub * owner:GetTraitMultiplier("sprint_stamina_cost", 1)
@@ -311,6 +384,19 @@ module[2] = function(owner, org, timeValue)
 	stamina[1] = min(stamina[1] + stamina.regen * (stamina.regenMul or 1) * staminaRecoveryMul * recentLossRecoveryMul * timeValue * stamina_recovery_per_second * (org.noradrenaline / 2 + 1) * (org.adrenaline / 16 + 1) * (org.satiety/700 + 1) * pulseMultiplier * postureRecoveryMul * (1 + ledgeHang * ledge_hang_recovery_bonus) * physiologyRecoveryMul * (1 - heatWeakness * 0.65) * (owner.GetTraitMultiplier and owner:GetTraitMultiplier("stamina_recovery", 1) or 1), stamina.max)
 	stamina.regenMul = math.Approach(stamina.regenMul or 1, 1, timeValue * (org.BlockRegenRecoverRate or 0.25))
 
+	local coreFatigue = hg.GetCoreFatigue(org)
+	local limbRecovery = limb_stamina_recovery_per_second * timeValue * postureRecoveryMul * physiologyRecoveryMul * (1 - heatWeakness * 0.65) * (owner.GetTraitMultiplier and owner:GetTraitMultiplier("stamina_recovery", 1) or 1) * Lerp(coreFatigue, 1, core_fatigue_limb_recovery_min_mul)
+	local jogging = owner:IsPlayer() and owner.hg_isJogging and owner:GetVelocity():LengthSqr() > 1
+	recoverLimbStamina(stamina, "legs", limbRecovery * (jogging and leg_jog_recovery_mul or 1), now)
+	recoverLimbStamina(stamina, "arms", limbRecovery, now)
+	org.aiming_fatigue = hg.GetLimbFatigue(org, "arms") * arm_aim_fatigue_scale
+
+	local legsWorking = now < (stamina.legsRestUntil or 0)
+	local armsWorking = now < (stamina.armsRestUntil or 0)
+	stamina.o2Strain = (legsWorking and hg.GetLimbStaminaFatigue(org, "legs") * leg_fatigue_o2_debt or 0)
+		+ (armsWorking and hg.GetLimbStaminaFatigue(org, "arms") * arm_fatigue_o2_debt or 0)
+		+ ((legsWorking or armsWorking or stamina.sub > 0.05) and coreFatigue * core_fatigue_o2_debt or 0)
+
 
 
 	-- local painfrommoving = (stamina[1] < 150 and 1 or 0) * (stamina[1] - old) * (org.chest)
@@ -342,6 +428,14 @@ module[2] = function(owner, org, timeValue)
 		stamina.sub = 0
 
 		stamina[1] = stamina.max
+
+		stamina.legs = hg.LIMB_STAMINA_MAX
+
+		stamina.arms = hg.LIMB_STAMINA_MAX
+
+		org.aiming_fatigue = 0
+
+		stamina.o2Strain = 0
 
 	end
 
@@ -429,7 +523,10 @@ hook.Add("FinishMove", "!homigrad-organism", function(ply, move)
 
 
 
-	if vel ~= vecZero then ply.organism.stamina[1] = max(ply.organism.stamina[1] - ply:GetJumpPower() / 10,0) end
+	if vel ~= vecZero then
+		ply.organism.stamina[1] = max(ply.organism.stamina[1] - ply:GetJumpPower() / 10,0)
+		hg.organism.ConsumeLimbStamina(ply.organism, "legs", leg_jump_cost)
+	end
 	ply.organism.moveMaxSpeed = move:GetMaxSpeed()
 
 end)

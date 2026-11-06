@@ -1331,6 +1331,8 @@ local IsValid = IsValid
 		local nausea = math.Clamp(tonumber(org.nausea) or 0, 0, 6)
 		local hunger = math.Clamp(tonumber(org.hungry) or 0, 0, 100)
 		local temperature = tonumber(org.temperature) or 36.7
+		local armFatigue = hg.GetLimbFatigue(org, "arms")
+		local legFatigue = hg.GetLimbFatigue(org, "legs")
 
 		local staminaPower = Lerp(staminaFraction, 0.58, 1)
 		local consciousnessPower = Lerp(consciousness, 0.28, 1)
@@ -1345,7 +1347,7 @@ local IsValid = IsValid
 		local adrenaline = math.Clamp((tonumber(org.adrenaline) or 0) / 3, 0, 1)
 		local power = math.Clamp(staminaPower * consciousnessPower * reservePower * painPower * shockPower * disorientationPower * ailmentPower, 0.08, 1)
 
-		local tempo = math.Clamp(power ^ 0.62 * Lerp(staminaFraction, 0.72, 1), 0.18, 1)
+		local tempo = math.Clamp(power ^ 0.62 * Lerp(staminaFraction, 0.72, 1), 0.18, 1) * Lerp(armFatigue, 1, 0.7)
 		local instability = math.Clamp(
 			(1 - consciousness) * 0.7 + (1 - reserve) * 0.58 + (1 - staminaFraction) * 0.22
 			+ math.Clamp(disorientation / 4, 0, 1) * 0.95 + pain / 100 * 0.18 + shock / 100 * 0.3
@@ -1355,17 +1357,42 @@ local IsValid = IsValid
 		instability = math.Clamp(instability + flight * 0.4 - fight * 0.2, 0, 1)
 
 		return {
-			power = power * Lerp(flight, 1, 0.75) * Lerp(fight, 1, 1.25) * (1 + adrenaline * 0.1),
+			power = power * Lerp(flight, 1, 0.75) * Lerp(fight, 1, 1.25) * (1 + adrenaline * 0.1) * Lerp(armFatigue, 1, 0.6),
 			tempo = tempo,
 			speed = tempo * Lerp(flight, 1, 1.4),
 			effort = Lerp(flight, 1, 0.8) * Lerp(fight, 1, 1.2),
 			exertion = Lerp(flight, 1, 1.4) * Lerp(fight, 1, 0.7) * (1 - adrenaline * 0.15),
 			recoil = Lerp(flight, 1, 1.35) * Lerp(fight, 1, 0.8),
-			move = Lerp(flight, 1, 1.15) * Lerp(fight, 1, 0.85),
+			move = Lerp(flight, 1, 1.15) * Lerp(fight, 1, 0.85) * Lerp(legFatigue, 1, 0.65),
 			sprintCost = Lerp(flight, 1, 0.6),
 			stability = 1 - instability,
 			aim = (1 + instability * 2.5) * Lerp(fight, 1, 0.8)
 		}
+	end
+
+	hg.LIMB_STAMINA_MAX = 100
+
+	function hg.GetLimbStaminaFraction(org, pool)
+		local stamina = org and org.stamina
+		if not stamina then return 1 end
+
+		return math.Clamp((stamina[pool] or hg.LIMB_STAMINA_MAX) / hg.LIMB_STAMINA_MAX, 0, 1)
+	end
+
+	function hg.GetLimbStaminaFatigue(org, pool)
+		return 1 - math.Clamp(hg.GetLimbStaminaFraction(org, pool) / 0.5, 0, 1)
+	end
+
+	function hg.GetCoreFatigue(org)
+		local stamina = org and org.stamina
+		if not stamina then return 0 end
+
+		local staminaMax = math.max(tonumber(stamina.max) or tonumber(stamina.range) or 1, 1)
+		return 1 - math.Clamp((tonumber(stamina[1]) or staminaMax) / staminaMax / 0.4, 0, 1)
+	end
+
+	function hg.GetLimbFatigue(org, pool)
+		return math.max(hg.GetLimbStaminaFatigue(org, pool), hg.GetCoreFatigue(org) * 0.8)
 	end
 
 	function hg.GetLegEffectiveness(ent, side, segment)

@@ -9,10 +9,6 @@ end
 
 MODE.TypeSounds = {
 	["standard"] = "rem_newroundcommence.mp3",
-	["suicidelunatic"] = {
-		"zbattle/jihadmode.mp3",
-		"snd_jack_hmcd_islam.ogg"
-	},
 }
 
 local function PlayRoundBeginSound(roundType, sequence)
@@ -139,7 +135,6 @@ end)
 
 MODE.TypeNames = {
 	["standard"] = "Homicide",
-	["suicidelunatic"] = "Suicide Lunatic",
 }
 
 --local hg_coolvetica = ConVarExists("hg_coolvetica") and GetConVar("hg_coolvetica") or CreateClientConVar("hg_coolvetica", "0", true, false, "changes every text to coolvetica because its good", 0, 1)
@@ -224,27 +219,6 @@ MODE.TypeObjectives.standard = {
 	innocent = {
 		objective = "You are a potential victim. Survive, stay cautious and help identify the Executioner.",
 		name = "a Victim",
-		color1 = Color(0,120,190)
-	},
-}
-
-MODE.TypeObjectives.suicidelunatic = {
-	traitor = {
-		objective = "Protect your brother at all costs. Do not let him down",
-		name = "a Saboteur",
-		color1 = Color(190,0,0),
-		color2 = Color(190,0,0)
-	},
-
-	gunner = {
-		objective = "Someone is seriously armed with explosives, now you need to survive.",
-		name = "an Savior",
-		color1 = Color(0,120,190)
-	},
-
-	innocent = {
-		objective = "Someone is seriously armed with explosives, now you need to survive.",
-		name = "an Innocent",
 		color1 = Color(0,120,190)
 	},
 }

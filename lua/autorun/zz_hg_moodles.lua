@@ -113,6 +113,18 @@ local moodleTexts = {
 		[3] = {title = "Exhausted", description = "You need to rest before your body can perform normally."},
 		[4] = {title = "No Stamina", description = "You are completely spent and need immediate rest."},
 	}},
+	tired_legs = {levels = {
+		[1] = {title = "Heavy Legs", description = "Your legs are starting to tire."},
+		[2] = {title = "Tired Legs", description = "Your legs are slowing you down and your kicks are weaker."},
+		[3] = {title = "Burning Legs", description = "Your legs are close to giving out."},
+		[4] = {title = "Dead Legs", description = "Your legs have nothing left. Rest them."},
+	}},
+	tired_arms = {levels = {
+		[1] = {title = "Heavy Arms", description = "Your arms are starting to tire."},
+		[2] = {title = "Tired Arms", description = "Your swings are weaker and your aim is less steady."},
+		[3] = {title = "Burning Arms", description = "Recoil is harder to control and your grip is slipping."},
+		[4] = {title = "Dead Arms", description = "Your arms have nothing left. Rest them."},
+	}},
 	tired = {levels = {
 		[1] = {title = "Slightly Tired", description = "Activity has strained you, but you can keep going."},
 		[2] = {title = "Tired", description = "You should slow down and catch your breath."},
@@ -487,7 +499,7 @@ local function getMoodle3IconName(effect)
 	local level = effect.level or 1
 	local names = {
 		fracture = "fractured", dislocated = "dislocated", analgesia = "drugged",
-		stamina = "exertion", exertion = "exertion", bleeding = level == 1 and "bleeding" or "bleeding" .. level,
+		stamina = "exertion", exertion = "exertion", tired_legs = "exertion", tired_arms = "exertion", bleeding = level == 1 and "bleeding" or "bleeding" .. level,
 		carbon_monoxide = "carbon-monoxide", hypercapnia = "hypercapnia", arrhythmia = "arrhythmia", palpitations = "fibrilation", self_harm = "self-harm", fibrillation = "fibrilation",
 		hypoxemia = "hypoxemia", brain_hypoxia = "brain-hypoxia", brain_dying = "brain-dying", asystole = "heart-failure",
 		low_blood = "hypotension", high_blood = "hypertension", hypovolemia = level == 1 and "blood-loss" or "blood-loss" .. level, no_eye = "last-stand", blinded = "confused",
@@ -728,6 +740,16 @@ local function buildEffects(ply, org)
 			-- Moodle 3 reserves tired/very-tired for consciousness. Exertion shows
 			-- actual stamina depletion in place of the fitness moodle.
 			add(effects, "exertion", "exertion", level, "bad", 13, math.floor(staminaFraction * 100) .. "%")
+		end
+
+		local legsFraction = hg.GetLimbStaminaFraction(org, "legs")
+		if legsFraction < 0.75 then
+			add(effects, "tired_legs", "exertion", lowRank(legsFraction, {0.75, 0.5, 0.25, 0.1}), "bad", 13, math.floor(legsFraction * 100) .. "%")
+		end
+
+		local armsFraction = hg.GetLimbStaminaFraction(org, "arms")
+		if armsFraction < 0.75 then
+			add(effects, "tired_arms", "exertion", lowRank(armsFraction, {0.75, 0.5, 0.25, 0.1}), "bad", 13, math.floor(armsFraction * 100) .. "%")
 		end
 	end
 

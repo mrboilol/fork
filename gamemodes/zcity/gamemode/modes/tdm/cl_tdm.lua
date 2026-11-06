@@ -8,6 +8,29 @@ local voteResults = {[1] = 0, [2] = 0, [3] = 0}
 local gradientRight = Material("vgui/gradient-r")
 local gradientLeft = Material("vgui/gradient-l")
 local gradientDown = Material("vgui/gradient-d")
+local arenaMusic
+
+local function PlayArenaMusic(path)
+	if hg.DynaMusic then hg.DynaMusic:Stop() end
+	if arenaMusic then arenaMusic:Stop() end
+
+	arenaMusic = CreateSound(LocalPlayer(), path)
+	arenaMusic:PlayEx(1, 100)
+end
+
+local function StopArenaMusic()
+	if not arenaMusic then return end
+
+	arenaMusic:Stop()
+	arenaMusic = nil
+end
+
+hook.Add("Think", "ArenaMusicCleanup", function()
+	if not arenaMusic then return end
+
+	local mode = CurrentRound()
+	if not mode or mode.name ~= "tdm" then StopArenaMusic() end
+end)
 
 local function GetVoteTotal()
 	return (voteResults[1] or 0) + (voteResults[2] or 0) + (voteResults[3] or 0)
@@ -97,6 +120,7 @@ net.Receive("arena_start_vote", function()
 	voteResults = {[1] = 0, [2] = 0, [3] = 0}
 	MODE.ShowRoundIntro = false
 	MODE.IntroStartTime = nil
+	PlayArenaMusic("rem_track1.mp3")
 	OpenArenaVoteMenu()
 end)
 
@@ -108,12 +132,12 @@ net.Receive("arena_vote_result", function()
 	selectedVote = net.ReadUInt(2)
 	voteResults = net.ReadTable() or voteResults
 	if IsValid(ArenaVoteMenu) then ArenaVoteMenu:Remove() end
+	if arenaMusic then arenaMusic:ChangeVolume(0, 2) end
 	surface.PlaySound("ui/buttonclickrelease.wav")
 end)
 
 local function StartArenaIntro()
-	if hg.DynaMusic then hg.DynaMusic:Stop() end
-	surface.PlaySound("rem_tdm" .. math.random(1, 5) .. ".mp3")
+	PlayArenaMusic("rem_track2.mp3")
 	zb.RemoveFade()
 	MODE.RoundTextTilts = {}
 	for i = 1, 8 do
@@ -132,6 +156,7 @@ net.Receive("arena_cleanup_start", function()
 	MODE.ShowRoundIntro = false
 	MODE.IntroStartTime = nil
 	if IsValid(ArenaVoteMenu) then ArenaVoteMenu:Remove() end
+	StopArenaMusic()
 end)
 
 net.Receive("tdm_start",function()
