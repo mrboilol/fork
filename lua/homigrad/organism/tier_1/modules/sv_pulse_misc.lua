@@ -7,12 +7,15 @@ end
 
 local ADRENALINE_OVERDOSE_START = 4
 local ADRENALINE_DIZZY_START = 3.5
-local ADRENALINE_SLIGHT_DIZZY = 0.8
+local ADRENALINE_SLIGHT_DIZZY = 0.3
 local OVERLOAD_ADRENALINE_START = 3.5
 local OVERLOAD_PANIC_START = 0.65
-local OVERLOAD_BUILD_TIME = 30
+local OVERLOAD_BUILD_TIME = 45
 local OVERLOAD_RECOVERY_TIME = 15
 local OVERLOAD_SHOCK_PEAK = 105
+local OVERLOAD_FIGHT_MUL = 0.5
+local OVERLOAD_SEIZURE_CHANCE = 0.35
+local SYNCOPE_FIGHT_MUL = 0.5
 
 local ENCLOSURE_SAMPLE_INTERVAL = 2
 local ENCLOSURE_TRACE_LEN = 32768
@@ -128,16 +131,17 @@ function hg.organism.UpdateCirculatoryEffects(owner, org, timeValue, o2Value, ar
 
 	if adrenaline >= ADRENALINE_OVERDOSE_START and not org.otrub then
 		local overdoseK = Clamp(adrenaline - ADRENALINE_OVERDOSE_START, 0, 1)
-		org.disorientation = math.max(org.disorientation, 0.8 + overdoseK * 1.2)
+		org.disorientation = math.max(org.disorientation, 0.35 + overdoseK * 0.65)
 	end
 
 	local panicK = org.panicattackActive and Clamp(((org.panicattack or 0) - OVERLOAD_PANIC_START) / (1 - OVERLOAD_PANIC_START), 0, 1) or 0
 	local adrenalineK = Clamp((adrenaline - OVERLOAD_ADRENALINE_START) / (ADRENALINE_OVERDOSE_START - OVERLOAD_ADRENALINE_START), 0, 1)
-	local overloadDrive = panicK * adrenalineK
+	local fightingBack = org.panicattackActive and org.panicMode == "fight"
+	local overloadDrive = panicK * adrenalineK * (fightingBack and OVERLOAD_FIGHT_MUL or 1)
 	local overload = org.panicOverload or 0
 	if org.otrub then
 		if overload > 0.5 or org.panicOverloadPending then
-			hg.organism.AddSeizure(org, 1)
+			if math.Rand(0, 1) < OVERLOAD_SEIZURE_CHANCE then hg.organism.AddSeizure(org, 1) end
 			org.panicattackadd = math.min(org.panicattackadd or 0, 0.25)
 			org.panicattack = math.min(org.panicattack or 0, 0.4)
 			org.adrenalineAdd = math.min(org.adrenalineAdd or 0, 0)
@@ -153,7 +157,7 @@ function hg.organism.UpdateCirculatoryEffects(owner, org, timeValue, o2Value, ar
 	if overload > 0.5 then org.panicOverloadPending = true end
 
 	if overload > 0 and not org.otrub then
-		org.shock = math.max(org.shock, overload * OVERLOAD_SHOCK_PEAK)
+		org.shock = math.max(org.shock, overload * overload * OVERLOAD_SHOCK_PEAK)
 		if overload >= 1 then
 			org.needotrub = true
 			org.consciousness = math.min(org.consciousness or 1, 0.04)
@@ -169,7 +173,7 @@ function hg.organism.UpdateCirculatoryEffects(owner, org, timeValue, o2Value, ar
 
 	if not adrenalineOnlyPressure and (org.hypertension or 0) > 0.4 and not org.otrub and (org.nextHypertensionSyncopeRoll or 0) <= CurTime() then
 		org.nextHypertensionSyncopeRoll = CurTime() + 5
-		if math.Rand(0, 1) < ((org.hypertension - 0.4) * 0.05 + crisis * 0.08) then
+		if math.Rand(0, 1) < ((org.hypertension - 0.4) * 0.025 + crisis * 0.04) * (fightingBack and SYNCOPE_FIGHT_MUL or 1) then
 			org.consciousness = math.min(org.consciousness or 1, 0.2)
 			org.needotrub = true
 		end

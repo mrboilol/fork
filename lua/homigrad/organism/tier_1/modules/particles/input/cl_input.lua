@@ -598,6 +598,7 @@ net.Receive("bloodsquirt", function()
 	local pos = net.ReadVector()
 	local dir = net.ReadVector()
 	local len = dir:Length()
+	local duration = net.ReadUInt(8)
 
 	local function spawnEffect(attempt)
 		ent = IsValid(ent) and ent or Entity(entIndex)
@@ -612,7 +613,7 @@ net.Receive("bloodsquirt", function()
 
 		bloodSquirtSerial = bloodSquirtSerial + 1
 		local name = "squirtblood"..ent:EntIndex().."_"..bloodSquirtSerial
-		local i = 150
+		local i = duration > 0 and duration or 150
 		local maxI = i
 		local vechuy = Vector(0,0,0)
 		local dsqr = 2000 * 2000

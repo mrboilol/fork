@@ -1,3 +1,5 @@
+if not (StormFox2 and StormFox2.Net and StormFox2.Net.Tool) then return end
+
 
 
 SWEP.PrintName = "#sf_tool.name"

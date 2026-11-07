@@ -436,7 +436,7 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	if org.brainoxygen < 0.28 then
 		org.consciousness = math.min(org.consciousness or 1, 0.15 + org.brainoxygen / 0.28 * 0.55)
 	end
-	if org.brainoxygen < 0.08 and not org.convulsing then
+	if org.brainoxygen < 0.08 then
 		org.brain = math.min((org.brain or 0) + timeValue * (0.08 - org.brainoxygen) / 0.08 * hg.organism.convulsionConfig.hypoxiaBrainRate, 1)
 	end
 end
@@ -1077,7 +1077,7 @@ module[2] = function(owner, org, timeValue)
 		timeValue / (sympatheticTarget > (org.sympatheticCompensation or 0) and (acuteHemorrhageStress > 0 and 2 or 6) or 12)
 	)
 	org.sympatheticCompensation = sympatheticCompensation
-	local anestheticRelief = Clamp(((tonumber(org.analgesia) or 0) - 0.25) / 2.25, 0, 1)
+	local anestheticRelief = Clamp((math.max(tonumber(org.analgesia) or 0, (tonumber(org.painkiller) or 0) * 0.625) - 0.25) / 2.25, 0, 1)
 	local tranquilizerRelief = Clamp((tonumber(org.tranquilizer) or 0) / 12, 0, 1)
 	local sedativePressureRelief = math.max(anestheticRelief * 0.32, tranquilizerRelief * 0.42)
 	org.sedativePressureRelief = sedativePressureRelief
@@ -1187,6 +1187,12 @@ module[2] = function(owner, org, timeValue)
 	local cardiacDemand = 0.55 + 0.45 * (Clamp(demandRate / 70, 0, 4) ^ 1.3) + catecholamineDrive * 0.2
 	local volumeCompensatedCoronary = Clamp(coronaryPerfusion / math.max(bloodVolume, 0.1), 0, 1)
 	cardiacSupply = Lerp(compensatedLossTolerance, cardiacSupply, hg.organism.GetLimitingReserve(oxygenation, volumeCompensatedCoronary))
+	local coronaryReserveDrive = math.max(
+		Clamp((activeCatecholamine - 0.5) / 2.5, 0, 1),
+		Clamp((org.hypertension or 0) * 2, 0, 1)
+	)
+	local coronaryReserveAdequacy = Clamp((math.min(oxygenation, coronaryPerfusion, bloodVolume) - 0.7) / 0.3, 0, 1)
+	cardiacSupply = cardiacSupply * (1 + 0.9 * coronaryReserveDrive * coronaryReserveAdequacy)
 	local oxygenMismatch = Clamp((cardiacDemand - cardiacSupply) / math.max(cardiacDemand, 1), 0, 1)
 	local myocardialTarget = Clamp(cardiacSupply / math.max(cardiacDemand, 1), 0, 1)
 	if org.heartstop and defibGrace then myocardialTarget = math.max(myocardialTarget, 0.25) end

@@ -3,9 +3,11 @@ AddCSLuaFile()
 HG_SoundFallback = HG_SoundFallback or {log = {}, resolved = {}}
 
 local M = HG_SoundFallback
+M.played = M.played or {}
 local audioExtensions = {wav = true, mp3 = true, ogg = true}
 local LOG_COMMAND = "hg_soundlog"
 local MAX_NET_ENTRIES = 100
+local MAX_PLAYED_BYTES = 48000
 local MAX_CHAT_LINES = 8
 
 local function logMissing(path, replacement)
@@ -57,7 +59,9 @@ function M.Resolve(name)
 	local result = name
 	local extension = path:match("%.(%w+)$")
 	if extension and audioExtensions[extension:lower()] then
-		if not file.Exists("sound/" .. path, "GAME") then
+		if file.Exists("sound/" .. path, "GAME") then
+			if SERVER then M.played[#M.played + 1] = path end
+		else
 			local replacement = nextSibling(path)
 			logMissing(path, replacement)
 			if replacement then result = prefix .. replacement end
@@ -112,6 +116,17 @@ if SERVER then
 			for i = 1, count do
 				net.WriteString(formatEntry("SV", M.log[i]))
 			end
+
+			local played, bytes = {}, 0
+			for _, path in ipairs(M.played) do
+				bytes = bytes + #path + 1
+				if bytes > MAX_PLAYED_BYTES then break end
+				played[#played + 1] = path
+			end
+			net.WriteUInt(#played, 16)
+			for _, path in ipairs(played) do
+				net.WriteString(path)
+			end
 		net.Send(ply)
 	end)
 else
@@ -119,6 +134,12 @@ else
 		local lines = {}
 		for i = 1, net.ReadUInt(8) do
 			lines[i] = net.ReadString()
+		end
+		for _ = 1, net.ReadUInt(16) do
+			local path = net.ReadString()
+			if not file.Exists("sound/" .. path, "GAME") then
+				lines[#lines + 1] = "[CL] " .. path .. " -> missing on this client (server has it)"
+			end
 		end
 		for _, entry in ipairs(M.log) do
 			lines[#lines + 1] = formatEntry("CL", entry)

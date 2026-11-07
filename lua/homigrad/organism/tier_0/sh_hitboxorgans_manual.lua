@@ -119,13 +119,12 @@ male["ValveBiped.Bip01_Neck1"] = {
 		Vector(3, 0.5, 0.5),
 		Color(200, 0, 0)
 	},
-	{"aorta", 0, Vector(2.5, -0.75, 0), Angle(0, 0, 0), Vector(3.5, 0.45, 0.45), Color(255, 0, 0)},
 }
 
 local bone = 0.5
 male["ValveBiped.Bip01_Spine2"] = {
 	{"spine2", spine, Vector(4, -1, 0), Angle(0, 0, 0), Vector(8, 0.5, 0.5), Color(0, 125, 0)},
-	{"aorta", 0, Vector(2, 1.25, 0.5), Angle(0, 0, 0), Vector(7, 0.55, 0.55), Color(255, 0, 0)},
+	{"aorta", 0, Vector(2.5, 1.5, 0.75), Angle(0, 0, 0), Vector(2.5, 0.55, 0.55), Color(255, 0, 0)},
 	{
 		"chest", --right
 		bone,
@@ -443,7 +442,6 @@ female["ValveBiped.Bip01_Neck1"] = {
 		Vector(3, 0.5, 0.5),
 		Color(200, 0, 0)
 	},
-	{"aorta", 0, Vector(1.5, -0.75, 0), Angle(0, 0, 0), Vector(3.5, 0.45, 0.45), Color(255, 0, 0)},
 }
 
 table.insert(female["ValveBiped.Bip01_Head1"], 1, {"head_armor", 1, Vector(5, 1, 0), Angle(0, 0, 0), Vector(3.8, 3.5, 4.5), Color(250, 255, 0), "head", 0})

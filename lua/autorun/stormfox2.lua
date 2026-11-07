@@ -1,3 +1,6 @@
+local sf2Enable = CreateConVar("sf2_enable", "0", FCVAR_ARCHIVE + FCVAR_REPLICATED, "Enable StormFox2 (needs map restart)")
+if not sf2Enable:GetBool() then return end
+
 -- Check for StormFox 1
 if StormFox and StormFox.Version < 2 or file.Exists("autorun/stormfox_autorun.lua", "LUA") then
 	error("StormFox 1 detected. StormFox 2 can't run.")

@@ -306,7 +306,7 @@ local function impact(ply, wallPos, norm, scale)
 	end
 
 	if not org.otrub then
-		org.adrenaline = math.min((org.adrenaline or 0) + WB.AdrenalinePerHit * mul, WB.AdrenalineMax)
+		org.adrenaline = math.min((org.adrenaline or 0) + WB.AdrenalinePerHit * mul * hg.organism.GetAdrenalineGainMul(org), WB.AdrenalineMax)
 		org._adrenalineHoldUntil = math.max(org._adrenalineHoldUntil or 0, CurTime() + 8)
 		org.nextAdrenalineRegen = math.max(org.nextAdrenalineRegen or 0, CurTime() + 30)
 	end

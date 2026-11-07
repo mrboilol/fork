@@ -167,6 +167,7 @@ function SWEP:Shoot(override)
 
 	local gun = self:GetWeaponEntity()
 	local tr, pos, ang = self:GetTrace(true)
+	ang = self:GetShotAng(ang)
 	self:TakePrimaryAmmo(1)
 
 	local owner = self:GetOwner()

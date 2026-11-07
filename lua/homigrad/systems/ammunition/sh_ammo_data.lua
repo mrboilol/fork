@@ -5,6 +5,11 @@ local matShotgunAmmo = Material("vgui/hud/bullets/buck_caliber.png")
 local matBushwhackerRaptor = Material("bushwhacking/340frag.png")
 local matBushwhackerSolid = Material("bushwhacking/400solid.png")
 local matBushwhackerXPB = Material("bushwhacking/275hollow.png")
+local function ammoBulletFunction(name)
+	return function(...)
+		return hg.AmmoBulletFunctions[name](...)
+	end
+end
 hg.ammotypes = {
 	["5.56x45mm"] = {
 		name = "5.56x45 mm",
@@ -2571,7 +2576,7 @@ hg.ammotypes = {
 		},
 		BulletFunctions = {
 			-- Draw = draw_silk,
-			OnStopped = onstopped_silk,
+			OnStopped = ammoBulletFunction("onstopped_silk"),
 			--PreRemove = preremove_silk,
 			--PostRemove = postremove_silk,
 		},
@@ -2598,6 +2603,7 @@ hg.ammotypes = {
 			Speed = 5,
 			PhysPenetrationMul = 0.0,
 			PierceSoftArmor = true,
+			WindDriftMul = 4,
 		},
 		FunctionInfo = {
 			Model = "models/z_city/nmrih/items/arrow/ammo_arrow_single.mdl",
@@ -2610,7 +2616,7 @@ hg.ammotypes = {
 		},
 		BulletFunctions = {
 			-- Draw = draw_silk,
-			OnStopped = arrow_hit,
+			OnStopped = ammoBulletFunction("arrow_hit"),
 			--PreRemove = preremove_silk,
 			--PostRemove = postremove_silk,
 		},

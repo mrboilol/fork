@@ -414,6 +414,7 @@ function SWEP:Shoot(override)
 
     primary.Next = CurTime() + primary.Wait
     local _, pos, ang = self:GetTrace(true)
+    ang = self:GetShotAng(ang)
     self:DoFlareShot(pos, ang)
 
     self:EmitShoot()

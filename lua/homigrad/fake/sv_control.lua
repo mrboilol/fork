@@ -271,6 +271,26 @@ function hg.IsFinite(v)
 	return s - s == 0
 end
 
+do
+	local DRIVE_WALL_MARGIN = 1
+
+	function hg.ClampDriveTarget(ent, phys, pos)
+		local from = phys:GetPos()
+		local tr = util.TraceLine({start = from, endpos = pos, mask = MASK_SOLID_BRUSHONLY})
+		if not tr.Hit or tr.StartSolid then return pos end
+
+		local root = ent:GetPhysicsObject()
+		local limbPastWall = IsValid(root) and util.TraceLine({
+			start = root:GetPos(),
+			endpos = from,
+			mask = MASK_SOLID_BRUSHONLY,
+		}).Hit
+		if limbPastWall then return pos end
+
+		return tr.HitPos + tr.HitNormal * DRIVE_WALL_MARGIN
+	end
+end
+
 function hg.ShadowControl(ragdoll, physNumber, ss, ang, maxang, maxangdamp, pos, maxspeed, maxspeeddamp, alreadyReal)
 	if (ang and not hg.IsFinite(ang)) or (pos and not hg.IsFinite(pos))
 		or (maxang and not hg.IsFinite(maxang)) or (maxangdamp and not hg.IsFinite(maxangdamp))
@@ -298,6 +318,8 @@ function hg.ShadowControl(ragdoll, physNumber, ss, ang, maxang, maxangdamp, pos,
 		phys:Wake()
 		return false
 	end
+
+	if pos and maxspeed and maxspeed > 0 then pos = hg.ClampDriveTarget(ragdoll, phys, pos) end
 
 	shadowparams.secondstoarrive = ss
 	shadowparams.angle = ang
@@ -811,7 +833,7 @@ hook.Add("Think", "Fake", function()
 		tr.filter = {ply,ragdoll}
 		local tracehuy = util.TraceLine(tr)
 		
-		local power = org.pain and ((org.pain > 50 or org.blood < 2900 or org.o2[1] < 5) and 0.3) or ((org.pain > 20 or org.blood < 4200 or org.o2[1] < 10) and 0.5) or 1
+		local power = org.pain and ((org.pain > 80 or org.blood < 2900 or org.o2[1] < 5) and 0.35) or ((org.pain > 55 or org.blood < 3500 or org.o2[1] < 8) and 0.65) or K.FAKE_BODY_POWER
 		power = power * org.consciousness
 		power = power * math.Clamp(org.perfusionMoveMul or 1, 0.35, 1)
 		power = power * (1 + math.min(org.berserk or 0, 3) * 0.3)

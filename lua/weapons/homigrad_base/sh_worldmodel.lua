@@ -602,6 +602,10 @@ local function DrawWorldModel(self, force)
 		if IsValid(owner) and (owner.GetActiveWeapon and (owner:GetActiveWeapon() ~= self) or owner:IsRagdoll()) then
 			if not self.shouldntDrawHolstered then
 				self:WorldModel_Transform_Holstered()
+				if self:ShouldUseFakeModel() and IsValid(self.worldModel) and (self.reverseanim or self.seq ~= (self.AnimList["idle"] or "idle")) then
+					self.callback = nil
+					self:PlayAnim("idle", 1, not self.NoIdleLoop)
+				end
 				willdraw = true
 			else
 				if IsValid(self.worldModel) then
@@ -992,20 +996,30 @@ function SWEP:WorldModel_Transform(bNoApply, bNoAdditional, model)
 		-- if not should then ent:SetupBones() end
 		
 		local RHand = ent:LookupBone("ValveBiped.Bip01_R_Hand")
-		
+
 		if not RHand then return end
 
+		local npcGrip
+		if ent:IsNPC() then
+			local gripId = ent:LookupAttachment("anim_attachment_RH")
+			local grip = gripId and gripId > 0 and ent:GetAttachment(gripId)
+			if grip then
+				npcGrip = grip.Ang
+				npcGrip:RotateAroundAxis(npcGrip:Forward(), 180)
+			end
+		end
+
 		local matrixR = ent:GetBoneMatrix(RHand) or ent:GetBoneMatrix(ent:LookupBone("ValveBiped.Bip01_R_Forearm"))
-		
-		if not matrixR then 
+
+		if not matrixR then
 			//matrixR = Matrix()
 			//local att = ent:GetAttachment(ent:LookupAttachment("anim_attachment_RH"))
 			//matrixR:SetTranslation(att.Pos)
 			//matrixR:SetAngles(att.Ang)
 			return
 		end
-		
-		local aimvec = ent:IsNPC() and matrixR:GetAngles() or owner:GetAimVector():Angle()
+
+		local aimvec = ent:IsNPC() and (npcGrip or matrixR:GetAngles()) or owner:GetAimVector():Angle()
 
 		//self:ChangeGunPos()
 		
@@ -1032,7 +1046,10 @@ function SWEP:WorldModel_Transform(bNoApply, bNoAdditional, model)
 			--self.lastTpikPos = desiredPos
 			--self.lastTpikAng = desiredAng
 		end
-		
+
+		local ikShift = hg.WeaponIKShift
+		if ikShift and ent == owner then desiredPos = desiredPos + ikShift end
+
 		--self.fuckhands = LerpFT(0.1, self.fuckhands, self.setrhik and 1 or 0)
 
 		--desiredPos = LerpVector(self.fuckhands, oldPos, self.lastTpikPos or desiredPos)
@@ -1274,7 +1291,8 @@ end
 --hook.Add("PostDrawPlayerRagdoll", "huyCock", function(ent,owner)
 function hg.RenderWeapons(ent, owner)
 	local wep = owner.GetActiveWeapon and owner:GetActiveWeapon()
-	
+	hg.WeaponIKShift = ent == owner and hg.GetIKGunShift and hg.GetIKGunShift(ent, owner) or nil
+
 	local handoffHides = hg.PickupHandoffHides
 	if IsValid(wep) and wep.ishgweapon then
 		if handoffHides and handoffHides(owner, wep) then
@@ -1296,6 +1314,8 @@ function hg.RenderWeapons(ent, owner)
 			end
 		end
 	end
+
+	hg.WeaponIKShift = nil
 
 	local inv = ent:GetNetVar("Inventory",nil) or ent.PredictedInventory
 	if ent == owner and not owner:IsPlayer()  and inv != nil and inv["Weapons"] then

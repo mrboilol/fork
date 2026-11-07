@@ -21,9 +21,10 @@ local anger_combat_hold_time = 6
 local anger_decay_per_second = 0.075
 local limb_stamina_recovery_per_second = 7
 local limb_stamina_rest_time = 1
-local leg_sprint_drain_per_second = 3.5
-local leg_jog_recovery_mul = 0.35
-local leg_jump_cost = 6
+local leg_sprint_drain_per_second = 2
+local leg_recovery_mul = 1.5
+local leg_jog_recovery_mul = 0.6
+local leg_jump_cost = 3
 local arm_aim_drain_per_second = 0.35
 local arm_aim_drain_per_weight = 0.12
 local arm_aim_fatigue_scale = 6
@@ -387,7 +388,7 @@ module[2] = function(owner, org, timeValue)
 	local coreFatigue = hg.GetCoreFatigue(org)
 	local limbRecovery = limb_stamina_recovery_per_second * timeValue * postureRecoveryMul * physiologyRecoveryMul * (1 - heatWeakness * 0.65) * (owner.GetTraitMultiplier and owner:GetTraitMultiplier("stamina_recovery", 1) or 1) * Lerp(coreFatigue, 1, core_fatigue_limb_recovery_min_mul)
 	local jogging = owner:IsPlayer() and owner.hg_isJogging and owner:GetVelocity():LengthSqr() > 1
-	recoverLimbStamina(stamina, "legs", limbRecovery * (jogging and leg_jog_recovery_mul or 1), now)
+	recoverLimbStamina(stamina, "legs", limbRecovery * leg_recovery_mul * (jogging and leg_jog_recovery_mul or 1), now)
 	recoverLimbStamina(stamina, "arms", limbRecovery, now)
 	org.aiming_fatigue = hg.GetLimbFatigue(org, "arms") * arm_aim_fatigue_scale
 
@@ -453,7 +454,7 @@ function hg.organism.AddNaturalAdrenaline(org, fAmount)
 		fAmount = fAmount * owner:GetTraitMultiplier(fAmount <= 0.5 and "trivial_adrenaline" or "combat_adrenaline", 1)
 	end
 
-	fAmount = fAmount * 0.45
+	fAmount = fAmount * 0.45 * hg.organism.GetAdrenalineGainMul(org)
 	if org.heartstop then fAmount = fAmount * 0.75 end
 
 	local storage = org.adrenalineStorage or 0

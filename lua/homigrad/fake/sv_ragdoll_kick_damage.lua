@@ -249,7 +249,7 @@ local function ApplyKickDamage(attacker, target, damage, hitPos, force, boneName
 		end
 
 		if now <= (attackerOrg._attackAdrenalineGainUntil or 0) then
-			local adrenalineGain = math.Clamp(damage * 0.01, 0.1, 0.15)
+			local adrenalineGain = math.Clamp(damage * 0.01, 0.1, 0.15) * hg.organism.GetAdrenalineGainMul(attackerOrg)
 			attackerOrg.adrenalineAdd = math.min((attackerOrg.adrenalineAdd or 0) + adrenalineGain, 1.5)
 		end
 	end

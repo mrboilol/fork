@@ -68,6 +68,7 @@ C.Cover = {
     AllyCrowdDist = 110,
     CacheLifetime = 8,
     CompromiseTime = 1.6,
+    CompromiseSuppression = 25,
     Weights = {
         distSelf = 1.0,
         distEnemy = 1.2,
@@ -141,6 +142,22 @@ C.WeaponResponses = {
 
 -- Inside this an armed, steady NPC fights back instead of running for cover.
 C.CloseContactDist = 380
+C.PressFire = {
+    FreshFor = 2.5,
+    MinFactor = 0.7,
+    MaxFactor = 1.75,
+    SquadFreshFor = 8,
+    MinRange = 160,
+    Spread = 28,
+    MoveEvery = 0.45,
+}
+C.Hold = {
+    MinTime = 2.5,
+    MaxTime = 6,
+    RelocateTime = 3,
+    DodgeCooldown = 6,
+    FlankCooldown = 25,
+}
 -- Close enough for a melee NPC's own attack to land; outside it they chase.
 C.MeleeReach = 85
 

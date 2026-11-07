@@ -312,7 +312,21 @@ local function Beat()
 	Write("*", "alive, npcs " .. npcs)
 end
 
+local function DumpEntities()
+	if not out then return end
+
+	local all = ents.GetAll()
+	Write("*", "cleanup entity dump: " .. #all)
+
+	for _, ent in ipairs(all) do
+		Write("*", string.format("dump %s model=%s phys=%d constrained=%s parent=%s movetype=%d",
+			tostring(ent), tostring(ent:GetModel()), ent:GetPhysicsObjectCount(),
+			tostring(ent:IsConstrained()), tostring(ent:GetParent()), ent:GetMoveType()))
+	end
+end
+
 hook.Add("PreCleanupMap", "zcnpc_crashtrace", function()
+	if SERVER then DumpEntities() end
 	cleaning = true
 end)
 

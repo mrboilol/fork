@@ -348,6 +348,7 @@ if CLIENT then
 else -- Save
 	local file_location = "stormfox2/streetlights/" .. game.GetMap() .. ".json"
 	hook.Add( "ShutDown", "StormFox2.Streetlights.Save", function()
+		if not StormFox2 then return end
 		local tab = {}
 		for k, ent in ipairs(ents.FindByClass("stormfox_streetlight_invisible")) do
 			if ent:CreatedByMap() then continue end
@@ -363,6 +364,7 @@ else -- Save
 		StormFox2.FileWrite(file_location, out)
 	end)
 	local function loadStreetLights()
+		if not StormFox2 then return end
 		local fil = file.Read(file_location, "DATA" )
 		if not fil then return end
 		local tab = util.JSONToTable( fil )

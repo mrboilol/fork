@@ -114,6 +114,7 @@ function SWEP:Shoot(override)
 
     local gun = self:GetWeaponEntity()
 	local tr, pos, ang = self:GetTrace(true)
+	ang = self:GetShotAng(ang)
 	self:TakePrimaryAmmo(1)
 	if SERVER then
 		local projectile = ents.Create("rpg_projectile")

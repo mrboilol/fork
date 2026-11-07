@@ -3,6 +3,10 @@ AddCSLuaFile("shared.lua")
 include("shared.lua")
 
 SWEP.CurState = -1 -- -1 = idle; 0 = period between ready and idle; 1 = ready
+SWEP.StabDamage = 35
+SWEP.StabPenetration = 12
+SWEP.StabReach = 75
+SWEP.StabStamina = 20
 
 function SWEP:SoundEmit(snd, vol, pitch, volstupid) -- хо ро шо я тебя услышал
 	sound.Play(snd, self:GetPos(), vol, pitch, volstupid)
@@ -43,25 +47,32 @@ function SWEP:PrimaryAttack()
 		self:SoundEmit("weapons/bow_deerhunter/bow_fire_01.wav", 60, math.random(90, 115), 1)
 		self:SetNextPrimaryFire(CurTime() + 1.1)
 	elseif self.CurState == -1 and not ply:IsSprinting() then --and hg.KeyDown(ply, IN_USE)
+		local loaded = ply:GetAmmoCount("Arrow") > 0
 		self.CurState = 0.5
-		self:PlayAnim(ply:GetAmmoCount("Arrow") == 0 and "meleeattack_empty" or "meleeattack")
+		self:PlayAnim(loaded and "meleeattack" or "meleeattack_empty")
 		self:SoundEmit("weapons/slam/throw.wav", 50, math.random(95, 105), 1)
 
 		ply:LagCompensation(true)
-		local tr = hg.eyeTrace(ply)
+		local tr = hg.eyeTrace(ply, loaded and self.StabReach or nil)
 		if IsValid(tr.Entity) or tr.Entity:IsWorld() then
 			local ent = tr.Entity
+			local soft = self:IsEntSoft(ent)
 			local dmgInfo = DamageInfo()
-			dmgInfo:SetDamage((ply:GetAmmoCount("Arrow") > 0 and 15 or 9) * (ply.organism.superfighter and 5 or 1))
-			dmgInfo:SetDamageType(ply:GetAmmoCount("Arrow") > 0 and DMG_SLASH or DMG_CLUB)
+			dmgInfo:SetDamage((loaded and self.StabDamage or 9) * (ply.organism.superfighter and 5 or 1))
+			dmgInfo:SetDamageType(loaded and DMG_SLASH or DMG_CLUB)
 			dmgInfo:SetAttacker(ply)
 			dmgInfo:SetInflictor(self)
 			dmgInfo:SetDamagePosition(tr.HitPos)
 			dmgInfo:SetDamageForce(tr.Normal * 50)
 
+			self.Penetration = loaded and self.StabPenetration or nil
 			ent:TakeDamageInfo(dmgInfo)
+			self.Penetration = nil
 
-			if ent:IsPlayer() or ent:IsRagdoll() or ent:IsNPC() then
+			if loaded and soft then
+				ply:EmitSound("snd_jack_hmcd_axehit.wav", 65)
+				util.Decal("Blood", tr.HitPos + tr.HitNormal * 15, tr.HitPos - tr.HitNormal * 15, ply)
+			elseif soft then
 				ply:EmitSound("weapons/tfa/melee_hit_world"..math.random(1,3)..".ogg", 65)
 			else
 				ply:EmitSound("physics/metal/weapon_impact_hard3.wav", 65)
@@ -79,7 +90,7 @@ function SWEP:PrimaryAttack()
 			end
 		end
 
-		ply.organism.stamina.subadd = ply.organism.stamina.subadd + 15
+		ply.organism.stamina.subadd = ply.organism.stamina.subadd + (loaded and self.StabStamina or 15)
 
 		ply:ViewPunch(bashvpang / 2)
 

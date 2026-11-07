@@ -87,15 +87,10 @@ if SERVER then
 				if npc.GetActiveWeapon == nil then continue end
 				if not npc.GetActiveWeapon then continue end
 				if not IsValid(npc:GetActiveWeapon()) then continue end
+				if CAI and CAI.Enabled() and CAI.Manager.Get(npc) then continue end
 
 				local enemy = npc:GetEnemy()
 				if IsValid(enemy) then
-					if CAI and CAI.Enabled() and CAI.Manager.Get(npc) and not CAI.Util.IsTargetable(enemy) then
-						if npc.didResetProficiency == false then npc:SetCurrentWeaponProficiency(npc.defaultProficiency) end
-						npc.overshootTime = 0
-						npc.didResetProficiency = true
-						continue
-					end
 					local enemyVisible = npc:Visible(enemy)
 
 					if transparencyCheck:GetBool() then
@@ -134,7 +129,7 @@ if SERVER then
 					end
 
 					if enemyVisible then
-						npc.overshootTime = CurTime() + math.Rand(0, math.max(0, maxOvershoot:GetFloat()) * (CAI and CAI.AimSkill and (1.5 - CAI.AimSkill()) or 1))
+						npc.overshootTime = CurTime() + math.Rand(0, math.max(0, maxOvershoot:GetFloat()))
 						if math.random(1, 100) > overshootChance:GetInt() then npc.overshootTime = 0 end
 						npc.defaultProficiency = npc:GetCurrentWeaponProficiency()
 						npc.didResetProficiency = true

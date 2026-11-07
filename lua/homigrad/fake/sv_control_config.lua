@@ -100,8 +100,9 @@ K.FAKE_LEG_KICK = {
 	EXTEND_SHADOW_DAMP = 150,
 }
 K.LIMB_STAMINA_POOL = {lleg = "legs", rleg = "legs", larm = "arms", rarm = "arms"}
-K.LIMB_FATIGUE_POWER = 0.4
+K.LIMB_FATIGUE_POWER = 0.55
+K.FAKE_BODY_POWER = 1.15
 K.ARM_GRIP_DRAIN = 2
-K.LEG_CONTROL_DRAIN = 2.5
+K.LEG_CONTROL_DRAIN = 1
 
 return K

@@ -211,6 +211,7 @@ end)
 local WAKE_DIZZY_DURATION = 30
 local WAKE_DIZZY_MAX = 2
 local WAKE_DIZZY_MIN = 1.5
+local WAKE_DIZZY_CHANCE = 0.25
 
 module[1] = function(org)
 	org.rehab_otrub = 0
@@ -254,5 +255,8 @@ hook.Add("HG_OnWakeOtrub", "organism-rehab-after-otrub", function(owner)
 	end
 	org.rehab_otrub_duration = duration
 	org.rehab_otrub = CurTime() + duration
-	org.rehab_dizzy_until = CurTime() + WAKE_DIZZY_DURATION
+	local headFactor = max(brainFactor, Clamp((org.concussion or 0) / 3, 0, 1))
+	if math.Rand(0, 1) < WAKE_DIZZY_CHANCE + headFactor * (1 - WAKE_DIZZY_CHANCE) then
+		org.rehab_dizzy_until = CurTime() + WAKE_DIZZY_DURATION
+	end
 end)

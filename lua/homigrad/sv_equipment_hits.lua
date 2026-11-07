@@ -1426,6 +1426,9 @@ local function TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, ori
             end
             local tr = table.Copy(originalTrace or {})
             tr.Hit, tr.HitWorld, tr.HitSky = true, false, false
+            if hit.armor and hg.organism.ApplyBlockedHelmetNeckLoad then
+                hg.organism.ApplyBlockedHelmetNeckLoad(hit, damage, direction, shot.Inflictor)
+            end
             tr.Entity = hit.weapon or hit.heldEntity or game.GetWorld()
             tr.HitPos, tr.HitNormal, tr.Normal = hit.position, hit.normal, direction
             tr.StartSolid, tr.AllSolid = false, false

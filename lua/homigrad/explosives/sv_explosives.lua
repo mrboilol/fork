@@ -531,7 +531,10 @@ local function ApplyBlastDamage(data, enta, tracePos, len)
 	dmginfo:SetInflictor(data.Inflictor)
 	dmginfo:SetDamagePosition(tracePos)
 	dmginfo:SetDamageForce(delayedPhysicalForce and vector_origin or forceadd)
+	local prevBlastOrigin = hg.ActiveBlastOrigin
+	hg.ActiveBlastOrigin = data.Pos
 	enta:TakeDamageInfo(dmginfo)
+	hg.ActiveBlastOrigin = prevBlastOrigin
 
 	if enta:IsPlayer() and not delayedPhysicalForce then
 		hg.AddForceRag(enta, 0, forceadd * 0.5, 0.5)

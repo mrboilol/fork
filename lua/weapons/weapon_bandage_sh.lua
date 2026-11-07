@@ -378,6 +378,42 @@ local function GetBandageableWounds(ent, org, bone)
 	return wounds
 end
 
+local bandageAreaNeighbors = {
+	["ValveBiped.Bip01_Head1"] = {"ValveBiped.Bip01_Neck1"},
+	["ValveBiped.Bip01_Neck1"] = {"ValveBiped.Bip01_Head1", "ValveBiped.Bip01_Spine2"},
+	["ValveBiped.Bip01_Spine2"] = {"ValveBiped.Bip01_Spine1", "ValveBiped.Bip01_Neck1", "ValveBiped.Bip01_L_UpperArm", "ValveBiped.Bip01_R_UpperArm"},
+	["ValveBiped.Bip01_Spine1"] = {"ValveBiped.Bip01_Spine2", "ValveBiped.Bip01_Spine", "ValveBiped.Bip01_Pelvis"},
+	["ValveBiped.Bip01_Spine"] = {"ValveBiped.Bip01_Spine1", "ValveBiped.Bip01_Pelvis"},
+	["ValveBiped.Bip01_Pelvis"] = {"ValveBiped.Bip01_Spine", "ValveBiped.Bip01_Spine1", "ValveBiped.Bip01_L_Thigh", "ValveBiped.Bip01_R_Thigh"},
+	["ValveBiped.Bip01_L_UpperArm"] = {"ValveBiped.Bip01_L_Forearm", "ValveBiped.Bip01_Spine2"},
+	["ValveBiped.Bip01_L_Forearm"] = {"ValveBiped.Bip01_L_UpperArm", "ValveBiped.Bip01_L_Hand"},
+	["ValveBiped.Bip01_L_Hand"] = {"ValveBiped.Bip01_L_Forearm"},
+	["ValveBiped.Bip01_R_UpperArm"] = {"ValveBiped.Bip01_R_Forearm", "ValveBiped.Bip01_Spine2"},
+	["ValveBiped.Bip01_R_Forearm"] = {"ValveBiped.Bip01_R_UpperArm", "ValveBiped.Bip01_R_Hand"},
+	["ValveBiped.Bip01_R_Hand"] = {"ValveBiped.Bip01_R_Forearm"},
+	["ValveBiped.Bip01_L_Thigh"] = {"ValveBiped.Bip01_L_Calf", "ValveBiped.Bip01_Pelvis"},
+	["ValveBiped.Bip01_L_Calf"] = {"ValveBiped.Bip01_L_Thigh", "ValveBiped.Bip01_L_Foot"},
+	["ValveBiped.Bip01_L_Foot"] = {"ValveBiped.Bip01_L_Calf"},
+	["ValveBiped.Bip01_R_Thigh"] = {"ValveBiped.Bip01_R_Calf", "ValveBiped.Bip01_Pelvis"},
+	["ValveBiped.Bip01_R_Calf"] = {"ValveBiped.Bip01_R_Thigh", "ValveBiped.Bip01_R_Foot"},
+	["ValveBiped.Bip01_R_Foot"] = {"ValveBiped.Bip01_R_Calf"},
+}
+
+local function GetBandageAreaWounds(ent, org, bone)
+	local wounds = GetBandageableWounds(ent, org, bone)
+	local seen = {}
+	for _, wound in ipairs(wounds) do seen[wound] = true end
+	for _, neighbor in ipairs(bandageAreaNeighbors[bone] or {}) do
+		for _, wound in ipairs(GetBandageableWounds(ent, org, neighbor)) do
+			if not seen[wound] then
+				seen[wound] = true
+				wounds[#wounds + 1] = wound
+			end
+		end
+	end
+	return wounds
+end
+
 local bandageVitalKeys = {"skull", "chest"}
 local bandageSpineKeys = {spine1 = true, spine2 = true, spine3 = true}
 local bandageBoneOrder = {
@@ -567,14 +603,13 @@ function SWEP:GetBandageOptions(target)
 	local woundGroups = {}
 	for _, wound in ipairs(org.wounds or {}) do
 		local bone = wound[4]
-		if bone and (wound[1] or 0) > 0 then
-			local group = woundGroups[bone]
-			if not group then
-				group = {kind = "wound", id = "wound:" .. bone, bone = bone, tier = 4, value = 0, label = "Bleeding wound - " .. hg.GetBoneLabel(bone)}
-				woundGroups[bone] = group
-				options[#options + 1] = group
+		if bone and (wound[1] or 0) > 0 and not woundGroups[bone] then
+			local group = {kind = "wound", id = "wound:" .. bone, bone = bone, tier = 4, value = 0, label = "Bleeding wound - " .. hg.GetBoneLabel(bone)}
+			woundGroups[bone] = group
+			options[#options + 1] = group
+			for _, areaWound in ipairs(GetBandageAreaWounds(target, org, bone)) do
+				group.value = group.value + (areaWound[1] or 0)
 			end
-			group.value = group.value + wound[1]
 		end
 	end
 
@@ -1064,7 +1099,7 @@ if SERVER then
 
 	function SWEP:BandageBoneWounds(ent, org, bone, layered)
 		local done = false
-		for _, wound in ipairs(GetBandageableWounds(ent, org, bone)) do
+		for _, wound in ipairs(GetBandageAreaWounds(ent, org, bone)) do
 			if self.modeValues[1] <= 0 then break end
 
 			local biggestWound = wound[1]

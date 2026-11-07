@@ -100,6 +100,20 @@ end
 hg.MaxLookX, hg.MinLookX = 55, -55
 hg.MaxLookY, hg.MinLookY = 45, -45
 
+local npcGunForceMax = CreateConVar("hg_npc_gunforce_max", "2500", {FCVAR_ARCHIVE, FCVAR_REPLICATED}, "Largest damage force a bullet carries when an NPC fires it or an NPC is hit by it.", 0)
+
+function hg.ClampNPCGunForce(dmgInfo, target, attacker)
+	local involvesNPC = IsValid(attacker) and attacker:IsNPC() or IsValid(target) and (target:IsNPC() or target.zcnpc_npcbody)
+	if not involvesNPC then return end
+
+	local force = dmgInfo:GetDamageForce()
+	local maximum = npcGunForceMax:GetFloat()
+	local lengthSqr = force:LengthSqr()
+	if lengthSqr > maximum * maximum then
+		dmgInfo:SetDamageForce(force * (maximum / math.sqrt(lengthSqr)))
+	end
+end
+
 function hg.ClampRagdollReactionForce(ragdoll, force)
 	if not isvector(force) then return vector_origin end
 

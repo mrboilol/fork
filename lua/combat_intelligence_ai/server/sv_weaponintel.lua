@@ -97,11 +97,31 @@ function WI.EffectiveAggression(data)
 end
 
 local ownIdeal = {
-    shotgun = 340, smg = 520, rifle = 650, lmg = 720,
-    sniper = 1100, pistol = 500, explosive = 900, rocket = 900, melee = 60,
+    shotgun = 340, smg = 750, rifle = 1400, lmg = 1600,
+    sniper = 2600, pistol = 600, explosive = 1100, rocket = 1100, melee = 60,
 }
 function WI.OwnIdeal(npc)
     local wep = npc.GetActiveWeapon and npc:GetActiveWeapon()
     if not IsValid(wep) then return ownIdeal.melee end
-    return ownIdeal[WI.Classify(wep)] or 600
+    return ownIdeal[WI.Classify(wep)] or 900
+end
+
+local ownMaxRange = {
+    shotgun = 1400, smg = 3000, rifle = 6000, lmg = 6000,
+    sniper = 12000, pistol = 2200, explosive = 4000, rocket = 5000,
+}
+function WI.MaxRange(npc)
+    local wep = npc.GetActiveWeapon and npc:GetActiveWeapon()
+    if not IsValid(wep) then return 0 end
+    return ownMaxRange[WI.Classify(wep)] or 4000
+end
+
+function WI.ApplyEngagementRange(data)
+    local npc = data.ent
+    local wep = npc.GetActiveWeapon and npc:GetActiveWeapon()
+    if not IsValid(wep) or wep == data.rangedWeapon or WI.IsMelee(wep) then return end
+    data.rangedWeapon = wep
+    local range = WI.MaxRange(npc)
+    wep:SetSaveValue("m_fMaxRange1", range)
+    npc:SetSaveValue("m_flDistTooFar", range)
 end

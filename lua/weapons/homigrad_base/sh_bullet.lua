@@ -777,6 +777,27 @@ function SWEP:GetTrace(bCacheTrace, desiredPos, desiredAng, NoTrace, closeanim)
 	return trace, pos, ang
 end
 
+function SWEP:GetSettledShotAng()
+	local additional, pitch = self.AdditionalAng, self.pitch
+	self.AdditionalAng = self.settledAdditionalAng or additional
+	self.pitch = self.settledPitch or pitch
+	local _, ang = self:GetTrace(true, nil, nil, true, true)
+	self.AdditionalAng, self.pitch = additional, pitch
+
+	return ang
+end
+
+function SWEP:GetShotAng(fallback)
+	local owner = self:GetOwner()
+	if not IsValid(owner) or not owner:IsPlayer() then return fallback end
+
+	if SERVER and (CurTime() - (self.hgClientRayTime or 0)) < 0.15 and isangle(self.hgClientRayAng) then
+		return self.hgClientRayAng
+	end
+
+	return self:GetSettledShotAng() or fallback
+end
+
 SWEP.ShellEject = "EjectBrass_556"
 SWEP.MuzzleEffectType = 1
 
@@ -920,6 +941,8 @@ function SWEP:FireBullet()
 				local punchAng = owner.hgCameraPunch and CurTime() - (owner.hgCameraPunchTime or 0) < 0.3 and owner.hgCameraPunch or Angle(0, 0, 0)
 				dir = (owner:EyeAngles() - punchAng):Forward()
 			end
+		else
+			dir = self:GetShotAng(ang):Forward()
 		end
 		local dist, point = util.DistanceToLine(pos, pos - dir * 50, owner:EyePos())
 		local blockFilter = {gun, self, owner, ent}
@@ -1284,6 +1307,7 @@ else
 		nextRaySend = now + 0.03
 		local tr, pos, ang = wep:GetTrace(true)
 		if not isvector(pos) or not isangle(ang) then return end
+		if wep.GetShotAng then ang = wep:GetShotAng(ang) end
 		net.Start("hg_client_ray", true)
 		net.WriteVector(pos)
 		net.WriteAngle(ang)

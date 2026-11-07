@@ -116,7 +116,7 @@ function CV.UpdateCoverStatus(data, enemy)
 
     if IsValid(enemy) and CAI.Util.CanSee(enemy, data.ent) then
         data.cover.exposedSince = data.cover.exposedSince or CurTime()
-        if CurTime() - data.cover.exposedSince > cfg.CompromiseTime then
+        if CurTime() - data.cover.exposedSince > cfg.CompromiseTime and data.suppression >= cfg.CompromiseSuppression then
 
             CAI.Battlefield.MarkCover(data.squad, data.cover.pos, false)
             CAI.Memory.AddDanger(data, data.cover.pos, 150, "compromised_cover")

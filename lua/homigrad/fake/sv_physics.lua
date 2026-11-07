@@ -3,6 +3,8 @@ local hg_ragdoll_rest = CreateConVar("hg_ragdoll_rest", "1", FCVAR_ARCHIVE + FCV
 local REST_LIN = 4
 local REST_ANG = 5
 local REST_MAX_SPEED = 35
+local REST_GROUND_TRACE = 30
+local REST_MAX_DTIME = 0.05
 
 local function isFloppyBone(ragdoll, physNum)
 	local floppy = ragdoll.hg_floppy_bones
@@ -28,7 +30,7 @@ hook.Add("Think", "HG_PhysicsRest", function()
 
 		if hg.KeyDown(ply, IN_FORWARD) or hg.KeyDown(ply, IN_BACK) or
 			hg.KeyDown(ply, IN_MOVELEFT) or hg.KeyDown(ply, IN_MOVERIGHT) or
-			hg.KeyDown(ply, IN_USE) or hg.KeyDown(ply, IN_ATTACK) or hg.KeyDown(ply, IN_ATTACK2) then
+			hg.KeyDown(ply, IN_USE) or hg.KeyDown(ply, IN_ATTACK) or hg.KeyDown(ply, IN_ATTACK2) or hg.KeyDown(ply, IN_DUCK) then
 			continue
 		end
 
@@ -36,7 +38,15 @@ hook.Add("Think", "HG_PhysicsRest", function()
 		if ragdoll.hgSettleUntil and ragdoll.hgSettleUntil > now then continue end
 		if ragdoll.hgWoundGrab or ragdoll.hgWallGrab or ragdoll.hgGetUp then continue end
 
-		local dtime = (now - (ragdoll.hgRestLast or now)) * game.GetTimeScale()
+		local rootPos = rootPhys:GetPos()
+		if not util.TraceLine({
+			start = rootPos,
+			endpos = rootPos - vector_up * REST_GROUND_TRACE,
+			filter = {ply, ragdoll},
+			mask = MASK_SOLID,
+		}).Hit then continue end
+
+		local dtime = math.min((now - (ragdoll.hgRestLast or now)) * game.GetTimeScale(), REST_MAX_DTIME)
 		ragdoll.hgRestLast = now
 		if dtime <= 0 then continue end
 

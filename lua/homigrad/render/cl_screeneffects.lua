@@ -105,6 +105,30 @@ local hg_damage_corner_distortion = CreateClientConVar("hg_damage_corner_distort
 local snd_musicvolume = GetConVar("snd_musicvolume")
 local hook_Run = hook.Run
 -- Collect this frame's requests and blur the next world frame before screen overlays draw.
+do
+	local TRAUMA_BLUR_DECAY = 1
+	local traumaBlur, traumaBlurTime = 0, 0
+
+	function hg.GetTraumaBlur()
+		return math.max(traumaBlur - (CurTime() - traumaBlurTime) * TRAUMA_BLUR_DECAY, 0)
+	end
+
+	function hg.AddTraumaBlur(amount)
+		traumaBlur = math.max(hg.GetTraumaBlur(), amount)
+		traumaBlurTime = CurTime()
+	end
+
+	function hg.GetVisualDisorientation(org)
+		local wakeRemain = (org.rehab_dizzy_until or 0) - CurTime()
+		local wakeDizzy = wakeRemain > 0 and 1 + math.min(wakeRemain / 30, 1) * 0.4 or 0
+		local panicSway = 0
+		if org.panicattackActive and org.panicMode == "flight" then
+			panicSway = math.Clamp(((tonumber(org.panicattack) or 0) - 0.35) / 0.65, 0, 1) * math.Clamp(((tonumber(org.adrenaline) or 0) - 2.5) / 1.5, 0.3, 1) * 2.5
+		end
+		return math.max(hg.GetTraumaBlur(), (org.concussion or 0) * 0.65, wakeDizzy, (org.disorientation or 0) - 4, panicSway)
+	end
+end
+
 local worldMotionBlur = {}
 function hg.DrawWorldMotionBlur(addAlpha, drawAlpha, delay)
 	worldMotionBlur[#worldMotionBlur + 1] = {addAlpha, drawAlpha, delay}
@@ -645,7 +669,7 @@ local painBeatOverlayVolumeMul = 1.25
 local painThresholdMax = 120
 local painAgonyThreshold = 60
 local painExcruciatingThreshold = 85
-local painAgonyVolumeMul = 1.15
+local painAgonyVolumeMul = 0.5
 local painExcruciatingVolumeMul = 0.85
 local painLayerFadeLerp = 0.06
 local painPitchMax = 150
@@ -1350,9 +1374,10 @@ function hg.DrawO2Vignette(org)
 	end
 
 	render.UpdateScreenEffectTexture()
-	noiseMat:SetFloat("$c0_y", 1 - o2Severity)
+	local grainSeverity = org.otrub and math.min(o2Severity * 1.5, 1) or o2Severity
+	noiseMat:SetFloat("$c0_y", 1 - grainSeverity)
 	noiseMat:SetFloat("$c0_z", 1)
-	noiseMat:SetFloat("$c1_x", math.Clamp(o2Severity * 1.6, 0, 1.6))
+	noiseMat:SetFloat("$c1_x", math.Clamp(grainSeverity * 1.6, 0, 1.6))
 	noiseMat:SetFloat("$c1_y", math.min(O2Lerp, 400) * (org.otrub and 0.2 or 0.08))
 	noiseMat:SetFloat("$c2_x", CurTime() + 10000)
 	render.SetMaterial(noiseMat)
@@ -1394,13 +1419,7 @@ drawFinalVitalsVignettes = function()
 	local visualConsciousness = math.Clamp(consciousnessLerp or consciousness, 0, 1)
 	local consciousnessSeverity = math.Clamp((0.82 - visualConsciousness) / (0.82 - OTRUB_CONSCIOUSNESS_THRESHOLD), 0, 1) ^ 2.2
 	local lowConsciousnessDarkness = math.Clamp((0.74 - visualConsciousness) / (0.74 - OTRUB_CONSCIOUSNESS_THRESHOLD), 0, 1) ^ 1.8
-	local bloodPressure = math.Clamp(tonumber(org.bloodPressure) or 92, 0, 180)
-	local hypotensionSeverity = math.max(
-		math.Clamp(tonumber(org.hypotension) or 0, 0, 1),
-		math.Clamp((72 - bloodPressure) / 52, 0, 1)
-	)
-	local disorientationSeverity = math.Clamp((tonumber(org.disorientation) or 0) / 4, 0, 1)
-	local motionBlurCause = math.max(hypotensionSeverity, disorientationSeverity)
+	local motionBlurCause = math.Clamp(hg.GetVisualDisorientation(org) / 4, 0, 1)
 	local brainDamageSeverity = math.max(
 		math.Clamp(((tonumber(org.brain) or 0) - 0.025) / 0.5, 0, 1),
 		math.Clamp((tonumber(org.brainFrontal) or 0) * 0.75, 0, 1),
@@ -1575,6 +1594,8 @@ drawFinalVitalsVignettes = function()
 		render.SetMaterial(painMat)
 		render.DrawScreenQuad()
 	end
+
+	if hg.O2VignetteOrg then hg.DrawO2Vignette(hg.O2VignetteOrg) end
 end
 end
 
@@ -1597,7 +1618,7 @@ end
 hook.Add("Think", "HG_EngulfedFireSound", function()
 	local ply = LocalPlayer()
 	local count = IsValid(ply) and ply:Alive() and getEngulfedFireCount(ply) or 0
-	local target = math.Clamp(count / 4, 0, 1) * engulfedFireVolumeMax
+	local target = math.Clamp(math.max(count / 4, PanicAttackLerp), 0, 1) * engulfedFireVolumeMax
 	engulfedFireVolume = Lerp(FrameTime() * 4, engulfedFireVolume, target)
 
 	if target > 0 and not engulfedFireStationLoading and not IsValid(engulfedFireStation) then
@@ -1838,7 +1859,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 
 	if (painMode == 6 or painMode == 7) and not RemAgonyStationLoading and canRetrySound("RemAgonyStation", RemAgonyStation) then
 		RemAgonyStationLoading = true
-		sound.PlayFile("sound/rem_agony.mp3", "noblock noplay", function(station)
+		sound.PlayFile("sound/reality.mp3", "noblock noplay", function(station)
 			RemAgonyStationLoading = false
 			if IsValid(station) then
 				if getServerSoundMode("hg_painsound", 6) != 6 and getServerSoundMode("hg_painsound", 6) != 7 then
@@ -2096,35 +2117,36 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	local panicBaseTarget = getPanicAttackFx(org)
 	PanicAttackLerp = LerpFT(0.12, PanicAttackLerp, panicBaseTarget ^ hg.screeneffects_config.panicattackVisualExponent)
 	if PanicAttackLerp > 0.001 and not (org.otrub or org.incapacitated) then
-		local modeMul = org.panicattackActive and (org.panicMode == "fight" and 1.4 or org.panicMode == "flight" and 0.6) or 1
-		local panicBase = math.min(PanicAttackLerp * modeMul, 1.4)
+		local panicBase = math.min(PanicAttackLerp, 1.4)
 		local panicPulse = panicBase * (0.78 + math.ease.InOutSine(math.abs(math.cos(CurTime() * 2))) * 0.2)
 		local sw, sh = ScrW(), ScrH()
 		local steps = 4
 		local innerScale = Lerp(math.min(panicBase * 1.5, 1), 1.3, 0.65) - math.sin(CurTime() * 0.7) * 0.04 * panicBase
 
-		local fightBlack = org.panicattackActive and org.panicMode == "fight"
 		render.UpdateScreenEffectTexture()
 		render.UpdateFullScreenDepthTexture()
-		if fightBlack then
-			vignetteMat:SetFloat("$c2_x", CurTime() + 10500)
-			vignetteMat:SetFloat("$c0_z", scaleVignette(math.min(panicPulse * 0.9, 1)))
-			vignetteMat:SetFloat("$c1_y", scaleVignette(panicPulse * 2.4))
-			render.SetMaterial(vignetteMat)
-		else
-			grainMat:SetFloat("$c0_x", 0)
-			grainMat:SetFloat("$c0_y", -1)
-			grainMat:SetFloat("$c0_z", 4096)
-			grainMat:SetFloat("$c1_x", panicBase * 3.2 + panicPulse * 5.8)
-			grainMat:SetFloat("$c1_y", (panicBase * 0.08 + panicPulse * 0.22) * 1.3)
-			grainMat:SetFloat("$c1_z", 0)
-			grainMat:SetFloat("$c2_x", panicBase * 0.04 + panicPulse * 0.12)
-			grainMat:SetFloat("$c2_y", 0.075 * panicBase)
-			grainMat:SetFloat("$c2_z", 0)
-			grainMat:SetFloat("$c3_x", 0)
-			render.SetMaterial(grainMat)
-		end
+		grainMat:SetFloat("$c0_x", 0)
+		grainMat:SetFloat("$c0_y", -1)
+		grainMat:SetFloat("$c0_z", 4096)
+		grainMat:SetFloat("$c1_x", panicBase * 3.2 + panicPulse * 5.8)
+		grainMat:SetFloat("$c1_y", (panicBase * 0.08 + panicPulse * 0.22) * 1.3)
+		grainMat:SetFloat("$c1_z", 0)
+		grainMat:SetFloat("$c2_x", panicBase * 0.04 + panicPulse * 0.12)
+		grainMat:SetFloat("$c2_y", 0.075 * panicBase)
+		grainMat:SetFloat("$c2_z", 0)
+		grainMat:SetFloat("$c3_x", 0)
+		render.SetMaterial(grainMat)
 		render.DrawScreenQuad()
+
+		if org.panicattackActive and org.panicMode == "flight" then
+			local tunnel = panicPulse * Lerp(math.Clamp(((tonumber(org.adrenaline) or 0) - 2.5) / 1.5, 0, 1), 0.5, 1)
+			render.UpdateScreenEffectTexture()
+			vignetteMat:SetFloat("$c2_x", CurTime() + 10500)
+			vignetteMat:SetFloat("$c0_z", scaleVignette(math.min(tunnel * 0.9, 1)))
+			vignetteMat:SetFloat("$c1_y", scaleVignette(tunnel * 2.4))
+			render.SetMaterial(vignetteMat)
+			render.DrawScreenQuad()
+		end
 
 		render.ClearStencil()
 		render.SetStencilEnable(true)
@@ -2163,9 +2185,9 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			grainMat:SetFloat("$c1_x", 0.1 + grain * 0.14)
 			grainMat:SetFloat("$c1_y", 1.4)
 			grainMat:SetFloat("$c1_z", grain * 0.1)
-			grainMat:SetFloat("$c2_x", fightBlack and 0 or grain * 0.55)
-			grainMat:SetFloat("$c2_y", fightBlack and 0 or grain * 0.22)
-			grainMat:SetFloat("$c2_z", fightBlack and 0 or grain * 0.02)
+			grainMat:SetFloat("$c2_x", grain * 0.55)
+			grainMat:SetFloat("$c2_y", grain * 0.22)
+			grainMat:SetFloat("$c2_z", grain * 0.02)
 			grainMat:SetFloat("$c3_x", 0)
 			render.SetMaterial(grainMat)
 			render.DrawScreenQuad()
@@ -2336,10 +2358,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		pain = PainLerp + strobe
 		shock = shockLerp
 
-		if org.otrub then
-			if not HasBlindTrait() then hg.DrawWorldMotionBlur(0.1, 1, 0.01) end
-		end
-
 		//if pain > 10 then
 			painVolume = math.Clamp(math.Remap(pain, 0, hg.screeneffects_config.painThresholdMax, 0, 2), 0, 2)
 			normalizedPain = math.Clamp(pain / hg.screeneffects_config.painThresholdMax, 0, 1)
@@ -2481,7 +2499,8 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end
 	end
 
-	disorientationFxLerp = LerpFT(disorientation > (disorientationFxLerp or 0) and 0.35 or 0.025, disorientationFxLerp or 0, math.max(disorientation, concussion * 0.65))
+	local visualDisorientation = hg.GetVisualDisorientation(org)
+	disorientationFxLerp = LerpFT(visualDisorientation > (disorientationFxLerp or 0) and 0.35 or 0.025, disorientationFxLerp or 0, visualDisorientation)
 	if lply:Alive() and not HasBlindTrait() and not org.otrub and disorientationFxLerp > 1.2 then
 		local blurPower = math.Clamp((disorientationFxLerp - 1.2) / 7.5, 0, 1)
 		hg.DrawWorldMotionBlur(0.08 + blurPower * 0.12, 0.45 + blurPower * 1.25, 0.01)

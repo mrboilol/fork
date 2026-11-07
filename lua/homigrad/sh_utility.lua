@@ -1379,8 +1379,10 @@ local IsValid = IsValid
 		return math.Clamp((stamina[pool] or hg.LIMB_STAMINA_MAX) / hg.LIMB_STAMINA_MAX, 0, 1)
 	end
 
+	hg.LIMB_FATIGUE_START = {legs = 0.25, arms = 0.5}
+
 	function hg.GetLimbStaminaFatigue(org, pool)
-		return 1 - math.Clamp(hg.GetLimbStaminaFraction(org, pool) / 0.5, 0, 1)
+		return 1 - math.Clamp(hg.GetLimbStaminaFraction(org, pool) / (hg.LIMB_FATIGUE_START[pool] or 0.5), 0, 1)
 	end
 
 	function hg.GetCoreFatigue(org)

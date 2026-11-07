@@ -116,6 +116,25 @@ hook.Add("Think", "hg-ragdoll-collide-queue", function()
 	end
 end)
 
+do
+	local WORLD_CLEARANCE = 2
+
+	function hg.PullRagdollFromWorld(ragdoll, origin)
+		for physNum = 0, ragdoll:GetPhysicsObjectCount() - 1 do
+			local phys = ragdoll:GetPhysicsObjectNum(physNum)
+			if not IsValid(phys) then continue end
+
+			local tr = util.TraceLine({
+				start = origin,
+				endpos = phys:GetPos(),
+				mask = MASK_SOLID_BRUSHONLY,
+			})
+			if tr.StartSolid then return end
+			if tr.Hit then phys:SetPos(tr.HitPos + tr.HitNormal * WORLD_CLEARANCE) end
+		end
+	end
+end
+
 local function Ragdoll_CreateInternal(ply)
 	local Data = duplicator.CopyEntTable( ply )
 	local ragdoll = ents.Create("prop_ragdoll")
@@ -385,6 +404,8 @@ local function Ragdoll_CreateInternal(ply)
 			phys:EnableMotion(false)
 		end--]]
 	end
+
+	if not ply:InVehicle() then hg.PullRagdollFromWorld(ragdoll, ply:WorldSpaceCenter()) end
 
 	for physNum = 0, ragdoll:GetPhysicsObjectCount() - 1 do
 		local phys = ragdoll:GetPhysicsObjectNum(physNum)
@@ -697,6 +718,12 @@ function hg.ApplyPoses(ply)
 					obj:EnableMotion(true)
 				end
 			end)
+		end
+
+		local rag = ply.FakeRagdoll
+		if rag.hg_floppy_bones then
+			hg.fakeBoneFlop.CleanupRagdoll(rag)
+			hg.fakeBoneFlop.ApplyStored(rag, ply.organism)
 		end
 	end
 end
@@ -1092,11 +1119,6 @@ function fakeBoneFlop.ApplyBone(rag, bone, org)
 
 	local pos = phys:GetPos()
 	if not isSafeNetworkPos(pos) or not isSafeNetworkPos(physParent:GetPos()) then return end
-	local fracture = org and org.open_fractures and org.open_fractures[bone]
-	if fracture and not spineFractureBones[bone] and isvector(fracture[1]) then
-		local fracturePos = phys:LocalToWorld(fracture[1])
-		if isSafeNetworkPos(fracturePos) then pos = fracturePos end
-	end
 
 	local swingLimit = 15 + 85 * severity
 	local twistLimit = 18 + 102 * severity

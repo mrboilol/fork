@@ -34,6 +34,10 @@ function N.CheckStuck(data)
         return false
     end
     if CurTime() - (data.moveIssuedAt or 0) < 1.5 then return false end
+    if not npc:IsCurrentSchedule(SCHED_FORCED_GO_RUN) and not npc:IsCurrentSchedule(SCHED_FORCED_GO) then
+        data.stuckChecks = 0
+        return false
+    end
 
     local moved = npc:GetPos():DistToSqr(data.stuckPos or npc:GetPos())
     data.stuckPos = npc:GetPos()

@@ -48,6 +48,7 @@ local panicattack_threat_adrenaline_cap = 1.5
 local panicattack_threat_adrenaline_min = 0.1
 local panicattack_threat_adrenaline_max = 0.4
 local panicattack_fire_adrenaline_target = 1.2
+local panicattack_focus_adrenaline = 2.5
 local panicattack_fire_adrenaline_rise_time = 1.5
 local panicattack_fire_panic_rate = 0.4
 local panicattack_damage_scale = 0.02
@@ -57,8 +58,8 @@ local panicattack_death_radius = 900
 local panicattack_gunfight_hold_time = 8
 local panicattack_sustained_fear_time = 10
 local panicattack_grenade_radius = 750
-local seizure_min_duration = 10
-local seizure_max_duration = 30
+local seizure_min_duration = 13
+local seizure_max_duration = 36
 local seizure_recovery_duration = 20
 local seizure_pose_force = 850
 local seizure_pose_damp = 42
@@ -461,6 +462,7 @@ local function send_organism(org, ply, recipientForce, reliable)
 	sendtable.spine3 = org.spine3
 	sendtable.pelvis = org.pelvis
 	sendtable.disorientation = org.disorientation
+	sendtable.rehab_dizzy_until = org.rehab_dizzy_until
 	sendtable.brain = org.brain
 	sendtable.brainFrontal = org.brainFrontal
 	sendtable.brainParietal = org.brainParietal
@@ -1021,7 +1023,7 @@ local function apply_panic_disabled_stress(org, amount)
 end
 
 local function panic_threat_adrenaline_spike(org, amount)
-	local spike = math.Clamp(amount * 1.5, panicattack_threat_adrenaline_min, panicattack_threat_adrenaline_max)
+	local spike = math.Clamp(amount * 1.5, panicattack_threat_adrenaline_min, panicattack_threat_adrenaline_max) * hg.organism.GetAdrenalineGainMul(org)
 	org.adrenalineAdd = math.max(org.adrenalineAdd or 0, math.min((org.adrenalineAdd or 0) + spike, panicattack_threat_adrenaline_cap))
 end
 
@@ -1173,8 +1175,10 @@ hg.organism.convulsionConfig = {
 	brainFull = 0.5,
 	brainChanceMin = 0.05,
 	brainChanceMax = 0.5,
-	brainRate = 1 / 80,
-	hypoxiaConvulsionBrainRate = 1 / 600,
+	brainQuicken = 3,
+	brainQuickenMaxRate = 0.05,
+	maxDuration = 45,
+	seizureBrainDamage = 0.012,
 	hypoxiaBrainRate = 1 / 300,
 	hypoxiaPenalty = 0.35,
 	mannitolBlock = 0.25,
@@ -1245,6 +1249,9 @@ local function start_seizure(owner, org)
 	org.nextSeizureSpasm = time
 	org.seizureOtrubAt = time + (org.seizureEnd - time) * math.Rand(0.5, 1)
 	org.needfake = true
+	if not (hg.organism.IsBrainDamageIgnored and hg.organism.IsBrainDamageIgnored(org)) then
+		org.brain = math.min((org.brain or 0) + hg.organism.convulsionConfig.seizureBrainDamage, 1)
+	end
 	owner.fullsend = true
 	send_organism(org, owner)
 end
@@ -1273,10 +1280,11 @@ function hg.organism.StartConvulsion(owner, org)
 	local cfg = hg.organism.convulsionConfig
 	org.convulsing = true
 	org.convulsionStart = time
+	org.convulsionLastBrain = org.brain or 0
 	org.convulsionCure = 0
 	org.nextConvulsionSound = 0
 	org.seizureOtrubAt = math.min(tonumber(org.seizureOtrubAt) or math.huge, time + math.Rand(cfg.otrubDelayMin, cfg.otrubDelayMax))
-	org.seizureEnd = time + 10
+	org.seizureEnd = time + seizure_min_duration
 	org.seizureFakeCooldownEnd = org.seizureEnd
 	owner.fullsend = true
 end
@@ -1305,7 +1313,7 @@ function hg.organism.TickConvulsion(owner, org, timeValue, ignoreBrainDamage)
 		return
 	end
 
-	if risk < cfg.recoveryRisk and (ignoreBrainDamage or (org.brain or 0) < cfg.brainStart) then
+	if (risk < cfg.recoveryRisk and (ignoreBrainDamage or (org.brain or 0) < cfg.brainStart)) or time - (org.convulsionStart or time) >= cfg.maxDuration then
 		stop_seizure(owner, org)
 		return
 	end
@@ -1318,16 +1326,16 @@ function hg.organism.TickConvulsion(owner, org, timeValue, ignoreBrainDamage)
 		end
 	end
 
-	if not ignoreBrainDamage then
+	local brainNow = org.brain or 0
+	local brainGrowth = brainNow - (org.convulsionLastBrain or brainNow)
+	if not ignoreBrainDamage and brainGrowth > 0 and brainGrowth < timeValue * cfg.brainQuickenMaxRate then
 		local shield = math.Clamp(1 - mannitolK * cfg.mannitolBrainShield, 0, 1)
-		if shield > 0 then
-			local brainRate = (org.brain or 0) < cfg.brainStart and cfg.hypoxiaConvulsionBrainRate or cfg.brainRate
-			org.brain = math.min((org.brain or 0) + timeValue * brainRate * shield, 1)
-		end
+		org.brain = math.min(brainNow + brainGrowth * (cfg.brainQuicken - 1) * shield, 1)
 	end
+	org.convulsionLastBrain = org.brain or 0
 
 	if (org.seizureEnd or 0) - time < 5 then
-		org.seizureEnd = time + 10
+		org.seizureEnd = time + seizure_min_duration
 		org.seizureFakeCooldownEnd = org.seizureEnd
 	end
 
@@ -1633,7 +1641,6 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		panicOnFire = IsValid(panicChar) and panicChar:IsOnFire()
 	end
 	if panicOnFire then
-		org.panicFireUntil = CurTime() + 2
 		hg.organism.AddPanicAttack(org, timeValue * panicattack_fire_panic_rate, true, false, true, true)
 		if (org.adrenalineAdd or 0) < panicattack_fire_adrenaline_target then
 			org.adrenalineAdd = math.Approach(org.adrenalineAdd or 0, panicattack_fire_adrenaline_target, timeValue / panicattack_fire_adrenaline_rise_time)
@@ -1643,23 +1650,10 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.panicattackActive = hg_panic:GetBool() and not panicDying
 		if not org.panicattackActive then
 			org.panicMode = nil
-			org.panicModeNotified = nil
 		else
-			if (org.panicFireUntil or 0) > CurTime() then
-				org.panicMode = "flight"
-			end
-			if not org.panicMode then
-				org.panicMode = math.random(2) == 1 and "fight" or "flight"
-			end
-			if org.panicMode != org.panicModeNotified then
-				org.panicModeNotified = org.panicMode
-				if isPly then
-					owner:Notify(org.panicMode == "fight" and "I need to fight back." or "I need to get out of here now.", 2, "panicattack_mode", 2, nil, Color(255, 170, 120))
-				end
-			end
+			org.panicMode = (tonumber(org.adrenaline) or 0) < panicattack_focus_adrenaline and "fight" or "flight"
 		end
 	else
-		org.panicModeNotified = nil
 		org.panicattackActive = false
 		org.panicMode = nil
 		org.panicAdrenalineUntil = 0
@@ -2158,21 +2152,6 @@ hook.Add("HG_OnWakeOtrub", "afterOtrub", function( owner )
 	end)
 	owner.organism.fearadd = owner.organism.fearadd + 5
 	owner:SendLua("system.FlashWindow()")
-end)
-hook.Add("HG_OnOtrub", "fearful", function( plya )// ЧЕ
-	local ent = hg.GetCurrentCharacter(plya)
-	if not IsValid(ent) then return end
-	for i,ply in ipairs(ents.FindInSphere(ent:GetPos(),256)) do
-		if not ply:IsPlayer() or not ply.organism or plya == ply then continue end
-		local tr = {}
-		tr.start = ply:GetPos()
-		tr.endpos = ent:GetPos()
-		tr.filter = {ply,ent}
-		if not util.TraceLine(tr).Hit then
-			ply.organism.adrenalineAdd = ply.organism.adrenalineAdd + 0.3
-			ply.organism.fearadd = ply.organism.fearadd + 0.3
-		end
-	end
 end)
 local unlucky_dislocations = {
 	"Why can't I fix this goddamn dislocation...",

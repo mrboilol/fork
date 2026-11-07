@@ -494,7 +494,7 @@ hook.Add("Think", "HG_EuphoriaSettle", function()
 			continue
 		end
 
-		if hg.KeyDown(ply, IN_USE) or hg.KeyDown(ply, IN_ATTACK) or hg.KeyDown(ply, IN_ATTACK2) then
+		if hg.KeyDown(ply, IN_USE) or hg.KeyDown(ply, IN_ATTACK) or hg.KeyDown(ply, IN_ATTACK2) or hg.KeyDown(ply, IN_DUCK) then
 			ragdoll.hgSettleUntil = nil
 			continue
 		end

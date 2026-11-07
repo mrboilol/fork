@@ -365,7 +365,7 @@ local function getlocalshit(owner, hitEnt, bone, dir, hit)
 	if not mat then return end
 	local bonePos, boneAng = mat:GetTranslation(), mat:GetAngles()
 	local dmgPos = isvector(hit) and hit or bonePos
-	local localPos, localAng = WorldToLocal(dmgPos, angZero, bonePos, boneAng)
+	local localPos, localAng = WorldToLocal(dmgPos, (-dir):Angle(), bonePos, boneAng)
 	local _, dir2 = WorldToLocal(vecZero, dir:Angle(), vecZero, boneAng)
 	return localPos, localAng, dir2:Forward(), ent:GetBoneName(boneID)
 end

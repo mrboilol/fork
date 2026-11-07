@@ -30,6 +30,22 @@ local function IsSuppressionShooter(ply, shooter)
     return false
 end
 
+local function SendSuppressionFlinch(ply, eyePos, closestPos)
+    local now = CurTime()
+    if (ply._ZCityWindFlinchNext or 0) > now or IsValid(ply.FakeRagdoll) then return end
+    ply._ZCityWindFlinchNext = now + 0.6
+
+    local onRight = ply:EyeAngles():Right():Dot(closestPos - eyePos) > 0
+    local sequence = ply:LookupSequence(onRight and "flinch_shoulder_r" or "flinch_shoulder_l")
+    local activity = sequence and sequence >= 0 and ply:GetSequenceActivity(sequence) or -1
+    if activity < 0 then activity = onRight and ACT_FLINCH_RIGHTARM or ACT_FLINCH_LEFTARM end
+
+    net.Start("DoPlayerFlinch")
+        net.WriteInt(activity, 32)
+        net.WriteEntity(ply)
+    net.Broadcast()
+end
+
 function ZW.SendServerSuppressionForBullet(bullet, startPos, endPos)
     if not config.Suppression then return end
     if not bullet or not startPos or not endPos then return end
@@ -119,6 +135,8 @@ function ZW.SendServerSuppressionForBullet(bullet, startPos, endPos)
         -- Apply Z-City adrenaline and fear from nearby flying bullets
         local org = ply.organism
         if org and not org.otrub then
+            if not soundOnly then SendSuppressionFlinch(ply, eyePos, closestPos) end
+
             local shooterdist = (IsValid(owner) and owner or shooter):GetPos():Distance(eyePos)
             local isLooking = true
             if shooterdist < 200 then
@@ -139,8 +157,8 @@ function ZW.SendServerSuppressionForBullet(bullet, startPos, endPos)
                 end
 
                 local disorientation = org.disorientation or 0
-                if disorientation < 2.5 then
-                    org.disorientation = math.min(disorientation + math.Clamp(suppressionResponse * 0.8, 0.08, 0.35), 2.5)
+                if dist <= 60 and disorientation < 1 then
+                    org.disorientation = math.min(disorientation + math.Clamp(suppressionResponse * 0.4, 0.04, 0.18), 1)
                 end
                 org.fearadd = (org.fearadd or 0) + 0.2
 

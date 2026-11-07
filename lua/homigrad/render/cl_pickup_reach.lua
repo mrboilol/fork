@@ -96,6 +96,22 @@ local function reachWeight(reach, now)
 	return reach.grabWeight * math.ease.InOutSine(1 - math_Clamp((now - reach.grabbedAt) / reach.backTime, 0, 1))
 end
 
+local function resolveItemVisual(ent, model, pos, ang)
+	if not IsValid(ent) then return model, pos, ang end
+
+	local fake = ent.WorldModelFake
+	if isstring(fake) and util.IsValidModel(fake) then
+		if ent.FakePos and ent.FakeAng then pos, ang = LocalToWorld(ent.FakePos, ent.FakeAng, pos, ang) end
+
+		return fake, pos, ang, ent.FakeScale
+	end
+
+	local exchange = ent.WorldModelExchange
+	if isstring(exchange) and util.IsValidModel(exchange) then return exchange, pos, ang, ent.modelscale end
+
+	return model, pos, ang
+end
+
 net.Receive("HG_PickupReach", function()
 	local ply = net.ReadEntity()
 	local ent = net.ReadEntity()
@@ -104,6 +120,9 @@ net.Receive("HG_PickupReach", function()
 	local modelAng = net.ReadAngle()
 	local model = net.ReadString()
 	if not IsValid(ply) or not ply:IsPlayer() then return end
+
+	local scale
+	model, modelPos, modelAng, scale = resolveItemVisual(ent, model, modelPos, modelAng)
 
 	local side, weak = chooseHand(ply)
 	clearReach(ply)
@@ -119,6 +138,7 @@ net.Receive("HG_PickupReach", function()
 		modelPos = modelPos,
 		modelAng = modelAng,
 		model = model ~= "" and util.IsValidModel(model) and model or nil,
+		scale = scale or 1,
 		start = CurTime(),
 		outTime = duration * GRAB_FRACTION,
 		backTime = duration * (1 - GRAB_FRACTION),
@@ -252,7 +272,7 @@ local function blendToReal(reach, pos, ang, now)
 	local ip, ia = WorldToLocal(vector_origin, angle_zero, op, oa)
 	local tpos, tang = LocalToWorld(ip, ia, rm:GetTranslation(), rm:GetAngles())
 	local frac = math.ease.InOutSine(math_Clamp((now - reach.select) / reach.blend, 0, 1))
-	ghost:SetModelScale(Lerp(frac, 1, real:GetModelScale()))
+	ghost:SetModelScale(Lerp(frac, reach.scale, real:GetModelScale()))
 
 	return LerpVector(frac, pos, tpos), LerpAngle(frac, ang, tang)
 end
@@ -268,6 +288,24 @@ local function ghostTransform(ent, reach, now)
 	local pos, ang = LerpVector(settle, reach.modelPos, heldPos), LerpAngle(settle, reach.modelAng, heldAng)
 
 	return blendToReal(reach, pos, ang, now)
+end
+
+local function dressGhost(reach)
+	local ghost, item = reach.ghost, reach.entity
+	ghost:SetSkin(reach.skin)
+	ghost:SetModelScale(reach.scale, 0)
+	if not IsValid(item) then return end
+
+	for i = 0, 6 do
+		ghost:SetBodygroup(i, item:GetBodygroup(i))
+	end
+
+	if item.WorldModelFake ~= ghost:GetModel() then return end
+	if item.FakeBodyGroups then ghost:SetBodyGroups(item.FakeBodyGroups) end
+
+	local idle = item.AnimList and item.AnimList.idle or "idle"
+	local sequence = isstring(idle) and ghost:LookupSequence(idle) or idle
+	if isnumber(sequence) and sequence >= 0 then ghost:SetSequence(sequence) end
 end
 
 function hg.PickupHandoffHides(ply, wep)
@@ -300,7 +338,7 @@ function hg.DrawPickupHandoff(ent, ply)
 			return
 		end
 		reach.ghost:SetNoDraw(true)
-		reach.ghost:SetSkin(reach.skin)
+		dressGhost(reach)
 	end
 
 	local pos, ang = ghostTransform(ent, reach, now)

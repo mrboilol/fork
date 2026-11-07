@@ -28,7 +28,8 @@ SWEP.holsteredBone = "ValveBiped.Bip01_Spine2"
 SWEP.holsteredPos = Vector(5, 8, -4)
 SWEP.holsteredAng = Angle(270, 0, 180)
 SWEP.BigMeleeHolsterBackOffset = 6
-SWEP.BigMeleeHolsterSide = 5
+SWEP.BigMeleeHolsterSide = 0
+SWEP.BigMeleeDrawArc = 14
 SWEP.BigMeleeReachTime = 0.8
 SWEP.BigMeleeDeployTime = 1
 SWEP.MeleeDrawGripTime = 0.3
@@ -462,8 +463,7 @@ if CLIENT then
         local _, ang = LocalToWorld(self.weaponPos or vector_origin, self.weaponAng or angle_zero, anchorPos, anchorAng)
         local pos = spine:GetTranslation() - forward * (self.BigMeleeHolsterBackOffset or 6) + side * (self.BigMeleeHolsterSide or 5)
 
-        local target = up * 0.85 + side * 0.5
-        target:Normalize()
+        local target = up
 
         local size = model:OBBMaxs() - model:OBBMins()
         local lengthDir = size.x >= size.y and size.x >= size.z and ang:Forward()
@@ -476,7 +476,7 @@ if CLIENT then
         end
 
         local center = LocalToWorld(model:OBBCenter(), angle_zero, pos, ang)
-        return pos - (center - pos) + up, ang
+        return pos - (center - pos) + up, ang, side
     end
 
     function SWEP:DrawHolsteredWorldModel(ent)
@@ -610,7 +610,7 @@ if CLIENT then
             local clock = self:GetDeployClock()
             if reachEnd > clock then
                 local holsterModel = IsValid(self.holsteredWorldModel) and self.holsteredWorldModel or WorldModel
-                local holsteredPos, holsteredAng = self:GetHolsteredWorldTransform(ent, holsterModel)
+                local holsteredPos, holsteredAng, holsterSide = self:GetHolsteredWorldTransform(ent, holsterModel)
                 if holsteredPos then
                     if self.WorldModelExchange then
                         WorldModel:InvalidateBoneCache()
@@ -624,7 +624,7 @@ if CLIENT then
                     end
                     local moveStart = math.max(self.MeleeDeployMoveStart or 0, self:GetNWFloat("MeleeDeployMoveStart", 0))
                     local fraction = math.ease.InOutSine(math.Clamp((clock - moveStart) / math.max(reachEnd - moveStart, 0.001), 0, 1))
-                    pos = LerpVector(fraction, holsteredPos, pos)
+                    pos = LerpVector(fraction, holsteredPos, pos) + holsterSide * (math.sin(math.pi * fraction) * (self.BigMeleeDrawArc or 14))
                     ang = LerpAngle(fraction, holsteredAng, ang)
                 end
             end

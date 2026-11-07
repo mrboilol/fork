@@ -378,12 +378,14 @@ local function protec(org, bone, dmg, dmgInfo, placement, boneindex, dir, hit, r
 	if not isBullet and plate.BluntDamageMul and dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH) and not dmgInfo:IsDamageType(DMG_SLASH) then
 		if armor.HGBluntDamageInfo ~= dmgInfo then meleeArmorEffect(placement, plate, dmgInfo, org, hit) end
 		local scale = hg.AbsorbZCityBluntImpact(armor, plate, dmgInfo)
+		if placement == ZC_ARMOR_SLOT_HEAD then org.lastHelmetImpactScale = scale end
 		if scale < 1 then return 1 end
 		return
 	end
 	if not isBullet and plate.SlashDamageMul and dmgInfo:IsDamageType(DMG_SLASH) then
 		if armor.HGBluntDamageInfo ~= dmgInfo then meleeArmorEffect(placement, plate, dmgInfo, org, hit) end
 		local scale = hg.AbsorbZCitySlashImpact(armor, plate, dmgInfo)
+		if placement == ZC_ARMOR_SLOT_HEAD then org.lastHelmetImpactScale = scale end
 		if scale < 1 then return 1 end
 		return
 	end

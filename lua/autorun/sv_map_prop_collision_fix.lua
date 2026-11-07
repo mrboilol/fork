@@ -384,18 +384,41 @@ local function tryRepairMapPropCollision(ent)
 	return false
 end
 
+local REPAIR_BATCH_SIZE = 150
+local repairRun = 0
+local mapRepairReady = false
+
 local function repairBrokenMapPropCollisions()
+	repairRun = repairRun + 1
+	local run = repairRun
+	local all = ents.GetAll()
+	local index = 1
 	local repaired = 0
 
-	for _, ent in ipairs(ents.GetAll()) do
-		if tryRepairMapPropCollision(ent) then
-			repaired = repaired + 1
+	local function step()
+		if run ~= repairRun then return end
+
+		local last = math.min(index + REPAIR_BATCH_SIZE - 1, #all)
+		for i = index, last do
+			local ent = all[i]
+			if IsValid(ent) and repairClasses[ent:GetClass()] and tryRepairMapPropCollision(ent) then
+				repaired = repaired + 1
+			end
+		end
+		index = last + 1
+
+		if index <= #all then
+			timer.Simple(0, step)
+			return
+		end
+
+		mapRepairReady = true
+		if repaired > 0 and GetConVar("developer"):GetBool() then
+			print(string.format("[zcity] repaired collision on %d map props", repaired))
 		end
 	end
 
-	if repaired > 0 and GetConVar("developer"):GetBool() then
-		print(string.format("[zcity] repaired collision on %d map props", repaired))
-	end
+	step()
 end
 
 hook.Add("InitPostEntity", "zcity_repair_map_prop_collision", function()
@@ -418,7 +441,8 @@ hook.Add("PostCleanupMap", "zcity_cleanup_map_prop_collision", function()
 end)
 
 hook.Add("OnEntityCreated", "zcity_repair_map_prop_collision", function(ent)
-	if not IsValid(ent) then return end
+	if not mapRepairReady or not IsValid(ent) then return end
+	if not repairClasses[ent:GetClass()] then return end
 
 	timer.Simple(0, function()
 		if not IsValid(ent) then return end

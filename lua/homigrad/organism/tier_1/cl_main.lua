@@ -556,7 +556,6 @@ hook.Add("Post Post Processing", "organism-otrub-overlay", function()
 		surface.DrawRect(-1, -1, ScrW() + 2, ScrH() + 2)
 	end
 
-	if hg.O2VignetteOrg and hg.DrawO2Vignette then hg.DrawO2Vignette(hg.O2VignetteOrg) end
 	if hg.DrawConvulsionWhiteout then hg.DrawConvulsionWhiteout(org) end
 
 	DrawSeizureMemory(org)
@@ -708,6 +707,7 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 	local k4 = math.Clamp((EXHAUSTED_THRESHOLD - stamina) / EXHAUSTED_THRESHOLD, 0, 1)
 
 	DrawSharpen(k1 * 2, k1 * 1)
+	disorientation = hg.GetVisualDisorientation(org)
 	if (lply.PlayerClassName == "headcrabzombie" or lply:GetNetVar("headcrab")) and lply:Alive() then
 		disorientation = disorientation + 100
 	end
@@ -740,8 +740,8 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 		render.DrawScreenQuad()
 	end
 
-	if ((disorientationLerp > 1 or adrenaline >= 4) and lply:Alive()) or brain > 0 then
-		local add2 = math.max(disorientationLerp - 1, adrenaline >= 4 and 0.35 or 0)
+	if (disorientationLerp > 1 and lply:Alive()) or brain > 0 then
+		local add2 = math.max(disorientationLerp - 1, 0)
 		if not lply:HasTrait("blind") and not brain_motionblur and lply.PlayerClassName ~= "headcrabzombie" then hg.DrawWorldMotionBlur(0.15 - math.Clamp(add2 / 1, 0, 0.1), add2 * 2, 0.001) end
 		if disorientationLerp > 2 then
 			local add = (disorientationLerp - 2) * 2

@@ -3,11 +3,78 @@ local BR = CAI.Brain
 local STATE = nil
 
 function BR.SetState(data, newState, reason)
+    if reason then data.lastDecision = reason end
     if data.state == newState then return end
     data.prevState = data.state
     data.state = newState
     data.stateSince = CurTime()
-    if reason then data.lastDecision = reason end
+    local npc = data.ent
+    if newState == CAI.STATE.ENGAGE and IsValid(npc)
+       and (npc:IsCurrentSchedule(SCHED_FORCED_GO_RUN) or npc:IsCurrentSchedule(SCHED_FORCED_GO)) then
+        npc:ClearSchedule()
+        data.moveTarget = nil
+    end
+end
+
+local function OpenFire(data)
+    local npc = data.ent
+    if npc:IsCurrentSchedule(SCHED_RANGE_ATTACK1) then return end
+    if npc:IsCurrentSchedule(SCHED_FORCED_GO_RUN) or npc:IsCurrentSchedule(SCHED_FORCED_GO) then return end
+    if CurTime() - (data.fireOrderAt or 0) < 0.6 then return end
+    data.fireOrderAt = CurTime()
+    npc:SetSchedule(npc:HasCondition(COND.CAN_RANGE_ATTACK1) and SCHED_RANGE_ATTACK1 or SCHED_COMBAT_FACE)
+end
+
+local function WantsToHold(data)
+    local cfg = CAI.Config.Hold
+    local now = CurTime()
+    if (data.holdUntil or 0) > now then return true end
+    if (data.relocateUntil or 0) > now then return false end
+    local chance = 0.55 + CAI.WeaponIntel.EffectiveAggression(data) * 0.3
+        + (data.cover and 0.15 or 0)
+        - data.suppression / CAI.Config.Suppression.Max * 0.6
+    if math.random() < chance then
+        data.holdUntil = now + math.Rand(cfg.MinTime, cfg.MaxTime) * (1 + (data.personality.stats.patience or 0) * 0.5)
+        return true
+    end
+    data.relocateUntil = now + cfg.RelocateTime
+    return false
+end
+
+local function WantsPressFire(data, enemy, rec, wep)
+    if not rec or rec.heardOnly then return false end
+    if CAI.WeaponIntel.NeedsReload(wep) or CAI.Suppression.IsPinned(data) then return false end
+    local cfg = CAI.Config.PressFire
+    local now = CurTime()
+    if data.suppressUntil and now < data.suppressUntil then
+        return now - rec.t < cfg.SquadFreshFor
+    end
+    if data.pressRolled or data.lastVisEnemy ~= enemy or now - (data.lastVisAt or 0) > cfg.FreshFor then
+        return false
+    end
+    data.pressRolled = true
+    if not CAI.CVBool("nos_enabled") then return false end
+    local stats = data.personality.stats
+    local chance = CAI.CVNum("nos_overshoot_chance") / 100
+        + (stats.aggression or 0) * 0.35
+        - (stats.patience or 0) * 0.25
+        + (data.role == CAI.ROLE.SUPPRESSOR and 0.35 or 0)
+    if math.random() > chance then return false end
+    data.suppressUntil = now + math.Rand(cfg.MinFactor, cfg.MaxFactor)
+        * math.max(CAI.CVNum("nos_max_overshoot_time"), 0.5)
+        * (1 + math.max(stats.aggression or 0, 0))
+    return true
+end
+
+local function CoverFirePoint(npc, rec)
+    local cfg = CAI.Config.PressFire
+    local eye = CAI.Util.EyePos(npc)
+    local goal = rec.pos + Vector(math.Rand(-cfg.Spread, cfg.Spread), math.Rand(-cfg.Spread, cfg.Spread), math.Rand(30, 64))
+    local tr = util.TraceLine({ start = eye, endpos = goal, filter = npc, mask = MASK_SHOT })
+    if IsValid(tr.Entity) and tr.Entity:IsNPC() and npc:Disposition(tr.Entity) == D_LI then return nil end
+    local point = tr.Hit and tr.HitPos + tr.HitNormal * 6 or goal
+    if point:DistToSqr(eye) < cfg.MinRange * cfg.MinRange then return nil end
+    return point
 end
 
 local function Perceive(data)
@@ -23,7 +90,7 @@ local function Perceive(data)
         local ply = CAI.Util.NearestPlayer(npc:GetPos())
         if IsValid(ply) and CAI.Util.IsTargetable(ply)
            and npc:Disposition(ply) == D_HT
-           and npc:GetPos():DistToSqr(ply:GetPos()) < 1500 * 1500 then
+           and npc:GetPos():DistToSqr(ply:GetPos()) < CAI.CVNum("cai_sight_distance") ^ 2 then
             local toNPC = (npc:WorldSpaceCenter() - ply:EyePos())
             toNPC:Normalize()
             if ply:GetAimVector():Dot(toNPC) > 0.995 and CAI.Util.CanSee(npc, ply) then
@@ -31,7 +98,9 @@ local function Perceive(data)
                 if CurTime() - data.aimedSince > 0.35 then
                     CAI.Memory.SeeEnemy(data, ply, ply:GetPos())
                     if data.state == CAI.STATE.COVER and not data.forceRecover
+                       and CurTime() - (data.dodgeAt or 0) > CAI.Config.Hold.DodgeCooldown
                        and math.random() < 0.35 then
+                        data.dodgeAt = CurTime()
                         data.forceRecover = true
                     end
                 end
@@ -44,7 +113,7 @@ local function Perceive(data)
     end
 
     local engineEnemy = npc.GetEnemy and npc:GetEnemy()
-    if IsValid(engineEnemy) and CAI.Util.IsTargetable(engineEnemy) then
+    if IsValid(engineEnemy) and engineEnemy:GetClass() ~= "npc_bullseye" and CAI.Util.IsTargetable(engineEnemy) then
         if CAI.Util.CanSee(npc, engineEnemy) then
             local firstContact = data.memory.enemies[engineEnemy] == nil
             CAI.Memory.SeeEnemy(data, engineEnemy, engineEnemy:GetPos())
@@ -108,9 +177,11 @@ local function Decide(data)
     end
 
     local enemy, rec = CAI.Target.Evaluate(data)
-    local visible = IsValid(enemy) and CAI.Util.CanSee(npc, enemy)
+    local seenNow = IsValid(enemy) and CAI.Util.CanSee(npc, enemy)
+    local visible = seenNow
     if visible then
         data.lastVisEnemy, data.lastVisAt = enemy, CurTime()
+        data.pressRolled = nil
     elseif IsValid(enemy) and data.lastVisEnemy == enemy
        and CurTime() - (data.lastVisAt or 0) < 1.0 then
         visible = true
@@ -128,6 +199,11 @@ local function Decide(data)
             data.search = nil
             return S.ENGAGE, "melee_rush"
         end
+    end
+
+    if IsValid(enemy) and not seenNow and WantsPressFire(data, enemy, rec, ownWep) then
+        data.search = nil
+        return S.SUPPRESS, "press_fire"
     end
 
     if IsValid(enemy) then
@@ -159,7 +235,9 @@ local function Decide(data)
             end
             if data.wantFlank then
                 data.wantFlank = nil
-                return S.FLANK, "squad_flank_order"
+                if CurTime() - (data.flankEndedAt or -math.huge) > CAI.Config.Hold.FlankCooldown then
+                    return S.FLANK, "squad_flank_order"
+                end
             end
             if data.suppressUntil and CurTime() < data.suppressUntil then
                 return S.SUPPRESS, "squad_suppress_order"
@@ -178,6 +256,12 @@ local function Decide(data)
             end
             if data.squadPlan == "retreat" then
                 return S.RETREAT, "squad_retreat"
+            end
+            if dist > CAI.WeaponIntel.MaxRange(npc) then
+                return S.ENGAGE, "out_of_range"
+            end
+            if WantsToHold(data) then
+                return S.ENGAGE, "hold_and_fire"
             end
 
             return S.COVER, "fight_from_cover"
@@ -260,6 +344,12 @@ Exec[2] = function(data)
         return
     end
 
+    if data.lastDecision == "hold_and_fire" then
+        OpenFire(data)
+        CAI.FriendlyFire.Update(data)
+        return
+    end
+
     local ideal = CAI.WeaponIntel.OwnIdeal(npc)
     local resp = data.enemyWeaponResponse
     if resp and resp.keepDistance then ideal = math.max(ideal, resp.idealDist or ideal) end
@@ -339,7 +429,9 @@ Exec[3] = function(data)
             local sees = IsValid(enemy) and CAI.Util.CanSee(npc, enemy)
             local settled = data.cover and CurTime() - data.cover.since > 1.5
 
-            if IsValid(enemy) and not sees and settled
+            if sees then
+                OpenFire(data)
+            elseif IsValid(enemy) and settled
                and CurTime() - (data.peekAt or 0) > 3 * (1.3 - aggro) then
                 data.peekAt = CurTime()
                 npc:SetSchedule(SCHED_ESTABLISH_LINE_OF_FIRE)
@@ -356,11 +448,13 @@ Exec[4] = function(data)
     if not data.flank then
         local _, rec = CAI.Memory.FreshestEnemy(data)
         if not rec or not CAI.Flank.Begin(data, rec.pos) then
+            data.flankEndedAt = CurTime()
             BR.SetState(data, CAI.STATE.COVER, "flank_unavailable")
             return
         end
     end
     if not CAI.Flank.Update(data) then
+        data.flankEndedAt = CurTime()
         BR.SetState(data, CAI.STATE.ENGAGE, "flank_complete")
     end
 end
@@ -374,8 +468,9 @@ BR.StopSuppressing = StopSuppressing
 Exec[5] = function(data)
     local npc = data.ent
     local enemy, rec = CAI.Memory.FreshestEnemy(data)
-    if not rec then
+    if not rec or CAI.WeaponIntel.NeedsReload(npc:GetActiveWeapon()) then
         StopSuppressing(data)
+        data.saidSuppress = false
         BR.SetState(data, CAI.STATE.COVER, "nothing_to_suppress")
         return
     end
@@ -384,13 +479,10 @@ Exec[5] = function(data)
         StopSuppressing(data)
         if npc.SetEnemy then npc:SetEnemy(enemy) end
         if npc.UpdateEnemyMemory then npc:UpdateEnemyMemory(enemy, rec.pos) end
-    else
-        local aim
-        for _, h in ipairs({ 55, 90 }) do
-            local p = rec.pos + Vector(0, 0, h)
-            if CAI.Util.CanSeePos(npc, p) then aim = p break end
-        end
+    elseif not IsValid(data.suppBullseye) or CurTime() - (data.suppMovedAt or 0) > CAI.Config.PressFire.MoveEvery then
+        local aim = CoverFirePoint(npc, rec)
         if aim then
+            data.suppMovedAt = CurTime()
             local bull = data.suppBullseye
             if not IsValid(bull) then
                 bull = ents.Create("npc_bullseye")
@@ -414,10 +506,7 @@ Exec[5] = function(data)
         end
     end
 
-    if CurTime() - (data.suppFaceAt or 0) > 1.5 then
-        data.suppFaceAt = CurTime()
-        npc:SetSchedule(SCHED_COMBAT_FACE)
-    end
+    OpenFire(data)
     if not data.saidSuppress then
         data.saidSuppress = true
         CAI.Voice.Speak(data, "suppressing")
@@ -515,7 +604,7 @@ Exec[9] = function(data)
     local slot = CAI.Squad.FormationSlot(squad, idx)
     if slot and CurTime() - (data.regroupAt or 0) > 1.5 then
         data.regroupAt = CurTime()
-        CAI.Nav.MoveTo(data, slot, "run")
+        CAI.Nav.MoveTo(data, slot, next(data.memory.enemies) and "run" or "walk")
     end
     if CAI.Nav.Arrived(data, 90) then
         BR.SetState(data, CAI.STATE.PATROL, "in_formation")
@@ -525,6 +614,7 @@ end
 function BR.Think(data, dt)
     local npc = data.ent
     if not CAI.Util.Alive(npc) then return end
+    if (npc.cai_airdropUntil or 0) > CurTime() then return end
 
     local classInfo = CAI.Config.NPCClasses[npc:GetClass()]
     if classInfo and classInfo.lightTouch then
@@ -540,9 +630,7 @@ function BR.Think(data, dt)
     CAI.Suppression.Decay(data, dt)
     CAI.Morale.Regen(data, dt)
     CAI.Personality.ApplyProficiency(data)
-    if npc.overshootTime and npc.overshootTime > CurTime() and npc.didResetProficiency == false then
-        return
-    end
+    CAI.WeaponIntel.ApplyEngagementRange(data)
     CAI.Nav.CheckStuck(data)
 
     local newState, reason = Decide(data)

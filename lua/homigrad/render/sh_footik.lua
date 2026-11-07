@@ -1263,6 +1263,13 @@ function hg.GetIKHeadOffset(ply)
 	return offset
 end
 
+function hg.GetIKGunShift(ent, ply)
+	local state = ply.hg_FootIK
+	if not state or alreadyApplied(ent, state) then return end
+
+	return hg.GetIKHeadOffset(ply)
+end
+
 function IKFoot.HardReset(ply)
 	if not IsValid(ply) then return end
 	ply.hg_FootIK = nil

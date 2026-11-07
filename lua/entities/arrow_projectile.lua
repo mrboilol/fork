@@ -35,6 +35,18 @@ if SERVER then
 		end
 	end
 
+	function ENT:GetEmbedAngle(normal)
+		local ang = (-normal):Angle()
+		ang:RotateAroundAxis(ang:Up(), -90)
+		return ang
+	end
+
+	function ENT:Think()
+		AeroDrag(self, -self:GetAngles():Right(), .6)
+		self:NextThink(CurTime() + 0.1)
+		return true
+	end
+
 	function ENT:Use(ply)
 		ply:GiveAmmo(1, "Arrow", true)
 		ply:EmitSound("weapons/bow_deerhunter/arrow_load_0"..math.random(3)..".wav", 55)

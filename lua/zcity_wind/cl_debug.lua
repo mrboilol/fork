@@ -69,6 +69,14 @@ net.Receive("ZCity_Wind_SuppressionForce", function()
             SIB_suppress = SIB_suppress or {}
             SIB_suppress.Force = math.Clamp((SIB_suppress.Force or 0) + force, 0, 10)
         end
+
+        if hg and hg.AddTraumaBlur then
+            if wasHit then
+                hg.AddTraumaBlur(1.1 + math.Clamp(damage / 60, 0, 0.2))
+            elseif force >= 7 then
+                hg.AddTraumaBlur(Lerp((force - 7) / 7, 1.2, 1.7))
+            end
+        end
     end
 
     -- Hits have their own impact feedback; this event represents a clear
@@ -92,6 +100,10 @@ net.Receive("ZCity_Wind_SuppressionForce", function()
 			ViewPunch(punch)
 		elseif lply.ViewPunch then
 			lply:ViewPunch(punch)
+		end
+
+		if hg and hg.AddWeaponHitKick and hg.GetPunchAwayAngle then
+			hg.AddWeaponHitKick(hg.GetPunchAwayAngle(pos) * math.min(punchScale * 2, 6))
 		end
 	end
 

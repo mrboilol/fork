@@ -133,16 +133,25 @@ local function arrow_hit(self, last_unsure_penetration_pos, reason, trace)
 			local normal = -self.Vel:GetNormalized()
 			local projectile = ents.Create(self.FunctionInfo.Ent)
 			projectile:SetPos(self.Pos)
-			projectile:SetAngles(normal:Angle())
+			projectile:SetAngles(projectile:GetEmbedAngle(normal))
 			projectile:Spawn()
 			self.SpawnedEntity = projectile
-			
+
 			if(trace)then
 				projectile:Hit(trace.Entity, trace.HitPos + normal * -4, trace.PhysicsBone, normal)
+			else
+				local phys = projectile:GetPhysicsObject()
+				if(IsValid(phys))then
+					phys:SetVelocity(self.Vel)
+				end
 			end
 		end
 	end
 end
+
+hg.AmmoBulletFunctions = hg.AmmoBulletFunctions or {}
+hg.AmmoBulletFunctions.onstopped_silk = onstopped_silk
+hg.AmmoBulletFunctions.arrow_hit = arrow_hit
 
 --=\\Scheduled explosions
 APScheduledExplosions = APScheduledExplosions or {}

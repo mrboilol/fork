@@ -32,6 +32,10 @@ if SERVER then
 
 	ENT.Hit = false
 
+	function ENT:GetEmbedAngle(normal)
+		return normal:Angle()
+	end
+
 	function ENT:Hit(ent, hit_pos, phys_bone_id, normal)
 		local ply = hg.RagdollOwner(ent) or ent
 		local rag = IsValid(ply) and (IsValid(ply:GetNWEntity("RagdollDeath", ply.FakeRagdoll)) and ply:GetNWEntity("RagdollDeath", ply.FakeRagdoll)) or ent:IsRagdoll() and ent or IsValid(ent.FakeRagdoll) and ent.FakeRagdoll
@@ -40,7 +44,7 @@ if SERVER then
 		
 		if !org then
 			self:SetPos(hit_pos)
-			self:SetAngles((normal):Angle())
+			self:SetAngles(self:GetEmbedAngle(normal))
 			constraint.Weld(self, rag, 0, rag:IsPlayer() and 0 or phys_bone_id, 0, true, false)
 		end
 
@@ -50,7 +54,7 @@ if SERVER then
 		local offset_ang = Angle()
 		
 		if(mat)then
-			offset_pos, offset_ang = WorldToLocal(hit_pos, (normal):Angle(), mat:GetTranslation(), mat:GetAngles())
+			offset_pos, offset_ang = WorldToLocal(hit_pos, self:GetEmbedAngle(normal), mat:GetTranslation(), mat:GetAngles())
 		end
 		
 		local phys = ent:GetPhysicsObjectNum(phys_bone_id or 0)

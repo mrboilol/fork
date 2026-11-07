@@ -1,9 +1,9 @@
 SWEP.Base = "homigrad_base"
 SWEP.Spawnable = true
 SWEP.AdminOnly = false
-SWEP.PrintName = "SIG Sauer P226"
+SWEP.PrintName = "SIG Sauer P320 AXG"
 SWEP.Author = "SIG Sauer"
-SWEP.Instructions = "A Swiss-German service pistol chambered in 9x19mm"
+SWEP.Instructions = "Looks like a P226, But the internals are relatively the same as a P320. Dont drop it."
 SWEP.Category = "Weapons - Pistols"
 SWEP.Slot = 2
 SWEP.SlotPos = 10

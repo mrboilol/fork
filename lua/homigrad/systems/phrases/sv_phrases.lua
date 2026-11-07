@@ -400,7 +400,7 @@ hg.UniversalScreamSounds = {
 }
 local painVoiceAgony = 60
 local painVoiceRush = 85
-local painNumbedRatio = 0.75
+local painNumbedRatio = 0.95
 local painGapBlink = 25
 local painRiseWindow = 0.4
 local painRiseAmount = 12

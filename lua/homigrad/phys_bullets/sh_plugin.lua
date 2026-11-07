@@ -112,6 +112,7 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 		
 		--=\\???
 			bullet.AirResistMul = bullet.AirResistMul or hg_ammo_table.BulletSettings.AirResistMul
+			bullet.WindDriftMul = bullet.WindDriftMul or hg_ammo_table.BulletSettings.WindDriftMul
 			bullet.LifeTime = bullet.LifeTime or hg_ammo_table.BulletSettings.LifeTime
 			bullet.Mass = bullet.Mass or hg_ammo_table.BulletSettings.Mass or 1
 			bullet.Diameter = bullet.Diameter or hg_ammo_table.BulletSettings.Diameter
@@ -618,7 +619,8 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 						dmg:SetAmmoType(self.AmmoID or -1)
 						dmg:SetDamagePosition(trace.HitPos)
 						dmg:SetDamageForce(self.AmmoForce * dir * (speedmul * self.Force * self.ForceMul))
-						
+						hg.ClampNPCGunForce(dmg, trace.Entity, self.Shooter)
+
 						local ballisticInflictor = IsValid(self.Inflictor) and self.Inflictor or self.Shooter
 						if(IsValid(self.Shooter))then
 							dmg:SetAttacker(self.Shooter)

@@ -16,8 +16,14 @@ local shardLengths = {
 	["ValveBiped.Bip01_R_Calf"] = 7.5,
 }
 
-local tracked = {}
+local lastSeen = {}
 local lastBurst = {}
+
+local function getFractures(index)
+	local vars = zb.net[index]
+	local fractures = vars and vars.openfractures
+	if istable(fractures) and next(fractures) then return fractures end
+end
 local shard, shardAxis, shardCenter, shardLength
 
 local function getShard()
@@ -142,7 +148,7 @@ end
 
 hook.Add("PostDrawAppearance", "hg_openfractures", function(ent)
 	if not IsValid(ent) then return end
-	local fractures = tracked[ent:EntIndex()]
+	local fractures = getFractures(ent:EntIndex())
 	if not fractures then return end
 
 	local entry = {frame = FrameNumber()}
@@ -168,9 +174,9 @@ end
 hook.Add("OnNetVarSet", "hg_openfractures", function(index, key, var)
 	if key ~= "openfractures" then return end
 
-	local old = tracked[index]
-	tracked[index] = istable(var) and next(var) and var or nil
-	if not tracked[index] then return end
+	local old = lastSeen[index]
+	lastSeen[index] = istable(var) and next(var) and var or nil
+	if not lastSeen[index] then return end
 
 	timer.Simple(0, function()
 		local ent = getFractureBody(Entity(index))
@@ -190,18 +196,20 @@ end)
 
 hook.Add("EntityRemoved", "hg_openfractures", function(ent, fullUpdate)
 	if fullUpdate then return end
-	tracked[ent:EntIndex()] = nil
+	lastSeen[ent:EntIndex()] = nil
 	rendered[ent] = nil
 end)
 
 hook.Add("PostDrawOpaqueRenderables", "hg_openfractures", function(depth, skybox)
-	if depth or skybox or not next(tracked) then return end
+	if depth or skybox then return end
 
 	local eyePos = EyePos()
 	local frame = FrameNumber()
 	local mdl
 
-	for index, fractures in pairs(tracked) do
+	for index, vars in pairs(zb.net) do
+		local fractures = isnumber(index) and istable(vars) and vars.openfractures
+		if not istable(fractures) or not next(fractures) then continue end
 		local ent = getFractureBody(Entity(index))
 		if not ent or ent:GetPos():DistToSqr(eyePos) > drawDistSqr then continue end
 		local entry = rendered[ent]

@@ -62,7 +62,7 @@ if SERVER then
 	local CurTime = CurTime
 	hook.Add("Think", "drum_think", function()
 		if time > CurTime() then return end
-		time = time + 0.1
+		time = CurTime() + 0.1
 
 		for i, drum in pairs(hg.drums) do
 			hook.Run("Drum Think", i, drum)
@@ -73,7 +73,8 @@ if SERVER then
 	local ents_FindInSphere = ents.FindInSphere
 	hook.Add("Think", "path_think", function()
 		if time2 > CurTime() then return end
-		time2 = time2 + 1
+		time2 = CurTime() + 1
+		if not hg.gasolinePath[1] then return end
 
 		for i, tbl in ipairs(hg.gasolinePath) do
 			local pos, ignited = tbl[1], tbl[2]

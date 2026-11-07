@@ -45,6 +45,7 @@ Server("server/sv_debug.lua")
 Server("server/sv_settings.lua")
 Server("server/sv_vjsupport.lua")
 Server("server/sv_darkness.lua")
+Server("server/sv_aircraft.lua")
 
 Client("client/cl_debug.lua")
 Client("client/cl_settings.lua")

@@ -108,7 +108,7 @@ function SE.Update(data)
                 CAI.Voice.Speak(data, "enemy_lost")
                 return false
             end
-            CAI.Nav.MoveTo(data, s.points[s.idx], "run")
+            CAI.Nav.MoveTo(data, s.points[s.idx], "walk")
         end
     end
     return true

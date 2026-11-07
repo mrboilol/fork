@@ -90,6 +90,7 @@ function SWEP:Shoot(override)
     local owner = self:GetOwner()
     local gun = self:GetWeaponEntity()
 	local tr, pos, ang = self:GetTrace(true)
+	ang = self:GetShotAng(ang)
 	--self:GetOwner():Kick("lol")
 	self:TakePrimaryAmmo(1)
 	if SERVER then

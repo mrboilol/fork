@@ -15,15 +15,19 @@ CAI.PlayerLight = PlayerLight
 function CAI.ApplyDarknessVision(data)
     local npc = data.ent
     if not npc.SetMaxLookDistance then return end
-    if not data.baseLookDist then
-        data.baseLookDist = (npc.GetMaxLookDistance and npc:GetMaxLookDistance()) or 2048
+    if not data.nativeLookDist then
+        data.nativeLookDist = (npc.GetMaxLookDistance and npc:GetMaxLookDistance()) or 2048
     end
+    data.baseLookDist = math.max(data.nativeLookDist, CAI.CVNum("cai_sight_distance"))
     if not CAI.CVBool("cai_darkness") then
         npc:SetMaxLookDistance(data.baseLookDist)
         return
     end
     local ply = CAI.Util.NearestPlayer(npc:GetPos())
-    if not IsValid(ply) then return end
+    if not IsValid(ply) then
+        npc:SetMaxLookDistance(data.baseLookDist)
+        return
+    end
     local light = PlayerLight(ply)
     local dist = Lerp(math.Clamp(light * 2.2, 0, 1), 400, data.baseLookDist)
     npc:SetMaxLookDistance(dist)

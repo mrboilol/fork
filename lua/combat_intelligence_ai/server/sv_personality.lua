@@ -56,10 +56,6 @@ function PS.ApplyProficiency(data)
 			if data.suppression >= threshold then score = math.min(score, 4 - penalty) end
 		end
 	end
-	if npc.overshootTime and npc.overshootTime > CurTime() and npc.didResetProficiency == false then
-		local overshootProficiency = GetConVar("nos_overshoot_proficiency")
-		if overshootProficiency then score = math.min(score, overshootProficiency:GetInt()) end
-	end
 	npc:SetCurrentWeaponProficiency(math.Clamp(math.Round(score), 0, 4))
 	if isfunction(npc.SetMaxYawSpeed) and isfunction(npc.GetMaxYawSpeed) then
 		data.baseYawSpeed = data.baseYawSpeed or npc:GetMaxYawSpeed()

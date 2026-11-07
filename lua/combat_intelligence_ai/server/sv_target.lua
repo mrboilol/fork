@@ -3,6 +3,22 @@ local T = CAI.Target
 
 local AIM_PREDICTION_PASSES = 8
 local MAX_AIM_ERROR_DEGREES = 9
+local AIM_ERROR_CURVE = 1.4
+local COVER_FIRE_ERROR_DEGREES = 2.5
+local AIM_SETTLE_SECONDS = 2.2
+local AIM_SETTLE_ERROR = 1.5
+local AIM_RESETTLE_AFTER = 2.5
+
+local function AimSettle(data, enemy, skill)
+	local now = CurTime()
+	if data.aimTarget ~= enemy or now - (data.aimLastShot or 0) > AIM_RESETTLE_AFTER then
+		data.aimTarget, data.aimSince = enemy, now
+	end
+	data.aimLastShot = now
+	local settle = (1 - skill) * AIM_SETTLE_SECONDS
+	if settle <= 0 then return 1 end
+	return 1 + math.max(1 - (now - data.aimSince) / settle, 0) * AIM_SETTLE_ERROR
+end
 
 function T.CalculateShotVelocity(src, aim, targetVelocity, bullet)
 	local speed = bullet.Vel:Length()
@@ -53,7 +69,7 @@ function T.ApplyBulletRecoil(shooter, bullet, physical)
 	local recoil = data.recoil
 	local now = CurTime()
 	if recoil.shotAt ~= now then
-		local recovery = (1.2 + CAI.AimSkill() * 1.2) / math.max(weapon.shotRecoveryScale or 1, 0.1)
+		local recovery = (1.2 + CAI.AimSkill() * 4) / math.max(weapon.shotRecoveryScale or 1, 0.1)
 		local elapsed = math.max(now - (recoil.shotAt or now), 0)
 		recoil.shotPitch = math.Approach(recoil.pitch, 0, elapsed * recovery)
 		recoil.shotYaw = math.Approach(recoil.yaw, 0, elapsed * recovery)
@@ -68,10 +84,12 @@ function T.ApplyBulletRecoil(shooter, bullet, physical)
 		recoil.yaw = math.Clamp(recoil.shotYaw + impulse * math.Rand(-0.35, 0.35), -3, 3)
 		recoil.shotAt = now
 	end
-	if recoil.shotPitch == 0 and recoil.shotYaw == 0 then return end
+	local uncontrolled = math.Clamp((1 - CAI.AimSkill()) * 1.4, 0, 1)
+	local shotPitch, shotYaw = recoil.shotPitch * uncontrolled, recoil.shotYaw * uncontrolled
+	if shotPitch == 0 and shotYaw == 0 then return end
 	local angle = dir:Angle()
-	angle.p = angle.p - recoil.shotPitch
-	angle.y = angle.y + recoil.shotYaw
+	angle.p = angle.p - shotPitch
+	angle.y = angle.y + shotYaw
 	local recoiled = angle:Forward()
 	if physical then
 		bullet.Vel = recoiled * dir:Length()
@@ -94,7 +112,9 @@ function T.ApplyBulletAim(shooter, bullet, physical)
 	local npc = IsValid(bullet.Attacker) and bullet.Attacker
 		or IsValid(bullet.Shooter) and bullet.Shooter or shooter
 	if IsValid(npc) and npc:IsWeapon() then npc = npc:GetOwner() end
-	if not IsValid(npc) or not npc:IsNPC() or not CAI.Manager.Get(npc) then return end
+	if not IsValid(npc) or not npc:IsNPC() then return end
+	local data = CAI.Manager.Get(npc)
+	if not data then return end
 	local skill = CAI.AimSkill()
 	local godAim = skill == 1
 	local speed = isvector(bullet.Vel) and bullet.Vel:Length() or 0
@@ -105,7 +125,8 @@ function T.ApplyBulletAim(shooter, bullet, physical)
 		if physical then bullet.Vel = currentDir:GetNormalized() * speed end
 	end
 	local enemy = npc:GetEnemy()
-	if not CAI.Util.IsTargetable(enemy) or enemy:GetClass() == "npc_bullseye" then return godAim or nil end
+	if not CAI.Util.IsTargetable(enemy) then return godAim or nil end
+	local coverFire = enemy:GetClass() == "npc_bullseye"
 	local target = IsValid(enemy.zcnpc_rag) and enemy.zcnpc_rag
 		or hg and hg.GetCurrentCharacter and hg.GetCurrentCharacter(enemy) or enemy
 	if not IsValid(target) then return godAim or nil end
@@ -125,15 +146,22 @@ function T.ApplyBulletAim(shooter, bullet, physical)
 	end
 	if not isvector(aim) then return godAim or nil end
 	local trace = util.TraceLine({start = src, endpos = aim, filter = filter, mask = MASK_SHOT})
-	if trace.Hit and trace.Entity ~= target then return godAim or nil end
+	if trace.Hit and trace.Entity ~= target then coverFire = true end
 	local dir = aim - src
 	if dir:LengthSqr() < 1 then return godAim or nil end
-	if not godAim then
-		local radius = dir:Length() * math.tan(math.rad(MAX_AIM_ERROR_DEGREES * (1 - skill) ^ 3))
+	if not godAim or coverFire then
+		local errorDegrees = MAX_AIM_ERROR_DEGREES * (1 - skill) ^ AIM_ERROR_CURVE
+		if coverFire then
+			errorDegrees = errorDegrees + COVER_FIRE_ERROR_DEGREES
+		else
+			errorDegrees = errorDegrees * AimSettle(data, enemy, skill)
+		end
+		local radius = dir:Length() * math.tan(math.rad(errorDegrees))
 		local proficiency = math.Clamp(npc:GetCurrentWeaponProficiency(), 0, WEAPON_PROFICIENCY_PERFECT)
 		radius = radius * (1 + (WEAPON_PROFICIENCY_GOOD - proficiency) * 0.35)
-		local horizontal = math.Rand(-radius, radius)
-		if skill == 0 then
+		local horizontal = (math.Rand(-radius, radius) + math.Rand(-radius, radius)) * 0.5
+		local vertical = (math.Rand(-radius, radius) + math.Rand(-radius, radius)) * 0.5
+		if skill == 0 and not coverFire then
 			radius = math.max(radius, target:BoundingRadius() * 1.5)
 			horizontal = radius * math.Rand(0.8, 1.2) * (math.random() < 0.5 and -1 or 1)
 		end
@@ -142,12 +170,12 @@ function T.ApplyBulletAim(shooter, bullet, physical)
 		if right:LengthSqr() < 0.0001 then right = Vector(1, 0, 0) end
 		right = right:GetNormalized()
 		local up = right:Cross(dir:GetNormalized())
-		aim = aim + right * horizontal + up * math.Rand(-radius, radius) * 0.6
+		aim = aim + right * horizontal + up * vertical * 0.6
 		dir = aim - src
 	end
 	dir = dir:GetNormalized()
 	if physical then
-		if skill > 0.5 then
+		if skill > 0.5 and not coverFire then
 			local calculated = T.CalculateShotVelocity(src, aim, target:GetVelocity(), bullet)
 			local prediction = (skill - 0.5) * 2
 			dir = (dir * (1 - prediction) + calculated:GetNormalized() * prediction):GetNormalized()

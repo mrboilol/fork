@@ -3,9 +3,23 @@ if SERVER then util.AddNetworkString("headtrauma_flash") end
 
 local player_crush_amputation_threshold = 7
 local melee_skull_bone_mul = 0.42
-local melee_skull_knockout_threshold = 1.3
 local skull_break_brain_mul = 0.8
 local skull_break_neck_mul = 2.5
+
+local bluntTuning = {
+	limbRetain = 0.85,
+	koStart = 0.2,
+	koSlope = 1.1,
+	koMax = 0.85,
+	dazeStart = 0.22,
+	brainStart = 0.5,
+	brainSlope = 0.55,
+	brainMax = 0.5,
+}
+
+function bluntTuning.retention(dmgInfo)
+	return dmgInfo:IsDamageType(DMG_CLUB) and bluntTuning.limbRetain or 0.5
+end
 
 util.AddNetworkString("hg_play_client_sound_file")
 
@@ -575,7 +589,7 @@ local function legs(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 
 	local dmg = org[healthKey]
 
-	org[healthKey] = org[healthKey] * 0.5
+	org[healthKey] = org[healthKey] * bluntTuning.retention(dmgInfo)
 
 	if dmg < 0.5 then return 0 end
 	if dmg < 1 then return result, vecrand end
@@ -639,7 +653,7 @@ local function arms(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 
 	local dmg = org[healthKey]
 
-	org[healthKey] = org[healthKey] * 0.5
+	org[healthKey] = org[healthKey] * bluntTuning.retention(dmgInfo)
 
 	if dmg < 0.5 then return 0 end
 	if dmg < 1 then return result, vecrand end
@@ -1236,15 +1250,28 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 			headOutcomeHandled = true
 		end
 	end
-	if not headOutcomeHandled and org.alive and not org.otrub and not org.needotrub and not isStab and dmg > 0.2
-		and not (impact and impact.source == "physics") and (isMelee(dmgInfo) or dmgInfo:IsDamageType(DMG_CRUSH))
-		and (org.skull >= 1 or brainDelta > 0) then
-		local bluntKnockoutChance = math.Clamp((dmg - melee_skull_knockout_threshold) * 0.5, 0, 0.6) * (helmetProtectedHit and 0.25 or 1)
-		if math.Rand(0, 1) < bluntKnockoutChance then
-			org.needotrub = true
-			org.consciousness = math.min(org.consciousness or 1, 0.12)
-			org.shock = math.min((org.shock or 0) + 10, 95)
-			headOutcomeHandled = true
+	if org.alive and not org.otrub and not isStab and not (impact and impact.source == "physics")
+		and dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH) and dmg > bluntTuning.dazeStart then
+		local helmetMul = helmetProtectedHit and 0.25 or 1
+		if not ignoreBrainDamage then
+			local brainChance = math.Clamp((dmg - bluntTuning.brainStart) * bluntTuning.brainSlope, 0, bluntTuning.brainMax) * helmetMul
+			if math.Rand(0, 1) < brainChance then
+				org.brain = math.min((org.brain or 0) + dmg * math.Rand(0.04, 0.14), 1)
+				brainDelta = math.max(org.brain - oldBrain, 0)
+			end
+		end
+		if not headOutcomeHandled and not org.needotrub then
+			local knockoutChance = math.Clamp((dmg - bluntTuning.koStart) * bluntTuning.koSlope, 0, bluntTuning.koMax) * helmetMul
+			if math.Rand(0, 1) < knockoutChance then
+				org.needotrub = true
+				org.consciousness = math.min(org.consciousness or 1, 0.12)
+				org.shock = math.min((org.shock or 0) + 10, 95)
+				headOutcomeHandled = true
+			else
+				local dazed = math.min(dmg * 1.4, 1.1) * (helmetProtectedHit and 0.4 or 1)
+				org.disorientation = math.min((org.disorientation or 0) + dazed, 1.5)
+				org.consciousness = math.max((org.consciousness or 1) - math.min(dmg * 0.3, 0.45) * helmetMul, 0.2)
+			end
 		end
 	end
 	if not (impact and impact.headOutcomeHandled) and hg.organism.module.concussion and hg.organism.module.concussion.AddHeadTrauma then
@@ -1312,7 +1339,7 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		pleura[2] = 1
 	end
 
-	local result, vecrand = damageBone(org, 0.1, dmg / 4, dmgInfo, "chest", boneindex, dir, hit, ricochet, true)
+	local result, vecrand = damageBone(org, 0.1, dmg / 4 * (dmgInfo:GetInflictor().RibBreakMul or 1), dmgInfo, "chest", boneindex, dir, hit, ricochet, true)
 	
 	hg.AddHarmToAttacker(dmgInfo, (org.chest - oldDmg) * 3, "Ribs bone damage harm")
 
@@ -1380,7 +1407,7 @@ local function upper_limb(org, bone, dmg, dmgInfo, amputate_key, limb_key, segme
 	local result, vecrand = damageBone(org, 0.3, dmg, dmgInfo, healthKey, boneindex, dir, hit, ricochet)
 
 	local d = org[healthKey]
-	org[healthKey] = org[healthKey] * 0.5
+	org[healthKey] = org[healthKey] * bluntTuning.retention(dmgInfo)
 
 	if d < 0.5 then return 0 end
 	if d < 1 then return result, vecrand end
