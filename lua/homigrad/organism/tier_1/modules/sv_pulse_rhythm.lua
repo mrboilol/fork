@@ -106,7 +106,7 @@ function hg.organism.UpdateCardiacRhythm(owner, org, timeValue, s)
 	org.internalBleedRhythmRisk = internalBleedRhythmRisk
 	org.traumaRhythmRisk = traumaRhythmRisk
 	local hypercapniaInstability = Clamp(((org.co2 or 0) - 14) / 12, 0, 1)
-	local stress = Clamp(hypercapniaInstability * 0.9 + myocardialInstability * 1.2 + ischemia * 0.8 + (org.heartStrain or 0) * 0.35 + (org.cardiacStressExposure or 0) * 0.45 + (org.hypertension or 0) * 0.35 + (org.hypotension or 0) * 0.3 + hemorrhageRhythmStress * 0.35 + hemorrhageElectricalInstability * 0.95 + hypothermiaInstability * 0.35 + traumaRhythmRisk * 0.8 + hypotensionInstability * 0.9 + Clamp(rhythmShock - 20, 0, 60) / 320 + max(rhythmPain - 80, 0) / 420 + max(org.heartbeat - 165, 0) / 190, 0, 2.5)
+	local stress = Clamp(hypercapniaInstability * 0.9 + myocardialInstability * 1.2 + ischemia * 0.8 + (org.heartStrain or 0) * 0.35 + (org.cardiacStressExposure or 0) * 0.45 + (org.otrub and org.hypertension or 0) * 0.35 + (org.hypotension or 0) * 0.3 + hemorrhageRhythmStress * 0.35 + hemorrhageElectricalInstability * 0.95 + hypothermiaInstability * 0.35 + traumaRhythmRisk * 0.8 + hypotensionInstability * 0.9 + Clamp(rhythmShock - 20, 0, 60) / 320 + max(rhythmPain - 80, 0) / 420 + max(org.heartbeat - 165, 0) / 190, 0, 2.5)
 	local arrhythmiaTarget = Clamp(math.max(stress * 0.42, hemorrhageElectricalInstability * 0.88, traumaRhythmRisk * 0.72, hypercapniaInstability * 0.85) * math.Clamp(org.conditionResistanceMul or 1, 0.05, 1), 0, 1)
 	if org.seizureActive then arrhythmiaTarget = math.max(arrhythmiaTarget, 0.15) end
 	do

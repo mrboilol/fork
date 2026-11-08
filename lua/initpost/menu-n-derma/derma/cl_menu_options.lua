@@ -222,6 +222,7 @@ end
 
 hg.settings:AddOpt("Server-side settings","hg_selfpreservation", "self preservation")
 hg.settings:AddOpt("Server-side settings","hg_depression", "Depression")
+hg.settings:AddOpt("Server-side settings","hg_selfharm", "Depression self-harm")
 hg.settings:AddOpt("Server-side settings","hg_panic", "Panic attacks")
 hg.settings:AddOpt("Server-side settings","hg_hatprotect", "Hat protection")
 hg.settings:AddOpt("Server-side settings","hg_oldsoundoptions", "Old dying/pain/otrub sound options")

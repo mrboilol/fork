@@ -241,7 +241,8 @@ end)
 
 timer.Create("rem_suicideurges_roll", 1, 0, function()
 	local now = CurTime()
-	if not GetConVar("hg_depression"):GetBool() then
+	local selfharmCvar = GetConVar("hg_selfharm")
+	if not GetConVar("hg_depression"):GetBool() or (selfharmCvar and not selfharmCvar:GetBool()) then
 		for _, ply in ipairs(player.GetAll()) do
 			if ply.remUrgeEnd then endUrge(ply, true) end
 		end

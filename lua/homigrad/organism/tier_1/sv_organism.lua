@@ -843,6 +843,18 @@ function hg.organism.GetResilience(org)
 	return math.max(zerlkers, adrenaline)
 end
 
+local adrenalineBraceGroups = {
+	[HITGROUP_CHEST] = true,
+	[HITGROUP_STOMACH] = true,
+	[HITGROUP_LEFTARM] = true,
+	[HITGROUP_RIGHTARM] = true,
+}
+
+function hg.organism.AdrenalineBrace(org, hitgroup)
+	if not org or (hitgroup ~= nil and not adrenalineBraceGroups[hitgroup]) then return 0 end
+	return hg.organism.GetResilience(org) * 0.8
+end
+
 function hg.organism.IsHitKnockdownImmune(org)
 	if not org then return false end
 	return (org.zerlkers or 0) > 0 or (org.adrenaline or 0) >= 3
@@ -1610,6 +1622,8 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 			org.panicattackadd = math.Approach(org.panicattackadd or 0, 0, timeValue / decayTime)
 		end
 		org.panicattack = math.Approach(oldPanicAttack, org.panicattackadd or 0, timeValue / ((org.panicattackadd or 0) > oldPanicAttack and panicattack_rise_time or panicattack_decay_time))
+		org.panicattackadd = math.min(org.panicattackadd or 0, 1 - math.Clamp(tonumber(org.depression) or 0, 0, 1))
+		org.panicattack = math.min(org.panicattack, 1 - math.Clamp(tonumber(org.depression) or 0, 0, 1))
 	end
 	local oldSeizureBrain = org.lastSeizureBrain or (org.brain or 0)
 	local lobeDamage = getSeizureLobeDamage(org)

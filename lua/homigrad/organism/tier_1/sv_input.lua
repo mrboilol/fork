@@ -2225,6 +2225,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		org.shock_turn = 10 * (!org.otrub and 1 or 0.1)
 		local collapseThreshold = org.shock_turn * 1.5 * analgesiaMul * painkillerMul
 			* math.max(org.traumaResistanceMul or 1, 1) * (1 + math.Clamp(adrenaline, 0, 5) * 0.5)
+			/ (1 - hg.organism.AdrenalineBrace(org, hitgroup))
 
 		if org.shock > collapseThreshold then
 			timer.Simple(0, function() hg.Fake(org.owner) end)

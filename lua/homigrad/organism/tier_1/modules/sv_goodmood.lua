@@ -27,6 +27,34 @@ local function AbsorbFear(org)
     org.goodmood = math.max(org.goodmood - absorbed * FEAR_SHIELD_COST, 0)
 end
 
+function hg.organism.ShieldEmotion(org, amount, cost)
+    if not org or not isnumber(amount) or amount <= 0 then return 0 end
+    local goodmood = GetGoodMood(org)
+    if goodmood <= 0 then return amount end
+
+    local absorbed = math.min(amount, goodmood / cost)
+    org.goodmood = math.max(goodmood - absorbed * cost, 0)
+
+    return amount - absorbed
+end
+
+function hg.organism.AddHappiness(org, amount)
+    if not org or not isnumber(amount) or amount <= 0 then return end
+
+    local depression = math.Clamp(tonumber(org.depression) or 0, 0, 1)
+    local eased = math.min(depression, amount)
+    org.depression = depression - eased
+    org.depressionadd = math.max((tonumber(org.depressionadd) or 0) - amount, 0)
+    amount = amount - eased
+
+    local panic = math.max(tonumber(org.panicattackadd) or 0, 0)
+    local calmed = math.min(panic, amount)
+    org.panicattackadd = panic - calmed
+    amount = amount - calmed
+
+    org.goodmood = math.Clamp(GetGoodMood(org) + amount, 0, 1)
+end
+
 module[1] = function(org)
     org.goodmood = 1.0
     org._goodmoodLostTime = 0

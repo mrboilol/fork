@@ -341,7 +341,7 @@ local function updateGhostPositions(st, ragdoll, isMoving, horizontalVel)
 	pelvisAng.p = 0
 	pelvisAng.r = 0
 
-	local prediction = horizontalVel * st.cfg.PredictionTime * K.STUMBLE_STRIDE_MUL * (1 - K.STUMBLE_FOOT_LAG * (st.instability or 0))
+	local prediction = horizontalVel * st.cfg.PredictionTime * K.STUMBLE_STRIDE_MUL * st.profile.stride * (1 - K.STUMBLE_FOOT_LAG * (st.instability or 0))
 	if prediction:Length() > K.STUMBLE_STRIDE_MAX then prediction = prediction:GetNormalized() * K.STUMBLE_STRIDE_MAX end
 
 	for i = 1, 2 do
@@ -365,7 +365,7 @@ local function updateGhostPositions(st, ragdoll, isMoving, horizontalVel)
 end
 
 local function stumbleLifetime(st)
-	return st.hit and K.STUMBLE_HIT_TIME or math.max(st.cfg.Duration, 0.1)
+	return (st.hit and K.STUMBLE_HIT_TIME or math.max(st.cfg.Duration, 0.1)) * st.profile.life
 end
 
 local function stumbleRelease(st, now)
@@ -479,7 +479,9 @@ local function updateStumble(st, ragdoll)
 		st.lastGroundCheckTime = now
 	end
 
-	local stepSpeed = math.Clamp(K.STEP_RATE_MIN + speed / K.STEP_RATE_SPEED, K.STEP_RATE_MIN, K.STEP_RATE_MAX)
+	local p = st.profile
+	local stepSpeed = math.Clamp(K.STEP_RATE_MIN + speed / K.STEP_RATE_SPEED, K.STEP_RATE_MIN, K.STEP_RATE_MAX) * p.rate
+	if speed > cfg.MinMovementSpeed then st.offBalance = math.min(st.offBalance + dt * p.tip, 1) end
 
 	for i = 1, 2 do
 		local state = st.legState[i]
@@ -492,10 +494,11 @@ local function updateStumble(st, ragdoll)
 				if st.steps >= st.minSteps and not st.stepsDoneAt then st.stepsDoneAt = now end
 				st.footPositions[i] = state.targetPos
 				st.lockedFootPositions[i] = state.targetPos
+				st.offBalance = st.offBalance * p.recover
 				if moveDir and st.hasGroundContact[i] then
-					st.pelvis:AddVelocity(moveDir * math.min(speed * K.STUMBLE_LUNGE_MUL, K.STUMBLE_LUNGE_MAX) * K.FOOT_PUSHOFF)
+					st.pelvis:AddVelocity(moveDir * math.min(speed * K.STUMBLE_LUNGE_MUL, K.STUMBLE_LUNGE_MAX) * K.FOOT_PUSHOFF * p.lunge)
 					local plantSide = moveDir:Cross(state.targetPos - pelvisPos).z
-					st.spine:AddAngleVelocity(moveDir * math.Clamp(plantSide, -12, 12) * 2)
+					st.spine:AddAngleVelocity(moveDir * math.Clamp(plantSide, -12, 12) * 2 * p.sway)
 				end
 			else
 				local t = state.progress
@@ -513,11 +516,11 @@ local function updateStumble(st, ragdoll)
 		else
 			state.isLocked = false
 
-			local trigger = cfg.StepTriggerForward
+			local trigger = cfg.StepTriggerForward * p.trigger
 			if st.hasGroundContact[i] and st.ikChains[i]
 				and st.footPositions[i]:DistToSqr(st.ghostPositions[i]) > trigger * trigger
 				and not st.legState[i == 1 and 2 or 1].isStepping
-				and now - state.lastStepTime > cfg.MinStepInterval then
+				and now - state.lastStepTime > cfg.MinStepInterval * p.interval then
 				local target = findStepGround(st, ragdoll, i, st.ghostPositions[i], st.ghostPositions[i].z)
 				if not target then continue end
 				if st.steps >= st.minSteps and math.Rand(0, 1) < st.legTrip[i] then
@@ -531,7 +534,7 @@ local function updateStumble(st, ragdoll)
 				state.targetPos = target
 				local rootPos = st.ikChains[i].physObjects[1]:GetPos()
 				local stride = Vector(target.x - rootPos.x, target.y - rootPos.y, 0):Length()
-				state.stepSpeed = math.min(math.max(stepSpeed, speed / math.max(stride, K.FOOT_PLANT_DIST)), K.STEP_RATE_CAP)
+				state.stepSpeed = math.min(math.max(stepSpeed, speed / math.max(stride, K.FOOT_PLANT_DIST)), K.STEP_RATE_CAP * p.rate)
 			end
 		end
 	end
@@ -582,12 +585,12 @@ local function updateStumble(st, ragdoll)
 		end
 	end
 	local instability = st.instability
-	st.spine:AddAngleVelocity(Vector(math.Rand(-1, 1), math.Rand(-1, 1), 0) * K.STUMBLE_WOBBLE * (0.5 + instability) * dt)
+	st.spine:AddAngleVelocity(Vector(math.Rand(-1, 1), math.Rand(-1, 1), 0) * K.STUMBLE_WOBBLE * p.wobble * (0.5 + instability) * dt)
 	local grounded = planted > 0
 	local support = math.min(planted, 1) + (planted > 1 and 0.25 or 0)
 
 	local hold = st.steps < st.minSteps and 1 or 1 - instability ^ K.STUMBLE_CARRY_POW
-	hold = hold * math.max(st.vigor, K.STUMBLE_HOLD_VIGOR_FLOOR)
+	hold = hold * math.max(st.vigor, K.STUMBLE_HOLD_VIGOR_FLOOR) * (1 - st.offBalance * p.sag)
 	if st.spine:GetAngles():Forward().z < K.FADE_LOST_UPRIGHT then hold = 0 end
 
 	local groundZ = cfg.Carry > 0 and hold > 0 and st.hipHeight and fadeGroundZ(ragdoll, pelvisPos)
@@ -601,7 +604,7 @@ local function updateStumble(st, ragdoll)
 	end
 
 	if hold > 0 then
-		local lean = Lerp(instability, K.STUMBLE_LEAN[1], K.STUMBLE_LEAN[2]) * cfg.Pitch / K.STUMBLE_PITCH_REF
+		local lean = (Lerp(instability, K.STUMBLE_LEAN[1], K.STUMBLE_LEAN[2]) + st.offBalance * p.tipLean) * cfg.Pitch / K.STUMBLE_PITCH_REF
 		local leanDir = moveDir or vector_origin
 		local want = Vector(leanDir.x * lean, leanDir.y * lean, 1)
 		want:Normalize()
@@ -612,7 +615,7 @@ local function updateStumble(st, ragdoll)
 		st.driveSpeed = math.min(math.max(st.driveSpeed + cfg.MomentumGain * dt, flatVel:Dot(moveDir)), cfg.MaxDriveSpeed)
 		local deficit = st.driveSpeed - rawVel:Dot(moveDir)
 		if deficit > 0 and grounded then
-			local add = moveDir * math.min(deficit, cfg.DriveAccel * dt) * math.min(support, 1)
+			local add = moveDir * math.min(deficit, cfg.DriveAccel * dt) * math.min(support, 1) * p.drive
 			st.pelvis:AddVelocity(add)
 			st.spine:AddVelocity(add)
 		end
@@ -693,7 +696,7 @@ local function startStumble(ply, ragdoll)
 		smoothedVelocity = pelvis:GetVelocity(),
 		ikChains = {},
 		steps = 0,
-		minSteps = math.random(K.STUMBLE_MIN_STEPS[1], K.STUMBLE_MIN_STEPS[2]),
+		offBalance = 0,
 		footPhys = {getBonePhys(ragdoll, "ValveBiped.Bip01_L_Foot"), getBonePhys(ragdoll, "ValveBiped.Bip01_R_Foot")},
 		vigor = vigor(org),
 		legTrip = {legTripChance(org, "lleg"), legTripChance(org, "rleg")},
@@ -708,6 +711,8 @@ local function startStumble(ply, ragdoll)
 		end
 	end
 	st.swayPhase = math.Rand(0, math.pi * 2)
+	st.profile = K.STUMBLE_PROFILES[not st.hit and ragdoll.HGFakeReason == "voluntary" and "will" or "struggle"]
+	st.minSteps = math.random(st.profile.minSteps[1], st.profile.minSteps[2])
 
 	local startVel = pelvis:GetVelocity()
 	startVel.z = 0
@@ -1087,9 +1092,13 @@ local function brokenBones(org)
 	}
 end
 
-hook.Add("PreHomigradDamage", "HG_StumbleBreakSnapshot", function(ply)
+hook.Add("PreHomigradDamage", "HG_StumbleBreakSnapshot", function(ply, dmgInfo, hitgroup)
 	if not IsValid(ply) or not ply:IsPlayer() or not ply.organism then return end
 	ply.hgBonesBefore = brokenBones(ply.organism)
+
+	local brace = hg.organism.AdrenalineBrace(ply.organism, hitgroup)
+	if ply.hgHitBraceAt == CurTime() then brace = math.min(brace, ply.hgHitBrace) end
+	ply.hgHitBrace, ply.hgHitBraceAt = brace, CurTime()
 end)
 
 hook.Add("HomigradDamage", "HG_StumbleFreshBreak", function(ply)
@@ -1099,7 +1108,11 @@ hook.Add("HomigradDamage", "HG_StumbleFreshBreak", function(ply)
 
 	local chance = 0
 	for bone, broken in pairs(brokenBones(ply.organism)) do
-		if broken and not before[bone] then chance = math.max(chance, K.FRESH_BREAK_FALL[bone] or 0) end
+		if broken and not before[bone] then
+			local fall = K.FRESH_BREAK_FALL[bone] or 0
+			if K.FRESH_BREAK_BRACED[bone] then fall = fall * (1 - hg.organism.AdrenalineBrace(ply.organism)) end
+			chance = math.max(chance, fall)
+		end
 	end
 	if chance <= 0 then return end
 
@@ -1109,8 +1122,12 @@ hook.Add("HomigradDamage", "HG_StumbleFreshBreak", function(ply)
 end)
 
 local function standingHitReact(ply)
+	local pending = ply.hgPendingHitEnergy or 0
+	local brace = CurTime() - (ply.hgHitBraceAt or 0) < 0.25 and ply.hgHitBrace or 0
+	ply.hgPendingHitEnergy = nil
 	local acc = ply.hgHitEnergy
 	if not acc or acc.knockdown or not ply:Alive() or IsValid(ply.FakeRagdoll) then return end
+	acc.energy = math.max(acc.energy - pending * brace, 0)
 	if acc.dir:LengthSqr() < 0.01 then return end
 	local flatDir = Vector(acc.dir.x, acc.dir.y, 0):GetNormalized()
 
@@ -1178,6 +1195,7 @@ hook.Add("EntityTakeDamage", "HG_EuphoriaStumbleHit", function(ent, dmgInfo)
 	if not IsValid(ragdoll) then
 		if energy <= 0 or not flatDir or acc.knockdown then return end
 
+		ply.hgPendingHitEnergy = (ply.hgPendingHitEnergy or 0) + energy
 		local push = takePush(acc, energy * K.ENERGY_PLAYER_PUSH, K.ENERGY_PLAYER_PUSH_MAX)
 		if push > 0 then ply:SetVelocity(flatDir * push) end
 

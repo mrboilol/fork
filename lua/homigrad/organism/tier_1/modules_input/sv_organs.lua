@@ -103,7 +103,7 @@ local function applyOrganTrauma(org, dmgInfo, force, delta, previousDamage, orga
 
 	if severity >= 1.7 and math.Rand(0, 1) < math.Clamp((severity - 1.5) * 0.16 / resistance, 0, 0.35) then
 		org.needotrub = true
-	elseif not hg.organism.IsHitKnockdownImmune(org) then
+	elseif string.StartWith(organ or "", "brain") and (org.zerlkers or 0) <= 0 or not hg.organism.IsHitKnockdownImmune(org) and math.Rand(0, 1) >= hg.organism.AdrenalineBrace(org) then
 		org.needfake = true
 	end
 end

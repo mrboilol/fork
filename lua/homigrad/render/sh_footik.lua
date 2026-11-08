@@ -1273,31 +1273,10 @@ function hg.FootIK(ent, ply)
 	footIK(ent, ply)
 
 	local after = before and ent:GetBoneMatrix(head)
-	ply.hg_IKHeadOffset = after and after:GetTranslation() - before or nil
+	after = after and after:GetTranslation()
+	ply.hg_IKHeadOffset = after and after - before or nil
+	ply.hg_IKHeadPos = after
 	ply.hg_IKHeadFrame = FrameNumber()
-
-	local dt = math_min(FrameTime(), 0.1)
-	local body = ply.hg_Body
-	local lean = body and body.frame == FrameNumber() and body.lean:Length() >= 0.2 and vector_up:Cross(body.lean) or Vector()
-	local smooth = ply.hg_IKLeanSmooth or Vector()
-	smooth = smooth + (lean - smooth) * (1 - math_exp(-dt / 0.12))
-	ply.hg_IKLeanSmooth = smooth
-
-	local leanDegrees = smooth:Length()
-	local tilt = leanDegrees > 4 and smooth * ((leanDegrees - 4) / leanDegrees) or Vector()
-
-	local org = ply.organism
-	local grip = hg.GetLimbEffectiveness and hg.GetLimbEffectiveness(org, "rarm", "up") * 0.6 + hg.GetLimbEffectiveness(org, "larm", "up") * 0.4 or 1
-	local recover = 1 - math_exp(-dt * math_max(grip, 0.2) / 0.4)
-	local comp = ply.hg_IKAimComp or Vector()
-	comp = comp + (tilt - comp) * recover
-	if (tilt - comp):Dot(comp) < 0 then comp = Vector(tilt) end
-	ply.hg_IKAimComp = comp
-
-	local aimTilt = (tilt - comp) * 0.8
-	local aimDegrees = aimTilt:Length()
-	if aimDegrees > 12 then aimTilt:Mul(12 / aimDegrees) end
-	ply.hg_IKAimTilt = aimTilt
 end
 
 function hg.GetIKHeadOffset(ply)
@@ -1307,18 +1286,16 @@ function hg.GetIKHeadOffset(ply)
 	return offset
 end
 
-function hg.GetIKAimTilt(ply)
-	local tilt = ply.hg_IKAimTilt
-	if not tilt or FrameNumber() - (ply.hg_IKHeadFrame or 0) > 2 or tilt:LengthSqr() < 0.0025 then return end
-
-	return tilt
-end
-
 function hg.GetIKGunShift(ent, ply)
-	local state = ply.hg_FootIK
-	if not state or alreadyApplied(ent, state) then return end
+	local offset = hg.GetIKHeadOffset(ply)
+	if not offset then return end
 
-	return hg.GetIKHeadOffset(ply)
+	local head = headBoneCache[ply:GetModel()]
+	local mat = head and ent:GetBoneMatrix(head)
+	local applied = ply.hg_IKHeadPos
+	if mat and applied and mat:GetTranslation():DistToSqr(applied) < 0.01 then return end
+
+	return offset
 end
 
 function IKFoot.HardReset(ply)

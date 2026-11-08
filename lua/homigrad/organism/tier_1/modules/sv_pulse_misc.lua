@@ -15,6 +15,7 @@ local OVERLOAD_RECOVERY_TIME = 15
 local OVERLOAD_SHOCK_PEAK = 105
 local OVERLOAD_FIGHT_MUL = 0.5
 local OVERLOAD_SEIZURE_CHANCE = 0.35
+local OVERLOAD_SUSTAIN = {start = 40, ramp = 40, floor = 0.4, panicStart = 0.35}
 local SYNCOPE_FIGHT_MUL = 0.5
 
 local ENCLOSURE_SAMPLE_INTERVAL = 2
@@ -137,9 +138,12 @@ function hg.organism.UpdateCirculatoryEffects(owner, org, timeValue, o2Value, ar
 	local panicK = org.panicattackActive and Clamp(((org.panicattack or 0) - OVERLOAD_PANIC_START) / (1 - OVERLOAD_PANIC_START), 0, 1) or 0
 	local adrenalineK = Clamp((adrenaline - OVERLOAD_ADRENALINE_START) / (ADRENALINE_OVERDOSE_START - OVERLOAD_ADRENALINE_START), 0, 1)
 	local fightingBack = org.panicattackActive and org.panicMode == "fight"
-	local overloadDrive = panicK * adrenalineK * (fightingBack and OVERLOAD_FIGHT_MUL or 1)
+	org.panicActiveTime = (org.panicattackActive and not org.otrub) and (org.panicActiveTime or 0) + timeValue or math.max((org.panicActiveTime or 0) - timeValue * 2, 0)
+	local sustainK = org.panicattackActive and Clamp((org.panicActiveTime - OVERLOAD_SUSTAIN.start) / OVERLOAD_SUSTAIN.ramp, 0, 1) * Lerp(Clamp(((org.panicattack or 0) - OVERLOAD_SUSTAIN.panicStart) / (1 - OVERLOAD_SUSTAIN.panicStart), 0, 1), OVERLOAD_SUSTAIN.floor, 1) or 0
+	local overloadDrive = math.max(panicK * adrenalineK, sustainK) * (fightingBack and OVERLOAD_FIGHT_MUL or 1)
 	local overload = org.panicOverload or 0
 	if org.otrub then
+		org.panicActiveTime = 0
 		if overload > 0.5 or org.panicOverloadPending then
 			if math.Rand(0, 1) < OVERLOAD_SEIZURE_CHANCE then hg.organism.AddSeizure(org, 1) end
 			org.panicattackadd = math.min(org.panicattackadd or 0, 0.25)
@@ -179,7 +183,7 @@ function hg.organism.UpdateCirculatoryEffects(owner, org, timeValue, o2Value, ar
 		end
 	end
 
-	if crisis > 0.5 and not org.otrub and not org.seizureActive and (org.nextHypertensionSeizureRoll or 0) <= CurTime() then
+	if crisis > 0.5 and org.otrub and not org.seizureActive and (org.nextHypertensionSeizureRoll or 0) <= CurTime() then
 		org.nextHypertensionSeizureRoll = CurTime() + 5
 		if math.Rand(0, 1) < (crisis - 0.5) * 0.12 then hg.organism.AddSeizure(org, 1) end
 	end

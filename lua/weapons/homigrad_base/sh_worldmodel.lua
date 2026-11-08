@@ -1047,15 +1047,8 @@ function SWEP:WorldModel_Transform(bNoApply, bNoAdditional, model)
 			--self.lastTpikAng = desiredAng
 		end
 
-		local ikShift = hg.WeaponIKShift
-		if ikShift and ent == owner then desiredPos = desiredPos + ikShift end
-
-		local ikTilt = hg.WeaponIKTilt
-		if ikTilt and ent == owner and not bNoApply and not self:IsResting() then
-			local degrees = ikTilt:Length()
-			desiredAng:RotateAroundAxis(ikTilt / degrees, degrees)
-			self.hgIKTilt, self.hgIKTiltFrame = ikTilt, FrameNumber()
-		end
+		local ikShift = ent == owner and hg.GetIKGunShift and hg.GetIKGunShift(ent, owner)
+		if ikShift then desiredPos = desiredPos + ikShift end
 
 		--self.fuckhands = LerpFT(0.1, self.fuckhands, self.setrhik and 1 or 0)
 
@@ -1298,8 +1291,6 @@ end
 --hook.Add("PostDrawPlayerRagdoll", "huyCock", function(ent,owner)
 function hg.RenderWeapons(ent, owner)
 	local wep = owner.GetActiveWeapon and owner:GetActiveWeapon()
-	hg.WeaponIKShift = ent == owner and hg.GetIKGunShift and hg.GetIKGunShift(ent, owner) or nil
-	hg.WeaponIKTilt = ent == owner and hg.GetIKAimTilt and hg.GetIKAimTilt(owner) or nil
 
 	local handoffHides = hg.PickupHandoffHides
 	if IsValid(wep) and wep.ishgweapon then
@@ -1322,9 +1313,6 @@ function hg.RenderWeapons(ent, owner)
 			end
 		end
 	end
-
-	hg.WeaponIKShift = nil
-	hg.WeaponIKTilt = nil
 
 	local inv = ent:GetNetVar("Inventory",nil) or ent.PredictedInventory
 	if ent == owner and not owner:IsPlayer()  and inv != nil and inv["Weapons"] then

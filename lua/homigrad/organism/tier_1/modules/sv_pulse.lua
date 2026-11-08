@@ -131,6 +131,7 @@ local function updateStrokeRisk(org, timeValue)
 		Remap(tonumber(org.systolic) or 120, 160, 220, 0, 1),
 		math.Clamp(tonumber(org.hypertension) or 0, 0, 1)
 	)
+	if not org.otrub then bloodPressureRisk = 0 end
 	local brainDamage = math.Clamp(math.max(
 		tonumber(org.brain) or 0,
 		tonumber(org.brainFrontal) or 0,
@@ -169,7 +170,7 @@ local function updateStrokeRisk(org, timeValue)
 		local pressureDominance = math.Clamp((bloodPressureRisk - nonPressureStrokeRisk) / 0.65, 0, 1)
 		local exposureTime = 18 + 72 * pressureDominance
 		local hypertensiveEmergency = math.Clamp(tonumber(org.hypertensiveEmergency) or 0, 0, 1)
-		if hypertensiveEmergency > 0 then
+		if hypertensiveEmergency > 0 and org.otrub then
 			exposureTime = math.min(exposureTime, Lerp(hypertensiveEmergency, 60, 12))
 		end
 		exposure = math.min(exposure + timeValue * (strokeRisk - 0.35) / exposureTime, 1)

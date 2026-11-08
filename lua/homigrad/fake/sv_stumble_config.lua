@@ -14,6 +14,7 @@ K.FALL_CHANCE_MAX = 0.75
 K.FALL_LEG_MUL = 0.5
 K.STAGGER_FALL_DELAY = {0.3, 0.55}
 K.FRESH_BREAK_FALL = {pelvis = 0.95, lleg = 0.85, rleg = 0.85, chest = 0.4, larm = 0.25, rarm = 0.25}
+K.FRESH_BREAK_BRACED = {chest = true, larm = true, rarm = true}
 K.FRESH_BREAK_DELAY_MUL = 0.5
 K.UPRIGHT_THRESHOLD = 0.05
 K.UPRIGHT_TRACE = 60
@@ -54,7 +55,10 @@ K.STUMBLE_STEER = 3
 K.STUMBLE_SWAY_RATE = 2.3
 K.STUMBLE_SWAY_ANGLE = 22
 K.DIVE_PUSH = 260
-K.STUMBLE_MIN_STEPS = {3, 5}
+K.STUMBLE_PROFILES = {
+	struggle = {minSteps = {3, 4}, trigger = 1.9, rate = 0.55, interval = 1.8, stride = 1.25, drive = 0.3, lunge = 1.8, tip = 1.6, tipLean = 0.3, recover = 0.45, sag = 0.1, sway = 2.5, wobble = 1.3, life = 1},
+	will = {minSteps = {1, 2}, trigger = 1, rate = 1, interval = 1, stride = 1, drive = 1, lunge = 1, tip = 0, tipLean = 0, recover = 1, sag = 0, sway = 1, wobble = 0.6, life = 0.5},
+}
 K.STUMBLE_STRIDE_MUL = 1.8
 K.STUMBLE_STRIDE_MAX = 110
 K.STUMBLE_WOBBLE = 170

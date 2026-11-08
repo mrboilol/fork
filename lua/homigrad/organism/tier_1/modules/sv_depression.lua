@@ -2,6 +2,8 @@ local max, min, Clamp, Approach = math.max, math.min, math.Clamp, math.Approach
 hg.organism.module.depression = {}
 local module = hg.organism.module.depression
 local hg_depression = CreateConVar("hg_depression", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enable depression and its mechanics", 0, 1)
+local hg_selfharm = CreateConVar("hg_selfharm", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Depression can push you into self harm", 0, 1)
+local depression_happiness_cost = 1.5
 
 local depression_max = 1
 local depression_drain_time = 300
@@ -140,6 +142,12 @@ local function showDepressionThought(owner, text, duration, id)
 	else
 		owner:Notify(text, duration, id, 0)
 	end
+end
+
+function hg.organism.EmotionThought(owner, text, duration, id)
+	if not IsValid(owner) or not owner:IsPlayer() or not owner:Alive() then return end
+
+	showDepressionThought(owner, text, duration, id)
 end
 
 local function isSelfHarmWeapon(wep)
@@ -515,13 +523,17 @@ module[2] = function(owner, org, timeValue)
 		add = add * max(1 - adrenaline * 0.2, depression_adrenaline_suppress_min)
 	end
 
-	local goodmood = Clamp(tonumber(org.goodmood) or 0, 0, 1)
-	if goodmood > 0 then
-		add = add * Lerp(goodmood, 1, 0.6)
-	end
 	if now < (org.depressionWakeReliefUntil or 0) then
 		add = 0
 	end
+	if add > 0 and hg.organism.ShieldEmotion then
+		add = hg.organism.ShieldEmotion(org, add, depression_happiness_cost)
+	end
+	if add > 0 then
+		org.panicattackadd = max((org.panicattackadd or 0) - add, 0)
+		org.panicattack = max((org.panicattack or 0) - add, 0)
+	end
+	local goodmood = Clamp(tonumber(org.goodmood) or 0, 0, 1)
 
 	org.depression = Clamp((org.depression or 0) + add, 0, depression_max)
 
@@ -621,9 +633,12 @@ module[2] = function(owner, org, timeValue)
 
 	if owner.selfharming then
 		updateSelfHarm(owner, org)
-	elseif owner:IsPlayer() then
+	elseif owner:IsPlayer() and hg_selfharm:GetBool() then
 		rollSelfHarm(owner, org)
 		updatePending(owner, org)
+	elseif org.selfharmPendingUntil then
+		org.selfharmPendingUntil = nil
+		owner:SetNWFloat("rem_selfharm_pending", 0)
 	end
 end
 

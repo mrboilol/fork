@@ -789,13 +789,6 @@ function SWEP:GetSettledShotAng()
 	local _, ang = self:GetTrace(true, nil, nil, true, true)
 	self.AdditionalAng, self.pitch = additional, pitch
 
-	local tilt = CLIENT and isangle(ang) and self.hgIKTilt
-	if tilt and FrameNumber() - (self.hgIKTiltFrame or 0) <= 2 then
-		ang = Angle(ang)
-		local degrees = tilt:Length()
-		ang:RotateAroundAxis(tilt / degrees, degrees)
-	end
-
 	return ang
 end
 

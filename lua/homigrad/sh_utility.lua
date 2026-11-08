@@ -1345,6 +1345,7 @@ local IsValid = IsValid
 		local fight = org.panicMode == "fight" and panic or 0
 		local flight = org.panicMode == "flight" and panic or 0
 		local adrenaline = math.Clamp((tonumber(org.adrenaline) or 0) / 3, 0, 1)
+		local depression = math.Clamp(((tonumber(org.depression) or 0) - 0.15) / 0.85, 0, 1)
 		local power = math.Clamp(staminaPower * consciousnessPower * reservePower * painPower * shockPower * disorientationPower * ailmentPower, 0.08, 1)
 
 		local tempo = math.Clamp(power ^ 0.62 * Lerp(staminaFraction, 0.72, 1), 0.18, 1) * Lerp(armFatigue, 1, 0.7)
@@ -1354,19 +1355,19 @@ local IsValid = IsValid
 			+ concussion / 6 * 0.46 + nausea / 6 * 0.14,
 			0, 1
 		)
-		instability = math.Clamp(instability + flight * 0.4 - fight * 0.2, 0, 1)
+		instability = math.Clamp(instability + flight * 0.4 - fight * 0.2 + depression * 0.45, 0, 1)
 
 		return {
-			power = power * Lerp(flight, 1, 0.75) * Lerp(fight, 1, 1.25) * (1 + adrenaline * 0.1) * Lerp(armFatigue, 1, 0.6),
-			tempo = tempo,
-			speed = tempo * Lerp(flight, 1, 1.4),
-			effort = Lerp(flight, 1, 0.8) * Lerp(fight, 1, 1.2),
-			exertion = Lerp(flight, 1, 1.4) * Lerp(fight, 1, 0.7) * (1 - adrenaline * 0.15),
+			power = power * Lerp(flight, 1, 0.75) * Lerp(fight, 1, 1.25) * (1 + adrenaline * 0.1) * Lerp(armFatigue, 1, 0.6) * Lerp(depression, 1, 0.7),
+			tempo = tempo * Lerp(depression, 1, 0.8),
+			speed = tempo * Lerp(flight, 1, 1.4) * Lerp(depression, 1, 0.8),
+			effort = Lerp(flight, 1, 0.8) * Lerp(fight, 1, 1.2) * Lerp(depression, 1, 0.75),
+			exertion = Lerp(flight, 1, 1.4) * Lerp(fight, 1, 0.7) * (1 - adrenaline * 0.15) * Lerp(depression, 1, 1.25),
 			recoil = Lerp(flight, 1, 1.35) * Lerp(fight, 1, 0.8),
-			move = Lerp(flight, 1, 1.15) * Lerp(fight, 1, 0.85) * Lerp(legFatigue, 1, 0.65),
+			move = Lerp(flight, 1, 1.15) * Lerp(fight, 1, 1.1) * Lerp(legFatigue, 1, 0.65) * Lerp(depression, 1, 0.75),
 			sprintCost = Lerp(flight, 1, 0.6),
 			stability = 1 - instability,
-			aim = (1 + instability * 2.5) * Lerp(fight, 1, 0.8)
+			aim = (1 + instability * 2.5) * Lerp(fight, 1, 0.8) * Lerp(depression, 1, 1.15)
 		}
 	end
 
