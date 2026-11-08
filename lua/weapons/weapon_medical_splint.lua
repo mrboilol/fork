@@ -3,7 +3,7 @@ if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_bandage_sh"
 SWEP.BandageTPIK = false
 SWEP.PrintName = "Splint"
-SWEP.Instructions = "Apply to a broken arm or leg to set the fracture. A splinted limb heals faster. LMB to use on yourself, RMB to use on someone else."
+SWEP.Instructions = "Apply to a broken arm or leg to set the fracture, or brace a cracked neck or back. A splinted bone heals faster. LMB to use on yourself, RMB to use on someone else."
 SWEP.Category = "ZCity Medicine"
 SWEP.Spawnable = true
 SWEP.AdminOnly = false
@@ -26,6 +26,8 @@ hg.SPLINT_LIMB_LABELS = {
 	rarm = "right arm",
 	lleg = "left leg",
 	rleg = "right leg",
+	spine2 = "back",
+	spine3 = "neck",
 }
 
 local splintLimbOrder = {"lleg", "rleg", "larm", "rarm"}
@@ -254,6 +256,16 @@ local function NeedsSplint(holder, org, limb)
 	return not org[limb .. "amputated"] and hg.IsLimbFractured(org, limb) and not hg.IsLimbSplinted(holder, limb)
 end
 
+local function SpineFromBone(bone)
+	if not isstring(bone) then return end
+	if string.find(bone, "Neck", 1, true) or string.find(bone, "Head", 1, true) then return "spine3" end
+	if string.find(bone, "Spine", 1, true) then return "spine2" end
+end
+
+local function NeedsSpineSplint(org, key)
+	return hg.IsSpinePartiallyBroken and hg.IsSpinePartiallyBroken(org, key) and not org[key .. "splinted"]
+end
+
 function hg.GetSplintTarget(ent, bone)
 	local org = ent.organism
 	if not org then return end
@@ -261,6 +273,12 @@ function hg.GetSplintTarget(ent, bone)
 
 	local aimed = LimbFromBone(bone)
 	if aimed and NeedsSplint(holder, org, aimed) then return aimed end
+
+	local aimedSpine = SpineFromBone(bone)
+	if aimedSpine and NeedsSpineSplint(org, aimedSpine) then return aimedSpine end
+	for _, key in ipairs({"spine3", "spine2"}) do
+		if NeedsSpineSplint(org, key) then return key end
+	end
 
 	local best, bestDamage
 	for _, limb in ipairs(splintLimbOrder) do
@@ -285,14 +303,17 @@ if SERVER then
 			return false
 		end
 
-		hg.organism.ApplyBandageBoneTreatment(org, limb, 0.25)
+		local holder = GetSplintHolder(ent)
+		if hg.SPLINT_LIMB_BONES[limb] then
+			hg.organism.ApplyBandageBoneTreatment(org, limb, 0.25)
+			holder.splints = holder.splints or {}
+			table.insert(holder.splints, hg.SPLINT_LIMB_BONES[limb])
+			SyncSplints(holder)
+		else
+			hg.organism.StabilizeSpine(org, limb, 0.35, true)
+		end
 		org.avgpain = math.max((org.avgpain or 0) - 5, 0)
 		org.pain = math.max((org.pain or 0) - 5, 0)
-
-		local holder = GetSplintHolder(ent)
-		holder.splints = holder.splints or {}
-		table.insert(holder.splints, hg.SPLINT_LIMB_BONES[limb])
-		SyncSplints(holder)
 
 		local label = hg.SPLINT_LIMB_LABELS[limb]
 		if IsValid(holder) and holder:IsPlayer() then

@@ -826,6 +826,10 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 			k = k * (rightTourniquets >= 2 and 0.3 or rightTourniquets == 1 and 0.7 or hg.GetArteryWeakness(org, "rleg"))
 		end
 		k = k * (org.pelvis == 1 and 0.4 or 1)
+		if hg.IsSpinePartiallyBroken then
+			if hg.IsSpinePartiallyBroken(org, "spine2") then k = k * softenDebuff(org.spine2stabilized and 0.85 or 0.6) end
+			if hg.IsSpinePartiallyBroken(org, "spine3") then k = k * softenDebuff(org.spine3stabilized and 0.9 or 0.7) end
+		end
 		local carryent = ply:GetNetVar("carryent")
 		local carryent2 = ply:GetNetVar("carryent2")
 		local validCarryEnt = IsValid(carryent)

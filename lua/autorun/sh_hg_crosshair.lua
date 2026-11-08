@@ -224,8 +224,12 @@ end
 local function updateGun(wep, owner)
 	if wep:IsZoom() or (wep.IsSprinting and wep:IsSprinting()) then return false end
 
-	local tr = wep:GetTrace(true)
-	if not tr or not tr.HitPos then return false end
+	local pos, ang = wep:GetTrace(true, nil, nil, true)
+	if not isvector(pos) or not isangle(ang) then return false end
+	if wep.GetShotAng then ang = wep:GetShotAng(ang) or ang end
+
+	local filter = wep.GetTraceFilter and wep:GetTraceFilter(owner, wep:GetWeaponEntity()) or {wep, owner}
+	local tr = util.TraceLine({start = pos, endpos = pos + ang:Forward() * 8000, filter = filter})
 	local scr = tr.HitPos:ToScreen()
 	if not scr.visible then return false end
 

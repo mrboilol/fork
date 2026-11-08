@@ -1036,8 +1036,11 @@ function fakeBoneFlop.ReconcileLimb(org, limb)
 		changed = fakeBoneFlop.ClearStoredLimb(org, limb) or changed
 	else
 		for segment, bone in pairs(fakeLimbBoneSegments[limb]) do
-			if (org[limb .. "_" .. segment] or 0) < 1 and not org[limb .. "_" .. segment .. "_disl"] then
+			local broken = (org[limb .. "_" .. segment] or 0) >= 1
+			if not broken and not org[limb .. "_" .. segment .. "_disl"] then
 				changed = fakeBoneFlop.FlagBone(org, bone, false) or changed
+			elseif broken and not org[limb .. "stabilized"] and not org[limb .. "upamputated"] and not (segment == "down" and org[limb .. "amputated"]) then
+				fakeBoneFlop.SetBoneState(org, bone, true)
 			end
 		end
 	end

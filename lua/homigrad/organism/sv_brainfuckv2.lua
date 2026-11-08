@@ -664,7 +664,9 @@ function hg.applySeizurePostureToRagdoll(rag, org)
 	end
 
 	local skip = isHeadless(org, rag) and {[10] = true} or {}
-	driveStatic(rag, skip, modelOffsets, nil, reference:GetAngles(), 1500, 50, nil, 0.001, seizureTremor)
+	local severity = math.Clamp(org.seizureSeverity or 0.3, 0.2, 1)
+	if org.convulsing then severity = math.max(severity, 0.85) end
+	driveStatic(rag, skip, modelOffsets, nil, reference:GetAngles(), Lerp(severity, 700, 1500), 50, nil, 0.001, Lerp(severity, 2, seizureTremor))
 end
 
 local function setPosture(org, posture, severity, rag)

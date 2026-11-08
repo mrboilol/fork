@@ -1307,7 +1307,7 @@ module[2] = function(owner, org, timeValue)
 		hypovolemicGiveUp)
 	local zerlkersSuppression = math.Clamp(org.zerlkersOverdose or 0, 0, 1)
 	local drugBradycardia = math.Clamp(((org.drugRespiratoryDepression or 0) - 0.12) / 0.88, 0, 1)
-	local cervicalSuppression = org.cervicalParalysis and 0.58 or 0
+	local cervicalSuppression = math.max(org.cervicalParalysis and 0.58 or 0, math.Clamp(tonumber(org.spinalBradycardia) or 0, 0, 1))
 	local bradycardiaSeverity = math.max(cerebralSuppression, hypoxiaSuppression, cardiacSuppression, coldSuppression, zerlkersSuppression, drugBradycardia * 0.9, cervicalSuppression)
 	org.bradycardiaSeverity = bradycardiaSeverity
 	org.drugBradycardia = drugBradycardia

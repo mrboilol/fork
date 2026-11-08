@@ -467,6 +467,10 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 				end
 			end
 
+			if(SERVER and hg.SkipOwnGripHit and not self.PenetratingMaterial and not self.IsFragment)then
+				trace = hg.SkipOwnGripHit(trace, hull_trace.start, hull_trace.endpos, self.Shooter, self.TraceFilter, self.TraceMask)
+			end
+
 			if(SERVER and hg.TraceHeldWeaponShot and not self.PenetratingMaterial)then
 				local speedmul = math.max(len_before / self.StartLen, 0)
 				self.EquipmentRadius = self.Size * 0.5

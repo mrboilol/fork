@@ -320,7 +320,7 @@ local function DumpEntities()
 
 	for _, ent in ipairs(all) do
 		Write("*", string.format("dump %s model=%s phys=%d constrained=%s parent=%s movetype=%d",
-			tostring(ent), tostring(ent:GetModel()), ent:GetPhysicsObjectCount(),
+			tostring(ent), tostring(ent:GetModel() or "nil"), ent:GetPhysicsObjectCount(),
 			tostring(ent:IsConstrained()), tostring(ent:GetParent()), ent:GetMoveType()))
 	end
 end

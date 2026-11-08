@@ -64,8 +64,6 @@ local seizure_recovery_duration = 20
 local seizure_pose_force = 850
 local seizure_pose_damp = 42
 local seizure_leg_buckle = 46
-local seizure_shake_freq = 5.8
-local seizure_shake_amp = 1.35
 local seizure_brain_trauma_gain_mul = 2
 local seizure_temperature_gain_mul = 0.013
 local seizure_temperature_low_start = 35
@@ -184,6 +182,16 @@ hook.Add("Org Clear", "Main", function(org)
 	org.cervicalParalysis = false
 	org.cervicalRespiratoryArrest = false
 	org.cervicalArrestAnnounced = false
+	org.spine2stabilized = false
+	org.spine3stabilized = false
+	org.spine2splinted = false
+	org.spine3splinted = false
+	org.spine2CordRolled = nil
+	org.spine3CordRolled = nil
+	org.spinalBradypnea = 0
+	org.spinalBradypneaTarget = 0
+	org.spinalBradycardia = 0
+	org.spinalBradycardiaTarget = 0
 	org.recoilmul = 1
 	org.legstrength = 1
 	org.meleespeed = 1
@@ -564,7 +572,8 @@ local function send_organism(org, ply, recipientForce, reliable)
 		"strokeVolume", "hypoxiaTime", "intracranialPressure", "peripheralperfusion", "perfusionMoveMul",
 		"legstrength", "armstrength", "losing_oxy", "respiratoryArrest", "pneumothorax", "hemothorax",
 		"skull", "chest", "heart", "trachea", "liver", "kidneys", "stomach", "intestines", "lungsL", "lungsR",
-		"spine1", "spine2", "spine3", "internalBleed", "internalBleedComplication", "wantToVomit",
+		"spine1", "spine2", "spine3", "spine2stabilized", "spine3stabilized", "spine2splinted", "spine3splinted",
+		"spinalBradypnea", "spinalBradycardia", "internalBleed", "internalBleedComplication", "wantToVomit",
 		"weight", "maxweight", "ischemia", "hemotransfusionshock", "zerlkers", "zerlkersOverdose", "anger",
 		"brainSwelling", "cardiacTamponade", "needle", "respiratoryRate", "bradyapnea", "drugRespiratoryDepression",
 		"exertionO2Debt", "circulatoryO2Reserve", "oxygenIntakeAvailable", "vomitInThroat", "otrub", "alive",
@@ -1186,26 +1195,13 @@ hg.organism.convulsionConfig = {
 	mannitolCureProgress = 15,
 	soundMin = 5,
 	soundMax = 9,
-	spasmVelocity = 55,
-	spasmAngVelocity = 420,
 	otrubDelayMin = 1,
 	otrubDelayMax = 3,
 	sounds = {"rotten_agony/convulse1.ogg", "rotten_agony/convulse2.ogg"}
 }
 
-local function apply_seizure_pose(rag, org, time)
-	if hg.applySeizurePostureToRagdoll then hg.applySeizurePostureToRagdoll(rag, org, 1) return end
-	if time < (org.nextSeizureSpasm or 0) then return end
-	org.nextSeizureSpasm = time + math.Rand(0.6, 1.4) / seizure_shake_freq
-	local cfg = hg.organism.convulsionConfig
-	local amp = seizure_shake_amp * (org.convulsing and 1.4 or 1)
-	for i = 0, rag:GetPhysicsObjectCount() - 1 do
-		local phys = rag:GetPhysicsObjectNum(i)
-		if IsValid(phys) then
-			phys:AddVelocity(VectorRand() * cfg.spasmVelocity * amp)
-			phys:AddAngleVelocity(VectorRand() * cfg.spasmAngVelocity * amp)
-		end
-	end
+local function apply_seizure_pose(rag, org)
+	if hg.applySeizurePostureToRagdoll then hg.applySeizurePostureToRagdoll(rag, org) end
 end
 local function stop_seizure(owner, org)
 	local wasActive = org.seizureActive
@@ -1215,6 +1211,7 @@ local function stop_seizure(owner, org)
 	org.seizure = 0
 	org.seizureActive = false
 	org.seizureStart = 0
+	org.seizureSeverity = nil
 	org.seizureEnd = 0
 	org.seizureFakeCooldownEnd = 0
 	org.seizureOtrubAt = nil
@@ -1244,6 +1241,7 @@ local function start_seizure(owner, org)
 	org.seizure = 1
 	org.seizureActive = true
 	org.seizureStart = time
+	org.seizureSeverity = math.max(severity, 0.2)
 	org.seizureEnd = time + seizure_min_duration + (seizure_max_duration - seizure_min_duration) * severity
 	org.seizureFakeCooldownEnd = org.seizureEnd
 	org.nextSeizureSpasm = time
@@ -1279,6 +1277,7 @@ function hg.organism.StartConvulsion(owner, org)
 	if not org.seizureActive then return end
 	local cfg = hg.organism.convulsionConfig
 	org.convulsing = true
+	org.seizureSeverity = math.max(org.seizureSeverity or 0, 0.85)
 	org.convulsionStart = time
 	org.convulsionLastBrain = org.brain or 0
 	org.convulsionCure = 0
@@ -1734,7 +1733,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		else
 			local rag = owner.FakeRagdoll
 			if IsValid(rag) then
-				apply_seizure_pose(rag, org, time)
+				apply_seizure_pose(rag, org)
 			end
 		end
 	end
@@ -1780,6 +1779,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 			if movementFailure or tissueO2 <= 0.25 then org.needfake = true end
 		end
 		org.paralyzed = (org.spine3 or 0) >= (hg.organism.fake_spine3 or 0.75)
+		org.cervicalParalysis = org.paralyzed
 		org.canmove = (org.spine2 < hg.organism.fake_spine2 and not org.paralyzed) and not org.otrub
 		org.canmovehead = (org.spine3 < hg.organism.fake_spine3) and not org.otrub
 		if not (org.canmove and org.canmovehead and (org.stun - CurTime()) < 0) then org.needfake = true end

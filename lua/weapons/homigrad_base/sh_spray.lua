@@ -62,6 +62,31 @@ SWEP.weaponSway = Angle(0,0,0)
 
 local hg_coolcamera = ConVarExists("hg_coolcamera") and GetConVar("hg_coolcamera") or CreateConVar("hg_coolcamera", 0, FCVAR_ARCHIVE + FCVAR_REPLICATED, "Cool camera movement", 0, 1)
 
+local function rollOneHandRecoilInjury(self, owner, org, arm)
+	local caliberMul, weightMul = self:GetRecoilImpulseFactors()
+	local load = caliberMul * math.sqrt(weightMul) - 1.3
+	if load <= 0 then return end
+
+	local trained = self.HasFirearmTraining and self:HasFirearmTraining(owner)
+	local proficiency = self.GetFirearmProficiency and self:GetFirearmProficiency(owner) or 0
+	local skillMul = trained and 0.45 or Lerp(proficiency, 1.25, 0.7)
+	local armMul = 2 - math.Clamp(hg.GetArmEffectiveness and hg.GetArmEffectiveness(owner, arm) or 1, 0, 1)
+	local risk = load * skillMul * armMul * (self.OneHandRecoilRiskMul or 1)
+
+	if math.Rand(0, 1) < math.min(risk * 0.04, 0.18) then
+		local hurt = math.random() < 0.6 and hg.TryDislocateLimb and hg.TryDislocateLimb(org, arm, "down", 1.2 + load * 0.4)
+		if not hurt and hg.FractureArmSegment then hurt = hg.FractureArmSegment(org, arm, "down", 0.6 + load * 0.3) end
+		if hurt then
+			if hg.drop then hg.drop(owner, self, nil, -120, true) end
+			return
+		end
+	end
+
+	if hg.drop and math.Rand(0, 1) < math.min(risk * 0.11, 0.4) then
+		hg.drop(owner, self, nil, -120, true)
+	end
+end
+
 function SWEP:PrimarySpread()
 	self.Primary.Force2 = (hg.ammotypeshuy[self.Primary.Ammo] and hg.ammotypeshuy[self.Primary.Ammo].BulletSettings and hg.ammotypeshuy[self.Primary.Ammo].BulletSettings.Force) or self.Primary.Force
 	self:SetLastShootTime(CurTime())
@@ -114,6 +139,9 @@ function SWEP:PrimarySpread()
 				if (org[braceArm] or 0) >= 1 then injuryPain = injuryPain + 0.9 end
 			end
 			org.painadd = (org.painadd or 0) + injuryPain
+			if support.oneHanded and not self.IgnoreOneArmPenalties and owner:IsPlayer() then
+				rollOneHandRecoilInjury(self, owner, org, firingArm)
+			end
 		end
 	end
 

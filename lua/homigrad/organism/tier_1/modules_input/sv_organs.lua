@@ -247,13 +247,20 @@ end
 
 hg.organism.AddBrainHemorrhage = addBrainHemorrhage
 
+local function skullBrainTransfer(skull)
+	skull = math.Clamp(tonumber(skull) or 0, 0, 1)
+	if skull >= 1 then return 1 end
+	return 0.05 + 0.35 * skull * skull
+end
+
+hg.organism.SkullBrainTransfer = skullBrainTransfer
+
 local function damageBrainLobe(org, bone, dmg, dmgInfo, key, impact)
 	local profile = brainLobeProfiles[key]
 	if not profile then return 0 end
 	if dmgInfo:IsDamageType(DMG_BLAST) then dmg = dmg / 50 end
 	if dmgInfo:IsDamageType(DMG_CLUB) then
-		local intactSkull = math.Clamp(1 - (org.skull or 0) / 0.7, 0, 1)
-		dmg = dmg / 3 * Lerp(intactSkull, 1, 0.75)
+		dmg = dmg / 3 * skullBrainTransfer(org.skull)
 	end
 
 	if dmgInfo:IsDamageType(DMG_BULLET + DMG_SNIPER) then

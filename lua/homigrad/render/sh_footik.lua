@@ -91,7 +91,16 @@ local LIMP_DIP = 1.6
 local SPRINT_HOP_SCALE = 1.4
 local SPRINT_COMPRESS = 2.2
 local SPRINT_SWING_LIFT = 2.4
-local SPRINT_SWING_PEAK = 0.7
+local SPRINT_SWING_PEAK = 0.5
+local WALK_SWING_PEAK = 0.75
+local JOG_SWING_PEAK = 0.62
+local JOG_SWING_LIFT = 1.4
+local JOG_BLEND_START = 120
+local JOG_BLEND_END = 200
+local HEEL_STRIKE_PITCH = 14
+local RUN_STRIKE_PITCH = 3
+local STRIKE_PITCH_START = 0.5
+local FOOT_FLAT_TIME = 0.12
 local FOOT_SPLAY = 7
 local BROKEN_POWER_START = 0.6
 local BROKEN_POWER_RANGE = 0.5
@@ -461,6 +470,7 @@ local function updateSwing(ply, state, ctx, index, dt)
 		plantFoot(state, foot, foot.tracedPos, foot.targetNormal, foot.targetEnt, ctx.bodyYaw)
 		foot.ground = foot.planted
 		foot.groundNormal = foot.normal
+		foot.landPitch, foot.landTime, foot.pitch = foot.pitch or 0, CurTime(), nil
 
 		if foot.stagger then
 			if not foot.stagger.final then state.staggerFollow = 3 - index end
@@ -479,11 +489,17 @@ local function updateSwing(ply, state, ctx, index, dt)
 	local zProgress = rise > 1 and smoothstep(math_min(t * 1.6, 1)) or s
 	local clearance = (IKFoot.GetFloat("step_height") * (0.6 + 0.4 * ctx.speedFraction) + math_min(math_abs(rise), MAX_RISE_CLEARANCE) * 0.3) * (1 - ctx.limp[index] * LIMP_DRAG) * (ctx.crouching and CROUCH_STEP_SCALE or 1)
 	local sprint = ctx.sprintBlend
-	clearance = clearance * Lerp(sprint, 1, SPRINT_SWING_LIFT)
+	local moving = foot.gait and ctx.speed > MOVING_SPEED
+	local jog = moving and math_Clamp((ctx.speed - JOG_BLEND_START) / (JOG_BLEND_END - JOG_BLEND_START), 0, 1) or 0
+	clearance = clearance * Lerp(sprint, Lerp(jog, 1, JOG_SWING_LIFT), SPRINT_SWING_LIFT)
+	local peak = moving and Lerp(sprint, Lerp(jog, WALK_SWING_PEAK, JOG_SWING_PEAK), SPRINT_SWING_PEAK) or 1
 	local pos = LerpVector(s, start, target)
-	pos.z = Lerp(zProgress, start.z, target.z) + math_sin(math.pi * t ^ Lerp(sprint, 1, SPRINT_SWING_PEAK)) * clearance
+	pos.z = Lerp(zProgress, start.z, target.z) + math_sin(math.pi * t ^ peak) * clearance
 	foot.ground = pos
 	foot.groundNormal = LerpVector(s, foot.startNormal or vector_up, foot.targetNormal)
+
+	local strike = moving and Lerp(smoothstep(hg.GaitRunBlend(ctx.speed)), HEEL_STRIKE_PITCH, RUN_STRIKE_PITCH) * (1 - ctx.limp[index] * LIMP_DRAG) or 0
+	foot.pitch = strike * smoothstep(math_Clamp((t - STRIKE_PITCH_START) / (1 - STRIKE_PITCH_START), 0, 1))
 end
 
 local function remoteGait(ply, state, dt)
@@ -873,18 +889,23 @@ local function alignFoot(foot, carriedAng, animAng, animToe, weight, ankleHeight
 	end
 
 	local yaw = foot.toeYaw or restYaw
+	local pitch = 0
 	if foot.swinging then
 		local startYaw = foot.startYaw or restYaw
 		yaw = startYaw + math_AngleDifference(restYaw, startYaw) * smoothstep(foot.t)
 		weight = weight * (1 - SWING_ALIGN_RELEASE * math_sin(math.pi * foot.t))
+		pitch = foot.pitch or 0
+	elseif foot.landPitch and foot.landPitch > 0 then
+		pitch = foot.landPitch * (1 - smoothstep(math_min((CurTime() - foot.landTime) / FOOT_FLAT_TIME, 1)))
+		if pitch <= 0 then foot.landPitch = nil end
 	end
 	if weight <= 0 then return carriedAng end
 
 	local flat = Angle(0, yaw, 0):Forward()
 	flat = flat - normal * flat:Dot(normal)
 	flat:Normalize()
-	local drop = math_Clamp((ankleHeight - TOE_HEIGHT) / math_max(toeLength, 1), 0, MAX_TOE_DROP)
-	local desired = flat * math_sqrt(1 - drop * drop) - normal * drop
+	local toeDown = math.asin(math_Clamp((ankleHeight - TOE_HEIGHT) / math_max(toeLength, 1), 0, MAX_TOE_DROP)) - math.rad(pitch)
+	local desired = flat * math.cos(toeDown) - normal * math_sin(toeDown)
 	local aligned = rebase(animAng, animToe, vector_up, desired, normal)
 	if roll ~= 0 then aligned:RotateAroundAxis(desired, roll) end
 	if weight >= 1 then return aligned end
@@ -1254,6 +1275,29 @@ function hg.FootIK(ent, ply)
 	local after = before and ent:GetBoneMatrix(head)
 	ply.hg_IKHeadOffset = after and after:GetTranslation() - before or nil
 	ply.hg_IKHeadFrame = FrameNumber()
+
+	local dt = math_min(FrameTime(), 0.1)
+	local body = ply.hg_Body
+	local lean = body and body.frame == FrameNumber() and body.lean:Length() >= 0.2 and vector_up:Cross(body.lean) or Vector()
+	local smooth = ply.hg_IKLeanSmooth or Vector()
+	smooth = smooth + (lean - smooth) * (1 - math_exp(-dt / 0.12))
+	ply.hg_IKLeanSmooth = smooth
+
+	local leanDegrees = smooth:Length()
+	local tilt = leanDegrees > 4 and smooth * ((leanDegrees - 4) / leanDegrees) or Vector()
+
+	local org = ply.organism
+	local grip = hg.GetLimbEffectiveness and hg.GetLimbEffectiveness(org, "rarm", "up") * 0.6 + hg.GetLimbEffectiveness(org, "larm", "up") * 0.4 or 1
+	local recover = 1 - math_exp(-dt * math_max(grip, 0.2) / 0.4)
+	local comp = ply.hg_IKAimComp or Vector()
+	comp = comp + (tilt - comp) * recover
+	if (tilt - comp):Dot(comp) < 0 then comp = Vector(tilt) end
+	ply.hg_IKAimComp = comp
+
+	local aimTilt = (tilt - comp) * 0.8
+	local aimDegrees = aimTilt:Length()
+	if aimDegrees > 12 then aimTilt:Mul(12 / aimDegrees) end
+	ply.hg_IKAimTilt = aimTilt
 end
 
 function hg.GetIKHeadOffset(ply)
@@ -1261,6 +1305,13 @@ function hg.GetIKHeadOffset(ply)
 	if not offset or FrameNumber() - (ply.hg_IKHeadFrame or 0) > 2 then return end
 
 	return offset
+end
+
+function hg.GetIKAimTilt(ply)
+	local tilt = ply.hg_IKAimTilt
+	if not tilt or FrameNumber() - (ply.hg_IKHeadFrame or 0) > 2 or tilt:LengthSqr() < 0.0025 then return end
+
+	return tilt
 end
 
 function hg.GetIKGunShift(ent, ply)

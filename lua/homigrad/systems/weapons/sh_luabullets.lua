@@ -804,6 +804,7 @@ function ENTITY:FireLuaBullets(tInfo)
 				--print(tr.Entity, tr.HitGroup, hitgroup, tr.PhysicsBone, tr.StartSolid)
 			end
 
+			if SERVER and hg.SkipOwnGripHit then tr = hg.SkipOwnGripHit(tr, vNewSrc, vEnd, pAttacker, Filter, iMask) end
 			if SERVER and hg.TraceHeldWeaponShot then
 				local equipmentDamage = iDamage ~= 0 and iDamage or (bIsPlayer and iAmmoPlayerDamage or iAmmoNPCDamage)
 				tr = hg.TraceHeldWeaponShot(vNewSrc, tr.Hit and tr.HitPos or vEnd, pAttacker, equipmentDamage, flForce, tr, {
@@ -1187,6 +1188,7 @@ function PLAYER:FireCSSBullets(tInfo)
 					filter = Filter
 				})
 			
+			if SERVER and hg.SkipOwnGripHit then tr = hg.SkipOwnGripHit(tr, vNewSrc, vEnd, pAttacker, Filter, iMask) end
 			if SERVER and hg.TraceHeldWeaponShot then
 				equipmentShot.Penetration = flPenetrationPower
 				tr = hg.TraceHeldWeaponShot(vNewSrc, tr.Hit and tr.HitPos or vEnd, pAttacker, flCurrentDamage, flForce, tr, equipmentShot) or tr

@@ -694,26 +694,57 @@ function hg.GetHeldWeaponImpactModel(ply, wep)
     return modelName, pos, ang, scale
 end
 
+local POSE_BOX_ISOLATION = 12
+local POSE_BOX_HUMAN_PARTS = {"hand", "arm", "palm", "finger", "clavicle", "spine"}
+
+local function IsPoseBoxHumanBone(name)
+    if not (name:find("valvebiped", 1, true) or name:find("human", 1, true) or name:find("bip01", 1, true)) then return false end
+    for _, part in ipairs(POSE_BOX_HUMAN_PARTS) do
+        if name:find(part, 1, true) then return true end
+    end
+    return false
+end
+
+local function CollectPoseBoxes(pose, scale)
+    local boxes = {}
+    if not IsValid(pose) then return boxes end
+    local set = pose.GetHitboxSet and pose:GetHitboxSet() or 0
+    for index = 0, (pose:GetHitBoxCount(set) or 0) - 1 do
+        local bone = pose:GetHitBoxBone(index, set)
+        if not bone or IsPoseBoxHumanBone(string.lower(pose:GetBoneName(bone) or "")) then continue end
+        local matrix = pose:GetBoneMatrix(bone)
+        local mins, maxs = pose:GetHitBoxBounds(index, set)
+        if not matrix or not mins or not maxs then continue end
+        mins, maxs = mins * scale, maxs * scale
+        local pos, ang = matrix:GetTranslation(), matrix:GetAngles()
+        boxes[#boxes + 1] = {pos = pos, ang = ang, mins = mins, maxs = maxs, center = LocalToWorld((mins + maxs) * 0.5, angle_zero, pos, ang), radius = (maxs - mins):Length() * 0.5}
+    end
+    if #boxes < 2 then return boxes end
+    local attached = {}
+    for i, box in ipairs(boxes) do
+        for j, other in ipairs(boxes) do
+            if i ~= j and box.center:Distance(other.center) - box.radius - other.radius <= POSE_BOX_ISOLATION then
+                attached[#attached + 1] = box
+                break
+            end
+        end
+    end
+    return attached
+end
+
 local function TraceHeldWeaponModel(ply, wep, startPos, endPos, padding)
     local model, pos, ang, scale, pose, worldPos, worldAng = hg.GetHeldWeaponImpactModel(ply, wep)
     if not model then return end
     local best, hasPoseGeometry
-    local set = IsValid(pose) and pose.GetHitboxSet and pose:GetHitboxSet() or 0
-    if IsValid(pose) and (pose:GetHitBoxCount(set) or 0) > 0 then
+    local poseBoxes = CollectPoseBoxes(pose, scale or 1)
+    if #poseBoxes > 0 then
+        hasPoseGeometry = true
         local expand = Vector(padding, padding, padding)
         local ray = endPos - startPos
-        for index = 0, pose:GetHitBoxCount(set) - 1 do
-            local bone = pose:GetHitBoxBone(index, set)
-            local name = bone and string.lower(pose:GetBoneName(bone) or "") or ""
-            local humanBone = name:find("valvebiped", 1, true) or name:find("human", 1, true) or name:find("bip01", 1, true)
-            if humanBone and (name:find("hand", 1, true) or name:find("arm", 1, true) or name:find("palm", 1, true) or name:find("finger", 1, true) or name:find("clavicle", 1, true)) then continue end
-            local matrix = bone and pose:GetBoneMatrix(bone)
-            local mins, maxs = pose:GetHitBoxBounds(index, set)
-            if not matrix or not mins or not maxs then continue end
-            hasPoseGeometry = true
-            local position, normal, fraction = util.IntersectRayWithOBB(startPos, ray, matrix:GetTranslation(), matrix:GetAngles(), mins * scale - expand, maxs * scale + expand)
+        for _, box in ipairs(poseBoxes) do
+            local position, normal, fraction = util.IntersectRayWithOBB(startPos, ray, box.pos, box.ang, box.mins - expand, box.maxs + expand)
             if position and (not best or fraction < best.fraction) then
-                best = {position = position, normal = normal, fraction = fraction, thickness = math.max((maxs - mins):Length() * scale, 0.05)}
+                best = {position = position, normal = normal, fraction = fraction, thickness = math.max((box.maxs - box.mins):Length(), 0.05)}
             end
         end
     end
@@ -1243,6 +1274,30 @@ end
 
 local debugWeaponHits = CreateConVar("hg_debug_weaponhits", "0", FCVAR_NONE)
 
+local OWN_GRIP_RADIUS_SQR = 40 * 40
+
+local function IsOwnGripHit(trace, shooter)
+    local ent = trace.Entity
+    local bone = ent:IsPlayer() and trace.HitBoxBone
+    if not bone and ent:IsRagdoll() and isfunction(ent.TranslatePhysBoneToBone) then bone = ent:TranslatePhysBoneToBone(trace.PhysicsBone or 0) end
+    local name = bone and bone >= 0 and string.lower(ent:GetBoneName(bone) or "") or ""
+    if not (name:find("hand", 1, true) or name:find("forearm", 1, true)) then return false end
+    local wep = shooter:GetActiveWeapon()
+    local ref = IsValid(wep) and (isvector(wep.handPos) and wep.handPos or wep:GetPos()) or shooter:EyePos()
+    return trace.HitPos:DistToSqr(ref) <= OWN_GRIP_RADIUS_SQR
+end
+
+function hg.SkipOwnGripHit(trace, startPos, endPos, shooter, filter, mask)
+    if IsValid(shooter) and shooter:IsWeapon() then shooter = shooter:GetOwner() end
+    if not IsValid(shooter) or not shooter:IsPlayer() or shooter.suiciding then return trace end
+    local direction = (endPos - startPos):GetNormalized()
+    for _ = 1, 4 do
+        if not trace or not trace.Hit or not TraceBelongsToPlayer(trace, shooter) or not IsOwnGripHit(trace, shooter) then break end
+        trace = util.TraceLine({start = trace.HitPos + direction * 2, endpos = endPos, mask = mask or MASK_SHOT, filter = filter})
+    end
+    return trace
+end
+
 local function DebugWeaponTrace(ply, wep, startPos, endPos, hit, obstructionFraction, originalTrace)
     local model, pos, ang, scale, pose = hg.GetHeldWeaponImpactModel(ply, wep)
     local ray = endPos - startPos
@@ -1260,13 +1315,8 @@ local function DebugWeaponTrace(ply, wep, startPos, endPos, hit, obstructionFrac
     debugoverlay.Line(startPos, endPos, 6, Color(255, 255, 0), true)
     if isvector(pos) and isangle(ang) then debugoverlay.Axis(pos, ang, 12, 6, true) end
     if IsValid(pose) and poseBoxes > 0 then
-        for index = 0, poseBoxes - 1 do
-            local bone = pose:GetHitBoxBone(index, set)
-            local matrix = bone and pose:GetBoneMatrix(bone)
-            local mins, maxs = pose:GetHitBoxBounds(index, set)
-            if matrix and mins and maxs then
-                debugoverlay.BoxAngles(matrix:GetTranslation(), mins * scale, maxs * scale, matrix:GetAngles(), 6, Color(255, 0, 0, 40))
-            end
+        for _, box in ipairs(CollectPoseBoxes(pose, scale or 1)) do
+            debugoverlay.BoxAngles(box.pos, box.mins, box.maxs, box.ang, 6, Color(255, 0, 0, 40))
         end
     end
 end

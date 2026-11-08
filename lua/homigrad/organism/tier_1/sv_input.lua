@@ -1210,20 +1210,24 @@ function hg.organism.AddWound(ent, tr, bone, dmgInfo, dmgPos, dmgBlood, inputHol
 	end
 	
 	if bone and dmgBlood > 0 then
+		local surfacePos = isvector(dmgPos) and dmgPos or nil
+		local ballistic = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
+		local hasExit = ballistic and outputHole[1] ~= nil
+		local forceBonePos = dmgInfo:IsDamageType(DMG_BLAST) or (dmgInfo:GetAttacker():IsNPC() and not ballistic) or (ent:IsPlayer() and ent:InVehicle())
 		for i = 1, 2 do
 			local matrix = bone >= 0 and ent:GetBoneMatrix(bone)
 			local bonePos = matrix and matrix:GetTranslation()
-			
+
 			if not bonePos then return end
 
-			dmgPos = (i == 1 and inputHole[1] or outputHole[1]) or bonePos
-			
-			if i == 2 and not outputHole[1] then continue end
-			if i == 1 and not outputHole[1] then dmgBlood = dmgBlood * 2 end
+			if i == 2 and not hasExit then continue end
+			if i == 1 and not hasExit then dmgBlood = dmgBlood * 2 end
 
-			if dmgInfo:IsDamageType(DMG_BLAST) or dmgInfo:GetAttacker():IsNPC() or (ent:IsPlayer() and ent:InVehicle()) then dmgPos = bonePos end
+			dmgPos = (i == 1 and (surfacePos or inputHole[1]) or outputHole[1]) or bonePos
 
-			local localPos, localAng, woundBone = hg.organism.GetWoundAnchor(ent, dmgPos + ((i == 1 and 1 or -1) * hitNormal), ((i == 1 and -1 or 1) * traceNormal):Angle(), bone)
+			if forceBonePos then dmgPos = bonePos end
+
+			local localPos, localAng, woundBone = hg.organism.GetWoundAnchor(ent, dmgPos + ((i == 1 and 1 or -1) * hitNormal), ((i == 1 and -1 or 1) * traceNormal):Angle(), i == 1 and bone or nil)
 			if not localPos then continue end
 			local exitBleedMul = i == 2 and impact and 1 + math.min(impact.expansionTrauma or 0, 3) * 0.75 or 1
 			addOrReopenWound(org, dmgBlood / 2 * exitBleedMul, localPos, localAng, woundBone, CurTime(), woundType)
@@ -2109,7 +2113,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	--end
 
 	if inputHole and inputHole[1] and #org.arterialwounds > arterialWoundCount and dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT+DMG_SLASH+DMG_CLUB+DMG_GENERIC) then
-		local woundPos, woundAng, woundBone = hg.organism.GetWoundAnchor(ent, inputHole[1], dir:Angle(), ent:TranslatePhysBoneToBone(bone or 0))
+		local woundPos, woundAng, woundBone = hg.organism.GetWoundAnchor(ent, isvector(dmgPos) and dmgPos or inputHole[1], dir:Angle(), ent:TranslatePhysBoneToBone(bone or 0))
 		local woundBoneID = woundPos and ent:LookupBone(woundBone)
 		local woundMatrix = woundBoneID and woundBoneID >= 0 and ent:GetBoneMatrix(woundBoneID)
 		if woundMatrix then
@@ -2123,8 +2127,9 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	end
 
 	if inputHole and #inputHole > 0 and dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT) then
+		local entryHole = isvector(dmgPos) and dmgPos or inputHole[1]
 		local effdata = EffectData()
-		effdata:SetOrigin(inputHole[1])
+		effdata:SetOrigin(entryHole)
 		effdata:SetRadius(dmg / 10)
 		effdata:SetMagnitude(dmg / 10)
 		effdata:SetScale(1)
@@ -2136,12 +2141,12 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 
 		ent.bloodamt2 = ent.bloodamt2 or 0
 		ent.bloodamt2 = ent.bloodamt2 + 1
-		local entryPos, entryAng, entryBone = hg.organism.GetWoundAnchor(ent, inputHole[1], dir:Angle(), ent:TranslatePhysBoneToBone(bone or 0))
+		local entryPos, entryAng, entryBone = hg.organism.GetWoundAnchor(ent, entryHole, dir:Angle(), ent:TranslatePhysBoneToBone(bone or 0))
 
 		queueTimer(ent, "blood_input", 0.02, function()
 			if not IsValid(ent) then return end
 			net.Start("hg_bloodimpact")
-			net.WriteVector(inputHole[1])
+			net.WriteVector(entryHole)
 			net.WriteVector(dir / 2)
 			net.WriteFloat(dmg)
 			net.WriteInt(ent.bloodamt2, 8)
@@ -2151,13 +2156,13 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 				net.WriteAngle(entryAng)
 				net.WriteString(entryBone)
 			end
-			net.SendPVS(inputHole[1])
+			net.SendPVS(entryHole)
 			ent.bloodamt2 = 0
 		end)
 
 		local goreMul = 1 + (impact.expansionTrauma or 0) * 0.6 + math.max((impact.temporaryCavity or 0.5) - 0.5, 0) * 0.8 + math.max((impact.woundMultiplier or 1) - 1, 0) * 0.4
 		local goreExit = outputHole and outputHole[1] and outputHole[#outputHole] or nil
-		hg.GoreSpray(inputHole[1], dir, dmg / 30 * goreMul, false, goreExit)
+		hg.GoreSpray(entryHole, dir, dmg / 30 * goreMul, false, goreExit)
 	end
 
 	--print(dmg_before, 2)
@@ -3319,6 +3324,7 @@ function hg.BreakNeck(ent, recipient, soundEnt, deathChance)
 	org.heartbeat = math.min(tonumber(org.heartbeat) or 70, 45)
 	org.cervicalRespiratoryArrest = false
 	org.respiratoryArrest = false
+	if hg.organism.RollSpinalCordFailure then hg.organism.RollSpinalCordFailure(org, "spine3") end
 	if (org.spine3AcutePainUntil or 0) <= CurTime() then
 		org.spine3AcutePainUntil = CurTime() + 1.5
 		org.spine3AcutePain = 95

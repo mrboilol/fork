@@ -633,6 +633,46 @@ local function legs(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 	return result, vecrand
 end
 
+local function fractureArmSegment(org, key, segment, dmg, otherBroken)
+	local stabilized = org[key.."stabilized"]
+	org[segmentHealthKey(key, segment)] = 1
+	if hg.fakeBoneFlop then
+		hg.fakeBoneFlop.SetLimbSegmentState(org, key, segment, not stabilized)
+	end
+
+	if not stabilized then
+		addBoneFracturePain(org, 55, "body")
+		org.immobilization = org.immobilization + dmg * 25
+	else
+		addBoneFracturePain(org, 10, "body")
+		org.immobilization = org.immobilization + dmg * 5
+	end
+	org.owner:AddNaturalAdrenaline(1)
+	org.fearadd = org.fearadd + 0.5
+
+	if hasNewThoughts(org) then
+		sendThought(org, "Your " .. segmentName[key][segment] .. " is broken.", "thought_broke" .. key .. segment, 1, Color(255, 210, 210))
+	else
+		notifyBoneBreak(org, key, broke_arm[math.random(#broke_arm)], "broke" .. key .. segment)
+	end
+
+	playBoneFractureSound(org.owner)
+	if org.isPly and hg.QueuePainScream and canFeelPain(org, "body") then hg.QueuePainScream(org.owner, 1.35) end
+	if otherBroken then compoundFractureResponse(org, key, "body", stabilized) end
+end
+
+function hg.FractureArmSegment(org, key, segment, dmg)
+	if not org or (key ~= "rarm" and key ~= "larm") or not IsValid(org.owner) or org[key .. "amputated"] or org[key .. "upamputated"] then return false end
+	segment = segment == "up" and "up" or "down"
+	hg.organism.SyncLimbSegments(org, key)
+	if (org[segmentHealthKey(key, segment)] or 0) >= 1 then return false end
+	local otherBroken = (org[segmentHealthKey(key, otherSegment(segment))] or 0) >= 1
+	if org.isPly then org.just_damaged_bone = CurTime() end
+	fractureArmSegment(org, key, segment, math.max(tonumber(dmg) or 1, 0), otherBroken)
+	refreshLimbAggregate(org, key)
+	return true
+end
+
 local function arms(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, ricochet)
 	hg.organism.SyncLimbSegments(org, key)
 	local healthKey = segmentHealthKey(key, segment)
@@ -660,33 +700,8 @@ local function arms(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 
 	if IsValid(org.owner) and org.owner:IsPlayer() and !org[key.."amputated"] then org.just_damaged_bone = CurTime() end
 
-	local stabilized = org[key.."stabilized"]
-
 	if not shouldDislocateLimb(org, key, segment, dmgInfo, hit) then
-		org[healthKey] = 1
-		if hg.fakeBoneFlop then
-			hg.fakeBoneFlop.SetLimbSegmentState(org, key, segment, not stabilized)
-		end
-
-		if not stabilized then
-			addBoneFracturePain(org, 55, "body")
-			org.immobilization = org.immobilization + dmg * 25
-		else
-			addBoneFracturePain(org, 10, "body")
-			org.immobilization = org.immobilization + dmg * 5
-		end
-		org.owner:AddNaturalAdrenaline(1)
-		org.fearadd = org.fearadd + 0.5
-
-		if hasNewThoughts(org) then
-			sendThought(org, "Your " .. segmentName[key][segment] .. " is broken.", "thought_broke" .. key .. segment, 1, Color(255, 210, 210))
-		else
-			notifyBoneBreak(org, key, broke_arm[math.random(#broke_arm)], "broke" .. key .. segment)
-		end
-
-		playBoneFractureSound(org.owner)
-		if org.isPly and hg.QueuePainScream and canFeelPain(org, "body") then hg.QueuePainScream(org.owner, 1.35) end
-		if otherBroken then compoundFractureResponse(org, key, "body", stabilized) end
+		fractureArmSegment(org, key, segment, dmg, otherBroken)
 	else
 		doDislocate(org, key, dmg, segment)
 	end
@@ -713,6 +728,46 @@ local spine_partial_break_floppiness = 0.3
 local spine_full_break_death_chance = 0.35
 local spine_early_break_threshold = 0.5
 local spine_early_break_chance = 0.3
+local spinal_cord_failure = {
+	spine2 = {bradypnea = 0.25, bradycardia = 0.35},
+	spine3 = {bradypnea = 0.6, bradycardia = 0.45},
+}
+local spinal_failure_onset = 25
+local spine_heal_time = 480
+local spine_splint_heal_mul = 1.35
+
+function hg.organism.RollSpinalCordFailure(org, name)
+	local chances = spinal_cord_failure[name]
+	if not org or not chances or org[name .. "CordRolled"] then return end
+	org[name .. "CordRolled"] = true
+
+	local bradypnea = math.Rand(0, 1) < chances.bradypnea
+	if bradypnea then
+		org.spinalBradypneaTarget = math.max(org.spinalBradypneaTarget or 0, math.Rand(0.8, 1))
+	end
+	if math.Rand(0, 1) < chances.bradycardia then
+		org.spinalBradycardiaTarget = math.max(org.spinalBradycardiaTarget or 0, math.Rand(0.85, 1))
+	end
+	if bradypnea and org.isPly and IsValid(org.owner) and org.owner:IsPlayer() then
+		org.owner:Notify("I can barely breathe... every breath is weaker...", true, "spinal_bradypnea", 3, nil, Color(255, 120, 120))
+	end
+end
+
+function hg.organism.StabilizeSpine(org, name, amount, splint)
+	if not hg.IsSpinePartiallyBroken or not hg.IsSpinePartiallyBroken(org, name) then return 0 end
+	local current = org[name]
+	org[name] = math.max(current - (amount or 0.25), 0)
+	org[name .. "stabilized"] = true
+	if splint then org[name .. "splinted"] = true end
+	if name == "spine3" and org[name] < (hg.organism.fake_spine3 or 0.75) then
+		org.paralyzed = false
+		org.cervicalParalysis = false
+	end
+	if hg.fakeBoneFlop and hg.fakeBoneFlop.ReconcileSpine and hg.fakeBoneFlop.ReconcileSpine(org) then
+		hg.fakeBoneFlop.ScheduleRebuild(org.owner)
+	end
+	return current - org[name]
+end
 
 local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricochet)
 	if dmgInfo:IsDamageType(DMG_BLAST) then dmg = dmg / 3 end
@@ -739,6 +794,9 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 	end
 	if name ~= "spine3" and oldDmg < breakThreshold and org[name] >= breakThreshold and hg.fakeBoneFlop then
 		hg.fakeBoneFlop.SetBoneState(org, "ValveBiped.Bip01_Spine2", true, spine_partial_break_floppiness)
+	end
+	if name == "spine2" and oldDmg < breakThreshold and org[name] >= breakThreshold then
+		hg.organism.RollSpinalCordFailure(org, name)
 	end
 
 	if oldDmg < breakThreshold and org[name] >= breakThreshold and org.isPly then
@@ -1128,6 +1186,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	local bluntMelee = dmgInfo:IsDamageType(DMG_CLUB) and not (impact and impact.source == "physics")
 	local meleeContact = IsValid(dmgInfo:GetInflictor()) and dmgInfo:GetInflictor().MeleeDamageContact
 	local fullCharge = meleeContact and meleeContact.fullCharge and not (impact and impact.source == "physics")
+	local brainTransfer = hg.organism.SkullBrainTransfer and hg.organism.SkullBrainTransfer(oldDmg) or 1
 
 	local result, vecrand, appliedSkullDmg = damageBone(org, 0.25, bluntMelee and dmg * melee_skull_bone_mul or dmg, dmgInfo, "skull", boneindex, dir, hit, ricochet, oldDmg >= 1)
 	if oldDmg >= 1 then
@@ -1171,6 +1230,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 				if not ignoreBrainDamage then org.brain = math.min((org.brain or 0) + excess * skull_break_brain_mul, 1) end
 			end
 		end
+		if bluntMelee and not fullCharge then result = 1 end
 	end
 	if isMelee(dmgInfo) and oldDmg < 1 and org.skull < 1 and dmg > 0.3 and dmg < 1.35 then result = 1 end
 
@@ -1200,7 +1260,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 
 	local rnd = not headOutcomeHandled and (math.random(10) == 1 or dmgInfo:IsDamageType(DMG_CRUSH)) and brainEnergy > 0.05
 
-	org.brain = math.min(org.brain + (rnd and dmg * 0.05 or 0), 1)
+	org.brain = math.min(org.brain + (rnd and dmg * 0.05 * brainTransfer or 0), 1)
 	if not ignoreBrainDamage and impact and impact.source == "physics" and oldDmg >= 1 and brainEnergy > 0.05 then
 		org.brain = math.min(org.brain + math.Clamp(brainEnergy * 0.06, 0.005, 0.12), 1)
 	end
@@ -1215,7 +1275,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	end
 
 	if (org.skull - oldDmg) > 0.6 and brainEnergy > 0.05 then
-		org.brain = math.min(org.brain + 0.1, 1)
+		org.brain = math.min(org.brain + 0.1 * (hg.organism.SkullBrainTransfer and hg.organism.SkullBrainTransfer(org.skull) or 1), 1)
 	end
 
 	if not ignoreBrainDamage and brainEnergy > 0.05 and org.brain >= 0.01 and math.random(3) == 1 and (rnd or (org.skull - oldDmg) > 0.6) then
@@ -1254,7 +1314,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		and dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH) and dmg > bluntTuning.dazeStart then
 		local helmetMul = helmetProtectedHit and 0.25 or 1
 		if not ignoreBrainDamage then
-			local brainChance = math.Clamp((dmg - bluntTuning.brainStart) * bluntTuning.brainSlope, 0, bluntTuning.brainMax) * helmetMul
+			local brainChance = math.Clamp((dmg - bluntTuning.brainStart) * bluntTuning.brainSlope, 0, bluntTuning.brainMax) * helmetMul * brainTransfer
 			if math.Rand(0, 1) < brainChance then
 				org.brain = math.min((org.brain or 0) + dmg * math.Rand(0.04, 0.14), 1)
 				brainDelta = math.max(org.brain - oldBrain, 0)
@@ -1467,6 +1527,37 @@ input_list.llegdown = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ric
 input_list.spine1 = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return spine(org, bone, dmg, dmgInfo, 1, boneindex, dir, hit, ricochet) end
 input_list.spine2 = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return spine(org, bone, dmg, dmgInfo, 2, boneindex, dir, hit, ricochet) end
 input_list.spine3 = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return spine(org, bone, dmg, dmgInfo, 3, boneindex, dir, hit, ricochet) end
+
+hook.Add("Org Think", "homigrad_spinal_cord", function(owner, org, timeValue)
+	if not org.alive then return end
+
+	local anyFull = false
+	for _, name in ipairs({"spine2", "spine3"}) do
+		if hg.IsSpineFullyBroken and hg.IsSpineFullyBroken(org, name) then
+			anyFull = true
+			org[name .. "stabilized"] = false
+			org[name .. "splinted"] = false
+		else
+			org[name .. "CordRolled"] = nil
+			if org[name .. "stabilized"] then
+				local healMul = (org[name .. "splinted"] and spine_splint_heal_mul or 1) * hg.organism.RecoveryMul(org)
+				org[name] = math.max((org[name] or 0) - timeValue / spine_heal_time * healMul, 0)
+				if org[name] < 0.05 then
+					org[name] = 0
+					org[name .. "stabilized"] = false
+					org[name .. "splinted"] = false
+				end
+			end
+		end
+	end
+
+	if not anyFull then
+		org.spinalBradypneaTarget = 0
+		org.spinalBradycardiaTarget = 0
+	end
+	org.spinalBradypnea = math.Approach(org.spinalBradypnea or 0, org.spinalBradypneaTarget or 0, timeValue / spinal_failure_onset)
+	org.spinalBradycardia = math.Approach(org.spinalBradycardia or 0, org.spinalBradycardiaTarget or 0, timeValue / spinal_failure_onset)
+end)
 
 hook.Add("Org Think", "homigrad_bone_stabilization", function(owner, org, timeValue)
 	if not org.alive then return end

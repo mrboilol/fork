@@ -27,8 +27,10 @@ SWEP.weight = 0.4
 SWEP.holsteredBone = "ValveBiped.Bip01_Spine2"
 SWEP.holsteredPos = Vector(5, 8, -4)
 SWEP.holsteredAng = Angle(270, 0, 180)
-SWEP.BigMeleeHolsterBackOffset = 6
+SWEP.BigMeleeHolsterBackOffset = 9
 SWEP.BigMeleeHolsterSide = 0
+SWEP.BigMeleeHolsterDrop = 3
+SWEP.BigMeleeHolsterTilt = 45
 SWEP.BigMeleeDrawArc = 14
 SWEP.BigMeleeReachTime = 0.8
 SWEP.BigMeleeDeployTime = 1
@@ -461,9 +463,10 @@ if CLIENT then
 
         local anchorPos, anchorAng = LocalToWorld(self.holsteredPos, self.holsteredAng, spine:GetTranslation(), spine:GetAngles())
         local _, ang = LocalToWorld(self.weaponPos or vector_origin, self.weaponAng or angle_zero, anchorPos, anchorAng)
-        local pos = spine:GetTranslation() - forward * (self.BigMeleeHolsterBackOffset or 6) + side * (self.BigMeleeHolsterSide or 5)
+        local pos = spine:GetTranslation() - forward * (self.BigMeleeHolsterBackOffset or 9) + side * (self.BigMeleeHolsterSide or 0) - up * (self.BigMeleeHolsterDrop or 3)
 
-        local target = up
+        local tilt = math.rad(self.BigMeleeHolsterTilt or 45)
+        local target = up * math.cos(tilt) + side * math.sin(tilt)
 
         local size = model:OBBMaxs() - model:OBBMins()
         local lengthDir = size.x >= size.y and size.x >= size.z and ang:Forward()
@@ -1393,7 +1396,14 @@ function SWEP:SetHandPos(noset)
 
 	local bones = hg.TPIKBonesRH
 	local reachEnd = math.max(self.MeleeDeployReachEnd or 0, self:GetNWFloat("MeleeDeployReachEnd", 0))
-	local reachLerp = leftDraw and reachEnd > clock and grip
+	local reachLerp = false
+	if leftDraw and reachEnd > clock then
+		reachLerp = 0
+		if moveStart <= clock then
+			local moveFraction = math.Clamp((clock - moveStart) / math.max(reachEnd - moveStart, 0.001), 0, 1)
+			reachLerp = math.ease.InOutSine(math.Clamp((moveFraction - 0.4) / 0.6, 0, 1))
+		end
+	end
 
 	if self.rhandik and self:InUse() then
 		for _, bone in ipairs(bones) do

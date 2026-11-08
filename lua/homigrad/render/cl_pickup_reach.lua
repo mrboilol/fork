@@ -3,11 +3,10 @@ local WorldToLocal, LocalToWorld = WorldToLocal, LocalToWorld
 
 local REACH_TIME = 0.55
 local WEAK_REACH_TIME = 0.95
-local GRAB_FRACTION = 0.45
-local GRAB_RADIUS = 3
-local SETTLE_TIME = 0.06
+local GRAB_FRACTION = 0.5
+local HOVER_FRACTION = 0.5
 local HANDOFF_BLEND = 0.35
-local REACH_SPAN = 1.85
+local REACH_SPAN = 1.95
 local WEAK_EXTENT = 0.65
 local WEAK_SAG = 3
 local WEAK_TREMOR = 0.6
@@ -161,6 +160,122 @@ net.Receive("hg_pickup_handoff", function()
 	reach.blend = IsValid(wep) and wep.isTPIKBase and 0 or HANDOFF_BLEND
 end)
 
+local function dressGhost(reach)
+	local ghost, item = reach.ghost, reach.entity
+	ghost:SetSkin(reach.skin)
+	ghost:SetModelScale(reach.scale, 0)
+	if not IsValid(item) then return end
+
+	for i = 0, 6 do
+		ghost:SetBodygroup(i, item:GetBodygroup(i))
+	end
+
+	if item.WorldModelFake ~= ghost:GetModel() then return end
+	if item.FakeBodyGroups then ghost:SetBodyGroups(item.FakeBodyGroups) end
+
+	local idle = item.AnimList and item.AnimList.idle or "idle"
+	local sequence = isstring(idle) and ghost:LookupSequence(idle) or idle
+	if isnumber(sequence) and sequence >= 0 then ghost:SetSequence(sequence) end
+end
+
+local function ensureGhost(reach)
+	if IsValid(reach.ghost) then return reach.ghost end
+	if not reach.model then return end
+
+	local ghost = ClientsideModel(reach.model, RENDERGROUP_OPAQUE)
+	if not IsValid(ghost) then
+		reach.model = nil
+
+		return
+	end
+
+	ghost:SetNoDraw(true)
+	reach.ghost = ghost
+	dressGhost(reach)
+
+	return ghost
+end
+
+local function aimAngle(ang, dir)
+	local fwd = ang:Forward()
+	dir = dir:GetNormalized()
+	local axis = fwd:Cross(dir)
+	local sine = axis:Length()
+	local out = Angle(ang.p, ang.y, ang.r)
+	if sine < 0.0001 then return out end
+
+	out:RotateAroundAxis(axis / sine, math.deg(math.atan2(sine, fwd:Dot(dir))))
+
+	return out
+end
+
+local function fakeGrip(reach, item)
+	if not IsValid(item) or not reach.model or reach.model ~= item.WorldModelFake then return end
+
+	local ghost = ensureGhost(reach)
+	local bone = ghost and ghost:LookupBone(HANDS[reach.side].hand)
+	if not bone then return end
+
+	ghost:SetRenderOrigin(vector_origin)
+	ghost:SetRenderAngles(angle_zero)
+	ghost:InvalidateBoneCache()
+	ghost:SetupBones()
+	local mat = ghost:GetBoneMatrix(bone)
+	if mat then return mat:GetTranslation(), mat:GetAngles() end
+end
+
+local function swepGrip(reach, item)
+	if not IsValid(item) or not item.WorldPos or not item.LHPos then return end
+
+	local frame = Vector(0, 0, -1)
+	local handPos, handAng
+	if reach.side == "left" then
+		local lhang = Angle(0, 0, 0)
+		lhang:RotateAroundAxis(lhang:Forward(), -90)
+		handPos, handAng = LocalToWorld(item.LHPos, item.LHAng or angle_zero, frame, lhang)
+		handPos, handAng = LocalToWorld(item.LHPosOffset or vector_origin, item.LHAngOffset or angle_zero, handPos, handAng)
+	else
+		handPos, handAng = LocalToWorld(item.RHPosOffset or vector_origin, item.RHAngOffset or angle_zero, frame, angle_zero)
+	end
+
+	local modelPos, modelAng = LocalToWorld(item.WorldPos, (item.WorldAng or angle_zero) + (item.WorldAng2 or angle_zero), vector_origin, angle_zero)
+	modelAng:RotateAroundAxis(modelAng:Forward(), 180)
+	if reach.model and reach.model == item.WorldModelFake and item.FakePos and item.FakeAng then
+		modelPos, modelAng = LocalToWorld(item.FakePos, item.FakeAng, modelPos, modelAng)
+	end
+
+	return WorldToLocal(handPos, handAng, modelPos, modelAng)
+end
+
+local function fallbackGrip(reach, ent)
+	local hand = HANDS[reach.side]
+	local handBone = ent:LookupBone(hand.hand)
+	local handMat = handBone and ent:GetBoneMatrix(handBone)
+	if not handMat then return end
+
+	local shoulderBone = ent:LookupBone(hand.upperArm)
+	local shoulderMat = shoulderBone and ent:GetBoneMatrix(shoulderBone)
+	local origin = shoulderMat and shoulderMat:GetTranslation() or handMat:GetTranslation()
+	local aim = aimAngle(handMat:GetAngles(), reach.target - origin)
+
+	return WorldToLocal(reach.target - aim:Forward() * HAND_GRIP_OFFSET, aim, reach.modelPos, reach.modelAng)
+end
+
+local function ensureGrip(reach, ent)
+	if reach.handInModelPos then return true end
+
+	local item = reach.entity
+	local pos, ang = fakeGrip(reach, item)
+	if not pos then pos, ang = swepGrip(reach, item) end
+	if not pos then pos, ang = fallbackGrip(reach, ent) end
+	if not pos then return false end
+
+	reach.handInModelPos, reach.handInModelAng = pos, ang
+	reach.modelInHandPos, reach.modelInHandAng = WorldToLocal(vector_origin, angle_zero, pos, ang)
+
+	return true
+end
+
 local function reachGoal(ent, ply, reach, hand, weight)
 	local shoulderBone = ent:LookupBone(hand.upperArm)
 	local shoulderMat = shoulderBone and ent:GetBoneMatrix(shoulderBone)
@@ -170,20 +285,20 @@ local function reachGoal(ent, ply, reach, hand, weight)
 	local forearmLength = forearm and ply:BoneLength(forearm) or 0
 	if forearmLength <= 0 then forearmLength = DEFAULT_FOREARM_LENGTH end
 
+	local goal, goalAng = LocalToWorld(reach.handInModelPos, reach.handInModelAng, reach.modelPos, reach.modelAng)
 	local shoulder = shoulderMat:GetTranslation()
-	local toItem = reach.target - shoulder
-	local distance = toItem:Length()
+	local toGoal = goal - shoulder
+	local distance = toGoal:Length()
 	local maxReach = forearmLength * REACH_SPAN * (reach.weak and WEAK_EXTENT or 1)
-	if distance > 0 then toItem:Mul(math_Clamp(distance - HAND_GRIP_OFFSET, 0, maxReach) / distance) end
+	if distance > maxReach then goal = shoulder + toGoal * (maxReach / distance) end
 
-	local goal = shoulder + toItem
 	if reach.weak then
 		local now = CurTime()
 		local tremor = Vector(math_sin(now * 23), math_cos(now * 19), math_sin(now * 29)) * WEAK_TREMOR
 		goal = goal + (tremor - vector_up * WEAK_SAG) * weight
 	end
 
-	return goal
+	return goal, goalAng
 end
 
 function hg.PickupReachTPIK(ent, ply, wpn)
@@ -207,27 +322,32 @@ function hg.PickupReachTPIK(ent, ply, wpn)
 	local hand = HANDS[reach.side]
 	local handBone = ent:LookupBone(hand.hand)
 	local handMat = handBone and ent:GetBoneMatrix(handBone)
-	if not handMat then return end
+	if not handMat or not ensureGrip(reach, ent) then return end
 
 	local weight = reachWeight(reach, now)
-	local goal = reachGoal(ent, ply, reach, hand, weight)
+	local goal, goalAng = reachGoal(ent, ply, reach, hand, weight)
 	if not goal then return end
 
 	local hold = reach.side == "left" and ply.lhold or ply.rhold
 	local base = hold and hold:GetTranslation() or handMat:GetTranslation()
-	local pos = LerpVector(weight, base, goal)
-	if hold then hold:SetTranslation(pos) end
+	local baseAng = hold and hold:GetAngles() or handMat:GetAngles()
+	local pos, ang = LerpVector(weight, base, goal), LerpAngle(weight, baseAng, goalAng)
+	if hold then
+		hold:SetTranslation(pos)
+		hold:SetAngles(ang)
+	end
 
-	if weight >= 1 or pos:DistToSqr(goal) <= GRAB_RADIUS * GRAB_RADIUS then markGrab(reach, now, weight) end
+	if weight >= 1 then markGrab(reach, now, weight) end
 
 	if reach.side == "left" then
 		ply.hgPickupReachLeft = true
-		hg.DragLeftHand_Ex(ent, wpn, pos, handMat:GetAngles())
+		hg.DragLeftHand_Ex(ent, wpn, pos, ang)
 
 		return
 	end
 
 	handMat:SetTranslation(pos)
+	handMat:SetAngles(ang)
 	hg.bone_apply_matrix(ent, handBone, handMat)
 	wpn.rhandik = true
 end
@@ -241,19 +361,9 @@ end
 local function heldTransform(ent, reach)
 	local handBone = ent:LookupBone(HANDS[reach.side].hand)
 	local handMat = handBone and ent:GetBoneMatrix(handBone)
-	if not handMat then return end
-	local handPos, handAng = handMat:GetTranslation(), handMat:GetAngles()
+	if not handMat or not ensureGrip(reach, ent) then return end
 
-	if not reach.gripAng then
-		local _, localAng = WorldToLocal(reach.modelPos, reach.modelAng, handPos, handAng)
-		reach.gripAng = localAng
-	end
-
-	local _, heldAng = LocalToWorld(vector_origin, reach.gripAng, handPos, handAng)
-	local grip = LocalToWorld(Vector(HAND_GRIP_OFFSET, 0, 0), angle_zero, handPos, handAng)
-	local heldPos = LocalToWorld(-reach.ghost:OBBCenter(), angle_zero, grip, heldAng)
-
-	return heldPos, heldAng
+	return LocalToWorld(reach.modelInHandPos, reach.modelInHandAng, handMat:GetTranslation(), handMat:GetAngles())
 end
 
 local function blendToReal(reach, pos, ang, now)
@@ -278,34 +388,19 @@ local function blendToReal(reach, pos, ang, now)
 end
 
 local function ghostTransform(ent, reach, now)
-	if now < grabTime(reach) then return reach.modelPos, reach.modelAng end
-	markGrab(reach, now, 1)
-
 	local heldPos, heldAng = heldTransform(ent, reach)
 	if not heldPos then return reach.modelPos, reach.modelAng end
 
-	local settle = math.ease.OutQuad(math_Clamp((now - reach.grabbedAt) / SETTLE_TIME, 0, 1))
-	local pos, ang = LerpVector(settle, reach.modelPos, heldPos), LerpAngle(settle, reach.modelAng, heldAng)
+	local grab = grabTime(reach)
+	if now < grab then
+		local hoverStart = reach.start + reach.outTime * (1 - HOVER_FRACTION)
+		local hover = math.ease.InOutSine(math_Clamp((now - hoverStart) / math_max(grab - hoverStart, 0.001), 0, 1))
 
-	return blendToReal(reach, pos, ang, now)
-end
-
-local function dressGhost(reach)
-	local ghost, item = reach.ghost, reach.entity
-	ghost:SetSkin(reach.skin)
-	ghost:SetModelScale(reach.scale, 0)
-	if not IsValid(item) then return end
-
-	for i = 0, 6 do
-		ghost:SetBodygroup(i, item:GetBodygroup(i))
+		return LerpVector(hover, reach.modelPos, heldPos), LerpAngle(hover, reach.modelAng, heldAng)
 	end
+	markGrab(reach, now, 1)
 
-	if item.WorldModelFake ~= ghost:GetModel() then return end
-	if item.FakeBodyGroups then ghost:SetBodyGroups(item.FakeBodyGroups) end
-
-	local idle = item.AnimList and item.AnimList.idle or "idle"
-	local sequence = isstring(idle) and ghost:LookupSequence(idle) or idle
-	if isnumber(sequence) and sequence >= 0 then ghost:SetSequence(sequence) end
+	return blendToReal(reach, heldPos, heldAng, now)
 end
 
 function hg.PickupHandoffHides(ply, wep)
@@ -330,16 +425,7 @@ function hg.DrawPickupHandoff(ent, ply)
 		return
 	end
 
-	if not IsValid(reach.ghost) then
-		reach.ghost = ClientsideModel(reach.model, RENDERGROUP_OPAQUE)
-		if not IsValid(reach.ghost) then
-			reach.model = nil
-
-			return
-		end
-		reach.ghost:SetNoDraw(true)
-		dressGhost(reach)
-	end
+	if not ensureGhost(reach) then return end
 
 	local pos, ang = ghostTransform(ent, reach, now)
 	reach.ghost:SetRenderOrigin(pos)

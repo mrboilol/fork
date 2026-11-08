@@ -700,6 +700,18 @@ local tr = {}
 local att
 local util_TraceLine = util.TraceLine
 
+function SWEP:GetTraceFilter(owner, gun)
+	local fake = CLIENT and owner.FakeRagdoll or nil
+	local traceFilter = {self, gun}
+	if IsValid(self.worldModel) then traceFilter[#traceFilter + 1] = self.worldModel end
+	local fakeGun = self.GetNWEntity and self:GetNWEntity("fakeGun") or nil
+	if IsValid(fakeGun) then traceFilter[#traceFilter + 1] = fakeGun end
+	if not owner.suiciding then traceFilter[#traceFilter + 1] = owner end
+	if not owner.suiciding and fake then traceFilter[#traceFilter + 1] = fake end
+
+	return traceFilter
+end
+
 function SWEP:GetTrace(bCacheTrace, desiredPos, desiredAng, NoTrace, closeanim)
 	if SERVER and !bCacheTrace and self.cache_trace and !(desiredPos or desiredAng) then return self.cache_trace[1], self.cache_trace[2], self.cache_trace[3] end
 	local owner = self:GetOwner()
@@ -750,16 +762,9 @@ function SWEP:GetTrace(bCacheTrace, desiredPos, desiredAng, NoTrace, closeanim)
 
 	local dir = ang:Forward()
 
-	local fake = CLIENT and owner.FakeRagdoll or nil
-	local traceFilter = {self, gun}
-	if IsValid(self.worldModel) then traceFilter[#traceFilter + 1] = self.worldModel end
-	local fakeGun = self.GetNWEntity and self:GetNWEntity("fakeGun") or nil
-	if IsValid(fakeGun) then traceFilter[#traceFilter + 1] = fakeGun end
-	if not owner.suiciding then traceFilter[#traceFilter + 1] = owner end
-	if not owner.suiciding and fake then traceFilter[#traceFilter + 1] = fake end
 	tr.start = pos
 	tr.endpos = pos + dir * 8000
-	tr.filter = traceFilter
+	tr.filter = self:GetTraceFilter(owner, gun)
 
 	local trace = util_TraceLine(tr)
 	if bCacheTrace then
@@ -783,6 +788,13 @@ function SWEP:GetSettledShotAng()
 	self.pitch = self.settledPitch or pitch
 	local _, ang = self:GetTrace(true, nil, nil, true, true)
 	self.AdditionalAng, self.pitch = additional, pitch
+
+	local tilt = CLIENT and isangle(ang) and self.hgIKTilt
+	if tilt and FrameNumber() - (self.hgIKTiltFrame or 0) <= 2 then
+		ang = Angle(ang)
+		local degrees = tilt:Length()
+		ang:RotateAroundAxis(tilt / degrees, degrees)
+	end
 
 	return ang
 end
@@ -1091,7 +1103,7 @@ function SWEP:FireBullet()
 	local f3 = isply and owner.GetSimfphys and IsValid(owner:GetSimfphys()) and owner:GetSimfphys() or nil
 	local f4 = isply and owner:InVehicle() and owner.FakeRagdoll
 	local f5 = IsValid(owner.OldRagdoll) and owner.OldRagdoll or nil
-	
+
 	if IsValid(f1) then table.insert(bullet.Filter, 1, f1) end
 	if IsValid(f2) then table.insert(bullet.Filter, 1, f2) end
 	if IsValid(f3) then table.insert(bullet.Filter, 1, f3) end

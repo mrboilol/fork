@@ -416,6 +416,19 @@ end
 
 local bandageVitalKeys = {"skull", "chest"}
 local bandageSpineKeys = {spine1 = true, spine2 = true, spine3 = true}
+local spinePartialBreak = 0.5
+local spineFullBreak = {spine2 = 1, spine3 = 1}
+hg.SPINE_BONES = {spine2 = "ValveBiped.Bip01_Spine2", spine3 = "ValveBiped.Bip01_Neck1"}
+
+function hg.IsSpineFullyBroken(org, key)
+	local limit = spineFullBreak[key]
+	if key == "spine2" then limit = hg.organism and hg.organism.fake_spine2 or limit end
+	return org and limit and (tonumber(org[key]) or 0) >= limit or false
+end
+
+function hg.IsSpinePartiallyBroken(org, key)
+	return org and spineFullBreak[key] and (tonumber(org[key]) or 0) >= spinePartialBreak and not hg.IsSpineFullyBroken(org, key) or false
+end
 local bandageBoneOrder = {
 	"skull", "chest", "jaw", "pelvis", "lleg", "rleg", "larm", "rarm"
 }
@@ -552,7 +565,7 @@ local bandageKeyLabels = {
 	lleg = "left leg", rleg = "right leg", larm = "left arm", rarm = "right arm",
 }
 local bandageDislocationOrder = {"lleg", "rleg", "larm", "rarm", "jaw"}
-local bandageDefaultRank = {wound = 1, artery = 2, dislocation = 3, bone = 4}
+local bandageDefaultRank = {wound = 1, artery = 2, spine = 3, dislocation = 4, bone = 5}
 
 function hg.GetBoneLabel(bone)
 	bone = tostring(bone or "")
@@ -586,6 +599,16 @@ function SWEP:GetBandageOptions(target)
 				kind = "bone", id = "bone:" .. key, key = key, bone = bandageBoneNames[key],
 				tier = broken and (key == "skull" and 1 or 3) or 6, value = tonumber(org[key]) or 0,
 				label = (broken and (key == "skull" and "Fractured " or "Broken ") or "Injured ") .. bandageKeyLabels[key],
+			}
+		end
+	end
+
+	for _, key in ipairs({"spine3", "spine2"}) do
+		if hg.IsSpinePartiallyBroken(org, key) and not org[key .. "stabilized"] then
+			options[#options + 1] = {
+				kind = "spine", id = "spine:" .. key, key = key, bone = hg.SPINE_BONES[key],
+				tier = 3, value = tonumber(org[key]) or 0,
+				label = key == "spine3" and "Broken neck" or "Broken back",
 			}
 		end
 	end
@@ -1138,6 +1161,17 @@ if SERVER then
 		return true
 	end
 
+	function SWEP:BandageSpine(ent, org, option, layered)
+		local cost = self:GetBandageBoneTreatmentCost()
+		local used = math.min(self.modeValues[1], cost)
+		if used <= 0 or hg.organism.StabilizeSpine(org, option.key, 0.25 * used / cost) <= 0 then return false end
+
+		self.modeValues[1] = self.modeValues[1] - used
+		org.avgpain = math.max(org.avgpain - 7, 0)
+		hg.AddBandageLayer(ent, option.bone, layered)
+		return true
+	end
+
 	function SWEP:BandageDislocation(ent, org, option, layered)
 		local cost = self:GetBandageStructuralTreatmentCost()
 		local used = math.min(self.modeValues[1], cost)
@@ -1171,6 +1205,8 @@ if SERVER then
 			done = self:BandageBoneWounds(ent, org, option.bone, layered)
 		elseif option.kind == "dislocation" then
 			done = self:BandageDislocation(ent, org, option, layered)
+		elseif option.kind == "spine" then
+			done = self:BandageSpine(ent, org, option, layered)
 		else
 			done = self:BandageBone(ent, org, option.key, layered)
 		end
