@@ -1278,7 +1278,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		org.brain = math.min(org.brain + 0.1 * (hg.organism.SkullBrainTransfer and hg.organism.SkullBrainTransfer(org.skull) or 1), 1)
 	end
 
-	if not ignoreBrainDamage and brainEnergy > 0.05 and org.brain >= 0.01 and math.random(3) == 1 and (rnd or (org.skull - oldDmg) > 0.6) then
+	if not ignoreBrainDamage and brainEnergy > 0.05 and org.brain >= 0.3 and math.random(3) == 1 and (rnd or (org.skull - oldDmg) > 0.6) then
 		org.shock = 70
 	end
 
@@ -1333,6 +1333,10 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 				org.consciousness = math.max((org.consciousness or 1) - math.min(dmg * 0.3, 0.45) * helmetMul, 0.2)
 			end
 		end
+	end
+	if not headOutcomeHandled and not org.needotrub and hg.organism.BrainHitKnockout and hg.organism.BrainHitKnockout(org, brainDelta) then
+		org.shock = math.min((org.shock or 0) + 12 + brainDelta * 20, 95)
+		headOutcomeHandled = true
 	end
 	if not (impact and impact.headOutcomeHandled) and hg.organism.module.concussion and hg.organism.module.concussion.AddHeadTrauma then
 		concussionGain = hg.organism.module.concussion.AddHeadTrauma(org, skullConsciousDelta, brainDelta, brainEnergy * (helmetProtectedHit and 1.8 or 1), dmgInfo)
@@ -1399,7 +1403,20 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		pleura[2] = 1
 	end
 
-	local result, vecrand = damageBone(org, 0.1, dmg / 4 * (dmgInfo:GetInflictor().RibBreakMul or 1), dmgInfo, "chest", boneindex, dir, hit, ricochet, true)
+	local inflictor = dmgInfo:GetInflictor()
+	local ribDmg = dmg
+	local ribThreshold = inflictor.RibBreakThreshold
+	if ribThreshold then
+		local tick = engine.TickCount()
+		if org.ribImpactTick == tick then
+			ribDmg = 0
+		else
+			org.ribImpactTick = tick
+			ribDmg = math.max(dmg - ribThreshold, 0)
+		end
+	end
+
+	local result, vecrand = damageBone(org, 0.1, ribDmg / 4 * (inflictor.RibBreakMul or 1), dmgInfo, "chest", boneindex, dir, hit, ricochet, true)
 	
 	hg.AddHarmToAttacker(dmgInfo, (org.chest - oldDmg) * 3, "Ribs bone damage harm")
 

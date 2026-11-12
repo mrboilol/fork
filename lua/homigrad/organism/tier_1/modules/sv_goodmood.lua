@@ -7,6 +7,59 @@ local function GetGoodMood(org)
 end
 
 local FEAR_SHIELD_COST = 0.35
+local INJURY_CAP_DRAIN = 0.1
+local WOUND_THOUGHT_DEPRESSION_MAX = 0.25
+local WOUND_THOUGHT_MIN = 30
+local WOUND_THOUGHT_MAX = 60
+local WOUND_THOUGHT_ESCALATE_DELAY = 3
+local WOUND_THOUGHT_DURATION = 5
+local LIMBS = {"rarm", "larm", "rleg", "lleg"}
+local BLEED_CONCERN_RATE = 1.5
+local BLEED_CONCERN_BLOOD = 4500
+local BLEED_WORSEN_DELTA = 0.75
+
+local WOUND_RANK = {hurt = 1, broken = 2, bloodloss = 3, bleeding = 3, bleedingBad = 4}
+local WOUND_LINES = {
+	hurt = {
+		"Ow... fuck, that actually hurts.",
+		"Okay. I'm hurt. I'm still standing, though.",
+		"That's gonna bruise like hell tomorrow...",
+		"Walk it off... just walk it off...",
+		"That hurt way more than it should have.",
+		"God, everything aches.",
+	},
+	broken = {
+		"Something's broken. I heard it go.",
+		"Don't put weight on it, don't put weight on it...",
+		"It's not supposed to bend like that...",
+		"Fuck, I think it's broken...",
+		"I can feel it grinding every time I move...",
+	},
+	bleeding = {
+		"Is that my blood? Shit, that's my blood.",
+		"I'm bleeding. Okay. I need to wrap that.",
+		"Press on it. Just press on it and breathe.",
+		"It's soaking through... I need a bandage.",
+		"I need to stop this before it gets worse.",
+		"Why is it so warm... oh. Oh no.",
+	},
+	bleedingBad = {
+		"This bleeding won't stop... why won't it stop...",
+		"It's not stopping, it's NOT STOPPING!",
+		"There's so much... how is there this much?!",
+		"Come on, come on, stop bleeding, please...",
+		"I'm leaving a trail... I'm leaving a fucking trail...",
+		"My hands are covered in it, I can't stop it!",
+		"Somebody, anybody, I need something to stop this!",
+	},
+	bloodloss = {
+		"I feel so lightheaded...",
+		"My legs feel hollow...",
+		"I lost too much... I need to sit down.",
+		"Why am I so tired all of a sudden...",
+		"Everything's going quiet and cold...",
+	},
+}
 
 local function GetGoodMoodGainMultiplier(org)
     local depression = math.Clamp(tonumber(org.depression) or 0, 0, 1)
@@ -25,6 +78,79 @@ local function AbsorbFear(org)
     local absorbed = math.min(fearadd, org.goodmood / FEAR_SHIELD_COST)
     org.fearadd = fearadd - absorbed
     org.goodmood = math.max(org.goodmood - absorbed * FEAR_SHIELD_COST, 0)
+end
+
+local function isLimbBroken(org)
+    for _, limb in ipairs(LIMBS) do
+        if org[limb .. "dislocation"] or (hg.IsLimbFractured and hg.IsLimbFractured(org, limb)) then return true end
+    end
+
+    return false
+end
+
+local function getInjury(org)
+    local pain = tonumber(org.pain) or 0
+    local bleed = tonumber(org.bleed) or 0
+    local blood = tonumber(org.blood) or 5000
+    local bleeding = bleed > 0.2
+    local broken = isLimbBroken(org)
+
+    local severity = math.max(
+        math.Clamp((pain - 15) / 85, 0, 1) * 0.7,
+        bleeding and math.Clamp(0.3 + bleed / 8, 0, 0.85) or 0,
+        math.Clamp((4700 - blood) / 2200, 0, 1) * 0.95,
+        (tonumber(org.internalBleed) or 0) > 0.5 and 0.4 or 0,
+        broken and 0.3 or 0
+    )
+
+    if not bleeding then
+        org.bleedTrendBase = nil
+    elseif not org.bleedTrendBase or bleed < org.bleedTrendBase then
+        org.bleedTrendBase = bleed
+    end
+
+    local base = org.bleedTrendBase or bleed
+    local worsening = bleeding and bleed >= base * 2 and bleed - base >= BLEED_WORSEN_DELTA
+    local concerning = bleeding and (bleed >= BLEED_CONCERN_RATE or (tonumber(org.arterialBleed) or 0) > 0 or blood < BLEED_CONCERN_BLOOD or worsening)
+
+    local kind = concerning and (bleed > 4 or blood < 3800) and "bleedingBad"
+        or concerning and "bleeding"
+        or blood < 4200 and "bloodloss"
+        or broken and "broken"
+        or pain > 25 and "hurt"
+        or nil
+
+    return severity, kind
+end
+
+local function updateWoundThoughts(owner, org, kind)
+    local rank = kind and WOUND_RANK[kind] or 0
+    local shown = org.woundThoughtRank or 0
+    if rank <= shown then
+        org.woundThoughtEscalate = nil
+        if rank < shown then org.woundThoughtRank = rank end
+    end
+    if rank == 0 or org.otrub or not hg.organism.EmotionThought then return end
+    if (tonumber(org.depression) or 0) >= WOUND_THOUGHT_DEPRESSION_MAX then return end
+    if (tonumber(org.blood) or 5000) <= (hg.organism.BLEEDOUT_START_BLOOD or 2500) then return end
+
+    local now = CurTime()
+    local K = hg.PsycheCombat
+    if now - (owner.hgLastEmotionTime or 0) < (K and K.thoughtGlobalCooldown or 8) then return end
+
+    if rank > shown then
+        org.woundThoughtEscalate = org.woundThoughtEscalate or now + WOUND_THOUGHT_ESCALATE_DELAY
+        if now < org.woundThoughtEscalate then return end
+    elseif now < (org.woundThoughtNext or 0) then
+        return
+    end
+
+    org.woundThoughtEscalate = nil
+    org.woundThoughtRank = rank
+    org.woundThoughtNext = now + math.Rand(WOUND_THOUGHT_MIN, WOUND_THOUGHT_MAX)
+    if kind == "bleeding" or kind == "bleedingBad" then org.bleedTrendBase = tonumber(org.bleed) or org.bleedTrendBase end
+    local list = WOUND_LINES[kind]
+    hg.organism.EmotionThought(owner, list[math.random(#list)], WOUND_THOUGHT_DURATION, "wound_" .. kind)
 end
 
 function hg.organism.ShieldEmotion(org, amount, cost)
@@ -59,6 +185,10 @@ module[1] = function(org)
     org.goodmood = 1.0
     org._goodmoodLostTime = 0
     org._fearDuration = 0
+    org.woundThoughtRank = nil
+    org.woundThoughtNext = nil
+    org.woundThoughtEscalate = nil
+    org.bleedTrendBase = nil
 end
 
 module[2] = function(owner, org, timeValue)
@@ -146,7 +276,20 @@ module[2] = function(owner, org, timeValue)
         goodmood_add = goodmood_add - timeValue * 0.04 * org.fear * fearDurationMultiplier
     end
 
+    local injury, woundKind = getInjury(org)
+    local cap = 1 - injury
+    if goodmood_add > 0 then
+        goodmood_add = math.min(goodmood_add, math.max(cap - org.goodmood, 0))
+    end
+
     org.goodmood = math.Clamp(org.goodmood + goodmood_add, 0, 1)
+    if org.goodmood > cap then
+        org.goodmood = math.Approach(org.goodmood, cap, timeValue * INJURY_CAP_DRAIN)
+    end
+
+    if org.isPly and IsValid(owner) and owner:IsPlayer() and owner:Alive() then
+        updateWoundThoughts(owner, org, woundKind)
+    end
 end
 
 -- Decrease goodmood when taking damage

@@ -319,10 +319,11 @@ local function findStepGround(st, ragdoll, i, pos, currentZ)
 	rootPos:Add(lead)
 	local reach = chain.completeLength * K.LEG_REACH_MUL
 	local height = rootPos.z - ground.z - K.FOOT_ANKLE_HEIGHT
-	if math.abs(height) >= reach then return end
+	if height >= reach + K.STUMBLE_DOWNHILL_DROP or -height >= reach then return end
 
 	local offset = Vector(ground.x - rootPos.x, ground.y - rootPos.y, 0)
-	local horizontalReach = math.sqrt(reach * reach - height * height)
+	local strideHeight = math.min(height, chain.completeLength * K.HIP_SUPPORT_HEIGHT_MUL)
+	local horizontalReach = math.sqrt(reach * reach - strideHeight * strideHeight)
 	if offset:LengthSqr() > horizontalReach * horizontalReach then
 		offset = offset:GetNormalized() * horizontalReach
 		local clampedPos = Vector(rootPos.x + offset.x, rootPos.y + offset.y, ground.z)
@@ -330,7 +331,8 @@ local function findStepGround(st, ragdoll, i, pos, currentZ)
 	end
 	if not ground then return end
 	local anklePos = ground + Vector(0, 0, K.FOOT_ANKLE_HEIGHT)
-	if rootPos:DistToSqr(anklePos) > chain.completeLength * chain.completeLength then return end
+	local maxDist = chain.completeLength + K.STUMBLE_DOWNHILL_DROP
+	if rootPos:DistToSqr(anklePos) > maxDist * maxDist then return end
 
 	return ground, normal
 end
@@ -341,7 +343,7 @@ local function updateGhostPositions(st, ragdoll, isMoving, horizontalVel)
 	pelvisAng.p = 0
 	pelvisAng.r = 0
 
-	local prediction = horizontalVel * st.cfg.PredictionTime * K.STUMBLE_STRIDE_MUL * st.profile.stride * (1 - K.STUMBLE_FOOT_LAG * (st.instability or 0))
+	local prediction = horizontalVel * st.cfg.PredictionTime * K.STUMBLE_STRIDE_MUL * st.profile.stride * (1 + K.STUMBLE_FOOT_REACH * math.max(st.instability or 0, st.offBalance or 0))
 	if prediction:Length() > K.STUMBLE_STRIDE_MAX then prediction = prediction:GetNormalized() * K.STUMBLE_STRIDE_MAX end
 
 	for i = 1, 2 do
@@ -358,7 +360,7 @@ local function updateGhostPositions(st, ragdoll, isMoving, horizontalVel)
 			st.ghostPositions[i] = LerpVector(FrameTime() * (isMoving and 20 or 5), st.ghostPositions[i], ground)
 			st.groundNormals[i] = normal or Vector(0, 0, 1)
 		else
-			st.ghostPositions[i] = st.ghostPositions[i] or Vector(idealPos.x, idealPos.y, pelvisPos.z - st.cfg.HipTargetHeight)
+			st.ghostPositions[i] = Vector(idealPos.x, idealPos.y, st.ghostPositions[i] and st.ghostPositions[i].z or pelvisPos.z - st.cfg.HipTargetHeight)
 			st.groundNormals[i] = Vector(0, 0, 1)
 		end
 	end
@@ -453,12 +455,6 @@ local function updateStumble(st, ragdoll)
 		speed = cfg.MaxVelocityClamp
 	end
 	local flatVel = Vector(rawVel.x, rawVel.y, 0)
-	local excess = flatVel:Length() - math.max(cfg.MaxDriveSpeed, cfg.MinDriveSpeed)
-	if excess > 0 then
-		local brake = flatVel:GetNormalized() * -math.min(excess, excess * K.STUMBLE_BRAKE * dt)
-		st.pelvis:AddVelocity(brake)
-		st.spine:AddVelocity(brake)
-	end
 	local wish = not st.hit and wishDir(st.ply)
 	if wish then
 		wish:Rotate(Angle(0, math.sin((now - st.startTime) * K.STUMBLE_SWAY_RATE + st.swayPhase) * K.STUMBLE_SWAY_ANGLE, 0))
@@ -494,9 +490,8 @@ local function updateStumble(st, ragdoll)
 				if st.steps >= st.minSteps and not st.stepsDoneAt then st.stepsDoneAt = now end
 				st.footPositions[i] = state.targetPos
 				st.lockedFootPositions[i] = state.targetPos
-				st.offBalance = st.offBalance * p.recover
 				if moveDir and st.hasGroundContact[i] then
-					st.pelvis:AddVelocity(moveDir * math.min(speed * K.STUMBLE_LUNGE_MUL, K.STUMBLE_LUNGE_MAX) * K.FOOT_PUSHOFF * p.lunge)
+					st.lungeVel = (st.lungeVel or Vector()) + moveDir * math.min(speed * K.STUMBLE_LUNGE_MUL, K.STUMBLE_LUNGE_MAX) * K.FOOT_PUSHOFF * p.lunge
 					local plantSide = moveDir:Cross(state.targetPos - pelvisPos).z
 					st.spine:AddAngleVelocity(moveDir * math.Clamp(plantSide, -12, 12) * 2 * p.sway)
 				end
@@ -517,12 +512,32 @@ local function updateStumble(st, ragdoll)
 			state.isLocked = false
 
 			local trigger = cfg.StepTriggerForward * p.trigger
-			if st.hasGroundContact[i] and st.ikChains[i]
+			local chain = st.ikChains[i]
+			local root = chain and chain.physObjects[1]
+			local overreach = IsValid(root) and chain.completeLength * K.STUMBLE_OVERREACH
+			local stretched = overreach and st.footPositions[i]:DistToSqr(root:GetPos()) > overreach * overreach
+			local otherStepping = st.legState[i == 1 and 2 or 1].isStepping
+			local trailing = overreach and moveDir and not otherStepping
+				and (root:GetPos() - st.footPositions[i]):Dot(moveDir) > chain.completeLength * K.STUMBLE_TRAIL_MUL
+			if chain and (stretched or trailing or st.hasGroundContact[i]
 				and st.footPositions[i]:DistToSqr(st.ghostPositions[i]) > trigger * trigger
-				and not st.legState[i == 1 and 2 or 1].isStepping
-				and now - state.lastStepTime > cfg.MinStepInterval * p.interval then
+				and not otherStepping
+				and now - state.lastStepTime > cfg.MinStepInterval * p.interval) then
 				local target = findStepGround(st, ragdoll, i, st.ghostPositions[i], st.ghostPositions[i].z)
-				if not target then continue end
+				if not target and (stretched or trailing) then
+					local rootPos = root:GetPos()
+					target = findStepGround(st, ragdoll, i, Vector(rootPos.x, rootPos.y, st.footPositions[i].z), st.footPositions[i].z)
+				end
+				if not target then
+					if stretched then
+						local rootPos = root:GetPos()
+						local trail = st.footPositions[i] - rootPos
+						trail:Normalize()
+						st.footPositions[i] = rootPos + trail * overreach
+						st.lockedFootPositions[i] = st.footPositions[i]
+					end
+					continue
+				end
 				if st.steps >= st.minSteps and math.Rand(0, 1) < st.legTrip[i] then
 					st.tripLeg = i
 					return
@@ -539,6 +554,24 @@ local function updateStumble(st, ragdoll)
 		end
 	end
 
+	if st.lungeVel then
+		local share = st.lungeVel * math.min(dt / K.STUMBLE_LUNGE_TIME, 1)
+		st.pelvis:AddVelocity(share)
+		st.spine:AddVelocity(share * 0.5)
+		st.lungeVel:Sub(share)
+		if st.lungeVel:LengthSqr() < 1 then st.lungeVel = nil end
+	end
+
+	local hips = {}
+	for i = 1, 2 do
+		local chain = st.ikChains[i]
+		hips[i] = chain and ragdoll:GetBonePosition(chain.boneIndices[1])
+	end
+	local facing = (hips[1] or pelvisPos) - (hips[2] or pelvisPos)
+	facing.z = 0
+	facing = facing:Cross(vector_up)
+	facing:Normalize()
+
 	local planted = 0
 	for i = 1, 2 do
 		local chain = st.ikChains[i]
@@ -546,6 +579,16 @@ local function updateStumble(st, ragdoll)
 		if chain then
 			for _, phys in pairs(chain.physObjects) do
 				if IsValid(phys) then phys:Wake() end
+			end
+			local hip = hips[i]
+			if hip then
+				chain.poleTarget = hip + facing * K.KNEE_POLE_FORWARD - vector_up * (chain.completeLength * K.KNEE_POLE_DROP)
+				local reach = chain.completeLength * K.LEG_REACH_MUL
+				local toFoot = target + Vector(0, 0, K.FOOT_ANKLE_HEIGHT) - hip
+				if toFoot:LengthSqr() > reach * reach then
+					toFoot:Normalize()
+					target = hip + toFoot * reach - Vector(0, 0, K.FOOT_ANKLE_HEIGHT)
+				end
 			end
 			chain:SetTarget(target + Vector(0, 0, K.FOOT_ANKLE_HEIGHT))
 			chain:Update(dt)
@@ -1144,7 +1187,7 @@ local function standingHitReact(ply)
 	local falls = knockdown > 0 and staggerScale >= 1
 	if knockdown > 0 and not falls and staggerScale >= K.FALL_CHANCE_FRAC then
 		local chance = (staggerScale - K.FALL_CHANCE_FRAC) / (1 - K.FALL_CHANCE_FRAC) * K.FALL_CHANCE_MAX
-		chance = hg.ScaleTripChance and hg.ScaleTripChance(ply, org, chance) or chance
+		chance = hg.ScaleTripChance and hg.ScaleTripChance(ply, org, chance, true) or chance
 		chance = chance + math.max(legTripChance(org, "lleg"), legTripChance(org, "rleg")) * K.FALL_LEG_MUL
 		falls = math.random() < chance
 	end
@@ -1737,6 +1780,26 @@ hook.Add("RagdollDeath", "HG_EuphoriaDeathThroes", function(ply, ragdoll)
 	end)
 end)
 
+local function ctrlCancel(ply, ragdoll)
+	local pelvis = getBonePhys(ragdoll, "ValveBiped.Bip01_Pelvis")
+	local spine = getBonePhys(ragdoll, "ValveBiped.Bip01_Spine2")
+	local push = stumbling[ragdoll] or falling[ragdoll]
+		or (ragdoll.hgStumblePending and not groundTrace(ply, ragdoll, K.UPRIGHT_TRACE).Hit)
+
+	stopStumble(ragdoll, "ctrl")
+	stopFalling(ragdoll)
+	ragdoll.hgStumblePending = nil
+
+	if not push or ragdoll.hgCtrlPushed or not IsValid(pelvis) or not IsValid(spine) then return end
+	ragdoll.hgCtrlPushed = true
+	local dir = ply:EyeAngles():Forward()
+	dir.z = 0
+	if dir:LengthSqr() < 0.01 then return end
+	dir:Normalize()
+	pelvis:AddVelocity(dir * K.CTRL_PUSH)
+	spine:AddVelocity(dir * (K.CTRL_PUSH * 1.2))
+end
+
 hook.Add("Think", "HG_EuphoriaStumble", function()
 	for ragdoll, st in pairs(stumbling) do
 		local reason = stumbleEndReason(st.ply, ragdoll, st)
@@ -1776,19 +1839,28 @@ hook.Add("Think", "HG_EuphoriaStumble", function()
 		local ragdoll = ply.FakeRagdoll
 		if not IsValid(ragdoll) then continue end
 
+		if hg.KeyDown(ply, IN_DUCK) and (stumbling[ragdoll] or falling[ragdoll] or ragdoll.hgStumblePending) then
+			ctrlCancel(ply, ragdoll)
+		end
+
 		updateReaction(ply, ragdoll)
 		updateHoldEnv(ply, ragdoll)
 		updateBrace(ply, ragdoll)
 
 		local pending = ragdoll.hgStumblePending
 		if not stumbleEnabled or stumbling[ragdoll] or not pending or now < pending.from then continue end
+
+		local ground = groundTrace(ply, ragdoll, K.UPRIGHT_TRACE)
+		if not ground.Hit then
+			pending.untilT = now + K.START_WINDOW
+			continue
+		end
 		if now > pending.untilT then
 			ragdoll.hgStumblePending = nil
 			continue
 		end
 
-		local ground = groundTrace(ply, ragdoll, K.UPRIGHT_TRACE)
-		if canStumble(ply, ragdoll) and not hg.KeyDown(ply, IN_DUCK) and hasMomentum(ply, ragdoll)
+		if canStumble(ply, ragdoll) and hasMomentum(ply, ragdoll)
 			and ground.Hit and K.UPRIGHT_TRACE * ground.Fraction > K.UPRIGHT_MIN_HEIGHT then
 			startStumble(ply, ragdoll)
 		end

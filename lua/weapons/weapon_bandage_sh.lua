@@ -565,7 +565,7 @@ local bandageKeyLabels = {
 	lleg = "left leg", rleg = "right leg", larm = "left arm", rarm = "right arm",
 }
 local bandageDislocationOrder = {"lleg", "rleg", "larm", "rarm", "jaw"}
-local bandageDefaultRank = {wound = 1, artery = 2, spine = 3, dislocation = 4, bone = 5}
+local bandageDefaultRank = {wound = 1, spine = 3, dislocation = 4, bone = 5}
 
 function hg.GetBoneLabel(bone)
 	bone = tostring(bone or "")
@@ -609,16 +609,6 @@ function SWEP:GetBandageOptions(target)
 				kind = "spine", id = "spine:" .. key, key = key, bone = hg.SPINE_BONES[key],
 				tier = 3, value = tonumber(org[key]) or 0,
 				label = key == "spine3" and "Broken neck" or "Broken back",
-			}
-		end
-	end
-
-	for _, wound in ipairs(org.arterialwounds or {}) do
-		if (wound[1] or 0) > 0 then
-			options[#options + 1] = {
-				kind = "artery", id = "artery:" .. tostring(wound[4]) .. ":" .. tostring(wound[7]), wound = wound, bone = wound[4],
-				tier = 2, value = wound[1],
-				label = "Arterial bleed - " .. (wound[7] == "arteria" and "neck" or hg.GetBoneLabel(wound[4])),
 			}
 		end
 	end
@@ -1035,23 +1025,7 @@ function hg.AddBandageLayer(ent, bone, applied)
 	return true
 end
 
-local neckArteryBandageCostMultiplier = 4
-local arteryBandageCapacityShare = 0.35
 local boneBandageCapacityShare = 0.5
-
-local function GetArteryBandageTreatmentCost(wound, capacity)
-	if not wound then return 0 end
-
-	local severity = math.max(tonumber(wound.initialSeverity) or tonumber(wound[1]) or 0, 0)
-	local cost = wound[7] == "arteria" and math.max(severity * neckArteryBandageCostMultiplier, 1) or severity
-	return math.max(cost, (capacity or 0) * arteryBandageCapacityShare)
-end
-
-local function GetRemainingArteryBandageTreatmentCost(wound, capacity)
-	local total = GetArteryBandageTreatmentCost(wound, capacity)
-	local applied = math.Clamp(tonumber(wound.bandageMaterial) or 0, 0, total)
-	return math.max(total - applied, 0), total, applied
-end
 
 function SWEP:GetBandageCapacity()
 	local def = self.modeValuesdef and self.modeValuesdef[1]
@@ -1069,7 +1043,6 @@ end
 
 function SWEP:GetBandageOptionCost(option)
 	if not option then return 0 end
-	if option.kind == "artery" then return (GetRemainingArteryBandageTreatmentCost(option.wound, self:GetBandageCapacity())) end
 	if option.kind == "wound" then return option.value end
 	if option.kind == "dislocation" then return self:GetBandageStructuralTreatmentCost() end
 	return self:GetBandageBoneTreatmentCost()
@@ -1081,45 +1054,6 @@ function SWEP:GetBandageTreatmentCost(target)
 end
 
 if SERVER then
-	function SWEP:BandageArtery(ent, org, arteryWound, layered)
-		local remainingCost, totalCost, appliedMaterial = GetRemainingArteryBandageTreatmentCost(arteryWound, self:GetBandageCapacity())
-		local usedMaterial = math.min(self.modeValues[1], remainingCost)
-		if usedMaterial <= 0 then return false end
-
-		local arterySeverity = arteryWound[1]
-		local arteryName = arteryWound[7]
-		appliedMaterial = appliedMaterial + usedMaterial
-		arteryWound.bandageMaterial = appliedMaterial
-		arteryWound.bandageCoverage = math.Clamp(appliedMaterial / math.max(totalCost, 0.01), 0, 1)
-		arteryWound.bandaged = arteryWound.bandageCoverage > 0
-		self.modeValues[1] = self.modeValues[1] - usedMaterial
-
-		hg.AddBandageLayer(ent, arteryName == "arteria" and "ValveBiped.Bip01_Neck1" or arteryWound[4], layered)
-
-		if arteryWound.bandageCoverage >= 0.999 then
-			table.RemoveByValue(org.arterialwounds, arteryWound)
-			if math.Rand(0, 1) < math.Clamp(0.08 + arterySeverity / 80, 0.08, 0.3) then
-				org.internalBleed = (org.internalBleed or 0) + math.Rand(0.25, 0.7) * arterySeverity / 14
-			end
-			if arteryName == "arteria" then
-				org.neckslit = false
-				org.neckslitDeadline = nil
-				org.neckslitWarned = nil
-				org.throatCutPressureShock = 0
-				org.neckBrainOxygenPenalty = 0
-			end
-			if hg.organism.RebuildArteryWoundState then
-				hg.organism.RebuildArteryWoundState(org, true)
-			else
-				hg.organism.MarkArterialWoundsNetDirty(org)
-			end
-		else
-			hg.organism.MarkArterialWoundsNetDirty(org)
-		end
-
-		return true
-	end
-
 	function SWEP:BandageBoneWounds(ent, org, bone, layered)
 		local done = false
 		for _, wound in ipairs(GetBandageAreaWounds(ent, org, bone)) do
@@ -1199,10 +1133,12 @@ if SERVER then
 		ent.bandaged_limbs = ent.bandaged_limbs or {}
 
 		local done
-		if option.kind == "artery" then
-			done = self:BandageArtery(ent, org, option.wound, layered)
-		elseif option.kind == "wound" then
+		if option.kind == "wound" then
 			done = self:BandageBoneWounds(ent, org, option.bone, layered)
+			local holder = IsValid(org.owner) and org.owner or ent
+			if done and hg.ReleaseTourniquetIfLimbClear(holder, org, option.bone) > 0 and IsValid(owner) and owner:IsPlayer() then
+				owner:Notify("The wounds are closed. You take the tourniquet off.", true, "bandage_tourniquet", 0)
+			end
 		elseif option.kind == "dislocation" then
 			done = self:BandageDislocation(ent, org, option, layered)
 		elseif option.kind == "spine" then
@@ -1608,6 +1544,20 @@ if SERVER then
 			SetNetVar("TourniquetGuys", hg.TourniquetGuys)
 		end
 		return removed
+	end
+
+	function hg.ReleaseTourniquetIfLimbClear(ent, org, bone)
+		local limb = getTourniquetLimb(bone)
+		if not limb or not org then return 0 end
+
+		for _, wound in ipairs(org.arterialwounds or {}) do
+			if (wound[1] or 0) > 0 and getTourniquetLimb(wound[7] == "arteria" and "arteria" or wound[4]) == limb then return 0 end
+		end
+		for _, wound in ipairs(org.wounds or {}) do
+			if (wound[1] or 0) > 0 and getTourniquetLimb(wound[4]) == limb then return 0 end
+		end
+
+		return hg.RemoveTourniquetsOnLimb(ent, bone)
 	end
 
 	function hg.GetTourniquetLimb(bone)

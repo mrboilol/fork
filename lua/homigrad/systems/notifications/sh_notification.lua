@@ -361,7 +361,7 @@ if CLIENT then
 	local overlapMax = 3
 	local function ThoughtsOverlap(org)
 		if not org then return false end
-		return org.panicattackActive or org.critical or org.incapacitated or GetThoughtInstability(org) > 0.35
+		return org.panicattackActive or org.critical or org.incapacitated or (tonumber(org.panicattack) or 0) > 0.1 or (tonumber(org.depression) or 0) >= 0.25 or GetThoughtInstability(org) > 0.35
 	end
 
 	local function NotificationsThink()

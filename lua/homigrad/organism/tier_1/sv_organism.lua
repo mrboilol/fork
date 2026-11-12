@@ -36,11 +36,11 @@ local panicattack_threshold = 0.35
 local panicattack_add_decay_time = 45
 local panicattack_decay_hold_time = 4
 local panicattack_combat_decay_mul = 1.3
-local panicattack_rise_time = 1.5
+local panicattack_rise_time = 2.5
 local panicattack_decay_time = 4
 local panicattack_gain_chance = 1
-local panicattack_gain_mul = 0.6
-local panicattack_event_cap = 0.18
+local panicattack_gain_mul = 0.45
+local panicattack_event_cap = 0.14
 local panicattack_streak_window = 12
 local panicattack_streak_step = 0.15
 local panicattack_streak_max = 6
@@ -237,6 +237,8 @@ hook.Add("Org Clear", "Main", function(org)
 	org.panicAdrenalineUntil = 0
 	org.panicGunfightUntil = 0
 	org.panicSustainedFearSince = 0
+	org.adrenalineCrash = 0
+	org.psycheAdrenalinePeak = 0
 	org.seizure = 0
 	org.seizureActive = false
 	org.convulsing = false
@@ -548,6 +550,7 @@ local function send_organism(org, ply, recipientForce, reliable)
 	sendtable.noradrenaline = org.noradrenaline
 	sendtable.panicattackadd = org.panicattackadd
 	sendtable.panicattack = org.panicattack
+	sendtable.adrenalineCrash = org.adrenalineCrash
 	sendtable.psycheAnger = org.psycheAnger or 0
 	sendtable.seizure = org.seizure
 	sendtable.seizureActive = org.seizureActive
@@ -780,6 +783,7 @@ local function send_bareinfo(org, force, reliable)
 	sendtable.noradrenalineActive = org.noradrenalineActive
 	sendtable.panicattackadd = org.panicattackadd
 	sendtable.panicattack = org.panicattack
+	sendtable.adrenalineCrash = org.adrenalineCrash
 	sendtable.panicattackActive = org.panicattackActive
 	sendtable.panicMode = org.panicMode or false
 	sendtable.seizure = org.seizure
@@ -840,7 +844,7 @@ function hg.organism.GetResilience(org)
 
 	local zerlkers = math.Clamp(org.zerlkers or 0, 0, 1)
 	local adrenaline = math.Clamp((org.adrenaline or 0) / 1.5, 0, 1)
-	return math.max(zerlkers, adrenaline)
+	return math.max(zerlkers, adrenaline) - math.Clamp(tonumber(org.depressionSuccumb) or 0, 0, 0.6)
 end
 
 local adrenalineBraceGroups = {
@@ -852,7 +856,8 @@ local adrenalineBraceGroups = {
 
 function hg.organism.AdrenalineBrace(org, hitgroup)
 	if not org or (hitgroup ~= nil and not adrenalineBraceGroups[hitgroup]) then return 0 end
-	return hg.organism.GetResilience(org) * 0.8
+	local panic = hg.GetPanicLevel and hg.GetPanicLevel(org) or 0
+	return math.max(hg.organism.GetResilience(org), panic, 0) * 0.8
 end
 
 function hg.organism.IsHitKnockdownImmune(org)
@@ -1050,7 +1055,7 @@ end
 
 function hg.organism.AddPanicAttack(org, amount, silent, combatEvent, ignoreGunfightProtection, universalStressApplied)
 	if not org then return 0 end
-	if IsValid(org.owner) and org.owner.HasTrait and org.owner:HasTrait("gurajchaka_child") then return 0 end
+	if IsValid(org.owner) and org.owner.HasTrait and (org.owner:HasTrait("gurajchaka_child") or org.owner:HasTrait("apathetic")) then return 0 end
 	if (org.fury13 or 0) > 0 then
 		org.panicattackadd = 0
 		org.panicattack = 0
@@ -1060,6 +1065,7 @@ function hg.organism.AddPanicAttack(org, amount, silent, combatEvent, ignoreGunf
 	end
 	if not isnumber(amount) or amount <= 0 then return org.panicattackadd or 0 end
 	if IsValid(org.owner) and org.owner.GetTraitMultiplier then amount = amount * org.owner:GetTraitMultiplier("panic_gain", 1) end
+	if hg.organism.PsychePanicGainMul then amount = amount * hg.organism.PsychePanicGainMul(org, combatEvent) end
 	if combatEvent then
 		hg.organism.MarkPanicGunfight(org)
 		if (org.panicLastHit or 0) > CurTime() - panicattack_streak_window then
@@ -1463,6 +1469,7 @@ hook.Add("HomigradDamage", "PanicAttackDamage", function(ply, dmgInfo)
 	local combatEvent = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_BLAST)
 		or (IsValid(attacker) and attacker != ply and dmgInfo:IsDamageType(DMG_SLASH + DMG_CLUB))
 	local amount = math.Clamp(dmgInfo:GetDamage() * panicattack_damage_scale + (dmgInfo:IsDamageType(DMG_BLAST) and 0.08 or 0), 0.03, 0.55)
+	if hg.organism.PsycheHitPanicMul then amount = amount * hg.organism.PsycheHitPanicMul(ply, attacker) end
 	local victimOrg = ply.organism
 	if combatEvent then
 		local streakActive = (victimOrg.panicLastHit or 0) > CurTime() - panicattack_streak_window
@@ -1618,7 +1625,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.panicAdrenalineUntil = 0
 	else
 		if (org.panicLastGain or 0) + panicattack_decay_hold_time <= CurTime() then
-			local decayTime = panicattack_add_decay_time * ((org.panicGunfightUntil or 0) > CurTime() and panicattack_combat_decay_mul or 1)
+			local decayTime = panicattack_add_decay_time * ((org.panicGunfightUntil or 0) > CurTime() and panicattack_combat_decay_mul or 1) / (hg.organism.PsychePanicDecayMul and hg.organism.PsychePanicDecayMul(org) or 1)
 			org.panicattackadd = math.Approach(org.panicattackadd or 0, 0, timeValue / decayTime)
 		end
 		org.panicattack = math.Approach(oldPanicAttack, org.panicattackadd or 0, timeValue / ((org.panicattackadd or 0) > oldPanicAttack and panicattack_rise_time or panicattack_decay_time))
@@ -1664,7 +1671,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		if not org.panicattackActive then
 			org.panicMode = nil
 		else
-			org.panicMode = (tonumber(org.adrenaline) or 0) < panicattack_focus_adrenaline and "fight" or "flight"
+			org.panicMode = ((tonumber(org.adrenaline) or 0) < panicattack_focus_adrenaline or (tonumber(org.anger) or 0) >= (hg.PsycheCombat and hg.PsycheCombat.angerFightAt or 0.3)) and "fight" or "flight"
 		end
 	else
 		org.panicattackActive = false

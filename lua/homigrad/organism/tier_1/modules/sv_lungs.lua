@@ -655,7 +655,7 @@ module[2] = function(owner, org, timeValue)
 	end
 	org.airPressureRatio = altitudeO2K
 	local coldOxygenUseMul = (1 + shiveringO2Demand) * (1 - coldMetabolicPreservation)
-	local losing_oxy = timeValue * math.Clamp(org.o2[1] / 30, 0.25, 1) * coldOxygenUseMul
+	local losing_oxy = timeValue * math.Clamp(org.o2[1] / 30, 0.25, 1) * coldOxygenUseMul * (org.hopelessO2Mul or 1)
 
 	org.losing_oxy = losing_oxy
 
@@ -1497,26 +1497,18 @@ kaz
 	org.brainHemorrhage = hemorrhage
 	org.brainBleedRate = bleedRate
 
-	org.disorientation = math.max(org.disorientation, frontal * 0.35 + parietal * 0.65 + temporal * 0.25)
 	org.immobilization = math.max(org.immobilization, parietal * 8)
-	org.consciousness = math.min(org.consciousness, 1 - frontal * 0.35 - temporal * 0.15)
-	local skullDebuffMul = org.bandagedskull and 0.5 or 1
-	local skullPain = math.Clamp((skullDamage - 0.1) / 0.9, 0, 1)
-	if skullPain > 0 and (org.pain or 0) + (org.painadd or 0) < skullPain * 35 * skullDebuffMul then
-		org.painadd = math.min((org.painadd or 0) + timeValue * skullPain * 3 * skullDebuffMul, 150)
+	local severeLobe = math.Clamp((lobeDamage - 0.6) / 0.4, 0, 1)
+	if severeLobe > 0 then
+		org.consciousness = math.min(org.consciousness, 1 - severeLobe * 0.75)
 	end
+	local skullDebuffMul = org.bandagedskull and 0.5 or 1
 	if skullBroken then
-		org.disorientation = math.max(org.disorientation, 0.9 * skullDebuffMul)
 		org.immobilization = math.max(org.immobilization, 5 * skullDebuffMul)
 		org.consciousness = math.min(org.consciousness, 1 - 0.4 * skullDebuffMul)
 	end
 	if hemorrhage > 0 then
 		org.brain = min(org.brain + timeValue * hemorrhage / (hemorrhage < 0.3 and 900 or 300), 1)
-		org.disorientation = math.max(org.disorientation, hemorrhage * 0.9)
-		org.consciousness = math.min(org.consciousness, 1 - hemorrhage * 0.45)
-		if (org.pain or 0) + (org.painadd or 0) < hemorrhage * 45 then
-			org.painadd = math.min((org.painadd or 0) + timeValue * hemorrhage * 4, 150)
-		end
 	end
 
 	if hg.organism.AddSeizure and temporal > 0.2 then
@@ -1558,10 +1550,6 @@ kaz
 		org.brainParietal = max(parietal - mannitolBrainRecovery, 0)
 		org.brainTemporal = max(temporal - mannitolBrainRecovery, 0)
 		org.brainOccipital = max(occipital - mannitolBrainRecovery, 0)
-	end
-
-	if occipital > 0.35 then
-		org.disorientation = math.max(org.disorientation, occipital * 0.4)
 	end
 
 	if org.skull < 1 and org.skull > 0 and org.bandagedskull then

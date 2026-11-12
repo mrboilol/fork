@@ -452,17 +452,6 @@ CalcView = function(ply, origin, angles, fov, znear, zfar)
 	if suicideScale <= 0 then suicideScale = 1 end
 	lerpfovadd = LerpFT(0.01, lerpfovadd, (ply:IsSprinting() and rlEnt == ply and rlEnt:GetVelocity():LengthSqr() > 1500 and 10 or 0) - ( ply.organism and (ply.organism and (((ply.organism.immobilization or 0) / 4) - (ply.organism.adrenaline or 0) * 5 - (ply.organism.noradrenaline or 0) * 15)) or 0) / 2 - (ply.suiciding and (ply:GetNetVar("suicide_time",CurTime()) < CurTime()) and (1 - math.max(ply:GetNetVar("suicide_time",CurTime()) + 8 - CurTime(),0) / 8) * suicideScale * 20 or 0))
 	lerpfovadd2 = LerpFT(0.1, lerpfovadd2, zooming and -25 or 0)
-	local depVal = 0
-	if IsValid(ply) and ply.organism and ply.organism.depression then
-		depVal = math.Clamp(ply.organism.depression, 0, 1)
-	else
-		local spec = IsValid(lply) and lply:GetNWEntity("spect") or nil
-		if IsValid(spec) and spec.organism and spec.organism.depression then
-			depVal = math.Clamp(spec.organism.depression, 0, 1)
-		end
-	end
-	local pulseSin = math.sin(CurTime() * math.pi / 0.93) * 0.5 + 0.5
-	local depFovAdd = pulseSin * 7 * depVal
 
 	fov = hg_fov:GetInt()
 	
@@ -641,7 +630,7 @@ CalcView = function(ply, origin, angles, fov, znear, zfar)
 
 	view.znear = 1
 	view.zfar = zfar
-	view.fov = math.Clamp(hg_fov:GetFloat(),75,100) + fova[1] + lerpfovadd + lerpfovadd2 - depFovAdd
+	view.fov = math.Clamp(hg_fov:GetFloat(),75,100) + fova[1] + lerpfovadd + lerpfovadd2
 	view.drawviewer = true--not hullcheck.Hit
 	view.origin = origin
 	view.angles = angles

@@ -210,7 +210,7 @@ function hg.organism.UpdateCardiacRhythm(owner, org, timeValue, s)
 		if org.temperature > 42 then org.heartstop = true end
 	end
 	local hemorrhageDrivenLowOutput = criticalHemorrhageDepth > 0
-	if ((org.pulse < 10 and not hemorrhageDrivenLowOutput) or (org.brain >= 0.6 and not (hg.organism.IsBrainDamageIgnored and hg.organism.IsBrainDamageIgnored(org)))) and not restartCirculationActive then org.heartstop = true end
+	if ((org.pulse < 10 and not hemorrhageDrivenLowOutput) or (org.brain >= 0.6 and math.random() < timeValue / 20 and not (hg.organism.IsBrainDamageIgnored and hg.organism.IsBrainDamageIgnored(org)))) and not restartCirculationActive then org.heartstop = true end
 	if org.temperature > 42 then org.heartstop = true end
 	if org.heartstop and not org.fibrillation and org.terminalRhythm ~= "ventricular_fibrillation" and org.terminalRhythm ~= "asystole"
 		and (org.heartbeat or 0) >= 140 and (org.arrhythmia or 0) >= 0.72

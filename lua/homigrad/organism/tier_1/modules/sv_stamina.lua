@@ -481,6 +481,7 @@ function hg.organism.RileAnger(org, amount, adrenalineAmount)
 	if not org or not org.alive or org.otrub then return end
 	amount = math.max(amount or 0, 0)
 	adrenalineAmount = math.max(adrenalineAmount == nil and amount * 2 or adrenalineAmount, 0)
+	if amount > 0 and hg.GetPsycheTraining then amount = amount * Lerp(hg.GetPsycheTraining(org.owner), 1, hg.PsycheCombat.trainedAngerMul) end
 	if amount > 0 then
 		org.anger = math.Clamp((org.anger or 0) + amount, 0, 1)
 		org.angerCombatUntil = math.max(org.angerCombatUntil or 0, CurTime() + anger_combat_hold_time)

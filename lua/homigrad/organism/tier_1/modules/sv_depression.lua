@@ -7,37 +7,36 @@ local depression_happiness_cost = 1.5
 
 local depression_max = 1
 local depression_drain_time = 300
-local depression_drain_boost_time = 100
-local depression_pain_threshold = 60
-local depression_pain_gain = 0.02
-local depression_fear_threshold = 3
-local depression_fear_gain = 0.015
+local depression_drain_calm_mul = 3
+local depression_drain_treated_mul = 3.5
+local depression_treated_gain_mul = 0.25
 local depression_blood_threshold = 3500
 local depression_blood_gain = 0.01
-local depression_otrub_gain = 0.005
 local depression_cotard_gain = 0.012
 local depression_adrenaline_suppress_start = 0.5
 local depression_adrenaline_suppress_min = 0.1
 local selfharm_adrenaline_threshold = 1.5
 local selfharm_adrenaline_delay = 3
 local depression_bleedrate_threshold = 5
-local depression_bleedrate_gain = 0.03
+local depression_bleedrate_gain = 0.02
 local depression_bleedrate_maxmul = 4
 local depression_o2_threshold = 15
 local depression_o2_gain = 0.02
-local depression_bones_gain = 0.012
-local depression_cold_threshold = 35
-local depression_cold_gain = 0.01
-local depression_panic_gain = 0.02
-local depression_amputation_gain = 0.015
 local depression_wake_relief = 0.2
 local depression_wake_relief_time = 35
 local depression_untreated_bleed_threshold = 2
 local depression_untreated_bleed_delay = 45
 local depression_untreated_bleed_gain = 0.006
 local depression_treatment_failure_gain = 0.035
+local depression_stages = {0.25, 0.6, 0.85}
+local depression_hopeless_release = 0.7
+local depression_hopeless_dying = 0.2
+local depression_succumb_max = 0.3
+local depression_hopeless_succumb = 0.3
+local depression_hopeless_o2_mul = 1.35
+local depression_calm_dying = 0.2
 
-local selfharm_threshold = 0.4
+local selfharm_threshold = 0.6
 local selfharm_roll_time_min = 5
 local selfharm_roll_time_max = 12
 local selfharm_chance_min = 0.25
@@ -53,59 +52,46 @@ local selfharm_wave_interval_max = 7
 local selfharm_wave_presses = 10
 
 local selfharm_phrases = {
-	"I can't take my eyes off my own wrist...",
-	"The urge is too strong... maybe just one cut...",
-	"I need to feel something else... anything...",
-	"The pain in my head needs a way out...",
+	"I CAN'T DO THIS ANYMORE. I'M GOING TO DIE ANYWAY.",
+	"Holy shit I can't do anything... just make it stop...",
+	"WHAT'S THE POINT, THEY'RE GOING TO KILL ME ANYWAY.",
+	"I can't... I can't fucking do this... make it stop...",
 }
 
 local selfharm_pending_phrases = {
-	"My eyes keep drifting to the blade...",
-	"Maybe I should pick it up... just to hold it...",
-	"I can't stop thinking about the knife...",
+	"I'M GOING TO FUCKING DIE. I'M GOING TO DIE.",
+	"Holy shit I can't do anything... I'm going to die...",
+	"It's over... there's nothing I can do...",
 }
 
-local depression_stage_thresholds = {0.25, 0.35, 0.5}
-local depression_stage_thoughts = {
-	[0.25] = "You are feeling down.",
-	[0.35] = "You are feeling upset.",
-	[0.5] = "You are feeling depressed.",
-}
 local depression_stage_cooldown = 30
-local depression_dark_threshold = 0.65
 local depression_dark_thought_min = 45
 local depression_dark_thought_max = 120
-local depression_dark_thoughts = {
-	"You wont make it far.",
-	"You wont succeed.",
-	"Find something sharp.",
-	"Have you lost hope?",
-	"Do you miss them?",
-	"You are nobody.",
-	"You are a waste of time.",
-	"You are worthless.",
-	"End it all.",
-}
-
-local depression_notify_stage_thresholds = {0.35, 0.45, 0.55}
-local depression_notify_stage_phrases = {
-	[0.35] = {
-		"I'm feeling down..",
-		"I'm feeling kinda down..",
-		"Dude... I'm bored..",
-		"Mmmh... I should get busy with something.",
+local depression_thought_pools = {
+	dying = {
+		{"That's a lot of blood... that's a lot of MY blood...", "I don't feel right... something's really wrong...", "Okay... okay, I'm hurt bad. Think. THINK."},
+		{"It's not stopping... nothing I do is stopping it...", "Nobody's coming... I have to fix this and I can't...", "I'm getting cold... why am I getting cold..."},
+		{"Please... I don't want to die here... not like this...", "I can't feel my hands anymore... this is it, isn't it...", "I'm sorry... I'm so sorry... I wanted more time..."},
 	},
-	[0.45] = {
-		"I feel upset..",
-		"I really feel sad..",
-		"Does it get worse than this?",
-		"Staying strong... I hope.",
+	fight = {
+		{"They're winning... they're actually winning...", "I can't keep up with this...", "Shit. Shit. This is going bad, fast."},
+		{"Nothing's working... why is NOTHING working?!", "They're going to kill me. They're really going to kill me.", "I keep missing... I keep fucking missing..."},
+		{"I'm done... I'm so done...", "It's over. They've got me.", "What's the point... they've already won..."},
 	},
-	[0.55] = {
-		"Fuck my life.",
-		"I cant take this anymore.",
-		"I need something sharp.",
-		"Fuck everything.",
+	grief = {
+		{"They were just talking to me... a second ago...", "I can't stop shaking...", "I just stood there... I didn't do anything..."},
+		{"It should've been me...", "I keep seeing their face...", "Why them... why not me..."},
+		{"I can't do this without them...", "Everyone's dying... I'm next, aren't I...", "What's even the point anymore..."},
+	},
+	guilt = {
+		{"That was one of ours... what did I do...", "I didn't mean to... I swear I didn't mean to...", "That was on me. That was all on me."},
+		{"They trusted me... and I killed them...", "I can't look anyone in the eye...", "They had a whole life... and I ended it by accident..."},
+		{"I don't deserve to walk out of here...", "They're dead because of me...", "How am I supposed to live with this..."},
+	},
+	aftermath = {
+		{"I'm alive... how am I still alive...", "That was way too close...", "I need to sit down before I fall down..."},
+		{"Next time I won't be this lucky...", "I can't get it out of my head...", "I almost died back there. I ALMOST DIED."},
+		{"I can't keep doing this...", "I won't survive the next one...", "Why am I even still trying..."},
 	},
 }
 
@@ -146,6 +132,11 @@ end
 
 function hg.organism.EmotionThought(owner, text, duration, id)
 	if not IsValid(owner) or not owner:IsPlayer() or not owner:Alive() then return end
+	local now = CurTime()
+	local K = hg.PsycheCombat
+	if K and owner.hgLastEmotionText == text and now - (owner.hgLastEmotionTime or 0) < K.thoughtRepeatWindow then return end
+	owner.hgLastEmotionText = text
+	owner.hgLastEmotionTime = now
 
 	showDepressionThought(owner, text, duration, id)
 end
@@ -257,11 +248,13 @@ end
 module[1] = function(org)
 	org.depression = 0
 	org.depressionadd = 0
+	org.depressionCause = nil
+	org.depressionHopeless = nil
+	org.depressionSuccumb = 0
+	org.hopelessO2Mul = nil
 	org.depressionThoughtStage = nil
 	org.depressionNextStageThought = nil
 	org.depressionNextDarkThought = nil
-	org.depressionNotifyStage = nil
-	org.depressionNextNotifyThought = nil
 	org.depressionNextMinigamePhrase = nil
 	org.depressionWakeReliefUntil = nil
 	org.depressionUntreatedBleedSince = nil
@@ -423,20 +416,74 @@ local function rollSelfHarm(owner, org)
 	end
 end
 
+local function getDyingLevel(org)
+	local blood = Clamp((4000 - (org.blood or 5000)) / 1500, 0, 1)
+	local bleed = Clamp(((org.bleed or 0) - 2) / 8, 0, 1)
+	local o2 = Clamp((18 - (org.o2 and org.o2[1] or 30)) / 12, 0, 1)
+	local fading = Clamp((0.7 - (org.consciousness or 1)) / 0.4, 0, 1)
+	local internal = (org.internalBleed or 0) > 0.5 and 0.5 or 0
+
+	return max(blood, bleed, o2, fading, internal)
+end
+
+local function getTreatment(org)
+	if CurTime() < (org.betaBlockerUntil or 0) then return 1 end
+
+	return Clamp(max(org.analgesia or 0, (org.painkiller or 0) * 0.4), 0, 1)
+end
+
+local function getStage(dep)
+	for i = #depression_stages, 1, -1 do
+		if dep >= depression_stages[i] then return i end
+	end
+
+	return 0
+end
+
+local function clearDepression(owner, org)
+	if owner.selfharming then hg.organism.EndSelfHarm(owner) end
+	org.depression = 0
+	org.depressionadd = 0
+	org.depressionCause = nil
+	org.depressionHopeless = nil
+	org.depressionSuccumb = 0
+	org.hopelessO2Mul = nil
+	org.depressionThoughtStage = nil
+	org.depressionNextStageThought = nil
+	org.depressionNextDarkThought = nil
+	org.depressionNextMinigamePhrase = nil
+	org.depressionUntreatedBleedSince = nil
+	org.selfharmPendingUntil = nil
+	if owner:IsPlayer() then owner:SetNWFloat("rem_selfharm_pending", 0) end
+end
+
+local function updateDepressionThoughts(owner, org, dying, inFight)
+	local now = CurTime()
+	local stage = getStage(org.depression or 0)
+	local shown = org.depressionThoughtStage or 0
+	if stage < shown then
+		org.depressionThoughtStage = stage
+		return
+	end
+	if stage == 0 or org.otrub then return end
+
+	local context = dying >= 0.35 and "dying" or inFight and "fight" or depression_thought_pools[org.depressionCause] and org.depressionCause or "aftermath"
+	local pool = depression_thought_pools[context][stage]
+
+	if stage > shown and now >= (org.depressionNextStageThought or 0) then
+		org.depressionThoughtStage = stage
+		org.depressionNextStageThought = now + depression_stage_cooldown
+		org.depressionNextDarkThought = now + math.Rand(depression_dark_thought_min, depression_dark_thought_max)
+		showDepressionThought(owner, pool[math.random(#pool)], 6, "depression_stage")
+	elseif now >= (org.depressionNextDarkThought or now + 1) then
+		org.depressionNextDarkThought = now + math.Rand(depression_dark_thought_min, depression_dark_thought_max)
+		showDepressionThought(owner, pool[math.random(#pool)], 6, "depression_dark")
+	end
+end
+
 module[2] = function(owner, org, timeValue)
 	if not hg_depression:GetBool() or isDepressionImmune(org) then
-		if owner.selfharming then hg.organism.EndSelfHarm(owner) end
-		org.depression = 0
-		org.depressionadd = 0
-		org.depressionThoughtStage = nil
-		org.depressionNextStageThought = nil
-		org.depressionNextDarkThought = nil
-		org.depressionNotifyStage = nil
-		org.depressionNextNotifyThought = nil
-		org.depressionNextMinigamePhrase = nil
-		org.depressionUntreatedBleedSince = nil
-		org.selfharmPendingUntil = nil
-		if owner:IsPlayer() then owner:SetNWFloat("rem_selfharm_pending", 0) end
+		clearDepression(owner, org)
 		return
 	end
 
@@ -451,20 +498,13 @@ module[2] = function(owner, org, timeValue)
 	end
 	org.depressionWasUnconscious = org.otrub and true or false
 
+	local now = CurTime()
+	local dying = getDyingLevel(org)
+	local treatment = getTreatment(org)
+	local inFight = (org.panicGunfightUntil or 0) > now or (org.hgLosing or 0) > 0
 	local add = 0
 
-	local pain = org.pain or 0
-	if pain > depression_pain_threshold then
-		add = add + depression_pain_gain * timeValue
-	end
-
-	local fear = org.fear or 0
-	if fear > depression_fear_threshold then
-		add = add + depression_fear_gain * timeValue
-	end
-
-	local blood = org.blood or 5000
-	if blood < depression_blood_threshold then
+	if (org.blood or 5000) < depression_blood_threshold then
 		add = add + depression_blood_gain * timeValue
 	end
 
@@ -478,30 +518,10 @@ module[2] = function(owner, org, timeValue)
 		add = add + depression_o2_gain * timeValue
 	end
 
-	if (org.immobilization or 0) > 0 or (org.spine1 or 0) > 0.5 or (org.spine2 or 0) > 0.5 or (org.spine3 or 0) > 0.5 then
-		add = add + depression_bones_gain * timeValue
-	end
-
-	if (org.temperature or 36.7) < depression_cold_threshold then
-		add = add + depression_cold_gain * timeValue
-	end
-
-	if org.panicattackActive then
-		add = add + depression_panic_gain * timeValue
-	end
-
-	if org.larmamputated or org.rarmamputated or org.llegamputated or org.rlegamputated then
-		add = add + depression_amputation_gain * timeValue
-	end
-
-	if org.otrub then
-		add = add + depression_otrub_gain * timeValue
-	end
 	if (org.cotard or 0) > 0 then
 		add = add + depression_cotard_gain * org.cotard * timeValue
 	end
 
-	local now = CurTime()
 	local severeBleeding = bleedrate > depression_untreated_bleed_threshold or (org.internalBleed or 0) > 0.5
 	if severeBleeding and now >= (org.depressionTreatmentUntil or 0) then
 		org.depressionUntreatedBleedSince = org.depressionUntreatedBleedSince or now
@@ -522,6 +542,7 @@ module[2] = function(owner, org, timeValue)
 	if adrenaline > depression_adrenaline_suppress_start then
 		add = add * max(1 - adrenaline * 0.2, depression_adrenaline_suppress_min)
 	end
+	add = add * Lerp(treatment, 1, depression_treated_gain_mul)
 
 	if now < (org.depressionWakeReliefUntil or 0) then
 		add = 0
@@ -533,92 +554,32 @@ module[2] = function(owner, org, timeValue)
 		org.panicattackadd = max((org.panicattackadd or 0) - add, 0)
 		org.panicattack = max((org.panicattack or 0) - add, 0)
 	end
-	local goodmood = Clamp(tonumber(org.goodmood) or 0, 0, 1)
 
 	org.depression = Clamp((org.depression or 0) + add, 0, depression_max)
 
 	local drainRate = timeValue / depression_drain_time
-	if pain < 30 and fear < 2 and blood > 4000 and not org.otrub then
-		drainRate = drainRate * (depression_drain_time / depression_drain_boost_time)
+	if not inFight and dying < depression_calm_dying and not org.otrub then
+		drainRate = drainRate * depression_drain_calm_mul
 	end
-	if goodmood > 0 then
-		drainRate = drainRate * Lerp(goodmood, 1, 1.75)
-	end
-
+	drainRate = drainRate * Lerp(treatment, 1, depression_drain_treated_mul)
+	drainRate = drainRate * Lerp(Clamp(tonumber(org.goodmood) or 0, 0, 1), 1, 1.75)
 	if org.superfighter then
 		drainRate = drainRate * 4
 	end
 
-	if (org.depression or 0) > 0.5 then
-		drainRate = drainRate / 2.5
-	end
-
 	org.depression = max((org.depression or 0) - drainRate, 0)
 
+	local dep = org.depression
+	if dep >= depression_stages[3] and dying >= depression_hopeless_dying then
+		org.depressionHopeless = true
+	elseif dep < depression_hopeless_release then
+		org.depressionHopeless = nil
+	end
+	org.depressionSuccumb = Clamp((dep - depression_stages[1]) / (depression_stages[3] - depression_stages[1]), 0, 1) * depression_succumb_max + (org.depressionHopeless and depression_hopeless_succumb or 0)
+	org.hopelessO2Mul = org.depressionHopeless and depression_hopeless_o2_mul or nil
+
 	if owner:IsPlayer() then
-		local dep = org.depression or 0
-		if owner:GetInfoNum("hg_newthoughts", 0) > 0 then
-			local stage = org.depressionThoughtStage
-
-			if stage and dep < stage then
-				org.depressionThoughtStage = nil
-			end
-
-			if dep < depression_stage_thresholds[1] then
-				org.depressionThoughtStage = nil
-			elseif (org.depressionNextStageThought or 0) < CurTime() then
-				stage = org.depressionThoughtStage or 0
-
-				for i = #depression_stage_thresholds, 1, -1 do
-					local threshold = depression_stage_thresholds[i]
-
-					if dep >= threshold then
-						if stage < threshold then
-							org.depressionThoughtStage = threshold
-							org.depressionNextStageThought = CurTime() + depression_stage_cooldown
-							showDepressionThought(owner, depression_stage_thoughts[threshold], 6, "depression_stage_" .. threshold)
-						end
-
-						break
-					end
-				end
-			end
-
-			if dep > depression_dark_threshold then
-				if (org.depressionNextDarkThought or 0) < CurTime() then
-					org.depressionNextDarkThought = CurTime() + math.Rand(depression_dark_thought_min, depression_dark_thought_max)
-					showDepressionThought(owner, table.Random(depression_dark_thoughts), 6, "depression_dark")
-				end
-			else
-				org.depressionNextDarkThought = nil
-			end
-		else
-			local notifyStage = org.depressionNotifyStage
-
-			if notifyStage and dep < notifyStage then
-				org.depressionNotifyStage = nil
-			end
-
-			if dep < depression_notify_stage_thresholds[1] then
-				org.depressionNotifyStage = nil
-			elseif (org.depressionNextNotifyThought or 0) < CurTime() then
-				notifyStage = org.depressionNotifyStage or 0
-
-				for i = #depression_notify_stage_thresholds, 1, -1 do
-					local threshold = depression_notify_stage_thresholds[i]
-
-					if dep >= threshold then
-						if notifyStage < threshold then
-							org.depressionNotifyStage = threshold
-							org.depressionNextNotifyThought = CurTime() + depression_stage_cooldown
-							owner:Notify(table.Random(depression_notify_stage_phrases[threshold]), 6, "depression_notify_stage_" .. threshold, 0)
-						end
-
-						break
-					end
-				end
-			end
-		end
+		updateDepressionThoughts(owner, org, dying, inFight)
 
 		if owner.suiciding and (owner.hgSuicideAim or 0) > 0 and (org.depressionNextMinigamePhrase or 0) < CurTime() then
 			org.depressionNextMinigamePhrase = CurTime() + math.Rand(depression_minigame_phrase_interval_min, depression_minigame_phrase_interval_max)
@@ -642,7 +603,7 @@ module[2] = function(owner, org, timeValue)
 	end
 end
 
-function hg.organism.AddDepression(org, amount)
+function hg.organism.AddDepression(org, amount, cause)
 	if not org then return 0 end
 	if not hg_depression:GetBool() or isDepressionImmune(org) then
 		org.depression = 0
@@ -650,8 +611,10 @@ function hg.organism.AddDepression(org, amount)
 		return 0
 	end
 	if not isnumber(amount) or amount <= 0 then return org.depressionadd or 0 end
+	if hg.GetPsycheTraining then amount = amount * Lerp(hg.GetPsycheTraining(org.owner), 1, hg.PsycheCombat.trainedDepressionMul) end
 
 	org.depressionadd = Clamp((org.depressionadd or 0) + amount, 0, depression_max)
+	if cause then org.depressionCause = cause end
 
 	return org.depressionadd
 end
@@ -661,7 +624,7 @@ concommand.Add("selfharm", function(ply)
 	if not IsValid(ply) or not ply:IsPlayer() or not ply:Alive() then return end
 	if not ply.organism or ply.selfharming or ply.suiciding or ply.remUrgeEnd then return end
 	if (ply.remUrgeCooldown or 0) > CurTime() then return end
-	if ply.organism and (ply.organism.depression or 0) < 0.5 then
+	if ply.organism and (ply.organism.depression or 0) < selfharm_threshold then
 		if ply:GetInfoNum("hg_newthoughts", 0) > 0 then
 			ply:Thought("You shouldn't do this.", 6, "depression_block_selfharm", 0)
 		else

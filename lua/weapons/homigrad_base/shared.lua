@@ -262,6 +262,11 @@ function SWEP:GetFirearmProficiency(ply)
 	return skill
 end
 
+local trainingSWEP = SWEP
+function hg.GetCombatTraining(ply)
+	return trainingSWEP:GetFirearmProficiency(ply)
+end
+
 function SWEP:GetAmmoBallistics()
 	local ammo = self.Primary and self.Primary.Ammo
 	local ammoInfo = ammo and hg.ammotypeshuy and hg.ammotypeshuy[ammo]

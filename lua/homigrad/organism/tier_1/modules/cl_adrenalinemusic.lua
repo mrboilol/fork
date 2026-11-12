@@ -63,10 +63,13 @@ hook.Add("Think", "hg_adrenalinemusic_check", function()
 		return
 	end
 
+	local panicking = organism.panicattackActive or (organism.panicattack or 0) >= 0.35
+	if panicking then hg.lastCombatTime = CurTime() end
+
 	if (organism.pain or 0) > 70 then
 		hg.lastSeverePainTime = CurTime()
 	end
-	if CurTime() - hg.lastSeverePainTime < 30 then
+	if not panicking and CurTime() - hg.lastSeverePainTime < 30 then
 		StopAdrenalineMusic(true)
 		return
 	end

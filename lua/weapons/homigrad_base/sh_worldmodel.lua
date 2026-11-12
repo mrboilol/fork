@@ -199,6 +199,13 @@ function SWEP:ChangeGunPos(dtime)
 	local controlDamping = Lerp(proficiency, 0.55, 1.05)
 	local tremor = 25 * (1 + instability * 4 + (self.recoilAimPenalty or 0) * 0.5) * (1 + armInjury * 0.6) * (1 - steady * 0.7)
 	local sway = 38 * (fatigueLoad + instability * 2)
+	local K = hg.PsycheCombat
+	local psyPanic = combat and combat.panic or 0
+	local psyTraining = combat and combat.training or 0
+	local fineTremor = K.tremorForce * (combat and combat.tremor or 0) * (1 - steady * 0.5)
+	local breathAmp = K.breathForce * (1 + psyPanic * K.breathPanicAmp) * (ply.organism and ply.organism.holdingbreath and K.breathHoldMul or 1) * (1 - steady * K.breathBraceMul) * Lerp(psyTraining, 1, K.trainedShakeMul)
+	self.psycheBreathPhase = ((self.psycheBreathPhase or 0) + recoilDtime * K.breathRate * (1 + psyPanic * K.breathPanicRate) * math.pi * 2) % (math.pi * 2)
+	local breathPhase = self.psycheBreathPhase
 	local positionSpring = Lerp(proficiency, 55, 110) * 0.8 * strength
 	local positionDamping = Lerp(proficiency, 9, 21) * strength
 	local lateralPositionSpring = positionSpring * 0.5
@@ -218,7 +225,8 @@ function SWEP:ChangeGunPos(dtime)
 	local lag = 1 - math.exp(-h / reaction)
 	for i = 1, 3 do
 		local freq = i == 1 and controlFreq or controlFreq * 0.7
-		local disturbance = (aimNoise(t * 9, seed + i * 31) * tremor + aimNoise(t * 0.8, seed + i * 57) * sway) * (i == 3 and 0.4 or 1)
+		local breath = i == 1 and math.sin(breathPhase) or i == 2 and math.cos(breathPhase) * K.breathYaw or 0
+		local disturbance = (aimNoise(t * 9, seed + i * 31) * tremor + aimNoise(t * 0.8, seed + i * 57) * sway + aimNoise(t * K.tremorFreq, seed + i * 13) * fineTremor + breath * breathAmp) * (i == 3 and 0.4 or 1)
 		for _ = 1, steps do
 			perceived[i] = perceived[i] + (wobble[i] - perceived[i]) * lag
 			perceivedVelocity[i] = perceivedVelocity[i] + (wobbleVelocity[i] - perceivedVelocity[i]) * lag

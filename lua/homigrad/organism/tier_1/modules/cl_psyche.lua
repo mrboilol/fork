@@ -7,6 +7,7 @@ local FEAR_FALLBACK = 6
 
 local fearSound
 local fearReplayAt
+local angerTunnel = 0
 local fearLength = SoundDuration(FEAR_SOUND) or 0
 
 local function stopPsycheSounds()
@@ -56,10 +57,14 @@ hook.Add("Think", "hg_psyche_effects", function()
 end)
 
 hook.Add("Player_Death", "hg_psyche_sound_stop", function(ply)
-	if ply == LocalPlayer() then stopPsycheSounds() end
+	if ply == LocalPlayer() then
+		stopPsycheSounds()
+		angerTunnel = 0
+	end
 end)
 
 local vignetteMat = Material("effects/shaders/zb_vignette")
+local angerMat = Material("effects/shaders/zb_grain2")
 
 local psyche_color_tab = {
 	["$pp_colour_addr"] = 0,
@@ -98,4 +103,26 @@ hook.Add("RenderScreenspaceEffects", "hg_psyche_color", function()
 		render.SetMaterial(vignetteMat)
 		render.DrawScreenQuad()
 	end
+
+	local K = hg.PsycheCombat
+	local angerTarget = K and Clamp((anger - K.angerTunnelStart) / (K.angerTunnelFull - K.angerTunnelStart), 0, 1) or 0
+	if org.otrub or org.incapacitated then angerTarget = 0 end
+	angerTunnel = Lerp(math.min(FrameTime() * 2.5, 1), angerTunnel, angerTarget)
+	if angerTunnel < 0.005 then return end
+
+	local pulse = angerTunnel * (0.85 + math.abs(math.sin(CurTime() * 2.6)) * 0.15)
+	render.UpdateScreenEffectTexture()
+	render.UpdateFullScreenDepthTexture()
+	angerMat:SetFloat("$c0_x", 0)
+	angerMat:SetFloat("$c0_y", -1)
+	angerMat:SetFloat("$c0_z", 4096)
+	angerMat:SetFloat("$c1_x", pulse * 7)
+	angerMat:SetFloat("$c1_y", pulse * 0.45)
+	angerMat:SetFloat("$c1_z", 0)
+	angerMat:SetFloat("$c2_x", pulse * 0.2)
+	angerMat:SetFloat("$c2_y", 0)
+	angerMat:SetFloat("$c2_z", 0)
+	angerMat:SetFloat("$c3_x", 0)
+	render.SetMaterial(angerMat)
+	render.DrawScreenQuad()
 end)

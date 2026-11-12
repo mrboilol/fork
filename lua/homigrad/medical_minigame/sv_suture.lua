@@ -145,28 +145,17 @@ function hg.Suture.Apply(ply, session, option)
 		else
 			hg.organism.MarkArterialWoundsNetDirty(org)
 		end
-
-		local woundBone = wound[7] == "arteria" and "arteria" or wound[4]
-		local limb = hg.GetTourniquetLimb and hg.GetTourniquetLimb(woundBone)
-		if limb then
-			local limbStillBleeding = false
-			for _, other in ipairs(org.arterialwounds or {}) do
-				if (other[1] or 0) > 0 and hg.GetTourniquetLimb(other[7] == "arteria" and "arteria" or other[4]) == limb then
-					limbStillBleeding = true
-					break
-				end
-			end
-
-			local holder = IsValid(org.owner) and org.owner or target
-			if not limbStillBleeding and hg.RemoveTourniquetsOnLimb(holder, woundBone) > 0 then
-				ply:Notify("The artery is closed. You take the tourniquet off.", true, "suture_tourniquet", 0)
-			end
-		end
 	else
 		org.bleed = math.max((org.bleed or 0) - (wound[1] or 0), 0)
 		wound[1] = 0
 		table.RemoveByValue(org.wounds, wound)
 		hg.organism.MarkWoundsNetDirty(org, true)
+	end
+
+	local holder = IsValid(org.owner) and org.owner or target
+	local woundBone = option.kind == "artery" and wound[7] == "arteria" and "arteria" or wound[4]
+	if hg.ReleaseTourniquetIfLimbClear and hg.ReleaseTourniquetIfLimbClear(holder, org, woundBone) > 0 then
+		ply:Notify("The bleeding is closed. You take the tourniquet off.", true, "suture_tourniquet", 0)
 	end
 
 	org.painadd = (org.painadd or 0) + (option.kind == "artery" and 6 or 3)

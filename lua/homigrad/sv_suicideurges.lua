@@ -1,4 +1,4 @@
-local urge_threshold = 0.35
+local urge_threshold = 0.6
 local urge_roll_time_min = 3
 local urge_roll_time_max = 7
 local urge_chance_min = 0.35

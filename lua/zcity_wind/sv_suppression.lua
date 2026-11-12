@@ -165,6 +165,7 @@ function ZW.SendServerSuppressionForBullet(bullet, startPos, endPos)
                 if hg.organism and hg.organism.AddPanicAttack and CurTime() >= (org._panicSuppressionNext or 0) then
                     org._panicSuppressionNext = CurTime() + 0.15
                     hg.organism.AddPanicAttack(org, 0.1 + suppressionResponse * 0.35, true, true, true, true)
+                    if hg.organism.PsycheNearMiss then hg.organism.PsycheNearMiss(ply, org) end
                 end
             end
         end

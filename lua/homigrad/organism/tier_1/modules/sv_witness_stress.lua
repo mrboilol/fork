@@ -26,9 +26,9 @@ local RELIEF_PANIC_KEEP = 0.5
 local RELIEF_MIN_ADRENALINE = 0.3
 
 local STRESS = {
-	death = {panic = 0.35, depression = 0.06, fear = 0.5},
-	otrub = {panic = 0.16, depression = 0.02, fear = 0.3},
-	corpse = {panic = 0.08, depression = 0.025, fear = 0.15},
+	death = {panic = 0.35, depression = 0.3, fear = 0.5},
+	otrub = {panic = 0.16, depression = 0.08, fear = 0.3},
+	corpse = {panic = 0.08, depression = 0, fear = 0.15},
 }
 local BUDDY_MUL = 2
 
@@ -37,14 +37,24 @@ local FIGHT_DAMAGE = DMG_BULLET + DMG_BUCKSHOT + DMG_BLAST + DMG_SLASH + DMG_CLU
 local EMO = {
 	reliefHappiness = 0.35,
 	hopeHappiness = 0.15,
-	hopeDepressionMin = 0.15,
-	buddyDeathDepression = 0.15,
+	fighterSeeRadius = 3000,
+	chanceHappiness = 0.1,
+	chanceCooldown = 6,
+	chanceCheckDelay = 0.15,
+	chancePainJump = 30,
+	chancePainHigh = 70,
+	disarmWindow = 1,
+	stressedDepression = 0.1,
+	stressedHurt = 0.35,
 	friendlyFireDepression = 0.12,
 	friendlyKillDepression = 0.35,
 	friendlyFireCooldown = 8,
 	losingInterval = 1,
 	losingStart = 0.3,
+	losingBadly = 0.5,
 	losingConvertRate = 0.012,
+	winningHurt = 0.35,
+	winningHappiness = 0.01,
 	hopelessTime = 20,
 	hopelessDepression = 0.2,
 	doomedHurt = 0.7,
@@ -54,19 +64,57 @@ local EMO = {
 	botchDepression = 0.06,
 }
 
-local PHRASES = {
-	buddyDeath = {"DID I JUST SEE MY TEAMMATE DIE?", "NO. NO. THEY'RE DEAD. THEY'RE ACTUALLY DEAD.", "They were right next to me... and now they're gone."},
-	friendlyFire = {"DID I REALLY JUST SHOOT MY OWN TEAMMATE?", "OH GOD, THAT WAS ONE OF OURS!", "No no no, I hit my own guy!"},
-	friendlyKill = {"I KILLED THEM. I KILLED MY OWN TEAMMATE.", "What have I done... they were on my side...", "That's on me. I killed them."},
-	hope = {"WE HAVE A CHANCE!", "One down! We can do this!", "They can be beaten... keep going!"},
-	doomed = {"THEY'RE GOING TO KILL ME.", "I'm hit bad... they're going to finish me...", "I can't take another one... they're going to kill me..."},
-	hopeless = {"Holy shit I'm going to die... this is hopeless...", "There's too many... I'm not getting out of this...", "This is it. This is how I die."},
-	botch = {"I can't hit them... I can't hit ANYTHING.", "Why won't they go down?!", "I keep missing... I keep fucking missing..."},
-}
+local HANDS = {weapon_hg_coolhands = true, weapon_hands_sh = true}
 
-local relief_phrases = {"It's over.", "They're down. I'm okay.", "That's it... breathe.", "Done. It's done."}
-local buddy_phrases = {"No... no, no, no.", "Oh god, not them!", "Shit, they're down!"}
-local ganged_phrases = {"There's still more of them!", "One down, keep moving!", "Not done yet!"}
+local PHRASES = {
+	buddyDeath = {"No... no, they were RIGHT THERE...", "They're dead. They're actually dead.", "They were right next to me... and now they're just... gone."},
+	buddyDown = {"No, no, no, get up!", "Oh god, not them!", "Shit, they're down! They're down!"},
+	friendlyFire = {"OH SHIT, THAT WAS ONE OF OURS!", "No no no, I hit my own guy!", "Fuck- I shot them, I shot our guy!"},
+	friendlyKill = {"They're not moving... I killed them... I killed our own...", "What did I do... they were on my side...", "That's on me. I did that."},
+	calmDown = {"One down.", "Next.", "Keep moving."},
+	hope = {
+		solo = {"They're down... I might actually live through this!", "That's one! Keep it going!"},
+		ganged = {"One less on me... I can do this!", "They CAN go down... keep going!", "That's one... just a few more..."},
+		group = {"We can actually win this!", "One down! Keep it up!", "They're dropping! Push, push!"},
+		fist = {"Stay down! STAY DOWN!", "Got one... who's next?!"},
+	},
+	relief = {
+		solo = {"It's over... I'm still alive.", "They're down. I'm okay. I'm okay.", "Breathe... it's done."},
+		ganged = {"All of them... holy shit, I'm alive...", "I actually made it... I don't believe it..."},
+		group = {"We did it... we actually did it.", "That's all of them. We're okay.", "It's over. We made it."},
+		fist = {"They're out cold... it's over.", "Stay down... it's done."},
+	},
+	chance = {
+		solo = {"They're hurt... I can actually win this!", "They're slowing down... keep at it!"},
+		ganged = {"That one's hurt bad... I might get out of this!", "I got one good... don't stop now!"},
+		group = {"They're breaking! We've got this!", "They're hurt! Keep pushing!"},
+		fist = {"That one landed! They felt that!", "Something cracked... keep hitting!"},
+	},
+	disarm = {
+		solo = {"They lost their gun! Now, NOW'S my chance!", "They're unarmed... go, go!"},
+		ganged = {"One of them dropped it! Keep going!"},
+		group = {"They dropped it! Push them!", "They're unarmed, GO!"},
+		fist = {"Got it out of their hands!"},
+	},
+	doomed = {
+		solo = {"They're going to kill me... they're actually going to kill me...", "I'm hit bad... they're coming to finish me..."},
+		ganged = {"There's too many! I can't- there's too many!", "They're all on me... I can't hold them..."},
+		group = {"I'M HIT, SOMEONE HELP ME!", "I'm down! Cover me, please, cover me!"},
+		fist = {"One more hit and I'm done...", "They're not stopping... they're going to beat me to death..."},
+	},
+	botch = {
+		solo = {"Why can't I hit them?!", "Why won't they go DOWN?!"},
+		ganged = {"I can't hit any of them!", "There's too many, I can't hit anything!"},
+		group = {"I'm not hitting shit... I'm useless...", "Everyone's fighting and I can't hit a damn thing..."},
+		fist = {"I can't land anything...", "They keep blocking everything..."},
+	},
+	hopeless = {
+		solo = {"It's not working... nothing's working... I'm going to die...", "I can't beat them... I'm going to die here..."},
+		ganged = {"There's too many... I'm not getting out of this...", "They're everywhere... this is it..."},
+		group = {"We're losing... we're all going to die here...", "We're fucked... we're so fucked..."},
+		fist = {"I can't fight back... they're going to kill me with their bare hands...", "I can't even lift my arms anymore..."},
+	},
+}
 
 local function resolveFighter(ent)
 	if not IsValid(ent) then return end
@@ -140,7 +188,8 @@ function hg.organism.GetAdrenalineGainMul(org)
 	local owner = org and org.owner
 	if not IsValid(owner) or not owner:IsPlayer() then return 1 end
 	local now = CurTime()
-	if (org._adrGainMulNext or 0) > now then return org._adrGainMul or 1 end
+	local numb = hg.organism.PsycheAdrenalineNumb and hg.organism.PsycheAdrenalineNumb(org) or 1
+	if (org._adrGainMulNext or 0) > now then return (org._adrGainMul or 1) * numb end
 	org._adrGainMulNext = now + GAIN_MUL_REFRESH
 
 	local balance = countSupporters(owner) - math.max(#collectRecent(owner.hgFightAttackers) - 1, 0)
@@ -151,19 +200,21 @@ function hg.organism.GetAdrenalineGainMul(org)
 		mul = math.min(1 + OUTNUMBERED_STEP * -balance, OUTNUMBERED_CEIL)
 	end
 	org._adrGainMul = mul
-	return mul
+	return mul * numb
 end
 
-local function emotionThought(ply, list, id)
+local function emotionThought(ply, set, id, context)
+	local list = set[1] and set or set[context] or set.solo
+	local text = list[math.random(#list)]
 	if hg.organism.EmotionThought then
-		hg.organism.EmotionThought(ply, list[math.random(#list)], 5, id)
+		hg.organism.EmotionThought(ply, text, 5, id)
 	else
-		ply:Notify(list[math.random(#list)], 5, id, 0)
+		ply:Notify(text, 5, id, 0)
 	end
 end
 
-local function addDepression(org, amount)
-	if hg.organism.AddDepression then hg.organism.AddDepression(org, amount) end
+local function addDepression(org, amount, cause)
+	if hg.organism.AddDepression then hg.organism.AddDepression(org, amount, cause) end
 end
 
 local function addHappiness(org, amount)
@@ -176,8 +227,7 @@ local function addSurge(org, amount)
 	org.adrenalineAdd = math.min(current + amount, SURGE_CAP)
 end
 
-local function applyRelief(watcher, org)
-	addHappiness(org, EMO.reliefHappiness)
+local function applyRelief(watcher, org, context)
 	if (org.epinephrineStabilizationUntil or 0) > CurTime() then return end
 	local hadStress = (org.adrenaline or 0) >= RELIEF_MIN_ADRENALINE or (org.adrenalineAdd or 0) > 0 or org.panicattackActive
 	if not hadStress then return end
@@ -185,7 +235,7 @@ local function applyRelief(watcher, org)
 	org._adrenalineHoldUntil = 0
 	org._adrenalineReliefUntil = CurTime() + RELIEF_DURATION
 	org.panicattackadd = (org.panicattackadd or 0) * RELIEF_PANIC_KEEP
-	watcher:Notify(relief_phrases[math.random(#relief_phrases)], 4, "witness_relief", 0)
+	emotionThought(watcher, PHRASES.relief, "witness_relief", context)
 end
 
 local function canSee(watcher, pos, radius, dot, ignore1, ignore2)
@@ -203,7 +253,7 @@ local function canSee(watcher, pos, radius, dot, ignore1, ignore2)
 end
 
 local function isStressImmune(watcher, org)
-	return watcher.isTraitor or org.superfighter or (watcher.IsBerserk and watcher:IsBerserk())
+	return watcher.isTraitor or hg.IsPsycheApathetic(watcher) or org.superfighter or (watcher.IsBerserk and watcher:IsBerserk())
 end
 
 local function isEndangered(watcher, org, killer)
@@ -213,12 +263,13 @@ local function isEndangered(watcher, org, killer)
 		and killer:GetPos():DistToSqr(watcher:GetPos()) <= KILLER_THREAT_RADIUS * KILLER_THREAT_RADIUS
 end
 
-local function applyStress(watcher, org, stress, killer, mul)
+local function applyStress(watcher, org, stress, killer, mul, buddy)
 	org.fearadd = math.min((org.fearadd or 0) + stress.fear * mul, 3)
 	if isEndangered(watcher, org, killer) then
-		hg.organism.AddPanicAttack(org, stress.panic * mul, true, false, mul > 1)
-	elseif hg.organism.AddDepression then
-		hg.organism.AddDepression(org, stress.depression * mul)
+		hg.organism.AddPanicAttack(org, stress.panic * mul, true, false, buddy)
+	end
+	if buddy and stress.depression > 0 then
+		addDepression(org, stress.depression, "grief")
 	end
 end
 
@@ -268,7 +319,7 @@ local function onFriendlyFire(attacker)
 	local now = CurTime()
 	if (attacker.hgFriendlyFireNext or 0) > now then return end
 	attacker.hgFriendlyFireNext = now + EMO.friendlyFireCooldown
-	addDepression(org, EMO.friendlyFireDepression)
+	addDepression(org, EMO.friendlyFireDepression, "guilt")
 	emotionThought(attacker, PHRASES.friendlyFire, "emotion_friendly_fire")
 end
 
@@ -280,12 +331,34 @@ local function hurtLevel(org)
 	return math.max(blood, pain, shock, legs)
 end
 
+local function isStressed(org)
+	return org.panicattackActive or (org.depression or 0) >= EMO.stressedDepression or (org.hgLosing or 0) > 0 or hurtLevel(org) >= EMO.stressedHurt
+end
+
+local function isFistFighting(ply, now)
+	local wep = ply:GetActiveWeapon()
+	return IsValid(wep) and HANDS[wep:GetClass()] and (ply.hgFistFightTime or 0) > now - FIGHT_WINDOW
+end
+
+local function getFightContext(ply, attackers, now)
+	if isFistFighting(ply, now) then return "fist" end
+	local enemies = {}
+	for _, enemy in ipairs(attackers) do enemies[enemy] = true end
+	for _, enemy in ipairs(collectRecent(ply.hgFightTargets)) do enemies[enemy] = true end
+	local count = table.Count(enemies)
+	local allies = countSupporters(ply)
+	if count > allies + 1 then return "ganged" end
+	if allies > 0 then return "group" end
+	return "solo"
+end
+
 local function clearLosing(org)
 	org.hgLosing = nil
 	org.hgNoHitSince = nil
 	org.hgDoomedSaid = nil
 	org.hgHopelessSaid = nil
 	org.hgBotchSaid = nil
+	org.hgFightContext = nil
 end
 
 local function updateLosing(ply, org, now)
@@ -293,9 +366,12 @@ local function updateLosing(ply, org, now)
 	if #attackers == 0 then
 		org.hgNoHitSince = nil
 		org.hgLosing = math.max((org.hgLosing or 0) - EMO.losingInterval * 2, 0)
-		if org.hgLosing <= 0 then clearLosing(org) end
+		if org.hgLosing <= 0 and #collectRecent(ply.hgFightTargets) == 0 then clearLosing(org) end
 		return
 	end
+
+	local context = getFightContext(ply, attackers, now)
+	org.hgFightContext = context
 
 	local landed = 0
 	for _, enemy in ipairs(attackers) do
@@ -313,42 +389,90 @@ local function updateLosing(ply, org, now)
 
 	if losing >= EMO.losingStart then
 		org.hgLosing = (org.hgLosing or 0) + EMO.losingInterval * losing
-		if org.panicattackActive then
-			addDepression(org, EMO.losingConvertRate * losing * EMO.losingInterval)
+		if losing >= EMO.losingBadly or org.panicattackActive then
+			addDepression(org, EMO.losingConvertRate * losing * EMO.losingInterval, "fight")
 		end
+	elseif landed > 0 and hurt < EMO.winningHurt and outnumbered == 0 then
+		org.hgLosing = math.max((org.hgLosing or 0) - EMO.losingInterval * 2, 0)
+		addHappiness(org, EMO.winningHappiness * EMO.losingInterval)
 	else
 		org.hgLosing = math.max((org.hgLosing or 0) - EMO.losingInterval, 0)
 	end
 
-	if hurt >= EMO.doomedHurt and not org.hgDoomedSaid then
+	if hurt >= EMO.doomedHurt and losing >= EMO.losingStart and not org.hgDoomedSaid then
 		org.hgDoomedSaid = true
-		addDepression(org, EMO.doomedDepression)
-		emotionThought(ply, PHRASES.doomed, "emotion_doomed")
+		addDepression(org, EMO.doomedDepression, "fight")
+		emotionThought(ply, PHRASES.doomed, "emotion_doomed", context)
 	elseif org.hgNoHitSince and now - org.hgNoHitSince >= EMO.botchTime and not org.hgBotchSaid then
 		org.hgBotchSaid = true
-		addDepression(org, EMO.botchDepression)
-		emotionThought(ply, PHRASES.botch, "emotion_botch")
-	elseif org.panicattackActive and org.hgLosing >= EMO.hopelessTime and not org.hgHopelessSaid then
+		addDepression(org, EMO.botchDepression, "fight")
+		emotionThought(ply, PHRASES.botch, "emotion_botch", context)
+	elseif (org.hgLosing or 0) >= EMO.hopelessTime and (org.panicattackActive or (org.depression or 0) >= 0.25) and not org.hgHopelessSaid then
 		org.hgHopelessSaid = true
-		addDepression(org, EMO.hopelessDepression)
-		emotionThought(ply, PHRASES.hopeless, "emotion_hopeless")
+		addDepression(org, EMO.hopelessDepression, "fight")
+		emotionThought(ply, PHRASES.hopeless, "emotion_hopeless", context)
 	end
 end
 
-local function reactAsFighter(watcher, org, victim, isDeath)
+local function reactAsFighter(watcher, org, victim, isDeath, victimPos, victimEnt)
 	local gangedBy = collectRecent(watcher.hgFightAttackers, victim)
 	if #gangedBy > 0 then
 		addSurge(org, SURGE_GANGED_KILL * (isDeath and 1 or 0.6) * hg.organism.GetAdrenalineGainMul(org))
-		if (org.depression or 0) >= EMO.hopeDepressionMin then
-			addHappiness(org, EMO.hopeHappiness * (isDeath and 1 or 0.6))
-			emotionThought(watcher, PHRASES.hope, "witness_hope")
-		else
-			watcher:Notify(ganged_phrases[math.random(#ganged_phrases)], 3, "witness_ganged", 0)
-		end
+	end
+	if not canSee(watcher, victimPos, EMO.fighterSeeRadius, SEE_DOT, victim, victimEnt) then return end
+
+	local context = org.hgFightContext or "solo"
+	local stressed = isStressed(org)
+	if #gangedBy > 0 or #collectRecent(watcher.hgFightTargets, victim) > 0 then
+		addHappiness(org, EMO.hopeHappiness * (isDeath and 1 or 0.8))
+		emotionThought(watcher, stressed and PHRASES.hope or PHRASES.calmDown, "witness_hope", context)
 		return
 	end
-	if #collectRecent(watcher.hgFightTargets, victim) > 0 then return end
-	applyRelief(watcher, org)
+
+	addHappiness(org, EMO.reliefHappiness * (isDeath and 1 or 0.8))
+	if stressed then applyRelief(watcher, org, context) end
+end
+
+local CHANCE_BONES = {"skull", "jaw", "pelvis", "spine1", "spine2", "spine3"}
+local CHANCE_LIMBS = {"lleg", "rleg", "larm", "rarm"}
+
+local function countBroken(org)
+	local count = 0
+	for _, key in ipairs(CHANCE_BONES) do
+		if (tonumber(org[key]) or 0) >= 1 then count = count + 1 end
+	end
+	if hg.IsLimbFractured then
+		for _, limb in ipairs(CHANCE_LIMBS) do
+			if hg.IsLimbFractured(org, limb) then count = count + 1 end
+		end
+	end
+	return count
+end
+
+local function totalPain(org)
+	return (org.pain or 0) + (org.painadd or 0) + (org.headpainadd or 0)
+end
+
+local function onChance(attacker, victim, set, id)
+	if not IsValid(attacker) or not attacker:IsPlayer() or not attacker:Alive() then return end
+	local org = attacker.organism
+	if not org or org.otrub then return end
+	if not wasFighting(attacker.hgFightAttackers, victim) or not isStressed(org) then return end
+	local now = CurTime()
+	if (attacker.hgChanceNext or 0) > now then return end
+	attacker.hgChanceNext = now + EMO.chanceCooldown
+	addHappiness(org, EMO.chanceHappiness)
+	emotionThought(attacker, set, id, org.hgFightContext)
+end
+
+local function checkChance(attacker, victim, painBefore, brokenBefore)
+	if not IsValid(attacker) or not IsValid(victim) then return end
+	local org = victim.organism
+	if not org or org.alive == false or org.otrub then return end
+	local pain = totalPain(org)
+	if countBroken(org) > brokenBefore or pain - painBefore >= EMO.chancePainJump or (painBefore < EMO.chancePainHigh and pain >= EMO.chancePainHigh) then
+		onChance(attacker, victim, PHRASES.chance, "emotion_chance")
+	end
 end
 
 local function latestAttacker(victim)
@@ -396,7 +520,7 @@ local function onVictimDown(victim, killer, isDeath)
 			watcher.hgWitnessNext[victim] = now + OTRUB_REPEAT_COOLDOWN
 			witnessed[watcher] = true
 			if isDeath then
-				addDepression(org, EMO.friendlyKillDepression)
+				addDepression(org, EMO.friendlyKillDepression, "guilt")
 				emotionThought(watcher, PHRASES.friendlyKill, "emotion_friendly_kill")
 			end
 			continue
@@ -405,7 +529,7 @@ local function onVictimDown(victim, killer, isDeath)
 		if watcher == killer or wasFighting(watcher.hgFightTargets, victim) or wasFighting(watcher.hgFightAttackers, victim) then
 			watcher.hgWitnessNext[victim] = now + OTRUB_REPEAT_COOLDOWN
 			witnessed[watcher] = true
-			reactAsFighter(watcher, org, victim, isDeath)
+			reactAsFighter(watcher, org, victim, isDeath, victimPos, victimEnt)
 			continue
 		end
 
@@ -417,15 +541,11 @@ local function onVictimDown(victim, killer, isDeath)
 
 		if isBuddy(watcher, victim, twoTeams) then
 			addSurge(org, (isDeath and SURGE_BUDDY_DEATH or SURGE_BUDDY_OTRUB) * hg.organism.GetAdrenalineGainMul(org))
-			applyStress(watcher, org, stress, killer, BUDDY_MUL)
-			if isDeath then
-				addDepression(org, EMO.buddyDeathDepression)
-				emotionThought(watcher, PHRASES.buddyDeath, "witness_buddy")
-			else
-				watcher:Notify(buddy_phrases[math.random(#buddy_phrases)], 3, "witness_buddy", 0)
-			end
+			applyStress(watcher, org, stress, killer, BUDDY_MUL, true)
+			emotionThought(watcher, isDeath and PHRASES.buddyDeath or PHRASES.buddyDown, "witness_buddy")
 		else
 			applyStress(watcher, org, stress, killer, 1)
+			if isDeath and hg.organism.PsycheWitnessDeath then hg.organism.PsycheWitnessDeath(watcher, org, victimPos) end
 		end
 	end
 
@@ -449,8 +569,22 @@ hook.Add("EntityTakeDamage", "WitnessStressTrackFight", function(target, dmgInfo
 	end
 	victim.hgFightAttackers = victim.hgFightAttackers or {}
 	victim.hgFightAttackers[attacker] = now
+	victim.hgLastEnemyHit = attacker
+	victim.hgLastEnemyHitTime = now
+	local victimOrg = victim.organism
+	if attacker:IsPlayer() and victimOrg and not victimOrg.otrub and victimOrg.alive ~= false then
+		local painBefore, brokenBefore = totalPain(victimOrg), countBroken(victimOrg)
+		timer.Simple(EMO.chanceCheckDelay, function() checkChance(attacker, victim, painBefore, brokenBefore) end)
+	end
 	attacker.hgFightTargets = attacker.hgFightTargets or {}
 	attacker.hgFightTargets[victim] = now
+	if dmgInfo:IsDamageType(DMG_CLUB) and attacker:IsPlayer() then
+		local wep = attacker:GetActiveWeapon()
+		if IsValid(wep) and HANDS[wep:GetClass()] then
+			attacker.hgFistFightTime = now
+			victim.hgFistFightTime = now
+		end
+	end
 end)
 
 hook.Add("PlayerDeath", "WitnessStressDeath", function(victim, _, attacker)
@@ -478,7 +612,19 @@ hook.Add("PlayerSpawn", "WitnessStressReset", function(ply)
 	ply.hgSeenCorpseCount = nil
 	ply.hgFriendlyFireBy = nil
 	ply.hgFriendlyFireNext = nil
+	ply.hgLastEnemyHit = nil
+	ply.hgLastEnemyHitTime = nil
+	ply.hgChanceNext = nil
+	ply.hgFistFightTime = nil
 	if ply.organism then clearLosing(ply.organism) end
+end)
+
+hook.Add("PlayerDroppedWeapon", "WitnessStressDisarm", function(ply, wep)
+	if not IsValid(ply) or not ply:Alive() or not IsValid(wep) or wep:GetClass() == "weapon_hands_sh" or wep:GetClass() == "weapon_hg_coolhands" then return end
+	if (ply.hgLastEnemyHitTime or 0) < CurTime() - EMO.disarmWindow then return end
+	local attacker = ply.hgLastEnemyHit
+	if attacker == ply then return end
+	onChance(attacker, ply, PHRASES.disarm, "emotion_disarm")
 end)
 
 hook.Add("KeyPress", "WitnessStressFightBack", function(ply, key)
@@ -524,6 +670,7 @@ timer.Create("WitnessStressCorpses", CORPSE_INTERVAL, 0, function()
 				watcher.hgSeenCorpses[corpse] = true
 				watcher.hgSeenCorpseCount = (watcher.hgSeenCorpseCount or 0) + 1
 				applyStress(watcher, org, STRESS.corpse, nil, 1 / watcher.hgSeenCorpseCount)
+				if hg.organism.PsycheSeeCorpse then hg.organism.PsycheSeeCorpse(watcher, org, 1 / watcher.hgSeenCorpseCount) end
 			end
 		end
 	end

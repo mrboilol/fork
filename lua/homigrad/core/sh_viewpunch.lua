@@ -294,6 +294,7 @@ local IsValid = IsValid
 		end
 
 		function hg.AddWeaponHitKick(angle)
+			angle = angle * (hg.GetPsycheFlinchMul and hg.GetPsycheFlinchMul(LocalPlayer()) or 1)
 			hitKick = hitKick * math.exp(-(CurTime() - hitKickTime) * HIT_KICK_DECAY) + angle
 			hitKickTime = CurTime()
 		end

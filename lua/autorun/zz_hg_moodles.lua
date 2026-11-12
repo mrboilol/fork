@@ -138,10 +138,10 @@ local moodleTexts = {
 		[4] = {title = "Euphoric", description = "Peak morale is boosting stamina recovery, damage, and resilience."},
 	}},
 	depression = {levels = {
-		[1] = {title = "Unhappy", description = "Stress and injury are beginning to weigh on you."},
-		[2] = {title = "Dreary", description = "You are becoming noticeably unhappy."},
-		[3] = {title = "Hopeless", description = "Depressive symptoms are starting to take hold."},
-		[4] = {title = "Miserable", description = "You are depressed and need relief from the conditions worsening it."},
+		[1] = {title = "Shaken", description = "What you saw or how the fight is going is getting to you. Your hands are starting to shake."},
+		[2] = {title = "Losing Hope", description = "You think you are losing. Shaky aim, weaker hits and slower movement. Beta blockers, painkillers or getting away from the fight will help."},
+		[3] = {title = "Desolate", description = "You have given up on winning. Your wounds take you down more easily and you fight badly."},
+		[4] = {title = "Hopeless", description = "You have stopped fighting for your life. If your wounds keep winning, you will black out and die faster."},
 	}},
 	cotard = {levels = {
 		[1] = {title = "Nihilistic Delusion", description = "Your sense of being alive is beginning to feel unreal."},
@@ -180,7 +180,7 @@ local moodleTexts = {
 		[4] = {title = "Critical Hypercapnia", description = "You are close to blacking out from CO2 retention."},
 	}},
 	self_harm = {levels = {
-		[1] = {title = "Self-Harm Urges", description = "Your depression is pushing you toward hurting yourself."},
+		[1] = {title = "Self-Harm Urges", description = "You are desolate and the urge to hurt yourself is surfacing."},
 		[2] = {title = "Self-Harm Risk", description = "You are close to harming yourself."},
 		[3] = {title = "Severe Self-Harm Risk", description = "You are on the verge of hurting yourself."},
 		[4] = {title = "Critical Self-Harm Risk", description = "Despair has you ready to end it."},
@@ -758,21 +758,20 @@ local function buildEffects(ply, org)
 		add(effects, "happy", "happy", math.ceil(goodmood * 4), "good", 15, math.floor(goodmood * 100) .. "%")
 	end
 	local depression = math.Clamp(orgNumber(org, "depression", 0), 0, 1)
-	if depression > 0 then
+	if depression >= 0.1 then
 		local icon, level = "unhappy", 1
-		if depression >= 0.5 then
-			icon, level = "miserable", 4
-		elseif depression >= 0.4 then
-			icon, level = "desolate", 4
-		elseif depression >= 0.35 then
-			icon, level = "hopeless", 3
+		if depression >= 0.85 then
+			icon, level = "hopeless", 4
+		elseif depression >= 0.6 then
+			icon, level = "desolate", 3
 		elseif depression >= 0.25 then
 			icon, level = "dreary", 2
 		end
 		add(effects, "depression", icon, level, "bad", -64, math.floor(depression * 100) .. "%")
 	end
-	if depression >= 0.4 then
-		add(effects, "self_harm", "self-harm", highRank(depression, {0.4, 0.45, 0.5, 0.6}), "bad", -66, math.floor(depression * 100) .. "%")
+	local selfHarmCvar = GetConVar("hg_selfharm") or CreateConVar("hg_selfharm", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Depression can push you into self harm", 0, 1)
+	if depression >= 0.6 and selfHarmCvar:GetBool() then
+		add(effects, "self_harm", "self-harm", highRank(depression, {0.6, 0.7, 0.8, 0.9}), "bad", -66, math.floor(depression * 100) .. "%")
 	end
 	local cotard = math.Clamp(orgNumber(org, "cotard", 0), 0, 1)
 	if cotard > 0 then
@@ -1101,10 +1100,6 @@ local function drawTooltip(effect, pos, mx, my, berserkActive)
 	local levelText = rageActive and textData.fixed or textLevels and textLevels[tooltipLevel] or nil
 	local title = effect.title or levelText and levelText.title or effect.name
 	local description = effect.description or levelText and levelText.description or "An active condition is affecting you."
-	if effect.name == "depression" and effect.icon == "desolate" then
-		title = "Desolate"
-		description = "Your depression has reached self-harm levels."
-	end
 	local descriptionLines = rageActive and levelText and levelText.descriptionLines or {description}
 	local details = not rageActive and "Severity " .. tooltipLevel .. " of 4" or nil
 	if details and effect.value ~= nil then details = details .. " - " .. tostring(effect.value) end

@@ -139,7 +139,7 @@ local function ApplyTripInertia(ply, ragdoll, tripType, velocity, collisionTrace
     PreserveRagdollMomentum(ragdoll, velocity)
 end
 
-local function ScaleTripChance(ply, org, tripChance)
+local function ScaleTripChance(ply, org, tripChance, ignorePanic)
     local disorientation = org.disorientation or 0
     if disorientation > 0.1 then
         tripChance = tripChance + disorientation * 0.05
@@ -150,6 +150,12 @@ local function ScaleTripChance(ply, org, tripChance)
     if stamina < maxStamina then
         local staminaPenalty = (maxStamina - stamina) / maxStamina
         tripChance = tripChance + staminaPenalty * 0.2
+    end
+
+    local panic = not ignorePanic and hg.GetPanicLevel and hg.GetPanicLevel(org) or 0
+    if panic > 0 then
+        local K = hg.PsycheCombat
+        tripChance = (tripChance + panic * K.panicTripAdd) * (1 + panic * K.panicTripMul)
     end
 
     if org.superfighter then

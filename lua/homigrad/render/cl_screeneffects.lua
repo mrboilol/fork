@@ -74,7 +74,7 @@ if not ConVarExists("hg_oldsoundoptions") then CreateConVar("hg_oldsoundoptions"
 local function getServerSoundMode(name, fallback)
 	local oldOptions = GetConVar("hg_oldsoundoptions")
 	if not (oldOptions and oldOptions:GetBool()) then
-		if name == "hg_dyingsound" then return 12 end
+		if name == "hg_dyingsound" then return 0 end
 		if name == "hg_painsound" then return 7 end
 		if name == "hg_otrubsound" then return 8 end
 	end
@@ -455,40 +455,25 @@ local function DrawDepressionEffect(org)
 	depressionState.lerp = LerpFT(0.01, depressionState.lerp, depression)
 	local intensity = depressionState.lerp
 	if intensity > 0.00005 then
-		local time = CurTime()
-		local pulse = math.sin(time * 1.4) * 0.5 + 0.5
-		depressionState.greyscaleLerp = LerpFT(0.012, depressionState.greyscaleLerp, math.Clamp(intensity * 1.18, 0, 1))
-		depressionState.vignetteLerp = LerpFT(0.01, depressionState.vignetteLerp, intensity * 4.5)
+		depressionState.greyscaleLerp = LerpFT(0.012, depressionState.greyscaleLerp, math.Clamp(intensity * 0.2, 0, 0.2))
 		local mat = GetDepressionMaterial()
 		if mat then
-			local wobbleX = math.sin(time * 0.9) * 0.042 + math.sin(time * 0.935) * 0.028
-			local wobbleY = math.cos(time * 0.72) * 0.042 + math.cos(time * 0.715) * 0.028
-			depressionState.motionLerp = LerpFT(0.04, depressionState.motionLerp, intensity * (0.25 + pulse * 0.4))
-			local pulseScale = (math.sin(time * math.pi / 0.93) * 0.5 + 0.5) * 1.1 * intensity
-
 			render.UpdateScreenEffectTexture()
 			mat:SetFloat("$c0_x", intensity)
 			mat:SetFloat("$c0_y", 0)
-			mat:SetFloat("$c0_z", time + wobbleX * 85 + depressionState.motionLerp * 14)
+			mat:SetFloat("$c0_z", CurTime())
 			mat:SetFloat("$c0_w", 0)
-			mat:SetFloat("$c1_x", 1 + wobbleX * 3.2 + depressionState.motionLerp * 0.65 + pulseScale)
-			mat:SetFloat("$c1_y", 1 + wobbleY * 3.2 + depressionState.motionLerp * 0.65 + pulseScale)
-			mat:SetFloat("$c1_z", 0.82661 + depressionState.greyscaleLerp * 0.38)
+			mat:SetFloat("$c1_x", 1)
+			mat:SetFloat("$c1_y", 1)
+			mat:SetFloat("$c1_z", 0.82661)
 			render.SetMaterial(mat)
 			render.DrawScreenQuad()
 		end
 
-		render.UpdateScreenEffectTexture()
-		vignetteMat:SetFloat("$c2_x", time + 10000)
-		vignetteMat:SetFloat("$c0_z", scaleVignette(depressionState.vignetteLerp))
-		vignetteMat:SetFloat("$c1_y", scaleVignette(depressionState.vignetteLerp))
-		render.SetMaterial(vignetteMat)
-		render.DrawScreenQuad()
-
 		local tab = depressionState.greyTab
-		tab["$pp_colour_brightness"] = -depressionState.greyscaleLerp * 0.07
-		tab["$pp_colour_contrast"] = 1 - depressionState.greyscaleLerp * 0.16
-		tab["$pp_colour_colour"] = 1 - depressionState.greyscaleLerp * 0.98
+		tab["$pp_colour_brightness"] = 0
+		tab["$pp_colour_contrast"] = 1
+		tab["$pp_colour_colour"] = 1 - depressionState.greyscaleLerp
 		DrawColorModify(tab)
 	end
 	UpdateDepressionAudio(depression, org.otrub)
@@ -502,6 +487,13 @@ local PainLerp = 0
 local painThresholdIntensityLerp = 1
 local PanicAttackLerp = 0
 local O2Lerp = 0
+function hg.GetO2FadeK(org)
+	if not org then return 0 end
+	if org.otrub or org.heartstop then return 1 end
+	local fading = math.Clamp((0.7 - (org.consciousness or 1)) / 0.3, 0, 1)
+	local brainDamage = math.Clamp((org.brain or 0) / 0.05, 0, 1)
+	return math.max(fading, brainDamage)
+end
 local damageFlashEnd = 0
 local damageFlashStrength = 0
 local damageFlashColor = {
@@ -2110,7 +2102,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 
 	local o2 = org.o2[1] or 0
 	o2 = o2 + (org.CO or 0)
-	O2Lerp = LerpFT(0.01, O2Lerp, (30 - o2) * 10 + brain * (org.otrub and 100 or 500))
+	O2Lerp = LerpFT(0.01, O2Lerp, math.min((30 - o2) * 10, Lerp(hg.GetO2FadeK(org), 187.5, 300)) + brain * (org.otrub and 100 or 500))
 	updateSeizureEffects(org)
 	hg.O2VignetteOrg = org
 
@@ -3088,7 +3080,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	hg.screeneffects_sound.criticalFade = LerpFT(0.03, hg.screeneffects_sound.criticalFade or 0, painMode == 7 and math.Clamp(((org.heartbeat or 0) - hg.screeneffects_config.criticalHeartbeatStart) / (hg.screeneffects_config.criticalHeartbeatFull - hg.screeneffects_config.criticalHeartbeatStart), 0, 1) * hg.screeneffects_config.criticalLoopVolume or 0)
 	hg.ScreenEffectsLoop("criticalLoop", hg.screeneffects_config.criticalLoopPath, org.otrub and 0 or hg.screeneffects_sound.criticalFade)
 	hg.ScreenEffectsLoop("criticalLoopOtrub", hg.screeneffects_config.criticalLoopOtrubPath, org.otrub and hg.screeneffects_sound.criticalFade or 0)
-	hg.screeneffects_sound.wrapsFade = LerpFT(org.convulsing and 0.06 or 0.03, hg.screeneffects_sound.wrapsFade or 0, painMode == 7 and math.max(org.otrub and math.Clamp((O2Lerp - 20) / 80, 0, 1) or 0, org.convulsing and not (GetConVar("hg_incapacitation") and GetConVar("hg_incapacitation"):GetBool()) and 1 or 0) or 0)
+	hg.screeneffects_sound.wrapsFade = LerpFT(org.convulsing and 0.06 or 0.03, hg.screeneffects_sound.wrapsFade or 0, painMode == 7 and math.max(org.otrub and math.Clamp((O2Lerp - 20) / 80 + (brain > 0.3 and (brain - 0.3) * 5 or 0), 0, 1) or 0, org.convulsing and not (GetConVar("hg_incapacitation") and GetConVar("hg_incapacitation"):GetBool()) and 1 or 0) or 0)
 	hg.ScreenEffectsLoop("wraps", hg.screeneffects_config.wrapsPath, hg.screeneffects_sound.wrapsFade * hg.screeneffects_config.wrapsVolume)
 
 	-- Play noises.ogg when brain health is between 0.6 and 0.7
@@ -3252,7 +3244,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end
 
 		local painSharpen = math.Clamp(((org.pain or 0) - 15) / (hg.screeneffects_config.painAgonyThreshold - 15), 0, 1)
-		local o2Sharpen = math.Clamp((45 - o2) / 30, 0, 1)
+		local o2Sharpen = math.Clamp((45 - o2) / 30, 0, 1) * Lerp(hg.GetO2FadeK(org), 0.75, 1)
 		local stressSharpen = math.min(painSharpen + o2Sharpen, 1.5)
 		stressSharpenLerp = LerpFT(0.05, stressSharpenLerp, stressSharpen)
 		if stressSharpenLerp > 0.01 then
@@ -3728,7 +3720,7 @@ hook.Add("HG_CalcView", "ConsciousBeatShake", function(ply, pos, angles, fova, z
 
 	local danger = org and math.Clamp((0.65 - (org.consciousness or 1)) / 0.55, 0, 1) or 0
 	local shakeAmt = pulse * (0.08 + danger * 0.55) + painShake
-	local lowOxygen = org and math.Clamp((20 - (org.o2 and org.o2[1] or 30)) / 16, 0, 1) or 0
+	local lowOxygen = org and math.Clamp((20 - (org.o2 and org.o2[1] or 30)) / 16, 0, 1) * Lerp(hg.GetO2FadeK(org), 0.75, 1) or 0
 	if lowOxygen > 0 and not org.otrub then
 		angles.r = angles.r + math.sin(CurTime() * 1.8) * lowOxygen * 0.55
 		angles.p = angles.p + math.sin(CurTime() * 2.3) * lowOxygen * 0.22

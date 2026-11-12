@@ -234,10 +234,10 @@ input_list.intestines = function(org, bone, dmg, dmgInfo)
 end
 
 local brainLobeProfiles = {
-	brainFrontal = {brain = 0.8, consciousness = 1.2, disorientation = 1.5, shock = 2, pain = 7, hemorrhage = 0.6},
-	brainParietal = {brain = 0.7, consciousness = 1.4, disorientation = 2.2, shock = 2.5, pain = 8, hemorrhage = 0.7},
-	brainTemporal = {brain = 0.9, consciousness = 1.1, disorientation = 1.3, shock = 2.5, pain = 8, hemorrhage = 0.9},
-	brainOccipital = {brain = 0.75, consciousness = 1.3, disorientation = 1.1, shock = 2, pain = 7, hemorrhage = 0.75}
+	brainFrontal = {brain = 0.8, disorientation = 1.5, shock = 2, pain = 7, hemorrhage = 0.6},
+	brainParietal = {brain = 0.7, disorientation = 2.2, shock = 2.5, pain = 8, hemorrhage = 0.7},
+	brainTemporal = {brain = 0.9, disorientation = 1.3, shock = 2.5, pain = 8, hemorrhage = 0.9},
+	brainOccipital = {brain = 0.75, disorientation = 1.1, shock = 2, pain = 7, hemorrhage = 0.75}
 }
 
 local function addBrainHemorrhage(org, amount, rate)
@@ -254,6 +254,20 @@ local function skullBrainTransfer(skull)
 end
 
 hg.organism.SkullBrainTransfer = skullBrainTransfer
+
+local function brainHitKnockout(org, delta)
+	if (delta or 0) <= 0.002 or not org.alive or org.otrub then return false end
+	if hg.organism.IsBrainDamageIgnored and hg.organism.IsBrainDamageIgnored(org) then return false end
+	local now = CurTime()
+	if org.brainKnockoutRollAt == now then return org.needotrub == true end
+	org.brainKnockoutRollAt = now
+	if math.Rand(0, 1) >= math.Clamp(0.6 + delta * 10, 0, 0.9) then return false end
+	org.needotrub = true
+	org.consciousness = math.min(org.consciousness or 1, 0.08)
+	return true
+end
+
+hg.organism.BrainHitKnockout = brainHitKnockout
 
 local function damageBrainLobe(org, bone, dmg, dmgInfo, key, impact)
 	local profile = brainLobeProfiles[key]
@@ -280,8 +294,8 @@ local function damageBrainLobe(org, bone, dmg, dmgInfo, key, impact)
 	local delta = (org[key] or 0) - oldDmg
 
 	org.brain = math.min((org.brain or 0) + (math.min(org[key] or 0, brainCap) - math.min(oldDmg, brainCap)) * 1.5, 1)
-	org.consciousness = math.Approach(org.consciousness, 0, delta * profile.consciousness)
 	org.disorientation = org.disorientation + delta * profile.disorientation
+	brainHitKnockout(org, delta)
 	if hg.organism.module.concussion and hg.organism.module.concussion.AddHeadTrauma then
 		hg.organism.module.concussion.AddHeadTrauma(org, 0, delta, dmg, dmgInfo)
 	end
@@ -321,7 +335,7 @@ local function damageBrainLobe(org, bone, dmg, dmgInfo, key, impact)
 		end
 	end
 
-	if org.brain >= 0.01 and delta > 0.01 and math.random(3) == 1 then
+	if org.brain >= 0.3 and delta > 0.01 and math.random(3) == 1 then
 		org.shock = 70
 	end
 
@@ -659,12 +673,22 @@ input_list.lungsR = function(org, bone, dmg, dmgInfo)
 	return 0//isCrush(dmgInfo) and 1 or prot
 end
 
-input_list.trachea = function(org, bone, dmg, dmgInfo)
+local tracheaBluntTypes = DMG_CLUB + DMG_CRUSH + DMG_FALL + DMG_VEHICLE + DMG_PHYSGUN
+
+input_list.trachea = function(org, bone, dmg, dmgInfo, boneindex)
 	local oldDmg = org.trachea
 
 	if dmgInfo:IsDamageType(DMG_BLAST) then dmg = dmg / 5 end
 
-	local result = damageOrgan(org, dmg * 2, dmgInfo, "trachea")
+	local blunt = dmgInfo:IsDamageType(tracheaBluntTypes) and not dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_SLASH)
+	local chestShield = 1
+	if boneindex == "ValveBiped.Bip01_Spine2" then
+		local chest = math.Clamp(tonumber(org.chest) or 0, 0, 1)
+		chestShield = blunt and (0.04 + chest * 0.36) or (0.55 + chest * 0.45)
+	end
+	if blunt then dmg = math.max(dmg - 0.15, 0) * 0.3 end
+
+	local result = damageOrgan(org, dmg * 1.2 * chestShield, dmgInfo, "trachea")
 
 	hg.AddHarmToAttacker(dmgInfo, (org.trachea - oldDmg) * 8, "Trachea damage harm")
 	applyOrganTrauma(org, dmgInfo, dmg, org.trachea - oldDmg, oldDmg, "trachea")

@@ -306,8 +306,6 @@ module[2] = function(owner, org, timeValue)
 
 
 
-	-- Brain trauma and intracranial bleeding share the normal unconsciousness
-	-- pipeline, so a hemorrhage cannot be hidden by the regular recovery step.
 	local structuralBrainDamage = math.max(
 		org.brain or 0,
 		(org.brainFrontal or 0) * 0.75,
@@ -317,18 +315,12 @@ module[2] = function(owner, org, timeValue)
 		(org.brainHemorrhage or 0) * 0.8
 	)
 	if hg.organism.IsBrainDamageIgnored and hg.organism.IsBrainDamageIgnored(org) then structuralBrainDamage = 0 end
-	local brainSeverity = math.Clamp((structuralBrainDamage - 0.1) / 0.9, 0, 1)
-	local severeBrainSeverity = math.Clamp((structuralBrainDamage - 0.325) / 0.675, 0, 1)
-	local hemorrhageSeverity = math.Clamp(((org.brainHemorrhage or 0) - 0.05) / 0.95, 0, 1)
-	if brainSeverity > 0 or hemorrhageSeverity > 0 then
-		if brainSeverity > 0 then
-			org.consciousness = math.min(org.consciousness or 1, 0.94 - brainSeverity * 0.6)
-		end
-		local consciousnessDrain = brainSeverity > 0 and (0.025 + brainSeverity * 0.04) or 0
-		if severeBrainSeverity > 0 then
-			consciousnessDrain = consciousnessDrain + 0.17 + severeBrainSeverity * 0.06
-		end
-		consciousnessDrain = consciousnessDrain + hemorrhageSeverity * (0.02 + hemorrhageSeverity * 0.12)
+	local comaActive = structuralBrainDamage >= 0.3
+	local brainSeverity = comaActive and math.Clamp((structuralBrainDamage - 0.3) / 0.7, 0, 1) or 0
+	local hemorrhageSeverity = comaActive and math.Clamp(((org.brainHemorrhage or 0) - 0.05) / 0.95, 0, 1) or 0
+	if comaActive then
+		org.consciousness = math.min(org.consciousness or 1, 0.85 - brainSeverity * 0.85)
+		local consciousnessDrain = 0.15 + brainSeverity * 0.2 +hemorrhageSeverity * (0.02 + hemorrhageSeverity * 0.12)
 		org.consciousness = math.max((org.consciousness or 1) - consciousnessDrain * timeValue, 0)
 	end
 
@@ -339,7 +331,7 @@ module[2] = function(owner, org, timeValue)
 	local wakeShockThreshold = otrub_wake_shock_max * wakeThresholdProgress
 	local wakePainThreshold = otrub_wake_pain_max * wakeThresholdProgress
 	local recoveryBlocked = org.otrub and (org.shock > wakeShockThreshold or org.pain > wakePainThreshold)
-	local persistentConsciousnessCause = org.tranquilizer > 0 or brainSeverity > 0 or hemorrhageSeverity > 0
+	local persistentConsciousnessCause = org.tranquilizer > 0 or comaActive
 	local consciousnessTooLow = org.consciousness < consciousness_otrub_threshold * consciousnessResistance
 	if recoveryBlocked or (consciousnessTooLow and (not org.otrub or persistentConsciousnessCause)) then
 		org.needotrub = true

@@ -1345,29 +1345,42 @@ local IsValid = IsValid
 		local fight = org.panicMode == "fight" and panic or 0
 		local flight = org.panicMode == "flight" and panic or 0
 		local adrenaline = math.Clamp((tonumber(org.adrenaline) or 0) / 3, 0, 1)
-		local depression = math.Clamp(((tonumber(org.depression) or 0) - 0.15) / 0.85, 0, 1)
+		local depression = math.Clamp(((tonumber(org.depression) or 0) - 0.1) / 0.5, 0, 1)
+		local K = hg.PsycheCombat
+		local owner = ent:IsPlayer() and ent or (hg.RagdollOwner and hg.RagdollOwner(ent))
+		local training = hg.GetPsycheTraining and hg.GetPsycheTraining(owner) or 0
+		local panicRaw = math.Clamp(tonumber(org.panicattack) or 0, 0, 1)
+		local crash = math.Clamp(tonumber(org.adrenalineCrash) or 0, 0, 1) * (1 - math.Clamp((tonumber(org.adrenaline) or 0) / K.crashMaskAdrenaline, 0, 1))
+		local focus = training * math.Clamp(math.min((panicRaw - K.focusPanicLow) / (K.focusPanicPeak - K.focusPanicLow), (K.focusPanicHigh - panicRaw) / (K.focusPanicHigh - K.focusPanicPeak)), 0, 1)
+		local o2 = org.o2 and tonumber(org.o2[1]) or 30
+		local o2Low = math.Clamp((K.o2TremorStart - o2) / (K.o2TremorStart - K.o2TremorFull), 0, 1)
+		local bloodLow = math.Clamp((K.bloodTremorStart - (tonumber(org.blood) or 5000)) / (K.bloodTremorStart - K.bloodTremorFull), 0, 1)
+		local tremor = math.min(adrenaline * K.tremorAdrenaline + crash * K.tremorCrash + o2Low * K.tremorO2 + bloodLow * K.tremorBlood + (1 - staminaFraction) * K.tremorStamina, K.tremorCap) * Lerp(training, 1, K.trainedShakeMul)
 		local power = math.Clamp(staminaPower * consciousnessPower * reservePower * painPower * shockPower * disorientationPower * ailmentPower, 0.08, 1)
 
-		local tempo = math.Clamp(power ^ 0.62 * Lerp(staminaFraction, 0.72, 1), 0.18, 1) * Lerp(armFatigue, 1, 0.7)
+		local tempo = math.Clamp(power ^ 0.62 * Lerp(staminaFraction, 0.72, 1), 0.18, 1) * Lerp(armFatigue, 1, 0.7) * Lerp(crash, 1, K.crashTempo) * Lerp(focus, 1, K.focusTempo)
 		local instability = math.Clamp(
 			(1 - consciousness) * 0.7 + (1 - reserve) * 0.58 + (1 - staminaFraction) * 0.22
 			+ math.Clamp(disorientation / 4, 0, 1) * 0.95 + pain / 100 * 0.18 + shock / 100 * 0.3
 			+ concussion / 6 * 0.46 + nausea / 6 * 0.14,
 			0, 1
 		)
-		instability = math.Clamp(instability + flight * 0.4 - fight * 0.2 + depression * 0.45, 0, 1)
+		instability = math.Clamp((instability + flight * 0.4 - fight * 0.2 + depression * 0.45 + crash * K.crashInstability) * Lerp(focus, 1, K.focusSteady), 0, 1)
 
 		return {
-			power = power * Lerp(flight, 1, 0.75) * Lerp(fight, 1, 1.25) * (1 + adrenaline * 0.1) * Lerp(armFatigue, 1, 0.6) * Lerp(depression, 1, 0.7),
+			tremor = tremor,
+			panic = panicRaw,
+			training = training,
+			power = power * Lerp(flight, 1, 0.75) * Lerp(fight, 1, 1.25) * (1 + adrenaline * 0.1) * Lerp(armFatigue, 1, 0.6) * Lerp(depression, 1, 0.7) * Lerp(crash, 1, K.crashPower),
 			tempo = tempo * Lerp(depression, 1, 0.8),
 			speed = tempo * Lerp(flight, 1, 1.4) * Lerp(depression, 1, 0.8),
 			effort = Lerp(flight, 1, 0.8) * Lerp(fight, 1, 1.2) * Lerp(depression, 1, 0.75),
-			exertion = Lerp(flight, 1, 1.4) * Lerp(fight, 1, 0.7) * (1 - adrenaline * 0.15) * Lerp(depression, 1, 1.25),
+			exertion = Lerp(flight, 1, 1.4) * Lerp(fight, 1, 0.7) * (1 - adrenaline * 0.15) * Lerp(depression, 1, 1.25) * Lerp(crash, 1, K.crashExertion),
 			recoil = Lerp(flight, 1, 1.35) * Lerp(fight, 1, 0.8),
-			move = Lerp(flight, 1, 1.15) * Lerp(fight, 1, 1.1) * Lerp(legFatigue, 1, 0.65) * Lerp(depression, 1, 0.75),
+			move = Lerp(flight, 1, 1.15) * Lerp(fight, 1, 1.1) * Lerp(legFatigue, 1, 0.65) * Lerp(depression, 1, 0.75) * (1 + adrenaline * K.adrenalineMoveBonus),
 			sprintCost = Lerp(flight, 1, 0.6),
 			stability = 1 - instability,
-			aim = (1 + instability * 2.5) * Lerp(fight, 1, 0.8) * Lerp(depression, 1, 1.15)
+			aim = (1 + instability * 2.5) * Lerp(fight, 1, 0.8) * Lerp(depression, 1, 1.15) * Lerp(focus, 1, K.focusAim) * Lerp(crash, 1, K.crashAim)
 		}
 	end
 

@@ -426,7 +426,7 @@ if not _G.IKSystem_Unity_FABRIK then
         if rootPos then self.positions[1] = rootPos end
 
         local midIdx = math.floor(#self.positions / 2) + 1
-        local polePos = CalculatePoleTarget(self.positions, self.localPoleOffset, ent, self.boneIndices[midIdx], self.pelvisIndex)
+        local polePos = self.poleTarget or CalculatePoleTarget(self.positions, self.localPoleOffset, ent, self.boneIndices[midIdx], self.pelvisIndex)
 
         local solved
         if #self.positions == 3 then

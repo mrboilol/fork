@@ -30,7 +30,8 @@ K.STUMBLE_DRIVE_ACCEL_MUL = 0.6
 K.STUMBLE_MOMENTUM_MUL = 0.5
 K.STUMBLE_MIN_DRIVE_MUL = 0.85
 K.STUMBLE_DURATION_MUL = 1.3
-K.STUMBLE_FOOT_LAG = 0.55
+K.STUMBLE_FOOT_REACH = 0.35
+K.STUMBLE_TRAIL_MUL = 0.3
 K.STUMBLE_CARRY_POW = 1.5
 K.STEP_RATE_MIN = 3.5
 K.STEP_RATE_SPEED = 50
@@ -38,7 +39,8 @@ K.STEP_RATE_MAX = 6.5
 K.STEP_RATE_CAP = 7
 K.STUMBLE_STEP_LEAD = 0.18
 K.STUMBLE_STEP_LEAD_MAX = 30
-K.STUMBLE_BRAKE = 6
+K.STUMBLE_DOWNHILL_DROP = 22
+K.STUMBLE_OVERREACH = 1.05
 K.STUMBLE_HOLD_VIGOR_FLOOR = 0.85
 K.STUMBLE_SPINE_TORQUE = 900
 K.STUMBLE_LEAN = {0.12, 0.45}
@@ -47,6 +49,9 @@ K.STUMBLE_RELEASE_TIME = 0.5
 K.STUMBLE_HURT_STEPS = 2
 K.STUMBLE_LUNGE_MUL = 0.18
 K.STUMBLE_LUNGE_MAX = 35
+K.STUMBLE_LUNGE_TIME = 0.2
+K.KNEE_POLE_FORWARD = 50
+K.KNEE_POLE_DROP = 0.5
 K.STUMBLE_FALL_GRACE = 1.5
 K.STUMBLE_INTENT_GRACE = 0.6
 K.STUMBLE_HIT_TIME = 2.8
@@ -55,9 +60,10 @@ K.STUMBLE_STEER = 3
 K.STUMBLE_SWAY_RATE = 2.3
 K.STUMBLE_SWAY_ANGLE = 22
 K.DIVE_PUSH = 260
+K.CTRL_PUSH = 110
 K.STUMBLE_PROFILES = {
-	struggle = {minSteps = {3, 4}, trigger = 1.9, rate = 0.55, interval = 1.8, stride = 1.25, drive = 0.3, lunge = 1.8, tip = 1.6, tipLean = 0.3, recover = 0.45, sag = 0.1, sway = 2.5, wobble = 1.3, life = 1},
-	will = {minSteps = {1, 2}, trigger = 1, rate = 1, interval = 1, stride = 1, drive = 1, lunge = 1, tip = 0, tipLean = 0, recover = 1, sag = 0, sway = 1, wobble = 0.6, life = 0.5},
+	struggle = {minSteps = {3, 4}, trigger = 1.9, rate = 0.55, interval = 1.8, stride = 1.25, drive = 0.3, lunge = 1.8, tip = 0.45, tipLean = 0.45, sag = 0.35, sway = 2.5, wobble = 1.3, life = 1},
+	will = {minSteps = {1, 2}, trigger = 1, rate = 1, interval = 1, stride = 1, drive = 1, lunge = 1, tip = 0, tipLean = 0, sag = 0, sway = 1, wobble = 0.6, life = 0.5},
 }
 K.STUMBLE_STRIDE_MUL = 1.8
 K.STUMBLE_STRIDE_MAX = 110

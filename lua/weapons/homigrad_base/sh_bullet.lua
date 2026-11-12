@@ -803,6 +803,23 @@ function SWEP:GetShotAng(fallback)
 	return self:GetSettledShotAng() or fallback
 end
 
+function SWEP:GetTriggerSnatch(owner, dir)
+	local K = hg.PsycheCombat
+	local combat = K and hg.GetCombatCondition and hg.GetCombatCondition(owner)
+	if not combat then return dir end
+
+	local k = math.Clamp(((combat.panic or 0) - K.snatchStart) / (1 - K.snatchStart), 0, 1)
+	if k <= 0 then return dir end
+
+	local deg = K.snatchMaxDeg * k * Lerp(combat.training or 0, 1, K.trainedSnatchMul)
+	local seed = self:Clip1()
+	local ang = dir:Angle()
+	ang.p = ang.p + util.SharedRandom("hg_trigger_snatch_p", 0.3, 1, seed) * deg * 0.8
+	ang.y = ang.y + util.SharedRandom("hg_trigger_snatch_y", -1, 1, seed) * deg * 0.6
+
+	return ang:Forward()
+end
+
 SWEP.ShellEject = "EjectBrass_556"
 SWEP.MuzzleEffectType = 1
 
@@ -949,6 +966,7 @@ function SWEP:FireBullet()
 		else
 			dir = self:GetShotAng(ang):Forward()
 		end
+		dir = self:GetTriggerSnatch(owner, dir)
 		local dist, point = util.DistanceToLine(pos, pos - dir * 50, owner:EyePos())
 		local blockFilter = {gun, self, owner, ent}
 		if IsValid(self.worldModel) then blockFilter[#blockFilter + 1] = self.worldModel end
