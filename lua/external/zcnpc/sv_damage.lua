@@ -351,7 +351,7 @@ end)
 -- one of them and never counts as a hit to the chest.
 local painParts = {
 	{ organ = "chest", bone = "ValveBiped.Bip01_Spine2", torso = true },
-	{ organ = "stomach", bone = "ValveBiped.Bip01_Spine", torso = true },
+	{ organ = "gut", bone = "ValveBiped.Bip01_Spine", torso = true },
 	{ organ = "larm", bone = "ValveBiped.Bip01_L_UpperArm" },
 	{ organ = "rarm", bone = "ValveBiped.Bip01_R_UpperArm" },
 	{ organ = "lleg", bone = "ValveBiped.Bip01_L_Thigh" },

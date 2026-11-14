@@ -320,7 +320,7 @@ function SWEP:StartPulseCheck(ply, org, target)
 	if not IsValid(ply) or not org or not IsValid(target) then return end
 
 	if org.heartstop or (tonumber(org.pulse) or 0) <= 0 then
-		ply:Notify("No Pulse.", 2)
+		ply:Notify("No Pulse.", 2, "vitals_nopulse")
 		return
 	end
 
@@ -514,7 +514,7 @@ function SWEP:ApplyForce()
 
 					self.Checking = math.min(self.Checking + FrameTime() * 2, 10)
 				else
-					ply:Notify("I dont think I need to check their vitals.", 10)
+					ply:Notify("I dont think I need to check their vitals.", 10, "vitals_unneeded")
 				end
 			end
 		end
@@ -545,7 +545,7 @@ function SWEP:ApplyForce()
 						if not ply2.noHead then
 							ply:ChatPrint("You are beginning to perform CPR.")
 						else
-							ply:Notify("I dont think CPR would help here...", 10)
+							ply:Notify("I dont think CPR would help here...", 10, "cpr_useless")
 						end
 					end
 
@@ -578,6 +578,7 @@ function SWEP:ApplyForce()
 							org.cprSupportUntil = CurTime() + 0.75
 							org.cprSupportPulse = skillMult > 1 and 50 or 40
 							org.cprResuscitationUntil = CurTime() + 2
+							if hg.organism and hg.organism.CPRClearVomit then hg.organism.CPRClearVomit(org) end
 							if hg.organism and hg.organism.TryRestartHeartWithResuscitation then hg.organism.TryRestartHeartWithResuscitation(org, self.CPRDuration) end
 							if hg.organism and hg.organism.TryRestoreBreathingWithResuscitation then hg.organism.TryRestoreBreathingWithResuscitation(org, 0.5 * skillMult) end
 							
@@ -672,6 +673,11 @@ function SWEP:SetCarrying(ent, bone, pos, dist)
 	if not IsValid(owner) then return end
 
 	if IsValid(ent) or game.GetWorld() == ent then
+		local grabbed = ent:IsPlayer() and ent or ent:IsRagdoll() and hg.RagdollOwner(ent)
+		if hg.ChatLog and IsValid(grabbed) and grabbed:IsPlayer() and grabbed ~= owner and self.CarryEnt ~= ent then
+			hg.ChatLog.Emit("grab", owner, grabbed)
+		end
+
 		self.CarryEnt = ent
 		self.CarryBone = bone
 		self.CarryDist = dist
@@ -1072,6 +1078,7 @@ function SWEP:ShoveFront(sprintShove)
                 sound.Play("physics/body/body_medium_impact_soft" .. math_random(1, 7) .. ".wav", trace.HitPos, 75, 110)
                 PushRagdoll(ent, trace.PhysicsBone or 0, pushVel * 0.65, trace.HitPos)
                 WriteShoveHarm(owner, ent, self, sprintShove and 2 or 1.25)
+                if hg.ChatLog and IsValid(target) and target:IsPlayer() then hg.ChatLog.Emit("shove", owner, target) end
                 owner:LagCompensation(false)
                 return
         end
@@ -1084,6 +1091,7 @@ function SWEP:ShoveFront(sprintShove)
 
 		if IsValid(target) and target:IsPlayer() and target ~= owner then
                 WriteShoveHarm(owner, target, self, sprintShove and 2 or 1.25)
+                if hg.ChatLog then hg.ChatLog.Emit("shove", owner, target) end
 
                 local ragdolled = false
 

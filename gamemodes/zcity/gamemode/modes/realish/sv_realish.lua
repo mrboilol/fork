@@ -1371,9 +1371,8 @@ local function RealishPartialHealHero(ply)
 	org.eyeL = reduce(org.eyeL or 0)
 	org.eyeR = reduce(org.eyeR or 0)
 	org.liver = reduce(org.liver or 0)
-	org.intestines = reduce(org.intestines or 0)
 	org.heart = reduce(org.heart or 0)
-	org.stomach = reduce(org.stomach or 0)
+	org.gut = reduce(org.gut or 0)
 
 	org.lungsR = org.lungsR or {0, 0}
 	org.lungsL = org.lungsL or {0, 0}

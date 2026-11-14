@@ -15,6 +15,7 @@ end
 
 RegisterZChatConVar("zchat_maxmessagelength", 256, "Maximum message length allowed", 32, 512, "number", 0)
 local maxLength = CreateConVar("zchat_maxmessagelength", "256", {FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED}, "Maximum message length allowed")
+CreateConVar("sv_bigchat", "1", {FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED}, "1 - big SS13-style zchat on the right, 0 - normal zchat", 0, 1)
 
 if CLIENT then
 	RegisterZChatConVar("zchat_fontsize", 9, "Font scale", 3, 60, "number", 0)
@@ -212,6 +213,12 @@ if CLIENT then
 
 	concommand.Add("zchat_reload", function()
 		LoadFonts()
+		RefreshChatFonts()
+	end)
+
+	hook.Add("OnScreenSizeChanged", "ZChat", function()
+		LoadFonts()
+		if IsValid(hg.chat) and hg.chat.ApplySavedBounds then hg.chat:ApplySavedBounds() end
 		RefreshChatFonts()
 	end)
 

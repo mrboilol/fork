@@ -91,7 +91,8 @@ local organismModuleInitOrder = {
 	"medical_system",
 	"teeth",
 	"depression",
-	"psyche"
+	"psyche",
+	"simplehealth"
 }
 
 local faintThoughts = {
@@ -107,9 +108,14 @@ local function runOrganismModule(name, stage, owner, org, timeValue)
 	if not isfunction(callback) then return end
 	if stage == 1 then
 		callback(org)
-	else
-		callback(owner, org, timeValue)
+		return
 	end
+	local simpleOverride = org.simpleMode and hg.SimpleHealth.ModuleOverrides[name]
+	if simpleOverride then
+		simpleOverride(owner, org, timeValue, callback)
+		return
+	end
+	callback(owner, org, timeValue)
 end
 
 hook.Add("Org Clear", "Main", function(org)
@@ -145,8 +151,7 @@ hook.Add("Org Clear", "Main", function(org)
 	org.chest = 0
 	org.pelvis = 0
 	org.skull = 0
-	org.stomach = 0
-	org.intestines = 0
+	org.gut = 0
 	org.thiamine = 0
 	org.lleg = 0
 	org.rleg = 0
@@ -303,7 +308,7 @@ hook.Add("Org Clear", "Main", function(org)
 	org.brainSwelling = 0
 	org.intracranialPressure = 0
 	for _, key in ipairs({
-		"_zeroO2Time", "cervicalOxygenLoss", "spine3OxygenLossAt", "spine3OxygenLossWarned", "spine3AcutePain", "spine3AcutePainUntil", "choking", "scubaOxygenActive", "neckslit", "neckslitDeadline", "neckslitWarned", "neckBrainOxygenPenalty", "hypoxiaTime", "heartstoptime", "terminalRhythm", "terminalCirculatoryFailure", "unstableRhythm", "hemorrhagicDecompensation", "hemorrhageCompensation", "hemostaticTreatment", "hypovolemia", "hypovolemicShock", "cardiacArrestMechanicalStart", "cardiacArrestMechanicalInitial", "cardiacRestartUntil", "resuscitationAttemptUntil", "sedativePressureRelief", "drugBradycardia", "critical", "incapacitated", "needfake", "needotrub", "uncon_timer", "overdoseShit", "overdoseNausea", "is_sprayed_at", "brokenribs", "gibdmgstack", "gibhealth", "stamina_damage", "panic"
+		"_zeroO2Time", "cervicalOxygenLoss", "spine3OxygenLossAt", "spine3OxygenLossWarned", "spine3AcutePain", "spine3AcutePainUntil", "choking", "scubaOxygenActive", "neckslit", "neckslitDeadline", "neckslitWarned", "neckBrainOxygenPenalty", "hypoxiaTime", "heartstoptime", "terminalRhythm", "terminalCirculatoryFailure", "unstableRhythm", "hemorrhagicDecompensation", "hemorrhageCompensation", "hemostaticTreatment", "hypovolemia", "hypovolemicShock", "cardiacArrestMechanicalStart", "cardiacArrestMechanicalInitial", "cardiacRestartUntil", "resuscitationAttemptUntil", "sedativePressureRelief", "drugBradycardia", "critical", "incapacitated", "needfake", "needotrub", "uncon_timer", "overdoseShit", "overdoseNausea", "is_sprayed_at", "brokenribs", "gibdmgstack", "gibhealth", "stamina_damage", "panic", "witnessTrauma", "witnessTraumaAt"
 	}) do
 		org[key] = nil
 	end
@@ -574,7 +579,7 @@ local function send_organism(org, ply, recipientForce, reliable)
 		"painkiller", "goodmood", "hungry", "satiety", "palpitations", "unstableRhythm", "ecgState",
 		"strokeVolume", "hypoxiaTime", "intracranialPressure", "peripheralperfusion", "perfusionMoveMul",
 		"legstrength", "armstrength", "losing_oxy", "respiratoryArrest", "pneumothorax", "hemothorax",
-		"skull", "chest", "heart", "trachea", "liver", "kidneys", "stomach", "intestines", "lungsL", "lungsR",
+		"skull", "chest", "heart", "trachea", "liver", "flank", "gut", "lungsL", "lungsR",
 		"spine1", "spine2", "spine3", "spine2stabilized", "spine3stabilized", "spine2splinted", "spine3splinted",
 		"spinalBradypnea", "spinalBradycardia", "internalBleed", "internalBleedComplication", "wantToVomit",
 		"weight", "maxweight", "ischemia", "hemotransfusionshock", "zerlkers", "zerlkersOverdose", "anger",
@@ -802,7 +807,7 @@ local function send_bareinfo(org, force, reliable)
 	sendtable.deathStateEnd = org.deathStateEnd or 0
 	for _, key in ipairs({
 		"stamina", "immobilization", "adrenaline", "adrenalineAdd", "pain", "shock", "hurt",
-		"pelvis", "chest", "skull", "heart", "stomach", "liver", "kidneys", "intestines", "trachea",
+		"pelvis", "chest", "skull", "heart", "gut", "liver", "flank", "trachea",
 		"lungsL", "lungsR", "spine1", "spine2", "spine3", "internalBleed", "internalBleedHeal",
 		"arteria", "rarmartery", "larmartery", "rlegartery", "llegartery", "aorta",
 		"cardiacTamponade", "ischemia", "brainSwelling", "intracranialPressure", "hypoxiaTime",
@@ -852,12 +857,16 @@ local adrenalineBraceGroups = {
 	[HITGROUP_STOMACH] = true,
 	[HITGROUP_LEFTARM] = true,
 	[HITGROUP_RIGHTARM] = true,
+	[HITGROUP_HEAD] = 0.6,
 }
 
 function hg.organism.AdrenalineBrace(org, hitgroup)
-	if not org or (hitgroup ~= nil and not adrenalineBraceGroups[hitgroup]) then return 0 end
+	local groupMul = hitgroup == nil and 1 or adrenalineBraceGroups[hitgroup]
+	if not org or not groupMul then return 0 end
+	groupMul = groupMul == true and 1 or groupMul
 	local panic = hg.GetPanicLevel and hg.GetPanicLevel(org) or 0
-	return math.max(hg.organism.GetResilience(org), panic, 0) * 0.8
+	local shockFade = 1 - math.Clamp(((org.shock or 0) - 30) / 30, 0, 1)
+	return math.max(hg.organism.GetResilience(org), panic, 0) * 0.8 * groupMul * shockFade
 end
 
 function hg.organism.IsHitKnockdownImmune(org)
@@ -1589,6 +1598,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	runOrganismModule("concussion", 2, owner, org, timeValue)
 	runOrganismModule("psyche", 2, owner, org, timeValue)
 	runOrganismModule("depression", 2, owner, org, timeValue)
+	runOrganismModule("simplehealth", 2, owner, org, timeValue)
 	if org.owner.PlayerClassName == "furry" then
 		org.assimilated = 0
 	end
@@ -1811,12 +1821,11 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		local naturalHeal = (org.thiamine > 0 and timeValue / 140 or timeValue / 1800) * hg.organism.RecoveryMul(org)
 		org.thiamine = math.Approach(org.thiamine, 0, timeValue / 240)
 		if org.liver < 1 then org.liver = math.Approach(org.liver, 0, naturalHeal) end
-		if (org.kidneys or 0) < 1 then org.kidneys = math.Approach(org.kidneys or 0, 0, naturalHeal) end
+		if (org.flank or 0) < 1 then org.flank = math.Approach(org.flank or 0, 0, naturalHeal) end
 		if org.heart < 1 then org.heart = math.Approach(org.heart, 0, naturalHeal) end
 		org.heartStrain = math.Approach(org.heartStrain or 0, 0, naturalHeal * 0.5)
 		org.arrhythmia = math.Approach(org.arrhythmia or 0, 0, naturalHeal)
-		if org.stomach < 1 then org.stomach = math.Approach(org.stomach, 0, naturalHeal) end
-		if org.intestines < 1 then org.intestines = math.Approach(org.intestines, 0, naturalHeal) end
+		if org.gut < 1 then org.gut = math.Approach(org.gut, 0, naturalHeal) end
 		if org.lungsR[1] < 1 then org.lungsR[1] = math.Approach(org.lungsR[1], 0, naturalHeal) end
 		if org.lungsL[1] < 1 then org.lungsL[1] = math.Approach(org.lungsL[1], 0, naturalHeal) end
 		if (org.eyeL or 0) < 1 then org.eyeL = math.Approach(org.eyeL or 0, 0, naturalHeal) end
@@ -2006,10 +2015,9 @@ hook.Add("Org Think", "regenerationberserk", function(owner, org, timeValue)
 	org.spine3 = math.max(org.spine3 - regen, 0)
 	org.skull = math.max(org.skull - regen, 0)
 	org.liver = math.max(org.liver - regen, 0)
-	org.kidneys = math.max((org.kidneys or 0) - regen, 0)
-	org.intestines = math.max(org.intestines - regen, 0)
+	org.flank = math.max((org.flank or 0) - regen, 0)
 	org.heart = math.max(org.heart - regen, 0)
-	org.stomach = math.max(org.stomach - regen, 0)
+	org.gut = math.max(org.gut - regen, 0)
 	org.lungsR[1] = math.max(org.lungsR[1] - regen, 0)
 	org.lungsL[1] = math.max(org.lungsL[1] - regen, 0)
 	org.lungsR[2] = math.max((org.lungsR[2] or 0) - regen, 0)

@@ -77,6 +77,8 @@ module[1] = function(org)
 
 	org.hemotransfusionshock = 0
 	org.sepsisBloodPrev = nil
+	org.sepsisSource = 0
+	org.sepsisOrganPrev = nil
 	org.ischemia = 0
 	org.internalBleedDuration = 0
 	org.internalBleedPeak = 0
@@ -418,7 +420,7 @@ local function gutOrganNausea(value)
 end
 
 function hg.organism.GutNauseaLevel(org)
-	return gutOrganNausea(org.stomach) + gutOrganNausea(org.intestines) * 0.75
+	return gutOrganNausea(org.gut) * 0.875
 end
 
 function hg.organism.AddGutHitNausea(org, delta, previousDamage, dmg)
@@ -436,24 +438,40 @@ function hg.organism.UpdateSepsis(org, mulTime, adrenalineStabilizer)
 	local bloodLost = max((org.sepsisBloodPrev or org.blood) - org.blood, 0)
 	org.sepsisBloodPrev = org.blood
 
-	local sepsis = org.hemotransfusionshock
-	if sepsis <= 0 then return end
-
 	local thiamine = (org.thiamine or 0) > 0
 	local txa = (org.tranexamic_acid or 0) > 0
+
+	local organLoad = (org.liver or 0) + (org.flank or 0)
+	local organHealed = max((org.sepsisOrganPrev or organLoad) - organLoad, 0)
+	local source = org.sepsisSource or 0
+	if source > 0 then
+		source = max(source - organHealed * 1.5 - mulTime * (1 / 600 + (thiamine and 1 / 20 or 0)), 0)
+		org.sepsisSource = source
+		local cap = source * 1.5
+		if org.hemotransfusionshock < cap then
+			org.hemotransfusionshock = min(org.hemotransfusionshock + mulTime * source * 0.015, cap)
+		end
+	end
+
+	local sepsis = org.hemotransfusionshock
+	if sepsis <= 0 then
+		org.sepsisOrganPrev = organLoad
+		return
+	end
 	local severity = min(sepsis, 2)
 	local organDamage = mulTime * max(severity - 0.5, 0) * (thiamine and 0.5 or 1) * (txa and 0.5 or 1)
 
 	org.internalBleed = org.internalBleed + mulTime * severity * 0.3 * (txa and 0.5 or 1)
 	org.liver = min(org.liver + organDamage * 0.012, 1)
-	org.kidneys = min((org.kidneys or 0) + organDamage * 0.012, 1)
+	org.flank = min((org.flank or 0) + organDamage * 0.012, 1)
 	org.heart = min(org.heart + organDamage * 0.006, 1)
 	if not adrenalineStabilizer and not thiamine and not txa then
 		org.ischemia = org.ischemia + mulTime * severity * 0.3
 	end
 
-	local clearance = mulTime * (1 / 45 + (thiamine and 1 / 30 or 0) + (txa and 1 / 30 or 0)) + bloodLost / 600
+	local clearance = mulTime * ((source > 0 and 0 or 1 / 45) + (thiamine and 1 / 30 or 0) + (txa and 1 / 30 or 0)) + bloodLost / 600
 	org.hemotransfusionshock = max(sepsis - clearance, 0)
+	org.sepsisOrganPrev = (org.liver or 0) + (org.flank or 0)
 end
 
 module[2] = function(owner, org, mulTime)
@@ -554,7 +572,7 @@ module[2] = function(owner, org, mulTime)
 		local internalBleedPeak = org.internalBleedPeak or 0
 		local catastrophic = internalBleedPeak >= internalBleedCatastrophicThreshold
 		local severityK = math.Clamp(internalBleedPeak / internalBleedCatastrophicThreshold, 0, 1)
-		local abdominalDamage = math.Clamp((tonumber(org.liver) or 0) + (tonumber(org.kidneys) or 0) * 0.6 + (tonumber(org.stomach) or 0) * 0.45 + (tonumber(org.intestines) or 0) * 0.4, 0, 1)
+		local abdominalDamage = math.Clamp((tonumber(org.liver) or 0) + (tonumber(org.flank) or 0) * 0.6 + (tonumber(org.gut) or 0) * 0.425, 0, 1)
 		local complicationDelay = catastrophic and 0 or Lerp(severityK, 100, 50) * (1 - abdominalDamage * 0.4)
 		local progressionTime = catastrophic and 1 or Lerp(severityK, 300, 200) * (1 - abdominalDamage * 0.4)
 		local severityLimit = catastrophic and 1 or math.Clamp(severityK + abdominalDamage * 0.35, 0.05, 0.9)
@@ -797,19 +815,11 @@ module[2] = function(owner, org, mulTime)
 	-- It is multiplied by 100 when applied below. Keep the resulting loss in a
 	-- range where a serious injury needs treatment, but does not empty a player
 	-- from a few stacked organ hits before the delayed complications can matter.
-	-- An internal-bleed score of 10 produces about 0.033 bleed (3.3 mL/s after the
-	-- existing x100 application below); lower injuries scale proportionally.
-	-- This keeps a score around 1.0 as an urgent injury instead of an
-	-- immediate blood-loss death sentence.
 	local bleed = math.Clamp(org.internalBleed / 300, 0, 0.11) * bloodLeftK
 	
-	-- Damaged liver prevents natural internal bleeding healing unless tranexamic acid is present
-	local canHealInternalBleed = (org.liver <= 0 and (org.kidneys or 0) <= 0) or (org.tranexamic_acid or 0) > 0
+	local canHealInternalBleed = (org.liver <= 0 and (org.flank or 0) <= 0) or (org.tranexamic_acid or 0) > 0
 	local internalBleedHeal = org.internalBleedHeal or 0
 
-	-- Internal hemostasis also has an opening phase. Large internal injuries take
-	-- longer to stabilize naturally, while TXA/internalBleedHeal can establish a
-	-- clot much earlier. The treatment budget still repairs only active bleeding.
 	local bleedBeforeHeal = math.max(org.internalBleed or 0, 0)
 	local internalSeverityK = math.Clamp(bleedBeforeHeal / 6, 0, 1)
 	local internalClotDelay = Lerp(internalSeverityK, 10, 32)
@@ -901,6 +911,8 @@ module[2] = function(owner, org, mulTime)
 	local regenRate = (hg.organism.config and hg.organism.config.BLOOD_REGEN_RATE_ML_S) or 4.6
 	local regenerationMul = math.Clamp(tonumber(org.blood_regeneration_multiplier) or 1, 0.1, 2)
 	local hemorrhageRegenMul = org.bleed > 0.2 and 0 or 1
+	local internalBleedRegenMul = 1 - math.Clamp(math.max(tonumber(org.internalBleed) or 0, 0) / 1.5, 0, 1)
+	hemorrhageRegenMul = hemorrhageRegenMul * internalBleedRegenMul
 	org.bloodRegenRate = org.alive and not org.heartstop and org.pulse > 5 and org.blood < org.maxblood and regenRate * regenerationMul * recoveryBoost * hemorrhageRegenMul or 0
 	if org.bloodRegenRate > 0 then org.blood = min(org.blood + mulTime * org.bloodRegenRate, org.maxblood) end
 	if hg.organism.UpdateVitalHealthToll then
@@ -1101,6 +1113,41 @@ function hg.organism.Defecate(owner)
 	net.Start("hg_organism_defecate")
 		net.WriteEntity(owner)
 	net.SendPVS(owner:GetPos())
+end
+
+local CPR_VOMIT_CLEAR_CHANCE = 0.2
+
+function hg.organism.CPRClearVomit(org)
+	if not org.vomitInThroat then return false end
+	if math.Rand(0, 1) > CPR_VOMIT_CLEAR_CHANCE then return false end
+
+	local ply = org.owner
+	if not IsValid(ply) then return false end
+
+	local ent = hg.GetCurrentCharacter(ply)
+	if not IsValid(ent) then return false end
+
+	local bon = "ValveBiped.Bip01_Head1"
+	local bone = ent:LookupBone(bon)
+	local mat = bone and ent:GetBoneMatrix(bone)
+
+	org.vomitInThroat = nil
+
+	ply:EmitSound("zcitysnd/real_sonar/" .. (ThatPlyIsFemale(ply) and "female" or "male") .. "_cough" .. math.random(4) .. ".ogg")
+	ply.phrCld = CurTime() + 2
+
+	if mat then
+		net.Start("bloodsquirt2")
+		net.WriteEntity(ent)
+		net.WriteString(bon)
+		net.WriteMatrix(mat)
+		net.WriteVector(mat:GetTranslation() + mat:GetAngles():Right() * 6 + mat:GetAngles():Forward())
+		net.WriteVector(mat:GetAngles():Right() * 2 * math.Clamp((org.pulse or 0) / 70, 0.4, 1))
+		net.Broadcast()
+	end
+
+	ent:EmitSound("vomit/vomit5.ogg")
+	return true
 end
 
 function hg.organism.CoughBlood(org)

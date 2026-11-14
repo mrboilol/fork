@@ -422,9 +422,6 @@ players : 1 humans, 0 bots (20 max)
 				DrawColorModify(colormodify)
 			end
 
-			local blurFraction = math.Clamp((force - 3) / 4, 0, 1)
-			if not LocalPlayer():HasTrait("blind") and !hg_potatopc:GetBool() and blurFraction > 0.1 then DrawToyTown(2, math.min(math.ease.InBack(blurFraction), 0.85) * ScrH() * blurFraction * 0.6) end
-
 		end)
 
 		hook.Add("Think","SIB_Suppresss_Think",function()

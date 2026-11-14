@@ -129,6 +129,7 @@ concommand.Add("hg_hand_gesture",function( ply, cmd, args )
 
 	if args[1] and gestures[args[1]] then
 		hg.RunZManipAnim( ply, gestures[args[1]][1], gestures[args[1]][2] )
+		if hg.ChatLog then hg.ChatLog.Gesture(ply, args[1]) end
 		if args[1] == "omw" then boiiBackfire(ply) end
 	elseif not args[1] then
 		local gestur = table.Random(gestures)

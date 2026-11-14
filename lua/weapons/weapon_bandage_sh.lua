@@ -1159,6 +1159,7 @@ if SERVER then
 		end)
 
 		if done then
+			hg.SimpleHealth.OnBandageApplied(org)
 			if not self:UseJudgeBandageTPIK() then
 				owner:EmitSound("snd_jack_hmcd_bandage.wav", 60, math.random(95, 105))
 			end

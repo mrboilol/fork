@@ -313,7 +313,7 @@ function ENT:Use(ply)
         if not self.UseWarned then
             local doubt_phrase = doubt_phrases[math.random(#doubt_phrases)]
             if ply.Notify then
-                ply:Notify(doubt_phrase, 3)
+                ply:Notify(doubt_phrase, 3, "rocket_doubt")
             else
                 ply:ChatPrint(doubt_phrase)
             end
@@ -353,7 +353,7 @@ function ENT:Use(ply)
                     else
                         local relief_phrase = relief_phrases[math.random(#relief_phrases)]
                         if ply.Notify then
-                            ply:Notify(relief_phrase, 3)
+                            ply:Notify(relief_phrase, 3, "rocket_relief")
                         else
                             ply:ChatPrint(relief_phrase)
                         end

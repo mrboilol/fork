@@ -16,8 +16,7 @@ local cfg = ZCNPC.Config
 local ORGANS = {
 	{ key = "heart", bone = "ValveBiped.Bip01_Spine2" },
 	{ key = "liver", bone = "ValveBiped.Bip01_Spine1" },
-	{ key = "stomach", bone = "ValveBiped.Bip01_Spine1" },
-	{ key = "intestines", bone = "ValveBiped.Bip01_Spine" },
+	{ key = "gut", bone = "ValveBiped.Bip01_Spine1" },
 }
 
 local ARTERIES = {

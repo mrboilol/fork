@@ -98,9 +98,9 @@ if SERVER then
 			table.RemoveByValue(hg.Bullets, ent)
 			
 			-- Notify player
-			ply:Notify("Picked up " .. ammoAmount .. " " .. ammoType, 3)
+			ply:Notify("Picked up " .. ammoAmount .. " " .. ammoType, 3, "ammo_pickup")
 		else
-			ply:Notify("Ammo full", 3)
+			ply:Notify("Ammo full", 3, "ammo_full")
 		end
 	end)
 	

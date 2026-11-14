@@ -156,10 +156,6 @@ function ZW.SendServerSuppressionForBullet(bullet, startPos, endPos)
                     ply:AddNaturalAdrenaline(suppressionResponse)
                 end
 
-                local disorientation = org.disorientation or 0
-                if dist <= 60 and disorientation < 1 then
-                    org.disorientation = math.min(disorientation + math.Clamp(suppressionResponse * 0.4, 0.04, 0.18), 1)
-                end
                 org.fearadd = (org.fearadd or 0) + 0.2
 
                 if hg.organism and hg.organism.AddPanicAttack and CurTime() >= (org._panicSuppressionNext or 0) then

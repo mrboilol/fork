@@ -11,13 +11,13 @@ local inventorySystem = GetConVar("hg_invsystem") or CreateConVar(
 	"hg_invsystem",
 	1,
 	{FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_SERVER_CAN_EXECUTE},
-	"Inventory system: 0 = body/backpack, 1 = Judge-style selector, 2 = compact dial, 3 = radial selector",
+	"Inventory system: 0 = body/backpack, 1 = Judge-style selector, 2 = compact dial, 3 = radial selector, 4 = coin selector",
 	0,
-	3
+	4
 )
 
 local function SyncInventorySystem()
-	local mode = math.Clamp(inventorySystem:GetInt(), 0, 3)
+	local mode = math.Clamp(inventorySystem:GetInt(), 0, 4)
 	SetGlobalInt("InventorySystem", mode)
 	SetGlobalBool("RadialInventory", mode == 3)
 end

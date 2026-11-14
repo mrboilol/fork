@@ -179,10 +179,9 @@ local list = {
 	{"spine3", 1, true},
 	{"chest", 1, true},
 	{"pelvis", 1, true},
-	{"stomach", 1, true},
+	{"gut", 1, true},
 	{"liver", 1, true},
-	{"kidneys", 1, true},
-	{"intestines", 1, true},
+	{"flank", 1, true},
 }
 local function LerpColor(lerp, source, set)
 	return Lerp(lerp, source.r, set.r), Lerp(lerp, source.g, set.g), Lerp(lerp, source.b, set.b)

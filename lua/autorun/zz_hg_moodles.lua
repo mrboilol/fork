@@ -956,10 +956,10 @@ local function buildEffects(ply, org)
 	end
 
 	local heart, trachea = orgNumber(org, "heart", 0), orgNumber(org, "trachea", 0)
-	local liver, stomach, intestines = orgNumber(org, "liver", 0), orgNumber(org, "stomach", 0), orgNumber(org, "intestines", 0)
+	local liver, gut = orgNumber(org, "liver", 0), orgNumber(org, "gut", 0)
 	local lungL, lungR = tableNumber(org, "lungsL", 1, 0), tableNumber(org, "lungsR", 1, 0)
 	local lungPenetratedL, lungPenetratedR = tableNumber(org, "lungsL", 2, 0), tableNumber(org, "lungsR", 2, 0)
-	local organPeak = math.max(heart, trachea, liver, stomach, intestines, lungL, lungR)
+	local organPeak = math.max(heart, trachea, liver, gut, lungL, lungR)
 	local hasRespiratoryOrganDamage = math.max(trachea, lungL, lungR, lungPenetratedL, lungPenetratedR) > 0
 	if organPeak >= 0.6 or hasRespiratoryOrganDamage then
 		local combatLevel = organPeak >= 1 and 2 or 1

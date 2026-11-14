@@ -19,14 +19,19 @@ local function ZCityGetInventorySystem()
 	-- The server-owned global is authoritative. A replicated ConVar can briefly
 	-- retain its old value while joining, which previously hid the mode-2 dial.
 	local globalMode = GetGlobalInt("InventorySystem", -1)
-	if globalMode >= 0 then return math.Clamp(globalMode, 0, 3) end
+	if globalMode >= 0 then return math.Clamp(globalMode, 0, 4) end
 
 	local convar = GetConVar("hg_invsystem")
 	if convar then
-		return math.Clamp(convar:GetInt(), 0, 3)
+		return math.Clamp(convar:GetInt(), 0, 4)
 	end
 
-    return math.Clamp(GetGlobalInt("InventorySystem", 0), 0, 3)
+    return math.Clamp(GetGlobalInt("InventorySystem", 0), 0, 4)
+end
+
+local function ZCityUsesJudgeInput()
+    local mode = ZCityGetInventorySystem()
+    return mode == 1 or mode == 4
 end
 
 local function ZCitySelectInventoryWeapon(wep)
@@ -118,7 +123,7 @@ end)
 
 function WS.GetWeaponTable( ply )
     if not IsValid( ply ) or not ply:Alive() then return end
-    if ZCityGetInventorySystem() == 1 and SimpleSelector.Weapons then
+    if ZCityUsesJudgeInput() and SimpleSelector.Weapons then
         return SimpleSelector.Weapons(ply)
     end
 
@@ -161,7 +166,11 @@ local AcsentColor = Color(155,0,0)
 local gradient_u = Material("vgui/gradient-d")
 
 function WS.WeaponSelectorDraw( ply )
-    if ZCityGetInventorySystem() == 1 and SimpleSelector.Draw then
+    local mode = ZCityGetInventorySystem()
+    if mode == 4 and SimpleSelector.CoinDraw then
+        return SimpleSelector.CoinDraw(ply)
+    end
+    if mode == 1 and SimpleSelector.Draw then
         return SimpleSelector.Draw(ply)
     end
 end
@@ -424,6 +433,10 @@ local function ZCityJudgeIconInfo(icon)
 end
 
 local function ZCityJudgeDrawIcon(wep, x, y, wide, tall, alpha, muted)
+    if WS.DrawProceduralIcon then
+        local inset = math.max(2, math.floor(ScreenScale(1.5) + 0.5))
+        if WS.DrawProceduralIcon(wep, math.floor(x + inset), math.floor(y + inset), math.floor(wide - inset * 2), math.floor(tall - inset * 2), alpha, muted and judgeInactiveIcon or nil) then return true end
+    end
     local icon, iconWide, iconTall = ZCityJudgeIconInfo(wep.WepSelectIcon2)
     if not icon then icon, iconWide, iconTall = ZCityJudgeIconInfo(wep.WepSelectIcon) end
     if not icon then return false end
@@ -706,7 +719,150 @@ function JudgeSelector.Select(ply, cmd)
     surface.PlaySound("arc9_eft_shared/weapon_generic_spin" .. math.random(1, 10) .. ".ogg")
 end
 
+local coinOuter = Color(253, 250, 253)
+local coinInner = Color(60, 58, 62)
+local coinCircleCache = {}
+
+local function ZCityCoinCircle(x, y, radius, color, alpha)
+    local segments = math.Clamp(math.floor(radius * 0.6), 24, 64)
+    local unit = coinCircleCache[segments]
+    if not unit then
+        unit = {}
+        for i = 0, segments - 1 do
+            local a = math.rad(i / segments * -360)
+            unit[#unit + 1] = {math.sin(a), math.cos(a)}
+        end
+        coinCircleCache[segments] = unit
+    end
+    local poly = {}
+    for i, point in ipairs(unit) do poly[i] = {x = x + point[1] * radius, y = y + point[2] * radius} end
+    draw.NoTexture()
+    surface.SetDrawColor(color.r, color.g, color.b, alpha)
+    surface.DrawPoly(poly)
+end
+
+local COIN_CAROUSEL_COUNT = 7
+
+local function ZCityDrawCoin(wep, cx, centerY, radius, alpha, isSelected)
+    local line = math.max(1, math.floor(ScreenScale(0.5) + 0.5))
+    local innerRadius = radius * 0.86
+    ZCityCoinCircle(cx, centerY, radius + line, color_black, alpha)
+    ZCityCoinCircle(cx, centerY, radius, coinOuter, alpha)
+    ZCityCoinCircle(cx, centerY, innerRadius + line, color_black, alpha)
+
+    render.ClearStencil()
+    render.SetStencilEnable(true)
+    render.SetStencilWriteMask(255)
+    render.SetStencilTestMask(255)
+    render.SetStencilReferenceValue(1)
+    render.SetStencilCompareFunction(STENCIL_ALWAYS)
+    render.SetStencilPassOperation(STENCIL_REPLACE)
+    render.SetStencilFailOperation(STENCIL_KEEP)
+    render.SetStencilZFailOperation(STENCIL_KEEP)
+    ZCityCoinCircle(cx, centerY, innerRadius, coinInner, alpha)
+    render.SetStencilCompareFunction(STENCIL_EQUAL)
+    render.SetStencilPassOperation(STENCIL_KEEP)
+    local iconSize = innerRadius * 1.8
+    local iconX, iconY = cx - iconSize * 0.5, centerY - iconSize * 0.5
+    if not ZCityJudgeDrawIcon(wep, iconX, iconY, iconSize, iconSize, alpha, not isSelected) and wep.DrawWeaponSelection then
+        wep:DrawWeaponSelection(iconX, centerY - iconSize * 0.25, iconSize, iconSize, alpha)
+    end
+    render.SetStencilEnable(false)
+end
+
+local function ZCityDrawCoinDescription(wep, fade)
+    local text = ZCityGetWeaponDescription(wep)
+    if text == "" then return end
+    local lines = ZCityJudgeWrapText(text, "ZCityJudgeInfoText", math.min(ScrW() * 0.5, 720))
+    surface.SetFont("ZCityJudgeInfoText")
+    local _, lineTall = surface.GetTextSize("Wg")
+    lineTall = lineTall + 2
+    local y = ScrH() - ScreenScale(6) - #lines * lineTall
+    for _, lineText in ipairs(lines) do
+        draw.SimpleText(lineText, "ZCityJudgeInfoText", ScrW() * 0.5 + 1, y + 1, Color(0, 0, 0, fade * 220), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
+        draw.SimpleText(lineText, "ZCityJudgeInfoText", ScrW() * 0.5, y, Color(judgeName.r, judgeName.g, judgeName.b, fade * 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
+        y = y + lineTall
+    end
+end
+
+function JudgeSelector.CoinDraw(ply)
+    if not IsValid(ply) or not ply:Alive() then return end
+    local now = CurTime()
+    if JudgeSelector.Show < now then
+        JudgeSelector.SelectedSlot = JudgeSelector.LastSelectedSlot
+        JudgeSelector.SelectedSlotPos = -1
+        JudgeSelector.Transparent = 0
+        JudgeSelector.CoinScroll = nil
+        return
+    end
+
+    local slots = ZCityJudgeWeaponTable(ply)
+    local selected = ZCityJudgeSelectedWeapon(slots) or ZCityJudgeSelectFallback(slots, ply)
+    if not IsValid(selected) then return end
+    JudgeSelector.Transparent = LerpFT(0.2, JudgeSelector.Transparent, math.min(JudgeSelector.Show - now, 1))
+    local fade = JudgeSelector.Transparent
+    JudgeSelector.CoinAnim = JudgeSelector.CoinAnim or setmetatable({}, {__mode = "k"})
+
+    local smallRadius, bigRadius = ScreenScale(13), ScreenScale(21)
+    local gap = ScreenScale(3)
+    local coins, selectedIndex = {}, 1
+    for slot = 0, 5 do
+        local slotTable = slots[slot]
+        for position = 0, slotTable.count - 1 do
+            local wep = slotTable[position]
+            local radius = LerpFT(0.2, JudgeSelector.CoinAnim[wep] or smallRadius, wep == selected and bigRadius or smallRadius)
+            JudgeSelector.CoinAnim[wep] = radius
+            coins[#coins + 1] = {wep = wep, radius = radius}
+            if wep == selected then selectedIndex = #coins end
+        end
+    end
+
+    local count = #coins
+    local centerY = ScrH() * 0.05 + bigRadius
+    local centerX = ScrW() * 0.5
+    if count > COIN_CAROUSEL_COUNT then
+        local scroll = JudgeSelector.CoinScroll or selectedIndex
+        local delta = (selectedIndex - scroll + count * 0.5) % count - count * 0.5
+        scroll = (scroll + delta * math.min(FrameTime() * 12, 1) - 1) % count + 1
+        JudgeSelector.CoinScroll = scroll
+        local spacing = smallRadius * 2 + gap
+        local push = bigRadius - smallRadius
+        local order = {}
+        for index, coin in ipairs(coins) do
+            local rel = (index - scroll + count * 0.5) % count - count * 0.5
+            local distance = math.abs(rel)
+            coin.x = centerX + rel * spacing + math.Clamp(rel, -1, 1) * push
+            coin.alpha = math.Clamp(1 - (distance - 1.5) / 1.5, 0, 1)
+            coin.distance = distance
+            if coin.alpha > 0.01 then order[#order + 1] = coin end
+        end
+        table.sort(order, function(a, b) return a.distance > b.distance end)
+        for _, coin in ipairs(order) do
+            local isSelected = coin.wep == selected
+            ZCityDrawCoin(coin.wep, coin.x, centerY, coin.radius, fade * coin.alpha * (isSelected and 255 or 170), isSelected)
+        end
+    else
+        JudgeSelector.CoinScroll = nil
+        local totalWide = math.max(0, count - 1) * gap
+        for _, coin in ipairs(coins) do totalWide = totalWide + coin.radius * 2 end
+        local cursorX = centerX - totalWide * 0.5
+        for _, coin in ipairs(coins) do
+            local isSelected = coin.wep == selected
+            ZCityDrawCoin(coin.wep, cursorX + coin.radius, centerY, coin.radius, fade * (isSelected and 255 or 170), isSelected)
+            cursorX = cursorX + coin.radius * 2 + gap
+        end
+    end
+
+    local fittedName, font = ZCityJudgeFitName(WS.GetPrintName(selected), ScrW() * 0.3)
+    local nameY = centerY + bigRadius + ScreenScale(4)
+    draw.SimpleText(fittedName, font, centerX + 1, nameY + 1, Color(judgeShadow.r, judgeShadow.g, judgeShadow.b, fade * 210), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
+    draw.SimpleText(fittedName, font, centerX, nameY, Color(judgeName.r, judgeName.g, judgeName.b, fade * 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
+
+    ZCityDrawCoinDescription(selected, fade)
+end
+
 SimpleSelector.Draw = JudgeSelector.Draw
+SimpleSelector.CoinDraw = JudgeSelector.CoinDraw
 SimpleSelector.Change = JudgeSelector.Change
 SimpleSelector.Select = JudgeSelector.Select
 
@@ -1709,7 +1865,7 @@ function WS.ChangeSelectionWep( ply, key, pressed, code )
         return
     end
 
-    if inventorySystem == 1 then
+    if inventorySystem == 1 or inventorySystem == 4 then
         ZCityResetSlotHold(false)
         if pressed == false then return end
         if SimpleSelector.Change then
@@ -1851,7 +2007,7 @@ end
 
 function WS.SetActuallyWeapon( ply, cmd )
     local inventorySystem = ZCityGetInventorySystem()
-    if inventorySystem == 1 then
+    if inventorySystem == 1 or inventorySystem == 4 then
         ZCityResetSlotHold(false)
         if SimpleSelector.Select then return SimpleSelector.Select(ply, cmd) end
         return

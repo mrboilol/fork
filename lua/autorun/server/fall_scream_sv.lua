@@ -112,6 +112,7 @@ if SERVER then
         local sound = GetScreamSound(ply)
         if sound then
             ply:EmitSound(sound, SCREAM_VOLUME, math.random(90, 110))
+            if hg.ChatLog then hg.ChatLog.Emit("fallscream", ply) end
             ply._lastScream = CurTime() + SCREAM_COOLDOWN
             ply._screamSound = sound
             ply._isScreaming = true

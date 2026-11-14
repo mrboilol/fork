@@ -37,13 +37,12 @@ end
 local organTraumaMul = {
 	heart = 1.35,
 	liver = 1.15,
-	kidneys = 1.15,
+	flank = 1.15,
 	lungsL = 1.1,
 	lungsR = 1.1,
 	trachea = 1.2,
 	brain = 1.45,
-	stomach = 0.85,
-	intestines = 0.8,
+	gut = 0.825,
 }
 
 local function traumaDirection(org, dmgInfo)
@@ -159,6 +158,7 @@ input_list.liver = function(org, bone, dmg, dmgInfo)
 		end)
 	end
 
+	if harmed > 0 then org.sepsisSource = math.min((org.sepsisSource or 0) + harmed * 1.5, 1) end
 	addInternalBleed(org, harmed * 8, "liver")
 	applyOrganTrauma(org, dmgInfo, dmg, harmed, oldDmg, "liver")
 	
@@ -167,17 +167,18 @@ input_list.liver = function(org, bone, dmg, dmgInfo)
 	return 0
 end
 
-input_list.kidneys = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet, impact)
-	local oldDmg = org.kidneys or 0
+input_list.flank = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet, impact)
+	local oldDmg = org.flank or 0
 
-	org.kidneys = math.min(oldDmg + dmg / math.max(org.organStrengthMul or 1, 1), 1)
-	local harmed = org.kidneys - oldDmg
+	org.flank = math.min(oldDmg + dmg / math.max(org.organStrengthMul or 1, 1), 1)
+	local harmed = org.flank - oldDmg
 
-	hg.AddHarmToAttacker(dmgInfo, harmed * 3, "Kidney damage harm")
+	hg.AddHarmToAttacker(dmgInfo, harmed * 3, "Flank damage harm")
 
 	if harmed > 0 then
 		org.shock = org.shock + dmg * 20
 		addPain(org, dmg * 40, "body")
+		org.sepsisSource = math.min((org.sepsisSource or 0) + harmed * 1.5, 1)
 	end
 	if org.analgesia < 0.4 and harmed >= 0.2 then
 		local owner = org.owner
@@ -186,50 +187,32 @@ input_list.kidneys = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, rico
 		end)
 	end
 
-	addInternalBleed(org, harmed * 8, "kidneys")
+	addInternalBleed(org, harmed * 6.8, "flank")
 	if harmed > 0 and not isCrush(dmgInfo) and not dmgInfo:IsDamageType(DMG_BLAST) then
 		openRenalHemorrhage(org, dmgInfo, boneindex, dir, hit, impact)
 	end
-	applyOrganTrauma(org, dmgInfo, dmg, harmed, oldDmg, "kidneys")
+	applyOrganTrauma(org, dmgInfo, dmg, harmed, oldDmg, "flank")
 
 	dmgInfo:ScaleDamage(0.8)
 
 	return 0
 end
 
-input_list.stomach = function(org, bone, dmg, dmgInfo)
-	local oldDmg = org.stomach
+input_list.gut = function(org, bone, dmg, dmgInfo)
+	local oldDmg = org.gut
 
-	local result = damageOrgan(org, dmg, dmgInfo, "stomach")
+	local result = damageOrgan(org, dmg, dmgInfo, "gut")
 
-	hg.AddHarmToAttacker(dmgInfo, (org.stomach - oldDmg) * 2, "Stomach damage harm")
+	hg.AddHarmToAttacker(dmgInfo, (org.gut - oldDmg) * 2, "Gut damage harm")
 
-	local delta = org.stomach - oldDmg
+	local delta = org.gut - oldDmg
 	if delta > 0 then
-		addPain(org, dmg * 25, "body")
-		org.shock = org.shock + dmg * 6
+		addPain(org, dmg * 22.5, "body")
+		org.shock = org.shock + dmg * 5.5
 	end
-	addInternalBleed(org, delta, "stomach")
-	if hg.organism.AddGutHitNausea then hg.organism.AddGutHitNausea(org, delta, oldDmg, dmg) end
-	applyOrganTrauma(org, dmgInfo, dmg, delta, oldDmg, "stomach")
-	return result
-end
-
-input_list.intestines = function(org, bone, dmg, dmgInfo)
-	local oldDmg = org.intestines
-
-	local result = damageOrgan(org, dmg, dmgInfo, "intestines")
-
-	hg.AddHarmToAttacker(dmgInfo, (org.intestines - oldDmg) * 2, "Intestines damage harm")
-
-	local delta = org.intestines - oldDmg
-	if delta > 0 then
-		addPain(org, dmg * 20, "body")
-		org.shock = org.shock + dmg * 5
-	end
-	addInternalBleed(org, delta, "intestines")
-	if hg.organism.AddGutHitNausea then hg.organism.AddGutHitNausea(org, delta * 0.8, oldDmg, dmg) end
-	applyOrganTrauma(org, dmgInfo, dmg, delta, oldDmg, "intestines")
+	addInternalBleed(org, delta * 1.75, "gut")
+	if hg.organism.AddGutHitNausea then hg.organism.AddGutHitNausea(org, delta * 0.9, oldDmg, dmg) end
+	applyOrganTrauma(org, dmgInfo, dmg, delta, oldDmg, "gut")
 	return result
 end
 

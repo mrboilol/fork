@@ -55,7 +55,7 @@ properties.Add( "notify", {
 		if ( !self:Filter( ent, ply ) ) then return end
         ent = hg.RagdollOwner( ent ) or ent
 
-		ent:Notify( text, 0 )
+		ent:Notify( text, 0, "admin_notify" )
 		print(tostring(ply:Nick() or ply) .." has notfied ".. tostring(ent:Nick() or ent) .." with the following message; "..text)
 	end 
 } )
@@ -197,16 +197,16 @@ local organismEditorFields = {
 	"assimilated", "avgpain", "berserk", "bleed", "bleedingmul", "blood", "bloodPressure", "bodyoxygen",
 	"brain", "brainBleedRate", "brainFrontal", "brainHemorrhage", "brainOccipital", "brainoxygen", "brainoxygenTarget", "brainParietal", "brainSwelling", "brainTemporal",
 	"bruises", "bulletwounds", "burns", "canmove", "canmovehead", "cardiacOutput", "cerebralPerfusion", "chest", "consciousness",
-	"diastolic", "disorientation", "energy", "eyeL", "eyeR", "explosionwounds", "fear", "fearadd", "fibrillation", "goodmood",
+	"diastolic", "disorientation", "energy", "eyeL", "eyeR", "explosionwounds", "fear", "fearadd", "fibrillation", "flank", "goodmood", "gut",
 	"handcuffed", "health", "heart", "heartbeat", "heartstop", "heartStrain", "hemothorax", "hydration", "hypertension", "hypotension",
-	"immobilization", "incapacitated", "internalBleed", "intestines", "intracranialPressure", "jaw", "jawdislocation", "kidneys", "legstrength", "liver",
+	"immobilization", "incapacitated", "internalBleed", "intracranialPressure", "jaw", "jawdislocation", "legstrength", "liver",
 	"larm", "larmamputated", "larmdislocation", "larmupamputated", "lhandamputated", "lleg", "llegamputated", "llegdislocation", "llegupamputated",
 	"lungsfunction", "maxweight", "meleespeed", "myocardialOxygen", "nausea", "needfake", "needotrub", "neckslit", "noHead", "noradrenaline",
 	"o2.current", "o2.range", "o2.regen", "o2.curregen", "otrub", "pain", "painadd", "painkiller", "panicattack", "panicattackActive",
 	"paralyzed", "pelvis", "perfusion", "peripheralperfusion", "pneumothorax", "pulse", "pulseDeficit", "rarm", "rarmamputated", "rarmdislocation",
 	"rarmupamputated", "regeneratehp", "respiratoryArrest", "respiratoryRate", "rhandamputated", "rleg", "rlegamputated", "rlegdislocation", "rlegupamputated",
 	"satiety", "seizure", "seizureActive", "shock", "skull", "slashwounds", "spine1", "spine2", "spine3", "stamina.current",
-	"stamina.max", "stamina.range", "stamina.regen", "stamina.sub", "stamina.subadd", "stomach", "strokeVolume", "stun", "superfighter", "survivalchance",
+	"stamina.max", "stamina.range", "stamina.regen", "stamina.sub", "stamina.subadd", "strokeVolume", "stun", "superfighter", "survivalchance",
 	"systolic", "teethLost", "temperature", "thiamine", "thirst", "trachea", "tranexamic_acid", "tranquilizer", "vitalHealthCeiling", "weight"
 }
 
@@ -216,10 +216,10 @@ for _, field in ipairs(organismEditorFields) do organismEditorFieldSet[field] = 
 local organismEditorUnitFields = {
 	adrenaline = true, analgesia = true, anger = true, arrhythmia = true, assimilated = true, brain = true, brainFrontal = true,
 	brainHemorrhage = true, brainOccipital = true, brainParietal = true, brainSwelling = true, chest = true, consciousness = true,
-	disorientation = true, eyeL = true, eyeR = true, fear = true, heart = true, hemothorax = true, immobilization = true,
-	intestines = true, jaw = true, kidneys = true, larm = true, lleg = true, liver = true, myocardialOxygen = true, painkiller = true,
+	disorientation = true, eyeL = true, eyeR = true, fear = true, flank = true, gut = true, heart = true, hemothorax = true, immobilization = true,
+	jaw = true, larm = true, lleg = true, liver = true, myocardialOxygen = true, painkiller = true,
 	pelvis = true, perfusion = true, peripheralperfusion = true, pneumothorax = true, rarm = true, rleg = true, shock = true,
-	skull = true, spine1 = true, spine2 = true, spine3 = true, stomach = true, survivalchance = true, trachea = true
+	skull = true, spine1 = true, spine2 = true, spine3 = true, survivalchance = true, trachea = true
 }
 
 local function getOrganismEditorValue(org, field)

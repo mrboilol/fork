@@ -279,7 +279,7 @@ module[2] = function(owner, org, timeValue)
 	end
 	if org.tranquilizer > 0 then
 
-		org.tranquilizer = math.Approach(org.tranquilizer, 0, org.tranquilizer > 1 and timeValue / 5 or timeValue / 30)
+		org.tranquilizer = math.Approach(org.tranquilizer, 0, (org.tranquilizer > 1 and timeValue / 5 or timeValue / 30) / hg.organism.DrugClearanceMul(org, 0.85, 0.15, 2))
 		--org.shock = math.Approach(org.shock, 50, timeValue * org.tranquilizer * 5)
 		--org.shock = math.Approach(org.shock, 50, timeValue * org.tranquilizer * 5)
 
@@ -404,7 +404,7 @@ module[2] = function(owner, org, timeValue)
 		org.needfake = true
 	end
 	
-	org.analgesia =  Approach(org.analgesia, 0, timeValue / 240 * (org.naloxone * 25 + 1))
+	org.analgesia =  Approach(org.analgesia, 0, timeValue / 240 * (org.naloxone * 25 + 1) / hg.organism.DrugClearanceMul(org, 0.7, 0.3, 2))
 
 	if org.analgesiaAdd > 0 then
 

@@ -1,0 +1,234 @@
+local ChatLog = hg.ChatLog
+
+local IsValid = IsValid
+local EyePos = EyePos
+local EyeAngles = EyeAngles
+
+local HEAD_BONE = "ValveBiped.Bip01_Head1"
+local VIEW_DOT = 0.5
+local LOS_CLEAR_FRACTION = 0.97
+local NEARBY_DIST = 250
+local FAR_DIST = 1800
+local VERTICAL_DIST = 160
+local FRONT_YAW = 50
+local BACK_YAW = 130
+local OVERHEAD_LIFE = 3
+local OVERHEAD_FADE = 2.5
+local MIN_YELL_LETTERS = 2
+
+local EMOTE_COLOR = Color(225, 225, 225)
+local HEARD_COLOR = Color(165, 165, 165)
+local SAY_COLOR = Color(255, 255, 255)
+local OVERHEAD_COLOR = Color(235, 235, 235)
+
+local traceFilter = {}
+local traceData = {filter = traceFilter, mask = MASK_VISIBLE}
+
+function ChatLog.Name(ply)
+	if not IsValid(ply) then return "Someone" end
+
+	local name = ply.GetPlayerName and ply:GetPlayerName()
+	if isstring(name) and name ~= "" then return name end
+
+	return ply:Nick()
+end
+
+local function NameColor(ply)
+	if IsValid(ply) and ply.GetPlayerColor then return ply:GetPlayerColor():ToColor() end
+
+	return EMOTE_COLOR
+end
+
+function ChatLog.SourcePos(ent, fallback)
+	if not IsValid(ent) or ent:IsDormant() then return fallback end
+
+	local character = hg.GetCurrentCharacter(ent)
+	if not IsValid(character) then return fallback end
+
+	local bone = character:LookupBone(HEAD_BONE)
+	local matrix = bone and character:GetBoneMatrix(bone)
+
+	return matrix and matrix:GetTranslation() or fallback
+end
+
+function ChatLog.IsVisible(ent, pos)
+	local lply = LocalPlayer()
+	if ent == lply then return true end
+
+	local eyePos = EyePos()
+	local delta = pos - eyePos
+	local dist = delta:Length()
+	if dist < 1 then return true end
+	if delta:Dot(EyeAngles():Forward()) < dist * VIEW_DOT then return false end
+
+	traceFilter[1] = lply
+	traceFilter[2] = hg.GetCurrentCharacter(lply)
+	traceFilter[3] = ent
+	traceFilter[4] = IsValid(ent) and hg.GetCurrentCharacter(ent) or ent
+	traceData.start = eyePos
+	traceData.endpos = pos
+
+	return util.TraceLine(traceData).Fraction >= LOS_CLEAR_FRACTION
+end
+
+function ChatLog.DirectionPhrase(pos)
+	local delta = pos - EyePos()
+	local dist = delta:Length()
+	if dist < NEARBY_DIST then return "right next to you" end
+
+	local height = math.abs(delta.z)
+	local flatDist = math.sqrt(delta.x * delta.x + delta.y * delta.y)
+	if height > VERTICAL_DIST and height > flatDist then
+		return delta.z > 0 and "above you" or "below you"
+	end
+
+	local yaw = math.AngleDifference(delta:Angle().y, EyeAngles().y)
+	local absYaw = math.abs(yaw)
+	local far = dist > FAR_DIST
+	local side
+	if absYaw <= FRONT_YAW then
+		side = far and "ahead" or "in front of you"
+	elseif absYaw >= BACK_YAW then
+		side = "behind you"
+	else
+		side = yaw > 0 and "to your left" or "to your right"
+	end
+
+	return far and "in the distance " .. side or side
+end
+
+local function Compile(template)
+	if not template then return end
+
+	local parts = {}
+	local last = 1
+	for startPos, token, endPos in string.gmatch(template, "(){(%w+)}()") do
+		if startPos > last then parts[#parts + 1] = string.sub(template, last, startPos - 1) end
+		parts[#parts + 1] = {token}
+		last = endPos
+	end
+	if last <= #template then parts[#parts + 1] = string.sub(template, last) end
+
+	return parts
+end
+
+for _, event in ipairs(ChatLog.Events) do
+	event.seenParts = Compile(event.seen)
+	event.heardParts = Compile(event.heard)
+	event.overheadParts = Compile((string.gsub(event.seen, "^{a} ", "")))
+end
+
+local function TokenValue(token, ctx)
+	if token == "a" then return ctx.actorName, ctx.actorColor end
+	if token == "t" then return ctx.targetSelf and "you" or ctx.targetName, not ctx.targetSelf and ctx.targetColor end
+	if token == "tp" then return ctx.targetSelf and "your" or ctx.targetName .. "'s", not ctx.targetSelf and ctx.targetColor end
+	if token == "w" then return ctx.weapon end
+	if token == "g" then return ctx.gesture end
+	if token == "dir" then return ctx.dir end
+
+	return ""
+end
+
+local function BuildElements(parts, ctx, textColor)
+	local elements = {}
+	local current
+
+	local function Append(text, clr)
+		clr = clr or textColor
+		if clr ~= current then
+			elements[#elements + 1] = clr
+			current = clr
+		end
+		elements[#elements + 1] = text
+	end
+
+	for _, part in ipairs(parts) do
+		if isstring(part) then
+			Append(part)
+		else
+			Append(TokenValue(part[1], ctx))
+		end
+	end
+
+	return elements
+end
+
+local function BuildText(parts, ctx)
+	local buffer = {}
+	for _, part in ipairs(parts) do
+		buffer[#buffer + 1] = isstring(part) and part or (TokenValue(part[1], ctx))
+	end
+
+	return table.concat(buffer)
+end
+
+local function WeaponText(event, wep)
+	local article = event.article or "their"
+	if not IsValid(wep) or not wep.GetPrintName then return article .. " weapon" end
+
+	return article .. " " .. string.lower(wep:GetPrintName())
+end
+
+local function AddChatLine(elements)
+	if IsValid(hg.chat) and hg.chat.AddLine then hg.chat:AddLine(elements) end
+end
+
+net.Receive("hg_chatlog_event", function()
+	local event = ChatLog.Events[net.ReadUInt(ChatLog.NET_ID_BITS)]
+	local actor = net.ReadEntity()
+	local target = net.ReadEntity()
+	local extra = net.ReadEntity()
+	local arg = net.ReadUInt(ChatLog.NET_ARG_BITS)
+	local netPos = net.ReadVector()
+	if not event then return end
+
+	local lply = LocalPlayer()
+	if not IsValid(lply) then return end
+
+	local pos = ChatLog.SourcePos(actor, netPos)
+	local seen = IsValid(actor) and not actor:IsDormant() and ChatLog.IsVisible(actor, pos)
+	local targetSelf = target == lply
+	if not seen and not targetSelf and not event.heardParts then return end
+
+	local ctx = {
+		actorName = seen and ChatLog.Name(actor) or "Someone",
+		actorColor = seen and NameColor(actor) or EMOTE_COLOR,
+		targetSelf = targetSelf,
+		targetName = ChatLog.Name(target),
+		targetColor = NameColor(target),
+		weapon = WeaponText(event, extra),
+		gesture = ChatLog.Gestures[arg] or "gestures",
+	}
+
+	if seen or targetSelf then
+		AddChatLine(BuildElements(event.seenParts, ctx, EMOTE_COLOR))
+		if seen and actor ~= lply and hg.AddOverheadMessage then
+			hg.AddOverheadMessage(actor, "*" .. BuildText(event.overheadParts, ctx) .. "*", OVERHEAD_COLOR, OVERHEAD_LIFE, OVERHEAD_FADE)
+		end
+		return
+	end
+
+	ctx.dir = ChatLog.DirectionPhrase(pos)
+	AddChatLine(BuildElements(event.heardParts, ctx, HEARD_COLOR))
+end)
+
+local function SayVerb(text, whisper)
+	if whisper then return "whispers" end
+
+	local letters = string.gsub(text, "[^%a]", "")
+	if #letters >= MIN_YELL_LETTERS and letters == string.upper(letters) then return "yells" end
+	if string.find(text, "!%s*$") then return "exclaims" end
+	if string.find(text, "%?%s*$") then return "asks" end
+
+	return "says"
+end
+
+function ChatLog.SayElements(ply, text, whisper)
+	local verb = SayVerb(text, whisper)
+	local quoted = " " .. verb .. ", \"" .. text .. "\""
+	local pos = ChatLog.SourcePos(ply, ply:EyePos())
+	local seen = ply == LocalPlayer() or not ply:IsDormant() and ChatLog.IsVisible(ply, pos)
+	if seen then return {NameColor(ply), ChatLog.Name(ply), SAY_COLOR, quoted} end
+
+	return {HEARD_COLOR, "Someone " .. ChatLog.DirectionPhrase(pos) .. quoted}
+end

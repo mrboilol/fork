@@ -502,7 +502,7 @@ local function RegisterIEDBomb(self, ent, tr, insideObject)
 		local number = HG_PHONE.GetNumber(self)
 		if IsValid(owner) then
 			if owner.Notify then
-				owner:Notify("IED planted. Dial " .. number .. " to detonate.", 0)
+				owner:Notify("IED planted. Dial " .. number .. " to detonate.", 0, "ied_planted")
 			else
 				owner:ChatPrint("IED planted. Dial " .. number .. " to detonate.")
 			end

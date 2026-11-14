@@ -124,6 +124,8 @@ if SERVER then
 			})
 		end
 
+		totalRotations, totalCost = hg.SimpleHealth.AppendKitHealData(org, bonesToHeal, totalRotations, totalCost, availableResource)
+
 		return totalRotations, totalCost, bonesToHeal
 	end
 
@@ -158,7 +160,6 @@ if SERVER then
 		local totalRotations, totalCost, bones = self:GetHealData(org, bone)
 		if #bones == 0 then return false end
 
-		-- Heal the bones and spend bruise kit
 		local amountHealed = 0
 		for _, data in ipairs(bones) do
 			local key = data.key
@@ -169,6 +170,10 @@ if SERVER then
 					org.internalBleedHeal = math.min((tonumber(org.internalBleedHeal) or 0) + healAmount, 20)
 					amountHealed = amountHealed + healAmount
 				end
+				continue
+			end
+			if data.simplePool then
+				amountHealed = amountHealed + hg.SimpleHealth.ApplyKitHeal(org, data)
 				continue
 			end
 			if data.dislocation then

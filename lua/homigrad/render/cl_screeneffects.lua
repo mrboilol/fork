@@ -679,6 +679,8 @@ hg.screeneffects_config = {
 	painBeatOverlayPath = painBeatOverlayPath,
 	panicattackVisualExponent = 1.1,
 	painBeatOverlayVolumeMul = painBeatOverlayVolumeMul,
+	realityVolumeMul = 0.4,
+	realityVolumeMax = 0.55,
 	painThresholdMax = painThresholdMax,
 	painAgonyThreshold = painAgonyThreshold,
 	painExcruciatingThreshold = painExcruciatingThreshold,
@@ -2102,7 +2104,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 
 	local o2 = org.o2[1] or 0
 	o2 = o2 + (org.CO or 0)
-	O2Lerp = LerpFT(0.01, O2Lerp, math.min((30 - o2) * 10, Lerp(hg.GetO2FadeK(org), 187.5, 300)) + brain * (org.otrub and 100 or 500))
+	O2Lerp = LerpFT(0.01, O2Lerp, (hg.SimpleHealth.GetOxyEffectTarget() or math.min((30 - o2) * 10, Lerp(hg.GetO2FadeK(org), 187.5, 300))) + brain * (org.otrub and 100 or 500))
 	updateSeizureEffects(org)
 	hg.O2VignetteOrg = org
 
@@ -2362,15 +2364,16 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			local targetRemAgonyVolume = 0
 			local targetRemExcruciatingVolume = 0
 
+			local realityVolume = math.min(painVolume * hg.screeneffects_config.realityVolumeMul, hg.screeneffects_config.realityVolumeMax)
 			if painMode == 0 then
 				targetPainVolume = painVolume
-				targetRealityVolume = painVolume
+				targetRealityVolume = realityVolume
 			elseif painMode == 1 then
 				targetPainVolume = painVolume
 			elseif painMode == 2 then
 				targetAgonyVolume = painVolume
 			elseif painMode == 4 then
-				targetRealityVolume = painVolume
+				targetRealityVolume = realityVolume
 			elseif painMode == 5 then
 				targetSillypainVolume = painVolume
 			elseif painMode == 6 then

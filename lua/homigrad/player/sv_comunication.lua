@@ -69,7 +69,7 @@ end
 	util.AddNetworkString("ChatWhisper")
 	
 	net.Receive("ChatWhisper", function(len, ply)
-		ply.ChatWhisper = net.ReadBool()
+		ply.ChatWhisper = net.ReadBool() or hg.SimpleHealth.IsWhisperForced(ply)
 	end)
 --//
 

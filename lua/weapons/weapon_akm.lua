@@ -67,10 +67,10 @@ SWEP.ARC9DefaultLHIKPart = "handguard"
 SWEP.ARC9DefaultLHIKSourceModel = "models/weapons/mods/ak_hg_akm_std_wood.mdl"
 
 SWEP.FakePos = Vector(-14, 2.52, 7.5)
-SWEP.FakeAng = Angle(0, 0, 0)
-SWEP.ZoomPos = Vector(0, -1.7688, 6.0696)
+SWEP.FakeAng = Angle(0, 0.3, 5.5)
+SWEP.ZoomPos = Vector(0, -0.0027, 4.6866)
 SWEP.AttachmentPos = Vector(3, 3, -26.8)
-SWEP.AttachmentAng = Angle(0, -1.5, 0)
+SWEP.AttachmentAng = Angle(0, 0, 0)
 SWEP.FakeAttachment = "1"
 SWEP.FakeBodyGroups = "01010080102"
 SWEP.LocalMuzzlePos = Vector(26.986, -0.2, 2.741)

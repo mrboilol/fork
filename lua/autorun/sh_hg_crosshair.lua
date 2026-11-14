@@ -8,9 +8,8 @@ if SERVER then
 	local organNames = {
 		heart = "organ",
 		liver = "organ",
-		kidneys = "organ",
-		stomach = "organ",
-		intestines = "organ",
+		flank = "organ",
+		gut = "organ",
 		brain = "organ",
 		spine1 = "organ",
 		spine2 = "organ",

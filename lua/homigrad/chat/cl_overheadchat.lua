@@ -24,6 +24,8 @@ local edgeFade = 120
 local whisperDist = 64
 local drawScale = 0.025
 local whisperScale = 0.8
+local emoteScale = 0.75
+local emoteRepeatWindow = 1
 local headOffset = Vector(0, 0, 24)
 local stackGap = 4
 local boxRadius = 40
@@ -125,6 +127,37 @@ hook.Add("OnPlayerChat", "HGOverheadChat", function(ply, strText, bTeam, bDead, 
 	end
 end)
 
+function hg.AddOverheadMessage(ply, text, color, life, fade)
+	if not hg_overheadchat:GetBool() then return end
+	if not IsValid(ply) or not ply:IsPlayer() or not ply:Alive() then return end
+
+	local list = ply.HGOverheadChat
+	if not istable(list) then
+		list = {}
+		ply.HGOverheadChat = list
+	end
+
+	local now = CurTime()
+	local last = list[#list]
+	if last and last.text == text and now - last.born < emoteRepeatWindow then
+		last.die = now + life + fade
+		return
+	end
+
+	list[#list + 1] = {
+		text = text,
+		color = Color(color.r, color.g, color.b, 255),
+		emote = true,
+		born = now,
+		die = now + life + fade,
+		fade = fade,
+	}
+
+	while #list > maxMessages do
+		table.remove(list, 1)
+	end
+end
+
 local function DrawOverheadChat(ply, eyePos, maxDist)
 	local list = ply.HGOverheadChat
 	if not istable(list) or #list == 0 then return end
@@ -169,7 +202,7 @@ local function DrawOverheadChat(ply, eyePos, maxDist)
 		local distLimit = msg.whisper and whisperDist or maxDist
 		if dist > distLimit then continue end
 
-		local alpha = math_Clamp((msg.die - time) / fadeOutTime, 0, 1)
+		local alpha = math_Clamp((msg.die - time) / (msg.fade or fadeOutTime), 0, 1)
 			* math_Clamp((time - msg.born) / fadeInTime, 0, 1)
 			* math_Clamp((distLimit - dist) / edgeFade, 0, 1)
 
@@ -205,11 +238,13 @@ local function DrawOverheadChat(ply, eyePos, maxDist)
 		rimColor.b = clr.b
 		rimColor.a = 60 * alpha
 
-		bgColor.a = (msg.whisper and 120 or 175) * alpha
+		bgColor.a = ((msg.whisper or msg.emote) and 120 or 175) * alpha
 		outlineColor.a = 200 * alpha
 
-		cam.Start3D2D(msgPos, ang, drawScale * (msg.whisper and whisperScale or 1))
-			if not msg.whisper then
+		local msgScale = msg.emote and emoteScale or msg.whisper and whisperScale or 1
+
+		cam.Start3D2D(msgPos, ang, drawScale * msgScale)
+			if not msg.whisper and not msg.emote then
 				draw.RoundedBox(boxRadius, -panelW / 2 - underlay, -panelH / 2 - underlay, panelW + underlay * 2, panelH + underlay * 2, rimColor)
 			end
 

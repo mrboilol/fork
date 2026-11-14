@@ -1046,6 +1046,7 @@ function SWEP:PrimaryAttack(broadcast)
 	if SERVER and huy then
 		local caliberMul, weightMul = self:GetRecoilImpulseFactors()
 		hg.organism.ConsumeLimbStamina(owner.organism, "arms", math.Clamp(caliberMul * weightMul * 0.8, 0.2, 3))
+		if hg.ChatLog and hg.ChatLog.Gunshot then hg.ChatLog.Gunshot(owner, self) end
 		self.hgShootEventID = ((self.hgShootEventID or 0) % 65535) + 1
 		net.Start("hgwep shoot", true)
 		net.WriteEntity(self)

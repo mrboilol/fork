@@ -22,6 +22,7 @@ local files = {
     -- Player:OpenInventory method with the old non-grid implementation.
     "zcity_inventory/new_inventory/cl_inventory.lua",
     "zcity_inventory/new_inventory/sv_inventory.lua",
+    "zcity_inventory/hud/cl_weapon_icons.lua",
     "zcity_inventory/hud/cl_weapon_selector.lua",
 }
 

@@ -765,10 +765,9 @@ elseif SERVER then
                 org.skull = math.max(org.skull - regen, 0)
             
                 org.liver = math.max(org.liver - regen, 0)
-                org.kidneys = math.max((org.kidneys or 0) - regen, 0)
-                org.intestines = math.max(org.intestines - regen, 0)
+                org.flank = math.max((org.flank or 0) - regen, 0)
                 org.heart = math.max(org.heart - regen, 0)
-                org.stomach = math.max(org.stomach - regen, 0)
+                org.gut = math.max(org.gut - regen, 0)
                 org.lungsR[1] = math.max(org.lungsR[1] - regen, 0)
                 org.lungsL[1] = math.max(org.lungsL[1] - regen, 0)
                 org.lungsR[2] = math.max(org.lungsR[2] - regen, 0)

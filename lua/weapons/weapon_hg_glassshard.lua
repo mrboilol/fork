@@ -184,7 +184,7 @@ function SWEP:PrimaryAttackAdd(ent, trace)
 		local owner = self:GetOwner()
 
 		hg.organism.AddWoundManual(owner, dmg * 2, vector_origin, angle_zero,"ValveBiped.Bip01_R_Hand", CurTime() + (dmg * 220))
-        owner:Notify("This glass shard is cutting through my hand!..", 30)
+        owner:Notify("This glass shard is cutting through my hand!..", 30, "glassshard_cut")
 
 		if ent and math.random(1, self:IsEntSoft(ent) and 10 or 5) == 1 then
 			self:PrecacheGibs()

@@ -10,7 +10,10 @@ concommand.Add("fake", function(ply)
 		if hook.Run("CanPlayerFake", ply) == false then ply._godFakeBypass = nil return end
 		hg.Fake(ply, nil, nil, nil, "voluntary")
 	else
-		hg.FakeUp(ply)
+		local result = hg.FakeUp(ply)
+		local blocked = result == false and IsValid(ply.FakeRagdoll) and (ply.fakecd or 0) <= CurTime()
+		local reason = blocked and hg.ChatLog and hg.ChatLog.StandUpBlockReason(ply)
+		if reason then hg.ChatLog.BlockedThought(ply, reason) end
 	end
 	ply._godFakeBypass = nil
 end)

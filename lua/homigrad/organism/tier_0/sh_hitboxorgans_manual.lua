@@ -4,9 +4,9 @@ male["ValveBiped.Bip01_Spine1"] = {}
 
 male["ValveBiped.Bip01_Spine"] = {
 	{"liver", nil, Vector(4, 3, -2.5), Angle(0, 0, 0), Vector(2, 2, 3.5), Color(125, 50, 0)},
-	{"stomach", nil, Vector(3, 2, 2), Angle(0, 0, 0), Vector(2.5, 2, 3), Color(255, 125, 0)},
-	{"kidneys", nil, Vector(1.5, -0.25, -3.5), Angle(0, 0, 0), Vector(2, 1, 1.25), Color(150, 40, 60)},
-	{"kidneys", nil, Vector(2.5, -0.25, 3.5), Angle(0, 0, 0), Vector(2, 1, 1.25), Color(150, 40, 60)},
+	{"gut", nil, Vector(3, 2, 2), Angle(0, 0, 0), Vector(2.5, 2, 3), Color(255, 125, 0)},
+	{"flank", nil, Vector(1.5, -0.25, -3.5), Angle(0, 0, 0), Vector(2, 1, 1.25), Color(150, 40, 60)},
+	{"flank", nil, Vector(2.5, -0.25, 3.5), Angle(0, 0, 0), Vector(2, 1, 1.25), Color(150, 40, 60)},
 	{"aorta", 0, Vector(2, 0, 0), Angle(0, 0, 0), Vector(5, 0.5, 0.5), Color(255, 0, 0)}
 }
 male["ValveBiped.Bip01_Head1"] = {
@@ -215,7 +215,7 @@ male["ValveBiped.Bip01_Pelvis"] = {
 		Vector(0.5, 3, 3.5),
 		Color(0, 255, 0)
 	},
-	{"intestines", nil, Vector(0, 2, 0), Angle(0, 0, 0), Vector(5, 3.5, 3), Color(250, 120, 120)}
+	{"gut", nil, Vector(0, 2, 0), Angle(0, 0, 0), Vector(5, 3.5, 3), Color(250, 120, 120)}
 }
 
 local bone = 0.5
@@ -513,14 +513,13 @@ hg.organism.translationTbl = {
 	["larmup"] = "Left upperarm",
 	["rlegdown"] = "Right calf",
 	["liver"] = "Liver",
-	["stomach"] = "Stomach",
-	["kidneys"] = "Kidney",
+	["gut"] = "Gut",
+	["flank"] = "Flank",
 	["llegdown"] = "Left calf",
 	["rlegup"] = "Right thigh",
 	["rlegartery"] = "Right leg artery",
 	["spine1"] = "Lower spine",
 	["pelvis"] = "Pelvis",
-	["intestines"] = "Intestines",
 	["rarmdown"] = "Right forearm",
 	["rarmup"] = "Right upperarm",
 	["rarmartery"] = "Right arm artery",

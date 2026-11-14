@@ -603,11 +603,28 @@ module[2] = function(owner, org, timeValue)
 	end
 end
 
+function hg.organism.GetWitnessTrauma(org)
+	local trauma = org and tonumber(org.witnessTrauma) or 0
+	if trauma <= 0 then return 0 end
+	return trauma * math.exp(-(CurTime() - (org.witnessTraumaAt or 0)) / hg.PsycheCombat.noDepressionTraumaDecay)
+end
+
 function hg.organism.AddDepression(org, amount, cause)
 	if not org then return 0 end
 	if not hg_depression:GetBool() or isDepressionImmune(org) then
 		org.depression = 0
 		org.depressionadd = 0
+		if not isDepressionImmune(org) and isnumber(amount) and amount > 0 and cause and cause ~= "dying" then
+			local K = hg.PsycheCombat
+			if hg.GetPsycheTraining then amount = amount * Lerp(hg.GetPsycheTraining(org.owner), 1, K.trainedDepressionMul) end
+			local current = org.adrenalineAdd or 0
+			if current >= 0 and current < K.noDepressionSurgeCap then
+				org.adrenalineAdd = min(current + amount * K.noDepressionSurge, K.noDepressionSurgeCap)
+			end
+			org.goodmood = max(Clamp(tonumber(org.goodmood) or 1, 0, 1) - amount * K.noDepressionHappinessCost, 0)
+			org.witnessTrauma = min(hg.organism.GetWitnessTrauma(org) + amount * K.noDepressionTraumaGain, 1)
+			org.witnessTraumaAt = CurTime()
+		end
 		return 0
 	end
 	if not isnumber(amount) or amount <= 0 then return org.depressionadd or 0 end

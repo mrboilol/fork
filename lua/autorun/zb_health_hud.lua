@@ -1858,8 +1858,7 @@ local function draw_status_effects()
 
 			-- Check for destroyed non-vital organs
 			if getOrgVal(org, "liver", 0) >= 1 then destroyed_organs = destroyed_organs + 1 end
-			if getOrgVal(org, "stomach", 0) >= 1 then destroyed_organs = destroyed_organs + 1 end
-			if getOrgVal(org, "intestines", 0) >= 1 then destroyed_organs = destroyed_organs + 1 end
+			if getOrgVal(org, "gut", 0) >= 1 then destroyed_organs = destroyed_organs + 1 end
 
 			-- Check for severely damaged vital organs
 			if getOrgVal(org, "heart", 0) >= 0.8 then severely_damaged_vital_organs = severely_damaged_vital_organs + 1 end
@@ -1871,8 +1870,7 @@ local function draw_status_effects()
 
 			-- Check for any damaged organ
 			if getOrgVal(org, "liver", 0) > 0.1 then damaged_organs = damaged_organs + 1 end
-			if getOrgVal(org, "stomach", 0) > 0.1 then damaged_organs = damaged_organs + 1 end
-			if getOrgVal(org, "intestines", 0) > 0.1 then damaged_organs = damaged_organs + 1 end
+			if getOrgVal(org, "gut", 0) > 0.1 then damaged_organs = damaged_organs + 1 end
 			if getOrgVal(org, "heart", 0) > 0.1 then damaged_organs = damaged_organs + 1 end
 			if getOrgVal(org, "trachea", 0) > 0 then damaged_organs = damaged_organs + 1 end
 			if getOrgTableVal(org, "lungsR", 1, nil, 0) > 0 then damaged_organs = damaged_organs + 1 end

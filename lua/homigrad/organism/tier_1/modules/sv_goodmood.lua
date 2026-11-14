@@ -13,6 +13,7 @@ local WOUND_THOUGHT_MIN = 30
 local WOUND_THOUGHT_MAX = 60
 local WOUND_THOUGHT_ESCALATE_DELAY = 3
 local WOUND_THOUGHT_DURATION = 5
+local INJURY_THOUGHT_SUPPRESS = 30
 local LIMBS = {"rarm", "larm", "rleg", "lleg"}
 local BLEED_CONCERN_RATE = 1.5
 local BLEED_CONCERN_BLOOD = 4500
@@ -131,10 +132,16 @@ local function updateWoundThoughts(owner, org, kind)
         if rank < shown then org.woundThoughtRank = rank end
     end
     if rank == 0 or org.otrub or not hg.organism.EmotionThought then return end
+    local now = CurTime()
+    if rank > shown and rank <= WOUND_RANK.broken and now - (org.injuryThoughtTime or -math.huge) < INJURY_THOUGHT_SUPPRESS then
+        org.woundThoughtEscalate = nil
+        org.woundThoughtRank = rank
+        org.woundThoughtNext = now + math.Rand(WOUND_THOUGHT_MIN, WOUND_THOUGHT_MAX)
+        return
+    end
     if (tonumber(org.depression) or 0) >= WOUND_THOUGHT_DEPRESSION_MAX then return end
     if (tonumber(org.blood) or 5000) <= (hg.organism.BLEEDOUT_START_BLOOD or 2500) then return end
 
-    local now = CurTime()
     local K = hg.PsycheCombat
     if now - (owner.hgLastEmotionTime or 0) < (K and K.thoughtGlobalCooldown or 8) then return end
 

@@ -230,9 +230,8 @@ local torsoSquirtOrganChance = {
 	lungsL = 0.35,
 	lungsR = 0.35,
 	liver = 0.4,
-	kidneys = 0.3,
-	stomach = 0.2,
-	intestines = 0.2,
+	flank = 0.3,
+	gut = 0.2,
 }
 
 local function rollTorsoBloodSquirt(org, impact, hitgroup)
@@ -306,9 +305,8 @@ local softLayerEnergy = {
 	trachea = 0.01,
 	heart = 0.05,
 	liver = 0.05,
-	kidneys = 0.05,
-	stomach = 0.04,
-	intestines = 0.04,
+	flank = 0.05,
+	gut = 0.04,
 }
 
 local function getLayerEnergyFraction(name, bone, impact)
@@ -343,7 +341,7 @@ local function Trace_Bullet(box, hit, ricochet, impact, org, organs, dmg, dmgInf
 	end
 	dmg = dmgInfo:GetDamage() / 25
 	if org.superfighter and not (string.find(name,"vest") or string.find(name,"helmet")) then return 0 end
-	if name == "stomach" or name == "intestines" then
+	if name == "gut" then
 		org.lastGibHitGroup = HITGROUP_STOMACH
 		org.lastGibHitTime = CurTime()
 	end
@@ -800,9 +798,8 @@ function hg.organism.RadDamage(org, dmg, dmgInfo)
 	hg.organism.GasDamage(org, dmg, dmgInfo)
 
 	hg.organism.input_list.liver(org,nil,dmg / 20,dmgInfo)
-	hg.organism.input_list.kidneys(org,nil,dmg / 20,dmgInfo)
-	hg.organism.input_list.stomach(org,nil,dmg / 20,dmgInfo)
-	hg.organism.input_list.intestines(org,nil,dmg / 20,dmgInfo)
+	hg.organism.input_list.flank(org,nil,dmg / 20,dmgInfo)
+	hg.organism.input_list.gut(org,nil,dmg / 20,dmgInfo)
 end
 
 local limbs = {
@@ -1196,10 +1193,11 @@ function hg.organism.AddWound(ent, tr, bone, dmgInfo, dmgPos, dmgBlood, inputHol
 		or dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) and "bullet"
 		or "trauma"
 	
-	local physBone = isnumber(bone) and bone >= 0 and bone or 0
+	local hasHitBone = isnumber(bone) and bone >= 0
+	local physBone = hasHitBone and bone or 0
 	local bone = ent:TranslatePhysBoneToBone(physBone)
 	if bone and dmgInfo:IsDamageType(DMG_CLUB + DMG_VEHICLE + DMG_CRUSH + DMG_FALL) then
-		local localPos, _, woundBone = hg.organism.GetWoundAnchor(ent, dmgPos + hitNormal, (-traceNormal):Angle(), bone)
+		local localPos, _, woundBone = hg.organism.GetWoundAnchor(ent, dmgPos + hitNormal, (-traceNormal):Angle(), hasHitBone and bone or nil)
 		local wound = localPos and findNearbyWound(org, woundBone, localPos)
 		if wound and (tonumber(wound[1]) or 0) > 0 then
 			worsenWound(org, wound, math.Clamp(dmgInfo:GetDamage() / 18, 0.15, 6))
@@ -1227,7 +1225,7 @@ function hg.organism.AddWound(ent, tr, bone, dmgInfo, dmgPos, dmgBlood, inputHol
 
 			if forceBonePos then dmgPos = bonePos end
 
-			local localPos, localAng, woundBone = hg.organism.GetWoundAnchor(ent, dmgPos + ((i == 1 and 1 or -1) * hitNormal), ((i == 1 and -1 or 1) * traceNormal):Angle(), i == 1 and bone or nil)
+			local localPos, localAng, woundBone = hg.organism.GetWoundAnchor(ent, dmgPos + ((i == 1 and 1 or -1) * hitNormal), ((i == 1 and -1 or 1) * traceNormal):Angle(), i == 1 and hasHitBone and bone or nil)
 			if not localPos then continue end
 			local exitBleedMul = i == 2 and impact and 1 + math.min(impact.expansionTrauma or 0, 3) * 0.75 or 1
 			addOrReopenWound(org, dmgBlood / 2 * exitBleedMul, localPos, localAng, woundBone, CurTime(), woundType)
@@ -2113,7 +2111,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	--end
 
 	if inputHole and inputHole[1] and #org.arterialwounds > arterialWoundCount and dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT+DMG_SLASH+DMG_CLUB+DMG_GENERIC) then
-		local woundPos, woundAng, woundBone = hg.organism.GetWoundAnchor(ent, isvector(dmgPos) and dmgPos or inputHole[1], dir:Angle(), ent:TranslatePhysBoneToBone(bone or 0))
+		local woundPos, woundAng, woundBone = hg.organism.GetWoundAnchor(ent, isvector(dmgPos) and dmgPos or inputHole[1], dir:Angle(), bone and ent:TranslatePhysBoneToBone(bone) or nil)
 		local woundBoneID = woundPos and ent:LookupBone(woundBone)
 		local woundMatrix = woundBoneID and woundBoneID >= 0 and ent:GetBoneMatrix(woundBoneID)
 		if woundMatrix then
@@ -2141,7 +2139,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 
 		ent.bloodamt2 = ent.bloodamt2 or 0
 		ent.bloodamt2 = ent.bloodamt2 + 1
-		local entryPos, entryAng, entryBone = hg.organism.GetWoundAnchor(ent, entryHole, dir:Angle(), ent:TranslatePhysBoneToBone(bone or 0))
+		local entryPos, entryAng, entryBone = hg.organism.GetWoundAnchor(ent, entryHole, dir:Angle(), bone and ent:TranslatePhysBoneToBone(bone) or nil)
 
 		queueTimer(ent, "blood_input", 0.02, function()
 			if not IsValid(ent) then return end
@@ -2253,11 +2251,8 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 			org.lungsL[1] = math.min(org.lungsL[1] + bigRand, 1)
 			org.lungsR[1] = math.min(org.lungsR[1] + bigRand, 1)
 			hg.organism.input_list.liver(org, nil, smallRand, dmgInfo)
-			hg.organism.input_list.stomach(org, nil,smallRand, dmgInfo)
-			hg.organism.input_list.intestines(org, nil, smallRand, dmgInfo)
+			hg.organism.input_list.gut(org, nil,smallRand, dmgInfo)
 			hg.AddHarmToAttacker(dmgInfo, bigRand, "Burns harm")
-			--org.liver = math.min(org.liver + math.Rand(0.0005,0.0008),1) 
-			--org.stomach = math.min(org.stomach + math.Rand(0.0005,0.0008),1) 
 			//org.trachea = math.min(org.trachea + smallRand, 1)
 		end
 	else

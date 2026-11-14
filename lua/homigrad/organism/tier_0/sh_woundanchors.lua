@@ -69,16 +69,23 @@ function hg.organism.GetWoundAnchor(ent, pos, ang, fallbackBone)
     if not IsValid(ent) or not isvector(pos) then return end
     if isfunction(ent.SetupBones) then ent:SetupBones() end
     local bestBone, bestPos, bestNormal, bestAng, bestDistance
+    local fallbackFound = false
     local hitboxSet = isfunction(ent.GetHitboxSet) and ent:GetHitboxSet() or 0
     for index = 0, (ent:GetHitBoxCount(hitboxSet) or 0) - 1 do
         local bone = ent:GetHitBoxBone(index, hitboxSet)
         local matrix = bone and bone >= 0 and ent:GetBoneMatrix(bone)
         if not matrix or ent:GetManipulateBoneScale(bone):LengthSqr() < 0.1 then continue end
+        local isFallback = bone == fallbackBone
+        if fallbackFound and not isFallback then continue end
         local offset, rotation = WorldToLocal(pos, ang, matrix:GetTranslation(), matrix:GetAngles())
         local clamped, normal, distance = hg.organism.ClampWoundOffset(ent, bone, offset, rotation:Forward())
-        local score = distance and distance - (bone == fallbackBone and 16 or 0)
-        if score and (not bestDistance or score < bestDistance) then
-            bestBone, bestPos, bestNormal, bestAng, bestDistance = bone, clamped, normal or rotation:Forward(), rotation, score
+        if not distance then continue end
+        if isFallback and not fallbackFound then
+            fallbackFound = true
+            bestDistance = nil
+        end
+        if not bestDistance or distance < bestDistance then
+            bestBone, bestPos, bestNormal, bestAng, bestDistance = bone, clamped, normal or rotation:Forward(), rotation, distance
         end
     end
     if bestBone then return bestPos, isfunction(bestNormal.Angle) and bestNormal:Angle() or bestAng, ent:GetBoneName(bestBone) end

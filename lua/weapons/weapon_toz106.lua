@@ -324,7 +324,7 @@ function SWEP:Reload(time)
 	if ply.organism and ply.organism.larmamputated then
 		if self.drawBullet == false then
 			if SERVER then
-				ply:Notify("I can't cycle it with one hand.", 1)
+				ply:Notify("I can't cycle it with one hand.", 1, "cycle_onehand")
 			end
 			return
 		end

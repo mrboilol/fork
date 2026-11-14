@@ -1344,7 +1344,7 @@ function SWEP:StopPulseCheck(targetPly, skipNotify)
 
 			if not skipNotify and IsValid(ply) and data and data.completed and data.counted then
 				local bpm = data.counted * 6
-				ply:Notify(data.counted .. " x 6 = " .. bpm .. " BPM", 3)
+				ply:Notify(data.counted .. " x 6 = " .. bpm .. " BPM", 3, "vitals_bpm")
 				printPerfusionDiagnosis(ply, data.org, bpm)
 			end
 
@@ -1362,12 +1362,12 @@ function SWEP:StartPulseCheck(ply, org, target)
 
 	local active = self.ActivePulseChecks[ply]
 	if active then
-		ply:Notify("Interrupted.", 1)
+		ply:Notify("Interrupted.", 1, "vitals_interrupted")
 		return
 	end
 
 	if org.heartstop or (tonumber(org.pulse) or 0) <= 0 then
-		ply:Notify("No Pulse.", 2)
+		ply:Notify("No Pulse.", 2, "vitals_nopulse")
 		return
 	end
     
@@ -1620,7 +1620,7 @@ function SWEP:ApplyForce()
 
 					self.Checking = math.min(self.Checking + FrameTime() * 2, 10)
 				else
-					ply:Notify("I dont think I need to check their vitals.", 10)
+					ply:Notify("I dont think I need to check their vitals.", 10, "vitals_unneeded")
 				end
 			end
 		end
@@ -1651,7 +1651,7 @@ function SWEP:ApplyForce()
 						if not ply2.noHead then
 							ply:ChatPrint("You are beginning to perform CPR.")
 						else
-							ply:Notify("I dont think CPR would help here...", 10)
+							ply:Notify("I dont think CPR would help here...", 10, "cpr_useless")
 						end
 					end
 
@@ -1687,6 +1687,7 @@ function SWEP:ApplyForce()
 							org.cprSupportUntil = CurTime() + 0.75
 							org.cprSupportPulse = skillMult > 1 and 50 or 40
 							org.cprResuscitationUntil = CurTime() + 2
+							if hg.organism and hg.organism.CPRClearVomit then hg.organism.CPRClearVomit(org) end
 							if hg.organism and hg.organism.TryRestartHeartWithResuscitation then hg.organism.TryRestartHeartWithResuscitation(org, self.CPRDuration) end
 							if hg.organism and hg.organism.TryRestoreBreathingWithResuscitation then hg.organism.TryRestoreBreathingWithResuscitation(org, 0.5 * skillMult) end
 							

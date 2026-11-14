@@ -60,19 +60,12 @@ local settingsOverlayColor = Color(0, 0, 0, 170)
 local settingsColorWhite = Color(255, 255, 255, 240)
 local settingsColorText = Color(225, 225, 225)
 local settingsColorTextDim = Color(160, 160, 160)
-local chatBoxColor = Color(0, 0, 0, 245)
 local chatPanelColor = Color(0, 0, 0, 255)
-local chatOutlineColor = Color(255, 255, 255, 80)
-local chatInnerOutlineColor = Color(255, 255, 255, 28)
-local chatVignetteColor = Color(120, 120, 120, 95)
 local chatButtonIdle = Color(0, 0, 0, 255)
 local chatButtonHover = Color(30, 30, 30, 255)
 local settingsIcon = Material("radialmenu/settings.png")
-local gradient_d = Material("vgui/gradient-d")
-local chatBoundsCookiePrefix = "zchat_bounds_"
 local chatResizeEdge = 8
 local chatTopGrip = 26
-local chatMinWidth = 260
 local chatMinHeight = 140
 local chatHatHeight = 20
 local chatHatGap = 0
@@ -81,6 +74,42 @@ local settingsRowHeight = 36
 local settingsSliderWidth = 120
 local settingsNumberWidth = 60
 local settingsStringWidth = 170
+local bigChat = GetConVar("sv_bigchat") or CreateConVar("sv_bigchat", "1", {FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED}, "1 - big SS13-style zchat on the right, 0 - normal zchat", 0, 1)
+local gradient_d = Material("vgui/gradient-d")
+
+local CHAT_STYLES = {
+	big = {
+		box = Color(70, 70, 70, 150),
+		outline = Color(255, 255, 255, 255),
+		cookiePrefix = "zchat_bounds_v2_",
+		minWidth = 180,
+		maxEntries = 150,
+		persistent = true,
+		width = 1 / 6,
+		height = 0.5,
+		rightMargin = 0.008,
+		bottomMargin = 0.06,
+	},
+	normal = {
+		box = Color(0, 0, 0, 245),
+		outline = Color(255, 255, 255, 80),
+		innerOutline = Color(255, 255, 255, 28),
+		vignette = Color(120, 120, 120, 95),
+		cookiePrefix = "zchat_bounds_",
+		minWidth = 260,
+		maxEntries = 100,
+		persistent = false,
+		width = 0.3,
+		height = 0.2,
+		x = 0.02,
+		y = 0.67,
+	},
+}
+
+local function ChatStyle()
+	return bigChat:GetBool() and CHAT_STYLES.big or CHAT_STYLES.normal
+end
+
 local function RunZChatConVar(name, value)
 	RunConsoleCommand(name, tostring(value))
 end
@@ -110,14 +139,14 @@ end
 local function PaintEntryPanel(self, w, h)
 	surface.SetDrawColor(0, 0, 0, 245)
 	surface.DrawRect(0, 0, w, h)
-	surface.SetDrawColor(chatOutlineColor)
+	surface.SetDrawColor(ChatStyle().outline)
 	surface.DrawOutlinedRect(0, 0, w, h, 1)
 end
 
 local function PaintHatPanel(self, w, h)
 	surface.SetDrawColor(0, 0, 0, 245)
 	surface.DrawRect(0, 0, w, h)
-	surface.SetDrawColor(chatOutlineColor)
+	surface.SetDrawColor(ChatStyle().outline)
 	surface.DrawOutlinedRect(0, 0, w, h, 1)
 end
 
@@ -355,9 +384,10 @@ local function CreateZChatStringRow(parent, data, convar)
 end
 
 local function ClampChatBounds(x, y, w, h)
-	local maxW = math.max(chatMinWidth, ScrW() - 8)
+	local minWidth = ChatStyle().minWidth
+	local maxW = math.max(minWidth, ScrW() - 8)
 	local maxH = math.max(chatMinHeight, ScrH() - 8)
-	w = math.Clamp(w, chatMinWidth, maxW)
+	w = math.Clamp(w, minWidth, maxW)
 	h = math.Clamp(h, chatMinHeight, maxH)
 	x = math.Clamp(x, 0, ScrW() - w)
 	y = math.Clamp(y, 0, ScrH() - h)
@@ -368,10 +398,11 @@ local function SaveChatBounds(panel)
 	local x, y = panel:GetPos()
 	local w, h = panel:GetSize()
 	x, y, w, h = ClampChatBounds(x, y, w, h)
-	cookie.Set(chatBoundsCookiePrefix .. "x", x)
-	cookie.Set(chatBoundsCookiePrefix .. "y", y)
-	cookie.Set(chatBoundsCookiePrefix .. "w", w)
-	cookie.Set(chatBoundsCookiePrefix .. "h", h)
+	local prefix = ChatStyle().cookiePrefix
+	cookie.Set(prefix .. "x", x)
+	cookie.Set(prefix .. "y", y)
+	cookie.Set(prefix .. "w", w)
+	cookie.Set(prefix .. "h", h)
 end
 
 local function SyncHatPanel(panel)
@@ -381,18 +412,20 @@ local function SyncHatPanel(panel)
 	local w, h = panel:GetSize()
 	panel.hatPanel:SetPos(x - math.floor(chatHatWidthPadding * 0.5), y - chatHatHeight - chatHatGap)
 	panel.hatPanel:SetSize(w + chatHatWidthPadding, chatHatHeight)
-	panel.hatPanel:SetAlpha(panel:GetAlpha())
+	panel.hatPanel:SetAlpha(panel.bActive and panel:GetAlpha() or 0)
 end
 
 local function GetSavedChatBounds()
-	local defaultW = ScrW() * 0.3
-	local defaultH = ScrH() * 0.2
-	local defaultX = ScrW() * 0.02
-	local defaultY = ScrH() * 0.67
-	local w = cookie.GetNumber(chatBoundsCookiePrefix .. "w", defaultW)
-	local h = cookie.GetNumber(chatBoundsCookiePrefix .. "h", defaultH)
-	local x = cookie.GetNumber(chatBoundsCookiePrefix .. "x", defaultX)
-	local y = cookie.GetNumber(chatBoundsCookiePrefix .. "y", defaultY)
+	local style = ChatStyle()
+	local defaultW = ScrW() * style.width
+	local defaultH = ScrH() * style.height
+	local defaultX = style.x and ScrW() * style.x or ScrW() - defaultW - ScrW() * style.rightMargin
+	local defaultY = style.y and ScrH() * style.y or ScrH() - defaultH - ScrH() * style.bottomMargin
+	local prefix = style.cookiePrefix
+	local w = cookie.GetNumber(prefix .. "w", defaultW)
+	local h = cookie.GetNumber(prefix .. "h", defaultH)
+	local x = cookie.GetNumber(prefix .. "x", defaultX)
+	local y = cookie.GetNumber(prefix .. "y", defaultY)
 	return ClampChatBounds(x, y, w, h)
 end
 
@@ -556,14 +589,9 @@ function PANEL:SetMarkup(text)
 	self:QueueLinkButtonBuild()
 
 	timer.Simple(self.fadeDelay, function()
-		if (!IsValid(self)) then
-			return
-		end
+		if not IsValid(self) or ChatStyle().persistent then return end
 
-		self:CreateAnimation(self.fadeDuration, {
-			index = 3,
-			target = {alpha = 0}
-		})
+		self:StartFade()
 	end)
 
 	self:CreateAnimation(self.yAnimDuration, {
@@ -576,6 +604,35 @@ function PANEL:SetMarkup(text)
 		index = 3,
 		target = {alpha = 255},
 	})
+end
+
+function PANEL:StartFade()
+	self:CreateAnimation(self.fadeDuration, {
+		index = 3,
+		target = {alpha = 0}
+	})
+end
+
+function PANEL:Unfade()
+	self:CreateAnimation(0.3, {
+		index = 3,
+		target = {alpha = 255}
+	})
+end
+
+function PANEL:UpdateMarkup(text)
+	if self.text == text then return end
+
+	local oldHeight = self:GetTall()
+	self.text = text
+	self.markupWidth = self:GetWide()
+	self.markup = hg.markup.Parse(self.text, self.markupWidth)
+	self.markup.onDrawText = PaintMarkupOverride
+
+	local height = self.markup:GetHeight()
+	if height ~= oldHeight then self:SetTall(height) end
+
+	return height ~= oldHeight
 end
 
 function PANEL:PerformLayout(width, height)
@@ -751,6 +808,7 @@ function PANEL:Init()
 	self.alpha = 255
 	self.realAlpha = 255
 	self.dragState = nil
+	self.chatPersistent = ChatStyle().persistent
 
 	local x, y, w, h = GetSavedChatBounds()
 	self:SetSize(w, h)
@@ -909,6 +967,8 @@ function PANEL:OnMouseReleased(mouseCode)
 end
 
 function PANEL:Think()
+	if self.chatPersistent ~= ChatStyle().persistent then self:ApplyChatMode() end
+
 	local state = self.dragState
 
 	if state then
@@ -930,12 +990,12 @@ function PANEL:Think()
 			local mask = state.mask
 
 			if mask.left then
-				x = math.min(state.x + dx, right - chatMinWidth)
+				x = math.min(state.x + dx, right - ChatStyle().minWidth)
 				w = right - x
 			end
 
 			if mask.right then
-				w = math.max(chatMinWidth, state.w + dx)
+				w = math.max(ChatStyle().minWidth, state.w + dx)
 			end
 
 			if mask.top then
@@ -959,23 +1019,34 @@ function PANEL:Think()
 end
 
 function PANEL:Paint(w, h)
-	surface.SetDrawColor(chatBoxColor)
+	local style = ChatStyle()
+	surface.SetDrawColor(style.box)
 	surface.DrawRect(0, 0, w, h)
 
-	surface.SetDrawColor(chatVignetteColor.r, chatVignetteColor.g, chatVignetteColor.b, chatVignetteColor.a + math.sin(CurTime()) * 12)
-	surface.SetMaterial(gradient_d)
-	surface.DrawTexturedRect(0, h * 0.5, w, h * 0.5)
+	local vignette = style.vignette
+	if vignette then
+		surface.SetDrawColor(vignette.r, vignette.g, vignette.b, vignette.a + math.sin(CurTime()) * 12)
+		surface.SetMaterial(gradient_d)
+		surface.DrawTexturedRect(0, h * 0.5, w, h * 0.5)
+	end
 
-	surface.SetDrawColor(chatOutlineColor)
+	surface.SetDrawColor(style.outline)
 	surface.DrawOutlinedRect(0, 0, w, h, 1)
-	surface.SetDrawColor(chatInnerOutlineColor)
-	surface.DrawOutlinedRect(1, 1, w - 2, h - 2, 1)
+	if style.innerOutline then
+		surface.SetDrawColor(style.innerOutline)
+		surface.DrawOutlinedRect(1, 1, w - 2, h - 2, 1)
+	end
 
 	surface.SetAlphaMultiplier(1)
 		self.history:PaintManual()
 		local bar = self.history:GetVBar()
-		bar:SetAlpha(self:GetAlpha())
+		bar:SetAlpha(self.bActive and self:GetAlpha() or 0)
 	surface.SetAlphaMultiplier(self:GetAlpha() / 255)
+
+	if not self.bActive then
+		if style.persistent then self:SetAlpha(self.realAlpha) end
+		return
+	end
 
 	DisableClipping(true)
 		draw.SimpleText("Hold left ALT and press ENTER to whisper", "zChatFontSmall", 5, h * 1.01 + 1, black)
@@ -988,9 +1059,40 @@ function PANEL:Paint(w, h)
 		end
 	DisableClipping(false)
 
-	if self.bActive then
-		self:SetAlpha(self.alpha - (255 - self.realAlpha))
+	self:SetAlpha(self.alpha - (255 - self.realAlpha))
+end
+
+function PANEL:UpdateEntryVisibility()
+	local pending = ShowTextBoxInactive:GetBool() and (self.entry.prevText or "") ~= ""
+	local visible = not ChatStyle().persistent or self.bActive or pending
+	if self.entryPanel:IsVisible() == visible then return end
+
+	self.entryPanel:SetVisible(visible)
+	self:InvalidateLayout(true)
+end
+
+function PANEL:ApplyChatMode()
+	local persistent = ChatStyle().persistent
+	self.chatPersistent = persistent
+
+	for _, panel in ipairs(self.entries) do
+		if IsValid(panel) then
+			if persistent then panel:Unfade() else panel:StartFade() end
+		end
 	end
+
+	if not self.bActive then self:SetAlpha(persistent and self.realAlpha or 0) end
+	self:ApplySavedBounds()
+	self:UpdateEntryVisibility()
+	if self.RefreshFonts then self:RefreshFonts() end
+end
+
+function PANEL:ApplySavedBounds()
+	local x, y, w, h = GetSavedChatBounds()
+	self:SetSize(w, h)
+	self:SetPos(x, y)
+	self:InvalidateLayout(true)
+	SyncHatPanel(self)
 end
 
 function PANEL:OpenSettings()
@@ -1010,7 +1112,7 @@ function PANEL:SetActive(bActive, bRemovePrev)
 
 		hook.Run("StartChat")
 	else
-		self:SetAlpha(0)
+		self:SetAlpha(ChatStyle().persistent and self.realAlpha or 0)
 		self:SetMouseInputEnabled(false)
 		self:SetKeyboardInputEnabled(false)
 		self.hatPanel:SetMouseInputEnabled(false)
@@ -1027,7 +1129,10 @@ function PANEL:SetActive(bActive, bRemovePrev)
 	end
 
 	self.bActive = bActive
+	self:UpdateEntryVisibility()
+	SyncHatPanel(self)
 
+	self.history:InvalidateLayout(true)
 	local bar = self.history:GetVBar()
 	bar:SetScroll(bar.CanvasSize)
 end
@@ -1158,7 +1263,7 @@ function PANEL:OnMessageSent()
 	self:SetActive(false, true)
 end
 
-function PANEL:AddLine(elements)
+local function BuildLineMarkup(elements)
 	local buffer = {
 		"<font=zChatFont>"
 	}
@@ -1186,12 +1291,34 @@ function PANEL:AddLine(elements)
 		end
 	end
 
+	return table.concat(buffer)
+end
+
+function PANEL:IsScrolledToBottom()
+	local bar = self.history:GetVBar()
+	return !self:GetActive() or bar.Scroll >= bar.CanvasSize - 1
+end
+
+function PANEL:UpdateLine(panel, elements)
+	if not IsValid(panel) then return end
+
+	local stick = self:IsScrolledToBottom()
+	if not panel:UpdateMarkup(BuildLineMarkup(elements)) then return end
+
+	self.history:InvalidateLayout(true)
+	if stick then
+		local bar = self.history:GetVBar()
+		bar:SetScroll(bar.CanvasSize)
+	end
+end
+
+function PANEL:AddLine(elements)
 	local panel = self.history:Add("zChatMessage")
 	panel:Dock(TOP)
 	panel:InvalidateParent(true)
-	panel:SetMarkup(table.concat(buffer))
+	panel:SetMarkup(BuildLineMarkup(elements))
 
-	if (#self.entries >= 100) then
+	if (#self.entries >= ChatStyle().maxEntries) then
 		local oldPanel = table.remove(self.entries, 1)
 
 		if (IsValid(oldPanel)) then

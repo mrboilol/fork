@@ -16,7 +16,12 @@ concommand.Add("hg_fixdislocation", function(ply, _, args)
     if not ply.organism or ply.organism.otrub then return end
 
     local org = ply.organism
-    if not org.canmove or not org.canmovehead or (org.pain or 0) > 60 then return end
+    if not org.canmove or not org.canmovehead or (org.pain or 0) > 60 then
+        if hg.ChatLog and hg.ChatLog.BlockedThought then
+            hg.ChatLog.BlockedThought(ply, (org.pain or 0) > 60 and "fix_pain" or "fix_arms")
+        end
+        return
+    end
     if (ply.tried_fixing_limb or 0) > CurTime() then return end
 
     if not EnsureDislocationMinigameLoaded() then return end

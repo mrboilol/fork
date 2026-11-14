@@ -190,7 +190,7 @@ function CLASS.On(self, data)
 		for _, v in player.Iterator() do
 			if math.random(1, 3) == 1 then
 				if v:Alive() and v.PlayerClassName == "furry" and self:GetPos():Distance(v:GetPos()) < 256 and v != self then
-					v:Notify(table.Random(oneofus))
+					v:Notify(table.Random(oneofus), nil, "furry_assimilate")
 				end
 			end
 		end

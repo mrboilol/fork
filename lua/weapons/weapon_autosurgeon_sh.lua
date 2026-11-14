@@ -152,7 +152,7 @@ local ComplexReliefFields = {
 -- passes instead of treating every injury as critical surgery.
 local SimpleFields = {
     "jaw", "pelvis", "lleg", "rleg", "larm", "rarm", "spine1", "spine2", "spine3",
-    "eyeL", "eyeR", "headtrauma", "pneumothorax", "liver", "stomach", "intestines"
+    "eyeL", "eyeR", "headtrauma", "pneumothorax", "liver", "gut"
 }
 
 local RecoveryFields = {

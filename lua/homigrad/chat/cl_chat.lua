@@ -18,7 +18,11 @@ hook.Add( "OnPlayerChat", "HGPlayerChat", function( ply, strText, bTeam, bDead, 
 			return Hook
 		end
 
-		chat.AddText( ply:GetPlayerColor():ToColor(), ply:GetPlayerName(), color_white, ": "..strText ) -- print Hello fuckyou to the console
+		if hg.ChatLog and hg.ChatLog.SayElements then
+			chat.AddText(unpack(hg.ChatLog.SayElements(ply, strText, bWhisper)))
+		else
+			chat.AddText( ply:GetPlayerColor():ToColor(), ply:GetPlayerName(), color_white, ": "..strText )
+		end
 		
 		return true -- this suppresses the fcukyopu from being shown
 	end
@@ -94,11 +98,6 @@ end)
 		end
 	end)
 
-	hook.Add("ModifyMessageBuffer", "ChatWhisper", function(buffer, speaker)
-		if IsValid(speaker) and speaker.ChatWhisper then
-			buffer[#buffer + 1] = "<color=150,150,150>[whisper]</color> "
-		end
-	end)
 
 -- hook.Add("Player_Death", "ResetChatFont",function()
 -- 	atlaschat.font:SetString("atlaschat.theme.text")

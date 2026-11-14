@@ -172,7 +172,7 @@ if SERVER then
         end
 
         ply:SetCollisionGroup(ply.organism.godmode and COLLISION_GROUP_DEBRIS or (ply.cloak and COLLISION_GROUP_DEBRIS or COLLISION_GROUP_PLAYER))
-		ply:Notify(ply.organism.godmode and "now i'm immortal..." or "now i'm mortal")
+		ply:Notify(ply.organism.godmode and "now i'm immortal..." or "now i'm mortal", nil, ply.organism.godmode and "admin_godmode_on" or "admin_godmode_off")
 
         recalcZcActive()
 		return
@@ -230,7 +230,7 @@ if SERVER then
 		end
 
         recalcZcActive()
-		ply:Notify(ply.cloak and "now i'm invisible..." or "now i'm visible")
+		ply:Notify(ply.cloak and "now i'm invisible..." or "now i'm visible", nil, ply.cloak and "admin_cloak_on" or "admin_cloak_off")
 		return
     end,1}
 
@@ -309,7 +309,7 @@ if SERVER then
             return
         end
         
-        target:Notify(message, 0)
+        target:Notify(message, 0, "admin_notify")
         ply:ChatPrint("Sent notification to " .. target:GetName() .. ": " .. message)
 
     end, 2, "name; message"}

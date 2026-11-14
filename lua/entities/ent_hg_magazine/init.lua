@@ -50,11 +50,11 @@ function ENT:Use(ply)
 		
 		-- Notify player
 		if SERVER then
-			ply:Notify("Picked up magazine with " .. self.ammoCount .. " rounds", 3)
+			ply:Notify("Picked up magazine with " .. self.ammoCount .. " rounds", 3, "magazine_pickup")
 		end
 	else
 		if SERVER then
-			ply:Notify("Picked up empty magazine", 3)
+			ply:Notify("Picked up empty magazine", 3, "magazine_pickup")
 		end
 	end
 	

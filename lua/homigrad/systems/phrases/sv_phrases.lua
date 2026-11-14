@@ -345,6 +345,8 @@ net.Receive("hg_phrase", function(len, ply)
 		ent:EmitSound(phrase, muffed and 65 or 75,ply.VoicePitch or 100,1,CHAN_AUTO,0, pitch and 56 or muffed and 14 or 0)
 	end
 
+	if hg.ChatLog then hg.ChatLog.Emit(inpain and "scream" or "shout", ply) end
+
 	if string.match( phrase, ".ogg" ) then // ogg doesn't return the right soundduration
 		ply.phrCld = CurTime() + 1
 	else
@@ -472,7 +474,7 @@ function hg.QueuePainScream(ply, amount)
 	org.painScreamUntil = CurTime() + 8
 end
 
-local function voice(ply, phrase, level, mouth)
+local function voice(ply, phrase, level, mouth, kind)
 	local ent = hg.GetCurrentCharacter(ply)
 	if !IsValid(ent) or !file.Exists("sound/" .. phrase, "GAME") then return 0 end
 
@@ -480,6 +482,7 @@ local function voice(ply, phrase, level, mouth)
 
 	local muffed = hg.IsVoiceMuffled and hg.IsVoiceMuffled(ply)
 	ent:EmitSound(phrase, muffed and level - 10 or level, mClamp(ply.VoicePitch or 100, 92, 108), 1, CHAN_AUTO, 0, muffed and 16 or 0)
+	if kind and hg.ChatLog then hg.ChatLog.Emit(kind, ply) end
 
 	local duration = SoundDuration(phrase)
 	if duration <= 0 then duration = 2 end
@@ -525,10 +528,10 @@ local function breathSounds(ply, org, now)
 
 	if state == "gasp" then
 		local phrases = ThatPlyIsFemale(ply) and gaspFemale or gaspMale
-		local duration = voice(ply, phrases[mRandom(#phrases)], 70, true)
+		local duration = voice(ply, phrases[mRandom(#phrases)], 70, true, "gasp")
 		org.breathSoundNext = now + duration + math.Rand(0.4, 1.2)
 	else
-		voice(ply, "breathing/agonalbreathing_" .. mRandom(13) .. ".ogg", 60)
+		voice(ply, "breathing/agonalbreathing_" .. mRandom(13) .. ".ogg", 60, nil, "agonal")
 		org.breathSoundNext = now + math.Rand(4, 7)
 	end
 
@@ -588,7 +591,7 @@ hook.Add("Org Think", "HG_PainVoice", function(ply, org)
 		timer.Simple(painBlinkDelay, function()
 			if !canVoice(ply) or ply.organism != org or org.otrub or CurTime() < (org.voiceFreeAt or 0) then return end
 
-			local duration = voice(ply, hg.UniversalScreamSounds[mRandom(#hg.UniversalScreamSounds)], 80, true)
+			local duration = voice(ply, hg.UniversalScreamSounds[mRandom(#hg.UniversalScreamSounds)], 80, true, "scream")
 			org.painVoiceNext = CurTime() + duration + 0.15
 		end)
 
@@ -599,10 +602,12 @@ hook.Add("Org Think", "HG_PainVoice", function(ply, org)
 		local phrases = ThatPlyIsFemale(ply) and agonyFemale or agonyMale
 		if numbed then phrases = painBigSounds end
 		local phrase = custom or phrases[mRandom(#phrases)]
+		local kind = numbed and "groan" or "painyell"
 		if burning and !custom and hg.GetFallScreamSound and mRandom(2) == 1 then
 			phrase = hg.GetFallScreamSound(ply) or phrase
+			kind = "scream"
 		end
-		local duration = voice(ply, phrase, 80, true)
+		local duration = voice(ply, phrase, 80, true, kind)
 		org.painVoiceNext = now + duration + math.Rand(2.5, 4)
 		if rush then org.painRushNext = now + 1.5 end
 	end

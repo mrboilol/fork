@@ -552,8 +552,8 @@ local function getPalpitationThreat(org, blood, o2Value, rhythmShock)
 	return math.max(lowBlood, lowCirculation, hypoxia, shock, heartDamage, temperatureStress)
 end
 
-local heatDamageTargets = {"brain", "heart", "liver", "stomach", "intestines"}
-local coldDamageTargets = {"heart", "liver", "stomach", "intestines"}
+local heatDamageTargets = {"brain", "heart", "liver", "gut"}
+local coldDamageTargets = {"heart", "liver", "gut"}
 local function applyTemperatureTrauma(org)
 	local temperature = org.temperature or 36.7
 	local heatStress = math.Clamp(math.Remap(temperature, 40, 42, 0, 1), 0, 1)
@@ -766,8 +766,6 @@ function hg.organism.StartFibrillation(org, force)
 end
 
 local function maintainSimplifiedCirculation(org)
-	-- hg_huyorgans 0 keeps one intentionally small cardiovascular model. Organ
-	-- hits may still bleed and hurt, but the protected heart continues pumping.
 	org.heartstop = false
 	if hg.organism.ClearCardiacArrestMechanicalDecay then hg.organism.ClearCardiacArrestMechanicalDecay(org) end
 	org.heartbeat = 70
@@ -801,6 +799,8 @@ local function maintainSimplifiedCirculation(org)
 	org.hemorrhagicCollapseExposure = 0
 	hg.organism.UpdatePerfusion(org.owner, org, org.timeValue or 0)
 end
+
+hg.organism.MaintainSimplifiedCirculation = maintainSimplifiedCirculation
 
 local function restoreHeartAfterResuscitation(org, now, resusBloodK)
 	org.heartstop = false

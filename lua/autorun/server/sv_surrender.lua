@@ -144,6 +144,7 @@ net.Receive("hg_surrender_enter", function(len, ply)
     if not IsValid(ply) or not ply:Alive() then return end
     local variantIndex = net.ReadUInt(4)
     PlaySurrBegin(ply, variantIndex)
+    if hg.ChatLog then hg.ChatLog.Emit("surrender", ply) end
     net.Start("hg_surrender_enter")
         net.WriteEntity(ply)
         net.WriteUInt(variantIndex, 4)
@@ -186,7 +187,8 @@ net.Receive("hg_kneel_enter", function(len, ply)
     kneelTransition[ply] = CurTime() + 1.5
     kneelLockedPos[ply] = ply:GetPos()
     PlayKneelBegin(ply, variantIndex)
-    
+    if hg.ChatLog then hg.ChatLog.Emit("kneel", ply) end
+
     ply.Kneeling = true
     ply:SetNWBool("Kneeling", true)
     

@@ -262,6 +262,7 @@ end
 local function notifyBoneBreak(org, limb, msg, msgKey)
 	org.boneBreakNotifyUntil = org.boneBreakNotifyUntil or {}
 	local now = CurTime()
+	org.injuryThoughtTime = now
 	if (org.boneBreakNotifyUntil[limb] or 0) > now then return end
 	if notifyOwner(org, msg, true, msgKey, 2) then org.boneBreakNotifyUntil[limb] = now + 5 end
 end
@@ -315,6 +316,7 @@ local function sendThought(org, msg, key, delay, clr)
 
 	local pending = org.pendingTraumaThoughts
 	pending[#pending + 1] = {msg = msg, key = key, delay = delay, clr = clr, weight = traumaWeight(key)}
+	org.injuryThoughtTime = CurTime()
 	return true
 end
 
@@ -519,6 +521,7 @@ local function doDislocate(org, key, dmg, segment)
 	if hasNewThoughts(org) then
 		sendThought(org, "Your " .. limbName[key] .. " is dislocated at the " .. jointName[key][segment] .. ".", "thought_dislocated" .. key .. segment, 1, Color(255, 220, 220))
 	else
+		org.injuryThoughtTime = CurTime()
 		notifyOwner(org, (key == "rarm" or key == "larm") and dislocated_arm[math.random(#dislocated_arm)] or dislocated_leg[math.random(#dislocated_leg)], true, "dislocated" .. key, 2)
 	end
 

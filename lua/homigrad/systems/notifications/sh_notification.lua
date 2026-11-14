@@ -151,8 +151,145 @@ if CLIENT then
 	})
 
 	hg.notifications = hg.notifications or {}
-	hg.thoughts = hg.thoughts or {}
+	hg.thoughts = {}
+	hg.thoughtQueue = {}
 	hg.overlapNotifications = hg.overlapNotifications or {}
+
+	local THOUGHT_CHAR_TIME = 0.035
+	local THOUGHT_BRAIN_CHAR_MUL = 2
+	local THOUGHT_MAX_ACTIVE = 3
+	local THOUGHT_STAGGER = 0.25
+	local THOUGHT_QUEUE_MAX = 4
+	local THOUGHT_HOLD = 3
+	local THOUGHT_FADE = 0.6
+	local THOUGHT_BRAIN_DAMAGE = 0.1
+	local THOUGHT_PRIORITY = {
+		despair = 4,
+		trauma = 4,
+		faint = 3,
+		dying = 3,
+		combat = 2,
+		blocked = 1,
+	}
+	local THOUGHT_INTERRUPTS = {
+		despair = true,
+		trauma = true,
+		faint = true,
+		combat = true,
+	}
+	local lastThoughtStart = 0
+
+	local function PushThoughtLine(thought)
+		if not IsValid(hg.chat) or not hg.chat.AddLine then return end
+
+		local elements = {thought.lineColor, thought.typed}
+		if IsValid(thought.line) and hg.chat.UpdateLine then
+			hg.chat:UpdateLine(thought.line, elements)
+		else
+			thought.line = hg.chat:AddLine(elements)
+		end
+	end
+
+	local function SetThoughtShown(thought, shown)
+		thought.shown = shown
+		thought.typed = utf8.sub(thought.msg, 1, shown)
+		PushThoughtLine(thought)
+	end
+
+	local function FinishThought(thought, cut)
+		if thought.finishedAt then return end
+		thought.finishedAt = CurTime()
+
+		if cut and thought.shown < thought.len then
+			thought.typed = string.TrimRight(thought.typed) .. "-"
+			PushThoughtLine(thought)
+		end
+
+		MsgC(thought.lineColor, thought.typed, "\n")
+	end
+
+	local function CutThoughts(belowPriority)
+		for _, thought in ipairs(hg.thoughts) do
+			if not thought.finishedAt and (not belowPriority or thought.priority < belowPriority) then
+				FinishThought(thought, true)
+			end
+		end
+
+		for i = #hg.thoughtQueue, 1, -1 do
+			if not belowPriority or hg.thoughtQueue[i].priority < belowPriority then table.remove(hg.thoughtQueue, i) end
+		end
+	end
+
+	local function StartThought(thought)
+		thought.start = CurTime()
+		lastThoughtStart = thought.start
+		hg.thoughts[#hg.thoughts + 1] = thought
+		SetThoughtShown(thought, 1)
+	end
+
+	local function RunningThoughts()
+		local count, lowest = 0
+		for _, thought in ipairs(hg.thoughts) do
+			if not thought.finishedAt then
+				count = count + 1
+				if not lowest or thought.priority < lowest.priority then lowest = thought end
+			end
+		end
+
+		return count, lowest
+	end
+
+	local function QueueThought(thought)
+		local queue = hg.thoughtQueue
+		for i = #queue, 1, -1 do
+			if thought.group and queue[i].group == thought.group then table.remove(queue, i) end
+		end
+
+		local index = #queue + 1
+		for i, queued in ipairs(queue) do
+			if thought.priority > queued.priority then index = i break end
+		end
+		table.insert(queue, index, thought)
+
+		while #queue > THOUGHT_QUEUE_MAX do
+			table.remove(queue)
+		end
+	end
+
+	local function ThoughtCharTime()
+		local org = lply.organism
+		local damaged = org and (org.brain or 0) > THOUGHT_BRAIN_DAMAGE
+
+		return THOUGHT_CHAR_TIME * (damaged and THOUGHT_BRAIN_CHAR_MUL or 1)
+	end
+
+	local function ThoughtsThink()
+		if #hg.thoughts == 0 and #hg.thoughtQueue == 0 then return end
+
+		local now = CurTime()
+		local charTime = ThoughtCharTime()
+		for i = #hg.thoughts, 1, -1 do
+			local thought = hg.thoughts[i]
+			if not thought.finishedAt then
+				local shown = math.min(math.floor((now - thought.start) / charTime) + 1, thought.len)
+				if shown ~= thought.shown then SetThoughtShown(thought, shown) end
+				if shown >= thought.len then FinishThought(thought, false) end
+			elseif now - thought.finishedAt > THOUGHT_HOLD + THOUGHT_FADE then
+				table.remove(hg.thoughts, i)
+			end
+		end
+
+		if #hg.thoughtQueue == 0 or now - lastThoughtStart < THOUGHT_STAGGER then return end
+		if RunningThoughts() >= THOUGHT_MAX_ACTIVE then return end
+
+		StartThought(table.remove(hg.thoughtQueue, 1))
+	end
+
+	local function ResetThoughts(cut)
+		if cut then CutThoughts() end
+		hg.thoughts = {}
+		hg.thoughtQueue = {}
+	end
 	hg.notificationFont = "HuyFont"
 	local thoughtSound
 	local oldclick = 0
@@ -169,7 +306,7 @@ if CLIENT then
 		StopThoughtSound()
 		hg.currentNotification = nil
 		hg.notifications = {}
-		hg.thoughts = {}
+		ResetThoughts(true)
 		hg.overlapNotifications = {}
 	end, "hg_clear_notification_mode_switch")
 
@@ -177,9 +314,8 @@ if CLIENT then
 		if ply != lply then return end
 		StopThoughtSound()
 
-		//hg.currentNotification = nil
 		hg.notifications = {}
-		hg.thoughts = {}
+		ResetThoughts(true)
 		hg.overlapNotifications = {}
 	end)
 
@@ -189,7 +325,7 @@ if CLIENT then
 
 		hg.currentNotification = nil
 		hg.notifications = {}
-		hg.thoughts = {}
+		ResetThoughts(false)
 		hg.overlapNotifications = {}
 	end)
 
@@ -197,9 +333,8 @@ if CLIENT then
 		if ply != lply then return end
 		StopThoughtSound()
 
-		//hg.currentNotification = nil
 		hg.notifications = {}
-		hg.thoughts = {}
+		ResetThoughts(true)
 		hg.overlapNotifications = {}
 	end)
 
@@ -262,30 +397,44 @@ if CLIENT then
 		if not hg_newthoughts:GetBool() then return end
 		if lply:IsBerserk() then return end
 
-		local now = CurTime()
+		msg = utf8.force(msg)
 		for _, thought in ipairs(hg.thoughts) do
-			if thought[1] == msg and now - (thought[2] or 0) < 18 then return end
+			if thought.msg == msg and not thought.finishedAt then return end
 		end
-		if group == "despair" or group == "trauma" then
-			hg.thoughts = {}
-		elseif group == "combat" or group == "faint" then
-			for _, thought in ipairs(hg.thoughts) do
-				chat.AddText(Color(thought[3].r, thought[3].g, thought[3].b, 255), thought[1] .. "\n")
-			end
-			hg.thoughts = {}
-		elseif group then
-			for i = #hg.thoughts, 1, -1 do
-				if hg.thoughts[i][4] == group then table.remove(hg.thoughts, i) end
-			end
+		for _, queued in ipairs(hg.thoughtQueue) do
+			if queued.msg == msg then return end
 		end
-		table.insert(hg.thoughts, {msg, now, clr or Color(255, 255, 255, 255), group})
 
-		while #hg.thoughts > 3 do
-			local tbl = hg.thoughts[1]
-			local clr = tbl[3]
-			chat.AddText(Color(clr.r, clr.g, clr.b, 255), tbl[1] .. "\n")
-			table.remove(hg.thoughts, 1)
+		clr = clr or color_white
+		local thought = {
+			msg = msg,
+			len = math.max(utf8.len(msg) or #msg, 1),
+			lineColor = Color(clr.r, clr.g, clr.b, 255),
+			group = group,
+			priority = THOUGHT_PRIORITY[group] or 0,
+			shown = 0,
+			typed = "",
+		}
+
+		if group then
+			for i = #hg.thoughts, 1, -1 do
+				local old = hg.thoughts[i]
+				if old.group == group and old.finishedAt then table.remove(hg.thoughts, i) end
+			end
 		end
+
+		if THOUGHT_INTERRUPTS[group] then
+			CutThoughts(thought.priority)
+			StartThought(thought)
+			return
+		end
+
+		local running, lowest = RunningThoughts()
+		if running >= THOUGHT_MAX_ACTIVE and lowest and thought.priority > lowest.priority then
+			FinishThought(lowest, true)
+		end
+
+		QueueThought(thought)
 	end
 
 	local PLAYER = FindMetaTable("Player")
@@ -330,8 +479,13 @@ if CLIENT then
 			StopThoughtSound()
 			hg.currentNotification = nil
 			hg.notifications = {}
-			hg.thoughts = {}
+			ResetThoughts(true)
 			hg.overlapNotifications = {}
+			return
+		end
+
+		if group == "cut" then
+			CutThoughts()
 			return
 		end
 
@@ -615,36 +769,36 @@ if CLIENT then
 	end
 
 	local thoughtBrown = Color(20, 20, 20)
+	local thoughtColor = Color(255, 255, 255)
 	local function ThoughtsDraw()
 		if not hg_newthoughts:GetBool() then return end
 		if #hg.thoughts == 0 then return end
 		if not lply:Alive() then hg.thoughts = {} return end
 
 		local time = CurTime()
-		local duration = 4.5
-		local fade = 0.6
 		local org = LocalPlayer().organism
 		local instability = org and GetThoughtInstability(org) or 0
 		local shake = GetThoughtShake(instability)
 		local redness = GetThoughtRedness(instability)
+		local uiScale = hg.UIScale and hg.UIScale() or 1
+		local baseY = ScrH() - 270 * uiScale
+		local rowStep = 32 * uiScale
+		local centerX = ScrW() / 2
 
 		for i = #hg.thoughts, 1, -1 do
-			local tbl = hg.thoughts[i]
-			local delta = time - tbl[2]
+			local thought = hg.thoughts[i]
+			local fadeIn = math.min((time - thought.start) / THOUGHT_FADE, 1)
+			local fadeOut = thought.finishedAt and math.Clamp((THOUGHT_HOLD + THOUGHT_FADE - (time - thought.finishedAt)) / THOUGHT_FADE, 0, 1) or 1
+			local alpha = math.min(fadeIn, fadeOut) * 255
+			local clr = thought.lineColor
+			local y = baseY - (i - 1) * rowStep
 
-			if delta >= duration then
-				local clr = tbl[3]
-				chat.AddText(Color(clr.r, clr.g, clr.b, 255), tbl[1] .. "\n")
-				table.remove(hg.thoughts, i)
-			else
-				local clr = tbl[3]
-				local alpha = math.min(delta / fade, 1, (duration - delta) / fade) * 255
-				local uiScale = hg.UIScale and hg.UIScale() or 1
-				local y = ScrH() - 270 * uiScale - (i - 1) * 32 * uiScale
-
-				thoughtBrown.a = alpha
-				draw.SimpleTextOutlined(tbl[1], "ThoughtFont", ScrW() / 2 + math.Rand(-shake, shake), y + math.Rand(-shake, shake), Color(Lerp(redness, clr.r, 255), Lerp(redness, clr.g, 25), Lerp(redness, clr.b, 25), alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, thoughtBrown)
-			end
+			thoughtColor.r = Lerp(redness, clr.r, 255)
+			thoughtColor.g = Lerp(redness, clr.g, 25)
+			thoughtColor.b = Lerp(redness, clr.b, 25)
+			thoughtColor.a = alpha
+			thoughtBrown.a = alpha
+			draw.SimpleTextOutlined(thought.typed, "ThoughtFont", centerX + math.Rand(-shake, shake), y + math.Rand(-shake, shake), thoughtColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, thoughtBrown)
 		end
 	end
 
@@ -653,13 +807,16 @@ if CLIENT then
 		OverlapNotificationsDraw()
 		ThoughtsDraw()
 	end)
-	hook.Add("Think", "HGNotificationsThink", NotificationsThink)
+	hook.Add("Think", "HGNotificationsThink", function()
+		NotificationsThink()
+		if hg_newthoughts:GetBool() then ThoughtsThink() end
+	end)
 else
 	concommand.Add("hg_notify", function(ply, cmd, args)
 		if not ply:IsAdmin() then return end
 		for i, ply in pairs(player.GetListByName(args[1])) do
 			//(ply, msg, delay, msgKey, showTime, func, clr)
-			ply:Notify(args[2], 6, nil, 0, nil, Color(args[3] or 255, args[4] or 255, args[5] or 255))
+			ply:Notify(args[2], 6, "admin_notify", 0, nil, Color(args[3] or 255, args[4] or 255, args[5] or 255))
 		end
 	end)
 end

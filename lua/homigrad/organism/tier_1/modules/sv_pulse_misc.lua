@@ -78,8 +78,7 @@ function hg.organism.UpdateCirculatoryEffects(owner, org, timeValue, o2Value, ar
 			org.brain = math.min(org.brain + damage * 0.2, 1)
 			org.heart = math.min(org.heart + damage, 1)
 			org.liver = math.min(org.liver + damage * 0.5, 1)
-			org.stomach = math.min(org.stomach + damage * 0.3, 1)
-			org.intestines = math.min(org.intestines + damage * 0.3, 1)
+			org.gut = math.min(org.gut + damage * 0.3, 1)
 		end
 
 		local decayRate = (adrenalineStabilizer or hasAntiIschemia) and timeValue / 4 or timeValue / 10

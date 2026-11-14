@@ -5,6 +5,12 @@ hg.PsycheCombat = {
 
 	trainedPanicGainMul = 0.6,
 	trainedDepressionMul = 0.5,
+	noDepressionSurge = 1.5,
+	noDepressionSurgeCap = 1.2,
+	noDepressionHappinessCost = 2,
+	noDepressionTraumaGain = 2,
+	noDepressionTraumaMul = 0.6,
+	noDepressionTraumaDecay = 150,
 	trainedAngerMul = 1.6,
 	panicBraceStart = 0.15,
 	panicBraceFull = 0.6,

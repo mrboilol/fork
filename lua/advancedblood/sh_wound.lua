@@ -47,7 +47,7 @@ local organFlags = {
 	chest = F.BONE, pelvis = F.BONE,
 	spine1 = F.BONE + F.SPINE, spine2 = F.BONE + F.SPINE, spine3 = F.BONE + F.SPINE,
 	heart = F.HEART, lungsL = F.LUNG, lungsR = F.LUNG,
-	liver = F.ABDOMEN, stomach = F.ABDOMEN, intestines = F.ABDOMEN,
+	liver = F.ABDOMEN, gut = F.ABDOMEN,
 	trachea = F.AIRWAY,
 	arteria = F.ARTERY, spineartery = F.ARTERY,
 }

@@ -5,9 +5,14 @@ util.AddNetworkString("HGThought")
 --local hg_old_notificate = ConVarExists("hg_old_notificate") and GetConVar("hg_old_notificate") or CreateConVar("hg_old_notificate",0,FCVAR_SERVER_CAN_EXECUTE,"enable old notifications (chatprints)",0,1)
 local hev_color = Color(255,125,0)
 local CreateThought
+local THOUGHT_GLOBAL_GAP = 1.2
 
 local function InDespair(ply)
     return (ply.despairUntil or 0) > CurTime()
+end
+
+local function SameThoughtText(msg)
+    return msg
 end
 
 local thoughtMessages = {
@@ -19,7 +24,7 @@ local thoughtMessages = {
     neckslit_save = {"Your neck wound is causing severe blood loss.", "Your neck artery is bleeding dangerously."},
     cervical_respiratory_arrest = {"Your spinal injury is stopping you from moving or breathing.", "Your cervical spine is causing respiratory failure."},
     dislocations_unlucky = {"You are struggling to fix a dislocation.", "You fail to fix a dislocation."},
-    fix = {"Your dislocation was reduced.", "Your dislocated joint was put back in place."},
+    fix = SameThoughtText,
     painfromjawspeak = {"Your jaw is hurting due to speech.", "Speaking causes your jaw to hurt."},
     arteria = {"Your neck has ben cut open.", "Your carotid artery is open."},
     take_gasmask = {"Your gas mask is restricting airflow.", "Your gas mask is making it hard to breathe."},
@@ -88,6 +93,72 @@ local thoughtMessages = {
     med_err_dose = {"You administered the wrong dosage.", "You introduced the wrong dosage."},
     med_err_bandage = {"You failed to properly bandage the wound.", "Something went wrong while bandaging."},
     med_error_actor = {"You botched the treatment.", "Something went wrong during treatment."},
+    neardeath = {"You are close to death.", "Your body is shutting down."},
+    lowoxy_mild = {"You are short on oxygen.", "You feel lightheaded."},
+    blood_mild = {"You have lost some blood.", "Blood loss is making you feel lightheaded."},
+    bomb_disarm = {"That was close.", "You barely made it out of that."},
+    touched_hot_thing = {"You shouldn't have touched that.", "It burns your hand."},
+    ragdoll_almostfall = {"You are at your limit.", "You can't hold on much longer."},
+    hypercapnia = {"Your head is pounding and you feel drowsy.", "Everything is spinning and you can't breathe it out.", "You feel heavy, like you are slowly suffocating."},
+    hypertension_crisis = {"Your vision keeps swimming in and out.", "You are about to black out.", "Your head is pounding so hard you can't think."},
+    spinal_bradypnea = {"You can barely breathe.", "Every breath you take is weaker."},
+    ply_burn = {"You are burning.", "The burns are excruciating."},
+    cantdoit = {"You can't bring yourself to do it.", "There must be another way."},
+    desomorphine_paralysis = {"One of your limbs has gone numb.", "One of your limbs stopped responding."},
+    fiberwire_strangle_start = {"You are being strangled.", "Something is crushing your throat."},
+    poison1 = {"You can't breathe properly.", "Your breathing feels wrong."},
+    poison2 = {"Something is stopping you from breathing normally.", "Your breathing feels restricted."},
+    cyanide = {"It smells like almonds in here.", "You notice a faint smell of almonds."},
+    cyanide2 = {"It's getting difficult to breathe.", "Breathing is getting harder for no clear reason."},
+    poison4 = {"Something feels wrong.", "Breathing is oddly harder."},
+    idkdrive = {"You don't know how to drive."},
+    rocket_doubt = {"You wonder if you should really do this.", "You hope this thing doesn't blow up.", "You brace yourself."},
+    rocket_relief = {"You thought you were going to die.", "What a relief.", "It didn't explode."},
+    furry_assimilate = {"Another one joins you.", "The assimilation is complete.", "You feel unstoppable."},
+    furry_kill = {"One freak less.", "You put down an abomination.", "You silenced a raving beast."},
+    reload_fumble = {"You missed.", "You dropped it."},
+    reload_onehand = {"You can't reload it in your hand."},
+    cycle_onehand = {"You can't cycle it with one hand."},
+    glassshard_cut = {"The glass shard is cutting through your hand."},
+    vitals_unneeded = {"You don't think you need to check their vitals."},
+    cpr_useless = {"You don't think CPR would help here."},
+    vitals_nopulse = {"You can't find a pulse."},
+    vitals_interrupted = {"You were interrupted."},
+    admin_godmode_on = {"You are now immortal."},
+    admin_godmode_off = {"You are now mortal."},
+    admin_cloak_on = {"You are now invisible."},
+    admin_cloak_off = {"You are now visible."},
+    jam = SameThoughtText,
+    adrenaline_rouse = SameThoughtText,
+    autoresuscitator_nohead = SameThoughtText,
+    spine_fail = SameThoughtText,
+    bandage_tourniquet = SameThoughtText,
+    suture_nothing = SameThoughtText,
+    suture_tourniquet = SameThoughtText,
+    armor_unusable = SameThoughtText,
+    armor_conflict = SameThoughtText,
+    accessory_slot_occupied = SameThoughtText,
+    armor_headphones_blocked = SameThoughtText,
+    splint_nofrac = SameThoughtText,
+    splint_apply = SameThoughtText,
+    splint_apply_other = SameThoughtText,
+    conc_test = SameThoughtText,
+    mannitol_hev = SameThoughtText,
+    needle_hev = SameThoughtText,
+    morphine_hev = SameThoughtText,
+    co_hev = SameThoughtText,
+    bones_hev = SameThoughtText,
+    pulse_hev = SameThoughtText,
+    admin_notify = SameThoughtText,
+    ammo_pickup = SameThoughtText,
+    ammo_full = SameThoughtText,
+    magazine_pickup = SameThoughtText,
+    ied_planted = SameThoughtText,
+    vitals_bpm = SameThoughtText,
+}
+
+local thoughtMessagePrefixes = {
+    armor_dependency_ = SameThoughtText,
 }
 
 local scpcbHitgroupToCat = {
@@ -334,8 +405,14 @@ local conditionThoughtCooldowns = {
     nosebleed = 30,
 }
 
-local function GetConditionThought(ply, msgKey)
+local function GetConditionThought(ply, msgKey, msg)
     local options = thoughtMessages[msgKey]
+    if options == nil and isstring(msgKey) then
+        for prefix, prefixOptions in pairs(thoughtMessagePrefixes) do
+            if string.StartWith(msgKey, prefix) then options = prefixOptions break end
+        end
+    end
+    if isfunction(options) then return options(msg) end
     if not istable(options) then return options end
 
     local optionCount = #options
@@ -425,7 +502,7 @@ function hg.CombatThought(ply, pool)
     if org then org.nextStatusThought = math.max(org.nextStatusThought or 0, now + 6) end
 
     if useNew then
-        ply.nextThoughtGlobal = now + 3
+        ply.nextThoughtGlobal = now + THOUGHT_GLOBAL_GAP
         net.Start("HGThought")
         net.WriteString(msg)
         net.WriteColor(Color(255, 90, 90, 255))
@@ -564,7 +641,7 @@ local function CreateNotification(ply, msg, delay, msgKey, showTime, func, clr)
     msgKey = msgKey or msg
 
     if ply:GetInfoNum("hg_newthoughts", 0) > 0 and CreateThought then
-        local thought = GetConditionThought(ply, msgKey)
+        local thought = GetConditionThought(ply, msgKey, msg)
         if not thought then return false end
 
         local conditionCooldown = conditionThoughtCooldowns[msgKey]
@@ -708,6 +785,7 @@ local function ResetNotification(ply, key)
 end
 
 local thoughtGroupPatterns = {
+    {"blocked_", "blocked"},
     {"oxygen", "respiration"}, {"hypox", "respiration"}, {"lowoxy", "respiration"}, {"breath", "respiration"}, {"lung", "respiration"}, {"pneumo", "respiration"}, {"hemothorax", "respiration"},
     {"blood", "circulation"}, {"bleed", "circulation"}, {"arter", "circulation"}, {"perfusion", "circulation"},
     {"heart", "cardiac"}, {"pulse", "cardiac"}, {"arrhythm", "cardiac"}, {"tachy", "cardiac"}, {"brady", "cardiac"},
@@ -747,12 +825,10 @@ CreateThought = function(ply, msg, delay, msgKey, showTime, clr, func)
     local now = CurTime()
     local group = GetThoughtGroup(msgKey, msg)
 
-    -- Different hooks often describe the same physiological event with different
-    -- keys. Group them so one injury does not dump several near-identical thoughts
-    -- onto the screen in the same second.
-    if (ply.nextThoughtGlobal or 0) > now then return false end
+    local blocked = group == "blocked"
+    if not blocked and (ply.nextThoughtGlobal or 0) > now then return false end
     if (ply.thoughtGroupCooldowns[group] or 0) > now then return false end
-    if (ply.recentThoughtText[msg] or 0) > now then return false end
+    if not blocked and (ply.recentThoughtText[msg] or 0) > now then return false end
 
     if msgKey and ply.thoughtmsgs[msgKey] then
         if isnumber(ply.thoughtmsgs[msgKey]) then
@@ -767,9 +843,11 @@ CreateThought = function(ply, msg, delay, msgKey, showTime, clr, func)
     delay = delay or 0
 
     if msgKey then ply.thoughtmsgs[msgKey] = delay and (not isnumber(delay) or now + delay) or nil end
-    ply.nextThoughtGlobal = now + 3
-    ply.thoughtGroupCooldowns[group] = now + (group == "misc" and 5 or 10)
-    ply.recentThoughtText[msg] = now + 25
+    if not blocked then
+        ply.nextThoughtGlobal = now + THOUGHT_GLOBAL_GAP
+        ply.recentThoughtText[msg] = now + 25
+    end
+    ply.thoughtGroupCooldowns[group] = now + (blocked and 1 or group == "misc" and 3 or 6)
 
     showTime = showTime or 0
     local clr = clr or color_white
@@ -794,8 +872,8 @@ end
 
 local function CreateModeThought(ply, msg, delay, msgKey, showTime, clr, func)
     if ply:GetInfoNum("hg_newthoughts", 0) > 0 then
-        local messages = msgKey and thoughtMessages[msgKey]
-        if messages then msg = messages[math.random(#messages)] end
+        local thought = msgKey and GetConditionThought(ply, msgKey, msg)
+        if thought then msg = thought end
         return CreateThought(ply, msg, delay, msgKey, showTime, clr, func)
     end
 
