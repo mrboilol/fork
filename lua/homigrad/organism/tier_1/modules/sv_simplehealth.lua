@@ -1,5 +1,6 @@
 util.AddNetworkString("hg_simplehealth")
 util.AddNetworkString("hg_simplehealth_faint")
+util.AddNetworkString("hg_simplehealth_death")
 
 local SimpleHealth = hg.SimpleHealth
 local organism = hg.organism
@@ -13,11 +14,21 @@ local MODE_ORGANS = SimpleHealth.MODE_ORGANS
 
 local NET_INTERVAL = 0.25
 local NET_KEEPALIVE = 5
-local LOW_BRAIN_OXYGEN = 0.28
 local BURN_TYPES = bit.bor(DMG_BURN, DMG_SLOWBURN, DMG_PLASMA, DMG_ENERGYBEAM)
 local TOXIN_TYPES = bit.bor(DMG_POISON, DMG_NERVEGAS, DMG_RADIATION, DMG_ACID, DMG_PARALYZE)
-local PERFUSION_KEYS = {"perfusion", "cerebralPerfusion", "peripheralperfusion", "bodyoxygen", "brainoxygen"}
 local LUNG_KEYS = {"lungsL", "lungsR"}
+local NORMAL_TEMPERATURE = 36.7
+local DEATH_DAMAGE_CAUSES = {
+	{DMG_BLAST, "blast"},
+	{bit.bor(DMG_BULLET, DMG_BUCKSHOT, DMG_SNIPER), "shot"},
+	{DMG_FALL, "fall"},
+	{DMG_DROWN, "drown"},
+	{DMG_SLASH, "slash"},
+	{DMG_CLUB, "club"},
+	{DMG_CRUSH, "crush"},
+	{BURN_TYPES, "burn"},
+	{TOXIN_TYPES, "toxin"},
+}
 
 organism.module.simplehealth = {}
 
@@ -37,6 +48,7 @@ function SimpleHealth.AddDamage(org, pool, amount)
 
 	local before = state[pool] or 0
 	state[pool] = math.min(before + amount, CONFIG.poolMax)
+	state.lastDamage = CurTime()
 
 	return state[pool] - before
 end
@@ -61,7 +73,14 @@ local function newState()
 		crit = CRIT_NONE,
 		contamination = 0,
 		heartEfficiency = 1,
+		heartRate = CONFIG.heart.base,
+		consciousnessCap = 1,
+		lastDamage = CurTime(),
 	}
+end
+
+local function rampUp(value, from, to)
+	return math.Clamp((value - from) / (to - from), 0, 1)
 end
 
 local function quantizePool(value)
@@ -103,8 +122,9 @@ local function sendState(owner, org, force)
 	net.Send(owner)
 end
 
-local function die(org, cause)
+local function die(org, causeKey, cause)
 	organism.SetDeathCause(org, "simplehealth: " .. cause)
+	org.simpleDeathCause = causeKey
 	org.alive = false
 end
 
@@ -116,7 +136,8 @@ module[1] = function(org)
 	org.simpleMode = mode > 0 and mode or nil
 	org.simple = org.simpleMode and newState() or nil
 	org.simpleNetSignature = nil
-	if org.simple then org.simple.aedMark = org.aedResuscitationUntil end
+	org.simpleDeathCause = nil
+	org.simpleControlMul = nil
 
 	SimpleHealth.WrapInputs()
 
@@ -135,24 +156,56 @@ SimpleHealth.ModuleOverrides.pulse = function(owner, org, timeValue)
 	org.postMortemStart = nil
 	org.ischemia = 0
 
-	local brainBefore = org.brain
-	organism.MaintainSimplifiedCirculation(org)
-	org.brain = brainBefore
+	organism.UpdateBodyTemperature(owner, org, timeValue)
 
 	local state = org.simple
+	local heartConfig = CONFIG.heart
 	local heartDamage = org.simpleMode == MODE_ORGANS and math.Clamp(tonumber(org.heart) or 0, 0, 1) or 0
 	local heartEfficiency = heartDamage >= CONFIG.organs.heartMax and 0 or 1 - heartDamage
 	state.heartEfficiency = heartEfficiency
-	if heartEfficiency >= 1 then return end
 
-	org.cardiacOutput = heartEfficiency
-	for _, key in ipairs(PERFUSION_KEYS) do
-		org[key] = math.min(tonumber(org[key]) or 1, heartEfficiency)
+	if state.flatline then
+		state.heartRate = 0
+	else
+		state.heartRate = math.Approach(state.heartRate, SimpleHealth.GetTargetHeartRate(org, state), heartConfig.approach * timeValue)
 	end
 
-	if org.brainoxygen < LOW_BRAIN_OXYGEN then
-		org.consciousness = math.min(org.consciousness or 1, 0.15 + org.brainoxygen / LOW_BRAIN_OXYGEN * 0.55)
+	local rate = state.heartRate
+	local fastPenalty = Lerp(rampUp(rate, heartConfig.fastStart, heartConfig.max), 1, heartConfig.fastOutputMin)
+	local output = math.min(rate / heartConfig.base, 1) * fastPenalty * heartEfficiency
+
+	local brainBefore = org.brain
+	organism.MaintainSimplifiedCirculation(org, rate, rate * fastPenalty * heartEfficiency, heartConfig.pressure * output)
+	org.brain = brainBefore
+	org.cardiacOutput = output
+
+	if state.flatline then
+		org.heartstop = true
+		org.ecgState = "asystole"
 	end
+end
+
+function SimpleHealth.GetTargetHeartRate(org, state)
+	local heartConfig = CONFIG.heart
+	local blood = tonumber(org.blood) or CONFIG.contamination.normalBlood
+	local temperature = tonumber(org.temperature) or NORMAL_TEMPERATURE
+	local rate = heartConfig.base
+
+	rate = rate + math.Clamp((tonumber(org.adrenaline) or 0) / CONFIG.adrenalineFull, 0, 1) * heartConfig.adrenaline
+	rate = rate + math.Clamp((tonumber(org.pain) or 0) / heartConfig.painFull, 0, 1) * heartConfig.pain
+	rate = rate + rampUp(heartConfig.bloodStart - blood, 0, heartConfig.bloodStart - heartConfig.bloodPeak) * heartConfig.bloodGain
+	rate = rate + rampUp(state.oxy, heartConfig.oxyStart, heartConfig.oxyPeak) * heartConfig.oxyGain
+	if state.crit == CRIT_SOFT then rate = rate + heartConfig.softCrit end
+
+	rate = rate - math.max(tonumber(org.tranquilizer) or 0, 0) * heartConfig.sedative
+	rate = rate - math.max(tonumber(org.analgesia) or 0, 0) * heartConfig.opioid
+	rate = rate - math.max(heartConfig.coldStart - temperature, 0) * heartConfig.coldPerDegree
+	rate = rate + math.max(temperature - heartConfig.heatStart, 0) * heartConfig.heatPerDegree
+
+	rate = Lerp(rampUp(heartConfig.bloodPeak - blood, 0, heartConfig.bloodPeak - heartConfig.bloodFloor), rate, heartConfig.bloodCrashTo)
+	rate = Lerp(rampUp(state.oxy, heartConfig.oxyPeak, CONFIG.oxy.countdownStart), rate, heartConfig.oxyCrashTo)
+
+	return math.Clamp(rate, 0, heartConfig.max)
 end
 
 SimpleHealth.ModuleOverrides.lungs = function(owner, org, timeValue, callback)
@@ -174,8 +227,7 @@ local function tickOxy(owner, org, state, timeValue)
 	local delivery = math.Clamp(tonumber(org.brainoxygen) or 1, 0, 1)
 	local deficit = math.Clamp((oxyConfig.deliveryFull - delivery) / oxyConfig.deliveryFull, 0, 1)
 	local gain = deficit * oxyConfig.deliveryGain
-	if state.heartEfficiency <= 0 then gain = gain + oxyConfig.heartDestroyedGain end
-	if crit == CRIT_HARD then gain = gain + oxyConfig.hardCritGain end
+	if state.lethalCrit then gain = gain + oxyConfig.hardCritGain end
 
 	local overdose, sedative = SimpleHealth.GetOverdose(org)
 	gain = gain + math.min(sedative, overdose) * oxyConfig.sedativeGain + (state.oxyGainBonus or 0)
@@ -188,7 +240,7 @@ local function tickOxy(owner, org, state, timeValue)
 	oxy = oxy + gain * gainMul * timeValue
 
 	local floor = crit == CRIT_SOFT and oxyConfig.softCritCap or 0
-	if gain <= 0 and crit ~= CRIT_HARD and oxy > floor then
+	if gain <= 0 and not state.lethalCrit and oxy > floor then
 		oxy = math.max(oxy - oxyConfig.regen * timeValue, floor)
 	end
 
@@ -205,20 +257,106 @@ end
 
 local function tickRegen(owner, org, state, timeValue)
 	local damageConfig = CONFIG.damage
-	if damageConfig.bruteRegen > 0 then state.brute = math.max(state.brute - damageConfig.bruteRegen * timeValue, 0) end
-	if damageConfig.burnRegen > 0 then state.burn = math.max(state.burn - damageConfig.burnRegen * timeValue, 0) end
+	if state.flatline or CurTime() - state.lastDamage < damageConfig.passiveDelay then return end
+
+	state.brute = math.max(state.brute - damageConfig.passiveBruteRegen * timeValue, 0)
+	state.burn = math.max(state.burn - damageConfig.passiveBurnRegen * timeValue, 0)
+end
+
+local function tickTemperature(owner, org, state, timeValue)
+	local temperatureConfig = CONFIG.temperature
+	local temperature = tonumber(org.temperature) or NORMAL_TEMPERATURE
+	local cold = math.max(temperatureConfig.coldStart - temperature, 0) * temperatureConfig.coldBurnPerDegree
+	local heat = math.max(temperature - temperatureConfig.heatStart, 0) * temperatureConfig.heatBurnPerDegree
+
+	SimpleHealth.AddDamage(org, "burn", (cold + heat) * timeValue)
+end
+
+local function startFlatline(owner, org, state)
+	state.flatline = true
+	state.heartRate = 0
+	hook.Run("hg/simplehealth/flatline-changed", owner, org, true)
+end
+
+local function stopFlatline(owner, org, state)
+	if not state.flatline or state.heartEfficiency <= 0 then return false end
+
+	state.flatline = false
+	state.heartRate = CONFIG.heart.restartRate
+	state.flatlineGraceUntil = CurTime() + CONFIG.flatline.grace
+	hook.Run("hg/simplehealth/flatline-changed", owner, org, false)
+
+	return true
+end
+
+local function flatlineChance(org, state)
+	local flatlineConfig = CONFIG.flatline
+	local softAt, hardAt = SimpleHealth.GetCritThresholds(org.adrenaline)
+	local chance = 0
+
+	if state.health <= softAt then
+		chance = flatlineConfig.softCritChance + rampUp(softAt - state.health, 0, softAt - hardAt) * flatlineConfig.softCritDepthChance
+	end
+	if state.health <= hardAt then chance = chance + flatlineConfig.severeChance end
+
+	local blood = tonumber(org.blood) or CONFIG.contamination.normalBlood
+	chance = chance + rampUp(flatlineConfig.bloodStart - blood, 0, flatlineConfig.bloodStart - CONFIG.deathBlood) * flatlineConfig.bloodChance
+
+	local rate = state.heartRate
+	if rate < flatlineConfig.rateLow or rate > flatlineConfig.rateHigh then chance = chance + flatlineConfig.rateChance end
+	if (tonumber(org.temperature) or NORMAL_TEMPERATURE) < flatlineConfig.coldStart then chance = chance + flatlineConfig.coldChance end
+
+	return chance
+end
+
+local function tickFlatline(owner, org, state, timeValue)
+	if state.flatline then return end
+	if state.heartEfficiency <= 0 then
+		startFlatline(owner, org, state)
+
+		return
+	end
+
+	if (state.flatlineGraceUntil or 0) > CurTime() then return end
+	if math.Rand(0, 1) < flatlineChance(org, state) * timeValue then startFlatline(owner, org, state) end
+end
+
+local function tickConsciousness(owner, org, state, timeValue)
+	local consciousnessConfig = CONFIG.consciousness
+	local softAt, hardAt = SimpleHealth.GetCritThresholds(org.adrenaline)
+	local blood = tonumber(org.blood) or CONFIG.contamination.normalBlood
+	local drain = 0
+
+	if state.health <= softAt then
+		drain = consciousnessConfig.softCritDrain + rampUp(softAt - state.health, 0, softAt - hardAt) * consciousnessConfig.softCritDepthDrain
+	end
+	if state.flatline then drain = drain + consciousnessConfig.flatlineDrain end
+	drain = drain + rampUp(consciousnessConfig.bleedStart - blood, 0, consciousnessConfig.bleedStart - CONFIG.deathBlood) * consciousnessConfig.bleedDrain
+	drain = drain + rampUp(state.oxy, consciousnessConfig.oxyStart, consciousnessConfig.oxyFull) * consciousnessConfig.oxyDrain
+
+	local rate = drain > 0 and -drain or consciousnessConfig.recover
+	state.consciousnessCap = math.Clamp(state.consciousnessCap + rate * timeValue, 0, 1)
+	org.consciousness = math.min(tonumber(org.consciousness) or 1, state.consciousnessCap)
 end
 
 table.insert(SimpleHealth.Tickers, tickOxy)
 table.insert(SimpleHealth.Tickers, tickRegen)
+table.insert(SimpleHealth.Tickers, tickTemperature)
+table.insert(SimpleHealth.Tickers, tickFlatline)
+table.insert(SimpleHealth.Tickers, tickConsciousness)
 
 local function updateCrit(org, state)
 	local previous = state.crit
 	state.health = SimpleHealth.GetHealth(state)
-	state.crit = SimpleHealth.GetCritState(state.health, org.adrenaline)
+
+	local healthCrit = SimpleHealth.GetCritState(state.health, org.adrenaline)
+	local severe = state.flatline or healthCrit == CRIT_HARD
+	state.crit = (severe or org.otrub) and CRIT_HARD or healthCrit
+	state.lethalCrit = severe or (org.otrub and healthCrit == CRIT_SOFT)
+	org.simpleControlMul = state.crit == CRIT_SOFT and CONFIG.softCritControlMul or nil
 
 	if state.crit >= CRIT_SOFT then org.needfake = true end
-	if state.crit == CRIT_HARD then org.needotrub = true end
+	if severe then org.needotrub = true end
 
 	if state.crit ~= previous then
 		hook.Run("hg/simplehealth/crit-changed", org.owner, org, state.crit, previous)
@@ -268,15 +406,48 @@ module[2] = function(owner, org, timeValue)
 	local brainIgnored = organism.IsBrainDamageIgnored and organism.IsBrainDamageIgnored(org)
 
 	if countdownExpired then
-		die(org, "oxy countdown expired")
+		die(org, state.flatline and "flatline" or "suffocate", "oxy countdown expired")
 	elseif org.otrub and (tonumber(org.blood) or CONFIG.contamination.normalBlood) < CONFIG.deathBlood then
-		die(org, "blood below " .. CONFIG.deathBlood .. " while unconscious")
+		die(org, "bleed", "blood below " .. CONFIG.deathBlood .. " while unconscious")
 	elseif not brainIgnored and (tonumber(org.brain) or 0) >= CONFIG.brainDeath then
-		die(org, "brain death")
+		die(org, "brain", "brain death")
 	end
 
 	sendState(owner, org)
 end
+
+local function resolveDeathCause(org, state)
+	local recent = state.lastDamageTime and CurTime() - state.lastDamageTime <= CONFIG.recentDamageTime
+	if recent then
+		for _, entry in ipairs(DEATH_DAMAGE_CAUSES) do
+			if bit.band(state.lastDamageType or 0, entry[1]) ~= 0 then return entry[2] end
+		end
+	end
+
+	if org.simpleDeathCause then return org.simpleDeathCause end
+	if state.flatline then return "flatline" end
+
+	local temperatureConfig = CONFIG.temperature
+	local temperature = tonumber(org.temperature) or NORMAL_TEMPERATURE
+	if temperature < temperatureConfig.deathColdBelow then return "cold" end
+	if temperature > temperatureConfig.deathHeatAbove then return "heat" end
+	if (tonumber(org.blood) or CONFIG.contamination.normalBlood) < temperatureConfig.deathBloodBelow then return "bleed" end
+
+	local pool = SimpleHealth.GetDominantPool(state)
+	if pool == "oxy" then return "suffocate" end
+
+	return pool or "unknown"
+end
+
+hook.Add("PlayerDeath", "hg/simplehealth/death-cause", function(ply)
+	local org = IsValid(ply) and ply.organism
+	local state = SimpleHealth.GetState(org)
+	if not state then return end
+
+	net.Start("hg_simplehealth_death")
+		net.WriteString(resolveDeathCause(org, state))
+	net.Send(ply)
+end)
 
 local function classifyDamage(dmgInfo)
 	if dmgInfo:IsDamageType(DMG_DROWN) then return "oxy" end
@@ -293,6 +464,9 @@ hook.Add("HomigradDamage", "hg/simplehealth/damage-pools", function(victim, dmgI
 
 	local damage = dmgInfo:GetDamage()
 	if damage <= 0 then return end
+
+	state.lastDamageType = dmgInfo:GetDamageType()
+	state.lastDamageTime = CurTime()
 
 	local damageConfig = CONFIG.damage
 	local pool = classifyDamage(dmgInfo)
@@ -317,6 +491,7 @@ local GATED_INPUTS = {
 	trachea = false,
 	eyeL = false,
 	eyeR = false,
+	chest = true,
 }
 
 SimpleHealth.OriginalInputs = SimpleHealth.OriginalInputs or {}
@@ -332,7 +507,7 @@ local function wrapInput(inputList, name, allowedMode)
 	local function wrapper(org, ...)
 		local mode = org.simpleMode
 		if not mode then return original(org, ...) end
-		if mode ~= allowedMode then return 0 end
+		if allowedMode ~= true and mode ~= allowedMode then return 0 end
 
 		local handler = SimpleHealth.InputHandlers[name]
 		if handler then return handler(original, org, ...) end
@@ -412,8 +587,10 @@ local function convertPoisons(owner, org, state)
 
 	local shock = tonumber(org.hemotransfusionshock) or 0
 	if shock > 0 then
+		SimpleHealth.AddDamage(org, "toxin", shock * contaminationConfig.wrongBloodToxinPerShock)
 		SimpleHealth.AddContamination(org, shock * contaminationConfig.wrongBloodPerShock)
 		org.hemotransfusionshock = 0
+		if state then state.wrongBloodUntil = now + contaminationConfig.wrongBloodHold end
 	end
 
 	org.sepsisSource = 0
@@ -438,6 +615,7 @@ local function tickBloodExchange(org, state, timeValue)
 
 	local transfused = delta - (tonumber(org.bloodRegenRate) or 0) * timeValue
 	if transfused <= contaminationConfig.transfusionMinMl then return end
+	if (state.wrongBloodUntil or 0) > CurTime() then return end
 
 	state.contamination = state.contamination * lastBlood / math.max(lastBlood + transfused, 1)
 	SimpleHealth.Heal(org, "toxin", transfused * toxinConfig.transfusionHealPerMl)
@@ -469,6 +647,8 @@ local function tickToxin(owner, org, state, timeValue)
 	state.thiamineActive = (tonumber(org.thiamine) or 0) > 0
 	if state.thiamineActive then
 		SimpleHealth.Heal(org, "toxin", toxinConfig.thiamineHeal * timeValue)
+		SimpleHealth.Heal(org, "brute", toxinConfig.thiamineDamageHeal * timeValue)
+		SimpleHealth.Heal(org, "burn", toxinConfig.thiamineDamageHeal * timeValue)
 		state.contamination = math.max(state.contamination - toxinConfig.thiamineContaminationClear * timeValue, 0)
 	end
 
@@ -482,13 +662,25 @@ local function tickResuscitation(owner, org, state, timeValue)
 	if (org.cprSupportUntil or 0) > now and (state.nextCprClear or 0) <= now then
 		state.nextCprClear = now + oxyConfig.cprCycle
 		SimpleHealth.Heal(org, "oxy", oxyConfig.cprClear)
+		if state.flatline and math.Rand(0, 1) < CONFIG.flatline.cprRestartChance then stopFlatline(owner, org, state) end
 	end
+end
 
-	local aedMark = org.aedResuscitationUntil
-	if aedMark and aedMark > now and aedMark ~= state.aedMark then
-		state.aedMark = aedMark
-		state.aedResistUntil = now + oxyConfig.aedResistTime
-	end
+function SimpleHealth.ShouldAEDShock(org)
+	local state = SimpleHealth.GetState(org)
+
+	return state ~= nil and (state.flatline or state.oxy >= CONFIG.oxy.aedShockAt)
+end
+
+function SimpleHealth.OnAEDShock(org)
+	local state = SimpleHealth.GetState(org)
+	if not state then return end
+
+	local oxyConfig = CONFIG.oxy
+	SimpleHealth.Heal(org, "oxy", oxyConfig.aedShockClear)
+	state.aedResistUntil = CurTime() + oxyConfig.aedResistTime
+
+	if state.flatline and math.Rand(0, 1) < CONFIG.flatline.aedSuccess then stopFlatline(org.owner, org, state) end
 end
 
 table.insert(SimpleHealth.Tickers, tickToxin)
@@ -563,6 +755,19 @@ SimpleHealth.ModuleOverrides.liver = function(owner, org)
 	org.blood_regeneration_multiplier = DEFAULT_BLOOD_REGENERATION
 end
 
+local REPAIRED_ORGANS = {"heart", "liver", "flank", "gut", "pneumothorax"}
+
+local function repairOrgans(org, amount)
+	for _, key in ipairs(REPAIRED_ORGANS) do
+		org[key] = math.max(organDamage(org, key) - amount, 0)
+	end
+
+	for _, key in ipairs(LUNG_KEYS) do
+		local lung = org[key]
+		if istable(lung) then lung[1] = math.max((tonumber(lung[1]) or 0) - amount, 0) end
+	end
+end
+
 local function tickOrgans(owner, org, state, timeValue)
 	if org.simpleMode ~= MODE_ORGANS then
 		state.toxinRegenMul = 1
@@ -572,6 +777,8 @@ local function tickOrgans(owner, org, state, timeValue)
 	end
 
 	local organConfig = CONFIG.organs
+	if state.thiamineActive then repairOrgans(org, CONFIG.toxin.thiamineOrganHeal * timeValue) end
+
 	local liver = organDamage(org, "liver")
 	local flank = organDamage(org, "flank")
 	local gut = organDamage(org, "gut")
@@ -629,6 +836,27 @@ local function abdominalHit(key)
 	end
 end
 
+SimpleHealth.InputHandlers.chest = function(original, org, bone, dmg, dmgInfo, ...)
+	local damageConfig = CONFIG.damage
+	local broken = org.simpleMode == MODE_SIMPLE and (tonumber(org.chest) or 0) >= damageConfig.brokenChestAt
+	local result, vec = original(org, bone, dmg, dmgInfo, ...)
+	local tick = engine.TickCount()
+	if not broken or org.simpleBrokenChestTick == tick then return result, vec end
+
+	SimpleHealth.AddDamage(org, "brute", dmgInfo:GetDamage() * damageConfig.brokenChestDamageMul)
+	org.simpleBrokenChestTick = tick
+
+	return result, vec
+end
+
+hook.Add("PreHomigradDamageBulletBleedAdd", "hg/simplehealth/broken-chest", function(victim, org, dmgInfo, hitgroup, harm, hitBoxs, inputHole, info)
+	local tick = engine.TickCount()
+	if not org or org.simpleBrokenChestTick ~= tick or org.simpleBrokenChestBledTick == tick then return end
+
+	org.simpleBrokenChestBledTick = tick
+	info.bleed = (tonumber(info.bleed) or 0) * CONFIG.damage.brokenChestBleedMul
+end)
+
 SimpleHealth.InputHandlers.liver = abdominalHit("liver")
 SimpleHealth.InputHandlers.flank = abdominalHit("flank")
 SimpleHealth.InputHandlers.gut = abdominalHit("gut")
@@ -676,14 +904,87 @@ hook.Add("hg/simplehealth/countdown-changed", "hg/simplehealth/chat", function(o
 	if counting and IsValid(owner) then hg.ChatLog.Emit("stopbreathing", owner) end
 end)
 
+hook.Add("hg/simplehealth/flatline-changed", "hg/simplehealth/chat", function(owner, org, flatline)
+	if flatline and not org.otrub then stateThought(owner, "flatline", "My chest... my heart stopped...") end
+end)
+
 hook.Add("hg/simplehealth/poisoned", "hg/simplehealth/chat", function(owner)
 	stateThought(owner, "poisoned", "Something is wrong with me... I feel sick.")
 end)
+
+local BLOOD_THOUGHTS = {
+	{legacy = "I'm losing a lot of blood..", new = "Your skin is becoming pale."},
+	{legacy = "I'm about to pass out from blood..", new = "Your skin is deathly pale and cold. You are about to pass out."},
+}
+
+local function tickBloodThoughts(owner, org, state)
+	local chatConfig = CONFIG.chat
+	local blood = tonumber(org.blood) or CONFIG.contamination.normalBlood
+	local current = state.bloodThoughtLevel or 0
+	local exit = chatConfig.bloodThoughtHysteresis
+	local level = 0
+
+	if blood <= chatConfig.bloodThoughtCritical + (current >= 2 and exit or 0) then
+		level = 2
+	elseif blood <= chatConfig.bloodThoughtLow + (current >= 1 and exit or 0) then
+		level = 1
+	end
+
+	state.bloodThoughtLevel = level
+	if level <= current or org.otrub then return end
+
+	local lines = BLOOD_THOUGHTS[level]
+	local useNew = owner:GetInfoNum("hg_newthoughts", 0) > 0
+	if not owner.Thought then return end
+
+	owner:Thought(useNew and lines.new or lines.legacy, chatConfig.thoughtCooldown, "hgstatus_simpleblood" .. level, 1, THOUGHT_COLOR)
+end
+
+local HEALTH_THOUGHTS = {
+	{legacy = "I'm hurt pretty badly...", new = "You are badly hurt."},
+	{legacy = "I'm in really bad shape...", new = "Your body is failing. You need medical attention."},
+	{legacy = "I'm very close to death...", new = "You are very close to death."},
+	{legacy = "I'm dying... I need help now...", new = "You are dying. Without help, you will not survive."},
+}
+
+local function healthThoughtLevel(org, state, current)
+	local chatConfig = CONFIG.chat
+	local softAt, hardAt = SimpleHealth.GetCritThresholds(org.adrenaline)
+	local health = state.health
+	local thresholds = {
+		chatConfig.healthThoughtHurt,
+		chatConfig.healthThoughtBad,
+		softAt,
+		softAt - (softAt - hardAt) * chatConfig.healthThoughtDying,
+	}
+
+	for level = #thresholds, 1, -1 do
+		local exit = current >= level and chatConfig.healthThoughtHysteresis or 0
+		if health <= thresholds[level] + exit then return level end
+	end
+
+	return 0
+end
+
+local function tickHealthThoughts(owner, org, state)
+	local current = state.healthThoughtLevel or 0
+	local level = healthThoughtLevel(org, state, current)
+	state.healthThoughtLevel = level
+	if level <= current or org.otrub or not owner.Thought then return end
+
+	local lines = HEALTH_THOUGHTS[level]
+	local useNew = owner:GetInfoNum("hg_newthoughts", 0) > 0
+
+	owner:Thought(useNew and lines.new or lines.legacy, CONFIG.chat.thoughtCooldown, "hgstatus_simplehealth" .. level, 1, THOUGHT_COLOR)
+end
 
 local function tickSymptoms(owner, org, state)
 	local oxyConfig = CONFIG.oxy
 	local organConfig = CONFIG.organs
 	local now = CurTime()
+
+	tickBloodThoughts(owner, org, state)
+	tickHealthThoughts(owner, org, state)
 
 	if state.oxy >= oxyConfig.gaspAt and not state.gasping then
 		state.gasping = true

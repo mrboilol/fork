@@ -190,6 +190,7 @@ end
 
 local function ShouldShock(org)
 	if not org or not org.alive or org.deathStateKilled then return false end
+	if hg.SimpleHealth and hg.SimpleHealth.ShouldAEDShock and hg.SimpleHealth.ShouldAEDShock(org) then return true end
 	local rhythm = org.ecgState or org.terminalRhythm or org.unstableRhythm
 	local output = tonumber(org.cardiacOutput) or 1
 	local pulse = tonumber(org.pulse) or 0
@@ -380,6 +381,8 @@ local function ApplyAEDShock(org, accidental)
 		org.pulse = math.max(org.pulse or 0, 70)
 		return
 	end
+
+	if hg.SimpleHealth and hg.SimpleHealth.OnAEDShock then hg.SimpleHealth.OnAEDShock(org) end
 
 	org.fibrillation = false
 	org.ventricularTachycardia = nil

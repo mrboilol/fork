@@ -16,9 +16,9 @@ local OVERHEAD_LIFE = 3
 local OVERHEAD_FADE = 2.5
 local MIN_YELL_LETTERS = 2
 
-local EMOTE_COLOR = Color(225, 225, 225)
-local HEARD_COLOR = Color(165, 165, 165)
-local SAY_COLOR = Color(255, 255, 255)
+local EMOTE_COLOR = ChatLog.COLOR_AROUND
+local HEARD_COLOR = ChatLog.COLOR_AROUND
+local SAY_COLOR = ChatLog.COLOR_STATEMENT
 local OVERHEAD_COLOR = Color(235, 235, 235)
 
 local traceFilter = {}
@@ -230,5 +230,5 @@ function ChatLog.SayElements(ply, text, whisper)
 	local seen = ply == LocalPlayer() or not ply:IsDormant() and ChatLog.IsVisible(ply, pos)
 	if seen then return {NameColor(ply), ChatLog.Name(ply), SAY_COLOR, quoted} end
 
-	return {HEARD_COLOR, "Someone " .. ChatLog.DirectionPhrase(pos) .. quoted}
+	return {SAY_COLOR, "Someone " .. ChatLog.DirectionPhrase(pos) .. quoted}
 end

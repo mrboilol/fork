@@ -170,12 +170,19 @@ if CLIENT then
 		dying = 3,
 		combat = 2,
 		blocked = 1,
+		status = 1,
+		good = 1,
 	}
 	local THOUGHT_INTERRUPTS = {
 		despair = true,
 		trauma = true,
 		faint = true,
 		combat = true,
+	}
+	local THOUGHT_STACKING = {
+		blocked = true,
+		status = true,
+		good = true,
 	}
 	local lastThoughtStart = 0
 
@@ -242,7 +249,7 @@ if CLIENT then
 	local function QueueThought(thought)
 		local queue = hg.thoughtQueue
 		for i = #queue, 1, -1 do
-			if thought.group and queue[i].group == thought.group then table.remove(queue, i) end
+			if thought.group and not THOUGHT_STACKING[thought.group] and queue[i].group == thought.group then table.remove(queue, i) end
 		end
 
 		local index = #queue + 1
@@ -397,6 +404,7 @@ if CLIENT then
 		if not hg_newthoughts:GetBool() then return end
 		if lply:IsBerserk() then return end
 
+		if group ~= "emotion" and hg.ChatLog and hg.ChatLog.SecondPerson then msg = hg.ChatLog.SecondPerson(msg) end
 		msg = utf8.force(msg)
 		for _, thought in ipairs(hg.thoughts) do
 			if thought.msg == msg and not thought.finishedAt then return end
@@ -409,14 +417,14 @@ if CLIENT then
 		local thought = {
 			msg = msg,
 			len = math.max(utf8.len(msg) or #msg, 1),
-			lineColor = Color(clr.r, clr.g, clr.b, 255),
+			lineColor = hg.ChatLog and hg.ChatLog.ThoughtColor and hg.ChatLog.ThoughtColor(clr, group) or Color(clr.r, clr.g, clr.b, 255),
 			group = group,
 			priority = THOUGHT_PRIORITY[group] or 0,
 			shown = 0,
 			typed = "",
 		}
 
-		if group then
+		if group and not THOUGHT_STACKING[group] then
 			for i = #hg.thoughts, 1, -1 do
 				local old = hg.thoughts[i]
 				if old.group == group and old.finishedAt then table.remove(hg.thoughts, i) end

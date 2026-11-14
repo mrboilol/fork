@@ -97,8 +97,6 @@ local limbShafts = {
 }
 local shaftFraction = 0.45
 
-local rendered = {}
-
 local function posedMatrix(ent, boneID)
 	return hg.GetIKBoneMatrix and hg.GetIKBoneMatrix(ent, boneID) or ent:GetBoneMatrix(boneID)
 end
@@ -146,18 +144,6 @@ local function getFractureTransform(ent, fx, pose)
 	return pos, ang:Forward(), boneAng:Forward()
 end
 
-hook.Add("PostDrawAppearance", "hg_openfractures", function(ent)
-	if not IsValid(ent) then return end
-	local fractures = getFractures(ent:EntIndex())
-	if not fractures then return end
-
-	local entry = {frame = FrameNumber()}
-	rendered[ent] = entry
-	for bone in pairs(fractures) do
-		entry[bone] = samplePose(ent, bone)
-	end
-end)
-
 local function fractureBurst(ent, bone, fx)
 	if not hg.addBloodPart then return end
 	ent:SetupBones()
@@ -197,44 +183,31 @@ end)
 hook.Add("EntityRemoved", "hg_openfractures", function(ent, fullUpdate)
 	if fullUpdate then return end
 	lastSeen[ent:EntIndex()] = nil
-	rendered[ent] = nil
 end)
 
-hook.Add("PostDrawOpaqueRenderables", "hg_openfractures", function(depth, skybox)
-	if depth or skybox then return end
+hook.Add("PostDrawAppearance", "hg_openfractures", function(ent, ply)
+	if not IsValid(ent) then return end
+	local fractures = getFractures(ent:EntIndex()) or (IsValid(ply) and ply ~= ent and getFractures(ply:EntIndex()))
+	if not fractures then return end
 
 	local eyePos = EyePos()
-	local frame = FrameNumber()
-	local mdl
+	if ent:GetPos():DistToSqr(eyePos) > drawDistSqr then return end
+	local mdl = getShard()
+	if not mdl then return end
 
-	for index, vars in pairs(zb.net) do
-		local fractures = isnumber(index) and istable(vars) and vars.openfractures
-		if not istable(fractures) or not next(fractures) then continue end
-		local ent = getFractureBody(Entity(index))
-		if not ent or ent:GetPos():DistToSqr(eyePos) > drawDistSqr then continue end
-		local entry = rendered[ent]
-		local fresh = entry and entry.frame == frame
-		if not fresh and ent == LocalPlayer() and not ent:ShouldDrawLocalPlayer() then continue end
-		if not fresh then ent:SetupBones() end
+	render.SetColorModulation(1, 0.8, 0.76)
+	for bone, fx in pairs(fractures) do
+		local pos, normal, along = getFractureTransform(ent, fx, samplePose(ent, bone))
+		if not pos or pos:DistToSqr(eyePos) < 36 then continue end
 
-		mdl = mdl or getShard()
-		if not mdl then return end
-
-		render.SetColorModulation(1, 0.8, 0.76)
-		for bone, fx in pairs(fractures) do
-			local pos, normal, along = getFractureTransform(ent, fx, fresh and entry[bone] or samplePose(ent, bone))
-			if not pos or pos:DistToSqr(eyePos) < 36 then continue end
-
-			local length = shardLengths[bone] or 6
-			drawShard(mdl, pos, (normal - along * 0.55):GetNormalized(), along, length, 0.4)
-			drawShard(mdl, pos + along * 1.2, (normal + along * 0.35):GetNormalized(), along, length * 0.6, 0.45)
-		end
-		render.SetColorModulation(1, 1, 1)
+		local length = shardLengths[bone] or 6
+		drawShard(mdl, pos, (normal - along * 0.55):GetNormalized(), along, length, 0.4)
+		drawShard(mdl, pos + along * 1.2, (normal + along * 0.35):GetNormalized(), along, length * 0.6, 0.45)
 	end
+	render.SetColorModulation(1, 1, 1)
 end)
 
 local chestBones = {"ValveBiped.Bip01_Spine2", "ValveBiped.Bip01_Neck1", "ValveBiped.Bip01_L_UpperArm", "ValveBiped.Bip01_R_UpperArm"}
-local chestEntries = {}
 local maxChestShards = 9
 
 local function getChestOrganism(ent)
@@ -247,47 +220,32 @@ end
 hook.Add("PostDrawAppearance", "hg_chestbones", function(ent)
 	if not IsValid(ent) then return end
 	local org = getChestOrganism(ent)
-	if not org or (org.chest or 0) < 0.08 then chestEntries[ent] = nil return end
+	if not org or (org.chest or 0) < 0.08 then return end
+	if ent:GetPos():DistToSqr(EyePos()) > drawDistSqr then return end
 
-	local entry = {frame = FrameNumber()}
+	local points = {}
 	for _, bone in ipairs(chestBones) do
 		local boneID = ent:LookupBone(bone)
-		local matrix = boneID and ent:GetBoneMatrix(boneID)
-		if not matrix then chestEntries[ent] = nil return end
-		entry[bone] = matrix:GetTranslation()
+		local matrix = boneID and posedMatrix(ent, boneID)
+		if not matrix then return end
+		points[bone] = matrix:GetTranslation()
 	end
-	chestEntries[ent] = entry
-end)
 
-hook.Add("PostDrawOpaqueRenderables", "hg_chestbones", function(depth, skybox)
-	if depth or skybox or not next(chestEntries) then return end
+	local mdl = getShard()
+	if not mdl then return end
+	local count = math.Clamp(math.ceil((org.chest or 0) * maxChestShards), 1, maxChestShards)
 
-	local eyePos = EyePos()
-	local frame = FrameNumber()
-	local mdl
+	local spine = points["ValveBiped.Bip01_Spine2"]
+	local up = (points["ValveBiped.Bip01_Neck1"] - spine):GetNormalized()
+	local right = (points["ValveBiped.Bip01_R_UpperArm"] - points["ValveBiped.Bip01_L_UpperArm"]):GetNormalized()
+	local front = up:Cross(right):GetNormalized()
 
-	for ent, entry in pairs(chestEntries) do
-		if not IsValid(ent) then chestEntries[ent] = nil continue end
-		if entry.frame ~= frame or ent:GetPos():DistToSqr(eyePos) > drawDistSqr then continue end
-		local org = getChestOrganism(ent)
-		if not org then continue end
-		local count = math.Clamp(math.ceil((org.chest or 0) * maxChestShards), 1, maxChestShards)
-
-		local spine = entry["ValveBiped.Bip01_Spine2"]
-		local up = (entry["ValveBiped.Bip01_Neck1"] - spine):GetNormalized()
-		local right = (entry["ValveBiped.Bip01_R_UpperArm"] - entry["ValveBiped.Bip01_L_UpperArm"]):GetNormalized()
-		local front = up:Cross(right):GetNormalized()
-
-		mdl = mdl or getShard()
-		if not mdl then return end
-
-		render.SetColorModulation(1, 0.8, 0.76)
-		for i = 1, count do
-			local col, row = (i - 1) % 3, math.floor((i - 1) / 3)
-			local surface = spine + front * 5.5 + right * ((col - 1) * 2.6 + math.sin(i * 12.9) * 0.8) + up * (row * 2.4 - 2 + math.cos(i * 7.3) * 0.6)
-			local dir = (front + right * math.sin(i * 5.1) * 0.5 + up * math.cos(i * 3.7) * 0.5):GetNormalized()
-			drawShard(mdl, surface, dir, right, 2.5 + (i % 3) * 0.8, 0.35)
-		end
-		render.SetColorModulation(1, 1, 1)
+	render.SetColorModulation(1, 0.8, 0.76)
+	for i = 1, count do
+		local col, row = (i - 1) % 3, math.floor((i - 1) / 3)
+		local surface = spine + front * 5.5 + right * ((col - 1) * 2.6 + math.sin(i * 12.9) * 0.8) + up * (row * 2.4 - 2 + math.cos(i * 7.3) * 0.6)
+		local dir = (front + right * math.sin(i * 5.1) * 0.5 + up * math.cos(i * 3.7) * 0.5):GetNormalized()
+		drawShard(mdl, surface, dir, right, 2.5 + (i % 3) * 0.8, 0.35)
 	end
+	render.SetColorModulation(1, 1, 1)
 end)

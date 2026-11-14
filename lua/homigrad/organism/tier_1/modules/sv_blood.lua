@@ -474,6 +474,7 @@ function hg.organism.UpdateSepsis(org, mulTime, adrenalineStabilizer)
 	org.sepsisOrganPrev = (org.liver or 0) + (org.flank or 0)
 end
 
+---@param org table<string, any>
 module[2] = function(owner, org, mulTime)
 	local bloodCapacity =(hg.organism.normalBloodVolume or 5000) + (owner:IsPlayer() and owner.GetTraitBonus and owner:GetTraitBonus("blood_capacity", 0) or 0)
 	org.maxblood = math.max(bloodCapacity, 1)

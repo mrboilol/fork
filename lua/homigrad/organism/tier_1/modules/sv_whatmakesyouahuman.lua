@@ -2,40 +2,40 @@ local Clamp, Approach = math.Clamp, math.Approach
 
 local LINES = {
 	panic = {
-		civilian = {"Oh god oh god oh god...", "Where do I- where?!", "Move, MOVE, just move!", "No no no no no...", "I can't breathe, I can't think...", "Make it stop, make it stop!"},
-		trained = {"Okay, breathe. Get to cover first.", "Slow down. Panicking gets you killed.", "Breathe in... breathe out... now move.", "Too exposed. Move first, think after.", "Scared's fine. Freezing isn't."},
+		civilian = {"Oh god oh god oh god...", "I cant- I cant fucking focus...", "I CANT FOCUS!", "I need to clear my head...", "I cant' breathe properly...", "Make it stop.. make it stop..."},
+		trained = {"Just breathe...", "I need to find somewhere to relax.", "I need cover.", "I need to move.", "I need to get my shit in order."},
 	},
 	adrenaline = {
-		civilian = {"My heart's going crazy...", "Everything's so loud...", "I can do this. I can do this.", "My hands won't stay still..."},
-		trained = {"Alright. Who's next.", "Easy... front sight, squeeze.", "Good. Keep it going.", "Stay on it. Don't get cocky."},
+		civilian = {"My heart's going crazy...", "Everything's so loud...", "Why- why am I shaking...", "Im shaking.. im fucking shaking..."},
+		trained = {"Im starting to get anxious.", "Im starting to shake...", "I need to keep going...", "I cant panic.. not now.."},
 	},
 	crash = {
-		civilian = {"Why am I shaking now? It's over...", "I think I'm gonna be sick...", "My legs feel like jelly...", "I need to sit down..."},
-		trained = {"Here come the shakes. Ride it out.", "Hands are shaking. That's normal. Breathe.", "Coming down... check yourself for holes.", "Shake it off. Reset."},
+		civilian = {"Why am I shaking now? It's over...", "I think I'm gonna be sick...", "My legs are getting weak from that...", "Im dizzy and still shaking..."},
+		trained = {"Still shaking.. I need to relax.", "Its over. Im still shaking though.", "Im still shaking.", "Here come the shakes..."},
 	},
 	shotAt = {
-		civilian = {"THEY'RE SHOOTING AT ME! THEY'RE SHOOTING AT ME!", "Too close, too close, that was too close!", "I can't get my head up!", "Stop shooting, please stop shooting!"},
-		trained = {"Fuck, that's close- stay down!", "Pinned. Wait for them to reload.", "Don't pop up in the same spot.", "Where the hell is that coming from..."},
+		civilian = {"THEY'RE SHOOTING AT ME! THEY'RE SHOOTING AT ME!", "WHY ARE THEY SHOOTING- WHY!?", "OH GOD IM GOING TO FUCKING DIE", "STOP SHOOTING STOP SHOOTING!"},
+		trained = {"That's too close...", "Someone's angry at me...", "Im fucking pinned...", "Im being shot at..."},
 	},
 	witness = {
 		civilian = {"They just... they just died. Right there.", "Oh god, they're not moving...", "That could've been me...", "I watched them die..."},
-		trained = {"Can't help them now. Focus.", "They're gone. Don't look at it.", "Later. Deal with it later."},
+		trained = {"Can't help them now...", "They're gone..", "..."},
 	},
 	corpse = {
-		civilian = {"Don't look at it... don't look at it...", "There's so much blood...", "That was a person..."},
-		trained = {"Don't look. Keep moving.", "Not now. Think about it later."},
+		civilian = {"Don't look at them.. just don't...", "Holy shit.. are they...?", "That was a person..."},
+		trained = {"Don't look. Just dont look...", "Don't think about it..."},
 	},
 	firstKill = {
-		civilian = {"I killed someone... I actually killed someone...", "They're not getting up... I did that...", "Oh god, what did I just do..."},
-		trained = {"First one. Don't think about it. Not yet.", "They're down. That's it. Move."},
+		civilian = {"I killed someone... I actually killed someone...", "Why- Why aren't they moving...", "Oh god, what did I just do..."},
+		trained = {"First one.", "They're down."},
 	},
 	isolation = {
-		civilian = {"Nobody's coming... nobody's coming for me...", "I'm alone... I'm going to die alone here...", "Please, someone... anyone..."},
-		trained = {"Nobody's coming. Patch yourself up.", "On my own and hit... stop the bleeding first.", "No help's coming. Figure it out."},
+		civilian = {"Nobody's coming... nobody's coming for me...", "I'm alone and dying...", "WONT ANYONE COME FOR ME!?"},
+		trained = {"Nobody's coming...", "Im on my own...", "No help's coming..."},
 	},
 	anger = {
-		civilian = {"You son of a bitch...", "Oh, you're dead. You're DEAD.", "That's it. I'm not running.", "Come here. COME HERE!"},
-		trained = {"Wrong person to hit.", "Alright. My turn.", "Stay angry. Stay sharp.", "Not backing down from this."},
+		civilian = {"Fuck you. FUCK YOU!", "Oh, you're dead. You're DEAD.", "Im not fucking running from this.", "Come here. COME HERE!"},
+		trained = {"Im not going down.", "Im refusing to run.", "I need to fight back."},
 	},
 }
 

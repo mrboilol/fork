@@ -237,6 +237,7 @@ local function recoverTinnitus(org, timeValue)
     org.concussion_tinnitus = math.Approach(org.concussion_tinnitus or 0, 0, timeValue * 1.05 * recovery)
 end
 
+---@param org table<string, any>
 module[2] = function(ply, org, timeValue)
     if not org.concussion then org.concussion = 0 end
     if not org.concussion_onset then org.concussion_onset = 0 end
@@ -387,8 +388,6 @@ module[2] = function(ply, org, timeValue)
                 local phrase = selectConcussionPhrase(org, effectiveConcussion)
                 if phrase then
                     ply:Notify(phrase, 5, "concussion_thought", 0)
-                    -- Severe symptoms can recur sooner, but never stack into a
-                    -- constant stream of notifications.
                     org.nextConcussionThought = now + (stage >= 3 and math.Rand(14, 20) or math.Rand(22, 32))
                 end
             end
@@ -492,8 +491,6 @@ module[2] = function(ply, org, timeValue)
                 org.stamina.subadd = (org.stamina.subadd or 0) + VOMIT_STAMINA_DRAIN * 0.4
             end
         end
-        -- A failed roll must still schedule the next check; otherwise it rolls
-        -- every organism tick until it succeeds.
         org.nextDryHeave = now + math.Rand(16.0, 26.0)
     end
 end

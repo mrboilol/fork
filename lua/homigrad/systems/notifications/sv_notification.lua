@@ -6,6 +6,11 @@ util.AddNetworkString("HGThought")
 local hev_color = Color(255,125,0)
 local CreateThought
 local THOUGHT_GLOBAL_GAP = 1.2
+local UNTHROTTLED_GROUPS = {
+    blocked = true,
+    status = true,
+    good = true,
+}
 
 local function InDespair(ply)
     return (ply.despairUntil or 0) > CurTime()
@@ -566,7 +571,9 @@ local function SCPCBHitThought(ply, target, dmgType, dmg, hitPos, dmginfo)
         category = "head_nonlethal"
     end
 
-    SCPCBCreateThought(ply, category, dmgType, isLethal)
+    if dmgType ~= "bullet" or category == "armor_full" or category == "armor_partial" then
+        SCPCBCreateThought(ply, category, dmgType, isLethal)
+    end
 end
 
 SCPCBCreateThought = function(ply, category, dmgType, isLethal)
@@ -786,6 +793,9 @@ end
 
 local thoughtGroupPatterns = {
     {"blocked_", "blocked"},
+    {"hgstatus_", "status"},
+    {"hggood_", "good"},
+    {"emotion_", "emotion"}, {"witness_", "emotion"}, {"psyche_", "emotion"}, {"depression_", "emotion"}, {"selfharm", "emotion"}, {"wound_", "emotion"},
     {"oxygen", "respiration"}, {"hypox", "respiration"}, {"lowoxy", "respiration"}, {"breath", "respiration"}, {"lung", "respiration"}, {"pneumo", "respiration"}, {"hemothorax", "respiration"},
     {"blood", "circulation"}, {"bleed", "circulation"}, {"arter", "circulation"}, {"perfusion", "circulation"},
     {"heart", "cardiac"}, {"pulse", "cardiac"}, {"arrhythm", "cardiac"}, {"tachy", "cardiac"}, {"brady", "cardiac"},
@@ -825,7 +835,7 @@ CreateThought = function(ply, msg, delay, msgKey, showTime, clr, func)
     local now = CurTime()
     local group = GetThoughtGroup(msgKey, msg)
 
-    local blocked = group == "blocked"
+    local blocked = UNTHROTTLED_GROUPS[group] == true
     if not blocked and (ply.nextThoughtGlobal or 0) > now then return false end
     if (ply.thoughtGroupCooldowns[group] or 0) > now then return false end
     if not blocked and (ply.recentThoughtText[msg] or 0) > now then return false end
@@ -847,7 +857,7 @@ CreateThought = function(ply, msg, delay, msgKey, showTime, clr, func)
         ply.nextThoughtGlobal = now + THOUGHT_GLOBAL_GAP
         ply.recentThoughtText[msg] = now + 25
     end
-    ply.thoughtGroupCooldowns[group] = now + (blocked and 1 or group == "misc" and 3 or 6)
+    ply.thoughtGroupCooldowns[group] = now + (blocked and 0 or (group == "misc" or group == "emotion") and 3 or 6)
 
     showTime = showTime or 0
     local clr = clr or color_white
@@ -1124,6 +1134,213 @@ hook.Add("EntityTakeDamage", "SCPCB_HGThoughtDamage", function(target, dmginfo)
     SCPCBHitThought(ply, target, dmgType, dmginfo:GetDamage(), nil, dmginfo)
 end)
 
+local BODY_SEGMENTS = {
+	{"ValveBiped.Bip01_Head1", nil, "head"},
+	{"ValveBiped.Bip01_Neck1", "ValveBiped.Bip01_Head1", "neck"},
+	{"ValveBiped.Bip01_Spine2", "ValveBiped.Bip01_Spine4", "chest"},
+	{"ValveBiped.Bip01_Spine", "ValveBiped.Bip01_Spine2", "stomach"},
+	{"ValveBiped.Bip01_Pelvis", nil, "pelvis"},
+	{"ValveBiped.Bip01_L_UpperArm", "ValveBiped.Bip01_L_Forearm", "left upper arm"},
+	{"ValveBiped.Bip01_L_Forearm", "ValveBiped.Bip01_L_Hand", "left forearm"},
+	{"ValveBiped.Bip01_L_Hand", nil, "left hand"},
+	{"ValveBiped.Bip01_R_UpperArm", "ValveBiped.Bip01_R_Forearm", "right upper arm"},
+	{"ValveBiped.Bip01_R_Forearm", "ValveBiped.Bip01_R_Hand", "right forearm"},
+	{"ValveBiped.Bip01_R_Hand", nil, "right hand"},
+	{"ValveBiped.Bip01_L_Thigh", "ValveBiped.Bip01_L_Calf", "left thigh"},
+	{"ValveBiped.Bip01_L_Calf", "ValveBiped.Bip01_L_Foot", "left shin"},
+	{"ValveBiped.Bip01_L_Foot", "ValveBiped.Bip01_L_Toe0", "left foot"},
+	{"ValveBiped.Bip01_R_Thigh", "ValveBiped.Bip01_R_Calf", "right thigh"},
+	{"ValveBiped.Bip01_R_Calf", "ValveBiped.Bip01_R_Foot", "right shin"},
+	{"ValveBiped.Bip01_R_Foot", "ValveBiped.Bip01_R_Toe0", "right foot"},
+}
+local NEAR_MISS_PARTS = {head = {"head", "forehead", "face"}, neck = {"neck", "throat"}}
+local HIT_ORGAN_KEYS = {"heart", "liver", "flank", "gut", "trachea", "eyeL", "eyeR", "brainFrontal", "brainParietal", "brainTemporal", "brainOccipital"}
+local HIT_LUNG_KEYS = {"lungsL", "lungsR"}
+local HIT_BONES = {
+	lleg_up = "left thigh", lleg_down = "left shin", rleg_up = "right thigh", rleg_down = "right shin",
+	larm_up = "left upper arm", larm_down = "left forearm", rarm_up = "right upper arm", rarm_down = "right forearm",
+	chest = "ribs", pelvis = "pelvis", spine1 = "spine", spine2 = "spine", spine3 = "neck", skull = "skull", jaw = "jaw",
+}
+local HIT_ARTERIES = {
+	arteria = "You are bleeding from an artery in your neck.",
+	aorta = "Your aorta is torn open.",
+	larmartery = "You are bleeding from an artery in your left arm.",
+	rarmartery = "You are bleeding from an artery in your right arm.",
+	llegartery = "You are bleeding from an artery in your left leg.",
+	rlegartery = "You are bleeding from an artery in your right leg.",
+}
+local HIT_REPORT_COLOR = Color(255, 110, 110)
+local HIT_REPORT_COOLDOWN = 0.5
+local NEAR_MISS_REACTION_CHANCE = 0.5
+local NEAR_MISS_REACTIONS = {
+	"Holy shit- I almost got shot...",
+	"Fuck- that was way too close...",
+	"Shit, shit- that almost hit me...",
+	"Jesus- that was close...",
+}
+
+local function segmentDistanceSqr(point, a, b)
+	if not b then return point:DistToSqr(a) end
+
+	local ab = b - a
+	local lengthSqr = ab:LengthSqr()
+	if lengthSqr <= 0 then return point:DistToSqr(a) end
+
+	local t = math.Clamp((point - a):Dot(ab) / lengthSqr, 0, 1)
+
+	return point:DistToSqr(a + ab * t)
+end
+
+local function boneSegment(body, segment)
+	local bone = body:LookupBone(segment[1])
+	if not bone then return end
+
+	local startPos = body:GetBonePosition(bone)
+	local child = segment[2] and body:LookupBone(segment[2])
+	local endPos = child and body:GetBonePosition(child) or nil
+
+	return startPos, endPos
+end
+
+local function nearestBodyPart(body, point)
+	local best, bestDist
+
+	for _, segment in ipairs(BODY_SEGMENTS) do
+		local startPos, endPos = boneSegment(body, segment)
+		if startPos then
+			local dist = segmentDistanceSqr(point, startPos, endPos)
+			if not bestDist or dist < bestDist then best, bestDist = segment[3], dist end
+		end
+	end
+
+	return best
+end
+
+local function nearestBodyPartToLine(body, src, dir, length)
+	local best, bestDist
+
+	for _, segment in ipairs(BODY_SEGMENTS) do
+		local startPos, endPos = boneSegment(body, segment)
+		if startPos then
+			local samples = endPos and {startPos, (startPos + endPos) * 0.5, endPos} or {startPos}
+			for _, sample in ipairs(samples) do
+				local closest = src + dir * math.Clamp((sample - src):Dot(dir), 0, length)
+				local dist = sample:DistToSqr(closest)
+				if not bestDist or dist < bestDist then best, bestDist = segment[3], dist end
+			end
+		end
+	end
+
+	return best
+end
+
+local function snapshotOrganism(org)
+	local snapshot = {time = CurTime(), organs = 0, bones = {}}
+
+	for _, key in ipairs(HIT_ORGAN_KEYS) do
+		snapshot.organs = snapshot.organs + (tonumber(org[key]) or 0)
+	end
+	for _, key in ipairs(HIT_LUNG_KEYS) do
+		local lung = org[key]
+		snapshot.organs = snapshot.organs + (istable(lung) and tonumber(lung[1]) or 0)
+	end
+	for key in pairs(HIT_BONES) do
+		snapshot.bones[key] = tonumber(org[key]) or 0
+	end
+
+	snapshot.wounds = istable(org.wounds) and #org.wounds or 0
+	snapshot.arterial = istable(org.arterialwounds) and #org.arterialwounds or 0
+
+	return snapshot
+end
+
+local function sendHitReport(ply, key, msg)
+	CreateThought(ply, msg, HIT_REPORT_COOLDOWN, "hgstatus_hit_" .. key, 0, HIT_REPORT_COLOR)
+end
+
+local function hitReportTarget(victim, ent)
+	local ply = SCPCBThoughtOwner(victim)
+	if not IsValid(ply) or ply:GetInfoNum("hg_newthoughts", 0) <= 0 then return end
+
+	local org = (IsValid(ent) and ent.organism) or ply.organism
+	if not org then return end
+
+	return ply, org
+end
+
+hook.Add("PreHomigradDamage", "HGThoughtHitReport", function(victim, dmgInfo, hitgroup, ent)
+	if not dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) then return end
+
+	local ply, org = hitReportTarget(victim, ent)
+	if not ply then return end
+
+	org.hgHitSnapshot = snapshotOrganism(org)
+end)
+
+hook.Add("HomigradDamage", "HGThoughtHitReport", function(victim, dmgInfo, hitgroup, ent)
+	if not dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) then return end
+
+	local ply, org = hitReportTarget(victim, ent)
+	if not ply then return end
+
+	local before = org.hgHitSnapshot
+	org.hgHitSnapshot = nil
+	if not before or before.time ~= CurTime() then return end
+
+	local after = snapshotOrganism(org)
+	local newArteries = after.arterial > before.arterial
+	local organHit = after.organs > before.organs + 0.001
+	local fractures = {}
+
+	for key, label in pairs(HIT_BONES) do
+		if before.bones[key] < 1 and after.bones[key] >= 1 then fractures[#fractures + 1] = label end
+	end
+
+	local wounded = newArteries or after.wounds > before.wounds or organHit or #fractures > 0
+	if not wounded then return end
+
+	local body = IsValid(ent) and ent or hg.GetCurrentCharacter(ply)
+	local part = IsValid(body) and nearestBodyPart(body, dmgInfo:GetDamagePosition())
+	sendHitReport(ply, "location", part and "A bullet hit your " .. part .. "." or "A bullet hit you.")
+
+	for _, label in ipairs(fractures) do
+		sendHitReport(ply, "fracture_" .. label, label == "ribs" and "Your ribs are broken." or "Your " .. label .. " is broken.")
+	end
+
+	if organHit then sendHitReport(ply, "organ", "You have organ damage.") end
+
+	if newArteries then
+		local wound = org.arterialwounds[#org.arterialwounds]
+		local name = istable(wound) and wound[7]
+		sendHitReport(ply, "artery", HIT_ARTERIES[name] or "You are bleeding from an artery.")
+	elseif after.wounds > before.wounds then
+		sendHitReport(ply, "bleed", "You are bleeding.")
+	end
+end)
+
+local function NearMissThought(ply, body, src, dir, length)
+	local now = CurTime()
+	if (ply.hgNearMissNext or 0) > now then return false end
+
+	if ply:GetInfoNum("hg_newthoughts", 0) > 0 then
+		local part = nearestBodyPartToLine(body, src, dir, length) or "head"
+		local variants = NEAR_MISS_PARTS[part]
+		if variants then part = variants[math.random(#variants)] end
+
+		if not CreateThought(ply, "A bullet almost hit your " .. part .. ".", 6, "near_miss_report", 0, color_white) then return false end
+
+		if math.Rand(0, 1) < NEAR_MISS_REACTION_CHANCE then
+			CreateThought(ply, NEAR_MISS_REACTIONS[math.random(#NEAR_MISS_REACTIONS)], 10, "hgstatus_near_miss_reaction", 0.6, color_white)
+		end
+	elseif not CreateNotification(ply, NEAR_MISS_REACTIONS[math.random(#NEAR_MISS_REACTIONS)], 10, "near_miss_reaction") then
+		return false
+	end
+
+	ply.hgNearMissNext = now + 6
+
+	return true
+end
+
 local function SCPCBCheckBulletNearMiss(entity, shooter, src, hitPos, hitEntity, reported)
 	local dir = hitPos - src
 	local length = dir:Length()
@@ -1142,7 +1359,7 @@ local function SCPCBCheckBulletNearMiss(entity, shooter, src, hitPos, hitEntity,
 		local closestPoint = src + dir * projection
 
 		if plyPos:DistToSqr(closestPoint) < 125 * 125 then
-			if SCPCBCreateThought(ply, "near_miss", "bullet", false) and reported then
+			if NearMissThought(ply, body, src, dir, length) and reported then
 				reported[ply] = true
 			end
 		end

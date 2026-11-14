@@ -58,7 +58,7 @@ hook.Add("Think", "hg_adrenalinemusic_check", function()
 	end
 
 	local organism = ply.new_organism or ply.organism
-	if not organism or organism.otrub or (organism.noradrenaline or 0) > 0.01 or (organism.berserk or 0) > 0.01 then
+	if not organism or organism.otrub then
 		StopAdrenalineMusic(true)
 		return
 	end
@@ -74,7 +74,7 @@ hook.Add("Think", "hg_adrenalinemusic_check", function()
 		return
 	end
 
-	local duration = 10 + math.Clamp(organism.fear or 0, 0, 1) * 10 + math.Clamp(organism.adrenaline or 0, 0, 5) * 5
+	local duration = 10 + math.Clamp(organism.fear or 0, 0, 1) * 10
 	local remaining = duration - (CurTime() - hg.lastCombatTime)
 	if remaining <= 0 then
 		StopAdrenalineMusic(false)

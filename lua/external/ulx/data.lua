@@ -35,10 +35,6 @@ files["adverts.txt"] =
 	"time_on_screen" "10"
 	"time" "300"
 }
-{
-	"text" "This server is running ULX Admin Mod %ulx_version% by Team Ulysses from ulyssesmod.net"
-	"time" "635"
-}
 ]]
 
 files["banmessage.txt"] = [[

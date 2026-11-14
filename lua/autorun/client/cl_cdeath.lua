@@ -556,6 +556,8 @@ local function CinematicDeathTracker()
         CDeath.incapTimerDeath = incapExpiring
     end
 
+	if hg and hg.SimpleHealth and hg.SimpleHealth.HoldsDeathScreen() then return end
+
 	if not ply:Alive() and not CDeath.isDead and CDeath.hasSpawned then
 		CDeath.isDead           = true
 		if not RealishDeathEffect() then TakeAuthority() end
@@ -888,6 +890,10 @@ local function CinematicDeathBackground()
 			surface.DrawRect(0, 0, sw, sh)
 			local textAlpha = math.floor(math.Clamp((stageElapsed - SILENT_TEXT_DELAY) / SILENT_TEXT_FADE_IN, 0, 1) * alpha)
 			draw.SimpleText(CDeath.silentMessage, "DeathEffect_HG", sw / 2, sh / 2, Color(200, 200, 200, textAlpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			local causeText = hg and hg.SimpleHealth and hg.SimpleHealth.GetDeathCauseText and hg.SimpleHealth.GetDeathCauseText()
+			if causeText then
+				draw.SimpleText(causeText, "DeathEffect_HG_Desc", sw / 2, sh / 2 + 55, Color(200, 200, 200, textAlpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			end
 			return
 		end
 		if realish then
@@ -938,6 +944,10 @@ local function CinematicDeathBackground()
         local textY = sh / 2 - 60 + math.cos(CurTime() * 110) * shake
         draw.SimpleText(text, "DeathEffect_HG_Large", textX, textY, Color(0, 0, 0, textAlpha), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
         draw.SimpleText(desc, "DeathEffect_HG_Desc", textX + 6, textY + 85, Color(0, 0, 0, textAlpha), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+        local causeText = hg and hg.SimpleHealth and hg.SimpleHealth.GetDeathCauseText and hg.SimpleHealth.GetDeathCauseText()
+        if causeText then
+            draw.SimpleText(causeText, "DeathEffect_HG_Desc", textX + 6, textY + 125, Color(0, 0, 0, textAlpha), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+        end
 
         local hint = "press [SPACE] or [BACKSPACE] to skip"
         local hintAlpha = math.floor(textFadeIn * overlayAlpha * 0.45)

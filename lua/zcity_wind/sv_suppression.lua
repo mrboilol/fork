@@ -30,9 +30,14 @@ local function IsSuppressionShooter(ply, shooter)
     return false
 end
 
-local function SendSuppressionFlinch(ply, eyePos, closestPos)
+local GRAZE_MIN_DIST = 14
+local GRAZE_MAX_DIST = 36
+local GRAZE_FORCE = 14
+local GRAZE_COLOR = Color(255, 80, 80)
+
+local function SendSuppressionFlinch(ply, eyePos, closestPos, hard)
     local now = CurTime()
-    if (ply._ZCityWindFlinchNext or 0) > now or IsValid(ply.FakeRagdoll) then return end
+    if not hard and ((ply._ZCityWindFlinchNext or 0) > now or IsValid(ply.FakeRagdoll)) then return end
     ply._ZCityWindFlinchNext = now + 0.6
 
     local onRight = ply:EyeAngles():Right():Dot(closestPos - eyePos) > 0
@@ -46,8 +51,99 @@ local function SendSuppressionFlinch(ply, eyePos, closestPos)
     net.Broadcast()
 end
 
+local function GrazeProbePoints(ply)
+    local body = hg and hg.GetCurrentCharacter and hg.GetCurrentCharacter(ply)
+    if IsValid(body) and body ~= ply then return {body:WorldSpaceCenter()} end
+
+    local pos = ply:GetPos()
+    return {pos + Vector(0, 0, 12), pos + Vector(0, 0, 36), ply:EyePos()}
+end
+
+local function GrazeThought(ply)
+    if not ply.Thought then return end
+
+    local useNew = ply:GetInfoNum("hg_newthoughts", 0) > 0
+    ply:Thought(useNew and "A bullet grazed you." or "AHH- THAT BULLET GRAZED ME", 3, "hgstatus_bulletgraze", 0, GRAZE_COLOR)
+end
+
+function ZW.ApplyBulletShock(ply, damage, fromPos)
+    local org = ply.organism
+    if not org or org.otrub then return end
+
+    SendSuppressionFlinch(ply, ply:EyePos(), fromPos, true)
+
+    local strength = math.Clamp((tonumber(damage) or 10) / 30, 0.5, 1.5)
+    if ply.AddNaturalAdrenaline then ply:AddNaturalAdrenaline(0.08 * strength) end
+    org.fearadd = (org.fearadd or 0) + 0.3 * strength
+    if hg.organism and hg.organism.AddPanicAttack then
+        hg.organism.AddPanicAttack(org, 0.12 * strength, true, true, true, true)
+    end
+end
+
+function ZW.GrazePlayer(ply, closestPos, damage)
+    if (ply._ZCityWindGrazeNext or 0) > CurTime() then return end
+    ply._ZCityWindGrazeNext = CurTime() + 0.4
+
+    local org = ply.organism
+    if not org or org.otrub then return end
+
+    ZW.ApplyBulletShock(ply, damage, closestPos)
+
+    net.Start("ZCity_Wind_SuppressionForce")
+        net.WriteVector(closestPos)
+        net.WriteFloat(GRAZE_FORCE)
+        net.WriteBool(false)
+        net.WriteBool(false)
+        net.WriteBool(false)
+        net.WriteFloat(tonumber(damage) or 10)
+        net.WriteBool(false)
+    net.Send(ply)
+
+    GrazeThought(ply)
+end
+
+function ZW.CheckBulletGraze(bullet, startPos, endPos)
+    if not bullet or not startPos or not endPos then return end
+    if (endPos - startPos):LengthSqr() <= 1 then return end
+
+    local shooter = GetBulletShooterEntity(bullet)
+    local grazed = bullet._ZCityWindGrazed
+    if not grazed then
+        grazed = {}
+        bullet._ZCityWindGrazed = grazed
+    end
+
+    local now = CurTime()
+    for _, ply in PlayerIterator() do
+        if not IsValid(ply) or not ply:Alive() or grazed[ply] then continue end
+        if IsSuppressionShooter(ply, shooter) or (ply._ZCityWindGrazeHitUntil or 0) > now then continue end
+
+        local nearest, nearestPos = math.huge
+        for _, point in ipairs(GrazeProbePoints(ply)) do
+            local dist, closest = distanceToLine(startPos, endPos, point)
+            if dist and dist < nearest then nearest, nearestPos = dist, closest end
+        end
+
+        if nearest < GRAZE_MIN_DIST or nearest > GRAZE_MAX_DIST then continue end
+
+        local filter = {ply, hg.GetCurrentCharacter(ply)}
+        if IsValid(shooter) then filter[#filter + 1] = shooter end
+        local blocked = traceLine({
+            start = nearestPos,
+            endpos = ply:WorldSpaceCenter(),
+            filter = filter,
+            mask = maskShot
+        }).Hit
+        if blocked then continue end
+
+        grazed[ply] = true
+        ZW.GrazePlayer(ply, nearestPos, bullet.Damage)
+    end
+end
+
 function ZW.SendServerSuppressionForBullet(bullet, startPos, endPos)
     if not config.Suppression then return end
+    ZW.CheckBulletGraze(bullet, startPos, endPos)
     if not bullet or not startPos or not endPos then return end
 
     local move = endPos - startPos
@@ -187,7 +283,11 @@ hook.Add("PostEntityFireBullets", "ZCity_Wind_HitscanNearMissAudio", function(sh
         Speed = tonumber(data.Speed) or 343
     }
 
-    ZW.SendServerSuppressionForBullet(synthetic, data.Src, data.Src + direction * distance)
+    local endPos = data.Src + direction * distance
+    local trace = data.Trace
+    if istable(trace) and isvector(trace.HitPos) and not trace.HitSky then endPos = trace.HitPos end
+
+    ZW.SendServerSuppressionForBullet(synthetic, data.Src, endPos)
 end)
 
 -- A hit is suppression too. Physical bullets may die during their impact tick,
@@ -201,9 +301,11 @@ hook.Add("EntityTakeDamage", "ZCity_Wind_BulletHitSuppression", function(ent, dm
 	local now = CurTime()
 	if (ply._ZCityWindBulletHitSuppressionNext or 0) > now then return end
 	ply._ZCityWindBulletHitSuppressionNext = now + 0.03
+	ply._ZCityWindGrazeHitUntil = now + 0.25
 
 	local pos = dmgInfo:GetDamagePosition()
 	if not pos or pos:IsZero() then pos = ply:EyePos() end
+	ZW.ApplyBulletShock(ply, dmgInfo:GetDamage(), pos)
 	local force = math.Clamp(6 + dmgInfo:GetDamage() / 12, 6, 10)
 
 	net.Start("ZCity_Wind_SuppressionForce")

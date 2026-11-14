@@ -59,7 +59,7 @@ local EMO = {
 	hopelessDepression = 0.2,
 	doomedHurt = 0.7,
 	doomedDepression = 0.08,
-	botchTime = 10,
+	botchTries = 4,
 	botchTryWindow = 3,
 	botchDepression = 0.06,
 }
@@ -67,51 +67,56 @@ local EMO = {
 local HANDS = {weapon_hg_coolhands = true, weapon_hands_sh = true}
 
 local PHRASES = {
-	buddyDeath = {"No... no, they were RIGHT THERE...", "They're dead. They're actually dead.", "They were right next to me... and now they're just... gone."},
-	buddyDown = {"No, no, no, get up!", "Oh god, not them!", "Shit, they're down! They're down!"},
-	friendlyFire = {"OH SHIT, THAT WAS ONE OF OURS!", "No no no, I hit my own guy!", "Fuck- I shot them, I shot our guy!"},
-	friendlyKill = {"They're not moving... I killed them... I killed our own...", "What did I do... they were on my side...", "That's on me. I did that."},
-	calmDown = {"One down.", "Next.", "Keep moving."},
+	buddyDeath = {"Holy shit.. they just died...", "THEY JUST FUCKING DIED IN FRONT OF ME", "IM NEXT, IM NEXT!"},
+	buddyDown = {"No, no, no, get up!", "They're down.. holy crap..", "Oh fuck- he just dropped down.."},
+	friendlyFire = {"DID I JUST HIT MY OWN TEAMMATE?", "I JUST HIT MY OWN TEAM", "WHY DID I DO THAT"},
+	friendlyKill = {"WHAT DID I JUST DO", "THEY WERE ON MY SIDE", "WHAT THE FUCK IS WRONG WITH ME"},
+	calmDown = {
+		solo = {"That's it.. I won.", "Oh.. its over.", "Hey.. I got him."},
+		ganged = {"Nice.. one down.", "Shit.. there's still more?", "Thats one out of many."},
+		group = {"I KNEW WE COULD DO IT!", "I GOT ONE!", "YEAH! ONE DOWN!"},
+		fist = {"THAT'S WHAT YOU GET!", "YEAH! HOW'D YOU LIKE THAT?"},
+	},
 	hope = {
-		solo = {"They're down... I might actually live through this!", "That's one! Keep it going!"},
-		ganged = {"One less on me... I can do this!", "They CAN go down... keep going!", "That's one... just a few more..."},
-		group = {"We can actually win this!", "One down! Keep it up!", "They're dropping! Push, push!"},
-		fist = {"Stay down! STAY DOWN!", "Got one... who's next?!"},
+		solo = {"Fuck- I think I finally got him down..", "I got one.."},
+		ganged = {"One less on me... I can do this!", "I know I can keep going I just know it..", "I might actually win this..."},
+		group = {"WE MIGHT WIN!", "YEAH, HOW'D YOU LIKE THAT?"},
+		fist = {"THAT'S WHAT YOU GET!", "I KNEW I HAD IT IN ME!"},
 	},
 	relief = {
-		solo = {"It's over... I'm still alive.", "They're down. I'm okay. I'm okay.", "Breathe... it's done."},
+		solo = {"It's over... I'm still alive.", "I'm okay.. Im okay...", "Im fucking shaking after that..."},
 		ganged = {"All of them... holy shit, I'm alive...", "I actually made it... I don't believe it..."},
 		group = {"We did it... we actually did it.", "That's all of them. We're okay.", "It's over. We made it."},
-		fist = {"They're out cold... it's over.", "Stay down... it's done."},
+		fist = {"They're out.. I did it..", "I did that.. With my fists..."},
 	},
 	chance = {
-		solo = {"They're hurt... I can actually win this!", "They're slowing down... keep at it!"},
-		ganged = {"That one's hurt bad... I might get out of this!", "I got one good... don't stop now!"},
-		group = {"They're breaking! We've got this!", "They're hurt! Keep pushing!"},
-		fist = {"That one landed! They felt that!", "Something cracked... keep hitting!"},
+		solo = {"They're in pain.. I need to keep going.", "They're slowing down, I cant stop now."},
+		ganged = {"That one's hurt bad... I might get out of this..", "I got one, I must keep going."},
+		group = {"They're breaking! We've got this!", "They're hurt! We might win!"},
+		fist = {"I need to keep going, They're going down!", "I felt something of them break."},
 	},
 	disarm = {
-		solo = {"They lost their gun! Now, NOW'S my chance!", "They're unarmed... go, go!"},
-		ganged = {"One of them dropped it! Keep going!"},
-		group = {"They dropped it! Push them!", "They're unarmed, GO!"},
-		fist = {"Got it out of their hands!"},
+		solo = {"I got their gun- I got it!", "Oh shit- Their gun is gone!"},
+		ganged = {"One of them dropped it!"},
+		group = {"They dropped their gun..?", "They're unarmed!"},
+		fist = {"I gotta hit them before they pick it up!"},
 	},
 	doomed = {
-		solo = {"They're going to kill me... they're actually going to kill me...", "I'm hit bad... they're coming to finish me..."},
-		ganged = {"There's too many! I can't- there's too many!", "They're all on me... I can't hold them..."},
-		group = {"I'M HIT, SOMEONE HELP ME!", "I'm down! Cover me, please, cover me!"},
-		fist = {"One more hit and I'm done...", "They're not stopping... they're going to beat me to death..."},
+		solo = {"They're going to kill me, They're actually going to fucking kill me..", "I'm fucking hurt.. I dont know if I can keep going.."},
+		ganged = {"Jesus chrsist im going to die to them..", "There's too much of them..!"},
+		group = {"Someone help me please...", "Please someone just cover me..."},
+		fist = {"One more hit and I'm done...", "They're gonna beat me to fucking death..."},
 	},
 	botch = {
-		solo = {"Why can't I hit them?!", "Why won't they go DOWN?!"},
-		ganged = {"I can't hit any of them!", "There's too many, I can't hit anything!"},
-		group = {"I'm not hitting shit... I'm useless...", "Everyone's fighting and I can't hit a damn thing..."},
-		fist = {"I can't land anything...", "They keep blocking everything..."},
+		solo = {"WHY AM I MISSING", "I CAN'T FUCKING HIT THEM"},
+		ganged = {"HOW HAVE I NOT HIT ANYTHING", "I CAN'T HIT ANY OF THEM!"},
+		group = {"I'm not hitting shit..", "Fuck, im useless.."},
+		fist = {"I can't land anything...", "I can't hit a damn thing!"},
 	},
 	hopeless = {
-		solo = {"It's not working... nothing's working... I'm going to die...", "I can't beat them... I'm going to die here..."},
-		ganged = {"There's too many... I'm not getting out of this...", "They're everywhere... this is it..."},
-		group = {"We're losing... we're all going to die here...", "We're fucked... we're so fucked..."},
+		solo = {"I'm going to die to this fucking guy.", "I'm going to die arent I?"},
+		ganged = {"I'm not getting out of this.", "This is it."},
+		group = {"We're losing...", "We're fucked... we're so fucked..."},
 		fist = {"I can't fight back... they're going to kill me with their bare hands...", "I can't even lift my arms anymore..."},
 	},
 }
@@ -128,8 +133,11 @@ local function resolveVictim(ent)
 	if IsValid(ent.ply) and ent.ply:IsPlayer() then return ent.ply end
 end
 
+local downedFighter
+
 local function isActiveFighter(ent)
 	if not IsValid(ent) then return false end
+	if ent == downedFighter then return true end
 	if ent:IsPlayer() then
 		return ent:Alive() and not (ent.organism and ent.organism.otrub)
 	end
@@ -171,11 +179,36 @@ local function wasFighting(tbl, ent)
 	return tbl and (tbl[ent] or 0) > CurTime() - FIGHT_WINDOW
 end
 
+local function hitsFrom(victim, attacker)
+	local rec = victim.hgHitsFrom and victim.hgHitsFrom[attacker]
+	return rec and rec.t > CurTime() - FIGHT_WINDOW and rec.n or 0
+end
+
+local function hitsMeMore(owner, ent)
+	local onMe = hitsFrom(owner, ent)
+	if onMe == 0 then return false end
+	local onTargets = 0
+	for target, when in pairs(owner.hgFightTargets or {}) do
+		if IsValid(target) and when > CurTime() - FIGHT_WINDOW then
+			onTargets = onTargets + hitsFrom(target, ent)
+		end
+	end
+	return onTargets <= onMe
+end
+
+local function collectAttackers(owner, exclude)
+	local out = {}
+	for _, ent in ipairs(collectRecent(owner.hgFightAttackers, exclude)) do
+		if hitsMeMore(owner, ent) then out[#out + 1] = ent end
+	end
+	return out
+end
+
 local function countSupporters(owner)
 	local seen, count = {}, 0
 	for _, target in ipairs(collectRecent(owner.hgFightTargets)) do
 		for _, ally in ipairs(collectRecent(target.hgFightAttackers, owner)) do
-			if not seen[ally] and ally:GetPos():DistToSqr(owner:GetPos()) <= SUPPORT_RADIUS * SUPPORT_RADIUS then
+			if not seen[ally] and not hitsMeMore(owner, ally) and ally:GetPos():DistToSqr(owner:GetPos()) <= SUPPORT_RADIUS * SUPPORT_RADIUS then
 				seen[ally] = true
 				count = count + 1
 			end
@@ -193,7 +226,7 @@ function hg.organism.GetAdrenalineGainMul(org)
 	if (org._adrGainMulNext or 0) > now then return (org._adrGainMul or 1) * numb end
 	org._adrGainMulNext = now + GAIN_MUL_REFRESH
 
-	local balance = countSupporters(owner) - math.max(#collectRecent(owner.hgFightAttackers) - 1, 0)
+	local balance = countSupporters(owner) - math.max(#collectAttackers(owner) - 1, 0)
 	local mul = 1
 	if balance > 0 then
 		mul = math.max(1 / (1 + SUPPORT_STEP * balance), SUPPORT_FLOOR)
@@ -259,7 +292,7 @@ end
 
 local function isEndangered(watcher, org, killer)
 	if (org.panicGunfightUntil or 0) > CurTime() then return true end
-	if #collectRecent(watcher.hgFightAttackers) > 0 then return true end
+	if #collectAttackers(watcher) > 0 then return true end
 	return IsValid(killer) and killer != watcher and isActiveFighter(killer)
 		and killer:GetPos():DistToSqr(watcher:GetPos()) <= KILLER_THREAT_RADIUS * KILLER_THREAT_RADIUS
 end
@@ -305,6 +338,11 @@ local function isBuddy(watcher, victim, twoTeams)
 	if wasFighting(watcher.hgFightTargets, victim) or wasFighting(watcher.hgFightAttackers, victim) then return false end
 	if twoTeams and watcher:Team() == victim:Team() then return true end
 	return sharesEnemy(watcher, victim)
+end
+
+local function isEnemySide(watcher, victim, twoTeams)
+	if victim:IsNPC() then return victim:Disposition(watcher) == D_HT end
+	return twoTeams and victim:IsPlayer() and watcher:Team() != victim:Team()
 end
 
 local function isFriendlyHit(attacker, victim)
@@ -355,7 +393,7 @@ end
 
 local function clearLosing(org)
 	org.hgLosing = nil
-	org.hgNoHitSince = nil
+	org.hgMissTries = nil
 	org.hgDoomedSaid = nil
 	org.hgHopelessSaid = nil
 	org.hgBotchSaid = nil
@@ -363,9 +401,9 @@ local function clearLosing(org)
 end
 
 local function updateLosing(ply, org, now)
-	local attackers = collectRecent(ply.hgFightAttackers)
+	local attackers = collectAttackers(ply)
 	if #attackers == 0 then
-		org.hgNoHitSince = nil
+		org.hgMissTries = nil
 		org.hgLosing = math.max((org.hgLosing or 0) - EMO.losingInterval * 2, 0)
 		if org.hgLosing <= 0 and #collectRecent(ply.hgFightTargets) == 0 then clearLosing(org) end
 		return
@@ -381,12 +419,6 @@ local function updateLosing(ply, org, now)
 	local hurt = hurtLevel(org)
 	local outnumbered = math.max(#attackers - 1 - countSupporters(ply), 0)
 	local losing = math.Clamp(hurt * 0.6 + (landed == 0 and 0.3 or 0) + outnumbered * 0.2, 0, 1)
-
-	if landed > 0 then
-		org.hgNoHitSince = nil
-	elseif (ply.hgLastAttackTry or 0) > now - EMO.botchTryWindow then
-		org.hgNoHitSince = org.hgNoHitSince or now
-	end
 
 	if losing >= EMO.losingStart then
 		org.hgLosing = (org.hgLosing or 0) + EMO.losingInterval * losing
@@ -404,7 +436,7 @@ local function updateLosing(ply, org, now)
 		org.hgDoomedSaid = true
 		addDepression(org, EMO.doomedDepression, "fight")
 		emotionThought(ply, PHRASES.doomed, "emotion_doomed", context)
-	elseif org.hgNoHitSince and now - org.hgNoHitSince >= EMO.botchTime and not org.hgBotchSaid then
+	elseif (org.hgMissTries or 0) >= EMO.botchTries and (ply.hgLastAttackTry or 0) > now - EMO.botchTryWindow and not org.hgBotchSaid then
 		org.hgBotchSaid = true
 		addDepression(org, EMO.botchDepression, "fight")
 		emotionThought(ply, PHRASES.botch, "emotion_botch", context)
@@ -416,13 +448,15 @@ local function updateLosing(ply, org, now)
 end
 
 local function reactAsFighter(watcher, org, victim, isDeath, victimPos, victimEnt)
-	local gangedBy = collectRecent(watcher.hgFightAttackers, victim)
+	local gangedBy = collectAttackers(watcher, victim)
 	if #gangedBy > 0 then
 		addSurge(org, SURGE_GANGED_KILL * (isDeath and 1 or 0.6) * hg.organism.GetAdrenalineGainMul(org))
 	end
 	if not canSee(watcher, victimPos, EMO.fighterSeeRadius, SEE_DOT, victim, victimEnt) then return end
 
-	local context = org.hgFightContext or "solo"
+	downedFighter = victim
+	local context = getFightContext(watcher, collectAttackers(watcher), CurTime())
+	downedFighter = nil
 	local stressed = isStressed(org)
 	if #gangedBy > 0 or #collectRecent(watcher.hgFightTargets, victim) > 0 then
 		addHappiness(org, EMO.hopeHappiness * (isDeath and 1 or 0.8))
@@ -546,7 +580,7 @@ local function onVictimDown(victim, killer, isDeath)
 			emotionThought(watcher, isDeath and PHRASES.buddyDeath or PHRASES.buddyDown, "witness_buddy")
 		else
 			applyStress(watcher, org, stress, killer, 1)
-			if isDeath and hg.organism.PsycheWitnessDeath then hg.organism.PsycheWitnessDeath(watcher, org, victimPos) end
+			if isDeath and hg.organism.PsycheWitnessDeath and not isEnemySide(watcher, victim, twoTeams) then hg.organism.PsycheWitnessDeath(watcher, org, victimPos) end
 		end
 	end
 
@@ -570,6 +604,14 @@ hook.Add("EntityTakeDamage", "WitnessStressTrackFight", function(target, dmgInfo
 	end
 	victim.hgFightAttackers = victim.hgFightAttackers or {}
 	victim.hgFightAttackers[attacker] = now
+	victim.hgHitsFrom = victim.hgHitsFrom or {}
+	local rec = victim.hgHitsFrom[attacker]
+	if rec and rec.t > now - FIGHT_WINDOW then
+		rec.n = rec.n + 1
+		rec.t = now
+	else
+		victim.hgHitsFrom[attacker] = {n = 1, t = now}
+	end
 	victim.hgLastEnemyHit = attacker
 	victim.hgLastEnemyHitTime = now
 	local victimOrg = victim.organism
@@ -579,6 +621,7 @@ hook.Add("EntityTakeDamage", "WitnessStressTrackFight", function(target, dmgInfo
 	end
 	attacker.hgFightTargets = attacker.hgFightTargets or {}
 	attacker.hgFightTargets[victim] = now
+	if attacker.organism then attacker.organism.hgMissTries = 0 end
 	if dmgInfo:IsDamageType(DMG_CLUB) and attacker:IsPlayer() then
 		local wep = attacker:GetActiveWeapon()
 		if IsValid(wep) and HANDS[wep:GetClass()] then
@@ -608,6 +651,7 @@ end)
 hook.Add("PlayerSpawn", "WitnessStressReset", function(ply)
 	ply.hgFightAttackers = nil
 	ply.hgFightTargets = nil
+	ply.hgHitsFrom = nil
 	ply.hgWitnessNext = nil
 	ply.hgSeenCorpses = nil
 	ply.hgSeenCorpseCount = nil
@@ -629,7 +673,14 @@ hook.Add("PlayerDroppedWeapon", "WitnessStressDisarm", function(ply, wep)
 end)
 
 hook.Add("KeyPress", "WitnessStressFightBack", function(ply, key)
-	if key == IN_ATTACK then ply.hgLastAttackTry = CurTime() end
+	if key ~= IN_ATTACK then return end
+	local now = CurTime()
+	local org = ply.organism
+	if org then
+		if (ply.hgLastAttackTry or 0) < now - EMO.botchTryWindow then org.hgMissTries = 0 end
+		org.hgMissTries = (org.hgMissTries or 0) + 1
+	end
+	ply.hgLastAttackTry = now
 end)
 
 timer.Create("WitnessStressLosing", EMO.losingInterval, 0, function()

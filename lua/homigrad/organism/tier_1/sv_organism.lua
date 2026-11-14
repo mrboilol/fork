@@ -1491,6 +1491,7 @@ hook.Add("HomigradDamage", "PanicAttackDamage", function(ply, dmgInfo)
 	ply.nextPanicAttackTime = CurTime() + panicattack_damage_cooldown
 end)
 
+---@param org table<string, any>
 hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	if not IsValid(owner) then
 		hg.organism.list[owner] = nil

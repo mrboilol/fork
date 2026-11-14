@@ -117,7 +117,7 @@ if CLIENT then
 
 	hook.Add("ChatText", "ZChat", function(index, name, text, messageType)
 		if (IsValid(hg.chat)) then
-			hg.chat:AddMessage(text)
+			hg.chat:AddMessage(color_white, text)
 		end
 	end)
 

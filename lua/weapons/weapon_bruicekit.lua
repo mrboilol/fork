@@ -72,10 +72,16 @@ if SERVER then
 	end
 
 	function SWEP:GetHealData(org, bone)
-		local totalRotations = 1 -- Base 1 rotation
+		local totalRotations = 1
 		local totalCost = 0
 		local bonesToHeal = {}
 		local availableResource = self.modeValues[1] or 0
+
+		if hg.SimpleHealth.GetState(org) then
+			totalRotations, totalCost = hg.SimpleHealth.AppendKitHealData(org, bonesToHeal, totalRotations, totalCost, availableResource)
+
+			return totalRotations, totalCost, bonesToHeal
+		end
 
 		local priority = table.Copy(conditionPriority)
 		if bone == "skull" or (isstring(bone) and string.find(bone, "Head", 1, true)) then
@@ -96,13 +102,12 @@ if SERVER then
 			})
 		end
 
-		-- Prioritize based on conditionPriority order
 		for _, key in ipairs(priority) do
 			if CanHealKey(org, key) then
 				local isBroken = table.HasValue(brokenLimbsList, key)
 				local isComplex = table.HasValue(complexBonesList, key)
 				local cost = 0.25
-				local rotations = isBroken and 2 or 1 -- 2 rotations for broken bones, 1 for others
+				local rotations = isBroken and 2 or 1
 				
 				if totalCost + cost <= availableResource + 0.001 then
 					totalCost = totalCost + cost
@@ -238,9 +243,10 @@ if SERVER then
 			end
 		end
 
-		-- gain slight analgesia per total use (0.2-0.4 depending how much one healed)
-		local analgesiaAdd = math.Clamp(amountHealed * 0.65, 0.35, 0.8)
-		org.analgesiaAdd = math.min((org.analgesiaAdd or 0) + analgesiaAdd, 4)
+		if not hg.SimpleHealth.GetState(org) then
+			local analgesiaAdd = math.Clamp(amountHealed * 0.65, 0.35, 0.8)
+			org.analgesiaAdd = math.min((org.analgesiaAdd or 0) + analgesiaAdd, 4)
+		end
 
 		owner:EmitSound("snd_jack_hmcd_bandage.ogg", 60, math.random(95, 105))
 

@@ -528,6 +528,7 @@ local bit_band,util_PointContents = bit.band,util.PointContents
 
 local color_white, color_red, color_red2, color_red3 = Color(255, 255, 255), Color(255, 0, 0), Color(200, 55, 55), Color(255, 100, 100)
 
+---@param org table<string, any>
 module[2] = function(owner, org, timeValue)
 
 	local o2 = org.o2

@@ -131,6 +131,8 @@ end
 
 -- Whether or not it's a csay is determined by whether there's a value specified in "len"
 function ulx.addAdvert( message, rpt, group, color, len )
+	if isstring( message ) and string.find( message, "running ULX", 1, true ) then return end
+
 	local t
 
 	if group then
