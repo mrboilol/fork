@@ -1064,6 +1064,7 @@ if SERVER then
 			org.bleed = math.max(org.bleed - (biggestWound - healedWound), 0)
 			self.modeValues[1] = self.modeValues[1] - (biggestWound - healedWound)
 			wound[1] = healedWound
+			if biggestWound > 0 then hg.SimpleHealth.OnWoundHealed(org, wound, (biggestWound - healedWound) / biggestWound) end
 
 			org.pain = math.max(org.pain - (biggestWound - healedWound) / 4, 0)
 

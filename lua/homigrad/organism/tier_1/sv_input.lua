@@ -1201,6 +1201,7 @@ function hg.organism.AddWound(ent, tr, bone, dmgInfo, dmgPos, dmgBlood, inputHol
 		local wound = localPos and findNearbyWound(org, woundBone, localPos)
 		if wound and (tonumber(wound[1]) or 0) > 0 then
 			worsenWound(org, wound, math.Clamp(dmgInfo:GetDamage() / 18, 0.15, 6))
+				hg.SimpleHealth.TagWoundBrute(org, wound, dmgInfo, 1)
 			table.sort(org.wounds, function(a, b) return a[1] > b[1] end)
 			hg.organism.MarkWoundsNetDirty(org, true)
 			return wound
@@ -1228,7 +1229,8 @@ function hg.organism.AddWound(ent, tr, bone, dmgInfo, dmgPos, dmgBlood, inputHol
 			local localPos, localAng, woundBone = hg.organism.GetWoundAnchor(ent, dmgPos + ((i == 1 and 1 or -1) * hitNormal), ((i == 1 and -1 or 1) * traceNormal):Angle(), i == 1 and hasHitBone and bone or nil)
 			if not localPos then continue end
 			local exitBleedMul = i == 2 and impact and 1 + math.min(impact.expansionTrauma or 0, 3) * 0.75 or 1
-			addOrReopenWound(org, dmgBlood / 2 * exitBleedMul, localPos, localAng, woundBone, CurTime(), woundType)
+			local made = addOrReopenWound(org, dmgBlood / 2 * exitBleedMul, localPos, localAng, woundBone, CurTime(), woundType)
+				hg.SimpleHealth.TagWoundBrute(org, made, dmgInfo, hasExit and 0.5 or 1)
 			placeWoundDecal(ent, dmgPos, i == 1 and hitNormal or -hitNormal, woundType)
 			
 			table.sort(org.wounds, function(a, b) return a[1] > b[1] end)

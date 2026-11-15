@@ -5,7 +5,8 @@ local max, min, Clamp, Approach = math.max, math.min, math.Clamp, math.Approach
 hg.organism.module.pain = {}
 
 local module = hg.organism.module.pain
-local consciousness_otrub_threshold = 0.3
+local consciousness_otrub_threshold = 0.2
+local consciousness_otrub_threshold_riled = 0.1
 local consciousness_fake_threshold = 0.38
 local shock_heavy_offset = 30
 local shock_critical_ramp = 40
@@ -332,7 +333,9 @@ module[2] = function(owner, org, timeValue)
 	local wakePainThreshold = otrub_wake_pain_max * wakeThresholdProgress
 	local recoveryBlocked = org.otrub and (org.shock > wakeShockThreshold or org.pain > wakePainThreshold)
 	local persistentConsciousnessCause = org.tranquilizer > 0 or comaActive
-	local consciousnessTooLow = org.consciousness < consciousness_otrub_threshold * consciousnessResistance
+	local riled = fightingBack and 1 or Clamp(((adrenaline or 0) - 0.5) / 1, 0, 1)
+	local otrubThreshold = Lerp(riled, consciousness_otrub_threshold, consciousness_otrub_threshold_riled) * consciousnessResistance
+	local consciousnessTooLow = org.consciousness < otrubThreshold
 	if recoveryBlocked or (consciousnessTooLow and (not org.otrub or persistentConsciousnessCause)) then
 		org.needotrub = true
 
@@ -366,7 +369,7 @@ module[2] = function(owner, org, timeValue)
 	local syncopeResistance = Clamp(resilience * 0.35 + zerlkersResistance * 0.8 + (math.max(org.traumaResistanceMul or 1, 1) - 1) * 0.2 + (fightingBack and pain_syncope_fight_resistance or 0), 0, 0.9)
 	local syncopeRate = syncopeSeverity ^ 1.7 * pain_syncope_max_rate * (1 - syncopeResistance)
 	if not org.otrub and syncopeRate > 0 and math.random() < Clamp(syncopeRate * timeValue, 0, 1) then
-		org.consciousness = math.min(org.consciousness or 1, consciousness_otrub_threshold * consciousnessResistance * 0.8)
+		org.consciousness = math.min(org.consciousness or 1, otrubThreshold * 0.8)
 	end
 	org.nearpainlimit = not org.otrub and org.pain >= org.pain_turn * pain_fake_threshold
 	if org.isPly and org.pain >= 85 and not org.otrub and IsValid(owner) and owner.Notify and owner:GetInfoNum("hg_newthoughts", 0) <= 0 then

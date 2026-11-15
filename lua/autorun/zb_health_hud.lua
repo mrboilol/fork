@@ -1371,7 +1371,7 @@ local function draw_status_effects()
 		})
 		currentEffectNames["death"] = true
 	else
-		if org.panicattackActive then
+		if org.panicattackActive and GetConVar("hg_panic"):GetBool() then
 			table.insert(effects, {
 				name = "death",
 				has_levels = true,

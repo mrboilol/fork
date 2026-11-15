@@ -131,7 +131,7 @@ end
 module[1] = function(org)
 	local owner = org.owner
 	local isPlayer = IsValid(owner) and owner:IsPlayer()
-	local mode = isPlayer and SimpleHealth.ConVar:GetInt() or 0
+	local mode = IsValid(owner) and SimpleHealth.ConVar:GetInt() or 0
 
 	org.simpleMode = mode > 0 and mode or nil
 	org.simple = org.simpleMode and newState() or nil
@@ -228,6 +228,11 @@ local function tickOxy(owner, org, state, timeValue)
 	local deficit = math.Clamp((oxyConfig.deliveryFull - delivery) / oxyConfig.deliveryFull, 0, 1)
 	local gain = deficit * oxyConfig.deliveryGain
 	if state.lethalCrit then gain = gain + oxyConfig.hardCritGain end
+
+	local blood = tonumber(org.blood) or CONFIG.contamination.normalBlood
+	if blood < oxyConfig.bleedStart and state.oxy < oxyConfig.bleedCap then
+		gain = gain + math.Clamp((oxyConfig.bleedStart - blood) / (oxyConfig.bleedStart - CONFIG.deathBlood), 0, 1) * oxyConfig.bleedGain
+	end
 
 	local overdose, sedative = SimpleHealth.GetOverdose(org)
 	gain = gain + math.min(sedative, overdose) * oxyConfig.sedativeGain + (state.oxyGainBonus or 0)
@@ -405,7 +410,9 @@ module[2] = function(owner, org, timeValue)
 	local countdownExpired = updateCountdown(owner, org, state)
 	local brainIgnored = organism.IsBrainDamageIgnored and organism.IsBrainDamageIgnored(org)
 
-	if countdownExpired then
+	if state.crit == CRIT_HARD and state.health <= CONFIG.deathHealth then
+		die(org, "brute", "health " .. math.floor(state.health) .. " in hardcrit")
+	elseif countdownExpired then
 		die(org, state.flatline and "flatline" or "suffocate", "oxy countdown expired")
 	elseif org.otrub and (tonumber(org.blood) or CONFIG.contamination.normalBlood) < CONFIG.deathBlood then
 		die(org, "bleed", "blood below " .. CONFIG.deathBlood .. " while unconscious")
@@ -417,6 +424,8 @@ module[2] = function(owner, org, timeValue)
 end
 
 local function resolveDeathCause(org, state)
+	if org.fatalBrainDeath and (tonumber(org.spine3) or 0) >= 1 then return "neck" end
+
 	local recent = state.lastDamageTime and CurTime() - state.lastDamageTime <= CONFIG.recentDamageTime
 	if recent then
 		for _, entry in ipairs(DEATH_DAMAGE_CAUSES) do
@@ -457,6 +466,27 @@ local function classifyDamage(dmgInfo)
 	return "brute"
 end
 
+local function registerSpike(org, state, applied)
+	local spikeConfig = CONFIG.spike
+	local now = CurTime()
+
+	if now - (state.spikeTime or 0) > spikeConfig.window then state.spikeAmount = 0 end
+	state.spikeTime = now
+	state.spikeAmount = (state.spikeAmount or 0) + applied
+
+	if state.spikeAmount < spikeConfig.minDamage then return end
+
+	local softAt = SimpleHealth.GetCritThresholds(org.adrenaline)
+	if SimpleHealth.GetHealth(state) > softAt then return end
+
+	local severity = rampUp(state.spikeAmount, spikeConfig.minDamage, spikeConfig.fullDamage)
+	local knockoutUntil = now + Lerp(severity, spikeConfig.minTime, spikeConfig.maxTime)
+	if knockoutUntil > (org.postureOtrubUntil or 0) then org.postureOtrubUntil = knockoutUntil end
+	org.needotrub = true
+	org.needfake = true
+	org.consciousness = math.min(tonumber(org.consciousness) or 1, 0.04)
+end
+
 hook.Add("HomigradDamage", "hg/simplehealth/damage-pools", function(victim, dmgInfo)
 	local org = IsValid(victim) and victim.organism
 	local state = SimpleHealth.GetState(org)
@@ -470,15 +500,16 @@ hook.Add("HomigradDamage", "hg/simplehealth/damage-pools", function(victim, dmgI
 
 	local damageConfig = CONFIG.damage
 	local pool = classifyDamage(dmgInfo)
+	local applied
 	if pool == "burn" and dmgInfo:IsDamageType(DMG_BLAST) then
 		local burnShare = damageConfig.blastBurnShare
-		SimpleHealth.AddDamage(org, "brute", damage * (1 - burnShare) * damageConfig.bruteScale)
-		SimpleHealth.AddDamage(org, "burn", damage * burnShare * damageConfig.burnScale)
-
-		return
+		applied = SimpleHealth.AddDamage(org, "brute", damage * (1 - burnShare) * damageConfig.bruteScale)
+		applied = applied + SimpleHealth.AddDamage(org, "burn", damage * burnShare * damageConfig.burnScale)
+	else
+		applied = SimpleHealth.AddDamage(org, pool, damage * damageConfig[pool .. "Scale"])
 	end
 
-	SimpleHealth.AddDamage(org, pool, damage * damageConfig[pool .. "Scale"])
+	if pool ~= "oxy" and pool ~= "toxin" then registerSpike(org, state, applied) end
 end)
 
 local GATED_INPUTS = {
@@ -655,13 +686,38 @@ local function tickToxin(owner, org, state, timeValue)
 	SimpleHealth.Heal(org, "toxin", toxinConfig.regen * (state.toxinRegenMul or 1) * timeValue)
 end
 
+local function healWorstPools(org, state, amount)
+	local healed = 0
+
+	while amount - healed > 0.001 do
+		local worst, value
+		for _, pool in ipairs(SimpleHealth.POOLS) do
+			if (state[pool] or 0) > (value or 0) then worst, value = pool, state[pool] end
+		end
+		if not worst then break end
+
+		healed = healed + SimpleHealth.Heal(org, worst, amount - healed)
+	end
+
+	return healed
+end
+
 local function tickResuscitation(owner, org, state, timeValue)
 	local oxyConfig = CONFIG.oxy
 	local now = CurTime()
 
+	if state.crit == CRIT_NONE then state.cprCritHealed = nil end
+
 	if (org.cprSupportUntil or 0) > now and (state.nextCprClear or 0) <= now then
 		state.nextCprClear = now + oxyConfig.cprCycle
 		SimpleHealth.Heal(org, "oxy", oxyConfig.cprClear)
+
+		local _, hardAt = SimpleHealth.GetCritThresholds(org.adrenaline)
+		local healed = state.cprCritHealed or 0
+		if state.health <= hardAt and healed < oxyConfig.cprCritBudget then
+			state.cprCritHealed = healed + healWorstPools(org, state, math.min(oxyConfig.cprCritHeal, oxyConfig.cprCritBudget - healed))
+		end
+
 		if state.flatline and math.Rand(0, 1) < CONFIG.flatline.cprRestartChance then stopFlatline(owner, org, state) end
 	end
 end
@@ -677,10 +733,35 @@ function SimpleHealth.OnAEDShock(org)
 	if not state then return end
 
 	local oxyConfig = CONFIG.oxy
-	SimpleHealth.Heal(org, "oxy", oxyConfig.aedShockClear)
+	SimpleHealth.Heal(org, "oxy", state.oxy)
+	healWorstPools(org, state, oxyConfig.aedHeal)
 	state.aedResistUntil = CurTime() + oxyConfig.aedResistTime
+	state.cprCritHealed = nil
 
-	if state.flatline and math.Rand(0, 1) < CONFIG.flatline.aedSuccess then stopFlatline(org.owner, org, state) end
+	if state.flatline then stopFlatline(org.owner, org, state) end
+	state.heartRate = math.max(state.heartRate, CONFIG.heart.base)
+	state.consciousnessCap = 1
+	state.health = SimpleHealth.GetHealth(state)
+end
+
+function SimpleHealth.TagWoundBrute(org, wound, dmgInfo, share)
+	local state = SimpleHealth.GetState(org)
+	if not state or not wound or classifyDamage(dmgInfo) ~= "brute" then return end
+
+	local damageConfig = CONFIG.damage
+	local brute = dmgInfo:GetDamage() * damageConfig.bruteScale
+	if dmgInfo:IsDamageType(DMG_BLAST) then brute = brute * (1 - damageConfig.blastBurnShare) end
+
+	wound.simpleBrute = (wound.simpleBrute or 0) + brute * share
+end
+
+function SimpleHealth.OnWoundHealed(org, wound, fraction)
+	local brute = wound and wound.simpleBrute
+	if not brute or brute <= 0 or fraction <= 0 then return end
+
+	local part = brute * math.min(fraction, 1)
+	wound.simpleBrute = brute - part
+	SimpleHealth.Heal(org, "brute", part * CONFIG.medicine.bandageBruteShare)
 end
 
 table.insert(SimpleHealth.Tickers, tickToxin)
@@ -806,6 +887,36 @@ local function tickOrgans(owner, org, state, timeValue)
 end
 
 table.insert(SimpleHealth.Tickers, tickOrgans)
+
+local FRACTURE_KINDS = {
+	lleg_up = "limb", lleg_down = "limb",
+	rleg_up = "limb", rleg_down = "limb",
+	larm_up = "limb", larm_down = "limb",
+	rarm_up = "limb", rarm_down = "limb",
+	chest = "torso", pelvis = "torso",
+	spine1 = "spine", spine2 = "spine",
+	spine3 = "neck",
+	skull = "skull", jaw = "jaw",
+}
+
+local function tickFractures(owner, org, state)
+	local known = state.fractures
+	local baseline = known == nil
+	if baseline then
+		known = {}
+		state.fractures = known
+	end
+
+	for key, kind in pairs(FRACTURE_KINDS) do
+		local broken = (tonumber(org[key]) or 0) >= 1
+		if broken and not known[key] and not baseline then
+			SimpleHealth.AddDamage(org, "brute", CONFIG.fracture[kind])
+		end
+		known[key] = broken
+	end
+end
+
+table.insert(SimpleHealth.Tickers, tickFractures)
 
 local function abdominalHit(key)
 	return function(original, org, bone, dmg, dmgInfo, ...)
@@ -934,8 +1045,8 @@ local function tickBloodThoughts(owner, org, state)
 	if level <= current or org.otrub then return end
 
 	local lines = BLOOD_THOUGHTS[level]
-	local useNew = owner:GetInfoNum("hg_newthoughts", 0) > 0
 	if not owner.Thought then return end
+	local useNew = owner:GetInfoNum("hg_newthoughts", 0) > 0
 
 	owner:Thought(useNew and lines.new or lines.legacy, chatConfig.thoughtCooldown, "hgstatus_simpleblood" .. level, 1, THOUGHT_COLOR)
 end
@@ -970,7 +1081,7 @@ local function tickHealthThoughts(owner, org, state)
 	local current = state.healthThoughtLevel or 0
 	local level = healthThoughtLevel(org, state, current)
 	state.healthThoughtLevel = level
-	if level <= current or org.otrub or not owner.Thought then return end
+	if level <= current or org.otrub or not owner.Thought or not owner.GetInfoNum then return end
 
 	local lines = HEALTH_THOUGHTS[level]
 	local useNew = owner:GetInfoNum("hg_newthoughts", 0) > 0

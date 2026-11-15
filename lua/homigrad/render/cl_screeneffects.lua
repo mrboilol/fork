@@ -122,7 +122,7 @@ do
 		local wakeRemain = (org.rehab_dizzy_until or 0) - CurTime()
 		local wakeDizzy = wakeRemain > 0 and 1 + math.min(wakeRemain / 30, 1) * 0.4 or 0
 		local panicSway = 0
-		if org.panicattackActive and org.panicMode == "flight" then
+		if org.panicattackActive and org.panicMode == "flight" and GetConVar("hg_panic"):GetBool() then
 			panicSway = math.Clamp(((tonumber(org.panicattack) or 0) - 0.35) / 0.65, 0, 1) * math.Clamp(((tonumber(org.adrenaline) or 0) - 2.5) / 1.5, 0.3, 1) * 2.5
 		end
 		return math.max(hg.GetTraumaBlur(), (org.concussion or 0) * 0.65, wakeDizzy, (org.disorientation or 0) - 4, panicSway)
@@ -1827,7 +1827,9 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end)
 	end
 
-	if canRetrySound("RealityStation", RealityStation) then
+	hg.DisableLoudPainCV = hg.DisableLoudPainCV or CreateClientConVar("hg_disableloudpain", "1", true, false, "1 = never play the loud reality pain sound", 0, 1)
+
+	if not hg.DisableLoudPainCV:GetBool() and canRetrySound("RealityStation", RealityStation) then
 		sound.PlayFile("sound/reality.mp3", "noblock noplay", function(station)
 			if IsValid(station) then
 				station:SetVolume(0)
@@ -1851,7 +1853,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end)
 	end
 
-	if (painMode == 6 or painMode == 7) and not RemAgonyStationLoading and canRetrySound("RemAgonyStation", RemAgonyStation) then
+	if not hg.DisableLoudPainCV:GetBool() and (painMode == 6 or painMode == 7) and not RemAgonyStationLoading and canRetrySound("RemAgonyStation", RemAgonyStation) then
 		RemAgonyStationLoading = true
 		sound.PlayFile("sound/reality.mp3", "noblock noplay", function(station)
 			RemAgonyStationLoading = false
@@ -2132,7 +2134,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		render.SetMaterial(grainMat)
 		render.DrawScreenQuad()
 
-		if org.panicattackActive and org.panicMode == "flight" then
+		if org.panicattackActive and org.panicMode == "flight" and GetConVar("hg_panic"):GetBool() then
 			local tunnel = panicPulse * Lerp(math.Clamp(((tonumber(org.adrenaline) or 0) - 2.5) / 1.5, 0, 1), 0.5, 1)
 			render.UpdateScreenEffectTexture()
 			vignetteMat:SetFloat("$c2_x", CurTime() + 10500)
@@ -2384,6 +2386,11 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			elseif painMode == 7 and not org.otrub then
 				targetPainVolume = painVolume
 				targetRemAgonyVolume = getPainLayerBlend(rawPain, hg.screeneffects_config.painAgonyThreshold) * painVolume * hg.screeneffects_config.painAgonyVolumeMul
+			end
+
+			if hg.DisableLoudPainCV and hg.DisableLoudPainCV:GetBool() then
+				targetRealityVolume = 0
+				targetRemAgonyVolume = 0
 			end
 
 			if IsValid(PainStation) then

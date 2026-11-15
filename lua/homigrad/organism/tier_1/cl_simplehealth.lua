@@ -16,9 +16,7 @@ local TINT_BASE_GAIN = 0.08
 local TINT_PULSE_GAIN = 0.24
 local TINT_GRAIN_SCALE = 4096
 local FACE_BOX_COLOR = Color(15, 15, 15, 200)
-local FACE_PADDING = 0.1
-local FACE_CURVE_STEPS = 8
-local FACE_FONT = "HGSimpleHealthFace"
+local FACE_PADDING = 0.16
 
 local VIGNETTE_MATERIAL = Material("effects/shaders/zb_vignette")
 local TINT_MATERIAL = Material("effects/shaders/zb_grain2")
@@ -113,12 +111,25 @@ local function drawTintedVignette(strength, color, pulseSpeed)
 	render.DrawScreenQuad()
 end
 
-local DAMAGE_TINT_KEYS = {"brute", "burn", "toxin", "oxy"}
-local damageTintLerps = {brute = 0, burn = 0, toxin = 0, oxy = 0}
+local DAMAGE_TINT_KEYS = {"toxin"}
+local damageTintLerps = {toxin = 0}
+local traumaLerp = 0
 
 local function updateDamageTints(state)
 	local effects = CONFIG.effects
 	local dominant = state and SimpleHealth.GetDominantPool(state)
+
+	local traumaTarget = 0
+	if state then
+		local range = math.max(effects.traumaVignetteFull - effects.traumaVignetteStart, 1)
+		local trauma = (state.brute or 0) + (state.burn or 0)
+		traumaTarget = math.Clamp((trauma - effects.traumaVignetteStart) / range, 0, 1) ^ 1.5 * effects.traumaVignetteStrength
+	end
+
+	traumaLerp = LerpFT(effects.lerp, traumaLerp, traumaTarget)
+	if traumaLerp > EFFECT_MIN then
+		drawTintedVignette(traumaLerp, effects.traumaVignetteColor, effects.traumaVignettePulseSpeed)
+	end
 
 	for _, pool in ipairs(DAMAGE_TINT_KEYS) do
 		local target = 0
@@ -148,10 +159,11 @@ local bloodTab = {
 
 local bloodLerp = 0
 local softCritLerp = 0
+local dofLerp = 0
 
 hook.Add("Post Post Pre Post Processing", "hg/simplehealth/screen-effects", function()
 	local state = SimpleHealth.GetLocalState()
-	if not state and bloodLerp <= EFFECT_MIN and softCritLerp <= EFFECT_MIN then return end
+	if not state and bloodLerp <= EFFECT_MIN and softCritLerp <= EFFECT_MIN and dofLerp <= EFFECT_MIN then return end
 
 	local effects = CONFIG.effects
 	local org = state and IsValid(lply) and lply:Alive() and (lply.new_organism or lply.organism)
@@ -172,6 +184,12 @@ hook.Add("Post Post Pre Post Processing", "hg/simplehealth/screen-effects", func
 		bloodTab["$pp_colour_colour"] = 1 - bloodLerp
 		bloodTab["$pp_colour_brightness"] = -effects.bloodDarken * bloodLerp
 		DrawColorModify(bloodTab)
+	end
+
+	local dofTarget = org and math.Clamp((effects.bleedDofStart - (tonumber(org.blood) or effects.bleedDofStart)) / (effects.bleedDofStart - CONFIG.deathBlood), 0, 1) or 0
+	dofLerp = LerpFT(effects.lerp, dofLerp, dofTarget)
+	if dofLerp > EFFECT_MIN then
+		DrawBokehDOF(dofLerp * effects.bleedDofIntensity, 1, 0)
 	end
 
 	if softCritLerp > EFFECT_MIN then
@@ -196,17 +214,23 @@ local function getFaceMaterial(key)
 end
 
 local function getFaceKey(state, alive)
-	if not alive then return "dead" end
-	if state.crit == CRIT_HARD then return "asleep" end
-	if state.crit == CRIT_SOFT then return "mortified" end
+	if not alive then return end
+	if state.crit == CRIT_HARD then return "hardcrit" end
+	if state.crit == CRIT_SOFT then return "softcrit" end
 
 	local faceConfig = CONFIG.face
 	local health = SimpleHealth.GetHealth(state)
-	if health <= faceConfig.panickingBelow then return "panicking" end
-	if health <= faceConfig.sadBelow then return "sad" end
-	if health <= faceConfig.okBelow then return "ok" end
+	if health < faceConfig.criticalBelow then return "critical" end
+	if health < faceConfig.hurtBelow then return "hurt" end
 
-	return "happy"
+	return "healthy"
+end
+
+local function isFacePale()
+	local org = IsValid(lply) and (lply.new_organism or lply.organism)
+	local blood = org and tonumber(org.blood)
+
+	return blood ~= nil and blood < CONFIG.face.paleBloodBelow
 end
 
 SimpleHealth.GetFaceKey = getFaceKey
@@ -221,145 +245,105 @@ local function playOuchie(path, pitch, volume)
 	end)
 end
 
-local lastFaceKey
+local FACE_RANK = {healthy = 1, hurt = 2, critical = 3, softcrit = 4, hardcrit = 5}
 
-local function updateStatusSound(state)
-	if not IsValid(lply) or not lply:Alive() then
+local lastFaceKey
+local lastFacePale = false
+local lastDamageTotal
+local shakeStart = 0
+
+local function updateFaceSound()
+	local state = SimpleHealth.GetLocalState()
+	if not state or not IsValid(lply) or not lply:Alive() then
 		lastFaceKey = nil
+		lastFacePale = false
 
 		return
 	end
 
 	local key = getFaceKey(state, true)
-	if lastFaceKey and key ~= lastFaceKey then
-		local faceConfig = CONFIG.face
+	local pale = isFacePale()
+	local faceConfig = CONFIG.face
+	local worse = lastFaceKey and FACE_RANK[key] > FACE_RANK[lastFaceKey]
+
+	if (worse and key == "critical") or (lastFaceKey and pale and not lastFacePale) then
+		playOuchie(faceConfig.blipSound, 1, faceConfig.blipVolume)
+	elseif worse then
 		playOuchie(faceConfig.statusSound, 1, faceConfig.statusVolume)
 	end
 
 	lastFaceKey = key
+	lastFacePale = pale
 end
 
-SimpleHealth.OnLocalStateChanged = updateStatusSound
+hook.Add("Think", "hg/simplehealth/face-sound", updateFaceSound)
 
-local function drawCurve(cx, cy, width, bend, thickness, color)
-	local half = width * 0.5
-	local lastX, lastY
+local function updateDamageShake(state)
+	if not IsValid(lply) or not lply:Alive() then
+		lastDamageTotal = nil
 
-	surface.SetDrawColor(color)
-	for step = 0, FACE_CURVE_STEPS do
-		local t = step / FACE_CURVE_STEPS * 2 - 1
-		local px = cx + t * half
-		local py = cy + (1 - t * t) * bend
-		if lastX then
-			for offset = 0, thickness - 1 do
-				surface.DrawLine(lastX, lastY + offset, px, py + offset)
-			end
-		end
-
-		lastX, lastY = px, py
+		return
 	end
+
+	local total = state.brute + state.burn + state.toxin + state.oxy
+	if lastDamageTotal and total > lastDamageTotal then shakeStart = RealTime() end
+	lastDamageTotal = total
 end
 
-local function drawEyes(spec, cx, cy, radius, color)
-	local spread = radius * 0.38
-	local eyeY = cy - radius * 0.18
-	local thickness = math.max(math.floor(radius * 0.08), 1)
-
-	for side = -1, 1, 2 do
-		local ex = cx + spread * side
-		if spec.eyes == "closed" then
-			drawCurve(ex, eyeY, radius * 0.3, radius * 0.08, thickness, color)
-		else
-			local eyeRadius = math.floor(radius * (spec.eyes == "wide" and 0.15 or 0.08))
-			draw.RoundedBox(eyeRadius, ex - eyeRadius, eyeY - eyeRadius, eyeRadius * 2, eyeRadius * 2, color)
-		end
-
-		if spec.brows then
-			local tilt = (spec.brows == "sad" and -1 or 1) * side * radius * 0.07
-			local browY = eyeY - radius * 0.28
-			for offset = 0, thickness - 1 do
-				surface.DrawLine(ex - radius * 0.14, browY + tilt + offset, ex + radius * 0.14, browY - tilt + offset)
-			end
-		end
-	end
-end
-
-local function drawMouth(spec, cx, cy, radius, color)
-	local mouthY = cy + radius * 0.38
-	local thickness = math.max(math.floor(radius * 0.08), 1)
-	local width = radius * 0.7
-
-	if spec.mouth == "smile" then
-		drawCurve(cx, mouthY - radius * 0.08, width, radius * 0.18, thickness, color)
-	elseif spec.mouth == "frown" then
-		drawCurve(cx, mouthY + radius * 0.08, width, -radius * 0.18, thickness, color)
-	elseif spec.mouth == "flat" then
-		drawCurve(cx, mouthY, width * 0.7, 0, thickness, color)
-	else
-		local mouthW = math.floor(radius * (spec.mouth == "scream" and 0.45 or 0.26))
-		local mouthH = math.floor(radius * (spec.mouth == "scream" and 0.4 or 0.2))
-		draw.RoundedBox(math.floor(math.min(mouthW, mouthH) * 0.5), cx - mouthW * 0.5, mouthY - mouthH * 0.5, mouthW, mouthH, color)
-	end
-end
-
-local function drawFallbackFace(key, x, y, size)
+local function getFaceShake(size)
 	local faceConfig = CONFIG.face
-	local spec = faceConfig.states[key]
-	local padding = math.floor(size * FACE_PADDING)
-	local diameter = size - padding * 2
-	local radius = diameter * 0.5
-	local cx, cy = x + size * 0.5, y + size * 0.5
-	local color = faceConfig.featureColor
-
-	draw.RoundedBox(math.floor(radius), x + padding, y + padding, diameter, diameter, spec.skin)
-	drawEyes(spec, cx, cy, radius, color)
-	drawMouth(spec, cx, cy, radius, color)
-
-	if spec.sweat then
-		local drop = math.floor(radius * 0.14)
-		draw.RoundedBox(drop, cx + radius * 0.62, cy - radius * 0.55, drop * 2, drop * 3, faceConfig.sweatColor)
-	end
-
-	if spec.sleep then
-		draw.SimpleText("z", FACE_FONT, x + size - padding, y + padding, color_white, TEXT_ALIGN_RIGHT, TEXT_ALIGN_TOP)
-	end
-end
-
-local function createFaceFont()
-	surface.CreateFont(FACE_FONT, {
-		font = "Roboto",
-		size = math.max(math.floor(ScrH() * CONFIG.face.size * 0.3), 10),
-		weight = 800,
-	})
-end
-
-createFaceFont()
-hook.Add("OnScreenSizeChanged", "hg/simplehealth/face-font", createFaceFont)
-
-hook.Add("HUDPaint", "hg/simplehealth/face", function()
 	local state = SimpleHealth.GetLocalState()
-	if not state or not IsValid(lply) then return end
+	local amount = 0
+
+	local age = RealTime() - shakeStart
+	if age < faceConfig.shakeTime then
+		amount = faceConfig.shakeHit * (1 - age / faceConfig.shakeTime)
+	end
+
+	if state and state.crit >= CRIT_SOFT then amount = math.max(amount, faceConfig.shakeCrit) end
+	if amount <= 0 then return 0, 0 end
+
+	local now = RealTime()
+	amount = amount * size
+
+	return math.sin(now * 95) * amount, math.cos(now * 110) * amount
+end
+
+SimpleHealth.OnLocalStateChanged = updateDamageShake
+
+local function nildoy()
+	local state = SimpleHealth.GetLocalState()
+	if not state or not IsValid(lply) or not lply:Alive() then return end
 	if hook.Run("HUDShouldDraw", "HGSimpleHealthFace") == false then return end
 
 	local faceConfig = CONFIG.face
 	local size = math.floor(ScrH() * faceConfig.size)
 	local x = math.floor(ScrW() * faceConfig.x)
 	local y = math.floor(ScrH() * faceConfig.y)
-	local key = getFaceKey(state, lply:Alive())
-	local material = getFaceMaterial(key)
-
-	draw.RoundedBox(4, x, y, size, size, FACE_BOX_COLOR)
-
-	if not material then
-		drawFallbackFace(key, x, y, size)
-
-		return
-	end
+	local shakeX, shakeY = getFaceShake(size)
+	x, y = x + math.floor(shakeX), y + math.floor(shakeY)
 
 	surface.SetDrawColor(255, 255, 255, 255)
+
+	local boxMaterial = getFaceMaterial("box")
+	if boxMaterial then
+		surface.SetMaterial(boxMaterial)
+		surface.DrawTexturedRect(x, y, size, size)
+	else
+		draw.RoundedBox(4, x, y, size, size, FACE_BOX_COLOR)
+	end
+
+	local key = getFaceKey(state, true)
+	local material = getFaceMaterial(isFacePale() and key .. "_pale" or key)
+	if not material then return end
+
+	local padding = math.floor(size * FACE_PADDING)
+	surface.SetDrawColor(255, 255, 255, 255)
 	surface.SetMaterial(material)
-	surface.DrawTexturedRect(x, y, size, size)
-end)
+	surface.DrawTexturedRect(x + padding, y + padding, size - padding * 2, size - padding * 2)
+end
+
+hook.Add("HUDPaint", "hg/simplehealth/face", nildoy)
 
 local deathDelay = {active = false, wasAlive = false, aliveMode = 0}
 
@@ -369,6 +353,7 @@ local function finishDeathDelay(playSecond)
 	if playSecond then
 		local deathConfig = CONFIG.death
 		playOuchie(deathConfig.sound, deathConfig.secondPitch, deathConfig.volume)
+		playOuchie(deathConfig.sound, deathConfig.highPitch, deathConfig.volume)
 	end
 end
 

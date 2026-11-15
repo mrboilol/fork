@@ -179,14 +179,37 @@ end)
 
 local BLOCKED_LINES = {
 	standup_leg = {
-		"You can't stand on your broken leg.",
-		"Your leg gives out under you!",
-		"YOUR LEG WON'T HOLD YOU!",
+		{
+			"You can't stand on your broken leg.",
+			"Your broken leg prevents you from getting up.",
+			"Your leg is too broken to stand on.",
+			"The bone won't take your weight.",
+		},
+		{
+			"Your leg gives out under you!",
+			"Your broken leg won't let you get up!",
+			"Your leg is too broken to stand on it..",
+		},
+		{
+			"YOUR LEG WON'T HOLD YOU!",
+			"YOUR BROKEN LEG WON'T LET YOU UP!",
+			"YOUR LEG IS TOO BROKEN TO STAND!",
+		},
 	},
 	standup_dislocated = {
-		"You can't stand on your dislocated leg.",
-		"Your leg is out of place, you can't stand on it!",
-		"YOU CAN'T STAND ON YOUR DISLOCATED LEG!",
+		{
+			"You can't stand on your dislocated leg.",
+			"Your dislocated leg prevents you from getting up.",
+			"Your leg is out of its socket, it won't hold you.",
+		},
+		{
+			"Your leg is out of place, you can't stand on it!",
+			"Your leg is too out of place to stand on..",
+		},
+		{
+			"YOU CAN'T STAND ON YOUR DISLOCATED LEG!",
+			"YOUR LEG IS OUT OF PLACE, YOU CAN'T GET UP!",
+		},
 	},
 	standup_pain = {
 		"You can't stand up, it hurts too much.",
@@ -260,7 +283,10 @@ function ChatLog.BlockedThought(ply, kind)
 	local tier = severity >= SEVERITY_PANIC and 3 or severity >= SEVERITY_STRAINED and 2 or 1
 	local clr = tier == 3 and Color(255, 90, 90) or BLOCKED_COLOR
 
-	return ply:Thought(lines[tier], BLOCKED_COOLDOWN, "blocked_" .. kind, 0, clr)
+	local line = lines[tier]
+	if istable(line) then line = line[math.random(#line)] end
+
+	return ply:Thought(line, BLOCKED_COOLDOWN, "blocked_" .. kind, 0, clr)
 end
 
 local function IsLegDislocated(org, limb)

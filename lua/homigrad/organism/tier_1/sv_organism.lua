@@ -1052,11 +1052,6 @@ local function panic_has_gunfight_protection(org)
 	return (org.panicGunfightUntil or 0) > CurTime() and panic_has_usable_firearm(org) and not panic_has_sustained_fear(org)
 end
 
-local function apply_panic_disabled_stress(org, amount)
-	if org.otrub then return end
-	org.fearadd = math.min((org.fearadd or 0) + math.Clamp(amount * 2.5, 0.04, 0.6), 3)
-end
-
 local function panic_threat_adrenaline_spike(org, amount)
 	local spike = math.Clamp(amount * 1.5, panicattack_threat_adrenaline_min, panicattack_threat_adrenaline_max) * hg.organism.GetAdrenalineGainMul(org)
 	org.adrenalineAdd = math.max(org.adrenalineAdd or 0, math.min((org.adrenalineAdd or 0) + spike, panicattack_threat_adrenaline_cap))
@@ -1088,12 +1083,6 @@ function hg.organism.AddPanicAttack(org, amount, silent, combatEvent, ignoreGunf
 		org.goodmood = math.max(goodmood - absorbed * 2.5, 0)
 		amount = amount - absorbed
 		if amount <= 0 then return org.panicattackadd or 0 end
-	end
-	if not hg_panic:GetBool() then
-		if not universalStressApplied then apply_panic_disabled_stress(org, amount) end
-		org.panicattackadd = math.Clamp((org.panicattackadd or 0) + math.min(amount * panicattack_gain_mul, panicattack_event_cap), 0, 1)
-		org.panicLastGain = CurTime()
-		return org.panicattackadd
 	end
 	if not ignoreGunfightProtection and panic_has_gunfight_protection(org) then return org.panicattackadd or 0 end
 	if silent and IsValid(org.owner) and org.owner:IsPlayer() and (org.owner.lastKillTime or 0) > CurTime() - 4 then
@@ -1662,7 +1651,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	elseif org.noradrenaline <= 0 then
 		org.noradrenalineActive = false
 	end
-	if hg_panic:GetBool() and oldPanicAttack < panicattack_threshold and org.panicattack >= panicattack_threshold and isPly and owner:Alive() then
+	if oldPanicAttack < panicattack_threshold and org.panicattack >= panicattack_threshold and isPly and owner:Alive() then
 		owner:Notify("I can't calm down.", 2, "panicattack_start", 2, nil, Color(255, 140, 140))
 	end
 	local panicDying = org.otrub or org.incapacitated or org.deathStateKilled or (isPly and not owner:Alive())
@@ -1678,7 +1667,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		end
 	end
 	if org.panicattack >= panicattack_threshold then
-		org.panicattackActive = hg_panic:GetBool() and not panicDying
+		org.panicattackActive = not panicDying
 		if not org.panicattackActive then
 			org.panicMode = nil
 		else
