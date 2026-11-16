@@ -854,6 +854,21 @@ local function CinematicDeathHideRagdoll()
 end
 hook.Add("PreDrawOpaqueRenderables", "CinematicDeathHideRagdoll", CinematicDeathHideRagdoll)
 
+function hg.DeathHUDAlpha()
+    if not CDeath.isDead or CDeath.compatActive or CDeath.inSpectator then return 1 end
+    if CDeath.inTransition then return 0 end
+
+    local stageElapsed = CurTime() - CDeath.deathTime - STAGE_1_DURATION
+    if stageElapsed < 0 then return 1 end
+
+    local fadeDuration, fadeOutDuration = DeathFadeDurations()
+    if stageElapsed < fadeDuration then
+        return 1 - math.Clamp((stageElapsed - 1) / 1.5, 0, 1)
+    end
+
+    return math.Clamp((stageElapsed - fadeDuration) / fadeOutDuration, 0, 1)
+end
+
 local function CinematicDeathBackground()
     if not CDeath.isDead or CDeath.compatActive then return end
 
@@ -955,7 +970,13 @@ local function CinematicDeathBackground()
     end
 
 end
-hook.Add("DrawOverlay", "CinematicDeathBackground", CinematicDeathBackground)
+local function CinematicDeathOverlay()
+    CinematicDeathBackground()
+    if CDeath.isDead and not CDeath.compatActive and not CDeath.inSpectator and not CDeath.inTransition then
+        hook.Run("HG_DeathOverlayHUD")
+    end
+end
+hook.Add("DrawOverlay", "CinematicDeathBackground", CinematicDeathOverlay)
 
 local function HideDefaultDamage(name)
     if CDeath.isDead and name == "CHudDamageIndicator" then return false end

@@ -39,6 +39,54 @@ local pain_settle_time = 14
 local pain_linger_mul = 0.3
 local pain_settle_mul = 2.6
 
+hg.organism.PainConfig = {
+	stages = {15, 35, 60, 85},
+	stageNames = {"low", "medium", "high", "extreme"},
+	diminishStart = 100,
+	diminishRange = 50,
+	lightPain = 20,
+	lightDecayMul = 2,
+	shock = {
+		hardLimit = 100,
+		grace = 3,
+		minChance = 0.1,
+		maxChance = 0.6,
+		fullOver = 30,
+		wakeFraction = 0.65,
+	},
+}
+
+function hg.organism.GetPainStage(pain)
+	local stages = hg.organism.PainConfig.stages
+	for stage = #stages, 1, -1 do
+		if pain >= stages[stage] then return stage end
+	end
+
+	return 0
+end
+
+function hg.organism.UpdatePainShock(org, limit, timeValue)
+	local shock = hg.organism.PainConfig.shock
+	if org.painCollapsed then
+		if org.pain < limit * shock.wakeFraction then org.painCollapsed = nil end
+		org.painShockTime = nil
+
+		return
+	end
+
+	if org.otrub or org.pain < limit then
+		org.painShockTime = nil
+
+		return
+	end
+
+	org.painShockTime = (org.painShockTime or 0) + timeValue
+	if org.painShockTime < shock.grace then return end
+
+	local chance = Lerp(Clamp((org.pain - limit) / shock.fullOver, 0, 1), shock.minChance, shock.maxChance)
+	if math.random() < chance * timeValue then org.painCollapsed = true end
+end
+
 function hg.organism.GetAdrenalinePainPacing(adrenaline)
 	adrenaline = max(adrenaline or 0, 0)
 	if adrenaline <= 0.5 then return 1 end
@@ -59,7 +107,7 @@ function hg.organism.CanFeelPain(org, region)
 end
 
 function hg.organism.AddPain(org, amount, region)
-	amount = math.max(tonumber(amount) or 0, 0)
+	amount = math.max(tonumber(amount) or 0, 0) * hg.GetPainSeverity()
 	local owner = org and org.owner
 	if IsValid(owner) and owner.GetTraitMultiplier then amount = amount * owner:GetTraitMultiplier("pain_received", 1) end
 	if amount <= 0 or not hg.organism.CanFeelPain(org, region) then return 0 end
@@ -71,7 +119,7 @@ function hg.organism.AddPain(org, amount, region)
 end
 
 function hg.organism.AddInstantPain(org, amount, region)
-	amount = math.max(tonumber(amount) or 0, 0)
+	amount = math.max(tonumber(amount) or 0, 0) * hg.GetPainSeverity()
 	local owner = org and org.owner
 	if IsValid(owner) and owner.GetTraitMultiplier then amount = amount * owner:GetTraitMultiplier("pain_received", 1) end
 	if amount <= 0 or not hg.organism.CanFeelPain(org, region) then return 0 end
@@ -97,6 +145,9 @@ module[1] = function(org)
 	org.painadd = 0
 	org.headpainadd = 0
 	org.nearpainlimit = false
+	org.painCollapsed = nil
+	org.painShockTime = nil
+	org.painStage = 0
 	org.hurt = 0
 
 	org.hurtadd = 0
@@ -217,13 +268,15 @@ module[2] = function(owner, org, timeValue)
 	end
 	if org.adrenalinePainBreakthrough then adrenalinePainPacing = math.max(adrenalinePainPacing, 0.5) end
 	add = add * Lerp(zerlkers, adrenalinePainPacing, 0.025)
+	local painConfig = hg.organism.PainConfig
+	add = add / (1 + max(org.avgpain - painConfig.diminishStart, 0) / painConfig.diminishRange)
+	if org.avgpain < painConfig.lightPain then sub = sub * painConfig.lightDecayMul end
 	sub = sub * (1 + resilience * 0.35 + zerlkersResistance * 1.5)
 
 
 
-	if org.pain > 60 and not org.otrub then
+	if org.pain > painConfig.stages[3] and not org.otrub then
 
-		-- Severe pain compounds: it is harder to settle and more readily aggravated.
 		add = add * 1.5
 
 		if org.pain > 70 and add > 0.01 then
@@ -240,7 +293,7 @@ module[2] = function(owner, org, timeValue)
 
 		org.disorientation = math.max(org.pain / 50, org.disorientation)//org.disorientation + add
 
-		org.shock = min(org.shock + timeValue * (org.pain - 60) * pain_shock_gain / (1 + max(adrenaline, 0) * 0.45), 95)
+		org.shock = min(org.shock + timeValue * (org.pain - painConfig.stages[3]) * pain_shock_gain / (1 + max(adrenaline, 0) * 0.45), 95)
 
 		org.fearadd = 1
 
@@ -331,7 +384,7 @@ module[2] = function(owner, org, timeValue)
 	local wakeThresholdProgress = Clamp(unconsciousTime / otrub_wake_threshold_ramp_time, 0, 1)
 	local wakeShockThreshold = otrub_wake_shock_max * wakeThresholdProgress
 	local wakePainThreshold = otrub_wake_pain_max * wakeThresholdProgress
-	local recoveryBlocked = org.otrub and (org.shock > wakeShockThreshold or org.pain > wakePainThreshold)
+	local recoveryBlocked = org.otrub and (org.shock > wakeShockThreshold or (org.rawPain or org.pain) > wakePainThreshold)
 	local persistentConsciousnessCause = org.tranquilizer > 0 or comaActive
 	local riled = fightingBack and 1 or Clamp(((adrenaline or 0) - 0.5) / 1, 0, 1)
 	local otrubThreshold = Lerp(riled, consciousness_otrub_threshold, consciousness_otrub_threshold_riled) * consciousnessResistance
@@ -353,6 +406,7 @@ module[2] = function(owner, org, timeValue)
 	org.avgpain = min(org.avgpain + add, 150)
 
 	if !org.lasthit or org.lasthit + 1 < CurTime() then org.avgpain = max(org.avgpain - sub, 0) end
+	org.avgpain = max(org.avgpain, (org.softPain or 0) * hg.GetPainSeverity())
 
 	org.painlessen = sub
 
@@ -362,6 +416,8 @@ module[2] = function(owner, org, timeValue)
 	if zerlkersDose > 0 or (adrenaline >= 3 and not org.adrenalinePainBreakthrough) then
 		org.pain = math.min(org.pain, 69.99)
 	end
+	org.rawPain = org.pain
+	if org.otrub then org.pain = 0 end
 	-- Pain can now produce a vasovagal blackout before the slower shock drain has
 	-- finished lowering consciousness. The smooth severity curve keeps moderate
 	-- pain occasional and makes sustained extreme pain progressively less stable.
@@ -371,8 +427,10 @@ module[2] = function(owner, org, timeValue)
 	if not org.otrub and syncopeRate > 0 and math.random() < Clamp(syncopeRate * timeValue, 0, 1) then
 		org.consciousness = math.min(org.consciousness or 1, otrubThreshold * 0.8)
 	end
-	org.nearpainlimit = not org.otrub and org.pain >= org.pain_turn * pain_fake_threshold
-	if org.isPly and org.pain >= 85 and not org.otrub and IsValid(owner) and owner.Notify and owner:GetInfoNum("hg_newthoughts", 0) <= 0 then
+	hg.organism.UpdatePainShock(org, min(org.pain_turn * pain_fake_threshold, painConfig.shock.hardLimit), timeValue)
+	org.nearpainlimit = not org.otrub and (org.pain >= org.pain_turn * pain_fake_threshold or org.painCollapsed == true)
+	org.painStage = hg.organism.GetPainStage(org.pain)
+	if org.isPly and org.pain >= painConfig.stages[4] and not org.otrub and IsValid(owner) and owner.Notify and owner:GetInfoNum("hg_newthoughts", 0) <= 0 then
 		local sharpPain = hg.sharp_pain
 		owner:Notify(sharpPain and sharpPain[math.random(#sharpPain)] or "AAAAAAAAAAAAAGHH!", 8, "pain_scream", 0, nil, Color(255, 80, 80))
 	end
@@ -403,7 +461,7 @@ module[2] = function(owner, org, timeValue)
 
 	//org.painkiller = Approach(org.painkiller, 0, timeValue / 240 * (org.naloxone * 25 + 1))
 
-	if org.nearpainlimit and not hg.organism.IsHitKnockdownImmune(org) then
+	if org.painCollapsed and not hg.organism.IsHitKnockdownImmune(org) then
 		org.needfake = true
 	end
 	
@@ -516,14 +574,6 @@ module[2] = function(owner, org, timeValue)
 	if org.pelvis < 1 then
 
 		org.pelvis = max(org.pelvis - timeValue / 900 * recoveryMul * (hg.GetBandageRegenMultiplier and hg.GetBandageRegenMultiplier(org.owner, "pelvis") or 1), 0)
-
-	end
-
-
-
-	if org.pain > 100 then
-
-		org.needfake = true
 
 	end
 

@@ -15,7 +15,8 @@ local SHOCK_TIME_OFFSET = 9750
 local TINT_BASE_GAIN = 0.08
 local TINT_PULSE_GAIN = 0.24
 local TINT_GRAIN_SCALE = 4096
-local FACE_BOX_COLOR = Color(15, 15, 15, 200)
+local FACE_BOX_COLOR = Color(25, 25, 35, 240)
+local FACE_OUTLINE_COLOR = Color(255, 255, 255, 255)
 local FACE_PADDING = 0.16
 
 local VIGNETTE_MATERIAL = Material("effects/shaders/zb_vignette")
@@ -56,20 +57,20 @@ function SimpleHealth.GetLocalState()
 	return state
 end
 
-function SimpleHealth.GetOxyEffectTarget()
+function SimpleHealth.GetOxyEffectTarget(o2Target)
 	local state = SimpleHealth.GetLocalState()
-	if not state or not IsValid(lply) or not lply:Alive() then return end
+	if not state or not IsValid(lply) or not lply:Alive() then return o2Target end
 	if state.countdownEnd > CurTime() then return OXY_EFFECT_FULL end
 
 	local effects = CONFIG.effects
 	local oxy = state.oxy
-	if oxy <= effects.oxyStart then return 0 end
+	if oxy <= effects.oxyStart then return math.max(o2Target, 0) end
 
 	local rising = math.Clamp((oxy - effects.oxyStart) / (effects.oxyStrong - effects.oxyStart), 0, 1)
 	local closing = math.Clamp((oxy - effects.oxyStrong) / (CONFIG.oxy.countdownStart - effects.oxyStrong), 0, 1)
 	local severity = rising * effects.oxyStrongAmount + closing * (effects.oxyCloseAmount - effects.oxyStrongAmount)
 
-	return severity * OXY_EFFECT_FULL
+	return math.max(severity * OXY_EFFECT_FULL, o2Target)
 end
 
 local hg_vignette_scale = GetConVar("hg_vignette_scale")
@@ -111,14 +112,10 @@ local function drawTintedVignette(strength, color, pulseSpeed)
 	render.DrawScreenQuad()
 end
 
-local DAMAGE_TINT_KEYS = {"toxin"}
-local damageTintLerps = {toxin = 0}
 local traumaLerp = 0
 
 local function updateDamageTints(state)
 	local effects = CONFIG.effects
-	local dominant = state and SimpleHealth.GetDominantPool(state)
-
 	local traumaTarget = 0
 	if state then
 		local range = math.max(effects.traumaVignetteFull - effects.traumaVignetteStart, 1)
@@ -129,19 +126,6 @@ local function updateDamageTints(state)
 	traumaLerp = LerpFT(effects.lerp, traumaLerp, traumaTarget)
 	if traumaLerp > EFFECT_MIN then
 		drawTintedVignette(traumaLerp, effects.traumaVignetteColor, effects.traumaVignettePulseSpeed)
-	end
-
-	for _, pool in ipairs(DAMAGE_TINT_KEYS) do
-		local target = 0
-		if pool == dominant then
-			local range = math.max(effects.damageTintFull - effects.damageTintMin, 1)
-			target = math.Clamp((state[pool] - effects.damageTintMin) / range, 0, 1) * effects.damageTintStrength
-		end
-
-		damageTintLerps[pool] = LerpFT(effects.lerp, damageTintLerps[pool], target)
-		if damageTintLerps[pool] > EFFECT_MIN then
-			drawTintedVignette(damageTintLerps[pool], effects.damageTints[pool], effects.damageTintPulseSpeed)
-		end
 	end
 end
 
@@ -221,6 +205,7 @@ local function getFaceKey(state, alive)
 	local faceConfig = CONFIG.face
 	local health = SimpleHealth.GetHealth(state)
 	if health < faceConfig.criticalBelow then return "critical" end
+	if health < faceConfig.woundedBelow then return "wounded" end
 	if health < faceConfig.hurtBelow then return "hurt" end
 
 	return "healthy"
@@ -245,12 +230,13 @@ local function playOuchie(path, pitch, volume)
 	end)
 end
 
-local FACE_RANK = {healthy = 1, hurt = 2, critical = 3, softcrit = 4, hardcrit = 5}
+local FACE_RANK = {healthy = 1, hurt = 2, wounded = 3, critical = 4, softcrit = 5, hardcrit = 6}
 
 local lastFaceKey
 local lastFacePale = false
 local lastDamageTotal
-local shakeStart = 0
+local shakeStart = -10
+local shakeScale = 1
 
 local function updateFaceSound()
 	local state = SimpleHealth.GetLocalState()
@@ -265,11 +251,18 @@ local function updateFaceSound()
 	local pale = isFacePale()
 	local faceConfig = CONFIG.face
 	local worse = lastFaceKey and FACE_RANK[key] > FACE_RANK[lastFaceKey]
+	if lastFaceKey and key ~= lastFaceKey then
+		shakeStart = RealTime()
+		shakeScale = 1
+	end
 
-	if (worse and key == "critical") or (lastFaceKey and pale and not lastFacePale) then
-		playOuchie(faceConfig.blipSound, 1, faceConfig.blipVolume)
-	elseif worse then
+	local blip = (worse and key == "critical") or (lastFaceKey and pale and not lastFacePale)
+	if worse or blip then
 		playOuchie(faceConfig.statusSound, 1, faceConfig.statusVolume)
+	end
+
+	if blip then
+		playOuchie(faceConfig.blipSound, 1, faceConfig.blipVolume)
 	end
 
 	lastFaceKey = key
@@ -285,67 +278,100 @@ local function updateDamageShake(state)
 		return
 	end
 
-	local total = state.brute + state.burn + state.toxin + state.oxy
-	if lastDamageTotal and total > lastDamageTotal then shakeStart = RealTime() end
+	local total = state.brute + state.burn
+	local gained = lastDamageTotal and total - lastDamageTotal or 0
+	if gained > 0 then
+		shakeStart = RealTime()
+		shakeScale = math.Clamp(0.6 + gained / 25, 0.6, 1.5)
+		if hg.AddDamageFlash then
+			hg.AddDamageFlash(math.Clamp(0.3 + gained / 20, 0.3, 1.2), 0.6 + math.Clamp(total / 100, 0, 1) * 0.9)
+		end
+	end
 	lastDamageTotal = total
 end
 
 local function getFaceShake(size)
 	local faceConfig = CONFIG.face
-	local state = SimpleHealth.GetLocalState()
-	local amount = 0
-
 	local age = RealTime() - shakeStart
-	if age < faceConfig.shakeTime then
-		amount = faceConfig.shakeHit * (1 - age / faceConfig.shakeTime)
-	end
+	if age >= faceConfig.shakeTime then return 0, 0 end
 
-	if state and state.crit >= CRIT_SOFT then amount = math.max(amount, faceConfig.shakeCrit) end
-	if amount <= 0 then return 0, 0 end
+	local fade = 1 - age / faceConfig.shakeTime
 
-	local now = RealTime()
-	amount = amount * size
-
-	return math.sin(now * 95) * amount, math.cos(now * 110) * amount
+	return math.sin(age * 32) * faceConfig.shakeHit * shakeScale * fade * fade * size, 0
 end
 
 SimpleHealth.OnLocalStateChanged = updateDamageShake
 
+local bigChat = GetConVar("sv_bigchat")
+local CHAT_HAT_HEIGHT = 20
+local FACE_CHAT_GAP = 6
+
+local function getFaceAnchor(size)
+	local faceConfig = CONFIG.face
+	bigChat = bigChat or GetConVar("sv_bigchat")
+
+	if not bigChat or not bigChat:GetBool() then
+		return math.floor(ScrW() * faceConfig.x), math.floor(ScrH() * faceConfig.y)
+	end
+
+	local chatX, chatY, chatW
+	local chat = hg.chat
+	if IsValid(chat) then
+		chatX, chatY = chat:GetPos()
+		chatW = chat:GetWide()
+	else
+		chatW = cookie.GetNumber("zchat_bounds_v2_w", ScrW() / 6)
+		chatX = cookie.GetNumber("zchat_bounds_v2_x", ScrW() - chatW - ScrW() * 0.008)
+		chatY = cookie.GetNumber("zchat_bounds_v2_y", ScrH() - ScrH() * 0.5 - ScrH() * 0.06)
+	end
+
+	local x = math.floor(chatX + chatW - size)
+	local y = math.floor(chatY - CHAT_HAT_HEIGHT - FACE_CHAT_GAP - size)
+
+	return math.Clamp(x, 0, ScrW() - size), math.max(y, 0)
+end
+
+local deathDelay = {active = false, wasAlive = false, aliveMode = 0}
+
 local function nildoy()
+	if not IsValid(lply) then return end
+
+	local alive = lply:Alive()
 	local state = SimpleHealth.GetLocalState()
-	if not state or not IsValid(lply) or not lply:Alive() then return end
+	if alive then
+		if not state then return end
+	elseif deathDelay.aliveMode <= 0 then
+		return
+	end
 	if hook.Run("HUDShouldDraw", "HGSimpleHealthFace") == false then return end
 
 	local faceConfig = CONFIG.face
 	local size = math.floor(ScrH() * faceConfig.size)
-	local x = math.floor(ScrW() * faceConfig.x)
-	local y = math.floor(ScrH() * faceConfig.y)
-	local shakeX, shakeY = getFaceShake(size)
-	x, y = x + math.floor(shakeX), y + math.floor(shakeY)
+	local x, y = getFaceAnchor(size)
 
-	surface.SetDrawColor(255, 255, 255, 255)
+	surface.SetDrawColor(FACE_BOX_COLOR)
+	surface.DrawRect(x, y, size, size)
+	surface.SetDrawColor(FACE_OUTLINE_COLOR)
+	surface.DrawOutlinedRect(x, y, size, size, 2)
 
-	local boxMaterial = getFaceMaterial("box")
-	if boxMaterial then
-		surface.SetMaterial(boxMaterial)
-		surface.DrawTexturedRect(x, y, size, size)
-	else
-		draw.RoundedBox(4, x, y, size, size, FACE_BOX_COLOR)
-	end
-
-	local key = getFaceKey(state, true)
-	local material = getFaceMaterial(isFacePale() and key .. "_pale" or key)
+	local key = alive and getFaceKey(state, true) or "hardcrit"
+	local material = getFaceMaterial(alive and isFacePale() and key .. "_pale" or key)
 	if not material then return end
 
+	local shakeX, shakeY
+	if alive then
+		shakeX, shakeY = getFaceShake(size)
+	else
+		shakeX, shakeY = math.sin(RealTime() * faceConfig.deadShakeSpeed) * faceConfig.deadShake * size, 0
+	end
 	local padding = math.floor(size * FACE_PADDING)
 	surface.SetDrawColor(255, 255, 255, 255)
 	surface.SetMaterial(material)
-	surface.DrawTexturedRect(x + padding, y + padding, size - padding * 2, size - padding * 2)
+	surface.DrawTexturedRect(x + padding + math.floor(shakeX), y + padding + math.floor(shakeY), size - padding * 2, size - padding * 2)
 end
 
 hook.Add("HUDPaint", "hg/simplehealth/face", nildoy)
-
-local deathDelay = {active = false, wasAlive = false, aliveMode = 0}
+hook.Add("HG_DeathOverlayHUD", "hg/simplehealth/face", nildoy)
 
 local function finishDeathDelay(playSecond)
 	deathDelay.active = false
@@ -386,9 +412,16 @@ function SimpleHealth.UpdateDeathDelay()
 	return deathDelay.active
 end
 
+local DEATH_CAUSE_COLOR = Color(200, 40, 40)
+
 net.Receive("hg_simplehealth_death", function()
 	local key = net.ReadString()
-	SimpleHealth.Local.deathCause = CONFIG.deathCauses[key] or CONFIG.deathCauses.unknown
+	local cause = CONFIG.deathCauses[key] or CONFIG.deathCauses.unknown
+	SimpleHealth.Local.deathCause = cause
+
+	if IsValid(hg.chat) and hg.chat.AddLine then
+		hg.chat:AddLine({DEATH_CAUSE_COLOR, cause})
+	end
 end)
 
 function SimpleHealth.GetDeathCauseText()

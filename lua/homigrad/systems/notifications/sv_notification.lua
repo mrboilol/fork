@@ -476,7 +476,30 @@ local combatThoughts = {
         "FUCK- I'M BEING SHOT AT-",
         "THAT ROUND WENT RIGHT PAST ME-",
     },
+    multi_pass = {
+        "THEY'RE LAYING DOWN FIRE- GET DOWN-",
+        "SO MANY ROUNDS- THEY'RE ALL AROUND ME-",
+        "FUCK- BULLETS EVERYWHERE- I CAN'T MOVE-",
+        "THEY'RE PINNING ME- I NEED COVER-",
+        "RIGHT PAST MY HEAD- AGAIN AND AGAIN-",
+        "KEEP YOUR HEAD DOWN- KEEP YOUR HEAD DOWN-",
+    },
+    multi_hit = {
+        "I'M BEING HIT- AGAIN- AGAIN-",
+        "THEY'RE TEARING ME APART-",
+        "TOO MANY- I'M TAKING TOO MANY-",
+        "FUCK- THEY KEEP HITTING ME-",
+        "I'M GETTING SHREDDED-",
+    },
+    multi_mixed = {
+        "SOME HIT- SOME MISS- I'M IN A KILL ZONE-",
+        "THEY'RE RAKING ME- I NEED TO MOVE-",
+        "ROUNDS ALL OVER- AND I'M HIT-",
+        "I'M UNDER FIRE- I'M HIT- MOVE MOVE MOVE-",
+    },
 }
+
+local multiBulletPools = {multi_pass = true, multi_hit = true, multi_mixed = true}
 
 function hg.CombatThought(ply, pool)
     if not IsValid(ply) or not ply:IsPlayer() or not ply:Alive() then return false end
@@ -491,14 +514,15 @@ function hg.CombatThought(ply, pool)
     local options = combatThoughts[pool]
     if not options then return false end
 
+    local isMulti = multiBulletPools[pool] == true
     local isNear = pool == "near_shot"
     local useNew = ply:GetInfoNum("hg_newthoughts", 0) > 0
-    if useNew and not isNear then return false end
+    if useNew and not isNear and not isMulti then return false end
 
     local now = CurTime()
-    local cdKey = isNear and "nextNearShotThought" or "nextCombatThought"
+    local cdKey = isMulti and "nextMultiBulletThought" or isNear and "nextNearShotThought" or "nextCombatThought"
     if (ply[cdKey] or 0) > now then return false end
-    ply[cdKey] = now + (isNear and 5 or 8)
+    ply[cdKey] = now + (isMulti and 4 or isNear and 5 or 8)
 
     local msg = options[math.random(#options)]
     if ply.lastCombatThoughtText == msg then msg = options[math.random(#options)] end
@@ -876,6 +900,20 @@ CreateThought = function(ply, msg, delay, msgKey, showTime, clr, func)
         net.WriteString(group)
         net.Send(ply)
     end)
+
+    return true
+end
+
+function hg.OtrubThought(ply, msg, clr)
+    if not IsValid(ply) or not ply:IsPlayer() or not ply:Alive() then return false end
+    if not ply.organism or not ply.organism.otrub then return false end
+
+    clr = clr or color_white
+    net.Start("HGThought")
+    net.WriteString(msg)
+    net.WriteColor(Color(clr.r, clr.g, clr.b, 255))
+    net.WriteString(GetThoughtGroup(msg, msg))
+    net.Send(ply)
 
     return true
 end
@@ -1318,28 +1356,76 @@ hook.Add("HomigradDamage", "HGThoughtHitReport", function(victim, dmgInfo, hitgr
 	end
 end)
 
-local function NearMissThought(ply, body, src, dir, length)
+local BULLET_BURST_WINDOW = 0.75
+
+local function flushBulletBurst(ply)
+	local burst = ply.hgBulletBurst
+	ply.hgBulletBurst = nil
+	if not burst or not IsValid(ply) or not ply:Alive() then return end
+
+	local passes, hits = burst.passes, burst.hits
+	if passes + hits >= 2 then
+		local pool = hits == 0 and "multi_pass" or passes == 0 and "multi_hit" or "multi_mixed"
+		hg.CombatThought(ply, pool)
+
+		return
+	end
+
+	if passes ~= 1 then return end
+
 	local now = CurTime()
-	if (ply.hgNearMissNext or 0) > now then return false end
+	if (ply.hgNearMissNext or 0) > now then return end
 
 	if ply:GetInfoNum("hg_newthoughts", 0) > 0 then
-		local part = nearestBodyPartToLine(body, src, dir, length) or "head"
+		local part = burst.part or "head"
 		local variants = NEAR_MISS_PARTS[part]
 		if variants then part = variants[math.random(#variants)] end
 
-		if not CreateThought(ply, "A bullet almost hit your " .. part .. ".", 6, "near_miss_report", 0, color_white) then return false end
+		if not CreateThought(ply, "A bullet almost hit your " .. part .. ".", 6, "near_miss_report", 0, color_white) then return end
 
 		if math.Rand(0, 1) < NEAR_MISS_REACTION_CHANCE then
 			CreateThought(ply, NEAR_MISS_REACTIONS[math.random(#NEAR_MISS_REACTIONS)], 10, "hgstatus_near_miss_reaction", 0.6, color_white)
 		end
 	elseif not CreateNotification(ply, NEAR_MISS_REACTIONS[math.random(#NEAR_MISS_REACTIONS)], 10, "near_miss_reaction") then
-		return false
+		return
 	end
 
 	ply.hgNearMissNext = now + 6
+end
+
+local function registerBulletEvent(ply, kind, part)
+	local burst = ply.hgBulletBurst
+	if not burst then
+		burst = {passes = 0, hits = 0}
+		ply.hgBulletBurst = burst
+
+		timer.Simple(BULLET_BURST_WINDOW, function()
+			if IsValid(ply) then flushBulletBurst(ply) end
+		end)
+	end
+
+	local now = CurTime()
+	if kind == "hits" then
+		if now - (burst.lastHit or -1) < 0.05 then return end
+		burst.lastHit = now
+	end
+
+	burst[kind] = burst[kind] + 1
+	if kind == "passes" and not burst.part then burst.part = part end
+end
+
+local function NearMissThought(ply, body, src, dir, length)
+	registerBulletEvent(ply, "passes", nearestBodyPartToLine(body, src, dir, length))
 
 	return true
 end
+
+hook.Add("PreHomigradDamage", "HGThoughtBulletBurst", function(victim, dmgInfo)
+	if not dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) then return end
+
+	local ply = SCPCBThoughtOwner(victim)
+	if IsValid(ply) and ply:Alive() then registerBulletEvent(ply, "hits") end
+end)
 
 local function SCPCBCheckBulletNearMiss(entity, shooter, src, hitPos, hitEntity, reported)
 	local dir = hitPos - src

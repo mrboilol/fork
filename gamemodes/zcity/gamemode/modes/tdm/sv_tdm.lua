@@ -204,6 +204,8 @@ function MODE:AssignArenaTeams()
 		ply:SetTeam(i % 2)
 	end
 
+	if hg.Buddy then hg.Buddy.BiasTeams() end
+
 	for _, ply in ipairs(players) do
 		local spawnPos = zb:GetTeamSpawn(ply)
 		if spawnPos then ply:SetPos(spawnPos) end

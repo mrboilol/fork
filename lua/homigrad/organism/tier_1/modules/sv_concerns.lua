@@ -173,6 +173,7 @@ end
 
 function hg.organism.AddHappiness(org, amount)
     if not org or not isnumber(amount) or amount <= 0 then return end
+    if org.buddyNear and hg.Buddy then amount = amount * hg.Buddy.Config.happinessMul end
 
     local depression = math.Clamp(tonumber(org.depression) or 0, 0, 1)
     local eased = math.min(depression, amount)

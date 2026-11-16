@@ -186,14 +186,21 @@ if CLIENT then
 	}
 	local lastThoughtStart = 0
 
+	local bigChatConVar
+
+	local function ThoughtsInChat()
+		bigChatConVar = bigChatConVar or GetConVar("sv_bigchat")
+		return bigChatConVar and bigChatConVar:GetBool() and IsValid(hg.chat) and hg.chat.AddLine ~= nil
+	end
+
 	local function PushThoughtLine(thought)
-		if not IsValid(hg.chat) or not hg.chat.AddLine then return end
+		if not thought.inChat or not IsValid(hg.chat) or not hg.chat.AddLine then return end
 
 		local elements = {thought.lineColor, thought.typed}
 		if IsValid(thought.line) and hg.chat.UpdateLine then
 			hg.chat:UpdateLine(thought.line, elements)
 		else
-			thought.line = hg.chat:AddLine(elements)
+			thought.line = hg.chat:AddLine(elements, true)
 		end
 	end
 
@@ -210,6 +217,10 @@ if CLIENT then
 		if cut and thought.shown < thought.len then
 			thought.typed = string.TrimRight(thought.typed) .. "-"
 			PushThoughtLine(thought)
+		end
+
+		if IsValid(thought.line) and IsValid(hg.chat) and hg.chat.MergeRepeat then
+			thought.line = hg.chat:MergeRepeat(thought.line)
 		end
 
 		MsgC(thought.lineColor, thought.typed, "\n")
@@ -317,6 +328,10 @@ if CLIENT then
 		hg.overlapNotifications = {}
 	end, "hg_clear_notification_mode_switch")
 
+	cvars.AddChangeCallback("sv_bigchat", function()
+		ResetThoughts(true)
+	end, "hg_thoughts_bigchat_switch")
+
 	hook.Add("Player_Death","removeNotifications",function(ply)
 		if ply != lply then return end
 		StopThoughtSound()
@@ -404,7 +419,7 @@ if CLIENT then
 		if not hg_newthoughts:GetBool() then return end
 		if lply:IsBerserk() then return end
 
-		if group ~= "emotion" and hg.ChatLog and hg.ChatLog.SecondPerson then msg = hg.ChatLog.SecondPerson(msg) end
+		if group ~= "emotion" and hg.ChatLog and hg.ChatLog.Narrate then msg = hg.ChatLog.Narrate(msg) end
 		msg = utf8.force(msg)
 		for _, thought in ipairs(hg.thoughts) do
 			if thought.msg == msg and not thought.finishedAt then return end
@@ -423,6 +438,14 @@ if CLIENT then
 			shown = 0,
 			typed = "",
 		}
+
+		if ThoughtsInChat() then
+			thought.inChat = true
+			thought.start = CurTime()
+			SetThoughtShown(thought, thought.len)
+			FinishThought(thought, false)
+			return
+		end
 
 		if group and not THOUGHT_STACKING[group] then
 			for i = #hg.thoughts, 1, -1 do
@@ -811,9 +834,17 @@ if CLIENT then
 	end
 
 	hook.Add("DrawOverlay", "HGNotificationsThink", function()
-		NotificationsDraw()
-		OverlapNotificationsDraw()
-		ThoughtsDraw()
+		local alpha = hg.DeathHUDAlpha and hg.DeathHUDAlpha() or 1
+		if alpha <= 0 then return end
+
+		surface.SetAlphaMultiplier(alpha)
+		local ok, err = pcall(function()
+			NotificationsDraw()
+			OverlapNotificationsDraw()
+			ThoughtsDraw()
+		end)
+		surface.SetAlphaMultiplier(1)
+		if not ok then ErrorNoHalt(err, "\n") end
 	end)
 	hook.Add("Think", "HGNotificationsThink", function()
 		NotificationsThink()

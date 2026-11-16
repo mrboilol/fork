@@ -194,3 +194,16 @@ function hg.IsOnGround(ent)
 	tr.mask = MASK_PLAYERSOLID
 	return util.TraceEntityHull(tr, ent).Hit
 end
+
+local bloodImpactsCvar
+function hg.BloodImpactEffect(data, ...)
+	bloodImpactsCvar = bloodImpactsCvar or GetConVar("hg_bloodimpacts") or CreateConVar("hg_bloodimpacts", 0, FCVAR_ARCHIVE + FCVAR_REPLICATED, "Enable custom blood impact effects spray cool kill death", 0, 1)
+	if not bloodImpactsCvar:GetBool() then return end
+	util.Effect("BloodImpact", data, ...)
+end
+
+local fleshMats = {[MAT_FLESH] = true, [MAT_BLOODYFLESH] = true, [MAT_ALIENFLESH] = true, [MAT_ANTLION] = true}
+function hg.SuppressFleshImpact(tr)
+	bloodImpactsCvar = bloodImpactsCvar or GetConVar("hg_bloodimpacts") or CreateConVar("hg_bloodimpacts", 0, FCVAR_ARCHIVE + FCVAR_REPLICATED, "Enable custom blood impact effects spray cool kill death", 0, 1)
+	return not bloodImpactsCvar:GetBool() and fleshMats[tr.MatType] == true
+end

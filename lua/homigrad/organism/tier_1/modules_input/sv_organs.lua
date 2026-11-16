@@ -309,7 +309,7 @@ local function damageBrainLobe(org, bone, dmg, dmgInfo, key, impact)
 		effdata:SetRadius(dmg / 10)
 		effdata:SetMagnitude(dmg / 10)
 		effdata:SetScale(1)
-		util.Effect("BloodImpact", effdata)
+		hg.BloodImpactEffect(effdata)
 
 		local ent = hg.GetCurrentCharacter(org.owner)
 		if IsValid(ent) and ent.organism and not ent.organism.SpawnedBrainChunks and math.random(5) == 1 then
@@ -392,7 +392,7 @@ local function emitArterialImpact(owner, wound)
 	effect:SetMagnitude(2)
 	effect:SetScale(1.2)
 	effect:SetRadius(3)
-	util.Effect("BloodImpact", effect, true, true)
+	hg.BloodImpactEffect(effect, true, true)
 end
 
 local arterySize = {

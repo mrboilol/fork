@@ -3,7 +3,7 @@ SWEP.Base = "weapon_bandage_sh"
 SWEP.PrintName = "Bruice kit"
 SWEP.Color = Color(60, 200, 60)
 SWEP.BandageTPIKColor = SWEP.Color
-SWEP.Instructions = "A roll of green trauma bandages designed to restore limb condition and a small amount of internal bleeding. RMB to use on someone else."
+SWEP.Instructions = "A roll of green trauma bandages for bruises, burns and damaged muscle. Does not set bones or stop bleeding. RMB to use on someone else."
 SWEP.Category = "ZCity Medicine"
 SWEP.Spawnable = true
 SWEP.Primary.Wait = 1
@@ -42,54 +42,13 @@ SWEP.modeValuesdef = {
 SWEP.ShouldDeleteOnFullUse = true
 
 if SERVER then
-	local conditionPriority = {
-		"spine3",
-		"spine2",
-		"spine1",
-		"pelvis",
-		"lleg",
-		"rleg",
-		"larm",
-		"rarm",
-		"chest",
-		"skull",
-		"jaw",
-	}
-
-	local brokenLimbsList = { "lleg", "rleg", "larm", "rarm", "chest" }
-	local complexBonesList = { "spine3", "spine2", "spine1", "pelvis", "chest", "skull" }
-	local boneHealing = 0.35
-	local internalBleedHealing = 0.5
-	local internalBleedCost = 0.25
-
-	local function CanHealKey(org, key)
-		local v = tonumber(org[key] or 0) or 0
-		if key == "larm" and org.larmamputated then return false end
-		if key == "rarm" and org.rarmamputated then return false end
-		if key == "lleg" and org.llegamputated then return false end
-		if key == "rleg" and org.rlegamputated then return false end
-		return v >= 0.05
-	end
-
 	function SWEP:GetHealData(org, bone)
 		local totalRotations = 1
 		local totalCost = 0
 		local bonesToHeal = {}
 		local availableResource = self.modeValues[1] or 0
 
-		if hg.SimpleHealth.GetState(org) then
-			totalRotations, totalCost = hg.SimpleHealth.AppendKitHealData(org, bonesToHeal, totalRotations, totalCost, availableResource)
-
-			return totalRotations, totalCost, bonesToHeal
-		end
-
-		local priority = table.Copy(conditionPriority)
-		if bone == "skull" or (isstring(bone) and string.find(bone, "Head", 1, true)) then
-			table.RemoveByValue(priority, "skull")
-			table.insert(priority, 1, "skull")
-		end
-
-		local dislocation = hg.organism.GetBandageDislocation and hg.organism.GetBandageDislocation(org, bone)
+		local dislocation = not hg.SimpleHealth.GetState(org) and hg.organism.GetBandageDislocation(org, bone)
 		if dislocation and availableResource >= 0.25 then
 			totalCost = totalCost + 0.25
 			totalRotations = totalRotations + 2
@@ -102,36 +61,13 @@ if SERVER then
 			})
 		end
 
-		for _, key in ipairs(priority) do
-			if CanHealKey(org, key) then
-				local isBroken = table.HasValue(brokenLimbsList, key)
-				local isComplex = table.HasValue(complexBonesList, key)
-				local cost = 0.25
-				local rotations = isBroken and 2 or 1
-				
-				if totalCost + cost <= availableResource + 0.001 then
-					totalCost = totalCost + cost
-					totalRotations = totalRotations + rotations
-					table.insert(bonesToHeal, {key = key, cost = cost, heal = boneHealing})
-				end
-			end
-		end
-
-		local internalBleed = math.max((tonumber(org.internalBleed) or 0) - (tonumber(org.internalBleedHeal) or 0), 0)
-		if internalBleed > 0.05 and totalCost + internalBleedCost <= availableResource + 0.001 then
-			totalCost = totalCost + internalBleedCost
+		local steps, stepCost = hg.Medicine.Plan("weapon_bruicekit", org, bone, availableResource - totalCost)
+		for _, step in ipairs(steps) do
 			totalRotations = totalRotations + 1
-			table.insert(bonesToHeal, {
-				key = "internalBleed",
-				cost = internalBleedCost,
-				heal = math.min(internalBleed, internalBleedHealing),
-				internalBleed = true,
-			})
+			bonesToHeal[#bonesToHeal + 1] = step
 		end
 
-		totalRotations, totalCost = hg.SimpleHealth.AppendKitHealData(org, bonesToHeal, totalRotations, totalCost, availableResource)
-
-		return totalRotations, totalCost, bonesToHeal
+		return totalRotations, totalCost + stepCost, bonesToHeal
 	end
 
 	function SWEP:CanHeal(ent)
@@ -167,45 +103,13 @@ if SERVER then
 
 		local amountHealed = 0
 		for _, data in ipairs(bones) do
-			local key = data.key
-			if data.internalBleed then
-				local internalBleed = math.max((tonumber(org.internalBleed) or 0) - (tonumber(org.internalBleedHeal) or 0), 0)
-				local healAmount = math.min(internalBleed, data.heal)
-				if healAmount > 0 then
-					org.internalBleedHeal = math.min((tonumber(org.internalBleedHeal) or 0) + healAmount, 20)
-					amountHealed = amountHealed + healAmount
-				end
-				continue
-			end
-			if data.simplePool then
-				amountHealed = amountHealed + hg.SimpleHealth.ApplyKitHeal(org, data)
-				continue
-			end
-			if data.dislocation then
-				if hg.organism.CompleteDislocationFix then
-					hg.organism.CompleteDislocationFix(org, data.limb, owner)
-				else
-					org[key] = false
-				end
-				amountHealed = amountHealed + data.heal
+			if data.medicine then
+				if hg.Medicine.ApplyStep(org, data) > 0 then amountHealed = amountHealed + data.cost end
 				continue
 			end
 
-			local v = tonumber(org[key] or 0) or 0
-			local newVal = math.max(v - data.heal, 0)
-
-			if key == "skull" and v >= 0.6 then
-				newVal = 0.55
-			end
-
-			org[key] = newVal
-			if hg.fakeBoneFlop and hg.fakeBoneFlop.ReconcileLimb and hg.fakeBoneFlop.ReconcileLimb(org, key) then
-				hg.fakeBoneFlop.ScheduleRebuild(org.owner)
-			end
-			if key == "skull" and newVal < v then
-				org.bandagedskull = true
-			end
-			amountHealed = amountHealed + (v - newVal)
+			hg.organism.CompleteDislocationFix(org, data.limb, owner)
+			amountHealed = amountHealed + data.heal
 		end
 
 		self.modeValues[1] = math.max((self.modeValues[1] or 0) - totalCost, 0)

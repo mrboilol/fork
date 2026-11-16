@@ -104,6 +104,7 @@ local function GetLocalDeathState()
 
 	local org = ply.new_organism or ply.organism
 	if not org or not (org.otrub or ply.organism and ply.organism.otrub) or not org.incapacitated then return end
+	if org.simpleMode or hg.SimpleHealth and hg.SimpleHealth.ConVar and hg.SimpleHealth.ConVar:GetInt() > 0 then return end
 
 	local deathStateEnd = tonumber(org.deathStateEnd)
 	if not deathStateEnd or deathStateEnd <= 0 then return end
@@ -295,11 +296,11 @@ local upDir = Vector(0, 0, 1)
 local fwdDir = Vector(0, 2.5, 0)
 local rightDir = Vector(2.5, 0, 0)
 
-local function plyCommand(ply,cmd)
+local function plyCommand(ply,cmd,keepChat)
 	local time = CurTime()
 	ply.cmdtimer = ply.cmdtimer or time
 
-	if cmd == "soundfade 100 99999" then
+	if cmd == "soundfade 100 99999" and not keepChat then
 		if IsValid(hg.chat) then
 			hg.chat:SetRealAlpha(0)
 
@@ -339,10 +340,10 @@ hook.Add("HG_OnOtrub", "adsadsadhuy!!", function(ply)
 	end
 end)
 
-hook.Add("Player_Death", "adsadsadhuy!!", function(ply)	
+hook.Add("Player_Death", "adsadsadhuy!!", function(ply)
 	if ply == LocalPlayer() then
 		lply:SetDSP(17)
-		plyCommand(lply,"soundfade 100 99999")
+		plyCommand(lply,"soundfade 100 99999",true)
 	end
 end)
 
@@ -1375,7 +1376,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 					muffed = ent.armors["face"] == "mask2" or ent.PlayerClassName == "Combine"
 				end
 				
-				if org.timeValue and org.o2.curregen <= org.timeValue * 0.5 and org.o2[1] < 20 then
+				if (org.breathLabored or 0) >= 0.5 or org.timeValue and org.o2.curregen <= org.timeValue * 0.5 and org.o2[1] < 20 then
 					ply:EmitSound("zcitysnd/real_sonar/"..(ThatPlyIsFemale(ent) and "fe" or "").."male_wheeze"..math.random(5)..".mp3", 40, nil, nil, nil, nil, 1)
 				end
 			else

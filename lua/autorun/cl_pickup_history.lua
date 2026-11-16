@@ -25,8 +25,25 @@ local function GetTextColor()
     return color_text_def
 end
 
+local color_chat = Color(255, 255, 255)
+local bigChatConVar
+
+local function SendToBigChat(text, isLoss)
+    bigChatConVar = bigChatConVar or GetConVar("sv_bigchat")
+    if not bigChatConVar or not bigChatConVar:GetBool() then return false end
+
+    local chat = hg and hg.chat
+    if not IsValid(chat) or not chat.AddLine then return false end
+
+    local line = (isLoss and "You dropped " or "You picked up ") .. text .. "."
+    chat:AddLine({hg.ChatLog and hg.ChatLog.COLOR_STATEMENT or color_chat, line})
+
+    return true
+end
+
 local function AddPickupNotification(text, isLoss)
     if not isstring(text) or text == "" then return end
+    if SendToBigChat(text, isLoss) then return end
 
     local id = tostring(CurTime()) .. "_" .. math.random(1, 100000)
     pickupHistory[#pickupHistory + 1] = {

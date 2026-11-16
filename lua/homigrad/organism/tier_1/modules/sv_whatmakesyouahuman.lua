@@ -72,6 +72,7 @@ end
 function hg.organism.PsychePanicGainMul(org, combatEvent)
 	local K = hg.PsycheCombat
 	local mul = Lerp(getTraining(org.owner), 1, K.trainedPanicGainMul) * Lerp(getSorrow(org), 1, K.sorrowPanicNumb) * (1 - hg.GetAngerShield(org) * K.angerPanicShield)
+	if org.buddyNear and hg.Buddy then mul = mul * (1 - hg.Buddy.Config.moodResist) end
 	if combatEvent and hg.organism.GetAdrenalineGainMul then
 		hg.organism.GetAdrenalineGainMul(org)
 		local ganged = org._adrGainMul or 1
@@ -292,6 +293,7 @@ local function onKill(victim, attacker)
 	attacker.hgPsycheHasKilled = true
 
 	if victim.hgFriendlyFireBy and (victim.hgFriendlyFireBy[attacker] or 0) > CurTime() - 15 then return end
+	if hg.organism.GetKillKarmaLoss and hg.organism.GetKillKarmaLoss(attacker, victim) > 0 then return end
 	local K = hg.PsycheCombat
 	local training = getTraining(attacker)
 	local org = attacker.organism

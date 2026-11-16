@@ -30,4 +30,6 @@ function zb:AutoBalance()
 		if ply:Team() == TEAM_SPECTATOR then continue end
 		ply:SetTeam(zb:BalancedChoice(0, 1))
 	end
+
+	if hg.Buddy then hg.Buddy.BiasTeams() end
 end

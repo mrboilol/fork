@@ -284,7 +284,7 @@ local function resetPose(rag)
 end
 
 local function getHeadlessPosture(rag)
-	if not IsValid(rag) then return end
+	if not IsValid(rag) or rag.brainfuckv2HeadlessDone then return end
 
 	local posture = rag.brainfuckv2Headless
 	if posture == nil then
@@ -594,6 +594,7 @@ local function applyPosture(rag, posture)
 	local fade = math.Clamp(1 - elapsed / fadeTime, 0, 1)
 	if elapsed > fadeTime + (headless and 1 or 10) then
 		rag.brainfuckv2Spent = true
+		if headless then rag.brainfuckv2HeadlessDone = true end
 		return
 	end
 	if not headless and (rag.brainfuckv2PoseError or 0) > 25 then fade = math.max(fade, 0.4) end
@@ -716,6 +717,13 @@ local function forceFake(ply, org)
 		if hg.EuphoriaBrainFreeze and IsValid(ply.FakeRagdoll) then hg.EuphoriaBrainFreeze(ply, ply.FakeRagdoll, org.brainfuckv2Posture) end
 	end)
 end
+
+hook.Add("PlayerSpawn", "BrainfuckV2Prewarm", function(ply)
+	timer.Simple(2, function()
+		if not IsValid(ply) or not ply:Alive() then return end
+		getNeutralBase(ply)
+	end)
+end)
 
 hook.Add("Org Clear", "BrainfuckV2", function(org)
 	if not org then return end

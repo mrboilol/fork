@@ -31,6 +31,15 @@ local function IsAware(ply)
 	return not (ply.organism and ply.organism.otrub)
 end
 
+local function IsStunned(ply)
+	local org = ply.organism
+	if not org then return false end
+
+	local now = CurTime()
+
+	return (org.stun or 0) > now or (org.lightstun or 0) > now
+end
+
 local function SourcePos(actor)
 	local character = hg.GetCurrentCharacter(actor)
 	if IsValid(character) and character ~= actor then
@@ -150,11 +159,70 @@ hook.Add("Fake", "hg/chatlog/fall", function(ply)
 	local voluntary = ply._godFakeBypass
 	local collapsed = hg.SimpleHealth.GetCrit(ply) >= hg.SimpleHealth.CRIT_SOFT
 	if not voluntary and NewThoughts(ply) then SendThoughtCut(ply) end
-	ChatLog.Emit(collapsed and "softcrit" or voluntary and "drop" or "fall", ply)
+
+	if collapsed or voluntary then
+		ChatLog.Emit(collapsed and "softcrit" or "drop", ply)
+
+		return
+	end
+
+	timer.Simple(0, function()
+		if not IsValid(ply) or not ply:Alive() or not IsValid(ply.FakeRagdoll) then return end
+		if not IsStunned(ply) then return end
+
+		ChatLog.Emit("fall", ply)
+	end)
 end)
 
-hook.Add("Fake Up", "hg/chatlog/getup", function(ply)
-	if IsValid(ply) and ply:IsPlayer() then ChatLog.Emit("getup", ply) end
+local INJURY_SCAN_INTERVAL = 0.5
+
+local function ActiveInjuries(org)
+	local active = {}
+	for index, injury in ipairs(ChatLog.Injuries) do
+		if injury.check(org) then active[index] = true end
+	end
+
+	return active
+end
+
+function ChatLog.InspectInjuries(viewer, org)
+	if not IsValid(viewer) or not org then return end
+
+	for _, injury in ipairs(ChatLog.Injuries) do
+		if injury.check(org) then viewer:ChatPrint("Their " .. injury.text .. ".") end
+	end
+end
+
+timer.Create("hg/chatlog/injuries", INJURY_SCAN_INTERVAL, 0, function()
+	for _, ply in player.Iterator() do
+		local org = ply:Alive() and ply.organism
+		if not org then
+			ply.hgInjurySeen = nil
+
+			continue
+		end
+
+		local active = ActiveInjuries(org)
+		local seen = ply.hgInjurySeen
+		if not seen then
+			ply.hgInjurySeen = active
+
+			continue
+		end
+
+		for index in pairs(seen) do
+			if not active[index] then seen[index] = nil end
+		end
+
+		for index = 1, #ChatLog.Injuries do
+			if active[index] and not seen[index] then
+				seen[index] = true
+				ChatLog.Emit("injury", ply, nil, nil, index)
+
+				break
+			end
+		end
+	end
 end)
 
 hook.Add("HG_OnOtrub", "hg/chatlog/collapse", function(ply)

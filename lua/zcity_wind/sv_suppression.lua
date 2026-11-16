@@ -33,7 +33,6 @@ end
 local GRAZE_MIN_DIST = 14
 local GRAZE_MAX_DIST = 36
 local GRAZE_FORCE = 14
-local GRAZE_COLOR = Color(255, 80, 80)
 
 local function SendSuppressionFlinch(ply, eyePos, closestPos, hard)
     local now = CurTime()
@@ -57,13 +56,6 @@ local function GrazeProbePoints(ply)
 
     local pos = ply:GetPos()
     return {pos + Vector(0, 0, 12), pos + Vector(0, 0, 36), ply:EyePos()}
-end
-
-local function GrazeThought(ply)
-    if not ply.Thought then return end
-
-    local useNew = ply:GetInfoNum("hg_newthoughts", 0) > 0
-    ply:Thought(useNew and "A bullet grazed you." or "AHH- THAT BULLET GRAZED ME", 3, "hgstatus_bulletgraze", 0, GRAZE_COLOR)
 end
 
 function ZW.ApplyBulletShock(ply, damage, fromPos)
@@ -98,8 +90,6 @@ function ZW.GrazePlayer(ply, closestPos, damage)
         net.WriteFloat(tonumber(damage) or 10)
         net.WriteBool(false)
     net.Send(ply)
-
-    GrazeThought(ply)
 end
 
 function ZW.CheckBulletGraze(bullet, startPos, endPos)

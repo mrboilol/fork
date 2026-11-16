@@ -61,10 +61,14 @@ function hg.organism.CompleteDislocationFix(org, limb)
 	return true
 end
 
-function hg.organism.ApplyBandageBoneTreatment(org, key, amount)
+function hg.organism.ApplyBandageBoneTreatment(org, key, amount, splinting)
 	if not org or not key then return 0 end
 	local isLimb = key == "lleg" or key == "rleg" or key == "larm" or key == "rarm"
 	if isLimb then hg.organism.SyncLimbSegments(org, key) end
+	if isLimb and not splinting and hg.IsLimbFractured(org, key)
+		and not (hg.IsLimbSplinted and IsValid(org.owner) and hg.IsLimbSplinted(org.owner, key)) then
+		return 0
+	end
 	local current = math.Clamp(tonumber(org[key]) or 0, 0, 1)
 	if current < 0.05 then return 0 end
 
@@ -222,6 +226,7 @@ module[1] = function(org)
 	org.next_med_error_check = 0
 	org.bandagedchest = false
 	org.bandagedskull = false
+	org.medicineActive = nil
 end
 module[2] = function(owner, org, timeValue)
 	if not org.alive then return end
@@ -241,6 +246,7 @@ module[2] = function(owner, org, timeValue)
 		local dizzyRemain = Clamp((org.rehab_dizzy_until - now) / WAKE_DIZZY_DURATION, 0, 1)
 		org.disorientation = max(org.disorientation or 0, WAKE_DIZZY_MIN + (WAKE_DIZZY_MAX - WAKE_DIZZY_MIN) * dizzyRemain)
 	end
+	hg.Medicine.Tick(org)
 end
 hook.Add("HG_OnWakeOtrub", "organism-rehab-after-otrub", function(owner)
 	if not IsValid(owner) or not owner.organism then return end
@@ -260,3 +266,243 @@ hook.Add("HG_OnWakeOtrub", "organism-rehab-after-otrub", function(owner)
 		org.rehab_dizzy_until = CurTime() + WAKE_DIZZY_DURATION
 	end
 end)
+
+local Medicine = hg.Medicine
+local SoftTissue = hg.SoftTissue
+
+local BONE_KEYS = {head = "skull", torso = "chest"}
+local SEVERITY_STOPS = {muscle = SoftTissue.Config.muscle.severity}
+local ANALGESIA_ADD_MAX = 4
+
+local function limbBleed(org, limb)
+	local bleed = 0
+	for _, wound in ipairs(org.wounds or {}) do
+		if SoftTissue.LimbFromBone(wound[4]) == limb then bleed = bleed + math.max(tonumber(wound[1]) or 0, 0) end
+	end
+
+	return bleed
+end
+
+Medicine.Measures = {
+	brute = function(org, limb) return SoftTissue.Get(org, "brute", limb) end,
+	burn = function(org, limb) return SoftTissue.Get(org, "burn", limb) end,
+	muscle = function(org, limb) return SoftTissue.GetMuscle(org, limb) end,
+	bleeding = limbBleed,
+	fracture = function(org, limb) return math.Clamp(tonumber(org[BONE_KEYS[limb] or limb]) or 0, 0, 1) end,
+	pain = function(org) return tonumber(org.pain) or 0 end,
+}
+
+Medicine.Handlers = {
+	brute = function(org, limb, amount) return SoftTissue.Heal(org, "brute", limb, amount) end,
+	burn = function(org, limb, amount) return SoftTissue.Heal(org, "burn", limb, amount) end,
+	muscle = function(org, limb, amount) return SoftTissue.HealMuscle(org, limb, amount) end,
+	fracture = function(org, limb, amount)
+		return hg.organism.ApplyBandageBoneTreatment(org, BONE_KEYS[limb] or limb, amount)
+	end,
+	pain = function(org, limb, amount)
+		org.analgesiaAdd = min((org.analgesiaAdd or 0) + amount, ANALGESIA_ADD_MAX)
+
+		return amount
+	end,
+	bleeding = function(org, limb, amount)
+		local healed = 0
+		for _, wound in ipairs(org.wounds or {}) do
+			local size = math.max(tonumber(wound[1]) or 0, 0)
+			if size > 0 and healed < amount and SoftTissue.LimbFromBone(wound[4]) == limb then
+				local part = min(size, amount - healed)
+				wound[1] = size - part
+				healed = healed + part
+			end
+		end
+
+		if healed > 0 then
+			org.bleed = max((org.bleed or 0) - healed, 0)
+			hg.organism.MarkWoundsNetDirty(org, true)
+		end
+
+		return healed
+	end,
+}
+
+Medicine.Requirements = {
+	splint = function(org, limb)
+		return hg.IsLimbSplinted ~= nil and IsValid(org.owner) and hg.IsLimbSplinted(org.owner, limb)
+	end,
+	bandage = function(org, limb)
+		return hg.GetBandageKeyLayers ~= nil and IsValid(org.owner) and hg.GetBandageKeyLayers(org.owner, limb) > 0
+	end,
+}
+
+Medicine.SideEffects = {
+	crash = function(org, amount) org.adrenalineAdd = (org.adrenalineAdd or 0) - amount end,
+	hiddenPain = function(org, amount) hg.organism.AddPain(org, amount, "body") end,
+}
+
+local function requirement(entry, kind)
+	local requires = entry.requires
+	if istable(requires) then return requires[kind] end
+
+	return requires
+end
+
+function Medicine.CanTreat(org, entry, kind, limb)
+	local measure = Medicine.Measures[kind]
+	local damage = measure and measure(org, limb) or 0
+	if damage <= 0 or damage < (entry.minDamage and entry.minDamage[kind] or 0) then return false end
+
+	local maxSeverity = entry.maxSeverity
+	if maxSeverity and kind ~= "pain" and kind ~= "bleeding" and kind ~= "fracture" then
+		local rank = SoftTissue.GetSeverityRank(damage, SEVERITY_STOPS[kind])
+		if rank > (SoftTissue.Config.severityRank[maxSeverity] or maxSeverity) then return false end
+	end
+
+	local check = Medicine.Requirements[requirement(entry, kind)]
+
+	return check == nil or check(org, limb) == true
+end
+
+local function limbScore(org, entry, limb)
+	local score = 0
+	for _, kind in ipairs(entry.heals) do
+		if Medicine.CanTreat(org, entry, kind, limb) then
+			local damage = Medicine.Measures[kind](org, limb)
+			local unit = (kind == "muscle" or kind == "fracture") and SoftTissue.Config.impairment.softFull or 1
+			score = score + damage * unit
+		end
+	end
+
+	return score
+end
+
+function Medicine.ResolveLimbs(org, entry, bone)
+	if entry.target == "all" then return SoftTissue.LIMBS end
+
+	local aimed = entry.target ~= "worst" and SoftTissue.LimbFromBone(bone)
+	if aimed and limbScore(org, entry, aimed) > 0 then return {aimed} end
+
+	local worst, worstScore = nil, 0
+	for _, limb in ipairs(SoftTissue.LIMBS) do
+		local score = limbScore(org, entry, limb)
+		if score > worstScore then worst, worstScore = limb, score end
+	end
+
+	return {worst}
+end
+
+function Medicine.Plan(id, org, bone, available)
+	local entry = Medicine.Items[id]
+	local steps, totalCost = {}, 0
+	if not entry or not org or not org.softBrute then return steps, totalCost end
+
+	local cost = entry.cost or Medicine.DEFAULT_COST
+	for _, limb in ipairs(Medicine.ResolveLimbs(org, entry, bone)) do
+		for _, kind in ipairs(entry.heals) do
+			local affordable = not available or totalCost + cost <= available + 0.001
+			if affordable and Medicine.CanTreat(org, entry, kind, limb) then
+				totalCost = totalCost + cost
+				steps[#steps + 1] = {
+					key = "medicine_" .. kind,
+					limb = Medicine.WRAP_KEYS[limb] or limb,
+					medicine = id,
+					kind = kind,
+					target = limb,
+					cost = cost,
+					heal = istable(entry.amount) and entry.amount[kind] or entry.amount or 0,
+				}
+			end
+		end
+	end
+
+	return steps, totalCost
+end
+
+local function applyHeal(org, kind, limb, amount)
+	local before = SoftTissue.GetPainLoad(org, true)
+	local healed = Medicine.Handlers[kind](org, limb, amount) or 0
+	local relief = before - SoftTissue.GetPainLoad(org, true)
+	if relief > 0 then org.avgpain = max((org.avgpain or 0) - relief, 0) end
+
+	return healed
+end
+
+function Medicine.ApplyStep(org, step)
+	local entry = Medicine.Items[step.medicine]
+	if not entry or not Medicine.Handlers[step.kind] then return 0 end
+
+	if entry.mode ~= "overtime" then return applyHeal(org, step.kind, step.target, step.heal) end
+
+	local tickRate = entry.tickRate or 1
+	local ticks = max(math.floor((entry.duration or tickRate) / tickRate), 1)
+	org.medicineActive = org.medicineActive or {}
+	org.medicineActive[#org.medicineActive + 1] = {
+		kind = step.kind,
+		limb = step.target,
+		perTick = step.heal / ticks,
+		ticks = ticks,
+		tickRate = tickRate,
+		nextTick = CurTime() + tickRate,
+	}
+
+	return step.heal
+end
+
+function Medicine.Tick(org)
+	local active = org.medicineActive
+	if not active then return end
+
+	local now = CurTime()
+	for index = #active, 1, -1 do
+		local effect = active[index]
+		if effect.nextTick <= now then
+			effect.nextTick = now + effect.tickRate
+			effect.ticks = effect.ticks - 1
+			applyHeal(org, effect.kind, effect.limb, effect.perTick)
+			if effect.ticks <= 0 then table.remove(active, index) end
+		end
+	end
+
+	if #active == 0 then org.medicineActive = nil end
+end
+
+function Medicine.Use(id, org, bone, available)
+	local steps, totalCost = Medicine.Plan(id, org, bone, available)
+	if #steps == 0 then return false end
+
+	for _, step in ipairs(steps) do
+		Medicine.ApplyStep(org, step)
+	end
+
+	for name, amount in pairs(Medicine.Items[id].sideEffects or {}) do
+		local effect = Medicine.SideEffects[name]
+		if effect then effect(org, amount) end
+	end
+
+	return totalCost, steps
+end
+
+function Medicine.SwepCanHeal(wep, ent)
+	local org = ent and ent.organism
+	local available = wep.modeValues and wep.modeValues[1] or 0
+	if not org or available <= 0 then return false end
+
+	return #Medicine.Plan(wep.MedicineId, org, nil, available) > 0
+end
+
+function Medicine.SwepHeal(wep, ent, mode, bone)
+	local org = ent.organism
+	if not org then return end
+
+	local cost = Medicine.Use(wep.MedicineId, org, bone, wep.modeValues[1] or 0)
+	if not cost then return false end
+
+	wep.modeValues[1] = max((wep.modeValues[1] or 0) - cost, 0)
+
+	local owner = wep:GetOwner()
+	owner:EmitSound("snd_jack_hmcd_bandage.ogg", 60, math.random(95, 105))
+	if wep.modeValues[1] <= 0 and wep.ShouldDeleteOnFullUse then
+		owner:SelectWeapon("weapon_hands_sh")
+		wep:Remove()
+	end
+
+	return true
+end

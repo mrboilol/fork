@@ -1160,7 +1160,7 @@ if SERVER then
 		end)
 
 		if done then
-			hg.SimpleHealth.OnBandageApplied(org)
+			hg.SimpleHealth.OnBandageApplied(org, bone)
 			if not self:UseJudgeBandageTPIK() then
 				owner:EmitSound("snd_jack_hmcd_bandage.wav", 60, math.random(95, 105))
 			end
@@ -1994,9 +1994,10 @@ else
 		local splinted = {}
 		if hasSplints then
 			for _, bone in ipairs(splints) do
-				segments[bone] = nil
-				colored[bone] = nil
-				if not isHidden(bone) then splinted[bone] = true end
+				local drawBone = hg.GetSplintDrawBone(ent, bone)
+				segments[bone], segments[drawBone] = nil, nil
+				colored[bone], colored[drawBone] = nil, nil
+				if not isHidden(bone) then splinted[bone] = drawBone end
 			end
 		end
 
@@ -2020,8 +2021,8 @@ else
 			DrawBandagePass(model, groups, colored, Color(coloredTint.r, coloredTint.g, coloredTint.b))
 		end
 
-		if next(splinted) then
-			DrawBandagePass(model, groups, splinted, hg.SPLINT_BANDAGE_COLOR)
+		for bone, drawBone in pairs(splinted) do
+			DrawBandagePass(model, groups, {[drawBone] = true}, hg.GetSplintColor(hg.GetSplintDurability(ent, bone)))
 		end
 
 		if limbs[HEAD_BONE] and not (ply == LocalPlayer() and GetViewEntity() == LocalPlayer()) then

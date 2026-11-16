@@ -20,6 +20,48 @@ local function AimSettle(data, enemy, skill)
 	return 1 + math.max(1 - (now - data.aimSince) / settle, 0) * AIM_SETTLE_ERROR
 end
 
+local TURN_RATE_BASE = 220
+local TURN_RATE_SKILL_MIN = 0.7
+local TURN_WEIGHT_REF = 3
+local TURN_WEIGHT_EXP = 0.8
+local TURN_WEIGHT_MIN = 0.3
+local TURN_WEIGHT_MAX = 1.5
+local SLEW_STALE_AFTER = 4
+local SLEW_MAX_STEP_TIME = 1
+local RECOIL_CONTROL_CAP = 0.65
+
+local function WeaponHandlingWeight(weapon)
+	if not IsValid(weapon) or not weapon.GetHandlingWeight then return TURN_WEIGHT_REF end
+	return math.max(weapon:GetHandlingWeight(), 0.5)
+end
+
+local function RotateToward(from, to, maxDegrees)
+	local dot = math.Clamp(from:Dot(to), -1, 1)
+	local angle = math.deg(math.acos(dot))
+	if angle <= maxDegrees then return to, 0 end
+	local t = maxDegrees / angle
+	local sine = math.sin(math.rad(angle))
+	if sine < 0.001 then return from, angle - maxDegrees end
+	local a = math.sin(math.rad(angle * (1 - t))) / sine
+	local b = math.sin(math.rad(angle * t)) / sine
+	return (from * a + to * b):GetNormalized(), angle - maxDegrees
+end
+
+local function SlewAim(data, npc, weapon, desired, skill)
+	local now = CurTime()
+	local current = data.aimSlewDir
+	if not current or now - (data.aimSlewAt or 0) > SLEW_STALE_AFTER then
+		current = npc:GetAimVector()
+		data.aimSlewAt = now
+	end
+	local elapsed = math.Clamp(now - data.aimSlewAt, 0, SLEW_MAX_STEP_TIME)
+	local weightMul = math.Clamp((TURN_WEIGHT_REF / WeaponHandlingWeight(weapon)) ^ TURN_WEIGHT_EXP, TURN_WEIGHT_MIN, TURN_WEIGHT_MAX)
+	local rate = TURN_RATE_BASE * weightMul * (TURN_RATE_SKILL_MIN + (1 - TURN_RATE_SKILL_MIN) * skill)
+	local slewed = RotateToward(current, desired, rate * elapsed)
+	data.aimSlewDir, data.aimSlewAt = slewed, now
+	return slewed
+end
+
 function T.CalculateShotVelocity(src, aim, targetVelocity, bullet)
 	local speed = bullet.Vel:Length()
 	if speed < 1 then return bullet.Vel, 0 end
@@ -84,7 +126,7 @@ function T.ApplyBulletRecoil(shooter, bullet, physical)
 		recoil.yaw = math.Clamp(recoil.shotYaw + impulse * math.Rand(-0.35, 0.35), -3, 3)
 		recoil.shotAt = now
 	end
-	local uncontrolled = math.Clamp((1 - CAI.AimSkill()) * 1.4, 0, 1)
+	local uncontrolled = 1 - CAI.AimSkill() * RECOIL_CONTROL_CAP
 	local shotPitch, shotYaw = recoil.shotPitch * uncontrolled, recoil.shotYaw * uncontrolled
 	if shotPitch == 0 and shotYaw == 0 then return end
 	local angle = dir:Angle()
@@ -180,9 +222,11 @@ function T.ApplyBulletAim(shooter, bullet, physical)
 			local prediction = (skill - 0.5) * 2
 			dir = (dir * (1 - prediction) + calculated:GetNormalized() * prediction):GetNormalized()
 		end
+		dir = SlewAim(data, npc, weapon, dir, skill)
 		bullet.Vel = dir * speed
 		bullet.DirOriginal = dir
 	else
+		dir = SlewAim(data, npc, weapon, dir, skill)
 		bullet.Dir = dir
 	end
 	bullet.Spread = vector_origin

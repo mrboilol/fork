@@ -816,6 +816,7 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 			local damage = tonumber(org[limb]) or 0
 			local base = damage >= 0.5 and math.max(1 - damage, LIMP_LEG_SPEED_MIN) or 1
 			if org[limb .. "dislocation"] then base = base * 0.75 end
+			if hg.SoftTissue then base = base * hg.SoftTissue.GetLegSpeedMul(org, limb) end
 			return 1 - (1 - base) * limbDebuff
 		end
 		k = k * legMoveMultiplier("lleg") * legMoveMultiplier("rleg")

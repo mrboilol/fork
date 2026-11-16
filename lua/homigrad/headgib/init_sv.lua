@@ -147,9 +147,10 @@ function SpawnMeatGore(mainent, pos, count, force, scale, spawnEyes, models)
 	models = istable(models) and #models > 0 and models or meatModels
 	force = force or Vector(0,0,0)
 	models = models or meatModels
-	for i = 1, (count or math.random(8, 10)) do
+	local function spawnGib()
+		if activeGibCount >= MAX_ACTIVE_GIBS:GetInt() then return end
 		local ent = ents_Create("prop_physics")
-		if not IsValid(ent) then continue end
+		if not IsValid(ent) then return end
 		ent:SetModel(models[math.random(#models)])
 		if models == meatModels then ent:SetSubMaterial(0, mat) end
 		ent:SetPos(pos)
@@ -189,6 +190,16 @@ function SpawnMeatGore(mainent, pos, count, force, scale, spawnEyes, models)
 			net.WriteBool(true)
 			net.SendPVS(ent:GetPos())
 		end)
+	end
+
+	local total = count or math.random(8, 10)
+	local batch = 3
+	for i = 1, total do
+		if i <= batch then
+			spawnGib()
+		else
+			timer.Simple(math.floor((i - 1) / batch) * 0.05, spawnGib)
+		end
 	end
 
 	if hg.GoreSpray and isvector(pos) then

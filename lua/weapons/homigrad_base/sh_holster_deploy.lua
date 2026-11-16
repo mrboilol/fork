@@ -11,7 +11,14 @@ function SWEP:GetDeployDuration()
 	local armEffectiveness = hg.GetArmEffectiveness and hg.GetArmEffectiveness(self:GetOwner(), "rarm") or 1
 	local support = self.GetHandSupportState and self:GetHandSupportState(self:GetOwner())
 	local stanceMul = support and (support.postureOneHanded and 0.75 or support.wantsTwoHands and 1.1) or 1
-	return math.max(self.CooldownDeploy / self.Ergonomics * roleDeployMul * stanceMul / Lerp(armEffectiveness, 0.5, 1), 0.3)
+	local duration = self.CooldownDeploy / self.Ergonomics * roleDeployMul * stanceMul / Lerp(armEffectiveness, 0.5, 1)
+	if not self:HasDrawAnim() then return math.max(duration * 0.3, 0.12) end
+	return math.max(duration, 0.3)
+end
+
+function SWEP:HasDrawAnim()
+	local list = self.AnimList
+	return list ~= nil and (list.deploy ~= nil or list.draw ~= nil)
 end
 
 function SWEP:GetHolsterDuration()

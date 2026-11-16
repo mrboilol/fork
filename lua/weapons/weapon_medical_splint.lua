@@ -3,7 +3,7 @@ if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_bandage_sh"
 SWEP.BandageTPIK = false
 SWEP.PrintName = "Splint"
-SWEP.Instructions = "Apply to a broken arm or leg to set the fracture, or brace a cracked neck or back. A splinted bone heals faster. LMB to use on yourself, RMB to use on someone else."
+SWEP.Instructions = "Apply to a broken or dislocated arm or leg to hold the whole limb, or brace a cracked neck or back. A splinted limb heals faster until it heals or the splint takes too much damage. LMB to use on yourself, RMB to use on someone else."
 SWEP.Category = "ZCity Medicine"
 SWEP.Spawnable = true
 SWEP.AdminOnly = false
@@ -32,10 +32,37 @@ hg.SPLINT_LIMB_LABELS = {
 
 local splintLimbOrder = {"lleg", "rleg", "larm", "rarm"}
 
+local SPLINT_DAMAGE_CAPACITY = 120
+local SPLINT_DISLOCATION_TIME = 45
+
 local function GetSplintState(ent)
 	if not IsValid(ent) then return {} end
 	if istable(ent.splints) then return ent.splints end
 	return ent.GetNetVar and ent:GetNetVar("Splints", {}) or {}
+end
+
+function hg.GetSplintDurability(ent, bone)
+	if not IsValid(ent) then return 1 end
+	local dur = istable(ent.splintDur) and ent.splintDur or ent.GetNetVar and ent:GetNetVar("SplintDur", nil)
+	return istable(dur) and tonumber(dur[bone]) or 1
+end
+
+hg.SPLINT_LIMB_UPPER_BONES = {
+	larm = "ValveBiped.Bip01_L_UpperArm",
+	rarm = "ValveBiped.Bip01_R_UpperArm",
+	lleg = "ValveBiped.Bip01_L_Thigh",
+	rleg = "ValveBiped.Bip01_R_Thigh",
+}
+
+function hg.GetSplintDrawBone(ent, bone)
+	if not IsValid(ent) then return bone end
+	local map = istable(ent.splintBone) and ent.splintBone or ent.GetNetVar and ent:GetNetVar("SplintBone", nil)
+	return istable(map) and map[bone] or bone
+end
+
+function hg.GetSplintColor(durability)
+	local t = math.Clamp(durability or 1, 0, 1)
+	return Color(math.floor(Lerp(t, 120, 255)), math.floor(Lerp(t, 120, 130)), math.floor(Lerp(t, 125, 20)), 255)
 end
 
 function hg.IsLimbSplinted(ent, limb)
@@ -112,6 +139,13 @@ if CLIENT then
 		ent:CallOnRemove("splint_render_remove", function()
 			RemoveSplintModels(ent)
 		end)
+	end)
+
+	hook.Add("OnNetVarSet", "splint_durability_netvar", function(index, key, var)
+		if key ~= "SplintDur" and key ~= "SplintBone" then return end
+		local ent = Entity(index)
+		if not IsValid(ent) then return end
+		if key == "SplintDur" then ent.splintDur = var else ent.splintBone = var end
 	end)
 
 	hook.Add("Player_Death", "splint_render_death_cl", function(ply)
@@ -233,11 +267,27 @@ end
 
 local function SyncSplints(holder)
 	holder.splints = holder.splints or {}
+	holder.splintDur = holder.splintDur or {}
+	holder.splintBone = holder.splintBone or {}
 	holder:SetNetVar("Splints", holder.splints)
+	holder:SetNetVar("SplintDur", holder.splintDur)
+	holder:SetNetVar("SplintBone", holder.splintBone)
 	if IsValid(holder.FakeRagdoll) then
 		holder.FakeRagdoll.splints = table.Copy(holder.splints)
+		holder.FakeRagdoll.splintDur = table.Copy(holder.splintDur)
+		holder.FakeRagdoll.splintBone = table.Copy(holder.splintBone)
 		holder.FakeRagdoll:SetNetVar("Splints", holder.FakeRagdoll.splints)
+		holder.FakeRagdoll:SetNetVar("SplintDur", holder.FakeRagdoll.splintDur)
+		holder.FakeRagdoll:SetNetVar("SplintBone", holder.FakeRagdoll.splintBone)
 	end
+end
+
+local function RemoveSplint(holder, bone)
+	for i = #holder.splints, 1, -1 do
+		if holder.splints[i] == bone then table.remove(holder.splints, i) end
+	end
+	if holder.splintDur then holder.splintDur[bone] = nil end
+	if holder.splintBone then holder.splintBone[bone] = nil end
 end
 
 local function LimbFromBone(bone)
@@ -253,7 +303,7 @@ local function LimbFromBone(bone)
 end
 
 local function NeedsSplint(holder, org, limb)
-	return not org[limb .. "amputated"] and hg.IsLimbFractured(org, limb) and not hg.IsLimbSplinted(holder, limb)
+	return not org[limb .. "amputated"] and (hg.IsLimbFractured(org, limb) or org[limb .. "dislocation"]) and not hg.IsLimbSplinted(holder, limb)
 end
 
 local function SpineFromBone(bone)
@@ -283,7 +333,7 @@ function hg.GetSplintTarget(ent, bone)
 	local best, bestDamage
 	for _, limb in ipairs(splintLimbOrder) do
 		if NeedsSplint(holder, org, limb) then
-			local damage = tonumber(org[limb]) or 0
+			local damage = (tonumber(org[limb]) or 0) + (org[limb .. "dislocation"] and 0.5 or 0)
 			if not best or damage > bestDamage then best, bestDamage = limb, damage end
 		end
 	end
@@ -305,10 +355,21 @@ if SERVER then
 
 		local holder = GetSplintHolder(ent)
 		if hg.SPLINT_LIMB_BONES[limb] then
-			hg.organism.ApplyBandageBoneTreatment(org, limb, 0.25)
+			local up, down = hg.GetLimbSegmentDamage(org, limb)
+			local lowerOnly = down >= 1 and up < 1 and not org[limb .. "dislocation"]
+			org[limb .. "stabilized"] = true
+			hg.organism.ApplyBandageBoneTreatment(org, limb, 0.25, true)
 			holder.splints = holder.splints or {}
-			table.insert(holder.splints, hg.SPLINT_LIMB_BONES[limb])
+			holder.splintDur = holder.splintDur or {}
+			holder.splintBone = holder.splintBone or {}
+			local limbBone = hg.SPLINT_LIMB_BONES[limb]
+			table.insert(holder.splints, limbBone)
+			holder.splintDur[limbBone] = 1
+			holder.splintBone[limbBone] = lowerOnly and limbBone or hg.SPLINT_LIMB_UPPER_BONES[limb]
 			SyncSplints(holder)
+			if hg.fakeBoneFlop and hg.fakeBoneFlop.ReconcileLimb and hg.fakeBoneFlop.ReconcileLimb(org, limb) then
+				hg.fakeBoneFlop.ScheduleRebuild(org.owner)
+			end
 		else
 			hg.organism.StabilizeSpine(org, limb, 0.35, true)
 		end
@@ -363,48 +424,117 @@ if SERVER then
 		return true
 	end
 
-	hook.Add("Org Think", "splint_remove_on_heal", function(owner, org)
-		if not IsValid(owner) or not istable(owner.splints) or not next(owner.splints) then return end
+	local splintHitgroupLimb = {
+		[HITGROUP_LEFTARM] = "larm",
+		[HITGROUP_RIGHTARM] = "rarm",
+		[HITGROUP_LEFTLEG] = "lleg",
+		[HITGROUP_RIGHTLEG] = "rleg",
+	}
+
+	hook.Add("HomigradDamage", "splint_durability_damage", function(victim, dmgInfo, hitgroup)
+		if not IsValid(victim) or not istable(victim.splints) or not next(victim.splints) then return end
+		local limb = splintHitgroupLimb[hitgroup]
+		local bone = limb and hg.SPLINT_LIMB_BONES[limb]
+		if not bone or not hg.IsLimbSplinted(victim, limb) then return end
+
+		victim.splintDur = victim.splintDur or {}
+		local dur = (victim.splintDur[bone] or 1) - dmgInfo:GetDamage() / SPLINT_DAMAGE_CAPACITY
+		if dur > 0 then
+			victim.splintDur[bone] = dur
+		else
+			RemoveSplint(victim, bone)
+			if victim:IsPlayer() then
+				victim:Notify("Your " .. hg.SPLINT_LIMB_LABELS[limb] .. " splint breaks.", true, "splint_break", 0)
+			end
+		end
+		SyncSplints(victim)
+	end)
+
+	hook.Add("Org Think", "splint_remove_on_heal", function(owner, org, timeValue)
+		if not IsValid(owner) or not org then return end
 
 		local changed
-		for i = #owner.splints, 1, -1 do
-			for limb, limbBone in pairs(hg.SPLINT_LIMB_BONES) do
-				if owner.splints[i] == limbBone and ((tonumber(org[limb]) or 0) < 0.05 or org[limb .. "amputated"]) then
-					table.remove(owner.splints, i)
-					changed = true
-					break
+		if istable(owner.splints) then
+			for i = #owner.splints, 1, -1 do
+				for limb, limbBone in pairs(hg.SPLINT_LIMB_BONES) do
+					if owner.splints[i] == limbBone and (((tonumber(org[limb]) or 0) < 0.05 and not org[limb .. "dislocation"]) or org[limb .. "amputated"]) then
+						RemoveSplint(owner, limbBone)
+						changed = true
+						break
+					end
 				end
 			end
 		end
 		if changed then SyncSplints(owner) end
+
+		owner.splintStab = owner.splintStab or {}
+		for limb in pairs(hg.SPLINT_LIMB_BONES) do
+			if hg.IsLimbSplinted(owner, limb) then
+				org[limb .. "stabilized"] = true
+				owner.splintStab[limb] = true
+
+				if org[limb .. "dislocation"] then
+					owner.splintDislT = owner.splintDislT or {}
+					local t = (owner.splintDislT[limb] or 0) + (timeValue or 0) * hg.organism.RecoveryMul(org)
+					if t >= SPLINT_DISLOCATION_TIME then
+						t = 0
+						hg.organism.ClearLimbDislocation(org, limb)
+					end
+					owner.splintDislT[limb] = t
+				end
+			elseif owner.splintStab[limb] then
+				org[limb .. "stabilized"] = false
+				owner.splintStab[limb] = nil
+			end
+		end
 	end)
 
 	hook.Add("Player Spawn", "splint_render_clear_spawn", function(ply)
 		if OverrideSpawn then return end
 		ply.splints = {}
+		ply.splintDur = {}
+		ply.splintBone = {}
 		ply:SetNetVar("Splints", {})
+		ply:SetNetVar("SplintDur", {})
+		ply:SetNetVar("SplintBone", {})
 	end)
 
 	hook.Add("Org Clear", "splint_clear_on_reset", function(org)
 		local ent = org and org.owner
 		if not IsValid(ent) or not istable(ent.splints) or not next(ent.splints) then return end
 		ent.splints = {}
+		ent.splintDur = {}
+		ent.splintBone = {}
 		SyncSplints(ent)
 	end)
 
 	hook.Add("Player_Death", "splint_render_death", function(ply)
 		if IsValid(ply.FakeRagdoll) then
 			ply.FakeRagdoll.splints = table.Copy(ply.splints or {})
+			ply.FakeRagdoll.splintDur = table.Copy(ply.splintDur or {})
 			ply.FakeRagdoll:SetNetVar("Splints", ply.FakeRagdoll.splints)
+			ply.FakeRagdoll:SetNetVar("SplintDur", ply.FakeRagdoll.splintDur)
+			ply.FakeRagdoll.splintBone = table.Copy(ply.splintBone or {})
+			ply.FakeRagdoll:SetNetVar("SplintBone", ply.FakeRagdoll.splintBone)
 		end
 		ply.splints = {}
+		ply.splintDur = {}
+		ply.splintBone = {}
 		ply:SetNetVar("Splints", {})
+		ply:SetNetVar("SplintDur", {})
+		ply:SetNetVar("SplintBone", {})
 	end)
 
 	hook.Add("Fake", "splint_render_fake_sv", function(ply, ragdoll)
 		if not IsValid(ragdoll) then return end
 		ragdoll.splints = table.Copy(ply.splints or {})
+		ragdoll.splintDur = table.Copy(ply.splintDur or {})
+		ragdoll.splintBone = table.Copy(ply.splintBone or {})
 		ply:SetNetVar("Splints", ply.splints or {})
+		ply:SetNetVar("SplintDur", ply.splintDur or {})
+		ply:SetNetVar("SplintBone", ply.splintBone or {})
 		ragdoll:SetNetVar("Splints", ragdoll.splints)
+		ragdoll:SetNetVar("SplintDur", ragdoll.splintDur)
+		ragdoll:SetNetVar("SplintBone", ragdoll.splintBone)
 	end)
 end

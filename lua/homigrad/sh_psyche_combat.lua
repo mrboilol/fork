@@ -89,15 +89,15 @@ hg.PsycheCombat = {
 	trainedSnatchMul = 0.5,
 
 	bystanderDeathRadius = 450,
-	bystanderDeathSorrow = 0.04,
+	bystanderDeathSorrow = 0.10,
 	corpseSorrow = 0.02,
 	firstKillSorrow = 0.15,
 	firstKillTrainingMax = 0.5,
 	isolationRadius = 1500,
 	isolationCheck = 2,
-	isolationTime = 40,
+	isolationTime = 15,
 	isolationRate = 0.002,
-	isolationBlood = 3800,
+	isolationBlood = 4300,
 	isolationPain = 60,
 
 	angerShieldStart = 0.15,
@@ -129,6 +129,7 @@ hg.PsycheCombat = {
 	thoughtPriority = {
 		firstKill = true,
 		witness = true,
+		isolation = true,
 	},
 }
 

@@ -471,6 +471,7 @@ function SWEP:ApplyForce()
 							ply:ChatPrint("The body is bleeding "..((org.bleed > 10 and "profusely.") or (org.bleed > 5 and "moderately.") or "slightly."))
 						end
 						PrintPerfusionDiagnosis(ply, org)
+						if hg.ChatLog and hg.ChatLog.InspectInjuries then hg.ChatLog.InspectInjuries(ply, org) end
 
 						//org.bulletwounds = 0
 						//org.stabwounds = 0

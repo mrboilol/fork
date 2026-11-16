@@ -1806,6 +1806,30 @@ function PANEL:PostInit()
 
     local function OpenTraitsMenu()
         OpenSelectorPanel("Traits", "Traits", "Balance must be 0 or higher", function(scroll)
+            CreateAppearanceSectionLabel(scroll, "Buddy")
+            local buddyBox = vgui.Create("DComboBox", scroll)
+            buddyBox:Dock(TOP)
+            buddyBox:SetTall(MenuUnit(30))
+            buddyBox:DockMargin(MenuUnit(12), 0, MenuUnit(12), MenuUnit(8))
+            buddyBox:SetFont("ZCity_Menu_Settings_Tiny")
+            buddyBox:SetSortItems(false)
+            buddyBox:SetTooltip("Your buddy steadies your mood when near, you hear them from further away, and you are likelier to share a team.")
+
+            local currentBuddy = GetConVar("hg_buddy"):GetString()
+            local foundBuddy = currentBuddy == ""
+            buddyBox:AddChoice("No buddy", "", foundBuddy)
+            for _, other in player.Iterator() do
+                if other == LocalPlayer() or other:IsBot() then continue end
+                local sid = other:SteamID64()
+                local isCurrent = sid == currentBuddy
+                foundBuddy = foundBuddy or isCurrent
+                buddyBox:AddChoice(other:Nick(), sid, isCurrent)
+            end
+            if not foundBuddy then buddyBox:AddChoice("Saved buddy (offline)", currentBuddy, true) end
+            buddyBox.OnSelect = function(_, _, _, sid)
+                RunConsoleCommand("hg_buddy", sid or "")
+            end
+
             local balancePanel = vgui.Create("DPanel", scroll)
             balancePanel:Dock(TOP)
             balancePanel:SetTall(MenuUnit(62))

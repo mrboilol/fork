@@ -625,6 +625,7 @@ module[2] = function(owner, org, timeValue)
 	org.drugRespiratoryDepression = drugRespiratoryDepression
 	org.bradyapnea = bradyapnea
 	org.respiratoryRate = math.Round(Lerp(bradyapnea, 14, 4))
+	hg.organism.Breathing.Apply(owner, org)
 	if drugRespiratoryDepression >= opioidRespiratoryArrestThreshold then
 		org.respiratoryArrest = true
 	elseif org.respiratoryArrest and hg.organism.CanRescueRespiratoryArrest(org) then
@@ -830,7 +831,7 @@ module[2] = function(owner, org, timeValue)
 	local thoracicGasExchange = math.Clamp(1 - (org.pneumothorax or 0) * 0.70 - (org.hemothorax or 0) * 0.65, 0, 1)
 	local respiratoryDrive = math.Clamp(1 - math.max(drugRespiratoryDepression * 0.95, math.Clamp(tonumber(org.spinalBradypnea) or 0, 0, 1) * 0.85), 0, 1)
 	local ventilationAvailable = success and 1 or 0
-	local rawGasExchange = math.Clamp(lungGasExchange * airwayGasExchange * thoracicGasExchange * respiratoryDrive * ventilationAvailable, 0, 1)
+	local rawGasExchange = math.Clamp(lungGasExchange * airwayGasExchange * thoracicGasExchange * respiratoryDrive * ventilationAvailable * org.breathEfficiency * org.breathDepth, 0, 1)
 	local saturationReserve = rawGasExchange > 0 and (1 - (1 - rawGasExchange) ^ 3.2) or 0
 	local altitudeSaturation = Lerp(altitudeO2K, 0.55, 1)
 	local airwayO2Cap = hg.organism.GetAirwayOxygenCap(org)

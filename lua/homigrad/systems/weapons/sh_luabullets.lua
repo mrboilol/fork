@@ -330,6 +330,7 @@ local function Splash(vHitPos, bStartedInWater, bEndNotWater, vSrc, pWeapon, bFi
 end
 
 local function Impact(Weapon, iAmmoDamageType, bFirstTimePredicted, vSrc, tr, sImpactEffect, sRagdollImpactEffect, tInfo, bExit)
+	if hg.SuppressFleshImpact(tr) then return end
 	if (not (Weapon and Weapon.DoImpactEffect and Weapon:DoImpactEffect(tr, iAmmoDamageType))) then
 		if (bFirstTimePredicted) then
 			local bHole = sImpactEffect == "Impact" and HG_BulletHoles and HG_BulletHoles.Handles(tr)

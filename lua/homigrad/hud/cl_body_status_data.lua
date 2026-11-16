@@ -36,7 +36,7 @@ K.CFG = {
 	GRAY_CONSCIOUSNESS_START = 0.85,
 }
 K.DISPLAY_SPINE = 20
-K.OUTLINE_ALPHA = 220
+K.OUTLINE_ALPHA = 255
 K.MIN_AXIS_LENGTH = 0.05
 K.SKULL_LIFT = 0.12
 K.WEIGHT = {
@@ -47,11 +47,7 @@ K.WEIGHT = {
 }
 K.DEFAULT_PULSE = 72
 K.SECONDS_PER_MINUTE = 60
-K.WOUND_MARK = {
-	sizeBase = 1.5, sizePerSize = 0.15, sizeMax = 4,
-	venous = {110, 0, 0},
-	arterial = {255, 30, 30},
-}
+K.BIG_BONE_REGIONS = {skull = true, jaw = true, chest = true, pelvis = true}
 K.REFERENCE_SCREEN_HEIGHT = 1080
 K.HEALTH_STOPS = {
 	{0, 245, 245, 240, 180},
@@ -65,11 +61,16 @@ K.COLOR = {
 	ARMOR_FILL_ALPHA = 30,
 	ARMOR_LINE_ALPHA = 220,
 	RING_HEALTHY = {255, 255, 255},
-	RING_BLEEDING = {215, 25, 25},
+	RING_BLEEDING = {255, 25, 25},
+	RING_BLEEDING_LOW = {90, 0, 0},
+	ORGAN_LINE = {215, 215, 220},
 	DISLOCATION = {45, 130, 255},
 	TOURNIQUET_RING = {70, 130, 235},
 	TOURNIQUET_STRAP = {35, 60, 150},
 	BANDAGE_CLEAN = {225, 215, 190},
+	BANDAGE_SOAKED = {150, 12, 18},
+	SPLINT_NEW = {255, 130, 20},
+	SPLINT_WORN = {120, 120, 125},
 	OUTLINE = {20, 20, 22},
 	ORGAN_GRAY = {110, 110, 112},
 	ORGAN_BRAIN = {235, 150, 175},
@@ -99,12 +100,28 @@ K.ORGAN = {
 	LUNG_RISE = 0.15,
 	TRACHEA_RADIUS = 0.45,
 	TRACHEA_DROP = 0.3,
+	CALLOUT_COLUMN = 0.4,
+	CALLOUT_RADIUS = 0.045,
+	CALLOUT_GAP = 0.6,
+	CALLOUT_BRAIN_SCALE = 1.5,
+	ANCHOR_DOT = 0.012,
 }
 K.SHAPE = {
-	OUTLINE_WIDTH = 1.5,
+	OUTLINE_WIDTH = 2,
 	STRAP_THICKNESS = 0.8,
 	STRAP_MAX_SEGMENT_SHARE = 0.35,
 	TOURNIQUET_STRAP_T = 0.25,
+	BONE_ROD = 0.4,
+	BONE_ROD_BIG = 0.88,
+	TISSUE_FULL = 100,
+}
+K.TISSUE_REGIONS = {
+	skull = "head", jaw = "head",
+	chest = "torso", pelvis = "torso",
+	larmup = "larm", larm = "larm", lhand = "larm",
+	rarmup = "rarm", rarm = "rarm", rhand = "rarm",
+	llegup = "lleg", lleg = "lleg",
+	rlegup = "rleg", rleg = "rleg",
 }
 K.STRESS = {
 	PULL_SPEED = 520,

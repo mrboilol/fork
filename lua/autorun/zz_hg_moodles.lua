@@ -1053,7 +1053,7 @@ local function buildEffects(ply, org)
 	local adrenaline = orgNumber(org, "adrenaline", 0)
 	if adrenaline > 0.3 then add(effects, "adrenaline", "adrenaline", highRank(adrenaline, {0.3, 0.8, 1.5, 2.1}), "good", 11, math.Round(adrenaline, 1)) end
 	local panic = orgNumber(org, "panicattack", 0)
-	if panic > 0.1 and GetConVar("hg_panic"):GetBool() then add(effects, "panic", "panic", highRank(panic, {0.1, 0.35, 0.6, 0.85}), "bad", 12, math.floor(panic * 100) .. "%") end
+	if panic > 0.1 then add(effects, "panic", "panic", highRank(panic, {0.1, 0.35, 0.6, 0.85}), "bad", 12, math.floor(panic * 100) .. "%") end
 	local anger = math.Clamp(orgNumber(org, "anger", 0), 0, 1)
 	if anger > 0.01 then
 		add(effects, "anger", "anger", math.ceil(anger * 4), "good", 14, math.floor(anger * 100) .. "%")
@@ -1382,4 +1382,19 @@ local function drawMoodles()
 	if hoveredIndex then drawTooltip(effects[hoveredIndex], moodlePositions[hoveredIndex], mx, my, berserkActive) end
 end
 
-hook.Add("HUDPaint", "HG_NormalMoodles", drawMoodles)
+local function drawMoodlesFaded()
+	local alpha = hg.DeathHUDAlpha and hg.DeathHUDAlpha() or 1
+	if alpha <= 0 then return end
+
+	surface.SetAlphaMultiplier(alpha)
+	local ok, err = pcall(drawMoodles)
+	surface.SetAlphaMultiplier(1)
+	if not ok then ErrorNoHalt(err, "\n") end
+end
+
+hook.Add("HUDPaint", "HG_NormalMoodles", drawMoodlesFaded)
+
+hook.Add("HG_DeathOverlayHUD", "HG_NormalMoodles", function()
+	local ply = LocalPlayer()
+	if IsValid(ply) and not ply:Alive() then drawMoodlesFaded() end
+end)

@@ -14,6 +14,8 @@ function hg.organism.IncapacitationEnabled()
 end
 
 function hg.organism.CanTouchHealth(org)
+	if org and org.simpleMode then return false end
+
 	return not hg.organism.OrganSystemsEnabled() or (org and org.superfighter)
 end
 
@@ -92,6 +94,7 @@ local organismModuleInitOrder = {
 	"teeth",
 	"depression",
 	"psyche",
+	"softtissue",
 	"simplehealth"
 }
 
@@ -585,7 +588,8 @@ local function send_organism(org, ply, recipientForce, reliable)
 		"weight", "maxweight", "ischemia", "hemotransfusionshock", "zerlkers", "zerlkersOverdose", "anger",
 		"brainSwelling", "cardiacTamponade", "needle", "respiratoryRate", "bradyapnea", "drugRespiratoryDepression",
 		"exertionO2Debt", "circulatoryO2Reserve", "oxygenIntakeAvailable", "vomitInThroat", "otrub", "alive",
-		"incapReason", "deathCause", "defibDeathGrace", "brainRate", "uncon_timer", "otrubMinUntil", "fatalDamageQueued"
+		"incapReason", "deathCause", "defibDeathGrace", "brainRate", "uncon_timer", "otrubMinUntil", "fatalDamageQueued",
+		"softBrute", "softBurn", "muscle", "painStage", "breathLabored"
 	}) do
 		sendtable[key] = org[key]
 	end
@@ -817,7 +821,8 @@ local function send_bareinfo(org, force, reliable)
 		"fear", "satiety", "hemotransfusionshock", "weight", "maxweight", "health", "canmove",
 		"brain", "co2", "CO", "bradyapnea", "respiratoryRate", "oxygenIntakeAvailable",
 		"cardiacStressExposure", "hypotensionExposure", "arrhythmiaComplication",
-		"ventricularTachycardia", "terminalRhythm", "rhythmRecoveryUntil", "defibDeathGrace"
+		"ventricularTachycardia", "terminalRhythm", "rhythmRecoveryUntil", "defibDeathGrace",
+		"softBrute", "softBurn", "muscle", "painStage", "breathLabored"
 	}) do
 		sendtable[key] = org[key]
 	end
@@ -891,9 +896,6 @@ function hg.organism.SetDeathCause(org, cause)
 		org.pulse or 0, org.bloodPressure or 0, org.blood or 0, org.trachea or 0, tostring(org.needle), org.spine2 or 0, org.spine3 or 0, org.uncon_timer or 0)
 
 	MsgN(snapshot)
-	if IsValid(org.owner) and org.owner:IsPlayer() then
-		org.owner:PrintMessage(HUD_PRINTCONSOLE, snapshot)
-	end
 end
 
 function hg.organism.KillFatalBrainDamage(org, silent)
@@ -1579,6 +1581,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		end
 	end
 
+	runOrganismModule("softtissue", 2, owner, org, timeValue)
 	runOrganismModule("pain", 2, owner, org, timeValue)
 	if isPly then
 		runOrganismModule("metabolism", 2, owner, org, timeValue)
@@ -1878,6 +1881,10 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.needotrub = false
 		org.fake = false
 		org.needfake = false
+	elseif (org.spawnKnockdownGraceUntil or 0) > CurTime() then
+		org.otrub = false
+		org.needotrub = false
+		org.fake = org.needfake
 	else
 		org.otrub = org.needotrub
 		org.fake = org.needfake
@@ -1933,6 +1940,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 			org.likely_phrase = 0
 			local str, statusThoughtKey = hg.get_status_message(owner)
 			if str and str != "" then
+				str = hg.DescribeStatusThought(owner, statusThoughtKey) or str
 				local dyingThought = statusThoughtKey == "heartstop" or statusThoughtKey == "lowoxy" or statusThoughtKey == "blood2" or statusThoughtKey == "neardeath"
 				local statusCooldown = dyingThought and math.Rand(9, 13) or math.Rand(15, 22)
 				org.nextStatusThought = CurTime() + statusCooldown

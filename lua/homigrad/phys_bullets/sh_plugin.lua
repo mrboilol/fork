@@ -1049,6 +1049,7 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 	end
 
 	function PLUGIN.SetImpactEffect(effectdata, trace, no_decal)
+		if hg.SuppressFleshImpact(trace) then return end
 		local flags = no_decal and HG_BulletHoles.IMPACT_NODECAL or 0
 		local replacedSound = HG_BulletImpactSounds and HG_BulletImpactSounds.PlayMaterialImpact(trace)
 

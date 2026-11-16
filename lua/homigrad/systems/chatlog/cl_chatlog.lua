@@ -120,6 +120,8 @@ end
 
 local function TokenValue(token, ctx)
 	if token == "a" then return ctx.actorName, ctx.actorColor end
+	if token == "ap" then return ctx.actorName .. "'s", ctx.actorColor end
+	if token == "inj" then return ctx.injury end
 	if token == "t" then return ctx.targetSelf and "you" or ctx.targetName, not ctx.targetSelf and ctx.targetColor end
 	if token == "tp" then return ctx.targetSelf and "your" or ctx.targetName .. "'s", not ctx.targetSelf and ctx.targetColor end
 	if token == "w" then return ctx.weapon end
@@ -202,7 +204,7 @@ net.Receive("hg_chatlog_event", function()
 
 	if seen or targetSelf then
 		AddChatLine(BuildElements(event.seenParts, ctx, EMOTE_COLOR))
-		if seen and actor ~= lply and hg.AddOverheadMessage then
+		if seen and actor ~= lply and hg.AddOverheadMessage and not event.noOverhead then
 			hg.AddOverheadMessage(actor, "*" .. BuildText(event.overheadParts, ctx) .. "*", OVERHEAD_COLOR, OVERHEAD_LIFE, OVERHEAD_FADE)
 		end
 		return

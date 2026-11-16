@@ -79,8 +79,9 @@ local gradient_d = Material("vgui/gradient-d")
 
 local CHAT_STYLES = {
 	big = {
-		box = Color(70, 70, 70, 150),
+		box = Color(25, 25, 35, 240),
 		outline = Color(255, 255, 255, 255),
+		thickness = 2,
 		cookiePrefix = "zchat_bounds_v2_",
 		minWidth = 180,
 		maxEntries = 150,
@@ -91,10 +92,9 @@ local CHAT_STYLES = {
 		bottomMargin = 0.06,
 	},
 	normal = {
-		box = Color(0, 0, 0, 245),
-		outline = Color(255, 255, 255, 80),
-		innerOutline = Color(255, 255, 255, 28),
-		vignette = Color(120, 120, 120, 95),
+		box = Color(25, 25, 35, 240),
+		outline = Color(255, 255, 255, 255),
+		thickness = 2,
 		cookiePrefix = "zchat_bounds_",
 		minWidth = 260,
 		maxEntries = 100,
@@ -137,17 +137,19 @@ local function PaintSettingRow(self, w, h)
 end
 
 local function PaintEntryPanel(self, w, h)
-	surface.SetDrawColor(0, 0, 0, 245)
+	local style = ChatStyle()
+	surface.SetDrawColor(style.box)
 	surface.DrawRect(0, 0, w, h)
-	surface.SetDrawColor(ChatStyle().outline)
-	surface.DrawOutlinedRect(0, 0, w, h, 1)
+	surface.SetDrawColor(style.outline)
+	surface.DrawOutlinedRect(0, 0, w, h, style.thickness)
 end
 
 local function PaintHatPanel(self, w, h)
-	surface.SetDrawColor(0, 0, 0, 245)
+	local style = ChatStyle()
+	surface.SetDrawColor(style.box)
 	surface.DrawRect(0, 0, w, h)
-	surface.SetDrawColor(ChatStyle().outline)
-	surface.DrawOutlinedRect(0, 0, w, h, 1)
+	surface.SetDrawColor(style.outline)
+	surface.DrawOutlinedRect(0, 0, w, h, style.thickness)
 end
 
 local function PaintSettingsButton(self, w, h)
@@ -1023,19 +1025,8 @@ function PANEL:Paint(w, h)
 	surface.SetDrawColor(style.box)
 	surface.DrawRect(0, 0, w, h)
 
-	local vignette = style.vignette
-	if vignette then
-		surface.SetDrawColor(vignette.r, vignette.g, vignette.b, vignette.a + math.sin(CurTime()) * 12)
-		surface.SetMaterial(gradient_d)
-		surface.DrawTexturedRect(0, h * 0.5, w, h * 0.5)
-	end
-
 	surface.SetDrawColor(style.outline)
-	surface.DrawOutlinedRect(0, 0, w, h, 1)
-	if style.innerOutline then
-		surface.SetDrawColor(style.innerOutline)
-		surface.DrawOutlinedRect(1, 1, w - 2, h - 2, 1)
-	end
+	surface.DrawOutlinedRect(0, 0, w, h, style.thickness)
 
 	surface.SetAlphaMultiplier(1)
 		self.history:PaintManual()
@@ -1044,7 +1035,7 @@ function PANEL:Paint(w, h)
 	surface.SetAlphaMultiplier(self:GetAlpha() / 255)
 
 	if not self.bActive then
-		if style.persistent then self:SetAlpha(self.realAlpha) end
+		if style.persistent then self:SetAlpha(self.realAlpha * (hg.DeathHUDAlpha and hg.DeathHUDAlpha() or 1)) end
 		return
 	end
 
@@ -1059,7 +1050,7 @@ function PANEL:Paint(w, h)
 		end
 	DisableClipping(false)
 
-	self:SetAlpha(self.alpha - (255 - self.realAlpha))
+	self:SetAlpha((self.alpha - (255 - self.realAlpha)) * (hg.DeathHUDAlpha and hg.DeathHUDAlpha() or 1))
 end
 
 function PANEL:UpdateEntryVisibility()
@@ -1303,7 +1294,9 @@ function PANEL:UpdateLine(panel, elements)
 	if not IsValid(panel) then return end
 
 	local stick = self:IsScrolledToBottom()
-	if not panel:UpdateMarkup(BuildLineMarkup(elements)) then return end
+	local markup = BuildLineMarkup(elements)
+	panel.baseMarkup = markup
+	if not panel:UpdateMarkup(markup) then return end
 
 	self.history:InvalidateLayout(true)
 	if stick then
@@ -1312,11 +1305,48 @@ function PANEL:UpdateLine(panel, elements)
 	end
 end
 
-function PANEL:AddLine(elements)
+local REPEAT_MARKUP = "<color=150,150,150> (%dx)"
+
+function PANEL:MergeRepeat(panel)
+	if not IsValid(panel) then return panel end
+
+	panel.streaming = nil
+
+	local index
+	for i = #self.entries, 1, -1 do
+		if self.entries[i] == panel then
+			index = i
+			break
+		end
+	end
+
+	local previous = index and self.entries[index - 1]
+	if not IsValid(previous) or previous.streaming or previous.baseMarkup ~= panel.baseMarkup then return panel end
+
+	previous.repeatCount = (previous.repeatCount or 1) + 1
+	previous:UpdateMarkup(previous.baseMarkup .. string.format(REPEAT_MARKUP, previous.repeatCount))
+
+	table.remove(self.entries, index)
+	panel:SetVisible(false)
+	panel:Remove()
+
+	self.history:InvalidateLayout(true)
+	if self:IsScrolledToBottom() then
+		local bar = self.history:GetVBar()
+		bar:SetScroll(bar.CanvasSize)
+	end
+
+	return previous
+end
+
+function PANEL:AddLine(elements, streaming)
 	local panel = self.history:Add("zChatMessage")
 	panel:Dock(TOP)
 	panel:InvalidateParent(true)
-	panel:SetMarkup(BuildLineMarkup(elements))
+
+	local markup = BuildLineMarkup(elements)
+	panel.baseMarkup = markup
+	panel:SetMarkup(markup)
 
 	if (#self.entries >= ChatStyle().maxEntries) then
 		local oldPanel = table.remove(self.entries, 1)
@@ -1334,7 +1364,14 @@ function PANEL:AddLine(elements)
 	end
 
 	self.entries[#self.entries + 1] = panel
-	return panel
+
+	if streaming then
+		panel.streaming = true
+
+		return panel
+	end
+
+	return self:MergeRepeat(panel)
 end
 
 function PANEL:AddMessage(...)
@@ -1342,6 +1379,39 @@ function PANEL:AddMessage(...)
 
 	chat.PlaySound()
 end
+
+function PANEL:ClearLines()
+	for _, panel in ipairs(self.entries) do
+		if IsValid(panel) then panel:Remove() end
+	end
+
+	self.entries = {}
+	self.history:InvalidateLayout(true)
+end
+
+do
+	local wasDead = false
+
+	hook.Add("Think", "zChatClearOnRespawn", function()
+		local ply = LocalPlayer()
+		if not IsValid(ply) then return end
+
+		if not ply:Alive() then
+			wasDead = true
+		elseif wasDead then
+			wasDead = false
+			if IsValid(hg.chat) and hg.chat.ClearLines then hg.chat:ClearLines() end
+		end
+	end)
+end
+
+hook.Add("HG_DeathOverlayHUD", "zChat", function()
+	local chat = hg.chat
+	if not IsValid(chat) then return end
+
+	if IsValid(chat.hatPanel) then chat.hatPanel:PaintManual() end
+	chat:PaintManual()
+end)
 
 vgui.Register("zChatbox", PANEL, "EditablePanel")
 

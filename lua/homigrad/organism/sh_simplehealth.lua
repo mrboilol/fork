@@ -35,7 +35,7 @@ SimpleHealth.ConVar = ConVarExists("hg_simplehealth") and GetConVar("hg_simplehe
 SimpleHealth.Config = {
 	maxHealth = 100,
 	poolMax = 200,
-	softCritHealth = 0,
+	softCritHealth = 5,
 	hardCritHealth = -100,
 	deathHealth = -100,
 	spike = {
@@ -45,8 +45,6 @@ SimpleHealth.Config = {
 		minTime = 6,
 		maxTime = 20,
 	},
-	adrenalineCritBonus = 20,
-	adrenalineFull = 4,
 	deathBlood = 2500,
 	brainDeath = 0.4,
 	softCritControlMul = 0.55,
@@ -55,6 +53,7 @@ SimpleHealth.Config = {
 	damage = {
 		bruteScale = 1,
 		burnScale = 1,
+		fireTickMul = 0.2,
 		toxinScale = 1,
 		oxyScale = 1,
 		blastBurnShare = 0.5,
@@ -80,14 +79,13 @@ SimpleHealth.Config = {
 		max = 220,
 		approach = 12,
 		restartRate = 55,
-		adrenaline = 50,
 		pain = 25,
 		painFull = 100,
 		bloodStart = 4500,
 		bloodPeak = 3000,
 		bloodGain = 65,
 		bloodFloor = 2500,
-		bloodCrashTo = 35,
+		bloodMax = 300,
 		sedative = 18,
 		opioid = 12,
 		coldStart = 36.2,
@@ -110,11 +108,12 @@ SimpleHealth.Config = {
 		softCritChance = 0.004,
 		softCritDepthChance = 0.02,
 		severeChance = 0.03,
-		bloodStart = 3000,
-		bloodChance = 0.02,
 		rateLow = 35,
 		rateHigh = 190,
 		rateChance = 0.02,
+		fastChance = 0.03,
+		fastOxyMul = 3,
+		certainRate = 300,
 		coldStart = 31,
 		coldChance = 0.02,
 		grace = 20,
@@ -122,16 +121,26 @@ SimpleHealth.Config = {
 		cprRestartChance = 0.02,
 	},
 
+	fibrillation = {
+		rate = 300,
+		jitter = 40,
+		deathTime = 20,
+	},
+
 	consciousness = {
 		recover = 0.05,
 		softCritDrain = 0.004,
 		softCritDepthDrain = 0.03,
-		bleedStart = 3500,
-		bleedDrain = 0.05,
+		bleedStart = 2750,
+		bleedDrain = 0.12,
 		oxyStart = 50,
 		oxyFull = 100,
 		oxyDrain = 0.06,
+		airwayStart = 25,
+		airwayFull = 75,
+		airwayDrain = 0.12,
 		flatlineDrain = 0.12,
+		wakeAt = 0.2,
 	},
 
 	temperature = {
@@ -148,24 +157,20 @@ SimpleHealth.Config = {
 		softCritCap = 20,
 		softCritGain = 1,
 		hardCritGain = 2,
-		deliveryFull = 0.6,
-		deliveryGain = 5,
+		airwayGain = 7,
 		regen = 2,
-		bleedStart = 3500,
-		bleedGain = 0.8,
-		bleedCap = 70,
 		brainDamageStart = 75,
 		brainDamageFull = 100,
 		brainDamageRate = 0.004,
 		countdownStart = 100,
 		countdownTime = 30,
+		airwayCountdownTime = 12,
 		countdownTrackAt = 5,
 		gaspAt = 50,
 		gaspHysteresis = 10,
-		adrenalineGainMul = 0.5,
-		adrenalineClear = 0.5,
 		aedResistTime = 45,
 		aedGainMul = 0.4,
+		needleGainMul = 0.7,
 		cprClear = 3,
 		cprCycle = 0.5,
 		cprCritHeal = 1,
@@ -205,11 +210,6 @@ SimpleHealth.Config = {
 	},
 
 	medicine = {
-		kitCost = 0.25,
-		kitMinDamage = 1,
-		kitHeal = {brute = 25, burn = 20},
-		kitHealedScore = 0.25,
-		bandageBurnHeal = 10,
 		bandageBruteShare = 0.5,
 	},
 
@@ -235,7 +235,7 @@ SimpleHealth.Config = {
 
 	effects = {
 		lerp = 0.04,
-		oxyStart = 20,
+		oxyStart = 0,
 		oxyStrong = 75,
 		oxyStrongAmount = 0.75,
 		oxyCloseAmount = 0.95,
@@ -247,12 +247,6 @@ SimpleHealth.Config = {
 		softCritColor = Color(150, 0, 0),
 		softCritPulseSpeed = 2.2,
 		damageTintMin = 25,
-		damageTintFull = 100,
-		damageTintStrength = 0.35,
-		damageTintPulseSpeed = 1.2,
-		damageTints = {
-			toxin = Color(60, 170, 40),
-		},
 		traumaVignetteStart = 60,
 		traumaVignetteFull = 100,
 		traumaVignetteStrength = 0.7,
@@ -262,14 +256,16 @@ SimpleHealth.Config = {
 
 	face = {
 		x = 0.012,
-		y = 0.62,
+		y = 0.012,
 		size = 0.075,
-		hurtBelow = 70,
-		criticalBelow = 40,
+		hurtBelow = 75,
+		woundedBelow = 55,
+		criticalBelow = 30,
 		paleBloodBelow = 3500,
-		shakeTime = 0.55,
-		shakeHit = 0.06,
-		shakeCrit = 0.04,
+		shakeTime = 0.9,
+		shakeHit = 0.045,
+		deadShake = 0.06,
+		deadShakeSpeed = 14,
 		materialPath = "nildoy/face_%s.png",
 		statusSound = "ouchie.wav",
 		statusVolume = 1,
@@ -279,10 +275,10 @@ SimpleHealth.Config = {
 
 	death = {
 		sound = "ouchie.wav",
-		delay = 0.9,
+		delay = 1.05,
 		firstPitch = 1,
 		secondPitch = 1.35,
-		highPitch = 2.7,
+		highPitch = 1.35,
 		volume = 1,
 		muteInterval = 0.5,
 	},
@@ -290,6 +286,7 @@ SimpleHealth.Config = {
 	deathCauses = {
 		bleed = "You bled out.",
 		flatline = "Your heart stopped.",
+		fibrillation = "Your heart fibrillated and gave out.",
 		suffocate = "You choked to death.",
 		brain = "Your brain gave out.",
 		toxin = "You were poisoned to death.",
@@ -319,6 +316,7 @@ SimpleHealth.Config = {
 		bloodThoughtLow = 3800,
 		bloodThoughtCritical = 3200,
 		bloodThoughtHysteresis = 150,
+		healthThoughtLow = 75,
 		healthThoughtHurt = 50,
 		healthThoughtBad = 25,
 		healthThoughtDying = 0.5,
@@ -332,15 +330,14 @@ function SimpleHealth.GetHealth(state)
 	return config.maxHealth - (state.brute or 0) - (state.burn or 0) - (state.toxin or 0) - (state.oxy or 0)
 end
 
-function SimpleHealth.GetCritThresholds(adrenaline)
+function SimpleHealth.GetCritThresholds()
 	local config = SimpleHealth.Config
-	local bonus = math.Clamp((tonumber(adrenaline) or 0) / config.adrenalineFull, 0, 1) * config.adrenalineCritBonus
 
-	return config.softCritHealth - bonus, config.hardCritHealth - bonus
+	return config.softCritHealth, config.hardCritHealth
 end
 
-function SimpleHealth.GetCritState(health, adrenaline)
-	local softAt, hardAt = SimpleHealth.GetCritThresholds(adrenaline)
+function SimpleHealth.GetCritState(health)
+	local softAt, hardAt = SimpleHealth.GetCritThresholds()
 	if health <= hardAt then return SimpleHealth.CRIT_HARD end
 	if health <= softAt then return SimpleHealth.CRIT_SOFT end
 

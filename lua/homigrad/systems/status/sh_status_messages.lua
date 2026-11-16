@@ -298,6 +298,37 @@ local near_death_mild = {
 	"Why.. why am I feeling like this...",
 }
 
+hg.DepressionDyingThoughts = {
+	{"I'm dying..", "I don't feel right... something's really wrong...", "It's getting cold.. why is it getting cold..."},
+	{"I don't want to go. Not yet...", "I have to fix this soon...", "It's too late for regrets..."},
+	{"I can't fucking die like this.", "I don't want to go yet.", "I'm sorry... I'm so sorry... I wanted more time..."},
+}
+
+local function mergePhraseLists(...)
+	local merged, seen = {}, {}
+	for _, list in ipairs({...}) do
+		for _, phrase in ipairs(list) do
+			if not seen[phrase] then
+				seen[phrase] = true
+				merged[#merged + 1] = phrase
+			end
+		end
+	end
+
+	return merged
+end
+
+local near_death_light = mergePhraseLists(near_death_mild, hg.DepressionDyingThoughts[1])
+local near_death_moderate = mergePhraseLists(near_death_mild, hg.DepressionDyingThoughts[2], near_death_poetic)
+local near_death_severe = mergePhraseLists(near_death_poetic, hg.DepressionDyingThoughts[3])
+
+local dying_status_lists = {
+	[near_death_light] = true,
+	[near_death_moderate] = true,
+	[near_death_severe] = true,
+	[near_death_positive] = true,
+}
+
 local hungry_a_bit = {
     "Mgh, I'm hungry...",
     "Some food would be great...",
@@ -639,19 +670,19 @@ local function get_status_message(ply)
 	end
 
 	if org.heartstop then
-		most_wanted_phraselist = near_death_poetic
+		most_wanted_phraselist = near_death_severe
 		statusThoughtKey = "heartstop"
 	elseif o2 <= 12 then
-		most_wanted_phraselist = near_death_poetic
+		most_wanted_phraselist = near_death_severe
 		statusThoughtKey = "lowoxy"
 	elseif nearDeath or terminalBloodLoss then
-		most_wanted_phraselist = near_death_poetic
+		most_wanted_phraselist = terminalBloodLoss and near_death_severe or near_death_moderate
 		statusThoughtKey = terminalBloodLoss and "blood2" or "neardeath"
 	elseif o2 <= 22 then
-		most_wanted_phraselist = math.random(2) == 1 and near_death_mild or short_breath_phrases
+		most_wanted_phraselist = math.random(2) == 1 and near_death_light or short_breath_phrases
 		statusThoughtKey = "lowoxy_mild"
 	elseif bleedingOut and blood <= bleedoutStartBlood then
-		most_wanted_phraselist = near_death_mild
+		most_wanted_phraselist = near_death_light
 		statusThoughtKey = "blood_mild"
 	elseif pain > 100 then
 		most_wanted_phraselist = sharp_pain
@@ -683,9 +714,9 @@ local function get_status_message(ply)
 
 		if not most_wanted_phraselist then
 			if (broken_notify or dislocated_notify) and bleedingOut and blood <= bleedoutDeathBlood then
-				most_wanted_phraselist = near_death_poetic
+				most_wanted_phraselist = near_death_severe
 			elseif bleedingOut and blood <= bleedoutStartBlood then
-				most_wanted_phraselist = positive_thinking and near_death_positive or near_death_poetic
+				most_wanted_phraselist = positive_thinking and near_death_positive or near_death_moderate
 			end
 		end
 	elseif after_unconscious_notify then
@@ -716,7 +747,7 @@ local function get_status_message(ply)
 		end
 	end
 
-	if most_wanted_phraselist == near_death_poetic or most_wanted_phraselist == near_death_positive or most_wanted_phraselist == near_death_mild then
+	if dying_status_lists[most_wanted_phraselist] then
 		statusThoughtKey = statusThoughtKey or (bleedingOut and "blood2" or "fear")
 	elseif most_wanted_phraselist == panicattack_phrases or most_wanted_phraselist == panic_anxious_phrases or most_wanted_phraselist == panic_uneasy_phrases or most_wanted_phraselist == panic_fight_phrases or most_wanted_phraselist == panic_flight_phrases then
 		statusThoughtKey = "panicattack"
@@ -726,7 +757,7 @@ local function get_status_message(ply)
 		statusThoughtKey = "threatened"
 	end
 	
-	if most_wanted_phraselist == near_death_poetic or most_wanted_phraselist == near_death_positive or most_wanted_phraselist == near_death_mild then
+	if dying_status_lists[most_wanted_phraselist] then
 		org.dying_phrases_used = org.dying_phrases_used or {}
 		local candidates = {}
 		for i, phrase in ipairs(most_wanted_phraselist) do
@@ -889,4 +920,62 @@ function hg.get_status_message(ply)
 	local txt, statusThoughtKey = get_status_message(ply)
 
 	return txt, statusThoughtKey
+end
+
+local DESCRIPTIVE_STATUS = {
+	heartstop = {
+		"Your heart has stopped.",
+		"You can't feel your heartbeat anymore.",
+		"Your chest is silent. Your heart is not beating.",
+	},
+	lowoxy = {
+		"Your oxygen levels are critically low.",
+		"You are suffocating.",
+		"Your vision is tunneling as you run out of air.",
+	},
+	lowoxy_mild = {
+		"Your oxygen levels are low.",
+		"You are struggling to breathe.",
+		"You are getting lightheaded from a lack of air.",
+		"Your breathing is shallow and fast.",
+	},
+	shortbreath = {
+		"Your oxygen levels are low.",
+		"You can't get enough air.",
+		"Your chest is tight.",
+		"You are panting, and it isn't helping.",
+	},
+	neardeath = {
+		"Your body is shutting down.",
+		"Your pulse is failing.",
+		"Everything is growing dark and distant.",
+		"You can barely feel your own body.",
+	},
+	blood2 = {
+		"You are bleeding out.",
+		"You have lost far too much blood.",
+		"Your body is running out of blood.",
+		"You are cold, weak and fading.",
+	},
+	blood_mild = {
+		"You are losing a lot of blood.",
+		"Your skin is turning pale and cold.",
+		"You feel weak from blood loss.",
+	},
+}
+
+function hg.DescribeStatusThought(ply, key)
+	local pool = DESCRIPTIVE_STATUS[key]
+	if not pool or not IsValid(ply) or ply:GetInfoNum("hg_newthoughts", 0) <= 0 then return end
+
+	local org = ply.organism
+	local pick
+	for _ = 1, 4 do
+		pick = pool[math.random(#pool)]
+		if not org or pick ~= org.lastDescriptiveStatus then break end
+	end
+
+	if org then org.lastDescriptiveStatus = pick end
+
+	return pick
 end

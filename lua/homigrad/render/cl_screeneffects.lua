@@ -451,7 +451,8 @@ local function UpdateDepressionAudio(depression, unconscious)
 end
 
 local function DrawDepressionEffect(org)
-	local depression = math.Clamp(tonumber(org.depression) or 0, 0, 1)
+	local depressionConVar = GetConVar("hg_depression")
+	local depression = depressionConVar and not depressionConVar:GetBool() and 0 or math.Clamp(tonumber(org.depression) or 0, 0, 1)
 	depressionState.lerp = LerpFT(0.01, depressionState.lerp, depression)
 	local intensity = depressionState.lerp
 	if intensity > 0.00005 then
@@ -504,13 +505,16 @@ local damageFlashColor = {
 }
 local damageFlashDuration = 0.5
 local nextDamagePunch = 0
+function hg.AddDamageFlash(strength, duration)
+	local remaining = math.Clamp((damageFlashEnd - CurTime()) / damageFlashDuration, 0, 1)
+	damageFlashStrength = math.max(damageFlashStrength * remaining, strength)
+	damageFlashDuration = math.max(duration or 0, 0.5 + damageFlashStrength * 0.8)
+	damageFlashEnd = CurTime() + damageFlashDuration
+end
 net.Receive("hg_damage_flash", function()
 	local strength = net.ReadFloat()
 	local hitPos = net.ReadVector()
-	local remaining = math.Clamp((damageFlashEnd - CurTime()) / damageFlashDuration, 0, 1)
-	damageFlashStrength = math.max(damageFlashStrength * remaining, strength)
-	damageFlashDuration = 0.35 + damageFlashStrength * 0.65
-	damageFlashEnd = CurTime() + damageFlashDuration
+	hg.AddDamageFlash(strength)
 
 	local lply = LocalPlayer()
 	if CurTime() < nextDamagePunch or not IsValid(lply) or not lply:Alive() or not hg.GetPunchAwayAngle then return end
@@ -523,9 +527,10 @@ hook.Add("Post Post Pre Post Processing", "HG_DamageFlash", function()
 	local remaining = math.Clamp((damageFlashEnd - CurTime()) / damageFlashDuration, 0, 1)
 	if remaining <= 0 then damageFlashStrength = 0 return end
 	local flash = remaining * remaining * damageFlashStrength
-	damageFlashColor["$pp_colour_addr"] = flash * 0.2
-	damageFlashColor["$pp_colour_colour"] = 1 - flash * 0.35
-	damageFlashColor["$pp_colour_mulr"] = flash * 0.35
+	damageFlashColor["$pp_colour_addr"] = flash * 0.4
+	damageFlashColor["$pp_colour_brightness"] = -flash * 0.05
+	damageFlashColor["$pp_colour_colour"] = math.max(1 - flash * 0.6, 0.2)
+	damageFlashColor["$pp_colour_mulr"] = flash * 0.7
 	DrawColorModify(damageFlashColor)
 end)
 local painBlinkStart = -1
@@ -2106,12 +2111,14 @@ hook.Add("Post Post Processing", "ItHurts", function()
 
 	local o2 = org.o2[1] or 0
 	o2 = o2 + (org.CO or 0)
-	O2Lerp = LerpFT(0.01, O2Lerp, (hg.SimpleHealth.GetOxyEffectTarget() or math.min((30 - o2) * 10, Lerp(hg.GetO2FadeK(org), 187.5, 300))) + brain * (org.otrub and 100 or 500))
+	O2Lerp = LerpFT(0.01, O2Lerp, hg.SimpleHealth.GetOxyEffectTarget(math.min((30 - o2) * 10, Lerp(hg.GetO2FadeK(org), 187.5, 300))) + brain * (org.otrub and 100 or 500))
 	updateSeizureEffects(org)
 	hg.O2VignetteOrg = org
 
+	local panicConVar = GetConVar("hg_panic")
+	local panicEnabled = not panicConVar or panicConVar:GetBool()
 	local panicBaseTarget = getPanicAttackFx(org)
-	PanicAttackLerp = LerpFT(0.12, PanicAttackLerp, panicBaseTarget ^ hg.screeneffects_config.panicattackVisualExponent)
+	PanicAttackLerp = panicEnabled and LerpFT(0.12, PanicAttackLerp, panicBaseTarget ^ hg.screeneffects_config.panicattackVisualExponent) or 0
 	if PanicAttackLerp > 0.001 and not (org.otrub or org.incapacitated) then
 		local panicBase = math.min(PanicAttackLerp, 1.4)
 		local panicPulse = panicBase * (0.78 + math.ease.InOutSine(math.abs(math.cos(CurTime() * 2))) * 0.2)
@@ -2278,7 +2285,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		render.DrawScreenQuad()
 	end
 
-	local rawPain = math.max(org.pain or 0, 0)
+	local rawPain = math.max(org.pain or 0, 0) * hg.GetPainSeverity()
 	local pain = math.max(rawPain - 15, 0)
 	local shock = (org.shock or 0) * 1 + (1 - org.consciousness) * 40
 	shockLerp = LerpFT(0.01, shockLerp or 0, shock)
@@ -2391,6 +2398,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			if hg.DisableLoudPainCV and hg.DisableLoudPainCV:GetBool() then
 				targetRealityVolume = 0
 				targetRemAgonyVolume = 0
+				targetRemExcruciatingVolume = 0
 			end
 
 			if IsValid(PainStation) then
@@ -2413,7 +2421,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			end
 			if IsValid(SillypainStation) then SillypainStation:SetVolume(targetSillypainVolume) end
 			if IsValid(hg.screeneffects_sound.painLayer) then
-				hg.screeneffects_sound.painLayer:SetVolume(painMode == 7 and not org.otrub and getPainLayerBlend(rawPain, hg.screeneffects_config.painLayerThreshold) * painVolume * hg.screeneffects_config.painLayerVolumeMul or 0)
+				hg.screeneffects_sound.painLayer:SetVolume(painMode == 7 and not org.otrub and not hg.DisableLoudPainCV:GetBool() and getPainLayerBlend(rawPain, hg.screeneffects_config.painLayerThreshold) * painVolume * hg.screeneffects_config.painLayerVolumeMul or 0)
 				hg.screeneffects_sound.painLayer:SetPlaybackRate(painPitch / 100)
 			end
 			hg.ScreenEffectsLoop("painOtrub", hg.screeneffects_config.painOtrubPath, painMode == 7 and org.otrub and math.min(painVolume, 1.5) or 0)
@@ -3087,6 +3095,25 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		hg.SetHellVolume(0)
 	end
 
+	local simpleMuted = org.simpleMode or hg.SimpleHealth and hg.SimpleHealth.ConVar and hg.SimpleHealth.ConVar:GetInt() > 0
+	if simpleMuted or incapacitated then
+		if IsValid(NoiseStation) then NoiseStation:SetVolume(0) end
+		if IsValid(OtrubModeStation) then OtrubModeStation:SetVolume(0) end
+		if IsValid(NoiseStation2) then NoiseStation2:SetVolume(0) end
+		if IsValid(NoiseStation2Dying) then NoiseStation2Dying:SetVolume(0) end
+		if IsValid(EndStation) then EndStation:SetVolume(0) end
+		if IsValid(DyingStation) then DyingStation:SetVolume(0) end
+		if IsValid(SillydyingStation) then SillydyingStation:SetVolume(0) end
+		if IsValid(ItssooverStation) then ItssooverStation:SetVolume(0) end
+		if IsValid(SonimCookedStation) then SonimCookedStation:SetVolume(0) end
+		if IsValid(RemDying1Station) then RemDying1Station:SetVolume(0) end
+		if IsValid(VitalityStation) then VitalityStation:SetVolume(0) end
+		if IsValid(AsphyxiationStation) then AsphyxiationStation:SetVolume(0) end
+		setItsHopelessVolume(0)
+		hg.SetHellVolume(0)
+		if simpleMuted and IsValid(IncapacitatedStation) then IncapacitatedStation:SetVolume(0) end
+	end
+
 	hg.screeneffects_sound.criticalFade = LerpFT(0.03, hg.screeneffects_sound.criticalFade or 0, painMode == 7 and math.Clamp(((org.heartbeat or 0) - hg.screeneffects_config.criticalHeartbeatStart) / (hg.screeneffects_config.criticalHeartbeatFull - hg.screeneffects_config.criticalHeartbeatStart), 0, 1) * hg.screeneffects_config.criticalLoopVolume or 0)
 	hg.ScreenEffectsLoop("criticalLoop", hg.screeneffects_config.criticalLoopPath, org.otrub and 0 or hg.screeneffects_sound.criticalFade)
 	hg.ScreenEffectsLoop("criticalLoopOtrub", hg.screeneffects_config.criticalLoopOtrubPath, org.otrub and hg.screeneffects_sound.criticalFade or 0)
@@ -3292,7 +3319,7 @@ hook.Add("Post Post Pre Post Processing", "HiddenPainFlicker", function()
 
 	local avgPain = math.max(org.avgpain or 0, 0)
 	local painAdd = math.max(org.painadd or 0, 0)
-	local feltPain = math.max(org.pain or 0, 0)
+	local feltPain = math.max(org.pain or 0, 0) * hg.GetPainSeverity()
 	local storedPain = math.Clamp(avgPain + painAdd, 0, 150)
 	local hiddenDifference = math.max(storedPain - feltPain, 0)
 	local targetSeverity = math.Clamp((hiddenDifference - 10) / 125, 0, 1)
@@ -3761,12 +3788,16 @@ local CONCUSSION_SOUND_COOLDOWN = 2.5
 local last_headhit_sound = 0
 local last_concussion_sound = 0
 
-local function PlayHeadhitSound(volumeScale)
+local function PlayHeadhitSound(volumeScale, severe)
     if CurTime() < last_headhit_sound + 0.15 then return end
     last_headhit_sound = CurTime()
     volumeScale = math.Clamp(volumeScale or 1, 0.2, 1.0)
-    -- Always above full volume, with extra scaling from damage
-    local finalVolume = HEADHIT_VOLUME * (HEADHIT_BASE_BOOST + volumeScale * 0.8)
+    local finalVolume
+    if severe then
+        finalVolume = HEADHIT_VOLUME * (HEADHIT_BASE_BOOST + volumeScale * 0.8)
+    else
+        finalVolume = HEADHIT_VOLUME * (0.25 + volumeScale * 0.5)
+    end
     sound.PlayFile("sound/headhit.mp3", "noblock noplay", function(station)
         if IsValid(station) then
             station:SetVolume(finalVolume)
@@ -3823,7 +3854,7 @@ net.Receive("headtrauma_flash", function()
     end
 
     if not (playConcussionSound and PlayConcussionSound(math.max(damageScale, 0.8))) then
-        PlayHeadhitSound(damageScale)
+        PlayHeadhitSound(damageScale, is_critical or hasBrainDamage)
     end
 
     -- Scaled view punch based on damage

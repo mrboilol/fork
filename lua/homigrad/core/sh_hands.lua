@@ -45,10 +45,11 @@ function hg.GetLimbEffectiveness(org, limb, segment)
 		local power = math.min(1 - (1 - mechanical) * debuff, 1 - damage ^ 4 * 0.75)
 		return dislocated and math.min(power, leg and 0.15 or 0.18) or power
 	end
+	local tissue = hg.SoftTissue and hg.SoftTissue.GetLimbFunction(org, limb) or 1
 	up, down = strength(up, upDislocated), strength(down, downDislocated)
-	if segment == "up" then return up * (0.85 + down * 0.15) end
-	if segment == "down" then return down * up ^ 0.5 end
-	return up ^ (leg and 0.9 or 0.75) * down ^ (leg and 0.75 or 0.9)
+	if segment == "up" then return up * (0.85 + down * 0.15) * tissue end
+	if segment == "down" then return down * up ^ 0.5 * tissue end
+	return up ^ (leg and 0.9 or 0.75) * down ^ (leg and 0.75 or 0.9) * tissue
 end
 
 local arteryWeakness = {larm = 0.7, rarm = 0.7, lleg = 0.82, rleg = 0.82}

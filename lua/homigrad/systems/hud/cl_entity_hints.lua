@@ -2,20 +2,63 @@
 local hg_hints = ConVarExists("hg_hints") and GetConVar("hg_hints") or CreateClientConVar("hg_hints", "1", true, false, "Toggle UI hints")
 
 local HintBackgroundColor = Color( 0, 0, 0, 200 )
+local PromptBackgroundColor = Color( 0, 0, 0, 200 )
+
+local function hintScale()
+	return hg.UIScale and hg.UIScale() or math.Clamp(math.min(ScrW() / 1920, ScrH() / 1080), 0.65, 1.5)
+end
+
+local function drawHintBox(markup, screenX, screenY, backgroundColor, alphaMul)
+	local scale = hintScale()
+	local padding = 5 * scale
+	local width, height = markup:GetWidth(), markup:GetHeight()
+	local x = math.Clamp(screenX, width * 0.5 + padding, ScrW() - width * 0.5 - padding)
+	local y = math.Clamp(screenY, padding, ScrH() - height - padding)
+
+	draw.RoundedBox(math.max(1, math.floor(2 * scale)), x - width / 2 - padding * 0.5, y - padding * 0.5, width + padding, height + padding, backgroundColor)
+
+	markup:Draw(x, y, TEXT_ALIGN_CENTER, nil, 175 * alphaMul, TEXT_ALIGN_CENTER)
+
+	return x, y
+end
+
+local function drawObjectPrompt(ent, alphaMul)
+	if not IsValid(ent) or not ent.HudHintMarkup then return end
+
+	local scale = hintScale()
+	local mins, maxs = ent:OBBMins(), ent:OBBMaxs()
+	local bottom = ent:WorldSpaceCenter() - Vector(0, 0, (maxs.z - mins.z) * 0.5)
+	local screen = bottom:ToScreen()
+	if not screen.visible then return end
+
+	PromptBackgroundColor.a = 200 * alphaMul
+	drawHintBox(ent.HudHintMarkup, screen.x, screen.y + 14 * scale, PromptBackgroundColor, alphaMul)
+end
 
 hook.Add("HUDPaint","EntHints",function()
-	if not hg_hints:GetBool() then return end 
+	if not hg_hints:GetBool() then return end
 	if HGSuppressEntityHints then return end
 	if lply.organism and lply.organism.otrub then return end
 	if !lply:Alive() then return end
-	
+
 	local trace = hg.eyeTrace(lply)
 
 	if not trace then return end
 
-	HintBackgroundColor.a = LerpFT(0.1, HintBackgroundColor.a, (IsValid(trace.Entity) and trace.Entity.HudHintMarkup) and 200 or 0)
+	local traceEnt = trace.Entity
+	local traceHasHint = IsValid(traceEnt) and traceEnt.HudHintMarkup
 
-	hg.BasicHudHint(trace.Entity, trace, hint)
+	HintBackgroundColor.a = LerpFT(0.1, HintBackgroundColor.a, traceHasHint and 200 or 0)
+
+	hg.BasicHudHint(traceEnt, trace)
+
+	if not hg.GetPickupPromptEntities then return end
+
+	local prompts, selected = hg.GetPickupPromptEntities(lply, traceEnt)
+	for _, ent in ipairs(prompts) do
+		if ent == traceEnt and traceHasHint then continue end
+		drawObjectPrompt(ent, ent == selected and 1 or 0.6)
+	end
 end)
 
 function hg.BasicHudHint(ent, trace)
@@ -24,16 +67,9 @@ function hg.BasicHudHint(ent, trace)
 	if not hint then return end
 
 	local screen = trace.HitPos:ToScreen()
-	local scale = hg.UIScale and hg.UIScale() or math.Clamp(math.min(ScrW() / 1920, ScrH() / 1080), 0.65, 1.5)
-	local padding = 5 * scale
-	local x = math.Clamp(screen.x, hint:GetWidth() * 0.5 + padding, ScrW() - hint:GetWidth() * 0.5 - padding)
-	local y = math.Clamp(screen.y + 100 * scale, padding, ScrH() - hint:GetHeight() - padding)
+	local x, y = drawHintBox(hint, screen.x, screen.y + 100 * hintScale(), HintBackgroundColor, HintBackgroundColor.a / 200)
 
-	draw.RoundedBox(math.max(1, math.floor(2 * scale)), x - hint:GetWidth() / 2 - padding * 0.5, y - padding * 0.5, hint:GetWidth() + padding, hint:GetHeight() + padding, HintBackgroundColor)
-	
-	hint:Draw(x, y, TEXT_ALIGN_CENTER, nil, 175 * (HintBackgroundColor.a / 200), TEXT_ALIGN_CENTER)
-
-	if ent.AdditionalInfoFunc then
+	if IsValid(ent) and ent.AdditionalInfoFunc then
 		local str = ent.AdditionalInfoFunc()
 
 		surface.SetFont("ZCity_Tiny")

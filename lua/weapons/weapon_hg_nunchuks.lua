@@ -429,7 +429,7 @@ function SWEP:PrimaryAttackAdd(ent, trace)
             fx:SetNormal(hitNormal)
             fx:SetMagnitude(1)
             fx:SetScale(0.4)
-            util.Effect("BloodImpact", fx)
+            hg.BloodImpactEffect(fx)
         end
 
         if self.LoopInputState then

@@ -90,7 +90,7 @@ local function scrape_blood(self, trace, len, len_before)
 			local effect_data = EffectData()
 			
 			effect_data:SetOrigin(trace.HitPos)
-			util.Effect("BloodImpact", effect_data)
+			hg.BloodImpactEffect(effect_data)
 		end
 	end
 	

@@ -49,7 +49,7 @@ local lastBody
 local lastDrawTime = 0
 
 
-local severity, broken = {}, {}
+local severity, broken, tissue = {}, {}, {}
 local dislocated = {}
 local arterial, missing = {}, {}
 local organDamage = {
@@ -57,6 +57,7 @@ local organDamage = {
 	heart = 0, trachea = 0, lungsL = 0, lungsR = 0,
 }
 local bleedLevel, tourniquet, bandage, stress = {}, {}, {}, {}
+local splint = {}
 local regionBleed, regionArterial = {}, {}
 local nextMedicalUpdate = 0
 local pulseHz = K.DEFAULT_PULSE / K.SECONDS_PER_MINUTE
@@ -587,6 +588,23 @@ local function updateBandages(ply, body)
 	end
 end
 
+local function updateSplints(ply, body)
+	local owner = body
+	local bones = readWearable(body, "splints", "Splints")
+	if not bones and body ~= ply then
+		owner = ply
+		bones = readWearable(ply, "splints", "Splints")
+	end
+	if not bones then return end
+
+	for _, bone in ipairs(bones) do
+		local region = resolveWoundRegion(hg.GetSplintDrawBone and hg.GetSplintDrawBone(owner, bone) or bone)
+		if region then
+			splint[region] = hg.GetSplintDurability and hg.GetSplintDurability(owner, bone) or 1
+		end
+	end
+end
+
 local function vitalDamage(org, key)
 	local damage = orgNumber(org, key)
 
@@ -625,6 +643,8 @@ local function clearMedicalState()
 		severity[region], bleedLevel[region] = 0, 0
 		broken[region], arterial[region], missing[region], tourniquet[region] = false, false, false, false
 		bandage[region] = nil
+		splint[region] = nil
+		tissue[region] = nil
 	end
 	for _, limb in ipairs(K.LIMBS) do
 		dislocated[limb.dislocKeys.up], dislocated[limb.dislocKeys.down] = false, false
@@ -647,6 +667,10 @@ local function updateMedicalState(ply, body)
 		updateLimbState(org, limb)
 	end
 	updateBandages(ply, body)
+	updateSplints(ply, body)
+	for region, limb in pairs(K.TISSUE_REGIONS) do
+		tissue[region] = combine(hg.SoftTissue.GetLimb(org, limb) / K.SHAPE.TISSUE_FULL, hg.SoftTissue.GetMuscle(org, limb))
+	end
 
 	pulseHz = math_Clamp((tonumber(org.pulse) or K.DEFAULT_PULSE) / K.SECONDS_PER_MINUTE, 0.5, 3)
 end
@@ -725,9 +749,9 @@ local function updateDisplayState(ply)
 	displayFade = displayFade + (fadeTarget - displayFade) * (1 - math_exp(-dt * fadeRate))
 end
 
-local function healthColor(region)
-	if broken[region] then return 0, 0, 0, 255 end
-	local value = math_Clamp(severity[region] or 0, 0, 1)
+local function healthColor(region, value)
+	if not value and broken[region] then return 0, 0, 0, 255 end
+	value = math_Clamp(value or severity[region] or 0, 0, 1)
 	for index = 2, #K.HEALTH_STOPS do
 		local high = K.HEALTH_STOPS[index]
 		if value <= high[1] then
@@ -746,7 +770,13 @@ end
 local function ringColor(region)
 	if tourniquet[region] then return K.COLOR.TOURNIQUET_RING[1], K.COLOR.TOURNIQUET_RING[2], K.COLOR.TOURNIQUET_RING[3] end
 
-	local r, g, b = lerpColor(K.COLOR.RING_HEALTHY, K.COLOR.RING_BLEEDING, bleedLevel[region] or 0)
+	local bleed = bleedLevel[region] or 0
+	local r, g, b
+	if bleed > 0 then
+		r, g, b = lerpColor(K.COLOR.RING_BLEEDING_LOW, K.COLOR.RING_BLEEDING, math_Clamp(bleed, 0, 1))
+	else
+		r, g, b = K.COLOR.RING_HEALTHY[1], K.COLOR.RING_HEALTHY[2], K.COLOR.RING_HEALTHY[3]
+	end
 	if not arterial[region] then return r, g, b end
 
 	local mul = 1 - K.CFG.ARTERIAL_PULSE_DEPTH * (0.5 + 0.5 * math_sin(CurTime() * pulseHz * K.CFG.TAU))
@@ -834,21 +864,59 @@ local function drawStrap(ax, ay, bx, by, r, t, red, green, blue, horizontal)
 	drawLine(strapPoly[2].x, strapPoly[2].y, strapPoly[3].x, strapPoly[3].y, outlineWidth)
 end
 
+local function drawSplintBox(ax, ay, bx, by, r, red, green, blue)
+	local dx, dy = bx - ax, by - ay
+	local length = math_sqrt(dx * dx + dy * dy)
+	local ux, uy = 0, 1
+	if length > 0.001 then ux, uy = dx / length, dy / length end
+	local px, py = -uy * (r + outlineWidth), ux * (r + outlineWidth)
+	local fx, fy = dx * 0.45, dy * 0.45
+	local cx, cy = ax + dx * 0.5, ay + dy * 0.5
+
+	strapPoly[1].x, strapPoly[1].y = cx - fx - px, cy - fy - py
+	strapPoly[2].x, strapPoly[2].y = cx + fx - px, cy + fy - py
+	strapPoly[3].x, strapPoly[3].y = cx + fx + px, cy + fy + py
+	strapPoly[4].x, strapPoly[4].y = cx - fx + px, cy - fy + py
+	setDrawColor(red, green, blue, K.CFG.FILL_ALPHA)
+	surface.DrawPoly(strapPoly)
+	setDrawColor(K.COLOR.OUTLINE[1], K.COLOR.OUTLINE[2], K.COLOR.OUTLINE[3], K.OUTLINE_ALPHA)
+	for i = 1, 4 do
+		local a, b = strapPoly[i], strapPoly[i % 4 + 1]
+		drawLine(a.x, a.y, b.x, b.y, outlineWidth)
+	end
+end
+
+local function lerpColor(from, to, t)
+	return from[1] + (to[1] - from[1]) * t, from[2] + (to[2] - from[2]) * t, from[3] + (to[3] - from[3]) * t
+end
+
 local centerX, centerY, pixelScale, targetZ = 0, 0, 1, 0
+
+local function boneRod(region, inner)
+	local fraction = K.BIG_BONE_REGIONS[region] and K.SHAPE.BONE_ROD_BIG or K.SHAPE.BONE_ROD
+
+	return math.max(inner * fraction, 1)
+end
 
 local function drawSplit(shape, x, y, outer, inner)
 	local towardX = centerX + shape.sx * pixelScale - x
 	local towardY = centerY - (shape.sz - targetZ) * pixelScale - y
 	local angle = math_atan2(towardY, towardX)
-	if (severity[shape.region] or 0) > 0 then
-		local red, green, blue, alpha = healthColor(shape.region)
-		setDrawColor(red, green, blue, alpha)
+	if (tissue[shape.region] or 0) > 0 then
+		setDrawColor(healthColor(shape.region, tissue[shape.region]))
 		polyHalfCircle(x, y, inner, angle + math.pi * 0.5)
 	end
-	if (severity[shape.splitRegion] or 0) > 0 then
-		local red, green, blue, alpha = healthColor(shape.splitRegion)
-		setDrawColor(red, green, blue, alpha)
+	if (severity[shape.region] or 0) > 0 then
+		setDrawColor(healthColor(shape.region))
+		polyHalfCircle(x, y, boneRod(shape.region, inner), angle + math.pi * 0.5)
+	end
+	if (tissue[shape.splitRegion] or 0) > 0 then
+		setDrawColor(healthColor(shape.splitRegion, tissue[shape.splitRegion]))
 		polyHalfCircle(x, y, inner, angle - math.pi * 0.5)
+	end
+	if (severity[shape.splitRegion] or 0) > 0 then
+		setDrawColor(healthColor(shape.splitRegion))
+		polyHalfCircle(x, y, boneRod(shape.splitRegion, inner), angle - math.pi * 0.5)
 	end
 
 	local red, green, blue = ringColor(shape.region)
@@ -865,9 +933,15 @@ local function drawShapeExtras(shape, ax, ay, bx, by, r)
 	local region = shape.region
 	local soak = bandage[region]
 	if soak then
-		local color = K.COLOR.BANDAGE_CLEAN
 		local horizontal = region == "chest" or region == "pelvis"
-		drawStrap(ax, ay, bx, by, r, 0.5, color[1], color[2], color[3], horizontal)
+		local red, green, blue = lerpColor(K.COLOR.BANDAGE_CLEAN, K.COLOR.BANDAGE_SOAKED, math_Clamp(soak, 0, 1))
+		drawStrap(ax, ay, bx, by, r, 0.5, red, green, blue, horizontal)
+	end
+
+	local durability = splint[region]
+	if durability then
+		local red, green, blue = lerpColor(K.COLOR.SPLINT_WORN, K.COLOR.SPLINT_NEW, math_Clamp(durability, 0, 1))
+		drawSplintBox(ax, ay, bx, by, r, red, green, blue)
 	end
 
 	local limbTop = region == "larmup" or region == "rarmup" or region == "llegup" or region == "rlegup"
@@ -877,6 +951,9 @@ local function drawShapeExtras(shape, ax, ay, bx, by, r)
 	end
 end
 
+local wasAlive = true
+local deathShakeEnd = 0
+
 local function drawShape(shape)
 	local ax = centerX + shape.ax * pixelScale
 	local ay = centerY - (shape.az - targetZ) * pixelScale
@@ -885,7 +962,7 @@ local function drawShape(shape)
 	local depthScale = math_Clamp(1 + shape.depth * K.CFG.DEPTH_SCALE, K.CFG.DEPTH_SCALE_MIN, K.CFG.DEPTH_SCALE_MAX)
 	local r = shape.radius * K.DISPLAY_SPINE * pixelScale * depthScale
 	local shake = stress[shape.region] or 0
-	if shake > K.STRESS.VISIBLE then
+	if shake > K.STRESS.VISIBLE and (wasAlive or CurTime() < deathShakeEnd) then
 		local amount = shake * shake * K.STRESS.SHAKE_PIXELS
 		local jx, jy = math.Rand(-amount, amount), math.Rand(-amount, amount)
 		ax, ay, bx, by = ax + jx, ay + jy, bx + jx, by + jy
@@ -895,10 +972,14 @@ local function drawShape(shape)
 	if shape.splitRegion then
 		drawSplit(shape, ax, ay, r, inner)
 	else
-		if (severity[shape.region] or 0) > 0 then
-			local red, green, blue, alpha = healthColor(shape.region)
-			setDrawColor(red, green, blue, alpha)
+		local soft = tissue[shape.region]
+		if (soft or 0) > 0 then
+			setDrawColor(healthColor(shape.region, soft))
 			polyCapsule(ax, ay, bx, by, inner)
+		end
+		if (severity[shape.region] or 0) > 0 then
+			setDrawColor(healthColor(shape.region))
+			polyCapsule(ax, ay, bx, by, soft and boneRod(shape.region, inner) or inner)
 		end
 		local red, green, blue = ringColor(shape.region)
 		setDrawColor(red, green, blue, K.OUTLINE_ALPHA)
@@ -932,23 +1013,6 @@ local function drawDislocations()
 	end
 end
 
-local function drawWounds()
-	local sizeScale = ScrH() / K.REFERENCE_SCREEN_HEIGHT
-	for i = 1, emitterCount do
-		local emitter = emitters[i]
-		if emitter.valid then
-			local color = emitter.arterial and K.WOUND_MARK.arterial or K.WOUND_MARK.venous
-			local radius = math.min(K.WOUND_MARK.sizeBase + emitter.size * K.WOUND_MARK.sizePerSize, K.WOUND_MARK.sizeMax) * sizeScale
-			local x = centerX + emitter.y * pixelScale
-			local y = centerY - (emitter.z - targetZ) * pixelScale
-			setDrawColor(K.COLOR.OUTLINE[1], K.COLOR.OUTLINE[2], K.COLOR.OUTLINE[3], K.OUTLINE_ALPHA)
-			polyCapsule(x, y, x, y, radius + outlineWidth)
-			setDrawColor(color[1], color[2], color[3], 255)
-			polyCapsule(x, y, x, y, radius)
-		end
-	end
-end
-
 local function pointScreen(point)
 	return centerX + smoothY[point] * pixelScale, centerY - (smoothZ[point] - targetZ) * pixelScale
 end
@@ -976,16 +1040,44 @@ local function drawOrgan(ax, ay, bx, by, radius, color, damage, brain)
 	polyCapsule(ax, ay, bx, by, radius)
 end
 
-local function drawOrgans()
-	local unit = K.DISPLAY_SPINE * pixelScale
+local callouts, calloutCount = {}, 0
 
-	if organDamage.brain > 0 and not missing.skull and smoothValid[K.POINT.SKULL] then
-		local x, y = pointScreen(K.POINT.SKULL)
-		local skullUnit = skullRadius * unit
-		drawOrgan(x, y, x, y, skullUnit * K.ORGAN.BRAIN_RADIUS, K.COLOR.ORGAN_BRAIN, organDamage.brain, true)
+local function addCallout(ax, ay, kind, key, color)
+	calloutCount = calloutCount + 1
+	local entry = callouts[calloutCount]
+	if not entry then
+		entry = {}
+		callouts[calloutCount] = entry
+	end
+	entry.ax, entry.ay, entry.kind, entry.key, entry.color = ax, ay, kind, key, color
+	entry.y = ay
+end
 
-		local lobeRadius = skullUnit * K.ORGAN.LOBE_RADIUS
-		local offsetX, offsetY = skullUnit * K.ORGAN.LOBE_OFFSET_X, skullUnit * K.ORGAN.LOBE_OFFSET_Y
+local function calloutByY(a, b)
+	return a.ay < b.ay
+end
+
+local function drawCallout(entry, x, radius)
+	local lineColor = K.COLOR.ORGAN_LINE
+	local width = math.max(outlineWidth, 1)
+	setDrawColor(K.COLOR.OUTLINE[1], K.COLOR.OUTLINE[2], K.COLOR.OUTLINE[3], K.OUTLINE_ALPHA)
+	drawLine(entry.ax, entry.ay, x, entry.y, width * 2.5)
+	setDrawColor(lineColor[1], lineColor[2], lineColor[3], K.OUTLINE_ALPHA)
+	drawLine(entry.ax, entry.ay, x, entry.y, width)
+
+	local dot = math.max(ScrH() * K.ORGAN.ANCHOR_DOT, 2)
+	setDrawColor(K.COLOR.OUTLINE[1], K.COLOR.OUTLINE[2], K.COLOR.OUTLINE[3], K.OUTLINE_ALPHA)
+	polyCapsule(entry.ax, entry.ay, entry.ax, entry.ay, dot + width)
+	setDrawColor(lineColor[1], lineColor[2], lineColor[3], 255)
+	polyCapsule(entry.ax, entry.ay, entry.ax, entry.ay, dot)
+
+	if entry.kind == "brain" then
+		local big = radius * K.ORGAN.CALLOUT_BRAIN_SCALE
+		local y = entry.y
+		drawOrgan(x, y, x, y, big, K.COLOR.ORGAN_BRAIN, organDamage.brain, true)
+
+		local lobeRadius = big * K.ORGAN.LOBE_RADIUS / K.ORGAN.BRAIN_RADIUS
+		local offsetX, offsetY = big * K.ORGAN.LOBE_OFFSET_X / K.ORGAN.BRAIN_RADIUS, big * K.ORGAN.LOBE_OFFSET_Y / K.ORGAN.BRAIN_RADIUS
 		if organDamage.brainFrontal > 0 then
 			drawOrgan(x, y - offsetY, x, y - offsetY, lobeRadius, K.COLOR.LOBE_FRONTAL, organDamage.brainFrontal, true)
 		end
@@ -999,37 +1091,73 @@ local function drawOrgans()
 			drawOrgan(x - offsetX, y, x - offsetX, y, lobeRadius, K.COLOR.LOBE_TEMPORAL, organDamage.brainTemporal, true)
 			drawOrgan(x + offsetX, y, x + offsetX, y, lobeRadius, K.COLOR.LOBE_TEMPORAL, organDamage.brainTemporal, true)
 		end
+		return
+	end
+
+	drawOrgan(x, entry.y, x, entry.y, radius, entry.color, organDamage[entry.key])
+end
+
+local function drawOrgans()
+	calloutCount = 0
+	local unit = K.DISPLAY_SPINE * pixelScale
+
+	if organDamage.brain > 0 and not missing.skull and smoothValid[K.POINT.SKULL] then
+		local x, y = pointScreen(K.POINT.SKULL)
+		addCallout(x, y, "brain")
 	end
 
 	if organDamage.trachea > 0 and not missing.neck and smoothValid[K.POINT.NECK] and smoothValid[K.POINT.CHEST] then
 		local ax, ay = pointScreen(K.POINT.NECK)
 		local cx, cy = pointScreen(K.POINT.CHEST)
-		drawOrgan(ax, ay, ax + (cx - ax) * K.ORGAN.TRACHEA_DROP, ay + (cy - ay) * K.ORGAN.TRACHEA_DROP,
-			K.RADIUS.NECK * unit * K.ORGAN.TRACHEA_RADIUS, K.COLOR.ORGAN_TRACHEA, organDamage.trachea)
+		addCallout(ax + (cx - ax) * K.ORGAN.TRACHEA_DROP * 0.5, ay + (cy - ay) * K.ORGAN.TRACHEA_DROP * 0.5, "organ", "trachea", K.COLOR.ORGAN_TRACHEA)
 	end
 
-	if missing.chest or not smoothValid[K.POINT.CHEST] then return end
+	if not missing.chest and smoothValid[K.POINT.CHEST] then
+		local x, y = pointScreen(K.POINT.CHEST)
+		local chestUnit = chestRadius * unit
+		local side = 1
+		if smoothValid[K.POINT.CHEST_L] and smoothValid[K.POINT.CHEST_R] and smoothY[K.POINT.CHEST_L] > smoothY[K.POINT.CHEST_R] then
+			side = -1
+		end
 
-	local x, y = pointScreen(K.POINT.CHEST)
-	local chestUnit = chestRadius * unit
-	local side = 1
-	if smoothValid[K.POINT.CHEST_L] and smoothValid[K.POINT.CHEST_R] and smoothY[K.POINT.CHEST_L] > smoothY[K.POINT.CHEST_R] then
-		side = -1
+		local spread = chestUnit * K.ORGAN.LUNG_SPREAD * side
+		local rise = chestUnit * K.ORGAN.LUNG_RISE
+		if organDamage.lungsL > 0 then
+			addCallout(x - spread, y - rise, "organ", "lungsL", K.COLOR.ORGAN_LUNG)
+		end
+		if organDamage.lungsR > 0 then
+			addCallout(x + spread, y - rise, "organ", "lungsR", K.COLOR.ORGAN_LUNG)
+		end
+		if organDamage.heart > 0 then
+			addCallout(x - spread * 0.3, y + chestUnit * K.ORGAN.HEART_DROP, "organ", "heart", K.COLOR.ORGAN_HEART)
+		end
 	end
 
-	local lungRadius = chestUnit * K.ORGAN.LUNG_RADIUS
-	local spread = chestUnit * K.ORGAN.LUNG_SPREAD * side
-	local rise = chestUnit * K.ORGAN.LUNG_RISE
-	if organDamage.lungsL > 0 then
-		drawOrgan(x - spread, y - rise, x - spread, y - rise, lungRadius, K.COLOR.ORGAN_LUNG, organDamage.lungsL)
+	if calloutCount == 0 then return end
+
+	for i = calloutCount + 1, #callouts do
+		callouts[i] = nil
 	end
-	if organDamage.lungsR > 0 then
-		drawOrgan(x + spread, y - rise, x + spread, y - rise, lungRadius, K.COLOR.ORGAN_LUNG, organDamage.lungsR)
+	table.sort(callouts, calloutByY)
+
+	local size = ScrH() * K.CFG.PANEL_SIZE_FRACTION
+	local radius = size * K.ORGAN.CALLOUT_RADIUS
+	local column = centerX - size * K.ORGAN.CALLOUT_COLUMN
+	local previous
+	for i = 1, calloutCount do
+		local entry = callouts[i]
+		local own = entry.kind == "brain" and radius * K.ORGAN.CALLOUT_BRAIN_SCALE or radius
+		if previous then
+			local minY = previous.y + previous.own + own + radius * K.ORGAN.CALLOUT_GAP
+			if entry.y < minY then entry.y = minY end
+		end
+		entry.own = own
+		previous = entry
 	end
 
-	if organDamage.heart > 0 then
-		local drop = chestUnit * K.ORGAN.HEART_DROP
-		drawOrgan(x - spread * 0.3, y + drop, x - spread * 0.3, y + drop, chestUnit * K.ORGAN.HEART_RADIUS, K.COLOR.ORGAN_HEART, organDamage.heart)
+	for i = 1, calloutCount do
+		local entry = callouts[i]
+		drawCallout(entry, column, radius)
 	end
 end
 
@@ -1185,11 +1313,10 @@ local function renderFigure()
 	drawCircles()
 	drawDislocations()
 	drawArmor()
-	drawWounds()
 	drawOrgans()
 end
 
-hook.Add("HUDPaint", "homigrad/body-status/draw", function()
+local function drawBodyStatus()
 	if not enabled:GetBool() then
 		trackedBody = nil
 		return
@@ -1220,4 +1347,18 @@ hook.Add("HUDPaint", "homigrad/body-status/draw", function()
 	if displayFade < 0.01 then return end
 
 	renderFigure()
+end
+
+hook.Add("HUDPaint", "homigrad/body-status/draw", function()
+	local alive = LocalPlayer():Alive()
+	if wasAlive and not alive then deathShakeEnd = CurTime() + 0.6 end
+	wasAlive = alive
+
+	local alpha = hg.DeathHUDAlpha and hg.DeathHUDAlpha() or 1
+	if alpha <= 0 then return end
+
+	surface.SetAlphaMultiplier(alpha)
+	local ok, err = pcall(drawBodyStatus)
+	surface.SetAlphaMultiplier(1)
+	if not ok then ErrorNoHalt(err, "\n") end
 end)

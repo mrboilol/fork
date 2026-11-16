@@ -918,5 +918,5 @@ hook.Add("HUDPaint", "HG_WoundHoldPrompt", function()
 		outlineColor = Color(inv, inv, inv, 255 * alphaMul)
 	end
 
-	draw.SimpleTextOutlined(woundHoldPromptText, "HGWoundHoldPrompt", ScrW() * 0.5, ScrH() - 62, color, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, outlineColor)
+	draw.SimpleTextOutlined(woundHoldPromptText, "HGWoundHoldPrompt", ScrW() * 0.5, ScrH() * 0.5 + 120 * (hg.UIScale and hg.UIScale() or 1), color, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, outlineColor)
 end)

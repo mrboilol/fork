@@ -48,6 +48,9 @@ local EMO = {
 	stressedHurt = 0.35,
 	friendlyFireDepression = 0.12,
 	friendlyKillDepression = 0.35,
+	karmaKillDepression = 0.5,
+	karmaKillFull = 30,
+	karmaKillLowMul = 0.5,
 	friendlyFireCooldown = 8,
 	losingInterval = 1,
 	losingStart = 0.3,
@@ -71,6 +74,7 @@ local PHRASES = {
 	buddyDown = {"No, no, no, get up!", "They're down.. holy crap..", "Oh fuck- he just dropped down.."},
 	friendlyFire = {"DID I JUST HIT MY OWN TEAMMATE?", "I JUST HIT MY OWN TEAM", "WHY DID I DO THAT"},
 	friendlyKill = {"WHAT DID I JUST DO", "THEY WERE ON MY SIDE", "WHAT THE FUCK IS WRONG WITH ME"},
+	regretKill = {"They didn't have to die...", "That wasn't supposed to happen...", "I killed an innocent person..."},
 	calmDown = {
 		solo = {"That's it.. I won.", "Oh.. its over.", "Hey.. I got him."},
 		ganged = {"Nice.. one down.", "Shit.. there's still more?", "Thats one out of many."},
@@ -262,14 +266,15 @@ local function addSurge(org, amount)
 end
 
 local function applyRelief(watcher, org, context)
-	if (org.epinephrineStabilizationUntil or 0) > CurTime() then return end
+	if (org.epinephrineStabilizationUntil or 0) > CurTime() then return false end
 	local hadStress = (org.adrenaline or 0) >= RELIEF_MIN_ADRENALINE or (org.adrenalineAdd or 0) > 0 or org.panicattackActive
-	if not hadStress then return end
+	if not hadStress then return false end
 	org.adrenalineAdd = math.min(org.adrenalineAdd or 0, 0)
 	org._adrenalineHoldUntil = 0
 	org._adrenalineReliefUntil = CurTime() + RELIEF_DURATION
 	org.panicattackadd = (org.panicattackadd or 0) * RELIEF_PANIC_KEEP
 	emotionThought(watcher, PHRASES.relief, "witness_relief", context)
+	return true
 end
 
 local function canSee(watcher, pos, radius, dot, ignore1, ignore2)
@@ -336,6 +341,7 @@ local function isBuddy(watcher, victim, twoTeams)
 	if not victim:IsPlayer() then return false end
 	if victim.isTraitor then return false end
 	if wasFighting(watcher.hgFightTargets, victim) or wasFighting(watcher.hgFightAttackers, victim) then return false end
+	if hg.Buddy and hg.Buddy.IsChosen(watcher, victim) then return true end
 	if twoTeams and watcher:Team() == victim:Team() then return true end
 	return sharesEnemy(watcher, victim)
 end
@@ -465,7 +471,9 @@ local function reactAsFighter(watcher, org, victim, isDeath, victimPos, victimEn
 	end
 
 	addHappiness(org, EMO.reliefHappiness * (isDeath and 1 or 0.8))
-	if stressed then applyRelief(watcher, org, context) end
+	if (stressed or wasFighting(watcher.hgFightAttackers, victim)) and not applyRelief(watcher, org, context) then
+		emotionThought(watcher, PHRASES.calmDown, "witness_hope", context)
+	end
 end
 
 local CHANCE_BONES = {"skull", "jaw", "pelvis", "spine1", "spine2", "spine3"}
@@ -521,6 +529,20 @@ local function latestAttacker(victim)
 	return latest
 end
 
+function hg.organism.GetKillKarmaLoss(killer, victim)
+	local harmed = zb and zb.HarmDoneKarma and zb.HarmDoneKarma[victim]
+	return harmed and tonumber(harmed[killer]) or 0
+end
+
+local function killGuilt(watcher, victim, friendly)
+	local loss = hg.organism.GetKillKarmaLoss(watcher, victim)
+	local amount = math.Clamp(loss / EMO.karmaKillFull, 0, 1) * EMO.karmaKillDepression
+	if friendly then amount = math.max(amount, EMO.friendlyKillDepression) end
+	local karma = tonumber(watcher.Karma) or 100
+	amount = amount * Lerp(math.Clamp((100 - karma) / 100, 0, 1), 1, 1 + EMO.karmaKillLowMul)
+	return amount, loss
+end
+
 local function onVictimDown(victim, killer, isDeath)
 	if not IsValid(victim) then return end
 	if killer == victim then killer = nil end
@@ -551,12 +573,18 @@ local function onVictimDown(victim, killer, isDeath)
 			continue
 		end
 
-		if watcher == killer and victim.hgFriendlyFireBy and (victim.hgFriendlyFireBy[watcher] or 0) > now - FIGHT_WINDOW then
+		local friendlyKill = watcher == killer and victim.hgFriendlyFireBy and (victim.hgFriendlyFireBy[watcher] or 0) > now - FIGHT_WINDOW
+		local guiltAmount, karmaLoss = 0, 0
+		if watcher == killer and isDeath then
+			guiltAmount, karmaLoss = killGuilt(watcher, victim, friendlyKill)
+		end
+
+		if friendlyKill or karmaLoss > 0 then
 			watcher.hgWitnessNext[victim] = now + OTRUB_REPEAT_COOLDOWN
 			witnessed[watcher] = true
 			if isDeath then
-				addDepression(org, EMO.friendlyKillDepression, "guilt")
-				emotionThought(watcher, PHRASES.friendlyKill, "emotion_friendly_kill")
+				addDepression(org, guiltAmount, "guilt")
+				emotionThought(watcher, friendlyKill and PHRASES.friendlyKill or PHRASES.regretKill, "emotion_friendly_kill")
 			end
 			continue
 		end

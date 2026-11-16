@@ -610,7 +610,7 @@ local function DrawWorldModel(self, force)
 		if IsValid(owner) and (owner.GetActiveWeapon and (owner:GetActiveWeapon() ~= self) or owner:IsRagdoll()) then
 			if not self.shouldntDrawHolstered then
 				self:WorldModel_Transform_Holstered()
-				if self:ShouldUseFakeModel() and IsValid(self.worldModel) and (self.reverseanim or self.seq ~= (self.AnimList["idle"] or "idle")) then
+				if self:ShouldUseFakeModel() and IsValid(self.worldModel) and not self.ZCityCycleScrub and (self.reverseanim or self.seq ~= (self.AnimList["idle"] or "idle")) then
 					self.callback = nil
 					self:PlayAnim("idle", 1, not self.NoIdleLoop)
 				end
@@ -719,7 +719,11 @@ local function DrawWorldModel(self, force)
 
 			if self.seq then self:GetWM():SetSequence(self.seq) end
 			local timing
-			if not self.cycling then
+			local scrub = self.ZCityCycleScrub or ((self.deploy or self.holster) and self:GetDrawFraction())
+			if scrub then
+				timing = math.Clamp(scrub, 0, 1)
+				self.worldModel:SetCycle(timing)
+			elseif not self.cycling then
 				timing = (1 - math.Clamp((self.animtime - CurTime()) / self.animspeed, 0, 1))
 				timing = self.reverseanim and (1 - timing) or timing
 				self.worldModel:SetCycle(timing)

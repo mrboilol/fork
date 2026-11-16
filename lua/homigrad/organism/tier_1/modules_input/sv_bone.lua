@@ -9,7 +9,7 @@ local skull_break_neck_mul = 2.5
 local bluntTuning = {
 	limbRetain = 0.85,
 	koStart = 0.2,
-	koSlope = 1.1,
+	koSlope = 1.5,
 	koMax = 0.85,
 	dazeStart = 0.22,
 	brainStart = 0.5,
@@ -74,7 +74,7 @@ local function bloodBurst(org, dmgInfo, amount, hit, severe, dmg)
 		effect:SetMagnitude(severe and 2 or 1)
 		effect:SetScale(severe and 1.2 or 0.5)
 		effect:SetRadius(severe and 3 or 1)
-		util.Effect("BloodImpact", effect, true, true)
+		hg.BloodImpactEffect(effect, true, true)
 		net.Start("hg_bloodimpact")
 		net.WriteVector(pos)
 		net.WriteVector(normal * (severe and math.Rand(0.2, 0.45) or 0.15))
@@ -913,7 +913,7 @@ local function sendHeadTraumaFlash(org, dmg, dmgInfo, boneDelta, concussionGain,
 	local skullFissured = boneDelta > 0.01 and skullNow >= 0.6 and skullNow - boneDelta < 0.6
 	local playConcussionSound = brainGain > 0.01 or boneDelta >= 0.35 or skullFissured or concussionGain >= 1.5 or org.needotrub or org.otrub
 	local timeScale = math.Clamp(0.35 + boneDelta * 0.8 + concussionGain * 0.2 + brainGain, 0.35, isSevere and 1.35 or 0.5)
-	local flashSize = math.Clamp(950 + dmg * 260 + boneDelta * 1500 + concussionGain * 180 + brainGain * 900, 950, isSevere and 3200 or 1300)
+	local flashSize = math.Clamp(400 + dmg * 260 + boneDelta * 1500 + concussionGain * 180 + brainGain * 900, 400, isSevere and 3200 or 1000)
 	if isSevere then
 		timeScale = math.max(timeScale, 1)
 		flashSize = math.max(flashSize, 2400)
@@ -1001,7 +1001,7 @@ local function SpawnTeeth(org, count, hitPos, forceDir, violent)
 	local effect = EffectData()
 	effect:SetOrigin(pos)
 	effect:SetNormal(direction)
-	util.Effect("BloodImpact", effect, true, true)
+	hg.BloodImpactEffect(effect, true, true)
 end
 
 input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet, impact)

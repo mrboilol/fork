@@ -255,9 +255,10 @@ function SWEP:SecondaryAttack()
 		if !IsValid(self.healbuddy) then return end
 		if hg.GetCurrentCharacter(self.healbuddy) == hg.GetCurrentCharacter(self:GetOwner()) then return end
 		local done = self:Heal(self.healbuddy, self.mode)
+		if done then hook.Run("HG_HealedOther", self:GetOwner(), self.healbuddy) end
 		if(done and self.PostHeal)then
 			self:PostHeal(self.healbuddy, self.mode)
-		end		
+		end
 
 		if self.net_cooldown2 < CurTime() then
 			self:SetNetVar("modeValues",self.modeValues)

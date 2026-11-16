@@ -62,7 +62,11 @@ hook.Add("PlayerSpawn", "homigrad-organism-oxygen-safety", function(ply)
 		if not istable(org.o2) or not isnumber(org.o2.range) then
 			hg.organism.Clear(org, true)
 		end
-		if not org.o2 or (tonumber(org.o2[1]) or 0) > 0 then return end
+		org.spawnOxygenGraceUntil = CurTime() + 0.5
+		org.spawnKnockdownGraceUntil = CurTime() + 0.5
+		org.needotrub = false
+		org.otrub = false
+		if not org.o2 then return end
 		org.o2[1] = math.max(tonumber(org.o2.range) or 30, 1)
 		org.o2.curregen = tonumber(org.o2.regen) or 4
 		org.lungsfunction = true
@@ -70,7 +74,6 @@ hook.Add("PlayerSpawn", "homigrad-organism-oxygen-safety", function(ply)
 		org.bodyoxygen = 1
 		org.brainoxygen = 1
 		org.brainoxygenTarget = 1
-		org.spawnOxygenGraceUntil = CurTime() + 1.5
 		ply.fullsend = true
 		if hg.send_organism then hg.send_organism(org, ply, true, true) end
 	end)

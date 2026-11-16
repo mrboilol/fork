@@ -165,6 +165,59 @@ local function UpdateStatus(ply, org, status, levels)
 	StatusMessage(ply, "hggood_" .. status.key, status.recover, GOOD_COLOR)
 end
 
+local OTRUB_REPEAT = 15
+local OTRUB_LINES = {
+	{key = "hgOtrubBreath", text = "You stopped breathing.", clr = Color(255, 120, 120), active = function(org)
+		return org.respiratoryArrest or not org.lungsfunction
+	end},
+	{key = "hgOtrubFlat", text = "You are flatlining.", clr = Color(255, 70, 70), active = function(org)
+		return org.heartstop or org.ecgState == "asystole"
+	end},
+}
+
+local function RestoreThoughts(ply)
+	if not ply.hgThoughtsForced then return end
+	ply.hgThoughtsForced = nil
+	ply:ConCommand("hg_newthoughts 0")
+end
+
+hook.Add("Org Think", "hg/chatlog/otrub-thoughts", function(ply, org)
+	if not IsValid(ply) or not ply:IsPlayer() then return end
+
+	if not ply:Alive() or not org.otrub then
+		org.hgOtrubSeen = nil
+		RestoreThoughts(ply)
+		return
+	end
+
+	if ply:GetInfoNum("hg_newthoughts", 0) <= 0 and not ply.hgThoughtsForced then
+		ply.hgThoughtsForced = true
+		ply:ConCommand("hg_newthoughts 1")
+	end
+
+	local now = CurTime()
+	org.hgOtrubSeen = org.hgOtrubSeen or {}
+	for _, line in ipairs(OTRUB_LINES) do
+		if line.active(org) then
+			if (org.hgOtrubSeen[line.key] or 0) <= now then
+				if hg.OtrubThought(ply, line.text, line.clr) then
+					org.hgOtrubSeen[line.key] = now + OTRUB_REPEAT
+				end
+			end
+		else
+			org.hgOtrubSeen[line.key] = nil
+		end
+	end
+end)
+
+hook.Add("PlayerDeath", "hg/chatlog/otrub-thoughts-restore", function(ply)
+	RestoreThoughts(ply)
+end)
+
+hook.Add("PlayerSpawn", "hg/chatlog/otrub-thoughts-restore", function(ply)
+	RestoreThoughts(ply)
+end)
+
 hook.Add("Org Think", "hg/chatlog/status-effects", function(ply, org)
 	if not IsValid(ply) or not ply:IsPlayer() or not ply:Alive() then return end
 	if org.otrub or not ply.Thought then return end

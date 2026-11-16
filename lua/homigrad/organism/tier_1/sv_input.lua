@@ -1161,7 +1161,7 @@ local function emitWoundImpact(ent, wound)
 	effect:SetMagnitude(1)
 	effect:SetScale(0.8)
 	effect:SetRadius(2)
-	util.Effect("BloodImpact", effect, true, true)
+	hg.BloodImpactEffect(effect, true, true)
 end
 
 local woundDecals = {
@@ -1929,7 +1929,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 			org.bruises = org.bruises + 1
 		end
 
-		if dmgInfo:IsDamageType(DMG_BURN) then
+		if dmgInfo:IsDamageType(DMG_BURN + DMG_BLAST) then
 			org.burns = org.burns + 1
 		end
 
@@ -2012,7 +2012,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 				effdata:SetRadius(dmg / 10 * exitBloodScale)
 				effdata:SetMagnitude(dmg / 10 * exitBloodScale)
 				effdata:SetScale(1)
-				util.Effect("BloodImpact", effdata)
+				hg.BloodImpactEffect(effdata)
 
 				net.Start("hg_bloodimpact")
 				net.WriteVector(outputHole[#outputHole])
@@ -2133,7 +2133,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		effdata:SetRadius(dmg / 10)
 		effdata:SetMagnitude(dmg / 10)
 		effdata:SetScale(1)
-		util.Effect("BloodImpact", effdata)
+		hg.BloodImpactEffect(effdata)
 
 		if IsValid(ply) and ply:IsPlayer() and ply:Alive() then
 			ply:ViewPunch(AngleRand(-3, 3))
@@ -2538,7 +2538,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		effect:SetMagnitude(1)
 		effect:SetScale(1)
 		effect:SetRadius(4)
-		util.Effect("BloodImpact", effect, true, true)
+		hg.BloodImpactEffect(effect, true, true)
 	end
 	if brokenSkullHeadImpact or (dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) and dmgBlood > 1 and #inputHole > 0) then
 		net.Start("hg_bloodimpact")
