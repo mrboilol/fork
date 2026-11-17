@@ -851,23 +851,11 @@ local spineFractureBones = {
 	["ValveBiped.Bip01_Neck1"] = {offset = Vector(1, 1, 0), direction = Vector(0, 1, 0.65)},
 }
 
-local function buildFractureVisuals(org)
-	local data = table.Copy(org.open_fractures or {})
-	for bone in pairs(org.fake_dislocated_bones or {}) do
-		local cfg = openFractureBones[bone]
-		if cfg and not data[bone] then
-			local theta = math.rad(tonumber(util.CRC(bone)) % 360)
-			data[bone] = {Vector(cfg.depth, 0, 0), Vector(-0.35, math.cos(theta), math.sin(theta)):Angle(), joint = true}
-		end
-	end
-	return data
-end
-
 function fakeBoneFlop.SyncOpenFractures(org, ownerOnly)
 	local owner = org and org.owner
 	if not IsValid(owner) then return end
 
-	local data = buildFractureVisuals(org)
+	local data = table.Copy(org.open_fractures or {})
 	owner:SetNetVar("openfractures", data)
 	if ownerOnly or not owner:IsPlayer() then return end
 
@@ -1218,7 +1206,7 @@ hook.Add("Ragdoll_Create", "hg-fakeboneflop-apply", function(ply, rag)
 
 	if ply and ply.organism then
 		fakeBoneFlop.ApplyStored(rag, ply.organism)
-		if ply.organism.open_fractures or ply.organism.fake_dislocated_bones then rag:SetNetVar("openfractures", buildFractureVisuals(ply.organism)) end
+		if ply.organism.open_fractures then rag:SetNetVar("openfractures", table.Copy(ply.organism.open_fractures)) end
 	end
 end)
 

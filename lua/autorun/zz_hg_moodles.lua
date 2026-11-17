@@ -1076,6 +1076,113 @@ local function buildEffects(ply, org)
 	return effects
 end
 
+local nilguyLevels = {healthy = 1, hurt = 1, wounded = 2, critical = 3, softcrit = 4, hardcrit = 4}
+local nilguyTitles = {
+	healthy = "Doing Fine", hurt = "Hurt", wounded = "Wounded", critical = "Critical",
+	softcrit = "Dying", hardcrit = "On The Brink",
+}
+local nilguyStatus = {
+	healthy = "You feel alright.",
+	hurt = "You are hurt, but still on your feet.",
+	wounded = "You are badly wounded.",
+	critical = "Your body is failing. You need help soon.",
+	softcrit = "You are dying and can barely stay conscious.",
+	hardcrit = "You are one breath from death.",
+}
+local nilguyPoolLabels = {brute = "Brute", burn = "Burn", toxin = "Toxin", oxy = "Oxygen"}
+
+local function nilguyLimbReasons(org, kind)
+	local SoftTissue = hg.SoftTissue
+	if not SoftTissue then return {} end
+
+	local found = {}
+	for _, limb in ipairs(SoftTissue.LIMBS) do
+		local value = SoftTissue.Get(org, kind, limb)
+		local key = SoftTissue.GetSeverityKey(value)
+		if key then
+			found[#found + 1] = {value = value, text = string.lower(SoftTissue.LIMB_NAMES[limb]) .. " " .. SoftTissue.Config.wording[kind][key]}
+		end
+	end
+	table.sort(found, function(a, b) return a.value > b.value end)
+
+	local reasons = {}
+	for index = 1, math.min(#found, 3) do reasons[index] = found[index].text end
+
+	return reasons
+end
+
+local function nilguyPoolReasons(ply, org, state, pool)
+	if pool == "brute" or pool == "burn" then
+		local reasons = nilguyLimbReasons(org, pool)
+		if pool == "burn" then
+			if ply:IsOnFire() then table.insert(reasons, 1, "you are on fire") end
+			local temperature = orgNumber(org, "temperature", 36.7)
+			local config = hg.SimpleHealth.Config.temperature
+			if temperature < config.coldStart then reasons[#reasons + 1] = "freezing cold" end
+			if temperature > config.heatStart then reasons[#reasons + 1] = "overheating" end
+		end
+
+		return reasons
+	end
+
+	local config = hg.SimpleHealth.Config
+	local reasons = {}
+	if pool == "toxin" then
+		local toxinConfig = config.toxin
+		if orgNumber(org, "analgesia") > toxinConfig.opioidSafeDose or orgNumber(org, "painkiller") > toxinConfig.painkillerSafeDose
+			or orgNumber(org, "tranquilizer") > toxinConfig.tranquilizerSafeDose then
+			reasons[#reasons + 1] = "drug overdose"
+		end
+		if orgNumber(org, "poison2") > 0 or orgNumber(org, "poison4") > 0 then reasons[#reasons + 1] = "poison in your blood" end
+		if #reasons == 0 and state.toxin > 0 then reasons[1] = "toxins in your blood" end
+	else
+		if state.countdownEnd > CurTime() then reasons[#reasons + 1] = "suffocation countdown running" end
+		if orgNumber(org, "blood", 5000) < config.effects.bloodStart then reasons[#reasons + 1] = "low blood volume" end
+		if o2Value(org) < o2Maximum(org) * 0.7 then reasons[#reasons + 1] = "not enough air" end
+		if #reasons == 0 and state.oxy > 0 then reasons[1] = "oxygen starvation" end
+	end
+
+	return reasons
+end
+
+local function buildNilguyEffect(ply, org)
+	local SimpleHealth = hg.SimpleHealth
+	if not SimpleHealth or not SimpleHealth.NilguyMoodle or not SimpleHealth.NilguyMoodle:GetBool() then return end
+
+	local state = SimpleHealth.GetLocalState()
+	if not state then return end
+
+	local key = SimpleHealth.GetFaceKey(state, true)
+	local pale = SimpleHealth.IsFacePale()
+	local bad = key ~= "healthy" or pale
+	local description = nilguyStatus[key]
+	if pale then description = description .. " You look pale from blood loss." end
+
+	local dominant = SimpleHealth.GetDominantPool(state)
+	if dominant then description = description .. " Mostly " .. string.lower(nilguyPoolLabels[dominant]) .. " damage." end
+
+	local lines = {description, "", "Health " .. math.floor(SimpleHealth.GetHealth(state)) .. " / " .. SimpleHealth.Config.maxHealth}
+	for _, pool in ipairs(SimpleHealth.POOLS) do
+		local value = state[pool] or 0
+		lines[#lines + 1] = nilguyPoolLabels[pool] .. " " .. math.floor(value)
+		if value > 0 then
+			local reasons = nilguyPoolReasons(ply, org, state, pool)
+			if #reasons > 0 then lines[#lines + 1] = "  " .. table.concat(reasons, ", ") end
+		end
+	end
+
+	return {
+		name = "nilguy",
+		level = nilguyLevels[key],
+		mood = bad and "bad" or "good",
+		priority = 0,
+		title = nilguyTitles[key],
+		description = description,
+		tooltipLines = lines,
+		faceMaterial = SimpleHealth.GetFaceMaterial(pale and key .. "_pale" or key) or SimpleHealth.GetFaceMaterial(key),
+	}
+end
+
 local function drawGlowingRageText(text, font, x, y)
 	local glowPulse = 0.75 + math.abs(math.sin(CurTime() * 4)) * 0.25
 	local maxRadius = math.max(1, math.floor(ui(4)))
@@ -1100,8 +1207,8 @@ local function drawTooltip(effect, pos, mx, my, berserkActive)
 	local levelText = rageActive and textData.fixed or textLevels and textLevels[tooltipLevel] or nil
 	local title = effect.title or levelText and levelText.title or effect.name
 	local description = effect.description or levelText and levelText.description or "An active condition is affecting you."
-	local descriptionLines = rageActive and levelText and levelText.descriptionLines or {description}
-	local details = not rageActive and "Severity " .. tooltipLevel .. " of 4" or nil
+	local descriptionLines = effect.tooltipLines or rageActive and levelText and levelText.descriptionLines or {description}
+	local details = not rageActive and not effect.tooltipLines and "Severity " .. tooltipLevel .. " of 4" or nil
 	if details and effect.value ~= nil then details = details .. " - " .. tostring(effect.value) end
 
 	local titleFont = "HG_MoodleTitle"
@@ -1160,9 +1267,10 @@ local function drawTooltip(effect, pos, mx, my, berserkActive)
 end
 
 local function drawMoodle3Severity(x, y, size, effect, age)
-	local exempt = effect.name == "full" or effect.name == "happy"
+	local nilguy = effect.name == "nilguy"
+	local exempt = effect.name == "full" or effect.name == "happy" or nilguy and effect.mood == "good"
 	local severe = not exempt and effect.level >= 3
-	local severity = not exempt and math.Clamp((effect.level - 1) / 3, 0, 1) or 0
+	local severity = not exempt and (nilguy and math.Clamp(effect.level / 4, 0.25, 1) or math.Clamp((effect.level - 1) / 3, 0, 1)) or 0
 	local fadeIn = math.Clamp((age or 0) * 0.8, 0, 1)
 	local pulse = 0.85 + math.sin(CurTime() * 2.5) * 0.15
 	local gradient = getMoodle3Material("SeverityGradient")
@@ -1254,6 +1362,8 @@ local function drawMoodles()
 		end
 		return aScore > bScore
 	end)
+	local nilguy = buildNilguyEffect(ply, org)
+	if nilguy then table.insert(effects, 1, nilguy) end
 	local active = {}
 	for _, effect in ipairs(effects) do
 		active[effect.name] = true
@@ -1367,7 +1477,8 @@ local function drawMoodles()
 		-- Berserk is Moodle 3's anger level 5: retain each moodle's frame and
 		-- severity, but replace every active symbol except its own rage moodle
 		-- with the break marker.
-		local icon = effect.name == "zerlked" and getMoodle3Material("zerlked") or (berserkActive and effect.name ~= "rage" and getMoodle3Material("moodlebreak") or getMoodle3Icon(effect))
+		local icon = effect.faceMaterial or effect.name == "zerlked" and getMoodle3Material("zerlked") or (berserkActive and effect.name ~= "rage" and getMoodle3Material("moodlebreak") or getMoodle3Icon(effect))
+		if effect.faceMaterial then offsetX = offsetX + (hg.SimpleHealth.GetFaceShake(drawSize)) end
 		if icon then
 			surface.SetMaterial(icon)
 			local inset = ui(2)

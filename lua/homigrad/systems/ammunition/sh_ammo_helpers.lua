@@ -121,7 +121,7 @@ local function onstopped_silk(self, last_unsure_penetration_pos, reason, trace)
 			self.SpawnedEntity = projectile
 
 			if(trace)then
-				projectile:Hit(trace.Entity, trace.HitPos - normal * 10, trace.PhysicsBone, normal)
+				projectile:Hit(trace.Entity, trace.HitPos - normal * 10, trace.PhysicsBone, normal, trace.HitBox)
 			end
 		end
 	end
@@ -130,7 +130,7 @@ end
 local function arrow_hit(self, last_unsure_penetration_pos, reason, trace)
 	if(SERVER)then
 		if(!trace or !trace.HitSky)then
-			local normal = -self.Vel:GetNormalized()
+			local normal = self.Vel:GetNormalized()
 			local projectile = ents.Create(self.FunctionInfo.Ent)
 			projectile:SetPos(self.Pos)
 			projectile:SetAngles(projectile:GetEmbedAngle(normal))
@@ -138,7 +138,7 @@ local function arrow_hit(self, last_unsure_penetration_pos, reason, trace)
 			self.SpawnedEntity = projectile
 
 			if(trace)then
-				projectile:Hit(trace.Entity, trace.HitPos + normal * -4, trace.PhysicsBone, normal)
+				projectile:Hit(trace.Entity, trace.HitPos + normal * 4, trace.PhysicsBone, normal, trace.HitBox)
 			else
 				local phys = projectile:GetPhysicsObject()
 				if(IsValid(phys))then

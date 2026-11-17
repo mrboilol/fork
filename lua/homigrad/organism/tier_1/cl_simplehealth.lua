@@ -204,6 +204,7 @@ local function getFaceKey(state, alive)
 
 	local faceConfig = CONFIG.face
 	local health = SimpleHealth.GetHealth(state)
+	if health <= (SimpleHealth.GetCritThresholds()) + 5 then return "softcrit" end
 	if health < faceConfig.criticalBelow then return "critical" end
 	if health < faceConfig.woundedBelow then return "wounded" end
 	if health < faceConfig.hurtBelow then return "hurt" end
@@ -219,6 +220,9 @@ local function isFacePale()
 end
 
 SimpleHealth.GetFaceKey = getFaceKey
+SimpleHealth.GetFaceMaterial = getFaceMaterial
+SimpleHealth.IsFacePale = isFacePale
+SimpleHealth.NilguyMoodle = CreateClientConVar("hg_nilguyisamoodle", "0", true, false, "1 = the face is the first moodle instead of a separate HUD box", 0, 1)
 
 local function playOuchie(path, pitch, volume)
 	sound.PlayFile("sound/" .. path, "noplay noblock", function(station)
@@ -301,6 +305,7 @@ local function getFaceShake(size)
 end
 
 SimpleHealth.OnLocalStateChanged = updateDamageShake
+SimpleHealth.GetFaceShake = getFaceShake
 
 local bigChat = GetConVar("sv_bigchat")
 local CHAT_HAT_HEIGHT = 20
@@ -335,6 +340,7 @@ local deathDelay = {active = false, wasAlive = false, aliveMode = 0}
 
 local function nildoy()
 	if not IsValid(lply) then return end
+	if SimpleHealth.NilguyMoodle:GetBool() and HGCustomMoodlesActive then return end
 
 	local alive = lply:Alive()
 	local state = SimpleHealth.GetLocalState()

@@ -166,13 +166,24 @@ function SoftTissue.GetSeverityRank(value, stops)
 	return SoftTissue.Config.severityRank[SoftTissue.GetSeverityKey(value, stops)] or 0
 end
 
-function SoftTissue.GetSoftImpairment(org, limb)
+function SoftTissue.ImpairmentFor(limb, soft)
 	local impairment = SoftTissue.Config.impairment
 	local range = impairment.softFull - impairment.softStart
 
 	local weight = impairment.limbWeight[limb] or 1
 
-	return math.Clamp((SoftTissue.GetLimb(org, limb) - impairment.softStart) / range * weight, 0, 1)
+	return math.Clamp((soft - impairment.softStart) / range * weight, 0, 1)
+end
+
+function SoftTissue.FunctionFor(limb, soft, muscle)
+	local impairment = SoftTissue.Config.impairment
+
+	return (1 - SoftTissue.ImpairmentFor(limb, soft) * impairment.softLoss)
+		* (1 - math.Clamp(muscle, 0, 1) * impairment.muscleLoss)
+end
+
+function SoftTissue.GetSoftImpairment(org, limb)
+	return SoftTissue.ImpairmentFor(limb, SoftTissue.GetLimb(org, limb))
 end
 
 function SoftTissue.GetDamageProfile(dmgInfo)
@@ -210,11 +221,7 @@ end
 function SoftTissue.GetLimbFunction(org, limb)
 	if not org or not org.softBrute then return 1 end
 
-	local impairment = SoftTissue.Config.impairment
-	local soft = 1 - SoftTissue.GetSoftImpairment(org, limb) * impairment.softLoss
-	local muscle = 1 - math.Clamp(SoftTissue.GetMuscle(org, limb), 0, 1) * impairment.muscleLoss
-
-	return soft * muscle
+	return SoftTissue.FunctionFor(limb, SoftTissue.GetLimb(org, limb), SoftTissue.GetMuscle(org, limb))
 end
 
 function SoftTissue.LimbFromBone(bone)

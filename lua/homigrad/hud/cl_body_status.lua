@@ -1065,12 +1065,6 @@ local function drawCallout(entry, x, radius)
 	setDrawColor(lineColor[1], lineColor[2], lineColor[3], K.OUTLINE_ALPHA)
 	drawLine(entry.ax, entry.ay, x, entry.y, width)
 
-	local dot = math.max(ScrH() * K.ORGAN.ANCHOR_DOT, 2)
-	setDrawColor(K.COLOR.OUTLINE[1], K.COLOR.OUTLINE[2], K.COLOR.OUTLINE[3], K.OUTLINE_ALPHA)
-	polyCapsule(entry.ax, entry.ay, entry.ax, entry.ay, dot + width)
-	setDrawColor(lineColor[1], lineColor[2], lineColor[3], 255)
-	polyCapsule(entry.ax, entry.ay, entry.ax, entry.ay, dot)
-
 	if entry.kind == "brain" then
 		local big = radius * K.ORGAN.CALLOUT_BRAIN_SCALE
 		local y = entry.y

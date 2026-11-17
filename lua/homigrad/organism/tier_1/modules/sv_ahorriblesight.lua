@@ -649,7 +649,10 @@ hook.Add("EntityTakeDamage", "WitnessStressTrackFight", function(target, dmgInfo
 	end
 	attacker.hgFightTargets = attacker.hgFightTargets or {}
 	attacker.hgFightTargets[victim] = now
-	if attacker.organism then attacker.organism.hgMissTries = 0 end
+	if attacker.organism then
+		attacker.organism.hgMissTries = 0
+		attacker.organism.hgBotchSaid = nil
+	end
 	if dmgInfo:IsDamageType(DMG_CLUB) and attacker:IsPlayer() then
 		local wep = attacker:GetActiveWeapon()
 		if IsValid(wep) and HANDS[wep:GetClass()] then

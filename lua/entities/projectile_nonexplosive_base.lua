@@ -36,12 +36,31 @@ if SERVER then
 		return normal:Angle()
 	end
 
-	function ENT:Hit(ent, hit_pos, phys_bone_id, normal)
+	local function lodgeAnchorBone(ent, hitPos, physBone, hitBox, ang)
+		local trusted
+		if ent:GetPhysicsObjectCount() > 1 then
+			trusted = ent:TranslatePhysBoneToBone(physBone or 0)
+		elseif isnumber(hitBox) and (ent:IsPlayer() or ent:IsNPC()) then
+			trusted = ent:GetHitBoxBone(hitBox, ent:GetHitboxSet() or 0)
+		end
+
+		local boneName = hg.organism and hg.organism.GetWoundAnchor and select(3, hg.organism.GetWoundAnchor(ent, hitPos, ang, trusted))
+		local bone = boneName and ent:LookupBone(boneName) or trusted
+		if not bone or bone < 0 then return ent:TranslatePhysBoneToBone(physBone or 0), physBone end
+
+		local anchorPhysBone = ent:TranslateBoneToPhysBone(bone)
+		if anchorPhysBone and anchorPhysBone >= 0 then
+			return ent:TranslatePhysBoneToBone(anchorPhysBone), anchorPhysBone
+		end
+		return bone, physBone
+	end
+
+	function ENT:Hit(ent, hit_pos, phys_bone_id, normal, hitbox)
 		local ply = hg.RagdollOwner(ent) or ent
 		local rag = IsValid(ply) and (IsValid(ply:GetNWEntity("RagdollDeath", ply.FakeRagdoll)) and ply:GetNWEntity("RagdollDeath", ply.FakeRagdoll)) or ent:IsRagdoll() and ent or IsValid(ent.FakeRagdoll) and ent.FakeRagdoll
 		local org = rag and rag.organism or ent.organism
 		rag = rag or ent
-		
+
 		if !org then
 			self:SetPos(hit_pos)
 			self:SetAngles(self:GetEmbedAngle(normal))
@@ -49,17 +68,20 @@ if SERVER then
 		end
 
 		local bone = ent:TranslatePhysBoneToBone(phys_bone_id)
-		local mat = ent:GetBoneMatrix(bone)
+		if org then
+			bone, phys_bone_id = lodgeAnchorBone(ent, hit_pos, phys_bone_id, hitbox, normal:Angle())
+		end
+		local mat = bone and bone >= 0 and ent:GetBoneMatrix(bone)
 		local offset_pos = Vector()
 		local offset_ang = Angle()
-		
+
 		if(mat)then
 			offset_pos, offset_ang = WorldToLocal(hit_pos, self:GetEmbedAngle(normal), mat:GetTranslation(), mat:GetAngles())
 		end
-		
+
 		local phys = ent:GetPhysicsObjectNum(phys_bone_id or 0)
 		if IsValid(phys) then
-			phys:ApplyForceOffset(-normal * self.Damage * 200, hit_pos)
+			phys:ApplyForceOffset(normal * self.Damage * 200, hit_pos)
 		end
 
 		self.HitEntity = ent

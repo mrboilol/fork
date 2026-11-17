@@ -122,35 +122,6 @@ local SUBJECT_VERBS = {
 
 local SENTENCE_BREAK = "[%.%!%?%-]"
 
-ChatLog.SecondPersonOverrides = {
-	["STOP STOP STOP HELP HELP IT HURTS WHY IM GONNA DIE IM GONNA DIE"] = "IT WON'T STOP- IT HURTS- YOU'RE GOING TO DIE- YOU'RE GOING TO DIE-",
-	["NO NO NO NO PLEASE IT HURTS IT HURTS HELP ME HELP ME"] = "NO NO NO- IT HURTS- IT HURTS- YOU NEED HELP- YOU NEED HELP-",
-	["AAAGH HELP HELP SOMEBODY HELP ME I'M DYING I'M DYING"] = "YOU SCREAM FOR ANYBODY- YOU'RE DYING- YOU'RE DYING-",
-	["MAKE IT STOP MAKE IT STOP PLEASE GOD MAKE IT STOP"] = "YOU BEG FOR IT TO STOP- PLEASE GOD- MAKE IT STOP-",
-	["PLEASE PLEASE PLEASE STOP IT HURTS WHY WHY WHY"] = "YOU CAN'T TAKE IT- IT HURTS- WHY- WHY- WHY-",
-	["I'm down! Cover me, please, cover me!"] = "You're down! You need someone to cover you!",
-	["I'M HIT, SOMEONE HELP ME!"] = "YOU'RE HIT, YOU NEED HELP!",
-	["I CAN'T STOP THE BLEEDING I CAN'T I JUST CAN'T PLEASE HELP ME"] = "YOU CAN'T STOP THE BLEEDING- YOU CAN'T- YOU NEED HELP-",
-	["no-no no.. someone help me.."] = "no-no no.. you need someone to help you..",
-	["The edges of my vision are going dark... I need air..."] = "Your oxygen levels are low.",
-	["My head is swimming... I need oxygen..."] = "Your oxygen levels are low. Your head is swimming.",
-	["Breathe... just breathe..."] = "You force yourself to breathe slowly.",
-	["Why can't I breathe properly..."] = "You can't breathe properly.",
-	["I'm panting and it's not helping..."] = "You are panting, and it isn't helping.",
-	["The edges of my vision are starting to blur..."] = "Your vision is starting to blur.",
-	["I NEED AIR... I CAN'T BREATHE..."] ="You are struggling to breathe. You need air.",
-	["IM SUFFOCATING TO FUCKING DEATH."] = "You are suffocating.",
-	["WHY CANT I BREATHE. I NEED AIR..."] = "You can't breathe. Your lungs are burning for air.",
-	["IT'S GETTING HARDER TO BREATHE... I NEED AIR..."] = "You are struggling to breathe.",
-	["I CANT FUCKING BREATHE."] = "You can't draw a breath.",
-	["I CAN'T... I CAN BARELY BREATHE!"] = "You can barely breathe.",
-	["I NEED WATER!!"] = "You desperately need water.",
-	["GET ME A MEDIC, NOW!"] = "You need a medic, now.",
-	["LOOK AT ME! I'M IN PIECES!"] = "You look down at yourself. You are in pieces.",
-	["I'M DYING... I CAN'T FEEL MY PULSE"] = "You are dying. You can't feel your pulse.",
-	["stop.. please.. dont make me.."] = "stop.. please.. you don't want to..",
-}
-
 local function MatchCase(replacement, original, caps, sentenceStart)
 	if caps then return string.upper(replacement) end
 	if #original > 1 and original == string.upper(original) then return string.upper(replacement) end
@@ -165,11 +136,62 @@ local function Adjacent(separator)
 	return separator ~= nil and string.find(separator, "^%s+$") ~= nil
 end
 
+ChatLog.FirstPersonLines = {}
+for _, line in ipairs({
+	"I can't stay awake...",
+	"I'm about to pass out...",
+	"Everything is going dark...",
+	"I can't stay awake much longer...",
+	"My body is shutting down...",
+	"SO MANY ROUNDS- THEY'RE ALL AROUND ME-",
+	"FUCK- BULLETS EVERYWHERE- I CAN'T MOVE-",
+	"THEY'RE PINNING ME- I NEED COVER-",
+	"I'M BEING HIT- AGAIN- AGAIN-",
+	"THEY'RE TEARING ME APART-",
+	"I'M GETTING SHREDDED-",
+	"THEY'RE RAKING ME- I NEED TO MOVE-",
+	"ROUNDS ALL OVER- AND I'M HIT-",
+	"I'm in pain.",
+	"I CAN'T TAKE THE PAIN!",
+	"I'm going into shock!",
+	"I feel lightheaded.",
+	"I feel very weak.",
+	"I'M ABOUT TO PASS OUT FROM BLOOD LOSS!",
+	"I can't stand up, it hurts too much.",
+	"The pain keeps me on the ground!",
+	"I can't fix it, the pain is too much!",
+	"I'm afraid.",
+	"I'm terrified.",
+	"I'm in danger.",
+	"I'm panicking.",
+	"I can't stop panicking.",
+	"I'm starting to panic.",
+	"Panic is clouding my head.",
+	"I'm in severe pain.",
+	"My injuries hurt so much.",
+	"I'm in extreme pain.",
+	"The pain is overwhelming me.",
+	"My chest hurts.",
+	"Something is poking at my lungs.",
+	"My leg hurts when I move.",
+	"I can't move comfortably on this leg.",
+	"My jaw hurts when I speak.",
+	"My jaw is killing me.",
+	"My jaw hurts when I talk.",
+	"Talking makes my jaw hurt.",
+	"I'm close to death.",
+	"I'm burning!",
+	"I'm at my limit.",
+	"I can't hold on much longer.",
+}) do
+	ChatLog.FirstPersonLines[line] = true
+end
+
+local keepFirstPerson = false
+
 function ChatLog.SecondPerson(msg)
 	if not isstring(msg) or msg == "" then return msg end
-
-	local override = ChatLog.SecondPersonOverrides[msg]
-	if override then return override end
+	if keepFirstPerson then return msg end
 
 	local words = {}
 	for startPos, word, endPos in string.gmatch(msg, "()([%a']+)()") do
@@ -322,12 +344,20 @@ local function LimbCondition(msg)
 	end
 end
 
+local NarrateInner
+
 function ChatLog.Narrate(msg)
 	if not isstring(msg) or msg == "" then return msg end
-	if not IsShouted(msg) then return ChatLog.SecondPerson(msg) end
 
-	local override = ChatLog.SecondPersonOverrides[msg]
-	if override then return override end
+	keepFirstPerson = ChatLog.FirstPersonLines[msg] == true
+	local result = NarrateInner(msg)
+	keepFirstPerson = false
+
+	return result
+end
+
+NarrateInner = function(msg)
+	if not IsShouted(msg) then return ChatLog.SecondPerson(msg) end
 
 	local limbCondition = LimbCondition(msg)
 	if limbCondition then return limbCondition end
@@ -357,6 +387,10 @@ function ChatLog.Narrate(msg)
 	local result = string.lower(table.concat(sentences, " "))
 	result = string.gsub(result, "^%l", string.upper)
 	result = string.gsub(result, "([%.%?]%s+)(%l)", function(separator, letter) return separator .. string.upper(letter) end)
+	if keepFirstPerson then
+		result = string.gsub(result, "%f[%a']i%f[^%a']", "I")
+		result = string.gsub(result, "%f[%a']i('%a+)", "I%1")
+	end
 
 	return result
 end

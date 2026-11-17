@@ -3,7 +3,7 @@ SWEP.Base = "weapon_bandage_sh"
 SWEP.PrintName = "Bruice kit"
 SWEP.Color = Color(60, 200, 60)
 SWEP.BandageTPIKColor = SWEP.Color
-SWEP.Instructions = "A roll of green trauma bandages for bruises, burns and damaged muscle. Does not set bones or stop bleeding. RMB to use on someone else."
+SWEP.Instructions = "A roll of green trauma bandages for bruises, burns and damaged muscle. Sets broken bones (not spines) so they can heal. Does not stop bleeding. RMB to use on someone else."
 SWEP.Category = "ZCity Medicine"
 SWEP.Spawnable = true
 SWEP.Primary.Wait = 1
@@ -42,6 +42,78 @@ SWEP.modeValuesdef = {
 SWEP.ShouldDeleteOnFullUse = true
 
 if SERVER then
+	local BONE_COST = 0.1
+	local BONE_DEBUFF = 0.3
+	local GREEN = Color(60, 200, 60)
+	local BONE_ORDER = {"skull", "chest", "pelvis", "jaw", "lleg", "rleg", "larm", "rarm"}
+	local BONE_THRESHOLDS = {skull = 0.6, chest = 1, pelvis = 1, jaw = 1}
+	local LIMB_BONE_KEYS = {head = {"skull", "jaw"}, torso = {"chest", "pelvis"}}
+	local WRAP_BONES = {
+		head = "ValveBiped.Bip01_Head1",
+		torso = "ValveBiped.Bip01_Spine2",
+		larm = "ValveBiped.Bip01_L_Forearm",
+		rarm = "ValveBiped.Bip01_R_Forearm",
+		lleg = "ValveBiped.Bip01_L_Calf",
+		rleg = "ValveBiped.Bip01_R_Calf",
+		skull = "ValveBiped.Bip01_Head1",
+		jaw = "ValveBiped.Bip01_Head1",
+		chest = "ValveBiped.Bip01_Spine2",
+		pelvis = "ValveBiped.Bip01_Pelvis",
+	}
+
+	local function needsSetting(org, key)
+		if BONE_THRESHOLDS[key] then return (tonumber(org[key]) or 0) >= BONE_THRESHOLDS[key] end
+
+		return hg.IsLimbFractured(org, key)
+	end
+
+	local function pickBone(org, bone)
+		local aimed = hg.SoftTissue.LimbFromBone(bone)
+		local candidates = aimed and (LIMB_BONE_KEYS[aimed] or {aimed}) or {}
+		if isstring(bone) and string.find(bone, "Pelvis", 1, true) then candidates = {"pelvis", "chest"} end
+
+		for _, key in ipairs(candidates) do
+			if needsSetting(org, key) then return key end
+		end
+		for _, key in ipairs(BONE_ORDER) do
+			if needsSetting(org, key) then return key end
+		end
+	end
+
+	local function tissueRelief(org, steps)
+		local SoftTissue = hg.SoftTissue
+		local limb = steps[1] and steps[1].target
+		if not limb then return 0 end
+
+		local soft, muscle = SoftTissue.GetLimb(org, limb), SoftTissue.GetMuscle(org, limb)
+		for _, step in ipairs(steps) do
+			if step.kind == "muscle" then
+				muscle = math.max(muscle - step.heal, 0)
+			else
+				soft = soft - math.min(step.heal, SoftTissue.Get(org, step.kind, limb))
+			end
+		end
+
+		return SoftTissue.FunctionFor(limb, math.max(soft, 0), muscle) - SoftTissue.GetLimbFunction(org, limb)
+	end
+
+	local function softCritLimb(org)
+		local SimpleHealth = hg.SimpleHealth
+		local state = SimpleHealth.GetState(org)
+		if not state or SimpleHealth.GetHealth(state) > (SimpleHealth.GetCritThresholds()) then return end
+
+		local amounts = hg.Medicine.Items.weapon_bruicekit.amount
+		local weights = SimpleHealth.Config.damage.limbHealth
+		local best, bestGain = nil, 0
+		for _, limb in ipairs(hg.SoftTissue.LIMBS) do
+			local gain = (math.min(hg.SoftTissue.Get(org, "brute", limb), amounts.brute)
+				+ math.min(hg.SoftTissue.Get(org, "burn", limb), amounts.burn)) * (weights[limb] or 1)
+			if gain > bestGain then best, bestGain = limb, gain end
+		end
+
+		return best
+	end
+
 	function SWEP:GetHealData(org, bone)
 		local totalRotations = 1
 		local totalCost = 0
@@ -61,13 +133,32 @@ if SERVER then
 			})
 		end
 
-		local steps, stepCost = hg.Medicine.Plan("weapon_bruicekit", org, bone, availableResource - totalCost)
+		local available = availableResource - totalCost
+		local critLimb = softCritLimb(org)
+		local steps, stepCost = hg.Medicine.Plan("weapon_bruicekit", org, critLimb and WRAP_BONES[critLimb] or bone, available)
+
+		local boneKey = not critLimb and available >= BONE_COST - 0.001 and pickBone(org, bone)
+		if boneKey and (#steps == 0 or tissueRelief(org, steps) <= BONE_DEBUFF) then
+			steps, stepCost = {{key = boneKey, limb = boneKey, setBone = true, cost = BONE_COST, heal = 0}}, BONE_COST
+		end
+
 		for _, step in ipairs(steps) do
 			totalRotations = totalRotations + 1
 			bonesToHeal[#bonesToHeal + 1] = step
 		end
 
 		return totalRotations, totalCost + stepCost, bonesToHeal
+	end
+
+	local function wrapGreen(ent, boneName, applied)
+		if not boneName or not hg.AddBandageLayer(ent, boneName, applied) then return end
+
+		local state = ent.bandaged_limbs[boneName]
+		if istable(state) then
+			state.color = GREEN
+		else
+			ent.bandaged_limbs[boneName] = {pos = vector_origin, ang = angle_zero, color = GREEN, layers = tonumber(state) or 1}
+		end
 	end
 
 	function SWEP:CanHeal(ent)
@@ -102,9 +193,22 @@ if SERVER then
 		if #bones == 0 then return false end
 
 		local amountHealed = 0
+		local wrapped = {}
+		local applied = {}
 		for _, data in ipairs(bones) do
 			if data.medicine then
-				if hg.Medicine.ApplyStep(org, data) > 0 then amountHealed = amountHealed + data.cost end
+				if hg.Medicine.ApplyStep(org, data) > 0 then
+					amountHealed = amountHealed + data.cost
+					wrapped[#wrapped + 1] = WRAP_BONES[data.target]
+				end
+				continue
+			end
+
+			if data.setBone then
+				if hg.organism.ApplyBandageBoneTreatment(org, data.key, nil, true) > 0 then
+					amountHealed = amountHealed + data.cost
+					wrapped[#wrapped + 1] = WRAP_BONES[data.key]
+				end
 				continue
 			end
 
@@ -114,28 +218,10 @@ if SERVER then
 
 		self.modeValues[1] = math.max((self.modeValues[1] or 0) - totalCost, 0)
 
-		if amountHealed > 0 then
-			local bruisemap = {
-				larm = "ValveBiped.Bip01_L_Forearm",
-				rarm = "ValveBiped.Bip01_R_Forearm",
-				lleg = "ValveBiped.Bip01_L_Calf",
-				rleg = "ValveBiped.Bip01_R_Calf",
-				chest = "ValveBiped.Bip01_Spine2",
-				pelvis = "ValveBiped.Bip01_Pelvis",
-				spine1 = "ValveBiped.Bip01_Spine1",
-				spine2 = "ValveBiped.Bip01_Spine2",
-				spine3 = "ValveBiped.Bip01_Spine2",
-				skull = "ValveBiped.Bip01_Head1",
-				jaw = "ValveBiped.Bip01_Head1",
-			}
-			local green = Color(60, 200, 60)
-
+		if #wrapped > 0 then
 			ent.bandaged_limbs = ent.bandaged_limbs or {}
-			for _, data in ipairs(bones) do
-				local boneName = bruisemap[data.limb or data.key]
-				if boneName then
-					ent.bandaged_limbs[boneName] = { pos = vector_origin, ang = angle_zero, color = green }
-				end
+			for _, boneName in ipairs(wrapped) do
+				wrapGreen(ent, boneName, applied)
 			end
 
 			ent:SetNetVar("bandaged_limbs", ent.bandaged_limbs)

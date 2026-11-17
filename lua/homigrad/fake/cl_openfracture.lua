@@ -135,7 +135,7 @@ local function getFractureTransform(ent, fx, pose)
 		end
 		out:Normalize()
 
-		return bonePos + along * (fx.joint and 0 or length * shaftFraction) + out * pose.shaft.radius, out, along
+		return bonePos + along * length * shaftFraction + out * pose.shaft.radius, out, along
 	end
 
 	local offset = hg.organism.ClampWoundOffset(ent, pose.boneID, fx[1], fx[2]:Forward())
@@ -171,7 +171,7 @@ hook.Add("OnNetVarSet", "hg_openfractures", function(index, key, var)
 		local ownerKey = IsValid(owner) and owner:EntIndex() or index
 
 		for bone, fx in pairs(var) do
-			if fx.joint or (old and old[bone] and not old[bone].joint) then continue end
+			if old and old[bone] then continue end
 			local burstKey = ownerKey .. bone
 			if (lastBurst[burstKey] or 0) > CurTime() then continue end
 			lastBurst[burstKey] = CurTime() + burstCooldown

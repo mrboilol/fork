@@ -13,8 +13,8 @@ SimpleHealth.CRIT_HARD = 2
 
 SimpleHealth.NET_MODE_BITS = 2
 SimpleHealth.NET_CRIT_BITS = 2
-SimpleHealth.NET_POOL_BITS = 8
-SimpleHealth.NET_POOL_MAX = 255
+SimpleHealth.NET_POOL_BITS = 9
+SimpleHealth.NET_POOL_MAX = 511
 SimpleHealth.NET_FAINT_BITS = 2
 
 SimpleHealth.FAINT_SPEECH = 1
@@ -61,17 +61,8 @@ SimpleHealth.Config = {
 		passiveBruteRegen = 0.1,
 		passiveBurnRegen = 0.08,
 		brokenChestAt = 1,
-		brokenChestDamageMul = 0.5,
 		brokenChestBleedMul = 1.75,
-	},
-
-	fracture = {
-		limb = 12,
-		torso = 15,
-		spine = 25,
-		neck = 60,
-		skull = 25,
-		jaw = 8,
+		limbHealth = {head = 0.75, torso = 0.75, larm = 0.2, rarm = 0.2, lleg = 0.2, rleg = 0.2},
 	},
 
 	heart = {
@@ -129,8 +120,8 @@ SimpleHealth.Config = {
 
 	consciousness = {
 		recover = 0.05,
-		softCritDrain = 0.004,
-		softCritDepthDrain = 0.03,
+		softCritDrain = 0,
+		softCritDepthDrain = 0,
 		bleedStart = 2750,
 		bleedDrain = 0.12,
 		oxyStart = 50,
@@ -154,10 +145,9 @@ SimpleHealth.Config = {
 	},
 
 	oxy = {
-		softCritCap = 20,
-		softCritGain = 1,
+		softCritCap = 90,
+		softCritGain = 2,
 		hardCritGain = 2,
-		airwayGain = 7,
 		regen = 2,
 		brainDamageStart = 75,
 		brainDamageFull = 100,

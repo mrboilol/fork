@@ -200,6 +200,8 @@ local IsValid, math_Clamp = IsValid, math.Clamp
 
 		hg.RenderTourniquets(ent, ply)
 
+		if hg.RenderSplints then hg.RenderSplints(ent, ply) end
+
 		hg.GoreCalc(ent, ply)
 
 --local current = ent:GetManipulateBoneScale(lkp)

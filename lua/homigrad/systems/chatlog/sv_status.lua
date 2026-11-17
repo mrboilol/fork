@@ -38,6 +38,14 @@ local function LimbStatus(limb, name, failLine)
 	}
 end
 
+local CANT_STAND_TEXT = {
+	standup_pain = "It hurts too much to stand.",
+	standup_spine = "You can't feel your legs.",
+	standup_leg = "Your leg won't hold your weight.",
+	standup_dislocated = "Your leg is out of place, it won't hold you.",
+	standup_dazed = "You are too dizzy to stand up.",
+}
+
 local STATUSES = {
 	{
 		key = "bleed",
@@ -48,7 +56,7 @@ local STATUSES = {
 
 			return 0
 		end,
-		lines = {"You are bleeding.", "You are bleeding out!"},
+		lines = {false, "You are bleeding out!"},
 		recover = "Your bleeding has stopped.",
 	},
 	{
@@ -63,7 +71,7 @@ local STATUSES = {
 
 			return 0
 		end,
-		lines = {"You feel lightheaded.", "You feel very weak.", "YOU ARE ABOUT TO PASS OUT FROM BLOOD LOSS!"},
+		lines = {"I feel lightheaded.", "I feel very weak.", "I'M ABOUT TO PASS OUT FROM BLOOD LOSS!"},
 		recover = "You feel less faint.",
 	},
 	{
@@ -76,7 +84,7 @@ local STATUSES = {
 
 			return 0
 		end,
-		lines = {"You are in pain.", "The pain is unbearable!", "THE PAIN IS TOO MUCH!"},
+		lines = {"I'm in pain.", "The pain is unbearable!", "I CAN'T TAKE THE PAIN!"},
 		recover = "The pain fades.",
 	},
 	{
@@ -84,7 +92,7 @@ local STATUSES = {
 		level = function(org, _, current)
 			return Above(tonumber(org.shock) or 0, 40, 30, current, 1) and 1 or 0
 		end,
-		lines = {"You are going into shock!"},
+		lines = {"I'm going into shock!"},
 		recover = "You feel steadier.",
 	},
 	{
@@ -101,9 +109,16 @@ local STATUSES = {
 	},
 	{
 		key = "stun",
-		level = function(org)
-			return ((tonumber(org.stun) or 0) > CurTime() or org.canmove == false) and 1 or 0
+		level = function(org, ply)
+			local now = CurTime()
+			local forced = org.needfake or org.canmove == false or org.paralyzed or (tonumber(org.stun) or 0) > now
+			if forced and IsValid(ply.FakeRagdoll) and not org.otrub then org.hgMoveHold = now + 1.5 end
+			if (org.hgMoveHold or 0) <= now then return 0 end
+			if ChatLog.StandUpBlockReason(ply) then return 0 end
+
+			return 1
 		end,
+		quietClear = function(ply) return not IsValid(ply.FakeRagdoll) or ChatLog.StandUpBlockReason(ply) ~= nil end,
 		lines = {"You can't move!"},
 		recover = "You can move again.",
 	},
@@ -133,6 +148,7 @@ local STATUSES = {
 			return IsValid(ply.FakeRagdoll) and ChatLog.StandUpBlockReason(ply) and 1 or 0
 		end,
 		quietClear = function(ply) return not IsValid(ply.FakeRagdoll) end,
+		text = function(ply) return CANT_STAND_TEXT[ChatLog.StandUpBlockReason(ply)] or "You can't stand up." end,
 		lines = {"You can't stand up."},
 		recover = "You feel strong enough to stand.",
 	},
@@ -154,8 +170,8 @@ local function UpdateStatus(ply, org, status, levels)
 	levels[status.key] = level
 
 	if level > current then
-		local text = status.lines[math.min(level, #status.lines)]
-		StatusMessage(ply, "hgstatus_" .. status.key .. level, text, BAD_COLOR)
+		local text = status.text and status.text(ply) or status.lines[math.min(level, #status.lines)]
+		if text then StatusMessage(ply, "hgstatus_" .. status.key .. level, text, BAD_COLOR) end
 		return
 	end
 

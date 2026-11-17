@@ -1734,7 +1734,6 @@ else
 
 	function hg.RenderTourniquets(ent, ply)
 		RenderTourniquetModels(ent, ply)
-		if hg.RenderSplints then hg.RenderSplints(ent, ply) end
 	end
 	--end)
 

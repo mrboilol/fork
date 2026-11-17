@@ -36,7 +36,7 @@ if SERVER then
 	end
 
 	function ENT:GetEmbedAngle(normal)
-		local ang = (-normal):Angle()
+		local ang = normal:Angle()
 		ang:RotateAroundAxis(ang:Up(), -90)
 		return ang
 	end

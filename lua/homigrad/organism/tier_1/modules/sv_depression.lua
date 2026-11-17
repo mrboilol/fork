@@ -6,7 +6,7 @@ local hg_selfharm = CreateConVar("hg_selfharm", "1", FCVAR_ARCHIVE + FCVAR_REPLI
 local depression_happiness_cost = 1.5
 
 local depression_max = 1
-local depression_drain_time = 300
+local depression_drain_time = 210
 local depression_drain_calm_mul = 3
 local depression_drain_treated_mul = 3.5
 local depression_treated_gain_mul = 0.25

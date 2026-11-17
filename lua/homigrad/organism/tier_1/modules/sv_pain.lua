@@ -562,7 +562,8 @@ module[2] = function(owner, org, timeValue)
 	local recoveryMul = hg.organism.RecoveryMul(org)
 
 	for _, limb in ipairs({"lleg", "rleg", "rarm", "larm"}) do
-		hg.organism.HealLimbSegments(org, limb, timeValue / 240 * recoveryMul * (hg.GetBandageRegenMultiplier and hg.GetBandageRegenMultiplier(org.owner, limb) or 1))
+		local splinted = hg.IsLimbSplinted and IsValid(org.owner) and hg.IsLimbSplinted(org.owner, limb)
+		hg.organism.HealLimbSegments(org, limb, timeValue / 240 * recoveryMul * (hg.GetBandageRegenMultiplier and hg.GetBandageRegenMultiplier(org.owner, limb) or 1), splinted)
 	end
 
 	if org.chest < 1 then

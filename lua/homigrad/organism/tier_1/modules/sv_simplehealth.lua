@@ -45,6 +45,25 @@ function SimpleHealth.GetState(org)
 	return org and org.simpleMode and org.simple or nil
 end
 
+local function syncTissuePools(org, state)
+	local weights = CONFIG.damage.limbHealth
+	local limbMax = SoftTissue.Config.limbMax
+	local brute, burn = 0, 0
+	for _, limb in ipairs(SoftTissue.LIMBS) do
+		local limbBrute = SoftTissue.Get(org, "brute", limb)
+		local limbBurn = SoftTissue.Get(org, "burn", limb)
+		local total = limbBrute + limbBurn
+		if total > 0 then
+			local scale = math.min(total, limbMax) / total * (weights[limb] or 1)
+			brute = brute + limbBrute * scale
+			burn = burn + limbBurn * scale
+		end
+	end
+
+	state.brute = brute
+	state.burn = burn
+end
+
 function SimpleHealth.AddDamage(org, pool, amount, limb)
 	local state = SimpleHealth.GetState(org)
 	if not state or not amount or amount <= 0 then return 0 end
@@ -53,10 +72,10 @@ function SimpleHealth.AddDamage(org, pool, amount, limb)
 	state.lastDamage = CurTime()
 
 	if LIMB_POOLS[pool] then
-		SoftTissue.Add(org, pool, limb, math.min(amount, CONFIG.poolMax - before))
-		state[pool] = SoftTissue.Total(org, pool)
+		local applied = SoftTissue.Add(org, pool, limb, amount)
+		syncTissuePools(org, state)
 
-		return state[pool] - before
+		return applied
 	end
 
 	state[pool] = math.min(before + amount, CONFIG.poolMax)
@@ -71,7 +90,7 @@ function SimpleHealth.Heal(org, pool, amount, limb)
 	local before = state[pool] or 0
 	if LIMB_POOLS[pool] then
 		SoftTissue.Heal(org, pool, limb, amount)
-		state[pool] = SoftTissue.Total(org, pool)
+		syncTissuePools(org, state)
 
 		return before - state[pool]
 	end
@@ -261,10 +280,24 @@ SimpleHealth.ModuleOverrides.lungs = function(owner, org, timeValue, callback)
 	end
 
 	clearRemovedVitals(org)
-	callback(owner, org, timeValue)
-	clearRemovedVitals(org)
 
 	local state = org.simple
+	local o2 = org.o2
+	local scale = istable(o2) and isnumber(o2.range) and o2.range > 0 and CONFIG.oxy.countdownStart / o2.range
+	local before
+	if state and scale then
+		before = math.max(o2.range - state.oxy / scale, 0)
+		o2[1] = before
+	end
+
+	callback(owner, org, timeValue)
+
+	if before then
+		state.lungOxyRate = math.max(before - o2[1], 0) * scale / math.max(timeValue, 0.001)
+	end
+
+	clearRemovedVitals(org)
+
 	if state then state.airwayBlocked = org.breathObstructed or (org.breathFailed and not org.heartstop) or false end
 end
 
@@ -298,7 +331,7 @@ local function tickOxy(owner, org, state, timeValue)
 	local needleSoft = SimpleHealth.NeedleHoldsSoftCrit(org, state)
 	if (tonumber(org.needle) or 0) > 0 then gainMul = gainMul * oxyConfig.needleGainMul end
 
-	local gain = state.airwayBlocked and oxyConfig.airwayGain or 0
+	local gain = org.heartstop and 0 or state.lungOxyRate or 0
 	if state.lethalCrit then gain = gain + oxyConfig.hardCritGain end
 
 	local overdose, sedative = SimpleHealth.GetOverdose(org)
@@ -330,7 +363,8 @@ end
 
 local function tickRegen(owner, org, state, timeValue)
 	local damageConfig = CONFIG.damage
-	if state.flatline or state.fibrillating or CurTime() - state.lastDamage < damageConfig.passiveDelay then return end
+	if state.flatline or state.fibrillating then return end
+	if (tonumber(org.thiamine) or 0) <= 0 and CurTime() - state.lastDamage < damageConfig.passiveDelay then return end
 
 	SoftTissue.Regen(org, timeValue, damageConfig.passiveBruteRegen, damageConfig.passiveBurnRegen)
 end
@@ -533,8 +567,7 @@ module[2] = function(owner, org, timeValue)
 		if not poolsOnly or SimpleHealth.PoolTickers[tick] then tick(owner, org, state, timeValue) end
 	end
 
-	state.brute = SoftTissue.Total(org, "brute")
-	state.burn = SoftTissue.Total(org, "burn")
+	syncTissuePools(org, state)
 
 	if poolsOnly then
 		state.health = SimpleHealth.GetHealth(state)
@@ -1021,44 +1054,6 @@ end
 
 table.insert(SimpleHealth.Tickers, tickOrgans)
 
-local FRACTURE_LIMBS = {
-	lleg_up = "lleg", lleg_down = "lleg",
-	rleg_up = "rleg", rleg_down = "rleg",
-	larm_up = "larm", larm_down = "larm",
-	rarm_up = "rarm", rarm_down = "rarm",
-	spine3 = "head", skull = "head", jaw = "head",
-}
-
-local FRACTURE_KINDS = {
-	lleg_up = "limb", lleg_down = "limb",
-	rleg_up = "limb", rleg_down = "limb",
-	larm_up = "limb", larm_down = "limb",
-	rarm_up = "limb", rarm_down = "limb",
-	chest = "torso", pelvis = "torso",
-	spine1 = "spine", spine2 = "spine",
-	spine3 = "neck",
-	skull = "skull", jaw = "jaw",
-}
-
-local function tickFractures(owner, org, state)
-	local known = state.fractures
-	local baseline = known == nil
-	if baseline then
-		known = {}
-		state.fractures = known
-	end
-
-	for key, kind in pairs(FRACTURE_KINDS) do
-		local broken = (tonumber(org[key]) or 0) >= 1
-		if broken and not known[key] and not baseline then
-			SimpleHealth.AddDamage(org, "brute", CONFIG.fracture[kind], FRACTURE_LIMBS[key])
-		end
-		known[key] = broken
-	end
-end
-
-table.insert(SimpleHealth.Tickers, tickFractures)
-
 local function abdominalHit(key)
 	return function(original, org, bone, dmg, dmgInfo, ...)
 		local organConfig = CONFIG.organs
@@ -1095,7 +1090,6 @@ SimpleHealth.InputHandlers.chest = function(original, org, bone, dmg, dmgInfo, .
 	local tick = engine.TickCount()
 	if not broken or org.simpleBrokenChestTick == tick then return result, vec end
 
-	SimpleHealth.AddDamage(org, "brute", dmgInfo:GetDamage() * damageConfig.brokenChestDamageMul)
 	org.simpleBrokenChestTick = tick
 
 	return result, vec

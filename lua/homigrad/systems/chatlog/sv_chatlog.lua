@@ -280,8 +280,8 @@ local BLOCKED_LINES = {
 		},
 	},
 	standup_pain = {
-		"You can't stand up, it hurts too much.",
-		"The pain keeps you on the ground!",
+		"I can't stand up, it hurts too much.",
+		"The pain keeps me on the ground!",
 		"IT HURTS TOO MUCH TO STAND!",
 	},
 	standup_spine = {
@@ -296,7 +296,7 @@ local BLOCKED_LINES = {
 	},
 	fix_pain = {
 		"It hurts too much to fix it.",
-		"You can't fix it, the pain is too much!",
+		"I can't fix it, the pain is too much!",
 		"IT HURTS TOO MUCH TO FIX IT!",
 	},
 	fix_arms = {

@@ -738,6 +738,7 @@ local spinal_cord_failure = {
 local spinal_failure_onset = 25
 local spine_heal_time = 480
 local spine_splint_heal_mul = 1.35
+local spine_thiamine_heal_time = 180
 
 function hg.organism.RollSpinalCordFailure(org, name)
 	local chances = spinal_cord_failure[name]
@@ -1390,7 +1391,8 @@ local function damageLungFromRibs(org, brokenRibs)
 
 	local msg = punctured and "A broken rib punctured my lung." or "I felt a broken rib dig into my lung."
 	if hasNewThoughts(org) then
-		sendThought(org, msg, punctured and "thought_ribs_lung" or "thought_ribs_lung_bruise", 4, Color(255, 210, 210))
+		org.injuryThoughtTime = CurTime()
+		deliverThought(org, msg, punctured and "thought_ribs_lung" or "thought_ribs_lung_bruise", 4, Color(255, 210, 210))
 	else
 		notifyOwner(org, msg, 5, "ribs", 4)
 	end
@@ -1429,9 +1431,15 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	org.shock = org.shock + dmg * 1.5
 
 	if org.isPly and (not org.brokenribs or (org.brokenribs ~= math.Round(org.chest * 12))) then
+		local previousRibs = org.brokenribs or 0
 		org.brokenribs = math.Round(org.chest * 12)
-		
+
 		if org.brokenribs > 0 then
+			if org.brokenribs > previousRibs and hasNewThoughts(org) and not org.otrub then
+				org.injuryThoughtTime = CurTime()
+				deliverThought(org, org.brokenribs >= 12 and "Your ribcage is crushed." or "Your ribs are broken.", "thought_ribs_broken", 2, Color(255, 210, 210))
+			end
+
 			damageLungFromRibs(org, org.brokenribs)
 
 			playBoneFractureSound(org.owner)
@@ -1548,8 +1556,36 @@ input_list.spine1 = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoc
 input_list.spine2 = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return spine(org, bone, dmg, dmgInfo, 2, boneindex, dir, hit, ricochet) end
 input_list.spine3 = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return spine(org, bone, dmg, dmgInfo, 3, boneindex, dir, hit, ricochet) end
 
+local function spineThresholds(name)
+	if name == "spine3" then return 1, hg.organism.fake_spine3 or 0.75 end
+
+	return hg.organism["fake_" .. name] or 1
+end
+
+local function thiamineHealSpines(owner, org, timeValue)
+	if (tonumber(org.thiamine) or 0) <= 0 then return end
+
+	local heal = timeValue / spine_thiamine_heal_time * hg.organism.RecoveryMul(org)
+	local crossed = false
+	for _, name in ipairs({"spine1", "spine2", "spine3"}) do
+		local current = tonumber(org[name]) or 0
+		if current > 0 then
+			org[name] = math.max(current - heal, 0)
+			for _, limit in ipairs({spineThresholds(name)}) do
+				crossed = crossed or current >= limit and org[name] < limit
+			end
+		end
+	end
+
+	if crossed and hg.fakeBoneFlop and hg.fakeBoneFlop.ReconcileSpine and hg.fakeBoneFlop.ReconcileSpine(org) then
+		hg.fakeBoneFlop.ScheduleRebuild(owner)
+	end
+end
+
 hook.Add("Org Think", "homigrad_spinal_cord", function(owner, org, timeValue)
 	if not org.alive then return end
+
+	thiamineHealSpines(owner, org, timeValue)
 
 	local anyFull = false
 	for _, name in ipairs({"spine2", "spine3"}) do
