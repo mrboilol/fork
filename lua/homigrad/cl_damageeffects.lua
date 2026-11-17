@@ -22,7 +22,7 @@ net.Receive("damage_flash", function(len)
 end)
 
 hook.Add("HUDPaint", "homigrad_damageeffects", function()
-    if flashUntil <= CurTime() then return end
+    if flashUntil <= CurTime() or not LocalPlayer():Alive() then return end
 
     local fade = math.Clamp((flashUntil - CurTime()) / math.max(flashUntil - flashStarted, 0.001), 0, 1)
     surface.SetDrawColor(255, 255, 255, flashAlpha * fade)

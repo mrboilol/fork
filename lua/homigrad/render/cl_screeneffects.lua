@@ -525,7 +525,7 @@ net.Receive("hg_damage_flash", function()
 end)
 hook.Add("Post Post Pre Post Processing", "HG_DamageFlash", function()
 	local remaining = math.Clamp((damageFlashEnd - CurTime()) / damageFlashDuration, 0, 1)
-	if remaining <= 0 then damageFlashStrength = 0 return end
+	if remaining <= 0 or not LocalPlayer():Alive() then damageFlashStrength = 0 return end
 	local flash = remaining * remaining * damageFlashStrength
 	damageFlashColor["$pp_colour_addr"] = flash * 0.4
 	damageFlashColor["$pp_colour_brightness"] = -flash * 0.05

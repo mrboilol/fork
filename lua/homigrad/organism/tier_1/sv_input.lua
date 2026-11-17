@@ -1288,7 +1288,7 @@ util.AddNetworkString("hg_gore_spray")
 util.AddNetworkString("hg_damage_flash")
 
 function hg.SendDamageFlash(ply, strength, dmgInfo)
-	if not IsValid(ply) or not ply:IsPlayer() then return end
+	if not IsValid(ply) or not ply:IsPlayer() or not ply:Alive() then return end
 	local hitPos = dmgInfo and dmgInfo:GetDamagePosition() or vector_origin
 	if hitPos:IsZero() and dmgInfo then
 		local source = IsValid(dmgInfo:GetInflictor()) and dmgInfo:GetInflictor() or dmgInfo:GetAttacker()

@@ -358,12 +358,8 @@ local function nildoy()
 	local material = getFaceMaterial(alive and isFacePale() and key .. "_pale" or key)
 	if not material then return end
 
-	local shakeX, shakeY
-	if alive then
-		shakeX, shakeY = getFaceShake(size)
-	else
-		shakeX, shakeY = math.sin(RealTime() * faceConfig.deadShakeSpeed) * faceConfig.deadShake * size, 0
-	end
+	local shakeX, shakeY = 0, 0
+	if alive then shakeX, shakeY = getFaceShake(size) end
 	local padding = math.floor(size * FACE_PADDING)
 	surface.SetDrawColor(255, 255, 255, 255)
 	surface.SetMaterial(material)
