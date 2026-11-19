@@ -168,6 +168,14 @@ function I.Handle(d, tr)
 	local alpha = math.Clamp(235 * surf.alpha * (0.7 + 0.3 * min(vol / 0.05, 1)), 90, 255)
 	local wetT = C.Stain.dryBase * ((vol / 0.05) ^ 0.35) / surf.dry
 
+	if ABL.GPU.Land(d, tr, stainVol, stainD * 0.5, vx, vy, vz) then
+		ABL.FlowCore.Move("airborne", "dried", stainVol)
+		DripSound(x, y, z, vol, surf.name == "metal")
+		Remember(x, y, z, nx, ny, nz, K, "gpu")
+		if d.src then ABL.Wounds.Ledger(d.src, up > 0.64 and "ground" or "wall", stainVol) end
+		return
+	end
+
 	local kind
 	if up > 0.64 and not ent then
 		-- the ground (floor-like world surface): ABL's own capped ground stains

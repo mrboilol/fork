@@ -30,7 +30,7 @@ local pain_syncope_start = 65
 local pain_syncope_full = 120
 local pain_syncope_max_rate = 0.03
 local pain_syncope_fight_resistance = 0.5
-local otrub_wake_threshold_delay = 5
+local otrub_wake_threshold_delay = 0
 local otrub_wake_threshold_ramp_time = 50
 local otrub_wake_shock_max = 50
 local otrub_wake_pain_max = 75
@@ -46,6 +46,15 @@ hg.organism.PainConfig = {
 	diminishRange = 50,
 	lightPain = 20,
 	lightDecayMul = 2,
+	habit = {
+		onset = 12,
+		time = 45,
+		maxRelief = 0.55,
+		constantCap = 55,
+		ceiling = 60,
+		spikeLoss = 25,
+		hitLoss = 0.08,
+	},
 	shock = {
 		hardLimit = 100,
 		grace = 3,
@@ -139,6 +148,7 @@ module[1] = function(org)
 	org.shock = 0
 
 	org.pain = 0
+	org.painHabit = 0
 
 	org.avgpain = 0
 
@@ -406,13 +416,26 @@ module[2] = function(owner, org, timeValue)
 	org.avgpain = min(org.avgpain + add, 150)
 
 	if !org.lasthit or org.lasthit + 1 < CurTime() then org.avgpain = max(org.avgpain - sub, 0) end
-	org.avgpain = max(org.avgpain, (org.softPain or 0) * hg.GetPainSeverity())
+	local habit = painConfig.habit
+	local habitLevel = org.painHabit or 0
+	if org.otrub then
+		habitLevel = 0
+	elseif quiet and org.avgpain > 3 and org.avgpain < habit.ceiling and org.painQuiet > habit.onset then
+		habitLevel = min(habitLevel + timeValue / habit.time, 1)
+	elseif org.avgpain >= habit.ceiling then
+		habitLevel = max(habitLevel - timeValue * habit.spikeLoss / 100, 0)
+	elseif not quiet then
+		habitLevel = max(habitLevel - add * habit.hitLoss / 100, 0)
+	end
+	org.painHabit = habitLevel
+	local habitMul = 1 - habitLevel * habit.maxRelief
+	org.avgpain = max(org.avgpain, min((org.softPain or 0) * hg.GetPainSeverity() * habitMul, habit.constantCap))
 
 	org.painlessen = sub
 
 
 
-	org.pain = org.avgpain * math.max(1 - (org.analgesia + org.painkiller * 0.3), 0) / math.max(org.painResistanceMul or 1, 1) * math.max(1 - math.Clamp(adrenaline, 0, 5) * 0.14, 0.3)
+	org.pain = org.avgpain * math.max(1 - (org.analgesia + org.painkiller * 0.3), 0) / math.max(org.painResistanceMul or 1, 1) * math.max(1 - math.Clamp(adrenaline, 0, 5) * 0.14, 0.3) * habitMul
 	if zerlkersDose > 0 or (adrenaline >= 3 and not org.adrenalinePainBreakthrough) then
 		org.pain = math.min(org.pain, 69.99)
 	end

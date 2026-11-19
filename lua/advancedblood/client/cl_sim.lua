@@ -22,6 +22,7 @@ local function Ema(key, v) TM[key] = (TM[key] or 0) * 0.92 + v * 0.08 end
 function ABL.ClearAll(keepDecals)
 	if ABL.Drops then ABL.Drops.Clear() end
 	if ABL.Pools then ABL.Pools.Clear() end
+	if ABL.GPU then ABL.GPU.Clear() end
 	if ABL.Runoff then ABL.Runoff.Clear() end
 	if ABL.FlowWorld then ABL.FlowWorld.Clear() end
 	if ABL.Stains then ABL.Stains.Clear() end

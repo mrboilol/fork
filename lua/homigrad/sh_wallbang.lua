@@ -21,6 +21,8 @@ WB.AdrenalinePerHit = 0.45
 WB.AdrenalineMax = 4
 WB.WoundMul = 1.6
 WB.TerminalBrain = 0.4
+WB.SimpleHeadMul = 8
+WB.SimpleSkullMul = 0.4
 
 local vecUp = Vector(0, 0, 1)
 
@@ -287,8 +289,13 @@ local function impact(ply, wallPos, norm, scale)
 	local brainBefore = org.brain or 0
 	local frontalBefore = org.brainFrontal or 0
 
+	local simple = hg.SimpleHealth and hg.SimpleHealth.GetState(org)
+	local headDamage = 12 * mul * (simple and WB.SimpleHeadMul or 1)
+	local fatal = simple and hg.SimpleHealth.WouldCrit(org, headDamage, DMG_CLUB, "head")
+	local skullMul = simple and WB.SimpleSkullMul or 1
+
 	local otrubBefore = org.needotrub
-	if input.skull then input.skull(org, 0, (oldSkull < 1 and WB.SkullHit * math.Rand(0.7, 1.3) or 0.38) * mul, dmgInfo, nil, -norm) end
+	if input.skull then input.skull(org, 0, (oldSkull < 1 and WB.SkullHit * math.Rand(0.7, 1.3) or 0.38) * mul * skullMul, dmgInfo, nil, -norm) end
 	if oldSkull >= 1 and input.brainFrontal then input.brainFrontal(org, 0, math.Rand(0.1, 0.18) * mul, dmgInfo) end
 	if oldSkull < 1 and (org.skull or 0) >= 1 and not otrubBefore then org.needotrub = false end
 
@@ -337,7 +344,13 @@ local function impact(ply, wallPos, norm, scale)
 	ply:EmitSound("physics/body/body_medium_impact_hard" .. math.random(1, 6) .. ".wav", 70, math.random(90, 105))
 	ply:EmitSound("physics/flesh/flesh_impact_hard" .. math.random(1, 6) .. ".wav", 65, math.random(85, 100), 0.7)
 
+	dmgInfo:SetDamage(headDamage)
 	hook.Run("HomigradDamage", ply, dmgInfo, HITGROUP_HEAD, ply, 4 * mul)
+
+	if fatal then
+		hg.SimpleHealth.Suicide(org)
+		return
+	end
 
 	local braindead = hg.organism.IsBrainDamageIgnored and hg.organism.IsBrainDamageIgnored(org)
 	if oldSkull >= 1 and (scale or 1) >= 1 and not braindead and ply:Alive() then

@@ -72,6 +72,52 @@ local function updateVentricularTachycardia(org, timeValue, o2Value, electricalI
 	end
 end
 
+local function getArrestCauses(org, o2Value, bloodNow, normalBloodVolume, terminalFailure)
+	local bloodLoss = terminalFailure and 1 or Clamp((1 - bloodNow / normalBloodVolume - 0.15) / 0.35, 0, 1)
+	local heartDamage = Clamp((org.heart or 0) / 0.8, 0, 1)
+	local hypoxia = Clamp((12 - (o2Value or 30)) / 12, 0, 1)
+	local pain = Clamp(((org.pain or 0) - 120) / 180, 0, 1) * 0.5
+	return max(bloodLoss, heartDamage), max(hypoxia, pain), hypoxia
+end
+
+local function updateArrestRhythm(org, timeValue, o2Value, bloodNow, normalBloodVolume, terminalFailure)
+	local now = CurTime()
+	local perfusion, electrical, hypoxia = getArrestCauses(org, o2Value, bloodNow, normalBloodVolume, terminalFailure)
+	local rhythm = org.arrestRhythm
+
+	if not rhythm then
+		local shockable = org.fibrillation or org.ventricularTachycardia
+			or org.terminalRhythm == "ventricular_fibrillation" or org.terminalRhythm == "terminal_tachycardia"
+		local peaWeight = perfusion * 1.5
+		org.arrestRhythm = (not shockable and math.Rand(0, 1) < peaWeight / (peaWeight + electrical + 0.2)) and "pea" or "vf"
+		org.arrestRhythmSince = now
+		return
+	end
+
+	local elapsed = now - (org.arrestRhythmSince or now)
+	local roll = math.Rand(0, 1)
+	if rhythm == "vf" then
+		if elapsed < 4 then return end
+		local hazard = 0.0035 + perfusion * 0.06 + Clamp(elapsed - 60, 0, 240) / 240 * 0.01
+		if roll < hazard * timeValue then
+			org.arrestRhythm = "pea"
+			org.arrestRhythmSince = now
+			org.terminalRhythm = nil
+			org.ventricularTachycardia = nil
+		end
+	elseif rhythm == "pea" then
+		if elapsed < 12 then return end
+		if elapsed >= 75 or roll < (0.025 + hypoxia * 0.04 + perfusion * 0.02) * timeValue then
+			org.arrestRhythm = "asystole"
+			org.arrestRhythmSince = now
+		end
+	end
+end
+
+function hg.organism.IsAsystole(org)
+	return org ~= nil and org.heartstop == true and org.arrestRhythm == "asystole"
+end
+
 function hg.organism.UpdateCardiacRhythm(owner, org, timeValue, s)
 	local terminalHeartRate, peaDuration = hg.organism.TERMINAL_HEART_RATE, hg.organism.PEA_DURATION
 	local organSystemsEnabled = s.organSystemsEnabled
@@ -218,8 +264,12 @@ function hg.organism.UpdateCardiacRhythm(owner, org, timeValue, s)
 		org.terminalRhythm = "terminal_tachycardia"
 	end
 	if org.heartstop then
-		if org.terminalRhythm ~= "ventricular_fibrillation" then org.fibrillation = false end
+		updateArrestRhythm(org, timeValue, o2Value, bloodNow, normalBloodVolume, terminalCirculatoryFailure)
+		org.fibrillation = org.arrestRhythm == "vf"
 		org.arrhythmia = math.Approach(org.arrhythmia or 0, 0, timeValue * 0.35)
+	else
+		org.arrestRhythm = nil
+		org.arrestRhythmSince = nil
 	end
 
 	if org.temperature < 34 or org.temperature > 38 or org.blood < 4000 or org.pain > 20 then
@@ -239,26 +289,30 @@ function hg.organism.UpdateCardiacRhythm(owner, org, timeValue, s)
 		end
 
 		local arrestElapsed = math.max(CurTime() - org.cardiacArrestStart, 0)
-		if org.ventricularTachycardia and arrestElapsed < peaDuration then
-			org.heartbeat = org.vtRate or 200
-			org.ecgState = org.ventricularTachycardia == "polymorphic" and "torsades_de_pointes" or "ventricular_tachycardia"
-		elseif org.terminalRhythm == "ventricular_fibrillation" and arrestElapsed < peaDuration then
-			org.heartbeat = 260
-			org.ecgState = "ventricular_fibrillation"
-		elseif org.terminalRhythm == "terminal_tachycardia" and arrestElapsed < peaDuration then
-			org.heartbeat = 180
-			org.ecgState = "terminal_tachycardia"
-		elseif arrestElapsed < peaDuration then
-			local peaTarget = Lerp(math.Clamp(arrestElapsed / peaDuration, 0, 1), 60, 20)
+		local arrestRhythm = org.arrestRhythm
+		if arrestRhythm == "vf" then
+			if org.ventricularTachycardia and arrestElapsed < peaDuration then
+				org.heartbeat = org.vtRate or 200
+				org.ecgState = org.ventricularTachycardia == "polymorphic" and "torsades_de_pointes" or "ventricular_tachycardia"
+			elseif org.terminalRhythm == "terminal_tachycardia" and arrestElapsed < peaDuration then
+				org.heartbeat = 180
+				org.ecgState = "terminal_tachycardia"
+			else
+				org.heartbeat = 260
+				org.ecgState = "ventricular_fibrillation"
+			end
+			if arrestElapsed >= peaDuration then
+				org.terminalRhythm = nil
+				org.ventricularTachycardia = nil
+			end
+		elseif arrestRhythm == "pea" then
+			local peaElapsed = CurTime() - (org.arrestRhythmSince or CurTime())
+			local peaTarget = Lerp(math.Clamp(peaElapsed / 30, 0, 1), 60, 25)
 			org.heartbeat = math.Approach(org.heartbeat or terminalHeartRate, peaTarget, timeValue * 120)
 			org.ecgState = "pea"
 		else
-			org.heartbeat = math.Approach(org.heartbeat or 0, 0, timeValue * 18)
-			org.ecgState = org.heartbeat < 1 and "asystole" or "pea"
-		end
-		if arrestElapsed >= peaDuration then
-			org.terminalRhythm = nil
-			org.ventricularTachycardia = nil
+			org.heartbeat = math.Approach(org.heartbeat or 0, 0, timeValue * 40)
+			org.ecgState = "asystole"
 		end
 
 	else
@@ -270,7 +324,8 @@ function hg.organism.UpdateCardiacRhythm(owner, org, timeValue, s)
 	if org.heartstop and org.terminalCirculatoryFailure and bloodNow <= (tonumber(hg.organism.BLEEDOUT_DEATH_BLOOD) or 2000) and not restartCirculationActive then
 		org.terminalHeartbeat = math.Approach(org.terminalHeartbeat or org.heartbeat or 0, 0, timeValue * 9)
 		org.heartbeat = org.terminalHeartbeat
-		org.ecgState = org.heartbeat < 1 and "asystole" or "pea"
+		org.arrestRhythm = org.heartbeat < 1 and "asystole" or "pea"
+		org.ecgState = org.arrestRhythm
 	else
 		org.terminalHeartbeat = nil
 	end

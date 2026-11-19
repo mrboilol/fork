@@ -419,7 +419,7 @@ if CLIENT then
 		if not hg_newthoughts:GetBool() then return end
 		if lply:IsBerserk() then return end
 
-		if group ~= "emotion" and hg.ChatLog and hg.ChatLog.Narrate then msg = hg.ChatLog.Narrate(msg) end
+		if group ~= "emotion" and group ~= "combat" and hg.ChatLog and hg.ChatLog.Narrate then msg = hg.ChatLog.Narrate(msg) end
 		msg = utf8.force(msg)
 		for _, thought in ipairs(hg.thoughts) do
 			if thought.msg == msg and not thought.finishedAt then return end

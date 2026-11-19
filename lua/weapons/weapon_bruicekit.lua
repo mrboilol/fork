@@ -218,6 +218,8 @@ if SERVER then
 
 		self.modeValues[1] = math.max((self.modeValues[1] or 0) - totalCost, 0)
 
+		if amountHealed > 0 then org.painHabit = 1 end
+
 		if #wrapped > 0 then
 			ent.bandaged_limbs = ent.bandaged_limbs or {}
 			for _, boneName in ipairs(wrapped) do

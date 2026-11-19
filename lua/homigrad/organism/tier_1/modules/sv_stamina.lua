@@ -477,6 +477,38 @@ function hg.organism.AddNaturalAdrenaline(org, fAmount)
 
 end
 
+local trauma_adrenaline_chance = 0.8
+local trauma_adrenaline_chance_dry = 0.55
+local trauma_adrenaline_floor = 1
+local trauma_adrenaline_roll_window = 0.6
+local trauma_adrenaline_skip_roll = 1.5
+
+function hg.organism.AddTraumaAdrenaline(org, fAmount)
+	if org.otrub and not org.heartstop then return end
+
+	local now = CurTime()
+	if (org.adrenaline or 0) < trauma_adrenaline_skip_roll then
+		if now >= (org._traumaAdrenalineRollUntil or 0) then
+			local reserveK = math.Clamp((org.adrenalineStorage or 0) / 5, 0, 1)
+			local chance = Lerp(reserveK, trauma_adrenaline_chance_dry, trauma_adrenaline_chance)
+			org._traumaAdrenalineRollPass = math.random() < chance
+			org._traumaAdrenalineRollUntil = now + trauma_adrenaline_roll_window
+		end
+		if not org._traumaAdrenalineRollPass then return end
+	end
+
+	hg.organism.AddNaturalAdrenaline(org, fAmount)
+
+	if now < (org.betaBlockerUntil or 0) then return end
+	local lacking = trauma_adrenaline_floor - (org.adrenaline or 0)
+	if lacking <= 0 then return end
+
+	org.adrenaline = trauma_adrenaline_floor
+	org._adrenalineHoldUntil = math.max(org._adrenalineHoldUntil or 0, now + 3)
+	org.adrenalineStorage = math.max((org.adrenalineStorage or 0) - lacking, 0)
+	org.nextAdrenalineRegen = now + 30
+end
+
 function hg.organism.RileAnger(org, amount, adrenalineAmount)
 	if not org or not org.alive or org.otrub then return end
 	amount = math.max(amount or 0, 0)
@@ -509,6 +541,12 @@ function entMeta:AddNaturalAdrenaline(fAmount)
 
 	hg.organism.AddNaturalAdrenaline(org, fAmount)
 
+end
+
+function entMeta:AddTraumaAdrenaline(fAmount)
+	local org = self.organism
+	if !org then return end
+	hg.organism.AddTraumaAdrenaline(org, fAmount)
 end
 
 

@@ -264,7 +264,6 @@ function SimpleHealth.GetTargetHeartRate(org, state)
 end
 
 local function clearRemovedVitals(org)
-	org.adrenaline = 0
 	org.hypertension = 0
 	org.hypertensiveEmergency = 0
 
@@ -504,10 +503,12 @@ local function updateCrit(org, state)
 	local needleSoft = healthCrit == CRIT_SOFT and SimpleHealth.NeedleHoldsSoftCrit(org, state)
 	state.crit = (severe or (org.otrub and not needleSoft)) and CRIT_HARD or healthCrit
 	state.displayCrit = severe and CRIT_HARD or healthCrit
+	org.critical = state.displayCrit == CRIT_HARD
 	state.lethalCrit = severe or (org.otrub and healthCrit == CRIT_SOFT and not needleSoft and not isBreathing(state))
 	org.simpleControlMul = state.crit == CRIT_SOFT and CONFIG.softCritControlMul or nil
 
-	if state.crit >= CRIT_SOFT then org.needfake = true end
+	local softCritFree = state.crit == CRIT_SOFT and state.health < 15
+	if state.crit >= CRIT_SOFT and not softCritFree then org.needfake = true end
 	if severe then org.needotrub = true end
 
 	if state.crit ~= previous then
@@ -598,7 +599,28 @@ module[2] = function(owner, org, timeValue)
 	sendState(owner, org)
 end
 
+function SimpleHealth.WouldCrit(org, damage, damageType, limb)
+	local state = SimpleHealth.GetState(org)
+	if not state then return false end
+
+	if bit.band(damageType, TOXIN_TYPES) ~= 0 or bit.band(damageType, BURN_TYPES) ~= 0 or bit.band(damageType, DMG_DROWN) ~= 0 then return false end
+
+	local damageConfig = CONFIG.damage
+	local dmgInfo = DamageInfo()
+	dmgInfo:SetDamageType(damageType)
+	local brute = damage * SoftTissue.GetDamageProfile(dmgInfo) * damageConfig.bruteScale * (damageConfig.limbHealth[limb] or 1)
+
+	return SimpleHealth.GetCritState(SimpleHealth.GetHealth(state) - brute) ~= CRIT_NONE
+end
+
+function SimpleHealth.Suicide(org)
+	if not SimpleHealth.GetState(org) or not org.alive then return end
+
+	die(org, "suicide", "self-inflicted blow")
+end
+
 local function resolveDeathCause(org, state)
+	if org.simpleDeathCause == "suicide" then return "suicide" end
 	if org.fatalBrainDeath and (tonumber(org.spine3) or 0) >= 1 then return "neck" end
 
 	local recent = state.lastDamageTime and CurTime() - state.lastDamageTime <= CONFIG.recentDamageTime
@@ -797,7 +819,15 @@ function SimpleHealth.AddContamination(org, amount)
 	state.contamination = math.min(state.contamination + amount, CONFIG.contamination.max)
 end
 
+local function syncSepsis(org, state)
+	local sepsis = state.contamination
+	org.hemotransfusionshock = sepsis
+	state.sepsisShown = sepsis
+end
+
 local function convertPoisons(owner, org, state)
+	if not state then return end
+
 	local contaminationConfig = CONFIG.contamination
 	local now = CurTime()
 
@@ -811,15 +841,15 @@ local function convertPoisons(owner, org, state)
 		end
 	end
 
-	local shock = tonumber(org.hemotransfusionshock) or 0
-	if shock > 0 then
+	local shock = (tonumber(org.hemotransfusionshock) or 0) - (state.sepsisShown or 0)
+	if shock > 0.0001 then
 		SimpleHealth.AddDamage(org, "toxin", shock * contaminationConfig.wrongBloodToxinPerShock)
 		SimpleHealth.AddContamination(org, shock * contaminationConfig.wrongBloodPerShock)
-		org.hemotransfusionshock = 0
-		if state then state.wrongBloodUntil = now + contaminationConfig.wrongBloodHold end
+		state.wrongBloodUntil = now + contaminationConfig.wrongBloodHold
 	end
 
 	org.sepsisSource = 0
+	syncSepsis(org, state)
 end
 
 table.insert(SimpleHealth.Sanitizers, convertPoisons)
@@ -879,6 +909,8 @@ local function tickToxin(owner, org, state, timeValue)
 	end
 
 	SimpleHealth.Heal(org, "toxin", toxinConfig.regen * (state.toxinRegenMul or 1) * timeValue)
+
+	syncSepsis(org, state)
 end
 
 local function healWorstPools(org, state, amount)

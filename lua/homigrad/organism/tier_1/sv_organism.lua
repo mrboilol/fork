@@ -491,6 +491,7 @@ local function send_organism(org, ply, recipientForce, reliable)
 	sendtable.o2 = org.o2
 	sendtable.CO = org.CO
 	sendtable.co2 = org.co2
+	sendtable.etco2 = org.etco2
 	sendtable.blood = org.blood
 	sendtable.bloodtype = org.bloodtype
 	sendtable.bleed = org.bleed
@@ -819,7 +820,7 @@ local function send_bareinfo(org, force, reliable)
 		"respiratoryArrest", "pneumothorax", "hemothorax", "strokeVolume", "ecgState",
 		"palpitations", "unstableRhythm", "concussion", "nausea", "consciousness", "temperature",
 		"fear", "satiety", "hemotransfusionshock", "weight", "maxweight", "health", "canmove",
-		"brain", "co2", "CO", "bradyapnea", "respiratoryRate", "oxygenIntakeAvailable",
+		"brain", "co2", "etco2", "CO", "bradyapnea", "respiratoryRate", "oxygenIntakeAvailable",
 		"cardiacStressExposure", "hypotensionExposure", "arrhythmiaComplication",
 		"ventricularTachycardia", "terminalRhythm", "rhythmRecoveryUntil", "defibDeathGrace",
 		"softBrute", "softBurn", "muscle", "painStage", "breathLabored"
@@ -1054,6 +1055,11 @@ local function panic_has_gunfight_protection(org)
 	return (org.panicGunfightUntil or 0) > CurTime() and panic_has_usable_firearm(org) and not panic_has_sustained_fear(org)
 end
 
+local function apply_panic_disabled_stress(org, amount)
+	if org.otrub then return end
+	org.fearadd = math.min((org.fearadd or 0) + math.Clamp(amount * 2.5, 0.04, 0.6), 3)
+end
+
 local function panic_threat_adrenaline_spike(org, amount)
 	local spike = math.Clamp(amount * 1.5, panicattack_threat_adrenaline_min, panicattack_threat_adrenaline_max) * hg.organism.GetAdrenalineGainMul(org)
 	org.adrenalineAdd = math.max(org.adrenalineAdd or 0, math.min((org.adrenalineAdd or 0) + spike, panicattack_threat_adrenaline_cap))
@@ -1086,6 +1092,7 @@ function hg.organism.AddPanicAttack(org, amount, silent, combatEvent, ignoreGunf
 		amount = amount - absorbed
 		if amount <= 0 then return org.panicattackadd or 0 end
 	end
+	if not hg_panic:GetBool() and not universalStressApplied then apply_panic_disabled_stress(org, amount) end
 	if not ignoreGunfightProtection and panic_has_gunfight_protection(org) then return org.panicattackadd or 0 end
 	if silent and IsValid(org.owner) and org.owner:IsPlayer() and (org.owner.lastKillTime or 0) > CurTime() - 4 then
 		return org.panicattackadd or 0
@@ -1782,14 +1789,10 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.needotrub = true
 		org.needfake = true
 	end
-	if org.otrub and org.alive and (org.otrubMinUntil or 0) > CurTime() then
-		org.needotrub = true
-	end
 	if org.needotrub and not org.otrub and org.alive and (org.wallbangGritUntil or 0) > CurTime() and (org.consciousness or 0) > 0.04 then
 		org.needotrub = false
 	end
 	local just_went_uncon = not org.otrub and org.needotrub and not org.NoKnockdown
-	if just_went_uncon then org.otrubMinUntil = CurTime() + 5 end
 	local just_woke_up = not org.needotrub and org.otrub
 	if isPly and just_went_uncon then hook.Run("HG_OnOtrub", owner); hook.Run("PlayerDropWeapon", owner) end
 	if isPly and just_woke_up then hook.Run("HG_OnWakeOtrub", owner) end

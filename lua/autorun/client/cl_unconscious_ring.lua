@@ -1,3 +1,30 @@
+local function DrawArc(x, y, radius, thickness, startAng, endAng, segments, color)
+    surface.SetDrawColor(color.r, color.g, color.b, color.a)
+    draw.NoTexture()
+
+    local step = (endAng - startAng) / segments
+    for i = 0, segments - 1 do
+        local a1 = math.rad(startAng + i * step)
+        local a2 = math.rad(startAng + (i + 1) * step)
+        local cos1, sin1 = math.cos(a1), math.sin(a1)
+        local cos2, sin2 = math.cos(a2), math.sin(a2)
+
+        surface.DrawPoly({
+            { x = x + cos1 * (radius - thickness), y = y - sin1 * (radius - thickness) },
+            { x = x + cos1 * radius, y = y - sin1 * radius },
+            { x = x + cos2 * radius, y = y - sin2 * radius },
+            { x = x + cos2 * (radius - thickness), y = y - sin2 * (radius - thickness) }
+        })
+    end
+end
+
+surface.CreateFont("UnconsciousDots", {
+    font = "Bahnschrift",
+    size = 120,
+    weight = 800,
+    antialias = true
+})
+
 surface.CreateFont("HomigradCriticalWarning", {
     font = "Bahnschrift",
     size = ScreenScaleH(14),
@@ -122,7 +149,19 @@ local nearDeathClasses = {
 }
 
 local hg_unconsciousring = CreateClientConVar("hg_unconsciousring", "1", true, false, "Enable unconscious ring", 0, 1)
-local hg_unconsciousclassic = CreateClientConVar("hg_unconsciousclassic", "0", true, false, "Use classic dots instead of EKG line", 0, 1)
+local hg_casualtiesknown = CreateClientConVar("hg_casualtiesknown", "1", true, false, "Show the consciousness circle when unconscious or nearly so", 0, 1)
+
+local PLAYER_ECG_ENABLED = false
+local dyingSpan = 0
+local dyingSeen = 0
+local LOW_CONSCIOUSNESS = 0.4
+local OTRUB_CONSCIOUSNESS = 0.2
+local WAKE_CONSCIOUSNESS = 0.3
+local WAKE_SHOCK_LIMIT = 50
+
+local ringProgress = 0
+local ringStatus = 0
+local dotBeat = 0
 
 local function GetMechanicalPulseStrength(org)
     if not org then return 0 end
@@ -752,6 +791,72 @@ hg = hg or {}
 hg.DrawOrganismECG = DrawEKG
 hg.IsOrganismCirculationCritical = IsCirculationCritical
 
+local ringColorStable = Color(220, 220, 220)
+local ringColorCritical = Color(210, 35, 30)
+local ringColorDying = Color(255, 70, 55)
+local ringDots = {
+    { ".", "..", "..." },
+    { ".!", "..!", "...!" },
+    { "!", "!!", "!!!" },
+}
+
+local function DrawCasualtiesRing(org, alpha, isUnconscious, isCritical, dying, deathStateEnd)
+    local scrW, scrH = ScrW(), ScrH()
+    local centerX, centerY = scrW * 0.5, scrH * 0.5
+    local status = dying and 2 or isCritical and 1 or 0
+    ringStatus = SmoothAlpha(ringStatus, status, 4)
+
+    local consciousness = tonumber(org.consciousness) or 0
+    local simpleHealth = hg.SimpleHealth
+    local simple = org.simpleMode or simpleHealth and simpleHealth.ConVar and simpleHealth.ConVar:GetInt() > 0
+    local wakeConsciousness = simple and simpleHealth.Config and simpleHealth.Config.consciousness.wakeAt or WAKE_CONSCIOUSNESS
+    local target
+    if dying then
+        local now = CurTime()
+        local remaining = deathStateEnd - now
+        if now - dyingSeen > 1 then dyingSpan = 0 end
+        dyingSeen = now
+        dyingSpan = math.max(dyingSpan, remaining)
+        target = math.Clamp(remaining / dyingSpan, 0, 1)
+    elseif isCritical then
+        target = math.Clamp((0.70 - (tonumber(org.brain) or 0)) / 0.68, 0, 1)
+    elseif isUnconscious then
+        local shockProgress = math.Clamp(1 - (tonumber(org.shock) or 0) / WAKE_SHOCK_LIMIT, 0, 1)
+        target = math.min(shockProgress, math.Clamp(consciousness / wakeConsciousness, 0, 1))
+    else
+        target = math.Clamp((consciousness - OTRUB_CONSCIOUSNESS) / (LOW_CONSCIOUSNESS - OTRUB_CONSCIOUSNESS), 0, 1)
+    end
+    ringProgress = math.Approach(ringProgress, target, FrameTime() * 2)
+
+    local base = ringStatus <= 1 and ringColorStable or ringColorCritical
+    local nextColor = ringStatus <= 1 and ringColorCritical or ringColorDying
+    local blend = ringStatus <= 1 and ringStatus or ringStatus - 1
+    local pulse = 1
+    if ringStatus > 1 then
+        pulse = 0.78 + 0.22 * math.abs(math.sin(CurTime() * 5)) * (ringStatus - 1)
+    elseif ringStatus > 0 then
+        pulse = 1 - 0.12 * ringStatus * (0.5 + 0.5 * math.sin(CurTime() * 3))
+    end
+    local r = Lerp(blend, base.r, nextColor.r)
+    local g = Lerp(blend, base.g, nextColor.g)
+    local b = Lerp(blend, base.b, nextColor.b)
+    local a = 255 * alpha * pulse
+
+    surface.SetDrawColor(Lerp(ringStatus / 2, 0, 25), 0, 0, Lerp(ringStatus / 2, 90, 200) * alpha)
+    surface.DrawRect(0, 0, scrW, scrH)
+
+    local radius = math.min(280, scrH * 0.32)
+    local thickness = 12 + math.floor(ringStatus * 3)
+    DrawArc(centerX, centerY, radius, thickness, 0, 360, 60, Color(Lerp(ringStatus / 2, 40, 70), 40 - ringStatus * 15, 40 - ringStatus * 15, 100 * alpha))
+    if ringProgress > 0.002 then
+        DrawArc(centerX, centerY, radius, thickness, 90, 90 - ringProgress * 360, 80, Color(r, g, b, a))
+    end
+
+    dotBeat = math.floor(CurTime() * (dying and 2 or 1)) % 3
+    local dotStatus = dying and 3 or isCritical and 2 or 1
+    draw.SimpleText(ringDots[dotStatus][dotBeat + 1], "UnconsciousDots", centerX, centerY, Color(r, g, b, a), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+end
+
 hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     if not hg_unconsciousring:GetBool() then
         if hg then hg.healthAlarmActive = false end
@@ -821,7 +926,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
 
     -- Asystole can happen while awake. Play its cue once, independent of
     -- whether the unconscious-ring UI is currently visible.
-    if ecgState == "asystole" and not flatlinePlayedThisLife and not (hg_unconsciousclassic and hg_unconsciousclassic:GetBool()) then
+    if ecgState == "asystole" and not flatlinePlayedThisLife then
         EmitRingSound(SOUND_FLATLINE, 1.0)
         flatlinePlayedThisLife = true
     end
@@ -857,7 +962,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     local severeMechanicalPulse = (pulse > 0 and pulse < 45) or pulse > 125
     local abnormalECG = ecgState ~= "normal_sinus"
     local sinusECGTail = UpdateECGStateAlert(ecgState)
-    local showAwakeECG = not isUnconscious and not lowConsciousness
+    local showAwakeECG = PLAYER_ECG_ENABLED and not isUnconscious and not lowConsciousness
         and (abnormalECG or sinusECGTail > 0 or (isCritical and (severeMechanicalPulse or admiring)))
     
 	local unconsciousElapsed = isUnconscious and (CurTime() - (unconsciousStartTime or CurTime())) or 0
@@ -955,8 +1060,13 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     end
     local otrubECGAlpha = (isUnconscious or lowConsciousness) and ecgRingAlpha * ecgMemoryFade or awakeECGAlpha
     local incapPromptX, incapPromptY = ScrW() * 0.5, math.max(ScrH() * 0.1, ScreenScaleH(20))
-    
-    if otrubECGAlpha > 0.01 and not showPulseCheckECG then
+
+    if ringAlpha > 0.01 and not showPulseCheckECG and hg_casualtiesknown:GetBool() then
+        local dying = incapacitated and deathStateEnd and deathStateEnd > CurTime()
+        DrawCasualtiesRing(org, ringAlpha, isUnconscious, isCritical, dying, deathStateEnd)
+    end
+
+    if PLAYER_ECG_ENABLED and otrubECGAlpha > 0.01 and not showPulseCheckECG then
         local scrW, scrH = ScrW(), ScrH()
         local centerX, centerY = scrW * 0.5, scrH * 0.5
         local ecgCenterY = centerY

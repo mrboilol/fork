@@ -90,6 +90,7 @@ local function BuildJob(m, model, mask)
 	local nv = 0
 	local t1, t2, t3, tb, tsg, tskin = {}, {}, {}, {}, {}, {}
 	local tabs = {}
+	local tua, tva, tub, tvb, tuc, tvc, tmat = {}, {}, {}, {}, {}, {}, {}
 	local matNames = {}
 	local nt = 0
 	local work = 0
@@ -153,6 +154,8 @@ local function BuildJob(m, model, mask)
 						if area2 > 1e-8 then
 							nt = nt + 1
 							t1[nt], t2[nt], t3[nt] = ia, ib, ic
+							tua[nt], tva[nt], tub[nt], tvb[nt], tuc[nt], tvc[nt] = A.u or 0, A.v or 0, B.u or 0, B.v or 0, Cc.u or 0, Cc.v or 0
+							tmat[nt] = matName
 							local sn = cx * (nx[ia] + nx[ib] + nx[ic]) + cy * (ny[ia] + ny[ib] + ny[ic]) + cz * (nz[ia] + nz[ib] + nz[ic])
 							tsg[nt] = sn >= 0 and 1 or -1
 							if skin then tskin[nt] = true end
@@ -287,6 +290,7 @@ local function BuildJob(m, model, mask)
 	m.b1, m.w1, m.b2, m.w2, m.b3, m.w3 = b1, w1, b2, w2, b3, w3
 	m.t1, m.t2, m.t3, m.tb, m.tsg, m.tskin = t1, t2, t3, tb, tsg, tskin
 	m.tabs = tabs
+	m.tua, m.tva, m.tub, m.tvb, m.tuc, m.tvc, m.tmat = tua, tva, tub, tvb, tuc, tvc, tmat
 	m.n1, m.n2, m.n3 = n1, n2, n3
 	m.tcx, m.tcy, m.tcz = tcx, tcy, tcz
 	m.boneTris = boneTris
@@ -924,6 +928,13 @@ function BM.BindPoint(m, t, u, v)
 	local w = 1 - u - v
 	return m.vx[a] * w + m.vx[b] * u + m.vx[c] * v, m.vy[a] * w + m.vy[b] * u + m.vy[c] * v, m.vz[a] * w + m.vz[b] * u + m.vz[c] * v
 end
+function BM.TexPoint(m, t, u, v)
+	if not m.tua or not m.tua[t] then return nil end
+	local w = 1 - u - v
+
+	return m.tua[t] * w + m.tub[t] * u + m.tuc[t] * v, m.tva[t] * w + m.tvb[t] * u + m.tvc[t] * v, m.tmat[t]
+end
+
 function BM.WorldDirToBind(pose, bone, dx, dy, dz)
 	local s = pose:Skin(bone)
 	if not s then return nil end

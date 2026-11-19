@@ -807,6 +807,8 @@ local function restoreHeartAfterResuscitation(org, now, resusBloodK)
 	org.heartstop = false
 	if hg.organism.ClearCardiacArrestMechanicalDecay then hg.organism.ClearCardiacArrestMechanicalDecay(org) end
 	org.fibrillation = false
+	org.arrestRhythm = nil
+	org.arrestRhythmSince = nil
 	org.terminalRhythm = nil
 	org.unstableRhythm = nil
 	org.ventricularTachycardia = nil
@@ -851,6 +853,7 @@ end
 function hg.organism.ApplyAEDResuscitation(org)
 	if not org or not org.alive or org.deathStateKilled then return false end
 	if (org.brain or 0) >= 0.85 or (org.heart or 0) >= 1 then return false end
+	if hg.organism.IsAsystole(org) then return false end
 
 	local resusBloodK = getBloodPerfusion(org.blood or 5000)
 	if resusBloodK <= 0.03 then return false end
@@ -862,15 +865,21 @@ function hg.organism.TryRestartHeartWithResuscitation(org, cprDuration)
 	if (org.brain or 0) >= 0.85 or (org.heart or 0) >= 1 then return false end
 
 	local now = CurTime()
-	local hasAED = (org.aedResuscitationUntil or 0) > now
+	local asystole = hg.organism.IsAsystole(org)
+	local hasAED = (org.aedResuscitationUntil or 0) > now and not asystole
 	local hasEpinephrine = (org.epinephrineResuscitationUntil or 0) > now
 	local hasCPR = (org.cprResuscitationUntil or 0) > now
-	if not ((hasAED and (hasEpinephrine or hasCPR)) or (hasEpinephrine and hasCPR)) then return false end
+	if asystole then
+		if not hasEpinephrine then return false end
+	elseif not ((hasAED and (hasEpinephrine or hasCPR)) or (hasEpinephrine and hasCPR)) then
+		return false
+	end
 
 	if (org.resuscitationAttemptUntil or 0) > now then return false end
 	org.resuscitationAttemptUntil = now + 6
 
-	local chance = hasAED and hasCPR and hasEpinephrine and 100
+	local chance = asystole and (hasCPR and 80 or 35)
+		or hasAED and hasCPR and hasEpinephrine and 100
 		or hasAED and hasCPR and 96
 		or hasAED and hasEpinephrine and 92
 		or hasCPR and hasEpinephrine and 84
@@ -914,6 +923,8 @@ module[1] = function(org)
 	org.arrhythmiaComplication = 0
 	org.fibrillation = false
 	org.fibrillationStart = 0
+	org.arrestRhythm = nil
+	org.arrestRhythmSince = nil
 	org.ventricularTachycardia = nil
 	org.nextVTRoll = 0
 	org.myocardialOxygen = 1

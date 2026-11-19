@@ -955,6 +955,10 @@ function P.Deposit(x, y, z, n, vol, surf, ent, kind, dx, dy, dz, K)
 		return
 	end
 	if dx and not ABL.Finite3(dx, dy, dz) then dx = nil end
+	if ABL.GPU.Pour(x, y, z, n, vol, dx, dy, dz) then
+		ABL.FlowCore.Move("pool", "dried", vol)
+		return
+	end
 	if not IsValid(ent) then ent = nil end
 	local p = P.Find(x, y, z, n.x, n.y, n.z, 1.2)
 	if p then P.Feed(p, vol, x, y, z, kind, dx, dy, dz, K) return p end

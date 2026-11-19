@@ -196,7 +196,8 @@ local function ShouldShock(org)
 	local pulse = tonumber(org.pulse) or 0
 	local heartbeat = tonumber(org.heartbeat) or 0
 
-	if org.heartstop or rhythm == "asystole" or rhythm == "pea" then return true end
+	if rhythm == "asystole" then return false end
+	if org.heartstop or rhythm == "pea" then return true end
 	if org.fibrillation or rhythm == "ventricular_fibrillation" or rhythm == "terminal_tachycardia" then return true end
 	if org.ventricularTachycardia or rhythm == "ventricular_tachycardia" or rhythm == "torsades_de_pointes" then return true end
 	if rhythm == "av_block_complete" or rhythm == "ventricular_escape" or rhythm == "junctional_escape" then return output < 0.55 or pulse < 35 end
@@ -498,7 +499,6 @@ local function StartNoShockWarnings(defib, ply, getTarget, uses)
 		return
 	end
 	MarkAEDResuscitation(org)
-	if org and org.heartstop then PlayAEDSound(defib, AEDSounds.asystole, 75, 100, 2) end
 	PlayAEDSound(defib, AEDSounds.noshock)
 
 	timer.Simple(4.5, function()
@@ -706,12 +706,13 @@ function SWEP:AttachDefib(owner, target, ply)
 	local nextHeartbeat = 0
 	local movingSince
 	local fibrillationLoop
-	local asystolePlayed
+	local asystoleLoop
 	local fibrillationStop
 
 	defib:CallOnRemove("DefibCleanup", function()
 		timer.Remove(timerName)
 		if fibrillationLoop then StopAEDLoop(fibrillationLoop) end
+		if asystoleLoop then StopAEDLoop(asystoleLoop) end
 		defib.AEDSoundEmitter = nil
 		if IsValid(activeTarget) then
 			activeTarget.DefibModelEnt = nil
@@ -761,16 +762,15 @@ function SWEP:AttachDefib(owner, target, ply)
 		)
 		if flatline then
 			if fibrillationLoop and not fibrillationStop then fibrillationStop = CurTime() + 0.4 end
-			if not asystolePlayed then
-				PlayAEDSound(defib, AEDSounds.asystole, 75, 100)
-				asystolePlayed = true
-			end
+			asystoleLoop = StartAEDLoop(defib, AEDSounds.asystole, asystoleLoop)
 		elseif org and org.fibrillation then
 			fibrillationStop = nil
-			asystolePlayed = nil
+			StopAEDLoop(asystoleLoop)
+			asystoleLoop = nil
 			fibrillationLoop = StartAEDLoop(defib, AEDSounds.fibrillation, fibrillationLoop)
 		elseif org then
-			asystolePlayed = nil
+			StopAEDLoop(asystoleLoop)
+			asystoleLoop = nil
 			if fibrillationLoop and not fibrillationStop then fibrillationStop = CurTime() + 0.4 end
 		end
 
@@ -784,7 +784,7 @@ function SWEP:AttachDefib(owner, target, ply)
 			BeginAEDShock(defib, ply, function() return activeTarget end, uses)
 		end
 
-		if org and not org.fibrillation and not org.heartstop and (org.heartbeat or 0) > 0 and nextHeartbeat < CurTime() then
+		if org and not org.fibrillation and (not org.heartstop or org.ecgState == "pea") and (org.heartbeat or 0) > 0 and nextHeartbeat < CurTime() then
 			nextHeartbeat = CurTime() + 60 / math.Clamp(org.heartbeat, 30, 220)
 			PlayAEDSound(defib, AEDSounds.heartbeat, 55, 100)
 		end

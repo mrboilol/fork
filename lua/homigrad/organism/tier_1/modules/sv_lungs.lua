@@ -114,6 +114,12 @@ module[1] = function(org)
 
 	org.CO = 0
 	org.co2 = 0
+	org.paco2 = 40
+	org.etco2 = nil
+	org.lactaid = 1
+	org.breathPanic = 0
+	org.tourniquetPoison = 0
+	org.sharpieOnTourniquet = nil
 
 	org.COregen = 0
 	org.fireCOExposure = 0
@@ -528,6 +534,128 @@ local bit_band,util_PointContents = bit.band,util.PointContents
 
 local color_white, color_red, color_red2, color_red3 = Color(255, 255, 255), Color(255, 0, 0), Color(200, 55, 55), Color(255, 100, 100)
 
+local co2Config = {
+	normal = 40,
+	min = 15,
+	max = 110,
+	startAdjust = 45,
+	pressureAdjustion = 0.5,
+	upRate = 0.8,
+	downRate = 1.2,
+	perfusionBlowOffMin = 0.4,
+	driveStart = 42,
+	driveRange = 25,
+	panicStart = 8,
+	panicGain = 0.05,
+	etco2Rate = 8,
+	etco2FlowFull = 0.7,
+	cprMin = 10,
+	cprMax = 20,
+	lactateNormal = 1,
+	lactateMax = 20,
+	lactateClear = 0.01,
+	ischemiaMax = 600,
+	reperfusionLactate = 120,
+	reperfusionCO2 = 60,
+	tourniquetLimbs = {"larm", "rarm", "lleg", "rleg"},
+	amputationKeys = {"larmamputated", "rarmamputated", "llegamputated", "rlegamputated"},
+}
+
+local function countTourniquetHuys(owner)
+	if not hg.GetTourniquetCountOnLimb then return 0 end
+	local count = 0
+	for _, limb in ipairs(co2Config.tourniquetLimbs) do
+		count = count + hg.GetTourniquetCountOnLimb(owner, limb)
+	end
+	return count
+end
+
+local function updateCO2(owner, org, timeValue, ventilating, exerting, staminaValue, metabolismMul)
+	local cfg = co2Config
+	local perfusion = math.Clamp(tonumber(org.circulatoryO2Reserve) or 1, 0, 1)
+	local hypoxia = math.Clamp((15 - (tonumber(org.o2[1]) or 30)) / 15, 0, 1)
+	local seizure = org.seizureActive and 1 or 0
+	local exhausted = exerting and staminaValue < 20 and 1 or 0
+
+	local lactate = math.max(tonumber(org.lactaid) or cfg.lactateNormal, 0)
+	lactate = lactate + timeValue * ((1 - perfusion) * 0.06 + hypoxia * 0.05 + exhausted * 0.03 + seizure * 0.04)
+	lactate = math.Approach(lactate, cfg.lactateNormal, timeValue * math.max(lactate - cfg.lactateNormal, 0) * cfg.lactateClear * perfusion)
+
+	local tourniquets = countTourniquetHuys(owner)
+	local lastCount = org.sharpieOnTourniquet or tourniquets
+	local ischemia = math.min((tonumber(org.tourniquetPoison) or 0) + timeValue * tourniquets, cfg.ischemiaMax)
+	local spike = 0
+	if tourniquets < lastCount then
+		spike = ischemia * (lastCount - tourniquets) / lastCount
+		ischemia = ischemia - spike
+	end
+	org.tourniquetPoison = ischemia
+	org.sharpieOnTourniquet = tourniquets
+	lactate = math.min(lactate + spike / cfg.reperfusionLactate, cfg.lactateMax)
+	org.lactaid = lactate
+
+	local muscle = 0
+	for _, limb in ipairs(hg.SoftTissue.LIMBS) do
+		muscle = muscle + math.Clamp(tonumber(hg.SoftTissue.GetMuscle(org, limb)) or 0, 0, 1)
+	end
+	local lost = 0
+	for _, key in ipairs(cfg.amputationKeys) do
+		if org[key] then lost = lost + 1 end
+	end
+	local temperature = tonumber(org.temperature) or 36.7
+	local production = metabolismMul * (1
+		+ (exerting and Lerp(math.Clamp(staminaValue / 100, 0, 1), 0.8, 0.3) or 0)
+		+ math.Clamp((temperature - 37.5) * 0.1, 0, 0.4)
+		+ seizure * 0.8
+		+ math.Clamp((lactate - 2) * 0.05, 0, 0.4)
+		+ math.min(muscle * 0.08, 0.3)
+		- (org.paralyzed and 0.25 or 0)
+		- lost * 0.06)
+	production = math.max(production, 0.3)
+
+	local lungDamage = (math.Clamp(tonumber(org.lungsL[1]) or 0, 0, 1) + math.Clamp(tonumber(org.lungsR[1]) or 0, 0, 1)) / 2
+	local deadSpace = math.Clamp(lungDamage * 0.5 + (org.pneumothorax or 0) * 0.6 + (org.hemothorax or 0) * 0.5, 0, 0.9)
+	local airway = (org.needle or 0) > 0 and 1 or math.Clamp(1 - (org.trachea or 0) * 0.8, 0.1, 1)
+	local ventilation = 0
+	if ventilating then
+		ventilation = (tonumber(org.respiratoryRate) or 14) / 14 * (org.breathDepth or 1) * (org.breathEfficiency or 1) * airway * (1 - deadSpace)
+			* (1 - math.Clamp(tonumber(org.chest) or 0, 0, 1) * 0.3)
+			* (1 - math.Clamp(tonumber(org.brain) or 0, 0, 1) * 0.6)
+	end
+	local blowOff = ventilation * Lerp(perfusion, cfg.perfusionBlowOffMin, 1)
+
+	local paco2 = math.Clamp(tonumber(org.paco2) or cfg.normal, cfg.min, cfg.max) + spike / cfg.reperfusionCO2
+	if blowOff > 0.05 then
+		local target = math.Clamp(cfg.normal * production / blowOff, cfg.min, cfg.max)
+		paco2 = math.Approach(paco2, target, timeValue * (target > paco2 and cfg.upRate * production or cfg.downRate))
+	else
+		paco2 = paco2 + timeValue * cfg.upRate * production
+	end
+	paco2 = math.Clamp(paco2, cfg.min, cfg.max)
+	org.paco2 = paco2
+
+	local drugDrive = 1 - math.Clamp(tonumber(org.drugRespiratoryDepression) or 0, 0, 1)
+	local chemoDrive = math.max((paco2 - cfg.driveStart) / cfg.driveRange, (lactate - 2) / 6, hypoxia)
+	org.breathPanic = math.Clamp(math.Clamp(chemoDrive, 0, 1) * drugDrive + math.Clamp(tonumber(org.panicattack) or 0, 0, 1) * 0.6, 0, 1)
+
+	local etco2Target = 0
+	if org.heartstop or (tonumber(org.pulse) or 0) <= 0 then
+		if (org.cprSupportUntil or 0) > CurTime() then
+			etco2Target = Lerp(math.Clamp(hg.organism.GetSupportedCirculationFloor(org) / 0.55, 0, 1), cfg.cprMin, cfg.cprMax)
+		end
+	elseif ventilating then
+		local flow = math.Clamp(tonumber(org.cardiacOutput) or perfusion, 0, 1)
+		etco2Target = paco2 * (1 - deadSpace * 0.6) * math.Clamp(flow / cfg.etco2FlowFull, 0, 1)
+	end
+	org.etco2 = math.Approach(tonumber(org.etco2) or etco2Target, etco2Target, timeValue * cfg.etco2Rate)
+
+	local excess = math.Clamp((paco2 - cfg.startAdjust) * cfg.pressureAdjustion, 0, 30)
+	if excess > cfg.panicStart and not org.otrub and hg.organism.AddPanicAttack then
+		hg.organism.AddPanicAttack(org, timeValue * (excess - cfg.panicStart) / (30 - cfg.panicStart) * cfg.panicGain, true)
+	end
+	return excess
+end
+
 ---@param org table<string, any>
 module[2] = function(owner, org, timeValue)
 
@@ -539,6 +667,7 @@ module[2] = function(owner, org, timeValue)
 		o2.curregen = 0
 		org.oxygenIntakeAvailable = false
 		org.lungsfunction = false
+		org.etco2 = 0
 		return
 	end
 
@@ -557,6 +686,9 @@ module[2] = function(owner, org, timeValue)
 		org.respiratoryArrest = false
 		org.circulatoryO2Reserve = 1
 		org.co2 = 0
+		org.paco2 = 40
+		org.etco2 = nil
+		org.breathPanic = 0
 		org._zeroO2Time = 0
 		if org.brain >= 0.7 and org.alive then
 			if hg.organism.KillFatalBrainDamage then
@@ -573,6 +705,9 @@ module[2] = function(owner, org, timeValue)
 		o2.curregen = o2.regen
 		org.exertionO2Debt = 0
 		org.co2 = 0
+		org.paco2 = 40
+		org.etco2 = nil
+		org.breathPanic = 0
 		org.oxygenIntakeAvailable = true
 		org.lungsfunction = true
 		return
@@ -875,10 +1010,11 @@ module[2] = function(owner, org, timeValue)
 
 	local ventilating = success and not org.holdingbreath and not (org.is_sprayed_at or owner:GetNetVar("zableval_masku", false))
 	local co2 = math.Clamp(tonumber(org.co2) or 0, 0, 30)
-	if ventilating then
+	if not org.simpleMode then
+		co2 = updateCO2(owner, org, timeValue, ventilating, activelyExerting, staminaValue, coldOxygenUseMul)
+	elseif ventilating then
 		local gasImpairment = 1 - math.Clamp(lungGasExchange * airwayGasExchange * thoracicGasExchange, 0, 1)
-		local hyperventilation = org.panicattackActive and math.Clamp(org.panicattack or 0, 0, 1) or 0
-		local retention = math.Clamp(bradyapnea * 0.6 + gasImpairment * 0.5 + hyperventilation * 0.4, 0, 1)
+		local retention = math.Clamp(bradyapnea * 0.6 + gasImpairment * 0.5, 0, 1)
 		local co2Target = 30 * retention
 		co2 = math.Approach(co2, co2Target, timeValue * (co2Target > co2 and 0.4 or 0.6))
 	else

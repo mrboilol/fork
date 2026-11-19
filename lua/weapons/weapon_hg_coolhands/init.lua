@@ -194,6 +194,46 @@ local function WhomILookinAt(ply, cone, dist)
 	return
 end
 
+local function RefineFistTrace(owner, Ent, trace, pos)
+	if not IsValid(Ent) or not (Ent:IsPlayer() or Ent:IsNPC() or Ent:IsRagdoll()) then return trace end
+
+	local dir = trace.HitPos - pos
+	if dir:LengthSqr() < 1 then return trace end
+	dir:Normalize()
+
+	local line = util.TraceLine({
+		start = pos,
+		endpos = trace.HitPos + dir * 24,
+		filter = {owner, hg.GetCurrentCharacter(owner)},
+	})
+	if line.Entity == Ent and (line.HitBoxBone ~= nil or (line.PhysicsBone or -1) >= 0) then return line end
+
+	local boneGroups = hg.bonetohitgroup
+	if not boneGroups then return trace end
+
+	local bestBone, bestName, bestDist
+	for name in pairs(boneGroups) do
+		local bone = Ent:LookupBone(name)
+		local matrix = bone and Ent:GetBoneMatrix(bone)
+		if matrix then
+			local dist = matrix:GetTranslation():DistToSqr(trace.HitPos)
+			if not bestDist or dist < bestDist then bestBone, bestName, bestDist = bone, name, dist end
+		end
+	end
+	if not bestBone then return trace end
+
+	local refined = table.Copy(trace)
+	refined.HitBox = nil
+	refined.HitBoxBone = bestBone
+	refined.HitGroup = boneGroups[bestName]
+	if Ent:IsRagdoll() then
+		local physBone = Ent:TranslateBoneToPhysBone(bestBone)
+		if physBone and physBone >= 0 then refined.PhysicsBone = physBone end
+	end
+
+	return refined
+end
+
 function SWEP:Deploy()
 	local owner = self:GetOwner()
 	if not IsFirstTimePredicted() then
@@ -1289,7 +1329,7 @@ function SWEP:AttackFront(special_attack, rand)
                 Dam:SetDamageType((owner.PlayerClassName == "furry" or (Ent:GetClass() == "func_breakable_surf")) and DMG_SLASH or DMG_CLUB)
                 Dam:SetDamagePosition(HitPos)
 				local isClub = special_attack and Dam:GetDamageType() == DMG_CLUB
-				if hg.SetMeleeDamageContact then hg.SetMeleeDamageContact(self, Ent, trace) end
+				if hg.SetMeleeDamageContact then hg.SetMeleeDamageContact(self, Ent, RefineFistTrace(owner, Ent, trace, pos)) end
 				Ent:TakeDamageInfo(Dam)
 				if hg.ClearMeleeDamageContact then hg.ClearMeleeDamageContact(self) end
 				SendCoolHandsHitStop(self, trace.HitNormal, special_attack)

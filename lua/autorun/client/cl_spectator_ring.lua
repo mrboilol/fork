@@ -174,8 +174,6 @@ hook.Add("HUDPaint", "DrawSpectatorUnconsciousRing", function()
         return
     end
     
-    local hg_unconsciousclassic = GetConVar("hg_unconsciousclassic")
-
     local lp = LocalPlayer()
     if not IsValid(lp) then return end
     
@@ -267,24 +265,6 @@ hook.Add("HUDPaint", "DrawSpectatorUnconsciousRing", function()
     DrawArc(centerX, centerY, radius, thickness, 0, 360, 60, Color(40, 40, 40, 100 * ringAlpha))
     DrawArc(centerX, centerY, radius, thickness, 90, 90 - (progress * 360), 80, ringColor)
     
-    if hg_unconsciousclassic and hg_unconsciousclassic:GetBool() then
-        local beat = dotBeat
-        local dotText = ""
-
-        if isCritical then
-            local redDots = {".!", "..!", "...!"}
-            dotText = redDots[beat + 1]
-        else
-            local whiteDots = {".", "..", "..."}
-            dotText = whiteDots[beat + 1]
-        end
-        
-        draw.SimpleText(dotText, "UnconsciousDots", centerX, centerY, dotColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-    else
-        if hg and hg.DrawOrganismECG then
-            hg.DrawOrganismECG(organismEKGState, centerX, centerY, 540, 140, org, dotColor, ringAlpha)
-        else
-            DrawEKG(centerX, centerY, 540, 140, heartRate, org.pulse or 70, dotColor, ringAlpha)
-        end
-    end
+    local dotText = (isCritical and { ".!", "..!", "...!" } or { ".", "..", "..." })[dotBeat + 1]
+    draw.SimpleText(dotText, "UnconsciousDots", centerX, centerY, dotColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 end)

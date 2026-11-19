@@ -435,6 +435,8 @@ function hg.organism.AddGutHitNausea(org, delta, previousDamage, dmg)
 end
 
 function hg.organism.UpdateSepsis(org, mulTime, adrenalineStabilizer)
+	if org.simpleMode then return end
+
 	local bloodLost = max((org.sepsisBloodPrev or org.blood) - org.blood, 0)
 	org.sepsisBloodPrev = org.blood
 

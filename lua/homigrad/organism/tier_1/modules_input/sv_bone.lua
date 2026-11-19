@@ -275,6 +275,18 @@ local function deliverThought(org, msg, key, delay, clr)
 	end
 end
 
+local RIB_WORDS = {"one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven"}
+
+local function describeBrokenRibs(count)
+	if count >= 12 then return "Your whole ribcage is crushed." end
+	if count <= 1 then return "You broke a rib." end
+	local word = RIB_WORDS[count] or tostring(count)
+	if count <= 3 then return "You broke " .. word .. " ribs." end
+	if count <= 6 then return "You broke " .. word .. " ribs, it hurts to move." end
+	if count <= 9 then return "You broke " .. word .. " ribs, your chest is wrecked." end
+	return "You broke " .. word .. " ribs, your ribcage is caving in."
+end
+
 local traumaBurstWindow = 0.3
 local traumaBurstWeight = 2
 
@@ -485,7 +497,7 @@ local function compoundFractureResponse(org, key, region, stabilized)
 		addBoneFracturePain(org, 15, region)
 		org.immobilization = org.immobilization + 15
 	end
-	org.owner:AddNaturalAdrenaline(0.5)
+	org.owner:AddTraumaAdrenaline(0.5)
 	org.fearadd = org.fearadd + 0.5
 
 	if hasNewThoughts(org) then
@@ -515,7 +527,7 @@ local function doDislocate(org, key, dmg, segment)
 		addPain(org, 10, (key == "lleg" or key == "rleg") and "lower" or "body")
 		org.immobilization = org.immobilization + dmg * 3
 	end
-	org.owner:AddNaturalAdrenaline(0.5)
+	org.owner:AddTraumaAdrenaline(0.5)
 	org.fearadd = org.fearadd + 0.5
 
 	if hasNewThoughts(org) then
@@ -614,7 +626,7 @@ local function legs(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 			addBoneFracturePain(org, 10, "lower")
 			org.immobilization = org.immobilization + dmg * 5
 		end
-		org.owner:AddNaturalAdrenaline(1)
+		org.owner:AddTraumaAdrenaline(1)
 		org.fearadd = org.fearadd + 0.5
 
 		if hasNewThoughts(org) then
@@ -650,7 +662,7 @@ local function fractureArmSegment(org, key, segment, dmg, otherBroken)
 		addBoneFracturePain(org, 10, "body")
 		org.immobilization = org.immobilization + dmg * 5
 	end
-	org.owner:AddNaturalAdrenaline(1)
+	org.owner:AddTraumaAdrenaline(1)
 	org.fearadd = org.fearadd + 0.5
 
 	if hasNewThoughts(org) then
@@ -1437,7 +1449,7 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		if org.brokenribs > 0 then
 			if org.brokenribs > previousRibs and hasNewThoughts(org) and not org.otrub then
 				org.injuryThoughtTime = CurTime()
-				deliverThought(org, org.brokenribs >= 12 and "Your ribcage is crushed." or "Your ribs are broken.", "thought_ribs_broken", 2, Color(255, 210, 210))
+				deliverThought(org, describeBrokenRibs(org.brokenribs), "thought_ribs_broken", 2, Color(255, 210, 210))
 			end
 
 			damageLungFromRibs(org, org.brokenribs)
@@ -1517,7 +1529,7 @@ local function upper_limb(org, bone, dmg, dmgInfo, amputate_key, limb_key, segme
 			addBoneFracturePain(org, 10, (limb_key == "lleg" or limb_key == "rleg") and "lower" or "body")
 			org.immobilization = org.immobilization + d * 5
 		end
-		org.owner:AddNaturalAdrenaline(1)
+		org.owner:AddTraumaAdrenaline(1)
 		org.fearadd = org.fearadd + 0.5
 
 		if hasNewThoughts(org) then

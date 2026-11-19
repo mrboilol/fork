@@ -19,6 +19,18 @@ local BLEED_CONCERN_RATE = 1.5
 local BLEED_CONCERN_BLOOD = 4500
 local BLEED_WORSEN_DELTA = 0.75
 
+local CHRONIC_INJURY_MIN = 0.25
+local CHRONIC_RISE_TIME = 60
+local CHRONIC_FALL_TIME = 90
+local CHRONIC_TREATED_RISE_MUL = 0.25
+local CHRONIC_HAPPINESS_PENALTY = 0.6
+local CHRONIC_IRRITABLE_START = 0.3
+local CHRONIC_ANGER_RATE = 0.014
+local CHRONIC_ANGER_CAP = 0.2
+local CHRONIC_DEPRESSION_START = 0.6
+local CHRONIC_DEPRESSION_RATE = 0.006
+local CHRONIC_DEPRESSION_CAP = 0.2
+
 local WOUND_RANK = {hurt = 1, broken = 2, bloodloss = 3, bleeding = 3, bleedingBad = 4}
 local WOUND_LINES = {
 	hurt = {
@@ -62,6 +74,10 @@ local WOUND_LINES = {
 	},
 }
 
+local function Clamp01(value)
+    return math.Clamp(tonumber(value) or 0, 0, 1)
+end
+
 local function GetGoodMoodGainMultiplier(org)
     local depression = math.Clamp(tonumber(org.depression) or 0, 0, 1)
     local panic = math.Clamp(tonumber(org.panicattack) or 0, 0, 1)
@@ -69,7 +85,7 @@ local function GetGoodMoodGainMultiplier(org)
     if depression > 0.05 then mul = math.Clamp(1 - depression * 1.6, 0.05, 0.9) end
     if panic > 0.05 then mul = mul * math.Clamp(1 - panic * 1.5, 0, 1) end
 
-    return mul
+    return mul * (1 - Clamp01(org.chronicStrain) * CHRONIC_HAPPINESS_PENALTY)
 end
 
 local function AbsorbFear(org)
@@ -174,6 +190,7 @@ end
 function hg.organism.AddHappiness(org, amount)
     if not org or not isnumber(amount) or amount <= 0 then return end
     if org.buddyNear and hg.Buddy then amount = amount * hg.Buddy.Config.happinessMul end
+    amount = amount * (1 - Clamp01(org.chronicStrain) * CHRONIC_HAPPINESS_PENALTY)
 
     local depression = math.Clamp(tonumber(org.depression) or 0, 0, 1)
     local eased = math.min(depression, amount)
@@ -197,6 +214,27 @@ module[1] = function(org)
     org.woundThoughtNext = nil
     org.woundThoughtEscalate = nil
     org.bleedTrendBase = nil
+    org.chronicStrain = 0
+end
+
+local function updateChronicStrain(owner, org, timeValue, injury)
+    local strain = Clamp01(org.chronicStrain)
+    if injury >= CHRONIC_INJURY_MIN and not org.otrub then
+        local treated = math.Clamp(math.max(tonumber(org.analgesia) or 0, (tonumber(org.painkiller) or 0) * 0.4), 0, 1)
+        strain = strain + timeValue / CHRONIC_RISE_TIME * injury * Lerp(treated, 1, CHRONIC_TREATED_RISE_MUL)
+    else
+        strain = strain - timeValue / CHRONIC_FALL_TIME
+    end
+    org.chronicStrain = Clamp01(strain)
+
+    if org.chronicStrain >= CHRONIC_IRRITABLE_START and (org.anger or 0) < CHRONIC_ANGER_CAP then
+        org.anger = math.min((org.anger or 0) + timeValue * CHRONIC_ANGER_RATE * org.chronicStrain, CHRONIC_ANGER_CAP)
+    end
+
+    if org.chronicStrain >= CHRONIC_DEPRESSION_START and (tonumber(org.depression) or 0) < CHRONIC_DEPRESSION_CAP and hg.organism.AddDepression then
+        local weight = (org.chronicStrain - CHRONIC_DEPRESSION_START) / (1 - CHRONIC_DEPRESSION_START)
+        hg.organism.AddDepression(org, timeValue * CHRONIC_DEPRESSION_RATE * weight)
+    end
 end
 
 module[2] = function(owner, org, timeValue)
@@ -285,6 +323,7 @@ module[2] = function(owner, org, timeValue)
     end
 
     local injury, woundKind = getInjury(org)
+    updateChronicStrain(owner, org, timeValue, injury)
     local cap = 1 - injury
     if goodmood_add > 0 then
         goodmood_add = math.min(goodmood_add, math.max(cap - org.goodmood, 0))

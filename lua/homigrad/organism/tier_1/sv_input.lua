@@ -645,6 +645,22 @@ local hitgrouptolimb = {
 	[HITGROUP_RIGHTARM] = "rarm",
 }
 
+local function injuredPartPainMul(org, hitgroup)
+	local limb = hitgrouptolimb[hitgroup]
+	local bone = 0
+	if limb then
+		local up, down = hg.GetLimbSegmentDamage(org, limb)
+		bone = math.max(up, down)
+		if org[limb .. "_up_disl"] or org[limb .. "_down_disl"] or org[limb .. "dislocation"] then bone = math.max(bone, 0.6) end
+	end
+
+	local soft = 0
+	local softLimb = hg.SoftTissue and hg.SoftTissue.HITGROUP_LIMBS[hitgroup]
+	if softLimb then soft = math.Clamp(hg.SoftTissue.GetLimb(org, softLimb) / hg.SoftTissue.Config.limbMax, 0, 1) end
+
+	return math.min(1 + bone * 1.5 + soft * 1.0, 3)
+end
+
 hg.bonetohitgroup = bonetohitgroup
 
 function hg.SetMeleeDamageContact(inflictor, ent, trace, forceHead, trauma)
@@ -1002,7 +1018,7 @@ function hg.organism.AmputateLimb(org, limb, noShake, dmgInfo)
 	org.immobilization = math.min((org.immobilization or 0) + 45, 100)
 	org.fearadd = math.min((org.fearadd or 0) + 2, 3)
 	if IsValid(org.owner) and org.owner:IsPlayer() and org.owner:Alive() then
-		org.owner:AddNaturalAdrenaline(1)
+		org.owner:AddTraumaAdrenaline(1)
 		if hg.QueuePainScream and (not hg.organism.CanFeelPain or hg.organism.CanFeelPain(org, region)) then hg.QueuePainScream(org.owner, 2) end
 		if hg.LightStunPlayer then hg.LightStunPlayer(org.owner, 3) end
 	end
@@ -2183,7 +2199,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	instaPain = instaPain * armMit
 	immobilization = immobilization * armMit
 	if not org.otrub and org.adrenalineAdd >= 0 then
-		org.owner:AddNaturalAdrenaline(instaPain * 0.75 * (dmgInfo:IsDamageType(DMG_BLAST) and 4 or 1)
+		org.owner:AddTraumaAdrenaline(instaPain * 0.75 * (dmgInfo:IsDamageType(DMG_BLAST) and 4 or 1)
 			* (dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) and 4 or 1))
 	end
 	
@@ -2197,7 +2213,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		attacker.harm = (attacker.harm or 0) + bleed_add / 50
 		local hurt_add = dmgHurt * 0.5 * hurtMul
 		org.hurtadd = org.hurtadd + hurt_add
-		local painadd = dmgHurt * painMul * 0.75 * (org.painresist or 1)
+		local painadd = dmgHurt * painMul * 0.75 * (org.painresist or 1) * injuredPartPainMul(org, hitgroup)
 		local instantPainMul = 0.2
 		local instant_pain = (instantPainMul or 0) * painadd
 		local slow_pain = (1 - (instantPainMul or 0)) * painadd

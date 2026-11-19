@@ -78,6 +78,10 @@ Breathing.Sources = {
 		efficiency = 0.7,
 		cough = 0.5,
 	},
+	breathPanic = {
+		value = function(org) return unit(org.breathPanic) end,
+		rate = 16,
+	},
 }
 
 local function due(org, key, interval)

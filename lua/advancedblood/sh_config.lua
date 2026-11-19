@@ -28,6 +28,7 @@ if CLIENT then
 		newBlood    = ConVarExists("hg_old_blood") and GetConVar("hg_old_blood") or CreateClientConVar("hg_old_blood", "1", true, false, "1 = AdvancedBlood system, 0 = old Z-City blood particles and decals", 0, 1),
 		quality     = CreateClientConVar("abl_quality", "3", true, false, "0 = low, 1 = medium, 2 = high, 3 = ultra, 4 = extreme.", 0, 4),
 		budget      = CreateClientConVar("abl_budget_ms", "2.5", true, false, "Target CPU milliseconds per frame for the blood simulation.", 0.3, 20),
+		gpu         = CreateClientConVar("abl_gpu", "1", true, false, "Simulate floor/wall pools and relief-following trickles on the GPU with ABL's own shaders (0 = CPU pool and runoff simulation).", 0, 1),
 		simHz       = CreateClientConVar("abl_sim_hz", "165", true, false, "Target update rate (Hz) of high-priority blood (near, visible); lowered automatically when over abl_budget_ms.", 30, 240),
 		maxDrops    = CreateClientConVar("abl_max_droplets", "1000", true, false, "Hard cap: simulated droplets.", 16, 4000),
 		maxBlobs    = CreateClientConVar("abl_max_blobs", "120", true, false, "Hard cap: body-surface blobs.", 8, 1000),

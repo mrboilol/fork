@@ -1250,6 +1250,18 @@ local function draw_bar()
 			table.insert(segs, {label = "BP", val = systolic .. "/" .. diastolic, suf = "", ratio = math.Clamp(map / 110, 0, 1), col = pressureColor, w = math_floor(92 * scale), icon = "pulse", prio = 5})
 		end
 	end
+
+	local etco2 = tonumber(org.etco2)
+	if etco2 then
+		smooth.etco2 = Lerp(s * dt, smooth.etco2 or etco2, etco2)
+		local etco2Val = math_floor(smooth.etco2 + 0.5)
+		if etco2Val < 35 or etco2Val > 45 then
+			local etco2Color = (etco2Val < 20 or etco2Val > 55) and Color(255, 70, 70) or Color(255, 165, 65)
+			table.insert(segs, {label = "ETCO2", val = "ETCO2 " .. etco2Val, suf = "", ratio = math.Clamp(etco2Val / 60, 0, 1), col = etco2Color, w = math_floor(92 * scale), icon = "o2", prio = 6})
+		end
+	else
+		smooth.etco2 = nil
+	end
 	
 	if #segs == 0 then return end
 	

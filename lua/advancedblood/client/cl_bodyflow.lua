@@ -95,6 +95,12 @@ end
 -- Seeped blood arriving at a wound.
 function F.Feed(src, wd, vol)
 	if not ABL.GoodVol(vol) then return end
+	if ABL.GPU.BodyFeed(src, wd, vol) then
+		FC.Release("dried", vol)
+		src.lbk = (src.lbk or 0) + vol
+		ABL.Wounds.Ledger(src, "onBody", vol)
+		return
+	end
 	-- (as a continuous liquid: cl_flowcore.lua; what follows is the older bead model)
 	if FC.Uses(src) then return FC.Feed(src, wd, vol) end
 	local b = wd.bead
@@ -147,6 +153,11 @@ local function AddBead(src, bone, x, y, z, vol, vx, vy, vz)
 end
 function F.AddAt(src, bone, x, y, z, vol, vx, vy, vz)
 	if not ABL.GoodVol(vol) or not ABL.InWorld(x, y, z) then return false end
+	if ABL.GPU.BodyAdd(src, bone, x, y, z, vol) then
+		FC.Move("airborne", "dried", vol)
+		src.lbk = (src.lbk or 0) + vol
+		return true
+	end
 	if FC.Uses(src) then return FC.AddAt(src, bone, x, y, z, vol, vx, vy, vz) end
 	if not AddBead(src, bone, x, y, z, vol, vx, vy, vz) then return false end
 	FC.Move("airborne", "surface", vol)

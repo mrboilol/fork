@@ -21,6 +21,15 @@ local depression_untreated_bleed_delay = 45
 local depression_stages = {0.25, 0.6, 0.85}
 local depression_succumb_max = 0.3
 local depression_calm_dying = 0.2
+local depression_panic_strain = {
+	suppressedPanic = 0.2,
+	suppressedStart = 20,
+	suppressedRamp = 20,
+	suppressedGain = 0.025,
+	overPanic = 0.75,
+	overGain = 0.035,
+	recoverMul = 2,
+}
 
 local selfharm_threshold = 0.6
 local selfharm_roll_time_min = 5
@@ -107,11 +116,21 @@ local function isDepressionImmune(org)
 	return IsValid(owner) and owner.HasTrait and owner:HasTrait("apathetic")
 end
 
+local GOOD_EMOTION_IDS = {
+	witness_hope = true,
+	witness_relief = true,
+	buddy_heal = true,
+	emotion_chance = true,
+	emotion_disarm = true,
+}
+local GOOD_EMOTION_COLOR = Color(110, 170, 255)
+
 local function showDepressionThought(owner, text, duration, id)
+	local clr = GOOD_EMOTION_IDS[id] and GOOD_EMOTION_COLOR or nil
 	if owner:GetInfoNum("hg_newthoughts", 0) > 0 then
-		owner:Thought(text, duration, id, 0)
+		owner:Thought(text, duration, id, 0, clr)
 	else
-		owner:Notify(text, duration, id, 0)
+		owner:Notify(text, duration, id, 0, nil, clr)
 	end
 end
 
@@ -437,6 +456,7 @@ local function clearDepression(owner, org)
 	org.depressionNextDarkThought = nil
 	org.depressionNextMinigamePhrase = nil
 	org.depressionUntreatedBleedSince = nil
+	org.depressionPanicStrain = nil
 	org.selfharmPendingUntil = nil
 	if owner:IsPlayer() then owner:SetNWFloat("rem_selfharm_pending", 0) end
 end
@@ -507,6 +527,21 @@ module[2] = function(owner, org, timeValue)
 		local applied = min(org.depressionadd, timeValue / 5)
 		org.depressionadd = max(org.depressionadd - applied, 0)
 		add = add + applied
+	end
+
+	local strainConfig = depression_panic_strain
+	local panic = Clamp(tonumber(org.panicattack) or 0, 0, 1)
+	local strain = org.depressionPanicStrain or 0
+	if not org.otrub and (org.panicGunfightUntil or 0) > now and panic >= strainConfig.suppressedPanic then
+		strain = strain + timeValue
+	else
+		strain = max(strain - timeValue * strainConfig.recoverMul, 0)
+	end
+	org.depressionPanicStrain = strain
+	if not org.otrub then
+		add = add + strainConfig.suppressedGain * Clamp((strain - strainConfig.suppressedStart) / strainConfig.suppressedRamp, 0, 1) * timeValue
+		add = add + strainConfig.overGain * Clamp((panic - strainConfig.overPanic) / (1 - strainConfig.overPanic), 0, 1) * timeValue
+		if add > 0 and not org.depressionCause then org.depressionCause = "fight" end
 	end
 
 	local adrenaline = org.adrenaline or 0
@@ -586,6 +621,17 @@ function hg.organism.AddDepression(org, amount, cause)
 	if not isnumber(amount) or amount <= 0 then return org.depressionadd or 0 end
 	if hg.GetPsycheTraining then amount = amount * Lerp(hg.GetPsycheTraining(org.owner), 1, hg.PsycheCombat.trainedDepressionMul) end
 	if org.buddyNear and hg.Buddy then amount = amount * (1 - hg.Buddy.Config.moodResist) end
+
+	if not hg_depression:GetBool() and cause and cause ~= "dying" then
+		local K = hg.PsycheCombat
+		local current = org.adrenalineAdd or 0
+		if current >= 0 and current < K.noDepressionSurgeCap then
+			org.adrenalineAdd = min(current + amount * K.noDepressionSurge, K.noDepressionSurgeCap)
+		end
+		org.goodmood = max(Clamp(tonumber(org.goodmood) or 1, 0, 1) - amount * K.noDepressionHappinessCost, 0)
+		org.witnessTrauma = min(hg.organism.GetWitnessTrauma(org) + amount * K.noDepressionTraumaGain, 1)
+		org.witnessTraumaAt = CurTime()
+	end
 
 	org.depressionadd = Clamp((org.depressionadd or 0) + amount, 0, depression_max)
 	if cause then org.depressionCause = cause end
