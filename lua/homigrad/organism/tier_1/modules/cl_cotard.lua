@@ -87,7 +87,6 @@ hook.Add("RenderScreenspaceEffects", "CotardEffects", function()
 	DrawToyTown(2, ScrH() * math.Clamp(0.04 + tunnel * 0.22, 0.04, 0.28))
 	render.SetMaterial(vignette)
 	render.DrawScreenQuad()
-	DrawSharpen(1, math.Clamp(0.08 + tunnel * 0.75, 0, 0.8))
 end)
 
 hook.Add("SetupWorldFog", "CotardWorldFog", function()

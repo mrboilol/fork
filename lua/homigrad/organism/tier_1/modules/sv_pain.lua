@@ -200,6 +200,8 @@ module[2] = function(owner, org, timeValue)
 	local adrenalineMul = min(max(1 + org.adrenaline, 1), 1.2)
 
 	local adrenaline = org.adrenaline
+	local anger = Clamp(tonumber(org.anger) or 0, 0, 1)
+	local painAdrenaline = adrenaline * (1 + anger * 1.5)
 	local zerlkersDose = math.Clamp(tonumber(org.zerlkers) or 0, 0, 4)
 	if zerlkersDose > 0 then
 		zerlkersDose = math.max(zerlkersDose - timeValue / 120, 0)
@@ -241,8 +243,8 @@ module[2] = function(owner, org, timeValue)
 	
 
 	local shockDecayMul = 1.5 + math.Clamp((org.shock - 25) / 15, 0, 1) * 1.5 + math.Clamp((org.shock - 40) / 30, 0, 1) ^ 2 * 5
-	if !org.lasthit or org.lasthit + 1.5 < CurTime() then org.shock = max(org.shock - timeValue * 4 * shockDecayMul * (org.otrub and 1 or 0.5) * (1 + resilience * 0.75 + zerlkersResistance * 2.25 + math.Clamp(adrenaline, 0, 5) * 0.6), 0) end
-	if adrenaline > 0 then org.shock = max(org.shock - timeValue * math.Clamp(adrenaline, 0, 5) * 0.9, 0) end
+	if !org.lasthit or org.lasthit + 1.5 < CurTime() then org.shock = max(org.shock - timeValue * 4 * shockDecayMul * (org.otrub and 1 or 0.5) * (1 + resilience * 0.75 + zerlkersResistance * 2.25 + math.Clamp(painAdrenaline, 0, 5) * 0.6), 0) end
+	if adrenaline > 0 then org.shock = max(org.shock - timeValue * math.Clamp(painAdrenaline, 0, 5) * 0.9, 0) end
 	org.immobilization = math.Clamp(max((tonumber(org.immobilization) or 0) - timeValue * 5 * adrenalineMul, 0), 0, 100)
 
 	local spine2Broken = (org.spine2 or 0) >= (hg.organism.fake_spine2 or 1)
@@ -251,25 +253,25 @@ module[2] = function(owner, org, timeValue)
 	local queuedHeadPain = math.min(timeValue * 15, org.headpainadd or 0)
 	local add = org.otrub and 0 or (spine3Broken and 0 or (spine2Broken and queuedHeadPain or queuedPain + queuedHeadPain))
 	local quiet = add <= 0.2
-	org.painQuiet = quiet and math.min((org.painQuiet or 0) + timeValue, 60) or 0
+	org.painQuiet = quiet and adrenaline <= 0.5 and math.min((org.painQuiet or 0) + timeValue, 60) or 0
 	local severity = 1 + Clamp(org.avgpain / 100, 0, 1.5)
 	local persistMul
 	if org.otrub then
 		persistMul = 1
 	elseif adrenaline > 0.5 then
-		persistMul = 0.12 / (severity * (1 + Clamp(adrenaline, 0, 5) * 0.5))
+		persistMul = 0
 	else
 		local settle = math.Clamp((org.painQuiet - pain_linger_time) / pain_settle_time, 0, 1)
 		persistMul = Lerp(settle, pain_linger_mul, pain_settle_mul) / severity
 	end
 	local sub = quiet and (timeValue * pain_drain_base * persistMul * (org.otrub and pain_drain_otrub_mul or 1) + timeValue * ((org.painkiller * 0.3 + org.analgesia) * 4)) or (0)
 
-	local adrenalinePainPacing = hg.organism.GetAdrenalinePainPacing(adrenaline)
+	local adrenalinePainPacing = hg.organism.GetAdrenalinePainPacing(adrenaline > 0.5 and painAdrenaline or adrenaline)
 	if adrenaline > 0.5 and add > 0 then
 		org.adrenalinePainStart = org.adrenalinePainStart or CurTime()
 		local elapsed = CurTime() - org.adrenalinePainStart
-		if not org.adrenalinePainBreakthrough and elapsed > 30 + adrenaline * 4
-			and math.random() < math.min(timeValue * 0.12 / (1 + adrenaline), 1) then
+		if not org.adrenalinePainBreakthrough and elapsed > 30 + painAdrenaline * 4
+			and math.random() < math.min(timeValue * 0.12 / (1 + painAdrenaline), 1) then
 			org.adrenalinePainBreakthrough = true
 		end
 	else
@@ -303,7 +305,7 @@ module[2] = function(owner, org, timeValue)
 
 		org.disorientation = math.max(org.pain / 50, org.disorientation)//org.disorientation + add
 
-		org.shock = min(org.shock + timeValue * (org.pain - painConfig.stages[3]) * pain_shock_gain / (1 + max(adrenaline, 0) * 0.45), 95)
+		org.shock = min(org.shock + timeValue * (org.pain - painConfig.stages[3]) * pain_shock_gain / (1 + max(painAdrenaline, 0) * 0.45), 95)
 
 		org.fearadd = 1
 
@@ -435,8 +437,8 @@ module[2] = function(owner, org, timeValue)
 
 
 
-	org.pain = org.avgpain * math.max(1 - (org.analgesia + org.painkiller * 0.3), 0) / math.max(org.painResistanceMul or 1, 1) * math.max(1 - math.Clamp(adrenaline, 0, 5) * 0.14, 0.3) * habitMul
-	if zerlkersDose > 0 or (adrenaline >= 3 and not org.adrenalinePainBreakthrough) then
+	org.pain = org.avgpain * math.max(1 - (org.analgesia + org.painkiller * 0.3), 0) / math.max(org.painResistanceMul or 1, 1) * math.max(1 - math.Clamp(painAdrenaline, 0, 5) * 0.14, Lerp(anger, 0.3, 0.12)) * habitMul
+	if zerlkersDose > 0 or (painAdrenaline >= 3 and not org.adrenalinePainBreakthrough) then
 		org.pain = math.min(org.pain, 69.99)
 	end
 	org.rawPain = org.pain

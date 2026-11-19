@@ -275,7 +275,7 @@ local function Ragdoll_CreateInternal(ply)
 		
 		--print(ragdoll:GetBoneName(ragdoll:TranslatePhysBoneToBone(hg.cachedmodels[model][ragdoll:GetBoneName(bone)])),ragdoll:GetBoneName(bone),IdealMassPlayer[ragdoll:GetBoneName(bone)])
 		
-		phys:SetMass(IdealMassPlayer[ragdoll:GetBoneName(bone)] or 4)
+		phys:SetMass(hg.RagdollBoneMass(ragdoll:GetBoneName(bone), ragdoll, ply) or IdealMassPlayer[ragdoll:GetBoneName(bone)] or 4)
 		pendingReactionForce = pendingReactionForce + vel
 
 		--phys:SetContents(bit.band(phys:GetContents(), bit.bnot(MASK_SHOT)))
@@ -360,7 +360,7 @@ local function Ragdoll_CreateInternal(ply)
 								local phys = ragdoll:GetPhysicsObjectNum(physNum)
 								local bone = ragdoll:TranslatePhysBoneToBone(physNum)
 								if IsValid(phys) and isnumber(bone) and bone >= 0 then
-									phys:SetMass(IdealMassPlayer[ragdoll:GetBoneName(bone)] or 4)
+									phys:SetMass(hg.RagdollBoneMass(ragdoll:GetBoneName(bone), ragdoll) or IdealMassPlayer[ragdoll:GetBoneName(bone)] or 4)
 								end
 							end
 						end

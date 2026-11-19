@@ -27,7 +27,7 @@ SimpleHealth.ConVar = ConVarExists("hg_simplehealth") and GetConVar("hg_simplehe
 	"hg_simplehealth",
 	"0",
 	FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY,
-	"0 = Homigrad organism, 1 = simple health, 2 = simple health + simplified organs (applies on next spawn)",
+	"0 = Homigrad organism, 1 = simple health, 2 = simple health + simplified organs (changing it fully resets every living player's organism)",
 	0,
 	2
 )
@@ -36,7 +36,7 @@ SimpleHealth.Config = {
 	maxHealth = 100,
 	poolMax = 200,
 	softCritHealth = 5,
-	hardCritHealth = -100,
+	hardCritHealth = -50,
 	deathHealth = -100,
 	spike = {
 		window = 2,
@@ -132,6 +132,8 @@ SimpleHealth.Config = {
 		airwayDrain = 0.12,
 		flatlineDrain = 0.12,
 		wakeAt = 0.2,
+		hardCritFloor = 0.25,
+		depthDrain = 0.04,
 	},
 
 	temperature = {
@@ -236,11 +238,18 @@ SimpleHealth.Config = {
 		softCritStrength = 0.8,
 		softCritColor = Color(150, 0, 0),
 		softCritPulseSpeed = 2.2,
+		critDepthStart = 40,
+		critDepthExponent = 1.4,
+		critStrengthMax = 2.4,
+		critDesaturate = 0.85,
+		critDarken = 0.3,
+		critDofIntensity = 4,
 		damageTintMin = 25,
-		traumaVignetteStart = 60,
-		traumaVignetteFull = 100,
-		traumaVignetteStrength = 0.7,
-		traumaVignetteColor = Color(190, 0, 0),
+		traumaVignetteStart = 20,
+		traumaVignetteFull = 120,
+		traumaVignetteExponent = 1.1,
+		traumaVignetteStrength = 1.3,
+		traumaVignetteColor = Color(210, 0, 0),
 		traumaVignettePulseSpeed = 1.6,
 	},
 
@@ -333,6 +342,13 @@ function SimpleHealth.GetCritState(health)
 	if health <= softAt then return SimpleHealth.CRIT_SOFT end
 
 	return SimpleHealth.CRIT_NONE
+end
+
+function SimpleHealth.GetCritDepth(state)
+	local startAt = SimpleHealth.Config.effects.critDepthStart
+	local _, hardAt = SimpleHealth.GetCritThresholds()
+
+	return math.Clamp((startAt - SimpleHealth.GetHealth(state)) / (startAt - hardAt), 0, 1)
 end
 
 function SimpleHealth.GetDominantPool(state)

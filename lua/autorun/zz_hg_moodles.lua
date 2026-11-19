@@ -754,7 +754,7 @@ local function buildEffects(ply, org)
 	end
 
 	local goodmood = math.Clamp(orgNumber(org, "goodmood", 0), 0, 1)
-	if goodmood > 0 then
+	if goodmood > 0.1 then
 		add(effects, "happy", "happy", math.ceil(goodmood * 4), "good", 15, math.floor(goodmood * 100) .. "%")
 	end
 	local depression = math.Clamp(orgNumber(org, "depression", 0), 0, 1)

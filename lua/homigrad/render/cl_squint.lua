@@ -59,8 +59,6 @@ hook.Add("RenderScreenspaceEffects", "HG_SquintVignette", function()
 	if squintLerp < 0.02 then return end
 
 	local shaped = squintLerp * squintLerp * (3 - 2 * squintLerp)
-	DrawSharpen(shaped * 0.3, 0.4)
-
 	colorTab["$pp_colour_contrast"] = 1 + shaped * 0.03
 	colorTab["$pp_colour_brightness"] = -shaped * 0.02
 	DrawColorModify(colorTab)

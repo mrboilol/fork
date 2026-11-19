@@ -92,9 +92,9 @@ local depression_thought_pools = {
 local depression_minigame_phrase_interval_min = 2
 local depression_minigame_phrase_interval_max = 4
 local depression_minigame_phrases = {
-	"Wh-what are you doing?",
+	"WHAT ARE YOU DOING!?",
 	"Dont do that.",
-	"That's too close...",
+	"That's too close.",
 	"Put that away.",
 }
 
@@ -546,7 +546,8 @@ module[2] = function(owner, org, timeValue)
 
 	local adrenaline = org.adrenaline or 0
 	if adrenaline > depression_adrenaline_suppress_start then
-		add = add * max(1 - adrenaline * 0.2, depression_adrenaline_suppress_min)
+		local suppress = max(1 - adrenaline * 0.2, depression_adrenaline_suppress_min)
+		add = add * Lerp(hg.GetAngerShield and hg.GetAngerShield(org) or 0, suppress, 1)
 	end
 	add = add * Lerp(treatment, 1, depression_treated_gain_mul)
 

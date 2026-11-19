@@ -312,9 +312,20 @@ local STRUCTURE_INPUTS = {
 
 SoftTissue.InputWrappers = SoftTissue.InputWrappers or {}
 
+hg.InputWrapperInner = hg.InputWrapperInner or setmetatable({}, {__mode = "k"})
+
+hg.InputWrapperChainHas = hg.InputWrapperChainHas or function(fn, target)
+	while fn do
+		if fn == target then return true end
+		fn = hg.InputWrapperInner[fn]
+	end
+
+	return false
+end
+
 local function wrapInput(inputList, name)
 	local original = inputList[name]
-	if not isfunction(original) or original == SoftTissue.InputWrappers[name] then return end
+	if not isfunction(original) or hg.InputWrapperChainHas(original, SoftTissue.InputWrappers[name]) then return end
 
 	local isOrgan = CONFIG.organInputs[name]
 	local function wrapper(org, bone, dmg, dmgInfo, ...)
@@ -331,6 +342,7 @@ local function wrapInput(inputList, name)
 	end
 
 	SoftTissue.InputWrappers[name] = wrapper
+	hg.InputWrapperInner[wrapper] = original
 	inputList[name] = wrapper
 end
 

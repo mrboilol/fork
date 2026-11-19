@@ -64,13 +64,14 @@ function SimpleHealth.GetOxyEffectTarget(o2Target)
 
 	local effects = CONFIG.effects
 	local oxy = state.oxy
-	if oxy <= effects.oxyStart then return math.max(o2Target, 0) end
+	local critTarget = SimpleHealth.GetCritDepth(state) ^ effects.critDepthExponent * OXY_EFFECT_FULL
+	if oxy <= effects.oxyStart then return math.max(o2Target, critTarget, 0) end
 
 	local rising = math.Clamp((oxy - effects.oxyStart) / (effects.oxyStrong - effects.oxyStart), 0, 1)
 	local closing = math.Clamp((oxy - effects.oxyStrong) / (CONFIG.oxy.countdownStart - effects.oxyStrong), 0, 1)
 	local severity = rising * effects.oxyStrongAmount + closing * (effects.oxyCloseAmount - effects.oxyStrongAmount)
 
-	return math.max(severity * OXY_EFFECT_FULL, o2Target)
+	return math.max(severity * OXY_EFFECT_FULL, o2Target, critTarget)
 end
 
 local hg_vignette_scale = GetConVar("hg_vignette_scale")
@@ -120,7 +121,7 @@ local function updateDamageTints(state)
 	if state then
 		local range = math.max(effects.traumaVignetteFull - effects.traumaVignetteStart, 1)
 		local trauma = (state.brute or 0) + (state.burn or 0)
-		traumaTarget = math.Clamp((trauma - effects.traumaVignetteStart) / range, 0, 1) ^ 1.5 * effects.traumaVignetteStrength
+		traumaTarget = math.Clamp((trauma - effects.traumaVignetteStart) / range, 0, 1) ^ effects.traumaVignetteExponent * effects.traumaVignetteStrength
 	end
 
 	traumaLerp = LerpFT(effects.lerp, traumaLerp, traumaTarget)
@@ -144,36 +145,41 @@ local bloodTab = {
 local bloodLerp = 0
 local softCritLerp = 0
 local dofLerp = 0
+local critLerp = 0
 
 hook.Add("Post Post Pre Post Processing", "hg/simplehealth/screen-effects", function()
 	local state = SimpleHealth.GetLocalState()
-	if not state and bloodLerp <= EFFECT_MIN and softCritLerp <= EFFECT_MIN and dofLerp <= EFFECT_MIN then return end
+	if not state and bloodLerp <= EFFECT_MIN and softCritLerp <= EFFECT_MIN and dofLerp <= EFFECT_MIN and critLerp <= EFFECT_MIN then return end
 
 	local effects = CONFIG.effects
 	local org = state and IsValid(lply) and lply:Alive() and (lply.new_organism or lply.organism)
 	local bloodTarget = 0
 	local softCritTarget = 0
+	local critTarget = 0
 
 	if org then
 		local blood = tonumber(org.blood) or effects.bloodStart
 		bloodTarget = math.Clamp((effects.bloodStart - blood) / (effects.bloodStart - CONFIG.deathBlood), 0, 1)
+		critTarget = SimpleHealth.GetCritDepth(state) ^ effects.critDepthExponent
+		softCritTarget = state.crit >= CRIT_SOFT and Lerp(critTarget, 1, effects.critStrengthMax) or critTarget
 	end
-
-	if state and IsValid(lply) and lply:Alive() and state.crit == CRIT_SOFT then softCritTarget = 1 end
 
 	bloodLerp = LerpFT(effects.lerp, bloodLerp, bloodTarget)
 	softCritLerp = LerpFT(effects.lerp, softCritLerp, softCritTarget)
+	critLerp = LerpFT(effects.lerp, critLerp, critTarget)
 
-	if bloodLerp > EFFECT_MIN then
-		bloodTab["$pp_colour_colour"] = 1 - bloodLerp
-		bloodTab["$pp_colour_brightness"] = -effects.bloodDarken * bloodLerp
+	local colorSeverity = math.max(bloodLerp, critLerp * effects.critDesaturate)
+	if colorSeverity > EFFECT_MIN then
+		bloodTab["$pp_colour_colour"] = 1 - colorSeverity
+		bloodTab["$pp_colour_brightness"] = -effects.bloodDarken * bloodLerp - effects.critDarken * critLerp
 		DrawColorModify(bloodTab)
 	end
 
 	local dofTarget = org and math.Clamp((effects.bleedDofStart - (tonumber(org.blood) or effects.bleedDofStart)) / (effects.bleedDofStart - CONFIG.deathBlood), 0, 1) or 0
 	dofLerp = LerpFT(effects.lerp, dofLerp, dofTarget)
-	if dofLerp > EFFECT_MIN then
-		DrawBokehDOF(dofLerp * effects.bleedDofIntensity, 1, 0)
+	local dofAmount = math.max(dofLerp * effects.bleedDofIntensity, critLerp * effects.critDofIntensity)
+	if dofAmount > EFFECT_MIN then
+		DrawBokehDOF(dofAmount, 1, 0)
 	end
 
 	if softCritLerp > EFFECT_MIN then

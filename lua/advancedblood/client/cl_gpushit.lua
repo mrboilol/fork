@@ -807,6 +807,47 @@ local function SelfTest()
 	return r and r >= SELFTEST_MIN
 end
 
+local DRAWTEST_RES = 16
+local DRAWTEST_MIN = 60
+local drawTest
+
+local function DrawTest()
+	if not drawTest then
+		local t = {}
+		t.state = RT("drawtest_state", IMAGE_FORMAT_RGBA16161616F, 4)
+		t.out = GetRenderTargetEx("ablgpu_drawtest_out", DRAWTEST_RES, DRAWTEST_RES, RT_SIZE_LITERAL, MATERIAL_RT_DEPTH_SEPARATE, RT_FLAGS, 0, IMAGE_FORMAT_RGBA8888)
+		t.mat = Mat("drawtest", "world_vs30", "surface_ps30", true)
+		t.mat:SetTexture("$basetexture", t.state)
+		SetC(t.mat, 0, 1 / 4, ABSORB, STAIN_ABSORB, SHINE)
+		SetC(t.mat, 1, 1, 1, 1, 0)
+		SetC(t.mat, 2, 0, 0, 64, 0)
+		SetC(t.mat, 3, 0, 0, 1, 1)
+		drawTest = t
+	end
+	render.PushRenderTarget(drawTest.state)
+	render.Clear(255, 0, 0, 0)
+	render.PopRenderTarget()
+	render.PushRenderTarget(drawTest.out)
+	render.Clear(0, 0, 0, 255, true, true)
+	cam.Start3D(Vector(0, 0, 64), Angle(90, 0, 0), 60, 0, 0, DRAWTEST_RES, DRAWTEST_RES)
+	render.SetMaterial(drawTest.mat)
+	local up = Vector(0, 0, 1)
+	mesh.Begin(MATERIAL_QUADS, 1)
+	for _, c in ipairs(corners) do
+		mesh.Position(Vector((c[1] * 2 - 1) * 64, (c[2] * 2 - 1) * 64, 0))
+		mesh.Normal(up)
+		mesh.TexCoord(0, c[1], c[2])
+		mesh.AdvanceVertex()
+	end
+	mesh.End()
+	cam.End3D()
+	render.CapturePixels()
+	local r = render.ReadPixel(DRAWTEST_RES / 2, DRAWTEST_RES / 2)
+	render.PopRenderTarget()
+
+	return r and r >= DRAWTEST_MIN
+end
+
 local function SimFrame()
 	local now = RealTime()
 	simAcc = min(simAcc + FrameTime(), MAX_STEPS / SIM_HZ)
@@ -859,6 +900,16 @@ local function Verify()
 	local rt = render.GetRenderTarget()
 	local ok, passed = pcall(SelfTest)
 	if render.GetRenderTarget() ~= rt then render.PopRenderTarget() end
+	if ok and passed == true then
+		ok, passed = pcall(DrawTest)
+		if render.GetRenderTarget() ~= rt then render.PopRenderTarget() end
+		GP.drawPassed = ok and passed == true
+		if not GP.drawPassed then
+			GP.verified = false
+			Fail(ok and "world surface draw produced nothing (draw self-test read back nothing)" or passed)
+			return
+		end
+	end
 	GP.verified = ok and passed == true
 	if not GP.verified then Fail(ok and "custom shaders did not run (self-test read back nothing)" or passed) end
 end
@@ -926,7 +977,7 @@ function GP.Count()
 end
 
 concommand.Add("abl_gpu_status", function()
-	print(string.format("[ABL] GPU blood: enabled=%s capable=%s verified=%s failed=%s patches=%d bodies=%d",
-		tostring(C.cl.gpu:GetBool()), tostring(Capable()), tostring(GP.verified), tostring(GP.failed == true),
+	print(string.format("[ABL] GPU blood: enabled=%s capable=%s verified=%s draw=%s failed=%s patches=%d bodies=%d",
+		tostring(C.cl.gpu:GetBool()), tostring(Capable()), tostring(GP.verified), tostring(GP.drawPassed), tostring(GP.failed == true),
 		#patches, GP.BodyCount and GP.BodyCount() or 0))
 end)

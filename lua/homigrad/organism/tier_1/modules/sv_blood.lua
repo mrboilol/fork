@@ -205,8 +205,11 @@ local proximalArteryBleedMultipliers = {
 	Thigh = 0.44,
 }
 
+local stump_arterial_bleed_mul = (hg.organism.config and hg.organism.config.ARTERIAL_STUMP_BLEED_MULTIPLIER) or 0.15
+
 local function getArteryBleedMultiplier(wound, ent)
 	local artery = wound[7]
+	if isstring(artery) and not arteryBleedMultipliers[artery] and string.StartsWith(artery, "ValveBiped.") then return stump_arterial_bleed_mul end
 	local mul = arteryBleedMultipliers[artery] or 1
 	if not limbArteryWeakness[artery] then return mul end
 	local bone = wound[4]

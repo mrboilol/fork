@@ -24,14 +24,21 @@ local dying = {}
 local fading = {}
 local posing = {}
 
-local function readConfig()
+local function massMul(ragdoll)
+	if not hg.RagdollTotalMass then return 1 end
+	local tuned = hg.RagdollTunedMass()
+	if tuned <= 0 then return 1 end
+	return math.Clamp(hg.RagdollTotalMass(ragdoll) / tuned, 0.2, 20)
+end
+
+local function readConfig(ragdoll)
 	local cfg = {}
 	for key, default in pairs(K.AR_DEFAULTS) do
 		local cv = GetConVar("hg_stumble_" .. key)
 		cfg[key] = cv and cv:GetFloat() or default
 	end
 
-	cfg.PushPeakForce = cfg.PushPeakForce * K.STUMBLE_PUSH_MUL
+	cfg.PushPeakForce = cfg.PushPeakForce * K.STUMBLE_PUSH_MUL * massMul(ragdoll)
 	cfg.PushDuration = cfg.PushDuration * K.STUMBLE_PUSH_TIME_MUL
 	cfg.StepTriggerForward = cfg.StepTriggerForward * K.STUMBLE_STEP_TRIGGER_MUL
 	cfg.MinStepInterval = cfg.MinStepInterval * K.STUMBLE_STEP_INTERVAL_MUL
@@ -403,6 +410,7 @@ local function uprightAngle(cur, want)
 end
 
 local function driveFadeSpine(fs, want, torque, dt)
+	torque = torque * massMul(fs.spine:GetEntity())
 	fs.spine:Wake()
 	fs.spine:ComputeShadowControl({
 		secondstoarrive = K.FADE_SPINE_ARRIVE,
@@ -716,7 +724,7 @@ local function stopStumble(ragdoll, reason)
 		if dir:LengthSqr() < K.START_MIN_SPEED * K.START_MIN_SPEED then dir = st.pushDir or st.driveDir or st.spine:GetAngles():Forward() end
 		dir = Vector(dir.x, dir.y, 0)
 		if dir:LengthSqr() > 0.01 then
-			falling[ragdoll] = {ply = st.ply, pelvis = st.pelvis, spine = st.spine, dir = dir:GetNormalized(), untilT = CurTime() + K.FALL_LOCK_TIME}
+			falling[ragdoll] = {ply = st.ply, pelvis = st.pelvis, spine = st.spine, head = getBonePhys(ragdoll, "ValveBiped.Bip01_Head1"), dir = dir:GetNormalized(), untilT = CurTime() + K.FALL_LOCK_TIME}
 			ragdoll.hgStumbleFalling = true
 		end
 	end
@@ -731,7 +739,7 @@ local function startStumble(ply, ragdoll)
 	local org = ply.organism
 	local st = {
 		ply = ply,
-		cfg = readConfig(),
+		cfg = readConfig(ragdoll),
 		pelvis = pelvis,
 		spine = spine,
 		startTime = CurTime(),
@@ -1480,8 +1488,12 @@ local function updateFalling(ragdoll, fs)
 	end
 
 	local dt = FrameTime()
-	fs.spine:AddVelocity(fs.dir * K.FALL_FOLLOW_PUSH * dt)
-	fs.pelvis:AddVelocity(Vector(0, 0, -K.FALL_BUCKLE * dt))
+	local weight = massMul(ragdoll)
+	fs.spine:AddVelocity(fs.dir * K.FALL_FOLLOW_PUSH * weight * dt)
+	fs.pelvis:AddVelocity(Vector(0, 0, -K.FALL_BUCKLE * weight * dt))
+	if IsValid(fs.head) then
+		fs.head:AddVelocity((fs.dir * K.FALL_HEAD_PUSH + Vector(0, 0, -K.FALL_HEAD_DOWN)) * weight * dt)
+	end
 end
 
 local function removeDying(ragdoll)

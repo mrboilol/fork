@@ -122,7 +122,7 @@ do
 		local wakeRemain = (org.rehab_dizzy_until or 0) - CurTime()
 		local wakeDizzy = wakeRemain > 0 and 1 + math.min(wakeRemain / 30, 1) * 0.4 or 0
 		local panicSway = 0
-		if org.panicattackActive and org.panicMode == "flight" and GetConVar("hg_panic"):GetBool() then
+		if org.panicattackActive and org.panicMode == "flight" then
 			panicSway = math.Clamp(((tonumber(org.panicattack) or 0) - 0.35) / 0.65, 0, 1) * math.Clamp(((tonumber(org.adrenaline) or 0) - 2.5) / 1.5, 0.3, 1) * 2.5
 		end
 		return math.max(hg.GetTraumaBlur(), (org.concussion or 0) * 0.65, wakeDizzy, (org.disorientation or 0) - 4, panicSway)
@@ -1141,7 +1141,6 @@ local stations = {
 local choosera = 1
 local tempolerp = 0
 local grayscaleLerp = 0
-stressSharpenLerp = 0
 
 hg.SharpenLimit = hg.SharpenLimit or {contrast = 2.6, distance = 1.5}
 hg.SharpenState = hg.SharpenState or {frame = 0, used = 0}
@@ -3279,18 +3278,9 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		if grayscaleLerp > 0.005 then
 			tab["$pp_colour_colour"] = math.min(tab["$pp_colour_colour"] or 1, 1 - grayscaleLerp)
 		end
-
-		local painSharpen = math.Clamp(((org.pain or 0) - 15) / (hg.screeneffects_config.painAgonyThreshold - 15), 0, 1)
-		local o2Sharpen = math.Clamp((45 - o2) / 30, 0, 1) * Lerp(hg.GetO2FadeK(org), 0.75, 1)
-		local stressSharpen = math.min(painSharpen + o2Sharpen, 1.5)
-		stressSharpenLerp = LerpFT(0.05, stressSharpenLerp, stressSharpen)
-		if stressSharpenLerp > 0.01 then
-			DrawSharpen(stressSharpenLerp * 1.3, 0.4 + stressSharpenLerp * 0.9)
-		end
 		else
 			grayscaleLerp = LerpFT(0.04, grayscaleLerp, 0)
 			ischemicVignetteLerp = LerpFT(0.04, ischemicVignetteLerp, 0)
-			stressSharpenLerp = LerpFT(0.08, stressSharpenLerp, 0)
 		end
 	end
 
@@ -3414,7 +3404,6 @@ hook.Add("Post Pre Post Processing", "BrainLobeEffects", function()
 
 	if not HasBlindTrait() and parietal > 0.01 then
 		hg.DrawWorldMotionBlur(0.025 + parietal * 0.08, 0.35 + parietal * 0.55, 0.015 + parietal * 0.09)
-		DrawSharpen(parietal * 0.8, parietal * 1.4)
 	end
 
 	if temporal > 0.01 then

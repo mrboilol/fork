@@ -255,7 +255,7 @@ local function CreateNPCRagdoll(npc, addVel)
 				phys:SetPos(matrix:GetTranslation())
 				phys:SetAngles(matrix:GetAngles())
 			end
-			phys:SetMass(hg.IdealMassPlayer[rag:GetBoneName(bone)] or 4)
+			phys:SetMass(hg.RagdollBoneMass(rag:GetBoneName(bone), rag) or hg.IdealMassPlayer[rag:GetBoneName(bone)] or 4)
 		end
 
 		phys:SetVelocity(velocity)

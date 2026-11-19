@@ -3098,6 +3098,11 @@ local function velocityDamage(ent, data)
 		end
 	end
 	if RagdollDamageBoneMul[hitgroup] then dmgInfo:ScaleDamage(RagdollDamageBoneMul[hitgroup]) end
+	if hitgroup == HITGROUP_HEAD and hg.RagdollTotalMass then
+		local bodyLoad = math.Clamp((hg.RagdollTotalMass(ent) / hg.RagdollTargetMass()) ^ 1.5, 0.5, 2.5)
+		dmg = dmg * bodyLoad
+		dmgInfo:ScaleDamage(bodyLoad)
+	end
 	local accessoryDamage = dmgInfo:GetDamage()
 	local collisionEnt = IsValid(data.HitObject) and data.HitObject:GetEntity() or nil
 	local impactRadius = hg.Appearance and hg.Appearance.GetEntityImpactRadius and hg.Appearance.GetEntityImpactRadius(collisionEnt) or 0

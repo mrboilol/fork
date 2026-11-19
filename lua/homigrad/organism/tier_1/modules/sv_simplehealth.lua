@@ -473,8 +473,17 @@ local function tickConsciousness(owner, org, state, timeValue)
 		drain = drain + rampUp(state.oxy, consciousnessConfig.airwayStart, consciousnessConfig.airwayFull) * consciousnessConfig.airwayDrain
 	end
 
+	local ceiling = 1
+	if state.health <= softAt and not SimpleHealth.IsCritImmune(org) then
+		ceiling = Lerp(rampUp(softAt - state.health, 0, softAt - hardAt), 1, consciousnessConfig.hardCritFloor)
+	end
+
 	local rate = drain > 0 and -drain or consciousnessConfig.recover
-	state.consciousnessCap = math.Clamp(state.consciousnessCap + rate * timeValue, 0, 1)
+	local previousCap = state.consciousnessCap
+	local cap = previousCap + rate * timeValue
+	if cap > ceiling then cap = math.max(ceiling, math.min(cap, previousCap - consciousnessConfig.depthDrain * timeValue)) end
+
+	state.consciousnessCap = math.Clamp(cap, 0, 1)
 	org.consciousness = math.min(tonumber(org.consciousness) or 1, state.consciousnessCap)
 
 	if org.otrub and org.consciousness < consciousnessConfig.wakeAt then org.needotrub = true end
@@ -509,7 +518,8 @@ local function updateCrit(org, state)
 
 	local softCritFree = state.crit == CRIT_SOFT and state.health < 15
 	if state.crit >= CRIT_SOFT and not softCritFree then org.needfake = true end
-	if severe then org.needotrub = true end
+	local healthDrained = healthCrit == CRIT_HARD and state.consciousnessCap <= CONFIG.consciousness.hardCritFloor + 0.005
+	if state.flatline or state.fibrillating or healthDrained then org.needotrub = true end
 
 	if state.crit ~= previous then
 		hook.Run("hg/simplehealth/crit-changed", org.owner, org, state.crit, previous)
@@ -746,9 +756,20 @@ SimpleHealth.OriginalInputs = SimpleHealth.OriginalInputs or {}
 SimpleHealth.InputWrappers = SimpleHealth.InputWrappers or {}
 SimpleHealth.InputHandlers = SimpleHealth.InputHandlers or {}
 
+hg.InputWrapperInner = hg.InputWrapperInner or setmetatable({}, {__mode = "k"})
+
+hg.InputWrapperChainHas = hg.InputWrapperChainHas or function(fn, target)
+	while fn do
+		if fn == target then return true end
+		fn = hg.InputWrapperInner[fn]
+	end
+
+	return false
+end
+
 local function wrapInput(inputList, name, allowedMode)
 	local original = inputList[name]
-	if not isfunction(original) or original == SimpleHealth.InputWrappers[name] then return end
+	if not isfunction(original) or hg.InputWrapperChainHas(original, SimpleHealth.InputWrappers[name]) then return end
 
 	SimpleHealth.OriginalInputs[name] = original
 
@@ -764,6 +785,7 @@ local function wrapInput(inputList, name, allowedMode)
 	end
 
 	SimpleHealth.InputWrappers[name] = wrapper
+	hg.InputWrapperInner[wrapper] = original
 	inputList[name] = wrapper
 end
 
@@ -1381,3 +1403,17 @@ hook.Add("EntityFireBullets", "hg/simplehealth/faint-gunfire", function(shooter)
 		sendFaintSound(listener, SimpleHealth.FAINT_GUNFIRE)
 	end)
 end)
+
+local function resetOrganismsForMode()
+	table.Empty(faintListeners)
+
+	for _, ply in ipairs(player.GetAll()) do
+		local org = ply.organism
+		if org and ply:Alive() then hg.organism.Clear(org) end
+	end
+end
+
+cvars.RemoveChangeCallback("hg_simplehealth", "hg/simplehealth/mode-reset")
+cvars.AddChangeCallback("hg_simplehealth", function()
+	timer.Create("hg/simplehealth/mode-reset", 0, 1, resetOrganismsForMode)
+end, "hg/simplehealth/mode-reset")
