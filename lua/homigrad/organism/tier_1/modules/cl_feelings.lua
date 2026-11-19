@@ -8,6 +8,23 @@ hook.Add("Player_Death", "hg_psyche_sound_stop", function(ply)
 	end
 end)
 
+local angerTier = 0
+hook.Add("Think", "hg_psyche_anger_sound", function()
+	local lply = LocalPlayer()
+	if not IsValid(lply) or not lply:Alive() or not lply.organism then angerTier = 0 return end
+	local org = lply.organism
+	local anger = Clamp(org.psycheAnger or 0, 0, 1)
+	local tier = (org.otrub or org.incapacitated) and 0 or (anger >= 0.75 and 2 or anger >= 0.5 and 1 or 0)
+	if tier > angerTier then
+		surface.PlaySound(tier == 2 and "FURIOUS.mp3" or "angry.mp3")
+	end
+	if tier < angerTier and anger < (angerTier == 2 and 0.65 or 0.4) then
+		angerTier = tier
+	elseif tier > angerTier then
+		angerTier = tier
+	end
+end)
+
 local angerMat = Material("effects/shaders/zb_grain2")
 
 local psyche_color_tab = {

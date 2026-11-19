@@ -826,7 +826,7 @@ local function DrawCasualtiesRing(org, alpha, isUnconscious, isCritical, dying, 
     else
         target = math.Clamp((consciousness - OTRUB_CONSCIOUSNESS) / (LOW_CONSCIOUSNESS - OTRUB_CONSCIOUSNESS), 0, 1)
     end
-    ringProgress = math.Approach(ringProgress, target, FrameTime() * 2)
+    ringProgress = SmoothAlpha(ringProgress, target, 3)
 
     local base = ringStatus <= 1 and ringColorStable or ringColorCritical
     local nextColor = ringStatus <= 1 and ringColorCritical or ringColorDying
@@ -845,11 +845,11 @@ local function DrawCasualtiesRing(org, alpha, isUnconscious, isCritical, dying, 
     surface.SetDrawColor(Lerp(ringStatus / 2, 0, 25), 0, 0, Lerp(ringStatus / 2, 90, 200) * alpha)
     surface.DrawRect(0, 0, scrW, scrH)
 
-    local radius = math.min(280, scrH * 0.32)
-    local thickness = 12 + math.floor(ringStatus * 3)
-    DrawArc(centerX, centerY, radius, thickness, 0, 360, 60, Color(Lerp(ringStatus / 2, 40, 70), 40 - ringStatus * 15, 40 - ringStatus * 15, 100 * alpha))
+    local radius = math.min(180, scrH * 0.2)
+    local thickness = 9 + math.floor(ringStatus * 2)
+    DrawArc(centerX, centerY, radius, thickness, 0, 360, 90, Color(Lerp(ringStatus / 2, 40, 70), 40 - ringStatus * 15, 40 - ringStatus * 15, 100 * alpha))
     if ringProgress > 0.002 then
-        DrawArc(centerX, centerY, radius, thickness, 90, 90 - ringProgress * 360, 80, Color(r, g, b, a))
+        DrawArc(centerX, centerY, radius, thickness, 90, 90 - ringProgress * 360, 120, Color(r, g, b, a))
     end
 
     dotBeat = math.floor(CurTime() * (dying and 2 or 1)) % 3

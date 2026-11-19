@@ -17,8 +17,19 @@ local recent_stamina_loss_hold_time = 1
 local recent_stamina_loss_fade_time = 4
 local ledge_hang_recovery_bonus = 3
 local stamina_recovery_per_second = 9.5
-local anger_combat_hold_time = 6
-local anger_decay_per_second = 0.075
+local anger_combat_hold_time = 12
+local anger_decay_per_second = 0.04
+local anger_opponent_range = 3000
+local function angerOpponentStanding(org, now)
+	local opp = org.angerOpponent
+	if not IsValid(opp) or not opp:IsPlayer() or not opp:Alive() then return false end
+	if now > (org.angerOpponentUntil or 0) then return false end
+	local oorg = opp.organism
+	if not oorg or not oorg.alive or oorg.otrub or oorg.incapacitated then return false end
+	local owner = org.owner
+	if not IsValid(owner) then return false end
+	return owner:GetPos():DistToSqr(opp:GetPos()) < anger_opponent_range * anger_opponent_range
+end
 local limb_stamina_recovery_per_second = 8.25
 local limb_stamina_rest_time = 1
 local leg_sprint_drain_per_second = 2
@@ -195,6 +206,9 @@ module[2] = function(owner, org, timeValue)
 	local stamina = org.stamina
 
 	local now = CurTime()
+	if (org.anger or 0) > 0 and angerOpponentStanding(org, now) then
+		org.angerCombatUntil = math.max(org.angerCombatUntil or 0, now + 1)
+	end
 	if now > (org.angerCombatUntil or 0) then
 		org.anger = math.max((org.anger or 0) - timeValue * anger_decay_per_second, 0)
 	end
@@ -509,8 +523,12 @@ function hg.organism.AddTraumaAdrenaline(org, fAmount)
 	org.nextAdrenalineRegen = now + 30
 end
 
-function hg.organism.RileAnger(org, amount, adrenalineAmount)
+function hg.organism.RileAnger(org, amount, adrenalineAmount, opponent)
 	if not org or not org.alive or org.otrub then return end
+	if IsValid(opponent) and opponent:IsPlayer() then
+		org.angerOpponent = opponent
+		org.angerOpponentUntil = CurTime() + 90
+	end
 	amount = math.max(amount or 0, 0)
 	adrenalineAmount = math.max(adrenalineAmount == nil and amount * 2 or adrenalineAmount, 0)
 	if amount > 0 and hg.GetPsycheTraining then amount = amount * Lerp(hg.GetPsycheTraining(org.owner), 1, hg.PsycheCombat.trainedAngerMul) end

@@ -26,12 +26,18 @@ local function getCombatPlayer(ent)
 	return IsValid(owner) and owner:IsPlayer() and owner or nil
 end
 
-local function addCombatResponse(org, angerAmount, adrenalineAmount)
+local function addCombatResponse(org, angerAmount, adrenalineAmount, opponent)
 	if not org or not hg.organism.RileAnger then return end
 	local now = CurTime()
-	if (org._combatResponseNext or 0) > now then return end
+	if (org._combatResponseNext or 0) > now then
+		if IsValid(opponent) and opponent:IsPlayer() then
+			org.angerOpponent = opponent
+			org.angerOpponentUntil = now + 90
+		end
+		return
+	end
 	org._combatResponseNext = now + combat_response_cooldown
-	hg.organism.RileAnger(org, angerAmount, adrenalineAmount)
+	hg.organism.RileAnger(org, angerAmount, adrenalineAmount, opponent)
 end
 
 local function triggerCombatResponses(target, dmgInfo)
@@ -62,9 +68,9 @@ local function triggerCombatResponses(target, dmgInfo)
 		victimAnger, victimAdrenaline = 0.18, 0.65
 	end
 
-	if IsValid(attackerPlayer) then addCombatResponse(attackerPlayer.organism, attackerAnger * severity, attackerAdrenaline * severity) end
+	if IsValid(attackerPlayer) then addCombatResponse(attackerPlayer.organism, attackerAnger * severity, attackerAdrenaline * severity, targetPlayer) end
 	if IsValid(targetPlayer) and IsValid(dmgInfo:GetAttacker()) and not dmgInfo:GetAttacker():IsWorld() then
-		addCombatResponse(targetPlayer.organism, victimAnger * severity, victimAdrenaline * severity)
+		addCombatResponse(targetPlayer.organism, victimAnger * severity, victimAdrenaline * severity, attackerPlayer)
 	end
 end
 
