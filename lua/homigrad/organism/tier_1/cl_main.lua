@@ -591,8 +591,6 @@ function hg.DrawIncapacitatedText()
 
 	local remaining = math.max(deathStateEnd - CurTime(), 0)
 	remDeathStateColor.a = math.Clamp((INCAPACITATION_DEATH_TIME - remaining) / 2, 0, 1) * 255
-	draw.SimpleText("You are incapacitated, You will die in " .. math.ceil(remaining), "RemDeathStateFont", ScrW() / 2, ScrH() * 0.62, remDeathStateColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-
 	local binding = input.LookupBinding("suicide")
 	binding = binding and binding ~= "" and string.upper(binding) or "K"
 	draw.SimpleText("Press " .. binding .. " to give up.", "HomigradFontTypewriterSmall", ScrW() / 2, ScrH() * 0.62 + ScreenScale(18), Color(210, 210, 210, remDeathStateColor.a * 0.8), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)

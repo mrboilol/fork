@@ -7,6 +7,7 @@ hg.organism.module.pain = {}
 local module = hg.organism.module.pain
 local consciousness_otrub_threshold = 0.2
 local consciousness_otrub_threshold_riled = 0.1
+local otrub_wake_hysteresis = 0.05
 local consciousness_fake_threshold = 0.38
 local shock_heavy_offset = 30
 local shock_critical_ramp = 40
@@ -397,7 +398,8 @@ module[2] = function(owner, org, timeValue)
 	local riled = fightingBack and 1 or Clamp(((adrenaline or 0) - 0.5) / 1, 0, 1)
 	local otrubThreshold = Lerp(riled, consciousness_otrub_threshold, consciousness_otrub_threshold_riled) * consciousnessResistance
 	local consciousnessTooLow = org.consciousness < otrubThreshold
-	if recoveryBlocked or (consciousnessTooLow and (not org.otrub or persistentConsciousnessCause)) then
+	local stillRecovering = org.otrub and org.consciousness < otrubThreshold + otrub_wake_hysteresis
+	if recoveryBlocked or consciousnessTooLow or stillRecovering then
 		org.needotrub = true
 
 	end

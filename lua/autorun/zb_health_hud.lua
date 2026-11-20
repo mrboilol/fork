@@ -1678,18 +1678,19 @@ local function draw_status_effects()
 				end
 
 				local co_val = getOrgVal(org, "CO", 0)
-				if co_val > 5 then
+				local co2_val = getOrgVal(org, "co2", 0)
+				if co_val > 5 or co2_val >= 8 then
 					local level_num = 1
-					if co_val > 25 then level_num = 4
-					elseif co_val > 20 then level_num = 3
-					elseif co_val > 10 then level_num = 2 end
+					if co_val > 25 or co2_val >= 24 then level_num = 4
+					elseif co_val > 20 or co2_val >= 18 then level_num = 3
+					elseif co_val > 10 or co2_val >= 12 then level_num = 2 end
 
 					table.insert(effects, {
 						name = "hypercapnia",
 						level_num = level_num,
 						has_levels = true,
 						priority = 0.52,
-						value = math_floor(math.Clamp(co_val / 30, 0, 1) * 100)
+						value = math_floor(math.Clamp(math.max(co_val, co2_val) / 30, 0, 1) * 100)
 					})
 					currentEffectNames["hypercapnia"] = true
 				end

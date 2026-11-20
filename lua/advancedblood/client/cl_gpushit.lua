@@ -474,6 +474,9 @@ local function InitState(p)
 	p.pending = nil
 end
 
+local DYN = 8
+local DYN_STRIDE = GRID / DYN
+
 local function MeshVertex(p, gx, gy)
 	local v = BedAt(p, gx, gy)
 	local h = Sentinel(v) and 0 or v
@@ -497,6 +500,33 @@ local function BuildMesh(p)
 	local m = Mesh()
 	m:BuildFromTriangles(verts)
 	p.mesh = m
+	local dyn = {}
+	for gy = 0, DYN do
+		for gx = 0, DYN do
+			local v = BedAt(p, gx * DYN_STRIDE, gy * DYN_STRIDE)
+			local h = Sentinel(v) and 0 or v
+			dyn[gy * (DYN + 1) + gx + 1] = PlanePoint(p, gx / DYN * PATCH_UNITS, gy / DYN * PATCH_UNITS) + p.n * (h + LIFT)
+		end
+	end
+	p.dyn = dyn
+end
+
+local function DrawDyn(p)
+	local dyn, n = p.dyn, p.n
+	mesh.Begin(MATERIAL_QUADS, DYN * DYN)
+	for gy = 0, DYN - 1 do
+		for gx = 0, DYN - 1 do
+			for ci = 1, 4 do
+				local c = corners[ci]
+				local cx, cy = gx + c[1], gy + c[2]
+				mesh.Position(dyn[cy * (DYN + 1) + cx + 1])
+				mesh.Normal(n)
+				mesh.TexCoord(0, cx / DYN, cy / DYN)
+				mesh.AdvanceVertex()
+			end
+		end
+	end
+	mesh.End()
 end
 
 local function Release(p)
@@ -852,6 +882,29 @@ local function RenderState(tex)
 	return lit, maxR
 end
 
+local function MeshProbe(p)
+	local mat = p.slot.draw[p.cur]
+	SetC(mat, 1, 1, 1, 1, 0)
+	SetC(mat, 2, p.center.x, p.center.y, p.center.z + 64, 0)
+	SetC(mat, 3, p.n.x, p.n.y, p.n.z, 1)
+	render.PushRenderTarget(drawTest.out)
+	render.Clear(0, 0, 0, 255, true, true)
+	cam.Start3D(p.center + p.n * 64, (-p.n):Angle(), 90, 0, 0, DRAWTEST_RES, DRAWTEST_RES)
+	render.SetMaterial(mat)
+	p.mesh:Draw()
+	cam.End3D()
+	render.CapturePixels()
+	local lit = 0
+	for y = 0, DRAWTEST_RES - 1 do
+		for x = 0, DRAWTEST_RES - 1 do
+			if render.ReadPixel(x, y) > 0 then lit = lit + 1 end
+		end
+	end
+	render.PopRenderTarget()
+
+	return lit
+end
+
 local function DrawTest()
 	RenderState(Shared().zero)
 	render.PushRenderTarget(drawTest.state)
@@ -962,7 +1015,7 @@ local function DrawPatches()
 			SetC(mat, 2, eye.x, eye.y, eye.z, 0)
 			SetC(mat, 3, p.n.x, p.n.y, p.n.z, 1)
 			render.SetMaterial(mat)
-			p.mesh:Draw()
+			DrawDyn(p)
 		end
 	end
 end
@@ -1006,13 +1059,15 @@ concommand.Add("abl_gpu_status", function()
 		#patches, GP.BodyCount and GP.BodyCount() or 0))
 	local eye = EyePos()
 	for i, p in ipairs(patches) do
-		local lit, maxR = 0, 0
+		local lit, maxR, meshLit = 0, 0, 0
 		if not p.pending then
 			local ok, l, m = pcall(RenderState, p.slot.rt[p.cur])
 			if ok then lit, maxR = l, m else lit, maxR = -1, -1 end
+			local okM, ml = pcall(MeshProbe, p)
+			meshLit = okM and ml or -1
 		end
-		print(string.format("  patch %d: pending=%s stamps=%d mesh=%s dist=%d facing=%s age=%.1f litPixels=%d/256 maxR=%d",
+		print(string.format("  patch %d: pending=%s stamps=%d mesh=%s dist=%d facing=%s age=%.1f litPixels=%d/256 maxR=%d staticMeshLit=%d",
 			i, tostring(p.pending == true), #p.stamps, tostring(p.mesh ~= nil), eye:Distance(p.center),
-			tostring((eye - p.center):Dot(p.n) > 0), RealTime() - p.last, lit, maxR))
+			tostring((eye - p.center):Dot(p.n) > 0), RealTime() - p.last, lit, maxR, meshLit))
 	end
 end)

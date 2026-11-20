@@ -114,6 +114,8 @@ hook.Add("PostPlayerDeath", "homigrad-organism", function(ply)
 end)
 
 local tickrate = 1 / 10
+local CORPSE_TICK_FAST = 0.5
+local CORPSE_TICK_SLOW = 2
 local delay = 0
 local time, mulTime, start
 local CurTime = CurTime
@@ -141,7 +143,16 @@ hook.Add("Think", "homigrad-organism", function()
 			continue
 		end
 		if org.alive == false then
-			if owner:IsRagdoll() then hook_Run("Org PostMortem Think", owner, org, mulTime) end
+			if owner:IsRagdoll() then
+				local accum = (org.corpseTickAccum or 0) + mulTime
+				if (org.corpseNextTick or 0) > time then
+					org.corpseTickAccum = accum
+				else
+					org.corpseTickAccum = 0
+					org.corpseNextTick = time + ((time - (org.postMortemStart or time)) < hg.organism.postMortemCascadeTime and CORPSE_TICK_FAST or CORPSE_TICK_SLOW)
+					hook_Run("Org PostMortem Think", owner, org, accum)
+				end
+			end
 			continue
 		end
 		if owner:IsPlayer() and not owner:Alive() then continue end

@@ -74,7 +74,7 @@ if not ConVarExists("hg_oldsoundoptions") then CreateConVar("hg_oldsoundoptions"
 local function getServerSoundMode(name, fallback)
 	local oldOptions = GetConVar("hg_oldsoundoptions")
 	if not (oldOptions and oldOptions:GetBool()) then
-		if name == "hg_dyingsound" then return 0 end
+		if name == "hg_dyingsound" then return 2 end
 		if name == "hg_painsound" then return 7 end
 		if name == "hg_otrubsound" then return 8 end
 	end
@@ -559,7 +559,7 @@ local dyingAudioFade = 0
 local ischemicVignetteLerp = 0
 local shockVignetteLerp = 0
 local consciousnessVignetteLerp = 0
-local OTRUB_CONSCIOUSNESS_THRESHOLD = 0.3
+local OTRUB_CONSCIOUSNESS_THRESHOLD = 0.2
 local SHOCK_CONSCIOUSNESS_THRESHOLD = 40
 local SHOCK_ANALGESIA_RANGE = 60
 local SHOCK_CONSCIOUSNESS_MAX = 85
@@ -840,11 +840,57 @@ local function addSeizureFlash(isFinal)
 	hg.AddFlash(view.origin, 1, pos, time, size)
 end
 
+local seizureWhiteLerp = 0
+local seizureGradH = Material("gui/gradient")
+local seizureGradV = Material("gui/gradient_down")
+
+local function drawSeizureWhiteVignette(amount)
+	local sw, sh = ScrW(), ScrH()
+	local cover = math.Clamp(amount, 0, 1)
+	local alpha = math.Clamp(80 + cover * 175, 0, 255)
+	local tx = sw * (0.08 + cover * 0.5)
+	local ty = sh * (0.08 + cover * 0.5)
+
+	surface.SetDrawColor(255, 255, 255, alpha)
+	surface.SetMaterial(seizureGradH)
+	surface.DrawTexturedRectUV(0, 0, tx, sh, 0, 0, 1, 1)
+	surface.DrawTexturedRectUV(sw - tx, 0, tx, sh, 1, 0, 0, 1)
+	surface.SetMaterial(seizureGradV)
+	surface.DrawTexturedRectUV(0, 0, sw, ty, 0, 0, 1, 1)
+	surface.DrawTexturedRectUV(0, sh - ty, sw, ty, 0, 1, 1, 0)
+
+	local fill = math.Clamp((cover - 0.8) / 0.2, 0, 1)
+	if fill > 0 then
+		draw.NoTexture()
+		surface.SetDrawColor(255, 255, 255, fill * 255)
+		surface.DrawRect(0, 0, sw, sh)
+	end
+end
+
+local function updateSeizureWhiteVignette(org, active)
+	local target = 0
+	if active then
+		local duration = math.max(seizureClientEnd - seizureClientStart, 0.001)
+		local timeline = math.Clamp((CurTime() - seizureClientStart) / duration, 0, 1)
+		local consciousness = math.Clamp(tonumber(org.consciousness) or 1, 0, 1)
+		local lowConsciousness = math.Clamp((0.8 - consciousness) / (0.8 - OTRUB_CONSCIOUSNESS_THRESHOLD), 0, 1)
+		target = math.max(0.25 + timeline * 0.45, lowConsciousness)
+	end
+
+	seizureWhiteLerp = LerpFT(active and 0.03 or 0.06, seizureWhiteLerp, target)
+	if seizureWhiteLerp > 0.01 then
+		drawSeizureWhiteVignette(seizureWhiteLerp)
+	end
+end
+
 local function updateSeizureEffects(org)
 	if org.otrub then
+		updateSeizureWhiteVignette(org, false)
 		stopSeizureEffects()
 		return
 	end
+
+	updateSeizureWhiteVignette(org, org.seizureActive and (org.seizureEnd or 0) > CurTime())
 
 	if org.seizureActive and (org.seizureStart or 0) > 0 and (org.seizureEnd or 0) > CurTime() then
 		if not seizureClientActive or seizureClientStart != org.seizureStart or seizureClientEnd != org.seizureEnd then
@@ -2644,7 +2690,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				end)
 			end
 
-			local dyingAudioTarget = math.Clamp((o2 - 25) / 75 + (brain > 0.2 and (brain - 0.2) * 2.5 or 0), 0, 1.2)
+			local dyingAudioTarget = math.Clamp((o2 - 1) / 99 +(brain > 0.2 and (brain - 0.2) * 2.5 or 0), 0, 1.2)
 			local blood = org.blood or 5000
 			local bleed = org.bleed or 0
 			if blood < 4000 and bleed > 0 then
@@ -2999,8 +3045,11 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			if incapacitated then
 				otrubVol = math.max(otrubVol, 0.3) * Lerp(incapacitationProgress, 0.45, 0.12)
 			end
+			local incapConVar = GetConVar("hg_incapacitation")
+			local otrubSilenced = org.simpleMode or (hg.SimpleHealth and hg.SimpleHealth.ConVar and hg.SimpleHealth.ConVar:GetInt() > 0) or (incapConVar and incapConVar:GetBool())
+			if otrubSilenced then otrubVol = 0 end
 
-			if canRetrySound("NoiseStation", NoiseStation) then
+			if not otrubSilenced and canRetrySound("NoiseStation", NoiseStation) then
 				sound.PlayFile("sound/zbattle/unconscious_type_beat.mp3", "noblock noplay", function(station)
 					if IsValid(station) then
 						station:SetVolume(0)
@@ -3101,7 +3150,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		if IsValid(NoiseStation2) then NoiseStation2:SetVolume(0) end
 		if IsValid(NoiseStation2Dying) then NoiseStation2Dying:SetVolume(0) end
 		if IsValid(EndStation) then EndStation:SetVolume(0) end
-		if IsValid(DyingStation) then DyingStation:SetVolume(0) end
+		if incapacitated and IsValid(DyingStation) then DyingStation:SetVolume(0) end
 		if IsValid(SillydyingStation) then SillydyingStation:SetVolume(0) end
 		if IsValid(ItssooverStation) then ItssooverStation:SetVolume(0) end
 		if IsValid(SonimCookedStation) then SonimCookedStation:SetVolume(0) end

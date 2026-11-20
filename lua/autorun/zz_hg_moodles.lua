@@ -168,16 +168,10 @@ local moodleTexts = {
 		[4] = {title = "Consumed by Fire", description = "You are fully ablaze and need to extinguish yourself immediately."},
 	}},
 	carbon_monoxide = {levels = {
-		[1] = {title = "Carbon Monoxide Exposure", description = "A mild headache signals toxic gas exposure."},
-		[2] = {title = "Carbon Monoxide Poisoning", description = "Dizziness and confusion are developing from poor oxygen delivery."},
-		[3] = {title = "Severe CO Poisoning", description = "Toxic gas is seriously impairing your brain and movement."},
-		[4] = {title = "Deadly CO Poisoning", description = "Your blood can no longer deliver enough oxygen to survive."},
-	}},
-	hypercapnia = {levels = {
-		[1] = {title = "Air Hunger", description = "Exhaled gas is building up faster than you clear it."},
-		[2] = {title = "Hypercapnia", description = "Trapped CO2 is clouding your head and making you drowsy."},
-		[3] = {title = "Severe Hypercapnia", description = "CO2 buildup is dulling your mind and straining your heart."},
-		[4] = {title = "Critical Hypercapnia", description = "You are close to blacking out from CO2 retention."},
+		[1] = {title = "Toxic Gas Exposure", description = "A mild headache and air hunger signal bad air."},
+		[2] = {title = "Gas Poisoning", description = "Dizziness and confusion are developing from poor oxygen delivery."},
+		[3] = {title = "Severe Gas Poisoning", description = "Toxic gas is seriously impairing your brain and movement."},
+		[4] = {title = "Deadly Gas Poisoning", description = "You are close to blacking out and cannot get enough oxygen to survive."},
 	}},
 	self_harm = {levels = {
 		[1] = {title = "Self-Harm Urges", description = "You are desolate and the urge to hurt yourself is surfacing."},
@@ -806,14 +800,12 @@ local function buildEffects(ply, org)
 		add(effects, "burning", "burning", math.Clamp(fireCount, 1, 4), "bad", -75, fireCount)
 	end
 	local co = orgNumber(org, "CO", 0)
-	if co > 5 then
-		local level = co >= 25 and 4 or co >= 20 and 3 or co >= 10 and 2 or 1
-		add(effects, "carbon_monoxide", "crabon", level, "bad", 22, math.floor(math.Clamp(co / 30, 0, 1) * 100) .. "%")
-	end
+	local coLevel = co > 5 and (co >= 25 and 4 or co >= 20 and 3 or co >= 10 and 2 or 1) or 0
 	local co2 = orgNumber(org, "co2", 0)
-	if co2 >= 8 then
-		local level = co2 >= 24 and 4 or co2 >= 18 and 3 or co2 >= 12 and 2 or 1
-		add(effects, "hypercapnia", "bradyapnea", level, "bad", 23, math.floor(math.Clamp(co2 / 30, 0, 1) * 100) .. "%")
+	local co2Level = co2 >= 8 and (co2 >= 24 and 4 or co2 >= 18 and 3 or co2 >= 12 and 2 or 1) or 0
+	if coLevel > 0 or co2Level > 0 then
+		local fraction = math.max(coLevel > 0 and co / 30 or 0, co2Level > 0 and co2 / 30 or 0)
+		add(effects, "carbon_monoxide", "crabon", math.max(coLevel, co2Level), "bad", 22, math.floor(math.Clamp(fraction, 0, 1) * 100) .. "%")
 	end
 
 	local heartRate = orgNumber(org, "heartbeat", orgNumber(org, "pulse", 70))
