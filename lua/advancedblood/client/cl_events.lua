@@ -141,7 +141,7 @@ net.Receive(N.PERSIST, function(len)
 	for i = 1, n do
 		recs[i] = { pos = net.ReadVector(), normal = net.ReadNormal(), vol = net.ReadUInt(14), age = net.ReadUInt(14) }
 	end
-	if not ABL.Enabled() then return end
+	if not ABL.Enabled() or ABL.GPU.Ready() then return end
 	for _, r in ipairs(recs) do
 		local ok = ABL.InWorld(r.pos.x, r.pos.y, r.pos.z) and r.normal:LengthSqr() > 0.5
 		local t = ok and util.TraceLine({ start = r.pos + r.normal * 4, endpos = r.pos - r.normal * 6, mask = MASK_SOLID_BRUSHONLY })

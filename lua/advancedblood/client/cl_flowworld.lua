@@ -229,6 +229,7 @@ end
 -- A new stream at a point of a surface. Returns its head (or the head it joined), nil when there is
 -- no room. (The caller books the blood onto the surface.)
 function FW.Spawn(x, y, z, nx, ny, nz, vol, surf, ent, hanging, noMerge)
+	if ABL.GPU.Ready() then return nil end
 	if not (ABL.GoodVol(vol) and ABL.InWorld(x, y, z) and nx * nx + ny * ny + nz * nz > 0.5) then return nil end
 	surf = surf or C.Surfaces.default
 	if not noMerge then

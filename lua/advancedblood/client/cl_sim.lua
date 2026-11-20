@@ -16,6 +16,7 @@ local Prof = ABL.Prof
 ABL.Timing = ABL.Timing or { sim = 0, draw = 0, body = 0, emit = 0, flow = 0, drops = 0, runoff = 0, pools = 0, src = 0, misc = 0 }
 local TM = ABL.Timing
 local nextPrune = 0
+local gpuWas = false
 
 local function Ema(key, v) TM[key] = (TM[key] or 0) * 0.92 + v * 0.08 end
 
@@ -44,6 +45,17 @@ hook.Add("Think", "ABL_Sim", function()
 	if not ABL.Enabled() then return end
 	-- one-off body mesh builds are time-sliced separately and not counted against the governor
 	ABL.BodyMesh.RunJobs(1.5)
+	local gpuOn = ABL.GPU.Ready()
+	if gpuOn ~= gpuWas then
+		gpuWas = gpuOn
+		if gpuOn then
+			ABL.Pools.Clear()
+			ABL.Runoff.Clear()
+			ABL.FlowWorld.Clear()
+		else
+			ABL.GPU.Clear()
+		end
+	end
 	Prof.MemBegin()
 	Prof.Heap()
 	local t0 = SysTime()
@@ -84,8 +96,10 @@ hook.Add("Think", "ABL_Sim", function()
 			ABL.Drops.Step(h)
 			Prof.Heap("droplets")
 			local d = SysTime()
-			ABL.Runoff.Step(h)
-			ABL.FlowWorld.Step(h)
+			if not gpuOn then
+				ABL.Runoff.Step(h)
+				ABL.FlowWorld.Step(h)
+			end
 			Prof.Heap("runoff")
 			local e = SysTime()
 			te, td, tr = te + (b - a), td + (d - b), tr + (e - d)
@@ -113,7 +127,7 @@ hook.Add("Think", "ABL_Sim", function()
 		Prof.Add("sim.emission", te) Prof.Add("sim.bodyflow", tf) Prof.Add("sim.droplets", td) Prof.Add("sim.runoff", tr)
 
 		local p0 = SysTime()
-		ABL.Pools.Think()
+		if not gpuOn then ABL.Pools.Think() end
 		Prof.Heap("pools")
 		local m0 = SysTime()
 		Ema("pools", (m0 - p0) * 1000)
@@ -149,7 +163,7 @@ end)
 -- Pool canvases are repainted before the frame renders (render-target passes, outside the 3D
 -- view), within a small per-frame budget (cl_pools.lua P.Paint).
 hook.Add("PreRender", "ABL_PoolPaint", function()
-	if not ABL.Enabled() then return end
+	if not ABL.Enabled() or ABL.GPU.Ready() then return end
 	local t0 = SysTime()
 	Prof.Heap()
 	ABL.Pools.Paint()
@@ -180,11 +194,14 @@ hook.Add("PreDrawTranslucentRenderables", "ABL_Draw", function(depth, skybox, sk
 	Prof.Heap("draw stains")
 	local t2 = SysTime()
 	-- layer 2: pools and runoff streaks (static meshes)
-	ABL.Pools.Draw()
+	local gpuOn = ABL.GPU.Ready()
+	if not gpuOn then ABL.Pools.Draw() end
 	Prof.Heap("draw pools")
 	local t3 = SysTime()
-	ABL.Runoff.Draw()
-	ABL.FlowWorld.Draw()
+	if not gpuOn then
+		ABL.Runoff.Draw()
+		ABL.FlowWorld.Draw()
+	end
 	Prof.Heap("draw runoff")
 	local t4 = SysTime()
 	-- layer 3: body-surface blood (reports itself as draw.body) and airborne droplets

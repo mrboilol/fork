@@ -102,7 +102,9 @@ SWEP.DefibRange = 80
 SWEP.DefibUses = 3
 
 local AEDSounds = {
-	charging = "defibrilator/rem_aed_charging.mp3",
+	charging = "defibrilator/defib_charge.ogg",
+	shockfailed = "defibrilator/defib_failed.ogg",
+	shocksuccess = "defibrilator/defib_success.ogg",
 	asystole = "defibrilator/rem_aed_asystole.wav",
 	checkbreathing = "defibrilator/rem_aed_checkforbreathing.mp3",
 	checkpulse = "defibrilator/rem_aed_checkforpulse.mp3",
@@ -119,6 +121,8 @@ local AEDSounds = {
 	standclear = "defibrilator/rem_aed_standclear.mp3",
 	startcpr = "defibrilator/rem_aed_startcpr.mp3"
 }
+
+local AEDChargeTime = 7.75
 
 local AEDNoSoundCooldown = {
 	[AEDSounds.fibrillation] = true,
@@ -416,11 +420,11 @@ local function BeginAEDShock(defib, ply, getTarget, uses, accidental)
 	defib.AEDNoShockWarnings = false
 	PlayAEDSound(defib, AEDSounds.shockadvised)
 	PlayAEDSound(defib, AEDSounds.charging)
-	timer.Simple(1.5, function()
+	timer.Simple(AEDChargeTime, function()
 		if IsAEDState(defib, "charging") then PlayAEDSound(defib, AEDSounds.standclear) end
 	end)
 
-	timer.Simple(5, function()
+	timer.Simple(AEDChargeTime + 3.5, function()
 		if not IsAEDState(defib, "charging") or defib.AEDShocked then return end
 
 		defib.AEDCharging = false
@@ -440,6 +444,7 @@ local function BeginAEDShock(defib, ply, getTarget, uses, accidental)
 		PlayAEDSound(defib, AEDSounds.shockdelivered, 75, 100, 3)
 		ShockChest(target, 2)
 		ApplyAEDShock(org, accidental)
+		PlayAEDSound(defib, (not accidental and org and org.alive and not org.heartstop and not org.fibrillation) and AEDSounds.shocksuccess or AEDSounds.shockfailed, 75, 100, 2)
 
 		if org then
 			if not accidental then
@@ -813,11 +818,11 @@ function hg.DefibReviveIncapacitated(defib, owner, ply, getTarget, uses)
 	PlayAEDSound(defib, AEDSounds.shockadvised)
 	PlayAEDSound(defib, AEDSounds.charging)
 
-	timer.Simple(1.5, function()
+	timer.Simple(AEDChargeTime, function()
 		if IsAEDState(defib, "charging") then PlayAEDSound(defib, AEDSounds.standclear) end
 	end)
 
-	timer.Simple(3, function()
+	timer.Simple(AEDChargeTime + 1.5, function()
 		if not IsAEDState(defib, "charging") or defib.AEDShocked then return end
 
 		defib.AEDCharging = false
@@ -840,6 +845,7 @@ function hg.DefibReviveIncapacitated(defib, owner, ply, getTarget, uses)
 		PlayAEDSound(defib, AEDSounds.shocksound, 85, 100, 2)
 		PlayAEDSound(defib, AEDSounds.shockdelivered, 75, 100, 3)
 		ShockChest(target, 2)
+		PlayAEDSound(defib, AEDSounds.shocksuccess, 75, 100, 2)
 
 		local victim = IsValid(ply) and ply or org.owner
 

@@ -76,6 +76,7 @@ local function OnSurface(x, y, z, nx, ny, nz)
 end
 
 function RU.Spawn(x, y, z, nx, ny, nz, vol, surf, ent, hanging, noMerge)
+	if ABL.GPU.Ready() then return nil end
 	if not (ABL.GoodVol(vol) and OnSurface(x, y, z, nx, ny, nz)) then return nil end
 	-- (as channels of the flow core: cl_flowworld.lua; what follows is the older head-and-trail model)
 	if ABL.FlowCore.cv:GetBool() then return ABL.FlowWorld.Spawn(x, y, z, nx, ny, nz, vol, surf, ent, hanging, noMerge) end
