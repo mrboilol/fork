@@ -51,7 +51,13 @@ function hg.Suture.GetOptions(target)
 		end
 	end
 
+	local owner = IsValid(org.owner) and org.owner or target
+	for _, option in ipairs(options) do
+		option.stopped = hg.GetTourniquetBleedMultiplier and hg.GetTourniquetBleedMultiplier(owner, option.wound[7] == "arteria" and "arteria" or option.bone, option.kind == "artery") <= 0 or false
+	end
+
 	table.sort(options, function(a, b)
+		if a.stopped ~= b.stopped then return not a.stopped end
 		if a.kind ~= b.kind then return a.kind == "artery" end
 		return a.value > b.value
 	end)

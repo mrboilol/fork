@@ -26,7 +26,11 @@ local function updateAngerSound(name, target, dt)
 	end
 	snd.vol = math.Approach(snd.vol, target, dt * 3)
 	if target <= 0 and snd.vol <= 0.01 then stopAngerSound(name) return end
-	snd.patch:ChangeVolume(snd.vol, 0)
+	if not snd.patch:IsPlaying() then
+		snd.patch:PlayEx(snd.vol, 100)
+	else
+		snd.patch:ChangeVolume(snd.vol, 0)
+	end
 end
 
 hook.Add("Think", "hg_psyche_anger_sound", function()

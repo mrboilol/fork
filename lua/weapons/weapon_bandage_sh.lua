@@ -411,7 +411,13 @@ local function GetBandageAreaWounds(ent, org, bone)
 			end
 		end
 	end
-	return wounds
+	local active, stopped = {}, {}
+	for _, wound in ipairs(wounds) do
+		local list = IsTourniquetStopped(ent, org, wound[4], false) and stopped or active
+		list[#list + 1] = wound
+	end
+	for _, wound in ipairs(stopped) do active[#active + 1] = wound end
+	return active
 end
 
 local bandageVitalKeys = {"skull", "chest"}
@@ -1556,7 +1562,7 @@ if SERVER then
 			if (wound[1] or 0) > 0 and getTourniquetLimb(wound[7] == "arteria" and "arteria" or wound[4]) == limb then return 0 end
 		end
 		for _, wound in ipairs(org.wounds or {}) do
-			if (wound[1] or 0) > 0 and getTourniquetLimb(wound[4]) == limb then return 0 end
+			if (wound[1] or 0) > 0 and getTourniquetLimb(wound[4]) == limb and not hg.HasBandageOnBone(ent, wound[4]) then return 0 end
 		end
 
 		return hg.RemoveTourniquetsOnLimb(ent, bone)

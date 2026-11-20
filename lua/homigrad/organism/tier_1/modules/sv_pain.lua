@@ -14,8 +14,8 @@ local consciousness_recovery_speed = 12
 local low_consciousness_recovery_speed = 16
 local otrub_consciousness_recovery_speed = 20
 local otrub_rouse_consciousness_recovery_speed = 3.5
-local shock_consciousness_threshold = 40
-local shock_adrenaline_offset = 10
+local shock_consciousness_threshold = 60
+local shock_adrenaline_offset = 12
 local shock_blackout_rate = 0.28
 local shock_heavy_blackout_rate = 0.8
 local shock_fight_threshold_mul = 1.35
@@ -25,11 +25,7 @@ local otrub_pain_tolerance = 90
 local pain_fake_threshold = 0.9
 local pain_drain_base = 8
 local pain_drain_otrub_mul = 4.5
-local pain_shock_gain = 0.4
-local pain_syncope_start = 65
-local pain_syncope_full = 120
-local pain_syncope_max_rate = 0.03
-local pain_syncope_fight_resistance = 0.5
+local pain_shock_gain = 0.9
 local otrub_wake_threshold_delay = 0
 local otrub_wake_threshold_ramp_time = 50
 local otrub_wake_shock_max = 50
@@ -243,8 +239,8 @@ module[2] = function(owner, org, timeValue)
 	
 
 	local shockDecayMul = 1.5 + math.Clamp((org.shock - 25) / 15, 0, 1) * 1.5 + math.Clamp((org.shock - 40) / 30, 0, 1) ^ 2 * 5
-	if !org.lasthit or org.lasthit + 1.5 < CurTime() then org.shock = max(org.shock - timeValue * 4 * shockDecayMul * (org.otrub and 1 or 0.5) * (1 + resilience * 0.75 + zerlkersResistance * 2.25 + math.Clamp(painAdrenaline, 0, 5) * 0.6), 0) end
-	if adrenaline > 0 then org.shock = max(org.shock - timeValue * math.Clamp(painAdrenaline, 0, 5) * 0.9, 0) end
+	if !org.lasthit or org.lasthit + 1.5 < CurTime() then org.shock = max(org.shock - timeValue * 4 * shockDecayMul * (org.otrub and 1 or 0.5) * (1 + resilience * 0.75 + zerlkersResistance * 2.25 + math.Clamp(painAdrenaline, 0, 5) * 0.3), 0) end
+	if adrenaline > 0 then org.shock = max(org.shock - timeValue * math.Clamp(painAdrenaline, 0, 5) * 0.35, 0) end
 	org.immobilization = math.Clamp(max((tonumber(org.immobilization) or 0) - timeValue * 5 * adrenalineMul, 0), 0, 100)
 
 	local spine2Broken = (org.spine2 or 0) >= (hg.organism.fake_spine2 or 1)
@@ -305,7 +301,7 @@ module[2] = function(owner, org, timeValue)
 
 		org.disorientation = math.max(org.pain / 50, org.disorientation)//org.disorientation + add
 
-		org.shock = min(org.shock + timeValue * (org.pain - painConfig.stages[3]) * pain_shock_gain / (1 + max(painAdrenaline, 0) * 0.45), 95)
+		org.shock = min(org.shock + timeValue * (org.pain - painConfig.stages[3]) * pain_shock_gain / (1 + max(painAdrenaline, 0) * 0.2), 95)
 
 		org.fearadd = 1
 
@@ -319,7 +315,7 @@ module[2] = function(owner, org, timeValue)
 
 	local shockAnalgesia = Clamp(org.analgesia + org.painkiller * 0.3, 0, 1)
 	local fightingBack = org.panicattackActive and org.panicMode == "fight"
-	local shockThreshold = (shock_consciousness_threshold + shock_adrenaline_offset * Clamp(adrenaline, 0, 1) + shock_consciousness_analgesia_range * shockAnalgesia) *(1 + resilience * 0.6 + zerlkersResistance * 1.4) * math.max(org.traumaResistanceMul or 1, 1) * (fightingBack and shock_fight_threshold_mul or 1)
+	local shockThreshold = (shock_consciousness_threshold + shock_adrenaline_offset * Clamp(adrenaline, 0, 2) + shock_consciousness_analgesia_range * shockAnalgesia) *(1 + resilience * 0.6 + zerlkersResistance * 1.4) * math.max(org.traumaResistanceMul or 1, 1) * (fightingBack and shock_fight_threshold_mul or 1)
 	local shockHeavy = shockThreshold + shock_heavy_offset
 	local o2Value = org.o2 and tonumber(org.o2[1]) or 30
 	local hypoxicDrain = o2Value < 4 and 0.1 or o2Value < 8 and 0.03 or o2Value < 10 and 0.01 or 0
@@ -439,19 +435,10 @@ module[2] = function(owner, org, timeValue)
 
 	org.pain = org.avgpain * math.max(1 - (org.analgesia + org.painkiller * 0.3), 0) / math.max(org.painResistanceMul or 1, 1) * math.max(1 - math.Clamp(painAdrenaline, 0, 5) * 0.14, Lerp(anger, 0.3, 0.4)) * habitMul
 	if zerlkersDose > 0 or (painAdrenaline >= 3 and not org.adrenalinePainBreakthrough) then
-		org.pain = math.min(org.pain, 69.99)
+		org.pain = math.min(org.pain, 79.99)
 	end
 	org.rawPain = org.pain
 	if org.otrub then org.pain = 0 end
-	-- Pain can now produce a vasovagal blackout before the slower shock drain has
-	-- finished lowering consciousness. The smooth severity curve keeps moderate
-	-- pain occasional and makes sustained extreme pain progressively less stable.
-	local syncopeSeverity = Clamp((org.pain - pain_syncope_start) / (pain_syncope_full - pain_syncope_start), 0, 1)
-	local syncopeResistance = Clamp(resilience * 0.35 + zerlkersResistance * 0.8 + (math.max(org.traumaResistanceMul or 1, 1) - 1) * 0.2 + (fightingBack and pain_syncope_fight_resistance or 0), 0, 0.9)
-	local syncopeRate = syncopeSeverity ^ 1.7 * pain_syncope_max_rate * (1 - syncopeResistance)
-	if not org.otrub and syncopeRate > 0 and math.random() < Clamp(syncopeRate * timeValue, 0, 1) then
-		org.consciousness = math.min(org.consciousness or 1, otrubThreshold * 0.8)
-	end
 	hg.organism.UpdatePainShock(org, min(org.pain_turn * pain_fake_threshold, painConfig.shock.hardLimit), timeValue)
 	org.nearpainlimit = not org.otrub and (org.pain >= org.pain_turn * pain_fake_threshold or org.painCollapsed == true)
 	org.painStage = hg.organism.GetPainStage(org.pain)
@@ -567,6 +554,9 @@ module[2] = function(owner, org, timeValue)
 	end
 	if org.adrenalinePainBreakthrough then
 		adrenalineDecayRate = math.max(adrenalineDecayRate, timeValue / 8)
+	end
+	if not org.otrub and org.pain > 15 then
+		adrenalineDecayRate = adrenalineDecayRate * (1 + Clamp(org.pain / 60, 0, 1.5) * 2)
 	end
 	if CurTime() < (org._adrenalineReliefUntil or 0) then
 		adrenalineDecayRate = math.max(adrenalineDecayRate, timeValue / 3)

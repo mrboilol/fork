@@ -17,6 +17,25 @@ module[2] = function(owner, org, timeValue)
 	local anger = Clamp(org.anger or 0, 0, 1)
 	org.psycheAnger = anger
 	org.psychePainMul = 1
+
+	local K = hg.PsycheCombat
+	local mood = Clamp(tonumber(org.goodmood) or 0, 0, 1)
+	local peak = org.moodPeak or mood
+	peak = mood >= peak and mood or math.max(peak - timeValue / K.moodPeakMemory, mood)
+	org.moodPeak = peak
+
+	local dep = Clamp(tonumber(org.depression) or 0, 0, 1)
+	local depMem = org.depressionMemory or 0
+	depMem = dep >= depMem and dep or math.max(depMem - timeValue / K.depressionMemoryTime, dep)
+	org.depressionMemory = depMem
+end
+
+function hg.organism.GetFightLean(org)
+	local K = hg.PsycheCombat
+	local peak = Clamp(tonumber(org.moodPeak) or tonumber(org.goodmood) or 0, 0, 1)
+	local depMem = Clamp(tonumber(org.depressionMemory) or 0, 0, 1)
+
+	return Clamp(K.leanBase + peak * K.leanMood - depMem * K.leanDepression, K.leanMin, K.leanMax)
 end
 
 local function getCombatPlayer(ent)

@@ -22,12 +22,12 @@ local depression_stages = {0.25, 0.6, 0.85}
 local depression_succumb_max = 0.3
 local depression_calm_dying = 0.2
 local depression_panic_strain = {
-	suppressedPanic = 0.2,
-	suppressedStart = 20,
-	suppressedRamp = 20,
-	suppressedGain = 0.025,
-	overPanic = 0.75,
-	overGain = 0.035,
+	suppressedPanic = 0.12,
+	suppressedStart = 6,
+	suppressedRamp = 10,
+	suppressedGain = 0.045,
+	overPanic = 0.6,
+	overGain = 0.07,
 	recoverMul = 2,
 }
 

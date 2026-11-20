@@ -18,6 +18,7 @@ local LIMBS = {"rarm", "larm", "rleg", "lleg"}
 local BLEED_CONCERN_RATE = 1.5
 local BLEED_CONCERN_BLOOD = 4500
 local BLEED_WORSEN_DELTA = 0.75
+local BLEED_DYING_BLOOD = 3200
 
 local CHRONIC_INJURY_MIN = 0.25
 local CHRONIC_RISE_TIME = 60
@@ -30,8 +31,18 @@ local CHRONIC_ANGER_CAP = 0.2
 local CHRONIC_DEPRESSION_START = 0.6
 local CHRONIC_DEPRESSION_RATE = 0.006
 local CHRONIC_DEPRESSION_CAP = 0.2
+local PAIN_FOCUS = {
+    start = 40,
+    full = 90,
+    angerDrain = 0.12,
+    riseTime = 40,
+    fallTime = 150,
+    depressionStart = 0.4,
+    depressionRate = 0.01,
+    depressionCap = 0.25,
+}
 
-local WOUND_RANK = {hurt = 1, broken = 2, bloodloss = 3, bleeding = 3, bleedingBad = 4}
+local WOUND_RANK = {hurt = 1, broken = 2, bloodloss = 3, bleeding = 3, bleedingBad = 4, dying = 5}
 local WOUND_LINES = {
 	hurt = {
 		"Something's starting to hurt bad...",
@@ -64,6 +75,15 @@ local WOUND_LINES = {
 		"My fucking body is covered in blood.",
 		"Im not supposed to lose this much blood...",
 		"I should really stop the bleeding somehow...",
+	},
+	dying = {
+		"I think im dying...",
+		"I cant feel my hands anymore...",
+		"Everything's fading... Im not going to make it...",
+		"Somebody.. please.. I dont want to die...",
+		"Im so cold.. this is it, isnt it...",
+		"I cant keep my eyes open...",
+		"Theres too much blood.. I think this is the end...",
 	},
 	bloodloss = {
 		"Im starting to feel dizzy...",
@@ -130,7 +150,8 @@ local function getInjury(org)
     local worsening = bleeding and bleed >= base * 2 and bleed - base >= BLEED_WORSEN_DELTA
     local concerning = bleeding and (bleed >= BLEED_CONCERN_RATE or (tonumber(org.arterialBleed) or 0) > 0 or blood < BLEED_CONCERN_BLOOD or worsening)
 
-    local kind = concerning and (bleed > 4 or blood < 3800) and "bleedingBad"
+    local kind = concerning and blood < BLEED_DYING_BLOOD and "dying"
+        or concerning and (bleed > 4 or blood < 3800) and "bleedingBad"
         or concerning and "bleeding"
         or blood < 4200 and "bloodloss"
         or broken and "broken"
@@ -171,7 +192,7 @@ local function updateWoundThoughts(owner, org, kind)
     org.woundThoughtEscalate = nil
     org.woundThoughtRank = rank
     org.woundThoughtNext = now + math.Rand(WOUND_THOUGHT_MIN, WOUND_THOUGHT_MAX)
-    if kind == "bleeding" or kind == "bleedingBad" then org.bleedTrendBase = tonumber(org.bleed) or org.bleedTrendBase end
+    if kind == "bleeding" or kind == "bleedingBad" or kind == "dying" then org.bleedTrendBase = tonumber(org.bleed) or org.bleedTrendBase end
     local list = WOUND_LINES[kind]
     hg.organism.EmotionThought(owner, list[math.random(#list)], WOUND_THOUGHT_DURATION, "wound_" .. kind)
 end
@@ -218,6 +239,7 @@ module[1] = function(org)
     org.woundThoughtEscalate = nil
     org.bleedTrendBase = nil
     org.chronicStrain = 0
+    org.painExposure = 0
 end
 
 local function updateChronicStrain(owner, org, timeValue, injury)
@@ -237,6 +259,29 @@ local function updateChronicStrain(owner, org, timeValue, injury)
     if org.chronicStrain >= CHRONIC_DEPRESSION_START and (tonumber(org.depression) or 0) < CHRONIC_DEPRESSION_CAP and hg.organism.AddDepression then
         local weight = (org.chronicStrain - CHRONIC_DEPRESSION_START) / (1 - CHRONIC_DEPRESSION_START)
         hg.organism.AddDepression(org, timeValue * CHRONIC_DEPRESSION_RATE * weight)
+    end
+end
+
+local function updatePainFocus(org, timeValue)
+    local K = PAIN_FOCUS
+    local pain = tonumber(org.pain) or 0
+    local exposure = Clamp01(org.painExposure)
+    local severity = math.Clamp((pain - K.start) / (K.full - K.start), 0, 1)
+
+    if severity > 0 and not org.otrub then
+        exposure = exposure + timeValue / K.riseTime * severity
+        local anger = tonumber(org.anger) or 0
+        if anger > 0 then
+            org.anger = math.max(anger - timeValue * K.angerDrain * severity, 0)
+        end
+    else
+        exposure = exposure - timeValue / K.fallTime
+    end
+    org.painExposure = Clamp01(exposure)
+
+    if org.painExposure >= K.depressionStart and (tonumber(org.depression) or 0) < K.depressionCap and hg.organism.AddDepression then
+        local weight = (org.painExposure - K.depressionStart) / (1 - K.depressionStart)
+        hg.organism.AddDepression(org, timeValue * K.depressionRate * weight, "pain")
     end
 end
 
@@ -327,6 +372,7 @@ module[2] = function(owner, org, timeValue)
 
     local injury, woundKind = getInjury(org)
     updateChronicStrain(owner, org, timeValue, injury)
+    updatePainFocus(org, timeValue)
     local cap = 1 - injury
     if goodmood_add > 0 then
         goodmood_add = math.min(goodmood_add, math.max(cap - org.goodmood, 0))

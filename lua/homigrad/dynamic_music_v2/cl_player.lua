@@ -108,8 +108,14 @@ end
 
 local function LayerFade(channel, volume, howfast)
     if !IsValid(channel) then return end
-    local l_volume = LerpFT( howfast or 0.02, channel:GetVolume(), volume or 1)
+    local l_volume = LerpFT( howfast or 0.02, channel:GetVolume(), (volume or 1) * hg.DynamicMusicV2.Player.MasterVolume)
     channel:SetVolume(l_volume)
+end
+
+hg.DynamicMusicV2.Player.MasterVolume = hg.DynamicMusicV2.Player.MasterVolume or 1
+
+function hg.DynamicMusicV2.Player.SetVolume(volume)
+    hg.DynamicMusicV2.Player.MasterVolume = math.Clamp(volume or 1, 0, 1)
 end
 
 function hg.DynamicMusicV2.Player.Play()
@@ -125,6 +131,7 @@ end
 
 function hg.DynamicMusicV2.Player.Start( strTrackName )
     hg.DynamicMusicV2.Player.CurrentTrack = strTrackName or hg.DynamicMusicV2.Player.CurrentTrack
+    hg.DynamicMusicV2.Player.MasterVolume = 1
     hg.DynamicMusicV2.Player.SetupLayers()
 end
 

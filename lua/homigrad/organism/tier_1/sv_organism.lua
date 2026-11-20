@@ -1087,12 +1087,14 @@ function hg.organism.AddPanicAttack(org, amount, silent, combatEvent, ignoreGunf
 		panic_threat_adrenaline_spike(org, amount)
 		local K = hg.PsycheCombat
 		local owner = org.owner
-		local fightChance = K.angerFightChance * 0.4 + math.Clamp(tonumber(org.anger) or 0, 0, 1) * 0.4
+		local fightChance = hg.organism.GetFightLean(org)
 		if hg.organism.RileAnger and math.Rand(0, 1) < fightChance then
 			local att = IsValid(owner) and owner.lastPanicAttacker
 			hg.organism.RileAnger(org, math.min(amount * 1.5, 0.3), 0, IsValid(att) and att:IsPlayer() and att or nil)
 			return org.panicattackadd or 0
 		end
+		ignoreGunfightProtection = true
+		if hg.organism.AddDepression then hg.organism.AddDepression(org, amount * K.fightDepressionMul, "fight") end
 	end
 	if CurTime() < (org.betaBlockerUntil or 0) then amount = amount * hg.PsycheCombat.betaBlockMul end
 	local goodmood = math.Clamp(tonumber(org.goodmood) or 0, 0, 1)
