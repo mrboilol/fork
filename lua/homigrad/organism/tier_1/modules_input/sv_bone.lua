@@ -980,9 +980,11 @@ local function SpawnTeeth(org, count, hitPos, forceDir, violent)
 	local speedMul = violent and 1.8 or 1
 	local spread = violent and 110 or 55
 
-	for _ = 1, math.min(count, violent and 16 or 6) do
+	local total = math.min(count, violent and 8 or 4)
+
+	local function spawnOne()
 		local tooth = ents.Create("prop_physics")
-		if not IsValid(tooth) then continue end
+		if not IsValid(tooth) then return end
 
 		tooth:SetModel(model)
 		tooth:SetPos(pos + VectorRand(-2, 2))
@@ -1011,10 +1013,16 @@ local function SpawnTeeth(org, count, hitPos, forceDir, violent)
 		SafeRemoveEntityDelayed(tooth, 20)
 	end
 
-	local effect = EffectData()
-	effect:SetOrigin(pos)
-	effect:SetNormal(direction)
-	hg.BloodImpactEffect(effect, true, true)
+	for i = 1, total do
+		timer.Simple(0.03 * i, spawnOne)
+	end
+
+	timer.Simple(0, function()
+		local effect = EffectData()
+		effect:SetOrigin(pos)
+		effect:SetNormal(direction)
+		hg.BloodImpactEffect(effect, true, true)
+	end)
 end
 
 input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet, impact)

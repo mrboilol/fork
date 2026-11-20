@@ -32,7 +32,7 @@ local function addCombatResponse(org, angerAmount, adrenalineAmount, opponent)
 	if (org._combatResponseNext or 0) > now then
 		if IsValid(opponent) and opponent:IsPlayer() then
 			org.angerOpponent = opponent
-			org.angerOpponentUntil = now + 90
+			org.angerOpponentUntil = now + 45
 		end
 		return
 	end

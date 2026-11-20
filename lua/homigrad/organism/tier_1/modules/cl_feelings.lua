@@ -8,21 +8,41 @@ hook.Add("Player_Death", "hg_psyche_sound_stop", function(ply)
 	end
 end)
 
-local angerTier = 0
+local angerSounds = {}
+
+local function stopAngerSound(name)
+	local snd = angerSounds[name]
+	if snd then snd.patch:Stop() angerSounds[name] = nil end
+end
+
+local function updateAngerSound(name, target, dt)
+	local snd = angerSounds[name]
+	if not snd then
+		if target <= 0.01 then return end
+		local lply = LocalPlayer()
+		snd = {patch = CreateSound(lply, name), vol = 0}
+		snd.patch:PlayEx(0, 100)
+		angerSounds[name] = snd
+	end
+	snd.vol = math.Approach(snd.vol, target, dt * 3)
+	if target <= 0 and snd.vol <= 0.01 then stopAngerSound(name) return end
+	snd.patch:ChangeVolume(snd.vol, 0)
+end
+
 hook.Add("Think", "hg_psyche_anger_sound", function()
 	local lply = LocalPlayer()
-	if not IsValid(lply) or not lply:Alive() or not lply.organism then angerTier = 0 return end
-	local org = lply.organism
-	local anger = Clamp(org.psycheAnger or 0, 0, 1)
-	local tier = (org.otrub or org.incapacitated) and 0 or (anger >= 0.75 and 2 or anger >= 0.5 and 1 or 0)
-	if tier > angerTier then
-		surface.PlaySound(tier == 2 and "FURIOUS.mp3" or "angry.mp3")
+	local org = IsValid(lply) and lply:Alive() and lply.organism
+	local anger = org and not (org.otrub or org.incapacitated) and Clamp(org.psycheAnger or 0, 0, 1) or 0
+	local angryTarget, furiousTarget = 0, 0
+	if anger >= 0.75 then
+		angryTarget = Clamp(math.Remap(anger, 0.75, 0.8, 0.5, 0), 0, 0.5)
+		furiousTarget = math.Remap(anger, 0.75, 1, 0.5, 1)
+	elseif anger > 0.5 then
+		angryTarget = Clamp(math.Remap(anger, 0.5, 0.74, 0, 0.5), 0, 0.5)
 	end
-	if tier < angerTier and anger < (angerTier == 2 and 0.65 or 0.4) then
-		angerTier = tier
-	elseif tier > angerTier then
-		angerTier = tier
-	end
+	local dt = FrameTime()
+	updateAngerSound("angry.mp3", angryTarget, dt)
+	updateAngerSound("FURIOUS.mp3", furiousTarget, dt)
 end)
 
 local angerMat = Material("effects/shaders/zb_grain2")

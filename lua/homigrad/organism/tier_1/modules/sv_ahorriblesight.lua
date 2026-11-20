@@ -28,7 +28,7 @@ local RELIEF_MIN_ADRENALINE = 0.3
 local STRESS = {
 	death = {panic = 0.35, depression = 0.3, fear = 0.5},
 	otrub = {panic = 0.16, depression = 0.08, fear = 0.3},
-	corpse = {panic = 0.08, depression = 0, fear = 0.15},
+	corpse = {panic = 0.3, depression = 0, fear = 0.15, always = true},
 }
 local BUDDY_MUL = 2
 
@@ -304,7 +304,7 @@ end
 
 local function applyStress(watcher, org, stress, killer, mul, buddy)
 	org.fearadd = math.min((org.fearadd or 0) + stress.fear * mul, 3)
-	if isEndangered(watcher, org, killer) then
+	if stress.always or isEndangered(watcher, org, killer) then
 		hg.organism.AddPanicAttack(org, stress.panic * mul, true, false, buddy)
 	end
 	if buddy and stress.depression > 0 then

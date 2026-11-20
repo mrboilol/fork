@@ -855,7 +855,8 @@ function hg.organism.GetResilience(org)
 
 	local zerlkers = math.Clamp(org.zerlkers or 0, 0, 1)
 	local adrenaline = math.Clamp((org.adrenaline or 0) / 1.5, 0, 1)
-	return math.max(zerlkers, adrenaline) - math.Clamp(tonumber(org.depressionSuccumb) or 0, 0, 0.6)
+	local rage = hg.GetAngerShield(org) * hg.PsycheCombat.angerResilience
+	return math.max(zerlkers, adrenaline, rage) - math.Clamp(tonumber(org.depressionSuccumb) or 0, 0, 0.6)
 end
 
 local adrenalineBraceGroups = {
@@ -1084,7 +1085,16 @@ function hg.organism.AddPanicAttack(org, amount, silent, combatEvent, ignoreGunf
 			amount = amount * (1 + math.min(org.panicHitStreak or 0, panicattack_streak_max) * panicattack_streak_step)
 		end
 		panic_threat_adrenaline_spike(org, amount)
+		local K = hg.PsycheCombat
+		local owner = org.owner
+		local fightChance = K.angerFightChance * 0.4 + math.Clamp(tonumber(org.anger) or 0, 0, 1) * 0.4
+		if hg.organism.RileAnger and math.Rand(0, 1) < fightChance then
+			local att = IsValid(owner) and owner.lastPanicAttacker
+			hg.organism.RileAnger(org, math.min(amount * 1.5, 0.3), 0, IsValid(att) and att:IsPlayer() and att or nil)
+			return org.panicattackadd or 0
+		end
 	end
+	if CurTime() < (org.betaBlockerUntil or 0) then amount = amount * hg.PsycheCombat.betaBlockMul end
 	local goodmood = math.Clamp(tonumber(org.goodmood) or 0, 0, 1)
 	if goodmood > 0 then
 		local absorbed = math.min(amount, goodmood / 2.5)

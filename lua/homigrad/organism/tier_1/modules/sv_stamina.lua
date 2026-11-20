@@ -206,11 +206,34 @@ module[2] = function(owner, org, timeValue)
 	local stamina = org.stamina
 
 	local now = CurTime()
-	if (org.anger or 0) > 0 and angerOpponentStanding(org, now) then
-		org.angerCombatUntil = math.max(org.angerCombatUntil or 0, now + 1)
+	local K = hg.PsycheCombat
+	local standing = (org.anger or 0) > 0 and angerOpponentStanding(org, now)
+	if standing then
+		org.angerOpponentWasUp = true
+	elseif org.angerOpponentWasUp then
+		org.angerOpponentWasUp = nil
+		local opp = org.angerOpponent
+		local oorg = IsValid(opp) and opp.organism
+		local down = IsValid(opp) and (not opp:Alive() or (oorg and (oorg.otrub or oorg.alive == false)))
+		if down then
+			org.anger = math.max((org.anger or 0) - K.angerDownRelief, 0)
+			org.angerCombatUntil = 0
+			org.angerOpponent = nil
+			if org.psycheAnger ~= nil then org.psycheAnger = org.anger end
+			if hg.organism.AddHappiness then hg.organism.AddHappiness(org, K.angerDownHappiness) end
+		end
 	end
 	if now > (org.angerCombatUntil or 0) then
-		org.anger = math.max((org.anger or 0) - timeValue * anger_decay_per_second, 0)
+		local rate = anger_decay_per_second * (standing and K.angerOpponentDecayMul or 1)
+		org.anger = math.max((org.anger or 0) - timeValue * rate, 0)
+	end
+	if (org.anger or 0) >= 0.5 then
+		org.angerLongFor = (org.angerLongFor or 0) + timeValue
+		if org.angerLongFor > K.angerDepressionAfter and hg.organism.AddDepression then
+			hg.organism.AddDepression(org, timeValue * K.angerDepressionRate * org.anger, "fight")
+		end
+	else
+		org.angerLongFor = math.max((org.angerLongFor or 0) - timeValue * 2, 0)
 	end
 
 	
@@ -527,9 +550,10 @@ function hg.organism.RileAnger(org, amount, adrenalineAmount, opponent)
 	if not org or not org.alive or org.otrub then return end
 	if IsValid(opponent) and opponent:IsPlayer() then
 		org.angerOpponent = opponent
-		org.angerOpponentUntil = CurTime() + 90
+		org.angerOpponentUntil = CurTime() + 45
 	end
 	amount = math.max(amount or 0, 0)
+	if CurTime() < (org.betaBlockerUntil or 0) then amount = amount * hg.PsycheCombat.betaBlockMul end
 	adrenalineAmount = math.max(adrenalineAmount == nil and amount * 2 or adrenalineAmount, 0)
 	if amount > 0 and hg.GetPsycheTraining then amount = amount * Lerp(hg.GetPsycheTraining(org.owner), 1, hg.PsycheCombat.trainedAngerMul) end
 	if amount > 0 then

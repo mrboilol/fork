@@ -1136,6 +1136,18 @@ function SWEP:ShoveFront(sprintShove)
 
                 local ragdolled = false
 
+                local heldWep = target:GetActiveWeapon()
+                if IsValid(heldWep) and heldWep ~= self and not heldWep.NoDrop and hg.DropWeaponFromImpact and heldWep:GetClass() ~= "weapon_hg_coolhands" and heldWep:GetClass() ~= "weapon_hands_sh" then
+                        local disarmChance = 0.2
+                        local rightPos, leftPos = hg.GetWeaponHandPoints(heldWep)
+                        local hit = trace.HitPos
+                        if (isvector(rightPos) and rightPos:DistToSqr(hit) < 400) or (isvector(leftPos) and leftPos:DistToSqr(hit) < 400) then
+                                disarmChance = 0.65
+                        end
+                        if sprintShove then disarmChance = math.min(disarmChance * 1.3, 0.9) end
+                        if math.Rand(0, 1) < disarmChance then hg.DropWeaponFromImpact(target, heldWep, pushVel, 0.7) end
+                end
+
                 local victimSprinting = target:KeyDown(IN_SPEED) or (target.IsSprinting and target:IsSprinting())
 			local targetWep = target:GetActiveWeapon()
 			local victimBlocking = IsValid(targetWep) and targetWep.GetBlocking and targetWep:GetBlocking()

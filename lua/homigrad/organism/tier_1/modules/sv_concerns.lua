@@ -191,6 +191,9 @@ function hg.organism.AddHappiness(org, amount)
     if not org or not isnumber(amount) or amount <= 0 then return end
     if org.buddyNear and hg.Buddy then amount = amount * hg.Buddy.Config.happinessMul end
     amount = amount * (1 - Clamp01(org.chronicStrain) * CHRONIC_HAPPINESS_PENALTY)
+    amount = amount * (1 - Clamp01(org.anger) * hg.PsycheCombat.angerHappinessBlock)
+    if CurTime() < (org.betaBlockerUntil or 0) then amount = amount * hg.PsycheCombat.betaBlockMul end
+    if amount <= 0 then return end
 
     local depression = math.Clamp(tonumber(org.depression) or 0, 0, 1)
     local eased = math.min(depression, amount)

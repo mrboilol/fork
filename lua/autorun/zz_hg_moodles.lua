@@ -758,7 +758,7 @@ local function buildEffects(ply, org)
 		add(effects, "happy", "happy", math.ceil(goodmood * 4), "good", 15, math.floor(goodmood * 100) .. "%")
 	end
 	local depression = math.Clamp(orgNumber(org, "depression", 0), 0, 1)
-	if depression >= 0.1 then
+	if depression >= 0.03 then
 		local icon, level = "unhappy", 1
 		if depression >= 0.85 then
 			icon, level = "hopeless", 4
@@ -1053,7 +1053,7 @@ local function buildEffects(ply, org)
 	local adrenaline = orgNumber(org, "adrenaline", 0)
 	if adrenaline > 0.3 then add(effects, "adrenaline", "adrenaline", highRank(adrenaline, {0.3, 0.8, 1.5, 2.1}), "good", 11, math.Round(adrenaline, 1)) end
 	local panic = orgNumber(org, "panicattack", 0)
-	if panic > 0.1 then add(effects, "panic", "panic", highRank(panic, {0.1, 0.35, 0.6, 0.85}), "bad", 12, math.floor(panic * 100) .. "%") end
+	if panic > 0.03 then add(effects, "panic", "panic", highRank(panic, {0.03, 0.35, 0.6, 0.85}), "bad", 12, math.floor(panic * 100) .. "%") end
 	local anger = math.Clamp(orgNumber(org, "anger", 0), 0, 1)
 	if anger > 0.01 then
 		add(effects, "anger", "anger", math.ceil(anger * 4), "good", 14, math.floor(anger * 100) .. "%")

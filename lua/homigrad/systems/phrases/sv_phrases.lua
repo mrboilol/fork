@@ -403,7 +403,6 @@ hg.UniversalScreamSounds = {
 local painVoiceAgony = 60
 local painVoiceRush = 85
 local painNumbedRatio = 0.95
-local painGapBlink = 25
 local painRiseWindow = 0.4
 local painRiseAmount = 12
 local voiceGap = 0.35
@@ -561,24 +560,24 @@ hook.Add("Org Think", "HG_PainVoice", function(ply, org)
 		org.painRiseAt = now
 	end
 
-	local rush = pain >= painVoiceRush and now < (org.painRiseUntil or 0)
-		and now >= (org.painRushNext or 0) and now >= (org.painBlinkPending or 0)
-	if now < (org.voiceFreeAt or 0) or (now < (org.painVoiceNext or 0) and !rush) then return end
-
-	local gap = (org.avgpain or 0) - pain >= painGapBlink
+	local spiking = pain >= painVoiceAgony and now < (org.painRiseUntil or 0)
+	local rush = pain >= painVoiceRush and spiking
 	local queued = (org.painScreamQueue or 0) >= 1
 	local ent = hg.GetCurrentCharacter(ply)
 	local burning = ply:IsOnFire() or (IsValid(ent) and ent:IsOnFire())
+	local blink = !burning and (queued or spiking) and now >= (org.painBlinkNext or 0) and now >= (org.painBlinkPending or 0)
+
+	if now < (org.voiceFreeAt or 0) or (now < (org.painVoiceNext or 0) and !(blink and rush)) then return end
+
 	local rawPain = org.avgpain or 0
-	local numbed = !burning and rawPain >= painVoiceAgony and pain < rawPain * painNumbedRatio
+	local numbed = !burning and rawPain >= painVoiceAgony and pain < painVoiceAgony and pain < rawPain * painNumbedRatio
 	local agony = pain >= painVoiceAgony or burning or numbed
-	local blink = !burning and (org.nearpainlimit or gap or queued) and now >= (org.painBlinkNext or 0)
 
 	if !blink and !agony then return end
 
 	local custom = customPhrase(ply)
 
-	if blink and !custom and !rush then
+	if blink and !custom then
 		if queued then org.painScreamQueue = org.painScreamQueue - 1 end
 
 		org.painBlinkNext = now + math.Rand(2, 3.5)
@@ -609,7 +608,6 @@ hook.Add("Org Think", "HG_PainVoice", function(ply, org)
 		end
 		local duration = voice(ply, phrase, 80, true, kind)
 		org.painVoiceNext = now + duration + math.Rand(2.5, 4)
-		if rush then org.painRushNext = now + 1.5 end
 	end
 end)
 

@@ -811,30 +811,27 @@ local DRAWTEST_RES = 16
 local DRAWTEST_MIN = 60
 local drawTest
 
-local function DrawTest()
+local function RenderState(tex)
 	if not drawTest then
 		local t = {}
 		t.state = RT("drawtest_state", IMAGE_FORMAT_RGBA16161616F, 4)
 		t.out = GetRenderTargetEx("ablgpu_drawtest_out", DRAWTEST_RES, DRAWTEST_RES, RT_SIZE_LITERAL, MATERIAL_RT_DEPTH_SEPARATE, RT_FLAGS, 0, IMAGE_FORMAT_RGBA8888)
 		t.mat = Mat("drawtest", "world_vs30", "surface_ps30", true)
-		t.mat:SetTexture("$basetexture", t.state)
-		SetC(t.mat, 0, 1 / 4, ABSORB, STAIN_ABSORB, SHINE)
+		SetC(t.mat, 0, 1 / RES, ABSORB, STAIN_ABSORB, SHINE)
 		SetC(t.mat, 1, 1, 1, 1, 0)
-		SetC(t.mat, 2, 0, 0, 64, 0)
+		SetC(t.mat, 2, 0, 0, 32, 0)
 		SetC(t.mat, 3, 0, 0, 1, 1)
 		drawTest = t
 	end
-	render.PushRenderTarget(drawTest.state)
-	render.Clear(255, 0, 0, 0)
-	render.PopRenderTarget()
+	drawTest.mat:SetTexture("$basetexture", tex)
 	render.PushRenderTarget(drawTest.out)
 	render.Clear(0, 0, 0, 255, true, true)
-	cam.Start3D(Vector(0, 0, 64), Angle(90, 0, 0), 60, 0, 0, DRAWTEST_RES, DRAWTEST_RES)
+	cam.Start3D(Vector(0, 0, 32), Angle(90, 0, 0), 90, 0, 0, DRAWTEST_RES, DRAWTEST_RES)
 	render.SetMaterial(drawTest.mat)
 	local up = Vector(0, 0, 1)
 	mesh.Begin(MATERIAL_QUADS, 1)
 	for _, c in ipairs(corners) do
-		mesh.Position(Vector((c[1] * 2 - 1) * 64, (c[2] * 2 - 1) * 64, 0))
+		mesh.Position(Vector((c[1] * 2 - 1) * 32, (c[2] * 2 - 1) * 32, 0))
 		mesh.Normal(up)
 		mesh.TexCoord(0, c[1], c[2])
 		mesh.AdvanceVertex()
@@ -842,10 +839,27 @@ local function DrawTest()
 	mesh.End()
 	cam.End3D()
 	render.CapturePixels()
-	local r = render.ReadPixel(DRAWTEST_RES / 2, DRAWTEST_RES / 2)
+	local lit, maxR = 0, 0
+	for y = 0, DRAWTEST_RES - 1 do
+		for x = 0, DRAWTEST_RES - 1 do
+			local r = render.ReadPixel(x, y)
+			if r > 0 then lit = lit + 1 end
+			if r > maxR then maxR = r end
+		end
+	end
 	render.PopRenderTarget()
 
-	return r and r >= DRAWTEST_MIN
+	return lit, maxR
+end
+
+local function DrawTest()
+	RenderState(Shared().zero)
+	render.PushRenderTarget(drawTest.state)
+	render.Clear(255, 0, 0, 0)
+	render.PopRenderTarget()
+	local _, maxR = RenderState(drawTest.state)
+
+	return maxR >= DRAWTEST_MIN
 end
 
 local function SimFrame()
@@ -953,12 +967,22 @@ local function DrawPatches()
 	end
 end
 
-hook.Add("PostDrawOpaqueRenderables", "ABL_GPUDraw", function(depth, sky, sky3d)
-	if depth or sky or sky3d or not Busy() or not GP.Ready() then return end
+hook.Add("PreDrawTranslucentRenderables", "ABL_GPUDraw", function(depth, sky, sky3d)
+	if depth or sky or sky3d or #patches == 0 or not GP.Ready() then return end
 	render.OverrideBlend(true, BLEND_SRC_ALPHA, BLEND_ONE_MINUS_SRC_ALPHA, BLENDFUNC_ADD, BLEND_ZERO, BLEND_ONE, BLENDFUNC_ADD)
 	render.OverrideDepthEnable(true, false)
 	local ok, err = pcall(DrawPatches)
-	if ok and GP.BodyDraw then ok, err = pcall(GP.BodyDraw) end
+	render.OverrideDepthEnable(false)
+	render.OverrideBlend(false)
+	if not ok then Fail(err) end
+end)
+
+hook.Add("PostDrawOpaqueRenderables", "ABL_GPUBodyDraw", function(depth, sky, sky3d)
+	if depth or sky or sky3d or not GP.BodyDraw or not GP.Ready() then return end
+	if not (GP.BodyCount and GP.BodyCount() > 0) then return end
+	render.OverrideBlend(true, BLEND_SRC_ALPHA, BLEND_ONE_MINUS_SRC_ALPHA, BLENDFUNC_ADD, BLEND_ZERO, BLEND_ONE, BLENDFUNC_ADD)
+	render.OverrideDepthEnable(true, false)
+	local ok, err = pcall(GP.BodyDraw)
 	render.OverrideDepthEnable(false)
 	render.OverrideBlend(false)
 	if not ok then
@@ -980,4 +1004,15 @@ concommand.Add("abl_gpu_status", function()
 	print(string.format("[ABL] GPU blood: enabled=%s capable=%s verified=%s draw=%s failed=%s patches=%d bodies=%d",
 		tostring(C.cl.gpu:GetBool()), tostring(Capable()), tostring(GP.verified), tostring(GP.drawPassed), tostring(GP.failed == true),
 		#patches, GP.BodyCount and GP.BodyCount() or 0))
+	local eye = EyePos()
+	for i, p in ipairs(patches) do
+		local lit, maxR = 0, 0
+		if not p.pending then
+			local ok, l, m = pcall(RenderState, p.slot.rt[p.cur])
+			if ok then lit, maxR = l, m else lit, maxR = -1, -1 end
+		end
+		print(string.format("  patch %d: pending=%s stamps=%d mesh=%s dist=%d facing=%s age=%.1f litPixels=%d/256 maxR=%d",
+			i, tostring(p.pending == true), #p.stamps, tostring(p.mesh ~= nil), eye:Distance(p.center),
+			tostring((eye - p.center):Dot(p.n) > 0), RealTime() - p.last, lit, maxR))
+	end
 end)

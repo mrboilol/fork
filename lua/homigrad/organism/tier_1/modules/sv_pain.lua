@@ -201,7 +201,7 @@ module[2] = function(owner, org, timeValue)
 
 	local adrenaline = org.adrenaline
 	local anger = Clamp(tonumber(org.anger) or 0, 0, 1)
-	local painAdrenaline = adrenaline * (1 + anger * 1.5)
+	local painAdrenaline = adrenaline * (1 + anger * 0.4)
 	local zerlkersDose = math.Clamp(tonumber(org.zerlkers) or 0, 0, 4)
 	if zerlkersDose > 0 then
 		zerlkersDose = math.max(zerlkersDose - timeValue / 120, 0)
@@ -437,7 +437,7 @@ module[2] = function(owner, org, timeValue)
 
 
 
-	org.pain = org.avgpain * math.max(1 - (org.analgesia + org.painkiller * 0.3), 0) / math.max(org.painResistanceMul or 1, 1) * math.max(1 - math.Clamp(painAdrenaline, 0, 5) * 0.14, Lerp(anger, 0.3, 0.12)) * habitMul
+	org.pain = org.avgpain * math.max(1 - (org.analgesia + org.painkiller * 0.3), 0) / math.max(org.painResistanceMul or 1, 1) * math.max(1 - math.Clamp(painAdrenaline, 0, 5) * 0.14, Lerp(anger, 0.3, 0.4)) * habitMul
 	if zerlkersDose > 0 or (painAdrenaline >= 3 and not org.adrenalinePainBreakthrough) then
 		org.pain = math.min(org.pain, 69.99)
 	end
