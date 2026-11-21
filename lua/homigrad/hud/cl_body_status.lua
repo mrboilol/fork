@@ -1368,8 +1368,7 @@ function hg.BodyStatus.DrawFor(subject, region)
 	focus.frame = FrameNumber()
 	local ok, err = pcall(drawBodyStatus, subject)
 	focus.region = nil
-	if not ok then ErrorNoHalt(err, "
-") end
+	if not ok then ErrorNoHalt(err, "\n") end
 end
 
 hook.Add("HUDPaint", "homigrad/body-status/draw", function()

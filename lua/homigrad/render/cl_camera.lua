@@ -481,6 +481,7 @@ CalcView = function(ply, origin, angles, fov, znear, zfar)
 		ply.lockcamera = false
 	end
 
+	lply = IsValid(lply) and lply or LocalPlayer()
 	if not ply:Alive() and not follow then
 		if lply:GetNWInt("viewmode",0) == 1 then
 			local spectView = hook.Run("HG_CalcView", lply, origin, angles, fov, znear, zfar)
