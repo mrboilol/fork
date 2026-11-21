@@ -420,7 +420,7 @@ local function BeginAEDShock(defib, ply, getTarget, uses, accidental)
 	defib.AEDNoShockWarnings = false
 	PlayAEDSound(defib, AEDSounds.shockadvised)
 	PlayAEDSound(defib, AEDSounds.charging)
-	timer.Simple(AEDChargeTime, function()
+	timer.Simple(math.max(SoundDuration(AEDSounds.shockadvised), 0.1), function()
 		if IsAEDState(defib, "charging") then PlayAEDSound(defib, AEDSounds.standclear) end
 	end)
 
@@ -818,7 +818,7 @@ function hg.DefibReviveIncapacitated(defib, owner, ply, getTarget, uses)
 	PlayAEDSound(defib, AEDSounds.shockadvised)
 	PlayAEDSound(defib, AEDSounds.charging)
 
-	timer.Simple(AEDChargeTime, function()
+	timer.Simple(math.max(SoundDuration(AEDSounds.shockadvised), 0.1), function()
 		if IsAEDState(defib, "charging") then PlayAEDSound(defib, AEDSounds.standclear) end
 	end)
 

@@ -21,6 +21,7 @@ local render_GetLightColor = render.GetLightColor
 
 local hg_blood_draw_distance = ConVarExists("hg_blood_draw_distance") and GetConVar("hg_blood_draw_distance") or CreateClientConVar("hg_blood_draw_distance", 1024, true, nil, "distance to draw blood", 0, 4096)
 local hg_blood_sprites = ConVarExists("hg_blood_sprites") and GetConVar("hg_blood_sprites") or CreateClientConVar("hg_blood_sprites", 1, true, nil, "blood is sprites or trails", 0, 1)
+local hg_supercheapblood = ConVarExists("hg_supercheapblood") and GetConVar("hg_supercheapblood") or CreateClientConVar("hg_supercheapblood", 0, true, false, "1 = cheapest blood: old Z-City particles and decals, AdvancedBlood CPU and GPU blood off", 0, 1)
 
 function hg.ResetBloodDecals()
 	hg.bloodpositions = {}
@@ -93,7 +94,7 @@ bloodparticles_hook[1] = function(anim_pos, mul)
 			local beamMotion = (part[2] - part[1]) / mul / 24
 			local size = part[5] or 1
 			local maxLength = part.maxBeamLength or size
-			if beamMotion:LengthSqr() > maxLength * maxLength then
+			if not hg_supercheapblood:GetBool() and beamMotion:LengthSqr() > maxLength * maxLength then
 				beamMotion = beamMotion:GetNormalized() * maxLength
 			end
 			render_DrawBeam(pos - beamMotion * 0.5, pos + beamMotion * 0.5, size, 0, 1, part[9] or lightcolor)
@@ -103,9 +104,8 @@ end
 
 local hg_old_blood = ConVarExists("hg_old_blood") and GetConVar("hg_old_blood") or CreateClientConVar("hg_old_blood", 1, true, false, "1 = AdvancedBlood system, 0 = old Z-City blood particles and decals", 0, 1)
 local hg_oldblood = ConVarExists("hg_oldblood") and GetConVar("hg_oldblood") or CreateClientConVar("hg_oldblood", 0, true, false, "Use old Z-City blood decals", 0, 1)
-local hg_supercheapblood = ConVarExists("hg_supercheapblood") and GetConVar("hg_supercheapblood") or CreateClientConVar("hg_supercheapblood", 0, true, false, "1 = cheapest blood: old Z-City particles and decals, AdvancedBlood CPU and GPU blood off", 0, 1)
 local function useOldBlood()
-	return not hg_old_blood:GetBool() or hg_oldblood:GetBool() or hg_supercheapblood:GetBool()
+	return hg_oldblood:GetBool()
 end
 
 cvars.RemoveChangeCallback("hg_supercheapblood", "hg_refresh_cheap_blood")
@@ -149,10 +149,12 @@ local function isDecalExSafe(target)
 	return not IsValid(target) or target:IsWorld() or string.sub(target:GetModel() or "", 1, 1) == "*"
 end
 
-local bloodDecalDiameterMul = 7
+local function bloodDecalDiameter(amount, particleSize)
+	return math.Clamp(math.max(1 + math.sqrt(math.max(amount or 0.2, 0)) * 2.2, (particleSize or 0) * 2), 1, 16)
+end
 
 local function getBloodDecalScale(amount, particleSize, material)
-	local diameter = math.max(0.5 + math.sqrt(amount or 0.2) * 1.5, particleSize or 0) * bloodDecalDiameterMul
+	local diameter = (amount or 0.2) > 0 and bloodDecalDiameter(amount, particleSize) or math.Clamp(particleSize or 1, 0.5, 16)
 	local materialScale = material:GetFloat("$decalscale") or 1
 	if materialScale <= 0 then materialScale = 1 end
 	return diameter / (math.max(material:Width(), material:Height(), 1) * materialScale)
@@ -208,7 +210,33 @@ local function placeNewBloodDecal(pos, normal, target, artery, amount, particleS
 		material = Material(util.DecalMaterial(name))
 		newBloodDecalMaterials[name] = material
 	end
-	local scale = getBloodDecalScale(amount, particleSize, material) * (1 + (math.min(count, 6) - 1) * 0.15)
+	local scale = getBloodDecalScale(amount, particleSize, material)
+	util.DecalEx(material, target or game.GetWorld(), pos, normal, color_white, scale, scale)
+end
+
+local function placeCheapBloodDecal(pos, normal, target, artery, amount, particleSize)
+	amount = math.max(amount or 0.2, 0.05)
+	local material
+	if useOldBlood() then
+		local decals = artery and oldArterialBloodDecals or oldBloodDecals
+		material = decals[math_random(#decals)]
+	else
+		local name = (artery and "Arterial.Blood2" or "Normal.Blood2") .. math_random(1, 5)
+		if not isDecalExSafe(target) then
+			util.Decal(name, pos + normal, pos - normal, target)
+			return
+		end
+		material = newBloodDecalMaterials[name]
+		if not material then
+			material = Material(util.DecalMaterial(name))
+			newBloodDecalMaterials[name] = material
+		end
+	end
+	if not isDecalExSafe(target) then
+		util.Decal(artery and "Arterial.Blood1" or "Normal.Blood1", pos + normal, pos - normal, target)
+		return
+	end
+	local scale = getBloodDecalScale(amount, particleSize, material)
 	util.DecalEx(material, target or game.GetWorld(), pos, normal, color_white, scale, scale)
 end
 
@@ -218,6 +246,10 @@ function hg.DepositBodyBloodRunoff(pos, amount, artery, particleSize)
 	poolTrace.endpos = pos - vector_up * 256
 	local result = util_TraceLine(poolTrace)
 	if result.HitWorld and result.HitNormal.z >= 0.55 then
+		if hg_supercheapblood:GetBool() then
+			placeCheapBloodDecal(result.HitPos, result.HitNormal, nil, artery, amount or 0.2, particleSize)
+			return
+		end
 		if useOldBlood() then
 			placeOldBloodDecal(result.HitPos, result.HitNormal, nil, artery, amount or 0.2, particleSize)
 			return
@@ -240,7 +272,7 @@ local dripChance = 0.65
 local function placeBloodStreak(place, pos, normal, target, artery, dir, headSize, steps, startFade)
 	local side = normal:Cross(dir)
 	local drift = math.Rand(-0.1, 0.1)
-	local spacing = headSize * bloodDecalDiameterMul * 0.32
+	local spacing = headSize * 0.32
 	local p = pos
 	for i = 1, steps do
 		local fade = startFade * (1 - (i - 1) / steps)
@@ -270,7 +302,8 @@ local function decalBlood(pos, normal, tr, artery, owner, tiny, amount, particle
 	end
 
 	if hg_supercheapblood:GetBool() then
-		placeOldBloodDecal(pos, normal, IsValid(tr.Entity) and tr.Entity or nil, artery, amount, particleSize)
+		placeCheapBloodDecal(pos, normal, IsValid(tr.Entity) and tr.Entity or nil, artery, amount, particleSize)
+		if not tiny or math.random(7) == 1 then playBloodDripImpact(pos, tr) end
 		return
 	end
 
@@ -291,7 +324,7 @@ local function decalBlood(pos, normal, tr, artery, owner, tiny, amount, particle
 	local place = useOldBlood() and placeOldBloodDecal or placeNewBloodDecal
 	place(pos, normal, target, artery, amount, particleSize)
 	if not tiny and isDecalExSafe(target) then
-		local headSize = math.max(0.5 + math.sqrt(amount) * 1.5, particleSize or 0)
+		local headSize = bloodDecalDiameter(amount, particleSize)
 		if steps > 0 then
 			placeBloodStreak(place, pos, normal, target, artery, dir, headSize, steps, 0.8)
 		end
@@ -302,7 +335,7 @@ local function decalBlood(pos, normal, tr, artery, owner, tiny, amount, particle
 				local side = normal:Cross(down)
 				local runs = (artery or amount > 1.5) and math_random(1, 3) or 1
 				for _ = 1, runs do
-					local start = pos + side * math.Rand(-0.6, 0.6) * headSize * 1.25
+					local start = pos + side * math.Rand(-0.6, 0.6) * headSize * 0.18
 					placeBloodStreak(place, start, normal, target, artery, down, headSize, math_random(dripMinSteps, dripMaxSteps), math.Rand(0.3, 0.5))
 				end
 			end

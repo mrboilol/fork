@@ -1,6 +1,8 @@
 hg.StandingWoundHold = hg.StandingWoundHold or {}
 local SWH = hg.StandingWoundHold
 
+local standingHoldCvar = CreateConVar("hg_standing_woundhold", "1", {FCVAR_ARCHIVE, FCVAR_REPLICATED, FCVAR_NOTIFY}, "Standing players hold their wounds with their hands", 0, 1)
+
 SWH.HandsClasses = {
 	weapon_hands_sh = true,
 	weapon_hg_coolhands = true,
@@ -40,6 +42,7 @@ if SERVER then
 	end
 
 	local function canHold(ply, org)
+		if not standingHoldCvar:GetBool() then return false end
 		if not ply:Alive() or not org or not org.alive or org.otrub or not org.canmove then return false end
 		if not ply:OnGround() or ply:InVehicle() then return false end
 

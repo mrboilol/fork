@@ -263,6 +263,100 @@ local function updateThresholdThoughts(owner, org, K)
 	end
 end
 
+function hg.organism.RelieveStress(org, amount)
+	if not org or not isnumber(amount) or amount <= 0 then return end
+	org.depression = Clamp((tonumber(org.depression) or 0) - amount, 0, 1)
+	org.depressionadd = math.max((tonumber(org.depressionadd) or 0) - amount, 0)
+	org.panicattackadd = math.max((tonumber(org.panicattackadd) or 0) - amount, 0)
+end
+
+function hg.organism.CombatSuccess(org, amount)
+	if not org then return end
+	local now = CurTime()
+	if (org._successNext or 0) > now then return end
+	org._successNext = now + hg.PsycheCombat.successCooldown
+	hg.organism.RelieveStress(org, amount)
+end
+
+local function entDown(ent)
+	if not IsValid(ent) then return true end
+	if ent:IsPlayer() then
+		local oorg = ent.organism
+		return not ent:Alive() or (oorg and (oorg.otrub or oorg.alive == false)) or false
+	end
+	return ent:Health() <= 0
+end
+
+local function latestStamp(tbl, latest)
+	if not tbl then return latest end
+	for ent, when in pairs(tbl) do
+		if IsValid(ent) and when > latest then latest = when end
+	end
+	return latest
+end
+
+local function updateDisengage(owner, org, now, timeValue, K)
+	local last = latestStamp(owner.hgFightTargets, latestStamp(owner.hgFightAttackers, 0))
+	if now - last < K.disengageAfter or now < (org.panicGunfightUntil or 0) then
+		org.psycheEngaged = true
+		return
+	end
+
+	local opp = org.angerOpponent
+	local alive = not entDown(opp)
+	local threat = alive and owner:GetPos():DistToSqr(opp:GetPos()) < K.angerFleeDistance * K.angerFleeDistance
+
+	if org.psycheEngaged then
+		org.psycheEngaged = nil
+		local stressed = (org.adrenaline or 0) >= 0.3 or (org.adrenalineAdd or 0) > 0
+		if alive and not threat and stressed and now >= (org.epinephrineStabilizationUntil or 0) then
+			org.adrenalineAdd = math.min(org.adrenalineAdd or 0, 0)
+			org._adrenalineHoldUntil = 0
+			org._adrenalineReliefUntil = now + K.fleeReliefDuration
+		end
+	end
+
+	if threat then return end
+	if now < (org.angerCombatUntil or 0) then org.angerCombatUntil = now end
+
+	local anger = tonumber(org.anger) or 0
+	if anger <= 0 then return end
+	local drop = math.min(anger, timeValue * K.angerDisengageDecay)
+	org.anger = anger - drop
+
+	local depression = Clamp(tonumber(org.depression) or 0, 0, 1)
+	if alive and depression >= K.angerFleeDepression then
+		local panic = math.max(tonumber(org.panicattackadd) or 0, 0)
+		org.panicattackadd = math.max(panic, math.min(panic + drop * K.angerFleePanic, 1 - depression))
+	end
+end
+
+local function updateAdrenalineIdle(org, now, timeValue, K)
+	local adrenaline = tonumber(org.adrenaline) or 0
+	local previous = org.psycheAdrLast or adrenaline
+	local receiving = adrenaline > previous + 0.0005
+		or (org.adrenalineAdd or 0) > 0
+		or now < (org._adrenalineHoldUntil or 0)
+		or org.panicattackActive
+		or org.psycheEngaged
+		or now < (org.panicGunfightUntil or 0)
+		or now < (org.epinephrineStabilizationUntil or 0)
+		or now < (org._berserkEndTime or 0)
+		or now < (org._noradrenalineEndTime or 0)
+	if receiving or not org.psycheAdrActiveAt then
+		org.psycheAdrActiveAt = now
+		org.psycheAdrLast = adrenaline
+		return
+	end
+
+	local ramp = Clamp((now - org.psycheAdrActiveAt - K.adrenalineIdleAfter) / K.adrenalineIdleRamp, 0, 1)
+	if ramp > 0 and adrenaline > 0 then
+		adrenaline = Approach(adrenaline, 0, timeValue / 25 * (K.adrenalineIdleMul - 1) * ramp)
+		org.adrenaline = adrenaline
+	end
+	org.psycheAdrLast = adrenaline
+end
+
 hook.Add("Org Think", "CombatPsyche", function(owner, org, timeValue)
 	if not org.isPly or not IsValid(owner) or not owner:IsPlayer() then return end
 	local K = hg.PsycheCombat
@@ -281,6 +375,8 @@ hook.Add("Org Think", "CombatPsyche", function(owner, org, timeValue)
 	updateOxygen(org, timeValue, K)
 	updateIsolation(owner, org, timeValue, now, K)
 	updateAnger(owner, org, timeValue, K)
+	updateDisengage(owner, org, now, timeValue, K)
+	updateAdrenalineIdle(org, now, timeValue, K)
 	updateThresholdThoughts(owner, org, K)
 end)
 
@@ -289,6 +385,7 @@ local function onKill(victim, attacker)
 	if not attacker:IsPlayer() and attacker.GetOwner then attacker = attacker:GetOwner() end
 	if not IsValid(attacker) or not attacker:IsPlayer() or attacker == victim or not attacker:Alive() then return end
 	if not victim:IsPlayer() and not victim.organism then return end
+	if victim:IsNPC() then return end
 	if attacker.hgPsycheHasKilled or attacker.isTraitor then return end
 	attacker.hgPsycheHasKilled = true
 

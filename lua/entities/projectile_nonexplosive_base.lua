@@ -259,6 +259,32 @@ if SERVER then
 	if CLIENT then
 	hg.lodgedmodels = hg.lodgedmodels or {}
 
+	local lodgedFitCache = {}
+	local lodgedAxes = {Vector(1, 0, 0), Vector(0, 1, 0), Vector(0, 0, 1)}
+
+	local function lodgedModelFit(model)
+		local key = model:GetModel()
+		local fit = lodgedFitCache[key]
+		if fit then return fit end
+
+		local mins, maxs = model:GetModelBounds()
+		local size = maxs - mins
+		local order = {1, 2, 3}
+		table.sort(order, function(a, b) return size[a] > size[b] end)
+		local long, wide = order[1], order[2]
+		local longSign = math.abs(maxs[long]) >= math.abs(mins[long]) and 1 or -1
+		local wideSign = math.abs(maxs[wide]) >= math.abs(mins[wide]) and 1 or -1
+
+		local tip = (mins + maxs) * 0.5
+		tip[long] = longSign > 0 and maxs[long] or mins[long]
+
+		local basis = (lodgedAxes[long] * longSign):AngleEx(lodgedAxes[wide] * wideSign)
+		local _, inverse = WorldToLocal(vector_origin, angle_zero, vector_origin, basis)
+		fit = {inverse = inverse, tip = tip}
+		lodgedFitCache[key] = fit
+		return fit
+	end
+
 	function hg.ProjectilesDraw(ent, ply)
 		if !IsValid(arrowasdasd) then
 			arrowasdasd = ClientsideModel("models/z_city/nmrih/items/arrow/ammo_arrow_single.mdl")
@@ -285,6 +311,20 @@ if SERVER then
 				local mat = bone and bone >= 0 and ent:GetBoneMatrix(bone)
 				if not mat then continue end
 				local pos, ang = LocalToWorld(settings.OffsetPos, settings.OffsetAng, mat:GetTranslation(), mat:GetAngles())
+				local scale = tonumber(settings.modelscale) or 1
+				if arrow.hgLodgedScale ~= scale then
+					arrow:SetModelScale(scale, 0)
+					arrow.hgLodgedScale = scale
+				end
+
+				if settings.FitModel then
+					local fit = lodgedModelFit(arrow)
+					local _, modelAng = LocalToWorld(vector_origin, fit.inverse, vector_origin, ang)
+					local tipOffset = LocalToWorld(fit.tip * scale, angle_zero, vector_origin, modelAng)
+					local depth = tonumber(settings.LodgeDepth) or 3
+					pos = pos + ang:Forward() * depth + ang:Up() * depth * 0.5 - tipOffset
+					ang = modelAng
+				end
 	
 				arrow:SetPos(pos)
 				arrow:SetAngles(ang)

@@ -278,7 +278,6 @@ local function resetPose(rag)
 	rag.brainfuckv2Base = nil
 	rag.brainfuckv2PoseStart = nil
 	rag.brainfuckv2Skip = nil
-	rag.brainfuckv2Flop = nil
 	rag.brainfuckv2Legs = nil
 	rag.brainfuckv2Spent = nil
 end
@@ -359,8 +358,7 @@ local headlessFadeTime = 3.5
 local tremorAmp = 5
 local taserPhaseTime = 0.5
 local skipChance = 0.25
-local flopChance = 0.25
-local flopSpeed = 55
+local poseRampTime = 1.6
 local legChance = 0.3
 local slowTime = 3
 local legBones = {[8] = true, [9] = true, [11] = true, [12] = true, [13] = true, [14] = true}
@@ -550,14 +548,6 @@ local function applyPosture(rag, posture)
 			end
 		end
 		rag.brainfuckv2Skip = skip
-		local flop = math.Rand(0, 1) < (flopChance or 0.35)
-		rag.brainfuckv2Flop = flop
-		if flop then
-			for i = 0, rag:GetPhysicsObjectCount() - 1 do
-				local phys = rag:GetPhysicsObjectNum(i)
-				if IsValid(phys) then phys:AddVelocity(Vector(0, 0, -flopSpeed)) end
-			end
-		end
 		local legCount = hg.brainfuckv2.legVariants and #hg.brainfuckv2.legVariants or 0
 		if legCount > 0 and math.Rand(0, 1) < (legChance or 0.3) then
 			rag.brainfuckv2Legs = math.random(1, legCount)
@@ -586,7 +576,7 @@ local function applyPosture(rag, posture)
 	local damp = 50
 	local brake = nil
 	local brakeOwner = org.owner
-	if (org.brainfuckv2SlowUntil or 0) > CurTime() and not rag.brainfuckv2Flop and IsValid(brakeOwner) and brakeOwner:IsPlayer() and brakeOwner:Alive() and not isAirborne(rag, reference) then
+	if (org.brainfuckv2SlowUntil or 0) > CurTime() and IsValid(brakeOwner) and brakeOwner:IsPlayer() and brakeOwner:Alive() and not isAirborne(rag, reference) then
 		brake = data.taser and {160, 25} or {40, 60}
 	end
 
@@ -600,10 +590,13 @@ local function applyPosture(rag, posture)
 	if not headless and (rag.brainfuckv2PoseError or 0) > 25 then fade = math.max(fade, 0.4) end
 	if fade <= 0 then return end
 	if hg.StabilizeRagdollReaction then hg.StabilizeRagdollReaction(rag, 35, 180, 200, headless and 1 or 0.8) end
-	local tremor = tremorAmp * fade
+	local ramp = math.Clamp(elapsed / poseRampTime, 0, 1)
+	ramp = ramp * ramp * (3 - 2 * ramp)
+	local tremor = tremorAmp * fade * ramp
+	pulseMul = pulseMul * (0.12 + 0.88 * ramp)
 
 	local dampNow = 10 + 40 * fade
-	local ssNow = 0.001 + (1 - fade) * 0.4
+	local ssNow = 0.02 + (1 - fade) * 0.4 + (1 - ramp) * 0.35
 
 	local female = string.find(string.lower(rag:GetModel() or ""), "female", 1, true) ~= nil
 	local legs = getLegOffsets(rag, female)

@@ -250,6 +250,12 @@ function SimpleHealth.GetTargetHeartRate(org, state)
 	rate = rate + rampUp(heartConfig.bloodStart - blood, 0, heartConfig.bloodStart - heartConfig.bloodPeak) * heartConfig.bloodGain
 	rate = rate + rampUp(state.oxy, heartConfig.oxyStart, heartConfig.oxyPeak) * heartConfig.oxyGain
 	if state.crit == CRIT_SOFT then rate = rate + heartConfig.softCrit end
+	rate = rate + math.Clamp(tonumber(org.adrenaline) or 0, 0, heartConfig.adrenalineCap) * heartConfig.adrenaline
+
+	local stamina = org.stamina
+	if istable(stamina) and isnumber(stamina[1]) and isnumber(stamina.max) and stamina.max > 0 then
+		rate = rate + math.Clamp(1 - stamina[1] / stamina.max, 0, 1) * heartConfig.exertion
+	end
 
 	rate = rate - math.max(tonumber(org.tranquilizer) or 0, 0) * heartConfig.sedative
 	rate = rate - math.max(tonumber(org.analgesia) or 0, 0) * heartConfig.opioid
@@ -530,10 +536,21 @@ local function updateCountdown(owner, org, state)
 	local oxyConfig = CONFIG.oxy
 	local now = CurTime()
 	local wasCounting = state.countdownStart ~= nil
+	local bleedConfig = CONFIG.bleedCountdown
+	local blood = tonumber(org.blood) or CONFIG.contamination.normalBlood
+
+	if not org.otrub or blood >= bleedConfig.rollBelow then
+		state.bleedRoll = nil
+	elseif state.bleedRoll == nil then
+		state.bleedRoll = math.random() < bleedConfig.rollChance
+	end
+
+	local bleedOut = org.otrub and blood < bleedConfig.rollBelow and (blood < bleedConfig.start or state.bleedRoll)
+	state.countdownBleed = not state.fibrillating and bleedOut or nil
 
 	if state.fibrillating then
 		state.countdownStart = state.fibrillationStart
-	elseif state.oxy > oxyConfig.countdownStart and org.otrub then
+	elseif (state.oxy > oxyConfig.countdownStart or bleedOut) and org.otrub then
 		state.countdownStart = state.countdownStart or now
 	else
 		state.countdownStart = nil
@@ -542,7 +559,7 @@ local function updateCountdown(owner, org, state)
 	local counting = state.countdownStart ~= nil
 	state.countdownChoked = counting and (state.countdownChoked or state.airwayBlocked) or nil
 
-	local duration = state.fibrillating and CONFIG.fibrillation.deathTime or state.countdownChoked and oxyConfig.airwayCountdownTime or oxyConfig.countdownTime
+	local duration = state.fibrillating and CONFIG.fibrillation.deathTime or state.countdownChoked and oxyConfig.airwayCountdownTime or state.countdownBleed and bleedConfig.time or oxyConfig.countdownTime
 	state.countdownDuration = duration
 
 	if counting ~= wasCounting then
@@ -600,7 +617,7 @@ module[2] = function(owner, org, timeValue)
 	elseif org.otrub and (tonumber(org.blood) or CONFIG.contamination.normalBlood) < CONFIG.deathBlood then
 		die(org, "bleed", "unconscious below " .. CONFIG.deathBlood .. " blood")
 	elseif countdownExpired then
-		local causeKey = state.fibrillating and "fibrillation" or state.flatline and "flatline" or "suffocate"
+		local causeKey = state.fibrillating and "fibrillation" or state.flatline and "flatline" or state.countdownBleed and "bleed" or "suffocate"
 		die(org, causeKey, causeKey .. " countdown expired")
 	elseif not brainIgnored and (tonumber(org.brain) or 0) >= CONFIG.brainDeath then
 		die(org, "brain", "brain death")

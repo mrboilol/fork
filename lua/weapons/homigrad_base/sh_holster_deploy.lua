@@ -6,19 +6,68 @@ SWEP.CooldownDeploy = 1
 SWEP.DeployGripFraction = 0.3
 SWEP.DeploySnd = {"homigrad/weapons/draw_rifle.mp3", 65, 100, 110}
 
+SWEP.NoAnimDeployTime = 0.15
+
+local sequenceProbe
+local sequenceDurations = {}
+
+local function nativeSequenceDuration(model, sequence)
+	if not model or model == "" then return end
+
+	local key = model .. "|" .. sequence
+	local cached = sequenceDurations[key]
+	if cached ~= nil then return cached or nil end
+
+	if not IsValid(sequenceProbe) then
+		if SERVER then
+			sequenceProbe = ents.Create("base_anim")
+			if not IsValid(sequenceProbe) then return end
+			sequenceProbe:SetModel(model)
+			sequenceProbe:Spawn()
+			sequenceProbe:SetNoDraw(true)
+			sequenceProbe:SetSolid(SOLID_NONE)
+			sequenceProbe:SetMoveType(MOVETYPE_NONE)
+		else
+			sequenceProbe = ClientsideModel(model)
+			if not IsValid(sequenceProbe) then return end
+			sequenceProbe:SetNoDraw(true)
+		end
+	end
+
+	sequenceProbe:SetModel(model)
+	local index = sequenceProbe:LookupSequence(sequence)
+	local duration = index >= 0 and sequenceProbe:SequenceDuration(index) or 0
+	sequenceDurations[key] = duration > 0 and duration or false
+	return duration > 0 and duration or nil
+end
+
+hg.NativeSequenceDuration = nativeSequenceDuration
+
+function SWEP:GetNativeDrawDuration()
+	local list = self.AnimList
+	if not list then return end
+
+	local model = self.WorldModelFake or self.WorldModel
+	for _, name in ipairs({"deploy", "draw"}) do
+		local sequence = list[name]
+		if isstring(sequence) then
+			local duration = nativeSequenceDuration(model, sequence)
+			if duration then return duration end
+		end
+	end
+end
+
 function SWEP:GetDeployDuration()
+	local native = self:GetNativeDrawDuration()
+	if not native then return self.NoAnimDeployTime end
+
 	local roleDeployMul = hg.GetSubRolePerk and hg.GetSubRolePerk(self:GetOwner(), "DeployMul", 1) or 1
 	local armEffectiveness = hg.GetArmEffectiveness and hg.GetArmEffectiveness(self:GetOwner(), "rarm") or 1
-	local support = self.GetHandSupportState and self:GetHandSupportState(self:GetOwner())
-	local stanceMul = support and (support.postureOneHanded and 0.75 or support.wantsTwoHands and 1.1) or 1
-	local duration = self.CooldownDeploy / self.Ergonomics * roleDeployMul * stanceMul / Lerp(armEffectiveness, 0.5, 1)
-	if not self:HasDrawAnim() then return math.max(duration * 0.3, 0.12) end
-	return math.max(duration, 0.3)
+	return math.max(native * roleDeployMul / Lerp(armEffectiveness, 0.5, 1), 0.1)
 end
 
 function SWEP:HasDrawAnim()
-	local list = self.AnimList
-	return list ~= nil and (list.deploy ~= nil or list.draw ~= nil)
+	return self:GetNativeDrawDuration() ~= nil
 end
 
 function SWEP:GetHolsterDuration()

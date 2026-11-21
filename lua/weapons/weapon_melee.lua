@@ -288,7 +288,7 @@ SWEP.PenetrationSizeSecondary = 2.5
 
 SWEP.StaminaPrimary = 10
 SWEP.StaminaSecondary = 8.5
-SWEP.StaminaCostMul = 0.25
+SWEP.StaminaCostMul = 0.4
 SWEP.MeleeStaminaMul = 0.4
 
 SWEP.ViewPunch1 = Angle(2,0,0)
@@ -299,7 +299,7 @@ SWEP.SlamHoldTime = 0.25
 SWEP.SlamReach = 72
 SWEP.SlamRaisePos = Vector(2, 0, 6)
 SWEP.SlamRaiseAng = Angle(-40, 0, 0)
-SWEP.SlamStaminaMul = 2.5
+SWEP.SlamStaminaMul = 1.25
 SWEP.SlamSpeedMul = 0.7
 SWEP.SlamMinDamageMul = 0.6
 SWEP.SlamMinBoneMul = 0.7
@@ -1500,7 +1500,7 @@ function SWEP:Deploy()
         local arm = self.TwoHanded and "larm" or "rarm"
         local effectiveness = hg.GetArmEffectiveness and hg.GetArmEffectiveness(owner, arm) or 1
         local speed = Lerp(effectiveness, 0.5, 1)
-        local deployTime = (self.BigMeleeDeployTime or 1) / speed
+        local deployTime = self:GetBaseDeployTime() / speed
 
         if not self:UsesMeleeSling() then
             self.MeleeDeployGripStart = 0
@@ -1539,11 +1539,18 @@ function SWEP:Deploy()
 	return true
 end
 
+function SWEP:GetBaseDeployTime()
+    local sequence = self.AnimList and self.AnimList.deploy
+    local native = isstring(sequence) and hg.NativeSequenceDuration and hg.NativeSequenceDuration(self.WorldModelFake or self.WorldModel, sequence)
+    if native then return native end
+    return self.AnimList and self.AnimList.deploy and (self.BigMeleeDeployTime or 1) or 0.15
+end
+
 function SWEP:GetHolsterDuration()
     local arm = self.TwoHanded and "larm" or "rarm"
     local effectiveness = hg.GetArmEffectiveness and hg.GetArmEffectiveness(self:GetOwner(), arm) or 1
     local speed = Lerp(effectiveness, 0.5, 1)
-    local total = (self.BigMeleeDeployTime or 1) / speed
+    local total = self:GetBaseDeployTime() / speed
     if self.TwoHanded then
         total = total + ((self.MeleeDrawGripTime or 0.3) + (self.BigMeleeReachTime or 0.8)) / speed
     end
@@ -2041,14 +2048,31 @@ end
 function SWEP:GetMeleeLodgeBone(ent, trace)
     if not IsValid(ent) then return end
 
-    if trace.PhysicsBone ~= nil and ent.TranslatePhysBoneToBone then
-        local bone = ent:TranslatePhysBoneToBone(trace.PhysicsBone)
-        if bone and bone >= 0 then return bone, trace.PhysicsBone end
-    end
+    if ent.TranslatePhysBoneToBone and ent.TranslateBoneToPhysBone then
+        local trusted
+        if ent:GetPhysicsObjectCount() > 1 and isnumber(trace.PhysicsBone) then
+            trusted = ent:TranslatePhysBoneToBone(trace.PhysicsBone)
+        elseif isnumber(trace.HitBox) and (ent:IsPlayer() or ent:IsNPC()) then
+            trusted = ent:GetHitBoxBone(trace.HitBox, ent:GetHitboxSet() or 0)
+        end
 
-    if trace.HitBoxBone ~= nil and trace.HitBoxBone >= 0 and ent.TranslateBoneToPhysBone then
-        local physBone = ent:TranslateBoneToPhysBone(trace.HitBoxBone)
-        if physBone and physBone >= 0 then return trace.HitBoxBone, physBone end
+        local ang = isvector(trace.Normal) and trace.Normal:Angle() or angle_zero
+        local surfaceOffset, _, boneName
+        if hg.organism and hg.organism.GetWoundAnchor then
+            surfaceOffset, _, boneName =hg.organism.GetWoundAnchor(ent, trace.HitPos, ang, trusted)
+        end
+        local bone = isstring(boneName) and ent:LookupBone(boneName) or trusted
+        if bone and bone >= 0 then
+            local surfacePos
+            local matrix = isvector(surfaceOffset) and ent:GetBoneMatrix(bone)
+            if matrix then surfacePos = LocalToWorld(surfaceOffset, angle_zero, matrix:GetTranslation(), matrix:GetAngles()) end
+
+            local physBone = ent:TranslateBoneToPhysBone(bone)
+            if physBone and physBone >= 0 then
+                local physMatrixBone = ent:TranslatePhysBoneToBone(physBone)
+                if physMatrixBone and physMatrixBone >= 0 then return physMatrixBone, physBone, surfacePos end
+            end
+        end
     end
 
     if not ent.GetBoneCount or not ent.GetBoneMatrix or not ent.TranslateBoneToPhysBone then return end
@@ -2068,7 +2092,7 @@ function SWEP:GetMeleeLodgeBone(ent, trace)
     return closestBone, closestPhysBone
 end
 
-function SWEP:AddMeleeLodgedEntity(victim, body, bone, physBone, lodgePos, lodgeAng)
+function SWEP:AddMeleeLodgedEntity(victim, body, bone, physBone, lodgePos, lodgeAng, extra)
     if not SERVER or not IsValid(victim) or not victim.organism or not IsValid(body) then return false end
 
     local matrix = body:GetBoneMatrix(bone)
@@ -2090,6 +2114,7 @@ function SWEP:AddMeleeLodgedEntity(victim, body, bone, physBone, lodgePos, lodge
         takeent = self:GetClass(),
         poisoned2 = self.poisoned2,
     }
+    if istable(extra) then table.Merge(org.LodgedEntities[#org.LodgedEntities], extra) end
 
     net.Start("organism_send")
     net.WriteTable({LodgedEntities = org.LodgedEntities, owner = org.owner})
@@ -2102,6 +2127,18 @@ function SWEP:AddMeleeLodgedEntity(victim, body, bone, physBone, lodgePos, lodge
     return true, offsetPos
 end
 
+function SWEP:GetMeleeLodgeSwingDir(owner, rayDir, attacktype)
+    local eyeAng = owner:GetAimVector():Angle()
+    eyeAng:RotateAroundAxis(eyeAng:Forward(), self:GetAttackSwingAngle(attacktype))
+    local rads = self:GetAttackConfigValue(self.AttackRads, self.AttackRads2, self.ChargeAttackRads, attacktype) or 65
+
+    local swingDir = rayDir:Cross(eyeAng:Up())
+    if rads < 0 then swingDir:Mul(-1) end
+    if swingDir:LengthSqr() < 0.001 then return eyeAng:Right() end
+    swingDir:Normalize()
+    return swingDir
+end
+
 function SWEP:TryLodgeMeleeWeapon(ent, trace, attacktype)
     if not SERVER or self.MeleeWeaponLodged then return false end
     if self:GetClashDamageType(attacktype) ~= DMG_SLASH then return false end
@@ -2112,17 +2149,29 @@ function SWEP:TryLodgeMeleeWeapon(ent, trace, attacktype)
 	if victim.organism.lastArmorSharpStopped then return false end
 	if math.Rand(0, 1) > self:GetMeleeLodgeChance(attacktype) then return false end
 
-    local bone, physBone = self:GetMeleeLodgeBone(ent, trace)
+    local bone, physBone, surfacePos = self:GetMeleeLodgeBone(ent, trace)
     if not bone or physBone == nil then return false end
+    if not isvector(surfacePos) or surfacePos:DistToSqr(trace.HitPos) > 64 then surfacePos = trace.HitPos end
 
     local direction = isvector(trace.Normal) and trace.Normal or trace.HitPos - trace.StartPos
     if direction:LengthSqr() <= 0.001 then direction = owner:GetAimVector() end
     direction = Vector(direction.x, direction.y, direction.z)
     direction:Normalize()
 
-    local lodgePos = trace.HitPos + direction * (self.MeleeLodgeDepth or 3)
-    local lodgeAng = direction:Angle()
-    if not self:AddMeleeLodgedEntity(victim, ent, bone, physBone, lodgePos, lodgeAng) then return false end
+    local swingDir = self:GetMeleeLodgeSwingDir(owner, direction, attacktype)
+    local forward = (direction + swingDir * (self.MeleeLodgeSwingLean or 0.35)):GetNormalized()
+    local edge = swingDir - forward * swingDir:Dot(forward)
+    if edge:LengthSqr() < 0.01 then edge = forward:Angle():Up() end
+    edge:Normalize()
+
+    local lodgeAng = forward:AngleEx(edge)
+    if isangle(self.MeleeLodgeAngOffset) then
+        local _, offsetAng = LocalToWorld(vector_origin, self.MeleeLodgeAngOffset, vector_origin, lodgeAng)
+        lodgeAng = offsetAng
+    end
+
+    local extra = {FitModel = true, LodgeDepth = self.MeleeLodgeDepth or 3}
+    if not self:AddMeleeLodgedEntity(victim, ent, bone, physBone, surfacePos, lodgeAng, extra) then return false end
 
     self.MeleeWeaponLodged = true
     owner:StripWeapon(self:GetClass())

@@ -31,6 +31,17 @@ net.Receive("organism_send", function()
 		if hg.RegisterRelevantEntity then hg.RegisterRelevantEntity(ply) end
 	end
 
+	if merge and istable(org.LodgedEntities) then
+		local lodged = org.LodgedEntities
+		local bodies = {ply, ply:GetNWEntity("FakeRagdoll"), ply:GetNWEntity("RagdollDeath")}
+		for _, body in ipairs(bodies) do
+			if IsValid(body) then
+				if istable(body.organism) then body.organism.LodgedEntities = lodged end
+				if istable(body.new_organism) then body.new_organism.LodgedEntities = lodged end
+			end
+		end
+	end
+
 	if merge and org.owner.organism and org.owner.new_organism then
 		hook.Run("HG_OrganismChanged", org.owner.organism, org)
 		

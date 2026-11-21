@@ -844,6 +844,10 @@ local function buildEffects(ply, org)
 	end
 
 	local oxygen, oxygenMax = o2Value(org), o2Maximum(org)
+	local simpleState = hg.SimpleHealth and hg.SimpleHealth.GetLocalState and hg.SimpleHealth.GetLocalState()
+	if simpleState and simpleState.oxy then
+		oxygen = math.min(oxygen, oxygenMax * (1 - math.Clamp(simpleState.oxy / hg.SimpleHealth.Config.oxy.countdownStart, 0, 1)))
+	end
 	if oxygen < math.min(28, oxygenMax) then
 		local level = oxygen < 8 and 4 or oxygen < 14 and 3 or oxygen < 23 and 2 or 1
 		add(effects, "hypoxemia", "hypoxemia", level, "bad", 26, math.floor(oxygen))
@@ -1128,7 +1132,7 @@ local function nilguyPoolReasons(ply, org, state, pool)
 		if orgNumber(org, "poison2") > 0 or orgNumber(org, "poison4") > 0 then reasons[#reasons + 1] = "poison in your blood" end
 		if #reasons == 0 and state.toxin > 0 then reasons[1] = "toxins in your blood" end
 	else
-		if state.countdownEnd > CurTime() then reasons[#reasons + 1] = "suffocation countdown running" end
+		if state.countdownEnd > CurTime() then reasons[#reasons + 1] = "death countdown running" end
 		if orgNumber(org, "blood", 5000) < config.effects.bloodStart then reasons[#reasons + 1] = "low blood volume" end
 		if o2Value(org) < o2Maximum(org) * 0.7 then reasons[#reasons + 1] = "not enough air" end
 		if #reasons == 0 and state.oxy > 0 then reasons[1] = "oxygen starvation" end

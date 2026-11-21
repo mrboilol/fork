@@ -338,6 +338,7 @@ local function sharesEnemy(a, b)
 end
 
 local function isBuddy(watcher, victim, twoTeams)
+	if victim:IsNPC() then return victim:Disposition(watcher) == D_LI end
 	if not victim:IsPlayer() then return false end
 	if victim.isTraitor then return false end
 	if wasFighting(watcher.hgFightTargets, victim) or wasFighting(watcher.hgFightAttackers, victim) then return false end
@@ -434,6 +435,7 @@ local function updateLosing(ply, org, now)
 	elseif landed > 0 and hurt < EMO.winningHurt and outnumbered == 0 then
 		org.hgLosing = math.max((org.hgLosing or 0) - EMO.losingInterval * 2, 0)
 		addHappiness(org, EMO.winningHappiness * EMO.losingInterval)
+		if hg.organism.RelieveStress then hg.organism.RelieveStress(org, hg.PsycheCombat.winRelief * EMO.losingInterval) end
 	else
 		org.hgLosing = math.max((org.hgLosing or 0) - EMO.losingInterval, 0)
 	end
@@ -459,6 +461,7 @@ local function reactAsFighter(watcher, org, victim, isDeath, victimPos, victimEn
 		addSurge(org, SURGE_GANGED_KILL * (isDeath and 1 or 0.6) * hg.organism.GetAdrenalineGainMul(org))
 	end
 	if not canSee(watcher, victimPos, EMO.fighterSeeRadius, SEE_DOT, victim, victimEnt) then return end
+	if hg.organism.RelieveStress then hg.organism.RelieveStress(org, hg.PsycheCombat.killRelief * (isDeath and 1 or 0.6)) end
 
 	downedFighter = victim
 	local context = getFightContext(watcher, collectAttackers(watcher), CurTime())
@@ -573,7 +576,7 @@ local function onVictimDown(victim, killer, isDeath)
 			continue
 		end
 
-		local friendlyKill = watcher == killer and victim.hgFriendlyFireBy and (victim.hgFriendlyFireBy[watcher] or 0) > now - FIGHT_WINDOW
+		local friendlyKill = watcher == killer and ((victim:IsNPC() and victim:Disposition(watcher) == D_LI) or (victim.hgFriendlyFireBy and (victim.hgFriendlyFireBy[watcher] or 0) > now - FIGHT_WINDOW))
 		local guiltAmount, karmaLoss = 0, 0
 		if watcher == killer and isDeath then
 			guiltAmount, karmaLoss = killGuilt(watcher, victim, friendlyKill)
@@ -596,7 +599,7 @@ local function onVictimDown(victim, killer, isDeath)
 			continue
 		end
 
-		if not stressful or isStressImmune(watcher, org) then continue end
+		if not (stressful or (victim:IsNPC() and victim:Disposition(watcher) == D_LI)) or isStressImmune(watcher, org) then continue end
 		if not canSee(watcher, victimPos, radius, SEE_DOT, victim, victimEnt) then continue end
 
 		watcher.hgWitnessNext[victim] = now + OTRUB_REPEAT_COOLDOWN

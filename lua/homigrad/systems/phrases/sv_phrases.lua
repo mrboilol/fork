@@ -479,6 +479,10 @@ local function voice(ply, phrase, level, mouth, kind)
 
 	hg.StopPainScream(ply)
 
+	if (ply.phrCld or 0) > CurTime() and ply.lastPhr then
+		ent:StopSound(ply.lastPhr)
+	end
+
 	local muffed = hg.IsVoiceMuffled and hg.IsVoiceMuffled(ply)
 	ent:EmitSound(phrase, muffed and level - 10 or level, mClamp(ply.VoicePitch or 100, 92, 108), 1, CHAN_AUTO, 0, muffed and 16 or 0)
 	if kind and hg.ChatLog then hg.ChatLog.Emit(kind, ply) end
@@ -518,7 +522,11 @@ local function breathSounds(ply, org, now)
 
 	org.breathStateSince = org.breathStateSince or now
 	if now - org.breathStateSince < breathSustain then return false end
-	if now < (org.breathSoundNext or 0) or now < (org.voiceFreeAt or 0) then return true end
+	if now < (org.breathSoundNext or 0) then return true end
+
+	local mouthBusy = now < (org.voiceFreeAt or 0) or now < (ply.phrCld or 0)
+	local suffocating = org.o2 and (org.o2[1] or 30) < 15
+	if mouthBusy and !suffocating then return true end
 
 	if customPhrase(ply) then
 		org.breathSoundNext = now + 5
@@ -568,6 +576,7 @@ hook.Add("Org Think", "HG_PainVoice", function(ply, org)
 	local blink = !burning and (queued or spiking) and now >= (org.painBlinkNext or 0) and now >= (org.painBlinkPending or 0)
 
 	if now < (org.voiceFreeAt or 0) or (now < (org.painVoiceNext or 0) and !(blink and rush)) then return end
+	if now < (ply.phrCld or 0) and !rush then return end
 
 	local rawPain = org.avgpain or 0
 	local numbed = !burning and rawPain >= painVoiceAgony and pain < painVoiceAgony and pain < rawPain * painNumbedRatio
@@ -684,6 +693,8 @@ hook.Add("HG_CanDoPhrase", "Pharse_Check", function(ply, cmd, args)
 	if org.otrub then return true end
 	if org.o2[1] < 15 then return true end
 	if org.holdingbreath then return true end
+	if (org.voiceFreeAt or 0) > CurTime() then return true end
+	if (org.pain or 0) >= painVoiceRush then return true end
 	--if ply.PlayerClassName and ply:GetPlayerClass() and !ply:GetPlayerClass().CanUseDefaultPhrase then return true end
 
 	if org.vomitInThroat then

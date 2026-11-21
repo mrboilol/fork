@@ -45,11 +45,21 @@ local function getCombatPlayer(ent)
 	return IsValid(owner) and owner:IsPlayer() and owner or nil
 end
 
+local function getOpponent(ent)
+	local ply = getCombatPlayer(ent)
+	if ply then return ply end
+	if IsValid(ent) and ent:IsNPC() then return ent end
+end
+
+local function isFriendlyNPC(ent, watcher)
+	return IsValid(ent) and ent:IsNPC() and IsValid(watcher) and ent:Disposition(watcher) == D_LI
+end
+
 local function addCombatResponse(org, angerAmount, adrenalineAmount, opponent)
 	if not org or not hg.organism.RileAnger then return end
 	local now = CurTime()
 	if (org._combatResponseNext or 0) > now then
-		if IsValid(opponent) and opponent:IsPlayer() then
+		if IsValid(opponent) and (opponent:IsPlayer() or opponent:IsNPC()) then
 			org.angerOpponent = opponent
 			org.angerOpponentUntil = now + 45
 		end
@@ -87,9 +97,12 @@ local function triggerCombatResponses(target, dmgInfo)
 		victimAnger, victimAdrenaline = 0.18, 0.65
 	end
 
-	if IsValid(attackerPlayer) then addCombatResponse(attackerPlayer.organism, attackerAnger * severity, attackerAdrenaline * severity, targetPlayer) end
+	if IsValid(attackerPlayer) and not isFriendlyNPC(target, attackerPlayer) then
+		addCombatResponse(attackerPlayer.organism, attackerAnger * severity, attackerAdrenaline * severity, getOpponent(target))
+		if hg.organism.CombatSuccess then hg.organism.CombatSuccess(attackerPlayer.organism, hg.PsycheCombat.hitRelief * severity) end
+	end
 	if IsValid(targetPlayer) and IsValid(dmgInfo:GetAttacker()) and not dmgInfo:GetAttacker():IsWorld() then
-		addCombatResponse(targetPlayer.organism, victimAnger * severity, victimAdrenaline * severity, attackerPlayer)
+		addCombatResponse(targetPlayer.organism, victimAnger * severity, victimAdrenaline * severity, getOpponent(dmgInfo:GetAttacker()))
 	end
 end
 

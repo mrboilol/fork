@@ -22,10 +22,13 @@ local anger_decay_per_second = 0.015
 local anger_opponent_range = 3000
 local function angerOpponentStanding(org, now)
 	local opp = org.angerOpponent
-	if not IsValid(opp) or not opp:IsPlayer() or not opp:Alive() then return false end
-	if now > (org.angerOpponentUntil or 0) then return false end
-	local oorg = opp.organism
-	if not oorg or not oorg.alive or oorg.otrub or oorg.incapacitated then return false end
+	if not IsValid(opp) or now > (org.angerOpponentUntil or 0) then return false end
+	if opp:IsPlayer() then
+		local oorg = opp.organism
+		if not opp:Alive() or not oorg or not oorg.alive or oorg.otrub or oorg.incapacitated then return false end
+	elseif not opp:IsNPC() or opp:Health() <= 0 then
+		return false
+	end
 	local owner = org.owner
 	if not IsValid(owner) then return false end
 	return owner:GetPos():DistToSqr(opp:GetPos()) < anger_opponent_range * anger_opponent_range
@@ -214,7 +217,14 @@ module[2] = function(owner, org, timeValue)
 		org.angerOpponentWasUp = nil
 		local opp = org.angerOpponent
 		local oorg = IsValid(opp) and opp.organism
-		local down = IsValid(opp) and (not opp:Alive() or (oorg and (oorg.otrub or oorg.alive == false)))
+		local down = not IsValid(opp)
+		if not down then
+			if opp:IsPlayer() then
+				down = not opp:Alive() or (oorg and (oorg.otrub or oorg.alive == false))
+			else
+				down = opp:Health() <= 0 or (oorg and (oorg.otrub or oorg.alive == false))
+			end
+		end
 		if down then
 			org.anger = math.max((org.anger or 0) - K.angerDownRelief, 0)
 			org.angerCombatUntil = 0
@@ -548,7 +558,7 @@ end
 
 function hg.organism.RileAnger(org, amount, adrenalineAmount, opponent)
 	if not org or not org.alive or org.otrub then return end
-	if IsValid(opponent) and opponent:IsPlayer() then
+	if IsValid(opponent) and (opponent:IsPlayer() or opponent:IsNPC()) then
 		org.angerOpponent = opponent
 		org.angerOpponentUntil = CurTime() + 45
 	end

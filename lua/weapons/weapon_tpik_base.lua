@@ -604,7 +604,7 @@ end
 
 function SWEP:GetHolsterDuration()
 	local deploy = self.AnimList and self.AnimList.deploy
-	return istable(deploy) and deploy[2] or 0.6
+	return istable(deploy) and deploy[2] or 0.15
 end
 
 function SWEP:OnHolsterBegin(total, fraction)

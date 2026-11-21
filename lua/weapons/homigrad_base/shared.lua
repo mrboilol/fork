@@ -2389,7 +2389,12 @@ function SWEP:GetAdditionalValues()
 
 	--self.AdditionalPosPreLerp[3] = self.AdditionalPosPreLerp[3] - ((ply.lean or 0) * 2)
 	
-	local val = math.Clamp((self.deploy and ((self.deploy - CurTime()) * 10) or self.holster and ((1 - (self:GetDrawFraction() or 1)) *self.CooldownDeploy / self.Ergonomics * 10) or 0) / (self.CooldownDeploy / self.Ergonomics),0,10)
+	local val = 0
+	if self.deploy then
+		val = math.Clamp((self.deploy - CurTime()) * 10 / math.max(self:GetDeployDuration(), 0.001), 0, 10)
+	elseif self.holster then
+		val = math.Clamp((1 - (self:GetDrawFraction() or 1)) * 10, 0, 10)
+	end
 
 	self.AdditionalPosPreLerp[2] = self.AdditionalPosPreLerp[2] - val * 1.5
 	self.AdditionalPosPreLerp[1] = self.AdditionalPosPreLerp[1] - val * 2 * (self:IsPistolHoldType() and 0.5 or 0.75)

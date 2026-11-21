@@ -1046,6 +1046,9 @@ function hg.TryAbsorbEquipmentImpact(ent, dmgInfo, hitPos, direction, impactRadi
                 local weaponParry
                 absorbed, weaponParry = GetWeaponImpactAbsorption(hit.weapon, hit, dir, dmgInfo)
                 if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) then absorbed = 1 end
+                if IsValid(ply) and ply:IsPlayer() and hg.organism.CombatSuccess and (weaponParry or absorbed > 0.3) then
+                    hg.organism.CombatSuccess(ply.organism, weaponParry and hg.PsycheCombat.parryRelief or hg.PsycheCombat.blockRelief)
+                end
                 if weaponParry then
                     parried = true
                     if hit.weapon.PlayBlockImpactEffect then
