@@ -85,7 +85,6 @@ local function WriteChoice(option, index, count)
 	net.WriteUInt(math.min(index, 63), 6)
 	net.WriteUInt(math.min(count, 63), 6)
 	net.WriteUInt(GetStitchCount(option), 4)
-	net.WriteString(option.wound[7] == "arteria" and "arteria" or tostring(option.bone or ""))
 end
 
 local function GetSupply(session)

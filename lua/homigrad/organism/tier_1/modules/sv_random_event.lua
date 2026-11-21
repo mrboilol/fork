@@ -45,6 +45,10 @@ local RandomEvents = {
         end)
     end,
 }
+local randomPool = {}
+for name, event in pairs(RandomEvents) do
+    if name ~= "Cough" then randomPool[#randomPool + 1] = event end
+end
 function module.TriggerRandomEvent(owner, eventName)
     if IsValid(owner) and RandomEvents[eventName] and owner:IsPlayer() then
         if owner:IsRagdoll() or not owner:Alive() then return end
@@ -57,7 +61,7 @@ module[2] = function(owner, org, timeValue)
 			return
 		end
         if not org.otrub then
-            table.Random(RandomEvents)(owner,org)
+            randomPool[math.random(#randomPool)](owner,org)
         end
         org.timeToRandom = CurTime() + math.random(120,320)
     end

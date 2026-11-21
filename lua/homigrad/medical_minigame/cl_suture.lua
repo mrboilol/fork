@@ -264,12 +264,6 @@ function PANEL:Paint(w, h)
 	draw.DrawText(self.Done .. "/" .. self.Stitches, "HomigradFontLarge", cx - SLIT_GAP - 120, cy - 20, Color(255, 255, 255), TEXT_ALIGN_RIGHT)
 end
 
-function PANEL:PaintOver(w, h)
-	if not hg.BodyStatus or not hg.BodyStatus.DrawFor then return end
-
-	hg.BodyStatus.DrawFor(self.Target, hg.BodyStatus.ResolveRegion(self.Choice and self.Choice.bone))
-end
-
 function PANEL:OnRemove()
 	if not self.Finished then
 		net.Start("hg_suture_cancel")
@@ -286,7 +280,6 @@ local function ReadChoice()
 		index = net.ReadUInt(6),
 		count = net.ReadUInt(6),
 		stitches = net.ReadUInt(4),
-		bone = net.ReadString(),
 	}
 end
 

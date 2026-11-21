@@ -8,28 +8,48 @@ hook.Add("Player_Death", "hg_psyche_sound_stop", function(ply)
 	end
 end)
 
+local ANGER_LOOP_TAIL = 5
+
 local angerSounds = {}
 
 local function stopAngerSound(name)
 	local snd = angerSounds[name]
-	if snd then snd.patch:Stop() angerSounds[name] = nil end
+	if not snd then return end
+	if IsValid(snd.station) then snd.station:Stop() end
+	angerSounds[name] = nil
 end
 
 local function updateAngerSound(name, target, dt)
 	local snd = angerSounds[name]
 	if not snd then
 		if target <= 0.01 then return end
-		local lply = LocalPlayer()
-		snd = {patch = CreateSound(lply, name), vol = 0}
-		snd.patch:PlayEx(0, 100)
+		snd = {vol = 0, loading = true}
 		angerSounds[name] = snd
+		sound.PlayFile("sound/" .. name, "noblock noplay", function(station)
+			if angerSounds[name] ~= snd then
+				if IsValid(station) then station:Stop() end
+				return
+			end
+			snd.loading = false
+			if not IsValid(station) then angerSounds[name] = nil return end
+			snd.station = station
+			station:SetVolume(snd.vol)
+			station:Play()
+		end)
+		return
 	end
 	snd.vol = math.Approach(snd.vol, target, dt * 3)
 	if target <= 0 and snd.vol <= 0.01 then stopAngerSound(name) return end
-	if not snd.patch:IsPlaying() then
-		snd.patch:PlayEx(snd.vol, 100)
-	else
-		snd.patch:ChangeVolume(snd.vol, 0)
+	if snd.loading or not IsValid(snd.station) then return end
+	local station = snd.station
+	station:SetVolume(snd.vol)
+	local length = station:GetLength()
+	if length > ANGER_LOOP_TAIL and station:GetTime() >= length - ANGER_LOOP_TAIL then
+		station:SetTime(0)
+	end
+	if station:GetState() == GMOD_CHANNEL_STOPPED then
+		station:SetTime(0)
+		station:Play()
 	end
 end
 

@@ -772,14 +772,14 @@ if CLIENT then
 						local reveal = 1//math.Clamp(lply:EyeAngles()[1] / 90 - 0.25, 0, 1) * 4 / 3
 						colBrown.a = reveal * 185
 						draw.RoundedBox(2,x,y,x + ScreenScale(210) + ScrW() / 10,ScrH() / 25 + (#self.modeValues > 0 and 0 or 0),colBrown)
-						surface.SetFont("ZCity_Small")
+						surface.SetFont(self.StatsFont or "ZCity_Small")
 						surface.SetTextPos(x,y)
 						surface.SetTextColor(255,255,255,255 * reveal)
 						local txt = string.NiceName(tostring(self.modeNames[i]))
 						local w, h = surface.GetTextSize(txt)
 						--surface.DrawText(tostring(self.modeNames[i]))
 						colBrown.a = reveal * 255
-						draw.SimpleTextOutlined(txt, "ZCity_Small", x, y, Color(255,i == self.mode and 0 or 255,i == self.mode and 0 or 255, 255 * reveal), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP, 1.5, colBrown)
+						draw.SimpleTextOutlined(txt, self.StatsFont or "ZCity_Small", x, y, Color(255,i == self.mode and 0 or 255,i == self.mode and 0 or 255, 255 * reveal), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP, 1.5, colBrown)
 					
 						surface.SetDrawColor(0,100,0,255 * reveal)
 						surface.DrawRect(x + ScreenScale(210),y,ScrW() / 10 * val / 100,ScrH() / 25)

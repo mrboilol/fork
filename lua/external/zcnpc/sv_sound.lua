@@ -481,19 +481,5 @@ hook.Add("Org Think", "zcnpc_orgsounds", function(owner, org, timeValue)
 
 		return
 	end
-
-	-- Heavy external bleed still gets the odd cough without a full vomit bar
-	if (org.bleed or 0) > 8 and (org.blood or 5000) < 3500 then
-		if (org.zcnpc_coughcd or 0) < CurTime() and math.random(40) == 1 then
-			org.zcnpc_coughcd = CurTime() + math.Rand(6, 12)
-			local sex = Female(owner) and "female" or "male"
-			PlayVoice(owner, "zcitysnd/" .. sex .. "/cough_" .. math.random(1, 6) .. ".mp3", 2)
-		end
-	elseif (org.internalBleed or 0) > 1 and (org.zcnpc_coughcd or 0) < CurTime() and math.random(25) == 1 then
-		-- Internal bleed that has not filled the vomit bar yet still has to be
-		-- heard, or the only cough in the game is the one Vomit already spent.
-		org.zcnpc_coughcd = CurTime() + math.Rand(8, 16)
-		ZCNPC.CoughBlood(owner, org)
-	end
 end)
 --//

@@ -137,7 +137,8 @@ local function resolveWoundRegion(bone)
 	return K.TORSO_BONE_REGIONS[bone] or (hg.amputeetable and hg.amputeetable[bone])
 end
 
-local focus = {region = nil, frame = -10, limbRegions = {spine3 = "neck", spine2 = "chest", spine1 = "pelvis", arteria = "neck", head = "skull", torso = "chest"}}
+local focus = {frame = -10}
+local bandageTint = {}
 
 local function lookupNamedBone(ent, cache, bone)
 	if isnumber(bone) then return bone end
@@ -584,9 +585,12 @@ local function updateBandages(ply, body)
 	if not limbs then return end
 
 	local soak = istable(owner.bandagesSoak) and owner.bandagesSoak or nil
-	for bone in pairs(limbs) do
+	for bone, state in pairs(limbs) do
 		local region = resolveWoundRegion(bone)
-		if region then bandage[region] = math.max(bandage[region] or 0, soak and tonumber(soak[bone]) or 0) end
+		if region then
+			bandage[region] = math.max(bandage[region] or 0, soak and tonumber(soak[bone]) or 0)
+			if istable(state) and istable(state.color) then bandageTint[region] = state.color end
+		end
 	end
 end
 
@@ -645,6 +649,7 @@ local function clearMedicalState()
 		severity[region], bleedLevel[region] = 0, 0
 		broken[region], arterial[region], missing[region], tourniquet[region] = false, false, false, false
 		bandage[region] = nil
+		bandageTint[region] = nil
 		splint[region] = nil
 		tissue[region] = nil
 	end
@@ -727,7 +732,7 @@ local function setDrawColor(red, green, blue, alpha)
 end
 
 local function updateDisplayState(ply)
-	if not ply:Alive() then
+	if focus.active or not ply:Alive() then
 		displayGray, displayFade = 0, 1
 		return
 	end
@@ -936,7 +941,9 @@ local function drawShapeExtras(shape, ax, ay, bx, by, r)
 	local soak = bandage[region]
 	if soak then
 		local horizontal = region == "chest" or region == "pelvis"
-		local red, green, blue = lerpColor(K.COLOR.BANDAGE_CLEAN, K.COLOR.BANDAGE_SOAKED, math_Clamp(soak, 0, 1))
+		local tint = bandageTint[region]
+		local clean = tint and {tint.r or tint[1], tint.g or tint[2], tint.b or tint[3]} or K.COLOR.BANDAGE_CLEAN
+		local red, green, blue = lerpColor(clean, K.COLOR.BANDAGE_SOAKED, math_Clamp(soak, 0, 1))
 		drawStrap(ax, ay, bx, by, r, 0.5, red, green, blue, horizontal)
 	end
 
@@ -988,12 +995,6 @@ local function drawShape(shape)
 		polyCapsuleRing(ax, ay, bx, by, r, inner)
 	end
 
-	if focus.region and (shape.region == focus.region or shape.splitRegion == focus.region) then
-		local pulse = 0.55 + 0.45 * math_sin(CurTime() * 6)
-		setDrawColor(255, 255, 255, 25 + 230 * pulse)
-		polyCapsuleRing(ax, ay, bx, by, r + outlineWidth * (1.5 + pulse * 1.5), r)
-	end
-
 	drawShapeExtras(shape, ax, ay, bx, by, r)
 end
 
@@ -1025,27 +1026,40 @@ local function pointScreen(point)
 	return centerX + smoothY[point] * pixelScale, centerY - (smoothZ[point] - targetZ) * pixelScale
 end
 
-local function brainColor(color, damage)
-	if damage <= K.ORGAN.BRAIN_GRAY_AT then
-		return lerpColor(color, K.COLOR.ORGAN_GRAY, damage / K.ORGAN.BRAIN_GRAY_AT)
+local arcQuad = {{x = 0, y = 0}, {x = 0, y = 0}, {x = 0, y = 0}, {x = 0, y = 0}}
+
+local function drawHealthArc(x, y, outer, inner, fraction)
+	local segments = math.max(math.ceil(K.ORGAN.ARC_SEGMENTS * fraction), 1)
+	local span = fraction * math.pi * 2
+	for i = 0, segments - 1 do
+		local a1 = -math.pi * 0.5 + span * i / segments
+		local a2 = -math.pi * 0.5 + span * (i + 1) / segments
+		local c1, s1, c2, s2 = math_cos(a1), math_sin(a1), math_cos(a2), math_sin(a2)
+		arcQuad[1].x, arcQuad[1].y = x + c1 * outer, y + s1 * outer
+		arcQuad[2].x, arcQuad[2].y = x + c2 * outer, y + s2 * outer
+		arcQuad[3].x, arcQuad[3].y = x + c2 * inner, y + s2 * inner
+		arcQuad[4].x, arcQuad[4].y = x + c1 * inner, y + s1 * inner
+		surface.DrawPoly(arcQuad)
 	end
-
-	local t = math_Clamp((damage - K.ORGAN.BRAIN_GRAY_AT) / (K.ORGAN.BRAIN_RED_AT - K.ORGAN.BRAIN_GRAY_AT), 0, 1)
-
-	return lerpColor(K.COLOR.ORGAN_GRAY, K.COLOR.ORGAN_BRAIN_DEAD, t)
 end
 
-local function drawOrgan(ax, ay, bx, by, radius, color, damage, brain)
-	local red, green, blue
-	if brain then
-		red, green, blue = brainColor(color, damage)
-	else
-		red, green, blue = lerpColor(color, K.COLOR.ORGAN_GRAY, math_Clamp(damage, 0, 1))
-	end
+local function drawOrgan(ax, ay, bx, by, radius, color, damage)
+	damage = math_Clamp(damage or 0, 0, 1)
+	local ring = math.max(outlineWidth * K.ORGAN.ARC_WIDTH, 2)
 	setDrawColor(K.COLOR.OUTLINE[1], K.COLOR.OUTLINE[2], K.COLOR.OUTLINE[3], K.OUTLINE_ALPHA)
-	polyCapsule(ax, ay, bx, by, radius + outlineWidth)
-	setDrawColor(red, green, blue, 255)
+	polyCapsule(ax, ay, bx, by, radius + ring)
+	setDrawColor(color[1], color[2], color[3], 255)
 	polyCapsule(ax, ay, bx, by, radius)
+	if damage >= 0.995 then return end
+
+	local red, green, blue
+	if damage < 0.5 then
+		red, green, blue = lerpColor(K.COLOR.ORGAN_RING_HEALTHY, K.COLOR.ORGAN_RING_HURT, damage * 2)
+	else
+		red, green, blue = lerpColor(K.COLOR.ORGAN_RING_HURT, K.COLOR.ORGAN_RING_CRITICAL, (damage - 0.5) * 2)
+	end
+	setDrawColor(red, green, blue, 255)
+	drawHealthArc(ax, ay, radius + ring, radius, 1 - damage)
 end
 
 local callouts, calloutCount = {}, 0
@@ -1076,22 +1090,22 @@ local function drawCallout(entry, x, radius)
 	if entry.kind == "brain" then
 		local big = radius * K.ORGAN.CALLOUT_BRAIN_SCALE
 		local y = entry.y
-		drawOrgan(x, y, x, y, big, K.COLOR.ORGAN_BRAIN, organDamage.brain, true)
+		drawOrgan(x, y, x, y, big, K.COLOR.ORGAN_BRAIN, organDamage.brain)
 
 		local lobeRadius = big * K.ORGAN.LOBE_RADIUS / K.ORGAN.BRAIN_RADIUS
 		local offsetX, offsetY = big * K.ORGAN.LOBE_OFFSET_X / K.ORGAN.BRAIN_RADIUS, big * K.ORGAN.LOBE_OFFSET_Y / K.ORGAN.BRAIN_RADIUS
 		if organDamage.brainFrontal > 0 then
-			drawOrgan(x, y - offsetY, x, y - offsetY, lobeRadius, K.COLOR.LOBE_FRONTAL, organDamage.brainFrontal, true)
+			drawOrgan(x, y - offsetY, x, y - offsetY, lobeRadius, K.COLOR.LOBE_FRONTAL, organDamage.brainFrontal)
 		end
 		if organDamage.brainParietal > 0 then
-			drawOrgan(x, y, x, y, lobeRadius, K.COLOR.LOBE_PARIETAL, organDamage.brainParietal, true)
+			drawOrgan(x, y, x, y, lobeRadius, K.COLOR.LOBE_PARIETAL, organDamage.brainParietal)
 		end
 		if organDamage.brainOccipital > 0 then
-			drawOrgan(x, y + offsetY, x, y + offsetY, lobeRadius, K.COLOR.LOBE_OCCIPITAL, organDamage.brainOccipital, true)
+			drawOrgan(x, y + offsetY, x, y + offsetY, lobeRadius, K.COLOR.LOBE_OCCIPITAL, organDamage.brainOccipital)
 		end
 		if organDamage.brainTemporal > 0 then
-			drawOrgan(x - offsetX, y, x - offsetX, y, lobeRadius, K.COLOR.LOBE_TEMPORAL, organDamage.brainTemporal, true)
-			drawOrgan(x + offsetX, y, x + offsetX, y, lobeRadius, K.COLOR.LOBE_TEMPORAL, organDamage.brainTemporal, true)
+			drawOrgan(x - offsetX, y, x - offsetX, y, lobeRadius, K.COLOR.LOBE_TEMPORAL, organDamage.brainTemporal)
+			drawOrgan(x + offsetX, y, x + offsetX, y, lobeRadius, K.COLOR.LOBE_TEMPORAL, organDamage.brainTemporal)
 		end
 		return
 	end
@@ -1303,16 +1317,25 @@ local function drawArmor()
 end
 
 local function renderFigure()
-	local size = ScrH() * K.CFG.PANEL_SIZE_FRACTION
+	local size = ScrH() * K.CFG.PANEL_SIZE_FRACTION * (focus.active and focus.scale or 1)
 	pixelScale = size / (K.CFG.FIGURE_EXTENT * K.DISPLAY_SPINE)
 	outlineWidth = math.max(K.SHAPE.OUTLINE_WIDTH * ScrH() / K.REFERENCE_SCREEN_HEIGHT, 1)
-	centerX = ScrH() * K.CFG.PANEL_MARGIN_FRACTION + size * 0.5
-	centerY = ScrH() * 0.5
+	centerX = focus.active and focus.x or ScrH() * K.CFG.PANEL_MARGIN_FRACTION + size * 0.5
+	centerY = focus.active and focus.y or ScrH() * 0.5
 	targetZ = K.CFG.TARGET_HEIGHT * K.DISPLAY_SPINE
+
+	if focus.active and focus.shake > 0 then
+		local now = CurTime()
+		local amount = focus.shake * ScrH() * K.CFG.PAIN_SHAKE_FRACTION
+		centerX = centerX + (math_sin(now * 13.1) + math_sin(now * 7.7)) * 0.5 * amount
+		centerY = centerY + (math_sin(now * 11.3 + 1.7) + math_sin(now * 5.9)) * 0.5 * amount
+	end
 
 	draw.NoTexture()
 	queueBody()
 	drawCircles()
+	if focus.active then return end
+
 	drawDislocations()
 	drawArmor()
 	drawOrgans()
@@ -1353,21 +1376,19 @@ end
 
 hg.BodyStatus = hg.BodyStatus or {}
 
-function hg.BodyStatus.ResolveRegion(key)
-	if not isstring(key) or key == "" then return end
-	if K.REGION_SEGMENTS[key] then return key end
-
-	return focus.limbRegions[key] or resolveWoundRegion(key)
-end
-
-function hg.BodyStatus.DrawFor(subject, region)
+function hg.BodyStatus.DrawOther(subject, x, y, scale, alpha)
 	if IsValid(subject) and subject:IsRagdoll() and hg.RagdollOwner then subject = hg.RagdollOwner(subject) or subject end
-	if not IsValid(subject) or not subject:IsPlayer() then subject = LocalPlayer() end
+	if not IsValid(subject) or not subject:IsPlayer() then return end
 
-	focus.region = region
+	local org = subject.new_organism or subject.organism
+	focus.active = true
+	focus.x, focus.y, focus.scale = x, y, scale or 1
+	focus.shake = math_Clamp((istable(org) and tonumber(org.pain) or 0) / K.CFG.PAIN_SHAKE_FULL, 0, 1)
 	focus.frame = FrameNumber()
+	surface.SetAlphaMultiplier(alpha or 1)
 	local ok, err = pcall(drawBodyStatus, subject)
-	focus.region = nil
+	surface.SetAlphaMultiplier(1)
+	focus.active = false
 	if not ok then ErrorNoHalt(err, "\n") end
 end
 

@@ -13,7 +13,7 @@ end
 
 function ABL.Enabled()
 	if not C.sv.enabled:GetBool() then return false end
-	if CLIENT then return C.cl.enabled:GetBool() and C.cl.newBlood:GetBool() and not C.cl.superCheap:GetBool() end
+	if CLIENT then return C.cl.enabled:GetBool() and not C.cl.superCheap:GetBool() end
 	return true
 end
 

@@ -88,6 +88,21 @@ local function Run()
 	hook.Run("HomigradRun")
 end
 
+local function SendDirToClients(dir)
+	dir = dir .. "/"
+	local files, directories = file.Find(dir .. "*", "LUA")
+	for _, v in ipairs(files or {}) do
+		if string.EndsWith(v, ".lua") and string.lower(string.Left(v, 3)) ~= "sv_" then
+			AddCSLuaFile(dir .. v)
+		end
+	end
+	for _, v in ipairs(directories or {}) do
+		SendDirToClients(dir .. v)
+	end
+end
+
+if SERVER then SendDirToClients("initpost") end
+
 local initpost
 hook.Add("InitPostEntity", "zcity", function()
 	initpost = true

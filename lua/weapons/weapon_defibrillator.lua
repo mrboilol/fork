@@ -124,6 +124,13 @@ local AEDSounds = {
 
 local AEDChargeTime = 7.75
 
+local function AEDChargeDelay(fallback)
+	local duration = SoundDuration(AEDSounds.charging)
+	if duration and duration > 0 then return duration end
+
+	return fallback
+end
+
 local AEDNoSoundCooldown = {
 	[AEDSounds.fibrillation] = true,
 	[AEDSounds.charging] = true,
@@ -424,7 +431,7 @@ local function BeginAEDShock(defib, ply, getTarget, uses, accidental)
 		if IsAEDState(defib, "charging") then PlayAEDSound(defib, AEDSounds.standclear) end
 	end)
 
-	timer.Simple(AEDChargeTime + 3.5, function()
+	timer.Simple(AEDChargeDelay(AEDChargeTime + 3.5), function()
 		if not IsAEDState(defib, "charging") or defib.AEDShocked then return end
 
 		defib.AEDCharging = false
@@ -822,7 +829,7 @@ function hg.DefibReviveIncapacitated(defib, owner, ply, getTarget, uses)
 		if IsAEDState(defib, "charging") then PlayAEDSound(defib, AEDSounds.standclear) end
 	end)
 
-	timer.Simple(AEDChargeTime + 1.5, function()
+	timer.Simple(AEDChargeDelay(AEDChargeTime + 1.5), function()
 		if not IsAEDState(defib, "charging") or defib.AEDShocked then return end
 
 		defib.AEDCharging = false

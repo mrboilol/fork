@@ -977,6 +977,7 @@ local function tickResuscitation(owner, org, state, timeValue)
 	if (org.cprSupportUntil or 0) > now and (state.nextCprClear or 0) <= now then
 		state.nextCprClear = now + oxyConfig.cprCycle
 		SimpleHealth.Heal(org, "oxy", oxyConfig.cprClear)
+		SimpleHealth.Heal(org, "toxin", oxyConfig.cprToxinClear)
 
 		local _, hardAt = SimpleHealth.GetCritThresholds()
 		local healed = state.cprCritHealed or 0
@@ -1000,7 +1001,15 @@ function SimpleHealth.OnAEDShock(org)
 
 	local oxyConfig = CONFIG.oxy
 	SimpleHealth.Heal(org, "oxy", state.oxy)
-	healWorstPools(org, state, oxyConfig.aedHeal)
+	SimpleHealth.Heal(org, "toxin", state.toxin * oxyConfig.aedToxinFraction)
+
+	local softAt = SimpleHealth.GetCritThresholds()
+	if SimpleHealth.GetHealth(state) <= softAt then
+		SimpleHealth.Heal(org, "toxin", oxyConfig.aedCritToxinHeal)
+		SimpleHealth.Heal(org, "brute", oxyConfig.aedCritTissueHeal)
+		SimpleHealth.Heal(org, "burn", oxyConfig.aedCritTissueHeal)
+	end
+
 	state.aedResistUntil = CurTime() + oxyConfig.aedResistTime
 	state.cprCritHealed = nil
 
@@ -1329,8 +1338,10 @@ local function tickSymptoms(owner, org, state)
 		state.gasping = false
 	end
 
-	local bleedingInside = (tonumber(org.internalBleed) or 0) >= organConfig.coughBloodAt
-	if bleedingInside and not org.otrub and (state.nextCoughBlood or 0) <= now then
+	local nausea = tonumber(org.wantToVomit) or 0
+	local nauseaRising = nausea >= organConfig.coughNauseaAt and nausea > (state.nauseaPrev or 0)
+	state.nauseaPrev = nausea
+	if nauseaRising and not org.otrub and (state.nextCoughBlood or 0) <= now then
 		state.nextCoughBlood = now + organConfig.coughBloodInterval
 		organism.CoughBlood(org)
 		hg.ChatLog.Emit("coughblood", owner)

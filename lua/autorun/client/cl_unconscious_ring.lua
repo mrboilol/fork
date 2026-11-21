@@ -377,6 +377,26 @@ local g_PulseCheckTarget = nil
 usermessage.Hook("hg_StartPulseCheckECG", function(msg)
     g_PulseCheckTarget = msg:ReadEntity()
 end)
+
+local PULSE_FIGURE_SCALE = 0.55
+local PULSE_FIGURE_GAP = 12
+local PULSE_SCREEN_MARGIN = 0.04
+
+local function GetPulseCheckAnchor(ply, target)
+    local leftHand = ply:GetNetVar("carryent2") == target and ply:GetNetVar("carryent") ~= target
+    local body = hg.GetCurrentCharacter and hg.GetCurrentCharacter(ply) or ply
+    local bone = IsValid(body) and body:LookupBone(leftHand and "ValveBiped.Bip01_L_Hand" or "ValveBiped.Bip01_R_Hand")
+    local matrix = bone and body:GetBoneMatrix(bone)
+    if matrix then
+        local screen = matrix:GetTranslation():ToScreen()
+        local marginX, marginY = ScrW() * PULSE_SCREEN_MARGIN, ScrH() * PULSE_SCREEN_MARGIN
+        if screen.visible and screen.x >= marginX and screen.x <= ScrW() - marginX and screen.y >= marginY and screen.y <= ScrH() - marginY then
+            return screen.x, screen.y
+        end
+    end
+
+    return ScrW() * 0.5, ScrH() * 0.5
+end
 -- Local variables for faster access
 local math = math
 local surface = surface
@@ -1113,7 +1133,12 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
             ecgAlphaPulseCheck = 0
         else
             local boxW, boxH = 300, 150
-            local boxX, boxY = ScrW() / 2 - boxW / 2, ScrH() / 2 - boxH / 2
+            local figureSize = ScrH() * 0.36 * PULSE_FIGURE_SCALE
+            local totalW = figureSize + PULSE_FIGURE_GAP + boxW
+            local anchorX, anchorY = GetPulseCheckAnchor(ply, g_PulseCheckTarget)
+            anchorX = math.Clamp(anchorX, totalW * 0.5, ScrW() - totalW * 0.5)
+            anchorY = math.Clamp(anchorY, math.max(figureSize, boxH) * 0.5, ScrH() - math.max(figureSize, boxH) * 0.5)
+            local boxX, boxY = anchorX - totalW * 0.5 + figureSize + PULSE_FIGURE_GAP, anchorY - boxH / 2
 
             surface.SetDrawColor(0, 0, 0, 150 * ecgAlphaPulseCheck)
             surface.DrawRect(boxX, boxY, boxW, boxH)
@@ -1131,6 +1156,9 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
                 or (tonumber(target_org.brainSwelling) or 0) >= 0.45
             local targetECGColor = target_isCritical and Color(200, 0, 0, 255) or Color(255, 255, 255, 255)
             DrawEKG(pulseCheckEKGState, boxX + boxW / 2, boxY + boxH * 0.52, boxW - 20, boxH - 28, target_org, targetECGColor, ecgAlphaPulseCheck)
+            if hg.BodyStatus and hg.BodyStatus.DrawOther then
+                hg.BodyStatus.DrawOther(g_PulseCheckTarget, boxX - PULSE_FIGURE_GAP - figureSize * 0.5, anchorY, PULSE_FIGURE_SCALE, ecgAlphaPulseCheck)
+            end
         end
     else
         pulseCheckEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }

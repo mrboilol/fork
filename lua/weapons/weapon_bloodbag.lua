@@ -63,6 +63,7 @@ SWEP.modeValuesdef = {
 }
 
 SWEP.showstats = true
+SWEP.StatsFont = "ZCity_Tiny"
 
 SWEP.modeNames2 = {
 	[1] = "give blood",
@@ -340,7 +341,6 @@ if SERVER then
 		if self.net_cooldown < CurTime() then
 			self:SetNetVar("modeValues",self.modeValues)
 			self:SetNetVar("type",self.bloodtype)
-			self:SetNetVar("ph",self.bloodph)
 			self.net_cooldown = CurTime() + 0.1
 		end
 	end
@@ -371,7 +371,7 @@ else
 		ent = IsValid(ent) and ent.organism and ent or owner
 		local recipientBloodType = ent.organism and ent.organism.bloodtype or "unknown"
 		local modeStr = self.modeNames2[self:GetNetVar("mode",2)] or self.modeNames2[2]
-		self.modeNames[1] = self:GetNetVar("modeValues", {})[1] == 0 and modeStr .. " | Recipent: " .. recipientBloodType or modeStr .. " | in: "..self:GetNetVar("type","o-")..(self:GetNetVar("ph") and string.format(" pH %.2f", self:GetNetVar("ph")) or "").." | recipent: "..recipientBloodType
+		self.modeNames[1] = self:GetNetVar("modeValues", {})[1] == 0 and modeStr .. " | Recipent: " .. recipientBloodType or modeStr .. " | in: "..self:GetNetVar("type","o-").." | recipent: "..recipientBloodType
 	end
 
 	function SWEP:AfterDrawModel(wm,nodraw)

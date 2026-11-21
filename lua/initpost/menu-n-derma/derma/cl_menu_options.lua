@@ -243,8 +243,9 @@ hg.settings:AddOpt("Optimization","hg_tpik_distance", "TPIK Render Distance", tr
 hg.settings:AddOpt("Blood","hg_blood_draw_distance", "Blood Draw Distance")
 hg.settings:AddOpt("Blood","hg_blood_fps", "Blood FPS")
 hg.settings:AddOpt("Blood","hg_blood_sprites", "Blood Sprites (DISABLED FOR EVERYONE)")
-hg.settings:AddOpt("Blood","hg_old_blood", "New blood system (off = old particles and decals)")
+hg.settings:AddOpt("Blood","abl_gpu", "GPU blood (off = CPU advanced blood)")
 hg.settings:AddOpt("Blood","hg_supercheapblood", "Super cheap blood (old Z-City blood, no CPU/GPU advanced blood)")
+hg.settings:AddOpt("Blood","hg_old_blood", "Old Z-City stains (super cheap blood only)")
 hg.settings:AddOpt("UI","hg_moodles_enabled", "Moodles")
 
 hg.settings:AddOpt("UI","hg_font", "Change Custom Font", false, true)

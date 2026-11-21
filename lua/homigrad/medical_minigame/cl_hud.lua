@@ -681,14 +681,6 @@ function PANEL:DrawBandageChoice(w, h)
     end
 end
 
-function PANEL:PaintOver(w, h)
-    if not hg.BodyStatus or not hg.BodyStatus.DrawFor then return end
-
-    local info = hg.MedicalMinigame.BandageTarget
-    local key = self.GameType == "bandage" and info and info.bone or self.AmputationLimb or self.DislocationLimb
-    hg.BodyStatus.DrawFor(self.TreatmentTarget, hg.BodyStatus.ResolveRegion(key))
-end
-
 function PANEL:OnKeyCodePressed(code)
     if code ~= KEY_R or self.GameType ~= "bandage" then return end
     local info = hg.MedicalMinigame.BandageTarget
@@ -2072,7 +2064,6 @@ net.Receive("hg_medical_minigame_bandage_target", function()
         count = net.ReadUInt(6),
     }
     local required = net.ReadUInt(8)
-    hg.MedicalMinigame.BandageTarget.bone = net.ReadString()
 
     local panel = hg.MedicalMinigame.Panel
     if IsValid(panel) and panel.GameType == "bandage" and required > 0 then
