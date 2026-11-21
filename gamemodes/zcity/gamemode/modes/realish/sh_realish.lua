@@ -216,6 +216,7 @@ RealishClasses = RealishClasses or {
 		gadget = {
 			{name = "Medkit", class = "weapon_medkit_sh", clips = 0},
 			{name = "Painkillers", class = "weapon_painkillers", clips = 0},
+			{name = "Antibiotics", class = "weapon_antibiotics", clips = 0},
 			{name = "Defibrillator", class = "weapon_defibrillator", clips = 0},
 			{name = "Big Bandage", class = "weapon_bigbandage_sh", clips = 0},
 			{name = "Morphine", class = "weapon_morphine", clips = 0},

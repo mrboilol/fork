@@ -63,6 +63,7 @@ local MEDICINE = {
 	weapon_naloxone = true,
 	weapon_painkillers = true,
 	weapon_painkillers_tpik = true,
+	weapon_antibiotics = true,
 	weapon_betablock = true,
 	weapon_mannitol = true,
 	weapon_needle = true,

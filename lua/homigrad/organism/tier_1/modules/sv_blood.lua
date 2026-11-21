@@ -80,6 +80,7 @@ module[1] = function(org)
 	org.sepsisSource = 0
 	org.sepsisOrganPrev = nil
 	hg.organism.AcidBase.Init(org)
+	hg.organism.Infection.Init(org)
 	org.ischemia = 0
 	org.internalBleedDuration = 0
 	org.internalBleedPeak = 0
@@ -546,6 +547,7 @@ module[2] = function(owner, org, mulTime)
 	local adrenalineStabilizer = totalAdrenaline > 0.2
 	local hasAntiIschemia = (org.tranexamic_acid or 0) > 0 or (org.thiamine or 0) > 0
 
+	hg.organism.UpdateInfection(owner, org, mulTime)
 	hg.organism.UpdateSepsis(org, mulTime, adrenalineStabilizer)
 	hg.organism.UpdateMetabolicShock(owner, org, mulTime)
 

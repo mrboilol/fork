@@ -585,7 +585,7 @@ local function ApplySyringeProgress(wep, ply, target, progressDelta)
         local entOwner = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
         if class == "weapon_fury13" or class == "weapon_fury16" then
             entOwner:EmitSound("pshiksnd")
-        elseif class == "weapon_painkillers" or class == "weapon_zerlkers" then
+        elseif class == "weapon_painkillers" or class == "weapon_zerlkers" or wep.HGPillMinigame then
             -- Pills don't play an injection sound.
         else
             entOwner:EmitSound("snds_jack_gmod/ez_medical/" .. math.random(16, 18) .. ".ogg", 60, math.random(95, 105))

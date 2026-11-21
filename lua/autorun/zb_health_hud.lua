@@ -1774,7 +1774,7 @@ local function draw_status_effects()
 				local ischemia_val = smooth.ischemia or getOrgVal(org, "ischemia", 0)
 				local hemotransfusionshock_val = smooth.hemotransfusionshock or getOrgVal(org, "hemotransfusionshock", 0)
 				
-				if ischemia_val > 0.1 or hemotransfusionshock_val > 0.1 then
+				if ischemia_val > 0.1 or hemotransfusionshock_val > 0.1 or getOrgVal(org, "infection", 0) > 0.15 then
 					local level_num = 1
 					if ischemia_val > 0.5 or hemotransfusionshock_val > 0.1 then level_num = 2 end
 					if ischemia_val > 1.0 or hemotransfusionshock_val >= 0.6 then level_num = 3 end

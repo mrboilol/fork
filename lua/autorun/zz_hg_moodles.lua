@@ -394,7 +394,7 @@ local moodleTexts = {
 		[4] = {title = "Catastrophic Brain Damage", description = "Critical brain trauma is shutting down essential functions."},
 	}},
 	sepsis = {levels = {
-		[1] = {title = "Ischemia", description = "Poor circulation is beginning to damage vulnerable tissue."},
+		[1] = {title = "Infection", description = "A wound is infected or tissue is starved of blood. It will spread if left alone."},
 		[2] = {title = "Sepsis", description = "An infection is spreading through the blood. Fever, aches and a racing heart."},
 		[3] = {title = "Severe Sepsis", description = "The body is turning on itself. Strength drains away and organs suffer."},
 		[4] = {title = "Septic Shock", description = "Blood vessels are failing. Pressure is crashing and organs are starving."},
@@ -1046,11 +1046,12 @@ local function buildEffects(ply, org)
 		end
 	end
 	local ischemia, transfusionShock = orgNumber(org, "ischemia", 0), orgNumber(org, "hemotransfusionshock", 0)
-	if ischemia > 0.1 or transfusionShock > 0.1 then
-		local level = math.min(highRank(ischemia, {0.1, 0.5, 1, 1.5}), 3)
+	local infection = orgNumber(org, "infection", 0)
+	if ischemia > 0.1 or transfusionShock > 0.1 or infection > 0.15 then
+		local level = math.max(math.min(highRank(ischemia, {0.1, 0.5, 1, 1.5}), 3), infection > 0.15 and 1 or 0)
 		if transfusionShock > 0.1 then level = math.max(level, transfusionShock >= 0.6 and 3 or 2) end
 		if orgNumber(org, "septicShock", 0) > 0 then level = 4 end
-		local severity = math.max(ischemia, transfusionShock)
+		local severity = math.max(ischemia, transfusionShock, infection)
 		add(effects, "sepsis", "sepsis", level, "bad", 46, math.floor(severity * 100) .. "%")
 	end
 

@@ -117,6 +117,7 @@ local lootPools = {
 		"weapon_bigbandage_sh",
 		"weapon_tourniquet",
 		"weapon_painkillers",
+		"weapon_antibiotics",
 		"weapon_bloodbag",
 		"weapon_bloodbag_big",
 		"weapon_bruicekit",

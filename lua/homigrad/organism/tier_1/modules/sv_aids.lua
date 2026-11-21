@@ -30,7 +30,7 @@ AcidBase.Config = {
 	citrateMax = 12,
 
 	bicarbDropRate = 0.6,
-	bicarbRecoverRate = 0.04,
+	bicarbRecoverRate = 0.01,
 	thiamineRecoverRate = 0.25,
 
 	acidosisStart = 7.35,

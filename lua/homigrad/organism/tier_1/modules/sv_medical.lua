@@ -135,6 +135,7 @@ local function apply_med_error(actor, org, action, ctx)
 		org.owner:Notify("Wrong dose, feeling dizzy...", 6, "med_err_dose", 0)
 	elseif action == "bandage" then
 		org.medical_infection = min((org.medical_infection or 0) + 0.8, 2)
+		hg.organism.Infection.Seed(org, 0.3)
 		org.owner:Notify("Bandage wasn't clean enough.", 6, "med_err_bandage", 0)
 	end
 	if actor ~= org.owner then

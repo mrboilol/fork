@@ -22,6 +22,7 @@ local MEDICAL_WEAPON_CLASSES = {
     "weapon_medkit_surgical_sh",
     "weapon_needle",
     "weapon_painkillers",
+    "weapon_antibiotics",
     "weapon_zerlkers",
     "weapon_adrenaline",
     "weapon_thiamine",
