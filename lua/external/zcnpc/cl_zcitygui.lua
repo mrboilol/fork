@@ -243,6 +243,15 @@ if ZCNPC.__origVguiCreate then
 	ZCNPC.__origVguiCreate = nil
 end
 
+local vguiCreate = vgui.Create
+if not ZCNPC.__zframeLazy then
+	ZCNPC.__zframeLazy = true
+	vgui.Create = function(class, ...)
+		if class == "ZFrame" then EnsureZFrame() end
+		return vguiCreate(class, ...)
+	end
+end
+
 timer.Remove("zcnpc_zcitygui_chat")
 
 -- Medicine Think / HUD: KeyDown on a non-player owner, or GetHolding before
