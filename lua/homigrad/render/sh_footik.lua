@@ -1,4 +1,4 @@
-local IsValid, Vector, Angle, Matrix, Lerp, LerpVector, FrameTime, FrameNumber, CurTime = IsValid, Vector, Angle, Matrix, Lerp, LerpVector, FrameTime, FrameNumber, CurTime
+local IsValid, Vector, Angle, Matrix, Lerp, LerpVector, CurTime = IsValid, Vector, Angle, Matrix, Lerp, LerpVector, CurTime
 local WorldToLocal, LocalToWorld = WorldToLocal, LocalToWorld
 local math_Clamp, math_max, math_min, math_abs, math_sqrt, math_sin, math_exp, math_floor = math.Clamp, math.max, math.min, math.abs, math.sqrt, math.sin, math.exp, math.floor
 local math_AngleDifference = math.AngleDifference
@@ -6,6 +6,8 @@ local FrameTime = SERVER and engine.TickInterval or FrameTime
 local FrameNumber = SERVER and engine.TickCount or FrameNumber
 
 IKFoot = IKFoot or {}
+
+local K = include("homigrad/render/sh_footik_config.lua")
 
 local LEGS = {
 	{
@@ -137,9 +139,6 @@ local LAND_GAIN = 0.09
 local FOOT_POSE_SMOOTH = 32
 local FOOT_MAX_LAG = 3
 local SPINE_BONE= "ValveBiped.Bip01_Spine"
-local DEBUG_BOX = Vector(1.5, 1.5, 1.5)
-local DEBUG_PLANTED = Color(60, 255, 60)
-local DEBUG_SWING = Color(255, 200, 60)
 
 local cl_interp = CLIENT and GetConVar("cl_interp")
 local cl_interp_ratio = CLIENT and GetConVar("cl_interp_ratio")
@@ -154,6 +153,17 @@ end
 
 local groundHullMins, groundHullMaxs = Vector(-2, -2, 0), Vector(2, 2, 1)
 local boneCache = {}
+local playerFilter = {frame = -1}
+
+local function traceFilter()
+	local frame = FrameNumber()
+	if playerFilter.frame ~= frame then
+		playerFilter.frame = frame
+		playerFilter.list = player.GetAll()
+	end
+
+	return playerFilter.list
+end
 
 local function resetPelvisOffset(ply)
 	if SERVER and ply.hg_IKPelvisOffset ~= 0 then
@@ -258,6 +268,7 @@ local function traceGround(state, origin, x, y)
 	local tr = state.groundTrace
 	local dx, dy = x - origin.x, y - origin.y
 	local slopeReach = math_min(math_sqrt(dx * dx + dy * dy) * SLOPE_TRACE_PER_UNIT, SLOPE_TRACE_MAX)
+	tr.filter = traceFilter()
 	tr.start = Vector(x, y, origin.z + GROUND_TRACE_UP + slopeReach)
 	tr.endpos = Vector(x, y, origin.z - GROUND_TRACE_DOWN - slopeReach)
 	local result = util.TraceHull(tr)
@@ -285,6 +296,7 @@ local function clampToWalls(state, origin, target)
 	local tr = state.wallTrace
 	tr.start = origin + vector_up * WALL_TRACE_HEIGHT
 	tr.endpos = Vector(target.x, target.y, tr.start.z)
+	tr.filter = traceFilter()
 	local result = util.TraceLine(tr)
 	if not result.Hit or result.StartSolid then return target end
 	local dir = tr.endpos - tr.start
@@ -294,9 +306,36 @@ local function clampToWalls(state, origin, target)
 	return Vector(pos.x, pos.y, target.z)
 end
 
-local function newState(ply)
-	local filter = function(ent) return ent ~= ply and not ent:IsPlayer() end
+local function treadPlacement(state, ctx, foot, desired, pos, normal, groundEnt)
+	local toeLength = state.toeLength or 0
+	if foot.stagger or toeLength < K.TREAD_MIN_TOE or ctx.speed <= MOVING_SPEED then return pos, normal, groundEnt end
+	local forward = ctx.forward
+	local toeReach, heelReach = toeLength * K.TREAD_TOE_REACH, -toeLength * K.TREAD_HEEL_REACH
 
+	local function flatAt(ground, n)
+		local nz = math_max(n.z, 0.5)
+		for _, reach in ipairs({toeReach, heelReach}) do
+			local probe = ground + forward * reach
+			local hitPos, _, _, hit = traceGround(state, ctx.origin, probe.x, probe.y)
+			local planeZ = ground.z - (n.x * (probe.x - ground.x) + n.y * (probe.y - ground.y)) / nz
+			if not hit or math_abs(hitPos.z - planeZ) > K.TREAD_FLAT_TOLERANCE then return false end
+		end
+
+		return true
+	end
+
+	if flatAt(pos, normal) then return pos, normal, groundEnt end
+	local shift = toeLength * K.TREAD_SHIFT
+	for _, mul in ipairs(K.TREAD_SEARCH) do
+		local probe = desired + forward * (shift * mul)
+		local shiftedPos, shiftedNormal, shiftedEnt, hit = traceGround(state, ctx.origin, probe.x, probe.y)
+		if hit and flatAt(shiftedPos, shiftedNormal) then return shiftedPos, shiftedNormal, shiftedEnt end
+	end
+
+	return pos, normal, groundEnt
+end
+
+local function newState()
 	return {
 		weight = 0,
 		phase = 0,
@@ -305,8 +344,8 @@ local function newState(ply)
 		lastPlant = 0,
 		frame = -1,
 		feet = {{}, {}},
-		groundTrace = {mins = groundHullMins, maxs = groundHullMaxs, mask = MASK_PLAYERSOLID, filter = filter},
-		wallTrace = {mask = MASK_PLAYERSOLID, filter = filter},
+		groundTrace = {mins = groundHullMins, maxs = groundHullMaxs, mask = MASK_SOLID},
+		wallTrace = {mask = MASK_PLAYERSOLID},
 	}
 end
 
@@ -461,7 +500,7 @@ local function updateSwing(ply, state, ctx, index, dt)
 
 	local desired = clampToWalls(state, ctx.origin, landingTarget(ply, state, ctx, foot, index, remaining))
 	if not foot.tracedPos or foot.tracedAt:DistToSqr(desired) > RETRACE_DIST_SQR then
-		foot.tracedPos, foot.targetNormal, foot.targetEnt = traceSupport(state, ctx.origin, desired)
+		foot.tracedPos, foot.targetNormal, foot.targetEnt = treadPlacement(state, ctx, foot, desired, traceSupport(state, ctx.origin, desired))
 		foot.tracedAt = desired
 	end
 	foot.target = foot.target and LerpVector(math_min(dt * TARGET_SMOOTH, 1), foot.target, foot.tracedPos) or Vector(foot.tracedPos)
@@ -601,6 +640,31 @@ local function releaseFeet(state, ctx)
 	end
 end
 
+local function absorbOriginJump(ply, state, ctx)
+	local last, lastTime, wasOnGround = state.lastOrigin, state.lastOriginTime, state.wasOnGround
+	local now = CurTime()
+	state.lastOrigin, state.lastOriginTime, state.wasOnGround = ctx.origin, now, ctx.onGround
+	if not last then return 0 end
+	local elapsed = now - lastTime
+	if elapsed < 0 or elapsed > 0.25 then return 0 end
+
+	local vel = ply:GetVelocity()
+	local groundEnt = ply:GetGroundEntity()
+	if IsValid(groundEnt) then vel:Add(groundEnt:GetVelocity()) end
+	local unexplained = ctx.origin - last - vel * elapsed
+	if unexplained:LengthSqr() > K.TELEPORT_DIST * K.TELEPORT_DIST then
+		releaseFeet(state, ctx)
+		state.pelvis = nil
+
+		return 0
+	end
+
+	local rise = unexplained.z
+	if not (ctx.onGround and wasOnGround) or math_abs(rise) < K.ORIGIN_POP_MIN or math_abs(rise) <= unexplained:Length2D() * K.ORIGIN_POP_SLOPE + 1 then return 0 end
+
+	return rise
+end
+
 local function rawPelvisOffset(ply, state)
 	return (state.hop - state.drop - (ply.hg_Body and ply.hg_Body.drop or 0)) * state.weight
 end
@@ -621,12 +685,15 @@ local function springScalar(current, velocity, target, smoothTime, dt)
 	return value, (velocity - omega * temp) * decay
 end
 
-local function updatePelvis(ply, state, dt)
+local function updatePelvis(ply, state, dt, rise)
 	local target = rawPelvisOffset(ply, state)
 	if not state.pelvis then
 		state.pelvis, state.pelvisVel = target, 0
 
 		return
+	end
+	if rise ~= 0 then
+		state.pelvis = math_Clamp(state.pelvis - rise * state.weight, target - K.MAX_POP_LAG, target + K.MAX_POP_LAG)
 	end
 	state.pelvis, state.pelvisVel = springScalar(state.pelvis, state.pelvisVel, target, PELVIS_SMOOTH_TIME, dt)
 end
@@ -1078,10 +1145,10 @@ local function drawDebug(state)
 	for index = 1, 2 do
 		local foot = state.feet[index]
 		if foot.planted then
-			render.DrawWireframeBox(foot.planted, angle_zero, -DEBUG_BOX, DEBUG_BOX, DEBUG_PLANTED, true)
+			render.DrawWireframeBox(foot.planted, angle_zero, -K.DEBUG_BOX, K.DEBUG_BOX, K.DEBUG_PLANTED, true)
 		end
 		if foot.swinging and foot.target then
-			render.DrawWireframeBox(foot.target, angle_zero, -DEBUG_BOX, DEBUG_BOX, DEBUG_SWING, true)
+			render.DrawWireframeBox(foot.target, angle_zero, -K.DEBUG_BOX, K.DEBUG_BOX, K.DEBUG_SWING, true)
 		end
 	end
 end
@@ -1218,7 +1285,7 @@ local function footIK(ent, ply)
 		return
 	end
 
-	state = state or newState(ply)
+	state = state or newState()
 	ply.hg_FootIK = state
 
 	if state.frame == FrameNumber() then
@@ -1246,11 +1313,12 @@ local function footIK(ent, ply)
 	if not anim then return end
 	local ctx = buildContext(ply, state, anim, dt)
 	state.ctx = ctx
+	local rise = absorbOriginJump(ply, state, ctx)
 
 	updateFeet(ply, state, ctx, dt)
 	updateDrop(state, ctx, dt)
 	state.hop = gaitBob(state, ctx)
-	updatePelvis(ply, state, dt)
+	updatePelvis(ply, state, dt, rise)
 	applyPose(ent, ply, state, bones, ctx)
 
 	if CLIENT and IKFoot.GetFloat("debug") > 0 then drawDebug(state) end

@@ -103,9 +103,19 @@ end
 
 local hg_old_blood = ConVarExists("hg_old_blood") and GetConVar("hg_old_blood") or CreateClientConVar("hg_old_blood", 1, true, false, "1 = AdvancedBlood system, 0 = old Z-City blood particles and decals", 0, 1)
 local hg_oldblood = ConVarExists("hg_oldblood") and GetConVar("hg_oldblood") or CreateClientConVar("hg_oldblood", 0, true, false, "Use old Z-City blood decals", 0, 1)
+local hg_supercheapblood = ConVarExists("hg_supercheapblood") and GetConVar("hg_supercheapblood") or CreateClientConVar("hg_supercheapblood", 0, true, false, "1 = cheapest blood: old Z-City particles and decals, AdvancedBlood CPU and GPU blood off", 0, 1)
 local function useOldBlood()
-	return not hg_old_blood:GetBool() or hg_oldblood:GetBool()
+	return not hg_old_blood:GetBool() or hg_oldblood:GetBool() or hg_supercheapblood:GetBool()
 end
+
+cvars.RemoveChangeCallback("hg_supercheapblood", "hg_refresh_cheap_blood")
+cvars.AddChangeCallback("hg_supercheapblood", function(_, oldValue, newValue)
+	if oldValue == newValue then return end
+	table.Empty(hg.bloodparticles1)
+	if hg.bloodparticles2 then table.Empty(hg.bloodparticles2) end
+	hg.bloodpositions = {}
+	hg.bloodcount = 0
+end, "hg_refresh_cheap_blood")
 
 cvars.RemoveChangeCallback("hg_old_blood", "hg_refresh_old_blood_decals")
 cvars.AddChangeCallback("hg_old_blood", function(_, oldValue, newValue)
@@ -256,6 +266,11 @@ local function decalBlood(pos, normal, tr, artery, owner, tiny, amount, particle
 	if hg.BloodLandRedirect and hg.BloodLandRedirect(pos, normal, tr, artery, amount, particleSize, vel) then return end
 	if hg.BloodPoolCovers(pos, normal) then
 		if not tiny or math.random(7) == 1 then playBloodDripImpact(pos, tr) end
+		return
+	end
+
+	if hg_supercheapblood:GetBool() then
+		placeOldBloodDecal(pos, normal, IsValid(tr.Entity) and tr.Entity or nil, artery, amount, particleSize)
 		return
 	end
 

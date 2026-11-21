@@ -1074,6 +1074,24 @@ local function getHeartbeatLift(org, index)
 	return math.sin(phase / 0.32 * math.pi) * 2 - 1
 end
 
+local hg_supercheapblood = ConVarExists("hg_supercheapblood") and GetConVar("hg_supercheapblood") or CreateClientConVar("hg_supercheapblood", 0, true, false, "1 = cheapest blood: old Z-City particles and decals, AdvancedBlood CPU and GPU blood off", 0, 1)
+
+local function emitCheapBleeding(ent, org, pos, ang, visualRate, interval, artery)
+	local volume = math.min(visualRate * interval, 8)
+	local vel
+	local size
+	if artery then
+		local _, pressureDrive = getBleedPressureDrive(org)
+		vel = getBleedDirection(ang) * math.Clamp(40 + math.sqrt(visualRate) * 18, 40, 200) * math.min(pressureDrive, 1.1) + VectorRand(-10, 10)
+		size = math.Clamp(0.45 + math.sqrt(visualRate) * 0.22, 0.45, 3) * arterySizeMul
+	else
+		vel = VectorRand(-15, 15)
+		size = math.Clamp(0.35 + math.sqrt(visualRate) * 0.18, 0.35, 2) * 1.5
+	end
+	local part = hg.addBloodPart(pos, vel, nil, size, size, artery, nil, ent, volume < 0.25)
+	if part then part.volume = volume end
+end
+
 local function emitJugularBleeding(ent, wound, pos, ang, visualRate, interval)
 	local outward = getBleedDirection(ang)
 	local count = math.Clamp(math.ceil(visualRate / 4), 2, 5)
@@ -1441,8 +1459,13 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 						else
 							local bleeding = math.max(tonumber(wound[1]) or 0, 0.5)
 							local interval = wound.vessel == "jugular" and math.Rand(0.05, 0.08) or math.Clamp(15 / bleeding * math.Rand(0.5, 1), 0.05, 12)
+							if hg_supercheapblood:GetBool() then interval = math.max(interval, 0.15) end
 							if not (hg.BandageAbsorbBlood and hg.BandageAbsorbBlood(ent, bone, visualRate * interval)) then
-								emitOrdinaryBleeding(ent, org, wound, pos, ang, visualRate, interval)
+								if hg_supercheapblood:GetBool() then
+									emitCheapBleeding(ent, org, pos, ang, visualRate, interval, false)
+								else
+									emitOrdinaryBleeding(ent, org, wound, pos, ang, visualRate, interval)
+								end
 							end
 							wound.nextVisualBleed = time + interval
 						end
@@ -1477,6 +1500,16 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 							1 / math.max(hg_blood_fps:GetInt(), 1), 0.12)
 						if not water and hg.BandageAbsorbBlood and hg.BandageAbsorbBlood(ent, bone, visualRate * interval) then
 							wound.nextVisualBleed = time + interval
+							continue
+						end
+						if hg_supercheapblood:GetBool() then
+							if water then
+								hg.addBloodPart2(pos, VectorRand(-5, 5), nil, nil, nil, nil, true, ent)
+								wound.nextVisualBleed = time + 2
+							else
+								emitCheapBleeding(ent, org, pos, ang, visualRate, interval, true)
+								wound.nextVisualBleed = time + interval
+							end
 							continue
 						end
 						local exitWound = wound.exitWound

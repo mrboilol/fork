@@ -22,6 +22,11 @@ local MAX_LINES = 200000
 
 local cvar = CreateConVar(CVAR, "0", FCVAR_ARCHIVE, "Write a crash trace to data/" .. DIR .. "/" .. REALM .. ".txt", 0, 1)
 
+if not cvar:GetBool() then
+	ZCNPC.Trace = function() end
+	return
+end
+
 local out, lines = nil, 0
 local hotUntil = 0
 local cleaning = false

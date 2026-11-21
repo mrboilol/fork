@@ -14,8 +14,9 @@ local mat_huy = Material("effects/blood_core")
 local cloudmat = Material("effects/smoke_b")
 local hg_old_blood = ConVarExists("hg_old_blood") and GetConVar("hg_old_blood") or CreateClientConVar("hg_old_blood", 1, true, false, "1 = AdvancedBlood system, 0 = old Z-City blood particles and decals", 0, 1)
 local hg_oldblood = ConVarExists("hg_oldblood") and GetConVar("hg_oldblood") or CreateClientConVar("hg_oldblood", 0, true, false, "Use old Z-City blood decals", 0, 1)
+local hg_supercheapblood = ConVarExists("hg_supercheapblood") and GetConVar("hg_supercheapblood") or CreateClientConVar("hg_supercheapblood", 0, true, false, "1 = cheapest blood: old Z-City particles and decals, AdvancedBlood CPU and GPU blood off", 0, 1)
 local function useOldBloodParticles()
-	return not hg_old_blood:GetBool() or hg_oldblood:GetBool()
+	return not hg_old_blood:GetBool() or hg_oldblood:GetBool() or hg_supercheapblood:GetBool()
 end
 local texture = Material("decals/z_blood1"):GetTexture("$basetexture")
 if texture then mat_huy:SetTexture("$basetexture", texture) end

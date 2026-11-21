@@ -362,6 +362,8 @@ NarrateInner = function(msg)
 	local limbCondition = LimbCondition(msg)
 	if limbCondition then return limbCondition end
 
+	if true then return msg end
+
 	local text = string.gsub(msg, "%.%.+", ",")
 	text = string.gsub(text, "%-+", ",")
 	for _, phrase in ipairs(INTERJECTION_PHRASES) do

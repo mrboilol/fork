@@ -161,16 +161,18 @@ end
 local matBlood = Material("zbattle/blood")
 local oldMatBlood = Material("decals/z_blood1")
 local hg_old_blood = ConVarExists("hg_old_blood") and GetConVar("hg_old_blood") or CreateClientConVar("hg_old_blood", 1, true, false, "1 = AdvancedBlood system, 0 = old Z-City blood particles and decals", 0, 1)
+local hg_supercheapblood = ConVarExists("hg_supercheapblood") and GetConVar("hg_supercheapblood") or CreateClientConVar("hg_supercheapblood", 0, true, false, "1 = cheapest blood: old Z-City particles and decals, AdvancedBlood CPU and GPU blood off", 0, 1)
 net.Receive("bloody_decal_1", function()
 	local self = net.ReadEntity()
 
 	if IsValid(self) then
 		local mdl = getBloodDecalModel(self)
-		
+		local tex = (not hg_old_blood:GetBool() or hg_supercheapblood:GetBool()) and oldMatBlood or matBlood
+
 		if self.bloodID then
-			AddDecalToEnt(mdl, self.bloodID, self:EntIndex(), not hg_old_blood:GetBool() and oldMatBlood or matBlood, false, nil, nil, nil, nil, self.DamageType != DMG_SLASH and 100)
+			AddDecalToEnt(mdl, self.bloodID, self:EntIndex(), tex, false, nil, nil, nil, nil, self.DamageType != DMG_SLASH and 100)
 		else
-			AddDecalToEnt2(mdl, self:EntIndex(), not hg_old_blood:GetBool() and oldMatBlood or matBlood, false, nil, nil, nil, nil, self.DamageType != DMG_SLASH and 100)
+			AddDecalToEnt2(mdl, self:EntIndex(), tex, false, nil, nil, nil, nil, self.DamageType != DMG_SLASH and 100)
 		end
 	end
 end)

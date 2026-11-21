@@ -17,8 +17,8 @@ local recent_stamina_loss_hold_time = 1
 local recent_stamina_loss_fade_time = 4
 local ledge_hang_recovery_bonus = 3
 local stamina_recovery_per_second = 9.5
-local anger_combat_hold_time = 12
-local anger_decay_per_second = 0.04
+local anger_combat_hold_time = 45
+local anger_decay_per_second = 0.015
 local anger_opponent_range = 3000
 local function angerOpponentStanding(org, now)
 	local opp = org.angerOpponent

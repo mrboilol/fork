@@ -1003,24 +1003,6 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 	end)
 --//
 
---\\ Anti-gmod PVP system (anti crouch spam)
-	hook.Add("StartCommand", "HG_AntiGmodPVP", function(ply, cmd)
-		ply.NowCrouched = cmd:KeyDown(IN_DUCK)
-		ply.OldCrouched = ply.OldCrouched or cmd:KeyDown(IN_DUCK)
-
-		if IsValid(ply.FakeRagdoll) and not hg.RagdollCombatInUse(ply) then
-			ply.OldCrouched = cmd:KeyDown(IN_DUCK)
-			return
-		end
-
-		if not ply:OnGround() and ply:WaterLevel() < 2 and ply:GetMoveType() == MOVETYPE_WALK and ply.OldCrouched != ply.NowCrouched then
-			cmd:AddKey(IN_DUCK)
-		end
-
-		ply.OldCrouched = cmd:KeyDown(IN_DUCK)
-	end)
---//
-
 if CLIENT then
 	hook.Add("hg_AdjustMouseSensitivity", "HG_Sprint_Sens", function(ply)
 		if ply.hg_isSprinting then

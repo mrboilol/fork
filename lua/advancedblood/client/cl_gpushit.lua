@@ -110,7 +110,7 @@ local function ShadersPresent()
 end
 
 local function Check()
-	if GP.failed or not C.cl.gpu:GetBool() then return false end
+	if GP.failed or not C.cl.gpu:GetBool() or C.cl.superCheap:GetBool() then return false end
 	if render.GetDXLevel() < 90 then return false end
 
 	return ShadersPresent()
