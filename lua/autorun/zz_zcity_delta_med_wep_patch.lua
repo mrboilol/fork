@@ -284,7 +284,6 @@ local function ReplaceMedicalWeapon(ent)
     local modeValues = istable(ent.modeValues) and table.Copy(ent.modeValues) or nil
     local isMedkitContent = ent.HGMedkitContent == true
     local contentAmount = ent.HGMedkitContentAmount
-    local painkillerType = ent:GetNWString("hg_painkiller_type", "")
     local wasActive = IsValid(owner) and owner:IsPlayer() and owner:GetActiveWeapon() == ent
     if IsValid(owner) and owner:IsPlayer() then
         local replacement = owner:GetWeapon(targetClass)
@@ -295,7 +294,6 @@ local function ReplaceMedicalWeapon(ent)
                 replacement.HGMedkitContent = true
                 replacement.HGMedkitContentAmount = contentAmount
             end
-            if painkillerType ~= "" then replacement:SetNWString("hg_painkiller_type", painkillerType) end
             if wasActive then owner:SelectWeapon(targetClass) end
             ent:Remove()
         end
@@ -313,7 +311,6 @@ local function ReplaceMedicalWeapon(ent)
         replacement.HGMedkitContent = true
         replacement.HGMedkitContentAmount = contentAmount
     end
-    if painkillerType ~= "" then replacement:SetNWString("hg_painkiller_type", painkillerType) end
     local phys = ent:GetPhysicsObject()
     local newPhys = replacement:GetPhysicsObject()
     if IsValid(phys) and IsValid(newPhys) then
@@ -337,14 +334,25 @@ cvars.AddChangeCallback("hg_healanims", function()
     timer.Simple(0, ConvertExistingMedicalWeapons)
 end, "zcity_delta_healanims_replace_existing")
 
+local function ResolveOriginalAttack(stored, key)
+    local current = stored
+    for _ = 1, 16 do
+        if not istable(current) then return end
+        local original = current.__hg_med_original_attacks and current.__hg_med_original_attacks[key]
+        if original then return original end
+        if not current.__hg_med_minigame_patched and isfunction(current[key]) then return current[key] end
+        if not current.Base or current.Base == current.ClassName then return end
+        current = weapons.GetStored(current.Base)
+    end
+end
+
 local function PatchWeapon(class)
     local stored = weapons.GetStored(class)
     if not istable(stored) then return false end
     if stored.__hg_med_minigame_patched then return true end
 
+    stored.__hg_med_original_attacks = {PrimaryAttack = stored.PrimaryAttack, SecondaryAttack = stored.SecondaryAttack}
     stored.__hg_med_minigame_patched = true
-    local originalPrimary = stored.PrimaryAttack
-    local originalSecondary = stored.SecondaryAttack
     local originalThink = stored.Think
 
     function stored:Think()
@@ -380,6 +388,7 @@ local function PatchWeapon(class)
             return
         end
 
+        local originalPrimary = ResolveOriginalAttack(stored, "PrimaryAttack")
         if originalPrimary then
             return originalPrimary(self)
         end
@@ -402,6 +411,7 @@ local function PatchWeapon(class)
             end
         end
 
+        local originalSecondary = ResolveOriginalAttack(stored, "SecondaryAttack")
         if originalSecondary then
             return originalSecondary(self)
         end

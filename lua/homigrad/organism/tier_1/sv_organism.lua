@@ -590,7 +590,8 @@ local function send_organism(org, ply, recipientForce, reliable)
 		"brainSwelling", "cardiacTamponade", "needle", "respiratoryRate", "bradyapnea", "drugRespiratoryDepression",
 		"exertionO2Debt", "circulatoryO2Reserve", "oxygenIntakeAvailable", "vomitInThroat", "otrub", "alive",
 		"incapReason", "deathCause", "defibDeathGrace", "brainRate", "uncon_timer", "otrubMinUntil", "fatalDamageQueued",
-		"softBrute", "softBurn", "muscle", "painStage", "breathLabored"
+		"softBrute", "softBurn", "muscle", "painStage", "breathLabored",
+		"bloodph", "bicarb", "hepaticFailure", "hepaticToxin", "septicShock", "acidosis", "alkalosis"
 	}) do
 		sendtable[key] = org[key]
 	end
@@ -823,7 +824,8 @@ local function send_bareinfo(org, force, reliable)
 		"brain", "co2", "etco2", "CO", "bradyapnea", "respiratoryRate", "oxygenIntakeAvailable",
 		"cardiacStressExposure", "hypotensionExposure", "arrhythmiaComplication",
 		"ventricularTachycardia", "terminalRhythm", "rhythmRecoveryUntil", "defibDeathGrace",
-		"softBrute", "softBurn", "muscle", "painStage", "breathLabored"
+		"softBrute", "softBurn", "muscle", "painStage", "breathLabored",
+		"bloodph", "bicarb", "hepaticFailure", "hepaticToxin", "septicShock", "acidosis", "alkalosis"
 	}) do
 		sendtable[key] = org[key]
 	end

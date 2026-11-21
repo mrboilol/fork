@@ -364,7 +364,7 @@ local function nildoy()
 	surface.SetDrawColor(FACE_BOX_COLOR)
 	surface.DrawRect(x, y, size, size)
 	surface.SetDrawColor(FACE_OUTLINE_COLOR)
-	surface.DrawOutlinedRect(x, y, size, size, 2)
+	hg.DrawOutline(x, y, size, size, 1.5)
 
 	local key = alive and getFaceKey(state, true) or "hardcrit"
 	local material = getFaceMaterial(alive and isFacePale() and key .. "_pale" or key)

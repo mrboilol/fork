@@ -24,6 +24,7 @@ local hg_blood_sprites = ConVarExists("hg_blood_sprites") and GetConVar("hg_bloo
 local hg_supercheapblood = ConVarExists("hg_supercheapblood") and GetConVar("hg_supercheapblood") or CreateClientConVar("hg_supercheapblood", 0, true, false, "1 = cheapest blood: old Z-City particles and decals, AdvancedBlood CPU and GPU blood off", 0, 1)
 
 function hg.ResetBloodDecals()
+	hg.cheapBloodPools = {}
 	hg.bloodpositions = {}
 	hg.bloodcount = 0
 	hg.groundbloodstains = {}
@@ -115,6 +116,7 @@ cvars.AddChangeCallback("hg_supercheapblood", function(_, oldValue, newValue)
 	if hg.bloodparticles2 then table.Empty(hg.bloodparticles2) end
 	hg.bloodpositions = {}
 	hg.bloodcount = 0
+	hg.cheapBloodPools = {}
 end, "hg_refresh_cheap_blood")
 
 cvars.RemoveChangeCallback("hg_old_blood", "hg_refresh_old_blood_decals")
@@ -214,8 +216,9 @@ local function placeNewBloodDecal(pos, normal, target, artery, amount, particleS
 	util.DecalEx(material, target or game.GetWorld(), pos, normal, color_white, scale, scale)
 end
 
-local function placeCheapBloodDecal(pos, normal, target, artery, amount, particleSize)
+local function placeCheapBloodDecal(pos, normal, target, artery, amount, particleSize, diameter)
 	amount = math.max(amount or 0.2, 0.05)
+	diameter = diameter or math.Clamp(math.max(1 + math.sqrt(amount) * 2.2, (particleSize or 0) * 2), 1, 64)
 	local material
 	if useOldBlood() then
 		local decals = artery and oldArterialBloodDecals or oldBloodDecals
@@ -236,8 +239,64 @@ local function placeCheapBloodDecal(pos, normal, target, artery, amount, particl
 		util.Decal(artery and "Arterial.Blood1" or "Normal.Blood1", pos + normal, pos - normal, target)
 		return
 	end
-	local scale = getBloodDecalScale(amount, particleSize, material)
+	local materialScale = material:GetFloat("$decalscale") or 1
+	if materialScale <= 0 then materialScale = 1 end
+	local scale = diameter / (math.max(material:Width(), material:Height(), 1) * materialScale)
 	util.DecalEx(material, target or game.GetWorld(), pos, normal, color_white, scale, scale)
+end
+
+hg.cheapBloodPools = hg.cheapBloodPools or {}
+local cheapPoolMax = 384
+local cheapPoolTrace = {mask = MASK_SOLID_BRUSHONLY}
+
+local function cheapPoolDiameter(volume)
+	return math.Clamp(3 + math.sqrt(volume) * 5, 3, 200)
+end
+
+local function placeCheapPooledDecal(pos, normal, target, artery, amount, particleSize)
+	amount = math.max(amount or 0.2, 0.05)
+	if normal.z < 0.6 or (IsValid(target) and not target:IsWorld()) then
+		return placeCheapBloodDecal(pos, normal, target, artery, amount, particleSize)
+	end
+
+	local pools = hg.cheapBloodPools
+	local best, bestDist
+	for i = 1, #pools do
+		local pool = pools[i]
+		local reach = pool.diameter * 0.5 + 6
+		local dist = pool.pos:DistToSqr(pos)
+		if dist < reach * reach and math.abs(pool.pos.z - pos.z) < 10 and (not bestDist or dist < bestDist) then
+			best, bestDist = pool, dist
+		end
+	end
+
+	if not best then
+		if #pools >= cheapPoolMax then table_remove(pools, 1) end
+		pools[#pools + 1] = {pos = Vector(pos), volume = amount, diameter = cheapPoolDiameter(amount)}
+		return placeCheapBloodDecal(pos, normal, target, artery, amount, particleSize)
+	end
+
+	best.volume = best.volume + amount
+	best.diameter = cheapPoolDiameter(best.volume)
+	local radius = best.diameter * 0.5
+	local away = pos - best.pos
+	away.z = 0
+	if away:LengthSqr() < 1 then
+		away = VectorRand()
+		away.z = 0
+	end
+	away:Normalize()
+
+	local edge = best.pos + away * radius * math.Rand(0.55, 1)
+	cheapPoolTrace.start = edge + vector_up * 6
+	cheapPoolTrace.endpos = edge - vector_up * 16
+	local result = util_TraceLine(cheapPoolTrace)
+	local size = math.Clamp(math.max((particleSize or 0) * 2, radius * 0.7), 1, 96)
+	if result.HitWorld and result.HitNormal.z >= 0.6 then
+		placeCheapBloodDecal(result.HitPos, result.HitNormal, nil, artery, amount, particleSize, size)
+	else
+		placeCheapBloodDecal(pos, normal, target, artery, amount, particleSize, size)
+	end
 end
 
 function hg.DepositBodyBloodRunoff(pos, amount, artery, particleSize)
@@ -247,7 +306,7 @@ function hg.DepositBodyBloodRunoff(pos, amount, artery, particleSize)
 	local result = util_TraceLine(poolTrace)
 	if result.HitWorld and result.HitNormal.z >= 0.55 then
 		if hg_supercheapblood:GetBool() then
-			placeCheapBloodDecal(result.HitPos, result.HitNormal, nil, artery, amount or 0.2, particleSize)
+			placeCheapPooledDecal(result.HitPos, result.HitNormal, nil, artery, amount or 0.2, particleSize)
 			return
 		end
 		if useOldBlood() then
@@ -302,7 +361,7 @@ local function decalBlood(pos, normal, tr, artery, owner, tiny, amount, particle
 	end
 
 	if hg_supercheapblood:GetBool() then
-		placeCheapBloodDecal(pos, normal, IsValid(tr.Entity) and tr.Entity or nil, artery, amount, particleSize)
+		placeCheapPooledDecal(pos, normal, IsValid(tr.Entity) and tr.Entity or nil, artery, amount, particleSize)
 		if not tiny or math.random(7) == 1 then playBloodDripImpact(pos, tr) end
 		return
 	end

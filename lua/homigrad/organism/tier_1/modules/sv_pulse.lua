@@ -1168,7 +1168,7 @@ module[2] = function(owner, org, timeValue)
 	org.pulseDeficit = math.max((org.heartbeat or 0) - palpablePulseTarget, 0)
 	org.pulse = Approach(org.pulse, palpablePulseTarget, heart == 0 and timeValue * 10 or timeValue * 8)
 	local pressureCirculation = circulation * Clamp(1 - rhythmInstability * 0.24, 0.70, 1)
-	local pressureTarget = Clamp((92 * pressureCirculation ^ 0.75 + hypervolemia * 55) * (1 - Clamp(org.hemotransfusionshock or 0, 0, 2) * 0.2), 0, 180)
+	local pressureTarget = Clamp((92 * pressureCirculation ^ 0.75 + hypervolemia * 55) * (1 - Clamp(org.shockVasoplegia or 0, 0, 0.7)), 0, 180)
 	local pressureNow = tonumber(org.bloodPressure) or pressureTarget
 	local pressureFallRate = org.heartstop and not (dihSupport or defibGrace or cprSupport) and 22 or 12
 	org.bloodPressure = Approach(pressureNow, pressureTarget, timeValue * (pressureTarget > pressureNow and 12 or pressureFallRate))
@@ -1271,7 +1271,7 @@ module[2] = function(owner, org, timeValue)
 		sympatheticCompensation * 0.58 + acuteHemorrhageStress * 0.55 + hypotensionInstability * 0.12,
 		0, 1
 	)
-	cardiacCompensationRate = math.max(cardiacCompensationRate, getHemorrhageRateFloor(bloodNow))
+	cardiacCompensationRate = math.max(cardiacCompensationRate + (tonumber(org.metabolicHeartRate) or 0), getHemorrhageRateFloor(bloodNow))
 	org.compensationHeartRateTarget = cardiacCompensationRate
 	local lowVolumeInfluence = 1 - preloadReserve
 	if cardiacCompensationRate < compensationRate then

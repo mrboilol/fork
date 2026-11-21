@@ -579,7 +579,7 @@ local function updateCO2(owner, org, timeValue, ventilating, exerting, staminaVa
 
 	local lactate = math.max(tonumber(org.lactaid) or cfg.lactateNormal, 0)
 	lactate = lactate + timeValue * ((1 - perfusion) * 0.06 + hypoxia * 0.05 + exhausted * 0.03 + seizure * 0.04)
-	lactate = math.Approach(lactate, cfg.lactateNormal, timeValue * math.max(lactate - cfg.lactateNormal, 0) * cfg.lactateClear * perfusion)
+	lactate = math.Approach(lactate, cfg.lactateNormal, timeValue * math.max(lactate - cfg.lactateNormal, 0) * cfg.lactateClear * perfusion * (1 - math.Clamp(tonumber(org.hepaticFailure) or 0, 0, 1) * 0.75))
 
 	local tourniquets = countTourniquetHuys(owner)
 	local lastCount = org.sharpieOnTourniquet or tourniquets

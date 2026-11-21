@@ -1262,6 +1262,18 @@ local function draw_bar()
 	else
 		smooth.etco2 = nil
 	end
+
+	local bloodph = tonumber(org.bloodph)
+	if bloodph then
+		smooth.bloodph = Lerp(s * dt, smooth.bloodph or bloodph, bloodph)
+		local phVal = math.Round(smooth.bloodph, 2)
+		if phVal < 7.35 or phVal > 7.45 then
+			local phColor = (phVal < 7.2 or phVal > 7.55) and Color(255, 70, 70) or Color(255, 165, 65)
+			table.insert(segs, {label = "PH", val = string.format("pH %.2f", phVal), suf = "", ratio = math.Clamp(phVal - 6.8, 0, 1), col = phColor, w = math_floor(92 * scale), icon = "o2", prio = 6})
+		end
+	else
+		smooth.bloodph = nil
+	end
 	
 	if #segs == 0 then return end
 	
@@ -1762,11 +1774,11 @@ local function draw_status_effects()
 				local ischemia_val = smooth.ischemia or getOrgVal(org, "ischemia", 0)
 				local hemotransfusionshock_val = smooth.hemotransfusionshock or getOrgVal(org, "hemotransfusionshock", 0)
 				
-				-- Sepsis moodle: triggers from ischemia or hemotransfusionshock
 				if ischemia_val > 0.1 or hemotransfusionshock_val > 0.1 then
 					local level_num = 1
-					if ischemia_val > 0.5 or hemotransfusionshock_val > 0.3 then level_num = 2 end
-					if ischemia_val > 1.0 or hemotransfusionshock_val > 0.5 then level_num = 3 end
+					if ischemia_val > 0.5 or hemotransfusionshock_val > 0.1 then level_num = 2 end
+					if ischemia_val > 1.0 or hemotransfusionshock_val >= 0.6 then level_num = 3 end
+					if getOrgVal(org, "septicShock", 0) > 0 then level_num = 4 end
 					
 					table.insert(effects, {
 						name = "sepsis",

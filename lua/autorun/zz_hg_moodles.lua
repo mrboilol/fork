@@ -304,9 +304,9 @@ local moodleTexts = {
 		[4] = {title = "Broken Jaw", description = "Your jaw is fractured and painful to move or speak with."},
 	}},
 	organ_damage = {levels = {
-		[1] = {title = "Severe Organ Damage", description = "One or more internal organs are badly damaged."},
-		[2] = {title = "Destroyed Organ", description = "An internal organ has been completely destroyed."},
-		[3] = {title = "Critical Organ Loss", description = "A vital lung or liver has been destroyed or critically damaged."},
+		[1] = {title = "Organ Distress", description = "A damaged organ is starting to threaten your life."},
+		[2] = {title = "Organ Failure", description = "An organ is failing and the body can barely compensate."},
+		[3] = {title = "Critical Organ Failure", description = "Vital organs or blood chemistry are collapsing. Treat this now."},
 		[4] = {title = "Catastrophic Organ Failure", description = "Essential organs can no longer sustain life."},
 	}},
 	spine_break = {levels = {
@@ -394,10 +394,10 @@ local moodleTexts = {
 		[4] = {title = "Catastrophic Brain Damage", description = "Critical brain trauma is shutting down essential functions."},
 	}},
 	sepsis = {levels = {
-		[1] = {title = "Localized Ischemia", description = "Poor circulation is beginning to damage vulnerable tissue."},
-		[2] = {title = "Systemic Ischemia", description = "Widespread tissue is suffering from inadequate blood flow."},
-		[3] = {title = "Severe Ischemic Shock", description = "Circulatory complications are driving organ dysfunction."},
-		[4] = {title = "Septic Collapse", description = "Systemic damage and circulatory failure are becoming fatal."},
+		[1] = {title = "Ischemia", description = "Poor circulation is beginning to damage vulnerable tissue."},
+		[2] = {title = "Sepsis", description = "An infection is spreading through the blood. Fever, aches and a racing heart."},
+		[3] = {title = "Severe Sepsis", description = "The body is turning on itself. Strength drains away and organs suffer."},
+		[4] = {title = "Septic Shock", description = "Blood vessels are failing. Pressure is crashing and organs are starving."},
 	}},
 	adrenaline = {levels = {
 		[1] = {title = "Tense", description = "A small adrenaline surge is improving alertness."},
@@ -954,18 +954,23 @@ local function buildEffects(ply, org)
 	local heart, trachea = orgNumber(org, "heart", 0), orgNumber(org, "trachea", 0)
 	local liver, gut = orgNumber(org, "liver", 0), orgNumber(org, "gut", 0)
 	local lungL, lungR = tableNumber(org, "lungsL", 1, 0), tableNumber(org, "lungsR", 1, 0)
-	local lungPenetratedL, lungPenetratedR = tableNumber(org, "lungsL", 2, 0), tableNumber(org, "lungsR", 2, 0)
-	local organPeak = math.max(heart, trachea, liver, gut, lungL, lungR)
-	local hasRespiratoryOrganDamage = math.max(trachea, lungL, lungR, lungPenetratedL, lungPenetratedR) > 0
-	if organPeak >= 0.6 or hasRespiratoryOrganDamage then
-		local combatLevel = organPeak >= 1 and 2 or 1
-		if lungL >= 0.8 or lungR >= 0.8 or liver >= 0.8 then combatLevel = 3 end
-		if heart >= 0.8 or trachea >= 0.8 or (lungL >= 0.8 and lungR >= 0.8) then combatLevel = 4 end
-		if heart >= 1 or trachea >= 1 or (lungL >= 1 and lungR >= 1) then combatLevel = 5 end
-		-- Organ loss is trauma in Moodle 3 as well, including lungs and trachea.
-		-- Reserve dyspnea for the separate breathing-deficit moodle above.
-		local organIcon = "combat" .. combatLevel
-		add(effects, "organ_damage", organIcon, math.min(combatLevel, 4), "bad", 55)
+	local flank = orgNumber(org, "flank", 0)
+	local organThreat = math.max(
+		math.Clamp((heart - 0.5) / 0.5, 0, 1),
+		math.Clamp((trachea - 0.5) / 0.5, 0, 1),
+		math.Clamp((math.max(lungL, lungR) - 0.7) / 0.3, 0, 1) * 0.75,
+		(lungL >= 0.8 and lungR >= 0.8) and 1 or 0,
+		math.Clamp((liver - 0.7) / 0.3, 0, 1) * 0.75,
+		math.Clamp((flank - 0.7) / 0.3, 0, 1) * 0.6,
+		math.Clamp((gut - 0.8) / 0.2, 0, 1) * 0.5,
+		orgNumber(org, "hepaticFailure", 0),
+		orgNumber(org, "acidosis", 0),
+		orgNumber(org, "alkalosis", 0)
+	)
+	if organThreat >= 0.25 then
+		local level = highRank(organThreat, {0.25, 0.5, 0.75, 0.95})
+		local combatLevel = (heart >= 1 or trachea >= 1 or (lungL >= 1 and lungR >= 1)) and 5 or level
+		add(effects, "organ_damage", "combat" .. combatLevel, level, "bad", 55)
 	end
 
 	local spine1, spine2, spine3 = orgNumber(org, "spine1", 0), orgNumber(org, "spine2", 0), orgNumber(org, "spine3", 0)
@@ -1042,8 +1047,11 @@ local function buildEffects(ply, org)
 	end
 	local ischemia, transfusionShock = orgNumber(org, "ischemia", 0), orgNumber(org, "hemotransfusionshock", 0)
 	if ischemia > 0.1 or transfusionShock > 0.1 then
-		local severity = math.max(ischemia, transfusionShock * 2)
-		add(effects, "sepsis", "sepsis", highRank(severity, {0.1, 0.5, 1, 1.5}), "bad", 46, math.floor(severity * 100) .. "%")
+		local level = math.min(highRank(ischemia, {0.1, 0.5, 1, 1.5}), 3)
+		if transfusionShock > 0.1 then level = math.max(level, transfusionShock >= 0.6 and 3 or 2) end
+		if orgNumber(org, "septicShock", 0) > 0 then level = 4 end
+		local severity = math.max(ischemia, transfusionShock)
+		add(effects, "sepsis", "sepsis", level, "bad", 46, math.floor(severity * 100) .. "%")
 	end
 
 	local adrenaline = orgNumber(org, "adrenaline", 0)
@@ -1279,7 +1287,7 @@ local function drawMoodle3Severity(x, y, size, effect, age)
 
 	local border = Color(255, math.floor(255 - 205 * severity), math.floor(255 - 215 * severity), 255)
 	surface.SetDrawColor(border.r, border.g, border.b, border.a)
-	surface.DrawOutlinedRect(x, y, size, size, math.max(1, math.floor(ui(2))))
+	hg.DrawOutline(x, y, size, size, math.max(1, ui(1.5)))
 	if severe then
 		local alert = getMoodle3Material("moodlealert")
 		if alert then

@@ -79,6 +79,7 @@ module[1] = function(org)
 	org.sepsisBloodPrev = nil
 	org.sepsisSource = 0
 	org.sepsisOrganPrev = nil
+	hg.organism.AcidBase.Init(org)
 	org.ischemia = 0
 	org.internalBleedDuration = 0
 	org.internalBleedPeak = 0
@@ -464,6 +465,7 @@ function hg.organism.UpdateSepsis(org, mulTime, adrenalineStabilizer)
 		return
 	end
 	local severity = min(sepsis, 2)
+	local shock = math.Clamp((severity - 0.9) / 0.8, 0, 1)
 	local organDamage = mulTime * max(severity - 0.5, 0) * (thiamine and 0.5 or 1) * (txa and 0.5 or 1)
 
 	org.internalBleed = org.internalBleed + mulTime * severity * 0.3 * (txa and 0.5 or 1)
@@ -474,7 +476,11 @@ function hg.organism.UpdateSepsis(org, mulTime, adrenalineStabilizer)
 		org.ischemia = org.ischemia + mulTime * severity * 0.3
 	end
 
-	local clearance = mulTime * ((source > 0 and 0 or 1 / 45) + (thiamine and 1 / 30 or 0) + (txa and 1 / 30 or 0)) + bloodLost / 600
+	if shock > 0 and not thiamine then
+		sepsis = min(sepsis + mulTime * shock * 0.006, 2)
+	end
+
+	local clearance = mulTime * ((source > 0 and 0 or 1 / 150) * (1 - shock * 0.85) + (thiamine and 1 / 30 or 0) + (txa and 1 / 30 or 0)) + bloodLost / 600
 	org.hemotransfusionshock = max(sepsis - clearance, 0)
 	org.sepsisOrganPrev = (org.liver or 0) + (org.flank or 0)
 end
@@ -541,6 +547,7 @@ module[2] = function(owner, org, mulTime)
 	local hasAntiIschemia = (org.tranexamic_acid or 0) > 0 or (org.thiamine or 0) > 0
 
 	hg.organism.UpdateSepsis(org, mulTime, adrenalineStabilizer)
+	hg.organism.UpdateMetabolicShock(owner, org, mulTime)
 
 	if org.arterialwounds and #org.arterialwounds > 0 then
 		for _, wound in pairs(org.arterialwounds) do

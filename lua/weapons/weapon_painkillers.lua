@@ -24,30 +24,11 @@ SWEP.offsetAng = Angle(-30, 20, 180)
 SWEP.modeNames = {
 	[1] = "painkiller"
 }
-local painkillerTypes = {
-	paracetamol = {
-		name = "Paracetamol", dose = 1.25,
-		description = "Paracetamol is a OTC medication that tends to alleviate acute and chronic pain. It is classified as a NSAID and is generally safe to take in moderate amounts.",
-		appearance = "This one is a white, thick pill that leaves dust around.",
-	},
-}
-
-function SWEP:RandomizePainkillerType()
-	if not SERVER then return end
-
-	local medicine = painkillerTypes.paracetamol
-	self:SetNWString("hg_painkiller_type", "paracetamol")
-	self:SetNWString("hg_painkiller_label", medicine.name)
-	self:SetNWString("hg_painkiller_detail", medicine.description .. "\n" .. medicine.appearance)
-end
-
+local PAINKILLER_ANALGESIA = 0.3
 
 function SWEP:InitializeAdd()
 	self:SetHold(self.HoldType)
 	self.modeValues = {[1] = 1}
-	if not SERVER then return end
-
-	self:RandomizePainkillerType()
 end
 SWEP.modeValuesdef = {
 	[1] = 1,
@@ -64,17 +45,6 @@ function SWEP:Think()
 	self:SetBodyGroups("111")
 	if not self:GetOwner():KeyDown(IN_ATTACK) and not hg_healanims:GetBool() then
 		self:SetHolding(math.max(self:GetHolding() - 4, 0))
-	end
-
-	if CLIENT then
-		local label = self:GetNWString("hg_painkiller_label", "Painkillers")
-		local detail = self:GetNWString("hg_painkiller_detail", "")
-		local displayKey = label .. "\n" .. detail
-		if self.hg_painkiller_display_key ~= displayKey then
-			self.hg_painkiller_display_key = displayKey
-			self.PrintName = label
-			self.HudHintMarkup = markup.Parse("<font=ZCity_Tiny>" .. label .. "</font>\n<font=ZCity_SuperTiny><colour=125,125,125>" .. detail .. "</colour></font>\n" .. self.HowToUseInstructions, 450)
-		end
 	end
 end
 local lang1, lang2 = Angle(0, -10, 0), Angle(0, 10, 0)
@@ -135,7 +105,7 @@ if SERVER then
 			org.analgesiaAdd = math.min((org.analgesiaAdd or 0) + lacedAmount, 25)
 			self.HG_FentanylLacedAmount = nil
 		end
-		org.painkiller = math.min((org.painkiller or 0) + painkillerTypes.paracetamol.dose, 5)
+		org.analgesiaAdd = math.min(org.analgesiaAdd + PAINKILLER_ANALGESIA, 4)
 
 		if self.modeValues[1] > 0 then
 			self.modeValues[1] = 0

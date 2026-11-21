@@ -81,7 +81,7 @@ local CHAT_STYLES = {
 	big = {
 		box = Color(25, 25, 35, 240),
 		outline = Color(255, 255, 255, 255),
-		thickness = 2,
+		thickness = 1.5,
 		cookiePrefix = "zchat_bounds_v2_",
 		minWidth = 180,
 		maxEntries = 150,
@@ -94,7 +94,7 @@ local CHAT_STYLES = {
 	normal = {
 		box = Color(25, 25, 35, 240),
 		outline = Color(255, 255, 255, 255),
-		thickness = 2,
+		thickness = 1.5,
 		cookiePrefix = "zchat_bounds_",
 		minWidth = 260,
 		maxEntries = 100,
@@ -141,7 +141,7 @@ local function PaintEntryPanel(self, w, h)
 	surface.SetDrawColor(style.box)
 	surface.DrawRect(0, 0, w, h)
 	surface.SetDrawColor(style.outline)
-	surface.DrawOutlinedRect(0, 0, w, h, style.thickness)
+	hg.DrawOutline(0, 0, w, h, style.thickness)
 end
 
 local function PaintHatPanel(self, w, h)
@@ -149,7 +149,7 @@ local function PaintHatPanel(self, w, h)
 	surface.SetDrawColor(style.box)
 	surface.DrawRect(0, 0, w, h)
 	surface.SetDrawColor(style.outline)
-	surface.DrawOutlinedRect(0, 0, w, h, style.thickness)
+	hg.DrawOutline(0, 0, w, h, style.thickness)
 end
 
 local function PaintSettingsButton(self, w, h)
@@ -1026,7 +1026,7 @@ function PANEL:Paint(w, h)
 	surface.DrawRect(0, 0, w, h)
 
 	surface.SetDrawColor(style.outline)
-	surface.DrawOutlinedRect(0, 0, w, h, style.thickness)
+	hg.DrawOutline(0, 0, w, h, style.thickness)
 
 	surface.SetAlphaMultiplier(1)
 		self.history:PaintManual()

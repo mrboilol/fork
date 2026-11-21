@@ -15,77 +15,72 @@ local MEDKIT_TYPES = {
     },
     standard = {
         PrintName = "Standard Medkit",
-        Instructions = "A general-purpose first-aid kit with bandages, a tourniquet and paracetamol. Left click to unpack it; RMB applies the selected treatment.",
-        contents = {bandage = 60, tourniquet = 1, painkiller = 1.25},
+        Instructions = "A general-purpose first-aid kit with bandages, a tourniquet and painkillers. Left click to unpack it; RMB applies the selected treatment.",
+        contents = {bandage = 60, tourniquet = 1, painkiller = 1},
         contentItems = {
             {class = "weapon_bigbandage_sh", amount = 60},
             {class = "weapon_tourniquet", amount = 1},
-            {class = "weapon_painkillers", amount = 1, painkillerType = "paracetamol"},
+            {class = "weapon_painkillers", amount = 1},
         },
         bandageColor = Color(205, 205, 205),
-        painkillerType = "paracetamol",
     },
     emergency = {
         PrintName = "Emergency Medkit",
         Instructions = "An emergency trauma kit with extra bandages, two tourniquets, painkillers and naloxone. Left click to unpack it; RMB applies the selected treatment.",
-        contents = {bandage = 120, tourniquet = 2, painkiller = 1.25, naloxone = 1},
+        contents = {bandage = 120, tourniquet = 2, painkiller = 1, naloxone = 1},
         contentItems = {
             {class = "weapon_bigbandage_sh", amount = 120},
             {class = "weapon_tourniquet", amount = 1},
             {class = "weapon_tourniquet", amount = 1},
-            {class = "weapon_painkillers", amount = 1, painkillerType = "paracetamol"},
+            {class = "weapon_painkillers", amount = 1},
             {class = "weapon_naloxone", amount = 1},
         },
         bandageColor = Color(165, 165, 165),
-        painkillerType = "paracetamol",
     },
     advanced = {
         PrintName = "Advanced Medkit",
         Instructions = "An advanced trauma kit with large dressings, two tourniquets, painkillers, tranexamic acid and a decompression needle. Left click to unpack it; RMB applies the selected treatment.",
-        contents = {bandage = 225, tourniquet = 2, painkiller = 1.25, tranexamic = 10, needle = 1},
+        contents = {bandage = 225, tourniquet = 2, painkiller = 1, tranexamic = 10, needle = 1},
         contentItems = {
             {class = "weapon_bigbandage_sh", amount = 225},
             {class = "weapon_tourniquet", amount = 1},
             {class = "weapon_tourniquet", amount = 1},
-            {class = "weapon_painkillers", amount = 1, painkillerType = "paracetamol"},
+            {class = "weapon_painkillers", amount = 1},
             {class = "weapon_tranexamic_acid", amount = 10},
             {class = "weapon_needle", amount = 1},
         },
         bandageColor = Color(125, 125, 125),
-        painkillerType = "paracetamol",
     },
     surgical = {
         PrintName = "Surgical Medkit",
         Instructions = "A fully stocked surgical kit with large dressings, two tourniquets, painkillers, tranexamic acid, naloxone, mannitol and a decompression needle. Left click to unpack it; RMB applies the selected treatment.",
-        contents = {bandage = 350, tourniquet = 2, painkiller = 1.25, tranexamic = 10, naloxone = 1, mannitol = 1, needle = 1},
+        contents = {bandage = 350, tourniquet = 2, painkiller = 1, tranexamic = 10, naloxone = 1, mannitol = 1, needle = 1},
         contentItems = {
             {class = "weapon_bigbandage_sh", amount = 350},
             {class = "weapon_tourniquet", amount = 1},
             {class = "weapon_tourniquet", amount = 1},
-            {class = "weapon_painkillers", amount = 1, painkillerType = "paracetamol"},
+            {class = "weapon_painkillers", amount = 1},
             {class = "weapon_tranexamic_acid", amount = 10},
             {class = "weapon_naloxone", amount = 1},
             {class = "weapon_mannitol", amount = 1},
             {class = "weapon_needle", amount = 1},
         },
         bandageColor = Color(75, 75, 75),
-        painkillerType = "paracetamol",
     },
 }
 local NORMAL_MEDKIT = {
     PrintName = "Medkit",
     Instructions = "A standard medical bag with a big bandage, painkiller, tranexamic acid, a tourniquet and a decompression needle. Left click to unpack it; RMB applies the selected treatment.",
-    contents = {bandage = 100, painkiller = 1.25, tourniquet = 1, tranexamic = 10, needle = 1},
+    contents = {bandage = 100, painkiller = 1, tourniquet = 1, tranexamic = 10, needle = 1},
     contentItems = {
         {class = "weapon_bigbandage_sh", amount = 100},
-        {class = "weapon_painkillers", amount = 1, painkillerType = "paracetamol"},
+        {class = "weapon_painkillers", amount = 1},
         {class = "weapon_tourniquet", amount = 1},
         {class = "weapon_tranexamic_acid", amount = 10},
         {class = "weapon_needle", amount = 1},
     },
     bandageColor = Color(165, 165, 165),
     bandageName = "big bandage",
-    painkillerType = "paracetamol",
 }
 
 local MEDKIT_PICKUP_CLASSES = {
@@ -172,9 +167,6 @@ local function configureContentWeapon(wep, content)
     wep.HGMedkitContent = true
     setContentAmount(wep, content.amount)
 
-    if content.painkillerType and wep.SetNWString then
-        wep:SetNWString("hg_painkiller_type", content.painkillerType)
-    end
 end
 
 local function medkitHasSupplies(wep)
@@ -215,7 +207,7 @@ local function applyMedkitMode(wep, ent, mode)
     local owner = wep:GetOwner()
     local entOwner = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
     if typeName == "painkiller" then
-        org.painkiller = math.min((org.painkiller or 0) + amount, 5)
+        org.analgesiaAdd = math.min((org.analgesiaAdd or 0) + amount * 0.3, 4)
         wep.modeValues[modeIndex] = 0
         entOwner:EmitSound("snd_jack_hmcd_pillsuse.ogg", 60, math.random(95, 105))
         return true
@@ -471,8 +463,6 @@ if SERVER then
         local painkiller = math.max(org.painkiller or 0, 0)
         if painkiller <= 0 then return end
 
-        -- One paracetamol dose lasts roughly 90 seconds; naloxone clears opioid
-        -- load faster just as it does analgesia.
         org.painkiller = math.Approach(painkiller, 0, timeValue / 90 * ((org.naloxone or 0) * 25 + 1))
 
         local overdose = painkiller >= 3

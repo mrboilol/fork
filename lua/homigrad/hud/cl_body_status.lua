@@ -137,6 +137,8 @@ local function resolveWoundRegion(bone)
 	return K.TORSO_BONE_REGIONS[bone] or (hg.amputeetable and hg.amputeetable[bone])
 end
 
+local focus = {region = nil, frame = -10, limbRegions = {spine3 = "neck", spine2 = "chest", spine1 = "pelvis", arteria = "neck", head = "skull", torso = "chest"}}
+
 local function lookupNamedBone(ent, cache, bone)
 	if isnumber(bone) then return bone end
 	if not isstring(bone) then return end
@@ -986,6 +988,12 @@ local function drawShape(shape)
 		polyCapsuleRing(ax, ay, bx, by, r, inner)
 	end
 
+	if focus.region and (shape.region == focus.region or shape.splitRegion == focus.region) then
+		local pulse = 0.55 + 0.45 * math_sin(CurTime() * 6)
+		setDrawColor(255, 255, 255, 25 + 230 * pulse)
+		polyCapsuleRing(ax, ay, bx, by, r + outlineWidth * (1.5 + pulse * 1.5), r)
+	end
+
 	drawShapeExtras(shape, ax, ay, bx, by, r)
 end
 
@@ -1310,13 +1318,13 @@ local function renderFigure()
 	drawOrgans()
 end
 
-local function drawBodyStatus()
+local function drawBodyStatus(subject)
 	if not enabled:GetBool() then
 		trackedBody = nil
 		return
 	end
 
-	local ply = LocalPlayer()
+	local ply = subject or LocalPlayer()
 	local body = getBodyEntity(ply)
 	trackedBody = body
 	if not IsValid(body) or body:IsDormant() then return end
@@ -1343,7 +1351,29 @@ local function drawBodyStatus()
 	renderFigure()
 end
 
+hg.BodyStatus = hg.BodyStatus or {}
+
+function hg.BodyStatus.ResolveRegion(key)
+	if not isstring(key) or key == "" then return end
+	if K.REGION_SEGMENTS[key] then return key end
+
+	return focus.limbRegions[key] or resolveWoundRegion(key)
+end
+
+function hg.BodyStatus.DrawFor(subject, region)
+	if IsValid(subject) and subject:IsRagdoll() and hg.RagdollOwner then subject = hg.RagdollOwner(subject) or subject end
+	if not IsValid(subject) or not subject:IsPlayer() then subject = LocalPlayer() end
+
+	focus.region = region
+	focus.frame = FrameNumber()
+	local ok, err = pcall(drawBodyStatus, subject)
+	focus.region = nil
+	if not ok then ErrorNoHalt(err, "
+") end
+end
+
 hook.Add("HUDPaint", "homigrad/body-status/draw", function()
+	if FrameNumber() - focus.frame <= 2 then return end
 	local alive = LocalPlayer():Alive()
 	if wasAlive and not alive then deathShakeEnd = CurTime() + 0.6 end
 	wasAlive = alive

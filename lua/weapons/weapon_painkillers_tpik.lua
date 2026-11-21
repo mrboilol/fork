@@ -378,7 +378,7 @@ if SERVER then
 		end)
 
 		local mode = self.modeValues and self.modeValues[1] or self.modeValuesdef[1]
-		org.painkiller = math.min((org.painkiller or 0) + mode * 1.25, 5)
+		org.analgesiaAdd = math.min((org.analgesiaAdd or 0) + mode * 0.3, 4)
 
 		self.healing = false
 

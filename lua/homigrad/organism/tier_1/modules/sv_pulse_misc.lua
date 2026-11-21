@@ -204,7 +204,7 @@ end
 
 function hg.organism.UpdateBodyTemperature(owner, org, timeValue)
 	local lowPulseCold = Clamp(getLowPulseSeverity(org.pulse) / (55 / 70), 0, 1)
-	local needed_temp = math.min(36.7 - lowPulseCold * 5.7, org.lowBloodTemperatureTarget or 36.7)
+	local needed_temp = math.min(36.7 - lowPulseCold * 5.7, org.lowBloodTemperatureTarget or 36.7) + (tonumber(org.sepsisFever) or 0)
 	if IsValid(owner) then
 		local character = hg.GetCurrentCharacter(owner)
 		if not IsValid(character) then character = owner end

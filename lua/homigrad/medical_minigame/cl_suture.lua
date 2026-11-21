@@ -259,13 +259,15 @@ function PANEL:Paint(w, h)
 	DrawTweezers(self.HandX, self.HandY, self.HandAngle, self.Squeeze > 0.5)
 
 	local edgeY = math.max(ScreenScaleH(14), 28)
-	draw.SimpleTextOutlined(self.Choice.label, "ZCity_Small", w * 0.5, edgeY, Color(255, 255, 255, 245), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP, 1.5, Color(0, 0, 0, 220))
-	local hint = "Hold LMB and trace the dots in order   [RMB] stop"
-	if self.Choice.count > 1 then
-		hint = hint .. "   [R] switch wound (" .. self.Choice.index .. "/" .. self.Choice.count .. ")"
-	end
-	draw.SimpleTextOutlined(hint, "ZCity_Small", w * 0.5, h - edgeY, Color(200, 200, 200, 230), TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM, 1.5, Color(0, 0, 0, 220))
+	local label = self.Choice.count > 1 and self.Choice.label .. "  " .. self.Choice.index .. "/" .. self.Choice.count or self.Choice.label
+	draw.SimpleTextOutlined(label, "ZCity_Small", w * 0.5, edgeY, Color(255, 255, 255, 245), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP, 1.5, Color(0, 0, 0, 220))
 	draw.DrawText(self.Done .. "/" .. self.Stitches, "HomigradFontLarge", cx - SLIT_GAP - 120, cy - 20, Color(255, 255, 255), TEXT_ALIGN_RIGHT)
+end
+
+function PANEL:PaintOver(w, h)
+	if not hg.BodyStatus or not hg.BodyStatus.DrawFor then return end
+
+	hg.BodyStatus.DrawFor(self.Target, hg.BodyStatus.ResolveRegion(self.Choice and self.Choice.bone))
 end
 
 function PANEL:OnRemove()
@@ -284,6 +286,7 @@ local function ReadChoice()
 		index = net.ReadUInt(6),
 		count = net.ReadUInt(6),
 		stitches = net.ReadUInt(4),
+		bone = net.ReadString(),
 	}
 end
 

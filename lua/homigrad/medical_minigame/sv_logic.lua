@@ -336,7 +336,7 @@ local function SendBandageTarget(ply, wep, target, requiredCompletions)
         option, options, index = wep:GetBandageChoice(target, hg.eyeTrace(ply))
     elseif IsValid(wep) and wep.IsSplintMode and wep:IsSplintMode() then
         local limb = hg.GetSplintTarget and hg.GetSplintTarget(target)
-        option = limb and {label = "Splint - " .. hg.SPLINT_LIMB_LABELS[limb]} or nil
+        option = limb and {label = "Splint - " .. hg.SPLINT_LIMB_LABELS[limb], bone = limb} or nil
     end
 
     net.Start("hg_medical_minigame_bandage_target")
@@ -344,6 +344,7 @@ local function SendBandageTarget(ply, wep, target, requiredCompletions)
         net.WriteUInt(math.min(index or 0, 63), 6)
         net.WriteUInt(math.min(#options, 63), 6)
         net.WriteUInt(math.Clamp(requiredCompletions, 0, 255), 8)
+        net.WriteString(option and tostring(option.bone or "") or "")
     net.Send(ply)
 end
 

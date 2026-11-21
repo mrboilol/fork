@@ -30,6 +30,18 @@ function hg.UIPixel(value)
 	return math.max(1, math.floor(hg.SX(value) + 0.5))
 end
 
+function hg.DrawOutline(x, y, w, h, thickness)
+	local whole = math.floor(thickness)
+	local fraction = thickness - whole
+	if whole > 0 then surface.DrawOutlinedRect(x, y, w, h, whole) end
+	if fraction <= 0.01 then return end
+
+	local color = surface.GetDrawColor()
+	surface.SetDrawColor(color.r, color.g, color.b, color.a * fraction)
+	surface.DrawOutlinedRect(x + whole, y + whole, w - whole * 2, h - whole * 2, 1)
+	surface.SetDrawColor(color.r, color.g, color.b, color.a)
+end
+
 local function createRegisteredFont(name, definition)
 	local scaled = table.Copy(definition)
 	scaled.size = math.max(1, math.floor((definition.referenceSize or definition.size or 16) * hg.UIScale() + 0.5))

@@ -54,6 +54,7 @@ function SWEP:InitializeAdd()
 			self.bloodtype = types[math.random(#types)]
 			self.modeValues[1] = 1
 		end
+		if self.modeValues[1] > 0 then self.bloodph = hg.organism.AcidBase.RollBagPh() end
 	end
 end
 
@@ -79,6 +80,7 @@ function SWEP:GetInfo()
 	end
 	local tblcopy = table.Copy(self.modeValues)
 	tblcopy.bloodtype = self.bloodtype or "o-"
+	tblcopy.bloodph = self.bloodph
 	return tblcopy
 end
 
@@ -87,6 +89,8 @@ function SWEP:SetInfo(info)
 	self.modeValues = info
 	self.bloodtype = ""..(self.modeValues.bloodtype or "o-")
 	self.modeValues.bloodtype = nil
+	self.bloodph = tonumber(self.modeValues.bloodph)
+	self.modeValues.bloodph = nil
 end
 
 function SWEP:OwnerChanged()
@@ -242,6 +246,11 @@ if SERVER then
 						local old = -(-self.modeValues[1])
 						self.modeValues[1] = math.min(self.modeValues[1] + FrameTime() * (math.max(ent.organism.pulse / 70,0.3)) * 0.5 * 500 / self.BagVolume,1)
 						self.bloodtype = ent.organism.bloodtype
+						local added = self.modeValues[1] - old
+						if added > 0 then
+							local donorPh = hg.organism.AcidBase.GetPh(ent.organism)
+							self.bloodph = old > 0 and ((self.bloodph or donorPh) * old + donorPh * added) / self.modeValues[1] or donorPh
+						end
 
 						if ent.organism.furryinfected then
 							self.furryinfected = true
@@ -294,6 +303,10 @@ if SERVER then
 							end
 						end
 
+						if ent.organism.blood > old then
+							hg.organism.TransfuseBlood(ent.organism, ent.organism.blood - old, self.bloodph)
+						end
+
 						if (self.bloodtype == "c-" or self.furryinfected) and ent.PlayerClassName != "furry" and (ent.organism.blood - old) > 0 then
 							ent.organism.furryinfected = true
 						end
@@ -311,6 +324,7 @@ if SERVER then
 				end
 			else
 				self.bloodtype = nil
+				self.bloodph = nil
 			end
 		end
 
@@ -326,6 +340,7 @@ if SERVER then
 		if self.net_cooldown < CurTime() then
 			self:SetNetVar("modeValues",self.modeValues)
 			self:SetNetVar("type",self.bloodtype)
+			self:SetNetVar("ph",self.bloodph)
 			self.net_cooldown = CurTime() + 0.1
 		end
 	end
@@ -356,7 +371,7 @@ else
 		ent = IsValid(ent) and ent.organism and ent or owner
 		local recipientBloodType = ent.organism and ent.organism.bloodtype or "unknown"
 		local modeStr = self.modeNames2[self:GetNetVar("mode",2)] or self.modeNames2[2]
-		self.modeNames[1] = self:GetNetVar("modeValues", {})[1] == 0 and modeStr .. " | Recipent: " .. recipientBloodType or modeStr .. " | in: "..self:GetNetVar("type","o-").." | recipent: "..recipientBloodType
+		self.modeNames[1] = self:GetNetVar("modeValues", {})[1] == 0 and modeStr .. " | Recipent: " .. recipientBloodType or modeStr .. " | in: "..self:GetNetVar("type","o-")..(self:GetNetVar("ph") and string.format(" pH %.2f", self:GetNetVar("ph")) or "").." | recipent: "..recipientBloodType
 	end
 
 	function SWEP:AfterDrawModel(wm,nodraw)

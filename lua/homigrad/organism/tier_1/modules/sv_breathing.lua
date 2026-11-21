@@ -82,6 +82,19 @@ Breathing.Sources = {
 		value = function(org) return unit(org.breathPanic) end,
 		rate = 16,
 	},
+	acidosis = {
+		value = function(org) return unit(org.acidosisDrive) end,
+		start = 0.1,
+		rate = 12,
+		depth = 1.4,
+		labored = 0.6,
+	},
+	alkalosis = {
+		value = function(org) return unit(org.alkalosisDrive) end,
+		start = 0.2,
+		rate = -4,
+		depth = 0.85,
+	},
 }
 
 local function due(org, key, interval)

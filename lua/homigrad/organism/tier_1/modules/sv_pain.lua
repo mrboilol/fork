@@ -366,6 +366,10 @@ module[2] = function(owner, org, timeValue)
 	if hypoxicDrain > 0 then
 		org.consciousness = math.max((org.consciousness or 1) - hypoxicDrain * timeValue, 0)
 	end
+	local metabolicCap = tonumber(org.metabolicConsciousnessCap) or 1
+	if metabolicCap < 1 and org.consciousness > metabolicCap then
+		org.consciousness = Approach(org.consciousness, metabolicCap, timeValue / 20)
+	end
 
 
 

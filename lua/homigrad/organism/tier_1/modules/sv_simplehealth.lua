@@ -1106,7 +1106,7 @@ local function tickOrgans(owner, org, state, timeValue)
 	state.toxinRegenMul = math.max((1 - liver * organConfig.liverRegenPenalty) * flankRegenMul, 0)
 
 	if not state.thiamineActive then
-		local organToxin = liver * organConfig.liverToxinGain
+		local organToxin = liver * organConfig.liverToxinGain + flank * organConfig.flankToxinGain
 		if flankDestroyed then organToxin = organToxin + organConfig.flankDestroyedToxinGain end
 		SimpleHealth.AddDamage(org, "toxin", organToxin * timeValue)
 	end
