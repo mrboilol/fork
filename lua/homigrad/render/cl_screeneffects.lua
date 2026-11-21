@@ -435,14 +435,14 @@ local function UpdateDepressionAudio(depression, unconscious)
 		sound.PlayFile(track, "noblock noplay", function(station)
 			depressionStationLoading = false
 			if not IsValid(station) then return end
-			station:SetVolume(depressionState.audioLerp)
+			station:SetVolume(depressionState.audioLerp * GetConVar("snd_musicvolume"):GetFloat())
 			station:Play()
 			station:EnableLooping(true)
 			depressionStation = station
 		end)
 	end
 	if IsValid(depressionStation) then
-		depressionStation:SetVolume(depressionState.audioLerp)
+		depressionStation:SetVolume(depressionState.audioLerp * GetConVar("snd_musicvolume"):GetFloat())
 		if target <= 0.001 and depressionState.audioLerp <= 0.01 then
 			depressionStation:Stop()
 			depressionStation = nil

@@ -1262,7 +1262,7 @@ function SWEP:AttackFront(special_attack, rand)
                                 PlayKnuckledusterSound(HitPos, special_attack and 62 or 74, not special_attack)
                         end
                         if owner.PlayerClassName == "furry" then
-                                util.Decal("Blood",HitPos + owner:EyeAngles():Forward() * -1,HitPos - owner:EyeAngles():Forward() * -1)
+                                hg.BloodDecal(HitPos + owner:EyeAngles():Forward() * -1,HitPos - owner:EyeAngles():Forward() * -1)
                                 timer.Simple(0,function()
                                         local effectdata2 = EffectData()
                                         effectdata2:SetNormal(owner:EyeAngles():Forward() * -1)

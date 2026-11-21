@@ -50,7 +50,7 @@ local rare_decal_chance = 0.15
 local function bloodDecals(pos, dir, count, filter)
 	for _ = 1, count do
 		local decalDir = (dir * 0.6 + VectorRand() - vector_up * 0.5):GetNormalized()
-		util.Decal("Blood", pos, pos + decalDir * 150, filter)
+		hg.BloodDecal(pos, pos + decalDir * 150, filter)
 	end
 end
 hg.organism.BoneBloodDecals = bloodDecals

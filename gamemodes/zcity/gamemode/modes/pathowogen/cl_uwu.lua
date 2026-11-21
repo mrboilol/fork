@@ -24,7 +24,7 @@ function MODE:Think()
 		end
 
 		if IsValid(self.HellYeahMusic) then
-			self.HellYeahMusic:SetVolume(self.MusicLerp)
+			self.HellYeahMusic:SetVolume(self.MusicLerp * GetConVar("snd_musicvolume"):GetFloat())
 		end
 	else
 		if IsValid(self.HellYeahMusic) then
@@ -57,6 +57,7 @@ function MODE:Think()
 			if !IsValid(self.ExtractionMusic) then
 				sound.PlayFile("sound/zbattle/extracted.ogg", "", function(station)
 					if IsValid(station) then
+						station:SetVolume(GetConVar("snd_musicvolume"):GetFloat())
 						self.ExtractionMusic = station
 					end
 				end)

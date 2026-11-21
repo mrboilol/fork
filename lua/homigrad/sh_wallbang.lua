@@ -336,7 +336,7 @@ local function impact(ply, wallPos, norm, scale)
 		local headMat = headBone and ply:GetBoneMatrix(headBone)
 		local forehead = headMat and WorldToLocal(hit + norm + vecUp * 3, angle_zero, headMat:GetTranslation(), headMat:GetAngles()) or Vector()
 		hg.organism.AddWoundManual(ply, (14 + skull * 16) * WB.WoundMul * mul, forehead, angle_zero, "ValveBiped.Bip01_Head1", CurTime())
-		util.Decal("Blood", hit + norm * 4, hit - norm * 8, ply)
+		hg.BloodDecal(hit + norm * 4, hit - norm * 8, ply)
 	end
 
 	ply:ViewPunch(Angle(math.Rand(6, 9), math.Rand(-2, 2), math.Rand(-4, 4)))

@@ -25,6 +25,19 @@ function ZW.GetAtmosphereAtZ(worldZ)
     return altitude, temperature, pressure, saturatedPressure, vaporPressure, density, pressure / basePressure
 end
 
+local GAMEPLAY_ALTITUDE_SCALE = 40
+
+function ZW.GetGameplayAltitude(worldZ)
+    local atmosphere = ZW.Atmosphere or {}
+    local config = ZW.Config or {}
+    local baseZ = atmosphere.SeaLevel or config.MapSeaLevelZ or 0
+    return math.Clamp(((tonumber(worldZ) or baseZ) - baseZ) * 0.01905 * GAMEPLAY_ALTITUDE_SCALE, -3000, 12000)
+end
+
+function ZW.GetGameplayPressureRatio(altitude)
+    return math.max(1 - 2.25577e-5 * math.max(altitude, 0), 0.01) ^ 5.25588
+end
+
 function ZW.NormalizePhysBulletInput(bullet)
     if not istable(bullet) then return bullet end
 

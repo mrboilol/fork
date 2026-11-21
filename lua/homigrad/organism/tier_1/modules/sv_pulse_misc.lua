@@ -23,7 +23,12 @@ local ENCLOSURE_TRACE_LEN = 32768
 local ENCLOSURE_INDOOR_COLD = 0.35
 local ENCLOSURE_ROCK_COLD = 1.9
 local ENCLOSURE_ROCK_FULL = 768
-local enclosureUp = Vector(0, 0, ENCLOSURE_TRACE_LEN)
+local ALTITUDE_COLD_START = 400
+local ALTITUDE_HEIGHT_COLD = 0.004
+local ALTITUDE_HEIGHT_COLD_MAX = 12
+local ALTITUDE_DEPTH_COLD = 0.003
+local ALTITUDE_DEPTH_COLD_MAX = 6
+local enclosureUp =Vector(0, 0, ENCLOSURE_TRACE_LEN)
 local enclosureTrace = {mask = MASK_SOLID_BRUSHONLY}
 
 local function measureOverheadRock(start)
@@ -209,6 +214,10 @@ function hg.organism.UpdateBodyTemperature(owner, org, timeValue)
 		local character = hg.GetCurrentCharacter(owner)
 		if not IsValid(character) then character = owner end
 		local envCold = getEnclosureCold(character)
+		local altitude = ZCityWind and ZCityWind.GetGameplayAltitude and ZCityWind.GetGameplayAltitude(owner:GetPos().z) or 0
+		local depthCold = envCold > 0 and Clamp(-altitude * ALTITUDE_DEPTH_COLD, 0, ALTITUDE_DEPTH_COLD_MAX) or 0
+		local heightCold = envCold > 0 and 0 or Clamp((altitude - ALTITUDE_COLD_START) * ALTITUDE_HEIGHT_COLD, 0, ALTITUDE_HEIGHT_COLD_MAX)
+		envCold = envCold + depthCold + heightCold
 		if envCold > 0 then needed_temp = math.min(needed_temp, 36.7 - envCold) end
 	end
 	if StormFox2 and StormFox2.Loaded and StormFox2.Setting.SFEnabled() and IsValid(owner) then

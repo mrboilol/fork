@@ -2451,7 +2451,7 @@ function SWEP:AttackFront(special_attack, rand)
 				end
 			end
 			if clawClasses[owner.PlayerClassName] then
-				util.Decal("Blood",HitPos + owner:EyeAngles():Forward() * -1,HitPos - owner:EyeAngles():Forward() * -1)
+				hg.BloodDecal(HitPos + owner:EyeAngles():Forward() * -1,HitPos - owner:EyeAngles():Forward() * -1)
 				timer.Simple(0,function()
 					local effectdata2 = EffectData()
 					effectdata2:SetNormal(owner:EyeAngles():Forward() * -1)

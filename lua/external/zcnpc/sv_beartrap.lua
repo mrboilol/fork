@@ -163,7 +163,7 @@ local function PaintBlood(pos, source)
 			})
 
 			if tr.Hit then
-				util.Decal("Normal.Blood24", tr.HitPos + tr.HitNormal, tr.HitPos - tr.HitNormal, source)
+				hg.BloodDecal(tr.HitPos + tr.HitNormal, tr.HitPos - tr.HitNormal, source)
 			end
 		end
 	end

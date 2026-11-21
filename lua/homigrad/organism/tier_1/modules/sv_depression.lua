@@ -67,10 +67,12 @@ local depression_thought_pools = {
 	fight = {
 		{"How are they winning!?", "I can't keep up with this...", "This is bad..."},
 		{"Nothing's working... why is NOTHING working?!", "They're going to kill me. They're really going to kill me.", "Why isn't anything working!?"},
+		{"I can't win this... I'm done for.", "Nothing I do is changing anything.", "Why is this even happening to me?"},
 	},
 	grief = {
 		{"Holy shit.. I just saw them die...","I'm next aren't I?", "They just died in front of me..."},
 		{"Jesus christ.. He just died...", "I keep seeing their face...", "Oh god- I just saw them fucking die..."},
+		{"They're gone... they're really gone.", "I can't stop picturing it.", "I should have been able to do something."},
 	},
 	guilt = {
 		{"WHAT THE FUCK DID I JUST DO.", "I DIDN'T MEAN TO DO THAT!", "THAT WAS ME WASN'T IT!?"},

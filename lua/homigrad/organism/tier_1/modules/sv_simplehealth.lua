@@ -262,7 +262,7 @@ function SimpleHealth.GetTargetHeartRate(org, state)
 	rate = rate - math.max(heartConfig.coldStart - temperature, 0) * heartConfig.coldPerDegree
 	rate = rate + math.max(temperature - heartConfig.heatStart, 0) * heartConfig.heatPerDegree
 
-	local compensation = rampUp(heartConfig.bloodPeak - blood, 0, heartConfig.bloodPeak - heartConfig.bloodFloor)
+	local compensation = rampUp(heartConfig.bloodClimbStart - blood, 0, heartConfig.bloodClimbStart - heartConfig.bloodClimbEnd)
 	rate = Lerp(compensation, rate, heartConfig.bloodMax)
 	rate = Lerp(rampUp(state.oxy, heartConfig.oxyPeak, CONFIG.oxy.countdownStart), rate, heartConfig.oxyCrashTo)
 

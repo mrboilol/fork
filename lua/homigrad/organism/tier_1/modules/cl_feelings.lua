@@ -1,5 +1,7 @@
 local Clamp = math.Clamp
 
+local snd_musicvolume = GetConVar("snd_musicvolume")
+
 local angerTunnel = 0
 
 hook.Add("Player_Death", "hg_psyche_sound_stop", function(ply)
@@ -10,39 +12,57 @@ end)
 
 local ANGER_LOOP_TAIL = 5
 
-local angerSounds = {}
+local ANGER_ROLE_TRACKS = {
+	["Juggernaut"] = "sound/zbattle/ussr2.ogg",
+	["Active Shooter"] = "sound/zbattle/ger1.ogg",
+}
+local ANGER_DEFAULT_TRACK = "sound/zbattle/hellyeah.mp3"
 
-local function stopAngerSound(name)
-	local snd = angerSounds[name]
-	if not snd then return end
-	if IsValid(snd.station) then snd.station:Stop() end
-	angerSounds[name] = nil
+local function angerTrackForLocalPlayer()
+	local role = LocalPlayer().role
+	local name = istable(role) and role.name
+	return name and ANGER_ROLE_TRACKS[name] or ANGER_DEFAULT_TRACK
 end
 
-local function updateAngerSound(name, target, dt)
-	local snd = angerSounds[name]
+local angerSound
+
+local function stopAngerSound()
+	local snd = angerSound
+	if not snd then return end
+	if IsValid(snd.station) then snd.station:Stop() end
+	angerSound = nil
+end
+
+local function updateAngerSound(path, target, dt)
+	local snd = angerSound
+	if snd and snd.path ~= path then
+		stopAngerSound()
+		snd = nil
+	end
+
 	if not snd then
 		if target <= 0.01 then return end
-		snd = {vol = 0, loading = true}
-		angerSounds[name] = snd
-		sound.PlayFile("sound/" .. name, "noblock noplay", function(station)
-			if angerSounds[name] ~= snd then
+		snd = {path = path, vol = 0, loading = true}
+		angerSound = snd
+		sound.PlayFile(path, "noblock noplay", function(station)
+			if angerSound ~= snd then
 				if IsValid(station) then station:Stop() end
 				return
 			end
 			snd.loading = false
-			if not IsValid(station) then angerSounds[name] = nil return end
+			if not IsValid(station) then angerSound = nil return end
 			snd.station = station
-			station:SetVolume(snd.vol)
+			station:SetVolume(snd.vol * snd_musicvolume:GetFloat())
 			station:Play()
 		end)
 		return
 	end
+
 	snd.vol = math.Approach(snd.vol, target, dt * 3)
-	if target <= 0 and snd.vol <= 0.01 then stopAngerSound(name) return end
+	if target <= 0 and snd.vol <= 0.01 then stopAngerSound() return end
 	if snd.loading or not IsValid(snd.station) then return end
 	local station = snd.station
-	station:SetVolume(snd.vol)
+	station:SetVolume(snd.vol * snd_musicvolume:GetFloat())
 	local length = station:GetLength()
 	if length > ANGER_LOOP_TAIL and station:GetTime() >= length - ANGER_LOOP_TAIL then
 		station:SetTime(0)
@@ -57,16 +77,13 @@ hook.Add("Think", "hg_psyche_anger_sound", function()
 	local lply = LocalPlayer()
 	local org = IsValid(lply) and lply:Alive() and lply.organism
 	local anger = org and not (org.otrub or org.incapacitated) and Clamp(org.psycheAnger or 0, 0, 1) or 0
-	local angryTarget, furiousTarget = 0, 0
+	local angerTarget = 0
 	if anger >= 0.75 then
-		angryTarget = Clamp(math.Remap(anger, 0.75, 0.8, 0.5, 0), 0, 0.5)
-		furiousTarget = math.Remap(anger, 0.75, 1, 0.5, 1)
+		angerTarget = math.max(Clamp(math.Remap(anger, 0.75, 0.8, 0.5, 0), 0, 0.5), math.Remap(anger, 0.75, 1, 0.5, 1))
 	elseif anger > 0.5 then
-		angryTarget = Clamp(math.Remap(anger, 0.5, 0.74, 0, 0.5), 0, 0.5)
+		angerTarget = Clamp(math.Remap(anger, 0.5, 0.74, 0, 0.5), 0, 0.5)
 	end
-	local dt = FrameTime()
-	updateAngerSound("angry.mp3", angryTarget, dt)
-	updateAngerSound("FURIOUS.mp3", furiousTarget, dt)
+	updateAngerSound(angerTrackForLocalPlayer(), angerTarget, FrameTime())
 end)
 
 local angerMat = Material("effects/shaders/zb_grain2")

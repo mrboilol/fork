@@ -202,6 +202,29 @@ function hg.BloodImpactEffect(data, ...)
 	util.Effect("BloodImpact", data, ...)
 end
 
+if SERVER then util.AddNetworkString("hg_blood_splat") end
+
+local splatTrace = {mask = MASK_SOLID}
+function hg.BloodDecal(startPos, endPos, filter, size, artery)
+	splatTrace.start = startPos
+	splatTrace.endpos = endPos
+	splatTrace.filter = filter
+	local tr = util.TraceLine(splatTrace)
+	if not tr.Hit or tr.HitSky then return end
+	size = size or 24
+	if SERVER then
+		net.Start("hg_blood_splat")
+		net.WriteVector(tr.HitPos)
+		net.WriteVector(tr.HitNormal)
+		net.WriteEntity(tr.Entity)
+		net.WriteFloat(size)
+		net.WriteBool(artery or false)
+		net.SendPVS(tr.HitPos)
+	elseif hg.BigBloodSplat then
+		hg.BigBloodSplat(tr.HitPos, tr.HitNormal, tr.Entity, size, artery)
+	end
+end
+
 local fleshMats = {[MAT_FLESH] = true, [MAT_BLOODYFLESH] = true, [MAT_ALIENFLESH] = true, [MAT_ANTLION] = true}
 function hg.SuppressFleshImpact(tr)
 	bloodImpactsCvar = bloodImpactsCvar or GetConVar("hg_bloodimpacts") or CreateConVar("hg_bloodimpacts", 0, FCVAR_ARCHIVE + FCVAR_REPLICATED, "Enable custom blood impact effects spray cool kill death", 0, 1)

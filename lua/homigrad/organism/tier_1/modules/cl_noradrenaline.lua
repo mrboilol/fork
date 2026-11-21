@@ -64,14 +64,14 @@ hook.Add("RenderScreenspaceEffects", "noradrenalineEffect", function()
 
 		if altnoradrenaline:GetBool() then
 			if isNoradrenalineChannel(hg.noradrenalineStation) then
-				hg.noradrenalineStation:SetVolume(1)
+				hg.noradrenalineStation:SetVolume(GetConVar("snd_musicvolume"):GetFloat())
 				hg.noradrenalineFadeOut = false
 			else
 				sound.PlayFile("sound/run.mp3", "noblock", function(channel)
 					if not isNoradrenalineChannel(channel) or not isfunction(channel.EnableLooping) then return end
 					hg.noradrenalineStation = channel
 					channel:EnableLooping(true)
-					channel:SetVolume(1)
+					channel:SetVolume(GetConVar("snd_musicvolume"):GetFloat())
 				end)
 			end
 		else
@@ -121,7 +121,7 @@ hook.Add("RenderScreenspaceEffects", "noradrenalineEffect", function()
 		if altnoradrenaline:GetBool() then
 			if isNoradrenalineChannel(hg.noradrenalineStation) then
 				local volume = math.max(0, 1 - fadeProgress)
-				hg.noradrenalineStation:SetVolume(volume)
+				hg.noradrenalineStation:SetVolume(volume * GetConVar("snd_musicvolume"):GetFloat())
 				if fadeProgress >= 1 then
 					hg.noradrenalineStation:Stop()
 					hg.noradrenalineStation = nil

@@ -87,6 +87,7 @@ function S.Place(fam, idx, x, y, z, nx, ny, nz, dx, dy, dz, w, h, col, alpha, en
 	-- (a stain needs a place, a surface and a size)
 	if not (ABL.InWorld(x, y, z) and nx * nx + ny * ny + nz * nz > 0.5 and w > 0 and w < 1e3 and h > 0 and h < 1e3) then return false end
 	if dx and not ABL.Finite3(dx, dy, dz) then dx = nil end
+	if not IsValid(ent) and ABL.GPU.WetAt(x, y, z, nx, ny, nz) > 0.3 then return false end
 	local stainScale = C.cl.stainScale:GetFloat()
 	w, h = w * stainScale, h * stainScale
 	if S.CellFull(x, y, z) then S.stats.rejected = S.stats.rejected + 1 return false end

@@ -4,7 +4,7 @@ local GP = ABL.GPU
 local C = ABL.Config
 local min, max, sqrt, floor, abs, ceil = math.min, math.max, math.sqrt, math.floor, math.abs, math.ceil
 
-local PREFIX = "ablgpu2_"
+local PREFIX = "ablgpu3_"
 local SHADERS = {
 	"clip_vs30", "world_vs30", "blit_ps30", "stamp_ps30", "sim_ps30", "surface_ps30",
 	"unwrap_vs30", "geo_ps30", "none_ps30", "model_vs30", "simbody_ps30", "bodyfilm_ps30",
@@ -78,7 +78,13 @@ local MAX_FLUX = 0.12
 local EDGE_PIN = 1.5
 local ABSORB = 12
 local STAIN_ABSORB = 8
-local SHINE = 0.9
+
+local WET_SCALE_MM = 4
+local WET_MIN_MM = 0.05
+local BLOCK_MM2 = DRAIN_BLOCK * DRAIN_BLOCK * TEXEL_MM2
+local SMEAR_RADIUS = 2
+local SMEAR_STRETCH = 2
+local NEAR_REACH = PATCH_UNITS * 0.75
 
 local RT_CLAMP_S, RT_CLAMP_T, RT_NOMIP, RT_NOLOD, RT_RENDERTARGET = 4, 8, 256, 512, 32768
 local RT_FLAGS = bit.bor(RT_CLAMP_S, RT_CLAMP_T, RT_NOMIP, RT_NOLOD, RT_RENDERTARGET)
@@ -227,11 +233,11 @@ local function NewSlot(i)
 		slot.sim[k] = sim
 		local draw = Mat("draw" .. i .. "_" .. k, "world_vs30", "surface_ps30", true)
 		draw:SetTexture("$basetexture", slot.rt[k])
-		SetC(draw, 0, 1 / RES, ABSORB, STAIN_ABSORB, SHINE)
+		SetC(draw, 0, 1 / RES, ABSORB, STAIN_ABSORB, 0)
 		slot.draw[k] = draw
 		local drain = Mat("drain" .. i .. "_" .. k, "clip_vs30", "drain_ps30")
 		drain:SetTexture("$basetexture", slot.rt[k])
-		SetC(drain, 0, 1 / (DRAIN_STEP_MM * 255), 0, 0, 0)
+		SetC(drain, 0, 1 / (DRAIN_STEP_MM * 255), 1 / WET_SCALE_MM, 0, 0)
 		slot.drain[k] = drain
 		local clear = Mat("clear" .. i .. "_" .. k, "clip_vs30", "sinkclear_ps30")
 		clear:SetTexture("$basetexture", slot.rt[k])
@@ -693,6 +699,82 @@ function GP.Pour(x, y, z, n, vol, dx, dy, dz)
 	return true
 end
 
+local function Fresh(p)
+	return p.wetMax and p.wetMax > WET_MIN_MM and not p.pending and RealTime() - p.last < DRY_TIME
+end
+
+local wPos, wN = Vector(), Vector()
+
+local function WetBlock(x, y, z, nx, ny, nz)
+	wPos:SetUnpacked(x, y, z)
+	wN:SetUnpacked(nx, ny, nz)
+	local p, u, v = Find(wPos, wN)
+	if not p or not Fresh(p) then return end
+	local idx = floor(v * DRAIN_RES) * DRAIN_RES + floor(u * DRAIN_RES) + 1
+	local mm = p.wet[idx] or 0
+	if mm < WET_MIN_MM then return end
+
+	return p, u, v, idx, mm
+end
+
+function GP.WetAt(x, y, z, nx, ny, nz)
+	if not GP.Ready() then return 0 end
+	local _, _, _, _, mm = WetBlock(x, y, z, nx, ny, nz)
+
+	return mm or 0
+end
+
+function GP.AnyWet()
+	if not GP.Ready() then return false end
+	for _, p in ipairs(patches) do
+		if Fresh(p) then return true end
+	end
+
+	return false
+end
+
+function GP.NearWet(x, y, z, extra)
+	if not GP.Ready() then return false end
+	local r = NEAR_REACH + extra
+	for _, p in ipairs(patches) do
+		if Fresh(p) then
+			local c = p.center
+			if (c.x - x) ^ 2 + (c.y - y) ^ 2 + (c.z - z) ^ 2 < r * r then return true end
+		end
+	end
+
+	return false
+end
+
+function GP.Disturb(x, y, z, nx, ny, nz, dx, dy, dz, take, push)
+	if not GP.Ready() then return end
+	local p, u, v, idx, mm = WetBlock(x, y, z, nx, ny, nz)
+	if not p then return end
+	local avail = mm * BLOCK_MM2 / ML_TO_MM3
+	local got = min(take, avail * 0.5)
+	if got > 0 then Stamp(p, u, v, SMEAR_RADIUS, -got * ML_TO_MM3, 1, 0, 1) end
+	local moved = 0
+	if push and push > 0 and dx then
+		local du, dv = dx * p.u.x + dy * p.u.y + dz * p.u.z, dx * p.v.x + dy * p.v.y + dz * p.v.z
+		local l = sqrt(du * du + dv * dv)
+		local amt = min(push, (avail - got) * 0.3)
+		if l > 1e-3 and amt > 0 then
+			du, dv = du / l, dv / l
+			local reach = C.Smear.pushReach
+			local target = PlanePoint(p, u * PATCH_UNITS + du * reach, v * PATCH_UNITS + dv * reach)
+			local np, nu, nv = Patch(target, p.n, p.texName)
+			if np then
+				moved = amt
+				Stamp(p, u, v, SMEAR_RADIUS, -amt * ML_TO_MM3, du, dv, 1)
+				Stamp(np, nu, nv, SMEAR_RADIUS, amt * ML_TO_MM3, du, dv, SMEAR_STRETCH)
+			end
+		end
+	end
+	p.wet[idx] = max(0, mm - (got + moved) * ML_TO_MM3 / BLOCK_MM2)
+
+	return got
+end
+
 local function Additive(on)
 	if on then
 		render.OverrideBlend(true, BLEND_ONE, BLEND_ONE, BLENDFUNC_ADD, BLEND_ONE, BLEND_ONE, BLENDFUNC_ADD)
@@ -782,9 +864,14 @@ local function Drain(p)
 	FullQuad(DRAIN_RES)
 	render.CapturePixels()
 	local found
+	local wet, wetMax = p.wet or {}, 0
+	p.wet = wet
 	for by = 0, DRAIN_RES - 1 do
 		for bx = 0, DRAIN_RES - 1 do
-			local r, g = render.ReadPixel(bx, by)
+			local r, g, b = render.ReadPixel(bx, by)
+			local mm = b / 255 * WET_SCALE_MM
+			wet[by * DRAIN_RES + bx + 1] = mm
+			if mm > wetMax then wetMax = mm end
 			if r > 0 or g > 0 then
 				found = found or {}
 				found[#found + 1] = { bx, by, r, g }
@@ -792,6 +879,7 @@ local function Drain(p)
 		end
 	end
 	render.PopRenderTarget()
+	p.wetMax = wetMax
 	if not found then return end
 	local to = 3 - p.cur
 	render.PushRenderTarget(p.slot.rt[to])
@@ -847,7 +935,7 @@ local function RenderState(tex)
 		t.state = RT("drawtest_state", IMAGE_FORMAT_RGBA16161616F, 4)
 		t.out = GetRenderTargetEx("ablgpu_drawtest_out", DRAWTEST_RES, DRAWTEST_RES, RT_SIZE_LITERAL, MATERIAL_RT_DEPTH_SEPARATE, RT_FLAGS, 0, IMAGE_FORMAT_RGBA8888)
 		t.mat = Mat("drawtest", "world_vs30", "surface_ps30", true)
-		SetC(t.mat, 0, 1 / RES, ABSORB, STAIN_ABSORB, SHINE)
+		SetC(t.mat, 0, 1 / RES, ABSORB, STAIN_ABSORB, 0)
 		SetC(t.mat, 1, 1, 1, 1, 0)
 		SetC(t.mat, 2, 0, 0, 32, 0)
 		SetC(t.mat, 3, 0, 0, 1, 1)
@@ -1020,15 +1108,17 @@ local function DrawPatches()
 	end
 end
 
-hook.Add("PreDrawTranslucentRenderables", "ABL_GPUDraw", function(depth, sky, sky3d)
-	if depth or sky or sky3d or #patches == 0 or not GP.Ready() then return end
+hook.Remove("PreDrawTranslucentRenderables", "ABL_GPUDraw")
+
+function GP.DrawWorld()
+	if #patches == 0 or not GP.Ready() then return end
 	render.OverrideBlend(true, BLEND_SRC_ALPHA, BLEND_ONE_MINUS_SRC_ALPHA, BLENDFUNC_ADD, BLEND_ZERO, BLEND_ONE, BLENDFUNC_ADD)
 	render.OverrideDepthEnable(true, false)
 	local ok, err = pcall(DrawPatches)
 	render.OverrideDepthEnable(false)
 	render.OverrideBlend(false)
 	if not ok then Fail(err) end
-end)
+end
 
 hook.Add("PostDrawOpaqueRenderables", "ABL_GPUBodyDraw", function(depth, sky, sky3d)
 	if depth or sky or sky3d or not GP.BodyDraw or not GP.Ready() then return end

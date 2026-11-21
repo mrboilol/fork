@@ -68,7 +68,7 @@ hook.Add("RenderScreenspaceEffects", "CotardEffects", function()
 			theme:Play()
 		end)
 	end
-	if IsValid(theme) then theme:SetVolume(math.Clamp(strength * 0.55, 0, 0.55)) end
+	if IsValid(theme) then theme:SetVolume(math.Clamp(strength * 0.55, 0, 0.55) * GetConVar("snd_musicvolume"):GetFloat()) end
 
 	DrawBloom(0.025 * vision, 0.1 * vision, blur, 0, 1, 0.2, 0.65, 0.75, 1)
 	color["$pp_colour_brightness"] = kind == 3 and -0.1 * tunnel or -0.04 * tunnel

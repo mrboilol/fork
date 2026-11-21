@@ -907,8 +907,8 @@ local function MeleeEffects(host, bot, pos, dir)
 		if not ok then Log("  zcity: weapon_melee PlayEffects could not be run here (%s)", tostring(err)) end
 	end
 	if not done then
-		util.Decal("Blood", pos - dir * 15, pos + dir * 15, host)
-		util.Decal("Blood", pos - dir * 2, host:GetPos(), Z.GetBody(bot))
+		hg.BloodDecal(pos - dir * 15, pos + dir * 15, host)
+		hg.BloodDecal(pos - dir * 2, host:GetPos(), Z.GetBody(bot))
 	end
 	Log("  zcity: melee hit effects %s", done and "through Z-City's weapon_melee PlayEffects" or "as the two decal calls that method makes")
 end

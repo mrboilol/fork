@@ -110,12 +110,6 @@ local function emitSymptoms(owner, org, labored, cough, gasp)
 	if not owner:IsPlayer() or org.otrub or not org.lungsfunction then return end
 
 	local config = Breathing.Config
-	if cough and due(org, "nextBreathCough", config.coughInterval) then
-		local voice = ThatPlyIsFemale and ThatPlyIsFemale(owner) and "female" or "male"
-		local path = string.format(config.coughSound, voice, math.random(config.coughSoundCount))
-		hg.GetCurrentCharacter(owner):EmitSound(path, config.coughVolume)
-	end
-
 	if gasp and due(org, "nextBreathGasp", config.gaspInterval) then
 		local female = ThatPlyIsFemale and ThatPlyIsFemale(owner)
 		local path = female and "rotten_agony/gasp_female" .. math.random(13) .. ".ogg"

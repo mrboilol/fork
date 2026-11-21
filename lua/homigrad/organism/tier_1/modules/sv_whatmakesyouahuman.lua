@@ -334,18 +334,19 @@ end
 local function updateAdrenalineIdle(org, now, timeValue, K)
 	local adrenaline = tonumber(org.adrenaline) or 0
 	local previous = org.psycheAdrLast or adrenaline
-	local receiving = adrenaline > previous + 0.0005
+	org.psycheAdrLast = adrenaline
+	local gained = adrenaline > previous + 0.0005
 		or (org.adrenalineAdd or 0) > 0
 		or now < (org._adrenalineHoldUntil or 0)
-		or org.panicattackActive
+		or now < (org._berserkEndTime or 0)
+		or now < (org._noradrenalineEndTime or 0)
+	if gained or not org.psycheAdrGainAt then org.psycheAdrGainAt = now end
+	local sustained = org.panicattackActive
 		or org.psycheEngaged
 		or now < (org.panicGunfightUntil or 0)
 		or now < (org.epinephrineStabilizationUntil or 0)
-		or now < (org._berserkEndTime or 0)
-		or now < (org._noradrenalineEndTime or 0)
-	if receiving or not org.psycheAdrActiveAt then
+	if gained or not org.psycheAdrActiveAt or (sustained and now - org.psycheAdrGainAt < K.adrenalineSustainCap) then
 		org.psycheAdrActiveAt = now
-		org.psycheAdrLast = adrenaline
 		return
 	end
 

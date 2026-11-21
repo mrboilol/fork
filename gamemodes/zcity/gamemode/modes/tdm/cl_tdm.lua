@@ -15,7 +15,7 @@ local function PlayArenaMusic(path)
 	if arenaMusic then arenaMusic:Stop() end
 
 	arenaMusic = CreateSound(LocalPlayer(), path)
-	arenaMusic:PlayEx(1, 100)
+	arenaMusic:PlayEx(GetConVar("snd_musicvolume"):GetFloat(), 100)
 end
 
 local function StopArenaMusic()

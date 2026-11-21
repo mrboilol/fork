@@ -297,7 +297,7 @@ function PANEL:Think()
 		local remaining = self.duration - math.max(0, elapsed - self.slideIn)
 		local volIn = math.Clamp(elapsed / FADE_IN_TIME, 0, 1)
 		local volOut = math.Clamp(remaining / FADE_OUT_TIME, 0, 1)
-		self.musicChannel:SetVolume(math.min(volIn, volOut))
+		self.musicChannel:SetVolume(math.min(volIn, volOut) * GetConVar("snd_musicvolume"):GetFloat())
 	end
 end
 

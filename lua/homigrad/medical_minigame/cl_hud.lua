@@ -712,7 +712,7 @@ function PANEL:StartMusic()
         hg.MedicalMinigame.SoundChannel = channel
 
         if channel.SetVolume then
-            channel:SetVolume(1)
+            channel:SetVolume(GetConVar("snd_musicvolume"):GetFloat())
         end
 
         if channel.EnableLooping then
@@ -748,7 +748,7 @@ function PANEL:StopMusic()
 
             local volume = math.max(1 - (step / fadeSteps), 0)
             if channel.SetVolume then
-                channel:SetVolume(volume)
+                channel:SetVolume(volume * GetConVar("snd_musicvolume"):GetFloat())
             end
 
             if step == fadeSteps and channel.Stop then

@@ -71,7 +71,7 @@ function SWEP:PrimaryAttack()
 
 			if loaded and soft then
 				ply:EmitSound("snd_jack_hmcd_axehit.wav", 65)
-				util.Decal("Blood", tr.HitPos + tr.HitNormal * 15, tr.HitPos - tr.HitNormal * 15, ply)
+				hg.BloodDecal(tr.HitPos + tr.HitNormal * 15, tr.HitPos - tr.HitNormal * 15, ply)
 			elseif soft then
 				ply:EmitSound("weapons/tfa/melee_hit_world"..math.random(1,3)..".ogg", 65)
 			else

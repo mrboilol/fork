@@ -1853,6 +1853,13 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.deathStateRemaining = nil
 		if (org.defibDeathGrace or 0) > CurTime() then org.deathStateEnd = org.defibDeathGrace end
 
+		local now = CurTime()
+		local lastTick = org.deathStateLastTick or now
+		org.deathStateLastTick = now
+		if owner.DefibInProgress or (org.cprSupportUntil or 0) > now or (org.epinephrineResuscitationUntil or 0) > now then
+			org.deathStateEnd = org.deathStateEnd + math.max(now - lastTick, 0) * 0.9
+		end
+
 		if CurTime() >= org.deathStateEnd and not org.deathStateKilled then
 			org.deathStateKilled = true
 			hg.organism.SetDeathCause(org, "death-state timer expired (unconscious + incapacitated)")
@@ -1869,6 +1876,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 			org.deathStateRemaining = math.max(org.deathStateEnd - CurTime(), 0)
 		end
 		org.deathStateEnd = nil
+		org.deathStateLastTick = nil
 		org.deathStateKilled = nil
 	end
 

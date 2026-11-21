@@ -643,8 +643,8 @@ function SWEP:ChainsawHit()
     end
 
     if self:IsEntSoft(hitent) then
-        util.Decal("Blood", trace.HitPos + trace.HitNormal * 15, trace.HitPos - trace.HitNormal * 15, owner)
-        util.Decal("Blood", trace.HitPos + trace.HitNormal * 2, owner:GetPos(), hitent)
+        hg.BloodDecal(trace.HitPos + trace.HitNormal * 15, trace.HitPos - trace.HitNormal * 15, owner)
+        hg.BloodDecal(trace.HitPos + trace.HitNormal * 2, owner:GetPos(), hitent)
     end
 
     local mul = 1

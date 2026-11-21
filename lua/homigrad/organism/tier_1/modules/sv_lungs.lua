@@ -786,9 +786,9 @@ module[2] = function(owner, org, timeValue)
 	local altitudeO2K = 1
 	org.altitudeMeters = 0
 	if ZCityWind and ZCityWind.Config and ZCityWind.Config.AtmosphereEnabled and ZCityWind.GetAtmosphereAtZ then
-		local altitude, _, _, _, _, _, pressureRatio = ZCityWind.GetAtmosphereAtZ(owner:GetPos().z)
+		local altitude = ZCityWind.GetGameplayAltitude(owner:GetPos().z)
 		org.altitudeMeters = altitude
-		altitudeO2K = math.Clamp(pressureRatio, 0.35, 1)
+		altitudeO2K = math.Clamp(ZCityWind.GetGameplayPressureRatio(altitude), 0.35, 1)
 	end
 	org.airPressureRatio = altitudeO2K
 	local coldOxygenUseMul = (1 + shiveringO2Demand) * (1 - coldMetabolicPreservation)

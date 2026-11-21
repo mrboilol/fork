@@ -36,7 +36,7 @@ local function WetPools()
 	for _, p in ipairs(ABL.Pools.list) do
 		if p.wet > 0.02 and p.fade >= 1 then return true end
 	end
-	return false
+	return ABL.GPU.AnyWet()
 end
 
 local function NearPool(x, y, z, extra)
@@ -46,7 +46,7 @@ local function NearPool(x, y, z, extra)
 			if (p.x - x) ^ 2 + (p.y - y) ^ 2 + (p.z - z) ^ 2 < r * r then return true end
 		end
 	end
-	return false
+	return ABL.GPU.NearWet(x, y, z, extra)
 end
 
 local stainTmp = {}
@@ -80,8 +80,13 @@ local function Step(ply, st, side)
 	local fx, fy, fz = pos.x - dy * K.footSide * side, pos.y + dx * K.footSide * side, pos.z + 2
 	if not Down(fx, fy, fz, 12) then return end
 	local hp, hn = trOut.HitPos, trOut.HitNormal
-	local p = ABL.Pools.Find(hp.x, hp.y, hp.z, hn.x, hn.y, hn.z, 0.3)
 	local run = vl > 200
+	local gpuGot = ABL.GPU.Disturb(hp.x, hp.y, hp.z, hn.x, hn.y, hn.z, dx, dy, 0, K.pickup, K.push * (run and 2 or 1))
+	if gpuGot then
+		st.load = min(K.maxLoad, st.load + gpuGot)
+		return
+	end
+	local p = ABL.Pools.Find(hp.x, hp.y, hp.z, hn.x, hn.y, hn.z, 0.3)
 	if p and p.wet > 0.05 then
 		local got = ABL.Pools.Disturb(p, hp.x, hp.y, hp.z, dx, dy, 0, K.pickup, K.push * (run and 2 or 1))
 		st.load = min(K.maxLoad, st.load + got)
@@ -148,8 +153,11 @@ local function DragBone(rs, bone, x, y, z)
 	end
 	if d < K.dragStep then return end
 	dx, dy, dz = dx / d, dy / d, dz / d
-	local p = ABL.Pools.Find(hp.x, hp.y, hp.z, hn.x, hn.y, hn.z, 0.3)
-	if p and p.wet > 0.05 then
+	local gpuGot = ABL.GPU.Disturb(b.x, b.y, b.z, hn.x, hn.y, hn.z, dx, dy, dz, K.dragPickup, K.dragPush)
+	local p = not gpuGot and ABL.Pools.Find(hp.x, hp.y, hp.z, hn.x, hn.y, hn.z, 0.3)
+	if gpuGot then
+		b.load = min(K.maxLoad, b.load + gpuGot)
+	elseif p and p.wet > 0.05 then
 		b.load = min(K.maxLoad, b.load + ABL.Pools.Disturb(p, b.x, b.y, b.z, dx, dy, dz, K.dragPickup, K.dragPush))
 	else
 		b.load = min(K.maxLoad, b.load + StainLoad(hp.x, hp.y, hp.z, hn.x, hn.y, hn.z))

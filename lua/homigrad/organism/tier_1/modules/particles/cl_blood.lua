@@ -152,9 +152,34 @@ local function getBloodDecalScale(amount, particleSize, material)
 	return diameter / (math.max(material:Width(), material:Height(), 1) * materialScale)
 end
 
+function hg.BigBloodSplat(pos, normal, target, diameter, artery)
+	if not isvector(pos) then return end
+	if not isvector(normal) or normal:LengthSqr() < 0.0001 then normal = vector_up end
+	normal = normal:GetNormalized()
+	diameter = math.Clamp(diameter or 24, 4, 96)
+	if hg.BloodLandRedirect and hg.BloodLandRedirect(pos, normal, {}, artery, diameter * 0.3, diameter) then return end
+	if hg.BloodPoolCovers(pos, normal) then return end
+	if not isDecalExSafe(target) then return end
+	local decals = artery and oldArterialBloodDecals or oldBloodDecals
+	local material = decals[math_random(#decals)]
+	local materialScale = material:GetFloat("$decalscale") or 1
+	if materialScale <= 0 then materialScale = 1 end
+	local scale = diameter / (math.max(material:Width(), material:Height(), 1) * materialScale)
+	util.DecalEx(material, target or game.GetWorld(), pos, normal, color_white, scale, scale)
+end
+
+net.Receive("hg_blood_splat", function()
+	local pos = net.ReadVector()
+	local normal = net.ReadVector()
+	local ent = net.ReadEntity()
+	local size = net.ReadFloat()
+	local artery = net.ReadBool()
+	hg.BigBloodSplat(pos, normal, ent, size, artery)
+end)
+
 local function placeOldBloodDecal(pos, normal, target, artery, amount, particleSize)
 	if not isDecalExSafe(target) then
-		util.Decal(artery and "Arterial.Blood1" or "Normal.Blood1", pos + normal, pos - normal)
+		hg.BigBloodSplat(pos, normal, nil, bloodDecalDiameter(amount, particleSize), artery)
 		return
 	end
 	local decals = artery and oldArterialBloodDecals or oldBloodDecals
@@ -194,7 +219,7 @@ local function placeNewBloodDecal(pos, normal, target, artery, amount, particleS
 	if trail then count = 1 end
 	local name = artery and "Arterial.Blood2" .. math.Clamp(count, 1, 5) or "Normal.Blood2" .. math.Clamp(count + math_random(0, 2), 1, 5)
 	if not isDecalExSafe(target) then
-		util.Decal(name, pos + normal, pos - normal)
+		hg.BigBloodSplat(pos, normal, nil, bloodDecalDiameter(amount, particleSize), artery)
 		return
 	end
 	local material = newBloodDecalMaterials[name]
@@ -213,10 +238,11 @@ local function placeCheapBloodDecal(pos, normal, target, artery, amount, particl
 	if hg_old_blood:GetBool() then
 		local decals = artery and oldArterialBloodDecals or oldBloodDecals
 		material = decals[math_random(#decals)]
+		diameter = math.min(diameter, 10)
 	else
 		local name = (artery and "Arterial.Blood2" or "Normal.Blood2") .. math_random(1, 5)
 		if not isDecalExSafe(target) then
-			util.Decal(name, pos + normal, pos - normal, target)
+			hg.BigBloodSplat(pos, normal, nil, diameter, artery)
 			return
 		end
 		material = newBloodDecalMaterials[name]
@@ -226,7 +252,7 @@ local function placeCheapBloodDecal(pos, normal, target, artery, amount, particl
 		end
 	end
 	if not isDecalExSafe(target) then
-		util.Decal(artery and "Arterial.Blood1" or "Normal.Blood1", pos + normal, pos - normal, target)
+		hg.BigBloodSplat(pos, normal, nil, diameter, artery)
 		return
 	end
 	local materialScale = material:GetFloat("$decalscale") or 1
@@ -282,6 +308,7 @@ local function placeCheapPooledDecal(pos, normal, target, artery, amount, partic
 	cheapPoolTrace.endpos = edge - vector_up * 16
 	local result = util_TraceLine(cheapPoolTrace)
 	local size = math.Clamp(math.max((particleSize or 0) * 2, radius * 0.7), 1, 96)
+	if hg_old_blood:GetBool() then size = math.Clamp(math.max((particleSize or 0) * 2, radius * 0.12), 1, 10) end
 	if result.HitWorld and result.HitNormal.z >= 0.6 then
 		placeCheapBloodDecal(result.HitPos, result.HitNormal, nil, artery, amount, particleSize, size)
 	else

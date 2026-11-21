@@ -718,13 +718,12 @@ function SWEP:AttachDefib(owner, target, ply)
 	local nextHeartbeat = 0
 	local movingSince
 	local fibrillationLoop
-	local asystoleLoop
+	local asystolePlayed
 	local fibrillationStop
 
 	defib:CallOnRemove("DefibCleanup", function()
 		timer.Remove(timerName)
 		if fibrillationLoop then StopAEDLoop(fibrillationLoop) end
-		if asystoleLoop then StopAEDLoop(asystoleLoop) end
 		defib.AEDSoundEmitter = nil
 		if IsValid(activeTarget) then
 			activeTarget.DefibModelEnt = nil
@@ -774,15 +773,16 @@ function SWEP:AttachDefib(owner, target, ply)
 		)
 		if flatline then
 			if fibrillationLoop and not fibrillationStop then fibrillationStop = CurTime() + 0.4 end
-			asystoleLoop = StartAEDLoop(defib, AEDSounds.asystole, asystoleLoop)
+			if not asystolePlayed then
+				asystolePlayed = true
+				PlayAEDSound(defib, AEDSounds.asystole)
+			end
 		elseif org and org.fibrillation then
 			fibrillationStop = nil
-			StopAEDLoop(asystoleLoop)
-			asystoleLoop = nil
+			asystolePlayed = false
 			fibrillationLoop = StartAEDLoop(defib, AEDSounds.fibrillation, fibrillationLoop)
 		elseif org then
-			StopAEDLoop(asystoleLoop)
-			asystoleLoop = nil
+			asystolePlayed = false
 			if fibrillationLoop and not fibrillationStop then fibrillationStop = CurTime() + 0.4 end
 		end
 

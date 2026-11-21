@@ -22,7 +22,7 @@ local function StopAdrenalineMusic(immediate)
 	end
 
 	hg.adrenalineMusicVol = Lerp(FrameTime() * 2, hg.adrenalineMusicVol, 0)
-	station:SetVolume(hg.adrenalineMusicVol)
+	station:SetVolume(hg.adrenalineMusicVol * GetConVar("snd_musicvolume"):GetFloat())
 	if hg.adrenalineMusicVol <= 0.001 then
 		station:Stop()
 		hg.adrenalineMusicStation = nil
@@ -84,7 +84,7 @@ hook.Add("Think", "hg_adrenalinemusic_check", function()
 	StartAdrenalineMusic()
 	hg.adrenalineMusicVol = Lerp(FrameTime() * 2, hg.adrenalineMusicVol, math.Clamp(remaining / 20, 0, 0.75))
 	if IsValid(hg.adrenalineMusicStation) then
-		hg.adrenalineMusicStation:SetVolume(hg.adrenalineMusicVol)
+		hg.adrenalineMusicStation:SetVolume(hg.adrenalineMusicVol * GetConVar("snd_musicvolume"):GetFloat())
 	end
 end)
 

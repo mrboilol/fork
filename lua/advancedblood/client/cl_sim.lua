@@ -195,7 +195,7 @@ hook.Add("PreDrawTranslucentRenderables", "ABL_Draw", function(depth, skybox, sk
 	local t2 = SysTime()
 	-- layer 2: pools and runoff streaks (static meshes)
 	local gpuOn = ABL.GPU.Ready()
-	if not gpuOn then ABL.Pools.Draw() end
+	if gpuOn then ABL.GPU.DrawWorld() else ABL.Pools.Draw() end
 	Prof.Heap("draw pools")
 	local t3 = SysTime()
 	if not gpuOn then

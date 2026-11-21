@@ -2649,8 +2649,8 @@ function SWEP:PlayEffects(trace, attacktype)
         if self:IsStabAttack(attacktype) then self:SpewStabBlood(trace) end
 
         if self.DamageType == DMG_SLASH then
-            util.Decal( "Blood", trace.HitPos + trace.HitNormal * 15, trace.HitPos - trace.HitNormal * 15, owner )
-            util.Decal( "Blood", trace.HitPos + trace.HitNormal * 2, owner:GetPos(), trace.Entity )
+            hg.BloodDecal(trace.HitPos + trace.HitNormal * 15, trace.HitPos - trace.HitNormal * 15, owner )
+            hg.BloodDecal(trace.HitPos + trace.HitNormal * 2, owner:GetPos(), trace.Entity )
         elseif self.DamageType == DMG_CLUB then
             self:ApplyBruise(trace)
         end

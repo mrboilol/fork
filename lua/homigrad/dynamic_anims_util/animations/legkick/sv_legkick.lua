@@ -372,8 +372,8 @@ local function tryCurbStompJaw(attacker, ent, inflictor, kickDir)
         net.SendPVS(headPos)
     end
 
-    util.Decal("Blood", edgePos + edgeNormal * 4, edgePos - edgeNormal * 8, ent)
-    util.Decal("Blood", headPos, headPos - Vector(0, 0, 24), ent)
+    hg.BloodDecal(edgePos + edgeNormal * 4, edgePos - edgeNormal * 8, ent)
+    hg.BloodDecal(headPos, headPos - Vector(0, 0, 24), ent)
 
     ent:EmitSound("physics/body/body_medium_break" .. math.random(2, 4) .. ".wav", 70, math.random(90, 105))
     ent:EmitSound("physics/flesh/flesh_bloody_break.wav", 65, math.random(95, 110))

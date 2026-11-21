@@ -108,7 +108,7 @@ end
 
 local function LayerFade(channel, volume, howfast)
     if !IsValid(channel) then return end
-    local l_volume = LerpFT( howfast or 0.02, channel:GetVolume(), (volume or 1) * hg.DynamicMusicV2.Player.MasterVolume)
+    local l_volume = LerpFT( howfast or 0.02, channel:GetVolume(), (volume or 1) * hg.DynamicMusicV2.Player.MasterVolume * GetConVar("snd_musicvolume"):GetFloat())
     channel:SetVolume(l_volume)
 end
 

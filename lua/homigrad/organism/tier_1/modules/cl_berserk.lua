@@ -71,7 +71,7 @@ local function startBerserkMusic(musicPath)
 	if IsValid(hg.berserkStation) then
 		if hg.berserkMusicPath == musicPath then
 			hg.berserkStation:EnableLooping(true)
-			hg.berserkStation:SetVolume(1)
+			hg.berserkStation:SetVolume(GetConVar("snd_musicvolume"):GetFloat())
 			hg.berserkFadeOut = false
 			hg.berserkMusicPlayed = true
 			return
@@ -108,7 +108,7 @@ local function startBerserkMusic(musicPath)
 		hg.berserkStation = channel
 		hg.berserkMusicPath = musicPath
 		channel:EnableLooping(true)
-		channel:SetVolume(1)
+		channel:SetVolume(GetConVar("snd_musicvolume"):GetFloat())
 		hg.berserkFadeOut = false
 	end)
 end
@@ -185,7 +185,7 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 				startBerserkMusic(getBerserkMusicPath())
 			elseif IsValid(hg.berserkStation) then
 				hg.berserkStation:EnableLooping(true)
-				hg.berserkStation:SetVolume(1)
+				hg.berserkStation:SetVolume(GetConVar("snd_musicvolume"):GetFloat())
 				hg.berserkFadeOut = false
 			end
 
@@ -273,7 +273,7 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 		if hg.berserkFadeOut then
 			local fadeProgress = (SysTime() - hg.berserkFadeOutStartTime) / 30
 			local volume = math.max(0, 1 - fadeProgress)
-			hg.berserkStation:SetVolume(volume)
+			hg.berserkStation:SetVolume(volume * GetConVar("snd_musicvolume"):GetFloat())
 			if fadeProgress >= 1 then
 				hg.berserkStation:Stop()
 				hg.berserkStation = nil
@@ -281,7 +281,7 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 				hg.berserkMusicPlayed = false
 			end
 		else
-			hg.berserkStation:SetVolume(math.min(1, (organism.otrub and 0) or berserkClamped))
+			hg.berserkStation:SetVolume(math.min(1, (organism.otrub and 0) or berserkClamped) * GetConVar("snd_musicvolume"):GetFloat())
 		end
 	end
 end)

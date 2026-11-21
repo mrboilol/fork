@@ -148,7 +148,7 @@ function MODE:RenderScreenspaceEffects()
 	end
 
 	if IsValid(hg.ghostStation) then
-		hg.ghostStation:SetVolume(math.min((intensity - time) / 50, 1))
+		hg.ghostStation:SetVolume(math.min((intensity - time) / 50, 1) * GetConVar("snd_musicvolume"):GetFloat())
 	end
 
 	if intensity > time + 30 and !hg.fearphrase2 then

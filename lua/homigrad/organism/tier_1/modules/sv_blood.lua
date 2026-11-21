@@ -1168,12 +1168,12 @@ end
 function hg.organism.CoughBlood(org)
 	local ply = org.owner
 	if not IsValid(ply) then return end
-	local phr = "zcitysnd/real_sonar/" .. (ThatPlyIsFemale(ply) and "female" or "male") .. "_cough" .. math.random(4) .. ".ogg"
-	ply:EmitSound(phr)
-	ply.phrCld = CurTime() + 2
-	ply.lastPhr = phr
-
 	if math.random(5) == 1 then
+		local phr = "zcitysnd/real_sonar/" .. (ThatPlyIsFemale(ply) and "female" or "male") .. "_cough" .. math.random(4) .. ".ogg"
+		ply:EmitSound(phr)
+		ply.phrCld = CurTime() + 2
+		ply.lastPhr = phr
+
 		local ent = hg.GetCurrentCharacter(ply)
 		if not IsValid(ent) then return end
 		local bon = "ValveBiped.Bip01_Head1"

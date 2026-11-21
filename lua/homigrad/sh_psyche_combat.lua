@@ -135,6 +135,7 @@ hg.PsycheCombat = {
 	adrenalineIdleAfter = 15,
 	adrenalineIdleRamp = 20,
 	adrenalineIdleMul = 4,
+	adrenalineSustainCap = 10,
 	successCooldown = 0.4,
 	hitRelief = 0.012,
 	blockRelief = 0.02,
