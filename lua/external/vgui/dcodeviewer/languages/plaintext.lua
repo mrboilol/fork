@@ -1,1 +1,0 @@
-return [[hljs.registerLanguage("plaintext",function(e){return{disableAutodetect:!0}});]]
