@@ -4044,7 +4044,7 @@ hook.Add("Think", "hg_asphyxiation_track", function()
 	local org = IsValid(ply) and ply:Alive() and (ply.new_organism or ply.organism)
 	local target = 0
 
-	if org then
+	if org and not org.incapacitated then
 		local simple = hg.SimpleHealth and hg.SimpleHealth.GetLocalState and hg.SimpleHealth.GetLocalState()
 		if simple then
 			if simple.oxy >= 25 then target = Lerp(math.Clamp((simple.oxy - 25) / 70, 0, 1), 0.25, 1) end

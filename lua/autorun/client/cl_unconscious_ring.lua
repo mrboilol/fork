@@ -919,7 +919,9 @@ local function DrawCasualtiesRing(org, alpha, isUnconscious, isCritical, dying, 
     end
 
     dotBeat = math.floor(CurTime() * (dying and 2 or 1)) % 3
-    local dotStatus = dying and 3 or isCritical and 2 or 1
+    local localSimple = simple and simpleHealth.GetLocalState and simpleHealth.GetLocalState()
+    local counting = localSimple and isUnconscious and localSimple.countdownEnd > CurTime()
+    local dotStatus = dying and 3 or (isCritical or counting) and 2 or 1
     draw.SimpleText(ringDots[dotStatus][dotBeat + 1], "UnconsciousDots", centerX, centerY, Color(r, g, b, a), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 end
 
@@ -1042,7 +1044,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         ringAlpha = SmoothAlpha(ringAlpha, 0.4, 3)
     else
         ringAlpha = SmoothAlpha(ringAlpha, 0, 4)
-        if ringAlpha <= 0.01 and not showAwakeECG then
+        if ringAlpha <= 0.01 and not showAwakeECG and ecgAlphaSelfCheck <= 0.01 then
             ringAlpha = 0
                 centerEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
         end

@@ -1,14 +1,18 @@
 local K = include("homigrad/hud/cl_body_status_data.lua")
+local DRAW = include("homigrad/hud/cl_body_status_draw.lua")
+local polyCapsule = DRAW.Capsule
 
 local IsValid = IsValid
 local CurTime = CurTime
 local FrameTime = FrameTime
+local FrameNumber = FrameNumber
 local ScrH = ScrH
 local math_Clamp = math.Clamp
 local math_exp = math.exp
 local math_max = math.max
+local math_atan2 = math.atan2
 
-local cvar = CreateClientConVar("hg_simplesubrosa", "0", true, false, "1 - sub rosa shows your player model tinted by damage instead of circles", 0, 1)
+local cvar = CreateClientConVar("hg_simplesubrosa", "0", true, false, "1 - sub rosa shows a 2D figure of your real pose tinted by damage instead of circles", 0, 1)
 
 function hg.SimpleSubRosaEnabled()
 	return cvar:GetBool() and (not hg.SubRosaEnabled or hg.SubRosaEnabled())
@@ -17,53 +21,25 @@ end
 local CFG = {
 	DISLOCATION = 0.85,
 	TISSUE_BLACK = 0.95,
-	QUANT = 20,
-	PAD = 4,
-	FRAME_SMOOTH = 6,
-	YAW_SMOOTH = 5,
-	LYING_FORWARD = 0.35,
-	JAW_PLANE_LIFT = 0.35,
-	JAW_PLANE_TILT = 0.5,
-	AMBIENT = 0.45,
-	KEY_LIGHT = 1,
-	TOP_LIGHT = 0.75,
+	CHEST_WIDTH = 0.62,
+	ABDOMEN_WIDTH = 0.5,
+	PELVIS_WIDTH = 0.78,
+	SHOULDER_RADIUS = 0.11,
+	HIP_RADIUS = 0.14,
+	HAND_LENGTH = 0.45,
+	JAW_RADIUS = 0.6,
+	JAW_DEPTH = 0.01,
+	OUTLINE = 2,
+	STALE_CAPTURE = 2,
 }
 
 local STOPS = {
-	{0, 1, 1, 1},
-	{0.5, 1, 0.84, 0.16},
-	{1, 0.85, 0.1, 0.1},
+	{0, 255, 255, 255},
+	{0.5, 255, 214, 40},
+	{1, 215, 25, 25},
 }
-local BLACK = {0.08, 0.08, 0.08}
-
-local NAMED_REGIONS = {
-	["ValveBiped.Bip01_Head1"] = "skull",
-	["ValveBiped.Bip01_Neck1"] = "neck",
-	["ValveBiped.Bip01_Spine4"] = "chest",
-	["ValveBiped.Bip01_Spine2"] = "chest",
-	["ValveBiped.Bip01_L_Clavicle"] = "chest",
-	["ValveBiped.Bip01_R_Clavicle"] = "chest",
-	["ValveBiped.Bip01_Spine1"] = "abdomen",
-	["ValveBiped.Bip01_Spine"] = "abdomen",
-	["ValveBiped.Bip01_Pelvis"] = "pelvis",
-	["ValveBiped.Bip01_L_Thigh"] = "llegup",
-	["ValveBiped.Bip01_L_Calf"] = "lleg",
-	["ValveBiped.Bip01_L_Foot"] = "lleg",
-	["ValveBiped.Bip01_L_Toe0"] = "lleg",
-	["ValveBiped.Bip01_R_Thigh"] = "rlegup",
-	["ValveBiped.Bip01_R_Calf"] = "rleg",
-	["ValveBiped.Bip01_R_Foot"] = "rleg",
-	["ValveBiped.Bip01_R_Toe0"] = "rleg",
-	["ValveBiped.Bip01_L_UpperArm"] = "larmup",
-	["ValveBiped.Bip01_L_Forearm"] = "larm",
-	["ValveBiped.Bip01_L_Hand"] = "lhand",
-	["ValveBiped.Bip01_R_UpperArm"] = "rarmup",
-	["ValveBiped.Bip01_R_Forearm"] = "rarm",
-	["ValveBiped.Bip01_R_Hand"] = "rhand",
-}
-for _, name in ipairs(K.BONE_CANDIDATES[K.BONE.JAW]) do
-	NAMED_REGIONS[name] = "jaw"
-end
+local BLACK = {18, 18, 18}
+local OUTLINE_COLOR = {10, 10, 10, 220}
 
 local REGIONS = {"abdomen"}
 for _, region in ipairs(K.REGIONS) do
@@ -74,22 +50,29 @@ TISSUE_REGIONS.abdomen = "torso"
 local BELOW_SPINE1 = {"abdomen", "pelvis", "llegup", "lleg", "rlegup", "rleg"}
 local BELOW_SPINE2 = {"chest", "abdomen", "pelvis", "llegup", "lleg", "rlegup", "rleg"}
 
+local B = K.BONE
+local BONE_TOTAL = K.BONE_COUNT
+local CANDIDATES = K.BONE_CANDIDATES
+
 local level, black, missing = {}, {}, {}
-local groups, groupCount = {}, 0
-local splitHead, skullKey, jawKey
-local skullVisible, jawVisible = {skull = true}, {skull = true}
+local regionR, regionG, regionB = {}, {}, {}
 
-local proxy, boneRegion, boneCount, hasJawBone
-local ids = {}
-local localMats, hiddenMats = {}, {}
-local passVisible
-local zeroScale = Vector(0, 0, 0)
-local frameAng = Angle()
-local whiteMat = Material("models/debug/debugwhite")
+local worldPos, havePos = {}, {}
+for i = 1, BONE_TOTAL do
+	worldPos[i] = Vector()
+end
+local eyesForward = Vector()
+local haveEyes = false
+local captureFrame, capturePriority, captureBody = -10, 0, nil
+local trackedBody
 
-local smoothYaw, centerY, centerZ, halfExtent = 0, 0, 0, 40
+local smoothYaw = 0
 local lastBody, lastDrawTime, nextMedicalUpdate = nil, 0, 0
 local displayGray, displayFade = 0, 1
+
+local parts, partOrder, partCount = {}, {}, 0
+local frameRoot, frameForward, spineLength, yawCos, yawSin
+local centerX, centerY, pixelScale, targetZ = 0, 0, 1, 0
 
 local function orgNumber(org, key)
 	local value = org[key]
@@ -126,16 +109,7 @@ local function markAll(list)
 	end
 end
 
-local function regionKey(region)
-	if black[region] then return -1 end
-
-	return math.floor((level[region] or 0) * CFG.QUANT + 0.5)
-end
-
-local function keyColor(key)
-	if key < 0 then return BLACK[1], BLACK[2], BLACK[3] end
-
-	local value = key / CFG.QUANT
+local function levelColor(value)
 	for index = 2, #STOPS do
 		local high = STOPS[index]
 		if value <= high[1] then
@@ -198,40 +172,6 @@ local function updateTorso(org)
 	end
 end
 
-local function addToGroup(region, key)
-	for index = 1, groupCount do
-		local group = groups[index]
-		if group.key == key then
-			group.visible[region] = true
-			return
-		end
-	end
-
-	groupCount = groupCount + 1
-	local group = groups[groupCount]
-	if not group then
-		group = {visible = {}}
-		groups[groupCount] = group
-	end
-	group.key = key
-	group.r, group.g, group.b = keyColor(key)
-	for name in pairs(group.visible) do
-		group.visible[name] = nil
-	end
-	group.visible[region] = true
-end
-
-local function buildGroups()
-	groupCount = 0
-	skullKey, jawKey = regionKey("skull"), regionKey("jaw")
-	splitHead = ids.head ~= nil and not hasJawBone and not missing.skull and skullKey ~= jawKey
-
-	for _, region in ipairs(REGIONS) do
-		local skip = missing[region] or (region == "jaw" and not hasJawBone) or (region == "skull" and splitHead)
-		if not skip then addToGroup(region, regionKey(region)) end
-	end
-end
-
 local function updateMedicalState(ply, body)
 	for _, region in ipairs(REGIONS) do
 		level[region], black[region], missing[region] = 0, false, false
@@ -248,150 +188,229 @@ local function updateMedicalState(ply, body)
 		updateTorso(org)
 	end
 
-	buildGroups()
+	for _, region in ipairs(REGIONS) do
+		if black[region] then
+			regionR[region], regionG[region], regionB[region] = BLACK[1], BLACK[2], BLACK[3]
+		else
+			regionR[region], regionG[region], regionB[region] = levelColor(level[region])
+		end
+	end
 end
 
-local function buildBoneMap(ent)
-	boneCount = ent:GetBoneCount() or 0
-	boneRegion, hasJawBone = {}, false
-	local direct = {}
-	for i = 0, boneCount - 1 do
-		local name = ent:GetBoneName(i) or ""
-		local region = NAMED_REGIONS[name]
-		if not region and name:find("Finger", 1, true) then
-			region = name:find("_L_", 1, true) and "lhand" or name:find("_R_", 1, true) and "rhand" or nil
-		end
-		direct[i] = region
-		if region == "jaw" then hasJawBone = true end
-	end
-	for i = 0, boneCount - 1 do
-		local bone, region = i, direct[i]
-		while not region and bone >= 0 do
-			bone = ent:GetBoneParent(bone) or -1
-			region = bone >= 0 and direct[bone] or nil
-		end
-		boneRegion[i] = region or "pelvis"
-		localMats[i] = localMats[i] or Matrix()
-		hiddenMats[i] = hiddenMats[i] or Matrix()
-	end
+local function getBoneIds(ent)
+	local model = ent:GetModel()
+	local cache = ent.hgSimpleSubRosaBones
+	if cache and cache.model == model then return cache end
 
-	ids.pelvis = ent:LookupBone("ValveBiped.Bip01_Pelvis")
-	ids.neck = ent:LookupBone("ValveBiped.Bip01_Neck1") or ent:LookupBone("ValveBiped.Bip01_Spine4")
-	ids.head = ent:LookupBone("ValveBiped.Bip01_Head1")
-	ids.lThigh, ids.rThigh = ent:LookupBone("ValveBiped.Bip01_L_Thigh"), ent:LookupBone("ValveBiped.Bip01_R_Thigh")
-	ids.lArm, ids.rArm = ent:LookupBone("ValveBiped.Bip01_L_UpperArm"), ent:LookupBone("ValveBiped.Bip01_R_UpperArm")
+	cache = {model = model}
+	for index = 1, BONE_TOTAL do
+		local id = -1
+		for _, name in ipairs(CANDIDATES[index]) do
+			local found = ent:LookupBone(name)
+			if found then
+				id = found
+				break
+			end
+		end
+		cache[index] = id
+	end
 	local eyes = ent:LookupAttachment("eyes")
-	ids.eyes = eyes and eyes > 0 and eyes or nil
+	cache.eyes = eyes and eyes > 0 and eyes or -1
+	ent.hgSimpleSubRosaBones = cache
+
+	return cache
 end
 
-local function buildProxyBones(ent, count)
-	if not passVisible then return end
-
-	for i = 0, math.min(count, boneCount) - 1 do
-		ent:SetBoneMatrix(i, passVisible[boneRegion[i]] and localMats[i] or hiddenMats[i])
-	end
-end
-
-local function getProxy(body)
-	local model = body:GetModel()
-	if not isstring(model) or model == "" then return end
-
-	if not IsValid(proxy) or proxy:GetModel() ~= model then
-		if IsValid(proxy) then proxy:Remove() end
-		proxy = ClientsideModel(model, RENDERGROUP_OPAQUE)
-		if not IsValid(proxy) then return end
-		proxy:SetNoDraw(true)
-		proxy:SetPos(vector_origin)
-		proxy:SetAngles(angle_zero)
-		proxy:SetRenderBounds(Vector(-128, -128, -128), Vector(128, 128, 128))
-		proxy:AddCallback("BuildBonePositions", buildProxyBones)
-		buildBoneMap(proxy)
+local function captureBones(ent)
+	local cache = getBoneIds(ent)
+	for index = 1, BONE_TOTAL do
+		local id = cache[index]
+		local matrix = id >= 0 and ent:GetBoneMatrix(id)
+		if matrix then
+			worldPos[index]:Set(matrix:GetTranslation())
+			havePos[index] = true
+		else
+			havePos[index] = false
+		end
 	end
 
-	return proxy
+	haveEyes = false
+	if cache.eyes > 0 then
+		local attachment = ent:GetAttachment(cache.eyes)
+		if attachment then
+			eyesForward:Set(attachment.Ang:Forward())
+			haveEyes = true
+		end
+	end
+	captureBody = ent
 end
 
-local function bonePos(body, id)
-	local matrix = id and body:GetBoneMatrix(id)
+hook.Add("PostDrawAppearance", "homigrad/body-status-model/capture-rendered-pose", function(ent)
+	if ent ~= trackedBody or not IsValid(ent) then return end
 
-	return matrix and matrix:GetTranslation()
+	local priority = render.GetRenderTarget() == nil and 2 or 1
+	local frame = FrameNumber()
+	if captureFrame == frame and capturePriority > priority then return end
+
+	captureBones(ent)
+	captureFrame, capturePriority = frame, priority
+end)
+
+local function pos(index)
+	return havePos[index] and worldPos[index] or nil
 end
 
-local function targetYaw(body)
-	local pelvis, neck = bonePos(body, ids.pelvis), bonePos(body, ids.neck)
-	if not pelvis or not neck then return body:GetAngles().y end
+local function buildFrame()
+	local pelvis, neck = pos(B.PELVIS), pos(B.NECK) or pos(B.SPINE4)
+	if not pelvis or not neck then return false end
 
 	local up = neck - pelvis
-	up:Normalize()
-	local lSide, rSide = bonePos(body, ids.lArm) or bonePos(body, ids.lThigh), bonePos(body, ids.rArm) or bonePos(body, ids.rThigh)
-	if not lSide or not rSide then return body:GetAngles().y end
+	local length = up:Length()
+	if length < K.CFG.MIN_SPINE_LENGTH or length > K.CFG.MAX_SPINE_LENGTH then return false end
+	up:Div(length)
 
-	local right = rSide - lSide
-	right:Sub(up * right:Dot(up))
-	right:Normalize()
-	local forward = up:Cross(right)
-	local fx, fy = forward.x, forward.y
-	if fx * fx + fy * fy < CFG.LYING_FORWARD * CFG.LYING_FORWARD then
-		fx, fy = -up.y, up.x
-		local current = math.rad(smoothYaw)
-		if fx * math.cos(current) + fy * math.sin(current) < 0 then fx, fy = -fx, -fy end
-	end
+	local lThigh, rThigh = pos(B.L_THIGH), pos(B.R_THIGH)
+	local lArm, rArm = pos(B.L_UPPERARM), pos(B.R_UPPERARM)
+	local hipRight = lThigh and rThigh and rThigh - lThigh or lArm and rArm and rArm - lArm
+	if not hipRight then return false end
 
-	return math.deg(math.atan2(fy, fx))
+	local hipUp = (pos(B.SPINE1) or neck) - pelvis
+	if hipUp:Length() < K.MIN_AXIS_LENGTH then hipUp = Vector(up) end
+	hipUp:Normalize()
+	hipRight:Sub(hipUp * hipRight:Dot(hipUp))
+	if hipRight:Length() < K.MIN_AXIS_LENGTH then return false end
+	hipRight:Normalize()
+
+	local hipForward = hipUp:Cross(hipRight)
+	local headingX, headingY = hipRight.x + hipForward.y, hipRight.y - hipForward.x
+	if headingX * headingX + headingY * headingY < K.MIN_AXIS_LENGTH * K.MIN_AXIS_LENGTH then return false end
+
+	local torsoRight = lArm and rArm and rArm - lArm or Vector(hipRight)
+	torsoRight:Sub(up * torsoRight:Dot(up))
+	frameForward = torsoRight:Length() < K.MIN_AXIS_LENGTH and hipForward or up:Cross(torsoRight:GetNormalized())
+	frameRoot, spineLength = pelvis, length
+
+	return true, math.deg(math_atan2(headingX, -headingY))
 end
 
-local function updateLocalMatrices(body, root)
-	local scale = body:GetModelScale() or 1
-	local scaleVec = Vector(scale, scale, scale)
-	local minY, maxY, minZ, maxZ = math.huge, -math.huge, math.huge, -math.huge
-	for i = 0, boneCount - 1 do
-		local world = body:GetBoneMatrix(i)
-		local lm, hm = localMats[i], hiddenMats[i]
-		if world then
-			local pos, ang = WorldToLocal(world:GetTranslation(), world:GetAngles(), root, frameAng)
-			lm:Identity()
-			lm:SetAngles(ang)
-			lm:SetTranslation(pos)
-			lm:Scale(scaleVec)
-			if pos.y < minY then minY = pos.y end
-			if pos.y > maxY then maxY = pos.y end
-			if pos.z < minZ then minZ = pos.z end
-			if pos.z > maxZ then maxZ = pos.z end
-		else
-			lm:Identity()
-			lm:Scale(zeroScale)
-		end
-		hm:Set(lm)
-		hm:Scale(zeroScale)
-	end
-	if minY > maxY then return end
+local function project(p)
+	local scale = K.DISPLAY_SPINE / spineLength
+	local dx, dy = p.x - frameRoot.x, p.y - frameRoot.y
+	local depth = (dx * yawCos + dy * yawSin) * scale
+	local side = (dy * yawCos - dx * yawSin) * scale
 
-	return (minY + maxY) * 0.5, (minZ + maxZ) * 0.5, math_max(maxY - minY, maxZ - minZ) * 0.5 + CFG.PAD
+	return centerX + side * pixelScale, centerY - ((p.z - frameRoot.z) * scale - targetZ) * pixelScale, depth
 end
 
-local function headClipPlane(body, root)
-	local head, neck = localMats[ids.head], ids.neck and localMats[ids.neck]
-	if not head or not neck then return end
+local function radiusPixels(fraction)
+	return fraction * K.DISPLAY_SPINE * pixelScale
+end
 
-	local headPos, neckPos = head:GetTranslation(), neck:GetTranslation()
-	local up = headPos - neckPos
-	if up:Length() < 0.01 then return end
-	up:Normalize()
+local function addPart(region, a, b, radius, depthBias)
+	if not a or not b or missing[region] then return end
 
-	local lift, face = 2, Vector(1, 0, 0)
-	local attachment = ids.eyes and body:GetAttachment(ids.eyes)
-	if attachment then
-		local eyes = WorldToLocal(attachment.Pos, angle_zero, root, frameAng)
-		local offset = eyes - headPos
-		lift = offset:Dot(up) * CFG.JAW_PLANE_LIFT
-		offset:Sub(up * offset:Dot(up))
-		if offset:Length() > 0.01 then face = offset:GetNormalized() end
+	local ax, ay, ad = project(a)
+	local bx, by, bd = project(b)
+	partCount = partCount + 1
+	local part = parts[partCount]
+	if not part then
+		part = {}
+		parts[partCount] = part
 	end
+	part.ax, part.ay, part.bx, part.by = ax, ay, bx, by
+	part.r, part.region = radius, region
+	part.depth = (ad + bd) * 0.5 + (depthBias or 0)
+	partOrder[partCount] = partCount
+end
 
-	local normal = up - face * CFG.JAW_PLANE_TILT
-	normal:Normalize()
+local function handTip(hand, forearm)
+	if not hand or not forearm then return hand end
 
-	return normal, normal:Dot(headPos + up * lift)
+	return hand + (hand - forearm) * CFG.HAND_LENGTH
+end
+
+local function queueLimbs()
+	local lShoulder, rShoulder = pos(B.L_UPPERARM), pos(B.R_UPPERARM)
+	local lElbow, rElbow = pos(B.L_FOREARM), pos(B.R_FOREARM)
+	local lHand, rHand = pos(B.L_HAND), pos(B.R_HAND)
+	addPart("larmup", lShoulder, lElbow, radiusPixels(K.RADIUS.UPPER_ARM))
+	addPart("rarmup", rShoulder, rElbow, radiusPixels(K.RADIUS.UPPER_ARM))
+	if not missing.larmup then addPart("larm", lElbow, lHand, radiusPixels(K.RADIUS.LOWER_ARM)) end
+	if not missing.rarmup then addPart("rarm", rElbow, rHand, radiusPixels(K.RADIUS.LOWER_ARM)) end
+	if not missing.larm then addPart("lhand", lHand, handTip(lHand, lElbow), radiusPixels(K.RADIUS.HAND)) end
+	if not missing.rarm then addPart("rhand", rHand, handTip(rHand, rElbow), radiusPixels(K.RADIUS.HAND)) end
+
+	local lHip, rHip = pos(B.L_THIGH), pos(B.R_THIGH)
+	local lKnee, rKnee = pos(B.L_CALF), pos(B.R_CALF)
+	local lAnkle, rAnkle = pos(B.L_FOOT), pos(B.R_FOOT)
+	addPart("llegup", lHip, lKnee, radiusPixels(K.RADIUS.THIGH))
+	addPart("rlegup", rHip, rKnee, radiusPixels(K.RADIUS.THIGH))
+	if not missing.llegup then
+		addPart("lleg", lKnee, lAnkle, radiusPixels(K.RADIUS.CALF))
+		addPart("lleg", lAnkle, pos(B.L_TOE) or lAnkle, radiusPixels(K.RADIUS.FOOT))
+	end
+	if not missing.rlegup then
+		addPart("rleg", rKnee, rAnkle, radiusPixels(K.RADIUS.CALF))
+		addPart("rleg", rAnkle, pos(B.R_TOE) or rAnkle, radiusPixels(K.RADIUS.FOOT))
+	end
+end
+
+local function queueTorso()
+	local pelvis, spine1, spine2 = pos(B.PELVIS), pos(B.SPINE1), pos(B.SPINE2)
+	local spine4 = pos(B.SPINE4) or spine2
+	local neck, head = pos(B.NECK), pos(B.HEAD)
+	local lShoulder, rShoulder = pos(B.L_UPPERARM), pos(B.R_UPPERARM)
+	local lHip, rHip = pos(B.L_THIGH), pos(B.R_THIGH)
+
+	local shoulderSpan = lShoulder and rShoulder and lShoulder:Distance(rShoulder) / spineLength or K.RADIUS.CHEST * 4
+	local hipSpan = lHip and rHip and lHip:Distance(rHip) / spineLength or K.RADIUS.PELVIS * 3
+	local chestR = radiusPixels(shoulderSpan * 0.5 * CFG.CHEST_WIDTH)
+	local abdomenR = radiusPixels(shoulderSpan * 0.5 * CFG.ABDOMEN_WIDTH)
+	local pelvisR = radiusPixels(hipSpan * 0.5 * CFG.PELVIS_WIDTH + K.RADIUS.THIGH * 0.5)
+
+	addPart("pelvis", pelvis, spine1 or pelvis, pelvisR)
+	addPart("pelvis", lHip, rHip, radiusPixels(CFG.HIP_RADIUS))
+	addPart("abdomen", spine1 or pelvis, spine2, abdomenR)
+	addPart("chest", spine2, spine4, chestR)
+	addPart("chest", lShoulder, rShoulder, radiusPixels(CFG.SHOULDER_RADIUS))
+	addPart("neck", spine4, neck or head, radiusPixels(K.RADIUS.NECK))
+	if not head or missing.skull then return end
+
+	local headUp = neck and head - neck or (head - (spine4 or head))
+	if headUp:Length() > 0 then headUp:Normalize() end
+	local face = haveEyes and eyesForward or frameForward
+	local skull = head + headUp * (K.SKULL_LIFT * spineLength)
+	local jaw = pos(B.JAW) or skull + (face * K.CFG.JAW_FORWARD - headUp * K.CFG.JAW_DROP) * spineLength
+	addPart("neck", neck or spine4, head, radiusPixels(K.RADIUS.NECK))
+	addPart("skull", skull, skull, radiusPixels(K.RADIUS.SKULL))
+	addPart("jaw", LerpVector(0.4, skull, jaw), jaw, radiusPixels(K.RADIUS.SKULL * CFG.JAW_RADIUS), CFG.JAW_DEPTH)
+end
+
+local function farthestFirst(a, b)
+	return parts[a].depth < parts[b].depth
+end
+
+local function setColor(r, g, b, a)
+	local luma = r * 0.299 + g * 0.587 + b * 0.114
+	surface.SetDrawColor(r + (luma - r) * displayGray, g + (luma - g) * displayGray, b + (luma - b) * displayGray, a * displayFade)
+end
+
+local function drawParts()
+	for i = partCount + 1, #partOrder do
+		partOrder[i] = nil
+	end
+	table.sort(partOrder, farthestFirst)
+
+	local outline = math_max(CFG.OUTLINE * ScrH() / K.REFERENCE_SCREEN_HEIGHT, 1)
+	draw.NoTexture()
+	for i = 1, partCount do
+		local part = parts[partOrder[i]]
+		local region = part.region
+		setColor(OUTLINE_COLOR[1], OUTLINE_COLOR[2], OUTLINE_COLOR[3], OUTLINE_COLOR[4])
+		polyCapsule(part.ax, part.ay, part.bx, part.by, part.r + outline)
+		setColor(regionR[region] or 255, regionG[region] or 255, regionB[region] or 255, 255)
+		polyCapsule(part.ax, part.ay, part.bx, part.by, part.r)
+	end
 end
 
 local function updateDisplayState(ply)
@@ -412,50 +431,25 @@ local function updateDisplayState(ply)
 	displayFade = displayFade + ((otrub and 0 or 1) - displayFade) * (1 - math_exp(-dt * fadeRate))
 end
 
-local function setColor(r, g, b)
-	local luma = r * 0.299 + g * 0.587 + b * 0.114
-	render.SetColorModulation(r + (luma - r) * displayGray, g + (luma - g) * displayGray, b + (luma - b) * displayGray)
-end
-
-local function drawPass(visible, r, g, b)
-	passVisible = visible
-	setColor(r, g, b)
-	proxy:InvalidateBoneCache()
-	proxy:DrawModel()
-end
-
-local function drawHeadSplit(normal, distance)
-	local previous = render.EnableClipping(true)
-	render.PushCustomClipPlane(normal, distance)
-	local r, g, b = keyColor(skullKey)
-	drawPass(skullVisible, r, g, b)
-	render.PopCustomClipPlane()
-
-	render.PushCustomClipPlane(-normal, -distance)
-	r, g, b = keyColor(jawKey)
-	drawPass(jawVisible, r, g, b)
-	render.PopCustomClipPlane()
-	render.EnableClipping(previous)
-end
-
-local function panelRect()
+local function layout()
 	local size = ScrH() * K.CFG.PANEL_SIZE_FRACTION
-	local x = ScrH() * K.CFG.PANEL_MARGIN_FRACTION + size * 0.5
-	local y = ScrH() * 0.5
+	pixelScale = size / (K.CFG.FIGURE_EXTENT * K.DISPLAY_SPINE)
+	centerX = ScrH() * K.CFG.PANEL_MARGIN_FRACTION + size * 0.5
+	centerY = ScrH() * 0.5
 	if hg.MoodlesEnabled and not hg.MoodlesEnabled() then
 		local face = hg.SimpleHealth and hg.SimpleHealth.Config.face
 		local faceSize = ScrH() * (face and face.size or 0.075)
 		local margin = ScrH() * (face and face.y or 0.012)
-		x = ScrW() * 0.5
-		y = ScrH() - margin * 2 - faceSize - size * 0.5
+		centerX = ScrW() * 0.5
+		centerY = ScrH() - margin * 2 - faceSize - size * 0.5
 	end
+	targetZ = K.CFG.TARGET_HEIGHT * K.DISPLAY_SPINE
+
 	if hg.HudEdit then
 		local ox, oy = hg.HudEdit.Offset("subrosa")
-		x, y = x + ox, y + oy
-		hg.HudEdit.Rect("subrosa", x - size * 0.5, y - size * 0.5, size, size)
+		centerX, centerY = centerX + ox, centerY + oy
+		hg.HudEdit.Rect("subrosa", centerX - size * 0.5, centerY - size * 0.5, size, size)
 	end
-
-	return math.floor(x - size * 0.5), math.floor(y - size * 0.5), math.floor(size)
 end
 
 local function getBodyEntity(ply)
@@ -466,35 +460,31 @@ local function getBodyEntity(ply)
 	return ply
 end
 
-local function drawModelStatus(alpha)
+local function drawFigure()
 	local ply = LocalPlayer()
 	local body = getBodyEntity(ply)
-	if not IsValid(body) or body:IsDormant() or not getProxy(body) then return end
+	trackedBody = body
+	if not IsValid(body) or body:IsDormant() then return end
 
-	local root = bonePos(body, ids.pelvis) or body:GetPos()
+	if captureBody ~= body or FrameNumber() - captureFrame > CFG.STALE_CAPTURE then
+		captureBones(body)
+		captureFrame, capturePriority = FrameNumber(), 0
+	end
+
+	local ok, yaw = buildFrame()
+	if not ok then return end
+
 	local now = CurTime()
 	local snap = body ~= lastBody or now - lastDrawTime > K.CFG.SNAP_AFTER_HIDDEN
 	lastBody, lastDrawTime = body, now
-
-	local yaw = targetYaw(body)
-	local dt = FrameTime()
 	if snap then
 		smoothYaw = yaw
 	else
-		smoothYaw = math.NormalizeAngle(smoothYaw + math.AngleDifference(yaw, smoothYaw) * (1 - math_exp(-dt * CFG.YAW_SMOOTH)))
+		local blend = 1 - math_exp(-FrameTime() * K.CFG.YAW_SMOOTH_RATE)
+		smoothYaw = math.NormalizeAngle(smoothYaw + math.AngleDifference(yaw, smoothYaw) * blend)
 	end
-	frameAng.y = smoothYaw
-
-	local cy, cz, half = updateLocalMatrices(body, root)
-	if not cy then return end
-	if snap then
-		centerY, centerZ, halfExtent = cy, cz, half
-	else
-		local blend = 1 - math_exp(-dt * CFG.FRAME_SMOOTH)
-		centerY = centerY + (cy - centerY) * blend
-		centerZ = centerZ + (cz - centerZ) * blend
-		halfExtent = halfExtent + (half - halfExtent) * blend
-	end
+	local yawRadians = math.rad(smoothYaw)
+	yawCos, yawSin = math.cos(yawRadians), math.sin(yawRadians)
 
 	if snap or now >= nextMedicalUpdate then
 		updateMedicalState(ply, body)
@@ -503,52 +493,30 @@ local function drawModelStatus(alpha)
 	updateDisplayState(ply)
 	if displayFade < 0.01 then return end
 
-	local x, y, size = panelRect()
-	cam.Start({
-		type = "3D",
-		x = x, y = y, w = size, h = size,
-		origin = Vector(500, centerY, centerZ),
-		angles = Angle(0, 180, 0),
-		ortho = {left = -halfExtent, right = halfExtent, top = -halfExtent, bottom = halfExtent},
-		znear = 1, zfar = 1000,
-	})
-	render.ClearDepth()
-	render.SuppressEngineLighting(true)
-	render.ResetModelLighting(CFG.AMBIENT, CFG.AMBIENT, CFG.AMBIENT)
-	render.SetModelLighting(BOX_FRONT, CFG.KEY_LIGHT, CFG.KEY_LIGHT, CFG.KEY_LIGHT)
-	render.SetModelLighting(BOX_TOP, CFG.TOP_LIGHT, CFG.TOP_LIGHT, CFG.TOP_LIGHT)
-	render.MaterialOverride(whiteMat)
-	render.SetBlend(alpha * displayFade)
-
-	local ok, err = pcall(function()
-		for index = 1, groupCount do
-			local group = groups[index]
-			drawPass(group.visible, group.r, group.g, group.b)
-		end
-		if splitHead and ids.head then
-			local normal, distance = headClipPlane(body, root)
-			if normal then drawHeadSplit(normal, distance) else drawPass(skullVisible, keyColor(skullKey)) end
-		end
-	end)
-
-	passVisible = nil
-	render.SetBlend(1)
-	render.MaterialOverride()
-	render.SetColorModulation(1, 1, 1)
-	render.SuppressEngineLighting(false)
-	cam.End()
-	if not ok then ErrorNoHalt(err, "\n") end
+	layout()
+	partCount = 0
+	queueTorso()
+	queueLimbs()
+	drawParts()
 end
 
 hook.Add("HUDPaint", "homigrad/body-status-model/draw", function()
-	if not hg.SimpleSubRosaEnabled() then return end
+	if not hg.SimpleSubRosaEnabled() then
+		trackedBody = nil
+		return
+	end
 
 	local ply = LocalPlayer()
-	if not IsValid(ply) or not ply:Alive() then return end
+	if not IsValid(ply) or not ply:Alive() then
+		trackedBody = nil
+		return
+	end
 
 	local alpha = hg.DeathHUDAlpha and hg.DeathHUDAlpha() or 1
 	if alpha <= 0 then return end
 
-	local ok, err = pcall(drawModelStatus, alpha)
+	surface.SetAlphaMultiplier(alpha)
+	local ok, err = pcall(drawFigure)
+	surface.SetAlphaMultiplier(1)
 	if not ok then ErrorNoHalt(err, "\n") end
 end)

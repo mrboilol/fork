@@ -576,7 +576,7 @@ local function updateCountdown(owner, org, state)
 	org.deathStateRemaining = nil
 
 	local elapsed = counting and now - state.countdownStart or 0
-	org.incapacitated = counting and elapsed >= oxyConfig.countdownTrackAt
+	org.incapacitated = counting and duration - elapsed <= oxyConfig.countdownTrackRemaining
 	org.incapReason = org.incapacitated and "oxy" or nil
 	if org.incapacitated then
 		org.deathStateEnd = state.countdownStart + duration

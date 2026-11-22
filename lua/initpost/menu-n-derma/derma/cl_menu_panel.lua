@@ -182,17 +182,13 @@ local Selects = {
     {Title = "Settings", Func = function(luaMenu,pp) 
         hg.DrawSettings(pp) 
     end},
-    {Title = "Appearance", Func = function(luaMenu,pp) hg.CreateApperanceMenu(pp) end},
-    {Title = "Edit HUD", Func = function(luaMenu)
-        luaMenu:Close()
-        timer.Simple(0.3, function() if hg.HudEdit then hg.HudEdit.Open() end end)
-    end},
+    {Title = "Appearance", Func = function(luaMenu,pp) hg.CreateApperanceMenu(pp) end}, 
     {Title = "Return", Func = function(luaMenu) luaMenu:Close() end},
 }
 
 local splasheh = {
 'john stop using the grenade launchers',
-'UNPLAYABLE PIECE OF SHIT A-POSING NIG',
+'UNPLAYABLE PIECE OF SHIT T-POSING NIG',
 'best of zack',
 'huytown: guppy slaughter',
 'kill them all',
@@ -207,12 +203,18 @@ local splasheh = {
 'do you feel remorse... heh...',
 'gracias scav prototype',
 'redeem code BET for free money',
-'in case of a-posing inform sancho',
+'in case of t-posing inform host',
 'ischemia happens because of the lack of oxygen or a bad blood type',
 'bright bloood is bad',
 'votturs remorseism...',
-'sancho was here',
+'the host was here',
 'kill them all',
+'in case of missing textures, pray',
+'gracias jason statham',
+'i dont like me either',
+'dont make a permanent decision on a temporary feeling',
+'if we are all the same, why must we treat the other different',
+'depression is much more complex than what we represent',
 'in case of missing textures, pray',
 'gracias jason statham',
 }

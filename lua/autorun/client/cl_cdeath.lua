@@ -235,6 +235,10 @@ local function IncapTimerExpiring(ply)
     return deadline ~= nil and deadline - CurTime() <= 2
 end
 
+local function RealishDeathEffect()
+    return zb and zb.CROUND == "realish"
+end
+
 local function DeathFadeDurations()
     if CDeath.silent then return SILENT_BLACK_DURATION, SILENT_FADE_OUT_DURATION end
     if RealishDeathEffect() then return REALISH_BLACK_FADE_DURATION, REALISH_BLACK_FADE_OUT_DURATION end
@@ -275,10 +279,6 @@ local function DeathEffectRoundActive()
     end
 
     return true
-end
-
-local function RealishDeathEffect()
-    return zb and zb.CROUND == "realish"
 end
 
 local function PlayClick()
@@ -611,10 +611,8 @@ local function CinematicDeathTracker()
 CDeath.keepSoundAlive = true
 local soundGeneration = CDeath.deathSoundGeneration
 
-if not CDeath.silent or CDeath.incapTimerDeath then
-    for _, deathSound in pairs(DEATH_SOUNDS) do
-        PlayDeathSound(deathSound, soundGeneration)
-    end
+for _, deathSound in pairs(DEATH_SOUNDS) do
+    PlayDeathSound(deathSound, soundGeneration)
 end
 
     elseif ply:Alive() and CDeath.isDead then
