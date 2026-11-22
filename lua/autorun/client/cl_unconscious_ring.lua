@@ -1110,6 +1110,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         or (tonumber(org.spine3) or 0) >= (orgCfg.fake_spine3 or 0.75)
     local awakeGiveUp = not isUnconscious and not (incapacitated and deathStateEnd)
         and (isParalyzed or isCritical or incapacitated)
+        and ply:GetNWBool("hg_can_giveup", false)
     if awakeGiveUp then
         awakeGiveUpStart = awakeGiveUpStart or CurTime()
     else

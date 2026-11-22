@@ -9,6 +9,7 @@ local OXY_EFFECT_FULL = 250
 local EFFECT_MIN = 0.005
 local FACE_BOX_COLOR = Color(25, 25, 35, 240)
 local FACE_OUTLINE_COLOR = Color(255, 255, 255, 255)
+local FACE_TEXT_COLOR = Color(255, 255, 255, 255)
 local FACE_PADDING = 0.16
 
 
@@ -214,6 +215,53 @@ SimpleHealth.GetFaceKey = getFaceKey
 SimpleHealth.GetFaceMaterial = getFaceMaterial
 SimpleHealth.IsFacePale = isFacePale
 SimpleHealth.NilguyMoodle = CreateClientConVar("hg_nilguyisamoodle", "0", true, false, "1 = the face is the first moodle instead of a separate HUD box", 0, 1)
+SimpleHealth.FaceTitles = {
+	healthy = "Doing Fine", hurt = "Hurt", wounded = "Wounded", critical = "Critical",
+	softcrit = "Dying", hardcrit = "On The Brink",
+}
+
+function SimpleHealth.IsFurryFace(ply)
+	return IsValid(ply) and ply.PlayerClassName == "furry"
+end
+
+local faceTextFonts = {}
+
+local function getFaceTextFont(px)
+	if not faceTextFonts[px] then
+		local name = "HG_SimpleHealthFace" .. px
+		surface.CreateFont(name, {font = "VCR OSD Mono", size = px, weight = 700, antialias = true, extended = true})
+		faceTextFonts[px] = name
+	end
+
+	return faceTextFonts[px]
+end
+
+local function wrapFaceTitle(text, maxWidth)
+	local lines, line = {}, ""
+	for word in string.gmatch(text, "%S+") do
+		local candidate = line == "" and word or line .. " " .. word
+		if line ~= "" and surface.GetTextSize(candidate) > maxWidth then
+			lines[#lines + 1] = line
+			line = word
+		else
+			line = candidate
+		end
+	end
+	if line ~= "" then lines[#lines + 1] = line end
+
+	return lines
+end
+
+local function drawFaceTitle(x, y, size, title)
+	local font = getFaceTextFont(math.max(8, math.floor(size / 5.5)))
+	surface.SetFont(font)
+	local lines = wrapFaceTitle(title, size)
+	local _, lineHeight = surface.GetTextSize("A")
+	local top = y + size * 0.5 - #lines * lineHeight * 0.5
+	for index, line in ipairs(lines) do
+		draw.SimpleText(line, font, x + size * 0.5, top + (index - 1) * lineHeight, FACE_TEXT_COLOR, TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
+	end
+end
 
 local function playOuchie(path, pitch, volume)
 	sound.PlayFile("sound/" .. path, "noplay noblock", function(station)
@@ -340,7 +388,7 @@ local deathDelay = {active = false, wasAlive = false, aliveMode = 0}
 
 local function nildoy()
 	if not IsValid(lply) then return end
-	if SimpleHealth.NilguyMoodle:GetBool() and HGCustomMoodlesActive and hg.MoodlesEnabled() then return end
+	if SimpleHealth.NilguyMoodle:GetBool() and HGCustomMoodlesActive and hg.MoodlesEnabled() and not SimpleHealth.IsFurryFace(lply) then return end
 	if GetConVar("hg_hidenilguy"):GetBool() then return end
 
 	local alive = lply:Alive()
@@ -367,15 +415,24 @@ local function nildoy()
 	hg.DrawOutline(x, y, size, size, 1.5)
 
 	local key = alive and getFaceKey(state, true) or "hardcrit"
-	local material = getFaceMaterial(alive and isFacePale() and key .. "_pale" or key)
-	if not material then return end
-
 	local shakeX, shakeY = 0, 0
 	if alive then shakeX, shakeY = getFaceShake(size) end
 	local padding = math.floor(size * FACE_PADDING)
+	local inner = size - padding * 2
+	local innerX, innerY = x + padding + math.floor(shakeX), y + padding + math.floor(shakeY)
+
+	if SimpleHealth.IsFurryFace(lply) then
+		drawFaceTitle(innerX, innerY, inner, SimpleHealth.FaceTitles[key])
+
+		return
+	end
+
+	local material = getFaceMaterial(alive and isFacePale() and key .. "_pale" or key)
+	if not material then return end
+
 	surface.SetDrawColor(255, 255, 255, 255)
 	surface.SetMaterial(material)
-	surface.DrawTexturedRect(x + padding + math.floor(shakeX), y + padding + math.floor(shakeY), size - padding * 2, size - padding * 2)
+	surface.DrawTexturedRect(innerX, innerY, inner, inner)
 end
 
 hook.Add("HUDPaint", "hg/simplehealth/face", nildoy)

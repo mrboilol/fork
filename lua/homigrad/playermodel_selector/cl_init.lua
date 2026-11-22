@@ -29,7 +29,7 @@ local idleAnims = {"idle_all_01", "menu_walk", "pose_standing_02", "idle_fist", 
 local Menu
 
 local function CanUse()
-	return engine.ActiveGamemode() == "sandbox" or LocalPlayer():IsAdmin()
+	return LocalPlayer():IsAdmin()
 end
 
 local function PaintBG(self, w, h)
@@ -161,7 +161,10 @@ local function ToggleRow(parent, text, getState, onClick)
 end
 
 function Menu()
-	if not CanUse() then return end
+	if not CanUse() then
+		chat.AddText(clr.redhov, "Playermodel selector is admin only")
+		return
+	end
 	if IsValid(PMS_Frame) then PMS_Frame:Close() end
 
 	local lply = LocalPlayer()

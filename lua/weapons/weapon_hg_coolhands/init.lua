@@ -944,7 +944,7 @@ function SWEP:Think()
 	self.Secondary.Automatic = false//owner.PlayerClassName == "furry"
 
 	self.Checking = math.max(self.Checking - FrameTime(), 0)
-	self:SetCheckingAfflictions(not self:GetFists() and not IsValid(self.CarryEnt) and not IsValid(owner:GetNetVar("carryent2")) and owner:KeyDown(IN_RELOAD) and not owner:KeyDown(IN_USE) and not owner:InVehicle())
+	self:SetCheckingAfflictions(not IsValid(self.CarryEnt) and not IsValid(owner:GetNetVar("carryent2")) and owner:KeyDown(IN_RELOAD) and not owner:KeyDown(IN_USE) and not owner:InVehicle())
 
 	if self:GetOwner():GetNWBool("TauntHolsterWeapons", false) then
 		self:SetCheckingAfflictions(false)

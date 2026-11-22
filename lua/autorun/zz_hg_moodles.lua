@@ -1082,10 +1082,6 @@ local function buildEffects(ply, org)
 end
 
 local nilguyLevels = {healthy = 1, hurt = 1, wounded = 2, critical = 3, softcrit = 4, hardcrit = 4}
-local nilguyTitles = {
-	healthy = "Doing Fine", hurt = "Hurt", wounded = "Wounded", critical = "Critical",
-	softcrit = "Dying", hardcrit = "On The Brink",
-}
 local nilguyStatus = {
 	healthy = "You feel alright.",
 	hurt = "You are hurt, but still on your feet.",
@@ -1152,7 +1148,7 @@ end
 
 local function buildNilguyEffect(ply, org)
 	local SimpleHealth = hg.SimpleHealth
-	if not SimpleHealth or not SimpleHealth.NilguyMoodle or not SimpleHealth.NilguyMoodle:GetBool() then return end
+	if not SimpleHealth or not SimpleHealth.NilguyMoodle or not SimpleHealth.NilguyMoodle:GetBool() or SimpleHealth.IsFurryFace(ply) then return end
 
 	local state = SimpleHealth.GetLocalState()
 	if not state then return end
@@ -1181,7 +1177,7 @@ local function buildNilguyEffect(ply, org)
 		level = nilguyLevels[key],
 		mood = bad and "bad" or "good",
 		priority = 0,
-		title = nilguyTitles[key],
+		title = SimpleHealth.FaceTitles[key],
 		description = description,
 		tooltipLines = lines,
 		faceMaterial = SimpleHealth.GetFaceMaterial(pale and key .. "_pale" or key) or SimpleHealth.GetFaceMaterial(key),

@@ -1063,8 +1063,7 @@ hook.Add("radialOptions", "inspect_self", function()
 
 	hg.radialOptions[#hg.radialOptions + 1] = {
 		function() RunConsoleCommand("hg_inspect_self") end,
-		"Inspect",
-		description = "Check yourself over. You hold a guard for a moment, then your injuries and symptoms are listed."
+		"Inspect"
 	}
 end)
 

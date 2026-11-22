@@ -1852,15 +1852,18 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	local incapacitationEnabled = not hg.organism.IncapacitationEnabled or hg.organism.IncapacitationEnabled()
 	local terminalIncapacitation = (incapacitationEnabled or org.simpleMode) and org.otrub and org.incapacitated
 	if isPly and owner:Alive() and terminalIncapacitation then
-		org.deathStateEnd = org.deathStateEnd or CurTime() + (org.deathStateRemaining or 25)
+		org.deathStateEnd = org.deathStateEnd or CurTime() + (org.deathStateRemaining or 45)
 		org.deathStateRemaining = nil
 		if (org.defibDeathGrace or 0) > CurTime() then org.deathStateEnd = org.defibDeathGrace end
 
 		local now = CurTime()
 		local lastTick = org.deathStateLastTick or now
 		org.deathStateLastTick = now
-		if owner.DefibInProgress or (org.cprSupportUntil or 0) > now or (org.epinephrineResuscitationUntil or 0) > now then
-			org.deathStateEnd = org.deathStateEnd + math.max(now - lastTick, 0) * 0.9
+		local elapsedTick = math.max(now - lastTick, 0)
+		if owner.DefibInProgress or (org.epinephrineResuscitationUntil or 0) > now then
+			org.deathStateEnd = org.deathStateEnd + elapsedTick * 0.9
+		elseif (org.cprSupportUntil or 0) > now and org.deathStateEnd - now > 20 then
+			org.deathStateEnd = org.deathStateEnd + elapsedTick
 		end
 
 		if CurTime() >= org.deathStateEnd and not org.deathStateKilled then

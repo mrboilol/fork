@@ -7,7 +7,6 @@ util.AddNetworkString("ZC_PMS_Armor")
 
 local function CanUse(ply)
 	if not IsValid(ply) or not ply:IsPlayer() then return false end
-	if engine.ActiveGamemode() == "sandbox" then return true end
 	return ply:IsAdmin()
 end
 

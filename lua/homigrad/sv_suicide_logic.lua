@@ -37,9 +37,22 @@ if SERVER then
             or (tonumber(org.brainSwelling) or 0) >= 0.45
     end
 
+    local function canGiveUp(ply)
+        local org = ply.organism
+        if not org then return false end
+        return org.incapacitated or (not hg.organism.IncapacitationEnabled() and org.otrub) or isParalyzedOrDying(org) or false
+    end
+
+    hook.Add("Player Think", "HG_GiveUpAvailable", function(ply)
+        local can = ply:Alive() and canGiveUp(ply) and true or false
+        if ply:GetNWBool("hg_can_giveup", false) ~= can then
+            ply:SetNWBool("hg_can_giveup", can)
+        end
+    end)
+
     concommand.Add("suicide", function(ply)
         if not IsValid(ply) or not ply:Alive() then return end
-        if ply.organism and (ply.organism.incapacitated or (not hg.organism.IncapacitationEnabled() and ply.organism.otrub) or isParalyzedOrDying(ply.organism)) then
+        if canGiveUp(ply) then
             ply.organism.deathStateKilled = true
             ply:Kill()
             return

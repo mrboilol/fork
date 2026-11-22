@@ -553,7 +553,6 @@ function hg.GetInteractOptions()
 		options[#options + 1] = {
 			function() send(target, "accept") end,
 			"Take " .. target:GetNWString("hg_ia_item", "item"),
-			description = "Take what they are holding out. Your hand meets theirs.",
 		}
 	end
 
@@ -563,20 +562,17 @@ function hg.GetInteractOptions()
 		options[#options + 1] = {
 			function() send(target, "offer") end,
 			"Offer " .. name,
-			description = "Hold it out. They take it by opening their menu on you.",
 		}
 	end
 
 	options[#options + 1] = {
 		function() send(target, "check") end,
 		"Check Reaction",
-		description = "Grab their neck, check their pulse and see how they react.",
 	}
 
 	options[#options + 1] = {
 		function() send(target, "tap") end,
 		"Tap Shoulder",
-		description = "Tap them on the shoulder. They are notified.",
 	}
 
 	options[#options + 1] = {
@@ -600,7 +596,6 @@ function hg.GetInteractOptions()
 			return -1
 		end,
 		"Fix Dislocation",
-		description = "Set a dislocated joint on them.",
 	}
 
 	return options

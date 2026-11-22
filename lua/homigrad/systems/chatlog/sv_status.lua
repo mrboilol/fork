@@ -276,6 +276,30 @@ local INSPECT_DURATION = 2
 local INSPECT_COLOR = Color(225, 225, 225)
 local INSPECT_GOOD = Color(120, 175, 255)
 
+local FRAGILE_FROM = 0.6
+local TISSUE_NAMES = {
+	head = "head", torso = "torso",
+	larm = "left arm", rarm = "right arm",
+	lleg = "left leg", rleg = "right leg",
+}
+local FRAGILE_BONES = {
+	{key = "skull", text = "Your skull aches, it feels ready to crack."},
+	{key = "jaw", text = "Your jaw feels like it could snap."},
+	{key = "spine3", text = "Your neck feels dangerously fragile."},
+	{key = "spine2", text = "Your back feels like it could give out."},
+	{key = "spine1", text = "Your lower back feels like it could give out."},
+	{key = "pelvis", text = "Your hips feel like they could break."},
+	{key = "chest", text = "Your ribs feel like they are about to break."},
+	{key = "lleg_up", text = "Your left thigh feels like it is about to break."},
+	{key = "lleg_down", text = "Your left shin feels like it is about to break."},
+	{key = "rleg_up", text = "Your right thigh feels like it is about to break."},
+	{key = "rleg_down", text = "Your right shin feels like it is about to break."},
+	{key = "larm_up", text = "Your left upper arm feels like it is about to break."},
+	{key = "larm_down", text = "Your left forearm feels like it is about to break."},
+	{key = "rarm_up", text = "Your right upper arm feels like it is about to break."},
+	{key = "rarm_down", text = "Your right forearm feels like it is about to break."},
+}
+
 local function InspectLines(ply, org)
 	local lines = {}
 	local function add(text) lines[#lines + 1] = text end
@@ -298,6 +322,41 @@ local function InspectLines(ply, org)
 	end
 
 	if org.headamputated then add("Your head is gone.") end
+
+	local ribs = tonumber(org.brokenribs) or math.Round((tonumber(org.chest) or 0) * 12)
+	if ribs >= 6 then add("Your ribcage is crushed, most of your ribs are broken.")
+	elseif ribs > 1 then add("You have " .. ribs .. " broken ribs.")
+	elseif ribs == 1 then add("One of your ribs is broken.") end
+
+	for _, bone in ipairs(FRAGILE_BONES) do
+		local value = tonumber(org[bone.key]) or 0
+		if value >= FRAGILE_FROM and value < 1 then add(bone.text) end
+	end
+
+	local SoftTissue = hg.SoftTissue
+	if SoftTissue and org.softBrute then
+		local config = SoftTissue.Config
+		local heavyRank = config.severityRank.heavy
+		for _, limb in ipairs(SoftTissue.LIMBS) do
+			local name = TISSUE_NAMES[limb]
+			local brute = SoftTissue.GetSeverityKey(SoftTissue.Get(org, "brute", limb))
+			local burn = SoftTissue.GetSeverityKey(SoftTissue.Get(org, "burn", limb))
+			local muscle = SoftTissue.GetSeverityKey(SoftTissue.GetMuscle(org, limb), config.muscle.severity)
+			if (config.severityRank[brute] or 0) >= heavyRank then add("Your " .. name .. " is " .. config.wording.brute[brute] .. ", the flesh is badly damaged.") end
+			if (config.severityRank[burn] or 0) >= heavyRank then add("Your " .. name .. " is " .. config.wording.burn[burn] .. ".") end
+			if (config.severityRank[muscle] or 0) >= heavyRank then add("The muscle in your " .. name .. " is " .. string.gsub(config.wording.muscle[muscle], " muscle", "") .. ".") end
+		end
+	end
+
+	local simple = hg.SimpleHealth and hg.SimpleHealth.GetState(org)
+	if simple then
+		local health = hg.SimpleHealth.GetHealth(simple)
+		if health <= 0 then add("You are barely clinging on.")
+		elseif health < 25 then add("You are in terrible shape.")
+		elseif health < 50 then add("You are badly hurt.")
+		elseif health < 75 then add("You are hurt.")
+		elseif health < 95 then add("You have a few scrapes and bruises.") end
+	end
 
 	local teeth = tonumber(org.teethLost) or 0
 	if teeth >= 32 then add("You have no teeth left.") elseif teeth > 0 then add("You are missing " .. teeth .. (teeth == 1 and " tooth." or " teeth.")) end

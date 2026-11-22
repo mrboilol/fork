@@ -1770,7 +1770,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	local brain = org.brain or 0
 	local deathStateEnd = tonumber(org.deathStateEnd)
 	local incapacitated = org.otrub and org.incapacitated and deathStateEnd and deathStateEnd > CurTime()
-	local incapacitationProgress = incapacitated and math.Clamp((25 - (deathStateEnd - CurTime())) / 25, 0, 1) or 0
+	local incapacitationProgress = incapacitated and math.Clamp((45 - (deathStateEnd - CurTime())) / 45, 0, 1) or 0
 	local sensoryActive = not org.otrub or incapacitated
 	local sensoryMix = incapacitated and Lerp(incapacitationProgress, 1, 0.35) or 1
 
@@ -1985,7 +1985,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		IncapacitatedStation:Stop()
 		IncapacitatedStation = nil
 	end
-	if incapacitated and IsValid(IncapacitatedStation) and deathStateEnd - CurTime() > 0.05 and IncapacitatedStation:GetLength() - (deathStateEnd - CurTime()) >= 0 then
+	if incapacitated and IsValid(IncapacitatedStation) and deathStateEnd - CurTime() > 0.05 and deathStateEnd - CurTime() < 25 and IncapacitatedStation:GetLength() - (deathStateEnd - CurTime()) >= 0 then
 		if IncapacitatedStation:GetState() != GMOD_CHANNEL_PLAYING then
 			IncapacitatedStation:Play()
 			IncapacitatedStation:SetTime(IncapacitatedStation:GetLength() - (deathStateEnd - CurTime()))

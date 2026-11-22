@@ -588,6 +588,7 @@ end)
 function hg.DrawIncapacitatedText()
 	local _, deathStateEnd = GetLocalDeathState()
 	if not deathStateEnd then return end
+	if not lply:GetNWBool("hg_can_giveup", false) then return end
 
 	local remaining = math.max(deathStateEnd - CurTime(), 0)
 	remDeathStateColor.a = math.Clamp((INCAPACITATION_DEATH_TIME - remaining) / 2, 0, 1) * 255

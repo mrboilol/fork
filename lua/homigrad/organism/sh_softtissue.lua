@@ -88,6 +88,7 @@ SoftTissue.Config = {
 
 	profiles = {
 		{types = bit.bor(DMG_SLASH), tissue = 1.5, structure = 0.65},
+		{types = bit.bor(DMG_FALL), tissue = 1.2, structure = 1.3},
 		{types = bit.bor(DMG_CLUB, DMG_CRUSH, DMG_FALL, DMG_VEHICLE), tissue = 0.6, structure = 1.3},
 	},
 
@@ -106,10 +107,16 @@ SoftTissue.Config = {
 	organInputs = {heart = true, liver = true, flank = true, gut = true, lungsL = true, lungsR = true},
 
 	boneTrauma = {
-		minDelta = 0.05,
-		perDamage = 35,
-		fracture = 25,
-		muscleOnFracture = 0.15,
+		minDelta = 0.04,
+		perDamage = 45,
+		fracture = 30,
+		muscleOnFracture = 0.2,
+	},
+
+	fallLanding = {
+		leg = 22,
+		torso = 12,
+		torsoSpeed = 1100,
 	},
 
 	pain = {

@@ -993,6 +993,11 @@ local function tickResuscitation(owner, org, state, timeValue)
 
 		if state.flatline and math.Rand(0, 1) < CONFIG.flatline.cprRestartChance then stopFlatline(owner, org, state) end
 	end
+
+	if (org.cprSupportUntil or 0) > now and state.countdownStart and not state.fibrillating then
+		local remaining = state.countdownStart + (state.countdownDuration or oxyConfig.countdownTime) - now
+		if remaining > oxyConfig.cprHoldAbove then state.countdownStart = state.countdownStart + timeValue end
+	end
 end
 
 function SimpleHealth.ShouldAEDShock(org)
@@ -1006,16 +1011,16 @@ function SimpleHealth.OnAEDShock(org)
 	if not state then return end
 
 	local oxyConfig = CONFIG.oxy
-	SimpleHealth.Heal(org, "oxy", state.oxy)
-	SimpleHealth.Heal(org, "toxin", state.toxin * oxyConfig.aedToxinFraction)
-
-	local softAt = SimpleHealth.GetCritThresholds()
-	if SimpleHealth.GetHealth(state) <= softAt then
-		SimpleHealth.Heal(org, "toxin", oxyConfig.aedCritToxinHeal)
-		SimpleHealth.Heal(org, "brute", oxyConfig.aedCritTissueHeal)
-		SimpleHealth.Heal(org, "burn", oxyConfig.aedCritTissueHeal)
+	for _, pool in ipairs(SimpleHealth.POOLS) do
+		SimpleHealth.Heal(org, pool, state[pool] or 0)
 	end
 
+	state.countdownStart = nil
+	state.countdownChoked = nil
+	state.bleedRoll = nil
+	org.incapacitated = false
+	org.incapReason = nil
+	org.deathStateEnd = nil
 	state.aedResistUntil = CurTime() + oxyConfig.aedResistTime
 	state.cprCritHealed = nil
 

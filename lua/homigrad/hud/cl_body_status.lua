@@ -1434,7 +1434,7 @@ function hg.BodyStatus.DrawOther(subject, x, y, scale, alpha)
 end
 
 hook.Add("HUDPaint", "homigrad/body-status/draw", function()
-	if not enabled.GetBool() then
+	if not enabled.GetBool() or hg.SimpleSubRosaEnabled and hg.SimpleSubRosaEnabled() then
 		trackedBody = nil
 		return
 	end

@@ -504,7 +504,7 @@ if CLIENT then
 
         --;; HP
         do
-            local pos, size = drawBGPanel(0.065,0.15)
+            local pos, size = drawBGPanel(0.065,0.115)
             surface.SetFont("CMBFontDefault")
             local bloodcount = math.Round(100 * self.organism.blood/5000 , 0)
             local _,txt_size_y = surface.GetTextSize(bloodcount)
@@ -543,7 +543,7 @@ if CLIENT then
 
         --;; Pulse
         do
-            local pos, size = drawBGPanel(0.035,0.25)
+            local pos, size = drawBGPanel(0.035,0.2)
             surface.SetFont("CMBFontSmall")
             local org = self.organism
             if not org or not org.pulse then return end
@@ -580,7 +580,7 @@ if CLIENT then
 
         --;; Stamina
         do
-            local pos, size = drawBGPanel(0.035,0.35)
+            local pos, size = drawBGPanel(0.035,0.27)
             surface.SetFont("CMBFontSmall")
             local org = self.organism
             if not org or not org.stamina then return end
@@ -642,7 +642,7 @@ if CLIENT then
         local wep = self:GetActiveWeapon()
         if IsValid(wep) and wep.Clip1 then
             ammolerp = Lerp(frt,ammolerp,(wep:Clip1() < 0) and 0 or 1)
-            local pos, size = drawBGPanel(0.93,0.15)
+            local pos, size = drawBGPanel(0.945,0.115)
             surface.SetFont("CMBFontDefault")
             local _,txt_size_y = surface.GetTextSize(self:Armor())
             local col_bg = bg_color

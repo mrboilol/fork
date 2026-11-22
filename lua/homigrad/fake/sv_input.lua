@@ -129,6 +129,13 @@ hook.Add("OnPlayerHitGround","fallStun",function(ply,inwater,onfloater,speed)
 				hg.organism.input_list.rlegup(org, 0, fallDmg, dmgInfo)
 				hg.organism.input_list.llegdown(org, 0, fallDmg, dmgInfo)
 				hg.organism.input_list.rlegdown(org, 0, fallDmg, dmgInfo)
+				local SoftTissue = hg.SoftTissue
+				if SoftTissue and SoftTissue.Add and not org.simpleMode then
+					local landing = SoftTissue.Config.fallLanding
+					SoftTissue.Add(org, "brute", "lleg", fallDmg * landing.leg * math.Rand(0.8, 1.2))
+					SoftTissue.Add(org, "brute", "rleg", fallDmg * landing.leg * math.Rand(0.8, 1.2))
+					if speed > landing.torsoSpeed then SoftTissue.Add(org, "brute", "torso", fallDmg * landing.torso) end
+				end
 				if speed > 1100 then
 					hg.organism.input_list.spine1(org, 0, fallDmg * 0.5, dmgInfo)
 					hg.organism.input_list.spine2(org, 0, fallDmg * 0.6, dmgInfo)
