@@ -183,6 +183,10 @@ local Selects = {
         hg.DrawSettings(pp) 
     end},
     {Title = "Appearance", Func = function(luaMenu,pp) hg.CreateApperanceMenu(pp) end},
+    {Title = "Edit HUD", Func = function(luaMenu)
+        luaMenu:Close()
+        timer.Simple(0.3, function() if hg.HudEdit then hg.HudEdit.Open() end end)
+    end},
     {Title = "Return", Func = function(luaMenu) luaMenu:Close() end},
 }
 

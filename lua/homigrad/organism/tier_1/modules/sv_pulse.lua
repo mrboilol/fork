@@ -765,9 +765,9 @@ function hg.organism.StartFibrillation(org, force)
 	org.fibrillationStart = CurTime()
 end
 
-local function maintainSimplifiedCirculation(org, heartbeat, pulse, pressure)
+local function maintainSimplifiedCirculation(org, heartbeat, pulse, pressure, arrest)
 	pressure = pressure or 90
-	org.heartstop = false
+	org.heartstop = arrest and true or false
 	if hg.organism.ClearCardiacArrestMechanicalDecay then hg.organism.ClearCardiacArrestMechanicalDecay(org) end
 	org.heartbeat = heartbeat or 70
 	org.pulse = pulse or 70

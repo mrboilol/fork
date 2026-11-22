@@ -31,6 +31,15 @@ local stackGap = 4
 local boxRadius = 40
 local underlay = 8
 
+local maxEvents = 5
+local eventLife = 12
+local eventFade = 2
+local tagHeadOffset = Vector(0, 0, 14)
+local tagFont = "HomigradFontLarge"
+local eventFont = "HomigradFontMedium"
+local tagGap = 18
+local eventStep = 22
+
 local drawColor = Color(255, 255, 255)
 local bgColor = Color(0, 0, 0, 175)
 local rimColor = Color(255, 255, 255, 60)
@@ -137,24 +146,31 @@ function hg.AddOverheadMessage(ply, text, color, life, fade)
 		ply.HGOverheadChat = list
 	end
 
+	local events = ply.HGEventLog
+	if not istable(events) then
+		events = {}
+		ply.HGEventLog = events
+	end
+
 	local now = CurTime()
-	local last = list[#list]
+	local last = events[#events]
+	text = string.gsub(text, "^%*+", "")
+	text = string.gsub(text, "%*+$", "")
+
 	if last and last.text == text and now - last.born < emoteRepeatWindow then
-		last.die = now + life + fade
+		last.die = now + eventLife
 		return
 	end
 
-	list[#list + 1] = {
+	events[#events + 1] = {
 		text = text,
 		color = Color(color.r, color.g, color.b, 255),
-		emote = true,
 		born = now,
-		die = now + life + fade,
-		fade = fade,
+		die = now + eventLife,
 	}
 
-	while #list > maxMessages do
-		table.remove(list, 1)
+	while #events > maxEvents do
+		table.remove(events, 1)
 	end
 end
 
@@ -279,5 +295,77 @@ hook.Add("PostDrawTranslucentRenderables", "HGOverheadChat", function(depth, sky
 		if ply ~= lply or drawSelf then
 			DrawOverheadChat(ply, eyePos, maxDist)
 		end
+	end
+end)
+
+local tagColor = Color(255, 255, 255)
+local tagOutline = Color(0, 0, 0)
+local eventColor = Color(255, 255, 255)
+
+hook.Add("HUDPaint", "HGTargetTag", function()
+	local lply = LocalPlayer()
+	if not IsValid(lply) or not lply:Alive() then return end
+	if lply.organism and lply.organism.otrub then return end
+	if lply:GetNetVar("disappearance", nil) then return end
+
+	local trace = hg.eyeTrace(lply)
+	if not trace or not trace.Hit then return end
+
+	local ent = trace.Entity
+	if not IsValid(ent) then return end
+
+	local ply = ent:IsPlayer() and ent or (ent:IsRagdoll() and hg.RagdollOwner(ent))
+	if not IsValid(ply) and ent:IsRagdoll() then ply = ent end
+	if not IsValid(ply) then return end
+	if ply.PlayerClassName == "sc_infiltrator" then return end
+	if ply:GetNetVar("disappearance", nil) then return end
+
+	local character = ent:IsRagdoll() and ent or hg.GetCurrentCharacter(ply)
+	if not IsValid(character) then return end
+
+	local name = ply:GetPlayerName()
+	if not isstring(name) or name == "" then return end
+
+	local bone = character:LookupBone("ValveBiped.Bip01_Head1")
+	local matrix = bone and character:GetBoneMatrix(bone)
+	local worldPos = (matrix and matrix:GetTranslation() or character:GetPos()) + tagHeadOffset
+	local screen = worldPos:ToScreen()
+	if not screen.visible then return end
+
+	local pcol = ply.GetPlayerColor and ply:GetPlayerColor()
+	local col = pcol and pcol:ToColor() or tagColor
+	tagColor.r, tagColor.g, tagColor.b, tagColor.a = col.r, col.g, col.b, 255
+
+	local dark = col.r < 50 and col.g < 50 and col.b < 50
+	tagOutline.r, tagOutline.g, tagOutline.b, tagOutline.a = dark and 100 or 0, dark and 100 or 0, dark and 100 or 0, 255
+
+	surface.SetFont(tagFont)
+	local nameW, nameH = surface.GetTextSize(name)
+
+	draw.SimpleTextOutlined(name, tagFont, screen.x, screen.y, tagColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM, 1, tagOutline)
+
+	local events = ply.HGEventLog
+	if not istable(events) or #events == 0 then return end
+
+	local time = CurTime()
+
+	for i = #events, 1, -1 do
+		if time >= events[i].die then
+			table.remove(events, i)
+		end
+	end
+
+	local x = screen.x + nameW / 2 + tagGap
+	local y = screen.y - nameH
+
+	for i = 1, #events do
+		local event = events[i]
+		local alpha = math_Clamp((event.die - time) / eventFade, 0, 1) * math_Clamp((time - event.born) / fadeInTime, 0, 1)
+		local clr = event.color
+
+		eventColor.r, eventColor.g, eventColor.b, eventColor.a = clr.r, clr.g, clr.b, 255 * alpha
+		tagOutline.a = 255 * alpha
+
+		draw.SimpleTextOutlined(event.text, eventFont, x, y + (i - 1) * eventStep, eventColor, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP, 1, tagOutline)
 	end
 end)

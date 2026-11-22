@@ -246,7 +246,6 @@ hg.settings:AddOpt("Blood","hg_blood_sprites", "Blood Sprites (DISABLED FOR EVER
 hg.settings:AddOpt("Blood","abl_gpu", "GPU blood (off = CPU advanced blood)")
 hg.settings:AddOpt("Blood","hg_supercheapblood", "Super cheap blood (old Z-City blood, no CPU/GPU advanced blood)")
 hg.settings:AddOpt("Blood","hg_old_blood", "Old Z-City stains (super cheap blood only)")
-hg.settings:AddOpt("UI","hg_moodles_enabled", "Moodles")
 
 hg.settings:AddOpt("UI","hg_font", "Change Custom Font", false, true)
 

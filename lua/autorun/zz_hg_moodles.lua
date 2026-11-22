@@ -20,7 +20,7 @@ end
 
 HGCustomMoodlesActive = true
 
-local enabled = CreateClientConVar("hg_moodles_enabled", "1", true, false, "fading vitality references")
+local enabled = {GetBool = function() return not hg.MoodlesEnabled or hg.MoodlesEnabled() end}
 local moodle3Icons, appearances, lastLevels = {}, {}, {}
 local moodlePositions = {}
 local hover = {index = nil, scale = 1}
@@ -1330,6 +1330,8 @@ local function drawMoodles()
 	end
 	if not ply:Alive() then
 		clearMoodleDrawState()
+		local simple = GetConVar("hg_simplehealth")
+		if simple and simple:GetInt() > 0 then return end
 		local size = (HUD and HUD.status_effects_size or 62) * uiScale()
 		local edgeMargin = ui(16)
 		local x, y = edgeMargin, ScrH() - edgeMargin - size
@@ -1495,15 +1497,32 @@ local function drawMoodles()
 		moodlePositions[index] = {x = drawX, y = drawY, size = drawSize, effect = effect}
 	end
 
+	if hg.HudEdit and #moodlePositions > 0 then
+		local ox, oy = hg.HudEdit.Offset("moodles")
+		local minX, minY, maxX, maxY = math.huge, math.huge, -math.huge, -math.huge
+		for _, pos in ipairs(moodlePositions) do
+			minX, minY = math.min(minX, pos.x), math.min(minY, pos.y)
+			maxX, maxY = math.max(maxX, pos.x + pos.size), math.max(maxY, pos.y + pos.size)
+		end
+		hg.HudEdit.Rect("moodles", minX + ox, minY + oy, maxX - minX, maxY - minY)
+	end
+
 	if hoveredIndex then drawTooltip(effects[hoveredIndex], moodlePositions[hoveredIndex], mx, my, berserkActive) end
 end
 
 local function drawMoodlesFaded()
+	if not enabled.GetBool() then
+		clearMoodleDrawState()
+		return
+	end
+
 	local alpha = hg.DeathHUDAlpha and hg.DeathHUDAlpha() or 1
 	if alpha <= 0 then return end
 
 	surface.SetAlphaMultiplier(alpha)
+	local pushed = hg.HudEdit and hg.HudEdit.PushOffset("moodles")
 	local ok, err = pcall(drawMoodles)
+	if pushed then hg.HudEdit.PopOffset(pushed) end
 	surface.SetAlphaMultiplier(1)
 	if not ok then ErrorNoHalt(err, "\n") end
 end

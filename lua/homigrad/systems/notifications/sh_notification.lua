@@ -190,7 +190,7 @@ if CLIENT then
 
 	local function ThoughtsInChat()
 		bigChatConVar = bigChatConVar or GetConVar("sv_bigchat")
-		return bigChatConVar and bigChatConVar:GetBool() and IsValid(hg.chat) and hg.chat.AddLine ~= nil
+		return IsValid(hg.chat) and hg.chat.AddLine ~= nil
 	end
 
 	local function PushThoughtLine(thought)
@@ -201,6 +201,7 @@ if CLIENT then
 			hg.chat:UpdateLine(thought.line, elements)
 		else
 			thought.line = hg.chat:AddLine(elements, true)
+			if hg.BigChatHidden and hg.BigChatHidden() and hg.PushChatPopup then hg.PushChatPopup(elements) end
 		end
 	end
 
@@ -331,6 +332,10 @@ if CLIENT then
 	cvars.AddChangeCallback("sv_bigchat", function()
 		ResetThoughts(true)
 	end, "hg_thoughts_bigchat_switch")
+
+	cvars.AddChangeCallback("zchat_hidebig", function()
+		ResetThoughts(true)
+	end, "hg_thoughts_hidebig_switch")
 
 	hook.Add("Player_Death","removeNotifications",function(ply)
 		if ply != lply then return end
@@ -805,6 +810,7 @@ if CLIENT then
 		if not hg_newthoughts:GetBool() then return end
 		if #hg.thoughts == 0 then return end
 		if not lply:Alive() then hg.thoughts = {} return end
+		if IsValid(hg.chat) then return end
 
 		local time = CurTime()
 		local org = LocalPlayer().organism
@@ -814,7 +820,17 @@ if CLIENT then
 		local uiScale = hg.UIScale and hg.UIScale() or 1
 		local baseY = ScrH() - 270 * uiScale
 		local rowStep = 32 * uiScale
+		local riseOnFade = 48 * uiScale
 		local centerX = ScrW() / 2
+		local hidden = hg.BigChatHidden and hg.BigChatHidden() and hg.HiddenChatAnchor
+		local hiddenRight, hiddenBottom, hiddenOffset
+		if hidden then hiddenRight, hiddenBottom, hiddenOffset = hg.HiddenChatAnchor() end
+		if org then
+			local painSeverity = math.Clamp((tonumber(org.pain) or 0) / 90, 0, 1)
+			instability = math.max(instability, painSeverity)
+			shake = GetThoughtShake(instability)
+			redness = GetThoughtRedness(instability)
+		end
 
 		for i = #hg.thoughts, 1, -1 do
 			local thought = hg.thoughts[i]
@@ -822,14 +838,19 @@ if CLIENT then
 			local fadeOut = thought.finishedAt and math.Clamp((THOUGHT_HOLD + THOUGHT_FADE - (time - thought.finishedAt)) / THOUGHT_FADE, 0, 1) or 1
 			local alpha = math.min(fadeIn, fadeOut) * 255
 			local clr = thought.lineColor
-			local y = baseY - (i - 1) * rowStep
+			local y = baseY - (i - 1) * rowStep - (1 - fadeOut) * riseOnFade
+			local alignX, align = centerX, TEXT_ALIGN_CENTER
+			if hidden then
+				alignX, align = hiddenRight, TEXT_ALIGN_RIGHT
+				y = hiddenBottom - hiddenOffset - rowStep * 0.5 - (#hg.thoughts - i) * rowStep - (1 - fadeOut) * riseOnFade
+			end
 
 			thoughtColor.r = Lerp(redness, clr.r, 255)
 			thoughtColor.g = Lerp(redness, clr.g, 25)
 			thoughtColor.b = Lerp(redness, clr.b, 25)
 			thoughtColor.a = alpha
 			thoughtBrown.a = alpha
-			draw.SimpleTextOutlined(thought.typed, "ThoughtFont", centerX + math.Rand(-shake, shake), y + math.Rand(-shake, shake), thoughtColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, thoughtBrown)
+			draw.SimpleTextOutlined(thought.typed, "ThoughtFont", alignX + math.Rand(-shake, shake), y + math.Rand(-shake, shake), thoughtColor, align, TEXT_ALIGN_CENTER, 1, thoughtBrown)
 		end
 	end
 

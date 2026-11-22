@@ -181,7 +181,6 @@ local function UpdateStatus(ply, org, status, levels)
 	StatusMessage(ply, "hggood_" .. status.key, status.recover, GOOD_COLOR)
 end
 
-local OTRUB_REPEAT = 15
 local OTRUB_LINES = {
 	{key = "hgOtrubBreath", text = "You stopped breathing.", clr = Color(255, 120, 120), active = function(org)
 		return org.respiratoryArrest or not org.lungsfunction
@@ -217,7 +216,7 @@ hook.Add("Org Think", "hg/chatlog/otrub-thoughts", function(ply, org)
 		if line.active(org) then
 			if (org.hgOtrubSeen[line.key] or 0) <= now then
 				if hg.OtrubThought(ply, line.text, line.clr) then
-					org.hgOtrubSeen[line.key] = now + OTRUB_REPEAT
+					org.hgOtrubSeen[line.key] = math.huge
 				end
 			end
 		else
@@ -251,4 +250,128 @@ hook.Add("Org Think", "hg/chatlog/status-effects", function(ply, org)
 	for _, status in ipairs(STATUSES) do
 		UpdateStatus(ply, org, status, org.hgStatusLevels)
 	end
+end)
+
+local WAKE_DELAY = 1.5
+
+hook.Add("HG_OnWakeOtrub", "hg/chatlog/wake-good", function(ply)
+	if not IsValid(ply) or not ply:IsPlayer() then return end
+
+	timer.Simple(WAKE_DELAY, function()
+		if not IsValid(ply) or not ply:Alive() then return end
+
+		local org = ply.organism
+		if not org or org.otrub or not ply.Thought then return end
+
+		local needsSuture = hg.Suture and hg.Suture.HasOptions and hg.Suture.HasOptions(ply)
+		if not needsSuture then
+			StatusMessage(ply, "hggood_wake_suture", "You woke up. There is nothing to suture.", GOOD_COLOR)
+
+			return
+		end
+
+		if (tonumber(org.pain) or 0) < 15 and (tonumber(org.bleed) or 0) < 0.3 then
+			StatusMessage(ply, "hggood_wake_calm", "You woke up. You are not in much pain.", GOOD_COLOR)
+		end
+	end)
+end)
+
+local INSPECT_DURATION = 2
+local INSPECT_COLOR = Color(225, 225, 225)
+local INSPECT_GOOD = Color(120, 175, 255)
+
+local function InspectLines(ply, org)
+	local lines = {}
+	local function add(text) lines[#lines + 1] = text end
+
+	for _, injury in ipairs(ChatLog.Injuries) do
+		if injury.check(org) then add("Your " .. injury.text .. ".") end
+	end
+
+	for _, limb in ipairs({"lleg", "rleg", "larm", "rarm"}) do
+		local name = (string.sub(limb, 1, 1) == "l" and "left " or "right ") .. (string.sub(limb, 2) == "leg" and "leg" or "arm")
+		if org[limb .. "amputated"] then
+			add("Your " .. name .. " is gone.")
+		elseif hg.IsLimbIncapacitated and hg.IsLimbIncapacitated(org, limb) then
+			add("Your " .. name .. " is useless.")
+		elseif org[limb .. "dislocation"] or org[limb .. "_up_disl"] or org[limb .. "_down_disl"] then
+			add("Your " .. name .. " is out of place.")
+		elseif hg.IsLimbFractured and hg.IsLimbFractured(org, limb) then
+			add("Your " .. name .. " is broken.")
+		end
+	end
+
+	if org.headamputated then add("Your head is gone.") end
+
+	local teeth = tonumber(org.teethLost) or 0
+	if teeth >= 32 then add("You have no teeth left.") elseif teeth > 0 then add("You are missing " .. teeth .. (teeth == 1 and " tooth." or " teeth.")) end
+
+	local bleed = tonumber(org.bleed) or 0
+	if bleed > 5 then add("You are bleeding heavily.") elseif bleed > 1 then add("You are bleeding.") elseif bleed > 0.3 then add("You are bleeding a little.") end
+
+	local arterial = istable(ply.arterialwounds) and #ply.arterialwounds or 0
+	if arterial > 0 then add("Blood is pulsing out of you.") end
+
+	local wounds = istable(ply.wounds) and #ply.wounds or 0
+	if wounds > 0 then add("You have " .. wounds .. (wounds == 1 and " open wound." or " open wounds.")) end
+
+	local blood = tonumber(org.blood) or 5000
+	if blood < 2600 then add("You are about to pass out from blood loss.")
+	elseif blood < 3300 then add("You feel very weak.")
+	elseif blood < 4000 then add("You feel lightheaded.") end
+
+	local pain = tonumber(org.pain) or 0
+	if org.nearpainlimit or pain > 85 then add("The pain is unbearable.")
+	elseif pain > 60 then add("You are in severe pain.")
+	elseif pain > 30 then add("You are in pain.")
+	elseif pain > 10 then add("You ache.") end
+
+	if (tonumber(org.shock) or 0) > 40 then add("You feel cold and clammy, like you are going into shock.") end
+
+	local o2 = OxygenLevel(org)
+	if o2 < 8 then add("You are suffocating.") elseif o2 < 15 then add("You are short of breath.") end
+
+	local co2 = tonumber(org.co2) or 0
+	if co2 > 22 then add("Your head pounds and you can barely stay awake from the stale air in your lungs.")
+	elseif co2 > 14 then add("Your head pounds and you feel dizzy.") end
+
+	if (tonumber(org.consciousness) or 1) < 0.65 then add("Your vision swims and you struggle to stay conscious.") end
+
+	local temperature = tonumber(org.temperature) or 36.6
+	if temperature < 33 then add("You are shivering uncontrollably.") elseif temperature < 35 then add("You are freezing.") elseif temperature > 38.5 then add("You are burning up.") end
+
+	return lines
+end
+
+concommand.Add("hg_inspect_self", function(ply)
+	if not IsValid(ply) or not ply:Alive() then return end
+
+	local org = ply.organism
+	if not org or org.otrub then return end
+	if (ply.hgInspectUntil or 0) > CurTime() then return end
+
+	local wep = ply:GetActiveWeapon()
+	if not IsValid(wep) or not wep.GetBlocking then return end
+
+	ply.hgInspectUntil = CurTime() + INSPECT_DURATION
+	wep.ForceBlockUntil = CurTime() + INSPECT_DURATION
+
+	timer.Simple(INSPECT_DURATION, function()
+		if not IsValid(ply) or not ply:Alive() then return end
+
+		local current = ply.organism
+		if not current or current.otrub then return end
+
+		local lines = InspectLines(ply, current)
+		ply:zChatPrint(INSPECT_COLOR, "You check yourself over.")
+		if #lines == 0 then
+			ply:zChatPrint(INSPECT_GOOD, "You seem fine.")
+
+			return
+		end
+
+		for _, line in ipairs(lines) do
+			ply:zChatPrint(INSPECT_COLOR, line)
+		end
+	end)
 end)

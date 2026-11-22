@@ -1938,7 +1938,9 @@ else
 		end
 
 		model:SetColor(color)
+		render.SetColorModulation(color.r / 255, color.g / 255, color.b / 255)
 		model:DrawModel()
+		render.SetColorModulation(1, 1, 1)
 	end
 
 	hg.SPLINT_BANDAGE_COLOR = Color(255, 130, 20)
@@ -2023,7 +2025,7 @@ else
 			if isHidden(bone) then colored[bone] = nil end
 		end
 		if next(colored) then
-			DrawBandagePass(model, groups, colored, Color(coloredTint.r, coloredTint.g, coloredTint.b))
+			DrawBandagePass(model, groups, colored, Color(coloredTint.r or coloredTint[1], coloredTint.g or coloredTint[2], coloredTint.b or coloredTint[3]))
 		end
 
 		for bone, drawBone in pairs(splinted) do

@@ -589,6 +589,26 @@ local function DrawRadialItemDescription(option, itemX, itemY, directionX, iconS
 	end
 end
 
+local function DrawRadialIdentity(scrW, scrH, viewLerp)
+	local centerX = scrW * 0.5
+	local nameY = scrH * (0.035 - 0.02 * (1 - viewLerp))
+	local roleY = nameY + scrH * 0.052
+	local name = lply:GetPlayerName()
+	local role = (lply.role and lply.role.name) or ""
+	local alpha = 255 * viewLerp
+	local shadow = Color(colBack.r, colBack.g, colBack.b, alpha)
+
+	draw.SimpleText(name, "HomigradFontGigantoNormous", centerX + 2, nameY + 2, shadow, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+	draw.SimpleText(role, "HomigradFontGigantoNormous", centerX + 2, roleY + 2, shadow, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+
+	local col = lply:GetPlayerColor():ToColor()
+	col.a = alpha
+	draw.SimpleText(name, "HomigradFontGigantoNormous", centerX, nameY, col, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+
+	local roleColor = lply.role and lply.role.color or incoentCol
+	draw.SimpleText(role, "HomigradFontGigantoNormous", centerX, roleY, Color(roleColor.r, roleColor.g, roleColor.b, alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+end
+
 local function CreateRadialMenu(options_arg, bAutoClose)
 	local sizeX, sizeY = ScrW(), ScrH()
 	hg.radialOptions = {}
@@ -689,7 +709,7 @@ local function CreateRadialMenu(options_arg, bAutoClose)
 
 			for num, option in ipairs(options) do
 				local oldNum = num - 1
-				local r = (options_arg ~= nil and 432 or 486) * (hg.UIScale and hg.UIScale() or 1) * viewLerp
+				local r = (options_arg ~= nil and 392 or 440) * (hg.UIScale and hg.UIScale() or 1) * viewLerp
 				isMouseOnRadial = distance <= r and distance > 4
 				isMouseIntersecting = isMouseOnRadial and deg > oldNum * partDeg and deg < (oldNum + 1) * partDeg
 				if isMouseIntersecting then current_option = oldNum + 1 end
@@ -775,12 +795,7 @@ local function CreateRadialMenu(options_arg, bAutoClose)
 			end
 
 			if !paining then
-				draw.SimpleText(lply:GetPlayerName(),"HomigradFontGigantoNormous",scrW * 0.0215* viewLerp,scrH * 0.042, colBack, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-				draw.SimpleText( ( (lply.role and lply.role.name) or ""),"HomigradFontGigantoNormous" ,scrW * 0.0215 * viewLerp,scrH * 0.098, colBack, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-
-				local col = lply:GetPlayerColor():ToColor()
-				draw.SimpleText(lply:GetPlayerName(),"HomigradFontGigantoNormous",scrW * 0.02 * viewLerp,scrH * 0.04, col, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-				draw.SimpleText( ( (lply.role and lply.role.name) or ""),"HomigradFontGigantoNormous" ,scrW * 0.02 * viewLerp,scrH * 0.095, lply.role and lply.role.color or incoentCol, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+				DrawRadialIdentity(scrW, scrH, viewLerp)
 			end
 
 			return
@@ -822,8 +837,9 @@ local function CreateRadialMenu(options_arg, bAutoClose)
 
 		DrawFilledCircle(centerX, centerY, outerRadius, radialDrawSegments, Color(radialRingColor.r, radialRingColor.g, radialRingColor.b, radialRingColor.a * viewLerp))
 		local outlineWidth = 1.75 * modernHudScale * viewLerp
-		DrawCircleRing(centerX, centerY, outerRadius, outerRadius + outlineWidth, radialDrawSegments, Color(radialOutlineColor.r, radialOutlineColor.g, radialOutlineColor.b, radialOutlineColor.a * viewLerp))
-		DrawCircleRing(centerX, centerY, innerRadius - outlineWidth, innerRadius, radialDrawSegments, Color(radialOutlineColor.r, radialOutlineColor.g, radialOutlineColor.b, radialOutlineColor.a * viewLerp))
+		local plyColor = lply:GetPlayerColor():ToColor()
+		DrawCircleRing(centerX, centerY, outerRadius, outerRadius + outlineWidth, radialDrawSegments, Color(plyColor.r, plyColor.g, plyColor.b, radialOutlineColor.a * viewLerp))
+		DrawCircleRing(centerX, centerY, innerRadius - outlineWidth, innerRadius, radialDrawSegments, Color(plyColor.r, plyColor.g, plyColor.b, radialOutlineColor.a * viewLerp))
 
 		local hoveredText = nil
 
@@ -864,13 +880,11 @@ local function CreateRadialMenu(options_arg, bAutoClose)
 		if hoveredText then
 			DrawModernRadialCenterText(hoveredText, centerX, centerY, innerRadius * radialCenterTextWidthMul, Color(radialTextColor.r, radialTextColor.g, radialTextColor.b, 255 * radialCenterTextAlpha * viewLerp))
 		end
+		if !paining and radialCenterTextAlpha < 0.99 then
+			DrawModernRadialCenterText(lply:GetPlayerName(), centerX, centerY, innerRadius * radialCenterTextWidthMul, Color(plyColor.r, plyColor.g, plyColor.b, 255 * (1 - radialCenterTextAlpha) * viewLerp))
+		end
 		if !paining then
-			draw.SimpleText(lply:GetPlayerName(),"HomigradFontGigantoNormous",scrW * 0.0215* viewLerp,scrH * 0.042, colBack, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-			draw.SimpleText( ( (lply.role and lply.role.name) or ""),"HomigradFontGigantoNormous" ,scrW * 0.0215 * viewLerp,scrH * 0.098, colBack, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-
-			local col = lply:GetPlayerColor():ToColor()
-			draw.SimpleText(lply:GetPlayerName(),"HomigradFontGigantoNormous",scrW * 0.02 * viewLerp,scrH * 0.04, col, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-			draw.SimpleText( ( (lply.role and lply.role.name) or ""),"HomigradFontGigantoNormous" ,scrW * 0.02 * viewLerp,scrH * 0.095, lply.role and lply.role.color or incoentCol, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+			DrawRadialIdentity(scrW, scrH, viewLerp)
 		end
 	end
 end
@@ -1002,6 +1016,29 @@ hook.Add("radialOptions", "77", function()
 	end
 end)
 
+local inspectLatch = false
+
+hook.Add("radialOptions", "inspect_self", function()
+	local ply = lply
+	if not IsValid(ply) or not ply:Alive() then inspectLatch = false return end
+
+	local wep = ply:GetActiveWeapon()
+	local blocking = IsValid(wep) and wep.GetBlocking and wep:GetBlocking()
+	if blocking then
+		inspectLatch = true
+	elseif not IsValid(MENUPANELHUYHUY) then
+		inspectLatch = false
+	end
+
+	if not inspectLatch or (ply.organism and ply.organism.otrub) then return end
+
+	hg.radialOptions[#hg.radialOptions + 1] = {
+		function() RunConsoleCommand("hg_inspect_self") end,
+		"Inspect",
+		description = "Check yourself over. You hold a guard for a moment, then your injuries and symptoms are listed."
+	}
+end)
+
 local randomGestures = {
 	{"hello", function() RunConsoleCommand("hg_hand_gesture", "hello") end},
 	{"acknowledge", function() RunConsoleCommand("hg_hand_gesture", "acknowledge") end},
@@ -1104,36 +1141,6 @@ end
 	--local i = 1
 	--CopyRight("ЖДИ ДОКС ЖДИ СВАТ","HomigradFontBig",ScrW()/2 +(math.cos(CurTime()*1)*15*i),ScrH()/2+(math.sin(CurTime()*1)*55*i)+15,Color(255,255,255),math.cos(CurTime()*1)*1,2+math.sin(CurTime()*1)*0.5)
 --end)
-
-hook.Add("HUDPaint","Identifier",function()
-	if lply.organism and lply.organism.otrub then return end
-	if !lply:Alive() then return end
-	if lply:GetNetVar("disappearance", nil) then return end 
-	
-	local trace = hg.eyeTrace(lply)
-	
-	if not trace then return end
-
-	local Size = math.max(math.min(1 - trace.Fraction, 1), 0.1)
-	local x, y = trace.HitPos:ToScreen().x, trace.HitPos:ToScreen().y
-
-	if trace.Hit and (trace.Entity:IsRagdoll() or trace.Entity:IsPlayer()) then
-		if trace.Entity.PlayerClassName == "sc_infiltrator" then return end
-		if trace.Entity:GetNetVar("disappearance", nil) then return end
-
-		draw.NoTexture()
-
-		local col = trace.Entity:GetPlayerColor():ToColor()
-		col.a = 255 * Size * 1.5
-
-		local coloutline = (col.r < 50 and col.g < 50 and col.b < 50) and Color(100,100,100) or Color(0,0,0)
-		coloutline.a = 255 * Size * 1
-
-		draw.DrawText(trace.Entity:GetPlayerName() or "", "HomigradFontLarge", x + 1, y + 31, coloutline, TEXT_ALIGN_CENTER)
-
-		draw.DrawText(trace.Entity:GetPlayerName() or "", "HomigradFontLarge", x, y + 30, col, TEXT_ALIGN_CENTER)
-	end
-end)
 
 --sound.PlayURL("https://cdn.discordapp.com/attachments/1254022273661145108/1257385761414582382/pon_pon_016eb317d_1.mp4?ex=66882bbe&is=6686da3e&hm=429f0e4427bdc9d80673d3bfa2eccf48221ae5572ec508fb7699274c2c7041ef&","",function() end)
 

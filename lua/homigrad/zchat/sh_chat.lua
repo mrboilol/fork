@@ -16,17 +16,51 @@ end
 RegisterZChatConVar("zchat_maxmessagelength", 256, "Maximum message length allowed", 32, 512, "number", 0)
 local maxLength = CreateConVar("zchat_maxmessagelength", "256", {FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED}, "Maximum message length allowed")
 CreateConVar("sv_bigchat", "1", {FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED}, "1 - big SS13-style zchat on the right, 0 - normal zchat", 0, 1)
+CreateConVar("sv_moodles", "1", {FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED}, "1 - moodles enabled for everyone", 0, 1)
+CreateConVar("sv_subrosa", "1", {FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED}, "1 - sub rosa body status hud enabled for everyone", 0, 1)
+
+local hudConVars = {}
+
+local function HudConVarOn(name)
+	local cvar = hudConVars[name] or GetConVar(name)
+	if not cvar then return true end
+	hudConVars[name] = cvar
+
+	return cvar:GetBool()
+end
+
+function hg.MoodlesEnabled() return HudConVarOn("sv_moodles") end
+function hg.SubRosaEnabled() return HudConVarOn("sv_subrosa") end
+function hg.BigChatEnabled() return HudConVarOn("sv_bigchat") end
+function hg.ChatOnLeft() return hg.BigChatEnabled() and not hg.MoodlesEnabled() and not hg.SubRosaEnabled() end
 
 if CLIENT then
 	RegisterZChatConVar("zchat_fontsize", 9, "Font scale", 3, 60, "number", 0)
 	RegisterZChatConVar("zchat_font", "Lora", "Font name", nil, nil, "string", 0)
 	RegisterZChatConVar("zchat_fontaa", 1, "Font anti-aliasing", 0, 1, "bool", 0)
 	RegisterZChatConVar("zchat_fontweight", 1000, "Font weight", 0, 1000, "number", 0)
+	RegisterZChatConVar("zchat_hidebig", 0, "Hide the big chat box, new thoughts and actions pop up on screen instead", 0, 1, "bool", 0)
 
 	local fontSize = CreateClientConVar("zchat_fontsize", 9, true, false, "Self explanatory", 3, 60)
 	local fontName = CreateClientConVar("zchat_font", "Lora", true, false, "Self explanatory, should be available to GMod")
 	local fontAA = CreateClientConVar("zchat_fontaa", 1, true, false, "Font anti-aliasing", 0, 1)
 	local fontWeight = CreateClientConVar("zchat_fontweight", 1000, true, false, "Font weight", 0, 1000)
+	local hideBig = CreateClientConVar("zchat_hidebig", 0, true, false, "Hide the big chat box, new thoughts and actions pop up on screen instead", 0, 1)
+
+	function hg.BigChatHidden()
+		if not hg.BigChatEnabled() then return false end
+		if hideBig:GetBool() then return true end
+
+		local ply = LocalPlayer()
+		if not IsValid(ply) or not ply:Alive() then return false end
+
+		local simple = GetConVar("hg_simplehealth")
+		if not simple or simple:GetInt() <= 0 then return false end
+
+		local org = ply.new_organism or ply.organism
+
+		return istable(org) and org.ecgState == "asystole"
+	end
 
 	if fontName:GetString() == "VCR OSD Mono" then
 		RunConsoleCommand("zchat_font", "Lora")

@@ -219,7 +219,13 @@ SimpleHealth.ModuleOverrides.pulse = function(owner, org, timeValue)
 	local output = state.fibrillating and 0 or math.min(rate / heartConfig.base, 1) * fastPenalty * heartEfficiency
 
 	local brainBefore = org.brain
-	organism.MaintainSimplifiedCirculation(org, rate, state.fibrillating and 0 or rate * fastPenalty * heartEfficiency, heartConfig.pressure * output)
+	local arrest = state.flatline or state.fibrillating
+	local o2 = org.o2
+	if arrest and istable(o2) and isnumber(o2.range) and o2.range > 0 then
+		o2[1] = math.max(o2.range * (1 - state.oxy / CONFIG.oxy.countdownStart), 0)
+	end
+	organism.MaintainSimplifiedCirculation(org, rate, state.fibrillating and 0 or rate * fastPenalty * heartEfficiency, heartConfig.pressure * output, arrest)
+	if arrest then SimpleHealth.ClearRemovedVitals(org) end
 	org.brain = brainBefore
 	org.cardiacOutput = output
 	org.strokeVolume = output / math.max(rate / heartConfig.base, 0.1)
@@ -525,7 +531,7 @@ local function updateCrit(org, state)
 	local softCritFree = state.crit == CRIT_SOFT and state.health < 15
 	if state.crit >= CRIT_SOFT and not softCritFree then org.needfake = true end
 	local healthDrained = healthCrit == CRIT_HARD and state.consciousnessCap <= CONFIG.consciousness.hardCritFloor + 0.005
-	if state.flatline or state.fibrillating or healthDrained then org.needotrub = true end
+	if healthDrained then org.needotrub = true end
 
 	if state.crit ~= previous then
 		hook.Run("hg/simplehealth/crit-changed", org.owner, org, state.crit, previous)

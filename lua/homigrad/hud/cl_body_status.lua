@@ -1,4 +1,4 @@
-local enabled = CreateClientConVar("hg_subrosa", "1", true, false, "sub rosa hud")
+local enabled = {GetBool = function() return not hg.SubRosaEnabled or hg.SubRosaEnabled() end}
 
 local IsValid = IsValid
 local CurTime = CurTime
@@ -56,7 +56,7 @@ local organDamage = {
 	brain = 0, brainFrontal = 0, brainParietal = 0, brainTemporal = 0, brainOccipital = 0,
 	heart = 0, trachea = 0, lungsL = 0, lungsR = 0,
 }
-local bleedLevel, tourniquet, bandage, stress = {}, {}, {}, {}
+local bleedLevel, tourniquet, stress = {}, {}, {}
 local splint = {}
 local regionBleed, regionArterial = {}, {}
 local nextMedicalUpdate = 0
@@ -138,7 +138,6 @@ local function resolveWoundRegion(bone)
 end
 
 local focus = {frame = -10}
-local bandageTint = {}
 
 local function lookupNamedBone(ent, cache, bone)
 	if isnumber(bone) then return bone end
@@ -575,25 +574,6 @@ local function readWearable(ent, field, netKey)
 	if istable(state) and next(state) then return state end
 end
 
-local function updateBandages(ply, body)
-	local owner = body
-	local limbs = readWearable(body, "bandaged_limbs", "bandaged_limbs")
-	if not limbs and body ~= ply then
-		owner = ply
-		limbs = readWearable(ply, "bandaged_limbs", "bandaged_limbs")
-	end
-	if not limbs then return end
-
-	local soak = istable(owner.bandagesSoak) and owner.bandagesSoak or nil
-	for bone, state in pairs(limbs) do
-		local region = resolveWoundRegion(bone)
-		if region then
-			bandage[region] = math.max(bandage[region] or 0, soak and tonumber(soak[bone]) or 0)
-			if istable(state) and istable(state.color) then bandageTint[region] = state.color end
-		end
-	end
-end
-
 local function updateSplints(ply, body)
 	local owner = body
 	local bones = readWearable(body, "splints", "Splints")
@@ -648,8 +628,6 @@ local function clearMedicalState()
 	for _, region in ipairs(K.REGIONS) do
 		severity[region], bleedLevel[region] = 0, 0
 		broken[region], arterial[region], missing[region], tourniquet[region] = false, false, false, false
-		bandage[region] = nil
-		bandageTint[region] = nil
 		splint[region] = nil
 		tissue[region] = nil
 	end
@@ -669,14 +647,13 @@ local function updateMedicalState(ply, body)
 	local source = ply:Alive() and ply or body
 	collectWounds(org, source.wounds, source.arterialwounds)
 	updateTorsoState(org)
-	updateOrganState(org)
 	for _, limb in ipairs(K.LIMBS) do
 		updateLimbState(org, limb)
 	end
-	updateBandages(ply, body)
 	updateSplints(ply, body)
 	for region, limb in pairs(K.TISSUE_REGIONS) do
-		tissue[region] = combine(hg.SoftTissue.GetLimb(org, limb) / K.SHAPE.TISSUE_FULL, hg.SoftTissue.GetMuscle(org, limb))
+		local damage = combine(hg.SoftTissue.GetLimb(org, limb) / K.SHAPE.TISSUE_FULL, hg.SoftTissue.GetMuscle(org, limb))
+		tissue[region] = damage > 0 and damage or nil
 	end
 
 	pulseHz = math_Clamp((tonumber(org.pulse) or K.DEFAULT_PULSE) / K.SECONDS_PER_MINUTE, 0.5, 3)
@@ -905,23 +882,32 @@ local function boneRod(region, inner)
 	return math.max(inner * fraction, 1)
 end
 
-local function drawSplit(shape, x, y, outer, inner)
+local function splitAngle(shape, x, y)
 	local towardX = centerX + shape.sx * pixelScale - x
 	local towardY = centerY - (shape.sz - targetZ) * pixelScale - y
-	local angle = math_atan2(towardY, towardX)
+
+	return math_atan2(towardY, towardX)
+end
+
+local function drawSplitTissue(shape, x, y, inner)
+	local angle = splitAngle(shape, x, y)
 	if (tissue[shape.region] or 0) > 0 then
 		setDrawColor(healthColor(shape.region, tissue[shape.region]))
 		polyHalfCircle(x, y, inner, angle + math.pi * 0.5)
-	end
-	if (severity[shape.region] or 0) > 0 then
-		setDrawColor(healthColor(shape.region))
-		polyHalfCircle(x, y, boneRod(shape.region, inner), angle + math.pi * 0.5)
 	end
 	if (tissue[shape.splitRegion] or 0) > 0 then
 		setDrawColor(healthColor(shape.splitRegion, tissue[shape.splitRegion]))
 		polyHalfCircle(x, y, inner, angle - math.pi * 0.5)
 	end
-	if (severity[shape.splitRegion] or 0) > 0 then
+end
+
+local function drawSplit(shape, x, y, outer, inner)
+	local angle = splitAngle(shape, x, y)
+	if broken[shape.region] then
+		setDrawColor(healthColor(shape.region))
+		polyHalfCircle(x, y, boneRod(shape.region, inner), angle + math.pi * 0.5)
+	end
+	if broken[shape.splitRegion] then
 		setDrawColor(healthColor(shape.splitRegion))
 		polyHalfCircle(x, y, boneRod(shape.splitRegion, inner), angle - math.pi * 0.5)
 	end
@@ -938,15 +924,6 @@ end
 
 local function drawShapeExtras(shape, ax, ay, bx, by, r)
 	local region = shape.region
-	local soak = bandage[region]
-	if soak then
-		local horizontal = region == "chest" or region == "pelvis"
-		local tint = bandageTint[region]
-		local clean = tint and {tint.r or tint[1], tint.g or tint[2], tint.b or tint[3]} or K.COLOR.BANDAGE_CLEAN
-		local red, green, blue = lerpColor(clean, K.COLOR.BANDAGE_SOAKED, math_Clamp(soak, 0, 1))
-		drawStrap(ax, ay, bx, by, r, 0.5, red, green, blue, horizontal)
-	end
-
 	local durability = splint[region]
 	if durability then
 		local red, green, blue = lerpColor(K.COLOR.SPLINT_WORN, K.COLOR.SPLINT_NEW, math_Clamp(durability, 0, 1))
@@ -963,7 +940,7 @@ end
 local wasAlive = true
 local deathShakeEnd = 0
 
-local function drawShape(shape)
+local function placeShape(shape)
 	local ax = centerX + shape.ax * pixelScale
 	local ay = centerY - (shape.az - targetZ) * pixelScale
 	local bx = centerX + shape.bx * pixelScale
@@ -977,18 +954,34 @@ local function drawShape(shape)
 		ax, ay, bx, by = ax + jx, ay + jy, bx + jx, by + jy
 	end
 
+	shape.px, shape.py, shape.qx, shape.qy, shape.pr = ax, ay, bx, by, r
+end
+
+local function drawShapeTissue(shape)
+	placeShape(shape)
+	local ax, ay, bx, by = shape.px, shape.py, shape.qx, shape.qy
+	local inner = math.max(shape.pr - outlineWidth, 1)
+	if shape.splitRegion then
+		drawSplitTissue(shape, ax, ay, inner)
+		return
+	end
+
+	local soft = tissue[shape.region]
+	if (soft or 0) > 0 then
+		setDrawColor(healthColor(shape.region, soft))
+		polyCapsule(ax, ay, bx, by, inner)
+	end
+end
+
+local function drawShapeBone(shape)
+	local ax, ay, bx, by, r = shape.px, shape.py, shape.qx, shape.qy, shape.pr
 	local inner = math.max(r - outlineWidth, 1)
 	if shape.splitRegion then
 		drawSplit(shape, ax, ay, r, inner)
 	else
-		local soft = tissue[shape.region]
-		if (soft or 0) > 0 then
-			setDrawColor(healthColor(shape.region, soft))
-			polyCapsule(ax, ay, bx, by, inner)
-		end
-		if (severity[shape.region] or 0) > 0 then
+		if broken[shape.region] then
 			setDrawColor(healthColor(shape.region))
-			polyCapsule(ax, ay, bx, by, soft and boneRod(shape.region, inner) or inner)
+			polyCapsule(ax, ay, bx, by, tissue[shape.region] and boneRod(shape.region, inner) or inner)
 		end
 		local red, green, blue = ringColor(shape.region)
 		setDrawColor(red, green, blue, K.OUTLINE_ALPHA)
@@ -1001,7 +994,10 @@ end
 local function drawCircles()
 	table.sort(circleOrder, farthestFirst)
 	for i = 1, circleCount do
-		drawShape(circles[circleOrder[i]])
+		drawShapeTissue(circles[circleOrder[i]])
+	end
+	for i = 1, circleCount do
+		drawShapeBone(circles[circleOrder[i]])
 	end
 end
 
@@ -1322,7 +1318,20 @@ local function renderFigure()
 	outlineWidth = math.max(K.SHAPE.OUTLINE_WIDTH * ScrH() / K.REFERENCE_SCREEN_HEIGHT, 1)
 	centerX = focus.active and focus.x or ScrH() * K.CFG.PANEL_MARGIN_FRACTION + size * 0.5
 	centerY = focus.active and focus.y or ScrH() * 0.5
+	if not focus.active and hg.MoodlesEnabled and not hg.MoodlesEnabled() then
+		local face = hg.SimpleHealth and hg.SimpleHealth.Config.face
+		local faceSize = ScrH() * (face and face.size or 0.075)
+		local margin = ScrH() * (face and face.y or 0.012)
+		centerX = ScrW() * 0.5
+		centerY = ScrH() - margin * 2 - faceSize - size * 0.5
+	end
 	targetZ = K.CFG.TARGET_HEIGHT * K.DISPLAY_SPINE
+
+	if not focus.active and hg.HudEdit then
+		local ox, oy = hg.HudEdit.Offset("subrosa")
+		centerX, centerY = centerX + ox, centerY + oy
+		hg.HudEdit.Rect("subrosa", centerX - size * 0.5, centerY - size * 0.5, size, size)
+	end
 
 	if focus.active and focus.shake > 0 then
 		local now = CurTime()
@@ -1338,7 +1347,31 @@ local function renderFigure()
 
 	drawDislocations()
 	drawArmor()
-	drawOrgans()
+end
+
+local idleProxy
+
+local function getIdleProxy(model)
+	if not isstring(model) or model == "" then return end
+
+	if not IsValid(idleProxy) or idleProxy:GetModel() ~= model then
+		if IsValid(idleProxy) then idleProxy:Remove() end
+		idleProxy = ClientsideModel(model, RENDERGROUP_OTHER)
+		if not IsValid(idleProxy) then return end
+		idleProxy:SetNoDraw(true)
+		idleProxy:SetPos(vector_origin)
+		idleProxy:SetAngles(angle_zero)
+		local sequence = idleProxy:LookupSequence("idle_all_01")
+		if not sequence or sequence < 0 then sequence = idleProxy:LookupSequence("idle_all") end
+		if not sequence or sequence < 0 then sequence = idleProxy:SelectWeightedSequence(ACT_HL2MP_IDLE) end
+		if not sequence or sequence < 0 then sequence = 0 end
+		idleProxy:ResetSequence(sequence)
+		idleProxy:SetCycle(0)
+		idleProxy:SetPlaybackRate(0)
+	end
+	idleProxy:SetupBones()
+
+	return idleProxy
 end
 
 local function drawBodyStatus(subject)
@@ -1349,14 +1382,20 @@ local function drawBodyStatus(subject)
 
 	local ply = subject or LocalPlayer()
 	local body = getBodyEntity(ply)
-	trackedBody = body
+	trackedBody = not focus.active and body or nil
 	if not IsValid(body) or body:IsDormant() then return end
 	woundSource = ply:Alive() and ply or body
 
 	local now = CurTime()
 	local snap = body ~= lastBody or now - lastDrawTime > K.CFG.SNAP_AFTER_HIDDEN
 	if snap then smoothValid[K.POINT.PELVIS] = false end
-	if captureBody ~= body or captureFrame ~= FrameNumber() then captureBones(body) end
+	if focus.active then
+		local proxy = getIdleProxy(body:GetModel())
+		if not proxy then return end
+		captureBones(proxy)
+	elseif captureBody ~= body or captureFrame ~= FrameNumber() then
+		captureBones(body)
+	end
 	if updatePose(snap) then lastBody = body end
 	lastDrawTime = now
 	if not smoothValid[K.POINT.PELVIS] then return end
@@ -1366,7 +1405,7 @@ local function drawBodyStatus(subject)
 		collectArmorBoxes(ply, body)
 		nextMedicalUpdate = now + K.CFG.MEDICAL_UPDATE_INTERVAL
 	end
-	updateStress(body ~= ply and body:IsRagdoll(), snap)
+	updateStress(not focus.active and body ~= ply and body:IsRagdoll(), snap)
 
 	updateDisplayState(ply)
 	if displayFade < 0.01 then return end
@@ -1393,6 +1432,10 @@ function hg.BodyStatus.DrawOther(subject, x, y, scale, alpha)
 end
 
 hook.Add("HUDPaint", "homigrad/body-status/draw", function()
+	if not enabled.GetBool() then
+		trackedBody = nil
+		return
+	end
 	if FrameNumber() - focus.frame <= 2 then return end
 	local alive = LocalPlayer():Alive()
 	if wasAlive and not alive then deathShakeEnd = CurTime() + 0.6 end

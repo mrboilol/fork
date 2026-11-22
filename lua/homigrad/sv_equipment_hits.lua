@@ -1466,6 +1466,7 @@ local function TraceHeldWeaponShot(startPos, endPos, shooter, damage, force, ori
                 info:SetDamageType(shot.DamageType or DMG_CLUB)
                 hg.Appearance.TryAbsorbAccessoryImpact(hit.body, info, hit.position, direction * (force or damage), hit)
                 contactScale = info:GetDamage() / math.max(damage, 0.001)
+                if not GetConVar("hg_hatprotect"):GetBool() then continue end
             end
 
             if (hit.armor or not hit.weapon and not hit.heldEntity) and TraceReachesEquipmentWearer(originalTrace, hit) and not (armorResult and armorResult.stopped) then

@@ -69,36 +69,6 @@ hook.Add("HUDPaint", "homigrad-dev", function()
 	w, h = ScrW(), ScrH()
 end)
 
-hook.Add("HUDPaint", "Identifier", function()
-	if lply.organism and lply.organism.otrub then return end
-	if !lply:Alive() then return end
-	if lply:GetNetVar("disappearance", nil) then return end
-
-	local trace = hg.eyeTrace(lply)
-
-	if not trace then return end
-
-	local Size = math.max(math.min(1 - trace.Fraction, 1), 0.1)
-	local x, y = trace.HitPos:ToScreen().x, trace.HitPos:ToScreen().y
-
-	if trace.Hit and (trace.Entity:IsRagdoll() or trace.Entity:IsPlayer()) then
-		if trace.Entity.PlayerClassName == "sc_infiltrator" then return end
-		if trace.Entity:GetNetVar("disappearance", nil) then return end
-
-		draw.NoTexture()
-
-		local pcol = trace.Entity.GetPlayerColor and trace.Entity:GetPlayerColor()
-		local col = pcol and pcol:ToColor() or Color(255, 255, 255)
-		col.a = 255 * Size * 1.5
-
-		local coloutline = (col.r < 50 and col.g < 50 and col.b < 50) and Color(100, 100, 100) or Color(0, 0, 0)
-		coloutline.a = 255 * Size * 1
-
-		draw.DrawText(trace.Entity:GetPlayerName() or "", "HomigradFontLarge", x + 1, y + 31, coloutline, TEXT_ALIGN_CENTER)
-		draw.DrawText(trace.Entity:GetPlayerName() or "", "HomigradFontLarge", x, y + 30, col, TEXT_ALIGN_CENTER)
-	end
-end)
-
 if game.SinglePlayer() then
 	hook.Add("HUDPaint", "Exit the singleplayer", function()
 		draw.SimpleText("Z-City is not meant to be played in singleplayer, in map selection menu change SINGLEPLAYER (green button top right corner) to 2 players or any.", "HomigradFontMedium", ScrW() / 2, ScrH() / 2, nil, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)

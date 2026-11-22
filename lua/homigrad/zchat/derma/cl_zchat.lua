@@ -122,6 +122,7 @@ local function GetZChatSettingTitle(data)
 	if data.name == "zchat_maxmessagelength" then return "Message Length" end
 	if data.name == "zchat_dropcharacters" then return "Delete Effect" end
 	if data.name == "zchat_showtextboxinactive" then return "Show Inactive Text" end
+	if data.name == "zchat_hidebig" then return "Hide Big Chat" end
 
 	local text = data.name:gsub("^zchat_", ""):gsub("_", " ")
 	return text:gsub("(%a)([%w_']*)", function(first, rest)
@@ -424,9 +425,11 @@ local function GetSavedChatBounds()
 	local defaultX = style.x and ScrW() * style.x or ScrW() - defaultW - ScrW() * style.rightMargin
 	local defaultY = style.y and ScrH() * style.y or ScrH() - defaultH - ScrH() * style.bottomMargin
 	local prefix = style.cookiePrefix
+	local onLeft = style.persistent and hg.ChatOnLeft and hg.ChatOnLeft()
+	if onLeft then defaultX = ScrW() * style.rightMargin end
 	local w = cookie.GetNumber(prefix .. "w", defaultW)
 	local h = cookie.GetNumber(prefix .. "h", defaultH)
-	local x = cookie.GetNumber(prefix .. "x", defaultX)
+	local x = onLeft and defaultX or cookie.GetNumber(prefix .. "x", defaultX)
 	local y = cookie.GetNumber(prefix .. "y", defaultY)
 	return ClampChatBounds(x, y, w, h)
 end
@@ -862,6 +865,11 @@ function PANEL:Init()
 	self.history:Dock(FILL)
 	self.history:DockMargin(4, 2, 4, 4)
 
+	self.spacer = self.history:Add("DPanel")
+	self.spacer:Dock(TOP)
+	self.spacer:SetTall(0)
+	self.spacer.Paint = function() end
+
 	SyncHatPanel(self)
 	self:SetActive(false)
 end
@@ -971,6 +979,21 @@ end
 function PANEL:Think()
 	if self.chatPersistent ~= ChatStyle().persistent then self:ApplyChatMode() end
 
+	if IsValid(self.spacer) then
+		local used = 0
+		for _, panel in ipairs(self.entries) do
+			if IsValid(panel) then used = used + panel:GetTall() end
+		end
+
+		local gap = math.max(0, self.history:GetTall() - used - 4)
+		if math.abs(self.spacer:GetTall() - gap) >= 1 then
+			self.spacer:SetTall(gap)
+			self.history:InvalidateLayout(true)
+			local bar = self.history:GetVBar()
+			if gap > 0 or self:IsScrolledToBottom() then bar:SetScroll(bar.CanvasSize) end
+		end
+	end
+
 	local state = self.dragState
 
 	if state then
@@ -1022,6 +1045,8 @@ end
 
 function PANEL:Paint(w, h)
 	local style = ChatStyle()
+	if not self.bActive and hg.BigChatHidden and hg.BigChatHidden() then return end
+
 	surface.SetDrawColor(style.box)
 	surface.DrawRect(0, 0, w, h)
 
@@ -1055,7 +1080,8 @@ end
 
 function PANEL:UpdateEntryVisibility()
 	local pending = ShowTextBoxInactive:GetBool() and (self.entry.prevText or "") ~= ""
-	local visible = not ChatStyle().persistent or self.bActive or pending
+	local hidden = hg.BigChatHidden and hg.BigChatHidden() and not self.bActive
+	local visible = not hidden and (not ChatStyle().persistent or self.bActive or pending)
 	if self.entryPanel:IsVisible() == visible then return end
 
 	self.entryPanel:SetVisible(visible)
@@ -1374,7 +1400,106 @@ function PANEL:AddLine(elements, streaming)
 	return self:MergeRepeat(panel)
 end
 
+local popups = {}
+local POPUP_HOLD, POPUP_FADE, POPUP_MAX, POPUP_RISE = 1.8, 3.2, 8, 40
+local POPUP_LIFE = POPUP_HOLD + POPUP_FADE
+
+local function PushPopup(elements)
+	local segments, color = {}, color_white
+	for _, v in ipairs(elements) do
+		if type(v) == "IMaterial" then
+			continue
+		elseif type(v) == "Player" then
+			segments[#segments + 1] = {team.GetColor(v:Team()), v:GetName()}
+		elseif istable(v) and v.r and v.g and v.b then
+			color = v
+		else
+			segments[#segments + 1] = {color, tostring(v)}
+		end
+	end
+	if #segments == 0 then return end
+
+	popups[#popups + 1] = {segments = segments, born = CurTime()}
+	while #popups > POPUP_MAX do table.remove(popups, 1) end
+end
+
+hg.PushChatPopup = PushPopup
+
+function hg.MoveChat(dx, dy)
+	local chat = hg.chat
+	if not IsValid(chat) then return end
+
+	local x, y = chat:GetPos()
+	local w, h = chat:GetSize()
+	x, y, w, h = ClampChatBounds(x + dx, y + dy, w, h)
+	chat:SetPos(x, y)
+	SaveChatBounds(chat)
+	SyncHatPanel(chat)
+end
+
+function hg.ResetChat()
+	local prefix = ChatStyle().cookiePrefix
+	for _, key in ipairs({"x", "y", "w", "h"}) do cookie.Delete(prefix .. key) end
+	if IsValid(hg.chat) then hg.chat:ApplySavedBounds() end
+end
+
+local popupLineHeight = 0
+
+function hg.HiddenChatAnchor()
+	local x, y, w, h = GetSavedChatBounds()
+
+	return x + w - 8, y + h - 6, #popups * popupLineHeight
+end
+
+hook.Add("HUDPaint", "zChatHiddenPopups", function()
+	if #popups == 0 then return end
+	if not LocalPlayer():Alive() then popups = {} return end
+
+	local now = CurTime()
+	local scale = hg.UIScale and hg.UIScale() or 1
+	local right, baseY = hg.HiddenChatAnchor()
+	local deathAlpha = hg.DeathHUDAlpha and hg.DeathHUDAlpha() or 1
+
+	surface.SetFont("zChatFont")
+	local _, lineHeight = surface.GetTextSize("Hg")
+	lineHeight = lineHeight + 4 * scale
+	popupLineHeight = lineHeight
+
+	for i = #popups, 1, -1 do
+		local popup = popups[i]
+		local age = now - popup.born
+		if age > POPUP_LIFE then
+			table.remove(popups, i)
+		else
+			local progress = math.max(age - POPUP_HOLD, 0) / POPUP_FADE
+			local alpha = (1 - progress) * 255 * deathAlpha
+			local y = baseY - lineHeight * 0.5 - (#popups - i) * lineHeight - progress * POPUP_RISE * scale
+
+			local total = 0
+			for _, segment in ipairs(popup.segments) do
+				total = total + surface.GetTextSize(segment[2])
+			end
+
+			local x = right - total
+			for _, segment in ipairs(popup.segments) do
+				local color = segment[1]
+				draw.SimpleText(segment[2], "zChatFont", x + 1, y + 1, Color(0, 0, 0, alpha), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+				draw.SimpleText(segment[2], "zChatFont", x, y, Color(color.r, color.g, color.b, alpha), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+				x = x + surface.GetTextSize(segment[2])
+			end
+		end
+	end
+end)
+
+cvars.AddChangeCallback("zchat_hidebig", function()
+	if IsValid(hg.chat) and hg.chat.UpdateEntryVisibility then hg.chat:UpdateEntryVisibility() end
+end, "zchat_hidebig_refresh")
+
 function PANEL:AddMessage(...)
+	if hg.BigChatHidden and hg.BigChatHidden() and not self.bActive then
+		PushPopup({...})
+	end
+
 	self:AddLine({...})
 
 	chat.PlaySound()

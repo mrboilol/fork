@@ -70,7 +70,23 @@ local function Make(name, size, weight, extra)
 	made[name] = true
 end
 
+local function CreateMenuFonts()
+	pcall(function()
+		local scale = math.min(ScrW(), ScrH()) / 1000
+		local face = { font = "VCR OSD Mono" }
+
+		Make("ZCity_Menu_Small", ScreenScale(20), 200, face)
+		Make("ZCity_Menu_Tiny", ScreenScale(8), 200, face)
+		Make("ZCity_Menu_Settings_Medium", math.max(16, math.floor(32 * scale)), 300, face)
+		Make("ZCity_Menu_Settings_Small", math.max(14, math.floor(22 * scale)), 300, face)
+		Make("ZCity_Menu_Settings_Tiny", math.max(12, math.floor(16 * scale)), 300, face)
+		Make("ZCity_Menu_Settings_Category", ScreenScale(15), 100, face)
+	end)
+end
+
 local function CreateFonts()
+	CreateMenuFonts()
+
 	-- Z-City already registered its skin: its CreateFont calls have run.
 	if istable(hg) and istable(hg.VGUI) and hg.VGUI.MainSkin then
 		return true
@@ -110,6 +126,8 @@ end
 
 -- After initpost: Z-City's skin has registered. Creating these names first
 -- is what used to stamp the wrong sizes into their CreateFont cache.
+CreateMenuFonts()
+
 hook.Add("InitPostEntity", "zcnpc_zcitygui", function()
 	timer.Simple(2, CreateFonts)
 end)

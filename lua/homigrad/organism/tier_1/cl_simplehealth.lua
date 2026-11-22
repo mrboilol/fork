@@ -7,20 +7,10 @@ local CRIT_HARD = SimpleHealth.CRIT_HARD
 
 local OXY_EFFECT_FULL = 250
 local EFFECT_MIN = 0.005
-local SHOCK_COVERAGE = 4.2
-local SHOCK_BORDER_MAX = 0.86
-local SHOCK_BORDER_DIVISOR = 1.8
-local SHOCK_BORDER_EXPONENT = 0.78
-local SHOCK_TIME_OFFSET = 9750
-local TINT_BASE_GAIN = 0.08
-local TINT_PULSE_GAIN = 0.24
-local TINT_GRAIN_SCALE = 4096
 local FACE_BOX_COLOR = Color(25, 25, 35, 240)
 local FACE_OUTLINE_COLOR = Color(255, 255, 255, 255)
 local FACE_PADDING = 0.16
 
-local VIGNETTE_MATERIAL = Material("effects/shaders/zb_vignette")
-local TINT_MATERIAL = Material("effects/shaders/zb_grain2")
 
 SimpleHealth.Local = SimpleHealth.Local or {mode = 0, crit = 0, brute = 0, burn = 0, toxin = 0, oxy = 0, countdownEnd = 0}
 
@@ -82,35 +72,22 @@ local function vignetteScale()
 	return hg_vignette_scale and hg_vignette_scale:GetFloat() or 1
 end
 
-local function drawTintedVignette(strength, color, pulseSpeed)
-	local scale = vignetteScale()
-	local coverage = SHOCK_COVERAGE * strength
-	local border = math.Clamp((coverage / SHOCK_BORDER_DIVISOR) ^ SHOCK_BORDER_EXPONENT * SHOCK_BORDER_MAX, 0, SHOCK_BORDER_MAX)
+function hg.DrawEdgeVignette(r, g, b, alpha, depth)
+	if alpha <= 0 then return end
 
-	render.UpdateScreenEffectTexture()
-	VIGNETTE_MATERIAL:SetFloat("$c2_x", CurTime() + SHOCK_TIME_OFFSET)
-	VIGNETTE_MATERIAL:SetFloat("$c0_z", border * scale)
-	VIGNETTE_MATERIAL:SetFloat("$c1_y", coverage * scale)
-	render.SetMaterial(VIGNETTE_MATERIAL)
-	render.DrawScreenQuad()
-
-	local wave = math.ease.InOutSine(math.abs(math.cos(CurTime() * pulseSpeed)))
-	local pulse = strength * (0.78 + wave * 0.2)
-	local tint = (strength * TINT_BASE_GAIN + pulse * TINT_PULSE_GAIN) * scale
-
-	render.UpdateScreenEffectTexture()
-	TINT_MATERIAL:SetFloat("$c0_x", 0)
-	TINT_MATERIAL:SetFloat("$c0_y", -1)
-	TINT_MATERIAL:SetFloat("$c0_z", TINT_GRAIN_SCALE)
-	TINT_MATERIAL:SetFloat("$c1_x", strength * 3.2 + pulse * 5.8)
-	TINT_MATERIAL:SetFloat("$c1_y", (strength * 0.08 + pulse * 0.22) * 1.3)
-	TINT_MATERIAL:SetFloat("$c1_z", 0)
-	TINT_MATERIAL:SetFloat("$c2_x", tint * color.r / 255)
-	TINT_MATERIAL:SetFloat("$c2_y", tint * color.g / 255)
-	TINT_MATERIAL:SetFloat("$c2_z", tint * color.b / 255)
-	TINT_MATERIAL:SetFloat("$c3_x", 0)
-	render.SetMaterial(TINT_MATERIAL)
-	render.DrawScreenQuad()
+	local w, h = ScrW(), ScrH()
+	local size = math.max(math.floor(h * depth), 2)
+	local steps = 32
+	local stripe = math.max(math.ceil(size / steps), 1)
+	for i = 0, steps - 1 do
+		local fade = 1 - i / steps
+		surface.SetDrawColor(r, g, b, math.floor(alpha * fade * fade))
+		local offset = i * stripe
+		surface.DrawRect(offset, offset, w - offset * 2, stripe)
+		surface.DrawRect(offset, h - offset - stripe, w - offset * 2, stripe)
+		surface.DrawRect(offset, offset + stripe, stripe, h - offset * 2 - stripe * 2)
+		surface.DrawRect(w - offset - stripe, offset + stripe, stripe, h - offset * 2 - stripe * 2)
+	end
 end
 
 local traumaLerp = 0
@@ -125,9 +102,6 @@ local function updateDamageTints(state)
 	end
 
 	traumaLerp = LerpFT(effects.lerp, traumaLerp, traumaTarget)
-	if traumaLerp > EFFECT_MIN then
-		drawTintedVignette(traumaLerp, effects.traumaVignetteColor, effects.traumaVignettePulseSpeed)
-	end
 end
 
 local bloodTab = {
@@ -149,7 +123,7 @@ local critLerp = 0
 
 hook.Add("Post Post Pre Post Processing", "hg/simplehealth/screen-effects", function()
 	local state = SimpleHealth.GetLocalState()
-	if not state and bloodLerp <= EFFECT_MIN and softCritLerp <= EFFECT_MIN and dofLerp <= EFFECT_MIN and critLerp <= EFFECT_MIN then return end
+	if not state and bloodLerp <= EFFECT_MIN and softCritLerp <= EFFECT_MIN and traumaLerp <= EFFECT_MIN and dofLerp <= EFFECT_MIN and critLerp <= EFFECT_MIN then return end
 
 	local effects = CONFIG.effects
 	local org = state and IsValid(lply) and lply:Alive() and (lply.new_organism or lply.organism)
@@ -182,11 +156,22 @@ hook.Add("Post Post Pre Post Processing", "hg/simplehealth/screen-effects", func
 		DrawBokehDOF(dofAmount, 1, 0)
 	end
 
-	if softCritLerp > EFFECT_MIN then
-		drawTintedVignette(softCritLerp * effects.softCritStrength, effects.softCritColor, effects.softCritPulseSpeed)
-	end
-
 	updateDamageTints(org and state or nil)
+end)
+
+local HEALTH_VIGNETTE_COLOR = {170, 0, 0}
+local HEALTH_VIGNETTE_ALPHA = 235
+local HEALTH_VIGNETTE_DEPTH = 0.3
+
+hook.Add("HUDPaint", "hg/simplehealth/vignette", function()
+	if not IsValid(lply) or not lply:Alive() or not SimpleHealth.GetLocalState() then return end
+
+	local effects = CONFIG.effects
+	local strength = math.max(traumaLerp, softCritLerp * effects.softCritStrength) * vignetteScale()
+	if strength <= EFFECT_MIN then return end
+
+	local amount = math.Clamp(strength, 0, 1)
+	hg.DrawEdgeVignette(HEALTH_VIGNETTE_COLOR[1], HEALTH_VIGNETTE_COLOR[2], HEALTH_VIGNETTE_COLOR[3], HEALTH_VIGNETTE_ALPHA * amount, HEALTH_VIGNETTE_DEPTH * (0.4 + 0.6 * amount))
 end)
 
 local faceMaterials = {}
@@ -321,6 +306,15 @@ local function getFaceAnchor(size)
 	local faceConfig = CONFIG.face
 	bigChat = bigChat or GetConVar("sv_bigchat")
 
+	if not hg.MoodlesEnabled() then
+		local margin = math.floor(ScrH() * faceConfig.y)
+		local y = ScrH() - size - margin
+		if hg.SubRosaEnabled() then return math.floor((ScrW() - size) * 0.5), y end
+		if hg.BigChatEnabled() then return ScrW() - size - margin, y end
+
+		return math.floor((ScrW() - size) * 0.5), y
+	end
+
 	if not bigChat or not bigChat:GetBool() then
 		return math.floor(ScrW() * faceConfig.x), math.floor(ScrH() * faceConfig.y)
 	end
@@ -346,7 +340,8 @@ local deathDelay = {active = false, wasAlive = false, aliveMode = 0}
 
 local function nildoy()
 	if not IsValid(lply) then return end
-	if SimpleHealth.NilguyMoodle:GetBool() and HGCustomMoodlesActive then return end
+	if SimpleHealth.NilguyMoodle:GetBool() and HGCustomMoodlesActive and hg.MoodlesEnabled() then return end
+	if GetConVar("hg_hidenilguy"):GetBool() then return end
 
 	local alive = lply:Alive()
 	local state = SimpleHealth.GetLocalState()
@@ -360,6 +355,11 @@ local function nildoy()
 	local faceConfig = CONFIG.face
 	local size = math.floor(ScrH() * faceConfig.size)
 	local x, y = getFaceAnchor(size)
+	if hg.HudEdit then
+		local ox, oy = hg.HudEdit.Offset("face")
+		x, y = x + ox, y + oy
+		hg.HudEdit.Rect("face", x, y, size, size)
+	end
 
 	surface.SetDrawColor(FACE_BOX_COLOR)
 	surface.DrawRect(x, y, size, size)

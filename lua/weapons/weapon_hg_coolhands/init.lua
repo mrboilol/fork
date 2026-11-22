@@ -850,7 +850,7 @@ function SWEP:Think()
 		self:SetCarrying()
 	end
 
-        if self:GetFists() and owner:KeyDown(IN_ATTACK2) and (self:GetNextSecondaryFire() < CurTime()) and owner.PlayerClassName ~= "sc_infiltrator" and not owner:KeyDown(IN_USE) and not self.Charging and (self.SpecialAttackUntil or 0) <= CurTime() and (self.ShoveEnd or 0) <= CurTime() then
+        if self:GetFists() and (owner:KeyDown(IN_ATTACK2) or (self.ForceBlockUntil or 0) > CurTime()) and (self:GetNextSecondaryFire() < CurTime()) and owner.PlayerClassName ~= "sc_infiltrator" and not owner:KeyDown(IN_USE) and not self.Charging and (self.SpecialAttackUntil or 0) <= CurTime() and (self.ShoveEnd or 0) <= CurTime() then
 		self:SetNextPrimaryFire(CurTime() + .5)
 		self:SetBlocking(true)
 	else

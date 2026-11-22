@@ -2663,7 +2663,7 @@ hook.Add("PopulateToolMenu", "ZMoodle_PopulateMenu", function()
 		
 		panel:CheckBox("Enable HUD", "mzb_MoodleHud_enabled")
 		panel:CheckBox("Always show limbs", "mzb_popalimbs")
-		panel:CheckBox("Show moodles", "hg_moodles_enabled")
+		panel:CheckBox("Show moodles (server)", "sv_moodles")
 		panel:CheckBox("Enable text change for brain damage", "mzb_brain_distortion")
 		
 		local langCombo = panel:ComboBox("Language", "mzb_language")
