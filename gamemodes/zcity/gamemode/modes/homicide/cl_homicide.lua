@@ -113,6 +113,19 @@ net.Receive("HMCD_RoundStart",function()
 	lply.Profession = net.ReadString()
 	--//
 
+	if lply.isTraitor and IsValid(MODE.RoundBeginSoundChannel) then
+		MODE.RoundBeginSoundChannel:Stop()
+		MODE.RoundBeginSoundChannel = nil
+		MODE.RoundBeginSoundStartTime = CurTime()
+		local sequence = MODE.RoundBeginSoundSequence
+		sound.PlayFile("sound/antag" .. math.random(1, 2) .. ".ogg", "noplay noblock", function(channel)
+			if not IsValid(channel) then return end
+			if MODE.RoundBeginSoundSequence ~= sequence then channel:Stop() return end
+			channel:Play()
+			MODE.RoundBeginSoundChannel = channel
+		end)
+	end
+
 	if(MODE.RoleChooseRoundTypes[MODE.Type] and !screen_time_is_default)then
 		MODE.DynamicFadeScreenEndTime = CurTime() + MODE.RoleChooseRoundStartTime
 	else

@@ -115,7 +115,7 @@ hook.Add("Think", "juggernaut_music", function()
 	local t = CurTime() - rs
 	if t >= 0 and t <= 20 then
 		MusicPlayedFor = rs
-		surface.PlaySound("zbattle/ussr2.ogg")
+		surface.PlaySound(isJug and ("antag" .. math.random(1, 2) .. ".ogg") or "zbattle/ussr2.ogg")
 	end
 end)
 
