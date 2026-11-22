@@ -140,6 +140,13 @@ registerFont("HomigradFontRadialCenter", {
 	outline = false,
 })
 
+registerFont("HomigradFontRadialDescription", {
+	font = font(),
+	referenceSize = 20,
+	weight = 1100,
+	outline = false,
+})
+
 registerFont("HomigradFontLarge", {
 	font = font(),
 	referenceSize = 34,
@@ -526,6 +533,19 @@ end
 
 local function WrapRadialDescription(text, maxWidth)
 	surface.SetFont("HomigradFontRadialDescription")
+	if not surface.GetTextSize("Hg") then
+		registerFont("HomigradFontRadialDescription", {
+			font = font(),
+			referenceSize = 20,
+			weight = 1100,
+			outline = false,
+		})
+		surface.SetFont("HomigradFontRadialDescription")
+		if not surface.GetTextSize("Hg") then
+			return {}, 0, 0
+		end
+	end
+
 	local lines = {}
 	local current = ""
 
@@ -589,23 +609,24 @@ local function DrawRadialItemDescription(option, itemX, itemY, directionX, iconS
 	end
 end
 
-local function DrawRadialIdentity(scrW, scrH, viewLerp)
+local function DrawRadialIdentity(scrW, scrH, viewLerp, target, hideName)
 	local centerX = scrW * 0.5
 	local nameY = scrH * (0.035 - 0.02 * (1 - viewLerp))
-	local roleY = nameY + scrH * 0.052
-	local name = lply:GetPlayerName()
-	local role = (lply.role and lply.role.name) or ""
+	local roleY = hideName and nameY or nameY + scrH * 0.052
+	local subject = IsValid(target) and target or lply
+	local name = hideName and "" or subject:GetPlayerName()
+	local role = subject == lply and lply.role and lply.role.name or ""
 	local alpha = 255 * viewLerp
 	local shadow = Color(colBack.r, colBack.g, colBack.b, alpha)
 
 	draw.SimpleText(name, "HomigradFontGigantoNormous", centerX + 2, nameY + 2, shadow, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 	draw.SimpleText(role, "HomigradFontGigantoNormous", centerX + 2, roleY + 2, shadow, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 
-	local col = lply:GetPlayerColor():ToColor()
+	local col = subject:GetPlayerColor():ToColor()
 	col.a = alpha
 	draw.SimpleText(name, "HomigradFontGigantoNormous", centerX, nameY, col, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 
-	local roleColor = lply.role and lply.role.color or incoentCol
+	local roleColor = subject == lply and lply.role and lply.role.color or incoentCol
 	draw.SimpleText(role, "HomigradFontGigantoNormous", centerX, roleY, Color(roleColor.r, roleColor.g, roleColor.b, alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 end
 
@@ -795,7 +816,7 @@ local function CreateRadialMenu(options_arg, bAutoClose)
 			end
 
 			if !paining then
-				DrawRadialIdentity(scrW, scrH, viewLerp)
+				DrawRadialIdentity(scrW, scrH, viewLerp, options1.title, useOldRadial)
 			end
 
 			return
@@ -880,11 +901,13 @@ local function CreateRadialMenu(options_arg, bAutoClose)
 		if hoveredText then
 			DrawModernRadialCenterText(hoveredText, centerX, centerY, innerRadius * radialCenterTextWidthMul, Color(radialTextColor.r, radialTextColor.g, radialTextColor.b, 255 * radialCenterTextAlpha * viewLerp))
 		end
+		local centerSubject = IsValid(options1.title) and options1.title or lply
+		local centerColor = centerSubject:GetPlayerColor():ToColor()
 		if !paining and radialCenterTextAlpha < 0.99 then
-			DrawModernRadialCenterText(lply:GetPlayerName(), centerX, centerY, innerRadius * radialCenterTextWidthMul, Color(plyColor.r, plyColor.g, plyColor.b, 255 * (1 - radialCenterTextAlpha) * viewLerp))
+			DrawModernRadialCenterText(centerSubject:GetPlayerName(), centerX, centerY, innerRadius * radialCenterTextWidthMul, Color(centerColor.r, centerColor.g, centerColor.b, 255 * (1 - radialCenterTextAlpha) * viewLerp))
 		end
 		if !paining then
-			DrawRadialIdentity(scrW, scrH, viewLerp)
+			DrawRadialIdentity(scrW, scrH, viewLerp, options1.title)
 		end
 	end
 end
@@ -939,7 +962,13 @@ hook.Add( "PlayerBindPress", "PlayerBindPressExample2huy", function( ply, bind, 
 		end
 
 		if pressed and !IsValid(MENUPANELHUYHUY) then
-			CreateRadialMenu()
+			local interactOptions = hg.GetInteractOptions and hg.GetInteractOptions()
+			if interactOptions then
+				input.SetCursorPos(ScrW() / 2, ScrH() / 2)
+				CreateRadialMenu(interactOptions)
+			else
+				CreateRadialMenu()
+			end
 		else
 			PressRadialMenu(1)
 		end

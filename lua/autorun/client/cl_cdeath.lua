@@ -974,6 +974,8 @@ local function CinematicDeathOverlay()
     CinematicDeathBackground()
     if CDeath.isDead and not CDeath.compatActive and not CDeath.inSpectator and not CDeath.inTransition then
         hook.Run("HG_DeathOverlayHUD")
+    elseif CDeath.isDead and not CDeath.compatActive and CDeath.inTransition then
+        hook.Run("HG_DeathTransitionHUD")
     end
 end
 hook.Add("DrawOverlay", "CinematicDeathBackground", CinematicDeathOverlay)

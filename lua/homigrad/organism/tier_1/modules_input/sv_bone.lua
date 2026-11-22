@@ -751,6 +751,7 @@ local spinal_failure_onset = 25
 local spine_heal_time = 480
 local spine_splint_heal_mul = 1.35
 local spine_thiamine_heal_time = 180
+local spine_thiamine_mend_time = 150
 
 function hg.organism.RollSpinalCordFailure(org, name)
 	local chances = spinal_cord_failure[name]
@@ -808,7 +809,7 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 			or (number == 2 and "ValveBiped.Bip01_Spine2" or "ValveBiped.Bip01_Neck1")
 		hg.fakeBoneFlop.SetOpenFracture(org, fractureBone, true)
 	end
-	if name ~= "spine3" and oldDmg < breakThreshold and org[name] >= breakThreshold and hg.fakeBoneFlop then
+	if name == "spine2" and oldDmg < breakThreshold and org[name] >= breakThreshold and hg.fakeBoneFlop then
 		hg.fakeBoneFlop.SetBoneState(org, "ValveBiped.Bip01_Spine2", true, spine_partial_break_floppiness)
 	end
 	if name == "spine2" and oldDmg < breakThreshold and org[name] >= breakThreshold then
@@ -1589,11 +1590,18 @@ local function thiamineHealSpines(owner, org, timeValue)
 	local crossed = false
 	for _, name in ipairs({"spine1", "spine2", "spine3"}) do
 		local current = tonumber(org[name]) or 0
-		if current > 0 then
-			org[name] = math.max(current - heal, 0)
-			for _, limit in ipairs({spineThresholds(name)}) do
-				crossed = crossed or current >= limit and org[name] < limit
+		local limit = select(2, spineThresholds(name)) or spineThresholds(name)
+		if current >= limit then
+			local mend = (org[name .. "ThiamineMend"] or 0) + timeValue * hg.organism.RecoveryMul(org)
+			if mend >= spine_thiamine_mend_time then
+				org[name .. "ThiamineMend"] = nil
+				org[name] = limit - 0.001
+				crossed = true
+			else
+				org[name .. "ThiamineMend"] = mend
 			end
+		elseif current > 0 then
+			org[name] = math.max(current - heal, 0)
 		end
 	end
 

@@ -649,6 +649,7 @@ hook.Add("Org Think", "WhatsSoFunny",function(owner, org, timeValue)
 		owner:EmitSound(phrase, muffed and 90 or 100,owner.VoicePitch or 100,1 * math.min(2, org.berserk),CHAN_AUTO,0, pitch and 56 or muffed and 16 or 0)
 
 		owner.lastBerserkLaughSoundCD = CurTime() + math.Rand(5, 15)
+		if hg.ChatLog then hg.ChatLog.Emit("laugh", owner) end
 		owner.lastPhr = phrase
 	end
 end)

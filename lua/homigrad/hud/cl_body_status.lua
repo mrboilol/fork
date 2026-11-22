@@ -49,7 +49,7 @@ local lastBody
 local lastDrawTime = 0
 
 
-local severity, broken, tissue = {}, {}, {}
+local severity, broken, tissue, partial = {}, {}, {}, {}
 local dislocated = {}
 local arterial, missing = {}, {}
 local organDamage = {
@@ -559,8 +559,10 @@ local function updateTorsoState(org)
 	severity.spine2 = boneSeverity(spine2)
 	severity.spine1 = boneSeverity(spine1)
 	severity.pelvis = boneSeverity(pelvis)
-	broken.skull, broken.jaw, broken.neck = skull >= 1, jaw >= 1, spine3 >= 1
-	broken.chest, broken.pelvis = ribs >= 1, pelvis >= 1
+	local jawDislocated = org.jawdislocation == true
+	broken.skull, broken.jaw, broken.neck = skull >= 0.6, jaw >= 1 or jawDislocated, spine3 >= 1
+	broken.chest, broken.pelvis = ribs >= 0.75, pelvis >= 1
+	partial.skull, partial.jaw, partial.chest = skull >= 0.6 and skull < 1, jaw < 1 and jawDislocated, ribs >= 0.75 and ribs < 1
 	broken.spine2, broken.spine1 = spine2 >= 1, spine1 >= 1
 	missing.skull, missing.jaw = headMissing, headMissing
 end
@@ -628,6 +630,7 @@ local function clearMedicalState()
 	for _, region in ipairs(K.REGIONS) do
 		severity[region], bleedLevel[region] = 0, 0
 		broken[region], arterial[region], missing[region], tourniquet[region] = false, false, false, false
+		partial[region] = false
 		splint[region] = nil
 		tissue[region] = nil
 	end
@@ -734,7 +737,7 @@ local function updateDisplayState(ply)
 end
 
 local function healthColor(region, value)
-	if not value and broken[region] then return 0, 0, 0, 255 end
+	if not value and broken[region] and not partial[region] then return 0, 0, 0, 255 end
 	value = math_Clamp(value or severity[region] or 0, 0, 1)
 	for index = 2, #K.HEALTH_STOPS do
 		local high = K.HEALTH_STOPS[index]
@@ -1346,7 +1349,6 @@ local function renderFigure()
 	if focus.active then return end
 
 	drawDislocations()
-	drawArmor()
 end
 
 local idleProxy
@@ -1440,6 +1442,7 @@ hook.Add("HUDPaint", "homigrad/body-status/draw", function()
 	local alive = LocalPlayer():Alive()
 	if wasAlive and not alive then deathShakeEnd = CurTime() + 0.6 end
 	wasAlive = alive
+	if not alive then return end
 
 	local alpha = hg.DeathHUDAlpha and hg.DeathHUDAlpha() or 1
 	if alpha <= 0 then return end

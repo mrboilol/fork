@@ -805,6 +805,7 @@ hg.organism.MaintainSimplifiedCirculation = maintainSimplifiedCirculation
 
 local function restoreHeartAfterResuscitation(org, now, resusBloodK)
 	org.heartstop = false
+	if hg.SimpleHealth and hg.SimpleHealth.OnHeartRestarted then hg.SimpleHealth.OnHeartRestarted(org) end
 	if hg.organism.ClearCardiacArrestMechanicalDecay then hg.organism.ClearCardiacArrestMechanicalDecay(org) end
 	org.fibrillation = false
 	org.arrestRhythm = nil
@@ -1049,7 +1050,7 @@ module[2] = function(owner, org, timeValue)
 	local compensationPulseMultiplier = math.Clamp(1 - hypovolemicShock * 0.18 - effectivePalpitations * 0.3, 0.35, 1)
 	org.compensationPulseMultiplier = compensationPulseMultiplier
 	local bloodPerfusionK = preloadReserve
-	local k = heart * o2 * math.Clamp(bloodPerfusionK, 0, 1) * brain
+	local k = heart * o2 * math.Clamp(bloodPerfusionK, 0, 1)
 	if not org.heartstop then
 		pulse = pulse * k
 		pulse = pulse * compensationPulseMultiplier
@@ -1306,8 +1307,7 @@ module[2] = function(owner, org, timeValue)
 	-- suppress the sinus node differently. This creates bradycardia first, then
 	-- pause/junctional and ventricular escape ranges instead of one universal
 	-- flatline path.
-	local brainHemorrhage = math.Clamp(org.brainHemorrhage or 0, 0, 1)
-	local cerebralSuppression = math.Clamp(math.max((org.brain or 0) * 0.8, brainHemorrhage) * 0.9, 0, 1)
+	local cerebralSuppression = 0
 	arterialO2 = math.min(tonumber(org.bloodO2Cap) or o2Value, org.oxygenIntakeAvailable == false and o2Value or math.huge)
 	local hypoxiaSuppression = math.Clamp((16 - arterialO2) / 16, 0, 1)
 	local cardiacSuppression = myocardialConductionFailure

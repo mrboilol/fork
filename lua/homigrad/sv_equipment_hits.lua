@@ -690,7 +690,7 @@ function hg.GetHeldWeaponImpactModel(ply, wep)
     local modelName = wep.WorldModelExchange or wep.WorldModel or wep:GetModel()
     local scale = (wep.WorldModelExchange and wep.modelscale or wep.modelscale2) or wep:GetModelScale()
     if hg.EquipmentImpactPose then pos, ang = hg.EquipmentImpactPose(wep, pos, ang) end
-    if hg.ResolveEquipmentClearance then pos = hg.ResolveEquipmentClearance(wep, ply, modelName, pos, ang, scale) end
+    if hg.ResolveEquipmentClearance then pos = hg.ResolveEquipmentClearance(wep, ply, modelName, pos, ang, scale, wep.LocalMuzzlePos and LocalToWorld(wep.LocalMuzzlePos, angle_zero, pos, ang)) end
     return modelName, pos, ang, scale
 end
 

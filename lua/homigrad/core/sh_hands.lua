@@ -22,6 +22,13 @@ function hg.IsLimbIncapacitated(org, limb)
 	return upBroken and downBroken or dislocated and (upBroken or downBroken) or false
 end
 
+function hg.IsArmUsable(org, limb)
+	if not org then return true end
+	local hand = limb == "larm" and "lhand" or "rhand"
+	if org[limb .. "amputated"] or org[limb .. "upamputated"] or org[hand .. "amputated"] then return false end
+	return not hg.IsLimbIncapacitated(org, limb)
+end
+
 function hg.GetLimbDebuffMultiplier(org)
 	local analgesia = math.Clamp((tonumber(org.analgesia) or 0) + (tonumber(org.painkiller) or 0) * 0.3, 0, 1)
 	return Lerp(analgesia, 1, 0.35)
@@ -151,6 +158,11 @@ function hg.GetPrioritizedArm(ply)
 	if not IsValid(ply) or not ply.organism then return "left", false, false end
 
 	local org = ply.organism
+	if not hg.IsArmUsable(org, "larm") and hg.IsArmUsable(org, "rarm") then
+		local rightBroken = ((org.rarm and hg.IsLimbFractured(org, "rarm")) or org.rarmdislocation) == true
+		return "right", true, rightBroken
+	end
+
 	local isBroken = ((org.larm and hg.IsLimbFractured(org, "larm")) or org.larmdislocation) == true
 	return "left", false, isBroken
 end

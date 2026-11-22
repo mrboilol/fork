@@ -442,7 +442,7 @@ if CLIENT then
 
 	function SWEP:ModularDrawDroppedModel()
 		local owner = self:GetOwner()
-		if IsValid(owner) and owner:IsPlayer() then return end
+		if IsValid(owner) and (owner:IsPlayer() or IsValid(owner.FakeRagdoll)) then return end
 
 		if not IsValid(self.ModularDroppedFakeWorldModel) then
 			self:ModularCreateDroppedFakeModel()
@@ -551,13 +551,13 @@ if CLIENT then
 
 	function SWEP:DrawWorldModel()
 		local owner = self:GetOwner()
-		if IsValid(owner) and owner:IsPlayer() then return end
+		if IsValid(owner) and (owner:IsPlayer() or IsValid(owner.FakeRagdoll)) then return end
 		self:ModularDrawDroppedModel()
 	end
 
 	function SWEP:DrawWorldModelTranslucent()
 		local owner = self:GetOwner()
-		if IsValid(owner) and owner:IsPlayer() then return end
+		if IsValid(owner) and (owner:IsPlayer() or IsValid(owner.FakeRagdoll)) then return end
 		self:ModularDrawDroppedModel()
 	end
 

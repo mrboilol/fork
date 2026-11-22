@@ -206,6 +206,9 @@ hook.Add("Org Clear", "Main", function(org)
 	org.temperature = 36.7
 	org.superfighter = false
 	org.CantCheckPulse = nil
+	org.muteChat = nil
+	org.dialectCombine = nil
+	org.dialect = nil
 	org.HEV = nil
 	org.bleedingmul = 1
 	org.neckslitStunUntil = nil
@@ -1847,7 +1850,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	end
 
 	local incapacitationEnabled = not hg.organism.IncapacitationEnabled or hg.organism.IncapacitationEnabled()
-	local terminalIncapacitation = incapacitationEnabled and org.otrub and org.incapacitated
+	local terminalIncapacitation = (incapacitationEnabled or org.simpleMode) and org.otrub and org.incapacitated
 	if isPly and owner:Alive() and terminalIncapacitation then
 		org.deathStateEnd = org.deathStateEnd or CurTime() + (org.deathStateRemaining or 25)
 		org.deathStateRemaining = nil
@@ -2230,6 +2233,7 @@ local function fixlimb(org, key, fixer)
 			fixer:Notify(finally_fixed[math.random(#finally_fixed)], 1, "dislocations_unlucky", 1, nil, Color(255, 255, 255, 255))
 		end
 		fixer.tries = 0
+		if hg.ChatLog and hg.ChatLog.Medical then hg.ChatLog.Medical(fixer, org.owner, "medfixdisloc") end
 	else
 		fixer.tries = (fixer.tries or 0) + 1
 		org.painadd = org.painadd + 15 * math.random(1, 3)
@@ -2356,6 +2360,7 @@ net.Receive("hg_dislocation_minigame_success", function(len, ply)
 		end
 
 		patient:EmitSound("physics/body/body_medium_impact_soft1.wav", 60, 100, 1, CHAN_AUTO)
+		if hg.ChatLog and hg.ChatLog.Medical then hg.ChatLog.Medical(ply, patient, "medfixdisloc") end
 
 		if patient == ply then
 			ply:Notify("You fixed your dislocation.", 3, "fix", 2)

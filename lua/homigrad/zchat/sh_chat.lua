@@ -19,19 +19,32 @@ CreateConVar("sv_bigchat", "1", {FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED},
 CreateConVar("sv_moodles", "1", {FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED}, "1 - moodles enabled for everyone", 0, 1)
 CreateConVar("sv_subrosa", "1", {FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED}, "1 - sub rosa body status hud enabled for everyone", 0, 1)
 
+if CLIENT then
+	CreateClientConVar("hg_hud_moodles", "1", true, false, "Show moodles on this client", 0, 1)
+	CreateClientConVar("hg_hud_subrosa", "1", true, false, "Show the sub rosa figure on this client", 0, 1)
+	CreateClientConVar("hg_hud_bigchat", "1", true, false, "Show the big chat on this client", 0, 1)
+end
+
 local hudConVars = {}
 
-local function HudConVarOn(name)
+local function HudConVarOn(name, clientName)
 	local cvar = hudConVars[name] or GetConVar(name)
 	if not cvar then return true end
 	hudConVars[name] = cvar
 
-	return cvar:GetBool()
+	if not cvar:GetBool() then return false end
+	if not CLIENT then return true end
+
+	local clientCvar = hudConVars[clientName] or GetConVar(clientName)
+	if not clientCvar then return true end
+	hudConVars[clientName] = clientCvar
+
+	return clientCvar:GetBool()
 end
 
-function hg.MoodlesEnabled() return HudConVarOn("sv_moodles") end
-function hg.SubRosaEnabled() return HudConVarOn("sv_subrosa") end
-function hg.BigChatEnabled() return HudConVarOn("sv_bigchat") end
+function hg.MoodlesEnabled() return HudConVarOn("sv_moodles", "hg_hud_moodles") end
+function hg.SubRosaEnabled() return HudConVarOn("sv_subrosa", "hg_hud_subrosa") end
+function hg.BigChatEnabled() return HudConVarOn("sv_bigchat", "hg_hud_bigchat") end
 function hg.ChatOnLeft() return hg.BigChatEnabled() and not hg.MoodlesEnabled() and not hg.SubRosaEnabled() end
 
 if CLIENT then
@@ -302,6 +315,8 @@ else
 	net.Receive("zChatMessage", function(len, ply)
 		local text = net.ReadString()
 
+		if ply.organism and ply.organism.muteChat then return end
+
 		local maxLen = maxLength:GetInt()
 
 		if (text:utf8len() > maxLen) then
@@ -322,6 +337,7 @@ else
 
 	hook.Add("PlayerSay", "ZChat", function(ply, text)
 		if not IsValid(ply) then return "" end
+		if ply.organism and ply.organism.muteChat then return "" end
 		if ply:GetNWBool("ulx_muted", false) then
 			if ULib and ULib.tsayError then
 				ULib.tsayError(ply, "You are muted, and therefore cannot speak! Use asay for admin chat if urgent.", true)
@@ -338,21 +354,35 @@ else
 		ply.ChatWhisper = ply:Alive() and ply.ChatWhisper or false
 
 		local rf = RecipientFilter()
+		local rfCipher = RecipientFilter()
+		local cipher = hg.Dialect and hg.Dialect.Encrypt and hg.Dialect.Active(ply) == "combine" and hg.Dialect.Encrypt(text)
 		-- local checkdist = ply.ChatWhisper and 128 * 128 or 1024 * 1024
 		for i, plya in player.Iterator() do
 			if plya:Alive() and plya.organism and plya.organism.otrub then continue end
 			if plya:Alive() and !ply:Alive() then continue end
 
 			if (hook.Run("PlayerCanSeePlayersChat", text, false, plya, ply)) then
-				rf:AddPlayer(plya)
+				if cipher and not hg.Dialect.Knows(plya) then
+					rfCipher:AddPlayer(plya)
+				else
+					rf:AddPlayer(plya)
+				end
 			end
 		end
-		
+
 		net.Start("zChatMessage")
 			net.WriteEntity(ply)
 			net.WriteString(text)
 			net.WriteBool(ply.ChatWhisper)
 		net.Send(rf)
+
+		if cipher then
+			net.Start("zChatMessage")
+				net.WriteEntity(ply)
+				net.WriteString(cipher)
+				net.WriteBool(ply.ChatWhisper)
+			net.Send(rfCipher)
+		end
 
 		-- log chat message to console
 		local textConsole = {}

@@ -620,7 +620,6 @@ local function updateCO2(owner, org, timeValue, ventilating, exerting, staminaVa
 	if ventilating then
 		ventilation = (tonumber(org.respiratoryRate) or 14) / 14 * (org.breathDepth or 1) * (org.breathEfficiency or 1) * airway * (1 - deadSpace)
 			* (1 - math.Clamp(tonumber(org.chest) or 0, 0, 1) * 0.3)
-			* (1 - math.Clamp(tonumber(org.brain) or 0, 0, 1) * 0.6)
 	end
 	local blowOff = ventilation * Lerp(perfusion, cfg.perfusionBlowOffMin, 1)
 
@@ -875,7 +874,7 @@ module[2] = function(owner, org, timeValue)
 			org.lungsfunction = true
 		end
 	end
-	local success = owner:IsBerserk() or (not org.heartstop and not org.respiratoryArrest and org.alive and not (org.brain >= 0.4 and math.random(10 - (org.brain * 10)) < 4) and org.lungsfunction)
+	local success = owner:IsBerserk() or (not org.heartstop and not org.respiratoryArrest and org.alive and org.lungsfunction)
 
 	local couldBreathe = success
 
@@ -915,7 +914,7 @@ module[2] = function(owner, org, timeValue)
 	-- an uninjured lung become punctured. The actual puncture remains until the
 	-- lung is repaired, so the condition can return after the temporary vent ends.
 	if hasPneumothorax and not needleActive then
-		org.pneumothorax = min(org.pneumothorax + timeValue / 90 * (org.lungsL[2] + org.lungsR[2]) * math.Clamp(org.conditionResistanceMul or 1, 0.05, 1), (org.lungsL[2] + org.lungsR[2]) / 2)
+		org.pneumothorax = min(org.pneumothorax + timeValue / 12 * (org.lungsL[2] + org.lungsR[2]) * math.Clamp(org.conditionResistanceMul or 1, 0.05, 1), (org.lungsL[2] + org.lungsR[2]) / 2)
 	else
 		org.pneumothorax = max(org.pneumothorax - timeValue / 10, 0)
 	end
@@ -1699,12 +1698,6 @@ kaz
 
 
 	if org.brain >= 0.5 and not (hg.organism.IsBrainDamageIgnored and hg.organism.IsBrainDamageIgnored(org)) then
-		if org.brain >= 0.5 and (mannitolK <= 0 or (org.brainHemorrhage or 0) >= 0.85) then
-			if math.random(60) == 1 then
-				org.heartstop = true
-			end
-		end
-
 		local brainCap = 0.325
 		local brainSeverity = math.Clamp((org.brain - brainCap) / (1 - brainCap), 0.1, 1)
 		org.consciousness = math.max((org.consciousness or 1) - timeValue * brainSeverity * 0.6, 0)

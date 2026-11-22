@@ -7,23 +7,6 @@ local APmodule = hg.Appearance
 hg.PointShop = hg.PointShop or {}
 local PSmodule = hg.PointShop
 
--- Appearance backpacks are gameplay inventory equipment too: they cover the
--- body holster positions, so pistols and long guns must be drawn from the bag.
-local function SyncInventoryAccessoryEffects(ply, accessories)
-	local hasBackpack = false
-	if istable(accessories) then
-		for _, accessoryID in pairs(accessories) do
-			local data = hg.Accessories and hg.Accessories[accessoryID]
-			if data and data.inventoryRole == "backpack" then
-				hasBackpack = true
-				break
-			end
-		end
-	end
-
-	ply:SetNWBool("ZCityBodyHolsterBlocked", hasBackpack)
-end
-
 local accessoryImpactTypes = DMG_BULLET + DMG_BUCKSHOT + DMG_CLUB + DMG_SLASH + DMG_CRUSH + DMG_FALL
 APmodule.ImpactConfig = {
 	minDamage = 1,
@@ -101,8 +84,6 @@ local function SyncAccessories(ply, accessories, source)
 	if ply.CachedAppearance then
 		ply.CachedAppearance.AAttachments = CopyAccessories(accessories)
 	end
-
-	SyncInventoryAccessoryEffects(ply, accessories)
 end
 
 local function GetAccessoryTransform(ent, accessory)
@@ -593,7 +574,6 @@ local function ForceApplyAppearance(ply, tbl, noModelChange)
     end
 
 	ply:SetNetVar("Accessories", tbl.AAttachments)
-	SyncInventoryAccessoryEffects(ply, tbl.AAttachments)
 
     ply.CurAppearance = {}
     table.CopyFromTo(tbl, ply.CurAppearance)

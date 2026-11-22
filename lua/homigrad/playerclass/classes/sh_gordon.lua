@@ -6,9 +6,12 @@ function CLASS.Off(self, equipment)
     if CLIENT then return end
     self:SetNetVar("HEVPower", nil)
     self:SetNetVar("HEVSuit", nil)
+    self:SetNetVar("HEVOxygen", nil)
+    self:SetNetVar("HEVOxygenActive", nil)
     self.HEV = nil
     self.organism.recoilmul = 1
     self.organism.CantCheckPulse = nil
+    self.organism.muteChat = nil
 end
 
 CLASS.NoFreeze = true
@@ -20,6 +23,17 @@ local model = "models/gfreakman/gordonf_highpoly.mdl"
 local maxMorphine = 4
 local maxMedicine = 600
 local maxPower = 100
+local maxOxygen = 100
+local HEV_O2_LOW = 20
+local HEV_O2_SAFE = 26
+
+function hg.HasHEVHelmet(ply)
+    if not IsValid(ply) then return false end
+    local armors = ply.armors
+    if armors and armors["head"] == "gordon_helmet" then return true end
+    local worn = hg.GetNewArmorOnPlacement and hg.GetNewArmorOnPlacement(ply, "head")
+    return IsValid(worn) and worn:GetClass() == "ent_new_armor_legacy_gordon_helmet"
+end
 
 local function hevchanged(ply)
     if not ply.HEV or not ply.HEV.Power then return end
@@ -37,6 +51,7 @@ local function createhev(ply)
     ply.HEV.Morphine = maxMorphine
     ply.HEV.Medicine = maxMedicine
     ply.HEV.Power = maxPower
+    ply.HEV.Oxygen = maxOxygen
     ply.organism.HEV = ply.HEV
     ply:SetNetVar("HEVMedicine", ply.HEV.Medicine)
     ply:SetNetVar("HEVPower", ply.HEV.Power)
@@ -46,6 +61,7 @@ local function createhev(ply)
     ply:SetBodygroup(2, 2)
 
     ply.organism.CantCheckPulse = true
+    ply.organism.muteChat = true
     ply.armors = {}
     ply.armors["torso"] = "gordon_armor"
     ply.armors["head"] = "gordon_helmet"
@@ -144,6 +160,7 @@ function CLASS.On(self, data)
         self.HEV.Morphine = self.HEV.Morphine or maxMorphine
         self.HEV.Medicine = self.HEV.Medicine or maxMedicine
         self.HEV.Power = self.HEV.Power or maxPower
+        self.HEV.Oxygen = self.HEV.Oxygen or maxOxygen
         if self.organism then
             self.organism.HEV = self.HEV
             self.organism.CantCheckPulse = true
@@ -465,11 +482,11 @@ if CLIENT then
     local oldHpTxt = 0
     local oldArTxt = 0
     local oldAmmoTxt = 0
+    local o2lerp = 0
     local posSight = Vector(ScrW(),ScrH(),0)
     function CLASS.HUDPaint(self)
         if not self:Alive() then return end
-        local armors = self.armors
-        if not armors or armors["head"] ~= "gordon_helmet" then return end
+        if not hg.HasHEVHelmet(self) then return end
         local hasSuit = self:GetNetVar("HEVSuit")
 
         local FRT = FrameTime() * 5
@@ -564,12 +581,30 @@ if CLIENT then
         draw.DrawText(BloodTxt,"HEVFontSmall",pos[1]+size[1]*-0.09,pos[2]+(size[2]/2),color_bld,TEXT_ALIGN_LEFT)
         draw.DrawText("Blood/Ml","HEVFontSmall",pos[1]+size[1]*0.085+1,pos[2]+(size[2]/2)+1,color_bg,TEXT_ALIGN_LEFT)
         draw.DrawText("Blood/Ml","HEVFontSmall",pos[1]+size[1]*0.085,pos[2]+(size[2]/2),color_bld,TEXT_ALIGN_LEFT)
+
+        local org = self.organism
+        local o2 = org and istable(org.o2) and tonumber(org.o2[1])
+        local showO2 = self:GetNetVar("HEVOxygenActive") or (o2 and o2 < HEV_O2_LOW)
+        o2lerp = Lerp(FRT, o2lerp, showO2 and 1 or 0)
+        if o2lerp > 0.01 then
+            local tank = math.Clamp((self:GetNetVar("HEVOxygen", maxOxygen) or maxOxygen) / maxOxygen, 0, 1)
+            local barX, barY = pos[1], pos[2] + size[2] * 1.15
+            local barW, barH = size[1] * 0.6, ScrH() * 0.008
+            local color_o2 = color_hp1:Lerp(color_crit, (1 - tank) * math.abs(math.cos(CurTime() * 3)))
+
+            color_bg.a = 200 * o2lerp
+            surface.SetDrawColor(color_bg)
+            surface.DrawRect(barX, barY, barW, barH)
+            surface.SetDrawColor(color_o2.r, color_o2.g, color_o2.b, 255 * o2lerp)
+            surface.DrawRect(barX + 1, barY + 1, (barW - 2) * tank, barH - 2)
+            surface.DrawOutlinedRect(barX, barY, barW, barH)
+            draw.DrawText("O2 " .. math.Round(tank * 100) .. "%", "HEVFontSmall", barX + barW + size[1] * 0.04, barY + barH / 2 - ScreenScale(4), Color(color_o2.r, color_o2.g, color_o2.b, 255 * o2lerp), TEXT_ALIGN_LEFT)
+        end
     end
 
     local hevMat = Material("sprites/mat_jack_helmoverlay_r")
     hook.Add("RenderScreenspaceEffects","HEV_helmet",function()
-        local armors = lply.armors
-        if not armors or armors["head"] ~= "gordon_helmet" then return end
+        if not hg.HasHEVHelmet(lply) then return end
         if lply:Alive() then
 			surface.SetDrawColor(255,132,0,200)
 			surface.SetMaterial(hevMat)
@@ -587,17 +622,13 @@ end
 if CLIENT then
     local queen = {}
     net.Receive("HEV_DAMAGE",function()
-        local armors = lply.armors
-        if not armors then return end
-        if armors["head"] ~= "gordon_helmet" then return end
+        if not hg.HasHEVHelmet(lply) then return end
         queen[#queen + 1] = net.ReadString()
     end)
     local inPlaying = 0
     hook.Add("Think","HEV_Notify",function()
-        local armors = lply.armors
         if !lply:Alive() and #queen > 0 then queen = {} return end
-        if not armors then return end
-        if armors["head"] ~= "gordon_helmet" then return end
+        if not hg.HasHEVHelmet(lply) then return end
         if inPlaying < CurTime() - 0.1 and queen[#queen] and !lply.organism.otrub then
             inPlaying = CurTime() + SoundDuration(queen[#queen])
             surface.PlaySound(queen[#queen])
@@ -607,19 +638,6 @@ if CLIENT then
 
 elseif SERVER then
     util.AddNetworkString("HEV_DAMAGE")
-
-    local CheckBones = {
-        "spine3",
-        "spine2",
-        "spine1",
-        "rleg",
-        "lleg",
-        "rarm",
-        "larm",
-        "skull",
-        "chest",
-        "pelvis"
-    }
 
     local phrases = {
         "Gordon Freeman has died. Now what?",
@@ -631,11 +649,245 @@ elseif SERVER then
     local hev_color = Color(255,125,0)
     local dead_color = Color(255,0,0)
 
+    local function hevAlert(ply, text, id, snd)
+        ply:Notify(text, 10, id, 0.5, function(ply)
+            net.Start("HEV_DAMAGE")
+                net.WriteString(snd)
+            net.Send(ply)
+        end, hev_color)
+    end
+
+    local function hevControlBleeding(ply, org)
+        local hev = ply.HEV
+        if not hev or hev.Medicine <= 0 then return end
+
+        local swep = weapons.GetStored("weapon_bandage_sh")
+        if swep and swep.Tourniquet then
+            local proxy = {GetOwner = function() return ply end}
+            local seen = {}
+            local applied = false
+
+            local function try(bone)
+                local limb = hg.GetTourniquetLimb(bone)
+                if not limb or seen[limb] then return end
+                seen[limb] = true
+                if hev.Medicine < 15 or hg.HasTourniquetOnLimb(ply, limb) then return end
+                if swep.Tourniquet(proxy, ply, bone) then
+                    hev.Medicine = hev.Medicine - 15
+                    applied = true
+                end
+            end
+
+            for _, wound in ipairs(org.arterialwounds or {}) do
+                if (wound[1] or 0) > 0 then try(wound[7] == "arteria" and "arteria" or wound[4]) end
+            end
+            for _, wound in ipairs(org.wounds or {}) do
+                if (wound[1] or 0) > 0 then try(wound[4]) end
+            end
+
+            if applied then
+                hevAlert(ply, "HEV suit has detected severe hemorrhage. Applying tourniquet.", "tourniquet_hev", "hl1/fvox/torniquette_applied.wav")
+            end
+        end
+
+        local internal = (org.internalBleed or 0) > 0.05
+        local small = false
+        for _, wound in ipairs(org.wounds or {}) do
+            if (wound[1] or 0) > 0.05 and (hg.GetTourniquetBleedMultiplier(ply, wound[4], false) or 1) > 0 then
+                small = true
+                break
+            end
+        end
+
+        local txaActive = (org.tranexamic_acid or 0) > 1 or (org.tranexamic_acid_pending or 0) > 0
+        if (internal or small) and not txaActive and hev.Medicine >= 60 then
+            hg.organism.AdministerTranexamic(org, 10)
+            hev.Medicine = hev.Medicine - 60
+            hevAlert(ply, "HEV suit has detected bleeding. Injecting tranexamic acid.", "txa_hev", "hl1/fvox/automedic_on.wav")
+        end
+    end
+
+    local HEV_O2_RATE = 6
+    local HEV_O2_REFILL = 0.5
+
+    local function hevSupplyOxygen(ply, org, timeValue)
+        local hev = ply.HEV
+        local o2 = org.o2
+        if not istable(o2) or not isnumber(o2[1]) then return end
+
+        hev.Oxygen = hev.Oxygen or maxOxygen
+        local range = tonumber(o2.range) or 30
+        local low = o2[1] < HEV_O2_LOW or (org.hevO2Active and o2[1] < HEV_O2_SAFE)
+        local active = low and hev.Oxygen > 0 and hg.HasHEVHelmet(ply)
+
+        if active then
+            local give = math.max(math.min(HEV_O2_RATE * timeValue, range - o2[1], hev.Oxygen), 0)
+            o2[1] = o2[1] + give
+            hev.Oxygen = hev.Oxygen - give
+
+            if not org.hevO2Active then
+                ply:Notify("HEV suit has detected hypoxia. Supplying emergency oxygen.", 30, "o2_hev", 0.5, function(ply)
+                    net.Start("HEV_DAMAGE")
+                        net.WriteString("hl1/fvox/automedic_on.wav")
+                    net.Send(ply)
+                end, hev_color)
+            end
+        elseif not low and hev.Oxygen < maxOxygen and ply:WaterLevel() < 3 then
+            hev.Oxygen = math.min(hev.Oxygen + HEV_O2_REFILL * timeValue, maxOxygen)
+        end
+
+        org.hevO2Active = active or nil
+
+        local rounded = math.Round(hev.Oxygen)
+        if ply:GetNetVar("HEVOxygen") ~= rounded then ply:SetNetVar("HEVOxygen", rounded) end
+        if (ply:GetNetVar("HEVOxygenActive") or false) ~= active then ply:SetNetVar("HEVOxygenActive", active) end
+    end
+
+    local HEV_AED_CHARGE = 7
+    local HEV_AED_COOLDOWN = 45
+    local HEV_AED_COST = 200
+    local HEV_THIAMINE_COST = 80
+    local HEV_SPLINT_COST = 30
+    local HEV_SURGEON_COST = 250
+    local HEV_SURGEON_BATTERY = 400
+    local HEV_SURGEON_COOLDOWN = 90
+    local hevAEDSounds = {
+        shockadvised = "defibrilator/rem_aed_shockadvised.mp3",
+        charging = "defibrilator/defib_charge.ogg",
+        standclear = "defibrilator/rem_aed_standclear.mp3",
+        shocksound = "defibrilator/rem_aed_shocksound.mp3",
+        shockdelivered = "defibrilator/rem_aed_shockdelivered.mp3",
+        shocksuccess = "defibrilator/defib_success.ogg",
+        startcpr = "defibrilator/rem_aed_startcpr.mp3",
+    }
+
+    local function hevNotify(ply, text, id)
+        ply:Notify(text, 10, id, 0, function() end, hev_color)
+    end
+
+    local function hevNeedsAED(org)
+        if not org.alive then return false end
+        if org.heartstop or org.fibrillation or org.ecgState == "asystole" or org.terminalRhythm == "asystole" then return true end
+
+        local state = hg.SimpleHealth.GetState(org)
+        return state ~= nil and (state.flatline or state.crit >= hg.SimpleHealth.CRIT_SOFT)
+    end
+
+    local function hevPlayAED(ply, snd, level)
+        local ent = hg.GetCurrentCharacter(ply)
+        if IsValid(ent) then ent:EmitSound(snd, level or 75, 100) end
+    end
+
+    local function hevAutoAED(ply, org)
+        if org.hevAEDBusy or (org.hevAEDNext or 0) > CurTime() then return end
+        if ply.HEV.Medicine < HEV_AED_COST or not hevNeedsAED(org) then return end
+
+        org.hevAEDBusy = true
+        hevNotify(ply, "HEV suit has detected a life-threatening cardiac event. Shock advised.", "aed_hev")
+        hevPlayAED(ply, hevAEDSounds.shockadvised)
+        hevPlayAED(ply, hevAEDSounds.charging)
+
+        timer.Simple(math.max(SoundDuration(hevAEDSounds.shockadvised), 0.1), function()
+            if org.hevAEDBusy then hevPlayAED(ply, hevAEDSounds.standclear) end
+        end)
+
+        timer.Simple(HEV_AED_CHARGE, function()
+            org.hevAEDBusy = nil
+            if not IsValid(ply) or not ply:Alive() or not ply.HEV or not org.alive then return end
+            if ply.HEV.Medicine < HEV_AED_COST or not hevNeedsAED(org) then return end
+
+            org.hevAEDNext = CurTime() + HEV_AED_COOLDOWN
+            ply.HEV.Medicine = ply.HEV.Medicine - HEV_AED_COST
+
+            hevPlayAED(ply, hevAEDSounds.shocksound, 85)
+            hevPlayAED(ply, hevAEDSounds.shockdelivered)
+
+            if hg.SimpleHealth.OnAEDShock then hg.SimpleHealth.OnAEDShock(org) end
+
+            org.fibrillation = false
+            org.ventricularTachycardia = nil
+            org.arrhythmia = math.max((org.arrhythmia or 0) - 0.75, 0)
+            org.heartStrain = math.max((org.heartStrain or 0) - 0.35, 0)
+            org.myocardialOxygen = math.max(org.myocardialOxygen or 0, 0.5)
+            org.defibSupportUntil = CurTime() + 4
+            org.defibDeathGrace = CurTime() + 45
+            org.aedResuscitationUntil = CurTime() + 15
+            org.epinephrineResuscitationUntil = CurTime() + 15
+            org.adrenalineAdd = 4
+
+            if hg.organism.RestoreSupportedOxygen then
+                hg.organism.RestoreSupportedOxygen(org, 0.2, {
+                    artificialSupport = true,
+                    oxygen = 12, oxygenTarget = 20, bodyoxygen = 0.5, bodyoxygenTarget = 0.7,
+                    brainoxygen = 0.4, brainoxygenTarget = 0.65, perfusion = 0.4,
+                    perfusionTarget = 0.65, myocardialOxygen = 0.5, myocardialOxygenTarget = 0.7,
+                    hypoxiaTime = 7, severeHypoxiaTime = 2, systemicIschemiaTime = 8
+                })
+            end
+            if hg.organism.ApplyAEDResuscitation then hg.organism.ApplyAEDResuscitation(org) end
+            if hg.organism.TryRestartHeartWithResuscitation then hg.organism.TryRestartHeartWithResuscitation(org) end
+
+            if org.heartstop then
+                org.heartstop = false
+                org.pulse = math.max(org.pulse or 0, 70)
+                org.heartbeat = math.max(org.heartbeat or 0, 70)
+            end
+
+            hevPlayAED(ply, hevAEDSounds.shocksuccess)
+            hevNotify(ply, "Defibrillation delivered. Epinephrine injected. Auto-pulse enabled.", "aed_hev_done")
+
+            timer.Simple(3, function()
+                if IsValid(ply) and ply:Alive() then hevPlayAED(ply, hevAEDSounds.startcpr) end
+            end)
+        end)
+    end
+
+    local function hevSevereDamage(org)
+        if not org.alive then return false end
+        local lungs = math.max(istable(org.lungsL) and (org.lungsL[1] or 0) or 0, istable(org.lungsR) and (org.lungsR[1] or 0) or 0)
+        if (org.heart or 0) > 0.3 or (org.brain or 0) > 0.25 or (org.trachea or 0) > 0.4 or lungs > 0.5 then return true end
+        if (org.internalBleed or 0) > 1 or (org.blood or 5000) < 3200 or (org.liver or 0) > 0.6 then return true end
+        for _, wound in ipairs(org.arterialwounds or {}) do
+            if (wound[1] or 0) > 0.05 then return true end
+        end
+        return hevNeedsAED(org)
+    end
+
+    local function hevAutoThiamine(ply, org)
+        if (org.thiamine or 0) > 0.3 or ply.HEV.Medicine < HEV_THIAMINE_COST then return end
+
+        ply.HEV.Medicine = ply.HEV.Medicine - HEV_THIAMINE_COST
+        org.thiamine = 1
+        hevAlert(ply, "HEV suit has detected severe organ damage. Injecting thiamine.", "thiamine_hev", "hl1/fvox/automedic_on.wav")
+    end
+
+    local function hevAutoSurgeon(ply, org)
+        if (org.hevSurgeonNext or 0) > CurTime() or ply.HEV.Medicine < HEV_SURGEON_COST then return end
+        if IsValid(ply.AutosurgeonModelEnt) or ply.AutosurgeonInProgress then return end
+
+        local rag = ply.GetRagdollEntity and ply:GetRagdollEntity()
+        local target = IsValid(rag) and rag or ply
+        local wep = ents.Create("weapon_autosurgeon_sh")
+        if not IsValid(wep) then return end
+
+        wep:Spawn()
+        wep.BuiltIn = true
+        wep:SetClip1(HEV_SURGEON_BATTERY)
+        wep:AttachUnit(ply, target, ply)
+        wep:Remove()
+
+        if not ply.AutosurgeonInProgress then return end
+
+        org.hevSurgeonNext = CurTime() + HEV_SURGEON_COOLDOWN
+        ply.HEV.Medicine = ply.HEV.Medicine - HEV_SURGEON_COST
+        hevAlert(ply, "HEV suit has detected life-threatening damage. Deploying built-in autosurgeon.", "surgeon_hev", "hl1/fvox/automedic_on.wav")
+    end
+
     hook.Add("Org Think","gordon_healing",function(ply, org, timeValue)
 
         if org.HEV and not org.alive and not org.emitflatline then
             org.emitflatline = true
-            hg.GetCurrentCharacter(ply):EmitSound("hl1/fvox/flatline.ogg")
+            hg.GetCurrentCharacter(ply):EmitSound("hl1/fvox/flatline.wav")
 
             if CurrentRound and CurrentRound().name == "coop" then
                 if zChatPrint then
@@ -650,12 +902,18 @@ elseif SERVER then
 
         if ply.PlayerClassName == "Gordon" and ply:GetNetVar("HEVSuit") then
             ply:SetNetVar("HEVMedicine", ply.HEV.Medicine)
+            hevSupplyOxygen(ply, org, timeValue)
+            hevAutoAED(ply, org)
+            if hevSevereDamage(org) then
+                hevAutoThiamine(ply, org)
+                hevAutoSurgeon(ply, org)
+            end
             if org.brain > 0.1 then
                 org.mannitol = org.brain * 2
                 
                 ply:Notify("HEV suit has detected a traumatic brain injury. Injecting mannitol.",true,"mannitol_hev",0.5,function(ply)
                     net.Start("HEV_DAMAGE")
-                        net.WriteString("hl1/fvox/automedic_on.ogg")
+                        net.WriteString("hl1/fvox/automedic_on.wav")
                     net.Send(ply)
                 end, hev_color)
             else
@@ -670,7 +928,7 @@ elseif SERVER then
 
                 ply:Notify("HEV suit has detected pneumothorax. Repairing.", true, "needle_hev", 0.5, function(ply)
                     net.Start("HEV_DAMAGE")
-                        net.WriteString("hl1/fvox/automedic_on.ogg")
+                        net.WriteString("hl1/fvox/automedic_on.wav")
                     net.Send(ply)
                 end, hev_color)
             end
@@ -690,7 +948,7 @@ elseif SERVER then
                         ply:Notify("HEV suit has detected pain receptors almost reaching the threshold. Injecting morphine.", 10, "morphine_hev", 0.5,
                         function(ply)
                             net.Start("HEV_DAMAGE")
-                                net.WriteString("hl1/fvox/morphine_shot.ogg")
+                                net.WriteString("hl1/fvox/morphine_shot.wav")
                             net.Send(ply)
                         end, hev_color)
                     end
@@ -700,7 +958,7 @@ elseif SERVER then
             if (org.CO > 10) or (org.COregen > 10) then
                 ply:Notify("HEV suit has detected a carbon monoxide presence in the organism. Neutralising.",60,"co_hev",0.5,function(ply)
                     net.Start("HEV_DAMAGE")
-                        net.WriteString("hl1/fvox/automedic_on.ogg")
+                        net.WriteString("hl1/fvox/automedic_on.wav")
                     net.Send(ply)
                 end, hev_color)
 
@@ -718,52 +976,20 @@ elseif SERVER then
             if (org.BoneCheck or 0) < CurTime() then
                 org.BoneCheck = CurTime() + 10
 
-                local bonesfixed = false
-                for _, v in ipairs(CheckBones) do
-                    if org[v] > 0 then
-                        local old = org[v]
-                        org[v] = math.max(org[v] - ply.HEV.Medicine, 0) 
-                        ply.HEV.Medicine = math.max(ply.HEV.Medicine - (old - org[v]) * 10, 0) 
-                        
-                        if old == 1 then bonesfixed = true end
-                    end
-                end
-
-                if bonesfixed then
-                    ply:Notify("HEV suit has detected fractures. Repairing.",60,"bones_hev",0.5,function(ply)
-                        net.Start("HEV_DAMAGE")
-                            net.WriteString("hl1/fvox/automedic_on.ogg")
-                        net.Send(ply)
-                    end, hev_color)
+                if ply.HEV.Medicine >= HEV_SPLINT_COST and hg.GetSplintTarget(ply) and hg.ApplySplint(ply, ply) then
+                    ply.HEV.Medicine = ply.HEV.Medicine - HEV_SPLINT_COST
+                    hevAlert(ply, "HEV suit has detected a fracture. Applying splint.", "bones_hev", "hl1/fvox/major_fracture.wav")
                 end
             end
 
-            if org.bleed > 5 then
-                if (org.BleedThink or 0) < CurTime() then
-                    org.BleedThink = CurTime() + 1
-
-                    for i, wound in pairs(org.wounds) do
-                        local old = wound[1]
-                        wound[1] = math.max(wound[1] - 5, 0)
-                        ply.HEV.Medicine = math.max(ply.HEV.Medicine - (-wound[1] + old), 0)
-                    end
-                end
+            if (org.BleedThink or 0) < CurTime() then
+                org.BleedThink = CurTime() + 3
+                hevControlBleeding(ply, org)
             end
             
             if ply.HEV.Medicine > 300 then
                 local regen = timeValue / 30
 
-                org.lleg = math.max(org.lleg - regen, 0)
-                org.rleg = math.max(org.rleg - regen, 0)
-                org.rarm = math.max(org.rarm - regen, 0)
-                org.larm = math.max(org.larm - regen, 0)
-                org.chest = math.max(org.chest - regen, 0)
-                org.pelvis = math.max(org.pelvis - regen, 0)
-                org.spine1 = math.max(org.spine1 - regen, 0)
-                org.spine2 = math.max(org.spine2 - regen, 0)
-                org.spine3 = math.max(org.spine3 - regen, 0)
-                org.skull = math.max(org.skull - regen, 0)
-            
                 org.liver = math.max(org.liver - regen, 0)
                 org.flank = math.max((org.flank or 0) - regen, 0)
                 org.heart = math.max(org.heart - regen, 0)
@@ -778,7 +1004,7 @@ elseif SERVER then
             if (org.pulse < 40) or (org.blood < 3000) or (org.o2[1] < 10) then
                 ply:Notify("HEV suit has detected a critically low pulse. Epinephrine injected. Auto-pulse enabled. Plasma injected.", 60, "pulse_hev", 0.5, function(ply)
                     net.Start("HEV_DAMAGE")
-                        net.WriteString("hl1/fvox/health_critical.ogg")
+                        net.WriteString("hl1/fvox/health_critical.wav")
                     net.Send(ply)
                 end, hev_color)
                 
@@ -817,7 +1043,7 @@ elseif SERVER then
                     
                     if ply:Health() < 35 then
                         net.Start("HEV_DAMAGE")
-                            net.WriteString("hl1/fvox/health_critical.ogg")
+                            net.WriteString("hl1/fvox/health_critical.wav")
                         net.Send(ply)
                     end
                 end)
@@ -829,43 +1055,16 @@ elseif SERVER then
                     local org = ply.organism
 
                     net.Start("HEV_DAMAGE")
-                        net.WriteString("hl1/fvox/automedic_on.ogg")
+                        net.WriteString("hl1/fvox/automedic_on.wav")
                     net.Send(ply)
 
-                    local oldMedicine = ply.HEV.Medicine
-                    
-                    timer.Create("HEV_CheckHP",5,1,function()
-                        local ammoutNeeds = 0
-
-                        for _,v in ipairs(CheckBones) do
-                            if !istable(org[v]) and org[v] > 0 then
-                                local needed = ( 1 - org[v] ) * 10
-                                org[v] = math.max(org[v] - ply.HEV.Medicine, 0) 
-                                ply.HEV.Medicine = math.max( ply.HEV.Medicine - needed, 0 ) 
-                            end
-
-                            if istable(org[v]) then
-                                for k,w in pairs(org[v]) do
-                                    local needed = ( 1 - w ) * 10
-                                    w = math.max(w - ply.HEV.Medicine, 0)
-                                    ply.HEV.Medicine = math.max( ply.HEV.Medicine - needed, 0 )
-                                end
-                            end
-                        end
-
-                        if oldMedicine ~= ply.HEV.Medicine then
-                            net.Start("HEV_DAMAGE")
-                                net.WriteString("hl1/fvox/medical_repaired.ogg")
-                            net.Send(ply)
-                        end
-                    end)
                 end)
 
                 if #ply.organism.wounds > 0 or #ply.organism.arterialwounds > 0 or ply.organism.internalBleed > 0 then
                     if ply.organism.bleed > 0.025 and (!ply.HEV.BloodLossDetect or ply.HEV.BloodLossDetect < CurTime()) then
-                        snd = "hl1/fvox/blood_loss.ogg"
+                        snd = "hl1/fvox/blood_loss.wav"
                         if ply.organism.internalBleed > 0.02 then
-                            snd = "hl1/fvox/internal_bleeding.ogg"
+                            snd = "hl1/fvox/internal_bleeding.wav"
                         end
                         net.Start("HEV_DAMAGE")
                             net.WriteString(snd)
@@ -874,38 +1073,6 @@ elseif SERVER then
                         ply.HEV.BloodLossDetect = CurTime() + 5
                     end
 
-                    timer.Create("HEV_StopBleed", 5, 1, function()
-                        if not IsValid(ply) or not ply:Alive() or ply.PlayerClassName ~= "Gordon" or ply.HEV.Medicine <= 0 then return end
-                        
-                        local bleedneedRemove = ply.organism.bleed
-                        local bleedInterNeedRemove = ply.organism.internalBleed
-
-                        ply.organism.internalBleed = math.max(ply.organism.internalBleed - ply.HEV.Medicine,0)
-                        
-                        ply.HEV.Medicine = math.max(ply.HEV.Medicine - bleedneedRemove, 0)
-                        ply.HEV.Medicine = math.max(ply.HEV.Medicine - bleedInterNeedRemove, 0)
-                        
-                        table.Empty(ply.organism.wounds)
-
-                        ply.HEV.Medicine = ply.HEV.Medicine - #ply.organism.arterialwounds * 2.5
-                        local snd = "hl1/fvox/bleeding_stopped.ogg"
-                        if #ply.organism.arterialwounds > 0 then
-                            snd = "hl1/fvox/torniquette_applied.ogg"
-                        end
-                        
-                        for i, wound in pairs(ply.organism.arterialwounds) do
-                            wound[1] = 0
-                        end
-
-                        hg.organism.MarkArterialWoundsNetDirty(ply.organism)
-                        hg.organism.MarkWoundsNetDirty(ply.organism, true)
-                        if ply.organism.bleed > 0.025 then
-                            net.Start("HEV_DAMAGE")
-                                net.WriteString(snd)
-                            net.Send(ply)
-                        end
-                        ply.HEV.Medicine = math.max(ply.HEV.Medicine, 0)
-                    end)
                 end
             end)
         end

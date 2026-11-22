@@ -1420,6 +1420,8 @@ hook.Add("PreHomigradDamage", "HGThoughtBulletBurst", function(victim, dmgInfo)
 end)
 
 local function SCPCBCheckBulletNearMiss(entity, shooter, src, hitPos, hitEntity, reported)
+	if hg.ChatLog and hg.ChatLog.BulletPath then hg.ChatLog.BulletPath(shooter, src, hitPos, hitEntity) end
+
 	local dir = hitPos - src
 	local length = dir:Length()
 	if length <= 0 then return end

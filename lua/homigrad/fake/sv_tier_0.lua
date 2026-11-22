@@ -1040,8 +1040,7 @@ function fakeBoneFlop.ReconcileSpine(org)
 	if not org then return false end
 
 	local changed = false
-	local backBroken = (org.spine1 or 0) >= (hg.organism.fake_spine1 or 1)
-		or (org.spine2 or 0) >= (hg.organism.fake_spine2 or 1)
+	local backBroken = (org.spine2 or 0) >= (hg.organism.fake_spine2 or 1)
 	if (org.spine1 or 0) < (hg.organism.fake_spine1 or 1) then
 		changed = setOpenFracture(org, "ValveBiped.Bip01_Pelvis", false) or changed
 	end

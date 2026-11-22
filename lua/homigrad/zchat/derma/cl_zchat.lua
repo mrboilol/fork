@@ -107,7 +107,7 @@ local CHAT_STYLES = {
 }
 
 local function ChatStyle()
-	return bigChat:GetBool() and CHAT_STYLES.big or CHAT_STYLES.normal
+	return hg.BigChatEnabled() and CHAT_STYLES.big or CHAT_STYLES.normal
 end
 
 local function RunZChatConVar(name, value)
@@ -979,6 +979,12 @@ end
 function PANEL:Think()
 	if self.chatPersistent ~= ChatStyle().persistent then self:ApplyChatMode() end
 
+	local historyShown = self.bActive or not (hg.BigChatHidden and hg.BigChatHidden())
+	if self.history:IsVisible() ~= historyShown then
+		self.history:SetVisible(historyShown)
+		self:UpdateEntryVisibility()
+	end
+
 	if IsValid(self.spacer) then
 		local used = 0
 		for _, panel in ipairs(self.entries) do
@@ -992,6 +998,12 @@ function PANEL:Think()
 			local bar = self.history:GetVBar()
 			if gap > 0 or self:IsScrolledToBottom() then bar:SetScroll(bar.CanvasSize) end
 		end
+	end
+
+	if self.pinBottomUntil and FrameNumber() <= self.pinBottomUntil then
+		self.history:InvalidateLayout(true)
+		local bar = self.history:GetVBar()
+		bar:SetScroll(bar.CanvasSize)
 	end
 
 	local state = self.dragState
@@ -1152,6 +1164,7 @@ function PANEL:SetActive(bActive, bRemovePrev)
 	self.history:InvalidateLayout(true)
 	local bar = self.history:GetVBar()
 	bar:SetScroll(bar.CanvasSize)
+	self.pinBottomUntil = bActive and FrameNumber() + 3 or nil
 end
 
 function PANEL:OnRemove()
@@ -1366,6 +1379,10 @@ function PANEL:MergeRepeat(panel)
 end
 
 function PANEL:AddLine(elements, streaming)
+	if not streaming and not self.bActive and hg.BigChatHidden and hg.BigChatHidden() and hg.PushChatPopup then
+		hg.PushChatPopup(elements)
+	end
+
 	local panel = self.history:Add("zChatMessage")
 	panel:Dock(TOP)
 	panel:InvalidateParent(true)
@@ -1451,14 +1468,12 @@ function hg.HiddenChatAnchor()
 	return x + w - 8, y + h - 6, #popups * popupLineHeight
 end
 
-hook.Add("HUDPaint", "zChatHiddenPopups", function()
+local function DrawPopups(deathAlpha)
 	if #popups == 0 then return end
-	if not LocalPlayer():Alive() then popups = {} return end
 
 	local now = CurTime()
 	local scale = hg.UIScale and hg.UIScale() or 1
 	local right, baseY = hg.HiddenChatAnchor()
-	local deathAlpha = hg.DeathHUDAlpha and hg.DeathHUDAlpha() or 1
 
 	surface.SetFont("zChatFont")
 	local _, lineHeight = surface.GetTextSize("Hg")
@@ -1489,17 +1504,25 @@ hook.Add("HUDPaint", "zChatHiddenPopups", function()
 			end
 		end
 	end
+end
+
+hook.Add("HUDPaint", "zChatHiddenPopups", function()
+	if not LocalPlayer():Alive() then return end
+	DrawPopups(hg.DeathHUDAlpha and hg.DeathHUDAlpha() or 1)
 end)
+
+local function DrawDeathPopups()
+	DrawPopups(1)
+end
+
+hook.Add("HG_DeathOverlayHUD", "zChatHiddenPopups", DrawDeathPopups)
+hook.Add("HG_DeathTransitionHUD", "zChatHiddenPopups", DrawDeathPopups)
 
 cvars.AddChangeCallback("zchat_hidebig", function()
 	if IsValid(hg.chat) and hg.chat.UpdateEntryVisibility then hg.chat:UpdateEntryVisibility() end
 end, "zchat_hidebig_refresh")
 
 function PANEL:AddMessage(...)
-	if hg.BigChatHidden and hg.BigChatHidden() and not self.bActive then
-		PushPopup({...})
-	end
-
 	self:AddLine({...})
 
 	chat.PlaySound()
@@ -1525,6 +1548,7 @@ do
 			wasDead = true
 		elseif wasDead then
 			wasDead = false
+			popups = {}
 			if IsValid(hg.chat) and hg.chat.ClearLines then hg.chat:ClearLines() end
 		end
 	end)

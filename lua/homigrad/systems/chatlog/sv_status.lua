@@ -56,7 +56,7 @@ local STATUSES = {
 
 			return 0
 		end,
-		lines = {false, "You are bleeding out!"},
+		lines = {"You are bleeding.", "You are bleeding out!"},
 		recover = "Your bleeding has stopped.",
 	},
 	{
@@ -263,15 +263,11 @@ hook.Add("HG_OnWakeOtrub", "hg/chatlog/wake-good", function(ply)
 		local org = ply.organism
 		if not org or org.otrub or not ply.Thought then return end
 
-		local needsSuture = hg.Suture and hg.Suture.HasOptions and hg.Suture.HasOptions(ply)
-		if not needsSuture then
-			StatusMessage(ply, "hggood_wake_suture", "You woke up. There is nothing to suture.", GOOD_COLOR)
-
-			return
-		end
-
-		if (tonumber(org.pain) or 0) < 15 and (tonumber(org.bleed) or 0) < 0.3 then
-			StatusMessage(ply, "hggood_wake_calm", "You woke up. You are not in much pain.", GOOD_COLOR)
+		local bleed = tonumber(org.bleed) or 0
+		if bleed > 5 then
+			ply:InterruptThought("There is a pool of blood below you.", BAD_COLOR)
+		elseif (tonumber(org.pain) or 0) < 15 and bleed < 0.3 then
+			ply:InterruptThought("You woke up. You are not in much pain.", GOOD_COLOR)
 		end
 	end)
 end)

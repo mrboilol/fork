@@ -1026,6 +1026,14 @@ function SimpleHealth.OnAEDShock(org)
 	state.health = SimpleHealth.GetHealth(state)
 end
 
+function SimpleHealth.OnHeartRestarted(org)
+	local state = SimpleHealth.GetState(org)
+	if not state then return end
+
+	if state.flatline then stopFlatline(org.owner, org, state) end
+	stopFibrillation(org.owner, org, state)
+end
+
 function SimpleHealth.TagWoundBrute(org, wound, dmgInfo, share)
 	local state = SimpleHealth.GetState(org)
 	if not state or not wound or classifyDamage(dmgInfo) ~= "brute" then return end
@@ -1090,9 +1098,23 @@ end
 
 local REPAIRED_ORGANS = {"heart", "liver", "flank", "gut", "pneumothorax"}
 
-local function repairOrgans(org, amount)
+local DESTROYED_MEND_TIME = 120
+
+local function repairOrgans(org, amount, timeValue)
+	org.thiamineMend = org.thiamineMend or {}
 	for _, key in ipairs(REPAIRED_ORGANS) do
-		org[key] = math.max(organDamage(org, key) - amount, 0)
+		local damage = organDamage(org, key)
+		if damage >= DESTROYED then
+			local mend = (org.thiamineMend[key] or 0) + timeValue
+			if mend >= DESTROYED_MEND_TIME then
+				org.thiamineMend[key] = nil
+				org[key] = DESTROYED - 0.001
+			else
+				org.thiamineMend[key] = mend
+			end
+		else
+			org[key] = math.max(damage - amount, 0)
+		end
 	end
 
 	for _, key in ipairs(LUNG_KEYS) do
@@ -1110,7 +1132,7 @@ local function tickOrgans(owner, org, state, timeValue)
 	end
 
 	local organConfig = CONFIG.organs
-	if state.thiamineActive then repairOrgans(org, CONFIG.toxin.thiamineOrganHeal * timeValue) end
+	if state.thiamineActive then repairOrgans(org, CONFIG.toxin.thiamineOrganHeal * timeValue, timeValue) end
 
 	local liver = organDamage(org, "liver")
 	local flank = organDamage(org, "flank")

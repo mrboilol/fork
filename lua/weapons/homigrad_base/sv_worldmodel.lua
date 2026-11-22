@@ -88,13 +88,15 @@ function SWEP:WorldModel_Transform(bNoApply, bNoAdditional)
 		local newPos,newAng = LocalToWorld(self.WorldPos, self.WorldAng + (self.WorldAng2 or angle_zero), desiredPos, desiredAng)
 		newAng:RotateAroundAxis(newAng:Forward(), 180)
 
+		local muzzlePos = self.LocalMuzzlePos and LocalToWorld(self.LocalMuzzlePos, angle_zero, newPos, newAng)
+
 		if self:ShouldUseFakeModel() then
 			newPos, newAng = LocalToWorld(self.FakePos, self.FakeAng, newPos, newAng)
 		end
 
 		if hg.EquipmentImpactPose then newPos, newAng = hg.EquipmentImpactPose(self, newPos, newAng) end
 		if hg.ResolveEquipmentClearance then
-			local clearedPos = hg.ResolveEquipmentClearance(self, owner, model:GetModel(), newPos, newAng, model:GetModelScale())
+			local clearedPos = hg.ResolveEquipmentClearance(self, owner, model:GetModel(), newPos, newAng, model:GetModelScale(), muzzlePos)
 			desiredPos = desiredPos + (clearedPos - newPos)
 			newPos = clearedPos
 		end

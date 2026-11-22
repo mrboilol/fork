@@ -81,6 +81,115 @@ local function PrintReactionCheck(ply, org, head)
 	ply:ChatPrint(((org.o2 and org.o2.curregen == 0) or org.holdingbreath or org.respiratoryArrest) and "Not breathing." or "Breathing.")
 end
 
+hg.PrintPerfusionDiagnosis = PrintPerfusionDiagnosis
+hg.PrintReactionCheck = PrintReactionCheck
+
+local chokeMinStrength = 0.15
+local chokeStunTime = 3
+local chokeStruggleGain = 0.1
+local chokeInterruptDrop = 0.1
+
+local function GetChokeArmStrength(ply)
+	return (hg.GetArmEffectiveness(ply, "larm") + hg.GetArmEffectiveness(ply, "rarm")) * 0.5
+end
+
+local function GetChokeMobility(victim)
+	local org = victim.organism
+	if not org then return 0 end
+
+	local arms = (hg.GetArmEffectiveness(victim, "larm") + hg.GetArmEffectiveness(victim, "rarm")) * 0.5
+	local legs = (hg.GetLimbEffectiveness(org, "lleg") + hg.GetLimbEffectiveness(org, "rleg")) * 0.5
+	local mobility = arms * 0.6 + legs * 0.15 + math.Clamp(tonumber(org.consciousness) or 1, 0, 1) * 0.25
+	if org.o2 and org.o2.range and org.o2.range > 0 then
+		mobility = mobility * (0.4 + 0.6 * math.Clamp((org.o2[1] or 0) / org.o2.range, 0, 1))
+	end
+
+	return math.Clamp(mobility, 0, 1)
+end
+
+local function GetActiveChoke(victim)
+	local state = victim.hgChoke
+	if state and state.untilTime > CurTime() and IsValid(state.by) then return state end
+end
+
+function hg.ChokeStruggle(victim)
+	if not IsValid(victim) then return false end
+	local state = GetActiveChoke(victim)
+	if not state then return false end
+
+	local org = victim.organism
+	if not org or org.otrub or not victim:Alive() then return true end
+
+	local strength = GetChokeArmStrength(state.by)
+	local ability = math.Clamp((GetChokeMobility(victim) - 0.3) / 0.7, 0, 1)
+	state.bar = state.bar + chokeStruggleGain * ability ^ 1.5 * (1.6 - 0.9 * strength)
+
+	if state.bar >= 1 then
+		local choker = state.by
+		victim.hgChoke = nil
+		choker.hgChokeUntil = nil
+		hg.LightStunPlayer(choker, chokeStunTime)
+		victim:Notify("You break free.", 4, "hand_choke_free")
+		choker:Notify("They broke your hold.", 4, "hand_choke_broken")
+	end
+
+	return true
+end
+
+function SWEP:ChokeThink(ply, victim, org)
+	if not (IsValid(victim) and victim:IsPlayer() and victim ~= ply and victim:Alive() and org and org.alive) then return false end
+
+	local strength = GetChokeArmStrength(ply)
+	if strength < chokeMinStrength then return false end
+
+	local now = CurTime()
+	local state = victim.hgChoke
+	if not state or state.by ~= ply or state.untilTime < now then
+		state = {by = ply, bar = 0, last = now}
+		victim.hgChoke = state
+		victim:Notify("Someone is choking you. Mash the fake key to break free.", 6, "hand_choke_start")
+	end
+
+	local dt = math.min(now - state.last, 0.1)
+	state.last = now
+	state.untilTime = now + 0.3
+	state.bar = math.max(state.bar - 0.12 * (0.3 + 0.7 * strength) * dt, 0)
+	ply.hgChokeUntil = now + 0.3
+	ply.hgChokeVictim = victim
+
+	if org.o2 and org.o2[1] then
+		org.o2[1] = math.max(org.o2[1] - 7 * strength * dt, 0)
+		if strength > 0.4 then org.o2.curregen = 0 end
+	end
+	if org.stamina and org.stamina.subadd ~= nil then
+		org.stamina.subadd = org.stamina.subadd + 6 * dt
+	end
+
+	return true
+end
+
+hook.Add("EntityTakeDamage", "HG_ChokeInterrupt", function(ent, dmginfo)
+	if not IsValid(ent) or dmginfo:GetDamage() <= 0 then return end
+	local attacker = dmginfo:GetAttacker()
+
+	if ent:IsPlayer() and (ent.hgChokeUntil or 0) > CurTime() then
+		local victim = ent.hgChokeVictim
+		if attacker == ent or attacker == victim then return end
+		ent.hgChokeUntil = nil
+		if IsValid(victim) then victim.hgChoke = nil end
+		timer.Simple(0, function()
+			if IsValid(ent) then hg.LightStunPlayer(ent, chokeStunTime) end
+		end)
+		return
+	end
+
+	local owner = ent:IsRagdoll() and hg.RagdollOwner(ent) or ent
+	local state = IsValid(owner) and owner:IsPlayer() and GetActiveChoke(owner)
+	if state and attacker ~= state.by then
+		state.bar = math.max(state.bar - chokeInterruptDrop, 0)
+	end
+end)
+
 local ang4 = Angle(0,0,180)
 local ang5 = Angle(0,0,0)
 
@@ -297,7 +406,7 @@ function SWEP:SecondaryAttack()
 		local pos = hg.eye(owner)
 		local org = owner.organism
 		local chosenArm, isRight, isBroken = hg.GetPrioritizedArm(owner)
-		if org and hg.IsLimbIncapacitated(org, isRight and "rarm" or "larm") then return end
+		if org and not hg.IsArmUsable(org, isRight and "rarm" or "larm") then return end
 		local reachDist = self.ReachDistance
 		if isRight then
 			reachDist = reachDist * 1.25 -- 25% better reach with right arm!
@@ -576,7 +685,9 @@ function SWEP:ApplyForce()
 				tr.filter = {self.CarryEnt, self, ply}
 				local trace = util.TraceLine(tr)
 				
-				if bone != "ValveBiped.Bip01_Spine2" or !trace.Hit then
+				local choking = bone == "ValveBiped.Bip01_Head1" and not IsValid(ply.FakeRagdoll) and self:ChokeThink(ply, hg.RagdollOwner(self.CarryEnt), org)
+
+				if not choking and (bone != "ValveBiped.Bip01_Spine2" or !trace.Hit) then
 					phys:ApplyForceCenter(ply:GetAimVector() * math.min(5000, phys:GetMass() * 800) * GetCombatStrengthMul(ply))
 					self:SetCarrying()
 				end
@@ -1192,6 +1303,7 @@ end
 function SWEP:AttackFront(special_attack, rand)
         if CLIENT then return end
         local owner = self:GetOwner()
+        if hg.ChatLog and hg.ChatLog.Swing then hg.ChatLog.Swing(owner, self) end
         --self.PenetrationCopy = -(-self.Penetration) -- это как
         owner:LagCompensation(true)
         local attackDist = special_attack and (self.ReachDistance + 8) or 45

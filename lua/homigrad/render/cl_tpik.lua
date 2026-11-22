@@ -738,6 +738,7 @@ function hg.MainTPIKFunction(ent, ply, wpn)
         if hg.WallBangTPIK then hg.WallBangTPIK(ent, ply, wpn) end
         if hg.PickupReachTPIK then hg.PickupReachTPIK(ent, ply, wpn) end
         if hg.WoundHoldTPIK then hg.WoundHoldTPIK(ent, ply, wpn) end
+        if hg.PlayerInteractTPIK then hg.PlayerInteractTPIK(ent, ply, wpn) end
         hg.DoZManip(ent, ply)
         //local systime = SysTime()
         hg.DoTPIK(ply, ent)
@@ -1590,7 +1591,7 @@ function hg.DragHands(ply,self)
         --ply_spine_matrix:SetAngles(matang)
         --hg.bone_apply_matrix(ply, ply_spine_index, ply_spine_matrix)
 
-		local amputee = ply.organism and ply.organism.larmamputated
+		local amputee = ply.organism and not hg.IsArmUsable(ply.organism, "larm")
 
 		local posDot = (pos - ply_spine_matrix:GetTranslation()):GetNormalized():Dot(ply_spine_matrix:GetAngles():Forward()) * -50
 		local posMul = math_Clamp(-(-posDot / 20), 0.1, 1.5)

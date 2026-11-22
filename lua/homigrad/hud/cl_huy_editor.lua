@@ -4,6 +4,8 @@ hg.HudEdit = hg.HudEdit or {}
 local HudEdit = hg.HudEdit
 local SAVE_FILE = "hg_hud_layout.txt"
 local RECT_MAX_AGE = 0.25
+local SNAP_DIST = 14
+local WIGGLE_LIMIT = 45
 
 HudEdit.offsets = HudEdit.offsets or {}
 HudEdit.rects = HudEdit.rects or {}
@@ -16,9 +18,9 @@ local ELEMENTS = {
 }
 
 local TOGGLES = {
-	{label = "Sub Rosa figure", cvar = "sv_subrosa", element = "subrosa"},
-	{label = "Moodles", cvar = "sv_moodles", element = "moodles"},
-	{label = "Big chat", cvar = "sv_bigchat", element = "chat"},
+	{label = "Sub Rosa figure", cvar = "hg_hud_subrosa", element = "subrosa"},
+	{label = "Moodles", cvar = "hg_hud_moodles", element = "moodles"},
+	{label = "Big chat", cvar = "hg_hud_bigchat", element = "chat"},
 	{label = "Face (nilguy)", cvar = "hg_hidenilguy", invert = true, element = "face"},
 	{label = "Face as first moodle", cvar = "hg_nilguyisamoodle"},
 	{label = "Hide big chat box (pop-ups only)", cvar = "zchat_hidebig"},
@@ -161,7 +163,54 @@ function HudEdit.Open()
 			end
 		end
 
+		if drag then
+			surface.SetDrawColor(255, 255, 255, 40)
+			surface.DrawRect(math.floor(w * 0.5), 0, 1, h)
+			surface.DrawRect(0, math.floor(h * 0.5), w, 1)
+
+			surface.SetDrawColor(80, 220, 255, 230)
+			if drag.lineX then surface.DrawRect(math.Clamp(math.floor(drag.lineX), 0, w - 1), 0, 1, h) end
+			if drag.lineY then surface.DrawRect(0, math.Clamp(math.floor(drag.lineY), 0, h - 1), w, 1) end
+		end
+
 		draw.SimpleText("Hud editor: drag elements with left mouse, right click an element to erase it, Esc to finish", "HomigradFontMedium", w * 0.5, 14, color_white, TEXT_ALIGN_CENTER)
+	end
+
+	local function snapAxis(pos, size, screen)
+		local best, bestDist, line
+		local anchors = {{0, 0}, {size * 0.5, screen * 0.5}, {size, screen}}
+		for _, anchor in ipairs(anchors) do
+			local dist = math.abs(pos + anchor[1] - anchor[2])
+			if dist <= SNAP_DIST and (not bestDist or dist < bestDist) then
+				best, bestDist, line = anchor[2] - anchor[1], dist, anchor[2]
+			end
+		end
+
+		if best then return best, line end
+
+		return pos
+	end
+
+	local function wiggleSnap(state, axis, delta, raw, size, screen)
+		local snapped, line = snapAxis(raw, size, screen)
+		local freeKey, wiggleKey = "free" .. axis, "wiggle" .. axis
+
+		if not line then
+			state[freeKey], state[wiggleKey] = false, 0
+
+			return raw
+		end
+
+		if state[freeKey] then return raw end
+
+		state[wiggleKey] = (state[wiggleKey] or 0) + math.abs(delta)
+		if state[wiggleKey] > WIGGLE_LIMIT then
+			state[freeKey] = true
+
+			return raw
+		end
+
+		return snapped, line
 	end
 
 	function panel:OnMousePressed(code)
@@ -170,7 +219,8 @@ function HudEdit.Open()
 		if not id then return end
 
 		if code == MOUSE_LEFT then
-			drag = {id = id, x = x, y = y}
+			local rx, ry, rw, rh = elementRect(id)
+			drag = {id = id, x = x, y = y, rawX = rx, rawY = ry, curX = rx, curY = ry, w = rw, h = rh}
 		elseif code == MOUSE_RIGHT then
 			local toggle = toggleFor(id)
 			if toggle then setToggle(toggle, false) end
@@ -187,8 +237,21 @@ function HudEdit.Open()
 		hovered = hitTest(x, y)
 
 		if drag then
-			moveElement(drag.id, x - drag.x, y - drag.y)
+			local dx, dy = x - drag.x, y - drag.y
+			drag.rawX, drag.rawY = drag.rawX + dx, drag.rawY + dy
 			drag.x, drag.y = x, y
+
+			if drag.id == "chat" then
+				local cx, cy = elementRect("chat")
+				if cx then drag.curX, drag.curY = cx, cy end
+			end
+
+			local snapX, lineX = wiggleSnap(drag, "X", dx, drag.rawX, drag.w, ScrW())
+			local snapY, lineY = wiggleSnap(drag, "Y", dy, drag.rawY, drag.h, ScrH())
+			drag.lineX, drag.lineY = lineX, lineY
+
+			moveElement(drag.id, snapX - drag.curX, snapY - drag.curY)
+			drag.curX, drag.curY = snapX, snapY
 		end
 
 		for _, check in ipairs(self.checks or {}) do
@@ -202,7 +265,13 @@ function HudEdit.Open()
 	end
 
 	function panel:OnKeyCodePressed(key)
-		if key == KEY_ESCAPE then self:Remove() end
+		if key ~= KEY_ESCAPE then return end
+
+		self:Remove()
+		timer.Simple(0, function()
+			if IsValid(MainMenu) then return end
+			hook.Run("OnPauseMenuShow")
+		end)
 	end
 
 	local list = vgui.Create("DPanel", panel)
@@ -254,3 +323,16 @@ end
 concommand.Add("hg_hud_edit", function()
 	HudEdit.Open()
 end)
+
+hook.Add("OnShowZCityPause", "HudEditEsc", function()
+	if IsValid(HudEdit.panel) then HudEdit.panel:Remove() end
+end)
+
+list.Set("DesktopWindows", "HomigradHudEditor", {
+	title = "Edit HUD",
+	icon = "icon64/tool.png",
+	init = function()
+		RunConsoleCommand("-menu_context")
+		timer.Simple(0.1, HudEdit.Open)
+	end
+})

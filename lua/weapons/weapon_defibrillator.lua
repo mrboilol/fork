@@ -122,13 +122,10 @@ local AEDSounds = {
 	startcpr = "defibrilator/rem_aed_startcpr.mp3"
 }
 
-local AEDChargeTime = 7.75
+local AEDChargeTime = 7
 
-local function AEDChargeDelay(fallback)
-	local duration = SoundDuration(AEDSounds.charging)
-	if duration and duration > 0 then return duration end
-
-	return fallback
+local function AEDChargeDelay()
+	return AEDChargeTime
 end
 
 local AEDNoSoundCooldown = {

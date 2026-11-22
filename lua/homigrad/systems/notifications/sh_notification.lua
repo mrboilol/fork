@@ -333,6 +333,10 @@ if CLIENT then
 		ResetThoughts(true)
 	end, "hg_thoughts_bigchat_switch")
 
+	cvars.AddChangeCallback("hg_hud_bigchat", function()
+		ResetThoughts(true)
+	end, "hg_thoughts_bigchat_client_switch")
+
 	cvars.AddChangeCallback("zchat_hidebig", function()
 		ResetThoughts(true)
 	end, "hg_thoughts_hidebig_switch")
@@ -373,6 +377,13 @@ if CLIENT then
 		end
 
 		if lply:IsBerserk() then
+			return
+		end
+
+		if hg_newthoughts:GetBool() and ThoughtsInChat() and isstring(msg) and msg ~= "" then
+			local elements = {clr and Color(clr.r, clr.g, clr.b, 255) or (hg.ChatLog and hg.ChatLog.COLOR_STATEMENT) or color_white, utf8.force(msg)}
+			hg.chat:AddLine(elements)
+			if hg.BigChatHidden and hg.BigChatHidden() and hg.PushChatPopup then hg.PushChatPopup(elements) end
 			return
 		end
 
@@ -532,6 +543,16 @@ if CLIENT then
 	end)
 
 	hg.CreateNotification = CreateNotification
+
+	local legacyToast = notification.AddLegacy
+	function notification.AddLegacy(text, kind, length)
+		if hg_newthoughts:GetBool() and ThoughtsInChat() and isstring(text) and text ~= "" then
+			hg.chat:AddLine({hg.ChatLog and hg.ChatLog.COLOR_STATEMENT or color_white, text})
+			return
+		end
+
+		return legacyToast(text, kind, length)
+	end
 	hg.CreateNotificationBerserk = CreateNotificationBerserk
 	hg.CreateThought = CreateThought
 	local colred = Color(255,0,0)

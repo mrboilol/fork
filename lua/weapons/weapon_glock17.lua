@@ -317,7 +317,7 @@ if CLIENT then
 
 	function SWEP:DrawDroppedGlock()
 		local owner = self:GetOwner()
-		if IsValid(owner) and owner:IsPlayer() then return end
+		if IsValid(owner) and (owner:IsPlayer() or IsValid(owner.FakeRagdoll)) then return end
 		self:CreateDroppedGlockModels()
 		local fake = self.DroppedGlockModel
 		if not IsValid(fake) then return end

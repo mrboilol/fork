@@ -109,8 +109,15 @@ end
 --//
 --\\ Use function
     function ENT:Use(entUser)
-        local CanWear, Slot = self:CanWear(entUser) 
-        if !CanWear then entUser:GetEquipmentBySlot(Slot):Unwear(entUser) return end
+        local CanWear, Slot = self:CanWear(entUser)
+        for _ = 1, 4 do
+            if CanWear then break end
+            local worn = Slot and entUser:GetEquipmentBySlot(Slot)
+            if !IsValid(worn) then return end
+            worn:Unwear(entUser)
+            CanWear, Slot = self:CanWear(entUser)
+        end
+        if !CanWear then return end
 
         self:Wear(entUser)
     end

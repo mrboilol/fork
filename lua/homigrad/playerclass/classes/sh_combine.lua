@@ -232,6 +232,8 @@ function CLASS.Off(self)
 	self:SetNWString("PlayerRole", nil)
 	self:SetNWString("PlayerName", self.oldname_cmb or self:GetNWString("PlayerName"))
     self.organism.CantCheckPulse = nil
+    self.organism.dialectCombine = nil
+    self.organism.dialect = nil
     self.leader = nil
 	hook.Remove("OnEntityCreated", "relation_shipdo"..self:EntIndex())
 end
@@ -305,6 +307,7 @@ function CLASS.On(self, data)
     end
 
     self.organism.CantCheckPulse = true
+    self.organism.dialectCombine = true
 
     --;; Армор
     self.armors = {}

@@ -700,8 +700,7 @@ hg.screeneffects_config = {
 	painLayerVolumeMul = 1,
 	criticalLoopPath = "sound/playersounds/criticalloop.ogg",
 	criticalLoopOtrubPath = "sound/playersounds/criticalloop-unconscious.ogg",
-	criticalHeartbeatStart = 160,
-	criticalHeartbeatFull = 200,
+	criticalSeverityStart = 0.5,
 	criticalLoopVolume = 0.8,
 	painOtrubPath = "sound/playersounds/painotrub.mp3",
 	wrapsPath = "sound/playersounds/wraps.ogg",
@@ -2070,13 +2069,9 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end)
 	end
 
-	if selectedDyingMode == 11 and canRetrySound("AsphyxiationStation", AsphyxiationStation) then
+	if canRetrySound("AsphyxiationStation", AsphyxiationStation) then
 		sound.PlayFile("sound/asphyxiation.ogg", "noblock noplay", function(station)
 			if IsValid(station) then
-				if getServerSoundMode("hg_dyingsound", 12) != 11 then
-					station:Stop()
-					return
-				end
 				station:SetVolume(0)
 				station:Play()
 				AsphyxiationStation = station
@@ -2631,7 +2626,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 
 
 	local terminalDyingVolume = 0
-	local asphyxiationVolume = 0
 	if IsValid(IncapacitatedStation) then
 		IncapacitatedStation:SetVolume(0)
 	end
@@ -2690,7 +2684,9 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				end)
 			end
 
-			local dyingAudioTarget = math.Clamp((o2 - 1) / 99 +(brain > 0.2 and (brain - 0.2) * 2.5 or 0), 0, 1.2)
+			local simpleState = hg.SimpleHealth.GetLocalState()
+			local lowO2Audio = ((org.o2[1] or 30) + (org.CO or 0)) < 25 or (simpleState and simpleState.oxy >= 50)
+			local dyingAudioTarget = math.Clamp((lowO2Audio and (o2 - 1) / 99 or 0) +(brain > 0.2 and (brain - 0.2) * 2.5 or 0), 0, 1.2)
 			local blood = org.blood or 5000
 			local bleed = org.bleed or 0
 			if blood < 4000 and bleed > 0 then
@@ -2957,7 +2953,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				if IsValid(VitalityStation) then
 					VitalityStation:SetVolume(0)
 				end
-				asphyxiationVolume = consciousVol
 			elseif dyingMode == 12 then
 				if IsValid(NoiseStation2) then
 					NoiseStation2:SetVolume(0)
@@ -3033,9 +3028,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			hg.SetHellVolume(0)
 		end
 		
-		if IsValid(AsphyxiationStation) then
-			AsphyxiationStation:SetVolume(asphyxiationVolume)
-		end
 		if (o2 > 20 or incapacitated) and org.otrub then
 			local otrubMode = getServerSoundMode("hg_otrubsound", 0)
 			-- OTRU audio is selected solely by hg_otrubsound.  Remorseism
@@ -3156,13 +3148,11 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		if IsValid(SonimCookedStation) then SonimCookedStation:SetVolume(0) end
 		if IsValid(RemDying1Station) then RemDying1Station:SetVolume(0) end
 		if IsValid(VitalityStation) then VitalityStation:SetVolume(0) end
-		if IsValid(AsphyxiationStation) then AsphyxiationStation:SetVolume(0) end
 		setItsHopelessVolume(0)
 		hg.SetHellVolume(0)
-		if simpleMuted and IsValid(IncapacitatedStation) then IncapacitatedStation:SetVolume(0) end
 	end
 
-	hg.screeneffects_sound.criticalFade = LerpFT(0.03, hg.screeneffects_sound.criticalFade or 0, painMode == 7 and math.Clamp(((org.heartbeat or 0) - hg.screeneffects_config.criticalHeartbeatStart) / (hg.screeneffects_config.criticalHeartbeatFull - hg.screeneffects_config.criticalHeartbeatStart), 0, 1) * hg.screeneffects_config.criticalLoopVolume or 0)
+	hg.screeneffects_sound.criticalFade = LerpFT(0.03, hg.screeneffects_sound.criticalFade or 0, (painMode == 6 or painMode == 7) and math.Clamp(((hg.GetCardiacSeverity and hg.GetCardiacSeverity(org) or 0) - hg.screeneffects_config.criticalSeverityStart) / (1 - hg.screeneffects_config.criticalSeverityStart), 0, 1) * hg.screeneffects_config.criticalLoopVolume or 0)
 	hg.ScreenEffectsLoop("criticalLoop", hg.screeneffects_config.criticalLoopPath, org.otrub and 0 or hg.screeneffects_sound.criticalFade)
 	hg.ScreenEffectsLoop("criticalLoopOtrub", hg.screeneffects_config.criticalLoopOtrubPath, org.otrub and hg.screeneffects_sound.criticalFade or 0)
 	hg.screeneffects_sound.wrapsFade = LerpFT(org.convulsing and 0.06 or 0.03, hg.screeneffects_sound.wrapsFade or 0, painMode == 7 and math.max(org.otrub and math.Clamp((O2Lerp - 20) / 80 + (brain > 0.3 and (brain - 0.3) * 5 or 0), 0, 1) or 0, org.convulsing and not (GetConVar("hg_incapacitation") and GetConVar("hg_incapacitation"):GetBool()) and 1 or 0) or 0)
@@ -4043,4 +4033,27 @@ hook.Add("HUDPaint", "DrawSkullBrokenBlackSquares", function()
 			DrawSkullBlackSquare(rag, localPlayer, camPos, camAngles)
 		end
 	end
+end)
+
+local asphyxiationFade = 0
+
+hook.Add("Think", "hg_asphyxiation_track", function()
+	if not IsValid(AsphyxiationStation) then return end
+
+	local ply = LocalPlayer()
+	local org = IsValid(ply) and ply:Alive() and (ply.new_organism or ply.organism)
+	local target = 0
+
+	if org then
+		local simple = hg.SimpleHealth and hg.SimpleHealth.GetLocalState and hg.SimpleHealth.GetLocalState()
+		if simple then
+			if simple.oxy >= 25 then target = Lerp(math.Clamp((simple.oxy - 25) / 70, 0, 1), 0.25, 1) end
+		elseif org.o2 then
+			local pct = (org.o2[1] or 30) / math.max(org.o2.range or 30, 1) * 100
+			if pct < 25 then target = Lerp(math.Clamp((25 - pct) / 20, 0, 1), 1 / 6, 1) end
+		end
+	end
+
+	asphyxiationFade = LerpFT(0.02, asphyxiationFade, target)
+	AsphyxiationStation:SetVolume(asphyxiationFade * snd_musicvolume:GetFloat())
 end)

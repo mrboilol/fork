@@ -578,12 +578,17 @@ function SWEP:SetHandPos(noset)
 	local checkingAfflictions = self:GetCheckingAfflictions() or admiringAfflictions
 	self.afflictionPoseLerp = LerpFT(0.1, self.afflictionPoseLerp or 0, checkingAfflictions and 1 or 0)
 	if self.afflictionPoseLerp > 0.01 then
-		local chest = ply:GetBoneMatrix(ply:LookupBone("ValveBiped.Bip01_Spine2") or ply:LookupBone("ValveBiped.Bip01_Spine4"))
+		local neckBone = ply:LookupBone("ValveBiped.Bip01_Neck1") or ply:LookupBone("ValveBiped.Bip01_Spine4")
+		local chest = neckBone and ply:GetBoneMatrix(neckBone)
 		if chest then
-			local chestPos, chestAng = chest:GetTranslation(), chest:GetAngles()
-			local inspectPos = chestPos + chestAng:Forward() * 9 + chestAng:Right() * -4 + chestAng:Up() * 2
+			local bodyAng = Angle(0, ply:GetAngles().y, 0)
+			local fwd, right, up = bodyAng:Forward(), bodyAng:Right(), bodyAng:Up()
+			local neckPos = chest:GetTranslation()
+			local inspectPos = neckPos + fwd * 4.5 - right * 3 - up * 1.5
 			inspectPos = Lerp(self.afflictionPoseLerp, lhmat:GetTranslation(), inspectPos)
-			hg.DragHandsToPos(ply, self, inspectPos, false, 0, chestAng:Forward(), Angle(-80, -90, 0), Angle(-80, 90, 0))
+			local fingerDir = (right * 0.9 + up * 0.3):GetNormalized()
+			local handAng = fingerDir:AngleEx(fwd)
+			hg.DragHandsToPos(ply, self, inspectPos, true, 0, Vector(1, 0, 0), handAng, handAng)
 			return
 		end
 	end

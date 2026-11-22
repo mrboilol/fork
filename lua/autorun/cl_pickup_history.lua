@@ -29,8 +29,7 @@ local color_chat = Color(255, 255, 255)
 local bigChatConVar
 
 local function SendToBigChat(text, isLoss)
-    bigChatConVar = bigChatConVar or GetConVar("sv_bigchat")
-    if not bigChatConVar or not bigChatConVar:GetBool() then return false end
+    if not (hg and hg.BigChatEnabled and hg.BigChatEnabled()) then return false end
 
     local chat = hg and hg.chat
     if not IsValid(chat) or not chat.AddLine then return false end

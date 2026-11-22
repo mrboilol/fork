@@ -78,7 +78,8 @@ hook.Add("Player_Death","removeorg",function(ply)
 	ply.organism = nil
 	ply.new_organism = nil
 
-	if IsValid(ply.FakeRagdoll) then
+	local rag = ply.FakeRagdoll
+	if IsValid(rag) and not (istable(rag.organism) and rag.organism.owner == rag) then
 		ply.FakeRagdoll.organism = nil
 		ply.FakeRagdoll.new_organism = nil
 	end

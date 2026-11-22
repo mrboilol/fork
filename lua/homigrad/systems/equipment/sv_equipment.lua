@@ -686,6 +686,8 @@ function hg.AddArmor(ply, equipment, ent)
 	if ply:IsPlayer() and (placement == "torso" or placement == "head") and (not ent or ent.Base == "armor_base" and ent.name == equipment and not (ent.broken or ent:GetNWBool("ArmorBroken", false))) then
 		local newArmor = hg.CreateLegacyNewArmor(equipment)
 		if IsValid(newArmor) then
+			local wornNew = not ply.armors[placement] and hg.GetNewArmorOnPlacement(ply, placement)
+			if IsValid(wornNew) then wornNew:Unwear(ply) end
 			if newArmor:CanWear(ply) then
 				newArmor:Wear(ply)
 				return true
@@ -706,22 +708,27 @@ function hg.AddArmor(ply, equipment, ent)
 		end
 	end
 
-    for plc, arm in pairs(ply.armors) do
-        //if not hg.armor[plc] or not hg.armor[plc][arm] or not hg.armor[plc][arm].restricted then continue end
+	local swapDropped = false
+	local function dropForSwap(equipped)
+		if not equipped then return true end
+		if swapDropped then ply.DropCD = nil end
+		if not hg.DropArmor(ply, equipped) then return false end
+		swapDropped = true
+		return true
+	end
 
+    for plc, arm in pairs(ply.armors) do
         if hg.armor[plc][arm].restricted and table.HasValue(hg.armor[plc][arm].restricted, placement) then
-            if not hg.DropArmor(ply, ply.armors[plc]) then return false end
+            if not dropForSwap(ply.armors[plc]) then return false end
         end
-        
+
         if hg.armor[placement][equipment].restricted and table.HasValue(hg.armor[placement][equipment].restricted, plc) then
-            if not hg.DropArmor(ply, ply.armors[plc]) then return false end
+            if not dropForSwap(ply.armors[plc]) then return false end
         end
     end
 
     if ply.armors[placement] and ply:IsPlayer() then
-		local currentArmorData = hg.armor[placement] and hg.armor[placement][ply.armors[placement]]
-		
-        if not hg.DropArmor(ply, ply.armors[placement]) then return false end
+        if not dropForSwap(ply.armors[placement]) then return false end
     end
     
     if hg.armor[placement][equipment].AfterPickup then

@@ -206,6 +206,36 @@ local function UseCriticalHeartbeat(org)
         or rate >= 200 or (rate > 0 and rate <= 35)
 end
 
+local function GetCardiacSeverity(org)
+    if not org then return 0 end
+
+    local rate = tonumber(org.heartbeat) or 0
+    local rhythm = org.ecgState
+    local severity = math.Clamp((rate - 120) / 70, 0, 1)
+
+    if rate > 0 then
+        severity = math.max(severity, math.Clamp((55 - rate) / 25, 0, 1))
+    end
+
+    if IsVentricularFibrillation(org) then
+        severity = 1
+    elseif rhythm and rhythm ~= "normal_sinus" and rhythm ~= "sinus_bradycardia" and rhythm ~= "sinus_tachycardia" then
+        severity = math.max(severity, 0.8)
+    end
+
+    severity = math.max(severity,
+        math.Clamp((tonumber(org.arrhythmia) or 0) / 0.6, 0, 1),
+        math.Clamp((tonumber(org.palpitations) or 0) / 0.9, 0, 1))
+
+    if IsCirculationCritical(org) then severity = 1 end
+    if org.critical == true or org.incapacitated == true then severity = math.max(severity, 0.7) end
+
+    return severity
+end
+
+hg = hg or {}
+hg.GetCardiacSeverity = GetCardiacSeverity
+
 local function GetHeartbeatVolume(org)
     if not org then return 0.2 end
     local hurt = math.Clamp((5000 - (org.blood or 5000)) / 5000, 0, 1) * 0.4
@@ -217,7 +247,7 @@ local function GetHeartbeatVolume(org)
         hurt = math.min(hurt, 0.2)
     end
 
-    return math.Clamp(0.2 + hurt, 0.2, 1.0)
+    return math.Clamp(math.max(0.2 + hurt, 0.2 + GetCardiacSeverity(org) * 0.8), 0.2, 1.0)
 end
 
 -- Phase crossing detection from oldring
@@ -373,9 +403,12 @@ local alertPlayed = false
 local alertSound = nil
 
 local g_PulseCheckTarget = nil
+local g_PulseCheckAt = 0
+local ecgAlphaSelfCheck = 0
 
 usermessage.Hook("hg_StartPulseCheckECG", function(msg)
     g_PulseCheckTarget = msg:ReadEntity()
+    g_PulseCheckAt = CurTime()
 end)
 
 local PULSE_FIGURE_SCALE = 0.55
@@ -384,11 +417,24 @@ local PULSE_SCREEN_MARGIN = 0.04
 
 local function GetPulseCheckAnchor(ply, target)
     local leftHand = ply:GetNetVar("carryent2") == target and ply:GetNetVar("carryent") ~= target
-    local body = hg.GetCurrentCharacter and hg.GetCurrentCharacter(ply) or ply
-    local bone = IsValid(body) and body:LookupBone(leftHand and "ValveBiped.Bip01_L_Hand" or "ValveBiped.Bip01_R_Hand")
-    local matrix = bone and body:GetBoneMatrix(bone)
-    if matrix then
-        local screen = matrix:GetTranslation():ToScreen()
+    if not leftHand and ply:GetNetVar("carryent") == target then
+        leftHand = hg.IsArmUsable(ply.organism, "larm")
+    end
+    if ply:GetNWString("hg_ia_mode", "") == "check" and ply:GetNWEntity("hg_ia_target") == target then
+        leftHand = ply:GetNWInt("hg_ia_hand", 1) == 1
+    end
+    local handWorld
+    if ply:GetNWString("hg_ia_mode", "") == "check" and (ply.hgIATPIKAt or 0) > CurTime() - 0.25 then
+        handWorld = ply.hgIACheckHandPos
+    end
+    if not handWorld then
+        local body = hg.GetCurrentCharacter and hg.GetCurrentCharacter(ply) or ply
+        local bone = IsValid(body) and body:LookupBone(leftHand and "ValveBiped.Bip01_L_Hand" or "ValveBiped.Bip01_R_Hand")
+        local matrix = bone and body:GetBoneMatrix(bone)
+        handWorld = matrix and matrix:GetTranslation()
+    end
+    if handWorld then
+        local screen = handWorld:ToScreen()
         local marginX, marginY = ScrW() * PULSE_SCREEN_MARGIN, ScrH() * PULSE_SCREEN_MARGIN
         if screen.visible and screen.x >= marginX and screen.x <= ScrW() - marginX and screen.y >= marginY and screen.y <= ScrH() - marginY then
             return screen.x, screen.y
@@ -1035,9 +1081,10 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     if IsValid(g_PulseCheckTarget) then
         local wep = ply:GetActiveWeapon()
         local isHandsWeapon = IsValid(wep) and (wep:GetClass() == "weapon_hands_sh" or wep:GetClass() == "weapon_hg_coolhands")
-        if isHandsWeapon and wep.GetCarrying and IsValid(wep:GetCarrying()) and wep:GetCarrying() == g_PulseCheckTarget then
+        local standCheck = ply:GetNWString("hg_ia_mode", "") == "check" and ply:GetNWEntity("hg_ia_target") == g_PulseCheckTarget
+        if standCheck or (isHandsWeapon and wep.GetCarrying and IsValid(wep:GetCarrying()) and wep:GetCarrying() == g_PulseCheckTarget) then
             isCheckingPulse = true
-        else
+        elseif CurTime() - g_PulseCheckAt > 1 then
             g_PulseCheckTarget = nil
         end
     end
@@ -1045,6 +1092,17 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     if isCheckingPulse then
         showPulseCheckECG = true
     end
+
+    local selfCheckWep = ply:GetActiveWeapon()
+    local selfChecking = not showPulseCheckECG and IsValid(selfCheckWep)
+        and (selfCheckWep:GetClass() == "weapon_hands_sh" or selfCheckWep:GetClass() == "weapon_hg_coolhands")
+        and selfCheckWep.GetCheckingAfflictions and selfCheckWep:GetCheckingAfflictions() and true or false
+    if selfChecking and (ply:KeyDown(IN_ATTACK2) or ringAlpha > 0.01 or isUnconscious
+        or IsValid(ply:GetNWEntity("FakeRagdoll")) or IsValid(ply.FakeRagdoll)
+        or (org.larmamputated and org.rarmamputated)) then
+        selfChecking = false
+    end
+    ecgAlphaSelfCheck = Lerp(FrameTime() * (selfChecking and 6 or 8), ecgAlphaSelfCheck, selfChecking and 1 or 0)
 
     local orgCfg = hg and hg.organism or {}
     local isParalyzed = (tonumber(org.spine1) or 0) >= (orgCfg.fake_spine1 or 1)
@@ -1075,10 +1133,11 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
 
     UpdateRingAudio(heartbeat, 1, org)
 
-    if ringAlpha <= 0 and awakeECGAlpha <= 0.01 and not showPulseCheckECG then
+    if ringAlpha <= 0 and awakeECGAlpha <= 0.01 and ecgAlphaSelfCheck <= 0.01 and not showPulseCheckECG then
         return
     end
     local otrubECGAlpha = (isUnconscious or lowConsciousness) and ecgRingAlpha * ecgMemoryFade or awakeECGAlpha
+    otrubECGAlpha = PLAYER_ECG_ENABLED and math.max(otrubECGAlpha, ecgAlphaSelfCheck) or ecgAlphaSelfCheck
     local incapPromptX, incapPromptY = ScrW() * 0.5, math.max(ScrH() * 0.1, ScreenScaleH(20))
 
     if ringAlpha > 0.01 and not showPulseCheckECG and hg_casualtiesknown:GetBool() then
@@ -1086,11 +1145,11 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         DrawCasualtiesRing(org, ringAlpha, isUnconscious, isCritical, dying, deathStateEnd)
     end
 
-    if PLAYER_ECG_ENABLED and otrubECGAlpha > 0.01 and not showPulseCheckECG then
+    if otrubECGAlpha > 0.01 and not showPulseCheckECG then
         local scrW, scrH = ScrW(), ScrH()
         local centerX, centerY = scrW * 0.5, scrH * 0.5
         local ecgCenterY = centerY
-        local showLegacyECG = isUnconscious or lowConsciousness or abnormalECG
+        local showLegacyECG = ecgAlphaSelfCheck > 0.01 or isUnconscious or lowConsciousness or abnormalECG
             or (not isUnconscious and not lowConsciousness and (sinusECGTail > 0 or admiring))
 
         if showLegacyECG then

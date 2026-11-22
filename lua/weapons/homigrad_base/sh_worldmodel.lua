@@ -1070,13 +1070,15 @@ function SWEP:WorldModel_Transform(bNoApply, bNoAdditional, model)
 		local newPos, newAng = LocalToWorld(self.WorldPos, self.WorldAng + (self.WorldAng2 or angle_zero), desiredPos, desiredAng)
 		newAng:RotateAroundAxis(newAng:Forward(), 180)
 		
+		local muzzlePos = self.LocalMuzzlePos and LocalToWorld(self.LocalMuzzlePos, angle_zero, newPos, newAng)
+
 		if self:ShouldUseFakeModel() then
 			newPos, newAng = LocalToWorld(self.FakePos, self.FakeAng, newPos, newAng)
 		end
 		
 		if hg.EquipmentImpactPose then newPos, newAng = hg.EquipmentImpactPose(self, newPos, newAng) end
 		if hg.ResolveEquipmentClearance then
-			local clearedPos = hg.ResolveEquipmentClearance(self, owner, model:GetModel(), newPos, newAng, model:GetModelScale())
+			local clearedPos = hg.ResolveEquipmentClearance(self, owner, model:GetModel(), newPos, newAng, model:GetModelScale(), muzzlePos)
 			desiredPos = desiredPos + (clearedPos - newPos)
 			newPos = clearedPos
 		end
@@ -1268,6 +1270,7 @@ local function removeFlashlights(self)
 end
 
 function SWEP:DrawWorldModel()
+	self.hgWorldDrawFrame = FrameNumber()
 	local owner = self:GetOwner()
 	if IsValid(owner) and owner:IsNPC() and not IsValid(owner.FakeRagdoll) then
 		DrawWorldModel(self)
@@ -1298,6 +1301,11 @@ function SWEP:DrawWorldModel()
 			DrawWorldModel(self)
 		//end
 	end
+end
+
+function SWEP:DrawWorldModelTranslucent()
+	if self.hgWorldDrawFrame == FrameNumber() then return end
+	self:DrawWorldModel()
 end
 
 --hook.Add("PostDrawPlayerRagdoll", "huyCock", function(ent,owner)

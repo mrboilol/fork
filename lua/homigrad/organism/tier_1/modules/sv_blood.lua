@@ -700,6 +700,9 @@ module[2] = function(owner, org, mulTime)
 			end
 			if isAlive or not isPlayer then
 				wound[1] = math.Clamp((wound[1] or 0) + hemostasisDelta, 0, math.max((wound.initialSeverity or wound[1] or 0) * 1.35, wound[1] or 0))
+				if txaHemostasis > 0.05 and wound[1] > 0 and (wound.initialSeverity or wound[1]) <= 4 then
+					wound[1] = math.max(wound[1] - mulTime * 0.8 * txaHemostasis, 0)
+				end
 			end
 
 			if wound[1] <= 0.001 then

@@ -672,6 +672,13 @@ local function DropUnit(unit, target, ply, battery, snd)
     local pos, ang = unit:GetPos(), unit:GetAngles()
     ClearTargetState(target, ply, unit)
 
+    if unit.ASBuiltIn then
+        sound.Play(ASSounds.removed, pos, 75, 100)
+        if snd then sound.Play(snd, pos, 75, 100) end
+        unit:Remove()
+        return
+    end
+
     local pickup = ents.Create("prop_physics")
     if IsValid(pickup) then
         pickup:SetModel("models/w_models/weapons/w_eq_medkit.mdl")
@@ -791,6 +798,7 @@ function SWEP:AttachUnit(owner, target, ply)
     unit:Spawn()
     unit:SetMoveType(MOVETYPE_NONE)
     unit.ASSoundEmitter = target
+    unit.ASBuiltIn = self.BuiltIn
     unit:SetNWInt("AutosurgeonBattery", battery)
     owner:SetNWEntity("AutosurgeonModelEnt", unit)
     PositionUnit(unit, target, bone, unitPos, unitAng, unitFemPos)
@@ -861,7 +869,7 @@ function SWEP:AttachUnit(owner, target, ply)
             return
         end
 
-        if activeTarget:GetVelocity():LengthSqr() > 160 * 160 then
+        if not unit.ASBuiltIn and activeTarget:GetVelocity():LengthSqr() > 160 * 160 then
             movingSince = movingSince or CurTime()
             if movingSince + 1.25 < CurTime() then
                 DropUnit(unit, activeTarget, ply, battery)
@@ -1021,7 +1029,7 @@ function SWEP:AttachUnit(owner, target, ply)
         end
     end)
 
-    owner:StripWeapon(weaponClass)
+    if not self.BuiltIn then owner:StripWeapon(weaponClass) end
 end
 
 function SWEP:Think()

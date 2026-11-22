@@ -2462,6 +2462,7 @@ function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
             end
             
             self:PlaySwingSound(owner, attacktype)
+            if SERVER and hg.ChatLog and hg.ChatLog.Swing then hg.ChatLog.Swing(owner, self) end
             
 			self:ConsumeMeleeStamina(owner, self:GetAttackConfigValue(self.StaminaPrimary, self.StaminaSecondary, self.ChargeStamina, attacktype) * (self.StaminaCostMul or 0.25) * math.Clamp(vellen / 200, 1, 1.25) * (charge and (self.SlamStaminaMul or 1) or 1))
 

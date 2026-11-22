@@ -8,6 +8,7 @@ ChatLog.RANGE_TALK = 900
 ChatLog.RANGE_YELL = 1800
 ChatLog.RANGE_SCREAM = 3000
 ChatLog.RANGE_GUNSHOT = 6000
+ChatLog.RANGE_SWING = 170
 ChatLog.NET_ID_BITS = 6
 ChatLog.NET_ARG_BITS = 5
 
@@ -16,13 +17,14 @@ local TALK = ChatLog.RANGE_TALK
 local YELL = ChatLog.RANGE_YELL
 local SCREAM = ChatLog.RANGE_SCREAM
 local GUNSHOT = ChatLog.RANGE_GUNSHOT
+local SWING = ChatLog.RANGE_SWING
 
 ChatLog.Events = {
 	{key = "scream", range = SCREAM, cooldown = 1.5, seen = "{a} screams in pain!", heard = "You hear a scream {dir}."},
 	{key = "painyell", range = YELL, cooldown = 1.5, seen = "{a} yells in pain!", heard = "You hear someone yelling in pain {dir}."},
-	{key = "groan", range = TALK, cooldown = 2, seen = "{a} groans in agony.", heard = "You hear someone groaning {dir}."},
-	{key = "gasp", range = TALK, cooldown = 2.5, seen = "{a} gasps for air!", heard = "You hear someone gasping {dir}."},
-	{key = "agonal", range = NEAR, cooldown = 6, seen = "{a} wheezes, struggling to breathe.", heard = "You hear ragged breathing {dir}."},
+	{key = "groan", range = TALK, cooldown = 2, repeatEvery = 10, seen = "{a} groans in agony.", heard = "You hear someone groaning {dir}."},
+	{key = "gasp", range = TALK, cooldown = 2.5, repeatEvery = 10, seen = "{a} gasps for air!", heard = "You hear someone gasping {dir}."},
+	{key = "agonal", range = NEAR, cooldown = 6, repeatEvery = 45, seen = "{a} wheezes, struggling to breathe.", heard = "You hear ragged breathing {dir}."},
 	{key = "shout", range = YELL, cooldown = 1, seen = "{a} shouts!", heard = "You hear someone shouting {dir}."},
 	{key = "fallscream", range = SCREAM, cooldown = 3, seen = "{a} screams as they fall!", heard = "You hear a scream {dir}."},
 	{key = "punch", range = TALK, cooldown = 0.4, targeted = true, seen = "{a} punches {t}!", heard = "You hear scuffling {dir}."},
@@ -37,15 +39,36 @@ ChatLog.Events = {
 	{key = "fall", range = TALK, cooldown = 1, seen = "{a} falls over!", heard = "You hear a thud {dir}."},
 	{key = "drop", range = TALK, cooldown = 1, seen = "{a} drops to the ground."},
 	{key = "collapse", range = TALK, cooldown = 2, seen = "{a} collapses and goes limp!", heard = "You hear a body hit the floor {dir}."},
-	{key = "death", range = TALK, cooldown = 2, seen = "{a} goes completely still."},
+	{key = "death", range = TALK, cooldown = 2, seen = "{a} goes completely still.", heard = "You hear a body slump to the floor {dir}."},
 	{key = "gesture", range = TALK, cooldown = 1, seen = "{a} {g}."},
 	{key = "surrender", range = TALK, cooldown = 1.5, seen = "{a} raises their hands."},
 	{key = "kneel", range = TALK, cooldown = 1.5, seen = "{a} kneels down."},
 	{key = "softcrit", range = TALK, cooldown = 3, seen = "{a} collapses!", heard = "You hear a body hit the floor {dir}."},
-	{key = "hardcrit", range = TALK, cooldown = 3, seen = "{a} goes limp!"},
-	{key = "stopbreathing", range = NEAR, cooldown = 10, seen = "{a} stops breathing!"},
-	{key = "airgasp", range = TALK, cooldown = 15, seen = "{a} is gasping for air!", heard = "You hear someone gasping {dir}."},
-	{key = "coughblood", range = TALK, cooldown = 10, seen = "{a} coughs up blood!", heard = "You hear wet coughing {dir}."},
+	{key = "hardcrit", range = TALK, cooldown = 3, seen = "{a} goes limp!", heard = "You hear a body slump to the floor {dir}."},
+	{key = "stopbreathing", range = NEAR, cooldown = 10, repeatEvery = 120, seen = "{a} stops breathing!"},
+	{key = "airgasp", range = TALK, cooldown = 15, repeatEvery = 45, seen = "{a} is gasping for air!", heard = "You hear someone gasping {dir}."},
+	{key = "coughblood", range = TALK, cooldown = 10, repeatEvery = 30, seen = "{a} coughs up blood!", heard = "You hear wet coughing {dir}."},
+	{key = "laugh", range = YELL, cooldown = 4, repeatEvery = 20, seen = "{a} laughs maniacally!", heard = "You hear someone laughing {dir}."},
+	{key = "getup", range = TALK, cooldown = 2, seen = "{a} gets back up."},
+	{key = "wake", range = TALK, cooldown = 3, seen = "{a} stirs and wakes up."},
+	{key = "blooddrip", range = NEAR, cooldown = 6, repeatEvery = 120, repeatGroup = "blood", noOverhead = true, seen = "{ap} blood drips onto the floor.", heard = "You hear blood dripping {dir}."},
+	{key = "bloodpool", range = TALK, cooldown = 8, repeatEvery = 120, repeatGroup = "blood", noOverhead = true, seen = "{a} is leaving a puddle of blood!", heard = "You hear blood splattering on the floor {dir}."},
+	{key = "propimpact", range = TALK, cooldown = 0.5, world = true, heard = "You hear something heavy crash {dir}."},
+	{key = "propflyby", range = NEAR, cooldown = 1.5, world = true, heard = "Something whips past {dir}."},
+	{key = "bulletimpact", range = GUNSHOT, cooldown = 1.5, world = true, heard = "A bullet smacks into something {dir}!"},
+	{key = "bulletflyby", range = GUNSHOT, cooldown = 1, world = true, heard = "A bullet cracks past {dir}!"},
+	{key = "swingnear", range = SWING, cooldown = 1.2, noOverhead = true, seen = "{a} swings {w} right beside you!", heard = "Something swishes through the air {dir}."},
+	{key = "swingfist", range = SWING, cooldown = 1.2, noOverhead = true, seen = "{a} throws a punch right beside you!", heard = "You hear a fist cut the air {dir}."},
+	{key = "grenaderoll", range = NEAR, cooldown = 3, world = true, heard = "You hear something metallic rolling {dir}."},
+	{key = "medbandage", range = TALK, cooldown = 2, seen = "{a} bandages {tp} wounds.", self = "{a} bandages their wounds."},
+	{key = "medsplint", range = TALK, cooldown = 2, seen = "{a} splints {tp} limb.", self = "{a} splints their limb."},
+	{key = "medtourniquet", range = TALK, cooldown = 2, seen = "{a} ties a tourniquet around {tp} limb.", self = "{a} ties a tourniquet around their limb."},
+	{key = "medsuture", range = TALK, cooldown = 2, seen = "{a} stitches {tp} wounds shut.", self = "{a} stitches their wounds shut."},
+	{key = "medamputate", range = TALK, cooldown = 2, seen = "{a} cuts off {tp} limb!", self = "{a} cuts off their own limb!"},
+	{key = "medinject", range = TALK, cooldown = 2, article = "a", seen = "{a} injects {t} with {w}.", self = "{a} injects themselves with {w}."},
+	{key = "medpills", range = TALK, cooldown = 2, seen = "{a} gives {t} some pills.", self = "{a} swallows some pills."},
+	{key = "medneedle", range = TALK, cooldown = 2, seen = "{a} jabs a needle into {tp} chest!", self = "{a} jabs a needle into their chest!"},
+	{key = "medfixdisloc", range = TALK, cooldown = 2, seen = "{a} sets {tp} dislocated joint back into place.", self = "{a} pops their joint back into place.", heard = "You hear a sickening pop {dir}."},
 	{key = "injury", range = NEAR, cooldown = 0.4, noOverhead = true, seen = "{ap} {inj}."},
 }
 

@@ -66,12 +66,24 @@ function ChatLog.Emit(key, actor, target, extraEnt, arg)
 	local rangeSqr = event.range * event.range
 	local visualOnly = event.heard == nil
 	local filter = RecipientFilter()
+	local told
+	if event.repeatEvery then
+		local group = event.repeatGroup or event.key
+		actor.hgChatLogTold = actor.hgChatLogTold or {}
+		told = actor.hgChatLogTold[group]
+		if not told then
+			told = setmetatable({}, {__mode = "k"})
+			actor.hgChatLogTold[group] = told
+		end
+	end
 
 	for _, ply in player.Iterator() do
 		if ply == actor or not IsAware(ply) then continue end
 		if ply:EyePos():DistToSqr(pos) > rangeSqr then continue end
 		if visualOnly and not ply:TestPVS(pos) then continue end
+		if told and (told[ply] or 0) > now then continue end
 
+		if told then told[ply] = now + event.repeatEvery end
 		filter:AddPlayer(ply)
 	end
 
@@ -87,6 +99,25 @@ function ChatLog.Emit(key, actor, target, extraEnt, arg)
 	net.Send(filter)
 end
 
+function ChatLog.EmitWorld(key, pos, recipient)
+	local event = ChatLog.ByKey[key]
+	if not event or not IsValid(recipient) or not IsAware(recipient) then return end
+
+	local now = CurTime()
+	recipient.hgChatLogNext = recipient.hgChatLogNext or {}
+	if (recipient.hgChatLogNext[event.id] or 0) > now then return end
+	recipient.hgChatLogNext[event.id] = now + (event.cooldown or 0.5)
+
+	net.Start("hg_chatlog_event")
+		net.WriteUInt(event.id, ChatLog.NET_ID_BITS)
+		net.WriteEntity(NULL)
+		net.WriteEntity(NULL)
+		net.WriteEntity(NULL)
+		net.WriteUInt(0, ChatLog.NET_ARG_BITS)
+		net.WriteVector(pos)
+	net.Send(recipient)
+end
+
 local function ResolvePlayer(ent)
 	if not IsValid(ent) then return end
 	if ent:IsPlayer() then return ent end
@@ -94,6 +125,48 @@ local function ResolvePlayer(ent)
 		local owner = hg.RagdollOwner(ent)
 		if IsValid(owner) and owner:IsPlayer() then return owner end
 	end
+end
+
+local BULLET_IMPACT_DIST = 350
+local BULLET_FLYBY_DIST = 120
+local BULLET_FLYBY_CUE_DIST = 300
+
+function ChatLog.BulletPath(shooter, src, hitPos, hitEnt)
+	if not isvector(src) or not isvector(hitPos) then return end
+
+	local dir = hitPos - src
+	local length = dir:Length()
+	if length <= 0 then return end
+	dir:Mul(1 / length)
+
+	local hitPly = ResolvePlayer(hitEnt)
+	for _, ply in player.Iterator() do
+		if ply == shooter or ply == hitPly or not IsAware(ply) then continue end
+
+		local eye = ply:EyePos()
+		if eye:DistToSqr(hitPos) <= BULLET_IMPACT_DIST * BULLET_IMPACT_DIST then
+			ChatLog.EmitWorld("bulletimpact", hitPos, ply)
+
+			continue
+		end
+
+		local projection = (eye - src):Dot(dir)
+		if projection <= 0 or projection >= length then continue end
+
+		local offset = src + dir * projection - eye
+		if offset:LengthSqr() > BULLET_FLYBY_DIST * BULLET_FLYBY_DIST then continue end
+
+		if offset:LengthSqr() < 1 then offset = -dir end
+		offset:Normalize()
+		ChatLog.EmitWorld("bulletflyby", eye + offset * BULLET_FLYBY_CUE_DIST, ply)
+	end
+end
+
+function ChatLog.Swing(owner, wep)
+	if not IsValid(owner) or not owner:IsPlayer() then return end
+
+	local fist = IsValid(wep) and HAND_WEAPONS[wep:GetClass()]
+	ChatLog.Emit(fist and "swingfist" or "swingnear", owner, nil, wep)
 end
 
 local function IsMeleeWeapon(wep)
@@ -430,4 +503,189 @@ hook.Add("KeyPress", "hg/chatlog/blocked-actions", function(ply, key)
 	end
 
 	if kind then ChatLog.BlockedThought(ply, kind) end
+end)
+
+local WORLD_SCAN_INTERVAL = 0.2
+local IMPACT_MIN_SPEED = 300
+local IMPACT_MIN_MOMENTUM = 9000
+local IMPACT_MIN_DELTA = 0.15
+local IMPACT_QUEUE_MAX = 16
+local FLYBY_MIN_SPEED = 450
+local FLYBY_MAX_DIST = 220
+local FLYBY_MIN_DIST = 30
+local ROLL_MIN_SPEED = 25
+local ROLL_MAX_SPEED = 250
+local ROLL_MAX_DIST = 450
+local BLEED_DRIP = 0.35
+local BLEED_POOL = 1.5
+
+local impactQueue = {}
+local grenades = {}
+
+local function IsGrenade(ent)
+	return ent.Base == "ent_hg_grenade" or string.find(ent:GetClass(), "^ent_hg_grenade", 1) ~= nil
+end
+
+local function TrackEntity(ent)
+	if not IsValid(ent) then return end
+
+	local class = ent:GetClass()
+	if class == "prop_physics" and not ent.hgChatLogCallback then
+		ent.hgChatLogCallback = true
+		ent:AddCallback("PhysicsCollide", function(prop, data)
+			if data.Speed < IMPACT_MIN_SPEED or data.DeltaTime < IMPACT_MIN_DELTA then return end
+			if #impactQueue >= IMPACT_QUEUE_MAX then return end
+
+			local phys = prop:GetPhysicsObject()
+			local mass = IsValid(phys) and phys:GetMass() or 0
+			if data.Speed * mass < IMPACT_MIN_MOMENTUM then return end
+
+			impactQueue[#impactQueue + 1] = data.HitPos
+		end)
+	elseif IsGrenade(ent) then
+		grenades[ent] = true
+	end
+end
+
+hook.Add("OnEntityCreated", "hg/chatlog/track", function(ent)
+	timer.Simple(0, function() TrackEntity(ent) end)
+end)
+
+local function TrackExisting()
+	for _, ent in ents.Iterator() do TrackEntity(ent) end
+end
+
+hook.Add("InitPostEntity", "hg/chatlog/track-existing", TrackExisting)
+hook.Add("PostCleanupMap", "hg/chatlog/track-existing", TrackExisting)
+
+local function Aware()
+	local list = {}
+	for _, ply in player.Iterator() do
+		if IsAware(ply) then list[#list + 1] = ply end
+	end
+
+	return list
+end
+
+local function Passing(ent, speed, players, now)
+	if ent:IsPlayerHolding() then return end
+
+	local pos = ent:GetPos()
+	ent.hgFlybyNext = ent.hgFlybyNext or {}
+	for _, ply in ipairs(players) do
+		local distSqr = ply:EyePos():DistToSqr(pos)
+		if distSqr > FLYBY_MAX_DIST * FLYBY_MAX_DIST or distSqr < FLYBY_MIN_DIST * FLYBY_MIN_DIST then continue end
+		if (ent.hgFlybyNext[ply] or 0) > now then continue end
+
+		ent.hgFlybyNext[ply] = now + 2
+		ChatLog.EmitWorld("propflyby", pos, ply)
+	end
+end
+
+local function Rolling(ent, players)
+	if ent:IsPlayerHolding() then return end
+
+	local pos = ent:GetPos()
+	for _, ply in ipairs(players) do
+		if ply:EyePos():DistToSqr(pos) <= ROLL_MAX_DIST * ROLL_MAX_DIST then ChatLog.EmitWorld("grenaderoll", pos, ply) end
+	end
+end
+
+timer.Create("hg/chatlog/world", WORLD_SCAN_INTERVAL, 0, function()
+	local players = Aware()
+	if #players == 0 then
+		impactQueue = {}
+
+		return
+	end
+
+	local now = CurTime()
+	local range = ChatLog.RANGE_TALK
+	for _, pos in ipairs(impactQueue) do
+		for _, ply in ipairs(players) do
+			if ply:EyePos():DistToSqr(pos) <= range * range then ChatLog.EmitWorld("propimpact", pos, ply) end
+		end
+	end
+	impactQueue = {}
+
+	for _, prop in ipairs(ents.FindByClass("prop_physics")) do
+		local speed = prop:GetVelocity():Length()
+		if speed >= FLYBY_MIN_SPEED then Passing(prop, speed, players, now) end
+	end
+
+	for ent in pairs(grenades) do
+		if not IsValid(ent) then
+			grenades[ent] = nil
+
+			continue
+		end
+
+		local speed = ent:GetVelocity():Length()
+		if speed >= FLYBY_MIN_SPEED then
+			Passing(ent, speed, players, now)
+		elseif speed >= ROLL_MIN_SPEED and speed <= ROLL_MAX_SPEED then
+			Rolling(ent, players)
+		end
+	end
+end)
+
+timer.Create("hg/chatlog/bleeding", 1, 0, function()
+	for _, ply in player.Iterator() do
+		local org = ply:Alive() and ply.organism
+		local bleed = org and tonumber(org.bleed) or 0
+		if bleed >= BLEED_POOL then
+			ChatLog.Emit("bloodpool", ply)
+		elseif bleed >= BLEED_DRIP then
+			ChatLog.Emit("blooddrip", ply)
+		end
+	end
+end)
+
+hook.Add("Fake Up", "hg/chatlog/getup", function(ply)
+	if not IsValid(ply) or not ply:IsPlayer() or not ply:Alive() then return end
+	if ply.organism and ply.organism.otrub then return end
+
+	ChatLog.Emit("getup", ply)
+end)
+
+hook.Add("HG_OnWakeOtrub", "hg/chatlog/wake", function(ply)
+	if IsValid(ply) and ply:IsPlayer() and ply:Alive() then ChatLog.Emit("wake", ply) end
+end)
+
+local PILL_CLASSES = {
+	weapon_painkillers = true,
+	weapon_zerlkers = true,
+}
+
+local function MedicalKey(minigameType, wep)
+	if minigameType == "bandage" then
+		return IsValid(wep) and wep.IsSplintMode and wep:IsSplintMode() and "medsplint" or "medbandage"
+	end
+
+	if minigameType == "tourniquet" then return "medtourniquet" end
+	if minigameType == "suture" then return "medsuture" end
+	if minigameType == "amputation" then return "medamputate" end
+	if minigameType == "dislocation" then return "medfixdisloc" end
+	if minigameType ~= "syringe" or not IsValid(wep) then return end
+
+	local class = wep:GetClass()
+	if PILL_CLASSES[class] then return "medpills" end
+	if class == "weapon_needle" or class == "weapon_medkit_sh" and wep.mode == 5 then return "medneedle" end
+
+	return "medinject"
+end
+
+function ChatLog.Medical(actor, target, key, wep)
+	if not IsValid(actor) or not actor:IsPlayer() then return end
+
+	local patient = ResolvePlayer(target)
+	ChatLog.Emit(key, actor, patient, wep)
+end
+
+hook.Add("hg_medical_minigame_finished", "hg/chatlog/medical", function(actor, target, minigameType)
+	if not IsValid(actor) or not actor:IsPlayer() then return end
+
+	local wep = actor:GetActiveWeapon()
+	local key = MedicalKey(minigameType, wep)
+	if key then ChatLog.Medical(actor, target, key, wep) end
 end)

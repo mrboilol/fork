@@ -53,6 +53,7 @@ if SERVER then
 		if IsValid(ply:GetNetVar("carryent")) or IsValid(ply:GetNetVar("carryent2")) then return false end
 		if ply:KeyDown(IN_ATTACK) or ply:KeyDown(IN_ATTACK2) then return false end
 		if hg.WallBang and hg.WallBang.Active(ply) then return false end
+		if ply:GetNWString("hg_ia_mode", "") ~= "" then return false end
 
 		local speed = ply:GetVelocity():Length2D()
 		if ply:KeyDown(IN_SPEED) and speed > ply:GetWalkSpeed() * 0.5 then return false end

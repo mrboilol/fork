@@ -4,6 +4,7 @@ concommand.Add("fake", function(ply)
 	if not ply:Alive() then return end
 	if ply.fakecd and ply.fakecd > CurTime() then return end
 	if ply:IsFlagSet( FL_FROZEN ) then return end
+	if hg.ChokeStruggle and hg.ChokeStruggle(ply) then return end
 	--ply.fakecd = CurTime() + cooldown
 	ply._godFakeBypass = true
 	if not IsValid(ply.FakeRagdoll) then

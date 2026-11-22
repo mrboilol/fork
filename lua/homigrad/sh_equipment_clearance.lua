@@ -54,10 +54,11 @@ local function FrameKey()
     return CLIENT and FrameNumber() or engine.TickCount()
 end
 
-function hg.ResolveEquipmentClearance(ent, owner, model, pos, ang, scale)
+function hg.ResolveEquipmentClearance(ent, owner, model, pos, ang, scale, muzzle)
     if not IsValid(owner) or not isstring(model) or model == "" then return pos end
     local mins, maxs = GetEquipmentModelBounds(ent, model)
-    if not mins or not maxs then return pos end
+    if not isvector(muzzle) then muzzle = nil end
+    if not (mins and maxs) and not muzzle then return pos end
     local aim = owner.GetAimVector and owner:GetAimVector() or ang:Forward()
     if not isvector(aim) or aim:LengthSqr() <= 0.000001 then aim = ang:Forward() end
     aim = aim:GetNormalized()
@@ -77,21 +78,28 @@ function hg.ResolveEquipmentClearance(ent, owner, model, pos, ang, scale)
     local start = owner.EyePos and owner:EyePos() or pos
 
     local probes = {}
-    for x = 0, 1 do
-        for y = 0, 1 do
-            for z = 0, 1 do
-                local corner = Vector(x == 0 and mins.x or maxs.x, y == 0 and mins.y or maxs.y, z == 0 and mins.z or maxs.z) * scale
-                local world = LocalToWorld(corner, angle_zero, pos, ang)
-                probes[#probes + 1] = {pos = world, distance = (world - start):Dot(aim)}
+    if mins and maxs then
+        for x = 0, 1 do
+            for y = 0, 1 do
+                for z = 0, 1 do
+                    local corner = Vector(x == 0 and mins.x or maxs.x, y == 0 and mins.y or maxs.y, z == 0 and mins.z or maxs.z) * scale
+                    local world = LocalToWorld(corner, angle_zero, pos, ang)
+                    probes[#probes + 1] = {pos = world, distance = (world - start):Dot(aim)}
+                end
             end
         end
     end
     table.sort(probes, function(a, b) return a.distance > b.distance end)
+    local probeCount = math.min(CLEARANCE_PROBES, #probes)
+    if muzzle then
+        probeCount = probeCount + 1
+        table.insert(probes, probeCount, {pos = muzzle, distance = (muzzle - start):Dot(aim)})
+    end
 
     local desired = 0
-    for index = 1, math.min(CLEARANCE_PROBES, #probes) do
+    for index = 1, probeCount do
         local probe = probes[index]
-        if probe.distance <= 0 then break end
+        if probe.distance <= 0 then continue end
         local trace = util.TraceLine({start = start, endpos = probe.pos, filter = filter, mask = MASK_PLAYERSOLID, collisiongroup = COLLISION_GROUP_PLAYER})
         if trace.Hit then
             desired = math.max(desired, (probe.pos - trace.HitPos):Dot(aim) + CLEARANCE_PADDING)

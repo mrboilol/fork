@@ -58,8 +58,7 @@ function SWEP:GetNativeDrawDuration()
 end
 
 function SWEP:GetDeployDuration()
-	local native = self:GetNativeDrawDuration()
-	if not native then return self.NoAnimDeployTime end
+	local native = math.max(self:GetNativeDrawDuration() or 0, self.CooldownDeploy / math.max(self.Ergonomics or 1, 0.1))
 
 	local roleDeployMul = hg.GetSubRolePerk and hg.GetSubRolePerk(self:GetOwner(), "DeployMul", 1) or 1
 	local armEffectiveness = hg.GetArmEffectiveness and hg.GetArmEffectiveness(self:GetOwner(), "rarm") or 1

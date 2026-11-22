@@ -315,7 +315,7 @@ local function getFaceAnchor(size)
 		return math.floor((ScrW() - size) * 0.5), y
 	end
 
-	if not bigChat or not bigChat:GetBool() then
+	if not hg.BigChatEnabled() then
 		return math.floor(ScrW() * faceConfig.x), math.floor(ScrH() * faceConfig.y)
 	end
 
@@ -380,6 +380,7 @@ end
 
 hook.Add("HUDPaint", "hg/simplehealth/face", nildoy)
 hook.Add("HG_DeathOverlayHUD", "hg/simplehealth/face", nildoy)
+hook.Add("HG_DeathTransitionHUD", "hg/simplehealth/face", nildoy)
 
 local function finishDeathDelay(playSecond)
 	deathDelay.active = false
@@ -429,6 +430,10 @@ net.Receive("hg_simplehealth_death", function()
 
 	if IsValid(hg.chat) and hg.chat.AddLine then
 		hg.chat:AddLine({DEATH_CAUSE_COLOR, cause})
+	end
+
+	if hg.BigChatHidden and hg.BigChatHidden() and hg.PushChatPopup then
+		hg.PushChatPopup({DEATH_CAUSE_COLOR, cause})
 	end
 end)
 

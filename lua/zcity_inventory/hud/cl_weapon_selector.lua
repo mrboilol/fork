@@ -280,9 +280,6 @@ local function ZCityJudgeInfoSections(wep)
     if author ~= "" then sections[#sections + 1] = {label = "Manufacturer", text = author} end
     if instructions ~= "" then sections[#sections + 1] = {label = "Information", text = instructions} end
 
-    local ply = LocalPlayer()
-    sections[#sections + 1] = {label = "Unholster from", text = WS.GetUnholsterPlace(ply, wep)}
-    sections[#sections + 1] = {label = "Unholster time", text = string.format("%.1f s", WS.GetUnholsterDuration(ply, wep))}
     return sections
 end
 
@@ -769,21 +766,6 @@ local function ZCityDrawCoin(wep, cx, centerY, radius, alpha, isSelected)
     render.SetStencilEnable(false)
 end
 
-local function ZCityDrawCoinDescription(wep, fade)
-    local text = ZCityGetWeaponDescription(wep)
-    if text == "" then return end
-    local lines = ZCityJudgeWrapText(text, "ZCityJudgeInfoText", math.min(ScrW() * 0.5, 720))
-    surface.SetFont("ZCityJudgeInfoText")
-    local _, lineTall = surface.GetTextSize("Wg")
-    lineTall = lineTall + 2
-    local y = ScrH() - ScreenScale(6) - #lines * lineTall
-    for _, lineText in ipairs(lines) do
-        draw.SimpleText(lineText, "ZCityJudgeInfoText", ScrW() * 0.5 + 1, y + 1, Color(0, 0, 0, fade * 220), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
-        draw.SimpleText(lineText, "ZCityJudgeInfoText", ScrW() * 0.5, y, Color(judgeName.r, judgeName.g, judgeName.b, fade * 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
-        y = y + lineTall
-    end
-end
-
 function JudgeSelector.CoinDraw(ply)
     if not IsValid(ply) or not ply:Alive() then return end
     local now = CurTime()
@@ -856,8 +838,6 @@ function JudgeSelector.CoinDraw(ply)
     local nameY = centerY + bigRadius + ScreenScale(4)
     draw.SimpleText(fittedName, font, centerX + 1, nameY + 1, Color(judgeShadow.r, judgeShadow.g, judgeShadow.b, fade * 210), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
     draw.SimpleText(fittedName, font, centerX, nameY, Color(judgeName.r, judgeName.g, judgeName.b, fade * 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
-
-    ZCityDrawCoinDescription(selected, fade)
 end
 
 SimpleSelector.Draw = JudgeSelector.Draw
@@ -871,15 +851,6 @@ WS.HoldWeapon = WS.HoldWeapon or nil
 WS.HoldSlotBind = WS.HoldSlotBind or nil
 WS.HoldSlotKeyCode = WS.HoldSlotKeyCode or nil
 WS.HoldDuration = 0.62
-WS.HolsterAwayDuration = 0.95
-WS.HoldDurationNoHolster = 1.15
-WS.BackpackHoldDurationFallback = 1.45
-WS.BackpackHoldDurationMin = 1.05
-WS.BackpackHoldDurationMax = 3.0
-WS.BackpackEarlySelect = WS.BackpackEarlySelect or false
-WS.BackpackEarlyWeapon = WS.BackpackEarlyWeapon or nil
-WS.BackpackEarlySelected = WS.BackpackEarlySelected or false
-WS.BackpackPreviousWeapon = WS.BackpackPreviousWeapon or nil
 WS.ConfirmProgress = WS.ConfirmProgress or 0
 
 WS.BodySquareSize = 116
@@ -916,256 +887,16 @@ local function ZCityWrapWeaponDescription(text, maxWidth)
     return lines
 end
 
-local function ZCityDrawWeaponDescription(wep, slotX, slotY, slotSize, alpha)
-    local description = ZCityGetWeaponDescription(wep)
-    local maxWidth = math.min(ScrW() * 0.34, 460)
-    local lines = description ~= "" and ZCityWrapWeaponDescription(description, maxWidth - 16) or {}
-
-    local ply = LocalPlayer()
-    lines[#lines + 1] = "Unholster from: " .. WS.GetUnholsterPlace(ply, wep)
-    lines[#lines + 1] = "Unholster time: " .. string.format("%.1f s", WS.GetUnholsterDuration(ply, wep))
-
-    surface.SetFont("ZCity_SuperTiny")
-    local _, lineHeight = surface.GetTextSize("Hg")
-    local padding = 8
-    local width = maxWidth
-    local height = lineHeight * #lines + padding * 2
-    local x = math.Clamp(slotX + slotSize * 0.5 - width * 0.5, 8, ScrW() - width - 8)
-    local belowY = slotY + slotSize + 10
-    local y = belowY + height <= ScrH() - 8 and belowY or slotY - height - 10
-    y = math.Clamp(y, 8, ScrH() - height - 8)
-
-    surface.SetDrawColor(0, 0, 0, 210 * alpha)
-    surface.DrawRect(x, y, width, height)
-    surface.SetDrawColor(235, 235, 235, 95 * alpha)
-    surface.DrawOutlinedRect(x, y, width, height, 1)
-
-    for index, line in ipairs(lines) do
-        local textY = y + padding + (index - 1) * lineHeight
-        draw.SimpleTextOutlined(line, "ZCity_SuperTiny", x + width * 0.5, textY, Color(240, 240, 240, 255 * alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP, 1, Color(0, 0, 0, 230 * alpha))
-    end
-end
-
-local function ZCityWepText(wep, key)
-    if not IsValid(wep) then return "" end
-    local value = wep[key]
-    if isfunction(value) then value = value(wep) end
-    return tostring(value or ""):lower()
-end
-
-local function ZCityGetBodySlotForWeapon(wep)
-    if not IsValid(wep) then return "pocket" end
-
-    local class = wep:GetClass()
-    if class == "weapon_hands_sh" or class == "weapon_hands" then return "hands" end
-
-    local category = tonumber(wep.weaponInvCategory or 0) or 0
-    if category == 1 then return "longgun" end
-    if category == 2 then return "pistol" end
-    if category == 3 or category == 5 or category == 6 then return "melee" end
-
-    class = ZCityWepText(wep, "GetClass")
-    local printName = ZCityWepText(wep, "GetPrintName")
-    local catName = ZCityWepText(wep, "Category")
-    local scrappersSlot = ZCityWepText(wep, "ScrappersSlot")
-
-    if scrappersSlot == "secondary"
-        or catName:find("pistol", 1, true)
-        or class:find("glock", 1, true)
-        or class:find("pistol", 1, true)
-        or class:find("usp", 1, true)
-        or class:find("m9", 1, true)
-        or class:find("pl15", 1, true)
-        or printName:find("glock", 1, true) then
-        return "pistol"
-    end
-
-    if scrappersSlot == "primary"
-        or catName:find("carbine", 1, true)
-        or catName:find("rifle", 1, true)
-        or catName:find("shotgun", 1, true)
-        or catName:find("smg", 1, true)
-        or class:find("ar15", 1, true)
-        or class:find("m4", 1, true)
-        or class:find("rifle", 1, true)
-        or class:find("shotgun", 1, true) then
-        return "longgun"
-    end
-
-    if wep.IsPistolHoldType then
-        return wep:IsPistolHoldType() and "pistol" or "longgun"
-    end
-
-    return "pocket"
-end
-
-
-local function ZCityIsBodyHolsterBlocked(ply)
-    if not IsValid(ply) then return false end
-
-    if ply:GetNWBool("ZCityBodyHolsterBlocked", false) then return true end
-
-    -- ФОИДбак.
-    if ZCityHasBodyAppearanceHolsterBlock then
-        return ZCityHasBodyAppearanceHolsterBlock(ply)
-    end
-
-    return false
-end
-
-local zcityBackpackDurationCache
-local function ZCityGetBackpackHoldDuration()
-    if zcityBackpackDurationCache then return zcityBackpackDurationCache end
-
-    local duration = 0
-    if SoundDuration then
-        duration = math.max(
-            SoundDuration("sounds/backpack.mp3") or 0,
-            SoundDuration("backpack.mp3") or 0
-        )
-    end
-
-    if duration <= 0 then duration = WS.BackpackHoldDurationFallback or WS.HoldDurationNoHolster or 1.15 end
-    zcityBackpackDurationCache = math.Clamp(duration, WS.BackpackHoldDurationMin or 0.85, WS.BackpackHoldDurationMax or 2.4)
-    return zcityBackpackDurationCache
-end
-
-local function ZCityIsBackpackDrawWeaponForSelector(wep)
-    if not IsValid(wep) then return false end
-    local place = ZCityGetBodySlotForWeapon(wep)
-    return place == "pistol" or place == "longgun"
-end
-
 local function ZCityIsHandsWeapon(wep)
     if not IsValid(wep) then return false end
     local class = wep:GetClass()
     return class == "weapon_hands_sh" or class == "weapon_hands"
 end
 
-local function ZCityGetWeaponActionDuration(wep, field, fallback, minimum, maximum)
-    if not IsValid(wep) then return fallback end
-
-    local base = tonumber(wep[field]) or fallback
-    local ergonomics = math.Clamp(tonumber(wep.Ergonomics) or 1, 0.35, 2.5)
-    return math.Clamp(base / ergonomics, minimum, maximum)
-end
-
-local function ZCityGetWeaponDrawTime(wep, fallback)
-    if not IsValid(wep) then return fallback end
-    if wep.GetDeployDuration then return math.Clamp(wep:GetDeployDuration(), 0.1, 2.4) end
-    if wep.GetHolsterDuration then return math.Clamp(wep:GetHolsterDuration(), 0.1, 2.4) end
-    return ZCityGetWeaponActionDuration(wep, "CooldownDeploy", fallback, 0.35, 2.4)
-end
-
-local function ZCityGetWeaponHolsterTime(wep, fallback)
-    if not IsValid(wep) then return fallback end
-    if wep.GetHolsterDuration then return math.Clamp(wep:GetHolsterDuration(), 0.1, 2.4) end
-    return ZCityGetWeaponActionDuration(wep, "CooldownHolster", fallback, 0.35, 2.4)
-end
-
 local function ZCityGetSlotHoldDuration(ply, wep)
-    local drawingHands = ZCityIsHandsWeapon(wep)
-    local duration = drawingHands and 0 or ZCityGetWeaponDrawTime(wep, WS.HoldDuration or 0.62)
-    local active = IsValid(ply) and ply:GetActiveWeapon() or nil
-
-    if IsValid(active) and active ~= wep and not ZCityIsHandsWeapon(active) then
-        local holsterDuration = ZCityGetWeaponHolsterTime(active, WS.HolsterAwayDuration or 0.95)
-        duration = drawingHands and holsterDuration or duration + holsterDuration
-    end
-
-    if IsValid(wep) and ZCityIsBackpackDrawWeaponForSelector(wep) and ZCityIsBodyHolsterBlocked(ply) then
-        return math.max(duration, ZCityGetBackpackHoldDuration())
-    end
-
-    if IsValid(wep) and wep.NoHolster then
-        return math.Clamp(math.max(duration, WS.HoldDurationNoHolster or 1.15), 0, 4)
-    end
-
-    return math.Clamp(duration, 0, 4)
-end
-
-local function ZCitySendBackpackDrawCancel(finished)
-    net.Start("ZCityBackpackDrawCancel")
-        net.WriteBool(finished == true)
-    net.SendToServer()
-end
-
-local function ZCityCancelBackpackDraw(finished)
-    if not WS.BackpackEarlySelect then return end
-    ZCitySendBackpackDrawCancel(finished)
-end
-
-local function ZCityStartBackpackDraw(ply, wep, duration)
-    if not IsValid(ply) or not IsValid(wep) then return end
-    if not ZCityIsBodyHolsterBlocked(ply) or not ZCityIsBackpackDrawWeaponForSelector(wep) then return end
-
-    duration = math.Clamp(tonumber(duration) or ZCityGetBackpackHoldDuration(), 0.25, 4)
-
-    net.Start("ZCityBackpackDrawStart")
-        net.WriteEntity(wep)
-        net.WriteFloat(duration)
-    net.SendToServer()
-end
-
-local function ZCityPlayBackpackReachPreview(wep, progress)
-    if not IsValid(wep) or not wep.PlayAnim or not wep.AnimList then return end
-
-    local anim = wep.AnimList["deploy"] and "deploy" or wep.AnimList["draw"] and "draw" or wep.AnimList["idle"] and "idle"
-    if not anim then return end
-
-    if wep.seq ~= (wep.AnimList[anim] or anim) then wep:PlayAnim(anim, 1, false) end
-    wep.ZCityCycleScrub = math.Clamp(progress or 0, 0, 1)
-end
-
-function WS.ShouldDelayBackpackDraw(ply, wep)
-    return ZCityIsBodyHolsterBlocked(ply) and ZCityIsBackpackDrawWeaponForSelector(wep)
-end
-
-function WS.GetBackpackDrawDuration(ply, wep)
-    return ZCityGetSlotHoldDuration(ply, wep)
-end
-
-function WS.StartBackpackDraw(ply, wep, duration)
-    ZCityStartBackpackDraw(ply, wep, duration)
-end
-
-function WS.CancelBackpackDraw(finished)
-    ZCitySendBackpackDrawCancel(finished)
-end
-
-function WS.PlayBackpackReachPreview(wep, progress)
-    ZCityPlayBackpackReachPreview(wep, progress)
-end
-
-local function ZCityShouldUseBackpackSource(ply, wep, place)
-    if not IsValid(ply) or not IsValid(wep) then return false end
-    if not ZCityIsBodyHolsterBlocked(ply) then return false end
-
-    return place == "pistol" or place == "longgun" or ZCityIsBackpackDrawWeaponForSelector(wep)
-end
-
-local ZCityBodySlotLabels = {
-    pistol = "Thigh holster",
-    longgun = "Back sling",
-    backpack = "Backpack",
-    pocket = "Pocket",
-    melee = "Belt",
-    hands = "Empty hands",
-}
-
-function WS.GetUnholsterPlace(ply, wep)
-    if not IsValid(wep) then return "" end
-    if IsValid(ply) and ply:GetActiveWeapon() == wep then return "Already in hand" end
-
-    local place = ZCityGetBodySlotForWeapon(wep)
-    if ZCityShouldUseBackpackSource(ply, wep, place) then return ZCityBodySlotLabels.backpack end
-    return ZCityBodySlotLabels[place] or ZCityBodySlotLabels.pocket
-end
-
-function WS.GetUnholsterDuration(ply, wep)
-    if not IsValid(wep) then return 0 end
-    if IsValid(ply) and ply:GetActiveWeapon() == wep then return 0 end
-    return ZCityGetSlotHoldDuration(ply, wep)
+    if not IsValid(wep) or ZCityIsHandsWeapon(wep) then return 0 end
+    if not wep.HasDrawAnim or not wep:HasDrawAnim() then return 0 end
+    return math.Clamp(wep:GetDeployDuration(), 0, 4)
 end
 
 local function ZCityIsUsableIconValue(icon)
@@ -1516,7 +1247,6 @@ function WS.DrawBodySlotSelector(ply)
     local badgeSize = math.floor(ScreenScale(7) + 0.5)
     local badgeY = math.floor(topY - badgeSize - ScreenScale(1.5))
     local deepest = maxDuration > minDuration
-    local selectedCard
 
     for groupIndex, group in ipairs(groups) do
         if groupIndex > 1 then cursor = cursor + groupGap end
@@ -1528,7 +1258,7 @@ function WS.DrawBodySlotSelector(ply)
             local scale = cardScale(item.wep) * fit
             local wide = cardSize * scale
             local durationK = deepest and math.Clamp((item.duration - minDuration) / (maxDuration - minDuration), 0, 1) or 0
-            local x, y, size = ZCityDrawSlotCard({
+            ZCityDrawSlotCard({
                 name = WS.GetPrintName(item.wep),
                 selected = isSelected,
                 wep = item.wep
@@ -1541,7 +1271,6 @@ function WS.DrawBodySlotSelector(ply)
                 progress = isSelected
             })
 
-            if isSelected and x then selectedCard = {wep = item.wep, x = x, y = y, size = size} end
             cursor = cursor + wide
         end
 
@@ -1552,10 +1281,6 @@ function WS.DrawBodySlotSelector(ply)
         surface.SetDrawColor(judgeAccent.r, judgeAccent.g, judgeAccent.b, badgeAlpha * 0.32)
         surface.DrawOutlinedRect(badgeX, badgeY, badgeSize, badgeSize, 1)
         draw.SimpleText(group.slot + 1, "ZCityJudgeSlotBadge", badgeX + badgeSize * 0.5, badgeY + badgeSize * 0.5 - 2, Color(220, 220, 220, badgeAlpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-    end
-
-    if selectedCard then
-        ZCityDrawWeaponDescription(selectedCard.wep, selectedCard.x, selectedCard.y, selectedCard.size, WS.BodyAlpha)
     end
 end
 
@@ -1577,18 +1302,12 @@ local tSlotFallbackKeys = {
     ["slot6"] = KEY_6,
 }
 
-local function ZCityResetSlotHold(fadeOut, finished)
-    ZCityCancelBackpackDraw(finished == true)
-
+local function ZCityResetSlotHold(fadeOut)
     if IsValid(WS.HoldWeapon) then WS.HoldWeapon.ZCityCycleScrub = nil end
     WS.HoldStart = 0
     WS.HoldWeapon = nil
     WS.HoldSlotBind = nil
     WS.HoldSlotKeyCode = nil
-    WS.BackpackEarlySelect = false
-    WS.BackpackEarlyWeapon = nil
-    WS.BackpackEarlySelected = false
-    WS.BackpackPreviousWeapon = nil
     if fadeOut then
         WS.ConfirmProgress = Lerp(FrameTime() * 14, WS.ConfirmProgress or 0, 0)
     else
@@ -1607,20 +1326,11 @@ end
 local function ZCityBeginHeldSelection(ply, selectedWep, bind, code)
     if not IsValid(selectedWep) then return end
 
-    ZCityCancelBackpackDraw(false)
     WS.HoldStart = CurTime()
     WS.HoldWeapon = selectedWep
     WS.HoldSlotBind = bind
     WS.HoldSlotKeyCode = code or tSlotFallbackKeys[bind]
-    WS.BackpackEarlySelect = ZCityIsBodyHolsterBlocked(ply) and ZCityIsBackpackDrawWeaponForSelector(selectedWep)
-    WS.BackpackEarlyWeapon = WS.BackpackEarlySelect and selectedWep or nil
-    WS.BackpackEarlySelected = false
-    WS.BackpackPreviousWeapon = WS.BackpackEarlySelect and ply:GetActiveWeapon() or nil
     WS.ConfirmProgress = 0
-
-    if WS.BackpackEarlySelect then
-        ZCityStartBackpackDraw(ply, selectedWep, ZCityGetSlotHoldDuration(ply, selectedWep))
-    end
 end
 
 --[[
@@ -1896,46 +1606,16 @@ function WS.SetActuallyWeapon( ply, cmd )
 
     local holdDuration = ZCityGetSlotHoldDuration(ply, selectedWep)
 
-    if not ZCityIsBodyHolsterBlocked(ply) or not ZCityIsBackpackDrawWeaponForSelector(selectedWep) then
-        WS.LastInv = ply:GetActiveWeapon()
-        WS.LastSelectedSlot = WS.SelectedSlot
-        WS.LastSelectedSlotPos = WS.SelectedSlotPos
-        WS.CommitWeapon = selectedWep
-        WS.CommitStart = now
-        WS.CommitDuration = math.max(holdDuration, 0.05)
-        WS.ConfirmProgress = 0
-        WS.Show = now + 0.25
-        ZCitySelectInventoryWeapon(selectedWep)
-        surface.PlaySound("arc9_eft_shared/weapon_generic_spin" .. math.random(1, 10) .. ".mp3")
-        return
-    end
-
-    if WS.HoldWeapon ~= selectedWep then
-        ZCityBeginHeldSelection(ply, selectedWep)
-    end
-
+    WS.LastInv = ply:GetActiveWeapon()
+    WS.LastSelectedSlot = WS.SelectedSlot
+    WS.LastSelectedSlotPos = WS.SelectedSlotPos
+    WS.CommitWeapon = selectedWep
+    WS.CommitStart = now
+    WS.CommitDuration = math.max(holdDuration, 0.05)
+    WS.ConfirmProgress = 0
     WS.Show = now + 0.25
-
-    local progress = math.Clamp((now - (WS.HoldStart or now)) / holdDuration, 0, 1)
-    WS.ConfirmProgress = Lerp(FrameTime() * 18, WS.ConfirmProgress or 0, progress)
-
-    if WS.BackpackEarlySelect and WS.BackpackEarlyWeapon == selectedWep then
-        ZCityPlayBackpackReachPreview(selectedWep, progress)
-    end
-
-    if progress >= 1 then
-        if IsValid(WS.BackpackPreviousWeapon) then
-            WS.LastInv = WS.BackpackPreviousWeapon
-        end
-        ZCitySelectInventoryWeapon(selectedWep)
-
-        WS.LastSelectedSlot = WS.SelectedSlot
-        WS.LastSelectedSlotPos = WS.SelectedSlotPos
-        WS.Selected = now + 0.2
-        WS.Show = now + 0.2
-        ZCityResetSlotHold(false, true)
-        surface.PlaySound("arc9_eft_shared/weapon_generic_spin" .. math.random(1, 10) .. ".mp3")
-    end
+    ZCitySelectInventoryWeapon(selectedWep)
+    surface.PlaySound("arc9_eft_shared/weapon_generic_spin" .. math.random(1, 10) .. ".mp3")
 end
 
 hook.Add( "PlayerBindPress", "WeaponSelector_PlayerBindPress", WS.ChangeSelectionWep )
