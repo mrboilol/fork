@@ -310,6 +310,33 @@ local STRUCTURE_INPUTS = {
 	"heart", "liver", "flank", "gut", "lungsL", "lungsR",
 }
 
+local BONE_FIELDS = {
+	skull = "skull", jaw = "jaw", chest = "chest", pelvis = "pelvis",
+	larmup = "larm_up", larmdown = "larm_down", rarmup = "rarm_up", rarmdown = "rarm_down",
+	llegup = "lleg_up", llegdown = "lleg_down", rlegup = "rleg_up", rlegdown = "rleg_down",
+}
+
+local function applyBoneTrauma(org, name, before)
+	local after = tonumber(org[BONE_FIELDS[name]])
+	if not before or not after then return end
+
+	local trauma = CONFIG.boneTrauma
+	local delta = after - before
+	if delta < trauma.minDelta then return end
+
+	local limb = CONFIG.boneLimbs[name] or string.sub(name, 1, 4)
+	local amount = delta * trauma.perDamage
+	local fractured = before < 1 and after >= 1
+	if fractured then amount = amount + trauma.fracture end
+
+	SoftTissue.Add(org, "brute", limb, amount)
+
+	local muscleConfig = CONFIG.muscle
+	if fractured and muscleConfig.limbs[limb] then
+		org.muscle[limb] = math.min(org.muscle[limb] + trauma.muscleOnFracture, muscleConfig.max)
+	end
+end
+
 SoftTissue.InputWrappers = SoftTissue.InputWrappers or {}
 
 hg.InputWrapperInner = hg.InputWrapperInner or setmetatable({}, {__mode = "k"})
@@ -328,17 +355,26 @@ local function wrapInput(inputList, name)
 	if not isfunction(original) or hg.InputWrapperChainHas(original, SoftTissue.InputWrappers[name]) then return end
 
 	local isOrgan = CONFIG.organInputs[name]
+	local boneField = BONE_FIELDS[name]
 	local function wrapper(org, bone, dmg, dmgInfo, ...)
-		if org.softBrute and isnumber(dmg) and dmgInfo and dmgInfo.IsDamageType then
-			if not isOrgan then
-				local _, structure = SoftTissue.GetDamageProfile(dmgInfo)
-				dmg = dmg * structure
-			end
-
-			dmg = dmg * SoftTissue.GetAccessMul(org, name)
+		if not org.softBrute or not isnumber(dmg) or not dmgInfo or not dmgInfo.IsDamageType then
+			return original(org, bone, dmg, dmgInfo, ...)
 		end
 
-		return original(org, bone, dmg, dmgInfo, ...)
+		if not isOrgan then
+			local _, structure = SoftTissue.GetDamageProfile(dmgInfo)
+			dmg = dmg * structure
+		end
+
+		dmg = dmg * SoftTissue.GetAccessMul(org, name)
+
+		if not boneField or org.simpleMode then return original(org, bone, dmg, dmgInfo, ...) end
+
+		local before = tonumber(org[boneField])
+		local results = {original(org, bone, dmg, dmgInfo, ...)}
+		applyBoneTrauma(org, name, before)
+
+		return unpack(results, 1, table.maxn(results))
 	end
 
 	SoftTissue.InputWrappers[name] = wrapper

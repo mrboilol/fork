@@ -105,6 +105,13 @@ SoftTissue.Config = {
 	},
 	organInputs = {heart = true, liver = true, flank = true, gut = true, lungsL = true, lungsR = true},
 
+	boneTrauma = {
+		minDelta = 0.05,
+		perDamage = 35,
+		fracture = 25,
+		muscleOnFracture = 0.15,
+	},
+
 	pain = {
 		soft = 0.25,
 		muscle = 30,
