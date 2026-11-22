@@ -703,7 +703,7 @@ elseif SERVER then
         if (internal or small) and not txaActive and hev.Medicine >= 60 then
             hg.organism.AdministerTranexamic(org, 10)
             hev.Medicine = hev.Medicine - 60
-            hevAlert(ply, "HEV suit has detected bleeding. Injecting tranexamic acid.", "txa_hev", "hl1/fvox/automedic_on.wav")
+            hevAlert(ply, "HEV suit has detected bleeding. Injecting tranexamic acid.", "txa_hev", "hl1/fvox/blood_plasma.wav")
         end
     end
 
@@ -745,10 +745,12 @@ elseif SERVER then
 
     local HEV_AED_CHARGE = 7
     local HEV_AED_COOLDOWN = 45
-    local HEV_AED_COST = 200
-    local HEV_THIAMINE_COST = 80
-    local HEV_SPLINT_COST = 30
-    local HEV_SURGEON_COST = 250
+    local HEV_AED_COST = 60
+    local HEV_THIAMINE_COST = 30
+    local HEV_SPLINT_COST = 10
+    local HEV_STERILIZE_COST = 10
+    local HEV_STERILIZE_COOLDOWN = 20
+    local HEV_SURGEON_COST = 100
     local HEV_SURGEON_BATTERY = 400
     local HEV_SURGEON_COOLDOWN = 90
     local hevAEDSounds = {
@@ -834,7 +836,7 @@ elseif SERVER then
             end
 
             hevPlayAED(ply, hevAEDSounds.shocksuccess)
-            hevNotify(ply, "Defibrillation delivered. Epinephrine injected. Auto-pulse enabled.", "aed_hev_done")
+            hevAlert(ply, "Defibrillation delivered. Epinephrine injected. Auto-pulse enabled.", "aed_hev_done", "hl1/fvox/adrenaline_shot.wav")
 
             timer.Simple(3, function()
                 if IsValid(ply) and ply:Alive() then hevPlayAED(ply, hevAEDSounds.startcpr) end
@@ -858,7 +860,39 @@ elseif SERVER then
 
         ply.HEV.Medicine = ply.HEV.Medicine - HEV_THIAMINE_COST
         org.thiamine = 1
-        hevAlert(ply, "HEV suit has detected severe organ damage. Injecting thiamine.", "thiamine_hev", "hl1/fvox/automedic_on.wav")
+        hevAlert(ply, "HEV suit has detected severe organ damage. Injecting thiamine.", "thiamine_hev", "hl1/fvox/antitoxin_shot.wav")
+    end
+
+    local function hevOpenWounds(org)
+        for _, list in ipairs({org.wounds, org.arterialwounds}) do
+            for _, wound in ipairs(list or {}) do
+                if (wound[1] or 0) > 0 then return true end
+            end
+        end
+        return false
+    end
+
+    local function hevAutoSterilize(ply, org)
+        if (org.hevSterilizeNext or 0) > CurTime() or ply.HEV.Medicine < HEV_STERILIZE_COST then return end
+
+        local state = org.simpleMode and hg.SimpleHealth.GetState(org)
+        local contaminated = state and (state.contamination or 0) > 1
+        local infected = (org.infection or 0) > 0.05 or (org.medical_infection or 0) > 0.05
+        local exposed = hevOpenWounds(org) and (org.openWoundTime or 0) > 5
+        if not (infected or exposed or contaminated) then return end
+
+        org.hevSterilizeNext = CurTime() + HEV_STERILIZE_COOLDOWN
+        ply.HEV.Medicine = ply.HEV.Medicine - HEV_STERILIZE_COST
+
+        org.infection = 0
+        org.medical_infection = 0
+        org.openWoundTime = 0
+        org.openWoundRoll = 0
+        org.infectionNotified = nil
+        org.sepsisSource = math.max((org.sepsisSource or 0) - 0.25, 0)
+        if contaminated then state.contamination = 0 end
+
+        hevAlert(ply, "HEV suit has detected wound contamination. Sterilizing wounds.", "sterilize_hev", "hl1/fvox/wound_sterilized.wav")
     end
 
     local function hevAutoSurgeon(ply, org)
@@ -880,7 +914,7 @@ elseif SERVER then
 
         org.hevSurgeonNext = CurTime() + HEV_SURGEON_COOLDOWN
         ply.HEV.Medicine = ply.HEV.Medicine - HEV_SURGEON_COST
-        hevAlert(ply, "HEV suit has detected life-threatening damage. Deploying built-in autosurgeon.", "surgeon_hev", "hl1/fvox/automedic_on.wav")
+        hevAlert(ply, "HEV suit has detected life-threatening damage. Deploying built-in autosurgeon.", "surgeon_hev", "hl1/fvox/administering_medical.wav")
     end
 
     hook.Add("Org Think","gordon_healing",function(ply, org, timeValue)
@@ -904,6 +938,7 @@ elseif SERVER then
             ply:SetNetVar("HEVMedicine", ply.HEV.Medicine)
             hevSupplyOxygen(ply, org, timeValue)
             hevAutoAED(ply, org)
+            hevAutoSterilize(ply, org)
             if hevSevereDamage(org) then
                 hevAutoThiamine(ply, org)
                 hevAutoSurgeon(ply, org)
@@ -958,7 +993,7 @@ elseif SERVER then
             if (org.CO > 10) or (org.COregen > 10) then
                 ply:Notify("HEV suit has detected a carbon monoxide presence in the organism. Neutralising.",60,"co_hev",0.5,function(ply)
                     net.Start("HEV_DAMAGE")
-                        net.WriteString("hl1/fvox/automedic_on.wav")
+                        net.WriteString("hl1/fvox/antidote_shot.wav")
                     net.Send(ply)
                 end, hev_color)
 
