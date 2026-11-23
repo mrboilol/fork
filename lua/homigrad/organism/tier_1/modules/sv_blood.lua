@@ -92,7 +92,6 @@ module[1] = function(org)
 	org.internalBleedThoughtLevel = 0
 	org.nextInternalBleedThought = 0
 
-	org.survivalchance = 1
 	org.hemothorax = 0
 	org.hemothoraxTrauma = 0
 	org.hemothoraxL = 0

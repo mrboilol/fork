@@ -113,7 +113,6 @@ module[1] = function(org)
 
 	org.o2[1] = org.o2.range
 	org.bloodO2Cap = org.o2.range
-	org.bloodCarryO2Cap = org.o2.range
 	org.perfusionO2Cap = org.o2.range
 	org.cardiacArrestO2Start = nil
 
@@ -554,6 +553,9 @@ local co2Config = {
 	panicGain = 0.05,
 	etco2Rate = 8,
 	etco2FlowFull = 0.7,
+	etco2VasodilationStart = 45,
+	etco2VasodilationRange = 30,
+	etco2VasodilationPressure = 0.5,
 	cprMin = 10,
 	cprMax = 20,
 	lactateNormal = 1,
@@ -615,6 +617,7 @@ local function updateCO2(owner, org, timeValue, ventilating, exerting, staminaVa
 		+ math.Clamp((lactate - 2) * 0.05, 0, 0.4)
 		+ math.min(muscle * 0.08, 0.3)
 		- (org.paralyzed and 0.25 or 0)
+		- math.Clamp((33 - temperature) * 0.05, 0, 0.45)
 		- lost * 0.06)
 	production = math.max(production, 0.3)
 	org.metabolicDemand = production
@@ -680,7 +683,6 @@ module[2] = function(owner, org, timeValue)
 		o2[1] = o2.range
 		o2.curregen = o2.regen
 		org.bloodO2Cap = o2.range
-		org.bloodCarryO2Cap = o2.range
 		org.oxygenIntakeAvailable = true
 		org.lungsfunction = true
 		org.exertionO2Debt = 0
@@ -716,7 +718,6 @@ module[2] = function(owner, org, timeValue)
 		org.oxygenIntakeAvailable = true
 		org.lungsfunction = true
 		org.bloodO2Cap = o2.range
-		org.bloodCarryO2Cap = o2.range
 		org.perfusionO2Cap = o2.range
 		org.circulatoryO2Reserve = 1
 		return
@@ -776,12 +777,6 @@ module[2] = function(owner, org, timeValue)
 		org.respiratoryArrest = false
 	end
 
-	-- Blood volume affects oxygen delivery through cardiac output, pulse, and
-	-- pressure. It is not itself an arterial saturation cap; the lungs own the
-	-- blood's oxygen saturation and the circulation module owns delivery.
-	org.bloodCarryO2Cap = o2.range
-	org.hemorrhageOxygenTransport = 1
-	org.hemorrhageAdrenalineO2Support = 0
 	local bloodO2Cap = org.bloodO2Cap or o2.range
 
 	local bodyTemperature = org.temperature or 36.7
@@ -870,6 +865,7 @@ module[2] = function(owner, org, timeValue)
 	local inwater = bit_band(util_PointContents(head),CONTENTS_WATER) == CONTENTS_WATER
 	local scubaOxygenActive = owner:IsPlayer() and inwater and hg.organism.HasUnderwaterOxygen(org)
 	org.scubaOxygenActive = scubaOxygenActive
+	org.hyperoxia = math.Approach(tonumber(org.hyperoxia) or 0, scubaOxygenActive and 1 or 0, timeValue / (scubaOxygenActive and 120 or 60))
 
 	
 

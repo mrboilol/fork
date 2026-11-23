@@ -747,7 +747,14 @@ hook.Add("Org Think", "BrainfuckV2", function(owner, org)
 	local posture, severity = getPostureState(org, rag)
 	setPosture(org, posture, severity, rag)
 
-	if posture and owner:IsPlayer() and owner:Alive() and not IsValid(rag) then
+	if not posture or not owner:IsPlayer() or not owner:Alive() then return end
+
+	if not (org.otrub or org.needotrub) then
+		hg.organism.AddSeizure(org, 1)
+		return
+	end
+
+	if not IsValid(rag) then
 		org.brainfuckv2SlowUntil = CurTime() + slowTime
 		forceFake(owner, org)
 	end

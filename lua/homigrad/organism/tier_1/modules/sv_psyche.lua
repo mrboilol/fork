@@ -10,13 +10,11 @@ local gunfight_adrenaline_cap = 1.5
 module[1] = function(org)
 	org.psycheAnger = 0
 	org.psycheAngerLastHit = 0
-	org.psychePainMul = 1
 end
 
 module[2] = function(owner, org, timeValue)
 	local anger = Clamp(org.anger or 0, 0, 1)
 	org.psycheAnger = anger
-	org.psychePainMul = 1
 
 	local K = hg.PsycheCombat
 	local mood = Clamp(tonumber(org.goodmood) or 0, 0, 1)

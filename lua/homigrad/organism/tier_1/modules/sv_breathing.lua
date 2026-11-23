@@ -95,6 +95,31 @@ Breathing.Sources = {
 		rate = -4,
 		depth = 0.85,
 	},
+	hypoxicDrive = {
+		value = function(org)
+			local range = tonumber(org.o2 and org.o2.range) or 30
+			local o2 = tonumber(org.o2 and org.o2[1]) or range
+			local thin = unit((1 - (tonumber(org.airPressureRatio) or 1)) / 0.6)
+			local low = unit((range * 0.7 - o2) / (range * 0.5))
+			local blunt = math.Clamp(((tonumber(org.paco2) or 40) - 15) / 25, 0.2, 1)
+			local drug = 1 - unit(org.drugRespiratoryDepression)
+
+			return math.max(thin, low) * blunt * drug
+		end,
+		start = 0.05,
+		rate = 12,
+		depth = 1.25,
+	},
+	hypothermia = {
+		value = function(org) return unit((35 - (tonumber(org.temperature) or 36.7)) / 9) end,
+		rate = -6,
+		depth = 0.8,
+	},
+	hyperoxia = {
+		value = function(org) return unit(org.hyperoxia) end,
+		rate = -6,
+		depth = 0.85,
+	},
 }
 
 local function due(org, key, interval)

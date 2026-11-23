@@ -1356,7 +1356,8 @@ local IsValid = IsValid
 		local o2Low = math.Clamp((K.o2TremorStart - o2) / (K.o2TremorStart - K.o2TremorFull), 0, 1)
 		local bloodLow = math.Clamp((K.bloodTremorStart - (tonumber(org.blood) or 5000)) / (K.bloodTremorStart - K.bloodTremorFull), 0, 1)
 		local despairShake = math.Clamp(tonumber(org.despairShake) or 0, 0, 1)
-		local tremor = (math.min(adrenaline * K.tremorAdrenaline + crash * K.tremorCrash + o2Low * K.tremorO2 + bloodLow * K.tremorBlood + (1 - staminaFraction) * K.tremorStamina, K.tremorCap) + despairShake * K.tremorDesolation) * Lerp(training, 1, K.trainedShakeMul)
+		local shivering = math.Clamp(tonumber(org.shivering) or 0, 0, 1)
+		local tremor = (math.min(adrenaline * K.tremorAdrenaline + crash * K.tremorCrash + o2Low * K.tremorO2 + bloodLow * K.tremorBlood + (1 - staminaFraction) * K.tremorStamina, K.tremorCap) + despairShake * K.tremorDesolation + shivering * K.tremorShiver) * Lerp(training, 1, K.trainedShakeMul)
 		local power = math.Clamp(staminaPower * consciousnessPower * reservePower * painPower * shockPower * disorientationPower * ailmentPower, 0.08, 1)
 
 		local tempo = math.Clamp(power ^ 0.62 * Lerp(staminaFraction, 0.72, 1), 0.18, 1) * Lerp(armFatigue, 1, 0.7) * Lerp(crash, 1, K.crashTempo) * Lerp(focus, 1, K.focusTempo)

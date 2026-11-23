@@ -907,7 +907,7 @@ local function CreateRadialMenu(options_arg, bAutoClose)
 			DrawModernRadialCenterText(centerSubject:GetPlayerName(), centerX, centerY, innerRadius * radialCenterTextWidthMul, Color(centerColor.r, centerColor.g, centerColor.b, 255 * (1 - radialCenterTextAlpha) * viewLerp))
 		end
 		if !paining then
-			DrawRadialIdentity(scrW, scrH, viewLerp, options1.title)
+			DrawRadialIdentity(scrW, scrH, viewLerp, options1.title, not useOldRadial)
 		end
 	end
 end

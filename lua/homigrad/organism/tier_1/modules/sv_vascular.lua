@@ -106,7 +106,7 @@ function hg.organism.UpdateVascularEvents(owner, org, timeValue)
 		+ (hasAtrialFibrillation(org) and 0.4 or 0)
 		+ remapClamped(50 - heartbeat, 0, 20) * 0.15
 		+ Clamp(tonumber(org.hypervolemia) or 0, 0, 1) * 0.15
-	burdenTarget = Clamp(burdenTarget * (1 - lysis * 0.9), 0, 1)
+	burdenTarget = Clamp(burdenTarget * (1 - lysis * 0.9) * hg.organism.TraitMul(org, "clot_burden", 1), 0, 1)
 	local burden = Clamp(tonumber(org.clotBurden) or 0, 0, 1)
 	local burdenRate = burdenTarget > burden and timeValue / 120 or timeValue / (lysis > 0 and 15 or 90)
 	burden = math.Approach(burden, burdenTarget, burdenRate)

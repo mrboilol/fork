@@ -1911,7 +1911,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	if just_went_uncon then
 		org.owner.fullsend = true
 	end
-	if not ignoreBrainDamage and org.brain > 0.05 then
+	if not ignoreBrainDamage and org.brain >= 0.3 and (org.otrub or org.needotrub) then
 		if math.random(600) < org.brain * 20 then
 			org.needfake = true
 		end

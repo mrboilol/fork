@@ -233,6 +233,12 @@ local moodleTexts = {
 		[3] = {title = "Hungry", description = "Hunger is sapping your strength."},
 		[4] = {title = "Starving", description = "You are starving and need food immediately."},
 	}},
+	thirst = {levels = {
+		[1] = {title = "Dry Mouth", description = "Your mouth is dry and a drink would help."},
+		[2] = {title = "Thirsty", description = "You are thirsty and need something to drink."},
+		[3] = {title = "Dehydrated", description = "Dehydration is thinning your blood pressure and sapping your strength."},
+		[4] = {title = "Severe Dehydration", description = "You are critically dehydrated and need water immediately."},
+	}},
 	full = {levels = {
 		[1] = {title = "Full", description = "You have eaten well."},
 		[2] = {title = "Stuffed", description = "You cannot fit any more food."},
@@ -387,11 +393,11 @@ local moodleTexts = {
 		[3] = {title = "Encumbered", description = "Excessive equipment is limiting your mobility."},
 		[4] = {title = "Overburdened", description = "Your load makes even basic movement difficult."},
 	}},
-	nausea = {levels = {
-		[1] = {title = "Queasy", description = "You feel unwell and may become nauseated."},
-		[2] = {title = "Nausea", description = "Stomach discomfort is giving you the urge to vomit."},
-		[3] = {title = "Nausea", description = "You are struggling to keep yourself from vomiting."},
-		[4] = {title = "Nausea", description = "Violent sickness signals that something is wrong."},
+	acidbase = {levels = {
+		[1] = {title = "Acid-Base Imbalance", description = "Your blood chemistry is drifting out of range."},
+		[2] = {title = "Acid-Base Imbalance", description = "Your blood chemistry is clearly off balance."},
+		[3] = {title = "Acid-Base Imbalance", description = "Your blood chemistry is dangerously off balance."},
+		[4] = {title = "Acid-Base Imbalance", description = "Your blood chemistry is failing."},
 	}},
 	amputated = {levels = {
 		[1] = {title = "Severed Limb", description = "A limb has suffered devastating traumatic separation."},
@@ -521,11 +527,12 @@ local function getMoodle3IconName(effect)
 		dislocated_jaw = "dejawed", organ_damage = effect.icon, spine_break = "fractured",
 		shock = "shock", seizure = "seizure", internal_bleed = "internal-bleeding",
 		panic = "panic", fear = "trauma", tinnitus = "tinnitus", deaf = "deafness", encumbered = "encumbered",
-		nausea = "sick", amputated = "amputation", concussion = "stress", sepsis = "sepsis",
+		acidbase = "sick", amputated = "amputation", concussion = "stress", sepsis = "sepsis",
 		adrenaline = "adrenaline", zerlked = "zerlked", poisoning = "radiation",
 		cotard = "suicide", hopelessness = "hopeless", desolation = "desolate", suicidal = "suicide",
 		rage = "anger5",
 		hunger = level == 1 and "hunger" or "hunger" .. level, full = level == 1 and "full" or "full2",
+		thirst = level == 1 and "thirst" or "thirst" .. level,
 	}
 	local name = names[effect.name]
 	if effect.name == "burning" then
@@ -546,6 +553,7 @@ end
 
 local moodle3IconFallbacks = {
 	["brain-hypoxia"] = "hypoxemia",
+	thirst = "hunger", thirst2 = "hunger2", thirst3 = "hunger3", thirst4 = "hunger4",
 }
 
 local function getMoodle3Icon(effect)
@@ -682,6 +690,20 @@ local irregularECGSeverity = {
 }
 
 hg = hg or {}
+hg.MoodleAcidosisTexts = {
+	[1] = {title = "Mild Acidosis", description = "Your blood is turning acidic; you feel sick and sluggish."},
+	[2] = {title = "Acidosis", description = "Acid is building in your blood, weakening your heart and nerves."},
+	[3] = {title = "Severe Acidosis", description = "Your blood is dangerously acidic and your body is failing to respond."},
+	[4] = {title = "Critical Acidosis", description = "Blood acidity is near fatal; coma and cardiac collapse are close."},
+}
+
+hg.MoodleAlkalosisTexts = {
+	[1] = {title = "Mild Alkalosis", description = "Your blood is turning alkaline; you feel light-headed and tingly."},
+	[2] = {title = "Alkalosis", description = "Alkaline blood is causing dizziness, pain and cramping."},
+	[3] = {title = "Severe Alkalosis", description = "Your blood is dangerously alkaline; your heart and brain are strained."},
+	[4] = {title = "Critical Alkalosis", description = "Blood alkalinity is near fatal; seizures and collapse are close."},
+}
+
 hg.MoodlePleuralTexts = {
 	pneumothorax = {thresholds = {0.01, 0.1, 0.3, 0.5},
 		[1] = {title = "Chest Tightness", description = "Some air is leaking into the space around a lung."},
@@ -821,6 +843,12 @@ local function buildEffects(ply, org)
 		add(effects, "hunger", "hunger", highRank(hungry, {10, 30, 55, 75}), "bad", 17, math.floor(hungry) .. "%")
 	elseif hungerSystem and hungerSystem:GetBool() and satiety >= 80 then
 		add(effects, "full", "full", satiety >= 95 and 2 or 1, "good", 17, math.floor(satiety) .. "%")
+	end
+
+	local thirstSystem = GetConVar("hg_thirstsystem")
+	local thirst = math.Clamp(orgNumber(org, "thirst", 0), 0, 100)
+	if thirstSystem and thirstSystem:GetBool() and thirst > 10 then
+		add(effects, "thirst", "thirst", highRank(thirst, {10, 30, 55, 75}), "bad", 18, math.floor(thirst) .. "%")
 	end
 
 	local bleed = orgNumber(org, "bleed", 0)
@@ -964,6 +992,17 @@ local function buildEffects(ply, org)
 		local deficit = math.Clamp(1 - o2Regen / o2Demand, 0, 1)
 		add(effects, "bradypnea", "bradyapnea", highRank(deficit, {0.1, 0.3, 0.55, 0.8}), "bad", 34, math.floor(deficit * 100) .. "%")
 	end
+	local slowBreathing = math.Clamp(orgNumber(org, "bradyapnea", 0), 0, 1)
+	if slowBreathing > 0.05 and org.respiratoryArrest ~= true and org.lungsfunction ~= false then
+		local slowLevel = highRank(slowBreathing, {0.05, 0.3, 0.6, 0.85})
+		local existing
+		for _, effect in ipairs(effects) do if effect.name == "bradypnea" then existing = effect break end end
+		if existing then
+			existing.level = math.max(existing.level, slowLevel)
+		else
+			add(effects, "bradypnea", "bradyapnea", slowLevel, "bad", 34, math.floor(slowBreathing * 100) .. "%")
+		end
+	end
 	local pneumothorax, hemothorax = orgNumber(org, "pneumothorax", 0), orgNumber(org, "hemothorax", 0)
 	local tamponade = orgNumber(org, "cardiacTamponade", 0)
 	local lungWater, pneumonia = orgNumber(org, "lungWater", 0), orgNumber(org, "pneumonia", 0)
@@ -1070,8 +1109,14 @@ local function buildEffects(ply, org)
 	local maxWeight = math.max(orgNumber(org, "maxweight", 60), 1)
 	local weightFraction = weight / maxWeight
 	if weightFraction > 0.5 then add(effects, "encumbered", "encumbered", highRank(weightFraction, {0.5, 0.7, 0.85, 0.95}), "bad", 60, math.floor(weightFraction * 100) .. "%") end
-	local nausea = orgNumber(org, "wantToVomit", 0)
-	if nausea > 0.2 then add(effects, "nausea", "nausea", highRank(nausea, {0.2, 0.6, 0.8, 0.9}), "bad", 43, math.floor(nausea * 100) .. "%") end
+	local acidosis, alkalosis = orgNumber(org, "acidosis", 0), orgNumber(org, "alkalosis", 0)
+	local acidBase = math.max(acidosis, alkalosis)
+	if acidBase > 0.05 then
+		local texts = alkalosis > acidosis and hg.MoodleAlkalosisTexts or hg.MoodleAcidosisTexts
+		local level = highRank(acidBase, {0.05, 0.3, 0.6, 0.85})
+		local text = texts[level]
+		add(effects, "acidbase", "nausea", level, "bad", 43, string.format("pH %.2f", orgNumber(org, "bloodph", 7.4)), text.title, text.description)
+	end
 
 	local tourniqueted = getTourniquetedLimbs(ply)
 	local amputations, untreatedAmputation = 0, false

@@ -74,6 +74,7 @@ hg.PsycheCombat = {
 	tremorStamina = 0.5,
 	tremorCap = 2.2,
 	tremorDesolation = 1.8,
+	tremorShiver = 1.4,
 	desolationInstability = 0.35,
 	tremorFreq = 12,
 	tremorForce = 120,

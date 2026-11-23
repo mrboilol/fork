@@ -255,7 +255,7 @@ local function updateChronicStrain(owner, org, timeValue, injury)
     local strain = Clamp01(org.chronicStrain)
     if injury >= CHRONIC_INJURY_MIN and not org.otrub then
         local treated = math.Clamp(math.max(tonumber(org.analgesia) or 0, (tonumber(org.painkiller) or 0) * 0.4), 0, 1)
-        strain = strain + timeValue / CHRONIC_RISE_TIME * injury * Lerp(treated, 1, CHRONIC_TREATED_RISE_MUL)
+        strain = strain + timeValue / CHRONIC_RISE_TIME * injury * Lerp(treated, 1, CHRONIC_TREATED_RISE_MUL) * hg.organism.TraitMul(org, "emotion_gain", 1)
     else
         strain = strain - timeValue / CHRONIC_FALL_TIME
     end

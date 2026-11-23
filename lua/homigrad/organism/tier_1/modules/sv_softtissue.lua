@@ -44,6 +44,7 @@ function SoftTissue.Add(org, kind, limb, amount)
 	if not values or not amount or amount <= 0 then return 0 end
 
 	limb = values[limb] and limb or "torso"
+	amount = amount * hg.organism.TraitMul(org, "tissue_damage", 1)
 
 	local before = values[limb]
 	values[limb] = math.min(before + amount, CONFIG.limbMax)
@@ -116,7 +117,7 @@ function SoftTissue.GetRegenMul(org)
 	if (tonumber(org.thiamine) or 0) > 0 then mul = mul * CONFIG.regen.thiamineMul end
 	if CurTime() - (org._satietyLastClimbed or -REGEN.fedTime) < REGEN.fedTime then mul = mul * REGEN.fedMul end
 
-	return mul
+	return mul * (0.4 + 0.6 * (tonumber(org.metabolicFuel) or 1))
 end
 
 local BANDAGE_KEYS = {head = "skull", torso = "chest"}

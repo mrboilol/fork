@@ -54,7 +54,10 @@ function SWEP:InitializeAdd()
 			self.bloodtype = types[math.random(#types)]
 			self.modeValues[1] = 1
 		end
-		if self.modeValues[1] > 0 then self.bloodph = hg.organism.AcidBase.RollBagPh() end
+		if self.modeValues[1] > 0 then
+			self.bloodph = hg.organism.AcidBase.RollBagPh()
+			self.bacteria = hg.organism.Infection.RollBagBacteria(self.bloodph)
+		end
 	end
 end
 
@@ -82,6 +85,7 @@ function SWEP:GetInfo()
 	local tblcopy = table.Copy(self.modeValues)
 	tblcopy.bloodtype = self.bloodtype or "o-"
 	tblcopy.bloodph = self.bloodph
+	tblcopy.bacteria = self.bacteria
 	return tblcopy
 end
 
@@ -92,6 +96,8 @@ function SWEP:SetInfo(info)
 	self.modeValues.bloodtype = nil
 	self.bloodph = tonumber(self.modeValues.bloodph)
 	self.modeValues.bloodph = nil
+	self.bacteria = tonumber(self.modeValues.bacteria)
+	self.modeValues.bacteria = nil
 end
 
 function SWEP:OwnerChanged()
@@ -251,6 +257,8 @@ if SERVER then
 						if added > 0 then
 							local donorPh = hg.organism.AcidBase.GetPh(ent.organism)
 							self.bloodph = old > 0 and ((self.bloodph or donorPh) * old + donorPh * added) / self.modeValues[1] or donorPh
+							local donorBacteria = hg.organism.Infection.GetBloodBacteria(ent.organism)
+							self.bacteria = ((self.bacteria or 0) * old + donorBacteria * added) / self.modeValues[1]
 						end
 
 						if ent.organism.furryinfected then
@@ -296,7 +304,7 @@ if SERVER then
 						--print(good_type)
 						if good_type then
 							ent.organism.blood = math.min(ent.organism.blood + math.min(FrameTime() * 0.5 * rateScale * (math.max(ent.organism.pulse / 70,0.3)),self.modeValues[1]) * volume, maxTransfusionBlood)
-							ent.organism.hemotransfusionshock = math.max(ent.organism.hemotransfusionshock - math.max(ent.organism.blood - old, 0) / 600, 0)
+							ent.organism.hemotransfusionshock = math.max(ent.organism.hemotransfusionshock - math.max(ent.organism.blood - old, 0) / 600 * (1 - math.Clamp(self.bacteria or 0, 0, 1)), 0)
 						else
 							ent.organism.blood = math.min(ent.organism.blood + math.min(FrameTime() * 0.5 * rateScale * (math.max(ent.organism.pulse / 70,0.3)),self.modeValues[1]) * volume * 0.4, maxTransfusionBlood)
 							if ent.organism.blood > old then
@@ -305,7 +313,7 @@ if SERVER then
 						end
 
 						if ent.organism.blood > old then
-							hg.organism.TransfuseBlood(ent.organism, ent.organism.blood - old, self.bloodph)
+							hg.organism.TransfuseBlood(ent.organism, ent.organism.blood - old, self.bloodph, self.bacteria)
 						end
 
 						if (self.bloodtype == "c-" or self.furryinfected) and ent.PlayerClassName != "furry" and (ent.organism.blood - old) > 0 then
@@ -326,6 +334,7 @@ if SERVER then
 			else
 				self.bloodtype = nil
 				self.bloodph = nil
+				self.bacteria = nil
 			end
 		end
 

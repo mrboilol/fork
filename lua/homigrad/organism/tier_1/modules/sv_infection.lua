@@ -61,6 +61,22 @@ Infection.Config = {
 
 	simpleContaminationGain = 0.01,
 	simpleAntibioticClear = 0.05,
+
+	bagMl = 500,
+	bagContaminationChance = 0.04,
+	staleBagPh = 7.1,
+	staleBagContaminationChance = 0.5,
+	bagLoad = {0.3, 1},
+	bagBacteremia = 0.6,
+	bagEndotoxin = 0.25,
+	bagSimpleContamination = 0.8,
+	donorSepsisMul = 0.5,
+	immuneSourceClear = 1 / 400,
+
+	sepsisLungDamage = 0.006,
+	sepsisLungCap = 0.7,
+	sepsisGutDamage = 0.008,
+	sepsisGutCap = 0.6,
 }
 local CONFIG = Infection.Config
 
@@ -111,6 +127,7 @@ function Infection.Seed(org, amount)
 	if not org or amount <= 0 or not infectionsEnabled() then return end
 	if (tonumber(org.antibiotics) or 0) > 0 then return end
 
+	amount = amount * hg.organism.TraitMul(org, "infection_risk", 1)
 	org.infection = min(max(tonumber(org.infection) or 0, 0) + amount, 1)
 end
 
@@ -119,6 +136,37 @@ function Infection.Contaminate(org, amount, bacteremia)
 	Infection.Seed(org, amount)
 	bacteremia = tonumber(bacteremia) or 0
 	if bacteremia > 0 then org.sepsisSource = min((tonumber(org.sepsisSource) or 0) + bacteremia, 1) end
+end
+
+function Infection.RollBagBacteria(bagPh)
+	local stale = (tonumber(bagPh) or 7.4) < CONFIG.staleBagPh
+	if math.random() >= (stale and CONFIG.staleBagContaminationChance or CONFIG.bagContaminationChance) then return 0 end
+
+	return math.Round(math.Rand(CONFIG.bagLoad[1], CONFIG.bagLoad[2]), 2)
+end
+
+function Infection.GetBloodBacteria(org)
+	if not org then return 0 end
+
+	return Clamp(max(tonumber(org.sepsisSource) or 0, min(tonumber(org.hemotransfusionshock) or 0, 2) * CONFIG.donorSepsisMul), 0, 1)
+end
+
+function Infection.TransfuseBacteria(org, ml, load)
+	load = Clamp(tonumber(load) or 0, 0, 1)
+	if not org or load <= 0 or not infectionsEnabled() then return end
+
+	local dose = (tonumber(ml) or 0) / CONFIG.bagMl * load
+	if dose <= 0 then return end
+
+	if org.simpleMode then
+		if hg.SimpleHealth and hg.SimpleHealth.AddContamination then
+			hg.SimpleHealth.AddContamination(org, dose * CONFIG.bagSimpleContamination)
+		end
+		return
+	end
+
+	org.sepsisSource = min((tonumber(org.sepsisSource) or 0) + dose * CONFIG.bagBacteremia, 1)
+	org.hemotransfusionshock = min((tonumber(org.hemotransfusionshock) or 0) + dose * CONFIG.bagEndotoxin, 2)
 end
 
 function Infection.Fight(org, value, mulTime, growthMul)
@@ -304,7 +352,9 @@ function hg.organism.UpdateSepsis(org, mulTime, adrenalineStabilizer)
 	local organHealed = max((org.sepsisOrganPrev or organLoad) - organLoad, 0)
 	local source = org.sepsisSource or 0
 	if source > 0 then
-		source = max(source - organHealed * 1.5 - mulTime * (1 / 600 + (thiamine and 1 / 20 or 0)), 0)
+		local immuneClear = mulTime * Clamp(org.immuneStrength or 1, 0, 1.5) * CONFIG.immuneSourceClear
+		org.wbc = max((tonumber(org.wbc) or CONFIG.wbcNormal) - immuneClear * CONFIG.fightCost, CONFIG.wbcMin)
+		source = max(source - organHealed * 1.5 - immuneClear - mulTime * (1 / 600 + (thiamine and 1 / 20 or 0)), 0)
 		org.sepsisSource = source
 		local cap = source * 1.5
 		if org.hemotransfusionshock < cap then
@@ -325,6 +375,16 @@ function hg.organism.UpdateSepsis(org, mulTime, adrenalineStabilizer)
 	org.liver = min(org.liver + organDamage * 0.012, 1)
 	org.flank = min((org.flank or 0) + organDamage * 0.012, 1)
 	org.heart = min(org.heart + organDamage * 0.006, 1)
+	if organDamage > 0 then
+		for _, lung in ipairs({org.lungsL, org.lungsR}) do
+			if istable(lung) and (lung[1] or 0) < CONFIG.sepsisLungCap then
+				lung[1] = min((lung[1] or 0) + organDamage * CONFIG.sepsisLungDamage, CONFIG.sepsisLungCap)
+			end
+		end
+		if (org.gut or 0) < CONFIG.sepsisGutCap then
+			org.gut = min((org.gut or 0) + organDamage * CONFIG.sepsisGutDamage, CONFIG.sepsisGutCap)
+		end
+	end
 	if not adrenalineStabilizer and not thiamine and not txa then
 		org.ischemia = org.ischemia + mulTime * severity * 0.3
 	end

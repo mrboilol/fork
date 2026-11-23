@@ -104,7 +104,7 @@ function hg.organism.UpdateRhabdo(owner, org, mulTime)
 
 	local release, load = releaseFromTissue(owner, org)
 	local myoglobin = tonumber(org.myoglobin) or 0
-	myoglobin = myoglobin + release + mulTime * load * CONFIG.leakPerMuscle
+	myoglobin = myoglobin + (release + mulTime * load * CONFIG.leakPerMuscle) * hg.organism.TraitMul(org, "strain_gain", 1)
 
 	local renal = Clamp(tonumber(org.renalFailure) or 0, 0, 1)
 	local perfusion = Clamp(tonumber(org.circulatoryO2Reserve) or 1, 0.2, 1)

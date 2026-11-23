@@ -214,10 +214,11 @@ function hg.organism.UpdateBodyTemperature(owner, org, timeValue)
 	local fever = tonumber(org.fever) or 0
 	local heartHeat = Clamp((heartbeat - 100) / 80, 0, 1)
 	local shiver = org.otrub and 0 or Clamp((35.5 - temperature) / 2.5, 0, 1) * (1 - Clamp((32 - temperature) / 4, 0, 1))
-	local heat = heartHeat * 1.5 + Clamp(((tonumber(org.metabolicDemand) or 1) - 1) * 1.5, 0, 2) + shiver * 1.2 + max(fever, 0) * 0.5
+	local fuel = Clamp(tonumber(org.metabolicFuel) or 1, 0, 1)
+	local heat = (0.3 + heartHeat * 1.5 + Clamp(((tonumber(org.metabolicDemand) or 1) - 1) * 1.5, 0, 2) + shiver * 1.2 + max(fever, 0) * 0.5) * fuel
 	org.heatProduction = heat
 	org.shivering = shiver
-	local needed_temp = math.min(36.7 - lowPulseCold * 5.7, org.lowBloodTemperatureTarget or 36.7) + fever + heartHeat * 0.8
+	local needed_temp = math.min(36.7 - lowPulseCold * 5.7, org.lowBloodTemperatureTarget or 36.7) + (fever + heartHeat * 0.8) * fuel - (1 - fuel) * 2
 	if IsValid(owner) then
 		local character = hg.GetCurrentCharacter(owner)
 		if not IsValid(character) then character = owner end

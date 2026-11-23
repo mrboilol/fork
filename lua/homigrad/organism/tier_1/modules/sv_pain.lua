@@ -410,7 +410,7 @@ module[2] = function(owner, org, timeValue)
 
 
 
-	if org.consciousness < consciousness_fake_threshold * consciousnessResistance then
+	if not (comaActive and not (org.otrub or org.needotrub)) and org.consciousness < consciousness_fake_threshold * consciousnessResistance then
 		org.needfake = true
 
 	end

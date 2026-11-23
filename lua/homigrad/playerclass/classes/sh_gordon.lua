@@ -780,6 +780,14 @@ elseif SERVER then
     local HEV_SURGEON_COST = 100
     local HEV_SURGEON_BATTERY = 400
     local HEV_SURGEON_COOLDOWN = 90
+    local HEV_BLOOD_LOW = 4000
+    local HEV_BLOOD_TARGET = 4500
+    local HEV_BLOOD_MAX_ML = 500
+    local HEV_BLOOD_COOLDOWN = 4
+    local HEV_ANTIBIOTIC_COST = 40
+    local HEV_ANTIBIOTIC_COOLDOWN = 30
+    local HEV_STREPTO_COST = 50
+    local HEV_STREPTO_COOLDOWN = 60
     local hevAEDSounds = {
         shockadvised = "defibrilator/rem_aed_shockadvised.mp3",
         charging = "defibrilator/defib_charge.ogg",
@@ -951,6 +959,49 @@ elseif SERVER then
         hevAlert(ply, "HEV suit has detected life-threatening damage. Deploying built-in autosurgeon.", "surgeon_hev", "hl1/fvox/administering_medical.wav")
     end
 
+    local function hevAutoBlood(ply, org)
+        if (org.hevBloodNext or 0) > CurTime() or org.blood >= HEV_BLOOD_LOW then return end
+
+        local needed = math.min(HEV_BLOOD_TARGET - org.blood, HEV_BLOOD_MAX_ML, ply.HEV.Medicine * 10)
+        if needed <= 0 then return end
+
+        org.hevBloodNext = CurTime() + HEV_BLOOD_COOLDOWN
+        ply.HEV.Medicine = ply.HEV.Medicine - needed / 10
+        hg.organism.TransfuseBlood(org, needed)
+        org.blood = org.blood + needed
+
+        hevAlert(ply, "HEV suit has detected blood loss. Replacing blood volume.", "blood_hev", "hl1/fvox/blood_plasma.wav")
+    end
+
+    local function hevAutoAntibiotics(ply, org)
+        if (org.hevAntibioticNext or 0) > CurTime() or ply.HEV.Medicine < HEV_ANTIBIOTIC_COST then return end
+        if (org.antibiotics or 0) > 60 then return end
+
+        local infected = (org.infection or 0) > 0.1 or (org.medical_infection or 0) > 0.1 or (org.pneumonia or 0) > 0.1 or (org.sepsisSource or 0) > 0.1 or (org.hemotransfusionshock or 0) > 0.2
+        if not infected then return end
+
+        org.hevAntibioticNext = CurTime() + HEV_ANTIBIOTIC_COOLDOWN
+        ply.HEV.Medicine = ply.HEV.Medicine - HEV_ANTIBIOTIC_COST
+        hg.organism.Infection.GiveAntibiotics(org)
+
+        hevAlert(ply, "HEV suit has detected an active infection. Injecting antibiotics.", "antibiotics_hev", "hl1/fvox/antidote_shot.wav")
+    end
+
+    local function hevAutoStreptokinase(ply, org)
+        if (org.hevStreptoNext or 0) > CurTime() or ply.HEV.Medicine < HEV_STREPTO_COST then return end
+        if hg.organism.GetStreptokinase(org) >= 0.5 then return end
+
+        local clot = (org.pulmonaryEmbolism or 0) > 0.15 or (org.clotBurden or 0) > 0.35
+        if not clot then return end
+        if (org.bleed or 0) > 0.05 or (org.internalBleed or 0) > 0.05 then return end
+
+        org.hevStreptoNext = CurTime() + HEV_STREPTO_COOLDOWN
+        ply.HEV.Medicine = ply.HEV.Medicine - HEV_STREPTO_COST
+        hg.organism.AdministerStreptokinase(org, 1)
+
+        hevAlert(ply, "HEV suit has detected a vascular clot. Injecting streptokinase.", "streptokinase_hev", "hl1/fvox/automedic_on.wav")
+    end
+
     hook.Add("Org Think","gordon_healing",function(ply, org, timeValue)
 
         if org.HEV and not org.alive and not org.emitflatline then
@@ -972,6 +1023,9 @@ elseif SERVER then
             ply:SetNetVar("HEVMedicine", ply.HEV.Medicine)
             hevSupplyOxygen(ply, org, timeValue)
             hevAutoAED(ply, org)
+            hevAutoBlood(ply, org)
+            hevAutoAntibiotics(ply, org)
+            hevAutoStreptokinase(ply, org)
             hevAutoSterilize(ply, org)
             if hevSevereDamage(org) then
                 hevAutoThiamine(ply, org)
@@ -1081,10 +1135,6 @@ elseif SERVER then
                     org.BloodThink = CurTime() + 4
     
                     if org.blood < 4000 then
-                        local needed = math.min(4000 - org.blood, 500, ply.HEV.Medicine / 6)
-                        ply.HEV.Medicine = math.max( ply.HEV.Medicine - needed / 10, 0 )
-                        org.blood = org.blood + needed
-
                         org.adrenalineAdd = 4
                     end
                 end

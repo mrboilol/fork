@@ -25,6 +25,8 @@ AcidBase.Config = {
 	renalRange = 0.6,
 	renalAcid = 12,
 	hypercapniaCompensation = 0.15,
+	hypocapniaCompensation = 0.25,
+	hypocapniaCompRate = 0.02,
 	citratePerMl = 0.0025,
 	citrateDecay = 1 / 240,
 	citrateMax = 12,
@@ -56,8 +58,26 @@ AcidBase.Config = {
 	sepsisLactate = 0.004,
 	septicShockLactate = 0.025,
 	septicShockNausea = 0.01,
+	sepsisEncephalopathyStart = 0.6,
+	sepsisEncephalopathyRange = 1,
+	sepsisEncephalopathy = 0.6,
 
 	vasoplegiaMax = 0.7,
+
+	mofRise = 60,
+	mofFall = 240,
+	mofStressStart = 0.4,
+	mofStressRate = 0.05,
+	mofHeartStart = 0.6,
+	mofHeartRate = 0.01,
+	mofOrganStart = 0.6,
+	mofOrganRate = 0.0005,
+	acidSeizureStart = 0.7,
+	acidSeizureRate = 0.1,
+	toxinSeizureStart = 0.6,
+	toxinSeizureRate = 0.08,
+	fibrillationRollInterval = 5,
+	fibrillationRollChance = 0.15,
 
 	acidosisNausea = 0.004,
 	acidContractilityLoss = 0.3,
@@ -127,6 +147,7 @@ function AcidBase.Init(org)
 	org.acidosisDrive = 0
 	org.alkalosisDrive = 0
 	org.hepaticFailure = 0
+	org.multiOrganFailure = 0
 	org.hepaticToxin = 0
 	org.septicShock = 0
 	org.renalFailure = 0
@@ -141,10 +162,11 @@ function AcidBase.Init(org)
 	org.metabolicThoughts = {}
 end
 
-function hg.organism.TransfuseBlood(org, ml, bagPh)
+function hg.organism.TransfuseBlood(org, ml, bagPh, bagBacteria)
 	ml = tonumber(ml) or 0
 	if not org or ml <= 0 then return end
 	bagPh = tonumber(bagPh) or CONFIG.normalPh
+	hg.organism.Infection.TransfuseBacteria(org, ml, bagBacteria)
 
 	if org.simpleMode then
 		local acid = max(CONFIG.acidosisStart - bagPh, 0)
@@ -199,7 +221,12 @@ local function updateBicarb(org, mulTime, thiamine, severity, shock, hepatic, re
 	local citrate = max((tonumber(org.citrate) or 0) - mulTime * (tonumber(org.citrate) or 0) * CONFIG.citrateDecay, 0)
 	org.citrate = citrate
 
+	local hypocapniaComp = tonumber(org.hypocapniaComp) or 0
+	hypocapniaComp = Approach(hypocapniaComp, max(CONFIG.normalPaco2 - paco2, 0) * CONFIG.hypocapniaCompensation * (1 - renal), mulTime * CONFIG.hypocapniaCompRate)
+	org.hypocapniaComp = hypocapniaComp
+
 	local target = CONFIG.normalBicarb
+		- hypocapniaComp
 		- lactateExcess * CONFIG.lactateBuffer
 		- severity * CONFIG.sepsisAcid
 		- shock * CONFIG.septicShockAcid
@@ -219,6 +246,46 @@ local function updateBicarb(org, mulTime, thiamine, severity, shock, hepatic, re
 	org.bloodph = math.Round(ph, 3)
 
 	return ph
+end
+
+local function updateTerminalCascade(org, mulTime, shock, acidosis, hepatic, toxin, renal)
+	local hyperK = Clamp(tonumber(org.hyperkalemia) or 0, 0, 1)
+	local target = Clamp(shock * 0.3 + acidosis * 0.3 + toxin * 0.2 + renal * 0.2 + hyperK * 0.2 + hepatic * 0.1, 0, 1)
+	local mof = tonumber(org.multiOrganFailure) or 0
+	mof = Approach(mof, target, mulTime / (target > mof and CONFIG.mofRise or CONFIG.mofFall))
+	org.multiOrganFailure = mof
+
+	if org.heartstop then return end
+
+	if mof > CONFIG.mofStressStart and hg.organism.AddCardiacStress then
+		hg.organism.AddCardiacStress(org, mulTime * (mof - CONFIG.mofStressStart) * CONFIG.mofStressRate)
+	end
+
+	if mof > CONFIG.mofHeartStart then
+		org.heart = Clamp((tonumber(org.heart) or 0) + mulTime * (mof - CONFIG.mofHeartStart) ^ 2 * CONFIG.mofHeartRate, 0, 1)
+		local organ = mulTime * (mof - CONFIG.mofOrganStart) * CONFIG.mofOrganRate
+		if organ > 0 then
+			org.liver = min((tonumber(org.liver) or 0) + organ, 1)
+			org.flank = min((tonumber(org.flank) or 0) + organ, 1)
+		end
+	end
+
+	if hg.organism.AddSeizure then
+		if acidosis > CONFIG.acidSeizureStart then
+			hg.organism.AddSeizure(org, mulTime * (acidosis - CONFIG.acidSeizureStart) * CONFIG.acidSeizureRate)
+		end
+		if toxin > CONFIG.toxinSeizureStart then
+			hg.organism.AddSeizure(org, mulTime * (toxin - CONFIG.toxinSeizureStart) * CONFIG.toxinSeizureRate)
+		end
+	end
+
+	local rhythmRisk = max(Clamp((acidosis - 0.6) / 0.4, 0, 1), hyperK ^ 2, Clamp((mof - 0.7) / 0.3, 0, 1))
+	if rhythmRisk > 0 and CurTime() >= (org.nextMetabolicFibrillationRoll or 0) then
+		org.nextMetabolicFibrillationRoll = CurTime() + CONFIG.fibrillationRollInterval
+		if math.Rand(0, 1) < rhythmRisk * CONFIG.fibrillationRollChance and hg.organism.StartFibrillation then
+			hg.organism.StartFibrillation(org)
+		end
+	end
 end
 
 local function emitThoughts(owner, org)
@@ -297,7 +364,7 @@ function hg.organism.UpdateMetabolicShock(owner, org, mulTime)
 	org.catecholamineResponse = 1 - acidosis * CONFIG.acidCatecholamineLoss
 	org.cerebralFlowMul = Clamp((1 - alkalosis * CONFIG.alkaliCerebralConstrict - hypocapnia * CONFIG.hypocapniaConstrict + hypercapnia * CONFIG.hypercapniaDilate)
 		* (1 + acidosis * CONFIG.acidOxygenUnload - alkalosis * CONFIG.alkaliOxygenHold), 0.4, 1.2)
-	org.metabolicDrowsiness = max(acidosis * 0.5, hypercapnia * 0.6, toxin * 0.5)
+	org.metabolicDrowsiness = max(acidosis * 0.5, hypercapnia * 0.6, toxin * 0.5, Clamp((severity - CONFIG.sepsisEncephalopathyStart) / CONFIG.sepsisEncephalopathyRange, 0, 1) * CONFIG.sepsisEncephalopathy)
 
 	org.shockVasoplegia = Clamp(severity * 0.08 + shock * 0.45 + acidosis * 0.25 + max(hepatic - CONFIG.hepaticShockStart, 0) * 0.5, 0, CONFIG.vasoplegiaMax)
 	org.metabolicHeartRate = severity * CONFIG.sepsisHeartRate + acidosis * 15 + hepatic * 10 + (tonumber(org.feverHeartRate) or 0)
@@ -310,6 +377,7 @@ function hg.organism.UpdateMetabolicShock(owner, org, mulTime)
 	org.metabolicStaminaMul = max((1 - severity * 0.25) * (1 - acidosis * 0.45) * (1 - hepatic * 0.3) * (1 - renal * 0.2)
 		* (1 - (org.feverK or 0) * 0.25) * (1 - (org.leukopenia or 0) * 0.2) * (1 - alkalosis * 0.3) * (1 - (tonumber(org.rhabdo) or 0) * 0.25), 0.2)
 
+	updateTerminalCascade(org, mulTime, shock, acidosis, hepatic, toxin, renal)
 	emitThoughts(owner, org)
 end
 

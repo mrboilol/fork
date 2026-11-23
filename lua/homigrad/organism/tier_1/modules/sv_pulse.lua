@@ -1241,7 +1241,7 @@ module[2] = function(owner, org, timeValue)
 	org.cardiacStressExposure = Clamp((org.cardiacStressExposure or 0) + timeValue * (oxygenMismatch ^ 2 / 85 + lowVolumeWork ^ 2 / 180 - cardiacRelief / 45), 0, 1)
 	local strainRecovery = not org.heartstop and not org.fibrillation and (org.arrhythmia or 0) < 0.25
 		and (org.myocardialOxygen or 1) > 0.7 and cardiacWorkload < 0.08 and (org.hypovolemicBradyStrain or 0) < 0.1
-	org.heartStrain = Clamp((org.heartStrain or 0) + timeValue * (cardiacWorkload ^ 2 / 120 - (strainRecovery and 1 / 90 or 0)), 0, 1)
+	org.heartStrain = Clamp((org.heartStrain or 0) + timeValue * (cardiacWorkload ^ 2 / 120 * hg.organism.TraitMul(org, "strain_gain", 1) - (strainRecovery and 1 / 90 or 0)), 0, 1)
 	local pressureHypotensionTarget = Clamp(Remap(pressureTarget, 70, 30, 0, 1), 0, 1)
 	local hypotensionTarget = pressureHypotensionTarget
 	local hypotensionRate = highSpeedPressureShock > 0.25 and timeValue / 2.5 or timeValue / 8

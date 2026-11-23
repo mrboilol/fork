@@ -277,34 +277,50 @@ local function buildRefPose(model)
 	ent:Remove()
 end
 
-local function buildBoneMap(ent)
-	boneCount = ent:GetBoneCount() or 0
-	boneRegion, hasJawBone = {}, false
-	local direct = {}
+local function mapRegions(ent)
+	local direct, linked = {}, false
+	hasJawBone = false
+	for name, region in pairs(NAMED_REGIONS) do
+		local id = ent:LookupBone(name)
+		if id and id >= 0 and id < boneCount then
+			direct[id] = region
+			if region == "jaw" then hasJawBone = true end
+		end
+	end
 	for i = 0, boneCount - 1 do
 		local name = ent:GetBoneName(i) or ""
-		local region = NAMED_REGIONS[name]
-		if not region and name:find("Finger", 1, true) then
-			region = name:find("_L_", 1, true) and "lhand" or name:find("_R_", 1, true) and "rhand" or nil
+		if not direct[i] and name:find("Finger", 1, true) then
+			direct[i] = name:find("_L_", 1, true) and "lhand" or name:find("_R_", 1, true) and "rhand" or nil
 		end
-		direct[i] = region
-		if region == "jaw" then hasJawBone = true end
+		local parent = ent:GetBoneParent(i)
+		parentOf[i] = parent and parent >= 0 and parent or nil
+		if parentOf[i] then linked = true end
 	end
 	for i = 0, boneCount - 1 do
 		local bone, region = i, direct[i]
-		while not region and bone >= 0 do
-			bone = ent:GetBoneParent(bone) or -1
-			region = bone >= 0 and direct[bone] or nil
+		while not region and parentOf[bone] do
+			bone = parentOf[bone]
+			region = direct[bone]
 		end
 		boneRegion[i] = region or "pelvis"
+	end
+	if linked then buildRefPose(ent:GetModel()) end
+
+	return linked
+end
+
+local regionMapReady = false
+
+local function buildBoneMap(ent)
+	boneCount = ent:GetBoneCount() or 0
+	boneRegion = {}
+	for i = 0, boneCount - 1 do
 		writable[i] = ent:BoneHasFlag(i, BONE_USED_BY_VERTEX_LOD0)
 		worldMats[i] = worldMats[i] or Matrix()
 		localMats[i] = localMats[i] or Matrix()
 		hiddenMats[i] = hiddenMats[i] or Matrix()
-		local parent = ent:GetBoneParent(i)
-		parentOf[i] = parent and parent >= 0 and parent or nil
 	end
-	buildRefPose(ent:GetModel())
+	regionMapReady = mapRegions(ent)
 
 	local B = K.BONE
 	ids.pelvis, ids.spine1 = lookupFirst(ent, B.PELVIS), lookupFirst(ent, B.SPINE1)
@@ -359,6 +375,8 @@ local function getProxy(body)
 		if not proxy then return end
 		buildBoneMap(proxy)
 		captureBody = nil
+	elseif not regionMapReady then
+		regionMapReady = mapRegions(proxy)
 	end
 
 	return proxy
