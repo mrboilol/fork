@@ -103,6 +103,7 @@ function hg.organism.ConsumeLimbStamina(org, pool, amount)
 		stamina.recoveryPenaltyFadeUntil = stamina.recoveryPenaltyUntil + recent_stamina_loss_fade_time
 	end
 
+	hg.organism.StressGreenstickLimbs(org, pool, amount)
 	return spent
 end
 

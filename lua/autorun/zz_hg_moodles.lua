@@ -1631,6 +1631,11 @@ function hg.DrawNilguyTooltip(x, y, size)
 end
 
 local function drawMoodlesFaded()
+	if hg.MoodleBase and hg.MoodleBase.Enabled() then
+		clearMoodleDrawState()
+		return
+	end
+
 	if not enabled.GetBool() then
 		clearMoodleDrawState()
 		return

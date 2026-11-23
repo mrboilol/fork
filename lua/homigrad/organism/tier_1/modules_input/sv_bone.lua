@@ -5,6 +5,8 @@ local player_crush_amputation_threshold = 7
 local melee_skull_bone_mul = 0.42
 local skull_break_brain_mul = 0.8
 local skull_break_neck_mul = 2.5
+local greenstick_threshold = 0.875
+local greenstick_break_per_stamina = 0.003
 
 local bluntTuning = {
 	limbRetain = 0.85,
@@ -444,7 +446,10 @@ function hg.organism.HealLimbSegments(org, key, amount, healFractures)
 	for _, segment in ipairs(limbSegments) do
 		local healthKey = segmentHealthKey(key, segment)
 		if (segment == "up" or not org[key .. "amputated"]) and (org[healthKey] < 1 or healFractures) then
-			org[healthKey] = math.max(org[healthKey] - amount, 0)
+			local value = org[healthKey]
+			local healed = math.max(value - amount, 0)
+			if value >= greenstick_threshold then healed = math.max(healed, greenstick_threshold) end
+			org[healthKey] = healed
 		end
 	end
 	refreshLimbAggregate(org, key)
@@ -584,6 +589,35 @@ local function shouldDislocateLimb(org, key, segment, dmgInfo, hit)
 	return false
 end
 
+local function fractureLegSegment(org, key, segment, dmg, otherBroken)
+	local stabilized = org[key.."stabilized"]
+	org[segmentHealthKey(key, segment)] = 1
+	if hg.fakeBoneFlop then
+		hg.fakeBoneFlop.SetLimbSegmentState(org, key, segment, not stabilized)
+	end
+
+	if not stabilized then
+		addBoneFracturePain(org, 55, "lower")
+		org.immobilization = org.immobilization + dmg * 25
+	else
+		addBoneFracturePain(org, 10, "lower")
+		org.immobilization = org.immobilization + dmg * 5
+	end
+	org.owner:AddTraumaAdrenaline(1)
+	org.fearadd = org.fearadd + 0.5
+
+	if hasNewThoughts(org) then
+		sendThought(org, "Your " .. segmentName[key][segment] .. " is broken.", "thought_broke" .. key .. segment, 1, Color(255, 210, 210))
+	else
+		notifyBoneBreak(org, key, broke_leg[math.random(#broke_leg)], "broke" .. key .. segment)
+	end
+
+	timer.Simple(0, function() hg.LightStunPlayer(org.owner,2) end)
+	playBoneFractureSound(org.owner)
+	if org.isPly and hg.QueuePainScream and canFeelPain(org, "lower") then hg.QueuePainScream(org.owner, 1.35) end
+	if otherBroken then compoundFractureResponse(org, key, "lower", stabilized) end
+end
+
 local function legs(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, ricochet)
 	hg.organism.SyncLimbSegments(org, key)
 	local healthKey = segmentHealthKey(key, segment)
@@ -611,34 +645,8 @@ local function legs(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 
 	if IsValid(org.owner) and org.owner:IsPlayer() and !org[key.."amputated"] then org.just_damaged_bone = CurTime() end
 
-	local stabilized = org[key.."stabilized"]
-
 	if not shouldDislocateLimb(org, key, segment, dmgInfo, hit) then
-		org[healthKey] = 1
-		if hg.fakeBoneFlop then
-			hg.fakeBoneFlop.SetLimbSegmentState(org, key, segment, not stabilized)
-		end
-
-		if not stabilized then
-			addBoneFracturePain(org, 55, "lower")
-			org.immobilization = org.immobilization + dmg * 25
-		else
-			addBoneFracturePain(org, 10, "lower")
-			org.immobilization = org.immobilization + dmg * 5
-		end
-		org.owner:AddTraumaAdrenaline(1)
-		org.fearadd = org.fearadd + 0.5
-
-		if hasNewThoughts(org) then
-			sendThought(org, "Your " .. segmentName[key][segment] .. " is broken.", "thought_broke" .. key .. segment, 1, Color(255, 210, 210))
-		else
-			notifyBoneBreak(org, key, broke_leg[math.random(#broke_leg)], "broke" .. key .. segment)
-		end
-
-		timer.Simple(0, function() hg.LightStunPlayer(org.owner,2) end)
-		playBoneFractureSound(org.owner)
-		if org.isPly and hg.QueuePainScream and canFeelPain(org, "lower") then hg.QueuePainScream(org.owner, 1.35) end
-		if otherBroken then compoundFractureResponse(org, key, "lower", stabilized) end
+		fractureLegSegment(org, key, segment, dmg, otherBroken)
 	else
 		doDislocate(org, key, dmg, segment)
 	end
@@ -686,6 +694,42 @@ function hg.FractureArmSegment(org, key, segment, dmg)
 	fractureArmSegment(org, key, segment, math.max(tonumber(dmg) or 1, 0), otherBroken)
 	refreshLimbAggregate(org, key)
 	return true
+end
+
+function hg.organism.BreakGreenstick(org, key, segment)
+	if not org or not limbName[key] or org[key .. "amputated"] or org[key .. "upamputated"] then return false end
+	segment = segment == "up" and "up" or "down"
+	hg.organism.SyncLimbSegments(org, key)
+	local value = org[segmentHealthKey(key, segment)] or 0
+	if value < greenstick_threshold or value >= 1 then return false end
+
+	local otherBroken = (org[segmentHealthKey(key, otherSegment(segment))] or 0) >= 1
+	if org.isPly then org.just_damaged_bone = CurTime() end
+	if key == "rarm" or key == "larm" then
+		fractureArmSegment(org, key, segment, 1, otherBroken)
+	else
+		fractureLegSegment(org, key, segment, 1, otherBroken)
+	end
+	refreshLimbAggregate(org, key)
+	return true
+end
+
+local greenstick_pool_limbs = {legs = {"lleg", "rleg"}, arms = {"larm", "rarm"}}
+
+function hg.organism.StressGreenstickLimbs(org, pool, load)
+	local limbs = greenstick_pool_limbs[pool]
+	if not org or not limbs or not (load > 0) then return end
+	for _, key in ipairs(limbs) do
+		for _, segment in ipairs(limbSegments) do
+			local value = org[segmentHealthKey(key, segment)] or 0
+			if value >= greenstick_threshold and value < 1 and math.Rand(0, 1) < load * greenstick_break_per_stamina then
+				timer.Simple(0, function()
+					if IsValid(org.owner) then hg.organism.BreakGreenstick(org, key, segment) end
+				end)
+				break
+			end
+		end
+	end
 end
 
 local function arms(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, ricochet)

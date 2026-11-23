@@ -390,7 +390,7 @@ local deathDelay = {active = false, wasAlive = false, aliveMode = 0}
 
 local function nildoy()
 	if not IsValid(lply) then return end
-	if SimpleHealth.NilguyMoodle:GetBool() and HGCustomMoodlesActive and hg.MoodlesEnabled() and not SimpleHealth.IsFurryFace(lply) then return end
+	if SimpleHealth.NilguyMoodle:GetBool() and HGCustomMoodlesActive and not (hg.MoodleBase and hg.MoodleBase.Enabled()) and hg.MoodlesEnabled() and not SimpleHealth.IsFurryFace(lply) then return end
 	if GetConVar("hg_hidenilguy"):GetBool() then return end
 
 	local alive = lply:Alive()

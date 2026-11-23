@@ -588,7 +588,7 @@ local function send_organism(org, ply, recipientForce, reliable)
 	sendtable.concussion_tinnitus = org.concussion_tinnitus
 	for _, key in ipairs({
 		"painkiller", "goodmood", "hungry", "satiety", "palpitations", "unstableRhythm", "ecgState",
-		"strokeVolume", "hypoxiaTime", "intracranialPressure", "peripheralperfusion", "perfusionMoveMul",
+		"strokeVolume", "strokeRisk", "strokeExposure", "breathObstructed", "painHabit", "hypoxiaTime", "intracranialPressure", "peripheralperfusion", "perfusionMoveMul",
 		"legstrength", "armstrength", "losing_oxy", "respiratoryArrest", "pneumothorax", "hemothorax", "lungWater", "pneumonia",
 		"skull", "chest", "heart", "trachea", "liver", "flank", "gut", "lungsL", "lungsR",
 		"spine1", "spine2", "spine3", "spine2stabilized", "spine3stabilized", "spine2splinted", "spine3splinted",

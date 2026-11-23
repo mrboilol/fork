@@ -1,6 +1,3 @@
-local sf2Enable = CreateConVar("sf2_enable", "0", FCVAR_ARCHIVE + FCVAR_REPLICATED, "Enable StormFox2 (needs map restart)")
-if not sf2Enable:GetBool() then return end
-
 -- Check for StormFox 1
 if StormFox and StormFox.Version < 2 or file.Exists("autorun/stormfox_autorun.lua", "LUA") then
 	error("StormFox 1 detected. StormFox 2 can't run.")
@@ -183,7 +180,6 @@ StormFox2.Msg("Version: V" .. StormFox2.Version .. (StormFox2.NikNaks and " (Nik
 
 -- Load functions. Functions are parts of StormFox that aren't utilized by anything else. Like clouds.
 	HandleFolder("stormfox2/functions")
-	HandleFolder("external/stormfox2_extras")
 	hook.Run("stormfox2.postfunction") -- Gets called after functions is done.
 
 -- Finish up
