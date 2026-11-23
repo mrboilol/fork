@@ -158,7 +158,7 @@ input_list.liver = function(org, bone, dmg, dmgInfo)
 		end)
 	end
 
-	if harmed > 0 then org.sepsisSource = math.min((org.sepsisSource or 0) + harmed * 1.5, 1) end
+	if harmed > 0 then hg.organism.Infection.Contaminate(org, harmed * 0.5, harmed * 1.5) end
 	addInternalBleed(org, harmed * 8, "liver")
 	applyOrganTrauma(org, dmgInfo, dmg, harmed, oldDmg, "liver")
 	
@@ -178,7 +178,7 @@ input_list.flank = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	if harmed > 0 then
 		org.shock = org.shock + dmg * 20
 		addPain(org, dmg * 40, "body")
-		org.sepsisSource = math.min((org.sepsisSource or 0) + harmed * 1.5, 1)
+		hg.organism.Infection.Contaminate(org, harmed * 0.5, harmed * 1.5)
 	end
 	if org.analgesia < 0.4 and harmed >= 0.2 then
 		local owner = org.owner
@@ -211,9 +211,7 @@ input_list.gut = function(org, bone, dmg, dmgInfo)
 		org.shock = org.shock + dmg * 5.5
 		local severity = math.Clamp((org.gut - 0.3) / 0.7, 0, 1)
 		if severity > 0 then
-			org.sepsisSource = math.min((org.sepsisSource or 0) + delta * (1 + severity * 3), 1)
-			local Infection = hg.organism.Infection
-			if Infection and Infection.Seed then Infection.Seed(org, delta * (0.6 + severity * 1.8) + severity * 0.15) end
+			hg.organism.Infection.Contaminate(org, delta * (0.6 + severity * 1.8) + severity * 0.15, delta * (1 + severity * 3))
 		end
 	end
 	addInternalBleed(org, delta * 1.75, "gut")

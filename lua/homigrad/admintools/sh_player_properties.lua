@@ -192,54 +192,127 @@ properties.Add( "reset_org", {
 	end 
 } )
 
-local organismEditorFields = {
-	"adrenaline", "adrenalineAdd", "alive", "analgesia", "analgesiaAdd", "anger", "arrhythmia", "arrhythmiaComplication",
-	"assimilated", "avgpain", "berserk", "bleed", "bleedingmul", "blood", "bloodPressure", "bodyoxygen",
-	"brain", "brainBleedRate", "brainFrontal", "brainHemorrhage", "brainOccipital", "brainoxygen", "brainoxygenTarget", "brainParietal", "brainSwelling", "brainTemporal",
-	"bruises", "bulletwounds", "burns", "canmove", "canmovehead", "cardiacOutput", "cerebralPerfusion", "chest", "consciousness",
-	"diastolic", "disorientation", "energy", "eyeL", "eyeR", "explosionwounds", "fear", "fearadd", "fibrillation", "flank", "goodmood", "gut",
-	"handcuffed", "health", "heart", "heartbeat", "heartstop", "heartStrain", "hemothorax", "hydration", "hypertension", "hypotension",
-	"immobilization", "incapacitated", "internalBleed", "intracranialPressure", "jaw", "jawdislocation", "legstrength", "liver",
-	"larm", "larmamputated", "larmdislocation", "larmupamputated", "lhandamputated", "lleg", "llegamputated", "llegdislocation", "llegupamputated",
-	"lungsfunction", "maxweight", "meleespeed", "myocardialOxygen", "nausea", "needfake", "needotrub", "neckslit", "noHead", "noradrenaline",
-	"o2.current", "o2.range", "o2.regen", "o2.curregen", "otrub", "pain", "painadd", "painkiller", "panicattack", "panicattackActive",
-	"paralyzed", "pelvis", "perfusion", "peripheralperfusion", "pneumothorax", "pulse", "pulseDeficit", "rarm", "rarmamputated", "rarmdislocation",
-	"rarmupamputated", "regeneratehp", "respiratoryArrest", "respiratoryRate", "rhandamputated", "rleg", "rlegamputated", "rlegdislocation", "rlegupamputated",
-	"satiety", "seizure", "seizureActive", "shock", "skull", "slashwounds", "spine1", "spine2", "spine3", "stamina.current",
-	"stamina.max", "stamina.range", "stamina.regen", "stamina.sub", "stamina.subadd", "strokeVolume", "stun", "superfighter", "survivalchance",
-	"systolic", "teethLost", "temperature", "thiamine", "thirst", "trachea", "tranexamic_acid", "tranquilizer", "vitalHealthCeiling", "weight"
+local function limbFields()
+	local out = {}
+	for _, limb in ipairs({"lleg", "rleg", "larm", "rarm"}) do
+		for _, suffix in ipairs({"", "_up", "_down", "dislocation", "_up_disl", "_down_disl", "amputated", "upamputated"}) do
+			out[#out + 1] = limb .. suffix
+		end
+	end
+	out[#out + 1] = "lhandamputated"
+	out[#out + 1] = "rhandamputated"
+	return out
+end
+
+local bonesAndLimbs = limbFields()
+for _, field in ipairs({"chest", "pelvis", "jaw", "jawdislocation", "teethLost", "legstrength", "armstrength"}) do bonesAndLimbs[#bonesAndLimbs + 1] = field end
+
+local organismEditorTabs = {
+	{name = "Vitals", icon = "icon16/heart.png", fields = {
+		"alive", "otrub", "consciousness", "incapacitated", "health", "temperature", "uncon_timer", "canmove", "canmovehead",
+		"paralyzed", "cervicalParalysis", "superfighter", "vitalHealthCeiling", "immobilization", "handcuffed",
+	}},
+	{name = "Cardiovascular", icon = "icon16/heart_add.png", fields = {
+		"heart", "heartbeat", "pulse", "pulseDeficit", "heartstop", "fibrillation", "arrhythmia", "arrhythmiaComplication", "palpitations",
+		"heartStrain", "cardiacTamponade", "cardiacStressExposure", "hypotensionExposure", "bloodPressure", "systolic", "diastolic",
+		"cardiacOutput", "strokeVolume", "myocardialOxygen", "perfusion", "peripheralperfusion", "cerebralPerfusion",
+		"hypertension", "hypotension", "ischemia", "clotBurden", "pulmonaryEmbolism", "streptokinase",
+	}},
+	{name = "Blood & Wounds", icon = "icon16/drink_empty.png", fields = {
+		"blood", "bleed", "bleedingmul", "coagulation_multiplier", "blood_regeneration_multiplier", "internalBleed",
+		"internalBleedComplication", "internalBleedHeal", "arteria", "aorta", "rarmartery", "larmartery", "rlegartery", "llegartery",
+		"bulletwounds", "slashwounds", "explosionwounds", "bruises", "burns", "hemotransfusionshock",
+	}},
+	{name = "Respiratory", icon = "icon16/weather_clouds.png", fields = {
+		"o2.current", "o2.range", "o2.regen", "o2.curregen", "co2", "paco2", "etco2", "CO", "lactaid", "respiratoryRate",
+		"respiratoryArrest", "bradyapnea", "drugRespiratoryDepression", "exertionO2Debt", "circulatoryO2Reserve", "lungsfunction",
+		"lungsL.1", "lungsR.1", "trachea", "pneumothorax", "hemothorax", "hemothoraxL", "hemothoraxR", "lungWater", "pneumonia",
+		"needle", "holdingbreath", "hypoxiaTime",
+	}},
+	{name = "Brain & Nerves", icon = "icon16/lightning.png", fields = {
+		"brain", "brainFrontal", "brainParietal", "brainTemporal", "brainOccipital", "brainHemorrhage", "brainBleedRate",
+		"brainSwelling", "intracranialPressure", "brainoxygen", "concussion", "concussion_tinnitus", "disorientation", "seizure",
+		"seizureActive", "skull", "eyeL", "eyeR", "noHead", "spine1", "spine2", "spine3", "spinalBradypnea", "spinalBradycardia",
+	}},
+	{name = "Bones & Limbs", icon = "icon16/user.png", fields = bonesAndLimbs},
+	{name = "Organs & Immune", icon = "icon16/bug.png", fields = {
+		"liver", "flank", "gut", "infection", "wbc", "antibiotics", "sepsisSource", "septicShock", "bloodph", "bicarb",
+		"hepaticFailure", "hepaticToxin", "citrate", "myoglobin", "thiamine", "tranexamic_acid", "medical_infection",
+	}},
+	{name = "Pain & Drugs", icon = "icon16/pill.png", fields = {
+		"pain", "painadd", "avgpain", "shock", "analgesia", "analgesiaAdd", "painkiller", "naloxone", "adrenaline", "adrenalineAdd",
+		"noradrenaline", "tranquilizer", "zerlkers", "zerlkersOverdose", "berserk", "assimilated",
+	}},
+	{name = "Mind", icon = "icon16/emoticon_unhappy.png", fields = {
+		"fear", "fearadd", "panicattack", "panicattackadd", "panicattackActive", "goodmood", "depression", "anger", "chronicStrain",
+		"hopelessness", "desolation", "suicidal", "cotard",
+	}},
+	{name = "Body", icon = "icon16/user_gray.png", fields = {
+		"stamina.current", "stamina.max", "stamina.range", "stamina.regen", "stamina.sub", "stamina.subadd", "satiety", "hydration", "thirst",
+		"regeneratehp", "bodyoxygen",
+		"nausea", "wantToVomit", "weight", "maxweight", "meleespeed",
+	}},
+	{name = "Simple Health", icon = "icon16/heart_delete.png", simple = true, fields = {
+		"simple.health", "simple.brute", "simple.burn", "simple.toxin", "simple.oxy", "simple.crit", "simple.contamination",
+		"simple.heartEfficiency", "simple.heartRate", "simple.rhythm", "simple.consciousnessCap", "simple.oxyGain",
+		"simple.oxyGainBonus", "simple.lungOxyRate", "simple.toxinRegenMul", "simple.airwayBlocked", "simple.gasping",
+		"simple.flatline", "simple.fibrillating", "simple.thiamineActive", "simple.cprCritHealed", "simple.critImmune",
+	}},
 }
 
 local organismEditorFieldSet = {}
-for _, field in ipairs(organismEditorFields) do organismEditorFieldSet[field] = true end
+for _, tab in ipairs(organismEditorTabs) do
+	for _, field in ipairs(tab.fields) do organismEditorFieldSet[field] = true end
+end
 
 local organismEditorUnitFields = {
 	adrenaline = true, analgesia = true, anger = true, arrhythmia = true, assimilated = true, brain = true, brainFrontal = true,
-	brainHemorrhage = true, brainOccipital = true, brainParietal = true, brainSwelling = true, chest = true, consciousness = true,
-	disorientation = true, eyeL = true, eyeR = true, fear = true, flank = true, gut = true, heart = true, hemothorax = true, immobilization = true,
-	jaw = true, larm = true, lleg = true, liver = true, myocardialOxygen = true, painkiller = true,
-	pelvis = true, perfusion = true, peripheralperfusion = true, pneumothorax = true, rarm = true, rleg = true, shock = true,
-	skull = true, spine1 = true, spine2 = true, spine3 = true, survivalchance = true, trachea = true
+	brainHemorrhage = true, brainOccipital = true, brainParietal = true, brainTemporal = true, brainSwelling = true, chest = true,
+	consciousness = true, disorientation = true, eyeL = true, eyeR = true, fear = true, flank = true, gut = true, heart = true,
+	hemothorax = true, jaw = true, larm = true, lleg = true, liver = true, myocardialOxygen = true, rarm = true, rleg = true,
+	pelvis = true, perfusion = true, peripheralperfusion = true, pneumothorax = true, skull = true, spine1 = true, spine2 = true,
+	spine3 = true, trachea = true, infection = true, pneumonia = true, lungWater = true, hepaticFailure = true, hepaticToxin = true,
+	goodmood = true, depression = true, panicattack = true, hopelessness = true, desolation = true, suicidal = true,
+	chronicStrain = true, cotard = true, septicShock = true, ["lungsL.1"] = true, ["lungsR.1"] = true,
+	["simple.heartEfficiency"] = true, ["simple.consciousnessCap"] = true,
+}
+
+local organismEditorBounds = {
+	blood = {0, 6000}, temperature = {20, 45}, heartbeat = {0, 300}, pulse = {0, 300}, systolic = {0, 300}, diastolic = {0, 300},
+	bloodPressure = {0, 200}, bloodph = {6.6, 7.9}, bicarb = {4, 45}, paco2 = {10, 150}, etco2 = {0, 150}, wbc = {0.2, 22},
+	lactaid = {0, 20}, hemotransfusionshock = {0, 2}, sepsisSource = {0, 1}, respiratoryRate = {0, 60},
+	["simple.brute"] = {0, 400}, ["simple.burn"] = {0, 400}, ["simple.toxin"] = {0, 400}, ["simple.oxy"] = {0, 400},
 }
 
 local function getOrganismEditorValue(org, field)
+	if not istable(org) then return end
 	if field == "stamina.current" then return org.stamina and org.stamina[1], org.stamina, 1 end
 	if field == "o2.current" then return org.o2 and org.o2[1], org.o2, 1 end
 	local group, key = string.match(field, "^([%a%d_]+)%.([%a%d_]+)$")
-	if group and key and (group == "stamina" or group == "o2") then return org[group] and org[group][key], org[group], key end
+	if group then
+		local container = org[group]
+		if not istable(container) then return end
+		key = tonumber(key) or key
+		return container[key], container, key
+	end
 	return org[field], org, field
 end
 
 local function getOrganismEditorBounds(org, field)
 	if organismEditorUnitFields[field] then return 0, 1 end
-	if field == "blood" then return 0, hg.organism.normalBloodVolume or 5000 end
-	if field == "health" then return 0, IsValid(org.owner) and org.owner:GetMaxHealth() or 100 end
-	if field == "temperature" then return 0, 50 end
-	if field == "heartbeat" or field == "pulse" or field == "systolic" or field == "diastolic" then return 0, 300 end
+	local bounds = organismEditorBounds[field]
+	if bounds then return bounds[1], bounds[2] end
+	if field == "health" or field == "simple.health" then return 0, IsValid(org.owner) and org.owner:GetMaxHealth() or 100 end
 	if field == "o2.current" then return 0, (org.o2 and org.o2.range) or 30 end
 	if field == "stamina.current" then return 0, (org.stamina and (org.stamina.max or org.stamina.range)) or 180 end
 	if field == "stamina.max" or field == "stamina.range" then return 0, 1000 end
 	return 0, 1000000
+end
+
+local function formatOrganismEditorValue(value)
+	if isnumber(value) then return (string.gsub(string.format("%.3f", value), "%.?0+$", "")) end
+	if value == nil then return "-" end
+	return tostring(value)
 end
 
 properties.Add("change_organism_value", {
@@ -249,8 +322,9 @@ properties.Add("change_organism_value", {
 	Filter = check,
 	Action = function(self, ent)
 		if not CLIENT then return end
+		local _, clientOrg = getOrganismTarget(ent)
 		local frame = vgui.Create("DFrame")
-		frame:SetSize(620, 500)
+		frame:SetSize(680, 560)
 		frame:Center()
 		frame:SetTitle("Change organism value: " .. ent:GetPlayerName())
 		frame:MakePopup()
@@ -258,12 +332,9 @@ properties.Add("change_organism_value", {
 		local search = vgui.Create("DTextEntry", frame)
 		search:Dock(TOP)
 		search:SetTall(26)
-		search:SetPlaceholderText("Search the organism-value list")
+		search:SetPlaceholderText("Search all organism values")
 
-		local list = vgui.Create("DListView", frame)
-		list:Dock(FILL)
-		list:AddColumn("Organism value")
-		local selected = organismEditorFields[1]
+		local selected
 		local value = vgui.Create("DTextEntry", frame)
 		value:Dock(BOTTOM)
 		value:SetTall(28)
@@ -271,12 +342,12 @@ properties.Add("change_organism_value", {
 
 		local controls = vgui.Create("DPanel", frame)
 		controls:Dock(BOTTOM)
-		controls:SetTall(58)
+		controls:SetTall(32)
 		controls.Paint = nil
 		local function send(mode, numberValue, boolValue)
 			local field = string.Trim(search:GetValue())
 			if organismEditorFieldSet[field] then selected = field else field = selected end
-			if field == "" then return end
+			if not field or field == "" then return end
 			self:MsgStart()
 				net.WriteEntity(ent)
 				net.WriteString(field)
@@ -298,23 +369,53 @@ properties.Add("change_organism_value", {
 		addButton("Maximum", 372, 76, function() value:SetText("1000000") end)
 		addButton("True", 452, 54, function() send("bool", nil, true) end)
 		addButton("False", 510, 54, function() send("bool", nil, false) end)
-		addButton("Set", 568, 44, function()
+		addButton("Set", 568, 100, function()
 			local amount = tonumber(value:GetValue())
 			if amount then send("number", amount) end
 		end)
 
+		local sheet = vgui.Create("DPropertySheet", frame)
+		sheet:Dock(FILL)
+		local lists = {}
+		for _, tab in ipairs(organismEditorTabs) do
+			if tab.simple and not (clientOrg and clientOrg.simpleMode) then continue end
+			local list = vgui.Create("DListView", sheet)
+			list:SetMultiSelect(false)
+			list:AddColumn("Organism value")
+			list:AddColumn("Current"):SetFixedWidth(110)
+			list.OnRowSelected = function(_, _, line)
+				selected = line:GetColumnText(1)
+				search:SetText(selected)
+				local current = line:GetColumnText(2)
+				value:SetText(tonumber(current) and current or "0")
+			end
+			lists[#lists + 1] = {list = list, fields = tab.fields}
+			sheet:AddSheet(tab.name, list, tab.icon)
+		end
+
 		local function populate(filter)
-			list:Clear()
 			filter = string.lower(filter or "")
-			for _, field in ipairs(organismEditorFields) do
-				if filter == "" or string.find(string.lower(field), filter, 1, true) then list:AddLine(field) end
+			for _, entry in ipairs(lists) do
+				entry.list:Clear()
+				for _, field in ipairs(entry.fields) do
+					if filter == "" or string.find(string.lower(field), filter, 1, true) then
+						entry.list:AddLine(field, formatOrganismEditorValue((getOrganismEditorValue(clientOrg, field))))
+					end
+				end
+			end
+		end
+		local nextRefresh = 0
+		frame.Think = function()
+			if CurTime() < nextRefresh then return end
+			nextRefresh = CurTime() + 0.5
+			_, clientOrg = getOrganismTarget(ent)
+			for _, entry in ipairs(lists) do
+				for _, line in ipairs(entry.list:GetLines()) do
+					line:SetColumnText(2, formatOrganismEditorValue((getOrganismEditorValue(clientOrg, line:GetColumnText(1)))))
+				end
 			end
 		end
 		search.OnValueChange = function(_, text) populate(text) end
-		list.OnRowSelected = function(_, _, line)
-			selected = line:GetColumnText(1)
-			search:SetText(selected)
-		end
 		search.OnEnter = function(input)
 			if organismEditorFieldSet[input:GetValue()] then selected = input:GetValue() end
 		end
@@ -332,10 +433,10 @@ properties.Add("change_organism_value", {
 		local current, container, key = getOrganismEditorValue(ent.organism, field)
 		if not container then return end
 		if isBoolean then
-			if not isbool(current) then return end
+			if current ~= nil and not isbool(current) then return end
 			container[key] = boolValue
 		else
-			if not isnumber(current) or not isnumber(numberValue) then return end
+			if (current ~= nil and not isnumber(current)) or not isnumber(numberValue) then return end
 			local minimum, maximum = getOrganismEditorBounds(ent.organism, field)
 			container[key] = math.Clamp(numberValue, minimum, maximum)
 		end

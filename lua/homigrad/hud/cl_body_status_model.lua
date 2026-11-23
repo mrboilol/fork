@@ -28,7 +28,7 @@ local CFG = {
 	DISLOCATION = 0.85,
 	TISSUE_BLACK = 0.95,
 	QUANT = 20,
-	OVERLAY_DEPTH = 0.9995,
+	OVERLAY_PULL = 6,
 	JAW_PLANE_LIFT = 0.35,
 	JAW_PLANE_TILT = 0.5,
 	STALE_CAPTURE = 2,
@@ -582,26 +582,23 @@ local function drawHeadOverlay(root)
 	render.EnableClipping(previous)
 end
 
-local function drawSilhouette(root)
-	drawPass(proxy, 1, 1, 1)
-	render.DepthRange(0, CFG.OVERLAY_DEPTH)
+local function drawOverlays(root)
 	for index = 1, tintedCount do
 		local region = tinted[index]
 		drawPass(regionProxy(region), keyColor(regionKey(region)))
 	end
 	if not hasJawBone then drawHeadOverlay(root) end
-	render.DepthRange(0, 1)
 end
 
 local OUTLINE_DIRS = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}, {0.7071, 0.7071}, {-0.7071, 0.7071}, {0.7071, -0.7071}, {-0.7071, -0.7071}}
 
-local function startCam(x, y, w, h, half, dy, dz)
+local function startCam(x, y, w, h, half, dy, dz, pull)
 	local halfW = half * w / h
 	local camX = math_max(CFG.CAMERA_DISTANCE, boundsMax.x + half)
 	cam.Start({
 		type = "3D",
 		x = x, y = y, w = w, h = h,
-		origin = Vector(camX, fitY + dy, fitZ + dz),
+		origin = Vector(camX - (pull or 0), fitY + dy, fitZ + dz),
 		angles = Angle(0, 180, 0),
 		ortho = {left = -halfW, right = halfW, top = -half, bottom = half},
 		znear = 1, zfar = camX - boundsMin.x + half,
@@ -703,9 +700,11 @@ local function drawFigure(alpha)
 	local drawn, err = drawOutline(x, y, w, h, half)
 	startCam(x, y, w, h, half, 0, 0)
 	render.ClearDepth()
-	if drawn then drawn, err = pcall(drawSilhouette, root) end
+	if drawn then drawn, err = pcall(drawPass, proxy, 1, 1, 1) end
+	cam.End()
+	startCam(x, y, w, h, half, 0, 0, CFG.OVERLAY_PULL * (body:GetModelScale() or 1))
+	if drawn then drawn, err = pcall(drawOverlays, root) end
 
-	render.DepthRange(0, 1)
 	render.SetBlend(1)
 	render.MaterialOverride()
 	render.SetColorModulation(1, 1, 1)
@@ -757,6 +756,10 @@ concommand.Add("hg_simplesubrosa_debug", function()
 			local shown, hidden = 0, 0
 			for i = 0, boneCount - 1 do
 				local m = ent:GetBoneMatrix(i)
+				local name = ent:GetBoneName(i) or ""
+				if boneRegion[i] == region or NAMED_REGIONS[name] == region then
+					print("[subrosa] bone", i, name, "map", boneRegion[i], "lod0", ent:BoneHasFlag(i, BONE_USED_BY_VERTEX_LOD0), "world", haveWorld[i], "mat", m and tostring(m:GetTranslation()) or "nil", m and tostring(m:GetScale()) or "", "local", tostring(localMats[i]:GetTranslation()))
+				end
 				if m and boneRegion[i] == region then
 					shown = shown + 1
 					if shown <= 2 then print("[subrosa]", region, ent:GetBoneName(i), m:GetTranslation(), localMats[i]:GetTranslation(), m:GetScale()) end

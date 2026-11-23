@@ -598,7 +598,11 @@ local function send_organism(org, ply, recipientForce, reliable)
 		"exertionO2Debt", "circulatoryO2Reserve", "oxygenIntakeAvailable", "vomitInThroat", "otrub", "alive",
 		"incapReason", "deathCause", "defibDeathGrace", "brainRate", "uncon_timer", "otrubMinUntil", "fatalDamageQueued",
 		"softBrute", "softBurn", "deepBrute", "deepBurn", "muscle", "painStage", "breathLabored",
-		"bloodph", "bicarb", "hepaticFailure", "hepaticToxin", "septicShock", "acidosis", "alkalosis", "infection", "antibiotics"
+		"bloodph", "bicarb", "hepaticFailure", "hepaticToxin", "septicShock", "acidosis", "alkalosis", "infection", "antibiotics", "wbc", "leukopenia",
+		"simpleMode", "simple", "fever", "paco2", "lactaid", "sepsisSource", "renalFailure", "heatProduction", "shivering", "metabolicDemand",
+		"chronicStrain", "pulseDeficit", "clotBurden", "pulmonaryEmbolism", "streptokinase", "hydration", "hemothoraxL", "hemothoraxR",
+		"citrate", "thiamine", "tranexamic_acid", "naloxone", "fearadd", "goodmood", "hopelessness", "desolation", "suicidal", "medical_infection",
+		"brainFog", "cerebralHypoperfusion", "cerebralFlowMul", "rhabdo", "myoglobin", "hyperkalemia", "acidContractility", "catecholamineResponse", "thirst", "regeneratehp", "bodyoxygen"
 	}) do
 		sendtable[key] = org[key]
 	end
@@ -832,7 +836,11 @@ local function send_bareinfo(org, force, reliable)
 		"cardiacStressExposure", "hypotensionExposure", "arrhythmiaComplication",
 		"ventricularTachycardia", "terminalRhythm", "rhythmRecoveryUntil", "defibDeathGrace",
 		"softBrute", "softBurn", "deepBrute", "deepBurn", "muscle", "painStage", "breathLabored",
-		"bloodph", "bicarb", "hepaticFailure", "hepaticToxin", "septicShock", "acidosis", "alkalosis", "infection", "antibiotics"
+		"bloodph", "bicarb", "hepaticFailure", "hepaticToxin", "septicShock", "acidosis", "alkalosis", "infection", "antibiotics", "wbc", "leukopenia",
+		"simpleMode", "simple", "fever", "paco2", "lactaid", "sepsisSource", "renalFailure", "heatProduction", "shivering", "metabolicDemand",
+		"chronicStrain", "pulseDeficit", "clotBurden", "pulmonaryEmbolism", "streptokinase", "hydration", "hemothoraxL", "hemothoraxR",
+		"citrate", "thiamine", "tranexamic_acid", "naloxone", "fearadd", "goodmood", "hopelessness", "desolation", "suicidal", "medical_infection",
+		"brainFog", "cerebralHypoperfusion", "cerebralFlowMul", "rhabdo", "myoglobin", "hyperkalemia", "acidContractility", "catecholamineResponse", "thirst", "regeneratehp", "bodyoxygen"
 	}) do
 		sendtable[key] = org[key]
 	end

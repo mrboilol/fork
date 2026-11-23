@@ -209,104 +209,139 @@ end
 local Round = math.Round -- Тут были плохие слова от деке...
 local red, green = Color(255, 0, 0), Color(0, 255, 0)
 
-local SIMPLE_KEYS = {"blood", "pulse", "temperature", "pain", "consciousness", "brain", "heartstop", "fibrillation", "otrub", "fake", "bleed", "needle", "tranquilizer", "analgesia"}
+local DEV_LIST = {
+	{"alive", true}, {"otrub", true, true}, {"incapacitated", true, true}, {"critical", true, true},
+	{"consciousness", 1}, {"health", 100}, "incapReason", "deathCause", {"uncon_timer", 20, true},
+	{"heart", 1, true}, {"heartbeat", 200, true}, {"pulse", 70}, {"pulseDeficit", 60, true}, {"heartstop", true, true},
+	{"fibrillation", true, true}, "ecgState", "unstableRhythm", "ventricularTachycardia", "terminalRhythm",
+	{"arrhythmia", 1, true}, {"arrhythmiaComplication", 1, true}, {"palpitations", 1, true}, {"heartStrain", 1, true},
+	{"cardiacTamponade", 1, true}, {"cardiacStressExposure", 1, true}, {"hypotensionExposure", 90, true},
+	{"bloodPressure", 90}, {"systolic", 120}, {"diastolic", 80}, {"cardiacOutput", 1}, {"strokeVolume", 1},
+	{"myocardialOxygen", 1}, {"perfusion", 1}, {"peripheralperfusion", 1}, {"cerebralPerfusion", 1},
+	{"hypotension", 1, true}, {"hypertension", 1, true}, {"ischemia", 1, true}, {"clotBurden", 1, true}, {"pulmonaryEmbolism", 1, true},
+	{"blood", 5000}, {"bleed", 100, true}, {"venousBleed", 100, true}, {"arterialBleed", 100, true}, {"internalBleed", 10, true},
+	{"internalBleedComplication", 1, true}, {"arteria", 1, true}, {"aorta", 1, true}, {"rarmartery", 1, true}, {"larmartery", 1, true},
+	{"rlegartery", 1, true}, {"llegartery", 1, true},
+	{"o2.1", "o2.range"}, {"brainoxygen", 1}, {"circulatoryO2Reserve", 1}, {"exertionO2Debt", 30, true}, {"paco2", 80, true},
+	{"etco2", 60, true}, {"co2", 30, true}, {"CO", 1, true}, {"lactaid", 10, true}, {"respiratoryRate", 14}, {"respiratoryArrest", true, true},
+	{"bradyapnea", 1, true}, {"drugRespiratoryDepression", 1, true}, {"lungsfunction", true}, {"oxygenIntakeAvailable", true},
+	{"vomitInThroat", true, true}, {"needle", 1}, {"lungsL.1", 1, true}, {"lungsR.1", 1, true}, {"trachea", 1, true},
+	{"pneumothorax", 1, true}, {"hemothorax", 1, true}, {"lungWater", 1, true}, {"pneumonia", 1, true},
+	{"temperature", 40}, {"fever", 3.6, true}, {"heatProduction", 3, false}, {"shivering", 1, true}, {"metabolicDemand", 2, true},
+	{"wbc", 7.5}, {"leukopenia", 1, true}, {"infection", 1, true}, {"antibiotics", 420}, {"sepsisSource", 1, true},
+	{"hemotransfusionshock", 2, true}, {"septicShock", 1, true}, {"bloodph", 7.4}, {"bicarb", 24}, {"acidosis", 1, true},
+	{"alkalosis", 1, true}, {"hepaticFailure", 1, true}, {"hepaticToxin", 1, true}, {"renalFailure", 1, true},
+	{"liver", 1, true}, {"flank", 1, true}, {"gut", 1, true}, {"myoglobin", 2, true}, {"rhabdo", 1, true}, {"hyperkalemia", 1, true},
+	{"acidContractility", 1}, {"catecholamineResponse", 1}, {"cerebralFlowMul", 1}, {"cerebralHypoperfusion", 1, true}, {"brainFog", 1, true},
+	{"pain", 90, true}, "painStage", {"shock", 10, true}, {"analgesia", 2, true}, {"painkiller", 3, true}, {"adrenaline", 5, true},
+	{"noradrenaline", 5, true}, {"tranquilizer", 1, true}, {"zerlkersOverdose", 1, true}, {"thiamine", 1}, {"tranexamic_acid", 1},
+	{"brain", 1, true}, {"brainRate", 0.01, true}, {"brainHemorrhage", 1, true}, {"brainBleedRate", 0.01, true}, {"brainSwelling", 1, true},
+	{"intracranialPressure", 1, true}, {"concussion", 3, true}, {"disorientation", 1, true}, {"seizureActive", true, true},
+	{"skull", 1, true}, {"spine1", 1, true}, {"spine2", 1, true}, {"spine3", 1, true}, {"cervicalParalysis", true, true}, {"paralyzed", true, true},
+	{"chest", 1, true}, {"pelvis", 1, true}, {"lleg", 1, true}, {"rleg", 1, true}, {"larm", 1, true}, {"rarm", 1, true},
+	{"stamina.1", "stamina.max"}, {"satiety", 100}, {"hydration", 100}, {"thirst", 100, true}, {"bodyoxygen", 1}, {"regeneratehp", 1}, {"nausea", 1, true},
+	{"fear", 1, true}, {"panicattack", 1, true}, {"goodmood", 1}, {"depression", 1, true}, {"anger", 1, true}, {"chronicStrain", 1, true},
+	{"hopelessness", 1, true}, {"desolation", 1, true}, {"suicidal", 1, true},
+}
+
+local DEV_TIMERS = {{"DEATH TIMER", "deathStateEnd"}, {"defib grace", "defibDeathGrace"}, {"rhythm recovery", "rhythmRecoveryUntil"}, {"otrub min", "otrubMinUntil"}}
+
+local SIMPLE_KEYS = {
+	{"blood", 5000}, {"bleed", 100, true}, {"pulse", 70}, {"heartbeat", 200, true}, {"bloodPressure", 90}, {"temperature", 40},
+	{"o2.1", "o2.range"}, {"stamina.1", "stamina.max"}, {"pain", 90, true}, {"shock", 10, true}, {"consciousness", 1}, {"brain", 1, true},
+	{"heartstop", true, true}, {"fibrillation", true, true}, {"otrub", true, true}, {"incapacitated", true, true}, {"needle", 1},
+	{"tranquilizer", 1, true}, {"analgesia", 2, true}, {"adrenaline", 5, true}, {"infection", 1, true}, {"wbc", 7.5}, {"fever", 3.6, true},
+	{"internalBleed", 10, true}, {"satiety", 100}, {"fear", 1, true}, {"panicattack", 1, true}, {"depression", 1, true}, {"goodmood", 1},
+}
+
+local SIMPLE_STATE_KEYS = {
+	{"brute", 200, true}, {"burn", 200, true}, {"toxin", 200, true}, {"oxy", 200, true}, "crit", {"contamination", 1, true},
+	{"heartEfficiency", 1}, {"heartRate", 70}, "rhythm", {"consciousnessCap", 1}, {"oxyGain", 5, true}, {"oxyGainBonus", 5},
+	{"lungOxyRate", 5, true}, {"toxinRegenMul", 1}, {"airwayBlocked", true, true}, {"gasping", true, true}, {"flatline", true, true},
+	{"fibrillating", true, true}, {"thiamineActive", true}, {"cprCritHealed", true}, {"critImmune", true}, {"lethalCrit", true, true},
+}
+
+local SIMPLE_STATE_TIMERS = {
+	{"countdown", "countdownEnd"}, {"wrong blood", "wrongBloodUntil"}, {"flatline grace", "flatlineGraceUntil"},
+	{"rhythm grace", "rhythmGraceUntil"}, {"aed resist", "aedResistUntil"}, {"rhythm degrade", "rhythmDegradeAt"},
+}
+
+local function devValue(source, key)
+	local group, sub = string.match(key, "^([%a%d_]+)%.([%a%d_]+)$")
+	if group then
+		local container = source[group]
+		return istable(container) and container[tonumber(sub) or sub] or nil
+	end
+	local value = source[key]
+	if istable(value) then value = value[1] end
+	return value
+end
+
+local function devFormat(value)
+	if isnumber(value) then return (string.gsub(string.format("%.3f", value), "%.?0+$", "")) end
+	return tostring(value)
+end
+
+local function addDevRows(textList, source, entries)
+	for _, entry in ipairs(entries) do
+		local key = istable(entry) and entry[1] or entry
+		local value = devValue(source, key)
+		if value == nil or istable(value) then continue end
+		local r, g, b
+		if istable(entry) then
+			local limit, badHigh = entry[2], entry[3]
+			if isbool(limit) then
+				if value then r, g, b = set(badHigh and red or green) else r, g, b = set(badHigh and green or red) end
+			elseif isnumber(value) then
+				if isstring(limit) then limit = devValue(source, limit) end
+				if isnumber(limit) and limit ~= 0 then
+					local k = math.Clamp(value / limit, 0, 1)
+					r, g, b = LerpColor(badHigh and 1 - k or k, red, green)
+				end
+			end
+		end
+		textList[#textList + 1] = {key, devFormat(value), r, g, b}
+	end
+end
+
+local function addDevTimers(textList, source, timers, now)
+	for _, entry in ipairs(timers) do
+		local left = (tonumber(source[entry[2]]) or 0) - now
+		if left > 0 then textList[#textList + 1] = {entry[1], string.format("%.1fs", left), 255, 0, 0} end
+	end
+end
 
 local function getSimpleTextTable(org)
 	local textList = {}
 	local now = CurTime()
 	local simple = hg.SimpleHealth
-	local localState = org.owner == LocalPlayer() and simple.GetLocalState and simple.GetLocalState() or nil
+	local state = istable(org.simple) and org.simple or (org.owner == LocalPlayer() and simple.GetLocalState and simple.GetLocalState()) or nil
 	local owner = org.owner
 
+	textList[#textList + 1] = {"simple mode", tostring(org.simpleMode or (simple.ConVar and simple.ConVar:GetInt()) or 0), 255, 128, 0}
 	if IsValid(owner) and owner:IsPlayer() then
 		textList[#textList + 1] = {"health", tostring(owner:Health()), 0, 255, 0}
 	end
+	addDevTimers(textList, org, {{"DEATH TIMER", "deathStateEnd"}, {"otrub min", "otrubMinUntil"}}, now)
 
-	if localState then
-		for _, pool in ipairs(simple.POOLS) do
-			textList[#textList + 1] = {pool, tostring(localState[pool]), 255, 128, 0}
-		end
-		textList[#textList + 1] = {"crit", tostring(localState.crit)}
+	if state then
+		if state.health then textList[#textList + 1] = {"simple health", devFormat(state.health), 0, 255, 0} end
+		addDevRows(textList, state, SIMPLE_STATE_KEYS)
+		addDevTimers(textList, state, SIMPLE_STATE_TIMERS, now)
 	end
-
-	for _, key in ipairs(SIMPLE_KEYS) do
-		local value = org[key]
-		if istable(value) then value = value[1] end
-		if value ~= nil then
-			textList[#textList + 1] = {key, isnumber(value) and string.format("%.2f", value) or tostring(value)}
-		end
-	end
-
-	for _, entry in ipairs({{"DEATH TIMER", "deathStateEnd"}, {"otrub min", "otrubMinUntil"}}) do
-		local left = (tonumber(org[entry[2]]) or 0) - now
-		if left > 0 then textList[#textList + 1] = {entry[1], string.format("%.1fs", left), 255, 0, 0} end
-	end
+	addDevRows(textList, org, SIMPLE_KEYS)
 
 	return textList
 end
 
 local function getTextTable(org)
-	if hg.SimpleHealth and hg.SimpleHealth.ConVar and hg.SimpleHealth.ConVar:GetInt() > 0 then
+	if org.simpleMode or (org.simpleMode == nil and hg.SimpleHealth and hg.SimpleHealth.ConVar and hg.SimpleHealth.ConVar:GetInt() > 0) then
 		return getSimpleTextTable(org)
 	end
 
 	local textList = {}
-	local shown = {}
-	local now = CurTime()
-	for _, entry in ipairs({{"DEATH TIMER", "deathStateEnd"}, {"defib grace", "defibDeathGrace"}, {"rhythm recovery", "rhythmRecoveryUntil"}, {"otrub min", "otrubMinUntil"}}) do
-		local left = (tonumber(org[entry[2]]) or 0) - now
-		if left > 0 then textList[#textList + 1] = {entry[1], string.format("%.1fs", left), 255, 0, 0} end
-	end
-	for i, v in pairs(list) do
-		local text1, text2 = "", ""
-		local value
-		local r, g, b
-		if type(v) == "table" then
-			if type(v[1]) == "table" then
-				if org[v[1][2]] == nil then continue end
-				text1 = v[1][1]
-				value = org[v[1][2]][v[1][3]]
-			else
-				if org[v[1]] == nil then continue end
-				text1 = v[1]
-				value = org[text1]
-				
-				if type(value) == "table" then value = value[1] end
-			end
-
-			if type(v[2]) == "boolean" then
-				if value then
-					r, g, b = set(v[3] and red or green)
-				else
-					r, g, b = set(v[3] and green or red)
-				end
-			elseif value then
-				local max = v[2]
-				if type(v[2]) == "string" then max = org[v[2]] end
-				if type(v[2]) == "table" then max = org[v[2][1]][v[2][2]] end
-				if not max then continue end
-				local k = value ~= 0 and max ~= 0 and value / max or 0 -- Тут были плохие слова от шарика...
-				if v[3] then
-					r, g, b = LerpColor(1 - k, red, green)
-				else
-					r, g, b = LerpColor(k, red, green)
-				end
-			end
-
-			text2 = isnumber(value) and string.sub(string.format("%f", value),1,-5) or value
-		elseif v == 0 then
-
-		else
-			if not org[v] then continue end
-			text1 = tostring(v)
-			text2 = isnumber(org[v]) and string.sub(string.format("%f", org[v]),1,-5) or org[v]
-		end
-		
-		if text1 != "" then
-			shown[text1] = true
-			textList[#textList + 1] = {text1, text2, r, g, b}
-		end
-	end
+	addDevTimers(textList, org, DEV_TIMERS, CurTime())
+	addDevRows(textList, org, DEV_LIST)
 
 	return textList
 end

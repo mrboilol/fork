@@ -81,6 +81,7 @@ module[1] = function(org)
 	org.sepsisOrganPrev = nil
 	hg.organism.AcidBase.Init(org)
 	hg.organism.Infection.Init(org)
+	hg.organism.Rhabdo.Init(org)
 	org.ischemia = 0
 	org.internalBleedDuration = 0
 	org.internalBleedPeak = 0
@@ -439,53 +440,6 @@ function hg.organism.AddGutHitNausea(org, delta, previousDamage, dmg)
 	org.wantToVomit = (org.wantToVomit or 0) + bump
 end
 
-function hg.organism.UpdateSepsis(org, mulTime, adrenalineStabilizer)
-	if org.simpleMode then return end
-
-	local bloodLost = max((org.sepsisBloodPrev or org.blood) - org.blood, 0)
-	org.sepsisBloodPrev = org.blood
-
-	local thiamine = (org.thiamine or 0) > 0
-	local txa = (org.tranexamic_acid or 0) > 0
-
-	local organLoad = (org.liver or 0) + (org.flank or 0)
-	local organHealed = max((org.sepsisOrganPrev or organLoad) - organLoad, 0)
-	local source = org.sepsisSource or 0
-	if source > 0 then
-		source = max(source - organHealed * 1.5 - mulTime * (1 / 600 + (thiamine and 1 / 20 or 0)), 0)
-		org.sepsisSource = source
-		local cap = source * 1.5
-		if org.hemotransfusionshock < cap then
-			org.hemotransfusionshock = min(org.hemotransfusionshock + mulTime * source * 0.015, cap)
-		end
-	end
-
-	local sepsis = org.hemotransfusionshock
-	if sepsis <= 0 then
-		org.sepsisOrganPrev = organLoad
-		return
-	end
-	local severity = min(sepsis, 2)
-	local shock = math.Clamp((severity - 0.9) / 0.8, 0, 1)
-	local organDamage = mulTime * max(severity - 0.5, 0) * (thiamine and 0.5 or 1) * (txa and 0.5 or 1)
-
-	org.internalBleed = org.internalBleed + mulTime * severity * 0.3 * (txa and 0.5 or 1)
-	org.liver = min(org.liver + organDamage * 0.012, 1)
-	org.flank = min((org.flank or 0) + organDamage * 0.012, 1)
-	org.heart = min(org.heart + organDamage * 0.006, 1)
-	if not adrenalineStabilizer and not thiamine and not txa then
-		org.ischemia = org.ischemia + mulTime * severity * 0.3
-	end
-
-	if shock > 0 and not thiamine then
-		sepsis = min(sepsis + mulTime * shock * 0.006, 2)
-	end
-
-	local clearance = mulTime * ((source > 0 and 0 or 1 / 150) * (1 - shock * 0.85) + (thiamine and 1 / 30 or 0) + (txa and 1 / 30 or 0)) + bloodLost / 600
-	org.hemotransfusionshock = max(sepsis - clearance, 0)
-	org.sepsisOrganPrev = (org.liver or 0) + (org.flank or 0)
-end
-
 ---@param org table<string, any>
 module[2] = function(owner, org, mulTime)
 	local bloodCapacity =(hg.organism.normalBloodVolume or 5000) + (owner:IsPlayer() and owner.GetTraitBonus and owner:GetTraitBonus("blood_capacity", 0) or 0)
@@ -552,9 +506,7 @@ module[2] = function(owner, org, mulTime)
 	local adrenalineStabilizer = totalAdrenaline > 0.2
 	local hasAntiIschemia = (org.tranexamic_acid or 0) > 0 or (org.thiamine or 0) > 0
 
-	hg.organism.UpdateInfection(owner, org, mulTime)
-	hg.organism.UpdateSepsis(org, mulTime, adrenalineStabilizer)
-	hg.organism.UpdateMetabolicShock(owner, org, mulTime)
+	hg.organism.UpdateSystemic(owner, org, mulTime, adrenalineStabilizer)
 
 	if org.arterialwounds and #org.arterialwounds > 0 then
 		for _, wound in pairs(org.arterialwounds) do

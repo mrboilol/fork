@@ -52,15 +52,25 @@ AcidBase.Config = {
 
 	septicShockStart = 0.9,
 	septicShockRange = 0.8,
-	sepsisFeverMax = 1.6,
-	sepsisColdStart = 1.4,
-	sepsisColdMax = -1.8,
 	sepsisHeartRate = 22,
 	sepsisLactate = 0.004,
 	septicShockLactate = 0.025,
 	septicShockNausea = 0.01,
 
 	vasoplegiaMax = 0.7,
+
+	acidosisNausea = 0.004,
+	acidContractilityLoss = 0.3,
+	acidCatecholamineLoss = 0.5,
+	acidOxygenUnload = 0.05,
+	alkaliOxygenHold = 0.1,
+	alkaliCerebralConstrict = 0.25,
+	hypocapniaStart = 35,
+	hypocapniaRange = 15,
+	hypocapniaConstrict = 0.25,
+	hypercapniaStart = 45,
+	hypercapniaRange = 40,
+	hypercapniaDilate = 0.15,
 	simpleToxinPerAcidMl = 0.05,
 
 	thoughtCooldown = 40,
@@ -119,11 +129,15 @@ function AcidBase.Init(org)
 	org.hepaticFailure = 0
 	org.hepaticToxin = 0
 	org.septicShock = 0
-	org.sepsisFever = 0
+	org.renalFailure = 0
 	org.shockVasoplegia = 0
 	org.metabolicHeartRate = 0
 	org.metabolicConsciousnessCap = 1
 	org.metabolicStaminaMul = 1
+	org.acidContractility = 1
+	org.catecholamineResponse = 1
+	org.cerebralFlowMul = 1
+	org.metabolicDrowsiness = 0
 	org.metabolicThoughts = {}
 end
 
@@ -152,13 +166,14 @@ local function updateSepsisOutputs(org)
 	local shock = Clamp((severity - CONFIG.septicShockStart) / CONFIG.septicShockRange, 0, 1)
 	org.septicShock = shock
 
-	local fever = min(severity, 1) * CONFIG.sepsisFeverMax
-	if severity > CONFIG.sepsisColdStart then
-		fever = Lerp((severity - CONFIG.sepsisColdStart) / (2 - CONFIG.sepsisColdStart), CONFIG.sepsisFeverMax, CONFIG.sepsisColdMax)
-	end
-	org.sepsisFever = fever
-
 	return severity, shock
+end
+
+local function updateRenal(org)
+	local renal = Clamp(((tonumber(org.flank) or 0) - CONFIG.renalStart) / CONFIG.renalRange, 0, 1)
+	org.renalFailure = renal
+
+	return renal
 end
 
 local function updateHepatic(org, mulTime, thiamine, shock)
@@ -177,8 +192,7 @@ local function updateHepatic(org, mulTime, thiamine, shock)
 	return failure, org.hepaticToxin
 end
 
-local function updateBicarb(org, mulTime, thiamine, severity, shock, hepatic)
-	local renal = Clamp(((tonumber(org.flank) or 0) - CONFIG.renalStart) / CONFIG.renalRange, 0, 1)
+local function updateBicarb(org, mulTime, thiamine, severity, shock, hepatic, renal)
 	local lactateExcess = max((tonumber(org.lactaid) or CONFIG.lactateNormal) - CONFIG.lactateNormal, 0)
 	local paco2 = Clamp(tonumber(org.paco2) or CONFIG.normalPaco2, 10, 150)
 
@@ -191,6 +205,7 @@ local function updateBicarb(org, mulTime, thiamine, severity, shock, hepatic)
 		- shock * CONFIG.septicShockAcid
 		- hepatic * CONFIG.hepaticAcid
 		- renal * CONFIG.renalAcid
+		- (tonumber(org.rhabdoAcid) or 0)
 		+ citrate * (1 - hepatic)
 		+ max(paco2 - 45, 0) * CONFIG.hypercapniaCompensation * (1 - renal)
 
@@ -229,10 +244,12 @@ end
 
 function hg.organism.UpdateMetabolicShock(owner, org, mulTime)
 	if org.simpleMode then
-		org.septicShock, org.sepsisFever, org.shockVasoplegia, org.metabolicHeartRate = 0, 0, 0, 0
+		org.septicShock, org.shockVasoplegia, org.renalFailure = 0, 0, 0
+		org.metabolicHeartRate = tonumber(org.feverHeartRate) or 0
 		org.acidosis, org.alkalosis, org.acidosisDrive, org.alkalosisDrive = 0, 0, 0, 0
 		org.metabolicConsciousnessCap = 1
-		org.metabolicStaminaMul = max(1 - (tonumber(org.hemotransfusionshock) or 0), 0.2)
+		org.acidContractility, org.catecholamineResponse, org.cerebralFlowMul, org.metabolicDrowsiness = 1, 1, 1, 0
+		org.metabolicStaminaMul = max((1 - (tonumber(org.hemotransfusionshock) or 0)) * (1 - (org.feverK or 0) * 0.25), 0.2)
 		return
 	end
 	if not org.alive then return end
@@ -240,13 +257,14 @@ function hg.organism.UpdateMetabolicShock(owner, org, mulTime)
 	local thiamine = (tonumber(org.thiamine) or 0) > 0
 	local severity, shock = updateSepsisOutputs(org)
 	local hepatic, toxin = updateHepatic(org, mulTime, thiamine, shock)
+	local renal = updateRenal(org)
 
 	org.lactaid = min((tonumber(org.lactaid) or CONFIG.lactateNormal) + mulTime * (severity * CONFIG.sepsisLactate + shock * CONFIG.septicShockLactate), 20)
 	if shock > 0 then
 		org.wantToVomit = (org.wantToVomit or 0) + mulTime * shock * CONFIG.septicShockNausea
 	end
 
-	local ph = updateBicarb(org, mulTime, thiamine, severity, shock, hepatic)
+	local ph = updateBicarb(org, mulTime, thiamine, severity, shock, hepatic, renal)
 	local acidosis = Clamp((CONFIG.acidosisStart - ph) / (CONFIG.acidosisStart - CONFIG.acidosisFull), 0, 1)
 	local alkalosis = Clamp((ph - CONFIG.alkalosisStart) / (CONFIG.alkalosisFull - CONFIG.alkalosisStart), 0, 1)
 	org.acidosis, org.alkalosis = acidosis, alkalosis
@@ -268,16 +286,36 @@ function hg.organism.UpdateMetabolicShock(owner, org, mulTime)
 	if toxin > 0 then
 		org.disorientation = max(org.disorientation or 0, toxin * 1.0)
 	end
+	if acidosis > 0 then
+		org.wantToVomit = (org.wantToVomit or 0) + mulTime * acidosis * CONFIG.acidosisNausea
+	end
+
+	local paco2 = Clamp(tonumber(org.paco2) or CONFIG.normalPaco2, 10, 150)
+	local hypocapnia = Clamp((CONFIG.hypocapniaStart - paco2) / CONFIG.hypocapniaRange, 0, 1)
+	local hypercapnia = Clamp((paco2 - CONFIG.hypercapniaStart) / CONFIG.hypercapniaRange, 0, 1)
+	org.acidContractility = 1 - acidosis * CONFIG.acidContractilityLoss
+	org.catecholamineResponse = 1 - acidosis * CONFIG.acidCatecholamineLoss
+	org.cerebralFlowMul = Clamp((1 - alkalosis * CONFIG.alkaliCerebralConstrict - hypocapnia * CONFIG.hypocapniaConstrict + hypercapnia * CONFIG.hypercapniaDilate)
+		* (1 + acidosis * CONFIG.acidOxygenUnload - alkalosis * CONFIG.alkaliOxygenHold), 0.4, 1.2)
+	org.metabolicDrowsiness = max(acidosis * 0.5, hypercapnia * 0.6, toxin * 0.5)
 
 	org.shockVasoplegia = Clamp(severity * 0.08 + shock * 0.45 + acidosis * 0.25 + max(hepatic - CONFIG.hepaticShockStart, 0) * 0.5, 0, CONFIG.vasoplegiaMax)
-	org.metabolicHeartRate = severity * CONFIG.sepsisHeartRate + acidosis * 15 + hepatic * 10
+	org.metabolicHeartRate = severity * CONFIG.sepsisHeartRate + acidosis * 15 + hepatic * 10 + (tonumber(org.feverHeartRate) or 0)
 
 	local acidCap = 1 - Clamp((CONFIG.acidosisComaStart - ph) / CONFIG.acidosisComaRange, 0, 1) * 0.9
 	local alkaliCap = 1 - max(alkalosis - 0.5, 0) * 1.2
 	local sepsisCap = 1 - shock * 0.5
 	local hepaticCap = 1 - Clamp((toxin - 0.3) / 0.7, 0, 1) * 0.85
 	org.metabolicConsciousnessCap = min(acidCap, alkaliCap, sepsisCap, hepaticCap)
-	org.metabolicStaminaMul = max((1 - severity * 0.25) * (1 - acidosis * 0.45) * (1 - hepatic * 0.3), 0.2)
+	org.metabolicStaminaMul = max((1 - severity * 0.25) * (1 - acidosis * 0.45) * (1 - hepatic * 0.3) * (1 - renal * 0.2)
+		* (1 - (org.feverK or 0) * 0.25) * (1 - (org.leukopenia or 0) * 0.2) * (1 - alkalosis * 0.3) * (1 - (tonumber(org.rhabdo) or 0) * 0.25), 0.2)
 
 	emitThoughts(owner, org)
+end
+
+function hg.organism.UpdateSystemic(owner, org, mulTime, adrenalineStabilizer)
+	hg.organism.UpdateInfection(owner, org, mulTime)
+	hg.organism.UpdateSepsis(org, mulTime, adrenalineStabilizer)
+	hg.organism.UpdateRhabdo(owner, org, mulTime)
+	hg.organism.UpdateMetabolicShock(owner, org, mulTime)
 end

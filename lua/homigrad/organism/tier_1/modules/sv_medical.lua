@@ -233,8 +233,7 @@ module[2] = function(owner, org, timeValue)
 	if not org.alive then return end
 	org.medical_infection = max((org.medical_infection or 0) - timeValue / 900, 0)
 	if org.medical_infection > 0 then
-		org.temperature = min((org.temperature or 36.7) + timeValue / 250 * org.medical_infection, 41)
-		org.fearadd = min((org.fearadd or 0) + timeValue * 0.03 * org.medical_infection, 3)
+		hg.organism.Infection.Seed(org, timeValue / 600 * org.medical_infection)
 	end
 	local now = CurTime()
 	if now < (org.rehab_otrub or 0) then

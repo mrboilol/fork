@@ -632,7 +632,7 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 	local blood = org.blood or 5000
 	local bleed = org.bleed or 0
 	local o2 = org.o2 and org.o2[1] or 30
-	local brain = org.brain or 0
+	local brain = math.max(org.brain or 0, (tonumber(org.brainFog) or 0) * 0.04)
 	local otrub = lply:Alive() and org.otrub or false
 	local consciousness = math.Clamp(org.consciousness or 1, 0, 1)
 	local analgesia = organism.analgesia or 0

@@ -19,7 +19,8 @@ local K = {
 	desolationRise = 1 / 30,
 	desolationFall = 1 / 50,
 
-	suicidalStart = 0.2,
+	switchMargin = 0.15,
+	giveUpStart = 0.6,
 	suicidalRise = 1 / 50,
 	suicidalFall = 1 / 70,
 
@@ -41,18 +42,18 @@ hg.organism.DespairConfig = K
 
 local THOUGHTS = {
 	hopelessness = {
-		{"Where is everyone...?", "Is anyone there? Anyone?", "Nobody's coming, are they..."},
+		{"Where is everyone...?", "Why is no one helping me...", "Nobody's coming, are they..."},
 		{"I'm going to die here alone.", "Nobody even knows I'm here...", "Please... someone... anyone..."},
 		{"No one's coming. No one was ever coming.", "I'm dying and there's nobody here.", "My heart... it's slowing down..."},
 	},
 	desolation = {
-		{"We're losing this...", "This isn't going well...", "Where did everyone go?"},
-		{"We're not getting out of this.", "They're everywhere... we're done.", "I can't stop shaking..."},
-		{"I'm going to die here. I know it.", "It's over. It's all over.", "There's nobody left on our side..."},
+		{"I'm losing this...", "This isn't going well...", "I'm so done for.."},
+		{"I'm not getting out of this...", "Why won't it get easier...", "I can't stop shaking..."},
+		{"I'm going to die here. I know it.", "It's over. It's all over.", "There's no point to it..."},
 	},
 	suicidal = {
 		{"What's even the point anymore...", "Maybe it's better if it just ends.", "I don't care anymore."},
-		{"Just get it over with...", "I don't want to feel this anymore.", "Let it end. Please."},
+		{"Im fucking done.", "I don't want to feel this anymore.", "Let it end. Please."},
 		{"Make it quick. Just make it quick.", "I'm done. I just want it over.", "Why won't it just end already..."},
 	},
 }
@@ -62,6 +63,11 @@ local FIELDS = {"hopelessness", "desolation", "suicidal"}
 local function depressionOn()
 	local cvar = GetConVar("hg_depression")
 	return not cvar or cvar:GetBool()
+end
+
+local function selfHarmOn()
+	local cvar = GetConVar("hg_selfharm")
+	return depressionOn() and (not cvar or cvar:GetBool())
 end
 
 local function isImmune(ply)
@@ -78,6 +84,7 @@ local function clearDespair(org)
 	org.despairAdrenalineMul = 1
 	org.despairStage = nil
 	org.despairNextThought = nil
+	org.despairKind = nil
 end
 
 hook.Add("Org Clear", "HG_Despair", clearDespair)
@@ -147,7 +154,7 @@ local function updateThoughts(ply, org, now)
 	if stage == 0 or stage <= (org.despairStage[best] or 0) or now < (org.despairNextThought or 0) then return end
 	org.despairStage[best] = stage
 	org.despairNextThought = now + K.thoughtCooldown
-	local pool = THOUGHTS[best][stage]
+	local pool = THOUGHTS[best == "suicidal" and not selfHarmOn() and "givingUp" or best][stage]
 	if hg.organism.EmotionThought then
 		hg.organism.EmotionThought(ply, pool[math.random(#pool)], 6, "despair_" .. best)
 	end
@@ -164,34 +171,49 @@ local function updatePlayer(ply, org, counts, twoTeams, now)
 		local alone = company == 0 and 1 or company == 1 and K.oneCompanionMul or 0
 		local hopeTarget = Clamp((dying - K.hopelessDying) / (K.hopelessFull - K.hopelessDying), 0, 1) * alone
 		local hope = org.hopelessness or 0
-		org.hopelessness = Approach(hope, hopeTarget, dt * (hopeTarget > hope and K.hopelessRise or K.hopelessFall))
 
 		local inFight = (org.panicGunfightUntil or 0) > now or (org.hgLosing or 0) > 0
 		local losing = Clamp((org.hgLosing or 0) / K.losingFull, 0, 1)
 		local team = teamStanding(ply, counts, twoTeams) * (inFight and 1 or K.outOfFightTeamMul)
 		local desoTarget = max(losing, team)
 		local deso = org.desolation or 0
+
+		local kind = org.despairKind
+		if kind == "hopelessness" and desoTarget > max(hope, hopeTarget) + K.switchMargin then
+			kind = "desolation"
+			deso, hope = max(deso, hope * 0.5), 0
+		elseif kind == "desolation" and hopeTarget > max(deso, desoTarget) + K.switchMargin then
+			kind = "hopelessness"
+			hope, deso = max(hope, deso * 0.5), 0
+		elseif not kind and max(hopeTarget, desoTarget) > 0 then
+			kind = hopeTarget >= desoTarget and "hopelessness" or "desolation"
+		end
+		if kind == "hopelessness" then desoTarget = 0 elseif kind == "desolation" then hopeTarget = 0 end
+
+		org.hopelessness = Approach(hope, hopeTarget, dt * (hopeTarget > hope and K.hopelessRise or K.hopelessFall))
 		org.desolation = Approach(deso, desoTarget, dt * (desoTarget > deso and K.desolationRise or K.desolationFall))
+		if org.hopelessness <= 0 and org.desolation <= 0 then kind = nil end
+		org.despairKind = kind
 
 		local h, d = org.hopelessness, org.desolation
-		local suicidalTarget = Clamp(max(min(h, d) * 1.3, (max(h, d) - 0.55) * 2), 0, 1) * Lerp(Clamp(org.depression or 0, 0, 1), 0.7, 1)
-		if suicidalTarget < K.suicidalStart then suicidalTarget = 0 end
+		local suicidalTarget = Clamp((max(h, d) - K.giveUpStart) / (1 - K.giveUpStart), 0, 1) * Lerp(Clamp(org.depression or 0, 0, 1), 0.7, 1)
 		local s = org.suicidal or 0
 		org.suicidal = Approach(s, suicidalTarget, dt * (suicidalTarget > s and K.suicidalRise or K.suicidalFall))
 	end
 
 	local h, d, s = org.hopelessness or 0, org.desolation or 0, org.suicidal or 0
-	org.despairHeart = Clamp((h + s * K.suicidalHeart) * gameplay, 0, 1)
-	org.despairShake = d * gameplay
+	local full = gameplay >= 1
+	org.despairHeart = full and Clamp(h + s * K.suicidalHeart, 0, 1) or 0
+	org.despairShake = max(d, s * 0.5) * gameplay
 	org.despairSuccumb = (s * K.suicidalSuccumb + h * K.hopeSuccumb) * gameplay
 	org.despairAdrenalineMul = max(1 - (d * K.desolationAdrenaline + s * K.suicidalAdrenaline) * gameplay, K.adrenalineFloor)
 
-	if hg.organism.AddDepression then
-		if h > 0 then hg.organism.AddDepression(org, h * K.hopeDepression * gameplay * dt, "dying") end
-		if d > 0 then hg.organism.AddDepression(org, d * K.desolationDepression * gameplay * dt) end
+	if full and hg.organism.AddDepression then
+		if h > 0 then hg.organism.AddDepression(org, h * K.hopeDepression * dt, "dying") end
+		if d > 0 then hg.organism.AddDepression(org, d * K.desolationDepression * dt) end
 	end
-	if h > 0 and dying > 0 and not org.heartstop then
-		local load = h * dying * gameplay * dt
+	if full and h > 0 and dying > 0 and not org.heartstop then
+		local load = h * dying * dt
 		org.heartStrain = Clamp((org.heartStrain or 0) + load * K.hopeHeartStrain, 0, 1)
 		org.arrhythmia = Clamp((org.arrhythmia or 0) + load * K.hopeArrhythmia, 0, 1)
 	end

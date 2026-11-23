@@ -42,8 +42,14 @@ local PAIN_FOCUS = {
     depressionCap = 0.25,
 }
 
-local WOUND_RANK = {hurt = 1, broken = 2, bloodloss = 3, bleeding = 3, bleedingBad = 4, dying = 5}
+local WOUND_RANK = {sick = 1, hurt = 1, broken = 2, bloodloss = 3, bleeding = 3, bleedingBad = 4, dying = 5}
 local WOUND_LINES = {
+	sick = {
+		"I feel sick... everything aches.",
+		"I'm burning up and shivering at the same time.",
+		"My whole body feels heavy and wrong.",
+		"I just want to lie down...",
+	},
 	hurt = {
 		"Something's starting to hurt bad...",
 		"This pain is starting to upset me.",
@@ -131,8 +137,10 @@ local function getInjury(org)
     local blood = tonumber(org.blood) or 5000
     local bleeding = bleed > 0.2
     local broken = isLimbBroken(org)
+    local sickness = hg.organism.Infection.GetSickness(org)
 
     local severity = math.max(
+        sickness * 0.8,
         math.Clamp((pain - 15) / 85, 0, 1) * 0.7,
         bleeding and math.Clamp(0.3 + bleed / 8, 0, 0.85) or 0,
         math.Clamp((4700 - blood) / 2200, 0, 1) * 0.95,
@@ -156,6 +164,7 @@ local function getInjury(org)
         or blood < 4200 and "bloodloss"
         or broken and "broken"
         or pain > 25 and "hurt"
+        or sickness >= 0.35 and "sick"
         or nil
 
     return severity, kind

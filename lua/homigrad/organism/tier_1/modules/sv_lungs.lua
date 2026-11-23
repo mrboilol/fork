@@ -617,6 +617,7 @@ local function updateCO2(owner, org, timeValue, ventilating, exerting, staminaVa
 		- (org.paralyzed and 0.25 or 0)
 		- lost * 0.06)
 	production = math.max(production, 0.3)
+	org.metabolicDemand = production
 
 	local lungDamage = (math.Clamp(tonumber(org.lungsL[1]) or 0, 0, 1) + math.Clamp(tonumber(org.lungsR[1]) or 0, 0, 1)) / 2
 	local deadSpace = math.Clamp(lungDamage * 0.5 + (org.pneumothorax or 0) * 0.6 + (org.hemothorax or 0) * 0.5, 0, 0.9)
@@ -800,7 +801,7 @@ module[2] = function(owner, org, timeValue)
 	end
 	org.airPressureRatio = altitudeO2K
 	local coldOxygenUseMul = (1 + shiveringO2Demand) * (1 - coldMetabolicPreservation)
-	local losing_oxy = timeValue * math.Clamp(org.o2[1] / 30, 0.25, 1) * coldOxygenUseMul * (org.hopelessO2Mul or 1)
+	local losing_oxy = timeValue * math.Clamp(org.o2[1] / 30, 0.25, 1) * coldOxygenUseMul * (org.hopelessO2Mul or 1) * (1 + (org.feverK or 0) * 0.2)
 
 	org.losing_oxy = losing_oxy
 

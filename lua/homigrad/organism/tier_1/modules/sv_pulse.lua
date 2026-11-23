@@ -410,6 +410,13 @@ local function getPalpablePulseTarget(org, heartbeat, circulation, hemorrhageCom
 	return rate * capture, capture
 end
 
+local brainFogThoughts = {
+	"I'm so sleepy... my head is all fuzzy.",
+	"Everything feels slow and far away.",
+	"I can't keep my eyes open...",
+	"My head feels light, like I'm floating.",
+}
+
 function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	if not org or not org.o2 then return end
 	hg.organism.EnforceBloodCirculationLimit(org)
@@ -417,7 +424,7 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	local o2Range = math.max(tonumber(org.o2.range) or 30, 1)
 	local oxygenReserve = Clamp((tonumber(org.o2[1]) or 0) / o2Range, 0, 1)
 	local effectiveCirculation = max(hg.organism.GetCirculatoryOxygenReserve(org.pulse, org.bloodPressure, org.blood), hg.organism.GetHypertensionPerfusionFloor(org))
-	local cerebralPerfusion = max(effectiveCirculation, hg.organism.GetSupportedCirculationFloor(org))
+	local cerebralPerfusion = max(effectiveCirculation * Clamp(tonumber(org.cerebralFlowMul) or 1, 0.4, 1.2), hg.organism.GetSupportedCirculationFloor(org))
 	local peripheralPerfusion = effectiveCirculation * Clamp(1 - (org.sympatheticCompensation or 0) * 0.45, 0.55, 1)
 	local neckPenalty = Clamp(tonumber(org.neckBrainOxygenPenalty) or 0, 0, 0.8)
 	local convulsionPenalty = org.convulsing and hg.organism.convulsionConfig.hypoxiaPenalty or 0
@@ -440,6 +447,19 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	end
 	if org.brainoxygen < 0.08 then
 		org.brain = math.min((org.brain or 0) + timeValue * (0.08 - org.brainoxygen) / 0.08 * hg.organism.convulsionConfig.hypoxiaBrainRate, 1)
+	end
+
+	local hypoperfusion = Clamp((0.8 - org.cerebralPerfusion) / 0.4, 0, 1)
+	org.cerebralHypoperfusion = hypoperfusion
+	local fog = max(hypoperfusion, Clamp(tonumber(org.metabolicDrowsiness) or 0, 0, 1))
+	org.brainFog = fog
+	if fog > 0.05 and not org.otrub then
+		org.disorientation = max(org.disorientation or 0, fog * 0.9)
+		org.consciousness = math.min(org.consciousness or 1, 1 - fog * 0.3)
+		if org.isPly and fog > 0.35 and (org.nextBrainFogThought or 0) < CurTime() and IsValid(owner) and owner.Notify then
+			org.nextBrainFogThought = CurTime() + math.Rand(40, 70)
+			owner:Notify(brainFogThoughts[math.random(#brainFogThoughts)], 20, "brain_fog", 0, nil, Color(190, 190, 210))
+		end
 	end
 end
 
@@ -1068,7 +1088,7 @@ module[2] = function(owner, org, timeValue)
 	-- sustain the myocardium once the lungs have stopped delivering oxygen.
 	local oxygenation = Clamp(o2 * (org.oxygenIntakeAvailable == false and 0 or 1), 0, 1)
 	local highSpeedPressureShock = updateHighSpeedPressureShock(owner, org, timeValue)
-	local activeCatecholamine = max(org.adrenaline or 0, org.adrenalineAdd or 0)
+	local activeCatecholamine = max(org.adrenaline or 0, org.adrenalineAdd or 0) * Clamp(tonumber(org.catecholamineResponse) or 1, 0.3, 1)
 	local catecholamineDrive = Clamp(
 		max(activeCatecholamine - 0.75, 0) / 4.25 + (org.noradrenaline or 0) / 5,
 		0,
@@ -1113,7 +1133,7 @@ module[2] = function(owner, org, timeValue)
 	if org.ventricularTachycardia then rhythmInstability = math.max(rhythmInstability, org.ventricularTachycardia == "polymorphic" and 0.9 or 0.7) end
 	if org.fibrillation then rhythmInstability = 1 end
 	local rateOutput = getRateOutput(org.heartstop and 0 or (org.heartbeat or 70), preloadReserve)
-	local circulationBase = bloodVolume * heart * compensationPulseMultiplier * rateOutput * vascularTone * accelerationPressureMul * dehydrationPressureMul * tamponadePreload * internalBleedPressureMul * Clamp(Remap(org.temperature, 28, 36.7, 0.55, 1), 0.45, 1.1)
+	local circulationBase = bloodVolume * heart * Clamp(tonumber(org.acidContractility) or 1, 0.5, 1) * compensationPulseMultiplier * rateOutput * vascularTone * accelerationPressureMul * dehydrationPressureMul * tamponadePreload * internalBleedPressureMul * Clamp(Remap(org.temperature, 28, 36.7, 0.55, 1), 0.45, 1.1)
 	local rhythm = org.ecgState
 	local rhythmMul = org.fibrillation and 0.18 or Clamp(1 - rhythmInstability * 0.42, 0.32, 1)
 	if not org.fibrillation then
@@ -1171,7 +1191,7 @@ module[2] = function(owner, org, timeValue)
 	org.pulseDeficit = math.max((org.heartbeat or 0) - palpablePulseTarget, 0)
 	org.pulse = Approach(org.pulse, palpablePulseTarget, heart == 0 and timeValue * 10 or timeValue * 8)
 	local pressureCirculation = circulation * Clamp(1 - rhythmInstability * 0.24, 0.70, 1)
-	local pressureTarget = Clamp((92 * pressureCirculation ^ 0.75 + hypervolemia * 55) * (1 - Clamp(org.shockVasoplegia or 0, 0, 0.7))
+	local pressureTarget = Clamp((92 * pressureCirculation ^ 0.75 + hypervolemia * 55) * (1 - Clamp(org.shockVasoplegia or 0, 0, 0.7)) * (1 + Clamp(tonumber(org.feverPressor) or 0, 0, 0.2))
 		* (1 - Clamp(tonumber(org.streptokinase) or 0, 0, 2) * 0.14 - Clamp(tonumber(org.pulmonaryEmbolism) or 0, 0, 1) * 0.3 + Clamp(tonumber(org.clotBurden) or 0, 0, 1) * 0.08), 0, 180)
 	local pressureNow = tonumber(org.bloodPressure) or pressureTarget
 	local pressureFallRate = org.heartstop and not (dihSupport or defibGrace or cprSupport) and 22 or 12

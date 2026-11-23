@@ -123,7 +123,7 @@ function CLASS.On(self, data)
 			if not hg.EquipClassArmor(self, "protovisor") then self.armors["head"] = "protovisor" end
 			self:SyncArmor()
 
-			zb.GiveRole(self, "Specimen", col1)
+			if zb and zb.GiveRole then zb.GiveRole(self, "Specimen", col1) end
 		else
 			hg.furcrack = {}
 		end

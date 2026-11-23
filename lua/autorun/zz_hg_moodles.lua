@@ -412,7 +412,7 @@ local moodleTexts = {
 		[4] = {title = "Brain Damage", description = "Brain trauma is shutting down essential functions."},
 	}},
 	sepsis = {levels = {
-		[1] = {title = "Infection", description = "A wound is infected or tissue is starved of blood. It will spread if left alone."},
+		[1] = {title = "Infection", description = "A wound is infected or your white blood cells are running low. It will spread if your body can't fight it."},
 		[2] = {title = "Sepsis", description = "An infection is spreading through the blood. Fever, aches and a racing heart."},
 		[3] = {title = "Sepsis", description = "The body is turning on itself. Strength drains away and organs suffer."},
 		[4] = {title = "Septic Shock", description = "Blood vessels are failing. Pressure is crashing and organs are starving."},
@@ -797,16 +797,16 @@ local function buildEffects(ply, org)
 		add(effects, "self_harm", "self-harm", highRank(depression, {0.6, 0.7, 0.8, 0.9}), "bad", -66, math.floor(depression * 100) .. "%")
 	end
 	local hopelessness = math.Clamp(orgNumber(org, "hopelessness", 0), 0, 1)
-	if hopelessness >= 0.08 then
-		add(effects, "hopelessness", "hopeless", highRank(hopelessness, {0.08, 0.3, 0.55, 0.8}), "bad", -67, math.floor(hopelessness * 100) .. "%")
+	if hopelessness >= 0.5 then
+		add(effects, "hopelessness", "hopeless", highRank(hopelessness, {0.5, 0.625, 0.75, 0.875}), "bad", -67, math.floor(hopelessness * 100) .. "%")
 	end
 	local desolation = math.Clamp(orgNumber(org, "desolation", 0), 0, 1)
-	if desolation >= 0.08 then
-		add(effects, "desolation", "desolate", highRank(desolation, {0.08, 0.3, 0.55, 0.8}), "bad", -68, math.floor(desolation * 100) .. "%")
+	if desolation >= 0.5 then
+		add(effects, "desolation", "desolate", highRank(desolation, {0.5, 0.625, 0.75, 0.875}), "bad", -68, math.floor(desolation * 100) .. "%")
 	end
 	local suicidal = math.Clamp(orgNumber(org, "suicidal", 0), 0, 1)
-	if suicidal >= 0.08 then
-		add(effects, "suicidal", "suicide", highRank(suicidal, {0.08, 0.3, 0.55, 0.8}), "bad", -69, math.floor(suicidal * 100) .. "%")
+	if suicidal >= 0.5 then
+		add(effects, "suicidal", "suicide", highRank(suicidal, {0.5, 0.625, 0.75, 0.875}), "bad", -69, math.floor(suicidal * 100) .. "%")
 	end
 	local cotard = math.Clamp(orgNumber(org, "cotard", 0), 0, 1)
 	if cotard > 0 then
@@ -1011,7 +1011,10 @@ local function buildEffects(ply, org)
 		math.Clamp((gut - 0.8) / 0.2, 0, 1) * 0.5,
 		orgNumber(org, "hepaticFailure", 0),
 		orgNumber(org, "acidosis", 0),
-		orgNumber(org, "alkalosis", 0)
+		orgNumber(org, "alkalosis", 0),
+		orgNumber(org, "rhabdo", 0) * 0.8,
+		orgNumber(org, "hyperkalemia", 0),
+		orgNumber(org, "renalFailure", 0) * 0.8
 	)
 	if organThreat >= 0.25 then
 		local level = highRank(organThreat, {0.25, 0.5, 0.75, 0.95})
@@ -1093,11 +1096,12 @@ local function buildEffects(ply, org)
 	end
 	local ischemia, transfusionShock = orgNumber(org, "ischemia", 0), orgNumber(org, "hemotransfusionshock", 0)
 	local infection = orgNumber(org, "infection", 0)
-	if ischemia > 0.1 or transfusionShock > 0.1 or infection > 0.15 then
-		local level = math.max(math.min(highRank(ischemia, {0.1, 0.5, 1, 1.5}), 3), infection > 0.15 and 1 or 0)
+	local leukopenia = orgNumber(org, "leukopenia", 0)
+	if ischemia > 0.1 or transfusionShock > 0.1 or infection > 0.15 or leukopenia > 0.3 then
+		local level = math.max(math.min(highRank(ischemia, {0.1, 0.5, 1, 1.5}), 3), (infection > 0.15 or leukopenia > 0.3) and 1 or 0)
 		if transfusionShock > 0.1 then level = math.max(level, transfusionShock >= 0.6 and 3 or 2) end
 		if orgNumber(org, "septicShock", 0) > 0 then level = 4 end
-		local severity = math.max(ischemia, transfusionShock, infection)
+		local severity = math.max(ischemia, transfusionShock, infection, leukopenia)
 		add(effects, "sepsis", "sepsis", level, "bad", 46, math.floor(severity * 100) .. "%")
 	end
 

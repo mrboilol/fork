@@ -12,17 +12,13 @@ Pneumonia.Config = {
 
 	seedFromWater = 0.08,
 	seedRate = 1 / 300,
-	growth = 0.0012,
-	growthStart = 0.2,
-	selfClear = 1 / 600,
+	growthMul = 0.9,
+	waterGrowthMul = 1.5,
 	antibioticClear = 1 / 90,
 
-	feverMax = 1.9,
 	lungDamageStart = 0.4,
 	lungDamageTime = 900,
 	lungDamageCap = 0.7,
-	sepsisStart = 0.5,
-	sepsisMul = 1.2,
 
 	coughEvery = {12, 28},
 }
@@ -50,7 +46,6 @@ end
 function hg.organism.ResetPneumonia(org)
 	org.lungWater = 0
 	org.pneumonia = 0
-	org.pneumoniaFever = 0
 	org.nextPneumoniaCough = nil
 	org.lungWaterNotified = nil
 	org.pneumoniaNotified = nil
@@ -85,11 +80,7 @@ local function updateInfection(org, timeValue, water)
 		if water > CONFIG.seedFromWater and infectionsEnabled() then
 			pneumonia = pneumonia + timeValue * water * CONFIG.seedRate
 		end
-		if pneumonia >= CONFIG.growthStart then
-			pneumonia = pneumonia + timeValue * CONFIG.growth * (1 + pneumonia)
-		elseif water <= CONFIG.seedFromWater then
-			pneumonia = pneumonia - timeValue * CONFIG.selfClear
-		end
+		pneumonia = hg.organism.Infection.Fight(org, pneumonia, timeValue, CONFIG.growthMul + water * CONFIG.waterGrowthMul)
 	end
 
 	pneumonia = Clamp(pneumonia, 0, 1)
@@ -98,8 +89,6 @@ local function updateInfection(org, timeValue, water)
 end
 
 local function applyPneumoniaEffects(org, timeValue, pneumonia)
-	org.pneumoniaFever = pneumonia * CONFIG.feverMax
-
 	local damageK = pneumonia - CONFIG.lungDamageStart
 	if damageK > 0 then
 		local add = timeValue * damageK / CONFIG.lungDamageTime
@@ -108,11 +97,6 @@ local function applyPneumoniaEffects(org, timeValue, pneumonia)
 				lung[1] = min(lung[1] + add, CONFIG.lungDamageCap)
 			end
 		end
-	end
-
-	local sepsisK = pneumonia - CONFIG.sepsisStart
-	if sepsisK > 0 then
-		org.sepsisSource = max(tonumber(org.sepsisSource) or 0, min(sepsisK * CONFIG.sepsisMul, 1))
 	end
 end
 

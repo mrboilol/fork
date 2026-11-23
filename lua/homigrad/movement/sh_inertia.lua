@@ -204,7 +204,7 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 		return phase % 1 < hg.GaitFlightFraction(swingFraction)
 	end
 
-	local SPRINT_SPEED_MUL = 1.45
+	local SPRINT_SPEED_MUL = 1.7
 	local JOG_SPEED_MUL = 0.68
 	local STAMINA_FULL_SPEED = 90
 	local LIMP_LEG_SPEED_MIN = 0.72

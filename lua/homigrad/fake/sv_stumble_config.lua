@@ -261,6 +261,13 @@ K.REACT_MODES = {
 		bones = K.SPINE_REACT_BONES,
 		legs = true,
 	},
+	topple = {
+		sequences = {"Falling", "Falling2"},
+		rate = 0.45,
+		strength = 2,
+		bones = K.SPINE_REACT_BONES,
+		legs = false,
+	},
 	writhe = {
 		sequences = K.DYING_SEQUENCES,
 		rate = 0.8,

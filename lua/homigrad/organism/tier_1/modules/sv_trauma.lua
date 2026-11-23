@@ -602,6 +602,11 @@ function module.AddConcussion(org, intensity, duration)
     org.concussion_effects.severity = math.max(org.concussion_effects.severity or 0, add)
     org.concussion_effects.duration = math.max(org.concussion_effects.duration or 0, duration or math.Clamp(intensity * 6, 5, 80))
     org.concussion_tinnitus = math.max(org.concussion_tinnitus or 0, add * 0.25)
+    if org.isPly and IsValid(org.owner) and org.owner:IsPlayer() and (org.nextHeadTinnitus or 0) < now
+        and math.random() < math.Clamp(0.1 + add * 0.2, 0.1, 0.7) then
+        org.nextHeadTinnitus = now + 8
+        org.owner:AddTinnitus(math.Clamp(add * 4, 3, 25), true)
+    end
     org.concussion_headache = math.max(org.concussion_headache or 0, add * 0.4)
     org.concussion_fatigue = math.max(org.concussion_fatigue or 0, add * 0.2)
 

@@ -210,7 +210,14 @@ end
 function hg.organism.UpdateBodyTemperature(owner, org, timeValue)
 	local heartbeat = org.heartstop and 0 or (tonumber(org.heartbeat) or 70)
 	local lowPulseCold = Clamp(getLowPulseSeverity(org.pulse) / (55 / 70), 0, 1) * (1 - Clamp((heartbeat - 110) / 60, 0, 1) * 0.6)
-	local needed_temp = math.min(36.7 - lowPulseCold * 5.7, org.lowBloodTemperatureTarget or 36.7) + max(tonumber(org.sepsisFever) or 0, tonumber(org.pneumoniaFever) or 0) + Clamp((heartbeat - 100) / 80, 0, 1) * 0.8
+	local temperature = tonumber(org.temperature) or 36.7
+	local fever = tonumber(org.fever) or 0
+	local heartHeat = Clamp((heartbeat - 100) / 80, 0, 1)
+	local shiver = org.otrub and 0 or Clamp((35.5 - temperature) / 2.5, 0, 1) * (1 - Clamp((32 - temperature) / 4, 0, 1))
+	local heat = heartHeat * 1.5 + Clamp(((tonumber(org.metabolicDemand) or 1) - 1) * 1.5, 0, 2) + shiver * 1.2 + max(fever, 0) * 0.5
+	org.heatProduction = heat
+	org.shivering = shiver
+	local needed_temp = math.min(36.7 - lowPulseCold * 5.7, org.lowBloodTemperatureTarget or 36.7) + fever + heartHeat * 0.8
 	if IsValid(owner) then
 		local character = hg.GetCurrentCharacter(owner)
 		if not IsValid(character) then character = owner end
@@ -219,7 +226,7 @@ function hg.organism.UpdateBodyTemperature(owner, org, timeValue)
 		local depthCold = envCold > 0 and Clamp(-altitude * ALTITUDE_DEPTH_COLD, 0, ALTITUDE_DEPTH_COLD_MAX) or 0
 		local heightCold = envCold > 0 and 0 or Clamp((altitude - ALTITUDE_COLD_START) * ALTITUDE_HEIGHT_COLD, 0, ALTITUDE_HEIGHT_COLD_MAX)
 		envCold = envCold + depthCold + heightCold
-		if envCold > 0 then needed_temp = math.min(needed_temp, 36.7 - envCold) end
+		if envCold > 0 then needed_temp = math.min(needed_temp, 36.7 - max(envCold - heat, 0)) end
 	end
 	if StormFox2 and StormFox2.Loaded and StormFox2.Setting.SFEnabled() and IsValid(owner) then
 		local character = hg.GetCurrentCharacter(owner)
@@ -227,7 +234,7 @@ function hg.organism.UpdateBodyTemperature(owner, org, timeValue)
 		local inWater = character:WaterLevel() > 0
 		if inWater or StormFox2.Wind.IsEntityInWind(character) then
 			local cold = math.max(10 - StormFox2.Temperature.Get(), 0)
-			needed_temp = math.min(needed_temp, math.max(20, 36.7 - cold * (inWater and 0.4 or 0.25)))
+			needed_temp = math.min(needed_temp, math.max(20, 36.7 - max(cold * (inWater and 0.4 or 0.25) - heat * (inWater and 0.5 or 1), 0)))
 		end
 	end
 	local changeRate = timeValue / 60

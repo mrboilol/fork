@@ -1263,7 +1263,13 @@ local function draw_bar()
 		smooth.etco2 = nil
 	end
 
-	
+	local wbc = tonumber(org.wbc)
+	if wbc and (wbc < 4.5 or wbc > 11) then
+		local wbcVal = math.Round(wbc, 1)
+		local wbcColor = wbc < 1.5 and Color(255, 70, 70) or Color(255, 165, 65)
+		table.insert(segs, {label = "WBC", val = "WBC " .. wbcVal, suf = "", ratio = math.Clamp(wbc / 15, 0, 1), col = wbcColor, w = math_floor(92 * scale), icon = "pulse", prio = 7})
+	end
+
 	if #segs == 0 then return end
 	
 	table.sort(segs, function(a, b) return a.prio < b.prio end)

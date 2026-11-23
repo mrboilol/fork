@@ -964,7 +964,10 @@ local function wantedReaction(ply, ragdoll)
 		if pain > 0 and writheWanted(ply, ragdoll, pain) then return "writhe" end
 		return
 	end
-	if euphoriaOn(hg_euphoria_windmill) and not limbControl(ply) and not hg.KeyDown(ply, IN_USE) and (isAirborne(ply, ragdoll) or falling[ragdoll]) then return "flail" end
+	if euphoriaOn(hg_euphoria_windmill) and not limbControl(ply) and not hg.KeyDown(ply, IN_USE) then
+		if isAirborne(ply, ragdoll) then return "flail" end
+		if falling[ragdoll] then return "topple" end
+	end
 	if stumbling[ragdoll] then return "stumble" end
 
 	if limbControl(ply) then
