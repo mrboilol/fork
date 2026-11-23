@@ -5,6 +5,15 @@ local LEGACY_CLASSES = {0.5, 1.5, 4, 8, 12, 16, 22}
 local CLASSES = {0.5, ZC_ARMOR_PROTCLASS_I, ZC_ARMOR_PROTCLASS_II, ZC_ARMOR_PROTCLASS_IIIA, ZC_ARMOR_PROTCLASS_III, ZC_ARMOR_PROTCLASS_III_PLUS, ZC_ARMOR_PROTCLASS_IV}
 local SOFT = 0.9
 
+hg.NewArmorByModel = {
+	["models/eft_props/gear/armor/ar_untar.mdl"] = "ent_new_armor_vest5",
+	["models/monolithservers2/kerry/sswat_armor.mdl"] = "ent_new_armor_vest6",
+	["models/eu_homicide/helmet.mdl"] = "ent_new_armor_helmet3",
+	["models/eft_props/gear/helmets/helmet_achhc_b.mdl"] = "ent_new_armor_helmet4",
+	["models/monolithservers2/kerry/swat_hat.mdl"] = "ent_new_armor_helmet5",
+	["models/eft_props/gear/helmets/helmet_s_sh_68.mdl"] = "ent_new_armor_helmet6",
+}
+
 local function nearestClass(protection)
 	local best = 1
 	for index, class in ipairs(LEGACY_CLASSES) do
@@ -96,6 +105,7 @@ local function registerTorsoSpec(key, data, spec)
 end
 
 for key, data in pairs(hg.armor.torso or {}) do
+	if hg.NewArmorByModel[data[2]] then continue end
 	local class = nearestClass(data.protection or 0)
 	if TORSO_SPEC[key] then
 		registerTorsoSpec(key, data, TORSO_SPEC[key])
@@ -137,7 +147,7 @@ local function registerFullCover(key, data, class)
 end
 
 for key, data in pairs(hg.armor.head or {}) do
-	if key == "helmet2" or key == "helmet18" or key == "helmet19" then continue end
+	if key == "helmet2" or key == "helmet18" or key == "helmet19" or hg.NewArmorByModel[data[2]] then continue end
 	local class = nearestClass(data.protection or 0)
 	if class < ZC_ARMOR_PROTCLASS_I then class = ZC_ARMOR_PROTCLASS_I end
 	if FULL_COVER[key] then

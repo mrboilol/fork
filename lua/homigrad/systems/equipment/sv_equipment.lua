@@ -580,6 +580,10 @@ hook.Add("Fake", "SyncArmorToFakeRagdoll", function(ply)
 end)
 
 function hg.GetLegacyNewArmorClass(equipment)
+	local key = string.Replace(tostring(equipment), "ent_armor_", "")
+	local data = (hg.armor.torso or {})[key] or (hg.armor.head or {})[key]
+	local handmade = data and hg.NewArmorByModel and hg.NewArmorByModel[data[2]]
+	if handmade and scripted_ents.GetStored(handmade) then return handmade end
 	local class = "ent_new_armor_legacy_" .. string.Replace(tostring(equipment), "ent_armor_", "")
 	return scripted_ents.GetStored(class) and class or nil
 end
