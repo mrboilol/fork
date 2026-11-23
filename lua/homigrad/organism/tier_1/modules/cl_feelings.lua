@@ -10,8 +10,6 @@ hook.Add("Player_Death", "hg_psyche_sound_stop", function(ply)
 	end
 end)
 
-local ANGER_LOOP_TAIL = 5
-
 local ANGER_ROLE_TRACKS = {
 	["Juggernaut"] = "sound/zbattle/ussr2.ogg",
 	["Active Shooter"] = "sound/zbattle/ger1.ogg",
@@ -48,6 +46,7 @@ local function updateAngerSound(path, target, dt)
 			snd.loading = false
 			if not IsValid(station) then angerSounds[path] = nil return end
 			snd.station = station
+			station:EnableLooping(true)
 			station:SetVolume(snd.vol * snd_musicvolume:GetFloat())
 			station:Play()
 		end)
@@ -59,12 +58,7 @@ local function updateAngerSound(path, target, dt)
 	if snd.loading or not IsValid(snd.station) then return end
 	local station = snd.station
 	station:SetVolume(snd.vol * snd_musicvolume:GetFloat())
-	local length = station:GetLength()
-	if length > ANGER_LOOP_TAIL and station:GetTime() >= length - ANGER_LOOP_TAIL then
-		station:SetTime(0)
-	end
 	if station:GetState() == GMOD_CHANNEL_STOPPED then
-		station:SetTime(0)
 		station:Play()
 	end
 end

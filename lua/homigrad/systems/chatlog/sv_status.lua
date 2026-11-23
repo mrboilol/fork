@@ -314,10 +314,6 @@ local function InspectLines(ply, org)
 			add("Your " .. name .. " is gone.")
 		elseif hg.IsLimbIncapacitated and hg.IsLimbIncapacitated(org, limb) then
 			add("Your " .. name .. " is useless.")
-		elseif org[limb .. "dislocation"] or org[limb .. "_up_disl"] or org[limb .. "_down_disl"] then
-			add("Your " .. name .. " is out of place.")
-		elseif hg.IsLimbFractured and hg.IsLimbFractured(org, limb) then
-			add("Your " .. name .. " is broken.")
 		end
 	end
 
@@ -342,9 +338,13 @@ local function InspectLines(ply, org)
 			local brute = SoftTissue.GetSeverityKey(SoftTissue.Get(org, "brute", limb))
 			local burn = SoftTissue.GetSeverityKey(SoftTissue.Get(org, "burn", limb))
 			local muscle = SoftTissue.GetSeverityKey(SoftTissue.GetMuscle(org, limb), config.muscle.severity)
-			if (config.severityRank[brute] or 0) >= heavyRank then add("Your " .. name .. " is " .. config.wording.brute[brute] .. ", the flesh is badly damaged.") end
-			if (config.severityRank[burn] or 0) >= heavyRank then add("Your " .. name .. " is " .. config.wording.burn[burn] .. ".") end
-			if (config.severityRank[muscle] or 0) >= heavyRank then add("The muscle in your " .. name .. " is " .. string.gsub(config.wording.muscle[muscle], " muscle", "") .. ".") end
+			if org[limb .. "amputated"] or (limb == "head" and org.headamputated) then continue end
+
+			local bruteRank = config.severityRank[brute] or 0
+			if bruteRank >= heavyRank then add("Your " .. name .. " is " .. config.wording.brute[brute] .. ", the flesh is badly damaged.")
+			elseif bruteRank > 0 then add("Your " .. name .. " is " .. config.wording.brute[brute] .. ".") end
+			if config.wording.burn[burn] then add("Your " .. name .. " is " .. config.wording.burn[burn] .. ".") end
+			if config.wording.muscle[muscle] then add("You have a " .. config.wording.muscle[muscle] .. " in your " .. name .. ".") end
 		end
 	end
 

@@ -2243,6 +2243,11 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 			* math.max(org.traumaResistanceMul or 1, 1) * (1 + math.Clamp(adrenaline, 0, 5) * 0.5)
 			/ (1 - hg.organism.AdrenalineBrace(org, hitgroup))
 
+		if meleeContact then
+			collapseThreshold = collapseThreshold * 2.5
+			if hg.organism.IsHitKnockdownImmune(org) then collapseThreshold = math.huge end
+		end
+
 		if org.shock > collapseThreshold then
 			timer.Simple(0, function() hg.Fake(org.owner) end)
 		end

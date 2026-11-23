@@ -494,7 +494,7 @@ local function getMoodle3IconName(effect)
 	local names = {
 		fracture = "fractured", dislocated = "dislocated", analgesia = "drugged",
 		stamina = "exertion", exertion = "exertion", tired_legs = "exertion", tired_arms = "exertion", bleeding = level == 1 and "bleeding" or "bleeding" .. level,
-		carbon_monoxide = "carbon-monoxide", hypercapnia = "hypercapnia", arrhythmia = "arrhythmia", palpitations = "fibrilation", self_harm = "self-harm", fibrillation = "fibrilation",
+		carbon_monoxide = "hypercapnia", hypercapnia = "hypercapnia", arrhythmia = "arrhythmia", palpitations = "fibrilation", self_harm = "self-harm", fibrillation = "fibrilation",
 		hypoxemia = "hypoxemia", brain_hypoxia = "brain-hypoxia", brain_dying = "brain-dying", asystole = "heart-failure",
 		low_blood = "hypotension", high_blood = "hypertension", hypovolemia = level == 1 and "blood-loss" or "blood-loss" .. level, no_eye = "last-stand", blinded = "confused",
 		brain_bleed = "brain-hemorrhage", intracranial_pressure = "terror",
@@ -527,7 +527,6 @@ local function getMoodle3IconName(effect)
 end
 
 local moodle3IconFallbacks = {
-	["carbon-monoxide"] = "hypoxemia",
 	["brain-hypoxia"] = "hypoxemia",
 }
 
@@ -1146,9 +1145,11 @@ local function nilguyPoolReasons(ply, org, state, pool)
 	return reasons
 end
 
-local function buildNilguyEffect(ply, org)
+local function buildNilguyEffect(ply, org, force)
 	local SimpleHealth = hg.SimpleHealth
-	if not SimpleHealth or not SimpleHealth.NilguyMoodle or not SimpleHealth.NilguyMoodle:GetBool() or SimpleHealth.IsFurryFace(ply) then return end
+	if not SimpleHealth then return end
+	if not force and (not SimpleHealth.NilguyMoodle or not SimpleHealth.NilguyMoodle:GetBool() or SimpleHealth.IsFurryFace(ply)) then return end
+	if not force and org and org.otrub then return end
 
 	local state = SimpleHealth.GetLocalState()
 	if not state then return end
@@ -1197,8 +1198,11 @@ local function drawGlowingRageText(text, font, x, y)
 	draw.SimpleText(text, font, x, y, Color(255, 70, 70), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
 end
 
-local function drawTooltip(effect, pos, mx, my, berserkActive)
+local pendingTooltip
+
+local function drawTooltip(effect, pos, mx, my, berserkActive, ox, oy)
 	if not effect or not pos or not mx or (mx == 0 and my == 0) then return end
+	ox, oy = ox or 0, oy or 0
 
 	local rageActive = effect.name == "rage"
 	local tooltipMood = effect.mood
@@ -1241,8 +1245,11 @@ local function drawTooltip(effect, pos, mx, my, berserkActive)
 	local centerX, centerY = pos.x + pos.size * 0.5, pos.y - totalHeight * 0.5 - ui(12)
 	local parallaxX = math.Clamp((mx - centerX) * 0.1, -ui(15), ui(15))
 	local parallaxY = math.Clamp((my - centerY) * 0.1, -ui(15), ui(15))
-	local tooltipX = math.Clamp(baseX + parallaxX, ui(10), ScrW() - totalWidth - ui(10))
-	local tooltipY = math.Clamp(baseY + parallaxY, ui(10), ScrH() - totalHeight - ui(10))
+	local tooltipX = math.Clamp(baseX + parallaxX, ui(10) - ox, ScrW() - totalWidth - ui(10) - ox)
+	local tooltipY = math.Clamp(baseY + parallaxY, ui(10) - oy, ScrH() - totalHeight - ui(10) - oy)
+	if tooltipY + totalHeight > pos.y and tooltipY < pos.y + pos.size then
+		tooltipY = math.Clamp(pos.y + pos.size + ui(12), ui(10) - oy, ScrH() - totalHeight - ui(10) - oy)
+	end
 
 	surface.SetDrawColor(25, 25, 35, 240)
 	surface.DrawRect(tooltipX, tooltipY, totalWidth, totalHeight)
@@ -1402,9 +1409,12 @@ local function drawMoodles()
 	effects = {}
 	for index, pos in ipairs(rawPositions) do effects[index] = pos.effect end
 
+	local editX, editY = 0, 0
+	if hg.HudEdit then editX, editY = hg.HudEdit.Offset("moodles") end
 	local mx, my = gui.MousePos()
 	local hoveredIndex = nil
 	if mx and my and not (mx == 0 and my == 0) then
+		mx, my = mx - editX, my - editY
 		for index, pos in ipairs(rawPositions) do
 			if mx >= pos.x and mx <= pos.x + pos.size and my >= pos.y and my <= pos.y + pos.size then
 				hoveredIndex = index
@@ -1494,7 +1504,7 @@ local function drawMoodles()
 	end
 
 	if hg.HudEdit and #moodlePositions > 0 then
-		local ox, oy = hg.HudEdit.Offset("moodles")
+		local ox, oy = editX, editY
 		local minX, minY, maxX, maxY = math.huge, math.huge, -math.huge, -math.huge
 		for _, pos in ipairs(moodlePositions) do
 			minX, minY = math.min(minX, pos.x), math.min(minY, pos.y)
@@ -1503,7 +1513,25 @@ local function drawMoodles()
 		hg.HudEdit.Rect("moodles", minX + ox, minY + oy, maxX - minX, maxY - minY)
 	end
 
-	if hoveredIndex then drawTooltip(effects[hoveredIndex], moodlePositions[hoveredIndex], mx, my, berserkActive) end
+	if hoveredIndex then
+		local pos = moodlePositions[hoveredIndex]
+		pendingTooltip = {effect = effects[hoveredIndex], pos = {x = pos.x + editX, y = pos.y + editY, size = pos.size}, mx = mx + editX, my = my + editY, berserk = berserkActive}
+	end
+end
+
+function hg.DrawNilguyTooltip(x, y, size)
+	local ply = LocalPlayer()
+	if not IsValid(ply) or not ply:Alive() then return end
+
+	local mx, my = gui.MousePos()
+	if not mx or (mx == 0 and my == 0) then return end
+	if mx < x or mx > x + size or my < y or my > y + size then return end
+
+	local org = ply.new_organism or ply.organism
+	if not istable(org) then return end
+
+	local effect = buildNilguyEffect(ply, org, true)
+	if effect then drawTooltip(effect, {x = x, y = y, size = size}, mx, my, false) end
 end
 
 local function drawMoodlesFaded()
@@ -1516,9 +1544,13 @@ local function drawMoodlesFaded()
 	if alpha <= 0 then return end
 
 	surface.SetAlphaMultiplier(alpha)
+	pendingTooltip = nil
 	local pushed = hg.HudEdit and hg.HudEdit.PushOffset("moodles")
 	local ok, err = pcall(drawMoodles)
 	if pushed then hg.HudEdit.PopOffset(pushed) end
+	local tip = pendingTooltip
+	pendingTooltip = nil
+	if ok and tip then ok, err = pcall(drawTooltip, tip.effect, tip.pos, tip.mx, tip.my, tip.berserk) end
 	surface.SetAlphaMultiplier(1)
 	if not ok then ErrorNoHalt(err, "\n") end
 end

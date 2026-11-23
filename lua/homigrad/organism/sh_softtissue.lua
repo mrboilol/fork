@@ -6,6 +6,7 @@ local SoftTissue = hg.SoftTissue
 SoftTissue.LIMBS = {"head", "torso", "larm", "rarm", "lleg", "rleg"}
 SoftTissue.KINDS = {"brute", "burn"}
 SoftTissue.FIELDS = {brute = "softBrute", burn = "softBurn"}
+SoftTissue.DEEP_FIELDS = {brute = "deepBrute", burn = "deepBurn"}
 
 SoftTissue.LIMB_NAMES = {
 	head = "Head",
@@ -80,6 +81,13 @@ SoftTissue.Config = {
 		headKnockoutMax = 6,
 	},
 
+	deep = {
+		at = 40,
+		mul = 1.5,
+		max = 200,
+		thiamineClear = 2,
+	},
+
 	regen = {
 		thiamineMul = 8,
 		heavyMul = 0.5,
@@ -148,8 +156,15 @@ function SoftTissue.Get(org, kind, limb)
 	return values and values[limb] or 0
 end
 
+function SoftTissue.GetDeep(org, kind, limb)
+	local values = org and org[SoftTissue.DEEP_FIELDS[kind]]
+
+	return values and values[limb] or 0
+end
+
 function SoftTissue.GetLimb(org, limb)
 	return SoftTissue.Get(org, "brute", limb) + SoftTissue.Get(org, "burn", limb)
+		+ SoftTissue.GetDeep(org, "brute", limb) + SoftTissue.GetDeep(org, "burn", limb)
 end
 
 function SoftTissue.GetMuscle(org, limb)

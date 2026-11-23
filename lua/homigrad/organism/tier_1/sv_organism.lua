@@ -593,7 +593,7 @@ local function send_organism(org, ply, recipientForce, reliable)
 		"brainSwelling", "cardiacTamponade", "needle", "respiratoryRate", "bradyapnea", "drugRespiratoryDepression",
 		"exertionO2Debt", "circulatoryO2Reserve", "oxygenIntakeAvailable", "vomitInThroat", "otrub", "alive",
 		"incapReason", "deathCause", "defibDeathGrace", "brainRate", "uncon_timer", "otrubMinUntil", "fatalDamageQueued",
-		"softBrute", "softBurn", "muscle", "painStage", "breathLabored",
+		"softBrute", "softBurn", "deepBrute", "deepBurn", "muscle", "painStage", "breathLabored",
 		"bloodph", "bicarb", "hepaticFailure", "hepaticToxin", "septicShock", "acidosis", "alkalosis", "infection", "antibiotics"
 	}) do
 		sendtable[key] = org[key]
@@ -827,7 +827,7 @@ local function send_bareinfo(org, force, reliable)
 		"brain", "co2", "etco2", "CO", "bradyapnea", "respiratoryRate", "oxygenIntakeAvailable",
 		"cardiacStressExposure", "hypotensionExposure", "arrhythmiaComplication",
 		"ventricularTachycardia", "terminalRhythm", "rhythmRecoveryUntil", "defibDeathGrace",
-		"softBrute", "softBurn", "muscle", "painStage", "breathLabored",
+		"softBrute", "softBurn", "deepBrute", "deepBurn", "muscle", "painStage", "breathLabored",
 		"bloodph", "bicarb", "hepaticFailure", "hepaticToxin", "septicShock", "acidosis", "alkalosis", "infection", "antibiotics"
 	}) do
 		sendtable[key] = org[key]
@@ -1904,7 +1904,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 			org.needfake = true
 		end
 	end
-	if org.needfake and isPly and (org.adrenaline or 0) > 0 and not (org.seizureActive or org.convulsing or org.needotrub) and hg.WallBang and hg.WallBang.Active(owner) then
+	if org.needfake and isPly and not ((org.llegamputated or org.rlegamputated or org.llegupamputated or org.rlegupamputated) and (org.berserk or 0) <= 0.3) and (org.adrenaline or 0) > 0 and not (org.seizureActive or org.convulsing or org.needotrub) and hg.WallBang and hg.WallBang.Active(owner) then
 		org.needfake = false
 	end
 	if org.NoKnockdown then

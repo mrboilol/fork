@@ -209,6 +209,12 @@ input_list.gut = function(org, bone, dmg, dmgInfo)
 	if delta > 0 then
 		addPain(org, dmg * 22.5, "body")
 		org.shock = org.shock + dmg * 5.5
+		local severity = math.Clamp((org.gut - 0.3) / 0.7, 0, 1)
+		if severity > 0 then
+			org.sepsisSource = math.min((org.sepsisSource or 0) + delta * (1 + severity * 3), 1)
+			local Infection = hg.organism.Infection
+			if Infection and Infection.Seed then Infection.Seed(org, delta * (0.6 + severity * 1.8) + severity * 0.15) end
+		end
 	end
 	addInternalBleed(org, delta * 1.75, "gut")
 	if hg.organism.AddGutHitNausea then hg.organism.AddGutHitNausea(org, delta * 0.9, oldDmg, dmg) end

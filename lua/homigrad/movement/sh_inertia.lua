@@ -183,7 +183,9 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 	function hg.GaitSwingFraction(speed)
 		local walkFraction = Lerp(math_Clamp(speed / GAIT_WALK_REFERENCE_SPEED, 0, 1), GAIT_WALK_SWING_FRACTION, 1)
 
-		return Lerp(hg.GaitRunBlend(speed), walkFraction, GAIT_RUN_SWING_FRACTION)
+		local maxStanceTravel = 42
+
+		return math_max(Lerp(hg.GaitRunBlend(speed), walkFraction, GAIT_RUN_SWING_FRACTION), 2 - maxStanceTravel / hg.GaitStepLength(speed))
 	end
 
 	function hg.GaitFlightFraction(swingFraction)
@@ -360,11 +362,10 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 		end
 
 		if not intent or not hg_footstep_push:GetBool() then return 1 end
-		if hg.GaitInFlight(phase, swingFraction) then return 0 end
+		if hg.GaitInFlight(phase, swingFraction) then return 0, true end
 		local minMul = hg_footstep_push_min:GetFloat()
-		local supportShare = 1 - hg.GaitFlightFraction(swingFraction)
 
-		return minMul + (1 - minMul) * hg.GaitPush(phase, swingFraction) * 2 / supportShare
+		return minMul + (1 - minMul) * hg.GaitPush(phase, swingFraction) * 2
 	end
 
 	local function hg_GetMovementLagComp(ply)
@@ -751,7 +752,7 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 			local has_intent = fm ~= 0 or sm ~= 0
 			local new_inertia
 			if on_ground and moveType == MOVETYPE_WALK then
-				local push_shape = gaitPushShape(ply, vel, has_intent, process_input, tick_interval)
+				local push_shape, in_flight = gaitPushShape(ply, vel, has_intent, process_input, tick_interval)
 				local target_len = inertia_to:Length2D()
 				if has_intent and hg_footstep_push:GetBool() and target_len > 1 then
 					local dir = inertia_to / target_len
@@ -759,7 +760,7 @@ hook.Add("PlayerSpawn", "HG/Movement/SurfaceTraction", resetSurfaceFriction)
 					local strength = hg.GaitPushStrength(ply, org, ply.hg_GaitPhase or 0) * terrain_mul * math_max(1 - slope_accel, PUSH_UPHILL_MIN)
 					local drag = PUSH_DRAG * math_min(ply.InertiaBlend / (PUSH_DRAG * target_len), 1)
 					local push_accel = drag * target_len * push_shape * strength
-					local decay = math.exp(-drag * delta_time)
+					local decay = in_flight and 1 or math.exp(-drag * delta_time)
 					new_inertia = ply.MovementInertia * decay + dir * (push_accel * delta_time)
 					new_inertia.z = 0
 					local new_len = new_inertia:Length2D()

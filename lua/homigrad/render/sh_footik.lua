@@ -821,14 +821,14 @@ local function gaitBob(state, ctx)
 	local flight = hg.GaitFlightFraction(ctx.swingFraction)
 	local runFraction = smoothstep(hg.GaitRunBlend(ctx.speed))
 	local sprint = ctx.sprintBlend
+	local vaultScale = WALK_BOB * math_min(ctx.speed / WALK_BOB_SPEED, 1) * (1 - runFraction)
 	if stepProgress >= flight then
 		local support = (stepProgress - flight) / (1 - flight)
-		local vault = (1 - math_sin(math.pi * support)) * WALK_BOB * math_min(ctx.speed / WALK_BOB_SPEED, 1) * (1 - runFraction)
 
-		return -dip - vault - math_sin(math.pi * support) * SPRINT_COMPRESS * sprint
+		return -dip - (1 - math_sin(math.pi * support)) * vaultScale - math_sin(math.pi * support) * SPRINT_COMPRESS * sprint
 	end
 
-	return math_sin(math.pi * stepProgress / flight) * IKFoot.GetFloat("flight_hop") * runFraction * Lerp(sprint, RUN_HOP_SCALE, SPRINT_HOP_SCALE) - dip
+	return math_sin(math.pi * stepProgress / flight) * IKFoot.GetFloat("flight_hop") * runFraction * Lerp(sprint, RUN_HOP_SCALE, SPRINT_HOP_SCALE) - dip - vaultScale
 end
 
 local function readAnim(ent, ply, bones)
@@ -905,8 +905,9 @@ local function buildContext(ply, state, anim, dt)
 	local oneLeg = anim[1].usable ~= anim[2].usable and (anim[1].usable and 1 or 2) or nil
 	local halfWidth = math_Clamp(hipSpan, MIN_HALF_WIDTH, MAX_HALF_WIDTH) * (oneLeg and ONE_LEG_WIDTH or 1)
 	local legLength = math_max(anim[1].length, anim[2].length)
-	local maxStrideDrop = math_min(MAX_STRIDE_DROP, IKFoot.GetFloat("max_body_drop")) * (ply:Crouching() and CROUCH_DROP_SCALE or 1)
 	local swingFraction = hg.GaitSwingFraction(speed)
+	local runStance = math_Clamp(hg.GaitFlightFraction(swingFraction) / K.RUN_STANCE_FULL_FLIGHT, 0, 1)
+	local maxStrideDrop = math_min(Lerp(runStance, MAX_STRIDE_DROP, K.RUN_STRIDE_DROP), IKFoot.GetFloat("max_body_drop")) * (ply:Crouching() and CROUCH_DROP_SCALE or 1)
 	local strideLead, plannedDrop = 0, 0
 	local rate = state.baseRate or 0
 	if speed > MOVING_SPEED and rate > 0 then

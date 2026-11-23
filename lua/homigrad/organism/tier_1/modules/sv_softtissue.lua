@@ -33,6 +33,8 @@ module[1] = function(org)
 	org.softBrute = newLimbTable()
 	org.softBurn = newLimbTable()
 	org.muscle = newLimbTable()
+	org.deepBrute = newLimbTable()
+	org.deepBurn = newLimbTable()
 	org.softLastDamage = 0
 	org.softPain = 0
 end
@@ -255,6 +257,30 @@ function SoftTissue.OnLimbDamaged(org, limb, applied, dmgInfo)
 	if limb == "head" then tryHeadKnockout(org, applied) end
 end
 
+local function addWithDeep(org, kind, limb, amount)
+	local deep = CONFIG.deep
+	local mangled = SoftTissue.Get(org, kind, limb) >= deep.at
+	local applied = SoftTissue.Add(org, kind, limb, amount)
+
+	local values = mangled and org[SoftTissue.DEEP_FIELDS[kind]]
+	if values and values[limb] and amount > 0 then
+		values[limb] = math.min(values[limb] + amount * deep.mul, deep.max)
+	end
+
+	return applied
+end
+
+local function clearDeep(org, amount)
+	for _, field in pairs(SoftTissue.DEEP_FIELDS) do
+		local values = org[field]
+		if values then
+			for limb, value in pairs(values) do
+				if value > 0 then values[limb] = math.max(value - amount, 0) end
+			end
+		end
+	end
+end
+
 hook.Add("HomigradDamage", "hg/softtissue/damage", function(victim, dmgInfo, hitgroup)
 	local org = IsValid(victim) and victim.organism
 	if not org or not org.softBrute or org.simpleMode then return end
@@ -271,10 +297,10 @@ hook.Add("HomigradDamage", "hg/softtissue/damage", function(victim, dmgInfo, hit
 	local applied
 	if pool == "burn" and dmgInfo:IsDamageType(DMG_BLAST) then
 		local burnShare = hg.SimpleHealth.Config.damage.blastBurnShare
-		applied = SoftTissue.Add(org, "brute", limb, damage * (1 - burnShare))
-		applied = applied + SoftTissue.Add(org, "burn", limb, damage * burnShare)
+		applied = addWithDeep(org, "brute", limb, damage * (1 - burnShare))
+		applied = applied + addWithDeep(org, "burn", limb, damage * burnShare)
 	else
-		applied = SoftTissue.Add(org, pool, limb, damage)
+		applied = addWithDeep(org, pool, limb, damage)
 	end
 
 	SoftTissue.OnLimbDamaged(org, limb, applied, dmgInfo)
@@ -286,6 +312,8 @@ module[2] = function(owner, org, timeValue)
 	if not org.simpleMode and CurTime() - org.softLastDamage >= CONFIG.passiveDelay then
 		SoftTissue.Regen(org, timeValue, CONFIG.passiveRegen.brute, CONFIG.passiveRegen.burn)
 	end
+
+	if (tonumber(org.thiamine) or 0) > 0 then clearDeep(org, CONFIG.deep.thiamineClear * timeValue) end
 
 	SoftTissue.UpdateLimbUse(org, timeValue)
 	org.softPain = SoftTissue.GetPainLoad(org)

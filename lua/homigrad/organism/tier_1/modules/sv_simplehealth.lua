@@ -1,6 +1,7 @@
 util.AddNetworkString("hg_simplehealth")
 util.AddNetworkString("hg_simplehealth_faint")
 util.AddNetworkString("hg_simplehealth_death")
+util.AddNetworkString("hg_simplehealth_hardcrit")
 
 local SimpleHealth = hg.SimpleHealth
 local SoftTissue = hg.SoftTissue
@@ -156,6 +157,7 @@ local function sendState(owner, org, force)
 				net.WriteUInt(quantizePool(state[pool]), SimpleHealth.NET_POOL_BITS)
 			end
 			net.WriteFloat(countdownEnd)
+			net.WriteFloat(countdownEnd > 0 and (state.countdownDuration or CONFIG.oxy.countdownTime) or 0)
 		end
 	net.Send(owner)
 end
@@ -181,6 +183,15 @@ module[1] = function(org)
 
 	if isPlayer then sendState(owner, org, true) end
 end
+
+local RHYTHM_ARRHYTHMIA = {ectopy = 0.15, bigeminy = 0.3, afib = 0.5, vtach = 0.75, torsades = 0.9}
+local RHYTHM_ECG = {
+	ectopy = "ventricular_ectopy",
+	bigeminy = "ventricular_bigeminy",
+	afib = "atrial_fibrillation",
+	vtach = "ventricular_tachycardia",
+	torsades = "torsades_de_pointes",
+}
 
 SimpleHealth.ModuleOverrides.pulse = function(owner, org, timeValue)
 	if not org.alive then
@@ -214,8 +225,23 @@ SimpleHealth.ModuleOverrides.pulse = function(owner, org, timeValue)
 		state.heartRate = math.Approach(state.heartRate, targetRate, heartConfig.approach * timeValue)
 	end
 
+	local rhythmConfig = CONFIG.rhythm
+	local rhythm = not state.flatline and not state.fibrillating and state.rhythm or nil
+	local rhythmOutput = 1
 	local rate = state.heartRate
-	local fastPenalty = Lerp(rampUp(rate, heartConfig.fastStart, heartConfig.max), 1, heartConfig.fastOutputMin)
+	if rhythm == "vtach" or rhythm == "torsades" then
+		rate = (rhythm == "torsades" and rhythmConfig.torsadesHeartRate or rhythmConfig.vtachHeartRate) + math.Rand(-rhythmConfig.vtachJitter, rhythmConfig.vtachJitter)
+		rhythmOutput = rhythm == "torsades" and rhythmConfig.torsadesOutput or rhythmConfig.vtachOutput
+	elseif rhythm == "afib" then
+		rate = math.max(rate + math.Rand(-rhythmConfig.afibRateJitter, rhythmConfig.afibRateJitter), 0)
+		rhythmOutput = rhythmConfig.afibOutput
+	elseif rhythm == "bigeminy" then
+		rhythmOutput = rhythmConfig.bigeminyOutput
+	elseif rhythm == "ectopy" then
+		rhythmOutput = rhythmConfig.ectopyOutput
+	end
+
+	local fastPenalty = Lerp(rampUp(rate, heartConfig.fastStart, heartConfig.max), 1, heartConfig.fastOutputMin) * rhythmOutput
 	local output = state.fibrillating and 0 or math.min(rate / heartConfig.base, 1) * fastPenalty * heartEfficiency
 
 	local brainBefore = org.brain
@@ -233,7 +259,7 @@ SimpleHealth.ModuleOverrides.pulse = function(owner, org, timeValue)
 	org.compensationPulseMultiplier = targetRate / heartConfig.base
 	org.hypotension = 1 - math.min(output, 1)
 	org.palpitations = rampUp(rate, heartConfig.fastStart, heartConfig.bloodMax)
-	org.heartStrain = math.max(1 - heartEfficiency, org.palpitations)
+	org.heartStrain = math.max(1 - heartEfficiency, org.palpitations, rhythm and rhythmConfig.strain[rhythm] or 0)
 
 	if state.flatline then
 		org.heartstop = true
@@ -243,7 +269,25 @@ SimpleHealth.ModuleOverrides.pulse = function(owner, org, timeValue)
 		org.fibrillation = true
 		org.fibrillationStart = state.fibrillationStart
 		org.ecgState = "ventricular_fibrillation"
+		org.arrhythmia = 1
+	else
+		org.ecgState = SimpleHealth.GetRhythmECGState(rhythm, rate, heartDamage)
+		org.arrhythmia = RHYTHM_ARRHYTHMIA[rhythm] or 0
+		org.ventricularTachycardia = rhythm == "torsades" and "polymorphic" or rhythm == "vtach" and "monomorphic" or nil
+		org.unstableRhythm = rhythm == "afib" and "atrial_fibrillation" or (rhythm == "ectopy" or rhythm == "bigeminy") and "ventricular_ectopy" or nil
 	end
+end
+
+function SimpleHealth.GetRhythmECGState(rhythm, rate, heartDamage)
+	if RHYTHM_ECG[rhythm] then return RHYTHM_ECG[rhythm] end
+	if heartDamage >= CONFIG.organs.heartMax * 0.8 and rate > 25 and rate <= 70 then return "av_block_complete" end
+	if rate < 60 then return "sinus_bradycardia" end
+	if rate <= 100 then return "normal_sinus" end
+	if rate <= 150 then return "sinus_tachycardia" end
+	if rate <= 200 then return "compressed_tachycardia" end
+	if rate < 260 then return "extreme_tachycardia" end
+
+	return "terminal_tachycardia"
 end
 
 function SimpleHealth.GetTargetHeartRate(org, state)
@@ -257,6 +301,7 @@ function SimpleHealth.GetTargetHeartRate(org, state)
 	rate = rate + rampUp(state.oxy, heartConfig.oxyStart, heartConfig.oxyPeak) * heartConfig.oxyGain
 	if state.crit == CRIT_SOFT then rate = rate + heartConfig.softCrit end
 	rate = rate + math.Clamp(tonumber(org.adrenaline) or 0, 0, heartConfig.adrenalineCap) * heartConfig.adrenaline
+	rate = rate + (state.rhythm and CONFIG.rhythm.strain[state.rhythm] or 0) * CONFIG.rhythm.strainRate
 
 	local stamina = org.stamina
 	if istable(stamina) and isnumber(stamina[1]) and isnumber(stamina.max) and stamina.max > 0 then
@@ -425,9 +470,6 @@ local function flatlineChance(org, state)
 
 	local rate = state.heartRate
 	if rate < flatlineConfig.rateLow then chance = chance + flatlineConfig.rateChance end
-
-	local hypoxia = rampUp(state.oxy, CONFIG.heart.oxyStart, CONFIG.oxy.countdownStart)
-	chance = chance + rampUp(rate, flatlineConfig.rateHigh, flatlineConfig.certainRate) * flatlineConfig.fastChance * (1 + hypoxia * flatlineConfig.fastOxyMul)
 	if (tonumber(org.temperature) or NORMAL_TEMPERATURE) < flatlineConfig.coldStart then chance = chance + flatlineConfig.coldChance end
 
 	return chance
@@ -453,12 +495,86 @@ end
 
 local function tickFibrillation(owner, org, state, timeValue)
 	if state.fibrillating or state.flatline then return end
-	if (tonumber(org.blood) or CONFIG.contamination.normalBlood) <= CONFIG.deathBlood then startFibrillation(owner, org, state) end
+	if (tonumber(org.blood) or CONFIG.contamination.normalBlood) <= CONFIG.deathBlood or state.heartRate >= CONFIG.flatline.certainRate then startFibrillation(owner, org, state) end
+end
+
+local function setRhythm(owner, org, state, rhythm)
+	if state.rhythm == rhythm then return end
+
+	state.rhythm = rhythm
+	state.rhythmDegradeAt = nil
+	if rhythm == "vtach" or rhythm == "torsades" then
+		local rhythmConfig = CONFIG.rhythm
+		state.rhythmDegradeAt = CurTime() + math.Rand(rhythmConfig.vtachDegradeMin, rhythmConfig.vtachDegradeMax)
+	end
+	if not rhythm then state.rhythmGraceUntil = CurTime() + CONFIG.rhythm.grace end
+	hook.Run("hg/simplehealth/rhythm-changed", owner, org, rhythm)
+end
+
+local function tickRhythm(owner, org, state, timeValue)
+	if state.flatline or state.fibrillating then
+		state.rhythm = nil
+		state.rhythmDegradeAt = nil
+
+		return
+	end
+
+	local rhythmConfig = CONFIG.rhythm
+	local now = CurTime()
+	local rhythm = state.rhythm
+	local rate = state.heartRate
+	local heartDamage = org.simpleMode == MODE_ORGANS and math.Clamp(tonumber(org.heart) or 0, 0, 1) or 0
+	local roll = math.Rand(0, 1)
+
+	if rhythm == "vtach" or rhythm == "torsades" then
+		if now >= (state.rhythmDegradeAt or now) then
+			state.rhythm = nil
+			state.rhythmDegradeAt = nil
+			startFibrillation(owner, org, state)
+		elseif rate < rhythmConfig.vtachResolveRate and roll < rhythmConfig.vtachResolveChance * timeValue then
+			setRhythm(owner, org, state, nil)
+		end
+
+		return
+	end
+
+	if (state.rhythmGraceUntil or 0) > now then return end
+
+	local hypoxia = rampUp(state.oxy, CONFIG.heart.oxyStart, CONFIG.oxy.countdownStart)
+	local vtachRisk = rampUp(rate, rhythmConfig.vtachRate, CONFIG.flatline.certainRate) * (1 + hypoxia * rhythmConfig.vtachOxyMul + heartDamage * rhythmConfig.vtachHeartDamageMul)
+	if vtachRisk > 0 and roll < vtachRisk * rhythmConfig.vtachChance * timeValue then
+		setRhythm(owner, org, state, math.Rand(0, 1) < rhythmConfig.torsadesShare and "torsades" or "vtach")
+
+		return
+	end
+
+	if rhythm == "afib" then
+		if rate < rhythmConfig.afibRate - rhythmConfig.resolveBelow and heartDamage < rhythmConfig.afibHeartDamage and roll < rhythmConfig.resolveChance * timeValue then
+			setRhythm(owner, org, state, nil)
+		end
+
+		return
+	end
+
+	local afibRisk = math.max(rampUp(rate, rhythmConfig.afibRate, rhythmConfig.vtachRate), rampUp(heartDamage, 0, rhythmConfig.afibHeartDamage))
+	if afibRisk > 0 and roll < afibRisk * rhythmConfig.afibChance * timeValue then
+		setRhythm(owner, org, state, "afib")
+	elseif rhythm then
+		if rate < rhythmConfig.ectopyRate - rhythmConfig.resolveBelow and heartDamage < rhythmConfig.bigeminyHeartDamage * 0.5 then
+			if roll < rhythmConfig.resolveChance * timeValue then setRhythm(owner, org, state, nil) end
+		else
+			local bigeminy = heartDamage >= rhythmConfig.bigeminyHeartDamage or rate >= rhythmConfig.bigeminyRate
+			setRhythm(owner, org, state, bigeminy and "bigeminy" or "ectopy")
+		end
+	else
+		local ectopyRisk = math.max(rampUp(rate, rhythmConfig.ectopyRate, rhythmConfig.afibRate), rampUp(heartDamage, 0, rhythmConfig.bigeminyHeartDamage))
+		if ectopyRisk > 0 and roll < ectopyRisk * rhythmConfig.ectopyChance * timeValue then setRhythm(owner, org, state, "ectopy") end
+	end
 end
 
 local function tickFlatline(owner, org, state, timeValue)
 	if state.flatline or state.fibrillating then return end
-	if state.heartEfficiency <= 0 or state.heartRate >= CONFIG.flatline.certainRate then
+	if state.heartEfficiency <= 0 then
 		startFlatline(owner, org, state)
 
 		return
@@ -506,6 +622,7 @@ table.insert(SimpleHealth.Tickers, tickRegen)
 table.insert(SimpleHealth.Tickers, tickFuryRegen)
 table.insert(SimpleHealth.Tickers, tickTemperature)
 table.insert(SimpleHealth.Tickers, tickFibrillation)
+table.insert(SimpleHealth.Tickers, tickRhythm)
 table.insert(SimpleHealth.Tickers, tickFlatline)
 table.insert(SimpleHealth.Tickers, tickConsciousness)
 
@@ -572,11 +689,18 @@ local function updateCountdown(owner, org, state)
 		hook.Run("hg/simplehealth/countdown-changed", owner, org, counting)
 	end
 
+	local convulsing = counting and (org.convulsing or org.seizureActive)
+	if convulsing and not state.convulseCut and state.countdownStart + duration - now > oxyConfig.convulseRemaining then
+		state.countdownStart = now + oxyConfig.convulseRemaining - duration
+		if state.fibrillating then state.fibrillationStart = state.countdownStart end
+	end
+	state.convulseCut = convulsing or nil
+
 	org.defibDeathGrace = nil
 	org.deathStateRemaining = nil
 
 	local elapsed = counting and now - state.countdownStart or 0
-	org.incapacitated = counting and duration - elapsed <= oxyConfig.countdownTrackRemaining
+	org.incapacitated = counting and (convulsing or duration - elapsed <= oxyConfig.countdownTrackRemaining)
 	org.incapReason = org.incapacitated and "oxy" or nil
 	if org.incapacitated then
 		org.deathStateEnd = state.countdownStart + duration
@@ -1003,7 +1127,7 @@ end
 function SimpleHealth.ShouldAEDShock(org)
 	local state = SimpleHealth.GetState(org)
 
-	return state ~= nil and (state.flatline or state.fibrillating or state.oxy >= CONFIG.oxy.aedShockAt)
+	return state ~= nil and (state.flatline or state.fibrillating or state.rhythm == "vtach" or state.rhythm == "torsades" or state.oxy >= CONFIG.oxy.aedShockAt)
 end
 
 function SimpleHealth.OnAEDShock(org)
@@ -1024,8 +1148,17 @@ function SimpleHealth.OnAEDShock(org)
 	state.aedResistUntil = CurTime() + oxyConfig.aedResistTime
 	state.cprCritHealed = nil
 
-	if state.flatline then stopFlatline(org.owner, org, state) end
+	if state.flatline then
+		local flatlineConfig = CONFIG.flatline
+		local cpr = (org.cprSupportUntil or 0) + flatlineConfig.aedCprWindow > CurTime()
+		if math.Rand(0, 1) < (cpr and flatlineConfig.aedCprRestartChance or flatlineConfig.aedRestartChance) then
+			stopFlatline(org.owner, org, state)
+		end
+	end
 	stopFibrillation(org.owner, org, state)
+	setRhythm(org.owner, org, state, nil)
+	org.heartstop = state.flatline or state.fibrillating or false
+	if not org.heartstop then org.fibrillation = false end
 	state.heartRate = math.max(state.heartRate, CONFIG.heart.base)
 	state.consciousnessCap = 1
 	state.health = SimpleHealth.GetHealth(state)
@@ -1256,6 +1389,8 @@ hook.Add("hg/simplehealth/crit-changed", "hg/simplehealth/chat", function(owner,
 		stateThought(owner, "softcrit", "I can't get up...")
 	elseif crit == CRIT_HARD then
 		stateThought(owner, "hardcrit", "Everything is going dark")
+		net.Start("hg_simplehealth_hardcrit")
+		net.Send(owner)
 	end
 end)
 
@@ -1265,6 +1400,19 @@ end)
 
 hook.Add("hg/simplehealth/flatline-changed", "hg/simplehealth/chat", function(owner, org, flatline)
 	if flatline and not org.otrub then stateThought(owner, "flatline", "My chest... my heart stopped...") end
+end)
+
+hook.Add("hg/simplehealth/rhythm-changed", "hg/simplehealth/chat", function(owner, org, rhythm)
+	if org.otrub then return end
+	if rhythm == "vtach" or rhythm == "torsades" then
+		stateThought(owner, "vtach", "My heart is hammering way too fast... something is wrong.")
+	elseif rhythm == "afib" then
+		stateThought(owner, "afib", "My heartbeat feels all over the place.")
+	end
+end)
+
+hook.Add("hg/simplehealth/fibrillation-changed", "hg/simplehealth/chat", function(owner, org, fibrillating)
+	if fibrillating and not org.otrub then stateThought(owner, "fibrillation", "My chest is quivering... I can't feel a heartbeat.") end
 end)
 
 hook.Add("hg/simplehealth/poisoned", "hg/simplehealth/chat", function(owner)

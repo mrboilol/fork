@@ -816,7 +816,7 @@ local function CreateRadialMenu(options_arg, bAutoClose)
 			end
 
 			if !paining then
-				DrawRadialIdentity(scrW, scrH, viewLerp, options1.title, useOldRadial)
+				DrawRadialIdentity(scrW, scrH, viewLerp, options1.title, not useOldRadial)
 			end
 
 			return
@@ -858,7 +858,8 @@ local function CreateRadialMenu(options_arg, bAutoClose)
 
 		DrawFilledCircle(centerX, centerY, outerRadius, radialDrawSegments, Color(radialRingColor.r, radialRingColor.g, radialRingColor.b, radialRingColor.a * viewLerp))
 		local outlineWidth = 1.75 * modernHudScale * viewLerp
-		local plyColor = lply:GetPlayerColor():ToColor()
+		local centerSubject = IsValid(options1.title) and options1.title.GetPlayerColor and options1.title or lply
+		local plyColor = centerSubject:GetPlayerColor():ToColor()
 		DrawCircleRing(centerX, centerY, outerRadius, outerRadius + outlineWidth, radialDrawSegments, Color(plyColor.r, plyColor.g, plyColor.b, radialOutlineColor.a * viewLerp))
 		DrawCircleRing(centerX, centerY, innerRadius - outlineWidth, innerRadius, radialDrawSegments, Color(plyColor.r, plyColor.g, plyColor.b, radialOutlineColor.a * viewLerp))
 
@@ -901,8 +902,7 @@ local function CreateRadialMenu(options_arg, bAutoClose)
 		if hoveredText then
 			DrawModernRadialCenterText(hoveredText, centerX, centerY, innerRadius * radialCenterTextWidthMul, Color(radialTextColor.r, radialTextColor.g, radialTextColor.b, 255 * radialCenterTextAlpha * viewLerp))
 		end
-		local centerSubject = IsValid(options1.title) and options1.title or lply
-		local centerColor = centerSubject:GetPlayerColor():ToColor()
+		local centerColor = plyColor
 		if !paining and radialCenterTextAlpha < 0.99 then
 			DrawModernRadialCenterText(centerSubject:GetPlayerName(), centerX, centerY, innerRadius * radialCenterTextWidthMul, Color(centerColor.r, centerColor.g, centerColor.b, 255 * (1 - radialCenterTextAlpha) * viewLerp))
 		end

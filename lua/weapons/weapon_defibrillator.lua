@@ -226,6 +226,22 @@ local function IsDefibDead(org)
 	return false
 end
 
+local DEFIB_FLATLINE_KEYS = {"pulse", "heartbeat", "cardiacOutput", "strokeVolume"}
+
+local function MarkDefibFlatline(org)
+	if not org then return end
+	local vitals = org.postMortemVitals
+	for _, key in ipairs(DEFIB_FLATLINE_KEYS) do
+		org[key] = 0
+		if vitals then vitals[key] = 0 end
+	end
+	org.heartstop = true
+	org.fibrillation = false
+	org.ventricularTachycardia = nil
+	org.ecgState = "asystole"
+	org.terminalRhythm = "asystole"
+end
+
 local function ShockChest(target, forceMul)
 	if not IsValid(target) then return end
 	local applied = false
@@ -436,6 +452,7 @@ local function BeginAEDShock(defib, ply, getTarget, uses, accidental)
 		if not IsValid(target) then return end
 		local org = GetDefibOrganism(ply, target)
 		if IsDefibDead(org) then
+			MarkDefibFlatline(org)
 			PlayAEDSound(defib, AEDSounds.shocknotdelivered, 75, 100, 2)
 			DropDefib(defib, target, uses)
 			return
@@ -503,6 +520,7 @@ local function StartNoShockWarnings(defib, ply, getTarget, uses)
 	defib.AEDNoShockWarnings = true
 	local org = GetDefibOrganism(ply, getTarget())
 	if IsDefibDead(org) then
+		MarkDefibFlatline(org)
 		PlayAEDSound(defib, AEDSounds.shocknotdelivered, 75, 100, 2)
 		DropDefib(defib, getTarget(), uses)
 		return
@@ -547,6 +565,7 @@ local function StartAEDSequence(defib, ply, getTarget, uses)
 		local target = getTarget()
 		local org = GetDefibOrganism(ply, target)
 		if IsDefibDead(org) then
+			MarkDefibFlatline(org)
 			PlayAEDSound(defib, AEDSounds.shocknotdelivered, 75, 100, 2)
 			DropDefib(defib, target, uses)
 			return
@@ -763,6 +782,7 @@ function SWEP:AttachDefib(owner, target, ply)
 		PositionDefib(defib, activeTarget, currentBone, defibPos, defibAng, defibFemPos)
 
 		local org = GetDefibOrganism(ply, activeTarget)
+		if org and IsDefibDead(org) and org.ecgState ~= "asystole" then MarkDefibFlatline(org) end
 		local flatline = org and (
 			org.ecgState == "asystole"
 			or org.terminalRhythm == "asystole"

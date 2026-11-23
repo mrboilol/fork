@@ -635,6 +635,93 @@ function hg.EquipClassArmor(ply, equipment)
 	return false
 end
 
+local cmbSet = {torso = "cmb_armor", head = "cmb_helmet"}
+local metrocopSet = {torso = "metrocop_armor", head = "metrocop_helmet"}
+local modelArmorSets = {
+	["models/player/combine_soldier.mdl"] = cmbSet,
+	["models/player/combine_soldier_prisonguard.mdl"] = cmbSet,
+	["models/player/combine_super_soldier.mdl"] = cmbSet,
+	["models/player/police.mdl"] = metrocopSet,
+	["models/player/police_fem.mdl"] = metrocopSet,
+}
+local classArmorOwners = {Combine = true, Metrocop = true}
+
+local function removeModelArmor(ply)
+	local set = ply.hgModelArmorSet
+	ply.hgModelArmorSet = nil
+	if not set or not ply.armors then return end
+	if ply.armors.torso == set.torso then ply.armors.torso = nil end
+	if ply.armors.head == set.head then ply.armors.head = nil end
+	hg.RemoveClassArmor(ply, set.head)
+	ply:SyncArmor()
+end
+
+local function applyModelArmor(ply, set)
+	ply.armors = ply.armors or {}
+	ply.armors.torso = set.torso
+	if set.torso == "cmb_armor" then
+		ply.armor_states = ply.armor_states or {}
+		ply.armor_states.cmb_armor = {plateMaterial = "titan", plateLevel = 5, plateSides = "all"}
+	end
+	if not hg.EquipClassArmor(ply, set.head) then ply.armors.head = set.head end
+	ply.hgModelArmorSet = set
+	ply:SyncArmor()
+end
+
+local function updateModelArmor(ply)
+	local model = string.lower(ply:GetModel() or "")
+	if ply.hgModelArmorModel == model then return end
+	ply.hgModelArmorModel = model
+
+	if classArmorOwners[ply.PlayerClassName] then
+		ply.hgModelArmorSet = nil
+		return
+	end
+
+	local set = modelArmorSets[model]
+	if ply.hgModelArmorSet == set then return end
+	removeModelArmor(ply)
+	if set then applyModelArmor(ply, set) end
+end
+
+hook.Add("PlayerSpawn", "HG_ModelArmorReset", function(ply)
+	ply.hgModelArmorModel = nil
+	ply.hgModelArmorSet = nil
+end)
+
+local armorClasses = {cmb_armor = "Combine", metrocop_armor = "Metrocop"}
+
+local function wornClassArmor(ply)
+	local name = ply.armors and ply.armors.torso
+	if armorClasses[name] then return name end
+
+	local worn = hg.GetNewArmorOnPlacement(ply, "torso")
+	if not IsValid(worn) then return end
+	for armor in pairs(armorClasses) do
+		if worn:GetClass() == hg.GetLegacyNewArmorClass(armor) then return armor end
+	end
+end
+
+local function updateArmorClass(ply)
+	local armor = wornClassArmor(ply)
+	local class = armor and armorClasses[armor]
+	if not class or ply.PlayerClassName == class then return end
+
+	local model = ply:GetModel()
+	ply:SetPlayerClass(class, {bNoEquipment = true})
+	if modelArmorSets[string.lower(model or "")] then ply:SetModel(model) end
+	ply.hgModelArmorModel = string.lower(ply:GetModel() or "")
+end
+
+timer.Create("HG_ModelArmor", 0.5, 0, function()
+	for _, ply in player.Iterator() do
+		if ply:Alive() then
+			updateModelArmor(ply)
+			updateArmorClass(ply)
+		end
+	end
+end)
+
 function hg.AddArmor(ply, equipment, ent)
     if not IsValid(ply) then return end
 	if IsValid(ent) and (ent.unusable or ent:GetNWBool("ArmorUnusable", false)) then

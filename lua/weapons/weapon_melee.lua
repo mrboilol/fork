@@ -272,7 +272,7 @@ if CLIENT then
     end)
 end
 SWEP.HeadTraceFallbackRadius = 10
-SWEP.HeadRagdollChance = 0.55
+SWEP.HeadRagdollChance = 0.25
 SWEP.HeadRagdollForceMul = 1.35
 SWEP.HeadRagdollUpMul = 1.2
 SWEP.HeadRagdollMinDamage = 20
@@ -1791,7 +1791,7 @@ local MELEE_FUMBLE_MAX_CHANCE = 0.3
 local function meleeArmEffectiveness(owner, limb)
 	local org = owner.organism
 	if org and (org[limb .. "amputated"] or org[limb .. "upamputated"] or org[(limb == "larm" and "lhand" or "rhand") .. "amputated"]) then return 0 end
-	return math.max(hg.GetArmEffectiveness(owner, limb), MELEE_CRIPPLED_ARM_FLOOR)
+	return math.max(hg.GetArmEffectiveness(owner, limb) * hg.GetPerfusionHandlingMul(org), MELEE_CRIPPLED_ARM_FLOOR)
 end
 
 function SWEP:GetMeleeArmEffectiveness(owner)
@@ -2368,7 +2368,10 @@ function SWEP:ShouldHeadRagdoll(ent, trace)
     if trace and trace.HGPreventHeadRagdoll then return false end
     if weaponDamage <= damageThreshold then return false end
     if not self:IsHeadHit(ent, trace) then return false end
-    return math.Rand(0, 1) <= (self.HeadRagdollChance or 0.85)
+    local org = victim.organism
+    if org and hg.organism.IsHitKnockdownImmune(org) then return false end
+    local brace = org and hg.organism.AdrenalineBrace(org, HITGROUP_HEAD) or 0
+    return math.Rand(0, 1) <= (self.HeadRagdollChance or 0.85) * (1 - brace)
 end
 
 function SWEP:ShouldPlayBrutalizeHitSound(ent, victim, trace, attacktype)

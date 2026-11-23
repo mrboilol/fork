@@ -354,6 +354,7 @@ function SWEP:GetArmHealthHandlingMul()
 
 	loss = loss + math.Clamp(org.aiming_fatigue or 0, 0, 10) * 0.045 * forgive * (1 - self:GetAimSteadiness(owner) * 0.7)
 	loss = loss + math.Clamp(org.permanent_aim_impairment or 0, 0, 2) * 0.4
+	loss = loss + hg.GetPerfusionHandlingLoss(org)
 	local combat = hg.GetCombatCondition and hg.GetCombatCondition(owner) or nil
 	if combat then loss = loss + (combat.aim - 1) * 0.7 end
 	loss = loss * (owner.GetTraitMultiplier and owner:GetTraitMultiplier("weapon_handling", 1) or 1)
@@ -921,13 +922,9 @@ function SWEP:PlaySndDist(snd)
 		local roomMultiplier = bRoom and 1.0 or 0.7
 		local suppressorVolume = self.Supressor and (self.DOZVUK and 10 or 60) or 100
 		local finalVolume = suppressorVolume * roomMultiplier
+		local tailVolume = math.Clamp(dist / 2500, 0.1, 1) * hg_gunshotvolume:GetFloat()
 
-		EmitSound(snd, owner:GetPos(), owner:EntIndex(), CHAN_STATIC, 1, finalVolume, 0, 90)
-
-		local farPitch = math.Clamp(100 - (dist / 1000), 75, 95)
-		if dist > 1000 then
-			EmitSound(snd, owner:GetPos(), owner:EntIndex() + 1, CHAN_STATIC, 1, finalVolume * 1.2, 0, farPitch)
-		end
+		EmitSound(snd, owner:GetPos(), owner:EntIndex(), CHAN_STATIC, tailVolume, finalVolume, 0, 95)
 	end)
 end
 
@@ -1203,9 +1200,8 @@ function SWEP:EmitShoot()
 	if !self.Supressor and !self.NoWINCHESTERFIRE then
 		self:PlaySnd("rifle_win1892/win1892_fire_01.ogg", nil, nil, vol * (1 - insideVal / 16), math.Clamp(1 / self.Primary.Force / (self.NumBullet or 1) * 100 * 50,90,150), 55555, true)
 
-		self:PlaySnd("zcitysnd/sound/weapons/firearms/hndg_colt1911/colt_1911_fire1.ogg", nil, nil, vol * (insideVal / 16), 150, 51256, true)
-		self:PlaySnd("zcitysnd/sound/weapons/firearms/hndg_colt1911/colt_1911_fire1.ogg", nil, nil, vol * (insideVal / 16), 80, 50256, true)
-		
+		self:PlaySnd("zcitysnd/sound/weapons/firearms/hndg_colt1911/colt_1911_fire1.ogg", nil, nil, vol * (insideVal / 16) * 0.6, 150, 51256)
+
 		if hg_highpitchgunfire:GetBool() or hg_gopro:GetBool() then
 			self:PlaySnd("grenades/grenade_flash_start_indoor_distant.ogg", nil, nil, vol * (insideVal / 16), 80, 50257, true)
 		end

@@ -543,7 +543,7 @@ if CLIENT then
 
         --;; Pulse
         do
-            local pos, size = drawBGPanel(0.035,0.2)
+            local pos, size = drawBGPanel(0.035,0.19)
             surface.SetFont("CMBFontSmall")
             local org = self.organism
             if not org or not org.pulse then return end
@@ -580,7 +580,7 @@ if CLIENT then
 
         --;; Stamina
         do
-            local pos, size = drawBGPanel(0.035,0.27)
+            local pos, size = drawBGPanel(0.035,0.25)
             surface.SetFont("CMBFontSmall")
             local org = self.organism
             if not org or not org.stamina then return end
@@ -709,6 +709,7 @@ if CLIENT then
             render.PushFilterMag(TEXFILTER.ANISOTROPIC)
             render.PushFilterMin(TEXFILTER.ANISOTROPIC)
                 CLASS.HUDPaint(lply)
+                if hg.DrawSuitECG then hg.DrawSuitECG(lply) end
             render.PopFilterMag()
             render.PopFilterMin()
         end

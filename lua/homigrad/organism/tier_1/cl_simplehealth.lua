@@ -13,11 +13,12 @@ local FACE_TEXT_COLOR = Color(255, 255, 255, 255)
 local FACE_PADDING = 0.16
 
 
-SimpleHealth.Local = SimpleHealth.Local or {mode = 0, crit = 0, brute = 0, burn = 0, toxin = 0, oxy = 0, countdownEnd = 0}
+SimpleHealth.Local = SimpleHealth.Local or {mode = 0, crit = 0, brute = 0, burn = 0, toxin = 0, oxy = 0, countdownEnd = 0, countdownDuration = 0}
 
 local function resetLocal(state)
 	state.crit = 0
 	state.countdownEnd = 0
+	state.countdownDuration = 0
 	for _, pool in ipairs(SimpleHealth.POOLS) do
 		state[pool] = 0
 	end
@@ -38,6 +39,7 @@ net.Receive("hg_simplehealth", function()
 	end
 
 	state.countdownEnd = net.ReadFloat()
+	state.countdownDuration = net.ReadFloat()
 	SimpleHealth.OnLocalStateChanged(state)
 end)
 
@@ -395,6 +397,8 @@ local function nildoy()
 	local state = SimpleHealth.GetLocalState()
 	if alive then
 		if not state then return end
+		local org = lply.organism
+		if org and org.otrub and not SimpleHealth.IsFurryFace(lply) then return end
 	elseif deathDelay.aliveMode <= 0 then
 		return
 	end
@@ -423,16 +427,16 @@ local function nildoy()
 
 	if SimpleHealth.IsFurryFace(lply) then
 		drawFaceTitle(innerX, innerY, inner, SimpleHealth.FaceTitles[key])
-
-		return
+	else
+		local material = getFaceMaterial(alive and isFacePale() and key .. "_pale" or key)
+		if material then
+			surface.SetDrawColor(255, 255, 255, 255)
+			surface.SetMaterial(material)
+			surface.DrawTexturedRect(innerX, innerY, inner, inner)
+		end
 	end
 
-	local material = getFaceMaterial(alive and isFacePale() and key .. "_pale" or key)
-	if not material then return end
-
-	surface.SetDrawColor(255, 255, 255, 255)
-	surface.SetMaterial(material)
-	surface.DrawTexturedRect(innerX, innerY, inner, inner)
+	if alive and hg.DrawNilguyTooltip then hg.DrawNilguyTooltip(x, y, size) end
 end
 
 hook.Add("HUDPaint", "hg/simplehealth/face", nildoy)
@@ -468,7 +472,11 @@ function SimpleHealth.UpdateDeathDelay()
 		deathDelay.aliveMode = SimpleHealth.Local.mode
 		if not deathDelay.wasAlive then SimpleHealth.Local.deathCause = nil end
 		if deathDelay.active then finishDeathDelay(false) end
-	elseif deathDelay.wasAlive and deathDelay.aliveMode > 0 then
+
+		local org = lply.new_organism or lply.organism
+		local deadline = org and org.incapacitated and tonumber(org.deathStateEnd) or 0
+		deathDelay.incapDeath = deadline > 0 and deadline - CurTime() <= 2
+	elseif deathDelay.wasAlive and deathDelay.aliveMode > 0 and not deathDelay.incapDeath then
 		startDeathDelay()
 	end
 
@@ -540,4 +548,8 @@ net.Receive("hg_simplehealth_faint", function()
 	end
 
 	chat.AddText(FAINT_COLOR, line)
+end)
+
+net.Receive("hg_simplehealth_hardcrit", function()
+	surface.PlaySound("dicksdoor.mp3")
 end)

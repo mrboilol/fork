@@ -88,6 +88,19 @@ function hg.GetArmEffectiveness(ply, limb, segment)
 	return math.Clamp(effectiveness, 0, 1)
 end
 
+function hg.GetPerfusionHandlingLoss(org)
+	if not istable(org) then return 0 end
+
+	local perfusionLoss = 1 - math.Clamp(tonumber(org.perfusion) or 1, 0, 1)
+	local mobilityLoss = 1 - math.Clamp(tonumber(org.perfusionMoveMul) or 1, 0, 1)
+
+	return math.max(perfusionLoss * 0.9, mobilityLoss * 1.2)
+end
+
+function hg.GetPerfusionHandlingMul(org)
+	return 1 / (1 + hg.GetPerfusionHandlingLoss(org))
+end
+
 function hg.GetThrowArmMultiplier(ply)
 	return 0.35 + 0.65 * hg.GetArmEffectiveness(ply, "rarm")
 end

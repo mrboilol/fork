@@ -560,7 +560,9 @@ local function ReplacePlayerEditor()
 			Menu()
 		end
 	})
+	concommand.Add("open_playermodel_selector", function() Menu() end)
 end
 
 ReplacePlayerEditor()
+hook.Add("PostGamemodeLoaded", "ZC_PMS_ReplacePlayerEditor", ReplacePlayerEditor)
 hook.Add("InitPostEntity", "ZC_PMS_ReplacePlayerEditor", ReplacePlayerEditor)

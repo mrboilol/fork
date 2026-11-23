@@ -1,6 +1,7 @@
 
 
 local hg_infstamina = CreateConVar("hg_infstamina", "0", {FCVAR_REPLICATED, FCVAR_HIDDEN})
+local hg_angry = GetConVar("hg_angry") or CreateConVar("hg_angry", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enable anger (adrenaline mechanics stay)", 0, 1)
 
 
 
@@ -210,6 +211,10 @@ module[2] = function(owner, org, timeValue)
 
 	local now = CurTime()
 	local K = hg.PsycheCombat
+	if not hg_angry:GetBool() and (org.anger or 0) ~= 0 then
+		org.anger = 0
+		if org.psycheAnger ~= nil then org.psycheAnger = 0 end
+	end
 	local standing = (org.anger or 0) > 0 and angerOpponentStanding(org, now)
 	if standing then
 		org.angerOpponentWasUp = true
@@ -244,6 +249,24 @@ module[2] = function(owner, org, timeValue)
 		end
 	else
 		org.angerLongFor = math.max((org.angerLongFor or 0) - timeValue * 2, 0)
+	end
+
+	local ragdolled = org.fake or (IsValid(owner) and IsValid(owner.FakeRagdoll))
+	if ragdolled and not org.otrub and not org.needfake and not org.needotrub then
+		org.angerFakeFor = (org.angerFakeFor or 0) + timeValue
+	elseif not ragdolled then
+		org.angerFakeFor = 0
+	end
+	local downFast = org.otrub or org.needfake or org.needotrub
+	local downSlow = (org.angerFakeFor or 0) > K.angerFakeAfter
+	if (downFast or downSlow) and (org.anger or 0) > 0 then
+		local mul = downFast and K.angerDownFadeMul or K.angerFakeFadeMul
+		local drop = math.min(org.anger, timeValue * anger_decay_per_second * mul)
+		org.anger = org.anger - drop
+		if org.psycheAnger ~= nil then org.psycheAnger = org.anger end
+		if hg.organism.AddDepression then
+			hg.organism.AddDepression(org, drop * K.angerDownDepression, "fight")
+		end
 	end
 
 	
@@ -558,6 +581,7 @@ end
 
 function hg.organism.RileAnger(org, amount, adrenalineAmount, opponent)
 	if not org or not org.alive or org.otrub then return end
+	if not hg_angry:GetBool() then return end
 	if IsValid(opponent) and (opponent:IsPlayer() or opponent:IsNPC()) then
 		org.angerOpponent = opponent
 		org.angerOpponentUntil = CurTime() + 45

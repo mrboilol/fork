@@ -809,8 +809,23 @@ function hg.DropWeaponFromImpact(ply, wep, direction, strength)
     if IsValid(wep) then wep.HGImpactDropNotificationPending = nil end
     if not IsValid(wep) or IsValid(wep:GetOwner()) then return false end
     ply.hgNextImpactDrop = CurTime() + cfg.dropCooldown
-    wep:SetPos(pos)
+    local safePos = wep:GetPos()
+    local tr = util.TraceHull({
+        start = safePos,
+        endpos = pos,
+        mins = wep:OBBMins(),
+        maxs = wep:OBBMaxs(),
+        filter = {ply, wep, body},
+        mask = MASK_SOLID
+    })
+    if not (tr.StartSolid or tr.AllSolid) then
+        safePos = tr.Hit and (tr.HitPos + tr.HitNormal * 2) or pos
+    end
+    if not util.IsInWorld(safePos) then safePos = ply:EyePos() end
+    wep:SetPos(safePos)
     wep:SetAngles(ang)
+    wep.init = true
+    wep.IsSpawned = true
     local phys = wep:GetPhysicsObject()
     if IsValid(phys) then
         local inherited = IsValid(body) and body:GetVelocity() or ply:GetVelocity()

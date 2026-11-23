@@ -1636,6 +1636,14 @@ drawFinalVitalsVignettes = function()
 		painMat:SetFloat("$c1_y", grainCoverage)
 		render.SetMaterial(painMat)
 		render.DrawScreenQuad()
+
+		local flashLevel = math.Clamp((pain - 30) / 90, 0, 1)
+		if flashLevel > 0 then
+			local flash = math.max(0, math.sin(CurTime() * (5 + flashLevel * 5))) ^ 2
+			surface.SetDrawColor(220, 0, 0, flash * flashLevel * 70)
+			surface.DrawRect(0, 0, ScrW(), ScrH())
+			surface.SetDrawColor(255, 255, 255, 255)
+		end
 	end
 
 	if hg.O2VignetteOrg then hg.DrawO2Vignette(hg.O2VignetteOrg) end
@@ -2402,7 +2410,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		shock = shockLerp
 
 		//if pain > 10 then
-			painVolume = math.Clamp(math.Remap(pain, 0, hg.screeneffects_config.painThresholdMax, 0, 2), 0, 2)
+			painVolume = math.Clamp(math.Remap(pain, 0, hg.screeneffects_config.painThresholdMax, 0, 2), 0, 2) * 0.55
 			normalizedPain = math.Clamp(pain / hg.screeneffects_config.painThresholdMax, 0, 1)
 			painPitch = math.Clamp(math.Remap(pain, 60, hg.screeneffects_config.painThresholdMax, 100, hg.screeneffects_config.painPitchMax), 100, hg.screeneffects_config.painPitchMax)
 			local targetPainVolume = 0
@@ -2561,17 +2569,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 
 	if (tinnitusTime > 0 or temporalTinnitus > 0.01) and lply:Alive() then
 		if canRetrySound("Tinnitus", Tinnitus) then
-			local choice = math.random(5)
-			local soundFile
-			if choice == 1 then
-				soundFile = "sound/tinnitus.wav"
-			elseif choice == 2 then
-				soundFile = "sound/tinnituslong.wav"
-			else
-				soundFile = "sound/zcitysnd/real_sonar/tinnitus"..math.random(3)..".ogg"
-			end
-
-			sound.PlayFile(soundFile, "noblock noplay", function(station, err)
+			sound.PlayFile("sound/goodtinnitus.wav", "noblock noplay", function(station, err)
 				if IsValid(station) then
 					station:SetVolume(0)
 					station:Play()
@@ -3865,7 +3863,6 @@ net.Receive("headtrauma_flash", function()
 	if lply.organism and lply.organism.otrub then return end
 
 	if trigger_tinnitus then
-        surface.PlaySound("tinnitus.wav")
         lply:AddTinnitus(0.6 + time * 0.2, false, hasBrainDamage)
     end
 
@@ -4044,10 +4041,13 @@ hook.Add("Think", "hg_asphyxiation_track", function()
 	local org = IsValid(ply) and ply:Alive() and (ply.new_organism or ply.organism)
 	local target = 0
 
-	if org and not org.incapacitated then
+	local oldOptions = GetConVar("hg_oldsoundoptions")
+	local asphyxiationMode = not (oldOptions and oldOptions:GetBool()) or getServerSoundMode("hg_dyingsound", 12) == 11
+
+	if org and not org.incapacitated and asphyxiationMode then
 		local simple = hg.SimpleHealth and hg.SimpleHealth.GetLocalState and hg.SimpleHealth.GetLocalState()
 		if simple then
-			if simple.oxy >= 25 then target = Lerp(math.Clamp((simple.oxy - 25) / 70, 0, 1), 0.25, 1) end
+			if simple.oxy >= 15 then target = Lerp(math.Clamp((simple.oxy - 15) / 80, 0, 1), 0.25, 1) end
 		elseif org.o2 then
 			local pct = (org.o2[1] or 30) / math.max(org.o2.range or 30, 1) * 100
 			if pct < 25 then target = Lerp(math.Clamp((25 - pct) / 20, 0, 1), 1 / 6, 1) end

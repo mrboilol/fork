@@ -611,8 +611,12 @@ local function CinematicDeathTracker()
 CDeath.keepSoundAlive = true
 local soundGeneration = CDeath.deathSoundGeneration
 
-for _, deathSound in pairs(DEATH_SOUNDS) do
-    PlayDeathSound(deathSound, soundGeneration)
+if CDeath.incapTimerDeath and not CDeath.silent then
+    for _, deathSound in pairs(DEATH_SOUNDS) do
+        PlayDeathSound(deathSound, soundGeneration)
+    end
+else
+    CDeath.keepSoundAlive = false
 end
 
     elseif ply:Alive() and CDeath.isDead then

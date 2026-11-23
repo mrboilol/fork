@@ -120,6 +120,16 @@ end
 local SOUND_HEART = "heartbeat/heartbeat_single.ogg"
 local SOUND_CRITICAL_HEART = "health/critbeat.mp3"
 local SOUND_FLATLINE = "health/gg.mp3"
+local SOUND_OHSHIT = "ohshit.mp3"
+local SOUND_CRITLOOP = "health/critloop.ogg"
+local SOUND_CRITLOOP_OTRUB = "health/critloopotrub.ogg"
+local CRITLOOP_VOLUME = 0.7
+local suitClasses = {
+    ["Gordon"] = true,
+    ["Combine"] = true,
+}
+local critLoops = {}
+local critLoopVolume = {}
 
 local lastPhaseMod = 0
 local wasUnconsciousState = false
@@ -154,6 +164,7 @@ local hg_casualtiesknown = CreateClientConVar("hg_casualtiesknown", "1", true, f
 local PLAYER_ECG_ENABLED = false
 local dyingSpan = 0
 local dyingSeen = 0
+local DEATH_STATE_TIME = 45
 local LOW_CONSCIOUSNESS = 0.4
 local OTRUB_CONSCIOUSNESS = 0.2
 local WAKE_CONSCIOUSNESS = 0.3
@@ -199,7 +210,9 @@ end
 local function UseCriticalHeartbeat(org)
     local rhythm = org.ecgState
     local rate = tonumber(org.heartbeat) or 0
+    local simple = hg.SimpleHealth and hg.SimpleHealth.GetLocalState and hg.SimpleHealth.GetLocalState()
     return org.critical == true or org.incapacitated == true or IsCirculationCritical(org)
+        or (simple and (simple.crit or 0) >= hg.SimpleHealth.CRIT_SOFT)
         or (rhythm and rhythm ~= "normal_sinus" and rhythm ~= "sinus_bradycardia" and rhythm ~= "sinus_tachycardia")
         or (tonumber(org.arrhythmia) or 0) >= 0.3
         or (tonumber(org.palpitations) or 0) >= 0.6
@@ -281,6 +294,11 @@ local function ResetRingAudio()
     flatlineStation = nil
     flatlineLoading = false
 
+    for _, st in pairs(critLoops) do
+        if IsValid(st) then st:Stop() end
+    end
+    critLoops = {}
+    critLoopVolume = {}
 end
 
 hook.Add("Player Spawn", "ResetUnconsciousRingFlatline", function(ply)
@@ -368,8 +386,6 @@ local function EmitRingSound(soundPath, volume)
                 end
             end)
         end
-    elseif soundPath == SOUND_CRITICAL_HEART then
-        sound.Play(soundPath, LocalPlayer():EyePos(), 65, 100, math.Clamp(volume or 1, 0, 1))
     else
         sound.PlayFile("sound/" .. soundPath, "noblock noplay", function(station)
             if IsValid(station) then
@@ -394,9 +410,60 @@ local function UpdateRingAudio(heartRate, ringAlpha, org)
     local beatVolume = GetHeartbeatVolume(org) * ringAlpha * mechanicalStrength
     if PhaseCrossed(prev, curr, 0.239) then
         if mechanicalStrength > 0.02 and not (org.ecgState == "sinus_pause" and math.floor(heartPhase) % 4 == 3) then
-            EmitRingSound(UseCriticalHeartbeat(org) and SOUND_CRITICAL_HEART or SOUND_HEART, beatVolume)
+            local critSound = suitClasses[LocalPlayer().PlayerClassName] and SOUND_OHSHIT or SOUND_CRITICAL_HEART
+            EmitRingSound(UseCriticalHeartbeat(org) and critSound or SOUND_HEART, beatVolume)
         end
     end
+end
+
+local function FadeCritLoop(path, target)
+    local vol = SmoothAlpha(critLoopVolume[path] or 0, target, target > 0 and 1.5 or 3)
+    critLoopVolume[path] = vol
+    local st = critLoops[path]
+
+    if target > 0 and st == nil then
+        critLoops[path] = false
+        local gen = soundGen
+        sound.PlayFile("sound/" .. path, "noblock noplay", function(station)
+            if not IsValid(station) then
+                if critLoops[path] == false then critLoops[path] = nil end
+                return
+            end
+            if gen ~= soundGen or critLoops[path] ~= false then
+                station:Stop()
+                return
+            end
+            station:EnableLooping(true)
+            station:SetVolume(0)
+            station:Play()
+            critLoops[path] = station
+        end)
+        return
+    end
+
+    if not IsValid(st) then return end
+    if target <= 0 and vol <= 0.005 then
+        st:Stop()
+        critLoops[path] = nil
+        critLoopVolume[path] = 0
+        return
+    end
+    st:SetVolume(vol * CRITLOOP_VOLUME)
+end
+
+local function UpdateCritLoop(org)
+    local rhythm = org.ecgState
+    local rate = tonumber(org.heartbeat) or 0
+    local simple = hg.SimpleHealth and hg.SimpleHealth.GetLocalState and hg.SimpleHealth.GetLocalState()
+    local active = IsVentricularFibrillation(org) or (simple and (simple.oxy or 0) > 15)
+    local nearFlatline = org.heartstop == true or rhythm == "asystole" or rhythm == "pea"
+        or IsVentricularFibrillation(org)
+        or (rate > 0 and rate < 30)
+        or (tonumber(org.bloodPressure) or 92) < 35
+    local otrubLoop = nearFlatline or org.otrub == true
+
+    FadeCritLoop(SOUND_CRITLOOP, (active and not otrubLoop) and 1 or 0)
+    FadeCritLoop(SOUND_CRITLOOP_OTRUB, (active and otrubLoop) and 1 or 0)
 end
 
 local alertPlayed = false
@@ -451,6 +518,7 @@ local Color = Color
 
 local centerEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
 local pulseCheckEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
+local suitEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
 
 local function DrawEKG(state, centerX, centerY, width, height, org, color, ringAlpha)
     org = org or {}
@@ -483,7 +551,7 @@ local function DrawEKG(state, centerX, centerY, width, height, org, color, ringA
     ), 0, 1)
 
     -- Increment heart phase based on heartbeat (BPM to beats per second)
-    state.phase = state == centerEKGState and heartPhase or state.phase + dt * (heartbeat / 60)
+    state.phase = (state == centerEKGState or state == suitEKGState) and heartPhase or state.phase + dt * (heartbeat / 60)
 
     local sweepSpeed = width / 4
     local oldSweepPos = state.sweepPos
@@ -857,6 +925,39 @@ hg = hg or {}
 hg.DrawOrganismECG = DrawEKG
 hg.IsOrganismCirculationCritical = IsCirculationCritical
 
+local suitECGColor = Color(255, 255, 255, 230)
+local suitECGCombine = Color(25, 190, 190)
+local suitECGCombineRed = Color(255, 60, 40)
+local suitECGGordon = Color(255, 155, 0)
+local suitECGCritical = Color(255, 0, 0)
+local suitECGRedRoles = { Leader = true, Shotgunner = true, Elite = true }
+
+local function DrawSuitECG(ply, org, critical)
+    local className = ply.PlayerClassName
+    if not suitClasses[className] then return end
+    if className == "Gordon" and hg.HasHEVHelmet and not hg.HasHEVHelmet(ply) then return end
+
+    local base = suitECGGordon
+    if className == "Combine" then
+        base = suitECGRedRoles[ply:GetNWString("PlayerRole")] and suitECGCombineRed or suitECGCombine
+    end
+    if critical then
+        base = base:Lerp(suitECGCritical, math.abs(math.sin(CurTime() * 3)))
+    end
+    suitECGColor.r, suitECGColor.g, suitECGColor.b = base.r, base.g, base.b
+
+    local width = math.floor(ScrW() * 0.19)
+    local centerY = className == "Gordon" and 0.165 or 0.29
+    DrawEKG(suitEKGState, ScrW() * 0.03 + width / 2, ScrH() * centerY, width, ScrH() * 0.075, org, suitECGColor, 1)
+end
+
+function hg.DrawSuitECG(ply)
+    local org = IsValid(ply) and ply:Alive() and ply.organism
+    if not org then return end
+
+    DrawSuitECG(ply, org, org.critical == true or IsCirculationCritical(org))
+end
+
 local ringColorStable = Color(220, 220, 220)
 local ringColorCritical = Color(210, 35, 30)
 local ringColorDying = Color(255, 70, 55)
@@ -876,13 +977,19 @@ local function DrawCasualtiesRing(org, alpha, isUnconscious, isCritical, dying, 
     local simpleHealth = hg.SimpleHealth
     local simple = org.simpleMode or simpleHealth and simpleHealth.ConVar and simpleHealth.ConVar:GetInt() > 0
     local wakeConsciousness = simple and simpleHealth.Config and simpleHealth.Config.consciousness.wakeAt or WAKE_CONSCIOUSNESS
+    local now = CurTime()
+    local localSimple = simple and simpleHealth.GetLocalState and simpleHealth.GetLocalState()
+    local countdownEnd = localSimple and tonumber(localSimple.countdownEnd) or 0
+    local countdownSpan = localSimple and tonumber(localSimple.countdownDuration) or 0
+    local counting = isUnconscious and countdownEnd > now
     local target
-    if dying then
-        local now = CurTime()
+    if counting and countdownSpan > 0 then
+        target = math.Clamp((countdownEnd - now) / countdownSpan, 0, 1)
+    elseif dying then
         local remaining = deathStateEnd - now
         if now - dyingSeen > 1 then dyingSpan = 0 end
         dyingSeen = now
-        dyingSpan = math.max(dyingSpan, remaining)
+        dyingSpan = math.max(dyingSpan, remaining, DEATH_STATE_TIME)
         target = math.Clamp(remaining / dyingSpan, 0, 1)
     elseif isCritical then
         target = math.Clamp((0.70 - (tonumber(org.brain) or 0)) / 0.68, 0, 1)
@@ -919,8 +1026,6 @@ local function DrawCasualtiesRing(org, alpha, isUnconscious, isCritical, dying, 
     end
 
     dotBeat = math.floor(CurTime() * (dying and 2 or 1)) % 3
-    local localSimple = simple and simpleHealth.GetLocalState and simpleHealth.GetLocalState()
-    local counting = localSimple and isUnconscious and localSimple.countdownEnd > CurTime()
     local dotStatus = dying and 3 or (isCritical or counting) and 2 or 1
     draw.SimpleText(ringDots[dotStatus][dotBeat + 1], "UnconsciousDots", centerX, centerY, Color(r, g, b, a), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 end
@@ -931,6 +1036,15 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         ringAlpha = 0
         ecgRingAlpha = 0
         ecgMemoryFade = 1
+        local lply = LocalPlayer()
+        local lorg = IsValid(lply) and lply:Alive() and lply.organism
+        if lorg then
+            local rate = tonumber(lorg.heartbeat) or 75
+            heartPhase = heartPhase + FrameTime() * (rate / 60)
+            UpdateRingAudio(rate, 1, lorg)
+            UpdateCritLoop(lorg)
+            return
+        end
         lastPhaseMod = 0
         ResetRingAudio()
         return
@@ -1135,6 +1249,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     end
 
     UpdateRingAudio(heartbeat, 1, org)
+    UpdateCritLoop(org)
 
     if ringAlpha <= 0 and awakeECGAlpha <= 0.01 and ecgAlphaSelfCheck <= 0.01 and not showPulseCheckECG then
         return

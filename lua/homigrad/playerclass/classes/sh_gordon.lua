@@ -354,6 +354,32 @@ hook.Add("HG_CanThoughts", "GordonCantDumat", function(ply)
 	end
 end)
 
+local gordonVocalPatterns = {
+	"^vo/", "^player/pl_pain", "^player/death", "^breathing/", "^zcitysnd/", "^homigrad/player/",
+	"male", "pain", "scream", "cough", "gasp", "groan", "moan", "choke", "sneez", "burp", "fart", "hungry", "vomit", "yell",
+}
+
+local function isGordonVocal(soundName)
+	soundName = string.lower(string.gsub(soundName or "", "\\", "/"))
+	soundName = string.gsub(soundName, "^[%^%)%(%*#@<>!?$&~`+%%]+", "")
+	if string.find(soundName, "fvox/", 1, true) then return false end
+
+	for _, pattern in ipairs(gordonVocalPatterns) do
+		if string.find(soundName, pattern) then return true end
+	end
+
+	return false
+end
+
+hook.Add("EntityEmitSound", "GordonSilentProtagonist", function(data)
+	local ent = data.Entity
+	if not IsValid(ent) then return end
+
+	local ply = ent:IsPlayer() and ent or hg.RagdollOwner and hg.RagdollOwner(ent)
+	if not IsValid(ply) or ply.PlayerClassName ~= "Gordon" then return end
+	if isGordonVocal(data.SoundName) then return false end
+end)
+
 hook.Add("PlayerCanPickupItem","hevsuit",function(ply, ent)
     local entclass = ent:GetClass()
     if entclass == "item_suit" then
@@ -613,6 +639,7 @@ if CLIENT then
         render.PushFilterMag(TEXFILTER.ANISOTROPIC)
         render.PushFilterMin(TEXFILTER.ANISOTROPIC)
             CLASS.HUDPaint(lply)
+            if hg.DrawSuitECG then hg.DrawSuitECG(lply) end
         render.PopFilterMag()
         render.PopFilterMin()
     end)
@@ -801,6 +828,15 @@ elseif SERVER then
             org.hevAEDNext = CurTime() + HEV_AED_COOLDOWN
             ply.HEV.Medicine = ply.HEV.Medicine - HEV_AED_COST
 
+            if hg.organism.IsAsystole and hg.organism.IsAsystole(org) then
+                org.epinephrineResuscitationUntil = CurTime() + 20
+                org.adrenalineAdd = 4
+                org.defibDeathGrace = CurTime() + 45
+                hevAlert(ply, "No shockable rhythm. Epinephrine injected. Auto-pulse compressions continuing.", "aed_hev_done", "hl1/fvox/adrenaline_shot.wav")
+                hevPlayAED(ply, hevAEDSounds.startcpr)
+                return
+            end
+
             hevPlayAED(ply, hevAEDSounds.shocksound, 85)
             hevPlayAED(ply, hevAEDSounds.shockdelivered)
 
@@ -830,13 +866,11 @@ elseif SERVER then
             if hg.organism.TryRestartHeartWithResuscitation then hg.organism.TryRestartHeartWithResuscitation(org) end
 
             if org.heartstop then
-                org.heartstop = false
-                org.pulse = math.max(org.pulse or 0, 70)
-                org.heartbeat = math.max(org.heartbeat or 0, 70)
+                hevAlert(ply, "Defibrillation delivered. No pulse detected. Epinephrine injected. Auto-pulse compressions continuing.", "aed_hev_done", "hl1/fvox/adrenaline_shot.wav")
+            else
+                hevPlayAED(ply, hevAEDSounds.shocksuccess)
+                hevAlert(ply, "Defibrillation delivered. Pulse restored. Epinephrine injected.", "aed_hev_done", "hl1/fvox/adrenaline_shot.wav")
             end
-
-            hevPlayAED(ply, hevAEDSounds.shocksuccess)
-            hevAlert(ply, "Defibrillation delivered. Epinephrine injected. Auto-pulse enabled.", "aed_hev_done", "hl1/fvox/adrenaline_shot.wav")
 
             timer.Simple(3, function()
                 if IsValid(ply) and ply:Alive() then hevPlayAED(ply, hevAEDSounds.startcpr) end
@@ -1058,12 +1092,27 @@ elseif SERVER then
                 if (org.CPRThink or 0) < CurTime() then
                     org.CPRThink = CurTime() + (1 / 120) * 60
                     
-                    if org.alive then
+                    if org.alive and org.heartstop then
+                        if hg.organism.RestoreSupportedOxygen then
+                            hg.organism.RestoreSupportedOxygen(org, 0.018, {
+                                artificialSupport = true, cpr = true,
+                                oxygen = math.min(24, org.o2.range or 30), bodyoxygen = 0.52,
+                                brainoxygen = 0.48, perfusion = 0.42, peripheralperfusion = 0.38,
+                                cerebralPerfusion = 0.42, myocardialOxygen = 0.45,
+                                hypoxiaTime = 14, severeHypoxiaTime = 4, systemicIschemiaTime = 14
+                            })
+                        end
+                        org.cprSupportUntil = CurTime() + 0.75
+                        org.cprSupportPulse = 40
+                        org.cprResuscitationUntil = CurTime() + 2
+                        org.CO = math.Approach(org.CO, 0, 1)
+                        org.COregen = math.Approach(org.COregen, 0, 1)
+                        if hg.organism.TryRestartHeartWithResuscitation then hg.organism.TryRestartHeartWithResuscitation(org) end
+                    elseif org.alive then
                         org.o2[1] = math.min(org.o2[1] + hg.organism.OxygenateBlood(org) * 2, hg.organism.GetAirwayOxygenCap(org))
                         org.pulse = math.min(org.pulse + 5,70)
                         org.CO = math.Approach(org.CO, 0, 1)
                         org.COregen = math.Approach(org.COregen, 0, 1)
-                        if org.pulse > 15 then org.heartstop = false end
                     end
                 end
             end

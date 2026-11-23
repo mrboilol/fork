@@ -252,7 +252,8 @@ local function updateChronicStrain(owner, org, timeValue, injury)
     end
     org.chronicStrain = Clamp01(strain)
 
-    if org.chronicStrain >= CHRONIC_IRRITABLE_START and (org.anger or 0) < CHRONIC_ANGER_CAP then
+    local angryCvar = GetConVar("hg_angry")
+    if (not angryCvar or angryCvar:GetBool()) and org.chronicStrain >= CHRONIC_IRRITABLE_START and (org.anger or 0) < CHRONIC_ANGER_CAP then
         org.anger = math.min((org.anger or 0) + timeValue * CHRONIC_ANGER_RATE * org.chronicStrain, CHRONIC_ANGER_CAP)
     end
 

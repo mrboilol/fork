@@ -1404,6 +1404,8 @@ hook.Add("Should Fake Up","speedhuy",function(ply)
 		if (ply.organism.stun - CurTime()) > 0 then return false end
 		if (ply.organism.lightstun - CurTime()) > 0 then return false end
 		if ply.organism.neckslit and (ply.organism.neckslitStunUntil or 0) > CurTime() then return false end
+		local org = ply.organism
+		if (org.llegamputated or org.rlegamputated or org.llegupamputated or org.rlegupamputated) and (org.berserk or 0) <= 0.3 and not org.NoKnockdown then return false end
 		if bit.band(ply.FakeRagdoll:GetFlags(),FL_DISSOLVING) == FL_DISSOLVING then return false end
 	end
 end)
