@@ -579,6 +579,10 @@ local function send_organism(org, ply, recipientForce, reliable)
 	sendtable.noradrenalineActive = org.noradrenalineActive
 	sendtable.superfighter = org.superfighter
 	sendtable.depression = org.depression
+	sendtable.hopelessness = org.hopelessness
+	sendtable.desolation = org.desolation
+	sendtable.suicidal = org.suicidal
+	sendtable.despairShake = org.despairShake
 	sendtable.concussion = org.concussion
 	sendtable.nausea = org.nausea
 	sendtable.concussion_tinnitus = org.concussion_tinnitus
@@ -861,7 +865,7 @@ function hg.organism.GetResilience(org)
 	local zerlkers = math.Clamp(org.zerlkers or 0, 0, 1)
 	local adrenaline = math.Clamp((org.adrenaline or 0) / 1.5, 0, 1)
 	local rage = hg.GetAngerShield(org) * hg.PsycheCombat.angerResilience
-	return math.max(zerlkers, adrenaline, rage) - math.Clamp(tonumber(org.depressionSuccumb) or 0, 0, 0.6)
+	return math.max(zerlkers, adrenaline, rage) - math.Clamp((tonumber(org.depressionSuccumb) or 0) + (tonumber(org.despairSuccumb) or 0), 0, 0.6)
 end
 
 local adrenalineBraceGroups = {

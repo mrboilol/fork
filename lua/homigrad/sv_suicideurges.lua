@@ -267,7 +267,7 @@ timer.Create("rem_suicideurges_roll", 1, 0, function()
 			continue
 		end
 
-		local dep = org.depression or 0
+		local dep = math.max(org.depression or 0, org.suicidal or 0)
 		if dep <= urge_threshold then continue end
 		if not hasSuicideWeapon(ply) then continue end
 

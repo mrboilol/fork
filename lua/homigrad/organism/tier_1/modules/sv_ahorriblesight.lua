@@ -227,6 +227,7 @@ function hg.organism.GetAdrenalineGainMul(org)
 	local now = CurTime()
 	local numb = hg.organism.PsycheAdrenalineNumb and hg.organism.PsycheAdrenalineNumb(org) or 1
 	numb = numb * (1 + (hg.organism.GetWitnessTrauma and hg.organism.GetWitnessTrauma(org) or 0) * hg.PsycheCombat.noDepressionTraumaMul)
+	numb = numb * (hg.organism.GetDespairAdrenalineMul and hg.organism.GetDespairAdrenalineMul(org) or 1)
 	if (org._adrGainMulNext or 0) > now then return (org._adrGainMul or 1) * numb end
 	org._adrGainMulNext = now + GAIN_MUL_REFRESH
 

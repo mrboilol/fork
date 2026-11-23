@@ -191,11 +191,11 @@ function hg.organism.UpdateCardiacRhythm(owner, org, timeValue, s)
 	end
 
 	if org.fibrillation then
-		if not org.heartstop then org.o2[1] = max(org.o2[1] - timeValue * 1.8, 0) end
+		if not org.heartstop then org.o2[1] = max(org.o2[1] - timeValue * 1.8 * (1 + (org.despairHeart or 0)), 0) end
 		local vfElapsed = CurTime() - (org.fibrillationStart or CurTime())
 		local minVF = math.max(tonumber(cfg.HEMORRHAGE_VF_MIN_SECONDS) or 6, 1)
 		local noUsefulOutput = (org.cardiacOutput or 0) < 0.08
-		if vfElapsed >= 24 or (noUsefulOutput and vfElapsed >= minVF) then
+		if vfElapsed >= 24 - (org.despairHeart or 0) * 10 or (noUsefulOutput and vfElapsed >= minVF) then
 			org.heartstop = true
 			org.terminalRhythm = "ventricular_fibrillation"
 		end

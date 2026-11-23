@@ -1476,13 +1476,13 @@ module[2] = function(owner, org, timeValue)
 		end
 		chance = math.max(chance, highTachyK * hemorrhageDanger * 0.025)
 		if sustainedTachy then chance = math.max(chance, highTachyK * oxygenMismatch * 0.06) end
-		chance = chance * rhythmRiskMul
+		chance = (chance * (1 + (org.despairHeart or 0) * 2) + (org.despairHeart or 0) * hemorrhageDanger * 0.01) * rhythmRiskMul
 
 		if chance > 0 and math.random() < chance then
 			hg.organism.StartFibrillation(org)
 			org.terminalRhythm = hb >= 220 and "terminal_tachycardia" or "ventricular_fibrillation"
 		elseif effectivePalpitations > 0.35
-			and math.random() < (effectivePalpitations - 0.35) ^ 2 * 0.04 * rhythmViability * rhythmRiskMul then
+			and math.random() < (effectivePalpitations - 0.35) ^ 2 * 0.04 * rhythmViability * rhythmRiskMul * (1 + (org.despairHeart or 0) * 2) then
 			hg.organism.StartFibrillation(org)
 		end
 	end
@@ -1511,6 +1511,7 @@ module[2] = function(owner, org, timeValue)
 	elseif not org.fibrillation then
 		heartbeat = math.max(heartbeat, math.min(cardiacCompensationRate, maxCompensatedRate))
 	end
+	if not org.fibrillation then heartbeat = heartbeat * (1 - (org.despairHeart or 0) * 0.3) end
 
 	org.heartbeat = math.Approach(org.heartbeat, heartbeat, heartbeat > org.heartbeat and timeValue * 5 or timeValue * 3)
 	org.heartbeat = math.Clamp(org.heartbeat, 0, org.fibrillation and terminalHeartRate or math.min(hemorrhageRateCeiling, terminalHeartRate))
