@@ -32,6 +32,15 @@ SimpleHealth.ConVar = ConVarExists("hg_simplehealth") and GetConVar("hg_simplehe
 	2
 )
 
+SimpleHealth.BloodNoOxyConVar = ConVarExists("hg_bloodnooxydamage") and GetConVar("hg_bloodnooxydamage") or CreateConVar(
+	"hg_bloodnooxydamage",
+	"0",
+	FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY,
+	"Simple health: low blood no longer builds oxy damage (perfusion, heart rate and screen effects stay; flatline still does)",
+	0,
+	1
+)
+
 SimpleHealth.Config = {
 	maxHealth = 100,
 	poolMax = 200,
@@ -68,7 +77,7 @@ SimpleHealth.Config = {
 		passiveBurnRegen = 0.08,
 		brokenChestAt = 1,
 		brokenChestBleedMul = 1.75,
-		limbHealth = {head = 0.75, torso = 0.75, larm = 0.2, rarm = 0.2, lleg = 0.2, rleg = 0.2},
+		limbHealth = {head = 1.75, torso = 1.5, larm = 0.3, rarm = 0.3, lleg = 0.3, rleg = 0.3},
 	},
 
 	heart = {
@@ -167,6 +176,8 @@ SimpleHealth.Config = {
 		softCritDepthDrain = 0,
 		bleedStart = 2750,
 		bleedDrain = 0.12,
+		bloodCapStart = 3500,
+		bloodCapMax = 0.4,
 		oxyStart = 50,
 		oxyFull = 100,
 		oxyDrain = 0.06,

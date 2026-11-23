@@ -309,6 +309,127 @@ hook.Add("EntityTakeDamage", "ZCity_Wind_BulletHitSuppression", function(ent, dm
 	net.Send(ply)
 end)
 
+local function ThreatVictim(ent)
+    if not IsValid(ent) then return end
+    if ent:IsPlayer() then return ent end
+    local owner = hg and hg.RagdollOwner and hg.RagdollOwner(ent)
+    return IsValid(owner) and owner:IsPlayer() and owner or nil
+end
+
+hook.Add("EntityTakeDamage", "ZCity_Wind_ThreatHitMark", function(ent, dmgInfo)
+    local ply = ThreatVictim(ent)
+    if not ply then return end
+    ply._ZCityWindThreatHitAt = CurTime()
+end)
+
+function ZW.ApplyNearMissThreat(ply, pos, force, panic, since)
+    if not config.Suppression or not IsValid(ply) or not ply:Alive() then return end
+    local org = ply.organism
+    if not org or org.otrub then return end
+
+    local K = hg and hg.PsycheCombat
+    if not K then return end
+    if since and (ply._ZCityWindThreatHitAt or 0) >= since - K.threatHitWindow then return end
+
+    SendSuppressionFlinch(ply, ply:EyePos(), pos)
+
+    net.Start("ZCity_Wind_SuppressionForce")
+        net.WriteVector(pos)
+        net.WriteFloat(force)
+        net.WriteBool(false)
+        net.WriteBool(false)
+        net.WriteBool(false)
+        net.WriteFloat(0)
+        net.WriteBool(false)
+    net.Send(ply)
+
+    if ply.AddNaturalAdrenaline then ply:AddNaturalAdrenaline(math.Clamp(force / 60, 0.05, 0.2)) end
+    org.fearadd = (org.fearadd or 0) + 0.2
+    if hg.organism and hg.organism.AddPanicAttack then
+        hg.organism.AddPanicAttack(org, panic, true, true, true, true)
+    end
+end
+
+local function QueueNearMissThreat(ply, pos, force, panic, delay)
+    local queuedAt = CurTime()
+    timer.Simple(delay, function()
+        ZW.ApplyNearMissThreat(ply, pos, force, panic, queuedAt + delay)
+    end)
+end
+
+function ZW.MeleeSwingThreat(attacker, wep)
+    local K = hg and hg.PsycheCombat
+    if not K or not config.Suppression or not IsValid(attacker) or not IsValid(wep) then return end
+    local reach = (wep.MeleeRange or (wep.GetAttackLength and wep:GetAttackLength()) or wep.ReachDistance or 60) + K.meleeThreatPad
+    local origin = attacker:EyePos()
+    local aim = attacker:GetAimVector()
+    local now = CurTime()
+
+    for _, ply in PlayerIterator() do
+        if ply == attacker or not ply:Alive() or (ply._ZCityWindMeleeThreatNext or 0) > now then continue end
+        local eye = ply:EyePos()
+        local diff = eye - origin
+        local dist = diff:Length()
+        if dist > reach or dist < 1 or aim:Dot(diff / dist) < K.meleeThreatDot then continue end
+
+        ply._ZCityWindMeleeThreatNext = now + K.meleeCooldown
+        local proximity = 1 - dist / reach
+        QueueNearMissThreat(ply, origin + aim * dist, 2 + proximity * K.meleeThreatForce, K.meleePanic, K.meleeThreatDelay)
+    end
+end
+
+local function IsThrownBy(ent, ply)
+    if ent:GetOwner() == ply or ent.owner == ply or ent.Owner == ply then return true end
+    return ent.GetPhysicsAttacker and ent:GetPhysicsAttacker(3) == ply
+end
+
+local function ScanFlyingThreats(ply, K, now)
+    local body = hg.GetCurrentCharacter and hg.GetCurrentCharacter(ply)
+    local center = ply:WorldSpaceCenter()
+    local seen = ply._ZCityWindThrowSeen or {}
+    ply._ZCityWindThrowSeen = seen
+
+    for _, ent in ipairs(ents.FindInSphere(center, K.throwThreatScan)) do
+        if ent == ply or ent == body or ent:IsPlayer() or ent:IsWorld() or IsValid(ent:GetParent()) then continue end
+        if (seen[ent] or 0) > now or ent:IsVehicle() or ent:IsPlayerHolding() then continue end
+
+        local phys = ent:GetPhysicsObject()
+        if not IsValid(phys) or not phys:IsMotionEnabled() then continue end
+        local vel = phys:GetVelocity()
+        local speedSqr = vel:LengthSqr()
+        if speedSqr < K.throwThreatSpeed * K.throwThreatSpeed then continue end
+        if ThreatVictim(ent) == ply or IsThrownBy(ent, ply) then continue end
+
+        local entPos = ent:WorldSpaceCenter()
+        local t = math.Clamp((center - entPos):Dot(vel) / speedSqr, 0, K.throwThreatLead)
+        if t <= 0 then continue end
+        local closest = entPos + vel * t
+        local dist = closest:Distance(center)
+        local radius = K.throwThreatRadius + ent:BoundingRadius() * 0.5
+        if dist > radius then continue end
+
+        seen[ent] = now + 1.5
+        local proximity = 1 - dist / radius
+        local heavy = math.Clamp(phys:GetMass() / 30, 0.5, 2)
+        QueueNearMissThreat(ply, closest, 2 + proximity * K.throwThreatForce * heavy, K.throwThreatPanic * heavy, t + 0.1)
+    end
+
+    for ent, untilTime in pairs(seen) do
+        if untilTime <= now or not IsValid(ent) then seen[ent] = nil end
+    end
+end
+
+timer.Create("ZCity_Wind_FlyingThreats", 0.1, 0, function()
+    if not config.Suppression or not hg or not hg.PsycheCombat then return end
+    local K = hg.PsycheCombat
+    local now = CurTime()
+    for _, ply in PlayerIterator() do
+        if IsValid(ply) and ply:Alive() and ply.organism and not ply.organism.otrub then
+            ScanFlyingThreats(ply, K, now)
+        end
+    end
+end)
+
 function ZW.RegisterServerSuppressionBridge()
     local plugin = hg and hg.PhysBullet
     if not plugin then return false end

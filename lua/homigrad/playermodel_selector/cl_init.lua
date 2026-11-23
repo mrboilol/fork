@@ -27,6 +27,7 @@ end
 local sndClick, sndRelease, sndHover = "shitty/tap_depress.ogg", "shitty/tap_release.ogg", "shitty/tap-resonant.ogg"
 local idleAnims = {"idle_all_01", "menu_walk", "pose_standing_02", "idle_fist", "idle"}
 local Menu
+local giveClassCvar = CreateClientConVar("hg_pms_giveclass", "1", true, false, "1 - picking a class model in the playermodel selector also gives you that playerclass", 0, 1)
 
 local function CanUse()
 	return LocalPlayer():IsAdmin()
@@ -222,6 +223,7 @@ function Menu()
 			net.WriteUInt(math.Clamp(sel.skin, 0, 255), 8)
 			net.WriteString(table.concat(t, " "))
 			net.WriteString(IsValid(nickEntry) and nickEntry:GetValue() or "")
+			net.WriteBool(giveClassCvar:GetBool())
 		net.SendToServer()
 	end
 
@@ -297,6 +299,13 @@ function Menu()
 		net.SendToServer()
 	end)
 
+	ToggleRow(left, "Give Playerclass", function()
+		return giveClassCvar:GetBool()
+	end, function()
+		giveClassCvar:SetBool(not giveClassCvar:GetBool())
+		QueueApply()
+	end)
+
 	preview = vgui.Create("DModelPanel", left)
 	preview:Dock(FILL)
 	preview:SetFOV(38)
@@ -312,6 +321,10 @@ function Menu()
 		surface.SetDrawColor(clr.border)
 		surface.DrawOutlinedRect(0, 0, w, h, 1)
 		draw.SimpleText("Hold LMB to rotate", "ZB_PMS_Small", w / 2, h - 10, clr.dim, TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM)
+		local entry = hg.GetModelPlayerClass and hg.GetModelPlayerClass(sel.model)
+		if entry then
+			draw.SimpleText("Playerclass: " .. entry.class .. (giveClassCvar:GetBool() and "" or " (off)"), "ZB_PMS_Small", 10, 10, giveClassCvar:GetBool() and clr.orange or clr.dim)
+		end
 	end
 
 	preview.LayoutEntity = function(self, ent)

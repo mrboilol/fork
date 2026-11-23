@@ -21,6 +21,8 @@ local CFG = {
 	FIT_PAD = 0.35,
 	REFERENCE_HALF = 44,
 	COLLAPSED_SCALE = 0.05,
+	STRETCH_FACTOR = 4,
+	STRETCH_SLACK = 12,
 	FIT_SMOOTH_RATE = 6,
 	OUTLINE_PIXELS = 2,
 	DISLOCATION = 0.85,
@@ -373,15 +375,28 @@ local function regionProxy(region)
 end
 
 local parentRot = Matrix()
+local rebuiltBone = {}
+
+local function boneBroken(world, parentWorld, rel, modelScale)
+	local scale = world:GetScale()
+	if math.min(scale.x, scale.y, scale.z) < CFG.COLLAPSED_SCALE then return true end
+
+	local pos = world:GetTranslation()
+	if pos.x ~= pos.x or pos.y ~= pos.y or pos.z ~= pos.z then return true end
+
+	local reach = rel:GetTranslation():Length() * modelScale * CFG.STRETCH_FACTOR + CFG.STRETCH_SLACK
+
+	return pos:DistToSqr(parentWorld:GetTranslation()) > reach * reach
+end
 
 local function restoreCollapsedBones(ent)
 	local modelScale = ent:GetModelScale() or 1
 	for i = 0, boneCount - 1 do
+		rebuiltBone[i] = false
 		local parent, rel = parentOf[i], refLocal[i]
 		if haveWorld[i] and parent and rel and haveWorld[parent] then
 			local world = worldMats[i]
-			local scale = world:GetScale()
-			if math.min(scale.x, scale.y, scale.z) < CFG.COLLAPSED_SCALE then
+			if rebuiltBone[parent] or boneBroken(world, worldMats[parent], rel, modelScale) then
 				local parentWorld = worldMats[parent]
 				local parentPos = parentWorld:GetTranslation()
 				parentRot:Identity()
@@ -390,6 +405,7 @@ local function restoreCollapsedBones(ent)
 				local rebuilt = parentRot * rel
 				rebuilt:SetTranslation(parentPos + (rebuilt:GetTranslation() - parentPos) * modelScale)
 				world:Set(rebuilt)
+				rebuiltBone[i] = true
 			end
 		end
 	end
@@ -715,4 +731,42 @@ hook.Add("HUDPaint", "homigrad/body-status-model/draw", function()
 
 	local ok, err = pcall(drawFigure, alpha)
 	if not ok then ErrorNoHalt(err, "\n") end
+end)
+
+concommand.Add("hg_simplesubrosa_debug", function()
+	local parts = {}
+	for index = 1, tintedCount do
+		local region = tinted[index]
+		parts[#parts + 1] = region .. "=" .. regionKey(region)
+	end
+	print("[subrosa] proxy", IsValid(proxy), "bones", boneCount, "tinted", tintedCount, table.concat(parts, " "))
+	local ply = LocalPlayer()
+	local org = ply.new_organism or ply.organism
+	if istable(org) then print("[subrosa] org rarm", org.rarm, org.rarm_up, org.rarm_down, "larm", org.larm, org.larm_up, org.larm_down) else print("[subrosa] no org") end
+	local unwritable = {}
+	for i = 0, (boneCount or 0) - 1 do
+		if not writable[i] and IsValid(proxy) and proxy:BoneHasFlag(i, BONE_USED_BY_VERTEX_LOD0) then unwritable[#unwritable + 1] = proxy:GetBoneName(i) end
+	end
+	print("[subrosa] latched unwritable", table.concat(unwritable, ", "))
+	for index = 1, tintedCount do
+		local region = tinted[index]
+		local ent = regionProxies[region]
+		if IsValid(ent) then
+			ent:InvalidateBoneCache()
+			ent:SetupBones()
+			local shown, hidden = 0, 0
+			for i = 0, boneCount - 1 do
+				local m = ent:GetBoneMatrix(i)
+				if m and boneRegion[i] == region then
+					shown = shown + 1
+					if shown <= 2 then print("[subrosa]", region, ent:GetBoneName(i), m:GetTranslation(), localMats[i]:GetTranslation(), m:GetScale()) end
+				elseif m and m:GetScale():Length() < 0.01 then
+					hidden = hidden + 1
+				end
+			end
+			print("[subrosa]", region, "visible bones", shown, "collapsed others", hidden)
+		else
+			print("[subrosa]", region, "proxy invalid")
+		end
+	end
 end)

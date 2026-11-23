@@ -163,7 +163,7 @@ if CLIENT then
         cam.End3D()
     end
     
-    hg.DrawFirstPersonHelmet = DrawFirstPersonHelmet
+    hg.DrawFirstPersonEquipment = DrawFirstPersonEquipment
     local scrw, scrh = ScrW() + 1, ScrH() + 1
 
     local function DrawSimpleOverlay(self, ply)

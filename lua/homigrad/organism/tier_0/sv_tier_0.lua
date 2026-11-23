@@ -69,6 +69,10 @@ hook.Add("PlayerSpawn", "homigrad-organism-oxygen-safety", function(ply)
 		if not org.o2 then return end
 		org.o2[1] = math.max(tonumber(org.o2.range) or 30, 1)
 		org.o2.curregen = tonumber(org.o2.regen) or 4
+		org.bloodO2Cap = org.o2[1]
+		org.bloodCarryO2Cap = org.o2[1]
+		org.perfusionO2Cap = org.o2[1]
+		org.circulatoryO2Reserve = 1
 		org.lungsfunction = true
 		org.oxygenIntakeAvailable = true
 		org.bodyoxygen = 1

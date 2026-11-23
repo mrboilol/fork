@@ -29,6 +29,7 @@ local MEDICAL_WEAPON_CLASSES = {
     "weapon_mannitol",
     "weapon_naloxone",
     "weapon_tranexamic_acid",
+    "weapon_streptokinase",
     "weapon_betablock",
     "weapon_autoresuscitator",
     "weapon_horse_tranq",
@@ -127,7 +128,7 @@ local function GetMinigameType(wep)
         return "tourniquet"
     end
 
-    if class == "weapon_morphine" or class == "weapon_fentanyl" or class == "weapon_needle" or class == "weapon_adrenaline" or class == "weapon_mannitol" or class == "weapon_naloxone" or class == "weapon_tranexamic_acid" or class == "weapon_horse_tranq" or class == "weapon_fury13" or class == "weapon_fury16" then
+    if class == "weapon_morphine" or class == "weapon_fentanyl" or class == "weapon_needle" or class == "weapon_adrenaline" or class == "weapon_mannitol" or class == "weapon_naloxone" or class == "weapon_tranexamic_acid" or class == "weapon_streptokinase" or class == "weapon_horse_tranq" or class == "weapon_fury13" or class == "weapon_fury16" then
         return "syringe"
     end
 

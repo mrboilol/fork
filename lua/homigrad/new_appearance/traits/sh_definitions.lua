@@ -16,7 +16,6 @@ Register("skin_and_bones", {Name = "Thick Skinned", Description = "You are resis
 Register("vibrams", {Name = "vibram ones", Description = "im vibraming it", Category = "positive", Points = 3, SortOrder = 100, Modifiers = {slip_chance = 0.03, terrain_trip_chance = 0.1, collision_trip_chance = 0.1, climb_stamina_cost = 0.45, climb_force = 1.45, movement_debuff_resistance = 0.35}, OnRemove = function(ply) ply.HGVibramRecoveryID = (ply.HGVibramRecoveryID or 0) + 1 end})
 
 Register("paraplegic", {Name = "Paraplegic", Description = "Your legs are useless.", Category = "negative", Points = 6, SortOrder = 10, Modifiers = {climb_force = 1.45, climb_stamina_cost = 0.45}, AmputationLimbPool = {"larm", "rarm"}})
-Register("blind", {Name = "Blind", Description = "WIP WIP WIP AA", Category = "negative", Points = 6, SortOrder = 20})
 Register("anemic", {Name = "Anemic", Description = "You naturally have less red blood cells.", Category = "negative", Points = 3, SortOrder = 30, Bonuses = {blood_capacity = -1000}})
 Register("stormtrooper", {Name = "Stormtrooper", Description = "You have ass aim.", Category = "negative", Points = 2, SortOrder = 40, Modifiers = {weapon_handling = 1.75, gun_accuracy = 2.2}})
 Register("kirk", {Name = "Kirk", Description = "dont get kirked", Category = "negative", Points = 3, SortOrder = 50, Modifiers = {artery_damage = 1.75}})
@@ -50,7 +49,7 @@ if CLIENT then
 
 	hook.Add("RenderScreenspaceEffects", "HGTraitsJohnVision", function()
 		local ply = LocalPlayer()
-		if IsValid(ply) and ply:Alive() and ply:HasTrait("john") and not ply:HasTrait("blind") then hg.DrawWorldMotionBlur(0.05, 0.08, 0.01) end
+		if IsValid(ply) and ply:Alive() and ply:HasTrait("john") then hg.DrawWorldMotionBlur(0.05, 0.08, 0.01) end
 	end)
 
 	hook.Add("EntityEmitSound", "HGTraitsAphasiaVoice", function(data)

@@ -41,7 +41,7 @@ ENT.Overlay.Fov = 0
 ENT.Overlay.ModelMaterial = nil
 ENT.Overlay.Model = "models/eft_props/gear/helmets/helmet_s_sh_68.mdl"
 
-ENT.DrawOverlay = hg.DrawFirstPersonHelmet
+ENT.DrawOverlay = hg.DrawFirstPersonEquipment
 --\\ Balistic settings                              -- soon can be enchanced, per plate material, durability and other stuff
 
 --\\ HitBoxSets Hitbox Creation

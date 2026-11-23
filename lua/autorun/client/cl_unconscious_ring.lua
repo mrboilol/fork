@@ -939,7 +939,7 @@ local function DrawSuitECG(ply, org, critical)
 
     local base = suitECGGordon
     if className == "Combine" then
-        base = suitECGRedRoles[ply:GetNWString("PlayerRole")] and suitECGCombineRed or suitECGCombine
+        base = (hg.CombineHUDRed and hg.CombineHUDRed(ply) or suitECGRedRoles[ply:GetNWString("PlayerRole")]) and suitECGCombineRed or suitECGCombine
     end
     if critical then
         base = base:Lerp(suitECGCritical, math.abs(math.sin(CurTime() * 3)))

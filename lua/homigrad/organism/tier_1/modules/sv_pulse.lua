@@ -131,7 +131,7 @@ local function updateStrokeRisk(org, timeValue)
 		Remap(tonumber(org.systolic) or 120, 160, 220, 0, 1),
 		math.Clamp(tonumber(org.hypertension) or 0, 0, 1)
 	)
-	if not org.otrub then bloodPressureRisk = 0 end
+	if not org.otrub then bloodPressureRisk = bloodPressureRisk * 0.8 end
 	local brainDamage = math.Clamp(math.max(
 		tonumber(org.brain) or 0,
 		tonumber(org.brainFrontal) or 0,
@@ -173,7 +173,8 @@ local function updateStrokeRisk(org, timeValue)
 		if hypertensiveEmergency > 0 and org.otrub then
 			exposureTime = math.min(exposureTime, Lerp(hypertensiveEmergency, 60, 12))
 		end
-		exposure = math.min(exposure + timeValue * (strokeRisk - 0.35) / exposureTime, 1)
+		local lysisMul = 1 - Clamp(tonumber(org.streptokinase) or 0, 0, 1) * 0.6
+		exposure = math.min(exposure + timeValue * (strokeRisk - 0.35) / exposureTime * lysisMul, 1)
 		org.strokeBadTime = (tonumber(org.strokeBadTime) or 0) + timeValue * (0.5 + (strokeRisk - 0.35) / 0.65)
 	else
 		exposure = math.max(exposure - timeValue / 45, 0)
@@ -945,6 +946,7 @@ module[1] = function(org)
 	org.strokeExposure = 0
 	org.strokeBadTime = 0
 	org.nextStrokeTime = 0
+	if hg.organism.ResetVascularEvents then hg.organism.ResetVascularEvents(org) end
 	org.sympatheticCompensation = 0
 	org.hypotension = 0
 	org.hypotensionExposure = 0
@@ -1169,7 +1171,8 @@ module[2] = function(owner, org, timeValue)
 	org.pulseDeficit = math.max((org.heartbeat or 0) - palpablePulseTarget, 0)
 	org.pulse = Approach(org.pulse, palpablePulseTarget, heart == 0 and timeValue * 10 or timeValue * 8)
 	local pressureCirculation = circulation * Clamp(1 - rhythmInstability * 0.24, 0.70, 1)
-	local pressureTarget = Clamp((92 * pressureCirculation ^ 0.75 + hypervolemia * 55) * (1 - Clamp(org.shockVasoplegia or 0, 0, 0.7)), 0, 180)
+	local pressureTarget = Clamp((92 * pressureCirculation ^ 0.75 + hypervolemia * 55) * (1 - Clamp(org.shockVasoplegia or 0, 0, 0.7))
+		* (1 - Clamp(tonumber(org.streptokinase) or 0, 0, 2) * 0.14 - Clamp(tonumber(org.pulmonaryEmbolism) or 0, 0, 1) * 0.3 + Clamp(tonumber(org.clotBurden) or 0, 0, 1) * 0.08), 0, 180)
 	local pressureNow = tonumber(org.bloodPressure) or pressureTarget
 	local pressureFallRate = org.heartstop and not (dihSupport or defibGrace or cprSupport) and 22 or 12
 	org.bloodPressure = Approach(pressureNow, pressureTarget, timeValue * (pressureTarget > pressureNow and 12 or pressureFallRate))
@@ -1244,6 +1247,7 @@ module[2] = function(owner, org, timeValue)
 	org.hypertension = Approach(org.hypertension or 0, hypertensionTarget, timeValue / (sedativePressureRelief > 0 and 8 or 20))
 	hg.organism.UpdatePerfusion(owner, org, timeValue)
 	updateStrokeRisk(org, timeValue)
+	if hg.organism.UpdateVascularEvents then hg.organism.UpdateVascularEvents(owner, org, timeValue) end
 	-- Normalized stroke volume separates a fast electrical rate from how much
 	-- blood each effective beat is actually moving.
 	local rateFactor = math.max((org.heartbeat or 0) / 70, 0.1)
@@ -1300,6 +1304,7 @@ module[2] = function(owner, org, timeValue)
 	heartbeat = heartbeat + sympatheticCompensation * (10 + 30 * perfusionNeed)
 	heartbeat = heartbeat + myocardialTachycardia
 	heartbeat = heartbeat - 40 * math.min(org.analgesia / 2.5, 1)
+	heartbeat = heartbeat - 12 * Clamp(tonumber(org.streptokinase) or 0, 0, 2) + 35 * Clamp(tonumber(org.pulmonaryEmbolism) or 0, 0, 1)
 	heartbeat = heartbeat + 100 * math.Clamp(math.Remap(org.temperature, 40, 42, 0, 1), 0, 1)
 	heartbeat = heartbeat - 160 * (1 - math.Clamp(math.Remap(org.temperature, 28, 36.7, 0, 1), 0, 1))
 

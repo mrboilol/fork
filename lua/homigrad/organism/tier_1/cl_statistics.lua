@@ -121,6 +121,8 @@ local list = {
 	{"trachea", 1, true},
 	{"pneumothorax", 1, true},
 	{"hemothorax", 1, true},
+	{"lungWater", 1, true},
+	{"pneumonia", 1, true},
 	0,
 	{"heart", 1, true},
 	{"heartstop", true, true},

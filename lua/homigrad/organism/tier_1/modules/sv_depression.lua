@@ -430,6 +430,7 @@ local function getDyingLevel(org)
 
 	return max(blood, bleed, o2, fading, internal)
 end
+hg.organism.GetDyingLevel = getDyingLevel
 
 local function getTreatment(org)
 	if CurTime() < (org.betaBlockerUntil or 0) then return 1 end

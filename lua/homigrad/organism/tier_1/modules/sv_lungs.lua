@@ -79,6 +79,7 @@ module[1] = function(org)
 	org.hemothoraxL = 0
 	org.hemothoraxR = 0
 	org.internalBleedLungSide = nil
+	if hg.organism.ResetPneumonia then hg.organism.ResetPneumonia(org) end
 
 	org.needle = 0
 
@@ -111,6 +112,10 @@ module[1] = function(org)
 	
 
 	org.o2[1] = org.o2.range
+	org.bloodO2Cap = org.o2.range
+	org.bloodCarryO2Cap = org.o2.range
+	org.perfusionO2Cap = org.o2.range
+	org.cardiacArrestO2Start = nil
 
 	org.CO = 0
 	org.co2 = 0
@@ -709,6 +714,10 @@ module[2] = function(owner, org, timeValue)
 		org.breathPanic = 0
 		org.oxygenIntakeAvailable = true
 		org.lungsfunction = true
+		org.bloodO2Cap = o2.range
+		org.bloodCarryO2Cap = o2.range
+		org.perfusionO2Cap = o2.range
+		org.circulatoryO2Reserve = 1
 		return
 	end
 
@@ -879,6 +888,7 @@ module[2] = function(owner, org, timeValue)
 	local couldBreathe = success
 
 	if success and owner:IsPlayer() and inwater and not scubaOxygenActive then success = false end
+	if hg.organism.UpdatePneumonia then hg.organism.UpdatePneumonia(owner, org, timeValue, inwater and not scubaOxygenActive) end
 
 	if success and org.choking then org.needfake = true success = false end
 
@@ -962,7 +972,7 @@ module[2] = function(owner, org, timeValue)
 	-- arterial desaturation.
 	local lungGasExchange = 1 - lungDamage
 	local airwayGasExchange = needleActive and 1 or math.Clamp(1 - (org.trachea or 0) * 0.8, 0, 1)
-	local thoracicGasExchange = math.Clamp(1 - (org.pneumothorax or 0) * 0.70 - (org.hemothorax or 0) * 0.65, 0, 1)
+	local thoracicGasExchange = math.Clamp(1 - (org.pneumothorax or 0) * 0.70 - (org.hemothorax or 0) * 0.65 - (tonumber(org.pulmonaryEmbolism) or 0) * 0.6 - (tonumber(org.lungWater) or 0) * 0.65 - (tonumber(org.pneumonia) or 0) * 0.35, 0, 1)
 	local respiratoryDrive = math.Clamp(1 - math.max(drugRespiratoryDepression * 0.95, math.Clamp(tonumber(org.spinalBradypnea) or 0, 0, 1) * 0.85), 0, 1)
 	local ventilationAvailable = success and 1 or 0
 	local rawGasExchange = math.Clamp(lungGasExchange * airwayGasExchange * thoracicGasExchange * respiratoryDrive * ventilationAvailable * org.breathEfficiency * org.breathDepth, 0, 1)
@@ -1107,7 +1117,7 @@ module[2] = function(owner, org, timeValue)
 		-- rate above.  A small floor keeps a critically injured but not yet fully
 		-- failed lung from snapping to zero in one tick.
 		if org.heartstop then regenerate = 0 end
-		local lungO2Cap = o2.range * math.max(1 - org.pneumothorax * org.pneumothorax, 0.1) * math.max(1 - (org.hemothorax or 0) * (org.hemothorax or 0), 0.1) * math.max(1 - lungDamage, 0.1)
+		local lungO2Cap = o2.range * math.max(1 - org.pneumothorax * org.pneumothorax, 0.1) * math.max(1 - (org.hemothorax or 0) * (org.hemothorax or 0), 0.1) * math.max(1 - (tonumber(org.lungWater) or 0) ^ 2, 0.1) * math.max(1 - lungDamage, 0.1)
 		o2[1] = min(o2[1] + regenerate * math.Clamp(org.o2[1] / 30, 0.25, 1) * (org.holdingbreath and 0 or 1) * (sprayed and 0 or 1) * min((10 / max(org.CO,1)),1), min(lungO2Cap, bloodO2Cap, coldO2Cap, altitudeO2Cap, exertionO2Cap, airwayO2Cap, hypercapniaO2Cap))
 
 
@@ -1424,7 +1434,7 @@ module[2] = function(owner, org, timeValue)
 
 
 
-	if (org.lungsL[1] == 1 and org.lungsR[1] == 1) or org.heartstop or org.respiratoryArrest or (org.hemothorax or 0) >= 0.9 then
+	if (org.lungsL[1] == 1 and org.lungsR[1] == 1) or org.heartstop or org.respiratoryArrest or (org.hemothorax or 0) >= 0.9 or (tonumber(org.lungWater) or 0) >= 0.9 then
 
 		org.lungsfunction = false
 

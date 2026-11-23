@@ -39,8 +39,6 @@ local LINES = {
 	},
 }
 
-local MELEE_BASES = {weapon_melee = true}
-
 local function getTraining(ply)
 	return hg.GetPsycheTraining and hg.GetPsycheTraining(ply) or 0
 end
@@ -161,29 +159,6 @@ local function updateCover(owner, org, now, K)
 		filter = {owner, hg.GetCurrentCharacter(owner), attacker, attackerChar},
 		mask = MASK_SHOT
 	}).Hit
-end
-
-local function isMeleeWeapon(wep)
-	return IsValid(wep) and (wep.ismelee or wep.ismelee2 or MELEE_BASES[wep.Base]) and true or false
-end
-
-local function updateMelee(owner, org, now, K)
-	if now < (org.psycheMeleeNext or 0) then return end
-	org.psycheMeleeNext = now + 0.2
-	local eye = owner:EyePos()
-	local radiusSqr = K.meleeRadius * K.meleeRadius
-
-	for _, other in player.Iterator() do
-		if other == owner or not other:Alive() then continue end
-		if not other:KeyDown(IN_ATTACK) or not isMeleeWeapon(other:GetActiveWeapon()) then continue end
-		local otherEye = other:EyePos()
-		if otherEye:DistToSqr(eye) > radiusSqr then continue end
-		if other:GetAimVector():Dot((eye - otherEye):GetNormalized()) < K.meleeDot then continue end
-
-		org.psycheMeleeNext = now + K.meleeCooldown
-		hg.organism.AddPanicAttack(org, K.meleePanic, true, false, true, true)
-		return
-	end
 end
 
 local function updateOxygen(org, timeValue, K)
@@ -372,7 +347,6 @@ hook.Add("Org Think", "CombatPsyche", function(owner, org, timeValue)
 	local now = CurTime()
 	updateCrash(owner, org, timeValue, K)
 	updateCover(owner, org, now, K)
-	updateMelee(owner, org, now, K)
 	updateOxygen(org, timeValue, K)
 	updateIsolation(owner, org, timeValue, now, K)
 	updateAnger(owner, org, timeValue, K)

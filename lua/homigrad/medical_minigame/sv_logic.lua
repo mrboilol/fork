@@ -525,7 +525,7 @@ local function GetMedicalMinigameType(wep)
 
     if class == "weapon_morphine" or class == "weapon_fentanyl" or class == "weapon_needle" or
        class == "weapon_painkillers" or class == "weapon_zerlkers" or class == "weapon_adrenaline" or class == "weapon_thiamine" or
-       class == "weapon_mannitol" or class == "weapon_naloxone" or class == "weapon_tranexamic_acid" or
+       class == "weapon_mannitol" or class == "weapon_naloxone" or class == "weapon_tranexamic_acid" or class == "weapon_streptokinase" or
        class == "weapon_betablock" or class == "weapon_autoresuscitator" or class == "weapon_horse_tranq" or
        class == "weapon_fury13" or class == "weapon_fury16" or (class == "weapon_medkit_sh" and (wep.mode == 2 or wep.mode == 3 or wep.mode == 5)) then
         return "syringe"
@@ -966,7 +966,7 @@ net.Receive("hg_medical_minigame_finish", function(len, ply)
 
             if not isIncremental then
                 if class == "weapon_tranexamic_acid" or class == "weapon_adrenaline" or class == "weapon_naloxone" or
-                   class == "weapon_mannitol" or class == "weapon_thiamine" or class == "weapon_betablock" or
+                   class == "weapon_mannitol" or class == "weapon_thiamine" or class == "weapon_betablock" or class == "weapon_streptokinase" or
                    class == "weapon_painkillers" or class == "weapon_zerlkers" or class == "weapon_needle" or class == "weapon_fury13" or
                    class == "weapon_fury16" or class == "weapon_autoresuscitator" then
                     hook.Run("hg_medical_minigame_finished", ply, target, minigameType)

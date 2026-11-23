@@ -1,5 +1,18 @@
 local CLASS = player.RegClass("Combine")
 
+local combineRedRoles = {Leader = true, Shotgunner = true, Elite = true}
+
+function hg.CombineModelSubclass(ent)
+    local model = string.lower(ent:GetModel() or "")
+    if model == "models/player/combine_super_soldier.mdl" then return "elite" end
+    if model == "models/player/combine_soldier.mdl" and ent:GetSkin() == 1 then return "shotgunner" end
+end
+
+function hg.CombineHUDRed(ply)
+    if combineRedRoles[ply:GetNWString("PlayerRole")] then return true end
+    return hg.CombineModelSubclass(ply) ~= nil
+end
+
 local callsigns = {
     "Alfa","Bravo","Charlie","Delta","Echo",
     "Foxtrot","Tango","Sierra","Uniform","Kilo","Yankee","Regent",
@@ -499,8 +512,7 @@ if CLIENT then
         if not self:Alive() then return end
         local lply = LocalPlayer()
         local frt = FrameTime() * 5
-        local role = self:GetNWString("PlayerRole")
-        local is_red = (role == "Leader" or role == "Shotgunner" or role == "Elite")
+        local is_red = hg.CombineHUDRed(self)
 
         --;; HP
         do
@@ -692,8 +704,7 @@ if CLIENT then
     hook.Add("RenderScreenspaceEffects","Combine_helmet",function()
         local lply = LocalPlayer()
         if lply:Alive() and lply.PlayerClassName == "Combine" then
-            local role = lply:GetNWString("PlayerRole")
-            if role == "Elite" or role == "Shotgunner" then
+            if hg.CombineHUDRed(lply) then
                 surface.SetDrawColor(255,25,25,255)
             else
                 surface.SetDrawColor(25,190,190,255)
@@ -876,8 +887,7 @@ if CLIENT then
             hook.Add("RenderScreenspaceEffects","PNV_ColorCorrection",function()
                 if ply.PlayerClassName ~= "Combine" then return end
                 local progress = math.min((CurTime() - transition_start)/transition_time,1)
-                local class = ply:GetNWString("PlayerRole")
-                local cc = (class == "Elite" or class == "Shotgunner") and table.Copy(pnv_color_2) or table.Copy(pnv_color_1)
+                local cc = hg.CombineHUDRed(ply) and table.Copy(pnv_color_2) or table.Copy(pnv_color_1)
                 for k,v in pairs(cc) do
                     cc[k] = v * progress
                 end
@@ -896,8 +906,7 @@ if CLIENT then
         local ply = LocalPlayer()
         if ply.PlayerClassName ~= "Combine" then return end
         if pnv_enabled then
-            local class = ply:GetNWString("PlayerRole")
-            local cc = (class == "Elite" or class == "Shotgunner") and pnv_color_2 or pnv_color_1
+            local cc = hg.CombineHUDRed(ply) and pnv_color_2 or pnv_color_1
             DrawColorModify(cc)
             DrawBloom(0.1,0.5,2,2,1,0.4,1,1,1)
         end

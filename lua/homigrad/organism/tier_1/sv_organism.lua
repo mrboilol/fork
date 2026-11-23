@@ -585,7 +585,7 @@ local function send_organism(org, ply, recipientForce, reliable)
 	for _, key in ipairs({
 		"painkiller", "goodmood", "hungry", "satiety", "palpitations", "unstableRhythm", "ecgState",
 		"strokeVolume", "hypoxiaTime", "intracranialPressure", "peripheralperfusion", "perfusionMoveMul",
-		"legstrength", "armstrength", "losing_oxy", "respiratoryArrest", "pneumothorax", "hemothorax",
+		"legstrength", "armstrength", "losing_oxy", "respiratoryArrest", "pneumothorax", "hemothorax", "lungWater", "pneumonia",
 		"skull", "chest", "heart", "trachea", "liver", "flank", "gut", "lungsL", "lungsR",
 		"spine1", "spine2", "spine3", "spine2stabilized", "spine3stabilized", "spine2splinted", "spine3splinted",
 		"spinalBradypnea", "spinalBradycardia", "internalBleed", "internalBleedComplication", "wantToVomit",
@@ -821,7 +821,7 @@ local function send_bareinfo(org, force, reliable)
 		"arteria", "rarmartery", "larmartery", "rlegartery", "llegartery", "aorta",
 		"cardiacTamponade", "ischemia", "brainSwelling", "intracranialPressure", "hypoxiaTime",
 		"peripheralperfusion", "perfusionMoveMul", "legstrength", "armstrength", "losing_oxy",
-		"respiratoryArrest", "pneumothorax", "hemothorax", "strokeVolume", "ecgState",
+		"respiratoryArrest", "pneumothorax", "hemothorax", "lungWater", "pneumonia", "strokeVolume", "ecgState",
 		"palpitations", "unstableRhythm", "concussion", "nausea", "consciousness", "temperature",
 		"fear", "satiety", "hemotransfusionshock", "weight", "maxweight", "health", "canmove",
 		"brain", "co2", "etco2", "CO", "bradyapnea", "respiratoryRate", "oxygenIntakeAvailable",

@@ -388,6 +388,7 @@ local function tickOxy(owner, org, state, timeValue)
 	if (tonumber(org.needle) or 0) > 0 then gainMul = gainMul * oxyConfig.needleGainMul end
 
 	local gain = org.heartstop and 0 or state.lungOxyRate or 0
+	if SimpleHealth.BloodNoOxyConVar:GetBool() and not (state.airwayBlocked or org.holdingbreath or (tonumber(org.CO) or 0) > 1) then gain = 0 end
 	if state.lethalCrit then gain = gain + oxyConfig.hardCritGain end
 
 	local overdose, sedative = SimpleHealth.GetOverdose(org)
@@ -425,11 +426,28 @@ local function tickRegen(owner, org, state, timeValue)
 	SoftTissue.Regen(org, timeValue, damageConfig.passiveBruteRegen, damageConfig.passiveBurnRegen)
 end
 
+local function boostedRegenMul(owner, org)
+	local mul = 0
+	if (tonumber(org.fury13) or 0) > 0 then mul = mul + 15 end
+	if IsValid(owner) and owner:IsPlayer() then
+		if owner.PlayerClassName == "furry" then mul = mul + 10 end
+		if owner.IsBerserk and owner:IsBerserk() then mul = mul + 10 * math.max(tonumber(org.berserk) or 1, 1) end
+	end
+	local noradrenaline = tonumber(org.noradrenaline) or 0
+	if noradrenaline > 0 then mul = mul + 5 * noradrenaline end
+
+	return mul
+end
+
 local function tickFuryRegen(owner, org, state, timeValue)
-	if (tonumber(org.fury13) or 0) <= 0 or state.flatline or state.fibrillating then return end
+	if state.flatline or state.fibrillating then return end
+
+	local mul = boostedRegenMul(owner, org)
+	if mul <= 0 then return end
 
 	local damageConfig = CONFIG.damage
-	SoftTissue.Regen(org, timeValue, damageConfig.passiveBruteRegen * 15, damageConfig.passiveBurnRegen * 15)
+	SoftTissue.Regen(org, timeValue, damageConfig.passiveBruteRegen * mul, damageConfig.passiveBurnRegen * mul)
+	state.toxin = math.max((state.toxin or 0) - damageConfig.passiveBruteRegen * mul * timeValue, 0)
 end
 
 local function tickTemperature(owner, org, state, timeValue)
@@ -605,6 +623,7 @@ local function tickConsciousness(owner, org, state, timeValue)
 	if state.health <= softAt and not SimpleHealth.IsCritImmune(org) then
 		ceiling = Lerp(rampUp(softAt - state.health, 0, softAt - hardAt), 1, consciousnessConfig.hardCritFloor)
 	end
+	ceiling = math.min(ceiling, 1 - rampUp(consciousnessConfig.bloodCapStart - blood, 0, consciousnessConfig.bloodCapStart - CONFIG.deathBlood) * consciousnessConfig.bloodCapMax)
 
 	local rate = drain > 0 and -drain or consciousnessConfig.recover
 	local previousCap = state.consciousnessCap
@@ -968,6 +987,7 @@ local function sanitizeOrgans(owner, org)
 	org.hemothoraxL = 0
 	org.hemothoraxR = 0
 	org.hemothoraxTrauma = 0
+	if hg.organism.ResetPneumonia then hg.organism.ResetPneumonia(org) end
 	org.cardiacTamponade = 0
 
 	for _, key in ipairs(LUNG_KEYS) do

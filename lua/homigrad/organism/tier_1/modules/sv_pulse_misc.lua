@@ -208,8 +208,9 @@ function hg.organism.UpdateCirculatoryEffects(owner, org, timeValue, o2Value, ar
 end
 
 function hg.organism.UpdateBodyTemperature(owner, org, timeValue)
-	local lowPulseCold = Clamp(getLowPulseSeverity(org.pulse) / (55 / 70), 0, 1)
-	local needed_temp = math.min(36.7 - lowPulseCold * 5.7, org.lowBloodTemperatureTarget or 36.7) + (tonumber(org.sepsisFever) or 0)
+	local heartbeat = org.heartstop and 0 or (tonumber(org.heartbeat) or 70)
+	local lowPulseCold = Clamp(getLowPulseSeverity(org.pulse) / (55 / 70), 0, 1) * (1 - Clamp((heartbeat - 110) / 60, 0, 1) * 0.6)
+	local needed_temp = math.min(36.7 - lowPulseCold * 5.7, org.lowBloodTemperatureTarget or 36.7) + max(tonumber(org.sepsisFever) or 0, tonumber(org.pneumoniaFever) or 0) + Clamp((heartbeat - 100) / 80, 0, 1) * 0.8
 	if IsValid(owner) then
 		local character = hg.GetCurrentCharacter(owner)
 		if not IsValid(character) then character = owner end

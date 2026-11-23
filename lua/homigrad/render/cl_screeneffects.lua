@@ -480,10 +480,6 @@ local function DrawDepressionEffect(org)
 	UpdateDepressionAudio(depression, org.otrub)
 end
 
-local function HasBlindTrait()
-	return IsValid(lply) and lply:HasTrait("blind")
-end
-
 local PainLerp = 0
 local painThresholdIntensityLerp = 1
 local PanicAttackLerp = 0
@@ -1537,7 +1533,7 @@ drawFinalVitalsVignettes = function()
 			chromaticMat:SetInt("$c0_y", 1)
 			render.SetMaterial(chromaticMat)
 			render.DrawScreenQuad()
-			if not HasBlindTrait() and motionBlurCause > 0.06 then
+			if motionBlurCause > 0.06 then
 				hg.DrawWorldMotionBlur(0.004 + motionBlurCause * 0.02, (collapseVisualLerp * 0.08 + blink * 0.05) * motionBlurCause, 0.014)
 			end
 		end
@@ -1831,7 +1827,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		adrenalineVisualLerp = math.Approach(adrenalineVisualLerp, 0, FrameTime() * 0.45)
     end
 
-    if not HasBlindTrait() and blurAmount > 0 then
+    if blurAmount > 0 then
         DrawToyTown(blurAmount, ScrH() / 2)
     end
 
@@ -1842,7 +1838,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		render.UpdateScreenEffectTexture()
 		render.UpdateFullScreenDepthTexture()
 
-		blindMat:SetFloat("$c0_x", HasBlindTrait() and 14 or 5)
+		blindMat:SetFloat("$c0_x", 5)
 		blindMat:SetFloat("$c0_y", CurTime())
 		blindMat:SetFloat("$c0_z", eyesmode)
 
@@ -2559,7 +2555,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 
 	local visualDisorientation = hg.GetVisualDisorientation(org)
 	disorientationFxLerp = LerpFT(visualDisorientation > (disorientationFxLerp or 0) and 0.35 or 0.025, disorientationFxLerp or 0, visualDisorientation)
-	if lply:Alive() and not HasBlindTrait() and not org.otrub and disorientationFxLerp > 1.2 then
+	if lply:Alive() and not org.otrub and disorientationFxLerp > 1.2 then
 		local blurPower = math.Clamp((disorientationFxLerp - 1.2) / 7.5, 0, 1)
 		hg.DrawWorldMotionBlur(0.08 + blurPower * 0.12, 0.45 + blurPower * 1.25, 0.01)
 		if blurPower > 0.35 then
@@ -2595,7 +2591,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		if show_some_images_time > 0 then
 			show_some_images_time = show_some_images_time - 1
 
-			if not HasBlindTrait() then hg.DrawWorldMotionBlur(0.035 + brainTrauma * 0.065, 0.22 + brainTrauma * 0.5, 0.018) end
+			hg.DrawWorldMotionBlur(0.035 + brainTrauma * 0.065, 0.22 + brainTrauma * 0.5, 0.018)
 			local flashRoll = math.max(math.floor(18 * (1 - brainTrauma)), 1)
 			if show_image_time <= 0 and math.random(flashRoll) < 2 then
 				show_image_time = 95 * math.Rand(0.12, 1) * (math.random(2) == 1 and 0.1 or 1)
@@ -3216,14 +3212,14 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		render.DrawScreenQuad()
 
 		-- Motion blur disorientation
-		if not HasBlindTrait() and suicideLerp > 0.15 then
+		if suicideLerp > 0.15 then
 			local blurAlpha = 0.1 + suicideLerp * 0.15
 			local blurDraw = suicideLerp * 1.5
 			hg.DrawWorldMotionBlur(blurAlpha, blurDraw, 0.001)
 		end
 
 		-- ToyTown blur at high intensity
-		if not HasBlindTrait() and suicideLerp > 0.4 then
+		if suicideLerp > 0.4 then
 			DrawToyTown((suicideLerp - 0.4) * 2.5, ScrH() / 2)
 		end
 
@@ -3439,7 +3435,7 @@ hook.Add("Post Pre Post Processing", "BrainLobeEffects", function()
 		render.DrawScreenQuad()
 	end
 
-	if not HasBlindTrait() and parietal > 0.01 then
+	if parietal > 0.01 then
 		hg.DrawWorldMotionBlur(0.025 + parietal * 0.08, 0.35 + parietal * 0.55, 0.015 + parietal * 0.09)
 	end
 
@@ -3630,44 +3626,6 @@ local function removeflash()
 	end
 end
 
-local blindEchoPings = {}
-local blindTraitEchoSoundRange = 18000
-local blindTraitEchoRadiusMin = 1200
-local blindTraitEchoRadiusMax = 3200
-
-hook.Add("EntityEmitSound", "HGTraitsBlindEcholocation", function(data)
-	if not HasBlindTrait() then return end
-
-	local source = data.Entity
-	if source == lply or (data.Volume or 1) <= 0.08 then return end
-
-	local pos = data.Pos
-	if not isvector(pos) then
-		if not IsValid(source) then return end
-		pos = source:WorldSpaceCenter()
-	end
-
-	local distanceSqr = pos:DistToSqr(lply:EyePos())
-	if distanceSqr > blindTraitEchoSoundRange ^ 2 then return end
-
-	local power = math.Clamp(((data.SoundLevel or 75) / 100) * (data.Volume or 1), 0.25, 1)
-	local duration = Lerp(power, 0.7, 1.8)
-	local now = CurTime()
-
-	for i = #blindEchoPings, 1, -1 do
-		local ping = blindEchoPings[i]
-		if ping.pos:DistToSqr(pos) <= 96 ^ 2 then
-			ping.power = math.max(ping.power, power)
-			ping.expires = now + duration
-			ping.duration = duration
-			return
-		end
-	end
-
-	blindEchoPings[#blindEchoPings + 1] = {pos = pos, power = power, expires = now + duration, duration = duration, source = source}
-	if #blindEchoPings > 16 then table.remove(blindEchoPings, 1) end
-end)
-
 hook.Add("Post Pain Processing", "DepressionEffects", function()
 	local spect = IsValid(lply:GetNWEntity("spect")) and lply:GetNWEntity("spect")
 	if !lply:Alive() and (!IsValid(spect) or viewmode != 1) then return end
@@ -3675,32 +3633,6 @@ hook.Add("Post Pain Processing", "DepressionEffects", function()
 	local org = lply:Alive() and lply.organism or (IsValid(spect) and spect.organism)
 	if not org then return end
 	DrawDepressionEffect(org)
-end)
-
-hook.Add("PreDrawHalos", "HGTraitsBlindEcholocation", function()
-	if not HasBlindTrait() then
-		table.Empty(blindEchoPings)
-		return
-	end
-
-	local now = CurTime()
-	local outlined = {}
-	for i = #blindEchoPings, 1, -1 do
-		local ping = blindEchoPings[i]
-		local remaining = ping.expires - now
-		if remaining <= 0 then
-			table.remove(blindEchoPings, i)
-		else
-			local radius = Lerp(ping.power, blindTraitEchoRadiusMin, blindTraitEchoRadiusMax)
-			for _, ent in ipairs(ents.FindInSphere(ping.pos, radius)) do
-				if IsValid(ent) and ent != lply and (ent:IsPlayer() or ent:IsNPC() or ent:IsWeapon() or ent:IsRagdoll() or ent:GetMoveType() == MOVETYPE_VPHYSICS) then outlined[ent] = math.max(outlined[ent] or 0, remaining / ping.duration) end
-			end
-			if IsValid(ping.source) then outlined[ping.source] = math.max(outlined[ping.source] or 0, remaining / ping.duration) end
-		end
-	end
-	for ent, intensity in pairs(outlined) do
-		halo.Add({ent}, Color(255, 255, 255, math.floor(255 * intensity)), 0.75 + intensity * 1.25, 0.75 + intensity * 1.25, 1, true, true)
-	end
 end)
 
 hook.Add("PreDrawOpaqueRenderables", "renderblindnessflash", function()
@@ -3730,9 +3662,9 @@ hook.Add("PreDrawOpaqueRenderables", "renderblindnessflash", function()
 	local Ang = view.angles
 	Ang[2] = Ang[2] + (eyesmode == 2 and 90 or eyesmode == 1 and -90 or 0)
 	Ang[1] = eyesmode == 0 and Ang[1] or 0
-	lply.blindflash:SetFarZ(HasBlindTrait() and 1400 or 40)
-	lply.blindflash:SetFOV(HasBlindTrait() and 175 or 160)
-	lply.blindflash:SetBrightness(HasBlindTrait() and 1.4 or 1)
+	lply.blindflash:SetFarZ(40)
+	lply.blindflash:SetFOV(160)
+	lply.blindflash:SetBrightness(1)
 	lply.blindflash:SetPos(view.origin)
 	lply.blindflash:SetAngles(Ang)
 	lply.blindflash:Update()

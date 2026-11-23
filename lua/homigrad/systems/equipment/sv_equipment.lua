@@ -672,10 +672,25 @@ local function applyModelArmor(ply, set)
 	ply:SyncArmor()
 end
 
+local function modelKey(ply)
+	return string.lower(ply:GetModel() or "") .. "#" .. ply:GetSkin()
+end
+
+local function revertModelClass(ply)
+	ply.hgModelClass = nil
+	removeModelArmor(ply)
+	if classArmorOwners[ply.PlayerClassName] then ply:SetPlayerClass() end
+	if ply.hgModelClassColor then ply:SetPlayerColor(ply.hgModelClassColor) end
+	ply.hgModelClassColor = nil
+end
+
 local function updateModelArmor(ply)
+	local key = modelKey(ply)
+	if ply.hgModelArmorModel == key then return end
+	ply.hgModelArmorModel = key
 	local model = string.lower(ply:GetModel() or "")
-	if ply.hgModelArmorModel == model then return end
-	ply.hgModelArmorModel = model
+
+	if ply.hgModelClass then revertModelClass(ply) end
 
 	if classArmorOwners[ply.PlayerClassName] then
 		ply.hgModelArmorSet = nil
@@ -691,6 +706,8 @@ end
 hook.Add("PlayerSpawn", "HG_ModelArmorReset", function(ply)
 	ply.hgModelArmorModel = nil
 	ply.hgModelArmorSet = nil
+	ply.hgModelClass = nil
+	ply.hgModelClassColor = nil
 end)
 
 local armorClasses = {cmb_armor = "Combine", metrocop_armor = "Metrocop"}
@@ -712,9 +729,17 @@ local function updateArmorClass(ply)
 	if not class or ply.PlayerClassName == class then return end
 
 	local model = ply:GetModel()
+	local skin = ply:GetSkin()
+	local fromModel = modelArmorSets[string.lower(model or "")] ~= nil
+	if class == "Combine" and fromModel then ply.subClass = hg.CombineModelSubclass(ply) end
+	ply.hgModelClassColor = ply:GetPlayerColor()
 	ply:SetPlayerClass(class, {bNoEquipment = true})
-	if modelArmorSets[string.lower(model or "")] then ply:SetModel(model) end
-	ply.hgModelArmorModel = string.lower(ply:GetModel() or "")
+	if fromModel then
+		if string.lower(ply:GetModel() or "") ~= string.lower(model) then ply:SetModel(model) end
+		ply:SetSkin(skin)
+	end
+	ply.hgModelClass = true
+	ply.hgModelArmorModel = modelKey(ply)
 end
 
 timer.Create("HG_ModelArmor", 0.5, 0, function()

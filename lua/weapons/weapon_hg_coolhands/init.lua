@@ -1304,6 +1304,7 @@ function SWEP:AttackFront(special_attack, rand)
         if CLIENT then return end
         local owner = self:GetOwner()
         if hg.ChatLog and hg.ChatLog.Swing then hg.ChatLog.Swing(owner, self) end
+        if ZCityWind and ZCityWind.MeleeSwingThreat then ZCityWind.MeleeSwingThreat(owner, self) end
         --self.PenetrationCopy = -(-self.Penetration) -- это как
         owner:LagCompensation(true)
         local attackDist = special_attack and (self.ReachDistance + 8) or 45

@@ -41,7 +41,7 @@ ENT.Overlay.Fov = -40
 ENT.Overlay.ModelMaterial = nil
 ENT.Overlay.Model = "models/monolithservers2/kerry/swat_hat.mdl"
 
-ENT.DrawOverlay = hg.DrawFirstPersonHelmet
+ENT.DrawOverlay = hg.DrawFirstPersonEquipment
 --\\ Balistic settings                              -- soon can be enchanced, per plate material, durability and other stuff
 
 --\\ HitBoxSets Hitbox Creation

@@ -140,8 +140,26 @@ local moodleTexts = {
 	depression = {levels = {
 		[1] = {title = "Shaken", description = "What you saw or how the fight is going is getting to you. Your hands are starting to shake."},
 		[2] = {title = "Losing Hope", description = "You think you are losing. Shaky aim, weaker hits and slower movement. Beta blockers, painkillers or getting away from the fight will help."},
-		[3] = {title = "Desolate", description = "You have given up on winning. Your wounds take you down more easily and you fight badly."},
-		[4] = {title = "Hopeless", description = "You have stopped fighting for your life. If your wounds keep winning, you will black out and die faster."},
+		[3] = {title = "Miserable", description = "You have given up on winning. Your wounds take you down more easily and you fight badly."},
+		[4] = {title = "Broken", description = "You have stopped fighting for your life. If your wounds keep winning, you will black out and die faster."},
+	}},
+	hopelessness = {levels = {
+		[1] = {title = "Alone", description = "You are hurt and nobody is around to help you."},
+		[2] = {title = "Hopeless", description = "Nobody is coming. Your heart is slowing and stumbling."},
+		[3] = {title = "Hopeless", description = "You are dying alone. Your heart is failing and fibrillation hits harder."},
+		[4] = {title = "Hopeless", description = "There is no one left to save you. Your heart is giving out."},
+	}},
+	desolation = {levels = {
+		[1] = {title = "Uneasy", description = "The fight is turning against you."},
+		[2] = {title = "Desolate", description = "You are losing. Your hands shake and adrenaline barely comes."},
+		[3] = {title = "Desolate", description = "Your side is falling apart. Severe shaking and a dread that you will die here."},
+		[4] = {title = "Desolate", description = "It is over and you know it. You can barely hold your weapon still."},
+	}},
+	suicidal = {levels = {
+		[1] = {title = "Accepting", description = "Part of you has stopped caring if you live."},
+		[2] = {title = "Suicidal", description = "You have accepted death. Your body gives up more easily."},
+		[3] = {title = "Suicidal", description = "You just want it to be over faster."},
+		[4] = {title = "Suicidal", description = "You have stopped fighting entirely. You want it to end now."},
 	}},
 	cotard = {levels = {
 		[1] = {title = "Nihilistic Delusion", description = "Your sense of being alive is beginning to feel unreal."},
@@ -505,7 +523,7 @@ local function getMoodle3IconName(effect)
 		panic = "panic", fear = "trauma", tinnitus = "tinnitus", deaf = "deafness", encumbered = "encumbered",
 		nausea = "sick", amputated = "amputation", concussion = "stress", sepsis = "sepsis",
 		adrenaline = "adrenaline", zerlked = "zerlked", poisoning = "radiation",
-		cotard = "suicide",
+		cotard = "suicide", hopelessness = "hopeless", desolation = "desolate", suicidal = "suicide",
 		rage = "anger5",
 		hunger = level == 1 and "hunger" or "hunger" .. level, full = level == 1 and "full" or "full2",
 	}
@@ -683,6 +701,18 @@ hg.MoodlePleuralTexts = {
 		[3] = {title = "Hemopneumothorax", description = "Trapped air and blood are collapsing your lung and restricting breathing."},
 		[4] = {title = "Hemopneumothorax", description = "Your chest is full of air and blood. It needs decompression and drainage."},
 	},
+	lungwater = {thresholds = {0.01, 0.1, 0.3, 0.7},
+		[1] = {title = "Water in Lungs", description = "You inhaled some water. Coughing will bring it up."},
+		[2] = {title = "Aspirated Water", description = "Water in your lungs is making every breath gurgle."},
+		[3] = {title = "Flooded Lungs", description = "Your lungs are filling with water and barely exchange air."},
+		[4] = {title = "Drowning", description = "Your lungs are full of water. You cannot breathe."},
+	},
+	pneumonia = {thresholds = {0.01, 0.15, 0.4, 0.7},
+		[1] = {title = "Chest Cold", description = "Your lungs feel heavy and you keep coughing."},
+		[2] = {title = "Pneumonia", description = "An infection in your lungs is causing fever and shortness of breath."},
+		[3] = {title = "Severe Pneumonia", description = "The infection is damaging your lungs. You need antibiotics."},
+		[4] = {title = "Septic Pneumonia", description = "The lung infection is destroying tissue and spreading into your blood."},
+	},
 	tamponade = {thresholds = {0.01, 0.15, 0.3, 0.5},
 		[1] = {title = "Pericardial Pressure", description = "Fluid is beginning to collect around your heart."},
 		[2] = {title = "Cardiac Tamponade", description = "Fluid around the heart is limiting how well it can fill."},
@@ -754,9 +784,9 @@ local function buildEffects(ply, org)
 	if depression >= 0.03 then
 		local icon, level = "unhappy", 1
 		if depression >= 0.85 then
-			icon, level = "hopeless", 4
+			icon, level = "miserable", 4
 		elseif depression >= 0.6 then
-			icon, level = "desolate", 3
+			icon, level = "miserable", 3
 		elseif depression >= 0.25 then
 			icon, level = "dreary", 2
 		end
@@ -765,6 +795,18 @@ local function buildEffects(ply, org)
 	local selfHarmCvar = GetConVar("hg_selfharm") or CreateConVar("hg_selfharm", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Depression can push you into self harm", 0, 1)
 	if depression >= 0.6 and selfHarmCvar:GetBool() then
 		add(effects, "self_harm", "self-harm", highRank(depression, {0.6, 0.7, 0.8, 0.9}), "bad", -66, math.floor(depression * 100) .. "%")
+	end
+	local hopelessness = math.Clamp(orgNumber(org, "hopelessness", 0), 0, 1)
+	if hopelessness >= 0.08 then
+		add(effects, "hopelessness", "hopeless", highRank(hopelessness, {0.08, 0.3, 0.55, 0.8}), "bad", -67, math.floor(hopelessness * 100) .. "%")
+	end
+	local desolation = math.Clamp(orgNumber(org, "desolation", 0), 0, 1)
+	if desolation >= 0.08 then
+		add(effects, "desolation", "desolate", highRank(desolation, {0.08, 0.3, 0.55, 0.8}), "bad", -68, math.floor(desolation * 100) .. "%")
+	end
+	local suicidal = math.Clamp(orgNumber(org, "suicidal", 0), 0, 1)
+	if suicidal >= 0.08 then
+		add(effects, "suicidal", "suicide", highRank(suicidal, {0.08, 0.3, 0.55, 0.8}), "bad", -69, math.floor(suicidal * 100) .. "%")
 	end
 	local cotard = math.Clamp(orgNumber(org, "cotard", 0), 0, 1)
 	if cotard > 0 then
@@ -924,10 +966,15 @@ local function buildEffects(ply, org)
 	end
 	local pneumothorax, hemothorax = orgNumber(org, "pneumothorax", 0), orgNumber(org, "hemothorax", 0)
 	local tamponade = orgNumber(org, "cardiacTamponade", 0)
-	local thorax = math.max(pneumothorax, hemothorax, tamponade)
+	local lungWater, pneumonia = orgNumber(org, "lungWater", 0), orgNumber(org, "pneumonia", 0)
+	local thorax = math.max(pneumothorax, hemothorax, tamponade, lungWater, pneumonia)
 	if thorax > 0.01 then
 		local kind
-		if pneumothorax > 0.05 and hemothorax > 0.05 then
+		if pneumonia >= thorax then
+			kind = "pneumonia"
+		elseif lungWater >= thorax then
+			kind = "lungwater"
+		elseif pneumothorax > 0.05 and hemothorax > 0.05 then
 			kind = "hemopneumothorax"
 		elseif tamponade >= pneumothorax and tamponade >= hemothorax then
 			kind = "tamponade"
@@ -937,7 +984,7 @@ local function buildEffects(ply, org)
 			kind = "pneumothorax"
 		end
 		local pleural = hg.MoodlePleuralTexts[kind]
-		local severity = kind == "tamponade" and tamponade or kind == "pneumothorax" and pneumothorax or thorax
+		local severity = kind == "tamponade" and tamponade or kind == "pneumothorax" and pneumothorax or kind == "pneumonia" and pneumonia or kind == "lungwater" and lungWater or thorax
 		local level = highRank(severity, pleural.thresholds)
 		local text = pleural[math.max(level, 1)]
 		add(effects, "thorax", "superthorax", level, "bad", 35, math.floor(severity * 100) .. "%", text.title, text.description)

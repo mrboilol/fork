@@ -23,10 +23,6 @@ local function ApplySpawnTraits(ply)
 	if not IsValid(ply) or not ply:Alive() or not ply.organism then return end
 	local org = ply.organism
 	if ply:HasTrait("paraplegic") then org.spine1 = math.max(org.spine1 or 0, hg.organism.fake_spine1 or 1) end
-	if ply:HasTrait("blind") then
-		org.eyeL = 1
-		org.eyeR = 1
-	end
 	if ply:HasTrait("naturally_hypertensive") then
 		org.hypertension = math.max(org.hypertension or 0, 0.7)
 		if not org.HGHypertensionDefib then

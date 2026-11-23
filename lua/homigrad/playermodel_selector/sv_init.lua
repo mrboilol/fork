@@ -20,10 +20,22 @@ net.Receive("ZC_PMS_Apply", function(len, ply)
 	local skin = net.ReadUInt(8)
 	local groupsStr = net.ReadString()
 	local nick = net.ReadString()
+	local giveClass = net.ReadBool()
 
 	if not isstring(mdl) or not string.StartsWith(mdl, "models/") or not string.EndsWith(mdl, ".mdl") then return end
 	if IsUselessModel(mdl) then return end
 	util.PrecacheModel(mdl)
+
+	local entry = giveClass and hg.GetModelPlayerClass(mdl)
+	if entry and player.classList[entry.class] then
+		if ply.PlayerClassName ~= entry.class then
+			ply:SetPlayerClass(entry.class, table.Copy(entry.data or {}))
+		end
+		ply.zc_pms_class = entry.class
+	elseif ply.zc_pms_class then
+		if ply.PlayerClassName == ply.zc_pms_class then ply:SetPlayerClass() end
+		ply.zc_pms_class = nil
+	end
 
 	local Appearance = ply.CurAppearance or hg.Appearance.GetRandomAppearance()
 	Appearance.AColthes = ""
@@ -54,6 +66,8 @@ net.Receive("ZC_PMS_Reset", function(len, ply)
 	if not CanUse(ply) then return end
 	if not ply:Alive() then return end
 
+	if ply.zc_pms_class and ply.PlayerClassName == ply.zc_pms_class then ply:SetPlayerClass() end
+	ply.zc_pms_class = nil
 	ApplyAppearance(ply, nil, nil, nil, true)
 	ply:ChatPrint("Appearance restored")
 end)

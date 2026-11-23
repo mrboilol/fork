@@ -1955,7 +1955,7 @@ local function draw_status_effects()
 			
 			local pneumo_val = smooth.pneumothorax or getOrgVal(org, "pneumothorax", 0)
 			local hemo_val = smooth.hemothorax or getOrgVal(org, "hemothorax", 0)
-			local combined_lung_fluid = math.max(pneumo_val, hemo_val)
+			local combined_lung_fluid = math.max(pneumo_val, hemo_val, getOrgVal(org, "lungWater", 0), getOrgVal(org, "pneumonia", 0))
 			if combined_lung_fluid > HUD.hemothorax_threshold then
 				local level_num = 1
 				if combined_lung_fluid > 0.7 then level_num = 4

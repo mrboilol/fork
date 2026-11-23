@@ -513,6 +513,11 @@ module[2] = function(owner, org, mulTime)
 		org.blood_regeneration_multiplier = org.blood_regeneration_multiplier * owner:GetTraitMultiplier("blood_regeneration", 1)
 		org.bleedingmul = org.bleedingmul * owner:GetTraitMultiplier("bleeding", 1)
 	end
+	local streptokinase = math.Clamp(tonumber(org.streptokinase) or 0, 0, 2)
+	if streptokinase > 0 then
+		org.bleedingmul = org.bleedingmul * (1 + streptokinase * 0.75)
+		org.coagulation_multiplier = org.coagulation_multiplier * (1 - math.min(streptokinase, 1) * 0.4)
+	end
 	local hemostaticTreatment, txaHemostasis, internalHemostasis = getHemostaticTreatmentDrive(org)
 	org.hemostaticTreatment = hemostaticTreatment
 
