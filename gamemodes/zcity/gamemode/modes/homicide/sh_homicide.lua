@@ -58,6 +58,29 @@ local function ParseLoadoutString(dataStr)
 	return loadout
 end
 
+local SyncedLoadoutNames = {
+	["hmcd_traitor_loadout"] = true,
+	["hmcd_hero_loadout"] = true,
+}
+
+if SERVER then
+	util.AddNetworkString("hmcd_loadout_sync")
+
+	net.Receive("hmcd_loadout_sync", function(_, ply)
+		local name = net.ReadString()
+		local raw = net.ReadString()
+		if not SyncedLoadoutNames[name] or #raw > 4096 then return end
+		ply.SyncedLoadouts = ply.SyncedLoadouts or {}
+		ply.SyncedLoadouts[name] = raw
+	end)
+end
+
+local function GetLoadoutInfo(ply, name)
+	local raw = ply.SyncedLoadouts and ply.SyncedLoadouts[name]
+	if isstring(raw) and raw ~= "" then return raw end
+	return ply:GetInfo(name)
+end
+
 local LegacyTraitorLoadout = {
 	skillset = "none",
 	weapons = {
@@ -96,7 +119,7 @@ local function ApplyCodeAttachments(weapon, attachments)
 end
 
 local function ApplyTraitorLoadout(ply)
-	local loadout = ParseLoadoutString(ply:GetInfo("hmcd_traitor_loadout"))
+	local loadout = ParseLoadoutString(GetLoadoutInfo(ply, "hmcd_traitor_loadout"))
 	if not loadout.skillset and not istable(loadout.weapons) then loadout = LegacyTraitorLoadout end
 
 	local skillset = loadout.skillset or "none"
@@ -192,7 +215,7 @@ local function ApplyTraitorLoadout(ply)
 end
 
 local function ApplyHeroLoadout(ply)
-	local loadout = ParseLoadoutString(ply:GetInfo("hmcd_hero_loadout"))
+	local loadout = ParseLoadoutString(GetLoadoutInfo(ply, "hmcd_hero_loadout"))
 	local weaponsList = istable(loadout.weapons) and loadout.weapons or {}
 	local selectedWeapon = "weapon_px4beretta"
 

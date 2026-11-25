@@ -253,8 +253,11 @@ end
 function MODE:CanLaunch()
 	local points = zb.GetMapPoints( "HMCD_CRI_CT" )
 	local points2 = zb.GetMapPoints( "HMCD_CRI_T" )
-	local plramount = zb:CheckPlaying()
-	return (#points > 3) and (#points2 > 0) and (#plramount >= 4)
+	local plramount = 0
+	for _, ply in player.Iterator() do
+		if ply:Team() ~= TEAM_SPECTATOR then plramount = plramount + 1 end
+	end
+	return (#points > 3) and (#points2 > 0) and (plramount >= 4)
 end
 
 local function GiveSuspect(ply)

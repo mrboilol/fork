@@ -29,6 +29,16 @@ function hg.IsArmUsable(org, limb)
 	return not hg.IsLimbIncapacitated(org, limb)
 end
 
+function hg.HasUsableArm(org)
+	return hg.IsArmUsable(org, "larm") or hg.IsArmUsable(org, "rarm")
+end
+
+function hg.UsesLeftHand(ply)
+	local org = IsValid(ply) and ply.organism
+
+	return org and not hg.IsArmUsable(org, "rarm") and hg.IsArmUsable(org, "larm") or false
+end
+
 function hg.GetLimbDebuffMultiplier(org)
 	local analgesia = math.Clamp((tonumber(org.analgesia) or 0) + (tonumber(org.painkiller) or 0) * 0.3, 0, 1)
 	return Lerp(analgesia, 1, 0.35)
@@ -126,9 +136,10 @@ function hg.CanUseLeftHand(ply)
 		holdingwheel = hg.GetCarSteering(Car) > 0
 	end
 
-	local chatgesture = (ply:GetTable().ChatGestureWeight or 0) > 0.1
-	local tauntleft = ply:GetNWBool("TauntLeftHand", false) and ply:GetNWFloat("StartTaunt", 0) + 0.1 < CurTime()
-	local flashlight = IsValid(ply.flashlight)
+	local leftOnly = hg.UsesLeftHand(ply)
+	local chatgesture = not leftOnly and (ply:GetTable().ChatGestureWeight or 0) > 0.1
+	local tauntleft = not leftOnly and ply:GetNWBool("TauntLeftHand", false) and ply:GetNWFloat("StartTaunt", 0) + 0.1 < CurTime()
+	local flashlight = not leftOnly and IsValid(ply.flashlight)
 	local nothandcuffed = !ply:GetNetVar("handcuffed")
 	local notreload = wep and not wep.reload
 	local fingerpose = ent != ply and math.abs(ent:GetManipulateBoneAngles(ent:LookupBone("ValveBiped.Bip01_L_Finger11"))[2]) > 5 and !ply:InVehicle()

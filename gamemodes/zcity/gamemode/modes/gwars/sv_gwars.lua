@@ -117,7 +117,7 @@ hook.Add("PlayerSpawn", "GWARS_TeamLook", function(ply)
 end)
 
 function MODE:CanLaunch()
-	return true
+	return zb:CountPlayers() >= 4
 	--[[local points = zb.GetMapPoints( "HMCD_TDM_T" )
 	local points2 = zb.GetMapPoints( "HMCD_TDM_CT" )
     return (#points > 0) and (#points2 > 0)--]]

@@ -177,7 +177,7 @@ function SWEP:DrawWorldModel2(nodraw)
 	if IsValid(owner) then
 		local offsetVec = self.offsetVec
 		local offsetAng = self.offsetAng
-		local boneid = owner:LookupBone(((owner.organism and owner.organism.rarmamputated) or (owner.zmanipstart ~= nil and owner.zmanipseq == "interact" and not ( owner.organism and owner.organism.larmamputated ))) and "ValveBiped.Bip01_L_Hand" or "ValveBiped.Bip01_R_Hand")
+		local boneid = owner:LookupBone((hg.UsesLeftHand(owner) or (owner.zmanipstart ~= nil and owner.zmanipseq == "interact" and not ( owner.organism and owner.organism.larmamputated ))) and "ValveBiped.Bip01_L_Hand" or "ValveBiped.Bip01_R_Hand")
 		if not boneid then return end
 		local matrix = owner:GetBoneMatrix(boneid)
 		if not matrix then return end
@@ -935,7 +935,7 @@ function SWEP:SpawnGarbage(mdl_custom, skin_custom, snd_custom, clr_custom, bgs_
 	if IsValid(owner) then
 		if owner:IsPlayer() then
 			local chr = hg.GetCurrentCharacter(owner)
-			boneid = chr:LookupBone(((owner.organism and owner.organism.rarmamputated) or (owner.zmanipstart ~= nil and owner.zmanipseq == "interact" and not ( owner.organism and owner.organism.larmamputated ))) and "ValveBiped.Bip01_L_Hand" or "ValveBiped.Bip01_R_Hand")
+			boneid = chr:LookupBone((hg.UsesLeftHand(owner) or (owner.zmanipstart ~= nil and owner.zmanipseq == "interact" and not ( owner.organism and owner.organism.larmamputated ))) and "ValveBiped.Bip01_L_Hand" or "ValveBiped.Bip01_R_Hand")
 		else
 			boneid = owner:LookupBone("ValveBiped.Bip01_R_Hand") or 1
 		end

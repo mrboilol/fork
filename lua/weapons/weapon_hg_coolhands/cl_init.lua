@@ -508,7 +508,7 @@ function SWEP:SetHandPos(noset)
 	-- ply:SetupBones()
 
 	local ent = self:GetNWEntity("carryent")
-	self.rhandik = (self:GetFists()) or (IsValid(ent) and twohands)
+	self.rhandik = (self:GetFists() and hg.CanUseRightHand(ply)) or (IsValid(ent) and twohands)
 	self.lhandik = (self:GetFists() and hg.CanUseLeftHand(ply)) or IsValid(ent)
 
 	local bones2 = hg.TPIKBonesOther
@@ -842,7 +842,9 @@ function SWEP:PrimaryAttack(forcespecial)
 	local owner = self:GetOwner()
 	if not IsValid(owner) or owner:InVehicle() or hg.WallBang.Active(owner) then return end
 	if (self.attacked or 0) > CurTime() then return end
-	if owner.organism and owner.organism.rarmamputated and owner.organism.larmamputated then return end
+	local leftOut = owner.organism and not hg.IsArmUsable(owner.organism, "larm")
+	local rightOut = owner.organism and not hg.IsArmUsable(owner.organism, "rarm")
+	if leftOut and rightOut then return end
 	local isfur = owner.PlayerClassName == "furry"
 	local side = isfur and "fists_left" or "attack_quick_2"
 	local rand = math.Round(util.SharedRandom( "fist_Punching", 1, 2 ),0) == 1
@@ -861,10 +863,10 @@ function SWEP:PrimaryAttack(forcespecial)
 		end
 	end
 
-	if org and org.larmamputated then
+	if leftOut then
 		rand = true
 		side = isfur and "fists_right" or "attack_quick_1"
-	elseif org and org.rarmamputated then
+	elseif rightOut then
 		rand = false
 		side = isfur and "fists_left" or "attack_quick_2"
 	end
@@ -892,7 +894,7 @@ function SWEP:PrimaryAttack(forcespecial)
 	self.attacked = CurTime() + 0.2
 
         local special_attack = forcespecial and true or false
-	if owner.organism and owner.organism.rarmamputated then
+	if rightOut then
 		special_attack = false
 	end
         self.SpecialAttackUntil = special_attack and (CurTime() + 0.6) or 0

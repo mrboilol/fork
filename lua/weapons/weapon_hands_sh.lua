@@ -610,7 +610,7 @@ function SWEP:SetHandPos(noset)
 	-- ply:SetupBones()
 
 	local ent = self:GetNWEntity("carryent")
-	self.rhandik = (self:GetFists()) or (IsValid(ent) and twohands)
+	self.rhandik = (self:GetFists() and hg.CanUseRightHand(ply)) or (IsValid(ent) and twohands)
 	self.lhandik = (self:GetFists() and hg.CanUseLeftHand(ply)) or IsValid(ent)
 
 	local bones2 = hg.TPIKBonesOther

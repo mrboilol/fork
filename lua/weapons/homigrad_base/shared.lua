@@ -3017,6 +3017,9 @@ function SWEP:SetHandPos(noset)
 
 	if not rhmat or not lhmat then return end
 
+	local leftGrip = hg.UsesLeftHand(ply) and hg.CanUseLeftHand(ply)
+	if leftGrip then self.lhandik = true end
+
 	self.handPos = self.handPos or rhmat:GetTranslation()
 	self.handAng = self.handAng or rhmat:GetAngles()
 
@@ -3048,14 +3051,20 @@ function SWEP:SetHandPos(noset)
 			addvec2 = LerpFT(0.05 * ((ent.organism and (ent.organism.adrenaline or 0) + (36.6 - (ent.organism.temperature or 36.6)) or 0) + 1) * 15, addvec2, addvec)
 		end
 
-		if not ply.holdingWeapon or ply.holdingWeapon ~= self then
+		if leftGrip then
+			local grip = hg.GetOffHandMatrix(rhmat, ply:EyeAngles():Right())
+			lhmat:SetTranslation(grip:GetTranslation())
+			lhmat:SetAngles(grip:GetAngles())
+			hg.bone_apply_matrix(ent, lh, lhmat)
+			hg.set_hold(ent, self.hold_type or (self:IsPistolHoldType() and "pistol_hold2" or "ak_hold"))
+		elseif hg.CanUseRightHand(ply) and (not ply.holdingWeapon or ply.holdingWeapon ~= self) then
 			hg.bone_apply_matrix(ent, rh, rhmat)
 			--ent:SetBoneMatrix(rh, rhmat)
 			
 			hg.set_holdrh(ent, self.hold_type or (self:IsPistolHoldType() and "pistol_hold2" or "ak_hold"))
 		end
 		
-		if (( hg.CanUseLeftHand(ply) and self.lhandik )) and self.attachments and vec2 and addvec2 and ang2 then
+		if (( hg.CanUseLeftHand(ply) and self.lhandik )) and not leftGrip and self.attachments and vec2 and addvec2 and ang2 then
 			lhmat:SetTranslation(vec2 + addvec2)
 			lhmat:SetAngles(ang2)
 			
@@ -3098,7 +3107,7 @@ function SWEP:SetHandPos(noset)
 		local TPIKBonesRHDict = hg.TPIKBonesRHDict
 		local TPIKBonesRHDictTranslate = hg.TPIKBonesRHDictTranslate
 		local canuseright = hg.CanUseRightHand(ply) and wpn.rhandik
-		local canuseleft = hg.CanUseLeftHand(ply) and wpn.lhandik
+		local canuseleft = hg.CanUseLeftHand(ply) and wpn.lhandik and not leftGrip
 
 		if hg.DebugTPIK and not canuseleft and wpn.setlhik ~= false then
 			hg.DebugTPIK(ply, "lh_skip", "canuseleft=" .. tostring(hg.CanUseLeftHand(ply)) .. "/lhandik=" .. tostring(wpn.lhandik) .. "/setlhik=" .. tostring(wpn.setlhik))
@@ -3159,6 +3168,15 @@ function SWEP:SetHandPos(noset)
 			ent:SetBoneMatrix(ply_boneindex, wm_bonematrix)
 			if ply:LookupBone(ply:GetBoneName(ply_boneindex)) then ply:SetBoneMatrix(ply_boneindex, wm_bonematrix) end
 		end
+		if leftGrip then
+			local gripBone = mdl:LookupBone("ValveBiped.Bip01_R_Hand")
+			local gripMatrix = gripBone and mdl:GetBoneMatrix(gripBone)
+			if gripMatrix then
+				local normal = angs:Right()
+				local gripPos = gripMatrix:GetTranslation()
+				hg.PoseOffHand(mdl, ent, hg.GetMirrorMatrix(gripPos - normal, normal), gripPos)
+			end
+		end
 		//rhmat = self:GetWM():GetBoneMatrix(self:GetWM():LookupBone("ValveBiped.Bip01_R_Hand"))
 	end
 
@@ -3171,7 +3189,7 @@ function SWEP:SetHandPos(noset)
 		self.lerphand = LerpFT(self.ARC9LHIKTransitionSpeed or 0.04, self.lerphand or 0, usePose and 0 or 1)
 		if actionActive then self.lerphand = math.min(self.lerphand, 1 - reloadLHIKWeight) end
 
-		if hg.CanUseLeftHand(ply) and self.lhandik then
+		if hg.CanUseLeftHand(ply) and self.lhandik and not leftGrip then
 			if not inf.ShouldtUseLHand then
 				if inf and inf.LHandPos and IsValid(model) then
 					local infpos, infang = inf.LHandPos, inf.LHandAng
@@ -3206,6 +3224,7 @@ function SWEP:SetHandPos(noset)
 		local reloadLHIKWeight = self:GetARC9ReloadLHIKWeight()
 		local actionActive = self.reload
 		local usePose = hg.CanUseLeftHand(ply)
+			and not leftGrip
 			and self.lhandik
 			and not ply.suiciding
 			and (not actionActive or reloadLHIKWeight > 0)

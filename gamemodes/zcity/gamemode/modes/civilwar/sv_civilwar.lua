@@ -117,7 +117,7 @@ function MODE:CanLaunch()
         end
     end
 
-    if activePlayers < 2 then
+    if activePlayers < 4 then
         return false
     end
 

@@ -165,7 +165,7 @@ function MODE:PlayerDeath(ply)
 end
 
 function MODE:CanLaunch()
-	return true
+	return zb:CountPlayers() >= 4
     --[[local TPoints = zb.GetMapPoints("HMCD_TDM_T")
     local CTPoints = zb.GetMapPoints("HMCD_TDM_CT")
     if TPoints and #TPoints > 0 and CTPoints and #CTPoints > 0 then

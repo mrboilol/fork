@@ -646,8 +646,11 @@ if CLIENT then
 		end
 
         if updatePose then
-            if reachEnd > self:GetDeployClock() then WorldModel:InvalidateBoneCache() end
+            local offHand = hg.UsesLeftHand(owner)
+            if offHand or reachEnd > self:GetDeployClock() then WorldModel:InvalidateBoneCache() end
             WorldModel:SetupBones()
+            self.OffHandMirror = offHand and inuse and self:GetOffHandMirror(owner, ent) or nil
+            if self.OffHandMirror then hg.TransformModelBones(WorldModel, self.OffHandMirror) end
         end
 
         if updatePose and inuse then
@@ -655,7 +658,8 @@ if CLIENT then
         end
 
         if updatePose and IsValid(owner) and !inuse then
-            local bon = ent:LookupBone("ValveBiped.Bip01_R_Hand")
+            local offHand = hg.UsesLeftHand(owner)
+            local bon = ent:LookupBone(offHand and "ValveBiped.Bip01_L_Hand" or "ValveBiped.Bip01_R_Hand")
             if not bon then return end
             local mat = ent:GetBoneMatrix(bon)
             if not mat then return end
@@ -678,7 +682,7 @@ if CLIENT then
 
             if !matW then return end
 
-            local invmat = mat * matW:GetInverse()
+            local invmat = offHand and hg.GetOffHandAttachTransform(mat, matW) or mat * matW:GetInverse()
 
             for i = 0, WorldModel:GetBoneCount() - 1 do
                 local mata = WorldModel:GetBoneMatrix(i)
@@ -730,7 +734,7 @@ if CLIENT then
             end
         end
 
-        if updatePose and self.CustomWorldModelBones then
+        if updatePose and self.CustomWorldModelBones and not hg.UsesLeftHand(owner) then
             self:CustomWorldModelBones(WorldModel)
         end
 
@@ -741,8 +745,14 @@ if CLIENT then
         if prepareOnly then return end
 
         local drawWorldModelReal = not self.WorldModelExchange or (self.ShouldDrawWorldModelReal and self:ShouldDrawWorldModelReal())
+        local baseMatrix = WorldModel:GetBoneMatrix(self.basebone or 1)
+        local mirrored = IsValid(owner) and baseMatrix and hg.IsMirroredMatrix(baseMatrix)
         if drawWorldModelReal then
-            WorldModel:DrawModel()
+            if mirrored then
+                hg.DrawMirroredModel(WorldModel)
+            else
+                WorldModel:DrawModel()
+            end
         end
 
         if IsValid(self.worldModel) and self.WorldModelExchange and not drawWorldModelReal then
@@ -772,12 +782,17 @@ if CLIENT then
             end
 
             self.worldModel2:SetModelScale(self.modelscale)
-            self.worldModel2:SetRenderOrigin(pos)
-            self.worldModel2:SetRenderAngles(ang)
-            self.worldModel2:SetPos(pos)
-            self.worldModel2:SetAngles(ang)
-            self.worldModel2:SetupBones()
-            self.worldModel2:DrawModel()
+            if mirrored and huy then
+                hg.SetupMirroredModel(self.worldModel2, baseMatrix, self.weaponPos, self.weaponAng)
+                hg.DrawMirroredModel(self.worldModel2)
+            else
+                self.worldModel2:SetRenderOrigin(pos)
+                self.worldModel2:SetRenderAngles(ang)
+                self.worldModel2:SetPos(pos)
+                self.worldModel2:SetAngles(ang)
+                self.worldModel2:SetupBones()
+                self.worldModel2:DrawModel()
+            end
         end
 		
 		if(self.DrawPostWorldModel)then
@@ -854,7 +869,7 @@ function SWEP:GetSelfHarmShake(curve)
 end
 
 function SWEP:DrawPostWorldModel()
-    if not self.setlh then return end
+    if not self.setlh or hg.UsesLeftHand(self:GetOwner()) then return end
 
     local wm = self:GetWM()
     if not IsValid(wm) then return end
@@ -1297,6 +1312,11 @@ function SWEP:Blur(x, y, w, z)
     return {x, y, w, z}
 end
 
+function SWEP:GetOffHandMirror(owner, ent)
+    local tr = hg.eyeTrace(owner, 40, ent)
+    return tr and hg.GetMirrorMatrix(tr.StartPos, owner:EyeAngles():Right())
+end
+
 local ang180, ang1 = Angle(0,180,0), Angle(-135,-90,0)
 function SWEP:SetHandPos(noset)
 	local ply = self:GetOwner()
@@ -1343,6 +1363,18 @@ function SWEP:SetHandPos(noset)
 
 	ply.rhold = rhmat
 	ply.lhold = lhmat
+
+	if hg.UsesLeftHand(ply) then
+		self.rhandik = false
+		self.lhandik = self.setrh and hg.CanUseLeftHand(ply)
+		if self.lhandik and self:InUse() then
+			hg.PoseOffHand(wm, ent, self.OffHandMirror, wmpos, grip)
+		end
+
+		return
+	end
+
+	self.rhandik = self.rhandik and hg.CanUseRightHand(ply)
 
 	if self.lhandik and self:InUse() then
 		for _, bone in ipairs(bones) do
@@ -1497,7 +1529,7 @@ function SWEP:Deploy()
     self:SetHold(self.HoldType)
 
     do
-        local arm = self.TwoHanded and "larm" or "rarm"
+        local arm = (self.TwoHanded or hg.UsesLeftHand(owner)) and "larm" or "rarm"
         local effectiveness = hg.GetArmEffectiveness and hg.GetArmEffectiveness(owner, arm) or 1
         local speed = Lerp(effectiveness, 0.5, 1)
         local deployTime = self:GetBaseDeployTime() / speed
@@ -1547,7 +1579,7 @@ function SWEP:GetBaseDeployTime()
 end
 
 function SWEP:GetHolsterDuration()
-    local arm = self.TwoHanded and "larm" or "rarm"
+    local arm = (self.TwoHanded or hg.UsesLeftHand(self:GetOwner())) and "larm" or "rarm"
     local effectiveness = hg.GetArmEffectiveness and hg.GetArmEffectiveness(self:GetOwner(), arm) or 1
     local speed = Lerp(effectiveness, 0.5, 1)
     local total = self:GetBaseDeployTime() / speed
@@ -1783,6 +1815,7 @@ function SWEP:MultiplyDMG(owner, ent, vellen, mul)
 end
 
 local MELEE_CRIPPLED_ARM_FLOOR = 0.05
+local MELEE_OFF_HAND = 0.85
 local MELEE_ONE_ARM_SPEED = 0.4
 local MELEE_ONE_ARM_DAMAGE = 0.75
 local MELEE_FUMBLE_BELOW = 0.5
@@ -1790,15 +1823,15 @@ local MELEE_FUMBLE_MAX_CHANCE = 0.3
 
 local function meleeArmEffectiveness(owner, limb)
 	local org = owner.organism
-	if org and (org[limb .. "amputated"] or org[limb .. "upamputated"] or org[(limb == "larm" and "lhand" or "rhand") .. "amputated"]) then return 0 end
+	if not hg.IsArmUsable(org, limb) then return 0 end
 	return math.max(hg.GetArmEffectiveness(owner, limb) * hg.GetPerfusionHandlingMul(org), MELEE_CRIPPLED_ARM_FLOOR)
 end
 
 function SWEP:GetMeleeArmEffectiveness(owner)
 	if not IsValid(owner) or not hg.GetArmEffectiveness then return 1 end
 	local right = meleeArmEffectiveness(owner, "rarm")
-	if not self.TwoHanded then return right end
 	local left = meleeArmEffectiveness(owner, "larm")
+	if not self.TwoHanded then return right > 0 and right or left * MELEE_OFF_HAND end
 	local both = math.sqrt(math.max(right * left, 0))
 	return math.Clamp(math.max(both, math.max(right, left) * MELEE_ONE_ARM_SPEED), 0, 1)
 end
@@ -1806,8 +1839,8 @@ end
 function SWEP:GetMeleeDamageEffectiveness(owner)
 	if not IsValid(owner) or not hg.GetArmEffectiveness then return 1 end
 	local right = meleeArmEffectiveness(owner, "rarm")
-	if not self.TwoHanded then return right end
 	local left = meleeArmEffectiveness(owner, "larm")
+	if not self.TwoHanded then return right > 0 and right or left * MELEE_OFF_HAND end
 	local both = math.sqrt(math.max(right * left, 0))
 	return math.Clamp(math.max(both, math.max(right, left) * MELEE_ONE_ARM_DAMAGE), 0, 1)
 end
@@ -2269,9 +2302,10 @@ function SWEP:ConsumeMeleeStamina(owner, amount)
 		hg.organism.ConsumeLimbStamina(org, "arms", cost * (self.TwoHanded and 0.6 or 0.8))
 	end
 
-	local arms = self.TwoHanded and {"rarm", "larm"} or {"rarm"}
+	local arms = self.TwoHanded and {"rarm", "larm"} or {hg.UsesLeftHand(owner) and "larm" or "rarm"}
 	local pain = 0
 	for _, arm in ipairs(arms) do
+		if not hg.IsArmUsable(org, arm) then continue end
 		local damage = math.Clamp(tonumber(org[arm]) or 0, 0, 1)
 		local dislocated = org[arm .. "dislocation"] or org[arm .. "dislocated"]
 		if damage >= 1 then
@@ -4150,7 +4184,7 @@ function SWEP:CustomThink()
         or (self:IsWristSuicide() and (self.SelfHarmHoldType or self.SuicideHoldType))
         or (self:IsSuicidePosing() and self.SuicideHoldType) or self.HoldType)
 
-    if SERVER and owner.organism and owner.organism.rarmamputated then
+    if SERVER and not hg.HasUsableArm(owner.organism) then
         self:RemoveFake()
 		
 		hg.drop(owner, nil, nil, nil, true)
@@ -5594,7 +5628,7 @@ function SWEP:CreateFake(ragdoll)
 	if not IsValid(ragdoll) then return end
 	local ent = ents.Create("prop_physics")
     ent.notprop = true
-	local physbonerh = GetPhysBoneNum(ragdoll,"ValveBiped.Bip01_R_Hand")
+	local physbonerh = GetPhysBoneNum(ragdoll, hg.UsesLeftHand(self:GetOwner()) and "ValveBiped.Bip01_L_Hand" or "ValveBiped.Bip01_R_Hand")
 	local rh = ragdoll:GetPhysicsObjectNum(physbonerh)
 
 	ent:SetPos(rh:GetPos())

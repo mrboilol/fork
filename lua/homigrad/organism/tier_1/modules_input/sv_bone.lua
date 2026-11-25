@@ -1505,7 +1505,9 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 				deliverThought(org, describeBrokenRibs(org.brokenribs), "thought_ribs_broken", 2, Color(255, 210, 210))
 			end
 
-			damageLungFromRibs(org, org.brokenribs)
+			if not hg.SimpleHealth.RibTissueDamage(org, org.brokenribs - previousRibs) then
+				damageLungFromRibs(org, org.brokenribs)
+			end
 
 			playBoneFractureSound(org.owner)
 			if hg.QueuePainScream then hg.QueuePainScream(org.owner, 0.8) end

@@ -180,7 +180,6 @@ local function updateLimbs(org)
 		mark(lower, down, down >= 1)
 		if hand then
 			missing[hand] = missing[lower] or org[hand .. "amputated"] == true
-			mark(hand, down * K.WEIGHT.HAND_BONE_SHARE, down >= 1)
 		end
 
 		local upDisl = not missing[upper] and segmentDislocated(org, limb.base, "up")
@@ -332,12 +331,37 @@ local function buildBoneMap(ent)
 	ids.eyes = eyes and eyes > 0 and eyes or nil
 end
 
+local boneAnchor = {}
+
+local function updateBoneAnchors(visible)
+	local entry = 0
+	for i = 0, boneCount - 1 do
+		if visible[boneRegion[i]] then
+			entry = i
+			break
+		end
+	end
+	for i = 0, boneCount - 1 do
+		local parent = parentOf[i]
+		if visible[boneRegion[i]] then
+			boneAnchor[i] = nil
+		elseif not parent then
+			boneAnchor[i] = entry
+		else
+			boneAnchor[i] = boneAnchor[parent] or i
+		end
+	end
+end
+
 local function buildProxyBones(ent, count)
 	local visible = ent.hgBodyStatusVisible
 	if not visible or not boneCount then return end
 
+	updateBoneAnchors(visible)
 	for i = 0, math.min(count, boneCount) - 1 do
-		if writable[i] and not pcall(ent.SetBoneMatrix, ent, i, visible[boneRegion[i]] and localMats[i] or hiddenMats[i]) then writable[i] = false end
+		local anchor = boneAnchor[i]
+		local matrix = anchor and hiddenMats[anchor] or localMats[i]
+		if writable[i] and not pcall(ent.SetBoneMatrix, ent, i, matrix) then writable[i] = false end
 	end
 end
 

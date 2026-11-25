@@ -24,21 +24,21 @@ local sf_font = "Lora"
 
 surface.CreateFont("ZB_JuggernautHeader", {
 	font = sf_font,
-	size = ScreenScale(45),
+	size = ScreenScale(24),
 	weight = 400,
 	antialias = true
 })
 
 surface.CreateFont("ZB_JuggernautMediumLarge", {
 	font = sf_font,
-	size = ScreenScale(25),
+	size = ScreenScale(14),
 	weight = 400,
 	antialias = true
 })
 
 surface.CreateFont("ZB_JuggernautMedium", {
 	font = sf_font,
-	size = ScreenScale(15),
+	size = ScreenScale(9),
 	weight = 400,
 	antialias = true
 })
@@ -193,6 +193,7 @@ local function DrawIntro(t)
 	cox = math.Clamp(cox, -1, 1) * cursor_reach
 	coy = math.Clamp(coy, -1, 1) * cursor_reach
 
+	hg.RoundStart.MarkTitle()
 	local variantName = VARIANT_NAMES[MODE_VARIANT] or ""
 
 	local elements = {}

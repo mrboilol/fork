@@ -1096,7 +1096,7 @@ hook.Add("Think", "Fake", function()
 					local coverDamp = 900 * ragdoll.power
 
 					for physBone, offset in pairs(offsets) do
-						local canUseArm = ((physBone == 2 or physBone == 6 or physBone == 7) and not org.rarmamputated) or ((physBone == 3 or physBone == 4 or physBone == 5) and not org.larmamputated)
+						local canUseArm = ((physBone == 2 or physBone == 6 or physBone == 7) and hg.IsArmUsable(org, "rarm")) or ((physBone == 3 or physBone == 4 or physBone == 5) and hg.IsArmUsable(org, "larm"))
 						if canUseArm then
 							local _, targetAng = LocalToWorld(vector_origin, offset.ang, vector_origin, referenceAng)
 							shadowControl(ragdoll, physBone, 0.04, targetAng, coverForce, coverDamp, vector_origin, 0, 0)

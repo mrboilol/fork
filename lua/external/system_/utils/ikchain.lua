@@ -39,6 +39,15 @@ if not _G.IKSystem_Unity_FABRIK then
         angleSmoothTime = 0.02
     }
 
+    IKSystem.LEG_CONFIG = {
+        manualUpdate = true,
+        angularDampening = 0.8,
+        arriveTime = 0.03,
+        positionSmoothTime = 0.03,
+        angleSmoothTime = 0,
+        debug = false,
+    }
+
     local function SmoothDamp(current, target, velocity, smoothTime, dt)
         smoothTime = math_max(0.0001, smoothTime)
         local omega = 2 / smoothTime
@@ -492,9 +501,13 @@ if not _G.IKSystem_Unity_FABRIK then
             local targetAngle = VectorsToAngle(targetDir, right, up)
             
             if self.smoothedAngles[i] and self.angleVelocities[i] then
-                local p, vp = SmoothDampAngle(self.smoothedAngles[i].p, targetAngle.p, self.angleVelocities[i].p, self.config.angleSmoothTime, dt)
-                local y, vy = SmoothDampAngle(self.smoothedAngles[i].y, targetAngle.y, self.angleVelocities[i].y, self.config.angleSmoothTime, dt)
-                local r, vr = SmoothDampAngle(self.smoothedAngles[i].r, targetAngle.r, self.angleVelocities[i].r, self.config.angleSmoothTime, dt)
+                local p, y, r = targetAngle.p, targetAngle.y, targetAngle.r
+                local vp, vy, vr = 0, 0, 0
+                if self.config.angleSmoothTime > 0 then
+                    p, vp = SmoothDampAngle(self.smoothedAngles[i].p, targetAngle.p, self.angleVelocities[i].p, self.config.angleSmoothTime, dt)
+                    y, vy = SmoothDampAngle(self.smoothedAngles[i].y, targetAngle.y, self.angleVelocities[i].y, self.config.angleSmoothTime, dt)
+                    r, vr = SmoothDampAngle(self.smoothedAngles[i].r, targetAngle.r, self.angleVelocities[i].r, self.config.angleSmoothTime, dt)
+                end
                 
                 if IsNaN(p) or IsNaN(y) or IsNaN(r) then continue end
 
@@ -561,7 +574,7 @@ if not _G.IKSystem_Unity_FABRIK then
                 local c = chains[i]
                 if not c or c.destroyed then 
                     table_remove(chains, i)
-                else
+                elseif not c.config.manualUpdate then
                     local ok, err = pcall(c.Update, c, dt)
                     if not ok then ErrorNoHaltWithStack(" ".. tostring(err).. "\n") end
                 end

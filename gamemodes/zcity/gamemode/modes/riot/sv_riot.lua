@@ -468,6 +468,10 @@ function MODE:GiveEquipment()
         numRioters = math.ceil(numPlayers * 5 / 8)
     end
 
+    if numPlayers >= 4 then
+        numRioters = math.Clamp(numRioters, 2, numPlayers - 2)
+    end
+
     local numLawEnforcers = numPlayers - numRioters
     local glockIndex = numLawEnforcers > 0 and math.random(numLawEnforcers) or 1
 

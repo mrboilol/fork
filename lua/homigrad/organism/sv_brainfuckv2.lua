@@ -361,7 +361,25 @@ local skipChance = 0.25
 local poseRampTime = 1.6
 local legChance = 0.3
 local slowTime = 3
+local seizureDelayMin = 1.5
+local seizureDelayMax = 3.5
+local episodeCooldown = 60
+local episodeRollDelay = 20
 local legBones = {[8] = true, [9] = true, [11] = true, [12] = true, [13] = true, [14] = true}
+
+local function scheduleSeizure(org)
+	local time = CurTime()
+	if time < (org.brainfuckv2NextSeizure or 0) or org.seizureActive then return end
+	org.brainfuckv2NextSeizure = time + episodeCooldown
+	local severity = org.brainfuckv2Severity or org.brain or 0
+	local chance = math.Clamp(math.Remap(severity, 0.12, 0.5, 0.4, 1), 0.4, 1)
+	if math.Rand(0, 1) >= chance then return end
+	org.brainfuckv2SeizureAt = time + math.Rand(seizureDelayMin, seizureDelayMax)
+end
+
+local function poseHeld(org)
+	return org.brainfuckv2Posture and CurTime() < (org.brainfuckv2HoldUntil or 0)
+end
 local taserBones = {2, 3, 4, 5, 6, 7, 8, 9, 11, 12}
 
 local airDropSpeed = -100
@@ -539,6 +557,8 @@ local function applyPosture(rag, posture)
 	if not start or not istable(skip) then
 		start = CurTime()
 		rag.brainfuckv2PoseStart = start
+		org.brainfuckv2HoldUntil = start + poseFadeTime
+		if not headless and org.alive ~= false then scheduleSeizure(org) end
 		skip = {}
 		local skipped = {}
 		for i = 1, 14 do
@@ -728,16 +748,20 @@ hook.Add("Org Clear", "BrainfuckV2", function(org)
 	org.brainfuckv2SlowUntil = nil
 	org.brainfuckv2Severe = nil
 	org.brainfuckv2LastSeverity = nil
+	org.brainfuckv2HoldUntil = nil
+	org.brainfuckv2SeizureAt = nil
+	org.brainfuckv2NextSeizure = nil
+	org.brainfuckv2NextRoll = nil
 end)
 
 hook.Add("Should Fake Up", "BrainfuckV2", function(ply)
 	local org = IsValid(ply) and ply.organism
-	if org and org.brainfuckv2Posture then return false end
+	if org and poseHeld(org) then return false end
 end)
 
 hook.Add("CanControlFake", "BrainfuckV2", function(ply, rag)
 	local org = IsValid(rag) and rag.organism or IsValid(ply) and ply.organism
-	if org and org.brainfuckv2Posture then return false end
+	if org and poseHeld(org) then return false end
 end)
 
 hook.Add("Org Think", "BrainfuckV2", function(owner, org)
@@ -747,17 +771,30 @@ hook.Add("Org Think", "BrainfuckV2", function(owner, org)
 	local posture, severity = getPostureState(org, rag)
 	setPosture(org, posture, severity, rag)
 
-	if not posture or not owner:IsPlayer() or not owner:Alive() then return end
-
-	if not (org.otrub or org.needotrub) then
-		hg.organism.AddSeizure(org, 1)
+	if not posture then
+		org.brainfuckv2SeizureAt = nil
 		return
 	end
+	if not owner:IsPlayer() or not owner:Alive() then return end
 
-	if not IsValid(rag) then
-		org.brainfuckv2SlowUntil = CurTime() + slowTime
-		forceFake(owner, org)
+	local time = CurTime()
+	local seizureAt = org.brainfuckv2SeizureAt
+	if seizureAt and time >= seizureAt then
+		org.brainfuckv2SeizureAt = nil
+		hg.organism.AddSeizure(org, 1)
 	end
+
+	if IsValid(rag) then return end
+
+	if not (org.otrub or org.needotrub) then
+		if time < (org.brainfuckv2NextRoll or 0) or time < (org.brainfuckv2NextSeizure or 0) or org.seizureActive then return end
+		org.brainfuckv2NextRoll = time + episodeRollDelay
+		local chance = math.Clamp(math.Remap(severity or 0, 0.12, 0.7, 0.04, 0.35), 0.04, 0.35)
+		if math.Rand(0, 1) >= chance then return end
+	end
+
+	org.brainfuckv2SlowUntil = time + slowTime
+	forceFake(owner, org)
 end)
 
 hook.Add("RagdollDeath", "BrainfuckV2", function(ply, rag)

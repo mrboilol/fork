@@ -23,6 +23,10 @@ if CLIENT then
 	CreateClientConVar("hg_hud_moodles", "1", true, false, "Show moodles on this client", 0, 1)
 	CreateClientConVar("hg_hud_subrosa", "1", true, false, "Show the sub rosa figure on this client", 0, 1)
 	CreateClientConVar("hg_hud_bigchat", "1", true, false, "Show the big chat on this client", 0, 1)
+	CreateClientConVar("hg_splitchat", "0", true, false, "1 - chat pop-ups get their own hud-editable position near screen center, big chat defaults bottom left", 0, 1)
+
+	local splitChat = GetConVar("hg_splitchat")
+	function hg.SplitChatEnabled() return splitChat:GetBool() end
 end
 
 local hudConVars = {}

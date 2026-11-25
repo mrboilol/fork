@@ -39,7 +39,7 @@ SWEP.SwingAng = -5
 
 function SWEP:CanShove()
 	local owner = self:GetOwner()
-	if not IsValid(owner) or owner:InVehicle() then return false end
+	if not IsValid(owner) or owner:InVehicle() or not hg.HasUsableArm(owner.organism) then return false end
 
 	local sprintShove = owner:KeyDown(IN_SPEED) and owner:KeyDown(IN_USE)
 	if (not self:GetFists() and not sprintShove) or self:GetBlocking() or self.Charging then return false end

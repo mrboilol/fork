@@ -196,9 +196,117 @@ local function WeaponText(event, wep)
 	return article .. " " .. string.lower(wep:GetPrintName())
 end
 
-local function AddChatLine(elements)
-	if IsValid(hg.chat) and hg.chat.AddLine then hg.chat:AddLine(elements) end
+local function AddChatLine(elements, noPopup)
+	if IsValid(hg.chat) and hg.chat.AddLine then hg.chat:AddLine(elements, false, noPopup) end
 end
+
+local OVERHEAD_MAX = 3
+local OVERHEAD_DIST = 1800
+local OVERHEAD_CHECK = 0.2
+local OVERHEAD_HEAD_LIFT = 12
+local OVERHEAD_GAP = 10
+local OVERHEAD_PAD_X = 8
+local OVERHEAD_PAD_Y = 3
+local OVERHEAD_STEP = 4
+local OVERHEAD_FONT = "HomigradFontMedium"
+
+local overheads = {}
+local overheadBack = Color(0, 0, 0)
+local overheadText = Color(255, 255, 255)
+
+function hg.AddOverheadMessage(actor, text, color, life, fade)
+	if not IsValid(actor) or not isstring(text) or text == "" then return end
+
+	local now = CurTime()
+	local data = overheads[actor]
+	if not data then
+		data = {list = {}, nextCheck = 0, visible = true}
+		overheads[actor] = data
+	end
+
+	local list = data.list
+	local last = list[#list]
+	if last and last.text == text then
+		last.born = now
+		return
+	end
+
+	list[#list + 1] = {text = text, color = color or color_white, born = now, life = life or OVERHEAD_LIFE, fade = fade or OVERHEAD_FADE}
+	while #list > OVERHEAD_MAX do table.remove(list, 1) end
+end
+
+local function DrawOverheads()
+	if next(overheads) == nil then return end
+
+	local lply = LocalPlayer()
+	if not IsValid(lply) then return end
+
+	local now = CurTime()
+	local eye = EyePos()
+	local scale = hg.UIScale and hg.UIScale() or 1
+	local alphaMul = hg.DeathHUDAlpha and hg.DeathHUDAlpha() or 1
+
+	surface.SetFont(OVERHEAD_FONT)
+	local _, textH = surface.GetTextSize("Hg")
+	local boxH = textH + OVERHEAD_PAD_Y * 2 * scale
+
+	for actor, data in pairs(overheads) do
+		local list = data.list
+		for i = #list, 1, -1 do
+			if now - list[i].born > list[i].life + list[i].fade then table.remove(list, i) end
+		end
+
+		if not IsValid(actor) or #list == 0 then
+			overheads[actor] = nil
+			continue
+		end
+
+		local character = hg.GetCurrentCharacter(actor)
+		if not IsValid(character) or character:IsDormant() then continue end
+
+		local top, raise
+		if hg.GetTagOverhead then top, raise = hg.GetTagOverhead(actor) end
+		top = top or ChatLog.SourcePos(actor, character:WorldSpaceCenter()) + Vector(0, 0, OVERHEAD_HEAD_LIFT)
+		raise = raise or 0
+
+		if data.nextCheck < now then
+			data.nextCheck = now + OVERHEAD_CHECK
+			data.visible = eye:DistToSqr(top) <= OVERHEAD_DIST * OVERHEAD_DIST and ChatLog.IsVisible(actor, top)
+		end
+		if not data.visible then continue end
+
+		local screen = top:ToScreen()
+		if not screen.visible then continue end
+
+		local y = screen.y - (OVERHEAD_GAP + raise) * scale
+
+		for i = #list, 1, -1 do
+			local item = list[i]
+			local age = now - item.born
+			local alpha = (age <= item.life and 1 or 1 - (age - item.life) / item.fade) * 255 * alphaMul
+			if alpha <= 0 then continue end
+
+			local textW = surface.GetTextSize(item.text)
+			local boxW = textW + OVERHEAD_PAD_X * 2 * scale
+			y = y - boxH
+
+			overheadBack.a = alpha * 0.65
+			draw.RoundedBox(6 * scale, screen.x - boxW / 2, y, boxW, boxH, overheadBack)
+
+			overheadText.r, overheadText.g, overheadText.b, overheadText.a = item.color.r, item.color.g, item.color.b, alpha
+			draw.SimpleText(item.text, OVERHEAD_FONT, screen.x, y + boxH / 2, overheadText, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+
+			y = y - OVERHEAD_STEP * scale
+		end
+	end
+end
+
+hook.Add("HUDPaint", "HGOverheadMessages", function()
+	local lply = LocalPlayer()
+	if not IsValid(lply) or not lply:Alive() then return end
+
+	DrawOverheads()
+end)
 
 net.Receive("hg_chatlog_event", function()
 	local event = ChatLog.Events[net.ReadUInt(ChatLog.NET_ID_BITS)]
@@ -229,8 +337,9 @@ net.Receive("hg_chatlog_event", function()
 
 	if seen or (targetSelf and event.seenParts) then
 		local selfAct = event.selfParts and IsValid(target) and target == actor
-		AddChatLine(BuildElements(selfAct and event.selfParts or event.seenParts, ctx, EMOTE_COLOR))
-		if seen and actor ~= lply and hg.AddOverheadMessage and not event.noOverhead then
+		local overhead = seen and actor ~= lply and not event.noOverhead
+		AddChatLine(BuildElements(selfAct and event.selfParts or event.seenParts, ctx, EMOTE_COLOR), overhead)
+		if overhead then
 			hg.AddOverheadMessage(actor, "*" .. BuildText(selfAct and event.selfOverheadParts or event.overheadParts, ctx) .. "*", OVERHEAD_COLOR, OVERHEAD_LIFE, OVERHEAD_FADE)
 		end
 		return

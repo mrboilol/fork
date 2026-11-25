@@ -336,6 +336,27 @@ local font = function() -- hg_coolvetica:GetBool() and "Coolvetica" or "Courier 
     return usefont
 end
 
+surface.CreateFont("ZB_TitleHeader", {
+    font = font(),
+    size = ScreenScale(24),
+    weight = 400,
+    antialias = true
+})
+
+surface.CreateFont("ZB_TitleLarge", {
+    font = font(),
+    size = ScreenScale(14),
+    weight = 400,
+    antialias = true
+})
+
+surface.CreateFont("ZB_TitleMedium", {
+    font = font(),
+    size = ScreenScale(9),
+    weight = 400,
+    antialias = true
+})
+
 surface.CreateFont("ZB_InterfaceSmall", {
     font = font(),
     size = ScreenScale(6),

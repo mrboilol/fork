@@ -3160,8 +3160,12 @@ local function velocityDamage(ent, data)
 	end
 	if armorPlacement and hg.GetArmorImpactMitigation then
 		local armorDmgMul
-		armorDmgMul, _, armorImpactApplied = hg.GetArmorImpactMitigation(org, armorPlacement, dmgInfo, dmgInfo:GetDamage())
+		local damageBeforeArmor = dmgInfo:GetDamage()
+		armorDmgMul, _, armorImpactApplied = hg.GetArmorImpactMitigation(org, armorPlacement, dmgInfo, damageBeforeArmor)
 		dmg = dmg * armorDmgMul
+		if org.simpleMode and armorImpactApplied and armorDmgMul < 1 and dmgInfo:GetDamage() >= damageBeforeArmor then
+			dmgInfo:ScaleDamage(armorDmgMul)
+		end
 		if armorImpactApplied and armorDmgMul == 0 then unarmoredImpactDamage = dmg end
 	end
 

@@ -26,6 +26,17 @@ local NAME_OFFSET = 30
 local OUTLINE_WIDTH = 2
 local IS_GAP = 10
 
+local HEAD_BONE = "ValveBiped.Bip01_Head1"
+local CHEST_BONE = "ValveBiped.Bip01_Spine2"
+local HEAD_CROWN = 9
+local TAG_COOLDOWN = 1.5
+local TAG_RISE_SPEED = 6
+local TAG_LOWER_SPEED = 2.5
+local TAG_GAP = 8
+local TAG_REST_ALPHA = 0.6
+local TAG_VIEW_DOT = 0.25
+local TAG_POINT_INTERVAL = 0.15
+
 local tagFont = "HomigradFontLarge"
 local cueFont = "HomigradFontMedium"
 
@@ -118,7 +129,7 @@ local function Announce(ply, def)
 	local base = hg.ChatLog and hg.ChatLog.COLOR_AROUND or color_white
 	local pcol = ply.GetPlayerColor and ply:GetPlayerColor()
 
-	hg.chat:AddLine({base, "You notice ", pcol and pcol:ToColor() or base, PlayerName(ply), base, " is " .. def.text .. "."})
+	hg.chat:AddLine({base, "You notice ", pcol and pcol:ToColor() or base, PlayerName(ply), base, " is " .. def.text .. "."}, false, true)
 end
 
 local losTrace = {mask = MASK_VISIBLE}
@@ -339,37 +350,160 @@ local function TagBlocked(lply)
 	return not hands and lply:KeyDown(IN_ATTACK2)
 end
 
+local tagStates = setmetatable({}, {__mode = "k"})
+local tagScreen = {x = 0, y = 0}
+
+local function IsHidden(ply)
+	return ply.PlayerClassName == "sc_infiltrator" or ply:GetNetVar("disappearance", nil)
+end
+
+local function BoneWorldPos(character, boneName)
+	local bone = character:LookupBone(boneName)
+	local matrix = bone and character:GetBoneMatrix(bone)
+
+	return matrix and matrix:GetTranslation()
+end
+
+local function VisiblePoint(ply, character, point, eye)
+	local lply = LocalPlayer()
+	losFilter[1] = lply
+	losFilter[2] = hg.GetCurrentCharacter(lply)
+	losFilter[3] = ply
+	losFilter[4] = character
+	losTrace.start = eye
+	losTrace.endpos = point
+	losTrace.filter = losFilter
+
+	return util.TraceLine(losTrace).Fraction >= LOS_MIN_FRACTION
+end
+
+local function RefreshTagPoints(state, ply, character, eye, now)
+	if state.pointsAt and state.pointsAt > now then return end
+	state.pointsAt = now + TAG_POINT_INTERVAL
+
+	local head = BoneWorldPos(character, HEAD_BONE)
+	local chest = BoneWorldPos(character, CHEST_BONE) or character:WorldSpaceCenter()
+
+	state.chest = chest
+	state.chestSeen = VisiblePoint(ply, character, chest, eye)
+	state.top = nil
+
+	if head then
+		local crown = head + Vector(0, 0, HEAD_CROWN)
+		if VisiblePoint(ply, character, crown, eye) then
+			state.top = crown
+		elseif VisiblePoint(ply, character, head, eye) then
+			state.top = head
+		end
+	end
+
+	if not state.top and state.chestSeen then state.top = chest end
+end
+
+local function DrawPlayerTags(lply, dist, faced)
+	local now = CurTime()
+	local eye, forward = EyePos(), EyeAngles():Forward()
+	local frameTime = FrameTime()
+	local players = player.GetAll()
+
+	for i = 1, #players do
+		local ply = players[i]
+		local state = tagStates[ply]
+		local character = ply ~= lply and not ply:IsDormant() and hg.GetCurrentCharacter(ply)
+
+		if not IsValid(character) or character:GetNoDraw() or IsHidden(ply) then
+			if state then state.lift, state.frame = 0, nil end
+			continue
+		end
+
+		if not state then
+			state = {lift = 0, faceAt = -100}
+			tagStates[ply] = state
+		end
+
+		local center = character:WorldSpaceCenter()
+		local delta = center - eye
+		local range = delta:Length()
+		if range > dist or delta:Dot(forward) < range * TAG_VIEW_DOT then
+			state.lift, state.frame = 0, nil
+			continue
+		end
+
+		RefreshTagPoints(state, ply, character, eye, now)
+
+		local top = state.top
+		if not top then
+			state.lift, state.frame = 0, nil
+			continue
+		end
+
+		if faced == ply then state.faceAt = now end
+		local raised = now - state.faceAt < TAG_COOLDOWN
+		state.lift = math.Approach(state.lift, raised and 1 or 0, frameTime * (raised and TAG_RISE_SPEED or TAG_LOWER_SPEED))
+
+		local name = PlayerName(ply)
+		local cues = KnownCues(ply)
+		local offer = ply:GetNWString("hg_ia_mode", "") == "offer" and ply:GetNWEntity("hg_ia_target") == lply and ply:GetNWString("hg_ia_item", "something") or nil
+
+		surface.SetFont(tagFont)
+		local _, nameH = surface.GetTextSize(name)
+		local lines = (cues and math.min(#cues, CUE_MAX) or 0) + (offer and 1 or 0)
+		local blockH = nameH + 2 + lines * CUE_STEP
+
+		local lowPos = state.chestSeen and state.chest or top
+		local low, high = lowPos:ToScreen(), top:ToScreen()
+		state.top3, state.raise, state.frame = top, state.lift * (blockH + TAG_GAP), FrameNumber()
+
+		if not (low.visible and high.visible) then continue end
+
+		local lift = state.lift
+		tagScreen.x = Lerp(lift, low.x, high.x)
+		tagScreen.y = Lerp(lift, low.y, high.y - blockH - TAG_GAP) - NAME_OFFSET
+
+		local alpha = Lerp(math_Clamp(range / dist, 0, 1), 1, NAME_MIN_ALPHA) * Lerp(lift, TAG_REST_ALPHA, 1) * 255
+
+		DrawPerson(ply, name, cues, offer, tagScreen, alpha)
+	end
+end
+
+function hg.GetTagOverhead(ply)
+	local state = tagStates[ply]
+	if not state or not state.frame or state.frame < FrameNumber() - 1 then return end
+
+	return state.top3, state.raise
+end
+
 local function DrawFacing(lply, dist)
 	local trace = hg.eyeTrace(lply, dist)
-	if not trace or not trace.Hit then return end
+	local hit = trace and trace.Hit and trace.Entity
+	local faced, corpseEnt
 
-	local ent = trace.Entity
-	if not IsValid(ent) or not (ent:IsRagdoll() or ent:IsPlayer()) then return end
-	if ent.PlayerClassName == "sc_infiltrator" or ent:GetNetVar("disappearance", nil) then return end
+	if IsValid(hit) then
+		if hit:IsPlayer() then
+			faced = hit
+		elseif hit:IsRagdoll() then
+			local owner = hg.RagdollOwner(hit)
+			if IsValid(owner) then faced = owner else corpseEnt = hit end
+		end
+	end
 
-	local owner = ent:IsRagdoll() and hg.RagdollOwner(ent) or ent
-	local corpse = ent:IsRagdoll() and not IsValid(owner) and istable(ent.organism) and ent.organism or nil
+	DrawPlayerTags(lply, dist, faced)
 
-	local name = ent:GetPlayerName()
+	if not corpseEnt or IsHidden(corpseEnt) then return end
+
+	local corpse = istable(corpseEnt.organism) and corpseEnt.organism or nil
+	local name = corpseEnt:GetPlayerName()
 	if not isstring(name) or name == "" then
-		local ply = ent:IsRagdoll() and ent:GetNWEntity("ply")
+		local ply = corpseEnt:GetNWEntity("ply")
 		name = IsValid(ply) and ply:IsPlayer() and PlayerName(ply) or nil
 	end
 	if not isstring(name) or name == "" then return end
 
 	local hitDist = EyePos():Distance(trace.HitPos)
 	local alpha = Lerp(math_Clamp(hitDist / dist, 0, 1), 1, NAME_MIN_ALPHA) * 255
-	local cues
-	if AltHeld() then
-		if corpse then
-			cues = CorpseCues(corpse)
-		elseif IsValid(owner) then
-			cues = KnownCues(owner)
-		end
-	end
-	local offer = IsValid(owner) and owner:GetNWString("hg_ia_mode", "") == "offer" and owner:GetNWEntity("hg_ia_target") == lply and owner:GetNWString("hg_ia_item", "something") or nil
+	local cues = corpse and AltHeld() and CorpseCues(corpse) or nil
 
-	DrawPerson(ent, name, cues, offer, trace.HitPos:ToScreen(), alpha, corpse and CORPSE_CUE_MAX)
+	DrawPerson(corpseEnt, name, cues, nil, trace.HitPos:ToScreen(), alpha, corpse and CORPSE_CUE_MAX)
 end
 
 local function IsMovable(ent)

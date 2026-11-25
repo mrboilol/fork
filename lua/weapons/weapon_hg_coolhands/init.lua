@@ -498,7 +498,7 @@ function SWEP:ApplyForce()
 	if not IsValid(self.CarryEnt) then return end
 	local phys = self.CarryEnt:GetPhysicsObjectNum(self.CarryBone)
 
-	if ply.organism and ply.organism.rarmamputated and ply:IsTyping() then
+	if hg.UsesLeftHand(ply) and ply:IsTyping() then
 		self:SetCarrying()
 
 		return
@@ -961,7 +961,7 @@ function SWEP:Think()
 		self:SetCarrying()
 	end
 
-        if self:GetFists() and (owner:KeyDown(IN_ATTACK2) or (self.ForceBlockUntil or 0) > CurTime()) and (self:GetNextSecondaryFire() < CurTime()) and owner.PlayerClassName ~= "sc_infiltrator" and not owner:KeyDown(IN_USE) and not self.Charging and (self.SpecialAttackUntil or 0) <= CurTime() and (self.ShoveEnd or 0) <= CurTime() then
+        if self:GetFists() and (owner:KeyDown(IN_ATTACK2) or (self.ForceBlockUntil or 0) > CurTime()) and (self:GetNextSecondaryFire() < CurTime()) and owner.PlayerClassName ~= "sc_infiltrator" and hg.HasUsableArm(owner.organism) and not owner:KeyDown(IN_USE) and not self.Charging and (self.SpecialAttackUntil or 0) <= CurTime() and (self.ShoveEnd or 0) <= CurTime() then
 		self:SetNextPrimaryFire(CurTime() + .5)
 		self:SetBlocking(true)
 	else
@@ -1050,7 +1050,9 @@ function SWEP:PrimaryAttack(forcespecial)
 	local owner = self:GetOwner()
 	if not IsValid(owner) or owner:InVehicle() or hg.WallBang.Active(owner) then return end
 	if (self.attacked or 0) > CurTime() then return end
-	if owner.organism and owner.organism.rarmamputated and owner.organism.larmamputated then return end
+	local leftOut = owner.organism and not hg.IsArmUsable(owner.organism, "larm")
+	local rightOut = owner.organism and not hg.IsArmUsable(owner.organism, "rarm")
+	if leftOut and rightOut then return end
 
 	local isfur = owner.PlayerClassName == "furry"
 	local side = isfur and "fists_left" or "attack_quick_2"
@@ -1065,34 +1067,34 @@ function SWEP:PrimaryAttack(forcespecial)
 
         if rand or (CLIENT and ((owner:GetTable().ChatGestureWeight and owner:GetTable().ChatGestureWeight >= 0.1) or twohands)) or kastetCount == 1 then
 		if isfur then
-			if org and org.larmamputated then
+			if leftOut then
 				rand = true
 				side = "fists_right"
 			end
 		
-			if org and org.rarmamputated then
+			if rightOut then
 				rand = false
 				side = "fists_left"
 			end
 		else
 			side = "attack_quick_1"
 
-			if org and org.larmamputated then
+			if leftOut then
 				rand = true
 				side = "attack_quick_1"
 			end
 		
-			if org and org.rarmamputated then
+			if rightOut then
 				rand = false
 				side = "attack_quick_2"
 			end
 		end
 	end
 
-	if org and org.larmamputated then
+	if leftOut then
 		rand = true
 		side = isfur and "fists_right" or "attack_quick_1"
-	elseif org and org.rarmamputated then
+	elseif rightOut then
 		rand = false
 		side = isfur and "fists_left" or "attack_quick_2"
 	end
@@ -1131,7 +1133,7 @@ function SWEP:PrimaryAttack(forcespecial)
 	self.attacked = CurTime() + 0.2
 
         local special_attack = forcespecial and true or false
-	if owner.organism and owner.organism.rarmamputated then
+	if rightOut then
 		special_attack = false
 	end
         self.SpecialAttackUntil = special_attack and (CurTime() + 0.6) or 0

@@ -32,6 +32,7 @@ local HANDS = {
 }
 
 local function armGone(org, side)
+	if hg.IsLimbIncapacitated(org, HANDS[side].arm) then return true end
 	for _, key in ipairs(HANDS[side].gone) do
 		if org[key] then return true end
 	end

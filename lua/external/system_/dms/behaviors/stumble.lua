@@ -55,6 +55,10 @@ local DEFAULTS = {
     MinStepInterval = 0.25, 
 }
 
+local STEP_LIFT = 0.4
+local KNEE_POLE_FORWARD = 50
+local KNEE_POLE_DROP = 0.5
+
 local CONFIG = setmetatable({}, {
     __index = function(t, key) return DEFAULTS[key] end,
     __newindex = function(t, key, value) DEFAULTS[key] = value end
@@ -223,17 +227,15 @@ function B:OnStart(ar)
 
     ar:ApplyBoneList({  
         "ValveBiped.Bip01_Spine2",
-        "ValveBiped.Bip01_L_Hand", "ValveBiped.Bip01_R_Hand", "ValveBiped.Bip01_R_Thigh", 
-        "ValveBiped.Bip01_R_Calf", "ValveBiped.Bip01_Head1", "ValveBiped.Bip01_L_Thigh", 
-        "ValveBiped.Bip01_L_Calf"
+        "ValveBiped.Bip01_L_Hand", "ValveBiped.Bip01_R_Hand", "ValveBiped.Bip01_Head1"
     })
     ar:SetStrength(3)
     ar:PlayAnimation("Cower", 0.5, "models/AREAnims/model_anim.mdl")
 
     self.ikChains = {}
     if IKSystem and IKSystem.CreateChain then
-        self.ikChains[1] = IKSystem.CreateChain(ragdoll, { "ValveBiped.Bip01_L_Thigh", "ValveBiped.Bip01_L_Calf", "ValveBiped.Bip01_L_Foot" }, "leftLeg", Vector(0,0,50))
-        self.ikChains[2] = IKSystem.CreateChain(ragdoll, { "ValveBiped.Bip01_R_Thigh", "ValveBiped.Bip01_R_Calf", "ValveBiped.Bip01_R_Foot" }, "rightLeg", Vector(0,0,50))
+        self.ikChains[1] = IKSystem.CreateChain(ragdoll, { "ValveBiped.Bip01_L_Thigh", "ValveBiped.Bip01_L_Calf", "ValveBiped.Bip01_L_Foot" }, "leftLeg", Vector(0,0,50), IKSystem.LEG_CONFIG)
+        self.ikChains[2] = IKSystem.CreateChain(ragdoll, { "ValveBiped.Bip01_R_Thigh", "ValveBiped.Bip01_R_Calf", "ValveBiped.Bip01_R_Foot" }, "rightLeg", Vector(0,0,50), IKSystem.LEG_CONFIG)
     end
 
     self.pelvisPhys = GetBonePhys(ragdoll, "ValveBiped.Bip01_Pelvis")
@@ -338,7 +340,7 @@ function B:OnUpdate(ar)
         self.lastGroundCheckTime = currentTime
     end
     
-    local dynamicSpeed = math.Clamp(3.0 + (speed / 40), 3.0, 10.0)
+    local dynamicSpeed = math.Clamp(3.0 + (speed / 100), 3.0, 4.5)
 
     for i = 1, 2 do
         local state = self.legState[i]
@@ -351,7 +353,7 @@ function B:OnUpdate(ar)
             else
                 local t = state.progress
                 local nextPos = LerpVector(t, state.startPos, state.targetPos)
-                nextPos.z = nextPos.z + (math.sin(t * math.pi) * CONFIG.StepHeight)
+                nextPos.z = nextPos.z + (math.sin(t * math.pi) * CONFIG.StepHeight * STEP_LIFT)
                 self.footPositions[i] = nextPos
             end
         else
@@ -376,8 +378,22 @@ function B:OnUpdate(ar)
         end
     end
 
+    local leftHip = self.ikChains[1] and ragdoll:GetBonePosition(self.ikChains[1].boneIndices[1])
+    local rightHip = self.ikChains[2] and ragdoll:GetBonePosition(self.ikChains[2].boneIndices[1])
+    local hips = {leftHip, rightHip}
+    local facing
+    if leftHip and rightHip then
+        local side = leftHip - rightHip
+        side.z = 0
+        facing = side:Cross(vector_up)
+        facing:Normalize()
+    end
+
     for i = 1, 2 do
         if self.ikChains[i] then
+            if facing and hips[i] then
+                self.ikChains[i].poleTarget = hips[i] + facing * KNEE_POLE_FORWARD - vector_up * (self.ikChains[i].completeLength * KNEE_POLE_DROP)
+            end
             local safeTarget = SanitizeVector(self.footPositions[i], pelvisPos)
             if self.ikChains[i].SetTarget then self.ikChains[i]:SetTarget(safeTarget) end
             if self.ikChains[i].Update then self.ikChains[i]:Update() end

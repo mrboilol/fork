@@ -10,15 +10,21 @@ local gradientLeft = Material("vgui/gradient-l")
 local gradientDown = Material("vgui/gradient-d")
 local arenaMusic
 
-local function PlayArenaMusic(path)
+local arenaMusicStartedAt = 0
+local arenaMusicStopAt
+
+local function PlayArenaMusic(path, duration)
 	if hg.DynaMusic then hg.DynaMusic:Stop() end
 	if arenaMusic then arenaMusic:Stop() end
 
 	arenaMusic = CreateSound(LocalPlayer(), path)
 	arenaMusic:PlayEx(GetConVar("snd_musicvolume"):GetFloat(), 100)
+	arenaMusicStartedAt = RealTime()
+	arenaMusicStopAt = duration and (RealTime() + duration) or nil
 end
 
 local function StopArenaMusic()
+	arenaMusicStopAt = nil
 	if not arenaMusic then return end
 
 	arenaMusic:Stop()
@@ -29,7 +35,28 @@ hook.Add("Think", "ArenaMusicCleanup", function()
 	if not arenaMusic then return end
 
 	local mode = CurrentRound()
-	if not mode or mode.name ~= "tdm" then StopArenaMusic() end
+	if not mode or mode.name ~= "tdm" then
+		if RealTime() - arenaMusicStartedAt > 2 then StopArenaMusic() end
+		return
+	end
+
+	local left = arenaMusicStopAt and (arenaMusicStopAt - RealTime())
+	if left then
+		if left <= 0 then
+			StopArenaMusic()
+			return
+		end
+
+		if left < 1.5 then
+			arenaMusic:ChangeVolume(GetConVar("snd_musicvolume"):GetFloat() * left / 1.5, 0)
+			return
+		end
+	end
+
+	if not arenaMusic:IsPlaying() and RealTime() - arenaMusicStartedAt > 0.5 then
+		arenaMusic:PlayEx(GetConVar("snd_musicvolume"):GetFloat(), 100)
+		arenaMusicStartedAt = RealTime()
+	end
 end)
 
 local function GetVoteTotal()
@@ -133,11 +160,12 @@ net.Receive("arena_vote_result", function()
 	voteResults = net.ReadTable() or voteResults
 	if IsValid(ArenaVoteMenu) then ArenaVoteMenu:Remove() end
 	if arenaMusic then arenaMusic:ChangeVolume(0, 2) end
+	if arenaMusic then arenaMusicStopAt = RealTime() + 2 end
 	surface.PlaySound("ui/buttonclickrelease.wav")
 end)
 
 local function StartArenaIntro()
-	PlayArenaMusic("rem_track2.mp3")
+	PlayArenaMusic("rem_track2.mp3", 10.5)
 	zb.RemoveFade()
 	MODE.RoundTextTilts = {}
 	for i = 1, 8 do
@@ -288,6 +316,7 @@ function MODE:HUDPaint()
 	if not lply:Alive() then return end
 	zb.RemoveFade()
 	local t = CurTime() - StartTime
+	hg.RoundStart.MarkTitle()
 	local out_fade = math.Clamp((10.5 - t) / 1.5, 0, 1)
 	local team_ = lply:Team()
     local Rolename = teams[team_].name
@@ -295,9 +324,9 @@ function MODE:HUDPaint()
     local Objective = teams[team_].objective
     local ColorObj = teams[team_].color2
 	local elements = {
-		{"Arena", "ZB_HomicideMediumLarge", Color(255, 255, 255), sw * 0.5, sh * 0.1, "left", 0, 0.9},
-		{"You are "..Rolename, "ZB_HomicideMediumLarge", ColorRole, sw * 0.5, sh * 0.5, "right", 0.7, 1.1},
-		{Objective, "ZB_HomicideMedium", ColorObj, sw * 0.5, sh * 0.9, "bottom", 1.4, 1.3, true}
+		{"Arena", "ZB_TitleLarge", Color(255, 255, 255), sw * 0.5, sh * 0.1, "left", 0, 0.9},
+		{"You are "..Rolename, "ZB_TitleLarge", ColorRole, sw * 0.5, sh * 0.5, "right", 0.7, 1.1},
+		{Objective, "ZB_TitleMedium", ColorObj, sw * 0.5, sh * 0.9, "bottom", 1.4, 1.3, true}
 	}
 
 	for i, el in ipairs(elements) do

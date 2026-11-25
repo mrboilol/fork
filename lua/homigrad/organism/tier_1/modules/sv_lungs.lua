@@ -906,11 +906,14 @@ module[2] = function(owner, org, timeValue)
 	local owner = org.owner
 	if (org.brokenribs or 0) > 0 and org.lungsL[2] ~= 1 and org.lungsR[2] ~= 1 and IsValid(owner) and owner:IsPlayer() and owner:GetVelocity():Length2D() > 150 then
 		if math.Rand(0, 1) < timeValue * org.brokenribs * 0.002 then
-			local lung = math.random(2) == 1 and org.lungsL or org.lungsR
-			lung[2] = 1
-			org.internalBleed = math.min((org.internalBleed or 0) + math.Rand(0.15, 0.35), 10)
+			local tissueOnly = hg.SimpleHealth.RibTissueDamage(org, 1)
+			if not tissueOnly then
+				local lung = math.random(2) == 1 and org.lungsL or org.lungsR
+				lung[2] = 1
+				org.internalBleed = math.min((org.internalBleed or 0) + math.Rand(0.15, 0.35), 10)
+			end
 			if owner.Thought then
-				owner:Thought("A broken rib punctured my lung.", 4, "thought_ribs_lung", 0, Color(255, 210, 210))
+				owner:Thought(tissueOnly and "My broken ribs are tearing me up." or "A broken rib punctured my lung.", 4, "thought_ribs_lung", 0, Color(255, 210, 210))
 			end
 		end
 	end

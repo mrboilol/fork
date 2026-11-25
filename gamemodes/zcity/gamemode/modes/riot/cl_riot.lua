@@ -15,6 +15,16 @@ local RiotVoteFadeStart = 0
 local RiotVoteFadeEnd = 0
 local RiotIntroMusic = nil
 local RiotIntroMusicStart = 0
+local RiotMusicPath = nil
+local RiotMusicStartedAt = 0
+
+local function PlayRiotMusic(path)
+    if RiotIntroMusic then RiotIntroMusic:Stop() end
+    RiotIntroMusic = CreateSound(LocalPlayer(), path)
+    RiotIntroMusic:PlayEx(1.5, 100)
+    RiotMusicPath = path
+    RiotMusicStartedAt = RealTime()
+end
 local tex_gradient_r = Material("vgui/gradient-r")
 local tex_gradient_l = Material("vgui/gradient-l")
 local tex_gradient_d = Material("vgui/gradient-d")
@@ -35,12 +45,7 @@ net.Receive("riot_start", function()
     end
 
     RiotIntroStartTime = CurTime()
-    if RiotIntroMusic then
-        RiotIntroMusic:Stop()
-        RiotIntroMusic = nil
-    end
-    RiotIntroMusic = CreateSound(LocalPlayer(), "rem_track2.mp3")
-    RiotIntroMusic:PlayEx(1.5, 100)
+    PlayRiotMusic("rem_track2.mp3")
     RiotIntroMusicStart = RiotIntroStartTime
     MODE.RoundTextTilts = {}
     for i = 1, 64 do
@@ -241,11 +246,12 @@ function MODE:HUDPaint()
         }
     end
 
-    add("Riot", "ZB_HomicideHeader", Color(255, 255, 255), sw * 0.5, sh * 0.1, "left", 0, 0.9)
-    add(intensityData.name, "ZB_HomicideMediumLarge", Color(255, 255, 255), sw * 0.5, sh * 0.2, "left", 0.25, 0.95)
+    hg.RoundStart.MarkTitle()
+    add("Riot", "ZB_TitleHeader", Color(255, 255, 255), sw * 0.5, sh * 0.1, "left", 0, 0.9)
+    add(intensityData.name, "ZB_TitleLarge", Color(255, 255, 255), sw * 0.5, sh * 0.2, "left", 0.25, 0.95)
     add(intensityData.description, "ZCity_Menu_Settings_Small", Color(225, 225, 225), sw * 0.5, sh * 0.26, "left", 0.45, 1, true)
-    add("You are " .. (riotIntroRoleName or teamData.name), "ZB_HomicideMediumLarge", ColorRole, sw * 0.5, sh * 0.5, "right", 0.7, 1.1)
-    add(teamData.objective, "ZB_HomicideMedium", Color(255, 255, 255), sw * 0.5, sh * 0.9, "bottom", 1.4, 1.3, true)
+    add("You are " .. (riotIntroRoleName or teamData.name), "ZB_TitleLarge", ColorRole, sw * 0.5, sh * 0.5, "right", 0.7, 1.1)
+    add(teamData.objective, "ZB_TitleMedium", Color(255, 255, 255), sw * 0.5, sh * 0.9, "bottom", 1.4, 1.3, true)
 
     local tilts = MODE.RoundTextTilts or {}
     for i, el in ipairs(elements) do
@@ -310,12 +316,7 @@ net.Receive("riot_start_vote", function()
     RiotIntroStartTime = 0
     RiotVoteFadeStart = 0
     RiotVoteFadeEnd = 0
-    if RiotIntroMusic then
-        RiotIntroMusic:Stop()
-        RiotIntroMusic = nil
-    end
-    RiotIntroMusic = CreateSound(LocalPlayer(), "rem_track1.mp3")
-    RiotIntroMusic:PlayEx(1.5, 100)
+    PlayRiotMusic("rem_track1.mp3")
     RiotIntroMusicStart = 0
     OpenVoteMenu()
 end)
@@ -348,9 +349,21 @@ hook.Add("Think", "RiotIntroSoundCleanup", function()
 
     local mode = CurrentRound()
     if not mode or mode.name ~= "riot" then
-        RiotIntroMusic:Stop()
-        RiotIntroMusic = nil
-        RiotIntroMusicStart = 0
+        if RealTime() - RiotMusicStartedAt > 2 then
+            RiotIntroMusic:Stop()
+            RiotIntroMusic = nil
+            RiotIntroMusicStart = 0
+        end
+        return
+    end
+
+    if RiotIntroMusic:IsPlaying() or RealTime() - RiotMusicStartedAt < 0.5 then return end
+
+    local voting = RiotMusicPath == "rem_track1.mp3" and voteEndTime > CurTime() and RiotVoteFadeStart == 0
+    local intro = RiotMusicPath == "rem_track2.mp3" and RiotIntroStartTime > 0 and CurTime() - RiotIntroStartTime < RiotIntroDuration
+    if voting or intro then
+        RiotIntroMusic:PlayEx(1.5, 100)
+        RiotMusicStartedAt = RealTime()
     end
 end)
 

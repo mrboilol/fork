@@ -644,6 +644,40 @@ for roleId, config in pairs(RoleConfigs) do
     }
 end
 
+local function SyncLoadoutToServer(name, json)
+    if not isstring(json) or json == "" or #json > 4096 then return end
+    if not IsValid(LocalPlayer()) then return end
+    net.Start("hmcd_loadout_sync")
+    net.WriteString(name)
+    net.WriteString(json)
+    net.SendToServer()
+end
+
+local function SyncAllLoadouts()
+    for _, name in ipairs({"hmcd_traitor_loadout", "hmcd_hero_loadout"}) do
+        local cv = GetConVar(name)
+        if cv then SyncLoadoutToServer(name, cv:GetString()) end
+    end
+    local raw = file.Read("zcity_arena_loadout.txt", "DATA")
+    if not raw or raw == "" then
+        local cv = GetConVar("zcity_arena_loadout")
+        raw = cv and cv:GetString()
+    end
+    if isstring(raw) and raw ~= "" and #raw <= 4096 and IsValid(LocalPlayer()) then
+        net.Start("arena_loadout_sync")
+        net.WriteString(raw)
+        net.SendToServer()
+    end
+end
+
+hook.Add("InitPostEntity", "HMCD_SyncLoadouts", function()
+    timer.Simple(3, SyncAllLoadouts)
+end)
+
+if IsValid(LocalPlayer()) then
+    timer.Simple(1, SyncAllLoadouts)
+end
+
 local function SaveLoadout(roleId)
     local config = RoleConfigs[roleId]
     local state = RoleState[roleId]
@@ -664,6 +698,8 @@ local function SaveLoadout(roleId)
     if cv then
         cv:SetString(dataStr)
     end
+
+    SyncLoadoutToServer(config.convar, dataStr)
 end
 
 for roleId in pairs(RoleConfigs) do
@@ -1649,6 +1685,11 @@ local function SaveArenaLoadout()
 	local json = util.TableToJSON(ArenaLoadout) or "{\"weapons\":[],\"attachments\":{},\"armor\":[],\"medical\":[]}"
 	file.Write("zcity_arena_loadout.txt", json)
     GetConVar("zcity_arena_loadout"):SetString(json)
+    if IsValid(LocalPlayer()) and #json <= 4096 then
+        net.Start("arena_loadout_sync")
+        net.WriteString(json)
+        net.SendToServer()
+    end
 end
 
 local function RandomArenaLoadout()

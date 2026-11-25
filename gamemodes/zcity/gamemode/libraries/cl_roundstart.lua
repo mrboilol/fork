@@ -12,6 +12,42 @@ hg.RoundStart = {
 
 local RS = hg.RoundStart
 
+local titleSeenAt = -1
+local hiddenHudEvents = {
+    HUDPaint = true,
+    HUDPaintBackground = true,
+    PostDrawHUD = true,
+    DrawOverlay = true,
+}
+
+function RS.MarkTitle()
+    titleSeenAt = RealTime()
+end
+
+function RS.IsTitleActive()
+    return RealTime() - titleSeenAt < 0.25
+end
+
+if not hook.ZBTitleWrapped then
+    hook.ZBTitleWrapped = true
+    local baseHookCall = hook.Call
+    function hook.Call(name, gm, ...)
+        if hiddenHudEvents[name] and hg.RoundStart.IsTitleActive() then
+            local current = zb.CROUND_MAIN or zb.CROUND or "tdm"
+            local modeHooks = zb.modesHooks and zb.modesHooks[current]
+            local modeHook = modeHooks and modeHooks[name]
+            if modeHook then modeHook(zb.modes[current], ...) end
+            return
+        end
+
+        return baseHookCall(name, gm, ...)
+    end
+end
+
+hook.Add("HUDShouldDraw", "ZB_RoundStartTitleHideHUD", function()
+    if RS.IsTitleActive() then return false end
+end)
+
 local lastRS = -1
 local tilts = {}
 local soundObj = nil
@@ -82,6 +118,7 @@ function hg.RoundStart.DrawTitle(content, opts)
     if lply:Team() == TEAM_SPECTATOR then return end
 
     ensureRound(startTime, opts.sound or RS.soundEnabled)
+    RS.MarkTitle()
     if zb.RemoveFade then zb.RemoveFade() end
 
     local out_fade = math.Clamp((duration - t) / 1.5, 0, 1)
@@ -110,21 +147,21 @@ function hg.RoundStart.DrawTitle(content, opts)
         }
     end
 
-    add(content.header or "", "ZB_HomicideHeader", Color(255, 255, 255), sw * 0.5, sh * 0.1, "left", 0, 0.9)
+    add(content.header or "", "ZB_TitleHeader", Color(255, 255, 255), sw * 0.5, sh * 0.1, "left", 0, 0.9)
 
     local cur_y = sh * 0.5
     local stack_delay = 0.7
 
     if content.lines then
         for _, line in ipairs(content.lines) do
-            cur_y = cur_y + ScreenScale(20)
-            add(line.text, line.font or "ZB_HomicideMediumLarge", line.color or color, sw * 0.5, cur_y, "right", stack_delay, 1.05)
+            cur_y = cur_y + ScreenScale(13)
+            add(line.text, line.font or "ZB_TitleLarge", line.color or color, sw * 0.5, cur_y, "right", stack_delay, 1.05)
             stack_delay = stack_delay + 0.15
         end
     end
 
     if content.objective and content.objective ~= "" then
-        add(content.objective, "ZB_HomicideMedium", Color(255, 255, 255), sw * 0.5, sh * 0.9, "bottom", 1.4, 1.3, true)
+        add(content.objective, "ZB_TitleMedium", Color(255, 255, 255), sw * 0.5, sh * 0.9, "bottom", 1.4, 1.3, true)
     end
 
     for i, el in ipairs(elements) do

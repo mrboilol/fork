@@ -59,7 +59,7 @@ SimpleHealth.Config = {
 		start = 2750,
 		rollBelow = 3000,
 		rollChance = 0.35,
-		time = 30,
+		time = 45,
 	},
 	brainDeath = 0.4,
 	softCritControlMul = 0.55,
@@ -77,6 +77,7 @@ SimpleHealth.Config = {
 		passiveBurnRegen = 0.08,
 		brokenChestAt = 1,
 		brokenChestBleedMul = 1.75,
+		ribBrute = 2.5,
 		limbHealth = {head = 1.75, torso = 1.5, larm = 0.3, rarm = 0.3, lleg = 0.3, rleg = 0.3},
 	},
 
@@ -134,7 +135,7 @@ SimpleHealth.Config = {
 	fibrillation = {
 		rate = 300,
 		jitter = 40,
-		deathTime = 20,
+		deathTime = 45,
 	},
 
 	rhythm = {
@@ -188,6 +189,17 @@ SimpleHealth.Config = {
 		wakeAt = 0.2,
 		hardCritFloor = 0.25,
 		depthDrain = 0.04,
+		perfusionStart = 0.5,
+		perfusionDrain = 0.1,
+		leadInFloor = 0.3,
+		leadInStart = 0.35,
+		leadInControlMul = 0.45,
+	},
+
+	perfusion = {
+		pulseFull = 45,
+		damageBelow = 0.35,
+		brainRate = 0.006,
 	},
 
 	temperature = {
@@ -201,7 +213,6 @@ SimpleHealth.Config = {
 	},
 
 	oxy = {
-		softCritCap = 90,
 		softCritGain = 2,
 		hardCritGain = 2,
 		regen = 2,
@@ -210,9 +221,9 @@ SimpleHealth.Config = {
 		brainDamageRate = 0.004,
 		countdownStart = 100,
 		countdownTime = 45,
-		cprHoldAbove = 20,
+		cprHoldAbove = 25,
 		airwayCountdownTime = 12,
-		countdownTrackRemaining = 20,
+		countdownTrackRemaining = 25,
 		convulseRemaining = 25,
 		gaspAt = 50,
 		gaspHysteresis = 10,
@@ -239,6 +250,8 @@ SimpleHealth.Config = {
 		thiamineContaminationClear = 0.1,
 		thiamineDamageHeal = 0.5,
 		thiamineOrganHeal = 0.01,
+		infectionStart = 0.05,
+		infectionGain = 0.8,
 		transfusionHealPerMl = 0.03,
 		bloodLossHealPerMl = 0.004,
 		overdoseGain = 0.75,
@@ -262,6 +275,13 @@ SimpleHealth.Config = {
 
 	medicine = {
 		bandageBruteShare = 0.5,
+	},
+
+	organBleed = {
+		max = 10,
+		harmScale = {heart = 0.3, lungsL = 0.25, lungsR = 0.25},
+		sharpMul = {heart = 3, gut = 3, trachea = 3},
+		perHarm = {heart = 10, liver = 8, flank = 6.8, gut = 3.5, lungsL = 4, lungsR = 4, trachea = 2},
 	},
 
 	organs = {

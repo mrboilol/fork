@@ -56,19 +56,20 @@ function MODE:HUDPaint()
 
     if not teams[team_id] then return end
 
-    draw.SimpleText("ZBattle | American Civil War", "ZB_HomicideMediumLarge",
+    hg.RoundStart.MarkTitle()
+    draw.SimpleText("ZBattle | American Civil War", "ZB_TitleLarge",
         sw * 0.5, sh * 0.1, Color(139, 69, 19, 255 * fade), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 
     local role_color = teams[team_id].color1
     role_color.a = 255 * fade
 
-    draw.SimpleText("You are " .. teams[team_id].name, "ZB_HomicideMediumLarge",
+    draw.SimpleText("You are " .. teams[team_id].name, "ZB_TitleLarge",
         sw * 0.5, sh * 0.5, role_color, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 
     local objective_color = teams[team_id].color2
     objective_color.a = 255 * fade
 
-    draw.SimpleText(teams[team_id].objective, "ZB_HomicideMedium",
+    draw.SimpleText(teams[team_id].objective, "ZB_TitleMedium",
         sw * 0.5, sh * 0.9, objective_color, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 end
 

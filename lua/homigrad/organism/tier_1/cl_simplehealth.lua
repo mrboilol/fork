@@ -178,15 +178,19 @@ hook.Add("HUDPaint", "hg/simplehealth/vignette", function()
 end)
 
 local faceMaterials = {}
+local CLARK_FACE_PATH = "clark/face_%s.png"
+local clarkConVar = CreateClientConVar("hg_clark", "0", true, false, "1 = show Clark instead of nilguy as the health face", 0, 1)
 
 local function getFaceMaterial(key)
-	local cached = faceMaterials[key]
+	local clark = clarkConVar:GetBool()
+	local cacheKey = clark and "clark_" .. key or key
+	local cached = faceMaterials[cacheKey]
 	if cached ~= nil then return cached or nil end
 
-	local path = string.format(CONFIG.face.materialPath, key)
+	local path = string.format(clark and CLARK_FACE_PATH or CONFIG.face.materialPath, key)
 	local material = file.Exists("materials/" .. path, "GAME") and Material(path, "smooth") or false
 	if material and material:IsError() then material = false end
-	faceMaterials[key] = material
+	faceMaterials[cacheKey] = material
 
 	return material or nil
 end
@@ -199,6 +203,13 @@ local function getFaceKey(state, alive)
 	local faceConfig = CONFIG.face
 	local health = SimpleHealth.GetHealth(state)
 	if health <= (SimpleHealth.GetCritThresholds()) + 5 then return "softcrit" end
+	if clarkConVar:GetBool() then
+		local third = SimpleHealth.Config.maxHealth / 3
+		if health < third then return "critical" end
+		if health < third * 2 then return "hurt" end
+
+		return "healthy"
+	end
 	if health < faceConfig.criticalBelow then return "critical" end
 	if health < faceConfig.woundedBelow then return "wounded" end
 	if health < faceConfig.hurtBelow then return "hurt" end

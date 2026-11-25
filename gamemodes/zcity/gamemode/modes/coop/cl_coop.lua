@@ -121,25 +121,26 @@ function MODE:HUDPaint()
 		}
 	end
 
-	add("Homicide | CO-OP", "ZB_HomicideHeader", Color(255, 255, 255), sw * 0.5, sh * 0.1, "left", 0, 0.9)
-	add("You are " .. Rolename, "ZB_HomicideMediumLarge", ColorRole, sw * 0.5, sh * 0.5, "right", 0.7, 1.1)
+	hg.RoundStart.MarkTitle()
+	add("Homicide | CO-OP", "ZB_TitleHeader", Color(255, 255, 255), sw * 0.5, sh * 0.1, "left", 0, 0.9)
+	add("You are " .. Rolename, "ZB_TitleLarge", ColorRole, sw * 0.5, sh * 0.5, "right", 0.7, 1.1)
 
 	local cur_y = sh * 0.5
 	local stack_delay = 1.1
 
 	if lply.SubRole and lply.SubRole != "" then
-		cur_y = cur_y + ScreenScale(20)
-		add(((MODE.SubRoles and MODE.SubRoles[lply.SubRole] and MODE.SubRoles[lply.SubRole].Name or lply.SubRole) or lply.SubRole), "ZB_HomicideMediumLarge", ColorRole, sw * 0.5, cur_y, "right", stack_delay, 1.05)
+		cur_y = cur_y + ScreenScale(13)
+		add(((MODE.SubRoles and MODE.SubRoles[lply.SubRole] and MODE.SubRoles[lply.SubRole].Name or lply.SubRole) or lply.SubRole), "ZB_TitleLarge", ColorRole, sw * 0.5, cur_y, "right", stack_delay, 1.05)
 		stack_delay = stack_delay + 0.15
 	end
 
 	if lply.Profession and lply.Profession != "" then
-		cur_y = cur_y + ScreenScale(20)
-		add("Occupation: " .. ((MODE.Professions and MODE.Professions[lply.Profession] and MODE.Professions[lply.Profession].Name or lply.Profession) or lply.Profession), "ZB_HomicideMedium", teams[0].color2, sw * 0.5, cur_y, "right", stack_delay, 1.05)
+		cur_y = cur_y + ScreenScale(13)
+		add("Occupation: " .. ((MODE.Professions and MODE.Professions[lply.Profession] and MODE.Professions[lply.Profession].Name or lply.Profession) or lply.Profession), "ZB_TitleMedium", teams[0].color2, sw * 0.5, cur_y, "right", stack_delay, 1.05)
 		stack_delay = stack_delay + 0.15
 	end
 
-	add(Objective, "ZB_HomicideMedium", teams[0].color2, sw * 0.5, sh * 0.9, "bottom", 1.4, 1.3, true)
+	add(Objective, "ZB_TitleMedium", teams[0].color2, sw * 0.5, sh * 0.9, "bottom", 1.4, 1.3, true)
 
 	local tilts = MODE.RoundTextTilts or {}
 

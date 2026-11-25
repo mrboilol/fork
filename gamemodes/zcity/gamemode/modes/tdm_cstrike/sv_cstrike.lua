@@ -40,7 +40,7 @@ function MODE:CanLaunch()
 
     local points5 = zb.GetMapPoints( "HOSTAGE_DELIVERY_ZONE" )
 
-    return (#points > 0) and (#points2 > 0) and (((#points3 > 1) or (#points4 > 1)) or (#points5 > 1))
+    return zb:CountPlayers() >= 4 and (#points > 0) and (#points2 > 0) and (((#points3 > 1) or (#points4 > 1)) or (#points5 > 1))
 end
 
 function MODE:OverrideBalance()--return true to keep alive players

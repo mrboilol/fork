@@ -50,7 +50,7 @@ function MODE:CanLaunch()
 		end
 	end
 
-	return count >= 2
+	return count >= 4
 end
 
 function MODE:SetupChances()

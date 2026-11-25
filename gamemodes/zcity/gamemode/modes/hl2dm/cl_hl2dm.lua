@@ -53,7 +53,8 @@ function MODE:HUDPaint()
     local role = lply:GetNWString("PlayerRole")
     local team_data = teams[team_id]
 
-    draw.SimpleText("ZBattle | Half-Life 2 Deathmatch", "ZB_HomicideMediumLarge", sw * 0.5, sh * 0.1, Color(0, 162, 255, 255 * fade), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+    hg.RoundStart.MarkTitle()
+    draw.SimpleText("ZBattle | Half-Life 2 Deathmatch", "ZB_TitleLarge", sw * 0.5, sh * 0.1, Color(0, 162, 255, 255 * fade), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 
 	--; Любимое ООП шарика
     local role_data = {
@@ -64,13 +65,13 @@ function MODE:HUDPaint()
     
     role_data.color.a = 255 * fade
 
-    draw.SimpleText("You are " .. role_data.name, "ZB_HomicideMediumLarge", sw * 0.5, sh * 0.5, role_data.color, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+    draw.SimpleText("You are " .. role_data.name, "ZB_TitleLarge", sw * 0.5, sh * 0.5, role_data.color, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 
     local objective_color = team_data.color2
 
     objective_color.a = 255 * fade
 
-    draw.SimpleText(role_data.objective, "ZB_HomicideMedium", sw * 0.5, sh * 0.9, objective_color, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+    draw.SimpleText(role_data.objective, "ZB_TitleMedium", sw * 0.5, sh * 0.9, objective_color, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 
 	if hg.PluvTown.Active then
 		surface.SetMaterial(hg.PluvTown.PluvMadness)

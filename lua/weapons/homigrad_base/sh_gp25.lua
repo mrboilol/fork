@@ -96,6 +96,7 @@ if CLIENT then
 			and not owner.suiciding
 			and self.lhandik
 			and hg.CanUseLeftHand(owner)
+			and not hg.UsesLeftHand(owner)
 			and (not actionActive or reloadLHIKWeight > 0)
 		self.GP25LHIKWeight = LerpFT(self.ARC9LHIKTransitionSpeed or 0.04, self.GP25LHIKWeight or 0, usePose and 1 or 0)
 		if actionActive then self.GP25LHIKWeight = math.max(self.GP25LHIKWeight, reloadLHIKWeight) end

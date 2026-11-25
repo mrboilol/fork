@@ -148,6 +148,14 @@ if CLIENT then
 			model:ManipulateBoneScale(detonatorBone, self.anim == "idle" and hiddenBoneScale or visibleBoneScale)
 		end
 
+		if self:UsesOffHand(ply, ent) then
+			self.rhandik = false
+			self.lhandik = hg.CanUseLeftHand(ply)
+			if self.lhandik then hg.PoseOffHand(model, ent, self.OffHandMirror, ply:EyePos()) end
+
+			return
+		end
+
 		for modelBone = 0, model:GetBoneCount() - 1 do
 			local modelBoneName = model:GetBoneName(modelBone)
 			local playerBoneName = rightBones[modelBoneName] or leftBones[modelBoneName]

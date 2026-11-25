@@ -319,7 +319,7 @@ function MODE:GiveGruntLoadout(ply, grunt)
 end
 
 function MODE:CanLaunch()
-	return self:GetPlayerCount() >= 2
+	return self:GetPlayerCount() >= 4
 end
 
 function MODE:PreselectJuggernauts()

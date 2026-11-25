@@ -162,16 +162,17 @@ function MODE:HUDPaint()
 	zb.RemoveFade()
     local fade = math.Clamp(zb.ROUND_START + 8 - CurTime(),0,1)
     
-    draw.SimpleText("Superfighters 3D", "ZB_HomicideMediumLarge", sw * 0.5, sh * 0.1, Color(0,162,255, 255 * fade), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+    hg.RoundStart.MarkTitle()
+    draw.SimpleText("Superfighters 3D", "ZB_TitleLarge", sw * 0.5, sh * 0.1, Color(0,162,255, 255 * fade), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
     local Rolename = fighter.name
 	local ColorRole = fighter.color1
     ColorRole.a = 255 * fade
-    draw.SimpleText("You are a "..Rolename , "ZB_HomicideMediumLarge", sw * 0.5, sh * 0.5, ColorRole, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+    draw.SimpleText("You are a "..Rolename , "ZB_TitleLarge", sw * 0.5, sh * 0.5, ColorRole, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 
     local Objective = fighter.objective
     local ColorObj = fighter.color1
     ColorObj.a = 255 * fade
-    draw.SimpleText( Objective, "ZB_HomicideMedium", sw * 0.5, sh * 0.9, ColorObj, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+    draw.SimpleText( Objective, "ZB_TitleMedium", sw * 0.5, sh * 0.9, ColorObj, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 end
 
 local CreateEndMenu = nil

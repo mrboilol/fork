@@ -397,15 +397,13 @@ local function tickOxy(owner, org, state, timeValue)
 	if needleSoft then gain = 0 end
 
 	local oxy = state.oxy
-	if crit == CRIT_SOFT and not needleSoft and oxy < oxyConfig.softCritCap then
-		oxy = math.min(oxy + oxyConfig.softCritGain * gainMul * timeValue, oxyConfig.softCritCap)
-	end
+	local softDying = crit == CRIT_SOFT and not needleSoft
+	if softDying then oxy = oxy + oxyConfig.softCritGain * gainMul * timeValue end
 
 	oxy = oxy + gain * gainMul * timeValue
 
-	local floor = crit == CRIT_SOFT and not needleSoft and oxyConfig.softCritCap or 0
-	if gain <= 0 and not state.lethalCrit and oxy > floor then
-		oxy = math.max(oxy - oxyConfig.regen * timeValue, floor)
+	if gain <= 0 and not state.lethalCrit and not softDying and oxy > 0 then
+		oxy = math.max(oxy - oxyConfig.regen * timeValue, 0)
 	end
 
 	state.oxy = math.Clamp(oxy, 0, CONFIG.poolMax)
@@ -602,22 +600,40 @@ local function tickFlatline(owner, org, state, timeValue)
 	if math.Rand(0, 1) < flatlineChance(org, state) * timeValue then startFlatline(owner, org, state) end
 end
 
+local function tickBrainPerfusion(owner, org, state, timeValue)
+	local perfusionConfig = CONFIG.perfusion
+	if state.flatline or state.fibrillating then
+		state.brainPerfusion = 0
+
+		return
+	end
+
+	local perfusion = math.Clamp((tonumber(org.pulse) or 0) / perfusionConfig.pulseFull, 0, 1)
+	state.brainPerfusion = perfusion
+
+	local severity = rampUp(perfusionConfig.damageBelow - perfusion, 0, perfusionConfig.damageBelow)
+	if severity > 0 then org.brain = math.min((tonumber(org.brain) or 0) + perfusionConfig.brainRate * severity * timeValue, 1) end
+end
+
 local function tickConsciousness(owner, org, state, timeValue)
 	local consciousnessConfig = CONFIG.consciousness
 	local softAt, hardAt = SimpleHealth.GetCritThresholds()
 	local blood = tonumber(org.blood) or CONFIG.contamination.normalBlood
 	local drain = 0
+	local held = 0
 
 	if state.health <= softAt then
 		drain = consciousnessConfig.softCritDrain + rampUp(softAt - state.health, 0, softAt - hardAt) * consciousnessConfig.softCritDepthDrain
 	end
-	if state.flatline or state.fibrillating then drain = drain + consciousnessConfig.flatlineDrain end
+	if state.flatline or state.fibrillating then held = held + consciousnessConfig.flatlineDrain end
 	local tolerance = SimpleHealth.IsCritImmune(org) and ((tonumber(org.fury13) or 0) > 0 and 0.2 or 0.35) or 1
 	drain = drain + rampUp(consciousnessConfig.bleedStart - blood, 0, consciousnessConfig.bleedStart - CONFIG.deathBlood) * consciousnessConfig.bleedDrain * tolerance
-	drain = drain + rampUp(state.oxy, consciousnessConfig.oxyStart, consciousnessConfig.oxyFull) * consciousnessConfig.oxyDrain
+	held = held + rampUp(state.oxy, consciousnessConfig.oxyStart, consciousnessConfig.oxyFull) * consciousnessConfig.oxyDrain
 	if state.airwayBlocked then
-		drain = drain + rampUp(state.oxy, consciousnessConfig.airwayStart, consciousnessConfig.airwayFull) * consciousnessConfig.airwayDrain
+		held = held + rampUp(state.oxy, consciousnessConfig.airwayStart, consciousnessConfig.airwayFull) * consciousnessConfig.airwayDrain
 	end
+	held = held + rampUp(consciousnessConfig.perfusionStart - (state.brainPerfusion or 1), 0, consciousnessConfig.perfusionStart) * consciousnessConfig.perfusionDrain
+	drain = drain + held
 
 	local ceiling = 1
 	if state.health <= softAt and not SimpleHealth.IsCritImmune(org) then
@@ -625,7 +641,9 @@ local function tickConsciousness(owner, org, state, timeValue)
 	end
 	ceiling = math.min(ceiling, 1 - rampUp(consciousnessConfig.bloodCapStart - blood, 0, consciousnessConfig.bloodCapStart - CONFIG.deathBlood) * consciousnessConfig.bloodCapMax)
 
-	local rate = drain > 0 and -drain or consciousnessConfig.recover
+	local settled = state.leadIn and held > 0 and state.consciousnessCap <= consciousnessConfig.leadInFloor
+	if settled then drain = drain - held end
+	local rate = drain > 0 and -drain or settled and 0 or consciousnessConfig.recover
 	local previousCap = state.consciousnessCap
 	local cap = previousCap + rate * timeValue
 	if cap > ceiling then cap = math.max(ceiling, math.min(cap, previousCap - consciousnessConfig.depthDrain * timeValue)) end
@@ -643,6 +661,7 @@ table.insert(SimpleHealth.Tickers, tickTemperature)
 table.insert(SimpleHealth.Tickers, tickFibrillation)
 table.insert(SimpleHealth.Tickers, tickRhythm)
 table.insert(SimpleHealth.Tickers, tickFlatline)
+table.insert(SimpleHealth.Tickers, tickBrainPerfusion)
 table.insert(SimpleHealth.Tickers, tickConsciousness)
 
 for _, ticker in ipairs({tickOxy, tickRegen, tickTemperature}) do
@@ -662,6 +681,7 @@ local function updateCrit(org, state)
 	state.displayCrit = severe and CRIT_HARD or healthCrit
 	org.critical = state.displayCrit == CRIT_HARD
 	state.lethalCrit = severe or (org.otrub and healthCrit == CRIT_SOFT and not needleSoft and not isBreathing(state))
+	state.dying = state.crit == CRIT_HARD or (state.crit == CRIT_SOFT and not needleSoft)
 	org.simpleControlMul = state.crit == CRIT_SOFT and CONFIG.softCritControlMul or nil
 
 	local softCritFree = state.crit == CRIT_SOFT and state.health < 15
@@ -681,18 +701,21 @@ local function updateCountdown(owner, org, state)
 	local bleedConfig = CONFIG.bleedCountdown
 	local blood = tonumber(org.blood) or CONFIG.contamination.normalBlood
 
-	if not org.otrub or blood >= bleedConfig.rollBelow then
+	local consciousnessConfig = CONFIG.consciousness
+	local drowsy = org.otrub or state.consciousnessCap <= consciousnessConfig.leadInStart
+
+	if not drowsy or blood >= bleedConfig.rollBelow then
 		state.bleedRoll = nil
 	elseif state.bleedRoll == nil then
 		state.bleedRoll = math.random() < bleedConfig.rollChance
 	end
 
-	local bleedOut = org.otrub and blood < bleedConfig.rollBelow and (blood < bleedConfig.start or state.bleedRoll)
+	local bleedOut = drowsy and blood < bleedConfig.rollBelow and (blood < bleedConfig.start or state.bleedRoll)
 	state.countdownBleed = not state.fibrillating and bleedOut or nil
 
 	if state.fibrillating then
 		state.countdownStart = state.fibrillationStart
-	elseif (state.oxy > oxyConfig.countdownStart or bleedOut) and org.otrub then
+	elseif (state.oxy > oxyConfig.countdownStart or bleedOut) and (org.otrub or state.dying or bleedOut) then
 		state.countdownStart = state.countdownStart or now
 	else
 		state.countdownStart = nil
@@ -723,7 +746,16 @@ local function updateCountdown(owner, org, state)
 	org.incapReason = org.incapacitated and "oxy" or nil
 	if org.incapacitated then
 		org.deathStateEnd = state.countdownStart + duration
+		if not org.otrub then
+			org.needotrub = true
+			org.consciousness = math.min(tonumber(org.consciousness) or 1, consciousnessConfig.wakeAt * 0.5)
+		end
 	end
+
+	local wasLeadIn = state.leadIn
+	state.leadIn = counting and not org.incapacitated or nil
+	if state.leadIn then org.simpleControlMul = math.min(org.simpleControlMul or 1, consciousnessConfig.leadInControlMul) end
+	if state.leadIn ~= wasLeadIn and IsValid(owner) and owner:IsPlayer() then owner.ChatWhisper = state.leadIn or state.crit == CRIT_SOFT end
 
 	return counting and elapsed >= duration
 end
@@ -933,6 +965,34 @@ hg.InputWrapperChainHas = hg.InputWrapperChainHas or function(fn, target)
 	return false
 end
 
+local function bleedFromOrgan(org, name, dmg, dmgInfo)
+	local bleedConfig = CONFIG.organBleed
+	local perHarm = bleedConfig.perHarm[name]
+	if not perHarm or not isnumber(dmg) or dmg <= 0 then return end
+
+	local blunt = not dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_SLASH + DMG_BLAST)
+	local harm = dmg * (bleedConfig.harmScale[name] or 1) / math.max(org.organStrengthMul or 1, 1)
+	if not blunt then harm = harm * (bleedConfig.sharpMul[name] or 1) end
+
+	local owner = org.owner
+	local mul = 1
+	if IsValid(owner) and owner.GetTraitMultiplier then
+		harm = harm * owner:GetTraitMultiplier("organ_damage", 1)
+		mul = owner:GetTraitMultiplier("internal_bleed", 1)
+	end
+
+	local current = tonumber(org.internalBleed) or 0
+	org.internalBleed = math.max(current, math.min(current + math.min(harm, 1) * perHarm * mul, bleedConfig.max))
+end
+
+function SimpleHealth.RibTissueDamage(org, ribs)
+	if org.simpleMode ~= MODE_SIMPLE then return false end
+
+	SimpleHealth.AddDamage(org, "brute", ribs * CONFIG.damage.ribBrute, "torso")
+
+	return true
+end
+
 local function wrapInput(inputList, name, allowedMode)
 	local original = inputList[name]
 	if not isfunction(original) or hg.InputWrapperChainHas(original, SimpleHealth.InputWrappers[name]) then return end
@@ -942,7 +1002,12 @@ local function wrapInput(inputList, name, allowedMode)
 	local function wrapper(org, ...)
 		local mode = org.simpleMode
 		if not mode then return original(org, ...) end
-		if allowedMode ~= true and mode ~= allowedMode then return 0 end
+		if allowedMode ~= true and mode ~= allowedMode then
+			local _, dmg, dmgInfo = ...
+			bleedFromOrgan(org, name, dmg, dmgInfo)
+
+			return 0
+		end
 
 		local handler = SimpleHealth.InputHandlers[name]
 		if handler then return handler(original, org, ...) end
@@ -1084,6 +1149,11 @@ local function tickToxin(owner, org, state, timeValue)
 		SimpleHealth.AddDamage(org, "toxin", state.contamination * CONFIG.contamination.toxinGain * timeValue)
 	end
 
+	local infection = rampUp(tonumber(org.infection) or 0, toxinConfig.infectionStart, 1)
+	if infection > 0 then
+		SimpleHealth.AddDamage(org, "toxin", infection * toxinConfig.infectionGain * timeValue)
+	end
+
 	local overdose = SimpleHealth.GetOverdose(org)
 	if overdose > 0 then
 		SimpleHealth.AddDamage(org, "toxin", overdose * toxinConfig.overdoseGain * timeValue)
@@ -1161,6 +1231,7 @@ function SimpleHealth.OnAEDShock(org)
 
 	state.countdownStart = nil
 	state.countdownChoked = nil
+	state.leadIn = nil
 	state.bleedRoll = nil
 	org.incapacitated = false
 	org.incapReason = nil
@@ -1390,7 +1461,9 @@ function SimpleHealth.GetCrit(ply)
 end
 
 function SimpleHealth.IsWhisperForced(ply)
-	return SimpleHealth.GetCrit(ply) == CRIT_SOFT
+	local state = IsValid(ply) and SimpleHealth.GetState(ply.organism)
+
+	return state and (state.crit == CRIT_SOFT or state.leadIn) or false
 end
 
 local function stateThought(owner, key, text)

@@ -123,6 +123,14 @@ local STATUSES = {
 		recover = "You can move again.",
 	},
 	{
+		key = "drowsy",
+		level = function(org, _, current)
+			return Below(tonumber(org.consciousness) or 1, 0.75, 0.85, current, 1) and 1 or 0
+		end,
+		lines = {"You feel drowsy."},
+		recover = "You no longer feel drowsy.",
+	},
+	{
 		key = "cold",
 		level = function(org, _, current)
 			local temperature = tonumber(org.temperature) or 36.6

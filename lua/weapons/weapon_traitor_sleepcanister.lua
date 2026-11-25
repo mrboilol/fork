@@ -50,7 +50,7 @@ function SWEP:DrawWorldModel()
 	WorldModel:SetModelScale(self.ModelScale or 1)
 
 	if IsValid(owner) then
-		local boneid = owner:LookupBone(((owner.organism and owner.organism.rarmamputated) or (owner.zmanipstart ~= nil and owner.zmanipseq == "interact" and not owner.organism.larmamputated)) and "ValveBiped.Bip01_L_Hand" or "ValveBiped.Bip01_R_Hand")
+		local boneid = owner:LookupBone((hg.UsesLeftHand(owner) or (owner.zmanipstart ~= nil and owner.zmanipseq == "interact" and not owner.organism.larmamputated)) and "ValveBiped.Bip01_L_Hand" or "ValveBiped.Bip01_R_Hand")
 		if not boneid then return end
 		local matrix = owner:GetBoneMatrix(boneid)
 		if not matrix then return end

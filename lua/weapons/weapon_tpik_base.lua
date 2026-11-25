@@ -256,7 +256,7 @@ if CLIENT then
 		end
 
         if IsValid(owner) and not (ent == owner or hg.KeyDown(owner,IN_USE) or (owner:GetNetVar("lastFake",0) > CurTime())) then
-            local bon = ent:LookupBone("ValveBiped.Bip01_R_Hand")
+            local bon = ent:LookupBone(hg.UsesLeftHand(owner) and "ValveBiped.Bip01_L_Hand" or "ValveBiped.Bip01_R_Hand")
             if not bon then return end
             local mat = ent:GetBoneMatrix(bon)
             if not mat then return end
@@ -265,7 +265,15 @@ if CLIENT then
 			WorldModel:SetRenderAngles(ang)
         end
 
+		local offHand = self:UsesOffHand(owner, ent)
+		if offHand then WorldModel:InvalidateBoneCache() end
         WorldModel:SetupBones()
+		self.OffHandMirror = nil
+		if offHand then
+			local tr = hg.eyeTrace(owner, 60, ent)
+			self.OffHandMirror = tr and hg.GetMirrorMatrix(tr.StartPos, owner:EyeAngles():Right())
+			if self.OffHandMirror then hg.TransformModelBones(WorldModel, self.OffHandMirror) end
+		end
 
 		if prepareOnly then return end
         
@@ -286,6 +294,7 @@ if CLIENT then
 			for bone in pairs(meshBlendTo) do blendBones[bone] = true end
 			for bone in pairs(blendBones) do hideMeshBones[#hideMeshBones + 1] = bone end
 		end
+		local baseMatrix = self.OffHandMirror and WorldModel:GetBoneMatrix(self.basebone or 1)
         if not self.WorldModelExchange or hideMeshBones then
             if hideMeshBones then
 				local collapseBone = self.GetHideMeshCollapseBone and self:GetHideMeshCollapseBone()
@@ -313,7 +322,9 @@ if CLIENT then
 						WorldModel:SetBoneMatrix(boneIndex,matrix)
 						continue
 					end
-					if collapsePos then
+					if self.OffHandMirror then
+						matrix:Zero()
+					elseif collapsePos then
 						matrix:SetTranslation(collapsePos)
 						matrix:SetAngles(collapseAng)
 						matrix:SetScale(vecPochtiZero)
@@ -326,7 +337,11 @@ if CLIENT then
                 end
             end
 
-            WorldModel:DrawModel()
+			if self.OffHandMirror then
+				hg.DrawMirroredModel(WorldModel)
+			else
+				WorldModel:DrawModel()
+			end
         end
 
         if IsValid(self.worldModel) and self.WorldModelExchange then
@@ -352,16 +367,25 @@ if CLIENT then
 				pos,ang = LocalToWorld(self.weaponPos,self.weaponAng,basePos,baseAng)
 			end
             self.worldModel2:SetModelScale(self.modelscale)
-            self.worldModel2:SetRenderOrigin(pos)
-            self.worldModel2:SetRenderAngles(ang)
-            self.worldModel2:SetupBones()
+			local mirrored = baseMatrix and huy
+			if mirrored then
+				hg.SetupMirroredModel(self.worldModel2, baseMatrix, self.weaponPos, self.weaponAng)
+			else
+				self.worldModel2:SetRenderOrigin(pos)
+				self.worldModel2:SetRenderAngles(ang)
+				self.worldModel2:SetupBones()
+			end
             --print(self.worldModel:GetManipulateBoneScale(self.basebone or 1))
             if self.worldModel:GetManipulateBoneScale(self.basebone or 1) != vector_origin then
-                self.worldModel2:DrawModel()
+				if mirrored then
+					hg.DrawMirroredModel(self.worldModel2)
+				else
+					self.worldModel2:DrawModel()
+				end
             end
         end
 
-        if self:IsLocal() and self.isTPIKBase then
+        if self:IsLocal() and self.isTPIKBase and not self.OffHandMirror then
             local camBone = WorldModel:LookupBone(self.ViewBobCamBone or "Camera_animated") or WorldModel:LookupBone("ValveBiped.Bip01_R_Hand")
             if camBone then
                 local camMat = WorldModel:GetBoneMatrix(camBone)
@@ -444,6 +468,12 @@ function SWEP:CanPrimaryAttack()
     return self:GetOwner():IsSprinting()
 end
 
+function SWEP:UsesOffHand(owner, ent)
+	if not self.setrh or not hg.UsesLeftHand(owner) then return false end
+
+	return ent == owner or hg.KeyDown(owner, IN_USE) or owner:GetNetVar("lastFake", 0) > CurTime()
+end
+
 function SWEP:SetHandPos(noset)
 	local ply = self:GetOwner()
 
@@ -485,7 +515,13 @@ function SWEP:SetHandPos(noset)
 	ply.rhold = rhmat
 	ply.lhold = lhmat
 
-	if self.lhandik and (ent == ply or hg.KeyDown(ply,IN_USE) or (ply:GetNetVar("lastFake",0) > CurTime())) and hg.CanUseLeftHand(ply) then
+	local offHand = self:UsesOffHand(ply, ent)
+	if offHand and hg.CanUseLeftHand(ply) then
+		self.rhandik = false
+		self.lhandik = true
+		hg.PoseOffHand(wm, ent, self.OffHandMirror, wmpos)
+		self.animBlendPose = nil
+	elseif not offHand and self.lhandik and (ent == ply or hg.KeyDown(ply,IN_USE) or (ply:GetNetVar("lastFake",0) > CurTime())) and hg.CanUseLeftHand(ply) then
 		for _, bone in ipairs(bones) do
 			local wm_boneindex = wm:LookupBone(bone)
 			if !wm_boneindex then continue end
@@ -553,7 +589,7 @@ function SWEP:SetHandPos(noset)
 		end
 	end
 
-    if self.PostSetHandPos then
+    if self.PostSetHandPos and not offHand then
         self:PostSetHandPos()
     end
 	if blendFraction >= 1 then
@@ -975,7 +1011,7 @@ function SWEP:SpawnGarbage(mdl_custom, skin_custom, snd_custom, clr_custom, bgs_
 	if owner:IsPlayer() then
 		character = hg.GetCurrentCharacter(owner)
 		if not IsValid(character) then return end
-		boneid = character:LookupBone(((owner.organism and owner.organism.rarmamputated) or (owner.zmanipstart ~= nil and owner.zmanipseq == "interact" and not ( owner.organism and owner.organism.larmamputated ))) and "ValveBiped.Bip01_L_Hand" or "ValveBiped.Bip01_R_Hand")
+		boneid = character:LookupBone((hg.UsesLeftHand(owner) or (owner.zmanipstart ~= nil and owner.zmanipseq == "interact" and not ( owner.organism and owner.organism.larmamputated ))) and "ValveBiped.Bip01_L_Hand" or "ValveBiped.Bip01_R_Hand")
 	else
 		boneid = owner:LookupBone("ValveBiped.Bip01_R_Hand") or 1
 	end

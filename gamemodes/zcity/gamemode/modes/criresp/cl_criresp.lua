@@ -276,7 +276,7 @@ function MODE:HUDPaint()
 			hg.RoundStart.DrawTitle({
 				header = "Crisis Response",
 				lines = {
-					{text = "You are " .. info.name, color = info.color1, font = "ZB_HomicideMediumLarge"}
+					{text = "You are " .. info.name, color = info.color1, font = "ZB_TitleLarge"}
 				},
 				objective = info.objective
 			}, {startTime = zb.ROUND_START, duration = introDuration})

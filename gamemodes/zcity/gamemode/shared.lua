@@ -121,6 +121,14 @@ function zb:CheckAlive(incapacitatedcheck)
 	return tbl
 end
 
+function zb:CountPlayers()
+	local count = 0
+	for _, ply in player.Iterator() do
+		if ply:Team() ~= TEAM_SPECTATOR then count = count + 1 end
+	end
+	return count
+end
+
 function zb:CheckPlaying()
 	local tbl = {}
 	for _, ply in player.Iterator() do

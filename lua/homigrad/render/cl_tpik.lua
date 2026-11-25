@@ -915,6 +915,19 @@ local function solve(segments, iter, keepRoot)
     return final
 end
 
+local function relaxArmHand(wep, shoulder, hand, previous, eyeang, length, side)
+	local pistolHold = wep.IsPistolHoldType and wep:IsPistolHoldType()
+	local relaxedHand = hand - vector_up * (pistolHold and 10 or 8) + eyeang:Forward() * 4 + (pistolHold and vector_origin or eyeang:Right() * 5 * side)
+	local offset = relaxedHand - shoulder
+	local maxReach = length * 1.85
+
+	if offset:LengthSqr() > maxReach * maxReach then
+		relaxedHand = shoulder + offset:GetNormalized() * maxReach
+	end
+
+	return LerpVectorFT(pistolHold and 0.04 or 0.08, previous, relaxedHand)
+end
+
 local function weakenArmIK(ply, org, limb, segments, length)
 	local upperPower = hg.GetLimbEffectiveness(org, limb, "up")
 	local lowerPower = hg.GetLimbEffectiveness(org, limb, "down")
@@ -1006,9 +1019,13 @@ function hg.DoTPIK(ply, ent)
 	local leftArmDisabled = leftArmAmputated
 	local brokenFistArm = leftArmBroken and IsValid(self) and self.GetFists and self:GetFists()
 	local reachingLeft = ply.hgPickupReachLeft and not leftArmAmputated
-	local leftArmRelaxing = not reachingLeft and leftArmBroken and not leftArmAmputated and IsValid(self) and ishgweapon(self) and not self.reload and not brokenFistArm
+	local rightArmAmputated = org and (org.rarmamputated or org.rhandamputated or org.rarmupamputated)
+	local heldStance = ent == ply and IsValid(self) and not ply:InVehicle() and not ply:GetNetVar("handcuffed", false) and (not self.GetFists or self:GetFists())
+	local leftArmUseless = heldStance and not leftArmAmputated and hg.IsLimbIncapacitated(org, "larm")
+	local leftArmRelaxing = not reachingLeft and (leftArmUseless or leftArmBroken and not leftArmAmputated and IsValid(self) and ishgweapon(self) and not self.reload and not brokenFistArm)
+	local rightArmRelaxing = heldStance and not rightArmAmputated and hg.IsLimbIncapacitated(org, "rarm")
 	local lhik2 = reachingLeft or leftArmRelaxing or ((not leftArmDisabled or brokenFistArm) and ((IsValid(self) and self.lhandik) or ply:InVehicle()) and hg.CanUseLeftHand(ply))
-    local rhik2 = ((IsValid(self) and self.rhandik) or ply:InVehicle()) and hg.CanUseRightHand(ply)
+    local rhik2 = rightArmRelaxing or ((IsValid(self) and self.rhandik) or ply:InVehicle()) and hg.CanUseRightHand(ply)
     
     local shouldrebuild = false
     if (ply.nextrebuild or 0) < CurTime() then
@@ -1120,9 +1137,9 @@ function hg.DoTPIK(ply, ent)
 
             local hand = ply_r_hand_matrix:GetTranslation()
 
-            if false and !ishgweapon(self) and ply.organism and ply.organism.rarm and ply.organism.rarm > 0.99 then
+            if rightArmRelaxing then
                 segments[3] = segments[3] or {Pos = hand, Len = limblength}
-                segments[3].Pos = LerpVector(ply.leftClicking, segments[3].Pos + (-vector_up * 0.8 + eyeang:Forward() * 0.4 + ent:GetVelocity() / 400) * 0.5, hand)
+                segments[3].Pos = relaxArmHand(self, segments[1].Pos, hand, segments[3].Pos, eyeang, limblength, -1)
             else
                 segments[3] = {Pos = Lerp(1 - lerp_rh, ply.last_rh and ply.last_rh:GetTranslation() or segments[3].Pos, ply_r_hand_matrix_old and ply_r_hand_matrix_old:GetTranslation() or hand), Len = 12}
             end
@@ -1134,7 +1151,7 @@ function hg.DoTPIK(ply, ent)
             end
 
             local rightArmWeak = weakenArmIK(ply, org, "rarm", segments, limblength)
-            segments = solve(segments, 4, rightArmWeak)
+            segments = solve(segments, 4, rightArmRelaxing or rightArmWeak)
 
             --[[if lply:IsSuperAdmin() then
                 for i = 2, #segments do
@@ -1185,10 +1202,9 @@ q = q * Quaternion():SetAngleAxis(-120 - angrr.r + eyeang.r - math.NormalizeAngl
         local ang = q:Angle()
         ply_r_forearm_matrix:SetAngles(ang)
 
-        if false and ply.organism and ply.organism.rarm and ply.organism.rarm > 0.99 then
-            local ang = ang//qt:Angle()
+        if rightArmRelaxing then
             ang:RotateAroundAxis(ang:Forward(), -95)
-            ply_r_hand_matrix:SetAngles(LerpAngle(math_Clamp(ply.leftClicking * 2, 0, 1), ang, ply_r_hand_matrix:GetAngles()))
+            ply_r_hand_matrix:SetAngles(LerpAngle(0.5, ply_r_hand_matrix:GetAngles(), ang))
         end
 
         hg.bone_apply_matrix(ent, ply_r_upperarm_index, ply_r_upperarm_matrix, ply_r_forearm_index)
@@ -1262,17 +1278,7 @@ local angrotate = math.NormalizeAngle(-eyeang.r + ply_r_hand_matrix:GetAngles().
             local hand = ply_l_hand_matrix:GetTranslation()
             if leftArmRelaxing then
                 segments[3] = segments[3] or {Pos = hand, Len = limblength}
-                local pistolHold = self:IsPistolHoldType()
-                local relaxedHand = hand - vector_up * (pistolHold and 10 or 8) + eyeang:Forward() * 4 + (pistolHold and vector_origin or eyeang:Right() * 5)
-                local shoulder = segments[1].Pos
-                local offset = relaxedHand - shoulder
-                local maxReach = limblength * 1.85
-
-                if offset:LengthSqr() > maxReach * maxReach then
-                    relaxedHand = shoulder + offset:GetNormalized() * maxReach
-                end
-
-                segments[3].Pos = LerpVectorFT(pistolHold and 0.04 or 0.08, segments[3].Pos, relaxedHand)
+                segments[3].Pos = relaxArmHand(self, segments[1].Pos, hand, segments[3].Pos, eyeang, limblength, 1)
             else
                 segments[3] = {Pos = Lerp(1 - lerp_lh, ply.last_lh and ply.last_lh:GetTranslation() or segments[3].Pos, ply_l_hand_matrix_old and ply_l_hand_matrix_old:GetTranslation() or hand), Len = 12}
             end
@@ -1601,7 +1607,7 @@ function hg.DragHands(ply,self)
 		ang1 = Angle(-30 * posMul,5,70 * -posMul2)
 		ang2 = Angle(-30 * posMul,-5,-120 * -posMul3)
 
-        if twohands or amputee then
+        if (twohands or amputee) and hg.IsArmUsable(ply.organism, "rarm") then
 
             local oldpos = rhmat:GetTranslation()
             --pos = pos + LerpFT(0.01,ply.oldposrh or (pos - oldpos),pos - oldpos)
@@ -1656,7 +1662,7 @@ function hg.DragRightHand(ply,self,pos,norm,anglh)
 end
 
 function hg.DragLeftHand(ply, self, pos, norm, anglh)
-    if not IsValid(ply) then return end
+    if not IsValid(ply) or not hg.IsArmUsable(ply.organism, "larm") then return end
 
 	local ply_spine_index = ply:LookupBone("ValveBiped.Bip01_Spine4")
 	if !ply_spine_index then return end
@@ -1694,7 +1700,7 @@ function hg.DragLeftHand(ply, self, pos, norm, anglh)
 end
 
 function hg.DragLeftHand_Ex(ply, self, pos, ang, anglh)
-    if not IsValid(ply) then return end
+    if not IsValid(ply) or not hg.IsArmUsable(ply.organism, "larm") then return end
 
 	local ply_spine_index = ply:LookupBone("ValveBiped.Bip01_Spine4")
 	if !ply_spine_index then return end
@@ -1730,7 +1736,7 @@ function hg.DragRightHand_Ex(ply, self, pos, ang, angrh)
 end
 
 function hg.DragHandsToPos(ply,self,pos,twohanded,twohanddist,norm,angrh,anglh)
-    if not IsValid(ply) then return end
+    if not IsValid(ply) or not hg.IsArmUsable(ply.organism, "larm") then return end
     	
     local ply_spine_index = ply:LookupBone("ValveBiped.Bip01_Spine4")
     if !ply_spine_index then return end

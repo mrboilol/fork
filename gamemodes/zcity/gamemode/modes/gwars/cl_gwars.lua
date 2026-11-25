@@ -127,8 +127,8 @@ function MODE:HUDPaint()
 	hg.RoundStart.DrawTitle({
 		header = "Gang Wars",
 		lines = {
-			{text = "You are " .. info.name, color = info.color1, font = "ZB_HomicideMediumLarge"},
-			{text = info.phrase, color = info.color1, font = "ZB_HomicideMedium"}
+			{text = "You are " .. info.name, color = info.color1, font = "ZB_TitleLarge"},
+			{text = info.phrase, color = info.color1, font = "ZB_TitleMedium"}
 		},
 		objective = info.objective,
 		color = info.color1

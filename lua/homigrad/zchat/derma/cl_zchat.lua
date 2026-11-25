@@ -426,7 +426,7 @@ local function GetSavedChatBounds()
 	local defaultY = style.y and ScrH() * style.y or ScrH() - defaultH - ScrH() * style.bottomMargin
 	local prefix = style.cookiePrefix
 	local onLeft = style.persistent and hg.ChatOnLeft and hg.ChatOnLeft()
-	if onLeft then defaultX = ScrW() * style.rightMargin end
+	if onLeft or (style.persistent and hg.SplitChatEnabled()) then defaultX = ScrW() * style.rightMargin end
 	local w = cookie.GetNumber(prefix .. "w", defaultW)
 	local h = cookie.GetNumber(prefix .. "h", defaultH)
 	local x = onLeft and defaultX or cookie.GetNumber(prefix .. "x", defaultX)
@@ -1378,8 +1378,8 @@ function PANEL:MergeRepeat(panel)
 	return previous
 end
 
-function PANEL:AddLine(elements, streaming)
-	if not streaming and not self.bActive and hg.BigChatHidden and hg.BigChatHidden() and hg.PushChatPopup then
+function PANEL:AddLine(elements, streaming, noPopup)
+	if not streaming and not noPopup and not self.bActive and hg.BigChatHidden and hg.BigChatHidden() and hg.PushChatPopup then
 		hg.PushChatPopup(elements)
 	end
 
@@ -1462,10 +1462,34 @@ end
 
 local popupLineHeight = 0
 
+local SPLIT_RIGHT, SPLIT_BOTTOM, SPLIT_WIDTH, SPLIT_LINES = 0.64, 0.34, 0.2, 5
+
+local function SplitPopupAnchor()
+	local ox, oy = 0, 0
+	if hg.HudEdit then ox, oy = hg.HudEdit.Offset("popups") end
+
+	return ScrW() * SPLIT_RIGHT + ox, ScrH() * SPLIT_BOTTOM + oy
+end
+
 function hg.HiddenChatAnchor()
+	if hg.SplitChatEnabled() then
+		local right, bottom = SplitPopupAnchor()
+
+		return right, bottom, #popups * popupLineHeight
+	end
+
 	local x, y, w, h = GetSavedChatBounds()
 
 	return x + w - 8, y + h - 6, #popups * popupLineHeight
+end
+
+local function RegisterSplitRect()
+	if not hg.HudEdit or not hg.SplitChatEnabled() then return end
+
+	local scale = hg.UIScale and hg.UIScale() or 1
+	local right, bottom = SplitPopupAnchor()
+	local w, h = ScrW() * SPLIT_WIDTH, math.max(popupLineHeight, 24 * scale) * SPLIT_LINES
+	hg.HudEdit.Rect("popups", right - w, bottom - h, w, h)
 end
 
 local function DrawPopups(deathAlpha)
@@ -1508,6 +1532,7 @@ end
 
 hook.Add("HUDPaint", "zChatHiddenPopups", function()
 	if not LocalPlayer():Alive() then return end
+	RegisterSplitRect()
 	DrawPopups(hg.DeathHUDAlpha and hg.DeathHUDAlpha() or 1)
 end)
 

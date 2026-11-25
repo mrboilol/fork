@@ -970,9 +970,6 @@ local ringDots = {
 local function DrawCasualtiesRing(org, alpha, isUnconscious, isCritical, dying, deathStateEnd)
     local scrW, scrH = ScrW(), ScrH()
     local centerX, centerY = scrW * 0.5, scrH * 0.5
-    local status = dying and 2 or isCritical and 1 or 0
-    ringStatus = SmoothAlpha(ringStatus, status, 4)
-
     local consciousness = tonumber(org.consciousness) or 0
     local simpleHealth = hg.SimpleHealth
     local simple = org.simpleMode or simpleHealth and simpleHealth.ConVar and simpleHealth.ConVar:GetInt() > 0
@@ -981,10 +978,17 @@ local function DrawCasualtiesRing(org, alpha, isUnconscious, isCritical, dying, 
     local localSimple = simple and simpleHealth.GetLocalState and simpleHealth.GetLocalState()
     local countdownEnd = localSimple and tonumber(localSimple.countdownEnd) or 0
     local countdownSpan = localSimple and tonumber(localSimple.countdownDuration) or 0
-    local counting = isUnconscious and countdownEnd > now
+    local counting = countdownEnd > now
+    ringStatus = SmoothAlpha(ringStatus, dying and 2 or (isCritical or counting) and 1 or 0, 4)
     local target
     if counting and countdownSpan > 0 then
-        target = math.Clamp((countdownEnd - now) / countdownSpan, 0, 1)
+        local track = simpleHealth.Config.oxy.countdownTrackRemaining
+        local remaining = countdownEnd - now
+        if remaining > track then
+            target = math.Clamp((remaining - track) / math.max(countdownSpan - track, 1), 0, 1)
+        else
+            target = math.Clamp(remaining / track, 0, 1)
+        end
     elseif dying then
         local remaining = deathStateEnd - now
         if now - dyingSeen > 1 then dyingSpan = 0 end
@@ -1148,7 +1152,9 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         and (abnormalECG or sinusECGTail > 0 or (isCritical and (severeMechanicalPulse or admiring)))
     
 	local unconsciousElapsed = isUnconscious and (CurTime() - (unconsciousStartTime or CurTime())) or 0
-	if isUnconscious and incapacitated then
+	local simpleLocal = hg.SimpleHealth and hg.SimpleHealth.GetLocalState and hg.SimpleHealth.GetLocalState()
+	local countdownRunning = simpleLocal and (tonumber(simpleLocal.countdownEnd) or 0) > CurTime() or false
+	if countdownRunning or isUnconscious and incapacitated then
 		ringAlpha = SmoothAlpha(ringAlpha, 1, 1.5)
 	elseif isUnconscious and unconsciousElapsed >= UNCONSCIOUS_RING_DELAY then
         ringAlpha = SmoothAlpha(ringAlpha, 1, 1.5)

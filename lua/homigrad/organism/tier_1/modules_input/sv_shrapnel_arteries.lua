@@ -28,6 +28,8 @@ local function isShrapnel(dmgInfo)
 	return false
 end
 
+hg.IsShrapnelDamage = isShrapnel
+
 local function closestBone(ent, bones, pos)
 	local best, bestDist
 	for _, name in ipairs(bones) do

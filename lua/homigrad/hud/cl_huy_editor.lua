@@ -15,12 +15,14 @@ local ELEMENTS = {
 	{id = "face", label = "Face"},
 	{id = "moodles", label = "Moodles"},
 	{id = "chat", label = "Big chat"},
+	{id = "popups", label = "Chat pop-ups"},
 }
 
 local TOGGLES = {
 	{label = "Sub Rosa figure", cvar = "hg_hud_subrosa", element = "subrosa"},
 	{label = "Moodles", cvar = "hg_hud_moodles", element = "moodles"},
 	{label = "Big chat", cvar = "hg_hud_bigchat", element = "chat"},
+	{label = "Split chat pop-ups (movable)", cvar = "hg_splitchat", element = "popups"},
 	{label = "Face (nilguy)", cvar = "hg_hidenilguy", invert = true, element = "face"},
 	{label = "Face as first moodle", cvar = "hg_nilguyisamoodle"},
 	{label = "Hide big chat box (pop-ups only)", cvar = "zchat_hidebig"},

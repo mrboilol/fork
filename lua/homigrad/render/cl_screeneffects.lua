@@ -2623,10 +2623,12 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	if IsValid(IncapacitatedStation) then
 		IncapacitatedStation:SetVolume(0)
 	end
-	if O2Lerp > 1 or incapacitated then
+	local bleedDyingBlood = org.blood or 5000
+	local bleedDyingSeverity = (bleedDyingBlood < 4000 and (org.bleed or 0) > 0) and math.Clamp((3500 - bleedDyingBlood) / 3500, 0, 1) or 0
+	if O2Lerp > 1 or incapacitated or bleedDyingSeverity > 0 then
 		o2 = O2Lerp
-		
-		if o2 > 1 and not org.otrub then
+
+		if (o2 > 1 or bleedDyingSeverity > 0) and not org.otrub then
 			local dyingMode = getServerSoundMode("hg_dyingsound", 12)
 
 			if canRetrySound("NoiseStation2", NoiseStation2) then
@@ -2681,11 +2683,8 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			local simpleState = hg.SimpleHealth.GetLocalState()
 			local lowO2Audio = ((org.o2[1] or 30) + (org.CO or 0)) < 25 or (simpleState and simpleState.oxy >= 50)
 			local dyingAudioTarget = math.Clamp((lowO2Audio and (o2 - 1) / 99 or 0) +(brain > 0.2 and (brain - 0.2) * 2.5 or 0), 0, 1.2)
-			local blood = org.blood or 5000
-			local bleed = org.bleed or 0
-			if blood < 4000 and bleed > 0 then
-				local bleedSeverity = math.Clamp((3500 - blood) / 3500, 0, 1)
-				dyingAudioTarget = math.max(dyingAudioTarget, bleedSeverity * 1.15)
+			if bleedDyingSeverity > 0 then
+				dyingAudioTarget = math.max(dyingAudioTarget, bleedDyingSeverity * 1.15)
 			end
 			if incapacitated then
 				dyingAudioTarget = math.max(dyingAudioTarget, Lerp(incapacitationProgress, 0.65, 0.9))

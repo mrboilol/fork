@@ -124,6 +124,9 @@ end
 hook.Add("Org Clear", "Main", function(org)
 	org.alive = true
 	org.otrub = false
+	org.needotrub = false
+	org.postureOtrubUntil = 0
+	org.uncon_timer = 0
 	org.entindex = IsValid(org.owner) and org.owner:EntIndex() or hg.organism.lastindex + 1
 	for _, name in ipairs(organismModuleInitOrder) do
 		runOrganismModule(name, 1, nil, org)

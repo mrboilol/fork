@@ -53,6 +53,12 @@ Infection.Config = {
 	weaponSepticMul = 2,
 	contactTypes = DMG_SLASH + DMG_CLUB,
 
+	shrapnelChance = 0.85,
+	shrapnelSeed = 0.2,
+	shrapnelBacteremia = 0.05,
+	bulletChance = 0.12,
+	bulletSeed = 0.1,
+
 	antibioticDose = 180,
 	antibioticMax = 420,
 	antibioticInfectionClear = 1 / 45,
@@ -409,6 +415,21 @@ local function getContactWeapon(dmgInfo)
 		if IsValid(active) then return active end
 	end
 end
+
+hook.Add("HomigradDamage", "hg/infection/dirty-projectile", function(victim, dmgInfo)
+	if not infectionsEnabled() or not dmgInfo:IsBulletDamage() then return end
+
+	local org = IsValid(victim) and victim.organism
+	if not org or not org.alive then return end
+
+	if hg.IsShrapnelDamage and hg.IsShrapnelDamage(dmgInfo) then
+		if math.random() < CONFIG.shrapnelChance then
+			Infection.Contaminate(org, CONFIG.shrapnelSeed, CONFIG.shrapnelBacteremia)
+		end
+	elseif math.random() < CONFIG.bulletChance then
+		Infection.Seed(org, CONFIG.bulletSeed)
+	end
+end)
 
 hook.Add("HomigradDamage", "hg/infection/contaminated-weapon", function(victim, dmgInfo)
 	if not infectionsEnabled() or not dmgInfo:IsDamageType(CONFIG.contactTypes) then return end
