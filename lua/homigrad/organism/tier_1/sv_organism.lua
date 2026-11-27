@@ -1086,7 +1086,7 @@ local function panic_threat_adrenaline_spike(org, amount)
 	org.adrenalineAdd = math.max(org.adrenalineAdd or 0, math.min((org.adrenalineAdd or 0) + spike, panicattack_threat_adrenaline_cap))
 end
 
-function hg.organism.AddPanicAttack(org, amount, silent, combatEvent, ignoreGunfightProtection, universalStressApplied)
+function hg.organism.AddPanicAttack(org, amount, silent, combatEvent, ignoreGunfightProtection, universalStressApplied, unshieldedStress)
 	if not org then return 0 end
 	if IsValid(org.owner) and org.owner.HasTrait and (org.owner:HasTrait("gurajchaka_child") or org.owner:HasTrait("apathetic")) then return 0 end
 	if (org.fury13 or 0) > 0 then
@@ -1117,6 +1117,8 @@ function hg.organism.AddPanicAttack(org, amount, silent, combatEvent, ignoreGunf
 		if hg.organism.AddDepression then hg.organism.AddDepression(org, amount * K.fightDepressionMul, "fight") end
 	end
 	if CurTime() < (org.betaBlockerUntil or 0) then amount = amount * hg.PsycheCombat.betaBlockMul end
+	local disabledStress = not hg_panic:GetBool() and not universalStressApplied
+	if disabledStress and unshieldedStress then apply_panic_disabled_stress(org, amount) end
 	local goodmood = math.Clamp(tonumber(org.goodmood) or 0, 0, 1)
 	if goodmood > 0 then
 		local absorbed = math.min(amount, goodmood / 2.5)
@@ -1124,7 +1126,7 @@ function hg.organism.AddPanicAttack(org, amount, silent, combatEvent, ignoreGunf
 		amount = amount - absorbed
 		if amount <= 0 then return org.panicattackadd or 0 end
 	end
-	if not hg_panic:GetBool() and not universalStressApplied then apply_panic_disabled_stress(org, amount) end
+	if disabledStress and not unshieldedStress then apply_panic_disabled_stress(org, amount) end
 	if not ignoreGunfightProtection and panic_has_gunfight_protection(org) then return org.panicattackadd or 0 end
 	if silent and IsValid(org.owner) and org.owner:IsPlayer() and (org.owner.lastKillTime or 0) > CurTime() - 4 then
 		return org.panicattackadd or 0

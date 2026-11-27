@@ -43,14 +43,47 @@ if SERVER then
 		return ai_disabled ~= nil and ai_disabled:GetBool()
 	end
 
-	local function IsValidTarget(ply)
-		if not IsValid(ply) or not ply:IsPlayer() then return false end
-		if not ply:Alive() then return false end
-		if ply:GetObserverMode() ~= OBS_MODE_NONE then return false end
-		if ply:IsFlagSet(FL_NOTARGET) then return false end
-		if ai_ignoreplayers and ai_ignoreplayers:GetBool() then return false end
-		return true
+	local IGNORED_NPCS = {
+		npc_kies = true,
+		npc_bullseye = true,
+		npc_enemyfinder = true,
+		npc_furniture = true,
+	}
+
+	local function IsValidTarget(ent)
+		if not IsValid(ent) or ent:IsFlagSet(FL_NOTARGET) then return false end
+
+		if ent:IsPlayer() then
+			if ai_ignoreplayers and ai_ignoreplayers:GetBool() then return false end
+			return ent:Alive() and ent:GetObserverMode() == OBS_MODE_NONE
+		end
+
+		if not ent:IsNPC() and not ent:IsNextBot() then return false end
+		if IGNORED_NPCS[ent:GetClass()] or ent:Health() <= 0 then return false end
+		return not ent:IsNPC() or ent:GetNPCState() ~= NPC_STATE_DEAD
 	end
+
+	local function GetTargetBody(target)
+		if IsValid(target.zcnpc_rag) then return target.zcnpc_rag end
+
+		local character = hg.GetCurrentCharacter(target)
+		return IsValid(character) and character or target
+	end
+
+	local function MakeHostile(npc, kies)
+		if not IsValid(npc) or not npc:IsNPC() or IGNORED_NPCS[npc:GetClass()] then return end
+		npc:AddEntityRelationship(kies, D_HT, 99)
+	end
+
+	hook.Add("OnEntityCreated", "kies/relations/hate-kies", function(ent)
+		if not ent:IsNPC() then return end
+
+		timer.Simple(0, function()
+			for _, kies in ipairs(ents.FindByClass("npc_kies")) do
+				MakeHostile(ent, kies)
+			end
+		end)
+	end)
 
 	local SLASH_ZONES = {
 		{artery = "arteria", bone = "ValveBiped.Bip01_Neck1", hitgroup = HITGROUP_HEAD},
@@ -69,6 +102,34 @@ if SERVER then
 	local AURA_PANIC = 0.12
 	local AURA_DEPRESSION = 0.035
 	local AURA_ANGER = 0.08
+
+	local CHASE_RADIUS = 1500
+	local CHASE_MOOD_LOSS = 0.05
+	local CHASE_DEPRESSION = 0.03
+	local CHASE_MEMORY = 10
+
+	local THOUGHT_DURATION = 4
+	local THOUGHT_DELAY_MIN = 7
+	local THOUGHT_DELAY_MAX = 14
+	local THOUGHTS = {
+		near = {
+			"The Kies are here...",
+			"What the fuck was that...",
+			"It's right there. The Kies are right there.",
+			"Why is it looking at me like that...",
+			"I need to get away from that thing.",
+			"The Kies are close...",
+		},
+		chased = {
+			"THE KIES ARE CHASING ME!",
+			"RUN! RUN!!",
+			"IT'S RIGHT BEHIND ME!",
+			"GET IT AWAY FROM ME!",
+			"DON'T LOOK BACK! JUST RUN!",
+			"THE KIES WON'T STOP!",
+			"SOMEBODY GET THE KIES OFF ME!",
+		},
+	}
 
 	local HIT_COOLDOWN = 1.8
 
@@ -145,6 +206,8 @@ if SERVER then
 
 	hook.Add("Org Clear", "kies/slash/reset-damage", function(org)
 		org.kiesSlashDamage = nil
+		org.kiesChasedUntil = nil
+		org.kiesNextThought = nil
 	end)
 
 	hook.Add("HomigradDamage", "kies/slash/cut-artery", function(victim, dmgInfo, hitgroup, ent)
@@ -173,15 +236,39 @@ if SERVER then
 		return IsValid(wep) and wep:GetPrimaryAmmoType() >= 0 and wep:Clip1() > 0
 	end
 
-	local function IsNearKies(ply, allKies)
+	local function GetKiesThreat(ply, allKies)
 		local body = hg.GetCurrentCharacter(ply)
 		local pos = IsValid(body) and body:WorldSpaceCenter() or ply:WorldSpaceCenter()
+		local near, chased = false, false
 
 		for _, kies in ipairs(allKies) do
-			if pos:DistToSqr(kies:WorldSpaceCenter()) <= AURA_RADIUS * AURA_RADIUS then return true end
+			local distance = pos:DistToSqr(kies:WorldSpaceCenter())
+			if distance <= AURA_RADIUS * AURA_RADIUS then near = true end
+			if kies.Quarry == ply and distance <= CHASE_RADIUS * CHASE_RADIUS then chased = true end
 		end
 
-		return false
+		return near, chased
+	end
+
+	local function ThinkAboutKies(ply, org, chased)
+		local now = CurTime()
+		local startedChase = chased and now > (org.kiesChasedUntil or 0)
+		if chased then org.kiesChasedUntil = now + CHASE_MEMORY end
+		if not startedChase and now < (org.kiesNextThought or 0) then return end
+		if not hg.organism.EmotionThought then return end
+
+		org.kiesNextThought = now + math.Rand(THOUGHT_DELAY_MIN, THOUGHT_DELAY_MAX)
+
+		local kind = chased and "chased" or "near"
+		local pool = THOUGHTS[kind]
+		hg.organism.EmotionThought(ply, pool[math.random(#pool)], THOUGHT_DURATION, "kies_" .. kind)
+	end
+
+	local function ApplyChaseMood(ply, org)
+		if HoldsLoadedGun(ply) then return end
+
+		hg.organism.ShieldEmotion(org, CHASE_MOOD_LOSS, 1)
+		hg.organism.AddDepression(org, CHASE_DEPRESSION, "fight")
 	end
 
 	local function ApplyAura(ply, org)
@@ -190,7 +277,7 @@ if SERVER then
 			return
 		end
 
-		hg.organism.AddPanicAttack(org, AURA_PANIC, false, false, true)
+		hg.organism.AddPanicAttack(org, AURA_PANIC, false, false, true, false, true)
 		hg.organism.AddDepression(org, AURA_DEPRESSION, "fight")
 	end
 
@@ -242,7 +329,11 @@ if SERVER then
 		for _, ply in player.Iterator() do
 			local org = ply.organism
 			if not org or org.otrub or not ply:Alive() or ply:GetObserverMode() ~= OBS_MODE_NONE then continue end
-			if IsNearKies(ply, allKies) then ApplyAura(ply, org) end
+
+			local near, chased = GetKiesThreat(ply, allKies)
+			if near then ApplyAura(ply, org) end
+			if chased then ApplyChaseMood(ply, org) end
+			if near or chased then ThinkAboutKies(ply, org, chased) end
 		end
 	end)
 
@@ -266,6 +357,11 @@ if SERVER then
 		self.loco:SetDeathDropHeight(300)
 
 		self.NextAttack = 0
+
+		self:AddFlags(FL_OBJECT)
+		for _, ent in ents.Iterator() do
+			MakeHostile(ent, self)
+		end
 	end
 
 	function ENT:ApplyNewMaxHealth(hp)
@@ -311,11 +407,11 @@ if SERVER then
 		local maxDist = cv_acquire:GetFloat()
 		local best, bestDist = nil, maxDist * maxDist
 
-		for _, ply in ipairs(player.GetAll()) do
-			if IsValidTarget(ply) then
-				local d = myPos:DistToSqr(ply:GetPos())
+		for _, ent in ents.Iterator() do
+			if IsValidTarget(ent) then
+				local d = myPos:DistToSqr(ent:GetPos())
 				if d < bestDist then
-					best, bestDist = ply, d
+					best, bestDist = ent, d
 				end
 			end
 		end
@@ -328,17 +424,15 @@ if SERVER then
 		if CurTime() < self.NextAttack then return end
 
 		local from = self:GetPos() + Vector(0, 0, SPRITE_H * 0.5)
-		local character = hg.GetCurrentCharacter(target)
-		local to = (IsValid(character) and character or target):WorldSpaceCenter()
+		local body = GetTargetBody(target)
+		local to = body:WorldSpaceCenter()
 		local range = cv_range:GetFloat()
 		if from:DistToSqr(to) > range * range then return end
 
 		self.NextAttack = CurTime() + math.max(cv_delay:GetFloat(), HIT_COOLDOWN)
 
 		local dir = (to - from):GetNormalized()
-		local body = IsValid(character) and character or target
-
-		local zone = PickSlashZone(target.organism)
+		local zone = PickSlashZone(target.organism or body.organism)
 		local trace = BuildSlashTrace(body, zone, from)
 
 		local dmg = DamageInfo()
@@ -413,6 +507,7 @@ if SERVER then
 				self.loco:Approach(tpos, 1)
 			end
 
+			self.Quarry = target
 			self:TryWarCry()
 			self:TryAttack(target)
 
@@ -493,6 +588,7 @@ if SERVER then
 
 			if IsValid(target) then
 				self:ChaseTarget(target)
+				self.Quarry = nil
 			else
 				self:Wander()
 			end
