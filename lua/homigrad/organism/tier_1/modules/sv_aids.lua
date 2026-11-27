@@ -15,6 +15,13 @@ AcidBase.Config = {
 	bagPh = {7.3, 7.42},
 	staleBagChance = 0.1,
 	staleBagPh = {6.85, 7.05},
+	salineBloodPerMl = 0.5,
+	salineHydrationPerMl = 0.05,
+	salineSatietyPerMl = 0.006,
+	salineBicarbPerMl = 0.008,
+	salineLactatePerMl = 0.002,
+	salineMyoglobinPerMl = 0.0006,
+	salineSystemicReliefPerMl = 0.0001,
 
 	lactateNormal = 1,
 	lactateBuffer = 1.1,
@@ -181,6 +188,31 @@ function hg.organism.TransfuseBlood(org, ml, bagPh, bagBacteria)
 	org.lactaid = Lerp(fraction, tonumber(org.lactaid) or CONFIG.lactateNormal, CONFIG.lactateNormal)
 	org.hepaticToxin = (tonumber(org.hepaticToxin) or 0) * (1 - fraction)
 	org.citrate = min((tonumber(org.citrate) or 0) + ml * CONFIG.citratePerMl, CONFIG.citrateMax)
+end
+
+function hg.organism.InfuseSaline(org, ml)
+	local blood = org.blood
+	local room = max(hg.organism.MAX_TRANSFUSION_BLOOD - blood, 0) / CONFIG.salineBloodPerMl
+	ml = Clamp(ml, 0, room)
+	if ml == 0 then return 0 end
+
+	org.blood = blood + ml * CONFIG.salineBloodPerMl
+	org.hydration = min((org.hydration or 100) + ml * CONFIG.salineHydrationPerMl, 100)
+	org.thirst = max((org.thirst or 0) - ml * CONFIG.salineHydrationPerMl, 0)
+	org.satiety = min((org.satiety or 100) + ml * CONFIG.salineSatietyPerMl, 100)
+	org.hungry = max((org.hungry or 0) - ml * CONFIG.salineSatietyPerMl, 0)
+	if org.simpleMode then return ml end
+
+	local paco2 = Clamp(org.paco2 or CONFIG.normalPaco2, 10, 150)
+	local target = Clamp(CONFIG.normalBicarb * paco2 / CONFIG.normalPaco2, CONFIG.bicarbMin, CONFIG.bicarbMax)
+	org.bicarb = Approach(org.bicarb or CONFIG.normalBicarb, target, ml * CONFIG.salineBicarbPerMl)
+	if (org.lactaid or 0) > CONFIG.lactateNormal then
+		org.lactaid = max(org.lactaid - ml * CONFIG.salineLactatePerMl, CONFIG.lactateNormal)
+	end
+	org.myoglobin = max((org.myoglobin or 0) - ml * CONFIG.salineMyoglobinPerMl, 0)
+	org.multiOrganFailure = max((org.multiOrganFailure or 0) - ml * CONFIG.salineSystemicReliefPerMl, 0)
+
+	return ml
 end
 
 local DRAIN_WASHOUT = {

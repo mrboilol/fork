@@ -107,15 +107,11 @@ local derivedActionsByClass = {
 		{"LMB", "Use on self"},
 		{"RMB", "Use on target"},
 		{"R", "Change mode"}
-	},
-	["weapon_bloodbag_big"] = {
-		{"LMB", "Use on self"},
-		{"RMB", "Use on target"},
-		{"R", "Change mode"}
 	}
 }
 
 local derivedActionsByBase = {
+	["weapon_bloodbag"] = derivedActionsByClass.weapon_bloodbag,
 	["weapon_bandage_sh"] = {
 		{"LMB", "Use on self"},
 		{"RMB", "Use on target"},

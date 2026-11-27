@@ -77,7 +77,9 @@ SimpleHealth.Config = {
 		passiveBurnRegen = 0.08,
 		brokenChestAt = 1,
 		brokenChestBleedMul = 1.75,
-		ribBrute = 2.5,
+		ribBrute = 2,
+		meleeHitHealth = 0.55,
+		fracture = {tissue = 6, permanent = 4, permanentMax = 40},
 		limbHealth = {head = 1.75, torso = 1.5, larm = 0.3, rarm = 0.3, lleg = 0.3, rleg = 0.3},
 	},
 

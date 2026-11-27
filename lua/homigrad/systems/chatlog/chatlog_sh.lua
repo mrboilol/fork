@@ -22,7 +22,6 @@ local SWING = ChatLog.RANGE_SWING
 ChatLog.Events = {
 	{key = "scream", range = SCREAM, cooldown = 1.5, seen = "{a} screams in pain!", heard = "You hear a scream {dir}."},
 	{key = "painyell", range = YELL, cooldown = 1.5, seen = "{a} yells in pain!", heard = "You hear someone yelling in pain {dir}."},
-	{key = "groan", range = TALK, cooldown = 2, repeatEvery = 10, seen = "{a} groans in agony.", heard = "You hear someone groaning {dir}."},
 	{key = "gasp", range = TALK, cooldown = 2.5, repeatEvery = 10, seen = "{a} gasps for air!", heard = "You hear someone gasping {dir}."},
 	{key = "agonal", range = NEAR, cooldown = 6, repeatEvery = 45, seen = "{a} wheezes, struggling to breathe.", heard = "You hear ragged breathing {dir}."},
 	{key = "shout", range = YELL, cooldown = 1, seen = "{a} shouts!", heard = "You hear someone shouting {dir}."},
@@ -69,8 +68,16 @@ ChatLog.Events = {
 	{key = "medpills", range = TALK, cooldown = 2, seen = "{a} gives {t} some pills.", self = "{a} swallows some pills."},
 	{key = "medneedle", range = TALK, cooldown = 2, seen = "{a} jabs a needle into {tp} chest!", self = "{a} jabs a needle into their chest!"},
 	{key = "medfixdisloc", range = TALK, cooldown = 2, seen = "{a} sets {tp} dislocated joint back into place.", self = "{a} pops their joint back into place.", heard = "You hear a sickening pop {dir}."},
-	{key = "injury", range = NEAR, cooldown = 0.4, noOverhead = true, seen = "{ap} {inj}."},
+	{key = "critblow", range = TALK, cooldown = 0.5, targeted = true, toActor = true, crit = true, seen = "{a} lands a crushing blow on {t}!", mine = "You land a crushing blow on {t}!", heard = "You hear a sickening thud {dir}."},
+	{key = "critshot", range = TALK, cooldown = 0.5, targeted = true, toActor = true, crit = true, seen = "{ap} shot tears right into {t}!", mine = "Your shot tears right into {t}!"},
+	{key = "organhit", range = TALK, cooldown = 0.5, targeted = true, toActor = true, crit = true, seen = "{a} hits something vital inside {t}!", mine = "You hit something vital inside {t}!"},
+	{key = "bonebreak", range = TALK, cooldown = 0.3, targeted = true, toActor = true, crit = true, seen = "{a} breaks {tp} {bone}!", mine = "You break {tp} {bone}!", heard = "You hear a sickening crack {dir}."},
+	{key = "knockout", range = TALK, cooldown = 1, targeted = true, toActor = true, crit = true, seen = "{a} knocks {t} out cold!", mine = "You knock {t} out cold!"},
 }
+
+ChatLog.COLOR_CRIT = Color(255, 90, 90)
+
+ChatLog.CritBones = {"ribs", "skull", "jaw", "neck", "spine", "pelvis", "left arm", "right arm", "left leg", "right leg"}
 
 ChatLog.Gestures = {
 	"waves",

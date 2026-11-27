@@ -61,7 +61,7 @@ local function syncTissuePools(org, state)
 		end
 	end
 
-	state.brute = brute
+	state.brute = brute + (state.permBrute or 0)
 	state.burn = burn
 end
 
@@ -84,6 +84,21 @@ function SimpleHealth.AddDamage(org, pool, amount, limb)
 	return state[pool] - before
 end
 
+function SimpleHealth.AddFracture(org, limb)
+	local state = SimpleHealth.GetState(org)
+	if not state then return end
+
+	local fractureConfig = CONFIG.damage.fracture
+	local before = SimpleHealth.GetHealth(state)
+	state.permBrute = math.min((state.permBrute or 0) + fractureConfig.permanent, fractureConfig.permanentMax)
+	SimpleHealth.AddDamage(org, "brute", fractureConfig.tissue, limb)
+
+	local tick = engine.TickCount()
+	if state.fractureBonusTick ~= tick then state.fractureBonus = 0 end
+	state.fractureBonusTick = tick
+	state.fractureBonus = state.fractureBonus + before - SimpleHealth.GetHealth(state)
+end
+
 function SimpleHealth.Heal(org, pool, amount, limb)
 	local state = SimpleHealth.GetState(org)
 	if not state or not amount or amount <= 0 then return 0 end
@@ -104,6 +119,7 @@ end
 local function newState()
 	return {
 		brute = 0,
+		permBrute = 0,
 		burn = 0,
 		toxin = 0,
 		oxy = 0,
@@ -396,12 +412,18 @@ local function tickOxy(owner, org, state, timeValue)
 
 	if needleSoft then gain = 0 end
 
+	local critOxy = math.min(state.critOxy or 0, state.oxy)
+	local critGain = state.lethalFromHealth and not needleSoft and oxyConfig.hardCritGain or 0
+
 	local bradypnea = needleSoft and 0 or tonumber(org.bradyapnea) or 0
 	local bradypneaFloor = rampUp(bradypnea, oxyConfig.bradypneaStart, oxyConfig.bradypneaFull) * oxyConfig.bradypneaPool
 
 	local oxy = state.oxy
 	local softDying = crit == CRIT_SOFT and not needleSoft
-	if softDying then oxy = oxy + oxyConfig.softCritGain * gainMul * timeValue end
+	if softDying then
+		oxy = oxy + oxyConfig.softCritGain * gainMul * timeValue
+		critGain = critGain + oxyConfig.softCritGain
+	end
 
 	oxy = oxy + gain * gainMul * timeValue
 
@@ -412,6 +434,7 @@ local function tickOxy(owner, org, state, timeValue)
 	end
 
 	state.oxy = math.Clamp(oxy, 0, CONFIG.poolMax)
+	state.critOxy = math.min(critOxy + critGain * gainMul * timeValue, state.oxy)
 	state.oxyGain = gain
 
 	if state.oxy > oxyConfig.brainDamageStart then
@@ -484,6 +507,7 @@ local function stopFlatline(owner, org, state)
 	if not state.flatline or state.fibrillating or state.heartEfficiency <= 0 then return false end
 
 	state.flatline = false
+	state.healthFlatline = nil
 	state.heartRate = CONFIG.heart.restartRate
 	state.flatlineGraceUntil = CurTime() + CONFIG.flatline.grace
 	hook.Run("hg/simplehealth/flatline-changed", owner, org, false)
@@ -614,7 +638,10 @@ local function tickFlatline(owner, org, state, timeValue)
 	end
 
 	if (state.flatlineGraceUntil or 0) > CurTime() then return end
-	if math.Rand(0, 1) < flatlineChance(org, state) * timeValue then startFlatline(owner, org, state) end
+	if math.Rand(0, 1) < flatlineChance(org, state) * timeValue then
+		state.healthFlatline = state.health <= SimpleHealth.GetCritThresholds() or nil
+		startFlatline(owner, org, state)
+	end
 end
 
 local function tickBrainPerfusion(owner, org, state, timeValue)
@@ -686,8 +713,21 @@ for _, ticker in ipairs({tickOxy, tickRegen, tickTemperature}) do
 	SimpleHealth.PoolTickers[ticker] = true
 end
 
+local function reverseHealthCrit(org, state)
+	local critOxy = math.min(state.critOxy or 0, state.oxy)
+	state.critOxy = critOxy
+
+	local softAt = SimpleHealth.GetCritThresholds()
+	if SimpleHealth.GetHealth(state) + critOxy <= softAt then return end
+
+	state.oxy = state.oxy - critOxy
+	state.critOxy = 0
+	if state.healthFlatline then stopFlatline(org.owner, org, state) end
+end
+
 local function updateCrit(org, state)
 	local previous = state.crit
+	reverseHealthCrit(org, state)
 	state.health = SimpleHealth.GetHealth(state)
 
 	local critImmune = SimpleHealth.IsCritImmune(org)
@@ -699,6 +739,7 @@ local function updateCrit(org, state)
 	state.displayCrit = severe and CRIT_HARD or healthCrit
 	org.critical = state.displayCrit == CRIT_HARD
 	state.lethalCrit = severe or (org.otrub and healthCrit == CRIT_SOFT and not needleSoft and not isBreathing(state))
+	state.lethalFromHealth = state.lethalCrit and healthCrit ~= CRIT_NONE and not state.fibrillating and (not state.flatline or state.healthFlatline) or nil
 	state.dying = state.crit == CRIT_HARD or (state.crit == CRIT_SOFT and not needleSoft)
 	org.simpleControlMul = state.crit == CRIT_SOFT and CONFIG.softCritControlMul or nil
 
@@ -919,6 +960,53 @@ function SimpleHealth.FireTickScale(dmgInfo)
 	return CONFIG.damage.fireTickMul
 end
 
+local function isMeleeHit(dmgInfo)
+	if not dmgInfo:IsDamageType(DMG_CLUB + DMG_SLASH) or dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_BLAST) then return false end
+
+	local inflictor = dmgInfo:GetInflictor()
+
+	return IsValid(inflictor) and inflictor:IsWeapon()
+end
+
+hook.Add("PreHomigradDamage", "hg/simplehealth/melee-cap", function(victim, dmgInfo)
+	local org = IsValid(victim) and victim.organism
+	local state = SimpleHealth.GetState(org)
+	if not state then return end
+
+	state.meleeSnapshot = nil
+	if not isMeleeHit(dmgInfo) then return end
+
+	syncTissuePools(org, state)
+	local tissue = {}
+	for _, limb in ipairs(SoftTissue.LIMBS) do
+		tissue[limb] = SoftTissue.Get(org, "brute", limb)
+	end
+	state.meleeSnapshot = {tick = engine.TickCount(), health = SimpleHealth.GetHealth(state), perm = state.permBrute or 0, tissue = tissue}
+end)
+
+local function capMeleeHit(org, state, damage, limb)
+	local snapshot = state.meleeSnapshot
+	state.meleeSnapshot = nil
+	if not snapshot or snapshot.tick ~= engine.TickCount() then return end
+
+	local damageConfig = CONFIG.damage
+	local cap = damage * damageConfig.meleeHitHealth * (damageConfig.limbHealth[limb] or 1) * hg.organism.TraitMul(org, "tissue_damage", 1)
+	if state.fractureBonusTick == snapshot.tick then cap = cap + (state.fractureBonus or 0) end
+
+	local lost = snapshot.health - SimpleHealth.GetHealth(state)
+	if lost <= cap then return end
+
+	local tissueLost = lost - ((state.permBrute or 0) - snapshot.perm)
+	if tissueLost <= 0 then return end
+
+	local refund = math.min((lost - cap) / tissueLost, 1)
+	for tissueLimb, before in pairs(snapshot.tissue) do
+		local gained = SoftTissue.Get(org, "brute", tissueLimb) - before
+		if gained > 0 then SoftTissue.Heal(org, "brute", tissueLimb, gained * refund) end
+	end
+	syncTissuePools(org, state)
+end
+
 hook.Add("HomigradDamage", "hg/simplehealth/damage-pools", function(victim, dmgInfo, hitgroup)
 	local org = IsValid(victim) and victim.organism
 	local state = SimpleHealth.GetState(org)
@@ -926,6 +1014,7 @@ hook.Add("HomigradDamage", "hg/simplehealth/damage-pools", function(victim, dmgI
 
 	local damage = dmgInfo:GetDamage()
 	if damage <= 0 then return end
+	local rawDamage = damage
 	damage = damage * SimpleHealth.FireTickScale(dmgInfo)
 
 	state.lastDamageType = dmgInfo:GetDamageType()
@@ -948,6 +1037,8 @@ hook.Add("HomigradDamage", "hg/simplehealth/damage-pools", function(victim, dmgI
 	else
 		applied = SimpleHealth.AddDamage(org, pool, damage * damageConfig[pool .. "Scale"], limb)
 	end
+
+	if pool == "brute" then capMeleeHit(org, state, rawDamage, limb) end
 
 	if LIMB_POOLS[pool] then
 		SoftTissue.OnLimbDamaged(org, limb, applied, dmgInfo)

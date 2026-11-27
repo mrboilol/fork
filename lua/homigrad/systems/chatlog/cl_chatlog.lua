@@ -139,6 +139,7 @@ for _, event in ipairs(ChatLog.Events) do
 	event.seenParts = Compile(event.seen)
 	event.heardParts = Compile(event.heard)
 	event.selfParts = Compile(event.self)
+	event.mineParts = Compile(event.mine)
 	event.selfOverheadParts = event.self and Compile((string.gsub(event.self, "^{a} ", "")))
 	event.overheadParts = event.seen and Compile((string.gsub(event.seen, "^{a} ", "")))
 end
@@ -146,11 +147,11 @@ end
 local function TokenValue(token, ctx)
 	if token == "a" then return ctx.actorName, ctx.actorColor end
 	if token == "ap" then return ctx.actorName .. "'s", ctx.actorColor end
-	if token == "inj" then return ctx.injury end
 	if token == "t" then return ctx.targetSelf and "you" or ctx.targetName, not ctx.targetSelf and ctx.targetColor end
 	if token == "tp" then return ctx.targetSelf and "your" or ctx.targetName .. "'s", not ctx.targetSelf and ctx.targetColor end
 	if token == "w" then return ctx.weapon end
 	if token == "g" then return ctx.gesture end
+	if token == "bone" then return ctx.bone end
 	if token == "dir" then return ctx.dir end
 
 	return ""
@@ -320,6 +321,15 @@ net.Receive("hg_chatlog_event", function()
 	local lply = LocalPlayer()
 	if not IsValid(lply) then return end
 
+	local textColor = event.crit and ChatLog.COLOR_CRIT or EMOTE_COLOR
+	if actor == lply then
+		if event.mineParts then
+			AddChatLine(BuildElements(event.mineParts, {targetName = ChatLog.Name(target), targetColor = NameColor(target), bone = ChatLog.CritBones[arg] or "bones"}, textColor))
+		end
+
+		return
+	end
+
 	local pos = ChatLog.SourcePos(actor, netPos)
 	local seen = ActorPresent(actor) and event.seenParts ~= nil and ChatLog.IsVisible(actor, pos)
 	local targetSelf = target == lply
@@ -333,12 +343,13 @@ net.Receive("hg_chatlog_event", function()
 		targetColor = NameColor(target),
 		weapon = WeaponText(event, extra),
 		gesture = ChatLog.Gestures[arg] or "gestures",
+		bone = ChatLog.CritBones[arg] or "bones",
 	}
 
 	if seen or (targetSelf and event.seenParts) then
 		local selfAct = event.selfParts and IsValid(target) and target == actor
 		local overhead = seen and actor ~= lply and not event.noOverhead
-		AddChatLine(BuildElements(selfAct and event.selfParts or event.seenParts, ctx, EMOTE_COLOR), overhead)
+		AddChatLine(BuildElements(selfAct and event.selfParts or event.seenParts, ctx, textColor), overhead)
 		if overhead then
 			hg.AddOverheadMessage(actor, "*" .. BuildText(selfAct and event.selfOverheadParts or event.overheadParts, ctx) .. "*", OVERHEAD_COLOR, OVERHEAD_LIFE, OVERHEAD_FADE)
 		end

@@ -633,6 +633,7 @@ local function QueueBlastTorso(target, dmgInfo)
 	if not IsBlastDamage(dmgInfo) then return end
 	local ply = ResolvePlayer(target)
 	if not IsValid(ply) then return end
+	if hg.PulseShieldActive and hg.PulseShieldActive(ply) then return end
 	if ply.__hgTorsoPending or ply.__hgTorsoBlastQueued or ply:GetNWBool("hgTorsoSevered", false) then return end
 	if IsValid(target) and target:GetNWBool("hgTorsoSevered", false) then return end
 	local attacker = dmgInfo:GetAttacker()

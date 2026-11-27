@@ -37,17 +37,56 @@ if CLIENT then
 		["$pp_colour_mulb"] = 0,
 	}
 
-	hook.Add("RenderScreenspaceEffects", "HG-BloodLossWeak", function()
-		local ply = LocalPlayer()
-		if not IsValid(ply) or not ply:Alive() then return end
-		local env = weakEnvelope(ply, CurTime()) * ply:GetNWFloat("HGWeakPower", 0.5)
-		if env <= 0 then return end
+	local EDGES = {
+		{mat = Material("vgui/gradient-u"), x = 0, y = 0, w = 1, h = 0.45},
+		{mat = Material("vgui/gradient-d"), x = 0, y = 0.55, w = 1, h = 0.45},
+		{mat = Material("vgui/gradient-l"), x = 0, y = 0, w = 0.4, h = 1},
+		{mat = Material("vgui/gradient-r"), x = 0.6, y = 0, w = 0.4, h = 1},
+	}
+	local VIGNETTE_ALPHA = 255
+	local PULSE_SPEED = 6
+	local PULSE_DEPTH = 0.2
+	local DIP_PITCH = 7
+	local DIP_ROLL = 5
 
-		colorMod["$pp_colour_brightness"] = -0.22 * env
-		colorMod["$pp_colour_contrast"] = 1 - 0.25 * env
-		colorMod["$pp_colour_colour"] = 1 - 0.6 * env
+	local lastDipStart = 0
+
+	local function localStrength()
+		local ply = LocalPlayer()
+		if not IsValid(ply) or not ply:Alive() then return 0, ply end
+
+		return weakEnvelope(ply, CurTime()) * ply:GetNWFloat("HGWeakPower", 0.5), ply
+	end
+
+	hook.Add("RenderScreenspaceEffects", "HG-BloodLossWeak", function()
+		local strength, ply = localStrength()
+		if strength <= 0 then return end
+
+		local start = ply:GetNWFloat("HGWeakStart", 0)
+		if start ~= lastDipStart then
+			lastDipStart = start
+			if ViewPunch then ViewPunch(Angle(DIP_PITCH, 0, math.Rand(-DIP_ROLL, DIP_ROLL))) end
+		end
+
+		colorMod["$pp_colour_brightness"] = -0.28 * strength
+		colorMod["$pp_colour_contrast"] = 1 - 0.3 * strength
+		colorMod["$pp_colour_colour"] = 1 - 0.85 * strength
 		DrawColorModify(colorMod)
-		DrawMotionBlur(0.25, 0.6 * env, 0.01)
+		DrawMotionBlur(0.18, 0.85 * strength, 0.01)
+	end)
+
+	hook.Add("HUDPaintBackground", "HG-BloodLossWeak", function()
+		local strength = localStrength()
+		if strength <= 0 then return end
+
+		local pulse = 1 - PULSE_DEPTH + PULSE_DEPTH * math.sin(CurTime() * PULSE_SPEED)
+		local w, h = ScrW(), ScrH()
+		surface.SetDrawColor(0, 0, 0, VIGNETTE_ALPHA * math.min(strength * 1.3, 1) * pulse)
+
+		for _, edge in ipairs(EDGES) do
+			surface.SetMaterial(edge.mat)
+			surface.DrawTexturedRect(w * edge.x, h * edge.y, w * edge.w, h * edge.h)
+		end
 	end)
 
 	return
@@ -55,24 +94,28 @@ end
 
 local K = {
 	interval = 1,
-	startBlood = 4000,
-	fullBlood = 2700,
-	chance = 0.04,
+	startBlood = 4200,
+	fullBlood = 2800,
+	chanceBase = 0.04,
+	chanceSeverity = 0.08,
 	movingMul = 1.4,
-	sprintMul = 3,
-	cooldownMin = 8,
-	cooldownMax = 30,
-	durationBase = 2.5,
+	sprintMul = 2.5,
+	cooldownMin = 12,
+	cooldownMax = 20,
+	durationBase = 3.5,
 	durationSeverity = 5,
-	powerBase = 0.35,
-	powerSeverity = 0.55,
-	fallBase = 0.12,
-	fallSeverity = 0.6,
+	powerBase = 0.55,
+	powerSeverity = 0.45,
+	fallBase = 0.28,
+	fallSeverity = 0.55,
 	fallSprint = 0.25,
 	fallDelayMin = 0.5,
 	fallDelayMax = 1.6,
-	wobblePower = 0.3,
-	thoughtCooldown = 20,
+	wobblePower = 0.45,
+	thoughtCooldown = 14,
+	fallGapMax = 45,
+	fallGapMin = 22,
+	recoverGrace = 10,
 }
 hg.BloodLossWeakConfig = K
 
@@ -100,7 +143,8 @@ local function startEpisode(ply, org, sev, sprinting, now)
 
 	local brace = hg.organism.AdrenalineBrace and hg.organism.AdrenalineBrace(org) or 0
 	local fallChance = (K.fallBase + K.fallSeverity * sev + (sprinting and K.fallSprint or 0)) * (1 - brace)
-	if math.random() < fallChance then
+	if now >= (org.bloodWeakNextFall or 0) and math.random() < fallChance then
+		org.bloodWeakNextFall = now + Lerp(sev, K.fallGapMax, K.fallGapMin)
 		local delay = Lerp(math.random(), K.fallDelayMin, K.fallDelayMax)
 		if not (hg.StartStagger and hg.StartStagger(ply, nil, power, delay)) then
 			timer.Simple(delay, function()
@@ -122,11 +166,24 @@ hook.Add("PlayerDeath", "HG-BloodLossWeak", function(ply)
 	ply:SetNWFloat("HGWeakEnd", 0)
 end)
 
+hook.Add("Org Clear", "HG-BloodLossWeak", function(org)
+	org.bloodWeakNext = nil
+	org.bloodWeakNextFall = nil
+	org.bloodWeakNextThought = nil
+end)
+
 timer.Create("HG_BloodLossWeak", K.interval, 0, function()
 	local now = CurTime()
 	for _, ply in player.Iterator() do
 		local org = ply.organism
-		if not org or now < (org.bloodWeakNext or 0) or ply:GetNWFloat("HGWeakEnd", 0) > now then continue end
+		if not org then continue end
+
+		if IsValid(ply.FakeRagdoll) then
+			org.bloodWeakNext = math.max(org.bloodWeakNext or 0, now + K.recoverGrace)
+			continue
+		end
+
+		if now < (org.bloodWeakNext or 0) or ply:GetNWFloat("HGWeakEnd", 0) > now then continue end
 
 		local sev = severity(org)
 		if sev <= 0 or not canEpisode(ply, org) then continue end
@@ -134,7 +191,7 @@ timer.Create("HG_BloodLossWeak", K.interval, 0, function()
 		local speed = ply:GetVelocity():Length2D()
 		local sprinting = ply:KeyDown(IN_SPEED) and speed > 150
 		local mul = sprinting and K.sprintMul or speed > 30 and K.movingMul or 1
-		if math.random() >= K.chance * sev * mul then continue end
+		if math.random() >= (K.chanceBase + K.chanceSeverity * sev) * mul then continue end
 
 		org.bloodWeakNext = now + Lerp(sev, K.cooldownMax, K.cooldownMin)
 		startEpisode(ply, org, sev, sprinting, now)

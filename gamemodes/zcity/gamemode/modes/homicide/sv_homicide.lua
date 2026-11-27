@@ -186,6 +186,7 @@ MODE.LootTable = {
 
 -- Judge arsenal, вшитый с настроенными множителями: сильный ствол и сильное
 -- мили — редкость, броня поделена по тирам (лёгкая чаще, тяжёлая почти не найти).
+hg.AppendLootPool(MODE.LootTable[1][2], hg.LootPools.TraumaSupplies, 1)
 hg.AppendLootPool(MODE.LootTable[2][2], hg.LootPools.MeleeCommon, 1)
 hg.AppendLootPool(MODE.LootTable[2][2], hg.LootPools.MeleeRare, 0.3)
 hg.AppendLootPool(MODE.LootTable[3][2], hg.LootPools.ArmorLight, 1)
@@ -227,6 +228,7 @@ MODE.LootTableStandard = {
 
 -- LootTableStandard only has medical + melee, so inject a rare gun category too.
 -- Здесь всё ещё слабее основного: и стволы, и сильное мили почти не встречаются.
+hg.AppendLootPool(MODE.LootTableStandard[1][2], hg.LootPools.TraumaSupplies, 0.75)
 hg.AppendLootPool(MODE.LootTableStandard[2][2], hg.LootPools.MeleeCommon, 1)
 hg.AppendLootPool(MODE.LootTableStandard[2][2], hg.LootPools.MeleeRare, 0.35)
 MODE.LootTableStandard[3] = {10, {}}

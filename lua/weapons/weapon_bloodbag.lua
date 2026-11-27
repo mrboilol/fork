@@ -43,7 +43,11 @@ function SWEP:InitializeAdd()
 
 	if SERVER then
 		local roll = math.random(100)
-		if roll <= 75 then
+		if self.SpawnWithSaline or roll <= 10 then
+			self.bloodtype = "saline"
+			self.modeValues[1] = math.min(500 / self.BagVolume, 1)
+			self:SetNetVar("mode", 1)
+		elseif roll <= 75 then
 			self.bloodtype = "o-"
 			self.modeValues[1] = 1
 		elseif roll <= 95 then
@@ -54,7 +58,7 @@ function SWEP:InitializeAdd()
 			self.bloodtype = types[math.random(#types)]
 			self.modeValues[1] = 1
 		end
-		if self.modeValues[1] > 0 then
+		if self.modeValues[1] > 0 and self.bloodtype ~= "saline" then
 			self.bloodph = hg.organism.AcidBase.RollBagPh()
 			self.bacteria = hg.organism.Infection.RollBagBacteria(self.bloodph)
 		end
@@ -80,24 +84,25 @@ function SWEP:GetInfo()
 		for i,val in ipairs(self.modeValuesdef) do
 			modevalues[i] = istable(val) and val[1] or val
 		end
+		if self.SpawnWithSaline then modevalues.bloodtype = "saline" end
 		return modevalues
 	end
 	local tblcopy = table.Copy(self.modeValues)
-	tblcopy.bloodtype = self.bloodtype or "o-"
+	tblcopy.bloodtype = self.bloodtype
 	tblcopy.bloodph = self.bloodph
 	tblcopy.bacteria = self.bacteria
 	return tblcopy
 end
 
 function SWEP:SetInfo(info)
-	self:SetNetVar("modeValues",info)
-	self.modeValues = info
-	self.bloodtype = ""..(self.modeValues.bloodtype or "o-")
-	self.modeValues.bloodtype = nil
-	self.bloodph = tonumber(self.modeValues.bloodph)
-	self.modeValues.bloodph = nil
-	self.bacteria = tonumber(self.modeValues.bacteria)
-	self.modeValues.bacteria = nil
+	self.modeValues = {math.Clamp(tonumber(info[1]) or 0, 0, 1)}
+	local filled = self.modeValues[1] > 0
+	self.bloodtype = filled and (info.bloodtype or (self.SpawnWithSaline and "saline" or "o-")) or nil
+	self.bloodph = filled and self.bloodtype ~= "saline" and tonumber(info.bloodph) or nil
+	self.bacteria = filled and self.bloodtype ~= "saline" and tonumber(info.bacteria) or nil
+	self:SetNetVar("modeValues", self.modeValues)
+	self:SetNetVar("type", self.bloodtype)
+	self:SetNetVar("mode", self.bloodtype == "saline" and 1 or 2)
 end
 
 function SWEP:OwnerChanged()
@@ -118,6 +123,33 @@ local drainClearCooldown = 5
 local punctureChance = 0.25
 
 if SERVER then
+	local function infuseBag(self, ent)
+		local org = ent.organism
+		local stored = self.modeValues[1] * self.BagVolume
+		local dose = math.min(stored, FrameTime() * 250 * math.max((org.pulse or 70) / 70, 0.3))
+		if self.bloodtype == "saline" then return hg.organism.InfuseSaline(org, dose), true end
+
+		local compatible = hg.organism.bloodtypes[self.bloodtype or "o-"][org.bloodtype or "o-"]
+		local bloodPerMl = compatible and 1 or 0.4
+		local used = math.min(dose, math.max(maxTransfusionBlood - org.blood, 0) / bloodPerMl)
+		if used <= 0 then return 0 end
+
+		local gain = used * bloodPerMl
+		org.blood = org.blood + gain
+		if compatible then
+			local clean = 1 - math.Clamp(self.bacteria or 0, 0, 1)
+			org.hemotransfusionshock = math.max(org.hemotransfusionshock - gain / 600 * clean, 0)
+		else
+			org.hemotransfusionshock = math.min(org.hemotransfusionshock + math.min(FrameTime() * 0.5, stored / 500), 2)
+		end
+		hg.organism.TransfuseBlood(org, gain, self.bloodph, self.bacteria)
+		if (self.bloodtype == "c-" or self.furryinfected) and ent.PlayerClassName ~= "furry" then
+			org.furryinfected = true
+		end
+
+		return used, compatible
+	end
+
 	function SWEP:DrainThink(owner)
 		if (self.drainCooldown or 0) > CurTime() then return end
 
@@ -233,6 +265,7 @@ if SERVER then
 
 		self.net_cooldown = self.net_cooldown or CurTime()
 		local owner = self:GetOwner()
+		if not IsValid(owner) then return end
 
 		if not owner:KeyDown(IN_ATTACK) and not hg_healanims:GetBool() then
 			self:SetHolding(math.max(self:GetHolding() - 12, 0))
@@ -242,7 +275,7 @@ if SERVER then
 		if mode == 3 then
 			self:DrainThink(owner)
 		elseif mode == 2 then
-			if self.modeValues[1] != 1 then
+			if self.modeValues[1] < 1 and self.bloodtype ~= "saline" then
 				if owner:KeyDown(IN_ATTACK) or owner:KeyDown(IN_ATTACK2) then
 					local takingSelf = owner:KeyDown(IN_ATTACK)
 					local ent = takingSelf and owner or hg.eyeTrace(self:GetOwner()).Entity
@@ -285,61 +318,36 @@ if SERVER then
 		else
 			if self.modeValues[1] > 0 then
 				if owner:KeyDown(IN_ATTACK) or owner:KeyDown(IN_ATTACK2) then
-					local ent = owner:KeyDown(IN_ATTACK) and owner or hg.eyeTrace(self:GetOwner()).Entity
-					if not ent.organism then return end
-					local ent = hg.GetCurrentCharacter(ent)
+					local target = owner:KeyDown(IN_ATTACK) and owner or hg.eyeTrace(owner).Entity
+					local ent = hg.GetCurrentCharacter(target)
+					if not IsValid(ent) or not ent.organism then return end
 					if ent:GetVelocity():LengthSqr() < 1000 then
-						local old = -(-ent.organism.blood)
-						local volume = self.BagVolume
-						local rateScale = 500 / volume
-						local good_type = hg.organism.bloodtypes[self.bloodtype or "o-"][ent.organism.bloodtype or "o-"]
-
+						local used, compatible = infuseBag(self, ent)
 						if self.poisoned2 then
 							ent.organism.poison4 = CurTime()
-				
 							self.poisoned2 = nil
 						end
-
-						--print(good_type)
-						if good_type then
-							ent.organism.blood = math.min(ent.organism.blood + math.min(FrameTime() * 0.5 * rateScale * (math.max(ent.organism.pulse / 70,0.3)),self.modeValues[1]) * volume, maxTransfusionBlood)
-							ent.organism.hemotransfusionshock = math.max(ent.organism.hemotransfusionshock - math.max(ent.organism.blood - old, 0) / 600 * (1 - math.Clamp(self.bacteria or 0, 0, 1)), 0)
-						else
-							ent.organism.blood = math.min(ent.organism.blood + math.min(FrameTime() * 0.5 * rateScale * (math.max(ent.organism.pulse / 70,0.3)),self.modeValues[1]) * volume * 0.4, maxTransfusionBlood)
-							if ent.organism.blood > old then
-								ent.organism.hemotransfusionshock = math.min(ent.organism.hemotransfusionshock + math.min(FrameTime() * 0.5,self.modeValues[1] / rateScale), 2)
-							end
-						end
-
-						if ent.organism.blood > old then
-							hg.organism.TransfuseBlood(ent.organism, ent.organism.blood - old, self.bloodph, self.bacteria)
-						end
-
-						if (self.bloodtype == "c-" or self.furryinfected) and ent.PlayerClassName != "furry" and (ent.organism.blood - old) > 0 then
-							ent.organism.furryinfected = true
-						end
-
-						self.modeValues[1] = math.max(self.modeValues[1] - (ent.organism.blood - old) / (good_type and volume or volume * 0.4),0)
-						if old ~= ent.organism.blood and (self.nextPerfusionRefresh or 0) < CurTime() then
+						self.modeValues[1] = math.max(self.modeValues[1] - used / self.BagVolume, 0)
+						if used > 0 and (self.nextPerfusionRefresh or 0) < CurTime() then
 							self.nextPerfusionRefresh = CurTime() + 0.25
-							self:RefreshPerfusionTreatment(ent, good_type and 0.3 or 0.12)
+							self:RefreshPerfusionTreatment(ent, compatible and 0.3 or 0.12)
 						end
-						if self.sndcd < CurTime() and old ~= ent.organism.blood  then
+						if used > 0 and self.sndcd < CurTime() then
 							owner:EmitSound("zcity/healing/bloodbag_loop_".. math.random(8) ..".ogg")
 							self.sndcd = CurTime() + 0.7
 						end
 					end
 				end
-			else
-				self.bloodtype = nil
-				self.bloodph = nil
-				self.bacteria = nil
 			end
 		end
 
-		if self.modeValues[1] < 0.00001 then 
-			self.modeValues[1] = 0 
-			self:SetHasBlood(false) 
+		if self.modeValues[1] < 0.00001 then
+			self.modeValues[1] = 0
+			self.bloodtype = nil
+			self.bloodph = nil
+			self.bacteria = nil
+			self.furryinfected = nil
+			self:SetHasBlood(false)
 			self:SetBodygroup(1,1)
 		else
 			self:SetHasBlood(true)
@@ -377,9 +385,18 @@ else
 
 		local ent = hg.eyeTrace(owner).Entity
 		ent = IsValid(ent) and ent.organism and ent or owner
-		local recipientBloodType = ent.organism and ent.organism.bloodtype or "unknown"
-		local modeStr = self.modeNames2[self:GetNetVar("mode",2)] or self.modeNames2[2]
-		self.modeNames[1] = self:GetNetVar("modeValues", {})[1] == 0 and modeStr .. " | Recipent: " .. recipientBloodType or modeStr .. " | in: "..self:GetNetVar("type","o-").." | recipent: "..recipientBloodType
+		local fill = self:GetNetVar("modeValues", {})[1] or 0
+		local fluid = self:GetNetVar("type", "o-")
+		local mode = self:GetNetVar("mode", 2)
+		local action = self.modeNames2[mode] or self.modeNames2[2]
+		if fill > 0 and fluid == "saline" then
+			if mode == 1 then action = "give saline" end
+			if mode == 2 then action = "empty saline before taking blood" end
+			self.modeNames[1] = action .. " | saline: " .. math.Round(fill * self.BagVolume) .. " mL"
+		else
+			local recipient = ent.organism and ent.organism.bloodtype or "unknown"
+			self.modeNames[1] = action .. (fill > 0 and " | in: " .. fluid or "") .. " | recipient: " .. recipient
+		end
 	end
 
 	function SWEP:AfterDrawModel(wm,nodraw)

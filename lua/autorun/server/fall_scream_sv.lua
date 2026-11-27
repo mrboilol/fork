@@ -128,7 +128,6 @@ if SERVER then
     end
 
     hg = hg or {}
-    hg.GetFallScreamSound = GetScreamSound
     hg.StopFallScream = StopScream
     
     local playerStates = {}

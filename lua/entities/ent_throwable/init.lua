@@ -190,6 +190,20 @@ local function GetEmbeddedTransform(ent, hitPos, hitNormal, direction, depth)
 	return pos, ang
 end
 
+local function TraceBodyContact(ent, hitEnt, target, hitPos, direction)
+	local tr = {
+		mask = MASK_SHOT,
+		ignoreworld = true,
+		filter = function(e) return e == hitEnt or e == target end,
+	}
+	for _, start in ipairs({hitPos, ent:WorldSpaceCenter()}) do
+		tr.start = start - direction * 24
+		tr.endpos = start + direction * 72
+		local result = util.TraceLine(tr)
+		if result.Hit and not result.StartSolid then return result end
+	end
+end
+
 local function StickToWorld(ent, hitPos, hitNormal, hitVel)
 	if not isvector(hitVel) or hitVel:LengthSqr() < 1 then
 		local physObj = ent:GetPhysicsObject()
@@ -378,6 +392,20 @@ function ENT:PhysicsCollide(data, phys)
 	end
 	local target = IsValid(ragdollOwner) and ragdollOwner or hitEnt
 	if not IsValid(target) then return end
+
+	local hitVelocity = data.OurOldVelocity
+	if not isvector(hitVelocity) or hitVelocity:LengthSqr() < 1 then
+		hitVelocity = IsValid(phys) and phys:GetVelocity() or self:GetAngles():Forward()
+	end
+	local hitDirection = hitVelocity:GetNormalized()
+	local hitPos = data.HitPos
+	local bodyTrace
+	if hitEnt:IsPlayer() or hitEnt:IsNPC() or hitEnt:IsNextBot() then
+		bodyTrace = TraceBodyContact(self, hitEnt, target, hitPos, hitDirection)
+		if not bodyTrace then return end
+		hitPos, hitNormal = bodyTrace.HitPos, bodyTrace.HitNormal
+	end
+
 	if self.NoDismemberment then
 		local dismembermentGraceUntil = CurTime() + 1
 		hitEnt.NoDismembermentPhysics = dismembermentGraceUntil
@@ -387,16 +415,9 @@ function ENT:PhysicsCollide(data, phys)
 	end
 	local targetOrganism = target.organism
 
-	-- Recover hitgroup and physics-bone metadata around the authoritative
-	-- PhysicsCollide contact without allowing the trace to replace its target.
-	local hitVelocity = data.OurOldVelocity
-	if not isvector(hitVelocity) or hitVelocity:LengthSqr() < 1 then
-		hitVelocity = IsValid(phys) and phys:GetVelocity() or self:GetAngles():Forward()
-	end
-	local hitDirection = hitVelocity:GetNormalized()
-	local headTrace = util.TraceHull({
-		start = data.HitPos - hitDirection * 12,
-		endpos = data.HitPos + hitDirection * 12,
+	local headTrace = bodyTrace or util.TraceHull({
+		start = hitPos - hitDirection * 12,
+		endpos = hitPos + hitDirection * 12,
 		mins = Vector(-2, -2, -2),
 		maxs = Vector(2, 2, 2),
 		mask = MASK_SHOT,
@@ -408,14 +429,14 @@ function ENT:PhysicsCollide(data, phys)
 	local anchorBone, anchorBoneName, anchorPhysBone, anchorMatrix
 	if targetOrganism and (self.DamageType or DMG_SLASH) == DMG_SLASH then
 		local anchorTrace = headTrace.Entity == hitEnt and headTrace or nil
-		anchorBone, anchorBoneName, anchorPhysBone, anchorMatrix = FindAnchorBone(hitEnt, data.HitPos, anchorTrace, data.HitObject)
+		anchorBone, anchorBoneName, anchorPhysBone, anchorMatrix = FindAnchorBone(hitEnt, hitPos, anchorTrace, data.HitObject)
 	end
 	local lodgedEntry
 	if anchorMatrix then
 		local anchorPos = anchorMatrix:GetTranslation()
 		local anchorAng = anchorMatrix:GetAngles()
 		local embedDepth = self.BodyStickDepth or self.uglublenie or 5
-		local projectilePos, projectileAng = GetEmbeddedTransform(self, data.HitPos, data.HitNormal, hitDirection, embedDepth)
+		local projectilePos, projectileAng = GetEmbeddedTransform(self, hitPos, hitNormal, hitDirection, embedDepth)
 		local lpos, lang = WorldToLocal(projectilePos, projectileAng, anchorPos, anchorAng)
 		lodgedEntry = {
 			PhysBoneID = anchorPhysBone,
@@ -447,11 +468,11 @@ function ENT:PhysicsCollide(data, phys)
 	dmginfo:SetDamage(baseDmg)
 	dmginfo:SetDamageForce(data.OurOldVelocity)
 	dmginfo:SetDamageType(damageType)
-	dmginfo:SetDamagePosition(data.HitPos)
+	dmginfo:SetDamagePosition(hitPos)
 	if hg.Appearance and hg.Appearance.TryAbsorbAccessoryImpact then
 		local impactBody = IsValid(hitEnt) and hitEnt or target
 		local impactRadius = hg.Appearance.GetEntityImpactRadius and hg.Appearance.GetEntityImpactRadius(self) or 0
-		if hg.Appearance.TryAbsorbAccessoryImpact(impactBody, dmginfo, data.HitPos, hitDirection, nil, impactRadius) and hg.EquipmentImpact then
+		if hg.Appearance.TryAbsorbAccessoryImpact(impactBody, dmginfo, hitPos, hitDirection, nil, impactRadius) and hg.EquipmentImpact then
 			hg.EquipmentImpact.ProcessedDamage[dmginfo] = {}
 		end
 	end
@@ -470,15 +491,15 @@ function ENT:PhysicsCollide(data, phys)
 		self:EmitSound(self.AttackHitFlesh, 65)
 
 		if (self.DamageType or DMG_SLASH) == DMG_SLASH then
-			hg.BloodDecal(data.HitPos + data.HitNormal * 2, data.HitPos - data.HitNormal * 2, hitEnt)
-			hg.BloodDecal(data.HitPos + data.HitNormal * 2, data.HitPos - data.HitNormal * 2)
+			hg.BloodDecal(hitPos + hitNormal * 2, hitPos - hitNormal * 2, hitEnt)
+			hg.BloodDecal(hitPos + hitNormal * 2, hitPos - hitNormal * 2)
 		elseif (self.DamageType or DMG_SLASH) == DMG_CLUB then
 			if hitEnt:IsPlayer() then
-				hg.ApplyBruiseTo(hitEnt, hitEnt, data.HitPos, data.HitNormal)
+				hg.ApplyBruiseTo(hitEnt, hitEnt, hitPos, hitNormal)
 			elseif hitEnt:GetClass() == "prop_ragdoll" then
 				local ragOwner = hg.RagdollOwner(hitEnt)
 				if IsValid(ragOwner) and ragOwner:IsPlayer() then
-					hg.ApplyBruiseTo(hitEnt, ragOwner, data.HitPos, data.HitNormal)
+					hg.ApplyBruiseTo(hitEnt, ragOwner, hitPos, hitNormal)
 				end
 			end
 		end

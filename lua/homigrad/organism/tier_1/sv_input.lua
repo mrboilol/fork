@@ -1020,7 +1020,7 @@ function hg.organism.AmputateLimb(org, limb, noShake, dmgInfo)
 	org.fearadd = math.min((org.fearadd or 0) + 2, 3)
 	if IsValid(org.owner) and org.owner:IsPlayer() and org.owner:Alive() then
 		org.owner:AddTraumaAdrenaline(1)
-		if hg.QueuePainScream and (not hg.organism.CanFeelPain or hg.organism.CanFeelPain(org, region)) then hg.QueuePainScream(org.owner, 2) end
+		if hg.QueuePainScream and (not hg.organism.CanFeelPain or hg.organism.CanFeelPain(org, region)) then hg.QueuePainScream(org.owner) end
 		if hg.LightStunPlayer then hg.LightStunPlayer(org.owner, 3) end
 	end
 
@@ -1662,6 +1662,8 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	if ent == ply and IsValid(ply.FakeRagdoll) and dmgInfo:IsDamageType(DMG_BURN) then
 		return true
 	end
+
+	if hg.PulseShieldBlock and hg.PulseShieldBlock(ply, ent, dmgInfo) then return true end
 
 	local time = CurTime()
 
@@ -3362,7 +3364,7 @@ function hg.BreakNeck(ent, recipient, soundEnt, deathChance)
 		org.spine3AcutePainUntil = CurTime() + 1.5
 		org.spine3AcutePain = 95
 		if hg.organism.AddPain then hg.organism.AddPain(org, 95, "spine3acute") else org.painadd = math.min((org.painadd or 0) + 95, 150) end
-		if hg.QueuePainScream then hg.QueuePainScream(org.owner, 1.6) end
+		if hg.QueuePainScream then hg.QueuePainScream(org.owner) end
 	end
 	if hg.fakeBoneFlop then
 		hg.fakeBoneFlop.FlagBone(org, "ValveBiped.Bip01_Spine3", true)

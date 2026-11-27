@@ -59,6 +59,8 @@ local function traumaDirection(org, dmgInfo)
 	return vector_up
 end
 
+local organScreamDamage = 0.15
+
 local function applyOrganTrauma(org, dmgInfo, force, delta, previousDamage, organ)
 	if not org.stamina or not org.stamina[1] then return end
 
@@ -80,9 +82,8 @@ local function applyOrganTrauma(org, dmgInfo, force, delta, previousDamage, orga
 
 	local severity = freshDamage * 1.8 + math.max(rawForce - repeatThreshold * 0.45, 0) * 0.32
 	if repeatHit then severity = severity * 0.45 end
-	if severity >= 0.9 and org.isPly and hg.QueuePainScream then
-		hg.QueuePainScream(org.owner, math.Clamp(severity, 1, 1.6))
-	end
+	local screams = freshDamage >= organScreamDamage or (freshDamage > 0 and severity >= 0.9)
+	if screams and org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner) end
 	if severity <= 0.35 or org.NoKnockdown then return end
 
 	local resistance = 1 + priorDamage * 1.6
@@ -506,7 +507,7 @@ hitArtery = function(artery, org, dmg, dmgInfo, boneindex, dir, hit, impact, for
 	local owner = org.owner
 
 	if IsValid(owner) and owner:IsPlayer() and owner:Alive() and hg.QueuePainScream and (not hg.organism.CanFeelPain or hg.organism.CanFeelPain(org, "body")) then
-		hg.QueuePainScream(owner, 2)
+		hg.QueuePainScream(owner)
 	end
 
 	if artery == "arteria" and IsValid(owner) then

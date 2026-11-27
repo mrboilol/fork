@@ -116,8 +116,8 @@ SoftTissue.Config = {
 
 	boneTrauma = {
 		minDelta = 0.04,
-		perDamage = 45,
-		fracture = 30,
+		perDamage = 35,
+		fracture = 22,
 		limbScale = {head = 0.35, torso = 0.4},
 	},
 

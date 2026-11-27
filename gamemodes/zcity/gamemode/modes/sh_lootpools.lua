@@ -408,6 +408,13 @@ LP.ArmorHeavy = {
 	{0.06, "ent_armor_visor_maska"},
 }
 
+LP.TraumaSupplies = {
+	{2, "weapon_bloodbag_saline"},
+	{1.5, "weapon_medical_splint"},
+	{0.8, "weapon_tranexamic_acid"},
+	{0.5, "weapon_streptokinase"},
+}
+
 LP.Medicine = {
 	{4, "weapon_bandage_sh"},
 	{3, "weapon_bigbandage_sh"},
@@ -435,3 +442,5 @@ function hg.AppendLootPool(dest, pool, mul)
 	end
 	return dest
 end
+
+hg.AppendLootPool(LP.Medicine, LP.TraumaSupplies)

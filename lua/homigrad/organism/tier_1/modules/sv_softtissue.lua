@@ -351,13 +351,15 @@ local function applyBoneTrauma(org, name, before)
 
 	local trauma = CONFIG.boneTrauma
 	local delta = after - before
-	if delta < trauma.minDelta then return end
+	local fractured = before < 1 and after >= 1
+	if delta < trauma.minDelta and not fractured then return end
 
 	local limb = CONFIG.boneLimbs[name] or string.sub(name, 1, 4)
 	local amount = delta * trauma.perDamage
-	if before < 1 and after >= 1 then amount = amount + trauma.fracture end
+	if fractured then amount = amount + trauma.fracture end
 
 	hg.SimpleHealth.AddDamage(org, "brute", amount * (trauma.limbScale[limb] or 1), limb)
+	if fractured then hg.SimpleHealth.AddFracture(org, limb) end
 end
 
 SoftTissue.InputWrappers = SoftTissue.InputWrappers or {}

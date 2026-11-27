@@ -41,6 +41,8 @@ MODE.LootTable = {
 	}},
 }
 
+hg.AppendLootPool(MODE.LootTable[1][2], hg.LootPools.TraumaSupplies, 0.5)
+
 function MODE:CanLaunch()
 	local count = 0
 

@@ -45,8 +45,7 @@ function SWEP:CanReload()
 		return false
 	end
 
-	local npcJamReload = self.NPCJamReload
-	if self.ReloadNext or not self:CanUse() or self:IsJamClearing() or (self:GetJammed() and not npcJamReload) or (self:Clip1() >= self:GetReloadCapacity() and not npcJamReload) then --shit
+	if self.ReloadNext or not self:CanUse() or self:IsJamClearing() or self:GetJammed() or self:Clip1() >= self:GetReloadCapacity() then --shit
 		return
 	end
 
@@ -129,45 +128,49 @@ function SWEP:ReloadEnd()
 	self:InsertAmmo(math.max(self:GetReloadCapacity() - self:Clip1(), 0))
 	--end
 	self.ReloadNext = CurTime() + self.ReloadCooldown --я хуй знает чо это
-	if SERVER and self.NPCJamReload then
-		self.NPCJamReload = nil
-		self:SetJammed(false)
-	end
 	self:Draw()
 end
 
-function SWEP:Step_NPCWeaponState(time)
-	if not SERVER then return end
+if SERVER then
+	local NPC_UNJAM_TICK = 0.25
+	local NPC_UNJAM_MIN = 1.2
+	local NPC_UNJAM_MAX = 2.4
+	local NPC_UNJAM_ONE_ARM_MUL = 2
 
-	local owner = self:GetOwner()
-	if not IsValid(owner) or not owner:IsNPC() or owner:GetActiveWeapon() ~= self then return end
-	if (self.NPCWeaponActionAt or 0) > time then return end
-
-	if self.GetJammed and self:GetJammed() then
-		if self.reload then return end
-		self.NPCWeaponActionAt = time + 0.5
-		if self.ShotgunTubeReload then
-			if self.StartJamClear then self:StartJamClear() end
-			return
+	local function startUnjam(wep, npc, now)
+		local duration = math.Rand(NPC_UNJAM_MIN, NPC_UNJAM_MAX)
+		if ZCNPC and ZCNPC.CanReloadWeapon and not ZCNPC.CanReloadWeapon(npc) then
+			duration = duration * NPC_UNJAM_ONE_ARM_MUL
 		end
 
-		self.NPCJamReload = true
-		self:Reload()
-		if not self.reload then
-			self.NPCJamReload = nil
-			if self.StartJamClear then self:StartJamClear() end
+		wep.NPCUnjamAt = now + duration
+		wep.NPCUnjamOwner = npc
+
+		local gesture = ACT_GESTURE_RELOAD
+		if npc:SelectWeightedSequence(gesture) >= 0 then npc:RestartGesture(gesture) end
+	end
+
+	timer.Create("homigrad/weapons/npc-unjam", NPC_UNJAM_TICK, 0, function()
+		local now = CurTime()
+
+		for _, wep in ipairs(hg.weapons or {}) do
+			if not IsValid(wep) or not wep.GetJammed then continue end
+
+			local npc = wep:GetOwner()
+			local holding = IsValid(npc) and npc:IsNPC() and npc:GetActiveWeapon() == wep
+			if not holding or not wep:GetJammed() or IsValid(npc.zcnpc_rag) then
+				wep.NPCUnjamAt = nil
+				continue
+			end
+
+			if not wep.NPCUnjamAt or wep.NPCUnjamOwner ~= npc then
+				startUnjam(wep, npc, now)
+			elseif now >= wep.NPCUnjamAt then
+				wep.NPCUnjamAt = nil
+				wep:StartJamClear()
+			end
 		end
-		return
-	end
-
-	if self.reload or self:IsJamClearing() or self:Clip1() > 0 then return end
-
-	self.NPCWeaponActionAt = time + 0.5
-	if self.ShotgunTubeReload then
-		if not self:IsShotgunBusy() then self:ShotgunReload() end
-	elseif self:CanReload() then
-		self:Reload()
-	end
+	end)
 end
 
 SWEP.FakeReloadEvents = {

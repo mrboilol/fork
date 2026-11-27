@@ -78,7 +78,7 @@ function ChatLog.Emit(key, actor, target, extraEnt, arg)
 	end
 
 	for _, ply in player.Iterator() do
-		if ply == actor or not IsAware(ply) then continue end
+		if (ply == actor and not event.toActor) or not IsAware(ply) then continue end
 		if ply:EyePos():DistToSqr(pos) > rangeSqr then continue end
 		if visualOnly and not ply:TestPVS(pos) then continue end
 		if told and (told[ply] or 0) > now then continue end
@@ -212,6 +212,84 @@ hook.Add("HomigradDamage", "hg/chatlog/hits", function(victimEnt, dmgInfo)
 	if key then ChatLog.Emit(key, attacker, victim, wep) end
 end)
 
+local CRIT_HEALTH_LOSS = 25
+local CRIT_ORGAN_DELTA = 0.05
+local CRIT_INTERNAL_BLEED_DELTA = 0.5
+local KNOCKOUT_WINDOW = 1.5
+local CRIT_ORGAN_KEYS = {"heart", "liver", "flank", "gut", "trachea", "brainFrontal", "brainParietal", "brainTemporal", "brainOccipital"}
+local CRIT_LUNG_KEYS = {"lungsL", "lungsR"}
+local CRIT_BONES = {
+	chest = 1, skull = 2, jaw = 3, spine3 = 4, spine1 = 5, spine2 = 5, pelvis = 6,
+	larm_up = 7, larm_down = 7, rarm_up = 8, rarm_down = 8,
+	lleg_up = 9, lleg_down = 9, rleg_up = 10, rleg_down = 10,
+}
+
+local function CritSnapshot(org)
+	local organs = 0
+	for _, key in ipairs(CRIT_ORGAN_KEYS) do
+		organs = organs + (tonumber(org[key]) or 0)
+	end
+	for _, key in ipairs(CRIT_LUNG_KEYS) do
+		local lung = org[key]
+		organs = organs + (istable(lung) and tonumber(lung[1]) or 0)
+	end
+
+	local bones = {}
+	for key in pairs(CRIT_BONES) do
+		bones[key] = tonumber(org[key]) or 0
+	end
+
+	local state = hg.SimpleHealth.GetState and hg.SimpleHealth.GetState(org)
+
+	return {
+		organs = organs,
+		bones = bones,
+		internalBleed = tonumber(org.internalBleed) or 0,
+		health = state and hg.SimpleHealth.GetHealth(state),
+	}
+end
+
+local function ReportCrits(attacker, victim, org, before, shot)
+	if not IsValid(attacker) or not IsValid(victim) then return end
+
+	local after = CritSnapshot(org)
+	for key, index in pairs(CRIT_BONES) do
+		if before.bones[key] < 1 and after.bones[key] >= 1 then
+			ChatLog.Emit("bonebreak", attacker, victim, nil, index)
+
+			break
+		end
+	end
+
+	if after.organs - before.organs >= CRIT_ORGAN_DELTA or after.internalBleed - before.internalBleed >= CRIT_INTERNAL_BLEED_DELTA then
+		ChatLog.Emit("organhit", attacker, victim)
+	elseif before.health and after.health and before.health - after.health >= CRIT_HEALTH_LOSS then
+		ChatLog.Emit(shot and "critshot" or "critblow", attacker, victim)
+	end
+end
+
+hook.Add("PreHomigradDamage", "hg/chatlog/crits", function(victimEnt, dmgInfo, hitgroup, ent)
+	local victim = ResolvePlayer(victimEnt)
+	if not victim then return end
+
+	local attacker = dmgInfo:GetAttacker()
+	if not IsValid(attacker) or not attacker:IsPlayer() or attacker == victim then return end
+
+	local org = (IsValid(ent) and ent.organism) or victim.organism
+	if not org then return end
+
+	victim.hgChatLogHitBy = attacker
+	victim.hgChatLogHitTime = CurTime()
+
+	local tick = engine.TickCount()
+	if org.hgCritTick == tick then return end
+	org.hgCritTick = tick
+
+	local before = CritSnapshot(org)
+	local shot = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
+	timer.Simple(0, function() ReportCrits(attacker, victim, org, before, shot) end)
+end)
+
 function ChatLog.Gunshot(owner, wep)
 	if not IsValid(owner) or not owner:IsPlayer() then return end
 
@@ -247,17 +325,6 @@ hook.Add("Fake", "hg/chatlog/fall", function(ply)
 	end)
 end)
 
-local INJURY_SCAN_INTERVAL = 0.5
-
-local function ActiveInjuries(org)
-	local active = {}
-	for index, injury in ipairs(ChatLog.Injuries) do
-		if injury.check(org) then active[index] = true end
-	end
-
-	return active
-end
-
 function ChatLog.InspectInjuries(viewer, org)
 	if not IsValid(viewer) or not org then return end
 
@@ -266,42 +333,16 @@ function ChatLog.InspectInjuries(viewer, org)
 	end
 end
 
-timer.Create("hg/chatlog/injuries", INJURY_SCAN_INTERVAL, 0, function()
-	for _, ply in player.Iterator() do
-		local org = ply:Alive() and ply.organism
-		if not org then
-			ply.hgInjurySeen = nil
-
-			continue
-		end
-
-		local active = ActiveInjuries(org)
-		local seen = ply.hgInjurySeen
-		if not seen then
-			ply.hgInjurySeen = active
-
-			continue
-		end
-
-		for index in pairs(seen) do
-			if not active[index] then seen[index] = nil end
-		end
-
-		for index = 1, #ChatLog.Injuries do
-			if active[index] and not seen[index] then
-				seen[index] = true
-				ChatLog.Emit("injury", ply, nil, nil, index)
-
-				break
-			end
-		end
-	end
-end)
-
 hook.Add("HG_OnOtrub", "hg/chatlog/collapse", function(ply)
 	if not IsValid(ply) or not ply:IsPlayer() or not ply:Alive() then return end
 
 	ChatLog.Emit(hg.SimpleHealth.GetState(ply.organism) and "hardcrit" or "collapse", ply)
+
+	local attacker = ply.hgChatLogHitBy
+	ply.hgChatLogHitBy = nil
+	if IsValid(attacker) and attacker ~= ply and (ply.hgChatLogHitTime or 0) > CurTime() - KNOCKOUT_WINDOW then
+		ChatLog.Emit("knockout", attacker, ply)
+	end
 end)
 
 hook.Add("PlayerDeath", "hg/chatlog/death", function(ply)

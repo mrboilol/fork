@@ -784,6 +784,7 @@ MODE.LootTable = {
 	}}
 }
 
+hg.AppendLootPool(MODE.LootTable[1][2], hg.LootPools.TraumaSupplies, 1)
 hg.AppendLootPool(MODE.LootTable[1][2], hg.LootPools.MeleeCommon, 0.8)
 hg.AppendLootPool(MODE.LootTable[1][2], hg.LootPools.MeleeRare, 0.7)
 hg.AppendLootPool(MODE.LootTable[2][2], hg.LootPools.Sidearms, 0.5)

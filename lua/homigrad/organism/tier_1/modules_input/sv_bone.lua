@@ -510,7 +510,7 @@ local function compoundFractureResponse(org, key, region, stabilized)
 	else
 		notifyBoneBreak(org, key, "MY " .. string.upper(limbName[key]) .. " IS BROKEN IN TWO PLACES!", "double_broke" .. key)
 	end
-	if hg.QueuePainScream and canFeelPain(org, region) then hg.QueuePainScream(org.owner, 2) end
+	if hg.QueuePainScream and canFeelPain(org, region) then hg.QueuePainScream(org.owner) end
 	playBoneFractureSound(org.owner, severe_bonebreak_sounds)
 end
 
@@ -544,7 +544,7 @@ local function doDislocate(org, key, dmg, segment)
 
 	timer.Simple(0, function() hg.LightStunPlayer(org.owner,2) end)
 	playBoneFractureSound(org.owner)
-	if org.isPly and hg.QueuePainScream and canFeelPain(org, (key == "lleg" or key == "rleg") and "lower" or "body") then hg.QueuePainScream(org.owner, 1) end
+	if org.isPly and hg.QueuePainScream and canFeelPain(org, (key == "lleg" or key == "rleg") and "lower" or "body") then hg.QueuePainScream(org.owner) end
 	return true
 end
 
@@ -614,7 +614,7 @@ local function fractureLegSegment(org, key, segment, dmg, otherBroken)
 
 	timer.Simple(0, function() hg.LightStunPlayer(org.owner,2) end)
 	playBoneFractureSound(org.owner)
-	if org.isPly and hg.QueuePainScream and canFeelPain(org, "lower") then hg.QueuePainScream(org.owner, 1.35) end
+	if org.isPly and hg.QueuePainScream and canFeelPain(org, "lower") then hg.QueuePainScream(org.owner) end
 	if otherBroken then compoundFractureResponse(org, key, "lower", stabilized) end
 end
 
@@ -680,7 +680,7 @@ local function fractureArmSegment(org, key, segment, dmg, otherBroken)
 	end
 
 	playBoneFractureSound(org.owner)
-	if org.isPly and hg.QueuePainScream and canFeelPain(org, "body") then hg.QueuePainScream(org.owner, 1.35) end
+	if org.isPly and hg.QueuePainScream and canFeelPain(org, "body") then hg.QueuePainScream(org.owner) end
 	if otherBroken then compoundFractureResponse(org, key, "body", stabilized) end
 end
 
@@ -862,7 +862,7 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 
 	if oldDmg < breakThreshold and org[name] >= breakThreshold and org.isPly then
 		if name ~= "spine3" then playBoneFractureSound(org.owner) end
-		if hg.QueuePainScream then hg.QueuePainScream(org.owner, 1.1) end
+		if hg.QueuePainScream then hg.QueuePainScream(org.owner) end
 		if IsValid(org.owner) and org.owner:IsPlayer() and !hasNewThoughts(org) then
 			notifyOwner(org, huyasd[name], true, name, 2)
 		end
@@ -871,7 +871,7 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 			org.spine3AcutePainUntil = CurTime() + 1.5
 			org.spine3AcutePain = 95
 			addPain(org, 95, "spine3acute")
-			if hg.QueuePainScream then hg.QueuePainScream(org.owner, 1.6) end
+			if hg.QueuePainScream then hg.QueuePainScream(org.owner) end
 		else
 			if name == "spine2" then
 				org.painadd = 0
@@ -1184,7 +1184,7 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 			addPain(org, 45, "head")
 			if hg.organism.AddInstantPain then hg.organism.AddInstantPain(org, 30, "head") else org.avgpain = math.min((org.avgpain or 0) + 30, 150) end
 			playBoneFractureSound(org.owner)
-			if org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner, 1) end
+			if org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner) end
 			playBoneFractureSound(org.owner, severe_bonebreak_sounds)
 		end
 	end
@@ -1197,7 +1197,7 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 		
 		if !org.jawdislocation then
 			playBoneFractureSound(org.owner)
-			if org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner, 0.85) end
+			if org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner) end
 		end
 
 		org.jawdislocation = true
@@ -1316,6 +1316,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 				bloodBurst(org, dmgInfo, math.Clamp(4 + dmg * 2, 7, 10), pos, true, dmg)
 			end
 			sendThought(org, "Your skull is broken.", "thought_skull", 4, Color(255, 180, 180))
+			if org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner) end
 
 			if bluntMelee and org.alive and not org.otrub and not helmetProtectedHit then
 				org.needotrub = true
@@ -1510,7 +1511,7 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 			end
 
 			playBoneFractureSound(org.owner)
-			if hg.QueuePainScream then hg.QueuePainScream(org.owner, 0.8) end
+			if org.brokenribs > previousRibs and hg.QueuePainScream then hg.QueuePainScream(org.owner) end
 
 			return math.min(0, result)
 		end
@@ -1532,6 +1533,7 @@ input_list.pelvis = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoc
 
 	if org.isPly and oldDmg < 1 and org.pelvis == 1 then
 		org.internalBleed = math.min((org.internalBleed or 0) + 4.5, 10)
+		if hg.QueuePainScream and canFeelPain(org, "lower") then hg.QueuePainScream(org.owner) end
 
 		if hasNewThoughts(org) then
 			sendThought(org, "You broke your pelvis.", "thought_pelvis", 4, Color(255, 210, 210))
@@ -1595,7 +1597,7 @@ local function upper_limb(org, bone, dmg, dmgInfo, amputate_key, limb_key, segme
 
 		playBoneFractureSound(org.owner)
 		local region = (limb_key == "lleg" or limb_key == "rleg") and "lower" or "body"
-		if org.isPly and hg.QueuePainScream and canFeelPain(org, region) then hg.QueuePainScream(org.owner, 1.35) end
+		if org.isPly and hg.QueuePainScream and canFeelPain(org, region) then hg.QueuePainScream(org.owner) end
 		if otherBroken then compoundFractureResponse(org, limb_key, region, stabilized) end
 	else
 		doDislocate(org, limb_key, d, segment)

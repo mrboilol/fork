@@ -33,6 +33,8 @@ local K = {
 	suicidalAdrenaline = 0.5,
 	adrenalineFloor = 0.15,
 	suicidalSuccumb = 0.35,
+	shockMax = 0.85,
+	shockHold = 25,
 	hopeSuccumb = 0.1,
 
 	stages = {0.3, 0.55, 0.8},
@@ -85,6 +87,8 @@ local function clearDespair(org)
 	org.despairStage = nil
 	org.despairNextThought = nil
 	org.despairKind = nil
+	org.despairShockUntil = nil
+	org.despairShockLevel = nil
 end
 
 hook.Add("Org Clear", "HG_Despair", clearDespair)
@@ -117,6 +121,24 @@ local function countCompany(ply, pos, twoTeams, now)
 		if ent:IsNPC() and ent:Health() > 0 and ent:Disposition(ply) == D_LI then count = count + 1 end
 	end
 	return count
+end
+
+function hg.organism.ShockDespair(ply, amount)
+	local org = ply.organism
+	if not org or not org.alive or org.otrub or isImmune(ply) then return end
+
+	local now = CurTime()
+	local kind = org.despairKind
+	if not kind then
+		local char = hg.GetCurrentCharacter(ply) or ply
+		kind = countCompany(ply, char:GetPos(), false, now) == 0 and "hopelessness" or "desolation"
+		org.despairKind = kind
+	end
+
+	local current = org[kind] or 0
+	org[kind] = max(current, min(current + amount, K.shockMax))
+	org.despairShockLevel = org[kind]
+	org.despairShockUntil = now + K.shockHold
 end
 
 local function teamStanding(ply, counts, twoTeams)
@@ -189,6 +211,13 @@ local function updatePlayer(ply, org, counts, twoTeams, now)
 			kind = hopeTarget >= desoTarget and "hopelessness" or "desolation"
 		end
 		if kind == "hopelessness" then desoTarget = 0 elseif kind == "desolation" then hopeTarget = 0 end
+		if (org.despairShockUntil or 0) > now then
+			if kind == "hopelessness" then
+				hopeTarget = max(hopeTarget, org.despairShockLevel)
+			elseif kind == "desolation" then
+				desoTarget = max(desoTarget, org.despairShockLevel)
+			end
+		end
 
 		org.hopelessness = Approach(hope, hopeTarget, dt * (hopeTarget > hope and K.hopelessRise or K.hopelessFall))
 		org.desolation = Approach(deso, desoTarget, dt * (desoTarget > deso and K.desolationRise or K.desolationFall))

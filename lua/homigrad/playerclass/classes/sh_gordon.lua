@@ -44,6 +44,12 @@ local function hevchanged(ply)
     ply.organism.stamina.regen = 1 + 3 * hevpow
 end
 
+local function setPower(ply, power)
+    ply.HEV.Power = math.Clamp(power, 0, maxPower)
+    ply:SetNetVar("HEVPower", math.ceil(ply.HEV.Power))
+    hevchanged(ply)
+end
+
 local function createhev(ply)
     ply.organism.recoilmul = 0.2
     ply.organism.meleespeed = 2
@@ -166,7 +172,7 @@ function CLASS.On(self, data)
             self.organism.CantCheckPulse = true
         end
         self:SetNetVar("HEVMedicine", self.HEV.Medicine)
-        self:SetNetVar("HEVPower", self.HEV.Power)
+        self:SetNetVar("HEVPower", math.ceil(self.HEV.Power))
         self:SetNetVar("HEVSuit", true)
         self:SetModel(model)
         self:SetSubMaterial()
@@ -190,51 +196,47 @@ function CLASS.On(self, data)
 end
 
 if SERVER then
+    local chargerFlags = {item_suitcharger = "armorcharger", item_healthcharger = "healthcharger"}
+
+    local function convertCharger(ent)
+        if not IsValid(ent) or ent.chargerConverted then return end
+        local flag = chargerFlags[ent:GetClass()]
+        if not flag then return end
+        ent.chargerConverted = true
+
+        local entnew = ents.Create("prop_physics")
+        entnew:SetModel(ent:GetModel())
+        entnew:SetPos(ent:GetPos())
+        entnew:SetAngles(ent:GetAngles())
+        entnew[flag] = true
+        entnew.power = 100
+        entnew:Spawn()
+
+        local phys = entnew:GetPhysicsObject()
+        if IsValid(phys) then
+            phys:EnableMotion(false)
+        end
+
+        timer.Simple(0.1,function()
+            SafeRemoveEntity(ent)
+        end)
+    end
+
     local function replaceChargers()
         timer.Simple(1,function()
             for i, ent in ents.Iterator() do
-                if ent:GetClass() == "item_suitcharger" then
-                    local entnew = ents.Create("prop_physics")
-                    entnew:SetModel(ent:GetModel())
-                    entnew:SetPos(ent:GetPos())
-                    entnew:SetAngles(ent:GetAngles())
-                    entnew.armorcharger = true
-                    entnew.power = 100
-                    entnew:Spawn()
-        
-                    local phys = entnew:GetPhysicsObject()
-                    if IsValid(phys) then
-                        phys:EnableMotion(false)
-                    end
-        
-                    timer.Simple(0.1,function()
-                        ent:Remove()
-                    end)
-                end
-        
-                if ent:GetClass() == "item_healthcharger" then
-                    local entnew = ents.Create("prop_physics")
-                    entnew:SetModel(ent:GetModel())
-                    entnew:SetPos(ent:GetPos())
-                    entnew:SetAngles(ent:GetAngles())
-                    entnew.healthcharger = true
-                    entnew.power = 100
-                    entnew:Spawn()
-                    
-                    local phys = entnew:GetPhysicsObject()
-                    if IsValid(phys) then
-                        phys:EnableMotion(false)
-                    end
-        
-                    timer.Simple(0.1,function()
-                        ent:Remove()
-                    end)
-                end
+                convertCharger(ent)
             end
         end)
     end
     hook.Add("InitPostEntity", "gordon_chargers_init", replaceChargers)
     hook.Add("PostCleanupMap", "huyhuygordonspasjizn", replaceChargers)
+    hook.Add("OnEntityCreated", "gordon_chargers_spawned", function(ent)
+        if not chargerFlags[ent:GetClass()] then return end
+        timer.Simple(0.1, function()
+            convertCharger(ent)
+        end)
+    end)
 end
 
 hook.Add("Player Think","health_armor_gordonthings",function(ply)
@@ -284,9 +286,7 @@ hook.Add("Player Think","health_armor_gordonthings",function(ply)
                 ent.snd = ent:StartLoopingSound("items/suitcharge1.wav")
             end
 
-            ply.HEV.Power = math.min(ply.HEV.Power + 1, maxPower)
-            ply:SetNetVar("HEVPower", ply.HEV.Power)
-            hevchanged(ply)
+            setPower(ply, ply.HEV.Power + 1)
             for placement, armor in pairs(ply.armors or {}) do
                 if armor == "gordon_armor" or armor == "gordon_helmet" then
                     local maximum = hg.GetArmorMaxCondition(ply, placement, armor)
@@ -417,27 +417,66 @@ hook.Add("PlayerCanPickupItem","hevsuit",function(ply, ent)
         if ply.PlayerClassName == "Gordon" and ply:GetNetVar("HEVSuit") then
             local noneedarmor = ply.HEV.Power == maxPower
             if noneedarmor then return false end
-            ply.HEV.Power = math.min(ply.HEV.Power + 25, maxPower)
-            ply:SetNetVar("HEVPower", ply.HEV.Power)
+            setPower(ply, ply.HEV.Power + 25)
             ply:SetArmor(0)
-            hevchanged(ply)
         else
             return false
         end
     end
 end)
 
-hook.Add("HomigradDamage","takesomearmor",function(ply,dmginfo,hitgroup,ent,harm)
-    if not (ply.PlayerClassName == "Gordon" and ply:GetNetVar("HEVSuit")) then return end
+if SERVER then
+    util.AddNetworkString("HEV_Shield")
 
-    if dmginfo:IsDamageType(DMG_FALL + DMG_DROWN + DMG_POISON + DMG_RADIATION) then return end
+    local SHIELD_DRAIN = 0.25
+    local SHIELD_FX_DELAY = 0.08
+    local SHIELD_BYPASS = DMG_FALL + DMG_DROWN + DMG_POISON + DMG_RADIATION
 
-    local sub = math.Round(dmginfo:GetDamage() / 4,0)
-    ply.HEV.Power = math.Clamp(ply.HEV.Power - sub, 0, maxPower)
-    ply:SetNetVar("HEVPower", ply.HEV.Power)
+    function hg.PulseShieldActive(ply)
+        return IsValid(ply) and ply:IsPlayer() and ply:Alive() and ply.PlayerClassName == "Gordon" and ply:GetNetVar("HEVSuit") == true and ply.HEV ~= nil and (ply.HEV.Power or 0) > 0
+    end
 
-    hevchanged(ply)
-end)
+    local function shieldEffects(ply, ent, pos)
+        if (ply.HEVShieldFXNext or 0) > CurTime() then return end
+        ply.HEVShieldFXNext = CurTime() + SHIELD_FX_DELAY
+
+        local center = ent:WorldSpaceCenter()
+        if pos:DistToSqr(center) > 100 ^ 2 then pos = center end
+
+        local sparks = EffectData()
+        sparks:SetOrigin(pos)
+        sparks:SetNormal((pos - center):GetNormalized())
+        sparks:SetMagnitude(2)
+        sparks:SetScale(1)
+        sparks:SetRadius(4)
+        util.Effect("Sparks", sparks, true, true)
+
+        local tesla = EffectData()
+        tesla:SetOrigin(pos)
+        tesla:SetEntity(ent)
+        tesla:SetMagnitude(4)
+        tesla:SetScale(1)
+        util.Effect("TeslaHitboxes", tesla, true, true)
+
+        local zaps = {1, 2, 3, 5, 6, 7, 8, 9}
+        ent:EmitSound("ambient/energy/zap" .. zaps[math.random(#zaps)] .. ".wav", 75, math.random(95, 110), 0.8)
+
+        net.Start("HEV_Shield")
+            net.WriteEntity(ent)
+        net.SendPVS(center)
+    end
+
+    function hg.PulseShieldBlock(ply, ent, dmgInfo)
+        if not hg.PulseShieldActive(ply) then return false end
+        local damage = dmgInfo:GetDamage()
+        if damage <= 0 or dmgInfo:IsDamageType(SHIELD_BYPASS) then return false end
+
+        setPower(ply, ply.HEV.Power - damage * SHIELD_DRAIN)
+        shieldEffects(ply, ent, dmgInfo:GetDamagePosition())
+        dmgInfo:SetDamage(0)
+        return true
+    end
+end
 
 if CLIENT then
     local BGColor = Color(0,0,0,255)
@@ -647,6 +686,61 @@ if CLIENT then
 end
 
 if CLIENT then
+    local SHIELD_TEXTURE = "effects/combineshield/comshieldwall"
+    local shieldAvailable = not Material(SHIELD_TEXTURE):IsError()
+    local shieldMat = CreateMaterial("hg_hev_pulseshield", "UnlitGeneric", {
+        ["$basetexture"] = SHIELD_TEXTURE,
+        ["$model"] = 1,
+        ["$additive"] = 1,
+        ["$translucent"] = 1,
+        Proxies = {
+            TextureScroll = {
+                texturescrollvar = "$basetexturetransform",
+                texturescrollrate = 0.8,
+                texturescrollangle = 90
+            }
+        }
+    })
+    local SHIELD_POP_TIME = 0.06
+    local SHIELD_HOLD_TIME = 0.2
+    local SHIELD_FADE_TIME = 0.6
+
+    net.Receive("HEV_Shield", function()
+        local ent = net.ReadEntity()
+        if not IsValid(ent) then return end
+        local now = CurTime()
+        local age = now - (ent.HEVShieldStart or 0)
+        local active = age < SHIELD_POP_TIME + SHIELD_HOLD_TIME + SHIELD_FADE_TIME
+        ent.HEVShieldStart = active and now - math.min(age, SHIELD_POP_TIME) or now
+    end)
+
+    hook.Add("PostDrawAppearance", "HEV_ShieldField", function(ent)
+        if not shieldAvailable or not ent.HEVShieldStart then return end
+
+        local age = CurTime() - ent.HEVShieldStart
+        local fadeAge = age - SHIELD_POP_TIME - SHIELD_HOLD_TIME
+        if fadeAge >= SHIELD_FADE_TIME then
+            ent.HEVShieldStart = nil
+            return
+        end
+
+        local strength
+        if age < SHIELD_POP_TIME then
+            strength = age / SHIELD_POP_TIME
+        elseif fadeAge < 0 then
+            strength = math.Rand(0.75, 1)
+        else
+            strength = (1 - fadeAge / SHIELD_FADE_TIME) ^ 2
+        end
+
+        render.MaterialOverride(shieldMat)
+        render.SetColorModulation(strength, strength, strength)
+        ent:DrawModel()
+        if fadeAge < 0 then ent:DrawModel() end
+        render.SetColorModulation(1, 1, 1)
+        render.MaterialOverride()
+    end)
+
     local queen = {}
     net.Receive("HEV_DAMAGE",function()
         if not hg.HasHEVHelmet(lply) then return end

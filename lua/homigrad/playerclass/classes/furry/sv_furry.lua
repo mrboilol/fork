@@ -83,13 +83,6 @@ hook.Add("HomigradDamage","FurCrackHit",function(ply, dmgInfo, hitgroup, ent)
 	end
 end)
 
-local function GetUniversalScream()
-	local sounds = hg.UniversalScreamSounds
-	if !sounds or #sounds == 0 then return end
-
-	return sounds[math.random(#sounds)]
-end
-
 local uwuspeak_phrases = {
 	"zbattle/furry/cat_mrrp1.mp3",
 	"zbattle/furry/cat_mrrp1.mp3",
@@ -104,30 +97,8 @@ local uwuspeak_phrases = {
 
 hook.Add("HG_ReplacePhrase", "UwUPhrases", function(ply, phrase, muffed, pitch)
 	if IsValid(ply) and ply.PlayerClassName == "furry" then
-		local inpain = ply.organism.pain > 60
-		local phr = (inpain and GetUniversalScream() or uwuspeak_phrases[math.random(#uwuspeak_phrases)])
+		local phr = uwuspeak_phrases[math.random(#uwuspeak_phrases)]
 
 		return ply, phr, muffed, pitch
-	end
-end)
-
-hook.Add("HG_ReplaceBurnPhrase", "UwUBurnPhrases", function(ply, phrase)
-	if ply.PlayerClassName == "furry" then
-		return ply, GetUniversalScream()
-	end
-end)
-
-hook.Add("Org Think", "ItHurtsfrfr",function(owner, org, timeValue)
-	if owner.PlayerClassName != "furry" then return end
-
-	if (owner.lastPainSoundCD or 0) < CurTime() and !org.otrub and org.pain >= 30 and math.random(1, 50) == 1 then
-		local phrase = GetUniversalScream()
-
-		local muffed = owner.armors["face"] == "mask2"
-
-		owner:EmitSound(phrase, muffed and 65 or 75,owner.VoicePitch or 100,1,CHAN_AUTO,0, pitch and 56 or muffed and 16 or 0)
-
-		owner.lastPainSoundCD = CurTime() + math.Rand(10, 25)
-		owner.lastPhr = phrase
 	end
 end)

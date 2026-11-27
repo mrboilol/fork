@@ -70,12 +70,38 @@ if SERVER then
 	local AURA_DEPRESSION = 0.035
 	local AURA_ANGER = 0.08
 
+	local HIT_COOLDOWN = 1.8
+
+	local LIMB_RIP_DAMAGE = 45
+	local LIMB_RIP_CHANCE = 0.35
+
+	local CRY_RADIUS = 2500
+	local CRY_COOLDOWN_MIN = 18
+	local CRY_COOLDOWN_MAX = 35
+	local CRY_DEPRESSION_MIN = 0.08
+	local CRY_DEPRESSION_MAX = 0.25
+	local CRY_SHAKEN_CONDITION = 0.2
+	local CRY_DESPAIR_CALM = 0.15
+	local CRY_DESPAIR_MIN = 0.3
+	local CRY_DESPAIR_MAX = 0.65
+	local CRY_BLOOD_FINE = 4500
+	local CRY_BLOOD_BAD = 2500
+	local CRY_PAIN_BAD = 80
+	local CRY_LOSING_BAD = 25
+
+	util.AddNetworkString("kies/war-cry")
+
 	local function PickSlashZone(org)
 		local intact = {}
 		for _, zone in ipairs(SLASH_ZONES) do
-			if org and (org[zone.artery] or 0) < 1 and not (zone.limb and org[zone.limb .. "amputated"]) then
-				intact[#intact + 1] = zone
+			local usable
+			if zone.limb then
+				usable = org and not org[zone.limb .. "amputated"]
+			else
+				usable = org and (org[zone.artery] or 0) < 1
 			end
+
+			if usable then intact[#intact + 1] = zone end
 		end
 
 		local pool = #intact > 0 and intact or SLASH_ZONES
@@ -102,6 +128,25 @@ if SERVER then
 		}
 	end
 
+	local function TryRipLimb(org, limb, damage)
+		if org.superfighter or org[limb .. "amputated"] then return end
+
+		org.kiesSlashDamage = org.kiesSlashDamage or {}
+		local total = (org.kiesSlashDamage[limb] or 0) + damage
+		org.kiesSlashDamage[limb] = total
+
+		if total < LIMB_RIP_DAMAGE or math.Rand(0, 1) > LIMB_RIP_CHANCE * total / LIMB_RIP_DAMAGE then return end
+
+		org.kiesSlashDamage[limb] = nil
+		timer.Simple(0, function()
+			if IsValid(org.owner) then hg.organism.AmputateLimb(org, limb) end
+		end)
+	end
+
+	hook.Add("Org Clear", "kies/slash/reset-damage", function(org)
+		org.kiesSlashDamage = nil
+	end)
+
 	hook.Add("HomigradDamage", "kies/slash/cut-artery", function(victim, dmgInfo, hitgroup, ent)
 		local kies = dmgInfo:GetInflictor()
 		if not IsValid(kies) or kies:GetClass() ~= "npc_kies" then return end
@@ -109,11 +154,15 @@ if SERVER then
 		local zone = kies.SlashZone
 		local contact = kies.MeleeDamageContact
 		local org = victim.organism
-		if not zone or not contact or not org or (org[zone.artery] or 0) >= 1 then return end
+		if not zone or not contact or not org then return end
 
 		local armorPass = org.lastArmorMitigation
 		if zone.hitgroup == HITGROUP_HEAD then armorPass = org.lastHeadArmorMitigation end
-		if (armorPass or 1) < ARTERY_MIN_ARMOR_PASS or math.Rand(0, 1) > ARTERY_CUT_CHANCE then return end
+		armorPass = armorPass or 1
+		if armorPass < ARTERY_MIN_ARMOR_PASS then return end
+
+		if zone.limb then TryRipLimb(org, zone.limb, cv_damage:GetFloat() * armorPass) end
+		if (org[zone.artery] or 0) >= 1 or math.Rand(0, 1) > ARTERY_CUT_CHANCE then return end
 
 		hg.organism.input_list[zone.artery](org, 0, ARTERY_CUT_FORCE, dmgInfo, zone.bone,
 			contact.normal, contact.hitPos, nil, {entity = ent})
@@ -143,6 +192,47 @@ if SERVER then
 
 		hg.organism.AddPanicAttack(org, AURA_PANIC, false, false, true)
 		hg.organism.AddDepression(org, AURA_DEPRESSION, "fight")
+	end
+
+	local function CryCondition(org)
+		local dying = hg.organism.GetDyingLevel and hg.organism.GetDyingLevel(org) or 0
+		local bleeding = (CRY_BLOOD_FINE - (org.blood or CRY_BLOOD_FINE)) / (CRY_BLOOD_FINE - CRY_BLOOD_BAD)
+		local pain = (org.pain or 0) / CRY_PAIN_BAD
+		local losing = (org.hgLosing or 0) / CRY_LOSING_BAD
+
+		return math.Clamp(math.max(dying, bleeding, pain, losing, org.depression or 0), 0, 1)
+	end
+
+	local function HearWarCry(ply, org)
+		local condition = CryCondition(org)
+		local despair = CRY_DESPAIR_CALM
+		if condition >= CRY_SHAKEN_CONDITION then
+			despair = Lerp(condition, CRY_DESPAIR_MIN, CRY_DESPAIR_MAX)
+		end
+
+		hg.organism.AddDepression(org, Lerp(condition, CRY_DEPRESSION_MIN, CRY_DEPRESSION_MAX), "fight")
+		if hg.organism.ShockDespair then hg.organism.ShockDespair(ply, despair) end
+	end
+
+	function ENT:TryWarCry()
+		if CurTime() < (self.NextWarCry or 0) then return end
+		self.NextWarCry = CurTime() + math.Rand(CRY_COOLDOWN_MIN, CRY_COOLDOWN_MAX)
+
+		local origin = self:GetPos() + Vector(0, 0, SPRITE_H * 0.75)
+
+		net.Start("kies/war-cry")
+		net.WriteVector(origin)
+		net.Broadcast()
+
+		for _, ply in player.Iterator() do
+			local org = ply.organism
+			if not org or org.otrub or not ply:Alive() or ply:GetObserverMode() ~= OBS_MODE_NONE then continue end
+			if HoldsLoadedGun(ply) then continue end
+
+			local body = hg.GetCurrentCharacter(ply)
+			local pos = IsValid(body) and body:WorldSpaceCenter() or ply:WorldSpaceCenter()
+			if pos:DistToSqr(origin) <= CRY_RADIUS * CRY_RADIUS then HearWarCry(ply, org) end
+		end
 	end
 
 	timer.Create("kies/aura/apply", AURA_INTERVAL, 0, function()
@@ -243,7 +333,7 @@ if SERVER then
 		local range = cv_range:GetFloat()
 		if from:DistToSqr(to) > range * range then return end
 
-		self.NextAttack = CurTime() + cv_delay:GetFloat()
+		self.NextAttack = CurTime() + math.max(cv_delay:GetFloat(), HIT_COOLDOWN)
 
 		local dir = (to - from):GetNormalized()
 		local body = IsValid(character) and character or target
@@ -323,6 +413,7 @@ if SERVER then
 				self.loco:Approach(tpos, 1)
 			end
 
+			self:TryWarCry()
 			self:TryAttack(target)
 
 			if self.loco:IsStuck() then
@@ -423,7 +514,6 @@ else
 			Vector(SPRITE_H / 2, SPRITE_H / 2, SPRITE_H),
 			Vector(5, 5, 5)
 		)
-		self:KiesStartAudio()
 	end
 
 	function ENT:Draw() end
@@ -447,96 +537,25 @@ else
 	local cv_volume = CreateClientConVar("kies_volume", "1", true, false,
 		"Kies audio volume (0-1).")
 
-	local MIN_VOL_FRACTION = 0.2
-	local FULL_VOL_DIST    = 300
-	local FADE_OUT_DIST    = 3000
-
-	local channel = nil
-	local loading = false
-	local warned = false
+	local CRY_SOUND_LEVEL = 110
 
 	local function FindSoundFile()
-		local files = file.Find("sound/kies/*", "GAME")
-		for _, f in ipairs(files) do
+		for _, f in ipairs(file.Find("sound/kies/*", "GAME")) do
 			local ext = string.lower(string.GetExtensionFromFilename(f) or "")
 			if ext == "mp3" or ext == "wav" or ext == "ogg" then
-				return "sound/kies/" .. f
+				return "kies/" .. f
 			end
 		end
 	end
 
-	local function StartChannel()
-		if loading then return end
+	local crySound = FindSoundFile()
 
-		local path = FindSoundFile()
-		if not path then
-			if not warned then
-				warned = true
-				print("[kies_nextbot] No audio found. Put your sound file in addons/kies_nextbot/sound/kies/ (mp3, wav or ogg).")
-			end
-			return
-		end
+	net.Receive("kies/war-cry", function()
+		local origin = net.ReadVector()
+		if not crySound then return end
 
-		loading = true
-		sound.PlayFile(path, "noplay noblock", function(ch, errID, errName)
-			loading = false
-			if IsValid(ch) then
-				ch:EnableLooping(true)
-				ch:SetVolume(0)
-				ch:Play()
-				channel = ch
-			else
-				print("[kies_nextbot] Could not play " .. path .. " (" .. tostring(errName) .. ")")
-			end
-		end)
-	end
-
-	local function StopChannel()
-		if IsValid(channel) then
-			channel:Stop()
-		end
-		channel = nil
-	end
-
-	local function UpdateAudio()
-		local all = ents.FindByClass("npc_kies")
-		local ply = LocalPlayer()
-
-		if #all == 0 then
-			StopChannel()
-			timer.Remove("KiesAudioUpdate")
-			return
-		end
-
-		if not IsValid(ply) then return end
-
-		if not IsValid(channel) then
-			StartChannel()
-			return
-		end
-
-		local myPos = ply:GetPos()
-		local nearest = math.huge
-		for _, k in ipairs(all) do
-			if IsValid(k) then
-				nearest = math.min(nearest, myPos:Distance(k:GetPos()))
-			end
-		end
-
-		local t = math.Clamp((nearest - FULL_VOL_DIST) / (FADE_OUT_DIST - FULL_VOL_DIST), 0, 1)
-		local vol = Lerp(t, 1, MIN_VOL_FRACTION) * math.Clamp(cv_volume:GetFloat(), 0, 1)
-		channel:SetVolume(vol)
-
-		if channel:GetState() ~= GMOD_CHANNEL_PLAYING then
-			channel:Play()
-		end
-	end
-
-	function ENT:KiesStartAudio()
-		if not timer.Exists("KiesAudioUpdate") then
-			timer.Create("KiesAudioUpdate", 0.1, 0, UpdateAudio)
-		end
-	end
+		sound.Play(crySound, origin, CRY_SOUND_LEVEL, 100, math.Clamp(cv_volume:GetFloat(), 0, 1))
+	end)
 
 end
 

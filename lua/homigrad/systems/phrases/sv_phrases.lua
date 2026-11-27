@@ -291,19 +291,13 @@ net.Receive("hg_phrase", function(len, ply)
 		num = mRandom(1, 2)
 	end
 
-	local inpain = ply.organism.pain > 60
-	local phrase
-	if inpain then
-		phrase = hg.UniversalScreamSounds[mRandom(#hg.UniversalScreamSounds)]
-	else
-		local phr = phrases[math.Round(mClamp(gender, 1, 2))]
-		phr = phr[math.Round(mClamp(i, 1, #phr))]
-		if !phr then return end
+	local phr = phrases[math.Round(mClamp(gender, 1, 2))]
+	phr = phr[math.Round(mClamp(i, 1, #phr))]
+	if !phr then return end
 
-		local random = math.Round(mClamp(num, phr[3], phr[4]))
-		local huy = random < 10 and not phr[5] and "0" or ""
-		phrase = phr[1] .. huy .. random .. phr[2]
-	end
+	local random = math.Round(mClamp(num, phr[3], phr[4]))
+	local huy = random < 10 and not phr[5] and "0" or ""
+	local phrase = phr[1] .. huy .. random .. phr[2]
 	local ent = hg.GetCurrentCharacter(ply)
 	local muffed = false
 	local pitch = nil
@@ -345,7 +339,7 @@ net.Receive("hg_phrase", function(len, ply)
 		ent:EmitSound(phrase, muffed and 65 or 75,ply.VoicePitch or 100,1,CHAN_AUTO,0, pitch and 56 or muffed and 14 or 0)
 	end
 
-	if hg.ChatLog then hg.ChatLog.Emit(inpain and "scream" or "shout", ply) end
+	if hg.ChatLog then hg.ChatLog.Emit("shout", ply) end
 
 	if string.match( phrase, ".ogg" ) then // ogg doesn't return the right soundduration
 		ply.phrCld = CurTime() + 1
@@ -361,8 +355,9 @@ hook.Add("PlayerDeath", "StopPhrOnDeath",function(ply)
 
 	local org = ply.organism
 	if org then
-		org.painScreamQueue = 0
-		org.painScreamUntil = 0
+		org.painScreamBusyUntil = nil
+		org.painFadeYelled = nil
+		org.painWasBurning = nil
 	end
 end)
 
@@ -401,13 +396,11 @@ hg.UniversalScreamSounds = {
 	"screams/universal1/wilhelm_scream.mp3",
 }
 local painVoiceAgony = 60
-local painVoiceRush = 85
-local painNumbedRatio = 0.95
-local painRiseWindow = 0.4
-local painRiseAmount = 12
+local painPhraseLimit = 85
 local voiceGap = 0.35
 local voiceMaxDuration = 9
 local painBlinkDelay = 0.15
+local injuryScreamWindow = 1.2
 local breathSustain = 1
 
 local silentCombatClasses = {
@@ -416,9 +409,8 @@ local silentCombatClasses = {
 	swat = true,
 }
 
-local painBigSounds, agonyFemale, agonyMale, gaspFemale, gaspMale = {}, {}, {}, {}, {}
+local agonyFemale, agonyMale, gaspFemale, gaspMale = {}, {}, {}, {}
 for i = 1, 8 do
-	painBigSounds[i] = "rotten_agony/painb" .. i .. ".ogg"
 	agonyFemale[i] = "rotten_agony/agony_female" .. i .. ".ogg"
 end
 for i = 1, 7 do
@@ -462,17 +454,6 @@ function hg.StopPainScream(ply)
 	if hg.StopFallScream then hg.StopFallScream(ply) end
 end
 
-function hg.QueuePainScream(ply, amount)
-	if !canVoice(ply) then return end
-
-	amount = mClamp(amount or 0, 0, 2)
-	if amount <= 0 then return end
-
-	local org = ply.organism
-	org.painScreamQueue = mClamp((org.painScreamQueue or 0) + amount, 0, 3)
-	org.painScreamUntil = CurTime() + 8
-end
-
 local function voice(ply, phrase, level, mouth, kind)
 	local ent = hg.GetCurrentCharacter(ply)
 	if !IsValid(ent) or !file.Exists("sound/" .. phrase, "GAME") then return 0 end
@@ -502,6 +483,29 @@ local function voice(ply, phrase, level, mouth, kind)
 	end
 
 	return duration
+end
+
+local function injuryScream(ply, org)
+	if !canVoice(ply) or ply.organism != org or org.otrub or ply:WaterLevel() >= 3 then return end
+
+	local custom = customPhrase(ply)
+	if !custom then
+		net.Start("hg_pain_blink")
+		net.Send(ply)
+	end
+
+	voice(ply, custom or hg.UniversalScreamSounds[mRandom(#hg.UniversalScreamSounds)], 80, true, "scream")
+end
+
+function hg.QueuePainScream(ply)
+	if !canVoice(ply) then return end
+
+	local org = ply.organism
+	local now = CurTime()
+	if org.otrub or now < (org.painScreamBusyUntil or 0) then return end
+
+	org.painScreamBusyUntil = now + injuryScreamWindow
+	timer.Simple(painBlinkDelay, function() injuryScream(ply, org) end)
 end
 
 local function breathSounds(ply, org, now)
@@ -552,72 +556,22 @@ hook.Add("Org Think", "HG_PainVoice", function(ply, org)
 	end
 
 	local now = CurTime()
+	local ent = hg.GetCurrentCharacter(ply)
+	local burning = ply:IsOnFire() or (IsValid(ent) and ent:IsOnFire())
+	if burning and !org.painWasBurning then hg.QueuePainScream(ply) end
+	org.painWasBurning = burning
 
-	if (org.painScreamUntil or 0) < now then
-		org.painScreamQueue = 0
-	end
+	if !org.shockBlackout then org.painFadeYelled = nil end
 
 	if breathSounds(ply, org, now) then return end
 	if org.otrub or ply:WaterLevel() >= 3 then return end
+	if org.painFadeYelled or !org.shockBlackout or (org.pain or 0) < painVoiceAgony then return end
+	if now < (org.painScreamBusyUntil or 0) then return end
 
-	local pain = org.pain or 0
+	org.painFadeYelled = true
 
-	if now - (org.painRiseAt or 0) >= painRiseWindow then
-		if pain - (org.painRisePrev or pain) >= painRiseAmount then org.painRiseUntil = now + painRiseWindow end
-		org.painRisePrev = pain
-		org.painRiseAt = now
-	end
-
-	local spiking = pain >= painVoiceAgony and now < (org.painRiseUntil or 0)
-	local rush = pain >= painVoiceRush and spiking
-	local queued = (org.painScreamQueue or 0) >= 1
-	local ent = hg.GetCurrentCharacter(ply)
-	local burning = ply:IsOnFire() or (IsValid(ent) and ent:IsOnFire())
-	local blink = !burning and (queued or spiking) and now >= (org.painBlinkNext or 0) and now >= (org.painBlinkPending or 0)
-
-	if now < (org.voiceFreeAt or 0) or (now < (org.painVoiceNext or 0) and !(blink and rush)) then return end
-	if now < (ply.phrCld or 0) and !rush then return end
-
-	local rawPain = org.avgpain or 0
-	local numbed = !burning and rawPain >= painVoiceAgony and pain < painVoiceAgony and pain < rawPain * painNumbedRatio
-	local agony = pain >= painVoiceAgony or burning or numbed
-
-	if !blink and !agony then return end
-
-	local custom = customPhrase(ply)
-
-	if blink and !custom then
-		if queued then org.painScreamQueue = org.painScreamQueue - 1 end
-
-		org.painBlinkNext = now + math.Rand(2, 3.5)
-		org.painVoiceNext = now + painBlinkDelay + 0.6
-		org.painBlinkPending = now + painBlinkDelay
-
-		net.Start("hg_pain_blink")
-		net.Send(ply)
-
-		timer.Simple(painBlinkDelay, function()
-			if !canVoice(ply) or ply.organism != org or org.otrub or CurTime() < (org.voiceFreeAt or 0) then return end
-
-			local duration = voice(ply, hg.UniversalScreamSounds[mRandom(#hg.UniversalScreamSounds)], 80, true, "scream")
-			org.painVoiceNext = CurTime() + duration + 0.15
-		end)
-
-		return
-	end
-
-	if agony then
-		local phrases = ThatPlyIsFemale(ply) and agonyFemale or agonyMale
-		if numbed then phrases = painBigSounds end
-		local phrase = custom or phrases[mRandom(#phrases)]
-		local kind = numbed and "groan" or "painyell"
-		if burning and !custom and hg.GetFallScreamSound and mRandom(2) == 1 then
-			phrase = hg.GetFallScreamSound(ply) or phrase
-			kind = "scream"
-		end
-		local duration = voice(ply, phrase, 80, true, kind)
-		org.painVoiceNext = now + duration + math.Rand(2.5, 4)
-	end
+	local phrases = ThatPlyIsFemale(ply) and agonyFemale or agonyMale
+	voice(ply, customPhrase(ply) or phrases[mRandom(#phrases)], 80, true, "painyell")
 end)
 
 hook.Add("PreHomigradDamage","BurnScream", function( ent, dmgInfo )
@@ -695,7 +649,7 @@ hook.Add("HG_CanDoPhrase", "Pharse_Check", function(ply, cmd, args)
 	if org.o2[1] < 15 then return true end
 	if org.holdingbreath then return true end
 	if (org.voiceFreeAt or 0) > CurTime() then return true end
-	if (org.pain or 0) >= painVoiceRush then return true end
+	if (org.pain or 0) >= painPhraseLimit then return true end
 	--if ply.PlayerClassName and ply:GetPlayerClass() and !ply:GetPlayerClass().CanUseDefaultPhrase then return true end
 
 	if org.vomitInThroat then

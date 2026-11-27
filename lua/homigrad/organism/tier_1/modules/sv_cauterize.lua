@@ -67,7 +67,7 @@ function hg.organism.Cauterize(org, ent, hitPos, includeAll, applier)
 		end)
 	end
 
-	if hg.QueuePainScream then hg.QueuePainScream(owner, 2) end
+	if hg.QueuePainScream then hg.QueuePainScream(owner) end
 
 	if owner:IsPlayer() and owner:Alive() then
 		owner:Thought(cauterizeThoughts[math.random(#cauterizeThoughts)], 8, "cauterized", 1, Color(255, 120, 60, 255))

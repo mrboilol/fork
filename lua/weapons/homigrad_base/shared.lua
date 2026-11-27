@@ -1932,7 +1932,6 @@ function SWEP:CoreStep()
 
 	self:Step_Inspect(time)
 	self:Step_Reload(time)
-	self:Step_NPCWeaponState(time)
 	self:ClearAnims()
 	-- self:Animation(time)
 

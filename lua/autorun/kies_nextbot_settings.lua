@@ -12,7 +12,7 @@ CreateConVar("kies_health", SETTINGS.kies_health[1], FLAGS, "Kies health.")
 CreateConVar("kies_speed",  SETTINGS.kies_speed[1],  FLAGS, "Kies movement speed (GMod walk speed is 200).")
 CreateConVar("kies_damage", SETTINGS.kies_damage[1], FLAGS, "Damage Kies deals per hit.")
 CreateConVar("kies_attack_range",     70,    FLAGS, "How close Kies must be to hit you.")
-CreateConVar("kies_attack_delay",     0.6,   FLAGS, "Seconds between Kies hits.")
+CreateConVar("kies_attack_delay",     1.8,   FLAGS, "Seconds between Kies hits.")
 CreateConVar("kies_acquire_distance", 10000, FLAGS, "Max distance Kies will chase a player from.")
 
 if SERVER then

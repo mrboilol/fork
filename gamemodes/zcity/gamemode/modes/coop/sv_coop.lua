@@ -120,6 +120,8 @@ MODE.LootTable = {
 }
 
 -- Rebel (civilian) loot: melee + light armor only, weapons stay rare.
+hg.AppendLootPool(MODE.LootTable[1][2], hg.LootPools.TraumaSupplies, 1)
+hg.AppendLootPool(MODE.LootTable[2][2], hg.LootPools.TraumaSupplies, 2)
 hg.AppendLootPool(MODE.LootTable[1][2], hg.LootPools.MeleeCommon, 1)
 hg.AppendLootPool(MODE.LootTable[1][2], hg.LootPools.MeleeRare, 0.6)
 hg.AppendLootPool(MODE.LootTable[1][2], hg.LootPools.Sidearms, 0.5)
