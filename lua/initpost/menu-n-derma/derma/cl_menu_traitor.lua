@@ -646,7 +646,7 @@ end
 
 local function SyncLoadoutToServer(name, json)
     if not isstring(json) or json == "" or #json > 4096 then return end
-    if not IsValid(LocalPlayer()) then return end
+    if not IsValid(LocalPlayer()) or util.NetworkStringToID("hmcd_loadout_sync") == 0 then return end
     net.Start("hmcd_loadout_sync")
     net.WriteString(name)
     net.WriteString(json)
@@ -663,7 +663,7 @@ local function SyncAllLoadouts()
         local cv = GetConVar("zcity_arena_loadout")
         raw = cv and cv:GetString()
     end
-    if isstring(raw) and raw ~= "" and #raw <= 4096 and IsValid(LocalPlayer()) then
+    if isstring(raw) and raw ~= "" and #raw <= 4096 and IsValid(LocalPlayer()) and util.NetworkStringToID("arena_loadout_sync") ~= 0 then
         net.Start("arena_loadout_sync")
         net.WriteString(raw)
         net.SendToServer()
@@ -1685,7 +1685,7 @@ local function SaveArenaLoadout()
 	local json = util.TableToJSON(ArenaLoadout) or "{\"weapons\":[],\"attachments\":{},\"armor\":[],\"medical\":[]}"
 	file.Write("zcity_arena_loadout.txt", json)
     GetConVar("zcity_arena_loadout"):SetString(json)
-    if IsValid(LocalPlayer()) and #json <= 4096 then
+    if IsValid(LocalPlayer()) and #json <= 4096 and util.NetworkStringToID("arena_loadout_sync") ~= 0 then
         net.Start("arena_loadout_sync")
         net.WriteString(json)
         net.SendToServer()

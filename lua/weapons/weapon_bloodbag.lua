@@ -172,8 +172,7 @@ if SERVER then
 
 		if (org.blood or 0) <= 0 then return end
 
-		local drained = math.min(FrameTime() * math.max((org.pulse or 70) / 70, 0.3) * 250, org.blood)
-		org.blood = org.blood - drained
+		local drained = hg.organism.DrainBlood(org, FrameTime() * math.max((org.pulse or 70) / 70, 0.3) * 250)
 
 		local victim = hg.RagdollOwner(ent) or ent
 		self.drainedFrom = self.drainedFrom or {}
@@ -271,7 +270,7 @@ if SERVER then
 							self.poisoned2 = nil
 						end
 						
-						ent.organism.blood = math.max(ent.organism.blood - (self.modeValues[1] - old) * self.BagVolume,0)
+						hg.organism.DrainBlood(ent.organism, (self.modeValues[1] - old) * self.BagVolume)
 						if old ~= self.modeValues[1] and (self.nextPerfusionRefresh or 0) < CurTime() then
 							self.nextPerfusionRefresh = CurTime() + 0.25
 							self:RefreshPerfusionTreatment(ent, 0.18)

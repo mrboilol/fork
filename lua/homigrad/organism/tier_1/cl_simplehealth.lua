@@ -9,7 +9,6 @@ local OXY_EFFECT_FULL = 250
 local EFFECT_MIN = 0.005
 local FACE_BOX_COLOR = Color(25, 25, 35, 240)
 local FACE_OUTLINE_COLOR = Color(255, 255, 255, 255)
-local FACE_TEXT_COLOR = Color(255, 255, 255, 255)
 local FACE_PADDING = 0.16
 
 
@@ -237,45 +236,6 @@ function SimpleHealth.IsFurryFace(ply)
 	return IsValid(ply) and ply.PlayerClassName == "furry"
 end
 
-local faceTextFonts = {}
-
-local function getFaceTextFont(px)
-	if not faceTextFonts[px] then
-		local name = "HG_SimpleHealthFace" .. px
-		surface.CreateFont(name, {font = "VCR OSD Mono", size = px, weight = 700, antialias = true, extended = true})
-		faceTextFonts[px] = name
-	end
-
-	return faceTextFonts[px]
-end
-
-local function wrapFaceTitle(text, maxWidth)
-	local lines, line = {}, ""
-	for word in string.gmatch(text, "%S+") do
-		local candidate = line == "" and word or line .. " " .. word
-		if line ~= "" and surface.GetTextSize(candidate) > maxWidth then
-			lines[#lines + 1] = line
-			line = word
-		else
-			line = candidate
-		end
-	end
-	if line ~= "" then lines[#lines + 1] = line end
-
-	return lines
-end
-
-local function drawFaceTitle(x, y, size, title)
-	local font = getFaceTextFont(math.max(8, math.floor(size / 5.5)))
-	surface.SetFont(font)
-	local lines = wrapFaceTitle(title, size)
-	local _, lineHeight = surface.GetTextSize("A")
-	local top = y + size * 0.5 - #lines * lineHeight * 0.5
-	for index, line in ipairs(lines) do
-		draw.SimpleText(line, font, x + size * 0.5, top + (index - 1) * lineHeight, FACE_TEXT_COLOR, TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
-	end
-end
-
 local function playOuchie(path, pitch, volume)
 	sound.PlayFile("sound/" .. path, "noplay noblock", function(station)
 		if not IsValid(station) then return end
@@ -400,8 +360,8 @@ end
 local deathDelay = {active = false, wasAlive = false, aliveMode = 0}
 
 local function nildoy()
-	if not IsValid(lply) then return end
-	if SimpleHealth.NilguyMoodle:GetBool() and HGCustomMoodlesActive and not (hg.MoodleBase and hg.MoodleBase.Enabled()) and hg.MoodlesEnabled() and not SimpleHealth.IsFurryFace(lply) then return end
+	if not IsValid(lply) or SimpleHealth.IsFurryFace(lply) then return end
+	if SimpleHealth.NilguyMoodle:GetBool() and HGCustomMoodlesActive and not (hg.MoodleBase and hg.MoodleBase.Enabled()) and hg.MoodlesEnabled() then return end
 	if GetConVar("hg_hidenilguy"):GetBool() then return end
 
 	local alive = lply:Alive()
@@ -409,7 +369,7 @@ local function nildoy()
 	if alive then
 		if not state then return end
 		local org = lply.organism
-		if org and org.otrub and not SimpleHealth.IsFurryFace(lply) then return end
+		if org and org.otrub then return end
 	elseif deathDelay.aliveMode <= 0 then
 		return
 	end
@@ -436,15 +396,11 @@ local function nildoy()
 	local inner = size - padding * 2
 	local innerX, innerY = x + padding + math.floor(shakeX), y + padding + math.floor(shakeY)
 
-	if SimpleHealth.IsFurryFace(lply) then
-		drawFaceTitle(innerX, innerY, inner, SimpleHealth.FaceTitles[key])
-	else
-		local material = getFaceMaterial(alive and isFacePale() and key .. "_pale" or key)
-		if material then
-			surface.SetDrawColor(255, 255, 255, 255)
-			surface.SetMaterial(material)
-			surface.DrawTexturedRect(innerX, innerY, inner, inner)
-		end
+	local material = getFaceMaterial(alive and isFacePale() and key .. "_pale" or key)
+	if material then
+		surface.SetDrawColor(255, 255, 255, 255)
+		surface.SetMaterial(material)
+		surface.DrawTexturedRect(innerX, innerY, inner, inner)
 	end
 
 	if alive and hg.DrawNilguyTooltip then hg.DrawNilguyTooltip(x, y, size) end

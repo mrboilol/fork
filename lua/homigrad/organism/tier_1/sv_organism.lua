@@ -2083,6 +2083,7 @@ hook.Add("Org Think", "regenerationberserk", function(owner, org, timeValue)
 	org.fibrillation = false
 	org.arrhythmia = 0
 	org.heartStrain = math.max((org.heartStrain or 0) - regen, 0)
+	hg.organism.RageClearConditions(org, timeValue)
 	owner:SetRunSpeed(math.min(500, 400 + (25 * org.berserk)))
 end)
 hook.Add("Org Think", "regenerationnoradrenaline", function(owner, org, timeValue)

@@ -183,6 +183,31 @@ function hg.organism.TransfuseBlood(org, ml, bagPh, bagBacteria)
 	org.citrate = min((tonumber(org.citrate) or 0) + ml * CONFIG.citratePerMl, CONFIG.citrateMax)
 end
 
+local DRAIN_WASHOUT = {
+	bicarb = CONFIG.normalBicarb,
+	lactaid = CONFIG.lactateNormal,
+	citrate = 0,
+	hypocapniaComp = 0,
+	hepaticToxin = 0,
+	myoglobin = 0,
+	rhabdoAcid = 0,
+	hyperkalemia = 0,
+}
+
+function hg.organism.DrainBlood(org, ml)
+	local blood = max(tonumber(org.blood) or 0, 0)
+	local drained = Clamp(tonumber(ml) or 0, 0, blood)
+	org.blood = blood - drained
+	if org.simpleMode or drained <= 0 then return drained end
+
+	local kept = 1 - drained / blood
+	for key, normal in pairs(DRAIN_WASHOUT) do
+		org[key] = normal + ((tonumber(org[key]) or normal) - normal) * kept
+	end
+
+	return drained
+end
+
 local function updateSepsisOutputs(org)
 	local severity = Clamp(tonumber(org.hemotransfusionshock) or 0, 0, 2)
 	local shock = Clamp((severity - CONFIG.septicShockStart) / CONFIG.septicShockRange, 0, 1)
@@ -379,6 +404,35 @@ function hg.organism.UpdateMetabolicShock(owner, org, mulTime)
 
 	updateTerminalCascade(org, mulTime, shock, acidosis, hepatic, toxin, renal)
 	emitThoughts(owner, org)
+end
+
+local RAGE_CLEARS = {
+	myoglobin = 2,
+	rhabdo = 1,
+	rhabdoAcid = 6,
+	hyperkalemia = 1,
+	hepaticFailure = 1,
+	hepaticToxin = 1,
+	multiOrganFailure = 1,
+	citrate = CONFIG.citrateMax,
+	hemotransfusionshock = 2,
+	sepsisSource = 1,
+	infection = 1,
+	pneumonia = 1,
+	lungWater = 1,
+	clotBurden = 1,
+	pulmonaryEmbolism = 1,
+	aneurysm = 1,
+}
+
+function hg.organism.RageClearConditions(org, mulTime)
+	local rate = mulTime / 20 * max(tonumber(org.berserk) or 0, 1)
+	for key, range in pairs(RAGE_CLEARS) do
+		org[key] = Approach(tonumber(org[key]) or 0, 0, rate * range)
+	end
+	org.rhabdoTime = 0
+	org.bicarb = Approach(tonumber(org.bicarb) or CONFIG.normalBicarb, CONFIG.normalBicarb, rate * 20)
+	org.lactaid = Approach(tonumber(org.lactaid) or CONFIG.lactateNormal, CONFIG.lactateNormal, rate * 20)
 end
 
 function hg.organism.UpdateSystemic(owner, org, mulTime, adrenalineStabilizer)

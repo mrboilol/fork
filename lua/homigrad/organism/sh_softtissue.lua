@@ -118,7 +118,7 @@ SoftTissue.Config = {
 		minDelta = 0.04,
 		perDamage = 45,
 		fracture = 30,
-		muscleOnFracture = 0.2,
+		limbScale = {head = 0.35, torso = 0.4},
 	},
 
 	fallLanding = {

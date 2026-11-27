@@ -5,13 +5,12 @@ local Rhabdo = hg.organism.Rhabdo
 
 Rhabdo.Config = {
 	musclePerUnit = 0.6,
-	tissuePerPoint = 0.003,
+	tissuePerMuscle = 100,
 	leakPerMuscle = 0.0015,
 	leakStart = 0.25,
 	myoglobinMax = 2,
 
 	brokenMuscle = 0.75,
-	brokenTissue = 80,
 	brokenBurst = 0.25,
 	brokenPain = 35,
 	brokenShock = 4,
@@ -60,9 +59,9 @@ function Rhabdo.Init(org)
 	org.rhabdoNotified = nil
 end
 
-local function limbTissue(org, limb)
+local function limbStrain(org, limb)
 	local soft = hg.SoftTissue
-	return soft.Get(org, "brute", limb) + soft.Get(org, "burn", limb) + soft.GetDeep(org, "brute", limb) + soft.GetDeep(org, "burn", limb)
+	return min(max(soft.GetMuscle(org, limb), soft.GetLimb(org, limb) / CONFIG.tissuePerMuscle), 1)
 end
 
 local function notify(owner, org, list, id)
@@ -77,16 +76,15 @@ local function releaseFromTissue(owner, org)
 
 	local release, load = 0, 0
 	for _, limb in ipairs(hg.SoftTissue.LIMBS) do
-		local muscle = hg.SoftTissue.GetMuscle(org, limb)
-		local tissue = limbTissue(org, limb)
-		local last = prev[limb]
+		local strain = limbStrain(org, limb)
+		local last = tonumber(prev[limb])
 		if last then
-			release = release + max(muscle - last[1], 0) * CONFIG.musclePerUnit + max(tissue - last[2], 0) * CONFIG.tissuePerPoint
+			release = release + max(strain - last, 0) * CONFIG.musclePerUnit
 		end
-		prev[limb] = {muscle, tissue}
-		load = load + max(muscle - CONFIG.leakStart, 0)
+		prev[limb] = strain
+		load = load + max(strain - CONFIG.leakStart, 0)
 
-		local isBroken = muscle >= CONFIG.brokenMuscle or tissue >= CONFIG.brokenTissue
+		local isBroken = strain >= CONFIG.brokenMuscle
 		if isBroken and not broken[limb] and last then
 			release = release + CONFIG.brokenBurst
 			org.painadd = (org.painadd or 0) + CONFIG.brokenPain

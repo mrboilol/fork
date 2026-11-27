@@ -242,6 +242,16 @@ SimpleHealth.Config = {
 		cprToxinClear = 0.15,
 		sedativeGain = 1,
 		lungGain = 1.5,
+		bradypneaStart = 0.15,
+		bradypneaFull = 0.85,
+		bradypneaPool = 125,
+		bradypneaGain = 2,
+	},
+
+	internalBleed = {
+		min = 0.1,
+		drainPerSeverity = 0.35,
+		regenMul = 0.1,
 	},
 
 	toxin = {

@@ -60,7 +60,62 @@ hg.organism.PainConfig = {
 		fullOver = 30,
 		wakeFraction = 0.65,
 	},
+	immobilization = {
+		hitCap = 30,
+		pain = {followRate = 6, threshold = 20, scale = 0.5},
+		shock = {followRate = 8, threshold = 15, scale = 0.6},
+		concussion = {minIntensity = 0.2, chancePerIntensity = 0.35, maxChance = 0.75, min = 8, max = 16, scale = 4},
+		hit = {minDamage = 8, chanceRange = 60, maxChance = 0.35, min = 6, max = 16},
+	},
 }
+
+function hg.organism.AddImmobilization(org, amount)
+	if org.superfighter then return end
+
+	local current = tonumber(org.immobilization) or 0
+	org.immobilization = max(current, min(current + amount, hg.organism.PainConfig.immobilization.hitCap))
+end
+
+function hg.organism.RollConcussionImmobilization(org, intensity)
+	local config = hg.organism.PainConfig.immobilization.concussion
+	if intensity < config.minIntensity then return end
+	if math.random() >= min(intensity * config.chancePerIntensity, config.maxChance) then return end
+
+	hg.organism.AddImmobilization(org, math.Rand(config.min, config.max) + intensity * config.scale)
+end
+
+function hg.organism.RollHitImmobilization(org, damage, multiplier)
+	local config = hg.organism.PainConfig.immobilization.hit
+	local chance = min((damage - config.minDamage) / config.chanceRange, config.maxChance)
+	if math.random() >= chance then return end
+
+	local resistance = max(org.traumaResistanceMul or 1, 1)
+	hg.organism.AddImmobilization(org, math.Rand(config.min, config.max) * multiplier / resistance)
+end
+
+local function applySpikeImmobilization(org, key, value, config, timeValue)
+	local baseline = min((org[key] or value) + config.followRate * timeValue, value)
+	local rise = value - baseline
+	if rise < config.threshold then
+		org[key] = baseline
+		return
+	end
+
+	org[key] = value
+	hg.organism.AddImmobilization(org, rise * config.scale)
+end
+
+local function updateSpikeImmobilization(org, timeValue)
+	local config = hg.organism.PainConfig.immobilization
+	if org.otrub then
+		org.painSpikeBase = org.rawPain
+		org.shockSpikeBase = org.shock
+		return
+	end
+
+	applySpikeImmobilization(org, "painSpikeBase", org.pain, config.pain, timeValue)
+	applySpikeImmobilization(org, "shockSpikeBase", org.shock, config.shock, timeValue)
+end
 
 function hg.organism.GetPainStage(pain)
 	local stages = hg.organism.PainConfig.stages
@@ -170,6 +225,8 @@ module[1] = function(org)
 	org.naloxoneadd = 0
 
 	org.immobilization = 0
+	org.painSpikeBase = nil
+	org.shockSpikeBase = nil
 
 	org.painlessen = 0
 	org.adrenalinePainStart = nil
@@ -470,6 +527,8 @@ module[2] = function(owner, org, timeValue)
 	elseif spine2Broken then
 		org.painadd = 0
 	end
+
+	updateSpikeImmobilization(org, timeValue)
 
 	if org.otrub then
 		local queueDrain = timeValue * pain_drain_base * pain_drain_otrub_mul * analgesiaMul

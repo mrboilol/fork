@@ -891,6 +891,7 @@ elseif SERVER then
         local lungs = math.max(istable(org.lungsL) and (org.lungsL[1] or 0) or 0, istable(org.lungsR) and (org.lungsR[1] or 0) or 0)
         if (org.heart or 0) > 0.3 or (org.brain or 0) > 0.25 or (org.trachea or 0) > 0.4 or lungs > 0.5 then return true end
         if (org.internalBleed or 0) > 1 or (org.blood or 5000) < 3200 or (org.liver or 0) > 0.6 then return true end
+        if not org.simpleMode and ((org.hemotransfusionshock or 0) > 0.6 or (org.myoglobin or 0) > 0.6) then return true end
         for _, wound in ipairs(org.arterialwounds or {}) do
             if (wound[1] or 0) > 0.05 then return true end
         end

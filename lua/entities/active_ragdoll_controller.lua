@@ -17,6 +17,10 @@ local timer = timer
 local RAD2DEG = 180 / math_pi
 local MAX_ANGULAR_VEL = 400 
 local MAX_ANGULAR_SQR = MAX_ANGULAR_VEL * MAX_ANGULAR_VEL
+local DAMPING_RATIO = 0.85
+local DAMP_MIN = 0.15
+local DAMP_MAX = 0.5
+local math_sqrt = math.sqrt
 
 local vec_buffer = Vector(0, 0, 0)
 
@@ -390,7 +394,7 @@ function ENT:PhysicsSimulate(phys, dt)
         currentVel = phys:GetAngleVelocity()
     end)
     
-    currentVel:Mul(0.15)
+    currentVel:Mul(math_clamp(DAMPING_RATIO * 2 * math_sqrt(strength / 66), DAMP_MIN, DAMP_MAX))
     angVel:Sub(currentVel)
 
     local magSqr = angVel:LengthSqr()

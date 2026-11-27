@@ -562,6 +562,7 @@ function module.AddConcussion(org, intensity, duration)
 
     org.concussion_lastImpact = now
     org.concussion_impacts = org.concussion_impacts + 1
+    hg.organism.RollConcussionImmobilization(org, add)
 
     org.headHitBuildup = (org.headHitBuildup or 0) * math.exp(-sinceLast / HEAD_KO_BUILDUP_DECAY) + add
     if org.alive and not org.otrub and not org.needotrub then

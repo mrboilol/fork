@@ -323,9 +323,10 @@ local function Trace_Bullet(box, hit, ricochet, impact, org, organs, dmg, dmgInf
 	if not organ then return 0 end
 	local name = organ[1]
 	if not name then return 0 end
+	local armorContact = string.find(name, "vest", 1, true) or string.find(name, "helmet", 1, true) or string.find(name, "armor", 1, true) or string.find(name, "visor", 1, true)
+	if impact.tissueOnly and not (armorContact or string.find(name, "mask", 1, true)) then return 0 end
 	if impact.ballisticVersion then
 		local energyFraction = math.Clamp(impact.energyBefore / impact.initialEnergy, 0, 1)
-		local armorContact = string.find(name, "vest", 1, true) or string.find(name, "helmet", 1, true) or string.find(name, "armor", 1, true) or string.find(name, "visor", 1, true)
 		local expansionTrauma = not armorContact and (impact.expansionTrauma or 0) or 0
 		local organDamageMul = impact.tissueDamage * (1 + impact.temporaryCavity * 0.35 + expansionTrauma * 0.5)
 		organDamageMul = organDamageMul * (impact.contactDamageMul or 1)
@@ -1852,6 +1853,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		ballisticVersion = isBallistic and 1 or nil,
 		pierceSoftArmor = isBallistic and hg.BulletPiercesSoftArmor(dmgInfo, bullet) or nil,
 		entity = ent,
+		tissueOnly = IsValid(inf) and inf.TissueOnlyDamage,
 		bullet = bullet,
 		rawDamage = dmg_before,
 		rawDamageType = dmgInfo:GetDamageType(),
@@ -2229,7 +2231,10 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 			hg.organism.AddTraumaticShock(org, meleeContact.trauma or dmg_before, IsValid(inf) and inf.TraumaShockMultiplier or nil)
 		end
 		org.shock = math.min(org.shock + instaPain * shockMul * 4.5 * K.instant_pain_shock_scale * math.Clamp(pen / 5,1,2) * hypoxiaShockMultiplier(org) / (1 + math.max(org.adrenaline or 0, 0) * 0.45), 70)
-		org.immobilization = math.min(org.immobilization + immobilization * immobilizationMul, 30)
+		hg.organism.AddImmobilization(org, immobilization * immobilizationMul)
+		if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_SLASH + DMG_CLUB + DMG_CRUSH + DMG_BLAST + DMG_FALL + DMG_VEHICLE) then
+			hg.organism.RollHitImmobilization(org, dmg_before, immobilizationMul * armMit)
+		end
 		org.lasthit = CurTime()
 		hg.SendDamageFlash(org.owner, math.Clamp(dmg_before / 45, 0.12, 0.7), dmgInfo)
 		

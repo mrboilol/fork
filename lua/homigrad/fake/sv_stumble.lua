@@ -953,11 +953,20 @@ local function removeReaction(ragdoll)
 	if rs and IsValid(rs.ent) then rs.ent:Remove() end
 end
 
+local function bindReactBones(rs, mode, org)
+	local bones, strength = reactBones(mode, org, rs.ragdoll)
+	rs.ent:SetBoneList(bones)
+	rs.ent:SetBoneStrength(strength)
+	rs.limbKey = limbKey(org, rs.ragdoll)
+	rs.held = nil
+end
+
 local function setReactMode(rs, modeName, org)
 	if rs.mode == modeName then return end
 
 	if not modeName then
 		rs.mode = nil
+		rs.weight = 0
 		rs.idleSince = CurTime()
 		rs.ent:SetControllerEnabled(false)
 		return
@@ -967,18 +976,15 @@ local function setReactMode(rs, modeName, org)
 	local seq = rs.ent:LookupSequence(mode.sequences[math.random(#mode.sequences)])
 	if not seq or seq == -1 then return end
 
-	local bones, strength = reactBones(mode, org, rs.ragdoll)
-	rs.ent:SetBoneList(bones)
-	rs.ent:SetBoneStrength(strength)
-	rs.ent:SetReactionStrength(mode.strength * vigor(org))
-	rs.limbKey = limbKey(org, rs.ragdoll)
+	if rs.mode then rs.weight = math.min(rs.weight, K.REACT_SWITCH_WEIGHT) end
+	bindReactBones(rs, mode, org)
+	rs.ent:SetReactionStrength(mode.strength * vigor(org) * rs.weight)
 	rs.ent:ResetSequence(seq)
 	rs.ent:SetPlaybackRate(mode.rate)
 	rs.ent:SetCycle(0)
 
 	rs.mode = modeName
 	rs.localInv = nil
-	rs.held = false
 	rs.alignAfter = CurTime()
 end
 
@@ -1082,6 +1088,7 @@ local function updateReaction(ply, ragdoll)
 			pelvis = pelvis,
 			pelvisBone = ctrl:LookupBone("ValveBiped.Bip01_Pelvis"),
 			idleSince = CurTime(),
+			weight = 0,
 		}
 		reacting[ragdoll] = rs
 	end
@@ -1091,27 +1098,43 @@ local function updateReaction(ply, ragdoll)
 		return
 	end
 
+	local now = CurTime()
+	local dt = now - (rs.lastUpdate or now)
+	rs.lastUpdate = now
+	if rs.mode then
+		if modeName then
+			rs.weight = math.min(rs.weight + dt / K.REACT_BLEND_IN, 1)
+		else
+			rs.weight = math.max(rs.weight - dt / K.REACT_BLEND_OUT, 0)
+		end
+	end
+
 	local org = ply.organism
-	if rs.mode and rs.limbKey ~= limbKey(org, ragdoll) then rs.mode = "stale" end
-	setReactMode(rs, modeName, org)
+	if K.REACT_MODES[rs.mode] and rs.limbKey ~= limbKey(org, ragdoll) then
+		bindReactBones(rs, K.REACT_MODES[rs.mode], org)
+	end
+	if modeName or rs.weight <= 0 then setReactMode(rs, modeName, org) end
 
 	if not rs.mode then
-		if CurTime() - rs.idleSince > K.REACT_IDLE_REMOVE then removeReaction(ragdoll) end
+		if now - rs.idleSince > K.REACT_IDLE_REMOVE then removeReaction(ragdoll) end
 		return
 	end
 
 	local mode = K.REACT_MODES[rs.mode]
 	if not mode then return end
-	local strength = mode.strength * vigor(org)
-	if rs.mode == "stumble" then
+	if rs.mode == modeName or not rs.baseStrength then
+		local strength = mode.strength * vigor(org)
 		local st = stumbling[ragdoll]
-		strength = strength * (1 - 0.8 * math.Clamp((CurTime() - st.startTime) / stumbleLifetime(st), 0, 1))
-	elseif rs.mode == "writhe" then
-		local drive, body = writheDrive(ply, org)
-		strength = mode.strength * drive
-		updateWrithe(ply, ragdoll, rs, org, body)
+		if rs.mode == "stumble" and st then
+			strength = strength * (1 - 0.8 * math.Clamp((now - st.startTime) / stumbleLifetime(st), 0, 1))
+		elseif rs.mode == "writhe" then
+			local drive, body = writheDrive(ply, org)
+			strength = mode.strength * drive
+			if modeName == "writhe" then updateWrithe(ply, ragdoll, rs, org, body) end
+		end
+		rs.baseStrength = strength
 	end
-	rs.ent:SetReactionStrength(strength)
+	rs.ent:SetReactionStrength(rs.baseStrength * rs.weight)
 
 	local held = (ragdoll.HGFallCoverActive or (ragdoll.hgBraceUntil or 0) > CurTime()) and true or false
 	if held ~= rs.held then
@@ -1595,7 +1618,7 @@ local function startDeathThroes(ragdoll, org)
 	local bones, strength = reactBones(mode, org, ragdoll)
 	ctrl:SetBoneList(bones)
 	ctrl:SetBoneStrength(strength)
-	ctrl:SetReactionStrength(K.DEATH_STRENGTH * deathDrive(org))
+	ctrl:SetReactionStrength(0)
 	ctrl:ResetSequence(seq)
 	ctrl:SetPlaybackRate(mode.rate)
 	ctrl:SetCycle(0)
@@ -1617,13 +1640,14 @@ local function updateDying(ragdoll, ds)
 		return
 	end
 
-	local frac = (CurTime() - ds.startTime) / K.DEATH_TIME
+	local t = CurTime() - ds.startTime
+	local frac = t / K.DEATH_TIME
 	if frac >= 1 then
 		removeDying(ragdoll)
 		return
 	end
 
-	ds.ent:SetReactionStrength(ds.strength * (1 - frac) ^ K.DEATH_FADE_POW)
+	ds.ent:SetReactionStrength(ds.strength * (1 - frac) ^ K.DEATH_FADE_POW * math.min(t / K.REACT_BLEND_IN, 1))
 	alignController(ds, ds.pelvis)
 end
 

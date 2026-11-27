@@ -355,15 +355,9 @@ local function applyBoneTrauma(org, name, before)
 
 	local limb = CONFIG.boneLimbs[name] or string.sub(name, 1, 4)
 	local amount = delta * trauma.perDamage
-	local fractured = before < 1 and after >= 1
-	if fractured then amount = amount + trauma.fracture end
+	if before < 1 and after >= 1 then amount = amount + trauma.fracture end
 
-	SoftTissue.Add(org, "brute", limb, amount)
-
-	local muscleConfig = CONFIG.muscle
-	if fractured and muscleConfig.limbs[limb] then
-		org.muscle[limb] = math.min(org.muscle[limb] + trauma.muscleOnFracture, muscleConfig.max)
-	end
+	hg.SimpleHealth.AddDamage(org, "brute", amount * (trauma.limbScale[limb] or 1), limb)
 end
 
 SoftTissue.InputWrappers = SoftTissue.InputWrappers or {}
@@ -397,7 +391,7 @@ local function wrapInput(inputList, name)
 
 		dmg = dmg * SoftTissue.GetAccessMul(org, name)
 
-		if not boneField or org.simpleMode then return original(org, bone, dmg, dmgInfo, ...) end
+		if not boneField or not org.simpleMode then return original(org, bone, dmg, dmgInfo, ...) end
 
 		local before = tonumber(org[boneField])
 		local results = {original(org, bone, dmg, dmgInfo, ...)}

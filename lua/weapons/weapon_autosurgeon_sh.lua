@@ -93,6 +93,8 @@ SWEP.Config = {
     BleedHeal = 3,
     InternalBleedHeal = 1.2,
     BloodRestore = 100,
+    ExchangeMl = 75,
+    ExchangeSepsisMl = 600,
     OxygenRecovery = 0.20,
     ModeMinTicks = 3,
     ModeClearTicks = 3,
@@ -147,13 +149,23 @@ local ComplexReliefFields = {
     "neckBrainOxygenPenalty", "arterialO2Impairment", "throatCutPressureShock"
 }
 
--- Generic mode reconstructs bones and non-vital abdominal organs.  Keep these
--- separate from ComplexFields so a patient is re-evaluated between the two
--- passes instead of treating every injury as critical surgery.
 local SimpleFields = {
     "jaw", "pelvis", "lleg", "rleg", "larm", "rarm", "spine1", "spine2", "spine3",
-    "eyeL", "eyeR", "headtrauma", "pneumothorax", "liver", "gut"
+    "eyeL", "eyeR", "headtrauma", "pneumothorax", "liver", "gut", "flank"
 }
+
+local SystemicLimits = {
+    hemotransfusionshock = 0.02,
+    sepsisSource = 0.02,
+    infection = 0.05,
+    pneumonia = 0.1,
+    myoglobin = 0.15,
+    hepaticToxin = 0.15
+}
+
+local SystemicBicarbFloor = 19
+
+local SystemicReliefFields = {"hepaticFailure", "multiOrganFailure"}
 
 local RecoveryFields = {
     "painadd", "avgpain", "shock", "concussion", "stamina_damage", "ischemia", "seizure",
@@ -359,10 +371,23 @@ local function HasDeliveryDeficit(org)
     return false
 end
 
+local function GetBloodCapacity(org)
+    return math.max(tonumber(org.maxblood) or 5000, 1)
+end
+
+local function HasSystemicWork(org)
+    if org.simpleMode then return false end
+    for key, limit in pairs(SystemicLimits) do
+        if (tonumber(org[key]) or 0) > limit then return true end
+    end
+    return (tonumber(org.bicarb) or 24) < SystemicBicarbFloor
+end
+
 local function HasRecoveryWork(org)
     local oxygen = istable(org.o2) and (tonumber(org.o2[1]) or 0) or 0
     local oxygenMax = istable(org.o2) and math.max(tonumber(org.o2.range) or 30, 1) or 0
-    return (tonumber(org.blood) or 5000) < 4975
+    local capacity = GetBloodCapacity(org)
+    return (tonumber(org.blood) or capacity) < capacity - 25
         or oxygen < oxygenMax * 0.96
         or HasDeliveryDeficit(org)
         or HasFieldsAbove(org, RecoveryFields, 0.01)
@@ -372,7 +397,7 @@ end
 
 local function HasTreatableInjury(org)
     if not org then return false end
-    return HasComplexWork(org) or HasStitchingWork(org) or HasSimpleWork(org) or HasRecoveryWork(org)
+    return HasComplexWork(org) or HasStitchingWork(org) or HasSimpleWork(org) or HasRecoveryWork(org) or HasSystemicWork(org)
 end
 
 local function ModeHasWork(org, mode)
@@ -380,12 +405,10 @@ local function ModeHasWork(org, mode)
     if mode == 2 then return HasStitchingWork(org) end
     if mode == 3 then return HasSimpleWork(org) end
     if mode == 4 then return HasRecoveryWork(org) end
+    if mode == 5 then return HasSystemicWork(org) end
     return false
 end
 
--- Score actual causes and live danger rather than walking a fixed mode list.
--- The active mode gets a small hysteresis bonus, so modest stat movement does
--- not make the device oscillate between two modes every treatment tick.
 local function GetTreatmentModeScore(org, mode, activeMode)
     if not ModeHasWork(org, mode) then return 0 end
 
@@ -415,11 +438,20 @@ local function GetTreatmentModeScore(org, mode, activeMode)
         for _, key in ipairs(ClearFlags) do
             if org[key] then score = score + 4 end
         end
+    elseif mode == 5 then
+        score = math.Clamp(tonumber(org.hemotransfusionshock) or 0, 0, 2) * 20
+            + math.Clamp(tonumber(org.sepsisSource) or 0, 0, 1) * 14
+            + math.Clamp(tonumber(org.myoglobin) or 0, 0, 2) * 14
+            + math.Clamp(tonumber(org.infection) or 0, 0, 1) * 8
+            + math.Clamp(tonumber(org.pneumonia) or 0, 0, 1) * 8
+            + math.Clamp(tonumber(org.hepaticToxin) or 0, 0, 1) * 10
+            + math.Clamp((SystemicBicarbFloor - (tonumber(org.bicarb) or 24)) / 10, 0, 1) * 8
     else
-        local blood = tonumber(org.blood) or 5000
+        local capacity = GetBloodCapacity(org)
+        local blood = tonumber(org.blood) or capacity
         local oxygen = istable(org.o2) and (tonumber(org.o2[1]) or 0) or 30
         local oxygenMax = istable(org.o2) and math.max(tonumber(org.o2.range) or 30, 1) or 30
-        score = math.Clamp((5000 - blood) / 5000, 0, 1) * 20
+        score = math.Clamp((capacity - blood) / capacity, 0, 1) * 20
             + math.Clamp(1 - oxygen / oxygenMax, 0, 1) * 16
             + math.Clamp((tonumber(org.pain) or 0) / 100, 0, 1) * 4
             + math.Clamp((tonumber(org.painadd) or 0) / 100, 0, 1) * 3
@@ -454,7 +486,7 @@ end
 
 local function GetNextTreatmentMode(org, activeMode)
     local bestMode, bestScore
-    for mode = 1, 4 do
+    for mode = 1, 5 do
         local score = GetTreatmentModeScore(org, mode, activeMode)
         if score > 0 and (not bestScore or score > bestScore) then
             bestMode, bestScore = mode, score
@@ -561,8 +593,42 @@ local function HealSimple(org, config)
     for _, key in ipairs(ClearFlags) do org[key] = false end
 end
 
+local function InfuseBlood(org, ml)
+    if ml <= 0 then return end
+    local citrate = org.citrate
+    hg.organism.TransfuseBlood(org, ml)
+    org.citrate = citrate
+    org.blood = org.blood + ml
+end
+
+local function HealSystemic(org, config)
+    local capacity = GetBloodCapacity(org)
+    org.blood = tonumber(org.blood) or capacity
+    local before = math.max(org.blood, 1)
+    local drained = hg.organism.DrainBlood(org, config.ExchangeMl)
+    local topUp = math.Clamp(capacity - before, 0, config.BloodRestore)
+    org.sepsisSource = (tonumber(org.sepsisSource) or 0) * (1 - drained / before)
+    InfuseBlood(org, drained + topUp)
+    org.hemotransfusionshock = math.max((tonumber(org.hemotransfusionshock) or 0) - (drained + topUp) / config.ExchangeSepsisMl, 0)
+    HealFields(org, SystemicReliefFields, config.InjuryHeal * 0.25)
+
+    local infected = (tonumber(org.hemotransfusionshock) or 0) > SystemicLimits.hemotransfusionshock
+        or (tonumber(org.sepsisSource) or 0) > SystemicLimits.sepsisSource
+        or (tonumber(org.infection) or 0) > SystemicLimits.infection
+        or (tonumber(org.pneumonia) or 0) > SystemicLimits.pneumonia
+    if infected and (tonumber(org.antibiotics) or 0) <= 60 then
+        hg.organism.Infection.GiveAntibiotics(org)
+    end
+end
+
 local function RestoreBloodAndOxygen(org, config)
-    org.blood = math.Approach(tonumber(org.blood) or 5000, 5000, config.BloodRestore)
+    local capacity = GetBloodCapacity(org)
+    org.blood = tonumber(org.blood) or capacity
+    if org.blood < capacity then
+        InfuseBlood(org, math.min(config.BloodRestore, capacity - org.blood))
+    else
+        org.blood = math.Approach(org.blood, capacity, config.BloodRestore)
+    end
     HealFields(org, ComplexReliefFields, config.InjuryHeal * 0.5)
 
     for _, key in ipairs(RecoveryFields) do
@@ -572,9 +638,6 @@ local function RestoreBloodAndOxygen(org, config)
     end
     HealFields(org, RecoveryReliefFields, config.InjuryHeal * 12)
 
-    -- The current organism derives respiratory arrest from opioid load. Give
-    -- antidote support before attempting oxygen recovery so the support helper
-    -- does not correctly reject an airway whose drive is still suppressed.
     local opioidDepression = tonumber(org.opioidRespiratoryDepression) or 0
     if opioidDepression > 0.15 or org.respiratoryArrest then
         org.naloxoneadd = math.max(tonumber(org.naloxoneadd) or 0, 0.65)
@@ -603,7 +666,13 @@ local function ApplyAutopulse(org, config)
     local now = CurTime()
     org.dihAutopulseUntil = now + config.AutopulseInterval * 1.5
     org.dihSupportUntil = org.dihAutopulseUntil
+    org.cprSupportUntil = math.max(tonumber(org.cprSupportUntil) or 0, org.dihAutopulseUntil)
+    org.cprSupportPulse = 70
     org.cprResuscitationUntil = math.max(tonumber(org.cprResuscitationUntil) or 0, now + 2)
+    org.palpitationTreatmentUntil = math.max(tonumber(org.palpitationTreatmentUntil) or 0, now + 1)
+    if hg.organism.IsAsystole(org) then
+        org.epinephrineResuscitationUntil = math.max(tonumber(org.epinephrineResuscitationUntil) or 0, now + 20)
+    end
     org.aedResuscitationUntil = math.max(tonumber(org.aedResuscitationUntil) or 0, now + 15)
     org.defibDeathGrace = math.max(tonumber(org.defibDeathGrace) or 0, now + 20)
     org.fibrillation = false
@@ -616,16 +685,11 @@ local function ApplyAutopulse(org, config)
     org.strokeVolume = math.max(tonumber(org.strokeVolume) or 0, 0.50)
     org.hypotension = math.min(tonumber(org.hypotension) or 1, 0.50)
 
-    -- A circulation assist is only useful if it also has enough volume and
-    -- oxygen to circulate.  This is deliberately limited to an emergency
-    -- bridge, rather than replacing the unit's normal blood-restoration pass.
     local blood = tonumber(org.blood) or 5000
     if blood < config.AutopulseBloodFloor then
         org.blood = math.min(blood + config.AutopulseBloodRestore, config.AutopulseBloodFloor)
     end
 
-    -- Give a small mannitol dose only when cerebral pressure is actually a
-    -- concern; dosing every beat on an otherwise stable patient is needless.
     local cerebralEmergency = (tonumber(org.intracranialPressure) or 0) > 0.20
         or (tonumber(org.brainSwelling) or 0) > 0.20
         or (tonumber(org.brainHemorrhage) or 0) > 0.15
@@ -636,7 +700,7 @@ local function ApplyAutopulse(org, config)
 
     if hg and hg.organism and hg.organism.RestoreSupportedOxygen then
         hg.organism.RestoreSupportedOxygen(org, config.AutopulseOxygenRecovery, {
-            artificialSupport = true,
+            artificialSupport = true, cpr = true,
             oxygen = config.AutopulseOxygenFloor,
             oxygenTarget = 30,
             bodyoxygen = 0.60, bodyoxygenTarget = 0.90,
@@ -649,8 +713,14 @@ local function ApplyAutopulse(org, config)
         })
     end
 
+    if hg and hg.organism and hg.organism.CPRClearVomit then
+        hg.organism.CPRClearVomit(org)
+    end
     if hg and hg.organism and hg.organism.TryRestartHeartWithResuscitation then
         hg.organism.TryRestartHeartWithResuscitation(org)
+    end
+    if hg and hg.organism and hg.organism.TryRestoreBreathingWithResuscitation then
+        hg.organism.TryRestoreBreathingWithResuscitation(org, 1)
     end
 end
 
@@ -1024,6 +1094,8 @@ function SWEP:AttachUnit(owner, target, ply)
             HealStitching(org, config)
         elseif treatmentMode == 3 then
             HealSimple(org, config)
+        elseif treatmentMode == 5 then
+            HealSystemic(org, config)
         else
             RestoreBloodAndOxygen(org, config)
         end

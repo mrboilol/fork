@@ -396,14 +396,19 @@ local function tickOxy(owner, org, state, timeValue)
 
 	if needleSoft then gain = 0 end
 
+	local bradypnea = needleSoft and 0 or tonumber(org.bradyapnea) or 0
+	local bradypneaFloor = rampUp(bradypnea, oxyConfig.bradypneaStart, oxyConfig.bradypneaFull) * oxyConfig.bradypneaPool
+
 	local oxy = state.oxy
 	local softDying = crit == CRIT_SOFT and not needleSoft
 	if softDying then oxy = oxy + oxyConfig.softCritGain * gainMul * timeValue end
 
 	oxy = oxy + gain * gainMul * timeValue
 
-	if gain <= 0 and not state.lethalCrit and not softDying and oxy > 0 then
-		oxy = math.max(oxy - oxyConfig.regen * timeValue, 0)
+	if gain <= 0 and not state.lethalCrit and not softDying and oxy > bradypneaFloor then
+		oxy = math.max(oxy - oxyConfig.regen * timeValue, bradypneaFloor)
+	elseif oxy < bradypneaFloor then
+		oxy = math.min(oxy + oxyConfig.bradypneaGain * gainMul * timeValue, bradypneaFloor)
 	end
 
 	state.oxy = math.Clamp(oxy, 0, CONFIG.poolMax)
@@ -414,6 +419,18 @@ local function tickOxy(owner, org, state, timeValue)
 		local severity = math.Clamp((state.oxy - oxyConfig.brainDamageStart) / range, 0, 1)
 		org.brain = math.min((org.brain or 0) + oxyConfig.brainDamageRate * severity * timeValue, 1)
 	end
+end
+
+local function hasInternalBleed(org)
+	return (tonumber(org.internalBleed) or 0) > CONFIG.internalBleed.min
+end
+
+local function tickInternalBleed(owner, org, state, timeValue)
+	if not hasInternalBleed(org) then return end
+
+	local pulseMul = math.max(tonumber(org.pulse) or 0, 0) / CONFIG.heart.base
+	local drain = org.internalBleed * CONFIG.internalBleed.drainPerSeverity * pulseMul * timeValue
+	org.blood = math.max((tonumber(org.blood) or CONFIG.contamination.normalBlood) - drain, 1)
 end
 
 local function tickRegen(owner, org, state, timeValue)
@@ -654,6 +671,7 @@ local function tickConsciousness(owner, org, state, timeValue)
 	if org.otrub and org.consciousness < consciousnessConfig.wakeAt then org.needotrub = true end
 end
 
+table.insert(SimpleHealth.Tickers, tickInternalBleed)
 table.insert(SimpleHealth.Tickers, tickOxy)
 table.insert(SimpleHealth.Tickers, tickRegen)
 table.insert(SimpleHealth.Tickers, tickFuryRegen)
@@ -1322,7 +1340,7 @@ SimpleHealth.ModuleOverrides.liver = function(owner, org)
 
 	org.bleedingmul = bleedMul
 	org.coagulation_multiplier = DEFAULT_COAGULATION
-	org.blood_regeneration_multiplier = DEFAULT_BLOOD_REGENERATION
+	org.blood_regeneration_multiplier = hasInternalBleed(org) and CONFIG.internalBleed.regenMul or DEFAULT_BLOOD_REGENERATION
 end
 
 local REPAIRED_ORGANS = {"heart", "liver", "flank", "gut", "pneumothorax"}

@@ -39,7 +39,7 @@
 		surface.DrawRect(0, 0, w, h)
 		surface.SetDrawColor(ammoMenuOutline)
 		surface.DrawOutlinedRect(0, 0, w, h, 1)
-		draw.SimpleText(self:GetText(), "ZB_InterfaceMedium", w * 0.5, h * 0.5, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		draw.SimpleText(self:GetText(), "ZCity_Menu_Settings_Small", w * 0.5, h * 0.5, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 	end
 
 	local function PaintCountSlider(self, w, h, frac)

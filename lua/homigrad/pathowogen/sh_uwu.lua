@@ -50,6 +50,23 @@ if CLIENT then
 	local LastBlink = 0
 	local BlinkDelay = 0
 
+	local SIMPLE_STATUS = {
+		hurt = "Minor damage",
+		wounded = "Moderate damage",
+		critical = "Heavy damage",
+		softcrit = "CRITICAL",
+		hardcrit = "SYSTEM FAILURE",
+	}
+
+	local function getSimpleStatus(state)
+		local simpleHealth = hg.SimpleHealth
+		local key = LocalPlayer():Alive() and simpleHealth.GetFaceKey(state, true) or "hardcrit"
+		if SIMPLE_STATUS[key] then return SIMPLE_STATUS[key] end
+		if simpleHealth.GetHealth(state) < simpleHealth.Config.maxHealth then return "Minimal damage" end
+
+		return "NOMINAL"
+	end
+
 	hook.Add("RenderScreenspaceEffects", "furbot", function()
 		if LocalPlayer().PlayerClassName != "furry" then
 			if IsValid(hg.matrix) then
@@ -103,6 +120,9 @@ if CLIENT then
 		elseif damageSum > 0 then
 			Status = "Minimal damage"
 		end
+
+		local simpleState = hg.SimpleHealth and hg.SimpleHealth.GetLocalState()
+		if simpleState then Status = getSimpleStatus(simpleState) end
 
 		DrawTextAndShadow("System status: " .. Status, "ZB_ProotOSMedium", sw * 0.01, sh * 0.96, bluewhite, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 
