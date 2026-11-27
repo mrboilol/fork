@@ -222,6 +222,7 @@ SimpleHealth.ModuleOverrides.pulse = function(owner, org, timeValue)
 	org.ischemia = 0
 
 	organism.UpdateBodyTemperature(owner, org, timeValue)
+	organism.UpdateFear(owner, org, timeValue)
 
 	SimpleHealth.ClearRemovedVitals(org)
 

@@ -99,12 +99,13 @@ if SERVER then
 
 	local AURA_RADIUS = 600
 	local AURA_INTERVAL = 1
-	local AURA_PANIC = 0.12
+	local AURA_PANIC = 0.3
 	local AURA_DEPRESSION = 0.035
 	local AURA_ANGER = 0.08
 
+	local HAPPINESS_LOSS = 0.2
+
 	local CHASE_RADIUS = 1500
-	local CHASE_MOOD_LOSS = 0.05
 	local CHASE_DEPRESSION = 0.03
 	local CHASE_MEMORY = 10
 
@@ -267,7 +268,6 @@ if SERVER then
 	local function ApplyChaseMood(ply, org)
 		if HoldsLoadedGun(ply) then return end
 
-		hg.organism.ShieldEmotion(org, CHASE_MOOD_LOSS, 1)
 		hg.organism.AddDepression(org, CHASE_DEPRESSION, "fight")
 	end
 
@@ -331,9 +331,12 @@ if SERVER then
 			if not org or org.otrub or not ply:Alive() or ply:GetObserverMode() ~= OBS_MODE_NONE then continue end
 
 			local near, chased = GetKiesThreat(ply, allKies)
+			if not near and not chased then continue end
+
+			hg.organism.ShieldEmotion(org, HAPPINESS_LOSS, 1)
 			if near then ApplyAura(ply, org) end
 			if chased then ApplyChaseMood(ply, org) end
-			if near or chased then ThinkAboutKies(ply, org, chased) end
+			ThinkAboutKies(ply, org, chased)
 		end
 	end)
 

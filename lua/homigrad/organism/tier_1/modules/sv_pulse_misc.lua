@@ -192,11 +192,17 @@ function hg.organism.UpdateCirculatoryEffects(owner, org, timeValue, o2Value, ar
 		if math.Rand(0, 1) < (crisis - 0.5) * 0.12 then hg.organism.AddSeizure(org, 1) end
 	end
 
+	hg.organism.UpdateFear(owner, org, timeValue)
+end
+
+function hg.organism.UpdateFear(owner, org, timeValue)
 	local fearless = IsValid(owner) and owner.HasTrait and owner:HasTrait("gurajchaka_child")
 	if fearless then
 		org.fear = 0
 		org.fearadd = 0
-	else
+		return
+	end
+
 	org.fear = math.Approach(org.fear, (org.otrub and 0 or (org.fearadd > 0 and 1 or -1)), org.otrub and timeValue * 0.5 or (org.fearadd > 0 and (org.fear < 0 and timeValue * 5 * org.fearadd or timeValue / 5 * org.fearadd) or (org.fear <= 0 and timeValue / 240 or timeValue / 50)))
 	-- less time to start fearing, more time to become calm again
 	-- if no fear, in 3 minutes become slightly talkative, so would say random phrases to calm themselves in a current situation
@@ -204,7 +210,6 @@ function hg.organism.UpdateCirculatoryEffects(owner, org, timeValue, o2Value, ar
 	org.fearadd = math.Approach(org.fearadd, 0, gainfear and timeValue or timeValue / 4.9) -- 15 seconds to stop fearing something and start to calm down
 	local fearGainRate = gainfear and timeValue / 5 or 0
 	org.fearadd = math.Approach(org.fearadd, 1, fearGainRate)
-	end
 end
 
 function hg.organism.UpdateBodyTemperature(owner, org, timeValue)
