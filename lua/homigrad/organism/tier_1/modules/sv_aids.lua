@@ -31,6 +31,13 @@ AcidBase.Config = {
 	renalStart = 0.35,
 	renalRange = 0.6,
 	renalAcid = 12,
+	uremiaRise = 1 / 180,
+	uremiaFall = 1 / 400,
+	uremiaNausea = 0.004,
+	fluidOverloadMl = 500,
+	fluidOverloadRate = 0.008,
+	peritonitisVasoplegia = 0.12,
+	peritonitisHeartRate = 14,
 	hypercapniaCompensation = 0.15,
 	hypocapniaCompensation = 0.25,
 	hypocapniaCompRate = 0.02,
@@ -123,6 +130,15 @@ local THOUGHTS = {
 		"My fingers are tingling and cramping...",
 		"My lips feel numb, my hands are twitching...",
 	}},
+	{key = "peritonitis", at = 0.3, value = function(org) return org.peritonitis or 0 end, color = Color(220, 170, 130), lines = {
+		"My belly is hard as a board and it burns inside...",
+		"Something's leaking in my gut... it hurts to even breathe.",
+		"Every move sets my stomach on fire...",
+	}},
+	{key = "uremia", at = 0.4, value = function(org) return org.uremia or 0 end, color = Color(200, 190, 150), lines = {
+		"I haven't pissed in ages... I feel poisoned.",
+		"There's a metal taste in my mouth and I can't stop itching...",
+	}},
 	{key = "hepatic", at = 0.4, value = function(org) return org.hepaticToxin or 0 end, color = Color(210, 200, 120), lines = {
 		"I can't think straight...",
 		"My skin looks yellow...",
@@ -158,6 +174,7 @@ function AcidBase.Init(org)
 	org.hepaticToxin = 0
 	org.septicShock = 0
 	org.renalFailure = 0
+	org.uremia = 0
 	org.shockVasoplegia = 0
 	org.metabolicHeartRate = 0
 	org.metabolicConsciousnessCap = 1
@@ -224,6 +241,7 @@ local DRAIN_WASHOUT = {
 	myoglobin = 0,
 	rhabdoAcid = 0,
 	hyperkalemia = 0,
+	uremia = 0,
 }
 
 function hg.organism.DrainBlood(org, ml)
@@ -248,11 +266,19 @@ local function updateSepsisOutputs(org)
 	return severity, shock
 end
 
-local function updateRenal(org)
+local function updateRenal(org, mulTime)
 	local renal = Clamp(((tonumber(org.flank) or 0) - CONFIG.renalStart) / CONFIG.renalRange, 0, 1)
 	org.renalFailure = renal
 
-	return renal
+	local uremia = tonumber(org.uremia) or 0
+	org.uremia = Clamp(Approach(uremia, renal, mulTime * (renal > uremia and CONFIG.uremiaRise or CONFIG.uremiaFall)), 0, 1)
+
+	local overload = max((tonumber(org.blood) or 0) - (tonumber(org.maxblood) or 5000), 0) / CONFIG.fluidOverloadMl
+	if renal > 0 and overload > 0 then
+		org.lungWater = min((tonumber(org.lungWater) or 0) + mulTime * renal * min(overload, 2) * CONFIG.fluidOverloadRate, 1)
+	end
+
+	return renal, org.uremia
 end
 
 local function updateHepatic(org, mulTime, thiamine, shock)
@@ -381,7 +407,8 @@ function hg.organism.UpdateMetabolicShock(owner, org, mulTime)
 	local thiamine = (tonumber(org.thiamine) or 0) > 0
 	local severity, shock = updateSepsisOutputs(org)
 	local hepatic, toxin = updateHepatic(org, mulTime, thiamine, shock)
-	local renal = updateRenal(org)
+	local renal, uremia = updateRenal(org, mulTime)
+	local peritonitis = Clamp(tonumber(org.peritonitis) or 0, 0, 1)
 
 	org.lactaid = min((tonumber(org.lactaid) or CONFIG.lactateNormal) + mulTime * (severity * CONFIG.sepsisLactate + shock * CONFIG.septicShockLactate), 20)
 	if shock > 0 then
@@ -410,8 +437,8 @@ function hg.organism.UpdateMetabolicShock(owner, org, mulTime)
 	if toxin > 0 then
 		org.disorientation = max(org.disorientation or 0, toxin * 1.0)
 	end
-	if acidosis > 0 then
-		org.wantToVomit = (org.wantToVomit or 0) + mulTime * acidosis * CONFIG.acidosisNausea
+	if acidosis > 0 or uremia > 0 then
+		org.wantToVomit = (org.wantToVomit or 0) + mulTime * (acidosis * CONFIG.acidosisNausea + uremia * CONFIG.uremiaNausea)
 	end
 
 	local paco2 = Clamp(tonumber(org.paco2) or CONFIG.normalPaco2, 10, 150)
@@ -421,20 +448,22 @@ function hg.organism.UpdateMetabolicShock(owner, org, mulTime)
 	org.catecholamineResponse = 1 - acidosis * CONFIG.acidCatecholamineLoss
 	org.cerebralFlowMul = Clamp((1 - alkalosis * CONFIG.alkaliCerebralConstrict - hypocapnia * CONFIG.hypocapniaConstrict + hypercapnia * CONFIG.hypercapniaDilate)
 		* (1 + acidosis * CONFIG.acidOxygenUnload - alkalosis * CONFIG.alkaliOxygenHold), 0.4, 1.2)
-	org.metabolicDrowsiness = max(acidosis * 0.5, hypercapnia * 0.6, toxin * 0.5, Clamp((severity - CONFIG.sepsisEncephalopathyStart) / CONFIG.sepsisEncephalopathyRange, 0, 1) * CONFIG.sepsisEncephalopathy)
+	org.metabolicDrowsiness = max(acidosis * 0.5, hypercapnia * 0.6, toxin * 0.5, uremia * 0.45, Clamp((severity - CONFIG.sepsisEncephalopathyStart) / CONFIG.sepsisEncephalopathyRange, 0, 1) * CONFIG.sepsisEncephalopathy)
 
-	org.shockVasoplegia = Clamp(severity * 0.08 + shock * 0.45 + acidosis * 0.25 + max(hepatic - CONFIG.hepaticShockStart, 0) * 0.5, 0, CONFIG.vasoplegiaMax)
-	org.metabolicHeartRate = severity * CONFIG.sepsisHeartRate + acidosis * 15 + hepatic * 10 + (tonumber(org.feverHeartRate) or 0)
+	org.shockVasoplegia = Clamp(severity * 0.08 + shock * 0.45 + acidosis * 0.25 + max(hepatic - CONFIG.hepaticShockStart, 0) * 0.5 + peritonitis * CONFIG.peritonitisVasoplegia, 0, CONFIG.vasoplegiaMax)
+	org.metabolicHeartRate = severity * CONFIG.sepsisHeartRate + acidosis * 15 + hepatic * 10 + peritonitis * CONFIG.peritonitisHeartRate + (tonumber(org.feverHeartRate) or 0)
 
 	local acidCap = 1 - Clamp((CONFIG.acidosisComaStart - ph) / CONFIG.acidosisComaRange, 0, 1) * 0.9
 	local alkaliCap = 1 - max(alkalosis - 0.5, 0) * 1.2
 	local sepsisCap = 1 - shock * 0.5
 	local hepaticCap = 1 - Clamp((toxin - 0.3) / 0.7, 0, 1) * 0.85
-	org.metabolicConsciousnessCap = min(acidCap, alkaliCap, sepsisCap, hepaticCap)
+	local uremiaCap = 1 - Clamp((uremia - 0.5) / 0.5, 0, 1) * 0.6
+	org.metabolicConsciousnessCap = min(acidCap, alkaliCap, sepsisCap, hepaticCap, uremiaCap)
 	org.metabolicStaminaMul = max((1 - severity * 0.25) * (1 - acidosis * 0.45) * (1 - hepatic * 0.3) * (1 - renal * 0.2)
-		* (1 - (org.feverK or 0) * 0.25) * (1 - (org.leukopenia or 0) * 0.2) * (1 - alkalosis * 0.3) * (1 - (tonumber(org.rhabdo) or 0) * 0.25), 0.2)
+		* (1 - (org.feverK or 0) * 0.25) * (1 - (org.leukopenia or 0) * 0.2) * (1 - alkalosis * 0.3) * (1 - (tonumber(org.rhabdo) or 0) * 0.25)
+		* (1 - peritonitis * 0.35) * (1 - uremia * 0.2), 0.2)
 
-	updateTerminalCascade(org, mulTime, shock, acidosis, hepatic, toxin, renal)
+	updateTerminalCascade(org, mulTime, shock, acidosis, hepatic, toxin, max(renal, uremia))
 	emitThoughts(owner, org)
 end
 
@@ -455,6 +484,8 @@ local RAGE_CLEARS = {
 	clotBurden = 1,
 	pulmonaryEmbolism = 1,
 	aneurysm = 1,
+	peritonitis = 1,
+	uremia = 1,
 }
 
 function hg.organism.RageClearConditions(org, mulTime)
@@ -469,6 +500,7 @@ end
 
 function hg.organism.UpdateSystemic(owner, org, mulTime, adrenalineStabilizer)
 	hg.organism.UpdateInfection(owner, org, mulTime)
+	hg.organism.UpdatePeritonitis(org, mulTime)
 	hg.organism.UpdateSepsis(org, mulTime, adrenalineStabilizer)
 	hg.organism.UpdateRhabdo(owner, org, mulTime)
 	hg.organism.UpdateMetabolicShock(owner, org, mulTime)

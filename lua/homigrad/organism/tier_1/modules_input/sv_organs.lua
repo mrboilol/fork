@@ -263,6 +263,8 @@ local function damageBrainLobe(org, bone, dmg, dmgInfo, key, impact)
 	if dmgInfo:IsDamageType(DMG_BLAST) then dmg = dmg / 50 end
 	if dmgInfo:IsDamageType(DMG_CLUB) then
 		dmg = dmg / 3 * skullBrainTransfer(org.skull)
+	elseif dmgInfo:IsDamageType(DMG_SLASH) and not dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) then
+		dmg = dmg * skullBrainTransfer(org.skull)
 	end
 
 	if dmgInfo:IsDamageType(DMG_BULLET + DMG_SNIPER) then
@@ -323,7 +325,7 @@ local function damageBrainLobe(org, bone, dmg, dmgInfo, key, impact)
 		end
 	end
 
-	if org.brain >= 0.3 and delta > 0.01 and math.random(3) == 1 then
+	if org.brain >= hg.organism.BRAIN_COMA and delta > 0.01 and math.random(3) == 1 then
 		org.shock = 70
 	end
 

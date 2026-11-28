@@ -1686,7 +1686,7 @@ local function freezePosture(org, posture)
 end
 
 local function isFatalHeadshot(ply, ragdoll, org)
-	if not org or org.headamputated or (org.brain or 0) < K.FADE_BRAIN_MIN then return false end
+	if not org or org.headamputated or (org.brain or 0) < hg.organism.BRAIN_DEATH then return false end
 
 	return not (ragdoll.noHead or ragdoll.headexploded or ragdoll.headExplodePending or ply.headExplodePending)
 end

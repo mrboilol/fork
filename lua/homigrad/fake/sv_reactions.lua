@@ -105,44 +105,31 @@ local function IsUpright(ragdoll)
     return up.z > 0.3 -- Allow some leaning, but not flat on ground
 end
 
--- Neurological Posturing (Decerebrate/Decorticate)
 function hg.reactions.ProcessNeurological(ragdoll, ply, org)
     if not org.brain or not org.alive or org.paralyzed then return false end
     
-    -- Decerebrate Posturing (Extensor) - Severe damage (brain stem)
-    -- Arms extended, legs extended, head arched back, rigid
-    if org.brain > 0.4 then
+    if org.brain > 0.55 then
         if IsPlayerControlling(ply) then return false end
         
-        -- Use stiffness to lock body
         if not ragdoll.stiffness_neurological then
             if RagdollStiffness then
-                RagdollStiffness.ActivateAllBody(ragdoll, 2) -- Keep re-applying every few seconds
+                RagdollStiffness.ActivateAllBody(ragdoll, 2)
             end
             ragdoll.stiffness_neurological = CurTime() + 1.5
         elseif CurTime() > ragdoll.stiffness_neurological then
-             ragdoll.stiffness_neurological = nil -- Allow re-application
+             ragdoll.stiffness_neurological = nil
         end
-        
-        -- Force extension poses via ShadowControl if not stiff enough
-        -- This is a "Tonic" phase approximation
-        -- We can also use "HeadshotCurl" but that looks like flexion (Decorticate)
-        -- So for Decerebrate we might want to just be very stiff and straight
         
         return true
     end
     
-    -- Decorticate Posturing (Flexor) - Moderate/Severe damage (corticospinal tract)
-    -- Arms flexed towards chest, legs extended
     if org.brain > 0.25 then
         if IsPlayerControlling(ply) then return false end
 
-        -- "HeadshotCurl" looks like a flexion response, suitable for Decorticate
         if not hg.animator.IsPlaying(ragdoll) or ragdoll.AnimCurrent.Name ~= "HeadshotCurl" then
             hg.animator.Play(ragdoll, "HeadshotCurl", 0.8, 1, true)
         end
         
-        -- Add some stiffness
         if not ragdoll.stiffness_neurological then
              if RagdollStiffness then
                 RagdollStiffness.ActivateHeadshot(ragdoll, 2)

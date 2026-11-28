@@ -361,11 +361,6 @@ if CLIENT then
 			draw.NoTexture()
 			surface.DrawRect(x - 25 * lerpthing, y - 2.5, 50 * lerpthing, 5)
 			surface.DrawRect(x - 2.5, y - 25 * lerpthing, 5, 50 * lerpthing)
-			local col = Tr.Entity:GetPlayerColor():ToColor()
-			local coloutline = (col.r < 50 and col.g < 50 and col.b < 50) and Color(255,255,255) or Color(0,0,0)
-			coloutline.a = 255 * Size * 2
-			draw.DrawText(Tr.Entity:IsPlayer() and Tr.Entity:GetPlayerName() or Tr.Entity:IsRagdoll() and Tr.Entity:GetPlayerName() or "", "HomigradFontLarge", x + 1, y + 31, coloutline, TEXT_ALIGN_CENTER)
-			draw.DrawText(Tr.Entity:IsPlayer() and Tr.Entity:GetPlayerName() or Tr.Entity:IsRagdoll() and Tr.Entity:GetPlayerName() or "", "HomigradFontLarge", x, y + 30, col, TEXT_ALIGN_CENTER)
 		end
 		self:DrawWorldModel2(true)
 		if self.showstats and self.modeValues and istable(self.modeValues) then

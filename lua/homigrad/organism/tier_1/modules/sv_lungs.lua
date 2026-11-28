@@ -697,7 +697,7 @@ module[2] = function(owner, org, timeValue)
 		org.etco2 = nil
 		org.breathPanic = 0
 		org._zeroO2Time = 0
-		if org.brain >= 0.7 and org.alive then
+		if org.brain >= hg.organism.BRAIN_DEATH and org.alive then
 			if hg.organism.KillFatalBrainDamage then
 				hg.organism.KillFatalBrainDamage(org)
 			else
@@ -1707,15 +1707,15 @@ kaz
 
 
 
-	if org.brain >= 0.5 and not (hg.organism.IsBrainDamageIgnored and hg.organism.IsBrainDamageIgnored(org)) then
-		local brainCap = 0.325
+	if org.brain >= 0.7 and not (hg.organism.IsBrainDamageIgnored and hg.organism.IsBrainDamageIgnored(org)) then
+		local brainCap = hg.organism.BRAIN_COMA
 		local brainSeverity = math.Clamp((org.brain - brainCap) / (1 - brainCap), 0.1, 1)
 		org.consciousness = math.max((org.consciousness or 1) - timeValue * brainSeverity * 0.6, 0)
 	end
 
 	local death_from_braindamage = false
 
-	if org.brain >= 0.7 and org.alive then
+	if org.brain >= hg.organism.BRAIN_DEATH and org.alive then
 
 		death_from_braindamage = true
 		if hg.organism.KillFatalBrainDamage then
@@ -1727,7 +1727,7 @@ kaz
 
 	if org.isPly then
 
-		if org.brain > 0.1 and org.brain < 0.3 then
+		if org.brain > 0.1 and org.brain < hg.organism.BRAIN_COMA then
 			org.owner:Notify(math.random(2) == 1 and "My head hurts..." or "Where am I?", true, "brain", 5)
 		else
 
@@ -1747,7 +1747,7 @@ kaz
 
 
 
-	local brainRecovery = timeValue / 400 * ((mannitolK > 0 and org.brain < 0.6) and 1 or (org.brain > 0.1 and 0.1 or 0))
+	local brainRecovery = timeValue / 400 * ((mannitolK > 0 and org.brain < 0.85) and 1 or (org.brain > 0.1 and 0.1 or 0))
 	org.brain = max(org.brain - brainRecovery, 0)
 	if mannitolK > 0 then
 		org.brainFrontal = max(org.brainFrontal - brainRecovery, 0)
@@ -1758,11 +1758,9 @@ kaz
 
 	org.mannitol = math.Approach(org.mannitol, 0, timeValue / 600)
 	
-	-- Tissue oxygen no longer writes brain injury. Intracranial bleeding remains
-	-- damaging here; cerebral hypoxia is handled from brainoxygen in UpdatePerfusion.
 	local hemorrhageInjury = math.Clamp(org.brainHemorrhage or 0, 0, 1)
 	if hemorrhageInjury > 0 then
-		local injuryTime = org.brain < 0.3 and 300 or 120
+		local injuryTime = org.brain < hg.organism.BRAIN_COMA and 300 or 120
 		org.brain = min(org.brain + timeValue / injuryTime * hemorrhageInjury, 1)
 	end
 

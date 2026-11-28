@@ -236,7 +236,7 @@ hook.Add("HUDPaint", "DrawSpectatorUnconsciousRing", function()
         or circulationCritical
         or org.ecgState == "ventricular_fibrillation"
         or (org.ecgState == "asystole" and brain >= 0.02)
-        or (brain > 0.4)
+        or (brain > 0.55)
         or (tonumber(org.brainHemorrhage) or 0) >= 0.4
         or (tonumber(org.brainSwelling) or 0) >= 0.45
     

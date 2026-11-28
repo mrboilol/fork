@@ -9,10 +9,8 @@ local VIEW_DOT = 0.7
 local LOS_INTERVAL = 0.2
 local LOS_MIN_FRACTION = 0.97
 
-local TAG_DIST = 3000
 local ZOOM_DIST = 6000
 local ZOOM_RADIUS = 0.2
-local NAME_MIN_ALPHA = 0.6
 local ITEM_LIMIT = 64
 local ITEM_NAME_LIMIT = 8
 local ITEM_REFRESH = 0.5
@@ -36,6 +34,9 @@ local TAG_TRANSITION_SPEED = 5
 local TAG_REST_ALPHA = 0.6
 local TAG_VIEW_DOT = 0.25
 local TAG_LOS_INTERVAL = 0.15
+local TAG_ZOOM_FADE_START = 1200
+local TAG_ZOOM_FADE_END = 2000
+local NOTICE_DELAY = 1
 
 local tagFont = "HomigradFontLarge"
 local cueFont = "HomigradFontMedium"
@@ -50,6 +51,8 @@ local haloColor = Color(255, 220, 90)
 local seen = setmetatable({}, {__mode = "k"})
 local losCache = setmetatable({}, {__mode = "k"})
 local itemCache, itemCacheAt = {}, 0
+local corpses = {}
+local told = {}
 local vignetteAmount = 0
 
 local function o2Of(org)
@@ -123,13 +126,77 @@ local function PlayerName(ply)
 	return isstring(name) and name or "Someone"
 end
 
-local function Announce(ply, def)
+local function SubjectName(ent)
+	if ent:IsPlayer() then return PlayerName(ent) end
+
+	local name = ent:GetPlayerName()
+	if isstring(name) and name ~= "" then return name end
+
+	local ply = ent:GetNWEntity("ply")
+
+	return IsValid(ply) and ply:IsPlayer() and PlayerName(ply) or nil
+end
+
+local function IsHidden(ent)
+	return ent.PlayerClassName == "sc_infiltrator" or ent:GetNetVar("disappearance", nil)
+end
+
+local function IsCorpse(ent)
+	if ent:IsDormant() or ent:GetNoDraw() or not istable(ent.organism) or IsHidden(ent) then return false end
+
+	local owner = hg.RagdollOwner(ent)
+	if IsValid(owner) and owner:Alive() then return false end
+
+	return SubjectName(ent) ~= nil
+end
+
+local function Suppressed(lply)
+	if IsValid(MENUPANELHUYHUY) then return true end
+	if lply:GetNWString("hg_ia_mode", "") ~= "" then return true end
+	if lply.organism and lply.organism.otrub then return true end
+
+	local wep = lply:GetActiveWeapon()
+
+	return IsValid(wep) and wep.GetCheckingAfflictions and wep:GetCheckingAfflictions() or false
+end
+
+local function AltHeld()
+	return input.IsKeyDown(KEY_LALT) or input.IsKeyDown(KEY_RALT)
+end
+
+local function ScanActive(lply)
+	return IsValid(lply) and lply:Alive() and AltHeld() and zooming == true and not Suppressed(lply)
+end
+
+function hg.IsCueScanning()
+	return ScanActive(LocalPlayer())
+end
+
+local function ToldRecently(name, key, now)
+	local at = told[name] and told[name][key]
+
+	return at ~= nil and now - at < MEMORY_TIME
+end
+
+local function SetTold(name, key, at)
+	told[name] = told[name] or {}
+	told[name][key] = at
+end
+
+function hg.MarkCuesTold(ent, keys)
+	local name = IsValid(ent) and SubjectName(ent)
+	if not name then return end
+
+	for i = 1, #keys do SetTold(name, keys[i], CurTime()) end
+end
+
+local function Announce(ent, name, def)
 	if not (IsValid(hg.chat) and hg.chat.AddLine) then return end
 
 	local base = hg.ChatLog and hg.ChatLog.COLOR_AROUND or color_white
-	local pcol = ply.GetPlayerColor and ply:GetPlayerColor()
+	local pcol = ent.GetPlayerColor and ent:GetPlayerColor()
 
-	hg.chat:AddLine({base, "You notice ", pcol and pcol:ToColor() or base, PlayerName(ply), base, " is " .. def.text .. "."}, false, true)
+	hg.chat:AddLine({base, "You notice ", pcol and pcol:ToColor() or base, name, base, " is " .. def.text .. "."}, false, true)
 end
 
 local losTrace = {mask = MASK_VISIBLE}
@@ -156,6 +223,68 @@ local function HasLOS(ply, character, pos, eye)
 	return cache.visible
 end
 
+local function ObserveSubject(ent, character, eye, forward, examined, corpse)
+	local org = ent.organism
+	local pos = character:WorldSpaceCenter()
+	local delta = pos - eye
+	local dist = delta:Length()
+	local visible = dist <= OBSERVE_MAX_DIST and delta:Dot(forward) >= dist * VIEW_DOT and HasLOS(ent, character, pos, eye)
+	if not visible and not examined then return end
+
+	local name = SubjectName(ent)
+	if not name then return end
+
+	local now = CurTime()
+	local record = seen[ent]
+	if not record then
+		record = {}
+		seen[ent] = record
+	end
+
+	for i = 1, #cueDefs do
+		local def = cueDefs[i]
+		local canSee = examined or (visible and not def.check and dist <= def.dist)
+		if not canSee or (corpse and not def.corpse) then continue end
+
+		local entry = record[def.key]
+
+		if def.test(org) then
+			if entry then
+				entry.at = now
+			else
+				record[def.key] = {def = def, at = now, noticeAt = now + NOTICE_DELAY}
+			end
+		elseif entry then
+			record[def.key] = nil
+			SetTold(name, def.key, nil)
+		end
+	end
+end
+
+local function FlushNotices(ent, record, now)
+	local name = SubjectName(ent)
+	if not name then return end
+
+	local texts = {}
+
+	for i = 1, #cueDefs do
+		local key = cueDefs[i].key
+		local entry = record[key]
+		if not entry or not entry.noticeAt or entry.noticeAt > now then continue end
+
+		entry.noticeAt = nil
+		if ToldRecently(name, key, now) then continue end
+
+		SetTold(name, key, now)
+		Announce(ent, name, entry.def)
+		texts[#texts + 1] = entry.def.text
+	end
+
+	if #texts == 0 or not hg.AddOverheadMessage then return end
+
+	hg.AddOverheadMessage(ent, "*is " .. table.concat(texts, ", ") .. "*", nil, nil, nil, true)
+end
+
 local function Observe()
 	local lply = LocalPlayer()
 	if not IsValid(lply) or not lply:Alive() then return end
@@ -163,52 +292,30 @@ local function Observe()
 	local now = CurTime()
 	local eye, forward = EyePos(), EyeAngles():Forward()
 	local checking = lply:GetNWString("hg_ia_mode", "") == "check" and lply:GetNWEntity("hg_ia_target") or nil
-	local players = player.GetAll()
 
-	for i = 1, #players do
-		local ply = players[i]
-		local org = ply.organism
-		local character = ply ~= lply and not ply:IsDormant() and hg.GetCurrentCharacter(ply)
-		if not org or not IsValid(character) then continue end
+	for _, ply in player.Iterator() do
+		if ply == lply or not ply.organism or not ply:Alive() or ply:IsDormant() then continue end
 
-		local pos = character:WorldSpaceCenter()
-		local delta = pos - eye
-		local dist = delta:Length()
-		local examined = checking == ply
-		local visible = dist <= OBSERVE_MAX_DIST and delta:Dot(forward) >= dist * VIEW_DOT and HasLOS(ply, character, pos, eye)
-		if not visible and not examined then continue end
-
-		local record = seen[ply]
-		if not record then
-			record = {}
-			seen[ply] = record
-		end
-
-		for j = 1, #cueDefs do
-			local def = cueDefs[j]
-			local canSee = examined or (visible and not def.check and dist <= def.dist)
-			if not canSee then continue end
-
-			local entry = record[def.key]
-
-			if def.test(org) then
-				if entry then
-					entry.at = now
-				else
-					record[def.key] = {def = def, at = now}
-					Announce(ply, def)
-				end
-			elseif entry then
-				record[def.key] = nil
-			end
-		end
+		local character = hg.GetCurrentCharacter(ply)
+		if IsValid(character) then ObserveSubject(ply, character, eye, forward, checking == ply, false) end
 	end
 
-	for ply, record in pairs(seen) do
-		if not IsValid(ply) then
-			seen[ply] = nil
+	corpses = {}
+
+	for _, ent in ipairs(ents.FindByClass("prop_ragdoll")) do
+		if not IsCorpse(ent) then continue end
+
+		corpses[#corpses + 1] = ent
+		ObserveSubject(ent, ent, eye, forward, checking == ent, true)
+	end
+
+	for ent, record in pairs(seen) do
+		if not IsValid(ent) then
+			seen[ent] = nil
 			continue
 		end
+
+		FlushNotices(ent, record, now)
 
 		for key, entry in pairs(record) do
 			if now - entry.at > MEMORY_TIME then record[key] = nil end
@@ -259,24 +366,6 @@ local function CorpseCues(org)
 	table.sort(list, function(a, b) return a.def.sev > b.def.sev end)
 
 	return list
-end
-
-local function Suppressed(lply)
-	if IsValid(MENUPANELHUYHUY) then return true end
-	if lply:GetNWString("hg_ia_mode", "") ~= "" then return true end
-	if lply.organism and lply.organism.otrub then return true end
-
-	local wep = lply:GetActiveWeapon()
-
-	return IsValid(wep) and wep.GetCheckingAfflictions and wep:GetCheckingAfflictions() or false
-end
-
-local function AltHeld()
-	return input.IsKeyDown(KEY_LALT) or input.IsKeyDown(KEY_RALT)
-end
-
-local function ScanActive(lply)
-	return IsValid(lply) and lply:Alive() and AltHeld() and zooming == true and not Suppressed(lply)
 end
 
 local function PlayerTagColor(ent)
@@ -341,6 +430,7 @@ local function TagBlocked(lply)
 	local wep = lply:GetActiveWeapon()
 	if not IsValid(wep) then return false end
 	if wep.GetCarrying and IsValid(wep:GetCarrying()) then return true end
+	if wep.modeNames then return false end
 
 	local hands = hg.PlayerInteract and hg.PlayerInteract.HandsClasses[wep:GetClass()]
 
@@ -349,10 +439,6 @@ end
 
 local tagStates = setmetatable({}, {__mode = "k"})
 local tagVisibility = 0
-
-local function IsHidden(ply)
-	return ply.PlayerClassName == "sc_infiltrator" or ply:GetNetVar("disappearance", nil)
-end
 
 local function BoneWorldPos(character, boneName)
 	local bone = character:LookupBone(boneName)
@@ -374,57 +460,85 @@ local function VisiblePoint(ply, character, point, eye)
 	return util.TraceLine(losTrace).Fraction >= LOS_MIN_FRACTION
 end
 
-local function DrawPlayerTags(lply, faced)
+local function DrawTorsoTag(ent, character, faced, scan, offer, opacity, eye, forward)
+	local center = character:WorldSpaceCenter()
+	local delta = center - eye
+	local range = delta:Length()
+	local fadeStart = scan and TAG_ZOOM_FADE_START or TAG_FADE_START
+	local fadeEnd = scan and TAG_ZOOM_FADE_END or TAG_FADE_END
+	local focused = faced and range <= TAG_FOCUS_DIST
+	local pinned = faced and scan
+	local outOfView = range >= fadeEnd or delta:Dot(forward) < range * TAG_VIEW_DOT
+	if outOfView and not focused and not pinned then
+		tagStates[ent] = nil
+		return
+	end
+
+	local name = SubjectName(ent)
+	if not name then return end
+
 	local now = CurTime()
-	local eye, forward = EyePos(), EyeAngles():Forward()
+	local state = tagStates[ent]
+	if not state or state.character ~= character then
+		state = {character = character, checkAt = 0, focus = 0}
+		tagStates[ent] = state
+	end
+
+	local chest = BoneWorldPos(character, CHEST_BONE) or center
+	if now >= state.checkAt then
+		state.visible = VisiblePoint(ent, character, chest, eye)
+		state.checkAt = now + TAG_LOS_INTERVAL
+	end
+
+	state.focus = math.Approach(state.focus, focused and 1 or 0, RealFrameTime() * TAG_TRANSITION_SPEED)
+	if not state.visible and not focused and not pinned then return end
+
+	local screen = chest:ToScreen()
+	if not screen.visible and not focused then return end
+
+	local blend = math.ease.InOutSine(state.focus)
 	local centerX, centerY = ScrW() * 0.5, ScrH() * 0.5 + NAME_OFFSET
-	local step = RealFrameTime() * TAG_TRANSITION_SPEED
+	local x = screen.visible and Lerp(blend, screen.x, centerX) or centerX
+	local y = screen.visible and Lerp(blend, screen.y, centerY) or centerY
+	local distanceFade = pinned and 1 or math_Clamp((fadeEnd - range) / (fadeEnd - fadeStart), 0, 1)
+	local alpha = opacity * math.ease.InOutSine(distanceFade) * (pinned and 1 or Lerp(blend, TAG_REST_ALPHA, 1))
+	local cues, cueMax
+
+	if scan then
+		if ent:IsPlayer() then
+			cues = KnownCues(ent)
+		elseif istable(ent.organism) then
+			cues, cueMax = CorpseCues(ent.organism), CORPSE_CUE_MAX
+		end
+	end
+
+	state.frame = FrameNumber()
+	DrawPerson(ent, name, cues, offer, x, y, alpha, cueMax)
+end
+
+local function OfferFor(ply, lply)
+	if ply:GetNWString("hg_ia_mode", "") ~= "offer" or ply:GetNWEntity("hg_ia_target") ~= lply then return end
+
+	return ply:GetNWString("hg_ia_item", "something")
+end
+
+local function DrawTorsoTags(lply, faced, scan)
+	local eye, forward = EyePos(), EyeAngles():Forward()
 	local opacity = math.ease.InOutSine(tagVisibility) * 255
 
 	for _, ply in player.Iterator() do
-		local character = ply ~= lply and not ply:IsDormant() and hg.GetCurrentCharacter(ply)
+		local character = ply ~= lply and ply:Alive() and not ply:IsDormant() and hg.GetCurrentCharacter(ply)
 		if not IsValid(character) or character:IsDormant() or character:GetNoDraw() or IsHidden(ply) then
 			tagStates[ply] = nil
 			continue
 		end
 
-		local center = character:WorldSpaceCenter()
-		local delta = center - eye
-		local range = delta:Length()
-		local focused = faced == ply and range <= TAG_FOCUS_DIST
-		if range >= TAG_FADE_END or (not focused and delta:Dot(forward) < range * TAG_VIEW_DOT) then
-			tagStates[ply] = nil
-			continue
-		end
+		DrawTorsoTag(ply, character, faced == ply, scan, OfferFor(ply, lply), opacity, eye, forward)
+	end
 
-		local state = tagStates[ply]
-		if not state or state.character ~= character then
-			state = {character = character, checkAt = 0, focus = 0}
-			tagStates[ply] = state
-		end
-
-		local chest = BoneWorldPos(character, CHEST_BONE) or center
-		if now >= state.checkAt then
-			state.visible = VisiblePoint(ply, character, chest, eye)
-			state.checkAt = now + TAG_LOS_INTERVAL
-		end
-
-		state.focus = math.Approach(state.focus, focused and 1 or 0, step)
-		if not state.visible and not focused then continue end
-
-		local screen = chest:ToScreen()
-		if not screen.visible and not focused then continue end
-
-		local blend = math.ease.InOutSine(state.focus)
-		local x = screen.visible and Lerp(blend, screen.x, centerX) or centerX
-		local y = screen.visible and Lerp(blend, screen.y, centerY) or centerY
-		local distanceFade = math_Clamp((TAG_FADE_END - range) / (TAG_FADE_END - TAG_FADE_START), 0, 1)
-		local alpha = opacity * math.ease.InOutSine(distanceFade) * Lerp(blend, TAG_REST_ALPHA, 1)
-		local offer = ply:GetNWString("hg_ia_mode", "") == "offer" and ply:GetNWEntity("hg_ia_target") == lply
-			and ply:GetNWString("hg_ia_item", "something") or nil
-
-		state.frame = FrameNumber()
-		DrawPerson(ply, PlayerName(ply), KnownCues(ply), offer, x, y, alpha)
+	for i = 1, #corpses do
+		local corpse = corpses[i]
+		if IsValid(corpse) then DrawTorsoTag(corpse, corpse, faced == corpse, scan, nil, opacity, eye, forward) end
 	end
 end
 
@@ -437,38 +551,33 @@ function hg.GetTagOverhead(ply)
 	return head and head + HEAD_CROWN_OFFSET or state.character:WorldSpaceCenter(), 0
 end
 
-local function DrawFacing(lply, dist, blocked)
+local function FacedSubject(lply, dist)
 	local trace = hg.eyeTrace(lply, dist)
 	local hit = trace and trace.Hit and trace.Entity
-	local faced, corpseEnt
+	if not IsValid(hit) then return end
+	if hit:IsPlayer() then return hit, trace end
+	if not hit:IsRagdoll() then return end
 
-	if IsValid(hit) then
-		if hit:IsPlayer() then
-			faced = hit
-		elseif hit:IsRagdoll() then
-			local owner = hg.RagdollOwner(hit)
-			if IsValid(owner) then faced = owner else corpseEnt = hit end
-		end
-	end
+	local owner = hg.RagdollOwner(hit)
+	if IsValid(owner) and owner:Alive() then return owner, trace end
 
-	if tagVisibility > 0 then DrawPlayerTags(lply, faced) end
+	return hit, trace
+end
 
-	if blocked or not corpseEnt or IsHidden(corpseEnt) then return end
+local function DrawHoverTag(lply, faced, trace)
+	if IsHidden(faced) then return end
 
-	local corpse = istable(corpseEnt.organism) and corpseEnt.organism or nil
-	local name = corpseEnt:GetPlayerName()
-	if not isstring(name) or name == "" then
-		local ply = corpseEnt:GetNWEntity("ply")
-		name = IsValid(ply) and ply:IsPlayer() and PlayerName(ply) or nil
-	end
-	if not isstring(name) or name == "" then return end
+	local name = SubjectName(faced)
+	if not name then return end
 
-	local hitDist = EyePos():Distance(trace.HitPos)
-	local alpha = Lerp(math_Clamp(hitDist / dist, 0, 1), 1, NAME_MIN_ALPHA) * 255
-	local cues = corpse and AltHeld() and CorpseCues(corpse) or nil
+	local range = EyePos():Distance(trace.HitPos)
+	local distanceFade = math_Clamp((TAG_FADE_END - range) / (TAG_FADE_END - TAG_FADE_START), 0, 1)
+	if distanceFade <= 0 then return end
 
+	local offer = faced:IsPlayer() and OfferFor(faced, lply) or nil
 	local screen = trace.HitPos:ToScreen()
-	DrawPerson(corpseEnt, name, cues, nil, screen.x, screen.y + NAME_OFFSET, alpha, corpse and CORPSE_CUE_MAX)
+
+	DrawPerson(faced, name, nil, offer, screen.x, screen.y + NAME_OFFSET, math.ease.InOutSine(distanceFade) * 255)
 end
 
 local function IsMovable(ent)
@@ -570,12 +679,15 @@ hook.Add("HUDPaint", "HGCueScan", function()
 		return
 	end
 
-	local blocked = not alt and TagBlocked(lply)
-	local showTags = not alt and not blocked
-	tagVisibility = math.Approach(tagVisibility, showTags and 1 or 0, RealFrameTime() * TAG_TRANSITION_SPEED)
-	if blocked and tagVisibility == 0 then return end
+	tagVisibility = math.Approach(tagVisibility, alt and 1 or 0, RealFrameTime() * TAG_TRANSITION_SPEED)
 
-	DrawFacing(lply, zoomScan and ZOOM_DIST or TAG_DIST, blocked)
+	local faced, trace = FacedSubject(lply, zoomScan and ZOOM_DIST or TAG_FADE_END)
+
+	if tagVisibility > 0 then
+		DrawTorsoTags(lply, faced, zoomScan)
+	elseif faced and not TagBlocked(lply) then
+		DrawHoverTag(lply, faced, trace)
+	end
 
 	if zoomScan then
 		MovableItems(EyePos())

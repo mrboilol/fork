@@ -58,6 +58,11 @@ local THOUGHTS = {
 		{"Im fucking done.", "I don't want to feel this anymore.", "Let it end. Please."},
 		{"Make it quick. Just make it quick.", "I'm done. I just want it over.", "Why won't it just end already..."},
 	},
+	givingUp = {
+		{"What's even the point anymore...", "I can't keep this up...", "I'm so tired of this..."},
+		{"I'm done trying.", "I've got nothing left.", "I can't do this anymore..."},
+		{"I give up.", "There's nothing left in me.", "I'm not getting back up from this..."},
+	},
 }
 
 local FIELDS = {"hopelessness", "desolation", "suicidal"}

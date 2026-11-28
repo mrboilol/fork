@@ -1099,7 +1099,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         or (ecgState == "asystole" and brain >= 0.02)
         or IsCirculationCritical(org)
         or IsVentricularFibrillation(org)
-        or (brain > 0.4)
+        or (brain > 0.55)
         or (brainHemorrhage >= 0.4)
         or (tonumber(org.brainSwelling) or 0) >= 0.45
     local admiring = ply:GetNWBool("mcd_admiring", false) and not ply.mcd_admire_local_cancel
@@ -1334,7 +1334,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
             local target_isCritical = (target_org.critical == true)
                 or IsCirculationCritical(target_org)
                 or IsVentricularFibrillation(target_org)
-                or (target_brain > 0.4)
+                or (target_brain > 0.55)
                 or (target_hemorrhage >= 0.4)
                 or (tonumber(target_org.brainSwelling) or 0) >= 0.45
             local targetECGColor = target_isCritical and Color(200, 0, 0, 255) or Color(255, 255, 255, 255)

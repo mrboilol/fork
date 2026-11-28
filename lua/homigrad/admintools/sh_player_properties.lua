@@ -256,7 +256,7 @@ local organismEditorTabs = {
 		"simple.health", "simple.brute", "simple.burn", "simple.toxin", "simple.oxy", "simple.crit", "simple.contamination",
 		"simple.heartEfficiency", "simple.heartRate", "simple.rhythm", "simple.consciousnessCap", "simple.oxyGain",
 		"simple.oxyGainBonus", "simple.lungOxyRate", "simple.toxinRegenMul", "simple.airwayBlocked", "simple.gasping",
-		"simple.flatline", "simple.fibrillating", "simple.thiamineActive", "simple.cprCritHealed", "simple.critImmune",
+		"simple.flatline", "simple.fibrillating", "simple.thiamineActive", "simple.critImmune",
 	}},
 }
 
@@ -587,7 +587,7 @@ properties.Add( "lobotomize", {
         ply:ChatPrint("Lobotomized brain to "..math.Round(ent.organism.brain * 100).."%")
         print(tostring(ply:Nick() or ply) .." has lobotomized ".. tostring(ent:Nick() or ent))
 
-        if ent.organism.brain >= 0.25 and ent.organism.brain < 0.3 then
+        if ent.organism.brain >= hg.organism.BRAIN_COMA - 0.05 and ent.organism.brain < hg.organism.BRAIN_COMA then
             ply:ChatPrint("Consciousness loss on the next lobotomization!")
         end
     end 

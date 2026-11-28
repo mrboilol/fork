@@ -1053,7 +1053,9 @@ local function buildEffects(ply, org)
 		orgNumber(org, "alkalosis", 0),
 		orgNumber(org, "rhabdo", 0) * 0.8,
 		orgNumber(org, "hyperkalemia", 0),
-		orgNumber(org, "renalFailure", 0) * 0.8
+		orgNumber(org, "renalFailure", 0) * 0.8,
+		orgNumber(org, "peritonitis", 0) * 0.8,
+		orgNumber(org, "uremia", 0) * 0.8
 	)
 	if organThreat >= 0.25 then
 		local level = highRank(organThreat, {0.25, 0.5, 0.75, 0.95})
@@ -1132,7 +1134,7 @@ local function buildEffects(ply, org)
 	if concussion > 0.1 then add(effects, "concussion", "concussion", highRank(concussion, {0.1, 0.25, 0.5, 0.75}), "bad", 44, math.floor(concussion * 100) .. "%") end
 	local brain = orgNumber(org, "brain", 0)
 	if brain > 0.01 then
-		if brain >= 0.35 then
+		if brain >= hg.organism.BRAIN_COMA then
 			add(effects, "brain_dying", "dranbamage", 4, "bad", -85, math.floor(brain * 100) .. "%")
 		else
 			local level = highRank(brain, {0.01, 0.1, 0.18, 0.25})

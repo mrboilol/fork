@@ -146,7 +146,7 @@ local function sendState(owner, org, force)
 	local now = CurTime()
 	local mode = org.simpleMode or 0
 	local state = org.simple
-	local crit = state and (state.displayCrit or state.crit) or CRIT_NONE
+	local crit = state and state.crit or CRIT_NONE
 	local countdownEnd = state and state.countdownStart and state.countdownStart + (state.countdownDuration or CONFIG.oxy.countdownTime) or 0
 	local signature = mode * 4 + crit
 
@@ -524,7 +524,10 @@ local function flatlineChance(org, state)
 	if state.health <= softAt then
 		chance = flatlineConfig.softCritChance + rampUp(softAt - state.health, 0, softAt - hardAt) * flatlineConfig.softCritDepthChance
 	end
-	if state.health <= hardAt then chance = chance + flatlineConfig.severeChance end
+	if state.health <= hardAt then
+		local depth = rampUp(hardAt - state.health, 0, hardAt - CONFIG.deathHealth)
+		chance = chance + flatlineConfig.severeChance + depth * flatlineConfig.severeDepthChance
+	end
 
 	local rate = state.heartRate
 	if rate < flatlineConfig.rateLow then chance = chance + flatlineConfig.rateChance end
@@ -680,9 +683,15 @@ local function tickConsciousness(owner, org, state, timeValue)
 	held = held + rampUp(consciousnessConfig.perfusionStart - (state.brainPerfusion or 1), 0, consciousnessConfig.perfusionStart) * consciousnessConfig.perfusionDrain
 	drain = drain + held
 
+	local softFloor = consciousnessConfig.softCritFloor
 	local ceiling = 1
 	if state.health <= softAt and not SimpleHealth.IsCritImmune(org) then
-		ceiling = Lerp(rampUp(softAt - state.health, 0, softAt - hardAt), 1, consciousnessConfig.hardCritFloor)
+		if state.health > hardAt then
+			ceiling = Lerp(rampUp(softAt - state.health, 0, softAt - hardAt), 1, softFloor)
+		else
+			local depth = rampUp(hardAt - state.health, 0, hardAt - CONFIG.hardCrit.otrubHealth)
+			ceiling = Lerp(depth, softFloor, consciousnessConfig.hardCritFloor)
+		end
 	end
 	ceiling = math.min(ceiling, 1 - rampUp(consciousnessConfig.bloodCapStart - blood, 0, consciousnessConfig.bloodCapStart - CONFIG.deathBlood) * consciousnessConfig.bloodCapMax)
 
@@ -692,11 +701,30 @@ local function tickConsciousness(owner, org, state, timeValue)
 	local previousCap = state.consciousnessCap
 	local cap = previousCap + rate * timeValue
 	if cap > ceiling then cap = math.max(ceiling, math.min(cap, previousCap - consciousnessConfig.depthDrain * timeValue)) end
+	if state.health > hardAt and isBreathing(state) and blood >= consciousnessConfig.bleedStart then
+		cap = math.max(cap, math.min(previousCap + consciousnessConfig.recover * timeValue, softFloor))
+	end
 
 	state.consciousnessCap = math.Clamp(cap, 0, 1)
 	org.consciousness = math.min(tonumber(org.consciousness) or 1, state.consciousnessCap)
 
 	if org.otrub and org.consciousness < consciousnessConfig.wakeAt then org.needotrub = true end
+end
+
+local function tickHardCritBlackout(owner, org, state, timeValue)
+	local _, hardAt = SimpleHealth.GetCritThresholds()
+	if org.otrub or state.health > hardAt or SimpleHealth.IsCritImmune(org) then return end
+
+	local hardConfig = CONFIG.hardCrit
+	local depth = rampUp(hardAt - state.health, 0, hardAt - hardConfig.otrubHealth)
+	local chance = hardConfig.blackoutChance + depth * hardConfig.blackoutDepthChance
+	if math.Rand(0, 1) >= chance * timeValue then return end
+
+	local knockoutUntil = CurTime() + math.Rand(hardConfig.blackoutMinTime, hardConfig.blackoutMaxTime)
+	org.postureOtrubUntil = math.max(org.postureOtrubUntil or 0, knockoutUntil)
+	org.needotrub = true
+	org.needfake = true
+	org.consciousness = math.min(tonumber(org.consciousness) or 1, 0.04)
 end
 
 table.insert(SimpleHealth.Tickers, tickInternalBleed)
@@ -709,6 +737,7 @@ table.insert(SimpleHealth.Tickers, tickRhythm)
 table.insert(SimpleHealth.Tickers, tickFlatline)
 table.insert(SimpleHealth.Tickers, tickBrainPerfusion)
 table.insert(SimpleHealth.Tickers, tickConsciousness)
+table.insert(SimpleHealth.Tickers, tickHardCritBlackout)
 
 for _, ticker in ipairs({tickOxy, tickRegen, tickTemperature}) do
 	SimpleHealth.PoolTickers[ticker] = true
@@ -736,18 +765,17 @@ local function updateCrit(org, state)
 	local healthCrit = critImmune and SimpleHealth.CRIT_NONE or SimpleHealth.GetCritState(state.health)
 	local severe = state.flatline or state.fibrillating or healthCrit == CRIT_HARD
 	local needleSoft = healthCrit == CRIT_SOFT and SimpleHealth.NeedleHoldsSoftCrit(org, state)
-	state.crit = (severe or (org.otrub and not needleSoft)) and CRIT_HARD or healthCrit
-	state.displayCrit = severe and CRIT_HARD or healthCrit
-	org.critical = state.displayCrit == CRIT_HARD
+	state.crit = severe and CRIT_HARD or healthCrit
+	org.critical = state.crit == CRIT_HARD
 	state.lethalCrit = severe or (org.otrub and healthCrit == CRIT_SOFT and not needleSoft and not isBreathing(state))
 	state.lethalFromHealth = state.lethalCrit and healthCrit ~= CRIT_NONE and not state.fibrillating and (not state.flatline or state.healthFlatline) or nil
-	state.dying = state.crit == CRIT_HARD or (state.crit == CRIT_SOFT and not needleSoft)
 	org.simpleControlMul = state.crit == CRIT_SOFT and CONFIG.softCritControlMul or nil
 
-	local softCritFree = state.crit == CRIT_SOFT and state.health < 15
-	if state.crit >= CRIT_SOFT and not softCritFree then org.needfake = true end
-	local healthDrained = healthCrit == CRIT_HARD and state.consciousnessCap <= CONFIG.consciousness.hardCritFloor + 0.005
-	if healthDrained then org.needotrub = true end
+	if state.crit == CRIT_HARD then org.needfake = true end
+	if healthCrit == CRIT_HARD and state.health <= CONFIG.hardCrit.otrubHealth then
+		org.needotrub = true
+		org.consciousness = math.min(tonumber(org.consciousness) or 1, CONFIG.consciousness.wakeAt * 0.5)
+	end
 
 	if state.crit ~= previous then
 		hook.Run("hg/simplehealth/crit-changed", org.owner, org, state.crit, previous)
@@ -773,9 +801,11 @@ local function updateCountdown(owner, org, state)
 	local bleedOut = drowsy and blood < bleedConfig.rollBelow and (blood < bleedConfig.start or state.bleedRoll)
 	state.countdownBleed = not state.fibrillating and bleedOut or nil
 
+	local oxyLimit = state.crit == CRIT_HARD and oxyConfig.hardCritCountdownStart or oxyConfig.countdownStart
+
 	if state.fibrillating then
 		state.countdownStart = state.fibrillationStart
-	elseif (state.oxy > oxyConfig.countdownStart or bleedOut) and (org.otrub or state.dying or bleedOut) then
+	elseif bleedOut or (org.otrub and state.oxy > oxyLimit) then
 		state.countdownStart = state.countdownStart or now
 	else
 		state.countdownStart = nil
@@ -942,8 +972,8 @@ local function registerSpike(org, state, applied)
 
 	if state.spikeAmount < spikeConfig.minDamage then return end
 
-	local softAt = SimpleHealth.GetCritThresholds()
-	if SimpleHealth.GetHealth(state) > softAt then return end
+	local _, hardAt = SimpleHealth.GetCritThresholds()
+	if SimpleHealth.GetHealth(state) > hardAt then return end
 
 	local severity = rampUp(state.spikeAmount, spikeConfig.minDamage, spikeConfig.fullDamage)
 	local knockoutUntil = now + Lerp(severity, spikeConfig.minTime, spikeConfig.maxTime)
@@ -1282,38 +1312,27 @@ local function tickToxin(owner, org, state, timeValue)
 	syncSepsis(org, state)
 end
 
-local function healWorstPools(org, state, amount)
-	local healed = 0
+local function healFromCPR(org, state)
+	local oxyConfig = CONFIG.oxy
+	local amount = math.min(oxyConfig.cprHeal, oxyConfig.cprHealTo - SimpleHealth.GetHealth(state))
+	local first, second = "brute", "burn"
+	if state.burn > state.brute then first, second = second, first end
 
-	while amount - healed > 0.001 do
-		local worst, value
-		for _, pool in ipairs(SimpleHealth.POOLS) do
-			if (state[pool] or 0) > (value or 0) then worst, value = pool, state[pool] end
-		end
-		if not worst then break end
+	for _, pool in ipairs({first, second, "toxin"}) do
+		if amount <= 0 then return end
 
-		healed = healed + SimpleHealth.Heal(org, worst, amount - healed)
+		amount = amount - SimpleHealth.Heal(org, pool, amount)
 	end
-
-	return healed
 end
 
 local function tickResuscitation(owner, org, state, timeValue)
 	local oxyConfig = CONFIG.oxy
 	local now = CurTime()
 
-	if state.crit == CRIT_NONE then state.cprCritHealed = nil end
-
 	if (org.cprSupportUntil or 0) > now and (state.nextCprClear or 0) <= now then
 		state.nextCprClear = now + oxyConfig.cprCycle
 		SimpleHealth.Heal(org, "oxy", oxyConfig.cprClear)
-		SimpleHealth.Heal(org, "toxin", oxyConfig.cprToxinClear)
-
-		local _, hardAt = SimpleHealth.GetCritThresholds()
-		local healed = state.cprCritHealed or 0
-		if state.health <= hardAt and healed < oxyConfig.cprCritBudget then
-			state.cprCritHealed = healed + healWorstPools(org, state, math.min(oxyConfig.cprCritHeal, oxyConfig.cprCritBudget - healed))
-		end
+		healFromCPR(org, state)
 
 		if state.flatline and math.Rand(0, 1) < CONFIG.flatline.cprRestartChance then stopFlatline(owner, org, state) end
 	end
@@ -1347,7 +1366,6 @@ function SimpleHealth.OnAEDShock(org)
 	org.incapReason = nil
 	org.deathStateEnd = nil
 	state.aedResistUntil = CurTime() + oxyConfig.aedResistTime
-	state.cprCritHealed = nil
 
 	if state.flatline then
 		local flatlineConfig = CONFIG.flatline

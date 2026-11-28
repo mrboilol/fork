@@ -112,4 +112,12 @@ PrecacheIfExists("impact_glass", { "particles/impact_fx.pcf" })
 --// Fix for homigrad content breaking impact decals (bruh)
 if CLIENT then
 	RunConsoleCommand("cl_new_impact_effects", "1")
+	pcall(RunConsoleCommand, "r_threaded_particles", "0")
+
+	hook.Add("InitPostEntity", "hg_particle_thread_crash", function()
+		local cvar = GetConVar("r_threaded_particles")
+		if cvar and cvar:GetBool() then
+			MsgN("[hg] r_threaded_particles is still on, enter 'r_threaded_particles 0' in console")
+		end
+	end)
 end

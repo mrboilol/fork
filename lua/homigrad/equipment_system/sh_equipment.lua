@@ -276,13 +276,22 @@ local function transferArmorBlunt(org, placement, plate, bluntDamage, stopped, d
 	local target = stopped and bluntTransferTargets[placement]
 	local transferTo = target and hg.organism.input_list[target]
 	if transferTo then
+		local attacker, inflictor = dmgInfo:GetAttacker(), dmgInfo:GetInflictor()
+		local damage, damageType = dmgInfo:GetDamage(), dmgInfo:GetDamageType()
+		local position, force = Vector(dmgInfo:GetDamagePosition()), Vector(dmgInfo:GetDamageForce())
 		local bluntInfo = DamageInfo()
-		bluntInfo:SetAttacker(dmgInfo:GetAttacker())
+		bluntInfo:SetAttacker(IsValid(attacker) and attacker or game.GetWorld())
 		bluntInfo:SetInflictor(game.GetWorld())
 		bluntInfo:SetDamage(bluntDamage)
 		bluntInfo:SetDamageType(DMG_CLUB)
-		bluntInfo:SetDamagePosition(dmgInfo:GetDamagePosition())
+		bluntInfo:SetDamagePosition(position)
 		transferTo(org, nil, bluntDamage * (1 - dispersion) / 25 * CHEST_TRANSFER, bluntInfo)
+		dmgInfo:SetAttacker(IsValid(attacker) and attacker or game.GetWorld())
+		dmgInfo:SetInflictor(IsValid(inflictor) and inflictor or game.GetWorld())
+		dmgInfo:SetDamage(damage)
+		dmgInfo:SetDamageType(damageType)
+		dmgInfo:SetDamagePosition(position)
+		dmgInfo:SetDamageForce(force)
 	end
 
 	return spread

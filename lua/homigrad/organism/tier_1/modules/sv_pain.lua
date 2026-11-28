@@ -439,8 +439,9 @@ module[2] = function(owner, org, timeValue)
 		(org.brainHemorrhage or 0) * 0.8
 	)
 	if hg.organism.IsBrainDamageIgnored and hg.organism.IsBrainDamageIgnored(org) then structuralBrainDamage = 0 end
-	local comaActive = structuralBrainDamage >= 0.3
-	local brainSeverity = comaActive and math.Clamp((structuralBrainDamage - 0.3) / 0.7, 0, 1) or 0
+	local brainComa, brainDeath = hg.organism.BRAIN_COMA, hg.organism.BRAIN_DEATH
+	local comaActive = structuralBrainDamage >= brainComa
+	local brainSeverity = comaActive and math.Clamp((structuralBrainDamage - brainComa) / (brainDeath - brainComa), 0, 1) or 0
 	local hemorrhageSeverity = comaActive and math.Clamp(((org.brainHemorrhage or 0) - 0.05) / 0.95, 0, 1) or 0
 	if comaActive then
 		org.consciousness = math.min(org.consciousness or 1, 0.85 - brainSeverity * 0.85)

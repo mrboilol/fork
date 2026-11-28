@@ -1314,7 +1314,7 @@ local function buildPerfusionDiagnosis(org, countedBPM)
 	if arterial > 0.5 then messages[#messages + 1] = "Active arterial bleeding needs immediate control." elseif venous > 4 then messages[#messages + 1] = "They have significant venous bleeding." end
 	if org.throatcut then messages[#messages + 1] = "Their throat is cut; control the neck bleeding and airway." end
 	if (tonumber(org.cardiacTamponade) or 0) > 0.1 then messages[#messages + 1] = "Their heart sounds muffled." end
-	if brainDamage > 0.3 then
+	if brainDamage > hg.organism.BRAIN_COMA then
 		messages[#messages + 1] = "Their pupils show signs of catastrophic brain damage."
 	elseif brainDamage > 0.25 then
 		messages[#messages + 1] = "Their pupils show signs of severe brain damage."

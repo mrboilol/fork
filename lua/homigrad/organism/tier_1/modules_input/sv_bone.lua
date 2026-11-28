@@ -1299,7 +1299,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 				if not ignoreBrainDamage then org.brain = math.min((org.brain or 0) + excess * skull_break_brain_mul, 1) end
 			end
 		end
-		if bluntMelee and not fullCharge then result = 1 end
+		if (bluntMelee or dmgInfo:IsDamageType(DMG_SLASH)) and not fullCharge then result = 1 end
 	end
 	if isMelee(dmgInfo) and oldDmg < 1 and org.skull < 1 and dmg > 0.3 and dmg < 1.35 then result = 1 end
 
@@ -1348,7 +1348,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		org.brain = math.min(org.brain + 0.1 * (hg.organism.SkullBrainTransfer and hg.organism.SkullBrainTransfer(org.skull) or 1), 1)
 	end
 
-	if not ignoreBrainDamage and brainEnergy > 0.05 and org.brain >= 0.3 and math.random(3) == 1 and (rnd or (org.skull - oldDmg) > 0.6) then
+	if not ignoreBrainDamage and brainEnergy > 0.05 and org.brain >= hg.organism.BRAIN_COMA and math.random(3) == 1 and (rnd or (org.skull - oldDmg) > 0.6) then
 		org.shock = 70
 	end
 

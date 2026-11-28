@@ -43,7 +43,7 @@ SWEP.offsetVec = Vector(6, 5.5, -41)
 SWEP.offsetAng = Angle(180, 160, 180)
 
 SWEP.BomberModel = "models/b2/b2.mdl"
-SWEP.BombModel = "models/gbombs/250lbgp.mdl"
+SWEP.BombModel = "models/jmod/explosives/bombs/c4/w_c4_planted.mdl"
 SWEP.BomberHeight = 4096
 SWEP.MinBomberHeight = 900
 SWEP.BomberSkyClearance = 350
@@ -51,7 +51,7 @@ SWEP.BomberDistance = 12000
 SWEP.BomberSpeed = 1800
 SWEP.BomberScale = 0.87
 SWEP.BombDropHeight = 900
-SWEP.BombScale = 1.35
+SWEP.BombScale = 0.5
 SWEP.BlastDamage = 2500
 SWEP.BlastRadius = 3500
 SWEP.NukeBombClass = "rem_bomb_2000"
@@ -369,6 +369,8 @@ if SERVER then
 			carpetCount = self.CarpetBombCount,
 			carpetClass = self.CarpetBombClass,
 			nukeClass = self.NukeBombClass,
+			bombModel = self.BombModel,
+			bombScale = self.BombScale,
 			rowSpacing = self.CarpetBombRowSpacing,
 			ambientSounds = self.AmbientSounds,
 			waveMin = waveMin,
@@ -394,6 +396,8 @@ if SERVER then
 
 		if not IsValid(bomb) then return end
 
+		bomb.Model = ctx.bombModel
+		bomb:SetModelScale(ctx.bombScale, 0)
 		bomb.IsOnPlane = true
 		bomb.GBOWNER = owner
 		bomb.Owner = owner
@@ -443,6 +447,8 @@ if SERVER then
 
 		if not IsValid(bomb) then return end
 
+		bomb.Model = ctx.bombModel
+		bomb:SetModelScale(ctx.bombScale, 0)
 		bomb.IsOnPlane = true
 		bomb.GBOWNER = owner
 		bomb.Owner = owner

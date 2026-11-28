@@ -605,7 +605,7 @@ local function send_organism(org, ply, recipientForce, reliable)
 		"simpleMode", "simple", "fever", "paco2", "lactaid", "sepsisSource", "renalFailure", "heatProduction", "shivering", "metabolicDemand",
 		"chronicStrain", "pulseDeficit", "clotBurden", "pulmonaryEmbolism", "streptokinase", "hydration", "hemothoraxL", "hemothoraxR",
 		"citrate", "thiamine", "tranexamic_acid", "naloxone", "fearadd", "goodmood", "hopelessness", "desolation", "suicidal", "medical_infection",
-		"brainFog", "cerebralHypoperfusion", "cerebralFlowMul", "rhabdo", "myoglobin", "hyperkalemia", "acidContractility", "catecholamineResponse", "thirst", "regeneratehp", "bodyoxygen"
+		"brainFog", "cerebralHypoperfusion", "cerebralFlowMul", "rhabdo", "myoglobin", "hyperkalemia", "peritonitis", "gutPerforation", "uremia", "acidContractility", "catecholamineResponse", "thirst", "regeneratehp", "bodyoxygen"
 	}) do
 		sendtable[key] = org[key]
 	end
@@ -843,7 +843,7 @@ local function send_bareinfo(org, force, reliable)
 		"simpleMode", "simple", "fever", "paco2", "lactaid", "sepsisSource", "renalFailure", "heatProduction", "shivering", "metabolicDemand",
 		"chronicStrain", "pulseDeficit", "clotBurden", "pulmonaryEmbolism", "streptokinase", "hydration", "hemothoraxL", "hemothoraxR",
 		"citrate", "thiamine", "tranexamic_acid", "naloxone", "fearadd", "goodmood", "hopelessness", "desolation", "suicidal", "medical_infection",
-		"brainFog", "cerebralHypoperfusion", "cerebralFlowMul", "rhabdo", "myoglobin", "hyperkalemia", "acidContractility", "catecholamineResponse", "thirst", "regeneratehp", "bodyoxygen"
+		"brainFog", "cerebralHypoperfusion", "cerebralFlowMul", "rhabdo", "myoglobin", "hyperkalemia", "peritonitis", "gutPerforation", "uremia", "acidContractility", "catecholamineResponse", "thirst", "regeneratehp", "bodyoxygen"
 	}) do
 		sendtable[key] = org[key]
 	end
@@ -923,7 +923,7 @@ end
 function hg.organism.KillFatalBrainDamage(org, silent)
 	if not org or org.fatalBrainDeath then return false end
 
-	hg.organism.SetDeathCause(org, "fatal brain damage (brain >= 0.7 or fatal head hit)")
+	hg.organism.SetDeathCause(org, "fatal brain damage (brain >= " .. hg.organism.BRAIN_DEATH .. " or fatal head hit)")
 	org.fatalBrainDeath = true
 
 	local owner = org.owner
@@ -1239,8 +1239,8 @@ hg.organism.convulsionConfig = {
 	chanceMin = 0.03,
 	chanceMax = 0.25,
 	recoveryRisk = 0.1,
-	brainStart = 0.3,
-	brainFull = 0.5,
+	brainStart = hg.organism.BRAIN_COMA,
+	brainFull = 0.7,
 	brainChanceMin = 0.05,
 	brainChanceMax = 0.5,
 	brainQuicken = 3,
@@ -1903,9 +1903,9 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.deathStateKilled = nil
 	end
 
-	if isPly and ((org.brain or 0) >= 1 or (org.blood or 5000) < 10) and owner:Alive() and not org.deathStateKilled then
+	if isPly and ((org.brain or 0) >= hg.organism.BRAIN_DEATH or (org.blood or 5000) < 10) and owner:Alive() and not org.deathStateKilled then
 		org.deathStateKilled = true
-		hg.organism.SetDeathCause(org, (org.brain or 0) >= 1 and "brain >= 1" or "blood < 10")
+		hg.organism.SetDeathCause(org, (org.brain or 0) >= hg.organism.BRAIN_DEATH and "brain >= " .. hg.organism.BRAIN_DEATH or "blood < 10")
 		if org.analgesia > 1.5 or org.painkiller > 2.4 then
 			hg.achievements.AddPlayerAchievement(owner, "drugs", 1)
 		end
@@ -1916,7 +1916,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	if just_went_uncon then
 		org.owner.fullsend = true
 	end
-	if not ignoreBrainDamage and org.brain >= 0.3 and (org.otrub or org.needotrub) then
+	if not ignoreBrainDamage and org.brain >= hg.organism.BRAIN_COMA and (org.otrub or org.needotrub) then
 		if math.random(600) < org.brain * 20 then
 			org.needfake = true
 		end

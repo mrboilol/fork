@@ -232,6 +232,7 @@ local DEV_LIST = {
 	{"hemotransfusionshock", 2, true}, {"septicShock", 1, true}, {"bloodph", 7.4}, {"bicarb", 24}, {"acidosis", 1, true},
 	{"alkalosis", 1, true}, {"hepaticFailure", 1, true}, {"hepaticToxin", 1, true}, {"renalFailure", 1, true},
 	{"liver", 1, true}, {"flank", 1, true}, {"gut", 1, true}, {"myoglobin", 2, true}, {"rhabdo", 1, true}, {"hyperkalemia", 1, true},
+	{"peritonitis", 1, true}, {"gutPerforation", 1, true}, {"uremia", 1, true},
 	{"acidContractility", 1}, {"catecholamineResponse", 1}, {"cerebralFlowMul", 1}, {"cerebralHypoperfusion", 1, true}, {"brainFog", 1, true},
 	{"pain", 90, true}, "painStage", {"shock", 10, true}, {"analgesia", 2, true}, {"painkiller", 3, true}, {"adrenaline", 5, true},
 	{"noradrenaline", 5, true}, {"tranquilizer", 1, true}, {"zerlkersOverdose", 1, true}, {"thiamine", 1}, {"tranexamic_acid", 1},
@@ -258,7 +259,7 @@ local SIMPLE_STATE_KEYS = {
 	{"brute", 200, true}, {"burn", 200, true}, {"toxin", 200, true}, {"oxy", 200, true}, "crit", {"contamination", 1, true},
 	{"heartEfficiency", 1}, {"heartRate", 70}, "rhythm", {"consciousnessCap", 1}, {"oxyGain", 5, true}, {"oxyGainBonus", 5},
 	{"lungOxyRate", 5, true}, {"toxinRegenMul", 1}, {"airwayBlocked", true, true}, {"gasping", true, true}, {"flatline", true, true},
-	{"fibrillating", true, true}, {"thiamineActive", true}, {"cprCritHealed", true}, {"critImmune", true}, {"lethalCrit", true, true},
+	{"fibrillating", true, true}, {"thiamineActive", true}, {"critImmune", true}, {"lethalCrit", true, true},
 }
 
 local SIMPLE_STATE_TIMERS = {

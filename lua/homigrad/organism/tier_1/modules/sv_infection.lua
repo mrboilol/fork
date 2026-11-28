@@ -83,6 +83,19 @@ Infection.Config = {
 	sepsisLungCap = 0.7,
 	sepsisGutDamage = 0.008,
 	sepsisGutCap = 0.6,
+
+	perforationStart = 0.3,
+	bileLeakStart = 0.5,
+	bileLeakMul = 0.45,
+	peritonitisRise = 1 / 45,
+	peritonitisFall = 1 / 300,
+	peritonitisSeed = 0.004,
+	peritonitisBacteremia = 0.0025,
+	peritonitisPain = 3,
+	peritonitisNausea = 0.006,
+	peritonitisFluidLoss = 1.2,
+	peritonitisHydrationLoss = 0.012,
+	peritonitisLactate = 0.003,
 }
 local CONFIG = Infection.Config
 
@@ -111,6 +124,8 @@ function Infection.Init(org)
 	org.feverK = 0
 	org.feverPressor = 0
 	org.immuneBloodPrev = nil
+	org.peritonitis = 0
+	org.gutPerforation = 0
 end
 
 function Infection.GetSickness(org)
@@ -343,6 +358,38 @@ function hg.organism.UpdateInfection(owner, org, mulTime)
 	end
 
 	feedSepsis(org, infection + (tonumber(org.pneumonia) or 0), wounds, temperature, mulTime)
+end
+
+function hg.organism.UpdatePeritonitis(org, mulTime)
+	if org.simpleMode or not org.alive then
+		org.peritonitis, org.gutPerforation = 0, 0
+		return
+	end
+
+	local perforation = Clamp(((tonumber(org.gut) or 0) - CONFIG.perforationStart) / (1 - CONFIG.perforationStart), 0, 1)
+	local bileLeak = Clamp(((tonumber(org.liver) or 0) - CONFIG.bileLeakStart) / (1 - CONFIG.bileLeakStart), 0, 1) * CONFIG.bileLeakMul
+	org.gutPerforation = perforation
+
+	local leak = min(perforation + bileLeak, 1)
+	local peritonitis = tonumber(org.peritonitis) or 0
+	if leak > peritonitis then
+		peritonitis = Approach(peritonitis, leak, mulTime * CONFIG.peritonitisRise * (0.5 + leak))
+	else
+		peritonitis = Approach(peritonitis, leak, mulTime * CONFIG.peritonitisFall)
+	end
+	org.peritonitis = peritonitis
+	if peritonitis <= 0 then return end
+
+	if perforation > 0 and infectionsEnabled() then
+		local spill = mulTime * perforation * (0.3 + peritonitis * 0.7)
+		Infection.Contaminate(org, spill * CONFIG.peritonitisSeed, (tonumber(org.antibiotics) or 0) > 0 and 0 or spill * CONFIG.peritonitisBacteremia)
+	end
+
+	org.painadd = min((tonumber(org.painadd) or 0) + mulTime * peritonitis * CONFIG.peritonitisPain, 150)
+	org.wantToVomit = (org.wantToVomit or 0) + mulTime * peritonitis * CONFIG.peritonitisNausea
+	org.blood = max((tonumber(org.blood) or 0) - mulTime * peritonitis * CONFIG.peritonitisFluidLoss, 0)
+	org.hydration = max((tonumber(org.hydration) or 100) - mulTime * peritonitis * CONFIG.peritonitisHydrationLoss, 0)
+	org.lactaid = min((tonumber(org.lactaid) or 1) + mulTime * peritonitis * perforation * CONFIG.peritonitisLactate, 20)
 end
 
 function hg.organism.UpdateSepsis(org, mulTime, adrenalineStabilizer)

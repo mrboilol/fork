@@ -7,6 +7,8 @@ hg.organism.BLEEDOUT_DEATH_BLOOD = 2000
 hg.organism.PULSELESS_BLOOD_VOLUME = 2000
 hg.organism.CPR_MIN_BLOOD = 1750
 hg.organism.MAX_TRANSFUSION_BLOOD = 6500
+hg.organism.BRAIN_COMA = 0.4
+hg.organism.BRAIN_DEATH = 1
 
 function hg.organism.GetLimitingReserve(...)
 	local reserve = 1

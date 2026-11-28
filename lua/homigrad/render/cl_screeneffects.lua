@@ -3023,10 +3023,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		
 		if (o2 > 20 or incapacitated) and org.otrub then
 			local otrubMode = getServerSoundMode("hg_otrubsound", 0)
-			-- OTRU audio is selected solely by hg_otrubsound.  Remorseism
-			-- incapacitation is a gameplay state, not an audio override: otherwise it
-			-- replaced every configured OTRU track with rem_dying1.
-			local otrubVol = math.Clamp((o2 - 20) / 80 +(brain > 0.3 and (brain - 0.3) * 5 or 0), 0, 1)
+			local otrubVol = math.Clamp((o2 - 20) / 80 +(brain > hg.organism.BRAIN_COMA and (brain - hg.organism.BRAIN_COMA) * 5 or 0), 0, 1)
 			if incapacitated then
 				otrubVol = math.max(otrubVol, 0.3) * Lerp(incapacitationProgress, 0.45, 0.12)
 			end
@@ -3148,12 +3145,11 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	hg.screeneffects_sound.criticalFade = LerpFT(0.03, hg.screeneffects_sound.criticalFade or 0, (painMode == 6 or painMode == 7) and math.Clamp(((hg.GetCardiacSeverity and hg.GetCardiacSeverity(org) or 0) - hg.screeneffects_config.criticalSeverityStart) / (1 - hg.screeneffects_config.criticalSeverityStart), 0, 1) * hg.screeneffects_config.criticalLoopVolume or 0)
 	hg.ScreenEffectsLoop("criticalLoop", hg.screeneffects_config.criticalLoopPath, org.otrub and 0 or hg.screeneffects_sound.criticalFade)
 	hg.ScreenEffectsLoop("criticalLoopOtrub", hg.screeneffects_config.criticalLoopOtrubPath, org.otrub and hg.screeneffects_sound.criticalFade or 0)
-	hg.screeneffects_sound.wrapsFade = LerpFT(org.convulsing and 0.06 or 0.03, hg.screeneffects_sound.wrapsFade or 0, painMode == 7 and math.max(org.otrub and math.Clamp((O2Lerp - 20) / 80 + (brain > 0.3 and (brain - 0.3) * 5 or 0), 0, 1) or 0, org.convulsing and not (GetConVar("hg_incapacitation") and GetConVar("hg_incapacitation"):GetBool()) and 1 or 0) or 0)
+	hg.screeneffects_sound.wrapsFade = LerpFT(org.convulsing and 0.06 or 0.03, hg.screeneffects_sound.wrapsFade or 0, painMode == 7 and math.max(org.otrub and math.Clamp((O2Lerp - 20) / 80 + (brain > hg.organism.BRAIN_COMA and (brain - hg.organism.BRAIN_COMA) * 5 or 0), 0, 1) or 0, org.convulsing and not (GetConVar("hg_incapacitation") and GetConVar("hg_incapacitation"):GetBool()) and 1 or 0) or 0)
 	hg.ScreenEffectsLoop("wraps", hg.screeneffects_config.wrapsPath, hg.screeneffects_sound.wrapsFade * hg.screeneffects_config.wrapsVolume)
 
-	-- Play noises.ogg when brain health is between 0.6 and 0.7
-	if brain >= 0.6 and brain <= 0.7 and not org.otrub then
-		local noisesVol = math.Remap(brain, 0.6, 0.7, 0, 0.75)
+	if brain >= 0.85 and brain <= hg.organism.BRAIN_DEATH and not org.otrub then
+		local noisesVol = math.Remap(brain, 0.85, hg.organism.BRAIN_DEATH, 0, 0.75)
 		noisesVol = math.Clamp(noisesVol, 0, 0.75)
 		if IsValid(NoisesStation) then
 			NoisesStation:SetVolume(noisesVol)

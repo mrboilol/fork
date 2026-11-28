@@ -853,10 +853,9 @@ module[2] = function(owner, org, mulTime)
 	-- Cerebral oxygen, brain/airway injury, cardiac arrest, and spinal failure do.
 	local cerebralFailure = (org.brainoxygen or 1) < 0.16
 	local ignoreBrainDamage = hg.organism.IsBrainDamageIgnored and hg.organism.IsBrainDamageIgnored(org)
-	org.incapacitated = incapacitationEnabled and org.otrub and (cerebralFailure or (not ignoreBrainDamage and org.brain > 0.4) or (org.trachea >= 0.5 and org.needle <= 0) or org.heartstop or (org.spine3 >= 1) or (org.spine2 >= hg.organism.fake_spine2)) or false
+	org.incapacitated = incapacitationEnabled and org.otrub and (cerebralFailure or (org.trachea >= 0.5 and org.needle <= 0) or org.heartstop or (org.spine3 >= 1) or (org.spine2 >= hg.organism.fake_spine2)) or false
 	local incapReasons = {}
 	if cerebralFailure then incapReasons[#incapReasons + 1] = "brainO2<0.16" end
-	if not ignoreBrainDamage and org.brain > 0.4 then incapReasons[#incapReasons + 1] = "brain>0.4" end
 	if org.trachea >= 0.5 and org.needle <= 0 then incapReasons[#incapReasons + 1] = "trachea" end
 	if org.heartstop then incapReasons[#incapReasons + 1] = "heartstop" end
 	if org.spine3 >= 1 then incapReasons[#incapReasons + 1] = "spine3" end
@@ -867,7 +866,7 @@ module[2] = function(owner, org, mulTime)
 	local tracheaBlocking = org.trachea > 0.5 and noNeedle
 	local tracheaNoO2Regen = org.trachea > 0.5 and (org.o2.curregen or 0) <= 0
 
-	if (not ignoreBrainDamage and org.brain > 0.4) or (org.heart > 0.6) or tracheaBlocking or tracheaNoO2Regen then
+	if (not ignoreBrainDamage and org.brain > 0.55) or (org.heart > 0.6) or tracheaBlocking or tracheaNoO2Regen then
 		org.critical = true
 	else
 		org.critical = false

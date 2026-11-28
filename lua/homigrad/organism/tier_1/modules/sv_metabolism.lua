@@ -110,6 +110,7 @@ module[2] = function(owner, org, timeValue)
 		fuel = Clamp((org.satiety or 0) / (FUEL_FULL_SATIETY * TraitMul(org, "fuel_need", 1)), 0, 1)
 		if thiamine and fuel < 1 then fuel = math.sqrt(fuel) end
 	end
+	if not org.simpleMode then fuel = fuel * (1 - Clamp(tonumber(org.hepaticFailure) or 0, 0, 1) * 0.4) end
 	org.metabolicFuel = fuel
 
 	if hungerEnabled and org.isPly and owner:IsPlayer() and not org.otrub then

@@ -201,7 +201,7 @@ local function getFaceKey(state, alive)
 
 	local faceConfig = CONFIG.face
 	local health = SimpleHealth.GetHealth(state)
-	if health <= (SimpleHealth.GetCritThresholds()) + 5 then return "softcrit" end
+	if health <= (SimpleHealth.GetCritThresholds()) then return "softcrit" end
 	if clarkConVar:GetBool() then
 		local third = SimpleHealth.Config.maxHealth / 3
 		if health < third then return "critical" end
@@ -413,7 +413,7 @@ hook.Add("HG_DeathTransitionHUD", "hg/simplehealth/face", nildoy)
 local function finishDeathDelay(playSecond)
 	deathDelay.active = false
 
-	if playSecond then
+	if playSecond and deathDelay.audio then
 		local deathConfig = CONFIG.death
 		playOuchie(deathConfig.sound, deathConfig.secondPitch, deathConfig.volume)
 		playOuchie(deathConfig.sound, deathConfig.highPitch, deathConfig.volume)
@@ -425,7 +425,10 @@ local function startDeathDelay()
 	deathDelay.active = true
 	deathDelay.endTime = RealTime() + deathConfig.delay
 	deathDelay.nextMute = 0
+	deathDelay.audio = deathDelay.aliveMode > 0
 	lastFaceKey = nil
+
+	if not deathDelay.audio then return end
 
 	RunConsoleCommand("stopsound")
 	playOuchie(deathConfig.sound, deathConfig.firstPitch, deathConfig.volume)
@@ -443,7 +446,7 @@ function SimpleHealth.UpdateDeathDelay()
 		local org = lply.new_organism or lply.organism
 		local deadline = org and org.incapacitated and tonumber(org.deathStateEnd) or 0
 		deathDelay.incapDeath = deadline > 0 and deadline - CurTime() <= 2
-	elseif deathDelay.wasAlive and deathDelay.aliveMode > 0 and not deathDelay.incapDeath then
+	elseif deathDelay.wasAlive and not deathDelay.incapDeath then
 		startDeathDelay()
 	end
 
@@ -478,7 +481,7 @@ function SimpleHealth.HoldsDeathScreen()
 end
 
 hook.Add("Think", "hg/simplehealth/death-delay", function()
-	if not SimpleHealth.UpdateDeathDelay() then return end
+	if not SimpleHealth.UpdateDeathDelay() or not deathDelay.audio then return end
 	if RealTime() < deathDelay.nextMute then return end
 
 	deathDelay.nextMute = RealTime() + CONFIG.death.muteInterval
@@ -486,11 +489,11 @@ hook.Add("Think", "hg/simplehealth/death-delay", function()
 end)
 
 hook.Add("EntityEmitSound", "hg/simplehealth/death-silence", function()
-	if deathDelay.active then return false end
+	if deathDelay.active and deathDelay.audio then return false end
 end)
 
 hook.Add("ModifyTinnitusFactor", "hg/simplehealth/death-silence", function(value)
-	if deathDelay.active then return 100 end
+	if deathDelay.active and deathDelay.audio then return 100 end
 end)
 
 local FAINT_COLOR = Color(150, 150, 150)

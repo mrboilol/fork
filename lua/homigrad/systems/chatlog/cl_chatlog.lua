@@ -197,6 +197,12 @@ local function WeaponText(event, wep)
 	return article .. " " .. string.lower(wep:GetPrintName())
 end
 
+local function CoverCues(event, actor, target)
+	if not event.covers or not hg.MarkCuesTold then return end
+
+	hg.MarkCuesTold(event.coversTarget and target or actor, event.covers)
+end
+
 local function AddChatLine(elements, noPopup)
 	if IsValid(hg.chat) and hg.chat.AddLine then hg.chat:AddLine(elements, false, noPopup) end
 end
@@ -215,7 +221,7 @@ local overheads = {}
 local overheadBack = Color(0, 0, 0)
 local overheadText = Color(255, 255, 255)
 
-function hg.AddOverheadMessage(actor, text, color, life, fade)
+function hg.AddOverheadMessage(actor, text, color, life, fade, hideOnScan)
 	if not IsValid(actor) or not isstring(text) or text == "" then return end
 
 	local now = CurTime()
@@ -232,7 +238,7 @@ function hg.AddOverheadMessage(actor, text, color, life, fade)
 		return
 	end
 
-	list[#list + 1] = {text = text, color = color or color_white, born = now, life = life or OVERHEAD_LIFE, fade = fade or OVERHEAD_FADE}
+	list[#list + 1] = {text = text, color = color or color_white, born = now, life = life or OVERHEAD_LIFE, fade = fade or OVERHEAD_FADE, hideOnScan = hideOnScan}
 	while #list > OVERHEAD_MAX do table.remove(list, 1) end
 end
 
@@ -246,6 +252,7 @@ local function DrawOverheads()
 	local eye = EyePos()
 	local scale = hg.UIScale and hg.UIScale() or 1
 	local alphaMul = hg.DeathHUDAlpha and hg.DeathHUDAlpha() or 1
+	local scanning = hg.IsCueScanning and hg.IsCueScanning()
 
 	surface.SetFont(OVERHEAD_FONT)
 	local _, textH = surface.GetTextSize("Hg")
@@ -283,6 +290,8 @@ local function DrawOverheads()
 
 		for i = #list, 1, -1 do
 			local item = list[i]
+			if scanning and item.hideOnScan then continue end
+
 			local age = now - item.born
 			local alpha = (age <= item.life and 1 or 1 - (age - item.life) / item.fade) * 255 * alphaMul
 			if alpha <= 0 then continue end
@@ -324,6 +333,7 @@ net.Receive("hg_chatlog_event", function()
 	local textColor = event.crit and ChatLog.COLOR_CRIT or EMOTE_COLOR
 	if actor == lply then
 		if event.mineParts then
+			CoverCues(event, actor, target)
 			AddChatLine(BuildElements(event.mineParts, {targetName = ChatLog.Name(target), targetColor = NameColor(target), bone = ChatLog.CritBones[arg] or "bones"}, textColor))
 		end
 
@@ -347,6 +357,8 @@ net.Receive("hg_chatlog_event", function()
 	}
 
 	if seen or (targetSelf and event.seenParts) then
+		CoverCues(event, actor, target)
+
 		local selfAct = event.selfParts and IsValid(target) and target == actor
 		local overhead = seen and actor ~= lply and not event.noOverhead
 		AddChatLine(BuildElements(selfAct and event.selfParts or event.seenParts, ctx, textColor), overhead)

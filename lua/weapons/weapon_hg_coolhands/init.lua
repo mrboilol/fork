@@ -46,7 +46,7 @@ local function PrintReactionCheck(ply, org, head)
 
 	local brain = tonumber(org.brain) or 0
 	local brainIgnored = hg.organism.IsBrainDamageIgnored and hg.organism.IsBrainDamageIgnored(org)
-	if not brainIgnored and (brain >= 0.6 or (brain >= 0.4 and org.otrub)) then
+	if not brainIgnored and (brain >= 0.85 or (brain >= 0.55 and org.otrub)) then
 		ply:ChatPrint("No response to anything.")
 		if head then ply:ChatPrint("Pupils are fixed and dilated.") end
 		return

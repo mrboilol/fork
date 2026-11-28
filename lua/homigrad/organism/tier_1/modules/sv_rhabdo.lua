@@ -121,7 +121,7 @@ function hg.organism.UpdateRhabdo(owner, org, mulTime)
 	end
 
 	org.rhabdoAcid = myoglobin * CONFIG.acidPerMyoglobin
-	org.hyperkalemia = Clamp((myoglobin - CONFIG.potassiumStart) / 1.2 + renal * CONFIG.potassiumRenal * min(myoglobin * 2, 1) + (tonumber(org.acidosis) or 0) * 0.3, 0, 1)
+	org.hyperkalemia = Clamp((myoglobin - CONFIG.potassiumStart) / 1.2 + renal * CONFIG.potassiumRenal * max(min(myoglobin * 2, 1), 0.6) + (tonumber(org.acidosis) or 0) * 0.3, 0, 1)
 
 	org.rhabdoTime = rhabdo > 0.3 and (org.rhabdoTime or 0) + mulTime or max((org.rhabdoTime or 0) - mulTime * 2, 0)
 	local sustained = Clamp(((org.rhabdoTime or 0) - CONFIG.arrhythmiaDelay) / CONFIG.arrhythmiaRamp, 0, 1)
