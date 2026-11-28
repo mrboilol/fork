@@ -13,7 +13,7 @@ local mat_huy = Material("effects/blood_core")
 
 local cloudmat = Material("effects/smoke_b")
 local hg_oldblood = ConVarExists("hg_oldblood") and GetConVar("hg_oldblood") or CreateClientConVar("hg_oldblood", 0, true, false, "Use old Z-City blood decals", 0, 1)
-local hg_supercheapblood = ConVarExists("hg_supercheapblood") and GetConVar("hg_supercheapblood") or CreateClientConVar("hg_supercheapblood", 0, true, false, "1 = cheapest blood: old Z-City particles and decals, AdvancedBlood CPU and GPU blood off", 0, 1)
+local hg_supercheapblood = ConVarExists("hg_supercheapblood") and GetConVar("hg_supercheapblood") or CreateClientConVar("hg_supercheapblood", 0, true, false, "0 = advanced blood, 1 = cheapest old Z-City blood, 2 = ZCici blood (1 and 2 turn AdvancedBlood off)", 0, 2)
 local function useOldBloodParticles()
 	return hg_oldblood:GetBool() or hg_supercheapblood:GetBool()
 end
@@ -167,7 +167,7 @@ local function addLegacyBloodPart(pos, vel, mat, w, h, artery, kishki, owner, ti
 	local pos2 = Vector()
 	pos2:Set(pos)
 
-	if #hg.bloodparticles1 >= (hg_supercheapblood:GetBool() and 4000 or 600) then table.remove(hg.bloodparticles1, 1) end
+	if #hg.bloodparticles1 >= (hg_supercheapblood:GetBool() and 8000 or 600) then table.remove(hg.bloodparticles1, 1) end
 	
 	local part = {pos, pos2, vel, mat or mat_huy, w or 1, h or w or 1, CurTime(), artery = artery, kishki = kishki, owner = owner, start_velocity = IsValid(owner) and owner:GetVelocity() or vector_origin, tiny = tiny, hidden = hidden, lifetime = lifetime, maxBeamLength = maxBeamLength, volume = math.Clamp((w or 2) / 2, 0.2, 4), size = math.max(w or 1, h or w or 1, maxBeamLength or 0)}
 	hg.bloodparticles1[#hg.bloodparticles1 + 1] = part
@@ -206,7 +206,7 @@ local function addBloodPart2(pos, vel, mat, w, h, time, water, owner)
 	local pos2 = Vector()
 	pos2:Set(pos)
 	
-	if #hg.bloodparticles2 > (hg_supercheapblood:GetBool() and 1000 or 200) then table.remove(hg.bloodparticles2, 1) end
+	if #hg.bloodparticles2 > (hg_supercheapblood:GetBool() and 2000 or 200) then table.remove(hg.bloodparticles2, 1) end
 	--if water and math.random(2) == 1 then return end
 	--if water and math.random(3) > 1 then return end
 
@@ -223,7 +223,7 @@ hg.gibbloodspillparticles = hg.gibbloodspillparticles or {}
 local function addGibBloodSpill(ent, stump)
 	if not IsValid(ent) then return end
 	if LocalPlayer():GetNetVar("disappearance", nil) or ent:GetNetVar("disappearance", nil) then return end
-	if #hg.gibbloodspillparticles > (hg_supercheapblood:GetBool() and 600 or 120) then table.remove(hg.gibbloodspillparticles, 1) end
+	if #hg.gibbloodspillparticles > (hg_supercheapblood:GetBool() and 1200 or 120) then table.remove(hg.gibbloodspillparticles, 1) end
 	local vel = VectorRand(stump and -34 or -18, stump and 34 or 18) + ent:GetVelocity() * 0.04
 	vel[3] = vel[3] + (stump and Rand(18, 34) or Rand(-2, 10))
 	if hg.BloodPartRedirect and hg.BloodPartRedirect(ent:GetPos() + VectorRand(-3, 3), vel, 1, false, stump, nil) then return end

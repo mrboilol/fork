@@ -25,7 +25,7 @@ C.sv = {
 if CLIENT then
 	C.cl = {
 		enabled     = CreateClientConVar("abl_cl_enabled", "1", true, false, "Client-side AdvancedBlood simulation/rendering.", 0, 1),
-		superCheap  = ConVarExists("hg_supercheapblood") and GetConVar("hg_supercheapblood") or CreateClientConVar("hg_supercheapblood", "0", true, false, "1 = cheapest blood: old Z-City particles and decals, AdvancedBlood CPU and GPU blood off", 0, 1),
+		superCheap  = ConVarExists("hg_supercheapblood") and GetConVar("hg_supercheapblood") or CreateClientConVar("hg_supercheapblood", "0", true, false, "0 = advanced blood, 1 = cheapest old Z-City blood, 2 = ZCici blood (1 and 2 turn AdvancedBlood off)", 0, 2),
 		quality     = CreateClientConVar("abl_quality", "3", true, false, "0 = low, 1 = medium, 2 = high, 3 = ultra, 4 = extreme.", 0, 4),
 		budget      = CreateClientConVar("abl_budget_ms", "2.5", true, false, "Target CPU milliseconds per frame for the blood simulation.", 0.3, 20),
 		gpu         = CreateClientConVar("abl_gpu", "1", true, false, "Simulate floor/wall pools and relief-following trickles on the GPU with ABL's own shaders (0 = CPU pool and runoff simulation).", 0, 1),

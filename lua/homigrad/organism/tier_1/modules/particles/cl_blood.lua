@@ -21,7 +21,7 @@ local render_GetLightColor = render.GetLightColor
 
 local hg_blood_draw_distance = ConVarExists("hg_blood_draw_distance") and GetConVar("hg_blood_draw_distance") or CreateClientConVar("hg_blood_draw_distance", 1024, true, nil, "distance to draw blood", 0, 4096)
 local hg_blood_sprites = ConVarExists("hg_blood_sprites") and GetConVar("hg_blood_sprites") or CreateClientConVar("hg_blood_sprites", 1, true, nil, "blood is sprites or trails", 0, 1)
-local hg_supercheapblood = ConVarExists("hg_supercheapblood") and GetConVar("hg_supercheapblood") or CreateClientConVar("hg_supercheapblood", 0, true, false, "1 = cheapest blood: old Z-City particles and decals, AdvancedBlood CPU and GPU blood off", 0, 1)
+local hg_supercheapblood = ConVarExists("hg_supercheapblood") and GetConVar("hg_supercheapblood") or CreateClientConVar("hg_supercheapblood", 0, true, false, "0 = advanced blood, 1 = cheapest old Z-City blood, 2 = ZCici blood (1 and 2 turn AdvancedBlood off)", 0, 2)
 
 function hg.ResetBloodDecals()
 	hg.cheapBloodPools = {}
@@ -69,6 +69,7 @@ end)
 local mat_huy = Material("effects/blood_core")
 local lightcolor = Color(0, 0, 0, 255)
 bloodparticles_hook[1] = function(anim_pos, mul)
+	if hg_supercheapblood:GetInt() == 2 then return ZCBlood.DrawDrops(anim_pos, mul) end
 	local distance = hg_blood_draw_distance:GetInt()
 	local distanceSqr = distance * distance
 	local eyePos, eyeForward = EyePos(), EyeAngles():Forward()
@@ -262,7 +263,7 @@ local function placeCheapBloodDecal(pos, normal, target, artery, amount, particl
 end
 
 hg.cheapBloodPools = hg.cheapBloodPools or {}
-local cheapPoolMax = 384
+local cheapPoolMax = 768
 local cheapPoolTrace = {mask = MASK_SOLID_BRUSHONLY}
 
 local function cheapPoolDiameter(volume)
@@ -322,7 +323,7 @@ function hg.DepositBodyBloodRunoff(pos, amount, artery, particleSize)
 	poolTrace.endpos = pos - vector_up * 256
 	local result = util_TraceLine(poolTrace)
 	if result.HitWorld and result.HitNormal.z >= 0.55 then
-		if hg_supercheapblood:GetBool() then
+		if hg_supercheapblood:GetInt() == 1 then
 			placeCheapPooledDecal(result.HitPos, result.HitNormal, nil, artery, amount or 0.2, particleSize)
 			return
 		end
@@ -377,7 +378,7 @@ local function decalBlood(pos, normal, tr, artery, owner, tiny, amount, particle
 		return
 	end
 
-	if hg_supercheapblood:GetBool() then
+	if hg_supercheapblood:GetInt() == 1 then
 		placeCheapPooledDecal(pos, normal, IsValid(tr.Entity) and tr.Entity or nil, artery, amount, particleSize)
 		if not tiny or math.random(7) == 1 then playBloodDripImpact(pos, tr) end
 		return
@@ -439,6 +440,7 @@ hook.Add("InitPostEntity", "sizeget", function()
 end)
 
 bloodparticles_hook[2] = function(mul)
+	if hg_supercheapblood:GetInt() == 2 then return ZCBlood.Physics(mul) end
 	local grav = gravity:GetInt() / 10
     local time = CurTime()
 	local gravvec = vecDown * mul * (math.max(0.0, grav))

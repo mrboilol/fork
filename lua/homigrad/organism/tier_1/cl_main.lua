@@ -1075,7 +1075,7 @@ local function getHeartbeatLift(org, index)
 	return math.sin(phase / 0.32 * math.pi) * 2 - 1
 end
 
-local hg_supercheapblood = ConVarExists("hg_supercheapblood") and GetConVar("hg_supercheapblood") or CreateClientConVar("hg_supercheapblood", 0, true, false, "1 = cheapest blood: old Z-City particles and decals, AdvancedBlood CPU and GPU blood off", 0, 1)
+local hg_supercheapblood = ConVarExists("hg_supercheapblood") and GetConVar("hg_supercheapblood") or CreateClientConVar("hg_supercheapblood", 0, true, false, "0 = advanced blood, 1 = cheapest old Z-City blood, 2 = ZCici blood (1 and 2 turn AdvancedBlood off)", 0, 2)
 
 local function emitCheapBleeding(ent, org, pos, ang, visualRate, interval, artery)
 	local volume = math.min(visualRate * interval, 8)
@@ -1460,9 +1460,9 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 						else
 							local bleeding = math.max(tonumber(wound[1]) or 0, 0.5)
 							local interval = wound.vessel == "jugular" and math.Rand(0.05, 0.08) or math.Clamp(15 / bleeding * math.Rand(0.5, 1), 0.05, 12)
-							if hg_supercheapblood:GetBool() then interval = math.max(interval, 0.15) end
+							if hg_supercheapblood:GetInt() == 1 then interval = math.max(interval, 0.15) end
 							if not (hg.BandageAbsorbBlood and hg.BandageAbsorbBlood(ent, bone, visualRate * interval)) then
-								if hg_supercheapblood:GetBool() then
+								if hg_supercheapblood:GetInt() == 1 then
 									emitCheapBleeding(ent, org, pos, ang, visualRate, interval, false)
 								else
 									emitOrdinaryBleeding(ent, org, wound, pos, ang, visualRate, interval)
@@ -1503,7 +1503,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 							wound.nextVisualBleed = time + interval
 							continue
 						end
-						if hg_supercheapblood:GetBool() then
+						if hg_supercheapblood:GetInt() == 1 then
 							if water then
 								hg.addBloodPart2(pos, VectorRand(-5, 5), nil, nil, nil, nil, true, ent)
 								wound.nextVisualBleed = time + 2
